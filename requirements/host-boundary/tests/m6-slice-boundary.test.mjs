@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readOwnerProjectInventoryV1 } from '../../../scripts/checks/owner-projects.mjs'
+import { readCompileShardInventoryV1 } from '../../../scripts/lib/compile-shards.mjs'
 import * as HostSignalSurface from '../../../dist/OpenCode/Host/HostSignalSurface.js'
 import { assertEffectIsInjected, assertFatalBoundary, assertOptionalObservationNoninterference, assertPureContract } from '../../structured-workflow/tests/support/m6-boundary-proof.mjs'
 
@@ -18,7 +18,7 @@ test('WHAT[HOST-BOUNDARY-027] Host message loop and envelope slices reject the o
 })
 
 test('WHAT[HOST-BOUNDARY-027] production inventory closes Host codec audiences without the wide signal adapter', () => {
-  const inventory = readOwnerProjectInventoryV1()
+  const inventory = readCompileShardInventoryV1()
   const envelope = locality(inventory, 'host-event-envelope')
   const message = locality(inventory, 'host-message-codec')
   const loop = locality(inventory, 'loop-event-codec')
@@ -89,7 +89,7 @@ test('WHAT[HOST-BOUNDARY-030] Host envelope rejects adjacent malformed event and
 })
 
 test('WHAT[HOST-BOUNDARY-028] typed subscription and diagnostic injection preserve one failure owner', async () => {
-  const inventory = readOwnerProjectInventoryV1()
+  const inventory = readCompileShardInventoryV1()
   const adapter = locality(inventory, 'host-signal-adapter')
   const composition = locality(inventory, 'opencode-host-hostsignalbootstrap')
 
@@ -107,7 +107,7 @@ test('WHAT[HOST-BOUNDARY-029] fatal vocabulary stays pure and physical execution
 })
 
 test('WHAT[HOST-BOUNDARY-031] RootWorkspace runtime is private and every observer consumes only the typed contract', () => {
-  const inventory = readOwnerProjectInventoryV1()
+  const inventory = readCompileShardInventoryV1()
   const contract = locality(inventory, 'host-root-workspace-contract')
   const runtime = locality(inventory, 'host-root-workspace-runtime')
 

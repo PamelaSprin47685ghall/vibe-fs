@@ -4,12 +4,13 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { readCompileShardInventory } from '../lib/compile-shards.mjs'
 import { buildTraceGraph } from '../lib/requirement-trace.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 export const DEFAULT_MANIFEST = resolve(HERE, 'authority-contracts.json')
-const SEMANTIC_OWNERS = resolve(HERE, 'semantic-owners.json')
 const REQUIREMENTS = resolve(HERE, '../../requirements')
+const REPOSITORY_ROOT = resolve(HERE, '../..')
 export const AUTHORITY_CLASSES = Object.freeze([
   'Evidence',
   'Decision',
@@ -25,11 +26,17 @@ const escapeRe = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 let canonicalRegistry
 const authorityRegistry = () => {
   if (canonicalRegistry) return canonicalRegistry
-  const semanticOwners = JSON.parse(readFileSync(SEMANTIC_OWNERS, 'utf8'))
+  const shardInventory = readCompileShardInventory({ repositoryRoot: REPOSITORY_ROOT })
+  const owners = new Set()
+  const ownership = new Map()
+  for (const [sourcePath, project] of shardInventory.sourceProject) {
+    if (project.legacyOwner) owners.add(project.legacyOwner)
+    ownership.set(norm(relative(REPOSITORY_ROOT, sourcePath)), project.legacyOwner || project.explicitSubsystem)
+  }
   const trace = buildTraceGraph(REQUIREMENTS)
   canonicalRegistry = {
-    owners: new Set(semanticOwners.owners ?? []),
-    ownership: new Map((semanticOwners.ownership ?? []).map((entry) => [norm(entry.path), entry.owner])),
+    owners,
+    ownership,
     whats: trace.whats,
   }
   return canonicalRegistry

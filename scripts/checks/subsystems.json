@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "subsystems": [
+    { "id": "authority", "legacy_owners": ["interaction-authority"] },
+    { "id": "change", "legacy_owners": ["change-integration"] },
+    { "id": "chat-execution", "legacy_owners": ["execution-failure-policy", "managed-chat-execution"] },
+    { "id": "context", "legacy_owners": ["context-compression", "prefix-stability", "semantic-trace"] },
+    { "id": "delegation", "legacy_owners": ["delegation", "intra-participant-parallelism", "participant-horizon"] },
+    { "id": "dispatch", "legacy_owners": ["dispatch-protocol"] },
+    { "id": "enforcer", "legacy_owners": ["behavior-diagnosis", "degeneration-guard", "institutional-learning"] },
+    { "id": "host", "legacy_owners": ["host-boundary"] },
+    { "id": "interaction", "legacy_owners": ["action-affordance", "attention-regulation", "capability-enforcement", "concern-routing", "guidance-delivery"] },
+    { "id": "knowledge", "legacy_owners": ["knowledge-reuse"] },
+    { "id": "output", "legacy_owners": ["output-distillation"] },
+    { "id": "participant", "legacy_owners": ["participant-identity"] },
+    { "id": "persistence", "legacy_owners": ["durable-convergence", "durable-events"] },
+    { "id": "process", "legacy_owners": ["process-execution"] },
+    { "id": "provider", "legacy_owners": ["execution-model-routing", "host-provider-failure-ownership", "provider-attempt-recovery", "provider-language", "provider-projection"] },
+    { "id": "relay", "legacy_owners": ["office-capability", "relay-assessment", "relay-context-projection", "relay-incumbency", "relay-retirement"] },
+    { "id": "repository-investigation", "legacy_owners": ["repository-investigation"] },
+    { "id": "repository-programming", "legacy_owners": ["repository-programming"] },
+    { "id": "requirements", "legacy_owners": ["requirement-grounding"] },
+    { "id": "resources", "legacy_owners": ["cognitive-environment", "distribution"] },
+    { "id": "runtime-platform", "legacy_owners": ["causal-wait", "time-capability"] },
+    { "id": "session-lifecycle", "legacy_owners": ["managed-session-lifecycle", "session-ontology"] },
+    { "id": "sphinx", "legacy_owners": ["epistemic-reasoning", "external-investigation"] },
+    { "id": "strength", "legacy_owners": ["speculative-investigation"] },
+    { "id": "verification", "legacy_owners": ["verification-system"] },
+    { "id": "work", "legacy_owners": ["obligation-ledger", "work-record"] }
+  ]
+}

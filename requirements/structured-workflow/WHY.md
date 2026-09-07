@@ -1,53 +1,39 @@
 # structured-workflow — WHY
 
-## 不可替代的存在理由
+`WHAT.md` 是唯一 normative 合同。本文只解释为什么架构治理收敛为 `subsystem -> compile shard -> source`。
 
-宿主编程语言的调用栈已经为业务流程提供了全部结构化边界：
-- `let!` / `await` 表达异步等待事实或效果；
-- `do!` 表达执行副作用；
-- `match` / `match!` 表达条件分支；
-- `return!` 表达继续与有界递归；
-- `use!` / `try-finally` 表达确定性的资源作用域与清理。
+## 为什么只保留 subsystem
 
-如果为了管理流程而将「程序下一步走到哪」重新编码为可持久化存储的字段（如 `CurrentStage`、`NextAction`、`InFlight`、`Parked`、`Sealed`），等于在业务层手工再造一个**第二运行时（second runtime）**。这种手写运行时会带来灾难性代价：
-1. **虚假恢复**：执行位置（调用栈）是不可直接序列化的。试图恢复手写状态机的「程序计数器（PC）」往往导致在错误的历史基座上恢复，或丢失真实的执行上下文。
-2. **测试退化**：测试被迫断言内部状态枚举或私有字段，而不是验证可观察的业务效果与持久事实，使验证体系丧失对真实行为的保真度。
-3. **状态空间爆炸**：多个 stage/bool/option 字段的正交组合导致系统存在大量无业务意义的非法状态，类型系统不仅无法拦截，反而被迫为其兜底。
+过去同时维护 semantic owner、locality、fsproj、slice、exposure、audience、manifest 与 adjudication。每层单看都有理由，叠加后却产生第二套产品：维护者必须先理解治理模型，才能修改业务代码；而大量细项目仍没有换来稳定的 change locality。
 
-`structured-workflow` 的核心存在理由是：**确立「控制流不是领域状态」的铁律，强制业务流程直接由宿主语言原生语法结构表达，彻底消灭手写的第二运行时。**
+Subsystem 回答唯一值得人工治理的问题：**哪一组知识、决策、不变量、失败语义与外部合同可以整体理解、整体替换？** 重构、重写、删除、任务分工与验收只以 subsystem 为单位。一个 subsystem 内部可以有很多 compile shard，但 shard 不拥有新的业务身份。
 
-## 核心张力与架构哲学
+## 为什么 compile shard 仍然可以很细
 
-- **直执而不是解释（Direct CE over Interpreter）**：领域 DSL 由 CE（Computation Expression）与具名语义操作直接构成并直接执行，严禁构造内部 AST 后再通过通用解释器进行重放或轮询驱动。
-- **状态标签仅表达真实事物**：DU（联合类型）与字段仅用于表达封闭领域词汇、DurableFact、Evidence/Decision、ExternalSignal、Witness、Capability、Receipt 或 PhysicalHandle，严禁充当程序计数器。同名协议碰撞必须正向分类，路径不提供豁免。
-- **组合具有结构闭包（Compositional Closure）**：父 workflow 组合子 workflow 时，只能观察子流程的类型化输入、领域结果与能力证明，严禁读取、存储或驱动子流程的内部执行位置；此约束跨 module/callback 仍成立。
-- **高阶 trace 必须可解释**：once-through scope 可透明组合；retry/fallback/recovery/deadline 等重复或恢复路径调用必须由 owner law、明确 trace relation 与可执行证明约束其 failure/cancel/deadline 行为，不能藏进 generic middleware。
-- **root 宽而浅**：composition root 可看见大量 construction/topology/order/lifetime wiring，但不得因此拥有 foreign policy；深语义必须回到 owner，不能以 LOC/import-count 代替语义审查。
-- **以可观察效果证明流程**：流程的正确性完全由领域事实、端口交互、调用 trace 与最终状态证明，不由内部解释器运行到了哪一步来定义。
-- **依赖必须穿过 locality 海关**：编译引用只说明实现依赖，requirement 引用只说明命题前提；两张图不可混同。任意两个不同 locality 之间的生产依赖必须落到 provider slice grant、physical port/adapter 或 composition-root wiring；same-owner 不豁免。owner 管语义，locality 管编译身份，slice 管能力授权。
-- **语义豁免必须消费真实 production proof edge**：执行位置词汇的 semantic-evidence 豁免只能引用 `requirement-trace` 已解析的唯一 active `(path,title,WHAT)` 边，并绑定该 test callback 实际可达使用的 exact registered Surface。文件存在、注释、字符串、skip/todo、同 WHAT 的无关测试或仅在文件其他 callback 使用 production 都不能授权架构边。
-- **F# 边界交给工程图、签名与编译器，不再自建 FCS 扫描器**：semantic owner 负责命题与业务承诺；production file 另有恰一个稳定 locality，每个 locality 恰一个 fsproj。ProjectReference 声明编译输入与归属，`.fsi` 界定公开面，正常 Fable 编译与定向反例证明签名及 private 可见性。`Wanxiangshu.fsproj` 只作为扁平 emitter，不参与授权 topology；Fable source-merge 不是独立 assembly firewall，manifest 不得声称编译器不能兑现的 per-symbol/per-owner ACL。独立 FCS 全仓遍历、symbol/typed-AST 分类、缓存复用与所谓轻量 report 都引入第二套编译知识和昂贵重复工作，全仓禁止；fixture 也不例外。正常 Fable 内部使用 compiler service 不等于允许仓库调用它另做扫描。
-- **slice 按 authority 与共同 audience 划界**：同 owner、同目录、同为纯类型不等于同一 contract slice。一个 slice 内的全部 `.fsi` export 对其完整 effective audience 可见；若该事实不可接受，就拆 slice。private 禁止外部 locality 到达；shared 只能承载无 authority 的不可变词汇与纯函数；bounded 必须限制传递 audience；effect implementation 只能由 composition 到达。
-- **物理能力必须独居**：文件、进程、网络等 Host API 是 capability，不是相邻 policy module 的便利 helper。物理 port 必须只有一份 import、独立 signed adapter locality、精确公开实际调用的方法；consumer adapter 只获得它声明的 port。把文件删除能力塞进 tool-policy contract，或在另一个 consumer 内复制第二套 import，会让无关 cohort 获得未登记副作用并制造两个物理 owner。
-- **观测先于声明，证据不越界**：locality kind、exposure、grant、relation 与 annotation 都是待验证 claim，不能决定源码里存在什么能力。显式 interop 与 JavaScript 的非 FCS observation 进入唯一 canonical world，`C(W)` 与 JavaScript AST traversal `J(W)` 分开闭合；F# visibility 由签名编译证明，F# 业务语义由 owner 行为 proof 证明。不得要求 typed-AST census，也不得在删除扫描器后用空 evidence 冒充原有完整性证明。
-- **生成物必须绑定来源**：deterministic 只证明相同输入产生相同 bytes，不证明 bytes 无 authority。repository-generated module 必须同时绑定 output digest、selector 实际读取的 input digest、generator/build/selector lineage、package import linkage 与完整 AST traversal；fact 只引用唯一 artifact identity，禁止复制 linkage 形成第二事实源。
-- **裁决必须绑定同一世界**：migration worksheet 只帮助施工，不能授权；formal adjudication 只冻结 M6.4 cutover 的同一 staged input。canonical encoder、world/query/index digest 与 tracking reader共同防止“扫描一棵树、提交另一棵树”，但冻结快照不得在 cutover 后继续充当 live authority。
-- **Oracle不得同源自证**：classifier输出不能由caller任意替换后仅重算ID，visitor输出不能回填成自身expected，测试不得以production不会产生的镜像row证明正式schema。每个安全结论必须由另一条canonical事实链或定向mutation约束；否则“完整闭集”只是相同遗漏的两次复述。
-- **局部编译只改变输入集合，不改变编译器模型**：owner/impact compile 先计算 ProjectReference closure 或 reverse-consumer impact，再按 aggregate source order 合并成一个零 ProjectReference flat fsproj，仅启动一次 Fable。实现 `.fs` 且 sibling `.fsi` 未变时不重编普通 consumer；`.fsi` 改动必须纳入全部 reverse consumers；工程/工具链输入变化保守走 full flat build。全量 release 继续编译与原始单工程完全相同的 source/config union，绝不逐 owner 启动 Fable，因此多工程边界不能给全量构建叠加工程图税。
+增量编译需要比业务治理更细的机械边界。稳定 `.fsi`、小 ProjectReference closure 和独立 adapter 能减少 implementation-only 修改的影响集合；这些收益不要求再创造 semantic owner。compile shard 应像函数内局部变量一样可调整：有收益就拆，无收益就合，不改变系统架构词汇。
 
-## 核心不变量与违约状态（RED）
+因此：
 
-仓库处于 RED 状态，当且仅当出现以下任一破坏结构化工作流的违约：
-1. 领域模型或持久记录中包含表达程序下一步去向的字段（程序计数器）。
-2. 业务层引入 Command/Reply 总线、Step continuation AST 或调用序列回放解释器。
-3. 崩溃恢复尝试恢复协程内部指针或暂停点，而非通过 Journal fold 产生事实后重入普通业务入口。
-4. 控制流决策形成第二层及更深的嵌套控制金字塔（lexical pyramid），手写短路样板而未使用标准的 Result/Option 组合子。
-5. 模块接缝处暴露内部阶段或运行槽位，导致父模块需要探测子模块状态以驱动下一步业务动作。
-6. 使用无界并发或无界重试作为业务流程的默认行为，或把 repeated/recovery-path invocation 藏进无 owner/WHAT/relation/proof/policy 的 decorator。
-7. 任意其他 locality 直接读取 private implementation、Stage/Step/cursor/registry presence，或 composition root 匹配 foreign policy DU。
-8. composition root 实现深层 semantic helper、动态 pipeline 或 generic middleware/decorator interface。
-9. semantic-evidence 通过裸 proof 路径、源码字符串、错误 owner 的 WHAT，或未被 exact test callback 可达使用的 Surface 取得跨 locality 授权。
-10. capability observation、disposition 或 JavaScript AST visit 集合缺失、重复、碰撞或含未知项，导致源码能力未进入唯一 canonical fact set。
-11. generated artifact 的 output/input digest、lineage、package linkage、traversal 或fact reference任一缺失/漂移，或以 `RuntimeV1.Node` 标签代替真实 authority 判定。
-12. cutover 读取未绑定 stage-0 的 repository bytes、按扩展名猜 input closure、容忍 unstaged/untracked/dynamic input，或让 worksheet/frozen snapshot取得 live release authority。
-13. 任一仓库脚本、门禁、测试、报告或 CI 自建 FCS 扫描，或以全量/局部、fixture、report-only、snapshot/cache/evidence 复用为例外重新引入；把仍存在的扫描实现或旧扫描测试登记成合法验收。
+```text
+人类架构：Subsystem A -> Subsystem B
+构建实现：A/a1 -> A/a2 -> B/b1 -> ...
+源码：每个 .fs 恰属于一个 shard，进而恰属于一个 subsystem
+```
+
+## 为什么依赖倒置比 ACL 更重要
+
+真正的解耦来自依赖方向，不来自授权表。若业务 consumer 为取得一个小类型而依赖一个同时携带 registry、factory、codec、并行工具和其他领域事实的大 project，再精细的 manifest 也没有把知识拆开。
+
+正确做法是先按 reason-to-change 分离知识，再让 consumer 只依赖所需的窄 contract/port。通用平台原语必须不认识 Session、Provider、Git、Relay 等领域概念；物理 adapter 依赖外界，业务依赖 capability port。这样编译边界与认知边界同时缩小。
+
+## 当前迁移如何判断进展
+
+不以 shard 数量、owner 数量或目录整齐程度衡量。关注：
+
+- subsystem SCC 是否缩小；
+- ordinary change 是否更常落在 1 个 subsystem；
+- shared gravity well 的 reverse closure 是否下降；
+- 一个 subsystem 是否能只凭 public contract + proof 被替换；
+- compile shard 拆分是否真的减少依赖，而不是把同一宽依赖改名。
+
+第一批拆分因此选择 `Foundation.Identity` 与 `foundation-taskresult`：把 Outcome、Nudge、MetadataCodec、CanonicalJson、Parallel、AsyncSupport 与 Fission facts 从历史大包中分离，使依赖方直接取得所需知识，而不是补一轮新 ACL。

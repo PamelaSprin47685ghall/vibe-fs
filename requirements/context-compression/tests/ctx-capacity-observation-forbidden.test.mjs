@@ -11,13 +11,15 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
+import { readCompileShardInventory } from '../../../scripts/lib/compile-shards.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 const NEXT_DIR = path.join(ROOT, 'src', 'Wanxiangshu')
-const ownerManifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts', 'checks', 'semantic-owners.json'), 'utf8'))
-const files = ownerManifest.ownership
-  .filter(({ owner }) => owner === 'context-compression')
-  .map(({ path: sourcePath }) => path.join(ROOT, sourcePath))
+const inventory = readCompileShardInventory({ repositoryRoot: ROOT })
+const files = [...inventory.projects.values()]
+  .filter((project) => project.legacyOwner === 'context-compression')
+  .flatMap((project) => project.implementationFiles)
+  .sort()
 
 test('WHAT[CONTEXT-COMPRESSION-001] CTX_001_context_compression_owner_never_observes_forbidden_capacity_synonyms', () => {
   // CTX-001's exact forbidden vocabulary, with one allowed exception: the

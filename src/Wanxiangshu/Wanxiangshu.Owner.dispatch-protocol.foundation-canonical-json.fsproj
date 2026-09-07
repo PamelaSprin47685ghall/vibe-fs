@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>dispatch-protocol</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>foundation-canonical-json</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuSubsystem>runtime-platform</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>canonical-json</WanxiangshuCompileShard>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Foundation/CanonicalJson.fsi"/>
+    <Compile Include="Foundation/CanonicalJson.fs"/>
+    <Compile Include="OpenCode/Codec/CanonicalJsonSurface.fsi"/>
+    <Compile Include="OpenCode/Codec/CanonicalJsonSurface.fs"/>
+  </ItemGroup>
+</Project>

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { readOwnerProjectInventoryV1 } from '../../../scripts/checks/owner-projects.mjs'
+import { readCompileShardInventoryV1 } from '../../../scripts/lib/compile-shards.mjs'
 import { assertOpaque } from '../../verification-system/tests/support/js-contract.mjs'
 import { assertEffectIsInjected, assertPureContract } from '../../structured-workflow/tests/support/m6-boundary-proof.mjs'
 
@@ -23,7 +23,7 @@ const consumersOf = (inventory, id) => inventory.localities
   .sort()
 
 test('WHAT[TIME-008] production inventory separates contracts adapter verification and representation', () => {
-  const inventory = readOwnerProjectInventoryV1()
+  const inventory = readCompileShardInventoryV1()
   const capability = locality(inventory, 'foundation-temporal-contract')
   const deadlineContract = locality(inventory, 'process-deadline-contract')
   const projection = locality(inventory, 'execution-session-sessionstartedatprojection')
@@ -47,11 +47,11 @@ test('WHAT[TIME-008] production inventory separates contracts adapter verificati
     'src/Wanxiangshu/Process/Surface.fs',
   ])
   assert.deepEqual(nodeAdapter.references, [
-    'foundation-taskresult',
+    'foundation-async-support',
     'foundation-temporal-contract',
   ])
   assert.deepEqual(virtualImplementation.references, [
-    'foundation-taskresult',
+    'foundation-async-support',
     'foundation-temporal-contract',
   ])
   for (const id of [

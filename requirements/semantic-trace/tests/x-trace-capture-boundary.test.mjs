@@ -52,28 +52,24 @@ test('WHAT[SEMANTIC-TRACE-008] no generic fact or full-history fold crosses the 
   }
 })
 
-test('WHAT[SEMANTIC-TRACE-008] published trace contract contains exact implementation vocabulary', () => {
-  const registry = JSON.parse(
-    readFileSync(new URL('../../../scripts/checks/published-contracts.json', import.meta.url), 'utf8'),
-  )
-  const rows = registry.contracts.filter((entry) => entry.contract === 'SemanticTrace.Contract')
-  assert.ok(rows.length > 0)
-  assert.ok(rows.every((row) => row.symbols.every((symbol) => !symbol.includes('*'))))
-  const published = new Set(rows.flatMap((row) => row.symbols))
-  for (const [ownerType, field] of [
-    ['XTraceProjectionState', 'Opening'],
-    ['XTraceProjectionState', 'Parts'],
-    ['XTraceProjectionState', 'Terminals'],
-    ['XTraceCursor', 'Sequence'],
-  ]) assert.equal(published.has(['Wanxiangshu.Context.Trace', ownerType, field].join('.')), false)
+test('WHAT[SEMANTIC-TRACE-008] signed trace contracts expose operations while keeping projection state opaque', () => {
+  const projection = readFileSync(new URL('../../../src/Wanxiangshu/Context/Trace/Projection.fsi', import.meta.url), 'utf8')
+  const cursor = readFileSync(new URL('../../../src/Wanxiangshu/Context/Trace/Cursor.fsi', import.meta.url), 'utf8')
+  const capture = readFileSync(new URL('../../../src/Wanxiangshu/Context/Trace/Capture.fsi', import.meta.url), 'utf8')
+  const terminal = readFileSync(new URL('../../../src/Wanxiangshu/Context/Trace/TerminalReporter.fsi', import.meta.url), 'utf8')
+
+  assert.match(projection, /type XTraceProjectionState =\s*private/)
+  assert.match(cursor, /^type XTraceCursor$/m)
   for (const operation of [
-    'Wanxiangshu.Context.Trace.XTraceProjection.orderedSemanticParts',
-    'Wanxiangshu.Context.Trace.XTraceProjection.currentGenerationSemanticParts',
-    'Wanxiangshu.Context.Trace.XTraceProjection.tryContiguousHostRange',
-    'Wanxiangshu.Context.Trace.XTraceProjection.hasSemanticParts',
-    'Wanxiangshu.Context.Trace.XTraceCapture.captureSessionMessagesWithReceipt',
-    'Wanxiangshu.Context.Trace.XTraceCapture.captureObservedMessagesWithReceipt',
-    'Wanxiangshu.Context.Trace.XTraceCapture.stableCaptureEligibility',
-    'Wanxiangshu.Context.Trace.TerminalReporter.completeWithEvidence',
-  ]) assert.equal(published.has(operation), true, `${operation} must be published`)
+    'orderedSemanticParts',
+    'currentGenerationSemanticParts',
+    'tryContiguousHostRange',
+    'hasSemanticParts',
+  ]) assert.match(projection, new RegExp(`\\b${operation}:`), `${operation} must be signed`)
+  for (const operation of [
+    'captureSessionMessagesWithReceipt',
+    'captureObservedMessagesWithReceipt',
+    'stableCaptureEligibility',
+  ]) assert.match(capture, new RegExp(`\\b${operation}:`), `${operation} must be signed`)
+  assert.match(terminal, /\bcompleteWithEvidence:/)
 })

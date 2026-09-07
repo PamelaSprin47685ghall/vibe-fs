@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>intra-participant-parallelism</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>execution-fission-facts</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuSubsystem>delegation</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>fission-facts</WanxiangshuCompileShard>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <Compile Include="Execution/Fission/Facts.fsi"/>
+    <Compile Include="Execution/Fission/Facts.fs"/>
+  </ItemGroup>
+</Project>

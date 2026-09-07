@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>dispatch-protocol</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>interaction-dispatch-metadata-codec</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuSubsystem>dispatch</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>prompt-metadata-codec</WanxiangshuCompileShard>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <Compile Include="Interaction/Dispatch/OpenCode/MetadataCodec.fsi"/>
+    <Compile Include="Interaction/Dispatch/OpenCode/MetadataCodec.fs"/>
+  </ItemGroup>
+</Project>

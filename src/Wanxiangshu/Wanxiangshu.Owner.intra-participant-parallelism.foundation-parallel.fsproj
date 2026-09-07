@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>intra-participant-parallelism</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>foundation-parallel</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuSubsystem>runtime-platform</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>bounded-parallel</WanxiangshuCompileShard>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Foundation/Parallel.fsi"/>
+    <Compile Include="Foundation/Parallel.fs"/>
+    <Compile Include="Foundation/ParallelSurface.fsi"/>
+    <Compile Include="Foundation/ParallelSurface.fs"/>
+  </ItemGroup>
+</Project>

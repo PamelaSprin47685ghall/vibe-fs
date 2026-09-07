@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>dispatch-protocol</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>interaction-dispatch-nudge</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuSubsystem>dispatch</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>runtime-nudge</WanxiangshuCompileShard>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Interaction/Dispatch/Nudge.fsi"/>
+    <Compile Include="Interaction/Dispatch/Nudge.fs"/>
+  </ItemGroup>
+</Project>

@@ -5,7 +5,7 @@
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    
     <Compile Include="Participant/Provider/Attempt/RequestKind.fsi"/>
     <Compile Include="Participant/Provider/Attempt/RequestKind.fs"/>
   </ItemGroup>

@@ -4,80 +4,38 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
-import {
-  checkOwnerProjects,
-  projectArchitectureViolations,
-  validateProjectContractEvidence,
-} from '../../../scripts/checks/owner-projects.mjs'
-import { buildTraceGraph } from '../../../scripts/lib/requirement-trace.mjs'
+import { checkSubsystems } from '../../../scripts/checks/subsystems.mjs'
 import { planOwnerCompile, materializeOwnerCompile, compileOwnerProject } from '../../../scripts/lib/owner-compile.mjs'
 
 const ROOT = resolve(import.meta.dirname, '../../..')
 const SRC = join(ROOT, 'src/Wanxiangshu')
 const FIXTURE = join(ROOT, 'requirements/structured-workflow/tests/fixtures/owner-project-boundary')
 
-test('WHAT[STRUCTURED-WORKFLOW-011] flattened Fable emitter mirrors owner-locality source coverage', () => {
+test('WHAT[STRUCTURED-WORKFLOW-011] flattened Fable emitter mirrors compile-shard source coverage', () => {
   const rootProject = readFileSync(join(SRC, 'Wanxiangshu.fsproj'), 'utf8')
   assert.match(rootProject, /<WanxiangshuEmitProject>true<\/WanxiangshuEmitProject>/)
   assert.doesNotMatch(rootProject, /<ProjectReference Include=/, 'emit project must not source-merge owner project graph')
 
-  const ownerProjects = readdirSync(SRC).filter((name) => /^Wanxiangshu\.Owner\..+\.fsproj$/.test(name))
-  assert.ok(ownerProjects.length > 1, '57.15 requires independent owner-locality projects')
+  const ownerProjects = readdirSync(SRC).filter((name) => /^Wanxiangshu\.(?:Owner|Shard)\..+\.fsproj$/.test(name))
+  assert.ok(ownerProjects.length > 1, 'compile-shard graph requires independent projects')
 
   for (const project of ownerProjects) {
     const xml = readFileSync(join(SRC, project), 'utf8')
-    assert.match(xml, /<WanxiangshuSemanticOwner>[^<]+<\/WanxiangshuSemanticOwner>/)
-    assert.match(xml, /<WanxiangshuOwnerLocality>[^<]+<\/WanxiangshuOwnerLocality>/)
+    assert.match(xml, /<Compile Include="[^"]+\.fs"\s*\/>/)
   }
 
   const props = readFileSync(join(SRC, 'Directory.Build.props'), 'utf8')
   assert.match(props, /<DisableTransitiveProjectReferences>true<\/DisableTransitiveProjectReferences>/)
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] owner-locality project graph is complete, authorized, and acyclic', () => {
-  const result = checkOwnerProjects()
+test('WHAT[STRUCTURED-WORKFLOW-011] subsystem ownership and compile-shard graph are complete and acyclic', () => {
+  const result = checkSubsystems()
   assert.equal(result.ok, true, result.violations.join('\n'))
-  assert.ok(result.sourceCount > 0, 'owner-locality graph must cover production sources')
-  assert.equal(result.contractLeakSourceCount, 0, 'published contract compile closure must contain no runtime/private source')
+  assert.ok(result.sourceCount > 0, 'compile-shard graph must cover production sources')
+  assert.ok(result.subsystemCount >= 15 && result.subsystemCount <= 35, 'subsystems must stay at human governance scale')
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] owner-project authorization rejects a comment-only semantic proof independently', () => {
-  const result = validateProjectContractEvidence(
-    {
-      contracts: [
-        {
-          path: 'src/Wanxiangshu/ExternalInvestigation/Cursor.fs',
-          owner: 'external-investigation',
-          kind: 'semantic-evidence',
-          consumers: ['consumer'],
-          symbols: ['Wanxiangshu.ExternalInvestigation.Cursor.current'],
-          law: 'WHAT[EXTERNAL-INVESTIGATION-010]',
-          proof: {
-            path: 'requirements/external-investigation/tests/browser-provenance-canary.test.mjs',
-            title: 'WHAT[EXTERNAL-INVESTIGATION-010] browser_is_the_only_network_office',
-            what_id: 'EXTERNAL-INVESTIGATION-010',
-          },
-        },
-      ],
-    },
-    buildTraceGraph(join(ROOT, 'requirements')),
-  )
-
-  assert.equal(result.contractManifest.contracts.length, 0)
-  assert.match(result.violations.join('\n'), /invalid-semantic-evidence-metadata/)
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-011] GitGateway exact contract has an isolated compiler boundary', () => {
-  const contracts = JSON.parse(readFileSync(join(ROOT, 'scripts/checks/published-contracts.json'), 'utf8'))
-  const contract = contracts.contracts.find((entry) => entry.path === 'src/Wanxiangshu/Git/Gateway.fs')
-  assert.ok(contract)
-  assert.deepEqual(contract.consumers, ['durable-convergence'])
-  assert.deepEqual(contract.symbols, [
-    'Wanxiangshu.Git.GitGateway.converge',
-    'Wanxiangshu.Git.GitGateway.createDefaultRunner',
-    'Wanxiangshu.Git.GitGatewayRunner',
-  ])
-
+test('WHAT[STRUCTURED-WORKFLOW-013] GitGateway exposes a narrow dependency-inverted compiler boundary', () => {
   const providerName = 'Wanxiangshu.Owner.change-integration.git-gateway.fsproj'
   const provider = readFileSync(join(SRC, providerName), 'utf8')
   assert.match(provider, /<WanxiangshuOwnerLocality>git-gateway<\/WanxiangshuOwnerLocality>/)
@@ -92,9 +50,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] GitGateway exact contract has an isolated co
   assert.doesNotMatch(signature, /SyncActiveEnv|discoverRemote/)
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] NodeFs physical port and tool contracts have isolated compiler boundaries', () => {
-  const manifest = JSON.parse(readFileSync(join(ROOT, 'scripts/checks/published-contracts.json'), 'utf8'))
-  const contractAt = (path) => manifest.contracts.find((entry) => entry.path === path)
+test('WHAT[STRUCTURED-WORKFLOW-014] NodeFs physical port and tool contracts have isolated compiler boundaries', () => {
   const compileItems = (projectName) =>
     [...readFileSync(join(SRC, projectName), 'utf8').matchAll(/<Compile Include="([^"]+)"\s*\/>/g)].map(
       ([, path]) => path,
@@ -103,52 +59,6 @@ test('WHAT[STRUCTURED-WORKFLOW-011] NodeFs physical port and tool contracts have
     [...readFileSync(join(SRC, projectName), 'utf8').matchAll(/<ProjectReference Include="([^"]+)"\s*\/>/g)].map(
       ([, path]) => path,
     )
-
-  assert.deepEqual(contractAt('src/Wanxiangshu/OpenCode/Tools/ManagedAgent.fs')?.consumers, [
-    'capability-enforcement',
-    'change-integration',
-    'context-compression',
-    'delegation',
-    'execution-model-routing',
-    'host-boundary',
-    'interaction-authority',
-    'managed-session-lifecycle',
-    'output-distillation',
-    'participant-horizon',
-    'process-execution',
-    'speculative-investigation',
-    'time-capability',
-  ])
-  assert.deepEqual(contractAt('src/Wanxiangshu/OpenCode/Tools/StaticTools.fs')?.consumers, [
-    'capability-enforcement',
-    'delegation',
-    'host-boundary',
-  ])
-
-  const nodeFsPath = 'src/Wanxiangshu/OpenCode/Tools/NodeFs.fs'
-  const nodeFsContract = contractAt(nodeFsPath)
-  assert.equal(nodeFsContract?.kind, 'physical-port')
-  assert.deepEqual(nodeFsContract?.consumers, ['repository-programming'])
-  assert.deepEqual(nodeFsContract?.symbols, [
-    'Wanxiangshu.OpenCode.NodeFs.cpSync',
-    'Wanxiangshu.OpenCode.NodeFs.existsSync',
-    'Wanxiangshu.OpenCode.NodeFs.readdirSync',
-    'Wanxiangshu.OpenCode.NodeFs.renameSync',
-    'Wanxiangshu.OpenCode.NodeFs.rmSync',
-    'Wanxiangshu.OpenCode.NodeFs.statSync',
-  ])
-
-  const fileMutationAdapter = manifest.physical_adapters.find(
-    (entry) => entry.path === 'src/Wanxiangshu/OpenCode/Tools/FileMutationTools.fs',
-  )
-  assert.ok(fileMutationAdapter)
-  assert.equal(fileMutationAdapter.owner, 'repository-programming')
-  assert.deepEqual(fileMutationAdapter.ports, [
-    {
-      path: nodeFsPath,
-      symbols: nodeFsContract.symbols,
-    },
-  ])
 
   const managedProject = 'Wanxiangshu.Owner.action-affordance.opencode-tools-managedagent.fsproj'
   const staticProject = 'Wanxiangshu.Owner.action-affordance.opencode-tools-statictools.fsproj'
@@ -194,9 +104,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] NodeFs physical port and tool contracts have
   assert.ok(joinToolRefs.includes('Wanxiangshu.Owner.delegation.delegation-pty-adapter.fsproj'))
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] request kind and fallback facts have disjoint compiler boundaries', () => {
-  const manifest = JSON.parse(readFileSync(join(ROOT, 'scripts/checks/published-contracts.json'), 'utf8'))
-  const contractAt = (path) => manifest.contracts.find((entry) => entry.path === path)
+test('WHAT[STRUCTURED-WORKFLOW-013] request kind and fallback facts remain disjoint compile shards', () => {
   const compileItems = (projectName) =>
     [...readFileSync(join(SRC, projectName), 'utf8').matchAll(/<Compile Include="([^"]+)"\s*\/>/g)].map(
       ([, path]) => path,
@@ -216,24 +124,6 @@ test('WHAT[STRUCTURED-WORKFLOW-011] request kind and fallback facts have disjoin
   assert.deepEqual(compileItems(factsProject), [
     'Participant/Provider/Attempt/Fallback/Facts.fsi',
     'Participant/Provider/Attempt/Fallback/Facts.fs',
-  ])
-
-  assert.deepEqual(contractAt('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Facts.fs')?.consumers, [
-    'durable-events',
-    'verification-system',
-  ])
-  assert.deepEqual(contractAt('src/Wanxiangshu/Participant/Provider/Attempt/RequestKind.fs')?.consumers, [
-    'capability-enforcement',
-    'cognitive-environment',
-    'context-compression',
-    'delegation',
-    'execution-failure-policy',
-    'execution-model-routing',
-    'host-boundary',
-    'interaction-authority',
-    'managed-chat-execution',
-    'prefix-stability',
-    'speculative-investigation',
   ])
 
   const capabilityRefs = references(
@@ -262,49 +152,9 @@ test('WHAT[STRUCTURED-WORKFLOW-011] request kind and fallback facts have disjoin
   assert.ok(ownerFallbackRefs.includes(requestProject))
   assert.ok(ownerFallbackRefs.includes(factsProject))
 
-  const localities = manifest.compiler_boundary_localities
-    .filter((entry) => entry.owner === 'provider-attempt-recovery')
-    .map((entry) => entry.locality)
-  assert.ok(localities.includes('participant-provider-attempt-requestkind'))
-  assert.ok(localities.includes('participant-provider-attempt-fallback-facts'))
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] locality kinds enforce contract purity, direction, and closure budget', () => {
-  const contract = resolve('/architecture/Contract.fsproj')
-  const nestedContract = resolve('/architecture/NestedContract.fsproj')
-  const runtime = resolve('/architecture/Runtime.fsproj')
-  const foreignRuntime = resolve('/architecture/ForeignRuntime.fsproj')
-  const composition = resolve('/architecture/Composition.fsproj')
-  const missing = resolve('/architecture/Missing.fsproj')
-  const project = (projectPath, owner, kind, compile, references = []) => ({
-    projectPath,
-    owner,
-    kind,
-    compile,
-    references,
-  })
-
-  const violations = projectArchitectureViolations(
-    new Map([
-      [runtime, project(runtime, 'provider', 'runtime', ['Runtime.fs'])],
-      [foreignRuntime, project(foreignRuntime, 'foreign', 'runtime', ['ForeignRuntime.fs'])],
-      [nestedContract, project(nestedContract, 'provider', 'contract', ['NestedA.fs', 'NestedB.fs'], [runtime])],
-      [contract, project(contract, 'consumer', 'contract', ['Contract.fs'], [nestedContract, foreignRuntime])],
-      [composition, project(composition, 'composition', 'composition', ['Composition.fs'], [foreignRuntime])],
-      [missing, project(missing, 'missing', '', ['Missing.fs'])],
-    ]),
-    { contractSourceBudget: 2 },
-  )
-
-  assert.ok(violations.some((violation) => /Missing\.fsproj: missing WanxiangshuOwnerLocalityKind/.test(violation)))
-  assert.ok(violations.some((violation) => /Contract\.fsproj: contract closure contains non-contract .*Runtime\.fsproj/.test(violation)))
-  assert.ok(violations.some((violation) => /Contract\.fsproj: contract closure contains non-contract .*ForeignRuntime\.fsproj/.test(violation)))
-  assert.ok(violations.some((violation) => /Contract\.fsproj: contract closure has 5 production \.fs; budget is 2/.test(violation)))
-  assert.ok(violations.some((violation) => /Contract\.fsproj -> .*ForeignRuntime\.fsproj: only composition may reference foreign runtime/.test(violation)))
-  assert.ok(!violations.some((violation) => /\/Composition\.fsproj -> .*ForeignRuntime\.fsproj/.test(violation)))
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-011] flat Fable projection planner produces exact closure and canonical aggregate order', () => {
+test('WHAT[STRUCTURED-WORKFLOW-012] flat Fable projection planner produces exact closure and canonical aggregate order', () => {
   const aggregatePath = join(FIXTURE, 'Emitter.fsproj')
   const leakyConsumerPath = join(FIXTURE, 'LeakyConsumer.fsproj')
   const leakyContractPath = join(FIXTURE, 'LeakyContract.fsproj')
@@ -343,7 +193,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] flat Fable projection planner produces exact
   ])
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] flat Fable projection materializes zero ProjectReference and isolated scratch props', () => {
+test('WHAT[STRUCTURED-WORKFLOW-012] flat Fable projection materializes zero ProjectReference and isolated scratch props', () => {
   const scratchRoot = mkdtempSync(join(tmpdir(), 'wanxiangshu-materialize-test-'))
   const rootPropsPath = join(ROOT, 'Directory.Build.props')
   try {
@@ -392,7 +242,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] flat Fable projection materializes zero Proj
   }
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] flat projection rejects missing or stale ProjectReference before compiler invocation', () => {
+test('WHAT[STRUCTURED-WORKFLOW-012] flat projection rejects missing or stale ProjectReference before compiler invocation', () => {
   const scratchRoot = mkdtempSync(join(tmpdir(), 'wanxiangshu-reject-test-'))
   try {
     const aggregatePath = join(FIXTURE, 'Emitter.fsproj')
@@ -453,7 +303,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] flat projection rejects missing or stale Pro
   }
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] flat Fable projection materialization escapes XML metacharacters, strips emitter identity, and binds source bytes into isolated fingerprints', () => {
+test('WHAT[STRUCTURED-WORKFLOW-012] flat Fable projection materialization escapes XML metacharacters, strips emitter identity, and binds source bytes into isolated fingerprints', () => {
   const scratchRoot = mkdtempSync(join(tmpdir(), 'wanxiangshu-xml-metachar-proof-'))
   try {
     const signatureFile = join(scratchRoot, 'Special&Signature.fsi')
@@ -704,7 +554,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] flat Fable projection materialization escape
   }
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] failure lifecycle prevents false-green warm cache and enforces success marker contract', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-012] failure lifecycle prevents false-green warm cache and enforces success marker contract', async () => {
   const scratchRoot = mkdtempSync(join(tmpdir(), 'wanxiangshu-sw011-failure-proof-'))
   try {
     const aggregatePath = join(FIXTURE, 'Emitter.fsproj')

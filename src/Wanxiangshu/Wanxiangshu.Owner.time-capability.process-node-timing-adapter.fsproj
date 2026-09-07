@@ -5,7 +5,7 @@
     <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-async-support.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal-contract.fsproj"/>
     <Compile Include="Process/NodeTiming.fsi"/>
     <Compile Include="Process/NodeTiming.fs"/>

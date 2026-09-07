@@ -23,27 +23,52 @@ const runNode = (root, args) => {
   })
 }
 
-test('WHAT[VERIFICATION-SYSTEM-009] repository closure gates reject a missing semantic owner and package member', () => {
+test('WHAT[VERIFICATION-SYSTEM-009] repository closure gates reject an unassigned production source and package member', () => {
   const fixture = mkdtempSync(join(tmpdir(), 'repository-closure-'))
 
   try {
     mkdirSync(join(fixture, 'scripts/checks'), { recursive: true })
     mkdirSync(join(fixture, 'scripts/lib'), { recursive: true })
     copyFileSync(
-      join(repositoryRoot, 'scripts/checks/semantic-owners.mjs'),
-      join(fixture, 'scripts/checks/semantic-owners.mjs'),
+      join(repositoryRoot, 'scripts/checks/subsystems.mjs'),
+      join(fixture, 'scripts/checks/subsystems.mjs'),
     )
     copyFileSync(
-      join(repositoryRoot, 'scripts/lib/walk.mjs'),
-      join(fixture, 'scripts/lib/walk.mjs'),
+      join(repositoryRoot, 'scripts/lib/compile-shards.mjs'),
+      join(fixture, 'scripts/lib/compile-shards.mjs'),
     )
-    write(fixture, 'scripts/checks/semantic-owners.json', JSON.stringify({ owners: ['distribution'], ownership: [] }))
+    write(fixture, 'scripts/checks/subsystems.json', JSON.stringify({
+      schema_version: 1,
+      subsystems: [{ id: 'fixture', legacy_owners: [] }],
+    }))
+    write(fixture, 'src/Wanxiangshu/Wanxiangshu.fsproj', `
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Compile Include="Owned.fsi"/>
+    <Compile Include="Owned.fs"/>
+  </ItemGroup>
+</Project>
+`)
+    write(fixture, 'src/Wanxiangshu/Wanxiangshu.Shard.fixture.owned.fsproj', `
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>fixture</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>owned</WanxiangshuCompileShard>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Owned.fsi"/>
+    <Compile Include="Owned.fs"/>
+  </ItemGroup>
+</Project>
+`)
+    write(fixture, 'src/Wanxiangshu/Owned.fsi', 'namespace ClosureFixture\n')
+    write(fixture, 'src/Wanxiangshu/Owned.fs', 'namespace ClosureFixture\n')
     write(fixture, 'src/Wanxiangshu/Unowned.fs', 'namespace ClosureFixture\n')
 
-    const ownerGate = runNode(fixture, ['scripts/checks/semantic-owners.mjs'])
-    assert.equal(ownerGate.status, 1, ownerGate.stderr || ownerGate.stdout)
-    assert.match(ownerGate.stderr, /UNMANIFESTED production files/)
-    assert.match(ownerGate.stderr, /src\/Wanxiangshu\/Unowned\.fs/)
+    const subsystemGate = runNode(fixture, ['scripts/checks/subsystems.mjs'])
+    assert.equal(subsystemGate.status, 1, subsystemGate.stderr || subsystemGate.stdout)
+    assert.match(subsystemGate.stderr, /production source coverage mismatch/)
+    assert.match(subsystemGate.stderr, /src\/Wanxiangshu\/Unowned\.fs/)
 
     mkdirSync(join(fixture, 'requirements/distribution/tests'), { recursive: true })
     copyFileSync(

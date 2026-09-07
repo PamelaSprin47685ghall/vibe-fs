@@ -2,12 +2,13 @@ import assert from 'node:assert/strict'
 import { readdirSync, readFileSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 import test from 'node:test'
+import { readCompileShardInventory } from '../../../scripts/lib/compile-shards.mjs'
 import { planOwnerCompile } from '../../../scripts/lib/owner-compile.mjs'
 
 const ROOT = resolve(import.meta.dirname, '../../..')
 const SOURCE_ROOT = join(ROOT, 'src/Wanxiangshu')
 const AGGREGATE = join(SOURCE_ROOT, 'Wanxiangshu.fsproj')
-const OWNERS = join(ROOT, 'scripts/checks/semantic-owners.json')
+const shardInventory = readCompileShardInventory({ repositoryRoot: ROOT })
 
 const projectMetadata = readdirSync(SOURCE_ROOT)
   .filter((name) => /^Wanxiangshu\.Owner\..+\.fsproj$/.test(name))
@@ -161,16 +162,12 @@ test('WHAT[HOST-BOUNDARY-026] host boundary projects declare explicit locality k
     ['OpenCode/Host/SphinxMcpConfig.fs', 'OpenCode/Host/SphinxMcpConfigSurface.fs'].sort(),
   )
 
-  // Verify all host-boundary production files have exactly one owner project
-  const ownerManifest = JSON.parse(readFileSync(OWNERS, 'utf8'))
+  // Verify the compile-shard inventory is the single source of production ownership.
   const hostBoundaryFiles = new Set(
-    ownerManifest.ownership
-      .filter((entry) => entry.owner === 'host-boundary')
-      .map((entry) => entry.path.slice('src/Wanxiangshu/'.length)),
+    [...shardInventory.sourceProject]
+      .filter(([, project]) => project.legacyOwner === 'host-boundary')
+      .map(([sourcePath]) => sourcePath.slice(SOURCE_ROOT.length + 1).replaceAll('\\', '/')),
   )
-  hostBoundaryFiles.add('OpenCode/Host/SessionContract.fs')
-  hostBoundaryFiles.add('OpenCode/Host/SessionHostPort.fs')
-  hostBoundaryFiles.add('OpenCode/Host/SessionSnapshot.fs')
 
   const hostProjects = projectMetadata.filter((project) => project.owner === 'host-boundary')
   const compiledFiles = hostProjects.flatMap((project) => project.compile).sort()

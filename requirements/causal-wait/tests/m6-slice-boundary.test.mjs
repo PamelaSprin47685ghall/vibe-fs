@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readOwnerProjectInventoryV1 } from '../../../scripts/checks/owner-projects.mjs'
+import { readCompileShardInventoryV1 } from '../../../scripts/lib/compile-shards.mjs'
 import { assertEffectIsInjected, assertPureContract } from '../../structured-workflow/tests/support/m6-boundary-proof.mjs'
 
 const locality = (inventory, id) => {
@@ -12,7 +12,7 @@ const locality = (inventory, id) => {
 const sourcePaths = (entry) => entry.sources.map(({ implementationPath }) => implementationPath)
 
 test('WHAT[CAUSAL-009] production inventory separates contract runtime adapter mailbox and proof surface', () => {
-  const inventory = readOwnerProjectInventoryV1()
+  const inventory = readCompileShardInventoryV1()
   const contract = locality(inventory, 'execution-session-wait-contract')
   const runtime = locality(inventory, 'execution-session-wait-runtime')
   const adapter = locality(inventory, 'execution-session-wait-diagnostic-adapter')

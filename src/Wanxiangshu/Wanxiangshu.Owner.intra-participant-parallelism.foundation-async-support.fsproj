@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>intra-participant-parallelism</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>foundation-async-support</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuSubsystem>runtime-platform</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>async-support</WanxiangshuCompileShard>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Foundation/AsyncSupport.fsi"/>
+    <Compile Include="Foundation/AsyncSupport.fs"/>
+  </ItemGroup>
+</Project>

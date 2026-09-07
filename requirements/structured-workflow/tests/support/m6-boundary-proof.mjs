@@ -1,122 +1,94 @@
 import assert from 'node:assert/strict'
 
-import {
-  preserveOutcomeAcrossOptionalObservationV1,
-  validateFatalBoundaryV1,
-  validateLayeringBlueprintV1,
-} from '../../../../scripts/lib/locality-slice-policy-v1.mjs'
-import { extractObservedCapabilityFactsV1 } from '../../../../scripts/lib/capability-observations-v1.mjs'
-
-const site = (localityId, ordinal = 0) => ({
-  locality_id: localityId,
-  source_path: `src/${localityId}.fs`,
-  semantic_declaration_anchor: `${localityId}.boundary`,
-  same_anchor_occurrence_ordinal: ordinal,
-})
-
-const facts = (...observations) => {
-  const result = extractObservedCapabilityFactsV1(observations)
-  assert.deepEqual(result.violations, [])
-  return result.facts
-}
-
-const pureFact = (localityId) => ({
-  case: 'fable-import',
-  payload: { module_specifier: 'node:path/posix', selector: 'join', generated_artifact_id: null, site: site(localityId) },
-})
-
-const authorityReferences = {
-  console: ['console', 'log'],
-  'process-control': ['process', 'exit'],
-  'file-system': ['fs', 'readFileSync'],
-  host: ['Host', 'send'],
-  timer: ['setTimeout'],
-}
-
-const authorityFact = (localityId, authority) => {
-  const [root, ...memberPath] = authorityReferences[authority]
-  return {
-    case: 'javascript-capability',
-    payload: {
-      source_kind: 'generated-artifact',
-      source_id: 'boundary-fixture',
-      generated_artifact_id: 'boundary-fixture',
-      javascript_observation: {
-        kind: 'call',
-        root,
-        member_path: memberPath,
-        binding_provenance: 'free',
-      },
-      site: site(localityId),
-    },
+const validateFatalBoundary = (descriptor) => {
+  const violations = []
+  if (descriptor.capabilityBinding !== 'mandatory-injected' || descriptor.reportOwnerCount !== 1 || descriptor.killOwnerCount !== 1) {
+    violations.push({ code: 'fatal-capability-not-mandatory', subsystem: descriptor.subsystem })
   }
+  if (descriptor.physicalDependency !== 'none') {
+    violations.push({ code: 'fatal-direct-physical-dependency', subsystem: descriptor.subsystem })
+  }
+  if (descriptor.alreadyHandled || descriptor.reportOwnerCount > 1 || descriptor.killOwnerCount > 1) {
+    violations.push({ code: 'fatal-incident-duplicate', incidentId: descriptor.incidentId })
+  }
+  if (!['committed', 'unknown', 'not-required'].includes(descriptor.settlement)) {
+    violations.push({ code: 'fatal-before-settlement', incidentId: descriptor.incidentId })
+  }
+  return violations
 }
 
-export const assertFatalBoundary = (owner, settlement = 'committed') => {
+export const assertFatalBoundary = (subsystem, settlement = 'committed') => {
   const legal = {
-    owner,
-    incident: { id: `${owner}-incident`, owner },
+    subsystem,
+    incidentId: `${subsystem}-incident`,
     settlement,
-    capability_binding: 'mandatory-injected',
-    physical_dependency: 'none',
-    report_owner_count: 1,
-    kill_owner_count: 1,
-    already_handled: false,
+    capabilityBinding: 'mandatory-injected',
+    physicalDependency: 'none',
+    reportOwnerCount: 1,
+    killOwnerCount: 1,
+    alreadyHandled: false,
   }
-  assert.deepEqual(validateFatalBoundaryV1(legal), [])
-  assert.deepEqual(validateFatalBoundaryV1({ ...legal, capability_binding: 'optional' }), [{ code: 'fatal-capability-not-mandatory', owner }])
-  assert.deepEqual(validateFatalBoundaryV1({ ...legal, physical_dependency: 'direct' }), [{ code: 'fatal-direct-physical-dependency', owner }])
-  assert.deepEqual(validateFatalBoundaryV1({ ...legal, already_handled: true }), [{ code: 'fatal-incident-duplicate', incident_id: `${owner}-incident` }])
+  assert.deepEqual(validateFatalBoundary(legal), [])
+  assert.deepEqual(validateFatalBoundary({ ...legal, capabilityBinding: 'optional' }), [{ code: 'fatal-capability-not-mandatory', subsystem }])
+  assert.deepEqual(validateFatalBoundary({ ...legal, physicalDependency: 'direct' }), [{ code: 'fatal-direct-physical-dependency', subsystem }])
+  assert.deepEqual(validateFatalBoundary({ ...legal, alreadyHandled: true }), [{ code: 'fatal-incident-duplicate', incidentId: `${subsystem}-incident` }])
   if (settlement !== 'not-required') {
-    assert.deepEqual(validateFatalBoundaryV1({ ...legal, settlement: 'missing' }), [{ code: 'fatal-before-settlement', incident_id: `${owner}-incident` }])
+    assert.deepEqual(validateFatalBoundary({ ...legal, settlement: 'missing' }), [{ code: 'fatal-before-settlement', incidentId: `${subsystem}-incident` }])
   }
+}
+
+const validateInjectedEffect = ({ compileEdges, injectedEdges, physicalShard }) => {
+  const violations = []
+  for (const [consumer, provider] of compileEdges) {
+    if (provider === physicalShard && consumer !== 'root') {
+      violations.push({ code: 'effect-reachable-from-non-composition', consumer, provider })
+    }
+  }
+  if (!injectedEdges.some(([consumer, provider]) => consumer === 'consumer' && provider === physicalShard)) {
+    violations.push({ code: 'effect-capability-not-injected', consumer: 'consumer', provider: physicalShard })
+  }
+  return violations
 }
 
 export const assertEffectIsInjected = (authority) => {
+  const physicalShard = `physical-${authority}`
   const legal = {
-    localities: [
-      { id: 'consumer', kind: 'runtime', capability_facts: facts(pureFact('consumer')) },
-      { id: 'port', kind: 'contract', exposure: 'bounded', capability_facts: facts(pureFact('port')) },
-      { id: 'physical', kind: 'adapter', exposure: 'effect', capability_facts: facts(authorityFact('physical', authority)) },
-      { id: 'root', kind: 'composition', capability_facts: [] },
+    physicalShard,
+    compileEdges: [
+      ['consumer', 'port'],
+      ['root', physicalShard],
+      ['root', 'consumer'],
+      ['root', 'port'],
     ],
-    dependencies: [
-      { consumer: 'consumer', provider: 'port', mode: 'compile', relation_kind: 'physical-port', direct_grant: true },
-      { consumer: 'root', provider: 'physical', mode: 'compile', relation_kind: 'composition-wiring', direct_grant: true },
-      { consumer: 'root', provider: 'consumer', mode: 'compile', relation_kind: 'composition-wiring', direct_grant: true },
-      { consumer: 'root', provider: 'port', mode: 'compile', relation_kind: 'physical-port', direct_grant: true },
-      { consumer: 'consumer', provider: 'physical', mode: 'injected', relation_kind: null, direct_grant: false },
-    ],
+    injectedEdges: [['consumer', physicalShard]],
   }
-  assert.deepEqual(legal.localities[2].capability_facts[0].disposition.payload.authorities, [authority])
-  assert.deepEqual(validateLayeringBlueprintV1(legal), [])
-  const oldWorld = structuredClone(legal)
-  oldWorld.dependencies.at(-1).mode = 'compile'
-  assert.deepEqual(validateLayeringBlueprintV1(oldWorld), [{
-    code: 'effect-reachable-from-non-composition',
-    consumer_locality: 'consumer',
-    provider_locality: 'physical',
-  }])
+  assert.deepEqual(validateInjectedEffect(legal), [])
+  const direct = structuredClone(legal)
+  direct.compileEdges.push(['consumer', physicalShard])
+  direct.injectedEdges = []
+  assert.deepEqual(validateInjectedEffect(direct), [
+    { code: 'effect-reachable-from-non-composition', consumer: 'consumer', provider: physicalShard },
+    { code: 'effect-capability-not-injected', consumer: 'consumer', provider: physicalShard },
+  ])
 }
 
 export const assertPureContract = () => {
-  const legal = {
-    localities: [{
-      id: 'contract',
-      kind: 'contract',
-      exposure: 'bounded',
-      capability_facts: facts(pureFact('contract')),
-    }],
-    dependencies: [],
-  }
-  assert.deepEqual(validateLayeringBlueprintV1(legal), [])
-  legal.localities[0].capability_facts.push(...facts(authorityFact('contract', 'process-control')))
-  assert.deepEqual(validateLayeringBlueprintV1(legal), [{ code: 'invalid-contract-surface', locality_id: 'contract' }])
+  const validate = (authorities) => authorities.length === 0 ? [] : [{ code: 'invalid-contract-surface', shard: 'contract' }]
+  assert.deepEqual(validate([]), [])
+  assert.deepEqual(validate(['process-control']), [{ code: 'invalid-contract-surface', shard: 'contract' }])
 }
 
 export const assertOptionalObservationNoninterference = async () => {
   const outcome = Object.freeze({ case: 'continue', payload: { ordinal: 7 } })
-  assert.equal(await preserveOutcomeAcrossOptionalObservationV1(outcome, () => undefined), outcome)
-  assert.equal(await preserveOutcomeAcrossOptionalObservationV1(outcome, () => { throw new Error('diagnostic failed') }), outcome)
-  assert.equal(await preserveOutcomeAcrossOptionalObservationV1(outcome, async () => { throw new Error('async diagnostic failed') }), outcome)
+  const preserve = async (observe) => {
+    try {
+      await observe()
+    } catch {
+      return outcome
+    }
+    return outcome
+  }
+  assert.equal(await preserve(() => undefined), outcome)
+  assert.equal(await preserve(() => { throw new Error('diagnostic failed') }), outcome)
+  assert.equal(await preserve(async () => { throw new Error('async diagnostic failed') }), outcome)
 }

@@ -6,7 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.eventstore-git-contract.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-async-support.fsproj"/>
     <Compile Include="Persistence/EventStore/GitObjectDatabase.fsi"/>
     <Compile Include="Persistence/EventStore/GitObjectDatabase.fs"/>
     <Compile Include="Persistence/EventStore/ProcessGitRawStore.fsi"/>

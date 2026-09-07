@@ -197,17 +197,16 @@ test('WHAT[VERIFICATION-SYSTEM-009] every wired gate path exists', () => {
   }
 })
 
-test('WHAT[VERIFICATION-SYSTEM-005] owner-contracts producer precedes every semantic consumer gate', () => {
+test('WHAT[VERIFICATION-SYSTEM-005] subsystem structure gate precedes every semantic consumer gate', () => {
   const checkSource = read('scripts/check.mjs')
   const wired = wiredGates(checkSource)
-  const semanticOwners = wired.indexOf('semantic-owners.mjs')
-  const ownerContracts = wired.indexOf('owner-contracts.mjs')
-  assert.ok(semanticOwners >= 0 && ownerContracts === semanticOwners + 1)
+  const subsystems = wired.indexOf('subsystems.mjs')
+  assert.ok(subsystems >= 0)
   for (const consumer of [
     'dsl-ownership.mjs',
     'authority-boundary.mjs',
     'semantic-decorator-invariant.mjs',
-  ]) assert.ok(ownerContracts < wired.indexOf(consumer), `${consumer} must run after the contract registry gate`)
+  ]) assert.ok(subsystems < wired.indexOf(consumer), `${consumer} must run after the subsystem structure gate`)
 })
 
 test('WHAT[VERIFICATION-SYSTEM-010] wired gate count has a non-shrinking floor', () => {

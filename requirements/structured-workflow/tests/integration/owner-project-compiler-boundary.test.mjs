@@ -32,7 +32,7 @@ function compile(project) {
   })
 }
 
-test('WHAT[STRUCTURED-WORKFLOW-011] independent Fable checks enforce compile-input locality boundaries', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-012] independent Fable checks enforce compile-shard input boundaries', async () => {
   const [
     green,
     red,
@@ -89,7 +89,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] independent Fable checks enforce compile-inp
   assert.match(`${signatureOnly.stdout}\n${signatureOnly.stderr}`, /SignedProvider|not defined/i)
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] flat closure compilation compiles transitive closure green and keeps unreferenced sources red', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-012] flat closure compilation compiles transitive closure green and keeps unreferenced sources red', async () => {
   const emitterPath = join(FIXTURE, 'Emitter.fsproj')
   const scratchRoot = mkdtempSync(join(tmpdir(), 'wanxiangshu-owner-flat-compile-'))
   const rootPropsPath = join(ROOT, 'Directory.Build.props')
