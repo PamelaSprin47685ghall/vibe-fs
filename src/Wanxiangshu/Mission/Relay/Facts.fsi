@@ -1,7 +1,5 @@
 namespace Wanxiangshu.Mission.Relay
 
-open Wanxiangshu.Foundation.Identity
-
 [<RequireQualifiedAccess>]
 type RelayEvent =
     | RoadOpened of RoadId * AuthorityRevision * PhysicalUserMessageId
@@ -38,7 +36,7 @@ type IncumbencyOpening =
 module IncumbencyOpening =
     val initial:
         sha256: (string -> string) ->
-        sessionId: SessionId ->
+        roadId: RoadId ->
         physicalUserMessageId: PhysicalUserMessageId ->
         snapshotId: WorkspaceSnapshotId ->
             IncumbencyOpening

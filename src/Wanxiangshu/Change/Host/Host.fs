@@ -596,7 +596,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                           incumbent,
                           expectedRevision,
                           nextRevision,
-                          physicalAuthorityMessage,
+                          Wanxiangshu.Mission.Relay.PhysicalUserMessageId.create (Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.value physicalAuthorityMessage),
                           snapshot
                       ) ]
 

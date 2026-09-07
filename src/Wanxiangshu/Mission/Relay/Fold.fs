@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Mission.Relay
 
 open FsToolkit.ErrorHandling
-open Wanxiangshu.Foundation.Identity
 
 type private AssessmentRecord =
     { Id: AssessmentId

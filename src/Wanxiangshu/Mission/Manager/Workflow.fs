@@ -159,7 +159,7 @@ module ManagerWorkflow =
                     let opening =
                         IncumbencyOpening.initial
                             HostDigest.sha256Hex
-                            sessionId
+                            (RoadId.create (SessionId.value sessionId))
                             (PhysicalUserMessageId.create rootUserMsg)
                             (captureSnapshot workspaceDirectory)
 

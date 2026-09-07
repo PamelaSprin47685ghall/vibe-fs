@@ -44,7 +44,7 @@ type ToolRuntimeScope
         snapshot: ISessionSnapshotPort option,
         cancelSignals: (SessionId seq -> unit) option,
         ?continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>),
-        ?captureWorktreeSnapshot: (WorktreePath -> Result<WorkspaceSnapshotId, string>),
+        ?captureWorktreeSnapshot: (WorktreePath -> Result<Wanxiangshu.Mission.Relay.WorkspaceSnapshotId, string>),
         ?eventPort: IEventObservationPort
     ) =
 
@@ -280,7 +280,7 @@ type ToolRuntimeScope
                     let! seed = humanRootIdentitySeedAdmission durable sessionId agent
 
                     let! attempt =
-                        runtime.AcceptHumanRoot sessionId (PhysicalUserMessageId.create user.Id) (Some seed)
+                        runtime.AcceptHumanRoot sessionId (Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.create user.Id) (Some seed)
                         |> TaskResultCE.ofTask
 
                     let! profile = attempt |> Result.mapError (fun _ -> ())
@@ -379,7 +379,7 @@ type ToolRuntimeScope
         |> Option.bind (fun durable ->
             AgentProjection.tryFind (SessionId.create sessionId) (AgentJournal.snapshot durable).AgentProjections)
         |> Option.bind (fun session -> session.Relay)
-        |> Option.bind (fun relay -> Wanxiangshu.Mission.Relay.Fold.view relay roadId)
+        |> Option.bind (fun relay -> Fold.view relay roadId)
 
     let hasValidBoundCertificate (view: RoadView) : bool =
         match view.ActiveIncumbency, view.ActiveSnapshotId, view.ActiveAuthorityRevision, view.Certificate with
@@ -711,7 +711,7 @@ type ToolRuntimeScope
     member this.TerminateSession(sessionId: string, reason: string) : Task<Result<unit, string>> =
         let authorityRoot =
             currentPhysicalUserMessage sessionId
-            |> Option.map (PhysicalUserMessageId.create >> PhysicalUserMessageId.promoteToAuthorityRoot)
+            |> Option.map (Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.create >> Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.promoteToAuthorityRoot)
 
         match terminalPort, authorityRoot with
         | None, _ -> Task.FromResult(Error "MANAGED-SESSION-017: terminal event port unavailable")

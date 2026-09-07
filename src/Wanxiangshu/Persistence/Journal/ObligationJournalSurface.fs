@@ -77,7 +77,7 @@ module ObligationJournalSurface =
             let incId = Wanxiangshu.Mission.Relay.IncumbencyId.create incumbencyId
             let snapId = Wanxiangshu.Mission.Relay.WorkspaceSnapshotId.create "snapshot-root"
             let authRev = Wanxiangshu.Mission.Relay.AuthorityRevision.create "rev-1"
-            let physUser = PhysicalUserMessageId.create "user-root"
+            let physUser = Wanxiangshu.Mission.Relay.PhysicalUserMessageId.create "user-root"
 
             let events =
                 [ Wanxiangshu.Mission.Relay.RelayEvent.RoadOpened(roadId, authRev, physUser)
@@ -109,7 +109,7 @@ module ObligationJournalSurface =
             let incId = Wanxiangshu.Mission.Relay.IncumbencyId.create incumbencyId
             let snapId = Wanxiangshu.Mission.Relay.WorkspaceSnapshotId.create "snapshot-root"
             let authRev = Wanxiangshu.Mission.Relay.AuthorityRevision.create "rev-1"
-            let physUser = PhysicalUserMessageId.create "user-root"
+            let physUser = Wanxiangshu.Mission.Relay.PhysicalUserMessageId.create "user-root"
             let assessId = Wanxiangshu.Mission.Relay.AssessmentId.create ("assess-" + sessionId)
 
             let binding: Wanxiangshu.Mission.Relay.AssessmentBinding =

@@ -9,6 +9,11 @@ type AuthorityRevision = private AuthorityRevision of string
 type AssessmentId = private AssessmentId of string
 type QualityCertificateId = private QualityCertificateId of string
 type RetirementId = private RetirementId of string
+type PhysicalUserMessageId = private PhysicalUserMessageId of string
+
+module PhysicalUserMessageId =
+    let create value = PhysicalUserMessageId value
+    let value (PhysicalUserMessageId value) = value
 
 module RoadId =
     let create value = RoadId value

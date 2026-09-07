@@ -7,6 +7,11 @@ type AuthorityRevision
 type AssessmentId
 type QualityCertificateId
 type RetirementId
+type PhysicalUserMessageId
+
+module PhysicalUserMessageId =
+    val create: string -> PhysicalUserMessageId
+    val value: PhysicalUserMessageId -> string
 
 module RoadId =
     val create: string -> RoadId

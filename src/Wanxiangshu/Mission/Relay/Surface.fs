@@ -1,7 +1,5 @@
 namespace Wanxiangshu.Mission.Relay
 
-open Wanxiangshu.Foundation.Identity
-
 module Surface =
     let empty () = Fold.empty
 

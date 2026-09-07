@@ -1,7 +1,5 @@
 namespace Wanxiangshu.Mission.Relay
 
-open Wanxiangshu.Foundation.Identity
-
 [<RequireQualifiedAccess>]
 type RelayEvent =
     | RoadOpened of RoadId * AuthorityRevision * PhysicalUserMessageId
@@ -47,19 +45,17 @@ module IncumbencyOpening =
 
     let initial
         (sha256: string -> string)
-        (sessionId: SessionId)
+        (roadId: RoadId)
         (physicalUserMessageId: PhysicalUserMessageId)
         (snapshotId: WorkspaceSnapshotId)
         =
-        let roadId = RoadId.create (SessionId.value sessionId)
-
         let authorityRevision =
             AuthorityRevision.create (PhysicalUserMessageId.value physicalUserMessageId)
 
         let incumbencyId =
             sha256 (
                 "incumbency-v1\n"
-                + SessionId.value sessionId
+                + RoadId.value roadId
                 + "\n"
                 + PhysicalUserMessageId.value physicalUserMessageId
             )
