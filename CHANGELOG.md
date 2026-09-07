@@ -2,6 +2,8 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- 优化 check 的 FCS 路径：DSL 只提取完整 declaration/application evidence，不执行无消费者的 capability 类型递归分类；逐文件 checker 调用改为一次 implementation project check，反射属性元数据按类型复用。完整 report 保留原有分类覆盖，真实 compiler fixture 精确验证两条提取路径的证据等价。
+
 - 执行故障链收敛为单一 `ExecutionFailureResolution`：删除可组合出非法状态的 retry/fallback/message 三轴，F# CE 每回合只返回一个互斥恢复或终结动作；provider fallback 以 exact `ProviderRunIdentity` + durable authorization 去重，managed-chat 不再成为第二 retry owner。Reconciler 的 `TurnFailed` 强制等待匹配的 typed physical witness，idle/retry 抢先到达不能裸终结；delegated completion 维持 first-proven-terminal 单次赋值。Long Strike 现连续注入两个非重试 provider failure，证明两次独立 durable recovery、第三 provider 成功、无并发 terminal exhaustion。
 - Host failure presentation 明确边界：恢复期 Wanxiangshu 不额外产生 final presentation，耗尽后仅一个 typed terminal；OpenCode 1.18.29 的 post-publication plugin event 无法拦截上游原始 `session.error`，不再声称虚假 UI suppression。依赖同步至当前解析版本：`@fable-org/fable-library-js` 2.6.0、`@opencode-ai/plugin` / `opencode-ai` 1.18.29、`zod` 4.5.4；lockfile 与 Host compatibility fixture 同步。
 - Manager baton/successor 模型按 clean cutover 退役，无别名与兼容路径：删除 `BatonSource`、`BatonId`、`ProjectionCutId`、`BatonEnvelope`、`ActiveSource` 与存储态 `OpenObligations`，删除 `SuccessorRequested` / `SuccessorActivated` 与 `Decision.activateSuccessor`；`Decision.openIncumbency` 不再接受 source 参数，初始开启唯一经真实权威接受后的 Plugin `BeginPhysicalProviderAttempt`，Change Host 不再伪造 `PhysicalUserMessageId`。

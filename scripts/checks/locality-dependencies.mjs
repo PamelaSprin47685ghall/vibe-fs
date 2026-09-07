@@ -87,7 +87,7 @@ export function readLocalities(sourceRoot = SOURCE_ROOT) {
   }))
 }
 
-export function scanCompilerObservationsV1({ aggregate = AGGREGATE, productionRoot = SOURCE_ROOT } = {}) {
+function scanCompiler({ aggregate = AGGREGATE, productionRoot = SOURCE_ROOT } = {}, scope) {
   const scratch = mkdtempSync(join(tmpdir(), 'wanxiangshu-locality-dependencies-'))
   const resultPath = join(scratch, 'compiler-observations-v1.json')
   try {
@@ -116,6 +116,7 @@ export function scanCompilerObservationsV1({ aggregate = AGGREGATE, productionRo
         FABLE_LIBRARY,
         materialized.assetsPath,
         resultPath,
+        scope,
       ],
       {
         cwd: ROOT,
@@ -165,6 +166,15 @@ export function scanCompilerObservationsV1({ aggregate = AGGREGATE, productionRo
   } finally {
     rmSync(scratch, { recursive: true, force: true })
   }
+}
+
+export function scanCompilerObservationsV1(options = {}) {
+  return scanCompiler(options, 'full')
+}
+
+export function scanDslCompilerEvidence(options = {}) {
+  const { schemaVersion, declarationUses, applicationUses } = scanCompiler(options, 'dsl')
+  return { schemaVersion, declarationUses, applicationUses }
 }
 
 export function runLocalityDependencyScan(options = {}) {

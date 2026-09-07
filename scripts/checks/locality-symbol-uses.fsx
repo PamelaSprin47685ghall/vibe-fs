@@ -74,9 +74,15 @@ type ScanResult =
 
 let arguments = fsi.CommandLineArgs |> Array.skip 1
 
-if arguments.Length <> 7 then
-    eprintfn "usage: locality-symbol-uses.fsx <project> <production-root> <scratch-root> <tool-dir> <fable-library> <assets-json> <result-json>"
+if arguments.Length <> 8 then
+    eprintfn "usage: locality-symbol-uses.fsx <project> <production-root> <scratch-root> <tool-dir> <fable-library> <assets-json> <result-json> <full|dsl>"
     exit 2
+
+let collectCapabilities =
+    match arguments.[7] with
+    | "full" -> true
+    | "dsl" -> false
+    | scope -> failwith $"unknown compiler scan scope: {scope}"
 
 let stopwatch = Stopwatch.StartNew()
 let projectFile = Path.GetFullPath arguments.[0]
@@ -117,12 +123,26 @@ let requireType (assembly: Assembly) name =
     | null -> failwith $"missing type: {name}"
     | candidate -> candidate
 
+let propertiesByType = Dictionary<Type, Dictionary<string, PropertyInfo>>()
+
 let requireProperty (candidate: Type) name =
-    candidate.GetProperties flags
-    |> Array.filter (fun property -> property.Name = name && property.GetIndexParameters().Length = 0)
-    |> Array.tryFind (fun property -> property.DeclaringType = candidate)
-    |> Option.orElseWith (fun () -> candidate.GetProperties flags |> Array.tryFind (fun property -> property.Name = name))
-    |> Option.defaultWith (fun () -> failwith $"missing property: {candidate.FullName}.{name}")
+    let properties =
+        match propertiesByType.TryGetValue candidate with
+        | true, properties -> properties
+        | _ ->
+            let properties = Dictionary<string, PropertyInfo>(StringComparer.Ordinal)
+            let reflected = candidate.GetProperties flags
+            for property in reflected do
+                if not (properties.ContainsKey property.Name) then
+                    properties.[property.Name] <- property
+            for property in Array.rev reflected do
+                if property.DeclaringType = candidate && property.GetIndexParameters().Length = 0 then
+                    properties.[property.Name] <- property
+            propertiesByType.[candidate] <- properties
+            properties
+    match properties.TryGetValue name with
+    | true, property -> property
+    | _ -> failwith $"missing property: {candidate.FullName}.{name}"
 
 let propertyValue (target: obj) name = requireProperty (target.GetType()) name |> fun property -> property.GetValue target
 let staticPropertyValue (candidate: Type) name = requireProperty candidate name |> fun property -> property.GetValue null
@@ -307,13 +327,12 @@ let checker =
         | _ -> null)
     |> fun values -> create.Invoke(null, values)
 
-let checkAsync =
+let parseAndCheckProject =
     checkerType.GetMethods flags
     |> Array.find (fun methodInfo ->
         methodInfo.Name = "ParseAndCheckProject"
         && methodInfo.GetParameters().Length = 2
         && methodInfo.GetParameters().[0].ParameterType.FullName = "FSharp.Compiler.CodeAnalysis.FSharpProjectOptions")
-    |> fun methodInfo -> methodInfo.Invoke(checker, [| projectOptions; null |])
 
 let checkResultType = requireType fcsAssembly "FSharp.Compiler.CodeAnalysis.FSharpCheckProjectResults"
 
@@ -327,7 +346,11 @@ let runAsync resultType asyncValue =
     |> fun methodInfo -> methodInfo.MakeGenericMethod [| resultType |]
     |> fun methodInfo -> methodInfo.Invoke(null, [| asyncValue; null; null |])
 
-let checkResult = runAsync checkResultType checkAsync
+let checkProject options =
+    parseAndCheckProject.Invoke(checker, [| options; null |])
+    |> runAsync checkResultType
+
+let checkResult = checkProject projectOptions
 
 let diagnostics = propertyValue checkResult "Diagnostics" :?> Array
 let errors =
@@ -903,7 +926,9 @@ let rec visitExpression sourcePath anchor expression =
     | None ->
         diagnostic "unsupported-fsharp-expression" sourcePath anchor "unknown" line column (expression.GetType().FullName)
     | Some(patternName, payload) ->
-        let nodeKind = resolvedFSharpNodeKind patternName payload
+        let nodeKind =
+            if collectCapabilities then resolvedFSharpNodeKind patternName payload
+            else kebabCase patternName
         let identity =
             match patternName with
             | "Value"
@@ -915,10 +940,11 @@ let rec visitExpression sourcePath anchor expression =
                 |> Option.map symbolName
                 |> Option.defaultValue $"fsharp:{nodeKind}"
             | _ -> $"fsharp:{nodeKind}"
-        fsharpNodesOut.Add
-            { NodeKind = nodeKind
-              SemanticIdentity = identity
-              Site = observationSite sourcePath anchor "fsharp-node" [ nodeKind; identity ] }
+        if collectCapabilities then
+            fsharpNodesOut.Add
+                { NodeKind = nodeKind
+                  SemanticIdentity = identity
+                  Site = observationSite sourcePath anchor "fsharp-node" [ nodeKind; identity ] }
         match patternName with
         | "Application"
         | "Call"
@@ -935,7 +961,7 @@ let rec visitExpression sourcePath anchor expression =
                           InferredType = inferredResultType () }
             | None -> ()
         | _ -> ()
-        if identity.EndsWith("emitJsExpr", StringComparison.Ordinal) then
+        if collectCapabilities && identity.EndsWith("emitJsExpr", StringComparison.Ordinal) then
             immediateExpressions expression
             |> Array.choose constantString
             |> Array.tryLast
@@ -966,41 +992,33 @@ let rec visitDeclaration sourcePath fallbackAnchor declaration =
         for nested in valuesOfType declarationType field do
             if not (obj.ReferenceEquals(nested, declaration)) then visitDeclaration sourcePath anchor nested
 
-let parseAndCheckFile =
-    checkerType.GetMethods flags
-    |> Array.find (fun methodInfo ->
-        methodInfo.Name = "ParseAndCheckFileInProject"
-        && methodInfo.GetParameters().Length = 5
-        && methodInfo.GetParameters().[1].ParameterType = typeof<int>)
-
-let sourceTextOfString =
-    requireType fcsAssembly "FSharp.Compiler.Text.SourceText"
-    |> fun candidate -> candidate.GetMethods flags
-    |> Array.find (fun methodInfo -> methodInfo.Name = "ofString" && methodInfo.IsStatic)
+let implementationResult = checkProject implementationProjectOptions
+let implementationDiagnostics = propertyValue implementationResult "Diagnostics" |> asObjects |> Seq.toArray
+if propertyValue implementationResult "HasCriticalErrors" :?> bool
+   || implementationDiagnostics |> Array.exists (fun diagnostic -> string (propertyValue diagnostic "Severity") = "Error") then
+    failwith "FCS implementation project check failed"
 
 let implementationFiles =
-    sourceFiles
-    |> Array.filter (fun path -> isProductionPath path && Path.GetExtension path = ".fs")
-    |> Array.choose (fun sourcePath ->
-        let sourceText = sourceTextOfString.Invoke(null, [| File.ReadAllText sourcePath |])
-        let check = parseAndCheckFile.Invoke(checker, [| sourcePath; box 0; sourceText; implementationProjectOptions; null |])
-        let resultType = parseAndCheckFile.ReturnType.GetGenericArguments().[0]
-        let pair = runAsync resultType check
-        let answer = propertyValue pair "Item2"
-        let answerCase, answerFields = unionFields answer
-        let fileResult = if answerCase = "Succeeded" then Some answerFields.[0] else None
-        match fileResult |> Option.bind (fun result -> optionValue (propertyValue result "ImplementationFile")) with
-        | Some implementationFile -> Some implementationFile
-        | None ->
-            diagnostic
-                "fsharp-implementation-file-missing"
-                (normalizePath sourcePath)
-                ("source:" + normalizePath sourcePath)
-                "implementation-file"
-                0
-                0
-                (normalizePath sourcePath)
-            None)
+    propertyValue (propertyValue implementationResult "AssemblyContents") "ImplementationFiles"
+    |> asObjects
+    |> Seq.toArray
+
+let observedImplementationPaths =
+    implementationFiles
+    |> Array.map (fun implementationFile -> propertyValue implementationFile "FileName" :?> string |> normalizePath)
+    |> fun paths -> HashSet<string>(paths, StringComparer.Ordinal)
+
+for sourcePath in sourceFiles do
+    if isProductionPath sourcePath && Path.GetExtension sourcePath = ".fs"
+       && not (observedImplementationPaths.Contains(normalizePath sourcePath)) then
+        diagnostic
+            "fsharp-implementation-file-missing"
+            (normalizePath sourcePath)
+            ("source:" + normalizePath sourcePath)
+            "implementation-file"
+            0
+            0
+            (normalizePath sourcePath)
 
 for implementationFile in implementationFiles do
     let sourcePath = propertyValue implementationFile "FileName" :?> string |> normalizePath
@@ -1067,6 +1085,7 @@ let declarationUses =
 
 let externalSymbolOccurrences =
     symbolUses
+    |> Seq.filter (fun _ -> collectCapabilities)
     |> Seq.choose (fun symbolUse ->
         let consumer = propertyValue symbolUse "FileName" :?> string |> normalizePath
         let isDefinition = propertyValue symbolUse "IsFromDefinition" :?> bool
@@ -1110,7 +1129,7 @@ let attributeStrings attribute =
 
 let definitionSymbols =
     symbolUses
-    |> Seq.filter (fun symbolUse -> propertyValue symbolUse "IsFromDefinition" :?> bool)
+    |> Seq.filter (fun symbolUse -> collectCapabilities && propertyValue symbolUse "IsFromDefinition" :?> bool)
     |> Seq.map (fun symbolUse ->
         propertyValue symbolUse "FileName" :?> string |> normalizePath,
         propertyValue symbolUse "Range",

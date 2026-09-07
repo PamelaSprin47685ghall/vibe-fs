@@ -8,6 +8,7 @@ import test from 'node:test'
 import {
   readOwnerProjectInventoryV1,
   runLocalityDependencyScan,
+  scanDslCompilerEvidence,
 } from '../../../../scripts/checks/locality-dependencies.mjs'
 import { classifyCapabilityObservationV1 } from '../../../../scripts/lib/capability-observations-v1.mjs'
 
@@ -26,6 +27,12 @@ test('WHAT[STRUCTURED-WORKFLOW-011] compiler-resolved analyzer rejects an aggreg
     assert.equal(aggregate.status, 0, `flattened aggregate must compile green\n${aggregate.stdout}\n${aggregate.stderr}`)
 
     const result = runLocalityDependencyScan({ aggregate: AGGREGATE, productionRoot: FIXTURE })
+    const dslEvidence = scanDslCompilerEvidence({ aggregate: AGGREGATE, productionRoot: FIXTURE })
+    assert.deepEqual(dslEvidence, {
+      schemaVersion: 1,
+      declarationUses: result.compilerObservations.declarationUses,
+      applicationUses: result.compilerObservations.applicationUses,
+    }, 'DSL extraction must preserve every compiler-resolved declaration and application, including private implementations')
     const inventory = readOwnerProjectInventoryV1({ sourceRoot: FIXTURE, aggregate: AGGREGATE })
     assert.equal(inventory.aggregatePath, 'requirements/structured-workflow/tests/fixtures/locality-dependencies/Wanxiangshu.fsproj')
     assert.deepEqual(

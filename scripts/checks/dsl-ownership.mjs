@@ -1347,7 +1347,7 @@ export const loadCompilerEvidence = async ({ lexicalOnly = false, evidencePath =
     const parsed = JSON.parse(readFileSync(fromFile, 'utf8'))
     return { mode: 'compiler-resolved', evidence: buildCompilerEvidence(parsed) }
   }
-  const scanned = await import('./locality-dependencies.mjs').then((mod) => mod.scanCompilerObservationsV1())
+  const scanned = await import('./locality-dependencies.mjs').then((mod) => mod.scanDslCompilerEvidence())
   return { mode: 'compiler-resolved', evidence: buildCompilerEvidence(scanned) }
 }
 export const scanTiers = (entries, compilerEvidence = undefined) => {
