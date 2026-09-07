@@ -44,6 +44,7 @@ type ToolRuntimeScope
         snapshot: ISessionSnapshotPort option,
         cancelSignals: (SessionId seq -> unit) option,
         ?continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>),
+        ?captureWorktreeSnapshot: (WorktreePath -> Result<WorkspaceSnapshotId, string>),
         ?eventPort: IEventObservationPort
     ) =
 
@@ -70,6 +71,13 @@ type ToolRuntimeScope
         defaultArg
             continueManagerLoop
             (fun _ _ -> Task.FromResult(Ok()) :> Task<Result<unit, string>>)
+
+    // Workspace-snapshot capture is an injected capability: Relay certificate
+    // binding owns the capture vocabulary, the composition root supplies it.
+    let captureWorktreeSnapshot =
+        defaultArg
+            captureWorktreeSnapshot
+            (fun _ -> Error "workspace snapshot capture unavailable")
 
     let childRecordForRun sessionId range providerRun =
         LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun journal sessionId range providerRun
@@ -613,6 +621,7 @@ type ToolRuntimeScope
                             fun childId path -> sessionDirectories.[SessionId.value childId] <- path
                           OnRunStarted = onStarted
                           ContinueManagerLoop = continueManagerLoop
+                          CaptureWorktreeSnapshot = captureWorktreeSnapshot
                           RepoPath = defaultArg workspaceDirectory "."
                           TargetBranch = ""
                           ParentWorkRecordFor = (fun sid -> parentRecord (SessionId.value sid))

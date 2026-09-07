@@ -13,6 +13,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Mission.Relay.OpenCode
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
@@ -147,6 +148,7 @@ module ToolRegistry =
         (casebookToolSpecs: ToolSpec list)
         (jsTransactionPersistence: IJsTransactionPersistence option)
         (continueManagerLoop: SessionId -> string -> Task<Result<unit, string>>)
+        (captureWorktreeSnapshot: WorktreePath -> Result<WorkspaceSnapshotId, string>)
         =
         let factory = ToolHostCodec.factory toolModule
         let providerLanguage = ProviderLanguageBinding.readGlobalPreference ()
@@ -174,6 +176,7 @@ module ToolRegistry =
                 snapshot,
                 cancelSignals,
                 continueManagerLoop = continueManagerLoop,
+                captureWorktreeSnapshot = captureWorktreeSnapshot,
                 ?eventPort = eventPort
             )
 

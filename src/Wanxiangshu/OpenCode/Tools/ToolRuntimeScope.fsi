@@ -38,6 +38,7 @@ type ToolRuntimeScope =
         snapshot: ISessionSnapshotPort option *
         cancelSignals: (SessionId seq -> unit) option *
         ?continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>) *
+        ?captureWorktreeSnapshot: (WorktreePath -> Result<WorkspaceSnapshotId, string>) *
         ?eventPort: IEventObservationPort ->
             ToolRuntimeScope
 

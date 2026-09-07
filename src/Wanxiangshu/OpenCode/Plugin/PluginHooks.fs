@@ -24,6 +24,8 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Manager
 open Wanxiangshu.Mission.Obligation.Todo
+open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Relay.OpenCode
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
@@ -231,6 +233,11 @@ module PluginHooks =
                                     with ex ->
                                         return Error ex.Message
                                 })
+                            (fun (worktreePath: WorktreePath) ->
+                                try
+                                    Ok(WorkspaceSnapshot.capture(WorktreePath.value worktreePath))
+                                with error ->
+                                    Error error.Message)
 
                     scope.AttachToolRuntime(toolRegistration.Runtime :> ISessionRuntimeOwner)
                     return toolRegistration

@@ -8,6 +8,7 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Git
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Persistence.Journal
 
 module PluginHostInterop =
@@ -84,4 +85,5 @@ module PluginHostInterop =
         eventPort: IEventObservationPort option ->
         casebookToolSpecs: ToolSpec list ->
         continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>) ->
+        captureWorktreeSnapshot: (WorktreePath -> Result<WorkspaceSnapshotId, string>) ->
             ToolRegistration

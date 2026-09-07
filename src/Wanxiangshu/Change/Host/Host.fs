@@ -19,9 +19,8 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Mission.Relay
-open Wanxiangshu.Mission.Relay.OpenCode
-open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 
@@ -300,10 +299,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         }
 
     let tryCaptureSnapshot (worktreePath: WorktreePath) : Result<WorkspaceSnapshotId, string> =
-        try
-            Ok(WorkspaceSnapshot.capture (WorktreePath.value worktreePath))
-        with error ->
-            Error error.Message
+        deps.CaptureWorktreeSnapshot worktreePath
 
     let captureSnapshot (jobId: ManagerJobId) : Task<Result<WorkspaceSnapshotId, string>> =
         requireJobRecord jobId

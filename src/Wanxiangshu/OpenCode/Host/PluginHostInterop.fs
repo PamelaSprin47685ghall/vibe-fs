@@ -23,6 +23,7 @@ open Wanxiangshu.Git
 open Wanxiangshu.Git.Hook
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Mission.Obligation.Todo.OpenCode
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Repository.Investigation.WarmStart
@@ -349,6 +350,7 @@ module PluginHostInterop =
         (eventPort: IEventObservationPort option)
         (casebookToolSpecs: ToolSpec list)
         (continueManagerLoop: SessionId -> string -> Task<Result<unit, string>>)
+        (captureWorktreeSnapshot: WorktreePath -> Result<WorkspaceSnapshotId, string>)
         : ToolRegistration =
         let jsTransactionPersistence =
             workspaceDirectory
@@ -382,6 +384,7 @@ module PluginHostInterop =
                 casebookToolSpecs
                 jsTransactionPersistence
                 continueManagerLoop
+                captureWorktreeSnapshot
 
         // Process-local join admission: JoinTool RequireCurrentProcessJoin → PluginRuntimeScope.
         registration.Runtime.AttachCurrentProcessJoin(fun root -> scope.RequireCurrentProcessJoin root)

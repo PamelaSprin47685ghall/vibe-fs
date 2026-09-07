@@ -351,6 +351,7 @@ module OrchestratorHostSurface =
               RegisterChildDirectory = fun _ _ -> ()
               OnRunStarted = fun _ _ _ -> ()
               ContinueManagerLoop = fun _ _ -> Task.FromResult(Ok())
+              CaptureWorktreeSnapshot = fun _ -> Error "workspace snapshot capture unavailable"
               RepoPath = stringOf (field options "repoPath")
               TargetBranch = stringOf (field options "targetBranch")
               ParentWorkRecordFor = fun _ -> Task.FromResult None

@@ -8,6 +8,7 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host.Contract
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Strength
@@ -73,4 +74,5 @@ module ToolRegistry =
         casebookToolSpecs: ToolSpec list ->
         jsTransactionPersistence: IJsTransactionPersistence option ->
         continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>) ->
+        captureWorktreeSnapshot: (WorktreePath -> Result<WorkspaceSnapshotId, string>) ->
             ToolRegistration
