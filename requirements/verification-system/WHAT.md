@@ -16,6 +16,8 @@
 
 证据层序由 `package.json` 中的构建流程与 `scripts/check.mjs` 注册清单固定，层序颠倒或错置直接判为违约。顶层 `format-build-test` 只调度 read-only format、static check、clean build、unit、唯一 integration orchestrator、Long Stroke 与 pack；distribution package child 与一次 physical warmup 只由 integration orchestrator 调度。每个 leaf step 必须恰有一个父级 owner，禁止顶层与子 orchestrator 重复执行。每项可被外部登记表引用的证明，其层级只能由 verification-system 所有的 `scripts/checks/proof-levels.json` 以精确 `(path, title, what_id)` 键独立分类；消费方自报层级、缺失键或重复键均不得取得证明权威。proof-level registry 只分类已经由 requirement-system 建立的精确 WHAT↔HOW↔active test 边，不得以自身条目创建或补足该拓扑。
 
+全仓禁止自建 FCS（`FSharp.Compiler.Service`）扫描：不得直接或经 wrapper、反射、`.fsx` 提取 F# typed AST、symbol/application use、推断类型或源码依赖图。全量、局部、owner/locality、fixture、report-only、CLI、CI、pre-build 与缓存/snapshot/delta/外部 evidence 复用均无豁免，不得作为门禁、报告或验收入口。正常 Fable 编译内部使用 compiler service 不在禁令范围内，但禁止为扫描取证额外启动或插桩编译器。纯源码文本与 JavaScript 静态检查仍是合法第 0 层证据。F# 编译器边界由 STRUCTURED-WORKFLOW-011 定义；不得用旧扫描结果或空 evidence 冒充当前证明。
+
 ## VERIFICATION-SYSTEM-002: One World——恰一个 Long Stroke
 
 第 4 层物理验收严格保持全局恰好一个真实 E2E 入口（`tests/e2e/entry.test.mjs`）和全程单次物理环境生命周期。严禁并行启动多个 Canary 实例、工作池或为每个测试场景单独创建独立世界以冒充覆盖率。E2E 用例上限必须严格受限且只降不升。
