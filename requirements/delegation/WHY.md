@@ -24,6 +24,7 @@
 - **认知发散与幻觉**：背景材料被当作新 assignment，导致子会话背离自身使命或重复执行父会话义务。
 - **旧结果冒充新完成**：上一轮 sticky terminal 或全生命周期 WorkRecord 被下一次复用直接消费，调用方看见“新工作已完成”，实际 child 根本没有处理新需求。
 - **命令/现实分叉**：Host 已经启动 child、模型已经在工作，tool 却因发送后的第二次 journal append 失败返回“无法放置”；调用方随后重试，只会撞上一个自己刚刚被告知“不存在”的 busy participant。
+- **入队与执行混淆**：本机派发回执已持久化，却因异步消息身份尚未到达而报告“不确定”，把正常调度间隔冒充发送异常。放置确认不等于消息身份确认，更不等于工作完成。
 - **物理拓扑偷走连续性**：把 parent delta frontier 挂在 `SessionId` 上，session replacement/recovery 后同一 logical participant 会被误当成第一次 handoff，重复或丢失背景。
 - **runtime、adapter与composition混居**：若PTY adapter读取`HostForkRuntime` registry、Gate、clock或concrete process backend，adapter会反向拥有delegation policy和其他physical implementation；若领域fold直接返回`AgentFact`，durable outer union会反向成为领域contract。
 - **fatal fuse偷渡**：handoff checkpoint invariant只属于delegation typed incident；physical report/kill必须由composition注入，不得让fork/sync runtime直接获得Host process authority。
