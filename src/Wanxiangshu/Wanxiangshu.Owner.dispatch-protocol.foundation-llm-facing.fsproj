@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>dispatch-protocol</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>foundation-llm-facing</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuSubsystem>runtime-platform</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>llm-facing</WanxiangshuCompileShard>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Foundation/SyntheticToml.fsi"/>
+    <Compile Include="Foundation/SyntheticToml.fs"/>
+    <Compile Include="Foundation/LlmFacing.fsi"/>
+    <Compile Include="Foundation/LlmFacing.fs"/>
+    <Compile Include="Foundation/SyntheticTomlSurface.fsi"/>
+    <Compile Include="Foundation/SyntheticTomlSurface.fs"/>
+  </ItemGroup>
+</Project>

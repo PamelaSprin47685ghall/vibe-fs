@@ -10,7 +10,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-parallel.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.provider-projection.participant-provider-projection-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
     <Compile Include="Repository/Investigation/Semble/Mcp.fsi"/>
     <Compile Include="Repository/Investigation/Semble/Mcp.fs"/>
     <Compile Include="Repository/Investigation/WarmStart/Prompt.fsi"/>

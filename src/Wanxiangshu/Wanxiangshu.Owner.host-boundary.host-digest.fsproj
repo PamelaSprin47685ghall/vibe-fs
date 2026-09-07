@@ -10,7 +10,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.output-distillation.host-contract-toolresultbound.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.provider-projection.participant-provider-projection-model.fsproj"/>
     <Compile Include="Host/Digest.fsi"/>
     <Compile Include="Host/Digest.fs"/>
     <Compile Include="OpenCode/Codec/OpencodeTypes.fsi"/>
