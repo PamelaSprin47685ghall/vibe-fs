@@ -323,6 +323,13 @@ export const DUP_CASES_EXEMPT = new Set([
   'src/Wanxiangshu/Execution/Failure/Model.fs:ProviderBreakerState',
   'src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs:GateContinuationOutcome',
   'src/Wanxiangshu/Interaction/Repair/Port.fs:InteractionRepairSendOutcome',
+  // Per-server MCP launch vocabularies are deliberately separate DUs with
+  // identical case shapes: each server owns its launch decision lifecycle
+  // (Sphinx precedent: "Not shared McpLaunch — avoids uvx case pollution").
+  // The shared Foundation.McpLaunch was retired because a Foundation-level
+  // DU forced cross-subsystem ProjectReferences from every consumer.
+  'src/Wanxiangshu/OpenCode/Host/StealthBrowserMcpConfig.fs:Launch',
+  'src/Wanxiangshu/Repository/Investigation/Semble/Mcp.fs:Launch',
   // Relative test fixture keys:
   'ChildRecovery.fs:ChildResolution',
   'ManagedAgent.fs:ManagedAgentParseError',

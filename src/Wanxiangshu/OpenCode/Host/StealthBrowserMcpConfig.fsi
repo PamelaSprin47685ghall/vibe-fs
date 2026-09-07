@@ -1,9 +1,13 @@
 namespace Wanxiangshu.OpenCode
 
-open Wanxiangshu.Foundation
-
 module StealthBrowserMcpConfig =
-    val launchFrom: read: (string -> string option) -> McpLaunch
-    val launchFromVars: vars: obj -> McpLaunch
-    val launchFromEnvironment: unit -> McpLaunch
-    val apply: config: obj -> launch: McpLaunch -> unit
+    [<RequireQualifiedAccess>]
+    type Launch =
+        | Disabled
+        | Fixture of path: string
+        | Uvx of gitRef: string
+
+    val launchFrom: read: (string -> string option) -> Launch
+    val launchFromVars: vars: obj -> Launch
+    val launchFromEnvironment: unit -> Launch
+    val apply: config: obj -> launch: Launch -> unit

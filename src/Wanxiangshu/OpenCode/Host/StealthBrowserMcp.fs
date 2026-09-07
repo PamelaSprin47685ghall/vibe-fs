@@ -1,7 +1,5 @@
 namespace Wanxiangshu.OpenCode
 
-open Wanxiangshu.Foundation
-
 open System
 
 /// AGENT-026: Browser-only stealth-browser MCP identity and launch command.

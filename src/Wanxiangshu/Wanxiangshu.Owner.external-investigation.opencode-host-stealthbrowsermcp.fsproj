@@ -5,7 +5,7 @@
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
+
     <Compile Include="OpenCode/Host/StealthBrowserMcp.fsi"/>
     <Compile Include="OpenCode/Host/StealthBrowserMcp.fs"/>
     <Compile Include="OpenCode/Host/StealthBrowserMcpConfig.fsi"/>

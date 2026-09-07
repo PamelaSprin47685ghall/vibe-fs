@@ -3,7 +3,6 @@ namespace Wanxiangshu.Repository.Investigation.Semble
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
-open Wanxiangshu.Foundation
 
 /// AGENT-027: internal Semble search. Not Host mcp. Not Strength.
 module SembleMcpClient =
@@ -17,23 +16,23 @@ module SembleMcpClient =
             |> Option.map string
             |> Option.filter (String.IsNullOrWhiteSpace >> not)
 
-    let launchFromVars (vars: obj) : McpLaunch =
+    let launchFromVars (vars: obj) : SembleMcp.Launch =
         SembleMcp.launchFrom (variableText vars)
 
-    let launchFromEnvironment () : McpLaunch =
+    let launchFromEnvironment () : SembleMcp.Launch =
         SembleMcp.launchFrom (fun name ->
             match Environment.GetEnvironmentVariable name with
             | null
             | "" -> None
             | value -> Some value)
 
-    let private invocation (launch: McpLaunch) : (string * string array) option =
+    let private invocation (launch: SembleMcp.Launch) : (string * string array) option =
         match launch with
-        | McpLaunch.Disabled -> None
-        | McpLaunch.Fixture path ->
+        | SembleMcp.Launch.Disabled -> None
+        | SembleMcp.Launch.Fixture path ->
             let cmd = SembleMcp.fixtureCommand path
             Some(cmd.[0], cmd.[1..])
-        | McpLaunch.Uvx gitRef ->
+        | SembleMcp.Launch.Uvx gitRef ->
             let cmd = SembleMcp.uvxCommand gitRef
             Some(cmd.[0], cmd.[1..])
 
@@ -61,7 +60,7 @@ module SembleMcpClient =
                 return! decodeSearchTool command args toolArgs
         }
 
-    let search (launch: McpLaunch) (query: string) (repoPath: string) (topK: int) : Task<SembleMcp.Hit list> =
+    let search (launch: SembleMcp.Launch) (query: string) (repoPath: string) (topK: int) : Task<SembleMcp.Hit list> =
         task {
             match invocation launch with
             | None -> return []

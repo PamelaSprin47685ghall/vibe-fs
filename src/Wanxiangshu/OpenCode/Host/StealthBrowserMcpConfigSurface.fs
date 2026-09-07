@@ -1,7 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
 open Fable.Core.JsInterop
-open Wanxiangshu.Foundation
 
 /// JS-native boundary for HOST-BOUNDARY-017 stealth-browser MCP launch contract
 /// tests.  Translates env vars → plain JS `{ kind, ref, enabled, reason }` and
@@ -27,9 +26,9 @@ module StealthBrowserMcpConfigSurface =
 
         let kind, ref, path, enabled, reason =
             match launch with
-            | McpLaunch.Disabled -> "disabled", "", "", false, "disabled"
-            | McpLaunch.Fixture p -> "fixture", "", p, true, "fixture"
-            | McpLaunch.Uvx r -> "uvx", r, "", true, "enabled"
+            | StealthBrowserMcpConfig.Launch.Disabled -> "disabled", "", "", false, "disabled"
+            | StealthBrowserMcpConfig.Launch.Fixture p -> "fixture", "", p, true, "fixture"
+            | StealthBrowserMcpConfig.Launch.Uvx r -> "uvx", r, "", true, "enabled"
 
         box
             {| kind = kind
@@ -55,9 +54,9 @@ module StealthBrowserMcpConfigSurface =
 
         let command, enabled =
             match launch with
-            | McpLaunch.Disabled -> StealthBrowserMcp.uvxCommand StealthBrowserMcp.defaultRef, false
-            | McpLaunch.Fixture p -> StealthBrowserMcp.fixtureCommand p, true
-            | McpLaunch.Uvx r -> StealthBrowserMcp.uvxCommand r, true
+            | StealthBrowserMcpConfig.Launch.Disabled -> StealthBrowserMcp.uvxCommand StealthBrowserMcp.defaultRef, false
+            | StealthBrowserMcpConfig.Launch.Fixture p -> StealthBrowserMcp.fixtureCommand p, true
+            | StealthBrowserMcpConfig.Launch.Uvx r -> StealthBrowserMcp.uvxCommand r, true
 
         box
             {| ``type`` = "local"

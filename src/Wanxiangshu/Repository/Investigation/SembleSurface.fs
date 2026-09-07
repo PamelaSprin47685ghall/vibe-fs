@@ -3,7 +3,6 @@ namespace Wanxiangshu.Repository.Investigation
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
-open Wanxiangshu.Foundation
 open Wanxiangshu.Repository.Investigation.Semble
 
 /// JS-native owner boundary for the internal Semble MCP resource. Launch
@@ -12,11 +11,11 @@ open Wanxiangshu.Repository.Investigation.Semble
 [<RequireQualifiedAccess>]
 module RepositorySembleSurface =
 
-    let private launchView (launch: McpLaunch) : obj =
+    let private launchView (launch: SembleMcp.Launch) : obj =
         match launch with
-        | McpLaunch.Disabled -> box {| kind = "Disabled" |}
-        | McpLaunch.Fixture path -> box {| kind = "Fixture"; value = path |}
-        | McpLaunch.Uvx gitRef -> box {| kind = "Uvx"; value = gitRef |}
+        | SembleMcp.Launch.Disabled -> box {| kind = "Disabled" |}
+        | SembleMcp.Launch.Fixture path -> box {| kind = "Fixture"; value = path |}
+        | SembleMcp.Launch.Uvx gitRef -> box {| kind = "Uvx"; value = gitRef |}
 
     let private hitView (hit: SembleMcp.Hit) : obj =
         box
@@ -27,7 +26,7 @@ module RepositorySembleSurface =
                score = hit.Score
                totalLines = hit.TotalLines |}
 
-    let private launchOf (value: obj) : McpLaunch =
+    let private launchOf (value: obj) : SembleMcp.Launch =
         let kind = if isNull value then "Disabled" else string (value?kind)
 
         let payload =
@@ -37,9 +36,9 @@ module RepositorySembleSurface =
                 string (value?value)
 
         match kind with
-        | "Fixture" -> McpLaunch.Fixture payload
-        | "Uvx" -> McpLaunch.Uvx payload
-        | _ -> McpLaunch.Disabled
+        | "Fixture" -> SembleMcp.Launch.Fixture payload
+        | "Uvx" -> SembleMcp.Launch.Uvx payload
+        | _ -> SembleMcp.Launch.Disabled
 
     let serverName = SembleMcp.serverName
     let defaultRef = SembleMcp.defaultRef

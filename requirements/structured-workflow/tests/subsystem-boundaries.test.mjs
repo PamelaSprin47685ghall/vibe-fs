@@ -17,7 +17,7 @@ const refs = (entry) => entry.references.map((path) => basename(path)).sort()
 test('WHAT[STRUCTURED-WORKFLOW-011] subsystem is the only semantic governance identity', () => {
   const inventory = buildSubsystemInventory()
   assert.equal(inventory.ok, true, inventory.violations.join('\n'))
-  assert.equal(inventory.sourceCount, 703)
+  assert.equal(inventory.sourceCount, 702)
   assert.equal(inventory.subsystemCount, 26)
   assert.ok(inventory.shardCount > inventory.subsystemCount)
   assert.ok(inventory.largestSubsystemCycle.length > 1, 'current subsystem cycles must remain visible as migration debt')

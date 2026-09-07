@@ -2,10 +2,16 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open Fable.Core.JsInterop
-open Wanxiangshu.Foundation
 
 /// AGENT-026: env → launch decision → Host `config.mcp.stealth-browser-mcp`.
+/// Stealth-browser-only launch decision. Not shared McpLaunch — avoids uvx case pollution.
 module StealthBrowserMcpConfig =
+    /// Stealth-browser-only launch (remote uvx). Local decision, Sphinx `Launch` precedent.
+    [<RequireQualifiedAccess>]
+    type Launch =
+        | Disabled
+        | Fixture of path: string
+        | Uvx of gitRef: string
 
     let private envValue (read: string -> string option) (name: string) =
         match read name with
@@ -19,20 +25,20 @@ module StealthBrowserMcpConfig =
         | "yes" -> true
         | _ -> false
 
-    let launchFrom (read: string -> string option) : McpLaunch =
+    let launchFrom (read: string -> string option) : Launch =
         let disabled = envValue read "STEALTH_BROWSER_MCP_DISABLED"
         let fixture = envValue read "STEALTH_BROWSER_MCP_FIXTURE"
         let testMode = envValue read "WANXIANGSHU_TEST"
         let gitRef = envValue read "STEALTH_BROWSER_MCP_REF"
 
         if isTruthy disabled then
-            McpLaunch.Disabled
+            Launch.Disabled
         elif fixture <> "" then
-            McpLaunch.Fixture fixture
+            Launch.Fixture fixture
         elif isTruthy testMode then
-            McpLaunch.Disabled
+            Launch.Disabled
         else
-            McpLaunch.Uvx(if gitRef = "" then StealthBrowserMcp.defaultRef else gitRef)
+            Launch.Uvx(if gitRef = "" then StealthBrowserMcp.defaultRef else gitRef)
 
     let private nonBlankVarValue (value: obj) =
         let text = string value
@@ -45,9 +51,9 @@ module StealthBrowserMcpConfig =
     let private readVar (vars: obj) name =
         if isNull vars then None else readVarValue vars name
 
-    let launchFromVars (vars: obj) : McpLaunch = launchFrom (readVar vars)
+    let launchFromVars (vars: obj) : Launch = launchFrom (readVar vars)
 
-    let launchFromEnvironment () : McpLaunch =
+    let launchFromEnvironment () : Launch =
         launchFrom (fun name ->
             match Environment.GetEnvironmentVariable name with
             | null
@@ -68,11 +74,11 @@ module StealthBrowserMcpConfig =
                 createObj [ "type" ==> "local"; "command" ==> command; "enabled" ==> enabled ]
 
         match launch with
-        | McpLaunch.Disabled -> write (StealthBrowserMcp.uvxCommand StealthBrowserMcp.defaultRef) false
-        | McpLaunch.Fixture path -> write (StealthBrowserMcp.fixtureCommand path) true
-        | McpLaunch.Uvx gitRef -> write (StealthBrowserMcp.uvxCommand gitRef) true
+        | Launch.Disabled -> write (StealthBrowserMcp.uvxCommand StealthBrowserMcp.defaultRef) false
+        | Launch.Fixture path -> write (StealthBrowserMcp.fixtureCommand path) true
+        | Launch.Uvx gitRef -> write (StealthBrowserMcp.uvxCommand gitRef) true
 
     let private applyNonNull config launch = applyLaunch (ensureMcp config) launch
 
-    let apply (config: obj) (launch: McpLaunch) : unit =
+    let apply (config: obj) (launch: Launch) : unit =
         if isNull config then () else applyNonNull config launch

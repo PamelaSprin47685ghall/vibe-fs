@@ -18,7 +18,6 @@
     <Compile Include="OpenCode/Host/Message.fs"/>
     <Compile Include="OpenCode/Signals/EventContract.fsi"/>
     <Compile Include="OpenCode/Signals/EventContract.fs"/>
-    <Compile Include="Foundation/McpLaunch.fsi"/>
-    <Compile Include="Foundation/McpLaunch.fs"/>
+
   </ItemGroup>
 </Project>

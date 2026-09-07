@@ -1,11 +1,17 @@
 namespace Wanxiangshu.Repository.Investigation.Semble
 
-open Wanxiangshu.Foundation
 open System
 
 /// AGENT-027: internal Semble MCP identity, launch command, and search hit.
 /// Not Host-wired. No env I/O.
 module SembleMcp =
+
+    /// Semble-only launch (remote uvx). Not shared McpLaunch — avoids uvx case pollution.
+    [<RequireQualifiedAccess>]
+    type Launch =
+        | Disabled
+        | Fixture of path: string
+        | Uvx of gitRef: string
 
     let serverName = "semble"
     let defaultRef = "main"
@@ -44,17 +50,17 @@ module SembleMcp =
         | "yes" -> true
         | _ -> false
 
-    let launchFrom (read: string -> string option) : McpLaunch =
+    let launchFrom (read: string -> string option) : Launch =
         let disabled = envValue read "SEMBLE_MCP_DISABLED"
         let fixture = envValue read "SEMBLE_MCP_FIXTURE"
         let testMode = envValue read "WANXIANGSHU_TEST"
         let gitRef = envValue read "SEMBLE_MCP_REF"
 
         if isTruthy disabled then
-            McpLaunch.Disabled
+            Launch.Disabled
         elif fixture <> "" then
-            McpLaunch.Fixture fixture
+            Launch.Fixture fixture
         elif isTruthy testMode then
-            McpLaunch.Disabled
+            Launch.Disabled
         else
-            McpLaunch.Uvx(if gitRef = "" then defaultRef else gitRef)
+            Launch.Uvx(if gitRef = "" then defaultRef else gitRef)
