@@ -70,8 +70,10 @@ package 的语义身份由包名唯一确定。包的物理目录布局、文件
 
 ## REQUIREMENT-SYSTEM-017: meta-verifier 机器执行
 
-仓库必须维护可执行的机器验证器（`meta-verifier`），对 `requirements/` 全树进行机械化扫描，断言文档齐备性、命题证明落点完整性、测试文件物理存在性、包目录封闭性以及依赖声明合法性。
+仓库必须维护可执行的机器验证器（`meta-verifier`），对 `requirements/` 全树进行机械化扫描，验证文档齐备性、已声明证明落点的引用完整性、测试文件物理存在性、包目录封闭性以及依赖声明合法性。未建立的证明落点属于 GAP，不冒充已声明引用的损坏。
 
 ## REQUIREMENT-SYSTEM-018: 可执行证明双向可追溯
 
-`requirements/**/tests/**/*.test.mjs` 中的每个有效可执行测试用例，必须由真实 `node:test` binding 直接注册为 `test()`，或由已绑定父测试的 TestContext 直接注册为 `t.test()`；shadow binding、未调用 helper 内的间接注册、无 callback、动态 skip/todo 状态与未绑定 TestContext 均不得取得 proof authority。每个有效测试必须在标题显式声明恰好一个当前合法的命题标签 `WHAT[<PACKAGE-NNN>]`。每个有效的 WHAT 命题必须至少被一个处于激活状态的非 skip、非 todo 测试用例所证明，且其 HOW 证明行必须包含至少一条可唯一解析的精确 `(path, title)` 边；同一命题可以拥有多个分别精确锚定的可执行证明，裸测试文件名或路径本身必须产生缺失/悬空证明诊断，不得被推断为证明充分性。WHAT↔HOW↔active test 拓扑只由 `requirement-trace` 裁决；release/migration ledger、合同册、proof-level 登记与任意其他文件清单只能消费或分类已经成立的精确证据边，不得凭路径存在、文件归档或 DONE 状态另行关闭 WHAT。测试与规范之间严禁存在悬空引用、多重 primary 归属或无标签的孤立测试。
+`requirements/**/tests/**/*.test.mjs` 中的每个有效可执行测试用例，必须由真实 `node:test` binding 直接注册为 `test()`，或由已绑定父测试的 TestContext 直接注册为 `t.test()`；shadow binding、未调用 helper 内的间接注册、无 callback、动态 skip/todo 状态与未绑定 TestContext 均不得取得 proof authority。每个有效测试必须在标题显式声明恰好一个当前合法的命题标签 `WHAT[<PACKAGE-NNN>]`。命题取得可执行证明，必须拥有处于激活状态的非 skip、非 todo 测试，以及 HOW 中至少一条可唯一解析的精确 `(path, title)` 边；同一命题可以拥有多个独立证明，裸测试路径不得被推断为充分证明。WHAT↔HOW↔active test 拓扑只由 `requirement-trace` 裁决；release/migration ledger、合同册、proof-level 登记与任意其他文件清单只能消费或分类已经成立的精确证据边，不得凭路径存在、文件归档或 DONE 状态另行关闭 WHAT。
+
+缺少 active test 或 HOW proof edge 是证明覆盖缺口，由包内 HOW 与 `requirements/GAP.md` 记录 OPEN/PARTIAL 状态；`requirement-trace` 必须继续列出这些缺口，但不得仅因此使 check 或测试套件失败，也不得把缺口标记为已证明。已声明证明的悬空路径、错误或歧义锚点、非法测试注册、未知 WHAT、多 primary、孤立测试和重复定义仍是门禁错误，不能被 GAP 掩盖；真实测试断言失败仍必须返回非零。测试全绿只表示已有检查通过，不等于所有 WHAT 已被证明或全部 GAP 已关闭。

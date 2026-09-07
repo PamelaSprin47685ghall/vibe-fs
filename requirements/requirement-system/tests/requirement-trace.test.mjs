@@ -4,6 +4,7 @@
 // 恰一个 primary WHAT）；每个 test 只回答一个问题。
 
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -22,6 +23,43 @@ import {
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const REQUIREMENTS = join(ROOT, 'requirements')
+
+test('WHAT[REQUIREMENT-SYSTEM-018] proof gaps do not fail the CLI but invalid declared proofs do', () => {
+  const root = mkdtempSync(join(tmpdir(), 'requirement-trace-cli-'))
+  const packageRoot = join(root, 'requirements/fixture-package')
+  const script = join(root, 'scripts/checks/requirement-trace.mjs')
+  mkdirSync(join(packageRoot, 'tests'), { recursive: true })
+  mkdirSync(dirname(script), { recursive: true })
+  try {
+    symlinkSync(join(ROOT, 'scripts/lib'), join(root, 'scripts/lib'), 'dir')
+    writeFileSync(script, readFileSync(join(ROOT, 'scripts/checks/requirement-trace.mjs')))
+    writeFileSync(join(packageRoot, 'WHAT.md'), '# WHAT\n## FIXTURE-001: missing test\n## FIXTURE-002: missing HOW edge\n')
+    writeFileSync(join(packageRoot, 'HOW.md'), '# HOW\n')
+    const testFile = join(packageRoot, 'tests/case.test.mjs')
+    writeFileSync(testFile, "import test from 'node:test'\ntest('WHAT[FIXTURE-002] active test', () => {})\n")
+    const run = () => spawnSync(process.execPath, [script], { cwd: root, encoding: 'utf8', timeout: 10_000 })
+    const gaps = run()
+    assert.equal(gaps.status, 0, gaps.stdout + gaps.stderr)
+    assert.match(gaps.stdout, /GAP TRACE_UNPROVED_WHAT .*FIXTURE-001/)
+    assert.match(gaps.stdout, /GAP TRACE_PROOF_MISSING .*FIXTURE-002/)
+    const graph = buildTraceGraph(join(root, 'requirements'))
+    assert.deepEqual(graph.proofEdges, [])
+    assert.deepEqual(graph.unproved.map(({ id }) => id), ['FIXTURE-001'])
+
+    writeFileSync(join(packageRoot, 'HOW.md'), '| WHAT | Proof |\n|---|---|\n| FIXTURE-002 | `tests/case.test.mjs::removed title` |\n')
+    const dangling = run()
+    assert.equal(dangling.status, 1)
+    assert.match(dangling.stdout, /TRACE_DANGLING_PROOF/)
+
+    writeFileSync(join(packageRoot, 'HOW.md'), '# HOW\n')
+    writeFileSync(testFile, "import test from 'node:test'\ntest('WHAT[UNKNOWN-001] invalid ownership', () => {})\n")
+    const unknown = run()
+    assert.equal(unknown.status, 1)
+    assert.match(unknown.stdout, /TRACE_UNKNOWN_WHAT/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
 
 test('WHAT[REQUIREMENT-SYSTEM-018] scanner skips strings, comments, and template literals', () => {
   const src = [

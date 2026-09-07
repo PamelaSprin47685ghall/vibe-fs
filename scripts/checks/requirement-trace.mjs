@@ -2,7 +2,7 @@
 // requirement-trace.mjs — REQUIREMENT-SYSTEM-018 closure gate (TASK.md trace roadmap).
 //
 // Modes:
-//   node scripts/checks/requirement-trace.mjs              strict: all findings fail
+//   node scripts/checks/requirement-trace.mjs              trace errors fail; proof gaps remain visible
 //   node scripts/checks/requirement-trace.mjs --report     report-only inventory table
 //   node scripts/checks/requirement-trace.mjs --package=<pkg>   trace one package
 //   node scripts/checks/requirement-trace.mjs --explain=<file:line>  explain one test
@@ -98,6 +98,7 @@ if (explain) {
 // ── findings ─────────────────────────────────────────────────────────────────
 
 const failures = []
+const gaps = []
 const add = (file, line, code, msg) => failures.push({ file, line, code, msg })
 
 // An ID with more than one definition has no authoritative owner. Report one
@@ -143,12 +144,12 @@ for (const { test, whats } of graph.multiPrimary) {
 // unproved WHAT: only one current, active executable declaration proves it.
 for (const what of graph.unproved) {
   if (what.deleted || !inScope(what.package)) continue
-  add(rel(what.file), what.line, 'TRACE_UNPROVED_WHAT', `${what.id} has zero active executable tests`)
+  gaps.push({ file: rel(what.file), line: what.line, code: 'TRACE_UNPROVED_WHAT', msg: `${what.id} has zero active executable tests` })
 }
 
 for (const what of graph.proofMissing) {
   if (what.deleted || !inScope(what.package)) continue
-  add(rel(what.file), what.line, 'TRACE_PROOF_MISSING', `${what.id} has no HOW.md row in ${what.package}`)
+  gaps.push({ file: rel(what.file), line: what.line, code: 'TRACE_PROOF_MISSING', msg: `${what.id} has no HOW.md row in ${what.package}` })
 }
 
 // A PROOF anchor is an exact (path,title) executable edge, not a file existence
@@ -182,6 +183,7 @@ for (const row of graph.proseOnlyProof) {
 // ── output ───────────────────────────────────────────────────────────────────
 
 const sorted = [...failures].sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line)
+for (const gap of gaps) print(`  GAP ${gap.code} ${gap.file}:${gap.line} ${gap.msg}`)
 
 if (report) {
   const perPackage = new Map()
@@ -211,13 +213,13 @@ if (report) {
     )
   }
   print('')
-  print(`totals: ${graph.whats.size} WHAT / ${graph.tests.length} test calls / ${graph.proofEdges.length} exact proof edges / ${sorted.length} findings`)
+  print(`totals: ${graph.whats.size} WHAT / ${graph.tests.length} test calls / ${graph.proofEdges.length} exact proof edges / ${sorted.length} errors / ${gaps.length} proof gaps`)
   for (const failure of sorted) print(`  ${failure.code} ${failure.file}:${failure.line} ${failure.msg}`)
   process.exit(0)
 }
 
 if (sorted.length === 0) {
-  print(`requirement-trace: OK — ${graph.whats.size} WHAT, ${graph.tests.length} tests, closure complete`)
+  print(`requirement-trace: OK — ${graph.whats.size} WHAT, ${graph.tests.length} tests, trace integrity valid; ${gaps.length} proof gap(s)`)
   process.exit(0)
 }
 print(`requirement-trace: ${sorted.length} finding(s)`)

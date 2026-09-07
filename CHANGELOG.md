@@ -2,6 +2,8 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- 证明缺口与测试错误分离：缺少 active test/HOW proof edge 继续输出 GAP，保持 OPEN/PARTIAL，不再导致 check 或 meta-verifier 失败；已有证明的悬空引用、非法归属与真实断言失败仍严格报错。共享 proof graph 不伪造证明边。
+
 - 删除独立 FCS 扫描器、compiler-dependent extractor/report CLI、扫描计时命令、专用 fixtures 与所有 compiler-evidence 消费分支；DSL、authority、decorator、owner-contract 检查恢复纯源码路径。187 项针对性回归通过；真实 check 越过原挂点并在证明追踪缺口处正常失败。STRUCTURED-WORKFLOW-013 的完整新合同证明继续保持 GAP-031 OPEN，不以删除代码代替证明。
 
 - 修复 fork/resume 将正常本机派发回执误报为“不确定”：派发成功且 Submitted 已持久化即返回已承接，不等待 PhysicalAccepted 或 child completion；后续真实消息仍负责绑定 Authority Root，真正发送结果未知时保留恢复权且不重发。

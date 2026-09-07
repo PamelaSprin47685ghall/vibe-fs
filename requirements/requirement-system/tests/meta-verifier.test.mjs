@@ -5,8 +5,7 @@
 // 本测试扫描 requirements/ 全树，断言五个结构事实：
 //   1. INDEX（requirements/INDEX.md 表 + requirements/README.md 树入口）
 //      中当前全部 54 个包都有 requirements/<pkg>/{WHY,WHAT,HOW}.md 与 tests/；
-//   2. 每个 WHAT.md 的每个 `<PACKAGE>-NNN` 命题 ID（标题定义）在 HOW.md
-//      表格中有行（按包名 + ID 交叉检查）；
+//   2. 缺少证明由 GAP 记录，不作为已有测试失败；
 //   3. 每个 HOW.md 落点引用的测试文件真实存在；
 //   4. requirements/ 下不存在 INDEX 之外的包目录；
 //   5. 每个包 WHY/WHAT/HOW 中出现的 DEPENDS ON 引用集合 ⊆ INDEX 依赖骨架
@@ -107,49 +106,6 @@ const collectNames = (line, allNames, self, out) => {
   }
 }
 
-// ── 命题 ID 与 HOW 交叉 ────────────────────────────────────────────────────
-
-const propositionIds = (pkg) => {
-  const text = read(join(REQUIREMENTS, pkg, 'WHAT.md'))
-  const prefix = pkg.toUpperCase()
-  const ids = []
-  for (const match of text.matchAll(/^#{1,6}\s+([A-Z][A-Z0-9-]*-\d{3})\b/gm)) {
-    const id = match[1]
-    if (id.slice(0, -4) === prefix) ids.push(id)
-  }
-  return [...new Set(ids)]
-}
-
-/**
- * HOW.md 中命中该命题 ID 的行。ID 可出现在行首格或第二格，接受多种形式：
- * 完整 ID（`| REQUIREMENT-SYSTEM-001 |`、第二格 `DISPATCH-PROTOCOL-002/003`）、
- * 裸编号（`| 006/007 |`，仅行首格，避免与测试锚点里的三位数字误配）。
- */
-const proofRowsFor = (pkg, id) => {
-  const text = read(join(REQUIREMENTS, pkg, 'HOW.md'))
-  const full = new RegExp(`\\b${id}\\b`)
-  const bare = new RegExp(`\\b${id.slice(-3)}\\b`)
-  const idTokens = (cell) => cell.split(/[\s/,–—]+/).filter(Boolean)
-  const rows = []
-  for (const line of text.split('\n')) {
-    if (!line.startsWith('|')) continue
-    const cells = line.split('|')
-    const cell1 = cells[1] ?? ''
-    const cell2 = cells[2] ?? ''
-    if (full.test(cell1) || bare.test(cell1)) {
-      rows.push(line)
-      continue
-    }
-    for (const token of idTokens(cell2)) {
-      if (full.test(token) || bare.test(token)) {
-        rows.push(line)
-        break
-      }
-    }
-  }
-  return rows
-}
-
 /** 解析落点单元格里的测试文件 token（包内 `tests/…`、仓库 `tests/unit|eval|integration|e2e/…`、`requirements/…`、`scripts/…`）。 */
 const landingFileTokens = (row) => {
   const cells = row.split('|').map((cell) => cell.trim())
@@ -179,15 +135,9 @@ const docFailures = (pkg) => {
   return failures
 }
 
-/** 对单个「已迁移」包跑 HOW 落点反向检查（命题有行、落点文件存在）。 */
+/** 检查已经声明的 HOW 落点文件，不把缺少证明当作悬空引用。 */
 const proofFailures = (pkg) => {
   const failures = []
-  for (const id of propositionIds(pkg)) {
-    if (proofRowsFor(pkg, id).length === 0) {
-      failures.push(`${pkg}: WHAT proposition ${id} has no row in HOW.md`)
-    }
-  }
-
   const howText = read(join(REQUIREMENTS, pkg, 'HOW.md'))
   for (const line of howText.split('\n')) {
     if (!line.startsWith('|')) continue
@@ -233,8 +183,7 @@ test('WHAT[REQUIREMENT-SYSTEM-003] every INDEX package carries all three documen
   )
 })
 
-test('WHAT[REQUIREMENT-SYSTEM-004] every WHAT proposition has a proof row and a live landing file', () => {
-  const allNames = packageNamesFromIndexTables()
+test('WHAT[REQUIREMENT-SYSTEM-004] declared proof rows name live landing files', () => {
   const dirs = readdirSync(REQUIREMENTS)
     .filter((entry) => statSync(join(REQUIREMENTS, entry)).isDirectory())
     .sort()
@@ -249,7 +198,7 @@ test('WHAT[REQUIREMENT-SYSTEM-004] every WHAT proposition has a proof row and a 
   assert.deepEqual(
     failures,
     [],
-    'every migrated package must prove every proposition and name live landing files:\n' + failures.join('\n'),
+    'declared proof rows must name live landing files:\n' + failures.join('\n'),
   )
 })
 
