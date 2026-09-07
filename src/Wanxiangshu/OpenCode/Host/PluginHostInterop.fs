@@ -348,6 +348,7 @@ module PluginHostInterop =
         (cancelSignals: (SessionId seq -> unit) option)
         (eventPort: IEventObservationPort option)
         (casebookToolSpecs: ToolSpec list)
+        (continueManagerLoop: SessionId -> string -> Task<Result<unit, string>>)
         : ToolRegistration =
         let jsTransactionPersistence =
             workspaceDirectory
@@ -380,6 +381,7 @@ module PluginHostInterop =
                 (Some scope.Strength.StrengthRuntime)
                 casebookToolSpecs
                 jsTransactionPersistence
+                continueManagerLoop
 
         // Process-local join admission: JoinTool RequireCurrentProcessJoin → PluginRuntimeScope.
         registration.Runtime.AttachCurrentProcessJoin(fun root -> scope.RequireCurrentProcessJoin root)

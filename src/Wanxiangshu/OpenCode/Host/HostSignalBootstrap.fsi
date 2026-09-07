@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Threading.Tasks
+open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -38,6 +39,7 @@ module HostSignalBootstrap =
           ObserveEvent: obj -> Task<unit> }
 
     val wire:
+        observeTurnWorkflow: (AbortCause -> ReconciledTurnContext -> Task) ->
         sessionPort: ISessionHostPort ->
         eventPort: IEventObservationPort ->
         snapshotOpt: ISessionSnapshotPort option ->

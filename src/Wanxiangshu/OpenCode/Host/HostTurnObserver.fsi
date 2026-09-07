@@ -9,6 +9,7 @@ open Wanxiangshu.Strength.Persistence
 module HostTurnObserver =
 
     val observe:
+        observeTurnWorkflow: (AbortCause -> ReconciledTurnContext -> Task) ->
         sessionPort: ISessionHostPort ->
         rootWorkspace: IRootWorkspaceReader ->
         eventPort: IEventObservationPort ->

@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 #nowarn "3511"
 
 open System.Threading.Tasks
+open Wanxiangshu.Composition.Turn
 
 /// Composition root (Wave 3): SpikePlugin only assembles the wiring modules.
 /// Every concrete step — resource install, journal, scope, host ports, session
@@ -14,7 +15,25 @@ module SpikePlugin =
         task {
             try
                 let! boot = PluginBoot.create input
-                let! host = PluginHostWiring.create boot
+                // Turn routing is injected here so the Host-side observer never
+                // needs a static reference to the relay turn-workflow module
+                // (host -> relay stays one-way: plugin -> workflow -> host types).
+                let observeTurnWorkflow =
+                    fun sessionPort eventPort rootWorkspace cause (context: ReconciledTurnContext) ->
+                        TurnWorkflow.observe
+                            sessionPort
+                            rootWorkspace
+                            eventPort
+                            boot.Journal
+                            boot.Scope.BloggerRuntimeHost
+                            boot.Scope.SyncDelegateRuntime
+                            boot.Scope.Sessions.NudgeSent
+                            boot.Scope.Sessions.JoinGuardNudges
+                            (fun s -> boot.Scope.HasLivePty s)
+                            cause
+                            boot.Scope.Sessions.Quiescence
+                            context
+                let! host = PluginHostWiring.create observeTurnWorkflow boot
                 PluginSessionWiring.attach boot host
                 PluginRecoveryWiring.attach boot
                 let transform = PluginTransforms.create boot host

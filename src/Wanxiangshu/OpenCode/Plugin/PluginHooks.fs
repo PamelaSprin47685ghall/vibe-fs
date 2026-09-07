@@ -217,6 +217,20 @@ module PluginHooks =
                             (Some wired.CancelSignals)
                             (Some eventPort)
                             casebookToolSpecs
+                            (fun (managerSessionId: SessionId) (managerWorkspace: string) ->
+                                task {
+                                    try
+                                        do!
+                                            ManagerWorkflow.maybeDeliverLoop
+                                                sessionPort
+                                                host.RootWorkspace
+                                                journal
+                                                (Some managerWorkspace)
+                                                (Some(SessionId.value managerSessionId))
+                                        return Ok()
+                                    with ex ->
+                                        return Error ex.Message
+                                })
 
                     scope.AttachToolRuntime(toolRegistration.Runtime :> ISessionRuntimeOwner)
                     return toolRegistration

@@ -15,7 +15,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Manager
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
@@ -44,6 +43,7 @@ type ToolRuntimeScope
         childWorkRecordFor: (string -> Task<string option>) option,
         snapshot: ISessionSnapshotPort option,
         cancelSignals: (SessionId seq -> unit) option,
+        ?continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>),
         ?eventPort: IEventObservationPort
     ) =
 
@@ -63,21 +63,13 @@ type ToolRuntimeScope
     let parentRecord = defaultArg parentWorkRecordFor (fun _ -> Task.FromResult None)
     let childRecord = defaultArg childWorkRecordFor (fun _ -> Task.FromResult None)
 
-    let continueManagerLoop managerSessionId managerWorkspace =
-        task {
-            try
-                do!
-                    ManagerWorkflow.maybeDeliverLoop
-                        sessions
-                        rootWorkspace
-                        journal
-                        (Some managerWorkspace)
-                        (Some(SessionId.value managerSessionId))
-
-                return Ok()
-            with ex ->
-                return Error ex.Message
-        }
+    // Manager-loop delivery is an injected capability: the Change/Host
+    // OrchestratorHostDeps model already owns this edge, and the
+    // composition root supplies the real workflow.
+    let continueManagerLoop =
+        defaultArg
+            continueManagerLoop
+            (fun _ _ -> Task.FromResult(Ok()) :> Task<Result<unit, string>>)
 
     let childRecordForRun sessionId range providerRun =
         LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun journal sessionId range providerRun

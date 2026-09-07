@@ -8,6 +8,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Host
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
+open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion.Blogger.OpenCode
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode
@@ -73,7 +74,15 @@ module PluginHostWiring =
           RootWorkspace: IRootWorkspaceReader
           CausalWaitObserver: IWaitObserver }
 
-    let create (boot: PluginBoot.Boot) : Task<Host> =
+    /// Callback supplier: wiring hands the bound ports, the composition root
+    /// returns the turn-workflow observation task. Keeps Host-side modules
+    /// free of any static reference to the relay turn-workflow module.
+    type ObserveTurnWorkflowSupplier =
+        ISessionHostPort -> IEventObservationPort -> IRootWorkspaceReader -> AbortCause -> ReconciledTurnContext -> Task
+
+    let create
+        (observeTurnWorkflowFor: ObserveTurnWorkflowSupplier)
+        (boot: PluginBoot.Boot) : Task<Host> =
         task {
             let input = boot.Input
             let scope = boot.Scope
@@ -118,6 +127,7 @@ module PluginHostWiring =
 
                     let! wired =
                         HostSignalBootstrap.wire
+                            (observeTurnWorkflowFor sessionPort eventPort rootWorkspace.Reader)
                             sessionPort
                             eventPort
                             snapshotOpt

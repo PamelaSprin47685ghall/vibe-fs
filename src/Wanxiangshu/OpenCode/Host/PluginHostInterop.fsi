@@ -83,4 +83,5 @@ module PluginHostInterop =
         cancelSignals: (SessionId seq -> unit) option ->
         eventPort: IEventObservationPort option ->
         casebookToolSpecs: ToolSpec list ->
+        continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>) ->
             ToolRegistration

@@ -146,6 +146,7 @@ module ToolRegistry =
         (strengthRuntime: StrengthRuntime option)
         (casebookToolSpecs: ToolSpec list)
         (jsTransactionPersistence: IJsTransactionPersistence option)
+        (continueManagerLoop: SessionId -> string -> Task<Result<unit, string>>)
         =
         let factory = ToolHostCodec.factory toolModule
         let providerLanguage = ProviderLanguageBinding.readGlobalPreference ()
@@ -172,6 +173,7 @@ module ToolRegistry =
                 childWorkRecordFor,
                 snapshot,
                 cancelSignals,
+                continueManagerLoop = continueManagerLoop,
                 ?eventPort = eventPort
             )
 

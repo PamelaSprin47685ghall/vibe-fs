@@ -70,6 +70,7 @@ module HostSignalBootstrap =
             observeSessionIdentity observation.SessionId observation.HasParent observation.Agent)
 
     let wire
+        (observeTurnWorkflow: AbortCause -> ReconciledTurnContext -> Task)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (snapshotOpt: ISessionSnapshotPort option)
@@ -131,7 +132,7 @@ module HostSignalBootstrap =
             let binding = TurnBinding.Store()
 
             let onTurn =
-                HostTurnObserver.observe sessionPort rootWorkspace eventPort journal strengthDurability scope
+                HostTurnObserver.observe observeTurnWorkflow sessionPort rootWorkspace eventPort journal strengthDurability scope
 
             let onSnapshot = HostCompactionObserver.observe scope journal
 

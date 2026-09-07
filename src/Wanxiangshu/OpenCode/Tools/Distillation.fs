@@ -45,7 +45,6 @@ open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Manager
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona

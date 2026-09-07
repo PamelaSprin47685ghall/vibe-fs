@@ -19,7 +19,6 @@ open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Manager
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
@@ -189,6 +188,7 @@ module HostTurnObserver =
         | StrengthPrimarySymbol.Other -> "Other"
 
     let private observeApplicationTurn
+        (observeTurnWorkflow: AbortCause -> ReconciledTurnContext -> Task)
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
@@ -214,23 +214,11 @@ module HostTurnObserver =
             else
                 // Sole Application turn entry (rabbit §6.5 / §18): Host no longer
                 // multiplexes SyncDelegate / Manager handled-bools.
-                do!
-                    TurnWorkflow.observe
-                        sessionPort
-                        rootWorkspace
-                        eventPort
-                        journal
-                        scope.BloggerRuntimeHost
-                        scope.SyncDelegateRuntime
-                        scope.Sessions.NudgeSent
-                        scope.Sessions.JoinGuardNudges
-                        (fun s -> scope.HasLivePty s)
-                        abortCause
-                        scope.Sessions.Quiescence
-                        context
+                do! observeTurnWorkflow abortCause context
         }
 
     let private observeCurrentTurn
+        (observeTurnWorkflow: AbortCause -> ReconciledTurnContext -> Task)
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
@@ -258,10 +246,11 @@ module HostTurnObserver =
                     turn
 
             if not isFissionOwner && not fissionHandled then
-                do! observeApplicationTurn sessionPort rootWorkspace eventPort journal scope abortCause context
+                do! observeApplicationTurn observeTurnWorkflow sessionPort rootWorkspace eventPort journal scope abortCause context
         }
 
     let private observeBusinessTurn
+        (observeTurnWorkflow: AbortCause -> ReconciledTurnContext -> Task)
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
@@ -334,10 +323,11 @@ module HostTurnObserver =
                 // No durable-family gate is fabricated here: Join tools admit via
                 // their exact current-process permit, and explicit /continue owns
                 // future user-driven work.
-                return! observeCurrentTurn sessionPort rootWorkspace eventPort journal scope abortCause context
+                return! observeCurrentTurn observeTurnWorkflow sessionPort rootWorkspace eventPort journal scope abortCause context
         }
 
     let observe
+        (observeTurnWorkflow: AbortCause -> ReconciledTurnContext -> Task)
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
@@ -355,4 +345,12 @@ module HostTurnObserver =
             // or interaction-repair effects from this physical material.
             Task.FromResult(()) :> Task
         else
-            observeBusinessTurn sessionPort rootWorkspace eventPort journal strengthDurability scope context
+            observeBusinessTurn
+                observeTurnWorkflow
+                sessionPort
+                rootWorkspace
+                eventPort
+                journal
+                strengthDurability
+                scope
+                context

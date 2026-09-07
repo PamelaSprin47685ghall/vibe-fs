@@ -72,4 +72,5 @@ module ToolRegistry =
         strengthRuntime: StrengthRuntime option ->
         casebookToolSpecs: ToolSpec list ->
         jsTransactionPersistence: IJsTransactionPersistence option ->
+        continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>) ->
             ToolRegistration
