@@ -37,12 +37,14 @@ type IncumbencyOpening =
 
 module IncumbencyOpening =
     val initial:
+        sha256: (string -> string) ->
         sessionId: SessionId ->
         physicalUserMessageId: PhysicalUserMessageId ->
         snapshotId: WorkspaceSnapshotId ->
             IncumbencyOpening
 
     val next:
+        sha256: (string -> string) ->
         roadId: RoadId ->
         retirementId: RetirementId ->
         authorityRevision: AuthorityRevision ->

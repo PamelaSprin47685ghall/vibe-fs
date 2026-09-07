@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Mission.Relay
 
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Host
 
 [<RequireQualifiedAccess>]
 type RelayEvent =
@@ -47,6 +46,7 @@ module IncumbencyOpening =
         | Error error -> failwith error
 
     let initial
+        (sha256: string -> string)
         (sessionId: SessionId)
         (physicalUserMessageId: PhysicalUserMessageId)
         (snapshotId: WorkspaceSnapshotId)
@@ -57,7 +57,7 @@ module IncumbencyOpening =
             AuthorityRevision.create (PhysicalUserMessageId.value physicalUserMessageId)
 
         let incumbencyId =
-            HostDigest.sha256Hex (
+            sha256 (
                 "incumbency-v1\n"
                 + SessionId.value sessionId
                 + "\n"
@@ -76,13 +76,14 @@ module IncumbencyOpening =
           Transaction = transaction }
 
     let next
+        (sha256: string -> string)
         (roadId: RoadId)
         (retirementId: RetirementId)
         (authorityRevision: AuthorityRevision)
         (snapshotId: WorkspaceSnapshotId)
         =
         let incumbencyId =
-            HostDigest.sha256Hex ("manager-loop-v1\n" + RetirementId.value retirementId)
+            sha256 ("manager-loop-v1\n" + RetirementId.value retirementId)
             |> fun digest -> IncumbencyId.create ("incumbency:" + digest)
 
         let transaction =

@@ -332,7 +332,12 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 let! snapshot = tryCaptureSnapshot record.WorktreePath |> Task.FromResult
 
                 let opening =
-                    IncumbencyOpening.next (roadIdOf record) retirement.Id road.AuthorityRevision snapshot
+                    IncumbencyOpening.next
+                        HostDigest.sha256Hex
+                        (roadIdOf record)
+                        retirement.Id
+                        road.AuthorityRevision
+                        snapshot
 
                 let! _ = appendRelayResult journal record opening.Transaction
                 return opening.IncumbencyId

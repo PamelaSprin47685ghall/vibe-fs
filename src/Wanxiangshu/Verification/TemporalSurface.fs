@@ -870,7 +870,11 @@ module TemporalSurface =
         let snapId = Wanxiangshu.Mission.Relay.WorkspaceSnapshotId.create "snap-1"
 
         let opening =
-            Wanxiangshu.Mission.Relay.IncumbencyOpening.initial sessionId physUser snapId
+            Wanxiangshu.Mission.Relay.IncumbencyOpening.initial
+                Wanxiangshu.Host.HostDigest.sha256Hex
+                sessionId
+                physUser
+                snapId
 
         let assessId = Wanxiangshu.Mission.Relay.AssessmentId.create "assess-session-reuse"
 

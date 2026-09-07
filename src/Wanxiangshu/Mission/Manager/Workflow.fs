@@ -158,6 +158,7 @@ module ManagerWorkflow =
 
                     let opening =
                         IncumbencyOpening.initial
+                            HostDigest.sha256Hex
                             sessionId
                             (PhysicalUserMessageId.create rootUserMsg)
                             (captureSnapshot workspaceDirectory)
@@ -261,7 +262,13 @@ module ManagerWorkflow =
             match needsOpening with
             | true ->
                 let snapshot = captureSnapshot workspaceDirectory
-                let opening = IncumbencyOpening.next roadId retirement.Id authorityRevision snapshot
+                let opening =
+                    IncumbencyOpening.next
+                        HostDigest.sha256Hex
+                        roadId
+                        retirement.Id
+                        authorityRevision
+                        snapshot
                 do! commitOpeningTransaction durable sessionId None opening.RoadId opening.Transaction
             | false -> return ()
         }
