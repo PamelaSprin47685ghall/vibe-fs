@@ -1,7 +1,5 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import {
   PHYSICAL_LISTENER_CONTRACTS,
@@ -13,7 +11,6 @@ import {
 } from '../../../scripts/checks/plugin-transforms-invariant.mjs'
 
 const readFixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8')
-const semanticDecoratorFcsFixture = fileURLToPath(new URL('./fixtures/semantic-decorator-fcs/', import.meta.url))
 
 test('WHAT[STRUCTURED-WORKFLOW-008] anonymous_retry_is_RED_but_declared_bounded_retry_is_GREEN', () => {
   const anonymous = scanSemanticDecorators(readFixture('anonymous-retry.fs'), 'anonymous-retry.fs')
@@ -117,80 +114,30 @@ test('WHAT[STRUCTURED-WORKFLOW-008] repeated_synchronous_invocation_is_RED_and_f
   assert.deepEqual(hits.map((hit) => hit.message.match(/^\w+/)?.[0]), ['invokeTwice'])
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-008] resolved_pipeline_and_nested_function_port_reinvocation_is_RED', () => {
-  const file = 'requirements/structured-workflow/tests/fixtures/semantic-decorator-fcs/ReviewerPipeline.fs'
-  const source = readFileSync(join(semanticDecoratorFcsFixture, 'ReviewerPipeline.fs'), 'utf8')
-  const application = (startLine, startColumn, endColumn) => ({
+test('WHAT[STRUCTURED-WORKFLOW-008] supplied_compiler_evidence_cannot_change_the_verdict', () => {
+  const file = 'anonymous-retry.fs'
+  const source = readFixture(file)
+  const applications = [5, 7].map((startLine) => ({
     consumerPath: file,
     resolvedTarget: 'operation',
     declarationPaths: [file],
     startLine,
-    startColumn,
+    startColumn: 12,
     endLine: startLine,
-    endColumn,
+    endColumn: 28,
     inferredType: "type 'a -> 'b",
-  })
-  const applications = [
-    application(5, 8, 22),
-    application(5, 24, 38),
-    application(8, 8, 22),
-    application(11, 17, 28),
-    application(11, 31, 42),
-    application(14, 8, 31),
-    application(14, 19, 30),
-  ]
-
-  const hits = scanSemanticDecorators(source, file, applications)
-    .filter((hit) => hit.kind === 'unowned-trace-change')
-  assert.deepEqual(hits.map((hit) => hit.message.match(/^\w+/)?.[0]), [
-    'reviewerPipelineTwice',
-    'nestedSiblingTwice',
-    'nestedSelfTwice',
-  ])
-  assert.ok(hits.every((hit) => hit.message.includes('invocation bound covering 2 calls')))
-  assert.ok(hits.every((hit) => !hit.message.includes('finite retry bound')))
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-008] compiler_flow_counts_max_paths_and_excludes_returned_lambdas', () => {
-  const file = 'ResolvedPaths.fs'
-  const source = [
-    'module ResolvedPaths',
-    'let exclusive operation choice =',
-    '    match choice with',
-    '    | true -> operation 1',
-    '    | false -> operation 2',
-    'let returned operation =',
-    '    fun value ->',
-    '        operation value',
-    '        operation value',
-    'let looping operation values =',
-    '    for value in values do',
-    '        operation value',
-  ].join('\n')
-  const application = (startLine) => ({
-    consumerPath: file,
-    resolvedTarget: 'operation',
-    declarationPaths: [file],
-    startLine,
-    startColumn: 8,
-    endLine: startLine,
-    endColumn: 23,
-    inferredType: "type 'a -> unit",
-  })
-  const applications = [4, 5, 8, 9, 12].map(application)
-  const range = (startLine, endLine) => ({ startLine, startColumn: 0, endLine, endColumn: 80 })
+  }))
   const flowEvidence = {
-    matchExpressions: [{ consumerPath: file, clauses: [range(4, 4), range(5, 5)] }],
+    matchExpressions: [],
     conditionalExpressions: [],
     tryExpressions: [],
-    lambdaExpressions: [{ consumerPath: file, body: range(8, 9) }],
-    loopExpressions: [{ consumerPath: file, body: range(12, 12) }],
+    lambdaExpressions: [],
+    loopExpressions: [],
   }
-
-  const hits = scanSemanticDecorators(source, file, applications, flowEvidence)
-    .filter((hit) => hit.kind === 'unowned-trace-change')
-  assert.deepEqual(hits.map((hit) => hit.message.match(/^\w+/)?.[0]), ['looping'])
-  assert.match(hits[0].message, /finite retry bound/)
+  const withEvidence = scanSemanticDecorators(source, file, applications, flowEvidence)
+  const sourceOnly = scanSemanticDecorators(source, file)
+  assert.deepEqual(withEvidence, sourceOnly)
+  assert.ok(sourceOnly.some((hit) => hit.kind === 'unowned-trace-change'))
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-008] dynamically_mutated_function_handler_collection_is_RED_by_itself', () => {

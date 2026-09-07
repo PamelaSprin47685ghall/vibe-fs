@@ -16,8 +16,6 @@ const CONTRACTS = join(ROOT, 'scripts/checks/published-contracts.json')
 const RELEASE_CLOSURE_NODES = join(ROOT, 'scripts/checks/release-closure-nodes.json')
 
 const PATH_GLOB = /[*?\[\]]/
-const PUBLICISH_PATH = /(?:Surface|Contract|Port|Api)\.fs$/
-const EXECUTION_POSITION = /(?:^|[._/])(Stage|Step|Cursor|Registry|NextAction|ResumeAt)(?:$|[A-Z._/])/i
 
 const norm = (path) => path.replace(/\\/g, '/')
 const meaningful = (value) => typeof value === 'string' && value.trim().length >= 16
@@ -41,44 +39,6 @@ function readCompilePaths(projectFile, productionRoot) {
   if (paths.length === 0) throw new Error(`${repositoryPath(project, 'project file')}: no production Compile entries found`)
   if (new Set(paths).size !== paths.length) throw new Error(`${repositoryPath(project, 'project file')}: duplicate Compile entry`)
   return paths
-}
-
-function stronglyConnectedComponents(nodes, edges) {
-  const adjacency = new Map(nodes.map((node) => [node, []]))
-  for (const { consumer, provider } of edges) adjacency.get(consumer)?.push(provider)
-  const indexByNode = new Map()
-  const lowLink = new Map()
-  const stack = []
-  const onStack = new Set()
-  const components = []
-  let nextIndex = 0
-
-  const visit = (node) => {
-    indexByNode.set(node, nextIndex)
-    lowLink.set(node, nextIndex++)
-    stack.push(node)
-    onStack.add(node)
-
-    for (const target of adjacency.get(node) ?? []) {
-      if (!indexByNode.has(target)) {
-        visit(target)
-        lowLink.set(node, Math.min(lowLink.get(node), lowLink.get(target)))
-      } else if (onStack.has(target)) lowLink.set(node, Math.min(lowLink.get(node), indexByNode.get(target)))
-    }
-
-    if (lowLink.get(node) !== indexByNode.get(node)) return
-    const component = []
-    let member
-    do {
-      member = stack.pop()
-      onStack.delete(member)
-      component.push(member)
-    } while (member !== node)
-    components.push(component.sort())
-  }
-
-  for (const node of nodes) if (!indexByNode.has(node)) visit(node)
-  return components.filter((component) => component.length > 1)
 }
 
 function authorizationOf(value, label, fail) {
@@ -108,19 +68,10 @@ const authorizes = (authorization, symbol) =>
   authorization.symbols.includes(symbol) ||
   authorization.symbolRoots.some((root) => symbol === root || symbol.startsWith(`${root}.`))
 
-const useKind = (use) =>
-  use.isFromPattern ? 'pattern' : use.isFromType ? 'type' : use.isFromUse ? 'use' : 'symbol'
-
-const isExecutionPosition = (edge) =>
-  !(edge.symbolKind === 'FSharpUnionCase' && /(?:Rejection|Error)\.[^.]*Cursor/.test(edge.symbol)) &&
-  (EXECUTION_POSITION.test(edge.providerPath) ||
-    (edge.symbolKind !== 'FSharpField' && EXECUTION_POSITION.test(edge.symbol)))
-
 export function analyzeOwnerContracts({
   compilePaths,
   semanticOwners,
   publishedContracts,
-  symbolUses,
   migrationState,
   requirementTrace,
   repositoryRoot = ROOT,
@@ -130,7 +81,6 @@ export function analyzeOwnerContracts({
   const compiled = compilePaths.map(norm)
   const compiledSet = new Set(compiled)
   if (compiledSet.size !== compiled.length) fail('duplicate-compile-entry', 'production compile set contains duplicate paths')
-  if (!Array.isArray(symbolUses)) fail('missing-compiler-symbol-uses', 'owner dependency analysis requires FCS symbol-use evidence')
 
   const ownerClaims = new Map()
   for (const entry of semanticOwners?.ownership ?? []) {
@@ -153,77 +103,13 @@ export function analyzeOwnerContracts({
 
   const ownerOf = new Map([...ownerClaims].filter(([, claims]) => claims.length === 1).map(([path, claims]) => [path, claims[0]]))
   const declaredOwners = new Set(ownerOf.values())
-  const sourceEdgeMap = new Map()
-  for (const use of Array.isArray(symbolUses) ? symbolUses : []) {
-    const consumerPath = norm(use.consumerPath ?? '')
-    if (!compiledSet.has(consumerPath)) {
-      fail('invalid-symbol-consumer', `${consumerPath || '<missing>'}: FCS symbol consumer is outside the compile set`, { consumerPath })
-      continue
-    }
-    if (use.isFromOpenStatement || use.isNamespace || use.isModule) continue
-    if (use.missingDeclaration) {
-      fail(
-        'missing-symbol-declaration',
-        `${consumerPath}:${use.line ?? 0}:${use.column ?? 0}: project symbol '${use.symbol ?? ''}' has no declaration location`,
-        { consumerPath, symbol: use.symbol },
-      )
-      continue
-    }
-    const providers = [...new Set((use.providerPaths ?? []).map(norm))]
-    const invalidProviders = providers.filter((path) => !compiledSet.has(path))
-    if (invalidProviders.length > 0) {
-      fail(
-        'invalid-symbol-provider',
-        `${consumerPath}: symbol '${use.symbol ?? ''}' resolves outside the production compile set (${invalidProviders.join(', ')})`,
-        { consumerPath, providerPaths: invalidProviders },
-      )
-      continue
-    }
-    if (providers.length > 1) {
-      fail(
-        'ambiguous-symbol-declaration',
-        `${consumerPath}: symbol '${use.symbol ?? ''}' resolves to multiple production files (${providers.join(', ')})`,
-        { consumerPath, providerPaths: providers, symbol: use.symbol },
-      )
-      continue
-    }
-    if (providers.length === 0 || providers[0] === consumerPath) continue
-    const providerPath = providers[0]
-    const consumerOwner = ownerOf.get(consumerPath)
-    const providerOwner = ownerOf.get(providerPath)
-    if (!consumerOwner || !providerOwner || consumerOwner === providerOwner) continue
-    const edge = {
-      consumerPath,
-      providerPath,
-      consumerOwner,
-      providerOwner,
-      symbol: use.symbol ?? '',
-      symbolKind: use.symbolKind ?? 'Unknown',
-      line: use.line ?? 0,
-      column: use.column ?? 0,
-      useKind: useKind(use),
-      isFromPattern: use.isFromPattern === true,
-    }
-    const key = `${edge.consumerPath}\0${edge.providerPath}\0${edge.symbol}\0${edge.line}\0${edge.column}\0${edge.useKind}`
-    sourceEdgeMap.set(key, edge)
-  }
-  const sourceEdges = [...sourceEdgeMap.values()].sort((left, right) =>
-    `${left.consumerPath}/${left.line}/${left.column}/${left.providerPath}/${left.symbol}`.localeCompare(
-      `${right.consumerPath}/${right.line}/${right.column}/${right.providerPath}/${right.symbol}`,
-    ),
-  )
-
-  const hasSymbolEvidence = Array.isArray(symbolUses) && symbolUses.length > 0
 
   const closedPaths = migrationState ? new Set(migrationState.closedPaths ?? []) : null
   const migrationNodeByPath = new Map(migrationState?.nodeByPath ?? [])
   const migrationNodes = new Map((migrationState?.nodes ?? []).map((node) => [node.id, node]))
   const registry = publishedContracts ?? {}
-  const hasCycleEvidence = Array.isArray(registry.owner_cycle_justifications) && registry.owner_cycle_justifications.length > 0
   const contractsByPath = new Map()
   const contractEntries = []
-  const adapterEntries = []
-  const rootEntries = []
 
   const validateOwnedPath = (entry, kind, publication) => {
     const path = norm(entry?.path ?? '')
@@ -369,160 +255,11 @@ export function analyzeOwnerContracts({
         `${path} → ${target.path}: physical adapter target must be a declared physical port consumed by '${entry.owner}'`,
         { path, targetPath: target.path },
       )
-    if (undeclaredTargets.length === 0) adapterEntries.push({ ...entry, path, targets })
   }
   for (const entry of registry.composition_roots ?? []) {
-    const path = validateOwnedPath(entry, 'composition root', false)
-    const targets = validateTargets(entry, 'wires', 'composition root', 'invalid-composition-root')
-    if (path && targets) rootEntries.push({ ...entry, path, targets })
+    validateOwnedPath(entry, 'composition root', false)
+    validateTargets(entry, 'wires', 'composition root', 'invalid-composition-root')
   }
-
-  const targetAllows = (entries, consumerPath, providerPath, symbol) =>
-    entries.some(
-      (entry) =>
-        entry.path === consumerPath &&
-        entry.targets.some((target) => target.path === providerPath && authorizes(target.authorization, symbol)),
-    )
-
-  const pendingEdges = []
-  const strictEdges = []
-  const allowedEdges = []
-  for (const edge of sourceEdges) {
-    if (closedPaths && !closedPaths.has(edge.providerPath)) {
-      pendingEdges.push(edge)
-      continue
-    }
-    strictEdges.push(edge)
-    const entries = contractsByPath.get(edge.providerPath) ?? []
-    const symbolContracts = entries.filter((entry) => authorizes(entry.authorization, edge.symbol))
-    const contractEdge = symbolContracts.some((entry) => entry.consumers.has(edge.consumerOwner))
-    const semanticEvidenceEdge = symbolContracts.some(
-      (entry) => entry.kind === 'semantic-evidence' && entry.consumers.has(edge.consumerOwner),
-    )
-    const physicalPortEdge = symbolContracts.some(
-      (entry) => entry.kind === 'physical-port' && entry.consumers.has(edge.consumerOwner),
-    )
-    const adapterEdge = targetAllows(adapterEntries, edge.consumerPath, edge.providerPath, edge.symbol)
-    const rootEdge = targetAllows(rootEntries, edge.consumerPath, edge.providerPath, edge.symbol)
-
-    if (isExecutionPosition(edge) && !semanticEvidenceEdge && !physicalPortEdge && !adapterEdge) {
-      fail(
-        'foreign-execution-position',
-        `${edge.consumerPath}:${edge.line}:${edge.column} → ${edge.providerPath}: foreign execution-position '${edge.symbol}' is forbidden`,
-        edge,
-      )
-      continue
-    }
-    if (edge.isFromPattern && rootEdge && !contractEdge) {
-      fail(
-        'composition-root-foreign-policy',
-        `${edge.consumerPath}:${edge.line}:${edge.column} → ${edge.providerPath}: composition root matches uncontracted foreign symbol '${edge.symbol}'`,
-        edge,
-      )
-      continue
-    }
-    if (!contractEdge && !adapterEdge && !rootEdge) {
-      const code =
-        entries.length === 0
-          ? PUBLICISH_PATH.test(edge.providerPath)
-            ? 'undeclared-published-contract'
-            : 'cross-owner-private-import'
-          : symbolContracts.length === 0
-            ? 'unauthorized-contract-symbol'
-            : 'unauthorized-contract-consumer'
-      fail(
-        code,
-        `${edge.consumerPath}:${edge.line}:${edge.column} → ${edge.providerPath}: ${edge.consumerOwner} may not consume ${edge.providerOwner} symbol '${edge.symbol}'`,
-        edge,
-      )
-      continue
-    }
-    allowedEdges.push({
-      ...edge,
-      authorizationKind: adapterEdge
-        ? 'physical-adapter'
-        : rootEdge
-          ? 'composition-root'
-          : physicalPortEdge
-            ? 'physical-port'
-            : 'contract',
-    })
-  }
-
-  const assertAuthorizationIsLive = (authorization, edges, label, details) => {
-    for (const symbol of authorization.symbols)
-      if (!edges.some((edge) => edge.symbol === symbol))
-        fail('stale-symbol-authorization', `${label}: exact symbol '${symbol}' has no matching compiler-resolved edge`, details)
-    for (const root of authorization.symbolRoots)
-      if (!edges.some((edge) => edge.symbol === root || edge.symbol.startsWith(`${root}.`)))
-        fail('stale-symbol-authorization', `${label}: symbol root '${root}' has no matching compiler-resolved edge`, details)
-  }
-
-  if (hasSymbolEvidence) {
-    for (const entry of contractEntries) {
-      const live = strictEdges.filter(
-        (edge) => edge.providerPath === entry.path && authorizes(entry.authorization, edge.symbol),
-      )
-      assertAuthorizationIsLive(entry.authorization, live, entry.path, { path: entry.path })
-      for (const consumer of entry.consumers)
-        if (!live.some((edge) => edge.consumerOwner === consumer))
-          fail('stale-contract-consumer', `${entry.path}: declared consumer '${consumer}' has no matching compiler-resolved edge`, {
-            path: entry.path,
-            consumer,
-          })
-    }
-  }
-
-  if (hasSymbolEvidence) {
-    for (const entry of adapterEntries)
-      for (const target of entry.targets) {
-        const live = strictEdges.filter(
-          (edge) =>
-            edge.consumerPath === entry.path && edge.providerPath === target.path && authorizes(target.authorization, edge.symbol),
-        )
-        assertAuthorizationIsLive(target.authorization, live, `${entry.path} → ${target.path}`, {
-          path: entry.path,
-          targetPath: target.path,
-        })
-      }
-  }
-
-  if (hasSymbolEvidence) {
-    for (const entry of rootEntries)
-      for (const target of entry.targets) {
-        const live = strictEdges.filter(
-          (edge) =>
-            edge.consumerPath === entry.path && edge.providerPath === target.path && authorizes(target.authorization, edge.symbol),
-        )
-        assertAuthorizationIsLive(target.authorization, live, `${entry.path} → ${target.path}`, {
-          path: entry.path,
-          targetPath: target.path,
-        })
-      }
-
-  }
-
-  const projectOwnerEdges = (edges) => {
-    const ownerEdgeMap = new Map()
-    for (const edge of edges) {
-      const key = `${edge.consumerOwner}\0${edge.providerOwner}`
-      if (!ownerEdgeMap.has(key)) ownerEdgeMap.set(key, { consumer: edge.consumerOwner, provider: edge.providerOwner, uses: [] })
-      ownerEdgeMap.get(key).uses.push({
-        consumerPath: edge.consumerPath,
-        providerPath: edge.providerPath,
-        symbol: edge.symbol,
-        line: edge.line,
-        column: edge.column,
-        useKind: edge.useKind,
-      })
-    }
-    return [...ownerEdgeMap.values()].sort((left, right) =>
-      `${left.consumer}/${left.provider}`.localeCompare(`${right.consumer}/${right.provider}`),
-    )
-  }
-
-  const allSourceOwnerEdges = projectOwnerEdges(sourceEdges)
-  const sourceOwnerEdges = projectOwnerEdges(strictEdges)
 
   const requirementOwnerEdges = []
   for (const edge of registry.requirement_dependencies ?? []) {
@@ -553,47 +290,12 @@ export function analyzeOwnerContracts({
     }
     cycleJustifications.set(key, entry.justification.trim())
   }
-  const semanticContractEdges = strictEdges.filter((edge) =>
-    (contractsByPath.get(edge.providerPath) ?? []).some(
-      (entry) =>
-        ['published-contract', 'semantic-evidence'].includes(entry.kind) &&
-        entry.consumers.has(edge.consumerOwner) &&
-        authorizes(entry.authorization, edge.symbol),
-    ),
-  )
-  const cycleOwnerEdges = projectOwnerEdges(semanticContractEdges)
-  const cycleOwners = [...declaredOwners]
-  const cycles = stronglyConnectedComponents(cycleOwners, cycleOwnerEdges)
-  if (hasSymbolEvidence || hasCycleEvidence) {
-    const liveCycleKeys = new Set()
-    for (const owners of cycles) {
-      const key = owners.join('\0')
-      liveCycleKeys.add(key)
-      if (!cycleJustifications.has(key))
-        fail('unjustified-owner-cycle', `owner dependency cycle lacks exact justification: ${owners.join(' → ')}`, { owners })
-    }
-    for (const [key] of cycleJustifications)
-      if (!liveCycleKeys.has(key))
-        fail('stale-cycle-justification', `cycle justification has no matching live SCC: ${key.split('\0').join(' → ')}`, {
-          owners: key.split('\0'),
-        })
-
-  }
 
   violations.sort((left, right) => `${left.code}/${left.message}`.localeCompare(`${right.code}/${right.message}`))
   return {
     ok: violations.length === 0,
     violations,
-    sourceEdges,
-    pendingEdges,
-    strictEdges,
-    allowedEdges,
-    semanticContractEdges,
-    allSourceOwnerEdges,
-    sourceOwnerEdges,
-    cycleOwnerEdges,
     requirementOwnerEdges,
-    cycles,
     contracts: contractEntries.length,
   }
 }
@@ -628,14 +330,11 @@ function readProductionInput() {
     compilePaths,
     semanticOwners,
     publishedContracts: JSON.parse(readFileSync(CONTRACTS, 'utf8')),
-    symbolUses: [],
     migrationState: readMigrationState(semanticOwners),
     requirementTrace: buildTraceGraph(join(ROOT, 'requirements')),
     repositoryRoot: ROOT,
   }
 }
-
-export { analyzeOwnerContracts as analyzeOwnerDependencies }
 
 function runCli() {
   try {

@@ -9,13 +9,11 @@
 // CI calls with --threshold to freeze the current backlog while preventing new violations.
 
 import { readFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { walk } from '../lib/walk.mjs'
 
 export const PRODUCTION_ROOT = 'src/Wanxiangshu'
-export const COMPILER_EVIDENCE_SCHEMA_VERSION = 1
-export const APPLICATION_USE_KEYS = ['consumerPath', 'startLine', 'startColumn', 'resolvedTarget', 'inferredType']
 const norm = (p) => p.replace(/\\/g, '/')
 
 /**
@@ -829,7 +827,7 @@ const declarationClassification = (lines, index) => {
  * match/conditional discriminant or collection instruction index is a stored
  * branch position regardless of what either the record or field is called.
  * A path or familiar type name never grants an exemption. */
-export const scanExecutionPositions = (text, file = '<synthetic>', compilerEvidence = undefined) => {
+export const scanExecutionPositions = (text, file = '<synthetic>') => {
   const lines = text.split('\n')
   const violations = []
   const emitted = new Set()
@@ -892,9 +890,6 @@ export const scanExecutionPositions = (text, file = '<synthetic>', compilerEvide
 
   const executableLines = lines.map((line) => line.replace(/\/\/.*$/, ''))
   const executable = executableLines.join('\n')
-  const sameConsumer = (use) => norm(use.consumerPath ?? '') === norm(file)
-  const resolvedUses = (compilerEvidence?.symbolUses ?? []).filter(sameConsumer)
-  const resolvedApplications = (compilerEvidence?.applicationUses ?? []).filter(sameConsumer)
   const executionCall =
     /\b(?:validate|send|dispatch|append|publish|write|emit|remove|add|start|stop|abort|create|delete)[A-Z]\w*\s*\(|(?<![.\w])(?:validate|send|dispatch|append|publish|write|emit|remove|add|start|stop|abort|create|delete)\s*\(/
   // Syntax-resolved function values are executable even when this module only
@@ -958,46 +953,6 @@ export const scanExecutionPositions = (text, file = '<synthetic>', compilerEvide
     }
     return { start, end, text: executableLines.slice(start, end).join('\n') }
   }
-  const compilerBranchSelectsExecution = ({ start, end }) => {
-    const inBranch = (use) => {
-      const line = use.line ?? use.startLine
-      return line >= start + 1 && line <= end
-    }
-    const applications = resolvedApplications.filter(inBranch)
-
-    // A resolved application is execution evidence when its callable returns
-    // unit or an effect carrier. Pure helpers returning immutable domain data
-    // intentionally remain green. Every arm must select such an application:
-    // a conditional validation inside one arm is not a returned operation seam.
-    const armLines = executableLines
-      .slice(start, end)
-      .map((line, index) => (line.includes('->') ? start + index + 1 : 0))
-      .filter(Boolean)
-    const effectApplicationLines = new Set(
-      applications
-        .filter((application) => {
-        const resultType = String(application.inferredType ?? '').split('->').at(-1)?.trim() ?? ''
-        return /^(?:Microsoft\.FSharp\.Core\.)?unit\b|(?:^|\.)Task(?:<|$)|(?:^|\.)Async</.test(
-          resultType,
-        )
-        })
-        .map((application) => application.startLine),
-    )
-    if (armLines.length > 0 && armLines.every((line) => effectApplicationLines.has(line))) return true
-
-    // A resolved function symbol appearing after an arm arrow without a
-    // corresponding application is a function selected for another caller.
-    return resolvedUses.some((use) => {
-      if (!inBranch(use) || !String(use.inferredType ?? '').includes('->')) return false
-      const sourceLine = executableLines[use.line - 1] ?? ''
-      const arrow = sourceLine.indexOf('->')
-      if (arrow < 0 || use.column <= arrow) return false
-      return !applications.some(
-        (application) =>
-          application.startLine === use.line && application.resolvedTarget === use.symbol,
-      )
-    })
-  }
   for (const rec of records) {
     if (!rec.exported) continue
     if (rec.classification === 'ExternalSignal' || rec.classification === 'PhysicalHandle') continue
@@ -1019,11 +974,7 @@ export const scanExecutionPositions = (text, file = '<synthetic>', compilerEvide
       )
       const drivesBranch = [...executable.matchAll(branch)].some((use) => {
         const region = branchRegion(use.index)
-        return (
-          executionCall.test(region.text) ||
-          branchSelectsExecution(region.text) ||
-          compilerBranchSelectsExecution(region)
-        )
+        return executionCall.test(region.text) || branchSelectsExecution(region.text)
       })
       if (drivesBranch || index.test(executable)) emit(rec.line, rec.source)
     }
@@ -1040,7 +991,7 @@ export const scanExecutionPositions = (text, file = '<synthetic>', compilerEvide
 }
 
 /** Scan one source text. Returns [{gate, file, line, text}, ...]. */
-export const scanText = (text, file = '<synthetic>', compilerEvidence = undefined) => {
+export const scanText = (text, file = '<synthetic>') => {
   const violations = []
   const lines = text.split('\n')
 
@@ -1049,7 +1000,7 @@ export const scanText = (text, file = '<synthetic>', compilerEvidence = undefine
   violations.push(...scanStateProducts(text, file))
   violations.push(...scanMutableRecordFields(text, file))
   violations.push(...scanRegistryJointBranches(text, file))
-  violations.push(...scanExecutionPositions(text, file, compilerEvidence))
+  violations.push(...scanExecutionPositions(text, file))
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
@@ -1171,12 +1122,12 @@ export const scanLargeDus = (text, file) => {
 }
 
 /** Scan {file, text} entries. */
-export const scanFiles = (entries, compilerEvidence = undefined) => {
+export const scanFiles = (entries) => {
   const violations = []
   for (const entry of entries) {
     const file = entry.file
     const text = entry.text
-    for (const v of scanText(text, file, compilerEvidence)) violations.push(v)
+    for (const v of scanText(text, file)) violations.push(v)
 
     // PR 9 item 4 / B: multi-bool loop detection applies to every Program
     // file, Process/ included (a PTY/process layer is not immune to a
@@ -1279,91 +1230,6 @@ export const groupByGate = (violations) => {
   return byGate
 }
 
-/**
- * Split findings into lexical vs compiler-resolved tiers.
- */
-const isValidApplicationUse = (row) => {
-  if (row === null || typeof row !== 'object' || Array.isArray(row)) return false
-  if (Object.keys(row).sort().join('\0') !== [...APPLICATION_USE_KEYS].sort().join('\0')) return false
-  return (
-    typeof row.consumerPath === 'string' && row.consumerPath.length > 0 &&
-    Number.isSafeInteger(row.startLine) && row.startLine >= 1 &&
-    Number.isSafeInteger(row.startColumn) && row.startColumn >= 0 &&
-    typeof row.resolvedTarget === 'string' && row.resolvedTarget.length > 0 &&
-    typeof row.inferredType === 'string'
-  )
-}
-
-/** Fail-closed shape check for compiler evidence. Bare `{symbolUses,applicationUses}`
- * test doubles pass when `applicationUses` is a valid array; full FCS observations
- * must additionally carry `schemaVersion: 1` and `declarationUses`. */
-export const validateCompilerEvidence = (evidence) => {
-  if (evidence === undefined || evidence === null) return { ok: false, reason: 'missing-evidence' }
-  if (typeof evidence !== 'object' || Array.isArray(evidence)) return { ok: false, reason: 'schema-mismatch' }
-  if (!Array.isArray(evidence.applicationUses)) return { ok: false, reason: 'missing-application-uses' }
-  if (!evidence.applicationUses.every(isValidApplicationUse)) return { ok: false, reason: 'schema-mismatch' }
-  if (evidence.symbolUses !== undefined && !Array.isArray(evidence.symbolUses)) return { ok: false, reason: 'schema-mismatch' }
-  if ('schemaVersion' in evidence && evidence.schemaVersion !== COMPILER_EVIDENCE_SCHEMA_VERSION) {
-    return { ok: false, reason: 'schema-mismatch' }
-  }
-  if ('declarationUses' in evidence && !Array.isArray(evidence.declarationUses)) {
-    return { ok: false, reason: 'schema-mismatch' }
-  }
-  return { ok: true, reason: 'compiler-evidence-valid' }
-}
-
-/** Project full FCS observations onto the `{symbolUses,applicationUses}` contract
- * consumed by `scanExecutionPositions`. Declaration uses carry no inferred result
- * type, so they map to symbol references with an empty `inferredType`; the
- * effectful-call branch reads `applicationUses` where the real FCS traversal
- * records `inferredType` per resolved call. */
-export const buildCompilerEvidence = (observations) => {
-  if (!observations || typeof observations !== 'object') throw new Error('dsl-ownership: missing compiler evidence')
-  const check = validateCompilerEvidence(observations)
-  if (!check.ok) throw new Error(`dsl-ownership: invalid compiler evidence (${check.reason})`)
-  const symbolUses = [
-    ...(Array.isArray(observations.symbolUses) ? observations.symbolUses : []),
-    ...(Array.isArray(observations.declarationUses)
-      ? observations.declarationUses.map((row) => ({
-        consumerPath: row.consumerPath,
-        symbol: row.symbol,
-        line: row.line,
-        column: row.column,
-        inferredType: '',
-      }))
-      : []),
-  ]
-  return { symbolUses, applicationUses: observations.applicationUses }
-}
-
-/** Resolve compiler evidence once per check run. `--lexical-only` opts into the
- * explicitly uncovered mode; otherwise `--compiler-evidence=<path>` (or
- * `DSL_COMPILER_EVIDENCE`) supplies a JSON payload, falling back to a single
- * live FCS scan. Throws fail-closed when strict evidence is required. */
-export const loadCompilerEvidence = async ({ lexicalOnly = false, evidencePath = undefined } = {}) => {
-  if (lexicalOnly) return { mode: 'lexical-only', evidence: undefined }
-  const fromFile = evidencePath ?? process.env.DSL_COMPILER_EVIDENCE
-  if (fromFile) {
-    const parsed = JSON.parse(readFileSync(fromFile, 'utf8'))
-    return { mode: 'compiler-resolved', evidence: buildCompilerEvidence(parsed) }
-  }
-  const scanned = await import('./locality-dependencies.mjs').then((mod) => mod.scanDslCompilerEvidence())
-  return { mode: 'compiler-resolved', evidence: buildCompilerEvidence(scanned) }
-}
-export const scanTiers = (entries, compilerEvidence = undefined) => {
-  const violations = scanFiles(entries, compilerEvidence)
-  const hasCompilerEvidence = Boolean(
-    compilerEvidence && (compilerEvidence.symbolUses?.length || compilerEvidence.applicationUses?.length),
-  )
-  return {
-    violations,
-    hasCompilerEvidence,
-    tier: hasCompilerEvidence ? 'compiler-resolved' : 'lexical-only',
-    lexicalViolations: violations.filter((v) => v.gate !== 'program-counter'),
-    compilerViolations: violations.filter((v) => v.gate === 'program-counter'),
-  }
-}
-
 /** Exit decision: { ok, reason }. threshold < 0 means zero-tolerance. */
 export const evaluateThreshold = (violationCount, threshold) => {
   if (violationCount === 0) return { ok: true, reason: 'clean' }
@@ -1374,33 +1240,16 @@ export const evaluateThreshold = (violationCount, threshold) => {
   return { ok: false, reason: 'fail-closed' }
 }
 
-const runCli = async () => {
+const runCli = () => {
   const thresholdArg = process.argv.find((arg) => arg.startsWith('--threshold='))
   const threshold = thresholdArg ? Number(thresholdArg.split('=')[1]) : -1
-  const lexicalOnly = process.argv.includes('--lexical-only')
-  const evidenceArg = process.argv.find((arg) => arg.startsWith('--compiler-evidence='))
-  const evidencePath = evidenceArg ? evidenceArg.split('=').slice(1).join('=') : undefined
-  const strict = process.argv.includes('--require-compiler-evidence')
 
   const productionFiles = walk(PRODUCTION_ROOT, ['.fs']).map(norm).filter(isProgramFile)
   const entries = productionFiles.map((file) => ({
     file,
     text: readFileSync(file, 'utf8'),
   }))
-  let compilerEvidence
-  let evidenceMode = 'lexical-only'
-  try {
-    const loaded = await loadCompilerEvidence({ lexicalOnly, evidencePath })
-    evidenceMode = loaded.mode
-    compilerEvidence = loaded.evidence
-  } catch (error) {
-    if (strict || !lexicalOnly) {
-      console.error(`dsl-ownership: compiler evidence unavailable — ${error instanceof Error ? error.message : String(error)}`)
-      process.exit(1)
-    }
-  }
-  const tierResult = scanTiers(entries, compilerEvidence)
-  const violations = tierResult.violations
+  const violations = scanFiles(entries)
   const byGate = groupByGate(violations)
   const write = threshold >= 0 ? console.log : console.error
 
@@ -1426,15 +1275,11 @@ const runCli = async () => {
   }
 
   if (violations.length === 0) {
-    if (!tierResult.hasCompilerEvidence) {
-      write(`dsl-ownership: uncovered (lexical-only) — ${productionFiles.length} Program/Domain files, lexical 0 / compiler uncovered (tier lexical-only; compiler evidence absent)`)
-    } else {
-      write(`dsl-ownership: OK — ${productionFiles.length} Program/Domain files, lexical ${tierResult.lexicalViolations.length} / compiler ${tierResult.compilerViolations.length} (tier compiler-resolved)`)
-    }
+    write(`dsl-ownership: OK — ${productionFiles.length} Program/Domain files`)
     process.exit(0)
   }
 
-  write(`dsl-ownership: ${violations.length} violation(s) — ${productionFiles.length} files, lexical ${tierResult.lexicalViolations.length} / compiler ${tierResult.compilerViolations.length} (tier ${tierResult.tier})\n`)
+  write(`dsl-ownership: ${violations.length} violation(s) — ${productionFiles.length} files\n`)
   for (const [gate, items] of byGate) {
     write(`${gate} (${items.length})`)
     for (const v of items) {
@@ -1465,8 +1310,5 @@ const isMain =
   process.argv[1] !== undefined &&
   resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1])
 
-if (isMain) runCli().catch((error) => {
-  console.error(`dsl-ownership: compiler evidence unavailable — ${error instanceof Error ? error.message : String(error)}`)
-  process.exit(1)
-})
+if (isMain) runCli()
 

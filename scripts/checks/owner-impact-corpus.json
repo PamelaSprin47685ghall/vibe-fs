@@ -76,14 +76,6 @@
   ],
   "timing_commands": [
     {
-      "id": "fresh-production-scan",
-      "command": [
-        "node",
-        "scripts/checks/locality-dependencies.mjs",
-        "--report-only"
-      ]
-    },
-    {
       "id": "full-release-build",
       "command": [
         "npm",
@@ -7066,15 +7058,6 @@
       }
     ],
     "timing": [
-      {
-        "id": "fresh-production-scan",
-        "raw_milliseconds": [
-          64736,
-          67141,
-          63156
-        ],
-        "median_milliseconds": 64736
-      },
       {
         "id": "full-release-build",
         "raw_milliseconds": [

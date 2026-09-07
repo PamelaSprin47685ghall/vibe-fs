@@ -65,10 +65,6 @@ const carriesEffect = (locality) => locality.capability_facts
 
 const contractIsPure = (locality) => !carriesEffect(locality)
 
-const publishesCapabilityType = (locality) => locality.capability_facts.some(({ disposition }) =>
-  disposition.case === 'classified'
-  && disposition.payload.semantic_classes.includes('capability-type-only'))
-
 const compileReachableProviders = (consumer, compileProvidersByConsumer) => {
   const visited = new Set()
   const pending = [...(compileProvidersByConsumer.get(consumer) ?? [])]
@@ -135,7 +131,7 @@ export const validateLayeringBlueprintV1 = (blueprint) => {
   for (const dependency of blueprint.dependencies) {
     if (dependency.mode !== 'compile' || dependency.relation_kind !== 'physical-port') continue
     const provider = localities.get(dependency.provider)
-    if (provider.kind !== 'contract' || !contractIsPure(provider) || !publishesCapabilityType(provider)) {
+    if (provider.kind !== 'contract' || !contractIsPure(provider)) {
       violations.push({
         code: 'invalid-physical-port-surface',
         consumer_locality: dependency.consumer,

@@ -119,7 +119,6 @@ test('WHAT[STRUCTURED-WORKFLOW-012] fixed owner impact corpus drives the product
     assert.equal(report.comparison.structural_median.reduction_percent, 20)
     assert.deepEqual(report.findings.map(({ code }) => code), [
       'wall-clock-regression-over-five-percent',
-      'wall-clock-regression-over-five-percent',
     ])
     assert.ok(!Object.hasOwn(report, 'ok'))
     assert.ok(!Object.hasOwn(report, 'verdict'))
@@ -148,7 +147,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] owner impact corpus rejects stable-case dele
   assert.throws(() => validateOwnerImpactCorpusV1(changedDefinition), /closed report-only schema/)
 
   const changedCommand = corpus()
-  changedCommand.timing_commands[0].command = ['node', 'scripts/checks/locality-slice-report.mjs']
+  changedCommand.timing_commands[0].command = ['npm', 'run', 'format-build-test', '--extra-flag']
   assert.throws(() => validateOwnerImpactCorpusV1(changedCommand), /closed report-only schema/)
 })
 
@@ -164,7 +163,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] baseline writer binds one clean exact commit
       measureTiming: () => ({ environment: environment(), timing: timing(100) }),
     })
     assert.equal(measured.baseline_measurement.commit, commit('a'))
-    assert.equal(validateOwnerImpactCorpusV1(JSON.parse(readFileSync(corpusPath))).baseline_measurement.timing.length, 2)
+    assert.equal(validateOwnerImpactCorpusV1(JSON.parse(readFileSync(corpusPath))).baseline_measurement.timing.length, 1)
     assert.throws(() => writeOwnerImpactBaselineV1(corpusPath, {
       root: fixture,
       inspectGit: () => ({ commit: commit('a'), clean: true }),

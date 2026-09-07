@@ -165,106 +165,9 @@ const conventionallyDurableTypeSpans = (text) =>
     /(?:Snapshot|Projection|Fact|Event|Codec|Payload)$/i.test(span.symbol)
     || /(?:^|\n)\s*\|\s*[A-Za-z0-9_']*(?:Snapshot|Projection|Fact|Event|Codec|Payload)\b/i.test(span.code))
 
-const methodMatches = (application, contract) =>
-  symbolMatches(application.resolvedTarget ?? application.symbol ?? '', contract.symbol ?? '')
-  && (!contract.file || [...(application.declarationPaths ?? []), ...(application.providerPaths ?? [])].map(norm).includes(norm(contract.file)))
-
-const sourcePosition = (line, column = 0) => line * 1_000_000 + column
-const rangeContains = (outer, inner) => sourcePosition(outer.startLine, outer.startColumn) <= sourcePosition(inner.startLine, inner.startColumn)
-  && sourcePosition(inner.endLine, inner.endColumn) <= sourcePosition(outer.endLine, outer.endColumn)
-const successPattern = (result) => result === 'Option' ? 'Some' : 'Ok'
-const resultContinuationMatches = (application) => {
-  const target = (application.resolvedTarget ?? '').replace(/Module\./g, '.')
-  return application.sourceAnchor === 'Result.map'
-    || application.sourceAnchor === 'Result.bind'
-    || target.endsWith('.Result.Map')
-    || target.endsWith('.Result.Bind')
-}
-
-const admittedProducerKeys = (entries, applications, admissionContracts, controlFlow) => {
-  const declarations = entries.flatMap((entry) => declarationSpans(entry.text).map((span) => ({ file: norm(entry.file), ...span })))
-  const keyOf = (declaration) => `${declaration.file}#${declaration.symbol}`
-  const targetKeys = (application) => {
-    const symbol = (application.resolvedTarget ?? '').split('.').at(-1)
-    return [...new Set([...(application.declarationPaths ?? []), ...(application.providerPaths ?? [])].map((file) => `${norm(file)}#${symbol}`))]
-  }
-  const callsByDeclaration = new Map(declarations.map((declaration) => [
-    keyOf(declaration),
-    applications.filter((application) =>
-      norm(application.consumerPath ?? '') === declaration.file
-      && application.startLine - 1 >= declaration.start
-      && application.startLine - 1 < declaration.end),
-  ]))
-  const successfulCarrier = (application) =>
-    (controlFlow.bindExpressions ?? []).some((bind) => bind.builderKind === 'TaskResult' && rangeContains(bind.binding, application))
-    || (controlFlow.matchExpressions ?? []).some((expression) => rangeContains(expression.scrutinee, application))
-    || applications.some((outer) => resultContinuationMatches(outer)
-      && rangeContains(outer, application)
-      && (controlFlow.lambdaExpressions ?? []).some((lambda) => rangeContains(outer, lambda.body) && rangeContains(lambda.body, application)))
-
-  const producers = new Set(declarations.filter((declaration) =>
-    callsByDeclaration.get(keyOf(declaration)).some((application) =>
-      admissionContracts.some((contract) => methodMatches(application, contract)) && successfulCarrier(application))).map(keyOf))
-  let changed = true
-  while (changed) {
-    changed = false
-    for (const declaration of declarations) {
-      if (producers.has(keyOf(declaration))) continue
-      const wrapsProducer = callsByDeclaration.get(keyOf(declaration)).some((application) =>
-        successfulCarrier(application)
-        && targetKeys(application).some((key) => producers.has(key)))
-      if (wrapsProducer) { producers.add(keyOf(declaration)); changed = true }
-    }
-  }
-  return {
-    matches: (application) => targetKeys(application).some((key) => producers.has(key)),
-  }
-}
-
-const admittedEffectIsDominated = (span, row, applications, admissionContracts, effectContracts, controlFlow, producerCalls) => {
-  const witnessBindings = [...span.code.matchAll(new RegExp(`\\b([a-z_][A-Za-z0-9_']*)\\s*:\\s*${escapeRe(row.symbol)}\\b`, 'g'))]
-    .map((match) => match[1])
-  const admissionUses = applications.filter((application) =>
-    admissionContracts.some((contract) => methodMatches(application, contract)) || producerCalls.matches(application))
-  const effectUses = applications.filter((application) => effectContracts.some((contract) => methodMatches(application, contract)))
-  for (const effect of effectUses) {
-    for (const admission of admissionUses) {
-      if (admission.startLine > effect.startLine) continue
-      const admittedWitnesses = (admission.argumentIdentifiers ?? []).filter((argument) =>
-        witnessBindings.includes(argument)
-        || Object.values(admission.argumentTypes ?? {}).some((type) => new RegExp(`\\b${escapeRe(row.symbol)}\\b`).test(type)))
-      if (admittedWitnesses.length === 0) continue
-      const effectWitnesses = (effect.argumentIdentifiers ?? []).filter((argument) =>
-        new RegExp(`\\b${escapeRe(row.symbol)}\\b`).test(effect.argumentTypes?.[argument] ?? ''))
-      const sameWitness = effectWitnesses.length === 0
-        || effectWitnesses.some((argument) => admittedWitnesses.includes(argument))
-      if (!sameWitness) continue
-
-      const admissionContract = admissionContracts.find((contract) => methodMatches(admission, contract))
-      const matchedSuccessArm = (controlFlow.matchExpressions ?? []).some((expression) =>
-        rangeContains(expression.scrutinee, admission)
-        && expression.clauses.some((clause) => clause.patternKind === successPattern(admissionContract?.result) && rangeContains(clause, effect)))
-      const successfulBind = (controlFlow.bindExpressions ?? []).some((bind) =>
-        bind.builderKind === 'TaskResult' && rangeContains(bind.binding, admission) && rangeContains(bind.body, effect))
-      const resultContinuation = applications.some((application) =>
-        resultContinuationMatches(application)
-        && rangeContains(application, admission)
-        && (controlFlow.lambdaExpressions ?? []).some((lambda) =>
-          rangeContains(application, lambda.body) && rangeContains(lambda.body, effect)))
-      if (matchedSuccessArm || successfulBind || resultContinuation) return true
-    }
-  }
-  return false
-}
-
 const whatIds = (value) => typeof value === 'string'
   ? value.split(',').map((id) => id.trim()).filter(Boolean)
   : []
-
-const symbolMatches = (actual, expected) => {
-  const normalized = actual.replace(/Module\./g, '.')
-  return normalized === expected || normalized.endsWith(`.${expected}`)
-}
 
 const lineOf = (text, offset) => text.slice(0, offset).split('\n').length
 const problem = (id, file, line, text) => ({ id, file: norm(file), line, text })
@@ -273,17 +176,9 @@ const problem = (id, file, line, text) => ({ id, file: norm(file), line, text })
  * @param {{file:string,text:string}[]} entries
  * @param {{version:number,contracts:object[]}} manifest
  */
-export const scanEntries = (entries, manifest, evidence = {}) => {
+export const scanEntries = (entries, manifest, registry = authorityRegistry()) => {
   const problems = []
   const byFile = new Map(entries.map((entry) => [norm(entry.file), entry.text]))
-  const registry = evidence.registry ?? authorityRegistry()
-  const compilerUses = Array.isArray(evidence.symbolUses) ? evidence.symbolUses : null
-  const applicationUses = Array.isArray(evidence.applicationUses) ? evidence.applicationUses : []
-  const controlFlow = {
-    matchExpressions: Array.isArray(evidence.matchExpressions) ? evidence.matchExpressions : [],
-    bindExpressions: Array.isArray(evidence.bindExpressions) ? evidence.bindExpressions : [],
-    lambdaExpressions: Array.isArray(evidence.lambdaExpressions) ? evidence.lambdaExpressions : [],
-  }
   const contracts = manifest?.contracts
   if (!Array.isArray(contracts)) return [problem('invalid-manifest', '<manifest>', 0, 'contracts must be an array')]
   const methodContracts = manifest?.methods
@@ -313,17 +208,6 @@ export const scanEntries = (entries, manifest, evidence = {}) => {
       else if (method.whatOwners?.[id] !== definition.package) problems.push(problem('authority-what-owner-mismatch', method.file, 0, `${method.symbol}: ${id}`))
     }
   }
-  const effectContracts = methodContracts.filter((method) => method.classification === 'Effect')
-  const admissionContracts = methodContracts.filter((method) => method.classification === 'Admission')
-  const durableSinkContracts = methodContracts.filter((method) => method.classification === 'DurableSink')
-  const producerCallsByWitness = new Map(contracts
-    .filter((row) => row.class === 'Witness')
-    .map((row) => {
-      const rowAdmissions = admissionContracts.filter((contract) => (row.admissions ?? []).some((admission) =>
-        symbolMatches(contract.symbol ?? '', admission.symbol ?? '') && norm(contract.file ?? '') === norm(admission.file ?? '')))
-      return [`${norm(row.file ?? '')}#${row.symbol ?? ''}`, admittedProducerKeys(entries, applicationUses, rowAdmissions, controlFlow)]
-    }))
-
   const byKey = new Map()
   const issuerSpansByContract = new Map()
   for (const row of contracts) {
@@ -416,39 +300,18 @@ export const scanEntries = (entries, manifest, evidence = {}) => {
       const key = `${norm(row.file ?? '')}#${row.symbol ?? ''}`
       const issuerSpans = issuerSpansByContract.get(key) ?? []
       const isInsideIssuer = (line) => issuerSpans.some((span) => span.file === file && line - 1 >= span.start && line - 1 < span.end)
-      if (compilerUses) {
-        const reportedMintLines = new Set()
-        for (const use of compilerUses) {
-          if (norm(use.consumerPath ?? '') !== file || use.isFromPattern || use.isFromType) continue
-          const declarationPaths = [...(use.declarationPaths ?? []), ...(use.providerPaths ?? [])].map(norm)
-          if (!declarationPaths.includes(norm(row.file))) continue
-          const unionConstruction = use.symbolKind === 'FSharpUnionCase' && symbolMatches(use.symbol ?? '', row.symbol)
-          const sourceLine = code.split('\n')[use.line - 1] ?? ''
-          const fieldName = (use.symbol ?? '').split('.').at(-1)
-          const fieldAtUse = sourceLine.slice(Math.max(0, use.column ?? 0))
-          const recordFieldConstruction = use.symbolKind === 'FSharpField'
-            && (use.symbol ?? '').includes(`.${row.symbol}.`)
-            && new RegExp(`^${escapeRe(fieldName)}\\s*=`).test(fieldAtUse)
-          if (!unionConstruction && !recordFieldConstruction) continue
-          if (!isInsideIssuer(use.line) && !reportedMintLines.has(use.line)) {
-            reportedMintLines.add(use.line)
-            problems.push(problem('foreign-issuance', file, use.line, row.symbol))
-          }
-        }
-      } else {
-        const mintPatterns = [
-          new RegExp(`(?<!\\.)\\b${symbol}\\s*(?:\\(|\\{\\|)`, 'g'),
-          new RegExp(`(?<!\\.)\\b${symbol}\\.issue\\b`, 'g'),
-        ]
-        for (const mintPattern of mintPatterns) {
-          for (const match of code.matchAll(mintPattern)) {
-            const line = lineOf(code, match.index)
-            const sourceLine = code.split('\n')[line - 1] ?? ''
-            const typeDeclaration = new RegExp(`^\\s*type\\s+(?:private\\s+|internal\\s+)?${symbol}\\b`).test(sourceLine)
-            const destructuringPattern = new RegExp(`^\\s*(?:let|function|match|\\|)[^=]*\\b${symbol}\\b`).test(sourceLine)
-            if (!typeDeclaration && !destructuringPattern && !isInsideIssuer(line)) {
-              problems.push(problem('foreign-issuance', file, line, row.symbol))
-            }
+      const mintPatterns = [
+        new RegExp(`(?<!\\.)\\b${symbol}\\s*(?:\\(|\\{\\|)`, 'g'),
+        new RegExp(`(?<!\\.)\\b${symbol}\\.issue\\b`, 'g'),
+      ]
+      for (const mintPattern of mintPatterns) {
+        for (const match of code.matchAll(mintPattern)) {
+          const line = lineOf(code, match.index)
+          const sourceLine = code.split('\n')[line - 1] ?? ''
+          const typeDeclaration = new RegExp(`^\\s*type\\s+(?:private\\s+|internal\\s+)?${symbol}\\b`).test(sourceLine)
+          const destructuringPattern = new RegExp(`^\\s*(?:let|function|match|\\|)[^=]*\\b${symbol}\\b`).test(sourceLine)
+          if (!typeDeclaration && !destructuringPattern && !isInsideIssuer(line)) {
+            problems.push(problem('foreign-issuance', file, line, row.symbol))
           }
         }
       }
@@ -459,63 +322,7 @@ export const scanEntries = (entries, manifest, evidence = {}) => {
         const capabilityReference = new RegExp(`\\b${symbol}\\b`)
         const durablePayload = conventionallyDurableTypeSpans(entry.text).some((span) => capabilityReference.test(span.code))
         const serializerSurface = new RegExp(`(?:Json|JSON|serialize|deserialize|encode|decode)[^\\n]*\\b${symbol}\\b|\\b${symbol}\\b[^\\n]*(?:Json|JSON|serialize|deserialize|encode|decode)`, 'i').test(code)
-        const spans = typeSpans(entry.text)
-        const payloadTypes = new Set()
-        for (const span of spans) {
-          if (span.symbol === row.symbol) continue
-          const typedCapabilityField = compilerUses?.some((use) =>
-            norm(use.consumerPath ?? '') === file
-            && use.line - 1 >= span.start
-            && use.line - 1 < span.end
-            && use.isFromType
-            && use.symbolKind === 'FSharpEntity'
-            && [...(use.declarationPaths ?? []), ...(use.providerPaths ?? [])].map(norm).includes(norm(row.file))
-            && symbolMatches(use.symbol ?? '', row.symbol)
-            && (/\{[\s\S]*\b[A-Za-z_][A-Za-z0-9_']*\s*:\s*/.test(span.code)
-              || /(?:^|\n)\s*\|\s*[A-Za-z_][A-Za-z0-9_']*(?:\s+of)?\b/.test(span.code)))
-          const lexicalCapabilityField = new RegExp(`(?:\\{|;)\\s*[A-Za-z_][A-Za-z0-9_']*\\s*:\\s*${symbol}\\b|(?:^|\\n)\\s*\\|[^\\n]*\\b${symbol}\\b`).test(span.code)
-          if (typedCapabilityField || (!compilerUses && lexicalCapabilityField)) payloadTypes.add(span.symbol)
-        }
-        let changed = true
-        while (changed) {
-          changed = false
-          for (const span of spans) {
-            if (payloadTypes.has(span.symbol)) continue
-            const nested = [...payloadTypes].some((payloadType) => new RegExp(`\\b${escapeRe(payloadType)}\\b`).test(span.code))
-            if (nested) { payloadTypes.add(span.symbol); changed = true }
-          }
-        }
-        const durableDataflow = applicationUses.some((application) =>
-          norm(application.consumerPath ?? '') === file
-          && durableSinkContracts.some((contract) => methodMatches(application, contract))
-          && Object.values(application.argumentTypes ?? {}).some((type) =>
-            [...payloadTypes, row.symbol].some((payloadType) => new RegExp(`\\b${escapeRe(payloadType)}\\b`).test(type))))
-        if (durablePayload || serializerSurface || durableDataflow) problems.push(problem('capability-persistence', file, 0, row.symbol))
-      }
-
-      if (row.class === 'Witness' && norm(row.file) !== file) {
-        const witnessReference = new RegExp(`\\b${symbol}\\b`)
-        for (const span of declarationSpans(entry.text)) {
-          const typedWitnessReference = compilerUses?.some((use) =>
-            norm(use.consumerPath ?? '') === file
-            && use.line - 1 >= span.start
-            && use.line - 1 < span.end
-            && use.symbolKind === 'FSharpEntity'
-            && (use.providerPaths ?? []).map(norm).includes(norm(row.file))
-            && symbolMatches(use.symbol ?? '', row.symbol))
-          if (compilerUses?.length > 0 ? !typedWitnessReference : !witnessReference.test(span.code)) continue
-          const applicationsInSpan = applicationUses.filter((use) =>
-            norm(use.consumerPath ?? '') === file
-            && use.startLine - 1 >= span.start
-            && use.startLine - 1 < span.end)
-          const directEffect = applicationsInSpan.some((application) => effectContracts.some((contract) => methodMatches(application, contract)))
-          const rowAdmissions = admissionContracts.filter((contract) => (row.admissions ?? []).some((admission) =>
-            symbolMatches(contract.symbol ?? '', admission.symbol ?? '') && norm(contract.file ?? '') === norm(admission.file ?? '')))
-          const producerCalls = producerCallsByWitness.get(`${norm(row.file ?? '')}#${row.symbol ?? ''}`) ?? { matches: () => false }
-          if (directEffect && !admittedEffectIsDominated(span, row, applicationsInSpan, rowAdmissions, effectContracts, controlFlow, producerCalls)) {
-            problems.push(problem('witness-direct-effect-without-admission', file, span.start + 1, row.symbol))
-          }
-        }
+        if (durablePayload || serializerSurface) problems.push(problem('capability-persistence', file, 0, row.symbol))
       }
     }
   }
@@ -523,8 +330,8 @@ export const scanEntries = (entries, manifest, evidence = {}) => {
 }
 
 export const scanRepo = (repoRoot = process.cwd(), manifest = readManifest()) => {
-  const entries = collectEntries(repoRoot, manifest)
-  const problems = scanEntries(entries, manifest, {})
+  const entries = collectEntries(repoRoot)
+  const problems = scanEntries(entries, manifest)
   return { ok: problems.length === 0, problems }
 }
 

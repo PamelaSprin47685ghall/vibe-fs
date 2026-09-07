@@ -25,78 +25,17 @@ const registry = (overrides = {}) => ({
   ...overrides,
 })
 
-const symbolUse = (consumer, provider, symbol, overrides = {}) => ({
-  consumerPath: consumer.path ?? consumer,
-  providerPaths: provider ? [provider.path ?? provider] : [],
-  symbol,
-  symbolKind: 'FSharpMemberOrFunctionOrValue',
-  line: 1,
-  column: 0,
-  isNamespace: false,
-  isModule: false,
-  isFromOpenStatement: false,
-  isFromPattern: false,
-  isFromType: false,
-  isFromUse: true,
-  missingDeclaration: false,
-  ...overrides,
-})
-
-const analyze = ({ files, owners, contracts = registry(), uses = [], migrationState, requirementTrace = REQUIREMENT_TRACE }) =>
+const analyze = ({ files, owners, contracts = registry(), migrationState, requirementTrace = REQUIREMENT_TRACE }) =>
   analyzeOwnerContracts({
     compilePaths: files.map((entry) => entry.path),
     semanticOwners: ownership(...owners),
     publishedContracts: contracts,
-    symbolUses: uses,
     migrationState,
     requirementTrace,
     repositoryRoot: ROOT,
   })
 
 const codes = (result) => result.violations.map((violation) => violation.code)
-
-test('WHAT[STRUCTURED-WORKFLOW-011] private cross-owner symbols are rejected', () => {
-  const provider = file('src/Wanxiangshu/Provider/Internal.fs')
-  const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
-  const result = analyze({
-    files: [provider, consumer],
-    owners: [
-      { path: provider.path, owner: 'provider' },
-      { path: consumer.path, owner: 'consumer' },
-    ],
-    uses: [
-      symbolUse(consumer, provider, 'Wanxiangshu.Provider.Internal.secret', {
-        line: 17,
-        column: 9,
-      }),
-    ],
-  })
-
-  const violation = result.violations.find((entry) => entry.code === 'cross-owner-private-import')
-  assert.deepEqual(
-    { code: violation?.code, message: violation?.message },
-    {
-      code: 'cross-owner-private-import',
-      message:
-        'src/Wanxiangshu/Consumer/Use.fs:17:9 → src/Wanxiangshu/Provider/Internal.fs: consumer may not consume provider symbol \'Wanxiangshu.Provider.Internal.secret\'',
-    },
-  )
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-011] Surface naming never substitutes for a declared contract', () => {
-  const provider = file('src/Wanxiangshu/Provider/Surface.fs')
-  const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
-  const result = analyze({
-    files: [provider, consumer],
-    owners: [
-      { path: provider.path, owner: 'provider' },
-      { path: consumer.path, owner: 'consumer' },
-    ],
-    uses: [symbolUse(consumer, provider, 'Wanxiangshu.Provider.Surface.value')],
-  })
-
-  assert.ok(codes(result).includes('undeclared-published-contract'))
-})
 
 test('WHAT[STRUCTURED-WORKFLOW-011] duplicate primary owners are rejected', () => {
   const contract = file('src/Wanxiangshu/Shared/Contract.fs')
@@ -116,48 +55,6 @@ test('WHAT[STRUCTURED-WORKFLOW-011] unowned production modules are rejected', ()
   const result = analyze({ files: [orphan], owners: [] })
 
   assert.ok(codes(result).includes('unowned-production-module'))
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-011] analysis fails closed without compiler evidence', () => {
-  const owned = file('src/Wanxiangshu/Alpha/Model.fs')
-  const result = analyzeOwnerContracts({
-    compilePaths: [owned.path],
-    semanticOwners: ownership({ path: owned.path, owner: 'alpha' }),
-    publishedContracts: registry(),
-  })
-
-  assert.ok(codes(result).includes('missing-compiler-symbol-uses'))
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-011] composition roots cannot match uncontracted foreign policy cases', () => {
-  const policy = file('src/Wanxiangshu/Provider/Policy.fs')
-  const root = file('src/Wanxiangshu/Host/Root.fs')
-  const policyRoot = 'Wanxiangshu.Provider.PolicyDecision'
-  const result = analyze({
-    files: [policy, root],
-    owners: [
-      { path: policy.path, owner: 'provider' },
-      { path: root.path, owner: 'host' },
-    ],
-    contracts: registry({
-      composition_roots: [
-        {
-          path: root.path,
-          owner: 'host',
-          wires: [{ path: policy.path, symbol_roots: [policyRoot] }],
-          justification: 'The host root may construct the provider input but may not own provider policy.',
-        },
-      ],
-    }),
-    uses: [
-      symbolUse(root, policy, `${policyRoot}.Allow`, {
-        symbolKind: 'FSharpUnionCase',
-        isFromPattern: true,
-      }),
-    ],
-  })
-
-  assert.ok(codes(result).includes('composition-root-foreign-policy'))
 })
 
 const ownerCycleFixture = (cycleJustifications = []) => {
@@ -190,18 +87,10 @@ const ownerCycleFixture = (cycleJustifications = []) => {
       ],
       owner_cycle_justifications: cycleJustifications,
     }),
-    uses: [
-      symbolUse(alpha, beta, 'Wanxiangshu.Beta.Contract.beta'),
-      symbolUse(beta, alpha, 'Wanxiangshu.Alpha.Contract.alpha'),
-    ],
   })
 }
 
-test('WHAT[STRUCTURED-WORKFLOW-011] unjustified owner cycles are rejected', () => {
-  assert.ok(codes(ownerCycleFixture()).includes('unjustified-owner-cycle'))
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-011] an exact live owner-cycle justification is accepted', () => {
+test('WHAT[STRUCTURED-WORKFLOW-011] an exact owner-cycle justification shape is accepted', () => {
   const result = ownerCycleFixture([
     {
       owners: ['alpha', 'beta'],
@@ -212,130 +101,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] an exact live owner-cycle justification is a
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] strict contract cycles remain live while their owners have migration backlog', () => {
-  const alphaContract = file('src/Wanxiangshu/Alpha/Contract.fs')
-  const alphaBacklog = file('src/Wanxiangshu/Alpha/Backlog.fs')
-  const betaContract = file('src/Wanxiangshu/Beta/Contract.fs')
-  const betaBacklog = file('src/Wanxiangshu/Beta/Backlog.fs')
-  const proof = 'requirements/structured-workflow/tests/owner-dependencies.test.mjs'
-  const cycleJustification = {
-    owners: ['alpha', 'beta'],
-    justification: 'The exact live contract SCC remains reviewed while unrelated owner files finish migrating.',
-  }
-  const fixture = (ownerCycleJustifications) =>
-    analyze({
-      files: [alphaContract, alphaBacklog, betaContract, betaBacklog],
-      owners: [
-        { path: alphaContract.path, owner: 'alpha' },
-        { path: alphaBacklog.path, owner: 'alpha' },
-        { path: betaContract.path, owner: 'beta' },
-        { path: betaBacklog.path, owner: 'beta' },
-      ],
-      contracts: registry({
-        contracts: [
-          {
-            path: alphaContract.path,
-            owner: 'alpha',
-            node: 'alpha-contract-cutover',
-            contract: 'Alpha.Contract',
-            kind: 'published-contract',
-            consumers: ['beta'],
-            symbols: ['Wanxiangshu.Alpha.Contract.alpha'],
-            justification: 'Beta consumes the migrated alpha contract while alpha retains unrelated backlog.',
-          },
-          {
-            path: betaContract.path,
-            owner: 'beta',
-            node: 'beta-contract-cutover',
-            contract: 'Beta.Contract',
-            kind: 'published-contract',
-            consumers: ['alpha'],
-            symbols: ['Wanxiangshu.Beta.Contract.beta'],
-            justification: 'Alpha consumes the migrated beta contract while beta retains unrelated backlog.',
-          },
-        ],
-        owner_cycle_justifications: ownerCycleJustifications,
-      }),
-      uses: [
-        symbolUse(alphaContract, betaContract, 'Wanxiangshu.Beta.Contract.beta'),
-        symbolUse(betaContract, alphaContract, 'Wanxiangshu.Alpha.Contract.alpha'),
-      ],
-      migrationState: {
-        closedPaths: [alphaContract.path, betaContract.path],
-        nodeByPath: [
-          [alphaContract.path, 'alpha-contract-cutover'],
-          [betaContract.path, 'beta-contract-cutover'],
-        ],
-        nodes: [
-          {
-            id: 'alpha-contract-cutover',
-            state: 'DONE',
-            proofs: [proof],
-            publishes: ['Alpha.Contract'],
-          },
-          {
-            id: 'beta-contract-cutover',
-            state: 'DONE',
-            proofs: [proof],
-            publishes: ['Beta.Contract'],
-          },
-        ],
-        closedOwners: [],
-      },
-    })
-
-  assert.ok(codes(fixture([])).includes('unjustified-owner-cycle'))
-  const justified = fixture([cycleJustification])
-  assert.equal(justified.ok, true, JSON.stringify(justified.violations, null, 2))
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-011] stale owner-cycle justifications are rejected', () => {
-  const owned = file('src/Wanxiangshu/Alpha/Model.fs')
-  const result = analyze({
-    files: [owned],
-    owners: [{ path: owned.path, owner: 'alpha' }],
-    contracts: registry({
-      owner_cycle_justifications: [
-        {
-          owners: ['alpha', 'beta'],
-          justification: 'This declaration has no corresponding live strongly connected component.',
-        },
-      ],
-    }),
-  })
-
-  assert.ok(codes(result).includes('stale-cycle-justification'))
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-011] foreign execution-position vocabulary is rejected even when published', () => {
-  const cursor = file('src/Wanxiangshu/Provider/Cursor.fs')
-  const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
-  const symbol = 'Wanxiangshu.Provider.Cursor.current'
-  const result = analyze({
-    files: [cursor, consumer],
-    owners: [
-      { path: cursor.path, owner: 'provider' },
-      { path: consumer.path, owner: 'consumer' },
-    ],
-    contracts: registry({
-      contracts: [
-        {
-          path: cursor.path,
-          owner: 'provider',
-          kind: 'published-contract',
-          consumers: ['consumer'],
-          symbols: [symbol],
-          justification: 'The fixture proves vocabulary restrictions outrank contract visibility.',
-        },
-      ],
-    }),
-    uses: [symbolUse(consumer, cursor, symbol)],
-  })
-
-  assert.ok(codes(result).includes('foreign-execution-position'))
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-011] durable semantic cursor evidence crosses the execution-position guard only by exact proof', () => {
+test('WHAT[STRUCTURED-WORKFLOW-011] durable semantic cursor evidence with exact proof is accepted', () => {
   const cursor = file('src/Wanxiangshu/Context/Trace/Cursor.fs')
   const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
   const symbol = 'Wanxiangshu.Context.Trace.XTraceCursor.sequence'
@@ -364,7 +130,6 @@ test('WHAT[STRUCTURED-WORKFLOW-011] durable semantic cursor evidence crosses the
         },
       ],
     }),
-    uses: [symbolUse(consumer, cursor, symbol)],
   })
 
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
@@ -394,11 +159,9 @@ test('WHAT[STRUCTURED-WORKFLOW-011] semantic evidence without an exact productio
       },
       justification: 'A trace edge without its production surface does not prove production behavior.',
     }] }),
-    uses: [symbolUse(consumer, cursor, symbol)],
   })
 
   assert.ok(codes(result).includes('invalid-semantic-evidence-metadata'))
-  assert.ok(codes(result).includes('foreign-execution-position'))
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-011] an active same-owner proof without callback surface use is rejected', () => {
@@ -426,11 +189,9 @@ test('WHAT[STRUCTURED-WORKFLOW-011] an active same-owner proof without callback 
       },
       justification: 'An active owner-law proof that does not call this surface cannot authorize the edge.',
     }] }),
-    uses: [symbolUse(consumer, cursor, symbol)],
   })
 
   assert.ok(codes(result).includes('invalid-semantic-evidence-metadata'))
-  assert.ok(codes(result).includes('foreign-execution-position'))
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-011] a comment-only WHAT mention cannot authorize semantic evidence', () => {
@@ -458,15 +219,13 @@ test('WHAT[STRUCTURED-WORKFLOW-011] a comment-only WHAT mention cannot authorize
             what_id: 'EXTERNAL-INVESTIGATION-010',
             surface_module: 'Context/Trace/SemanticTraceSurface.js',
           },
-          justification: 'A comment that names another proof must never grant an execution-position exception.',
+          justification: 'A comment that names another proof must never authorize semantic evidence.',
         },
       ],
     }),
-    uses: [symbolUse(consumer, cursor, symbol)],
   })
 
   assert.ok(codes(result).includes('invalid-semantic-evidence-metadata'))
-  assert.ok(codes(result).includes('foreign-execution-position'))
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-011] semantic evidence rejects bare paths wrong identities traversal and inactive tests', () => {
@@ -500,17 +259,15 @@ test('WHAT[STRUCTURED-WORKFLOW-011] semantic evidence rejects bare paths wrong i
         symbols: [symbol],
         law: 'WHAT[SEMANTIC-TRACE-003]',
         proof,
-        justification: 'Malformed semantic evidence must never grant an execution-position exception.',
+        justification: 'Malformed semantic evidence must be rejected on metadata alone.',
       }],
     }),
-    uses: [symbolUse(consumer, cursor, symbol)],
     requirementTrace,
   })
 
   for (const proof of malformed) {
     const result = run(proof)
     assert.ok(codes(result).includes('invalid-semantic-evidence-metadata'))
-    assert.ok(codes(result).includes('foreign-execution-position'))
   }
 
   const skippedProof = {
@@ -532,7 +289,6 @@ test('WHAT[STRUCTURED-WORKFLOW-011] semantic evidence rejects bare paths wrong i
     }
     const inactive = run(skippedProof, inactiveTrace)
     assert.ok(codes(inactive).includes('invalid-semantic-evidence-metadata'))
-    assert.ok(codes(inactive).includes('foreign-execution-position'))
   }
 
   const foreignLaw = analyze({
@@ -554,12 +310,10 @@ test('WHAT[STRUCTURED-WORKFLOW-011] semantic evidence rejects bare paths wrong i
         what_id: 'EXTERNAL-INVESTIGATION-010',
         surface_module: 'Context/Trace/SemanticTraceSurface.js',
       },
-      justification: 'A foreign owner law must never grant this provider an execution-position exception.',
+      justification: 'A foreign owner law must never authorize this provider semantic evidence.',
     }] }),
-    uses: [symbolUse(consumer, cursor, symbol)],
   })
   assert.ok(codes(foreignLaw).includes('invalid-semantic-evidence-metadata'))
-  assert.ok(codes(foreignLaw).includes('foreign-execution-position'))
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-011] semantic evidence fails closed without normative metadata or with symbol roots', () => {
@@ -589,34 +343,6 @@ test('WHAT[STRUCTURED-WORKFLOW-011] semantic evidence fails closed without norma
   assert.ok(codes(result).includes('invalid-semantic-evidence-authorization'))
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] immutable data fields named Cursor are not execution positions', () => {
-  const provider = file('src/Wanxiangshu/Provider/Anchor.fs')
-  const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
-  const symbol = 'Wanxiangshu.Provider.TraceAnchor.Cursor'
-  const result = analyze({
-    files: [provider, consumer],
-    owners: [
-      { path: provider.path, owner: 'provider' },
-      { path: consumer.path, owner: 'consumer' },
-    ],
-    contracts: registry({
-      contracts: [
-        {
-          path: provider.path,
-          owner: 'provider',
-          kind: 'published-contract',
-          consumers: ['consumer'],
-          symbols: [symbol],
-          justification: 'The cursor is immutable trace-anchor data, not an executable workflow position.',
-        },
-      ],
-    }),
-    uses: [symbolUse(consumer, provider, symbol, { symbolKind: 'FSharpField' })],
-  })
-
-  assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
-})
-
 test('WHAT[STRUCTURED-WORKFLOW-011] an exact published symbol is accepted', () => {
   const provider = file('src/Wanxiangshu/Provider/Contract.fs')
   const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
@@ -639,7 +365,6 @@ test('WHAT[STRUCTURED-WORKFLOW-011] an exact published symbol is accepted', () =
         },
       ],
     }),
-    uses: [symbolUse(consumer, provider, symbol)],
   })
 
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
@@ -681,7 +406,6 @@ const migrationContractFixture = ({
         },
       ],
     }),
-    uses: [symbolUse(consumer, provider, symbol)],
     migrationState: {
       closedPaths: closed ? [provider.path] : [],
       nodeByPath: [[provider.path, node.id]],
@@ -695,26 +419,9 @@ test('WHAT[STRUCTURED-WORKFLOW-011] a published contract binds its exact DONE no
   const result = migrationContractFixture()
 
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
-  assert.equal(result.strictEdges.length, 1)
-  assert.equal(result.pendingEdges.length, 0)
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] pending providers stay visible and cannot publish contracts before cutover', () => {
-  const provider = file('src/Wanxiangshu/Provider/Internal.fs')
-  const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
-  const pending = analyze({
-    files: [provider, consumer],
-    owners: [
-      { path: provider.path, owner: 'provider' },
-      { path: consumer.path, owner: 'consumer' },
-    ],
-    uses: [symbolUse(consumer, provider, 'Wanxiangshu.Provider.Internal.value')],
-    migrationState: { closedPaths: [], nodeByPath: [], nodes: [], closedOwners: [] },
-  })
-
-  assert.equal(pending.ok, true, JSON.stringify(pending.violations, null, 2))
-  assert.equal(pending.pendingEdges.length, 1)
-  assert.equal(pending.strictEdges.length, 0)
+test('WHAT[STRUCTURED-WORKFLOW-011] contracts cannot publish before cutover', () => {
   assert.ok(codes(migrationContractFixture({ closed: false })).includes('contract-before-cutover'))
 })
 
@@ -733,7 +440,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] migration proof inventory cannot grant or de
   assert.equal(codes(unrelated).includes('contract-without-proof'), false)
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] wildcard authorizations and stale consumer grants fail closed', () => {
+test('WHAT[STRUCTURED-WORKFLOW-011] wildcard authorizations fail closed', () => {
   const provider = file('src/Wanxiangshu/Provider/Contract.fs')
   const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
   const unused = file('src/Wanxiangshu/Unused/Model.fs')
@@ -753,41 +460,16 @@ test('WHAT[STRUCTURED-WORKFLOW-011] wildcard authorizations and stale consumer g
           kind: 'published-contract',
           consumers: ['consumer', 'unused'],
           symbols: [symbol, 'Wanxiangshu.Provider.*'],
-          justification: 'The fixture deliberately contains a wildcard and a stale consumer grant.',
+          justification: 'The fixture deliberately contains a wildcard authorization.',
         },
       ],
     }),
-    uses: [symbolUse(consumer, provider, symbol)],
   })
 
   assert.ok(codes(result).includes('invalid-symbol-authorization'))
-
-  const staleConsumer = analyze({
-    files: [provider, consumer, unused],
-    owners: [
-      { path: provider.path, owner: 'provider' },
-      { path: consumer.path, owner: 'consumer' },
-      { path: unused.path, owner: 'unused' },
-    ],
-    contracts: registry({
-      contracts: [
-        {
-          path: provider.path,
-          owner: 'provider',
-          kind: 'published-contract',
-          consumers: ['consumer', 'unused'],
-          symbols: [symbol],
-          justification: 'The unused owner deliberately has no compiler-resolved edge to this contract.',
-        },
-      ],
-    }),
-    uses: [symbolUse(consumer, provider, symbol)],
-  })
-
-  assert.ok(codes(staleConsumer).includes('stale-contract-consumer'))
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] a symbol root authorizes only that aggregate', () => {
+test('WHAT[STRUCTURED-WORKFLOW-011] a symbol root declaration shape is accepted', () => {
   const provider = file('src/Wanxiangshu/Provider/Contract.fs')
   const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
   const aggregate = 'Wanxiangshu.Provider.ProviderOutcome'
@@ -809,96 +491,9 @@ test('WHAT[STRUCTURED-WORKFLOW-011] a symbol root authorizes only that aggregate
         },
       ],
     }),
-    uses: [symbolUse(consumer, provider, `${aggregate}.Completed`, { symbolKind: 'FSharpUnionCase' })],
   })
 
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-011] a published file does not authorize a sibling symbol', () => {
-  const provider = file('src/Wanxiangshu/Provider/Contract.fs')
-  const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
-  const published = 'Wanxiangshu.Provider.Contract.published'
-  const secret = 'Wanxiangshu.Provider.Contract.secret'
-  const result = analyze({
-    files: [provider, consumer],
-    owners: [
-      { path: provider.path, owner: 'provider' },
-      { path: consumer.path, owner: 'consumer' },
-    ],
-    contracts: registry({
-      contracts: [
-        {
-          path: provider.path,
-          owner: 'provider',
-          kind: 'published-contract',
-          consumers: ['consumer'],
-          symbols: [published],
-          justification: 'Consumer receives only the provider-owned published value.',
-        },
-      ],
-    }),
-    uses: [symbolUse(consumer, provider, published), symbolUse(consumer, provider, secret, { line: 2 })],
-  })
-
-  assert.ok(codes(result).includes('unauthorized-contract-symbol'))
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-011] a published symbol does not authorize a sibling consumer', () => {
-  const provider = file('src/Wanxiangshu/Provider/Contract.fs')
-  const allowed = file('src/Wanxiangshu/Allowed/Use.fs')
-  const denied = file('src/Wanxiangshu/Denied/Use.fs')
-  const symbol = 'Wanxiangshu.Provider.Contract.published'
-  const result = analyze({
-    files: [provider, allowed, denied],
-    owners: [
-      { path: provider.path, owner: 'provider' },
-      { path: allowed.path, owner: 'allowed' },
-      { path: denied.path, owner: 'denied' },
-    ],
-    contracts: registry({
-      contracts: [
-        {
-          path: provider.path,
-          owner: 'provider',
-          kind: 'published-contract',
-          consumers: ['allowed'],
-          symbols: [symbol],
-          justification: 'Only the allowed owner receives this provider-owned symbol.',
-        },
-      ],
-    }),
-    uses: [symbolUse(allowed, provider, symbol), symbolUse(denied, provider, symbol, { line: 2 })],
-  })
-
-  assert.ok(codes(result).includes('unauthorized-contract-consumer'))
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-011] stale exact symbol grants are rejected', () => {
-  const provider = file('src/Wanxiangshu/Provider/Contract.fs')
-  const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
-  const result = analyze({
-    files: [provider, consumer],
-    owners: [
-      { path: provider.path, owner: 'provider' },
-      { path: consumer.path, owner: 'consumer' },
-    ],
-    contracts: registry({
-      contracts: [
-        {
-          path: provider.path,
-          owner: 'provider',
-          kind: 'published-contract',
-          consumers: ['consumer'],
-          symbols: ['Wanxiangshu.Provider.Contract.removed'],
-          justification: 'The declaration deliberately names a symbol with no live compiler edge.',
-        },
-      ],
-    }),
-    uses: [symbolUse(consumer, provider, 'Wanxiangshu.Provider.Contract.live')],
-  })
-
-  assert.ok(codes(result).includes('stale-symbol-authorization'))
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-011] an adapter target cannot authorize an undeclared provider port', () => {
@@ -921,10 +516,9 @@ test('WHAT[STRUCTURED-WORKFLOW-011] an adapter target cannot authorize an undecl
         },
       ],
     }),
-    uses: [symbolUse(adapter, provider, `${portRoot}.Read`)],
   })
 
-  assert.ok(codes(result).includes('cross-owner-private-import'))
+  assert.ok(codes(result).includes('undeclared-physical-port'))
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-011] an exact physical port and adapter target is accepted', () => {
@@ -957,11 +551,9 @@ test('WHAT[STRUCTURED-WORKFLOW-011] an exact physical port and adapter target is
         },
       ],
     }),
-    uses: [symbolUse(adapter, port, `${portRoot}.Read`, { symbolKind: 'FSharpMemberOrFunctionOrValue' })],
   })
 
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
-  assert.equal(result.allowedEdges[0]?.authorizationKind, 'physical-adapter')
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-011] physical adapters reject bare path targets', () => {
@@ -1008,40 +600,12 @@ test('WHAT[STRUCTURED-WORKFLOW-011] exact composition-root wiring is accepted', 
         },
       ],
     }),
-    uses: [symbolUse(root, contract, symbol)],
   })
 
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] composition-root targets do not authorize sibling symbols', () => {
-  const contract = file('src/Wanxiangshu/Provider/Contract.fs')
-  const root = file('src/Wanxiangshu/Host/Root.fs')
-  const published = 'Wanxiangshu.Provider.Contract.create'
-  const secret = 'Wanxiangshu.Provider.Contract.secret'
-  const result = analyze({
-    files: [contract, root],
-    owners: [
-      { path: contract.path, owner: 'provider' },
-      { path: root.path, owner: 'host' },
-    ],
-    contracts: registry({
-      composition_roots: [
-        {
-          path: root.path,
-          owner: 'host',
-          wires: [{ path: contract.path, symbols: [published] }],
-          justification: 'The root is limited to one exact provider-owned factory.',
-        },
-      ],
-    }),
-    uses: [symbolUse(root, contract, published), symbolUse(root, contract, secret, { line: 2 })],
-  })
-
-  assert.ok(codes(result).includes('undeclared-published-contract'))
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-011] source and requirement graphs stay distinct and requirement edges need prose', () => {
+test('WHAT[STRUCTURED-WORKFLOW-011] requirement edges need prose', () => {
   const owned = file('src/Wanxiangshu/Alpha/Model.fs')
   const result = analyze({
     files: [owned],
@@ -1059,113 +623,4 @@ test('WHAT[STRUCTURED-WORKFLOW-011] source and requirement graphs stay distinct 
   })
 
   assert.ok(codes(result).includes('invalid-requirement-dependency'))
-  assert.notDeepEqual(result.sourceOwnerEdges, result.requirementOwnerEdges)
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-011] compiler symbol uses are authoritative without lexical evidence', () => {
-  const provider = file('src/Wanxiangshu/Provider/Internal.fs')
-  const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
-  const result = analyze({
-    files: [provider, consumer],
-    owners: [
-      { path: provider.path, owner: 'provider' },
-      { path: consumer.path, owner: 'consumer' },
-    ],
-    uses: [symbolUse(consumer, provider, 'Wanxiangshu.Provider.Internal.inferred')],
-  })
-
-  assert.ok(codes(result).includes('cross-owner-private-import'))
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-011] type-only symbol uses remain dependency evidence', () => {
-  const provider = file('src/Wanxiangshu/Provider/Model.fs')
-  const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
-  const result = analyze({
-    files: [provider, consumer],
-    owners: [
-      { path: provider.path, owner: 'provider' },
-      { path: consumer.path, owner: 'consumer' },
-    ],
-    uses: [
-      symbolUse(consumer, provider, 'Wanxiangshu.Provider.HiddenOutcome', {
-        symbolKind: 'FSharpEntity',
-        isFromType: true,
-        isFromUse: false,
-      }),
-    ],
-  })
-
-  assert.ok(codes(result).includes('cross-owner-private-import'))
-  assert.equal(result.sourceEdges[0].useKind, 'type')
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-011] same-owner cross-file uses are not border crossings', () => {
-  const provider = file('src/Wanxiangshu/Alpha/Provider.fs')
-  const consumer = file('src/Wanxiangshu/Alpha/Consumer.fs')
-  const result = analyze({
-    files: [provider, consumer],
-    owners: [
-      { path: provider.path, owner: 'alpha' },
-      { path: consumer.path, owner: 'alpha' },
-    ],
-    uses: [symbolUse(consumer, provider, 'Wanxiangshu.Alpha.Provider.value')],
-  })
-
-  assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
-  assert.equal(result.sourceEdges.length, 0)
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-011] external symbols and raw open tokens are ignored', () => {
-  const provider = file('src/Wanxiangshu/Provider/Contract.fs')
-  const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
-  const result = analyze({
-    files: [provider, consumer],
-    owners: [
-      { path: provider.path, owner: 'provider' },
-      { path: consumer.path, owner: 'consumer' },
-    ],
-    uses: [
-      symbolUse(consumer, null, 'System.String', { symbolKind: 'FSharpEntity', isFromType: true }),
-      symbolUse(consumer, provider, 'Wanxiangshu.Provider.Contract', {
-        symbolKind: 'FSharpEntity',
-        isModule: true,
-        isFromOpenStatement: true,
-      }),
-    ],
-  })
-
-  assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
-  assert.equal(result.sourceEdges.length, 0)
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-011] project symbols without declaration locations fail closed', () => {
-  const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
-  const result = analyze({
-    files: [consumer],
-    owners: [{ path: consumer.path, owner: 'consumer' }],
-    uses: [symbolUse(consumer, null, 'Wanxiangshu.Missing.value', { missingDeclaration: true })],
-  })
-
-  assert.ok(codes(result).includes('missing-symbol-declaration'))
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-011] multiple production declaration locations fail closed', () => {
-  const left = file('src/Wanxiangshu/Provider/Left.fs')
-  const right = file('src/Wanxiangshu/Provider/Right.fs')
-  const consumer = file('src/Wanxiangshu/Consumer/Use.fs')
-  const result = analyze({
-    files: [left, right, consumer],
-    owners: [
-      { path: left.path, owner: 'provider' },
-      { path: right.path, owner: 'provider' },
-      { path: consumer.path, owner: 'consumer' },
-    ],
-    uses: [
-      symbolUse(consumer, left, 'Wanxiangshu.Provider.ambiguous', {
-        providerPaths: [left.path, right.path],
-      }),
-    ],
-  })
-
-  assert.ok(codes(result).includes('ambiguous-symbol-declaration'))
 })

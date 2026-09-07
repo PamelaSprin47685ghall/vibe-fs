@@ -13,7 +13,7 @@
 
 ### 2. 结构所有权与反状态机门禁（`dsl-ownership`）
 
-DSL 门禁只允许纯源码文本检查。`scripts/checks/dsl-ownership.mjs` 中下列规则及其反例仍适用；当前 CLI 调用 FCS 的路径违反 VERIFICATION-SYSTEM-001，属于 GAP-031，不能把现有入口宣称为合规门禁：
+DSL 门禁只执行纯源码文本检查。FCS 调用、compiler-evidence 参数与环境变量、lexical-only 切换及对应 tier 已删除；CLI tripwire 回归证明文本检查不启动 dotnet。
 - `second-runtime-protocol` & `business-interpreter`：拦截 Command/Reply 总线、AST 解释器与协议重放逻辑。
 - `program-counter` & `behaviour-bool`：拦截作为控制流标记的枚举、阶段后缀、stored/exported `NextAction|NextStep|ResumeAt*|StepIndex|ContinueToken` 与跨调用状态字段；ExternalSignal/PhysicalHandle 同名碰撞必须在声明处正向分类。
 - `DSL-class` taxonomy：区分 Vocabulary、DurableFact、Evidence、Decision、ExternalSignal、Witness、Capability、Receipt、PhysicalHandle；分类说明值的语义，不能把 PC 洗成领域状态。
@@ -49,11 +49,11 @@ DSL 门禁只允许纯源码文本检查。`scripts/checks/dsl-ownership.mjs` �
 
 - `scripts/checks/semantic-decorator-invariant.mjs` 对名称明确表达 retry/fallback/recovery/eventually/dedupe/deadline 的 trace-policy 词汇检查全部函数端口，对其他函数只检查 canonical decorator port（operation/next/wrapped/inner），并识别等价重复调用、loop 与递归再进入；语义装饰器必须声明 owner、WHAT、trace relation、executable proof、有限 bound，以及 failure/cancel/deadline policy。只调用一次且保持业务结果、multiplicity 与 authority 的透明资源/诊断 scope 合法。generic middleware/decorator interface 与动态注册硬失败。
 - `scripts/checks/plugin-transforms-invariant.mjs` 以纯 scanner 固定 `PluginTransforms` 的 typed `TransformMode` 与静态变换顺序。
-- M6 终态由 slice manifest validator 与 owner-project graph 共同治理跨 locality 引用：slice validator 核对 exact direct grant、bounded effective audience 与 exposure matrix；owner-project graph 校验 declared ProjectReference DAG、exact compile closure、locality kind 与 flattened emit source 并集。仓库自定义 FCS/FSharp.Compiler.Service 扫描在任何位置均被禁止（whole-tree、focused/locality、fixture、report-only、CLI、CI、prebuild、cached/snapshot/reuse/externally supplied evidence 均在内）；不存在从 compiler-resolved declaration use 推导 actual source edge 的义务，canonical world 不含 actual_source_edges。M6.4 前旧 `owner-contracts`/`owner-projects` 仍是唯一 release gate；禁止以 report-only 或其他临时通道运行自定义 FCS analyzer。M6.4 在一个 commit 中替换旧授权 schema与 owner-wide expansion，禁止双重权威。semantic-evidence 继续由共享 validator 对齐 requirement-trace、Surface owner/law 与 exact callback 可达 Surface use。现有 FCS analyzer、evidence 与 tests 为不合规缺口（见 GAP-031），不构成可执行验收。
+- M6 终态由 slice manifest validator 与 owner-project graph 共同治理声明式引用：核对 direct grant、bounded effective audience、exposure、DAG 与精确 compile closure。FCS analyzer、evidence API 与专用 tests 已删除，canonical world 不含 actual_source_edges；现有源码门禁保留 metadata 与工程图检查，owner-wide manifest 的完整切换仍在 GAP-031。semantic-evidence 继续由共享 validator 对齐 requirement-trace、Surface owner/law 与 exact callback 可达 Surface use。
 
 ### 5. Locality slice authorization cutover
 
-57.15 cutover 后，旧白盒 FCS snapshot/delta/cache 管线已退休，且不得以任何形式恢复：禁止新增任何 fresh、轻量的 compiler-resolved locality dependency analyzer（whole-tree、focused/locality、fixture、report-only、CLI、CI、prebuild、cached/snapshot/reuse/externally supplied evidence 均在内）；以 symbol identity 定位 declaration owner、映射后丢弃、输出不持久化、不恢复 per-symbol ACL 等写法也不改变被禁性质。要求（desired rule）与当前违规实现的区别以 GAP-031 为准，不得声称移除已完成。`owner-projects` 继续提供 source→locality 唯一映射、ProjectReference DAG 与 closure。M6.4 后 slice validator 以 locality ID 为授权主键，owner identity 不参与准入；semantic-evidence 的 `{path,title,what_id,surface_module}` 仍由共享 validator同时对齐 requirement-trace proof graph、Surface owner/law 与 exact callback 静态可达 Surface use。
+FCS snapshot/delta/cache 与重新引入的 fresh scanner 均已删除，不得恢复。`owner-projects` 继续提供 source→locality 唯一映射、ProjectReference DAG 与 closure；slice 授权切换和完整证明仍见 GAP-031。semantic-evidence 的 `{path,title,what_id,surface_module}` 由共享 validator 对齐 requirement-trace、Surface owner/law 与 exact callback 静态可达 Surface use，不依赖 compiler evidence。
 
 Fable-specific proof 分三层。第一层是结构 gate：ProjectReference graph 与 locality manifest 一致，并检查 foreign-facing contract/adapter locality 的**整个 transitive ProjectReference closure**；任一 contract → runtime/private 反向依赖即 RED。第二层是 compiler surface：graduated owner 的每个 production `.fs` 都有 sibling `.fsi`；owner project 与 flattened emit 都按 `.fsi → .fs` 编译。真实编译 canary 只断言编译成功/失败或公开行为：从 consumer 精确 closure 移除必需 provider 后编译为 RED；合法 direct/transitive 输入使用为 GREEN；module-local private binding 与 `.fsi` 未导出 symbol 的外部访问为 RED；implementation 与签名不兼容为 RED。不读取 compiler AST、symbol table 或扫描报告。`.fsi` 未签名 symbol 在 Fable source-merge 后不可见；signature-only project 本身不会产生可消费模块，因此不能用 header-only 假实现替代真实 contract implementation。第三层是永久工具链 canary：direct/transitive ProjectReference 下 `internal`、top-level private module 与 `DisableTransitiveProjectReferences` 都不是 firewall；module-local `let private` 与 `.fsi` 才是已证明的源码内隐藏原语，其隐藏性必须由真实编译器边界反例证明，不得由扫描器或人工 symbol 清单模拟；不得把 Fable 的 `internal`、top-level private module 或 `DisableTransitiveProjectReferences` 当作未经证明的隔离边界。ProjectReference 声明图始终是源码输入与归属边界的权威，但声明 DAG 本身不是 Fable assembly 隔离：跨 locality 可见性仅由 sibling `.fsi` 签名面、module-local `let private` 与普通 Fable 编译行为共同约束；普通受支持 Fable 编译（内部使用 compiler services）允许，不属于被禁的自定义 scanner。cutover 编译是其可达 DAG 的精确扁平 closure projection，消除 Fable 递归 MSBuild 图展开成本，而原生递归 fixture 保持作为工具链行为的永久 oracle。flattened emit 只证明可发布 JS + signature compatibility，不替代 project DAG gate。
 
@@ -63,14 +63,14 @@ Fable-specific proof 分三层。第一层是结构 gate：ProjectReference grap
 
 M6.3a 先建立不读取仓库、不拥有 release authority 的 production pure oracle。`scripts/lib/canonical-json-v1.mjs` 唯一拥有 canonical text comparator、closed JSON byte encoding 与 domain-separated digest；`scripts/lib/locality-slice-world-v1.mjs` 唯一拥有 `CanonicalWorldV1` 的 closed projection、ProjectReference closure、terminal classifier 与完整 locality candidate universe。任何 report、property、worksheet 或后续 release gate只调用这些函数，不复制排序、closure 或 classifier。
 
-`scripts/lib/capability-observations-v1.mjs` 分开验证 capability partition `C(W)` 与 JavaScript traversal `J(W)`。前者核对 observation/disposition/fact identity 全等，后者核对 AST node/visit partition 与 emitted observation union；Node 仅作为 runtime 标签保留，拒绝只由 authority、mutable resource、capability value/factory/effect constructor或 Unknown 决定。M6.3a 的 fixtures 只向该 production oracle提供最小 legal world 与单点 mutation；真实 JS production extractor属于 M6.3b，禁止在测试中重建；自定义 F#/FCS production extractor 被禁止（直接或经 wrapper、反射、`.fsx` 调用 compiler service 提取 F# typed AST、symbol use、application use、推断类型或源码依赖图；whole-tree、focused、fixture、report-only 均无豁免），现有实现为不合规缺口（见 GAP-031）。
+`scripts/lib/capability-observations-v1.mjs` 分开验证非 FCS capability partition 与 JavaScript traversal。前者核对 observation/disposition/fact identity，后者核对 AST node/visit partition 与 emitted observation union；Node 只是 runtime 标签，拒绝取决于 authority、mutable resource、capability value/factory/effect constructor 或 Unknown。旧 F# node/external-symbol/signature-export variants、classifier 与 compiler-dependent extractor 已删除；测试直接验证拒绝旧 observation 输入，不接受旧 evidence 兼容路径。
 
 fact validator对每行重新调用唯一classifier并比较canonical disposition；所有collection入口先验证array，非法shape只返回`capability-extraction-incomplete`。world reference validator闭合fact/artifact/traversal并拒绝零node traversal。JS visitor返回带closed binding provenance的`JsCapabilityObservationV1`，不得按root字符串猜free；traversal validator以raw AST与scope resolver内部重建node universe，只接受外部visit partition，不接受caller node rows。它以显式source context包装`JavaScriptCapability` raw observation并自行计算 emitted observation union，再与canonical facts按source独立投影比较。测试的visit partition可由production visitor产生，但canonical expected facts必须独立写出，不能把visitor输出回填为expected。scope-aware binding resolution属于M6.3b extractor输入；`unresolved`必为Unknown。
 `scripts/lib/locality-slice-policy-v1.mjs`拥有M6 point boundary的pure policy：contract purity、compile closure、physical-port与fatal settlement/injection/incident唯一性。它只消费`CanonicalCapabilityFactV1`与声明的 dependency mode（declared ProjectReference closure，不接受 FCS compiler dependency 观察），不接受测试手写的authority或semantic-class标签；owner fixtures只能构造非 FCS raw observation（JS/generated/explicit interop byte-source）并调用同一classifier。测试不得另写第二套 classification formula 或自定义 FCS scanner；普通源码文本静态检查仍允许。
 
 `scripts/lib/generated-artifact-v1.mjs` 唯一计算 artifact identity、raw-byte digests、tracked-input digest并校验 exact generated relation。selector只返回filesystem paths；generator boundary拒绝root外路径并规范为repository-relative identity，再经注入tracking reader取得bytes。loop-detector generator同步消费该 reader，不能由 `repositoryTextEntries()` 私自读取。`scripts/lib/cutover-inputs-v1.mjs` 只表达 semantic closure、stage-0 index与worksheet/formal snapshot closed lifecycle；M6.4 前保持 report-only（非 FCS lifecycle，不授权任何自定义扫描），旧 gate仍是唯一 release authority。
 
-worksheet 的合法规则仅是：从当前 owner inventory 构造 live ID，只允许覆盖全 `undecided` 集合，拒绝覆盖任何 `decided` record，不携 digest、classification 或授权力。现有 `locality-slice-report.mjs --write-fresh-worksheet` 会进入被禁 FCS 路径，不得执行；其替换属于 GAP-031，不能以 bootstrap 为例外运行扫描。
+worksheet 的合法规则仅是：从当前 owner inventory 构造 live ID，只允许覆盖全 `undecided` 集合，拒绝覆盖任何 `decided` record，不携 digest、classification 或授权力。旧 compiler-dependent worksheet CLI 已删除，不提供 bootstrap 扫描例外。
 
 generated relation validator只消费closed relation/artifact/traversal/actual-import、directed execution-lineage edges、registered-proof/runtime-callback与canonical fact rows；artifact reference从正式observation payload派生，不接受镜像列表。lineage证明build→generator→selector，proof callback证明generator+runtime Surface；两类证据不可互换。`TraversalObservationSetV1`是同次production traversal validation返回的ephemeral closed evidence，不进入canonical world；validator要求每个artifact traversal恰有一行，并把其emitted observation ID union与同artifact canonical JavaScript fact精确比较。`unknown_node_count>0`直接RED，零node或open traversal row在schema边界RED。semantic closure要求每个扫描入口有exact import row，selector必须返回closed array；M6.3b只负责从 JS 真实 AST/Acorn scope与registry产生这些 evidence；禁止从 F# typed AST 或 FCS symbol 产生 evidence，禁止增加 FCS scanner（普通源码文本静态检查除外），不能放宽M6.3a oracle。
 
@@ -78,15 +78,15 @@ cutover state validator不接收已求值closure。调用方只交exact `closure
 
 ### 5.2 Production report 的非 FCS 边界与现存缺口
 
-现有 `scripts/checks/locality-dependencies.mjs`、`locality-symbol-uses.fsx`、`scanCompilerObservationsV1`、`scanDslCompilerEvidence` 及其 caller/fixture 均属 GAP-031 的违规残余，不得执行。上次按需裁剪分类、批量 project check 与双路径 evidence 对等比较的优化不改变其被禁性质；外部传入 JSON、缓存或 snapshot 也不能恢复扫描证据的权威。
+独立 FCS 扫描器、Node launcher、compiler-dependent report CLI、production extractor、专用 fixtures 及其执行入口已删除。DSL、authority、decorator 与 owner-contract 门禁均不再消费 compiler evidence；旧 FCS observation variant 与 actual-source-edge schema 同时退出，不能经外部 JSON 或缓存重新输入。
 
-合法 report 只能组合当前声明性 inventory、tracked generator、显式 interop 源码字节、JavaScript AST/Acorn scope 与唯一 canonical world。调用方不得提交 compiler observations、typed-AST 节点、FCS symbol 或 `PublicSignatureExport` 分类。F# 可见性由签名编译证明，业务语义由 owner 行为 proof 证明；缺失证据不得补空数组冒充通过。现有 `production-capability-extractor-v1.mjs` 与 `locality-slice-report.mjs` 尚依赖旧扫描输入，不能宣称已满足此机制。
+合法 report 只能消费声明性 inventory 与可追溯的非 FCS 字节证据。纯 JavaScript capability validator、canonical world/query、generated artifact 与 report projection 保留；没有新建替代扫描器或 production report CLI。F# 可见性由签名编译证明，业务语义由 owner 行为 proof 证明，缺失证据不得补空数组冒充通过。
 
-非 FCS 路径仍要求完整 JS structural enumeration、semantic visit、traversal validation、generated artifact byte/linkage 核对与 canonical fact 校验。report 的 Unknown census 只是验证后事实的确定性投影，不得反向回填 world、worksheet 或授权输入；`--full` 只能扩展合法非 FCS 诊断，不能运行扫描器。当前 report CLI、worksheet writer 与旧 schema/test 的迁移均在 GAP-031，report-only 无执行豁免。
+非 FCS 路径仍要求完整 JS structural enumeration、semantic visit、traversal validation、generated artifact byte/linkage 核对与 canonical fact 校验。Unknown census 只保留为验证后事实的纯投影，不反向回填 world、worksheet 或授权输入。删除旧 CLI 与迁移部分纯测试不等于完整 production 授权证明闭合，GAP-031 保持未关闭。
 
 canonical JSON仍只有一套byte protocol；digest改用同一recursive encoder直接增量写入SHA-256，避免先物化超大字符串。文本比较器按Unicode scalar逐项读取，不分配code-point数组。derived disposition与caller-supplied fact最终都经过同一classifier、identity、collision、partition与coverage校验；production summary只把海量Unknown violation坐标压成带exact count的单行finding，canonical facts与`unknown_count`不丢失，显式full模式保留逐坐标诊断。
 
-owner-impact 性能比较只允许正常 Fable 构建与不执行 FCS 的结构测量。`scripts/owner-impact-report.mjs` 和 `owner-impact-corpus.json` 当前仍登记 `fresh-production-scan` 计时命令，属于 GAP-031；禁止执行该命令，不能声称已移除。fixed case/forward closure/reverse impact/input union 的结构基线可保留；待计时命令与 release sink 均清除独立 FCS 调用后，再按 clean checkout、固定 compiler inputs 与有限 recorded timing 比较构建性能。性能finding不取得correctness authority。
+owner-impact timing 只保留正常 full-release-build；FCS 扫描计时命令与测量轴已从脚本、corpus 和测试删除，既有 full-build 样本未改写。fixed case/forward closure/reverse impact/input union 的结构基线保留，性能 finding 不取得正确性权威。
 
 `scripts/checks/owner-impact-corpus.json`绑定clean exact `e6268f35a8a3bbff6587960160bd4ceb3b64dbc3`。以下计时中 fresh-production-scan 一组为历史测量（经已禁用的自定义 FCS 扫描取得），仅具历史意义，不得作为必跑命令或验收依据：同环境三次 raw sample 的 fresh production scan 曾为`64,736/67,141/63,156ms`，median=`64,736ms`；完整release sink曾为`141,550/140,316/140,148ms`，median=`140,316ms`。结构measurement保存每个fixed case的完整compile-item identity；后续split只更新对应`successor_path`并生成candidate comparison，不重写baseline。
 
@@ -109,7 +109,7 @@ M6 前完成的 locality 拆分是可复用的结构准备，不构成旧 ACL �
 
 ## 验证与测试落点
 
-STRUCTURED-WORKFLOW-011 不存在 compiler-resolved locality closure proof：`requirements/structured-workflow/tests/locality-dependencies.test.mjs` 的两条 scanner 行为断言与 `requirements/structured-workflow/tests/integration/locality-dependency-analyzer.test.mjs` 的 analyzer fixture（执行 `runLocalityDependencyScan`/`scanDslCompilerEvidence` 并 spawn dotnet FCS checker）均为不合规缺口（见 GAP-031），不构成可执行验收。011 的可执行证明只由下表中的声明式 project graph、exact compile closure、sibling `.fsi`、正常 Fable 编译 canary 与已注册行为证明承载。
+STRUCTURED-WORKFLOW-011 的扫描器 proof 与专用 fixture 已删除；下表仅登记声明式 project graph、exact compile closure、sibling `.fsi` 与正常 Fable compiler canary，不把扫描结果作为证明。
 
 | 命题 | 落点测试 |
 |---|---|
@@ -129,7 +129,7 @@ STRUCTURED-WORKFLOW-011 不存在 compiler-resolved locality closure proof：`re
 | STRUCTURED-WORKFLOW-015 | `requirements/structured-workflow/tests/generated-module-relation.test.mjs::WHAT[STRUCTURED-WORKFLOW-015] generated artifact binds tracked inputs bytes lineage traversal and import` |
 | STRUCTURED-WORKFLOW-016 | `requirements/structured-workflow/tests/cutover-input-closure.test.mjs::WHAT[STRUCTURED-WORKFLOW-016] cutover closure and stage index reject every competing input world`；`requirements/structured-workflow/tests/cutover-input-closure.property.test.mjs::WHAT[STRUCTURED-WORKFLOW-016] one staged input mutation yields the exact closure or index violation` |
 
-STRUCTURED-WORKFLOW-013 尚无符合修订合同的可执行证明：现有 canonical-world 测试仍要求旧 `actual_source_edges`/FCS fact schema，不能登记为当前证明，回归缺口计入 GAP-031。未登记的旧 symbol ACL、capability FCS 分类与 adjudication 测试同样不取得证明权威。上表的非 FCS 落点只证明各自行为，不宣称当前实现已符合整个修订合同。
+STRUCTURED-WORKFLOW-013 的完整新合同证明仍在 GAP-031，状态 OPEN。本轮仅迁移 canonical-world/query/adjudication 的非 FCS 输入，并保留拒绝旧 schema 的回归；未据此恢复完整 proof edge 或宣称整个合同闭合。
 
 STRUCTURED-WORKFLOW-011 的首个 exact consumer counterexample：`requirements/structured-workflow/tests/owner-project-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-011] GitGateway exact contract has an isolated compiler boundary`。
 

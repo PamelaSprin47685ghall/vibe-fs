@@ -181,27 +181,23 @@ export const SUITE_BACKSTOP_MS = budgetFromEnv('SUITE_BACKSTOP_MS', 300000);
 export const UNIT_VERDICT_SILENCE_MS = budgetFromEnv('UNIT_VERDICT_SILENCE_MS', 5000);
 
 /**
- * Verdict-silence basis for an integration step whose test IS a real `dotnet fsi` F# project check.
+ * Verdict-silence basis for the integration step whose tests ARE real Fable
+ * compiler-boundary invocations (`dotnet tool run fable` over fixture/owner
+ * projects, compile-impact CLI focused emits).
  *
  * Scoped on purpose. The integration default (15s test budget + 5s grace = 20s) is the right
  * criterion for every step that only loads modules and asserts: at 20s such a step is hung, and
  * the SIGKILL plus the outstanding-file dump name the causal scene. Raising that global to fit a
- * compiler invocation would buy the FCS steps their headroom by removing the hang criterion from
- * the other eleven steps — 「超时放大掩盖资源泄漏而非修复因果信号」, and 「延长静默窗口或测试超时以
- * 掩盖竞态」 (VERIFICATION-SYSTEM-006). So the bound is declared per step, and only the two steps
- * that invoke FCS carry it.
+ * compiler invocation would buy the compiler-boundary step its headroom by removing the hang
+ * criterion from the other steps — 「超时放大掩盖资源泄漏而非修复因果信号」, and 「延长静默窗口或测试超时以
+ * 掩盖竞态」 (VERIFICATION-SYSTEM-006). So the bound is declared per step, and only the
+ * compiler-boundary step carries it.
  *
- * The value is measured, not padded to taste. Production-tree scanner lanes measure 34s and 110s.
- * Tagged evidence production/reuse and the two fixture scans live in separate test files, because
- * Node 20 process isolation releases leaf verdicts only when the file wrapper completes. A completed
- * physical file is causal progress, while nested leaves and stdout remain non-authoritative.
- * 180s is ~1.64× the worst lane, which is the headroom a cold or loaded runner needs and no more —
- * it stays well under `SUITE_BACKSTOP_MS`, so the suite ceiling remains the 兜底 and the
- * verdict-silence window derived from this stays the primary criterion.
- *
- * There is no evidence-reuse shortcut available to these lanes. `FCS_REUSE_PATH_ENV` applies only
- * to a default production scan, and the expensive lanes are either fixture-project scans (not
- * reusable by construction) or the producer of the evidence itself.
+ * The value is headroom, not padded to taste. The compiler-boundary lanes live in separate test
+ * files, because Node 20 process isolation releases leaf verdicts only when the file wrapper
+ * completes. A completed physical file is causal progress, while nested leaves and stdout remain
+ * non-authoritative. 180s stays well under `SUITE_BACKSTOP_MS`, so the suite ceiling remains the
+ * 兜底 and the verdict-silence window derived from this stays the primary criterion.
  */
 export const PROJECT_CHECK_TIMEOUT_MS = budgetFromEnv('PROJECT_CHECK_TIMEOUT_MS', 180000);
 

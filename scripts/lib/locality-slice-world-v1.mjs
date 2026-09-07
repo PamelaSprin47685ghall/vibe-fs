@@ -124,16 +124,6 @@ const projectReference = (value, path) => {
   }
 }
 
-const sourceEdge = (value, path) => {
-  exactObject(value, ['consumer_locality', 'consumer_source', 'provider_locality', 'provider_source'], path)
-  return {
-    consumer_locality: text(value.consumer_locality, `${path}.consumer_locality`),
-    consumer_source: repositoryPath(value.consumer_source, `${path}.consumer_source`),
-    provider_locality: text(value.provider_locality, `${path}.provider_locality`),
-    provider_source: repositoryPath(value.provider_source, `${path}.provider_source`),
-  }
-}
-
 const linkage = (value, path) => {
   exactObject(value, ['import_specifier', 'package_import_target', 'generator_path', 'generator_entry', 'input_selector_path', 'input_selector_entry', 'build_path', 'build_entry'], path)
   return {
@@ -344,14 +334,8 @@ const validateReferences = (world) => {
   }
   for (const [path, consumer, provider] of [
     ...world.observed.project_references.map((row) => ['$.observed.project_references', row.consumer_locality, row.provider_locality]),
-    ...world.observed.actual_source_edges.map((row) => ['$.observed.actual_source_edges', row.consumer_locality, row.provider_locality]),
   ]) {
     if (!localities.has(consumer) || !localities.has(provider)) fail('canonical-world-schema', path, 'locality reference does not resolve')
-  }
-  for (const edge of world.observed.actual_source_edges) {
-    if (sourceOwner.get(edge.consumer_source) !== edge.consumer_locality || sourceOwner.get(edge.provider_source) !== edge.provider_locality) {
-      fail('canonical-world-schema', '$.observed.actual_source_edges', 'source edge does not match source ownership')
-    }
   }
   const slices = new Map(world.normative.slices.map((row) => [row.id, row]))
   const slicesByProvider = new Set()
@@ -439,7 +423,7 @@ const validateReferences = (world) => {
 export const buildCanonicalWorldV1 = (input) => {
   exactObject(input, ['schema_version', 'fact_schema_version', 'observed', 'normative'], '$')
   if (input.schema_version !== 1 || input.fact_schema_version !== 1) fail('canonical-world-schema', '$', 'world and fact schema versions must be 1')
-  exactObject(input.observed, ['localities', 'project_references', 'actual_source_edges', 'generated_artifacts', 'javascript_traversals', 'capability_extraction', 'capability_facts'], '$.observed')
+  exactObject(input.observed, ['localities', 'project_references', 'generated_artifacts', 'javascript_traversals', 'capability_extraction', 'capability_facts'], '$.observed')
   exactObject(input.normative, ['authorization_schema_version', 'slices', 'capability_relations', 'generated_module_relations'], '$.normative')
   if (input.normative.authorization_schema_version !== 2) fail('canonical-world-schema', '$.normative.authorization_schema_version', 'authorization schema version must be 2')
 
@@ -449,7 +433,6 @@ export const buildCanonicalWorldV1 = (input) => {
     observed: {
       localities: sortedUnique(array(input.observed.localities, '$.observed.localities').map((row, index) => locality(row, `$.observed.localities[${index}]`)), (row) => row.id, '$.observed.localities'),
       project_references: sortedUnique(array(input.observed.project_references, '$.observed.project_references').map((row, index) => projectReference(row, `$.observed.project_references[${index}]`)), (row) => `${row.consumer_locality}\0${row.provider_locality}`, '$.observed.project_references'),
-      actual_source_edges: sortedUnique(array(input.observed.actual_source_edges, '$.observed.actual_source_edges').map((row, index) => sourceEdge(row, `$.observed.actual_source_edges[${index}]`)), (row) => `${row.consumer_locality}\0${row.consumer_source}\0${row.provider_locality}\0${row.provider_source}`, '$.observed.actual_source_edges', { allowIdentical: true }),
       generated_artifacts: sortedUnique(array(input.observed.generated_artifacts, '$.observed.generated_artifacts').map((row, index) => generatedArtifact(row, `$.observed.generated_artifacts[${index}]`)), (row) => row.id, '$.observed.generated_artifacts'),
       javascript_traversals: sortedUnique(array(input.observed.javascript_traversals, '$.observed.javascript_traversals').map((row, index) => javascriptTraversal(row, `$.observed.javascript_traversals[${index}]`)), (row) => row.id, '$.observed.javascript_traversals'),
       capability_extraction: extractionCoverage(input.observed.capability_extraction, '$.observed.capability_extraction'),
@@ -518,12 +501,6 @@ const forwardProjectClosure = (world, localityId) =>
 export const forwardProjectClosureV1 = (worldInput, localityId) =>
   forwardProjectClosure(buildCanonicalWorldV1(worldInput), localityId)
 
-const actualEffectiveConsumers = (world, localityId) =>
-  graphClosure(projectGraphs(world).reverse, localityId, false)
-
-export const actualEffectiveConsumersV1 = (worldInput, localityId) =>
-  actualEffectiveConsumers(buildCanonicalWorldV1(worldInput), localityId)
-
 const terminal = (name) => ({ case: name, payload: {} })
 
 export const classifyTerminalV1 = (worldInput, localityId) => {
@@ -537,10 +514,6 @@ export const classifyTerminalV1 = (worldInput, localityId) => {
   if (classification.kind === 'composition') return terminal('composition-terminal')
   return terminal(`${classification.kind}-${classification.exposure}`)
 }
-
-const missingClosureEdges = (world, forwardClosure = (localityId) => forwardProjectClosure(world, localityId)) => world.observed.actual_source_edges.filter((edge) =>
-  edge.consumer_locality !== edge.provider_locality
-  && !forwardClosure(edge.consumer_locality).includes(edge.provider_locality))
 
 export const queryDigestV1 = (queryId, result) => {
   if (typeof queryId !== 'string' || !/^(surface|audience|capability)\/v1:[A-Za-z0-9._:-]+$/.test(queryId)) {
@@ -571,14 +544,11 @@ const createLocalityQueryContext = (worldInput) => {
   const world = buildCanonicalWorldV1(worldInput)
   const localityIds = world.observed.localities.map(({ id }) => id)
   const localityById = new Map(world.observed.localities.map((row) => [row.id, row]))
-  const { forward, reverse } = projectGraphs(world)
-  const forwardClosure = memoizedClosure(forward, true)
+  const { reverse } = projectGraphs(world)
   const reverseClosure = memoizedClosure(reverse, false)
   const factsByLocality = indexedLists(localityIds)
   const directConsumersByProvider = indexedLists(localityIds)
-  const sourceConsumersByProvider = indexedLists(localityIds)
   const relationEndpointsByLocality = indexedLists(localityIds)
-  const missingEdgesByLocality = indexedLists(localityIds)
   const sliceById = new Map(world.normative.slices.map((row) => [row.id, row]))
   const providerSlicesByLocality = indexedLists(localityIds)
   const artifactsById = new Map(world.observed.generated_artifacts.map((row) => [row.id, row]))
@@ -587,9 +557,6 @@ const createLocalityQueryContext = (worldInput) => {
   for (const fact of world.observed.capability_facts) factsByLocality.get(factLocality(fact)).push(fact)
   for (const { consumer_locality: consumer, provider_locality: provider } of world.observed.project_references) {
     directConsumersByProvider.get(provider).push(consumer)
-  }
-  for (const { consumer_locality: consumer, provider_locality: provider } of world.observed.actual_source_edges) {
-    sourceConsumersByProvider.get(provider).push(consumer)
   }
   for (const sliceRow of world.normative.slices) providerSlicesByLocality.get(sliceRow.provider_locality).push(sliceRow)
   for (const relation of world.normative.capability_relations) {
@@ -617,12 +584,6 @@ const createLocalityQueryContext = (worldInput) => {
       `${right.relation_kind}\0${right.role}\0${right.relation_id}`,
     ))
   }
-  const missing = missingClosureEdges(world, forwardClosure)
-  for (const edge of missing) {
-    missingEdgesByLocality.get(edge.consumer_locality).push(edge)
-    if (edge.provider_locality !== edge.consumer_locality) missingEdgesByLocality.get(edge.provider_locality).push(edge)
-  }
-
   const detailsByLocality = new Map(localityIds.map((localityId) => {
     const localityRow = localityById.get(localityId)
     const facts = factsByLocality.get(localityId)
@@ -644,14 +605,6 @@ const createLocalityQueryContext = (worldInput) => {
     const signatures = localityRow.sources.map((source) => ({
       signature_path: source.signature_path,
       signature_digest: source.signature_digest,
-      exports: sortedUnique(facts
-        .filter((fact) => fact.observation?.case === 'public-signature-export' && fact.observation.payload.site.source_path === source.signature_path)
-        .map((fact) => ({
-          export_kind: fact.observation.payload.export_kind,
-          declaration_identity: fact.observation.payload.declaration_identity,
-        })),
-      (row) => `${row.export_kind}\0${row.declaration_identity}`,
-      '$.query.surface.exports', { allowIdentical: true }),
     }))
     return [localityId, {
       signatures,
@@ -668,9 +621,7 @@ const createLocalityQueryContext = (worldInput) => {
     localityById,
     reverseClosure,
     directConsumersByProvider,
-    sourceConsumersByProvider,
     relationEndpointsByLocality,
-    missingEdgesByLocality,
     providerSlicesByLocality,
     detailsByLocality,
   }
@@ -683,10 +634,8 @@ const queryCanonicalLocalityFromContext = (context, localityId) => {
     surface: { signatures: details.signatures },
     audience: {
       direct_project_consumers: canonicalUniqueTexts(context.directConsumersByProvider.get(localityId)),
-      actual_source_consumers: canonicalUniqueTexts(context.sourceConsumersByProvider.get(localityId)),
       reverse_closure_effective_consumers: context.reverseClosure(localityId),
       relation_endpoints: context.relationEndpointsByLocality.get(localityId),
-      missing_closure_violations: context.missingEdgesByLocality.get(localityId),
     },
     capability: {
       facts: details.facts,
@@ -702,7 +651,6 @@ const adjudicationCandidateFromContext = (context, localityId) => {
   if (!localityRow) fail('canonical-world-schema', '$.locality_id', `unknown locality ${localityId}`)
   const reasons = new Set(['TerminalClassificationRequired'])
   const referenced = context.directConsumersByProvider.get(localityId).length > 0
-    || context.sourceConsumersByProvider.get(localityId).length > 0
   if (referenced) reasons.add('ReferencedProvider')
   if (localityRow.kind === 'composition' && referenced) reasons.add('CompositionProvider')
   const details = context.detailsByLocality.get(localityId)
@@ -714,7 +662,6 @@ const adjudicationCandidateFromContext = (context, localityId) => {
   for (const endpoint of context.relationEndpointsByLocality.get(localityId)) {
     reasons.add(`RelationEndpoint:${endpoint.relation_kind}:${endpoint.role}:${endpoint.relation_id}`)
   }
-  if (context.missingEdgesByLocality.get(localityId).length > 0) reasons.add('MissingClosureEndpoint')
   return { locality_id: localityId, reasons: [...reasons].sort(compareCanonicalTextV1) }
 }
 
@@ -739,7 +686,6 @@ const censusFromCanonicalWorld = (world) => ({
   locality_count: world.observed.localities.length,
   production_source_count: world.observed.localities.reduce((count, locality) => count + locality.sources.length, 0),
   project_reference_count: world.observed.project_references.length,
-  actual_source_edge_count: world.observed.actual_source_edges.length,
   generated_artifact_count: world.observed.generated_artifacts.length,
   javascript_traversal_count: world.observed.javascript_traversals.length,
   capability_fact_count: world.observed.capability_facts.length,

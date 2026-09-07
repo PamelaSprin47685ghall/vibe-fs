@@ -173,8 +173,6 @@ const WIRED_ALLOWLIST = new Set([
   'js-surface-manifest.mjs', // post-build gate：由 build.mjs 在 fable precompile 后调用（依赖 dist 产物，不能 pre-build）
   'js-module-linkage.mjs', // post-build linkage gate: invoked by build.mjs after Fable emit, cannot run pre-build
   'legacy-horizon-census.mjs', // census tool：由 OBL-007 历史 detector 退出验证调用
-  'locality-dependencies.mjs', // report-only integration analyzer：M6.4 原子切换前不得成为 pre-build release gate
-  'locality-slice-report.mjs', // M6.3b fresh report/worksheet producer：无strict mode，不进入release gate
 ])
 
 /** 解析 check.mjs 的 checks 数组，返回 wired basename 清单（保持声明顺序）。 */
@@ -233,6 +231,52 @@ test('WHAT[VERIFICATION-SYSTEM-004] checks directory is wired plus allowlist onl
     [...new Set([...wired, ...WIRED_ALLOWLIST])].sort(),
     'scripts/checks/*.mjs must equal wired gates ∪ explicit non-prebuild entrypoints',
   )
+})
+
+test('WHAT[VERIFICATION-SYSTEM-009] no custom FCS executable remains after the full-repo ban', () => {
+  // GAP-031 全仓自定义 FCS 禁令：扫描链是被删除，不是被禁用。任何自定义 FCS
+  // 可执行物（驱动 FSharp.Compiler.Service 的 .fsx，或 shell 到 `dotnet fsi` /
+  // 加载 Fable+FCS 程序集 / import 已删除扫描入口的 JS gate）都必须变红。
+  // 正常 Fable 编译边界（`dotnet tool run fable`、build.mjs、compile-impact CLI）
+  // 不在判据内，本测试不碰它们。
+  for (const rel of [
+    'scripts/checks/locality-symbol-uses.fsx',
+    'scripts/checks/locality-dependencies.mjs',
+    'scripts/checks/locality-slice-report.mjs',
+    'scripts/lib/locality-dependencies.mjs',
+  ]) {
+    assert.ok(!existsSync(join(ROOT, rel)), `custom FCS executable must stay deleted: ${rel}`)
+  }
+  assert.deepEqual(
+    readdirSync(join(ROOT, 'scripts/checks')).filter((name) => name.endsWith('.fsx')),
+    [],
+    'scripts/checks must contain no .fsx custom compiler executables',
+  )
+  const banned = [
+    'FSharp.Compiler.Service',
+    'Fable.Compiler.dll',
+    'Fable.AST.dll',
+    'locality-symbol-uses',
+    'scanCompilerObservationsV1',
+    'scanDslCompilerEvidence',
+    'runLocalityDependencyScan',
+    'scanProductionLocalitySliceReportV1',
+  ]
+  const hits = []
+  const walkScripts = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) walkScripts(full)
+      else if (entry.name.endsWith('.mjs')) {
+        const text = readFileSync(full, 'utf8')
+        for (const token of banned) {
+          if (text.includes(token)) hits.push(`${full}: ${token}`)
+        }
+      }
+    }
+  }
+  walkScripts(join(ROOT, 'scripts'))
+  assert.deepEqual(hits, [], 'scripts must not reference deleted custom FCS executables or assemblies')
 })
 
 // ── 3. check.mjs fail-closed 传播 ────────────────────────────────────────────

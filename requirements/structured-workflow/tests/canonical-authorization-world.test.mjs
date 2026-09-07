@@ -54,12 +54,6 @@ const minimalWorld = () => ({
       },
     ],
     project_references: [{ consumer_locality: 'consumer', provider_locality: 'provider' }],
-    actual_source_edges: [{
-      consumer_locality: 'consumer',
-      consumer_source: 'src/Consumer.fs',
-      provider_locality: 'provider',
-      provider_source: 'src/Provider.fs',
-    }],
     generated_artifacts: [],
     javascript_traversals: [],
     capability_extraction: extractObservedCapabilityFactsV1([]).coverage,
@@ -129,7 +123,6 @@ test('WHAT[STRUCTURED-WORKFLOW-013] canonical world has one closed byte identity
     locality_count: 2,
     production_source_count: 2,
     project_reference_count: 1,
-    actual_source_edge_count: 1,
     generated_artifact_count: 0,
     javascript_traversal_count: 0,
     capability_fact_count: 0,
@@ -142,16 +135,28 @@ test('WHAT[STRUCTURED-WORKFLOW-013] canonical world has one closed byte identity
     'generated_artifacts',
     'javascript_traversals',
   ])
+  assert.deepEqual(Object.keys(providerQuery.audience).sort(), [
+    'direct_project_consumers',
+    'relation_endpoints',
+    'reverse_closure_effective_consumers',
+  ])
+  assert.deepEqual(providerQuery.audience.direct_project_consumers, ['consumer'])
+  assert.deepEqual(providerQuery.audience.reverse_closure_effective_consumers, ['consumer'])
+  assert.deepEqual(providerQuery.surface.signatures, [{
+    signature_path: 'src/Provider.fsi',
+    signature_digest: digest('4'),
+  }])
   assert.equal(providerQuery.capability.declared_kind_mismatch, false)
   assert.match(canonicalWorldDigestV1(world), /^sha256:[0-9a-f]{64}$/)
   assert.equal(Buffer.from(serializeCanonicalWorldV1(world)).at(-1), 0x7d)
 
   const impureInput = minimalWorld()
   const impureExtraction = extractObservedCapabilityFactsV1([{
-    case: 'fcs-external-symbol-use',
+    case: 'fable-import',
     payload: {
-      assembly: 'node',
-      fully_qualified_symbol: 'node:fs.readFileSync',
+      module_specifier: 'node:fs',
+      selector: 'readFileSync',
+      generated_artifact_id: null,
       site: {
         locality_id: 'provider',
         source_path: 'src/Provider.fs',
@@ -171,6 +176,15 @@ test('WHAT[STRUCTURED-WORKFLOW-013] canonical world has one closed byte identity
   const unknownField = minimalWorld()
   unknownField.observed.localities[0].current_owner = 'decoy'
   assert.throws(() => buildCanonicalWorldV1(unknownField), { code: 'canonical-world-schema' })
+
+  const legacySourceEdges = minimalWorld()
+  legacySourceEdges.observed.actual_source_edges = [{
+    consumer_locality: 'consumer',
+    consumer_source: 'src/Consumer.fs',
+    provider_locality: 'provider',
+    provider_source: 'src/Provider.fs',
+  }]
+  assert.throws(() => buildCanonicalWorldV1(legacySourceEdges), { code: 'canonical-world-schema' })
 
   const duplicateIdentity = minimalWorld()
   duplicateIdentity.observed.localities.push({ ...duplicateIdentity.observed.localities[0] })

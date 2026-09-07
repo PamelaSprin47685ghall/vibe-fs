@@ -8,6 +8,7 @@ import {
   validateFormalAdjudicationV1,
 } from '../../../scripts/lib/locality-slice-adjudication-v1.mjs'
 import { extractObservedCapabilityFactsV1 } from '../../../scripts/lib/capability-observations-v1.mjs'
+import { queryCanonicalLocalityV1 } from '../../../scripts/lib/locality-slice-world-v1.mjs'
 
 const digest = (digit) => `sha256:${digit.repeat(64)}`
 
@@ -32,7 +33,6 @@ const world = () => ({
       },
     ],
     project_references: [{ consumer_locality: 'z-consumer', provider_locality: 'provider' }],
-    actual_source_edges: [],
     generated_artifacts: [],
     javascript_traversals: [],
     capability_extraction: extractObservedCapabilityFactsV1([]).coverage,
@@ -75,6 +75,11 @@ const code = (value) => validateFormalAdjudicationV1(value)[0]
 test('WHAT[STRUCTURED-WORKFLOW-011] adjudication validator binds a decision to terminal manifest claims', () => {
   const legal = fixture()
   assert.deepEqual(validateFormalAdjudicationV1(legal), [])
+  assert.deepEqual(Object.keys(queryCanonicalLocalityV1(legal.world, 'provider').audience).sort(), [
+    'direct_project_consumers',
+    'relation_endpoints',
+    'reverse_closure_effective_consumers',
+  ])
   assert.ok(legal.snapshot.records[0].decision.what_ids.includes('PROVIDER-001'))
   assert.ok(legal.snapshot.records[0].decision.what_ids.includes('STRUCTURED-WORKFLOW-011'))
   assert.ok(legal.snapshot.records[0].decision.proofs.some((proof) => proof.title === GLOBAL_ADJUDICATION_PROOF_V1.title))

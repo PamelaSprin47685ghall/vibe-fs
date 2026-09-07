@@ -27,7 +27,7 @@ Roles.permissions (Kernel 层单一真相源)
 
 4. **权威合同与静态边界**：
    - `scripts/checks/authority-contracts.json` 是正向 exact-symbol manifest。每行同时记录 class、owner、WHAT、scope、freshness、multiplicity、consume、durability 以及声明/发行 source anchor；它不是按名字放行的 allowlist。
-   - `authority-boundary.mjs` 导出可注入 fixture 的 scanner，拒绝 stale anchor、未分类敏感声明、foreign issuance、bool 一次性消费、Capability codec/JSON 持久化，以及未经过 current subject/version/digest admission 的 witness-direct-effect。
+   - `authority-boundary.mjs` 仅检查源码文本与正向 manifest：拒绝 stale anchor、未分类敏感声明、可见 foreign issuance、bool 一次性消费与显式 Capability codec/JSON 持久化。FCS symbol/application/control-flow 输入及其专用断言已删除；文本门禁不证明推断类型、跨函数数据流或 admission 支配关系，这些必须由编译器边界与真实 owner 行为证明。
    - `Evidence / Decision / Witness / Capability / Receipt / PhysicalHandle` 使用同一六类 DSL；`Vocabulary` 是显式正向分类，确保 `JsCapability` 这类非权威名词不会被名称启发式误判。
 
 5. **Quiescence typed owner gate**：
@@ -40,6 +40,8 @@ Roles.permissions (Kernel 层单一真相源)
    - 确定性发布与集成门禁由 `CHGINT-001` ~ `CHGINT-006` 对有效 quality candidate 的 typed admission 发行；durable `PublicationCommitted` 是结果，不另造第二套审查权威。
 
 ## 验证与测试落点
+
+ENF-015、ENF-016 原来的门禁测试仅提供手写 compiler evidence，已随被禁路径删除，不能作为真实 owner 行为证明。替代证明尚未闭合，记录于 GAP-031；不得以文本检测通过或空 evidence 宣称这两项已验证。
 
 | 命题 | 落点测试 |
 |---|---|
@@ -57,8 +59,6 @@ Roles.permissions (Kernel 层单一真相源)
 | ENF-012 | `requirements/capability-enforcement/tests/capability-isomorphism-gate.test.mjs::WHAT[ENF-012] capability_iso_tool_registry_requires_generator` |
 | ENF-013 | `requirements/capability-enforcement/tests/authority-boundary.test.mjs::WHAT[ENF-013] all six authority classes require exact positive contracts while JsCapability remains vocabulary` |
 | ENF-014 | `requirements/capability-enforcement/tests/authority-boundary.test.mjs::WHAT[ENF-014] stale anchors and unclassified sensitive declarations fail closed` |
-| ENF-015 | `requirements/capability-enforcement/tests/authority-boundary.test.mjs::WHAT[ENF-015] witness cannot drive an effect without current subject/version/digest admission` |
-| ENF-016 | `requirements/capability-enforcement/tests/authority-boundary.test.mjs::WHAT[ENF-016] stale witness needs a fresh current admission before an effect` |
 | ENF-017 | `requirements/capability-enforcement/tests/authority-boundary.test.mjs::WHAT[ENF-017] every authority contract declares its multiplicity` |
 | ENF-018 | `requirements/capability-enforcement/tests/process-capability-lifecycle.test.mjs::WHAT[ENF-018] process capability consumes once and reports duplicate consumption without effect` |
 | ENF-019 | `requirements/capability-enforcement/tests/process-capability-lifecycle.test.mjs::WHAT[ENF-019] provider-attempt composition requires fresh current-process admission without codec or event recovery` |

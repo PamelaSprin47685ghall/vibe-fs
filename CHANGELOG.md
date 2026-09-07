@@ -2,6 +2,8 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- 删除独立 FCS 扫描器、compiler-dependent extractor/report CLI、扫描计时命令、专用 fixtures 与所有 compiler-evidence 消费分支；DSL、authority、decorator、owner-contract 检查恢复纯源码路径。187 项针对性回归通过；真实 check 越过原挂点并在证明追踪缺口处正常失败。STRUCTURED-WORKFLOW-013 的完整新合同证明继续保持 GAP-031 OPEN，不以删除代码代替证明。
+
 - 修复 fork/resume 将正常本机派发回执误报为“不确定”：派发成功且 Submitted 已持久化即返回已承接，不等待 PhysicalAccepted 或 child completion；后续真实消息仍负责绑定 Authority Root，真正发送结果未知时保留恢复权且不重发。
 
 - 全仓自建 FCS 扫描禁令（规范修正，取代下条旧 FCS 优化 rationale）：仓库自建 FCS（FSharp.Compiler.Service）扫描在全仓任何位置一律禁止——直接调用、wrapper/reflection/fsx 封装、typed AST / symbol / application / inferred type / source-edge 提取等任何形态，whole-tree、focused/locality、fixture、report-only、CLI、CI、prebuild、cache/snapshot/delta/reuse/externally supplied evidence 等任何执行入口，均不得作为验收证据、门禁手段或临时 report lane；Fable 内部正常编译与纯源码文本静态门禁不受影响，但不得为提取证据而加做额外/instrumented 编译。F# 执行依据为声明式 ProjectReference DAG 与精确编译闭包、sibling `.fsi` 与普通 Fable 签名/私有可见性编译 canary、已注册行为证明；C(W) 只含 direct byte-backed 的 explicit interop 与 JS/generated observations（见 VERIFICATION-SYSTEM-001；STRUCTURED-WORKFLOW-011 载有同规则并回指 001；`requirements/GAP.md` GAP-031 已同步改写为 PARTIAL 缺口记录）。下条“优化 check 的 FCS 路径”保留为历史记录，其优化思路已被本禁令取代，不得再作为批准依据；现存 FCS producer/consumer/test 及引用 FCS 证据的过期 schema、测试与文档断言尚未移除，属未解决的非合规缺口。

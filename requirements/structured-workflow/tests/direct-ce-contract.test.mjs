@@ -178,48 +178,6 @@ test('WHAT[STRUCTURED-WORKFLOW-003] exported_discriminant_cannot_drive_resolved_
   )
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-003] compiler_resolved_cross_module_flow_is_rejected', () => {
-  const file = 'src/Wanxiangshu/Reviewer/Surface.fs'
-  const source = readFixture('execution-position-resolved-cross-module.fs')
-  const functionEvidence = {
-    symbolUses: [
-      {
-        consumerPath: file,
-        symbol: 'Foreign.runA',
-        line: 8,
-        column: 11,
-        inferredType: 'Microsoft.FSharp.Core.unit -> System.String',
-      },
-      {
-        consumerPath: file,
-        symbol: 'Foreign.runB',
-        line: 9,
-        column: 11,
-        inferredType: 'Microsoft.FSharp.Core.unit -> System.String',
-      },
-    ],
-    applicationUses: [],
-  }
-  assert.ok(
-    scanText(source, file, functionEvidence).some(({ gate }) => gate === 'program-counter'),
-    'resolved Foreign.runA/runB values selected for a caller must fail',
-  )
-
-  const memberEvidence = {
-    symbolUses: [],
-    applicationUses: [13, 14].map((line) => ({
-      consumerPath: file,
-      resolvedTarget: 'Foreign.Port.Send',
-      startLine: line,
-      inferredType: 'System.String -> Microsoft.FSharp.Core.unit',
-    })),
-  }
-  assert.ok(
-    scanText(source, file, memberEvidence).some(({ gate }) => gate === 'program-counter'),
-    'a member declared in another file remains executable branch evidence',
-  )
-})
-
 test('WHAT[STRUCTURED-WORKFLOW-003] non_branching_domain_fields_are_not_program_counters', () => {
   assert.deepEqual(
     scanText(
@@ -247,16 +205,7 @@ test('WHAT[STRUCTURED-WORKFLOW-003] immutable_domain_discriminants_stay_green', 
     '    | true -> Foreign.badge "verified"',
     '    | false -> Foreign.badge "unverified"',
   ].join('\n')
-  const compilerEvidence = {
-    symbolUses: [],
-    applicationUses: [4, 5].map((line) => ({
-      consumerPath: file,
-      resolvedTarget: 'Foreign.badge',
-      startLine: line,
-      inferredType: 'System.String -> Domain.Badge',
-    })),
-  }
-  assert.deepEqual(scanText(source, file, compilerEvidence), [])
+  assert.deepEqual(scanText(source, file), [])
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-003] classified_protocol_and_physical_positions_stay_green', () => {
@@ -284,7 +233,7 @@ test('WHAT[STRUCTURED-WORKFLOW-003] classified_protocol_and_physical_positions_s
   }
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-003] classified_physical_handle_stays_green_with_compiler_calls', () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] classified_physical_handle_stays_green', () => {
   const file = 'src/Wanxiangshu/Process/Port.fs'
   const source = [
     'module Boundary',
@@ -295,14 +244,5 @@ test('WHAT[STRUCTURED-WORKFLOW-003] classified_physical_handle_stays_green_with_
     '    | 0 -> port.Send "head"',
     '    | _ -> port.Send "tail"',
   ].join('\n')
-  const compilerEvidence = {
-    symbolUses: [],
-    applicationUses: [6, 7].map((line) => ({
-      consumerPath: file,
-      resolvedTarget: 'Foreign.Port.Send',
-      startLine: line,
-      inferredType: 'System.String -> Microsoft.FSharp.Core.unit',
-    })),
-  }
-  assert.deepEqual(scanText(source, file, compilerEvidence), [])
+  assert.deepEqual(scanText(source, file), [])
 })

@@ -21,10 +21,11 @@ const site = {
 }
 
 const observation = (ordinal) => ({
-  case: 'fcs-external-symbol-use',
+  case: 'fable-import',
   payload: {
-    assembly: 'node',
-    fully_qualified_symbol: 'node:path/posix.join',
+    module_specifier: 'node:path/posix',
+    selector: 'join',
+    generated_artifact_id: null,
     site: {
       locality_id: 'fixture-contract',
       source_path: 'src/Fixture.fs',

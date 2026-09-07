@@ -21,31 +21,36 @@ const facts = (...observations) => {
 }
 
 const pureFact = (localityId) => ({
-  case: 'public-signature-export',
-  payload: { export_kind: 'pure-type', declaration_identity: `${localityId}.Vocabulary`, site: site(localityId) },
+  case: 'fable-import',
+  payload: { module_specifier: 'node:path/posix', selector: 'join', generated_artifact_id: null, site: site(localityId) },
 })
 
-const capabilityTypeFact = (localityId) => ({
-  case: 'public-signature-export',
-  payload: { export_kind: 'capability-type', declaration_identity: `${localityId}.Capability`, site: site(localityId) },
-})
+const authorityReferences = {
+  console: ['console', 'log'],
+  'process-control': ['process', 'exit'],
+  'file-system': ['fs', 'readFileSync'],
+  host: ['Host', 'send'],
+  timer: ['setTimeout'],
+}
 
-const authorityIdentity = Object.freeze({
-  console: 'console.error',
-  'process-control': 'node:child_process.spawn',
-  'file-system': 'node:fs.readFileSync',
-  timer: 'setTimeout',
-  host: 'host.invoke',
-})
-
-const authorityFact = (localityId, authority) => ({
-  case: 'fcs-external-symbol-use',
-  payload: {
-    assembly: authority === 'host' ? 'host' : 'node',
-    fully_qualified_symbol: authorityIdentity[authority],
-    site: site(localityId),
-  },
-})
+const authorityFact = (localityId, authority) => {
+  const [root, ...memberPath] = authorityReferences[authority]
+  return {
+    case: 'javascript-capability',
+    payload: {
+      source_kind: 'generated-artifact',
+      source_id: 'boundary-fixture',
+      generated_artifact_id: 'boundary-fixture',
+      javascript_observation: {
+        kind: 'call',
+        root,
+        member_path: memberPath,
+        binding_provenance: 'free',
+      },
+      site: site(localityId),
+    },
+  }
+}
 
 export const assertFatalBoundary = (owner, settlement = 'committed') => {
   const legal = {
@@ -71,7 +76,7 @@ export const assertEffectIsInjected = (authority) => {
   const legal = {
     localities: [
       { id: 'consumer', kind: 'runtime', capability_facts: facts(pureFact('consumer')) },
-      { id: 'port', kind: 'contract', exposure: 'bounded', capability_facts: facts(capabilityTypeFact('port')) },
+      { id: 'port', kind: 'contract', exposure: 'bounded', capability_facts: facts(pureFact('port')) },
       { id: 'physical', kind: 'adapter', exposure: 'effect', capability_facts: facts(authorityFact('physical', authority)) },
       { id: 'root', kind: 'composition', capability_facts: [] },
     ],
@@ -83,6 +88,7 @@ export const assertEffectIsInjected = (authority) => {
       { consumer: 'consumer', provider: 'physical', mode: 'injected', relation_kind: null, direct_grant: false },
     ],
   }
+  assert.deepEqual(legal.localities[2].capability_facts[0].disposition.payload.authorities, [authority])
   assert.deepEqual(validateLayeringBlueprintV1(legal), [])
   const oldWorld = structuredClone(legal)
   oldWorld.dependencies.at(-1).mode = 'compile'
@@ -93,15 +99,13 @@ export const assertEffectIsInjected = (authority) => {
   }])
 }
 
-export const assertPureContract = (semanticClass = 'pure-representation') => {
+export const assertPureContract = () => {
   const legal = {
     localities: [{
       id: 'contract',
       kind: 'contract',
       exposure: 'bounded',
-      capability_facts: facts(semanticClass === 'capability-type-only'
-        ? capabilityTypeFact('contract')
-        : pureFact('contract')),
+      capability_facts: facts(pureFact('contract')),
     }],
     dependencies: [],
   }

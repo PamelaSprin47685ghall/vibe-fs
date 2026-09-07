@@ -3,8 +3,13 @@
  * Synthetic source only — never mutates production trees.
  */
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { delimiter, dirname, join } from 'node:path'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
+import * as dslOwnership from '../../../scripts/checks/dsl-ownership.mjs'
 import {
   FORBIDDEN,
   GATE_NAMES,
@@ -12,18 +17,15 @@ import {
   DSL_CLASSES,
   LARGE_DU_THRESHOLD,
   NARROW_PHASE_EXEMPTIONS,
-  APPLICATION_USE_KEYS,
-  COMPILER_EVIDENCE_SCHEMA_VERSION,
-  buildCompilerEvidence,
   evaluateThreshold,
   isHostBoundaryOpenPath,
   scanExecutionPositions,
   scanFiles,
-  scanTiers,
   scanLargeDus,
   scanText,
-  validateCompilerEvidence,
 } from '../../../scripts/checks/dsl-ownership.mjs'
+
+const DSL_GATE = fileURLToPath(new URL('../../../scripts/checks/dsl-ownership.mjs', import.meta.url))
 
 const readFixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8')
 
@@ -787,20 +789,6 @@ test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_narrow_phase_exemption_rejects
   )
 })
 
-// ── R19: scanTiers reports lexical-only vs compiler-resolved ────────────────
-
-test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_scanTiers_reports_uncovered_tier_without_compiler_evidence', () => {
-  const entries = [{ file: 'src/Wanxiangshu/Domain/Alpha.fs', text: 'module Alpha' }]
-  const lexicalRes = scanTiers(entries, undefined)
-  assert.equal(lexicalRes.tier, 'lexical-only')
-  assert.equal(lexicalRes.hasCompilerEvidence, false)
-
-  const compilerEvidence = { symbolUses: [{ consumerPath: 'src/Wanxiangshu/Domain/Alpha.fs' }] }
-  const resolvedRes = scanTiers(entries, compilerEvidence)
-  assert.equal(resolvedRes.tier, 'compiler-resolved')
-  assert.equal(resolvedRes.hasCompilerEvidence, true)
-})
-
 test('WHAT[STRUCTURED-WORKFLOW-005] DSL_OWNERSHIP_infrastructure_declared_mutable_is_accepted', () => {
   // Infrastructure is a production physical layer: a `let mutable` immediately
   // preceded by a valid `// DSL-MUTABLE: resource` declaration must be accepted
@@ -882,39 +870,27 @@ test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_cross_file_duplicate_case_set_
   assert.ok(!hits.some((v) => v.gate === 'dup-cases'))
 })
 
-// ── R18: lexical vs compiler tiers stay distinct ────────────────────────────
-
-test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_tiers_split_lexical_and_compiler_findings', () => {
-  const file = 'src/Wanxiangshu/Session/Sample.fs'
-  const entries = [{
-    file,
-    text: ['module Sample', 'type State = { HasPendingCompletion: bool }'].join('\n'),
-  }]
-  const lexical = scanTiers(entries, undefined)
-  assert.equal(lexical.tier, 'lexical-only')
-  assert.equal(lexical.hasCompilerEvidence, false)
-  assert.equal(lexical.lexicalViolations.length, 1)
-  assert.equal(lexical.lexicalViolations[0]?.gate, 'behaviour-bool')
-  assert.equal(lexical.compilerViolations.length, 0)
-  const evidence = {
-    symbolUses: [],
-    applicationUses: [{
-      consumerPath: file,
-      startLine: 2,
-      startColumn: 0,
-      resolvedTarget: 'Foreign.Port.Send',
-      inferredType: 'System.String -> Microsoft.FSharp.Core.unit',
-    }],
-  }
-  const resolved = scanTiers(entries, evidence)
-  assert.equal(resolved.tier, 'compiler-resolved')
-  assert.equal(resolved.hasCompilerEvidence, true)
-  assert.deepEqual(resolved.violations, lexical.violations)
-  assert.equal(resolved.lexicalViolations.length, 1)
-  assert.equal(resolved.compilerViolations.length, 0)
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_source_execution_position_needs_no_evidence', () => {
+  const file = 'src/Wanxiangshu/Mission/Child/Surface.fs'
+  const source = [
+    'module ChildSurface',
+    'type Child = { ContinuationAddress: int }',
+    'let resume child =',
+    '    match child.ContinuationAddress with',
+    '    | 0 -> validate ()',
+    '    | _ -> dispatch ()',
+  ].join('\n')
+  assert.ok(
+    scanExecutionPositions(source, file).some((hit) => hit.gate === 'program-counter'),
+    'a stored discriminant selecting lexical execution calls is an execution position',
+  )
+  assert.deepEqual(
+    scanExecutionPositions(readFixture('execution-position-domain-fields.fs'), 'src/Wanxiangshu/Domain/Profile.fs'),
+    [],
+  )
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_effectful_resolved_call_marks_execution_position', () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_supplied_evidence_cannot_change_the_verdict', () => {
   const file = 'src/Wanxiangshu/Domain/Profile.fs'
   const source = [
     'type Profile = { IsVerified: bool }',
@@ -923,7 +899,7 @@ test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_effectful_resolved_call_marks_
     '    | true -> Foreign.badge "verified"',
     '    | false -> Foreign.badge "unverified"',
   ].join('\n')
-  const effectful = {
+  const supplied = {
     symbolUses: [],
     applicationUses: [4, 5].map((line) => ({
       consumerPath: file,
@@ -933,22 +909,59 @@ test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_effectful_resolved_call_marks_
       inferredType: 'System.String -> Microsoft.FSharp.Core.unit',
     })),
   }
-  assert.ok(
-    scanExecutionPositions(source, file, effectful).some((hit) => hit.gate === 'program-counter'),
-    'a discriminant selecting resolved unit-returning calls is an execution position',
-  )
-  const pure = {
-    symbolUses: [],
-    applicationUses: [4, 5].map((line) => ({
-      consumerPath: file,
-      resolvedTarget: 'Foreign.badge',
-      startLine: line,
-      startColumn: 14,
-      inferredType: 'System.String -> Domain.Badge',
-    })),
+  assert.deepEqual(scanText(source, file, supplied), scanText(source, file))
+  assert.deepEqual(scanText(source, file), [])
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_compiler_evidence_apis_are_absent', () => {
+  for (const name of [
+    'validateCompilerEvidence',
+    'buildCompilerEvidence',
+    'loadCompilerEvidence',
+    'scanTiers',
+    'COMPILER_EVIDENCE_SCHEMA_VERSION',
+    'APPLICATION_USE_KEYS',
+  ]) {
+    assert.ok(!(name in dslOwnership), `${name} must not exist on the source-only gate`)
   }
-  assert.deepEqual(scanExecutionPositions(source, file, pure), [])
-  assert.deepEqual(scanExecutionPositions(source, file, undefined), [])
+  assert.equal(typeof dslOwnership.scanText, 'function')
+  assert.equal(typeof dslOwnership.scanFiles, 'function')
+  assert.equal(typeof dslOwnership.scanExecutionPositions, 'function')
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_cli_runs_source_only_without_dotnet', () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsl-ownership-no-compiler-'))
+  try {
+    const writeWorkspaceFile = (relativePath, text) => {
+      const path = join(root, relativePath)
+      mkdirSync(dirname(path), { recursive: true })
+      writeFileSync(path, text)
+    }
+    writeWorkspaceFile('src/Wanxiangshu/Domain/Clean.fs', CLEAN)
+
+    const bin = join(root, 'bin')
+    mkdirSync(bin, { recursive: true })
+    const marker = join(root, 'dotnet-launched')
+    const tripwire = join(bin, 'dotnet')
+    writeFileSync(tripwire, `#!/bin/sh\necho launched > "${marker}"\nexit 99\n`)
+    chmodSync(tripwire, 0o755)
+    const env = { ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}` }
+
+    const clean = spawnSync(process.execPath, [DSL_GATE], { cwd: root, encoding: 'utf8', env })
+    assert.equal(clean.error, undefined, clean.error?.message)
+    assert.equal(clean.status, 0, `stdout:\n${clean.stdout}\nstderr:\n${clean.stderr}`)
+    assert.match(clean.stderr, /dsl-ownership: OK/)
+    assert.equal(existsSync(marker), false, 'the source-only gate must not launch dotnet')
+
+    writeWorkspaceFile('src/Wanxiangshu/Domain/Dirty.fs', ['module Sample', 'let mutable counter = 0'].join('\n'))
+    const dirty = spawnSync(process.execPath, [DSL_GATE], { cwd: root, encoding: 'utf8', env })
+    assert.equal(dirty.error, undefined, dirty.error?.message)
+    assert.equal(dirty.status, 1, `stdout:\n${dirty.stdout}\nstderr:\n${dirty.stderr}`)
+    assert.match(dirty.stderr, /mutable \(1\)/)
+    assert.equal(existsSync(marker), false, 'a red verdict must come from source text, not dotnet')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_narrow_phase_boundary_rejects_unlisted_consumer', () => {
@@ -958,36 +971,4 @@ test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_narrow_phase_boundary_rejects_
     'IncumbencyPhase outside its relay-mission owner set must fire behaviour-bool',
   )
   assert.deepEqual(scanText(source, 'src/Wanxiangshu/Mission/Relay/Fold.fs').filter((h) => h.gate === 'behaviour-bool'), [])
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_missing_or_mismatched_evidence_fails_closed', () => {
-  assert.equal(COMPILER_EVIDENCE_SCHEMA_VERSION, 1)
-  assert.deepEqual(APPLICATION_USE_KEYS, ['consumerPath', 'startLine', 'startColumn', 'resolvedTarget', 'inferredType'])
-  assert.equal(validateCompilerEvidence(undefined).ok, false)
-  assert.equal(validateCompilerEvidence(undefined).reason, 'missing-evidence')
-  assert.equal(validateCompilerEvidence({}).ok, false)
-  assert.equal(validateCompilerEvidence({ applicationUses: [], schemaVersion: 2 }).reason, 'schema-mismatch')
-  assert.equal(
-    validateCompilerEvidence({ applicationUses: [{ consumerPath: 'a.fs', startLine: 0, startColumn: 0, resolvedTarget: 'F.g', inferredType: '' }] }).reason,
-    'schema-mismatch',
-  )
-  assert.equal(
-    validateCompilerEvidence({ applicationUses: [{ consumerPath: 'a.fs', startLine: 1, startColumn: 0, resolvedTarget: '', inferredType: '' }] }).reason,
-    'schema-mismatch',
-  )
-  const valid = {
-    schemaVersion: 1,
-    declarationUses: [],
-    applicationUses: [{
-      consumerPath: 'src/Wanxiangshu/Domain/Alpha.fs',
-      startLine: 4,
-      startColumn: 8,
-      resolvedTarget: 'Foreign.Port.Send',
-      inferredType: 'System.String -> Microsoft.FSharp.Core.unit',
-    }],
-  }
-  assert.equal(validateCompilerEvidence(valid).ok, true)
-  const built = buildCompilerEvidence(valid)
-  assert.equal(built.applicationUses.length, 1)
-  assert.throws(() => buildCompilerEvidence({ applicationUses: [{ bogus: true }] }), /invalid compiler evidence/)
 })

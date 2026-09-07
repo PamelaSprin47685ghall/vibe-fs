@@ -69,6 +69,6 @@ test('WHAT[CAUSAL-009] production inventory separates contract runtime adapter m
 })
 
 test('WHAT[CAUSAL-009] causal wait contract excludes registry diagnostics mailbox and proof runtime', () => {
-  assertPureContract('capability-type-only')
+  assertPureContract()
   assertEffectIsInjected('console')
 })

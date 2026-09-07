@@ -32,7 +32,6 @@ const worldFor = (ids) => {
       }],
     })),
     project_references: [],
-    actual_source_edges: [],
     generated_artifacts: [],
     javascript_traversals: [],
     capability_extraction: extractObservedCapabilityFactsV1([]).coverage,

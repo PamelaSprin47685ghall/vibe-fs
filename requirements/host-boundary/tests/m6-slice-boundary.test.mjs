@@ -102,7 +102,7 @@ test('WHAT[HOST-BOUNDARY-028] typed subscription and diagnostic injection preser
 })
 
 test('WHAT[HOST-BOUNDARY-029] fatal vocabulary stays pure and physical execution is composition-only', () => {
-  assertPureContract('capability-type-only')
+  assertPureContract()
   assertFatalBoundary('host-boundary')
 })
 

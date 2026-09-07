@@ -30,7 +30,6 @@ export const OWNER_IMPACT_CONTROL_CASE_IDS = Object.freeze([
 ])
 
 export const OWNER_IMPACT_TIMING_IDS = Object.freeze([
-  'fresh-production-scan',
   'full-release-build',
 ])
 
@@ -95,7 +94,6 @@ export const OWNER_IMPACT_CONTROL_CASES = Object.freeze([
 ])
 
 export const OWNER_IMPACT_TIMING_COMMANDS = Object.freeze([
-  { id: 'fresh-production-scan', command: Object.freeze(['node', 'scripts/checks/locality-dependencies.mjs', '--report-only']) },
   { id: 'full-release-build', command: Object.freeze(['npm', 'run', 'format-build-test']) },
 ])
 

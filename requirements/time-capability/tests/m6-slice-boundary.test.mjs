@@ -175,6 +175,6 @@ test('WHAT[TIME-008] Node capability construction cannot mutate virtual time', a
 })
 
 test('WHAT[TIME-008] temporal contracts exclude Node adapters mutable timers and SessionStartedAt projection', () => {
-  assertPureContract('capability-type-only')
+  assertPureContract()
   assertEffectIsInjected('timer')
 })

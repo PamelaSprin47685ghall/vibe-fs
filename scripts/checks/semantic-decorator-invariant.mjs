@@ -387,118 +387,6 @@ const directInvocations = (bodyLines, parameter) => {
   return results
 }
 
-const sourceOffsets = (text) => {
-  const offsets = [0]
-  for (let index = 0; index < text.length; index++) if (text[index] === '\n') offsets.push(index + 1)
-  return offsets
-}
-
-const position = (line, column) => line * 1_000_000 + column
-
-const applicationSource = (text, offsets, application) => {
-  const start = (offsets[application.startLine - 1] ?? 0) + application.startColumn
-  const end = (offsets[application.endLine - 1] ?? offsets[application.startLine - 1] ?? 0) + application.endColumn
-  return text.slice(start, end).trim().replace(/\s+/g, ' ')
-}
-
-const resolvedParameterInvocations = (text, offsets, file, bodyLines, bodyStartLine, bodyEndLine, parameter, applicationUses) => {
-  return applicationUses
-    .filter((application) => application.consumerPath === file)
-    .filter((application) => application.startLine >= bodyStartLine && application.startLine <= bodyEndLine)
-    .filter((application) => application.resolvedTarget === parameter && application.declarationPaths?.includes(file))
-    .filter((application) => /->/.test(application.inferredType ?? ''))
-    .map((application) => {
-      const line = application.startLine - bodyStartLine
-      const code = bodyLines[line]?.replace(/\/\/.*$/, '').trim() ?? ''
-      return {
-        line,
-        suffix: applicationSource(text, offsets, application),
-        awaited: /^(?:return!|do!|yield!|match!)\s+/.test(code) || /^(?:let!|use!)\s+[^=]+\s*=/.test(code),
-        application,
-      }
-    })
-}
-
-const rangeContains = (range, application) =>
-  position(range.startLine, range.startColumn) <= position(application.startLine, application.startColumn)
-  && position(application.endLine, application.endColumn) <= position(range.endLine, range.endColumn)
-
-const executableDeclarationCalls = (calls, file, declarationLine, flowEvidence) => {
-  const closures = [
-    ...(flowEvidence?.lambdaExpressions?.filter((lambda) => lambda.consumerPath === file)
-      .map((lambda) => ({ ...lambda, invokedBy: lambda.invokedBy ?? [], range: lambda })) ?? []),
-    ...(flowEvidence?.localFunctionBindings?.filter((binding) =>
-      binding.consumerPath === file && binding.startLine !== declarationLine)
-      .map((binding) => ({ ...binding, invokedBy: binding.invokedBy ?? [], range: binding })) ?? []),
-  ].sort((left, right) =>
-    (position(left.range.endLine, left.range.endColumn) - position(left.range.startLine, left.range.startColumn))
-    - (position(right.range.endLine, right.range.endColumn) - position(right.range.startLine, right.range.startColumn)))
-
-  return calls.flatMap((call) => {
-    const invokedWrapper = closures.find((closure) => closure.invokedBy.length > 0
-      && closure.invokedBy.some((invocation) => rangeContains(invocation, call.application))
-      && rangeContains({
-        startLine: call.application.targetStartLine,
-        startColumn: call.application.targetStartColumn,
-        endLine: call.application.targetEndLine,
-        endColumn: call.application.targetEndColumn,
-      }, closure.range))
-    if (invokedWrapper) {
-      return invokedWrapper.invokedBy.map((invocation) => ({ ...call, pathApplication: invocation }))
-    }
-
-    const closure = closures.find((candidate) => rangeContains(candidate.body, call.application))
-    if (!closure) return [{ ...call, pathApplication: call.application }]
-    return closure.invokedBy.map((invocation) => ({ ...call, pathApplication: invocation }))
-  })
-}
-
-const callsCanSharePath = (left, right, file, flowEvidence) => {
-  const branchGroups = [
-    ...(flowEvidence?.matchExpressions?.filter((match) => match.consumerPath === file).map((match) => match.clauses) ?? []),
-    ...(flowEvidence?.conditionalExpressions?.filter((conditional) => conditional.consumerPath === file)
-      .map((conditional) => conditional.branches) ?? []),
-    ...(flowEvidence?.tryExpressions?.filter((expression) => expression.consumerPath === file)
-      .map((expression) => expression.continuations) ?? []),
-  ]
-  return !branchGroups.some((branches) => {
-    const leftBranch = branches.findIndex((branch) => rangeContains(branch, left.pathApplication ?? left.application))
-    const rightBranch = branches.findIndex((branch) => rangeContains(branch, right.pathApplication ?? right.application))
-    return leftBranch >= 0 && rightBranch >= 0 && leftBranch !== rightBranch
-  })
-}
-
-const isInsideResolvedLoop = (call, file, flowEvidence) =>
-  flowEvidence?.loopExpressions?.some((loop) => loop.consumerPath === file
-    && (rangeContains(loop.body, call.application) || rangeContains(loop.body, call.pathApplication ?? call.application))) ?? false
-
-const maximumPathCalls = (calls, file, flowEvidence) => {
-  let best = []
-  const visit = (index, selected) => {
-    if (selected.length + calls.length - index <= best.length) return
-    if (index === calls.length) {
-      best = selected
-      return
-    }
-    const call = calls[index]
-    if (selected.every((candidate) => callsCanSharePath(candidate, call, file, flowEvidence))) {
-      visit(index + 1, [...selected, call])
-    }
-    visit(index + 1, selected)
-  }
-  visit(0, [])
-  return best
-}
-
-const hasCompatiblePair = (calls, file, flowEvidence, predicate) => {
-  for (let left = 0; left < calls.length; left++) {
-    for (let right = left + 1; right < calls.length; right++) {
-      if (callsCanSharePath(calls[left], calls[right], file, flowEvidence) && predicate(calls[left], calls[right])) return true
-    }
-  }
-  return false
-}
-
 const dynamicFunctionCollections = (text, file) => {
   const bindings = []
   const collection = /\b(?:ResizeArray|List|Dictionary|IList|ICollection)\s*</g
@@ -585,10 +473,9 @@ const repeatedAttemptShape = (calls) => {
 }
 
 /** @returns {{file:string,line:number,kind:string,message:string}[]} */
-export const scanSemanticDecorators = (text, file = '<synthetic>', applicationUses, flowEvidence) => {
+export const scanSemanticDecorators = (text, file = '<synthetic>') => {
   const violations = []
   const lines = text.split('\n')
-  const offsets = applicationUses === undefined ? undefined : sourceOffsets(text)
 
   for (const pattern of GENERIC_FRAMEWORK_PATTERNS) {
     if (pattern.test(text)) violations.push({ file, line: 1, kind: 'generic-framework', message: `generic or dynamic decorator framework: ${pattern}` })
@@ -608,20 +495,12 @@ export const scanSemanticDecorators = (text, file = '<synthetic>', applicationUs
     const end = bodyEnd(lines, signature.end, declaration[1].length)
     const body = lines.slice(signature.end + 1, end)
     for (const parameter of parameters) {
-      const calls = applicationUses === undefined
-        ? directInvocations(body, parameter)
-        : resolvedParameterInvocations(text, offsets, file, body, signature.end + 2, end, parameter, applicationUses)
-      const declarationCalls = applicationUses === undefined ? calls : executableDeclarationCalls(calls, file, start + 1, flowEvidence)
-      const maximumCalls = applicationUses === undefined ? calls : maximumPathCalls(declarationCalls, file, flowEvidence)
-      const physicalListener = resolvedPhysicalListenerContract(file, declaration[2], parameter, body, declarationCalls)
-      const traceContract = resolvedTraceChangeContract(file, declaration[2], parameter, body, declarationCalls)
-      const repeatedCalls = applicationUses === undefined
-        ? hasPossibleRepeatedCall(body, calls)
-        : maximumCalls.length > 1
-      const looped = applicationUses === undefined
-        ? declarationCalls.some(({ line }) => isInsideRepeatingLoop(body, line))
-        : declarationCalls.some((call) => isInsideResolvedLoop(call, file, flowEvidence))
-      const recursive = recursivelyReinvokes(lines[start], declaration[2], body, declarationCalls)
+      const calls = directInvocations(body, parameter)
+      const physicalListener = resolvedPhysicalListenerContract(file, declaration[2], parameter, body, calls)
+      const traceContract = resolvedTraceChangeContract(file, declaration[2], parameter, body, calls)
+      const repeatedCalls = hasPossibleRepeatedCall(body, calls)
+      const looped = calls.some(({ line }) => isInsideRepeatingLoop(body, line))
+      const recursive = recursivelyReinvokes(lines[start], declaration[2], body, calls)
       const traceChanging =
         repeatedCalls ||
         looped ||
@@ -632,17 +511,13 @@ export const scanSemanticDecorators = (text, file = '<synthetic>', applicationUs
 
       const docs = precedingDocBlock(lines, start)
       const missing = validateAuthority(docs)
-      const retrying = looped || recursive || (applicationUses === undefined
-        ? repeatedCalls && repeatedAttemptShape(calls)
-        : hasCompatiblePair(declarationCalls, file, flowEvidence, (left, right) => left.suffix === right.suffix))
-      const distinctSequence = applicationUses === undefined
-        ? repeatedCalls && new Set(calls.map(({ suffix }) => suffix)).size > 1
-        : hasCompatiblePair(declarationCalls, file, flowEvidence, (left, right) => left.suffix !== right.suffix)
+      const retrying = looped || recursive || (repeatedCalls && repeatedAttemptShape(calls))
+      const distinctSequence = repeatedCalls && new Set(calls.map(({ suffix }) => suffix)).size > 1
       if (retrying && !/semantic-decorator-retry-bound:\s*[1-9]\d*\s*$/im.test(docs)) missing.push('finite retry bound')
       if (distinctSequence) {
         const invocationBound = Number(annotationValue(docs, 'invocation-bound'))
-        if (!Number.isInteger(invocationBound) || invocationBound < maximumCalls.length) {
-          missing.push(`invocation bound covering ${maximumCalls.length} calls`)
+        if (!Number.isInteger(invocationBound) || invocationBound < calls.length) {
+          missing.push(`invocation bound covering ${calls.length} calls`)
         }
       }
       if (missing.length > 0) {
@@ -660,8 +535,8 @@ export const scanSemanticDecorators = (text, file = '<synthetic>', applicationUs
 }
 
 /** @param {{file:string,text:string}[]} entries */
-export const scanEntries = (entries, applicationUses, flowEvidence) =>
-  entries.flatMap((entry) => scanSemanticDecorators(entry.text, entry.file, applicationUses, flowEvidence))
+export const scanEntries = (entries) =>
+  entries.flatMap((entry) => scanSemanticDecorators(entry.text, entry.file))
 
 export const scanRepo = (root = ROOT) => {
   const base = resolve(root, PRODUCTION_ROOT)
