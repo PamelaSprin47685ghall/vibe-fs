@@ -120,39 +120,6 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             return! childSessionOrError agentId
         }
 
-    // Await one HostPendingRun.Source for this agent. Prefer Host pending over
-    // ForkRuntime.AwaitAgent: same agentId resume would otherwise re-observe the
-    // already-settled ChildRun.Completion and skip the new work unit.
-    let awaitPendingSource (agentId: string) (source: Task<AgentCompletionOutcome>) =
-        task {
-            let! completedFirst =
-                Wanxiangshu.Process.NodeTiming.raceExit (source :> Task) Distillation.AwaitAgentTimeoutMs
-
-            if not completedFirst then
-                return Error(sprintf "await agent timed out: %s" agentId)
-            else
-                let! outcome = source
-                return outcomeResult outcome
-        }
-
-    let awaitPendingOrJoin (agentId: string) (sourceOpt: Task<AgentCompletionOutcome> option) =
-        match sourceOpt with
-        | Some source -> awaitPendingSource agentId source
-        | None ->
-            taskResult {
-                let! run = HostForkJoin.awaitAgent runtime agentId (Some Distillation.AwaitAgentTimeoutMs)
-                return! outcomeOf run
-            }
-
-    let awaitChild (agentId: string) =
-        let sourceOpt =
-            lock runtime.Gate (fun () ->
-                match runtime.PendingRuns.TryGetValue agentId with
-                | true, run when not run.Finished -> Some run.Source.Task
-                | _ -> None)
-
-        awaitPendingOrJoin agentId sourceOpt
-
     // ── RelayPort ───────────────────────────────────────────────────────────
 
     let createManagerSession (start: ManagerStart) : Task<Result<SessionId, string>> =
@@ -596,7 +563,9 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                           incumbent,
                           expectedRevision,
                           nextRevision,
-                          Wanxiangshu.Mission.Relay.PhysicalUserMessageId.create (Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.value physicalAuthorityMessage),
+                          Wanxiangshu.Mission.Relay.PhysicalUserMessageId.create (
+                              Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.value physicalAuthorityMessage
+                          ),
                           snapshot
                       ) ]
 

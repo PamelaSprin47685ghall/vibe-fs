@@ -11,8 +11,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-identityseed.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.prefix-stability.context-prefix-candidate.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
     <Compile Include="Execution/Session/ChatExecution/Fact.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Fact.fs"/>
     <Compile Include="Execution/Session/ChatExecution/Recovery.fsi"/>
