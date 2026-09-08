@@ -11,7 +11,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-companionfactfold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-runtimesurface.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.degeneration-guard.execution-session-loopdetector.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-hostturnobservedsurface.fsproj"/>
  
