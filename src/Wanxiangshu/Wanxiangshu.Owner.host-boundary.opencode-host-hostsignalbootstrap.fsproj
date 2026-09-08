@@ -63,7 +63,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-bookkeeper.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-lifecyclesurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.composition-turn-reconcilesurface.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.repository-investigation.repository-investigation-semble-mcp.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.opencode-tools-filemutationtools.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-horizon.opencode-host-messagevisibility.fsproj"/>
