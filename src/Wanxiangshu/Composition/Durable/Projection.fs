@@ -156,6 +156,10 @@ module AgentProjection =
         |> List.isEmpty
         |> not
 
+    let activeOrchestratorJobPairs (projection: AgentProjectionSet) : (ManagerJobId * SessionId) list =
+        OrchestratorProjection.activeJobs projection.Orchestrator
+        |> List.map (fun job -> job.ManagerJobId, job.ManagerSessionId)
+
     let private sessionOrEmpty sessionId projection =
         Map.tryFind sessionId projection.Sessions |> Option.defaultValue emptySession
 

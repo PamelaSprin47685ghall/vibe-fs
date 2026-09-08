@@ -684,7 +684,7 @@ module ForkTool =
         =
         task {
             let managerId = ManagerJobId.create (ToolHostCodec.newHandleId ())
-            let host = scope.OrchestratorHostFor context.SessionId
+            let host = unbox<Wanxiangshu.Change.Host.OrchestratorHost> (scope.OrchestratorHostFor context.SessionId)
 
             match!
                 host.ForkManagerJob(
@@ -719,7 +719,7 @@ module ForkTool =
         job
         =
         task {
-            let host = scope.OrchestratorHostFor context.SessionId
+            let host = unbox<Wanxiangshu.Change.Host.OrchestratorHost> (scope.OrchestratorHostFor context.SessionId)
 
             match context.ProviderRunId, context.ToolCallId with
             | Some providerRun, Some toolCallId ->

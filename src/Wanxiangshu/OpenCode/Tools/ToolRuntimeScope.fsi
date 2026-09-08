@@ -3,7 +3,6 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Wanxiangshu.Change.Host
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Delegation.Handle
@@ -111,7 +110,7 @@ type ToolRuntimeScope =
 
     member ExecutorRuntimeFor: ctx: HostToolContext -> HostForkRuntime
 
-    member OrchestratorHostFor: sessionId: string -> OrchestratorHost
+    member OrchestratorHostFor: sessionId: string -> obj
 
     member RunOwnedWork: start: (unit -> Task) -> bool
 

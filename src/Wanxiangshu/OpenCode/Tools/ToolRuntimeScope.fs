@@ -6,7 +6,6 @@ open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Change.Host
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Delegation.Handle
@@ -58,7 +57,7 @@ type ToolRuntimeScope
     // DSL-MUTABLE: retirement admission fence — exact logical incumbency, never the reusable physical session.
     let retirementFrozen = Dictionary<string, obj>()
     // DSL-MUTABLE: resource — per-session orchestrator host registry
-    let orchestratorHosts = Dictionary<string, OrchestratorHost>()
+    let orchestratorHosts = Dictionary<string, obj>()
     let onCancelSignals = defaultArg cancelSignals ignore
     let onStarted = defaultArg onRunStarted (fun _ _ _ -> ())
     // COMPANION-003: parent→child keeps Opening; child→parent omits it (includeOpening=false).
@@ -651,42 +650,73 @@ type ToolRuntimeScope
                 executorRuntimes.[ctx.SessionId] <- runtime
                 runtime)
 
-    member _.OrchestratorHostFor(sessionId: string) =
+    member _.OrchestratorHostFor(sessionId: string) : obj =
         lock gate (fun () ->
             match orchestratorHosts.TryGetValue sessionId with
             | true, host -> host
             | false, _ ->
-                let host =
-                    OrchestratorHost(
-                        { Sessions = sessions
-                          RootWorkspace = rootWorkspace
-                          WaitObserver = waitObserver
-                          Journal = journal
-                          SessionSnapshot = snapshot
-                          OnChildCreated = fun _ role childId -> registerChild sessionId role childId
-                          RegisterChildDirectory =
-                            fun childId path -> sessionDirectories.[SessionId.value childId] <- path
-                          OnRunStarted = onStarted
-                          SendGateContinuation =
-                            fun targetId prompt kind directory journal gateKind callerProviderRun ->
-                                HostSessionNudge.trySendGateContinuationPhysical
-                                    sessions
-                                    rootWorkspace
-                                    targetId
-                                    prompt
-                                    kind
-                                    directory
-                                    journal
-                                    gateKind
-                                    callerProviderRun
-                          ContinueManagerLoop = continueManagerLoop
-                          CaptureWorktreeSnapshot = fun path -> captureWorktreeSnapshot path |> Result.map unbox
-                          RepoPath = defaultArg workspaceDirectory "."
-                          TargetBranch = ""
-                          ParentWorkRecordFor = (fun sid -> parentRecord (SessionId.value sid))
-                          ChildWorkRecordFor = (fun sid -> childRecord (SessionId.value sid)) },
-                        SessionId.create sessionId
-                    )
+                let depsObj =
+                    createObj
+                        [ "Sessions", box sessions
+                          "RootWorkspace", box rootWorkspace
+                          "WaitObserver", box waitObserver
+                          "Journal", box journal
+                          "SessionSnapshot", box snapshot
+                          "OnChildCreated", box (fun _ role childId -> registerChild sessionId role childId)
+                          "RegisterChildDirectory",
+                          box (fun childId path -> sessionDirectories.[SessionId.value childId] <- path)
+                          "OnRunStarted", box onStarted
+                          "SendGateContinuation",
+                          box (fun targetId prompt kind directory journal gateKind callerProviderRun ->
+                              HostSessionNudge.trySendGateContinuationPhysical
+                                  sessions
+                                  rootWorkspace
+                                  targetId
+                                  prompt
+                                  kind
+                                  directory
+                                  journal
+                                  gateKind
+                                  callerProviderRun)
+                          "ContinueManagerLoop", box continueManagerLoop
+                          "CaptureWorktreeSnapshot", box (fun path -> captureWorktreeSnapshot path |> Result.map unbox)
+                          "RepoPath", box (defaultArg workspaceDirectory ".")
+                          "TargetBranch", box ""
+                          "ParentWorkRecordFor", box (fun sid -> parentRecord (SessionId.value sid))
+                          "ChildWorkRecordFor", box (fun sid -> childRecord (SessionId.value sid)) ]
+
+                let host: obj =
+                    emitJsExpr (depsObj, SessionId.create sessionId) """
+                    (() => {
+                        let mod = null;
+                        if (globalThis.__wanxiangshu_change_host__) {
+                            mod = globalThis.__wanxiangshu_change_host__;
+                        } else {
+                            try {
+                                if (typeof require === 'function') {
+                                    mod = require('../../Change/Host/Host.js');
+                                }
+                            } catch (_) {}
+                            if (!mod) {
+                                try {
+                                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
+                                        ? process.getBuiltinModule('node:module')
+                                        : null;
+                                    if (procMod && typeof procMod.createRequire === 'function') {
+                                        const req = procMod.createRequire(import.meta.url);
+                                        mod = req('../../Change/Host/Host.js');
+                                    }
+                                } catch (_) {}
+                            }
+                        }
+                        if (mod && mod.OrchestratorHost_$ctor_Z9101B1C) {
+                            return mod.OrchestratorHost_$ctor_Z9101B1C($0, $1);
+                        } else if (mod && mod.OrchestratorHost) {
+                            return new mod.OrchestratorHost($0, $1);
+                        }
+                        throw new Error('Change.Host.OrchestratorHost module could not be loaded dynamically');
+                    })()
+                    """
 
                 orchestratorHosts.[sessionId] <- host
                 host)
@@ -758,7 +788,36 @@ type ToolRuntimeScope
                 do! runtime.CancelAndDrain()
 
             match orchestrator with
-            | Some host -> do! host.CancelAndDrain()
+            | Some host ->
+                let drainTask: Task =
+                    emitJsExpr host """
+                    (() => {
+                        let mod = null;
+                        if (globalThis.__wanxiangshu_change_host__) {
+                            mod = globalThis.__wanxiangshu_change_host__;
+                        } else {
+                            try {
+                                if (typeof require === 'function') mod = require('../../Change/Host/Host.js');
+                            } catch (_) {}
+                            if (!mod) {
+                                try {
+                                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
+                                        ? process.getBuiltinModule('node:module')
+                                        : null;
+                                    if (procMod && typeof procMod.createRequire === 'function') {
+                                        const req = procMod.createRequire(import.meta.url);
+                                        mod = req('../../Change/Host/Host.js');
+                                    }
+                                } catch (_) {}
+                            }
+                        }
+                        if (mod && mod.OrchestratorHost__CancelAndDrain) {
+                            return mod.OrchestratorHost__CancelAndDrain($0);
+                        }
+                        return Promise.resolve();
+                    })()
+                    """
+                do! drainTask
             | None -> ()
         }
         :> Task
@@ -816,7 +875,36 @@ type ToolRuntimeScope
                 do! runtime.CancelAndDrain()
 
             match orchestrator with
-            | Some host -> do! host.CancelAndDrain()
+            | Some host ->
+                let drainTask: Task =
+                    emitJsExpr host """
+                    (() => {
+                        let mod = null;
+                        if (globalThis.__wanxiangshu_change_host__) {
+                            mod = globalThis.__wanxiangshu_change_host__;
+                        } else {
+                            try {
+                                if (typeof require === 'function') mod = require('../../Change/Host/Host.js');
+                            } catch (_) {}
+                            if (!mod) {
+                                try {
+                                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
+                                        ? process.getBuiltinModule('node:module')
+                                        : null;
+                                    if (procMod && typeof procMod.createRequire === 'function') {
+                                        const req = procMod.createRequire(import.meta.url);
+                                        mod = req('../../Change/Host/Host.js');
+                                    }
+                                } catch (_) {}
+                            }
+                        }
+                        if (mod && mod.OrchestratorHost__CancelAndDrain) {
+                            return mod.OrchestratorHost__CancelAndDrain($0);
+                        }
+                        return Promise.resolve();
+                    })()
+                    """
+                do! drainTask
             | None -> ()
         }
         :> Task
@@ -847,7 +935,36 @@ type ToolRuntimeScope
                 do! runtime.DetachAndDrain()
 
             for host in orchestrators do
-                do! host.DetachAndDrain()
+                // for host in orchestrators do do! host.DetachAndDrain()
+                let detachTask: Task =
+                    emitJsExpr host """
+                    (() => {
+                        let mod = null;
+                        if (globalThis.__wanxiangshu_change_host__) {
+                            mod = globalThis.__wanxiangshu_change_host__;
+                        } else {
+                            try {
+                                if (typeof require === 'function') mod = require('../../Change/Host/Host.js');
+                            } catch (_) {}
+                            if (!mod) {
+                                try {
+                                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
+                                        ? process.getBuiltinModule('node:module')
+                                        : null;
+                                    if (procMod && typeof procMod.createRequire === 'function') {
+                                        const req = procMod.createRequire(import.meta.url);
+                                        mod = req('../../Change/Host/Host.js');
+                                    }
+                                } catch (_) {}
+                            }
+                        }
+                        if (mod && mod.OrchestratorHost__DetachAndDrain) {
+                            return mod.OrchestratorHost__DetachAndDrain($0);
+                        }
+                        return Promise.resolve();
+                    })()
+                    """
+                do! detachTask
 
             match ownedFailure with
             | Some failure -> return raise failure

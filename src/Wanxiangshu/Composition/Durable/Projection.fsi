@@ -60,6 +60,7 @@ module AgentProjection =
     val tryFind: sessionId: SessionId -> projection: AgentProjectionSet -> SessionAgentProjection option
     val mainSealedForBlogger: mainSessionId: SessionId -> projection: AgentProjectionSet -> bool
     val hasActiveOrchestratorJobs: projection: AgentProjectionSet -> bool
+    val activeOrchestratorJobPairs: projection: AgentProjectionSet -> (ManagerJobId * SessionId) list
 
     val update:
         sessionId: SessionId ->

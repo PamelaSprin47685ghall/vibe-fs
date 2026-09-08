@@ -4,7 +4,6 @@ open System
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Change
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Delegation
 
@@ -61,29 +60,29 @@ module RecoveryClosureProjection =
         (projection: AgentProjectionSet)
         (add: RecoveryNode -> unit)
         (linkedChildIds: System.Collections.Generic.HashSet<string>)
-        job
+        (jobId: ManagerJobId, managerSessionId: SessionId)
         =
         let related =
-            job.ManagerSessionId = root
-            || linkedChildIds.Contains(SessionId.value job.ManagerSessionId)
+            managerSessionId = root
+            || linkedChildIds.Contains(SessionId.value managerSessionId)
 
         if not related then
             ()
-        elif job.ManagerSessionId = root then
-            add (RecoveryNode.ManagerJob(job.ManagerJobId, job.ManagerSessionId))
-            addBloggerPair add job.ManagerSessionId projection
+        elif managerSessionId = root then
+            add (RecoveryNode.ManagerJob(jobId, managerSessionId))
+            addBloggerPair add managerSessionId projection
         else
-            add (RecoveryNode.ManagerJob(job.ManagerJobId, job.ManagerSessionId))
+            add (RecoveryNode.ManagerJob(jobId, managerSessionId))
 
             add (
                 RecoveryNode.AgentChild(
                     root,
-                    job.ManagerSessionId,
-                    AgentHandleId.create (ManagerJobId.value job.ManagerJobId)
+                    managerSessionId,
+                    AgentHandleId.create (ManagerJobId.value jobId)
                 )
             )
 
-            addBloggerPair add job.ManagerSessionId projection
+            addBloggerPair add managerSessionId projection
 
     let private sessionNeedsRecovery session =
         let pending =
@@ -137,7 +136,7 @@ module RecoveryClosureProjection =
 
         addBloggerPair add root projection
 
-        for job in OrchestratorProjection.activeJobs projection.Orchestrator do
+        for job in AgentProjection.activeOrchestratorJobPairs projection do
             addManagerJob root projection add linkedChildIds job
 
         for sessionId, session in Map.toList projection.Sessions do
