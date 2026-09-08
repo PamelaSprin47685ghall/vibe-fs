@@ -19,8 +19,9 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Participant.Provider.Projection
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Strength
 
 [<RequireQualifiedAccess>]
 type PrefixPresentationHorizon =
@@ -249,13 +250,27 @@ module XWire =
                         (ProjectionRenderer.cutoffDigest HostDigest.sha256Hex snapshot)
         }
 
+    let private tryFindStrengthReplicaBinding (scope: PluginRuntimeScope) (sessionId: SessionId) : obj option =
+        try
+            let key = SessionId.value sessionId
+            emitJsExpr (scope, key) "$0.strength?.strengthRuntime?.byReplica?.get($1) ?? null"
+            |> Option.ofObj
+        with _ ->
+            None
+
+    let private replicaBindingCanonicalRole (binding: obj) : Role =
+        emitJsExpr binding "$0.CanonicalRole"
+
+    let private replicaBindingCapabilitiesMatch (binding: obj) (expectedCapabilities: obj) : bool =
+        emitJsExpr (binding, expectedCapabilities) "$0.ToolCapabilitySet?.Equals ? $0.ToolCapabilitySet.Equals($1) : Object.is($0.ToolCapabilitySet, $1)"
+
     let private requireStrengthReplicaAuthority
-        (binding: StrengthReplicaBinding)
+        (binding: obj)
         (authority: PromptAuthority.AuthorityExecutionProfile option)
         =
         match authority with
         | None -> raise (InvalidOperationException "StrengthReplica has no active Authority Root")
-        | Some authority when authority.CanonicalRole <> binding.CanonicalRole ->
+        | Some authority when authority.CanonicalRole <> replicaBindingCanonicalRole binding ->
             raise (InvalidOperationException "StrengthReplica Authority Root role changed after binding")
         | Some authority -> authority
 
@@ -263,7 +278,7 @@ module XWire =
         (durable: AgentJournal)
         (scope: PluginRuntimeScope)
         (sessionId: SessionId)
-        (binding: StrengthReplicaBinding)
+        (binding: obj)
         (output: obj)
         : Task<unit> =
         task {
@@ -291,10 +306,10 @@ module XWire =
                     false
                     (fun () -> Error NoCandidateReason.NoCoverage)
 
-            if
+            let expectedCapabilities =
                 PromptAuthority.toolCapabilitiesFor authority.CanonicalRole ProviderRequestKind.StrengthReplica
-                <> binding.ToolCapabilitySet
-            then
+
+            if not (replicaBindingCapabilitiesMatch binding expectedCapabilities) then
                 raise (
                     InvalidOperationException
                         "StrengthReplica PromptAuthority capabilities disagree with live execution gate"
@@ -753,7 +768,7 @@ module XWire =
         (output: obj)
         : Task<PrefixPresentationHorizon> =
         task {
-            match scope.Strength.StrengthRuntime.TryFindByReplica sessionId with
+            match tryFindStrengthReplicaBinding scope sessionId with
             | Some binding ->
                 do! applyStrengthReplicaPlan durable scope sessionId binding output
                 return PrefixPresentationHorizon.Current
