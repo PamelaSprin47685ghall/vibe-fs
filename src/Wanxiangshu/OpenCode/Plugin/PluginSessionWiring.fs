@@ -161,6 +161,10 @@ module PluginSessionWiring =
                             range
                             providerRun),
                     DelegationHandoffLedger.port workRecordCapability durable,
+                    toolMapForRole =
+                        (fun role ->
+                            PromptAuthority.toolCapabilitiesFor role ProviderRequestKind.WorkMain
+                            |> StaticTools.requestToolMap),
                     ?workspaceDirectory = workspaceDirectory,
                     ?onInspectorPrompt = Some CasebookLifecycle.notePrompt,
                     ?onInspectorAnswer = Some CasebookLifecycle.noteAnswer,

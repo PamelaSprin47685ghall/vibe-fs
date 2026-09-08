@@ -78,6 +78,7 @@ type SyncDelegateRuntime
         quiescence: ISessionQuiescenceGate,
         workRecordFor: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>,
         handoff: ReusableHandoffPort,
+        ?toolMapForRole: Role -> Map<string, bool>,
         ?workspaceDirectory: string,
         /// Casebook draft hooks (wired from SpikePlugin → CasebookLifecycle; compile-order seam).
         ?onInspectorPrompt: string -> string -> unit,
@@ -102,8 +103,9 @@ type SyncDelegateRuntime
 
     // EXEC-031: SyncDelegate uses ordinary WorkMain tools — no Return permission.
     let toolMap role =
-        PromptAuthority.toolCapabilitiesFor role ProviderRequestKind.WorkMain
-        |> StaticTools.requestToolMap
+        match toolMapForRole with
+        | Some resolve -> resolve role
+        | None -> Map.empty
 
     let managedChildObservation
         (scope: ReuseScopeId)

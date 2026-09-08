@@ -31,6 +31,7 @@ type SyncDelegateRuntime =
         quiescence: ISessionQuiescenceGate *
         workRecordFor: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>) *
         handoff: ReusableHandoffPort *
+        ?toolMapForRole: (Role -> Map<string, bool>) *
         ?workspaceDirectory: string *
         ?onInspectorPrompt: (string -> string -> unit) *
         ?onInspectorAnswer: (string -> string -> unit) *
