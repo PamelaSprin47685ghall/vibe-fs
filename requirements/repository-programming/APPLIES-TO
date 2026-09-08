@@ -22,7 +22,6 @@
 /src/Wanxiangshu/Repository/Programming/Js/GeneratorSurface.fs
 /src/Wanxiangshu/Repository/Programming/Js/GlobFs.fs
 /src/Wanxiangshu/Repository/Programming/Js/MutationFs.fs
-/src/Wanxiangshu/Repository/Programming/Js/OpenCode/BookkeeperTool.fs
 /src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHost.fs
 /src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHostSurface.fs
 /src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs
