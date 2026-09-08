@@ -23,7 +23,6 @@ open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
-open Wanxiangshu.Resources
 open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Persistence
 
