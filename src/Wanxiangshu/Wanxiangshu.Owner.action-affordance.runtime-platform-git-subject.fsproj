@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>runtime-platform</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>git-subject</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>action-affordance</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>git-subject</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Git/Subject.fsi"/>
+    <Compile Include="Git/Subject.fs"/>
+  </ItemGroup>
+</Project>
