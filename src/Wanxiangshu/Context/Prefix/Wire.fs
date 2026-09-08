@@ -13,7 +13,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
@@ -186,6 +185,33 @@ module XWire =
     let suppressHostMessagesByIds (rawMessages: obj list) (hostMessageIds: Set<string>) =
         ProjectionMessageEdit.suppressHostMessagesByIds rawMessages hostMessageIds
 
+    let private renderFrozenRecordPrefix (opening: XTraceOpeningEvidence) (frameBodies: string list) : Task<Result<string, string>> =
+        let invokeAsync: Task<string> =
+            emitJsExpr
+                (opening, frameBodies)
+                """
+(async function(opening, frameBodies) {
+    try {
+        const mod = await import('../../Mission/WorkRecord/Model.js');
+        if (typeof mod.LifecycleWorkRecordModule_materialize === 'function') {
+            return mod.LifecycleWorkRecordModule_materialize(opening, frameBodies, '', false);
+        }
+    } catch (_) {}
+    const frames = [];
+    let cur = frameBodies;
+    while (cur && cur.tail) {
+        if (cur.head && cur.head.trim().length > 0) frames.push(cur.head);
+        cur = cur.tail;
+    }
+    return frames.length > 0 ? 'Chronicle\n' + frames.join('\n\n') : '';
+})($0, $1)
+"""
+
+        task {
+            let! text = invokeAsync
+            return Ok text
+        }
+
     /// COMPANION-009 / CTX-011: FrozenRecordPrefix = Opening + coverable Y frame
     /// prefix. RawGap never participates — it has no Y coverage proof.
     let private materializeFrozenRecordPrefix
@@ -207,12 +233,10 @@ module XWire =
             // Same-session FrozenRecordPrefix omits Opening (WORK-RECORD-007):
             // the true raw Opening remains physically present outside the Y
             // replacement. Gap/terminal are live X material and also stay out.
-            return
-                LifecycleWorkRecord.render
-                    false
-                    { Opening = opening
-                      Frames = frameBodies
-                      Gap = "" }
+            // Under WORK-RECORD-007, LifecycleWorkRecord.render false produces
+            // the headless Chronicle Y prefix.
+            let! rendered = renderFrozenRecordPrefix opening frameBodies
+            return rendered
         }
 
     let private candidate
