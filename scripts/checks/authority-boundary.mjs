@@ -30,8 +30,9 @@ const authorityRegistry = () => {
   const owners = new Set()
   const ownership = new Map()
   for (const [sourcePath, project] of shardInventory.sourceProject) {
-    if (project.legacyOwner) owners.add(project.legacyOwner)
-    ownership.set(norm(relative(REPOSITORY_ROOT, sourcePath)), project.legacyOwner || project.explicitSubsystem)
+    const validOwners = new Set([project.legacyOwner, project.explicitSubsystem].filter(Boolean))
+    for (const owner of validOwners) owners.add(owner)
+    ownership.set(norm(relative(REPOSITORY_ROOT, sourcePath)), validOwners)
   }
   const trace = buildTraceGraph(REQUIREMENTS)
   canonicalRegistry = {
@@ -205,9 +206,11 @@ export const scanEntries = (entries, manifest, registry = authorityRegistry()) =
       problems.push(problem('incomplete-method-contract', method.file ?? '<manifest>', 0, `${method.symbol ?? '<missing>'}: resultSymbol`))
     }
     if (!registry.owners.has(method.owner)) problems.push(problem('unregistered-authority-owner', method.file ?? '<manifest>', 0, `${method.symbol}: ${method.owner}`))
-    const declarationOwner = registry.ownership?.get(norm(method.file ?? ''))
-    if ((declarationOwner !== undefined || norm(method.file ?? '').startsWith('src/')) && declarationOwner !== method.owner) {
-      problems.push(problem('authority-owner-mismatch', method.file, 0, `${method.symbol}: declaration owner is ${declarationOwner ?? '<missing>'}, contract says ${method.owner}`))
+    const rawOwner = registry.ownership?.get(norm(method.file ?? ''))
+    const fileOwners = rawOwner instanceof Set ? rawOwner : (typeof rawOwner === 'string' ? new Set([rawOwner]) : undefined)
+    if ((fileOwners !== undefined || norm(method.file ?? '').startsWith('src/')) && !fileOwners?.has(method.owner)) {
+      const displayOwner = [...(fileOwners ?? [])].join(' / ') || '<missing>'
+      problems.push(problem('authority-owner-mismatch', method.file, 0, `${method.symbol}: declaration owner is ${displayOwner}, contract says ${method.owner}`))
     }
     for (const id of whatIds(method.what)) {
       const definition = registry.whats.get(id)
@@ -252,14 +255,18 @@ export const scanEntries = (entries, manifest, registry = authorityRegistry()) =
     }
     issuerSpansByContract.set(key, registeredIssuerSpans)
     if (!registry.owners.has(row.owner)) problems.push(problem('unregistered-authority-owner', row.file, 0, `${row.symbol}: ${row.owner ?? '<missing>'}`))
-    const declarationOwner = registry.ownership?.get(norm(row.file ?? ''))
-    if ((declarationOwner !== undefined || norm(row.file ?? '').startsWith('src/')) && declarationOwner !== row.owner) {
-      problems.push(problem('authority-owner-mismatch', row.file, 0, `${row.symbol}: declaration owner is ${declarationOwner ?? '<missing>'}, contract says ${row.owner ?? '<missing>'}`))
+    const rawOwner = registry.ownership?.get(norm(row.file ?? ''))
+    const fileOwners = rawOwner instanceof Set ? rawOwner : (typeof rawOwner === 'string' ? new Set([rawOwner]) : undefined)
+    if ((fileOwners !== undefined || norm(row.file ?? '').startsWith('src/')) && !fileOwners?.has(row.owner)) {
+      const displayOwner = [...(fileOwners ?? [])].join(' / ') || '<missing>'
+      problems.push(problem('authority-owner-mismatch', row.file, 0, `${row.symbol}: declaration owner is ${displayOwner}, contract says ${row.owner ?? '<missing>'}`))
     }
     for (const issuer of row.issuers ?? []) {
-      const issuerOwner = registry.ownership?.get(norm(issuer.file ?? ''))
-      if ((issuerOwner !== undefined || norm(issuer.file ?? '').startsWith('src/')) && issuer.owner !== issuerOwner) {
-        problems.push(problem('authority-issuer-owner-mismatch', issuer.file ?? row.file, 0, `${row.symbol}: issuer owner is ${issuerOwner ?? '<missing>'}, contract says ${issuer.owner ?? '<missing>'}`))
+      const rawIssuer = registry.ownership?.get(norm(issuer.file ?? ''))
+      const issuerOwners = rawIssuer instanceof Set ? rawIssuer : (typeof rawIssuer === 'string' ? new Set([rawIssuer]) : undefined)
+      if ((issuerOwners !== undefined || norm(issuer.file ?? '').startsWith('src/')) && !issuerOwners?.has(issuer.owner)) {
+        const displayIssuer = [...(issuerOwners ?? [])].join(' / ') || '<missing>'
+        problems.push(problem('authority-issuer-owner-mismatch', issuer.file ?? row.file, 0, `${row.symbol}: issuer owner is ${displayIssuer}, contract says ${issuer.owner ?? '<missing>'}`))
       }
     }
     for (const id of whatIds(row.what)) {

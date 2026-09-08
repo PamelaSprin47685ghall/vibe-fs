@@ -59,8 +59,7 @@ export function buildSubsystemInventory({ compileInventory = readCompileShardInv
         subsystemEdges.add(`${project.subsystem}\0${provider.subsystem}`)
       }
       if (
-        project.explicitSubsystem === 'runtime-platform'
-        && project.explicitCompileShard
+        project.subsystem === 'runtime-platform'
         && provider.subsystem !== 'runtime-platform'
       ) {
         violations.push(`${project.shardKey}: reusable runtime-platform shard depends on domain subsystem ${provider.subsystem}/${provider.shard}`)
