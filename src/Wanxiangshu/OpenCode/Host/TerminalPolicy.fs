@@ -1,7 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Collections.Generic
-open Wanxiangshu.Change
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Persistence.Journal
@@ -108,9 +107,7 @@ module TerminalPolicy =
         match journal with
         | None -> false
         | Some durable ->
-            OrchestratorProjection.activeJobs (AgentJournal.snapshot durable).AgentProjections.Orchestrator
-            |> List.isEmpty
-            |> not
+            AgentProjection.hasActiveOrchestratorJobs (AgentJournal.snapshot durable).AgentProjections
 
     /// EXEC-016: join-capable role still owns unconsumed background work.
     ///

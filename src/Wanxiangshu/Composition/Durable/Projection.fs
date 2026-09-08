@@ -151,6 +151,11 @@ module AgentProjection =
         | Some record -> HandleProjection.recordSealsBlogger record
         | None -> false
 
+    let hasActiveOrchestratorJobs (projection: AgentProjectionSet) : bool =
+        OrchestratorProjection.activeJobs projection.Orchestrator
+        |> List.isEmpty
+        |> not
+
     let private sessionOrEmpty sessionId projection =
         Map.tryFind sessionId projection.Sessions |> Option.defaultValue emptySession
 
