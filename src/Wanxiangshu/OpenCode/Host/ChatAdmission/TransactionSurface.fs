@@ -609,21 +609,48 @@ module TransactionSurface =
                           Origin = acceptedEvidence.Origin
                           IdentitySeed = acceptedEvidence.IdentitySeed }
 
+            let bindingModule: obj =
+                emitJsExpr () """
+                (() => {
+                    let mod = null;
+                    try {
+                        if (typeof require === 'function') {
+                            mod = require('../SessionExecutionBinding.js');
+                        }
+                    } catch (_) {}
+                    if (!mod) {
+                        try {
+                            const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
+                                ? process.getBuiltinModule('node:module')
+                                : null;
+                            if (procMod && typeof procMod.createRequire === 'function') {
+                                const req = procMod.createRequire(import.meta.url);
+                                mod = req('../SessionExecutionBinding.js');
+                            }
+                        } catch (_) {}
+                    }
+                    return mod;
+                })()
+                """
+
             let installBinding model =
                 match bindingIntent with
                 | ChatAdmissionIntent.Decision.PendingPromptIntent intent ->
-                    SessionExecutionBinding.acceptPromptExecution
-                        key.SessionId
-                        intent.PromptKey
-                        key.PhysicalUserMessageId
-                        (AcceptedChatExecutionEvidence.participant acceptedEvidence)
-                        model
+                    emitJsExpr (bindingModule, key.SessionId, intent.PromptKey, key.PhysicalUserMessageId, (AcceptedChatExecutionEvidence.participant acceptedEvidence), model) """
+                    (() => {
+                        if ($0 && typeof $0.acceptPromptExecution === 'function') {
+                            $0.acceptPromptExecution($1, $2, $3, $4, $5);
+                        }
+                    })()
+                    """
                 | _ ->
-                    SessionExecutionBinding.acceptExternalExecution
-                        key.SessionId
-                        key.PhysicalUserMessageId
-                        (AcceptedChatExecutionEvidence.participant acceptedEvidence)
-                        model
+                    emitJsExpr (bindingModule, key.SessionId, key.PhysicalUserMessageId, (AcceptedChatExecutionEvidence.participant acceptedEvidence), model) """
+                    (() => {
+                        if ($0 && typeof $0.acceptExternalExecution === 'function') {
+                            $0.acceptExternalExecution($1, $2, $3, $4);
+                        }
+                    })()
+                    """
 
             let ports: ChatAdmissionTransactionPorts =
                 { Accept = accept
@@ -665,9 +692,13 @@ module TransactionSurface =
                   SettlePreProvider = PreProviderSettlement.settleWith settlementPersistence
                   Unbind =
                     fun requested ->
-                        SessionExecutionBinding.releaseAcceptedExecution
-                            requested.SessionId
-                            requested.PhysicalUserMessageId }
+                        emitJsExpr (bindingModule, requested.SessionId, requested.PhysicalUserMessageId) """
+                        (() => {
+                            if ($0 && typeof $0.releaseAcceptedExecution === 'function') {
+                                $0.releaseAcceptedExecution($1, $2);
+                            }
+                        })()
+                        """ }
 
             let current = ChatExecutionProjection.byKey key projection
 
@@ -708,7 +739,16 @@ module TransactionSurface =
                        admission =
                         {| activeCapacity = activeCapacity
                            providerBinding =
-                            SessionExecutionBinding.exactExecutionBindingCount key.SessionId key.PhysicalUserMessageId |}
+                            let count: int =
+                                emitJsExpr (bindingModule, key.SessionId, key.PhysicalUserMessageId) """
+                                (() => {
+                                    if ($0 && typeof $0.exactExecutionBindingCount === 'function') {
+                                        return $0.exactExecutionBindingCount($1, $2);
+                                    }
+                                    return 0;
+                                })()
+                                """
+                            count |}
                        acceptedFactCount =
                         facts
                         |> Seq.filter (function

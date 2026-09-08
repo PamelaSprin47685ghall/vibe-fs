@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Threading.Tasks
+open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
@@ -552,6 +553,71 @@ module internal ChatAdmissionTransaction =
             | Ok AdmissionRequired -> return! executeAdmission observe ports input
         }
 
+    let private bindingModule: obj =
+        emitJsExpr () """
+        (() => {
+            let mod = null;
+            try {
+                if (typeof require === 'function') {
+                    mod = require('../SessionExecutionBinding.js');
+                }
+            } catch (_) {}
+            if (!mod) {
+                try {
+                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
+                        ? process.getBuiltinModule('node:module')
+                        : null;
+                    if (procMod && typeof procMod.createRequire === 'function') {
+                        const req = procMod.createRequire(import.meta.url);
+                        mod = req('../SessionExecutionBinding.js');
+                    }
+                } catch (_) {}
+            }
+            return mod;
+        })()
+        """
+
+    let private acceptExternalExecutionDynamically
+        (sessionId: SessionId)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        (participant: string)
+        (model: OpencodeModel)
+        : unit =
+        emitJsExpr (bindingModule, sessionId, physicalUserMessageId, participant, model) """
+        (() => {
+            if ($0 && typeof $0.acceptExternalExecution === 'function') {
+                $0.acceptExternalExecution($1, $2, $3, $4);
+            }
+        })()
+        """
+
+    let private acceptPromptExecutionDynamically
+        (sessionId: SessionId)
+        (promptKey: PromptKey)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        (participant: string)
+        (model: OpencodeModel)
+        : unit =
+        emitJsExpr (bindingModule, sessionId, promptKey, physicalUserMessageId, participant, model) """
+        (() => {
+            if ($0 && typeof $0.acceptPromptExecution === 'function') {
+                $0.acceptPromptExecution($1, $2, $3, $4, $5);
+            }
+        })()
+        """
+
+    let private releaseAcceptedExecutionDynamically
+        (sessionId: SessionId)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        : unit =
+        emitJsExpr (bindingModule, sessionId, physicalUserMessageId) """
+        (() => {
+            if ($0 && typeof $0.releaseAcceptedExecution === 'function') {
+                $0.releaseAcceptedExecution($1, $2);
+            }
+        })()
+        """
+
     let private bindIntent
         (intent: ChatAdmissionIntent.Decision)
         (witness: ManagedChatAcceptanceWitness)
@@ -561,19 +627,19 @@ module internal ChatAdmissionTransaction =
 
         match intent with
         | ChatAdmissionIntent.Decision.ExternalRootIntent intentEvidence ->
-            SessionExecutionBinding.acceptExternalExecution
+            acceptExternalExecutionDynamically
                 intentEvidence.Key.SessionId
                 intentEvidence.Key.PhysicalUserMessageId
                 (AcceptedChatExecutionEvidence.participant evidence)
                 model
         | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent intentEvidence ->
-            SessionExecutionBinding.acceptExternalExecution
+            acceptExternalExecutionDynamically
                 intentEvidence.Key.SessionId
                 intentEvidence.Key.PhysicalUserMessageId
                 (AcceptedChatExecutionEvidence.participant evidence)
                 model
         | ChatAdmissionIntent.Decision.PendingPromptIntent intentEvidence ->
-            SessionExecutionBinding.acceptPromptExecution
+            acceptPromptExecutionDynamically
                 intentEvidence.Key.SessionId
                 intentEvidence.PromptKey
                 intentEvidence.Key.PhysicalUserMessageId
@@ -624,6 +690,6 @@ module internal ChatAdmissionTransaction =
           Commit = ModelRouting.commitExecutionAdmission
           ReleaseBeforeProvider = fun lease -> ModelRouting.releaseExecutionAdmissionBeforeProvider lease lease.Identity
           SettlePreProvider = PreProviderSettlement.settle journal
-          Unbind = fun key -> SessionExecutionBinding.releaseAcceptedExecution key.SessionId key.PhysicalUserMessageId }
+          Unbind = fun key -> releaseAcceptedExecutionDynamically key.SessionId key.PhysicalUserMessageId }
 
     let execute ports input = executeWith ignore ports input
