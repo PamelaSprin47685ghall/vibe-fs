@@ -40,7 +40,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.process-execution.process-processrequest.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.repository-investigation.opencode-tools-inspectortool.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-capture.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.process-node-timing-adapter.fsproj"/>

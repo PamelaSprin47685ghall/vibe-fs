@@ -40,7 +40,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.repository-investigation.repository-investigation-semble-mcp.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.process-node-timing-adapter.fsproj"/>
     <Compile Include="Execution/Delegation/Join.fsi"/>
     <Compile Include="Execution/Delegation/Join.fs"/>

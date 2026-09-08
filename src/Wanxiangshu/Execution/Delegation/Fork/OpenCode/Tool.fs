@@ -15,7 +15,8 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Repository.Investigation.WarmStart
+open Fable.Core
+open Fable.Core.JsInterop
 
 /// Manager fork & resume / Orchestrator commission. One typed request backs
 /// every public tool; each tool exposes its own schema; PTY is absent.
@@ -217,8 +218,41 @@ module ForkTool =
     let private hasKeywords (request: Request) =
         not (String.IsNullOrWhiteSpace request.Keywords)
 
-    let private warmStartAllowed role =
-        RepositoryWarmStartPrompt.isDirectConsumer role
+    let private warmStartAllowed (role: Role) =
+        match role with
+        | Role.Coder
+        | Role.Inspector
+        | Role.DevOps -> true
+        | _ -> false
+
+    let private appendWarmStartToBaseDocument
+        (parentId: SessionId)
+        (role: Role)
+        (workspaceDirectory: string option)
+        (keywords: string)
+        (baseDocument: LlmFacing.Document)
+        : Task<LlmFacing.Document option> =
+        let invokeAsync: Task<obj> =
+            emitJsExpr
+                (parentId, role, workspaceDirectory, keywords, baseDocument)
+                """
+(async function(parentId, role, workspaceDirectory, keywords, baseDocument) {
+    try {
+        const mod = await import('../../../../Repository/Investigation/WarmStart/Runtime.js');
+        const appendFn = mod.appendToBaseDocument;
+        if (typeof appendFn !== 'function') return null;
+        const res = await appendFn(parentId, role, workspaceDirectory, keywords, baseDocument);
+        return res && res.tag === 0 ? res.fields[0] : null;
+    } catch {
+        return null;
+    }
+})($0, $1, $2, $3, $4)
+"""
+
+        task {
+            let! res = invokeAsync
+            return Option.ofObj (unbox<LlmFacing.Document> res)
+        }
 
     let private prepareForkPromptWithRecord
         (scope: ToolRuntimeScope)
@@ -240,15 +274,15 @@ module ForkTool =
 
             if hasKeywords request then
                 match!
-                    RepositoryWarmStart.appendToBaseDocument
+                    appendWarmStartToBaseDocument
                         runtime.ParentId
                         role
                         scope.WorkspaceDirectory
                         request.Keywords
                         baseDocument
                 with
-                | Ok prompt -> return LlmFacing.render prompt
-                | Error _ -> return LlmFacing.render baseDocument
+                | Some prompt -> return LlmFacing.render prompt
+                | None -> return LlmFacing.render baseDocument
             else
                 return LlmFacing.render baseDocument
         }
