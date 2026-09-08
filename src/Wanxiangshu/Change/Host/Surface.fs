@@ -350,6 +350,8 @@ module OrchestratorHostSurface =
               OnChildCreated = fun _ _ _ -> ()
               RegisterChildDirectory = fun _ _ -> ()
               OnRunStarted = fun _ _ _ -> ()
+              SendGateContinuation =
+                  fun _ _ _ _ _ _ _ -> Task.FromResult(Error "SendGateContinuation unavailable on harness surface")
               ContinueManagerLoop = fun _ _ -> Task.FromResult(Ok())
               CaptureWorktreeSnapshot = fun _ -> Error "workspace snapshot capture unavailable"
               RepoPath = stringOf (field options "repoPath")

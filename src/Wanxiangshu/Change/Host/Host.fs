@@ -17,7 +17,6 @@ open Wanxiangshu.Git
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Provider
@@ -545,9 +544,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             let gateKind = "relay-authority-update:" + AuthorityRevision.value nextRevision
 
             let! physicalAuthorityMessage =
-                HostSessionNudge.trySendGateContinuationPhysical
-                    deps.Sessions
-                    deps.RootWorkspace
+                deps.SendGateContinuation
                     record.ManagerSessionId
                     prompt
                     PromptAuthority.ContinuationKind.ManagedDelegationAssignment

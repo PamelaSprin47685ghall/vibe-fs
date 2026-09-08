@@ -15,6 +15,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
@@ -635,6 +636,18 @@ type ToolRuntimeScope
                           RegisterChildDirectory =
                             fun childId path -> sessionDirectories.[SessionId.value childId] <- path
                           OnRunStarted = onStarted
+                          SendGateContinuation =
+                            fun targetId prompt kind directory journal gateKind callerProviderRun ->
+                                HostSessionNudge.trySendGateContinuationPhysical
+                                    sessions
+                                    rootWorkspace
+                                    targetId
+                                    prompt
+                                    kind
+                                    directory
+                                    journal
+                                    gateKind
+                                    callerProviderRun
                           ContinueManagerLoop = continueManagerLoop
                           CaptureWorktreeSnapshot = captureWorktreeSnapshot
                           RepoPath = defaultArg workspaceDirectory "."

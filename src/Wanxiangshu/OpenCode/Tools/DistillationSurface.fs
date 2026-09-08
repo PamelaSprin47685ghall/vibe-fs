@@ -40,11 +40,10 @@ module DistillationSurface =
         CompanionTransform.allowsBloggerCompanionForAgentName managedAgentName
 
     /// Distiller has no execution, mutation, or judgement permissions.
-    let permissionLabels: string array =
-        Wanxiangshu.Participant.Persona.OfficeCapabilitySurface.permissions roleLabel
+    let permissionLabels: string array = [||]
 
     /// Distillation is invoked by the provider-visible run surface.
-    let executionToolName: string = ExecutorTool.RunToolName
+    let executionToolName: string = "run"
 
     /// Stable JSON-shaped contract for consumers that need one observation.
     let contract: obj =
