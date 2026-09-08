@@ -227,3 +227,18 @@ module PromptAuthorityLedger =
         | _ when pendingDispatchClaim sessionId payloadDigest agentProjections |> Option.isSome ->
             DispatchStatus.Pending
         | _ -> DispatchStatus.Dispatchable
+
+    let issueCurrentOwnerIdentitySeed
+        (agentProjections: AgentProjectionSet)
+        (ownerSessionId: SessionId)
+        (childAgent: string)
+        : Result<PromptAuthority.IdentitySeed, string> =
+        match activeProfile ownerSessionId agentProjections with
+        | None -> Error "AgentOwnerRoot identity seed requires the owner's active durable Logical Run"
+        | Some ownerProfile ->
+            PromptAuthority.issueInheritedIdentitySeed childAgent ownerProfile
+            |> Result.mapError (sprintf "Invalid inherited participant identity: %A")
+            |> Result.bind (fun seed ->
+                PromptAuthority.validateInheritedIdentitySeed ownerProfile seed
+                |> Result.mapError (sprintf "Invalid owner identity witness: %A")
+                |> Result.map (fun _ -> seed))

@@ -87,3 +87,9 @@ module PromptAuthorityLedger =
 
     val dispatchStatusFor:
         sessionId: SessionId -> payloadDigest: string -> agentProjections: AgentProjectionSet -> DispatchStatus
+
+    val issueCurrentOwnerIdentitySeed:
+        agentProjections: AgentProjectionSet ->
+        ownerSessionId: SessionId ->
+        childAgent: string ->
+            Result<PromptAuthority.IdentitySeed, string>

@@ -45,33 +45,18 @@ module HostForkRunLifecycle =
         | AcceptanceUncertain of string
         | Rejected of string
 
-    let private requireIdentitySeedJournal =
-        function
-        | None -> Error "No journal: an AgentOwnerRoot identity seed cannot be issued"
-        | Some durable -> Ok durable
-
-    let private requireExactActiveOwnerProfile ownerSessionId (durable: AgentJournal) =
-        match PromptAuthorityLedger.activeProfile ownerSessionId (AgentJournal.snapshot durable).AgentProjections with
-        | None -> Error "AgentOwnerRoot identity seed requires the owner's active durable Logical Run"
-        | Some ownerProfile -> Ok ownerProfile
-
-    let private issueExactActiveOwnerIdentitySeed childAgent ownerProfile =
-        PromptAuthority.issueInheritedIdentitySeed childAgent ownerProfile
-        |> Result.mapError (sprintf "Invalid inherited participant identity: %A")
-        |> Result.bind (fun seed ->
-            PromptAuthority.validateInheritedIdentitySeed ownerProfile seed
-            |> Result.mapError (sprintf "Invalid owner identity witness: %A")
-            |> Result.map (fun _ -> seed))
-
     let issueCurrentOwnerIdentitySeed
         (journal: AgentJournal option)
         (ownerSessionId: SessionId)
         (childAgent: string)
         : Result<PromptAuthority.IdentitySeed, string> =
-        journal
-        |> requireIdentitySeedJournal
-        |> Result.bind (requireExactActiveOwnerProfile ownerSessionId)
-        |> Result.bind (issueExactActiveOwnerIdentitySeed childAgent)
+        match journal with
+        | None -> Error "No journal: an AgentOwnerRoot identity seed cannot be issued"
+        | Some durable ->
+            PromptAuthorityLedger.issueCurrentOwnerIdentitySeed
+                (AgentJournal.snapshot durable).AgentProjections
+                ownerSessionId
+                childAgent
 
     [<RequireQualifiedAccess>]
     type private DurableDispatchObservation =
