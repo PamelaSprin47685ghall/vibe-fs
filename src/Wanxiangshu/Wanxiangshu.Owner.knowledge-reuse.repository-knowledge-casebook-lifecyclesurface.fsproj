@@ -11,9 +11,9 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.strength-persistence-durabilityport.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.opencode-tools-fetchtool.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-bookkeeper.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-model.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.repository-investigation.opencode-tools-inspectortool.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.opencode-tools-filemutationtools.fsproj"/>
     <Compile Include="Repository/Knowledge/Casebook/OpenCode/Tools.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/OpenCode/Tools.fs"/>
