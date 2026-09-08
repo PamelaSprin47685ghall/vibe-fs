@@ -4,16 +4,6 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 
-[<RequireQualifiedAccess>]
-type DegenerationKind =
-    | TooRepetitive
-    | TooRandom
-
-[<RequireQualifiedAccess>]
-type AbortCause =
-    | DegenerationGuard of DegenerationKind
-    | External
-
 type LoopSensor =
     new:
         isOwned: (SessionId -> bool) *

@@ -8,6 +8,16 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 [<RequireQualifiedAccess>]
+type DegenerationKind =
+    | TooRepetitive
+    | TooRandom
+
+[<RequireQualifiedAccess>]
+type AbortCause =
+    | DegenerationGuard of DegenerationKind
+    | External
+
+[<RequireQualifiedAccess>]
 type QuiescencePermitFailure =
     | WrongOwner
     | NoFreshIdle

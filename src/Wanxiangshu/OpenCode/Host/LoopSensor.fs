@@ -7,18 +7,6 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
-[<RequireQualifiedAccess>]
-type DegenerationKind =
-    | TooRepetitive
-    | TooRandom
-
-/// Host boundary outcome for an abort observed by reconciliation. A guarded
-/// abort has already transferred recovery ownership to LoopSensor.
-[<RequireQualifiedAccess>]
-type AbortCause =
-    | DegenerationGuard of DegenerationKind
-    | External
-
 /// Streaming degeneration owner. It owns the whole process-local protocol:
 /// detect -> arm typed anomaly -> interrupt -> consume reconciled abort -> continue.
 /// Anomaly ownership is bounded to exact execution/run: an armed anomaly records the
