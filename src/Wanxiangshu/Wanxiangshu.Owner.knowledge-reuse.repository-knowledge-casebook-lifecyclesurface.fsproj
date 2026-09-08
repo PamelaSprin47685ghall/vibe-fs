@@ -5,7 +5,6 @@
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.behavior-diagnosis.enforcer-continuation.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-surface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj"/>
@@ -14,7 +13,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.opencode-tools-fetchtool.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-bookkeeper.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-model.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.repository-programming.opencode-tools-filemutationtools.fsproj"/>
     <Compile Include="Repository/Knowledge/Casebook/OpenCode/Tools.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/OpenCode/Tools.fs"/>
   </ItemGroup>

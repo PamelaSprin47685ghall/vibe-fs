@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
 open System.Threading.Tasks
-open Wanxiangshu.Enforcer
 
 /// JS-native lifecycle boundary for the Casebook draft and observation flow.
 /// Draft storage, collector state, and Bookkeeper/Journal capabilities remain

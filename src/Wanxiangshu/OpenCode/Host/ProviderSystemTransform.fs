@@ -67,8 +67,6 @@ open Wanxiangshu.Git.Hook
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Mission.Obligation.Todo.OpenCode
 open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Repository.Knowledge.Casebook
-open Wanxiangshu.Repository.Knowledge.Casebook.OpenCode
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Repository.Programming.Js.OpenCode
 open Wanxiangshu.Resources

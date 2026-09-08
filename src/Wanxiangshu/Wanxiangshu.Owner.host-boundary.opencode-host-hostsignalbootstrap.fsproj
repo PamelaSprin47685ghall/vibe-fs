@@ -50,7 +50,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.execution-fission-opencode-host.fsproj"/>
  
  
-    <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-fold.fsproj"/>
@@ -60,10 +59,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.session-attachment-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.opencode-host-turnruntimepreparation.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.obligation-ledger.mission-obligation-todo-magictodosemanticsurface.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-bookkeeper.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-lifecyclesurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.composition-turn-reconcilesurface.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.repository-programming.opencode-tools-filemutationtools.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-horizon.opencode-host-messagevisibility.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
