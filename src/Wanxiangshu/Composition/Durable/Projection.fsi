@@ -61,6 +61,7 @@ module AgentProjection =
     val mainSealedForBlogger: mainSessionId: SessionId -> projection: AgentProjectionSet -> bool
     val hasActiveOrchestratorJobs: projection: AgentProjectionSet -> bool
     val activeOrchestratorJobPairs: projection: AgentProjectionSet -> (ManagerJobId * SessionId) list
+    val pendingAttentionWorkPairs: sessionId: SessionId -> projection: AgentProjectionSet -> (string * string) list
 
     val update:
         sessionId: SessionId ->

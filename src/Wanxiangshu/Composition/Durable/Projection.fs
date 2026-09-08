@@ -160,6 +160,10 @@ module AgentProjection =
         OrchestratorProjection.activeJobs projection.Orchestrator
         |> List.map (fun job -> job.ManagerJobId, job.ManagerSessionId)
 
+    let pendingAttentionWorkPairs (sessionId: SessionId) (projection: AgentProjectionSet) : (string * string) list =
+        AttentionProjection.pending sessionId projection.Attention
+        |> List.map (fun item -> item.OccurrenceId, item.Text)
+
     let private sessionOrEmpty sessionId projection =
         Map.tryFind sessionId projection.Sessions |> Option.defaultValue emptySession
 
