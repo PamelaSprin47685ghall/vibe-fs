@@ -6,8 +6,6 @@ open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Foundation
@@ -207,27 +205,7 @@ module InteractionRepairWorkflow =
         (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         : Task =
-        task {
-            match
-                BloggerRecoveryProbe.terminalRequestOwnershipForPhysicalMessage
-                    durable
-                    context.Turn.SessionId
-                    request
-                    context.Turn.PhysicalUserMessageId
-            with
-            | BloggerTerminalRequestOwnership.Superseded ->
-                Diagnostic.emit
-                    "blogger-protocol-repair-superseded"
-                    [ "session_id", SessionId.value context.Turn.SessionId
-                      "result", "terminal belongs to an older Blogger request" ]
-
-                return ()
-            | BloggerTerminalRequestOwnership.Current
-            | BloggerTerminalRequestOwnership.Unproven ->
-                return!
-                    sendOwnedBloggerRepair host durable request quiescence context sessionPort rootWorkspace eventPort
-        }
-        :> Task
+        sendOwnedBloggerRepair host durable request quiescence context sessionPort rootWorkspace eventPort
 
     let repairBloggerProtocol
         (host: IBloggerRuntimeHost)
