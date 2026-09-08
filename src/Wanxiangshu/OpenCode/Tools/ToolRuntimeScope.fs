@@ -19,7 +19,6 @@ open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Process
 
 /// Owns every per-session tool runtime.
 ///
@@ -370,7 +369,7 @@ type ToolRuntimeScope
     let parseProcessHardLimit (value: string) =
         match Double.TryParse value with
         | true, seconds when seconds > 0.0 && not (Double.IsInfinity seconds) -> TimeSpan.FromSeconds seconds
-        | _ -> ProcessEstimate.DefaultHardLimit
+        | _ -> TimeSpan.FromHours 1.0
 
     let relayRoadView (sessionId: string) =
         let roadId = RoadId.create sessionId
@@ -423,7 +422,7 @@ type ToolRuntimeScope
     member val ProcessHardLimit =
         match Environment.GetEnvironmentVariable "WANXIANGSHU_PROCESS_HARD_LIMIT_SECS" with
         | null
-        | "" -> ProcessEstimate.DefaultHardLimit
+        | "" -> TimeSpan.FromHours 1.0
         | value -> parseProcessHardLimit value
 
     member _.SessionParents = sessionParents
