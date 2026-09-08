@@ -3,7 +3,6 @@ namespace Wanxiangshu.Participant.Provider
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Resources
 
 /// Provider-language owner boundary. Language values, session binding and
@@ -117,17 +116,15 @@ module ProviderLanguageSurface =
     /// Exercise the real host transform at the provider-language boundary for
     /// the Bookkeeper-owned system segment. The attachment fixture is private;
     /// host-owned system bytes remain caller data and are never rewritten.
-    let transformBookkeeperSystem (sessionId: string) (system: string array) : Task<obj> =
+    let transformBookkeeperSystem
+        (sessionId: string)
+        (system: string array)
+        : Task<obj> =
         task {
             let sid = SessionId.create sessionId
             Wanxiangshu.OpenCode.ProviderLanguageBinding.ensureRoot sid |> ignore
-            BookkeeperRuntime.bindSession sessionId "provider-language-surface" "provider-language-surface"
-
-            try
-                let input = createObj [ "sessionID" ==> sessionId; "model" ==> createObj [] ]
-                let output = createObj [ "system" ==> system ]
-                let! _ = Wanxiangshu.OpenCode.ProviderSystemTransform.create None input output
-                return box {| system = unbox<string array> output?system |}
-            finally
-                BookkeeperRuntime.unbindSession sessionId
+            let input = createObj [ "sessionID" ==> sessionId; "model" ==> createObj [] ]
+            let output = createObj [ "system" ==> system ]
+            let! _ = Wanxiangshu.OpenCode.ProviderSystemTransform.create None input output
+            return box {| system = unbox<string array> output?system |}
         }

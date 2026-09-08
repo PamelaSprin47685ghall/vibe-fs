@@ -1860,7 +1860,7 @@ export const SURFACE_CONSUMERS = {
   'Process/DeadlineSurface.js': ['process-execution', 'verification-system'],
   'Process/Surface.js': ['causal-wait', 'process-execution'],
   'Repository/Knowledge/Casebook/BookkeeperRefreshSurface.js': ['knowledge-reuse'],
-  'Repository/Knowledge/Casebook/BookkeeperSurface.js': ['knowledge-reuse'],
+  'Repository/Knowledge/Casebook/BookkeeperSurface.js': ['knowledge-reuse', 'provider-language'],
   'Repository/Knowledge/Casebook/IndexSurface.js': ['knowledge-reuse', 'verification-system'],
   'Repository/Knowledge/Casebook/Surface.js': ['knowledge-reuse'],
   'Repository/Programming/Js/GeneratorSurface.js': ['repository-programming'],

@@ -14,6 +14,7 @@ import {
   loadBookkeeperSystem,
   transformBookkeeperSystem,
 } from '../../../dist/Participant/Provider/LanguageSurface.js'
+import * as bookkeeper from '../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js'
 
 const SID = 'provider-system-i18n-bookkeeper'
 
@@ -21,20 +22,30 @@ test.beforeEach(() => clearAllForTests())
 test.afterEach(() => clearAllForTests())
 
 test('WHAT[PROVIDER-LANGUAGE-005] system transform localizes only the wanxiangshu-owned segment', async () => {
-  assert.equal(bindOnce(SID, 'SimplifiedChinese').ok, true)
-  const english = loadBookkeeperSystem('English')
-  const chinese = loadBookkeeperSystem('SimplifiedChinese')
-  const hostOwned = 'HOST-OWNED-SYSTEM-BYTES'
-  const output = await transformBookkeeperSystem(SID, [english, hostOwned])
+  bookkeeper.bindSession(SID, 'provider-language-surface', 'provider-language-surface')
+  try {
+    assert.equal(bindOnce(SID, 'SimplifiedChinese').ok, true)
+    const english = loadBookkeeperSystem('English')
+    const chinese = loadBookkeeperSystem('SimplifiedChinese')
+    const hostOwned = 'HOST-OWNED-SYSTEM-BYTES'
+    const output = await transformBookkeeperSystem(SID, [english, hostOwned])
 
-  assert.deepEqual(output.system, [chinese, hostOwned])
-  assert.match(output.system[0], /^# # 共同法/)
-  assert.equal(output.system[0].split('\n').filter(Boolean).every((line) => line === '#' || line.startsWith('# ')), true)
+    assert.deepEqual(output.system, [chinese, hostOwned])
+    assert.match(output.system[0], /^# # 共同法/)
+    assert.equal(output.system[0].split('\n').filter(Boolean).every((line) => line === '#' || line.startsWith('# ')), true)
+  } finally {
+    bookkeeper.unbindSession(SID)
+  }
 })
 
 test('WHAT[PROVIDER-LANGUAGE-001] system transform is stable for an English session', async () => {
-  assert.equal(bindOnce(SID, 'English').ok, true)
-  const english = loadBookkeeperSystem('English')
-  const output = await transformBookkeeperSystem(SID, [english, 'OTHER'])
-  assert.deepEqual(output.system, [english, 'OTHER'])
+  bookkeeper.bindSession(SID, 'provider-language-surface', 'provider-language-surface')
+  try {
+    assert.equal(bindOnce(SID, 'English').ok, true)
+    const english = loadBookkeeperSystem('English')
+    const output = await transformBookkeeperSystem(SID, [english, 'OTHER'])
+    assert.deepEqual(output.system, [english, 'OTHER'])
+  } finally {
+    bookkeeper.unbindSession(SID)
+  }
 })

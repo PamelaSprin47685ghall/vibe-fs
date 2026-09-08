@@ -92,6 +92,9 @@ module CasebookBookkeeperSurface =
     let bindSession (sessionId: string) (txId: string) (ownerSessionId: string) : unit =
         BookkeeperRuntime.bindSession sessionId txId ownerSessionId
 
+    let unbindSession (sessionId: string) : unit =
+        BookkeeperRuntime.unbindSession sessionId
+
     let txIdFor (sessionId: string) : string = BookkeeperRuntime.txIdFor sessionId
 
     let beginTransaction (txId: string) (question: string) (answer: string) : unit =
