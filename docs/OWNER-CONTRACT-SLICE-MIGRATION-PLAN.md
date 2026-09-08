@@ -1,8 +1,10 @@
 # Owner、Locality 与 Contract Slice 迁移方案
 
+> 已退役，仅供历史追溯。STRUCTURED-WORKFLOW-016 已终止本文的 M6 owner／locality／slice release authorization 路线。以下状态、裁决、下一节点及验收清单均为当时记录，不是当前开工或恢复旧 gate、extractor、worksheet、ACL、snapshot 的依据。当前合同见 `requirements/structured-workflow/WHAT.md`；开放结构工作见同包 `HOW.md` 第 3.2 节与 `requirements/GAP.md` 的 GAP-033。
+
 日期：2026-09-03
 
-状态：M6.0–M6.3a已完成；M6.3全局规则及EventStore/Host/Delegation点名边界已裁决。`C(W)`/`J(W)`、generated artifact row、Node runtime非authority、semantic staged-input closure、formal snapshot binding与point-boundary oracle已进入正式WHY/WHAT/HOW/GAP及永久fixture；2026-09-04独立复核发现的pure-oracle同源自证、test-only mirror、fail-open collection/reference/input closure与Host raw membrane反例已由R0永久测试关闭。旧v1 gate仍是唯一release authority；下一节点为M6.3b production extractor、fresh全集worksheet与旧gate下可独立绿色的contract/port split。全部live locality的terminal classification/adjudication、完整capability census与全量slice manifest完成后才可进入M6.3c/M6.4。`deriveAdjudicationCandidates`的key universe固定为fresh owner-project graph的全部locality；当前92个composition provider只是带`CompositionProvider` reason的pre-cutover子集，不是永久gate数量。
+历史状态（已失效）：M6.0–M6.3a已完成；M6.3全局规则及EventStore/Host/Delegation点名边界已裁决。`C(W)`/`J(W)`、generated artifact row、Node runtime非authority、semantic staged-input closure、formal snapshot binding与point-boundary oracle已进入正式WHY/WHAT/HOW/GAP及永久fixture；2026-09-04独立复核发现的pure-oracle同源自证、test-only mirror、fail-open collection/reference/input closure与Host raw membrane反例已由R0永久测试关闭。旧v1 gate仍是唯一release authority；下一节点为M6.3b production extractor、fresh全集worksheet与旧gate下可独立绿色的contract/port split。全部live locality的terminal classification/adjudication、完整capability census与全量slice manifest完成后才可进入M6.3c/M6.4。`deriveAdjudicationCandidates`的key universe固定为fresh owner-project graph的全部locality；当前92个composition provider只是带`CompositionProvider` reason的pre-cutover子集，不是永久gate数量。
 
 适用背景：Fable owner-project 编译边界、published contract 授权与 semantic owner 重整
 
