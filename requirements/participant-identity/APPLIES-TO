@@ -2,6 +2,7 @@
 # requirements/participant-identity/** is covered implicitly and must not be listed here.
 # Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
 
+/src/Wanxiangshu/OpenCode/Tools/ManagedAgent.fs
 /src/Wanxiangshu/Participant/Persona/Catalog.fs
 /src/Wanxiangshu/Participant/Persona/Identity.fs
 /src/Wanxiangshu/Participant/Persona/ManagedCatalog.fs
