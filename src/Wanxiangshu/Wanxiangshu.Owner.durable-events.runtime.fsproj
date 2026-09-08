@@ -25,9 +25,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-identityseed.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.obligation-ledger.mission-obligation-todo-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
-
-    <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj"/>
     <Compile Include="Persistence/Journal/ObligationEnvelopeSurface.fsi"/>
     <Compile Include="Persistence/Journal/ObligationEnvelopeSurface.fs"/>
     <Compile Include="Persistence/EventStore/Surface.fsi"/>
