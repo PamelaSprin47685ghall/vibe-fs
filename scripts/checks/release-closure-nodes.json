@@ -998,7 +998,6 @@
       "state": "DONE",
       "files": [
         "src/Wanxiangshu/OpenCode/Host/BloggerChronicleText.fs",
-        "src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs",
         "src/Wanxiangshu/Resources/PromptResources.fs",
         "src/Wanxiangshu/Resources/PromptSurface.fs"
       ],
@@ -1137,6 +1136,7 @@
         "src/Wanxiangshu/OpenCode/Host/SessionBindingSurface.fs",
         "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
         "src/Wanxiangshu/OpenCode/Host/SessionsSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs",
         "src/Wanxiangshu/Execution/Session/Association.fs",
         "src/Wanxiangshu/Execution/Session/AssociationSurface.fs",
         "src/Wanxiangshu/Execution/Session/Ownership.fs"

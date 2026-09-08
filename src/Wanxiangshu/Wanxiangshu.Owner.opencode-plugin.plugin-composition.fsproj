@@ -9,7 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.behavior-diagnosis.enforcer-continuation.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.capability-enforcement.opencode-host-managedagentconfig.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-contract.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-runtime.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-promptsurface.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.session-ontology.opencode-host-sessionexecutionbinding.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-companionfactfold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-runtimesurface.fsproj"/>
@@ -79,6 +79,8 @@
     <Compile Include="OpenCode/Host/PluginHostInterop.fs"/>
     <Compile Include="OpenCode/Host/PluginHooksSurface.fsi"/>
     <Compile Include="OpenCode/Host/PluginHooksSurface.fs"/>
+    <Compile Include="OpenCode/Host/BloggerChronicleText.fsi"/>
+    <Compile Include="OpenCode/Host/BloggerChronicleText.fs"/>
     <Compile Include="OpenCode/Plugin/PluginTransforms.fsi"/>
     <Compile Include="OpenCode/Plugin/PluginTransforms.fs"/>
     <Compile Include="OpenCode/Plugin/PluginHooks.fsi"/>
