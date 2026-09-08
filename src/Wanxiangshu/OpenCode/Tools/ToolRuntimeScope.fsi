@@ -12,7 +12,6 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Persistence.Journal
 
 /// Owns every per-session tool runtime.
@@ -38,7 +37,7 @@ type ToolRuntimeScope =
         snapshot: ISessionSnapshotPort option *
         cancelSignals: (SessionId seq -> unit) option *
         ?continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>) *
-        ?captureWorktreeSnapshot: (WorktreePath -> Result<WorkspaceSnapshotId, string>) *
+        ?captureWorktreeSnapshot: (WorktreePath -> Result<string, string>) *
         ?eventPort: IEventObservationPort ->
             ToolRuntimeScope
 
@@ -79,7 +78,7 @@ type ToolRuntimeScope =
     member RoleFor: ctx: HostToolContext -> Role option
     member EnsureRoleFor: ctx: HostToolContext -> Task<Role option>
     member ManagerCapabilityFactsFor: sessionId: string -> ManagerCapabilityFacts
-    member TryFreezeRetirement: sessionId: string * incumbentId: IncumbencyId -> bool
+    member TryFreezeRetirement: sessionId: string * incumbentId: obj -> bool
     member UnfreezeRetirement: sessionId: string -> unit
     member IsRetirementFrozen: sessionId: string -> bool
     member RetirementBlockersFor: sessionId: string -> string list

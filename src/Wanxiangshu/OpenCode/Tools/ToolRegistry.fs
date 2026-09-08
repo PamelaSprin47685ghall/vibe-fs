@@ -176,7 +176,7 @@ module ToolRegistry =
                 snapshot,
                 cancelSignals,
                 continueManagerLoop = continueManagerLoop,
-                captureWorktreeSnapshot = captureWorktreeSnapshot,
+                captureWorktreeSnapshot = (fun path -> captureWorktreeSnapshot path |> Result.map WorkspaceSnapshotId.value),
                 ?eventPort = eventPort
             )
 

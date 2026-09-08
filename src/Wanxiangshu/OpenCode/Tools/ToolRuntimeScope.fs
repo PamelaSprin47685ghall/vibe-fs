@@ -3,6 +3,8 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Execution.Delegation
@@ -16,7 +18,6 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal
@@ -44,7 +45,7 @@ type ToolRuntimeScope
         snapshot: ISessionSnapshotPort option,
         cancelSignals: (SessionId seq -> unit) option,
         ?continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>),
-        ?captureWorktreeSnapshot: (WorktreePath -> Result<Wanxiangshu.Mission.Relay.WorkspaceSnapshotId, string>),
+        ?captureWorktreeSnapshot: (WorktreePath -> Result<string, string>),
         ?eventPort: IEventObservationPort
     ) =
 
@@ -55,7 +56,7 @@ type ToolRuntimeScope
     // DSL-MUTABLE: resource — per-session executor runtime registry
     let executorRuntimes = Dictionary<string, HostForkRuntime>()
     // DSL-MUTABLE: retirement admission fence — exact logical incumbency, never the reusable physical session.
-    let retirementFrozen = Dictionary<string, IncumbencyId>()
+    let retirementFrozen = Dictionary<string, obj>()
     // DSL-MUTABLE: resource — per-session orchestrator host registry
     let orchestratorHosts = Dictionary<string, OrchestratorHost>()
     let onCancelSignals = defaultArg cancelSignals ignore
@@ -372,35 +373,68 @@ type ToolRuntimeScope
         | true, seconds when seconds > 0.0 && not (Double.IsInfinity seconds) -> TimeSpan.FromSeconds seconds
         | _ -> TimeSpan.FromHours 1.0
 
-    let relayRoadView (sessionId: string) =
-        let roadId = RoadId.create sessionId
-
-        journal
-        |> Option.bind (fun durable ->
-            AgentProjection.tryFind (SessionId.create sessionId) (AgentJournal.snapshot durable).AgentProjections)
-        |> Option.bind (fun session -> session.Relay)
-        |> Option.bind (fun relay -> Fold.view relay roadId)
-
-    let hasValidBoundCertificate (view: RoadView) : bool =
-        match view.ActiveIncumbency, view.ActiveSnapshotId, view.ActiveAuthorityRevision, view.Certificate with
-        | Some active, Some snapshot, Some authority, Some certificate ->
-            certificate.Valid
-            && certificate.IncumbencyId = active
-            && certificate.SnapshotId = snapshot
-            && certificate.AuthorityRevision = authority
-        | _ -> false
-
-    let factsForRoadView (view: RoadView) : ManagerCapabilityFacts =
-        { HasActiveIncumbency = view.ActiveIncumbency.IsSome
-          HasAssessment = view.AcceptedAssessmentTransport.IsSome
-          HasValidBoundCertificate = hasValidBoundCertificate view
-          CleanupBlockerDigest = view.ActiveCleanupBlockerDigest }
-
     let emptyManagerFacts: ManagerCapabilityFacts =
         { HasActiveIncumbency = false
           HasAssessment = false
           HasValidBoundCertificate = false
           CleanupBlockerDigest = None }
+
+    let activeIncumbencyOfSession (sessionId: string) : obj option =
+        journal
+        |> Option.bind (fun durable ->
+            AgentProjection.tryFind (SessionId.create sessionId) (AgentJournal.snapshot durable).AgentProjections)
+        |> Option.bind (fun session -> session.Relay)
+        |> Option.bind (fun relay ->
+            let id: obj =
+                emitJsExpr (relay, sessionId) """
+                (() => {
+                    const map = $0 && $0.fields ? $0.fields[0] : $0;
+                    if (!map || typeof map.get !== 'function' || !map.has($1)) return undefined;
+                    const road = map.get($1);
+                    return road && road.Active ? road.Active.Id : undefined;
+                })()
+                """
+            if isNull id then None else Some id)
+
+    let managerFactsOfSession (sessionId: string) : ManagerCapabilityFacts =
+        journal
+        |> Option.bind (fun durable ->
+            AgentProjection.tryFind (SessionId.create sessionId) (AgentJournal.snapshot durable).AgentProjections)
+        |> Option.bind (fun session -> session.Relay)
+        |> Option.bind (fun relay ->
+            let facts: ManagerCapabilityFacts option =
+                emitJsExpr (relay, sessionId) """
+                (() => {
+                    const map = $0 && $0.fields ? $0.fields[0] : $0;
+                    if (!map || typeof map.get !== 'function' || !map.has($1)) return undefined;
+                    const road = map.get($1);
+                    if (!road || !road.Active) return undefined;
+                    const active = road.Active;
+                    const activeId = active.Id;
+                    const activeSnapshot = active.SnapshotId;
+                    const activeAuthority = active.AuthorityRevision;
+                    const blockerDigest = active.CleanupBlockerDigest == null ? undefined : active.CleanupBlockerDigest;
+                    const hasAssessment = active.Assessment != null;
+                    const certificate = road.Certificate;
+                    let hasValidCertificate = false;
+                    if (certificate && Boolean(certificate.Valid)) {
+                        const certInc = certificate.IncumbencyId;
+                        const certSnap = certificate.SnapshotId;
+                        const certAuth = certificate.AuthorityRevision;
+                        hasValidCertificate = (certInc === activeId || (certInc && certInc.Equals && certInc.Equals(activeId)))
+                            && (certSnap === activeSnapshot || (certSnap && certSnap.Equals && certSnap.Equals(activeSnapshot)))
+                            && (certAuth === activeAuthority || (certAuth && certAuth.Equals && certAuth.Equals(activeAuthority)));
+                    }
+                    return {
+                        HasActiveIncumbency: true,
+                        HasAssessment: hasAssessment,
+                        HasValidBoundCertificate: hasValidCertificate,
+                        CleanupBlockerDigest: blockerDigest
+                    };
+                })()
+                """
+            facts)
+        |> Option.defaultValue emptyManagerFacts
 
     member _.Sessions = sessions
     member _.WaitObserver = waitObserver
@@ -451,14 +485,12 @@ type ToolRuntimeScope
     /// can never open the finish window. The cleanup blocker digest is the
     /// stored objective evidence, passed through verbatim.
     member _.ManagerCapabilityFactsFor(sessionId: string) : ManagerCapabilityFacts =
-        relayRoadView sessionId
-        |> Option.map factsForRoadView
-        |> Option.defaultValue emptyManagerFacts
+        managerFactsOfSession sessionId
 
-    member _.TryFreezeRetirement(sessionId: string, incumbentId: IncumbencyId) =
+    member _.TryFreezeRetirement(sessionId: string, incumbentId: obj) =
         lock gate (fun () ->
             match retirementFrozen.TryGetValue sessionId with
-            | true, current when current = incumbentId -> false
+            | true, current when obj.Equals(current, incumbentId) -> false
             | _ ->
                 retirementFrozen.[sessionId] <- incumbentId
                 true)
@@ -467,13 +499,12 @@ type ToolRuntimeScope
         lock gate (fun () -> retirementFrozen.Remove sessionId |> ignore)
 
     member _.IsRetirementFrozen(sessionId: string) =
-        let activeIncumbency =
-            relayRoadView sessionId |> Option.bind (fun road -> road.ActiveIncumbency)
+        let activeIncumbency = activeIncumbencyOfSession sessionId
 
         lock gate (fun () ->
             match retirementFrozen.TryGetValue sessionId, activeIncumbency with
             | (false, _), _ -> false
-            | (true, frozen), Some active when active <> frozen ->
+            | (true, frozen), Some active when not (obj.Equals(active, frozen)) ->
                 retirementFrozen.Remove sessionId |> ignore
                 false
             | (true, _), _ -> true)
@@ -649,7 +680,7 @@ type ToolRuntimeScope
                                     gateKind
                                     callerProviderRun
                           ContinueManagerLoop = continueManagerLoop
-                          CaptureWorktreeSnapshot = captureWorktreeSnapshot
+                          CaptureWorktreeSnapshot = fun path -> captureWorktreeSnapshot path |> Result.map unbox
                           RepoPath = defaultArg workspaceDirectory "."
                           TargetBranch = ""
                           ParentWorkRecordFor = (fun sid -> parentRecord (SessionId.value sid))
