@@ -88,7 +88,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     /// DG-008: process-local armed anomaly lives inside the sensor.
     /// Optional until HostSignalBootstrap wires abort + ownership.
     // DSL-MUTABLE: resource — loop sensor attachment slot
-    let mutable loopSensor: LoopSensor option = None
+    let mutable loopSensor: ILoopSensor option = None
     // DSL-MUTABLE: resource — message-visibility hub attachment slot
     let mutable messageVisibility: MessageVisibilityHub option = None
     // DSL-MUTABLE: resource — satellite runtime attachment slot
@@ -193,7 +193,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
 
     member _.SyncDelegateRuntime = syncDelegateRuntime
 
-    member _.AttachLoopSensor(sensor: LoopSensor) = loopSensor <- Some sensor
+    member _.AttachLoopSensor(sensor: ILoopSensor) = loopSensor <- Some sensor
 
     member _.AttachMessageVisibility(hub: MessageVisibilityHub) = messageVisibility <- Some hub
 
@@ -201,7 +201,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     /// falls back to its bounded immediate form.
     member _.MessageVisibility = messageVisibility
 
-    member _.LoopSensor =
+    member _.LoopSensor: ILoopSensor =
         match loopSensor with
         | Some sensor -> sensor
         | None -> invalidOp "LoopSensor must be attached by Host composition before use"

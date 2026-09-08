@@ -22,6 +22,8 @@ type LoopSensor =
     member ResetDetector: sessionId: SessionId -> unit
     member ActiveInterruptTask: sessionId: SessionId * expectedRun: ProviderRunIdentity -> Task option
 
+    interface ILoopSensor
+
 module LoopSensor =
     val kindName: kind: DegenerationKind -> string
     val continuationPath: kind: DegenerationKind -> string

@@ -73,7 +73,7 @@ type PluginRuntimeScope =
 
     member SyncDelegateRuntime: SyncDelegateRuntime option
 
-    member AttachLoopSensor: sensor: LoopSensor -> unit
+    member AttachLoopSensor: sensor: ILoopSensor -> unit
 
     member AttachMessageVisibility: hub: MessageVisibilityHub -> unit
 
@@ -81,7 +81,7 @@ type PluginRuntimeScope =
     /// falls back to its bounded immediate form.
     member MessageVisibility: MessageVisibilityHub option
 
-    member LoopSensor: LoopSensor
+    member LoopSensor: ILoopSensor
 
     /// Current-process join admission only; no cross-process tool recovery.
     member RequireCurrentProcessJoin: root: SessionId -> Task<FamilyRecovery>

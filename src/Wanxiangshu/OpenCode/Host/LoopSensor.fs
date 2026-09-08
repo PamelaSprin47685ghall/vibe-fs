@@ -458,6 +458,13 @@ type LoopSensor
             | true, (storedRun, owned, _) when storedRun = expectedRun -> Some owned
             | _ -> None)
 
+    interface ILoopSensor with
+        member this.Observe raw = this.Observe raw
+        member this.ConsumeAbortCause(sessionId, expectedRun, directory) = this.ConsumeAbortCause(sessionId, expectedRun, directory)
+        member this.DropSession sessionId = this.DropSession sessionId
+        member this.ResetDetector sessionId = this.ResetDetector sessionId
+        member this.ActiveInterruptTask(sessionId, expectedRun) = this.ActiveInterruptTask(sessionId, expectedRun)
+
     /// Attempt boundary resets detector scratch but deliberately preserves an
     /// armed anomaly until TurnAborted reconciliation consumes its ownership.
     member _.ResetDetector(sessionId: SessionId) =

@@ -37,6 +37,14 @@ type QuiescencePermitFailure =
     | Superseded
     | Revoked
 
+/// Process-local streaming degeneration sensor port.
+type ILoopSensor =
+    abstract Observe: raw: obj -> unit
+    abstract ConsumeAbortCause: sessionId: SessionId * expectedRun: ProviderRunIdentity * directory: string option -> AbortCause
+    abstract DropSession: sessionId: SessionId -> unit
+    abstract ResetDetector: sessionId: SessionId -> unit
+    abstract ActiveInterruptTask: sessionId: SessionId * expectedRun: ProviderRunIdentity -> System.Threading.Tasks.Task option
+
 /// HOST-004: process-local side-effect admission capability.
 type ISessionQuiescenceGate =
     abstract BeginProviderAttempt: sessionId: SessionId -> unit
