@@ -1244,8 +1244,8 @@
     <Compile Include="Repository/Knowledge/Casebook/Store.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Replay.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/Replay.fs"/>
-    <Compile Include="Enforcer/ObservationCollector.fsi"/>
-    <Compile Include="Enforcer/ObservationCollector.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/ObservationCollector.fsi"/>
+    <Compile Include="Repository/Knowledge/Casebook/ObservationCollector.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/SessionDraft.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/SessionDraft.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/BookkeeperStaging.fsi"/>

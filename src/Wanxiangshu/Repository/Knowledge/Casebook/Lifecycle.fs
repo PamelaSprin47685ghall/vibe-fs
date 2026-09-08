@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
 open System.Threading.Tasks
-open Wanxiangshu.Enforcer
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
@@ -14,7 +13,7 @@ open Wanxiangshu.Persistence.Journal
 module CasebookLifecycle =
 
     /// Process-local singleton the plugin feeds; lifecycle drains it.
-    let collector = ObservationCollector()
+    let collector = CasebookObservationCollector()
 
     let private stateGate = obj ()
     // DSL-MUTABLE: resource

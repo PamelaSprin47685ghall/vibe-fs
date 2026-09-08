@@ -5,7 +5,6 @@
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.behavior-diagnosis.enforcer-continuation.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-surface.fsproj"/>
@@ -16,6 +15,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
+    <Compile Include="Repository/Knowledge/Casebook/ObservationCollector.fsi"/>
+    <Compile Include="Repository/Knowledge/Casebook/ObservationCollector.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Bookkeeper.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/Bookkeeper.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Lifecycle.fsi"/>

@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
 open System.Threading.Tasks
-open Wanxiangshu.Enforcer
 
 /// CASE-003/010: process-local Casebook session wiring — draft Q/A turns,
 /// observation drain, graceful finalize vs unexpected cleanup. Publication
@@ -9,7 +8,7 @@ open Wanxiangshu.Enforcer
 module CasebookLifecycle =
 
     /// Process-local singleton the plugin feeds; lifecycle drains it.
-    val collector: ObservationCollector
+    val collector: CasebookObservationCollector
 
     /// Marker-gated enablement for the shared collector path. `None` or a root
     /// without `.wanxiang/casebook` disables; does not touch the store.

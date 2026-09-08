@@ -1,14 +1,12 @@
-namespace Wanxiangshu.Enforcer
-
-open Wanxiangshu.Repository.Knowledge.Casebook
+namespace Wanxiangshu.Repository.Knowledge.Casebook
 
 /// CASE-003: per-session observation collector, fed by the Host
 /// tool.execute.after boundary (args + rendered output — never transcript
 /// text). Capture is best-effort: unparseable executions are skipped; the
 /// buffer is drained into an archive when the Inspector session terminates
 /// (the caller decides when — collector never decides lifecycle).
-type ObservationCollector =
-    new: unit -> ObservationCollector
+type CasebookObservationCollector =
+    new: unit -> CasebookObservationCollector
 
     /// Record one tool execution's observation for a session.
     member Collect: sessionId: string * toolName: string * args: obj * output: string -> unit

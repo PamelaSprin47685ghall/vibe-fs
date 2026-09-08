@@ -21,7 +21,6 @@
 /src/Wanxiangshu/Enforcer/Cycle/Recovery.fs
 /src/Wanxiangshu/Enforcer/Host.fs
 /src/Wanxiangshu/Enforcer/Observation.fs
-/src/Wanxiangshu/Enforcer/ObservationCollector.fs
 /src/Wanxiangshu/Enforcer/ObservationSurface.fs
 /src/Wanxiangshu/Enforcer/Projection.fs
 /src/Wanxiangshu/Enforcer/Repair.fs

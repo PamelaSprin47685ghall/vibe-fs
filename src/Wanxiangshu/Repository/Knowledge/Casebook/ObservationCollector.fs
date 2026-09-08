@@ -1,14 +1,13 @@
-namespace Wanxiangshu.Enforcer
+namespace Wanxiangshu.Repository.Knowledge.Casebook
 
 open System.Collections.Generic
-open Wanxiangshu.Repository.Knowledge.Casebook
 
 /// CASE-003: per-session observation collector, fed by the Host
 /// tool.execute.after boundary (args + rendered output — never transcript
 /// text). Capture is best-effort: unparseable executions are skipped; the
 /// buffer is drained into an archive when the Inspector session terminates
 /// (the caller decides when — collector never decides lifecycle).
-type ObservationCollector() =
+type CasebookObservationCollector() =
 
     // DSL-MUTABLE: resource — per-session observation buffer registry
     let buffers = Dictionary<string, ResizeArray<Observation>>()
