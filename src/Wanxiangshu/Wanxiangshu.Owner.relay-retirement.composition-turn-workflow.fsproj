@@ -3,6 +3,8 @@
     <WanxiangshuSemanticOwner>relay-retirement</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>composition-turn-workflow</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuSubsystem>dispatch</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>composition-turn-workflow</WanxiangshuCompileShard>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-companionfactfold.fsproj"/>
