@@ -34,6 +34,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.opencode-tools-fetchtool.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.repository-programming.opencode-tools-codertool.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-assessment.mission-relay-reviewtool.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-retirement.mission-relay-suicidetool.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-investigation.opencode-tools-inspectortool.fsproj"/>
