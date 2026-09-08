@@ -5,7 +5,6 @@
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.degeneration-guard.execution-session-loopdetector.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-host-adapter.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.execution-session-recovery-model.fsproj"/>
