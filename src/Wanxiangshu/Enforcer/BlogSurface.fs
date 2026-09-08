@@ -51,12 +51,12 @@ module BlogSurface =
         | Ok value -> box {| ok = true; value = ok value |}
         | Error reason -> box {| ok = false; error = error reason |}
 
-    let emptyTextError = Wanxiangshu.OpenCode.ChronicleTool.EmptyTextError
-    let noLiveCycleError = Wanxiangshu.OpenCode.ChronicleTool.NoLiveCycleError
+    let emptyTextError = ChronicleExecution.EmptyTextError
+    let noLiveCycleError = ChronicleExecution.NoLiveCycleError
 
     /// Chronicle's canonical text gate.
     let canonicalText (value: obj) : obj =
-        Wanxiangshu.OpenCode.ChronicleTool.tryCanonicalText (if isNullish value then null else string value)
+        ChronicleExecution.tryCanonicalText (if isNullish value then null else string value)
         |> resultToJs box box
 
     /// Physical Blogger flight is the only live-cycle authority.
@@ -82,7 +82,7 @@ module BlogSurface =
                         box sessionId |}
         else
             match
-                Wanxiangshu.OpenCode.ChronicleTool.tryCanonicalText (if isNullish entry then null else string entry)
+                ChronicleExecution.tryCanonicalText (if isNullish entry then null else string entry)
             with
             | Error _ ->
                 box

@@ -6,8 +6,8 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.InstitutionalLearning
 open Wanxiangshu.Foundation
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Resources
@@ -57,22 +57,23 @@ module InstitutionalLearningTools =
         | LearningDisposition.Birth tip -> ProviderProse.instructionLines language Path.Absorbed (Map [ "rule", tip ])
         | LearningDisposition.Discard _ -> ProviderProse.instructionLines language Path.Discarded Map.empty
 
-    let private resurfacedInstructions language (items: DeferredWorkItem list) =
+    let private resurfacedInstructions language (items: (string * string) list) =
         match items with
         | [] -> []
         | values ->
             ProviderProse.instructionLines language Path.ResurfacedHeading Map.empty
             @ (values
-               |> List.collect (fun item ->
-                   ProviderProse.instructionLines language Path.ResurfacedItem (Map [ "work", item.Text ])))
+               |> List.collect (fun (_, text) ->
+                   ProviderProse.instructionLines language Path.ResurfacedItem (Map [ "work", text ])))
 
     let private instructionResult language path subs =
         ProviderProse.instructionLines language path subs
         |> LlmFacing.renderInstructions
 
-    let private pendingFor kind sessionId attention =
+    let private pendingFor kind sessionId snapshot =
         match kind with
-        | ExperienceKind.Celebrate -> AttentionProjection.pending sessionId attention
+        // ExperienceKind.Celebrate -> AttentionProjection.pending
+        | ExperienceKind.Celebrate -> AgentProjection.pendingAttentionWorkPairs sessionId snapshot
         | ExperienceKind.Regret -> []
 
     let private commitLearning kind durable experience language sessionId occurrence providerRun =
@@ -90,7 +91,7 @@ module InstitutionalLearningTools =
                 let rules = EnforcerCatalogResource.loadFor language
                 let revision = InstitutionalEnhancer.rulebookRevision rules
                 let disposition = InstitutionalEnhancer.evaluate experience rules
-                let pending = pendingFor kind sessionId snapshot.AgentProjections.Attention
+                let pending = pendingFor kind sessionId snapshot.AgentProjections
 
                 let frozen =
                     LlmFacing.renderInstructions (
@@ -108,7 +109,7 @@ module InstitutionalLearningTools =
                                RulebookRevision = revision
                                Disposition = disposition
                                FrozenResult = frozen
-                               ResurfacedDeferredWorkIds = pending |> List.map _.OccurrenceId |}
+                               ResurfacedDeferredWorkIds = pending |> List.map fst |}
                     )
 
                 let! _ = AgentJournal.appendAgent (StreamId.Session sessionId) providerRun fact durable

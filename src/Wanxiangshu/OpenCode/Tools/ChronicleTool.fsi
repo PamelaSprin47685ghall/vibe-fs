@@ -20,9 +20,11 @@ module ChronicleTool =
         [<Literal>]
         val MissingTip: string = "tool/chronicle/missing-tip"
 
-    val EmptyTextError: string
+    [<Literal>]
+    val EmptyTextError: string = "CHRONICLE_EMPTY_ENFORCER_061"
 
-    val NoLiveCycleError: string
+    [<Literal>]
+    val NoLiveCycleError: string = "CHRONICLE_NO_LIVE_CYCLE"
 
     val tryCanonicalText: rawText: string -> Result<string, string>
 

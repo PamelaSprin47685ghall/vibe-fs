@@ -25,9 +25,11 @@ module ChronicleTool =
         [<Literal>]
         let MissingTip = "tool/chronicle/missing-tip"
 
-    let EmptyTextError = "CHRONICLE_EMPTY_ENFORCER_061"
+    [<Literal>]
+    let EmptyTextError = ChronicleExecution.EmptyTextError
 
-    let NoLiveCycleError = "CHRONICLE_NO_LIVE_CYCLE"
+    [<Literal>]
+    let NoLiveCycleError = ChronicleExecution.NoLiveCycleError
 
     let private lang (ctx: HostToolContext) =
         ProviderLanguageBinding.forSessionText ctx.SessionId
@@ -36,12 +38,7 @@ module ChronicleTool =
         ProviderProse.render language path Map.empty
 
     let tryCanonicalText (rawText: string) : Result<string, string> =
-        let trimmed = if isNull rawText then "" else rawText.Trim()
-
-        if trimmed.Length = 0 then
-            Error EmptyTextError
-        else
-            Ok trimmed
+        ChronicleExecution.tryCanonicalText rawText
 
     let private tryCurrentRequest (bloggerHost: IBloggerRuntimeHost option) (sessionId: string) =
         match bloggerHost with

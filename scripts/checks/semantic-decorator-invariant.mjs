@@ -195,7 +195,7 @@ export const TRACE_CHANGE_CONTRACTS = Object.freeze([
   }),
   Object.freeze({
     file: 'src/Wanxiangshu/Execution/Session/RecoveryClosureProjection.fs', declaration: 'addManagerJob', parameter: 'add',
-    sites: ['add (RecoveryNode.ManagerJob(job.ManagerJobId, job.ManagerSessionId))', 'add ('], owner: 'managed-session-lifecycle', what: 'MANAGED-SESSION-013',
+    sites: ['add (RecoveryNode.ManagerJob(jobId, managerSessionId))', 'add ('], owner: 'managed-session-lifecycle', what: 'MANAGED-SESSION-013',
     traceRelation: 'R_recovery_manager_job=job-plus-linked-manager-family',
     proof: 'requirements/managed-session-lifecycle/tests/session-recovery.test.mjs::WHAT[MANAGED-SESSION-013] session_recovery_contract_authorizes_family_without_physical_handle_leaks',
     failurePolicy: 'unrelated jobs add no node and add failure stops projection', cancelPolicy: 'pure projection introduces no cancellation', deadlinePolicy: 'pure projection introduces no deadline',
