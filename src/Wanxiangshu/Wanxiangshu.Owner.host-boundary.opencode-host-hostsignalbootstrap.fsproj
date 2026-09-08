@@ -60,7 +60,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.opencode-host-turnruntimepreparation.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.obligation-ledger.mission-obligation-todo-magictodosemanticsurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.composition-turn-reconcilesurface.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.repository-programming.runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-horizon.opencode-host-messagevisibility.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
  

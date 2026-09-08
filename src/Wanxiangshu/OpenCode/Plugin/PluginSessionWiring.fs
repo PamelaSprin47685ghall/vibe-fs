@@ -30,7 +30,6 @@ open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.WarmStart
 open Wanxiangshu.Repository.Knowledge.Casebook
-open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
@@ -54,8 +53,6 @@ open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Repository.Investigation.WarmStart
 open Wanxiangshu.Repository.Knowledge.Casebook
-open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Repository.Programming.Js.OpenCode
 open Wanxiangshu.Resources
 open Wanxiangshu.Strength.OpenCode
 open Wanxiangshu.Strength.Persistence
