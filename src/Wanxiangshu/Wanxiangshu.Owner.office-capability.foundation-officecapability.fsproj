@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>participant</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>foundation-officecapability</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>office-capability</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>foundation-officecapability</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
