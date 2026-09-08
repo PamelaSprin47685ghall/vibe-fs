@@ -4,10 +4,10 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
+open Fable.Core.JsInterop
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider.Projection
@@ -37,6 +37,51 @@ module BloggerMainContext =
             blog.Coverage.CoverableTurnCutoffExclusive
             projection.Messages
 
+    let private enforcerHostModule: obj =
+        emitJsExpr () """
+        (() => {
+            let mod = null;
+            try {
+                if (typeof require === 'function') {
+                    mod = require('../../../Enforcer/Host.js');
+                }
+            } catch (_) {}
+            if (!mod) {
+                try {
+                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
+                        ? process.getBuiltinModule('node:module')
+                        : null;
+                    if (procMod && typeof procMod.createRequire === 'function') {
+                        const req = procMod.createRequire(import.meta.url);
+                        mod = req('../../../Enforcer/Host.js');
+                    }
+                } catch (_) {}
+            }
+            return mod;
+        })()
+        """
+
+    let private mainContextFromChunkDynamically
+        (mainSessionId: SessionId)
+        (bloggerSessionId: SessionId)
+        (observedEpoch: PrefixEpochId)
+        (blog: BlogProjectionState)
+        (xTrace: XTraceProjectionState)
+        (projection: ProviderProjection.ProviderSemanticProjection)
+        (chunk: BloggerDeltaChunk)
+        : BloggerRequestContext option =
+        let raw: obj =
+            emitJsExpr (enforcerHostModule, mainSessionId, bloggerSessionId, observedEpoch, blog, xTrace, projection, chunk) """
+            (() => {
+                if ($0 && typeof $0.mainContextFromChunk === 'function') {
+                    const res = $0.mainContextFromChunk($1, $2, $3, $4, $5, $6, $7);
+                    return res !== undefined ? res : null;
+                }
+                return null;
+            })()
+            """
+        if isNull raw then None else Some(unbox<BloggerRequestContext> raw)
+
     let hasMaterial
         (journal: AgentJournal option)
         (mainSessionId: SessionId)
@@ -57,7 +102,7 @@ module BloggerMainContext =
         : BloggerRequestContext option =
         nextChunk journal mainSessionId blog xTrace projection
         |> Option.bind (
-            EnforcerHost.mainContextFromChunk mainSessionId bloggerSessionId observedEpoch blog xTrace projection
+            mainContextFromChunkDynamically mainSessionId bloggerSessionId observedEpoch blog xTrace projection
         )
 
     let fromJournal

@@ -1,10 +1,10 @@
 namespace Wanxiangshu.Context.Companion.Blogger
 
+open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
@@ -30,10 +30,62 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.ProjectionUpdate
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Guidance
 
 module ContextFactFold =
+
+    let private enforcerProjectionModule: obj =
+        emitJsExpr () """
+        (() => {
+            let mod = null;
+            try {
+                if (typeof require === 'function') {
+                    mod = require('../../../Enforcer/Projection.js');
+                }
+            } catch (_) {}
+            if (!mod) {
+                try {
+                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
+                        ? process.getBuiltinModule('node:module')
+                        : null;
+                    if (procMod && typeof procMod.createRequire === 'function') {
+                        const req = procMod.createRequire(import.meta.url);
+                        mod = req('../../../Enforcer/Projection.js');
+                    }
+                } catch (_) {}
+            }
+            return mod;
+        })()
+        """
+
+    let private emptyEnforcementState: obj =
+        emitJsExpr (enforcerProjectionModule) """
+        (() => {
+            if ($0 && $0.EnforcementProjection_empty) {
+                return $0.EnforcementProjection_empty;
+            }
+            return { ByProviderRun: new Map(), RecentTips: [] };
+        })()
+        """
+
+    let private applyEnforcementFromEntry (state: obj) (record: obj) : Result<obj, string> =
+        emitJsExpr (enforcerProjectionModule, state, record) """
+        (() => {
+            if ($0 && typeof $0.EnforcementProjection_applyFromEntry === 'function') {
+                return $0.EnforcementProjection_applyFromEntry($1, $2);
+            }
+            return { tag: 1, fields: ["EnforcementProjection module unavailable"] };
+        })()
+        """
+
+    let private applyEnforcementSquash (count: int) (state: obj) : obj =
+        emitJsExpr (enforcerProjectionModule, count, state) """
+        (() => {
+            if ($0 && typeof $0.EnforcementProjection_applySquash === 'function') {
+                return $0.EnforcementProjection_applySquash($1, $2);
+            }
+            return $2;
+        })()
+        """
 
     let private reject = FoldRejection.reject
 
@@ -115,22 +167,25 @@ module ContextFactFold =
             // ENFORCER-045 + C5: Blog + Enforcement + unified cycle receipt.
             let applyEnforcementAndReceipt session =
                 let enforcement =
-                    Option.defaultValue EnforcementProjection.empty session.Enforcement
+                    session.Enforcement
+                    |> Option.map box
+                    |> Option.defaultValue emptyEnforcementState
 
                 let cycles = Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
 
-                EnforcementProjection.applyFromEntry
-                    enforcement
-                    { MainSessionId = payload.SessionId
-                      BloggerSessionId = payload.BloggerSessionId
-                      ProviderRun = payload.ProviderRun
-                      ToolCallIds = payload.ToolCallIds
-                      CycleTextRef = payload.TextRef
-                      CycleTextDigest = payload.TextDigest
-                      TipRuleId = payload.TipRuleId
-                      FieldNameAtCommit = payload.FieldNameAtCommit
-                      CycleEvidenceRef = payload.EvidenceRef
-                      ObservedPrefixEpochId = payload.ObservedPrefixEpochId }
+                let record =
+                    {| MainSessionId = payload.SessionId
+                       BloggerSessionId = payload.BloggerSessionId
+                       ProviderRun = payload.ProviderRun
+                       ToolCallIds = payload.ToolCallIds
+                       CycleTextRef = payload.TextRef
+                       CycleTextDigest = payload.TextDigest
+                       TipRuleId = payload.TipRuleId
+                       FieldNameAtCommit = payload.FieldNameAtCommit
+                       CycleEvidenceRef = payload.EvidenceRef
+                       ObservedPrefixEpochId = payload.ObservedPrefixEpochId |}
+
+                applyEnforcementFromEntry enforcement record
                 |> Result.bind (fun enfUpdated ->
                     BloggerCycleProjection.recordReceipt
                         { ProviderRun = payload.ProviderRun
@@ -139,7 +194,7 @@ module ContextFactFold =
                         cycles
                     |> Result.map (fun cycleUpdated ->
                         { session with
-                            Enforcement = Some enfUpdated
+                            Enforcement = Some(unbox enfUpdated)
                             BloggerCycles = Some cycleUpdated }))
 
             AgentProjection.tryUpdate payload.SessionId applyEnforcementAndReceipt projection
@@ -168,8 +223,10 @@ module ContextFactFold =
                 let cycles = Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
 
                 let enforcement =
-                    Option.defaultValue EnforcementProjection.empty session.Enforcement
-                    |> EnforcementProjection.applySquash payload.CoveredFrameCount
+                    session.Enforcement
+                    |> Option.map box
+                    |> Option.defaultValue emptyEnforcementState
+                    |> applyEnforcementSquash payload.CoveredFrameCount
 
                 BloggerCycleProjection.recordReceipt
                     { ProviderRun = payload.ProviderRun
@@ -179,7 +236,7 @@ module ContextFactFold =
                 |> Result.map (fun updated ->
                     { session with
                         BloggerCycles = Some updated
-                        Enforcement = Some enforcement })
+                        Enforcement = Some(unbox enforcement) })
 
             AgentProjection.tryUpdate payload.SessionId applyReceiptAndTips projection
             |> projectionOutcome "BlogObservationsSquashed" (fun updated ->
