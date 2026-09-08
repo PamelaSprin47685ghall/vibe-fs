@@ -3,6 +3,8 @@
     <WanxiangshuSemanticOwner>time-capability</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>foundation-temporal</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuSubsystem>process</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>foundation-temporal</WanxiangshuCompileShard>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-managedagent.fsproj"/>
