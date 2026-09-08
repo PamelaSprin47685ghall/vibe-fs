@@ -5,8 +5,6 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Execution.Session
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation.Identity
 
@@ -58,20 +56,8 @@ module ExecutorToolSurface =
 
         SurfaceScope(scope) :> obj
 
-    let private recoveryOf (root: SessionId) (mode: string) : FamilyRecovery =
-        match mode with
-        | "ready" -> FamilyRecovery.FamilyReady(FamilyRecoveryPermit.currentProcess root 0L)
-        | "waiting" ->
-            FamilyRecovery.FamilyWaiting(
-                SessionRecovery.NonEmpty.one (RecoveryBlock.RecoveryCoordinatorUnavailable root)
-            )
-        | _ ->
-            FamilyRecovery.FamilyBlocked(
-                SessionRecovery.NonEmpty.one (RecoveryBlock.RecoveryCoordinatorUnavailable root)
-            )
-
     let private attachRecovery (scope: ToolRuntimeScope) (mode: string) =
-        scope.AttachCurrentProcessJoin(fun root -> Task.FromResult(recoveryOf root mode))
+        scope.AttachCurrentProcessJoinMode mode
 
     /// Plain metadata for the provider-visible run contract.
     let describeRun (toolModule: obj) : obj =

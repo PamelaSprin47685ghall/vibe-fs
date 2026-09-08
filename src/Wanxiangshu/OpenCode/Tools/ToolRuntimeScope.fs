@@ -549,6 +549,22 @@ type ToolRuntimeScope
     /// Wire PluginRuntimeScope.RequireCurrentProcessJoin (or test double).
     member _.AttachCurrentProcessJoin(fn: SessionId -> Task<FamilyRecovery>) = currentProcessJoin <- Some fn
 
+    /// Wire current-process join recovery mode directly by string label ("ready", "waiting", or "blocked").
+    member this.AttachCurrentProcessJoinMode(mode: string) =
+        this.AttachCurrentProcessJoin(fun root ->
+            let recovery =
+                match mode with
+                | "ready" -> FamilyRecovery.FamilyReady(FamilyRecoveryPermit.currentProcess root 0L)
+                | "waiting" ->
+                    FamilyRecovery.FamilyWaiting(
+                        NonEmpty.one (RecoveryBlock.RecoveryCoordinatorUnavailable root)
+                    )
+                | _ ->
+                    FamilyRecovery.FamilyBlocked(
+                        NonEmpty.one (RecoveryBlock.RecoveryCoordinatorUnavailable root)
+                    )
+            Task.FromResult recovery)
+
     /// EXEC-017: share PluginRuntimeScope.JoinAttempts with JoinTool.
     member _.AttachJoinAttempts(registry: IJoinAttemptRegistry) = joinAttempts <- registry
 

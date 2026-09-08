@@ -92,6 +92,9 @@ type ToolRuntimeScope =
     /// Wire PluginRuntimeScope.RequireCurrentProcessJoin (or test double).
     member AttachCurrentProcessJoin: fn: (SessionId -> Task<FamilyRecovery>) -> unit
 
+    /// Wire current-process join recovery mode directly by string label ("ready", "waiting", or "blocked").
+    member AttachCurrentProcessJoinMode: mode: string -> unit
+
     /// EXEC-017: share PluginRuntimeScope.JoinAttempts with JoinTool.
     member AttachJoinAttempts: registry: IJoinAttemptRegistry -> unit
 

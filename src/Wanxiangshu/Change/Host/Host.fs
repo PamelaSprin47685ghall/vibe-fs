@@ -19,7 +19,6 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Mission.Relay
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
