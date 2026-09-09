@@ -25,8 +25,6 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Context.Companion
@@ -34,7 +32,6 @@ open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
@@ -47,7 +44,6 @@ open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Persistence.Journal
 

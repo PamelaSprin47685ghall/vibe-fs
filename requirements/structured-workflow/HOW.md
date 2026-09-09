@@ -112,6 +112,12 @@ Subsystem SCC 是首要结构债：双向依赖必须通过移动知识所有权
 
 在 `32f66d952` 上并行核对 Provider wire decoder 与 Git hook 的全部源码／签名，分别将宽 Host 引用收窄到既有 `runtime-platform/digest`。两者只需媒体 URL 摘要与 common-dir socket key，不消费 OpenCode 消息／事件类型；保留其余真实引用，源码、签名与 aggregate 均不变。声明递归闭包分别从 10 项目／48 个 `.fs/.fsi` 输入降至 7／26、从 51／250 降至 49／240；独立 Fable 编译分别通过 64、278 parsed sources（`3b3604da2356`、`f39c6d4c6b7b`）。先验证 decoder 的反向 consumer 再修改 hook 引用，最终两分片签名反向消费者的 flat 并集通过 1418 parsed sources／1380 items（`91bced9bf768`），包含真实 decoder 与 HostSignalBootstrap 消费路径。新隔离产物的媒体投影和临时 Git hook 安装 smoke 范围分别记录于 provider-projection/HOW 与 durable-convergence/HOW。上述计数不代表编译耗时改善或全局 SCC 收敛，GAP-033 仍为 PARTIAL。
 
+在 `e5794c8f4` 上并行审查 Companion、Delegation recovery 与 shared-state 三个分片。前两者分别实际消费 `IEventObservationPort`／终端事件词汇和 `MessagePart.Text`，保留宽 Host 引用；三处机械替换摘要引用均不会缩小声明闭包，不作为隔离成果。shared-state 中的 OpenCode `GitTree.create`／`GitTreePort` 已无调用方，因此删除退役适配器、类型及当前编译／适用入口，保留 EventStore 同名模块和 Relay snapshot。
+
+该批首次 shared-state 独立编译暴露 `IJoinAttemptRegistry`／构造器漏报依赖及失效 namespace 引入。将既有 registry 的 sibling 源码移入窄 `delegation/join-attempt-registry` 分片，原 recovery 与 shared-state 显式消费它；只依赖 Identity、causal-wait contract、AsyncSupport，不以 recovery umbrella 或动态加载补回类型。registry 与 repaired shared-state 独立 Fable 编译分别通过 46、578 parsed sources（`5612752d421a`、`cf8198d664c9`），GitSubject／registry／session scope／recovery scope 签名反向消费者并集通过 1430 parsed sources／1392 items（`f31b44cd590f`）。新隔离 shared-state smoke 范围见 host-boundary/HOW。
+
+registry 声明闭包为 4 项目／8 输入；shared-state 从基准 87／538 变为 89／540，增长来自补齐真实 registry／wait contract，而非耦合收敛。结构 gate 为 26 subsystem、210 shard、700 source、1913 references，shard DAG，最大 SCC 22；相关 Host／Delegation／subsystem 结构测试 8/8 通过。删除死适配器与恢复可编译边界不代表全局 SCC 缩小或 subsystem 已可独立替换，GAP-033 保持 PARTIAL。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

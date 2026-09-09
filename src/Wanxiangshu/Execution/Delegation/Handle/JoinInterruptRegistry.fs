@@ -1,17 +1,6 @@
 namespace Wanxiangshu.Execution.Delegation.Handle
 
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Guidance
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Wait
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 open System
 open System.Collections.Generic

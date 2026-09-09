@@ -36,7 +36,6 @@
 /src/Wanxiangshu/OpenCode/Host/ExplicitResumeSurface.fs
 /src/Wanxiangshu/OpenCode/Host/ExplicitSessionResume.fs
 /src/Wanxiangshu/OpenCode/Host/FissionHostSurface.fs
-/src/Wanxiangshu/OpenCode/Host/GitTree.fs
 /src/Wanxiangshu/OpenCode/Host/HostBoundarySurface.fs
 /src/Wanxiangshu/OpenCode/Host/HostMessageProjection.fs
 /src/Wanxiangshu/OpenCode/Host/HostSessionContext.fs

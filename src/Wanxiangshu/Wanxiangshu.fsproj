@@ -1100,8 +1100,6 @@
     <Compile Include="Mission/WorkRecord/OpeningSemanticSurface.fs"/>
     <Compile Include="Composition/Turn/Workflow.fsi"/>
     <Compile Include="Composition/Turn/Workflow.fs"/>
-    <Compile Include="OpenCode/Host/GitTree.fsi"/>
-    <Compile Include="OpenCode/Host/GitTree.fs"/>
     <Compile Include="OpenCode/Host/HostCompactionGate.fsi"/>
     <Compile Include="OpenCode/Host/HostCompactionGate.fs"/>
     <Compile Include="Context/Prefix/Wire.fsi"/>

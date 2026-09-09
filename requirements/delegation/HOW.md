@@ -49,6 +49,12 @@ CompletionMailbox、Change VerdictMailbox 与 HostForkJoin 的 journal／fission
 - Sync/Fork/Recovery CE 分居三个 Runtime locality；Host 与 PTY 的物理调用分居两个 Adapter locality。Runtime/Adapter 只能依赖 contract/fold，普通 consumer 不能引用它们。
 - `scripts/checks/owner-projects.mjs` 固定 locality kind、方向与 closure budget；`scripts/compile-owner.mjs` 只编译目标 ProjectReference closure 的单一 flat projection。
 
+### JoinAttemptRegistry 窄编译边界
+
+在 `e5794c8f4` 上将既有 `JoinInterruptRegistry.fs/.fsi` 从 recovery runtime 移入 `delegation/join-attempt-registry` 编译分片；源码路径、公开签名、aggregate 顺序和 registry 行为不变，仅删除无用 namespace 引入。新分片只引用 Identity、causal-wait contract 与 AsyncSupport，由原 recovery 分片和真实 `PluginSessionScope` consumer 显式引用。它仍属于 delegation，不把 session／attempt 语义伪装成平台原语。
+
+新分片声明递归闭包为 4 项目／8 个 `.fs/.fsi` 输入，独立 Fable 编译通过 46 parsed sources（`5612752d421a`）。包含 GitSubject、registry 与 session／recovery scope 签名反向消费者的 flat 并集通过 1430 parsed sources／1392 items（`f31b44cd590f`）。编译证明不代替 no-future-latch、取消和逐项 CAS 的完整行为证明；现有 Join／中断证明入口保留。`ChildRecoveryWorkflow` 仍真实匹配 `MessagePart.Text`，本批保留 recovery 的宽 Host contract 引用，未以摘要调用为由误删它。
+
 ## 验证与测试落点
 
 | 命题 | 落点测试 |

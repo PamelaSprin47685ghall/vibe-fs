@@ -99,7 +99,6 @@ test('WHAT[HOST-BOUNDARY-026] host session contract compiles independently witho
     'OpenCode/Host/HostSessionContext.fs',
     'OpenCode/Host/HostBoundarySurface.fs',
     'OpenCode/Host/HostSessionContextSurface.fs',
-    'OpenCode/Host/GitTree.fs',
   ]
 
   for (const item of forbidden) {

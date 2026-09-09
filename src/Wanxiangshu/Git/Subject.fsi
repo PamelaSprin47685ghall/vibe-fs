@@ -1,8 +1,5 @@
 namespace Wanxiangshu.Git
 
-[<Struct>]
-type GitTreePort = { GetTreeHash: unit -> string }
-
 module GitSubject =
     [<Literal>]
     val Executable: string = "git"

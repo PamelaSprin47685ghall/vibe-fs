@@ -9,6 +9,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-handle-surface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.join-attempt-registry.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-canonical-json.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj"/>
@@ -22,8 +23,6 @@
     <Compile Include="Execution/Delegation/Fork/ChildRecovery.fs"/>
     <Compile Include="Execution/Delegation/Handle/Controller.fsi"/>
     <Compile Include="Execution/Delegation/Handle/Controller.fs"/>
-    <Compile Include="Execution/Delegation/Handle/JoinInterruptRegistry.fsi"/>
-    <Compile Include="Execution/Delegation/Handle/JoinInterruptRegistry.fs"/>
     <Compile Include="Execution/Delegation/Handle/CompletionCodec.fsi"/>
     <Compile Include="Execution/Delegation/Handle/CompletionCodec.fs"/>
     <Compile Include="Execution/Delegation/Handle/JoinDrain.fsi"/>

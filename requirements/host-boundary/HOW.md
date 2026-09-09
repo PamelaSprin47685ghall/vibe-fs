@@ -64,6 +64,12 @@
 - `PluginHostWiring`是process runtime的唯一production acquisition point。它先绑定boot workspace，再把reader注入Causal diagnostic、provider transform与Host workflow；普通consumer不引用runtime project。
 - `SharedStateSurface`只投影同一production runtime的bind/read行为，用“None→first→second”固定反例；不再公开set/clear或测试镜像cell。
 
+### 8. Shared-state 分片的真实编译依赖
+
+在 `e5794c8f4` 上删除无生产或测试调用方的 `OpenCode/Host/GitTree.fs/.fsi` 与 `GitTreePort`，同步去掉 aggregate、分片、APPLIES-TO 及 session-contract 排除表中的退役入口；EventStore 同名模块和 Relay snapshot 不变。shared-state 分片不再直接引用仅该适配器使用的 GitSubject 与宽 Host digest。历史 impact corpus／release-closure 快照不是当前 source authority，未重写其历史输入。
+
+首次独立 Fable 编译暴露 `PluginSessionScope` 的 `IJoinAttemptRegistry`／构造器漏报依赖及失效 namespace 引入。现直接引用窄 `delegation/join-attempt-registry`，删除失效引入，不通过整个 recovery runtime 补齐类型。修复后独立编译通过 578 parsed sources（`cf8198d664c9`）；新隔离 `SharedStateSurface` smoke 覆盖父子查询、空白候选拒绝、first-bind 和 continuation directory fallback。该 smoke 不证明 join 全部时序；消费者编译并集及未缩小的闭包口径见 structured-workflow/HOW 的 GAP-033 记录。
+
 ## 验证与测试落点
 
 | 命题 | 落点测试 |

@@ -3,11 +3,6 @@ namespace Wanxiangshu.Git
 open Fable.Core
 open Fable.Core.JsInterop
 
-/// Minimal synchronous Git tree capability shared by Host/runtime consumers.
-/// Review no longer owns repository state in the Relay architecture.
-[<Struct>]
-type GitTreePort = { GetTreeHash: unit -> string }
-
 /// Subject verbs that own the production `git` executable token (§37).
 /// Tree-hash / common-dir / orchestrator-host callers outside Infrastructure/Git|Persist
 /// must go through here (pre-GitGateway cutover).
@@ -23,9 +18,8 @@ module GitSubject =
     // only: it spawns a child and returns Task<Result<…>>.  GitSubject answers
     // synchronous callers — HookDispatcher installs hooks during activation,
     // HookSync resolves the repository root / common-dir before entering the
-    // async converge loop, GitTree.dirtyPayload builds the tree-hash payload
-    // inside a synchronous commit-build path, and RuntimePath resolves the
-    // journal common-dir once per workspace.
+    // async converge loop, and RuntimePath resolves the journal common-dir
+    // once per workspace.
     //
     // Converting these to Task would cascade async through every caller's
     // signature for no ergonomic gain: each is a startup-time introspection
