@@ -2,6 +2,8 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- 将既有 MessagePart sibling 源码独立到零引用的 host/message contract 分片；HostMessageCodec 直接消费它，不再编入无关 SDK DTO、终端事件和摘要实现。保持消息 union、decoder 行为、全部公开签名与 aggregate 顺序；编译闭包回归明确拒绝重新引入宽 Host 引用。
+
 - 删除无调用方的 OpenCode GitTree 适配器与 GitTreePort，保留 EventStore GitTree 和 Relay snapshot；JoinAttemptRegistry 独立为窄 delegation 分片，补齐 PluginSessionScope 的真实静态依赖，不再靠聚合编译补入 registry。
 
 - Provider wire decoder 与 Git hook 分片直接引用 runtime-platform/digest，去掉未使用的 OpenCode 消息／事件合同闭包；保留媒体 URL 摘要、Git common-dir socket key、用户 SSH 配置、全部源码与公开签名。

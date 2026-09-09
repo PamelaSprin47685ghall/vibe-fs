@@ -8,8 +8,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.digest.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
     <Compile Include="OpenCode/Codec/OpencodeTypes.fsi"/>
     <Compile Include="OpenCode/Codec/OpencodeTypes.fs"/>
-    <Compile Include="OpenCode/Host/Message.fsi"/>
-    <Compile Include="OpenCode/Host/Message.fs"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-message-contract.fsproj"/>
     <Compile Include="OpenCode/Signals/EventContract.fsi"/>
     <Compile Include="OpenCode/Signals/EventContract.fs"/>
 

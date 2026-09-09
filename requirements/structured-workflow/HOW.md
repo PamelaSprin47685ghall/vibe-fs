@@ -118,6 +118,12 @@ Subsystem SCC 是首要结构债：双向依赖必须通过移动知识所有权
 
 registry 声明闭包为 4 项目／8 输入；shared-state 从基准 87／538 变为 89／540，增长来自补齐真实 registry／wait contract，而非耦合收敛。结构 gate 为 26 subsystem、210 shard、700 source、1913 references，shard DAG，最大 SCC 22；相关 Host／Delegation／subsystem 结构测试 8/8 通过。删除死适配器与恢复可编译边界不代表全局 SCC 缩小或 subsystem 已可独立替换，GAP-033 保持 PARTIAL。
 
+在 `8e9e6d9f1` 上将既有 `OpenCode/Host/Message.fs/.fsi` 从宽 Host 分片移入零 ProjectReference 的 `host/host-message-contract`，HostMessageCodec 直接引用它，宽 Host 分片仍引用唯一消息定义。未改消息 union、decoder 实现、公开签名或 aggregate 顺序。按同一 production compile-shard inventory 递归计数，codec 声明闭包从 7 项目／32 输入降至 3／8，移除 OpencodeTypes、EventContract、Digest 及其传递输入；消息合同自身为 1／2。首轮 subsystem gate 拒绝将 requirement package 名 `host-boundary` 当作 subsystem，修正为现行映射的 `host`，未新增 alias 或放宽 gate。
+
+`host-boundary/tests/m6-slice-boundary.test.mjs` 的既有 codec audience 证明新增实际 transitive source closure 排除：临时恢复宽引用时以 `message codec must not acquire .../OpencodeTypes.fs` 失败，恢复窄引用后通过。codec 独立 Fable 编译通过 46 parsed sources；Message 与 HostMessageCodec 签名的真实反向消费者并集通过 1426 parsed sources／1388 items。新消费者产物的 `ProviderProjectionSurface.decodeHostParts` smoke 验证 Unicode／CRLF text、reasoning、pending/completed/error tool、canonical args、activity normalization 与未知／空白分段丢弃，不读取 Fable union 布局。它不替代真实 Host 时序 canary。
+
+同批并行审查保留 SyncDelegate runtime 的 `TerminalCompletionListener`／`TerminalStop`／`TerminalOutcome` 依赖，以及 recovery model 的 `ReconciledTurn.Parts`／`OpencodeModel` 和 `QuiescencePermit` 合同；它们不能机械替换为摘要或消息合同。仅 codec 的无关知识闭包已切断，未宣称全局 SCC 缩小或 subsystem 已可独立替换，GAP-033 保持 PARTIAL。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

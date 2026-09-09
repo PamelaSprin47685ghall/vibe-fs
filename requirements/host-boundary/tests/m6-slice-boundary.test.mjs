@@ -28,6 +28,23 @@ test('WHAT[HOST-BOUNDARY-027] production inventory closes Host codec audiences w
   assert.equal(loop.kind, 'contract')
   assert.deepEqual(sourcePaths(envelope), ['src/Wanxiangshu/OpenCode/Codec/HostEventEnvelope.fs'])
   assert.deepEqual(sourcePaths(message), ['src/Wanxiangshu/OpenCode/Codec/HostMessageCodec.fs'])
+
+  const messageClosure = new Set()
+  const pending = [message]
+  while (pending.length > 0) {
+    const shard = pending.pop()
+    if (messageClosure.has(shard)) continue
+    messageClosure.add(shard)
+    pending.push(...shard.references.map((id) => locality(inventory, id)))
+  }
+  const messageSources = new Set([...messageClosure].flatMap(sourcePaths))
+  assert.ok(messageSources.has('src/Wanxiangshu/OpenCode/Host/Message.fs'))
+  for (const unrelated of [
+    'src/Wanxiangshu/OpenCode/Codec/OpencodeTypes.fs',
+    'src/Wanxiangshu/OpenCode/Signals/EventContract.fs',
+    'src/Wanxiangshu/Host/Digest.fs',
+  ])
+    assert.ok(!messageSources.has(unrelated), `message codec must not acquire ${unrelated}`)
   assert.deepEqual(sourcePaths(loop), ['src/Wanxiangshu/OpenCode/Codec/LoopEventCodec.fs'])
   assert.deepEqual(loop.references, ['foundation-identity', 'host-event-envelope'])
 
