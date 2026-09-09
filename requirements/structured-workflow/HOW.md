@@ -130,6 +130,12 @@ registry 声明闭包为 4 项目／8 输入；shared-state 从基准 87／538 �
 
 同批完整审查 guidance-tip：唯一直接宽 Host 符号是 `stableCallId` 的 `HostDigest.sha256Hex`，但 production inventory 实测其余引用仍保留宽闭包。基准 112 项目／770 输入，在 SDK 分片迁移后为 113／770，假设将 guidance 引用替换为 digest 仍为 113／770；因此本批保留，不将直接符号收窄误报为闭包收益。结构 gate 为 26 subsystem、212 shard、700 source、1915 references，shard DAG，最大 SCC 22；Host／subsystem 相关检查 13/13 通过。GAP-033 仍为 PARTIAL，局部闭包下降不证明全局 SCC 收敛或 subsystem 已可独立替换。
 
+在 `26bfed9d0` 上继续审查终端事件 audience。既有 `host-digest` 分片只保留 EventContract 的 identity/outcome 引用，不再转接 SDK types、MessagePart 或 digest；SessionSnapshot 显式引用唯一消息合同。diagnostics 与 message visibility 没有终端知识，移除其引用。声明递归闭包（项目／输入）分别从 terminal 7／26、diagnostics 14／62、visibility 11／36、SyncDelegate 17／66、session contract 9／34 收到 4／20、10／54、5／12、14／60、8／32。
+
+同批 signal adapter 的独立 Fable 编译拒绝既有漏报的 ExecutionFailure、ChatExecutionTerminalDisposition 与 RuntimePath。先补齐实际 provider 引用并独立编译通过，再继续合同收窄；只删除 adapter 与 snapshot sibling 中无用途的 ingress namespace 引入，没有改变业务或公开签名。修复后的 adapter 闭包从漏报的 12／60 增至 35／198，不能把旧缺失输入当作隔离成果；RuntimePath 仍需要 digest。六个相关分片最终独立 Fable 编译分别通过 58、92、50、98、70、236 parsed sources；EventContract／SessionSnapshot／ReliabilityDiagnostics／MessageVisibility 签名反向消费者合并为一次 flat compile，通过 1426 parsed sources／1388 items（`0e6946de9286`）。初次 snapshot 独立编译拒绝失效 namespace，删除无用 open 后通过，没有把 namespace 名重新变成宽引用。
+
+既有 HOST-BOUNDARY-026 回归新增真实闭包性质：三个独立的 terminal 宽引用 mutant 与恢复 adapter 漏依赖的 mutant 均退出 1。新产物的 terminal replay／authority／dispose、diagnostic optional effect 与 visibility signal／deadline smoke 范围见 host-boundary/HOW。结构 gate 为 26 subsystem、212 shard、700 source、1914 references，shard DAG，最大 SCC 22；GAP-033 保持 PARTIAL，不以局部减少抵消漏依赖修复，也不宣称全局 SCC 收敛或编译耗时下降。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

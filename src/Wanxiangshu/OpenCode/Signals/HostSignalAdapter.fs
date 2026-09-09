@@ -1,7 +1,5 @@
 namespace Wanxiangshu.OpenCode
 
-open Wanxiangshu.Interaction.Dispatch.OpenCode
-
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Foundation

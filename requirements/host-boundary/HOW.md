@@ -46,10 +46,10 @@
 
 - **Locality 切分**：
   - `Host.Session.Contract`（`host-session-contract`，kind: `contract`）：仅包含 `SessionContract` capability 与 `SessionSnapshot` 纯词汇、端口、定位 decision；
-  - `Host.Signal.Contract`（`host-signal-contract`，kind: `contract`）：当前 `host-digest` 分片只编译 `EventContract.fs/.fsi`，引用既有 digest、identity、outcome、message contract 与 SDK 类型分片；保留唯一类型定义，尚未审查迁移的宽 consumer 不作机械替换。
+  - `Host.Signal.Contract`（`host-signal-contract`，kind: `contract`）：沿用 `host-digest` 工程路径，仅编译 `EventContract.fs/.fsi`，只引用 identity 与 outcome。终端合同不再传递 SDK record、MessagePart 或摘要实现；它不是兼容 umbrella。`SessionSnapshot` 显式引用唯一 message contract，SDK model 继续经其实际需要的 OpenCode prompt port 合同进入。
   - `Host SDK types`（`host-opencode-types`）：零 ProjectReference，显式归属 `host` subsystem，仅编译既有 `OpencodeTypes.fs/.fsi`。`OpenCodeContract` 与 `ModelRouting` 只需要其中的 `OpencodeModel`，直接消费此分片，不再编入终端事件与 `MessagePart`。源码、公开签名、模型字段与 aggregate 顺序不变。
   - `Host.Event.Envelope`（`host-event-envelope`，kind: `contract`）：raw envelope unwrap、event type、session/message-session identity 的唯一无状态公式；
-  - `Host.Message.Codec`（`host-message-codec`，kind: `contract`）：raw message part decode，bounded 到三个 fresh production consumer；直接引用 `host-message-contract` 中既有 `Message.fs/.fsi`，后者显式归属 `host` subsystem、零 ProjectReference。宽 signal contract 继续消费同一消息类型，没有复制定义或运行时别名；SDK DTO、终端事件与摘要实现不再进入 message codec 闭包。
+  - `Host.Message.Codec`（`host-message-codec`，kind: `contract`）：raw message part decode，bounded 到三个 fresh production consumer；直接引用 `host-message-contract` 中既有 `Message.fs/.fsi`，后者显式归属 `host` subsystem、零 ProjectReference。SessionSnapshot 与 message codec 消费同一消息定义，没有复制定义或运行时别名；SDK DTO、终端事件与摘要实现不再进入 message codec 闭包。
   - `Host.Loop.Event.Codec`（`loop-event-codec`，kind: `contract`）：loop text-delta decode/query，只依赖 `Host.Event.Envelope`；
   - `Host.Fatal.Effect`（`host-fatal-effect`，kind: `contract`）：`Foundation/FatalProcess` 进程 fuse 的窄物理效果边界；
   - `Host.Diagnostics.Runtime`（`host-diagnostics-runtime`，kind: `runtime`）：包含 `HookPolicy` 元数据表与 `ReliabilityDiagnostics` 因果记录收集；
@@ -57,6 +57,12 @@
   - `Host.Session.Runtime`（`host-session-runtime`，kind: `runtime`）：包含 `SessionSnapshotPort`/`SessionSnapshotSurface` wire 投影、`SessionQuiescenceGate`、`QuiescenceSurface`、`HostMessageProjection` 就地修改与 `HostSessionContext`；
   - `Sphinx.Host.Adapter`（`sphinx-host-adapter`，kind: `adapter`）：包含 `SphinxMcpConfig` 启动配置与环境适配。
 - **单向依赖与闭包纯洁性**：应用与领域契约只能引用 Contract locality，严禁传递包含 Runtime 与 Adapter 实现；契约源码闭包受 $\le 100$ 上限约束，聚焦 runtime 以 185 为 target、adapter/宽闭包 locality 以全仓 60% 为 full-fallback 硬顶（见 delegation/host 预算裁决）。
+
+以 `26bfed9d0` 为基准，本批把 terminal contract 收到 identity/outcome，移除 diagnostics 与 message visibility 的无实际用途引用。声明递归闭包（项目／`.fs/.fsi` 输入）分别为：terminal 7／26 → 4／20，diagnostics 14／62 → 10／54，visibility 11／36 → 5／12，SyncDelegate runtime 17／66 → 14／60，session contract 9／34 → 8／32。
+
+signal adapter 首次独立编译暴露既有 `ExecutionFailure`、`ChatExecutionTerminalDisposition`、`RuntimePath` 缺失；显式补齐各自 provider 引用，删除 adapter 与 SessionSnapshot sibling 中无用途的 ingress namespace 引入，不用动态加载或扩大 shared contract 掩盖错误。adapter 声明闭包由漏报的 12／60 修正为 35／198；RuntimePath 合法保留摘要依赖，这一增长不是隔离收益。terminal、diagnostics、visibility、SyncDelegate、session、adapter 的最终独立 Fable 编译分别通过 58、92、50、98、70、236 parsed sources；四组签名的实际反向消费者并集通过 1426 parsed sources／1388 items（`0e6946de9286`）。
+
+既有 `host-session-contract-closure.test.mjs` 的 HOST-BOUNDARY-026 证明同时拒绝终端合同重新引入 SDK／Message／digest，以及 adapter 再次丢失真实 provider。四个独立引用反例均退出 1；窄合同下相关结构检查通过。新隔离产物的 `HookPolicySurface` smoke 保持 critical policy fail-closed 与 optional effect 失败不改变 critical result；`MessageVisibilitySurface` 用显式 deadline 证明 foreign signal 不唤醒、同 session signal 取消 deadline、期限触发后清空 waiter。新消费者产物的 `EventsSurface` smoke 证明 sticky replay、future-only 不重放、同 run completion 去重、Failed/Aborted 的 exact authority 保留及 dispose 后零投递。`notify` 的布尔值表示 listener presence，不表示 sticky 是否保存。上述 smoke 不替代真实 Host canary；既有 `events-port.test.mjs`、`message-visibility.test.mjs` 与 `signals.test.mjs` 继续作为正式行为证明。
 
 ### 7. Root workspace effect隔离
 

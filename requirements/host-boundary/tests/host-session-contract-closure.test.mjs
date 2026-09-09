@@ -127,6 +127,25 @@ test('WHAT[HOST-BOUNDARY-026] host session contract compiles independently witho
   }
   const portSources = productionSources(planLocality('opencode-host-opencodeport').plan)
   assert.ok(!portSources.includes('Host/Digest.fs'), 'OpenCode port contract must not acquire Host/Digest.fs')
+
+  for (const consumer of ['host-signal-contract', 'delegation-sync-runtime', 'host-diagnostics-runtime', 'opencode-host-messagevisibility']) {
+    const consumerSources = productionSources(planLocality(consumer).plan)
+    for (const unrelated of ['Host/Digest.fs', 'OpenCode/Codec/OpencodeTypes.fs', 'OpenCode/Host/Message.fs']) {
+      assert.ok(!consumerSources.includes(unrelated), `${consumer} must not acquire ${unrelated}`)
+    }
+  }
+  for (const consumer of ['host-diagnostics-runtime', 'opencode-host-messagevisibility']) {
+    const consumerSources = productionSources(planLocality(consumer).plan)
+    assert.ok(!consumerSources.includes('OpenCode/Signals/EventContract.fs'), `${consumer} must not acquire terminal event vocabulary`)
+  }
+
+  const adapterSources = productionSources(planLocality('host-signal-adapter').plan)
+  for (const required of ['Execution/Failure/Model.fs', 'Execution/Session/ChatExecution/Facts.fs', 'Persistence/Journal/RuntimePath.fs']) {
+    assert.ok(adapterSources.includes(required), `signal adapter must compile its actual dependency ${required}`)
+  }
+  for (const unrelated of ['OpenCode/Codec/OpencodeTypes.fs', 'OpenCode/Host/Message.fs']) {
+    assert.ok(!adapterSources.includes(unrelated), `signal adapter must not acquire ${unrelated}`)
+  }
 })
 
 test('WHAT[HOST-BOUNDARY-026] host boundary projects declare explicit locality kinds and exact compile ownership', () => {

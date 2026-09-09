@@ -2,6 +2,8 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- 终端事件合同不再传递 SDK 类型、MessagePart 或摘要实现；SessionSnapshot 显式引用唯一消息合同，诊断与消息可见性移除不使用的终端引用。补齐 signal adapter 原本漏报的 failure、chat-execution 与 RuntimePath 静态依赖，清除失效 namespace 引入；保持终端重放、精确 authority、取消与公开签名。
+
 - 将既有 OpencodeTypes sibling 源码独立到零引用的 Host SDK 类型分片；OpenCodeContract 与模型路由直接消费它，不再为 OpencodeModel 引入终端事件和 MessagePart。保持 SDK wire 类型、模型投影、公开签名与 aggregate 顺序；既有编译边界回归拒绝两条 consumer 恢复宽 Host 引用。
 
 - 将既有 MessagePart sibling 源码独立到零引用的 host/message contract 分片；HostMessageCodec 直接消费它，不再编入无关 SDK DTO、终端事件和摘要实现。保持消息 union、decoder 行为、全部公开签名与 aggregate 顺序；编译闭包回归明确拒绝重新引入宽 Host 引用。

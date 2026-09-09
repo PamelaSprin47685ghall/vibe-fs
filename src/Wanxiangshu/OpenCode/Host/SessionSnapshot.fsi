@@ -3,7 +3,6 @@ namespace Wanxiangshu.OpenCode
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Interaction.Dispatch.OpenCode
 
 [<RequireQualifiedAccess>]
 type SnapshotToolPartState =
