@@ -9,9 +9,11 @@ open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Context.Companion.Blogger.Runtime
+open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
+open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Resources
 
@@ -653,31 +655,94 @@ module BlogSurface =
                hasFailedBlogAttempt = isBlog && (status = "error" || interrupted)
                blogPartInterrupted = isBlog && interrupted |}
 
-    /// Coverage birth guard: sequence and cutoff advance together with the
-    /// first durable frame; no synthetic zero/zero coverage is accepted.
+    /// Explicit trace evidence drives the real fold and coverage birth decision.
     let coverageBirth (value: obj) : obj =
         let previousSequence = int64 (text value?previousIngestedThroughSequence)
         let nextSequence = int64 (text value?nextIngestedThroughSequence)
         let previousCutoff = int (text value?previousCoverableTurnCutoffExclusive)
         let nextCutoff = int (text value?nextCoverableTurnCutoffExclusive)
 
-        if nextSequence <= previousSequence then
+        let traceSequences =
+            arrayOf value?traceSequences
+            |> Array.toList
+            |> List.map (fun item -> int64 (text item))
+
+        let xTrace =
+            traceSequences
+            |> List.fold
+                (fun state sequence ->
+                    XTraceProjection.applyPart
+                        sequence
+                        "user"
+                        "g:0/coverage-birth"
+                        (int sequence)
+                        0
+                        "text"
+                        None
+                        None
+                        None
+                        None
+                        (BlobRef.create "coverage-birth")
+                        (BlobDigest.create "coverage-birth")
+                        state
+                    |> Result.defaultWith (string >> invalidOp))
+                XTraceProjection.empty
+
+        let blog =
+            { BlogProjection.empty with
+                Coverage =
+                    { BlogProjection.empty.Coverage with
+                        IngestedThroughSequence = previousSequence
+                        CoverableTurnCutoffExclusive = previousCutoff
+                        CoveredPrefixDigest = text value?nextCoveredPrefixDigest } }
+
+        let projection: ProviderProjection.ProviderSemanticProjection =
+            { ProviderId = None
+              ModelId = None
+              Variant = None
+              Tools = []
+              System = []
+              Messages = [] }
+
+        let chunk: BloggerDeltaChunk =
+            { Items = []
+              Toml = "coverage-birth"
+              NextCursor =
+                { TurnIndex = int nextSequence + 1
+                  PartIndex = 0 }
+              NextCoverableTurnCutoffExclusive = nextCutoff }
+
+        let mainSessionId = SessionId.create "coverage-birth-main"
+        let bloggerSessionId = SessionId.create "coverage-birth-blogger"
+
+        match
+            BloggerMainContext.mainContextFromChunk
+                mainSessionId
+                bloggerSessionId
+                PrefixEpochId.initial
+                blog
+                xTrace
+                projection
+                chunk
+        with
+        | Some(BloggerRequestContext.Main context) ->
+            box
+                {| ok = true
+                   ingestedThroughSequence = context.NextIngestedThroughSequence
+                   coverableTurnCutoffExclusive = context.NextCoverableTurnCutoffExclusive
+                   nextCoveredPrefixDigest = context.NextCoveredPrefixDigest |}
+        | Some(BloggerRequestContext.Squash _) ->
+            box
+                {| ok = false
+                   error = "unexpected squash context" |}
+        | None when nextSequence <= previousSequence ->
             box
                 {| ok = false
                    error = "non-advancing ingested sequence" |}
-        elif nextCutoff <= previousCutoff then
+        | None ->
             box
                 {| ok = false
-                   error = "non-advancing coverable cutoff" |}
-        elif String.IsNullOrWhiteSpace(text value?nextCoveredPrefixDigest) then
-            box
-                {| ok = false
-                   error = "missing covered prefix digest" |}
-        else
-            box
-                {| ok = true
-                   ingestedThroughSequence = nextSequence
-                   coverableTurnCutoffExclusive = nextCutoff |}
+                   error = "unmapped next cursor" |}
 
     /// Commit branch classification over semantic evidence. Each branch keeps
     /// the production failure meaning visible without leaking a Cycle DU.

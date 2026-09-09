@@ -5,11 +5,10 @@ open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.OpenCode
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
-open Fable.Core
-open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Repository.Investigation.WarmStart
 open ToolHostCodec
 
 /// DevOps synchronous Coder delegation via reusable SyncDelegate Session.
@@ -98,69 +97,6 @@ module CoderTool =
     let private consequence ctx path subs =
         tomlObjectWithInstructions [ ProviderProse.render (lang ctx) path subs ] []
 
-    let private warmStartRuntimeModule: obj =
-        emitJsExpr
-            ()
-            """
-        (() => {
-            let mod = null;
-            try {
-                if (typeof require === 'function') {
-                    mod = require('../../Repository/Investigation/WarmStart/Runtime.js');
-                }
-            } catch (_) {}
-            if (!mod) {
-                try {
-                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
-                        ? process.getBuiltinModule('node:module')
-                        : null;
-                    if (procMod && typeof procMod.createRequire === 'function') {
-                        const req = procMod.createRequire(import.meta.url);
-                        mod = req('../../Repository/Investigation/WarmStart/Runtime.js');
-                    }
-                } catch (_) {}
-            }
-            return mod;
-        })()
-        """
-
-    let private prepareWarmStartDocument
-        (sessionId: SessionId)
-        (role: Role)
-        (workspaceDirectory: string option)
-        (keywords: string)
-        (charge: string)
-        : Task<LlmFacing.Document> =
-        let invokeAsync: Task<obj> =
-            emitJsExpr
-                (warmStartRuntimeModule, sessionId, role, workspaceDirectory, keywords, charge)
-                """
-(async function(mod, sessionId, role, workspaceDirectory, keywords, charge) {
-    try {
-        if (mod && typeof mod.prepareDocument === 'function') {
-            const res = await mod.prepareDocument(sessionId, role, workspaceDirectory, keywords, charge);
-            const tagKey = 't' + 'ag';
-            const fieldsKey = 'fiel' + 'ds';
-            if (res && res[tagKey] === 0 && res[fieldsKey] && res[fieldsKey][0]) {
-                return res[fieldsKey][0];
-            }
-        }
-        return null;
-    } catch {
-        return null;
-    }
-})($0, $1, $2, $3, $4, $5)
-"""
-
-        task {
-            let! res = invokeAsync
-
-            if isNull res then
-                return LlmFacing.instruction charge
-            else
-                return unbox<LlmFacing.Document> res
-        }
-
     let private invoke
         (sd: SyncDelegateRuntime)
         (role: SyncDelegateRole)
@@ -225,12 +161,13 @@ module CoderTool =
             | Some _, false, Ok _, true -> return consequence context surface.NeedsCharge (Map [ "tool", toolName ])
             | Some sd, false, Ok expectedToolCalls, false ->
                 let prepareProviderPrompt () =
-                    prepareWarmStartDocument
+                    RepositoryWarmStart.prepareDocument
                         (SessionId.create context.SessionId)
                         Role.Coder
                         scope.WorkspaceDirectory
                         keywords
                         charge
+                    |> TaskValue.map (Result.defaultWith invalidOp)
 
                 let! batch = SyncDelegateBatching.resolve sd scope SyncDelegateRole.Coder context
 

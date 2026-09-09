@@ -22,6 +22,9 @@
    - 若无活跃 Blogger cycle，产生类型化 `NoLiveCycle` 结果并清理过时会话。
 
 2. **原子提交与 Coverage 出生门**：
+   - `BloggerMainContext.mainContextFromChunk` 单独拥有出生门及 context 构造；原 `Enforcer/Host.fs(.fsi)` 已退役，cursor 映射与 prefix digest helper 随唯一消费者迁入 MainContext，不在 Recovery 保留副本或转发器。`fromProjection` 直接静态调用，不以动态模块缺失伪装为没有新材料。
+   - `BlogSurface.coverageBirth` 通过显式 trace sequences 调用真实 `XTraceProjection.applyPart` 和上述生产函数，不再复制不等式作为 oracle。出生门测试覆盖非推进、无法映射、严格推进及同一 turn 内推进保留原 prefix digest；无法映射的正序列反例在旧 Surface 返回成功，新实现拒绝。
+   - 已删除源码形状断言及未经过真实 writer 的三项伪 precheck 测试；这些出生门证据不证明提交阶段的 cutoff／epoch 不一致恢复与弃置，也不能据此宣布 BD-013 的提交前校验全部已证明。
    - 提交前校验待覆盖序列严格单调递增，且 staged cursor/cutoff/epoch 与当前投影一致。
    - 写入日志与证据 blob 后，原子追加 `BlogObservationCommitted` 事件，同步推进 coverage 与日志记录。
    - 提交后派生单一 RecentTip，在投影中维护容量为 8 的有序滑动窗口。

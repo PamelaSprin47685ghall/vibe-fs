@@ -694,7 +694,6 @@ test('WHAT[STRUCTURED-WORKFLOW-004] DSL_OWNERSHIP_host_boundary_open_is_not_gate
     'src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs',
     'src/Wanxiangshu/Execution/Session/Wait/CompletionMailbox.fs',
     'src/Wanxiangshu/Execution/Delegation/Fork/Runtime.fs',
-    'src/Wanxiangshu/Enforcer/Host.fs',
     'src/Wanxiangshu/Execution/Delegation/Handle/CompletionCodec.fs',
     'src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs',
   ]) {

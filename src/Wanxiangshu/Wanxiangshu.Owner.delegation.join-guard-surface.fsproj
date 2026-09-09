@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>delegation</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>join-guard-surface</WanxiangshuCompileShard>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-hostturnobservedsurface.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.composition-turn-reconcilesurface.fsproj" />
+    <Compile Include="Interaction/Dispatch/JoinGuardSurface.fsi" />
+    <Compile Include="Interaction/Dispatch/JoinGuardSurface.fs" />
+  </ItemGroup>
+</Project>

@@ -1058,8 +1058,6 @@
     <Compile Include="Context/Companion/RuntimeSurface.fs"/>
     <Compile Include="Composition/Turn/Binding.fsi"/>
     <Compile Include="Composition/Turn/Binding.fs"/>
-    <Compile Include="Enforcer/Host.fsi" />
-    <Compile Include="Enforcer/Host.fs"/>
     <Compile Include="Context/Companion/Blogger/MainContext.fsi"/>
     <Compile Include="Context/Companion/Blogger/MainContext.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/Coordinator.fsi"/>

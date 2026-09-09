@@ -22,6 +22,7 @@
    - 检索命中条目经 `stableDedupeHints`（按路径、起止行与正文）稳定去重；
    - 渲染阶段执行双重硬界限制（最大提示条目数与字节上限），超限时按整条 hint 剔除，保证数据结构完整；
    - 检索过程中的任何单项失败、超时或服务未就绪均安全 fail-open，返回原始任务描述，不阻断主线流程。
+   - `OpenCode/Tools/CoderTool.fs` 静态调用 `RepositoryWarmStart.prepareDocument`，由原 runtime 拥有上述 fail-open；adapter 不再动态加载模块、解码 Fable union 或吞掉所有异常。正常 `Ok` 文档直接传给 SyncDelegate；typed `Error` 为不变量失败，Task fault／取消继续传播，不另造成功结果。
 
 ## 验证与测试落点
 

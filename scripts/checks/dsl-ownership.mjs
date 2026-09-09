@@ -145,7 +145,6 @@ export const HOST_BOUNDARY_OPEN_PATHS = new Set([
   'src/Wanxiangshu/Enforcer/Guidance/Tip.fs',
   'src/Wanxiangshu/Enforcer/Guidance/TipSurface.fs',
   'src/Wanxiangshu/Enforcer/BlogSurface.fs',
-  'src/Wanxiangshu/Enforcer/Host.fs',
   'src/Wanxiangshu/Enforcer/Repair.fs',
   'src/Wanxiangshu/Execution/Delegation/ChildRecoveryWorkflow.fs',
   'src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs',

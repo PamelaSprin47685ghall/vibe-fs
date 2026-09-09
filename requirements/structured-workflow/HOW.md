@@ -76,6 +76,10 @@ Subsystem SCC 是首要结构债：双向依赖必须通过移动知识所有权
 
 旧 M6 计划仅用于追溯退役原因；其 extractor、worksheet、ACL 与 snapshot 清单不形成关闭本节缺口的条件。ENF-015、ENF-016 等独立产品证明缺口仍由所属包 HOW 记录，不因 GAP-031 路线退役或本节记录完成而关闭。
 
+在 `9b56d8ce2` 上继续恢复两条 typed 边界：Coder 静态调用既有 WarmStart 合同，保留查询级 fail-open 而去掉 adapter 的动态加载与 catch-all；Blogger 将唯一 context 构造及其两个纯 helper 收回 MainContext，删除旧 Enforcer Host 与 Recovery 中已无消费者的副本。`coverageBirth` Surface 改用真实 trace fold 和出生门，无法映射的正序列反例旧败新胜；相关出生门、WarmStart 和 JoinGuard 等测试 15/15 通过，不将出生门证据冒充 writer 提交前校验证据。
+
+本批 Coder focused compile 又暴露 `JoinGuardSurface → DispatchSurface` 的漏报依赖。证明 adapter 从运行时分片移入独立 `delegation/join-guard-surface`，显式引用原运行时和 DispatchSurface 所属分片，未复制 Host port adapter，aggregate 源码顺序不变。Coder、JoinGuard Surface、Enforcer continuation 的真实 focused Fable compile 分别通过 982、972、958-source 闭包；声明图为 26 subsystem、208 shard、701 production source、1879 references，shard DAG，最大 subsystem SCC 为 21。SCC 增长如实反映恢复的依赖，不是闭包收敛成果；GAP-033 保持 PARTIAL。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

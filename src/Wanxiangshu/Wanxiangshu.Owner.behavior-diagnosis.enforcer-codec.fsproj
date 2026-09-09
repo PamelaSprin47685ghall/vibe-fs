@@ -12,6 +12,4 @@
     <Compile Include="Enforcer/RepairSurface.fs" />
     <Compile Include="Enforcer/ObservationSurface.fsi" />
     <Compile Include="Enforcer/ObservationSurface.fs" />
-    <Compile Include="Enforcer/Host.fsi" />
-    <Compile Include="Enforcer/Host.fs" />
 </ItemGroup></Project>

@@ -33,18 +33,6 @@ module EnforcerFrameRecovery =
 
     val rebuildFromContext: AgentJournal -> SessionId -> BloggerRequestContext -> obj list -> Task<obj list>
 
-    val lastCoveredCursor:
-        Wanxiangshu.Context.Trace.XTraceProjectionState ->
-        Wanxiangshu.Context.Companion.Blogger.SemanticCursor ->
-            Wanxiangshu.Context.Trace.XTraceCursor option
-
-    val coveredPrefixDigest:
-        int ->
-        string ->
-        int ->
-        Wanxiangshu.Participant.Provider.Projection.ProviderProjection.ProviderSemanticProjection ->
-            string
-
     val tryReloadRequestContext:
         Wanxiangshu.Persistence.Journal.AgentJournal ->
         Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequest ->

@@ -10,6 +10,20 @@ open Wanxiangshu.Persistence.Journal
 [<RequireQualifiedAccess>]
 module BloggerMainContext =
 
+    /// Pure construction of a Blogger main request from one delta chunk.
+    /// Refuses at birth when coverage cannot strictly advance: an unmapped
+    /// next cursor or a next sequence at or below the previous ingested
+    /// sequence returns None so no BloggerMain is started.
+    val mainContextFromChunk:
+        mainSessionId: SessionId ->
+        bloggerSessionId: SessionId ->
+        observedEpoch: PrefixEpochId ->
+        blog: BlogProjectionState ->
+        xTrace: XTraceProjectionState ->
+        projection: ProviderProjection.ProviderSemanticProjection ->
+        chunk: BloggerDeltaChunk ->
+            BloggerRequestContext option
+
     /// True when the current XTrace/Blog state can produce a next Blogger chunk.
     val hasMaterial:
         journal: AgentJournal option ->
