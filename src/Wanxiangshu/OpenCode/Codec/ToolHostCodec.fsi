@@ -51,6 +51,7 @@ module ToolHostCodec =
     val newHandleId: unit -> string
     val decodeContext: raw: obj -> HostToolContext
     val factory: toolModule: obj -> HostToolFactory
+    val internal schemaValue: schema: HostSchema -> obj
     val stringSchema: factory: HostToolFactory -> HostSchema
     val stringSchemaDescribed: description: string -> factory: HostToolFactory -> HostSchema
     val numberSchema: factory: HostToolFactory -> HostSchema

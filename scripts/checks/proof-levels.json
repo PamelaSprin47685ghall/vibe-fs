@@ -2,6 +2,8 @@
   "schema_version": 1,
   "levels": ["static", "pure", "temporal", "adapter", "long-stroke"],
   "proofs": [
+    {"path": "requirements/provider-projection/tests/tool-host-codec-full.test.mjs", "title": "WHAT[VERIFICATION-SYSTEM-008] tool schema surface preserves native validation and optionality", "what_id": "VERIFICATION-SYSTEM-008", "level": "adapter"},
+    {"path": "requirements/provider-projection/tests/tool-host-codec-full.test.mjs", "title": "WHAT[VERIFICATION-SYSTEM-008] tool schema surface does not unwrap native literal values", "what_id": "VERIFICATION-SYSTEM-008", "level": "adapter"},
     {"path": "requirements/durable-events/tests/event-store-append.test.mjs", "title": "WHAT[DURABLE-EVENTS-001] append_commits_complete_canonical_line_then_updates_Current", "what_id": "DURABLE-EVENTS-001", "level": "adapter"},
     {"path": "requirements/durable-events/tests/event-store-identity-collision.test.mjs", "title": "WHAT[DURABLE-EVENTS-003] same_EventId_different_canonical_bytes_fail_closed", "what_id": "DURABLE-EVENTS-003", "level": "pure"},
     {"path": "requirements/durable-events/tests/event-store-utf8.test.mjs", "title": "WHAT[DURABLE-EVENTS-003] invalid UTF-8 bytes fail closed before canonical JSON decoding", "what_id": "DURABLE-EVENTS-003", "level": "pure"},

@@ -1,6 +1,7 @@
 // Host tool codec semantics through its owner surface.
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import * as toolModule from '@opencode-ai/plugin/tool'
 
 const codec = await import('../../../dist/OpenCode/Codec/ToolHostSurface.js')
 const {
@@ -71,48 +72,44 @@ test('WHAT[PROVIDER-PROJECTION-005] CODEC_arguments_null_raw_is_all_absent', () 
   assert.equal(argumentOptionalNumber(args, 'x'), null)
 })
 
-const toolModule = {
-  tool: {
-    schema: {
-      string: () => ({
-        schema: 'string',
-        describe: (description) => ({ schema: 'string-described', description, optional: () => ({ schema: 'string-described-optional', description }) }),
-        optional: () => ({ schema: 'string-optional' }),
-      }),
-      number: () => ({
-        schema: 'number',
-        optional: () => ({ schema: 'number-optional' }),
-        int: () => ({ nonnegative: () => ({ describe: (description) => ({ optional: () => ({ schema: 'nonnegative-int-described-optional', description }) }) }) }),
-      }),
-      boolean: () => ({ schema: 'boolean', optional: () => ({ schema: 'boolean-optional' }) }),
-      enum: (values) => ({
-        describe: (description) => ({ optional: () => ({ schema: 'enum-described-optional', values, description }), value: { schema: 'enum-described', values, description } }),
-        optional: () => ({ schema: 'enum-optional', values }),
-        value: { schema: 'enum', values },
-      }),
-      array: (inner) => ({ schema: 'array', inner, optional: () => ({ schema: 'array-optional', inner }) }),
-      union: (parts) => ({ schema: 'union', parts }),
-    },
-  },
-}
+test('WHAT[VERIFICATION-SYSTEM-008] tool schema surface preserves native validation and optionality', () => {
+  const schema = toolModule.tool.schema.object({
+    source: schemaString(toolModule),
+    described: schemaStringDescribed(toolModule, 'program source'),
+    count: schemaNumber(toolModule),
+    choice: schemaEnum(toolModule, ['a', 'b']),
+    describedChoice: schemaEnumDescribed(toolModule, ['a', 'b'], 'pick one'),
+    optionalChoice: schemaOptionalEnum(toolModule, ['a', 'b']),
+    optionalDescribedChoice: schemaOptionalEnumDescribed(toolModule, ['a', 'b'], 'maybe'),
+    target: schemaManagedOrHandle(toolModule, ['coder']),
+    hint: schemaOptionalString(toolModule),
+    describedHint: schemaOptionalStringDescribed(toolModule, 'hints'),
+    estimate: schemaOptionalNumber(toolModule),
+    budget: schemaOptionalNonNegativeIntegerDescribed(toolModule, 'delegator estimate'),
+    names: schemaOptionalStringArray(toolModule),
+  })
+  const required = { source: '', described: 'program', count: 2.5, choice: 'a', describedChoice: 'b', target: 'handle-123' }
+  assert.deepEqual(schema.parse(required), required)
+  const complete = {
+    ...required, optionalChoice: 'b', optionalDescribedChoice: 'a', hint: '', describedHint: 'hint',
+    estimate: 1.5, budget: 0, names: ['one', 'two'],
+  }
+  assert.deepEqual(schema.parse(complete), complete)
+  for (const mutation of [
+    { source: 1 }, { described: false }, { count: '2' }, { choice: 'unknown' },
+    { describedChoice: 'unknown' }, { optionalChoice: 'unknown' }, { optionalDescribedChoice: 'unknown' },
+    { target: 1 }, { hint: 2 }, { describedHint: [] }, { estimate: '1' },
+    { budget: -1 }, { budget: 0.5 }, { names: ['one', 2] },
+  ]) {
+    assert.equal(schema.safeParse({ ...complete, ...mutation }).success, false, JSON.stringify(mutation))
+  }
+})
 
-test('WHAT[PROVIDER-PROJECTION-005] CODEC_schema_dsl_builds_each_shape', () => {
-  assert.equal(schemaString(toolModule).schema, 'string')
-  assert.equal(schemaStringDescribed(toolModule, 'program source').schema, 'string-described')
-  assert.equal(schemaStringDescribed(toolModule, 'program source').description, 'program source')
-  assert.equal(schemaNumber(toolModule).schema, 'number')
-  assert.deepEqual(schemaEnumDescribed(toolModule, ['a', 'b'], 'pick one'), { schema: 'enum-described', values: ['a', 'b'], description: 'pick one' })
-  assert.deepEqual(schemaEnum(toolModule, ['x']), { schema: 'enum', values: ['x'] })
-  assert.deepEqual(schemaOptionalEnum(toolModule, ['y']), { schema: 'enum-optional', values: ['y'] })
-  assert.deepEqual(schemaOptionalEnumDescribed(toolModule, ['z'], 'maybe'), { schema: 'enum-described-optional', values: ['z'], description: 'maybe' })
-  assert.equal(schemaManagedOrHandle(toolModule, ['coder']).schema, 'union')
-  assert.deepEqual(schemaOptionalString(toolModule), { schema: 'string-optional' })
-  assert.deepEqual(schemaOptionalStringDescribed(toolModule, 'hints'), { schema: 'string-described-optional', description: 'hints' })
-  assert.deepEqual(schemaOptionalNumber(toolModule), { schema: 'number-optional' })
-  assert.deepEqual(schemaOptionalNonNegativeIntegerDescribed(toolModule, 'delegator estimate'), { schema: 'nonnegative-int-described-optional', description: 'delegator estimate' })
-  const optionalArray = schemaOptionalStringArray(toolModule)
-  assert.equal(optionalArray.schema, 'array-optional')
-  assert.equal(optionalArray.inner.schema, 'string')
+test('WHAT[VERIFICATION-SYSTEM-008] tool schema surface does not unwrap native literal values', () => {
+  const constrainedHost = { tool: { schema: { string: () => toolModule.tool.schema.literal('allowed') } } }
+  const schema = schemaString(constrainedHost)
+  assert.equal(schema.parse('allowed'), 'allowed')
+  assert.equal(schema.safeParse('other').success, false)
 })
 
 test('WHAT[PROVIDER-PROJECTION-005] CODEC_registry_maps_specs_by_name', () => {

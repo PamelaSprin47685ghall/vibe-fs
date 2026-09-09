@@ -42,68 +42,68 @@ module ToolHostSurface =
         | Ok None -> box {| ok = true; value = null |}
         | Error() -> box {| ok = false |}
 
-    [<Emit("(($0.value ?? $0.fields[0]).value ?? ($0.value ?? $0.fields[0]))")>]
-    let private schemaValue (schema: obj) : obj = jsNative
-
     let private factory (toolModule: obj) = ToolHostCodec.factory toolModule
 
     let schemaString toolModule =
-        ToolHostCodec.stringSchema (factory toolModule) |> schemaValue
+        ToolHostCodec.stringSchema (factory toolModule) |> ToolHostCodec.schemaValue
 
     let schemaStringDescribed toolModule description =
         ToolHostCodec.stringSchemaDescribed description (factory toolModule)
-        |> schemaValue
+        |> ToolHostCodec.schemaValue
 
     let schemaNumber toolModule =
-        ToolHostCodec.numberSchema (factory toolModule) |> schemaValue
+        ToolHostCodec.numberSchema (factory toolModule) |> ToolHostCodec.schemaValue
 
     let schemaNumberDescribed toolModule description =
         ToolHostCodec.numberSchemaDescribed description (factory toolModule)
-        |> schemaValue
+        |> ToolHostCodec.schemaValue
 
     let schemaBool toolModule =
-        ToolHostCodec.boolSchema (factory toolModule) |> schemaValue
+        ToolHostCodec.boolSchema (factory toolModule) |> ToolHostCodec.schemaValue
 
     let schemaBoolDescribed toolModule description =
         ToolHostCodec.boolSchemaDescribed description (factory toolModule)
-        |> schemaValue
+        |> ToolHostCodec.schemaValue
 
     let schemaEnum toolModule values =
         ToolHostCodec.enumSchema (List.ofArray values) (factory toolModule)
-        |> schemaValue
+        |> ToolHostCodec.schemaValue
 
     let schemaEnumDescribed toolModule values description =
         ToolHostCodec.enumSchemaDescribed (List.ofArray values) description (factory toolModule)
-        |> schemaValue
+        |> ToolHostCodec.schemaValue
 
     let schemaOptionalEnum toolModule values =
         ToolHostCodec.optionalEnumSchema (List.ofArray values) (factory toolModule)
-        |> schemaValue
+        |> ToolHostCodec.schemaValue
 
     let schemaOptionalEnumDescribed toolModule values description =
         ToolHostCodec.optionalEnumSchemaDescribed (List.ofArray values) description (factory toolModule)
-        |> schemaValue
+        |> ToolHostCodec.schemaValue
 
     let schemaManagedOrHandle toolModule values =
         ToolHostCodec.managedOrHandleSchema (List.ofArray values) (factory toolModule)
-        |> schemaValue
+        |> ToolHostCodec.schemaValue
 
     let schemaOptionalString toolModule =
-        ToolHostCodec.optionalStringSchema (factory toolModule) |> schemaValue
+        ToolHostCodec.optionalStringSchema (factory toolModule)
+        |> ToolHostCodec.schemaValue
 
     let schemaOptionalStringDescribed toolModule description =
         ToolHostCodec.optionalStringSchemaDescribed description (factory toolModule)
-        |> schemaValue
+        |> ToolHostCodec.schemaValue
 
     let schemaOptionalNumber toolModule =
-        ToolHostCodec.optionalNumberSchema (factory toolModule) |> schemaValue
+        ToolHostCodec.optionalNumberSchema (factory toolModule)
+        |> ToolHostCodec.schemaValue
 
     let schemaOptionalNonNegativeIntegerDescribed toolModule description =
         ToolHostCodec.optionalNonNegativeIntegerSchemaDescribed description (factory toolModule)
-        |> schemaValue
+        |> ToolHostCodec.schemaValue
 
     let schemaOptionalStringArray toolModule =
-        ToolHostCodec.optionalStringArraySchema (factory toolModule) |> schemaValue
+        ToolHostCodec.optionalStringArraySchema (factory toolModule)
+        |> ToolHostCodec.schemaValue
 
     let registryNames (toolModule: obj) (names: string array) : obj =
         let specs =

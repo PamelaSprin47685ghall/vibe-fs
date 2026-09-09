@@ -427,6 +427,8 @@ module ToolHostCodec =
 
     let factory (toolModule: obj) = HostToolFactory(toolModule?tool)
 
+    let internal schemaValue (HostSchema schema) = schema
+
     let stringSchema (HostToolFactory factory) = HostSchema(rawStringSchema factory)
 
     let stringSchemaDescribed description (HostToolFactory factory) =

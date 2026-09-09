@@ -98,6 +98,8 @@ Subsystem SCC 是首要结构债：双向依赖必须通过移动知识所有权
 
 在 `1aaf1c43e` 上继续恢复 Prefix Wire 与 Fallback Workflow 的 typed 查询。前者通过既有 `StrengthRuntime.TryFindByReplica` 取得 `StrengthReplicaBinding`，直接比较 Role 与 capability Set，删除私有字典路径、擦除字段与 catch-to-None；后者调用唯一 `SessionAssociationProjection`，删除 shadow module 的 Map 扫描与手写 union tag。两个 owning shard 分别显式引用既有 Strength runtime 和 Session association 合同，公开签名不变。包含真实 `PluginTransforms` 与 `OrdinaryTurnWorkflow` consumer 的 focused Fable 并集通过 1284 parsed sources／1246 items（fingerprint `ba15998515e3`）；新全量产物上的 association、Replica registry／transform／工具门禁、XWire decision、Blogger runtime、retry policy 与结构／impact 测试 105/105 通过。声明图为 26 subsystem、208 shard、701 source、1907 references，shard DAG，最大 subsystem SCC 22；两条引用公开原有依赖，不代表 SCC 或耦合已经收敛。未保留只匹配源码 token 的伪回归：上述 owner／decision Surface 测试不等于直接执行 Wire 的 Replica Authority 分支，也不覆盖 Workflow 的 association 材料等待分支；这两处专门 consumer 行为证明仍缺，GAP-033 保持 PARTIAL。
 
+在 `f40d0b63f` 上移除 `ToolHostSurface` 对 `HostSchema` 的 `.value/.fields[0]` 表示探针，改由既有 `ToolHostCodec` 在同一 shard 内发布 internal typed 解包；私有构造器、公开 Surface 签名与工具注册策略不变。原生 literal schema 在旧 Surface 被错误解成字符串，正式回归先以 `schema.parse is not a function` 失败，再随 typed 解包通过；删除迎合二次解包的虚构 schema fixture，用真实 SDK validator 证明接受／拒绝与 optionality。签名影响及其反向 consumer 的 focused Fable 并集通过 1418 parsed sources／1380 items（fingerprint `9557abcf695f`），新全量产物上的 codec、结构与 impact 测试 40/40 通过。声明图仍为 26 subsystem、208 shard、701 source、1907 references，shard DAG，最大 subsystem SCC 22；没有以表示依赖清理宣称 subsystem 已可独立替换，GAP-033 保持 PARTIAL。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

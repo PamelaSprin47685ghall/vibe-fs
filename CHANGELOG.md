@@ -2,6 +2,8 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- ToolHostSurface 的 schema 解包移回 ToolHostCodec 的 internal typed 合同，删除 Fable 私有表示探针，避免把原生 schema 的 `.value` 错解为返回值；保留私有 HostSchema 构造器。删除迎合旧解包的 mock 形状测试，改以真实 SDK validator 和旧败新胜的 literal schema 反例验证。
+
 - Prefix Wire 的 Replica 识别与 Authority 检查改用既有 StrengthRuntime／StrengthReplicaBinding 合同，删除私有字典路径、无类型字段读取和异常吞没；Fallback Workflow 改用 SessionAssociationProjection 的类型安全查询，删除 Map 扫描与手写 union tag。两处补齐真实静态依赖，不改变重试预算、前缀选择、材料等待或 Replica 权限策略。
 
 - CanonicalIntegrator 的 Casebook／JS transaction oracle、需求接地 glob 匹配和 repository 观察 Surface 恢复静态 typed 调用及真实编译引用，删除动态模块加载、编译器 union 布局解码与缺失模块 fallback。Generator 的既有 `typedRole` 合同公开给真实 composition consumer，不复制生成流程；接地失败词汇、观察失败不阻断已提交修改、事务 Current 与重放语义保持不变。

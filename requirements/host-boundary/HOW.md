@@ -18,6 +18,7 @@
 - **因果绑定**：公开 `message.updated.properties.info` 同时携带 exact `sessionID`、assistant `id`、exact user `parentID`、`role=assistant` 与 `time.created` 时，边界才发布 exact provider-start observation；任一字段缺失或不匹配即安全失败。
 - **Pre-run transform 边界**：公开顺序为 `chat.message → experimental.chat.messages.transform(user only) → chat.params(可重复) → provider`。Transform 只按 exact `(SessionId, PhysicalUserMessageId)` 冻结 pending attempt plan，绝不建立 `ProviderRunIdentity` 或写 `ProviderStarted`。首次 exact assistant observation 一次性绑定 plan 并先持久 `ProviderStarted`；同一事件若还携带 terminal evidence，只有 start 持久确认后才进入 terminal accounting。
 - **两半边身份守门**：`ToolHostCodec` 必须在上下文内同时获取消息 ID 与调用 ID，否则拒绝执行。
+- **Schema 表示归属**：`HostSchema` 保持私有构造，`ToolHostCodec.schemaValue` 在同一 adapter shard 内通过 typed pattern match 返回原生 SDK schema；`ToolHostSurface` 不读取 Fable 布局，也不把 schema 自身的 `.value` 当成额外包装。`tool-host-codec-full.test.mjs` 用公开 `@opencode-ai/plugin/tool` 的真实 validator 验证接受、拒绝与 optionality；原生 literal schema 的反例在旧实现报 `schema.parse is not a function`，typed 解包后保持正常验证。该证明属于 VERIFICATION-SYSTEM-008，不再用虚构 schema 形状证明 PROVIDER-PROJECTION-005。
 
 ### 3. 调和器调度与事件驱动收敛
 
