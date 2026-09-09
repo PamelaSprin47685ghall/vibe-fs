@@ -2,6 +2,8 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- Provider wire decoder 与 Git hook 分片直接引用 runtime-platform/digest，去掉未使用的 OpenCode 消息／事件合同闭包；保留媒体 URL 摘要、Git common-dir socket key、用户 SSH 配置、全部源码与公开签名。
+
 - Change 事实分片直接引用 runtime-platform/digest，不再为 RuntimePath 的工作区摘要引入 OpenCode 消息／事件合同；保留 Git common-dir、XDG fallback、事实投影与全部公开签名。
 
 - Requirement Grounding 模型与 Relay workspace snapshot 直接引用 runtime-platform/digest，去掉未使用的 OpenCode 消息／事件编译输入；保留规范材料与 package 摘要字节、Git snapshot canonical 输入和全部公开签名。

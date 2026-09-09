@@ -29,6 +29,12 @@
    - `pre-push` 先读取本地 Wanxiang tracking ref。若 materialization cache 的物理 fingerprint 仍精确命中、未跨 `NextExpiryMs`，且 cached root 与 tracking root 相同，则直接返回该 snapshot，不启动 Wanxiang 网络 transport。只有本地 truth/retention 变化或 tracking 已变化时才进入现有 merge + CAS publish；CAS reject 后再执行 remote discovery/fetch/retry。
    - NDJSON 尾记录读取使用从 EOF 反向按块 `pread` 查找裸 LF 的确定性算法；不猜测最后一行长度，也不解码整条 writer。
 
+## 编译边界验证
+
+在 `32f66d952` 上将 `git-hook-sync` 的宽 Host 引用收窄到既有 `runtime-platform/digest`。六个源码／签名输入只在 `HookDispatcher.repoSshKey` 使用 `HostDigest.sha256Hex`，不需要 OpenCode 消息／事件合同；其余 Git、同步与 EventStore 引用保持不变。声明递归闭包从 51 项目／250 个 `.fs/.fsi` 输入降至 49／240，独立 Fable 编译通过 278 parsed sources（`f39c6d4c6b7b`），源码、公开签名与 aggregate 均未改变。真实 HostSignalBootstrap consumer 随最终批次并集验证，证据见 structured-workflow/HOW。
+
+新隔离 `HookSurface.ensure` 产物在临时 Unicode Git 工作区中验证 common-dir 的 SHA-256 前 12 位对应 socket 路径、原 SSH 参数保留、重复 ensure 不叠加配置，以及用户自定义 multiplex 完全保留；临时目录已删除，未启动 SSH 或同步。该 smoke 不证明远端 CAS、writer retention、socket 目录重建或崩溃恢复；已有 `hook-performance-fast-path.test.mjs`、converge 与 retention suites 继续承担各自证明。
+
 ## 验证与测试落点
 
 | 命题 | 落点测试 |

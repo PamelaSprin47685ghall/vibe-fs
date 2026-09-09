@@ -21,6 +21,12 @@
    - 分面按 receiver semantics：对当前 Agent 的责任交接、行动要求、推理约束（包括 child → parent LWR）属于 instruction；仅供参考的事实材料属于 data。
    - 故意不提供业务解析器，确保单向渲染安全。
 
+## 编译边界验证
+
+在 `32f66d952` 上将 `opencode-codec-providerwiredecode` 的宽 Host 引用收窄到既有 `runtime-platform/digest`。四对源码／签名只有 `ProviderWireDecode` 的媒体 URL 摘要需要 `HostDigest.sha256Hex`；Capture 的 Host part identity 属于 Foundation，writeback 的摘要函数仍由调用方注入。保留 metadata codec、canonical JSON、identity 与 projection plan 引用，不修改源码、签名或 aggregate。声明递归闭包从 10 项目／48 个 `.fs/.fsi` 输入降至 7／26，独立 Fable 编译通过 64 parsed sources（`3b3604da2356`）；首次签名反向消费者并集通过 1418 parsed sources／1380 items（`d0a89df5e427`）。最终批次并集证据见 structured-workflow/HOW。
+
+新隔离 `ProjectionSurface.decodeMessages` 产物 smoke 对普通及 Unicode／CRLF／NUL URL 的媒体摘要逐字节比较独立 Node SHA-256，并确认缺失／空白 URL 与 bookkeeping part 被省略、合法文本保留。它不证明所有 writeback、物理 Host 或跨会话媒体分支；既有 `projection.test.mjs` 与 `projection-algebra.test.mjs` 继续拥有其对应行为证明。
+
 ## 验证与测试落点
 
 | 命题 | 落点测试 |

@@ -110,6 +110,8 @@ Subsystem SCC 是首要结构债：双向依赖必须通过移动知识所有权
 
 在 `bd99d71e7` 上并行核对 Change 事实分片和 Host message codec。仅前者的宽 Host 引用可替换为既有 `runtime-platform/digest`：六个输入中只有 `RuntimePath` 需要字符串摘要，声明递归闭包从 29 项目／158 个 `.fs/.fsi` 输入降至 27／148；独立 Fable 编译通过 186 parsed sources（`7711a827c1d3`），三个既有签名的保守反向消费者并集通过 1432／1394（parsed sources／compile items，`6f04afa1af0a`）。新隔离 RuntimePath 产物的真实 Git 与非 Git 摘要 smoke 范围见 change-integration/HOW。Host message codec 实际依赖宽分片拥有的 `MessagePart`，不使用摘要，因此保留声明依赖，不按项目名批量替换。源码、签名和 aggregate 均不变；本批不证明全局 SCC 收敛或 GAP-033 完成。
 
+在 `32f66d952` 上并行核对 Provider wire decoder 与 Git hook 的全部源码／签名，分别将宽 Host 引用收窄到既有 `runtime-platform/digest`。两者只需媒体 URL 摘要与 common-dir socket key，不消费 OpenCode 消息／事件类型；保留其余真实引用，源码、签名与 aggregate 均不变。声明递归闭包分别从 10 项目／48 个 `.fs/.fsi` 输入降至 7／26、从 51／250 降至 49／240；独立 Fable 编译分别通过 64、278 parsed sources（`3b3604da2356`、`f39c6d4c6b7b`）。先验证 decoder 的反向 consumer 再修改 hook 引用，最终两分片签名反向消费者的 flat 并集通过 1418 parsed sources／1380 items（`91bced9bf768`），包含真实 decoder 与 HostSignalBootstrap 消费路径。新隔离产物的媒体投影和临时 Git hook 安装 smoke 范围分别记录于 provider-projection/HOW 与 durable-convergence/HOW。上述计数不代表编译耗时改善或全局 SCC 收敛，GAP-033 仍为 PARTIAL。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。
