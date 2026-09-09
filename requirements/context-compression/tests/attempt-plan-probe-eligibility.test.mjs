@@ -9,6 +9,61 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as planner from '../../../dist/Context/Companion/CompressionSurface.js'
 import * as prefix from '../../../dist/Context/Prefix/Surface.js'
+import * as xwire from '../../../dist/Context/Prefix/XWireSurface.js'
+import { budget } from '../../../dist/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.js'
+
+test('WHAT[CONTEXT-COMPRESSION-002] successful retry tool steps keep the committed prefix despite new coverage', () => {
+  const projection = {
+    messages: [
+      { role: 'user', parts: [{ kind: 'text', text: 'opening' }] },
+      { role: 'assistant', parts: [{ kind: 'text', text: 'first result' }] },
+      { role: 'assistant', parts: [{ kind: 'text', text: 'second result' }] },
+    ],
+  }
+  const failed = budget.recordFailure(budget.initial)
+  const input = {
+    journal: true,
+    sessionId: 'retry-session',
+    acceptedRetry: true,
+    physicalUser: 'retry-user',
+    acceptedPhysicalUser: 'retry-user',
+    prefixEpoch: 0,
+    failures: failed.failures,
+    currentProjection: projection,
+    committedSnapshot: null,
+    coverableCutoff: 1,
+    requestStartCutoff: 2,
+    coveredDigest: xwire.coveredPrefixDigest(projection, 1),
+    frozenRecordPrefixRef: 'frozen-first',
+    frozenRecordPrefixDigest: 'digest-first',
+    frozenRecordPrefixBody: 'first frozen record',
+    memoryPreamble: 'prior responsibility',
+    outcome: 'tool-calls',
+  }
+  const first = xwire.transform(input)
+  assert.equal(first.probe.candidate.cutoff, 1)
+  assert.equal(first.promoted, true)
+
+  const succeeded = budget.recordSuccess(failed)
+  const nextInput = {
+    ...input,
+    failures: succeeded.failures,
+    prefixEpoch: 1,
+    committedSnapshot: first.probe.candidate,
+    coverableCutoff: 2,
+    coveredDigest: xwire.coveredPrefixDigest(projection, 2),
+    frozenRecordPrefixRef: 'frozen-later',
+    frozenRecordPrefixDigest: 'digest-later',
+    outcome: null,
+  }
+  const next = xwire.transform(nextInput)
+  assert.equal(next.probe, null, 'a retained retry row is not a new failure')
+  assert.deepEqual(next.output, first.output, 'new coverage must not replace the sealed prefix')
+
+  const failedAgain = budget.recordFailure(succeeded)
+  const recovery = xwire.transform({ ...nextInput, failures: failedAgain.failures })
+  assert.equal(recovery.probe.candidate.cutoff, 2, 'a new failure may select the newer coverage')
+})
 
 const requestKind = prefix.requestKind
 

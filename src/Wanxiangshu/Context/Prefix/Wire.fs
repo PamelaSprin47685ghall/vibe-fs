@@ -35,14 +35,7 @@ type XWireReconciliationDecision =
 
 module XWire =
 
-    let selectProbe
-        (allowProbe: bool)
-        (candidate: Result<PrefixProbe, NoCandidateReason>)
-        : Result<PrefixProbe, NoCandidateReason> =
-        if allowProbe then
-            candidate
-        else
-            Error NoCandidateReason.NoCoverage
+    let mayProbe (budget: ProviderFailureBudget.FailureBudget) : bool = budget.ConsecutiveFailureCount > 0
 
     let presentationHorizonForProbe (hasProbe: bool) : PrefixPresentationHorizon =
         if hasProbe then
@@ -622,6 +615,27 @@ module XWire =
                 )
             )
 
+    let private prepareRetryCandidate
+        allowProbe
+        durable
+        sessionId
+        physical
+        rawMessages
+        (state: SessionAgentProjection)
+        =
+        if not allowProbe then
+            Task.FromResult(Error NoCandidateReason.NoCoverage)
+        else
+            task {
+                let xTrace = state.XTrace |> Option.defaultValue XTraceProjection.empty
+                let prefix = state.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
+                let! currentResult = XTraceMaterialization.currentProjection durable xTrace
+                let current = requireOk currentResult
+                let cutoff = requestStartCutoff physical rawMessages xTrace
+                let snapshot = { CurrentProjection = current }
+                return! candidate durable sessionId snapshot prefix.Snapshot state cutoff
+            }
+
     let private planProviderRetry
         (durable: AgentJournal)
         (scope: PluginRuntimeScope)
@@ -638,10 +652,8 @@ module XWire =
                 ProviderFailureEvidence.tryCurrentState sessionId projections,
                 sessionProjection durable sessionId
             with
-            | Some authority, Some _, Some state ->
-                let blog = state.Blog |> Option.defaultValue BlogProjection.empty
+            | Some authority, Some failure, Some state ->
                 let prefix = state.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
-                let xTrace = state.XTrace |> Option.defaultValue XTraceProjection.empty
 
                 let existingPlan =
                     match scope.Recovery.TryPendingAttemptPlan sessionId physical with
@@ -662,18 +674,14 @@ module XWire =
                     | Some existing -> Task.FromResult existing
                     | None ->
                         task {
-                            let! currentResult = XTraceMaterialization.currentProjection durable xTrace
-                            let current = requireOk currentResult
+                            // The retry transport row survives a successful tool step.
+                            // Its presence does not authorize another cold prefix.
+                            let allowProbe = mayProbe failure.Budget
 
-                            let cutoff = requestStartCutoff physical rawMessages xTrace
-                            // PROJ-002: the attempt-local projection snapshot is built once
-                            // and feeds both the probe proof (cutoffDigest) and the prefix
-                            // decision (requiredBlob / forChoice).
-                            let snapshot = { CurrentProjection = current }
+                            let! candidateResult =
+                                prepareRetryCandidate allowProbe durable sessionId physical rawMessages state
 
-                            let! candidateResult = candidate durable sessionId snapshot prefix.Snapshot state cutoff
-
-                            let selectProbeForPlan () = selectProbe true candidateResult
+                            let selectProbeForPlan () = candidateResult
 
                             let pendingPlan =
                                 AttemptPlanner.freezePreInference
@@ -683,7 +691,7 @@ module XWire =
                                         PromptAuthority.ContinuationKind.ProviderRetryAttempt)
                                     ProviderRequestKind.WorkMain
                                     prefix.Snapshot
-                                    true
+                                    allowProbe
                                     selectProbeForPlan
 
                             // Freeze pending plan BEFORE rendering or modifying wire output.

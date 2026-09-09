@@ -231,6 +231,7 @@ module XWireSurface =
     ///   journal:       truthy = a durable journal is available.
     ///   sessionId:     the managed session id found in the transform output.
     ///   acceptedRetry: true when Host accepted this physical retry.
+    ///   failures:      current consecutive failure count after visible tool-success settlement.
     ///   prefixEpoch:   current durable prefix epoch (the probe's base epoch).
     ///   physicalUser:  the current physical user message id.
     ///   acceptedPhysicalUser: the exact Host-accepted retry message id.
@@ -354,26 +355,31 @@ module XWireSurface =
                         let recomputeDigest =
                             ProjectionRenderer.cutoffDigest HostDigest.sha256Hex projectionSnapshot
 
-                        let candidateResult =
-                            PrefixProbeSelection.select
-                                sha256Hex
-                                (SessionId.create sessionId)
-                                committedEpoch
-                                committedSnapshot
-                                coverableCutoff
-                                coveredDigest
-                                requestStartCutoff
-                                frozenRef
-                                frozenDigest
-                                recomputeDigest
+                        let allowProbe =
+                            XWire.mayProbe { ConsecutiveFailureCount = intValue input?failures }
 
-                        let probeResult = XWire.selectProbe true candidateResult
+                        let probeResult =
+                            if allowProbe then
+                                PrefixProbeSelection.select
+                                    sha256Hex
+                                    (SessionId.create sessionId)
+                                    committedEpoch
+                                    committedSnapshot
+                                    coverableCutoff
+                                    coveredDigest
+                                    requestStartCutoff
+                                    frozenRef
+                                    frozenDigest
+                                    recomputeDigest
+                            else
+                                Error NoCandidateReason.NoCoverage
 
                         // ── Prefix intent (CTX-010) ──
                         let choice, noProbeReason =
-                            match probeResult with
-                            | Ok probe -> XProjectionChoice.UsePrefixProbe probe, None
-                            | Error reason -> XProjectionChoice.UseCommittedEpoch, Some reason
+                            match allowProbe, probeResult with
+                            | false, _ -> XProjectionChoice.UseCommittedEpoch, None
+                            | true, Ok probe -> XProjectionChoice.UsePrefixProbe probe, None
+                            | true, Error reason -> XProjectionChoice.UseCommittedEpoch, Some reason
 
                         let frozenBody = text input?frozenRecordPrefixBody
                         let memoryPreamble = text input?memoryPreamble

@@ -2,6 +2,10 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- 修复成功 retry 的后续 tool step 因新增 Blogger coverage 再次选择 prefix probe、造成未声明冷边界的问题。候选资格读取已结算的连续失败计数，零失败保持 committed prefix 并跳过候选物化；已有 frozen plan 保持不变，新失败仍可恢复 probe。
+
+- 修复 HostSignalBootstrap 动态查找 LoopSensor 失败时静默丢失退化保护：静态构造并装配真实 sensor，reset／observe／drop 全部使用 typed 合同，复用异常类别资源映射。真实插件回归证明 managed child 重复流触发一次物理中断，root 与 foreign session 保持豁免。
+
 - ToolRegistry 与 PluginHooks 恢复静态 typed 工具注册、Casebook 门禁／观察捕获／工具接线，删除动态模块查找、备用权限判定和静默漏注册。JS 事务持久化能力从 PluginHostInterop factory 到 registry 全程保持 `IJsTransactionPersistence`；真实 consumer 编译补齐 ExecutorTool 已有 Distillation 依赖，不以丢失持久化或隐藏引用冒充解耦。
 
 - Host provider 校验、chat admission 绑定／释放和证明 Surface 恢复对 `SessionExecutionBinding` 的静态 typed 调用，移除动态加载、手写 union、静默 no-op 和虚假零值；SyncDelegate 证明入口直接构造并执行真实 Inspector tool，不依赖生成 JavaScript 的构造器布局。真实 consumer 并集编译同时清除 JoinSurface 的陈旧 Manager namespace 引入，保留 exact settlement、child 复用与 bounded WorkRecord 语义。

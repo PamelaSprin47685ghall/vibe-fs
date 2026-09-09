@@ -13,6 +13,8 @@
 
 ### Sensor-owned interruption + continuation
 
+`HostSignalBootstrap` 通过 `LoopSensor.create` 静态构造并调用 `scope.AttachLoopSensor`，reset／observe／drop 使用 `ILoopSensor` 合同；continuation 资源直接取自 `LoopSensor.continuationPath`。删除动态模块及 global fallback，缺失装配不再静默跳过保护。`host-boundary/tests/loop-sensor-wiring-owner.test.mjs` 经真实插件 fork 创建 managed child、投递订阅事件并观察 SDK abort：旧实现中断记录为空，新实现只中断该 child 一次，root 与 foreign session 均豁免。该回归替换原先仅匹配 source token 的伪证明；完整 reconcile 后 continuation 的细分语义仍由下表 sensor owner 测试证明。
+
 `LoopEventCodec`在独立`loop-event-codec` contract中只消费`host-event-envelope`；`execution-session-loopdetector`因此不再获得完整Host signal、provider terminal或diagnostics实现。`LoopSensor`的诊断能力是Host composition必填注入的窄callback；sensor在自身边界吸收callback异常，诊断成败不改变arm、interrupt、consume或continuation。
 
 1. `LoopSensor.Observe` 只消费 Host text/reasoning delta，并为每个 eligible session 持有 fresh detector。

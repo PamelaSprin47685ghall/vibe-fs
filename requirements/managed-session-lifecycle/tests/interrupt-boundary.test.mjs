@@ -44,24 +44,6 @@ test('WHAT[MANAGED-SESSION-016] managed interrupt Host rejection is terminal aft
   ])
 })
 
-test('WHAT[MANAGED-SESSION-016] automatic sensors cannot interrupt user-facing root and use attempt-only port', () => {
-  const bootstrap = read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
-  const loopSensor = read('src/Wanxiangshu/OpenCode/Host/LoopSensor.fs')
-
-  assert.match(
-    bootstrap,
-    /LoopSensor\.create[\s\S]*?\(fun sessionId ->\s+sessionPort\.InterruptAttempt sessionId\)/,
-  )
-  assert.match(
-    loopSensor,
-    /ownedSessions\.Contains key && sessionParents\.ContainsKey key/,
-  )
-  assert.match(
-    loopSensor,
-    /member\s+private\s+this\.RunInterrupt[\s\S]*?abortSession/,
-  )
-})
-
 test('WHAT[MANAGED-SESSION-018] TurnAborted has no logical child-cancel authority', () => {
   const ordinary = read('src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs')
   const tools = read('src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs')

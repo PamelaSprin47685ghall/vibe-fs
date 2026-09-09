@@ -8,6 +8,9 @@
 2. **BloggerRetryPolicy 按材料分型**：`nextRequest failedKind hasSquashMaterial` 是纯函数，不设第二个开关：失败的 `BloggerMain` 有 squash 材料则选 `BloggerSquash`，无材料则重发 `BloggerMain`；失败的 `BloggerSquash` 永远回到 `BloggerMain`；非 Blogger 运行分别返回 `MissingProjection` / `NoActiveBloggerRun`。X 的 `PrefixProbeSelection` 返回候选或精确 `NoCandidateReason`，Y 直接从 typed request + durable frames 判定 squash 材料。
 3. **单次 attempt 内决策**：材料决策只属于当前物理 attempt。NoCoverage / stale candidate 发送普通主请求，不跨 attempt 携带，不等待未来 X material。
 4. **分派与提交**：按 RequestKind 分派后继；Probe 成功原子提升 ActivePrefixEpoch，Squash 成功则压缩前半段 frames 并递增 FrameEpoch；只有 WorkMain/BloggerMain 的有效成功清零失败计数。
+5. **成功后的 retry transport row 不再授权 probe**：`settleVisibleToolContinuations` 先完成 prefix 提交、成功记账及 plan 消费。随后 `XWire.mayProbe` 读取已提交的连续失败计数；零失败只使用 committed prefix，不再物化 canonical X、读取候选 frames 或写入候选 blob。已有 frozen plan 仍原样复用；只有后续真实失败重新记账后才能选择新候选。`attempt-plan-probe-eligibility` 的回归通过 production budget 与 XWire decision Surface 重放 failure → tool success → coverage growth → new failure，证明成功后输出不变、再次失败恢复候选资格。
+
+该回归来自保留世界 `/tmp/oc-e2e-CEqj6W` 的 `seal-undeclared`：已提交 blob `f6067d123fb8…` 经 production memoryBlock 渲染的 wire digest 为 `28e287c40f4e`，新增 frame 的 blob `eb76afd20daa…` 渲染为 `a9cc2a3038ea`，分别精确匹配失败前后的 prefix。提交代码原样提升 candidate；缺陷是成功消费 plan 后，以仍存在的 failure projection 和 retry row 重新选出候选，而不是中断消息插入或提交时重算。旧实现确定性回归返回 cutoff 2 的新 probe（预期 `null`），修复后保持 committed output；此纯决策证明不替代真实 Host 的物理验收。
 
 ### Blogger 压缩与连续追平
 
@@ -56,7 +59,7 @@ validity 证明共同落在同一个 closure 上。
 | 命题 | 落点测试 |
 |---|---|
 | CONTEXT-COMPRESSION-001 | `requirements/context-compression/tests/ctx-capacity-observation-forbidden.test.mjs::WHAT[CONTEXT-COMPRESSION-001] CTX_001_context_compression_owner_never_observes_forbidden_capacity_synonyms` |
-| CONTEXT-COMPRESSION-002 | `requirements/context-compression/tests/retry-policy.test.mjs::WHAT[CONTEXT-COMPRESSION-002] retry dispatch reacts only to confirmed failure material` |
+| CONTEXT-COMPRESSION-002 | `requirements/context-compression/tests/retry-policy.test.mjs::WHAT[CONTEXT-COMPRESSION-002] retry dispatch reacts only to confirmed failure material`；`requirements/context-compression/tests/attempt-plan-probe-eligibility.test.mjs::WHAT[CONTEXT-COMPRESSION-002] successful retry tool steps keep the committed prefix despite new coverage` |
 | CONTEXT-COMPRESSION-003 | `requirements/context-compression/tests/blogger-delta.test.mjs::WHAT[CONTEXT-COMPRESSION-003] CTX_003_no_chunk_exceeds_the_limit` |
 | CONTEXT-COMPRESSION-004 | `requirements/context-compression/tests/terminal-validity.test.mjs::WHAT[CONTEXT-COMPRESSION-004] CTX_004_empty_terminal_is_not_a_result` |
 | CONTEXT-COMPRESSION-005 | `requirements/context-compression/tests/retry-policy.test.mjs::WHAT[CONTEXT-COMPRESSION-005] every recorded failure consumes exactly one budget unit` |

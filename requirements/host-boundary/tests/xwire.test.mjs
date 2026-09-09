@@ -22,6 +22,7 @@ const acceptedRetryInput = (overrides = {}) => ({
   journal: true,
   sessionId: 'ses_x',
   acceptedRetry: true,
+  failures: 1,
   prefixEpoch: 0,
   physicalUser: 'user-1',
   acceptedPhysicalUser: 'user-1',

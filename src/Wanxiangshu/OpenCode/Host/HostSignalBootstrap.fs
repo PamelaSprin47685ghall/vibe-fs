@@ -177,9 +177,7 @@ module HostSignalBootstrap =
                     // LOOP-005: idle ends the attempt → fresh detector for the next stream.
                     // Armed anomaly must survive until TurnAborted reconciliation consumes
                     // guard ownership (ResetDetector deliberately does not clear it; DG-008).
-                    emitJsExpr
-                        (scope, sessionId)
-                        "($0.loopSensor?.ResetDetector ? $0.loopSensor.ResetDetector($1) : undefined)"
+                    scope.LoopSensor.ResetDetector sessionId
 
                     // HOST-004: the idle observation mints the quiescence permit that
                     // idle-derived continuations must hold at send time. The permit is
@@ -233,23 +231,11 @@ module HostSignalBootstrap =
             // LOOP-002/006 and HOST-027 share one raw Host subscription but own
             // disjoint stream fields. Both abort physically; only their typed armed
             // marks decide the later reconciled-turn meaning.
-            // LoopSensor.create is invoked through dynamic ESM interop to eliminate
-            // compile-time cross-subsystem ProjectReference from host to enforcer.
-            // LoopSensor.create (fun sessionId -> sessionPort.InterruptAttempt sessionId)
-            let abortFn =
-                // LoopSensor.create
-                (fun sessionId -> sessionPort.InterruptAttempt sessionId)
-
             let continueFn =
-                fun (sessionId: SessionId) (kind: obj) (directory: string option) ->
+                fun (sessionId: SessionId) (kind: DegenerationKind) (directory: string option) ->
                     task {
-                        let continuationKind =
-                            if string kind = "TooRandom" then
-                                "runtime/degeneration-too-random"
-                            else
-                                "runtime/degeneration-too-repetitive"
-
-                        let prompt = ProviderProse.documentFor sessionId continuationKind Map.empty
+                        let prompt =
+                            ProviderProse.documentFor sessionId (LoopSensor.continuationPath kind) Map.empty
 
                         let! outcome =
                             HostSessionNudge.sendContinuationResult
@@ -266,40 +252,15 @@ module HostSignalBootstrap =
                         return outcome |> Result.map ignore
                     }
 
-            let resolveDynamicLoopSensor () : obj option =
-                try
-                    emitJsExpr
-                        (scope.Sessions.OwnedSessions,
-                         scope.Sessions.SessionParents,
-                         abortFn,
-                         continueFn,
-                         Diagnostic.emit)
-                        """
-(function(ownedSessions, sessionParents, abortFn, continueFn, emitDiagnostic) {
-    try {
-        const mod = require ? require('./LoopSensor.js') : null;
-        if (mod && mod.LoopSensorModule_create) {
-            return mod.LoopSensorModule_create(ownedSessions, sessionParents, abortFn, continueFn, emitDiagnostic);
-        }
-    } catch (_) {}
-    try {
-        const globalMod = globalThis.__wanxiangshu_loop_sensor__;
-        if (globalMod && globalMod.LoopSensorModule_create) {
-            return globalMod.LoopSensorModule_create(ownedSessions, sessionParents, abortFn, continueFn, emitDiagnostic);
-        }
-    } catch (_) {}
-    return null;
-})($0, $1, $2, $3, $4)
-"""
-                    |> Option.ofObj
-                with _ ->
-                    None
+            let loopSensor =
+                LoopSensor.create
+                    scope.Sessions.OwnedSessions
+                    scope.Sessions.SessionParents
+                    sessionPort.InterruptAttempt
+                    continueFn
+                    Diagnostic.emit
 
-            let loopSensorOpt = resolveDynamicLoopSensor ()
-
-            loopSensorOpt
-            |> Option.iter (fun sensor ->
-                emitJsExpr (scope, sensor) "$0.AttachLoopSensor ? $0.AttachLoopSensor($1) : ($0.loopSensor = $1)")
+            scope.AttachLoopSensor loopSensor
 
             let exactStarted (key: ChatExecutionKey) : ProviderStartedEvidence option =
                 journal
@@ -426,8 +387,7 @@ module HostSignalBootstrap =
                     }
                     :> Task
 
-            let onLoopEvent raw =
-                emitJsExpr (scope, raw) "($0.loopSensor?.Observe ? $0.loopSensor.Observe($1) : undefined)"
+            let onLoopEvent raw = scope.LoopSensor.Observe raw
 
             let signalRouter =
                 HostSignalRouter(
@@ -809,7 +769,7 @@ module HostSignalBootstrap =
             let cancelSignals (ids: SessionId seq) =
                 ids
                 |> Seq.iter (fun id ->
-                    emitJsExpr (scope, id) "($0.loopSensor?.DropSession ? $0.loopSensor.DropSession($1) : undefined)"
+                    scope.LoopSensor.DropSession id
                     signalRouter.UnregisterOwned id)
 
             return

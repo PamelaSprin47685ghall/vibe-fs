@@ -86,6 +86,12 @@ Subsystem SCC 是首要结构债：双向依赖必须通过移动知识所有权
 
 在 `173887ea9` 上恢复 `ToolRegistry` 的 typed 工具注册及 `PluginHooks` 的 Casebook 接线，同时将唯一 persistence 调用方 `PluginHostInterop` 与 registry 签名迁移到既有 `IJsTransactionPersistence`。删除 foreign module loader、备用权限表、静默漏注册及无类型 factory；provider 合同不变。首次真实 focused compile 暴露 `ExecutorTool` 对 `DistillationRuntime`／`Distillation` 的缺失引用，补回实际 provider 声明后，包含签名反向消费者的影响并集通过 1284 parsed sources／1246 compile items（fingerprint `879e5ddd19b7`）。新全量产物上的工具权限、Casebook、JS Host／事务测试 44/44 通过。声明图为 26 subsystem、208 shard、701 production source、1896 references，shard DAG，最大 subsystem SCC 从 21 增至 22；这是如实暴露既有知识依赖，不是隔离收敛。GAP-033 保持 PARTIAL，完整 hook／composition 的局部分支证明限制记录于所属 HOW。
 
+在 `bd2e9563e` 上恢复 `HostSignalBootstrap` 对 `LoopSensor` 的 typed 构造、装配及 reset／observe／drop 消费，复用 owner 的 continuation 资源映射。真实插件回归先复现 managed child 无物理中断，再确认恢复 exactly-once interruption；不再以注释里的 `LoopSensor.create` token 证明接线。focused Fable 并集通过 1144 parsed sources／1106 items（fingerprint `641bd4fec085`），新全量产物上的 bootstrap 与 sensor 行为测试 19/19 通过。声明图为 26 subsystem、208 shard、701 source、1897 references，shard DAG，最大 subsystem SCC 22；新增引用公开真实依赖，GAP-033 仍为 PARTIAL。
+
+该批首轮 ladder 的 3975 个语义测试及全部 integration suites 通过，但唯一 Long Stroke 在 `manager-interrupt.1` 后等待 `coder.3` 超时（保留世界 `/tmp/oc-e2e-yqJFT1`）。保留证据仅证明 Coder 下一步未进入 provider stream，不能证明其进入了 messages.transform，也不能据此断定容量等待。完整 stderr 的阶段观测实验通过（441 journal／2142 SSE），没有同 fence 重入或 capacity waiter；探针已移除，该实验不替代无探针正式验收。
+
+另一保留世界 `/tmp/oc-e2e-CEqj6W` 的 `seal-undeclared` 已通过 frozen blob 的 wire digest 对应及确定性旧败新胜回归定位：成功后仍保留的 retry row 重新触发 prefix candidate 选择。`XWire.mayProbe` 现在读取成功结算后的连续失败计数，复用已有 frozen plan，零失败只投影 committed epoch，不再构造候选。修复与证据边界见 `context-compression/HOW.md`；focused consumer 并集通过 1286 parsed sources／1248 items（fingerprint `e532369f51e2`），相关测试 38/38。未修改 watchdog、event ceilings 或 seal 声明，原 Coder 停顿仍不归因于该 prefix 缺陷。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

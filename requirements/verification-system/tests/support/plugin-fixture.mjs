@@ -204,7 +204,7 @@ export const withExecutablePlugin = async (body, options = {}) => {
       ...options,
       client,
       directory,
-      events: { listen: () => () => {} },
+      events: options.events ?? { listen: () => () => {} },
     })
     await configureManagedPlugin(hooks)
     let runtime

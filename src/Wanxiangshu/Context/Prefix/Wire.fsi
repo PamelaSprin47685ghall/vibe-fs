@@ -19,8 +19,7 @@ type XWireReconciliationDecision =
 
 module XWire =
 
-    val selectProbe:
-        allowProbe: bool -> candidate: Result<PrefixProbe, NoCandidateReason> -> Result<PrefixProbe, NoCandidateReason>
+    val mayProbe: budget: ProviderFailureBudget.FailureBudget -> bool
 
     val presentationHorizonForProbe: hasProbe: bool -> PrefixPresentationHorizon
 
