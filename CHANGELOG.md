@@ -2,6 +2,8 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- Host 闭包测试复用 compile-shard/subsystem inventory，移除退役 locality/kind、数量预算与 legacy owner 文件筛选；保留真实依赖与隔离断言，覆盖显式 Host 分片和 runtime-platform 摘要归属。显式声明正例及工具能力泄漏、错误归属反例通过，生产工程与行为不变。
+
 - 按用户裁决同步 HOST-BOUNDARY-026：独立列出消息、SDK 类型、终端合同与工具适配器，摘要原语归 runtime-platform；普通业务契约按实际知识消费窄合同，不再受两个旧名称限制。保留物理能力隔离、唯一实现和失败语义；未修改源码、工程或验证阈值，残余 Host legacy 验证缺口记入 GAP-033。
 
 - 将既有 ToolHostCodec／ToolHostSurface 独立为 Host 工具适配分片，工具消费者不再为参数解码、schema 与注册编入信号路由和终端总线；bootstrap 显式装配工具与信号两侧。保留所有源码、公开签名、取消释放、输出截断与 aggregate 顺序，不复制物理实现。

@@ -144,6 +144,8 @@ tool adapter、signal adapter、Attention consumer 与 repository-programming ru
 
 在 `8903c729c` 上核对 Host 现行规范时，发现 HOST-BOUNDARY-026 仍将摘要、消息、SDK 类型和工具注册写入旧宽 Host 边界，并将普通业务契约限制为两个旧合同。用户于 2026-09-10 明确批准同步合同；本批仅修订 WHAT/HOW 与导航，保留物理能力隔离及既有证明，不改变实现或以此关闭 GAP-033。另确认 `host-session-contract-closure.test.mjs` 仍依赖 legacy locality/kind、100/185 数量断言及 legacy owner 文件选择；这些检查尚未完全迁到 subsystem inventory，显式 Host 分片的归属仍由全仓 subsystem gate 证明。后续迁移必须保留真实闭包排除、必要 provider 与唯一归属反例，不能恢复旧 ACL 或仅删除测试取得绿色。
 
+在 `a0a710fb2` 上完成上述 Host 验证迁移：闭包测试直接消费既有 compile-shard/subsystem inventory，不再维护 XML parser、legacy kind、数量预算或 legacy owner 文件集合。保留真实 provider 与 composition 引用保护；会话合同排除工具注册、信号订阅和终端总线，新增 Host 分片与摘要原语按实际 subsystem 核对。显式元数据替换旧声明的正例通过；会话误引工具、会话归属错误及显式工具分片归属错误的三个真实工程反例均被拒绝，原工程全部恢复。全仓唯一来源、签名与 aggregate 完整性仍由同一库存机制及既有结构反例承接。本批不改生产编译输入，不宣称新增编译隔离或全局 SCC 收敛，GAP-033 保持 PARTIAL。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。
