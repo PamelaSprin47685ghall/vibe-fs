@@ -106,6 +106,8 @@ Subsystem SCC 是首要结构债：双向依赖必须通过移动知识所有权
 
 在 `686f3a9c4` 上将 Institutional Learning 事实／Enhancer 分片的摘要引用从宽 Host 分片迁到既有 `runtime-platform/digest`。完整分片只需要 Identity、Enforcer catalog 与字符串摘要；不修改源码、签名或 aggregate，不以动态加载补回 Host。正式 planner 的 forward closure 从 7 项目／38 个 `.fs/.fsi` 输入降至 4 项目／16 个输入，移除 OpenCode Message／OpencodeTypes／EventContract 及其 Outcome／Roles 传递输入；真实 focused Fable 编译通过 54 parsed sources（fingerprint `a731717f814a`）。声明图仍为 26 subsystem、209 shard、701 source、1910 references，shard DAG，最大 subsystem SCC 22。此次证明的是这一 consumer 的闭包收窄，不代表其余宽 Host consumer 已迁移或 GAP-033 完成。
 
+在 `be3054fab` 上并行核对 Grounding model 与 Relay workspace snapshot 的真实源码需求，分别将宽 Host 摘要引用替换为既有 `runtime-platform/digest`，无源码、签名或 aggregate 修改。按声明 ProjectReference 递归闭包计数，Grounding 从 8 项目／60 个 `.fs/.fsi` 输入降至 6／50，Relay snapshot 从 8／38 降至 4／14；前者仍保留 JS capability 所需的 Roles／OfficeCapability，后者仍保留 GitSubject 与 Relay core。两分片独立 Fable 编译分别通过 88、52 parsed sources（`91e59f8a1e03`、`068168b18cec`）；真实 Grounding Runtime consumer 通过 818／780，四条 Relay capture consumer 的并集通过 1284／1246（parsed sources／compile items；`9956ed957c82`、`6d4bccc9b9ff`）。编译按共享产物纪律串行，新隔离产物另实际执行规范材料与 Git snapshot 摘要 smoke，范围见所属 HOW。不将声明闭包计数当作耗时实验，也不以局部 consumer 收窄关闭 GAP-033。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

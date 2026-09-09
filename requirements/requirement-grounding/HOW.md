@@ -22,6 +22,12 @@ Missing-Material Filter (同 horizon 已看见的材料逐文件跳过)
 原 mutation / js transaction 始终按自身语义继续；grounding 失败不得转换成 tool failure。
 ```
 
+## 编译边界
+
+`requirement-grounding-model` 直接引用既有 `runtime-platform/digest`，不通过摘要取得 OpenCode Message／OpencodeTypes／EventContract。Identity 与 `repository-programming-js-capability` 引用保留；后者仍需要 Roles／OfficeCapability，不把这些真实依赖描述为已移除。`GroundingIdentity.materialDigest` 的 `path + NUL + resultBytes` 与 package snapshot 的逐材料 `path + NUL + resultBytes + NUL` 输入不变，源码及公开签名不变。
+
+在 `be3054fab` 上按声明 ProjectReference 的递归闭包测量，本分片由 8 项目／60 个 `.fs/.fsi` 输入收窄至 6 项目／50 个输入。真实独立 Fable 编译通过 88 parsed sources（fingerprint `91e59f8a1e03`）；真实 `OpenCode/Host/RequirementGrounding/Runtime.fs` consumer 的 focused compile 通过 818 parsed sources／780 items（`9956ed957c82`）。新隔离产物的 `Surface.materializePackage` smoke 验证 Unicode／CRLF 原始材料及独立 Node SHA-256，临时目录已清理；这不是新增正式 proof，也不代替下表的去重、重放与 mutation 行为证明。
+
 ## 核心机制
 
 ### 1. 范围解析与材料物化 (Scope Resolution & Materialization)

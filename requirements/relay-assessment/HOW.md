@@ -9,6 +9,12 @@
 - `src/Wanxiangshu/Mission/Manager/Workflow.fs(.fsi)`：`resourceForCurrentAction` 只从 active incumbent、accepted assessment transport 与 exact bound certificate 选择 nudge 文档：无 assessment 配 `runtime/manager-assess`，未持有效证书配 `runtime/manager-work`，exact valid certificate 配 `runtime/manager-finish`。
 - `src/Wanxiangshu/Mission/Relay/Assessment/Surface.fs(.fsi)`：唯一 JS proof surface（schema parse）。
 
+## 编译边界
+
+`mission-relay-workspace-snapshot` 直接引用 `runtime-platform/digest`，保留 GitSubject 与 Relay core 的真实依赖，不再因字符串摘要引入 OpenCode 消息／事件合同。`WorkspaceSnapshot.canonical` 的 HEAD tree、status、index、binary diff、untracked blob hash 及分隔符不变，`capture` 和公开签名不变。
+
+在 `be3054fab` 上按声明 ProjectReference 的递归闭包测量，本分片由 8 项目／38 个 `.fs/.fsi` 输入收窄至 4 项目／14 个输入；独立 Fable 编译通过 52 parsed sources（fingerprint `068168b18cec`）。ReviewTool、SuicideTool、Manager Workflow、PluginHooks 四条真实 consumer 路径的 focused 并集编译通过 1284 parsed sources／1246 items（`6d4bccc9b9ff`）。新隔离产物 smoke 在临时 Git 仓库验证无 HEAD 空仓的 canonical 字节，以及 Unicode／CRLF untracked 文件的 capture 与独立 SHA-256 一致，临时目录已清理。下表 assessment／certificate 测试使用 opaque snapshot identity，不冒称覆盖真实 Git capture；本次 smoke 也不证明全部 staged、conflict 或退休时序。
+
 ## 依赖关系
 
 DEPENDS ON:
