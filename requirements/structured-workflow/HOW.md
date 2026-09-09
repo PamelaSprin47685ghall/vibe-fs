@@ -148,6 +148,8 @@ tool adapter、signal adapter、Attention consumer 与 repository-programming ru
 
 在 `46a1c334c` 上将 `owner-project-boundaries.test.mjs` 的生产工程读取统一到既有 `checkSubsystems` 返回的库存，删除重复工程扫描、Compile／ProjectReference XML parser 与 GitGateway 的旧 locality 标签要求。GitGateway 归属核对现行 `change` subsystem，而不是 legacy owner `change-integration`；源码配对、必要／禁止引用和 NodeFs 物理边界仍受原测试保护。只删除库存已经覆盖的非空工程断言及无合同依据的项目数量下限；临时 planner 工程的 XML、顺序、缓存与失败生命周期证明不变，原测试标题及证明注册不变。恢复原字节的实验中，GitGateway 仅保留显式 subsystem／shard 元数据通过，错误归属到 persistence 被拒绝，FileMutationTools 缺失 NodeFs provider 被拒绝。相关 boundary／subsystem／impact 测试 24/24 通过；本批不修改生产工程，不以静态证明迁移宣称新 focused Fable 隔离或业务等价，GAP-033 保持 PARTIAL。
 
+在 `f3479bdf6` 上将 `owner-impact-compile.test.mjs` 的六个临时工程改为显式 subsystem／compile-shard 元数据，去掉夹具的旧 owner／locality／kind 参数。全部分片同属 fixture subsystem，原有精确 source／root 集合断言仍要求实现变更不扩入反向 consumer、签名变更包含全部反向 consumer；合并编译、full fallback、缓存与 CLI 证明及其标题／注册不变。相关测试 24/24 通过；临时将实现变更扩成 reverse closure、将签名变更缩成 owning shard 的两个 planner mutant 均被既有断言拒绝，planner 原字节恢复。本批仅更新证明输入，没有改变生产 planner、工程或公开合同，不是新的真实 focused Fable 编译或知识依赖收敛证据，GAP-033 保持 PARTIAL。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

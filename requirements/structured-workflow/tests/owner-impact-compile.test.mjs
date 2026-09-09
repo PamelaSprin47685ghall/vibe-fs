@@ -16,13 +16,12 @@ const ROOT = resolve(import.meta.dirname, '../../..')
 const SOURCE_ROOT = join(ROOT, 'src/Wanxiangshu')
 const AGGREGATE = join(SOURCE_ROOT, 'Wanxiangshu.fsproj')
 
-const writeProject = (root, name, locality, kind, refs, source) => {
+const writeProject = (root, name, shard, refs, source) => {
   const path = join(root, `${name}.fsproj`)
   writeFileSync(path, `<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSemanticOwner>fixture</WanxiangshuSemanticOwner>
-    <WanxiangshuOwnerLocality>${locality}</WanxiangshuOwnerLocality>
-    <WanxiangshuOwnerLocalityKind>${kind}</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuSubsystem>fixture</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>${shard}</WanxiangshuCompileShard>
   </PropertyGroup>
   <ItemGroup>
 ${refs.map((ref) => `    <ProjectReference Include="${ref}.fsproj"/>`).join('\n')}
@@ -46,12 +45,12 @@ const createFixture = () => {
   }
 
   const projects = {
-    base: writeProject(root, 'Owner.Base', 'base-contract', 'contract', [], 'Base'),
-    contract: writeProject(root, 'Owner.Provider.Contract', 'provider-contract', 'contract', ['Owner.Base'], 'Contract'),
-    runtime: writeProject(root, 'Owner.Provider.Runtime', 'provider-runtime', 'runtime', ['Owner.Provider.Contract'], 'Runtime'),
-    consumer: writeProject(root, 'Owner.Consumer.Runtime', 'consumer-runtime', 'runtime', ['Owner.Provider.Contract'], 'Consumer'),
-    composition: writeProject(root, 'Owner.Composition.Runtime', 'composition-runtime', 'composition', ['Owner.Provider.Runtime', 'Owner.Consumer.Runtime'], 'Composition'),
-    unrelated: writeProject(root, 'Owner.Unrelated.Runtime', 'unrelated-runtime', 'runtime', ['Owner.Base'], 'Unrelated'),
+    base: writeProject(root, 'Owner.Base', 'base-contract', [], 'Base'),
+    contract: writeProject(root, 'Owner.Provider.Contract', 'provider-contract', ['Owner.Base'], 'Contract'),
+    runtime: writeProject(root, 'Owner.Provider.Runtime', 'provider-runtime', ['Owner.Provider.Contract'], 'Runtime'),
+    consumer: writeProject(root, 'Owner.Consumer.Runtime', 'consumer-runtime', ['Owner.Provider.Contract'], 'Consumer'),
+    composition: writeProject(root, 'Owner.Composition.Runtime', 'composition-runtime', ['Owner.Provider.Runtime', 'Owner.Consumer.Runtime'], 'Composition'),
+    unrelated: writeProject(root, 'Owner.Unrelated.Runtime', 'unrelated-runtime', ['Owner.Base'], 'Unrelated'),
   }
 
   const aggregate = join(root, 'Aggregate.fsproj')
