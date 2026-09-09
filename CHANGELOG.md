@@ -2,6 +2,8 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- `ToolRuntimeScope` 的 Relay 查询改用既有 typed `RoadView`，移除 JavaScript Map／union 布局探针；退休围栏以 `IncumbencyId` 存储并暴露，保持 assessment、证书三项绑定、同任期冻结与新任期清除旧围栏的语义。
+
 - 恢复 `ToolRuntimeScope` 对 `OrchestratorHost` 的静态构造和 typed dependencies，消除 `createObj + box` 抹掉回调调用约定后触发的 `computation.then is not a function`；工作区快照保持 `WorkspaceSnapshotId`，取消与卸载直接调用真实 Host，不再动态查找模块或以默认成功掩盖缺失。
 
 - 恢复规则书校验与 Context fact fold 的静态类型依赖，移除动态模块查找、手写 union tag 和校验缺失时的默认成功；将 Nudge、Enforcer repair、provider system transform 分成可由真实 consumer 独立编译的窄分片。

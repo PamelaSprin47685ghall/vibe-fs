@@ -3,8 +3,6 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Fable.Core
-open Fable.Core.JsInterop
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Delegation
@@ -57,7 +55,7 @@ type ToolRuntimeScope
     // DSL-MUTABLE: resource — per-session executor runtime registry
     let executorRuntimes = Dictionary<string, HostForkRuntime>()
     // DSL-MUTABLE: retirement admission fence — exact logical incumbency, never the reusable physical session.
-    let retirementFrozen = Dictionary<string, obj>()
+    let retirementFrozen = Dictionary<string, IncumbencyId>()
     // DSL-MUTABLE: resource — per-session orchestrator host registry
     let orchestratorHosts = Dictionary<string, OrchestratorHost>()
     let onCancelSignals = defaultArg cancelSignals ignore
@@ -382,67 +380,39 @@ type ToolRuntimeScope
           HasValidBoundCertificate = false
           CleanupBlockerDigest = None }
 
-    let activeIncumbencyOfSession (sessionId: string) : obj option =
+    let roadViewOfSession (sessionId: string) : RoadView option =
         journal
         |> Option.bind (fun durable ->
             AgentProjection.tryFind (SessionId.create sessionId) (AgentJournal.snapshot durable).AgentProjections)
         |> Option.bind (fun session -> session.Relay)
-        |> Option.bind (fun relay ->
-            let id: obj =
-                emitJsExpr
-                    (relay, sessionId)
-                    """
-                (() => {
-                    const map = $0 && $0.fields ? $0.fields[0] : $0;
-                    if (!map || typeof map.get !== 'function' || !map.has($1)) return undefined;
-                    const road = map.get($1);
-                    return road && road.Active ? road.Active.Id : undefined;
-                })()
-                """
+        |> Option.bind (fun relay -> Fold.view relay (RoadId.create sessionId))
 
-            if isNull id then None else Some id)
+    let activeIncumbencyOfSession (sessionId: string) : IncumbencyId option =
+        roadViewOfSession sessionId |> Option.bind (fun road -> road.ActiveIncumbency)
+
+    let certificateMatchesActiveIncumbency (active: IncumbencyId) (road: RoadView) =
+        match road.ActiveSnapshotId, road.ActiveAuthorityRevision, road.Certificate with
+        | Some snapshot, Some authority, Some certificate ->
+            certificate.Valid
+            && certificate.IncumbencyId = active
+            && certificate.SnapshotId = snapshot
+            && certificate.AuthorityRevision = authority
+        | _ -> false
 
     let managerFactsOfSession (sessionId: string) : ManagerCapabilityFacts =
-        journal
-        |> Option.bind (fun durable ->
-            AgentProjection.tryFind (SessionId.create sessionId) (AgentJournal.snapshot durable).AgentProjections)
-        |> Option.bind (fun session -> session.Relay)
-        |> Option.bind (fun relay ->
-            let facts: ManagerCapabilityFacts option =
-                emitJsExpr
-                    (relay, sessionId)
-                    """
-                (() => {
-                    const map = $0 && $0.fields ? $0.fields[0] : $0;
-                    if (!map || typeof map.get !== 'function' || !map.has($1)) return undefined;
-                    const road = map.get($1);
-                    if (!road || !road.Active) return undefined;
-                    const active = road.Active;
-                    const activeId = active.Id;
-                    const activeSnapshot = active.SnapshotId;
-                    const activeAuthority = active.AuthorityRevision;
-                    const blockerDigest = active.CleanupBlockerDigest == null ? undefined : active.CleanupBlockerDigest;
-                    const hasAssessment = active.Assessment != null;
-                    const certificate = road.Certificate;
-                    let hasValidCertificate = false;
-                    if (certificate && Boolean(certificate.Valid)) {
-                        const certInc = certificate.IncumbencyId;
-                        const certSnap = certificate.SnapshotId;
-                        const certAuth = certificate.AuthorityRevision;
-                        hasValidCertificate = (certInc === activeId || (certInc && certInc.Equals && certInc.Equals(activeId)))
-                            && (certSnap === activeSnapshot || (certSnap && certSnap.Equals && certSnap.Equals(activeSnapshot)))
-                            && (certAuth === activeAuthority || (certAuth && certAuth.Equals && certAuth.Equals(activeAuthority)));
-                    }
-                    return {
-                        HasActiveIncumbency: true,
-                        HasAssessment: hasAssessment,
-                        HasValidBoundCertificate: hasValidCertificate,
-                        CleanupBlockerDigest: blockerDigest
-                    };
-                })()
-                """
+        roadViewOfSession sessionId
+        |> Option.bind (fun road ->
+            match road.ActiveIncumbency with
+            | None -> None
+            | Some active ->
 
-            facts)
+                let facts: ManagerCapabilityFacts =
+                    { HasActiveIncumbency = true
+                      HasAssessment = road.AcceptedAssessmentTransport.IsSome
+                      HasValidBoundCertificate = certificateMatchesActiveIncumbency active road
+                      CleanupBlockerDigest = road.ActiveCleanupBlockerDigest }
+
+                Some facts)
         |> Option.defaultValue emptyManagerFacts
 
     member _.Sessions = sessions
@@ -495,10 +465,10 @@ type ToolRuntimeScope
     /// stored objective evidence, passed through verbatim.
     member _.ManagerCapabilityFactsFor(sessionId: string) : ManagerCapabilityFacts = managerFactsOfSession sessionId
 
-    member _.TryFreezeRetirement(sessionId: string, incumbentId: obj) =
+    member _.TryFreezeRetirement(sessionId: string, incumbentId: IncumbencyId) =
         lock gate (fun () ->
             match retirementFrozen.TryGetValue sessionId with
-            | true, current when obj.Equals(current, incumbentId) -> false
+            | true, current when current = incumbentId -> false
             | _ ->
                 retirementFrozen.[sessionId] <- incumbentId
                 true)
@@ -512,7 +482,7 @@ type ToolRuntimeScope
         lock gate (fun () ->
             match retirementFrozen.TryGetValue sessionId, activeIncumbency with
             | (false, _), _ -> false
-            | (true, frozen), Some active when not (obj.Equals(active, frozen)) ->
+            | (true, frozen), Some active when active <> frozen ->
                 retirementFrozen.Remove sessionId |> ignore
                 false
             | (true, _), _ -> true)
