@@ -39,6 +39,8 @@ Roles.permissions (Kernel 层单一真相源)
    - 离任准入与资源闭包继续由 `RETIRE-001` ~ `RETIRE-008` 的 IncumbencyId、WorkspaceSnapshotId 与 recursive live resources closure 合同建立。
    - 确定性发布与集成门禁由 `CHGINT-001` ~ `CHGINT-006` 对有效 quality candidate 的 typed admission 发行；durable `PublicationCommitted` 是结果，不另造第二套审查权威。
 
+`ToolRegistry` 直接消费 Inspector、Fetch、Bookkeeper、Coder、文件变换与生成式 JS 工具的 typed admission／spec，删除模块查找、缺失模块时的备用权限表和静默漏注册路径。注册层只装配既有 provider 合同；`tool-spec-contracts.test.mjs` 与 `internal-leaf-tool-authority.test.mjs` 继续验证公开角色权限和无 attached transaction 时的内部工具拒绝，不以 source token 或生成 JavaScript 布局证明权限正确。
+
 ## 验证与测试落点
 
 ENF-015、ENF-016 原来的门禁测试仅提供手写 compiler evidence，已随被禁路径删除，不能作为真实 owner 行为证明。替代证明尚未闭合，记录于 GAP-031；不得以文本检测通过或空 evidence 宣称这两项已验证。

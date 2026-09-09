@@ -84,6 +84,8 @@ Subsystem SCC 是首要结构债：双向依赖必须通过移动知识所有权
 
 在 `21033d90c` 上恢复 Host 四个 consumer 对 `SessionExecutionBinding` 的 typed 调用，以及 SyncDelegate Surface 对真实 Inspector tool 的 typed 构造／调用。移除动态加载、手写 union、缺失模块时的 no-op 和虚假零值；provider 合同与公开 Surface 签名不变。真实 consumer 的影响集合经既有 `compile-impact` 求并集，focused Fable 编译通过 1068 parsed sources／1030 compile items；首次编译暴露并清除了 `JoinSurface` 未使用的旧 Manager namespace 引入，没有用额外引用掩盖问题。新全量产物上的绑定、chat.params、pre-provider settlement、Inspector finalize 与 SyncDelegate lifecycle 测试 38/38 通过。声明图为 26 subsystem、208 shard、701 production source、1885 references，shard DAG，最大 subsystem SCC 21；这些新增引用公开实际知识依赖，不代表 SCC 收敛或 GAP-033 完成。
 
+在 `173887ea9` 上恢复 `ToolRegistry` 的 typed 工具注册及 `PluginHooks` 的 Casebook 接线，同时将唯一 persistence 调用方 `PluginHostInterop` 与 registry 签名迁移到既有 `IJsTransactionPersistence`。删除 foreign module loader、备用权限表、静默漏注册及无类型 factory；provider 合同不变。首次真实 focused compile 暴露 `ExecutorTool` 对 `DistillationRuntime`／`Distillation` 的缺失引用，补回实际 provider 声明后，包含签名反向消费者的影响并集通过 1284 parsed sources／1246 compile items（fingerprint `879e5ddd19b7`）。新全量产物上的工具权限、Casebook、JS Host／事务测试 44/44 通过。声明图为 26 subsystem、208 shard、701 production source、1896 references，shard DAG，最大 subsystem SCC 从 21 增至 22；这是如实暴露既有知识依赖，不是隔离收敛。GAP-033 保持 PARTIAL，完整 hook／composition 的局部分支证明限制记录于所属 HOW。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

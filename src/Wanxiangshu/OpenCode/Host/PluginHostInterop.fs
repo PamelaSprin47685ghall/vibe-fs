@@ -33,6 +33,7 @@ open Wanxiangshu.Strength.Persistence
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Context.Companion
@@ -351,23 +352,7 @@ module PluginHostInterop =
         let jsTransactionPersistence =
             workspaceDirectory
             |> Option.bind (fun workspace -> WorkspaceEventStore.tryCurrent (RuntimePath.gitCommonDir workspace))
-            |> Option.bind (fun store ->
-                let created: obj =
-                    emitJsExpr
-                        store
-                        """
-                    (() => {
-                        try {
-                            const mod = require('../../Repository/Programming/Js/TransactionStore.js');
-                            if (mod && typeof mod.JsToolsTransactionStore_createPersistence === 'function') {
-                                return mod.JsToolsTransactionStore_createPersistence($0);
-                            }
-                        } catch (_) {}
-                        return null;
-                    })()
-                    """
-
-                if isNull created then None else Some(unbox created))
+            |> Option.map JsToolsTransactionStore.createPersistence
 
         let quiescence = scope.Sessions.Quiescence :> ISessionQuiescenceGate
 

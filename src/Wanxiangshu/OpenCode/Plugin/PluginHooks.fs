@@ -82,6 +82,8 @@ open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
+open Wanxiangshu.Repository.Knowledge.Casebook
+open Wanxiangshu.Repository.Knowledge.Casebook.OpenCode
 open PluginHostInterop
 
 module PluginHooks =
@@ -104,105 +106,9 @@ module PluginHooks =
             // CASE-003: typed capture at the tool boundary — shared
             // CasebookLifecycle.collector; marker flag gates the after-hook.
             // Store IO stays out of SpikePlugin (unified-store dual-write gate).
-            let casebookLifecycleModule: obj =
-                emitJsExpr
-                    ()
-                    """
-                (() => {
-                    let mod = null;
-                    try {
-                        if (typeof require === 'function') {
-                            mod = require('../../Repository/Knowledge/Casebook/Lifecycle.js');
-                        }
-                    } catch (_) {}
-                    if (!mod) {
-                        try {
-                            const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
-                                ? process.getBuiltinModule('node:module')
-                                : null;
-                            if (procMod && typeof procMod.createRequire === 'function') {
-                                const req = procMod.createRequire(import.meta.url);
-                                mod = req('../../Repository/Knowledge/Casebook/Lifecycle.js');
-                            }
-                        } catch (_) {}
-                    }
-                    return mod;
-                })()
-                """
-
-            let casebookWorkflowModule: obj =
-                emitJsExpr
-                    ()
-                    """
-                (() => {
-                    let mod = null;
-                    try {
-                        if (typeof require === 'function') {
-                            mod = require('../../Repository/Knowledge/Casebook/Workflow.js');
-                        }
-                    } catch (_) {}
-                    if (!mod) {
-                        try {
-                            const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
-                                ? process.getBuiltinModule('node:module')
-                                : null;
-                            if (procMod && typeof procMod.createRequire === 'function') {
-                                const req = procMod.createRequire(import.meta.url);
-                                mod = req('../../Repository/Knowledge/Casebook/Workflow.js');
-                            }
-                        } catch (_) {}
-                    }
-                    return mod;
-                })()
-                """
-
-            let casebookToolsModule: obj =
-                emitJsExpr
-                    ()
-                    """
-                (() => {
-                    let mod = null;
-                    try {
-                        if (typeof require === 'function') {
-                            mod = require('../../Repository/Knowledge/Casebook/OpenCode/Tools.js');
-                        }
-                    } catch (_) {}
-                    if (!mod) {
-                        try {
-                            const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
-                                ? process.getBuiltinModule('node:module')
-                                : null;
-                            if (procMod && typeof procMod.createRequire === 'function') {
-                                const req = procMod.createRequire(import.meta.url);
-                                mod = req('../../Repository/Knowledge/Casebook/OpenCode/Tools.js');
-                            }
-                        } catch (_) {}
-                    }
-                    return mod;
-                })()
-                """
-
-            let observationCollector: obj =
-                emitJsExpr
-                    casebookLifecycleModule
-                    """
-                (() => {
-                    return $0 ? $0.collector : null;
-                })()
-                """
-
-            let isCasebookFeatureEnabled (ws: string) : bool =
-                emitJsExpr
-                    (casebookWorkflowModule, ws)
-                    """
-                (() => {
-                    return $0 && typeof $0.CasebookFeature_isEnabled === 'function' ? !!$0.CasebookFeature_isEnabled($1) : false;
-                })()
-                """
-
             let casebookEnabled =
                 match workspaceDirectory with
-                | Some ws -> isCasebookFeatureEnabled ws
+                | Some ws -> CasebookFeature.isEnabled ws
                 | None -> false
 
             // TODO-002 / HOST-017..025: the builtin todowrite stays the physical
@@ -244,15 +150,7 @@ module PluginHooks =
                 let rendered = if isNull toolOutput then "" else string (toolOutput?output)
 
                 if not (System.String.IsNullOrWhiteSpace sessionId) then
-                    emitJsExpr
-                        (observationCollector, sessionId, toolName, toolInput?args, rendered)
-                        """
-                    (() => {
-                        if ($0 && typeof $0.Collect === 'function') {
-                            $0.Collect($1, $2, $3, $4);
-                        }
-                    })()
-                    """
+                    CasebookLifecycle.collector.Collect(sessionId, toolName, toolInput?args, rendered)
 
             let toolAfter (toolInput: obj) (toolOutput: obj) =
                 task {
@@ -295,20 +193,7 @@ module PluginHooks =
 
                     let casebookToolSpecs: ToolSpec list =
                         match workspaceDirectory with
-                        | Some ws ->
-                            let raw: obj =
-                                emitJsExpr
-                                    (casebookToolsModule, ToolHostCodec.factory toolModule, ws)
-                                    """
-                                (() => {
-                                    if ($0 && typeof $0.buildSpecs === 'function') {
-                                        return $0.buildSpecs($1, $2);
-                                    }
-                                    return null;
-                                })()
-                                """
-
-                            if isNull raw then [] else unbox raw
+                        | Some ws -> CasebookTools.buildSpecs (ToolHostCodec.factory toolModule) ws
                         | None -> []
 
                     let toolRegistration =

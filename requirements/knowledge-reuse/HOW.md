@@ -34,6 +34,8 @@
 
 `SyncDelegateSurface.executeInspector` 用 typed `ToolHostCodec.factory`、`HostToolArguments` 与 `HostToolContext` 直接执行真实 `InspectorTool.spec`；opaque JS Surface 合同不变，不再动态导入编译产物或依赖生成构造器的布局。`tests/g6-inspector-tool-finalize-fetch.test.mjs` 实际覆盖单一 Inspector child 的多次复用、每次 bounded record 不泄漏之前的回答，以及 Bookkeeper finalize 后的 canonical Casebook 内容。该测试使用无取消来源的 tool context；取消行为另由 SyncDelegate lifecycle 测试覆盖，不将其描述为 Inspector tool abort 接线证明。
 
+`PluginHooks` 静态调用 `CasebookFeature.isEnabled`、`CasebookLifecycle.collector.Collect` 与 `CasebookTools.buildSpecs`。缺失 workspace 仍禁用该功能；观察捕获仍在关键 after hooks 之后经 `HookPolicy.observeOptional` 隔离，工具构造和 store 获取的失败语义仍由原 owner 持有。`casebook-capture.test.mjs`、`lifecycle-wiring.test.mjs` 与 `fetch-tool.test.mjs` 证明捕获、归档和 marker 门禁的生产行为，但不单独证明完整 PluginHooks 创建至 after-hook 的所有接线路径。
+
 ## 验证与测试落点
 
 | 命题 | 落点测试 |
