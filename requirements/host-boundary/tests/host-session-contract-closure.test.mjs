@@ -117,6 +117,16 @@ test('WHAT[HOST-BOUNDARY-026] host session contract compiles independently witho
   }
 
   assert.ok(!sources.some((s) => s.startsWith('Sphinx/')), 'host-session-contract closure must not contain Sphinx runtime')
+
+  for (const consumer of ['opencode-host-opencodeport', 'strength-policy']) {
+    const consumerSources = productionSources(planLocality(consumer).plan)
+    assert.ok(consumerSources.includes('OpenCode/Codec/OpencodeTypes.fs'))
+    for (const unrelated of ['OpenCode/Signals/EventContract.fs', 'OpenCode/Host/Message.fs']) {
+      assert.ok(!consumerSources.includes(unrelated), `${consumer} must not acquire ${unrelated}`)
+    }
+  }
+  const portSources = productionSources(planLocality('opencode-host-opencodeport').plan)
+  assert.ok(!portSources.includes('Host/Digest.fs'), 'OpenCode port contract must not acquire Host/Digest.fs')
 })
 
 test('WHAT[HOST-BOUNDARY-026] host boundary projects declare explicit locality kinds and exact compile ownership', () => {

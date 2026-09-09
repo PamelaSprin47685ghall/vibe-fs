@@ -46,9 +46,10 @@
 
 - **Locality 切分**：
   - `Host.Session.Contract`（`host-session-contract`，kind: `contract`）：仅包含 `SessionContract` capability 与 `SessionSnapshot` 纯词汇、端口、定位 decision；
-  - `Host.Signal.Contract`（`host-signal-contract`，kind: `contract`）：包含 `HostDigest` sha256 词汇、`McpLaunch` 物理启动描述与共享终端词汇（`EventContract`、`Message`/`MessagePart`、`OpencodeTypes`/`OpencodeModel`）；
+  - `Host.Signal.Contract`（`host-signal-contract`，kind: `contract`）：当前 `host-digest` 分片只编译 `EventContract.fs/.fsi`，引用既有 digest、identity、outcome、message contract 与 SDK 类型分片；保留唯一类型定义，尚未审查迁移的宽 consumer 不作机械替换。
+  - `Host SDK types`（`host-opencode-types`）：零 ProjectReference，显式归属 `host` subsystem，仅编译既有 `OpencodeTypes.fs/.fsi`。`OpenCodeContract` 与 `ModelRouting` 只需要其中的 `OpencodeModel`，直接消费此分片，不再编入终端事件与 `MessagePart`。源码、公开签名、模型字段与 aggregate 顺序不变。
   - `Host.Event.Envelope`（`host-event-envelope`，kind: `contract`）：raw envelope unwrap、event type、session/message-session identity 的唯一无状态公式；
-  - `Host.Message.Codec`（`host-message-codec`，kind: `contract`）：raw message part decode，bounded 到三个 fresh production consumer；直接引用 `host-message-contract` 中既有 `MessagePart.fs/.fsi`，后者显式归属 `host` subsystem、零 ProjectReference。宽 signal contract 继续消费同一消息类型，没有复制定义或运行时别名；SDK DTO、终端事件与摘要实现不再进入 message codec 闭包。
+  - `Host.Message.Codec`（`host-message-codec`，kind: `contract`）：raw message part decode，bounded 到三个 fresh production consumer；直接引用 `host-message-contract` 中既有 `Message.fs/.fsi`，后者显式归属 `host` subsystem、零 ProjectReference。宽 signal contract 继续消费同一消息类型，没有复制定义或运行时别名；SDK DTO、终端事件与摘要实现不再进入 message codec 闭包。
   - `Host.Loop.Event.Codec`（`loop-event-codec`，kind: `contract`）：loop text-delta decode/query，只依赖 `Host.Event.Envelope`；
   - `Host.Fatal.Effect`（`host-fatal-effect`，kind: `contract`）：`Foundation/FatalProcess` 进程 fuse 的窄物理效果边界；
   - `Host.Diagnostics.Runtime`（`host-diagnostics-runtime`，kind: `runtime`）：包含 `HookPolicy` 元数据表与 `ReliabilityDiagnostics` 因果记录收集；

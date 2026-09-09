@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>host</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>host-opencode-types</WanxiangshuCompileShard>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="OpenCode/Codec/OpencodeTypes.fsi" />
+    <Compile Include="OpenCode/Codec/OpencodeTypes.fs" />
+  </ItemGroup>
+</Project>

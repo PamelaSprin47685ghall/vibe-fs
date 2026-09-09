@@ -124,6 +124,12 @@ registry 声明闭包为 4 项目／8 输入；shared-state 从基准 87／538 �
 
 同批并行审查保留 SyncDelegate runtime 的 `TerminalCompletionListener`／`TerminalStop`／`TerminalOutcome` 依赖，以及 recovery model 的 `ReconciledTurn.Parts`／`OpencodeModel` 和 `QuiescencePermit` 合同；它们不能机械替换为摘要或消息合同。仅 codec 的无关知识闭包已切断，未宣称全局 SCC 缩小或 subsystem 已可独立替换，GAP-033 保持 PARTIAL。
 
+在 `cd6ef0ded` 上将既有 `OpenCode/Codec/OpencodeTypes.fs/.fsi` 独立到零引用的 `host/host-opencode-types`，宽 Host 分片引用唯一 SDK 类型定义，`OpenCodeContract` 与 `strength-policy` 直接消费窄分片。两 consumer 只使用 `OpencodeModel`，不修改源码、签名或 aggregate 顺序。声明递归闭包分别从 7 项目／28 输入降至 5／22、55／338 降至 54／334；policy 仍保留其余真实域依赖及传递摘要原语，不宣称整个 policy 已纯化。
+
+先验证端口隔离编译及实际反向 consumer，再迁移 policy。最终端口、policy 独立 Fable 编译分别通过 60、372 parsed sources（`49421f904449`、`0b1e1c80861a`）；三组 SDK／端口／routing 签名反向 consumer 的 flat 并集通过 1426 parsed sources／1388 items（`dde50e2f81ac`）。既有 HOST-BOUNDARY-026 闭包测试在端口旧引用和 policy 宽引用 mutation 下分别因 EventContract 被编入而失败，窄引用下通过。新产物的公开 SDK prompt projection smoke 范围见 execution-model-routing/HOW。
+
+同批完整审查 guidance-tip：唯一直接宽 Host 符号是 `stableCallId` 的 `HostDigest.sha256Hex`，但 production inventory 实测其余引用仍保留宽闭包。基准 112 项目／770 输入，在 SDK 分片迁移后为 113／770，假设将 guidance 引用替换为 digest 仍为 113／770；因此本批保留，不将直接符号收窄误报为闭包收益。结构 gate 为 26 subsystem、212 shard、700 source、1915 references，shard DAG，最大 SCC 22；Host／subsystem 相关检查 13/13 通过。GAP-033 仍为 PARTIAL，局部闭包下降不证明全局 SCC 收敛或 subsystem 已可独立替换。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。
