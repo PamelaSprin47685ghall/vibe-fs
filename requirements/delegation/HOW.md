@@ -2,6 +2,12 @@
 
 ## 架构机制
 
+### 编译边界证明
+
+`delegation-compile-boundary.test.mjs` 复用 `readCompileShardInventory` 与 `buildSubsystemInventory`，按 compile shard 定位工程，验证 Delegation 分片及 persistence 投影的 subsystem 归属，不再读取 locality kind 或按旧 owner 文件名筛选工程。DELEG-028 的现行数量预算、60% ceiling 与增长 ratchet 原值保留；合同修订前不自行撤销。既有证明标题及登记保持不变。
+
+基于 `14eab559a` 的验证：相关 Delegation 与 subsystem 测试 8/8 通过；临时移除 Contract 的 legacy 元数据、改用显式 subsystem/shard 声明仍通过，错误 subsystem 与无环 Process 依赖分别被归属和物理隔离断言拒绝。另一个 Process 引用反例先被 DAG 检查拒绝，不计作物理隔离证明；临时工程改动均恢复。这是静态证明读取路径的迁移，不是新独立 Fable 编译或业务行为等价证明，也不关闭 GAP-033。
+
 ### 委托接口分流与权能门禁
 
 DELEG-020 约束：委托语义不依赖当前工具名字面值（`fork`、`commission`、`inspect`、`establish-behavior`、`repair-behavior`），改名不动 WHAT 语义定义。

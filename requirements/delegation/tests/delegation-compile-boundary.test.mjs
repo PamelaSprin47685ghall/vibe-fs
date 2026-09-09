@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
-import { readdirSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
+import { readCompileShardInventory } from '../../../scripts/lib/compile-shards.mjs'
+import { buildSubsystemInventory } from '../../../scripts/checks/subsystems.mjs'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
 import { planOwnerCompile } from '../../../scripts/lib/owner-compile.mjs'
@@ -8,43 +10,33 @@ const ROOT = resolve(import.meta.dirname, '../../..')
 const SOURCE_ROOT = join(ROOT, 'src/Wanxiangshu')
 const AGGREGATE = join(SOURCE_ROOT, 'Wanxiangshu.fsproj')
 
-const projects = readdirSync(SOURCE_ROOT)
-  .filter((name) => /^Wanxiangshu\.Owner\..+\.fsproj$/.test(name))
-  .map((name) => {
-    const path = join(SOURCE_ROOT, name)
-    const xml = readFileSync(path, 'utf8')
-    return {
-      path,
-      locality: xml.match(/<WanxiangshuOwnerLocality>([^<]+)<\/WanxiangshuOwnerLocality>/)?.[1],
-      kind: xml.match(/<WanxiangshuOwnerLocalityKind>([^<]+)<\/WanxiangshuOwnerLocalityKind>/)?.[1],
-    }
-  })
+const shardInventory = readCompileShardInventory({ repositoryRoot: ROOT })
+const subsystemInventory = buildSubsystemInventory({ compileInventory: shardInventory })
+assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))
+const projects = [...subsystemInventory.projects.values()]
 
-const requireLocality = (locality) => {
-  const matches = projects.filter((project) => project.locality === locality)
-  assert.equal(matches.length, 1, `${locality} must resolve to exactly one owner project`)
+const requireShard = (locality) => {
+  const matches = projects.filter((project) => project.shard === locality)
+  assert.equal(matches.length, 1, `${locality} must resolve to exactly one compile shard`)
+  assert.equal(matches[0].subsystem, 'delegation', `${locality} belongs to the delegation subsystem`)
   return matches[0]
 }
 
-const inspectLocality = (locality) => {
-  const project = requireLocality(locality)
-  const plan = planOwnerCompile({ projectPath: project.path, aggregatePath: AGGREGATE })
+const inspectShard = (locality) => {
+  const project = requireShard(locality)
+  const plan = planOwnerCompile({ projectPath: project.projectPath, aggregatePath: AGGREGATE })
   const sources = plan.compileItems
     .filter((path) => path.endsWith('.fs'))
     .map((path) => path.slice(SOURCE_ROOT.length + 1).replaceAll('\\', '/'))
   return { project, sources }
 }
 
-const EXPECTED_KINDS = new Map([
-  ['delegation-contract', 'contract'],
-  ['delegation-sync-contract', 'contract'],
-  ['delegation-fold', 'runtime'],
-  ['delegation-ledger', 'composition'],
-  ['delegation-sync-runtime', 'runtime'],
-  ['delegation-fork-runtime', 'runtime'],
-  ['delegation-host-adapter', 'adapter'],
-  ['delegation-pty-adapter', 'adapter'],
-  ['delegation-recovery-runtime', 'runtime'],
+const SOURCE_BUDGETS = new Map([
+  ['delegation-contract', 100],
+  ['delegation-sync-contract', 100],
+  ['delegation-fold', 185],
+  ['delegation-sync-runtime', 185],
+  ['delegation-fork-runtime', 185],
 ])
 
 // WHAT[DELEG-028] budget adjudication (see WHY.md): contract ≤100 hard; fold/runtime target
@@ -57,8 +49,7 @@ const ADAPTER_RATCHET = new Map([
 ])
 
 test('WHAT[DELEG-028] Delegation contract excludes workflow Host PTY and recovery sources', () => {
-  const { project, sources } = inspectLocality('delegation-contract')
-  assert.equal(project.kind, 'contract')
+  const { sources } = inspectShard('delegation-contract')
 
   const forbidden = [
     /Execution\/Delegation\/SyncDelegate\/(?:Wait|Store|Prompt|Workflow|Runtime)\.fs$/,
@@ -83,48 +74,38 @@ test('WHAT[DELEG-028] Delegation focused localities stay within compile budgets'
   assert.ok(aggregateSources > 0, 'aggregate must declare production sources')
   const fullFallbackCeiling = Math.floor(aggregateSources * 0.6)
 
-  for (const [locality, kind] of EXPECTED_KINDS) {
-    const inspected = inspectLocality(locality)
-    assert.equal(inspected.project.kind, kind, `${locality} must declare ${kind} kind`)
-    if (kind === 'composition') {
-      continue
-    }
-    if (kind === 'adapter' || ADAPTER_RATCHET.has(locality)) {
-      assert.ok(
-        inspected.sources.length <= fullFallbackCeiling,
-        `${locality} exceeds the 60% full-fallback ceiling (${inspected.sources.length} > ${fullFallbackCeiling})`,
-      )
-      const ratchet = ADAPTER_RATCHET.get(locality)
-      assert.ok(ratchet, `${locality} must declare a measured ratchet in WHAT[DELEG-028]`)
-      assert.ok(
-        inspected.sources.length <= ratchet,
-        `${locality} grew beyond its recorded ratchet ${ratchet} — revise WHAT[DELEG-028] or shrink the closure`,
-      )
-      continue
-    }
-    const budget = kind === 'contract' ? 100 : 185
+  for (const [locality, budget] of SOURCE_BUDGETS) {
+    const inspected = inspectShard(locality)
     assert.ok(inspected.sources.length <= budget, `${locality} exceeds its production source budget ${budget}`)
   }
+  for (const [locality, ratchet] of ADAPTER_RATCHET) {
+    const inspected = inspectShard(locality)
+    assert.ok(
+      inspected.sources.length <= fullFallbackCeiling,
+      `${locality} exceeds the 60% full-fallback ceiling (${inspected.sources.length} > ${fullFallbackCeiling})`,
+    )
+    assert.ok(
+      inspected.sources.length <= ratchet,
+      `${locality} grew beyond its recorded ratchet ${ratchet} — revise WHAT[DELEG-028] or shrink the closure`,
+    )
+  }
 
-  const foldSources = inspectLocality('delegation-fold').sources
+  const foldSources = inspectShard('delegation-fold').sources
   assert.ok(foldSources.includes('Execution/Delegation/DelegationFactFold.fs'))
   assert.ok(!foldSources.includes('Execution/Delegation/HandoffLedger.fs'))
-  assert.ok(inspectLocality('delegation-ledger').sources.includes('Execution/Delegation/HandoffLedger.fs'))
-  // LinkageProjection/DelegatedToolEstimateProjection are owned by the durable projection spine
-  // (Composition/Durable/Projection.fsi owns Handles/DelegatedToolEstimate fields); fold consumes
-  // them through that reference — the spine's owner project is the only compiling locality.
+  assert.ok(inspectShard('delegation-ledger').sources.includes('Execution/Delegation/HandoffLedger.fs'))
   const spineOwner = projects.find(
-    (p) => p.kind === 'composition' && readFileSync(p.path, 'utf8').includes('Execution/Delegation/LinkageProjection.fs'),
+    (project) => project.implementationFiles.includes(join(SOURCE_ROOT, 'Execution/Delegation/LinkageProjection.fs')),
   )
-  assert.ok(spineOwner, 'durable projection spine must own LinkageProjection')
-  assert.ok(inspectLocality('delegation-sync-runtime').sources.includes('Execution/Delegation/SyncDelegate/Wait.fs'))
-  assert.ok(inspectLocality('delegation-sync-runtime').sources.includes('Execution/Delegation/SyncDelegate/Store.fs'))
-  assert.ok(inspectLocality('delegation-sync-runtime').sources.includes('Execution/Delegation/SyncDelegate/Prompt.fs'))
-  assert.ok(inspectLocality('delegation-sync-runtime').sources.includes('Execution/Delegation/SyncDelegate/Workflow.fs'))
-  assert.ok(!inspectLocality('delegation-sync-runtime').sources.includes('Execution/Delegation/SyncDelegate/Runtime.fs'))
-  assert.ok(inspectLocality('delegation-host-adapter').sources.includes('Execution/Delegation/SyncDelegate/Runtime.fs'))
-  assert.ok(inspectLocality('delegation-fork-runtime').sources.includes('Execution/Delegation/Fork/Runtime.fs'))
-  assert.ok(inspectLocality('delegation-host-adapter').sources.includes('Execution/Delegation/Fork/Host/Runtime.fs'))
-  assert.ok(inspectLocality('delegation-pty-adapter').sources.includes('Execution/Delegation/Fork/Host/Pty.fs'))
-  assert.ok(inspectLocality('delegation-recovery-runtime').sources.includes('Execution/Delegation/ChildRecoveryWorkflow.fs'))
+  assert.equal(spineOwner?.subsystem, 'persistence', 'durable projection spine must own LinkageProjection')
+  assert.ok(inspectShard('delegation-sync-runtime').sources.includes('Execution/Delegation/SyncDelegate/Wait.fs'))
+  assert.ok(inspectShard('delegation-sync-runtime').sources.includes('Execution/Delegation/SyncDelegate/Store.fs'))
+  assert.ok(inspectShard('delegation-sync-runtime').sources.includes('Execution/Delegation/SyncDelegate/Prompt.fs'))
+  assert.ok(inspectShard('delegation-sync-runtime').sources.includes('Execution/Delegation/SyncDelegate/Workflow.fs'))
+  assert.ok(!inspectShard('delegation-sync-runtime').sources.includes('Execution/Delegation/SyncDelegate/Runtime.fs'))
+  assert.ok(inspectShard('delegation-host-adapter').sources.includes('Execution/Delegation/SyncDelegate/Runtime.fs'))
+  assert.ok(inspectShard('delegation-fork-runtime').sources.includes('Execution/Delegation/Fork/Runtime.fs'))
+  assert.ok(inspectShard('delegation-host-adapter').sources.includes('Execution/Delegation/Fork/Host/Runtime.fs'))
+  assert.ok(inspectShard('delegation-pty-adapter').sources.includes('Execution/Delegation/Fork/Host/Pty.fs'))
+  assert.ok(inspectShard('delegation-recovery-runtime').sources.includes('Execution/Delegation/ChildRecoveryWorkflow.fs'))
 })
