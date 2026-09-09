@@ -146,6 +146,8 @@ tool adapter、signal adapter、Attention consumer 与 repository-programming ru
 
 在 `a0a710fb2` 上完成上述 Host 验证迁移：闭包测试直接消费既有 compile-shard/subsystem inventory，不再维护 XML parser、legacy kind、数量预算或 legacy owner 文件集合。保留真实 provider 与 composition 引用保护；会话合同排除工具注册、信号订阅和终端总线，新增 Host 分片与摘要原语按实际 subsystem 核对。显式元数据替换旧声明的正例通过；会话误引工具、会话归属错误及显式工具分片归属错误的三个真实工程反例均被拒绝，原工程全部恢复。全仓唯一来源、签名与 aggregate 完整性仍由同一库存机制及既有结构反例承接。本批不改生产编译输入，不宣称新增编译隔离或全局 SCC 收敛，GAP-033 保持 PARTIAL。
 
+在 `46a1c334c` 上将 `owner-project-boundaries.test.mjs` 的生产工程读取统一到既有 `checkSubsystems` 返回的库存，删除重复工程扫描、Compile／ProjectReference XML parser 与 GitGateway 的旧 locality 标签要求。GitGateway 归属核对现行 `change` subsystem，而不是 legacy owner `change-integration`；源码配对、必要／禁止引用和 NodeFs 物理边界仍受原测试保护。只删除库存已经覆盖的非空工程断言及无合同依据的项目数量下限；临时 planner 工程的 XML、顺序、缓存与失败生命周期证明不变，原测试标题及证明注册不变。恢复原字节的实验中，GitGateway 仅保留显式 subsystem／shard 元数据通过，错误归属到 persistence 被拒绝，FileMutationTools 缺失 NodeFs provider 被拒绝。相关 boundary／subsystem／impact 测试 24/24 通过；本批不修改生产工程，不以静态证明迁移宣称新 focused Fable 隔离或业务等价，GAP-033 保持 PARTIAL。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

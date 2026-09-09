@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join, relative, resolve } from 'node:path'
 import test from 'node:test'
 import { checkSubsystems } from '../../../scripts/checks/subsystems.mjs'
 import { planOwnerCompile, materializeOwnerCompile, compileOwnerProject } from '../../../scripts/lib/owner-compile.mjs'
@@ -10,26 +10,35 @@ import { planOwnerCompile, materializeOwnerCompile, compileOwnerProject } from '
 const ROOT = resolve(import.meta.dirname, '../../..')
 const SRC = join(ROOT, 'src/Wanxiangshu')
 const FIXTURE = join(ROOT, 'requirements/structured-workflow/tests/fixtures/owner-project-boundary')
+const inventory = checkSubsystems()
+assert.ok(inventory.ok, inventory.violations.join('\n'))
+
+function productionProject(projectName) {
+  const project = inventory.projects.get(join(SRC, projectName))
+  assert.ok(project, `missing production compile shard ${projectName}`)
+  return project
+}
+
+function compileItems(projectName) {
+  const project = productionProject(projectName)
+  return [...project.signatureFiles, ...project.implementationFiles].map((path) => relative(SRC, path))
+}
+
+function references(projectName) {
+  return productionProject(projectName).references.map((path) => relative(SRC, path))
+}
 
 test('WHAT[STRUCTURED-WORKFLOW-011] flattened Fable emitter mirrors compile-shard source coverage', () => {
   const rootProject = readFileSync(join(SRC, 'Wanxiangshu.fsproj'), 'utf8')
   assert.match(rootProject, /<WanxiangshuEmitProject>true<\/WanxiangshuEmitProject>/)
   assert.doesNotMatch(rootProject, /<ProjectReference Include=/, 'emit project must not source-merge owner project graph')
 
-  const ownerProjects = readdirSync(SRC).filter((name) => /^Wanxiangshu\.(?:Owner|Shard)\..+\.fsproj$/.test(name))
-  assert.ok(ownerProjects.length > 1, 'compile-shard graph requires independent projects')
-
-  for (const project of ownerProjects) {
-    const xml = readFileSync(join(SRC, project), 'utf8')
-    assert.match(xml, /<Compile Include="[^"]+\.fs"\s*\/>/)
-  }
-
   const props = readFileSync(join(SRC, 'Directory.Build.props'), 'utf8')
   assert.match(props, /<DisableTransitiveProjectReferences>true<\/DisableTransitiveProjectReferences>/)
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-011] subsystem ownership and compile-shard graph are complete and acyclic', () => {
-  const result = checkSubsystems()
+  const result = inventory
   assert.equal(result.ok, true, result.violations.join('\n'))
   assert.ok(result.sourceCount > 0, 'compile-shard graph must cover production sources')
   const shardKeys = [...result.projects.values()].map((entry) => entry.shardKey)
@@ -47,29 +56,20 @@ test('WHAT[STRUCTURED-WORKFLOW-011] subsystem ownership and compile-shard graph 
 
 test('WHAT[STRUCTURED-WORKFLOW-013] GitGateway exposes a narrow dependency-inverted compiler boundary', () => {
   const providerName = 'Wanxiangshu.Owner.change-integration.git-gateway.fsproj'
-  const provider = readFileSync(join(SRC, providerName), 'utf8')
-  assert.match(provider, /<WanxiangshuOwnerLocality>git-gateway<\/WanxiangshuOwnerLocality>/)
-  assert.match(provider, /<Compile Include="Git\/Gateway\.fsi"\s*\/>\s*<Compile Include="Git\/Gateway\.fs"\s*\/>/)
-  assert.equal([...provider.matchAll(/<Compile Include="[^"]+\.fs"\s*\/>/g)].length, 1)
+  const provider = productionProject(providerName)
+  assert.equal(provider.shard, 'git-gateway')
+  assert.equal(provider.subsystem, 'change')
+  assert.deepEqual(compileItems(providerName), ['Git/Gateway.fsi', 'Git/Gateway.fs'])
 
-  const consumer = readFileSync(join(SRC, 'Wanxiangshu.Owner.durable-convergence.git-hook-sync.fsproj'), 'utf8')
-  assert.match(consumer, /<ProjectReference Include="Wanxiangshu\.Owner\.change-integration\.git-gateway\.fsproj"\s*\/>/)
-  assert.doesNotMatch(consumer, /ProjectReference Include="Wanxiangshu\.Owner\.change-integration\.git-integrationgate\.fsproj"/)
+  const consumer = references('Wanxiangshu.Owner.durable-convergence.git-hook-sync.fsproj')
+  assert.ok(consumer.includes(providerName))
+  assert.ok(!consumer.includes('Wanxiangshu.Owner.change-integration.git-integrationgate.fsproj'))
 
   const signature = readFileSync(join(SRC, 'Git/Gateway.fsi'), 'utf8')
   assert.doesNotMatch(signature, /SyncActiveEnv|discoverRemote/)
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-014] NodeFs physical port and tool contracts have isolated compiler boundaries', () => {
-  const compileItems = (projectName) =>
-    [...readFileSync(join(SRC, projectName), 'utf8').matchAll(/<Compile Include="([^"]+)"\s*\/>/g)].map(
-      ([, path]) => path,
-    )
-  const references = (projectName) =>
-    [...readFileSync(join(SRC, projectName), 'utf8').matchAll(/<ProjectReference Include="([^"]+)"\s*\/>/g)].map(
-      ([, path]) => path,
-    )
-
   const managedProject = 'Wanxiangshu.Owner.action-affordance.opencode-tools-managedagent.fsproj'
   const staticProject = 'Wanxiangshu.Owner.action-affordance.opencode-tools-statictools.fsproj'
   const nodeFsProject = 'Wanxiangshu.Owner.action-affordance.opencode-tools-nodefs.fsproj'
@@ -115,15 +115,6 @@ test('WHAT[STRUCTURED-WORKFLOW-014] NodeFs physical port and tool contracts have
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-013] request kind and fallback facts remain disjoint compile shards', () => {
-  const compileItems = (projectName) =>
-    [...readFileSync(join(SRC, projectName), 'utf8').matchAll(/<Compile Include="([^"]+)"\s*\/>/g)].map(
-      ([, path]) => path,
-    )
-  const references = (projectName) =>
-    [...readFileSync(join(SRC, projectName), 'utf8').matchAll(/<ProjectReference Include="([^"]+)"\s*\/>/g)].map(
-      ([, path]) => path,
-    )
-
   const requestProject = 'Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj'
   const factsProject = 'Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-facts.fsproj'
 

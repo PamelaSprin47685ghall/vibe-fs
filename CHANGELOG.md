@@ -2,6 +2,8 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- 生产 compiler-boundary 证明统一读取现有 subsystem inventory，移除重复 fsproj 扫描、XML 引用解析和 GitGateway 的旧 locality 标签断言。保留 GitGateway、NodeFs／工具合同、request kind／fallback facts 的源码与依赖边界；显式元数据正例、错误 subsystem 与缺失物理 provider 反例通过，planner fixtures 和生产工程不变。
+
 - Delegation 编译边界证明复用 subsystem/compile-shard inventory，移除旧 kind 与 owner 文件名筛选依赖，验证真实 subsystem 归属。保留 DELEG-028 明文预算、增长 ratchet、物理隔离与必要 provider 断言；显式元数据正例及错误归属、Process 依赖反例通过，生产工程与合同不变。
 
 - Host 闭包测试复用 compile-shard/subsystem inventory，移除退役 locality/kind、数量预算与 legacy owner 文件筛选；保留真实依赖与隔离断言，覆盖显式 Host 分片和 runtime-platform 摘要归属。显式声明正例及工具能力泄漏、错误归属反例通过，生产工程与行为不变。
