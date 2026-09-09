@@ -82,7 +82,8 @@ module JoinTool =
                       WaitEscape.SessionLifetime ]
                     "JoinTool.Orchestrator.JoinPublishedAvailable"
 
-            let host = unbox<Wanxiangshu.Change.Host.OrchestratorHost> (scope.OrchestratorHostFor context.SessionId)
+            let host = scope.OrchestratorHostFor context.SessionId
+
             let! outcome =
                 CausalAwait.awaitTask
                     scope.WaitObserver

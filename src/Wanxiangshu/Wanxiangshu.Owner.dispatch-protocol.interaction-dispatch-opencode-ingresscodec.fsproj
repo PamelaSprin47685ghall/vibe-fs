@@ -8,6 +8,7 @@
         <ProjectReference Include="Wanxiangshu.Owner.session-ontology.opencode-host-sessionexecutionbinding.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-companionfactfold.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.dispatch-runtime.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.session-nudge.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.execution-session-recovery-model.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj" /><ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.interaction-dispatch-metadata-codec.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj" />
@@ -31,10 +32,6 @@
     <Compile Include="Interaction/Dispatch/Ingress.fs" />
     <Compile Include="Interaction/Dispatch/Recovery.fsi" />
     <Compile Include="Interaction/Dispatch/Recovery.fs" />
-    <Compile Include="Interaction/Repair/Port.fsi" />
-    <Compile Include="Interaction/Repair/Port.fs" />
-    <Compile Include="Interaction/Dispatch/OpenCode/SessionNudge.fsi" />
-    <Compile Include="Interaction/Dispatch/OpenCode/SessionNudge.fs" />
     <Compile Include="Composition/Turn/Binding.fsi" />
     <Compile Include="Composition/Turn/Binding.fs" />
     <Compile Include="Composition/Turn/TurnReconcile.fsi" />

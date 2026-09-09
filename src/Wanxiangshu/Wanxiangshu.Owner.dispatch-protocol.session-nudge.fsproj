@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>dispatch</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>session-nudge</WanxiangshuCompileShard>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.dispatch-runtime.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-root-workspace-contract.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-ledger.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-async-support.fsproj" />
+    <Compile Include="Interaction/Repair/Port.fsi" />
+    <Compile Include="Interaction/Repair/Port.fs" />
+    <Compile Include="Interaction/Dispatch/OpenCode/SessionNudge.fsi" />
+    <Compile Include="Interaction/Dispatch/OpenCode/SessionNudge.fs" />
+  </ItemGroup>
+</Project>

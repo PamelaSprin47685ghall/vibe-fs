@@ -2,6 +2,12 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- 恢复 `ToolRuntimeScope` 对 `OrchestratorHost` 的静态构造和 typed dependencies，消除 `createObj + box` 抹掉回调调用约定后触发的 `computation.then is not a function`；工作区快照保持 `WorkspaceSnapshotId`，取消与卸载直接调用真实 Host，不再动态查找模块或以默认成功掩盖缺失。
+
+- 恢复规则书校验与 Context fact fold 的静态类型依赖，移除动态模块查找、手写 union tag 和校验缺失时的默认成功；将 Nudge、Enforcer repair、provider system transform 分成可由真实 consumer 独立编译的窄分片。
+- authority gate 分离源码 subsystem 身份与 WHAT package 归属，退役 legacy 身份别名；结构测试改用唯一归属、合法增长、真实 shard DAG／subsystem SCC 和平台隔离的正反例，不再锁住迁移数量快照。
+- 修复已有 execution parent binding、共享 parent cache 尚空时，真实子会话被误判为根会话并禁用 Fission 的问题。请求投影与父关系发现使用一致证据；真实 chat hook 回归同时保留根请求和 `/continue` 的 origin deny。
+
 - 证明缺口与测试错误分离：缺少 active test/HOW proof edge 继续输出 GAP，保持 OPEN/PARTIAL，不再导致 check 或 meta-verifier 失败；已有证明的悬空引用、非法归属与真实断言失败仍严格报错。共享 proof graph 不伪造证明边。
 
 - 删除独立 FCS 扫描器、compiler-dependent extractor/report CLI、扫描计时命令、专用 fixtures 与所有 compiler-evidence 消费分支；DSL、authority、decorator、owner-contract 检查恢复纯源码路径。187 项针对性回归通过；真实 check 越过原挂点并在证明追踪缺口处正常失败。STRUCTURED-WORKFLOW-013 的完整新合同证明继续保持 GAP-031 OPEN，不以删除代码代替证明。

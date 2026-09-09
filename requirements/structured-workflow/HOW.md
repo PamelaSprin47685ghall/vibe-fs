@@ -55,12 +55,22 @@ Subsystem SCC 是首要结构债：双向依赖必须通过移动知识所有权
 
 本节是 STRUCTURED-WORKFLOW-011 至 016 的实现与证明缺口记录，不新增产品条款，也不构成整表开工授权。仅处理用户任务明确覆盖的部分；相关 Worker 应显式读取本节，不依赖路径触发的自动接地。聚合状态见 `requirements/GAP.md` 的 GAP-033，保持 PARTIAL；单项修复不代表整体已可独立替换。
 
-以下事实核对于第 3.1 节基线；关闭依据是后续工程工作的证明要求，本次文档记录没有修复这些实现或测试。
+第 3.1 节保留历史测量口径；以下逐项记录当前实现和仍缺的证据，不用历史数量约束后续合法变化。
 
 1. **知识依赖尚未收敛。** subsystem 聚合图仍有 SCC，公共重力井仍待拆解。按真实 consumer 收窄 contract／port，记录被切断的具体知识依赖与前后闭包；对受影响 shard 和 consumer 提供真实 focused Fable 编译及相关行为证明。SCC 数字下降不能独自关闭整体缺口。
-2. **结构测试锁住迁移快照。** `requirements/structured-workflow/tests/subsystem-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-011] subsystem is the only semantic governance identity` 固定 `sourceCount = 702`、`subsystemCount = 26`，并要求最大 SCC 长度大于 1。正常源码增长或最终消环会使快照断言失败。以 source 唯一归属、编译输入完整性和 SCC 报告的性质替换：合法增长及无环图应通过，缺失／重复归属应拒绝，有环图应准确报告。保留有效 WHAT 标签与第 5 节的精确证明边，不仅删除断言。
-3. **平台检查覆盖不完整。** `scripts/checks/subsystems.mjs` 的平台域外依赖拒绝只覆盖 `explicitSubsystem === 'runtime-platform'` 且存在 `explicitCompileShard` 的项目；同套测试中的平台用例使用相同过滤。由 legacy 映射解析的平台 shard 尚未被这条检查完整覆盖。先区分真正平台原语与含领域知识的 shard，迁回错误归属，再覆盖所有解析为平台的 shard；显式与 legacy 映射路径都要有合法正例及域外依赖反例，不以补标签或整类豁免代替边界迁移。
-4. **旧身份仍被 authority gate 消费。** `scripts/checks/authority-boundary.mjs` 的 `authorityRegistry()` 仍优先取 `legacyOwner`，`owners` 集合也只加入旧身份。这里只确认读取逻辑，尚未完成整道 authority gate 的语义审计。先读 manifest schema 与全部消费者，区分源码 subsystem 归属和 requirement package 的命题／证明归属，再迁移对应解析与消费者；无 legacy 字段的合法项目应通过，错误归属仍应拒绝。保留有效能力检查，不批量把所有 owner 改名为 subsystem 或关闭 gate。
+2. **结构快照已替换为性质反例。** `subsystem-boundaries.test.mjs` 与 `owner-project-boundaries.test.mjs` 不再限制 subsystem 数量范围或要求 shard 多于 subsystem。前者通过真实临时 fsproj 验证合法增长、缺失／重复 source 归属、sibling 签名与 aggregate 输入完整性；`A1(alpha) → B1(beta) → A2(alpha)` 是合法 shard DAG，但必须准确报告 subsystem SCC，单向对照则无 SCC。测试标题与第 5 节的精确证明边保持不变。
+3. **平台解析路径已有正反例，知识归属审计仍未完成。** `scripts/checks/subsystems.mjs` 已按解析后的 `subsystem` 检查全部平台 shard；`subsystem-boundaries.test.mjs` 对 explicit 与 legacy 映射路径分别证明平台依赖合法、域外依赖拒绝。它不证明所有标成平台的源码都没有领域知识，也不替代真实 focused compile；不得据此宣布整个平台隔离已完成。
+4. **authority 源码身份已与 WHAT 包归属分离。** `authority-boundary.mjs` 通过 `buildSubsystemInventory` 取得唯一源码 subsystem；manifest 的 declaration、method、issuer `owner` 全部按实际文件归属迁移，`whatOwners` 继续指向 requirement package。legacy 字段只参与既有映射解析，不再作为第二个可接受身份；`scanRepo` 使用传入 repository root。`requirements/capability-enforcement/tests/authority-boundary.test.mjs::WHAT[ENF-014] explicit and legacy-mapped subsystems resolve through the real repository path` 用真实临时工程证明无 legacy 字段与 legacy 映射的合法路径，并拒绝旧 alias、错误源归属及错误 WHAT 包归属。能力发行、一次性消费和持久化检查没有放宽。
+
+2026-09-09，在 merge commit `2c6088fa8` 上叠加本批修改：相关结构、impact 与 authority 测试 40/40 通过；补全实际 consumer 后，subsystem gate 报 26 subsystem、207 shard、702 source、1874 references、最大 SCC 20。相比本批中途的 18，SCC 增长来自显式恢复 Host→Casebook 等已存在的代码依赖，不能把先前漏报当作隔离成果，也不能宣布本 GAP 已关闭。authority cutover 的临时对照使用同一迁移后 manifest，旧 gate 得到 59 个错误，新 gate 零错误；临时模块已删除。
+
+随后恢复 `ToolRuntimeScope → change-integration.git-integrationgate` 已被动态加载隐藏的实际依赖，静态构造 Host 并保留 callback 与 snapshot 类型。scope shard 的 942-source focused Fable compile 通过；subsystem gate 更新为 1875 references，其余上述计数不变，shard 图仍无环。这修复了真实 Long Stroke 首次 publication 的异步调用错误，不代表 subsystem 知识耦合已经消除。
+
+资源校验接缝恢复静态 `EnforcerCatalog.validate` 后，`Wanxiangshu.Owner.cognitive-environment.resources-promptsurface.fsproj` 的真实 focused Fable compile 通过（90 source）；新产物中英文各装载 120 条，移走 scratch 校验器模块时新 Node 进程以 `ERR_MODULE_NOT_FOUND` 失败，随后恢复并清理临时资源链接。随后修复 `enforcer-codec` consumer 的真实闭包：删除无用 namespace 引入，恢复纯 `EnforcementProjection` 静态依赖与 root-workspace contract；将 `SessionNudge`／repair port 从 ingress 大分片移到 `dispatch/session-nudge`，使 Companion 无需反向引用包含自身的 ingress 闭包。原 516-source 编译失败已在 522-source focused Fable compile 中通过；源码总数与 aggregate 顺序不变，没有用动态加载回捞依赖。合入的格式问题由正式 Fantomas 工具修正，整体验收仍使用 `npm run format-build-test`，局部编译不代替该入口。
+
+独立编译原 ingress consumer 又暴露了被 enforcer-codec 根项目遮住的 Companion→repair 依赖。`enforcer/repair` 现单独编译既有 codec、cycle model/decode、repair 和 Blogger probe，Companion 与 enforcer-codec 均静态引用它，不再依赖偶然被聚合根纳入的源码；Host signal adapter 也显式引用实际调用的 `ToolResultBound` 窄合同。`Wanxiangshu.Owner.dispatch-protocol.interaction-dispatch-opencode-ingresscodec.fsproj` 的 564-source focused compile 已通过。这些修复恢复真实声明依赖，references 增长是如实表达知识，不是架构退步的自动判据。
+
+`LanguageSurface` 的 Bookkeeper 资源读取仍需要 `PromptResources`，因此恢复其静态资源引用；真实 Host transform 从 bootstrap 分片移到 `host/provider-system-transform`，由语言验证 Surface 与 bootstrap 共用，公开 API 和源码路径不变。bootstrap 对 `BookkeeperRuntime`／`CasebookLifecycle` 的实际调用分别通过现有 casebook-model／casebook-bookkeeper 分片声明，不再依靠 aggregate 偶然补齐。语言 Surface 与原 bootstrap consumer 各使用自己的 focused compile 入口验证，不能仅用全量构建证明这两条闭包。
 
 旧 M6 计划仅用于追溯退役原因；其 extractor、worksheet、ACL 与 snapshot 清单不形成关闭本节缺口的条件。ENF-015、ENF-016 等独立产品证明缺口仍由所属包 HOW 记录，不因 GAP-031 路线退役或本节记录完成而关闭。
 

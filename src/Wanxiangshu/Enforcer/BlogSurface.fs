@@ -81,9 +81,7 @@ module BlogSurface =
                     else
                         box sessionId |}
         else
-            match
-                ChronicleExecution.tryCanonicalText (if isNullish entry then null else string entry)
-            with
+            match ChronicleExecution.tryCanonicalText (if isNullish entry then null else string entry) with
             | Error _ ->
                 box
                     {| ok = true

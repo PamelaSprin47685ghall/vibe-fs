@@ -152,9 +152,7 @@ module AgentProjection =
         | None -> false
 
     let hasActiveOrchestratorJobs (projection: AgentProjectionSet) : bool =
-        OrchestratorProjection.activeJobs projection.Orchestrator
-        |> List.isEmpty
-        |> not
+        OrchestratorProjection.activeJobs projection.Orchestrator |> List.isEmpty |> not
 
     let activeOrchestratorJobPairs (projection: AgentProjectionSet) : (ManagerJobId * SessionId) list =
         OrchestratorProjection.activeJobs projection.Orchestrator

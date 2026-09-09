@@ -1,15 +1,5 @@
 namespace Wanxiangshu.Enforcer
 
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Foundation
-open Wanxiangshu.Host
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-
-open System
-
 /// docs/what/enforcer.md ENFORCER-020…026：`blog` tip v2 codec.
 ///
 /// raw JSON object → Result<CanonicalBlogCall, string>.

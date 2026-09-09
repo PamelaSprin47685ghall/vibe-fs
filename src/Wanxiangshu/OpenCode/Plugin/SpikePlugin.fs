@@ -33,6 +33,7 @@ module SpikePlugin =
                             cause
                             boot.Scope.Sessions.Quiescence
                             context
+
                 let! host = PluginHostWiring.create observeTurnWorkflow boot
                 PluginSessionWiring.attach boot host
                 PluginRecoveryWiring.attach boot

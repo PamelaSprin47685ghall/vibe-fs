@@ -12,7 +12,7 @@ module CasebookBookkeeperSurface =
 
     val resetRuntime: unit -> unit
 
-        val bindSession: sessionId: string -> txId: string -> ownerSessionId: string -> unit
+    val bindSession: sessionId: string -> txId: string -> ownerSessionId: string -> unit
     val unbindSession: sessionId: string -> unit
     val txIdFor: sessionId: string -> string
 

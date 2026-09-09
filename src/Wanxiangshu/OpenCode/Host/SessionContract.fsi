@@ -27,10 +27,15 @@ type QuiescencePermitFailure =
 
 type ILoopSensor =
     abstract Observe: raw: obj -> unit
-    abstract ConsumeAbortCause: sessionId: SessionId * expectedRun: ProviderRunIdentity * directory: string option -> AbortCause
+
+    abstract ConsumeAbortCause:
+        sessionId: SessionId * expectedRun: ProviderRunIdentity * directory: string option -> AbortCause
+
     abstract DropSession: sessionId: SessionId -> unit
     abstract ResetDetector: sessionId: SessionId -> unit
-    abstract ActiveInterruptTask: sessionId: SessionId * expectedRun: ProviderRunIdentity -> System.Threading.Tasks.Task option
+
+    abstract ActiveInterruptTask:
+        sessionId: SessionId * expectedRun: ProviderRunIdentity -> System.Threading.Tasks.Task option
 
 type ISessionQuiescenceGate =
     abstract BeginProviderAttempt: sessionId: SessionId -> unit

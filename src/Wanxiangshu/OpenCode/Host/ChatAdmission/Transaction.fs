@@ -554,7 +554,9 @@ module internal ChatAdmissionTransaction =
         }
 
     let private bindingModule: obj =
-        emitJsExpr () """
+        emitJsExpr
+            ()
+            """
         (() => {
             let mod = null;
             try {
@@ -583,7 +585,9 @@ module internal ChatAdmissionTransaction =
         (participant: string)
         (model: OpencodeModel)
         : unit =
-        emitJsExpr (bindingModule, sessionId, physicalUserMessageId, participant, model) """
+        emitJsExpr
+            (bindingModule, sessionId, physicalUserMessageId, participant, model)
+            """
         (() => {
             if ($0 && typeof $0.acceptExternalExecution === 'function') {
                 $0.acceptExternalExecution($1, $2, $3, $4);
@@ -598,7 +602,9 @@ module internal ChatAdmissionTransaction =
         (participant: string)
         (model: OpencodeModel)
         : unit =
-        emitJsExpr (bindingModule, sessionId, promptKey, physicalUserMessageId, participant, model) """
+        emitJsExpr
+            (bindingModule, sessionId, promptKey, physicalUserMessageId, participant, model)
+            """
         (() => {
             if ($0 && typeof $0.acceptPromptExecution === 'function') {
                 $0.acceptPromptExecution($1, $2, $3, $4, $5);
@@ -610,7 +616,9 @@ module internal ChatAdmissionTransaction =
         (sessionId: SessionId)
         (physicalUserMessageId: PhysicalUserMessageId)
         : unit =
-        emitJsExpr (bindingModule, sessionId, physicalUserMessageId) """
+        emitJsExpr
+            (bindingModule, sessionId, physicalUserMessageId)
+            """
         (() => {
             if ($0 && typeof $0.releaseAcceptedExecution === 'function') {
                 $0.releaseAcceptedExecution($1, $2);

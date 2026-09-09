@@ -734,6 +734,7 @@ module SyncDelegateSurface =
         let ownerSessionId = SessionId.value (harness.OwnerSession owner)
         let scope = harness.Scope
         let runtimeOpt = Some harness.Runtime
+
         let invokeAsync: Task<string> =
             emitJsExpr
                 (scope, runtimeOpt, toolModule, ownerSessionId, charge)

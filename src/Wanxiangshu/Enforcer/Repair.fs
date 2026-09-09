@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Enforcer
 
-open System
 open Fable.Core.JsInterop
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer.Cycle

@@ -3,6 +3,8 @@
     <WanxiangshuSemanticOwner>distribution</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>assemblyinfo</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuSubsystem>runtime-platform</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>runtime-platform-assemblyinfo</WanxiangshuCompileShard>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fsi"/>

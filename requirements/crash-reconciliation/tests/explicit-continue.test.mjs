@@ -75,6 +75,8 @@ test('WHAT[CRASH-018] CRASH_018_real_command_material_materializes_briefing_and_
       physicalOutput,
     )
 
+    assert.equal(physicalOutput.message.tools?.fission, false, '/continue must retain the root request origin deny')
+
     const materialized = physicalOutput.parts.filter(
       (part) => part.metadata?.wanxiangshu_explicit_resume === true,
     )

@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-promptresources.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.provider-system-transform.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
     <Compile Include="Participant/Provider/LanguageSurface.fsi"/>

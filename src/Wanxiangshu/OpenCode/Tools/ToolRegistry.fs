@@ -484,8 +484,7 @@ module ToolRegistry =
                 snapshot,
                 cancelSignals,
                 continueManagerLoop = continueManagerLoop,
-                captureWorktreeSnapshot =
-                    (fun path -> captureWorktreeSnapshot path |> Result.map WorkspaceSnapshotId.value),
+                captureWorktreeSnapshot = captureWorktreeSnapshot,
                 ?eventPort = eventPort
             )
 

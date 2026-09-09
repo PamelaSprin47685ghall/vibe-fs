@@ -3,7 +3,6 @@ namespace Wanxiangshu.Participant.Provider
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Resources
 
 /// Provider-language owner boundary. Language values, session binding and
 /// localized resources cross as strings and plain objects; ProviderLanguage,
@@ -111,15 +110,12 @@ module ProviderLanguageSurface =
         ProviderProse.substitute template (mapOf substitutions)
 
     let loadBookkeeperSystem (language: string) : string =
-        PromptResources.loadBookkeeperSystemFor (languageOf language)
+        Wanxiangshu.Resources.PromptResources.loadBookkeeperSystemFor (languageOf language)
 
     /// Exercise the real host transform at the provider-language boundary for
     /// the Bookkeeper-owned system segment. The attachment fixture is private;
     /// host-owned system bytes remain caller data and are never rewritten.
-    let transformBookkeeperSystem
-        (sessionId: string)
-        (system: string array)
-        : Task<obj> =
+    let transformBookkeeperSystem (sessionId: string) (system: string array) : Task<obj> =
         task {
             let sid = SessionId.create sessionId
             Wanxiangshu.OpenCode.ProviderLanguageBinding.ensureRoot sid |> ignore

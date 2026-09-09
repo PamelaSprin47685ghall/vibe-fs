@@ -22,6 +22,8 @@
 9. **Stable-identity X 穿透**：X-wire 的 cutoff 是 canonical XTrace semantic-turn boundary，不是本次 provider 数组下标。写回时由 XTrace provenance 解析被 coverage 证明覆盖的 Host message id，明确排除 raw Opening，并在这些覆盖消息中保留 `todowrite` call/result 原始回合；request-local synthetic/presentation row 不在 covered id set 中，因此不会移动 cutoff 或被误删。
 10. **Blogger materialization admission + terminal owner fence**：同一 Blogger 的 materialize / PromptKey bind / abandon 先取得 process-wide、跨 plugin instance 的 keyed admission；取得后再读 durable projection 并执行 open-request 转换。normal start 持有 admission 直到 durable materialize、原子 flight claim 与 send/bind 完成，provider retry 的 stage/bind/abandon 也复用同一 admission。flight claim 只允许无 owner 时建立或同 RequestId 刷新；不同 RequestId 返回 conflict，不覆盖 owner。`BloggerRequestOwnership` 是 terminal→request ownership 的唯一纯 decision；Enforcer 与 reconciled-idle repair 只负责把 assistant `parentID` 解析为 exact `PhysicalUserMessageId`，再从 PromptAuthority accepted-dispatch evidence 与 durable open PromptKey/RequestId 组装 evidence 并调用该 decision。base attempt 或 request-scoped `InteractionRepair` 属于当前 request 才可继续；positive supersession 直接 no-op。不得用 latest-user 位置、文本内容或 process-local flight presence 猜 terminal owner。该 admission/flight 都是物理资源，不参与 retry correctness proof。
 
+`ContextFactFold` 在同一次 fact fold 内直接调用纯 `EnforcementProjection.applyFromEntry`／`applySquash`，使用具名 `EnforcementCycleRecord` 保留类型检查；不存在动态模块查找、手写 union tag 或模块缺失时的默认状态。该依赖指向 `enforcer-projection` 的纯投影分片，不指向 Enforcer runtime。Blogger Coordinator 所需 Nudge 工作流由独立 `dispatch/session-nudge` 分片提供，repair decision 与 Blogger evidence reader 由 `enforcer/repair` 提供，避免经 ingress 或 enforcer-codec 大分片形成编译环。
+
 ## 依赖关系
 
 DEPENDS ON:

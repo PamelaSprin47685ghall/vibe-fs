@@ -185,7 +185,10 @@ module XWire =
     let suppressHostMessagesByIds (rawMessages: obj list) (hostMessageIds: Set<string>) =
         ProjectionMessageEdit.suppressHostMessagesByIds rawMessages hostMessageIds
 
-    let private renderFrozenRecordPrefix (opening: XTraceOpeningEvidence) (frameBodies: string list) : Task<Result<string, string>> =
+    let private renderFrozenRecordPrefix
+        (opening: XTraceOpeningEvidence)
+        (frameBodies: string list)
+        : Task<Result<string, string>> =
         let invokeAsync: Task<string> =
             emitJsExpr
                 (opening, frameBodies)
@@ -277,16 +280,18 @@ module XWire =
     let private tryFindStrengthReplicaBinding (scope: PluginRuntimeScope) (sessionId: SessionId) : obj option =
         try
             let key = SessionId.value sessionId
+
             emitJsExpr (scope, key) "$0.strength?.strengthRuntime?.byReplica?.get($1) ?? null"
             |> Option.ofObj
         with _ ->
             None
 
-    let private replicaBindingCanonicalRole (binding: obj) : Role =
-        emitJsExpr binding "$0.CanonicalRole"
+    let private replicaBindingCanonicalRole (binding: obj) : Role = emitJsExpr binding "$0.CanonicalRole"
 
     let private replicaBindingCapabilitiesMatch (binding: obj) (expectedCapabilities: obj) : bool =
-        emitJsExpr (binding, expectedCapabilities) "$0.ToolCapabilitySet?.Equals ? $0.ToolCapabilitySet.Equals($1) : Object.is($0.ToolCapabilitySet, $1)"
+        emitJsExpr
+            (binding, expectedCapabilities)
+            "$0.ToolCapabilitySet?.Equals ? $0.ToolCapabilitySet.Equals($1) : Object.is($0.ToolCapabilitySet, $1)"
 
     let private requireStrengthReplicaAuthority
         (binding: obj)

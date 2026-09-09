@@ -1,14 +1,5 @@
 namespace Wanxiangshu.Enforcer
 
-open System
-open Fable.Core.JsInterop
-open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Host
-open Wanxiangshu.Persistence.Journal
-
 module EnforcerRepair =
 
     val RepairInstruction: string

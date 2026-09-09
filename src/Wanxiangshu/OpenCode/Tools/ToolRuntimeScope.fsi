@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Wanxiangshu.Change.Host
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Delegation.Handle
@@ -11,6 +12,7 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Persistence.Journal
 
 /// Owns every per-session tool runtime.
@@ -36,7 +38,7 @@ type ToolRuntimeScope =
         snapshot: ISessionSnapshotPort option *
         cancelSignals: (SessionId seq -> unit) option *
         ?continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>) *
-        ?captureWorktreeSnapshot: (WorktreePath -> Result<string, string>) *
+        ?captureWorktreeSnapshot: (WorktreePath -> Result<WorkspaceSnapshotId, string>) *
         ?eventPort: IEventObservationPort ->
             ToolRuntimeScope
 
@@ -110,7 +112,7 @@ type ToolRuntimeScope =
 
     member ExecutorRuntimeFor: ctx: HostToolContext -> HostForkRuntime
 
-    member OrchestratorHostFor: sessionId: string -> obj
+    member OrchestratorHostFor: sessionId: string -> OrchestratorHost
 
     member RunOwnedWork: start: (unit -> Task) -> bool
 

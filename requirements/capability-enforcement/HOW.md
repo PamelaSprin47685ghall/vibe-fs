@@ -26,8 +26,8 @@ Roles.permissions (Kernel 层单一真相源)
    - 静态检查器 `capability-isomorphism-gate.mjs` 在构建期验证生成的类型成员、描述文本、示例与门禁的一致性。
 
 4. **权威合同与静态边界**：
-   - `scripts/checks/authority-contracts.json` 是正向 exact-symbol manifest。每行同时记录 class、owner、WHAT、scope、freshness、multiplicity、consume、durability 以及声明/发行 source anchor；它不是按名字放行的 allowlist。
-   - `authority-boundary.mjs` 仅检查源码文本与正向 manifest：拒绝 stale anchor、未分类敏感声明、可见 foreign issuance、bool 一次性消费与显式 Capability codec/JSON 持久化。FCS symbol/application/control-flow 输入及其专用断言已删除；文本门禁不证明推断类型、跨函数数据流或 admission 支配关系，这些必须由编译器边界与真实 owner 行为证明。
+   - `scripts/checks/authority-contracts.json` 是正向 exact-symbol manifest。每行同时记录 class、owner、WHAT、scope、freshness、multiplicity、consume、durability 以及声明/发行 source anchor；它不是按名字放行的 allowlist。其中 `owner` 是源码 subsystem 身份（与 `scripts/checks/subsystems.json` 解析一致），`whatOwners` 是 requirement package 命题归属；两者不得混用。
+   - `authority-boundary.mjs` 仅检查源码文本与正向 manifest：拒绝 stale anchor、未分类敏感声明、可见 foreign issuance、bool 一次性消费与显式 Capability codec/JSON 持久化。源码归属只取唯一 resolved subsystem（显式 `WanxiangshuSubsystem` 优先，否则经 `subsystems.json` 的 legacy 映射解析），旧 `WanxiangshuSemanticOwner` 不再参与 verdict；WHAT 包存在性只看 requirement trace 的 package 集合，不看源码 subsystem 集合。FCS symbol/application/control-flow 输入及其专用断言已删除；文本门禁不证明推断类型、跨函数数据流或 admission 支配关系，这些必须由编译器边界与真实 owner 行为证明。
    - `Evidence / Decision / Witness / Capability / Receipt / PhysicalHandle` 使用同一六类 DSL；`Vocabulary` 是显式正向分类，确保 `JsCapability` 这类非权威名词不会被名称启发式误判。
 
 5. **Quiescence typed owner gate**：
@@ -57,8 +57,8 @@ ENF-015、ENF-016 原来的门禁测试仅提供手写 compiler evidence，已�
 | ENF-010 | `requirements/capability-enforcement/tests/agent-permission-gate.test.mjs::WHAT[ENF-010] AGENT_002_gate_accepts_distinct_models_and_writes_owned_fields` |
 | ENF-011 | `requirements/capability-enforcement/tests/managed-agent-config.test.mjs::WHAT[ENF-011] MACFG_applyOwnedFields_writes_owned_keys_and_never_touches_model` |
 | ENF-012 | `requirements/capability-enforcement/tests/capability-isomorphism-gate.test.mjs::WHAT[ENF-012] capability_iso_tool_registry_requires_generator` |
-| ENF-013 | `requirements/capability-enforcement/tests/authority-boundary.test.mjs::WHAT[ENF-013] all six authority classes require exact positive contracts while JsCapability remains vocabulary` |
-| ENF-014 | `requirements/capability-enforcement/tests/authority-boundary.test.mjs::WHAT[ENF-014] stale anchors and unclassified sensitive declarations fail closed` |
+| ENF-013 | `requirements/capability-enforcement/tests/authority-boundary.test.mjs::WHAT[ENF-013] all six authority classes require exact positive contracts while JsCapability remains vocabulary`；`requirements/capability-enforcement/tests/authority-boundary.test.mjs::WHAT[ENF-013] source identity is a single resolved subsystem without legacy aliases`；`requirements/capability-enforcement/tests/authority-boundary.test.mjs::WHAT[ENF-013] WHAT package identity is separate from source subsystem` |
+| ENF-014 | `requirements/capability-enforcement/tests/authority-boundary.test.mjs::WHAT[ENF-014] stale anchors and unclassified sensitive declarations fail closed`；`requirements/capability-enforcement/tests/authority-boundary.test.mjs::WHAT[ENF-014] explicit and legacy-mapped subsystems resolve through the real repository path` |
 | ENF-017 | `requirements/capability-enforcement/tests/authority-boundary.test.mjs::WHAT[ENF-017] every authority contract declares its multiplicity` |
 | ENF-018 | `requirements/capability-enforcement/tests/process-capability-lifecycle.test.mjs::WHAT[ENF-018] process capability consumes once and reports duplicate consumption without effect` |
 | ENF-019 | `requirements/capability-enforcement/tests/process-capability-lifecycle.test.mjs::WHAT[ENF-019] provider-attempt composition requires fresh current-process admission without codec or event recovery` |

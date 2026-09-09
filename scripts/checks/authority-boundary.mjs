@@ -6,10 +6,10 @@ import { fileURLToPath } from 'node:url'
 
 import { readCompileShardInventory } from '../lib/compile-shards.mjs'
 import { buildTraceGraph } from '../lib/requirement-trace.mjs'
+import { buildSubsystemInventory, readSubsystemPolicy } from './subsystems.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 export const DEFAULT_MANIFEST = resolve(HERE, 'authority-contracts.json')
-const REQUIREMENTS = resolve(HERE, '../../requirements')
 const REPOSITORY_ROOT = resolve(HERE, '../..')
 export const AUTHORITY_CLASSES = Object.freeze([
   'Evidence',
@@ -24,23 +24,30 @@ const norm = (path) => path.replace(/\\/g, '/')
 const escapeRe = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 let canonicalRegistry
-const authorityRegistry = () => {
-  if (canonicalRegistry) return canonicalRegistry
-  const shardInventory = readCompileShardInventory({ repositoryRoot: REPOSITORY_ROOT })
-  const owners = new Set()
+const authorityRegistry = (repoRoot = REPOSITORY_ROOT) => {
+  const normalized = resolve(repoRoot)
+  if (normalized === REPOSITORY_ROOT && canonicalRegistry) return canonicalRegistry
+  const compileInventory = readCompileShardInventory({ repositoryRoot: normalized })
+  const policyState = readSubsystemPolicy(resolve(normalized, 'scripts/checks/subsystems.json'))
+  const subsystemInventory = buildSubsystemInventory({ compileInventory, policyState })
+  const subsystems = new Set(policyState.ids)
   const ownership = new Map()
-  for (const [sourcePath, project] of shardInventory.sourceProject) {
-    const validOwners = new Set([project.legacyOwner, project.explicitSubsystem].filter(Boolean))
-    for (const owner of validOwners) owners.add(owner)
-    ownership.set(norm(relative(REPOSITORY_ROOT, sourcePath)), validOwners)
+  for (const project of subsystemInventory.projects.values()) {
+    if (!project.subsystem) continue
+    for (const file of project.implementationFiles) {
+      ownership.set(norm(relative(normalized, file)), project.subsystem)
+    }
   }
-  const trace = buildTraceGraph(REQUIREMENTS)
-  canonicalRegistry = {
-    owners,
+  const trace = buildTraceGraph(resolve(normalized, 'requirements'))
+  const packages = new Set([...trace.whats.values()].map((what) => what.package))
+  const registry = {
+    subsystems,
     ownership,
     whats: trace.whats,
+    packages,
   }
-  return canonicalRegistry
+  if (normalized === REPOSITORY_ROOT) canonicalRegistry = registry
+  return registry
 }
 
 /** Remove F# comments and string/char literal content while preserving newlines. */
@@ -205,16 +212,15 @@ export const scanEntries = (entries, manifest, registry = authorityRegistry()) =
     if (method.classification === 'Admission' && (typeof method.resultSymbol !== 'string' || method.resultSymbol.trim() === '')) {
       problems.push(problem('incomplete-method-contract', method.file ?? '<manifest>', 0, `${method.symbol ?? '<missing>'}: resultSymbol`))
     }
-    if (!registry.owners.has(method.owner)) problems.push(problem('unregistered-authority-owner', method.file ?? '<manifest>', 0, `${method.symbol}: ${method.owner}`))
-    const rawOwner = registry.ownership?.get(norm(method.file ?? ''))
-    const fileOwners = rawOwner instanceof Set ? rawOwner : (typeof rawOwner === 'string' ? new Set([rawOwner]) : undefined)
-    if ((fileOwners !== undefined || norm(method.file ?? '').startsWith('src/')) && !fileOwners?.has(method.owner)) {
-      const displayOwner = [...(fileOwners ?? [])].join(' / ') || '<missing>'
+    if (!registry.subsystems.has(method.owner)) problems.push(problem('unregistered-authority-owner', method.file ?? '<manifest>', 0, `${method.symbol}: ${method.owner}`))
+    const methodSubsystem = registry.ownership.get(norm(method.file ?? ''))
+    if ((methodSubsystem !== undefined || norm(method.file ?? '').startsWith('src/')) && methodSubsystem !== method.owner) {
+      const displayOwner = methodSubsystem ?? '<missing>'
       problems.push(problem('authority-owner-mismatch', method.file, 0, `${method.symbol}: declaration owner is ${displayOwner}, contract says ${method.owner}`))
     }
     for (const id of whatIds(method.what)) {
       const definition = registry.whats.get(id)
-      if (!definition || !registry.owners.has(definition.package)) problems.push(problem('unregistered-authority-what', method.file, 0, `${method.symbol}: ${id}`))
+      if (!definition || !registry.packages.has(definition.package)) problems.push(problem('unregistered-authority-what', method.file, 0, `${method.symbol}: ${id}`))
       else if (method.whatOwners?.[id] !== definition.package) problems.push(problem('authority-what-owner-mismatch', method.file, 0, `${method.symbol}: ${id}`))
     }
   }
@@ -254,24 +260,22 @@ export const scanEntries = (entries, manifest, registry = authorityRegistry()) =
       }
     }
     issuerSpansByContract.set(key, registeredIssuerSpans)
-    if (!registry.owners.has(row.owner)) problems.push(problem('unregistered-authority-owner', row.file, 0, `${row.symbol}: ${row.owner ?? '<missing>'}`))
-    const rawOwner = registry.ownership?.get(norm(row.file ?? ''))
-    const fileOwners = rawOwner instanceof Set ? rawOwner : (typeof rawOwner === 'string' ? new Set([rawOwner]) : undefined)
-    if ((fileOwners !== undefined || norm(row.file ?? '').startsWith('src/')) && !fileOwners?.has(row.owner)) {
-      const displayOwner = [...(fileOwners ?? [])].join(' / ') || '<missing>'
+    if (!registry.subsystems.has(row.owner)) problems.push(problem('unregistered-authority-owner', row.file, 0, `${row.symbol}: ${row.owner ?? '<missing>'}`))
+    const rowSubsystem = registry.ownership.get(norm(row.file ?? ''))
+    if ((rowSubsystem !== undefined || norm(row.file ?? '').startsWith('src/')) && rowSubsystem !== row.owner) {
+      const displayOwner = rowSubsystem ?? '<missing>'
       problems.push(problem('authority-owner-mismatch', row.file, 0, `${row.symbol}: declaration owner is ${displayOwner}, contract says ${row.owner ?? '<missing>'}`))
     }
     for (const issuer of row.issuers ?? []) {
-      const rawIssuer = registry.ownership?.get(norm(issuer.file ?? ''))
-      const issuerOwners = rawIssuer instanceof Set ? rawIssuer : (typeof rawIssuer === 'string' ? new Set([rawIssuer]) : undefined)
-      if ((issuerOwners !== undefined || norm(issuer.file ?? '').startsWith('src/')) && !issuerOwners?.has(issuer.owner)) {
-        const displayIssuer = [...(issuerOwners ?? [])].join(' / ') || '<missing>'
+      const issuerSubsystem = registry.ownership.get(norm(issuer.file ?? ''))
+      if ((issuerSubsystem !== undefined || norm(issuer.file ?? '').startsWith('src/')) && issuerSubsystem !== issuer.owner) {
+        const displayIssuer = issuerSubsystem ?? '<missing>'
         problems.push(problem('authority-issuer-owner-mismatch', issuer.file ?? row.file, 0, `${row.symbol}: issuer owner is ${displayIssuer}, contract says ${issuer.owner ?? '<missing>'}`))
       }
     }
     for (const id of whatIds(row.what)) {
       const definition = registry.whats.get(id)
-      if (!definition || !registry.owners.has(definition.package)) {
+      if (!definition || !registry.packages.has(definition.package)) {
         problems.push(problem('unregistered-authority-what', row.file, 0, `${row.symbol}: ${id}`))
       } else if ((norm(row.file ?? '').startsWith('src/') || row.whatOwners !== undefined) && row.whatOwners?.[id] !== definition.package) {
         problems.push(problem('authority-what-owner-mismatch', row.file, 0, `${row.symbol}: ${id} owner is ${definition.package}, contract says ${row.whatOwners?.[id] ?? '<missing>'}`))
@@ -345,7 +349,7 @@ export const scanEntries = (entries, manifest, registry = authorityRegistry()) =
 
 export const scanRepo = (repoRoot = process.cwd(), manifest = readManifest()) => {
   const entries = collectEntries(repoRoot)
-  const problems = scanEntries(entries, manifest)
+  const problems = scanEntries(entries, manifest, authorityRegistry(repoRoot))
   return { ok: problems.length === 0, problems }
 }
 

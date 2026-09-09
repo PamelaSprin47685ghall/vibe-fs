@@ -14,7 +14,9 @@ open Wanxiangshu.Requirement.Grounding
 module RequirementGroundingTransform =
 
     let private pairProgrammingThoughtTransformModule: obj =
-        emitJsExpr () """
+        emitJsExpr
+            ()
+            """
         (() => {
             let mod = null;
             try {
@@ -41,14 +43,18 @@ module RequirementGroundingTransform =
     let toolName = "read"
 
     let cursorSeparator: string =
-        emitJsExpr (pairProgrammingThoughtTransformModule) """
+        emitJsExpr
+            (pairProgrammingThoughtTransformModule)
+            """
         ($0 && typeof $0.cursorGuidanceSeparator === 'string')
             ? $0.cursorGuidanceSeparator
             : "\u0000\uFEFF"
         """
 
     let private isCursorProviderDynamically (providerId: string option) : bool =
-        emitJsExpr (pairProgrammingThoughtTransformModule, providerId) """
+        emitJsExpr
+            (pairProgrammingThoughtTransformModule, providerId)
+            """
         (() => {
             if ($0 && typeof $0.isCursorProvider === 'function') {
                 return $0.isCursorProvider($1);
@@ -59,7 +65,9 @@ module RequirementGroundingTransform =
 
     let private providerIdFromMessagesDynamically (rawMessages: obj list) : string option =
         let raw: obj =
-            emitJsExpr (pairProgrammingThoughtTransformModule, rawMessages) """
+            emitJsExpr
+                (pairProgrammingThoughtTransformModule, rawMessages)
+                """
             (() => {
                 if ($0 && typeof $0.providerIdFromMessages === 'function') {
                     const res = $0.providerIdFromMessages($1);
@@ -68,11 +76,14 @@ module RequirementGroundingTransform =
                 return null;
             })()
             """
+
         if isNull raw then None else Some(unbox<string> raw)
 
     let private appendCursorSuffixesDynamically (suffixes: string list) (message: obj) : obj option =
         let raw: obj =
-            emitJsExpr (pairProgrammingThoughtTransformModule, suffixes, message) """
+            emitJsExpr
+                (pairProgrammingThoughtTransformModule, suffixes, message)
+                """
             (() => {
                 if ($0 && typeof $0.appendCursorSuffixes === 'function') {
                     const res = $0.appendCursorSuffixes($1, $2);
@@ -81,10 +92,13 @@ module RequirementGroundingTransform =
                 return null;
             })()
             """
+
         if isNull raw then None else Some raw
 
     let private stripCursorSuffixesDynamically (suffixes: string list) (message: obj) : obj =
-        emitJsExpr (pairProgrammingThoughtTransformModule, suffixes, message) """
+        emitJsExpr
+            (pairProgrammingThoughtTransformModule, suffixes, message)
+            """
         (() => {
             if ($0 && typeof $0.stripCursorSuffixes === 'function') {
                 return $0.stripCursorSuffixes($1, $2);
@@ -97,7 +111,9 @@ module RequirementGroundingTransform =
         (realMessages: obj list)
         : Result<(TranscriptGap * TranscriptGap) option, string> =
         let raw: obj =
-            emitJsExpr (pairProgrammingThoughtTransformModule, realMessages) """
+            emitJsExpr
+                (pairProgrammingThoughtTransformModule, realMessages)
+                """
             (() => {
                 if ($0 && typeof $0.decideCurrentPlacement === 'function') {
                     return $0.decideCurrentPlacement($1);
@@ -105,6 +121,7 @@ module RequirementGroundingTransform =
                 return { tag: 0, fields: [undefined] };
             })()
             """
+
         unbox<Result<(TranscriptGap * TranscriptGap) option, string>> raw
 
     let private tryString (value: obj) : string option =
@@ -236,8 +253,7 @@ module RequirementGroundingTransform =
         if List.isEmpty suffixes then
             message
         else
-            appendCursorSuffixesDynamically suffixes message
-            |> Option.defaultValue message
+            appendCursorSuffixesDynamically suffixes message |> Option.defaultValue message
 
     let private replayCursor realMessages occurrences =
         let addresses =
@@ -336,8 +352,7 @@ module RequirementGroundingTransform =
         if isCursorProviderDynamically providerId then
             let suffixes = history |> List.collect _.Reads |> List.map _.CursorResultBytes
 
-            rawMessages
-            |> List.map (stripCursorSuffixesDynamically suffixes)
+            rawMessages |> List.map (stripCursorSuffixesDynamically suffixes)
         else
             rawMessages
 

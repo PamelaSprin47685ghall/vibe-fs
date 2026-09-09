@@ -4,7 +4,7 @@
 
 ### 准入检查与会话替换
 
-1. **Origin 门禁**：执行侧首先验证调用方是否具有物理父会话（`parentID` 存在）。根会话（root session）在解析 prompt 前即被拦截并拒绝，并在工具投影中显式关闭裂变可见性。
+1. **Origin 门禁**：执行侧首先验证调用方是否具有物理父会话（`parentID` 存在）。根会话（root session）在解析 prompt 前即被拦截并拒绝，并在工具投影中显式关闭裂变可见性。请求投影与父关系发现采用同一份证据条件：共享 parent cache 或 `SessionExecutionBinding.tryParent` 任一已知即可证明父关系；发现逻辑因已有 execution binding 跳过 Host 查询时，不能再把 cache 尚空的子会话误判为根会话。真实 `chat.message` 回归覆盖该情况；`/continue` 的真实 command→chat 回归同时验证 disclosure 分支保留根请求的 Fission deny，不再以源码符号或位置断言替代这些行为。
 2. **参数校验与原子准入**：校验 `prompts` 数组（N≥2 且非空），预留并发槽位后，为每条 lane 创建与原 caller 具有相同父级的 fresh sibling 会话。
 3. **首载荷注入与静默交接**：各 lane 继承调用方的角色配置与语言设置，注入原 caller 的 canonical LWR 与对应 lane 输入。全量 lanes 建立成功后，向原 caller 发起 Fission 专属的静默中断，无缝移交执行流。
 
@@ -32,7 +32,7 @@
 | INTRA-PARTICIPANT-PARALLELISM-010 | `requirements/intra-participant-parallelism/tests/fission-source-ratchet.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-010] V1 Fission has no OpenCode session-fork path and owns durable replay anchors` |
 | INTRA-PARTICIPANT-PARALLELISM-011 | `requirements/intra-participant-parallelism/tests/fission-runtime.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-011] second admission while active is rejected as AlreadyFissioned until release` |
 | INTRA-PARTICIPANT-PARALLELISM-012 | `requirements/intra-participant-parallelism/tests/fission-source-ratchet.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-012] Fission role eligibility comes from ToolPermission.Fission for current office vocabulary` |
-| INTRA-PARTICIPANT-PARALLELISM-013 | `requirements/intra-participant-parallelism/tests/fission-tool-origin.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-013] real root chat message carries a request-local fission deny`；`requirements/intra-participant-parallelism/tests/fission-tool-origin.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-013] forced root fission rejects origin before parsing prompts` |
+| INTRA-PARTICIPANT-PARALLELISM-013 | `requirements/intra-participant-parallelism/tests/fission-tool-origin.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-013] real root chat message carries a request-local fission deny`；`requirements/intra-participant-parallelism/tests/fission-tool-origin.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-013] a bound child retains fission when the physical parent cache is empty`；`requirements/intra-participant-parallelism/tests/fission-tool-origin.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-013] forced root fission rejects origin before parsing prompts` |
 | INTRA-PARTICIPANT-PARALLELISM-014 | `requirements/intra-participant-parallelism/tests/fission-domain.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-014] control-plane successors run before lane settlement and final takeover`；`requirements/intra-participant-parallelism/tests/fission-source-ratchet.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-014] Degeneration guard remains control-plane owner before Fission settlement` |
 | INTRA-PARTICIPANT-PARALLELISM-015 | `requirements/intra-participant-parallelism/tests/fission-domain.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-015] ring fold order and final takeover lane are canonical, never arrival ordered` |
 | INTRA-PARTICIPANT-PARALLELISM-016 | `requirements/intra-participant-parallelism/tests/task-result-list-traversal.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-016] TASK_RESULT_LIST_traverseM_calls_mapper_once_per_input_in_order_stops_at_first_Error_and_skips_empty` |

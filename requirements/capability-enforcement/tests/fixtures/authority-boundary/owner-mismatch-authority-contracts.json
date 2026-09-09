@@ -7,7 +7,7 @@
     "anchor": "type OneShotCapability =",
     "classification": "Authority",
     "class": "Capability",
-    "owner": "finality",
+    "owner": "persistence",
     "what": "ENF-013",
     "whatOwners": { "ENF-013": "capability-enforcement" },
     "scope": "exact subject and version",
@@ -19,7 +19,7 @@
       "file": "positive-six-classes.fs",
       "symbol": "issueOneShotCapability",
       "anchor": "let issueOneShotCapability",
-      "owner": "capability-enforcement"
+      "owner": "interaction"
     }]
   }]
 }

@@ -27,7 +27,9 @@ module ProviderRecoveryWorkflow =
 
     module private SessionAssociationProjection =
         let tryBloggerOf (sessionId: SessionId) (associations: obj) : SessionId option =
-            emitJsExpr (associations, sessionId) """
+            emitJsExpr
+                (associations, sessionId)
+                """
             (() => {
                 const map = $0;
                 const sid = $1;
@@ -44,7 +46,9 @@ module ProviderRecoveryWorkflow =
             """
 
         let tryMainSessionOf (sessionId: SessionId) (associations: obj) : SessionId option =
-            emitJsExpr (associations, sessionId) """
+            emitJsExpr
+                (associations, sessionId)
+                """
             (() => {
                 const map = $0;
                 const sid = $1;

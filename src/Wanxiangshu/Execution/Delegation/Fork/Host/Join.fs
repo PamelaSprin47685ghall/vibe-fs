@@ -30,14 +30,12 @@ open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Manager
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery

@@ -74,13 +74,7 @@ module RecoveryClosureProjection =
         else
             add (RecoveryNode.ManagerJob(jobId, managerSessionId))
 
-            add (
-                RecoveryNode.AgentChild(
-                    root,
-                    managerSessionId,
-                    AgentHandleId.create (ManagerJobId.value jobId)
-                )
-            )
+            add (RecoveryNode.AgentChild(root, managerSessionId, AgentHandleId.create (ManagerJobId.value jobId)))
 
             addBloggerPair add managerSessionId projection
 

@@ -104,6 +104,7 @@ type Orchestrator
 
         task {
             let! verdict = OrchestratorProgram.run programDeps job
+
             mailbox.Publish verdict
         }
         |> ignore

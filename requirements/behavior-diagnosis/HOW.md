@@ -7,6 +7,7 @@
 1. **Catalog 结构与合流**：
    - 规则目录由 built-in 资源与经校验的 `InstitutionalRuleBorn` durable 事件动态合流，生成统一的 `EnforcerCatalog`。
    - 纯函数 `validate` 校验规则唯一性、连续派生 LexicalOrder `1..N` 及双语正文非空性。
+   - `EnforcerCatalogResource.loadFor` 静态调用 `EnforcerCatalog.validate 1 rules`，并传播非法 catalog 的失败。resource shard 显式依赖 catalog 与 provider-language；不得动态查找编译模块或在校验器缺失时伪造成功结果。
    - `resolveByField` 执行精确匹配与 Levenshtein 编辑距离归一化，并列时按 LexicalOrder 决胜。
 
 2. **System Prompt 确定性合成**：

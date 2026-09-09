@@ -131,7 +131,14 @@ module HostSignalBootstrap =
             let binding = TurnBinding.Store()
 
             let onTurn =
-                HostTurnObserver.observe observeTurnWorkflow sessionPort rootWorkspace eventPort journal strengthDurability scope
+                HostTurnObserver.observe
+                    observeTurnWorkflow
+                    sessionPort
+                    rootWorkspace
+                    eventPort
+                    journal
+                    strengthDurability
+                    scope
 
             let onSnapshot = HostCompactionObserver.observe scope journal
 
@@ -170,7 +177,9 @@ module HostSignalBootstrap =
                     // LOOP-005: idle ends the attempt → fresh detector for the next stream.
                     // Armed anomaly must survive until TurnAborted reconciliation consumes
                     // guard ownership (ResetDetector deliberately does not clear it; DG-008).
-                    emitJsExpr (scope, sessionId) "($0.loopSensor?.ResetDetector ? $0.loopSensor.ResetDetector($1) : undefined)"
+                    emitJsExpr
+                        (scope, sessionId)
+                        "($0.loopSensor?.ResetDetector ? $0.loopSensor.ResetDetector($1) : undefined)"
 
                     // HOST-004: the idle observation mints the quiescence permit that
                     // idle-derived continuations must hold at send time. The permit is
@@ -229,8 +238,8 @@ module HostSignalBootstrap =
             // LoopSensor.create (fun sessionId -> sessionPort.InterruptAttempt sessionId)
             let abortFn =
                 // LoopSensor.create
-                (fun sessionId ->
-                    sessionPort.InterruptAttempt sessionId)
+                (fun sessionId -> sessionPort.InterruptAttempt sessionId)
+
             let continueFn =
                 fun (sessionId: SessionId) (kind: obj) (directory: string option) ->
                     task {
@@ -239,8 +248,8 @@ module HostSignalBootstrap =
                                 "runtime/degeneration-too-random"
                             else
                                 "runtime/degeneration-too-repetitive"
-                        let prompt =
-                            ProviderProse.documentFor sessionId continuationKind Map.empty
+
+                        let prompt = ProviderProse.documentFor sessionId continuationKind Map.empty
 
                         let! outcome =
                             HostSessionNudge.sendContinuationResult
@@ -260,7 +269,11 @@ module HostSignalBootstrap =
             let resolveDynamicLoopSensor () : obj option =
                 try
                     emitJsExpr
-                        (scope.Sessions.OwnedSessions, scope.Sessions.SessionParents, abortFn, continueFn, Diagnostic.emit)
+                        (scope.Sessions.OwnedSessions,
+                         scope.Sessions.SessionParents,
+                         abortFn,
+                         continueFn,
+                         Diagnostic.emit)
                         """
 (function(ownedSessions, sessionParents, abortFn, continueFn, emitDiagnostic) {
     try {
@@ -546,7 +559,10 @@ module HostSignalBootstrap =
                 }
 
             let hasPhysicalParent sessionId =
+                // Discovery skips Host I/O when execution binding already proves
+                // a parent; request projection must honor that same evidence.
                 scope.Sessions.SessionParents.ContainsKey(SessionId.value sessionId)
+                || (SessionExecutionBinding.tryParent sessionId).IsSome
 
             let continueUnmanagedChatMessage intent =
                 requireDurabilityActivation ()

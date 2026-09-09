@@ -5,6 +5,7 @@
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.change-integration.git-integrationgate.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-managedagent.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-completion-mailbox.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-contract.fsproj"/>

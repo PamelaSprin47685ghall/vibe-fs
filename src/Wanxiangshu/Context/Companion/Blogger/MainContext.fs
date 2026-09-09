@@ -38,7 +38,9 @@ module BloggerMainContext =
             projection.Messages
 
     let private enforcerHostModule: obj =
-        emitJsExpr () """
+        emitJsExpr
+            ()
+            """
         (() => {
             let mod = null;
             try {
@@ -71,7 +73,9 @@ module BloggerMainContext =
         (chunk: BloggerDeltaChunk)
         : BloggerRequestContext option =
         let raw: obj =
-            emitJsExpr (enforcerHostModule, mainSessionId, bloggerSessionId, observedEpoch, blog, xTrace, projection, chunk) """
+            emitJsExpr
+                (enforcerHostModule, mainSessionId, bloggerSessionId, observedEpoch, blog, xTrace, projection, chunk)
+                """
             (() => {
                 if ($0 && typeof $0.mainContextFromChunk === 'function') {
                     const res = $0.mainContextFromChunk($1, $2, $3, $4, $5, $6, $7);
@@ -80,7 +84,11 @@ module BloggerMainContext =
                 return null;
             })()
             """
-        if isNull raw then None else Some(unbox<BloggerRequestContext> raw)
+
+        if isNull raw then
+            None
+        else
+            Some(unbox<BloggerRequestContext> raw)
 
     let hasMaterial
         (journal: AgentJournal option)

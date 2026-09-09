@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>host</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>provider-system-transform</WanxiangshuCompileShard>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.distribution.resources-enforcercatalogresource.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-ledger.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-model.fsproj" />
+    <Compile Include="OpenCode/Host/ProviderSystemTransform.fsi" />
+    <Compile Include="OpenCode/Host/ProviderSystemTransform.fs" />
+  </ItemGroup>
+</Project>

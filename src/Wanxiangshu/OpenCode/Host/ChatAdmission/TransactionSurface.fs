@@ -610,7 +610,9 @@ module TransactionSurface =
                           IdentitySeed = acceptedEvidence.IdentitySeed }
 
             let bindingModule: obj =
-                emitJsExpr () """
+                emitJsExpr
+                    ()
+                    """
                 (() => {
                     let mod = null;
                     try {
@@ -636,7 +638,14 @@ module TransactionSurface =
             let installBinding model =
                 match bindingIntent with
                 | ChatAdmissionIntent.Decision.PendingPromptIntent intent ->
-                    emitJsExpr (bindingModule, key.SessionId, intent.PromptKey, key.PhysicalUserMessageId, (AcceptedChatExecutionEvidence.participant acceptedEvidence), model) """
+                    emitJsExpr
+                        (bindingModule,
+                         key.SessionId,
+                         intent.PromptKey,
+                         key.PhysicalUserMessageId,
+                         (AcceptedChatExecutionEvidence.participant acceptedEvidence),
+                         model)
+                        """
                     (() => {
                         if ($0 && typeof $0.acceptPromptExecution === 'function') {
                             $0.acceptPromptExecution($1, $2, $3, $4, $5);
@@ -644,7 +653,13 @@ module TransactionSurface =
                     })()
                     """
                 | _ ->
-                    emitJsExpr (bindingModule, key.SessionId, key.PhysicalUserMessageId, (AcceptedChatExecutionEvidence.participant acceptedEvidence), model) """
+                    emitJsExpr
+                        (bindingModule,
+                         key.SessionId,
+                         key.PhysicalUserMessageId,
+                         (AcceptedChatExecutionEvidence.participant acceptedEvidence),
+                         model)
+                        """
                     (() => {
                         if ($0 && typeof $0.acceptExternalExecution === 'function') {
                             $0.acceptExternalExecution($1, $2, $3, $4);
@@ -692,7 +707,9 @@ module TransactionSurface =
                   SettlePreProvider = PreProviderSettlement.settleWith settlementPersistence
                   Unbind =
                     fun requested ->
-                        emitJsExpr (bindingModule, requested.SessionId, requested.PhysicalUserMessageId) """
+                        emitJsExpr
+                            (bindingModule, requested.SessionId, requested.PhysicalUserMessageId)
+                            """
                         (() => {
                             if ($0 && typeof $0.releaseAcceptedExecution === 'function') {
                                 $0.releaseAcceptedExecution($1, $2);
@@ -740,7 +757,9 @@ module TransactionSurface =
                         {| activeCapacity = activeCapacity
                            providerBinding =
                             let count: int =
-                                emitJsExpr (bindingModule, key.SessionId, key.PhysicalUserMessageId) """
+                                emitJsExpr
+                                    (bindingModule, key.SessionId, key.PhysicalUserMessageId)
+                                    """
                                 (() => {
                                     if ($0 && typeof $0.exactExecutionBindingCount === 'function') {
                                         return $0.exactExecutionBindingCount($1, $2);
@@ -748,6 +767,7 @@ module TransactionSurface =
                                     return 0;
                                 })()
                                 """
+
                             count |}
                        acceptedFactCount =
                         facts

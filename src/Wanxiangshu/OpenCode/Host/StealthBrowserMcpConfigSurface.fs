@@ -54,7 +54,8 @@ module StealthBrowserMcpConfigSurface =
 
         let command, enabled =
             match launch with
-            | StealthBrowserMcpConfig.Launch.Disabled -> StealthBrowserMcp.uvxCommand StealthBrowserMcp.defaultRef, false
+            | StealthBrowserMcpConfig.Launch.Disabled ->
+                StealthBrowserMcp.uvxCommand StealthBrowserMcp.defaultRef, false
             | StealthBrowserMcpConfig.Launch.Fixture p -> StealthBrowserMcp.fixtureCommand p, true
             | StealthBrowserMcpConfig.Launch.Uvx r -> StealthBrowserMcp.uvxCommand r, true
 

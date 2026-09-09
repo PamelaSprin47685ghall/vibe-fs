@@ -96,7 +96,9 @@ module ChatParamsHook =
         | None, _ -> false
 
     let private bindingModule: obj =
-        emitJsExpr () """
+        emitJsExpr
+            ()
+            """
         (() => {
             let mod = null;
             try {
@@ -119,8 +121,14 @@ module ChatParamsHook =
         })()
         """
 
-    let private validateObservedProviderDynamically (sessionId: SessionId) (agent: string) (model: OpencodeModel) : Result<bool, string> =
-        emitJsExpr (bindingModule, sessionId, agent, model) """
+    let private validateObservedProviderDynamically
+        (sessionId: SessionId)
+        (agent: string)
+        (model: OpencodeModel)
+        : Result<bool, string> =
+        emitJsExpr
+            (bindingModule, sessionId, agent, model)
+            """
         (() => {
             if ($0 && typeof $0.validateObservedProvider === 'function') {
                 return $0.validateObservedProvider($1, $2, $3);
@@ -130,7 +138,9 @@ module ChatParamsHook =
         """
 
     let private isUnboundHostAuxiliaryChildDynamically (sessionId: SessionId) : bool =
-        emitJsExpr (bindingModule, sessionId) """
+        emitJsExpr
+            (bindingModule, sessionId)
+            """
         (() => {
             if ($0 && typeof $0.isUnboundHostAuxiliaryChild === 'function') {
                 return !!$0.isUnboundHostAuxiliaryChild($1);
@@ -140,7 +150,9 @@ module ChatParamsHook =
         """
 
     let private observeUserFacingAgentDynamically (sessionId: SessionId) (agent: string) : unit =
-        emitJsExpr (bindingModule, sessionId, agent) """
+        emitJsExpr
+            (bindingModule, sessionId, agent)
+            """
         (() => {
             if ($0 && typeof $0.observeUserFacingAgent === 'function') {
                 $0.observeUserFacingAgent($1, $2);

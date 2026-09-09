@@ -28,7 +28,4 @@ module PluginHostWiring =
     type ObserveTurnWorkflowSupplier =
         ISessionHostPort -> IEventObservationPort -> IRootWorkspaceReader -> AbortCause -> ReconciledTurnContext -> Task
 
-    val create:
-        observeTurnWorkflowFor: ObserveTurnWorkflowSupplier ->
-        boot: PluginBoot.Boot ->
-            Task<Host>
+    val create: observeTurnWorkflowFor: ObserveTurnWorkflowSupplier -> boot: PluginBoot.Boot -> Task<Host>

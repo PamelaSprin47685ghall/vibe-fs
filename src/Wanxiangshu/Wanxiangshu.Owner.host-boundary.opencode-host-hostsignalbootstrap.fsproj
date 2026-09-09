@@ -65,6 +65,9 @@
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.opencode-host-sessionbindingsurface.fsproj"/>
 
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal-contract.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.time-capability.process-node-timing-adapter.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.provider-system-transform.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-bookkeeper.fsproj"/>
     <Compile Include="OpenCode/Host/HostSignalBootstrap.fsi"/>
     <Compile Include="OpenCode/Host/HostSignalBootstrap.fs"/>
     <Compile Include="OpenCode/JoinResultRendererSurface.fsi"/>
@@ -77,8 +80,6 @@
     <Compile Include="OpenCode/Host/PluginHost.fs"/>
     <Compile Include="OpenCode/Host/ChatParamsSurface.fsi"/>
     <Compile Include="OpenCode/Host/ChatParamsSurface.fs"/>
-    <Compile Include="OpenCode/Host/ProviderSystemTransform.fsi"/>
-    <Compile Include="OpenCode/Host/ProviderSystemTransform.fs"/>
     <Compile Include="OpenCode/Plugin/PluginBoot.fsi"/>
     <Compile Include="OpenCode/Plugin/PluginBoot.fs"/>
     <Compile Include="OpenCode/Plugin/PluginHostWiring.fsi"/>

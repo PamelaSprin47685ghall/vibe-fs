@@ -7,7 +7,7 @@
       "classification": "Admission",
       "result": "Result",
       "resultSymbol": "AdmissionAcquisitionOutcome",
-      "owner": "managed-chat-execution",
+      "owner": "chat-execution",
       "what": "CHATEXEC-003, ENF-015",
       "whatOwners": {
         "CHATEXEC-003": "managed-chat-execution",
@@ -18,7 +18,7 @@
       "file": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
       "symbol": "AgentJournal.appendAgent",
       "classification": "Effect",
-      "owner": "durable-events",
+      "owner": "persistence",
       "what": "ENF-015",
       "whatOwners": {
         "ENF-015": "capability-enforcement"
@@ -28,7 +28,7 @@
       "file": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
       "symbol": "AgentJournal.AppendAgent",
       "classification": "Effect",
-      "owner": "durable-events",
+      "owner": "persistence",
       "what": "ENF-015",
       "whatOwners": {
         "ENF-015": "capability-enforcement"
@@ -38,7 +38,7 @@
       "file": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
       "symbol": "AgentJournal.WriteBlob",
       "classification": "Effect",
-      "owner": "durable-events",
+      "owner": "persistence",
       "what": "ENF-015",
       "whatOwners": {
         "ENF-015": "capability-enforcement"
@@ -48,7 +48,7 @@
       "file": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
       "symbol": "AgentJournal.AppendAgent",
       "classification": "DurableSink",
-      "owner": "durable-events",
+      "owner": "persistence",
       "what": "ENF-019",
       "whatOwners": {
         "ENF-019": "capability-enforcement"
@@ -58,7 +58,7 @@
       "file": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
       "symbol": "AgentJournal.appendAgent",
       "classification": "DurableSink",
-      "owner": "durable-events",
+      "owner": "persistence",
       "what": "ENF-019",
       "whatOwners": {
         "ENF-019": "capability-enforcement"
@@ -68,7 +68,7 @@
       "file": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
       "symbol": "AgentJournal.WriteBlob",
       "classification": "DurableSink",
-      "owner": "durable-events",
+      "owner": "persistence",
       "what": "ENF-019",
       "whatOwners": {
         "ENF-019": "capability-enforcement"
@@ -82,7 +82,7 @@
       "anchor": "type QuiescencePermit = interface end",
       "classification": "Authority",
       "class": "Capability",
-      "owner": "host-boundary",
+      "owner": "host",
       "what": "ENF-018, ENF-019",
       "scope": "opaque process-local token whose SessionId and attempt serial live only in the gate",
       "freshness": "only the latest ObserveIdle admission is eligible",
@@ -94,7 +94,7 @@
           "file": "src/Wanxiangshu/OpenCode/Host/SessionQuiescenceGate.fs",
           "symbol": "ObserveIdle",
           "anchor": "member _.ObserveIdle(sessionId: SessionId) : QuiescencePermit =",
-          "owner": "host-boundary"
+          "owner": "host"
         }
       ],
       "whatOwners": {
@@ -108,7 +108,7 @@
       "anchor": "type TransportReceipt = private TransportReceipt of string",
       "classification": "Authority",
       "class": "Receipt",
-      "owner": "dispatch-protocol",
+      "owner": "runtime-platform",
       "what": "ENF-013, ENF-014",
       "scope": "one Host transport admission identifier",
       "freshness": "bound to the accepting transport response",
@@ -120,7 +120,7 @@
           "file": "src/Wanxiangshu/Foundation/Identity.fs",
           "symbol": "create",
           "anchor": "let create (value: string) = TransportReceipt value",
-          "owner": "dispatch-protocol"
+          "owner": "runtime-platform"
         }
       ],
       "whatOwners": {
@@ -134,7 +134,7 @@
       "anchor": "type RecoveryReceipt =",
       "classification": "Authority",
       "class": "Receipt",
-      "owner": "dispatch-protocol",
+      "owner": "dispatch",
       "what": "ENF-013, ENF-015",
       "scope": "SessionId + journal sequence + snapshot digest + resolved closure",
       "freshness": "describes the exact recovered snapshot",
@@ -146,7 +146,7 @@
           "file": "src/Wanxiangshu/Execution/Session/Recovery/Model.fs",
           "symbol": "create",
           "anchor": "let create",
-          "owner": "dispatch-protocol"
+          "owner": "dispatch"
         }
       ],
       "whatOwners": {
@@ -160,7 +160,7 @@
       "anchor": "type FamilyRecoveryPermit =",
       "classification": "Authority",
       "class": "Capability",
-      "owner": "dispatch-protocol",
+      "owner": "dispatch",
       "what": "ENF-014, ENF-016",
       "scope": "root session + journal sequence + recovered closure members",
       "freshness": "admitted against the current family closure",
@@ -172,13 +172,13 @@
           "file": "src/Wanxiangshu/Execution/Session/Recovery/Model.fs",
           "symbol": "currentProcess",
           "anchor": "let currentProcess (root: SessionId)",
-          "owner": "dispatch-protocol"
+          "owner": "dispatch"
         },
         {
           "file": "src/Wanxiangshu/Execution/Session/Recovery/Model.fs",
           "symbol": "authorizeFamilyResume",
           "anchor": "let authorizeFamilyResume",
-          "owner": "dispatch-protocol"
+          "owner": "dispatch"
         }
       ],
       "whatOwners": {
@@ -192,7 +192,7 @@
       "anchor": "type BloggerCycleReceipt =",
       "classification": "Authority",
       "class": "Receipt",
-      "owner": "context-compression",
+      "owner": "context",
       "what": "ENF-013, ENF-015",
       "scope": "provider run + frame kind + Blogger request",
       "freshness": "bound to the folded provider run and request",
@@ -204,19 +204,19 @@
           "file": "src/Wanxiangshu/Context/Companion/Blogger/ContextFactFold.fs",
           "symbol": "applyEnforcementAndReceipt",
           "anchor": "{ ProviderRun = payload.ProviderRun\n                          Kind = BlogFrameKind.Entry",
-          "owner": "context-compression"
+          "owner": "context"
         },
         {
           "file": "src/Wanxiangshu/Context/Companion/Blogger/ContextFactFold.fs",
           "symbol": "applyReceiptAndTips",
           "anchor": "{ ProviderRun = payload.ProviderRun\n                      Kind = BlogFrameKind.Squash",
-          "owner": "context-compression"
+          "owner": "context"
         },
         {
           "file": "src/Wanxiangshu/Context/Companion/Blogger/Runtime/CycleSurface.fs",
           "symbol": "receipt",
           "anchor": "let private receipt kind requestId run : BloggerCycleReceipt =",
-          "owner": "context-compression"
+          "owner": "context"
         }
       ],
       "whatOwners": {
@@ -288,7 +288,7 @@
       "anchor": "type AppendReceipt = { Cuts: SemanticCut list }",
       "classification": "Authority",
       "class": "Receipt",
-      "owner": "durable-events",
+      "owner": "persistence",
       "what": "ENF-013, ENF-015",
       "scope": "one canonical append and its finite semantic cuts",
       "freshness": "returned by the completed append attempt",
@@ -300,13 +300,13 @@
           "file": "src/Wanxiangshu/Persistence/EventStore/Store.fs",
           "symbol": "commitPrepared",
           "anchor": "{ Cuts = prepared.Cuts }",
-          "owner": "durable-events"
+          "owner": "persistence"
         },
         {
           "file": "src/Wanxiangshu/Persistence/EventStore/StoreTypes.fs",
           "symbol": "empty",
           "anchor": "let empty = { Cuts = [] }",
-          "owner": "durable-events"
+          "owner": "persistence"
         }
       ],
       "whatOwners": {
@@ -320,7 +320,7 @@
       "anchor": "type MagicTodoAppendReceipt =",
       "classification": "Authority",
       "class": "Receipt",
-      "owner": "durable-events",
+      "owner": "persistence",
       "what": "ENF-013, ENF-015",
       "scope": "Todo EventId + resulting projection",
       "freshness": "returned only after the exact Todo append",
@@ -332,7 +332,7 @@
           "file": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
           "symbol": "AppendMagicTodo",
           "anchor": "member this.AppendMagicTodo",
-          "owner": "durable-events"
+          "owner": "persistence"
         }
       ],
       "whatOwners": {
@@ -346,7 +346,7 @@
       "anchor": "type BlobWriteReceipt =",
       "classification": "Authority",
       "class": "Receipt",
-      "owner": "durable-events",
+      "owner": "persistence",
       "what": "ENF-013, ENF-015",
       "scope": "one BlobRef + content digest",
       "freshness": "returned by the completed content write",
@@ -358,7 +358,7 @@
           "file": "src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs",
           "symbol": "writePayload",
           "anchor": "let writePayload (content: string) =",
-          "owner": "durable-events"
+          "owner": "persistence"
         }
       ],
       "whatOwners": {
@@ -372,7 +372,7 @@
       "anchor": "type XTraceCaptureReceipt =",
       "classification": "Authority",
       "class": "Receipt",
-      "owner": "semantic-trace",
+      "owner": "context",
       "what": "ENF-013, ENF-015",
       "scope": "one exact semantic-trace capture attempt and its durable projection delta",
       "freshness": "derived after the capture from before/after canonical projection heads",
@@ -384,13 +384,13 @@
           "file": "src/Wanxiangshu/Context/Trace/Capture.fs",
           "symbol": "captureReceipt",
           "anchor": "let private captureReceipt",
-          "owner": "semantic-trace"
+          "owner": "context"
         },
         {
           "file": "src/Wanxiangshu/Context/Trace/Capture.fs",
           "symbol": "withoutJournalReceipt",
           "anchor": "let private withoutJournalReceipt () =",
-          "owner": "semantic-trace"
+          "owner": "context"
         }
       ],
       "whatOwners": {
@@ -415,7 +415,7 @@
       "symbol": "RequirePermit",
       "anchor": "type RequirePermit = unit -> Task<Result<FamilyRecoveryPermit, string>>",
       "classification": "Vocabulary",
-      "owner": "output-distillation",
+      "owner": "output",
       "what": "ENF-014",
       "issuers": [],
       "whatOwners": {
@@ -440,7 +440,7 @@
       "anchor": "type ManagedChatAcceptanceWitness =",
       "classification": "Authority",
       "class": "Witness",
-      "owner": "managed-chat-execution",
+      "owner": "chat-execution",
       "what": "CHATEXEC-004, CHATEXEC-011, ENF-013, ENF-015",
       "scope": "exact ChatExecutionKey (SessionId + PhysicalUserMessageId) plus the AcceptedChatExecutionEvidence established for it",
       "freshness": "issued only from an exact projection read of the durable Accepted fact; different established evidence fails closed",
@@ -458,13 +458,13 @@
           "file": "src/Wanxiangshu/Execution/Session/ChatExecution/Acceptance.fs",
           "symbol": "witnessFromProjected",
           "anchor": "let private witnessFromProjected key attempted =",
-          "owner": "managed-chat-execution"
+          "owner": "chat-execution"
         },
         {
           "file": "src/Wanxiangshu/Execution/Session/ChatExecution/Acceptance.fs",
           "symbol": "decide",
           "anchor": "let private decide key evidence projected =",
-          "owner": "managed-chat-execution"
+          "owner": "chat-execution"
         }
       ],
       "whatOwners": {
@@ -480,7 +480,7 @@
       "anchor": "type ManagedChatProviderStartedWitness =",
       "classification": "Authority",
       "class": "Witness",
-      "owner": "managed-chat-execution",
+      "owner": "chat-execution",
       "what": "CHATEXEC-005, ENF-013, ENF-015",
       "scope": "exact ChatExecutionKey plus the ProviderStartedEvidence binding accepted evidence, ProviderRunIdentity, ProviderRequestKind and projection choice",
       "freshness": "issued only when the projection lifecycle is ProviderStarted and the established started evidence equals the attempt; a conflicting ProviderRunIdentity fails closed",
@@ -493,13 +493,13 @@
           "file": "src/Wanxiangshu/Execution/Session/ChatExecution/Acceptance.fs",
           "symbol": "startedWitness",
           "anchor": "let private startedWitness key startedEvidence persistence =",
-          "owner": "managed-chat-execution"
+          "owner": "chat-execution"
         },
         {
           "file": "src/Wanxiangshu/Execution/Session/ChatExecution/Acceptance.fs",
           "symbol": "existingStart",
           "anchor": "let private existingStart",
-          "owner": "managed-chat-execution"
+          "owner": "chat-execution"
         }
       ],
       "whatOwners": {
@@ -514,7 +514,7 @@
       "anchor": "type ManagedChatTerminalWitness =",
       "classification": "Authority",
       "class": "Witness",
-      "owner": "managed-chat-execution",
+      "owner": "chat-execution",
       "what": "CHATEXEC-006, ENF-013, ENF-015",
       "scope": "exact ChatExecutionKey plus the AfterProviderStart terminal evidence and the single projected ChatExecutionTerminalDisposition",
       "freshness": "issued only when the projected terminal evidence and disposition equal the attempt; a competing disposition fails closed and never overwrites the first fact",
@@ -527,13 +527,13 @@
           "file": "src/Wanxiangshu/Execution/Session/ChatExecution/Acceptance.fs",
           "symbol": "terminalWitness",
           "anchor": "let private terminalWitness key startedEvidence disposition persistence =",
-          "owner": "managed-chat-execution"
+          "owner": "chat-execution"
         },
         {
           "file": "src/Wanxiangshu/Execution/Session/ChatExecution/Acceptance.fs",
           "symbol": "existingTerminal",
           "anchor": "let private existingTerminal",
-          "owner": "managed-chat-execution"
+          "owner": "chat-execution"
         }
       ],
       "whatOwners": {
@@ -548,7 +548,7 @@
       "anchor": "type PreProviderTerminalWitness =",
       "classification": "Authority",
       "class": "Witness",
-      "owner": "managed-chat-execution",
+      "owner": "chat-execution",
       "what": "CHATEXEC-007, ENF-013, ENF-015",
       "scope": "exact ChatExecutionKey plus the PreProvider terminal disposition (Cancelled | Rejected | Failed) established for its accepted evidence",
       "freshness": "issued only after re-reading the projection: the established evidence, PreProvider terminal evidence and disposition must all equal the settled attempt",
@@ -561,7 +561,7 @@
           "file": "src/Wanxiangshu/Execution/Session/ChatExecution/Settlement.fs",
           "symbol": "witness",
           "anchor": "let private witness key evidence disposition persistence =",
-          "owner": "managed-chat-execution"
+          "owner": "chat-execution"
         }
       ],
       "whatOwners": {
@@ -576,7 +576,7 @@
       "anchor": "type OwnerIdentityWitness =",
       "classification": "Authority",
       "class": "Witness",
-      "owner": "interaction-authority",
+      "owner": "authority",
       "what": "INTERACTION-AUTHORITY-011, PID-008, ENF-013, ENF-015",
       "scope": "the owner's exact SessionId + LogicalRunId + AuthorityRootUserMessageId and the versioned ParticipantIdentityEvidence installed at that Authority Root",
       "freshness": "the derived root re-validates every owner field and the InheritedFromOwner origin; a mismatch is a typed PromptIdentitySeedValidationError",
@@ -589,7 +589,7 @@
           "file": "src/Wanxiangshu/Interaction/Authority/IdentitySeed.fs",
           "symbol": "inheritFromOwner",
           "anchor": "let inheritFromOwner",
-          "owner": "interaction-authority"
+          "owner": "authority"
         }
       ],
       "whatOwners": {
@@ -605,7 +605,7 @@
       "anchor": "type internal ChatAdmissionBindingReceipt =",
       "classification": "Authority",
       "class": "Receipt",
-      "owner": "managed-chat-execution",
+      "owner": "chat-execution",
       "what": "CHATEXEC-003, ENF-013, ENF-015",
       "scope": "the exact execution admission identity whose SessionExecutionBinding was installed, plus the binding kind that installed it",
       "freshness": "recorded only after the physical bind step returned Ok for that exact admission identity",
@@ -617,7 +617,7 @@
           "file": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs",
           "symbol": "bindingReceipt",
           "anchor": "let private bindingReceipt intent identity =",
-          "owner": "managed-chat-execution"
+          "owner": "chat-execution"
         }
       ],
       "whatOwners": {
@@ -632,7 +632,7 @@
       "anchor": "type internal HostModelProjectionReceipt =",
       "classification": "Authority",
       "class": "Receipt",
-      "owner": "managed-chat-execution",
+      "owner": "chat-execution",
       "what": "CHATEXEC-003, ENF-013, ENF-015",
       "scope": "the exact execution admission identity and OpenCode model projected for the leased routing target of the current transaction",
       "freshness": "recorded only after ProjectHost returned Ok inside that transaction step",
@@ -644,7 +644,7 @@
           "file": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs",
           "symbol": "projectAdmission",
           "anchor": "let private projectAdmission observe ports bound =",
-          "owner": "managed-chat-execution"
+          "owner": "chat-execution"
         }
       ],
       "whatOwners": {

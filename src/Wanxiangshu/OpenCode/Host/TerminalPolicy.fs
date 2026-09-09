@@ -106,8 +106,7 @@ module TerminalPolicy =
     let private hasActiveOrchestratorJobs (journal: AgentJournal option) =
         match journal with
         | None -> false
-        | Some durable ->
-            AgentProjection.hasActiveOrchestratorJobs (AgentJournal.snapshot durable).AgentProjections
+        | Some durable -> AgentProjection.hasActiveOrchestratorJobs (AgentJournal.snapshot durable).AgentProjections
 
     /// EXEC-016: join-capable role still owns unconsumed background work.
     ///

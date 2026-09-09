@@ -56,8 +56,7 @@ module ExecutorToolSurface =
 
         SurfaceScope(scope) :> obj
 
-    let private attachRecovery (scope: ToolRuntimeScope) (mode: string) =
-        scope.AttachCurrentProcessJoinMode mode
+    let private attachRecovery (scope: ToolRuntimeScope) (mode: string) = scope.AttachCurrentProcessJoinMode mode
 
     /// Plain metadata for the provider-visible run contract.
     let describeRun (toolModule: obj) : obj =

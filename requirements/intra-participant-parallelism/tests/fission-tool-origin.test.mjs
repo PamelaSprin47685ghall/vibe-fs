@@ -6,9 +6,12 @@ import test from 'node:test'
 
 import {
   acceptAuthorityRoot,
+  bindManagedChild,
   grantWorkOwned,
   withExecutablePlugin,
 } from '../../verification-system/tests/support/plugin-fixture.mjs'
+
+import * as sessionBinding from '../../../dist/OpenCode/Host/SessionBindingSurface.js'
 
 const withRoutingHome = async (body) => {
   const previousHome = process.env.HOME
@@ -55,6 +58,32 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] real root chat message carries a r
       assert.equal(output.message.tools?.horizon, true)
       assert.equal(output.message.tools?.suicide, true)
     })
+  })
+})
+
+test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] a bound child retains fission when the physical parent cache is empty', async () => {
+  await withExecutablePlugin(async (hooks) => {
+    const sessionID = 'fission-bound-child-provider-surface'
+    bindManagedChild('fission-binding-parent', sessionID, 'manager')
+    const output = {
+      message: {
+        id: 'msg-fission-bound-child-provider-surface',
+        role: 'user',
+        sessionID,
+        agent: 'manager',
+        model: { providerID: 'host', modelID: 'placeholder' },
+        tools: { fork: true, fission: true },
+      },
+      parts: [{ type: 'text', text: 'Interrupt the active join.' }],
+    }
+
+    try {
+      await hooks['chat.message']({ sessionID, agent: 'manager' }, output)
+      assert.equal(output.message.tools.fission, true)
+      assert.equal(output.message.tools.fork, true)
+    } finally {
+      sessionBinding.drop(sessionID)
+    }
   })
 })
 

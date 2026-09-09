@@ -262,13 +262,10 @@ module ManagerWorkflow =
             match needsOpening with
             | true ->
                 let snapshot = captureSnapshot workspaceDirectory
+
                 let opening =
-                    IncumbencyOpening.next
-                        HostDigest.sha256Hex
-                        roadId
-                        retirement.Id
-                        authorityRevision
-                        snapshot
+                    IncumbencyOpening.next HostDigest.sha256Hex roadId retirement.Id authorityRevision snapshot
+
                 do! commitOpeningTransaction durable sessionId None opening.RoadId opening.Transaction
             | false -> return ()
         }

@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Change.Host
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork.Host
@@ -17,6 +18,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Dispatch.OpenCode
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal
@@ -44,7 +46,7 @@ type ToolRuntimeScope
         snapshot: ISessionSnapshotPort option,
         cancelSignals: (SessionId seq -> unit) option,
         ?continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>),
-        ?captureWorktreeSnapshot: (WorktreePath -> Result<string, string>),
+        ?captureWorktreeSnapshot: (WorktreePath -> Result<WorkspaceSnapshotId, string>),
         ?eventPort: IEventObservationPort
     ) =
 
@@ -57,7 +59,7 @@ type ToolRuntimeScope
     // DSL-MUTABLE: retirement admission fence — exact logical incumbency, never the reusable physical session.
     let retirementFrozen = Dictionary<string, obj>()
     // DSL-MUTABLE: resource — per-session orchestrator host registry
-    let orchestratorHosts = Dictionary<string, obj>()
+    let orchestratorHosts = Dictionary<string, OrchestratorHost>()
     let onCancelSignals = defaultArg cancelSignals ignore
     let onStarted = defaultArg onRunStarted (fun _ _ _ -> ())
     // COMPANION-003: parent→child keeps Opening; child→parent omits it (includeOpening=false).
@@ -66,18 +68,17 @@ type ToolRuntimeScope
 
     // Manager-loop delivery is an injected capability: the Change/Host
     // OrchestratorHostDeps model already owns this edge, and the
-    // composition root supplies the real workflow.
+    // composition root supplies the real workflow. A missing capability
+    // fails closed: a silent no-op success would advance the loop without
+    // authority.
     let continueManagerLoop =
-        defaultArg
-            continueManagerLoop
-            (fun _ _ -> Task.FromResult(Ok()) :> Task<Result<unit, string>>)
+        defaultArg continueManagerLoop (fun _ _ ->
+            Task.FromResult(Error "continue manager loop unavailable") :> Task<Result<unit, string>>)
 
     // Workspace-snapshot capture is an injected capability: Relay certificate
     // binding owns the capture vocabulary, the composition root supplies it.
     let captureWorktreeSnapshot =
-        defaultArg
-            captureWorktreeSnapshot
-            (fun _ -> Error "workspace snapshot capture unavailable")
+        defaultArg captureWorktreeSnapshot (fun _ -> Error "workspace snapshot capture unavailable")
 
     let childRecordForRun sessionId range providerRun =
         LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun journal sessionId range providerRun
@@ -280,7 +281,10 @@ type ToolRuntimeScope
                     let! seed = humanRootIdentitySeedAdmission durable sessionId agent
 
                     let! attempt =
-                        runtime.AcceptHumanRoot sessionId (Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.create user.Id) (Some seed)
+                        runtime.AcceptHumanRoot
+                            sessionId
+                            (Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.create user.Id)
+                            (Some seed)
                         |> TaskResultCE.ofTask
 
                     let! profile = attempt |> Result.mapError (fun _ -> ())
@@ -385,7 +389,9 @@ type ToolRuntimeScope
         |> Option.bind (fun session -> session.Relay)
         |> Option.bind (fun relay ->
             let id: obj =
-                emitJsExpr (relay, sessionId) """
+                emitJsExpr
+                    (relay, sessionId)
+                    """
                 (() => {
                     const map = $0 && $0.fields ? $0.fields[0] : $0;
                     if (!map || typeof map.get !== 'function' || !map.has($1)) return undefined;
@@ -393,6 +399,7 @@ type ToolRuntimeScope
                     return road && road.Active ? road.Active.Id : undefined;
                 })()
                 """
+
             if isNull id then None else Some id)
 
     let managerFactsOfSession (sessionId: string) : ManagerCapabilityFacts =
@@ -402,7 +409,9 @@ type ToolRuntimeScope
         |> Option.bind (fun session -> session.Relay)
         |> Option.bind (fun relay ->
             let facts: ManagerCapabilityFacts option =
-                emitJsExpr (relay, sessionId) """
+                emitJsExpr
+                    (relay, sessionId)
+                    """
                 (() => {
                     const map = $0 && $0.fields ? $0.fields[0] : $0;
                     if (!map || typeof map.get !== 'function' || !map.has($1)) return undefined;
@@ -432,6 +441,7 @@ type ToolRuntimeScope
                     };
                 })()
                 """
+
             facts)
         |> Option.defaultValue emptyManagerFacts
 
@@ -483,8 +493,7 @@ type ToolRuntimeScope
     /// exactly equal the active facts, so a mismatched or stale certificate
     /// can never open the finish window. The cleanup blocker digest is the
     /// stored objective evidence, passed through verbatim.
-    member _.ManagerCapabilityFactsFor(sessionId: string) : ManagerCapabilityFacts =
-        managerFactsOfSession sessionId
+    member _.ManagerCapabilityFactsFor(sessionId: string) : ManagerCapabilityFacts = managerFactsOfSession sessionId
 
     member _.TryFreezeRetirement(sessionId: string, incumbentId: obj) =
         lock gate (fun () ->
@@ -587,13 +596,9 @@ type ToolRuntimeScope
                 match mode with
                 | "ready" -> FamilyRecovery.FamilyReady(FamilyRecoveryPermit.currentProcess root 0L)
                 | "waiting" ->
-                    FamilyRecovery.FamilyWaiting(
-                        NonEmpty.one (RecoveryBlock.RecoveryCoordinatorUnavailable root)
-                    )
-                | _ ->
-                    FamilyRecovery.FamilyBlocked(
-                        NonEmpty.one (RecoveryBlock.RecoveryCoordinatorUnavailable root)
-                    )
+                    FamilyRecovery.FamilyWaiting(NonEmpty.one (RecoveryBlock.RecoveryCoordinatorUnavailable root))
+                | _ -> FamilyRecovery.FamilyBlocked(NonEmpty.one (RecoveryBlock.RecoveryCoordinatorUnavailable root))
+
             Task.FromResult recovery)
 
     /// EXEC-017: share PluginRuntimeScope.JoinAttempts with JoinTool.
@@ -650,74 +655,29 @@ type ToolRuntimeScope
                 executorRuntimes.[ctx.SessionId] <- runtime
                 runtime)
 
-    member _.OrchestratorHostFor(sessionId: string) : obj =
+    member _.OrchestratorHostFor(sessionId: string) : OrchestratorHost =
         lock gate (fun () ->
             match orchestratorHosts.TryGetValue sessionId with
             | true, host -> host
             | false, _ ->
-                let depsObj =
-                    createObj
-                        [ "Sessions", box sessions
-                          "RootWorkspace", box rootWorkspace
-                          "WaitObserver", box waitObserver
-                          "Journal", box journal
-                          "SessionSnapshot", box snapshot
-                          "OnChildCreated", box (fun _ role childId -> registerChild sessionId role childId)
-                          "RegisterChildDirectory",
-                          box (fun childId path -> sessionDirectories.[SessionId.value childId] <- path)
-                          "OnRunStarted", box onStarted
-                          "SendGateContinuation",
-                          box (fun targetId prompt kind directory journal gateKind callerProviderRun ->
-                              HostSessionNudge.trySendGateContinuationPhysical
-                                  sessions
-                                  rootWorkspace
-                                  targetId
-                                  prompt
-                                  kind
-                                  directory
-                                  journal
-                                  gateKind
-                                  callerProviderRun)
-                          "ContinueManagerLoop", box continueManagerLoop
-                          "CaptureWorktreeSnapshot", box (fun path -> captureWorktreeSnapshot path |> Result.map unbox)
-                          "RepoPath", box (defaultArg workspaceDirectory ".")
-                          "TargetBranch", box ""
-                          "ParentWorkRecordFor", box (fun sid -> parentRecord (SessionId.value sid))
-                          "ChildWorkRecordFor", box (fun sid -> childRecord (SessionId.value sid)) ]
+                let deps: OrchestratorHostDeps =
+                    { Sessions = sessions
+                      RootWorkspace = rootWorkspace
+                      WaitObserver = waitObserver
+                      Journal = journal
+                      SessionSnapshot = snapshot
+                      OnChildCreated = fun _ role childId -> registerChild sessionId role childId
+                      RegisterChildDirectory = fun childId path -> sessionDirectories.[SessionId.value childId] <- path
+                      OnRunStarted = onStarted
+                      SendGateContinuation = HostSessionNudge.trySendGateContinuationPhysical sessions rootWorkspace
+                      ContinueManagerLoop = continueManagerLoop
+                      CaptureWorktreeSnapshot = captureWorktreeSnapshot
+                      RepoPath = defaultArg workspaceDirectory "."
+                      TargetBranch = ""
+                      ParentWorkRecordFor = fun sid -> parentRecord (SessionId.value sid)
+                      ChildWorkRecordFor = fun sid -> childRecord (SessionId.value sid) }
 
-                let host: obj =
-                    emitJsExpr (depsObj, SessionId.create sessionId) """
-                    (() => {
-                        let mod = null;
-                        if (globalThis.__wanxiangshu_change_host__) {
-                            mod = globalThis.__wanxiangshu_change_host__;
-                        } else {
-                            try {
-                                if (typeof require === 'function') {
-                                    mod = require('../../Change/Host/Host.js');
-                                }
-                            } catch (_) {}
-                            if (!mod) {
-                                try {
-                                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
-                                        ? process.getBuiltinModule('node:module')
-                                        : null;
-                                    if (procMod && typeof procMod.createRequire === 'function') {
-                                        const req = procMod.createRequire(import.meta.url);
-                                        mod = req('../../Change/Host/Host.js');
-                                    }
-                                } catch (_) {}
-                            }
-                        }
-                        if (mod && mod.OrchestratorHost_$ctor_Z9101B1C) {
-                            return mod.OrchestratorHost_$ctor_Z9101B1C($0, $1);
-                        } else if (mod && mod.OrchestratorHost) {
-                            return new mod.OrchestratorHost($0, $1);
-                        }
-                        throw new Error('Change.Host.OrchestratorHost module could not be loaded dynamically');
-                    })()
-                    """
-
+                let host = OrchestratorHost(deps, SessionId.create sessionId)
                 orchestratorHosts.[sessionId] <- host
                 host)
 
@@ -788,36 +748,7 @@ type ToolRuntimeScope
                 do! runtime.CancelAndDrain()
 
             match orchestrator with
-            | Some host ->
-                let drainTask: Task =
-                    emitJsExpr host """
-                    (() => {
-                        let mod = null;
-                        if (globalThis.__wanxiangshu_change_host__) {
-                            mod = globalThis.__wanxiangshu_change_host__;
-                        } else {
-                            try {
-                                if (typeof require === 'function') mod = require('../../Change/Host/Host.js');
-                            } catch (_) {}
-                            if (!mod) {
-                                try {
-                                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
-                                        ? process.getBuiltinModule('node:module')
-                                        : null;
-                                    if (procMod && typeof procMod.createRequire === 'function') {
-                                        const req = procMod.createRequire(import.meta.url);
-                                        mod = req('../../Change/Host/Host.js');
-                                    }
-                                } catch (_) {}
-                            }
-                        }
-                        if (mod && mod.OrchestratorHost__CancelAndDrain) {
-                            return mod.OrchestratorHost__CancelAndDrain($0);
-                        }
-                        return Promise.resolve();
-                    })()
-                    """
-                do! drainTask
+            | Some host -> do! host.CancelAndDrain()
             | None -> ()
         }
         :> Task
@@ -829,7 +760,10 @@ type ToolRuntimeScope
     member this.TerminateSession(sessionId: string, reason: string) : Task<Result<unit, string>> =
         let authorityRoot =
             currentPhysicalUserMessage sessionId
-            |> Option.map (Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.create >> Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.promoteToAuthorityRoot)
+            |> Option.map (
+                Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.create
+                >> Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.promoteToAuthorityRoot
+            )
 
         match terminalPort, authorityRoot with
         | None, _ -> Task.FromResult(Error "MANAGED-SESSION-017: terminal event port unavailable")
@@ -875,36 +809,7 @@ type ToolRuntimeScope
                 do! runtime.CancelAndDrain()
 
             match orchestrator with
-            | Some host ->
-                let drainTask: Task =
-                    emitJsExpr host """
-                    (() => {
-                        let mod = null;
-                        if (globalThis.__wanxiangshu_change_host__) {
-                            mod = globalThis.__wanxiangshu_change_host__;
-                        } else {
-                            try {
-                                if (typeof require === 'function') mod = require('../../Change/Host/Host.js');
-                            } catch (_) {}
-                            if (!mod) {
-                                try {
-                                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
-                                        ? process.getBuiltinModule('node:module')
-                                        : null;
-                                    if (procMod && typeof procMod.createRequire === 'function') {
-                                        const req = procMod.createRequire(import.meta.url);
-                                        mod = req('../../Change/Host/Host.js');
-                                    }
-                                } catch (_) {}
-                            }
-                        }
-                        if (mod && mod.OrchestratorHost__CancelAndDrain) {
-                            return mod.OrchestratorHost__CancelAndDrain($0);
-                        }
-                        return Promise.resolve();
-                    })()
-                    """
-                do! drainTask
+            | Some host -> do! host.CancelAndDrain()
             | None -> ()
         }
         :> Task
@@ -935,36 +840,7 @@ type ToolRuntimeScope
                 do! runtime.DetachAndDrain()
 
             for host in orchestrators do
-                // for host in orchestrators do do! host.DetachAndDrain()
-                let detachTask: Task =
-                    emitJsExpr host """
-                    (() => {
-                        let mod = null;
-                        if (globalThis.__wanxiangshu_change_host__) {
-                            mod = globalThis.__wanxiangshu_change_host__;
-                        } else {
-                            try {
-                                if (typeof require === 'function') mod = require('../../Change/Host/Host.js');
-                            } catch (_) {}
-                            if (!mod) {
-                                try {
-                                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
-                                        ? process.getBuiltinModule('node:module')
-                                        : null;
-                                    if (procMod && typeof procMod.createRequire === 'function') {
-                                        const req = procMod.createRequire(import.meta.url);
-                                        mod = req('../../Change/Host/Host.js');
-                                    }
-                                } catch (_) {}
-                            }
-                        }
-                        if (mod && mod.OrchestratorHost__DetachAndDrain) {
-                            return mod.OrchestratorHost__DetachAndDrain($0);
-                        }
-                        return Promise.resolve();
-                    })()
-                    """
-                do! detachTask
+                do! host.DetachAndDrain()
 
             match ownedFailure with
             | Some failure -> return raise failure

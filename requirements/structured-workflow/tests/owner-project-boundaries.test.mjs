@@ -32,7 +32,17 @@ test('WHAT[STRUCTURED-WORKFLOW-011] subsystem ownership and compile-shard graph 
   const result = checkSubsystems()
   assert.equal(result.ok, true, result.violations.join('\n'))
   assert.ok(result.sourceCount > 0, 'compile-shard graph must cover production sources')
-  assert.ok(result.subsystemCount >= 15 && result.subsystemCount <= 35, 'subsystems must stay at human governance scale')
+  const shardKeys = [...result.projects.values()].map((entry) => entry.shardKey)
+  assert.equal(new Set(shardKeys).size, shardKeys.length, 'compile shard keys must be unique')
+  for (const entry of result.compileInventory.projects.values()) {
+    for (const file of entry.implementationFiles) {
+      assert.equal(
+        result.compileInventory.sourceProject.get(file)?.projectPath,
+        entry.projectPath,
+        'every production source must be owned by exactly its compiling shard',
+      )
+    }
+  }
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-013] GitGateway exposes a narrow dependency-inverted compiler boundary', () => {

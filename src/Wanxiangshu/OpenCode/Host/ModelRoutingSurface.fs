@@ -713,7 +713,9 @@ module ModelRoutingSurface =
     let pendingCount (runtime: obj) : int = (runtimeOf runtime).PendingCount
 
     let private bindingModule: obj =
-        emitJsExpr () """
+        emitJsExpr
+            ()
+            """
         (() => {
             let mod = null;
             try {
@@ -739,8 +741,11 @@ module ModelRoutingSurface =
     let admissionSnapshot (routingRuntime: obj) (sessionId: string) (physicalUserMessageId: string) : obj =
         let sid = SessionId.create sessionId
         let pid = PhysicalUserMessageId.create physicalUserMessageId
+
         let exactBindingCount: int =
-            emitJsExpr (bindingModule, sid, pid) """
+            emitJsExpr
+                (bindingModule, sid, pid)
+                """
             (() => {
                 if ($0 && typeof $0.exactExecutionBindingCount === 'function') {
                     return $0.exactExecutionBindingCount($1, $2);
@@ -748,6 +753,7 @@ module ModelRoutingSurface =
                 return 0;
             })()
             """
+
         box
             {| activeCapacity = snapshotOccupied routingRuntime |> Array.length
                pendingAdmissions = pendingCount routingRuntime

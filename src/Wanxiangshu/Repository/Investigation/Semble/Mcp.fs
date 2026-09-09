@@ -56,11 +56,7 @@ module SembleMcp =
         let testMode = envValue read "WANXIANGSHU_TEST"
         let gitRef = envValue read "SEMBLE_MCP_REF"
 
-        if isTruthy disabled then
-            Launch.Disabled
-        elif fixture <> "" then
-            Launch.Fixture fixture
-        elif isTruthy testMode then
-            Launch.Disabled
-        else
-            Launch.Uvx(if gitRef = "" then defaultRef else gitRef)
+        if isTruthy disabled then Launch.Disabled
+        elif fixture <> "" then Launch.Fixture fixture
+        elif isTruthy testMode then Launch.Disabled
+        else Launch.Uvx(if gitRef = "" then defaultRef else gitRef)
