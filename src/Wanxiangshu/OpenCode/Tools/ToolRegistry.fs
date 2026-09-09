@@ -3,6 +3,8 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 open Wanxiangshu.Execution.Delegation.SyncDelegate
@@ -48,6 +50,67 @@ module ToolRegistry =
 
         ProviderLanguageBinding.forSessionText sessionText
 
+    let private inspectorToolModule: obj =
+        emitJsExpr
+            ()
+            """
+        (() => {
+            let mod = null;
+            try {
+                if (typeof require === 'function') {
+                    mod = require('./InspectorTool.js');
+                }
+            } catch (_) {}
+            if (!mod) {
+                try {
+                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
+                        ? process.getBuiltinModule('node:module')
+                        : null;
+                    if (procMod && typeof procMod.createRequire === 'function') {
+                        const req = procMod.createRequire(import.meta.url);
+                        mod = req('./InspectorTool.js');
+                    }
+                } catch (_) {}
+            }
+            return mod;
+        })()
+        """
+
+    let private inspectAdmission: ToolAdmission =
+        let raw: obj =
+            emitJsExpr
+                inspectorToolModule
+                """
+            (() => {
+                if ($0 && $0.admission) return $0.admission;
+                return null;
+            })()
+            """
+
+        if isNull raw then
+            ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Inspect)
+        else
+            unbox<ToolAdmission> raw
+
+    let private inspectSpec
+        (factory: HostToolFactory)
+        (scope: ToolRuntimeScope)
+        (syncDelegateRuntime: SyncDelegateRuntime option)
+        : ToolSpec option =
+        let raw: obj =
+            emitJsExpr
+                (inspectorToolModule, factory, scope, syncDelegateRuntime)
+                """
+            (() => {
+                if ($0 && typeof $0.spec === 'function') {
+                    return $0.spec($1, $2, $3);
+                }
+                return null;
+            })()
+            """
+
+        if isNull raw then None else Some(unbox<ToolSpec> raw)
+
     let private staticAdmissions (bloggerHost: IBloggerRuntimeHost option) : (string * ToolAdmission) list =
         [ "fork", ForkTool.managerAdmission
           "resume", ForkTool.managerAdmission
@@ -63,7 +126,7 @@ module ToolRegistry =
           "suicide", SuicideTool.admission
           "run", ExecutorTool.runAdmission
           "query-shell", ExecutorTool.queryShellAdmission
-          "inspect", InspectorTool.admission
+          "inspect", inspectAdmission
           "establish-behavior", CoderTool.behaviorAdmission
           "repair-behavior", CoderTool.behaviorAdmission
           "mv", FileMutationTools.mvAdmission
@@ -176,7 +239,8 @@ module ToolRegistry =
                 snapshot,
                 cancelSignals,
                 continueManagerLoop = continueManagerLoop,
-                captureWorktreeSnapshot = (fun path -> captureWorktreeSnapshot path |> Result.map WorkspaceSnapshotId.value),
+                captureWorktreeSnapshot =
+                    (fun path -> captureWorktreeSnapshot path |> Result.map WorkspaceSnapshotId.value),
                 ?eventPort = eventPort
             )
 
@@ -205,7 +269,9 @@ module ToolRegistry =
               yield SuicideTool.spec factory runtime
               yield ExecutorTool.runSpec factory runtime
               yield ExecutorTool.queryShellSpec factory runtime
-              yield InspectorTool.spec factory runtime syncDelegateRuntime
+              match inspectSpec factory runtime syncDelegateRuntime with
+              | Some s -> yield s
+              | None -> ()
               yield CoderTool.establishSpec factory runtime syncDelegateRuntime
               yield CoderTool.repairSpec factory runtime syncDelegateRuntime
               yield FileMutationTools.mvSpec factory
