@@ -28,6 +28,14 @@
    - 无论学习结果为 ABSORB、BIRTH 还是 DISCARD，均由 `LearningDispositionCommitted` 事实冻结其呈现文本；
    - 重放路径直接读取持久化事实返回，不重复调用 Enhancer、不重复写入规则、不重复弹出暂缓项。
 
+## 编译边界
+
+事实、Enhancer、projection 与既有 Surface 所在分片直接引用 `runtime-platform/digest`，另外仅依赖 Identity 与 Enforcer catalog；不再借助 `host-boundary/host-digest` 引入 OpenCode 消息和事件类型。`InstitutionalEnhancer.rulebookRevision` 的排序、字段分隔与 UTF-8 摘要输入未变；工具侧仍负责装配 live Rulebook、持久化与暂缓工作，不把这些效果移入纯分片。
+
+在 `686f3a9c4` 上替换这一条引用后，正式 planner 的 forward closure 从 7 个项目／38 个 `.fs/.fsi` 输入收窄到 4 个项目／16 个输入。该分片真实 focused Fable 编译通过（54 parsed sources，fingerprint `a731717f814a`）；其新产物的公开 Surface revision smoke 覆盖空规则、单规则与 Unicode／CRLF 多规则输入。这里的闭包数量不包括编译器隐式输入，不是编译耗时改善的证据。
+
+真实 `InstitutionalLearningTools` consumer 与 Enhancer 签名反向 consumer 的影响集合经 `compile-impact` 合并为一次编译，通过 1432 parsed sources／1394 items（fingerprint `f4c0e60d84d5`）。该集合仍含其他 consumer 真正需要的 Host 合同，不能把局部分片的闭包缩小推广到全部反向 consumer。
+
 ## 验证与测试落点
 
 | 命题 | 落点测试 |

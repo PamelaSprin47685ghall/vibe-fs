@@ -2,6 +2,8 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- Institutional Learning 的事实／Enhancer 分片直接引用 runtime-platform/digest，不再通过摘要取得 OpenCode 消息、事件和角色闭包；保留规则版本输入、学习 disposition 与冻结重放语义。
+
 - 将既有 UTF-8 字符串 SHA-256 原语抽到无领域引用的 runtime-platform/digest 编译分片；Casebook 与 Sphinx 删除重复 crypto 实现，Sphinx 全部调用方迁移并删除旧摘要导出。摘要输入、canonical JSON、事件身份、salt 与 Casebook null 语义不变；二进制 SHA-1／SHA-256 不合并。真实捕获测试改为独立固定摘要，删除只测试测试内 crypto 的伪 Host 证明。
 
 - CompletionMailbox、Change VerdictMailbox 与 HostForkJoin 的等待竞争改用 typed Choice，删除手写数字标签和无类型结果字段解码；保持单次 Promise 映射、注册顺序、drain-first 与局部中断语义。补充真实 verdict mailbox 的优先级、waiter 释放和有界 FIFO 证明，删除误称等待证明的重复 renderer／源码 token 检查。
