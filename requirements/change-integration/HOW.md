@@ -15,6 +15,12 @@
 
 2026-09-09，旧动态装配在唯一 Long Stroke 的首次 publication 触发上述异常，后续 join 耗尽内存 verdict 后持续为空；恢复 typed 装配并重建后，同一 `requirements/verification-system/tests/e2e/entry.test.mjs` 完成 `Continue → IncumbencyOpened → Accepted → ConflictDetected → RebasedCandidate → Published`，journal 为 454/699、SSE 为 2193/3351。剧本、事件上限和 outstanding 判定均未改变，临时诊断探针已删除。
 
+### RuntimePath 摘要依赖
+
+`change-fact` 分片中的 `RuntimePath` 仅通过 `HostDigest.sha256Hex` 为非 Git 工作区计算状态目录，直接引用既有零领域依赖的 `runtime-platform/digest`；GitSubject、Identity、Change facts 与 durable fact 引用保留。源码和签名不变，Git common-dir 优先、失败后的 XDG／home 路径选择及缓存语义均未修改。
+
+在 `bd99d71e7` 上，该分片声明递归闭包从 29 项目／158 个 `.fs/.fsi` 输入降至 27／148；独立 Fable 编译通过 186 parsed sources（`7711a827c1d3`）。以三个既有签名为输入保守选择反向消费者，单次 focused Fable 并集通过 1432 parsed sources／1394 items（`6f04afa1af0a`），并非签名发生了修改。新隔离产物 smoke 在临时目录中验证 Unicode 工作区的独立 Node SHA-256、已配置／未配置 XDG 的 fallback 与真实 Git common-dir 路径，临时目录已清理；该 smoke 不证明锁竞争、journal 恢复或 linked worktree 全分支。
+
 ### 门禁与工作树资源管理
 
 - **IntegrationGate 互斥**：基于文件锁实现的轻量互斥机制，仅覆盖目标分支指针更新窗口，不侵占 Relay assessment、Manager work、rebase 或冲突处理。

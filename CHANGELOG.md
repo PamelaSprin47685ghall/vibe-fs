@@ -2,6 +2,8 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- Change 事实分片直接引用 runtime-platform/digest，不再为 RuntimePath 的工作区摘要引入 OpenCode 消息／事件合同；保留 Git common-dir、XDG fallback、事实投影与全部公开签名。
+
 - Requirement Grounding 模型与 Relay workspace snapshot 直接引用 runtime-platform/digest，去掉未使用的 OpenCode 消息／事件编译输入；保留规范材料与 package 摘要字节、Git snapshot canonical 输入和全部公开签名。
 
 - Institutional Learning 的事实／Enhancer 分片直接引用 runtime-platform/digest，不再通过摘要取得 OpenCode 消息、事件和角色闭包；保留规则版本输入、学习 disposition 与冻结重放语义。

@@ -108,6 +108,8 @@ Subsystem SCC 是首要结构债：双向依赖必须通过移动知识所有权
 
 在 `be3054fab` 上并行核对 Grounding model 与 Relay workspace snapshot 的真实源码需求，分别将宽 Host 摘要引用替换为既有 `runtime-platform/digest`，无源码、签名或 aggregate 修改。按声明 ProjectReference 递归闭包计数，Grounding 从 8 项目／60 个 `.fs/.fsi` 输入降至 6／50，Relay snapshot 从 8／38 降至 4／14；前者仍保留 JS capability 所需的 Roles／OfficeCapability，后者仍保留 GitSubject 与 Relay core。两分片独立 Fable 编译分别通过 88、52 parsed sources（`91e59f8a1e03`、`068168b18cec`）；真实 Grounding Runtime consumer 通过 818／780，四条 Relay capture consumer 的并集通过 1284／1246（parsed sources／compile items；`9956ed957c82`、`6d4bccc9b9ff`）。编译按共享产物纪律串行，新隔离产物另实际执行规范材料与 Git snapshot 摘要 smoke，范围见所属 HOW。不将声明闭包计数当作耗时实验，也不以局部 consumer 收窄关闭 GAP-033。
 
+在 `bd99d71e7` 上并行核对 Change 事实分片和 Host message codec。仅前者的宽 Host 引用可替换为既有 `runtime-platform/digest`：六个输入中只有 `RuntimePath` 需要字符串摘要，声明递归闭包从 29 项目／158 个 `.fs/.fsi` 输入降至 27／148；独立 Fable 编译通过 186 parsed sources（`7711a827c1d3`），三个既有签名的保守反向消费者并集通过 1432／1394（parsed sources／compile items，`6f04afa1af0a`）。新隔离 RuntimePath 产物的真实 Git 与非 Git 摘要 smoke 范围见 change-integration/HOW。Host message codec 实际依赖宽分片拥有的 `MessagePart`，不使用摘要，因此保留声明依赖，不按项目名批量替换。源码、签名和 aggregate 均不变；本批不证明全局 SCC 收敛或 GAP-033 完成。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。
