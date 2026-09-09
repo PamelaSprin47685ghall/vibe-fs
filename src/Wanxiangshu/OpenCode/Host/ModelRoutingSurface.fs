@@ -712,47 +712,12 @@ module ModelRoutingSurface =
 
     let pendingCount (runtime: obj) : int = (runtimeOf runtime).PendingCount
 
-    let private bindingModule: obj =
-        emitJsExpr
-            ()
-            """
-        (() => {
-            let mod = null;
-            try {
-                if (typeof require === 'function') {
-                    mod = require('./SessionExecutionBinding.js');
-                }
-            } catch (_) {}
-            if (!mod) {
-                try {
-                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
-                        ? process.getBuiltinModule('node:module')
-                        : null;
-                    if (procMod && typeof procMod.createRequire === 'function') {
-                        const req = procMod.createRequire(import.meta.url);
-                        mod = req('./SessionExecutionBinding.js');
-                    }
-                } catch (_) {}
-            }
-            return mod;
-        })()
-        """
-
     let admissionSnapshot (routingRuntime: obj) (sessionId: string) (physicalUserMessageId: string) : obj =
         let sid = SessionId.create sessionId
         let pid = PhysicalUserMessageId.create physicalUserMessageId
 
         let exactBindingCount: int =
-            emitJsExpr
-                (bindingModule, sid, pid)
-                """
-            (() => {
-                if ($0 && typeof $0.exactExecutionBindingCount === 'function') {
-                    return $0.exactExecutionBindingCount($1, $2);
-                }
-                return 0;
-            })()
-            """
+            SessionExecutionBinding.exactExecutionBindingCount sid pid
 
         box
             {| activeCapacity = snapshotOccupied routingRuntime |> Array.length

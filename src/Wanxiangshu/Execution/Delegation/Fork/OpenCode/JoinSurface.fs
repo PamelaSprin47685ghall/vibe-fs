@@ -11,7 +11,6 @@ open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
-open Wanxiangshu.Mission.Manager
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider

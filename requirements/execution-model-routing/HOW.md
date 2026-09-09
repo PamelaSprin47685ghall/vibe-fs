@@ -44,6 +44,8 @@ ModelRoutingRuntime (进程单例，管理 Lease multiset 与 Capacity Token)
    - `CapacityReconciliation.decide : CapacityInvariantEvidence -> CapacityReconciliationDecision` 只比较 canonical evidence；合法状态返回 `NoOp`，ledger/map、owner/custody、state count 或 counter 不可能态返回 typed `FailClosed`。该函数不持有 runtime，因而不能 repair、清 counter/config 或推进 queue。
    - commit、release、cancel 的唯一边界 outcome 为 `Applied | AlreadyApplied | StaleFence | Conflict`；同一 counter owner 只按后三类单调累加 duplicate/stale/conflict。
 
+`ChatParamsHook`、`ChatAdmissionTransaction` 及 admission 的两个证明 Surface 静态消费 `SessionExecutionBinding` 的既有 public contract。provider 校验、物理执行绑定／释放与 exact binding count 不再经过动态模块查找、手写 union 或缺失模块时的 no-op／零值。`chat.params` 仍只观察既有绑定，不取得调度 authority；绑定异常仍进入 transaction 的既有 pre-provider settlement。`interaction-authority/tests/chat-params-hook.test.mjs` 与 `managed-chat-execution/tests/pre-provider-settlement.test.mjs` 分别执行真实 hook 和 exact 绑定／释放路径，不以源码函数名匹配代替行为证明。
+
 ## 验证与测试落点
 | 命题 | 落点测试 |
 |---|---|

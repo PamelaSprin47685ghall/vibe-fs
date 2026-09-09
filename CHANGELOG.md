@@ -2,6 +2,8 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- Host provider 校验、chat admission 绑定／释放和证明 Surface 恢复对 `SessionExecutionBinding` 的静态 typed 调用，移除动态加载、手写 union、静默 no-op 和虚假零值；SyncDelegate 证明入口直接构造并执行真实 Inspector tool，不依赖生成 JavaScript 的构造器布局。真实 consumer 并集编译同时清除 JoinSurface 的陈旧 Manager namespace 引入，保留 exact settlement、child 复用与 bounded WorkRecord 语义。
+
 - Fork WarmStart 与 Prefix WorkRecord 恢复静态 typed 依赖，删除动态加载、union 解码和默认成功／备用渲染路径；保留 WarmStart 查询级 fail-open、无关键词零工作、同 session Opening 排除与 frame 读取失败语义。移除只匹配源码注释的 Opening 伪证明，记录真实行为证明的覆盖边界。
 
 - Coder WarmStart 恢复静态 typed 调用，保留查询级 fail-open，移除 adapter 动态加载、union 解码与 catch-all；Blogger context 构造归入 MainContext，删除旧 Enforcer Host 和 Recovery 副本。Coverage 出生门测试改走真实 trace fold／生产函数，补足无法映射与同 turn 推进的反例，移除虚假 precheck 证明；JoinGuard 证明 adapter 独立编译并显式声明实际依赖。

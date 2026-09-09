@@ -32,6 +32,8 @@
    - `CasebookIndex` 管理 `{ shelfmark, canonicalQuestion }` 快照，按 epoch 缓存冻结；
    - 当检测到可见集合变化或显式失效时推进 epoch，保证同一 epoch 内提示词字节完全稳定。
 
+`SyncDelegateSurface.executeInspector` 用 typed `ToolHostCodec.factory`、`HostToolArguments` 与 `HostToolContext` 直接执行真实 `InspectorTool.spec`；opaque JS Surface 合同不变，不再动态导入编译产物或依赖生成构造器的布局。`tests/g6-inspector-tool-finalize-fetch.test.mjs` 实际覆盖单一 Inspector child 的多次复用、每次 bounded record 不泄漏之前的回答，以及 Bookkeeper finalize 后的 canonical Casebook 内容。该测试使用无取消来源的 tool context；取消行为另由 SyncDelegate lifecycle 测试覆盖，不将其描述为 Inspector tool abort 接线证明。
+
 ## 验证与测试落点
 
 | 命题 | 落点测试 |

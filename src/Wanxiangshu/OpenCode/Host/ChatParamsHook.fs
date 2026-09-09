@@ -1,7 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
 open System
-open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
 
@@ -95,73 +94,8 @@ module ChatParamsHook =
         | Some sessionId, None -> ExplicitResumeSuppression.hasMarkedPhysicalMaterial sessionId
         | None, _ -> false
 
-    let private bindingModule: obj =
-        emitJsExpr
-            ()
-            """
-        (() => {
-            let mod = null;
-            try {
-                if (typeof require === 'function') {
-                    mod = require('./SessionExecutionBinding.js');
-                }
-            } catch (_) {}
-            if (!mod) {
-                try {
-                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
-                        ? process.getBuiltinModule('node:module')
-                        : null;
-                    if (procMod && typeof procMod.createRequire === 'function') {
-                        const req = procMod.createRequire(import.meta.url);
-                        mod = req('./SessionExecutionBinding.js');
-                    }
-                } catch (_) {}
-            }
-            return mod;
-        })()
-        """
-
-    let private validateObservedProviderDynamically
-        (sessionId: SessionId)
-        (agent: string)
-        (model: OpencodeModel)
-        : Result<bool, string> =
-        emitJsExpr
-            (bindingModule, sessionId, agent, model)
-            """
-        (() => {
-            if ($0 && typeof $0.validateObservedProvider === 'function') {
-                return $0.validateObservedProvider($1, $2, $3);
-            }
-            return { tag: 1, fields: ["SessionExecutionBinding not available"] };
-        })()
-        """
-
-    let private isUnboundHostAuxiliaryChildDynamically (sessionId: SessionId) : bool =
-        emitJsExpr
-            (bindingModule, sessionId)
-            """
-        (() => {
-            if ($0 && typeof $0.isUnboundHostAuxiliaryChild === 'function') {
-                return !!$0.isUnboundHostAuxiliaryChild($1);
-            }
-            return false;
-        })()
-        """
-
-    let private observeUserFacingAgentDynamically (sessionId: SessionId) (agent: string) : unit =
-        emitJsExpr
-            (bindingModule, sessionId, agent)
-            """
-        (() => {
-            if ($0 && typeof $0.observeUserFacingAgent === 'function') {
-                $0.observeUserFacingAgent($1, $2);
-            }
-        })()
-        """
-
     let private checkObservedProvider sessionId agent model =
-        match validateObservedProviderDynamically sessionId agent model with
+        match SessionExecutionBinding.validateObservedProvider sessionId agent model with
         | Ok true -> ()
         | Ok false ->
             invalidOp (
@@ -244,9 +178,9 @@ module ChatParamsHook =
 
     let private applyManagedPolicy input output =
         match trySessionAndAgent input with
-        | Some(sessionId, _) when isUnboundHostAuxiliaryChildDynamically sessionId -> ()
+        | Some(sessionId, _) when SessionExecutionBinding.isUnboundHostAuxiliaryChild sessionId -> ()
         | Some(sessionId, agent) ->
-            observeUserFacingAgentDynamically sessionId agent
+            SessionExecutionBinding.observeUserFacingAgent sessionId agent
             validateModel sessionId agent input
             applyManagedTemperature input output
         | None -> ()

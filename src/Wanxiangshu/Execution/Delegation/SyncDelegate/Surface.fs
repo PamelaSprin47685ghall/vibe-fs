@@ -730,28 +730,30 @@ module SyncDelegateSurface =
     /// SyncDelegate runtime. Tool arguments/context are translated here so the
     /// semantic caller never imports ToolHostCodec or InspectorTool internals.
     let executeInspector (value: obj) (toolModule: obj) (owner: string) (charge: string) : Task<string> =
-        let harness = unbox<Harness> value
-        let ownerSessionId = SessionId.value (harness.OwnerSession owner)
-        let scope = harness.Scope
-        let runtimeOpt = Some harness.Runtime
+        task {
+            let harness = unbox<Harness> value
 
-        let invokeAsync: Task<string> =
-            emitJsExpr
-                (scope, runtimeOpt, toolModule, ownerSessionId, charge)
-                """
-(async function(scope, runtimeOpt, toolModule, ownerSessionId, charge) {
-    const { ToolHostCodec_factory } = await import('../../../OpenCode/Codec/ToolHostCodec.js');
-    const actualFactory = ToolHostCodec_factory ? ToolHostCodec_factory(toolModule) : toolModule;
-    const { spec: specFactory } = await import('../../../OpenCode/Tools/InspectorTool.js');
-    const spec = specFactory(actualFactory, scope, runtimeOpt);
-    const { HostToolArguments, HostToolContext } = await import('../../../OpenCode/Codec/ToolHostCodec.js');
-    const args = new HostToolArguments({ charge: charge, keywords: null, expected_tool_calls: null });
-    const context = new HostToolContext(ownerSessionId, null, null, null, null, () => () => {});
-    return await spec.Execute(args, context);
-})($0, $1, $2, $3, $4)
-"""
+            let spec =
+                InspectorTool.spec (ToolHostCodec.factory toolModule) harness.Scope (Some harness.Runtime)
 
-        invokeAsync
+            let args =
+                HostToolArguments(
+                    box
+                        {| charge = charge
+                           keywords = null
+                           expected_tool_calls = null |}
+                )
+
+            let context: HostToolContext =
+                { SessionId = SessionId.value (harness.OwnerSession owner)
+                  Agent = None
+                  ToolCallId = None
+                  ProviderRunId = None
+                  PromptText = None
+                  AttachAbort = fun _ -> fun () -> () }
+
+            return! spec.Execute args context
+        }
 
     /// Invoke one ordinary managed delegation. The returned promise remains
     /// pending until `settle` receives a reconciled provider turn.
