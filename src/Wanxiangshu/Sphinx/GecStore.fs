@@ -62,7 +62,7 @@ module GecStore =
         if isNullish payload then createObj [] else payload
 
     let private envelopeId (inquiryId: string) (revision: int) (kind: string) : string =
-        (CoreHash.sha256Hex (inquiryId + "|" + string revision + "|" + kind))
+        (Wanxiangshu.Host.HostDigest.sha256Hex (inquiryId + "|" + string revision + "|" + kind))
             .Substring(0, 40)
 
     let private prefixedEventType (kind: string) : string option =

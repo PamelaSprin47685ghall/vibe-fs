@@ -111,7 +111,9 @@ module SelfPrediction =
         let parts =
             outcomes |> List.map (fun outcome -> outcome + "=" + string forecast.[outcome])
 
-        CoreHash.sha256Hex (workId + "|" + String.concat "," outcomes + "|" + String.concat "," parts)
+        Wanxiangshu.Host.HostDigest.sha256Hex (
+            workId + "|" + String.concat "," outcomes + "|" + String.concat "," parts
+        )
 
     let commit (workId: string) (forecast: Map<string, float>) : Result<Seal, PredictionError> =
         if String.IsNullOrWhiteSpace workId then

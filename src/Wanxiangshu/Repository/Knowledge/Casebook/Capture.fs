@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
-open Fable.Core
 open Fable.Core.JsInterop
 
 /// CASE-003: typed observation capture from the final execution layer.
@@ -11,18 +10,12 @@ open Fable.Core.JsInterop
 /// fewer change-detection opportunity, never a failed Inspector call.
 module CasebookCapture =
 
-    [<Import("createHash", "node:crypto")>]
-    let private createHash (algorithm: string) : obj = jsNative
-
-    [<Emit("$0.update($1, 'utf8').digest('hex')")>]
-    let private digestHex (hash: obj) (data: string) : string = jsNative
-
     /// Stable content fingerprint for FileRead observations (CASE-003).
     let contentHash (text: string) : string =
         if isNull text then
             ""
         else
-            digestHex (createHash "sha256") text
+            Wanxiangshu.Host.HostDigest.sha256Hex text
 
     let private text (value: obj) : string option =
         if isNull value || value = null then

@@ -325,7 +325,9 @@ module Protocol =
                       OrderPermutation = order
                       BlindToken =
                         "blind"
-                        + CoreHash.sha256Hex (sprintf "%s|%s|%d|%d" subject treatment.Name treatmentIndex input.Seed) }
+                        + Wanxiangshu.Host.HostDigest.sha256Hex (
+                            sprintf "%s|%s|%d|%d" subject treatment.Name treatmentIndex input.Seed
+                        ) }
 
                 let count = exposure |> Map.tryFind treatment.Name |> Option.defaultValue 0
 
@@ -640,16 +642,16 @@ module Protocol =
     // hiding). Callers needing hiding must use the salted variant below.
     let commitResponse (subject: string) (responseText: string) =
         { Subject = subject
-          Digest = CoreHash.sha256Hex (sprintf "%s|%s" subject responseText) }
+          Digest = Wanxiangshu.Host.HostDigest.sha256Hex (sprintf "%s|%s" subject responseText) }
 
     let verifyResponse (commit: ResponseCommit) (subject: string) (responseText: string) =
         commit.Subject = subject
-        && commit.Digest = CoreHash.sha256Hex (sprintf "%s|%s" subject responseText)
+        && commit.Digest = Wanxiangshu.Host.HostDigest.sha256Hex (sprintf "%s|%s" subject responseText)
 
     let commitResponseWithSalt (subject: string) (responseText: string) (salt: string) =
         { Subject = subject
-          Digest = CoreHash.sha256Hex (sprintf "%s|%s|%s" subject responseText salt) }
+          Digest = Wanxiangshu.Host.HostDigest.sha256Hex (sprintf "%s|%s|%s" subject responseText salt) }
 
     let verifyResponseWithSalt (commit: ResponseCommit) (subject: string) (responseText: string) (salt: string) =
         commit.Subject = subject
-        && commit.Digest = CoreHash.sha256Hex (sprintf "%s|%s|%s" subject responseText salt)
+        && commit.Digest = Wanxiangshu.Host.HostDigest.sha256Hex (sprintf "%s|%s|%s" subject responseText salt)

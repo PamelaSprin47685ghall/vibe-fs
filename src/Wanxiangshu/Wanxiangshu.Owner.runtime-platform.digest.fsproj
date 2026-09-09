@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>runtime-platform</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>digest</WanxiangshuCompileShard>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Host/Digest.fsi"/>
+    <Compile Include="Host/Digest.fs"/>
+  </ItemGroup>
+</Project>

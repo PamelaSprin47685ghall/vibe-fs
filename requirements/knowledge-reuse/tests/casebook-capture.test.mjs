@@ -11,12 +11,11 @@ import test from 'node:test'
 import * as casebook from '../../../dist/Repository/Knowledge/Casebook/Surface.js'
 
 test('WHAT[KNOWLEDGE-REUSE-003] CASE003_read_capture_is_typed_and_hashed', () => {
-  const obs = casebook.capture('read', { path: 'src/a.fs' }, 'module A')
+  const obs = casebook.capture('read', { path: 'src/a.fs' }, 'module A // 观察 🧭\r\n')
   assert.notEqual(obs, null)
   assert.equal(obs.kind, 'file-read')
   assert.equal(obs.path, 'src/a.fs')
-  assert.equal(obs.contentHash, casebook.contentHash('module A'))
-  assert.equal(obs.contentHash.length, 64, 'sha256 hex')
+  assert.equal(obs.contentHash, 'af5ff296cbbdd95c83f69ae8ad47f52a58778dc97c8fadc3c3609313c3a3f35d')
   // empty output → no observation
   assert.equal(casebook.capture('read', { path: 'src/a.fs' }, ''), null)
   // missing path → no observation

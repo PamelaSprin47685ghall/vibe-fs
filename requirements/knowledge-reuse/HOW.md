@@ -7,6 +7,7 @@
 1. **类型化捕获（Capture）**：
    - 监听 Inspector 工具调用，对 `read` 生成 `FileRead(path, contentHash)`、对 `glob` 生成 `GlobResult(pattern, paths)`、对 `grep` 生成 `GrepResult(pattern, matches)`；
    - 提取的观察经 `Observations.normalize` 执行按路径与内容的稳定去重和排序，折叠为规范的观察集合。
+   - `CasebookCapture.contentHash` 保留 null 的空字符串哨兵，其他文本调用 `runtime-platform/digest` 中既有 `HostDigest.sha256Hex`，不再拥有第二份 crypto 适配器；空字符串仍是正常的 SHA-256 输入。`CASE003_read_capture_is_typed_and_hashed` 经真实 Capture Surface 校验含非 ASCII 字符与 CRLF 的独立固定摘要，不再用生产 helper 自证或仅检查输出长度。只读 replay 继续调用同一捕获合同。
 
 2. **只读重放（Replay）**：
    - `FetchTool.Execute` 首先复用 `CasebookFeature.isEnabled(workspaceRoot)` 检查 marker；未启用时不解析 shelfmark、不构建索引、不触碰事件流；

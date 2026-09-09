@@ -30,6 +30,8 @@ MCP 层返回 structuredContent 携带 nextTool 提示
 
 ## 核心机制
 
+Sphinx 的 canonical digest、事件 ID、blind token、response commit 与 SelfPrediction seal 共用 `runtime-platform/digest` 的 `HostDigest.sha256Hex`；不再在 CoreHash 复制 Node crypto 适配器或保留同名转发入口。原语 shard 只有字符串摘要 `.fs/.fsi`，无领域 ProjectReference，不把 OpenCode 消息／事件合同带入该依赖。canonical JSON、字段顺序策略、ID 前缀与截断、salt 和各调用方输入拼接保持不变；既有 replay、host-equivalence、legacy-golden、split-ballot 与 self-prediction 测试继续验证其生产后果。
+
 ### 1. 认知状态结构与生命周期 (State Structure & Lifecycle)
 
 - **充分状态管理**：`EpistemicState` 显式维护 `Findings`、`Evidence`、`Hypotheses`、`Dependencies` 与 `CognitiveActions`，拒绝将原始文本记录作为状态本体。

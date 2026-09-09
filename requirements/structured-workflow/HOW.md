@@ -102,6 +102,8 @@ Subsystem SCC 是首要结构债：双向依赖必须通过移动知识所有权
 
 在 `8cddee173` 上将 CompletionMailbox、Change VerdictMailbox 与 HostForkJoin 的 journal／fission 竞争结果改为 typed `Choice`，删除手写 `{ kind, reason }` 协议；不新增调度运行时，不改变单次 `.then`、注册顺序、drain-first 或中断语义。首轮格式检查拒绝未括号化的 `let!` 类型模式，修正后真实 focused Fable 并集通过 950 parsed sources／912 items（fingerprint `21025f5f1239`），新全量产物上的 verdict／join／causal wait 测试 35/35 通过。新增 Change Surface 直接观察真实 VerdictMailbox，证明竞争优先级、旧 waiter 移除及有界 FIFO；公开 mailbox／join 生产签名不变，仅扩充既有证明 Surface。无 journal join probe 不证明 journal／fission 全分支，具体证据边界见 delegation/HOW。声明图仍为 26 subsystem、208 shard、701 source、1907 references，shard DAG，最大 subsystem SCC 22；本批只是类型安全收敛，不是 subsystem 知识依赖减少，GAP-033 保持 PARTIAL。
 
+在 `d087240ac` 上将现有 `Host/Digest.fs/.fsi` 从混有 OpenCode 类型的 host-digest 分片抽到零 ProjectReference 的 `runtime-platform/digest`，公开摘要 API 与 aggregate 顺序不变。原 Host 分片保留全部消息／事件合同并引用原语；Casebook 和 Sphinx 直接声明窄原语引用，删除各自重复的字符串 crypto 实现及 Sphinx 旧导出的全部调用方，保留 canonical JSON、身份输入与 null 语义。二进制 SHA-1／SHA-256 不属于本次统一范围。focused Fable 的签名反向 consumer 并集通过 1402 parsed sources／1364 items（fingerprint `dbdfc4eb9b9d`）；新全量产物上的捕获／重放、Sphinx 身份／承诺／golden 与结构测试 41/41 通过，真实 Capture Surface smoke 另覆盖空串、Unicode、CRLF、NUL、孤立 surrogate 与 null。删除只执行测试内 crypto、却误称 HOST-BOUNDARY-019 生产证明的用例；该删除不宣称补齐 Host canary 缺口。声明图为 26 subsystem、209 shard、701 source、1910 references，shard DAG，最大 subsystem SCC 22。新增原语确实不包含 Host 类型或领域知识，但原宽 Host 消费者未迁移，不宣称其闭包缩小或 GAP-033 完成。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

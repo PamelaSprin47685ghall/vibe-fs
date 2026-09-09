@@ -79,7 +79,7 @@ module GecHost =
             Ok value
 
     let private childSessionFor (workId: string) (attempt: int) (snapshotHash: string) : string =
-        CoreHash.sha256Hex (workId + "|" + string attempt + "|" + snapshotHash)
+        Wanxiangshu.Host.HostDigest.sha256Hex (workId + "|" + string attempt + "|" + snapshotHash)
 
     let private planChild
         (workId: string)

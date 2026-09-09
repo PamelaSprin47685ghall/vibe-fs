@@ -20,10 +20,11 @@ module HostDigest =
 
     /// Lowercase hex SHA-256 of a UTF-8 string.
     ///
-    /// The one hash function this codebase has. Digests appear in durable
-    /// facts (REVIEW-010 seals, COMPANION-011 prefix digests) and in derived
-    /// identities, so a second implementation that differed in encoding would
-    /// invalidate stored evidence rather than merely disagree.
+    /// Digests appear in durable facts (REVIEW-010 seals, COMPANION-011 prefix
+    /// digests) and in derived identities, so a second UTF-8 string
+    /// implementation that differed in encoding would invalidate stored
+    /// evidence rather than merely disagree. Binary-input hashes (SHA-1/SHA-256
+    /// over byte[]) are separate functions, not this one.
     let sha256Hex (input: string) : string =
         let hash = createHash "sha256"
         hash?update (box input) |> ignore

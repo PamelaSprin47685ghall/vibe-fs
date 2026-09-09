@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-mcp.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.digest.fsproj"/>
     <Compile Include="Sphinx/Types.fsi"/>
     <Compile Include="Sphinx/Types.fs"/>
     <Compile Include="Sphinx/RuntimeTypes.fsi"/>
