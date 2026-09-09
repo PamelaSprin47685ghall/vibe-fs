@@ -111,6 +111,90 @@ module ToolRegistry =
 
         if isNull raw then None else Some(unbox<ToolSpec> raw)
 
+    let private fetchToolModule: obj =
+        emitJsExpr
+            ()
+            """
+        (() => {
+            let mod = null;
+            try {
+                if (typeof require === 'function') {
+                    mod = require('./FetchTool.js');
+                }
+            } catch (_) {}
+            if (!mod) {
+                try {
+                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
+                        ? process.getBuiltinModule('node:module')
+                        : null;
+                    if (procMod && typeof procMod.createRequire === 'function') {
+                        const req = procMod.createRequire(import.meta.url);
+                        mod = req('./FetchTool.js');
+                    }
+                } catch (_) {}
+            }
+            return mod;
+        })()
+        """
+
+    let private fetchAdmission: ToolAdmission =
+        let raw: obj =
+            emitJsExpr
+                fetchToolModule
+                """
+            (() => {
+                if ($0 && $0.admission) return $0.admission;
+                return null;
+            })()
+            """
+
+        if isNull raw then
+            ToolAdmission.OfficeRole(fun _ r -> r = Role.Inspector || r = Role.Coder)
+        else
+            unbox<ToolAdmission> raw
+
+    let private bookkeeperToolModule: obj =
+        emitJsExpr
+            ()
+            """
+        (() => {
+            let mod = null;
+            try {
+                if (typeof require === 'function') {
+                    mod = require('../../Repository/Programming/Js/OpenCode/BookkeeperTool.js');
+                }
+            } catch (_) {}
+            if (!mod) {
+                try {
+                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
+                        ? process.getBuiltinModule('node:module')
+                        : null;
+                    if (procMod && typeof procMod.createRequire === 'function') {
+                        const req = procMod.createRequire(import.meta.url);
+                        mod = req('../../Repository/Programming/Js/OpenCode/BookkeeperTool.js');
+                    }
+                } catch (_) {}
+            }
+            return mod;
+        })()
+        """
+
+    let private jsBookkeeperAdmission: ToolAdmission =
+        let raw: obj =
+            emitJsExpr
+                bookkeeperToolModule
+                """
+            (() => {
+                if ($0 && $0.admission) return $0.admission;
+                return null;
+            })()
+            """
+
+        if isNull raw then
+            ToolAdmission.PrivateAttachment(fun ctx -> not (String.IsNullOrWhiteSpace ctx.SessionId))
+        else
+            unbox<ToolAdmission> raw
+
     let private staticAdmissions (bloggerHost: IBloggerRuntimeHost option) : (string * ToolAdmission) list =
         [ "fork", ForkTool.managerAdmission
           "resume", ForkTool.managerAdmission
@@ -141,8 +225,8 @@ module ToolRegistry =
           "celebrate", InstitutionalLearningTools.admission
           "regret", InstitutionalLearningTools.admission
           "chronicle", ChronicleTool.admission bloggerHost
-          "fetch", FetchTool.admission
-          "js-bookkeeper", JsBookkeeperTool.admission ]
+          "fetch", fetchAdmission
+          "js-bookkeeper", jsBookkeeperAdmission ]
 
     let private tryAdmissionFor (specName: string) (bloggerHost: IBloggerRuntimeHost option) : ToolAdmission option =
         match staticAdmissions bloggerHost |> List.tryFind (fun (name, _) -> name = specName) with
