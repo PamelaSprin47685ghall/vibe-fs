@@ -7,7 +7,6 @@
 // as raw X messages.
 
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import * as prefix from '../../../dist/Context/Prefix/Surface.js'
 import * as magicTodo from '../../../dist/Mission/Obligation/Todo/MagicTodoSemanticSurface.js'
@@ -70,36 +69,4 @@ test('WHAT[CONTEXT-COMPRESSION-020] todowrite call and matching result are retai
     [false, true, true, false],
     'only the todowrite round punches through an otherwise replaceable prefix',
   )
-})
-
-test('WHAT[CONTEXT-COMPRESSION-017] same_session_Y_prefix_never_repackages_or_deletes_the_raw_Opening', () => {
-  const wire = readFileSync(new URL('../../../src/Wanxiangshu/Context/Prefix/Wire.fs', import.meta.url), 'utf8')
-  const adapter = readFileSync(
-    new URL('../../../src/Wanxiangshu/OpenCode/Codec/ProjectionMessageEdit.fs', import.meta.url),
-    'utf8',
-  )
-
-  const frozen = wire.slice(
-    wire.indexOf('let private materializeFrozenRecordPrefix'),
-    wire.indexOf('let private candidate'),
-  )
-  assert.match(frozen, /LifecycleWorkRecord\.render\s+false/)
-  assert.doesNotMatch(frozen, /LifecycleWorkRecord\.render\s+true/)
-
-  const replacement = wire.slice(
-    wire.indexOf('let private requireStableReplacement'),
-    wire.indexOf('let private commitPromotablePrefixRebase'),
-  )
-  assert.match(replacement, /XTraceProjection\.tryOpeningHostMessageId/)
-  assert.match(replacement, /List\.filter/)
-  assert.match(replacement, /replacePrefixByHostIds/)
-  assert.doesNotMatch(replacement, /List\.(?:take|skip)\s+activation\.CutoffExclusive/)
-
-  const stableReplacement = adapter.slice(
-    adapter.indexOf('let replacePrefixByHostIds'),
-    adapter.indexOf('let suppressHostMessagesByIds'),
-  )
-  assert.match(stableReplacement, /ProviderWireDecode\.hostMessageId/)
-  assert.match(stableReplacement, /Set\.contains messageId coveredIds/)
-  assert.doesNotMatch(stableReplacement, /List\.(?:take|skip)/)
 })

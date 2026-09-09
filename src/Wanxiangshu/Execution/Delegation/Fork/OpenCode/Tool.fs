@@ -15,8 +15,7 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
-open Fable.Core
-open Fable.Core.JsInterop
+open Wanxiangshu.Repository.Investigation.WarmStart
 
 /// Manager fork & resume / Orchestrator commission. One typed request backs
 /// every public tool; each tool exposes its own schema; PTY is absent.
@@ -225,35 +224,6 @@ module ForkTool =
         | Role.DevOps -> true
         | _ -> false
 
-    let private appendWarmStartToBaseDocument
-        (parentId: SessionId)
-        (role: Role)
-        (workspaceDirectory: string option)
-        (keywords: string)
-        (baseDocument: LlmFacing.Document)
-        : Task<LlmFacing.Document option> =
-        let invokeAsync: Task<obj> =
-            emitJsExpr
-                (parentId, role, workspaceDirectory, keywords, baseDocument)
-                """
-(async function(parentId, role, workspaceDirectory, keywords, baseDocument) {
-    try {
-        const mod = await import('../../../../Repository/Investigation/WarmStart/Runtime.js');
-        const appendFn = mod.appendToBaseDocument;
-        if (typeof appendFn !== 'function') return null;
-        const res = await appendFn(parentId, role, workspaceDirectory, keywords, baseDocument);
-        return res && res.tag === 0 ? res.fields[0] : null;
-    } catch {
-        return null;
-    }
-})($0, $1, $2, $3, $4)
-"""
-
-        task {
-            let! res = invokeAsync
-            return Option.ofObj (unbox<LlmFacing.Document> res)
-        }
-
     let private prepareForkPromptWithRecord
         (scope: ToolRuntimeScope)
         (runtime: HostForkRuntime)
@@ -261,31 +231,26 @@ module ForkTool =
         (request: Request)
         (commissionerRecord: string option)
         (attachment: string option)
-        =
-        task {
-            let baseDocument =
-                ForkChildPayload.relayDocument
-                    (forkInstructions runtime.ParentId)
-                    request.Charge
-                    commissionerRecord
-                    attachment
-                    []
-                    None
+        : Task<string> =
+        let baseDocument =
+            ForkChildPayload.relayDocument
+                (forkInstructions runtime.ParentId)
+                request.Charge
+                commissionerRecord
+                attachment
+                []
+                None
 
-            if hasKeywords request then
-                match!
-                    appendWarmStartToBaseDocument
-                        runtime.ParentId
-                        role
-                        scope.WorkspaceDirectory
-                        request.Keywords
-                        baseDocument
-                with
-                | Some prompt -> return LlmFacing.render prompt
-                | None -> return LlmFacing.render baseDocument
-            else
-                return LlmFacing.render baseDocument
-        }
+        if hasKeywords request then
+            RepositoryWarmStart.appendToBaseDocument
+                runtime.ParentId
+                role
+                scope.WorkspaceDirectory
+                request.Keywords
+                baseDocument
+            |> TaskValue.map (Result.defaultWith invalidOp >> LlmFacing.render)
+        else
+            Task.FromResult(LlmFacing.render baseDocument)
 
     let private isSelfAttachment (request: Request) =
         request.Attach

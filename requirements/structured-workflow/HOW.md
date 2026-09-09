@@ -80,6 +80,8 @@ Subsystem SCC 是首要结构债：双向依赖必须通过移动知识所有权
 
 本批 Coder focused compile 又暴露 `JoinGuardSurface → DispatchSurface` 的漏报依赖。证明 adapter 从运行时分片移入独立 `delegation/join-guard-surface`，显式引用原运行时和 DispatchSurface 所属分片，未复制 Host port adapter，aggregate 源码顺序不变。Coder、JoinGuard Surface、Enforcer continuation 的真实 focused Fable compile 分别通过 982、972、958-source 闭包；声明图为 26 subsystem、208 shard、701 production source、1879 references，shard DAG，最大 subsystem SCC 为 21。SCC 增长如实反映恢复的依赖，不是闭包收敛成果；GAP-033 保持 PARTIAL。
 
+在 `11a221797` 上继续恢复 Fork → WarmStart 与 Prefix → WorkRecord 两条实际依赖。Fork 直接调用既有 typed append 合同，不再解码编译器 union 或吞掉 adapter 异常；Prefix 静态调用唯一纯 materializer，删除动态加载与备用 Chronicle 渲染器。两个真实 consumer shard 的 focused Fable compile 分别通过 980、952-source 闭包，相关行为测试 50/50 通过；声明图为 26 subsystem、208 shard、701 production source、1881 references，shard DAG，最大 subsystem SCC 21。新增引用公开原来隐藏的知识依赖，并不代表 SCC 已缩小；GAP-033 仍为 PARTIAL。删除只能匹配源码注释的 Opening 伪证明，保留 canonical renderer 与真实 writeback 行为证明；完整 frozen 物化及 Fork adapter fault／取消的直接证明限制分别记录于所属 HOW。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

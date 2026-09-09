@@ -24,6 +24,8 @@
    - 检索过程中的任何单项失败、超时或服务未就绪均安全 fail-open，返回原始任务描述，不阻断主线流程。
    - `OpenCode/Tools/CoderTool.fs` 静态调用 `RepositoryWarmStart.prepareDocument`，由原 runtime 拥有上述 fail-open；adapter 不再动态加载模块、解码 Fable union 或吞掉所有异常。正常 `Ok` 文档直接传给 SyncDelegate；typed `Error` 为不变量失败，Task fault／取消继续传播，不另造成功结果。
 
+`ForkTool.prepareForkPromptWithRecord` 同样静态调用 `RepositoryWarmStart.appendToBaseDocument`：原始 relay document、关键词准入与无关键词零工作保持不变；查询级 fail-open 仍由 WarmStart 拥有，adapter 不再通过 null／默认原文掩盖 typed Error、Task fault 或取消。既有 WarmStart suite 证明 runtime 的查询失败与角色／路径边界，Fork suite 证明实际工具准入和派发；尚无直接注入 Fork adapter fault／取消的专门回归，不将前者冒充后者。
+
 ## 验证与测试落点
 
 | 命题 | 落点测试 |
