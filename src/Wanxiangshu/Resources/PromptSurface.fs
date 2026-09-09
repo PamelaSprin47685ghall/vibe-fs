@@ -1,6 +1,8 @@
 namespace Wanxiangshu.Resources
 
-open Wanxiangshu.Enforcer
+open Fable.Core
+open Fable.Core.JsInterop
+open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider
 
 /// JS-native owner boundary for the canonical provider prompt catalog and the
@@ -35,14 +37,22 @@ module PromptSurface =
            catalog.DistillerSystemPrompt
            catalog.BloggerSystemPrompt |]
 
-    let private ruleToJs (rule: EnforcerRule) : obj =
-        box
-            {| name = rule.Name
-               enforcerText = rule.EnforcerText
-               mainText = rule.MainText
-               ruleId = rule.RuleId
-               fieldName = rule.FieldName
-               lexicalOrder = rule.LexicalOrder |}
+    let private ruleToJs (rule: obj) : obj =
+        emitJsExpr
+            rule
+            """
+        (() => {
+            if (!$0) return null;
+            return {
+                name: $0.Name || $0.name || '',
+                enforcerText: $0.EnforcerText || $0.enforcerText || '',
+                mainText: $0.MainText || $0.mainText || '',
+                ruleId: $0.RuleId || $0.ruleId || '',
+                fieldName: $0.FieldName || $0.fieldName || '',
+                lexicalOrder: $0.LexicalOrder || $0.lexicalOrder || 0
+            };
+        })()
+        """
 
     let private runtimeToJs (resources: RuntimeResources) : obj =
         box

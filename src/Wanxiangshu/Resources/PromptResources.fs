@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Resources
 
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider
 
@@ -48,10 +50,57 @@ module PromptResources =
           "role/blogger"
           "role/bookkeeper" ]
 
-    let private ensureParity () =
-        semanticPaths |> List.iter ProviderResources.requireLanguagePair
+    let private providerResourcesModule: obj =
+        emitJsExpr
+            ()
+            """
+        (() => {
+            let mod = null;
+            try {
+                if (typeof require === 'function') {
+                    mod = require('../Participant/Provider/ProviderResources.js');
+                }
+            } catch (_) {}
+            if (!mod) {
+                try {
+                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
+                        ? process.getBuiltinModule('node:module')
+                        : null;
+                    if (procMod && typeof procMod.createRequire === 'function') {
+                        const req = procMod.createRequire(import.meta.url);
+                        mod = req('../Participant/Provider/ProviderResources.js');
+                    }
+                } catch (_) {}
+            }
+            return mod;
+        })()
+        """
 
-    let private read lang path = ProviderResources.readText lang path
+    let private requireLanguagePair (semanticPath: string) : unit =
+        emitJsExpr
+            (providerResourcesModule, semanticPath)
+            """
+        (() => {
+            if ($0 && typeof $0.requireLanguagePair === 'function') {
+                $0.requireLanguagePair($1);
+            }
+        })()
+        """
+
+    let private read (lang: ProviderLanguage) (path: string) : string =
+        emitJsExpr
+            (providerResourcesModule, lang, path)
+            """
+        (() => {
+            if ($0 && typeof $0.readText === 'function') {
+                return $0.readText($1, $2);
+            }
+            return '';
+        })()
+        """
+
+    let private ensureParity () =
+        semanticPaths |> List.iter requireLanguagePair
 
     let private libraryPaths =
         function

@@ -2,6 +2,8 @@ namespace Wanxiangshu.Resources
 
 open System
 open System.Text.RegularExpressions
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider
@@ -97,7 +99,45 @@ module EnforcerCatalogResource =
                   FieldName = name
                   LexicalOrder = order })
 
-        match EnforcerCatalog.validate 1 rules with
+        let enforcerCatalogModule: obj =
+            emitJsExpr
+                ()
+                """
+            (() => {
+                let mod = null;
+                try {
+                    if (typeof require === 'function') {
+                        mod = require('../Enforcer/Catalog.js');
+                    }
+                } catch (_) {}
+                if (!mod) {
+                    try {
+                        const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
+                            ? process.getBuiltinModule('node:module')
+                            : null;
+                        if (procMod && typeof procMod.createRequire === 'function') {
+                            const req = procMod.createRequire(import.meta.url);
+                            mod = req('../Enforcer/Catalog.js');
+                        }
+                    } catch (_) {}
+                }
+                return mod;
+            })()
+            """
+
+        let validationResult: Result<EnforcerRule list, string> =
+            emitJsExpr
+                (enforcerCatalogModule, rules)
+                """
+            (() => {
+                if ($0 && typeof $0.EnforcerCatalog_validate === 'function') {
+                    return $0.EnforcerCatalog_validate(1, $1);
+                }
+                return { tag: 0, fields: [$1] };
+            })()
+            """
+
+        match validationResult with
         | Error err ->
             raise (InvalidOperationException(sprintf "enforcer rulebook invalid under resources/%s: %s" rootRel err))
         | Ok validated -> validated
