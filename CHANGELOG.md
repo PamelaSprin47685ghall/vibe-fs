@@ -2,6 +2,8 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- CanonicalIntegrator 的 Casebook／JS transaction oracle、需求接地 glob 匹配和 repository 观察 Surface 恢复静态 typed 调用及真实编译引用，删除动态模块加载、编译器 union 布局解码与缺失模块 fallback。Generator 的既有 `typedRole` 合同公开给真实 composition consumer，不复制生成流程；接地失败词汇、观察失败不阻断已提交修改、事务 Current 与重放语义保持不变。
+
 - RequirementGroundingTransform 与 PromptResources 恢复对既有消息投影、ProviderResources 的静态 typed 调用及真实 ProjectReference，删除动态加载、手写成功 union、空资源与静默跳过校验的 fallback。规范重放证明改为比较冻结终端结果字节，验证磁盘内容变化不会改写历史，新的内容版本仅追加；删除只匹配入口符号的伪证明。
 
 - 修复成功 retry 的后续 tool step 因新增 Blogger coverage 再次选择 prefix probe、造成未声明冷边界的问题。候选资格读取已结算的连续失败计数，零失败保持 committed prefix 并跳过候选物化；已有 frozen plan 保持不变，新失败仍可恢复 probe。

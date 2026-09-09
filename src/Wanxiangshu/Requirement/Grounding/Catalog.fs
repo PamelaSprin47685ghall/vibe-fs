@@ -4,6 +4,7 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Host
+open Wanxiangshu.Repository.Programming.Js
 
 module GroundingCatalog =
 
@@ -86,56 +87,10 @@ module GroundingCatalog =
         with _ ->
             relativeWithin lexicalRoot absolute
 
-    let private globFsModule: obj =
-        emitJsExpr
-            ()
-            """
-        (() => {
-            let mod = null;
-            try {
-                if (typeof require === 'function') {
-                    mod = require('../../Repository/Programming/Js/GlobFs.js');
-                }
-            } catch (_) {}
-            if (!mod) {
-                try {
-                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
-                        ? process.getBuiltinModule('node:module')
-                        : null;
-                    if (procMod && typeof procMod.createRequire === 'function') {
-                        const req = procMod.createRequire(import.meta.url);
-                        mod = req('../../Repository/Programming/Js/GlobFs.js');
-                    }
-                } catch (_) {}
-            }
-            return mod;
-        })()
-        """
-
     let private matches pattern path =
-        let matched: obj =
-            emitJsExpr
-                (globFsModule, pattern, path)
-                """
-            (() => {
-                try {
-                    if ($0 && typeof $0.matchesPathPattern === 'function') {
-                        const res = $0.matchesPathPattern($1, $2);
-                        const tagKey = 't' + 'ag';
-                        const fieldsKey = 'fiel' + 'ds';
-                        if (res && res[tagKey] === 0) {
-                            return res[fieldsKey][0];
-                        }
-                    }
-                } catch (_) {}
-                return null;
-            })()
-            """
-
-        if isNull matched then
-            invalidOp ("invalid APPLIES-TO pattern: " + pattern)
-        else
-            unbox<bool> matched
+        match JsGlobFs.matchesPathPattern pattern path with
+        | Ok matched -> matched
+        | Error _ -> invalidOp ("invalid APPLIES-TO pattern: " + pattern)
 
     let private ruleBody (raw: string) =
         let line = raw.Trim()

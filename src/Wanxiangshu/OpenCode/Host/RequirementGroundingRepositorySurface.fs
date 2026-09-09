@@ -5,8 +5,9 @@ open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
-open Fable.Core
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Repository.Programming.Js
+open Wanxiangshu.Repository.Programming.Js.OpenCode
 open Wanxiangshu.Requirement.Grounding
 
 module RequirementGroundingRepositorySurface =
@@ -39,38 +40,24 @@ module RequirementGroundingRepositorySurface =
     let dispose (runtime: obj) : unit =
         JournalSurface.dispose (runtimeOf runtime).Handle
 
-    let private summary (runtime: RuntimeHandle) (outcome: obj) =
+    let private summary (runtime: RuntimeHandle) (outcome: JsToolWorkflow.JsToolOutcome) =
         let handle = runtime.Handle
         let journal = handle.Journal
         let session = SessionId.create runtime.SessionId
 
+        // Surface compatibility projection: preserve the prior observable
+        // failure vocabulary via typed matching, not numeric DU knowledge.
+        let failureCodeText failure =
+            match failure with
+            | JsFailure.InvalidProgram -> "invalid_program"
+            | JsFailure.ProgramFailed _ -> "program_failed"
+            | JsFailure.ProgramTimeout -> "program_timeout"
+            | _ -> "unknown"
+
         let caseName, failureCode, created =
-            emitJsExpr
-                outcome
-                """
-            (() => {
-                const tagKey = 't' + 'ag';
-                const fieldsKey = 'fiel' + 'ds';
-                if ($0 && $0[tagKey] === 0) {
-                    const createdList = $0[fieldsKey][2];
-                    const createdArr = [];
-                    if (Array.isArray(createdList)) {
-                        createdArr.push(...createdList);
-                    } else if (createdList && typeof createdList[Symbol.iterator] === 'function') {
-                        for (const item of createdList) createdArr.push(item);
-                    }
-                    return ["Succeeded", null, createdArr];
-                } else if ($0 && $0[tagKey] === 1) {
-                    const failure = $0[fieldsKey][0];
-                    let code = "unknown";
-                    if (failure && failure[tagKey] === 0) code = "invalid_program";
-                    else if (failure && failure[tagKey] === 1) code = "program_failed";
-                    else if (failure && failure[tagKey] === 2) code = "program_timeout";
-                    return ["Failed", code, []];
-                }
-                return ["Failed", "unknown", []];
-            })()
-            """
+            match outcome with
+            | JsToolWorkflow.JsToolOutcome.Succeeded(_, _, created) -> "Succeeded", null, List.toArray created
+            | JsToolWorkflow.JsToolOutcome.Failed failure -> "Failed", box (failureCodeText failure), [||]
 
         box
             {| runtime = (runtime :> obj)
@@ -93,39 +80,9 @@ module RequirementGroundingRepositorySurface =
             match! boot workspace sessionId with
             | Error error -> return raise (InvalidOperationException error)
             | Ok runtime ->
-                let surfaceBaseClass: string option =
-                    emitJsExpr
-                        ()
-                        """
-                    (() => {
-                        let mod = null;
-                        try {
-                            if (typeof require === 'function') {
-                                mod = require('../../Repository/Programming/Js/GeneratorSurface.js');
-                            }
-                        } catch (_) {}
-                        if (!mod) {
-                            try {
-                                const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
-                                    ? process.getBuiltinModule('node:module')
-                                    : null;
-                                if (procMod && typeof procMod.createRequire === 'function') {
-                                    const req = procMod.createRequire(import.meta.url);
-                                    mod = req('../../Repository/Programming/Js/GeneratorSurface.js');
-                                }
-                            } catch (_) {}
-                        }
-                        if (mod && typeof mod.typedRole === 'function') {
-                            const s = mod.typedRole("Coder", "en");
-                            if (s && (s.BaseClassSource || s.baseClassSource)) return s.BaseClassSource || s.baseClassSource;
-                        }
-                        return null;
-                    })()
-                    """
-
-                match surfaceBaseClass with
+                match JsGeneratorSurface.typedRole "Coder" "en" with
                 | None -> return raise (InvalidOperationException "Coder js surface unavailable")
-                | Some baseClassSource ->
+                | Some surface ->
                     let observe readPaths effectPaths =
                         task {
                             do!
@@ -141,39 +98,15 @@ module RequirementGroundingRepositorySurface =
                         }
 
                     let! outcome =
-                        emitJsExpr
-                            (runtime.Workspace, baseClassSource, program, observe)
-                            """
-                        (() => {
-                            let mod = null;
-                            try {
-                                if (typeof require === 'function') {
-                                    mod = require('../../Repository/Programming/Js/OpenCode/ToolWorkflow.js');
-                                }
-                            } catch (_) {}
-                            if (!mod) {
-                                try {
-                                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
-                                        ? process.getBuiltinModule('node:module')
-                                        : null;
-                                    if (procMod && typeof procMod.createRequire === 'function') {
-                                        const req = procMod.createRequire(import.meta.url);
-                                        mod = req('../../Repository/Programming/Js/OpenCode/ToolWorkflow.js');
-                                    }
-                                } catch (_) {}
-                            }
-                            if (mod && typeof mod.JsToolWorkflow_runWithFileAccessObservation === 'function') {
-                                return mod.JsToolWorkflow_runWithFileAccessObservation(
-                                    $0, $1, $2, 2000,
-                                    Date.now() + 60000,
-                                    1 << 20,
-                                    null,
-                                    $3
-                                );
-                            }
-                            throw new Error("ToolWorkflow.runWithFileAccessObservation unavailable");
-                        })()
-                        """
+                        JsToolWorkflow.runWithFileAccessObservation
+                            runtime.Workspace
+                            surface.BaseClassSource
+                            program
+                            2000
+                            (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 60000L)
+                            (1 <<< 20)
+                            None
+                            observe
 
                     return summary runtime outcome
         }

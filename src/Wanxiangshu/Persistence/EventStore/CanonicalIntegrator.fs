@@ -1,57 +1,17 @@
 namespace Wanxiangshu.Persistence.EventStore
 
 open System
-open Fable.Core
-open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
 open Thoth.Json
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Repository.Knowledge.Casebook
+open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Persistence
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Sphinx
-
-module private CanonicalIntegratorDynamic =
-
-    let private loadModule (relPath: string) : obj =
-        emitJsExpr
-            relPath
-            """
-        (() => {
-            let mod = null;
-            try {
-                if (typeof require === 'function') {
-                    mod = require($0);
-                }
-            } catch (_) {}
-            if (!mod) {
-                try {
-                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
-                        ? process.getBuiltinModule('node:module')
-                        : null;
-                    if (procMod && typeof procMod.createRequire === 'function') {
-                        const req = procMod.createRequire(import.meta.url);
-                        mod = req($0);
-                    }
-                } catch (_) {}
-            }
-            return mod;
-        })()
-        """
-
-    let casebookStoreModule: obj =
-        loadModule "../../Repository/Knowledge/Casebook/Store.js"
-
-    let casebookModelModule: obj =
-        loadModule "../../Repository/Knowledge/Casebook/Model.js"
-
-    let jsTransactionStoreModule: obj =
-        loadModule "../../Repository/Programming/Js/TransactionStore.js"
-
-    let jsTransactionModule: obj =
-        loadModule "../../Repository/Programming/Js/Transaction.js"
 
 /// Structural frontier oracle. It sees every durable event but owns no business
 /// meaning; DomainConflict is simply `heads.Count > 1` in this Integrator slot.
@@ -229,173 +189,44 @@ module SphinxGenericIntegration =
 
 [<RequireQualifiedAccess>]
 module CasebookIntegration =
-    let private storeModule: obj = CanonicalIntegratorDynamic.casebookStoreModule
-
-    let private modelModule: obj = CanonicalIntegratorDynamic.casebookModelModule
-
-    let private initialState: obj =
-        emitJsExpr
-            modelModule
-            """
-        (() => {
-            if ($0 && $0.CasebookProjection_emptyState) {
-                return $0.CasebookProjection_emptyState;
-            }
-            return {};
-        })()
-        """
-
-    let private accepts (eventType: string) : bool =
-        emitJsExpr
-            (storeModule, eventType)
-            """
-        (() => {
-            if ($0 && typeof $0.isCasebookEventType === 'function') {
-                return $0.isCasebookEventType($1);
-            }
-            return false;
-        })()
-        """
-
-    let private integrate (current: obj) (envelope: EventEnvelope) : Result<obj, string> =
-        let raw: obj =
-            emitJsExpr
-                (storeModule, modelModule, current, envelope)
-                """
-        (() => {
-            try {
-                if (!$0 || typeof $0.tryDecodeEnvelope !== 'function') {
-                    return [false, "Casebook module unavailable"];
-                }
-                const decoded = $0.tryDecodeEnvelope($3);
-                const tagKey = 't' + 'ag';
-                const fieldsKey = 'fiel' + 'ds';
-                if (!decoded || decoded[tagKey] !== 0) {
-                    const err =
-                        (decoded && decoded[fieldsKey] && decoded[fieldsKey][0])
-                            ? String(decoded[fieldsKey][0])
-                            : "Casebook decode failed";
-                    return [false, err];
-                }
-                const event = decoded[fieldsKey][0];
-                if (!$1 || typeof $1.CasebookProjection_apply !== 'function') {
-                    return [false, "CasebookProjection module unavailable"];
-                }
-                const next = $1.CasebookProjection_apply($2, event);
-                return [true, next];
-            } catch (e) {
-                return [false, String(e && e.message ? e.message : e)];
-            }
-        })()
-        """
-
-        let succeeded: bool = emitJsExpr raw "$0[0]"
-
-        if succeeded then
-            Ok(emitJsExpr raw "$0[1]")
-        else
-            let message: obj = emitJsExpr raw "$0[1]"
-            Error(string message)
-
     let rule: IntegrationRule =
         { Name = "Casebook"
-          Initial = initialState
+          Initial = box CasebookProjection.emptyState
           FaultScope = fun _ -> "global"
-          Accepts = fun envelope -> accepts envelope.EventType
-          Integrate = fun current envelope -> integrate current envelope
+          Accepts = fun envelope -> CasebookStore.isCasebookEventType envelope.EventType
+          Integrate =
+            fun current envelope ->
+                match CasebookStore.tryDecodeEnvelope envelope with
+                | Error error -> Error error
+                | Ok event ->
+                    CasebookProjection.apply (unbox<CasebookProjection.State> current) event
+                    |> box
+                    |> Ok
           PlanCut = fun _ _ _ _ -> Ok { ResetJson = "{}" }
           ApplyCut = fun current _ -> Ok current }
 
 [<RequireQualifiedAccess>]
 module JsTransactionIntegration =
-    let private storeModule: obj = CanonicalIntegratorDynamic.jsTransactionStoreModule
-
-    let private projectionModule: obj = CanonicalIntegratorDynamic.jsTransactionModule
-
-    let private initialState: obj =
-        emitJsExpr
-            projectionModule
-            """
-        (() => {
-            if ($0 && $0.JsTransactionProjectionModule_empty) {
-                return $0.JsTransactionProjectionModule_empty;
-            }
-            return {};
-        })()
-        """
-
-    let private accepts (eventType: string) : bool =
-        emitJsExpr
-            (storeModule, eventType)
-            """
-        (() => {
-            if ($0 && typeof $0.JsToolsTransactionStore_isTransactionEventType === 'function') {
-                return $0.JsToolsTransactionStore_isTransactionEventType($1);
-            }
-            return false;
-        })()
-        """
-
-    let private integrate (current: obj) (envelope: EventEnvelope) : Result<obj, string> =
-        let raw: obj =
-            emitJsExpr
-                (storeModule, projectionModule, current, envelope, envelope.EventId)
-                """
-        (() => {
-            try {
-                if (!$0 || typeof $0.JsToolsTransactionStore_tryDecodeEnvelope !== 'function') {
-                    return [false, "JsTransaction module unavailable"];
-                }
-                const decoded = $0.JsToolsTransactionStore_tryDecodeEnvelope($3);
-                const tagKey = 't' + 'ag';
-                const fieldsKey = 'fiel' + 'ds';
-                if (!decoded || decoded[tagKey] !== 0) {
-                    const err =
-                        (decoded && decoded[fieldsKey] && decoded[fieldsKey][0])
-                            ? String(decoded[fieldsKey][0])
-                            : "JsTransaction decode failed";
-                    return [false, err];
-                }
-                const inner = decoded[fieldsKey][0];
-                if (!inner || typeof inner[tagKey] !== 'number') {
-                    return [false, "JsTransaction decode failed"];
-                }
-                const payload = inner[fieldsKey][0];
-                if (inner[tagKey] === 0) {
-                    if (!$1 || typeof $1.JsTransactionProjectionModule_prepared !== 'function') {
-                        return [false, "JsTransactionProjection module unavailable"];
-                    }
-                    const next = $1.JsTransactionProjectionModule_prepared($4, payload, $2);
-                    return [true, next];
-                } else if (inner[tagKey] === 1) {
-                    if (!$1 || typeof $1.JsTransactionProjectionModule_committed !== 'function') {
-                        return [false, "JsTransactionProjection module unavailable"];
-                    }
-                    const next = $1.JsTransactionProjectionModule_committed($4, payload, $2);
-                    return [true, next];
-                } else {
-                    return [false, "JsTransaction decode failed"];
-                }
-            } catch (e) {
-                return [false, String(e && e.message ? e.message : e)];
-            }
-        })()
-        """
-
-        let succeeded: bool = emitJsExpr raw "$0[0]"
-
-        if succeeded then
-            Ok(emitJsExpr raw "$0[1]")
-        else
-            let message: obj = emitJsExpr raw "$0[1]"
-            Error(string message)
-
     let rule: IntegrationRule =
         { Name = "JsTransaction"
-          Initial = initialState
+          Initial = box JsTransactionProjection.empty
           FaultScope = fun _ -> "global"
-          Accepts = fun envelope -> accepts envelope.EventType
-          Integrate = fun current envelope -> integrate current envelope
+          Accepts = fun envelope -> JsToolsTransactionStore.isTransactionEventType envelope.EventType
+          Integrate =
+            fun current envelope ->
+                match JsToolsTransactionStore.tryDecodeEnvelope envelope with
+                | Error error -> Error error
+                | Ok(JsToolsTransactionStore.DecodedTransactionEvent.Prepared prepared) ->
+                    JsTransactionProjection.prepared envelope.EventId prepared (unbox<JsTransactionProjection> current)
+                    |> box
+                    |> Ok
+                | Ok(JsToolsTransactionStore.DecodedTransactionEvent.Committed committed) ->
+                    JsTransactionProjection.committed
+                        envelope.EventId
+                        committed
+                        (unbox<JsTransactionProjection> current)
+                    |> box
+                    |> Ok
           PlanCut = fun _ _ _ _ -> Ok { ResetJson = "{}" }
           ApplyCut = fun current _ -> Ok current }
 

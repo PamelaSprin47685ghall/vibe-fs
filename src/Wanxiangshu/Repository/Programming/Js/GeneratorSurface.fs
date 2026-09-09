@@ -8,7 +8,8 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Repository.Programming.Js.OpenCode
 
 /// JS-native generator boundary. Role and permission labels are vocabulary at
-/// this edge; ToolPermission and JsSurface stay inside the owner.
+/// the JS edge; typedRole exposes the typed JsSurface to real F# composition
+/// consumers, while typedFor stays inside the owner.
 [<RequireQualifiedAccess>]
 module JsGeneratorSurface =
 
@@ -96,7 +97,7 @@ module JsGeneratorSurface =
             let prose = JsDescriptionAssets.load (languageOf language)
             JsToolGenerator.generate role (permissionsOfLabels labels) prose
 
-    let internal typedRole (role: string) (language: string) : JsSurface option =
+    let typedRole (role: string) (language: string) : JsSurface option =
         typedFor role (canonicalLabels role) language
 
     let private fragmentToJs fragment =

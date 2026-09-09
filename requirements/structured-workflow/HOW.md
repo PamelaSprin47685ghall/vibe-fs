@@ -94,6 +94,8 @@ Subsystem SCC 是首要结构债：双向依赖必须通过移动知识所有权
 
 在 `47e2d4666` 上恢复 RequirementGroundingTransform → PairProgrammingThoughtTransform 与 PromptResources → ProviderResources 的静态 typed 调用，删除缺失模块时的伪造成功、空资源及跳过校验路径。两个 owning shard 显式声明原有知识依赖，公开签名不变；包含真实 PluginHooks、ManagedAgentConfig、Grounding／Language／Prompt Surface consumer 的 focused Fable 并集通过 1288 parsed sources／1250 items（fingerprint `9cb200792b8c`）。相关投影、资源与语言行为检查通过，结构／impact 测试 14/14；规范重放测试不再比较空 synthetic 列表，而是证明冻结终端结果、journal 重开不重新读取文件以及新 digest 仅追加。删除入口 token 伪证明，物理终止与 OS crash 的证明限制见 requirement-grounding/HOW。声明图为 26 subsystem、208 shard、701 source、1899 references，shard DAG，最大 subsystem SCC 22；新增引用公开隐藏依赖，不代表耦合消除，GAP-033 保持 PARTIAL。
 
+在 `9dbdbf2a8` 上恢复 CanonicalIntegrator 的 Casebook／JsTransaction oracle、GroundingCatalog 的 glob 匹配及 RequirementGroundingRepositorySurface 的生成器／工作流静态调用。删除 foreign runtime loader、编译器 union tag 解码及缺失模块 fallback；只扩大既有 `JsGeneratorSurface.typedRole` 的可见性，`typedFor` 仍为 internal，不复制生成器或装配逻辑。接地 Surface 保留原失败词汇，业务注册、cut/reset、提交与观察语义不变。首轮 focused compile 拒绝事务嵌套 union 模式的缺括号，修正后包含签名反向 consumer 与真实持久化／Host／Delegation consumer 的并集通过 1360 parsed sources／1322 items（fingerprint `2444894e6950`）；新全量产物上的 grounding、事务、canonical Current／重放及结构／impact 测试 44/44 通过。生产工作流 smoke 实际拒绝无效程序与程序异常，分别保持 `invalid_program`、`program_failed`；临时探针已删除。声明图为 26 subsystem、208 shard、701 source、1905 references，shard DAG，最大 subsystem SCC 22。新增六条引用公开既有依赖，不代表知识耦合消除；未新增 Casebook／JsTransaction decoder fault 到物理 fatal 的专门证明，GAP-033 保持 PARTIAL。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。
