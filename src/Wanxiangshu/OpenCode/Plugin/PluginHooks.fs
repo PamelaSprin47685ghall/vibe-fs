@@ -33,7 +33,6 @@ open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.WarmStart
-open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Prediction
@@ -57,8 +56,6 @@ open Wanxiangshu.Mission.Obligation.Todo.OpenCode
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Repository.Investigation.WarmStart
-open Wanxiangshu.Repository.Knowledge.Casebook
-open Wanxiangshu.Repository.Knowledge.Casebook.OpenCode
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Repository.Programming.Js.OpenCode
 open Wanxiangshu.Resources
@@ -110,11 +107,105 @@ module PluginHooks =
             // CASE-003: typed capture at the tool boundary — shared
             // CasebookLifecycle.collector; marker flag gates the after-hook.
             // Store IO stays out of SpikePlugin (unified-store dual-write gate).
-            let observationCollector = CasebookLifecycle.collector
+            let casebookLifecycleModule: obj =
+                emitJsExpr
+                    ()
+                    """
+                (() => {
+                    let mod = null;
+                    try {
+                        if (typeof require === 'function') {
+                            mod = require('../../Repository/Knowledge/Casebook/Lifecycle.js');
+                        }
+                    } catch (_) {}
+                    if (!mod) {
+                        try {
+                            const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
+                                ? process.getBuiltinModule('node:module')
+                                : null;
+                            if (procMod && typeof procMod.createRequire === 'function') {
+                                const req = procMod.createRequire(import.meta.url);
+                                mod = req('../../Repository/Knowledge/Casebook/Lifecycle.js');
+                            }
+                        } catch (_) {}
+                    }
+                    return mod;
+                })()
+                """
+
+            let casebookWorkflowModule: obj =
+                emitJsExpr
+                    ()
+                    """
+                (() => {
+                    let mod = null;
+                    try {
+                        if (typeof require === 'function') {
+                            mod = require('../../Repository/Knowledge/Casebook/Workflow.js');
+                        }
+                    } catch (_) {}
+                    if (!mod) {
+                        try {
+                            const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
+                                ? process.getBuiltinModule('node:module')
+                                : null;
+                            if (procMod && typeof procMod.createRequire === 'function') {
+                                const req = procMod.createRequire(import.meta.url);
+                                mod = req('../../Repository/Knowledge/Casebook/Workflow.js');
+                            }
+                        } catch (_) {}
+                    }
+                    return mod;
+                })()
+                """
+
+            let casebookToolsModule: obj =
+                emitJsExpr
+                    ()
+                    """
+                (() => {
+                    let mod = null;
+                    try {
+                        if (typeof require === 'function') {
+                            mod = require('../../Repository/Knowledge/Casebook/OpenCode/Tools.js');
+                        }
+                    } catch (_) {}
+                    if (!mod) {
+                        try {
+                            const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
+                                ? process.getBuiltinModule('node:module')
+                                : null;
+                            if (procMod && typeof procMod.createRequire === 'function') {
+                                const req = procMod.createRequire(import.meta.url);
+                                mod = req('../../Repository/Knowledge/Casebook/OpenCode/Tools.js');
+                            }
+                        } catch (_) {}
+                    }
+                    return mod;
+                })()
+                """
+
+            let observationCollector: obj =
+                emitJsExpr
+                    casebookLifecycleModule
+                    """
+                (() => {
+                    return $0 ? $0.collector : null;
+                })()
+                """
+
+            let isCasebookFeatureEnabled (ws: string) : bool =
+                emitJsExpr
+                    (casebookWorkflowModule, ws)
+                    """
+                (() => {
+                    return $0 && typeof $0.CasebookFeature_isEnabled === 'function' ? !!$0.CasebookFeature_isEnabled($1) : false;
+                })()
+                """
 
             let casebookEnabled =
                 match workspaceDirectory with
-                | Some ws -> CasebookFeature.isEnabled ws
+                | Some ws -> isCasebookFeatureEnabled ws
                 | None -> false
 
             // TODO-002 / HOST-017..025: the builtin todowrite stays the physical
@@ -156,7 +247,15 @@ module PluginHooks =
                 let rendered = if isNull toolOutput then "" else string (toolOutput?output)
 
                 if not (System.String.IsNullOrWhiteSpace sessionId) then
-                    observationCollector.Collect(sessionId, toolName, toolInput?args, rendered)
+                    emitJsExpr
+                        (observationCollector, sessionId, toolName, toolInput?args, rendered)
+                        """
+                    (() => {
+                        if ($0 && typeof $0.Collect === 'function') {
+                            $0.Collect($1, $2, $3, $4);
+                        }
+                    })()
+                    """
 
             let toolAfter (toolInput: obj) (toolOutput: obj) =
                 task {
@@ -197,9 +296,22 @@ module PluginHooks =
 
                     let parentWorkRecordFor, childWorkRecordFor = workRecord true, workRecord false
 
-                    let casebookToolSpecs =
+                    let casebookToolSpecs: ToolSpec list =
                         match workspaceDirectory with
-                        | Some ws -> CasebookTools.buildSpecs (ToolHostCodec.factory toolModule) ws
+                        | Some ws ->
+                            let raw: obj =
+                                emitJsExpr
+                                    (casebookToolsModule, ToolHostCodec.factory toolModule, ws)
+                                    """
+                                (() => {
+                                    if ($0 && typeof $0.buildSpecs === 'function') {
+                                        return $0.buildSpecs($1, $2);
+                                    }
+                                    return null;
+                                })()
+                                """
+
+                            if isNull raw then [] else unbox raw
                         | None -> []
 
                     let toolRegistration =
@@ -229,13 +341,14 @@ module PluginHooks =
                                                 journal
                                                 (Some managerWorkspace)
                                                 (Some(SessionId.value managerSessionId))
+
                                         return Ok()
                                     with ex ->
                                         return Error ex.Message
                                 })
                             (fun (worktreePath: WorktreePath) ->
                                 try
-                                    Ok(WorkspaceSnapshot.capture(WorktreePath.value worktreePath))
+                                    Ok(WorkspaceSnapshot.capture (WorktreePath.value worktreePath))
                                 with error ->
                                     Error error.Message)
 

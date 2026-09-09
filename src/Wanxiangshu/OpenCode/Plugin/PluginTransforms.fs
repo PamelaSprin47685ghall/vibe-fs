@@ -35,7 +35,6 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
@@ -57,8 +56,6 @@ open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Mission.Obligation.Todo.OpenCode
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.Semble
-open Wanxiangshu.Repository.Knowledge.Casebook
-open Wanxiangshu.Repository.Knowledge.Casebook.OpenCode
 open Wanxiangshu.Repository.Programming.Js.OpenCode
 open Wanxiangshu.Resources
 open Wanxiangshu.Strength.OpenCode
