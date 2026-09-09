@@ -10,7 +10,6 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Strength
 
 /// Assembly-only registry: tool behavior lives in one vertical verb module;
@@ -72,7 +71,7 @@ module ToolRegistry =
         syncDelegateRuntime: SyncDelegateRuntime option ->
         strengthRuntime: StrengthRuntime option ->
         casebookToolSpecs: ToolSpec list ->
-        jsTransactionPersistence: IJsTransactionPersistence option ->
+        jsTransactionPersistence: obj option ->
         continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>) ->
         captureWorktreeSnapshot: (WorktreePath -> Result<WorkspaceSnapshotId, string>) ->
             ToolRegistration

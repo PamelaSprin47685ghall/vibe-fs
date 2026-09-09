@@ -27,8 +27,6 @@ open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Repository.Investigation.WarmStart
-open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Repository.Programming.Js.OpenCode
 open Wanxiangshu.Resources
 open Wanxiangshu.Strength.OpenCode
 open Wanxiangshu.Strength.Persistence
@@ -353,7 +351,23 @@ module PluginHostInterop =
         let jsTransactionPersistence =
             workspaceDirectory
             |> Option.bind (fun workspace -> WorkspaceEventStore.tryCurrent (RuntimePath.gitCommonDir workspace))
-            |> Option.map JsToolsTransactionStore.createPersistence
+            |> Option.bind (fun store ->
+                let created: obj =
+                    emitJsExpr
+                        store
+                        """
+                    (() => {
+                        try {
+                            const mod = require('../../Repository/Programming/Js/TransactionStore.js');
+                            if (mod && typeof mod.JsToolsTransactionStore_createPersistence === 'function') {
+                                return mod.JsToolsTransactionStore_createPersistence($0);
+                            }
+                        } catch (_) {}
+                        return null;
+                    })()
+                    """
+
+                if isNull created then None else Some(unbox created))
 
         let quiescence = scope.Sessions.Quiescence :> ISessionQuiescenceGate
 

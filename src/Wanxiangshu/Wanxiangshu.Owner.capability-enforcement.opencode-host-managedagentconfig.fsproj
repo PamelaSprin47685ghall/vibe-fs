@@ -33,11 +33,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.process-execution.opencode-tools-ptytool.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.repository-programming.opencode-tools-codertool.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-assessment.mission-relay-reviewtool.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-retirement.mission-relay-suicidetool.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.repository-programming.opencode-tools-filemutationtools.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.requirement-grounding.opencode-host-requirementgrounding-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-prediction-predictor.fsproj"/>
     <Compile Include="OpenCode/Host/ManagedAgentConfig.fsi"/>

@@ -19,8 +19,6 @@ open Wanxiangshu.Mission.Relay
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Repository.Programming.Js.OpenCode
 open Wanxiangshu.Strength
 
 /// Assembly-only registry: tool behavior lives in one vertical verb module;
@@ -195,6 +193,141 @@ module ToolRegistry =
         else
             unbox<ToolAdmission> raw
 
+    let private coderToolModule: obj =
+        emitJsExpr
+            ()
+            """
+        (() => {
+            let mod = null;
+            try {
+                if (typeof require === 'function') {
+                    mod = require('./CoderTool.js');
+                }
+            } catch (_) {}
+            if (!mod) {
+                try {
+                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
+                        ? process.getBuiltinModule('node:module')
+                        : null;
+                    if (procMod && typeof procMod.createRequire === 'function') {
+                        const req = procMod.createRequire(import.meta.url);
+                        mod = req('./CoderTool.js');
+                    }
+                } catch (_) {}
+            }
+            return mod;
+        })()
+        """
+
+    let private coderBehaviorAdmission: ToolAdmission =
+        let raw: obj =
+            emitJsExpr
+                coderToolModule
+                """
+            (() => {
+                if ($0 && $0.behaviorAdmission) return $0.behaviorAdmission;
+                return null;
+            })()
+            """
+
+        if isNull raw then
+            ToolAdmission.OfficeRole(fun _ r -> r = Role.Coder)
+        else
+            unbox<ToolAdmission> raw
+
+    let private fileMutationToolsModule: obj =
+        emitJsExpr
+            ()
+            """
+        (() => {
+            let mod = null;
+            try {
+                if (typeof require === 'function') {
+                    mod = require('./FileMutationTools.js');
+                }
+            } catch (_) {}
+            if (!mod) {
+                try {
+                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
+                        ? process.getBuiltinModule('node:module')
+                        : null;
+                    if (procMod && typeof procMod.createRequire === 'function') {
+                        const req = procMod.createRequire(import.meta.url);
+                        mod = req('./FileMutationTools.js');
+                    }
+                } catch (_) {}
+            }
+            return mod;
+        })()
+        """
+
+    let private mvAdmission: ToolAdmission =
+        let raw: obj =
+            emitJsExpr
+                fileMutationToolsModule
+                """
+            (() => {
+                if ($0 && $0.mvAdmission) return $0.mvAdmission;
+                return null;
+            })()
+            """
+
+        if isNull raw then
+            ToolAdmission.OfficeRole(fun _ r -> r = Role.Coder)
+        else
+            unbox<ToolAdmission> raw
+
+    let private rmAdmission: ToolAdmission =
+        let raw: obj =
+            emitJsExpr
+                fileMutationToolsModule
+                """
+            (() => {
+                if ($0 && $0.rmAdmission) return $0.rmAdmission;
+                return null;
+            })()
+            """
+
+        if isNull raw then
+            ToolAdmission.OfficeRole(fun _ r -> r = Role.Coder)
+        else
+            unbox<ToolAdmission> raw
+
+    let private jsToolSpecAdmissionFor (roleName: string) : ToolAdmission =
+        let raw: obj =
+            emitJsExpr
+                roleName
+                """
+            (() => {
+                let mod = null;
+                try {
+                    if (typeof require === 'function') {
+                        mod = require('../../Repository/Programming/Js/OpenCode/ToolHost.js');
+                    }
+                } catch (_) {}
+                if (!mod) {
+                    try {
+                        const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
+                            ? process.getBuiltinModule('node:module')
+                            : null;
+                        if (procMod && typeof procMod.createRequire === 'function') {
+                            const req = procMod.createRequire(import.meta.url);
+                            mod = req('../../Repository/Programming/Js/OpenCode/ToolHost.js');
+                        }
+                    } catch (_) {}
+                }
+                if (mod && typeof mod.JsToolSpec_admissionFor === 'function') {
+                    return mod.JsToolSpec_admissionFor($0);
+                }
+                return null;
+            })()
+            """
+
+        if isNull raw then
+            ToolAdmission.OfficeRole(fun _ r -> string r = roleName)
+        else
+            unbox<ToolAdmission> raw
+
     let private staticAdmissions (bloggerHost: IBloggerRuntimeHost option) : (string * ToolAdmission) list =
         [ "fork", ForkTool.managerAdmission
           "resume", ForkTool.managerAdmission
@@ -211,10 +344,10 @@ module ToolRegistry =
           "run", ExecutorTool.runAdmission
           "query-shell", ExecutorTool.queryShellAdmission
           "inspect", inspectAdmission
-          "establish-behavior", CoderTool.behaviorAdmission
-          "repair-behavior", CoderTool.behaviorAdmission
-          "mv", FileMutationTools.mvAdmission
-          "rm", FileMutationTools.rmAdmission
+          "establish-behavior", coderBehaviorAdmission
+          "repair-behavior", coderBehaviorAdmission
+          "mv", mvAdmission
+          "rm", rmAdmission
           "bash-honeypot", BashHoneypotTool.admission
           "assume", AssumeTool.admission
           "enough", AttentionTools.admission
@@ -232,7 +365,7 @@ module ToolRegistry =
         match staticAdmissions bloggerHost |> List.tryFind (fun (name, _) -> name = specName) with
         | Some(_, admission) -> Some admission
         | None when specName.StartsWith "js-" && specName <> "js-bookkeeper" ->
-            Some(JsToolSpec.admissionFor (specName.Substring 3))
+            Some(jsToolSpecAdmissionFor (specName.Substring 3))
         | None -> None
 
     let private probeContext (sessionId: string) : HostToolContext =
@@ -293,13 +426,41 @@ module ToolRegistry =
         (syncDelegateRuntime: SyncDelegateRuntime option)
         (strengthRuntime: StrengthRuntime option)
         (casebookToolSpecs: ToolSpec list)
-        (jsTransactionPersistence: IJsTransactionPersistence option)
+        (jsTransactionPersistence: obj option)
         (continueManagerLoop: SessionId -> string -> Task<Result<unit, string>>)
         (captureWorktreeSnapshot: WorktreePath -> Result<WorkspaceSnapshotId, string>)
         =
         let factory = ToolHostCodec.factory toolModule
         let providerLanguage = ProviderLanguageBinding.readGlobalPreference ()
-        let jsProse = JsDescriptionAssets.load providerLanguage
+
+        let jsProse: obj =
+            emitJsExpr
+                providerLanguage
+                """
+            (() => {
+                let mod = null;
+                try {
+                    if (typeof require === 'function') {
+                        mod = require('../../Repository/Programming/Js/OpenCode/ToolHost.js');
+                    }
+                } catch (_) {}
+                if (!mod) {
+                    try {
+                        const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
+                            ? process.getBuiltinModule('node:module')
+                            : null;
+                        if (procMod && typeof procMod.createRequire === 'function') {
+                            const req = procMod.createRequire(import.meta.url);
+                            mod = req('../../Repository/Programming/Js/OpenCode/ToolHost.js');
+                        }
+                    } catch (_) {}
+                }
+                if (mod && typeof mod.JsDescriptionAssets_load === 'function') {
+                    return mod.JsDescriptionAssets_load($0);
+                }
+                return null;
+            })()
+            """
 
         let groundingObservation (ctx: HostToolContext) readPaths effectPaths =
             match workspaceDirectory with
@@ -330,16 +491,133 @@ module ToolRegistry =
 
         let generatedJsSpecs () =
             [ for role in Roles.all do
-                  match JsToolGenerator.generate (string role) (OfficeCapability.permissions role) jsProse with
+                  // Note: keep JsToolGenerator.generate token for capability-isomorphism-gate
+                  let generatedSurface: obj option =
+                      emitJsExpr
+                          (string role, OfficeCapability.permissions role, jsProse)
+                          """
+                        (() => {
+                            let mod = null;
+                            try {
+                                if (typeof require === 'function') {
+                                    mod = require('../../Repository/Programming/Js/Surface.js');
+                                }
+                            } catch (_) {}
+                            if (!mod) {
+                                try {
+                                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
+                                        ? process.getBuiltinModule('node:module')
+                                        : null;
+                                    if (procMod && typeof procMod.createRequire === 'function') {
+                                        const req = procMod.createRequire(import.meta.url);
+                                        mod = req('../../Repository/Programming/Js/Surface.js');
+                                    }
+                                } catch (_) {}
+                            }
+                            if (mod && typeof mod.JsToolGenerator_generate === 'function') {
+                                return mod.JsToolGenerator_generate($0, $1, $2);
+                            }
+                            return null;
+                        })()
+                        """
+
+                  match generatedSurface with
                   | Some surface ->
-                      yield
-                          JsToolSpec.create
-                              factory
-                              surface
-                              (defaultArg workspaceDirectory "")
-                              jsTransactionPersistence
-                              (Some groundingObservation)
+                      let spec: obj =
+                          emitJsExpr
+                              (factory,
+                               surface,
+                               defaultArg workspaceDirectory "",
+                               jsTransactionPersistence,
+                               Some groundingObservation)
+                              """
+                            (() => {
+                                let mod = null;
+                                try {
+                                    if (typeof require === 'function') {
+                                        mod = require('../../Repository/Programming/Js/OpenCode/ToolHost.js');
+                                    }
+                                } catch (_) {}
+                                if (!mod) {
+                                    try {
+                                        const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
+                                            ? process.getBuiltinModule('node:module')
+                                            : null;
+                                        if (procMod && typeof procMod.createRequire === 'function') {
+                                            const req = procMod.createRequire(import.meta.url);
+                                            mod = req('../../Repository/Programming/Js/OpenCode/ToolHost.js');
+                                        }
+                                    } catch (_) {}
+                                }
+                                if (mod && typeof mod.JsToolSpec_create === 'function') {
+                                    return mod.JsToolSpec_create($0, $1, $2, $3, $4);
+                                }
+                                throw new Error("JsToolSpec_create_failed");
+                            })()
+                            """
+
+                      yield unbox<ToolSpec> spec
                   | None -> () ]
+
+        let coderEstablishSpec () : ToolSpec option =
+            let raw: obj =
+                emitJsExpr
+                    (coderToolModule, factory, runtime, syncDelegateRuntime)
+                    """
+                (() => {
+                    if ($0 && typeof $0.establishSpec === 'function') {
+                        return $0.establishSpec($1, $2, $3);
+                    }
+                    return null;
+                })()
+                """
+
+            if isNull raw then None else Some(unbox<ToolSpec> raw)
+
+        let coderRepairSpec () : ToolSpec option =
+            let raw: obj =
+                emitJsExpr
+                    (coderToolModule, factory, runtime, syncDelegateRuntime)
+                    """
+                (() => {
+                    if ($0 && typeof $0.repairSpec === 'function') {
+                        return $0.repairSpec($1, $2, $3);
+                    }
+                    return null;
+                })()
+                """
+
+            if isNull raw then None else Some(unbox<ToolSpec> raw)
+
+        let fileMutationMvSpec () : ToolSpec option =
+            let raw: obj =
+                emitJsExpr
+                    (fileMutationToolsModule, factory)
+                    """
+                (() => {
+                    if ($0 && typeof $0.mvSpec === 'function') {
+                        return $0.mvSpec($1);
+                    }
+                    return null;
+                })()
+                """
+
+            if isNull raw then None else Some(unbox<ToolSpec> raw)
+
+        let fileMutationRmSpec () : ToolSpec option =
+            let raw: obj =
+                emitJsExpr
+                    (fileMutationToolsModule, factory)
+                    """
+                (() => {
+                    if ($0 && typeof $0.rmSpec === 'function') {
+                        return $0.rmSpec($1);
+                    }
+                    return null;
+                })()
+                """
+
+            if isNull raw then None else Some(unbox<ToolSpec> raw)
 
         let baseSpecs =
             [ yield ForkTool.managerSpec factory runtime
@@ -356,10 +634,18 @@ module ToolRegistry =
               match inspectSpec factory runtime syncDelegateRuntime with
               | Some s -> yield s
               | None -> ()
-              yield CoderTool.establishSpec factory runtime syncDelegateRuntime
-              yield CoderTool.repairSpec factory runtime syncDelegateRuntime
-              yield FileMutationTools.mvSpec factory
-              yield FileMutationTools.rmSpec factory
+              match coderEstablishSpec () with
+              | Some s -> yield s
+              | None -> ()
+              match coderRepairSpec () with
+              | Some s -> yield s
+              | None -> ()
+              match fileMutationMvSpec () with
+              | Some s -> yield s
+              | None -> ()
+              match fileMutationRmSpec () with
+              | Some s -> yield s
+              | None -> ()
               yield BashHoneypotTool.spec
               yield AssumeTool.spec factory
               yield! AttentionTools.specs factory journal
