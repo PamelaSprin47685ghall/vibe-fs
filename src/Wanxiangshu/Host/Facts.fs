@@ -1,8 +1,11 @@
 namespace Wanxiangshu.Host
 
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Requirement.Grounding
+
+type ConcernPlacementBatch =
+    { AnnouncedGenerations: string list
+      DeliveredMessages: string list }
 
 [<RequireQualifiedAccess>]
 type TipPresentation =

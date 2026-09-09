@@ -708,6 +708,12 @@ module PairProgrammingThoughtTransform =
         (pair: PairProgrammingGuidelineWire)
         : Task<Result<unit, string>> =
         task {
+            let hostConcernPlacement =
+                pair.ConcernPlacement
+                |> Option.map (fun batch ->
+                    { Wanxiangshu.Host.ConcernPlacementBatch.AnnouncedGenerations = batch.AnnouncedGenerations
+                      Wanxiangshu.Host.ConcernPlacementBatch.DeliveredMessages = batch.DeliveredMessages })
+
             let fact =
                 HostFact.PairProgrammingGuidelineAnchored
                     {| SessionId = sessionId
@@ -716,7 +722,7 @@ module PairProgrammingThoughtTransform =
                        MarkerText = pair.MarkerText
                        CallGap = pair.CallGap
                        ResultGap = pair.ResultGap
-                       ConcernPlacement = pair.ConcernPlacement |}
+                       ConcernPlacement = hostConcernPlacement |}
 
             match! AgentJournal.appendAgent (StreamId.Session sessionId) None fact journal with
             | Ok _ -> return Ok()

@@ -24,11 +24,14 @@ module HostFactFold =
             { Fact = "PairProgrammingGuidelineAnchored"
               Reason = sprintf "placement (%A, %A) already exists in this transcript (HOST-013 §8)" callGap resultGap }
 
-    let private applyConcernPlacement sessionId placement (projection: AgentProjectionSet) =
+    let private applyConcernPlacement sessionId (placement: Wanxiangshu.Host.ConcernPlacementBatch option) (projection: AgentProjectionSet) =
         match placement with
         | None -> Ok projection
         | Some batch ->
-            ConcernProjection.applyPlacement sessionId batch projection.Concern
+            let concernBatch: Wanxiangshu.Interaction.Concern.ConcernPlacementBatch =
+                { AnnouncedGenerations = batch.AnnouncedGenerations
+                  DeliveredMessages = batch.DeliveredMessages }
+            ConcernProjection.applyPlacement sessionId concernBatch projection.Concern
             |> Result.map (fun concern -> { projection with Concern = concern })
             |> Result.mapError (fun reason ->
                 { Fact = "PairProgrammingGuidelineAnchored"

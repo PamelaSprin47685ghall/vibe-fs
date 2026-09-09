@@ -2,7 +2,6 @@ namespace Wanxiangshu.Host
 
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Requirement.Grounding
 
 module HostFact =
