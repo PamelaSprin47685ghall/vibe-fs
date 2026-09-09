@@ -92,6 +92,8 @@ Subsystem SCC 是首要结构债：双向依赖必须通过移动知识所有权
 
 另一保留世界 `/tmp/oc-e2e-CEqj6W` 的 `seal-undeclared` 已通过 frozen blob 的 wire digest 对应及确定性旧败新胜回归定位：成功后仍保留的 retry row 重新触发 prefix candidate 选择。`XWire.mayProbe` 现在读取成功结算后的连续失败计数，复用已有 frozen plan，零失败只投影 committed epoch，不再构造候选。修复与证据边界见 `context-compression/HOW.md`；focused consumer 并集通过 1286 parsed sources／1248 items（fingerprint `e532369f51e2`），相关测试 38/38。未修改 watchdog、event ceilings 或 seal 声明，原 Coder 停顿仍不归因于该 prefix 缺陷。
 
+在 `47e2d4666` 上恢复 RequirementGroundingTransform → PairProgrammingThoughtTransform 与 PromptResources → ProviderResources 的静态 typed 调用，删除缺失模块时的伪造成功、空资源及跳过校验路径。两个 owning shard 显式声明原有知识依赖，公开签名不变；包含真实 PluginHooks、ManagedAgentConfig、Grounding／Language／Prompt Surface consumer 的 focused Fable 并集通过 1288 parsed sources／1250 items（fingerprint `9cb200792b8c`）。相关投影、资源与语言行为检查通过，结构／impact 测试 14/14；规范重放测试不再比较空 synthetic 列表，而是证明冻结终端结果、journal 重开不重新读取文件以及新 digest 仅追加。删除入口 token 伪证明，物理终止与 OS crash 的证明限制见 requirement-grounding/HOW。声明图为 26 subsystem、208 shard、701 source、1899 references，shard DAG，最大 subsystem SCC 22；新增引用公开隐藏依赖，不代表耦合消除，GAP-033 保持 PARTIAL。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

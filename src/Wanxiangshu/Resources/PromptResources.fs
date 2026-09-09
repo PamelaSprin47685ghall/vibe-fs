@@ -1,7 +1,5 @@
 namespace Wanxiangshu.Resources
 
-open Fable.Core
-open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider
 
@@ -50,57 +48,8 @@ module PromptResources =
           "role/blogger"
           "role/bookkeeper" ]
 
-    let private providerResourcesModule: obj =
-        emitJsExpr
-            ()
-            """
-        (() => {
-            let mod = null;
-            try {
-                if (typeof require === 'function') {
-                    mod = require('../Participant/Provider/ProviderResources.js');
-                }
-            } catch (_) {}
-            if (!mod) {
-                try {
-                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
-                        ? process.getBuiltinModule('node:module')
-                        : null;
-                    if (procMod && typeof procMod.createRequire === 'function') {
-                        const req = procMod.createRequire(import.meta.url);
-                        mod = req('../Participant/Provider/ProviderResources.js');
-                    }
-                } catch (_) {}
-            }
-            return mod;
-        })()
-        """
-
-    let private requireLanguagePair (semanticPath: string) : unit =
-        emitJsExpr
-            (providerResourcesModule, semanticPath)
-            """
-        (() => {
-            if ($0 && typeof $0.requireLanguagePair === 'function') {
-                $0.requireLanguagePair($1);
-            }
-        })()
-        """
-
-    let private read (lang: ProviderLanguage) (path: string) : string =
-        emitJsExpr
-            (providerResourcesModule, lang, path)
-            """
-        (() => {
-            if ($0 && typeof $0.readText === 'function') {
-                return $0.readText($1, $2);
-            }
-            return '';
-        })()
-        """
-
     let private ensureParity () =
-        semanticPaths |> List.iter requireLanguagePair
+        semanticPaths |> List.iter ProviderResources.requireLanguagePair
 
     let private libraryPaths =
         function
@@ -117,19 +66,19 @@ module PromptResources =
 
     let instructionTextsForRole (lang: ProviderLanguage) (role: Role) =
         ensureParity ()
-        let common = read lang "world/common-law"
-        let law = read lang (roleSemanticPath role)
+        let common = ProviderResources.readText lang "world/common-law"
+        let law = ProviderResources.readText lang (roleSemanticPath role)
         let inherited = libraryPaths role
 
         if List.isEmpty inherited then
             composeInstructions [ common; law ]
         else
-            let books = inherited |> List.map (read lang)
+            let books = inherited |> List.map (ProviderResources.readText lang)
 
             composeInstructions (
-                [ common; law; read lang "library/ingress" ]
+                [ common; law; ProviderResources.readText lang "library/ingress" ]
                 @ books
-                @ [ read lang "library/closing" ]
+                @ [ ProviderResources.readText lang "library/closing" ]
             )
 
     let systemForRole (lang: ProviderLanguage) (role: Role) =
@@ -139,7 +88,10 @@ module PromptResources =
     /// Common Law and receives its own Role Law.
     let bookkeeperInstructionTextsFor (lang: ProviderLanguage) : string list =
         ensureParity ()
-        composeInstructions [ read lang "world/common-law"; read lang "role/bookkeeper" ]
+
+        composeInstructions
+            [ ProviderResources.readText lang "world/common-law"
+              ProviderResources.readText lang "role/bookkeeper" ]
 
     let loadBookkeeperSystemFor (lang: ProviderLanguage) : string =
         bookkeeperInstructionTextsFor lang |> LlmFacing.renderInstructions

@@ -13,116 +13,12 @@ open Wanxiangshu.Requirement.Grounding
 
 module RequirementGroundingTransform =
 
-    let private pairProgrammingThoughtTransformModule: obj =
-        emitJsExpr
-            ()
-            """
-        (() => {
-            let mod = null;
-            try {
-                if (typeof require === 'function') {
-                    mod = require('../PairProgrammingThoughtTransform.js');
-                }
-            } catch (_) {}
-            if (!mod) {
-                try {
-                    const procMod = (typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function')
-                        ? process.getBuiltinModule('node:module')
-                        : null;
-                    if (procMod && typeof procMod.createRequire === 'function') {
-                        const req = procMod.createRequire(import.meta.url);
-                        mod = req('../PairProgrammingThoughtTransform.js');
-                    }
-                } catch (_) {}
-            }
-            return mod;
-        })()
-        """
-
     let source = "requirement-grounding-auto-read"
     let toolName = "read"
 
+    /// Cursor result-only separator owned by PairProgrammingThoughtTransform; consumed here as a typed value.
     let cursorSeparator: string =
-        emitJsExpr
-            (pairProgrammingThoughtTransformModule)
-            """
-        ($0 && typeof $0.cursorGuidanceSeparator === 'string')
-            ? $0.cursorGuidanceSeparator
-            : "\u0000\uFEFF"
-        """
-
-    let private isCursorProviderDynamically (providerId: string option) : bool =
-        emitJsExpr
-            (pairProgrammingThoughtTransformModule, providerId)
-            """
-        (() => {
-            if ($0 && typeof $0.isCursorProvider === 'function') {
-                return $0.isCursorProvider($1);
-            }
-            return true;
-        })()
-        """
-
-    let private providerIdFromMessagesDynamically (rawMessages: obj list) : string option =
-        let raw: obj =
-            emitJsExpr
-                (pairProgrammingThoughtTransformModule, rawMessages)
-                """
-            (() => {
-                if ($0 && typeof $0.providerIdFromMessages === 'function') {
-                    const res = $0.providerIdFromMessages($1);
-                    return res !== undefined ? res : null;
-                }
-                return null;
-            })()
-            """
-
-        if isNull raw then None else Some(unbox<string> raw)
-
-    let private appendCursorSuffixesDynamically (suffixes: string list) (message: obj) : obj option =
-        let raw: obj =
-            emitJsExpr
-                (pairProgrammingThoughtTransformModule, suffixes, message)
-                """
-            (() => {
-                if ($0 && typeof $0.appendCursorSuffixes === 'function') {
-                    const res = $0.appendCursorSuffixes($1, $2);
-                    return res !== undefined ? res : null;
-                }
-                return null;
-            })()
-            """
-
-        if isNull raw then None else Some raw
-
-    let private stripCursorSuffixesDynamically (suffixes: string list) (message: obj) : obj =
-        emitJsExpr
-            (pairProgrammingThoughtTransformModule, suffixes, message)
-            """
-        (() => {
-            if ($0 && typeof $0.stripCursorSuffixes === 'function') {
-                return $0.stripCursorSuffixes($1, $2);
-            }
-            return $2;
-        })()
-        """
-
-    let private decideCurrentPlacementDynamically
-        (realMessages: obj list)
-        : Result<(TranscriptGap * TranscriptGap) option, string> =
-        let raw: obj =
-            emitJsExpr
-                (pairProgrammingThoughtTransformModule, realMessages)
-                """
-            (() => {
-                if ($0 && typeof $0.decideCurrentPlacement === 'function') {
-                    return $0.decideCurrentPlacement($1);
-                }
-                return { tag: 0, fields: [undefined] };
-            })()
-            """
-
-        unbox<Result<(TranscriptGap * TranscriptGap) option, string>> raw
+        PairProgrammingThoughtTransform.cursorGuidanceSeparator
 
     let private tryString (value: obj) : string option =
         if isNull value then None else Some(string value)
@@ -253,7 +149,8 @@ module RequirementGroundingTransform =
         if List.isEmpty suffixes then
             message
         else
-            appendCursorSuffixesDynamically suffixes message |> Option.defaultValue message
+            PairProgrammingThoughtTransform.appendCursorSuffixes suffixes message
+            |> Option.defaultValue message
 
     let private replayCursor realMessages occurrences =
         let addresses =
@@ -264,7 +161,7 @@ module RequirementGroundingTransform =
         realMessages |> List.map (projectCursorMessage active)
 
     let private replay providerId realMessages occurrences =
-        if isCursorProviderDynamically providerId then
+        if PairProgrammingThoughtTransform.isCursorProvider providerId then
             replayCursor realMessages occurrences
         else
             replayOrdinary realMessages occurrences
@@ -347,18 +244,19 @@ module RequirementGroundingTransform =
             )
 
     let private stripCursorHistory history rawMessages =
-        let providerId = providerIdFromMessagesDynamically rawMessages
+        let providerId = PairProgrammingThoughtTransform.providerIdFromMessages rawMessages
 
-        if isCursorProviderDynamically providerId then
+        if PairProgrammingThoughtTransform.isCursorProvider providerId then
             let suffixes = history |> List.collect _.Reads |> List.map _.CursorResultBytes
 
-            rawMessages |> List.map (stripCursorSuffixesDynamically suffixes)
+            rawMessages
+            |> List.map (PairProgrammingThoughtTransform.stripCursorSuffixes suffixes)
         else
             rawMessages
 
     let private appendRequestedAtCurrentPlacement journal sessionId realMessages providerId history pending =
         taskResult {
-            let! placementOpt = decideCurrentPlacementDynamically realMessages
+            let! placementOpt = PairProgrammingThoughtTransform.decideCurrentPlacement realMessages
 
             match placementOpt with
             | None -> return replay providerId realMessages history
@@ -387,7 +285,7 @@ module RequirementGroundingTransform =
             let history = RequirementGroundingRuntime.historyOccurrences journal session
             let visibleHistory = RequirementGroundingRuntime.occurrences journal session
             let! realMessages = validateSyntheticHistory history (stripCursorHistory history rawMessages)
-            let providerId = providerIdFromMessagesDynamically realMessages
+            let providerId = PairProgrammingThoughtTransform.providerIdFromMessages realMessages
             let pending = RequirementGroundingRuntime.pending journal session
             return! anchorRequested journal sessionId realMessages providerId visibleHistory pending
         }

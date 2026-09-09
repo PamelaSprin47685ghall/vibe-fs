@@ -154,7 +154,7 @@ test('WHAT[REQUIREMENT-GROUNDING-011] ordinary read observations add knowledge w
   } finally { cleanup() }
 })
 
-test('WHAT[REQUIREMENT-GROUNDING-012] freezes ordinary read-pair bytes and Cursor path-attributed result bytes for restart replay while changed digests append without rewriting the provider prefix', async () => {
+test('WHAT[REQUIREMENT-GROUNDING-012] freezes result-only terminal bytes across restart replay while changed digests append without rewriting the provider prefix', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const source = join(dir, 'src', 'main.fs')
@@ -162,12 +162,31 @@ test('WHAT[REQUIREMENT-GROUNDING-012] freezes ordinary read-pair bytes and Curso
     await host.requestPaths(opened.journal, dir, 's-restart', [source])
     const first = await host.projectWithJournal(opened.journal, 's-restart', terminalRead(source))
     assert.equal(first.ok, true)
-    const frozen = first.value.filter((m) => m.info?.source === host.source)
+    // Universal cursor mode produces no synthetic read pairs; grounding rides the terminal tool result.
+    assert.equal(first.value.some((m) => m.info?.source === host.source), false)
+    const frozen = first.value.at(-1).parts[0].state.output
+    assert.ok(frozen.includes('requirement_source_path = "requirements/alpha/WHAT.md"'))
+    assert.ok(frozen.includes('what-v1'))
     host.disposeJournal(opened.journal)
 
+    // Restart must replay the durable occurrence bytes without rereading the files:
+    // WHAT.md changed on disk, but a bare re-projection keeps the frozen bytes.
+    writeFileSync(join(dir, 'requirements', 'alpha', 'WHAT.md'), 'what-v2\n', 'utf8')
     opened = await host.createJournal(dir)
     const replay = await host.projectWithJournal(opened.journal, 's-restart', terminalRead(source))
-    assert.deepEqual(replay.value.filter((m) => m.info?.source === host.source), frozen)
+    assert.equal(replay.ok, true)
+    assert.equal(replay.value.at(-1).parts[0].state.output, frozen)
+    assert.equal(replay.value.at(-1).parts[0].state.output.includes('what-v2'), false)
+
+    // A fresh request grounds the changed digest by appending after the frozen prefix.
+    const changed = await host.requestPaths(opened.journal, dir, 's-restart', [source])
+    assert.equal(changed.needsGrounding, true)
+    assert.equal(changed.requested, 1)
+    const appended = await host.projectWithJournal(opened.journal, 's-restart', terminalRead(source))
+    assert.equal(appended.ok, true)
+    const grown = appended.value.at(-1).parts[0].state.output
+    assert.ok(grown.startsWith(frozen))
+    assert.ok(grown.includes('what-v2'))
     host.disposeJournal(opened.journal)
   } finally { cleanup() }
 })
