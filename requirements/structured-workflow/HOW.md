@@ -136,6 +136,12 @@ registry 声明闭包为 4 项目／8 输入；shared-state 从基准 87／538 �
 
 既有 HOST-BOUNDARY-026 回归新增真实闭包性质：三个独立的 terminal 宽引用 mutant 与恢复 adapter 漏依赖的 mutant 均退出 1。新产物的 terminal replay／authority／dispose、diagnostic optional effect 与 visibility signal／deadline smoke 范围见 host-boundary/HOW。结构 gate 为 26 subsystem、212 shard、700 source、1914 references，shard DAG，最大 SCC 22；GAP-033 保持 PARTIAL，不以局部减少抵消漏依赖修复，也不宣称全局 SCC 收敛或编译耗时下降。
 
+在 `26b439645` 上将既有 ToolHostCodec／ToolHostSurface 四个源码与签名输入转入显式 `host/host-tool-adapter` 分片，公开类型、函数、物理实现与 aggregate 顺序不变。完整审查十五个直接 consumer：十三个只直接使用工具知识，改引工具适配器；bootstrap 同时使用 HostIngressCodec 与信号／终端实现，显式引用两侧；SessionExecutionBinding 只使用 ExactProviderStartObservation，保留信号引用。所有其他工具符号消费者的传递闭包仍有唯一 provider，没有复制实现或运行时回捞。
+
+声明递归闭包口径为项目／`.fs/.fsi` 输入。工具 audience 从原宽 adapter 的 35／198 收为 5／26；signal adapter 自身从 35／198 收为 33／186。Attention fold 59／356 → 56／332，Concern fold 58／352 → 55／328，InstitutionalLearning fold 61／362 → 59／340，filemutationtools 99／616 → 97／594，repository-programming runtime 100／628 → 98／606，BookkeeperTool 101／636 → 99／614，FetchTool 99／622 → 97／600；这七条路径不再编入 HostSignal、HostEventCodec、Events 与 SharedTerminalBus。其余直接迁移路径仍经真实依赖保留信号闭包：executor tools 143／986 → 144／986，action runtime 146／1004 → 147／1004，PTY tools 141／968 → 142／968，review 141／964 → 142／964，retirement 141／962 → 142／962，plugin composition 190／1244 → 191／1244，bootstrap 166／1118 → 167／1118。后七项只完成正确 provider cutover，不计源码闭包收益。
+
+tool adapter、signal adapter、Attention consumer 与 repository-programming runtime 分别独立 Fable 编译通过 64、224、370、644 parsed sources；ToolHostCodec／HostEventCodec 签名的真实反向消费者合并为一次 flat compile，通过 1416 parsed sources／1378 items（`bafa41b8e0a7`）。新编译边界回归先在旧混装闭包失败，再分别拒绝工具、consumer 与信号侧重新耦合的三个引用 mutant。新产物的 SDK schema、exact identity、abort disposal、结果尾部界限与异常 smoke 范围见 host-boundary/HOW。结构 gate 为 26 subsystem、213 shard、700 source、1917 references，shard DAG，最大 SCC 22；局部闭包变小不等于全局 SCC 收敛、subsystem 可替换性已证明或实际编译耗时下降，GAP-033 保持 PARTIAL。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

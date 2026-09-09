@@ -12,13 +12,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-event-envelope.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.loop-event-codec.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.output-distillation.host-contract-toolresultbound.fsproj"/>
     <Compile Include="OpenCode/Codec/HostEventCodec.fsi"/>
     <Compile Include="OpenCode/Codec/HostEventCodec.fs"/>
-    <Compile Include="OpenCode/Codec/ToolHostCodec.fsi"/>
-    <Compile Include="OpenCode/Codec/ToolHostCodec.fs"/>
-    <Compile Include="OpenCode/Codec/ToolHostSurface.fsi"/>
-    <Compile Include="OpenCode/Codec/ToolHostSurface.fs"/>
     <Compile Include="OpenCode/Signals/HostSignal.fsi"/>
     <Compile Include="OpenCode/Signals/HostSignal.fs"/>
     <Compile Include="OpenCode/Signals/HostSignalAdapter.fsi"/>

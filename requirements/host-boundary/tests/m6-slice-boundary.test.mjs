@@ -71,6 +71,58 @@ test('WHAT[HOST-BOUNDARY-027] production inventory closes Host codec audiences w
   assert.ok(locality(inventory, 'execution-delegation-hostturnobservedsurface').references.includes('host-event-envelope'))
 })
 
+test('WHAT[HOST-BOUNDARY-026] tool registration compiles without signal routing or terminal bus implementations', () => {
+  const inventory = readCompileShardInventoryV1()
+  const tool = inventory.localities.find((entry) => sourcePaths(entry).includes('src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fs'))
+  assert.ok(tool, 'tool codec must have a production compile shard')
+
+  const closureSources = (root) => {
+    const closure = new Set()
+    const pending = [root]
+    while (pending.length > 0) {
+      const shard = pending.pop()
+      if (closure.has(shard)) continue
+      closure.add(shard)
+      pending.push(...shard.references.map((id) => locality(inventory, id)))
+    }
+    return new Set([...closure].flatMap(sourcePaths))
+  }
+  const sources = closureSources(tool)
+  assert.ok(sources.has('src/Wanxiangshu/Host/Contract/ToolResultBound.fs'))
+  for (const unrelated of [
+    'src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs',
+    'src/Wanxiangshu/OpenCode/Signals/HostSignal.fs',
+    'src/Wanxiangshu/OpenCode/Signals/HostSignalAdapter.fs',
+    'src/Wanxiangshu/OpenCode/Host/Events.fs',
+    'src/Wanxiangshu/OpenCode/Host/SharedTerminalBus.fs',
+    'src/Wanxiangshu/Execution/Failure/Model.fs',
+    'src/Wanxiangshu/Persistence/Journal/RuntimePath.fs',
+  ])
+    assert.ok(!sources.has(unrelated), `tool adapter must not acquire ${unrelated}`)
+
+  for (const id of [
+    'interaction-attention-fold',
+    'interaction-concern-fold',
+    'enforcer-institutionallearning-fold',
+    'opencode-tools-filemutationtools',
+    'opencode-tools-bookkeepertool',
+    'opencode-tools-fetchtool',
+  ]) {
+    const consumerSources = closureSources(locality(inventory, id))
+    assert.ok(consumerSources.has('src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fs'))
+    for (const unrelated of [
+      'src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs',
+      'src/Wanxiangshu/OpenCode/Signals/HostSignal.fs',
+      'src/Wanxiangshu/OpenCode/Host/Events.fs',
+      'src/Wanxiangshu/OpenCode/Host/SharedTerminalBus.fs',
+    ])
+      assert.ok(!consumerSources.has(unrelated), `${id} must not acquire ${unrelated}`)
+  }
+
+  const signalSources = closureSources(locality(inventory, 'host-signal-adapter'))
+  assert.ok(!signalSources.has('src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fs'), 'signal adapter must not acquire tool registration')
+})
+
 test('WHAT[HOST-BOUNDARY-027] Host envelope projection is shared and never mutates the raw payload', () => {
   const payload = { type: 'message.updated', properties: { sessionID: 'session-1', info: { sessionID: 'session-2' } } }
   const input = { directory: '/must-not-cross', payload }
