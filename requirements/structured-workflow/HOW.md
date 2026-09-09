@@ -142,6 +142,8 @@ registry 声明闭包为 4 项目／8 输入；shared-state 从基准 87／538 �
 
 tool adapter、signal adapter、Attention consumer 与 repository-programming runtime 分别独立 Fable 编译通过 64、224、370、644 parsed sources；ToolHostCodec／HostEventCodec 签名的真实反向消费者合并为一次 flat compile，通过 1416 parsed sources／1378 items（`bafa41b8e0a7`）。新编译边界回归先在旧混装闭包失败，再分别拒绝工具、consumer 与信号侧重新耦合的三个引用 mutant。新产物的 SDK schema、exact identity、abort disposal、结果尾部界限与异常 smoke 范围见 host-boundary/HOW。结构 gate 为 26 subsystem、213 shard、700 source、1917 references，shard DAG，最大 SCC 22；局部闭包变小不等于全局 SCC 收敛、subsystem 可替换性已证明或实际编译耗时下降，GAP-033 保持 PARTIAL。
 
+在 `8903c729c` 上核对 Host 现行规范时，发现 HOST-BOUNDARY-026 仍将摘要、消息、SDK 类型和工具注册写入旧宽 Host 边界，并将普通业务契约限制为两个旧合同。用户于 2026-09-10 明确批准同步合同；本批仅修订 WHAT/HOW 与导航，保留物理能力隔离及既有证明，不改变实现或以此关闭 GAP-033。另确认 `host-session-contract-closure.test.mjs` 仍依赖 legacy locality/kind、100/185 数量断言及 legacy owner 文件选择；这些检查尚未完全迁到 subsystem inventory，显式 Host 分片的归属仍由全仓 subsystem gate 证明。后续迁移必须保留真实闭包排除、必要 provider 与唯一归属反例，不能恢复旧 ACL 或仅删除测试取得绿色。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

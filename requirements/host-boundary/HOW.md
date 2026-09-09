@@ -44,20 +44,26 @@
 
 ### 6. Contract/Runtime 编译架构分界与单向依赖
 
-- **Locality 切分**：
+- **现有编译分片**：以下旧 kind 值只用于说明现存工程元数据，不作为架构治理或 capability 授权；实际边界按源码知识、公开合同与物理效果区分。
   - `Host.Session.Contract`（`host-session-contract`，kind: `contract`）：仅包含 `SessionContract` capability 与 `SessionSnapshot` 纯词汇、端口、定位 decision；
   - `Host.Signal.Contract`（`host-signal-contract`，kind: `contract`）：沿用 `host-digest` 工程路径，仅编译 `EventContract.fs/.fsi`，只引用 identity 与 outcome。终端合同不再传递 SDK record、MessagePart 或摘要实现；它不是兼容 umbrella。`SessionSnapshot` 显式引用唯一 message contract，SDK model 继续经其实际需要的 OpenCode prompt port 合同进入。
-  - `Host SDK types`（`host-opencode-types`）：零 ProjectReference，显式归属 `host` subsystem，仅编译既有 `OpencodeTypes.fs/.fsi`。`OpenCodeContract` 与 `ModelRouting` 只需要其中的 `OpencodeModel`，直接消费此分片，不再编入终端事件与 `MessagePart`。源码、公开签名、模型字段与 aggregate 顺序不变。
+  - `Host.Message.Contract`（`host-message-contract`）：零 ProjectReference，显式归属 `host` subsystem，仅编译既有 `Message.fs/.fsi`；SessionSnapshot 与 message codec 消费唯一消息词汇。
+  - `Host.SDK.Types`（`host-opencode-types`）：零 ProjectReference，显式归属 `host` subsystem，仅编译既有 `OpencodeTypes.fs/.fsi`。`OpenCodeContract` 与 `ModelRouting` 只需要其中的 `OpencodeModel`，直接消费此分片，不再编入终端事件与 `MessagePart`。源码、公开签名、模型字段与 aggregate 顺序不变。
+  - `runtime-platform/digest`：零 ProjectReference，仅编译既有 `Host/Digest.fs/.fsi`，保留 `HostDigest` 公开名称但不属于 Host subsystem；名称不构成对 Host 实现的知识依赖。
   - `Host.Event.Envelope`（`host-event-envelope`，kind: `contract`）：raw envelope unwrap、event type、session/message-session identity 的唯一无状态公式；
   - `Host.Message.Codec`（`host-message-codec`，kind: `contract`）：raw message part decode，bounded 到三个 fresh production consumer；直接引用 `host-message-contract` 中既有 `Message.fs/.fsi`，后者显式归属 `host` subsystem、零 ProjectReference。SessionSnapshot 与 message codec 消费同一消息定义，没有复制定义或运行时别名；SDK DTO、终端事件与摘要实现不再进入 message codec 闭包。
   - `Host.Loop.Event.Codec`（`loop-event-codec`，kind: `contract`）：loop text-delta decode/query，只依赖 `Host.Event.Envelope`；
-  - `Host.Fatal.Effect`（`host-fatal-effect`，kind: `contract`）：`Foundation/FatalProcess` 进程 fuse 的窄物理效果边界；
+  - `Host.Fatal.Effect`（`host-fatal-effect`）：`Foundation/FatalProcess` 进程 fuse 的窄物理效果边界；旧 `kind: contract` 标签不使进程控制变成纯合同，物理执行与 capability 注入由 HOST-BOUNDARY-029 的既有证明承接。
   - `Host.Diagnostics.Runtime`（`host-diagnostics-runtime`，kind: `runtime`）：包含 `HookPolicy` 元数据表与 `ReliabilityDiagnostics` 因果记录收集；
   - `Host.Signal.Adapter`（`host-signal-adapter`，kind: `adapter`）：包含 `HostSignal` 词汇、完整 provider failure/terminal `HostEventCodec`、`HostSignalAdapter` 路由器、`HostSignalSubscribe` 订阅器与 `Events` 终端总线；不再拥有 message/loop codec 或工具注册实现。
   - `Host.Tool.Adapter`（`host-tool-adapter`）：显式归属 `host` subsystem，独立编译既有 `ToolHostCodec.fs/.fsi` 与 `ToolHostSurface.fs/.fsi`，只引用 identity、roles 和 ToolResultBound provider。HostIngressCodec 随唯一实现保留其中；schema factory、随机 handle、abort listener 与工具注册仍是物理适配能力，不把此分片声明为纯合同。bootstrap 同时消费工具与信号分片，SessionExecutionBinding 的 ExactProviderStartObservation 仍由信号侧提供。此拆分按 STRUCTURED-WORKFLOW-011..014 调整编译资产，不新增 subsystem、旧 owner ACL 或平行实现。
   - `Host.Session.Runtime`（`host-session-runtime`，kind: `runtime`）：包含 `SessionSnapshotPort`/`SessionSnapshotSurface` wire 投影、`SessionQuiescenceGate`、`QuiescenceSurface`、`HostMessageProjection` 就地修改与 `HostSessionContext`；
   - `Sphinx.Host.Adapter`（`sphinx-host-adapter`，kind: `adapter`）：包含 `SphinxMcpConfig` 启动配置与环境适配。
-- **单向依赖与闭包纯洁性**：应用与领域契约只能引用 Contract locality，严禁传递包含 Runtime 与 Adapter 实现；契约源码闭包受 $\le 100$ 上限约束，聚焦 runtime 以 185 为 target、adapter/宽闭包 locality 以全仓 60% 为 full-fallback 硬顶（见 delegation/host 预算裁决）。
+- **单向依赖与闭包纯洁性**：应用与领域契约按真实知识消费窄合同、纯数据/decision 或 capability port，严禁传递包含 Runtime 与 Adapter 实现。compile shard 可以调整，不因旧 locality 标签或源码数量取得架构权威；结构治理以 STRUCTURED-WORKFLOW-011 至 016 为准。
+
+2026-09-10，用户在本次规范冲突裁决中批准同步 HOST-BOUNDARY-026：纠正已拆出的摘要、消息、SDK 类型与工具适配器仍被写入旧宽合同的描述，解除仅允许两个旧合同名称的限制，但保留物理能力隔离、唯一实现、失败与结算语义。源码、签名、工程和测试未改；既有 HOST-BOUNDARY-026/027 的终端、SDK、消息、工具闭包反例及 HOST-BOUNDARY-029 的 fatal 注入证明继续承接对应性质，没有用文档一致性冒充新增编译或行为证明。
+
+**尚未完成的旧验证迁移**：`host-session-contract-closure.test.mjs` 仍用 legacy locality/kind 及 100/185 源码数断言参与验收；其末尾归属比较按 legacy owner 选取文件，未覆盖显式声明 subsystem 的新增 Host 分片。这些断言不是本次修订的授权依据，亦不能代表所有 Host source 的当前归属证明。本批不修改测试或放宽阈值；其向真实 subsystem inventory 与闭包性质迁移的缺口纳入 GAP-033，已有 runtime 排除、真实 provider 和唯一来源保护应保留。全仓唯一生产源码归属由 subsystem gate 承接。
 
 以 `26bfed9d0` 为基准，本批把 terminal contract 收到 identity/outcome，移除 diagnostics 与 message visibility 的无实际用途引用。声明递归闭包（项目／`.fs/.fsi` 输入）分别为：terminal 7／26 → 4／20，diagnostics 14／62 → 10／54，visibility 11／36 → 5／12，SyncDelegate runtime 17／66 → 14／60，session contract 9／34 → 8／32。
 
