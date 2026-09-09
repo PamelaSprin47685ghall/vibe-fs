@@ -83,26 +83,31 @@ type CompletionMailbox(gate: obj) =
     /// EXEC-018: wait for completion signal, typed local interrupt, or
     /// permanent cancel.
     member this.WaitForSignal(interrupt: Task<JoinInterruptReason>) : Task<MailboxWakeReason> =
-        // Race wake vs interrupt without nested task{} (dsl-ownership raw-task budget).
-        // kind=0 + reason = wake; kind=1 + reason = local interrupt.
-        let wakeTask: Task<obj> =
-            emitJsExpr (this.WaitForWake()) "$0.then(function (r) { return { kind: 0, reason: r }; })"
+        // Subscribe to wake before interrupt, preserving ready-signal priority.
+        let tagWake (reason: MailboxWakeReason) : Choice<MailboxWakeReason, JoinInterruptReason> = Choice1Of2 reason
 
-        let interruptTask: Task<obj> =
-            emitJsExpr interrupt "$0.then(function (r) { return { kind: 1, reason: r }; })"
+        let tagInterrupt (reason: JoinInterruptReason) : Choice<MailboxWakeReason, JoinInterruptReason> =
+            Choice2Of2 reason
 
-        task {
-            let! winner = emitJsExpr (wakeTask, interruptTask) "Promise.race([$0, $1])": Task<obj>
+        let wakeChoice: Task<Choice<MailboxWakeReason, JoinInterruptReason>> =
+            emitJsExpr (this.WaitForWake(), tagWake) "$0.then($1)"
 
-            let kind: int = emitJsExpr winner "$0.kind"
+        let interruptChoice: Task<Choice<MailboxWakeReason, JoinInterruptReason>> =
+            emitJsExpr (interrupt, tagInterrupt) "$0.then($1)"
 
-            if kind = 0 then
-                return emitJsExpr winner "$0.reason": MailboxWakeReason
-            else
+        let decideSignal (outcome: Choice<MailboxWakeReason, JoinInterruptReason>) : MailboxWakeReason =
+            match outcome with
+            | Choice1Of2 wakeReason -> wakeReason
+            | Choice2Of2 interruptReason ->
                 // Drop mailbox waiter if still pending (local interrupt won).
                 this.PulseWake()
-                let reason: JoinInterruptReason = emitJsExpr winner "$0.reason"
-                return LocalInterrupt reason
+                LocalInterrupt interruptReason
+
+        task {
+            let! (winner: Choice<MailboxWakeReason, JoinInterruptReason>) =
+                emitJsExpr (wakeChoice, interruptChoice) "Promise.race([$0, $1])"
+
+            return decideSignal winner
         }
 
     /// Drain agent wake tokens (no payload). Callers re-read Journal after wake.

@@ -214,22 +214,16 @@ module HostForkJoin =
         | LocalInterrupt reason -> Done(Ok(Interrupted reason))
         | CompletionMayBeAvailable -> Retry
 
-    let private decideJournalRaceWinner (kind: int) (winner: obj) =
-        if kind = 0 then
-            let reason: MailboxWakeReason = emitJsExpr winner "$0.reason"
-            decideWakeReason reason
-        elif kind = 2 then
-            let interruptReason: JoinInterruptReason = emitJsExpr winner "$0.reason"
-            Done(Ok(Interrupted interruptReason))
-        else
-            Retry
+    let private decideJournalRaceWinner (winner: Choice<MailboxWakeReason, unit, JoinInterruptReason>) =
+        match winner with
+        | Choice1Of3 reason -> decideWakeReason reason
+        | Choice3Of3 interruptReason -> Done(Ok(Interrupted interruptReason))
+        | Choice2Of3() -> Retry
 
-    let private decideFissionRaceWinner (kind: int) (winner: obj) =
-        if kind = 1 then
-            let reason: JoinInterruptReason = emitJsExpr winner "$0.reason"
-            Done(Ok(Interrupted reason))
-        else
-            Retry
+    let private decideFissionRaceWinner (winner: Choice<unit, JoinInterruptReason>) =
+        match winner with
+        | Choice2Of2 reason -> Done(Ok(Interrupted reason))
+        | Choice1Of2() -> Retry
 
     let private applyJoinPoll (poll: JoinPoll) (retry: unit -> Task<Result<JoinWaitOutcome<JoinItem>, ForkError>>) =
         match poll with
@@ -262,22 +256,31 @@ module HostForkJoin =
         (durable: AgentJournal)
         (interrupt: Task<JoinInterruptReason>)
         (runtime: HostForkRuntime)
-        =
+        : Task<Choice<MailboxWakeReason, unit, JoinInterruptReason>> =
         task {
             let _, fromRev = durable.SnapshotWithRevision
+            let wakeSource = runtime.Runtime.WaitForWake()
+            let changeSource = durable.AwaitChangeFrom fromRev
 
-            // Tagged race arms without nested task{} (dsl-ownership).
-            // kind: 0=wake(+reason), 1=journal change, 2=user interrupt.
-            let wakeTask: Task<obj> =
-                emitJsExpr (runtime.Runtime.WaitForWake()) "$0.then(function (r) { return { kind: 0, reason: r }; })"
+            let tagWake (reason: MailboxWakeReason) : Choice<MailboxWakeReason, unit, JoinInterruptReason> =
+                Choice1Of3 reason
 
-            let changeTask: Task<obj> =
-                emitJsExpr (durable.AwaitChangeFrom fromRev) "$0.then(function () { return { kind: 1 }; })"
+            let tagChange (_: JournalChange) : Choice<MailboxWakeReason, unit, JoinInterruptReason> = Choice2Of3()
 
-            let interruptTask: Task<obj> =
-                emitJsExpr interrupt "$0.then(function (r) { return { kind: 2, reason: r }; })"
+            let tagInterrupt (reason: JoinInterruptReason) : Choice<MailboxWakeReason, unit, JoinInterruptReason> =
+                Choice3Of3 reason
 
-            let! winner = emitJsExpr (wakeTask, changeTask, interruptTask) "Promise.race([$0, $1, $2])": Task<obj>
+            let wakeChoice: Task<Choice<MailboxWakeReason, unit, JoinInterruptReason>> =
+                emitJsExpr (wakeSource, tagWake) "$0.then($1)"
+
+            let changeChoice: Task<Choice<MailboxWakeReason, unit, JoinInterruptReason>> =
+                emitJsExpr (changeSource, tagChange) "$0.then($1)"
+
+            let interruptChoice: Task<Choice<MailboxWakeReason, unit, JoinInterruptReason>> =
+                emitJsExpr (interrupt, tagInterrupt) "$0.then($1)"
+
+            let! (winner: Choice<MailboxWakeReason, unit, JoinInterruptReason>) =
+                emitJsExpr (wakeChoice, changeChoice, interruptChoice) "Promise.race([$0, $1, $2])"
 
             runtime.Runtime.PulseWake()
             return winner
@@ -329,8 +332,7 @@ module HostForkJoin =
             }
 
         and continueFromJournalRace winner =
-            let kind: int = emitJsExpr winner "$0.kind"
-            applyJoinPoll (decideJournalRaceWinner kind winner) loop
+            applyJoinPoll (decideJournalRaceWinner winner) loop
 
         and waitWithoutJournal () =
             task {
@@ -435,17 +437,26 @@ module HostForkJoin =
                 return tryResultsAvailable joined
         }
 
-    let private raceFissionArms (durable: AgentJournal) (interrupt: Task<JoinInterruptReason>) =
+    let private raceFissionArms
+        (durable: AgentJournal)
+        (interrupt: Task<JoinInterruptReason>)
+        : Task<Choice<unit, JoinInterruptReason>> =
         task {
             let _, fromRevision = durable.SnapshotWithRevision
+            let changeSource = durable.AwaitChangeFrom fromRevision
+            let tagChange (_: JournalChange) : Choice<unit, JoinInterruptReason> = Choice1Of2()
+            let tagInterrupt (reason: JoinInterruptReason) : Choice<unit, JoinInterruptReason> = Choice2Of2 reason
 
-            let changeTask: Task<obj> =
-                emitJsExpr (durable.AwaitChangeFrom fromRevision) "$0.then(function () { return { kind: 0 }; })"
+            let changeChoice: Task<Choice<unit, JoinInterruptReason>> =
+                emitJsExpr (changeSource, tagChange) "$0.then($1)"
 
-            let interruptTask: Task<obj> =
-                emitJsExpr interrupt "$0.then(function (reason) { return { kind: 1, reason: reason }; })"
+            let interruptChoice: Task<Choice<unit, JoinInterruptReason>> =
+                emitJsExpr (interrupt, tagInterrupt) "$0.then($1)"
 
-            return! emitJsExpr (changeTask, interruptTask) "Promise.race([$0, $1])": Task<obj>
+            let! (winner: Choice<unit, JoinInterruptReason>) =
+                emitJsExpr (changeChoice, interruptChoice) "Promise.race([$0, $1])"
+
+            return winner
         }
 
     let private joinFissionLaneLoop
@@ -485,8 +496,7 @@ module HostForkJoin =
             }
 
         and continueFromFissionRace winner =
-            let kind: int = emitJsExpr winner "$0.kind"
-            applyJoinPoll (decideFissionRaceWinner kind winner) loop
+            applyJoinPoll (decideFissionRaceWinner winner) loop
 
         loop ()
 

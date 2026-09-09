@@ -31,9 +31,12 @@ mechanism.
 
 ## Related unit proof
 
-`requirements/delegation/tests/join-v2-mailbox.test.mjs` — registry fan-out, latch,
-mailbox non-cancel, drain-before-interrupt, anti-cheat against OperatorAbort
-masquerading as user_message.
+`requirements/delegation/tests/join-wake-owner.test.mjs` — real journal-less
+join interruption, child completion after interruption, spurious wakes and lock release.
+
+`requirements/change-integration/tests/verdict-mailbox.test.mjs` — real verdict
+mailbox drain-before-interrupt, removal of interrupted waiters, bounded FIFO and
+idle completion. Neither probe claims journal-backed or fission-lane coverage.
 
 Temporal race extraction lives under `tests/unit/temporal/` (G4R-1/2), not as
 extra E2E canaries.

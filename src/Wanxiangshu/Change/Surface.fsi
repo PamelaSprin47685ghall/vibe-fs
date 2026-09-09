@@ -87,3 +87,19 @@ module ChangeSurface =
     val releaseGate: gate: obj -> Task<unit>
 
     val disposeGate: gate: obj -> Task<unit>
+
+    val createVerdictMailbox: unit -> obj
+
+    val verdictMailboxStartJob: mailbox: obj -> unit
+
+    val verdictMailboxPublish: mailbox: obj -> verdict: obj -> unit
+
+    val verdictMailboxPendingCount: mailbox: obj -> int
+
+    val createVerdictInterrupt: unit -> obj
+
+    val fireVerdictInterrupt: handle: obj -> reason: string -> unit
+
+    val verdictMailboxJoinAvailable: mailbox: obj -> maxCount: int -> interrupt: obj -> Task<obj>
+
+    val verdictMaxBatch: unit -> int

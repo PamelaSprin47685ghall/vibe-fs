@@ -140,25 +140,28 @@ type VerdictMailbox(observer: IWaitObserver) =
             else
                 waiters.Enqueue waiter)
 
-    member private this.resolveEmptyDrain (waiter: TaskCompletionSource<unit>) (kind: int) (winner: obj) =
-        if kind = 0 then
+    member private this.resolveEmptyDrain
+        (waiter: TaskCompletionSource<unit>)
+        (winner: Choice<unit, JoinInterruptReason>)
+        : JoinWaitOutcome<OrchestratorVerdict> =
+        match winner with
+        | Choice1Of2() ->
             // Idle wake with empty queue → Empty sentinel.
             ResultsAvailable(NonEmptyBatch.ofHeadTail OrchestratorVerdict.Empty [])
-        else
+        | Choice2Of2 reason ->
             this.dropWaiter waiter
-            let reason: JoinInterruptReason = emitJsExpr winner "$0.reason"
             Interrupted reason
 
-    member private this.resolveAfterDrain (waiter: TaskCompletionSource<unit>) (cap: int) (winner: obj) =
-        let after = this.DrainAvailable cap
-
-        match NonEmptyBatch.tryOfList after with
+    member private this.resolveAfterDrain
+        (waiter: TaskCompletionSource<unit>)
+        (cap: int)
+        (winner: Choice<unit, JoinInterruptReason>)
+        : JoinWaitOutcome<OrchestratorVerdict> =
+        match NonEmptyBatch.tryOfList (this.DrainAvailable cap) with
         | Some batch -> ResultsAvailable batch
-        | None ->
-            let kind: int = emitJsExpr winner "$0.kind"
-            this.resolveEmptyDrain waiter kind winner
+        | None -> this.resolveEmptyDrain waiter winner
 
-    /// EXEC-017 / EXEC-019: drain-first → race wait/interrupt → re-drain.
+    /// Drain-first → race wait/interrupt → re-drain.
     /// A local operator abort is not a publish failure.
     member this.JoinAvailable
         (maxCount: int, interrupt: Task<JoinInterruptReason>)
@@ -176,12 +179,16 @@ type VerdictMailbox(observer: IWaitObserver) =
 
             this.signalOrEnqueue waiter
 
-            // Race arms as int tags — no nested task{} (dsl-ownership raw-task budget).
-            let waitTask: Task<obj> =
-                emitJsExpr waiter.Task "$0.then(function () { return { kind: 0 }; })"
+            // Signal arm first: simultaneous settlement favors the verdict signal.
+            let signalOf () : Choice<unit, JoinInterruptReason> = Choice1Of2()
 
-            let interruptTask: Task<obj> =
-                emitJsExpr interrupt "$0.then(function (r) { return { kind: 1, reason: r }; })"
+            let interruptOf (reason: JoinInterruptReason) : Choice<unit, JoinInterruptReason> = Choice2Of2 reason
+
+            let signalArm: Task<Choice<unit, JoinInterruptReason>> =
+                emitJsExpr (waiter.Task, signalOf) "$0.then($1)"
+
+            let interruptArm: Task<Choice<unit, JoinInterruptReason>> =
+                emitJsExpr (interrupt, interruptOf) "$0.then($1)"
 
             let descriptor =
                 DiagnosticWait.create
@@ -194,12 +201,13 @@ type VerdictMailbox(observer: IWaitObserver) =
                     "VerdictMailbox.JoinAvailable"
 
             task {
-                let! winner =
+                let! (winner: Choice<unit, JoinInterruptReason>) =
                     CausalAwait.awaitTask
                         observer
                         descriptor
-                        (emitJsExpr (waitTask, interruptTask) "Promise.race([$0, $1])": Task<obj>)
+                        (emitJsExpr (signalArm, interruptArm) "Promise.race([$0, $1])")
 
-                // Always re-drain first (EXEC-018).
+                // Always re-drain first: a verdict that arrived before the race
+                // settled takes precedence over the interrupt.
                 return this.resolveAfterDrain waiter cap winner
             }

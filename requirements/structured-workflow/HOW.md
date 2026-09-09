@@ -100,6 +100,8 @@ Subsystem SCC 是首要结构债：双向依赖必须通过移动知识所有权
 
 在 `f40d0b63f` 上移除 `ToolHostSurface` 对 `HostSchema` 的 `.value/.fields[0]` 表示探针，改由既有 `ToolHostCodec` 在同一 shard 内发布 internal typed 解包；私有构造器、公开 Surface 签名与工具注册策略不变。原生 literal schema 在旧 Surface 被错误解成字符串，正式回归先以 `schema.parse is not a function` 失败，再随 typed 解包通过；删除迎合二次解包的虚构 schema fixture，用真实 SDK validator 证明接受／拒绝与 optionality。签名影响及其反向 consumer 的 focused Fable 并集通过 1418 parsed sources／1380 items（fingerprint `9557abcf695f`），新全量产物上的 codec、结构与 impact 测试 40/40 通过。声明图仍为 26 subsystem、208 shard、701 source、1907 references，shard DAG，最大 subsystem SCC 22；没有以表示依赖清理宣称 subsystem 已可独立替换，GAP-033 保持 PARTIAL。
 
+在 `8cddee173` 上将 CompletionMailbox、Change VerdictMailbox 与 HostForkJoin 的 journal／fission 竞争结果改为 typed `Choice`，删除手写 `{ kind, reason }` 协议；不新增调度运行时，不改变单次 `.then`、注册顺序、drain-first 或中断语义。首轮格式检查拒绝未括号化的 `let!` 类型模式，修正后真实 focused Fable 并集通过 950 parsed sources／912 items（fingerprint `21025f5f1239`），新全量产物上的 verdict／join／causal wait 测试 35/35 通过。新增 Change Surface 直接观察真实 VerdictMailbox，证明竞争优先级、旧 waiter 移除及有界 FIFO；公开 mailbox／join 生产签名不变，仅扩充既有证明 Surface。无 journal join probe 不证明 journal／fission 全分支，具体证据边界见 delegation/HOW。声明图仍为 26 subsystem、208 shard、701 source、1907 references，shard DAG，最大 subsystem SCC 22；本批只是类型安全收敛，不是 subsystem 知识依赖减少，GAP-033 保持 PARTIAL。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

@@ -39,6 +39,10 @@ DELEG-020 约束：委托语义不依赖当前工具名字面值（`fork`、`com
 
 Join 机制从所有者的完成信箱中按稳定排序逐项 CAS 消费可用结果，单次消费上限受 `MaxJoinBatch` 约束。外部打断信号与超时仅产生 `Interrupted` 结果，确保子会话的执行与既有权能不受破坏。
 
+CompletionMailbox、Change VerdictMailbox 与 HostForkJoin 的 journal／fission 竞争结果使用单次调用内的 typed `Choice`，各 arm 保留原来的单次 `.then` 与注册顺序；`Promise.race` 只透传该类型，不编码数字标签或读取无类型字段。verdict 与 journal join 仍在竞争后先重新 drain，再解释中断；局部中断不取消 child，mailbox waiter 的释放责任不变。`join-wake-owner.test.mjs` 实际执行无 journal 的 PTY join，不能冒充 journal／fission 分支证明；后两者由真实 focused Fable 编译覆盖类型闭包，端到端范围以唯一 Long Stroke 实际经过的路径为限。
+
+`verdict-mailbox.test.mjs` 经正式 Change Surface 构造真实 VerdictMailbox，证明已就绪／同一同步回合到达的 verdict 优先于中断、中断后的新 waiter 不被旧 waiter 吞掉唤醒，以及 FIFO 上限与余量。删除旧 `join-v2-mailbox.test.mjs`、`host-fork-join-algebra.test.mjs` 的九个重复 renderer／源码 token 检查：DELEG-019 约束 child prompt，不授权将这些检查称为等待竞争证明；有效 batch／中断后果仍由真实 join probe 与 `join-completion.test.mjs` 覆盖。
+
 ### Contract/Runtime 编译边界
 
 - `Delegation.Contract` 汇集稳定 command/result、fact、payload、route 与 completion evidence；`Delegation.Fold` 只消费 contract 计算投影；`Delegation.Ledger` 在显式 Composition locality 中连接 `AgentJournal`。
@@ -62,8 +66,8 @@ Join 机制从所有者的完成信箱中按稳定排序逐项 CAS 消费可用�
 | DELEG-011 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs::WHAT[DELEG-011] SYNC_RUNTIME_ordinary_completion_settles_batch_without_return_channel` |
 | DELEG-012 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs::WHAT[DELEG-012] SYNC_RUNTIME_first_provider_call_receives_canonical_record_and_sibling_receives_reference` |
 | DELEG-013 | `requirements/delegation/tests/join-completion.test.mjs::WHAT[DELEG-013] JOIN_COMPLETION_completed_is_rendered_as_entry_local_work_record` |
-| DELEG-014 | `requirements/delegation/tests/join-completion.test.mjs::WHAT[DELEG-014] JOIN_COMPLETION_batch_preserves_order_and_bounded_work_records` |
-| DELEG-015 | `requirements/delegation/tests/join-completion.test.mjs::WHAT[DELEG-015] JOIN_COMPLETION_interrupted_is_not_fork_error` |
+| DELEG-014 | `requirements/delegation/tests/join-completion.test.mjs::WHAT[DELEG-014] JOIN_COMPLETION_batch_preserves_order_and_bounded_work_records`；`requirements/change-integration/tests/verdict-mailbox.test.mjs::WHAT[DELEG-014] VERDICT_MAILBOX_ready_or_racing_verdict_beats_interrupt`；`requirements/change-integration/tests/verdict-mailbox.test.mjs::WHAT[DELEG-014] VERDICT_MAILBOX_idle_empty_returns_empty_sentinel`；`requirements/change-integration/tests/verdict-mailbox.test.mjs::WHAT[DELEG-014] VERDICT_MAILBOX_batch_is_capped_at_maxjoinbatch_fifo_with_exact_remainder` |
+| DELEG-015 | `requirements/delegation/tests/join-completion.test.mjs::WHAT[DELEG-015] JOIN_COMPLETION_interrupted_is_not_fork_error`；`requirements/change-integration/tests/verdict-mailbox.test.mjs::WHAT[DELEG-015] VERDICT_MAILBOX_pending_interrupt_stays_interrupted_then_next_publish_delivers_exactly_once`；`requirements/delegation/tests/join-wake-owner.test.mjs::WHAT[DELEG-015] JOIN_WAKE_interrupt_stays_distinct_from_failure_and_releases_lock`；`requirements/delegation/tests/join-wake-owner.test.mjs::WHAT[DELEG-015] JOIN_WAKE_cancel_and_error_paths_release_lock_for_next_join` |
 | DELEG-016 | `requirements/delegation/tests/join-v2-wire.test.mjs::WHAT[DELEG-016] JOIN_V2_empty_batch_is_plain_empty_wire` |
 | DELEG-017 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs::WHAT[DELEG-017] SYNC_RUNTIME_work_record_is_evidence_and_does_not_transfer_authority` |
 | DELEG-019 | `requirements/delegation/tests/fork-child-payload.test.mjs::WHAT[DELEG-019] FORK_CHILD_PAYLOAD_full_shape_puts_all_instructions_before_reference_data` |

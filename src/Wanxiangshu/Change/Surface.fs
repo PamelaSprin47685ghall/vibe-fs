@@ -11,6 +11,7 @@ open Wanxiangshu.Process
 open Wanxiangshu.Git
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Mission.Relay
 
 /// JS-native boundary for change integration. Job projections and git/worktree
@@ -1655,3 +1656,86 @@ module ChangeSurface =
 
     let disposeGate (gate: obj) : Task<unit> =
         task { do! ((gate :?> GateHandle).Gate :> IAsyncDisposable).DisposeAsync() }
+
+    type private VerdictMailboxHandle(mailbox: VerdictMailbox) =
+        member _.Mailbox = mailbox
+
+    type private VerdictInterruptHandle(tcs: TaskCompletionSource<JoinInterruptReason>) =
+        member _.Source = tcs
+
+    let private verdictInterruptOf (reason: string) : JoinInterruptReason =
+        match reason with
+        | "UserMessageArrived" -> JoinInterruptReason.UserMessageArrived
+        | "DeadlineExpired" -> JoinInterruptReason.DeadlineExpired
+        | "OperatorAbort" -> JoinInterruptReason.OperatorAbort
+        | _ -> invalidArg "reason" "Unknown join interrupt reason"
+
+    let private verdictOf (value: obj) : OrchestratorVerdict =
+        let job = jobId (field value [ "jobId"; "ManagerJobId" ])
+        let head = commit (field value [ "head"; "Head"; "candidateCommit" ])
+
+        match stringField value [ "kind"; "case"; "name" ] with
+        | "PublishedPendingCleanup" ->
+            OrchestratorVerdict.PublishedPendingCleanup(
+                job,
+                head,
+                stringField value [ "cleanupError"; "error"; "detail" ]
+            )
+        | "Cancelled" -> OrchestratorVerdict.Cancelled job
+        | "RejectedDirty" -> OrchestratorVerdict.RejectedDirty(stringField value [ "reason"; "detail" ])
+        | "IntegrationFailed" ->
+            OrchestratorVerdict.IntegrationFailed(job, stringField value [ "errorDetails"; "detail"; "error" ])
+        | "Empty" -> OrchestratorVerdict.Empty
+        | "Published" -> OrchestratorVerdict.Published(job, head)
+        | _ -> invalidArg "value" "Unknown orchestrator verdict"
+
+    let private verdictInterruptName (reason: JoinInterruptReason) =
+        match reason with
+        | JoinInterruptReason.UserMessageArrived -> "UserMessageArrived"
+        | JoinInterruptReason.DeadlineExpired -> "DeadlineExpired"
+        | JoinInterruptReason.OperatorAbort -> "OperatorAbort"
+
+    let private verdictJoinOutcomeObject (outcome: JoinWaitOutcome<OrchestratorVerdict>) : obj =
+        match outcome with
+        | ResultsAvailable batch ->
+            box
+                {| kind = "ResultsAvailable"
+                   count = NonEmptyBatch.length batch
+                   verdicts = NonEmptyBatch.toList batch |> List.map verdictObject |> List.toArray |}
+        | Interrupted reason ->
+            box
+                {| kind = "Interrupted"
+                   reason = verdictInterruptName reason |}
+
+    let createVerdictMailbox () : obj =
+        VerdictMailboxHandle(VerdictMailbox(CausalWaitRuntime().Observer)) :> obj
+
+    let verdictMailboxStartJob (mailbox: obj) : unit =
+        (mailbox :?> VerdictMailboxHandle).Mailbox.StartJob()
+
+    let verdictMailboxPublish (mailbox: obj) (verdict: obj) : unit =
+        (mailbox :?> VerdictMailboxHandle).Mailbox.Publish(verdictOf verdict)
+
+    let verdictMailboxPendingCount (mailbox: obj) : int =
+        (mailbox :?> VerdictMailboxHandle).Mailbox.PendingCount
+
+    let createVerdictInterrupt () : obj =
+        VerdictInterruptHandle(
+            TaskCompletionSource<JoinInterruptReason>(TaskCreationOptions.RunContinuationsAsynchronously)
+        )
+        :> obj
+
+    let fireVerdictInterrupt (handle: obj) (reason: string) : unit =
+        AsyncSupport.trySetResult (handle :?> VerdictInterruptHandle).Source (verdictInterruptOf reason)
+        |> ignore
+
+    let verdictMailboxJoinAvailable (mailbox: obj) (maxCount: int) (interrupt: obj) : Task<obj> =
+        task {
+            let! outcome =
+                (mailbox :?> VerdictMailboxHandle)
+                    .Mailbox.JoinAvailable(maxCount, (interrupt :?> VerdictInterruptHandle).Source.Task)
+
+            return verdictJoinOutcomeObject outcome
+        }
+
+    let verdictMaxBatch () : int = JoinBatch.MaxJoinBatch

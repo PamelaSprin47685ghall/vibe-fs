@@ -1370,8 +1370,8 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Change/Surface.js',
     owner: 'change-integration',
-    laws: ['CHGINT-001', 'CHGINT-002', 'CHGINT-003', 'CHGINT-004', 'CHGINT-005', 'CHGINT-006', 'CHGINT-007', 'CHGINT-008', 'CHGINT-009', 'CHGINT-010', 'CHGINT-011', 'CHGINT-012', 'CHGINT-013', 'CRASH-019'],
-    lawOwners: { 'CRASH-019': 'crash-reconciliation' },
+    laws: ['CHGINT-001', 'CHGINT-002', 'CHGINT-003', 'CHGINT-004', 'CHGINT-005', 'CHGINT-006', 'CHGINT-007', 'CHGINT-008', 'CHGINT-009', 'CHGINT-010', 'CHGINT-011', 'CHGINT-012', 'CHGINT-013', 'CRASH-019', 'DELEG-014', 'DELEG-015'],
+    lawOwners: { 'CRASH-019': 'crash-reconciliation', 'DELEG-014': 'delegation', 'DELEG-015': 'delegation' },
     source: 'src/Wanxiangshu/Change/Surface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
