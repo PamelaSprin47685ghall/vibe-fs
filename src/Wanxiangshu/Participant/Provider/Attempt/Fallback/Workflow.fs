@@ -1,13 +1,13 @@
 namespace Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 open System.Threading.Tasks
-open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Execution.Failure
+open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -24,48 +24,6 @@ open Wanxiangshu.Persistence.Journal
 /// maintenance request before retrying main. No future unrelated provider material is a
 /// retry trigger.
 module ProviderRecoveryWorkflow =
-
-    module private SessionAssociationProjection =
-        let tryBloggerOf (sessionId: SessionId) (associations: obj) : SessionId option =
-            emitJsExpr
-                (associations, sessionId)
-                """
-            (() => {
-                const map = $0;
-                const sid = $1;
-                if (!map) return null;
-                for (const [k, v] of (map.entries ? map.entries() : [])) {
-                    if (k && k.fields && k.fields[0] === sid.fields[0]) {
-                        if (v && v.BloggerSessionId && v.BloggerSessionId.fields) {
-                            return v.BloggerSessionId;
-                        }
-                    }
-                }
-                return null;
-            })()
-            """
-
-        let tryMainSessionOf (sessionId: SessionId) (associations: obj) : SessionId option =
-            emitJsExpr
-                (associations, sessionId)
-                """
-            (() => {
-                const map = $0;
-                const sid = $1;
-                if (!map) return null;
-                for (const [k, v] of (map.entries ? map.entries() : [])) {
-                    if (k && k.fields && k.fields[0] === sid.fields[0]) {
-                        if (v && v.Kind && v.Kind.fields) {
-                            const kind = v.Kind.fields[1];
-                            if (kind && (kind === 0 || kind.tag === 0)) {
-                                return { tag: 1, fields: [v.Kind.fields[0]] };
-                            }
-                        }
-                    }
-                }
-                return null;
-            })()
-            """
 
     let private sessionHasFreshCoverage (projection: ProjectionSet) (sessionId: SessionId) =
         let session = AgentProjection.tryFind sessionId projection.AgentProjections

@@ -19,9 +19,8 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Participant.Provider.Projection
-open Fable.Core
-open Fable.Core.JsInterop
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Strength
 
 [<RequireQualifiedAccess>]
 type PrefixPresentationHorizon =
@@ -240,29 +239,19 @@ module XWire =
                         (ProjectionRenderer.cutoffDigest HostDigest.sha256Hex snapshot)
         }
 
-    let private tryFindStrengthReplicaBinding (scope: PluginRuntimeScope) (sessionId: SessionId) : obj option =
-        try
-            let key = SessionId.value sessionId
-
-            emitJsExpr (scope, key) "$0.strength?.strengthRuntime?.byReplica?.get($1) ?? null"
-            |> Option.ofObj
-        with _ ->
-            None
-
-    let private replicaBindingCanonicalRole (binding: obj) : Role = emitJsExpr binding "$0.CanonicalRole"
-
-    let private replicaBindingCapabilitiesMatch (binding: obj) (expectedCapabilities: obj) : bool =
-        emitJsExpr
-            (binding, expectedCapabilities)
-            "$0.ToolCapabilitySet?.Equals ? $0.ToolCapabilitySet.Equals($1) : Object.is($0.ToolCapabilitySet, $1)"
+    let private tryFindStrengthReplicaBinding
+        (scope: PluginRuntimeScope)
+        (sessionId: SessionId)
+        : StrengthReplicaBinding option =
+        scope.Strength.StrengthRuntime.TryFindByReplica sessionId
 
     let private requireStrengthReplicaAuthority
-        (binding: obj)
+        (binding: StrengthReplicaBinding)
         (authority: PromptAuthority.AuthorityExecutionProfile option)
         =
         match authority with
         | None -> raise (InvalidOperationException "StrengthReplica has no active Authority Root")
-        | Some authority when authority.CanonicalRole <> replicaBindingCanonicalRole binding ->
+        | Some authority when authority.CanonicalRole <> binding.CanonicalRole ->
             raise (InvalidOperationException "StrengthReplica Authority Root role changed after binding")
         | Some authority -> authority
 
@@ -270,7 +259,7 @@ module XWire =
         (durable: AgentJournal)
         (scope: PluginRuntimeScope)
         (sessionId: SessionId)
-        (binding: obj)
+        (binding: StrengthReplicaBinding)
         (output: obj)
         : Task<unit> =
         task {
@@ -301,7 +290,7 @@ module XWire =
             let expectedCapabilities =
                 PromptAuthority.toolCapabilitiesFor authority.CanonicalRole ProviderRequestKind.StrengthReplica
 
-            if not (replicaBindingCapabilitiesMatch binding expectedCapabilities) then
+            if binding.ToolCapabilitySet <> expectedCapabilities then
                 raise (
                     InvalidOperationException
                         "StrengthReplica PromptAuthority capabilities disagree with live execution gate"
