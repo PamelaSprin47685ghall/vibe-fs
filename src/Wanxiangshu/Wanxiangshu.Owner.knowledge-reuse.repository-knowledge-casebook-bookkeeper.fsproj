@@ -15,8 +15,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-model.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
     <Compile Include="Repository/Knowledge/Casebook/ObservationCollector.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/ObservationCollector.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Bookkeeper.fsi"/>
