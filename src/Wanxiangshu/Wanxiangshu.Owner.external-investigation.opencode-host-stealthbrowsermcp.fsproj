@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>sphinx</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>opencode-host-stealthbrowsermcp</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>external-investigation</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>opencode-host-stealthbrowsermcp</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>

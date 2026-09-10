@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>sphinx</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>sphinx-event-vocabulary-contract</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>epistemic-reasoning</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>sphinx-event-vocabulary-contract</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>

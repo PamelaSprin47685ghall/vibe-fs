@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>verification</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>verification-eventstorewritersurface</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>verification-system</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>verification-eventstorewritersurface</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>

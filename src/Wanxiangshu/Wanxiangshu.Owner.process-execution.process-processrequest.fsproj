@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>process</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>process-processrequest</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>process-execution</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>process-processrequest</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>

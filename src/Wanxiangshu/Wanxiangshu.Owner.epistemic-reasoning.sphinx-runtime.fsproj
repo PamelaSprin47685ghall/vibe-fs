@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>sphinx</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>sphinx-runtime</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>epistemic-reasoning</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>sphinx-runtime</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>

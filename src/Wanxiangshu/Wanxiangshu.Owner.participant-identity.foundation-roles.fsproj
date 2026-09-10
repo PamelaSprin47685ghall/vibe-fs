@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>participant</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>foundation-roles</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>participant-identity</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>foundation-roles</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
