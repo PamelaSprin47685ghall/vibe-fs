@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>chat-execution</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>execution-session-chatexecution-fact</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>managed-chat-execution</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>execution-session-chatexecution-fact</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>

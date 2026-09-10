@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>authority</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>authority-runtime-surface</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>interaction-authority</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>authority-runtime-surface</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>

@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>relay</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>mission-relay-projection</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>relay-context-projection</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>mission-relay-projection</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>

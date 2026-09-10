@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>relay</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>mission-relay-core</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>relay-incumbency</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>mission-relay-core</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>

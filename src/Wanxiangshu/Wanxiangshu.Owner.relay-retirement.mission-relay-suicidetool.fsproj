@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>relay</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>mission-relay-suicidetool</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>relay-retirement</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>mission-relay-suicidetool</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>

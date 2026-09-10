@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>chat-execution</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>execution-failure-model</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>execution-failure-policy</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>execution-failure-model</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>

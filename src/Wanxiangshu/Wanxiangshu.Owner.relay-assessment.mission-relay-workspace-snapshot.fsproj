@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>relay</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>mission-relay-workspace-snapshot</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>relay-assessment</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>mission-relay-workspace-snapshot</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>
