@@ -188,6 +188,22 @@ tool adapter、signal adapter、Attention consumer 与 repository-programming ru
 
 上述分片及其代表性消费分片（如 `join-guard-surface`、`plugin-composition`、`action-affordance.runtime`、`opencode-host-managedagentconfig`、`enforcer-repair`、`sessionexecutionbinding`）均通过独立 Fable 聚焦编译验证。全仓 ProjectReference 引用总数降至 1890，结构与架构门禁全绿通过。
 
+进一步深入清理 10 个源文件中未使用的 `open Wanxiangshu.Host.Contract`、`open Wanxiangshu.Strength` 与 `open Wanxiangshu.Strength.Prediction` 残留语句（如 `Context/Trace/Capture.fs`、`Execution/Delegation/SyncDelegate/Runtime.fs` 及 Fork/Host 运行期源码），彻底消除对宽命名空间的隐式伪依赖。在此基础上，系统审计并移除 12 条无真实符号消费的跨 subsystem ProjectReference：
+1. `intra-participant-parallelism/execution-fission-opencode-host`（`Wanxiangshu.Owner.intra-participant-parallelism.execution-fission-opencode-host.fsproj`）：移除对 `execution-model-routing/opencode-host-opencodeport` 的冗余引用；
+2. `provider-projection/opencode-codec-providerprojectionsurface`（`Wanxiangshu.Owner.provider-projection.opencode-codec-providerprojectionsurface.fsproj`）：移除对 `host-boundary/host-digest` 的冗余引用；
+3. `requirement-grounding/opencode-host-requirementgrounding-runtime`（`Wanxiangshu.Owner.requirement-grounding.opencode-host-requirementgrounding-runtime.fsproj`）：移除对 `dispatch-protocol/foundation-outcome` 的冗余引用；
+4. `guidance-delivery/enforcer-guidance-tip`（`Wanxiangshu.Owner.guidance-delivery.enforcer-guidance-tip.fsproj`）：移除对 `host-boundary/host-digest` 的冗余引用；
+5. `interaction-authority/interaction-authority-fold`（`Wanxiangshu.Owner.interaction-authority.interaction-authority-fold.fsproj`）：移除对 `host-boundary/host-digest` 的冗余引用；
+6. `managed-chat-execution/opencode-host-chatadmission-transaction`（`Wanxiangshu.Owner.managed-chat-execution.opencode-host-chatadmission-transaction.fsproj`）：移除对 `host-boundary/host-digest` 的冗余引用；
+7. `participant-horizon/execution-session-opencode-horizontool`（`Wanxiangshu.Owner.participant-horizon.execution-session-opencode-horizontool.fsproj`）：移除对 `host-boundary/host-digest` 的冗余引用；
+8. `relay-assessment/mission-relay-reviewtool`（`Wanxiangshu.Owner.relay-assessment.mission-relay-reviewtool.fsproj`）：移除对 `host-boundary/host-digest` 的冗余引用；
+9. `relay-retirement/mission-relay-suicidetool`（`Wanxiangshu.Owner.relay-retirement.mission-relay-suicidetool.fsproj`）：移除对 `host-boundary/host-digest` 的冗余引用；
+10. `semantic-trace/context-trace-semantictracesurface`（`Wanxiangshu.Owner.semantic-trace.context-trace-semantictracesurface.fsproj`）：移除对 `host-boundary/host-digest` 的冗余引用；
+11. `speculative-investigation/strength-opencode-settings`（`Wanxiangshu.Owner.speculative-investigation.strength-opencode-settings.fsproj`）：移除对 `host-boundary/host-digest` 的冗余引用；
+12. `speculative-investigation/strength-turnevidence`（`Wanxiangshu.Owner.speculative-investigation.strength-turnevidence.fsproj`）：移除对 `host-boundary/host-digest` 的冗余引用。
+
+上述修改的分片及其代表性消费分片（包含 `delegation-host-adapter`、`managedagentconfig`、`plugin-composition` 等）均通过独立 Fable 聚焦编译验证。全仓 ProjectReference 引用总数降至 1878（净减 12 条跨 subsystem 依赖），结构与架构门禁全绿通过。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

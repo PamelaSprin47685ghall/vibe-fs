@@ -15,7 +15,6 @@ open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host
-open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Obligation.Todo
@@ -24,8 +23,6 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 open Wanxiangshu.Host
 open Wanxiangshu.Composition.Durable
@@ -51,7 +48,6 @@ open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
 
 [<RequireQualifiedAccess>]
 type XTraceCaptureIdentity =

@@ -17,7 +17,6 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
 
 open System
 open System.Collections.Generic
