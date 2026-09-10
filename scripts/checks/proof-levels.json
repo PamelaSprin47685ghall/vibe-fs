@@ -4,6 +4,8 @@
   "proofs": [
     {"path": "requirements/host-boundary/tests/host-session-contract-closure.test.mjs", "title": "WHAT[HOST-BOUNDARY-026] host session contract compiles independently without runtime or sphinx dependencies", "what_id": "HOST-BOUNDARY-026", "level": "static"},
     {"path": "requirements/host-boundary/tests/host-session-contract-closure.test.mjs", "title": "WHAT[HOST-BOUNDARY-026] Host source ownership follows subsystem inventory and physical boundaries", "what_id": "HOST-BOUNDARY-026", "level": "static"},
+    {"path": "requirements/durable-events/tests/event-store-compile-boundary.test.mjs", "title": "WHAT[DURABLE-EVENTS-022] EventStore contracts exclude physical and Strength runtime closure", "what_id": "DURABLE-EVENTS-022", "level": "static"},
+    {"path": "requirements/durable-events/tests/event-store-compile-boundary.test.mjs", "title": "WHAT[DURABLE-EVENTS-022] EventStore focused localities stay within compile budgets", "what_id": "DURABLE-EVENTS-022", "level": "static"},
     {"path": "requirements/change-integration/tests/verdict-mailbox.test.mjs", "title": "WHAT[DELEG-014] VERDICT_MAILBOX_ready_or_racing_verdict_beats_interrupt", "what_id": "DELEG-014", "level": "temporal"},
     {"path": "requirements/change-integration/tests/verdict-mailbox.test.mjs", "title": "WHAT[DELEG-014] VERDICT_MAILBOX_idle_empty_returns_empty_sentinel", "what_id": "DELEG-014", "level": "temporal"},
     {"path": "requirements/change-integration/tests/verdict-mailbox.test.mjs", "title": "WHAT[DELEG-014] VERDICT_MAILBOX_batch_is_capped_at_maxjoinbatch_fifo_with_exact_remainder", "what_id": "DELEG-014", "level": "temporal"},

@@ -1,39 +1,32 @@
 import assert from 'node:assert/strict'
-import { readdirSync, readFileSync } from 'node:fs'
 import { basename, join, resolve } from 'node:path'
 import test from 'node:test'
+import { readCompileShardInventory } from '../../../scripts/lib/compile-shards.mjs'
+import { buildSubsystemInventory } from '../../../scripts/checks/subsystems.mjs'
 import { planOwnerCompile } from '../../../scripts/lib/owner-compile.mjs'
 
 const ROOT = resolve(import.meta.dirname, '../../..')
 const SOURCE_ROOT = join(ROOT, 'src/Wanxiangshu')
 const AGGREGATE = join(SOURCE_ROOT, 'Wanxiangshu.fsproj')
 
-const projectMetadata = readdirSync(SOURCE_ROOT)
-  .filter((name) => /^Wanxiangshu\.Owner\..+\.fsproj$/.test(name))
-  .map((name) => {
-    const path = join(SOURCE_ROOT, name)
-    const xml = readFileSync(path, 'utf8')
-    return {
-      path,
-      name,
-      locality: xml.match(/<WanxiangshuOwnerLocality>([^<]+)<\/WanxiangshuOwnerLocality>/)?.[1],
-      kind: xml.match(/<WanxiangshuOwnerLocalityKind>([^<]+)<\/WanxiangshuOwnerLocalityKind>/)?.[1],
-    }
-  })
+const shardInventory = readCompileShardInventory({ repositoryRoot: ROOT })
+const subsystemInventory = buildSubsystemInventory({ compileInventory: shardInventory })
+assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))
 
-const projectByPath = new Map(projectMetadata.map((project) => [resolve(project.path), project]))
+const projects = [...subsystemInventory.projects.values()]
+const projectByPath = new Map(projects.map((project) => [resolve(project.projectPath), project]))
 
-const requireLocality = (locality) => {
-  const matches = projectMetadata.filter((project) => project.locality === locality)
-  assert.equal(matches.length, 1, `${locality} must resolve to exactly one owner project`)
+const requireShard = (shard) => {
+  const matches = projects.filter((project) => project.shard === shard)
+  assert.equal(matches.length, 1, `${shard} must resolve to exactly one compile shard`)
   return matches[0]
 }
 
-const planLocality = (locality) => {
-  const project = requireLocality(locality)
+const planShard = (shard) => {
+  const project = requireShard(shard)
   return {
     project,
-    plan: planOwnerCompile({ projectPath: project.path, aggregatePath: AGGREGATE }),
+    plan: planOwnerCompile({ projectPath: project.projectPath, aggregatePath: AGGREGATE }),
   }
 }
 
@@ -41,7 +34,7 @@ const productionSources = (plan) => plan.compileItems
   .filter((path) => path.endsWith('.fs'))
   .map((path) => path.slice(SOURCE_ROOT.length + 1).replaceAll('\\', '/'))
 
-const CONTRACT_LOCALITIES = [
+const CONTRACT_SHARDS = [
   'eventstore-model-contract',
   'eventstore-port-contract',
   'eventstore-event-vocabulary-contract',
@@ -49,26 +42,39 @@ const CONTRACT_LOCALITIES = [
   'strength-event-vocabulary-contract',
 ]
 
-const FOCUSED_RUNTIME_LOCALITIES = [
+const FOCUSED_RUNTIME_SHARDS = [
   'eventstore-core-runtime',
   'eventstore-git-runtime',
 ]
 
+const ALLOWED_CONTRACT_CLOSURE_SHARDS = new Set([
+  'eventstore-model-contract',
+  'eventstore-port-contract',
+  'eventstore-event-vocabulary-contract',
+  'eventstore-git-contract',
+  'strength-event-vocabulary-contract',
+  'sphinx-event-vocabulary-contract',
+  'identity',
+])
+
 test('WHAT[DURABLE-EVENTS-022] EventStore contracts exclude physical and Strength runtime closure', () => {
-  for (const locality of CONTRACT_LOCALITIES) {
-    const { project, plan } = planLocality(locality)
-    assert.equal(project.kind, 'contract', `${locality} must declare contract kind`)
+  for (const shard of CONTRACT_SHARDS) {
+    const { project, plan } = planShard(shard)
+    assert.ok(
+      project.subsystem === 'persistence' || project.subsystem === 'strength',
+      `${shard} belongs to expected contract subsystem`,
+    )
 
     for (const projectPath of plan.projectPaths) {
-      assert.equal(
-        projectByPath.get(resolve(projectPath))?.kind,
-        'contract',
-        `${locality} contract closure contains non-contract ${basename(projectPath)}`,
+      const provider = projectByPath.get(resolve(projectPath))
+      assert.ok(
+        ALLOWED_CONTRACT_CLOSURE_SHARDS.has(provider?.shard),
+        `${shard} contract closure contains non-contract shard ${provider?.shardKey ?? basename(projectPath)}`,
       )
     }
   }
 
-  const portSources = productionSources(planLocality('eventstore-port-contract').plan)
+  const portSources = productionSources(planShard('eventstore-port-contract').plan)
   for (const forbidden of [
     'Persistence/EventStore/GitObjectDatabase.fs',
     'Persistence/EventStore/ProcessGitRawStore.fs',
@@ -80,7 +86,7 @@ test('WHAT[DURABLE-EVENTS-022] EventStore contracts exclude physical and Strengt
     assert.ok(!portSources.includes(forbidden), `EventStore.Port.Contract leaks ${forbidden}`)
   }
 
-  const vocabularySources = productionSources(planLocality('eventstore-event-vocabulary-contract').plan)
+  const vocabularySources = productionSources(planShard('eventstore-event-vocabulary-contract').plan)
   assert.ok(vocabularySources.includes('Strength/EventVocabulary.fs'))
   assert.ok(!vocabularySources.includes('Strength/Events.fs'))
   assert.ok(!vocabularySources.some((path) => path.startsWith('Strength/Prediction/')))
@@ -89,20 +95,20 @@ test('WHAT[DURABLE-EVENTS-022] EventStore contracts exclude physical and Strengt
 })
 
 test('WHAT[DURABLE-EVENTS-022] EventStore focused localities stay within compile budgets', () => {
-  for (const locality of CONTRACT_LOCALITIES) {
-    const { plan } = planLocality(locality)
+  for (const shard of CONTRACT_SHARDS) {
+    const { plan } = planShard(shard)
     assert.ok(
       productionSources(plan).length <= 100,
-      `${locality} contract closure exceeds 100 production sources`,
+      `${shard} contract closure exceeds 100 production sources`,
     )
   }
 
-  for (const locality of FOCUSED_RUNTIME_LOCALITIES) {
-    const { project, plan } = planLocality(locality)
-    assert.equal(project.kind, 'runtime', `${locality} must declare runtime kind`)
+  for (const shard of FOCUSED_RUNTIME_SHARDS) {
+    const { project, plan } = planShard(shard)
+    assert.equal(project.subsystem, 'persistence', `${shard} must belong to persistence subsystem`)
     assert.ok(
       productionSources(plan).length <= 185,
-      `${locality} runtime closure exceeds 185 production sources`,
+      `${shard} runtime closure exceeds 185 production sources`,
     )
   }
 })

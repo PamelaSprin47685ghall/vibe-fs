@@ -12,12 +12,16 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { readCompileShardInventory } from '../../../scripts/lib/compile-shards.mjs'
+import { buildSubsystemInventory } from '../../../scripts/checks/subsystems.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 const NEXT_DIR = path.join(ROOT, 'src', 'Wanxiangshu')
-const inventory = readCompileShardInventory({ repositoryRoot: ROOT })
-const files = [...inventory.projects.values()]
-  .filter((project) => project.legacyOwner === 'context-compression')
+const shardInventory = readCompileShardInventory({ repositoryRoot: ROOT })
+const subsystemInventory = buildSubsystemInventory({ compileInventory: shardInventory })
+assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))
+
+const files = [...subsystemInventory.projects.values()]
+  .filter((project) => project.subsystem === 'context')
   .flatMap((project) => project.implementationFiles)
   .sort()
 
@@ -37,7 +41,7 @@ test('WHAT[CONTEXT-COMPRESSION-001] CTX_001_context_compression_owner_never_obse
     'TokenToByte',
   ]
 
-  assert.ok(files.length > 0, 'context-compression must own production files')
+  assert.ok(files.length > 0, 'context subsystem must own production files')
   for (const file of files) {
     const source = fs.readFileSync(file, 'utf8')
     for (const name of forbidden) {

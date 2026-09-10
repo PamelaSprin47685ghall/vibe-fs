@@ -23,8 +23,8 @@
 
 4. **Contract/Runtime 编译边界**：
    - `EventStore.Model.Contract`、`EventStore.Port.Contract` 与 `EventStore.EventVocabulary.Contract` 是业务可见的最小 contract；`Strength.EventVocabulary.Contract` 单独发布四个 Strength event type，不拖入 predictor、replica 或 Host runtime。
-   - Git object/ref/physical port 位于独立 Git contract，Git 实现、local process log、codec、Integrator、Journal 与 Host acquisition 位于 Runtime/Adapter locality。Runtime 依赖 contract；contract 的 direct/transitive ProjectReference closure 不得出现 Runtime/Adapter。
-   - `scripts/checks/owner-projects.mjs` 固定 locality kind、方向、closure budget 与 foreign runtime prohibition；`scripts/compile-owner.mjs` 对每个目标 locality 生成 aggregate-order、零 ProjectReference 的 flat project，并以一次 Fable invocation 编译。
+   - Git object/ref/physical port 位于独立 Git contract，Git 实现、local process log、codec、Integrator、Journal 与 Host acquisition 位于 Runtime/Adapter 分片。Runtime 依赖 contract；contract 的 direct/transitive ProjectReference closure 不得出现 Runtime/Adapter。
+   - `event-store-compile-boundary.test.mjs` 直接消费既有 compile-shard 与 subsystem inventory，按显式分片与 subsystem 验证闭包排除及预算，不再自建 XML/legacy kind 正则解析；`scripts/compile-owner.mjs` 对每个目标分片生成 aggregate-order、零 ProjectReference 的 flat project，并以一次 Fable invocation 编译。
 
 ## 验证与测试落点
 

@@ -150,6 +150,8 @@ tool adapter、signal adapter、Attention consumer 与 repository-programming ru
 
 在 `f3479bdf6` 上将 `owner-impact-compile.test.mjs` 的六个临时工程改为显式 subsystem／compile-shard 元数据，去掉夹具的旧 owner／locality／kind 参数。全部分片同属 fixture subsystem，原有精确 source／root 集合断言仍要求实现变更不扩入反向 consumer、签名变更包含全部反向 consumer；合并编译、full fallback、缓存与 CLI 证明及其标题／注册不变。相关测试 24/24 通过；临时将实现变更扩成 reverse closure、将签名变更缩成 owning shard 的两个 planner mutant 均被既有断言拒绝，planner 原字节恢复。本批仅更新证明输入，没有改变生产 planner、工程或公开合同，不是新的真实 focused Fable 编译或知识依赖收敛证据，GAP-033 保持 PARTIAL。
 
+在本次推进中，将 `event-store-compile-boundary.test.mjs` 与 `ctx-capacity-observation-forbidden.test.mjs` 统一迁移至 compile-shard／subsystem inventory。删除自建 readdirSync/XML regex 解析与 legacy kind、legacy owner 属性依赖；按 persistence／strength subsystem 与显式 compile shard 验证闭包排除、生产源码预算及禁止容量词汇。相关边界测试通过；非契约分片侵入契约闭包与错误 subsystem 的两个反例均被拒绝。本批不修改生产工程，GAP-033 保持 PARTIAL。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。
