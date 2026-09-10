@@ -11,7 +11,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.distribution.resources-enforcercatalogresource.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj" />
-    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-diagnostics-runtime.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj" />

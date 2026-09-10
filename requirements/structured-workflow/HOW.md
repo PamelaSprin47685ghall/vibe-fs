@@ -159,6 +159,13 @@ tool adapter、signal adapter、Attention consumer 与 repository-programming ru
 
 全仓 ProjectReference 引用总数进一步从 1915 降至 1910。全套静态架构与规范检查 `node scripts/check.mjs`、子系统门禁 `node scripts/checks/subsystems.mjs` 以及结构工作流测试全部保持绿色通过，GAP-033 保持 PARTIAL。
 
+紧接着进一步深度审查 enforcer 子系统内部编译分片的跨 subsystem 冗余依赖：
+1. `enforcer/enforcer-codec`（`Wanxiangshu.Owner.behavior-diagnosis.enforcer-codec.fsproj`）：经对 ChronicleExecution、Surface、Commit、Recovery、RepairSurface 与 ObservationSurface 的源码及签名完整审查，确认其未消费 `chat-execution/outcome`、`host/host-digest`、`authority/interaction-authority-fact`、`authority/interaction-authority-identityseed`、`authority/interaction-authority-ledger` 以及 `context/context-trace-cursor`。移除这 6 条冗余引用后，独立 Fable 聚焦编译（542 parsed sources）以及其消费者 `opencode-tools-executortoolsurface`（1012 parsed sources）与 `enforcer-continuation`（1010 parsed sources）均编译通过。
+2. `enforcer/enforcer-continuation`（`Wanxiangshu.Owner.behavior-diagnosis.enforcer-continuation.fsproj`）：确认其源码与签名不使用 `persistence/composition-durable-projection`（CompositionDurableProjection 等），移除该跨 subsystem 引用。独立 Fable 编译（1010 parsed sources）通过。
+3. `enforcer/repair`（`Wanxiangshu.Owner.behavior-diagnosis.enforcer-repair.fsproj`）：确认其源码与签名不使用 `host/host-digest`（HostDigest），移除该跨 subsystem 引用。独立 Fable 编译（410 parsed sources）以及消费者 `context-companion-companionfactfold`（530 parsed sources）编译通过。
+
+全仓 ProjectReference 引用总数从 1910 降至 1902（减少 8 条冗余跨 subsystem 依赖）。全套静态架构检查 `node scripts/check.mjs` 与子系统门禁 `node scripts/checks/subsystems.mjs` 均保持绿色通过，GAP-033 保持 PARTIAL。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

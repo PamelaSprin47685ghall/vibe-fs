@@ -2,6 +2,7 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- 审计并移除 `enforcer/enforcer-codec`、`enforcer/enforcer-continuation` 与 `enforcer/repair` 中 8 条无真实源码符号消费的跨 subsystem ProjectReference，全仓声明引用数降至 1902，全部通过聚焦 Fable 编译及消费者闭包验证。
 - 审计并移除 `interaction/opencode-tools-executortoolsurface`、`enforcer/enforcer-institutionallearning-fold`、`knowledge/repository-knowledge-casebook-bookkeeper` 等分片中 5 条无真实源码符号消费的跨 subsystem ProjectReference，全仓声明引用数降至 1910，全部通过聚焦 Fable 编译及消费者闭包验证。
 - 审计并移除 `persistence/git-hook-sync` 对 `change/change-fact` 的冗余跨 subsystem ProjectReference，并通过聚焦 Fable 编译及消费者闭包验证。
 - 审计并移除 `opencode-tools-executortoolsurface` 对 `opencode-tools-ptytool` 的冗余 ProjectReference，使其前向闭包从 144 项目缩减为 141 项目，并通过独立 Fable 聚焦编译验证。
