@@ -8,7 +8,6 @@ open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Context.Companion
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
@@ -36,8 +35,7 @@ module DistillationSurface =
     let canBeForkedOrHorizonTarget: bool = not isInternalRuntime
 
     /// Distiller is a leaf runtime and never receives a Blogger companion.
-    let hasBloggerCompanion: bool =
-        CompanionTransform.allowsBloggerCompanionForAgentName managedAgentName
+    let hasBloggerCompanion: bool = false
 
     /// Distiller has no execution, mutation, or judgement permissions.
     let permissionLabels: string array = [||]
