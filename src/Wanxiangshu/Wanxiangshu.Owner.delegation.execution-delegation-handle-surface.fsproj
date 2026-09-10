@@ -13,7 +13,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
+    
     <Compile Include="Execution/Delegation/Fact.fsi"/>
     <Compile Include="Execution/Delegation/Fact.fs"/>
     <Compile Include="Execution/Delegation/ExecutionFactFold.fsi"/>

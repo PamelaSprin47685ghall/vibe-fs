@@ -166,6 +166,17 @@ tool adapter、signal adapter、Attention consumer 与 repository-programming ru
 
 全仓 ProjectReference 引用总数从 1910 降至 1902（减少 8 条冗余跨 subsystem 依赖）。全套静态架构检查 `node scripts/check.mjs` 与子系统门禁 `node scripts/checks/subsystems.mjs` 均保持绿色通过，GAP-033 保持 PARTIAL。
 
+继续推进全仓真实跨 subsystem 知识依赖审查与裁剪，对 7 个编译分片中无符号消费的跨 subsystem 引用进行剪枝：
+1. `resources/resources-promptsurface`（`Wanxiangshu.Owner.cognitive-environment.resources-promptsurface.fsproj`）：移除对 `runtime-platform/llm-facing` 的无用引用；
+2. `context/context-companion-companionfactfold`（`Wanxiangshu.Owner.context-compression.context-companion-companionfactfold.fsproj`）：移除对 `chat-execution/outcome` 的无用引用；
+3. `context/context-compression-runtime-surface`（`Wanxiangshu.Owner.context-compression.runtime.fsproj`）：移除对 `chat-execution/outcome` 的无用引用；
+4. `delegation/delegation-fold`（`Wanxiangshu.Owner.delegation.execution-delegation-handle-surface.fsproj`）：移除对 `context/context-trace-cursor` 的无用引用；
+5. `delegation/delegation-ledger`（`Wanxiangshu.Owner.delegation.execution-delegation-ledger.fsproj`）：移除对 `persistence/composition-durable-fact` 的无用引用；
+6. `persistence/strength-persistence-durabilityport`（`Wanxiangshu.Owner.durable-events.strength-persistence-durabilityport.fsproj`）：移除对 `context/context-prefix-candidate` 的无用引用；
+7. `provider/strength-policy`（`Wanxiangshu.Owner.execution-model-routing.strength-policy.fsproj`）：移除对 `chat-execution/outcome` 的无用引用。
+
+上述 7 个分片及代表性消费分片（如 `delegation-ledger`、`delegation-recovery-runtime`、`enforcer-guidance-tip`、`persistence-eventstore-canonicalintegrator`、`opencode-host-modelroutingsurface`）均通过独立 Fable 聚焦编译验证。全仓 ProjectReference 引用总数从 1902 降至 1895（净减 7 条跨 subsystem 依赖），子系统门禁与架构检查全绿。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。
