@@ -2,6 +2,7 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- causal-wait、time-capability 与 host-boundary 边界验证统一迁移至 subsystem/compile-shard inventory，移除对已退役 `readCompileShardInventoryV1` helper 及其 legacy locality/kind 属性的依赖；彻底清理 `readCompileShardInventoryV1`。
 - EventStore 编译边界与容量禁用检查统一迁移至 subsystem/compile-shard inventory，移除重复 fsproj readdir/XML legacy kind 字符串解析及 legacy owner 属性依赖；按 persistence/strength subsystem 与显式 compile shard 验证闭包排除、生产源码预算及禁止容量词汇。显式元数据及非契约分片、错误 subsystem 反例通过，生产工程不变。
 
 - 增量编译证明的临时工程改用显式 subsystem／compile-shard，去掉旧 owner／locality／kind 夹具参数。保留精确影响集合、合并编译、缓存及 CLI 断言；实现错误扩入反向消费者和签名遗漏反向消费者的两个反例均被拒绝，生产 planner 与工程不变。

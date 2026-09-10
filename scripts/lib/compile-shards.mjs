@@ -153,33 +153,6 @@ export function readCompileShardInventory({
   }
 }
 
-export function readCompileShardInventoryV1(options = {}) {
-  const inventory = readCompileShardInventory(options)
-  const localities = [...inventory.projects.values()]
-    .map((project) => ({
-      id: project.legacyLocality || project.explicitCompileShard,
-      owner: project.explicitSubsystem || project.legacyOwner,
-      kind: project.legacyKind,
-      projectPath: project.projectRepoPath,
-      sources: project.implementationFiles.map((implementationPath) => ({
-        implementationPath: repoPath(inventory.repositoryRoot, implementationPath),
-        signaturePath: repoPath(inventory.repositoryRoot, implementationPath.replace(/\.fs$/, '.fsi')),
-      })).sort((left, right) => left.implementationPath.localeCompare(right.implementationPath)),
-      references: project.references.map((reference) => {
-        const provider = inventory.projects.get(reference)
-        return provider.legacyLocality || provider.explicitCompileShard
-      }).sort(),
-    }))
-    .sort((left, right) => left.id.localeCompare(right.id))
-  return {
-    aggregatePath: repoPath(inventory.repositoryRoot, inventory.aggregatePath),
-    productionFiles: [...inventory.sourceProject.keys()].map((path) => repoPath(inventory.repositoryRoot, path)).sort(),
-    signatureFiles: [...inventory.projects.values()].flatMap((project) => project.signatureFiles.map((path) => repoPath(inventory.repositoryRoot, path))).sort(),
-    localities,
-    projectReferences: localities.flatMap((consumer) => consumer.references.map((provider) => ({ consumerLocality: consumer.id, providerLocality: provider }))),
-  }
-}
-
 export function stronglyConnectedComponents(nodes, edges) {
   const adjacency = new Map([...nodes].map((node) => [node, []]))
   for (const [from, to] of edges) adjacency.get(from)?.push(to)

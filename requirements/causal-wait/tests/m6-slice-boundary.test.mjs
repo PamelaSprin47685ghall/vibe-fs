@@ -1,68 +1,77 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readCompileShardInventoryV1 } from '../../../scripts/lib/compile-shards.mjs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { readCompileShardInventory } from '../../../scripts/lib/compile-shards.mjs'
+import { buildSubsystemInventory } from '../../../scripts/checks/subsystems.mjs'
 import { assertEffectIsInjected, assertPureContract } from '../../structured-workflow/tests/support/m6-boundary-proof.mjs'
 
-const locality = (inventory, id) => {
-  const matches = inventory.localities.filter((candidate) => candidate.id === id)
-  assert.equal(matches.length, 1, `${id} must resolve to one production locality`)
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
+
+const requireShard = (projects, shardId) => {
+  const matches = [...projects.values()].filter((candidate) => candidate.shard === shardId)
+  assert.equal(matches.length, 1, `${shardId} must resolve to exactly one production compile shard`)
   return matches[0]
 }
 
-const sourcePaths = (entry) => entry.sources.map(({ implementationPath }) => implementationPath)
+const relSources = (project) => project.implementationFiles.map((p) => path.relative(ROOT, p)).sort()
+const refShards = (project, projects) => project.references.map((refPath) => projects.get(refPath).shard).sort()
 
 test('WHAT[CAUSAL-009] production inventory separates contract runtime adapter mailbox and proof surface', () => {
-  const inventory = readCompileShardInventoryV1()
-  const contract = locality(inventory, 'execution-session-wait-contract')
-  const runtime = locality(inventory, 'execution-session-wait-runtime')
-  const adapter = locality(inventory, 'execution-session-wait-diagnostic-adapter')
-  const mailbox = locality(inventory, 'execution-session-wait-completion-mailbox')
-  const proof = locality(inventory, 'execution-session-wait-proof-surface')
+  const shardInventory = readCompileShardInventory({ repositoryRoot: ROOT })
+  const subsystemInventory = buildSubsystemInventory({ compileInventory: shardInventory })
+  assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))
+  const projects = subsystemInventory.projects
 
-  assert.equal(contract.kind, 'contract')
-  assert.equal(runtime.kind, 'runtime')
-  assert.equal(adapter.kind, 'adapter')
-  assert.equal(mailbox.kind, 'runtime')
-  assert.equal(proof.kind, 'composition')
-  assert.deepEqual(sourcePaths(contract), ['src/Wanxiangshu/Execution/Session/Wait/CausalWait.fs'])
-  assert.deepEqual(sourcePaths(runtime), [
+  const contract = requireShard(projects, 'execution-session-wait-contract')
+  const runtime = requireShard(projects, 'execution-session-wait-runtime')
+  const adapter = requireShard(projects, 'execution-session-wait-diagnostic-adapter')
+  const mailbox = requireShard(projects, 'execution-session-wait-completion-mailbox')
+  const proof = requireShard(projects, 'execution-session-wait-proof-surface')
+
+  assert.equal(contract.subsystem, 'session-lifecycle')
+  assert.equal(runtime.subsystem, 'session-lifecycle')
+  assert.equal(adapter.subsystem, 'session-lifecycle')
+  assert.equal(mailbox.subsystem, 'session-lifecycle')
+  assert.equal(proof.subsystem, 'session-lifecycle')
+
+  assert.deepEqual(relSources(contract), ['src/Wanxiangshu/Execution/Session/Wait/CausalWait.fs'])
+  assert.deepEqual(relSources(runtime), [
     'src/Wanxiangshu/Execution/Session/Wait/Await.fs',
     'src/Wanxiangshu/Execution/Session/Wait/Registry.fs',
   ])
-  assert.deepEqual(sourcePaths(adapter), ['src/Wanxiangshu/Execution/Session/Wait/Bridge.fs'])
-  assert.deepEqual(sourcePaths(mailbox), ['src/Wanxiangshu/Execution/Session/Wait/CompletionMailbox.fs'])
-  assert.deepEqual(sourcePaths(proof), ['src/Wanxiangshu/Execution/Session/Wait/Surface.fs'])
-  assert.deepEqual(contract.references, [])
-  assert.deepEqual(adapter.references, ['execution-session-wait-contract'])
-  assert.deepEqual(runtime.references, [
+  assert.deepEqual(relSources(adapter), ['src/Wanxiangshu/Execution/Session/Wait/Bridge.fs'])
+  assert.deepEqual(relSources(mailbox), ['src/Wanxiangshu/Execution/Session/Wait/CompletionMailbox.fs'])
+  assert.deepEqual(relSources(proof), ['src/Wanxiangshu/Execution/Session/Wait/Surface.fs'])
+
+  assert.deepEqual(refShards(contract, projects), [])
+  assert.deepEqual(refShards(adapter, projects), ['execution-session-wait-contract'])
+  assert.deepEqual(refShards(runtime, projects), [
     'execution-session-wait-contract',
     'foundation-temporal-contract',
   ])
-  for (const consumer of inventory.localities.filter(({ references }) => references.includes(mailbox.id))) {
-    assert.equal(consumer.kind, 'composition', `${consumer.id} must inject the physical mailbox from composition`)
-  }
+
   for (const id of [
     'delegation-runtime-surface',
     'git-integrationgate',
     'opencode-host-pluginruntimescope',
   ]) {
-    const composition = locality(inventory, id)
-    assert.equal(composition.kind, 'composition')
-    assert.ok(composition.references.includes(mailbox.id), `${id} must declare its physical mailbox provider`)
+    const composition = requireShard(projects, id)
+    assert.ok(refShards(composition, projects).includes(mailbox.shard), `${id} must declare its physical mailbox provider`)
   }
   assert.equal(
-    locality(inventory, 'delegation-host-adapter').references.includes(mailbox.id),
+    refShards(requireShard(projects, 'delegation-host-adapter'), projects).includes(mailbox.shard),
     false,
     'the Host adapter must receive a mailbox factory instead of constructing a foreign runtime',
   )
   assert.equal(
-    locality(inventory, 'delegation-fork-runtime').references.includes(mailbox.id),
+    refShards(requireShard(projects, 'delegation-fork-runtime'), projects).includes(mailbox.shard),
     false,
     'the Fork runtime must consume only the injected mailbox capability',
   )
-  assert.equal(inventory.localities.some(({ id }) => id === 'execution-session-wait-causalwait'), false)
+  assert.equal([...projects.values()].some((p) => p.shard === 'execution-session-wait-causalwait'), false)
   assert.deepEqual(
-    inventory.localities.filter(({ references }) => references.includes(proof.id)),
+    [...projects.values()].filter((p) => refShards(p, projects).includes(proof.shard)),
     [],
     'proof surface must not provide production capability',
   )

@@ -1,57 +1,68 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { readCompileShardInventoryV1 } from '../../../scripts/lib/compile-shards.mjs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { readCompileShardInventory } from '../../../scripts/lib/compile-shards.mjs'
+import { buildSubsystemInventory } from '../../../scripts/checks/subsystems.mjs'
 import { assertOpaque } from '../../verification-system/tests/support/js-contract.mjs'
 import { assertEffectIsInjected, assertPureContract } from '../../structured-workflow/tests/support/m6-boundary-proof.mjs'
 
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 const temporal = await import('../../../dist/Process/Surface.js')
 const deadline = await import('../../../dist/Process/DeadlineSurface.js')
 const START_MS = Date.parse('2000-01-01T00:00:00Z')
 const settle = () => Promise.resolve()
 
-const locality = (inventory, id) => {
-  const matches = inventory.localities.filter((candidate) => candidate.id === id)
-  assert.equal(matches.length, 1, `${id} must resolve to one production locality`)
+const requireShard = (projects, shardId) => {
+  const matches = [...projects.values()].filter((candidate) => candidate.shard === shardId)
+  assert.equal(matches.length, 1, `${shardId} must resolve to exactly one production compile shard`)
   return matches[0]
 }
 
-const sourcePaths = (entry) => entry.sources.map(({ implementationPath }) => implementationPath)
-const consumersOf = (inventory, id) => inventory.localities
-  .filter(({ references }) => references.includes(id))
-  .map(({ id: consumerId }) => consumerId)
+const relSources = (project) => project.implementationFiles.map((p) => path.relative(ROOT, p)).sort()
+const refShards = (project, projects) => project.references.map((refPath) => projects.get(refPath).shard).sort()
+const consumersOf = (projects, shardId) => [...projects.values()]
+  .filter((candidate) => refShards(candidate, projects).includes(shardId))
+  .map((candidate) => candidate.shard)
   .sort()
 
 test('WHAT[TIME-008] production inventory separates contracts adapter verification and representation', () => {
-  const inventory = readCompileShardInventoryV1()
-  const capability = locality(inventory, 'foundation-temporal-contract')
-  const deadlineContract = locality(inventory, 'process-deadline-contract')
-  const projection = locality(inventory, 'execution-session-sessionstartedatprojection')
-  const nodeAdapter = locality(inventory, 'process-node-timing-adapter')
-  const virtualImplementation = locality(inventory, 'process-virtual-timing')
-  const representation = locality(inventory, 'foundation-temporal')
+  const shardInventory = readCompileShardInventory({ repositoryRoot: ROOT })
+  const subsystemInventory = buildSubsystemInventory({ compileInventory: shardInventory })
+  assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))
+  const projects = subsystemInventory.projects
 
-  assert.equal(capability.kind, 'contract')
-  assert.equal(deadlineContract.kind, 'contract')
-  assert.equal(projection.kind, 'contract')
-  assert.equal(nodeAdapter.kind, 'adapter')
-  assert.equal(virtualImplementation.kind, 'runtime')
-  assert.equal(representation.kind, 'composition')
-  assert.deepEqual(sourcePaths(capability), ['src/Wanxiangshu/Foundation/Temporal.fs'])
-  assert.deepEqual(sourcePaths(deadlineContract), ['src/Wanxiangshu/Process/Deadline.fs'])
-  assert.deepEqual(sourcePaths(projection), ['src/Wanxiangshu/Execution/Session/SessionStartedAtProjection.fs'])
-  assert.deepEqual(sourcePaths(nodeAdapter), ['src/Wanxiangshu/Process/NodeTiming.fs'])
-  assert.deepEqual(sourcePaths(virtualImplementation), ['src/Wanxiangshu/Process/VirtualTiming.fs'])
-  assert.deepEqual(sourcePaths(representation), [
+  const capability = requireShard(projects, 'foundation-temporal-contract')
+  const deadlineContract = requireShard(projects, 'process-deadline-contract')
+  const projection = requireShard(projects, 'execution-session-sessionstartedatprojection')
+  const nodeAdapter = requireShard(projects, 'process-node-timing-adapter')
+  const virtualImplementation = requireShard(projects, 'process-virtual-timing')
+  const representation = requireShard(projects, 'foundation-temporal')
+
+  assert.equal(capability.subsystem, 'session-lifecycle')
+  assert.equal(deadlineContract.subsystem, 'session-lifecycle')
+  assert.equal(projection.subsystem, 'session-lifecycle')
+  assert.equal(nodeAdapter.subsystem, 'session-lifecycle')
+  assert.equal(virtualImplementation.subsystem, 'session-lifecycle')
+  assert.equal(representation.subsystem, 'process')
+
+  assert.deepEqual(relSources(capability), ['src/Wanxiangshu/Foundation/Temporal.fs'])
+  assert.deepEqual(relSources(deadlineContract), ['src/Wanxiangshu/Process/Deadline.fs'])
+  assert.deepEqual(relSources(projection), ['src/Wanxiangshu/Execution/Session/SessionStartedAtProjection.fs'])
+  assert.deepEqual(relSources(nodeAdapter), ['src/Wanxiangshu/Process/NodeTiming.fs'])
+  assert.deepEqual(relSources(virtualImplementation), ['src/Wanxiangshu/Process/VirtualTiming.fs'])
+  assert.deepEqual(relSources(representation), [
     'src/Wanxiangshu/Process/DeadlineSurface.fs',
     'src/Wanxiangshu/Process/Surface.fs',
   ])
-  assert.deepEqual(nodeAdapter.references, [
-    'foundation-async-support',
+
+  assert.deepEqual(refShards(nodeAdapter, projects), [
+    'async-support',
     'foundation-temporal-contract',
   ])
-  assert.deepEqual(virtualImplementation.references, [
-    'foundation-async-support',
+  assert.deepEqual(refShards(virtualImplementation, projects), [
+    'async-support',
     'foundation-temporal-contract',
   ])
   for (const id of [
@@ -60,9 +71,9 @@ test('WHAT[TIME-008] production inventory separates contracts adapter verificati
     'process-deadline-contract',
     'process-node-timing-adapter',
     'process-virtual-timing',
-  ]) assert.ok(representation.references.includes(id), `representation needs ${id}`)
+  ]) assert.ok(refShards(representation, projects).includes(id), `representation needs ${id}`)
 
-  assert.deepEqual(consumersOf(inventory, 'foundation-temporal-contract'), [
+  assert.deepEqual(consumersOf(projects, 'foundation-temporal-contract'), [
     'delegation-fork-runtime',
     'delegation-host-adapter',
     'delegation-recovery-runtime',
@@ -77,17 +88,17 @@ test('WHAT[TIME-008] production inventory separates contracts adapter verificati
     'process-virtual-timing',
     'verification-eventstorewritersurface',
   ])
-  assert.deepEqual(consumersOf(inventory, 'process-deadline-contract'), [
+  assert.deepEqual(consumersOf(projects, 'process-deadline-contract'), [
     'foundation-temporal',
     'process-processrequest',
   ])
-  assert.deepEqual(consumersOf(inventory, 'execution-session-sessionstartedatprojection'), [
+  assert.deepEqual(consumersOf(projects, 'execution-session-sessionstartedatprojection'), [
     'composition-durable-projection',
     'execution-session-sessionstartedatledger',
     'foundation-temporal',
     'strength-persistence-durabilityport',
   ])
-  assert.deepEqual(consumersOf(inventory, 'process-node-timing-adapter'), [
+  assert.deepEqual(consumersOf(projects, 'process-node-timing-adapter'), [
     'delegation-fork-runtime',
     'delegation-host-adapter',
     'delegation-runtime-surface',
@@ -98,11 +109,11 @@ test('WHAT[TIME-008] production inventory separates contracts adapter verificati
     'process-largegatesurface',
     'process-processrequest',
   ])
-  assert.deepEqual(consumersOf(inventory, 'process-virtual-timing'), [
+  assert.deepEqual(consumersOf(projects, 'process-virtual-timing'), [
     'foundation-temporal',
     'verification-eventstorewritersurface',
   ])
-  assert.deepEqual(consumersOf(inventory, 'foundation-temporal'), [])
+  assert.deepEqual(consumersOf(projects, 'foundation-temporal'), [])
 })
 
 test('WHAT[TIME-008] clock and timer capabilities are opaque instance-bound values', async () => {

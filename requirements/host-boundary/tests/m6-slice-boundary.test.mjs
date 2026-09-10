@@ -1,16 +1,36 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readCompileShardInventoryV1 } from '../../../scripts/lib/compile-shards.mjs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { readCompileShardInventory } from '../../../scripts/lib/compile-shards.mjs'
+import { buildSubsystemInventory } from '../../../scripts/checks/subsystems.mjs'
 import * as HostSignalSurface from '../../../dist/OpenCode/Host/HostSignalSurface.js'
 import { assertEffectIsInjected, assertFatalBoundary, assertOptionalObservationNoninterference, assertPureContract } from '../../structured-workflow/tests/support/m6-boundary-proof.mjs'
 
-const locality = (inventory, id) => {
-  const matches = inventory.localities.filter((candidate) => candidate.id === id)
-  assert.equal(matches.length, 1, `${id} must resolve to one production locality`)
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
+
+const requireShard = (projects, shardId) => {
+  const matches = [...projects.values()].filter((candidate) => candidate.shard === shardId)
+  assert.equal(matches.length, 1, `${shardId} must resolve to exactly one production compile shard`)
   return matches[0]
 }
 
-const sourcePaths = (entry) => entry.sources.map(({ implementationPath }) => implementationPath)
+const relSources = (project) => project.implementationFiles.map((p) => path.relative(ROOT, p)).sort()
+const refShards = (project, projects) => project.references.map((refPath) => projects.get(refPath).shard).sort()
+
+const closureSources = (root, projects) => {
+  const closure = new Set()
+  const pending = [root]
+  while (pending.length > 0) {
+    const project = pending.pop()
+    if (closure.has(project)) continue
+    closure.add(project)
+    for (const refPath of project.references) {
+      pending.push(projects.get(refPath))
+    }
+  }
+  return new Set([...closure].flatMap(relSources))
+}
 
 test('WHAT[HOST-BOUNDARY-027] Host message loop and envelope slices reject the old wide signal closure', () => {
   assertPureContract()
@@ -18,26 +38,23 @@ test('WHAT[HOST-BOUNDARY-027] Host message loop and envelope slices reject the o
 })
 
 test('WHAT[HOST-BOUNDARY-027] production inventory closes Host codec audiences without the wide signal adapter', () => {
-  const inventory = readCompileShardInventoryV1()
-  const envelope = locality(inventory, 'host-event-envelope')
-  const message = locality(inventory, 'host-message-codec')
-  const loop = locality(inventory, 'loop-event-codec')
+  const shardInventory = readCompileShardInventory({ repositoryRoot: ROOT })
+  const subsystemInventory = buildSubsystemInventory({ compileInventory: shardInventory })
+  assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))
+  const projects = subsystemInventory.projects
 
-  assert.equal(envelope.kind, 'contract')
-  assert.equal(message.kind, 'contract')
-  assert.equal(loop.kind, 'contract')
-  assert.deepEqual(sourcePaths(envelope), ['src/Wanxiangshu/OpenCode/Codec/HostEventEnvelope.fs'])
-  assert.deepEqual(sourcePaths(message), ['src/Wanxiangshu/OpenCode/Codec/HostMessageCodec.fs'])
+  const envelope = requireShard(projects, 'host-event-envelope')
+  const message = requireShard(projects, 'host-message-codec')
+  const loop = requireShard(projects, 'loop-event-codec')
 
-  const messageClosure = new Set()
-  const pending = [message]
-  while (pending.length > 0) {
-    const shard = pending.pop()
-    if (messageClosure.has(shard)) continue
-    messageClosure.add(shard)
-    pending.push(...shard.references.map((id) => locality(inventory, id)))
-  }
-  const messageSources = new Set([...messageClosure].flatMap(sourcePaths))
+  assert.equal(envelope.subsystem, 'host')
+  assert.equal(message.subsystem, 'host')
+  assert.equal(loop.subsystem, 'host')
+
+  assert.deepEqual(relSources(envelope), ['src/Wanxiangshu/OpenCode/Codec/HostEventEnvelope.fs'])
+  assert.deepEqual(relSources(message), ['src/Wanxiangshu/OpenCode/Codec/HostMessageCodec.fs'])
+
+  const messageSources = closureSources(message, projects)
   assert.ok(messageSources.has('src/Wanxiangshu/OpenCode/Host/Message.fs'))
   for (const unrelated of [
     'src/Wanxiangshu/OpenCode/Codec/OpencodeTypes.fs',
@@ -45,49 +62,42 @@ test('WHAT[HOST-BOUNDARY-027] production inventory closes Host codec audiences w
     'src/Wanxiangshu/Host/Digest.fs',
   ])
     assert.ok(!messageSources.has(unrelated), `message codec must not acquire ${unrelated}`)
-  assert.deepEqual(sourcePaths(loop), ['src/Wanxiangshu/OpenCode/Codec/LoopEventCodec.fs'])
-  assert.deepEqual(loop.references, ['foundation-identity', 'host-event-envelope'])
+  assert.deepEqual(relSources(loop), ['src/Wanxiangshu/OpenCode/Codec/LoopEventCodec.fs'])
+  assert.deepEqual(refShards(loop, projects), ['host-event-envelope', 'identity'])
 
   for (const id of ['host-session-runtime', 'authority-runtime-surface', 'opencode-codec-providerprojectionsurface']) {
-    const consumer = locality(inventory, id)
-    assert.ok(consumer.references.includes('host-message-codec'), `${id} must consume the message codec contract`)
-    assert.ok(!consumer.references.includes('host-signal-adapter'), `${id} must not consume the wide signal adapter`)
+    const consumer = requireShard(projects, id)
+    assert.ok(refShards(consumer, projects).includes('host-message-codec'), `${id} must consume the message codec contract`)
+    assert.ok(!refShards(consumer, projects).includes('host-signal-adapter'), `${id} must not consume the wide signal adapter`)
   }
 
-  const loopRuntime = locality(inventory, 'execution-session-loopdetector')
-  assert.ok(loopRuntime.references.includes('loop-event-codec'))
-  assert.ok(!loopRuntime.references.includes('host-signal-adapter'))
-  assert.ok(!loopRuntime.references.includes('host-diagnostics-runtime'))
+  const loopRuntime = requireShard(projects, 'execution-session-loopdetector')
+  assert.ok(refShards(loopRuntime, projects).includes('loop-event-codec'))
+  assert.ok(!refShards(loopRuntime, projects).includes('host-signal-adapter'))
+  assert.ok(!refShards(loopRuntime, projects).includes('host-diagnostics-runtime'))
 
-  const signalAdapter = locality(inventory, 'host-signal-adapter')
-  assert.ok(signalAdapter.references.includes('host-event-envelope'))
-  assert.ok(signalAdapter.references.includes('loop-event-codec'))
-  assert.ok(!sourcePaths(signalAdapter).includes('src/Wanxiangshu/OpenCode/Codec/HostMessageCodec.fs'))
-  assert.ok(!sourcePaths(signalAdapter).includes('src/Wanxiangshu/OpenCode/Codec/LoopEventCodec.fs'))
+  const signalAdapter = requireShard(projects, 'host-signal-adapter')
+  assert.ok(refShards(signalAdapter, projects).includes('host-event-envelope'))
+  assert.ok(refShards(signalAdapter, projects).includes('loop-event-codec'))
+  assert.ok(!relSources(signalAdapter).includes('src/Wanxiangshu/OpenCode/Codec/HostMessageCodec.fs'))
+  assert.ok(!relSources(signalAdapter).includes('src/Wanxiangshu/OpenCode/Codec/LoopEventCodec.fs'))
 
-  const visibility = locality(inventory, 'opencode-host-messagevisibility')
-  assert.ok(visibility.references.includes('host-event-envelope'))
-  assert.ok(!visibility.references.includes('host-signal-adapter'))
-  assert.ok(locality(inventory, 'execution-delegation-hostturnobservedsurface').references.includes('host-event-envelope'))
+  const visibility = requireShard(projects, 'opencode-host-messagevisibility')
+  assert.ok(refShards(visibility, projects).includes('host-event-envelope'))
+  assert.ok(!refShards(visibility, projects).includes('host-signal-adapter'))
+  assert.ok(refShards(requireShard(projects, 'execution-delegation-hostturnobservedsurface'), projects).includes('host-event-envelope'))
 })
 
 test('WHAT[HOST-BOUNDARY-026] tool registration compiles without signal routing or terminal bus implementations', () => {
-  const inventory = readCompileShardInventoryV1()
-  const tool = inventory.localities.find((entry) => sourcePaths(entry).includes('src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fs'))
+  const shardInventory = readCompileShardInventory({ repositoryRoot: ROOT })
+  const subsystemInventory = buildSubsystemInventory({ compileInventory: shardInventory })
+  assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))
+  const projects = subsystemInventory.projects
+
+  const tool = [...projects.values()].find((entry) => relSources(entry).includes('src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fs'))
   assert.ok(tool, 'tool codec must have a production compile shard')
 
-  const closureSources = (root) => {
-    const closure = new Set()
-    const pending = [root]
-    while (pending.length > 0) {
-      const shard = pending.pop()
-      if (closure.has(shard)) continue
-      closure.add(shard)
-      pending.push(...shard.references.map((id) => locality(inventory, id)))
-    }
-    return new Set([...closure].flatMap(sourcePaths))
-  }
-  const sources = closureSources(tool)
+  const sources = closureSources(tool, projects)
   assert.ok(sources.has('src/Wanxiangshu/Host/Contract/ToolResultBound.fs'))
   for (const unrelated of [
     'src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs',
@@ -108,7 +118,7 @@ test('WHAT[HOST-BOUNDARY-026] tool registration compiles without signal routing 
     'opencode-tools-bookkeepertool',
     'opencode-tools-fetchtool',
   ]) {
-    const consumerSources = closureSources(locality(inventory, id))
+    const consumerSources = closureSources(requireShard(projects, id), projects)
     assert.ok(consumerSources.has('src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fs'))
     for (const unrelated of [
       'src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs',
@@ -119,7 +129,7 @@ test('WHAT[HOST-BOUNDARY-026] tool registration compiles without signal routing 
       assert.ok(!consumerSources.has(unrelated), `${id} must not acquire ${unrelated}`)
   }
 
-  const signalSources = closureSources(locality(inventory, 'host-signal-adapter'))
+  const signalSources = closureSources(requireShard(projects, 'host-signal-adapter'), projects)
   assert.ok(!signalSources.has('src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fs'), 'signal adapter must not acquire tool registration')
 })
 
@@ -158,14 +168,18 @@ test('WHAT[HOST-BOUNDARY-030] Host envelope rejects adjacent malformed event and
 })
 
 test('WHAT[HOST-BOUNDARY-028] typed subscription and diagnostic injection preserve one failure owner', async () => {
-  const inventory = readCompileShardInventoryV1()
-  const adapter = locality(inventory, 'host-signal-adapter')
-  const composition = locality(inventory, 'opencode-host-hostsignalbootstrap')
+  const shardInventory = readCompileShardInventory({ repositoryRoot: ROOT })
+  const subsystemInventory = buildSubsystemInventory({ compileInventory: shardInventory })
+  assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))
+  const projects = subsystemInventory.projects
 
-  assert.ok(!adapter.references.includes('host-diagnostics-runtime'))
-  assert.ok(!adapter.references.includes('foundation-temporal'))
-  assert.ok(composition.references.includes('host-signal-adapter'))
-  assert.ok(composition.references.includes('host-diagnostics-runtime'))
+  const adapter = requireShard(projects, 'host-signal-adapter')
+  const composition = requireShard(projects, 'opencode-host-hostsignalbootstrap')
+
+  assert.ok(!refShards(adapter, projects).includes('host-diagnostics-runtime'))
+  assert.ok(!refShards(adapter, projects).includes('foundation-temporal'))
+  assert.ok(refShards(composition, projects).includes('host-signal-adapter'))
+  assert.ok(refShards(composition, projects).includes('host-diagnostics-runtime'))
   await assertOptionalObservationNoninterference()
   assertEffectIsInjected('console')
 })
@@ -176,24 +190,28 @@ test('WHAT[HOST-BOUNDARY-029] fatal vocabulary stays pure and physical execution
 })
 
 test('WHAT[HOST-BOUNDARY-031] RootWorkspace runtime is private and every observer consumes only the typed contract', () => {
-  const inventory = readCompileShardInventoryV1()
-  const contract = locality(inventory, 'host-root-workspace-contract')
-  const runtime = locality(inventory, 'host-root-workspace-runtime')
+  const shardInventory = readCompileShardInventory({ repositoryRoot: ROOT })
+  const subsystemInventory = buildSubsystemInventory({ compileInventory: shardInventory })
+  assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))
+  const projects = subsystemInventory.projects
 
-  assert.equal(contract.kind, 'contract')
-  assert.deepEqual(sourcePaths(contract), ['src/Wanxiangshu/OpenCode/Host/RootWorkspace.fs'])
-  assert.deepEqual(contract.references, [])
-  assert.equal(runtime.kind, 'runtime')
-  assert.deepEqual(sourcePaths(runtime), ['src/Wanxiangshu/OpenCode/Host/RootWorkspaceRuntime.fs'])
-  assert.deepEqual(runtime.references, ['host-root-workspace-contract'])
+  const contract = requireShard(projects, 'host-root-workspace-contract')
+  const runtime = requireShard(projects, 'host-root-workspace-runtime')
 
-  const runtimeConsumers = inventory.localities
-    .filter(({ references }) => references.includes('host-root-workspace-runtime'))
-    .map(({ id }) => id)
+  assert.equal(contract.subsystem, 'host')
+  assert.equal(runtime.subsystem, 'host')
+  assert.deepEqual(relSources(contract), ['src/Wanxiangshu/OpenCode/Host/RootWorkspace.fs'])
+  assert.deepEqual(refShards(contract, projects), [])
+  assert.deepEqual(relSources(runtime), ['src/Wanxiangshu/OpenCode/Host/RootWorkspaceRuntime.fs'])
+  assert.deepEqual(refShards(runtime, projects), ['host-root-workspace-contract'])
+
+  const runtimeConsumers = [...projects.values()]
+    .filter((candidate) => refShards(candidate, projects).includes('host-root-workspace-runtime'))
+    .map((candidate) => candidate.shard)
     .sort()
   assert.deepEqual(runtimeConsumers, ['opencode-host-hostsignalbootstrap', 'opencode-host-sharedstatesurface'])
 
-  assert.ok(locality(inventory, 'interaction-dispatch-opencode-ingresscodec').references.includes('host-root-workspace-contract'))
+  assert.ok(refShards(requireShard(projects, 'interaction-dispatch-opencode-ingresscodec'), projects).includes('host-root-workspace-contract'))
 
   for (const id of [
     'execution-delegation-hostturnobservedsurface',
@@ -202,5 +220,5 @@ test('WHAT[HOST-BOUNDARY-031] RootWorkspace runtime is private and every observe
     'opencode-host-pluginruntimescope',
     'participant-provider-attempt-fallback-ledger',
   ])
-    assert.ok(!locality(inventory, id).references.includes('host-root-workspace-runtime'), `${id} must not acquire the process-local runtime`)
+    assert.ok(!refShards(requireShard(projects, id), projects).includes('host-root-workspace-runtime'), `${id} must not acquire the process-local runtime`)
 })
