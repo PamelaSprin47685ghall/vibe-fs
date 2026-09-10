@@ -2,6 +2,7 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- 审计并移除 `opencode-tools-executortoolsurface` 对 `opencode-tools-ptytool` 的冗余 ProjectReference，使其前向闭包从 144 项目缩减为 141 项目，并通过独立 Fable 聚焦编译验证。
 - persistence（17分片）、provider（17分片）与 host（17分片）共计 51 个 compile shard 全部补齐显式 `<WanxiangshuSubsystem>` 与 `<WanxiangshuCompileShard>` 元数据，全仓全部 26 个子系统共 213 个编译分片达成 100% 显式归属。
 - session-lifecycle 与 delegation 两个子系统剩余 35 个 compile shard 补齐显式 `<WanxiangshuSubsystem>` 与 `<WanxiangshuCompileShard>` 元数据，使这两个子系统达成 100% 显式归属，全仓共 23 个子系统实现全显式归属。
 - interaction 与 context 两个子系统剩余 23 个 compile shard 补齐显式 `<WanxiangshuSubsystem>` 与 `<WanxiangshuCompileShard>` 元数据，使这两个子系统达成 100% 显式归属，全仓共 21 个子系统实现全显式归属。
