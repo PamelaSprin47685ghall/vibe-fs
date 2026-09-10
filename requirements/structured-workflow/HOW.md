@@ -210,6 +210,12 @@ tool adapter、signal adapter、Attention consumer 与 repository-programming ru
 - 审计确认其源码（`LargeGateSurface.fs`、`DistillationRuntime.fs`、`Distillation.fs`）完全不消费 `dispatch/execution-session-recovery-model` 与 `process/process-processrequest` 符号，安全剔除这两条冗余跨 subsystem ProjectReference。
 经独立 Fable 聚焦编译（610 sources）及其直接消费分片 `opencode-tools-ptytool`（1006 sources）双向验证通过，全仓声明引用总数降至 1876，结构与架构门禁全绿通过。
 
+继续系统审计 22-subsystem SCC 中的稀疏跨子系统边，重点审查 `relay -> chat-execution` 与 `process -> chat-execution` 路径：
+1. `relay/mission-relay-suicidetool`（`Wanxiangshu.Owner.relay-retirement.mission-relay-suicidetool.fsproj`）：确认其源码（`SuicideTool.fs`）均不消费 `chat-execution/outcome`，移除该冗余跨 subsystem 依赖，彻底切断 `relay -> chat-execution` 跨子系统边。经独立 Fable 编译（1040 sources）以及消费者 `managedagentconfig`（1034 sources）与 `plugin-composition`（1236 sources）验证通过。
+2. `process/foundation-temporal`（`Wanxiangshu.Owner.time-capability.foundation-temporal.fsproj`）：确认其源码（`DeadlineSurface.fs`、`Surface.fs`）完全不消费 `chat-execution/outcome`，移除该冗余跨 subsystem 依赖，彻底切断 `process -> chat-execution` 跨子系统边。经独立 Fable 编译（310 sources）验证通过。
+
+全仓 ProjectReference 引用总数降至 1874（净减 2 条跨 subsystem 边），结构与架构门禁全绿通过。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

@@ -2,6 +2,7 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- 审计并移除 `mission-relay-suicidetool` 与 `foundation-temporal` 对 `chat-execution/outcome` 的 2 条冗余跨 subsystem ProjectReference，彻底切断 `relay -> chat-execution` 与 `process -> chat-execution` 两条跨子系统边，全仓声明引用数降至 1874，全部通过独立 Fable 聚焦编译及消费者闭包验证。
 - 清理 `Distillation.fs` 与 `DistillationRuntime.fs` 中未使用的 `Strength` 命名空间引入，将 `process-largegatesurface` 对 `host-digest` 的宽引用收窄为 `runtime-platform/digest`，并移除其对 `execution-session-recovery-model` 与 `process-processrequest` 的 2 条冗余跨 subsystem ProjectReference，全仓声明引用数降至 1876，全部通过独立 Fable 聚焦编译及消费者闭包验证。
 - 清理 `Capture.fs`、`SyncDelegate/Runtime.fs` 与 Fork/Host 源码中未使用的 `Host.Contract`、`Strength` 与 `Strength.Prediction` 命名空间引入；系统审计并移除 `execution-fission-opencode-host`、`opencode-codec-providerprojectionsurface`、`opencode-host-requirementgrounding-runtime`、`enforcer-guidance-tip`、`interaction-authority-fold`、`opencode-host-chatadmission-transaction`、`execution-session-opencode-horizontool`、`mission-relay-reviewtool`、`mission-relay-suicidetool`、`context-trace-semantictracesurface`、`strength-opencode-settings` 与 `strength-turnevidence` 等 12 个分片中的跨 subsystem ProjectReference，全仓声明引用数降至 1878，全部通过独立 Fable 聚焦编译及消费者闭包验证。
 - 审计并移除 `hostturnobservedsurface`、`host-diagnostics-runtime`、`casebook-lifecyclesurface`、`magictodosemanticsurface`、`opencode-tools-ptytool` 与 `participant-provider-attempt-planner` 中 6 条无真实符号消费的跨 subsystem ProjectReference，显式补齐真实消费声明，全仓声明引用数降至 1890，全部通过独立 Fable 聚焦编译验证。
