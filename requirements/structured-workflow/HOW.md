@@ -177,6 +177,17 @@ tool adapter、signal adapter、Attention consumer 与 repository-programming ru
 
 上述 7 个分片及代表性消费分片（如 `delegation-ledger`、`delegation-recovery-runtime`、`enforcer-guidance-tip`、`persistence-eventstore-canonicalintegrator`、`opencode-host-modelroutingsurface`）均通过独立 Fable 聚焦编译验证。全仓 ProjectReference 引用总数从 1902 降至 1895（净减 7 条跨 subsystem 依赖），子系统门禁与架构检查全绿。
 
+在此基础上，持续深入审查 22-subsystem SCC 内的跨 subsystem 知识依赖，剔除 6 条无真实符号消费的冗余引用，并补齐 2 处真实编译消费声明：
+1. `delegation/execution-delegation-hostturnobservedsurface`（`Wanxiangshu.Owner.delegation.execution-delegation-hostturnobservedsurface.fsproj`）：移除对 `provider/opencode-host-opencodeport` 的冗余引用；
+2. `host/host-diagnostics-runtime`（`Wanxiangshu.Owner.host-boundary.host-diagnostics-runtime.fsproj`）：移除对 `chat-execution/outcome` 的冗余引用；
+3. `knowledge/repository-knowledge-casebook-lifecyclesurface`（`Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-lifecyclesurface.fsproj`）：移除对 `host/host-signal-contract` 的冗余引用；
+4. `work/mission-obligation-todo-magictodosemanticsurface`（`Wanxiangshu.Owner.obligation-ledger.mission-obligation-todo-magictodosemanticsurface.fsproj`）：移除对 `chat-execution/outcome` 的冗余引用；
+5. `process/opencode-tools-ptytool`（`Wanxiangshu.Owner.process-execution.opencode-tools-ptytool.fsproj`）：移除对 `chat-execution/outcome` 的冗余引用；
+6. `provider/participant-provider-attempt-planner`（`Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-planner.fsproj`）：移除对 `chat-execution/outcome` 的冗余引用；
+7. 显式补齐 `fetchtool` 对 `casebook-bookkeeper` 及 `sessionexecutionbinding` 对 `opencode-tools-managedagent` 的真实类型声明依赖，并清理 `ManagedAgentConfig.fs` 中未使用的 `Manager` 命名空间 open。
+
+上述分片及其代表性消费分片（如 `join-guard-surface`、`plugin-composition`、`action-affordance.runtime`、`opencode-host-managedagentconfig`、`enforcer-repair`、`sessionexecutionbinding`）均通过独立 Fable 聚焦编译验证。全仓 ProjectReference 引用总数降至 1890，结构与架构门禁全绿通过。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。
