@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>context</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>context-prefix-candidate</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>prefix-stability</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>context-prefix-candidate</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>

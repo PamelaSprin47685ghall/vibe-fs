@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>context</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>context-companion-fact</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>context-compression</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>context-companion-fact</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>

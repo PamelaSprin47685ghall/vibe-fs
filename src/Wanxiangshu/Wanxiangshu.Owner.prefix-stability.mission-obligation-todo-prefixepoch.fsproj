@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>context</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>context-prefix-epoch</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>prefix-stability</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>context-prefix-epoch</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>

@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>interaction</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>opencode-tools-statictools</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>action-affordance</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>opencode-tools-statictools</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>

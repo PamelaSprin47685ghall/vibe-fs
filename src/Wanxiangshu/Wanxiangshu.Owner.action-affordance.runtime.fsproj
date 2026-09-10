@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>interaction</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>tool-runtime-surface</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>action-affordance</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>tool-runtime-surface</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>

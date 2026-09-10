@@ -2,6 +2,7 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- interaction 与 context 两个子系统剩余 23 个 compile shard 补齐显式 `<WanxiangshuSubsystem>` 与 `<WanxiangshuCompileShard>` 元数据，使这两个子系统达成 100% 显式归属，全仓共 21 个子系统实现全显式归属。
 - authority、relay、chat-execution 与 enforcer 四个子系统剩余 28 个 compile shard 补齐显式 `<WanxiangshuSubsystem>` 与 `<WanxiangshuCompileShard>` 元数据，使这四个子系统达成 100% 显式归属，全仓共 19 个子系统实现全显式归属。
 - repository-programming、requirements、dispatch、knowledge 与 work 五个子系统剩余 19 个 compile shard 补齐显式 `<WanxiangshuSubsystem>` 与 `<WanxiangshuCompileShard>` 元数据，使这五个子系统达成 100% 显式归属，全仓共 15 个子系统实现全显式归属。
 - change、strength、resources、output 与 repository-investigation 五个子系统剩余 15 个 compile shard 补齐显式 `<WanxiangshuSubsystem>` 与 `<WanxiangshuCompileShard>` 元数据，使这五个子系统达成 100% 显式归属，全仓共 10 个子系统实现全显式归属。

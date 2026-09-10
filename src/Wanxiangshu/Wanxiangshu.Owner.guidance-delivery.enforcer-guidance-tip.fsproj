@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>interaction</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>enforcer-guidance-tip</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>guidance-delivery</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>enforcer-guidance-tip</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>

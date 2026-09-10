@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>interaction</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>interaction-concern-facts</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>concern-routing</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>interaction-concern-facts</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>

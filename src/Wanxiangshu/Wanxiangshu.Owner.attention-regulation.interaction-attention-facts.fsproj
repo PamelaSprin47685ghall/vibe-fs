@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>interaction</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>interaction-attention-facts</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>attention-regulation</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>interaction-attention-facts</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>

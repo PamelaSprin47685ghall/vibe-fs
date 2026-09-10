@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>context</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>context-trace-cursor</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>semantic-trace</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>context-trace-cursor</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
