@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>provider</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>opencode-host-providerfailurepresentation</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>host-provider-failure-ownership</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>opencode-host-providerfailurepresentation</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>

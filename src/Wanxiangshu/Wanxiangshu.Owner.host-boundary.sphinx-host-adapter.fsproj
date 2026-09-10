@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>host</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>sphinx-host-adapter</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>host-boundary</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>sphinx-host-adapter</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>

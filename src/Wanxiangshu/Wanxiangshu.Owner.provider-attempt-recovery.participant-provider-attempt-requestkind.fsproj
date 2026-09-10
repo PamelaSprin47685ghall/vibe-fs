@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>provider</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>participant-provider-attempt-requestkind</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>provider-attempt-recovery</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>participant-provider-attempt-requestkind</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>

@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>provider</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>participant-provider-languagesurface</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>provider-language</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>participant-provider-languagesurface</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>

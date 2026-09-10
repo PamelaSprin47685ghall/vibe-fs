@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>persistence</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>eventstore-sync-runtime</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>durable-convergence</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>eventstore-sync-runtime</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>

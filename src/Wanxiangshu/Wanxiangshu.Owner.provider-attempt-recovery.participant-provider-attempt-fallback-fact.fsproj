@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>provider</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>participant-provider-attempt-fallback-fact</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>provider-attempt-recovery</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>participant-provider-attempt-fallback-fact</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>

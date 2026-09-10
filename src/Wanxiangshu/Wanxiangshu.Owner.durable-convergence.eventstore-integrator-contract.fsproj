@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>persistence</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>eventstore-integrator-contract</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>durable-convergence</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>eventstore-integrator-contract</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>

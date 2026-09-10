@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>host</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>host-signal-contract</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>host-boundary</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>host-signal-contract</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>

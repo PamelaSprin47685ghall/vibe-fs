@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>host</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>opencode-host-hostsignalbootstrap</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>host-boundary</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>opencode-host-hostsignalbootstrap</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
