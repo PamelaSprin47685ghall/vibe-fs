@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>session-lifecycle</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>execution-session-recoveryclosureprojection</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>managed-session-lifecycle</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>execution-session-recoveryclosureprojection</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>

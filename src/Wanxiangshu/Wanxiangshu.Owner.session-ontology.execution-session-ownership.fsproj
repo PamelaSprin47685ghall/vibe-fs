@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>session-lifecycle</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>execution-session-ownership</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>session-ontology</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>execution-session-ownership</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>

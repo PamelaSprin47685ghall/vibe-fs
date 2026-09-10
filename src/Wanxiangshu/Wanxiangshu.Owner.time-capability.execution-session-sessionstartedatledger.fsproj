@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>session-lifecycle</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>execution-session-sessionstartedatledger</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>time-capability</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>execution-session-sessionstartedatledger</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>

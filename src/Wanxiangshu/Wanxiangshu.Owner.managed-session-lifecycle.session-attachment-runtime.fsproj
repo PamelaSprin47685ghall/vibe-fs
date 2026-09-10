@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>session-lifecycle</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>session-attachment-runtime</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>managed-session-lifecycle</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>session-attachment-runtime</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>

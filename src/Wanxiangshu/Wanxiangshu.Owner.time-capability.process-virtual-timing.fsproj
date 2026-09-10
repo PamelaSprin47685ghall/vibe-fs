@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>session-lifecycle</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>process-virtual-timing</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>time-capability</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>process-virtual-timing</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>

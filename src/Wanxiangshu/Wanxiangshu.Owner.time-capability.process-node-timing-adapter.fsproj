@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>session-lifecycle</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>process-node-timing-adapter</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>time-capability</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>process-node-timing-adapter</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>

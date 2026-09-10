@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>delegation</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>delegation-host-adapter</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>delegation</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>delegation-host-adapter</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>

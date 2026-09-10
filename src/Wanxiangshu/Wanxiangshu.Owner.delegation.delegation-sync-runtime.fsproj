@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>delegation</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>delegation-sync-runtime</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>delegation</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>delegation-sync-runtime</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>

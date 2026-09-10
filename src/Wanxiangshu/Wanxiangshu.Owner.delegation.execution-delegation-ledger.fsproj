@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>delegation</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>delegation-ledger</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>delegation</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>delegation-ledger</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>

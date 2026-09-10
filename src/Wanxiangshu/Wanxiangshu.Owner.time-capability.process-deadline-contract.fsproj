@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>session-lifecycle</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>process-deadline-contract</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>time-capability</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>process-deadline-contract</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>

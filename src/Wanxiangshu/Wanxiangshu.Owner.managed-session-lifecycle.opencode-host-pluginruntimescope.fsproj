@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>session-lifecycle</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>opencode-host-pluginruntimescope</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>managed-session-lifecycle</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>opencode-host-pluginruntimescope</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
