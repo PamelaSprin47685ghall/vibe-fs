@@ -204,6 +204,12 @@ tool adapter、signal adapter、Attention consumer 与 repository-programming ru
 
 上述修改的分片及其代表性消费分片（包含 `delegation-host-adapter`、`managedagentconfig`、`plugin-composition` 等）均通过独立 Fable 聚焦编译验证。全仓 ProjectReference 引用总数降至 1878（净减 12 条跨 subsystem 依赖），结构与架构门禁全绿通过。
 
+进一步审计 `output` 子系统的 `process-largegatesurface`（`Wanxiangshu.Owner.output-distillation.process-largegatesurface.fsproj`）：
+- 清理 `DistillationRuntime.fs` 与 `Distillation.fs` 中未使用的 `open Wanxiangshu.Strength` 及 `open Wanxiangshu.Strength.Prediction` 语句；
+- 将原对混装了 OpenCode 消息/终端类型的 `host/host-digest` 宽引用收窄至零引用的 `runtime-platform/digest`（源码仅需 `HostDigest.sha256Hex` 进行散列计算）；
+- 审计确认其源码（`LargeGateSurface.fs`、`DistillationRuntime.fs`、`Distillation.fs`）完全不消费 `dispatch/execution-session-recovery-model` 与 `process/process-processrequest` 符号，安全剔除这两条冗余跨 subsystem ProjectReference。
+经独立 Fable 聚焦编译（610 sources）及其直接消费分片 `opencode-tools-ptytool`（1006 sources）双向验证通过，全仓声明引用总数降至 1876，结构与架构门禁全绿通过。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

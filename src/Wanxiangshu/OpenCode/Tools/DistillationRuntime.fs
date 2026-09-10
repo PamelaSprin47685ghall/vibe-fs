@@ -24,7 +24,6 @@ open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
 
 /// Private mailbox surface: fork one Distiller + permit-gated Join. Never Manager Join.
 module DistillationRuntime =
