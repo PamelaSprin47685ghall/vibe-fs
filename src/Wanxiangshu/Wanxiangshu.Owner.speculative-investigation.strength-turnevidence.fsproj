@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>strength</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>strength-turnevidence</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>speculative-investigation</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>strength-turnevidence</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>

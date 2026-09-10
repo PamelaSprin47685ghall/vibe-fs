@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>change</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>change-facts</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>change-integration</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>change-facts</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>

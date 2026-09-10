@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>repository-investigation</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>repository-investigation-semble-mcp</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>repository-investigation</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>repository-investigation-semble-mcp</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>

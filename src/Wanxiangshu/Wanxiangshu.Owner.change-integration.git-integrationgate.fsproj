@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>change</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>git-integrationgate</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>change-integration</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>git-integrationgate</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>

@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>strength</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>strength-event-vocabulary-contract</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>speculative-investigation</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>strength-event-vocabulary-contract</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
