@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>dispatch</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>interaction-dispatch-opencode-ingresscodec</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>dispatch-protocol</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>interaction-dispatch-opencode-ingresscodec</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>

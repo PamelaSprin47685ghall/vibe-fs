@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>work</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>mission-workrecord-surface</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>work-record</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>mission-workrecord-surface</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>

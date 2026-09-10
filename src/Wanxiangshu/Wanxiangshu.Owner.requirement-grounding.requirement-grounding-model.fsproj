@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>requirements</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>requirement-grounding-model</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>requirement-grounding</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>requirement-grounding-model</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>

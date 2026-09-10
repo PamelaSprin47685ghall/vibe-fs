@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>work</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>mission-workrecord-model-contract</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>work-record</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>mission-workrecord-model-contract</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>

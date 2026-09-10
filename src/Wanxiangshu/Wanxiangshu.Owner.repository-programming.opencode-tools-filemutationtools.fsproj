@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>repository-programming</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>opencode-tools-filemutationtools</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>repository-programming</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>opencode-tools-filemutationtools</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>

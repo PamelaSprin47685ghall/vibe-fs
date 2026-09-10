@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>dispatch</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>dispatch-model-contract</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>dispatch-protocol</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>dispatch-model-contract</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>

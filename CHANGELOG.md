@@ -2,6 +2,7 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- repository-programming、requirements、dispatch、knowledge 与 work 五个子系统剩余 19 个 compile shard 补齐显式 `<WanxiangshuSubsystem>` 与 `<WanxiangshuCompileShard>` 元数据，使这五个子系统达成 100% 显式归属，全仓共 15 个子系统实现全显式归属。
 - change、strength、resources、output 与 repository-investigation 五个子系统剩余 15 个 compile shard 补齐显式 `<WanxiangshuSubsystem>` 与 `<WanxiangshuCompileShard>` 元数据，使这五个子系统达成 100% 显式归属，全仓共 10 个子系统实现全显式归属。
 - participant、sphinx、process 与 verification 四个子系统剩余 compile shard 补齐显式 `<WanxiangshuSubsystem>` 与 `<WanxiangshuCompileShard>` 元数据，使这四个子系统达成 100% 显式归属。
 - causal-wait、time-capability 与 host-boundary 边界验证统一迁移至 subsystem/compile-shard inventory，移除对已退役 `readCompileShardInventoryV1` helper 及其 legacy locality/kind 属性的依赖；彻底清理 `readCompileShardInventoryV1`。

@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>repository-programming</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>repository-programming-js-capability</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>repository-programming</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>repository-programming-js-capability</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>

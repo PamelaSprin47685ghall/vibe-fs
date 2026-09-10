@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>knowledge</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>repository-knowledge-casebook-model</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>knowledge-reuse</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>repository-knowledge-casebook-model</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>

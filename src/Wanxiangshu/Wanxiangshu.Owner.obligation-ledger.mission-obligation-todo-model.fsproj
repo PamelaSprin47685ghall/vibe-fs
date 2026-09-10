@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <WanxiangshuSubsystem>work</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>mission-obligation-todo-model</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>obligation-ledger</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>mission-obligation-todo-model</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
