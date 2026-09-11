@@ -13,5 +13,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
     <Compile Include="OpenCode/Tools/FileMutationTools.fsi"/>
     <Compile Include="OpenCode/Tools/FileMutationTools.fs"/>
+    <Compile Include="OpenCode/Tools/FileMutationSurface.fsi"/>
+    <Compile Include="OpenCode/Tools/FileMutationSurface.fs"/>
   </ItemGroup>
 </Project>

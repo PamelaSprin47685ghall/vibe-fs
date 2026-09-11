@@ -20,8 +20,8 @@ module JsToolsTransactionStore =
 
     /// Single linear stream for transaction facts.
     let TransactionStream = "js-tools/transactions"
-    let PreparedEventType = "JsTransactionPrepared"
-    let CommittedEventType = "JsTransactionCommitted"
+    let PreparedEventType = JsTransactionEventTypes.Prepared
+    let CommittedEventType = JsTransactionEventTypes.Committed
 
     // ---- payload codec ----------------------------------------------------
 
@@ -64,7 +64,7 @@ module JsToolsTransactionStore =
     // ---- append -----------------------------------------------------------
 
     let isTransactionEventType eventType =
-        eventType = PreparedEventType || eventType = CommittedEventType
+        JsTransactionEventTypes.isTransactionEvent eventType
 
     type DecodedTransactionEvent =
         | Prepared of JsTransactionPrepared

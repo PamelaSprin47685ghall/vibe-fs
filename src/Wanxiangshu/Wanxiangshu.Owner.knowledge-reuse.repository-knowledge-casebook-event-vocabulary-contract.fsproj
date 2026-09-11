@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>knowledge</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>casebook-event-vocabulary-contract</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>knowledge-reuse</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>repository-knowledge-casebook-event-vocabulary-contract</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Repository/Knowledge/Casebook/EventVocabulary.fsi"/>
+    <Compile Include="Repository/Knowledge/Casebook/EventVocabulary.fs"/>
+  </ItemGroup>
+</Project>

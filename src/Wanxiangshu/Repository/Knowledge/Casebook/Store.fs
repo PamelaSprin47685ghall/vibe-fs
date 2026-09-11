@@ -14,10 +14,10 @@ open Wanxiangshu.Persistence.EventStore
 module CasebookStore =
 
     let CasebookStream = "casebook"
-    let CapturedEventType = "InspectorCaseCaptured"
-    let RefreshedEventType = "InspectorCaseRefreshed"
-    let AccessedEventType = "InspectorCaseAccessed"
-    let EvictedEventType = "InspectorCaseEvicted"
+    let CapturedEventType = CasebookEventTypes.Captured
+    let RefreshedEventType = CasebookEventTypes.Refreshed
+    let AccessedEventType = CasebookEventTypes.Accessed
+    let EvictedEventType = CasebookEventTypes.Evicted
 
     // ---- observation codec ------------------------------------------------
 
@@ -91,10 +91,7 @@ module CasebookStore =
     // ---- single-event integration codec ----------------------------------
 
     let isCasebookEventType eventType =
-        eventType = CapturedEventType
-        || eventType = RefreshedEventType
-        || eventType = AccessedEventType
-        || eventType = EvictedEventType
+        CasebookEventTypes.isCasebookEvent eventType
 
     let private decodeRefreshed (payload: JsonValue) : Result<CasebookEvent, string> =
         let decoder =

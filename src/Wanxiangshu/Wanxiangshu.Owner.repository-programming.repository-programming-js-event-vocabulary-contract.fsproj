@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>repository-programming</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>js-transaction-event-vocabulary-contract</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>repository-programming</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>repository-programming-js-event-vocabulary-contract</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Repository/Programming/Js/EventVocabulary.fsi"/>
+    <Compile Include="Repository/Programming/Js/EventVocabulary.fs"/>
+  </ItemGroup>
+</Project>

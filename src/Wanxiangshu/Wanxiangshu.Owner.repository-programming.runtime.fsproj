@@ -1,18 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>interaction</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>repository-programming</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>js-programming-runtime-surface</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>repository-programming</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>js-programming-runtime-surface</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-tool-adapter.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.interaction.opencode-tools-filemutationtools.fsproj"/>
-
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-toolbindings.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj"/>
     <Compile Include="Repository/Programming/Js/RuntimeSurface.fsi"/>
     <Compile Include="Repository/Programming/Js/RuntimeSurface.fs"/>
     <Compile Include="Repository/Programming/Js/FilesystemSurface.fsi"/>
@@ -23,7 +18,5 @@
     <Compile Include="Repository/Programming/Js/WorkflowSurface.fs"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ToolHostSurface.fsi"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ToolHostSurface.fs"/>
-    <Compile Include="OpenCode/Tools/FileMutationSurface.fsi"/>
-    <Compile Include="OpenCode/Tools/FileMutationSurface.fs"/>
   </ItemGroup>
 </Project>

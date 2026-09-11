@@ -109,10 +109,34 @@ test('WHAT[STRUCTURED-WORKFLOW-014] NodeFs physical port and tool contracts have
   // compiles only Repository/Programming/Js sources and does not inherit the tool-face port.
   const fileMutationProject = 'Wanxiangshu.Owner.interaction.opencode-tools-filemutationtools.fsproj'
   const jsToolBindingsProject = 'Wanxiangshu.Owner.repository-programming.repository-programming-js-toolbindings.fsproj'
+  // The mv/rm tool face and its registered JS boundary travel together (same OpenCode/Tools
+  // knowledge), while the JS programming surface bundle is a repository-programming shard.
   assert.deepEqual(compileItems(fileMutationProject), [
     'OpenCode/Tools/FileMutationTools.fsi',
+    'OpenCode/Tools/FileMutationSurface.fsi',
     'OpenCode/Tools/FileMutationTools.fs',
+    'OpenCode/Tools/FileMutationSurface.fs',
   ])
+  assert.ok(
+    !compileItems(fileMutationProject).some((path) => path.startsWith('Repository/Programming/Js/')),
+    'the interaction tool face shard must not compile repository-programming sources',
+  )
+  const jsRuntimeSurfaceProject = 'Wanxiangshu.Owner.repository-programming.runtime.fsproj'
+  assert.equal(productionProject(jsRuntimeSurfaceProject).subsystem, 'repository-programming')
+  assert.deepEqual(compileItems(jsRuntimeSurfaceProject), [
+    'Repository/Programming/Js/RuntimeSurface.fsi',
+    'Repository/Programming/Js/FilesystemSurface.fsi',
+    'Repository/Programming/Js/TransactionSurface.fsi',
+    'Repository/Programming/Js/WorkflowSurface.fsi',
+    'Repository/Programming/Js/OpenCode/ToolHostSurface.fsi',
+    'Repository/Programming/Js/RuntimeSurface.fs',
+    'Repository/Programming/Js/FilesystemSurface.fs',
+    'Repository/Programming/Js/TransactionSurface.fs',
+    'Repository/Programming/Js/WorkflowSurface.fs',
+    'Repository/Programming/Js/OpenCode/ToolHostSurface.fs',
+  ])
+  assert.deepEqual(references(jsRuntimeSurfaceProject), [jsToolBindingsProject])
+
   assert.deepEqual(compileItems(jsToolBindingsProject), [
     'Repository/Programming/Js/ToolsBindings.fsi',
     'Repository/Programming/Js/TransactionStore.fsi',

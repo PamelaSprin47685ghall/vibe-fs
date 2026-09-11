@@ -40,6 +40,8 @@ const CONTRACT_SHARDS = [
   'eventstore-event-vocabulary-contract',
   'eventstore-git-contract',
   'strength-event-vocabulary-contract',
+  'casebook-event-vocabulary-contract',
+  'js-transaction-event-vocabulary-contract',
 ]
 
 const FOCUSED_RUNTIME_SHARDS = [
@@ -54,6 +56,8 @@ const ALLOWED_CONTRACT_CLOSURE_SHARDS = new Set([
   'eventstore-git-contract',
   'strength-event-vocabulary-contract',
   'sphinx-event-vocabulary-contract',
+  'casebook-event-vocabulary-contract',
+  'js-transaction-event-vocabulary-contract',
   'identity',
 ])
 
@@ -61,7 +65,7 @@ test('WHAT[DURABLE-EVENTS-022] EventStore contracts exclude physical and Strengt
   for (const shard of CONTRACT_SHARDS) {
     const { project, plan } = planShard(shard)
     assert.ok(
-      project.subsystem === 'persistence' || project.subsystem === 'strength',
+      ['persistence', 'strength', 'knowledge', 'repository-programming'].includes(project.subsystem),
       `${shard} belongs to expected contract subsystem`,
     )
 

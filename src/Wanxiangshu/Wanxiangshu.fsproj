@@ -413,6 +413,10 @@
     <Compile Include="Persistence/EventStore/GitTypes.fs"/>
     <Compile Include="Persistence/EventStore/CanonicalEventCodec.fsi"/>
     <Compile Include="Persistence/EventStore/CanonicalEventCodec.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/EventVocabulary.fsi"/>
+    <Compile Include="Repository/Knowledge/Casebook/EventVocabulary.fs"/>
+    <Compile Include="Repository/Programming/Js/EventVocabulary.fsi"/>
+    <Compile Include="Repository/Programming/Js/EventVocabulary.fs"/>
     <Compile Include="Persistence/EventStore/EventVocabulary.fsi"/>
     <Compile Include="Persistence/EventStore/EventVocabulary.fs"/>
     <Compile Include="Persistence/EventStore/ProcessEventLog.fsi"/>

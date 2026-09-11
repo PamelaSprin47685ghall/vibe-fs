@@ -2,6 +2,8 @@ namespace Wanxiangshu.Persistence.EventStore
 
 open Wanxiangshu.Sphinx
 open Wanxiangshu.Strength
+open Wanxiangshu.Repository.Knowledge.Casebook
+open Wanxiangshu.Repository.Programming.Js
 
 /// Additive authoritative event vocabulary. Unknown durable facts fail closed
 /// before they reach the canonical Integrator.
@@ -17,26 +19,19 @@ module ProjectionCutTailEvent =
 module AuthoritativeEventTypes =
     let private builtins =
         set
-            [ "JobRequested"
+            [ // Spine-owned durable envelope/cut vocabulary.
+              "JournalEnvelope"
+              ProjectionCutTailEvent.EventType
+              // Legacy job vocabulary: no in-tree producer or consumer remains;
+              // the durable-convergence laws still persist these names.
+              "JobRequested"
               "JobAccepted"
               "JobRejected"
               "JobConflictResolved"
-              "JournalEnvelope"
-              "JsTransactionPrepared"
-              "JsTransactionCommitted"
-              "InspectorCaseCaptured"
-              "InspectorCaseRefreshed"
-              "InspectorCaseAccessed"
-              "InspectorCaseEvicted"
-              ProjectionCutTailEvent.EventType
-              StrengthEventTypes.CandidatePrepared
-              StrengthEventTypes.CandidatePromoted
-              StrengthEventTypes.FramesTraced
-              StrengthEventTypes.CandidateAbandoned
-              SphinxEventTypes.PluginSetBound
-              SphinxEventTypes.ObservationAccepted
-              SphinxEventTypes.AnswerCommitted
-              SphinxEventTypes.LegacyObservation
-              SphinxEventTypes.GenericInquiry ]
+              // Domain-owned names, joined from the owning vocabulary contracts.
+              yield! JsTransactionEventTypes.all
+              yield! CasebookEventTypes.all
+              yield! StrengthEventTypes.all
+              yield! SphinxEventTypes.all ]
 
     let isKnown eventType = Set.contains eventType builtins
