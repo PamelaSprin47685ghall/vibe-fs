@@ -7,6 +7,7 @@
     <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-promptcatalog.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.language.fsproj"/>

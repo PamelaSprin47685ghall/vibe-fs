@@ -3,19 +3,6 @@ namespace Wanxiangshu.Resources
 open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider
 
-/// Canonical provider system composition:
-/// Common Law → Role Law → inherited Office Library.
-type PromptCatalog =
-    { ManagerSystemPrompt: string
-      CoderSystemPrompt: string
-      DevopsSystemPrompt: string
-      InspectorSystemPrompt: string
-      BrowserSystemPrompt: string
-      InquirySystemPrompt: string
-      OrchestratorSystemPrompt: string
-      DistillerSystemPrompt: string
-      BloggerSystemPrompt: string }
-
 module PromptResources =
 
     let private roleSemanticPath =

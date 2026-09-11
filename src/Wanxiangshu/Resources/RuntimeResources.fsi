@@ -11,8 +11,6 @@ type RuntimeResources =
       ProviderLanguageRootsReady: bool }
 
 module RuntimeResources =
-    val loadFor: lang: ProviderLanguage -> RuntimeResources
-    val load: unit -> RuntimeResources
     val install: resources: RuntimeResources -> unit
     val current: unit -> RuntimeResources
     val enforcerRulesFor: lang: ProviderLanguage -> EnforcerRule list

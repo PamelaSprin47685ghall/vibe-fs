@@ -29,7 +29,7 @@ module PluginBoot =
     let create (input: obj) : Task<Boot> =
         task {
             // Fail-fast resource load before any consumer (StaticTools / BlogTool / EnforcerHost).
-            RuntimeResources.install (RuntimeResources.load ())
+            RuntimeResources.install (RuntimeResourceAssembly.load ())
 
             // EMR-001: bootstrap/load the sole model scheduler during Load Phase.
             // This may create the missing user config atomically, but performs no Host call.

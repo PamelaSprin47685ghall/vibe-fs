@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>resources</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>resources-promptcatalog</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>cognitive-environment</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>resources-promptcatalog</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Resources/PromptCatalog.fsi"/>
+    <Compile Include="Resources/PromptCatalog.fs"/>
+  </ItemGroup>
+</Project>

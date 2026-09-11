@@ -719,6 +719,8 @@
     <Compile Include="Execution/Delegation/Fork/Surface.fs"/>
     <Compile Include="Execution/Delegation/HandoffSurface.fsi"/>
     <Compile Include="Execution/Delegation/HandoffSurface.fs"/>
+    <Compile Include="Resources/PromptCatalog.fsi"/>
+    <Compile Include="Resources/PromptCatalog.fs"/>
     <Compile Include="Resources/PromptResources.fsi"/>
     <Compile Include="Resources/PromptResources.fs"/>
     <Compile Include="Resources/EnforcerCatalogResource.fsi"/>
@@ -727,6 +729,8 @@
     <Compile Include="Enforcer/Surface.fs"/>
     <Compile Include="Resources/RuntimeResources.fsi"/>
     <Compile Include="Resources/RuntimeResources.fs"/>
+    <Compile Include="Resources/RuntimeResourceAssembly.fsi"/>
+    <Compile Include="Resources/RuntimeResourceAssembly.fs"/>
     <Compile Include="Resources/PromptSurface.fsi"/>
     <Compile Include="Resources/PromptSurface.fs"/>
     <Compile Include="Git/IntegrationGate.fsi"/>

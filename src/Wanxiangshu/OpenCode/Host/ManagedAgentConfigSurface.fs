@@ -14,7 +14,7 @@ module ManagedAgentConfigSurface =
     /// boundary is also useful to a pure config-contract consumer that does
     /// not construct a plugin instance.
     let installDefaultResources () : unit =
-        RuntimeResources.install (RuntimeResources.load ())
+        RuntimeResources.install (RuntimeResourceAssembly.load ())
 
     let private roleBindingNames () =
         ManagedAgent.requiredNames

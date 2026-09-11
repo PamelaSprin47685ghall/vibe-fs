@@ -80,15 +80,16 @@ module PromptSurface =
         PromptResources.loadBookkeeperSystemFor (languageOf language)
 
     /// Load the complete runtime package bundle as JS-native data.
-    let runtimeLoad () : obj = RuntimeResources.load () |> runtimeToJs
+    let runtimeLoad () : obj =
+        RuntimeResourceAssembly.load () |> runtimeToJs
 
     let runtimeLoadForLanguage (language: string) : obj =
-        RuntimeResources.loadFor (languageOf language) |> runtimeToJs
+        RuntimeResourceAssembly.loadFor (languageOf language) |> runtimeToJs
 
     /// Match plugin initialization: install the package-owned bundle before
     /// consumers such as EnforcerTipGuidance resolve a localized rule.
     let runtimeInstallFromPackage () : unit =
-        RuntimeResources.install (RuntimeResources.load ())
+        RuntimeResources.install (RuntimeResourceAssembly.load ())
 
     let runtimeCurrent () : obj =
         RuntimeResources.current () |> runtimeToJs
