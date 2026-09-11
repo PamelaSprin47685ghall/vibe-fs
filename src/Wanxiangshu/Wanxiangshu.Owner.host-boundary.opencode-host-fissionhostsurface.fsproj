@@ -35,5 +35,7 @@
     <Compile Include="OpenCode/Host/ExplicitResumeSuppression.fs"/>
     <Compile Include="OpenCode/Host/ExplicitSessionResume.fsi"/>
     <Compile Include="OpenCode/Host/ExplicitSessionResume.fs"/>
+    <Compile Include="OpenCode/Host/ExplicitResumeSurface.fsi"/>
+    <Compile Include="OpenCode/Host/ExplicitResumeSurface.fs"/>
   </ItemGroup>
 </Project>

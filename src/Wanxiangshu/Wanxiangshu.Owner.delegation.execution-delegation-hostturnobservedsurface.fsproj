@@ -38,6 +38,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.opencode-host-pluginruntimescope.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.office-capability.foundation-officecapability.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.participant-persona.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
@@ -61,5 +62,7 @@
     <Compile Include="Execution/Delegation/Fork/OpenCode/JoinTool.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Batching.fsi"/>
     <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Batching.fs"/>
+    <Compile Include="OpenCode/JoinResultRendererSurface.fsi"/>
+    <Compile Include="OpenCode/JoinResultRendererSurface.fs"/>
   </ItemGroup>
 </Project>

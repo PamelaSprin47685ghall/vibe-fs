@@ -304,6 +304,15 @@ tool adapter、signal adapter、Attention consumer 与 repository-programming ru
 
 声明图指标为 26 subsystems、218 compile shards（+3）、701 sources（+1）、1818 references（由于新增 3 个分片的必要接线与 16 条零符号剪枝及 DurabilityPort 内部引用从 31 降至 7，净增 3 条声明引用），保持严格 shard DAG。最大 subsystem cycle 仍为 22，GAP-033 保持 PARTIAL。HostSignal Stage 2（叶子 surface 抽取）与 Stage 3（PluginBoot 移至 plugin-composition）、OTW 子系统重分类为 dispatch，以及 ENF-015/016 证明缺口留在后续推进。
 
+**4. OTW 子系统重分类、HostSignal Stage 2 叶子测试 Surface 归属迁移与零符号剪枝：**
+- **OTW 归属修正**：将 `composition-turn-ordinaryturnworkflow.fsproj`（OTW）的子系统声明从 `provider` 修正为 `dispatch`。OTW 作为 turn observation 与 dispatch 调度的编排核心，本属于 `dispatch` 子系统，原归属 `provider` 系历史遗留；重分类后消除跨子系统反向编排倒挂，聚焦编译通过。
+- **HostSignal Stage 2 叶子 Surface 抽取**：
+  * 将 `ChatParamsSurface.fs/.fsi` 从 `host-boundary.opencode-host-hostsignalbootstrap` 抽离，移入其天然归属并已编译 `ChatParamsHook` 的 `execution-model-routing.opencode-host-modelroutingsurface` 分片中；
+  * 将 `JoinResultRendererSurface.fs/.fsi` 从 `hostsignalbootstrap` 抽离，移入实际拥有 `JoinResultRenderer` 的 `delegation.execution-delegation-hostturnobservedsurface` 分片中，并按需补全直接依赖 `foundation-roles`；
+  * 将 `ExplicitResumeSurface.fs/.fsi` 从 `hostsignalbootstrap` 抽离，移入已编译 `ExplicitSessionResume` 的 `host-boundary.opencode-host-fissionhostsurface` 分片中。
+- **HostSignalBootstrap 零符号剪枝**：经严格符号审查，剪除 `hostsignalbootstrap.fsproj` 中未使用的 `managed-chat-execution.execution-session-chatexecution-fold` 与 `dispatch-protocol.composition-turn-reconcilesurface` 2 条 ProjectReference。
+- **指标与验证**：全部分片聚焦编译绿色通过，`node scripts/checks/subsystems.mjs` 输出 26 subsystems / 218 compile shards / 701 sources / 1817 references（净减 1 条）/ 最大 subsystem cycle=22，全部门禁 `node scripts/check.mjs` 绿色通过（exit 0）。GAP-033 保持 PARTIAL。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

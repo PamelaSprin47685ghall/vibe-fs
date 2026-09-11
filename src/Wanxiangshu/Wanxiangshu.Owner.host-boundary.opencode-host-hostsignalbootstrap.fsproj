@@ -49,13 +49,11 @@
  
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-facts.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-fold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.opencode-host-chatadmission-transaction.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.opencode-host-pluginruntimescope.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.session-attachment-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.session-attachment-runtime.fsproj"/>
         <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.opencode-host-turnruntimepreparation.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.composition-turn-reconcilesurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-horizon.opencode-host-messagevisibility.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
 
@@ -69,16 +67,10 @@
     <ProjectReference Include="Wanxiangshu.Owner.degeneration-guard.execution-session-loopdetector.fsproj"/>
     <Compile Include="OpenCode/Host/HostSignalBootstrap.fsi"/>
     <Compile Include="OpenCode/Host/HostSignalBootstrap.fs"/>
-    <Compile Include="OpenCode/JoinResultRendererSurface.fsi"/>
-    <Compile Include="OpenCode/JoinResultRendererSurface.fs"/>
-    <Compile Include="OpenCode/Host/ExplicitResumeSurface.fsi"/>
-    <Compile Include="OpenCode/Host/ExplicitResumeSurface.fs"/>
     <Compile Include="OpenCode/Host/PairProgrammingThoughtSurface.fsi"/>
     <Compile Include="OpenCode/Host/PairProgrammingThoughtSurface.fs"/>
     <Compile Include="OpenCode/Host/PluginHost.fsi"/>
     <Compile Include="OpenCode/Host/PluginHost.fs"/>
-    <Compile Include="OpenCode/Host/ChatParamsSurface.fsi"/>
-    <Compile Include="OpenCode/Host/ChatParamsSurface.fs"/>
     <Compile Include="OpenCode/Plugin/PluginBoot.fsi"/>
     <Compile Include="OpenCode/Plugin/PluginBoot.fs"/>
     <Compile Include="OpenCode/Plugin/PluginHostWiring.fsi"/>
