@@ -27,6 +27,8 @@
 
 `ContextFactFold` 在同一次 fact fold 内直接调用纯 `EnforcementProjection.applyFromEntry`／`applySquash`，使用具名 `EnforcementCycleRecord` 保留类型检查；不存在动态模块查找、手写 union tag 或模块缺失时的默认状态。该依赖指向 `enforcer-projection` 的纯投影分片，不指向 Enforcer runtime。Blogger Coordinator 所需 Nudge 工作流由独立 `dispatch/session-nudge` 分片提供，repair decision 与 Blogger evidence reader 由 `enforcer/repair` 提供，避免经 ingress 或 enforcer-codec 大分片形成编译环。
 
+2026-09-12：`ContextFactFold` 交出聚合写入后，它对 `EnforcementProjection` 的调用形态没变（仍是纯投影 `applyFromEntry`／`applySquash`，值由 `Composition/Durable/DomainFamilyBridge.ContextProjectionBridge` 注入的窄查询提供），但 fold 不再持有 `AgentProjectionSet`：它只认识 `BloggerCycleProjectionState`／`EnforcementProjectionState`／`BlogProjectionState`／`ActivePrefixEpoch` 四个切片，按 `ContextProjectionChange` 列表表达六种事实要写的切片，拒绝文本与 fact 名放进闭合 `ContextFoldRejection`。前缀观测的吸收判定改由 `PrefixEpochProjection.describe` 提供，与 `ProjectionUpdate.prefixOutcome` 共用一份策略。
+
 `XWire.materializeFrozenRecordPrefix` 在读取并校验 coverable frame blobs 后，直接调用纯 `LifecycleWorkRecord.materialize opening frameBodies "" false`。同 session 不重复渲染 Opening，也不纳入 live RawGap；删除动态模块查找及手写 Chronicle fallback，frame 读取失败仍沿原 taskResult 传播。`lifecycle-work-record.test.mjs` 证明 canonical renderer，`prefix-stability/tests/prefix-writeback.test.mjs` 证明真实写回保留 raw Opening 对象与顺序；原 `ctx-opening-floor` 中只匹配源码／注释的 same-session 用例已删除。这些分别成立的证明尚不覆盖 journal → coverable frames → frozen blob 的完整物化路径，不宣称该集成缺口关闭。
 
 ## 依赖关系

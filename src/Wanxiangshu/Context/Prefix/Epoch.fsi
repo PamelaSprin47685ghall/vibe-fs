@@ -34,3 +34,9 @@ module PrefixEpochProjection =
 
     val isReanchored: run: ProviderRunIdentity -> state: ActivePrefixEpoch -> bool
     val hasSnapshot: state: ActivePrefixEpoch -> bool
+
+    /// Absorption policy for prefix observations. `None` means the observation is
+    /// the expected steady state or an already-captured candidate, so the caller
+    /// must write nothing; `Some reason` is the requirement text a refusal is
+    /// reported with.
+    val describe: rejection: PrefixFoldRejection -> string option

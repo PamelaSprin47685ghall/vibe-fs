@@ -17,3 +17,6 @@ module ProviderFailureProjectionBridge =
 
 module CompanionProjectionBridge =
     val fold: projection: AgentProjectionSet -> fact: CompanionFactCases -> Result<AgentProjectionSet, FoldRejection>
+
+module ContextProjectionBridge =
+    val fold: projection: AgentProjectionSet -> fact: ContextFactCases -> Result<AgentProjectionSet, FoldRejection>

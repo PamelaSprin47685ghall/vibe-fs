@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Context.Companion
+open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
@@ -97,3 +98,69 @@ module CompanionProjectionBridge =
         | Ok changes -> Ok(List.fold applyChange projection changes)
         | Error rejection ->
             FoldRejection.reject (CompanionFoldRejection.fact rejection) (CompanionFoldRejection.message rejection)
+
+module ContextProjectionBridge =
+
+    let private cyclesOf (projection: AgentProjectionSet) (sessionId: SessionId) =
+        Map.tryFind sessionId projection.Sessions
+        |> Option.bind (fun session -> session.BloggerCycles)
+
+    let private enforcementOf (projection: AgentProjectionSet) (sessionId: SessionId) =
+        Map.tryFind sessionId projection.Sessions
+        |> Option.bind (fun session -> session.Enforcement)
+
+    let private blogOf (projection: AgentProjectionSet) (sessionId: SessionId) =
+        Map.tryFind sessionId projection.Sessions
+        |> Option.bind (fun session -> session.Blog)
+
+    let private prefixEpochOf (projection: AgentProjectionSet) (sessionId: SessionId) =
+        Map.tryFind sessionId projection.Sessions
+        |> Option.bind (fun session -> session.PrefixEpoch)
+
+    let private applyChange (projection: AgentProjectionSet) (change: ContextProjectionChange) =
+        match change with
+        | ContextProjectionChange.BloggerCyclesSet(sessionId, cycles) ->
+            ProjectionUpdate.updateSession
+                sessionId
+                (fun session ->
+                    { session with
+                        BloggerCycles = Some cycles })
+                projection
+        | ContextProjectionChange.EnforcementSet(sessionId, enforcement) ->
+            ProjectionUpdate.updateSession
+                sessionId
+                (fun session ->
+                    { session with
+                        Enforcement = Some enforcement })
+                projection
+        | ContextProjectionChange.BlogSet(sessionId, blog) ->
+            ProjectionUpdate.updateSession sessionId (fun session -> { session with Blog = Some blog }) projection
+        | ContextProjectionChange.PrefixEpochSet(sessionId, epoch) ->
+            ProjectionUpdate.updateSession
+                sessionId
+                (fun session ->
+                    { session with
+                        PrefixEpoch = Some epoch })
+                projection
+        | ContextProjectionChange.BlogReanchored sessionId ->
+            ProjectionUpdate.updateSession
+                sessionId
+                (fun session ->
+                    { session with
+                        Blog = session.Blog |> Option.map BlogProjection.applyReanchor })
+                projection
+        | ContextProjectionChange.AuxiliaryVisibilityRetired sessionId ->
+            ProjectionUpdate.updateSession sessionId ProjectionUpdate.retireAuxiliaryInjectionVisibility projection
+
+    let fold (projection: AgentProjectionSet) (fact: ContextFactCases) : Result<AgentProjectionSet, FoldRejection> =
+        match
+            ContextFactFold.fold
+                (cyclesOf projection)
+                (enforcementOf projection)
+                (blogOf projection)
+                (prefixEpochOf projection)
+                fact
+        with
+        | Ok changes -> Ok(List.fold applyChange projection changes)
+        | Error rejection ->
+            FoldRejection.reject (ContextFoldRejection.fact rejection) (ContextFoldRejection.message rejection)

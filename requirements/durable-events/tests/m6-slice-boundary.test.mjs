@@ -108,14 +108,16 @@ test('WHAT[DURABLE-EVENTS-023] single-field family folds own their slice and dec
   assert.doesNotMatch(changeFoldSources, /\bAgentProjectionSet\b|\bFoldRejection\b/)
 })
 
-test('WHAT[DURABLE-EVENTS-023] prompt provider and companion folds decide on their own slices while composition owns the aggregate write', () => {
-  // These three families span more than one slice, so the fold stays and returns a
-  // change list over the slices it owns; the bridge writes it back. The Context
-  // (Blogger) fold still writes six slices and is not part of this boundary yet.
+test('WHAT[DURABLE-EVENTS-023] prompt provider companion and context folds decide on their own slices while composition owns the aggregate write', () => {
+  // These families span more than one slice, so the fold stays and returns a
+  // change list over the slices it owns; the bridge writes it back.
   for (const source of [
     'Interaction/Authority/Fold.fs',
     'Participant/Provider/Attempt/Fallback/ProviderFailureFactFold.fs',
     'Context/Companion/CompanionFactFold.fs',
+    // The Context (Blogger) fold writes six slices; it decides which ones move and
+    // leaves the aggregate write and the refusal rendering to the bridge.
+    'Context/Companion/Blogger/ContextFactFold.fs',
   ]) {
     const text = readFileSync(join(SOURCE_ROOT, source), 'utf8')
     assert.doesNotMatch(
@@ -127,7 +129,8 @@ test('WHAT[DURABLE-EVENTS-023] prompt provider and companion folds decide on the
 
   // The session-scoped write helpers are composition's; a domain fold that calls
   // them again would re-invert the dependency this boundary exists to prevent.
-  const writeHelper = /ProjectionUpdate\.(?:updateSession|updateAuthority|updateCompanion)\b/
+  const writeHelper =
+    /ProjectionUpdate\.(?:updateSession|updateAuthority|updateCompanion|retireAuxiliaryInjectionVisibility)\b/
   for (const file of collectSourceFiles(SOURCE_ROOT)) {
     const relative = file.slice(SOURCE_ROOT.length + 1)
     if (relative.startsWith('Composition/')) continue

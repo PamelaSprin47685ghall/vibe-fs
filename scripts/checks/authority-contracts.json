@@ -202,14 +202,14 @@
       "issuers": [
         {
           "file": "src/Wanxiangshu/Context/Companion/Blogger/ContextFactFold.fs",
-          "symbol": "applyEnforcementAndReceipt",
-          "anchor": "{ ProviderRun = payload.ProviderRun\n                          Kind = BlogFrameKind.Entry",
+          "symbol": "fold",
+          "anchor": "{ ProviderRun = payload.ProviderRun\n                      Kind = BlogFrameKind.Entry",
           "owner": "context"
         },
         {
           "file": "src/Wanxiangshu/Context/Companion/Blogger/ContextFactFold.fs",
-          "symbol": "applyReceiptAndTips",
-          "anchor": "{ ProviderRun = payload.ProviderRun\n                      Kind = BlogFrameKind.Squash",
+          "symbol": "fold",
+          "anchor": "{ ProviderRun = payload.ProviderRun\n                  Kind = BlogFrameKind.Squash",
           "owner": "context"
         },
         {

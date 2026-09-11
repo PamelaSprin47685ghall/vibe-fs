@@ -86,7 +86,7 @@ module Fold =
                 { Fact = OrchestratorFoldRejection.fact rejection
                   Reason = OrchestratorFoldRejection.message rejection })
         | AgentFact.Companion companion -> CompanionProjectionBridge.fold projection companion
-        | AgentFact.Context context -> ContextFactFold.fold projection context
+        | AgentFact.Context context -> ContextProjectionBridge.fold projection context
         | AgentFact.Host host -> HostFactFold.fold projection host
         | AgentFact.Fission fission -> ProjectionUpdate.applyFission projection fission
         | AgentFact.Delegation delegation -> DelegationProjectionBridge.foldDelegation projection delegation

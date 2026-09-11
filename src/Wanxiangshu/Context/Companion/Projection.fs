@@ -13,9 +13,9 @@ type CompanionProjection =
 /// Durable Companion cache facts. In-flight Blogger work remains runtime-only.
 ///
 /// Every function takes an already-resolved `CompanionProjection`, not an option:
-/// `Fold.updateCompanion` is the single caller and it defaults the absent case to
-/// `empty` before applying. A second `defaultArg` here would let a caller pass
-/// `None` and silently discard the session's existing companion state.
+/// defaulting and aggregate write-back are handled by composition assembly
+/// (`Composition/Durable/DomainFamilyBridge`). A second `defaultArg` here would let
+/// a caller pass `None` and silently discard the session's existing companion state.
 module CompanionProjection =
 
     let empty = { BloggerSessionId = None }

@@ -145,3 +145,27 @@ module PrefixEpochProjection =
 
     /// COMPANION-009: is a companion-memory prefix in force for this session.
     let hasSnapshot (state: ActivePrefixEpoch) = Option.isSome state.Snapshot
+
+    /// PERSIST-010 prefix-epoch absorption policy: `None` means the caller must
+    /// write nothing, `Some reason` is the requirement text a refusal is
+    /// reported with.
+    ///
+    /// `StalePrefixEpoch` is absorbed, unlike its frame counterpart. Every
+    /// epoch-advancing line carries the epoch it expected, so a replayed rebase or
+    /// reanchor — the crash-recovery path in CTX-012 deliberately re-attempts
+    /// both — arrives stale and means "already applied". That is what makes
+    /// recovery idempotent without a second dedupe mechanism. `CandidateNotNew`
+    /// is absorbed for the same reason: CTX-011 already refuses to build such a
+    /// probe, so a line carrying one is a replay.
+    let describe (rejection: PrefixFoldRejection) : string option =
+        match rejection with
+        | PrefixFoldRejection.StalePrefixEpoch _
+        | PrefixFoldRejection.CandidateNotNew
+        // HOST-006: the same compaction observed twice. Absorbed rather than fatal —
+        // the observation repeats on every reconcile because the compaction message
+        // stays in the transcript, so this is the expected steady state, not corruption.
+        | PrefixFoldRejection.CompactionAlreadyReanchored _ -> None
+        | PrefixFoldRejection.NonSequentialPrefixEpoch ->
+            Some "prefix epoch is not the successor of the previous one (PERSIST-010)"
+        | PrefixFoldRejection.CutoffRetreated(committed, proposed) ->
+            Some(sprintf "promoted cutoff %d is earlier than the committed %d (CTX-011)" proposed committed)
