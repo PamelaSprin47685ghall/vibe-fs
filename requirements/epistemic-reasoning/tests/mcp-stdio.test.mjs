@@ -7,10 +7,11 @@ import { tmpdir } from 'node:os'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { relativeServerEntry } from './support.mjs'
 
 // ─── repo paths ──────────────────────────────────────────────────────────────
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
-const serverEntry = join(repoRoot, 'dist', 'Sphinx', 'McpServer.js')
+const serverEntry = join(repoRoot, relativeServerEntry)
 const pkgVersion = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')).version
 
 // ─── shared payloads (reused from mcp-wire-characterization.test.mjs) ─────────
@@ -55,7 +56,7 @@ function investigateArgs(handle, actionKey) {
 
 // ─── spawn helper ────────────────────────────────────────────────────────────
 /**
- * Spawns `node dist/Sphinx/McpServer.js` and returns a client that speaks
+ * Spawns the Sphinx MCP server entry and returns a client that speaks
  * newline-delimited JSON-RPC 2.0 over stdio.  Every non-empty stdout line is
  * captured in `lines` for purity assertions.
  */

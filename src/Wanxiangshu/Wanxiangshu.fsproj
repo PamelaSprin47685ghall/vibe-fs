@@ -1308,6 +1308,8 @@
     <Compile Include="Sphinx/GenericDurability.fs"/>
     <Compile Include="Sphinx/McpServer.fsi"/>
     <Compile Include="Sphinx/McpServer.fs"/>
+    <Compile Include="Sphinx/ServeEntry.fsi"/>
+    <Compile Include="Sphinx/ServeEntry.fs"/>
     <Compile Include="Sphinx/Surface.fsi"/>
     <Compile Include="Sphinx/Surface.fs"/>
     <Compile Include="Repository/Programming/Js/GeneratorSurface.fsi"/>

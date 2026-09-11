@@ -10,7 +10,13 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.eventstore-integrator-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-event-vocabulary-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-runtime.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-serve-runtime.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.persistence-eventstore-canonicalintegrator.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.persistence-eventstore-processeventlog.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
     <Compile Include="Sphinx/IntegrationRules.fsi"/>
     <Compile Include="Sphinx/IntegrationRules.fs"/>
+    <Compile Include="Sphinx/ServeEntry.fsi"/>
+    <Compile Include="Sphinx/ServeEntry.fs"/>
   </ItemGroup>
 </Project>

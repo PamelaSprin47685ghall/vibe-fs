@@ -8,4 +8,4 @@ module McpServer =
     val createDurable: sessions: SessionStore -> events: IEventStore -> obj
     val serveStdio: store: SessionStore -> JS.Promise<unit>
     val serveDurable: sessions: SessionStore -> events: IEventStore -> JS.Promise<unit>
-    val serveDefault: unit -> JS.Promise<unit>
+    val bootDurable: events: IEventStore -> Result<SessionStore, string>

@@ -4,7 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { close, createStore, start, resume, state, assessWhy } from './support.mjs'
+import { close, createStore, start, resume, state, assessWhy, relativeServerEntry } from './support.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '../../..')
@@ -122,5 +122,5 @@ test('WHAT[EPI-002] fsharp_kernel_has_no_agent_host_domain_dependency_and_sdk_st
 
   const build = readFileSync(join(root, 'scripts/build.mjs'), 'utf8')
   assert.doesNotMatch(build, /fs\.cpSync\([^\n]*sphinx/i)
-  assert.match(build, /dist[^\n]*Sphinx[^\n]*McpServer\.js/)
+  assert.ok(build.includes(relativeServerEntry))
 })

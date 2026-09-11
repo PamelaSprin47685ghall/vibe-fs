@@ -1094,7 +1094,7 @@ export function detectChangedFiles({
 
   const essentialOutputs = [
     path.join(resolvedOutputDir, 'OpenCode/Plugin/Plugin.js'),
-    path.join(resolvedOutputDir, 'Sphinx/McpServer.js'),
+    path.join(resolvedOutputDir, 'Sphinx/ServeEntry.js'),
   ]
 
   const isProductionOutput = resolvedOutputDir === norm(path.resolve(root, 'dist'))

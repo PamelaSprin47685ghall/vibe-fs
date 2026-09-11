@@ -20,6 +20,7 @@
 /src/Wanxiangshu/Sphinx/Representation.fs
 /src/Wanxiangshu/Sphinx/RuntimeTypes.fs
 /src/Wanxiangshu/Sphinx/Search.fs
+/src/Wanxiangshu/Sphinx/ServeEntry.fs
 /src/Wanxiangshu/Sphinx/Session.fs
 /src/Wanxiangshu/Sphinx/State.fs
 /src/Wanxiangshu/Sphinx/Surface.fs

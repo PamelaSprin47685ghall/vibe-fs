@@ -1,7 +1,7 @@
 // Split from tests/unit/agent/sphinx-mcp.test.mjs (cutover Wave 2a); owner: epistemic-reasoning
 //
 // Sphinx MCP kernel identity/commands 事实：serverName / `sphinx_*` permissionKey /
-// `dist/Sphinx/McpServer.js` 入口 / isTool 判定 / local + fixture 命令形态。
+// `dist/Sphinx/ServeEntry.js` 入口 / isTool 判定 / local + fixture 命令形态。
 // （launch/env/apply → host-boundary；Inquiry-only wildcard → capability-enforcement。）
 
 import assert from 'node:assert/strict'
@@ -19,7 +19,7 @@ import {
 test('WHAT[EPI-004] AGENT_030_kernel_identity_and_commands', () => {
   assert.equal(serverName, 'sphinx')
   assert.equal(permissionKey, 'sphinx_*')
-  assert.equal(relativeServerEntry, 'dist/Sphinx/McpServer.js')
+  assert.equal(relativeServerEntry, 'dist/Sphinx/ServeEntry.js')
   assert.equal(isTool('sphinx_start'), true)
   assert.equal(isTool('sphinx_resume'), true)
   assert.equal(isTool('stealth-browser-mcp_get_debug_view'), false)

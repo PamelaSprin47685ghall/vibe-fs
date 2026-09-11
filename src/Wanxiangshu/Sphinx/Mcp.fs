@@ -9,7 +9,7 @@ module SphinxMcp =
     let serverName = "sphinx"
     let permissionKey = "sphinx_*"
     let toolPrefix = "sphinx_"
-    let relativeServerEntry = "dist/Sphinx/McpServer.js"
+    let relativeServerEntry = "dist/Sphinx/ServeEntry.js"
 
     let isTool (name: string) =
         not (String.IsNullOrWhiteSpace name) && name.StartsWith toolPrefix
