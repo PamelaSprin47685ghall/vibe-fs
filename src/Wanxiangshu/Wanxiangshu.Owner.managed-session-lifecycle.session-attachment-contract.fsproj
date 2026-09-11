@@ -7,7 +7,6 @@
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-syncdelegaterole.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
     <Compile Include="Execution/Session/Attachment/ReuseScope.fsi"/>

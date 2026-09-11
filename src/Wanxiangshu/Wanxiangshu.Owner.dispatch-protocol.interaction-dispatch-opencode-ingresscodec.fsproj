@@ -9,7 +9,6 @@
   <ItemGroup>
         <ProjectReference Include="Wanxiangshu.Owner.session-ontology.opencode-host-sessionexecutionbinding.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.dispatch-runtime.fsproj" />
-    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.session-nudge.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.execution-session-recovery-model.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj" /><ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.interaction-dispatch-metadata-codec.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj" />

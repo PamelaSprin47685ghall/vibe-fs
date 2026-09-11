@@ -8,11 +8,8 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-companionfactfold.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.degeneration-guard.execution-session-loopdetector.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-host-adapter.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.execution-session-recovery-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.interaction-dispatch-opencode-ingresscodec.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-agentjournal.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>

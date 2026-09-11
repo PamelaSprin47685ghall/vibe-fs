@@ -25,7 +25,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-event-envelope.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.opencode-host-chatadmission-intent.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.execution-fission-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.execution-fission-fold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>

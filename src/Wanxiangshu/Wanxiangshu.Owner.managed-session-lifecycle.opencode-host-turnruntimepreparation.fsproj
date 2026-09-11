@@ -20,7 +20,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.execution-fission-fold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.execution-fission-opencode-host.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.opencode-host-pluginruntimescope.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.participant-persona.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.prefix-stability.context-prefix-wire.fsproj"/>
     <Compile Include="OpenCode/Host/TurnRuntimePreparation.fsi"/>
     <Compile Include="OpenCode/Host/TurnRuntimePreparation.fs"/>
