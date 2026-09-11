@@ -427,6 +427,38 @@ test('WHAT[EMR-010] EMR_010_borrowed_step_handoff_reuses_the_same_credit', async
   assert.equal(snapshotOccupied(runtime).length, 1)
 })
 
+test('WHAT[EMR-010] EMR_010_owner_transform_entry_reclaims_foreign_inflight_borrow', async () => {
+  const only = target('provider/only')
+  const runtime = createRuntime(providerLimited({ provider: 1 }, { coder: [only], manager: [only] }))
+
+  await acquireTarget(runtime, 'parent', 'msg-parent', 'coder', 'alice')
+  await acquireTarget(runtime, 'child', 'msg-child', 'manager', 'bob', 'parent')
+
+  await enterProviderStep(runtime, 'parent', 'msg-parent', [])
+  endProviderStep(runtime, 'parent', 'msg-parent', 'run-parent-0')
+  assert.deepEqual(capacitySnapshot(runtime).tokenStateCounts, { idle: 1, inFlight: 0, retiring: 0 })
+
+  await enterProviderStep(runtime, 'child', 'msg-child', [])
+  assert.deepEqual(
+    capacitySnapshot(runtime).tokenStateCounts,
+    { idle: 0, inFlight: 1, retiring: 0 },
+    'descendant borrow holds the owner credit in flight',
+  )
+
+  // Leave the borrower's step open (the Long Stroke failure mode: EndStep blocked / never arrives).
+  // Owner re-entering messages.transform must reclaim — not hang behind the foreign InFlight step.
+  const parentNext = enterProviderStep(runtime, 'parent', 'msg-parent', ['run-parent-0'])
+  assert.deepEqual(
+    capacitySnapshot(runtime).waiters.map((waiter) => waiter.sessionId),
+    [],
+    'owner transform-entry reclaim grants immediately; must not leave the owner waiting behind a foreign InFlight borrow',
+  )
+  assert.deepEqual(capacitySnapshot(runtime).tokenStateCounts, { idle: 0, inFlight: 1, retiring: 0 })
+  await parentNext
+  suppressProviderStep(runtime, 'parent', 'msg-parent')
+  assert.deepEqual(capacitySnapshot(runtime).tokenStateCounts, { idle: 1, inFlight: 0, retiring: 0 })
+})
+
 test('WHAT[EMR-010] EMR_010_older_borrowed_step_precedes_later_owned_step', async () => {
   const only = target('provider/only')
   const runtime = createRuntime(providerLimited({ provider: 1 }, { coder: [only], manager: [only] }))

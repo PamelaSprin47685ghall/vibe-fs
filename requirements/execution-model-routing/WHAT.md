@@ -50,7 +50,7 @@ Host 的 `opencode.json` 不作为 managed model 的真相源。系统不要求�
 ## EMR-010: provider capacity 独立成可抢占 token；只凭显式 lender 借用
 
 ModelTarget 物理绑定与 provider capacity token 严格解耦。在 provider 请求发出前，`experimental.chat.messages.transform` 负责获取对应 provider 的 capacity token。
-借用只能使用 acquire 输入中 `lenderSessionId` 显式指定的 lender 的 credit；无 lender 输入的 demand 只走普通容量，绝不因派生关系、 ambient 拓扑或同名 session 而获得信用。token 仅在 provider-step 边界转移，lender 召回时需等待借用方 step 结束。
+借用只能使用 acquire 输入中 `lenderSessionId` 显式指定的 lender 的 credit；无 lender 输入的 demand 只走普通容量，绝不因派生关系、 ambient 拓扑或同名 session 而获得信用。token 仅在 provider-step 边界转移。显式召回（release/retire）须等待借用方 step 结束；但当 lender 自己的 `experimental.chat.messages.transform` 为同一 owned credit 再次进入后续 provider step 时，容量所有者必须在仲裁前回收该 credit 上任何外来 InFlight/Retiring step（transform 入口抢占召回）：回合内后代借用可阻塞属主，属主 transform 一旦触发即回收。等待中的 borrower 仍按单调序号优先于较晚的 lender owned step，不得被该回收饿死。
 同一 token 同时面对多个可执行 provider-step demand 时，必须按 demand 的单调序号选择最早者；owned、borrowed、ordinary 只决定该 demand 可使用哪枚 token，不构成调度优先级。较晚到达的 lender owned step 不得越过已等待且可借用该 token 的 child step。
 Host 开始执行某个 managed tool 时，tool context 的 exact `ProviderRunIdentity` 构成 provider→tool 的因果 step 边界：在任何 capability/role gate 与 tool body 运行前，必须用当前冻结的 `PhysicalUserMessageId` 结束该 provider step，使 token 进入可借用的 idle 状态。工具体可以同步等待 descendant provider work，因此严禁把 provider capacity 持有到 tool body 返回、严禁以 wall-clock timeout 猜测何时释放，也严禁通过允许借用真实仍在执行的 token 伪造并发容量。
 

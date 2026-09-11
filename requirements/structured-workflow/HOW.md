@@ -465,6 +465,18 @@ tool adapter、signal adapter、Attention consumer 与 repository-programming ru
 - **模式 B（`no-declared-turn`）证据**（与模式 A 不同源）：`/tmp/lst2-6.log` 第 205 行 `[MOCK-FATAL] first script mismatch: reason=no-declared-turn session=ses_f6fd9d29cffeLBoixBb72dFqHl parent=ses_f6fd9d370ffee2nA54RvB7263i lane=manager kind=chat step=0 … lastUser="# Establish read-only evidence about the current delivery through the entitled offices. Judge it independently on all eight dimensions, then submit the review tool once."`，候选集全部是 `g2-inspector-*`/`protocol-repair.0`/`manager-t1-*` 的 step-0 条目。即：一条 inspector/review charge 的 provider 请求落到一个被解析为 `manager` lane 的会话上，而脚本只为 inspector 条目声明了绑定；要么产品把该 charge 路由到了错误会话，要么 mock 的 lane 解析对该产品新会话缺失绑定。下一步：带 `MOCK_TRACE=1` 复现并在失败时保留世界，用 `session` 表确认 `ses_f6fd9d29…` 的 parent/agent 与产品侧 prompt 路由记录，二者取一后再决定改产品还是补脚本（不得两边同时动）。
 - **结构侧负结果（本班）**：`sphinx → persistence` 的 6 条引用逐条有真实符号消费（`EventEnvelope`/`EventStreamId`/`normalize`、`CanonicalIntegrator.createWithRules`/`baseRules`、`IntegrationRule`、`IEventStore`/`AppendError`/`SemanticCut`、`EventStore.createLocal`），属诚实知识依赖，**不得删**；`opencode-host-hostsignalbootstrap` 的 33 条引用按声明符号逐条检查也未发现零符号候选（本班未做 compile 探针）。
 
+15. **EMR-010 属主 transform 入口回收（Long Stroke 模式 A 危墙拆除）；SCC 保持 19**：
+
+上一班把模式 A 钉到「属主 owned credit 借给 companion blogger 后，blogger 的 `EndStep` 因 `inFence=true` 拒结束 → token 永久 InFlight → 属主下一步 `owned=true` 又被 `demandOwnsToken` 堵死 ordinary」。本班按用户钉死的语义做结构修复，而不是再测一轮：
+
+- **语义**：回合内后代借用可阻塞属主；一旦属主自己的 `experimental.chat.messages.transform` 为同一 owned credit 再次进入后续 provider step，必须在仲裁前回收该 credit 上任何外来 InFlight/Retiring step。这本来就是 HOW 写明的「messages.transform = 容量仲裁 + Step Fence 拦截」；缺口是 `reconcileFence` 只按 step 的 `(session,msg)` 匹配，借出后 step 已是后代，属主再入捞不到自己的 token。
+- **落地**：`BorrowingCapacity.reconcileFence` 在自有 fence 推进之外，按 `ownedTokenByExecution[ownerKey]` 找到属主 credit，若其 step 属于外来会话/消息则 `finishStep` 回收；helper 拆成 `tryDictionaryValue` / `stepBelongsTo` / `foreignBorrowedStepToken`，控制金字塔扫描仍为 0 nested decisions。
+- **法律**：`EMR-010` WHAT/HOW 同步写明「显式 release/retire 仍等借用方 step 结束；属主 transform 触发即回收；等待中的 borrower 仍按单调序号优先，不得被该回收饿死」。
+- **能失败的旧实现证明**：`EMR_010_owner_transform_entry_reclaims_foreign_inflight_borrow`——descendant borrow 把属主 credit 留在 InFlight，属主再入 `enterProviderStep` 必须立刻获授、不得留下 waiter；旧实现会在此处挂死。既有 `EMR_010_older_borrowed_step_precedes_later_owned_step` 仍绿（借用优先序未伤）。
+- **e2e 证据**：修复后 16 次串行 Long Stroke = 15 通过 + 1 次 11s 模式 B（`[MOCK-FATAL] no-declared-turn` inspector charge 落在 `lane=manager`）；**0 次 60s 模式 A capacity 卡死**。模式 B 是独立缺口（脚本 lane 绑定 / 产品路由），不得与模式 A 混修。
+
+验证：`subsystems` 26/229/709/1842 cycle=19；EMR suite 78/0；verification **3973/0**（+1 回收证明）；integration 279/0；`check.mjs`/`format:check` exit 0。GAP-033 仍 PARTIAL（本班未拆 SCC，是 capacity 语义危墙拆除）。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

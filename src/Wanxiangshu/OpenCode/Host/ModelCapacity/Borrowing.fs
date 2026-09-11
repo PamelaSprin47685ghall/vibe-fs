@@ -261,13 +261,28 @@ type internal BorrowingCapacity<'target>
             ledger.Retarget(token.Credit, token.OwnerTarget) |> ignore
         | CapacityCreditState.Retiring _ -> releaseToken token
 
+    let tryDictionaryValue (table: Dictionary<'key, 'value>) (key: 'key) =
+        match table.TryGetValue key with
+        | true, value -> Some value
+        | false, _ -> None
+
+    let stepBelongsTo sessionId physicalUserMessageId (step: CapacityStep) =
+        step.SessionId = sessionId && step.PhysicalUserMessageId = physicalUserMessageId
+
+    let foreignBorrowedStepToken sessionId physicalUserMessageId (token: CapacityCredit<'target>) =
+        match token.State with
+        | CapacityCreditState.InFlight step
+        | CapacityCreditState.Retiring step when not (stepBelongsTo sessionId physicalUserMessageId step) -> Some token
+        | _ -> None
+
     let reconcileFence sessionId physicalUserMessageId fence =
+        // Own-step fence progress: finish the owner's current step when the new
+        // transform fence strictly supersedes the in-flight fence.
         tokens.Values
         |> Seq.tryFind (fun token ->
             match token.State with
             | CapacityCreditState.InFlight step
-            | CapacityCreditState.Retiring step ->
-                step.SessionId = sessionId && step.PhysicalUserMessageId = physicalUserMessageId
+            | CapacityCreditState.Retiring step -> stepBelongsTo sessionId physicalUserMessageId step
             | CapacityCreditState.Idle -> false)
         |> Option.iter (fun token ->
             match token.State with
@@ -275,6 +290,17 @@ type internal BorrowingCapacity<'target>
             | CapacityCreditState.Retiring step when not (Set.isEmpty (Set.difference fence step.Fence)) ->
                 finishStep token
             | _ -> ())
+
+        // Owner transform-entry reclaim: when the owner re-enters messages.transform
+        // for this execution, reclaim the owned credit from any foreign InFlight/
+        // Retiring step (descendant borrow). Within a turn the owner may stay blocked
+        // by that borrow; once the owner's transform fires, the credit returns.
+        // Waiting borrowers keep sequence priority via drain (EMR-010).
+        executionKey sessionId (Some physicalUserMessageId)
+        |> tryDictionaryValue ownedTokenByExecution
+        |> Option.bind (tryDictionaryValue tokens)
+        |> Option.bind (foreignBorrowedStepToken sessionId physicalUserMessageId)
+        |> Option.iter finishStep
 
 
     let grant (token: CapacityCredit<'target>) (demand: CapacityStepDemand<'target>) =
