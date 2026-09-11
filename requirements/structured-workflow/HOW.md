@@ -323,6 +323,21 @@ tool adapter、signal adapter、Attention consumer 与 repository-programming ru
   * `speculative-investigation.strength-opencode-settings`：剪除未使用的 `sessionquiescencegate`。
 - **指标与门禁**：声明图指标变为 26 subsystems、218 compile shards、701 sources、1809 references（净减 8 条，从 1817 降至 1809）；shard 保持无环 DAG；最大 subsystem SCC 仍为 22。相关门禁 `subsystems.mjs`、`subsystem-boundaries.test.mjs` 与 `check.mjs` 全部通过，GAP-033 保持 PARTIAL。
 
+**6. 剥离 output 子系统出环（SCC 22→21）、RuntimeResources 细粒度分片抽取与零符号剪枝：**
+在基准 `081aabc36`（26 subsystems, 218 compile shards, 701 sources, 1809 refs, 最大 subsystem SCC 22）上继续实施 GAP-033 核心解环与知识细粒度解耦：
+- **解环 output 子系统（SCC 22→21）**：
+  * 将 `output-distillation.process-largegatesurface.fsproj` 的 `WanxiangshuSubsystem` 归属由 `output` 修正为 `process`（`WanxiangshuSemanticOwner` 保持 `output-distillation` 不变）；
+  * 消除跨子系统反向依赖：原先 `process/opencode-tools-ptytool` 对 `output/process-largegatesurface` 的引用转为 `process` 子系统内部引用；`output` 子系统入度变为 0，成功从全局最大强连通分量中剥离，最大 subsystem SCC 成功由 22 降至 21；
+  * 同步更新 `scripts/checks/authority-contracts.json` 中 `RequirePermit DistillationRuntime` 的 owner 为 `process`，`authority-boundary` 检查保持通过。
+- **RuntimeResources 细粒度分片抽取（Rank-2 解耦）**：
+  * 新建分片 `cognitive-environment.resources-runtimeresources.fsproj`（归属 `resources` 子系统），承接从 `distribution.resources-enforcercatalogresource` 抽出的 `RuntimeResources.fs/.fsi` 编译；
+  * 重定向 6 个仅需 `RuntimeResources` 的消费分片（`promptsurface`、`enforcer-repair`、`enforcer-guidance-tip`、`opencode-host-managedagentconfig`、`opencode-tools-executortoolsurface`、`strength-opencode-settings`），切断其对 `resources-enforcercatalogresource` 的引用，消除 `promptsurface` → `enforcercatalogresource` 跨分片直接依赖，并顺带消除了 `strength` → `enforcer` 经由 settings 的唯一跨子系统引用；
+  * 为同时使用两侧的 `provider-system-transform.fsproj` 补充对 `resources-runtimeresources` 的显式引用；保留 `resources` ↔ `enforcer` / `provider` 的真实必要依赖。
+- **零符号剪枝与格式收敛**：
+  * 剪除 6 条经符号复核零使用的跨分片引用：`strength-persistence-durabilityport` 去除 `foundation-outcome`；`composition-turn-ordinaryturnworkflow` 去除 `execution-session-recovery-model`；`opencode-host-hostsignalbootstrap` 去除 `wait-diagnostic-adapter`、`composition-durable-fact`、`session-attachment-runtime`；`repository-knowledge-casebook-model` 去除 `foundation-roles`；经严格符号复核保留（KEEP）`opencode-host-modelroutingsurface` 对 `fissionhostsurface` 的引用（消费 `ExplicitResumeSuppression`）；
+  * 格式整理：收敛 `modelroutingsurface` 与 `enforcercatalogresource` 的单行紧凑 XML 格式。
+- **指标与门禁**：声明图指标变为 26 subsystems、**219** compile shards（+1）、701 sources、**1809** references、shard DAG 保持严格无环；最大 subsystem SCC 成功降至 **21**。全套门禁 `node scripts/checks/subsystems.mjs`、`subsystem-boundaries.test.mjs` 与 `node scripts/check.mjs` 均绿色通过。单子系统剥离不代表全表独立替换就绪，GAP-033 保持 **PARTIAL**。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

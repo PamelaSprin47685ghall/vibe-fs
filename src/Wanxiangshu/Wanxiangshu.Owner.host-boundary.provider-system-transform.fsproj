@@ -5,6 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.distribution.resources-enforcercatalogresource.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-runtimeresources.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-ledger.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-model.fsproj" />

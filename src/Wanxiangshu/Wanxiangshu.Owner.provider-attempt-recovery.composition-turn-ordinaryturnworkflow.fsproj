@@ -3,7 +3,6 @@
     <WanxiangshuCompileShard>composition-turn-ordinaryturnworkflow</WanxiangshuCompileShard>
 <WanxiangshuSemanticOwner>provider-attempt-recovery</WanxiangshuSemanticOwner>…<WanxiangshuOwnerLocality>composition-turn-ordinaryturnworkflow</WanxiangshuOwnerLocality><WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>…</PropertyGroup><ItemGroup>    <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-companionfactfold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-hostturnobservedsurface.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.execution-session-recovery-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.interaction-dispatch-nudge.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj"/>

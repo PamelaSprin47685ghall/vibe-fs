@@ -415,7 +415,7 @@
       "symbol": "RequirePermit",
       "anchor": "type RequirePermit = unit -> Task<Result<FamilyRecoveryPermit, string>>",
       "classification": "Vocabulary",
-      "owner": "output",
+      "owner": "process",
       "what": "ENF-014",
       "issuers": [],
       "whatOwners": {
