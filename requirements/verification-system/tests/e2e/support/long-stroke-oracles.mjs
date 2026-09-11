@@ -350,8 +350,8 @@ export async function holdChildC1UntilLabor(scenario) {
 /**
  * Script the owner-driven Manager incarnations without inventing a Reviewer identity.
  * The initial authority prompt and later manager-assess resource keep separate
- * declarations; the reopened owner resource closes the audit turn by delivery:
- * initial-low→work, candidate-perfect→finish, conflict-low→repair,
+ * declarations; the reopened owner resource serves review or suicide closes
+ * by delivery: initial-low→work, candidate-perfect→finish, conflict-low→repair,
  * repaired-perfect→finish, rebased-perfect→finish. HumanRoot:
  * low→Continue, perfect→Accepted.
  * Every logical step still crosses the real review/suicide/resume tools and durable
@@ -427,8 +427,14 @@ export async function bindManagerLoopSequence(scenario) {
   runtime.consume = (body, selection, context) => {
     const { entry, attempt } = selection ?? {};
     if (entry?.id === 'manager-loop.0') {
-      latestManagerAuditAttempt = attempt;
+      latestManagerAuditAttempt = Math.max(latestManagerAuditAttempt, attempt);
       if (attempt > 1) entry.respond = attempt === 3 ? repairAudit() : candidatePerfect();
+    } else if (entry?.turnId === 'manager-reopened-loop' && (entry.step === 0 || entry.id === 'manager-reopened-loop.0')) {
+      latestManagerAuditAttempt = Math.max(latestManagerAuditAttempt + 1, attempt ?? 1);
+      const n = latestManagerAuditAttempt;
+      if (n > 1) {
+        entry.respond = n === 3 ? repairAudit() : candidatePerfect();
+      }
     } else if (entry?.id === 'manager-loop.1') {
       entry.respond = latestManagerAuditAttempt === 1
         ? initialLoopAction

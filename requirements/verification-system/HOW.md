@@ -22,6 +22,7 @@
 - 严禁顶层测试用例直接调用底层计时器的内部 advance 接口，防止由于传输层噪声或背景任务活动导致看门狗被非法延期。
 - unit/integration/package 的 process-isolated node:test child 由外部 supervisor 管理 verdict-silence 与 suite backstop；`run-inner.mjs` 不把叶子预算下发为整份文件的 timeout，也不把共享 AbortSignal 扇出到全部文件 worker。需要 timeout-and-forget 的叶子 proof 在自己的 `test` options 中声明 timeout。
 - Long Stroke `waitAny` 只等待 schema 闭集内首个 expectation 事件；winner 原子取消全部 sibling waiter 并返回精确 signal id，禁止用轮询、sleep 或双重独立等待猜测竞态结果。
+- Long Stroke `manager-reopened-loop` 绑定 `runtime/manager-assess`：属主再开迭代时该文案可落到 Manager 会话的 step=0（fresh turn）或 step=1（finish-resource 竞态续写）。脚本必须同时声明 optional `runtimeStep = 0`（`review`）与 `runtimeStep = 1`（`suicide`）；缺 step=0 会在 `resolveEntry` 上以 `no-declared-turn` 假失败。`internal` turn 不得声明 `lane`；候选里的 `@undefined` 是未绑 lane 的诊断噪声，不是 inspector 误路由。证明：`e2e-event-ceiling.test.mjs` 钉死 assess@step0/1 → `manager-reopened-loop.0/.1`。
 
 ### 3. 物理契约显式声明（`physical-contract`）
 

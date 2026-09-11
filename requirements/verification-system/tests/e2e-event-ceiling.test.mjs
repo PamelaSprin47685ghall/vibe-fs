@@ -129,6 +129,37 @@ test('WHAT[VERIFICATION-SYSTEM-003] Long Stroke keeps one Manager loop and two e
     'manager-join-guard.0',
   );
 
+  const assessUser =
+    '# Establish read-only evidence about the current delivery through the entitled offices. Judge it independently on all eight dimensions, then submit the review tool once.';
+  const loopRequest = (turn, step) => ({
+    messages: [
+      { role: 'user', content: turn },
+      ...Array.from({ length: step }, (_, index) => ({ role: 'assistant', content: `reply-${index}` })),
+    ],
+    tools: loopTools.map((name) => ({ name })),
+  });
+
+  const reopened0 = byId.get('manager-reopened-loop.0');
+  assert.equal(reopened0?.step, 0);
+  assert.equal(reopened0?.optional, true);
+  assert.equal(reopened0?.internal, true);
+  assert.equal(reopened0?.respond?.tool, 'review');
+
+  const reopened1 = byId.get('manager-reopened-loop.1');
+  assert.equal(reopened1?.step, 1);
+  assert.equal(reopened1?.optional, true);
+  assert.equal(reopened1?.internal, true);
+  assert.equal(reopened1?.respond?.tool, 'suicide');
+
+  assert.equal(
+    resolveEntry(loopRequest(assessUser, 0), result.scenario.entries, bindings, context).matched?.id,
+    'manager-reopened-loop.0',
+  );
+  assert.equal(
+    resolveEntry(loopRequest(assessUser, 1), result.scenario.entries, bindings, context).matched?.id,
+    'manager-reopened-loop.1',
+  );
+
   // Every live action in the reusable authority-first loop is exact; obsolete
   // explicit repair-resume and the optional join-guard race stay out of must.
   assert.equal(result.scenario.flow.filter((step) => step.waitAny).length, 0);
