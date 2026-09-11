@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>relay</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>interaction</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>mission-relay-reviewtool</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>relay-assessment</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>mission-relay-reviewtool</WanxiangshuOwnerLocality>
