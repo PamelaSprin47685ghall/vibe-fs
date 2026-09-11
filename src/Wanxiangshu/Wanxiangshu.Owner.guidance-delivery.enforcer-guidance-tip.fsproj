@@ -31,10 +31,14 @@
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-association.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.execution-session-sessionstartedatledger.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.digest.fsproj"/>
     <Compile Include="Enforcer/Guidance/Tip.fsi"/>
     <Compile Include="Enforcer/Guidance/Tip.fs"/>
     <Compile Include="OpenCode/Host/PairProgrammingThoughtTransform.fsi"/>
     <Compile Include="OpenCode/Host/PairProgrammingThoughtTransform.fs"/>
+    <Compile Include="OpenCode/Host/PairProgrammingThoughtSurface.fsi"/>
+    <Compile Include="OpenCode/Host/PairProgrammingThoughtSurface.fs"/>
     <Compile Include="Enforcer/Guidance/TipSurface.fsi"/>
     <Compile Include="Enforcer/Guidance/TipSurface.fs"/>
   </ItemGroup>

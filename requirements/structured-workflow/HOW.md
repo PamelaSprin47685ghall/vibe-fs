@@ -313,6 +313,16 @@ tool adapter、signal adapter、Attention consumer 与 repository-programming ru
 - **HostSignalBootstrap 零符号剪枝**：经严格符号审查，剪除 `hostsignalbootstrap.fsproj` 中未使用的 `managed-chat-execution.execution-session-chatexecution-fold` 与 `dispatch-protocol.composition-turn-reconcilesurface` 2 条 ProjectReference。
 - **指标与验证**：全部分片聚焦编译绿色通过，`node scripts/checks/subsystems.mjs` 输出 26 subsystems / 218 compile shards / 701 sources / 1817 references（净减 1 条）/ 最大 subsystem cycle=22，全部门禁 `node scripts/check.mjs` 绿色通过（exit 0）。GAP-033 保持 PARTIAL。
 
+**5. PairProgrammingThoughtSurface 迁移、HostSignal Stage 3 插件接线移入 PluginComposition 及稀疏剪枝：**
+在基准 `bccee6d39`（1817 refs）上推进 HostSignal 重构收口与零符号稀疏剪枝：
+- **PairProgrammingThoughtSurface 归属迁移**：将 `PairProgrammingThoughtSurface.fs/.fsi` 从 `host-boundary.opencode-host-hostsignalbootstrap` 移入 `guidance-delivery.enforcer-guidance-tip`，并为其补充直接依赖 `semantic-trace.context-trace-model` 与 `runtime-platform.digest`；HSB 随之剪除仅供 PPT 消费的 `enforcer-guidance-tip`、`guidelineprojection`、`context-trace-model`、`companion-fact`、`companionfactfold` 5 条引用，并经严格符号复核保留 `companion-runtimesurface` 以供给 `HostCompactionObserver`。
+- **HostSignal Stage 3 插件接线迁移至 PluginComposition**：将 Plugin Cluster B（`PluginHost.fs/.fsi`、`PluginBoot.fs/.fsi`、`PluginHostWiring.fs/.fsi`、`PluginSessionWiring.fs/.fsi`、`PluginRecoveryWiring.fs/.fsi`）整体移入 `opencode-plugin.plugin-composition`（物理位置排列于 `BloggerChronicleText` 之后、`PluginTransforms` 之前）；PC 补齐所需直接依赖（包含 `delegation-host-adapter` 等），同时剪除 PC 中未使用的 `git-hook-sync`；HSB 彻底移除 Cluster B 专用依赖及无用引用（`syncdelegate-model`、`wait-*`、`opencodeport*`、`statictools`、`managedagent`、`session-attachment-contract`、`foundation-temporal`、`host-root-workspace-runtime`），并将工作区依赖精确重定向为 narrow 的 `host-root-workspace-contract`（仅满足 `IRootWorkspaceReader`）。至此 HSB 分片仅编译唯一宿主信号入口 `HostSignalBootstrap.fs/.fsi`，且保持 `plugin-composition` → `hostsignalbootstrap` 单向依赖不变。
+- **独立符号复核稀疏剪枝**：
+  * `delegation.execution-delegation-hostturnobservedsurface`：经符号审计剪除 7 条未使用的 ProjectReference（`eventstore-surface`、`durable-fold`、`identityseed`、`handle-surface`、`wait-completion-mailbox`、`host-digest`、`ingresscodec`）；
+  * `managed-session-lifecycle.opencode-host-pluginruntimescope`：剪除未使用的 `sharedstatesurface`；
+  * `speculative-investigation.strength-opencode-settings`：剪除未使用的 `sessionquiescencegate`。
+- **指标与门禁**：声明图指标变为 26 subsystems、218 compile shards、701 sources、1809 references（净减 8 条，从 1817 降至 1809）；shard 保持无环 DAG；最大 subsystem SCC 仍为 22。相关门禁 `subsystems.mjs`、`subsystem-boundaries.test.mjs` 与 `check.mjs` 全部通过，GAP-033 保持 PARTIAL。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。
