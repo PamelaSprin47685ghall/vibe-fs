@@ -216,6 +216,25 @@ tool adapter、signal adapter、Attention consumer 与 repository-programming ru
 
 全仓 ProjectReference 引用总数降至 1874（净减 2 条跨 subsystem 边），结构与架构门禁全绿通过。
 
+在 `82d5c2513` 上将 `output/opencode-tools-distillationsurface` 从误挂的 `context-companion-runtimesurface` 收窄：源码不消费 companion runtime 符号，声明图降至 1873 references；其余计数不变，shard DAG，最大 SCC 仍为 22。
+
+本批继续按真实符号消费审计稀疏跨 subsystem ProjectReference，并在聚焦 Fable 编译失败时改挂实际消费的窄合同，而不是恢复宽伞引用：
+1. `process/opencode-tools-ptytool`：移除未使用的 `delegation/execution-delegation-fact`（1006 sources）。
+2. `process/foundation-temporal`：移除未使用的 `delegation/execution-delegation-syncdelegate-model`、`persistence/composition-durable-projection`、`persistence/persistence-journal-promptfactcodec`、`provider/participant-provider-language`（122 sources）。
+3. `repository-programming/opencode-tools-filemutationtools`：移除未使用的 `chat-execution/outcome`、`persistence/strength-persistence-durabilityport`、`runtime-platform/bounded-parallel`（632 sources）。
+4. `knowledge/repository-knowledge-casebook-model`：移除仅作传递闭包的 `persistence/strength-persistence-durabilityport`；聚焦编译暴露真实直接消费 `FatalProcess` 与 `ToolHostCodec`，改挂 `host/host-fatal-effect` 与 `host/host-tool-adapter`（274 sources）。
+5. `relay/mission-relay-reviewtool`：移除未使用的 `host/opencode-host-sessionquiescencegate`（SessionSnapshot 来自 host-session-contract）（1002 sources）。
+6. `work/mission-obligation-todo-magictodosemanticsurface`：仅移除未使用的 `runtime-platform/bounded-parallel`；保留 `host/host-digest`（`HostDigest.sha256Hex`）（792 sources）。
+7. `authority/interaction-authority-fold`、`enforcer/enforcer-continuation`、`enforcer/execution-session-loopdetector`：各移除未使用的 `chat-execution/outcome`（426／1010／82 sources）。
+8. `authority/interaction-repair-interactionrepair`：移除未使用的 `chat-execution/outcome`、`dispatch/interaction-dispatch-opencode-ingresscodec`、`provider/participant-provider-attempt-fallback-ledger`、`provider/participant-provider-attempt-requestkind`（546 sources）。
+9. `change/git-integrationgate`：移除未使用的 `delegation/execution-delegation-handle-surface`、`persistence/strength-persistence-durabilityport`、`host/opencode-host-sharedstatesurface`、`runtime-platform/bounded-parallel`、`provider/participant-provider-language`、`session-lifecycle/process-node-timing-adapter`；清理 Host.fs 中对应未使用 `open`；保留仍消费 `LlmFacing` 的 `foundation-llm-facing`（934 sources）。
+10. `strength/strength-opencode-settings`：移除未使用的 `participant/opencode-tools-managedagent` 与 `persistence/persistence-eventstore-storetypes`。
+11. `strength/strength-prediction-predictor`：移除未使用的 `participant/opencode-tools-managedagent`、`chat-execution/outcome`、`provider/strength-policy`；并删除七处无符号消费的 `open Wanxiangshu.Host.Contract`（464 sources）。
+
+审计中拒绝的假阳性包括：`context-prefix-wire` 的 outcome／host-digest（`AttemptOutcome`／`HostDigest` 仍用）、`magictodo`／`requirementgrounding` 的 host-digest、以及 `provider-languagesurface` 的 foundation-identity（`SessionId.create`）。取消中的错误编辑曾破坏 `context-prefix-wire.fsproj`，已从 git 还原，未纳入本批。
+
+当前声明图为 26 subsystem、213 shard、700 source、1846 references，shard DAG，最大 subsystem SCC 22；`node scripts/checks/subsystems.mjs` 与 `subsystem-boundaries.test.mjs` 4/4 通过。净减相对上一记录点（1873）为 27 条声明引用；SCC 未缩小，GAP-033 保持 PARTIAL。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

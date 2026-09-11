@@ -19,7 +19,6 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Mission.WorkRecord
-open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 
 /// Host wiring for one Change manager session. One physical Manager session can host many

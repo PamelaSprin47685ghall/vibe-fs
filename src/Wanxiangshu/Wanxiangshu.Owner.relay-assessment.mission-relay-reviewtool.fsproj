@@ -13,7 +13,6 @@
     
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-tool-adapter.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-sessionquiescencegate.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.opencode-host-pluginruntimescope.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.office-capability.foundation-officecapability.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>

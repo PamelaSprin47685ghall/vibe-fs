@@ -7,7 +7,6 @@ open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
-open Wanxiangshu.Host.Contract
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Strength
