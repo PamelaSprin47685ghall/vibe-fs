@@ -8,7 +8,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.eventstore-integrator-contract.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-model.fsproj"/>
     <Compile Include="Repository/Knowledge/Casebook/IntegrationRules.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/IntegrationRules.fs"/>

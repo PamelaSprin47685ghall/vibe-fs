@@ -499,6 +499,18 @@ tool adapter、signal adapter、Attention consumer 与 repository-programming ru
 
 验证：`subsystems` 26/230/710/1843 cycle=18；verification 3973/0；integration 279/0；`check.mjs`/`format:check` exit 0。GAP-033 保持 **PARTIAL**。
 
+17. **全仓零符号跨分片引用剪枝（persistence、rules 与 host/runtime 边界收敛）；SCC 保持 18**：
+   - 依赖与真实知识核对：经全仓 AST/符号审计与源码比对，以下 7 个分片中的 11 条 ProjectReference 经证明在调用方 `.fs`/`.fsi` 中零符号消费，系历史重构残留或过宽父项目引用；切除后各分片均独立 focused compile 通过，未引入任何伪解耦（无反射、无动态查找、无字符串标签）：
+     1. `persistence/persistence-journal-promptfactcodec`：切除未引用的 `chat-execution/foundation-outcome`、`host/host-fatal-effect` 以及 `runtime-platform/foundation-async-support`（3 条）；
+     2. `sphinx/sphinx-integration-rules`：切除未引用的 `runtime-platform/foundation-identity` 与 `persistence/persistence-eventstore-model`（2 条）；
+     3. `knowledge/knowledge-integration-rules`：切除未引用的 `persistence/persistence-eventstore-model`（1 条）；
+     4. `session-lifecycle/opencode-host-turnruntimepreparation`：切除未引用的 `runtime-platform/foundation-async-support`（1 条）；
+     5. `repository-programming/repository-programming-js-integration-rules`：切除未引用的 `persistence/persistence-eventstore-model`（1 条）；
+     6. `strength/strength-integration-rules`：切除未引用的 `runtime-platform/foundation-identity` 与 `persistence/persistence-eventstore-model`（2 条）；
+     7. `process/foundation-temporal`：切除未引用的 `participant/foundation-roles`（1 条）。
+   - 结构影响：`subsystems: OK — 26 subsystems, 230 compile shards, 710 sources, 1830 refs, shard DAG, largest subsystem cycle=18`。引用总数从 1841 净减 11 条至 1830 条（其中 6 条为环内跨子系统引用）。
+   - 验证：7 个分片 focused Fable compile 全部通过（指纹与耗时：promptfactcodec `fp:923c51bc3cdc`, sphinx-integration-rules `fp:1a52067f1dae`, knowledge-integration-rules `fp:4b643d16a62b`, turnruntimepreparation `fp:c21a317ba66b`, js-integration-rules `fp:c04d681c55e2`, strength-integration-rules `fp:340234c49ebd`, foundation-temporal `fp:2c33b5a7852b`）；`npm run build`（1420 items / 782 modules）；`verification`（3973/0）；`integration`（279/0）；`e2e`（1/1 通过）；`check.mjs` / `format:check` / `npm pack --dry-run` 全部通过。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。
