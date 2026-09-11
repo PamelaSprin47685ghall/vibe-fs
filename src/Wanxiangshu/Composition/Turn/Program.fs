@@ -5,7 +5,6 @@ open Wanxiangshu.Execution.Failure
 open System
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Host
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 

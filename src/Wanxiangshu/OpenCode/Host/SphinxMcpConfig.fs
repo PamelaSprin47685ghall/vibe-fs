@@ -5,7 +5,6 @@ open Wanxiangshu.Sphinx
 open System
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Foundation
 
 /// AGENT-030: env → launch decision → Host `config.mcp.sphinx`.
 module SphinxMcpConfig =

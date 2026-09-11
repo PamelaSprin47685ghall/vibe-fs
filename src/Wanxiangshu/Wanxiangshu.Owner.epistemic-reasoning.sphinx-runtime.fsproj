@@ -9,6 +9,9 @@
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-mcp.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.digest.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-canonical-json.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-event-vocabulary-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
     <Compile Include="Sphinx/Types.fsi"/>
     <Compile Include="Sphinx/Types.fs"/>
     <Compile Include="Sphinx/RuntimeTypes.fsi"/>
@@ -95,11 +98,5 @@
     <Compile Include="Sphinx/GecStore.fs"/>
     <Compile Include="Sphinx/GecSurface.fsi"/>
     <Compile Include="Sphinx/GecSurface.fs"/>
-    <Compile Include="Sphinx/GenericDurability.fsi"/>
-    <Compile Include="Sphinx/GenericDurability.fs"/>
-    <Compile Include="Sphinx/McpServer.fsi"/>
-    <Compile Include="Sphinx/McpServer.fs"/>
-    <Compile Include="Sphinx/Surface.fsi"/>
-    <Compile Include="Sphinx/Surface.fs"/>
   </ItemGroup>
 </Project>

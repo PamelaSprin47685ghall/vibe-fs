@@ -2,7 +2,6 @@ namespace Wanxiangshu.Composition.Turn
 
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Host
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Execution.Failure

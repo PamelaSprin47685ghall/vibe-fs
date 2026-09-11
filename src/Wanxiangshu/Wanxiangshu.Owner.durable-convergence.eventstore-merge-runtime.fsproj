@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.persistence-eventstore-processeventlog.fsproj"/>
     <Compile Include="Persistence/EventStore/EventKWayMerge.fsi"/>
     <Compile Include="Persistence/EventStore/EventKWayMerge.fs"/>
   </ItemGroup>
