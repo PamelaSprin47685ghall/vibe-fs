@@ -20,6 +20,9 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-eventstorewriter.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.execution-failure-policy.execution-failure-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.obligation-ledger.mission-obligation-todo-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-integration-rules.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.knowledge-integration-rules.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-integration-rules.fsproj"/>
     <Compile Include="Persistence/EventStore/StrengthSurface.fsi"/>
     <Compile Include="Persistence/EventStore/StrengthSurface.fs"/>
     <Compile Include="OpenCode/Host/WorkspaceEventStore.fsi"/>

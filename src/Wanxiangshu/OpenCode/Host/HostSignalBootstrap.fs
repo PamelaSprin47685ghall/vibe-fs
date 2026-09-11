@@ -22,11 +22,19 @@ open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
-open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Persistence
-open Wanxiangshu.Strength.OpenCode
 
 module HostSignalBootstrap =
+
+    /// Neutral Strength ports built by plugin composition (`PluginStrengthPorts`)
+    /// from the already-held `PluginStrengthScope` and durability handle.
+    /// The Host boundary never names Strength types; it only invokes these.
+    /// `None` means that Strength aspect is absent (same as before: no scope,
+    /// no durability, or no replica runtime attached at wire time).
+    type StrengthHostPorts =
+        { HandlePreTurn: (ReconciledTurn -> Task<bool>) option
+          ObservePrimaryTurn: (ReconciledTurn -> Task<unit>) option
+          CancelStrengthOwner: (SessionId -> unit) option
+          OnSessionDeleted: (SessionId -> unit) option }
 
     type internal ChatAdmissionHookFailure =
         | IntentRejected of ChatAdmissionIntent.Rejection
@@ -74,8 +82,7 @@ module HostSignalBootstrap =
         (eventPort: IEventObservationPort)
         (snapshotOpt: ISessionSnapshotPort option)
         (journal: AgentJournal option)
-        (strengthDurability: StrengthDurabilityPort option)
-        (strengthScope: PluginStrengthScope option)
+        (strengthPorts: StrengthHostPorts)
         (scope: PluginRuntimeScope)
         (rootWorkspace: IRootWorkspaceReader)
         (input: obj)
@@ -131,64 +138,6 @@ module HostSignalBootstrap =
 
             let binding = TurnBinding.Store()
 
-            let strengthReplicaRuntime = strengthScope |> Option.bind (fun s -> s.StrengthReplicaRuntime)
-
-            let handlePreTurn =
-                strengthReplicaRuntime
-                |> Option.map (fun runtime ->
-                    fun (turn: ReconciledTurn) ->
-                        Task.FromResult(runtime.HandleTurn turn))
-
-            let closeDryRunAtPrimaryTerminal (turn: ReconciledTurn) =
-                match strengthReplicaRuntime with
-                | Some runtime -> runtime.CloseDryRunAtTargetTerminal turn
-                | None -> AsyncSupport.completedTask ()
-
-            let observeStrengthPrimary (turn: ReconciledTurn) =
-                match strengthScope with
-                | Some s ->
-                    match s.ObserveStrengthPrimary(turn.SessionId, turn.ProviderRun, StrengthTurnEvidence.primarySymbol turn.Parts) with
-                    | None -> ()
-                    | Some pair ->
-                        Diagnostic.emit
-                            "strength-counterfactual-observed"
-                            [ "session_id", SessionId.value turn.SessionId
-                              "provider_run", ProviderRunIdentity.value turn.ProviderRun
-                              "result",
-                              sprintf "first=%A second=%A" pair.FirstSymbol pair.SecondSymbol ]
-                | None -> ()
-
-            let observePrimaryTurn =
-                match strengthDurability, strengthScope with
-                | None, None -> None
-                | _ ->
-                    Some (fun (turn: ReconciledTurn) ->
-                        task {
-                            do! closeDryRunAtPrimaryTerminal turn
-                            observeStrengthPrimary turn
-                            match strengthDurability with
-                            | Some durability ->
-                                match! durability.LoadProjection() with
-                                | Error err ->
-                                    strengthScope |> Option.iter (fun s -> s.TripStrengthFuse ("Strength promotion projection failed: " + err))
-                                    raise (InvalidOperationException ("Strength promotion projection failed: " + err))
-                                | Ok projection ->
-                                    match StrengthLifecycle.reconcileEvent projection turn with
-                                    | None -> ()
-                                    | Some ev ->
-                                        let! appendResult = durability.Append ev
-                                        match appendResult with
-                                        | StrengthDurableAppend.Applied -> ()
-                                        | StrengthDurableAppend.SemanticRejected error ->
-                                            // DURABLE-EVENTS-021: process is no longer trustworthy
-                                            Diagnostic.fatal "strength-semantic-cut" [ "result", error ]
-                                        | StrengthDurableAppend.StorageFailed reason ->
-                                            let message = "Strength promotion commit storage failure: " + reason
-                                            strengthScope |> Option.iter (fun s -> s.TripStrengthFuse message)
-                                            raise (InvalidOperationException message)
-                            | None -> ()
-                        })
-
             let onTurn =
                 HostTurnObserver.observe
                     observeTurnWorkflow
@@ -196,8 +145,8 @@ module HostSignalBootstrap =
                     rootWorkspace
                     eventPort
                     journal
-                    handlePreTurn
-                    observePrimaryTurn
+                    strengthPorts.HandlePreTurn
+                    strengthPorts.ObservePrimaryTurn
                     scope
 
             let onSnapshot = HostCompactionObserver.observe scope journal
@@ -217,8 +166,8 @@ module HostSignalBootstrap =
             let handleOrdinaryAbort sessionId signal =
                 scope.Sessions.Quiescence.RevokeCurrentAttempt sessionId
 
-                strengthReplicaRuntime
-                |> Option.iter (fun runtime -> runtime.CancelOwner sessionId |> ignore)
+                strengthPorts.CancelStrengthOwner
+                |> Option.iter (fun cancel -> cancel sessionId)
 
                 reconciler.Signal signal
 
@@ -279,22 +228,16 @@ module HostSignalBootstrap =
 
                             do! scope.DrainChatRecovery sessionId
 
-                            let onSessionDeleted =
-                                strengthReplicaRuntime
-                                |> Option.map (fun runtime ->
-                                    fun sid ->
-                                        runtime.CancelOwner sid |> ignore
-                                        runtime.HandleSessionDeleted sid)
-
                             do!
                                 HostSessionDeletion.handle
                                     scope
                                     cleanupInspectorDraft
                                     reconciler.Signal
                                     sessionId
-                                    onSessionDeleted
+                                    strengthPorts.OnSessionDeleted
                                     deletion
                         })
+
 
             // LOOP-002/006 and HOST-027 share one raw Host subscription but own
             // disjoint stream fields. Both abort physically; only their typed armed

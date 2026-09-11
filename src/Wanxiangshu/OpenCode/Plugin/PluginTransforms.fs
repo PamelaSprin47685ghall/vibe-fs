@@ -403,7 +403,9 @@ module PluginTransforms =
                 | RelayProjectionDisposition.CurrentIteration -> Task.FromResult()
                 | _ -> apply projectionSessionIdOpt inObj outObj
           ApplyXWire =
-            let isReplica = fun (sid: SessionId) -> boot.StrengthScope.StrengthRuntime.TryFindByReplica sid |> Option.isSome
+            let isReplica =
+                fun (sid: SessionId) -> boot.StrengthScope.StrengthRuntime.TryFindByReplica sid |> Option.isSome
+
             let apply = XWire.applyTransform isReplica snapshotOpt journal scope
 
             fun relayProjection outObj ->
@@ -422,7 +424,8 @@ module PluginTransforms =
                             projectionSessionIdOpt
                             outObj
                 }
-          ApplyStrengthSpeculate = StrengthSpeculate.tryApply snapshotOpt journal strengthDurability boot.StrengthScope scope
+          ApplyStrengthSpeculate =
+            StrengthSpeculate.tryApply snapshotOpt journal strengthDurability boot.StrengthScope scope
           InjectPairGuideline =
             fun projectionSessionIdOpt sessionStartedAt outObj ->
                 task {
@@ -466,7 +469,9 @@ module PluginTransforms =
           ReplicaXWire =
             fun outObj ->
                 task {
-                    let isReplica = fun (sid: SessionId) -> boot.StrengthScope.StrengthRuntime.TryFindByReplica sid |> Option.isSome
+                    let isReplica =
+                        fun (sid: SessionId) -> boot.StrengthScope.StrengthRuntime.TryFindByReplica sid |> Option.isSome
+
                     let! _ = XWire.applyTransform isReplica snapshotOpt journal scope outObj
                     return ()
                 }

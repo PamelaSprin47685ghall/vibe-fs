@@ -17,10 +17,17 @@
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-identityseed.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.execution-fission-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-facts.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.obligation-ledger.mission-obligation-todo-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.requirement-grounding.requirement-grounding-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-model.fsproj"/>
+    <Compile Include="Composition/Durable/MagicTodoIdentity.fsi"/>
+    <Compile Include="Composition/Durable/MagicTodoIdentity.fs"/>
+    <Compile Include="Composition/Durable/MagicTodoFacts.fsi"/>
+    <Compile Include="Composition/Durable/MagicTodoFacts.fs"/>
+    <Compile Include="Composition/Durable/MagicTodoFactCodec.fsi"/>
+    <Compile Include="Composition/Durable/MagicTodoFactCodec.fs"/>
     <Compile Include="Composition/Durable/Fact.fsi"/>
     <Compile Include="Composition/Durable/Fact.fs"/>
   </ItemGroup>

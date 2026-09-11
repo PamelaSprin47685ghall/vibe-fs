@@ -3,8 +3,8 @@ namespace Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Context.Trace
 
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Mission.Obligation.Todo.MagicTodoIdentity
 
 /// Magic Todo durable fact algebra (TODO-004/006/012).
 ///

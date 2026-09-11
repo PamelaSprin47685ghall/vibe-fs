@@ -56,8 +56,7 @@ module SyncDelegate =
         | SyncDelegateRole.Coder -> "coder"
 
     /// HOST-008: SyncDelegateRole → AttachmentKind for Work+Attached registration.
-    let delegateRoleToAttachment (role: SyncDelegateRole) : AttachmentKind =
-        SyncDelegateRole.toAttachmentKind role
+    let delegateRoleToAttachment (role: SyncDelegateRole) : AttachmentKind = SyncDelegateRole.toAttachmentKind role
 
     /// Canonical wire agent name for a dedicated SyncDelegate (`inspector`, `coder`).
     let agentNameFor (role: SyncDelegateRole) : string = roleLabel role

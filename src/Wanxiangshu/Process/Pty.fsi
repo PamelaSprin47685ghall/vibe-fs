@@ -3,9 +3,7 @@ namespace Wanxiangshu.Process
 open System.Threading.Tasks
 
 type PtyPort =
-    new:
-        ?exitListener: (PtyExitEvent -> unit) * ?handler: PtyBackendHandler ->
-            PtyPort
+    new: ?exitListener: (PtyExitEvent -> unit) * ?handler: PtyBackendHandler -> PtyPort
 
     member AddExitListener: listener: (PtyExitEvent -> unit) -> unit
     member Close: id: PtyId * ?outcome: Result<string, string> -> unit

@@ -383,7 +383,7 @@
       ],
       "intent": {
         "kind": "durable-intent",
-        "path": "src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs",
+        "path": "src/Wanxiangshu/Composition/Durable/MagicTodoFacts.fs",
         "symbols": [
           "TodoWritePrepared"
         ]
@@ -406,7 +406,7 @@
       },
       "durable_outcome": {
         "kind": "durable-outcome",
-        "path": "src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs",
+        "path": "src/Wanxiangshu/Composition/Durable/MagicTodoFacts.fs",
         "symbols": [
           "TodoWriteAccepted"
         ]
@@ -426,7 +426,7 @@
         ],
         "retry_when": "never",
         "query_or_compensation": {
-          "path": "src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs",
+          "path": "src/Wanxiangshu/Composition/Durable/MagicTodoProjection.fs",
           "symbol": "acceptedEvidence"
         }
       },

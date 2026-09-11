@@ -199,7 +199,7 @@ test('WHAT[DURABLE-EVENTS-021] every_live_semantic_cut_boundary_trips_process_fa
     casebook: readFileSync(new URL('Repository/Knowledge/Casebook/Store.fs', root), 'utf8'),
     jsTransactions: readFileSync(new URL('Repository/Programming/Js/TransactionStore.fs', root), 'utf8'),
     strengthDurability: readFileSync(new URL('Strength/Persistence/Durability.fs', root), 'utf8'),
-    hostTurn: readFileSync(new URL('OpenCode/Host/HostSignalBootstrap.fs', root), 'utf8'),
+    strengthPorts: readFileSync(new URL('OpenCode/Plugin/PluginStrengthPorts.fs', root), 'utf8'),
   }
 
   assert.match(sources.agentJournal, /FatalProcess\.trip\s+"journal-semantic-cut"/)
@@ -207,8 +207,8 @@ test('WHAT[DURABLE-EVENTS-021] every_live_semantic_cut_boundary_trips_process_fa
   assert.match(sources.casebook, /FatalProcess\.trip\s+"casebook-semantic-cut"/)
   assert.match(sources.jsTransactions, /FatalProcess\.trip\s+"js-transaction-semantic-cut"/)
   assert.match(sources.strengthDurability, /FatalProcess\.trip\s+"strength-prepared-semantic-cut"/)
-  assert.match(sources.hostTurn, /SemanticRejected error[\s\S]{0,500}Diagnostic\.fatal\s+"strength-semantic-cut"/)
-  assert.doesNotMatch(sources.hostTurn, /SemanticRejected error[\s\S]{0,500}Diagnostic\.emit\s+"strength-semantic-cut"/)
+  assert.match(sources.strengthPorts, /SemanticRejected error[\s\S]{0,500}Diagnostic\.fatal\s+"strength-semantic-cut"/)
+  assert.doesNotMatch(sources.strengthPorts, /SemanticRejected error[\s\S]{0,500}Diagnostic\.emit\s+"strength-semantic-cut"/)
 })
 
 test('WHAT[DURABLE-EVENTS-007] append_rejects_missing_parent_without_writing_bytes', async () => {

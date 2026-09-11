@@ -36,7 +36,10 @@ module JournalSurface =
     let openJournal (commonDir: string) (runtimeId: string) (processId: int) (startedAt: string) : Task<obj> =
         task {
             let store =
-                EventStore.createLocal commonDir (Guid.NewGuid().ToString("N")) (CanonicalIntegrator.create ())
+                EventStore.createLocal
+                    commonDir
+                    (Guid.NewGuid().ToString("N"))
+                    (CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules)
 
             match!
                 EventStoreJournalWriter.resumeOrCreate (

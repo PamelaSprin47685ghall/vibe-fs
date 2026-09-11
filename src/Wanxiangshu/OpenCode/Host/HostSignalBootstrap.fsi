@@ -7,8 +7,6 @@ open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Strength.Persistence
-open Wanxiangshu.Strength.OpenCode
 
 module HostSignalBootstrap =
 
@@ -39,14 +37,24 @@ module HostSignalBootstrap =
           ChatMessageHook: obj
           ObserveEvent: obj -> Task<unit> }
 
+    /// Neutral Strength ports built by plugin composition (`PluginStrengthPorts`)
+    /// from the already-held `PluginStrengthScope` and durability handle.
+    /// The Host boundary never names Strength types; it only invokes these.
+    /// `None` means that Strength aspect is absent (same as before: no scope,
+    /// no durability, or no replica runtime attached at wire time).
+    type StrengthHostPorts =
+        { HandlePreTurn: (ReconciledTurn -> Task<bool>) option
+          ObservePrimaryTurn: (ReconciledTurn -> Task<unit>) option
+          CancelStrengthOwner: (SessionId -> unit) option
+          OnSessionDeleted: (SessionId -> unit) option }
+
     val wire:
         observeTurnWorkflow: (AbortCause -> ReconciledTurnContext -> Task) ->
         sessionPort: ISessionHostPort ->
         eventPort: IEventObservationPort ->
         snapshotOpt: ISessionSnapshotPort option ->
         journal: AgentJournal option ->
-        strengthDurability: StrengthDurabilityPort option ->
-        strengthScope: PluginStrengthScope option ->
+        strengthPorts: StrengthHostPorts ->
         scope: PluginRuntimeScope ->
         rootWorkspace: IRootWorkspaceReader ->
         input: obj ->

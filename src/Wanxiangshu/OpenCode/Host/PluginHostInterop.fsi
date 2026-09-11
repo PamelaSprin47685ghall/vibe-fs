@@ -82,7 +82,8 @@ module PluginHostInterop =
         onRunStarted: (SessionId -> Role -> string option -> unit) option ->
         parentWorkRecordFor: (string -> Task<string option>) option ->
         childWorkRecordFor: (string -> Task<string option>) option ->
-        childWorkRecordForRun: (SessionId -> Wanxiangshu.Context.Trace.XTraceRange -> ProviderRunIdentity -> Task<string option>) ->
+        childWorkRecordForRun:
+            (SessionId -> Wanxiangshu.Context.Trace.XTraceRange -> ProviderRunIdentity -> Task<string option>) ->
         workRecordCapability: Wanxiangshu.Execution.Delegation.DelegationWorkRecordCapability ->
         snapshot: ISessionSnapshotPort option ->
         cancelSignals: (SessionId seq -> unit) option ->

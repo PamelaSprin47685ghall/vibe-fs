@@ -147,7 +147,8 @@ module ToolRegistry =
         (jsTransactionPersistence: IJsTransactionPersistence option)
         (continueManagerLoop: SessionId -> string -> Task<Result<unit, string>>)
         (captureWorktreeSnapshot: WorktreePath -> Result<WorkspaceSnapshotId, string>)
-        (childWorkRecordForRun: (SessionId -> Wanxiangshu.Context.Trace.XTraceRange -> ProviderRunIdentity -> Task<string option>) option)
+        (childWorkRecordForRun:
+            (SessionId -> Wanxiangshu.Context.Trace.XTraceRange -> ProviderRunIdentity -> Task<string option>) option)
         (workRecordCapability: Wanxiangshu.Execution.Delegation.DelegationWorkRecordCapability option)
         =
         let factory = ToolHostCodec.factory toolModule

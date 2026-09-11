@@ -1218,7 +1218,10 @@ module McpServer =
 
     let private serveDurableDir (commonDir: string) =
         try
-            let integrator = CanonicalIntegrator.create ()
+            // Sphinx serve replays its own durable sessions: the journal-only
+            // spine plus both Sphinx-owned oracles, in registration order.
+            let integrator =
+                CanonicalIntegrator.createWithRules (CanonicalIntegrator.baseRules @ SphinxIntegrationRules.rules)
 
             let events =
                 EventStore.createLocal commonDir (Guid.NewGuid().ToString("N")) integrator

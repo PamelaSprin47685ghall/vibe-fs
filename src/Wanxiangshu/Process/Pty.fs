@@ -106,8 +106,7 @@ module private PtyPortSupport =
 
 /// Typed PTY lifecycle boundary. A backend receives commands; completion events
 /// are supplied by Complete and share every registered exit listener.
-type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) as this
-    =
+type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) as this =
     let handler = defaultArg handler (fun _ _ -> Task.FromResult(Ok()))
     // DSL-MUTABLE: resource — exit listener callback registry
     let exitListeners = ResizeArray<PtyExitEvent -> unit>()

@@ -96,6 +96,8 @@
     <Compile Include="OpenCode/Host/PluginHost.fs"/>
     <Compile Include="OpenCode/Plugin/PluginBoot.fsi"/>
     <Compile Include="OpenCode/Plugin/PluginBoot.fs"/>
+    <Compile Include="OpenCode/Plugin/PluginStrengthPorts.fsi"/>
+    <Compile Include="OpenCode/Plugin/PluginStrengthPorts.fs"/>
     <Compile Include="OpenCode/Plugin/PluginHostWiring.fsi"/>
     <Compile Include="OpenCode/Plugin/PluginHostWiring.fs"/>
     <Compile Include="OpenCode/Plugin/PluginSessionWiring.fsi"/>

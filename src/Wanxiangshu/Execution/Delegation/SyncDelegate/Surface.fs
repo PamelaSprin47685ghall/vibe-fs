@@ -431,7 +431,7 @@ module SyncDelegateSurface =
 
     let private createJournal (directory: string) : Task<AgentJournal> =
         task {
-            let integrator = CanonicalIntegrator.create ()
+            let integrator = CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules
 
             let store =
                 EventStore.createLocal directory (Guid.NewGuid().ToString("N")) integrator
@@ -534,11 +534,7 @@ module SyncDelegateSurface =
             (journal :> IDisposable).Dispose()
             raise (InvalidOperationException error)
 
-    let private createWithAdmissions
-        (directory: string)
-        (observationMode: string option)
-        admissions
-        : Task<obj> =
+    let private createWithAdmissions (directory: string) (observationMode: string option) admissions : Task<obj> =
         task {
             let! journal = createJournal directory
             let dispatcher = PromptDispatcher.Runtime(journal)

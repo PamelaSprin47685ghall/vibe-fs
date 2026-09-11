@@ -287,7 +287,10 @@ module ForkToolSurface =
     let private createJournal (directory: string) : Task<AgentJournal> =
         task {
             let store =
-                EventStore.createLocal directory (Guid.NewGuid().ToString("N")) (CanonicalIntegrator.create ())
+                EventStore.createLocal
+                    directory
+                    (Guid.NewGuid().ToString("N"))
+                    (CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules)
 
             match!
                 EventStoreJournalWriter.resumeOrCreate (

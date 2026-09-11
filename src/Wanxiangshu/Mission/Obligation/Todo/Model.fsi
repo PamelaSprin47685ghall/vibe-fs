@@ -5,7 +5,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Relay
 
 module MagicTodo =
-    type TodoWriteId = private TodoWriteId of string
+    type TodoWriteId = MagicTodoIdentity.TodoWriteId
 
     module TodoWriteId =
         val create: value: string -> TodoWriteId

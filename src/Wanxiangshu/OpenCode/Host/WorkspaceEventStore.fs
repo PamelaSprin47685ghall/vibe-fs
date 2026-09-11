@@ -10,6 +10,18 @@ open Wanxiangshu.Persistence.Journal
 /// No GitRawStore is created on the runtime append/replay path.
 module WorkspaceEventStore =
 
+    /// The single host-wide store serves the workspace journal, casebook
+    /// lifecycle/fetch, js-transaction durability and strength durable
+    /// promotion, so its history program is the journal spine plus exactly
+    /// those owning oracles. Registration order matches the historical full
+    /// program. Sphinx durable sessions are served by the Sphinx MCP process
+    /// with its own store and its own Sphinx program, never through this one.
+    let private hostProgram: IntegrationRule list =
+        CanonicalIntegrator.baseRules
+        @ Wanxiangshu.Strength.StrengthIntegrationRules.rules
+        @ Wanxiangshu.Repository.Knowledge.Casebook.CasebookIntegrationRules.rules
+        @ Wanxiangshu.Repository.Programming.Js.JsTransactionIntegrationRules.rules
+
     /// DSL-state-combination: physical — shared local writer + canonical Current.
     type private SharedEntry =
         { Store: IEventStore
@@ -23,7 +35,7 @@ module WorkspaceEventStore =
         let active =
             lazy
                 (let writerId = Guid.NewGuid().ToString("N")
-                 let integrator = CanonicalIntegrator.create ()
+                 let integrator = CanonicalIntegrator.createWithRules hostProgram
                  EventStore.createLocal commonDir writerId integrator)
 
         { new IEventStore with

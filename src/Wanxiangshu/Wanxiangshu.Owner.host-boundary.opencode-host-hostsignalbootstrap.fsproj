@@ -10,10 +10,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.opencode-host-sessionexecutionbinding.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-runtimesurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-hostturnobservedsurface.fsproj"/>
- 
-    <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-opencode-settings.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-turnevidence.fsproj"/>
- 
+
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.dispatch-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.execution-session-recovery-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
@@ -21,7 +18,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.git-hook-sync.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-agentjournal.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.durable-events.strength-persistence-durabilityport.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.execution-model-routing.opencode-host-modelroutingsurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.execution-model-routing.strength-policy.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-diagnostics-runtime.fsproj"/>

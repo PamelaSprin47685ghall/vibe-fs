@@ -259,7 +259,11 @@ module StrengthSpeculate =
                 return ()
         }
 
-    let private observeDryRunCompletion (strengthScope: PluginStrengthScope) (owner: SessionId) (started: StrengthDryRunStart) =
+    let private observeDryRunCompletion
+        (strengthScope: PluginStrengthScope)
+        (owner: SessionId)
+        (started: StrengthDryRunStart)
+        =
         task {
             let! completed = started.Completion
 
@@ -606,7 +610,17 @@ module StrengthSpeculate =
                 return ()
             else
                 let surface =
-                    buildSurface strengthScope scope ports owner target authority projections settings rawMessages output
+                    buildSurface
+                        strengthScope
+                        scope
+                        ports
+                        owner
+                        target
+                        authority
+                        projections
+                        settings
+                        rawMessages
+                        output
 
                 return! applyRollout surface
         }
@@ -693,7 +707,8 @@ module StrengthSpeculate =
             match PromptAuthorityLedger.activeProfile owner projections.AgentProjections with
             | None -> return ()
             | Some authority ->
-                return! applyWithAuthority strengthScope scope ports owner target authority projections rawMessages output
+                return!
+                    applyWithAuthority strengthScope scope ports owner target authority projections rawMessages output
         }
 
     let private applyWithSnapshotMessages
@@ -726,7 +741,8 @@ module StrengthSpeculate =
 
             match snapshotResult with
             | Error _ -> return ()
-            | Ok messages -> return! applyWithSnapshotMessages strengthScope scope ports owner rawMessages output physical messages
+            | Ok messages ->
+                return! applyWithSnapshotMessages strengthScope scope ports owner rawMessages output physical messages
         }
 
     let private applyPrimaryOwner

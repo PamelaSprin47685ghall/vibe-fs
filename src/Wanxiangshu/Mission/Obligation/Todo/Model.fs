@@ -17,11 +17,17 @@ module MagicTodo =
     // ── Checkpoint identity ─────────────────────────────────────────────────
 
     /// Digest(IncumbencyId + ToolCallId). Same ToolCallId replay → same id.
-    type TodoWriteId = private TodoWriteId of string
+    /// Canonical definition lives in durable-convergence vocabulary
+    /// (`Composition/Durable/MagicTodoFacts.fs`, persistence shard) so the
+    /// journal fold no longer depends on this work decision module.
+    /// Same type, same bytes; this alias keeps admission callers source-stable.
+    type TodoWriteId = MagicTodoIdentity.TodoWriteId
 
     module TodoWriteId =
-        let create (value: string) = TodoWriteId value
-        let value (TodoWriteId value) = value
+        let create (value: string) : TodoWriteId =
+            MagicTodoIdentity.TodoWriteId.create value
+
+        let value (id: TodoWriteId) : string = MagicTodoIdentity.TodoWriteId.value id
 
     /// Semantic version frozen into Prepared / Accepted facts.
     [<Literal>]

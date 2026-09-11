@@ -1,7 +1,7 @@
 namespace Wanxiangshu.Mission.Obligation.Todo
 
 open Wanxiangshu.Context.Trace
-open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
+open Wanxiangshu.Mission.Obligation.Todo.MagicTodoIdentity
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation.Identity

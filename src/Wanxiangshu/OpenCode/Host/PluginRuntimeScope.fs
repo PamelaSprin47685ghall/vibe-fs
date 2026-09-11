@@ -402,8 +402,10 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             let linkedBloggerKeys = sessions.LinkedBloggerKeys sessionId
             sessions.ClearSession sessionId
             recovery.ClearSession sessionId
+
             for cleanup in List.rev sessionCleanups do
                 cleanup sessionId
+
             this.LoopSensor.DropSession(SessionId.create sessionId)
 
             // Always cancel the deleted id; also cancel linked Blogger keys.
@@ -476,6 +478,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             remember (captureSyncFailure (fun () -> sessions.Dispose()))
             remember (captureSyncFailure (fun () -> syncDelegateRuntime |> Option.iter (fun sd -> sd.Dispose())))
             syncDelegateRuntime <- None
+
             for dispose in List.rev scopeDisposers do
                 remember (captureSyncFailure dispose)
 

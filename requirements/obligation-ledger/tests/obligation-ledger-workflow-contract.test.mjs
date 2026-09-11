@@ -19,7 +19,7 @@ test('WHAT[OBLIGATION-LEDGER-018] business sequencing is a direct F# CE, not a s
 })
 
 test('WHAT[OBLIGATION-LEDGER-018] hot-path queries use incremental projection facts, never AcceptedOrder replay', () => {
-  const projection = read('src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs')
+  const projection = read('src/Wanxiangshu/Composition/Durable/MagicTodoProjection.fs')
   for (const field of [
     'FirstAcceptedCheckpoint',
     'LatestAcceptedCheckpoint',
@@ -42,8 +42,8 @@ test('WHAT[OBLIGATION-LEDGER-018] hot-path queries use incremental projection fa
 })
 
 test('WHAT[OBLIGATION-LEDGER-018] recovery contract is fact reentry, not a resumable workflow position', () => {
-  const facts = read('src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs')
-  const projection = read('src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs')
+  const facts = read('src/Wanxiangshu/Composition/Durable/MagicTodoFacts.fs')
+  const projection = read('src/Wanxiangshu/Composition/Durable/MagicTodoProjection.fs')
 
   assert.doesNotMatch(facts, /PlanningStage|ReviewStage|NextAction|ResumeAt|ProgramCounter|AwaitingReview\s*:/)
   assert.doesNotMatch(projection, /PlanningStage|ReviewStage|NextAction|ResumeAt|ProgramCounter/)

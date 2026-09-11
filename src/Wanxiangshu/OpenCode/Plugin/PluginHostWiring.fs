@@ -81,6 +81,12 @@ module PluginHostWiring =
 
                     CasebookLifecycle.setEnabled workspaceDirectory
 
+                    // Strength closures are built here in plugin composition from
+                    // the already-held scope and durability handle; the Host
+                    // boundary only receives the neutral `StrengthHostPorts`.
+                    let strengthPorts =
+                        PluginStrengthPorts.create (Some boot.StrengthScope) strengthDurability
+
                     let! wired =
                         HostSignalBootstrap.wire
                             (observeTurnWorkflowFor sessionPort eventPort rootWorkspace.Reader)
@@ -88,8 +94,7 @@ module PluginHostWiring =
                             eventPort
                             snapshotOpt
                             boot.Journal
-                            strengthDurability
-                            (Some boot.StrengthScope)
+                            strengthPorts
                             scope
                             rootWorkspace.Reader
                             input

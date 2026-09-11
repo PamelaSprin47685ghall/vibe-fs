@@ -812,6 +812,7 @@ module ProcessSurface =
                                   Closed = true
                                   Code = code
                                   Message = msg }
+
                     call1 senderValue (completionViewItem item) |> ignore)
 
         let handler =
@@ -862,6 +863,7 @@ module ProcessSurface =
                               Closed = true
                               Code = code
                               Message = msg }
+
                 call1 sender (completionViewItem item) |> ignore)
 
     let portFork (port: obj) (command: string) (agentName: string) (ptyId: obj) (cwd: obj) : obj =

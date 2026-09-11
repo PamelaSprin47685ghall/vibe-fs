@@ -108,7 +108,16 @@ module Surface =
 
     /// Create a process-local writer capability. The caller owns its lifecycle.
     let create (commonDir: string, writerId: string) : EventStoreHandle =
-        EventStoreHandle.Create(EventStore.createLocal commonDir writerId (CanonicalIntegrator.create ()))
+        // Historical full program, assembled explicitly in registration order:
+        // Structural, Journal, Strength, Sphinx, SphinxGeneric, Casebook, JsTransaction.
+        let program =
+            CanonicalIntegrator.baseRules
+            @ Wanxiangshu.Strength.StrengthIntegrationRules.rules
+            @ Wanxiangshu.Sphinx.SphinxIntegrationRules.rules
+            @ Wanxiangshu.Repository.Knowledge.Casebook.CasebookIntegrationRules.rules
+            @ Wanxiangshu.Repository.Programming.Js.JsTransactionIntegrationRules.rules
+
+        EventStoreHandle.Create(EventStore.createLocal commonDir writerId (CanonicalIntegrator.createWithRules program))
 
     /// Release a writer capability. Further operations fail rather than using a
     /// stale resource.

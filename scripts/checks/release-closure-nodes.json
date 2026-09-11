@@ -286,7 +286,7 @@
       "files": [
         "src/Wanxiangshu/Mission/Obligation/LedgerWorkflow.fs",
         "src/Wanxiangshu/Mission/Obligation/Todo/Admission.fs",
-        "src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs",
+        "src/Wanxiangshu/Composition/Durable/MagicTodoFacts.fs",
         "src/Wanxiangshu/Mission/Obligation/Todo/Model.fs"
       ],
       "proofs": [
@@ -543,7 +543,8 @@
       "state": "DONE",
       "files": [
         "src/Wanxiangshu/Mission/Manager/Narrative.fs",
-        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoFactCodec.fs",
+        "src/Wanxiangshu/Composition/Durable/MagicTodoFactCodec.fs",
+        "src/Wanxiangshu/Composition/Durable/MagicTodoIdentity.fs",
         "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocality.fs",
         "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocalitySurface.fs",
         "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs",
@@ -555,7 +556,7 @@
         "src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/HostCodec.fs",
         "src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.fs",
         "src/Wanxiangshu/Mission/Obligation/Todo/PrefixEpoch.fs",
-        "src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs",
+        "src/Wanxiangshu/Composition/Durable/MagicTodoProjection.fs",
         "src/Wanxiangshu/Mission/Obligation/Todo/Surface.fs"
       ],
       "proofs": [

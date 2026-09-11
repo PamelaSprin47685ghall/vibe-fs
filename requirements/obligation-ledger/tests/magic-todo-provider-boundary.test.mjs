@@ -164,13 +164,13 @@ test('WHAT[OBLIGATION-LEDGER-003] clean break removes the legacy todo ontology f
 test('WHAT[OBLIGATION-LEDGER-011] production checkpoint path has no reviewer settlement owner', () => {
   for (const path of [
     'src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs',
-    'src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs',
+    'src/Wanxiangshu/Composition/Durable/MagicTodoProjection.fs',
   ]) {
     const text = read(path)
     assert.doesNotMatch(text, /semanticMerge|SettledCurrentRef|RevisePreview/, path)
   }
 
-  const projection = read('src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs')
+  const projection = read('src/Wanxiangshu/Composition/Durable/MagicTodoProjection.fs')
   assert.match(
     projection,
     /CurrentObligationsRef\s*=\s*Some\(cp\.ProposedTodoRef, cp\.ProposedTodoDigest\)/,

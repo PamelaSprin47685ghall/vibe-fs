@@ -6,12 +6,6 @@ open Thoth.Json
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Repository.Knowledge.Casebook
-open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Persistence
-open Wanxiangshu.Strength.Projection
-open Wanxiangshu.Sphinx
 
 /// Structural frontier oracle. It sees every durable event but owns no business
 /// meaning; DomainConflict is simply `heads.Count > 1` in this Integrator slot.
@@ -55,206 +49,22 @@ module JournalIntegration =
           ApplyCut = fun current _ -> Ok current }
 
 [<RequireQualifiedAccess>]
-module StrengthIntegration =
-    let rule: IntegrationRule =
-        { Name = "Strength"
-          Initial = box StrengthProjection.empty
-          FaultScope = fun _ -> "global"
-          Accepts = fun envelope -> StrengthEventTypes.isStrengthEvent envelope.EventType
-          Integrate =
-            fun current envelope ->
-                match StrengthStore.tryDecodeEnvelope envelope with
-                | Error error -> Error error
-                | Ok event ->
-                    StrengthProjection.apply (unbox<StrengthProjection> current) event
-                    |> Result.map box
-                    |> Result.mapError (fun error -> sprintf "Strength integration rejected: %A" error)
-          PlanCut = fun _ _ _ _ -> Ok { ResetJson = "{}" }
-          ApplyCut = fun current _ -> Ok current }
-
-/// WHAT[EPI-030]: durable restart oracle for legacy Sphinx inquiries. It folds
-/// accepted sphinx-legacy observations into per-handle cursors; every other
-/// sphinx kind is forward-compatible vocabulary and leaves Current unchanged.
-[<RequireQualifiedAccess>]
-module SphinxIntegration =
-    let private toFields
-        (handle: string, tool: string, argsJson: string, revision: int, question: string)
-        : LegacyIntegrator.LegacyObservationFields =
-        { Handle = handle
-          Tool = tool
-          ArgsJson = argsJson
-          Revision = revision
-          Question = question }
-
-    let private legacyDecoder =
-        Decode.object (fun get ->
-            (get.Required.Field "handle" Decode.string,
-             get.Required.Field "tool" Decode.string,
-             get.Required.Field "args_json" Decode.string,
-             get.Required.Field "revision" Decode.int,
-             get.Optional.Field "question" Decode.string |> Option.defaultValue ""))
-
-    let private tryLegacyInput (envelope: EventEnvelope) : Result<LegacyIntegrator.LegacyEnvelopeInput, string> =
-        if envelope.EventType <> SphinxEventTypes.LegacyObservation then
-            Ok(LegacyIntegrator.LegacyEnvelopeInput.OtherSphinxEvent envelope.EventType)
-        else
-            Decode.fromValue "$" legacyDecoder envelope.Payload
-            |> Result.map (toFields >> LegacyIntegrator.LegacyEnvelopeInput.LegacyObservation)
-            |> Result.mapError (fun error -> sprintf "Sphinx legacy observation decode failed: %s" error)
-
-    let rule: IntegrationRule =
-        { Name = "Sphinx"
-          Initial = box LegacyIntegrator.empty
-          FaultScope = fun _ -> "global"
-          Accepts = fun envelope -> SphinxEventTypes.isSphinxEvent envelope.EventType
-          Integrate =
-            fun current envelope ->
-                match tryLegacyInput envelope with
-                | Error error -> Error error
-                | Ok input ->
-                    LegacyIntegrator.applyOne (unbox<LegacyIntegrator.SphinxLegacyCurrent> current) (box input)
-                    |> Result.map box
-                    |> Result.mapError (fun error -> sprintf "Sphinx integration rejected: %s" error)
-          PlanCut = fun _ _ _ _ -> Ok { ResetJson = "{}" }
-          ApplyCut = fun current _ -> Ok current }
-
-/// WHAT[EPI-019]: durable restart oracle for generic Sphinx inquiries. It folds
-/// accepted sphinx-generic transitions into per-inquiry cursors; the legacy
-/// Sphinx rule ignores this kind and leaves its own Current unchanged.
-[<RequireQualifiedAccess>]
-module SphinxGenericIntegration =
-    let private genericDecoder =
-        Decode.object (fun get ->
-            (get.Required.Field "inquiry" Decode.string,
-             get.Required.Field "kind" Decode.string,
-             get.Required.Field "revision" Decode.int,
-             get.Optional.Field "expectedRevision" Decode.int |> Option.defaultValue -1,
-             get.Optional.Field "question" Decode.string |> Option.defaultValue "",
-             get.Optional.Field "profile" Decode.string |> Option.defaultValue "",
-             get.Optional.Field "executionMode" Decode.string |> Option.defaultValue "",
-             get.Optional.Field "pluginsJson" Decode.string |> Option.defaultValue "null",
-             get.Optional.Field "budgetJson" Decode.string |> Option.defaultValue "null",
-             get.Optional.Field "resultsJson" Decode.string |> Option.defaultValue "[]"))
-
-    let private toInput
-        (
-            inquiry: string,
-            kind: string,
-            revision: int,
-            expectedRevision: int,
-            question: string,
-            profile: string,
-            executionMode: string,
-            pluginsJson: string,
-            budgetJson: string,
-            resultsJson: string
-        ) : Result<GenericIntegrator.GenericEnvelopeInput, string> =
-        match kind with
-        | "started" ->
-            Ok(
-                GenericIntegrator.GenericStarted(
-                    inquiry,
-                    revision,
-                    question,
-                    profile,
-                    executionMode,
-                    pluginsJson,
-                    budgetJson
-                )
-            )
-        | "submitted" -> Ok(GenericIntegrator.GenericSubmitted(inquiry, revision, expectedRevision, resultsJson))
-        | "cancelled" -> Ok(GenericIntegrator.GenericCancelled(inquiry, revision))
-        | _ -> Error(sprintf "sphinx generic envelope carries an unknown kind: %s" kind)
-
-    let private tryGenericInput (envelope: EventEnvelope) : Result<GenericIntegrator.GenericEnvelopeInput, string> =
-        Decode.fromValue "$" genericDecoder envelope.Payload
-        |> Result.mapError (fun error -> sprintf "Sphinx generic observation decode failed: %s" error)
-        |> Result.bind toInput
-
-    let rule: IntegrationRule =
-        { Name = "SphinxGeneric"
-          Initial = box GenericIntegrator.empty
-          FaultScope = fun _ -> "global"
-          Accepts = fun envelope -> envelope.EventType = SphinxEventTypes.GenericInquiry
-          Integrate =
-            fun current envelope ->
-                match tryGenericInput envelope with
-                | Error error -> Error error
-                | Ok input ->
-                    GenericIntegrator.applyOne (unbox<GenericIntegrator.SphinxGenericCurrent> current) input
-                    |> Result.map box
-                    |> Result.mapError (fun error -> sprintf "Sphinx generic integration rejected: %s" error)
-          PlanCut = fun _ _ _ _ -> Ok { ResetJson = "{}" }
-          ApplyCut = fun current _ -> Ok current }
-
-[<RequireQualifiedAccess>]
-module CasebookIntegration =
-    let rule: IntegrationRule =
-        { Name = "Casebook"
-          Initial = box CasebookProjection.emptyState
-          FaultScope = fun _ -> "global"
-          Accepts = fun envelope -> CasebookStore.isCasebookEventType envelope.EventType
-          Integrate =
-            fun current envelope ->
-                match CasebookStore.tryDecodeEnvelope envelope with
-                | Error error -> Error error
-                | Ok event ->
-                    CasebookProjection.apply (unbox<CasebookProjection.State> current) event
-                    |> box
-                    |> Ok
-          PlanCut = fun _ _ _ _ -> Ok { ResetJson = "{}" }
-          ApplyCut = fun current _ -> Ok current }
-
-[<RequireQualifiedAccess>]
-module JsTransactionIntegration =
-    let rule: IntegrationRule =
-        { Name = "JsTransaction"
-          Initial = box JsTransactionProjection.empty
-          FaultScope = fun _ -> "global"
-          Accepts = fun envelope -> JsToolsTransactionStore.isTransactionEventType envelope.EventType
-          Integrate =
-            fun current envelope ->
-                match JsToolsTransactionStore.tryDecodeEnvelope envelope with
-                | Error error -> Error error
-                | Ok(JsToolsTransactionStore.DecodedTransactionEvent.Prepared prepared) ->
-                    JsTransactionProjection.prepared envelope.EventId prepared (unbox<JsTransactionProjection> current)
-                    |> box
-                    |> Ok
-                | Ok(JsToolsTransactionStore.DecodedTransactionEvent.Committed committed) ->
-                    JsTransactionProjection.committed
-                        envelope.EventId
-                        committed
-                        (unbox<JsTransactionProjection> current)
-                    |> box
-                    |> Ok
-          PlanCut = fun _ _ _ _ -> Ok { ResetJson = "{}" }
-          ApplyCut = fun current _ -> Ok current }
-
-/// Tiny registration CE. Business modules contribute only single-event oracles;
-/// this is the only place that assembles a history integration program.
-type IntegratorBuilder() =
-    member _.Yield(()) : IntegrationRule list = []
-    member _.Zero() : IntegrationRule list = []
-    member _.Run(rules: IntegrationRule list) = List.rev rules
-
-    [<CustomOperation("register")>]
-    member _.Register(rules: IntegrationRule list, rule: IntegrationRule) = rule :: rules
-
-[<RequireQualifiedAccess>]
 module CanonicalIntegrator =
 
-    let integrator = IntegratorBuilder()
+    /// Journal-only spine: the structural frontier plus the journal fold.
+    /// Every domain rule (Strength, Sphinx, JsTransaction, Casebook) lives in
+    /// its owning module and is injected explicitly by composition owners
+    /// through `createWithRules`.
+    let baseRules: IntegrationRule list =
+        [ StructuralIntegration.rule; JournalIntegration.rule ]
 
-    let private program =
-        integrator {
-            register StructuralIntegration.rule
-            register JournalIntegration.rule
-            register StrengthIntegration.rule
-            register SphinxIntegration.rule
-            register SphinxGenericIntegration.rule
-            register CasebookIntegration.rule
-            register JsTransactionIntegration.rule
-        }
+    /// Fail-closed seam precondition: structural heads and the journal fold
+    /// are load-bearing for every store (`TryHeads`, journal resume).
+    let private requireBaseRules (program: IntegrationRule list) =
+        [ StructuralIntegration.rule.Name; JournalIntegration.rule.Name ]
+        |> List.iter (fun name ->
+            if program |> List.exists (fun rule -> rule.Name = name) |> not then
+                invalidArg "rules" (sprintf "CanonicalIntegrator program is missing required rule '%s'" name))
 
     type private RuleFaultKey = { Rule: string; Scope: string }
 
@@ -282,7 +92,7 @@ module CanonicalIntegrator =
           Reason: string
           ResetJson: string }
 
-    let private initialState =
+    let private initialState (program: IntegrationRule list) =
         { Currents = program |> List.map (fun rule -> rule.Name, rule.Initial) |> Map.ofList
           Events = Map.empty
           Faults = Map.empty }
@@ -291,14 +101,14 @@ module CanonicalIntegrator =
 
     let private structuralRule = StructuralIntegration.rule
 
-    let private businessRules =
+    let private businessOf (program: IntegrationRule list) =
         program |> List.filter (fun rule -> rule.Name <> structuralRule.Name)
 
-    let private matchingBusinessRules (envelope: EventEnvelope) =
-        businessRules |> List.filter (fun rule -> rule.Accepts envelope)
+    let private matchingBusinessRules (program: IntegrationRule list) (envelope: EventEnvelope) =
+        businessOf program |> List.filter (fun rule -> rule.Accepts envelope)
 
-    let private tryRule name =
-        businessRules |> List.tryFind (fun rule -> rule.Name = name)
+    let private tryRule (program: IntegrationRule list) name =
+        businessOf program |> List.tryFind (fun rule -> rule.Name = name)
 
     let private faultKey (rule: IntegrationRule) (envelope: EventEnvelope) =
         { Rule = rule.Name
@@ -353,8 +163,8 @@ module CanonicalIntegrator =
                 Currents = Map.add rule.Name reset state.Currents
                 Faults = Map.remove key state.Faults }
 
-    let private applyCut (state: IntegratorState) (payload: CutPayload) =
-        match tryRule payload.Rule, Map.tryFind (eventKey payload.FailedEventId) state.Events with
+    let private applyCut (program: IntegrationRule list) (state: IntegratorState) (payload: CutPayload) =
+        match tryRule program payload.Rule, Map.tryFind (eventKey payload.FailedEventId) state.Events with
         | Some rule, Some failed -> applyCutForRule state payload rule (faultKey rule failed)
         | _ -> state
 
@@ -403,20 +213,20 @@ module CanonicalIntegrator =
         decideBusinessRule state normalized rule
         |> applyBusinessDecision normalized rule (state, failures)
 
-    let private integrateBusiness (state: IntegratorState) (normalized: EventEnvelope) =
+    let private integrateBusiness (program: IntegrationRule list) (state: IntegratorState) (normalized: EventEnvelope) =
         let next, failures =
-            matchingBusinessRules normalized
+            matchingBusinessRules program normalized
             |> List.fold (applyBusinessRule normalized) (state, [])
 
         { State = next
           FailedRules = List.rev failures }
 
-    let private semanticStep state normalized =
+    let private semanticStep (program: IntegrationRule list) state normalized =
         match tryDecodeCutPayload normalized with
         | Some payload ->
-            { State = applyCut state payload
+            { State = applyCut program state payload
               FailedRules = [] }
-        | None -> integrateBusiness state normalized
+        | None -> integrateBusiness program state normalized
 
     let private addIntegratedEvent key normalized (semantic: IntegrationStep) =
         { semantic with
@@ -424,7 +234,13 @@ module CanonicalIntegrator =
                 { semantic.State with
                     Events = Map.add key normalized semantic.State.Events } }
 
-    let private integrateNew allowExternalParents (state: IntegratorState) (normalized: EventEnvelope) key =
+    let private integrateNew
+        (program: IntegrationRule list)
+        allowExternalParents
+        (state: IntegratorState)
+        (normalized: EventEnvelope)
+        key
+        =
         let missingParent =
             normalized.Parents
             |> List.tryFind (fun parent -> not (Map.containsKey (eventKey parent) state.Events))
@@ -433,7 +249,7 @@ module CanonicalIntegrator =
         | Some parent when not allowExternalParents ->
             Error(sprintf "missing parent during integration: %s" (EventId.value parent))
         | None ->
-            semanticStep (structuralStep state normalized) normalized
+            semanticStep program (structuralStep state normalized) normalized
             |> addIntegratedEvent key normalized
             |> Ok
         | Some _ ->
@@ -441,7 +257,7 @@ module CanonicalIntegrator =
             // aged out as a whole writer. EventKWayMerge.mergeRetained already
             // proved the parent is absent from the entire retained set; only
             // this boot/reload mode may treat that boundary as satisfied.
-            semanticStep (structuralStep state normalized) normalized
+            semanticStep program (structuralStep state normalized) normalized
             |> addIntegratedEvent key normalized
             |> Ok
 
@@ -450,6 +266,7 @@ module CanonicalIntegrator =
     /// marks that rule faulted; a later durable ProjectionCutTail applies the
     /// rule-owned reset patch and clears the fault.
     let private integrateOne
+        (program: IntegrationRule list)
         allowExternalParents
         (state: IntegratorState)
         (envelope: EventEnvelope)
@@ -462,23 +279,26 @@ module CanonicalIntegrator =
             CanonicalEventCodec.checkIdentity existing normalized
             |> Result.mapError (sprintf "identity collision: %A")
             |> Result.map (fun () -> { State = state; FailedRules = [] })
-        | None -> integrateNew allowExternalParents state normalized key
+        | None -> integrateNew program allowExternalParents state normalized key
 
     /// Boot history ordering is delegated to the one structural k-way primitive.
     /// Business semantic failures never abort replay; they cut only that rule's
     /// tail until an in-order ProjectionCutTail reset fact is encountered.
-    let private replay (streams: (string * EventEnvelope list) list) : Result<IntegratorState, string> =
+    let private replay
+        (program: IntegrationRule list)
+        (streams: (string * EventEnvelope list) list)
+        : Result<IntegratorState, string> =
         EventKWayMerge.mergeRetained streams
         |> Result.mapError (sprintf "writer-stream replay invalid: %A")
         |> Result.bind (fun ordered ->
             // DSL-MUTABLE: algorithm-scratch — stack depth must not scale with history length.
-            let mutable state = initialState
+            let mutable state = initialState program
             let mutable remaining = ordered
             // DSL-MUTABLE: algorithm-scratch — first integrateOne failure cuts this replay
             let mutable failure: string option = None
 
             let advance () =
-                match integrateOne true state (List.head remaining) with
+                match integrateOne program true state (List.head remaining) with
                 | Ok step ->
                     state <- step.State
                     remaining <- List.tail remaining
@@ -524,10 +344,14 @@ module CanonicalIntegrator =
                 |> Option.defaultValue (Ok())
         }
 
-    let create () : ICanonicalIntegrator =
+    /// Explicit construction seam. `rules` is the complete history program
+    /// in registration order; domain rules arrive from their owning modules.
+    let createWithRules (rules: IntegrationRule list) : ICanonicalIntegrator =
+        requireBaseRules rules
+        let program = rules
         let gate = obj ()
         // DSL-MUTABLE: resource — the sole process Current owned by this Integrator.
-        let mutable state = initialState
+        let mutable state = initialState program
         // DSL-MUTABLE: resource — last loaded local EventStore for the one allowed
         // process-wide full replay fallback when a business rule cannot infer a cut.
         let mutable loadedCommonDir: string option = None
@@ -553,7 +377,7 @@ module CanonicalIntegrator =
                         |> Result.mapError (sprintf "cut-tail full replay read failed: %A")
 
                     do! validateLocalHistory commonDir streams
-                    let! replayed = replay streams
+                    let! replayed = replay program streams
                     let replayCurrent = currentForRule rule replayed
 
                     return!
@@ -625,7 +449,7 @@ module CanonicalIntegrator =
                 | Some fault ->
                     let! plan = planCut currentState rule fault
                     let cut = cutEnvelope currentState rule fault plan
-                    let! integrated = integrateOne false currentState cut
+                    let! integrated = integrateOne program false currentState cut
 
                     let receipt =
                         { Rule = rule.Name
@@ -647,10 +471,10 @@ module CanonicalIntegrator =
                         return! loop next (cuts @ addedCuts) (receipts @ addedReceipts) tail
                 }
 
-            loop currentState [] [] (matchingBusinessRules envelope)
+            loop currentState [] [] (matchingBusinessRules program envelope)
 
         let closeFailure (state, addedEvents, addedCuts) ((key: RuleFaultKey), _) =
-            match tryRule key.Rule with
+            match tryRule program key.Rule with
             | None -> Ok(state, addedEvents, addedCuts)
             | Some rule ->
                 result {
@@ -672,7 +496,7 @@ module CanonicalIntegrator =
                     | raw :: tail ->
                         let normalized = EventEnvelope.normalize raw
                         let! before, resetEvents, resetCuts = ensureMatchingResets current normalized
-                        let! step = integrateOne false before normalized
+                        let! step = integrateOne program false before normalized
                         let! after, postCutEvents, postCuts = closeFailures step.State step.FailedRules
 
                         return!
@@ -694,7 +518,7 @@ module CanonicalIntegrator =
                             |> Result.mapError (sprintf "local event history read failed: %A")
 
                         do! validateLocalHistory commonDir streams
-                        let! replayed = replay streams
+                        let! replayed = replay program streams
                         state <- replayed
                         loadedCommonDir <- Some commonDir
                         return ()

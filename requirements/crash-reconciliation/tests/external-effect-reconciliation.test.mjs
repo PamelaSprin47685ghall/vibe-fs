@@ -101,7 +101,7 @@ test('WHAT[CRASH-019] physical_receipts_must_anchor_effect_calls_not_symbol_exis
   const staleTodo = copy()
   row(staleTodo, 'todo-write').physical_receipt = {
     kind: 'physical-observation',
-    path: 'src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs',
+    path: 'src/Wanxiangshu/Composition/Durable/MagicTodoFacts.fs',
     symbols: ['PhysicalSuccessEvidence'],
   }
   assertOwnedDiagnostic(finding(staleTodo, 'EFFECT_PHASE_TRUTH'), 'todo-write', 'effect-accounting', 'phase.physical_receipt')

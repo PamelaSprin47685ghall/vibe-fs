@@ -141,6 +141,18 @@ module HostTurnObserver =
                         context
         }
 
+    /// SPEC-INV-013 / STRENGTH-010: the primary-turn observation port is
+    /// optional; an absent port means no observation, never a skipped turn.
+    let private observePrimaryTurnIfPresent
+        (observePrimaryTurn: (ReconciledTurn -> Task<unit>) option)
+        (turn: ReconciledTurn)
+        : Task<unit> =
+        task {
+            match observePrimaryTurn with
+            | Some observePrimary -> do! observePrimary turn
+            | None -> ()
+        }
+
     let private observeBusinessTurn
         (observeTurnWorkflow: AbortCause -> ReconciledTurnContext -> Task)
         (sessionPort: ISessionHostPort)
@@ -176,9 +188,7 @@ module HostTurnObserver =
                 // SPEC-INV-013 / STRENGTH-010 / STRENGTH-007: primary turn observation
                 // (closing dry run, primary symbol evidence collection, durable append)
                 // executes before observeCurrentTurn.
-                match observePrimaryTurn with
-                | Some observePrimary -> do! observePrimary turn
-                | None -> ()
+                do! observePrimaryTurnIfPresent observePrimaryTurn turn
 
                 // Current-process Host observation proceeds from its exact facts.
                 // No durable-family gate is fabricated here: Join tools admit via

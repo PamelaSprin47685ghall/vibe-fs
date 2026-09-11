@@ -485,7 +485,10 @@ module TemporalSurface =
     let openJournal (commonDir: string) (runtimeId: string) (processId: int) (startedAt: string) : Task<obj> =
         task {
             let store =
-                EventStore.createLocal commonDir (Guid.NewGuid().ToString("N")) (CanonicalIntegrator.create ())
+                EventStore.createLocal
+                    commonDir
+                    (Guid.NewGuid().ToString("N"))
+                    (CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules)
 
             let! writer, _init =
                 EventStoreJournalWriter.create (
@@ -501,7 +504,10 @@ module TemporalSurface =
     let resumeJournal (commonDir: string) (runtimeId: string) (processId: int) (startedAt: string) : Task<obj> =
         task {
             let store =
-                EventStore.createLocal commonDir (Guid.NewGuid().ToString("N")) (CanonicalIntegrator.create ())
+                EventStore.createLocal
+                    commonDir
+                    (Guid.NewGuid().ToString("N"))
+                    (CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules)
 
             let! result =
                 EventStoreJournalWriter.resumeOrCreate (
