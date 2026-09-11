@@ -17,6 +17,7 @@ module StrengthSpeculate =
         snapshotPort: ISessionSnapshotPort option ->
         journal: AgentJournal option ->
         strengthDurability: StrengthDurabilityPort option ->
+        strengthScope: PluginStrengthScope ->
         scope: PluginRuntimeScope ->
         output: obj ->
             Task<unit>

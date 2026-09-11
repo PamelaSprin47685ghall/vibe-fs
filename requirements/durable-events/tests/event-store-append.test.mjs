@@ -199,7 +199,7 @@ test('WHAT[DURABLE-EVENTS-021] every_live_semantic_cut_boundary_trips_process_fa
     casebook: readFileSync(new URL('Repository/Knowledge/Casebook/Store.fs', root), 'utf8'),
     jsTransactions: readFileSync(new URL('Repository/Programming/Js/TransactionStore.fs', root), 'utf8'),
     strengthDurability: readFileSync(new URL('Strength/Persistence/Durability.fs', root), 'utf8'),
-    hostTurn: readFileSync(new URL('OpenCode/Host/HostTurnObserver.fs', root), 'utf8'),
+    hostTurn: readFileSync(new URL('OpenCode/Host/HostSignalBootstrap.fs', root), 'utf8'),
   }
 
   assert.match(sources.agentJournal, /FatalProcess\.trip\s+"journal-semantic-cut"/)

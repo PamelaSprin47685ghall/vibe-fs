@@ -2,7 +2,6 @@ namespace Wanxiangshu.Process
 
 open System
 open System.Threading.Tasks
-open Wanxiangshu.OpenCode
 
 [<RequireQualifiedAccess>]
 type PtySignal =
@@ -64,19 +63,27 @@ type PtyId =
 
     static member Create(id: string) = PtyId id
 
+/// Physical PTY exit event delivered to listeners.
+[<RequireQualifiedAccess>]
+type PtyExitEvent =
+    | Exited of id: PtyId * outcome: string
+    | Failed of id: PtyId * code: string * message: string
+    | Aborted of id: PtyId * code: string * message: string
+
+    member this.Id =
+        match this with
+        | Exited(id, _) -> id
+        | Failed(id, _, _) -> id
+        | Aborted(id, _, _) -> id
+
 /// One live PTY.
 ///
-/// `Agent` is the managed agent the forking profile selected, held as the parsed
-/// `ManagedAgent` rather than a name plus a role. The previous shape had
-/// `AgentId: string option` and `Role: Role option`, and `PtyPort.Fork` was
-/// never called with either — so every PTY completion reported role `Executor` and
-/// a rebuilt name `fast-distiller`, regardless of which DevOps agent opened it.
-/// Keeping name and role as one parsed value makes that disagreement unrepresentable.
+/// `Agent` is the selected managed agent name as plain text.
 type PtyHandle =
     { Id: PtyId
       Command: string
       StartedAt: DateTimeOffset
-      Agent: ManagedAgent }
+      Agent: string }
 
 type PtyRead =
     { Id: PtyId

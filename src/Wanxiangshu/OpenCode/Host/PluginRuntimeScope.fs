@@ -13,7 +13,6 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Strength.OpenCode
 
 /// Session-scoped resource owner implemented by the tool runtime without
 /// exposing its concrete dictionaries to the plugin composition root.
@@ -32,10 +31,13 @@ type ISessionRuntimeOwner =
 /// Explicit lifetime root for one plugin instance. Collections here are either
 /// physical resources, display caches, or bounded per-call deduplication.
 type PluginRuntimeScope(journal: AgentJournal option) =
-    let strength = PluginStrengthScope()
     let blogger = PluginBloggerScope()
     let sessions = PluginSessionScope()
     let recovery = PluginRecoveryScope(journal)
+    // DSL-MUTABLE: resource — session cleanup hook list registered by composition
+    let mutable sessionCleanups: (string -> unit) list = []
+    // DSL-MUTABLE: resource — scope dispose hook list registered by composition
+    let mutable scopeDisposers: (unit -> unit) list = []
 
     let toolRuntimeGate = obj ()
     // DSL-MUTABLE: resource — session tool runtime owner handle
@@ -149,8 +151,11 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         for activate in activators do
             activate ()
 
-    /// Composition-of-owners: Strength decision-local state lives in its own scope.
-    member _.Strength = strength
+    member _.AttachSessionCleanup(cleanup: string -> unit) =
+        sessionCleanups <- cleanup :: sessionCleanups
+
+    member _.AttachScopeDispose(dispose: unit -> unit) =
+        scopeDisposers <- dispose :: scopeDisposers
 
     /// Composition-of-owners: Blogger parking/flight/drain state lives in its own scope.
     member _.Blogger = blogger
@@ -397,7 +402,8 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             let linkedBloggerKeys = sessions.LinkedBloggerKeys sessionId
             sessions.ClearSession sessionId
             recovery.ClearSession sessionId
-            strength.ClearSession sessionId
+            for cleanup in List.rev sessionCleanups do
+                cleanup sessionId
             this.LoopSensor.DropSession(SessionId.create sessionId)
 
             // Always cancel the deleted id; also cancel linked Blogger keys.
@@ -470,7 +476,8 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             remember (captureSyncFailure (fun () -> sessions.Dispose()))
             remember (captureSyncFailure (fun () -> syncDelegateRuntime |> Option.iter (fun sd -> sd.Dispose())))
             syncDelegateRuntime <- None
-            remember (captureSyncFailure (fun () -> strength.Dispose()))
+            for dispose in List.rev scopeDisposers do
+                remember (captureSyncFailure dispose)
 
             let! repairDrainFailure = captureTaskFailure (blogger.DrainRepairEpisodes())
             remember repairDrainFailure

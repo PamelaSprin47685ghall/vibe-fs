@@ -190,6 +190,16 @@ module PluginHooks =
 
                     let parentWorkRecordFor, childWorkRecordFor = workRecord true, workRecord false
 
+                    let childRecordForRun =
+                        fun sid range run ->
+                            LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun journal sid range run
+
+                    let workRecordCapability: Wanxiangshu.Execution.Delegation.DelegationWorkRecordCapability =
+                        { ParentWorkRecord =
+                            fun sid -> LifecycleWorkRecordProjection.lifecycleWorkRecord journal sid true
+                          ParentWorkRecordBounded =
+                            fun sid range -> LifecycleWorkRecordProjection.lifecycleWorkRecordBounded journal sid range }
+
                     let casebookToolSpecs: ToolSpec list =
                         match workspaceDirectory with
                         | Some ws -> CasebookTools.buildSpecs (ToolHostCodec.factory toolModule) ws
@@ -203,11 +213,14 @@ module PluginHooks =
                             host.RootWorkspace
                             journal
                             (workspaceDirectory)
+                            (Some boot.StrengthScope)
                             scope
                             wired.CurrentPhysicalUserMessage
                             onRunStarted
                             parentWorkRecordFor
                             childWorkRecordFor
+                            childRecordForRun
+                            workRecordCapability
                             snapshotOpt
                             (Some wired.CancelSignals)
                             (Some eventPort)

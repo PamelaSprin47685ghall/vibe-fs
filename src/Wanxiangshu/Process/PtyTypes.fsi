@@ -2,7 +2,6 @@ namespace Wanxiangshu.Process
 
 open System
 open System.Threading.Tasks
-open Wanxiangshu.OpenCode
 
 [<RequireQualifiedAccess>]
 type PtySignal =
@@ -52,11 +51,20 @@ type PtyId =
     static member Create: id: string -> PtyId
     member Value: string
 
+/// Physical PTY exit event delivered to listeners.
+[<RequireQualifiedAccess>]
+type PtyExitEvent =
+    | Exited of id: PtyId * outcome: string
+    | Failed of id: PtyId * code: string * message: string
+    | Aborted of id: PtyId * code: string * message: string
+
+    member Id: PtyId
+
 type PtyHandle =
     { Id: PtyId
       Command: string
       StartedAt: DateTimeOffset
-      Agent: ManagedAgent }
+      Agent: string }
 
 type PtyRead =
     { Id: PtyId

@@ -32,7 +32,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.process-execution.process-processrequest.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.work-record.mission-workrecord-materialize-runtime.fsproj"/>
     <Compile Include="Git/IntegrationGate.fsi"/>
     <Compile Include="Git/IntegrationGate.fs"/>
     <Compile Include="Git/WorktreeResource.fsi"/>

@@ -89,6 +89,7 @@ module PluginHostWiring =
                             snapshotOpt
                             boot.Journal
                             strengthDurability
+                            (Some boot.StrengthScope)
                             scope
                             rootWorkspace.Reader
                             input

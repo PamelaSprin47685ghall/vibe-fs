@@ -14,7 +14,6 @@ open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Strength.OpenCode
 
 /// Session-scoped resource owner implemented by the tool runtime without
 /// exposing its concrete dictionaries to the plugin composition root.
@@ -43,8 +42,9 @@ type PluginRuntimeScope =
 
     member ActivateDurability: unit -> unit
 
-    /// Composition-of-owners: Strength decision-local state lives in its own scope.
-    member Strength: PluginStrengthScope
+    member AttachSessionCleanup: cleanup: (string -> unit) -> unit
+
+    member AttachScopeDispose: dispose: (unit -> unit) -> unit
 
     /// Composition-of-owners: Blogger parking/flight/drain state lives in its own scope.
     member Blogger: PluginBloggerScope

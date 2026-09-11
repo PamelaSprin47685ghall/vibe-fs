@@ -209,9 +209,10 @@ test('WHAT[HOST-BOUNDARY-031] RootWorkspace runtime is private and every observe
     .filter((candidate) => refShards(candidate, projects).includes('host-root-workspace-runtime'))
     .map((candidate) => candidate.shard)
     .sort()
-  assert.deepEqual(runtimeConsumers, ['opencode-host-hostsignalbootstrap', 'opencode-host-sharedstatesurface'])
+  assert.deepEqual(runtimeConsumers, ['opencode-host-sharedstatesurface', 'plugin-composition'])
 
-  assert.ok(refShards(requireShard(projects, 'interaction-dispatch-opencode-ingresscodec'), projects).includes('host-root-workspace-contract'))
+  assert.ok(refShards(requireShard(projects, 'opencode-host-hostsignalbootstrap'), projects).includes('host-root-workspace-contract'))
+  assert.ok(!refShards(requireShard(projects, 'opencode-host-hostsignalbootstrap'), projects).includes('host-root-workspace-runtime'), 'opencode-host-hostsignalbootstrap must consume only typed contract, not process-local runtime')
 
   for (const id of [
     'execution-delegation-hostturnobservedsurface',

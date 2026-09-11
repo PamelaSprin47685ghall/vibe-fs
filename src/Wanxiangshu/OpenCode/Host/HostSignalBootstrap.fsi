@@ -8,6 +8,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Strength.Persistence
+open Wanxiangshu.Strength.OpenCode
 
 module HostSignalBootstrap =
 
@@ -45,6 +46,7 @@ module HostSignalBootstrap =
         snapshotOpt: ISessionSnapshotPort option ->
         journal: AgentJournal option ->
         strengthDurability: StrengthDurabilityPort option ->
+        strengthScope: PluginStrengthScope option ->
         scope: PluginRuntimeScope ->
         rootWorkspace: IRootWorkspaceReader ->
         input: obj ->

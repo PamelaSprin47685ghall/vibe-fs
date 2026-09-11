@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Change.Host
+open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Delegation.Handle
@@ -37,6 +38,8 @@ type ToolRuntimeScope =
         childWorkRecordFor: (string -> Task<string option>) option *
         snapshot: ISessionSnapshotPort option *
         cancelSignals: (SessionId seq -> unit) option *
+        ?childWorkRecordForRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>) *
+        ?workRecordCapability: DelegationWorkRecordCapability *
         ?continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>) *
         ?captureWorktreeSnapshot: (WorktreePath -> Result<WorkspaceSnapshotId, string>) *
         ?eventPort: IEventObservationPort ->

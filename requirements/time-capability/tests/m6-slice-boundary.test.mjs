@@ -82,8 +82,8 @@ test('WHAT[TIME-008] production inventory separates contracts adapter verificati
     'execution-session-wait-proof-surface',
     'execution-session-wait-runtime',
     'foundation-temporal',
-    'opencode-host-hostsignalbootstrap',
     'opencode-host-messagevisibility',
+    'plugin-composition',
     'process-node-timing-adapter',
     'process-virtual-timing',
     'verification-eventstorewritersurface',
@@ -93,10 +93,10 @@ test('WHAT[TIME-008] production inventory separates contracts adapter verificati
     'process-processrequest',
   ])
   assert.deepEqual(consumersOf(projects, 'execution-session-sessionstartedatprojection'), [
+    'composition-durable-fold',
     'composition-durable-projection',
     'execution-session-sessionstartedatledger',
     'foundation-temporal',
-    'strength-persistence-durabilityport',
   ])
   assert.deepEqual(consumersOf(projects, 'process-node-timing-adapter'), [
     'delegation-fork-runtime',
@@ -104,8 +104,8 @@ test('WHAT[TIME-008] production inventory separates contracts adapter verificati
     'delegation-runtime-surface',
     'execution-delegation-hostturnobservedsurface',
     'foundation-temporal',
-    'git-integrationgate',
     'opencode-host-hostsignalbootstrap',
+    'plugin-composition',
     'process-largegatesurface',
     'process-processrequest',
   ])

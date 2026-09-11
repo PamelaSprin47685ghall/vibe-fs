@@ -758,7 +758,7 @@ module ProcessSurface =
             {| id = handle.Id.Value
                command = handle.Command
                startedAt = handle.StartedAt.ToString("o")
-               agent = handle.Agent.Name |}
+               agent = handle.Agent |}
 
     let ptyReadView (read: PtyRead) : obj =
         box
@@ -790,7 +790,29 @@ module ProcessSurface =
             if isNullish senderValue then
                 None
             else
-                Some(fun item -> call1 senderValue (completionViewItem item) |> ignore)
+                Some(fun (event: PtyExitEvent) ->
+                    let item =
+                        match event with
+                        | PtyExitEvent.Exited(id, outcome) ->
+                            PtyExited
+                                { PtyId = id.Value
+                                  Outcome = outcome
+                                  Closed = true }
+                        | PtyExitEvent.Failed(id, code, msg) ->
+                            PtyFailed
+                                { PtyId = id.Value
+                                  Outcome = msg
+                                  Closed = true
+                                  Code = code
+                                  Message = msg }
+                        | PtyExitEvent.Aborted(id, code, msg) ->
+                            PtyAborted
+                                { PtyId = id.Value
+                                  Outcome = msg
+                                  Closed = true
+                                  Code = code
+                                  Message = msg }
+                    call1 senderValue (completionViewItem item) |> ignore)
 
         let handler =
             if isNullish handlerValue then
@@ -798,51 +820,12 @@ module ProcessSurface =
             else
                 Some(handlerOf handlerValue)
 
-        let provider =
-            if isNullish providerValue then
-                None
-            else
-                Some(fun () ->
-                    let values = unbox<obj array> (call0 providerValue)
-
-                    values
-                    |> Array.choose (fun value ->
-                        let name =
-                            if value :? string then
-                                string value
-                            else
-                                let agentValue = property value "agent"
-
-                                if isNullish agentValue then
-                                    string (property value "Name")
-                                else
-                                    string agentValue
-
-                        match ManagedAgent.tryParse name with
-                        | None -> None
-                        | Some agent ->
-                            Some
-                                { AgentId = name
-                                  Agent = name
-                                  Role = Role.Distiller
-                                  Status = AgentStatus.Idle
-                                  CurrentRunId = None
-                                  TerminalStatusLabel = None
-                                  CompletionCellSettled = false
-                                  ChildSessionId = None })
-                    |> Array.toList)
-
         let port =
-            match sender, handler, provider with
-            | Some sender, Some handler, Some provider ->
-                PtyPort(mailboxSender = sender, handler = handler, agentProvider = provider)
-            | Some sender, Some handler, None -> PtyPort(mailboxSender = sender, handler = handler)
-            | Some sender, None, Some provider -> PtyPort(mailboxSender = sender, agentProvider = provider)
-            | None, Some handler, Some provider -> PtyPort(handler = handler, agentProvider = provider)
-            | Some sender, None, None -> PtyPort(mailboxSender = sender)
-            | None, Some handler, None -> PtyPort(handler = handler)
-            | None, None, Some provider -> PtyPort(agentProvider = provider)
-            | None, None, None -> PtyPort()
+            match sender, handler with
+            | Some sender, Some handler -> PtyPort(exitListener = sender, handler = handler)
+            | Some sender, None -> PtyPort(exitListener = sender)
+            | None, Some handler -> PtyPort(handler = handler)
+            | None, None -> PtyPort()
 
         PtyPortHandle port :> obj
 
@@ -857,7 +840,29 @@ module ProcessSurface =
     /// constructor sender; the underlying port remains an opaque capability.
     let portAddMailboxSender (port: obj) (sender: obj) : unit =
         (ptyPortOf port)
-            .AddMailboxSender(fun item -> call1 sender (completionViewItem item) |> ignore)
+            .AddExitListener(fun (event: PtyExitEvent) ->
+                let item =
+                    match event with
+                    | PtyExitEvent.Exited(id, outcome) ->
+                        PtyExited
+                            { PtyId = id.Value
+                              Outcome = outcome
+                              Closed = true }
+                    | PtyExitEvent.Failed(id, code, msg) ->
+                        PtyFailed
+                            { PtyId = id.Value
+                              Outcome = msg
+                              Closed = true
+                              Code = code
+                              Message = msg }
+                    | PtyExitEvent.Aborted(id, code, msg) ->
+                        PtyAborted
+                            { PtyId = id.Value
+                              Outcome = msg
+                              Closed = true
+                              Code = code
+                              Message = msg }
+                call1 sender (completionViewItem item) |> ignore)
 
     let portFork (port: obj) (command: string) (agentName: string) (ptyId: obj) (cwd: obj) : obj =
         match agentOf agentName with
@@ -865,7 +870,7 @@ module ProcessSurface =
         | Ok agent ->
             let id = if isNullish ptyId then None else Some(ptyIdOf ptyId)
             let directory = optionString cwd
-            PtyIdHandle((ptyPortOf port).Fork(command, agent, ?ptyId = id, ?cwd = directory)) :> obj
+            PtyIdHandle((ptyPortOf port).Fork(command, agent.Name, ?ptyId = id, ?cwd = directory)) :> obj
 
     let portExists (port: obj) (id: obj) : bool = (ptyPortOf port).Exists(ptyIdOf id)
     let portKnown (port: obj) (id: obj) : bool = (ptyPortOf port).Known(ptyIdOf id)
@@ -928,10 +933,10 @@ module ProcessSurface =
                completionCellSettled = agent.CompletionCellSettled |}
 
     let portList (port: obj) : obj =
-        let agents, ptys = (ptyPortOf port).List()
+        let ptys = (ptyPortOf port).List()
 
         box
-            {| agents = agents |> List.map agentView |> List.toArray
+            {| agents = [||]
                ptys = ptys |> List.map ptyHandleView |> List.toArray |}
 
 

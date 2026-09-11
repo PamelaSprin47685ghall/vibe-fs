@@ -10,6 +10,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Git
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Strength.OpenCode
 
 module PluginHostInterop =
 
@@ -75,11 +76,14 @@ module PluginHostInterop =
         rootWorkspace: IRootWorkspaceReader ->
         journal: AgentJournal option ->
         workspaceDirectory: string option ->
+        strengthScope: PluginStrengthScope option ->
         scope: PluginRuntimeScope ->
         currentPhysicalUserMessage: (string -> string option) ->
         onRunStarted: (SessionId -> Role -> string option -> unit) option ->
         parentWorkRecordFor: (string -> Task<string option>) option ->
         childWorkRecordFor: (string -> Task<string option>) option ->
+        childWorkRecordForRun: (SessionId -> Wanxiangshu.Context.Trace.XTraceRange -> ProviderRunIdentity -> Task<string option>) ->
+        workRecordCapability: Wanxiangshu.Execution.Delegation.DelegationWorkRecordCapability ->
         snapshot: ISessionSnapshotPort option ->
         cancelSignals: (SessionId seq -> unit) option ->
         eventPort: IEventObservationPort option ->

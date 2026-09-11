@@ -228,8 +228,31 @@ type HostForkRuntime
         for observer in observers do
             notifyPtyObserver observer item
 
+    let mapExitEvent (event: PtyExitEvent) : PtyJoinItem =
+        match event with
+        | PtyExitEvent.Exited(id, outcome) ->
+            PtyExited
+                { PtyId = id.Value
+                  Outcome = outcome
+                  Closed = true }
+        | PtyExitEvent.Failed(id, code, msg) ->
+            PtyFailed
+                { PtyId = id.Value
+                  Outcome = msg
+                  Closed = true
+                  Code = code
+                  Message = msg }
+        | PtyExitEvent.Aborted(id, code, msg) ->
+            PtyAborted
+                { PtyId = id.Value
+                  Outcome = msg
+                  Closed = true
+                  Code = code
+                  Message = msg }
+
     do
-        ptyPortInstance.AddMailboxSender(fun item ->
+        ptyPortInstance.AddExitListener(fun exitEvent ->
+            let item = mapExitEvent exitEvent
             let id = PtyJoinItem.ptyId item
             let owned = lock gate (fun () -> ptyRuns.Contains id)
 

@@ -18,7 +18,6 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Repository.Programming.Js.OpenCode
-open Wanxiangshu.Strength
 
 /// Assembly-only registry: tool behavior lives in one vertical verb module;
 /// per-session resources live in ToolRuntimeScope.
@@ -77,7 +76,7 @@ module ToolRegistry =
           "celebrate", InstitutionalLearningTools.admission
           "regret", InstitutionalLearningTools.admission
           "chronicle", ChronicleTool.admission bloggerHost
-          "fetch", FetchTool.admission
+          "fetch", ToolAdmission.OfficeRole(fun _ r -> r = Role.Inspector || r = Role.Coder)
           "js-bookkeeper", JsBookkeeperTool.admission ]
 
     let private tryAdmissionFor (specName: string) (bloggerHost: IBloggerRuntimeHost option) : ToolAdmission option =
@@ -143,11 +142,13 @@ module ToolRegistry =
         (eventPort: IEventObservationPort option)
         (bloggerHost: IBloggerRuntimeHost option)
         (syncDelegateRuntime: SyncDelegateRuntime option)
-        (strengthRuntime: StrengthRuntime option)
+        (isReplicaSession: (SessionId -> bool) option)
         (casebookToolSpecs: ToolSpec list)
         (jsTransactionPersistence: IJsTransactionPersistence option)
         (continueManagerLoop: SessionId -> string -> Task<Result<unit, string>>)
         (captureWorktreeSnapshot: WorktreePath -> Result<WorkspaceSnapshotId, string>)
+        (childWorkRecordForRun: (SessionId -> Wanxiangshu.Context.Trace.XTraceRange -> ProviderRunIdentity -> Task<string option>) option)
+        (workRecordCapability: Wanxiangshu.Execution.Delegation.DelegationWorkRecordCapability option)
         =
         let factory = ToolHostCodec.factory toolModule
         let providerLanguage = ProviderLanguageBinding.readGlobalPreference ()
@@ -176,6 +177,8 @@ module ToolRegistry =
                 childWorkRecordFor,
                 snapshot,
                 cancelSignals,
+                ?childWorkRecordForRun = childWorkRecordForRun,
+                ?workRecordCapability = workRecordCapability,
                 continueManagerLoop = continueManagerLoop,
                 captureWorktreeSnapshot = captureWorktreeSnapshot,
                 ?eventPort = eventPort
@@ -314,9 +317,9 @@ module ToolRegistry =
                         ctx.ProviderRunId
 
             let isStrengthReplica (ctx: HostToolContext) =
-                match strengthRuntime with
-                | Some strength when not (String.IsNullOrWhiteSpace ctx.SessionId) ->
-                    strength.TryFindByReplica(SessionId.create ctx.SessionId) |> Option.isSome
+                match isReplicaSession with
+                | Some replicaPred when not (String.IsNullOrWhiteSpace ctx.SessionId) ->
+                    replicaPred (SessionId.create ctx.SessionId)
                 | _ -> false
 
             let executeAfterBoundary args (ctx: HostToolContext) =

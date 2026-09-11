@@ -56,6 +56,7 @@ open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Strength
+open Wanxiangshu.Strength.OpenCode
 open CompanionProjection
 
 module PluginHostInterop =
@@ -337,11 +338,14 @@ module PluginHostInterop =
         (rootWorkspace: IRootWorkspaceReader)
         (journal: AgentJournal option)
         (workspaceDirectory: string option)
+        (strengthScope: PluginStrengthScope option)
         (scope: PluginRuntimeScope)
         (currentPhysicalUserMessage: string -> string option)
         (onRunStarted: (SessionId -> Role -> string option -> unit) option)
         (parentWorkRecordFor: (string -> Task<string option>) option)
         (childWorkRecordFor: (string -> Task<string option>) option)
+        (childWorkRecordForRun: SessionId -> Wanxiangshu.Context.Trace.XTraceRange -> ProviderRunIdentity -> Task<string option>)
+        (workRecordCapability: Wanxiangshu.Execution.Delegation.DelegationWorkRecordCapability)
         (snapshot: ISessionSnapshotPort option)
         (cancelSignals: (SessionId seq -> unit) option)
         (eventPort: IEventObservationPort option)
@@ -377,11 +381,13 @@ module PluginHostInterop =
                 eventPort
                 (Some scope.BloggerRuntimeHost)
                 scope.SyncDelegateRuntime
-                (Some scope.Strength.StrengthRuntime)
+                (strengthScope |> Option.map (fun s -> fun sid -> s.StrengthRuntime.TryFindByReplica sid |> Option.isSome))
                 casebookToolSpecs
                 jsTransactionPersistence
                 continueManagerLoop
                 captureWorktreeSnapshot
+                (Some childWorkRecordForRun)
+                (Some workRecordCapability)
 
         // Process-local join admission: JoinTool RequireCurrentProcessJoin → PluginRuntimeScope.
         registration.Runtime.AttachCurrentProcessJoin(fun root -> scope.RequireCurrentProcessJoin root)

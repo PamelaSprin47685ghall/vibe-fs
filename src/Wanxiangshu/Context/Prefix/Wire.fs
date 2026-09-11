@@ -20,7 +20,6 @@ open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Strength
 
 [<RequireQualifiedAccess>]
 type PrefixPresentationHorizon =
@@ -237,66 +236,6 @@ module XWire =
                         blob.BlobRef
                         blob.BlobDigest
                         (ProjectionRenderer.cutoffDigest HostDigest.sha256Hex snapshot)
-        }
-
-    let private tryFindStrengthReplicaBinding
-        (scope: PluginRuntimeScope)
-        (sessionId: SessionId)
-        : StrengthReplicaBinding option =
-        scope.Strength.StrengthRuntime.TryFindByReplica sessionId
-
-    let private requireStrengthReplicaAuthority
-        (binding: StrengthReplicaBinding)
-        (authority: PromptAuthority.AuthorityExecutionProfile option)
-        =
-        match authority with
-        | None -> raise (InvalidOperationException "StrengthReplica has no active Authority Root")
-        | Some authority when authority.CanonicalRole <> binding.CanonicalRole ->
-            raise (InvalidOperationException "StrengthReplica Authority Root role changed after binding")
-        | Some authority -> authority
-
-    let private applyStrengthReplicaPlan
-        (durable: AgentJournal)
-        (scope: PluginRuntimeScope)
-        (sessionId: SessionId)
-        (binding: StrengthReplicaBinding)
-        (output: obj)
-        : Task<unit> =
-        task {
-            let rawMessages = ProviderWireDecode.messagesFromTransformOutput output
-
-            let physical =
-                match ProviderWireCapture.lastUserMessageId rawMessages with
-                | Some physical -> physical
-                | None -> raise (InvalidOperationException "StrengthReplica request has no physical user message")
-
-            let projections = AgentJournal.snapshot durable
-
-            let authority =
-                requireStrengthReplicaAuthority
-                    binding
-                    (PromptAuthorityLedger.activeProfile sessionId projections.AgentProjections)
-
-            let plan =
-                AttemptPlanner.freezePreInference
-                    authority
-                    physical
-                    (PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
-                    ProviderRequestKind.StrengthReplica
-                    None
-                    false
-                    (fun () -> Error NoCandidateReason.NoCoverage)
-
-            let expectedCapabilities =
-                PromptAuthority.toolCapabilitiesFor authority.CanonicalRole ProviderRequestKind.StrengthReplica
-
-            if binding.ToolCapabilitySet <> expectedCapabilities then
-                raise (
-                    InvalidOperationException
-                        "StrengthReplica PromptAuthority capabilities disagree with live execution gate"
-                )
-
-            scope.RecordPendingAttemptPlan sessionId physical plan
         }
 
     let private readFrozenRecordPrefixBody
@@ -757,6 +696,7 @@ module XWire =
         }
 
     let private applySessionTransform
+        (isReplicaSession: SessionId -> bool)
         (durable: AgentJournal)
         (scope: PluginRuntimeScope)
         (sessionId: SessionId)
@@ -764,14 +704,14 @@ module XWire =
         (output: obj)
         : Task<PrefixPresentationHorizon> =
         task {
-            match tryFindStrengthReplicaBinding scope sessionId with
-            | Some binding ->
-                do! applyStrengthReplicaPlan durable scope sessionId binding output
+            if isReplicaSession sessionId then
                 return PrefixPresentationHorizon.Current
-            | None -> return! applyNonReplicaTransform durable scope sessionId snapshot output
+            else
+                return! applyNonReplicaTransform durable scope sessionId snapshot output
         }
 
     let applyTransform
+        (isReplicaSession: SessionId -> bool)
         (snapshot: ISessionSnapshotPort option)
         (journal: AgentJournal option)
         (scope: PluginRuntimeScope)
@@ -780,7 +720,7 @@ module XWire =
         task {
             match journal, sessionIdOfOutput output with
             | Some durable, Some sessionId when not (isCompanionSession durable sessionId) ->
-                return! applySessionTransform durable scope sessionId snapshot output
+                return! applySessionTransform isReplicaSession durable scope sessionId snapshot output
             | _ -> return PrefixPresentationHorizon.Current
         }
 

@@ -10,69 +10,9 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Persistence
-open Wanxiangshu.Strength.Prediction
-open Wanxiangshu.Strength.Projection
 
 /// Turn observation policy for one reconciled turn (STRENGTH / RECOVERY-FAMILY / TurnWorkflow).
 module HostTurnObserver =
-
-    let private failStrengthProjection (scope: PluginRuntimeScope) (error: string) =
-        let reason = "Strength promotion projection failed: " + error
-        scope.Strength.TripStrengthFuse reason
-        raise (InvalidOperationException reason)
-
-    let private failStrengthStorage (scope: PluginRuntimeScope) (error: string) =
-        let reason = "Strength promotion commit storage failure: " + error
-        scope.Strength.TripStrengthFuse reason
-        raise (InvalidOperationException reason)
-
-    let private applyStrengthAppend (scope: PluginRuntimeScope) (result: StrengthDurableAppend) =
-        match result with
-        | StrengthDurableAppend.Applied -> ()
-        | StrengthDurableAppend.SemanticRejected error ->
-            // DURABLE-EVENTS-021: cut/reset keeps the next process recoverable,
-            // but the process that produced the rejected live fact is no longer
-            // trustworthy. Never continue Strength/turn effects in this process.
-            Diagnostic.fatal "strength-semantic-cut" [ "result", error ]
-        | StrengthDurableAppend.StorageFailed error -> failStrengthStorage scope error
-
-    let private commitStrengthEvent
-        (durability: StrengthDurabilityPort)
-        (scope: PluginRuntimeScope)
-        (turn: ReconciledTurn)
-        (projection: StrengthProjection)
-        : Task =
-        task {
-            match StrengthLifecycle.reconcileEvent projection turn with
-            | None -> return ()
-            | Some event ->
-                let! appendResult = durability.Append event
-                return applyStrengthAppend scope appendResult
-        }
-
-    let private loadAndCommitStrength
-        (durability: StrengthDurabilityPort)
-        (scope: PluginRuntimeScope)
-        (turn: ReconciledTurn)
-        : Task =
-        task {
-            match! durability.LoadProjection() with
-            | Error error -> return failStrengthProjection scope error
-            | Ok projection -> return! commitStrengthEvent durability scope turn projection
-        }
-
-    let private observeStrengthDurability
-        (strengthDurability: StrengthDurabilityPort option)
-        (scope: PluginRuntimeScope)
-        (turn: ReconciledTurn)
-        : Task =
-        task {
-            match strengthDurability with
-            | None -> return ()
-            | Some durability -> return! loadAndCommitStrength durability scope turn
-        }
 
     let private isDurableFissionOwner (journal: AgentJournal option) (sessionId: SessionId) =
         journal
@@ -129,13 +69,6 @@ module HostTurnObserver =
             | None -> return ()
             | Some owned -> do! owned
         }
-
-    let private strengthSymbolName (symbol: StrengthPrimarySymbol) =
-        match symbol with
-        | StrengthPrimarySymbol.ReadonlyBatch -> "ReadonlyBatch"
-        | StrengthPrimarySymbol.MutatingOrExecuting -> "MutatingOrExecuting"
-        | StrengthPrimarySymbol.TextOnly -> "TextOnly"
-        | StrengthPrimarySymbol.Other -> "Other"
 
     let private observeApplicationTurn
         (observeTurnWorkflow: AbortCause -> ReconciledTurnContext -> Task)
@@ -214,15 +147,11 @@ module HostTurnObserver =
         (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
-        (strengthDurability: StrengthDurabilityPort option)
+        (handlePreTurn: (ReconciledTurn -> Task<bool>) option)
+        (observePrimaryTurn: (ReconciledTurn -> Task<unit>) option)
         (scope: PluginRuntimeScope)
         (context: ReconciledTurnContext)
         : Task =
-        let closeDryRunAtPrimaryTerminal (turn: ReconciledTurn) =
-            match scope.Strength.StrengthReplicaRuntime with
-            | Some runtime -> runtime.CloseDryRunAtTargetTerminal turn
-            | None -> AsyncSupport.completedTask ()
-
         task {
             let turn = context.Turn
             let abortCause = abortCauseOfTurn scope context
@@ -231,11 +160,12 @@ module HostTurnObserver =
             // business observation is admitted.
             do! awaitOwnedInterrupt scope turn.SessionId turn.ProviderRun
 
-            let strengthHandled =
-                scope.Strength.StrengthReplicaRuntime
-                |> Option.exists (fun runtime -> runtime.HandleTurn turn)
+            let! preTurnHandled =
+                match handlePreTurn with
+                | Some handler -> handler turn
+                | None -> Task.FromResult false
 
-            if strengthHandled then
+            if preTurnHandled then
                 // STRENGTH-004/011: Replica observations are leaf-local. They
                 // only reconcile the request plan for cleanup; family recovery,
                 // owner fallback, Companion and ordinary TurnWorkflow
@@ -243,40 +173,12 @@ module HostTurnObserver =
                 do! XWire.reconcileAttempt journal scope turn
                 return ()
             else
-                // SPEC-INV-013: an observation-only Replica that did not finish
-                // first is closed by the exact owner target run terminal. This is
-                // a causal horizon boundary, not a wall-clock timeout.
-                do! closeDryRunAtPrimaryTerminal turn
-
-                // STRENGTH-010: only primary (non-Replica) turns feed the
-                // counterfactual predictor. Pending shadow/control labels
-                // are target-bound inside the scope.
-                // A completed pair is consumed visibly as a typed diagnostic;
-                // predictor policy itself stays inside the scope collector.
-                match
-                    scope.Strength.ObserveStrengthPrimary(
-                        turn.SessionId,
-                        turn.ProviderRun,
-                        StrengthTurnEvidence.primarySymbol turn.Parts
-                    )
-                with
+                // SPEC-INV-013 / STRENGTH-010 / STRENGTH-007: primary turn observation
+                // (closing dry run, primary symbol evidence collection, durable append)
+                // executes before observeCurrentTurn.
+                match observePrimaryTurn with
+                | Some observePrimary -> do! observePrimary turn
                 | None -> ()
-                | Some pair ->
-                    Diagnostic.emit
-                        "strength-counterfactual-observed"
-                        [ "session_id", SessionId.value turn.SessionId
-                          "provider_run", ProviderRunIdentity.value turn.ProviderRun
-                          "result",
-                          "first="
-                          + strengthSymbolName pair.FirstSymbol
-                          + " second="
-                          + strengthSymbolName pair.SecondSymbol ]
-
-                // STRENGTH-007: consumption proof closes before any later
-                // continuation can be admitted. This writer is independent
-                // of rollout/fuse state because a provider may already have
-                // consumed a durable Candidate.
-                do! observeStrengthDurability strengthDurability scope turn
 
                 // Current-process Host observation proceeds from its exact facts.
                 // No durable-family gate is fabricated here: Join tools admit via
@@ -300,7 +202,8 @@ module HostTurnObserver =
         (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
-        (strengthDurability: StrengthDurabilityPort option)
+        (handlePreTurn: (ReconciledTurn -> Task<bool>) option)
+        (observePrimaryTurn: (ReconciledTurn -> Task<unit>) option)
         (scope: PluginRuntimeScope)
         (context: ReconciledTurnContext)
         : Task =
@@ -319,6 +222,7 @@ module HostTurnObserver =
                 rootWorkspace
                 eventPort
                 journal
-                strengthDurability
+                handlePreTurn
+                observePrimaryTurn
                 scope
                 context

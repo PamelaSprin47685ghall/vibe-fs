@@ -34,5 +34,6 @@ module HostSessionDeletion =
         cleanupInspectorDraft: (string -> unit) ->
         signalReconciler: (HostSignal -> unit) ->
         sessionId: SessionId ->
+        onSessionDeleted: (SessionId -> unit) option ->
         preparation: SessionDeletionPreparation ->
             Task

@@ -11,6 +11,7 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
+open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.OpenCode
@@ -401,6 +402,20 @@ module ForkToolSurface =
             let sessionPort = ForkSessionPort()
             let sessions = sessionPort :> ISessionHostPort
 
+            let childWorkRecordForRun sessionId range providerRun =
+                LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun
+                    (Some journal)
+                    sessionId
+                    range
+                    providerRun
+
+            let workRecordCapability: DelegationWorkRecordCapability =
+                { ParentWorkRecord =
+                    fun sessionId -> LifecycleWorkRecordProjection.lifecycleWorkRecord (Some journal) sessionId true
+                  ParentWorkRecordBounded =
+                    fun sessionId range ->
+                        LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some journal) sessionId range }
+
             let scope =
                 new ToolRuntimeScope(
                     sessions,
@@ -416,7 +431,9 @@ module ForkToolSurface =
                     None,
                     None,
                     None,
-                    None
+                    None,
+                    childWorkRecordForRun = childWorkRecordForRun,
+                    workRecordCapability = workRecordCapability
                 )
 
             return box (ForkHarness(journal, scope, sessionPort, ownerAgents))

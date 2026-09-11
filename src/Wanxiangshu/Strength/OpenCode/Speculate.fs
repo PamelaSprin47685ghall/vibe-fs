@@ -57,8 +57,8 @@ module StrengthSpeculate =
         SessionAssociationProjection.tryFind sessionId associations
         |> Option.exists isRootWorkEntry
 
-    let private failClosed (scope: PluginRuntimeScope) (reason: string) : 'a =
-        scope.Strength.TripStrengthFuse reason
+    let private failClosed (strengthScope: PluginStrengthScope) (reason: string) : 'a =
+        strengthScope.TripStrengthFuse reason
         raise (InvalidOperationException reason)
 
     let private renderCandidate
@@ -165,6 +165,7 @@ module StrengthSpeculate =
           RawMessages: obj list
           Output: obj
           Scope: PluginRuntimeScope
+          StrengthScope: PluginStrengthScope
           Ports: BoundPorts
           Projections: ProjectionSet
           Settings: StrengthRolloutConfig
@@ -213,6 +214,7 @@ module StrengthSpeculate =
         | _ -> bundleDisposition maxFrameBytes completed.Batches
 
     let private applyPublishedCandidate
+        (strengthScope: PluginStrengthScope)
         (scope: PluginRuntimeScope)
         (owner: SessionId)
         (target: ProviderRunIdentity)
@@ -222,10 +224,11 @@ module StrengthSpeculate =
         =
         match renderCandidate owner target id bundle output with
         | Ok() -> ()
-        | Error error -> failClosed scope ("Strength Candidate render failed closed: " + error)
+        | Error error -> failClosed strengthScope ("Strength Candidate render failed closed: " + error)
 
     let private publishPreparedCandidate
         (durability: StrengthDurabilityPort)
+        (strengthScope: PluginStrengthScope)
         (scope: PluginRuntimeScope)
         (owner: SessionId)
         (target: ProviderRunIdentity)
@@ -249,14 +252,14 @@ module StrengthSpeculate =
 
             match published with
             | StrengthPreparedPublish.StorageInvalid error ->
-                failClosed scope ("Strength Prepared storage invalid: " + error)
+                failClosed strengthScope ("Strength Prepared storage invalid: " + error)
             | StrengthPreparedPublish.Rejected _ -> return ()
             | StrengthPreparedPublish.Published ->
-                applyPublishedCandidate scope owner target id bundle output
+                applyPublishedCandidate strengthScope scope owner target id bundle output
                 return ()
         }
 
-    let private observeDryRunCompletion (scope: PluginRuntimeScope) (owner: SessionId) (started: StrengthDryRunStart) =
+    let private observeDryRunCompletion (strengthScope: PluginStrengthScope) (owner: SessionId) (started: StrengthDryRunStart) =
         task {
             let! completed = started.Completion
 
@@ -268,7 +271,7 @@ module StrengthSpeculate =
 
             match completed.Terminal with
             | StrengthReplicaTerminal.InvalidFrame reason ->
-                scope.Strength.TripStrengthFuse("Strength dry-run invalid frame: " + reason)
+                strengthScope.TripStrengthFuse("Strength dry-run invalid frame: " + reason)
             | _ -> ()
         }
 
@@ -302,7 +305,7 @@ module StrengthSpeculate =
                 // SPEC-INV-013: DryRun is a real, visible OpenCode child,
                 // but terminal observation is not on the owner's transform
                 // critical path. "Dry" means zero promotion while the shadow still executes for real.
-                observeDryRunCompletion surface.Scope surface.Owner started |> ignore
+                observeDryRunCompletion surface.StrengthScope surface.Owner started |> ignore
                 return ()
         }
 
@@ -331,7 +334,7 @@ module StrengthSpeculate =
 
         match StrengthPolicy.eligibility observationOpportunity with
         | StrengthEligibility.Eligible ->
-            surface.Scope.Strength.ArmStrengthCounterfactual(surface.Owner, surface.Target, surface.Feature)
+            surface.StrengthScope.ArmStrengthCounterfactual(surface.Owner, surface.Target, surface.Feature)
         | StrengthEligibility.Ineligible _ -> ()
 
     let private applyDryRun (surface: OpportunitySurface) : Task<unit> =
@@ -360,16 +363,17 @@ module StrengthSpeculate =
         task {
             match replicaMaterialDisposition surface.Ports.Runtime.MaxFrameBytes completed with
             | ReplicaMaterialDisposition.TripInvalidFrame reason ->
-                surface.Scope.Strength.TripStrengthFuse("Strength Replica invalid frame: " + reason)
+                surface.StrengthScope.TripStrengthFuse("Strength Replica invalid frame: " + reason)
                 return ()
             | ReplicaMaterialDisposition.EmptyBatches -> return ()
             | ReplicaMaterialDisposition.BundleInvalid error ->
-                surface.Scope.Strength.TripStrengthFuse(sprintf "Strength Replica bundle invalid: %A" error)
+                surface.StrengthScope.TripStrengthFuse(sprintf "Strength Replica bundle invalid: %A" error)
                 return ()
             | ReplicaMaterialDisposition.BundleReady bundle ->
                 return!
                     publishPreparedCandidate
                         surface.Ports.Durability
+                        surface.StrengthScope
                         surface.Scope
                         surface.Owner
                         surface.Target
@@ -440,7 +444,7 @@ module StrengthSpeculate =
             match decision, surface.ReplicaAgent with
             | StrengthDecision.Skip _, _ -> return ()
             | StrengthDecision.ControlHoldout, _ ->
-                surface.Scope.Strength.ArmStrengthCounterfactual(surface.Owner, surface.Target, surface.Feature)
+                surface.StrengthScope.ArmStrengthCounterfactual(surface.Owner, surface.Target, surface.Feature)
                 return ()
             | StrengthDecision.Speculate(budget, _), None -> return ()
             | StrengthDecision.Speculate(budget, _), Some agent -> return! runTreatmentReplica surface budget agent
@@ -461,6 +465,7 @@ module StrengthSpeculate =
         | None -> ProviderRequestKind.WorkMain, false
 
     let private buildOpportunity
+        (strengthScope: PluginStrengthScope)
         (scope: PluginRuntimeScope)
         (owner: SessionId)
         (authority: PromptAuthority.AuthorityExecutionProfile)
@@ -504,11 +509,12 @@ module StrengthSpeculate =
           HostCanaryHealthy =
             StrengthSettings.hostCanaryHealthy ()
             && stableCaptureEligible
-            && scope.Strength.StrengthFuseReason.IsNone
+            && strengthScope.StrengthFuseReason.IsNone
           PredictorAvailable = predictorAvailable
           CostModelAvailable = costsAvailable }
 
     let private buildSurface
+        (strengthScope: PluginStrengthScope)
         (scope: PluginRuntimeScope)
         (ports: BoundPorts)
         (owner: SessionId)
@@ -525,6 +531,7 @@ module StrengthSpeculate =
 
         let opportunity =
             buildOpportunity
+                strengthScope
                 scope
                 owner
                 authority
@@ -542,9 +549,9 @@ module StrengthSpeculate =
         let anchorDigest = HostDigest.sha256Hex semanticText
 
         let feature =
-            scope.Strength.StrengthFeature(owner, authority.CanonicalRole, StrengthFrame.utf8ByteCount semanticText)
+            strengthScope.StrengthFeature(owner, authority.CanonicalRole, StrengthFrame.utf8ByteCount semanticText)
 
-        let prediction = scope.Strength.StrengthPrediction feature
+        let prediction = strengthScope.StrengthPrediction feature
 
         let estimate =
             settings.Costs
@@ -566,6 +573,7 @@ module StrengthSpeculate =
           RawMessages = rawMessages
           Output = output
           Scope = scope
+          StrengthScope = strengthScope
           Ports = ports
           Projections = projections
           Settings = settings
@@ -579,6 +587,7 @@ module StrengthSpeculate =
           ReplicaAgent = replicaAgent }
 
     let private applyAfterRecovery
+        (strengthScope: PluginStrengthScope)
         (scope: PluginRuntimeScope)
         (ports: BoundPorts)
         (owner: SessionId)
@@ -597,12 +606,13 @@ module StrengthSpeculate =
                 return ()
             else
                 let surface =
-                    buildSurface scope ports owner target authority projections settings rawMessages output
+                    buildSurface strengthScope scope ports owner target authority projections settings rawMessages output
 
                 return! applyRollout surface
         }
 
     let private applyWithProjection
+        (strengthScope: PluginStrengthScope)
         (scope: PluginRuntimeScope)
         (ports: BoundPorts)
         (owner: SessionId)
@@ -618,10 +628,11 @@ module StrengthSpeculate =
             // Recovery is independent of rollout state: once Prepared is
             // durable, only its bound target may consume the same bytes.
             match! recoverPrepared ports.Durability owner target rawMessages durableStrength output with
-            | Error error -> failClosed scope ("Strength Prepared recovery failed closed: " + error)
+            | Error error -> failClosed strengthScope ("Strength Prepared recovery failed closed: " + error)
             | Ok recovered ->
                 return!
                     applyAfterRecovery
+                        strengthScope
                         scope
                         ports
                         owner
@@ -635,6 +646,7 @@ module StrengthSpeculate =
         }
 
     let private applyWithAuthority
+        (strengthScope: PluginStrengthScope)
         (scope: PluginRuntimeScope)
         (ports: BoundPorts)
         (owner: SessionId)
@@ -648,10 +660,11 @@ module StrengthSpeculate =
             let settings = StrengthSettings.load ()
 
             match! ports.Durability.LoadProjection() with
-            | Error error -> failClosed scope ("Strength opportunity cannot prove EventStore health: " + error)
+            | Error error -> failClosed strengthScope ("Strength opportunity cannot prove EventStore health: " + error)
             | Ok durableStrength ->
                 return!
                     applyWithProjection
+                        strengthScope
                         scope
                         ports
                         owner
@@ -665,6 +678,7 @@ module StrengthSpeculate =
         }
 
     let private applyWithAssistant
+        (strengthScope: PluginStrengthScope)
         (scope: PluginRuntimeScope)
         (ports: BoundPorts)
         (owner: SessionId)
@@ -679,10 +693,11 @@ module StrengthSpeculate =
             match PromptAuthorityLedger.activeProfile owner projections.AgentProjections with
             | None -> return ()
             | Some authority ->
-                return! applyWithAuthority scope ports owner target authority projections rawMessages output
+                return! applyWithAuthority strengthScope scope ports owner target authority projections rawMessages output
         }
 
     let private applyWithSnapshotMessages
+        (strengthScope: PluginStrengthScope)
         (scope: PluginRuntimeScope)
         (ports: BoundPorts)
         (owner: SessionId)
@@ -694,10 +709,11 @@ module StrengthSpeculate =
         task {
             match ProviderRunBinding.bindableRun (PhysicalUserMessageId.value physical) messages with
             | Error _ -> return ()
-            | Ok assistant -> return! applyWithAssistant scope ports owner rawMessages output assistant
+            | Ok assistant -> return! applyWithAssistant strengthScope scope ports owner rawMessages output assistant
         }
 
     let private applyWithPhysicalUser
+        (strengthScope: PluginStrengthScope)
         (scope: PluginRuntimeScope)
         (ports: BoundPorts)
         (owner: SessionId)
@@ -710,10 +726,11 @@ module StrengthSpeculate =
 
             match snapshotResult with
             | Error _ -> return ()
-            | Ok messages -> return! applyWithSnapshotMessages scope ports owner rawMessages output physical messages
+            | Ok messages -> return! applyWithSnapshotMessages strengthScope scope ports owner rawMessages output physical messages
         }
 
     let private applyPrimaryOwner
+        (strengthScope: PluginStrengthScope)
         (scope: PluginRuntimeScope)
         (ports: BoundPorts)
         (owner: SessionId)
@@ -724,10 +741,11 @@ module StrengthSpeculate =
 
             match ProviderWireCapture.lastUserMessageId rawMessages with
             | None -> return ()
-            | Some physical -> return! applyWithPhysicalUser scope ports owner rawMessages output physical
+            | Some physical -> return! applyWithPhysicalUser strengthScope scope ports owner rawMessages output physical
         }
 
     let private applyBoundOwner
+        (strengthScope: PluginStrengthScope)
         (scope: PluginRuntimeScope)
         (ports: BoundPorts)
         (owner: SessionId)
@@ -737,13 +755,14 @@ module StrengthSpeculate =
             if ports.Runtime.IsReplica owner then
                 return ()
             else
-                return! applyPrimaryOwner scope ports owner output
+                return! applyPrimaryOwner strengthScope scope ports owner output
         }
 
     let tryApply
         (snapshotPort: ISessionSnapshotPort option)
         (journal: AgentJournal option)
         (strengthDurability: StrengthDurabilityPort option)
+        (strengthScope: PluginStrengthScope)
         (scope: PluginRuntimeScope)
         (output: obj)
         : Task<unit> =
@@ -751,7 +770,7 @@ module StrengthSpeculate =
             let candidates =
                 journal,
                 snapshotPort,
-                scope.Strength.StrengthReplicaRuntime,
+                strengthScope.StrengthReplicaRuntime,
                 strengthDurability,
                 ProviderWireDecode.projectionSessionIdFromMessages output
 
@@ -769,5 +788,5 @@ module StrengthSpeculate =
 
             match bound with
             | None -> return ()
-            | Some(ports, owner) -> return! applyBoundOwner scope ports owner output
+            | Some(ports, owner) -> return! applyBoundOwner strengthScope scope ports owner output
         }

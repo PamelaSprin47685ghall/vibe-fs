@@ -534,7 +534,11 @@ module SyncDelegateSurface =
             (journal :> IDisposable).Dispose()
             raise (InvalidOperationException error)
 
-    let private createWithAdmissions (directory: string) (observationMode: string option) admissions : Task<obj> =
+    let private createWithAdmissions
+        (directory: string)
+        (observationMode: string option)
+        admissions
+        : Task<obj> =
         task {
             let! journal = createJournal directory
             let dispatcher = PromptDispatcher.Runtime(journal)
@@ -565,6 +569,8 @@ module SyncDelegateSurface =
                     fun sessionId range ->
                         LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some journal) sessionId range }
 
+            let handoffPort = DelegationHandoffLedger.port workRecordCapability journal
+
             let runtime =
                 new SyncDelegateRuntime(
                     sessions,
@@ -576,7 +582,7 @@ module SyncDelegateSurface =
                     (fun _ _ -> ()),
                     gate,
                     workRecordFor,
-                    DelegationHandoffLedger.port workRecordCapability journal,
+                    handoffPort,
                     workspaceDirectory = directory
                 )
 
@@ -595,7 +601,9 @@ module SyncDelegateSurface =
                     None,
                     None,
                     None,
-                    None
+                    None,
+                    childWorkRecordForRun = workRecordFor,
+                    workRecordCapability = workRecordCapability
                 )
 
             return box (Harness(journal, runtime, scope, sessionPort, readiness, children))

@@ -131,7 +131,7 @@ module PluginSessionWiring =
                 new StrengthReplicaRuntime(
                     sessionPort,
                     dispatcher,
-                    scope.Strength.StrengthRuntime,
+                    boot.StrengthScope.StrengthRuntime,
                     registerStrengthReplica,
                     ?workspaceDirectory = workspaceDirectory,
                     ?tryAcquireModel =
@@ -145,5 +145,5 @@ module PluginSessionWiring =
                     ?releaseModel = Some(fun sessionId -> ModelRouting.releaseExecution sessionId |> ignore)
                 )
 
-            scope.Strength.AttachStrengthReplicaRuntime strengthReplicaRuntime
+            boot.StrengthScope.AttachStrengthReplicaRuntime strengthReplicaRuntime
         | None -> ()

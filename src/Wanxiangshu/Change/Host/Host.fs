@@ -18,7 +18,6 @@ open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Relay
-open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Persistence.Journal
 
 /// Host wiring for one Change manager session. One physical Manager session can host many
@@ -38,13 +37,10 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         deps.OnChildCreated agentId role childId
 
     let runtime =
-        let childWorkRecordForRun childId range providerRun =
-            LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun deps.Journal childId range providerRun
-
         HostForkRuntime(
             orchestratorId,
             deps.Sessions,
-            childWorkRecordForRun,
+            deps.ChildWorkRecordForRun,
             CompletionMailboxRuntime.create,
             ?journal = deps.Journal,
             onChildCreated = onChildCreated,

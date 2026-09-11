@@ -5,6 +5,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Git
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Strength.OpenCode
 
 module PluginBoot =
 
@@ -15,6 +16,7 @@ module PluginBoot =
           PortOpt: IOpenCodePort option
           Journal: AgentJournal option
           Scope: PluginRuntimeScope
+          StrengthScope: PluginStrengthScope
           Clock: IClockPort
           StrengthFailClosed: string -> unit
           WorkspaceDirectory: string option

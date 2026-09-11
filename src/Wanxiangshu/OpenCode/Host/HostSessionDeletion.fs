@@ -21,7 +21,6 @@ open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
 
 /// SessionDeleted teardown: LoopSensor / Strength / SyncDelegate / Quiescence / Dispose.
 /// Caller supplies `signalReconciler` so this module never owns the Scheduler.
@@ -144,6 +143,7 @@ module HostSessionDeletion =
         (cleanupInspectorDraft: string -> unit)
         (signalReconciler: HostSignal -> unit)
         (sessionId: SessionId)
+        (onSessionDeleted: (SessionId -> unit) option)
         (SessionDeletionPreparation(parentSessionIdOpt, stagedInspector, _))
         : Task =
         scope.LoopSensor.DropSession sessionId
@@ -152,10 +152,7 @@ module HostSessionDeletion =
         // InternalLeaf immediately. CancelOwner completes the waiting
         // decision before its best-effort physical abort, so no deleted
         // owner can keep a Replica eligible for later collection.
-        scope.Strength.StrengthReplicaRuntime
-        |> Option.iter (fun runtime ->
-            runtime.CancelOwner sessionId |> ignore
-            runtime.HandleSessionDeleted sessionId)
+        onSessionDeleted |> Option.iter (fun onDeleted -> onDeleted sessionId)
 
         // OpenCode recursively emits child SessionDeleted before the owner
         // SessionDeleted. An attached Inspector child must retire its live

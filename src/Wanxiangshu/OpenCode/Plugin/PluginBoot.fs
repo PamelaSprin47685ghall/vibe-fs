@@ -9,6 +9,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
 open Wanxiangshu.Resources
+open Wanxiangshu.Strength.OpenCode
 
 module PluginBoot =
 
@@ -19,6 +20,7 @@ module PluginBoot =
           PortOpt: IOpenCodePort option
           Journal: AgentJournal option
           Scope: PluginRuntimeScope
+          StrengthScope: PluginStrengthScope
           Clock: IClockPort
           StrengthFailClosed: string -> unit
           WorkspaceDirectory: string option
@@ -43,10 +45,14 @@ module PluginBoot =
                 | Error err -> raise (InvalidOperationException err)
 
             let scope = new PluginRuntimeScope(journal)
+            let strengthScope = new PluginStrengthScope()
+            scope.AttachSessionCleanup(fun sid -> strengthScope.ClearSession sid)
+            scope.AttachScopeDispose(fun () -> strengthScope.Dispose())
+
             let clock = NodeTiming.nodeClockPort ()
 
             let strengthFailClosed (reason: string) : unit =
-                scope.Strength.TripStrengthFuse reason
+                strengthScope.TripStrengthFuse reason
                 raise (InvalidOperationException reason)
 
             let familyParent (sessionId: SessionId) =
@@ -66,6 +72,7 @@ module PluginBoot =
                   PortOpt = portOpt
                   Journal = journal
                   Scope = scope
+                  StrengthScope = strengthScope
                   Clock = clock
                   StrengthFailClosed = strengthFailClosed
                   WorkspaceDirectory = workspaceDirectory

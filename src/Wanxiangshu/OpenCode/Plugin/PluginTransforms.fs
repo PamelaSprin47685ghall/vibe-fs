@@ -403,7 +403,8 @@ module PluginTransforms =
                 | RelayProjectionDisposition.CurrentIteration -> Task.FromResult()
                 | _ -> apply projectionSessionIdOpt inObj outObj
           ApplyXWire =
-            let apply = XWire.applyTransform snapshotOpt journal scope
+            let isReplica = fun (sid: SessionId) -> boot.StrengthScope.StrengthRuntime.TryFindByReplica sid |> Option.isSome
+            let apply = XWire.applyTransform isReplica snapshotOpt journal scope
 
             fun relayProjection outObj ->
                 match relayProjection with
@@ -421,7 +422,7 @@ module PluginTransforms =
                             projectionSessionIdOpt
                             outObj
                 }
-          ApplyStrengthSpeculate = StrengthSpeculate.tryApply snapshotOpt journal strengthDurability scope
+          ApplyStrengthSpeculate = StrengthSpeculate.tryApply snapshotOpt journal strengthDurability boot.StrengthScope scope
           InjectPairGuideline =
             fun projectionSessionIdOpt sessionStartedAt outObj ->
                 task {
@@ -459,13 +460,14 @@ module PluginTransforms =
           RegisterOwned = wired.RegisterOwned
           ReplicaRuntime =
             fun projectionSessionIdOpt ->
-                match projectionSessionIdOpt, scope.Strength.StrengthReplicaRuntime with
+                match projectionSessionIdOpt, boot.StrengthScope.StrengthReplicaRuntime with
                 | Some sessionId, Some runtime when runtime.IsReplica(SessionId.create sessionId) -> Some runtime
                 | _ -> None
           ReplicaXWire =
             fun outObj ->
                 task {
-                    let! _ = XWire.applyTransform snapshotOpt journal scope outObj
+                    let isReplica = fun (sid: SessionId) -> boot.StrengthScope.StrengthRuntime.TryFindByReplica sid |> Option.isSome
+                    let! _ = XWire.applyTransform isReplica snapshotOpt journal scope outObj
                     return ()
                 }
           ReplicaSanitize = HostMessageProjection.sanitizeOutputMessages

@@ -129,7 +129,7 @@ module HostForkRuntimePty =
                 this.RegisterPtySnapshot id command
 
                 try
-                    this.PtyPort.Fork(command, agent, ptyId = id, ?cwd = cwd) |> ignore
+                    this.PtyPort.Fork(command, agent.Name, ptyId = id, ?cwd = cwd) |> ignore
                     return id
                 with ex ->
                     this.UntrackPtyRun id.Value

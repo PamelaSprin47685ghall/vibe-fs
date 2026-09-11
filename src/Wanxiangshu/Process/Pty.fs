@@ -5,9 +5,6 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.OpenCode
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Session
 
 module private PtyPortSupport =
     let invokeTerminate (handler: PtyBackendHandler) (id: PtyId) =
@@ -24,15 +21,15 @@ module private PtyPortSupport =
                 closed.Value <- true
                 false)
 
-    let tryDeliverJoin (sender: PtyJoinItem -> unit) (item: PtyJoinItem) =
+    let tryDeliverExit (sender: PtyExitEvent -> unit) (item: PtyExitEvent) =
         try
             sender item
         with _ ->
             ()
 
-    let deliverJoinItem (senders: (PtyJoinItem -> unit) list) (item: PtyJoinItem) =
+    let deliverExitEvent (senders: (PtyExitEvent -> unit) list) (item: PtyExitEvent) =
         for sender in senders do
-            tryDeliverJoin sender item
+            tryDeliverExit sender item
 
     let isAbortSignal (command: PtyCommand) =
         match command with
@@ -70,30 +67,14 @@ module private PtyPortSupport =
         else
             text
 
-    let abortedJoinItem (id: PtyId) (outcome: Result<string, string> option) =
+    let abortedExitEvent (id: PtyId) (outcome: Result<string, string> option) =
         let msg = outcomeText outcome |> abortMessage
+        PtyExitEvent.Aborted(id, "PTY_ABORTED", msg)
 
-        PtyAborted
-            { PtyId = id.Value
-              Outcome = msg
-              Closed = true
-              Code = "PTY_ABORTED"
-              Message = msg }
-
-    let naturalJoinItem (id: PtyId) (outcome: Result<string, string> option) =
+    let naturalExitEvent (id: PtyId) (outcome: Result<string, string> option) =
         match defaultArg outcome (Ok PtyOutcome.Closed) with
-        | Ok text ->
-            PtyExited
-                { PtyId = id.Value
-                  Outcome = text
-                  Closed = true }
-        | Error err ->
-            PtyFailed
-                { PtyId = id.Value
-                  Outcome = err
-                  Closed = true
-                  Code = "ERROR"
-                  Message = err }
+        | Ok text -> PtyExitEvent.Exited(id, text)
+        | Error err -> PtyExitEvent.Failed(id, "ERROR", err)
 
     let findExitTask (exitTasks: Dictionary<PtyId, Task>) (id: PtyId) =
         match exitTasks.TryGetValue id with
@@ -124,14 +105,12 @@ module private PtyPortSupport =
         }
 
 /// Typed PTY lifecycle boundary. A backend receives commands; completion events
-/// are supplied by Complete and share every registered mailbox sender.
-/// GREEN-5: sender carries PtyJoinItem (physical PTY fact), not agent RunCompletion.
-type PtyPort(?mailboxSender: PtyJoinItem -> unit, ?handler: PtyBackendHandler, ?agentProvider: unit -> AgentRecord list) as this
+/// are supplied by Complete and share every registered exit listener.
+type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) as this
     =
     let handler = defaultArg handler (fun _ _ -> Task.FromResult(Ok()))
-    let agentProvider = defaultArg agentProvider (fun () -> [])
-    // DSL-MUTABLE: resource — mailbox sender callback registry
-    let mailboxSenders = ResizeArray<PtyJoinItem -> unit>()
+    // DSL-MUTABLE: resource — exit listener callback registry
+    let exitListeners = ResizeArray<PtyExitEvent -> unit>()
     let gate = obj ()
     // DSL-MUTABLE: resource — active PTY handle registry by PtyId.
     let active = Dictionary<PtyId, PtyHandle * ref<bool>>()
@@ -147,9 +126,9 @@ type PtyPort(?mailboxSender: PtyJoinItem -> unit, ?handler: PtyBackendHandler, ?
 
     // DSL-MUTABLE: resource — per-PtyId exit task registry for CloseAll drain
     let exitTasks = Dictionary<PtyId, Task>()
-    do mailboxSender |> Option.iter mailboxSenders.Add
+    do exitListener |> Option.iter exitListeners.Add
 
-    let publishFirstClose (id: PtyId) (closed: bool ref) (item: PtyJoinItem) =
+    let publishFirstClose (id: PtyId) (closed: bool ref) (item: PtyExitEvent) =
         let alreadyClosed = PtyPortSupport.claimClosedFlag closed
 
         if not alreadyClosed then
@@ -158,8 +137,8 @@ type PtyPort(?mailboxSender: PtyJoinItem -> unit, ?handler: PtyBackendHandler, ?
                 closedIds.Add id |> ignore)
 
             this.FailRead(id, "PTY closed before read completed")
-            let senders = lock gate (fun () -> mailboxSenders |> Seq.toList)
-            PtyPortSupport.deliverJoinItem senders item
+            let listeners = lock gate (fun () -> exitListeners |> Seq.toList)
+            PtyPortSupport.deliverExitEvent listeners item
 
     /// Owner-initiated terminate: marks abort-pending + sends TERM. Does NOT
     /// remove from active, does NOT mark closed, does NOT FailRead, does NOT
@@ -178,11 +157,11 @@ type PtyPort(?mailboxSender: PtyJoinItem -> unit, ?handler: PtyBackendHandler, ?
             PtyPortSupport.invokeTerminate handler id
 
     /// Complete from a backend exit (onExit). This is the ONLY path that
-    /// publishes completion to mailbox senders. Removes from active, marks
+    /// publishes completion to exit listeners. Removes from active, marks
     /// closed, fails any parked reader, then delivers the completion.
-    /// EXEC-020: physical abort (owner kill / parent cancel TERM|KILL) → PtyAborted;
-    /// natural exit → PtyExited; backend spawn/IO error → PtyFailed.
-    let completeFromExit (id: PtyId) (item: PtyJoinItem) =
+    /// Physical abort (owner kill / parent cancel TERM|KILL) → Aborted;
+    /// natural exit → Exited; backend spawn/IO error → Failed.
+    let completeFromExit (id: PtyId) (item: PtyExitEvent) =
         let target =
             lock gate (fun () ->
                 match active.TryGetValue id with
@@ -193,20 +172,14 @@ type PtyPort(?mailboxSender: PtyJoinItem -> unit, ?handler: PtyBackendHandler, ?
         | None -> ()
         | Some(_handle, closed) -> publishFirstClose id closed item
 
-    member _.AddMailboxSender(sender: PtyJoinItem -> unit) =
-        lock gate (fun () -> mailboxSenders.Add sender)
+    member _.AddExitListener(listener: PtyExitEvent -> unit) =
+        lock gate (fun () -> exitListeners.Add listener)
 
-    member _.MailboxSender = mailboxSender
+    member _.ExitListener = exitListener
     member _.Handler = handler
-    member _.AgentProvider = agentProvider
 
     /// Open a PTY for a managed agent.
-    ///
-    /// `agent` is required. It used to be an optional `Role` that no caller
-    /// supplied, so every completion reported `fast-distiller` — PROMPT-008 forbids
-    /// inventing a managed name, and the only way to keep that true here is to make
-    /// the real one non-optional.
-    member this.Fork(command: string, agent: ManagedAgent, ?ptyId: PtyId, ?cwd: string) : PtyId =
+    member this.Fork(command: string, agentName: string, ?ptyId: PtyId, ?cwd: string) : PtyId =
         let id =
             defaultArg ptyId (PtyId("pty-" + Guid.NewGuid().ToString("N").Substring(0, 8)))
 
@@ -214,7 +187,7 @@ type PtyPort(?mailboxSender: PtyJoinItem -> unit, ?handler: PtyBackendHandler, ?
             { Id = id
               Command = command
               StartedAt = DateTimeOffset.UtcNow
-              Agent = agent }
+              Agent = agentName }
 
         lock gate (fun () ->
             closedIds.Remove id |> ignore
@@ -309,9 +282,9 @@ type PtyPort(?mailboxSender: PtyJoinItem -> unit, ?handler: PtyBackendHandler, ?
         lock gate (fun () -> exitTasks.[id] <- task)
 
     /// Complete from a backend exit (onExit). This is the ONLY path that
-    /// publishes completion to mailbox senders.
-    /// If owner requested terminate (Close/CloseAll/TERM), emits PtyAborted;
-    /// else Ok → PtyExited, Error → PtyFailed. Tests may call CompleteAborted
+    /// publishes completion to exit listeners.
+    /// If owner requested terminate (Close/CloseAll/TERM), emits Aborted;
+    /// else Ok → Exited, Error → Failed. Tests may call CompleteAborted
     /// to force abort without the terminate mark.
     member this.Complete(id: PtyId, ?outcome: Result<string, string>) =
         let wasAbort =
@@ -322,28 +295,20 @@ type PtyPort(?mailboxSender: PtyJoinItem -> unit, ?handler: PtyBackendHandler, ?
 
         let item =
             if wasAbort then
-                PtyPortSupport.abortedJoinItem id outcome
+                PtyPortSupport.abortedExitEvent id outcome
             else
-                PtyPortSupport.naturalJoinItem id outcome
+                PtyPortSupport.naturalExitEvent id outcome
 
         completeFromExit id item
 
-    /// Force PtyAborted (tests / callers that already know physical interrupt).
+    /// Force Aborted (tests / callers that already know physical interrupt).
     member this.CompleteAborted(id: PtyId, ?message: string) =
         lock gate (fun () ->
             abortPending.Remove id |> ignore
             exitTasks.Remove id |> ignore)
 
         let msg = defaultArg message "PTY aborted"
-
-        completeFromExit
-            id
-            (PtyAborted
-                { PtyId = id.Value
-                  Outcome = msg
-                  Closed = true
-                  Code = "PTY_ABORTED"
-                  Message = msg })
+        completeFromExit id (PtyExitEvent.Aborted(id, "PTY_ABORTED", msg))
 
     /// Owner-initiated close: sends TERM only. Does NOT publish completion —
     /// completion is delivered by the backend's onExit → Complete / CompleteAborted.
@@ -369,7 +334,6 @@ type PtyPort(?mailboxSender: PtyJoinItem -> unit, ?handler: PtyBackendHandler, ?
                 lock gate (fun () -> exitTasks.Remove id |> ignore)
         }
 
-    member _.List() : AgentRecord list * PtyHandle list =
-        let agents = agentProvider ()
+    member _.List() : PtyHandle list =
         let ptys = lock gate (fun () -> active.Values |> Seq.map fst |> Seq.toList)
-        agents, ptys
+        ptys

@@ -57,11 +57,19 @@ test('WHAT[SPEC-INV-013] SPEC_INV_013_DryRun_runtime_creates_a_real_visible_atta
 test('WHAT[SPEC-INV-013] SPEC_INV_013_DryRun_terminal_only_ends_observation_and_owner_cancel_still_cascades', async () => {
   const runtime = await read('src/Wanxiangshu/Strength/Replica/Runtime.fs')
   const observer = await read('src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs')
+  const bootstrap = await read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
   assert.match(runtime, /CancelOwner/)
   assert.match(runtime, /AbortSession/)
   assert.match(runtime, /CloseDryRunAtTargetTerminal/)
   assert.match(runtime, /dryRunStateAtTargetTerminal[\s\S]*TargetProviderRun = turn\.ProviderRun[\s\S]*StrengthReplicaPurpose\.DryRun/)
-  assert.match(observer, /CloseDryRunAtTargetTerminal turn/)
+  // SPEC-INV-013: HostTurnObserver delegates pre-turn replica arbitration via handlePreTurn
+  // before any other business observation is admitted.
+  assert.match(
+    observer,
+    /let!\s+preTurnHandled\s*=\s*match\s+handlePreTurn\s+with[\s\S]*?if\s+preTurnHandled\s+then[\s\S]*?do!\s+XWire\.reconcileAttempt[\s\S]*?return\s+\(\)[\s\S]*?else/
+  )
+  // Target terminal close for observation-only DryRun is implemented in the port composition layer
+  assert.match(bootstrap, /runtime\.CloseDryRunAtTargetTerminal\s+turn/)
 
   const host = await read('src/Wanxiangshu/Strength/OpenCode/Speculate.fs')
   const dry = branch(host, '| StrengthRolloutMode.DryRun ->', '| StrengthRolloutMode.Off ->')

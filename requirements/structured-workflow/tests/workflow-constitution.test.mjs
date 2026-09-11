@@ -185,7 +185,7 @@ test('WHAT[STRUCTURED-WORKFLOW-008] Host_physical_listener_fanout_requires_its_e
     collectionContracts.map(({ binding, owner, what }) => [binding, owner, what]),
     [
       ['ptyCompletionObservers', 'delegation', 'DELEG-019'],
-      ['mailboxSenders', 'process-execution', 'PROC-003'],
+      ['exitListeners', 'process-execution', 'PROC-003'],
     ],
   )
   for (const collection of collectionContracts) {

@@ -43,6 +43,7 @@ module XWire =
     val suppressHostMessagesByIds: rawMessages: obj list -> hostMessageIds: Set<string> -> obj list
 
     val applyTransform:
+        isReplicaSession: (SessionId -> bool) ->
         snapshot: ISessionSnapshotPort option ->
         journal: AgentJournal option ->
         scope: PluginRuntimeScope ->

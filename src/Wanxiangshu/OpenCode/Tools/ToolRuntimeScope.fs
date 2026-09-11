@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Delegation.Handle
@@ -17,7 +18,6 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Mission.Relay
-open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal
 
@@ -43,6 +43,8 @@ type ToolRuntimeScope
         childWorkRecordFor: (string -> Task<string option>) option,
         snapshot: ISessionSnapshotPort option,
         cancelSignals: (SessionId seq -> unit) option,
+        ?childWorkRecordForRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>),
+        ?workRecordCapability: DelegationWorkRecordCapability,
         ?continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>),
         ?captureWorktreeSnapshot: (WorktreePath -> Result<WorkspaceSnapshotId, string>),
         ?eventPort: IEventObservationPort
@@ -78,16 +80,12 @@ type ToolRuntimeScope
     let captureWorktreeSnapshot =
         defaultArg captureWorktreeSnapshot (fun _ -> Error "workspace snapshot capture unavailable")
 
-    let childRecordForRun sessionId range providerRun =
-        LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun journal sessionId range providerRun
-
-    let workRecordCapability: DelegationWorkRecordCapability =
-        { ParentWorkRecord = fun sessionId -> LifecycleWorkRecordProjection.lifecycleWorkRecord journal sessionId true
-          ParentWorkRecordBounded =
-            fun sessionId range -> LifecycleWorkRecordProjection.lifecycleWorkRecordBounded journal sessionId range }
+    let childRecordForRun =
+        defaultArg childWorkRecordForRun (fun _ _ _ -> Task.FromResult None)
 
     let reusableHandoff =
-        journal |> Option.map (DelegationHandoffLedger.port workRecordCapability)
+        workRecordCapability
+        |> Option.bind (fun cap -> journal |> Option.map (DelegationHandoffLedger.port cap))
 
     let terminalPort = eventPort
     // DSL-MUTABLE: resource — tool runtime dispose latch
@@ -645,7 +643,8 @@ type ToolRuntimeScope
                       RepoPath = defaultArg workspaceDirectory "."
                       TargetBranch = ""
                       ParentWorkRecordFor = fun sid -> parentRecord (SessionId.value sid)
-                      ChildWorkRecordFor = fun sid -> childRecord (SessionId.value sid) }
+                      ChildWorkRecordFor = fun sid -> childRecord (SessionId.value sid)
+                      ChildWorkRecordForRun = childRecordForRun }
 
                 let host = OrchestratorHost(deps, SessionId.create sessionId)
                 orchestratorHosts.[sessionId] <- host

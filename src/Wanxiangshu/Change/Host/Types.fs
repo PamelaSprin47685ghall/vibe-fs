@@ -8,6 +8,7 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Context.Trace
 
 type OrchestratorHostDeps =
     { Sessions: ISessionHostPort
@@ -32,4 +33,5 @@ type OrchestratorHostDeps =
       RepoPath: string
       TargetBranch: string
       ParentWorkRecordFor: SessionId -> Task<string option>
-      ChildWorkRecordFor: SessionId -> Task<string option> }
+      ChildWorkRecordFor: SessionId -> Task<string option>
+      ChildWorkRecordForRun: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option> }

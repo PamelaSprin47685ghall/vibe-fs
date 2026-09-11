@@ -51,18 +51,27 @@ test('WHAT[PROC-001] PORT_ctor_defaults_are_safe_and_functional', async () => {
   assert.deepEqual(await portSend(port, pid, write), success)
 })
 
-test('WHAT[PROC-001] PORT_ctor_keeps_supplied_sender_handler_and_agent_provider', async () => {
+test('WHAT[PROC-001] PORT_ctor_keeps_supplied_sender_and_handler', async () => {
   const seen = []
-  const sender = (item) => seen.push(item.kind)
+  const receivedEvents = []
+  const sender = (item) => receivedEvents.push(item)
   const handler = async (_pid, command) => {
     if (command.kind !== 'Spawn') seen.push(command.kind)
     return success
   }
-  const port = createPtyPort({ sender, handler, agentProvider: () => [agent] })
+  const port = createPtyPort({ sender, handler })
   const pid = forkDefault(port, 'pty-x')
   assert.deepEqual(await portSend(port, pid, write), success)
   assert.deepEqual(seen, ['Write'])
-  assert.equal(portList(port).agents.length, 1)
+  assert.equal(portList(port).ptys.length, 1)
+  assert.equal(portList(port).ptys[0].agent, 'distiller')
+
+  portComplete(port, pid, { ok: true, value: 'done' })
+  assert.equal(receivedEvents.length, 1)
+  assert.equal(receivedEvents[0].kind, 'PtyExited')
+  assert.equal(receivedEvents[0].ptyId, 'pty-x')
+  assert.equal(receivedEvents[0].outcome, 'done')
+  assert.equal(receivedEvents[0].closed, true)
 })
 
 test('WHAT[PROC-003] PORT_AddMailboxSender_reaches_every_registered_sender', () => {

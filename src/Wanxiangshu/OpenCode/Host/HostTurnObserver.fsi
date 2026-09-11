@@ -3,7 +3,6 @@ namespace Wanxiangshu.OpenCode
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Strength.Persistence
 
 /// Turn observation policy for one reconciled turn (STRENGTH / RECOVERY-FAMILY / TurnWorkflow).
 module HostTurnObserver =
@@ -14,7 +13,8 @@ module HostTurnObserver =
         rootWorkspace: IRootWorkspaceReader ->
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
-        strengthDurability: StrengthDurabilityPort option ->
+        handlePreTurn: (ReconciledTurn -> Task<bool>) option ->
+        observePrimaryTurn: (ReconciledTurn -> Task<unit>) option ->
         scope: PluginRuntimeScope ->
         context: ReconciledTurnContext ->
             Task
