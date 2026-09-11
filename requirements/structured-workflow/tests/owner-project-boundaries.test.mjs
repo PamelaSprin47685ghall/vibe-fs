@@ -104,8 +104,35 @@ test('WHAT[STRUCTURED-WORKFLOW-014] NodeFs physical port and tool contracts have
   assert.ok(actionRuntimeRefs.includes(nodeFsProject))
   assert.ok(!actionRuntimeRefs.includes(managedProject))
 
-  const repositoryRefs = references('Wanxiangshu.Owner.repository-programming.opencode-tools-filemutationtools.fsproj')
-  assert.ok(repositoryRefs.includes(nodeFsProject))
+  // The mv/rm file-mutation tool face and the JS tool bindings are separate compile shards:
+  // the interaction-side tool shard consumes the narrow NodeFs port, while the JS bindings shard
+  // compiles only Repository/Programming/Js sources and does not inherit the tool-face port.
+  const fileMutationProject = 'Wanxiangshu.Owner.interaction.opencode-tools-filemutationtools.fsproj'
+  const jsToolBindingsProject = 'Wanxiangshu.Owner.repository-programming.repository-programming-js-toolbindings.fsproj'
+  assert.deepEqual(compileItems(fileMutationProject), [
+    'OpenCode/Tools/FileMutationTools.fsi',
+    'OpenCode/Tools/FileMutationTools.fs',
+  ])
+  assert.deepEqual(compileItems(jsToolBindingsProject), [
+    'Repository/Programming/Js/ToolsBindings.fsi',
+    'Repository/Programming/Js/TransactionStore.fsi',
+    'Repository/Programming/Js/OpenCode/ToolWorkflow.fsi',
+    'Repository/Programming/Js/OpenCode/ToolHost.fsi',
+    'Repository/Programming/Js/GeneratorSurface.fsi',
+    'Repository/Programming/Js/ToolsBindings.fs',
+    'Repository/Programming/Js/TransactionStore.fs',
+    'Repository/Programming/Js/OpenCode/ToolWorkflow.fs',
+    'Repository/Programming/Js/OpenCode/ToolHost.fs',
+    'Repository/Programming/Js/GeneratorSurface.fs',
+  ])
+
+  const fileMutationRefs = references(fileMutationProject)
+  assert.ok(fileMutationRefs.includes(nodeFsProject))
+  assert.ok(!fileMutationRefs.includes(jsToolBindingsProject))
+
+  const jsToolBindingsRefs = references(jsToolBindingsProject)
+  assert.ok(!jsToolBindingsRefs.includes('Wanxiangshu.Owner.repository-programming.opencode-tools-filemutationtools.fsproj'))
+  assert.ok(!jsToolBindingsRefs.includes(nodeFsProject))
 
   const ptyToolRefs = references('Wanxiangshu.Owner.process-execution.opencode-tools-ptytool.fsproj')
   assert.ok(ptyToolRefs.includes('Wanxiangshu.Owner.delegation.delegation-pty-adapter.fsproj'))

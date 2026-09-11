@@ -13,7 +13,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.repository-programming.opencode-tools-filemutationtools.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-toolbindings.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj"/>
     <Compile Include="Repository/Programming/Js/OpenCode/BookkeeperTool.fsi"/>
     <Compile Include="Repository/Programming/Js/OpenCode/BookkeeperTool.fs"/>

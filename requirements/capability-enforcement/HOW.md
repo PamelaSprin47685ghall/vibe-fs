@@ -41,9 +41,11 @@ Roles.permissions (Kernel 层单一真相源)
 
 `ToolRegistry` 直接消费 Inspector、Fetch、Bookkeeper、Coder、文件变换与生成式 JS 工具的 typed admission／spec，删除模块查找、缺失模块时的备用权限表和静默漏注册路径。注册层只装配既有 provider 合同；`tool-spec-contracts.test.mjs` 与 `internal-leaf-tool-authority.test.mjs` 继续验证公开角色权限和无 attached transaction 时的内部工具拒绝，不以 source token 或生成 JavaScript 布局证明权限正确。
 
+文件变换工具的 `mv`/`rm` 规范与 JS 生成式工具规范分别归属 `interaction.opencode-tools-filemutationtools` 与 `repository-programming.repository-programming-js-toolbindings` 两个 compile shard（原先由同一 shard 混合编译两个子系统的源码）。`ToolRegistry` 与 `FileMutationSurface` 各自按真实符号分别引用这两半。
+
 ## 验证与测试落点
 
-ENF-015、ENF-016 原来的门禁测试仅提供手写 compiler evidence，已随被禁路径删除，不能作为真实 owner 行为证明。替代证明尚未闭合，记录于 GAP-031；不得以文本检测通过或空 evidence 宣称这两项已验证。
+ENF-015、ENF-016 原来的门禁测试仅提供手写 compiler evidence，已随被禁路径删除。替代的真实 owner 行为证明现由 `authority-subject-binding.test.mjs` 与 `authority-stale-admission.test.mjs` 承接：它们驱动注册的 ChatExecution surface，实际执行 `ManagedChatAcceptance` 与 `ManagedChatProviderLifecycle` 的准入（dist 构建产物，非重写的 oracle）。覆盖边界（不得外推）：这两条测试证明的是 chat-execution acceptance/lifecycle 这一个消费边界——精确 subject（`ChatExecutionKey` = SessionId + PhysicalUserMessageId）与版本（evidence 的 logical run / authority root / identity seed）绑定、外来主体及旧版本尝试在消费点 fail closed 且零效果、状态推进后旧准入不再驱动新效果、当前事实再次满足时从当前读取产生 fresh admission。其余已登记行（`RecoveryReceipt`、`RecoveryPermit`、`OwnerIdentityWitness`、`AppendReceipt`、`ChatAdmissionBindingReceipt` 等）的 subject/版本/digest 与 multiplicity 字段仍只由 `scripts/checks/authority-contracts.json` 的正向登记声明，其各自运行时的消费点 screening 未由本包测试逐一证明。
 
 | 命题 | 落点测试 |
 |---|---|
@@ -61,6 +63,8 @@ ENF-015、ENF-016 原来的门禁测试仅提供手写 compiler evidence，已�
 | ENF-012 | `requirements/capability-enforcement/tests/capability-isomorphism-gate.test.mjs::WHAT[ENF-012] capability_iso_tool_registry_requires_generator` |
 | ENF-013 | `requirements/capability-enforcement/tests/authority-boundary.test.mjs::WHAT[ENF-013] all six authority classes require exact positive contracts while JsCapability remains vocabulary`；`requirements/capability-enforcement/tests/authority-boundary.test.mjs::WHAT[ENF-013] source identity is a single resolved subsystem without legacy aliases`；`requirements/capability-enforcement/tests/authority-boundary.test.mjs::WHAT[ENF-013] WHAT package identity is separate from source subsystem` |
 | ENF-014 | `requirements/capability-enforcement/tests/authority-boundary.test.mjs::WHAT[ENF-014] stale anchors and unclassified sensitive declarations fail closed`；`requirements/capability-enforcement/tests/authority-boundary.test.mjs::WHAT[ENF-014] explicit and legacy-mapped subsystems resolve through the real repository path` |
+| ENF-015 | `requirements/capability-enforcement/tests/authority-subject-binding.test.mjs::WHAT[ENF-015] AUTHORITY_001_witness_declares_exact_subject_and_version_and_admits_fresh_at_consumption` |
+| ENF-016 | `requirements/capability-enforcement/tests/authority-stale-admission.test.mjs::WHAT[ENF-016] AUTHORITY_002_stale_admission_is_rejected_and_fresh_admission_reads_current_facts` |
 | ENF-017 | `requirements/capability-enforcement/tests/authority-boundary.test.mjs::WHAT[ENF-017] every authority contract declares its multiplicity` |
 | ENF-018 | `requirements/capability-enforcement/tests/process-capability-lifecycle.test.mjs::WHAT[ENF-018] process capability consumes once and reports duplicate consumption without effect` |
 | ENF-019 | `requirements/capability-enforcement/tests/process-capability-lifecycle.test.mjs::WHAT[ENF-019] provider-attempt composition requires fresh current-process admission without codec or event recovery` |

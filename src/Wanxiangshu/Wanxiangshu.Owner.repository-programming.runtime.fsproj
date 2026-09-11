@@ -9,7 +9,9 @@
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-tool-adapter.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.repository-programming.opencode-tools-filemutationtools.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.interaction.opencode-tools-filemutationtools.fsproj"/>
+
+    <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-toolbindings.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj"/>
     <Compile Include="Repository/Programming/Js/RuntimeSurface.fsi"/>
     <Compile Include="Repository/Programming/Js/RuntimeSurface.fs"/>

@@ -1810,7 +1810,7 @@ export const SURFACE_CONSUMERS = {
     'managed-session-lifecycle',
   ],
   'Execution/Session/ChatExecution/StatusSurface.js': ['host-boundary', 'managed-chat-execution'],
-  'Execution/Session/ChatExecution/Surface.js': ['managed-chat-execution', 'verification-system'],
+  'Execution/Session/ChatExecution/Surface.js': ['capability-enforcement', 'managed-chat-execution', 'verification-system'],
   'Execution/Session/Recovery/Surface.js': ['managed-session-lifecycle'],
   'Execution/Session/Wait/Surface.js': ['process-execution', 'time-capability'],
   'Foundation/RolesSurface.js': ['capability-enforcement', 'cognitive-environment', 'participant-identity', 'repository-programming', 'session-ontology'],

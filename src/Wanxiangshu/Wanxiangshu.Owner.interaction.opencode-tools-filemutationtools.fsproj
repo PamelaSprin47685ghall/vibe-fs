@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>interaction</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>opencode-tools-filemutationtools</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>repository-programming</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>opencode-tools-filemutationtools</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-nodefs.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-tool-adapter.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.office-capability.foundation-officecapability.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
+    <Compile Include="OpenCode/Tools/FileMutationTools.fsi"/>
+    <Compile Include="OpenCode/Tools/FileMutationTools.fs"/>
+  </ItemGroup>
+</Project>

@@ -40,7 +40,9 @@
     <ProjectReference Include="Wanxiangshu.Owner.requirement-grounding.opencode-host-requirementgrounding-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-investigation.opencode-tools-inspectortool.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.opencode-tools-codertool.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.repository-programming.opencode-tools-filemutationtools.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.interaction.opencode-tools-filemutationtools.fsproj"/>
+
+    <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-toolbindings.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.opencode-tools-bookkeepertool.fsproj"/>
     <Compile Include="OpenCode/Host/ManagedAgentConfig.fsi"/>

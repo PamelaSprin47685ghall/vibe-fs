@@ -1,26 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>interaction</WanxiangshuSubsystem>
-    <WanxiangshuCompileShard>opencode-tools-filemutationtools</WanxiangshuCompileShard>
+    <WanxiangshuSubsystem>repository-programming</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>repository-programming-js-toolbindings</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>repository-programming</WanxiangshuSemanticOwner>
-    <WanxiangshuOwnerLocality>opencode-tools-filemutationtools</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocality>repository-programming-js-toolbindings</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-nodefs.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-fatal-effect.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-tool-adapter.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-fatal-effect.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.office-capability.foundation-officecapability.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj"/>
-    <Compile Include="OpenCode/Tools/FileMutationTools.fsi"/>
-    <Compile Include="OpenCode/Tools/FileMutationTools.fs"/>
     <Compile Include="Repository/Programming/Js/ToolsBindings.fsi"/>
     <Compile Include="Repository/Programming/Js/ToolsBindings.fs"/>
     <Compile Include="Repository/Programming/Js/TransactionStore.fsi"/>
