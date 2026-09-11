@@ -9,7 +9,6 @@
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.distribution.assemblyinfo.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.language.fsproj"/>
     <Compile Include="Participant/Provider/SessionLanguage.fsi"/>
     <Compile Include="Participant/Provider/SessionLanguage.fs"/>

@@ -511,6 +511,16 @@ tool adapter、signal adapter、Attention consumer 与 repository-programming ru
    - 结构影响：`subsystems: OK — 26 subsystems, 230 compile shards, 710 sources, 1830 refs, shard DAG, largest subsystem cycle=18`。引用总数从 1841 净减 11 条至 1830 条（其中 6 条为环内跨子系统引用）。
    - 验证：7 个分片 focused Fable compile 全部通过（指纹与耗时：promptfactcodec `fp:923c51bc3cdc`, sphinx-integration-rules `fp:1a52067f1dae`, knowledge-integration-rules `fp:4b643d16a62b`, turnruntimepreparation `fp:c21a317ba66b`, js-integration-rules `fp:c04d681c55e2`, strength-integration-rules `fp:340234c49ebd`, foundation-temporal `fp:2c33b5a7852b`）；`npm run build`（1420 items / 782 modules）；`verification`（3973/0）；`integration`（279/0）；`e2e`（1/1 通过）；`check.mjs` / `format:check` / `npm pack --dry-run` 全部通过。
 
+18. **全仓零符号跨分片引用剪枝第二轮（provider-language、enforcer-codec）；SCC 保持 18**：
+   - 依赖与真实知识核对：以全仓分片级标识符扫描（目标分片的 namespace/module/type 与调用方 `.fs`/`.fsi` 全文比对）遍历全部 230 个分片，再次筛出两条零符号直接引用，并逐条以源码核对确认：
+     1. `runtime-platform/participant-provider-language`：切除未引用的 `runtime-platform-assemblyinfo`（`Wanxiangshu.Resources.PackageMetadata` / `PackageResources` / `ProviderResourceBytes` / `ModelRoutingResource`）。调用方 `SessionLanguage` / `Prose` / `ProviderLanguageBinding` 只消费同分片的 `ProviderResources`；`ProviderResources` 自身对 `ProviderResourceBytes` 的依赖仍由保留的 `runtime-platform/language` 引用传递，未切断。
+     2. `enforcer/enforcer-codec`：切除未引用的 `host/host-session-runtime`（`Wanxiangshu.OpenCode.ISessionQuiescenceGate` / `SessionQuiescenceGate` / `SessionSnapshotPort` / `QuiescenceSurface` / `HostMessageProjection` / `HostSessionContext` / `HostBoundarySurface` / `HostSessionContextSurface`）。`Enforcer/Surface.fs` 的 `open Wanxiangshu.Resources` 由保留的 `distribution/resources-enforcercatalogresource` 提供；目标分片无模块级副作用，删除不会丢失注册行为。
+   - 该启发式在其余 228 个分片上零候选，说明“静态零符号引用”剪切面已穷尽；更深层的跨子系统知识耦合不属于删 XML 行的范围，见下条事实记录。
+   - 结构影响：`subsystems: OK — 26 subsystems, 230 compile shards, 710 sources, 1828 refs, shard DAG, largest subsystem cycle=18`。引用总数 1830 净减 2 条至 1828 条；两条删除均不改变 subsystem 边集合（`enforcer → host` 仍由其余 6 条分片引用构成），SCC 未变属预期。
+   - 验证：两个分片 focused Fable compile 全部通过（participant-provider-language `fp:6fe5046a764c`、enforcer-codec `fp:af46444848fe`）；`npm run build`（1420 items / 782 modules）；`verification`（3973/0）；`integration`（279/0）；`e2e`（1/1 通过）；`check.mjs` / `format:check` / `npm pack --dry-run` 全部通过。
+   - 本班确认的未闭合事实（供后续批次定位，不构成已完成的解耦）：
+     a. `persistence/eventstore-event-vocabulary-contract` 的 `AuthoritativeEventTypes` 静态 `open` 了 `sphinx` / `strength` / `knowledge` / `repository-programming` 四个域词汇契约，使 persistence 持有全部署事件名知识。倒置方案（`IntegrationRule` 自带 `Vocabulary`，integrator 由注册规则求并集，`Store.validateVocabulary` 改问注入的 integrator）能把该知识移到装配点；但它同时改变只注册 `baseRules` 的 store（delegation / journal / verification 面）的接受集，实施前须先证明这些 store 不追加域事件。
+     b. `persistence/durable-runtime-surface` 分片（`Persistence/EventStore/Surface.fs` 的 full-program 装配：`baseRules @ Strength @ Sphinx @ Casebook @ JsTransaction`）在分片图中零消费者，但该模块落成 `dist/Persistence/EventStore/Surface.js`，被 durable-events / durable-convergence / effect-accounting / epistemic-reasoning / knowledge-reuse / repository-programming 六包测试直接 import，其路径与行为是现存测试合同，不能仅凭“零消费者”删除或改路径。
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。
