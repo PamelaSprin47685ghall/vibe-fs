@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>participant</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>participant-persona</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>participant-identity</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>participant-persona</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
+    <Compile Include="Participant/Persona/Catalog.fsi"/>
+    <Compile Include="Participant/Persona/Catalog.fs"/>
+    <Compile Include="Participant/Persona/ManagedCatalog.fsi"/>
+    <Compile Include="Participant/Persona/ManagedCatalog.fs"/>
+    <Compile Include="Participant/Persona/Identity.fsi"/>
+    <Compile Include="Participant/Persona/Identity.fs"/>
+    <Compile Include="Participant/Persona/Surface.fsi"/>
+    <Compile Include="Participant/Persona/Surface.fs"/>
+  </ItemGroup>
+</Project>

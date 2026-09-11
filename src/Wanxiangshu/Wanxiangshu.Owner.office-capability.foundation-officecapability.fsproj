@@ -7,7 +7,7 @@
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.participant-persona.fsproj"/>
     <Compile Include="Foundation/OfficeCapability.fsi"/>
     <Compile Include="Foundation/OfficeCapability.fs"/>
     <Compile Include="Participant/Persona/OfficeCapabilitySurface.fsi"/>

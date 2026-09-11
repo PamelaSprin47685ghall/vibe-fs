@@ -262,6 +262,20 @@ tool adapter、signal adapter、Attention consumer 与 repository-programming ru
 
 当前声明图为 26 subsystem、214 shard、700 source、1821 references，shard DAG，最大 subsystem SCC 22；相对 `1834` 净减 13 条声明引用，并新增 1 个 sharedstate shard。SCC 未缩小，GAP-033 保持 PARTIAL。下一刀继续重力井归属（例如 Role 合同与 Persona／ParticipantIdentity 分拆、ordinaryturnworkflow 编排归属、HostSignalBootstrap 多原因分片），不要把引用计数下降写成 SCC 已拆。
 
+在基准 `cd0ad1b49`（1821 refs, 214 shards, SCC=22）上继续实施重力井知识归属分拆与剪枝：
+
+**知识归属迁移（本批主刀）：**
+新建 `participant-identity/participant-persona`（`Participant/Persona/{Catalog,ManagedCatalog,Identity,Surface}.fs/.fsi`），将 Persona 词汇从 `foundation-roles` 中物理剥离，精简 `foundation-roles` 至基础 Role 合同；全仓 36 处仅消费 Persona 的消费者改挂 `participant-persona`；`prefix-wire` 补充直接消费的 `participant-persona` 引用。
+
+**伴随零符号剪枝（均经符号复核与聚焦编译）：**
+1. `opencode-host-hostsignalbootstrap`：仅删除未直接引用的 `provider-system-transform` 与 `host-tool-adapter` 边；经符号审计，`enforcer-guidance-tip` 必须保留（KEEP），因其通过 `PairProgrammingThoughtSurface` 实际消费 `ThoughtTransform` 符号。
+2. `composition-turn-ordinaryturnworkflow`（OTW）：删除 3 个未直接引用的 fact 边，分别为 `context-companion-fact`、`interaction-authority-fact`、`execution-fission-fact`。
+3. `interaction-attention-fold`：删除未直接引用的 `intra-participant-parallelism/foundation-parallel`。
+4. `repository-knowledge-casebook-bookkeeper`：删除未直接引用的 `strength-persistence-durabilityport`。
+5. `repository-knowledge-casebook-lifecyclesurface`：删除未直接引用的 `strength-persistence-durabilityport` 与 `persistence-journal-promptfactcodec`，改挂实际消费其 `RuntimePath` 类型的 `change-integration/change-fact`。
+
+当前声明图为 26 subsystem、215 compile shards、700 sources、1815 references，保持严格 shard DAG，最大 subsystem SCC 仍为 22；相对 `1821` 净减 6 条声明引用，并新增 1 个 persona shard。SCC 未缩小，GAP-033 依然保持 PARTIAL。下一刀重点推进 DurabilityPort 物理分片剥离等关键重力井，不要把引用计数下降写成 SCC 已拆。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

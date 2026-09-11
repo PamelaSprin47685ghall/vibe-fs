@@ -12,7 +12,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.execution-failure-policy.execution-failure-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-identityseed.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-facts.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.participant-persona.fsproj"/>
     <Compile Include="Execution/Session/ChatExecution/Fact.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Fact.fs"/>
     <Compile Include="Execution/Session/ChatExecution/Recovery.fsi"/>
