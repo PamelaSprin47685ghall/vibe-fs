@@ -32,17 +32,13 @@ test('WHAT[DELEG-029] delegation runtime consumes only the delegation-owned jour
 
   // 2. The recovery runtime never reaches the durable handle, the outer routing union or the
   //    journal codec: DELEG-029 keeps those at durable composition, and the runtime consumes
-  //    only the delegation-owned port. The single composition-kind provider left is the
-  //    durable projection spine, which carries the delegation-owned linkage projection type
-  //    and its pure transition functions (compiled there to break a fold circularity — see
-  //    2ee76f2dc "move LinkageProjection/FoldRejection to composition-durable-projection").
+  //    only the delegation-owned port. All cross-subsystem references must be contract kind.
   const durableCompositionOnly = new Set([
     'persistence-journal-agentjournal',
     'persistence-journal-promptfactcodec',
     'persistence-journal-eventstorewriter',
     'composition-durable-fact',
   ])
-  const pureProjectionSpine = new Set(['composition-durable-projection'])
   assert.ok(recoveryRuntime.references.length > 0, 'delegation-recovery-runtime must have references')
   for (const reference of recoveryRuntime.references) {
     const provider = subsystemInventory.projects.get(reference)
@@ -53,10 +49,18 @@ test('WHAT[DELEG-029] delegation runtime consumes only the delegation-owned jour
       `${provider.shard} must not be consumed by the delegation recovery runtime (DELEG-029)`,
     )
     assert.ok(
-      provider.legacyKind === 'contract' || pureProjectionSpine.has(provider.shard),
-      `cross-subsystem reference ${provider.shard} (${provider.legacyKind}) is not a contract or the pure projection spine`,
+      provider.legacyKind === 'contract',
+      `cross-subsystem reference ${provider.shard} (${provider.legacyKind}) is not a contract`,
     )
   }
+
+  // Execution/Delegation/LinkageProjection.fs must be provided by a delegation contract shard
+  const linkageProject = [...subsystemInventory.projects.values()].find((project) =>
+    project.implementationFiles.some((file) => file.endsWith('Execution/Delegation/LinkageProjection.fs')),
+  )
+  assert.ok(linkageProject, 'a project must compile Execution/Delegation/LinkageProjection.fs')
+  assert.equal(linkageProject.subsystem, 'delegation', 'LinkageProjection project must belong to delegation subsystem')
+  assert.equal(linkageProject.legacyKind, 'contract', "LinkageProjection project must have legacyKind 'contract'")
 
   // 3. The capability type is delegation-owned: the file declaring type AgentJournalPort is compiled by a project whose subsystem === 'delegation' and legacyKind === 'contract'
   let declaringProject = null

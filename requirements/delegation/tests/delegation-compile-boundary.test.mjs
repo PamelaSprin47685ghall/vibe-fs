@@ -33,6 +33,8 @@ const inspectShard = (locality) => {
 
 const SOURCE_BUDGETS = new Map([
   ['delegation-contract', 100],
+  ['delegation-linkage-projection', 100],
+  ['delegation-journal-port', 100],
   ['delegation-sync-contract', 100],
   ['delegation-fold', 185],
   ['delegation-sync-runtime', 185],
@@ -94,10 +96,18 @@ test('WHAT[DELEG-028] Delegation focused localities stay within compile budgets'
   assert.ok(foldSources.includes('Execution/Delegation/DelegationFactFold.fs'))
   assert.ok(!foldSources.includes('Execution/Delegation/HandoffLedger.fs'))
   assert.ok(inspectShard('delegation-ledger').sources.includes('Execution/Delegation/HandoffLedger.fs'))
-  const spineOwner = projects.find(
+  const linkageOwner = projects.find(
     (project) => project.implementationFiles.includes(join(SOURCE_ROOT, 'Execution/Delegation/LinkageProjection.fs')),
   )
-  assert.equal(spineOwner?.subsystem, 'persistence', 'durable projection spine must own LinkageProjection')
+  assert.equal(linkageOwner?.subsystem, 'delegation', 'delegation subsystem must own LinkageProjection')
+  assert.equal(linkageOwner?.shard, 'delegation-linkage-projection', 'delegation-linkage-projection shard must own LinkageProjection')
+  assert.equal(linkageOwner?.legacyKind, 'contract', 'delegation-linkage-projection must be a contract shard')
+  const spineProject = projects.find((project) => project.shard === 'composition-durable-projection')
+  assert.ok(spineProject, 'shard composition-durable-projection must exist')
+  assert.ok(
+    linkageOwner && spineProject.references.includes(linkageOwner.projectPath),
+    'composition-durable-projection must declare a ProjectReference to delegation-linkage-projection',
+  )
   assert.ok(inspectShard('delegation-sync-runtime').sources.includes('Execution/Delegation/SyncDelegate/Wait.fs'))
   assert.ok(inspectShard('delegation-sync-runtime').sources.includes('Execution/Delegation/SyncDelegate/Store.fs'))
   assert.ok(inspectShard('delegation-sync-runtime').sources.includes('Execution/Delegation/SyncDelegate/Prompt.fs'))
