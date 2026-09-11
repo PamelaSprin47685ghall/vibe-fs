@@ -18,7 +18,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fold.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-identityseed.fsproj" />
-    <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-ledger.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.opencode-host-chatadmission-intent.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj" />
         <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>

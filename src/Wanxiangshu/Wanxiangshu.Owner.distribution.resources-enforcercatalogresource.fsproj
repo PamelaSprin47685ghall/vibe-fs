@@ -14,7 +14,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.language.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-promptcatalog.fsproj"/>
     <Compile Include="Resources/EnforcerCatalogResource.fsi"/>
     <Compile Include="Resources/EnforcerCatalogResource.fs"/>
     <Compile Include="Resources/RuntimeResourceAssembly.fsi"/>

@@ -12,7 +12,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-fork-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
     
-    <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.process-execution.process-processrequest.fsproj"/>
     <Compile Include="Execution/Delegation/Fork/Host/Pty.fsi"/>
     <Compile Include="Execution/Delegation/Fork/Host/Pty.fs"/>

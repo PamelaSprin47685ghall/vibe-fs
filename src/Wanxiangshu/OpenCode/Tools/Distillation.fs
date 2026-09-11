@@ -49,7 +49,6 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Repository.Programming.Js
 
 /// Fixed-cost tail distillation for spooled command output.
 module Distillation =
