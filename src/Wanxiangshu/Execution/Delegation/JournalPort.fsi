@@ -16,4 +16,9 @@ type AgentJournalPort =
         ReadBlob: BlobRef -> Task<Result<string, string>>
         /// Write a completion blob body; PERSIST-007 ordering (blob before fact) is preserved by the caller.
         WriteBlob: string -> Task<Result<BlobRef * BlobDigest, string>>
+        /// Content digest of a blob body as the durable store computes it on write:
+        /// lowercase hex sha256 of the UTF-8 body. Composition must supply the same
+        /// adapter that produced the stored BlobDigest — a second implementation
+        /// would invalidate stored evidence rather than merely disagree.
+        Sha256: string -> string
     }

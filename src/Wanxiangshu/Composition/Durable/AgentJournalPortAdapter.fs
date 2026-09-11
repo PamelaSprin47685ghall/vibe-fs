@@ -3,6 +3,7 @@ namespace Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Host
 
 module AgentJournalPortAdapter =
     /// DELEG-029: durable composition is the only place that wraps delegation fact
@@ -25,4 +26,5 @@ module AgentJournalPortAdapter =
                     match! journal.WriteBlob content with
                     | Ok receipt -> return Ok(receipt.BlobRef, receipt.BlobDigest)
                     | Error err -> return Error err
-                } }
+                }
+          Sha256 = HostDigest.sha256Hex }

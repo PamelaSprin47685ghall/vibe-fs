@@ -13,6 +13,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-budget.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-prediction-predictor.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-event-vocabulary-contract.fsproj"/>
     <Compile Include="Strength/Persistence/DurabilityPort.fsi"/>
     <Compile Include="Strength/Persistence/DurabilityPort.fs"/>
     <Compile Include="Strength/Persistence/Store.fsi"/>

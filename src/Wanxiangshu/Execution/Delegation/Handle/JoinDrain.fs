@@ -5,7 +5,6 @@ open System.Threading.Tasks
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Host
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Execution.Delegation
@@ -371,7 +370,7 @@ module JoinDrain =
             let! readResult = durable.ReadBlob blobRef
 
             match readResult with
-            | Ok body when HostDigest.sha256Hex body = BlobDigest.value blobDigest ->
+            | Ok body when durable.Sha256 body = BlobDigest.value blobDigest ->
                 return! applyDecodedFalseAbort durable parentId record blobRef blobDigest body retired
             | _ -> return Ok()
         }

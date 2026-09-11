@@ -8,7 +8,6 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
-open Wanxiangshu.Host
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation
@@ -254,8 +253,8 @@ module HandleCompletionCodec =
         | LegacyFalseAbort _ -> Error "legacy false abort is not a joinable completion"
         | Invalid err -> Error(sprintf "completion blob decode failed: %s" (decodeErrorReason err))
 
-    let private assertBlobDigest (body: string) (expectedDigest: BlobDigest) =
-        if HostDigest.sha256Hex body <> BlobDigest.value expectedDigest then
+    let private assertBlobDigest (sha256: string -> string) (body: string) (expectedDigest: BlobDigest) =
+        if sha256 body <> BlobDigest.value expectedDigest then
             Error(sprintf "completion blob digest mismatch: %s" (BlobDigest.value expectedDigest))
         else
             Ok body
@@ -267,7 +266,7 @@ module HandleCompletionCodec =
         : System.Threading.Tasks.Task<Result<string, string>> =
         taskResult {
             let! body = journal.ReadBlob blobRef
-            return! assertBlobDigest body expectedDigest
+            return! assertBlobDigest journal.Sha256 body expectedDigest
         }
 
     let private tryReadCompletedAwaiting
