@@ -3,6 +3,7 @@ namespace Wanxiangshu.Repository.Programming.Js
 open Fable.Core
 open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
+open Wanxiangshu.Foundation
 
 /// JS-007: the deterministic gitignore-aware glob adapter behind the js-*
 /// runtime bindings. Durable facts never live here; EventStore owns them
@@ -26,12 +27,6 @@ module JsGlobFs =
 
     [<Emit("$0.isFile()")>]
     let private isFile (stat: obj) : bool = jsNative
-
-    [<Emit("new RegExp($0)")>]
-    let private regexExact (source: string) : obj = jsNative
-
-    [<Emit("$0.test($1)")>]
-    let private regexTest (re: obj) (text: string) : bool = jsNative
 
     type JsGlobListing = { Paths: string list }
 
@@ -85,48 +80,13 @@ module JsGlobFs =
         | None -> [ pattern ]
         | Some(before, alts, after) -> alts |> List.collect (fun alt -> expandBraces (before + alt + after))
 
-    let private wildmatchRegex (pattern: string) : Result<obj, JsFailure> =
-        let rec convert (chars: char list) (acc: string) : Result<string, JsFailure> =
-            match chars with
-            | [] -> Ok acc
-            | '*' :: '*' :: '/' :: rest -> convert rest (acc + "(?:.*/)?")
-            | '*' :: '*' :: rest -> convert rest (acc + ".*")
-            | '*' :: rest -> convert rest (acc + "[^/]*")
-            | '?' :: rest -> convert rest (acc + "[^/]")
-            | '[' :: rest -> takeClass rest "" 0 acc
-            | c :: rest -> convert rest (acc + System.Text.RegularExpressions.Regex.Escape(string c))
-
-        and takeClass (xs: char list) (buf: string) (count: int) (acc: string) : Result<string, JsFailure> =
-            match xs with
-            | [] -> Error JsFailure.AnchorInvalidPattern
-            | ']' :: more when count > 0 -> convert more (acc + "[" + buf + "]")
-            | '!' :: more when count = 0 -> takeClass more "^" 1 acc
-            | c :: more ->
-                let piece = if c = '\\' then "\\\\" else string c
-                takeClass more (buf + piece) (count + 1) acc
-
-        if System.String.IsNullOrEmpty pattern then
-            Error JsFailure.AnchorInvalidPattern
-        else
-            convert (List.ofSeq pattern) "^"
-            |> Result.map (fun body -> regexExact (body + "$"))
-
     let private compilePathPattern (pattern: string) : Result<obj, JsFailure> =
-        let leading = pattern.StartsWith("/")
-        let rest = if leading then pattern.Substring(1) else pattern
-
-        if System.String.IsNullOrEmpty rest then
-            Error JsFailure.AnchorInvalidPattern
-        else
-            let body =
-                if leading then rest
-                elif rest.Contains("/") then rest
-                else "**/" + rest
-
-            wildmatchRegex body
+        GlobMatch.compilePattern pattern
+        |> Result.mapError (fun _ -> JsFailure.AnchorInvalidPattern)
 
     let matchesPathPattern (pattern: string) (path: string) : Result<bool, JsFailure> =
-        compilePathPattern pattern |> Result.map (fun regex -> regexTest regex path)
+        GlobMatch.matchesPathPattern pattern path
+        |> Result.mapError (fun _ -> JsFailure.AnchorInvalidPattern)
 
     let private compileUserPatterns (pattern: string) : Result<obj array, JsFailure> =
         if System.String.IsNullOrEmpty pattern then
@@ -195,7 +155,7 @@ module JsGlobFs =
             | true, _ -> go (i + 1) ignored
             | _, None
             | _, Some "" -> go (i + 1) ignored
-            | _, Some path when regexTest rule.Regex path -> go (i + 1) (not rule.Negated)
+            | _, Some path when GlobMatch.testCompiled rule.Regex path -> go (i + 1) (not rule.Negated)
             | _, Some _ -> go (i + 1) ignored
 
         go 0 false
@@ -316,7 +276,7 @@ module JsGlobFs =
 
             let paths =
                 collectVisibleFiles root
-                |> List.filter (fun rel -> Array.exists (fun re -> regexTest re rel) matchers)
+                |> List.filter (fun rel -> Array.exists (fun re -> GlobMatch.testCompiled re rel) matchers)
                 |> List.sort
 
             return { Paths = paths }

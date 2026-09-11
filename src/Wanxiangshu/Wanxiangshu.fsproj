@@ -20,6 +20,8 @@
     <Compile Include="Host/Digest.fs"/>
     <Compile Include="Foundation/Identity.fsi"/>
     <Compile Include="Foundation/Identity.fs"/>
+    <Compile Include="Foundation/GlobMatch.fsi"/>
+    <Compile Include="Foundation/GlobMatch.fs"/>
     <Compile Include="Mission/Relay/Contract.fsi"/>
     <Compile Include="Mission/Relay/Contract.fs"/>
     <Compile Include="Mission/Relay/Facts.fsi"/>

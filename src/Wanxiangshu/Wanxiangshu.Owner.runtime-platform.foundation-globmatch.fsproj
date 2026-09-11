@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>runtime-platform</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>globmatch</WanxiangshuCompileShard>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Foundation/GlobMatch.fsi"/>
+    <Compile Include="Foundation/GlobMatch.fs"/>
+  </ItemGroup>
+</Project>

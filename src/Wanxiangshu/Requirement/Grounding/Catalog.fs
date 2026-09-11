@@ -4,7 +4,7 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Host
-open Wanxiangshu.Repository.Programming.Js
+open Wanxiangshu.Foundation
 
 module GroundingCatalog =
 
@@ -88,7 +88,7 @@ module GroundingCatalog =
             relativeWithin lexicalRoot absolute
 
     let private matches pattern path =
-        match JsGlobFs.matchesPathPattern pattern path with
+        match GlobMatch.matchesPathPattern pattern path with
         | Ok matched -> matched
         | Error _ -> invalidOp ("invalid APPLIES-TO pattern: " + pattern)
 

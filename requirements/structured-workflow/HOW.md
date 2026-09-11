@@ -477,6 +477,28 @@ tool adapter、signal adapter、Attention consumer 与 repository-programming ru
 
 验证：`subsystems` 26/229/709/1842 cycle=19；EMR suite 78/0；verification **3973/0**（+1 回收证明）；integration 279/0；`check.mjs`/`format:check` exit 0。GAP-033 仍 PARTIAL（本班未拆 SCC，是 capacity 语义危墙拆除）。
 
+16. **切断 requirements → repository-programming：纯 glob 模式匹配下沉 runtime-platform narrow shard；SCC 19 → 18**：
+
+按第 13 项记录的事实边界做诚实结构下沉，将纯算法与物理能力分层，切断 `requirements` 留在 SCC 环内的唯一跨子系统出边：
+
+- **依赖成因与历史证据**：第 13 项在尝试对 `requirement-grounding-model` 做零符号剪枝时，编译探针证明 `Requirement/Grounding/Catalog.fs` 真实调用了 `open Wanxiangshu.Repository.Programming.Js` 的 `JsGlobFs.matchesPathPattern`（用于接地目录中文件模式匹配），证明 `requirements → repository-programming` 是由单一消费者带来的真实知识依赖，此前按真实性原则予以保留并记录事实。
+- **纯算法与物理分界（Pure vs. Physical Split）**：审计证明 `matchesPathPattern` 及底层正则转换（`compilePathPattern`/`wildmatchRegex`/`takeClass`/`regexTest`）是完全脱离领域与 IO 的纯字符串/正则匹配（string → regex → bool），并不依赖文件系统状态；而 `node:fs` 物理扫描、忽略规则树与目录遍历等物理能力才真正属于 `repository-programming`。将纯算法与物理文件操作混合在同一分片，导致仅需模式判定的 `requirements` 被迫拉入重量级的 `repository-programming-js-capability`。
+- **新 Narrow Shard 合同与双向接线**：
+  - **新分片与合同**：新增 `runtime-platform` 子系统的零引用窄分片 `Wanxiangshu.Owner.runtime-platform.foundation-globmatch.fsproj`（`<WanxiangshuSubsystem>runtime-platform</WanxiangshuSubsystem>`，`<WanxiangshuCompileShard>globmatch</WanxiangshuCompileShard>`，0 ProjectReferences），包含 `src/Wanxiangshu/Foundation/GlobMatch.{fsi,fs}`。导出 `namespace Wanxiangshu.Foundation`、`module GlobMatch`、`type GlobPatternError = | InvalidPattern`，以及三个逐字迁移的纯函数：
+    - `val compilePattern: pattern:string -> Result<obj, GlobPatternError>`
+    - `val testCompiled: regex:obj -> text:string -> bool`
+    - `val matchesPathPattern: pattern:string -> path:string -> Result<bool, GlobPatternError>`
+  - **分片接线（Rewire）**：
+    1. `Repository/Programming/Js/GlobFs.fs`：移除纯匹配实现，内部委托给 `GlobMatch`（将 `GlobPatternError.InvalidPattern` 映射保留为 `JsFailure.AnchorInvalidPattern`），对外的 `JsGlobFs` 公共形状与 `glob` 等物理扫描逻辑完整保留。
+    2. `Requirement/Grounding/Catalog.fs`：改为 `open Wanxiangshu.Foundation` 并调用 `GlobMatch.matchesPathPattern`（保持 `Error _ -> invalidOp` 错误处理分支）；从 `Wanxiangshu.Owner.requirement-grounding.requirement-grounding-model.fsproj` 中彻底移除 `<ProjectReference ...repository-programming-js-capability.../>`。
+  - **拓扑收益**：`requirements` 子系统（唯一分片 `requirement-grounding-model`）的所有跨子系统出边归零，彻底退出 SCC 最大强连通分量。
+- **验收与门禁指标**：
+  - 聚焦编译：`runtime-platform.foundation-globmatch`、`repository-programming.repository-programming-js-capability`、`requirement-grounding.requirement-grounding-model` 三个分片独立编译全部通过（focused compile exit 0）。
+  - 环解耦：`node scripts/checks/subsystems.mjs` 证实 `requirements` 退出 SCC，最大强连通分量由 19 降至 18，拓扑规模 26/230/710/1843。
+  - 回归证据：接地范围解析等领域行为测试保持全绿（`requirements/grounding/...` 保持通过，由 parent 在 rebuild 后统一跑完门禁确认）。
+
+验证：`subsystems` 26/230/710/1843 cycle=18；verification 3973/0；integration 279/0；`check.mjs`/`format:check` exit 0。GAP-033 保持 **PARTIAL**。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。
