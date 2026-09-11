@@ -14,5 +14,7 @@
     <Compile Include="Execution/Delegation/LinkageProjection.fs"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimateProjection.fsi"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimateProjection.fs"/>
+    <Compile Include="Execution/Delegation/DelegationProjection.fsi"/>
+    <Compile Include="Execution/Delegation/DelegationProjection.fs"/>
   </ItemGroup>
 </Project>

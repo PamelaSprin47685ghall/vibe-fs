@@ -25,6 +25,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.persistence-eventstore-canonicalintegrator.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.persistence-eventstore-processeventlog.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.durable-journal-port-adapter.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj"/>

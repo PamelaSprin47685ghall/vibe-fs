@@ -44,10 +44,14 @@ const SOURCE_BUDGETS = new Map([
 // WHAT[DELEG-028] budget adjudication (see WHY.md): contract ≤100 hard; fold/runtime target
 // ≤185 hard; adapters carry the shared durable spine by charter — hard ceiling is the 60%
 // full-fallback ratio with the measured baseline as a growth ratchet; composition exempt.
+// Measured 2026-09-12 over the owner-compile production `.fs` closure: host 278, pty 279,
+// recovery 47. The ratchet is held at the measured value, so any growth (including one new
+// source file in a shared upstream shard) fails here and must be adjudicated against
+// WHAT[DELEG-028] instead of passing silently.
 const ADAPTER_RATCHET = new Map([
-  ['delegation-host-adapter', 315],
-  ['delegation-pty-adapter', 316],
-  ['delegation-recovery-runtime', 193],
+  ['delegation-host-adapter', 278],
+  ['delegation-pty-adapter', 279],
+  ['delegation-recovery-runtime', 47],
 ])
 
 test('WHAT[DELEG-028] Delegation contract excludes workflow Host PTY and recovery sources', () => {
@@ -118,4 +122,53 @@ test('WHAT[DELEG-028] Delegation focused localities stay within compile budgets'
   assert.ok(inspectShard('delegation-host-adapter').sources.includes('Execution/Delegation/Fork/Host/Runtime.fs'))
   assert.ok(inspectShard('delegation-pty-adapter').sources.includes('Execution/Delegation/Fork/Host/Pty.fs'))
   assert.ok(inspectShard('delegation-recovery-runtime').sources.includes('Execution/Delegation/ChildRecoveryWorkflow.fs'))
+
+  // DELEG-029 / DURABLE-EVENTS-023: the delegation fold owns linkage/estimate decisions and
+  // emits pure changes; durable composition is the only place that assembles them back into
+  // the aggregate projection. A runtime fold therefore must not name the aggregate, must not
+  // close authority runs itself, and may only declare contract references.
+  const foldProject = requireShard('delegation-fold')
+  for (const source of foldProject.implementationFiles) {
+    const text = readFileSync(source, 'utf8')
+    assert.doesNotMatch(text, /\bAgentProjectionSet\b/, `${source} must not name the aggregate projection`)
+    assert.doesNotMatch(text, /PromptAuthority/, `${source} must not close authority runs itself`)
+    assert.doesNotMatch(text, /\bFoldRejection\b/, `${source} must not speak the durable fail-closed report`)
+  }
+  for (const reference of foldProject.references) {
+    const provider = projects.find((project) => project.projectPath === reference)
+    assert.ok(provider, `referenced project must exist in inventory: ${reference}`)
+    if (provider.subsystem === 'delegation') continue
+    assert.ok(
+      !['composition', 'adapter', 'runtime'].includes(provider.legacyKind),
+      `delegation fold must not depend on foreign ${provider.legacyKind} shard ${provider.shard}`,
+    )
+  }
+  for (const spineSource of [
+    'Composition/Durable/Projection.fs',
+    'Composition/Durable/FoldRejection.fs',
+    'Composition/Durable/Fold.fs',
+  ]) {
+    assert.ok(
+      !foldSources.includes(spineSource),
+      `delegation fold closure must not pull ${spineSource} out of the durable spine`,
+    )
+  }
+
+  // The fold vocabulary is delegation-owned; applying it to the aggregate is composition's
+  // single assembly point.
+  const delegationProjectionOwner = projects.find((project) =>
+    project.implementationFiles.includes(join(SOURCE_ROOT, 'Execution/Delegation/DelegationProjection.fs')),
+  )
+  assert.equal(delegationProjectionOwner?.subsystem, 'delegation', 'delegation must own its fold state vocabulary')
+  assert.equal(
+    delegationProjectionOwner?.shard,
+    'delegation-linkage-projection',
+    'delegation-linkage-projection must compile the delegation fold state vocabulary',
+  )
+  assert.equal(delegationProjectionOwner?.legacyKind, 'contract', 'the fold state vocabulary must be a contract shard')
+  const bridgeOwner = projects.find((project) =>
+    project.implementationFiles.includes(join(SOURCE_ROOT, 'Composition/Durable/DelegationProjectionBridge.fs')),
+  )
+  assert.equal(bridgeOwner?.shard, 'composition-durable-fold', 'composition-durable-fold must compile the delegation bridge')
+  assert.equal(bridgeOwner?.legacyKind, 'composition', 'the delegation bridge must be a composition shard')
 })

@@ -73,7 +73,7 @@ module Fold =
         | AgentFact.Prompt prompt -> PromptFactFold.fold projection prompt
         | AgentFact.ProviderFailure failure -> ProviderFailureFactFold.fold projection failure
         | AgentFact.Relay relay -> foldRelay projection relay
-        | AgentFact.Execution execution -> ExecutionFactFold.fold projection execution
+        | AgentFact.Execution execution -> DelegationProjectionBridge.foldExecution projection execution
         | AgentFact.ChatExecution chatExecution ->
             ChatExecutionFactFold.fold projection.ChatExecutions chatExecution
             |> Result.map (fun updated ->
@@ -84,7 +84,7 @@ module Fold =
         | AgentFact.Context context -> ContextFactFold.fold projection context
         | AgentFact.Host host -> HostFactFold.fold projection host
         | AgentFact.Fission fission -> FissionFactFold.fold projection fission
-        | AgentFact.Delegation delegation -> DelegationFactFold.fold projection delegation
+        | AgentFact.Delegation delegation -> DelegationProjectionBridge.foldDelegation projection delegation
         | AgentFact.Attention attention -> AttentionFactFold.fold projection attention
         | AgentFact.Concern concern -> ConcernFactFold.fold projection concern
         | AgentFact.InstitutionalLearning learning ->

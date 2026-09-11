@@ -1,6 +1,10 @@
 namespace Wanxiangshu.Execution.Delegation
 
-open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Foundation.Identity
 
 module DelegationFactFold =
-    val fold: projection: AgentProjectionSet -> fact: DelegationFactCases -> Result<AgentProjectionSet, FoldRejection>
+    val fold:
+        sessionState: (SessionId -> DelegationSessionState option) ->
+        handoffFrontier: (string -> int64 option) ->
+        fact: DelegationFactCases ->
+            Result<DelegationProjectionChange list, DelegationFoldRejection>

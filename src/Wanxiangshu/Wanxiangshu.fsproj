@@ -557,6 +557,8 @@
     <Compile Include="Interaction/Authority/Fold.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailureFactFold.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailureFactFold.fs"/>
+    <Compile Include="Execution/Delegation/DelegationProjection.fsi"/>
+    <Compile Include="Execution/Delegation/DelegationProjection.fs"/>
     <Compile Include="Execution/Delegation/ExecutionFactFold.fsi"/>
     <Compile Include="Execution/Delegation/ExecutionFactFold.fs"/>
     <Compile Include="Change/Fold.fsi"/>
@@ -577,6 +579,8 @@
     <Compile Include="Enforcer/InstitutionalLearning/Fold.fs"/>
     <Compile Include="Execution/Session/ChatExecution/Fold.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Fold.fs"/>
+    <Compile Include="Composition/Durable/DelegationProjectionBridge.fsi"/>
+    <Compile Include="Composition/Durable/DelegationProjectionBridge.fs"/>
     <Compile Include="Composition/Durable/Fold.fsi"/>
     <Compile Include="Composition/Durable/Fold.fs"/>
     <Compile Include="Execution/Delegation/Handle/FoldSurface.fsi"/>

@@ -232,7 +232,7 @@ module HandleFoldSurface =
                 match buildFact factObj with
                 | Error errorBox -> Error errorBox
                 | Ok fact ->
-                    match ExecutionFactFold.fold current fact with
+                    match DelegationProjectionBridge.foldExecution current fact with
                     | Ok next -> foldAll next tail
                     | Error rejection ->
                         Error(

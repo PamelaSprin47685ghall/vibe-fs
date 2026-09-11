@@ -1,44 +1,8 @@
 namespace Wanxiangshu.Execution.Delegation
 
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Composition.Durable
 
 module ExecutionFactFold =
-
-    let private reject = FoldRejection.reject
-
-    let private handleOutcome factName projection result =
-        match result with
-        | Ok updated -> Ok updated
-        // Replaying a completion, abandon, or retirement is expected; durable
-        // terminals make those idempotent.
-        | Error AlreadyCompleted
-        | Error AlreadyAbandoned
-        | Error HandleIsRetired -> Ok projection
-        | Error HandleIdentityConflict -> reject factName "one handle cannot change its durable binding"
-        | Error UnknownHandle -> reject factName "handle completion or retirement for a handle that was never linked"
-        | Error NotCompleted -> reject factName "join retired a handle that had no completion (EXEC-004)"
-
-    /// PERSIST-008: keep `HandleByChildSession` in step with a handle change.
-    ///
-    /// Runs after the per-session fold succeeded, so the index always mirrors the
-    /// authoritative `Handles` map. `handleOutcome` absorbs duplicate replays, and
-    /// a replay re-syncs the index to the same record — idempotent by
-    /// construction.
-    let private syncHandleIndex (parentId: SessionId) (handle: HandleId) (projection: AgentProjectionSet) =
-        let record =
-            AgentProjection.tryFind parentId projection
-            |> Option.bind (fun session ->
-                session.Handles
-                |> Option.bind (fun handles -> HandleProjection.tryFind handle handles))
-
-        match record with
-        | Some record ->
-            { projection with
-                HandleByChildSession = Map.add record.ChildSessionId record projection.HandleByChildSession }
-        | None -> projection
 
     let private canonicalByname byname targetAgent =
         if System.String.IsNullOrWhiteSpace byname then
@@ -46,135 +10,141 @@ module ExecutionFactFold =
         else
             byname
 
-    let private closeCompletedChildAuthority
-        (childIdOpt: SessionId option)
-        (projectionResult: Result<AgentProjectionSet, FoldRejection>)
-        : Result<AgentProjectionSet, FoldRejection> =
-        match childIdOpt, projectionResult with
-        | Some childId, Ok proj ->
-            AgentProjection.tryUpdate
-                childId
-                (fun session ->
-                    let authority =
-                        session.PromptAuthority
-                        |> Option.bind (fun current ->
-                            current.ActiveLogicalRun
-                            |> Option.bind (fun active ->
-                                PromptAuthorityRun.closeCompletedAgentOwnerChildWork
-                                    active.LogicalRunId
-                                    active.AuthorityRootUserMessageId
-                                    current
-                                |> Result.toOption))
-                        |> Option.orElse session.PromptAuthority
+    /// A handle line whose transition may be refused. Replaying a completion,
+    /// abandon or retirement is absorbed (durable terminals make those
+    /// idempotent); the three impossible transitions fail closed with the fact
+    /// label the durable report names.
+    let private handleOutcome
+        (factName: string)
+        (parentSessionId: SessionId)
+        (handle: HandleId)
+        (priorState: DelegationSessionState option)
+        (terminalChild: SessionId option)
+        (result: Result<AgentLinkageProjection, HandleTransitionRejection>)
+        : Result<DelegationProjectionChange list, DelegationFoldRejection> =
+        let priorHandles = priorState |> Option.bind (fun state -> state.Handles)
 
-                    Ok
-                        { session with
-                            PromptAuthority = authority })
-                proj
-            |> Result.defaultValue proj
-            |> Ok
-        | _, res -> res
+        let indexChange (handles: AgentLinkageProjection) =
+            HandleProjection.tryFind handle handles
+            |> Option.map (fun record -> IndexChildHandle(record.ChildSessionId, record))
 
-    let fold (projection: AgentProjectionSet) (fact: ExecutionFactCases) : Result<AgentProjectionSet, FoldRejection> =
+        let terminalChanges =
+            terminalChild |> Option.map TerminatedChildHandle |> Option.toList
+
+        match result with
+        | Ok updatedHandles ->
+            let baseState = Option.defaultValue DelegationSessionState.empty priorState
+
+            Ok
+                [ ReplaceSessionState(
+                      parentSessionId,
+                      { baseState with
+                          Handles = Some updatedHandles }
+                  )
+                  yield! Option.toList (indexChange updatedHandles)
+                  yield! terminalChanges ]
+        | Error AlreadyCompleted
+        | Error AlreadyAbandoned
+        | Error HandleIsRetired ->
+            Ok
+                [ yield! priorHandles |> Option.bind indexChange |> Option.toList
+                  yield! terminalChanges ]
+        | Error HandleIdentityConflict -> Error(HandleBindingConflict factName)
+        | Error UnknownHandle -> Error(HandleNeverLinked factName)
+        | Error NotCompleted -> Error(HandleCompletionMissing factName)
+
+    let fold
+        (sessionState: SessionId -> DelegationSessionState option)
+        (fact: ExecutionFactCases)
+        : Result<DelegationProjectionChange list, DelegationFoldRejection> =
         // ── execution handles ───────────────────────────────────────────────
         match fact with
         | ExecutionFactCases.HandleLinked payload ->
             let byname = canonicalByname payload.Byname payload.TargetAgent
+            let priorState = sessionState payload.ParentSessionId
 
-            AgentProjection.tryUpdate
-                payload.ParentSessionId
-                (fun session ->
-                    HandleProjection.linkNamed
-                        payload.Handle
-                        payload.ChildSessionId
-                        payload.TargetAgent
-                        byname
-                        payload.CanonicalRole
-                        payload.Ownership
-                        (Option.defaultValue HandleProjection.empty session.Handles)
-                    |> Result.map (fun updated -> { session with Handles = Some updated }))
-                projection
-            |> handleOutcome "HandleLinked" projection
-            |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
+            HandleProjection.linkNamed
+                payload.Handle
+                payload.ChildSessionId
+                payload.TargetAgent
+                byname
+                payload.CanonicalRole
+                payload.Ownership
+                (priorState
+                 |> Option.bind (fun s -> s.Handles)
+                 |> Option.defaultValue HandleProjection.empty)
+            |> handleOutcome "HandleLinked" payload.ParentSessionId payload.Handle priorState None
 
         | ExecutionFactCases.HandleCompleted payload ->
-            let childIdOpt =
-                AgentProjection.tryFind payload.ParentSessionId projection
-                |> Option.bind (fun session -> session.Handles)
+            let priorState = sessionState payload.ParentSessionId
+
+            let terminalChild =
+                priorState
+                |> Option.bind (fun s -> s.Handles)
                 |> Option.bind (HandleProjection.tryFind payload.Handle)
                 |> Option.map (fun record -> record.ChildSessionId)
 
-            AgentProjection.tryUpdate
-                payload.ParentSessionId
-                (fun session ->
-                    HandleProjection.complete
-                        payload.Handle
-                        { Kind = payload.Kind
-                          CompletionRef = payload.CompletionRef
-                          CompletionDigest = payload.CompletionDigest }
-                        (Option.defaultValue HandleProjection.empty session.Handles)
-                    |> Result.map (fun updated -> { session with Handles = Some updated }))
-                projection
-            |> handleOutcome "HandleCompleted" projection
-            |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
-            |> closeCompletedChildAuthority childIdOpt
+            HandleProjection.complete
+                payload.Handle
+                { Kind = payload.Kind
+                  CompletionRef = payload.CompletionRef
+                  CompletionDigest = payload.CompletionDigest }
+                (priorState
+                 |> Option.bind (fun s -> s.Handles)
+                 |> Option.defaultValue HandleProjection.empty)
+            |> handleOutcome "HandleCompleted" payload.ParentSessionId payload.Handle priorState terminalChild
 
         | ExecutionFactCases.HandleRetired payload ->
-            let childIdOpt =
-                AgentProjection.tryFind payload.ParentSessionId projection
-                |> Option.bind (fun session -> session.Handles)
+            let priorState = sessionState payload.ParentSessionId
+
+            let terminalChild =
+                priorState
+                |> Option.bind (fun s -> s.Handles)
                 |> Option.bind (HandleProjection.tryFind payload.Handle)
                 |> Option.map (fun record -> record.ChildSessionId)
 
-            AgentProjection.tryUpdate
-                payload.ParentSessionId
-                (fun session ->
-                    HandleProjection.retire payload.Handle (Option.defaultValue HandleProjection.empty session.Handles)
-                    |> Result.map (fun updated -> { session with Handles = Some updated }))
-                projection
-            |> handleOutcome "HandleRetired" projection
-            |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
-            |> closeCompletedChildAuthority childIdOpt
+            HandleProjection.retire
+                payload.Handle
+                (priorState
+                 |> Option.bind (fun s -> s.Handles)
+                 |> Option.defaultValue HandleProjection.empty)
+            |> handleOutcome "HandleRetired" payload.ParentSessionId payload.Handle priorState terminalChild
 
         | ExecutionFactCases.HandleAbandoned payload ->
-            AgentProjection.tryUpdate
-                payload.ParentSessionId
-                (fun session ->
-                    HandleProjection.abandon
-                        payload.Handle
-                        payload.Reason
-                        (Option.defaultValue HandleProjection.empty session.Handles)
-                    |> Result.map (fun updated -> { session with Handles = Some updated }))
-                projection
-            |> handleOutcome "HandleAbandoned" projection
-            |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
+            let priorState = sessionState payload.ParentSessionId
+
+            HandleProjection.abandon
+                payload.Handle
+                payload.Reason
+                (priorState
+                 |> Option.bind (fun s -> s.Handles)
+                 |> Option.defaultValue HandleProjection.empty)
+            |> handleOutcome "HandleAbandoned" payload.ParentSessionId payload.Handle priorState None
 
         // Clean-break: false abort cell → Active only when ref/digest match.
 
         | ExecutionFactCases.HandleFalseCompletionRejected payload ->
-            AgentProjection.tryUpdate
-                payload.ParentSessionId
-                (fun session ->
-                    HandleProjection.rejectFalseCompletion
-                        payload.Handle
-                        payload.ExpectedCompletionRef
-                        payload.ExpectedCompletionDigest
-                        (Option.defaultValue HandleProjection.empty session.Handles)
-                    |> Result.map (fun updated -> { session with Handles = Some updated }))
-                projection
-            |> handleOutcome "HandleFalseCompletionRejected" projection
-            |> Result.map (syncHandleIndex payload.ParentSessionId payload.Handle)
+            let priorState = sessionState payload.ParentSessionId
+
+            HandleProjection.rejectFalseCompletion
+                payload.Handle
+                payload.ExpectedCompletionRef
+                payload.ExpectedCompletionDigest
+                (priorState
+                 |> Option.bind (fun s -> s.Handles)
+                 |> Option.defaultValue HandleProjection.empty)
+            |> handleOutcome "HandleFalseCompletionRejected" payload.ParentSessionId payload.Handle priorState None
 
         // Clean-break: retired false terminal report. Projection keeps original
         // Retired tombstone; replacement is linked by a separate HandleLinked.
 
-        | ExecutionFactCases.HandleFalseTerminalReported _ -> Ok projection
+        | ExecutionFactCases.HandleFalseTerminalReported _ -> Ok []
 
         // Clean-break: parent correction notice. No handle lifecycle change.
 
-        | ExecutionFactCases.ParentJoinCorrectionRequested _ -> Ok projection
+        | ExecutionFactCases.ParentJoinCorrectionRequested _ -> Ok []
 
         // HostTurnObserved is a durable observation inbox fact. CompletionReactor
         // (later batch) consumes it; LinkageProjection has no fold effect yet.
 
-        | ExecutionFactCases.HostTurnObserved _ -> Ok projection
+        | ExecutionFactCases.HostTurnObserved _ -> Ok []

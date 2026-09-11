@@ -12,6 +12,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.concern-routing.interaction-concern-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.concern-routing.interaction-concern-fold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-companionfactfold.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-linkage-projection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-handle-surface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
@@ -21,6 +22,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.guidance-delivery.opencode-host-pairprogramming-guidelineprojection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.institutional-learning.enforcer-institutionallearning-fold.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-ledger.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.execution-fission-fold.fsproj"/>
@@ -34,6 +36,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.execution-session-sessionstartedatprojection.fsproj"/>
     <Compile Include="Composition/Durable/HostFactFold.fsi"/>
     <Compile Include="Composition/Durable/HostFactFold.fs"/>
+    <Compile Include="Composition/Durable/DelegationProjectionBridge.fsi"/>
+    <Compile Include="Composition/Durable/DelegationProjectionBridge.fs"/>
     <Compile Include="Composition/Durable/Fold.fsi"/>
     <Compile Include="Composition/Durable/Fold.fs"/>
   </ItemGroup>

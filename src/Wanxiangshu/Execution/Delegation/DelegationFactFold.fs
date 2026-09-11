@@ -1,68 +1,71 @@
 namespace Wanxiangshu.Execution.Delegation
 
-open Wanxiangshu.Foundation
-open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Foundation.Identity
 
 module DelegationFactFold =
 
     let private completeHandoff
-        (projection: AgentProjectionSet)
+        (handoffFrontier: string -> int64 option)
         (payload:
-            {| ParentSessionId: Identity.SessionId
+            {| ParentSessionId: SessionId
                Route: DelegationHandoffRoute
                ParentEndExclusive: int64 |})
-        : Result<AgentProjectionSet, FoldRejection> =
+        : Result<DelegationProjectionChange list, DelegationFoldRejection> =
         let key = DelegationHandoff.key payload.ParentSessionId payload.Route
 
-        let previous =
-            Map.tryFind key projection.DelegationCompletedHandoffs |> Option.defaultValue 0L
+        let previous = handoffFrontier key |> Option.defaultValue 0L
 
         if payload.ParentEndExclusive < previous then
-            FoldRejection.reject "DelegationHandoffCompleted" "completed parent handoff frontier cannot retreat"
+            Error(HandoffFrontierCannotRetreat(previous, payload.ParentEndExclusive))
         elif payload.ParentEndExclusive < 0L then
-            FoldRejection.reject "DelegationHandoffCompleted" "completed parent handoff frontier must be non-negative"
+            Error(HandoffFrontierNegative payload.ParentEndExclusive)
         else
-            Ok
-                { projection with
-                    DelegationCompletedHandoffs =
-                        Map.add key payload.ParentEndExclusive projection.DelegationCompletedHandoffs }
+            Ok [ MoveHandoffFrontier(key, payload.ParentEndExclusive) ]
 
     let private replaceEstimate
-        (projection: AgentProjectionSet)
+        (sessionState: SessionId -> DelegationSessionState option)
         (payload:
-            {| SessionId: Identity.SessionId
+            {| SessionId: SessionId
                ExpectedToolCalls: int |})
-        : Result<AgentProjectionSet, FoldRejection> =
+        : Result<DelegationProjectionChange list, DelegationFoldRejection> =
         if payload.ExpectedToolCalls < 0 then
-            FoldRejection.reject "DelegatedToolEstimateReplaced" "expected tool calls must be a non-negative integer"
+            Error(ToolEstimateNegative payload.ExpectedToolCalls)
         else
-            Ok(
-                AgentProjection.update
-                    payload.SessionId
-                    (fun (session: SessionAgentProjection) ->
-                        { session with
-                            DelegatedToolEstimate =
-                                Some(DelegatedToolEstimateProjection.replace payload.ExpectedToolCalls) })
-                    projection
-            )
+            let state =
+                sessionState payload.SessionId
+                |> Option.defaultValue DelegationSessionState.empty
+
+            let updatedState =
+                { state with
+                    ToolEstimate = Some(DelegatedToolEstimateProjection.replace payload.ExpectedToolCalls) }
+
+            Ok [ ReplaceSessionState(payload.SessionId, updatedState) ]
 
     let private observeEstimate
-        (projection: AgentProjectionSet)
+        (sessionState: SessionId -> DelegationSessionState option)
         (payload:
-            {| SessionId: Identity.SessionId
-               ToolCallId: Identity.ToolCallId |})
-        : Result<AgentProjectionSet, FoldRejection> =
-        let update (session: SessionAgentProjection) =
-            match session.DelegatedToolEstimate with
+            {| SessionId: SessionId
+               ToolCallId: ToolCallId |})
+        : Result<DelegationProjectionChange list, DelegationFoldRejection> =
+        let state =
+            sessionState payload.SessionId
+            |> Option.defaultValue DelegationSessionState.empty
+
+        let updatedState =
+            match state.ToolEstimate with
             | Some estimate ->
-                { session with
-                    DelegatedToolEstimate = Some(DelegatedToolEstimateProjection.observe payload.ToolCallId estimate) }
-            | None -> session
+                { state with
+                    ToolEstimate = Some(DelegatedToolEstimateProjection.observe payload.ToolCallId estimate) }
+            | None -> state
 
-        Ok(AgentProjection.update payload.SessionId update projection)
+        Ok [ ReplaceSessionState(payload.SessionId, updatedState) ]
 
-    let fold projection fact =
+    let fold
+        (sessionState: SessionId -> DelegationSessionState option)
+        (handoffFrontier: string -> int64 option)
+        (fact: DelegationFactCases)
+        : Result<DelegationProjectionChange list, DelegationFoldRejection> =
         match fact with
-        | DelegationFactCases.DelegatedToolEstimateReplaced payload -> replaceEstimate projection payload
-        | DelegationFactCases.DelegatedToolCallObserved payload -> observeEstimate projection payload
-        | DelegationFactCases.DelegationHandoffCompleted payload -> completeHandoff projection payload
+        | DelegationFactCases.DelegatedToolEstimateReplaced payload -> replaceEstimate sessionState payload
+        | DelegationFactCases.DelegatedToolCallObserved payload -> observeEstimate sessionState payload
+        | DelegationFactCases.DelegationHandoffCompleted payload -> completeHandoff handoffFrontier payload
