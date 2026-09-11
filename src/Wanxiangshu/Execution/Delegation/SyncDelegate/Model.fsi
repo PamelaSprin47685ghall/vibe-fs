@@ -3,11 +3,9 @@ namespace Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Execution.Session
 
-[<RequireQualifiedAccess>]
-type SyncDelegateRole =
-    | Inspector
-    | Coder
+type SyncDelegateRole = Wanxiangshu.Execution.Session.SyncDelegateRole
 
 type ReuseScopeId = private ReuseScopeId of string
 

@@ -2,7 +2,6 @@ namespace Wanxiangshu.Execution.Session
 
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Execution.Delegation.SyncDelegate
 
 /// Plain keyed-lookup surface for the durable Work ↔ Companion association.
 /// The projection map and its typed association records remain production-owned.

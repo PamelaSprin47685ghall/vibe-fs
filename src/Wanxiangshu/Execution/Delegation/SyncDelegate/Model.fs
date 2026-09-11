@@ -5,14 +5,10 @@ open Wanxiangshu.Foundation
 
 open Wanxiangshu.Foundation.Identity
 
+type SyncDelegateRole = Wanxiangshu.Execution.Session.SyncDelegateRole
+
 /// EXEC-026 / HOST-008: SyncDelegate vocabulary — dedicated Inspector/Coder
 /// ownership keys and AttachmentKind mapping. Runtime/tools are wired later; this module is types + helpers only.
-
-[<RequireQualifiedAccess>]
-type SyncDelegateRole =
-    | Inspector
-    | Coder
-
 /// EXEC-026: reuse-scope half of the dedicated SyncDelegate key.
 /// Prefer a local wrapper here over churning Identity.fs.
 type ReuseScopeId = private ReuseScopeId of string
@@ -61,9 +57,7 @@ module SyncDelegate =
 
     /// HOST-008: SyncDelegateRole → AttachmentKind for Work+Attached registration.
     let delegateRoleToAttachment (role: SyncDelegateRole) : AttachmentKind =
-        match role with
-        | SyncDelegateRole.Inspector -> AttachmentKind.SyncInspector
-        | SyncDelegateRole.Coder -> AttachmentKind.SyncCoder
+        SyncDelegateRole.toAttachmentKind role
 
     /// Canonical wire agent name for a dedicated SyncDelegate (`inspector`, `coder`).
     let agentNameFor (role: SyncDelegateRole) : string = roleLabel role

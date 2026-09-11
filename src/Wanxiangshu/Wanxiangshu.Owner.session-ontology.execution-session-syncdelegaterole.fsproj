@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>session-lifecycle</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>execution-session-syncdelegaterole</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>session-ontology</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>execution-session-syncdelegaterole</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-ownership.fsproj"/>
+    <Compile Include="Execution/Session/SyncDelegateRole.fsi"/>
+    <Compile Include="Execution/Session/SyncDelegateRole.fs"/>
+  </ItemGroup>
+</Project>

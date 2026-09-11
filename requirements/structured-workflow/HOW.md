@@ -276,6 +276,34 @@ tool adapter、signal adapter、Attention consumer 与 repository-programming ru
 
 当前声明图为 26 subsystem、215 compile shards、700 sources、1815 references，保持严格 shard DAG，最大 subsystem SCC 仍为 22；相对 `1821` 净减 6 条声明引用，并新增 1 个 persona shard。SCC 未缩小，GAP-033 依然保持 PARTIAL。下一刀重点推进 DurabilityPort 物理分片剥离等关键重力井，不要把引用计数下降写成 SCC 已拆。
 
+在基准 `a8d51cff8`（26 subsystems, 215 compile shards, 700 sources, 1815 references, 最大 subsystem SCC 22）上继续实施 GAP-033 重力井物理分片剥离、所有权正名及稀疏边剪枝：
+
+**1. DurabilityPort 物理 4 路拆分：**
+原 `durable-events.strength-persistence-durabilityport` 分片混装了 Strength 持久化、Durable Fold、EventStore 日志写入器及 EventStoreHandle 资源契约，形成多原因重力井。本批将其解构：
+- 新建 `durable-events.composition-durable-fold.fsproj`（`HostFactFold.fs/.fsi`, `Fold.fs/.fsi`），承接纯事实折叠逻辑；
+- 新建 `durable-events.persistence-journal-eventstorewriter.fsproj`（`JournalEventStoreBoot.fs/.fsi`, `EventStoreJournalWriter.fs/.fsi`），承接 EventStore 日志写入逻辑；
+- 将 `EventStoreHandle.fs/.fsi` 源码及类型归并吸收至底层的 `durable-events.persistence-eventstore-storetypes.fsproj`（将其 `Store`、`Dispose`、`Create` 公开化，支持跨分片安全可见）；
+- 精简瘦身 `strength-persistence-durabilityport.fsproj`，仅保留 Strength 持久化类型（`DurabilityPort`, `Store`, `Durability`），其自身的 ProjectReferences 从 31 骤降至 7；
+- 将 ~17 个原消费方按精确符号需求重定向改挂至细粒度分片（例如 `runtime.fsproj`、`canonicalintegrator`、`foldsurface`、`context-compression.runtime`、`plugin-composition` 等）。
+
+**2. SyncDelegateRole 知识所有权正名与解环：**
+- 将 `SyncDelegateRole` 及 `delegateRoleToAttachment` 从执行侧的 `Execution/Delegation/SyncDelegate/Model.fs` 中抽出，移入会话本体域新建分片 `session-ontology.execution-session-syncdelegaterole.fsproj`（`Execution/Session/SyncDelegateRole.fs/.fsi`）；
+- 切断环路边：`session-ontology.execution-session-association` 不再反向引用下游的 `syncdelegate-model`，改为引用同子系统的 `syncdelegaterole`；
+- 在 `Model.fs` 中将 `SyncDelegateRole` 保留为对 `Wanxiangshu.Execution.Session.SyncDelegateRole` 的类型别名，保证下游源码完全兼容；
+- 同步更新 `scripts/checks/session-ownership-matrix.json` 中 SyncInspector 与 SyncCoder 的 evidencePath，指向真实物理所有权路径 `src/Wanxiangshu/Execution/Session/SyncDelegateRole.fs`。
+
+**3. 经符号复核的稀疏引用剪枝（共 16 条）：**
+- 9 条安全剪枝：涵盖 `delegation-sync-runtime`、`ingresscodec`（剪 4 条）、`chatadmission`、`managed-chat-execution`、`strength-predictor`、`delegation-host-adapter`；
+- 3 条 durability 拆分伴随剪枝：`foldsurface`（去 `composition-durable-fact`）、`context-compression.runtime`（去 `host-session-contract`）、`plugin-composition`（去 `foundation-outcome`）；
+- 1 条经审计确认必须保留的引用（KEEP）：`fallback-ledger` 对 `ingresscodec` 的引用，因其需要 `ModelRouting` 类型；
+- 3 条 HostSignal Stage 1 剪枝：在 `opencode-host-hostsignalbootstrap.fsproj` 上切断 `foundation-outcome`、`interaction-authority-identityseed` 与 `execution-failure-model`（确认零符号使用，聚焦编译 32.8s 通过）；
+- 清理 `PluginScope.fs` 中 5 处未使用的 Strength 命名空间 open。
+
+**验证结果：**
+全部 14+ 个受影响分片均独立通过 focused Fable 聚焦编译验证。静态门禁检查 `node scripts/checks/subsystems.mjs` 输出 26 subsystems / 218 compile shards / 701 sources / 1818 references / 最大 subsystem SCC=22（exit 0）；结构性质测试 `node --test requirements/structured-workflow/tests/subsystem-boundaries.test.mjs` 4/4 通过（exit 0）；全仓门禁 `node scripts/check.mjs` 全部通过（exit 0）。
+
+声明图指标为 26 subsystems、218 compile shards（+3）、701 sources（+1）、1818 references（由于新增 3 个分片的必要接线与 16 条零符号剪枝及 DurabilityPort 内部引用从 31 降至 7，净增 3 条声明引用），保持严格 shard DAG。最大 subsystem cycle 仍为 22，GAP-033 保持 PARTIAL。HostSignal Stage 2（叶子 surface 抽取）与 Stage 3（PluginBoot 移至 plugin-composition）、OTW 子系统重分类为 dispatch，以及 ENF-015/016 证明缺口留在后续推进。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

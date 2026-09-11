@@ -175,6 +175,8 @@
     <Compile Include="Execution/Session/Wait/CausalWait.fs"/>
     <Compile Include="Execution/Session/Ownership.fsi"/>
     <Compile Include="Execution/Session/Ownership.fs"/>
+    <Compile Include="Execution/Session/SyncDelegateRole.fsi"/>
+    <Compile Include="Execution/Session/SyncDelegateRole.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Model.fsi"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Model.fs"/>
     <Compile Include="Execution/Delegation/HandoffIdentity.fsi"/>
@@ -403,6 +405,8 @@
     <Compile Include="Persistence/EventStore/StoreTypes.fs"/>
     <Compile Include="Persistence/EventStore/Port.fsi"/>
     <Compile Include="Persistence/EventStore/Port.fs"/>
+    <Compile Include="Persistence/EventStore/EventStoreHandle.fsi"/>
+    <Compile Include="Persistence/EventStore/EventStoreHandle.fs"/>
     <Compile Include="Persistence/EventStore/GitTypes.fsi"/>
     <Compile Include="Persistence/EventStore/GitTypes.fs"/>
     <Compile Include="Persistence/EventStore/CanonicalEventCodec.fsi"/>
@@ -1258,8 +1262,6 @@
     <Compile Include="Repository/Programming/Js/TransactionStore.fs"/>
     <Compile Include="Persistence/EventStore/CanonicalIntegrator.fsi"/>
     <Compile Include="Persistence/EventStore/CanonicalIntegrator.fs"/>
-    <Compile Include="Persistence/EventStore/EventStoreHandle.fsi"/>
-    <Compile Include="Persistence/EventStore/EventStoreHandle.fs"/>
     <Compile Include="Persistence/EventStore/Surface.fsi"/>
     <Compile Include="Persistence/EventStore/Surface.fs"/>
     <Compile Include="Persistence/EventStore/StrengthSurface.fsi"/>

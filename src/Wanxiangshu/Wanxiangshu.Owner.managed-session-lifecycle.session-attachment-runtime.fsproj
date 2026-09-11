@@ -13,6 +13,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.session-attachment-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-syncdelegaterole.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-association.fsproj"/>
     <Compile Include="Execution/Session/Attachment/AttachedRuntime.fsi"/>
     <Compile Include="Execution/Session/Attachment/AttachedRuntime.fs"/>

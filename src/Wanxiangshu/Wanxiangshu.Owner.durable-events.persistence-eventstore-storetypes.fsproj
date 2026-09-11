@@ -13,5 +13,7 @@
     <Compile Include="Persistence/EventStore/StoreTypes.fs"/>
     <Compile Include="Persistence/EventStore/Port.fsi"/>
     <Compile Include="Persistence/EventStore/Port.fs"/>
+    <Compile Include="Persistence/EventStore/EventStoreHandle.fsi"/>
+    <Compile Include="Persistence/EventStore/EventStoreHandle.fs"/>
   </ItemGroup>
 </Project>

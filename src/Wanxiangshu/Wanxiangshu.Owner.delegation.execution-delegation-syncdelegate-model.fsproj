@@ -7,9 +7,11 @@
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.participant-persona.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-ownership.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-syncdelegaterole.fsproj"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Model.fsi"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Model.fs"/>
     <Compile Include="Execution/Delegation/HandoffIdentity.fsi"/>

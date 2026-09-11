@@ -28,10 +28,6 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Prediction
-open Wanxiangshu.Strength.Projection
-open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Execution.Delegation.Fork
@@ -44,8 +40,6 @@ open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
-
 /// ENFORCER-*: Blogger continuation parking, physical flight ownership and
 /// drain windows for one plugin instance. Parked transforms are per-session
 /// serial (the dictionary entry is the guard); flights live in SharedState

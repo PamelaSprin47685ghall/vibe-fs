@@ -1,7 +1,5 @@
 namespace Wanxiangshu.Execution.Session
 
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-
 open Wanxiangshu.Foundation.Identity
 
 /// HOST-008 / COMPANION-002: which kind of managed session this is.
@@ -292,7 +290,7 @@ module SyncDelegateAssociationHints =
     let dedicatedExecutionClass = SessionExecutionClass.Work
 
     let dedicatedOwnership (owner: SessionId) (role: SyncDelegateRole) : SessionOwnership =
-        SessionOwnership.Attached(owner, SyncDelegate.delegateRoleToAttachment role)
+        SessionOwnership.Attached(owner, SyncDelegateRole.toAttachmentKind role)
 
 /// StrengthReplica classification (HOST-008 / STRENGTH-014).
 ///

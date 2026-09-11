@@ -16,16 +16,12 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-sessionquiescencegate.fsproj" />
-    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-root-workspace-contract.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fold.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-identityseed.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-ledger.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.opencode-host-chatadmission-intent.fsproj" />
-    <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-async-support.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.execution-session-recoveryclosureprojection.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj" />
-    <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-planner.fsproj" />
         <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
     <Compile Include="Interaction/Dispatch/OpenCode/IngressCodec.fsi" />
     <Compile Include="Interaction/Dispatch/OpenCode/IngressCodec.fs" />

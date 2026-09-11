@@ -19,7 +19,7 @@
       "handle": "No. Dedicated SyncInspector does not enter public Handle/list/join.",
       "companion": "MAY. Work+Attached may hold its own Companion (Work capability path). Not InternalLeaf.",
       "crashReconcile": "Rebind via AttachedSessionRuntime when the Host child is still usable; otherwise create a replacement Work child. Durable association + HOST-015 fail-closed recovery. Returned→Completion is call algebra, not a second ownership map.",
-      "evidencePath": "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Model.fs"
+      "evidencePath": "src/Wanxiangshu/Execution/Session/SyncDelegateRole.fs"
     },
     "SyncCoder": {
       "owner": "Owning Work session (ownerSessionId). DedicatedDelegateKey = (OwnerReuseScopeId, Coder). Work + Attached(SyncCoder).",
@@ -29,7 +29,7 @@
       "handle": "No. Dedicated SyncCoder does not enter public Handle/list/join.",
       "companion": "MAY. Work+Attached may hold its own Companion (Work capability path). Not InternalLeaf.",
       "crashReconcile": "Rebind via AttachedSessionRuntime when the Host child is still usable; otherwise create a replacement Work child. Durable association + HOST-015 fail-closed recovery. Returned→Completion is call algebra, not a second ownership map.",
-      "evidencePath": "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Model.fs"
+      "evidencePath": "src/Wanxiangshu/Execution/Session/SyncDelegateRole.fs"
     },
     "Bookkeeper": {
       "owner": "Owning Work session (ownerSessionId). InternalLeaf + Attached(Bookkeeper of transactionId). BookkeeperRuntime.bindSession records sessionId→txId with AttachmentKind.Bookkeeper txId.",
