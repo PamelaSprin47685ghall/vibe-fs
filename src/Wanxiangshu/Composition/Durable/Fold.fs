@@ -7,12 +7,8 @@ open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Change
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session.ChatExecution
-open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Concern
-open Wanxiangshu.Enforcer.InstitutionalLearning
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
@@ -79,17 +75,26 @@ module Fold =
             |> Result.map (fun updated ->
                 { projection with
                     ChatExecutions = updated })
-        | AgentFact.Orchestrator orchestrator -> OrchestratorFactFold.fold projection orchestrator
+        | AgentFact.Orchestrator orchestrator ->
+            // The Change family fold consumes the journal-owned `ProjectionSet`,
+            // so its assembly stays with the dispatcher, downstream of that edge.
+            OrchestratorFactFold.fold projection.Orchestrator orchestrator
+            |> Result.map (fun updated ->
+                { projection with
+                    Orchestrator = updated })
+            |> Result.mapError (fun rejection ->
+                { Fact = OrchestratorFoldRejection.fact rejection
+                  Reason = OrchestratorFoldRejection.message rejection })
         | AgentFact.Companion companion -> CompanionFactFold.fold projection companion
         | AgentFact.Context context -> ContextFactFold.fold projection context
         | AgentFact.Host host -> HostFactFold.fold projection host
-        | AgentFact.Fission fission -> FissionFactFold.fold projection fission
+        | AgentFact.Fission fission -> ProjectionUpdate.applyFission projection fission
         | AgentFact.Delegation delegation -> DelegationProjectionBridge.foldDelegation projection delegation
-        | AgentFact.Attention attention -> AttentionFactFold.fold projection attention
-        | AgentFact.Concern concern -> ConcernFactFold.fold projection concern
+        | AgentFact.Attention attention -> ProjectionUpdate.applyAttention projection attention
+        | AgentFact.Concern concern -> ProjectionUpdate.applyConcern projection concern
         | AgentFact.InstitutionalLearning learning ->
-            InstitutionalLearningFactFold.fold projection learning
-            |> Result.bind (fun updated -> AttentionFactFold.foldLearning updated learning)
+            ProjectionUpdate.applyInstitutionalLearning projection learning
+            |> Result.bind (fun updated -> ProjectionUpdate.applyAttentionLearning updated learning)
 
     let private foldMagicTodo (projection: ProjectionSet) (eventId: EventId) (fact: MagicTodoFacts.MagicTodoFact) =
         match fact with

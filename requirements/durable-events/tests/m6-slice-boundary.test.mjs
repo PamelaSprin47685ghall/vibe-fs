@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { existsSync, readFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import * as eventCodec from '../../../dist/Persistence/EventStore/CodecSurface.js'
+import { readCompileShardInventory } from '../../../scripts/lib/compile-shards.mjs'
+import { buildSubsystemInventory } from '../../../scripts/checks/subsystems.mjs'
 import { assertEffectIsInjected, assertFatalBoundary, assertPureContract } from '../../structured-workflow/tests/support/m6-boundary-proof.mjs'
+
+const ROOT = resolve(import.meta.dirname, '../../..')
+const SOURCE_ROOT = join(ROOT, 'src/Wanxiangshu')
 
 const event = ({
   id = '1111111111111111111111111111111111111111',
@@ -63,4 +70,40 @@ test('WHAT[DURABLE-EVENTS-023] canonical codec and owner folds reject physical s
 
 test('WHAT[DURABLE-EVENTS-024] semantic cut fatal requires settlement and one injected physical fuse', () => {
   assertFatalBoundary('durable-events')
+})
+
+test('WHAT[DURABLE-EVENTS-023] single-field family folds own their slice and declare no aggregate dependency', () => {
+  const shardInventory = readCompileShardInventory({ repositoryRoot: ROOT })
+  const subsystemInventory = buildSubsystemInventory({ compileInventory: shardInventory })
+  assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))
+  const projects = [...subsystemInventory.projects.values()]
+
+  // These four families only ever wrote their own top-level field, so their
+  // `AgentProjectionSet -> ... -> AgentProjectionSet` wrappers are gone and the
+  // slice write lives in composition (`ProjectionUpdate.apply*`).
+  for (const source of [
+    'Execution/Fission/Fold.fs',
+    'Interaction/Concern/Fold.fs',
+    'Interaction/Attention/Fold.fs',
+    'Enforcer/InstitutionalLearning/Fold.fs',
+  ])
+    assert.equal(
+      existsSync(join(SOURCE_ROOT, source)),
+      false,
+      `${source} must not come back as an aggregate-typed wrapper`,
+    )
+
+  // The Change family keeps the fold but reads its own slice: the shard declares
+  // no reference to the aggregate projection and the fold names neither the
+  // aggregate nor the durable fail-closed report.
+  const changeFold = projects.filter((project) => project.shard === 'change-fold')
+  assert.equal(changeFold.length, 1, 'change-fold must resolve to exactly one compile shard')
+  assert.ok(
+    !changeFold[0].references.some((reference) => reference.endsWith('composition-durable-projection.fsproj')),
+    'change-fold must not declare composition-durable-projection',
+  )
+  const changeFoldSources = ['Change/Fold.fs', 'Change/Fold.fsi']
+    .map((source) => readFileSync(join(SOURCE_ROOT, source), 'utf8'))
+    .join('\n')
+  assert.doesNotMatch(changeFoldSources, /\bAgentProjectionSet\b|\bFoldRejection\b/)
 })

@@ -7,25 +7,25 @@
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.attention-regulation.interaction-attention-fold.fsproj"/>
+    
     <ProjectReference Include="Wanxiangshu.Owner.change-integration.change-fold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.concern-routing.interaction-concern-facts.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.concern-routing.interaction-concern-fold.fsproj"/>
+    
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-companionfactfold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-linkage-projection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-handle-surface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.change-integration.change-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.guidance-delivery.opencode-host-pairprogramming-guidelineprojection.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.institutional-learning.enforcer-institutionallearning-fold.fsproj"/>
+    
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-ledger.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.execution-fission-fold.fsproj"/>
+    
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-fold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.prefix-stability.mission-obligation-todo-prefixepoch.fsproj"/>

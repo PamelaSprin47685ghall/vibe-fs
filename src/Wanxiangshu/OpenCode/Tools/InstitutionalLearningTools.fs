@@ -6,7 +6,6 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.InstitutionalLearning
 open Wanxiangshu.Foundation
-open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal

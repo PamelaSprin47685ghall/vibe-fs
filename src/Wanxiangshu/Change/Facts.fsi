@@ -54,3 +54,13 @@ type OrchestratorFactCases =
         {| ManagerJobId: ManagerJobId
            WorktreeIdentity: WorktreeIdentity
            WorktreePath: WorktreePath |}
+
+[<RequireQualifiedAccess>]
+type OrchestratorFoldRejection =
+    | PublishClaimedWithoutRebasedCandidate
+    | PublishClaimedCommitMismatch
+
+[<RequireQualifiedAccess>]
+module OrchestratorFoldRejection =
+    val fact: OrchestratorFoldRejection -> string
+    val message: OrchestratorFoldRejection -> string

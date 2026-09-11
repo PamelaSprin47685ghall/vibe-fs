@@ -55,3 +55,21 @@ type OrchestratorFactCases =
         {| ManagerJobId: ManagerJobId
            WorktreeIdentity: WorktreeIdentity
            WorktreePath: WorktreePath |}
+
+/// Fold refusals owned by the Change family: composition renders them into the
+/// durable fail-closed report, the family keeps the decision (DURABLE-EVENTS-023).
+[<RequireQualifiedAccess>]
+type OrchestratorFoldRejection =
+    | PublishClaimedWithoutRebasedCandidate
+    | PublishClaimedCommitMismatch
+
+[<RequireQualifiedAccess>]
+module OrchestratorFoldRejection =
+    let fact (_: OrchestratorFoldRejection) : string = "PublishClaimed"
+
+    let message =
+        function
+        | OrchestratorFoldRejection.PublishClaimedWithoutRebasedCandidate ->
+            "publish claimed for a job with no rebased candidate (ORCH-004)"
+        | OrchestratorFoldRejection.PublishClaimedCommitMismatch ->
+            "publish claimed commit does not match admitted rebased commit"

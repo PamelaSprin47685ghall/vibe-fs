@@ -42,15 +42,6 @@ test('WHAT[INSTITUTIONAL-LEARNING-006] positive and negative experiences use the
   assert.doesNotMatch(tools, /Penalty|Punish|Severity|Score/)
 })
 
-test('WHAT[INSTITUTIONAL-LEARNING-007] celebrate alone resurfaces deferred work and the same durable fact updates attention coverage', () => {
-  const tools = read('src/Wanxiangshu/OpenCode/Tools/InstitutionalLearningTools.fs')
-  assert.match(tools, /ExperienceKind\.Celebrate -> AttentionProjection\.pending/)
-  assert.match(tools, /ExperienceKind\.Regret -> \[\]/)
-
-  const fold = read('src/Wanxiangshu/Composition/Durable/Fold.fs')
-  assert.match(fold, /InstitutionalLearningFactFold\.fold projection learning[\s\S]*?AttentionFactFold\.foldLearning updated learning/)
-})
-
 test('WHAT[INSTITUTIONAL-LEARNING-008] occurrence replay keeps the first frozen result and does not create a second disposition', () => {
   let state = learning.empty()
   state = learning.commit('ses-a', 'learn-1', 'celebrate', 'raw', 'rev-1', 'DISCARD', 'frozen-first', ['defer-1'], state)

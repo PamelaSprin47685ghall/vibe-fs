@@ -3,7 +3,11 @@ namespace Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Enforcer.InstitutionalLearning
+open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Interaction.Attention
+open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
@@ -11,7 +15,9 @@ open Wanxiangshu.Enforcer.Guidance
 
 /// Shared session-scoped projection-update algebra for the fold families
 /// (formerly private helpers of `Fold`). `prefixOutcome` is shared by the
-/// Context family and the MagicTodo envelope branch.
+/// Context family and the MagicTodo envelope branch; the `apply*` appliers at
+/// the end assemble the single-field fact families whose decision lives in the
+/// owning domain fold.
 module ProjectionUpdate =
 
     let private reject = FoldRejection.reject
@@ -81,10 +87,6 @@ module ProjectionUpdate =
                 session.RequirementGrounding
                 |> Option.map RequirementGroundingProjection.applyReanchor }
 
-    let updateOrchestrator apply (projection: AgentProjectionSet) =
-        { projection with
-            Orchestrator = apply projection.Orchestrator }
-
     /// PROMPT-005: dispatch facts all key on the same session and projection.
     let updateAuthority sessionId apply projection =
         updateSession
@@ -94,3 +96,52 @@ module ProjectionUpdate =
                     PromptAuthority =
                         Some(apply (Option.defaultValue PromptAuthorityLedger.empty session.PromptAuthority)) })
             projection
+
+    // ── single-field fact families ──────────────────────────────────────────
+
+    let applyFission (projection: AgentProjectionSet) (fact: FissionFactCases) =
+        FissionProjection.fold projection.Fission fact
+        |> Result.map (fun updated -> { projection with Fission = updated })
+        |> Result.mapError (fun reason ->
+            { Fact = "Fission"
+              Reason = sprintf "%A" reason })
+
+    let applyConcern (projection: AgentProjectionSet) (fact: ConcernFactCases) =
+        ConcernProjection.applyFact fact projection.Concern
+        |> Result.map (fun updated -> { projection with Concern = updated })
+        |> Result.mapError (fun reason -> { Fact = "Concern"; Reason = reason })
+
+    let applyAttention
+        (projection: AgentProjectionSet)
+        (fact: AttentionFactCases)
+        : Result<AgentProjectionSet, FoldRejection> =
+        match fact with
+        | AttentionFactCases.DeferredWorkRecorded payload ->
+            Ok
+                { projection with
+                    Attention =
+                        projection.Attention
+                        |> AttentionProjection.record payload.SessionId payload.OccurrenceId payload.Text }
+
+    let applyAttentionLearning
+        (projection: AgentProjectionSet)
+        (fact: InstitutionalLearningFactCases)
+        : Result<AgentProjectionSet, FoldRejection> =
+        match fact with
+        | InstitutionalLearningFactCases.LearningDispositionCommitted payload ->
+            Ok
+                { projection with
+                    Attention =
+                        projection.Attention
+                        |> AttentionProjection.resurface
+                            payload.SessionId
+                            payload.OccurrenceId
+                            payload.ResurfacedDeferredWorkIds }
+
+    let applyInstitutionalLearning
+        (projection: AgentProjectionSet)
+        (fact: InstitutionalLearningFactCases)
+        : Result<AgentProjectionSet, FoldRejection> =
+        Ok
+            { projection with
+                InstitutionalLearning = InstitutionalLearningProjection.apply fact projection.InstitutionalLearning }

@@ -1,14 +1,9 @@
 namespace Wanxiangshu.Change
 
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Composition.Durable.Fact
-open Wanxiangshu.Composition.Durable.ProjectionUpdate
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Relay
 
 module OrchestratorFactFold =
-
-    let private reject = FoldRejection.reject
 
     let private foldRebasedCandidateReady
         (payload:
@@ -16,19 +11,18 @@ module OrchestratorFactFold =
                RebasedCommit: CommitHash
                TargetHeadSnapshot: CommitHash
                WorkspaceSnapshotId: WorkspaceSnapshotId |})
-        (projection: AgentProjectionSet)
-        : Result<AgentProjectionSet, FoldRejection> =
+        (projection: OrchestratorProjection)
+        : Result<OrchestratorProjection, OrchestratorFoldRejection> =
         // Journal is append-only: the projection keeps the latest appended
         // RebasedCandidateReady as the current view. Exact replay is
         // idempotent; a later differing event supersedes because the prior
         // CAS/target observation proved that attempt did not land.
         Ok(
-            updateOrchestrator
-                (OrchestratorProjection.recordRebasedCandidateReady
-                    payload.ManagerJobId
-                    {| RebasedCommit = payload.RebasedCommit
-                       TargetHeadSnapshot = payload.TargetHeadSnapshot
-                       WorkspaceSnapshotId = payload.WorkspaceSnapshotId |})
+            OrchestratorProjection.recordRebasedCandidateReady
+                payload.ManagerJobId
+                {| RebasedCommit = payload.RebasedCommit
+                   TargetHeadSnapshot = payload.TargetHeadSnapshot
+                   WorkspaceSnapshotId = payload.WorkspaceSnapshotId |}
                 projection
         )
 
@@ -41,101 +35,91 @@ module OrchestratorFactFold =
                WorkspaceSnapshotId: WorkspaceSnapshotId
                QualityCertificateId: QualityCertificateId
                AuthorityRevision: AuthorityRevision |})
-        (projection: AgentProjectionSet)
-        : Result<AgentProjectionSet, FoldRejection> =
+        (projection: OrchestratorProjection)
+        : Result<OrchestratorProjection, OrchestratorFoldRejection> =
         match
-            OrchestratorProjection.tryFind payload.ManagerJobId projection.Orchestrator
+            OrchestratorProjection.tryFind payload.ManagerJobId projection
             |> Option.bind (fun job -> job.RebasedCandidateReady)
         with
-        | None -> reject "PublishClaimed" "publish claimed for a job with no rebased candidate (ORCH-004)"
+        | None -> Error OrchestratorFoldRejection.PublishClaimedWithoutRebasedCandidate
         | Some rebasedReady ->
             if payload.RebasedCommit <> rebasedReady.RebasedCommit then
-                reject "PublishClaimed" "publish claimed commit does not match admitted rebased commit"
+                Error OrchestratorFoldRejection.PublishClaimedCommitMismatch
             else
                 // Latest appended claim is the current view: a retried publish
                 // under a fresh certificate carries a new ExpectedHead and
                 // evidence, which supersedes the CAS-missed attempt.
                 Ok(
-                    updateOrchestrator
-                        (OrchestratorProjection.recordPublishClaimed
-                            payload.ManagerJobId
-                            {| TargetRef = payload.TargetRef
-                               RebasedCommit = payload.RebasedCommit
-                               ExpectedHead = payload.ExpectedHead
-                               WorkspaceSnapshotId = payload.WorkspaceSnapshotId
-                               QualityCertificateId = payload.QualityCertificateId
-                               AuthorityRevision = payload.AuthorityRevision |})
+                    OrchestratorProjection.recordPublishClaimed
+                        payload.ManagerJobId
+                        {| TargetRef = payload.TargetRef
+                           RebasedCommit = payload.RebasedCommit
+                           ExpectedHead = payload.ExpectedHead
+                           WorkspaceSnapshotId = payload.WorkspaceSnapshotId
+                           QualityCertificateId = payload.QualityCertificateId
+                           AuthorityRevision = payload.AuthorityRevision |}
                         projection
                 )
 
     let fold
-        (projection: AgentProjectionSet)
+        (orchestrator: OrchestratorProjection)
         (fact: OrchestratorFactCases)
-        : Result<AgentProjectionSet, FoldRejection> =
+        : Result<OrchestratorProjection, OrchestratorFoldRejection> =
         match fact with
-        | OrchestratorFactCases.ManagerJobCreated payload ->
-            Ok(updateOrchestrator (OrchestratorProjection.createJob payload) projection)
+        | OrchestratorFactCases.ManagerJobCreated payload -> Ok(OrchestratorProjection.createJob payload orchestrator)
         | OrchestratorFactCases.CandidateReady payload ->
             Ok(
-                updateOrchestrator
-                    (OrchestratorProjection.recordCandidateReady
-                        payload.ManagerJobId
-                        {| CandidateCommit = payload.CandidateCommit
-                           WorkspaceSnapshotId = payload.WorkspaceSnapshotId
-                           QualityCertificateId = payload.QualityCertificateId |})
-                    projection
+                OrchestratorProjection.recordCandidateReady
+                    payload.ManagerJobId
+                    {| CandidateCommit = payload.CandidateCommit
+                       WorkspaceSnapshotId = payload.WorkspaceSnapshotId
+                       QualityCertificateId = payload.QualityCertificateId |}
+                    orchestrator
             )
         | OrchestratorFactCases.ConflictDetected payload ->
             Ok(
-                updateOrchestrator
-                    (OrchestratorProjection.recordConflictDetected
-                        payload.ManagerJobId
-                        {| CandidateCommit = payload.CandidateCommit
-                           TargetHeadSnapshot = payload.TargetHeadSnapshot
-                           WorkspaceSnapshotId = payload.WorkspaceSnapshotId
-                           ConflictFiles = payload.ConflictFiles
-                           DiagnosticsDigest = payload.DiagnosticsDigest |})
-                    projection
+                OrchestratorProjection.recordConflictDetected
+                    payload.ManagerJobId
+                    {| CandidateCommit = payload.CandidateCommit
+                       TargetHeadSnapshot = payload.TargetHeadSnapshot
+                       WorkspaceSnapshotId = payload.WorkspaceSnapshotId
+                       ConflictFiles = payload.ConflictFiles
+                       DiagnosticsDigest = payload.DiagnosticsDigest |}
+                    orchestrator
             )
-        | OrchestratorFactCases.RebasedCandidateReady payload -> foldRebasedCandidateReady payload projection
-        | OrchestratorFactCases.PublishClaimed payload -> foldPublishClaimed payload projection
+        | OrchestratorFactCases.RebasedCandidateReady payload -> foldRebasedCandidateReady payload orchestrator
+        | OrchestratorFactCases.PublishClaimed payload -> foldPublishClaimed payload orchestrator
         | OrchestratorFactCases.Published payload ->
             Ok(
-                updateOrchestrator
-                    (OrchestratorProjection.recordTerminal
-                        payload.ManagerJobId
-                        (TerminalOutcome.Published
-                            {| CandidateCommit = payload.CandidateCommit
-                               ResultingTargetHead = payload.ResultingTargetHead |}))
-                    projection
+                OrchestratorProjection.recordTerminal
+                    payload.ManagerJobId
+                    (TerminalOutcome.Published
+                        {| CandidateCommit = payload.CandidateCommit
+                           ResultingTargetHead = payload.ResultingTargetHead |})
+                    orchestrator
             )
         | OrchestratorFactCases.JobFailed payload ->
             Ok(
-                updateOrchestrator
-                    (OrchestratorProjection.recordTerminal payload.ManagerJobId (TerminalOutcome.Failed payload.Reason))
-                    projection
+                OrchestratorProjection.recordTerminal
+                    payload.ManagerJobId
+                    (TerminalOutcome.Failed payload.Reason)
+                    orchestrator
             )
         | OrchestratorFactCases.JobAbandoned payload ->
-            Ok(
-                updateOrchestrator
-                    (OrchestratorProjection.recordTerminal payload.ManagerJobId TerminalOutcome.Abandoned)
-                    projection
-            )
+            Ok(OrchestratorProjection.recordTerminal payload.ManagerJobId TerminalOutcome.Abandoned orchestrator)
         | OrchestratorFactCases.WorktreeCreateRequested payload ->
             Ok(
-                updateOrchestrator
-                    (OrchestratorProjection.requestWorktree
-                        payload.WorktreeIdentity
-                        payload.WorktreePath
-                        payload.ManagerJobId)
-                    projection
+                OrchestratorProjection.requestWorktree
+                    payload.WorktreeIdentity
+                    payload.WorktreePath
+                    payload.ManagerJobId
+                    orchestrator
             )
         | OrchestratorFactCases.WorktreeCreated payload ->
             Ok(
-                updateOrchestrator
-                    (OrchestratorProjection.acceptWorktree
-                        payload.WorktreeIdentity
-                        payload.WorktreePath
-                        payload.ManagerJobId)
-                    projection
+                OrchestratorProjection.acceptWorktree
+                    payload.WorktreeIdentity
+                    payload.WorktreePath
+                    payload.ManagerJobId
+                    orchestrator
             )

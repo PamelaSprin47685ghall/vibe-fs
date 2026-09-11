@@ -29,7 +29,10 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-010] V1 Fission has no OpenCode session
   assert.doesNotMatch(code, /session\s*\.\s*fork|\/session\/[^"']*\/fork|CreateForkedSession|ForkSession/i)
 
   const facts = read('src/Wanxiangshu/Execution/Fission/Facts.fs')
-  const fold = read('src/Wanxiangshu/Execution/Fission/Projection.fs') + read('src/Wanxiangshu/Execution/Fission/Fold.fs')
+  // The aggregate-typed `Fold.fs` wrapper is gone (2026-09-12); the replay
+  // anchors live in the slice-owning projection fold, which is what this
+  // assertion has always been about.
+  const fold = read('src/Wanxiangshu/Execution/Fission/Projection.fs')
   assert.match(facts, /FissionAdmitted/)
   assert.match(facts, /FissionLaneMaterialized/)
   assert.match(facts, /FissionCompletionDelivered/)
