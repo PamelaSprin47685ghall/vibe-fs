@@ -302,7 +302,9 @@ module HostForkRunLifecycle =
         (agentOutcome: AgentCompletionOutcome)
         =
         task {
-            match! ChildRecoveryWorkflow.commitJoinable journal parentId proof with
+            let journalPort = journal |> Option.map AgentJournalPortAdapter.fromAgentJournal
+
+            match! ChildRecoveryWorkflow.commitJoinable journalPort parentId proof with
             | Ok() -> return agentOutcome
             | Error error ->
                 return

@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Execution.Delegation.Handle
 
-open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer
@@ -18,7 +17,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Persistence.Journal
 
 /// Why a controlled consume refused to retire (EXEC-009).
 type HandleConsumeRejection =
@@ -51,12 +49,8 @@ module HandleController =
     let agentHandle (agentId: string) =
         HandleId.Agent(AgentHandleId.create agentId)
 
-    let private append (journal: AgentJournal) (parentId: SessionId) fact =
-        task {
-            match! AgentJournal.appendAgent (StreamId.Session parentId) None fact journal with
-            | Ok _ -> return Ok()
-            | Error failure -> return Error(JournalAppendFailure.describe failure)
-        }
+    let private append (journal: AgentJournalPort) (parentId: SessionId) (fact: ExecutionFactCases) =
+        journal.AppendExecutionFact parentId fact
 
     /// EXEC-009: a fork bound a handle to a Host child session.
     ///
@@ -64,7 +58,7 @@ module HandleController =
     /// handle with no session points at nothing, and deriving one from the handle id
     /// would fabricate an identity every later operation silently no-ops against.
     let linkNamed
-        (journal: AgentJournal option)
+        (journal: AgentJournalPort option)
         (parentId: SessionId)
         (agentId: string)
         (childSessionId: SessionId)
@@ -79,7 +73,7 @@ module HandleController =
             append
                 durable
                 parentId
-                (ExecutionFact.HandleLinked
+                (ExecutionFactCases.HandleLinked
                     {| ParentSessionId = parentId
                        ChildSessionId = childSessionId
                        Handle = agentHandle agentId
@@ -91,7 +85,7 @@ module HandleController =
     /// Internal compatibility: when no distinct provider presentation identity
     /// exists, use the Host target name as the byname too.
     let link
-        (journal: AgentJournal option)
+        (journal: AgentJournalPort option)
         (parentId: SessionId)
         (agentId: string)
         (childSessionId: SessionId)
@@ -108,17 +102,17 @@ module HandleController =
     /// callers cannot pass raw Aborted or bare `HandleCompletionKind` + `"ABORTED"`.
     /// The fold refuses a second claim, so a duplicate is a no-op rather than overwrite.
     let private writeCompletionBlob
-        (durable: AgentJournal)
+        (durable: AgentJournalPort)
         (content: string)
         : Task<Result<BlobRef option * BlobDigest option, string>> =
         task {
             match! durable.WriteBlob content with
             | Error err -> return Error err
-            | Ok receipt -> return Ok(Some receipt.BlobRef, Some receipt.BlobDigest)
+            | Ok(blobRef, blobDigest) -> return Ok(Some blobRef, Some blobDigest)
         }
 
     let private completionBlobRefs
-        (durable: AgentJournal)
+        (durable: AgentJournalPort)
         (body: string option)
         : Task<Result<BlobRef option * BlobDigest option, string>> =
         task {
@@ -128,7 +122,7 @@ module HandleController =
         }
 
     let private recordCompletionWithJournal
-        durable
+        (durable: AgentJournalPort)
         parentId
         (completion: JoinableCompletion)
         : Task<Result<unit, string>> =
@@ -144,7 +138,7 @@ module HandleController =
                     append
                         durable
                         parentId
-                        (ExecutionFact.HandleCompleted
+                        (ExecutionFactCases.HandleCompleted
                             {| ParentSessionId = parentId
                                Handle = agentHandle agentId
                                Kind = kind
@@ -153,7 +147,7 @@ module HandleController =
         }
 
     let recordCompletion
-        (journal: AgentJournal option)
+        (journal: AgentJournalPort option)
         (parentId: SessionId)
         (completion: JoinableCompletion)
         : Task<Result<unit, string>> =
@@ -172,7 +166,7 @@ module HandleController =
     /// gone). Never from degeneration-guard interrupt, provider-retry wake, or any path
     /// that may continue the same handle through an independently owned control path.
     let recordAbandon
-        (journal: AgentJournal option)
+        (journal: AgentJournalPort option)
         (parentId: SessionId)
         (agentId: string)
         (reason: HandleAbandonReason)
@@ -184,7 +178,7 @@ module HandleController =
             append
                 durable
                 parentId
-                (ExecutionFact.HandleAbandoned
+                (ExecutionFactCases.HandleAbandoned
                     {| ParentSessionId = parentId
                        Handle = agentHandle agentId
                        Reason = reason
@@ -195,14 +189,14 @@ module HandleController =
     /// Retirement is what makes a consumed completion unreturnable. Without it the
     /// handle stays `CompletedAwaitingJoin` in the durable projection, so a restart
     /// restores it as joinable and the same completion is delivered twice.
-    let retire (journal: AgentJournal option) (parentId: SessionId) (agentId: string) : Task<Result<unit, string>> =
+    let retire (journal: AgentJournalPort option) (parentId: SessionId) (agentId: string) : Task<Result<unit, string>> =
         match journal with
         | None -> Task.FromResult(Ok())
         | Some durable ->
             append
                 durable
                 parentId
-                (ExecutionFact.HandleRetired
+                (ExecutionFactCases.HandleRetired
                     {| ParentSessionId = parentId
                        Handle = agentHandle agentId |})
 
@@ -213,40 +207,43 @@ module HandleController =
     ///
     /// CommitUnknown must not hand the payload out: the caller would treat the
     /// work as consumed while a later restart might still show it joinable.
-    let private retirementFailure (journal: AgentJournal) (parentId: SessionId) (handle: HandleId) failure =
-        let after = AgentJournal.handleProjection journal parentId
+    let private retirementFailure
+        (journal: AgentJournalPort)
+        (parentId: SessionId)
+        (handle: HandleId)
+        (failure: string)
+        =
+        let after = journal.HandleProjection parentId
 
         match HandleProjection.tryFind handle after with
         | Some { Lifecycle = Retired } -> Error AlreadyRetired
-        | _ -> Error(AppendFailed(JournalAppendFailure.describe failure))
+        | _ -> Error(AppendFailed failure)
 
     let private retireRecord
-        (journal: AgentJournal)
+        (journal: AgentJournalPort)
         (parentId: SessionId)
         (handle: HandleId)
         (record: HandleRecord)
         : Task<Result<HandleRecord, HandleConsumeRejection>> =
         task {
             match!
-                AgentJournal.appendAgent
-                    (StreamId.Session parentId)
-                    None
-                    (ExecutionFact.HandleRetired
+                journal.AppendExecutionFact
+                    parentId
+                    (ExecutionFactCases.HandleRetired
                         {| ParentSessionId = parentId
                            Handle = handle |})
-                    journal
             with
             | Ok _ -> return Ok record
             | Error failure -> return retirementFailure journal parentId handle failure
         }
 
     let consume
-        (journal: AgentJournal)
+        (journal: AgentJournalPort)
         (parentId: SessionId)
         (handle: HandleId)
         : Task<Result<HandleRecord, HandleConsumeRejection>> =
         task {
-            let projection = AgentJournal.handleProjection journal parentId
+            let projection = journal.HandleProjection parentId
 
             match HandleProjection.tryFind handle projection with
             | None -> return Error(NotJoinable UnknownHandle)
@@ -270,7 +267,7 @@ module HandleController =
         }
 
     let cancelChildren
-        (journal: AgentJournal option)
+        (journal: AgentJournalPort option)
         (parentId: SessionId)
         (agentIds: string list)
         (abandonedAt: System.DateTimeOffset)

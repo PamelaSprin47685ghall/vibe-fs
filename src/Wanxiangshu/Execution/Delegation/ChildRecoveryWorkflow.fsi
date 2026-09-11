@@ -5,11 +5,10 @@ open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
-open Wanxiangshu.Persistence.Journal
 
 module ChildRecoveryWorkflow =
     type Ports =
-        { Journal: AgentJournal option
+        { Journal: AgentJournalPort option
           ParentId: SessionId
           Snapshot: ISessionSnapshotPort option
           AgentId: string
@@ -22,6 +21,9 @@ module ChildRecoveryWorkflow =
           Clock: IClockPort }
 
     val commitJoinable:
-        journal: AgentJournal option -> parentId: SessionId -> proof: JoinableCompletion -> Task<Result<unit, string>>
+        journal: AgentJournalPort option ->
+        parentId: SessionId ->
+        proof: JoinableCompletion ->
+            Task<Result<unit, string>>
 
     val resolveAndCommit: ports: Ports -> Task<Result<ChildRecoveryResult, string>>

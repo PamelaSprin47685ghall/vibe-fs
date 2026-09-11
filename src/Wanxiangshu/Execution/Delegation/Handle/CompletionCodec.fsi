@@ -6,7 +6,6 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Persistence.Journal
 
 module HandleCompletionCodec =
     val encodeOutcome: runId: string -> outcome: AgentCompletionOutcome -> string
@@ -27,13 +26,13 @@ module HandleCompletionCodec =
             Result<RunCompletion, string>
 
     val tryRead:
-        journal: AgentJournal ->
+        journal: AgentJournalPort ->
         record: HandleRecord ->
         agentId: string ->
         completedAt: DateTimeOffset ->
             Task<Result<RunCompletion option, string>>
 
     val tryReadBody:
-        journal: AgentJournal ->
+        journal: AgentJournalPort ->
         record: HandleRecord ->
             Task<Result<string option * BlobRef option * BlobDigest option, string>>

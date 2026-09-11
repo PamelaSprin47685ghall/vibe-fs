@@ -76,9 +76,11 @@ module JournalSurface =
             match role roleName with
             | Error error -> return failure error
             | Ok canonicalRole ->
+                let journalPort = AgentJournalPortAdapter.fromAgentJournal resource.Journal
+
                 match!
                     HandleController.link
-                        (Some resource.Journal)
+                        (Some journalPort)
                         (SessionId.create parentId)
                         agentId
                         (SessionId.create childId)
@@ -101,9 +103,11 @@ module JournalSurface =
             match abandonReason reasonName with
             | Error error -> return failure error
             | Ok reason ->
+                let journalPort = AgentJournalPortAdapter.fromAgentJournal resource.Journal
+
                 match!
                     HandleController.recordAbandon
-                        (Some resource.Journal)
+                        (Some journalPort)
                         (SessionId.create parentId)
                         agentId
                         reason

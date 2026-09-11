@@ -25,7 +25,7 @@ module HostForkRestart =
     let private ports
         (runtime: ForkRuntime)
         (snapshot: ISessionSnapshotPort option)
-        (journal: AgentJournal option)
+        (journal: AgentJournalPort option)
         (parentId: SessionId)
         (agentId: string)
         (childSessionId: SessionId)
@@ -99,10 +99,13 @@ module HostForkRestart =
         (agent: string)
         : Task<ChildRecoveryResult> =
         task {
+            let journalPort = journal |> Option.map AgentJournalPortAdapter.fromAgentJournal
             runtime.Restore(agentId, role, agent)
             runtime.BindChildSession(agentId, childSessionId)
 
-            let p = ports runtime snapshot journal parentId agentId childSessionId role agent
+            let p =
+                ports runtime snapshot journalPort parentId agentId childSessionId role agent
+
             let! resolved = ChildRecoveryWorkflow.resolveAndCommit p
             return applyResolvedRecovery runtime agentId resolved
         }
@@ -395,7 +398,8 @@ module HostForkRestart =
 
             bindChildIntoRuntime runtime children childCreatedDir directoryOf agentId record role
 
-            let! read = HandleCompletionCodec.tryReadBody journal record
+            let journalPort = AgentJournalPortAdapter.fromAgentJournal journal
+            let! read = HandleCompletionCodec.tryReadBody journalPort record
 
             do!
                 restoreCompletedBody

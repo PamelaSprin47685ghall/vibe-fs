@@ -18,6 +18,16 @@ DELEG-020 约束：委托语义不依赖当前工具名字面值（`fork`、`com
 2. **独立道路委托（`commission`）**：由 Orchestrator 调用，负责开启或续做独立集成道路，支持多道路并行推进。
 3. **同步委托（`inspect` / `establish-behavior` / `repair-behavior`）**：由业务角色在单轮内发起阻塞式子任务，经由 `SyncDelegate` 管道调度，完成取证或局部修复。
 
+### durable 能力注入（DELEG-029）
+
+delegation 业务运行时（recovery、fork、fold、sync）不持有 durable store 的具体句柄，也不把领域 fact 包进外层 routing union。能力与包装位置分工如下：
+
+- **capability port 由 delegation 拥有**：`Execution/Delegation/JournalPort.fs` 声明 `AgentJournalPort`，四个成员正是运行时需要的全部操作——`AppendExecutionFact: SessionId -> ExecutionFactCases -> Task<Result<unit, string>>`、`HandleProjection: SessionId -> AgentLinkageProjection`、`ReadBlob: BlobRef -> Task<Result<string, string>>`、`WriteBlob: string -> Task<Result<BlobRef * BlobDigest, string>>`。capability 由 composition 注入，构造时必填；`None` 只表示该调用方确实没有 durable store（既有降级语义），不是可选默认。
+- **durable composition 实现并包装**：`Composition/Durable/AgentJournalPortAdapter.fs` 的 `AgentJournalPortAdapter.fromAgentJournal` 把 `AgentJournal` 适配成上述 port（`AgentFact.Execution cases` 包装、`JournalAppendFailure.describe` 展平失败文案、`WriteBlob` 的 receipt 投影为 `BlobRef * BlobDigest`）；`Execution/Delegation/Fact.fs` 的 `ExecutionFact.*`/`DelegationFact.*` 桥接由 `composition-durable-fact` 编译，因此「把 delegation case 包进 `AgentFact`」只发生在 durable composition。
+- **边界适配**：`delegation-host-adapter`（`Fork/Host/{Agent,ChildDispatch,Join,RunLifecycle}.fs`）、`delegation-runtime-surface`（`Fork/Host/Restart.fs`、`Handle/JournalSurface.fs`）与 `execution-fission-opencode-host`（`Execution/Fission/OpenCode/Host.fs`）在持有 journal 的位置调用 `AgentJournalPortAdapter.fromAgentJournal`，把 port 传给运行时；每次操作绑定一次，不在 drain 循环内重复构造。
+- **残留与原因**：`delegation-recovery-runtime` 仍引用 `composition-durable-projection`，因为 `HandleProjection.*` 纯决策与 `AgentLinkageProjection` 类型声明编译在该 spine shard（`2ee76f2dc` 为打断 fold 环而移入），其命名空间仍是 delegation 自己的 `Wanxiangshu.Execution.Delegation`。真正的边界闭合需要把 aggregate fold 组合改成按域切片，属未完成工作。
+- DELEG-029 关于 PTY adapter（不得读取 `HostForkRuntime`、Fork runtime、Process implementation、Gate、`Dictionary`、registry、TCS）的一半仍未实现：`Execution/Delegation/Fork/Host/Pty.fs` 目前扩展 `HostForkRuntime` 并使用 `Dictionary`，该半句没有对应证明，缺口见本文件 GAP 段。
+
 ### 载荷渲染与方向不对称
 
 - **父 → 子（初始提示词注入）**：父会话向子会话传递上下文时，`ForkChildPayload` 将任务正文渲染为 `instructions`，将 `commissioner_record` 与 `attached_work_record` 作为 TOML 数据字段嵌入 body，杜绝将背景解析为指令或混入注释。
@@ -92,7 +102,7 @@ CompletionMailbox、Change VerdictMailbox 与 HostForkJoin 的 journal／fission
 | DELEG-026 | `requirements/delegation/tests/reusable-work-unit.test.mjs::WHAT[DELEG-026] reusable delegation has no durable program-counter/state-machine vocabulary`；`requirements/delegation/tests/reusable-work-unit.test.mjs::WHAT[DELEG-026] fork admission bookkeeping that can fail happens before dispatch`；`requirements/delegation/tests/fork-tool.test.mjs::WHAT[DELEG-026] FORK_TOOL_acceptance_unknown_never_claims_charge_was_not_placed`；`requirements/delegation/tests/fork-tool.test.mjs::WHAT[DELEG-026] FORK_TOOL_transport_receipt_confirms_placement_without_fabricating_physical_acceptance` |
 | DELEG-027 | `requirements/delegation/tests/reusable-work-unit.test.mjs::WHAT[DELEG-027] active fork assignment never becomes BusyAgentNudge` |
 | DELEG-028 | `requirements/delegation/tests/delegation-compile-boundary.test.mjs::WHAT[DELEG-028] Delegation contract excludes workflow Host PTY and recovery sources`；`requirements/delegation/tests/delegation-compile-boundary.test.mjs::WHAT[DELEG-028] Delegation focused localities stay within compile budgets` |
-| DELEG-029 | `requirements/delegation/tests/m6-slice-boundary.test.mjs::WHAT[DELEG-029] delegation ports reject Host runtime PTY process and AgentFact reverse ownership` |
+| DELEG-029 | `requirements/delegation/tests/m6-slice-boundary.test.mjs::WHAT[DELEG-029] delegation runtime consumes only the delegation-owned journal port` |
 | DELEG-030 | `requirements/delegation/tests/m6-slice-boundary.test.mjs::WHAT[DELEG-030] delegation invariant fatal preserves settlement and one injected fuse` |
 
 ## GAP

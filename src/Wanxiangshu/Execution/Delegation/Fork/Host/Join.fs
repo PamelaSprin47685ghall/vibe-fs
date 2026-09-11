@@ -87,9 +87,11 @@ module HostForkJoin =
 
     let private drainWithJournal (runtime: HostForkRuntime) (durable: AgentJournal) (cap: int) =
         task {
+            let durablePort = AgentJournalPortAdapter.fromAgentJournal durable
+
             let! drained =
                 JoinDrain.drainFromJournalWhere
-                    durable
+                    durablePort
                     runtime.ParentId
                     cap
                     (runtime.Clock.UtcNow())
@@ -422,10 +424,12 @@ module HostForkJoin =
         (laneIndex: int)
         (cap: int)
         =
+        let durablePort = AgentJournalPortAdapter.fromAgentJournal durable
         let allowed = fissionLaneAllowed runtime durable groupId laneIndex
 
         task {
-            let! drained = JoinDrain.drainFromJournalWhere durable runtime.ParentId cap (runtime.Clock.UtcNow()) allowed
+            let! drained =
+                JoinDrain.drainFromJournalWhere durablePort runtime.ParentId cap (runtime.Clock.UtcNow()) allowed
 
             match drained with
             | Error error -> return Some(Error error)

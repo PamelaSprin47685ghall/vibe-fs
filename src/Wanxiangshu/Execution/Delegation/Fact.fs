@@ -2,6 +2,7 @@ namespace Wanxiangshu.Execution.Delegation
 
 open Wanxiangshu.Composition.Durable.Fact
 
+/// DELEG-029: Durable composition is the only place that wraps delegation fact cases into AgentFact.
 /// Execution fact constructors — bridge from Delegation-owned ExecutionFactCases
 /// into the Composition-owned AgentFact outer routing union.
 module ExecutionFact =

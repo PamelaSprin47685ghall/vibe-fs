@@ -1,14 +1,11 @@
 namespace Wanxiangshu.Execution.Delegation
 
-open Wanxiangshu.Composition.Durable
 
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
 open Wanxiangshu.OpenCode
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Context.Companion
@@ -35,7 +32,7 @@ module ChildRecoveryWorkflow =
     /// DSL-class: PhysicalHandle — HOST recovery invocation ports and wake handle; owner CHILD-RECOVERY, law FLOW-001, proof direct-ce-contract.
     type Ports =
         {
-            Journal: AgentJournal option
+            Journal: AgentJournalPort option
             ParentId: SessionId
             Snapshot: ISessionSnapshotPort option
             AgentId: string
@@ -83,7 +80,7 @@ module ChildRecoveryWorkflow =
 
     let private evidenceFromAwaitingJoin
         (ports: Ports)
-        (journal: AgentJournal)
+        (journal: AgentJournalPort)
         (record: HandleRecord)
         : Task<DurableHandleEvidence> =
         task {
@@ -95,7 +92,7 @@ module ChildRecoveryWorkflow =
 
     let private evidenceFromLifecycle
         (ports: Ports)
-        (journal: AgentJournal)
+        (journal: AgentJournalPort)
         (record: HandleRecord)
         : Task<DurableHandleEvidence> =
         match record.Lifecycle with
@@ -104,8 +101,8 @@ module ChildRecoveryWorkflow =
         | HandleLifecycle.Abandoned reason -> Task.FromResult(DurableHandleEvidence.Abandoned reason)
         | HandleLifecycle.CompletedAwaitingJoin _ -> evidenceFromAwaitingJoin ports journal record
 
-    let private readDurableFromJournal (ports: Ports) (journal: AgentJournal) : Task<DurableHandleEvidence> =
-        let projection = AgentJournal.handleProjection journal ports.ParentId
+    let private readDurableFromJournal (ports: Ports) (journal: AgentJournalPort) : Task<DurableHandleEvidence> =
+        let projection = journal.HandleProjection ports.ParentId
 
         match HandleProjection.tryFind ports.Handle projection with
         | None -> Task.FromResult DurableHandleEvidence.Unknown
@@ -171,7 +168,7 @@ module ChildRecoveryWorkflow =
 
     /// P0-RECOVERY-JOIN-001 §十: sole production caller of HandleController.recordCompletion.
     let commitJoinable
-        (journal: AgentJournal option)
+        (journal: AgentJournalPort option)
         (parentId: SessionId)
         (proof: JoinableCompletion)
         : Task<Result<unit, string>> =

@@ -4,7 +4,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Composition.Durable.Fact
 
 module ExecutionFactFold =
 

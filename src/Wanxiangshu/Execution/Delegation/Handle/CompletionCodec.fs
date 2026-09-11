@@ -17,7 +17,6 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
 open Wanxiangshu.Host
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -269,17 +268,17 @@ module HandleCompletionCodec =
             Ok body
 
     let private readVerifiedBlob
-        (journal: AgentJournal)
+        (journal: AgentJournalPort)
         (blobRef: BlobRef)
         (expectedDigest: BlobDigest)
         : System.Threading.Tasks.Task<Result<string, string>> =
         taskResult {
-            let! body = journal.Writer.BlobWriter.Read blobRef
+            let! body = journal.ReadBlob blobRef
             return! assertBlobDigest body expectedDigest
         }
 
     let private tryReadCompletedAwaiting
-        (journal: AgentJournal)
+        (journal: AgentJournalPort)
         (record: HandleRecord)
         (agentId: string)
         (completedAt: DateTimeOffset)
@@ -298,7 +297,7 @@ module HandleCompletionCodec =
 
     /// Read blob body from journal when the handle carries a completion ref.
     let tryRead
-        (journal: AgentJournal)
+        (journal: AgentJournalPort)
         (record: HandleRecord)
         (agentId: string)
         (completedAt: DateTimeOffset)
@@ -311,7 +310,7 @@ module HandleCompletionCodec =
         | HandleLifecycle.Retired -> System.Threading.Tasks.Task.FromResult(Ok None)
 
     let private tryReadBodyCompletedAwaiting
-        (journal: AgentJournal)
+        (journal: AgentJournalPort)
         (completion: HandleCompletion)
         : System.Threading.Tasks.Task<Result<string option * BlobRef option * BlobDigest option, string>> =
         taskResult {
@@ -326,7 +325,7 @@ module HandleCompletionCodec =
 
     /// Read raw blob body for decode-first JoinDrain path.
     let tryReadBody
-        (journal: AgentJournal)
+        (journal: AgentJournalPort)
         (record: HandleRecord)
         : System.Threading.Tasks.Task<Result<string option * BlobRef option * BlobDigest option, string>> =
         match record.Lifecycle with

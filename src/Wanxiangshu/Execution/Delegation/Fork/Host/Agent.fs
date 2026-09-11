@@ -299,9 +299,12 @@ module HostForkAgent =
             | Error error -> Task.FromResult(Error error)
             | Ok(identitySeed, childId) ->
                 task {
+                    let journalPort =
+                        runtime.Journal |> Option.map AgentJournalPortAdapter.fromAgentJournal
+
                     let! linkageRaw =
                         HandleController.linkNamed
-                            runtime.Journal
+                            journalPort
                             runtime.ParentId
                             agentId
                             childId
@@ -510,6 +513,9 @@ module HostForkAgent =
         (preparedHandoff: PreparedDelegationHandoff option)
         : Task<Result<ForkResult, string>> =
         task {
+            let journalPort =
+                runtime.Journal |> Option.map AgentJournalPortAdapter.fromAgentJournal
+
             let providerBynameOpt =
                 runtime.Journal
                 |> Option.bind (fun durable ->
@@ -523,7 +529,7 @@ module HostForkAgent =
             | Some providerByname ->
                 let! linkResult =
                     HandleController.linkNamed
-                        runtime.Journal
+                        journalPort
                         runtime.ParentId
                         agentId
                         childId

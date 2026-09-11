@@ -402,7 +402,9 @@ module HostForkChildDispatch =
         // leave a session aborted but still Active/joinable. A leaked abort is
         // recoverable; a leaked live handle is not.
         task {
-            let! cancelResult = HandleController.cancelChildren journal parentId (owned |> List.map fst) abandonedAt
+            let journalPort = journal |> Option.map AgentJournalPortAdapter.fromAgentJournal
+
+            let! cancelResult = HandleController.cancelChildren journalPort parentId (owned |> List.map fst) abandonedAt
 
             requireOk "Parent handle abandon failed" cancelResult
 

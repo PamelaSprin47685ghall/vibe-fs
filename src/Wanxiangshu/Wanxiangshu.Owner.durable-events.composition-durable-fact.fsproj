@@ -30,5 +30,7 @@
     <Compile Include="Composition/Durable/MagicTodoFactCodec.fs"/>
     <Compile Include="Composition/Durable/Fact.fsi"/>
     <Compile Include="Composition/Durable/Fact.fs"/>
+    <Compile Include="Execution/Delegation/Fact.fsi"/>
+    <Compile Include="Execution/Delegation/Fact.fs"/>
   </ItemGroup>
 </Project>

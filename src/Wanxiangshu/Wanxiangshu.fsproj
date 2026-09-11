@@ -477,6 +477,8 @@
     <Compile Include="Participant/Provider/Attempt/Fallback/Projection.fs"/>
     <Compile Include="Execution/Delegation/LinkageProjection.fsi"/>
     <Compile Include="Execution/Delegation/LinkageProjection.fs"/>
+    <Compile Include="Execution/Delegation/JournalPort.fsi"/>
+    <Compile Include="Execution/Delegation/JournalPort.fs"/>
     <Compile Include="Execution/Delegation/Handle/Surface.fsi"/>
     <Compile Include="Execution/Delegation/Handle/Surface.fs"/>
     <Compile Include="Change/Projection.fsi"/>
@@ -603,6 +605,8 @@
     <Compile Include="Execution/Session/SessionStartedAtLedger.fs"/>
     <Compile Include="Persistence/Journal/SharedAgentJournal.fsi"/>
     <Compile Include="Persistence/Journal/SharedAgentJournal.fs"/>
+    <Compile Include="Composition/Durable/AgentJournalPortAdapter.fsi"/>
+    <Compile Include="Composition/Durable/AgentJournalPortAdapter.fs"/>
     <Compile Include="Git/Subject.fsi"/>
     <Compile Include="Git/Subject.fs"/>
     <Compile Include="Mission/Relay/OpenCode/WorkspaceSnapshot.fsi"/>

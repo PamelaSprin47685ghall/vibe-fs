@@ -6,8 +6,6 @@ open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
-open Wanxiangshu.Composition.Durable.Fact
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Execution.Delegation
@@ -66,7 +64,7 @@ module JoinDrain =
     /// Materialise Abandoned as a batch item and CAS-retire (single report).
     /// `completedAt` is caller-minted (IClockPort at composition).
     let tryConsumeOneAbandoned
-        (durable: AgentJournal)
+        (durable: AgentJournalPort)
         (parentId: SessionId)
         (record: HandleRecord)
         (completedAt: DateTimeOffset)
@@ -80,24 +78,23 @@ module JoinDrain =
             | _ -> return None
         }
 
-    let private appendFact (durable: AgentJournal) (parentId: SessionId) (fact: AgentFact) =
-        AgentJournal.appendAgent (StreamId.Session parentId) None fact durable
-        |> TaskValue.map (Result.map ignore >> Result.mapError JournalAppendFailure.describe)
+    let private appendFact (durable: AgentJournalPort) (parentId: SessionId) (fact: ExecutionFactCases) =
+        durable.AppendExecutionFact parentId fact
 
     let private afterRejectAppendFailure
-        (durable: AgentJournal)
+        (durable: AgentJournalPort)
         (parentId: SessionId)
         (record: HandleRecord)
         (err: string)
         : Result<RunCompletion, ForkError> option =
-        let after = AgentJournal.handleProjection durable parentId
+        let after = durable.HandleProjection parentId
 
         match HandleProjection.tryFind record.Handle after with
         | Some { Lifecycle = HandleLifecycle.Active } -> None
         | _ -> Some(Error(ForkError.NotFound err))
 
     let private rejectAppendOutcome
-        (durable: AgentJournal)
+        (durable: AgentJournalPort)
         (parentId: SessionId)
         (record: HandleRecord)
         (appendResult: Result<unit, string>)
@@ -109,7 +106,7 @@ module JoinDrain =
     /// Unretired legacy false abort: append rejection, fold reverts to Active, no join item.
     /// Idempotent when already Active (fold rejects AlreadyCompleted / NotCompleted → treat as done).
     let private rejectUnretiredFalseAbort
-        (durable: AgentJournal)
+        (durable: AgentJournalPort)
         (parentId: SessionId)
         (record: HandleRecord)
         (blobRef: BlobRef)
@@ -122,7 +119,7 @@ module JoinDrain =
                     appendFact
                         durable
                         parentId
-                        (ExecutionFact.HandleFalseCompletionRejected
+                        (ExecutionFactCases.HandleFalseCompletionRejected
                             {| ParentSessionId = parentId
                                Handle = record.Handle
                                ExpectedCompletionRef = blobRef
@@ -152,7 +149,7 @@ module JoinDrain =
         | Error(AppendFailed err) -> Some(Error(ForkError.NotFound err))
 
     let private joinCurrentDecoded
-        (durable: AgentJournal)
+        (durable: AgentJournalPort)
         (parentId: SessionId)
         (record: HandleRecord)
         (agentId: string)
@@ -176,7 +173,7 @@ module JoinDrain =
         }
 
     let private afterDecodeBody
-        (durable: AgentJournal)
+        (durable: AgentJournalPort)
         (parentId: SessionId)
         (record: HandleRecord)
         (agentId: string)
@@ -191,7 +188,7 @@ module JoinDrain =
         | Invalid _ -> Task.FromResult None
 
     let private afterReadBody
-        (durable: AgentJournal)
+        (durable: AgentJournalPort)
         (parentId: SessionId)
         (record: HandleRecord)
         (agentId: string)
@@ -209,7 +206,7 @@ module JoinDrain =
     /// One durable completed handle: decode first, then prove, then CAS.
     /// `completedAt` is caller-minted (IClockPort at composition).
     let tryConsumeOneDurable
-        (durable: AgentJournal)
+        (durable: AgentJournalPort)
         (parentId: SessionId)
         (record: HandleRecord)
         (completedAt: DateTimeOffset)
@@ -225,7 +222,7 @@ module JoinDrain =
 
     /// Dispatch one record through the correct consume path.
     let tryConsumeOne
-        (durable: AgentJournal)
+        (durable: AgentJournalPort)
         (parentId: SessionId)
         (completedAt: DateTimeOffset)
         (record: HandleRecord)
@@ -331,7 +328,7 @@ module JoinDrain =
         | _ -> None
 
     let private applyDecodedFalseAbort
-        (durable: AgentJournal)
+        (durable: AgentJournalPort)
         (parentId: SessionId)
         (record: HandleRecord)
         (blobRef: BlobRef)
@@ -363,7 +360,7 @@ module JoinDrain =
         | _ -> Task.FromResult(Ok())
 
     let private maybeApplyLegacyFalseAbort
-        (durable: AgentJournal)
+        (durable: AgentJournalPort)
         (parentId: SessionId)
         (record: HandleRecord)
         (blobRef: BlobRef)
@@ -371,7 +368,7 @@ module JoinDrain =
         (retired: bool)
         : Task<Result<unit, ForkError>> =
         task {
-            let! readResult = durable.Writer.BlobWriter.Read blobRef
+            let! readResult = durable.ReadBlob blobRef
 
             match readResult with
             | Ok body when HostDigest.sha256Hex body = BlobDigest.value blobDigest ->
@@ -380,7 +377,7 @@ module JoinDrain =
         }
 
     let private reconcileOne
-        (durable: AgentJournal)
+        (durable: AgentJournalPort)
         (parentId: SessionId)
         (record: HandleRecord)
         : Task<Result<unit, ForkError>> =
@@ -394,8 +391,8 @@ module JoinDrain =
     /// Scan projection: reject unretired false aborts; refuse retired false aborts.
     /// O(handles) keyed lookups + blob reads for cells that already carry ref/digest.
     /// Returns Error on the first retired false-abort tombstone (fail-closed refuse).
-    let reconcileFalseAborts (durable: AgentJournal) (parentId: SessionId) : Task<Result<unit, ForkError>> =
-        let projection = AgentJournal.handleProjection durable parentId
+    let reconcileFalseAborts (durable: AgentJournalPort) (parentId: SessionId) : Task<Result<unit, ForkError>> =
+        let projection = durable.HandleProjection parentId
 
         let rec loop (remaining: HandleRecord list) : Task<Result<unit, ForkError>> =
             taskResult {
@@ -412,14 +409,14 @@ module JoinDrain =
     /// affinity belongs to this present. Candidates not accepted by the predicate
     /// stay untouched and remain joinable for their owning lane.
     let drainFromJournalWhere
-        (durable: AgentJournal)
+        (durable: AgentJournalPort)
         (parentId: SessionId)
         (maxCount: int)
         (completedAt: DateTimeOffset)
         (accept: HandleRecord -> bool)
         : Task<Result<RunCompletion list, ForkError>> =
         let filtered () =
-            let projection = AgentJournal.handleProjection durable parentId
+            let projection = durable.HandleProjection parentId
 
             { projection with
                 Handles = projection.Handles |> Map.filter (fun _ record -> accept record) }

@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Execution.Delegation
 
 open Wanxiangshu.Foundation
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Composition.Durable
 
 module DelegationFactFold =

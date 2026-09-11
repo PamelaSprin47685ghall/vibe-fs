@@ -6,7 +6,6 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Persistence.Journal
 
 type HandleConsumeRejection =
     | AlreadyRetired
@@ -17,7 +16,7 @@ module HandleController =
     val agentHandle: agentId: string -> HandleId
 
     val linkNamed:
-        journal: AgentJournal option ->
+        journal: AgentJournalPort option ->
         parentId: SessionId ->
         agentId: string ->
         childSessionId: SessionId ->
@@ -28,7 +27,7 @@ module HandleController =
             Task<Result<unit, string>>
 
     val link:
-        journal: AgentJournal option ->
+        journal: AgentJournalPort option ->
         parentId: SessionId ->
         agentId: string ->
         childSessionId: SessionId ->
@@ -38,29 +37,29 @@ module HandleController =
             Task<Result<unit, string>>
 
     val recordCompletion:
-        journal: AgentJournal option ->
+        journal: AgentJournalPort option ->
         parentId: SessionId ->
         completion: JoinableCompletion ->
             Task<Result<unit, string>>
 
     val recordAbandon:
-        journal: AgentJournal option ->
+        journal: AgentJournalPort option ->
         parentId: SessionId ->
         agentId: string ->
         reason: HandleAbandonReason ->
         abandonedAt: DateTimeOffset ->
             Task<Result<unit, string>>
 
-    val retire: journal: AgentJournal option -> parentId: SessionId -> agentId: string -> Task<Result<unit, string>>
+    val retire: journal: AgentJournalPort option -> parentId: SessionId -> agentId: string -> Task<Result<unit, string>>
 
     val consume:
-        journal: AgentJournal ->
+        journal: AgentJournalPort ->
         parentId: SessionId ->
         handle: HandleId ->
             Task<Result<HandleRecord, HandleConsumeRejection>>
 
     val cancelChildren:
-        journal: AgentJournal option ->
+        journal: AgentJournalPort option ->
         parentId: SessionId ->
         agentIds: string list ->
         abandonedAt: DateTimeOffset ->

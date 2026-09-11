@@ -4,6 +4,7 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
+/// DELEG-029: Durable composition is the only place that wraps delegation fact cases into AgentFact.
 module ExecutionFact =
     val inline HandleLinked:
         payload:

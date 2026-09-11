@@ -6,28 +6,27 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Persistence.Journal
 
 module JoinDrain =
     val stableJoinKey: record: HandleRecord -> int * string
     val orderedCandidates: projection: AgentLinkageProjection -> HandleRecord list
 
     val tryConsumeOneAbandoned:
-        durable: AgentJournal ->
+        durable: AgentJournalPort ->
         parentId: SessionId ->
         record: HandleRecord ->
         completedAt: DateTimeOffset ->
             Task<Result<RunCompletion, ForkError> option>
 
     val tryConsumeOneDurable:
-        durable: AgentJournal ->
+        durable: AgentJournalPort ->
         parentId: SessionId ->
         record: HandleRecord ->
         completedAt: DateTimeOffset ->
             Task<Result<RunCompletion, ForkError> option>
 
     val tryConsumeOne:
-        durable: AgentJournal ->
+        durable: AgentJournalPort ->
         parentId: SessionId ->
         completedAt: DateTimeOffset ->
         record: HandleRecord ->
@@ -40,10 +39,10 @@ module JoinDrain =
         refresh: (unit -> AgentLinkageProjection) ->
             Task<Result<RunCompletion list, ForkError>>
 
-    val reconcileFalseAborts: durable: AgentJournal -> parentId: SessionId -> Task<Result<unit, ForkError>>
+    val reconcileFalseAborts: durable: AgentJournalPort -> parentId: SessionId -> Task<Result<unit, ForkError>>
 
     val drainFromJournalWhere:
-        durable: AgentJournal ->
+        durable: AgentJournalPort ->
         parentId: SessionId ->
         maxCount: int ->
         completedAt: DateTimeOffset ->

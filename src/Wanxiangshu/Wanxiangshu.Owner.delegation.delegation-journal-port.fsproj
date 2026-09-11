@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>delegation</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>delegation-journal-port</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>delegation</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>delegation-journal-port</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj"/>
+    <Compile Include="Execution/Delegation/JournalPort.fsi"/>
+    <Compile Include="Execution/Delegation/JournalPort.fs"/>
+  </ItemGroup>
+</Project>

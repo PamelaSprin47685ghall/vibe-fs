@@ -166,36 +166,46 @@ module FissionHost =
         | Some { Lifecycle = HandleLifecycle.Retired } -> true
         | _ -> false
 
-    let private ensureRetiredAfterConsume durable ownerSessionId handle =
+    let private ensureRetiredAfterConsume (durablePort: AgentJournalPort) durable ownerSessionId handle =
         task {
-            match! HandleController.consume durable ownerSessionId handle with
+            match! HandleController.consume durablePort ownerSessionId handle with
             | Ok _ -> return true
             | Error _ -> return isHandleRetired durable ownerSessionId handle
         }
 
-    let private tryConsumeCompletedHandle durable ownerSessionId handle =
+    let private tryConsumeCompletedHandle (durablePort: AgentJournalPort) durable ownerSessionId handle =
         match HandleProjection.tryFind handle (AgentJournal.handleProjection durable ownerSessionId) with
         | Some { Lifecycle = HandleLifecycle.Retired } -> task { return true }
         | Some { Lifecycle = HandleLifecycle.CompletedAwaitingJoin _ }
-        | Some { Lifecycle = HandleLifecycle.Abandoned _ } -> ensureRetiredAfterConsume durable ownerSessionId handle
+        | Some { Lifecycle = HandleLifecycle.Abandoned _ } ->
+            ensureRetiredAfterConsume durablePort durable ownerSessionId handle
         | Some { Lifecycle = HandleLifecycle.Active }
         | None -> task { return false }
 
-    let private consumeOnePreFission durable (group: FissionGroupProjection) completionId =
+    let private consumeOnePreFission
+        (durablePort: AgentJournalPort)
+        durable
+        (group: FissionGroupProjection)
+        completionId
+        =
         match agentIdOfExternal completionId with
         | None -> task { return true }
-        | Some agentId -> tryConsumeCompletedHandle durable group.OwnerSessionId (HandleController.agentHandle agentId)
+        | Some agentId ->
+            tryConsumeCompletedHandle durablePort durable group.OwnerSessionId (HandleController.agentHandle agentId)
 
     let private continuePreFissionConsume ok rest consume =
         if ok then consume rest else task { return false }
 
     let private consumePreFissionAgents durable (group: FissionGroupProjection) =
+        let durablePort =
+            Wanxiangshu.Composition.Durable.AgentJournalPortAdapter.fromAgentJournal durable
+
         let rec consume completionIds =
             task {
                 match completionIds with
                 | [] -> return true
                 | completionId :: rest ->
-                    let! ok = consumeOnePreFission durable group completionId
+                    let! ok = consumeOnePreFission durablePort durable group completionId
                     return! continuePreFissionConsume ok rest consume
             }
 
