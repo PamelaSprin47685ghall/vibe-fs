@@ -247,6 +247,21 @@ tool adapter、signal adapter、Attention consumer 与 repository-programming ru
 
 当前声明图为 26 subsystem、213 shard、700 source、1834 references，shard DAG，最大 subsystem SCC 22；相对 `1846` 净减 12 条声明引用。SCC 未缩小，GAP-033 保持 PARTIAL。下一刀仍应优先真实知识归属迁移（重力井），稀疏边继续剪枝收益递减。
 
+在 `c82dc213b` 上继续 GAP-033：先对重力井做只读审计，再落地真实知识归属迁移，并对确认零符号消费的边并行剪枝。
+
+**知识归属迁移（本批主刀）：** `OpenCode/Host/SharedState.fs/.fsi` 原与 `ProviderRunBinding*` 混编在 `host/opencode-host-providerrunbinding`。SharedState 只依赖 companion Blogger 类型（`BloggerRequestContext`／`BloggerMaterializationAdmission`），与 Role 词汇无关；ProviderRunBinding 只需要 `SessionMessage`／`SessionSnapshotSurface`（经 `opencode-host-sessionquiescencegate`）。本批新建 `host/opencode-host-sharedstate` 承接 SharedState，从 providerrunbinding 删除 SharedState 编译项及其 companion-factfold／companion-fact 引用；SharedState 消费方（sharedstatesurface、companion foldsurface、companion runtime、pluginruntimescope）改挂 sharedstate。聚焦编译暴露 `sessionquiescencegate` 的 `SessionSnapshotPort` 直接消费 `taskResult`，原先靠 providerrunbinding→companion 传递闭包碰巧提供，改挂窄合同 `runtime-platform/task-result`（`foundation-taskresult`）。`strength-opencode-settings` 仍引用 providerrunbinding 以消费 `ProviderRunBinding.bindableRun`，不再被迫闭合 companion SharedState 知识。
+
+**伴随零符号剪枝（均经符号复核 + focused Fable compile）：**
+1. 去 `providerrunbinding`：`context-companion-runtimesurface`、`interaction-dispatch-opencode-ingresscodec`、`opencode-host-hostsignalbootstrap`（后者经 pluginruntimescope／PluginSessionScope 使用 SessionParents，不直接消费 SharedState／ProviderRunBinding 模块）。
+2. 去 `foundation-roles`：`execution-session-chatexecution-fold`；`execution-session-sessionstartedatledger` 同时去 `opencode-tools-managedagent`。
+3. 去误挂的 `host-signal-contract`（fsproj 名仍为 `host-digest`，仅 EventContract）：`context-companion-foldsurface`（并去未用的 `host-session-contract`，清理 PluginScope 三处无用 Delegation／Wait open）、`strength-persistence-durabilityport`、`opencode-host-modelroutingsurface`。HostDigest 仍由既有传递闭包中的 `runtime-platform/digest` 提供，本批未恢复宽 EventContract 伞。
+4. 去 `foundation-outcome`：`participant-provider-attempt-fallback-ledger`。
+5. 去 `opencode-host-chatadmission-intent`：`opencode-codec-providerprojectionsurface`。
+6. 去 `participant-provider-attempt-requestkind`：`delegation-host-adapter`。
+7. 去 `foundation-async-support`：`delegation-recovery-runtime`。
+
+当前声明图为 26 subsystem、214 shard、700 source、1821 references，shard DAG，最大 subsystem SCC 22；相对 `1834` 净减 13 条声明引用，并新增 1 个 sharedstate shard。SCC 未缩小，GAP-033 保持 PARTIAL。下一刀继续重力井归属（例如 Role 合同与 Persona／ParticipantIdentity 分拆、ordinaryturnworkflow 编排归属、HostSignalBootstrap 多原因分片），不要把引用计数下降写成 SCC 已拆。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

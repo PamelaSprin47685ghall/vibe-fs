@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>host</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>opencode-host-sharedstate</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>host-boundary</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>opencode-host-sharedstate</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-companionfactfold.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-fact.fsproj"/>
+    <Compile Include="OpenCode/Host/SharedState.fsi"/>
+    <Compile Include="OpenCode/Host/SharedState.fs"/>
+  </ItemGroup>
+</Project>

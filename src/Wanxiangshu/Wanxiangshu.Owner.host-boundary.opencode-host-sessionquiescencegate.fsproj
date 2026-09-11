@@ -13,6 +13,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-message-codec.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
     <Compile Include="OpenCode/Host/SessionSnapshotPort.fsi"/>
     <Compile Include="OpenCode/Host/SessionSnapshotPort.fs"/>
     <Compile Include="OpenCode/Host/SessionSnapshotSurface.fsi"/>
