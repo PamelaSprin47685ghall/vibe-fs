@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSemanticOwner>repository-investigation</WanxiangshuSemanticOwner>
+    <WanxiangshuSemanticOwner>action-affordance</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>opencode-tools-inspectortool</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
-    <WanxiangshuSubsystem>repository-investigation</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>interaction</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>opencode-tools-inspectortool</WanxiangshuCompileShard>
   </PropertyGroup>
   <ItemGroup>

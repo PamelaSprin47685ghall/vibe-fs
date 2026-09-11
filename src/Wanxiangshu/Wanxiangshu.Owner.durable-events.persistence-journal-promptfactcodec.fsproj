@@ -43,15 +43,9 @@
     <Compile Include="Persistence/Journal/Envelope.fs"/>
     <Compile Include="Persistence/Journal/EventStoreJournalCodec.fsi"/>
     <Compile Include="Persistence/Journal/EventStoreJournalCodec.fs"/>
-    <Compile Include="Persistence/Journal/Writer.fsi"/>
-    <Compile Include="Persistence/Journal/Writer.fs"/>
     <Compile Include="Composition/Durable/ProjectionState.fsi"/>
     <Compile Include="Composition/Durable/ProjectionState.fs"/>
     <Compile Include="Composition/Durable/ProjectionUpdate.fsi"/>
     <Compile Include="Composition/Durable/ProjectionUpdate.fs"/>
-    <Compile Include="Persistence/Journal/AgentJournal.fsi"/>
-    <Compile Include="Persistence/Journal/AgentJournal.fs"/>
-    <Compile Include="Persistence/Journal/SharedAgentJournal.fsi"/>
-    <Compile Include="Persistence/Journal/SharedAgentJournal.fs"/>
   </ItemGroup>
 </Project>

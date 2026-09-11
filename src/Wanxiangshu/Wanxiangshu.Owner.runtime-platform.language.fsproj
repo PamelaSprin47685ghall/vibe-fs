@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>runtime-platform</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>runtime-platform-language</WanxiangshuCompileShard>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.distribution.assemblyinfo.fsproj"/>
+    <Compile Include="Participant/Provider/Language.fsi"/>
+    <Compile Include="Participant/Provider/Language.fs"/>
+    <Compile Include="Participant/Provider/ProviderResources.fsi"/>
+    <Compile Include="Participant/Provider/ProviderResources.fs"/>
+  </ItemGroup>
+</Project>

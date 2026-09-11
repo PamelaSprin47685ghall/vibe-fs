@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>resources</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>enforcer</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>resources-promptsurface</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>cognitive-environment</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>resources-promptsurface</WanxiangshuOwnerLocality>

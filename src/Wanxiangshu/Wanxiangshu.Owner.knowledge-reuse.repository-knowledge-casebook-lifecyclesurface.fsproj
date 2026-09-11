@@ -7,7 +7,6 @@
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-surface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.change-integration.change-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.opencode-tools-bookkeepertool.fsproj"/>

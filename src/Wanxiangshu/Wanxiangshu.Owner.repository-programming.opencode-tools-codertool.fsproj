@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>repository-programming</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>interaction</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>opencode-tools-codertool</WanxiangshuCompileShard>
-    <WanxiangshuSemanticOwner>repository-programming</WanxiangshuSemanticOwner>
+    <WanxiangshuSemanticOwner>action-affordance</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>opencode-tools-codertool</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>

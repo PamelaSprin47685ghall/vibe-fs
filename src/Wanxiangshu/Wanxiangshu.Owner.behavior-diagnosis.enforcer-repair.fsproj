@@ -10,7 +10,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-runtimeresources.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj" />
-    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj" />
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-agentjournal.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-diagnostics-runtime.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj" />

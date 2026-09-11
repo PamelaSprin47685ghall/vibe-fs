@@ -338,6 +338,33 @@ tool adapter、signal adapter、Attention consumer 与 repository-programming ru
   * 格式整理：收敛 `modelroutingsurface` 与 `enforcercatalogresource` 的单行紧凑 XML 格式。
 - **指标与门禁**：声明图指标变为 26 subsystems、**219** compile shards（+1）、701 sources、**1809** references、shard DAG 保持严格无环；最大 subsystem SCC 成功降至 **21**。全套门禁 `node scripts/checks/subsystems.mjs`、`subsystem-boundaries.test.mjs` 与 `node scripts/check.mjs` 均绿色通过。单子系统剥离不代表全表独立替换就绪，GAP-033 保持 **PARTIAL**。
 
+**7. Language 下沉平台（Rank-3）、AgentJournal 独立分片拆分、三子系统连续剥离（SCC 21→18）与零符号安全剪枝：**
+在基准 `68ab2a8cc`（26 subsystems, 219 shards, 701 sources, 1809 refs, 最大 subsystem SCC 21）上继续推进 GAP-033 知识解耦与环路消解：
+- **Rank-3 Language 合同与资源读取下沉**：
+  * 新建 `runtime-platform.language.fsproj`（归属 `runtime-platform`，引用 `assemblyinfo`），承接 `Language.fs/.fsi` 与 `ProviderResources.fs/.fsi` 编译；
+  * `participant-provider-language` 移出上述 4 文件并反向引用该平台分片；
+  * `resources-promptresources`、`resources-runtimeresources`、`resources-enforcercatalogresource` 引用全部改挂 `runtime-platform.language`，彻底消解 `resources → provider` 知识边；保留 `languagesurface` 对 `promptresources` 的反向读取；
+- **AgentJournal 运行时句柄独立分片拆分（重力井治理）**：
+  * 新建 `persistence-journal-agentjournal.fsproj`（归属 `persistence`），独立编译 `Writer.fs/.fsi`、`AgentJournal.fs/.fsi`、`SharedAgentJournal.fs/.fsi`，包含 9 项最小前置依赖；
+  * `persistence-journal-promptfactcodec` 移出上述 6 个文件，专心承载 FactCodec／Envelope／ProjectionUpdate 序列化与折叠能力；
+  * 64 个消费分片严格按符号分类重定向：51 个句柄唯一消费方全部改挂 `persistence-journal-agentjournal`，4 个编解码/折叠方保留 `promptfactcodec`，9 个双重消费方保留两条依赖；
+- **剥离 resources 子系统出环（SCC 21→20）**：
+  * `RuntimeResources` 深度组合规则与审计目录，属于 enforcer 组合知识；将 `resources-runtimeresources.fsproj` 与配套暴露给 JS 的 `resources-promptsurface.fsproj` 的 `WanxiangshuSubsystem` 归入 `enforcer`；
+  * `resources` 唯一余留出边仅指向非环节点（`participant` 与 `runtime-platform`），其在 SCC 内的出度降为 0，成功剥离出环；
+- **剥离 repository-investigation 子系统出环（SCC 20→19）**：
+  * 将 `opencode-tools-inspectortool.fsproj` 重分类至 `interaction`（`action-affordance` 工具面）；
+  * 将已无领域依赖的 `participant-provider-language.fsproj` 重分类至 `runtime-platform`；
+  * `repository-investigation` 在 SCC 内出度归 0（仅余内部与平台依赖），成功剥离出环；
+- **剥离 repository-programming 子系统出环（SCC 19→18）**：
+  * 将其 3 个工具/运行时分片（`opencode-tools-codertool`、`opencode-tools-filemutationtools`、`runtime`）重分类至 `interaction`，仅保留纯接收汇 `js-capability`；
+  * `repository-programming` 在 SCC 内出度归 0，成功剥离出环；
+- **经符号复核的零符号安全剪枝（5 条）**：
+  * `composition-durable-fold`：剪除 `context-companion-facts` 与 `execution-fission-facts`；
+  * `opencode-tools-bookkeepertool`：剪除未消费的角色依赖 `foundation-roles`；
+  * `casebook-lifecyclesurface`：剪除未消费的底层类型 `persistence-eventstore-storetypes`；
+  * `execution-session-recovery-model`：剪除未消费的 `host-digest` 与 `foundation-outcome`；
+  * 经编译与符号复核确认 KEEP：`repository-programming.runtime` 依赖 `host-fatal-effect`（`TransactionStore` 依赖 `FatalProcess`）；`provider-system-transform` 依赖 `enforcercatalogresource`（调用 `composeBloggerSystemPromptFor`）；
+- **指标与门禁**：声明图指标变为 26 subsystems、**221** compile shards（+2）、701 sources、**1824** references、shard DAG 保持严格无环；最大 subsystem SCC 连续降至 **18**（先后剥离 resources、repository-investigation、repository-programming 3 个子系统）。全套门禁 `node scripts/checks/subsystems.mjs`、`subsystem-boundaries.test.mjs` 与 `node scripts/check.mjs` 全部绿色通过。GAP-033 保持 **PARTIAL**。
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。

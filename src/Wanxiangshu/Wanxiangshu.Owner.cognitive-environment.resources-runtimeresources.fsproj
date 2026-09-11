@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>resources</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>enforcer</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>resources-runtimeresources</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>cognitive-environment</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>resources-runtimeresources</WanxiangshuOwnerLocality>
@@ -10,7 +10,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.behavior-diagnosis.enforcer-catalog.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-promptresources.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.language.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.distribution.resources-enforcercatalogresource.fsproj"/>
     <Compile Include="Resources/RuntimeResources.fsi"/>
     <Compile Include="Resources/RuntimeResources.fs"/>
