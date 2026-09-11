@@ -38,6 +38,8 @@
     <Compile Include="Composition/Durable/HostFactFold.fs"/>
     <Compile Include="Composition/Durable/DelegationProjectionBridge.fsi"/>
     <Compile Include="Composition/Durable/DelegationProjectionBridge.fs"/>
+    <Compile Include="Composition/Durable/DomainFamilyBridge.fsi"/>
+    <Compile Include="Composition/Durable/DomainFamilyBridge.fs"/>
     <Compile Include="Composition/Durable/Fold.fsi"/>
     <Compile Include="Composition/Durable/Fold.fs"/>
   </ItemGroup>

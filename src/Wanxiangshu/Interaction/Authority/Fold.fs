@@ -1,32 +1,37 @@
 namespace Wanxiangshu.Interaction.Authority
 
-open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Foundation
-open Wanxiangshu.Host
-open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Foundation
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Composition.Durable.ProjectionUpdate
-open Wanxiangshu.Composition.Durable
+
+[<RequireQualifiedAccess>]
+type PromptAuthorityProjectionChange =
+    | PromptAuthoritySet of SessionId * PromptAuthority.PromptAuthorityProjection
+    | ProviderFailuresSet of SessionId * ProviderFailureProjection
+
+[<RequireQualifiedAccess>]
+type PromptAuthorityFoldRejection =
+    | ClaimOriginRejected of PromptAuthority.IdentitySeedValidationError
+    | AuthorityRootSchemaRejected of string
+    | AuthorityRootSeedRejected of PromptAuthority.IdentitySeedValidationError
+    | AuthorityRootLedgerRejected of string
+
+[<RequireQualifiedAccess>]
+module PromptAuthorityFoldRejection =
+    let fact (rejection: PromptAuthorityFoldRejection) : string =
+        match rejection with
+        | PromptAuthorityFoldRejection.ClaimOriginRejected _ -> "PluginPromptClaimed"
+        | PromptAuthorityFoldRejection.AuthorityRootSchemaRejected _
+        | PromptAuthorityFoldRejection.AuthorityRootSeedRejected _
+        | PromptAuthorityFoldRejection.AuthorityRootLedgerRejected _ -> "AuthorityRootAccepted"
+
+    let message (rejection: PromptAuthorityFoldRejection) : string =
+        match rejection with
+        | PromptAuthorityFoldRejection.ClaimOriginRejected error -> sprintf "%A" error
+        | PromptAuthorityFoldRejection.AuthorityRootSchemaRejected reason -> reason
+        | PromptAuthorityFoldRejection.AuthorityRootSeedRejected error -> sprintf "%A" error
+        | PromptAuthorityFoldRejection.AuthorityRootLedgerRejected reason -> reason
 
 module PromptFactFold =
-
-    let private reject = FoldRejection.reject
 
     let private parseAuthorityKind value =
         match value with
@@ -40,14 +45,17 @@ module PromptFactFold =
         else
             parseAuthorityKind authorityKind
 
-    let private validateAcceptedIdentitySeed projection authorityKind seed =
+    let private validateAcceptedIdentitySeed
+        (authorityOf: SessionId -> PromptAuthority.PromptAuthorityProjection option)
+        authorityKind
+        seed
+        =
         match authorityKind, PromptAuthority.identitySeedOwner seed with
         | PromptAuthority.RootAuthorityKind.HumanRoot, _ -> Ok()
         | PromptAuthority.RootAuthorityKind.AgentOwnerRoot, None ->
             Error PromptAuthority.IdentitySeedValidationError.ExpectedInheritedFromOwner
         | PromptAuthority.RootAuthorityKind.AgentOwnerRoot, Some(ownerSessionId, _, _) ->
-            AgentProjection.tryFind ownerSessionId projection
-            |> Option.bind (fun session -> session.PromptAuthority)
+            authorityOf ownerSessionId
             |> Option.bind (fun authority -> authority.ActiveLogicalRun)
             |> fun activeOwner ->
                 PromptAuthority.validateInheritedIdentitySeedAgainstActiveOwner activeOwner seed
@@ -61,54 +69,49 @@ module PromptFactFold =
             |> Option.map PromptAuthority.PromptOrigin.Continuation
 
     let private validateClaimOrigin
-        (projection: AgentProjectionSet)
+        authorityOf
         (identitySeed: PromptAuthority.IdentitySeed)
         (origin: PromptAuthority.PromptOrigin option)
         : Result<PromptAuthority.PromptOrigin option, PromptAuthority.IdentitySeedValidationError> =
         match origin with
         | Some(PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot) ->
-            validateAcceptedIdentitySeed projection PromptAuthority.RootAuthorityKind.AgentOwnerRoot identitySeed
+            validateAcceptedIdentitySeed authorityOf PromptAuthority.RootAuthorityKind.AgentOwnerRoot identitySeed
             |> Result.map (fun () -> origin)
         | _ -> Ok origin
 
-    let private applyValidatedClaimOrigin projection register validation =
+    let private applyValidatedClaimOrigin register validation =
         match validation with
-        | Error error -> reject "PluginPromptClaimed" (sprintf "%A" error)
-        | Ok None -> Ok projection
+        | Error error -> Error(PromptAuthorityFoldRejection.ClaimOriginRejected error)
+        | Ok None -> Ok []
         | Ok(Some resolvedOrigin) -> register resolvedOrigin
 
-    let private foldAuthorityRootAccepted (projection: AgentProjectionSet) (payload: AuthorityRootAcceptedPayload) =
+    let private foldAuthorityRootAccepted
+        (authorityOf: SessionId -> PromptAuthority.PromptAuthorityProjection option)
+        (payload: AuthorityRootAcceptedPayload)
+        : Result<PromptAuthorityProjectionChange list, PromptAuthorityFoldRejection> =
         let currentAuthority =
-            AgentProjection.tryFind payload.SessionId projection
-            |> Option.bind (fun session -> session.PromptAuthority)
-            |> Option.defaultValue PromptAuthorityLedger.empty
+            authorityOf payload.SessionId |> Option.defaultValue PromptAuthorityLedger.empty
 
-        let authorityResult =
-            validateAuthorityRootAccepted payload.SchemaVersion payload.AuthorityKind
-            |> Result.bind (fun authorityKind ->
-                validateAcceptedIdentitySeed projection authorityKind payload.IdentitySeed
-                |> Result.mapError (sprintf "%A")
-                |> Result.bind (fun () -> PromptAuthorityLedger.foldAuthorityRootAccepted currentAuthority payload)
-                |> Result.map (fun authority -> authorityKind, authority))
+        validateAuthorityRootAccepted payload.SchemaVersion payload.AuthorityKind
+        |> Result.mapError PromptAuthorityFoldRejection.AuthorityRootSchemaRejected
+        |> Result.bind (fun authorityKind ->
+            validateAcceptedIdentitySeed authorityOf authorityKind payload.IdentitySeed
+            |> Result.mapError PromptAuthorityFoldRejection.AuthorityRootSeedRejected
+            |> Result.bind (fun () ->
+                PromptAuthorityLedger.foldAuthorityRootAccepted currentAuthority payload
+                |> Result.mapError PromptAuthorityFoldRejection.AuthorityRootLedgerRejected)
+            |> Result.map (fun authority ->
+                [ PromptAuthorityProjectionChange.PromptAuthoritySet(payload.SessionId, authority)
+                  PromptAuthorityProjectionChange.ProviderFailuresSet(
+                      payload.SessionId,
+                      ProviderFailureProjection.forAuthority payload.LogicalRunId payload.AuthorityRootUserMessageId
+                  ) ]))
 
-        match authorityResult with
-        | Error reason -> reject "AuthorityRootAccepted" reason
-        | Ok(_, authority) ->
-            updateSession
-                payload.SessionId
-                (fun session ->
-                    { session with
-                        PromptAuthority = Some authority
-                        ProviderFailures =
-                            Some(
-                                ProviderFailureProjection.forAuthority
-                                    payload.LogicalRunId
-                                    payload.AuthorityRootUserMessageId
-                            ) })
-                projection
-            |> Ok
-
-    let fold (projection: AgentProjectionSet) (fact: PromptFactCases) : Result<AgentProjectionSet, FoldRejection> =
+    let fold
+        (authorityOf: SessionId -> PromptAuthority.PromptAuthorityProjection option)
+        (runtimeStartCount: int)
+        (fact: PromptFactCases)
+        : Result<PromptAuthorityProjectionChange list, PromptAuthorityFoldRejection> =
         match fact with
         // ── prompt dispatch ─────────────────────────────────────────────────
 
@@ -123,38 +126,41 @@ module PromptFactFold =
                       IdentitySeed = payload.IdentitySeed
                       PayloadDigest = payload.PayloadDigest
                       Receipt = None
-                      ClaimedAtRuntimeStartCount = projection.RuntimeStartCount }
+                      ClaimedAtRuntimeStartCount = runtimeStartCount }
 
-                Ok(updateAuthority payload.SessionId (PromptAuthorityRun.registerClaim claim) projection)
+                let currentAuthority =
+                    authorityOf payload.SessionId |> Option.defaultValue PromptAuthorityLedger.empty
+
+                let registered = PromptAuthorityRun.registerClaim claim currentAuthority
+                Ok [ PromptAuthorityProjectionChange.PromptAuthoritySet(payload.SessionId, registered) ]
 
             classifyClaimOrigin payload.ContinuationKind
-            |> validateClaimOrigin projection payload.IdentitySeed
-            |> applyValidatedClaimOrigin projection register
+            |> validateClaimOrigin authorityOf payload.IdentitySeed
+            |> applyValidatedClaimOrigin register
 
         | PromptFactCases.PluginPromptSubmitted payload ->
-            Ok(
-                updateAuthority
-                    payload.SessionId
-                    (fun authority -> PromptAuthorityLedger.foldPromptSubmitted authority payload)
-                    projection
-            )
+            let currentAuthority =
+                authorityOf payload.SessionId |> Option.defaultValue PromptAuthorityLedger.empty
+
+            let folded = PromptAuthorityLedger.foldPromptSubmitted currentAuthority payload
+            Ok [ PromptAuthorityProjectionChange.PromptAuthoritySet(payload.SessionId, folded) ]
 
         | PromptFactCases.PluginPromptPhysicalAccepted payload ->
-            Ok(
-                updateAuthority
-                    payload.SessionId
-                    (fun authority -> PromptAuthorityLedger.foldPromptPhysicalAccepted authority payload)
-                    projection
-            )
+            let currentAuthority =
+                authorityOf payload.SessionId |> Option.defaultValue PromptAuthorityLedger.empty
+
+            let folded =
+                PromptAuthorityLedger.foldPromptPhysicalAccepted currentAuthority payload
+
+            Ok [ PromptAuthorityProjectionChange.PromptAuthoritySet(payload.SessionId, folded) ]
 
         | PromptFactCases.PluginPromptAbandoned payload ->
-            Ok(
-                updateAuthority
-                    payload.SessionId
-                    (fun authority -> PromptAuthorityLedger.foldPromptAbandoned authority payload)
-                    projection
-            )
+            let currentAuthority =
+                authorityOf payload.SessionId |> Option.defaultValue PromptAuthorityLedger.empty
+
+            let folded = PromptAuthorityLedger.foldPromptAbandoned currentAuthority payload
+            Ok [ PromptAuthorityProjectionChange.PromptAuthoritySet(payload.SessionId, folded) ]
 
         // ── authority ───────────────────────────────────────────────────────
 
-        | PromptFactCases.AuthorityRootAccepted payload -> foldAuthorityRootAccepted projection payload
+        | PromptFactCases.AuthorityRootAccepted payload -> foldAuthorityRootAccepted authorityOf payload

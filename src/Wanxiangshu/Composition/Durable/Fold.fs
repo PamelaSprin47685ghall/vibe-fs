@@ -66,8 +66,8 @@ module Fold =
         // DSL-003: one dispatch per bounded-context family; each family folds
         // through its own branch so no fold depends on the whole catalogue.
         match fact with
-        | AgentFact.Prompt prompt -> PromptFactFold.fold projection prompt
-        | AgentFact.ProviderFailure failure -> ProviderFailureFactFold.fold projection failure
+        | AgentFact.Prompt prompt -> PromptAuthorityProjectionBridge.fold projection prompt
+        | AgentFact.ProviderFailure failure -> ProviderFailureProjectionBridge.fold projection failure
         | AgentFact.Relay relay -> foldRelay projection relay
         | AgentFact.Execution execution -> DelegationProjectionBridge.foldExecution projection execution
         | AgentFact.ChatExecution chatExecution ->
@@ -85,7 +85,7 @@ module Fold =
             |> Result.mapError (fun rejection ->
                 { Fact = OrchestratorFoldRejection.fact rejection
                   Reason = OrchestratorFoldRejection.message rejection })
-        | AgentFact.Companion companion -> CompanionFactFold.fold projection companion
+        | AgentFact.Companion companion -> CompanionProjectionBridge.fold projection companion
         | AgentFact.Context context -> ContextFactFold.fold projection context
         | AgentFact.Host host -> HostFactFold.fold projection host
         | AgentFact.Fission fission -> ProjectionUpdate.applyFission projection fission

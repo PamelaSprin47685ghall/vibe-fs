@@ -1,6 +1,31 @@
 namespace Wanxiangshu.Context.Companion
 
-open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Execution.Session
+open Wanxiangshu.Foundation.Identity
+
+[<RequireQualifiedAccess>]
+type CompanionProjectionChange =
+    | AssociationsSet of Map<SessionId, SessionAssociation>
+    | CompanionSet of SessionId * CompanionProjection
+    | XTraceSet of SessionId * XTraceProjectionState
+
+[<RequireQualifiedAccess>]
+type CompanionFoldRejection =
+    | CompanionBloggerLinkedRejected of AssociationRejection
+    | XTraceOpeningRejected of XTraceFoldRejection
+    | XTracePartRejected of XTraceFoldRejection
+    | XTraceTerminalRejected of XTraceFoldRejection
+
+[<RequireQualifiedAccess>]
+module CompanionFoldRejection =
+    val fact: CompanionFoldRejection -> string
+    val message: CompanionFoldRejection -> string
 
 module CompanionFactFold =
-    val fold: projection: AgentProjectionSet -> fact: CompanionFactCases -> Result<AgentProjectionSet, FoldRejection>
+    val fold:
+        associations: Map<SessionId, SessionAssociation> ->
+        companionOf: (SessionId -> CompanionProjection option) ->
+        xTraceOf: (SessionId -> XTraceProjectionState option) ->
+        fact: CompanionFactCases ->
+            Result<CompanionProjectionChange list, CompanionFoldRejection>

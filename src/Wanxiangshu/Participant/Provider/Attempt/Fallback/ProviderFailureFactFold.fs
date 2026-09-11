@@ -1,123 +1,123 @@
 namespace Wanxiangshu.Participant.Provider.Attempt.Fallback
 
-open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Composition.Durable.ProjectionUpdate
-open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Participant.Provider.Attempt
+
+[<RequireQualifiedAccess>]
+type ProviderFailureProjectionChange = ProviderFailuresSet of SessionId * ProviderFailureProjection
+
+[<RequireQualifiedAccess>]
+type ProviderFailureFoldRejection =
+    | FailureRecordedWithoutBudget
+    | RetryExhaustedWithoutBudget
+    | SuccessRecordedWithoutBudget
+    | InvalidTransition
+
+[<RequireQualifiedAccess>]
+module ProviderFailureFoldRejection =
+    let fact (rejection: ProviderFailureFoldRejection) : string =
+        match rejection with
+        | ProviderFailureFoldRejection.FailureRecordedWithoutBudget
+        | ProviderFailureFoldRejection.InvalidTransition -> "FailureRecorded"
+        | ProviderFailureFoldRejection.RetryExhaustedWithoutBudget -> "RetryExhausted"
+        | ProviderFailureFoldRejection.SuccessRecordedWithoutBudget -> "SuccessRecorded"
+
+    let message (rejection: ProviderFailureFoldRejection) : string =
+        match rejection with
+        | ProviderFailureFoldRejection.FailureRecordedWithoutBudget ->
+            "provider failure has no active budget: requires an accepted Authority Root"
+        | ProviderFailureFoldRejection.RetryExhaustedWithoutBudget ->
+            "retry exhausted has no active budget: requires an accepted Authority Root"
+        | ProviderFailureFoldRejection.SuccessRecordedWithoutBudget ->
+            "success has no budget to clear: requires an accepted Authority Root"
+        | ProviderFailureFoldRejection.InvalidTransition ->
+            "provider failure violates validation (consecutive failure count is not valid successor)"
 
 module ProviderFailureFactFold =
 
-    let private reject = FoldRejection.reject
+    let private isSuperseded
+        (current: ProviderFailureProjection)
+        (logicalRunId: LogicalRunId)
+        (authorityRoot: AuthorityRootUserMessageId)
+        : bool =
+        current.LogicalRunId <> logicalRunId
+        || current.AuthorityRootUserMessageId <> authorityRoot
 
-    let private outcome factName projection result =
-        match result with
-        | Ok updated -> Ok updated
-        | Error AlreadyObserved
-        | Error AlreadyExhausted
-        | Error DifferentRun -> Ok projection
-        | Error NoActiveBudget ->
-            reject factName "provider failure has no active budget: requires an accepted Authority Root"
-        | Error InvalidTransition ->
-            reject factName "provider failure violates validation (consecutive failure count is not valid successor)"
-
-    let private applyFailure identity consecutiveFailureCount session =
-        match session.ProviderFailures with
-        | None -> Error NoActiveBudget
-        | Some current ->
-            ProviderFailureProjection.applyFailure identity consecutiveFailureCount current
-            |> Result.map (fun updated ->
-                { session with
-                    ProviderFailures = Some updated })
-
-    let private foldSuccessRecorded
-        (projection: AgentProjectionSet)
+    let private applyFailureRecord
         (payload:
             {| SessionId: SessionId
                LogicalRunId: LogicalRunId
                AuthorityRootUserMessageId: AuthorityRootUserMessageId
-               ProviderRun: ProviderRunIdentity |})
-        : Result<AgentProjectionSet, FoldRejection> =
-        let currentFailure (sessionId: SessionId) (projection: AgentProjectionSet) : ProviderFailureProjection option =
-            AgentProjection.tryFind sessionId projection
-            |> Option.bind (fun session -> session.ProviderFailures)
+               ProviderRun: ProviderRunIdentity
+               ConsecutiveFailureCount: int
+               Reason: string |})
+        (current: ProviderFailureProjection)
+        : Result<ProviderFailureProjectionChange list, ProviderFailureFoldRejection> =
+        let identity: FailedProviderAttemptIdentity =
+            { SessionId = payload.SessionId
+              LogicalRunId = payload.LogicalRunId
+              AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
+              ProviderRun = payload.ProviderRun }
 
-        let isSupersededEpisode
-            (current: ProviderFailureProjection)
-            (logicalRunId: LogicalRunId)
-            (authorityRoot: AuthorityRootUserMessageId)
-            =
-            current.LogicalRunId <> logicalRunId
-            || current.AuthorityRootUserMessageId <> authorityRoot
+        match ProviderFailureProjection.applyFailure identity payload.ConsecutiveFailureCount current with
+        | Ok updated -> Ok [ ProviderFailureProjectionChange.ProviderFailuresSet(payload.SessionId, updated) ]
+        | Error ProviderFailureAdvanceRejection.AlreadyObserved
+        | Error ProviderFailureAdvanceRejection.AlreadyExhausted
+        | Error ProviderFailureAdvanceRejection.DifferentRun -> Ok []
+        | Error ProviderFailureAdvanceRejection.NoActiveBudget ->
+            Error ProviderFailureFoldRejection.FailureRecordedWithoutBudget
+        | Error ProviderFailureAdvanceRejection.InvalidTransition ->
+            Error ProviderFailureFoldRejection.InvalidTransition
 
-        let applySuccessClear
-            (projection: AgentProjectionSet)
-            (sessionId: SessionId)
-            (current: ProviderFailureProjection)
-            =
-            updateSession
-                sessionId
-                (fun s ->
-                    { s with
-                        ProviderFailures = Some(ProviderFailureProjection.recordSuccess current) })
-                projection
-
-        match currentFailure payload.SessionId projection with
-        | None -> reject "SuccessRecorded" "success has no budget to clear: requires an accepted Authority Root"
-        | Some current when isSupersededEpisode current payload.LogicalRunId payload.AuthorityRootUserMessageId ->
-            Ok projection
-        | Some current -> Ok(applySuccessClear projection payload.SessionId current)
+    let private foldFailureRecorded
+        (providerFailuresOf: SessionId -> ProviderFailureProjection option)
+        (payload:
+            {| SessionId: SessionId
+               LogicalRunId: LogicalRunId
+               AuthorityRootUserMessageId: AuthorityRootUserMessageId
+               ProviderRun: ProviderRunIdentity
+               ConsecutiveFailureCount: int
+               Reason: string |})
+        : Result<ProviderFailureProjectionChange list, ProviderFailureFoldRejection> =
+        match providerFailuresOf payload.SessionId with
+        | None -> Error ProviderFailureFoldRejection.FailureRecordedWithoutBudget
+        | Some current -> applyFailureRecord payload current
 
     let private foldRetryExhausted
-        (projection: AgentProjectionSet)
+        (providerFailuresOf: SessionId -> ProviderFailureProjection option)
         (payload:
             {| SessionId: SessionId
                LogicalRunId: LogicalRunId
                AuthorityRootUserMessageId: AuthorityRootUserMessageId
                FinalConsecutiveFailureCount: int |})
-        : Result<AgentProjectionSet, FoldRejection> =
-        let currentFailure: ProviderFailureProjection option =
-            AgentProjection.tryFind payload.SessionId projection
-            |> Option.bind (fun session -> session.ProviderFailures)
+        : Result<ProviderFailureProjectionChange list, ProviderFailureFoldRejection> =
+        match providerFailuresOf payload.SessionId with
+        | None -> Error ProviderFailureFoldRejection.RetryExhaustedWithoutBudget
+        | Some current when isSuperseded current payload.LogicalRunId payload.AuthorityRootUserMessageId -> Ok []
+        | Some current ->
+            let updated = ProviderFailureProjection.applyExhausted current
+            Ok [ ProviderFailureProjectionChange.ProviderFailuresSet(payload.SessionId, updated) ]
 
-        let isSuperseded =
-            currentFailure
-            |> Option.exists (fun current ->
-                current.LogicalRunId <> payload.LogicalRunId
-                || current.AuthorityRootUserMessageId <> payload.AuthorityRootUserMessageId)
-
-        match currentFailure, isSuperseded with
-        | None, _ -> reject "RetryExhausted" "retry exhausted has no active budget: requires an accepted Authority Root"
-        | Some _, true -> Ok projection
-        | Some _, false ->
-            Ok(
-                updateSession
-                    payload.SessionId
-                    (fun s ->
-                        { s with
-                            ProviderFailures =
-                                s.ProviderFailures |> Option.map ProviderFailureProjection.applyExhausted })
-                    projection
-            )
+    let private foldSuccessRecorded
+        (providerFailuresOf: SessionId -> ProviderFailureProjection option)
+        (payload:
+            {| SessionId: SessionId
+               LogicalRunId: LogicalRunId
+               AuthorityRootUserMessageId: AuthorityRootUserMessageId
+               ProviderRun: ProviderRunIdentity |})
+        : Result<ProviderFailureProjectionChange list, ProviderFailureFoldRejection> =
+        match providerFailuresOf payload.SessionId with
+        | None -> Error ProviderFailureFoldRejection.SuccessRecordedWithoutBudget
+        | Some current when isSuperseded current payload.LogicalRunId payload.AuthorityRootUserMessageId -> Ok []
+        | Some current ->
+            let updated = ProviderFailureProjection.recordSuccess current
+            Ok [ ProviderFailureProjectionChange.ProviderFailuresSet(payload.SessionId, updated) ]
 
     let fold
-        (projection: AgentProjectionSet)
+        (providerFailuresOf: SessionId -> ProviderFailureProjection option)
         (fact: ProviderFailureFactCases)
-        : Result<AgentProjectionSet, FoldRejection> =
+        : Result<ProviderFailureProjectionChange list, ProviderFailureFoldRejection> =
         match fact with
-        | ProviderFailureFactCases.FailureRecorded payload ->
-            let identity: FailedProviderAttemptIdentity =
-                { SessionId = payload.SessionId
-                  LogicalRunId = payload.LogicalRunId
-                  AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
-                  ProviderRun = payload.ProviderRun }
-
-            AgentProjection.tryUpdate
-                payload.SessionId
-                (fun session -> applyFailure identity payload.ConsecutiveFailureCount session)
-                projection
-            |> outcome "FailureRecorded" projection
-
-        | ProviderFailureFactCases.RetryExhausted payload -> foldRetryExhausted projection payload
-
-        | ProviderFailureFactCases.SuccessRecorded payload -> foldSuccessRecorded projection payload
+        | ProviderFailureFactCases.FailureRecorded payload -> foldFailureRecorded providerFailuresOf payload
+        | ProviderFailureFactCases.RetryExhausted payload -> foldRetryExhausted providerFailuresOf payload
+        | ProviderFailureFactCases.SuccessRecorded payload -> foldSuccessRecorded providerFailuresOf payload

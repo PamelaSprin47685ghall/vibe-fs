@@ -1,7 +1,24 @@
 namespace Wanxiangshu.Participant.Provider.Attempt.Fallback
 
-open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Foundation.Identity
+
+[<RequireQualifiedAccess>]
+type ProviderFailureProjectionChange = ProviderFailuresSet of SessionId * ProviderFailureProjection
+
+[<RequireQualifiedAccess>]
+type ProviderFailureFoldRejection =
+    | FailureRecordedWithoutBudget
+    | RetryExhaustedWithoutBudget
+    | SuccessRecordedWithoutBudget
+    | InvalidTransition
+
+[<RequireQualifiedAccess>]
+module ProviderFailureFoldRejection =
+    val fact: ProviderFailureFoldRejection -> string
+    val message: ProviderFailureFoldRejection -> string
 
 module ProviderFailureFactFold =
     val fold:
-        projection: AgentProjectionSet -> fact: ProviderFailureFactCases -> Result<AgentProjectionSet, FoldRejection>
+        providerFailuresOf: (SessionId -> ProviderFailureProjection option) ->
+        fact: ProviderFailureFactCases ->
+            Result<ProviderFailureProjectionChange list, ProviderFailureFoldRejection>

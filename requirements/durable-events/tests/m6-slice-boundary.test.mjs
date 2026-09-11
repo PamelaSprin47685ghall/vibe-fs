@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import * as eventCodec from '../../../dist/Persistence/EventStore/CodecSurface.js'
 import { readCompileShardInventory } from '../../../scripts/lib/compile-shards.mjs'
@@ -107,3 +107,44 @@ test('WHAT[DURABLE-EVENTS-023] single-field family folds own their slice and dec
     .join('\n')
   assert.doesNotMatch(changeFoldSources, /\bAgentProjectionSet\b|\bFoldRejection\b/)
 })
+
+test('WHAT[DURABLE-EVENTS-023] prompt provider and companion folds decide on their own slices while composition owns the aggregate write', () => {
+  // These three families span more than one slice, so the fold stays and returns a
+  // change list over the slices it owns; the bridge writes it back. The Context
+  // (Blogger) fold still writes six slices and is not part of this boundary yet.
+  for (const source of [
+    'Interaction/Authority/Fold.fs',
+    'Participant/Provider/Attempt/Fallback/ProviderFailureFactFold.fs',
+    'Context/Companion/CompanionFactFold.fs',
+  ]) {
+    const text = readFileSync(join(SOURCE_ROOT, source), 'utf8')
+    assert.doesNotMatch(
+      text,
+      /\bAgentProjection(?:Set|s)?\b|\bAgentProjection\.|\bFoldRejection\b|\bProjectionUpdate\b|\bComposition\.Durable\b/,
+      `${source} is a domain fold and must not name the aggregate projection, the write algebra, or the spine's rejection`,
+    )
+  }
+
+  // The session-scoped write helpers are composition's; a domain fold that calls
+  // them again would re-invert the dependency this boundary exists to prevent.
+  const writeHelper = /ProjectionUpdate\.(?:updateSession|updateAuthority|updateCompanion)\b/
+  for (const file of collectSourceFiles(SOURCE_ROOT)) {
+    const relative = file.slice(SOURCE_ROOT.length + 1)
+    if (relative.startsWith('Composition/')) continue
+    assert.doesNotMatch(
+      readFileSync(file, 'utf8'),
+      writeHelper,
+      `${relative} is outside composition and must not write the aggregate through ProjectionUpdate`,
+    )
+  }
+})
+
+function collectSourceFiles(directory) {
+  const found = []
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name)
+    if (entry.isDirectory()) found.push(...collectSourceFiles(path))
+    else if (/\.[fs]i?$/.test(entry.name) || entry.name.endsWith('.fs')) found.push(path)
+  }
+  return found
+}

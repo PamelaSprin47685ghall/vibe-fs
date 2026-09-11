@@ -1,126 +1,181 @@
 namespace Wanxiangshu.Context.Companion
 
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Composition.Durable.ProjectionUpdate
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Session
+open Wanxiangshu.Foundation.Identity
+
+[<RequireQualifiedAccess>]
+type CompanionProjectionChange =
+    | AssociationsSet of Map<SessionId, SessionAssociation>
+    | CompanionSet of SessionId * CompanionProjection
+    | XTraceSet of SessionId * XTraceProjectionState
+
+[<RequireQualifiedAccess>]
+type CompanionFoldRejection =
+    | CompanionBloggerLinkedRejected of AssociationRejection
+    | XTraceOpeningRejected of XTraceFoldRejection
+    | XTracePartRejected of XTraceFoldRejection
+    | XTraceTerminalRejected of XTraceFoldRejection
+
+[<RequireQualifiedAccess>]
+module CompanionFoldRejection =
+    let fact (rejection: CompanionFoldRejection) : string =
+        match rejection with
+        | CompanionFoldRejection.CompanionBloggerLinkedRejected _ -> "CompanionBloggerLinked"
+        | CompanionFoldRejection.XTraceOpeningRejected _ -> "OpeningPromptCaptured"
+        | CompanionFoldRejection.XTracePartRejected _ -> "XTracePartAppended"
+        | CompanionFoldRejection.XTraceTerminalRejected _ -> "TerminalOutputCaptured"
+
+    let message (rejection: CompanionFoldRejection) : string =
+        match rejection with
+        | CompanionFoldRejection.CompanionBloggerLinkedRejected r -> SessionAssociationProjection.describe r
+        | CompanionFoldRejection.XTraceOpeningRejected XTraceFoldRejection.OpeningAlreadyCaptured ->
+            "opening was already captured with different text (PERSIST-010)"
+        | CompanionFoldRejection.XTraceOpeningRejected r -> sprintf "unexpected XTrace rejection: %A" r
+        | CompanionFoldRejection.XTracePartRejected(XTraceFoldRejection.CursorNotAfterHead(expected, actual)) ->
+            sprintf "cursor %d is not after the head %d (PERSIST-010)" actual expected
+        | CompanionFoldRejection.XTracePartRejected r -> sprintf "unexpected XTrace rejection: %A" r
+        | CompanionFoldRejection.XTraceTerminalRejected XTraceFoldRejection.TerminalAlreadyCaptured ->
+            "terminal was already captured with a different blob for this ProviderRun (PERSIST-010)"
+        | CompanionFoldRejection.XTraceTerminalRejected r -> sprintf "unexpected XTrace rejection: %A" r
 
 module CompanionFactFold =
 
-    let private reject = FoldRejection.reject
+    let private foldCompanionBloggerLinked
+        (associations: Map<SessionId, SessionAssociation>)
+        (companionOf: SessionId -> CompanionProjection option)
+        (payload:
+            {| SessionId: SessionId
+               BloggerSessionId: SessionId
+               BloggerAgent: string |})
+        : Result<CompanionProjectionChange list, CompanionFoldRejection> =
+        // HOST-008 / COMPANION-002: one fact, two projections.
+        //
+        // The Companion cache records "my Y is this session"; the association
+        // records both directions of the relation, which is what makes "is this
+        // session itself a Companion" answerable without a scan (PERSIST-008).
+        //
+        // Both or neither. A cache entry without the association would leave the
+        // Y looking like an ordinary work session, and the next transform on it
+        // would give it a Y of its own — the recursion COMPANION-002 forbids.
+        match SessionAssociationProjection.link payload.SessionId payload.BloggerSessionId None associations with
+        | Ok linkedAssociations ->
+            let currentCompanion =
+                Option.defaultValue CompanionProjection.empty (companionOf payload.SessionId)
 
-    /// HOST-008 / COMPANION-002 association refusals.
-    ///
-    /// Every case is fatal. Unlike a stale prefix epoch, none of these can come from a
-    /// replay: `link` is idempotent for the same pair, which is exactly what restart
-    /// recovery re-attempts. A rejection therefore means two different Companions were
-    /// claimed for one work session, or a Companion was about to be given one of its
-    /// own — states no correct writer produces and neither of which can be repaired by
-    /// picking a side.
-    let private associationOutcome factName result =
-        match result with
-        | Ok updated -> Ok updated
-        | Error rejection -> reject factName (SessionAssociationProjection.describe rejection)
+            let linkedCompanion =
+                CompanionProjection.linkBlogger payload.BloggerSessionId currentCompanion
 
-    let fold (projection: AgentProjectionSet) (fact: CompanionFactCases) : Result<AgentProjectionSet, FoldRejection> =
+            Ok
+                [ CompanionProjectionChange.AssociationsSet linkedAssociations
+                  CompanionProjectionChange.CompanionSet(payload.SessionId, linkedCompanion) ]
+        | Error rejection -> Error(CompanionFoldRejection.CompanionBloggerLinkedRejected rejection)
+
+    let private foldCompanionBloggerClosed
+        (associations: Map<SessionId, SessionAssociation>)
+        (companionOf: SessionId -> CompanionProjection option)
+        (payload: {| SessionId: SessionId |})
+        : Result<CompanionProjectionChange list, CompanionFoldRejection> =
+        // `unlink` is total: an unknown session or one with no Y is already in the
+        // state this fact describes, so replaying it changes nothing.
+        let unlinkedAssociations =
+            SessionAssociationProjection.unlink payload.SessionId associations
+
+        let currentCompanion =
+            Option.defaultValue CompanionProjection.empty (companionOf payload.SessionId)
+
+        let closedCompanion = CompanionProjection.closeBlogger currentCompanion
+
+        Ok
+            [ CompanionProjectionChange.AssociationsSet unlinkedAssociations
+              CompanionProjectionChange.CompanionSet(payload.SessionId, closedCompanion) ]
+
+    let private foldOpeningPromptCaptured
+        (xTraceOf: SessionId -> XTraceProjectionState option)
+        (payload:
+            {| SessionId: SessionId
+               AssignmentText: string
+               AuthoritativeRequirements: string list
+               ProviderRun: ProviderRunIdentity option |})
+        : Result<CompanionProjectionChange list, CompanionFoldRejection> =
+        // COMPANION-003 / PERSIST-010: idempotent capture. Replaying the same
+        // text is the crash-recovery path; a DIFFERENT text is a line no
+        // correct writer produces, so it fails the fold closed.
+        let current =
+            Option.defaultValue XTraceProjection.empty (xTraceOf payload.SessionId)
+
+        match XTraceProjection.applyOpening payload.AssignmentText payload.AuthoritativeRequirements current with
+        | Ok updated -> Ok [ CompanionProjectionChange.XTraceSet(payload.SessionId, updated) ]
+        | Error rejection -> Error(CompanionFoldRejection.XTraceOpeningRejected rejection)
+
+    let private foldXTracePartAppended
+        (xTraceOf: SessionId -> XTraceProjectionState option)
+        (payload:
+            {| SessionId: SessionId
+               CursorSequence: int64
+               Role: string
+               Turn: int
+               PartIndex: int
+               Kind: string
+               ToolName: string option
+               TextRef: BlobRef
+               TextDigest: BlobDigest
+               Provenance: string
+               ProviderRun: ProviderRunIdentity option
+               ToolCallId: ToolCallId option
+               HostToolPartId: HostToolPartId option |})
+        : Result<CompanionProjectionChange list, CompanionFoldRejection> =
+        // COMPANION-003 / PERSIST-010: append-only, strictly monotonic cursor.
+        // The provenance is stored VERBATIM from the writer, so the recorded
+        // set and the writer's dedupe check share one namespace.
+        let current =
+            Option.defaultValue XTraceProjection.empty (xTraceOf payload.SessionId)
+
+        match
+            XTraceProjection.applyPart
+                payload.CursorSequence
+                payload.Role
+                payload.Provenance
+                payload.Turn
+                payload.PartIndex
+                payload.Kind
+                payload.ToolName
+                payload.ProviderRun
+                payload.ToolCallId
+                payload.HostToolPartId
+                payload.TextRef
+                payload.TextDigest
+                current
+        with
+        | Ok updated -> Ok [ CompanionProjectionChange.XTraceSet(payload.SessionId, updated) ]
+        | Error rejection -> Error(CompanionFoldRejection.XTracePartRejected rejection)
+
+    let private foldTerminalOutputCaptured
+        (xTraceOf: SessionId -> XTraceProjectionState option)
+        (payload:
+            {| SessionId: SessionId
+               TextRef: BlobRef
+               TextDigest: BlobDigest
+               ProviderRun: ProviderRunIdentity |})
+        : Result<CompanionProjectionChange list, CompanionFoldRejection> =
+        let current =
+            Option.defaultValue XTraceProjection.empty (xTraceOf payload.SessionId)
+
+        match XTraceProjection.applyTerminal payload.TextRef payload.TextDigest payload.ProviderRun current with
+        | Ok updated -> Ok [ CompanionProjectionChange.XTraceSet(payload.SessionId, updated) ]
+        | Error rejection -> Error(CompanionFoldRejection.XTraceTerminalRejected rejection)
+
+    let fold
+        (associations: Map<SessionId, SessionAssociation>)
+        (companionOf: SessionId -> CompanionProjection option)
+        (xTraceOf: SessionId -> XTraceProjectionState option)
+        (fact: CompanionFactCases)
+        : Result<CompanionProjectionChange list, CompanionFoldRejection> =
         match fact with
         | CompanionFactCases.CompanionBloggerLinked payload ->
-            // HOST-008 / COMPANION-002: one fact, two projections.
-            //
-            // The Companion cache records "my Y is this session"; the association
-            // records both directions of the relation, which is what makes "is this
-            // session itself a Companion" answerable without a scan (PERSIST-008).
-            //
-            // Both or neither. A cache entry without the association would leave the
-            // Y looking like an ordinary work session, and the next transform on it
-            // would give it a Y of its own — the recursion COMPANION-002 forbids.
-            SessionAssociationProjection.link payload.SessionId payload.BloggerSessionId None projection.Associations
-            |> Result.map (fun associations ->
-                updateCompanion
-                    payload.SessionId
-                    (CompanionProjection.linkBlogger payload.BloggerSessionId)
-                    { projection with
-                        Associations = associations })
-            |> associationOutcome "CompanionBloggerLinked"
-
+            foldCompanionBloggerLinked associations companionOf payload
         | CompanionFactCases.CompanionBloggerClosed payload ->
-            // `unlink` is total: an unknown session or one with no Y is already in the
-            // state this fact describes, so replaying it changes nothing.
-            Ok(
-                updateCompanion
-                    payload.SessionId
-                    CompanionProjection.closeBlogger
-                    { projection with
-                        Associations = SessionAssociationProjection.unlink payload.SessionId projection.Associations }
-            )
-
-        | CompanionFactCases.OpeningPromptCaptured payload ->
-            // COMPANION-003 / PERSIST-010: idempotent capture. Replaying the same
-            // text is the crash-recovery path; a DIFFERENT text is a line no
-            // correct writer produces, so it fails the fold closed.
-            AgentProjection.tryUpdate
-                payload.SessionId
-                (fun session ->
-                    XTraceProjection.applyOpening
-                        payload.AssignmentText
-                        payload.AuthoritativeRequirements
-                        (Option.defaultValue XTraceProjection.empty session.XTrace)
-                    |> Result.map (fun updated -> { session with XTrace = Some updated }))
-                projection
-            |> function
-                | Ok updated -> Ok updated
-                | Error XTraceFoldRejection.OpeningAlreadyCaptured ->
-                    reject "OpeningPromptCaptured" "opening was already captured with different text (PERSIST-010)"
-                | Error rejection ->
-                    reject "OpeningPromptCaptured" (sprintf "unexpected XTrace rejection: %A" rejection)
-
-        | CompanionFactCases.XTracePartAppended payload ->
-            // COMPANION-003 / PERSIST-010: append-only, strictly monotonic cursor.
-            // The provenance is stored VERBATIM from the writer, so the recorded
-            // set and the writer's dedupe check share one namespace.
-            AgentProjection.tryUpdate
-                payload.SessionId
-                (fun session ->
-                    XTraceProjection.applyPart
-                        payload.CursorSequence
-                        payload.Role
-                        payload.Provenance
-                        payload.Turn
-                        payload.PartIndex
-                        payload.Kind
-                        payload.ToolName
-                        payload.ProviderRun
-                        payload.ToolCallId
-                        payload.HostToolPartId
-                        payload.TextRef
-                        payload.TextDigest
-                        (Option.defaultValue XTraceProjection.empty session.XTrace)
-                    |> Result.map (fun updated -> { session with XTrace = Some updated }))
-                projection
-            |> function
-                | Ok updated -> Ok updated
-                | Error(XTraceFoldRejection.CursorNotAfterHead(expected, actual)) ->
-                    reject
-                        "XTracePartAppended"
-                        (sprintf "cursor %d is not after the head %d (PERSIST-010)" actual expected)
-                | Error rejection -> reject "XTracePartAppended" (sprintf "unexpected XTrace rejection: %A" rejection)
-
-        | CompanionFactCases.TerminalOutputCaptured payload ->
-            AgentProjection.tryUpdate
-                payload.SessionId
-                (fun session ->
-                    XTraceProjection.applyTerminal
-                        payload.TextRef
-                        payload.TextDigest
-                        payload.ProviderRun
-                        (Option.defaultValue XTraceProjection.empty session.XTrace)
-                    |> Result.map (fun updated -> { session with XTrace = Some updated }))
-                projection
-            |> function
-                | Ok updated -> Ok updated
-                | Error XTraceFoldRejection.TerminalAlreadyCaptured ->
-                    reject
-                        "TerminalOutputCaptured"
-                        "terminal was already captured with a different blob for this ProviderRun (PERSIST-010)"
-                | Error rejection ->
-                    reject "TerminalOutputCaptured" (sprintf "unexpected XTrace rejection: %A" rejection)
+            foldCompanionBloggerClosed associations companionOf payload
+        | CompanionFactCases.OpeningPromptCaptured payload -> foldOpeningPromptCaptured xTraceOf payload
+        | CompanionFactCases.XTracePartAppended payload -> foldXTracePartAppended xTraceOf payload
+        | CompanionFactCases.TerminalOutputCaptured payload -> foldTerminalOutputCaptured xTraceOf payload

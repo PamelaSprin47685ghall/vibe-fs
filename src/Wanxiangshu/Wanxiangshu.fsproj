@@ -573,6 +573,8 @@
     <Compile Include="Execution/Session/ChatExecution/Fold.fs"/>
     <Compile Include="Composition/Durable/DelegationProjectionBridge.fsi"/>
     <Compile Include="Composition/Durable/DelegationProjectionBridge.fs"/>
+    <Compile Include="Composition/Durable/DomainFamilyBridge.fsi"/>
+    <Compile Include="Composition/Durable/DomainFamilyBridge.fs"/>
     <Compile Include="Composition/Durable/Fold.fsi"/>
     <Compile Include="Composition/Durable/Fold.fs"/>
     <Compile Include="Execution/Delegation/Handle/FoldSurface.fsi"/>
