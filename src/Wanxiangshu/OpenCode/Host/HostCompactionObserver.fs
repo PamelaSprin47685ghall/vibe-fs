@@ -5,7 +5,6 @@ open System.Threading.Tasks
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
-open Wanxiangshu.Host.Contract
 open Wanxiangshu.Persistence.Journal
 
 /// HOST-006: observe reconciled snapshots for compaction startup gate + reanchor.

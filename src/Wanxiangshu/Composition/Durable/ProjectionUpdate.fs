@@ -3,7 +3,6 @@ namespace Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Context.Trace
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode.Host.PairProgramming

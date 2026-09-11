@@ -13,7 +13,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.concern-routing.interaction-concern-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-facts.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-handle-surface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
@@ -36,8 +35,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.requirement-grounding.host-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.requirement-grounding.requirement-grounding-model.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj"/>
     <Compile Include="Persistence/Journal/PromptFactCodec.fsi"/>
     <Compile Include="Persistence/Journal/PromptFactCodec.fs"/>
     <Compile Include="Persistence/Journal/FactCodec.fsi"/>

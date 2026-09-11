@@ -11,7 +11,6 @@ open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Host.Contract
 open Wanxiangshu.Mission.Relay.OpenCode
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.OpenCode.Host.RequirementGrounding

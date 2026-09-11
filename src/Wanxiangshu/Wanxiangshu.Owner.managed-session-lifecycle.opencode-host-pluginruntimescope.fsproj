@@ -15,7 +15,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-foldsurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-host-adapter.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-recovery-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-ledger.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>

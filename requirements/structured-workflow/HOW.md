@@ -235,6 +235,18 @@ tool adapter、signal adapter、Attention consumer 与 repository-programming ru
 
 当前声明图为 26 subsystem、213 shard、700 source、1846 references，shard DAG，最大 subsystem SCC 22；`node scripts/checks/subsystems.mjs` 与 `subsystem-boundaries.test.mjs` 4/4 通过。净减相对上一记录点（1873）为 27 条声明引用；SCC 未缩小，GAP-033 保持 PARTIAL。
 
+在 `bce851f5f` 之后继续审计尚未覆盖的稀疏边与大型 composition 分片。多数 1–2 边分片的跨 subsystem 引用均为真实符号消费（KEEP）；可剪项集中在部分 composition／persistence 分片：
+1. `resources/resources-promptsurface`：移除未使用的 `participant/foundation-roles`。
+2. `delegation/execution-fission-fold`：移除未使用的 `persistence/persistence-journal-promptfactcodec`。
+3. `dispatch/plugin-composition`：移除未使用的 `repository-programming/opencode-tools-filemutationtools`。
+4. `persistence/persistence-journal-promptfactcodec`：移除未使用的 `delegation/execution-delegation-fact`、`context/context-trace-cursor`、`context/context-trace-model`；并删除 `ProjectionUpdate.fs` 中无用的 `open Wanxiangshu.Context.Trace`。
+5. `session-lifecycle/opencode-host-pluginruntimescope`：移除未使用的 `delegation/delegation-recovery-runtime`。
+6. `context/context-companion-companionfactfold`：移除未使用的 `provider/strength-policy`。
+7. `provider/composition-turn-ordinaryturnworkflow`：移除未使用的 `chat-execution/outcome`、`authority/interaction-authority-identityseed`、`authority/opencode-host-chatadmission-intent`、`context/context-trace-capture`；并删除无用的 `open Wanxiangshu.Host.Contract`。
+8. 另清理 12 个源文件中无符号消费的 `open Wanxiangshu.Host.Contract`（Scheduler、Workflow、PluginScope、DispatchSurface、HostCompactionObserver、HostSignalBootstrap、ManagedAgentConfig、PluginRecoveryScope、PluginSessionScope、PluginHooks、PluginTransforms、ToolRegistry）；`ToolHostCodec`／Casebook Surface 仍保留对 `ToolResultBound` 的真实消费。相关 focused Fable 编译（含 managedagentconfig、hostsignalbootstrap、ordinaryturnworkflow、plugin-composition、promptsurface、fission-fold、journal codec、pluginruntimescope、companionfactfold）均通过。
+
+当前声明图为 26 subsystem、213 shard、700 source、1834 references，shard DAG，最大 subsystem SCC 22；相对 `1846` 净减 12 条声明引用。SCC 未缩小，GAP-033 保持 PARTIAL。下一刀仍应优先真实知识归属迁移（重力井），稀疏边继续剪枝收益递减。
+
 ### 3.3 语义词汇与证明义务注册
 
 此表保留既有业务词汇 proof edge。第二列中的旧模块身份只用于定位已有源码，不恢复 owner 作为治理粒度。
