@@ -45,6 +45,8 @@ type HostForkRuntime
         sessions: ISessionHostPort,
         childWorkRecordForRun: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>,
         createMailbox: obj -> ForkCompletionMailbox,
+        clock: IClockPort,
+        raceExit: Task -> int -> Task<bool>,
         ?journal: AgentJournal,
         ?onChildCreated: string -> Role -> SessionId -> unit,
         ?onChildCreatedDir: string -> SessionId -> string option -> unit,
@@ -58,12 +60,10 @@ type HostForkRuntime
         ?cancelSignals: SessionId seq -> unit,
         /// Ownership of every handle this runtime forks. Host-owned hidden
         /// children stay outside the parent's list/join/recovery surface.
-        ?ownership: HandleOwnership,
-        /// Injectable wall clock (NodeTiming.nodeClockPort at Host/Session composition).
-        ?clock: IClockPort
+        ?ownership: HandleOwnership
     ) as this =
-    let clockPort = defaultArg clock (NodeTiming.nodeClockPort ())
-    let runtime = ForkRuntimeBackend.create clockPort createMailbox
+    let clockPort = clock
+    let runtime = ForkRuntimeBackend.create clockPort raceExit createMailbox
     // DSL-MUTABLE: resource — live child session registry by agent id
     let children = Dictionary<string, SessionId>()
     // DSL-MUTABLE: resource — process-owned agent handle set

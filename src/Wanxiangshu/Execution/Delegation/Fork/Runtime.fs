@@ -9,7 +9,6 @@ open System.Threading.Tasks
 open Wanxiangshu.Execution.Agent
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Process
 
 type ForkCompletionMailbox = ICompletionMailbox<AgentHandleId, PtyJoinItem, JoinInterruptReason, MailboxWakeReason>
 
@@ -52,9 +51,14 @@ module private ForkRuntimeControl =
             return Ok value
         }
 
-    let awaitPendingWithTimeout (agentId: string) (pending: Task<RunCompletion>) (ms: int) =
+    let awaitPendingWithTimeout
+        (raceExit: Task -> int -> Task<bool>)
+        (agentId: string)
+        (pending: Task<RunCompletion>)
+        (ms: int)
+        =
         task {
-            let! completedFirst = NodeTiming.raceExit (pending :> Task) ms
+            let! completedFirst = raceExit (pending :> Task) ms
 
             if completedFirst then
                 let! value = pending
@@ -63,11 +67,16 @@ module private ForkRuntimeControl =
                 return Error(sprintf "await agent timed out: %s" agentId)
         }
 
-    let awaitKnownAgent (agentId: string) (pending: Task<RunCompletion>) (timeoutMs: int option) =
+    let awaitKnownAgent
+        (raceExit: Task -> int -> Task<bool>)
+        (agentId: string)
+        (pending: Task<RunCompletion>)
+        (timeoutMs: int option)
+        =
         match timeoutMs with
         | None -> awaitPendingNoTimeout pending
         | Some ms when ms <= 0 -> Task.FromResult(Error(sprintf "await agent timed out: %s" agentId))
-        | Some ms -> awaitPendingWithTimeout agentId pending ms
+        | Some ms -> awaitPendingWithTimeout raceExit agentId pending ms
 
     let tryCleanupAgent (cleanupPort: string -> unit) (id: string) =
         try
@@ -89,11 +98,11 @@ module private ForkRuntimeControl =
 type private ForkRuntimeBackendState
     (
         createMailbox: obj -> ForkCompletionMailbox,
+        clock: IClockPort,
+        raceExit: Task -> int -> Task<bool>,
         ?runner: string -> Role -> string option -> Task<AgentCompletionOutcome>,
         ?listener: RunCompletion -> unit,
-        ?cleanup: string -> unit,
-        /// Injectable wall clock (NodeTiming.nodeClockPort at Host/Session composition).
-        ?clock: IClockPort
+        ?cleanup: string -> unit
     ) =
 
     let childRunner =
@@ -102,7 +111,7 @@ type private ForkRuntimeBackendState
 
     let terminalListener = defaultArg listener ignore
     let cleanupPort = defaultArg cleanup ignore
-    let clockPort = defaultArg clock (NodeTiming.nodeClockPort ())
+    let clockPort = clock
 
     // DSL-MUTABLE: resource — live child agent registry under lockObj
     let mutable agents: Map<string, ChildRun> = Map.empty
@@ -273,14 +282,14 @@ type private ForkRuntimeBackendState
         lock lockObj (fun () -> agents <- ForkRecovery.bindChildSession agentId childSessionId agents)
 
     /// Internal targeted completion handle. Model-visible join remains join-any.
-    /// Optional timeoutMs races the completion cell via NodeTiming.raceExit.
+    /// Optional timeoutMs races the completion cell via the injected raceExit capability.
     member _.AwaitAgent(agentId: string, ?timeoutMs: int) : Task<Result<RunCompletion, string>> =
         let completion =
             lock lockObj (fun () -> agents |> Map.tryFind agentId |> Option.map (fun run -> run.Completion.Await))
 
         match completion with
         | None -> Task.FromResult(Error(sprintf "Unknown agent id: %s" agentId))
-        | Some pending -> ForkRuntimeControl.awaitKnownAgent agentId pending timeoutMs
+        | Some pending -> ForkRuntimeControl.awaitKnownAgent raceExit agentId pending timeoutMs
 
     /// Cancel one agent run without tearing down the whole runtime mailbox.
     member _.CancelAgent(agentId: string) : unit =
@@ -360,5 +369,9 @@ type private ForkRuntimeBackendState
 [<RequireQualifiedAccess>]
 module ForkRuntimeBackend =
 
-    let create (clock: IClockPort) (createMailbox: obj -> ForkCompletionMailbox) : ForkRuntime =
-        ForkRuntime(backend = (ForkRuntimeBackendState(createMailbox, clock = clock) :> IForkRuntimeBackend))
+    let create
+        (clock: IClockPort)
+        (raceExit: Task -> int -> Task<bool>)
+        (createMailbox: obj -> ForkCompletionMailbox)
+        : ForkRuntime =
+        ForkRuntime(backend = (ForkRuntimeBackendState(createMailbox, clock, raceExit) :> IForkRuntimeBackend))

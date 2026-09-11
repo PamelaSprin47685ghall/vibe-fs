@@ -20,6 +20,8 @@ type HostForkRuntime =
         sessions: ISessionHostPort *
         childWorkRecordForRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>) *
         createMailbox: (obj -> ForkCompletionMailbox) *
+        clock: IClockPort *
+        raceExit: (Task -> int -> Task<bool>) *
         ?journal: AgentJournal *
         ?onChildCreated: (string -> Role -> SessionId -> unit) *
         ?onChildCreatedDir: (string -> SessionId -> string option -> unit) *
@@ -31,8 +33,7 @@ type HostForkRuntime =
         ?handoff: ReusableHandoffPort *
         ?sessionSnapshot: ISessionSnapshotPort *
         ?cancelSignals: (SessionId seq -> unit) *
-        ?ownership: HandleOwnership *
-        ?clock: IClockPort ->
+        ?ownership: HandleOwnership ->
             HostForkRuntime
 
     member internal Runtime: ForkRuntime

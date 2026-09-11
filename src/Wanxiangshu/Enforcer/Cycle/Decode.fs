@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Enforcer.Cycle
 
-open Wanxiangshu.OpenCode
 open System
 open Fable.Core.JsInterop
 open Wanxiangshu.Enforcer
@@ -128,6 +127,7 @@ module EnforcerCycleDecode =
             |> Array.fold (fun acc key -> Map.add key (emitJsExpr (value, key) "$0[$1]") acc) Map.empty
 
     let private decodeCanonicalCall
+        (emitDiagnostic: string -> (string * string) list -> unit)
         (rules: EnforcerRule list)
         (ordinal: int)
         (callId: ToolCallId)
@@ -138,18 +138,19 @@ module EnforcerCycleDecode =
         | Error reason ->
             // CTX-014: fold identity into result — no whitelist growth for
             // protocol-skip diagnostics that are never recovery inputs.
-            Diagnostic.emit
+            emitDiagnostic
                 "enforcer-blog-call-invalid"
                 [ "result", sprintf "ordinal=%d call_id=%s %s" ordinal (ToolCallId.value callId) reason ]
 
             None
 
     let private tryCanonicalCall
+        (emitDiagnostic: string -> (string * string) list -> unit)
         (rules: EnforcerRule list)
         (ordinal: int, part: obj)
         : (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) option =
         blogCallFromPart part
-        |> Option.bind (fun (callId, input) -> decodeCanonicalCall rules ordinal callId input)
+        |> Option.bind (fun (callId, input) -> decodeCanonicalCall emitDiagnostic rules ordinal callId input)
 
     /// ENFORCER-042: (PartOrdinal, ToolCallId, CanonicalBlogCall) for one
     /// provider step, in provider-visible order. The ordinal is the part's
@@ -160,6 +161,7 @@ module EnforcerCycleDecode =
     /// Failed tip decode is a protocol skip (execute should already have
     /// rejected; defense in depth at transform).
     let extractCalls
+        (emitDiagnostic: string -> (string * string) list -> unit)
         (rawMessages: obj list)
         : (string * (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) list * bool) option =
         match lastAssistantStep rawMessages with
@@ -170,7 +172,7 @@ module EnforcerCycleDecode =
             let calls =
                 parts
                 |> List.mapi (fun ordinal part -> ordinal, part)
-                |> List.choose (tryCanonicalCall rules)
+                |> List.choose (tryCanonicalCall emitDiagnostic rules)
 
             Some(messageId, calls, completed)
 

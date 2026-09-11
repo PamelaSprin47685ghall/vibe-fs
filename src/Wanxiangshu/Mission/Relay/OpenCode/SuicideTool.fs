@@ -7,6 +7,7 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Git
 open Wanxiangshu.Host
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.OpenCode
@@ -43,7 +44,15 @@ module SuicideTool =
         [<Literal>]
         let FinishFailed = "tool/suicide/finish-failed"
 
-    let private text path =
+    let private gitCapability: WorkspaceSnapshotGitCapability =
+        { TryRevParseHeadTree = GitSubject.tryRevParseHeadTree
+          DiffHeadBinary = GitSubject.diffHeadBinary
+          LsFilesUntrackedZ = GitSubject.lsFilesUntrackedZ
+          HashObjectNoFilters = GitSubject.hashObjectNoFilters
+          StatusPorcelainV2Z = GitSubject.statusPorcelainV2Z
+          LsFilesStageZ = GitSubject.lsFilesStageZ }
+
+    let private text (path: string) =
         ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) path Map.empty
 
     let private currentState (journal: AgentJournal) (sessionId: SessionId) =
@@ -300,7 +309,7 @@ module SuicideTool =
     let private refreshAfterFreeze (context: HostToolContext) (target: FreezeTarget) =
         try
             result {
-                let snapshot = WorkspaceSnapshot.capture target.Bound.Directory
+                let snapshot = WorkspaceSnapshot.capture gitCapability target.Bound.Directory
                 let state = currentState target.Bound.Journal target.SessionId
                 let! road = requireView target.RoadId state
                 let! incumbent = requireSameIncumbency target road

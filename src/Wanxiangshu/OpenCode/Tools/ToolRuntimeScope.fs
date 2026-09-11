@@ -20,6 +20,7 @@ open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Process
 
 /// Owns every per-session tool runtime.
 ///
@@ -185,6 +186,8 @@ type ToolRuntimeScope
             sessions,
             childRecordForRun,
             CompletionMailboxRuntime.create,
+            NodeTiming.nodeClockPort (),
+            NodeTiming.raceExit,
             ?journal = journal,
             onChildCreated = (fun _ role childId -> registerChild sid role childId),
             onChildCreatedDir =
@@ -610,6 +613,8 @@ type ToolRuntimeScope
                         sessions,
                         childRecordForRun,
                         CompletionMailboxRuntime.create,
+                        NodeTiming.nodeClockPort (),
+                        NodeTiming.raceExit,
                         ?journal = journal,
                         onChildCreated = (fun _ role childId -> registerChild ctx.SessionId role childId),
                         // EXEC-014: map/reduce Distiller children are Host-owned and

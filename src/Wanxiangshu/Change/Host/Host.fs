@@ -19,6 +19,7 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Process
 
 /// Host wiring for one Change manager session. One physical Manager session can host many
 /// logical Relay incumbencies; Change never creates a second audit session.
@@ -42,6 +43,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             deps.Sessions,
             deps.ChildWorkRecordForRun,
             CompletionMailboxRuntime.create,
+            NodeTiming.nodeClockPort (),
+            NodeTiming.raceExit,
             ?journal = deps.Journal,
             onChildCreated = onChildCreated,
             onChildCreatedDir =

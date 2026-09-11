@@ -7,7 +7,6 @@
     <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.action-affordance.runtime-platform-git-subject.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.digest.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
     <Compile Include="Mission/Relay/OpenCode/WorkspaceSnapshot.fsi"/>

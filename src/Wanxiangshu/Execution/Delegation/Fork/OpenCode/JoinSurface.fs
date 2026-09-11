@@ -326,6 +326,8 @@ module JoinSurface =
                 sessions,
                 (fun _ _ _ -> Task.FromResult None),
                 CompletionMailboxRuntime.create,
+                NodeTiming.nodeClockPort (),
+                NodeTiming.raceExit,
                 ptyPort = port
             )
 

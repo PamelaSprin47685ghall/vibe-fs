@@ -19,6 +19,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.relay-assessment.mission-relay-workspace-snapshot.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-retirement.mission-relay-retirement.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.action-affordance.runtime-platform-git-subject.fsproj"/>
     <Compile Include="Mission/Relay/OpenCode/SuicideTool.fsi"/>
     <Compile Include="Mission/Relay/OpenCode/SuicideTool.fs"/>
   </ItemGroup>

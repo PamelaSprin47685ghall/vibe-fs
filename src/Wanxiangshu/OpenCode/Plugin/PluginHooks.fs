@@ -18,6 +18,7 @@ open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
+open Wanxiangshu.Git
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
@@ -242,7 +243,15 @@ module PluginHooks =
                                 })
                             (fun (worktreePath: WorktreePath) ->
                                 try
-                                    Ok(WorkspaceSnapshot.capture (WorktreePath.value worktreePath))
+                                    let git: WorkspaceSnapshotGitCapability =
+                                        { TryRevParseHeadTree = GitSubject.tryRevParseHeadTree
+                                          DiffHeadBinary = GitSubject.diffHeadBinary
+                                          LsFilesUntrackedZ = GitSubject.lsFilesUntrackedZ
+                                          HashObjectNoFilters = GitSubject.hashObjectNoFilters
+                                          StatusPorcelainV2Z = GitSubject.statusPorcelainV2Z
+                                          LsFilesStageZ = GitSubject.lsFilesStageZ }
+
+                                    Ok(WorkspaceSnapshot.capture git (WorktreePath.value worktreePath))
                                 with error ->
                                     Error error.Message)
 

@@ -47,6 +47,10 @@ module BloggerRecoveryProbe =
             Wanxiangshu.Context.Companion.Blogger.BloggerTerminalRequestOwnership
 
     val terminalRequestOwnershipForProviderRun:
+        tryPhysicalParent:
+            (Wanxiangshu.Foundation.Identity.ProviderRunIdentity
+                -> obj list
+                -> Wanxiangshu.Foundation.Identity.PhysicalUserMessageId option) ->
         Wanxiangshu.Persistence.Journal.AgentJournal ->
         Wanxiangshu.Foundation.Identity.SessionId ->
         Wanxiangshu.Context.Companion.Blogger.BloggerRequestContext ->

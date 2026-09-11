@@ -7,6 +7,7 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Git
 open Wanxiangshu.Host
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Mission.Relay.Assessment
@@ -53,6 +54,14 @@ module ReviewTool =
         | MissingRequest -> Path.MissingRequest
         | InvalidScores -> Path.InvalidScores
         | RecordFailed -> Path.RecordFailed
+
+    let private gitCapability: WorkspaceSnapshotGitCapability =
+        { TryRevParseHeadTree = GitSubject.tryRevParseHeadTree
+          DiffHeadBinary = GitSubject.diffHeadBinary
+          LsFilesUntrackedZ = GitSubject.lsFilesUntrackedZ
+          HashObjectNoFilters = GitSubject.hashObjectNoFilters
+          StatusPorcelainV2Z = GitSubject.statusPorcelainV2Z
+          LsFilesStageZ = GitSubject.lsFilesStageZ }
 
     let private fields = ScoreDimension.all |> List.map ScoreDimension.fieldName
 
@@ -261,7 +270,7 @@ module ReviewTool =
         let roadId = RoadId.create context.SessionId
 
         try
-            let snapshotId = WorkspaceSnapshot.capture bound.Directory
+            let snapshotId = WorkspaceSnapshot.capture gitCapability bound.Directory
             let state = currentRelayState bound.Journal sessionId
 
             let activeView =

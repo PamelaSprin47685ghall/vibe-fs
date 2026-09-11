@@ -95,6 +95,8 @@ module HostForkPtySurface =
                     Unchecked.defaultof<ISessionHostPort>,
                     (fun _ _ _ -> Task.FromResult None),
                     CompletionMailboxRuntime.create,
+                    NodeTiming.nodeClockPort (),
+                    NodeTiming.raceExit,
                     ptyPort = port
                 )
 

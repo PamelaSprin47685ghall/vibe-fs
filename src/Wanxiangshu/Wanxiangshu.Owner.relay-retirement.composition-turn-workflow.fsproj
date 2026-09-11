@@ -21,6 +21,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.composition-turn-ordinaryturnworkflow.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-assessment.mission-relay-workspace-snapshot.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.action-affordance.runtime-platform-git-subject.fsproj"/>
     <Compile Include="Mission/Manager/Workflow.fsi"/>
     <Compile Include="Mission/Manager/Workflow.fs"/>
     <Compile Include="Composition/Turn/Workflow.fsi"/>

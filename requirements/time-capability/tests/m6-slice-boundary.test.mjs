@@ -99,8 +99,6 @@ test('WHAT[TIME-008] production inventory separates contracts adapter verificati
     'foundation-temporal',
   ])
   assert.deepEqual(consumersOf(projects, 'process-node-timing-adapter'), [
-    'delegation-fork-runtime',
-    'delegation-host-adapter',
     'delegation-runtime-surface',
     'execution-delegation-hostturnobservedsurface',
     'foundation-temporal',

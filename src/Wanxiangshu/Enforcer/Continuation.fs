@@ -211,6 +211,7 @@ module EnforcerContinuation =
         |> Option.exists (fun live ->
             let ownership =
                 BloggerRecoveryProbe.terminalRequestOwnershipForProviderRun
+                    ProviderWireCapture.tryPhysicalParentOfProviderRun
                     ctx.Durable
                     ctx.BloggerSessionId
                     live
@@ -928,7 +929,7 @@ module EnforcerContinuation =
 
             let chronicleCallCount = EnforcerRepair.chronicleCallCount rawMessages
 
-            match journal, mainSessionId, EnforcerCycleDecode.extractCalls rawMessages with
+            match journal, mainSessionId, EnforcerCycleDecode.extractCalls Diagnostic.emit rawMessages with
             | Some durable, Some owner, Some(messageId, _, assistantCompleted) when chronicleCallCount > 1 ->
                 return! invalidCardinalityBranch (mkCtx durable owner) messageId chronicleCallCount assistantCompleted
             | Some durable, Some owner, Some(_messageId, calls, assistantCompleted) when List.isEmpty calls ->

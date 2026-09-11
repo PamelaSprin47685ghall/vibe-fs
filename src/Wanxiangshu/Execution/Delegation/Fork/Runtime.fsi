@@ -10,4 +10,9 @@ type ForkCompletionMailbox = ICompletionMailbox<AgentHandleId, PtyJoinItem, Join
 
 [<RequireQualifiedAccess>]
 module ForkRuntimeBackend =
-    val create: clock: IClockPort -> createMailbox: (obj -> ForkCompletionMailbox) -> ForkRuntime
+    /// Composition-injected timeout capability (raceExit: Task -> int -> Task<bool>) and wall clock.
+    val create:
+        clock: IClockPort ->
+        raceExit: (Task -> int -> Task<bool>) ->
+        createMailbox: (obj -> ForkCompletionMailbox) ->
+            ForkRuntime

@@ -565,6 +565,7 @@ module BloggerCoordinator =
 
             match
                 BloggerRecoveryProbe.terminalRequestOwnershipForProviderRun
+                    Wanxiangshu.OpenCode.ProviderWireCapture.tryPhysicalParentOfProviderRun
                     durable
                     bloggerId
                     request

@@ -6,6 +6,7 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Git
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch.OpenCode
@@ -24,6 +25,14 @@ module ManagerWorkflow =
 
     [<Literal>]
     let private finishPath = "runtime/manager-finish"
+
+    let private gitCapability: WorkspaceSnapshotGitCapability =
+        { TryRevParseHeadTree = GitSubject.tryRevParseHeadTree
+          DiffHeadBinary = GitSubject.diffHeadBinary
+          LsFilesUntrackedZ = GitSubject.lsFilesUntrackedZ
+          HashObjectNoFilters = GitSubject.hashObjectNoFilters
+          StatusPorcelainV2Z = GitSubject.statusPorcelainV2Z
+          LsFilesStageZ = GitSubject.lsFilesStageZ }
 
     let private roadId (sessionId: SessionId) =
         RoadId.create (SessionId.value sessionId)
@@ -106,7 +115,7 @@ module ManagerWorkflow =
 
     let private captureSnapshot (dirOpt: string option) =
         match dirOpt |> Option.filter (System.String.IsNullOrWhiteSpace >> not) with
-        | Some dir -> WorkspaceSnapshot.capture dir
+        | Some dir -> WorkspaceSnapshot.capture gitCapability dir
         | None -> invalidOp "MANAGER-LOOP-001: workspace directory unavailable for snapshot capture"
 
     let private commitOpeningTransaction

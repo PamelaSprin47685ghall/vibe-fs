@@ -8,6 +8,7 @@ module EnforcerCycleDecode =
     val lastAssistantStep: obj list -> (string * obj list * bool) option
 
     val extractCalls:
+        emitDiagnostic: (string -> (string * string) list -> unit) ->
         obj list ->
             (string *
             (int * Wanxiangshu.Foundation.Identity.ToolCallId * Wanxiangshu.Enforcer.EnforcerCodec.CanonicalBlogCall) list *

@@ -53,13 +53,14 @@ module BloggerRecoveryProbe =
             parent
 
     let terminalRequestOwnershipForProviderRun
+        (tryPhysicalParent: ProviderRunIdentity -> obj list -> PhysicalUserMessageId option)
         (journal: AgentJournal)
         (bloggerSessionId: SessionId)
         (request: BloggerRequestContext)
         (providerRun: ProviderRunIdentity)
         (rawMessages: obj list)
         : BloggerTerminalRequestOwnership =
-        ProviderWireCapture.tryPhysicalParentOfProviderRun providerRun rawMessages
+        tryPhysicalParent providerRun rawMessages
         |> Option.map (terminalRequestOwnershipForPhysicalMessage journal bloggerSessionId request)
         |> Option.defaultValue BloggerTerminalRequestOwnership.Unproven
 
