@@ -24,6 +24,7 @@ module HostJoinGuard =
     val nudge:
         sessionPort: ISessionHostPort ->
         rootWorkspace: IRootWorkspaceReader ->
+        port: HostJoinGuardJournalPort option ->
         journal: AgentJournal option ->
         nudgeKeys: HashSet<string> ->
         physicalAdmission: (unit -> Result<unit, QuiescencePermitFailure>) ->

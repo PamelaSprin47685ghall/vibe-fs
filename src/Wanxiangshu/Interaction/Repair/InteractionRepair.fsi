@@ -24,6 +24,7 @@ module InteractionRepairWorkflow =
         rootWorkspace: IRootWorkspaceReader ->
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
+        observation: TurnObservationJournalPort option ->
             Task
 
     val repairIncompleteInteraction:
@@ -33,4 +34,5 @@ module InteractionRepairWorkflow =
         rootWorkspace: IRootWorkspaceReader ->
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
+        observation: TurnObservationJournalPort option ->
             Task

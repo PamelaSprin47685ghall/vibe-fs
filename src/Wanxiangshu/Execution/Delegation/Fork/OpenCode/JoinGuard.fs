@@ -27,7 +27,7 @@ module HostJoinGuard =
     // DSL-MUTABLE: single-flight — one nudge per key across process
     let private processNudgeKeys = HashSet<string>()
 
-    let private hasOutstandingJoinClaim
+    let private hasOutstandingJoinClaimOnJournal
         (journal: AgentJournal)
         (targetSessionId: SessionId)
         (terminalProviderRun: ProviderRunIdentity)
@@ -44,13 +44,25 @@ module HostJoinGuard =
                 && claim.PayloadDigest = payloadDigest))
         |> Option.defaultValue false
 
+    let private hasOutstandingJoinClaim
+        (port: HostJoinGuardJournalPort option)
+        (journal: AgentJournal option)
+        (targetSessionId: SessionId)
+        (terminalProviderRun: ProviderRunIdentity)
+        =
+        match port, journal with
+        | Some p, _ -> p.HasOutstandingJoinClaim targetSessionId terminalProviderRun
+        | None, Some j -> hasOutstandingJoinClaimOnJournal j targetSessionId terminalProviderRun
+        | None, None -> false
+
     /// One reservation per exact terminal occasion. A fresh ProviderRun is a
     /// fresh reminder opportunity while outstanding work still exists.
     let private nudgeKey (targetSessionId: SessionId) (terminalProviderRun: ProviderRunIdentity) =
         sprintf "join-guard:%s:%s" (SessionId.value targetSessionId) (ProviderRunIdentity.value terminalProviderRun)
 
     let private reserveNudge
-        (durable: AgentJournal)
+        (port: HostJoinGuardJournalPort option)
+        (journal: AgentJournal option)
         (nudgeKeys: HashSet<string>)
         (sessionId: SessionId)
         (terminalProviderRun: ProviderRunIdentity)
@@ -58,7 +70,7 @@ module HostJoinGuard =
         : bool =
         lock processNudgeKeys (fun () ->
             if
-                hasOutstandingJoinClaim durable sessionId terminalProviderRun
+                hasOutstandingJoinClaim port journal sessionId terminalProviderRun
                 || nudgeKeys.Contains key
                 || processNudgeKeys.Contains key
             then
@@ -122,6 +134,7 @@ module HostJoinGuard =
     let private nudgeWithJournal
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
+        (port: HostJoinGuardJournalPort option)
         (durable: AgentJournal)
         (nudgeKeys: HashSet<string>)
         (physicalAdmission: unit -> Result<unit, QuiescencePermitFailure>)
@@ -132,7 +145,9 @@ module HostJoinGuard =
         : Task<JoinGuardNudgeOutcome> =
         task {
             let key = nudgeKey sessionId terminalProviderRun
-            let reserved = reserveNudge durable nudgeKeys sessionId terminalProviderRun key
+
+            let reserved =
+                reserveNudge port (Some durable) nudgeKeys sessionId terminalProviderRun key
 
             if not reserved then
                 return JoinGuardNudgeOutcome.AlreadyOutstanding
@@ -157,6 +172,7 @@ module HostJoinGuard =
     let nudge
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
+        (port: HostJoinGuardJournalPort option)
         (journal: AgentJournal option)
         (nudgeKeys: HashSet<string>)
         (physicalAdmission: unit -> Result<unit, QuiescencePermitFailure>)
@@ -173,6 +189,7 @@ module HostJoinGuard =
                     nudgeWithJournal
                         sessionPort
                         rootWorkspace
+                        port
                         durable
                         nudgeKeys
                         physicalAdmission

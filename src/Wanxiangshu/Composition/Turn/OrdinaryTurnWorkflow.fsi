@@ -17,6 +17,7 @@ module OrdinaryTurnWorkflow =
         rootWorkspace: IRootWorkspaceReader ->
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
+        observation: TurnObservationJournalPort option ->
         context: ReconciledTurnContext ->
             Task
 
@@ -25,6 +26,7 @@ module OrdinaryTurnWorkflow =
         rootWorkspace: IRootWorkspaceReader ->
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
+        observation: TurnObservationJournalPort option ->
         recoveryScope: IBloggerRuntimeHost ->
         joinGuardNudges: HashSet<string> ->
         hasLivePty: (string -> bool) ->

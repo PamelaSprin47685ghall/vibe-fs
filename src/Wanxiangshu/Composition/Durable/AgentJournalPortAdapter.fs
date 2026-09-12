@@ -4,7 +4,9 @@ open Wanxiangshu.Change
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Context.Companion
+open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation.Identity
@@ -18,7 +20,11 @@ open Wanxiangshu.Context.Trace
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Host
+open Wanxiangshu.Execution.Delegation.Fork.OpenCode
+open Wanxiangshu.Execution.Session.ChatExecution
+open Wanxiangshu.Context.Companion.Blogger
 
 module AgentJournalPortAdapter =
     let forAttention (journal: AgentJournal) : AttentionJournalPort =
@@ -150,6 +156,113 @@ module AgentJournalPortAdapter =
 
                     return result |> Result.map ignore |> Result.mapError JournalAppendFailure.describe
                 } }
+
+    let forProviderRecovery (journal: AgentJournal) : ProviderRecoveryJournalPort =
+        { TryRequestKind =
+            fun sessionId physicalUserMessageId ->
+                (AgentJournal.snapshot journal).AgentProjections.ChatExecutions
+                |> ChatExecutionProjection.byKey
+                    { SessionId = sessionId
+                      PhysicalUserMessageId = physicalUserMessageId }
+                |> Option.bind (fun execution -> execution.ProviderStarted)
+                |> Option.map (fun started -> started.RequestKind)
+          TryMainSessionOf =
+            fun sessionId ->
+                SessionAssociationProjection.tryMainSessionOf
+                    sessionId
+                    (AgentJournal.snapshot journal).AgentProjections.Associations
+          TryBlogState =
+            fun sessionId ->
+                let session =
+                    AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
+
+                let blog =
+                    session
+                    |> Option.bind (fun s -> s.Blog)
+                    |> Option.defaultValue BlogProjection.empty
+
+                let epoch =
+                    session
+                    |> Option.bind (fun s -> s.PrefixEpoch)
+                    |> Option.map (fun p -> p.EpochId)
+                    |> Option.defaultValue PrefixEpochId.initial
+
+                Some(epoch, blog)
+          AwaitChange =
+            fun revision cancellation ->
+                task {
+                    let! res = AgentJournal.awaitChangeFromOrCancel revision cancellation journal
+                    return res |> Option.map ignore
+                } }
+
+    /// TURN-OBSERVE: the three observation reads share one Snapshot revision
+    /// captured here, then project via the domain selectors.
+    let forTurnObservation (journal: AgentJournal) : TurnObservationJournalPort =
+        let projections = (AgentJournal.snapshot journal).AgentProjections
+
+        { TryBloggerReceiptKind =
+            fun sessionId providerRun ->
+                projections.Sessions
+                |> Map.tryFind sessionId
+                |> Option.bind (fun session -> session.BloggerCycles)
+                |> Option.bind (BloggerCycleProjection.tryReceipt providerRun)
+                |> Option.map (fun receipt -> receipt.Kind)
+          TryContinuationKind =
+            fun sessionId physicalUserMessageId ->
+                projections.Sessions
+                |> Map.tryFind sessionId
+                |> Option.bind (fun session -> session.PromptAuthority)
+                |> Option.bind (fun authority -> Map.tryFind physicalUserMessageId authority.AcceptedContinuationIds)
+          IsFissionActive =
+            fun sessionId ->
+                FissionProjection.tryActiveForOwner sessionId projections.Fission
+                |> Option.isSome }
+
+    let forTerminalPolicy (journal: AgentJournal) : TerminalPolicyPort =
+        let snapshot = AgentJournal.snapshot journal
+        let projections = snapshot.AgentProjections
+        let isPoisoned = journal.IsPoisoned
+
+        let canonicalRoleOf (authority: PromptAuthority.PromptAuthorityProjection) =
+            match authority.ActiveLogicalRun, authority.LastAuthorityProfile with
+            | Some run, _ -> Some run.CanonicalRole
+            | None, Some profile -> Some profile.CanonicalRole
+            | None, None -> None
+
+        { IsPoisoned = fun () -> isPoisoned
+          HasListableHandles =
+            fun sessionId ->
+                AgentProjection.tryFind sessionId projections
+                |> Option.bind (fun session -> session.Handles)
+                |> Option.defaultValue HandleProjection.empty
+                |> HandleProjection.listable
+                |> List.isEmpty
+                |> not
+          HasActiveOrchestratorJobs = fun () -> AgentProjection.hasActiveOrchestratorJobs projections
+          IsLinkedChild = fun sessionId -> Map.containsKey sessionId projections.HandleByChildSession
+          TryCanonicalRole =
+            fun sessionId ->
+                Map.tryFind sessionId projections.Sessions
+                |> Option.bind (fun session -> session.PromptAuthority)
+                |> Option.bind canonicalRoleOf }
+
+    let forHostJoinGuard (journal: AgentJournal) : HostJoinGuardJournalPort =
+        let projections = (AgentJournal.snapshot journal).AgentProjections
+
+        { HasOutstandingJoinClaim =
+            fun targetSessionId terminalProviderRun ->
+                let payloadDigest =
+                    PromptAuthority.gateNudgePayloadDigest "runtime/background-join" terminalProviderRun
+
+                AgentProjection.tryFind targetSessionId projections
+                |> Option.bind (fun session -> session.PromptAuthority)
+                |> Option.map (fun authority ->
+                    authority.PendingClaims
+                    |> Map.exists (fun _ claim ->
+                        claim.Origin = PromptAuthority.PromptOrigin.Continuation
+                                           PromptAuthority.ContinuationKind.JoinGuard
+                        && claim.PayloadDigest = payloadDigest))
+                |> Option.defaultValue false }
 
     let forRequirementGrounding (journal: AgentJournal) : RequirementGroundingPort =
         { RequirementGroundingPort.ReadState =

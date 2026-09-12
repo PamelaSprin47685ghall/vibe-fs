@@ -7,7 +7,6 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.OpenCode
-open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]
 type XTraceTerminalCompletion =
@@ -21,9 +20,48 @@ type XTraceTerminalCompletion =
 /// lifecycle / JoinGuard / IdleRepair / LoopSensor.
 module TerminalReporter =
 
+    /// Runs the durable-terminal capture through the port, or yields the deterministic
+    /// empty receipt when no port is provided (test/dev harness without journal).
+    let private runCapture
+        (port: TerminalTracePort option)
+        (turn: ReconciledTurn)
+        (sessionWideText: string)
+        : Task<Result<XTraceCaptureReceipt, XTraceCaptureError>> =
+        match port with
+        | Some tracePort -> tracePort.CaptureTerminalText turn.SessionId sessionWideText turn.ProviderRun
+        | None ->
+            Task.FromResult(
+                Ok
+                    { PreviousHead = XTraceCursor.originCursor
+                      CurrentHead = XTraceCursor.originCursor
+                      CapturedPartCount = 0
+                      OpeningCaptured = false
+                      TerminalCaptured = false
+                      Identity = XTraceCaptureIdentity.NoDurableTrace }
+            )
+
+    let private notifyTerminalCompletion
+        (eventPort: IEventObservationPort)
+        (port: TerminalTracePort option)
+        (turn: ReconciledTurn)
+        (sessionWideText: string)
+        (runResult: AgentRunResult)
+        : Task<XTraceTerminalCompletion> =
+        task {
+            let! captureResult = runCapture port turn sessionWideText
+
+            match captureResult with
+            | Ok _ ->
+                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
+                |> ignore
+
+                return XTraceTerminalCompletion.Published runResult
+            | Error error -> return XTraceTerminalCompletion.CaptureFailed error
+        }
+
     let private reportResolvedRole
         (eventPort: IEventObservationPort)
-        (journal: AgentJournal option)
+        (port: TerminalTracePort option)
         (turn: ReconciledTurn)
         (sessionWideText: string)
         (role: Role)
@@ -39,15 +77,7 @@ module TerminalReporter =
                   TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
 
             if runResult.IsValid then
-                match!
-                    XTraceCapture.captureTerminalTextWithReceipt journal turn.SessionId sessionWideText turn.ProviderRun
-                with
-                | Ok _ ->
-                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
-                    |> ignore
-
-                    return XTraceTerminalCompletion.Published runResult
-                | Error error -> return XTraceTerminalCompletion.CaptureFailed error
+                return! notifyTerminalCompletion eventPort port turn sessionWideText runResult
             else
                 eventPort.NotifyTerminal
                     turn.SessionId
@@ -63,7 +93,7 @@ module TerminalReporter =
     /// XTrace terminal segment, and report Completed / Failed.
     let completeUsingTextEvidence
         (eventPort: IEventObservationPort)
-        (journal: AgentJournal option)
+        (port: TerminalTracePort option)
         (turn: ReconciledTurn)
         (sessionWideText: string)
         : Task<XTraceTerminalCompletion> =
@@ -78,26 +108,26 @@ module TerminalReporter =
                 |> ignore
 
                 return XTraceTerminalCompletion.RejectedMissingRole
-            | Some role -> return! reportResolvedRole eventPort journal turn sessionWideText role
+            | Some role -> return! reportResolvedRole eventPort port turn sessionWideText role
         }
 
     let completeWithEvidence
         (eventPort: IEventObservationPort)
-        (journal: AgentJournal option)
+        (port: TerminalTracePort option)
         (turn: ReconciledTurn)
         : Task<XTraceTerminalCompletion> =
         let sessionWideText = CompletedTurnClassifier.partsSessionText turn.Parts
-        completeUsingTextEvidence eventPort journal turn sessionWideText
+        completeUsingTextEvidence eventPort port turn sessionWideText
 
     /// Legacy workflow result shape while foreign callers migrate. All terminal
     /// decisions and effects are owned by the typed operation above.
     let complete
         (eventPort: IEventObservationPort)
-        (journal: AgentJournal option)
+        (port: TerminalTracePort option)
         (turn: ReconciledTurn)
         : Task<bool * bool> =
         task {
-            let! completion = completeWithEvidence eventPort journal turn
+            let! completion = completeWithEvidence eventPort port turn
 
             return
                 match completion with

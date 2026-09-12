@@ -775,7 +775,9 @@ module FissionHost =
                     AuthorityRootUserMessageId = result.AuthorityRootUserMessageId
                     Role = Some role }
 
-            match! TerminalReporter.completeWithEvidence eventPort (Some durable) ownerTurn with
+            let tracePort = TerminalTracePort.forJournal durable |> Some
+
+            match! TerminalReporter.completeWithEvidence eventPort tracePort ownerTurn with
             | XTraceTerminalCompletion.Published published when
                 published.SessionId = result.SessionId
                 && published.ProviderRun = result.ProviderRun
@@ -957,6 +959,8 @@ module FissionHost =
                     HostJoinGuard.nudge
                         sessionPort
                         rootWorkspace
+                        (journal
+                         |> Option.map Wanxiangshu.Composition.Durable.AgentJournalPortAdapter.forHostJoinGuard)
                         journal
                         joinGuardNudges
                         (fun () -> quiescence.TryConsume idlePermit)

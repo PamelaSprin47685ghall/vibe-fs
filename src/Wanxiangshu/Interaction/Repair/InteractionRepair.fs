@@ -267,10 +267,18 @@ module InteractionRepairWorkflow =
         (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
+        (observation: TurnObservationJournalPort option)
         : Task =
         if
-            isFissionReplaced journal context.Turn.SessionId
-            || isRecoveryContinue journal context.Turn
+            (match observation with
+             | Some obs ->
+                 FissionRuntime.isSilentInterrupt context.Turn.SessionId
+                 || obs.IsFissionActive context.Turn.SessionId
+                 || obs.TryContinuationKind context.Turn.SessionId context.Turn.PhysicalUserMessageId = Some
+                                                                                                            PromptContinuationKind.ProviderRetryAttempt
+             | None ->
+                 isFissionReplaced journal context.Turn.SessionId
+                 || isRecoveryContinue journal context.Turn)
         then
             AsyncSupport.completedTask ()
         else
@@ -293,10 +301,20 @@ module InteractionRepairWorkflow =
         (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
+        (observation: TurnObservationJournalPort option)
         : Task =
         let turn = context.Turn
 
-        if isFissionReplaced journal turn.SessionId || isRecoveryContinue journal turn then
+        let isSuppressed =
+            match observation with
+            | Some obs ->
+                FissionRuntime.isSilentInterrupt turn.SessionId
+                || obs.IsFissionActive turn.SessionId
+                || obs.TryContinuationKind turn.SessionId turn.PhysicalUserMessageId = Some
+                                                                                           PromptContinuationKind.ProviderRetryAttempt
+            | None -> isFissionReplaced journal turn.SessionId || isRecoveryContinue journal turn
+
+        if isSuppressed then
             AsyncSupport.completedTask ()
         elif CompletedTurnClassifier.needsInteractionRepair turn.Role (box turn.Outcome) turn.Parts then
             repairDefect

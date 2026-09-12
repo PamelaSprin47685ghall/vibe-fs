@@ -75,6 +75,7 @@ module JoinGuardSurface =
                 HostJoinGuard.nudge
                     (DispatchSurface.sessionPort port)
                     (DispatchSurface.rootWorkspaceReader directory)
+                    None
                     journal
                     keys
                     (fun () -> Ok())

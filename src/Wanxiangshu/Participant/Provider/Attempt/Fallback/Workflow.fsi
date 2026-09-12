@@ -25,6 +25,7 @@ module ProviderRecoveryWorkflow =
         rootWorkspace: IRootWorkspaceReader ->
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
+        recoveryPort: ProviderRecoveryJournalPort option ->
         scope: IBloggerRuntimeHost ->
         turn: ReconciledTurn ->
         failure: ExecutionFailure ->

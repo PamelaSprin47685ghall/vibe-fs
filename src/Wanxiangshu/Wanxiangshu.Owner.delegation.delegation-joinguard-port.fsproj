@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>delegation</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>delegation-joinguard-port</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>delegation</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>delegation-joinguard-port</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <Compile Include="Execution/Delegation/Fork/OpenCode/HostJoinGuardJournalPort.fsi"/>
+    <Compile Include="Execution/Delegation/Fork/OpenCode/HostJoinGuardJournalPort.fs"/>
+  </ItemGroup>
+</Project>

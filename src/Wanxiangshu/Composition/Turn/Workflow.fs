@@ -3,6 +3,7 @@ namespace Wanxiangshu.Composition.Turn
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Context.Companion.Blogger.Runtime
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -37,6 +38,10 @@ module TurnWorkflow =
         task {
             let turn = context.Turn
 
+            // Single-snapshot fan-out: one adapter revision feeds every
+            // TurnObservationJournalPort read below.
+            let observation = journal |> Option.map AgentJournalPortAdapter.forTurnObservation
+
             // SyncDelegate path stays first and exclusive when it claims the turn
             // (Inspector/Coder dedicated sessions). Do not break this ownership.
             let! syncDelegateHandled =
@@ -48,7 +53,14 @@ module TurnWorkflow =
                 return ()
 
             let observeIdleOrdinary current =
-                OrdinaryTurnWorkflow.observeIdle quiescence sessionPort rootWorkspace eventPort journal current
+                OrdinaryTurnWorkflow.observeIdle
+                    quiescence
+                    sessionPort
+                    rootWorkspace
+                    eventPort
+                    journal
+                    observation
+                    current
 
             let observeIdleDelivery () : Task =
                 task {
@@ -64,6 +76,7 @@ module TurnWorkflow =
                     rootWorkspace
                     eventPort
                     journal
+                    observation
                     recoveryScope
                     joinGuardNudges
                     hasLivePty

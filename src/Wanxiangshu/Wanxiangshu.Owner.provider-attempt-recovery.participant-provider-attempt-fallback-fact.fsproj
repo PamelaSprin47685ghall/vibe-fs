@@ -21,5 +21,7 @@
     <Compile Include="Participant/Provider/Attempt/Fallback/Projection.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailurePort.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailurePort.fs"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/ProviderRecoveryPort.fsi"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/ProviderRecoveryPort.fs"/>
   </ItemGroup>
 </Project>

@@ -216,6 +216,7 @@ module FissionHostSurface =
                     rootWorkspace
                     eventPort
                     None
+                    None
                     (PluginBloggerScope() :> IBloggerRuntimeHost)
                     (HashSet<string>())
                     (fun _ -> false)
@@ -233,6 +234,7 @@ module FissionHostSurface =
                     sessionPort
                     rootWorkspace
                     eventPort
+                    None
                     None
                     idleContext
 

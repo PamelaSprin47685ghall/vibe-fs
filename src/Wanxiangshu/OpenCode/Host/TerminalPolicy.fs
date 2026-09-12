@@ -11,9 +11,9 @@ open Wanxiangshu.Interaction.Authority
 /// Pure terminal admission rules; no Host transport or mutable registry.
 module TerminalPolicy =
 
-    let sessionDead (journal: AgentJournal option) (sessionId: SessionId) =
-        match journal with
-        | Some j -> j.IsPoisoned
+    let sessionDead (port: TerminalPolicyPort option) (sessionId: SessionId) =
+        match port with
+        | Some p -> p.IsPoisoned()
         | None -> false
 
     let private canonicalRoleOf (authority: PromptAuthority.PromptAuthorityProjection) =
@@ -94,32 +94,28 @@ module TerminalPolicy =
         | None -> not (sessionParents.ContainsKey sessionKey)
         | Some j -> sessionIsTopLevelManager sessionParents journal sessionKey (AgentJournal.snapshot j)
 
-    let private hasListableHandles (journal: AgentJournal option) (sessionId: SessionId) =
-        match journal with
+    let private hasListableHandles (port: TerminalPolicyPort option) (sessionId: SessionId) =
+        match port with
         | None -> false
-        | Some durable ->
-            AgentJournal.handleProjection durable sessionId
-            |> HandleProjection.listable
-            |> List.isEmpty
-            |> not
+        | Some p -> p.HasListableHandles sessionId
 
-    let private hasActiveOrchestratorJobs (journal: AgentJournal option) =
-        match journal with
+    let private hasActiveOrchestratorJobs (port: TerminalPolicyPort option) =
+        match port with
         | None -> false
-        | Some durable -> AgentProjection.hasActiveOrchestratorJobs (AgentJournal.snapshot durable).AgentProjections
+        | Some p -> p.HasActiveOrchestratorJobs()
 
     /// EXEC-016: join-capable role still owns unconsumed background work.
     ///
     /// Pure projection predicate + optional live-PTY probe. Executor private
     /// runtimes never participate (EXEC-014).
     let outstandingBackground
-        (journal: AgentJournal option)
+        (port: TerminalPolicyPort option)
         (hasLivePty: string -> bool)
         (role: Role option)
         (sessionId: SessionId)
         : bool =
         match role with
-        | Some Role.Manager -> hasListableHandles journal sessionId
-        | Some Role.DevOps -> hasListableHandles journal sessionId || hasLivePty (SessionId.value sessionId)
-        | Some Role.Orchestrator -> hasActiveOrchestratorJobs journal
+        | Some Role.Manager -> hasListableHandles port sessionId
+        | Some Role.DevOps -> hasListableHandles port sessionId || hasLivePty (SessionId.value sessionId)
+        | Some Role.Orchestrator -> hasActiveOrchestratorJobs port
         | _ -> false

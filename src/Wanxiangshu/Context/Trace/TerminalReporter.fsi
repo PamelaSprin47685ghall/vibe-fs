@@ -4,7 +4,6 @@ open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Foundation
 open Wanxiangshu.OpenCode
-open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]
 type XTraceTerminalCompletion =
@@ -16,16 +15,16 @@ type XTraceTerminalCompletion =
 module TerminalReporter =
     val completeUsingTextEvidence:
         eventPort: IEventObservationPort ->
-        journal: AgentJournal option ->
+        port: TerminalTracePort option ->
         turn: ReconciledTurn ->
         sessionWideText: string ->
             Task<XTraceTerminalCompletion>
 
     val completeWithEvidence:
         eventPort: IEventObservationPort ->
-        journal: AgentJournal option ->
+        port: TerminalTracePort option ->
         turn: ReconciledTurn ->
             Task<XTraceTerminalCompletion>
 
     val complete:
-        eventPort: IEventObservationPort -> journal: AgentJournal option -> turn: ReconciledTurn -> Task<bool * bool>
+        eventPort: IEventObservationPort -> port: TerminalTracePort option -> turn: ReconciledTurn -> Task<bool * bool>

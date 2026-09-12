@@ -784,7 +784,7 @@ module ProviderRecoveryWorkflow =
             | Some target -> ModelRouting.markProviderFailed (providerOfTarget target)
             | None -> ()
 
-            let projections = AgentJournal.snapshot durable
+            let projections = (AgentJournal.snapshot durable)
 
             let activeProfileOpt =
                 PromptAuthorityLedger.activeProfile turn.SessionId projections.AgentProjections
@@ -841,6 +841,7 @@ module ProviderRecoveryWorkflow =
         (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
+        (recoveryPort: ProviderRecoveryJournalPort option)
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
         (failure: ExecutionFailure)

@@ -44,14 +44,15 @@ const SOURCE_BUDGETS = new Map([
 // WHAT[DELEG-028] budget adjudication (see WHY.md): contract ≤100 hard; fold/runtime target
 // ≤185 hard; adapters carry the shared durable spine by charter — hard ceiling is the 60%
 // full-fallback ratio with the measured baseline as a growth ratchet; composition exempt.
-// Measured 2026-09-12 over the owner-compile production `.fs` closure: host 288, pty 289,
-// recovery 45 (post Wave-6/Wire + Wave-7/OrchestratorPort splits). The ratchet is held at
-// the measured value, so any growth (including one new source file in a shared upstream
-// shard) fails here and must be adjudicated against WHAT[DELEG-028] instead of passing
-// silently.
+// Measured 2026-09-12 over the owner-compile production `.fs` closure: host 294, pty 295,
+// recovery 45 (post Wave-6/Wire + Wave-7/OrchestratorPort + Wave-9 terminal sibling
+// ports: TurnObservation, TerminalPolicy, HostJoinGuard, TerminalTrace, InteractionRepair,
+// ProviderRecovery). The ratchet is held at the measured value, so any growth (including
+// one new source file in a shared upstream shard) fails here and must be adjudicated
+// against WHAT[DELEG-028] instead of passing silently.
 const ADAPTER_RATCHET = new Map([
-  ['delegation-host-adapter', 288],
-  ['delegation-pty-adapter', 289],
+  ['delegation-host-adapter', 294],
+  ['delegation-pty-adapter', 295],
   ['delegation-recovery-runtime', 45],
 ])
 
