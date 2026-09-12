@@ -1,9 +1,13 @@
 namespace Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Session
+open Wanxiangshu.Enforcer.InstitutionalLearning
 open Wanxiangshu.Interaction.Attention
+open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Requirement.Grounding
 open Wanxiangshu.Persistence.Journal
@@ -27,6 +31,45 @@ module AgentJournalPortAdapter =
                         appended
                         |> Result.map ignore
                         |> Result.mapError (fun _ -> AttentionAppendFailure.DurabilityUnavailable)
+                } }
+
+    let forConcern (journal: AgentJournal) : ConcernJournalPort =
+        { ReadState = fun sessionId -> (AgentJournal.snapshot journal).AgentProjections.Concern
+          Append =
+            fun sessionId providerRun fact ->
+                task {
+                    let! appended =
+                        AgentJournal.appendAgent
+                            (StreamId.Session sessionId)
+                            providerRun
+                            (AgentFact.Concern fact)
+                            journal
+
+                    return
+                        appended
+                        |> Result.map ignore
+                        |> Result.mapError (fun _ -> ConcernAppendFailure.DurabilityUnavailable)
+                } }
+
+    let forInstitutionalLearning (journal: AgentJournal) : InstitutionalLearningJournalPort =
+        { ReadState = fun sessionId -> (AgentJournal.snapshot journal).AgentProjections.InstitutionalLearning
+          PendingAttentionWorkPairs =
+            fun sessionId ->
+                AgentProjection.pendingAttentionWorkPairs sessionId (AgentJournal.snapshot journal).AgentProjections
+          Append =
+            fun sessionId providerRun fact ->
+                task {
+                    let! appended =
+                        AgentJournal.appendAgent
+                            (StreamId.Session sessionId)
+                            providerRun
+                            (AgentFact.InstitutionalLearning fact)
+                            journal
+
+                    return
+                        appended
+                        |> Result.map ignore
+                        |> Result.mapError (fun _ -> InstitutionalLearningAppendFailure.DurabilityUnavailable)
                 } }
 
     let forDelegatedToolEstimate (journal: AgentJournal) : DelegatedToolEstimatePort =
@@ -150,6 +193,22 @@ module AgentJournalPortAdapter =
 
                     return res |> Result.map ignore |> Result.mapError JournalAppendFailure.describe
                 } }
+
+    let forSessionResume (journal: AgentJournal) : SessionResumeJournalPort =
+        { TryResumeProfile =
+            fun sessionId ->
+                let projections = (AgentJournal.snapshot journal).AgentProjections
+
+                PromptAuthorityLedger.activeProfile sessionId projections
+                |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile sessionId projections)
+          CandidateRecords =
+            fun parentId ->
+                AgentJournal.handleProjection journal parentId
+                |> HandleProjection.linkedChildren
+                |> List.filter (fun record ->
+                    match record.Ownership with
+                    | HandleOwnership.DurableParentHandle -> true
+                    | HandleOwnership.HostOwnedHidden -> false) }
 
     /// DELEG-029: durable composition is the only place that wraps delegation fact
     /// cases into the outer routing union and adapts the journal handle.

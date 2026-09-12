@@ -12,6 +12,8 @@
     <Compile Include="Interaction/Concern/Facts.fs"/>
     <Compile Include="Interaction/Concern/Projection.fsi"/>
     <Compile Include="Interaction/Concern/Projection.fs"/>
+    <Compile Include="Interaction/Concern/JournalPort.fsi"/>
+    <Compile Include="Interaction/Concern/JournalPort.fs"/>
     <Compile Include="Interaction/Concern/Surface.fsi"/>
     <Compile Include="Interaction/Concern/Surface.fs"/>
   </ItemGroup>

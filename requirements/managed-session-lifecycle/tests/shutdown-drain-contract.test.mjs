@@ -9,6 +9,7 @@ const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 
 test('WHAT[MANAGED-SESSION-018] shutdown detaches session runtimes before journal release without logical cancel', () => {
   const scope = read('src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs')
+  const sessionOwner = read('src/Wanxiangshu/OpenCode/Host/SessionRuntimeOwner.fs')
   const tools = read('src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs')
   const deletion = read('src/Wanxiangshu/OpenCode/Host/HostSessionDeletion.fs')
   const preparation = read('src/Wanxiangshu/OpenCode/Host/TurnRuntimePreparation.fs')
@@ -16,8 +17,8 @@ test('WHAT[MANAGED-SESSION-018] shutdown detaches session runtimes before journa
   const scheduler = read('src/Wanxiangshu/Composition/Turn/Scheduler.fs')
   const bootstrap = read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
 
-  assert.match(scope, /abstract DisposeSession: string -> Task/)
-  assert.match(scope, /abstract DisposeExecutorRuntime: string -> Task/)
+  assert.match(sessionOwner, /abstract DisposeSession: string -> Task/)
+  assert.match(sessionOwner, /abstract DisposeExecutorRuntime: string -> Task/)
   assert.match(scope, /do! active\.DisposeSession sessionId/)
   assert.match(scope, /captureTaskFailure \(SharedAgentJournal\.releaseAsync journal\)/)
 

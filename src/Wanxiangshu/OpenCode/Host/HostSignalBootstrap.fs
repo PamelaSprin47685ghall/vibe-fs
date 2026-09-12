@@ -778,7 +778,7 @@ module HostSignalBootstrap =
                             ExplicitSessionResume.observeChatMessage
                                 (fun sessionId ->
                                     scope.Sessions.ModelRoutingSessions.Add(SessionId.value sessionId) |> ignore)
-                                journal
+                                (journal |> Option.map AgentJournalPortAdapter.forSessionResume)
                                 decoded
                         else
                             do! continueClassifiedChatMessage intent output

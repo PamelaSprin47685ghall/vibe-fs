@@ -1,13 +1,10 @@
 namespace Wanxiangshu.OpenCode
 
 open System
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Resources
 
 [<RequireQualifiedAccess>]
@@ -64,9 +61,6 @@ module ConcernTools =
     let private occurrenceId (ctx: HostToolContext) =
         ctx.ToolCallId |> Option.map ToolCallId.value
 
-    let private append (journal: AgentJournal) (sessionId: SessionId) providerRun fact =
-        AgentJournal.appendAgent (StreamId.Session sessionId) providerRun fact journal
-
     type private SubscribeFailure =
         | Conflict
         | DurableUnavailable
@@ -75,9 +69,9 @@ module ConcernTools =
         | UnknownMailbox
         | DurableUnavailable
 
-    let private persistSubscription durable owner occurrence id concern providerRun =
+    let private persistSubscription (durable: ConcernJournalPort) owner occurrence id concern providerRun =
         taskResult {
-            let state = (AgentJournal.snapshot durable).AgentProjections.Concern
+            let state = durable.ReadState owner
 
             let! fact =
                 ConcernProjection.subscribe owner occurrence id concern state
@@ -87,7 +81,7 @@ module ConcernTools =
             | None -> return ()
             | Some value ->
                 let! _ =
-                    append durable owner providerRun (AgentFact.Concern value)
+                    durable.Append owner providerRun value
                     |> TaskResult.mapError (fun _ -> SubscribeFailure.DurableUnavailable)
 
                 return ()
@@ -104,9 +98,9 @@ module ConcernTools =
             | Error SubscribeFailure.DurableUnavailable -> return render ctx Path.DurableUnavailable Map.empty
         }
 
-    let private persistPublication durable sender occurrence id message providerRun =
+    let private persistPublication (durable: ConcernJournalPort) sender occurrence id message providerRun =
         taskResult {
-            let state = (AgentJournal.snapshot durable).AgentProjections.Concern
+            let state = durable.ReadState sender
 
             match ConcernProjection.tryFindMessage occurrence state with
             | Some _ -> return ()
@@ -116,7 +110,7 @@ module ConcernTools =
                     |> Result.mapError (fun _ -> PublishFailure.UnknownMailbox)
 
                 let! _ =
-                    append durable sender providerRun (AgentFact.Concern fact)
+                    durable.Append sender providerRun fact
                     |> TaskResult.mapError (fun _ -> PublishFailure.DurableUnavailable)
 
                 return ()
@@ -133,7 +127,7 @@ module ConcernTools =
             | Error PublishFailure.DurableUnavailable -> return render ctx Path.DurableUnavailable Map.empty
         }
 
-    let private subscribeExecute (journal: AgentJournal option) (args: HostToolArguments) (ctx: HostToolContext) =
+    let private subscribeExecute (journal: ConcernJournalPort option) (args: HostToolArguments) (ctx: HostToolContext) =
         task {
             let id = args.Text "id" |> trim
             let concern = args.Text "concern" |> trim
@@ -145,7 +139,7 @@ module ConcernTools =
             | _ -> return render ctx Path.DurableUnavailable Map.empty
         }
 
-    let private publishExecute (journal: AgentJournal option) (args: HostToolArguments) (ctx: HostToolContext) =
+    let private publishExecute (journal: ConcernJournalPort option) (args: HostToolArguments) (ctx: HostToolContext) =
         task {
             let id = args.Text "id" |> trim
             let message = args.Text "message" |> trim
@@ -160,7 +154,7 @@ module ConcernTools =
     let admission: ToolAdmission =
         ToolAdmission.OfficeRole(fun _ (r: Role) -> r <> Role.Blogger && r <> Role.Distiller)
 
-    let specs factory journal =
+    let specs factory (journal: ConcernJournalPort option) =
         let language = ProviderLanguageBinding.readGlobalPreference ()
 
         [ { Name = "subscribe"

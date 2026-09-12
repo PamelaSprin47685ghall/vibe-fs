@@ -49,7 +49,9 @@ test('WHAT[MANAGED-SESSION-018] TurnAborted has no logical child-cancel authorit
   const tools = read('src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs')
   const scope = read('src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs')
 
-  assert.match(scope, /abstract CancelSessionChildren: string -> Task/)
+  const sessionOwner = read('src/Wanxiangshu/OpenCode/Host/SessionRuntimeOwner.fs')
+
+  assert.match(sessionOwner, /abstract CancelSessionChildren: string -> Task/)
   assert.match(scope, /member _\.CancelSessionChildren\(sessionId: string\) : Task/)
   assert.match(tools, /member _\.CancelSessionChildren\(sessionId: string\) : Task/)
   assert.match(tools, /CancelSessionChildren[\s\S]*?runtime\.CancelAndDrain\(\)/)

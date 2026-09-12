@@ -511,6 +511,8 @@
     <Compile Include="Enforcer/Guidance/DeliverySurface.fs"/>
     <Compile Include="Execution/Fission/Projection.fsi"/>
     <Compile Include="Execution/Fission/Projection.fs"/>
+    <Compile Include="Execution/Fission/SessionResumePort.fsi"/>
+    <Compile Include="Execution/Fission/SessionResumePort.fs"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimateProjection.fsi"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimateProjection.fs"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimatePort.fsi"/>
@@ -527,8 +529,12 @@
     <Compile Include="Interaction/Attention/JournalPort.fs"/>
     <Compile Include="Interaction/Concern/Projection.fsi"/>
     <Compile Include="Interaction/Concern/Projection.fs"/>
+    <Compile Include="Interaction/Concern/JournalPort.fsi"/>
+    <Compile Include="Interaction/Concern/JournalPort.fs"/>
     <Compile Include="Enforcer/InstitutionalLearning/Projection.fsi"/>
     <Compile Include="Enforcer/InstitutionalLearning/Projection.fs"/>
+    <Compile Include="Enforcer/InstitutionalLearning/JournalPort.fsi"/>
+    <Compile Include="Enforcer/InstitutionalLearning/JournalPort.fs"/>
     <Compile Include="Interaction/Attention/Surface.fsi"/>
     <Compile Include="Interaction/Attention/Surface.fs"/>
     <Compile Include="Interaction/Concern/Surface.fsi"/>
@@ -903,6 +909,8 @@
     <Compile Include="OpenCode/Host/ProviderLanguageBinding.fs"/>
     <Compile Include="OpenCode/Host/SessionHostPort.fsi"/>
     <Compile Include="OpenCode/Host/SessionHostPort.fs"/>
+    <Compile Include="OpenCode/Host/SessionRuntimeOwner.fsi"/>
+    <Compile Include="OpenCode/Host/SessionRuntimeOwner.fs"/>
     <Compile Include="OpenCode/Host/Sessions.fsi"/>
     <Compile Include="OpenCode/Host/Sessions.fs"/>
     <Compile Include="OpenCode/Host/SessionsSurface.fsi"/>

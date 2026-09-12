@@ -2,9 +2,9 @@ namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Persistence.Journal
 
 /// CRASH-018: explicit, user-visible session resume. Nothing in this module is
 /// reachable from plugin load or ordinary turns. `/continue` only discovers and
@@ -18,7 +18,7 @@ module ExplicitSessionResume =
     /// authority/profile interpretation stays here.
     val observeChatMessage:
         observeManagedSession: (SessionId -> unit) ->
-        journal: AgentJournal option ->
+        journal: SessionResumeJournalPort option ->
         decoded: PromptIngressCodec.DecodedMessage ->
             unit
 
@@ -30,7 +30,7 @@ module ExplicitSessionResume =
     type AdoptExistingChild = SessionId -> HandleRecord -> Result<unit, string>
 
     val before:
-        journal: AgentJournal option ->
+        journal: SessionResumeJournalPort option ->
         snapshot: ISessionSnapshotPort option ->
         adopt: AdoptExistingChild ->
         input: obj ->

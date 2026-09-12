@@ -360,7 +360,14 @@ module PluginHooks =
                     let commandBefore =
                         registeredHook
                             HookKey.CommandBefore
-                            (pairedHook (box (ExplicitSessionResume.before journal snapshotOpt adoptExisting)))
+                            (pairedHook (
+                                box (
+                                    ExplicitSessionResume.before
+                                        (journal |> Option.map AgentJournalPortAdapter.forSessionResume)
+                                        snapshotOpt
+                                        adoptExisting
+                                )
+                            ))
 
                     createObj
                         [ chatMessage

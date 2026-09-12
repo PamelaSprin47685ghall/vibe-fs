@@ -16,6 +16,8 @@
     <Compile Include="Enforcer/InstitutionalLearning/Enhancer.fs"/>
     <Compile Include="Enforcer/InstitutionalLearning/Projection.fsi"/>
     <Compile Include="Enforcer/InstitutionalLearning/Projection.fs"/>
+    <Compile Include="Enforcer/InstitutionalLearning/JournalPort.fsi"/>
+    <Compile Include="Enforcer/InstitutionalLearning/JournalPort.fs"/>
     <Compile Include="Enforcer/InstitutionalLearning/Surface.fsi"/>
     <Compile Include="Enforcer/InstitutionalLearning/Surface.fs"/>
   </ItemGroup>

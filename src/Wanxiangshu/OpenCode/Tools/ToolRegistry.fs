@@ -232,8 +232,12 @@ module ToolRegistry =
               yield BashHoneypotTool.spec
               yield AssumeTool.spec factory
               yield! AttentionTools.specs factory (journal |> Option.map AgentJournalPortAdapter.forAttention)
-              yield! ConcernTools.specs factory journal
-              yield! InstitutionalLearningTools.specs factory journal
+              yield! ConcernTools.specs factory (journal |> Option.map AgentJournalPortAdapter.forConcern)
+
+              yield!
+                  InstitutionalLearningTools.specs
+                      factory
+                      (journal |> Option.map AgentJournalPortAdapter.forInstitutionalLearning)
 
               yield
                   ChronicleTool.spec

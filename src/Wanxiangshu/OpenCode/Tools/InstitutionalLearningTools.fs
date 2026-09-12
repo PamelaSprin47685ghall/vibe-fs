@@ -1,14 +1,11 @@
 namespace Wanxiangshu.OpenCode
 
 open System
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.InstitutionalLearning
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Resources
 
 [<RequireQualifiedAccess>]
@@ -69,28 +66,28 @@ module InstitutionalLearningTools =
         ProviderProse.instructionLines language path subs
         |> LlmFacing.renderInstructions
 
-    let private pendingFor kind sessionId snapshot =
+    let private pendingFor kind (durable: InstitutionalLearningJournalPort) sessionId =
         match kind with
-        // ExperienceKind.Celebrate -> AttentionProjection.pending
-        | ExperienceKind.Celebrate -> AgentProjection.pendingAttentionWorkPairs sessionId snapshot
+        | ExperienceKind.Celebrate -> durable.PendingAttentionWorkPairs sessionId
         | ExperienceKind.Regret -> []
 
-    let private commitLearning kind durable experience language sessionId occurrence providerRun =
+    let private commitLearning
+        kind
+        (durable: InstitutionalLearningJournalPort)
+        experience
+        language
+        sessionId
+        occurrence
+        providerRun
+        =
         taskResult {
-            let snapshot = AgentJournal.snapshot durable
-
-            match
-                InstitutionalLearningProjection.tryFind
-                    sessionId
-                    occurrence
-                    snapshot.AgentProjections.InstitutionalLearning
-            with
+            match InstitutionalLearningProjection.tryFind sessionId occurrence (durable.ReadState sessionId) with
             | Some record -> return record.FrozenResult
             | None ->
                 let rules = EnforcerCatalogResource.loadFor language
                 let revision = InstitutionalEnhancer.rulebookRevision rules
                 let disposition = InstitutionalEnhancer.evaluate experience rules
-                let pending = pendingFor kind sessionId snapshot.AgentProjections
+                let pending = pendingFor kind durable sessionId
 
                 let frozen =
                     LlmFacing.renderInstructions (
@@ -99,19 +96,17 @@ module InstitutionalLearningTools =
                     )
 
                 let fact =
-                    AgentFact.InstitutionalLearning(
-                        InstitutionalLearningFactCases.LearningDispositionCommitted
-                            {| SessionId = sessionId
-                               OccurrenceId = occurrence
-                               Kind = kind
-                               Experience = experience
-                               RulebookRevision = revision
-                               Disposition = disposition
-                               FrozenResult = frozen
-                               ResurfacedDeferredWorkIds = pending |> List.map fst |}
-                    )
+                    InstitutionalLearningFactCases.LearningDispositionCommitted
+                        {| SessionId = sessionId
+                           OccurrenceId = occurrence
+                           Kind = kind
+                           Experience = experience
+                           RulebookRevision = revision
+                           Disposition = disposition
+                           FrozenResult = frozen
+                           ResurfacedDeferredWorkIds = pending |> List.map fst |}
 
-                let! _ = AgentJournal.appendAgent (StreamId.Session sessionId) providerRun fact durable
+                let! _ = durable.Append sessionId providerRun fact
                 return frozen
         }
 
@@ -126,7 +121,12 @@ module InstitutionalLearningTools =
             | Error _ -> return instructionResult language Path.DurableUnavailable Map.empty
         }
 
-    let private execute kind (journal: AgentJournal option) (args: HostToolArguments) (ctx: HostToolContext) =
+    let private execute
+        kind
+        (journal: InstitutionalLearningJournalPort option)
+        (args: HostToolArguments)
+        (ctx: HostToolContext)
+        =
         task {
             let experience = args.Text "experience" |> trim
             let language = languageOf ctx
@@ -141,7 +141,7 @@ module InstitutionalLearningTools =
     let admission: ToolAdmission =
         ToolAdmission.OfficeRole(fun _ (r: Role) -> r <> Role.Blogger && r <> Role.Distiller)
 
-    let specs factory journal =
+    let specs factory (journal: InstitutionalLearningJournalPort option) =
         let language = ProviderLanguageBinding.readGlobalPreference ()
 
         let argument =

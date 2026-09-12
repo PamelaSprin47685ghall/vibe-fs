@@ -4,11 +4,10 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation.Identity
 
 /// CRASH-018: explicit, user-visible session resume. Nothing in this module is
@@ -18,13 +17,8 @@ open Wanxiangshu.Foundation.Identity
 [<RequireQualifiedAccess>]
 module ExplicitSessionResume =
 
-    let private tryResumeProfile (journal: AgentJournal option) sessionId =
-        journal
-        |> Option.bind (fun durable ->
-            let projections = (AgentJournal.snapshot durable).AgentProjections
-
-            PromptAuthorityLedger.activeProfile sessionId projections
-            |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile sessionId projections))
+    let private tryResumeProfile (journal: SessionResumeJournalPort option) sessionId =
+        journal |> Option.bind (fun port -> port.TryResumeProfile sessionId)
 
     let private bindChatSession
         (observeManagedSession: SessionId -> unit)
@@ -49,7 +43,7 @@ module ExplicitSessionResume =
     /// authority/profile interpretation stays here.
     let observeChatMessage
         (observeManagedSession: SessionId -> unit)
-        (journal: AgentJournal option)
+        (journal: SessionResumeJournalPort option)
         (decoded: PromptIngressCodec.DecodedMessage)
         =
         match decoded.SessionId with
@@ -103,15 +97,8 @@ module ExplicitSessionResume =
 
     let private roleText (record: HandleRecord) = sprintf "%A" record.CanonicalRole
 
-    let private isParentVisible (record: HandleRecord) =
-        match record.Ownership with
-        | HandleOwnership.DurableParentHandle -> true
-        | HandleOwnership.HostOwnedHidden -> false
-
-    let private candidateRecords (journal: AgentJournal) (parentId: SessionId) =
-        AgentJournal.handleProjection journal parentId
-        |> HandleProjection.linkedChildren
-        |> List.filter isParentVisible
+    let private candidateRecords (journal: SessionResumeJournalPort) (parentId: SessionId) =
+        journal.CandidateRecords parentId
 
     let private renderLine (prefix: string) (record: HandleRecord) (detail: string) =
         sprintf
@@ -202,7 +189,7 @@ module ExplicitSessionResume =
         |> List.toArray
 
     let private observations
-        (journal: AgentJournal option)
+        (journal: SessionResumeJournalPort option)
         (snapshot: ISessionSnapshotPort option)
         (adopt: AdoptExistingChild)
         (parentId: SessionId)
@@ -278,7 +265,7 @@ module ExplicitSessionResume =
             resumeSession journal snapshot adopt sessionId (argumentTextRaw input) output
 
     let before
-        (journal: AgentJournal option)
+        (journal: SessionResumeJournalPort option)
         (snapshot: ISessionSnapshotPort option)
         (adopt: AdoptExistingChild)
         (input: obj)

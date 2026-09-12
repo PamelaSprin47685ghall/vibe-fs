@@ -143,7 +143,12 @@ test('WHAT[HOST-BOUNDARY-026] Host source ownership follows subsystem inventory 
   const sessionContract = requireShard('host-session-contract')
   assert.deepEqual(
     sessionContract.compile.sort(),
-    ['OpenCode/Host/SessionContract.fs', 'OpenCode/Host/SessionHostPort.fs', 'OpenCode/Host/SessionSnapshot.fs'].sort(),
+    [
+      'OpenCode/Host/SessionContract.fs',
+      'OpenCode/Host/SessionHostPort.fs',
+      'OpenCode/Host/SessionRuntimeOwner.fs',
+      'OpenCode/Host/SessionSnapshot.fs',
+    ].sort(),
   )
 
   const diagnosticsRuntime = requireShard('host-diagnostics-runtime')

@@ -47,7 +47,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-fold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.opencode-host-chatadmission-transaction.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.opencode-host-pluginruntimescope.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.session-attachment-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.obligation-ledger.mission-obligation-todo-magictodosemanticsurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.participant-persona.fsproj"/>

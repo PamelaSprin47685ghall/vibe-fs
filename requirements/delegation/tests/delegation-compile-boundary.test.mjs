@@ -49,8 +49,8 @@ const SOURCE_BUDGETS = new Map([
 // source file in a shared upstream shard) fails here and must be adjudicated against
 // WHAT[DELEG-028] instead of passing silently.
 const ADAPTER_RATCHET = new Map([
-  ['delegation-host-adapter', 280],
-  ['delegation-pty-adapter', 281],
+  ['delegation-host-adapter', 284],
+  ['delegation-pty-adapter', 285],
   ['delegation-recovery-runtime', 47],
 ])
 

@@ -17,5 +17,7 @@
     <Compile Include="OpenCode/Host/SessionSnapshot.fs"/>
     <Compile Include="OpenCode/Host/SessionHostPort.fsi"/>
     <Compile Include="OpenCode/Host/SessionHostPort.fs"/>
+    <Compile Include="OpenCode/Host/SessionRuntimeOwner.fsi"/>
+    <Compile Include="OpenCode/Host/SessionRuntimeOwner.fs"/>
   </ItemGroup>
 </Project>
