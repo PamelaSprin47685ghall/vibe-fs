@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>work</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>host</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>mission-obligation-todo-magictodosemanticsurface</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>obligation-ledger</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>mission-obligation-todo-magictodosemanticsurface</WanxiangshuOwnerLocality>

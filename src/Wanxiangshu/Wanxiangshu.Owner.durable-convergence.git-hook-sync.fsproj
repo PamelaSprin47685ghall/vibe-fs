@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>persistence</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>git-hook-sync</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>durable-convergence</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>git-hook-sync</WanxiangshuOwnerLocality>

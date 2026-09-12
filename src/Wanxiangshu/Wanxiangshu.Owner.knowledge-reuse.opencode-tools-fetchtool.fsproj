@@ -3,7 +3,7 @@
     <WanxiangshuSemanticOwner>knowledge-reuse</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>opencode-tools-fetchtool</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
-    <WanxiangshuSubsystem>knowledge</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>host</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>opencode-tools-fetchtool</WanxiangshuCompileShard>
   </PropertyGroup>
   <ItemGroup>

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>persistence</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>strength</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>persistence-eventstore-strengthsurface</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>durable-events</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>persistence-eventstore-strengthsurface</WanxiangshuOwnerLocality>

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>strength</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>strength-opencode-settings</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>speculative-investigation</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>strength-opencode-settings</WanxiangshuOwnerLocality>

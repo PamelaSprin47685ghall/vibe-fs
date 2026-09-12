@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>sphinx</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>sphinx-serve-entry</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>epistemic-reasoning</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>sphinx-serve-entry</WanxiangshuOwnerLocality>
