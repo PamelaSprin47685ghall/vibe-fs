@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>enforcer</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>enforcer-institutionallearning-fold</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>institutional-learning</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>enforcer-institutionallearning-fold</WanxiangshuOwnerLocality>

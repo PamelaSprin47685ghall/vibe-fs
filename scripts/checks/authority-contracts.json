@@ -228,7 +228,7 @@
           "file": "src/Wanxiangshu/Context/Companion/Blogger/Runtime/CycleSurface.fs",
           "symbol": "receipt",
           "anchor": "let private receipt kind requestId run : BloggerCycleReceipt =",
-          "owner": "context"
+          "owner": "application-composition"
         }
       ],
       "whatOwners": {
@@ -384,7 +384,7 @@
       "anchor": "type XTraceCaptureReceipt =",
       "classification": "Authority",
       "class": "Receipt",
-      "owner": "context",
+      "owner": "durable-composition",
       "what": "ENF-013, ENF-015",
       "scope": "one exact semantic-trace capture attempt and its durable projection delta",
       "freshness": "derived after the capture from before/after canonical projection heads",
@@ -396,13 +396,13 @@
           "file": "src/Wanxiangshu/Context/Trace/Capture.fs",
           "symbol": "captureReceipt",
           "anchor": "let private captureReceipt",
-          "owner": "context"
+          "owner": "durable-composition"
         },
         {
           "file": "src/Wanxiangshu/Context/Trace/Capture.fs",
           "symbol": "withoutJournalReceipt",
           "anchor": "let private withoutJournalReceipt () =",
-          "owner": "context"
+          "owner": "durable-composition"
         }
       ],
       "whatOwners": {

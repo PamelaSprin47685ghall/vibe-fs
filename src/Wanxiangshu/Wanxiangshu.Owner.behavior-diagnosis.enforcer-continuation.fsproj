@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>enforcer</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>enforcer-continuation</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>behavior-diagnosis</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>enforcer-continuation</WanxiangshuOwnerLocality>
@@ -26,7 +26,11 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-projection.opencode-codec-providerwiredecode.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-diagnostics-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-association.fsproj"/>
-    <Compile Include="Enforcer/Continuation.fsi"/>
+            <ProjectReference Include="Wanxiangshu.Owner.durable-composition.durable-adapter-attention-concern.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.context-compression.companion-host-blogger.fsproj"/>
+<Compile Include="Enforcer/Cycle/Recovery.fsi"/>
+    <Compile Include="Enforcer/Cycle/Recovery.fs"/>
+<Compile Include="Enforcer/Continuation.fsi"/>
     <Compile Include="Enforcer/Continuation.fs"/>
     <Compile Include="Enforcer/BlogSurface.fsi"/>
     <Compile Include="Enforcer/BlogSurface.fs"/>

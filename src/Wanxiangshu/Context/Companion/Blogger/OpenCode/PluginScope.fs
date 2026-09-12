@@ -2,7 +2,6 @@ namespace Wanxiangshu.Context.Companion.Blogger.OpenCode
 
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Change
-open Wanxiangshu.Git
 
 open System
 open System.Collections.Generic

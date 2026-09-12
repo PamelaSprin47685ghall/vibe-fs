@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>dispatch</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>interaction-dispatch-opencode-ingresscodec</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>dispatch-protocol</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>interaction-dispatch-opencode-ingresscodec</WanxiangshuOwnerLocality>
@@ -19,7 +19,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.opencode-host-chatadmission-intent.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj" />
         <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
-    <Compile Include="Interaction/Dispatch/OpenCode/IngressCodec.fsi" />
+        <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.interaction-repair-completedturn.fsproj"/>
+<Compile Include="Interaction/Dispatch/OpenCode/IngressCodec.fsi" />
     <Compile Include="Interaction/Dispatch/OpenCode/IngressCodec.fs" />
     <Compile Include="Interaction/Dispatch/Ingress.fsi" />
     <Compile Include="Interaction/Dispatch/Ingress.fs" />
