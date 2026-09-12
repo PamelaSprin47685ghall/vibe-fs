@@ -5,24 +5,13 @@ open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Resources
 
 /// HOST-026 / PROMPT-017: project the session-bound ProviderLanguage onto the
 /// Wanxiangshu-owned system-prompt segment without disturbing Host/AGENTS text.
 module ProviderSystemTransform =
-
-    let private roleFor (journal: AgentJournal option) (sessionId: SessionId) =
-        journal
-        |> Option.bind (fun durable ->
-            let projections = (AgentJournal.snapshot durable).AgentProjections
-
-            PromptAuthorityLedger.activeProfile sessionId projections
-            |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile sessionId projections))
-        |> Option.map (fun profile -> profile.CanonicalRole)
 
     let private catalogPrompt (catalog: PromptCatalog) =
         function
@@ -73,27 +62,27 @@ module ProviderSystemTransform =
         else
             false
 
-    let private replaceRoleSystem journal sid lang output system =
-        match roleFor journal sid with
+    let private replaceRoleSystem (role: SessionId -> Role option) sid lang output system =
+        match role sid with
         | None -> ()
-        | Some role ->
-            let oldPrompt = catalogPrompt (RuntimeResources.current().Prompts) role
-            let nextPrompt = localizedRolePrompt lang role
+        | Some r ->
+            let oldPrompt = catalogPrompt (RuntimeResources.current().Prompts) r
+            let nextPrompt = localizedRolePrompt lang r
             output?system <- replaceOwnedSegment oldPrompt nextPrompt system
 
-    let private transformSystem journal sessionText output system =
+    let private transformSystem (role: SessionId -> Role option) sessionText output system =
         let sid = SessionId.create sessionText
         let lang = ProviderLanguageBinding.ensureRoot sid
 
         if replaceBookkeeperSystem lang sessionText output system then
             ()
         else
-            replaceRoleSystem journal sid lang output system
+            replaceRoleSystem role sid lang output system
 
-    let create (journal: AgentJournal option) : obj -> obj -> Task<unit> =
+    let createWith (role: SessionId -> Role option) : obj -> obj -> Task<unit> =
         fun input output ->
             task {
                 match sessionTransformInput input output with
                 | None -> ()
-                | Some(sessionText, system) -> transformSystem journal sessionText output system
+                | Some(sessionText, system) -> transformSystem role sessionText output system
             }

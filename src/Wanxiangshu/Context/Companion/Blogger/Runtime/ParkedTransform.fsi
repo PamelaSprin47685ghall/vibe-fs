@@ -22,14 +22,6 @@ type BloggerFlightRelease =
     | Missing
     | Conflict of BloggerRequestId
 
-type BloggerMaterializationLease =
-    internal new: release: (unit -> unit) -> BloggerMaterializationLease
-    member Release: unit -> unit
-
-type BloggerMaterializationAdmission =
-    new: unit -> BloggerMaterializationAdmission
-    member Acquire: sessionId: string -> Task<BloggerMaterializationLease>
-
 type IBloggerFlightLease =
     inherit IDisposable
     abstract RequestId: BloggerRequestId

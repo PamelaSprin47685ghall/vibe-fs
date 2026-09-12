@@ -1,8 +1,17 @@
 namespace Wanxiangshu.Context.Companion.Blogger.Runtime
 
+open System.Threading.Tasks
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider.Attempt
+
+type BloggerMaterializationLease =
+    internal new: release: (unit -> unit) -> BloggerMaterializationLease
+    member Release: unit -> unit
+
+type BloggerMaterializationAdmission =
+    new: unit -> BloggerMaterializationAdmission
+    member Acquire: sessionId: string -> Task<BloggerMaterializationLease>
 
 type BloggerCycleReceipt =
     { ProviderRun: ProviderRunIdentity

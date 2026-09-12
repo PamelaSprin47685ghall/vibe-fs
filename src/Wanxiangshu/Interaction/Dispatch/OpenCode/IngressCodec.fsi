@@ -6,4 +6,4 @@ open Wanxiangshu.OpenCode
 module PromptIngressCodec =
     type DecodedMessage = ChatAdmissionIntent.DecodedMessage
 
-    val decode: input: obj -> output: obj -> DecodedMessage
+    val decodeWith: tryResolveAgent: (SessionId -> string option) -> input: obj -> output: obj -> DecodedMessage

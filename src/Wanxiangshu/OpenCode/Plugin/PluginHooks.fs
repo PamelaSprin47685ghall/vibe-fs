@@ -32,6 +32,7 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.EventStore
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Repository.Investigation.WarmStart
 open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Prediction
@@ -101,7 +102,17 @@ module PluginHooks =
             let snapshotOpt = host.SnapshotOpt
             let eventPort = host.EventPort
             let chatParams = ChatParamsHook.create ()
-            let systemTransform = ProviderSystemTransform.create journal
+
+            let roleFor (sessionId: SessionId) =
+                journal
+                |> Option.bind (fun durable ->
+                    let projections = (AgentJournal.snapshot durable).AgentProjections
+
+                    PromptAuthorityLedger.activeProfile sessionId projections
+                    |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile sessionId projections))
+                |> Option.map (fun profile -> profile.CanonicalRole)
+
+            let systemTransform = ProviderSystemTransform.createWith roleFor
 
             // CASE-003: typed capture at the tool boundary — shared
             // CasebookLifecycle.collector; marker flag gates the after-hook.

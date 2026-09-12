@@ -1,10 +1,68 @@
 namespace Wanxiangshu.Context.Companion.Blogger.Runtime
 
+open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Participant.Provider.Attempt
+
+type BloggerMaterializationLease internal (release: unit -> unit) =
+    let gate = obj ()
+    // DSL-MUTABLE: resource — one-shot materialization admission release action
+    let mutable releaseAction: (unit -> unit) option = Some release
+
+    member _.Release() =
+        let pending =
+            lock gate (fun () ->
+                match releaseAction with
+                | Some action ->
+                    releaseAction <- None
+                    Some action
+                | None -> None)
+
+        match pending with
+        | Some action -> action ()
+        | None -> ()
+
+
+type BloggerMaterializationAdmission() =
+    let gate = obj ()
+
+    let queues =
+        System.Collections.Generic.Dictionary<
+            string,
+            System.Collections.Generic.Queue<TaskCompletionSource<BloggerMaterializationLease>>
+         >()
+
+    let rec release sessionId =
+        let next =
+            lock gate (fun () ->
+                match queues.TryGetValue sessionId with
+                | true, waiters when waiters.Count > 0 -> Some(waiters.Dequeue())
+                | true, _ ->
+                    queues.Remove sessionId |> ignore
+                    None
+                | false, _ -> None)
+
+        match next with
+        | Some waiter -> waiter.SetResult(BloggerMaterializationLease(fun () -> release sessionId))
+        | None -> ()
+
+    member _.Acquire(sessionId: string) : Task<BloggerMaterializationLease> =
+        lock gate (fun () ->
+            match queues.TryGetValue sessionId with
+            | true, waiters ->
+                let waiter =
+                    TaskCompletionSource<BloggerMaterializationLease>(
+                        TaskCreationOptions.RunContinuationsAsynchronously
+                    )
+
+                waiters.Enqueue waiter
+                waiter.Task
+            | false, _ ->
+                queues.Add(sessionId, System.Collections.Generic.Queue())
+                Task.FromResult(BloggerMaterializationLease(fun () -> release sessionId)))
 
 /// C5: unified Entry|Squash receipt keyed by ProviderRun (item 12).
 /// Kind reuses BlogFrameKind — the frame-vs-cycle distinction is the same

@@ -121,6 +121,6 @@ module ProviderLanguageSurface =
             Wanxiangshu.OpenCode.ProviderLanguageBinding.ensureRoot sid |> ignore
             let input = createObj [ "sessionID" ==> sessionId; "model" ==> createObj [] ]
             let output = createObj [ "system" ==> system ]
-            let! _ = Wanxiangshu.OpenCode.ProviderSystemTransform.create None input output
+            let! _ = Wanxiangshu.OpenCode.ProviderSystemTransform.createWith (fun _ -> None) input output
             return box {| system = unbox<string array> output?system |}
         }

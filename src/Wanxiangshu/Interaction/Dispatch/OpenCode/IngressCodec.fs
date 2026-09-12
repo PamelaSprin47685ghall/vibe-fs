@@ -279,7 +279,7 @@ module PromptIngressCodec =
             | [] -> None
             | texts -> Some(String.concat "\n" texts)
 
-    let decode (input: obj) (output: obj) : DecodedMessage =
+    let decodeWith (tryResolveAgent: SessionId -> string option) (input: obj) (output: obj) : DecodedMessage =
         let message = childObject output "message"
         let info = childObject output "info"
         let properties = childObject output "properties"
@@ -294,7 +294,7 @@ module PromptIngressCodec =
         let explicitAgent =
             match explicitAgent with
             | Text agent -> Some agent
-            | MissingText -> sessionId |> Option.bind SessionExecutionBinding.tryAgent
+            | MissingText -> sessionId |> Option.bind tryResolveAgent
             | MalformedText -> None
 
         { SessionId = sessionId

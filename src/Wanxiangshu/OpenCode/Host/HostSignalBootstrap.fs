@@ -717,7 +717,9 @@ module HostSignalBootstrap =
 
                         // Decode and resolve once; routing and physical authority consume
                         // the same frozen claim and identity evidence.
-                        let decoded = PromptIngressCodec.decode input output
+                        let decoded =
+                            PromptIngressCodec.decodeWith SessionExecutionBinding.tryAgent input output
+
                         let! decoded = resolveAgentForDecodedMessage decoded
 
                         let intent =
