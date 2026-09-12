@@ -8,6 +8,8 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Outcome
 
 /// Opaque JS owner for Main tip-guidance delivery. Journal handles and typed
 /// facts stay inside this boundary; tests provide only semantic ids and

@@ -23,6 +23,7 @@ open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Composition.Durable
 
 module HostForkAgentOwner =
 
@@ -47,12 +48,12 @@ module HostForkAgentOwner =
         (onDetachedFailure: (string -> Task) option)
         : Task<Result<PromptKey, string>> =
         let sendClaimed (durable: AgentJournal) =
-            let dispatcher = PromptDispatcher.forJournal durable
+            let dispatcher = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
 
             match onAccepted, onDetachedFailure with
             | Some accepted, _ ->
                 dispatcher.SendAgentOwnerRoot
-                    sessions
+                    (DispatchSessionPort.ofSessionPort sessions)
                     childId
                     prompt
                     identitySeed
@@ -60,11 +61,11 @@ module HostForkAgentOwner =
                     PromptDispatcher.AwaitMode.Await
                     (Some accepted)
             | None, Some callback ->
-                dispatcher.SendAgentOwnerRootDetachedObserved sessions childId prompt identitySeed directory callback
+                dispatcher.SendAgentOwnerRootDetachedObserved (DispatchSessionPort.ofSessionPort sessions) childId prompt identitySeed directory callback
             | None, None ->
                 // PROMPT-007 Detached: child owner root does not wait for PhysicalAccepted.
                 dispatcher.SendAgentOwnerRoot
-                    sessions
+                    (DispatchSessionPort.ofSessionPort sessions)
                     childId
                     prompt
                     identitySeed

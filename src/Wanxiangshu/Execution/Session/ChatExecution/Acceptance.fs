@@ -3,20 +3,17 @@ namespace Wanxiangshu.Execution.Session.ChatExecution
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
-open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Execution.Failure
+open Wanxiangshu.Interaction.Authority
 
 /// Proof that the exact execution acceptance is present in the durable projection.
 type ManagedChatAcceptanceWitness =
-    private | ManagedChatAcceptanceWitness of ChatExecutionKey * AcceptedChatExecutionEvidence
+    | ManagedChatAcceptanceWitness of ChatExecutionKey * AcceptedChatExecutionEvidence
 
 [<RequireQualifiedAccess>]
 module ManagedChatAcceptanceWitness =
@@ -45,13 +42,13 @@ type ManagedChatAcceptanceError =
 
 /// The canonical acceptance operation needs only an exact projection read and
 /// the existing durable AgentFact append capability.
-type internal ManagedChatAcceptancePersistence =
+type ManagedChatAcceptancePersistence =
     { ReadExact: ChatExecutionKey -> ChatExecutionState option
       AppendAccepted: ChatExecutionKey -> AcceptedChatExecutionEvidence -> Task<Result<unit, JournalAppendFailure>> }
 
 /// Proof that the exact provider step is present in the durable projection.
 type ManagedChatProviderStartedWitness =
-    private | ManagedChatProviderStartedWitness of ChatExecutionKey * ProviderStartedEvidence
+    | ManagedChatProviderStartedWitness of ChatExecutionKey * ProviderStartedEvidence
 
 [<RequireQualifiedAccess>]
 module ManagedChatProviderStartedWitness =
@@ -62,7 +59,7 @@ module ManagedChatProviderStartedWitness =
 
 /// Proof that the exact terminal disposition is present in the durable projection.
 type ManagedChatTerminalWitness =
-    private | ManagedChatTerminalWitness of
+    | ManagedChatTerminalWitness of
         ChatExecutionKey *
         ChatExecutionTerminalEvidence *
         ChatExecutionTerminalDisposition
@@ -95,12 +92,12 @@ type ManagedChatProviderLifecycleError =
     | CommitUnknown of EventId * JournalFailure
     | FactRejected of EventId * FoldRejection
 
-type internal ManagedChatProviderLifecyclePersistence =
+type ManagedChatProviderLifecyclePersistence =
     { ReadExact: ChatExecutionKey -> ChatExecutionState option
       AppendFact: ProviderStartedEvidence -> ChatExecutionFactCases -> Task<Result<unit, JournalAppendFailure>> }
 
 [<RequireQualifiedAccess>]
-module private ManagedChatExecutionFlight =
+module internal ManagedChatExecutionFlight =
 
     let private gate = obj ()
     let private inFlight = Dictionary<RuntimeId * ChatExecutionKey, Task>()
@@ -144,6 +141,17 @@ module private ManagedChatExecutionFlight =
             let flightKey = runtimeId, key
             start flightKey (preceding flightKey) operation)
 
+module JournalAppendOutcome =
+
+    let toExecutionFailure =
+        function
+        | Wanxiangshu.Foundation.JournalAppendFailure.WriterUnavailable _ ->
+            ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted
+        | Wanxiangshu.Foundation.JournalAppendFailure.FactRejected _ ->
+            ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed
+        | Wanxiangshu.Foundation.JournalAppendFailure.WriteUnknown _ ->
+            ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown
+
 [<RequireQualifiedAccess>]
 module ManagedChatAcceptance =
 
@@ -151,7 +159,7 @@ module ManagedChatAcceptance =
         { SessionId = evidence.SessionId
           PhysicalUserMessageId = evidence.PhysicalUserMessageId }
 
-    let internal evidenceFromIntent
+    let evidenceFromIntent
         (authority: PromptAuthority.AuthorityExecutionProfile)
         (physicalUserMessageId: PhysicalUserMessageId)
         (origin: PromptOrigin)
@@ -187,34 +195,14 @@ module ManagedChatAcceptance =
         | Some established ->
             Error(ManagedChatAcceptanceError.ProjectionConflictAfterCommit(established.Evidence, attempted))
 
-    let internal persistenceError failure =
-        match JournalAppendFailure.toExecutionFailure failure, failure with
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted,
-          JournalAppendFailure.WriterUnavailable(eventId, unavailable) ->
+    let persistenceError failure =
+        match failure with
+        | JournalAppendFailure.WriterUnavailable(eventId, unavailable) ->
             ManagedChatAcceptanceError.NotAttempted(eventId, unavailable)
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown,
-          JournalAppendFailure.WriteUnknown(eventId, writeFailure) ->
+        | JournalAppendFailure.WriteUnknown(eventId, writeFailure) ->
             ManagedChatAcceptanceError.CommitUnknown(eventId, writeFailure)
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed,
-          JournalAppendFailure.FactRejected(eventId, rejection) ->
+        | JournalAppendFailure.FactRejected(eventId, rejection) ->
             ManagedChatAcceptanceError.FactRejected(eventId, rejection)
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted,
-          (JournalAppendFailure.WriteUnknown _ | JournalAppendFailure.FactRejected _)
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown,
-          (JournalAppendFailure.WriterUnavailable _ | JournalAppendFailure.FactRejected _)
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed,
-          (JournalAppendFailure.WriterUnavailable _ | JournalAppendFailure.WriteUnknown _)
-        | ExecutionFailure.LocalInvariant, _
-        | ExecutionFailure.ProtocolRejection, _
-        | ExecutionFailure.AuthorizationDenied, _
-        | ExecutionFailure.UserCancelled, _
-        | ExecutionFailure.Superseded, _
-        | ExecutionFailure.CapacityQueueFull, _
-        | ExecutionFailure.ProviderTransient, _
-        | ExecutionFailure.ProviderPermanent, _
-        | ExecutionFailure.AcceptanceUnknown, _
-        | ExecutionFailure.StreamInterruptedAfterFirstToken, _ ->
-            invalidOp "journal append commitment contradicts physical receipt"
 
     let private decide key evidence projected =
         validate key evidence
@@ -232,7 +220,7 @@ module ManagedChatAcceptance =
             return result |> Result.mapError persistenceError
         }
 
-    let internal acceptWith
+    let acceptWith
         (persistence: ManagedChatAcceptancePersistence)
         (key: ChatExecutionKey)
         (evidence: AcceptedChatExecutionEvidence)
@@ -246,44 +234,6 @@ module ManagedChatAcceptance =
                 do! append persistence key evidence
                 return! witnessFromProjected key evidence (persistence.ReadExact key)
         }
-
-    let private forJournal (journal: AgentJournal) : ManagedChatAcceptancePersistence =
-        { ReadExact =
-            fun key ->
-                AgentJournal.snapshot journal
-                |> fun projection -> projection.AgentProjections.ChatExecutions
-                |> ChatExecutionProjection.byKey key
-          AppendAccepted =
-            fun key evidence ->
-                task {
-                    let! appended =
-                        AgentJournal.appendAgent
-                            (StreamId.Session key.SessionId)
-                            None
-                            (ChatExecutionFact.Accepted
-                                {| SchemaVersion = 1
-                                   Key = key
-                                   Evidence = evidence |})
-                            journal
-
-                    return appended |> Result.map ignore
-                } }
-
-    let private acceptOnce
-        (journal: AgentJournal)
-        (key: ChatExecutionKey)
-        (evidence: AcceptedChatExecutionEvidence)
-        : Task<Result<ManagedChatAcceptanceWitness, ManagedChatAcceptanceError>> =
-        acceptWith (forJournal journal) key evidence
-
-    /// Establish durable acceptance. Equal concurrent requests share the one
-    /// physical append across every caller holding the same journal runtime.
-    let internal accept
-        (journal: AgentJournal)
-        (key: ChatExecutionKey)
-        (evidence: AcceptedChatExecutionEvidence)
-        : Task<Result<ManagedChatAcceptanceWitness, ManagedChatAcceptanceError>> =
-        ManagedChatExecutionFlight.run (AgentJournal.runtimeId journal) key (fun () -> acceptOnce journal key evidence)
 
 [<RequireQualifiedAccess>]
 module ManagedChatProviderLifecycle =
@@ -304,17 +254,13 @@ module ManagedChatProviderLifecycle =
                 Error(ManagedChatProviderLifecycleError.AttemptKeyMismatch(supplied, key)))
 
     let private persistenceError failure =
-        match JournalAppendFailure.toExecutionFailure failure, failure with
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted,
-          JournalAppendFailure.WriterUnavailable(eventId, unavailable) ->
+        match failure with
+        | JournalAppendFailure.WriterUnavailable(eventId, unavailable) ->
             ManagedChatProviderLifecycleError.NotAttempted(eventId, unavailable)
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown,
-          JournalAppendFailure.WriteUnknown(eventId, writeFailure) ->
+        | JournalAppendFailure.WriteUnknown(eventId, writeFailure) ->
             ManagedChatProviderLifecycleError.CommitUnknown(eventId, writeFailure)
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed,
-          JournalAppendFailure.FactRejected(eventId, rejection) ->
+        | JournalAppendFailure.FactRejected(eventId, rejection) ->
             ManagedChatProviderLifecycleError.FactRejected(eventId, rejection)
-        | _ -> invalidOp "journal append commitment contradicts physical receipt"
 
     let private established key evidence persistence =
         validate key evidence
@@ -425,7 +371,7 @@ module ManagedChatProviderLifecycle =
         | ChatExecutionLifecycle.Terminal establishedDisposition ->
             existingTerminal key current startedEvidence establishedDisposition disposition
 
-    let internal startWith
+    let startWith
         (persistence: ManagedChatProviderLifecyclePersistence)
         (key: ChatExecutionKey)
         (acceptedEvidence: AcceptedChatExecutionEvidence)
@@ -463,7 +409,7 @@ module ManagedChatProviderLifecycle =
             | ExistingStart witness -> return witness
         }
 
-    let internal terminalWith
+    let terminalWith
         (persistence: ManagedChatProviderLifecyclePersistence)
         (key: ChatExecutionKey)
         (startedEvidence: ProviderStartedEvidence)
@@ -494,41 +440,3 @@ module ManagedChatProviderLifecycle =
             | ExistingTerminal witness -> return witness
         }
 
-    let private forJournal (journal: AgentJournal) : ManagedChatProviderLifecyclePersistence =
-        { ReadExact =
-            fun key ->
-                AgentJournal.snapshot journal
-                |> fun projection -> projection.AgentProjections.ChatExecutions
-                |> ChatExecutionProjection.byKey key
-          AppendFact =
-            fun startedEvidence fact ->
-                task {
-                    let! appended =
-                        AgentJournal.appendAgent
-                            (StreamId.Session startedEvidence.Accepted.SessionId)
-                            (Some startedEvidence.ProviderRun)
-                            (AgentFact.ChatExecution fact)
-                            journal
-
-                    return appended |> Result.map ignore
-                } }
-
-    let internal providerStarted
-        (journal: AgentJournal)
-        (key: ChatExecutionKey)
-        (acceptedEvidence: AcceptedChatExecutionEvidence)
-        (providerRun: ProviderRunIdentity)
-        (requestKind: ProviderRequestKind)
-        (projectionChoice: XProjectionChoice)
-        =
-        ManagedChatExecutionFlight.run (AgentJournal.runtimeId journal) key (fun () ->
-            startWith (forJournal journal) key acceptedEvidence providerRun requestKind projectionChoice)
-
-    let internal terminal
-        (journal: AgentJournal)
-        (key: ChatExecutionKey)
-        (startedEvidence: ProviderStartedEvidence)
-        (disposition: ChatExecutionTerminalDisposition)
-        =
-        ManagedChatExecutionFlight.run (AgentJournal.runtimeId journal) key (fun () ->
-            terminalWith (forJournal journal) key startedEvidence disposition)

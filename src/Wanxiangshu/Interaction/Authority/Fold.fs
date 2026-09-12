@@ -2,6 +2,7 @@ namespace Wanxiangshu.Interaction.Authority
 
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
+open Wanxiangshu.Foundation
 
 [<RequireQualifiedAccess>]
 type PromptAuthorityProjectionChange =

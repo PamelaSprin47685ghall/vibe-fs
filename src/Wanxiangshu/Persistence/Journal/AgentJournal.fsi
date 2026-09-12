@@ -10,6 +10,7 @@ open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
+open Wanxiangshu.Foundation
 
 type JournalChange =
     { Revision: JournalRevision
@@ -19,14 +20,6 @@ type MagicTodoAppendReceipt =
     { EventId: EventId
       Projection: ProjectionSet }
 
-type JournalAppendFailure =
-    | WriteUnknown of EventId * JournalFailure
-    | WriterUnavailable of EventId * JournalUnavailable
-    | FactRejected of EventId * FoldRejection
-
-module JournalAppendFailure =
-    val toExecutionFailure: JournalAppendFailure -> ExecutionFailure
-    val describe: failure: JournalAppendFailure -> string
 
 type AgentJournal =
     interface IAsyncDisposable

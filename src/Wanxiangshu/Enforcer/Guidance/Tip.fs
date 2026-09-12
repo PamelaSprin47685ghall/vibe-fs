@@ -6,6 +6,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Foundation
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Resources
 open Wanxiangshu.Participant.Provider

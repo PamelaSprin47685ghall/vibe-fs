@@ -13,6 +13,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.concern-routing.interaction-concern-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-linkage-projection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.guidance-delivery.opencode-host-pairprogramming-guidelineprojection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.institutional-learning.enforcer-institutionallearning-facts.fsproj"/>
@@ -28,8 +29,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-association.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.execution-session-sessionstartedatprojection.fsproj"/>
-    <Compile Include="Composition/Durable/FoldRejection.fsi"/>
-    <Compile Include="Composition/Durable/FoldRejection.fs"/>
     <Compile Include="Composition/Durable/MagicTodoProjection.fsi"/>
     <Compile Include="Composition/Durable/MagicTodoProjection.fs"/>
     <Compile Include="Composition/Durable/Projection.fsi"/>

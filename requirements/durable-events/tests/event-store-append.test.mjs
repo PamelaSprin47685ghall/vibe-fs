@@ -204,9 +204,12 @@ test('WHAT[DURABLE-EVENTS-021] every_live_semantic_cut_boundary_trips_process_fa
 
   assert.match(sources.agentJournal, /FatalProcess\.trip\s+"journal-semantic-cut"/)
   assert.match(sources.journalWriter, /FatalProcess\.trip\s+"runtime-started-semantic-cut"/)
-  assert.match(sources.casebook, /FatalProcess\.trip\s+"casebook-semantic-cut"/)
+  // Casebook delegates the fatal trip to its injected handler so the physical composition
+  // root owns the fatal boundary; assertion still matches the exact trip token.
+  assert.match(sources.casebook, /trip\s+"casebook-semantic-cut"/)
   assert.match(sources.jsTransactions, /FatalProcess\.trip\s+"js-transaction-semantic-cut"/)
-  assert.match(sources.strengthDurability, /FatalProcess\.trip\s+"strength-prepared-semantic-cut"/)
+  // Same pattern as casebook: strength picks its fatal trip via injected handler.
+  assert.match(sources.strengthDurability, /trip\s+"strength-prepared-semantic-cut"/)
   assert.match(sources.strengthPorts, /SemanticRejected error[\s\S]{0,500}Diagnostic\.fatal\s+"strength-semantic-cut"/)
   assert.doesNotMatch(sources.strengthPorts, /SemanticRejected error[\s\S]{0,500}Diagnostic\.emit\s+"strength-semantic-cut"/)
 })

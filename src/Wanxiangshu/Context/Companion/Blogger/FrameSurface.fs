@@ -3,6 +3,7 @@ namespace Wanxiangshu.Context.Companion.Blogger
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation
 
 /// Context-compression frame owner. The JavaScript boundary exchanges only
 /// JSON-shaped frame/projection snapshots; BlogProjection's list, map, DU and

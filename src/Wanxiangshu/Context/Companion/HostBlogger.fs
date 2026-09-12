@@ -122,7 +122,7 @@ module internal CompanionHostBlogger =
                 // PROMPT-007 Detached: Blogger dispatch does not wait for PhysicalAccepted.
                 return!
                     dispatcher.SendAgentOwnerRoot
-                        deps.Sessions
+                        (DispatchSessionPort.ofSessionPort deps.Sessions)
                         childId
                         prompt
                         identitySeed
@@ -137,12 +137,12 @@ module internal CompanionHostBlogger =
         (prompt: string)
         (journal: AgentJournal)
         : Task<Result<PromptKey, string>> =
-        let dispatcher = PromptDispatcher.forJournal journal
+        let dispatcher = PromptDispatcher.forPrompts (PromptJournalAdapter.create journal)
 
         match (dispatcher.ProjectionFor childId).ActiveLogicalRun with
         | Some profile ->
             dispatcher.SendContinuation
-                deps.Sessions
+                (DispatchSessionPort.ofSessionPort deps.Sessions)
                 childId
                 prompt
                 PromptAuthority.ContinuationKind.ManagedDelegationAssignment

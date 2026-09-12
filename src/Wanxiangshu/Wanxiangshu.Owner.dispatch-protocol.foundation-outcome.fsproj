@@ -3,7 +3,7 @@
     <WanxiangshuSemanticOwner>dispatch-protocol</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>foundation-outcome</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
-    <WanxiangshuSubsystem>chat-execution</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>runtime-platform</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>outcome</WanxiangshuCompileShard>
   </PropertyGroup>
   <ItemGroup>

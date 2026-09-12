@@ -2,10 +2,7 @@ namespace Wanxiangshu.Execution.Session.ChatExecution
 
 open System.Threading.Tasks
 open FsToolkit.ErrorHandling
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
-open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]
 type PreProviderSettlementError =
@@ -19,7 +16,7 @@ type PreProviderSettlementError =
     | PersistenceFailed of JournalAppendFailure
 
 type PreProviderTerminalWitness =
-    private | PreProviderTerminalWitness of ChatExecutionKey * ChatExecutionTerminalDisposition
+    | PreProviderTerminalWitness of ChatExecutionKey * ChatExecutionTerminalDisposition
 
 [<RequireQualifiedAccess>]
 module PreProviderTerminalWitness =
@@ -27,7 +24,7 @@ module PreProviderTerminalWitness =
     let key (PreProviderTerminalWitness(key, _)) = key
     let disposition (PreProviderTerminalWitness(_, disposition)) = disposition
 
-type internal PreProviderSettlementPersistence =
+type PreProviderSettlementPersistence =
     { ReadExact: ChatExecutionKey -> ChatExecutionState option
       AppendTerminal:
           ChatExecutionKey
@@ -74,7 +71,7 @@ module PreProviderSettlement =
         | None -> Error(PreProviderSettlementError.ProjectionMissingAfterCommit key)
         | Some state -> Error(PreProviderSettlementError.ProjectionConflictAfterCommit state)
 
-    let internal settleWith
+    let settleWith
         (persistence: PreProviderSettlementPersistence)
         (key: ChatExecutionKey)
         (evidence: AcceptedChatExecutionEvidence)
@@ -96,37 +93,3 @@ module PreProviderSettlement =
 
             return! witness key evidence disposition persistence
         }
-
-    let private forJournal (journal: AgentJournal) : PreProviderSettlementPersistence =
-        { ReadExact =
-            fun key ->
-                AgentJournal.snapshot journal
-                |> fun projection -> projection.AgentProjections.ChatExecutions
-                |> ChatExecutionProjection.byKey key
-          AppendTerminal =
-            fun key evidence disposition ->
-                task {
-                    let fact =
-                        ChatExecutionFactCases.Terminal
-                            {| SchemaVersion = 1
-                               Key = key
-                               Evidence = ChatExecutionTerminalEvidence.PreProvider evidence
-                               Disposition = disposition |}
-
-                    let! appended =
-                        AgentJournal.appendAgent
-                            (StreamId.Session key.SessionId)
-                            None
-                            (AgentFact.ChatExecution fact)
-                            journal
-
-                    return appended |> Result.map ignore
-                } }
-
-    let settle
-        (journal: AgentJournal)
-        (key: ChatExecutionKey)
-        (evidence: AcceptedChatExecutionEvidence)
-        (disposition: ChatExecutionTerminalDisposition)
-        =
-        settleWith (forJournal journal) key evidence disposition

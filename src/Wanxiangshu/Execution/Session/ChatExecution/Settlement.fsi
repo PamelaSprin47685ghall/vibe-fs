@@ -1,7 +1,7 @@
 namespace Wanxiangshu.Execution.Session.ChatExecution
 
+open Wanxiangshu.Foundation
 open System.Threading.Tasks
-open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]
 type PreProviderSettlementError =
@@ -15,14 +15,14 @@ type PreProviderSettlementError =
     | PersistenceFailed of JournalAppendFailure
 
 type PreProviderTerminalWitness =
-    private | PreProviderTerminalWitness of ChatExecutionKey * ChatExecutionTerminalDisposition
+    | PreProviderTerminalWitness of ChatExecutionKey * ChatExecutionTerminalDisposition
 
 [<RequireQualifiedAccess>]
 module PreProviderTerminalWitness =
     val key: PreProviderTerminalWitness -> ChatExecutionKey
     val disposition: PreProviderTerminalWitness -> ChatExecutionTerminalDisposition
 
-type internal PreProviderSettlementPersistence =
+type PreProviderSettlementPersistence =
     { ReadExact: ChatExecutionKey -> ChatExecutionState option
       AppendTerminal:
           ChatExecutionKey
@@ -32,16 +32,10 @@ type internal PreProviderSettlementPersistence =
 
 [<RequireQualifiedAccess>]
 module PreProviderSettlement =
-    val internal settleWith:
+    val settleWith:
         persistence: PreProviderSettlementPersistence ->
         key: ChatExecutionKey ->
         evidence: AcceptedChatExecutionEvidence ->
         disposition: ChatExecutionTerminalDisposition ->
             Task<Result<PreProviderTerminalWitness, PreProviderSettlementError>>
 
-    val settle:
-        journal: AgentJournal ->
-        key: ChatExecutionKey ->
-        evidence: AcceptedChatExecutionEvidence ->
-        disposition: ChatExecutionTerminalDisposition ->
-            Task<Result<PreProviderTerminalWitness, PreProviderSettlementError>>

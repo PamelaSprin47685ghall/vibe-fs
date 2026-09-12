@@ -1,18 +1,16 @@
 namespace Wanxiangshu.Execution.Session.ChatExecution
 
 open System.Threading.Tasks
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Foundation
 open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
+open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Persistence.Journal
 
 type ManagedChatAcceptanceWitness =
-    private | ManagedChatAcceptanceWitness of ChatExecutionKey * AcceptedChatExecutionEvidence
+    | ManagedChatAcceptanceWitness of ChatExecutionKey * AcceptedChatExecutionEvidence
 
 [<RequireQualifiedAccess>]
 module ManagedChatAcceptanceWitness =
@@ -36,12 +34,12 @@ type ManagedChatAcceptanceError =
     | CommitUnknown of EventId * JournalFailure
     | FactRejected of EventId * FoldRejection
 
-type internal ManagedChatAcceptancePersistence =
+type ManagedChatAcceptancePersistence =
     { ReadExact: ChatExecutionKey -> ChatExecutionState option
       AppendAccepted: ChatExecutionKey -> AcceptedChatExecutionEvidence -> Task<Result<unit, JournalAppendFailure>> }
 
 type ManagedChatProviderStartedWitness =
-    private | ManagedChatProviderStartedWitness of ChatExecutionKey * ProviderStartedEvidence
+    | ManagedChatProviderStartedWitness of ChatExecutionKey * ProviderStartedEvidence
 
 [<RequireQualifiedAccess>]
 module ManagedChatProviderStartedWitness =
@@ -49,7 +47,7 @@ module ManagedChatProviderStartedWitness =
     val evidence: ManagedChatProviderStartedWitness -> ProviderStartedEvidence
 
 type ManagedChatTerminalWitness =
-    private | ManagedChatTerminalWitness of
+    | ManagedChatTerminalWitness of
         ChatExecutionKey *
         ChatExecutionTerminalEvidence *
         ChatExecutionTerminalDisposition
@@ -78,35 +76,30 @@ type ManagedChatProviderLifecycleError =
     | CommitUnknown of EventId * JournalFailure
     | FactRejected of EventId * FoldRejection
 
-type internal ManagedChatProviderLifecyclePersistence =
+type ManagedChatProviderLifecyclePersistence =
     { ReadExact: ChatExecutionKey -> ChatExecutionState option
       AppendFact: ProviderStartedEvidence -> ChatExecutionFactCases -> Task<Result<unit, JournalAppendFailure>> }
 
 [<RequireQualifiedAccess>]
 module ManagedChatAcceptance =
-    val internal evidenceFromIntent:
+    val evidenceFromIntent:
         authority: PromptAuthority.AuthorityExecutionProfile ->
         physicalUserMessageId: PhysicalUserMessageId ->
         origin: PromptOrigin ->
             AcceptedChatExecutionEvidence
 
-    val internal persistenceError: failure: JournalAppendFailure -> ManagedChatAcceptanceError
+    val persistenceError: failure: JournalAppendFailure -> ManagedChatAcceptanceError
 
-    val internal acceptWith:
+    val acceptWith:
         persistence: ManagedChatAcceptancePersistence ->
         key: ChatExecutionKey ->
         evidence: AcceptedChatExecutionEvidence ->
             Task<Result<ManagedChatAcceptanceWitness, ManagedChatAcceptanceError>>
 
-    val internal accept:
-        journal: AgentJournal ->
-        key: ChatExecutionKey ->
-        evidence: AcceptedChatExecutionEvidence ->
-            Task<Result<ManagedChatAcceptanceWitness, ManagedChatAcceptanceError>>
 
 [<RequireQualifiedAccess>]
 module ManagedChatProviderLifecycle =
-    val internal startWith:
+    val startWith:
         persistence: ManagedChatProviderLifecyclePersistence ->
         key: ChatExecutionKey ->
         acceptedEvidence: AcceptedChatExecutionEvidence ->
@@ -115,25 +108,12 @@ module ManagedChatProviderLifecycle =
         projectionChoice: XProjectionChoice ->
             Task<Result<ManagedChatProviderStartedWitness, ManagedChatProviderLifecycleError>>
 
-    val internal terminalWith:
+    val terminalWith:
         persistence: ManagedChatProviderLifecyclePersistence ->
         key: ChatExecutionKey ->
         startedEvidence: ProviderStartedEvidence ->
         disposition: ChatExecutionTerminalDisposition ->
             Task<Result<ManagedChatTerminalWitness, ManagedChatProviderLifecycleError>>
 
-    val internal providerStarted:
-        journal: AgentJournal ->
-        key: ChatExecutionKey ->
-        acceptedEvidence: AcceptedChatExecutionEvidence ->
-        providerRun: ProviderRunIdentity ->
-        requestKind: ProviderRequestKind ->
-        projectionChoice: XProjectionChoice ->
-            Task<Result<ManagedChatProviderStartedWitness, ManagedChatProviderLifecycleError>>
-
-    val internal terminal:
-        journal: AgentJournal ->
-        key: ChatExecutionKey ->
-        startedEvidence: ProviderStartedEvidence ->
-        disposition: ChatExecutionTerminalDisposition ->
-            Task<Result<ManagedChatTerminalWitness, ManagedChatProviderLifecycleError>>
+module JournalAppendOutcome =
+    val toExecutionFailure: Wanxiangshu.Foundation.JournalAppendFailure -> ExecutionFailure

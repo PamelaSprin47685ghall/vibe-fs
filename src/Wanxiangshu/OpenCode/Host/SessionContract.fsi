@@ -1,7 +1,3 @@
-namespace Wanxiangshu.Foundation
-
-type QuiescencePermit = interface end
-
 namespace Wanxiangshu.OpenCode
 
 open Wanxiangshu.Foundation
@@ -16,14 +12,6 @@ type DegenerationKind =
 type AbortCause =
     | DegenerationGuard of DegenerationKind
     | External
-
-[<RequireQualifiedAccess>]
-type QuiescencePermitFailure =
-    | WrongOwner
-    | NoFreshIdle
-    | AlreadyConsumed
-    | Superseded
-    | Revoked
 
 type ILoopSensor =
     abstract Observe: raw: obj -> unit

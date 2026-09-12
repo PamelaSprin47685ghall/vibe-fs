@@ -310,7 +310,7 @@
         "kind": "durable-intent",
         "path": "src/Wanxiangshu/Interaction/Dispatch/Send.fs",
         "symbols": [
-          "PluginPromptClaimed"
+          "PromptSessionFact.PromptClaimed"
         ]
       },
       "admission": {
@@ -325,7 +325,7 @@
         "kind": "transport-receipt",
         "path": "src/Wanxiangshu/Interaction/Dispatch/Send.fs",
         "symbols": [
-          "PluginPromptSubmitted",
+          "PromptSessionFact.PromptSubmitted",
           "SendOutcome"
         ]
       },
@@ -333,7 +333,7 @@
         "kind": "durable-outcome",
         "path": "src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs",
         "symbols": [
-          "PluginPromptPhysicalAccepted"
+          "PromptSessionFact.PromptPhysicalAccepted"
         ]
       },
       "effect_identity": "PromptKey plus PhysicalUserMessageId",

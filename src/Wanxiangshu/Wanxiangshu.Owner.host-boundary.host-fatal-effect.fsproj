@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>host</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>runtime-platform</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>host-fatal-effect</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>host-boundary</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>host-fatal-effect</WanxiangshuOwnerLocality>

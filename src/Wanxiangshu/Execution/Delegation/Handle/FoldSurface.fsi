@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Execution.Delegation
 
 open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Foundation
 
 /// JS-native fold replay boundary for durable handle lifecycle
 /// (MANAGED-SESSION-006/008/015).

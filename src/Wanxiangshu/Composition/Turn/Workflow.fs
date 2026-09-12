@@ -88,7 +88,7 @@ module TurnWorkflow =
                 task {
                     // Linked-child prompt authority is Application ownership: establish it
                     // once from durable linkage before bounded-context workflows consume the fact.
-                    let! _ = ChildPromptAuthority.ensureForLinkedChild journal turn
+                    let! _ = ChildPromptAuthority.ensureForLinkedChild (journal |> Option.map PromptJournalAdapter.create) turn
 
                     match turn.Role, turn.Observation, turn.Outcome with
                     | Some Role.Manager, _, _ ->

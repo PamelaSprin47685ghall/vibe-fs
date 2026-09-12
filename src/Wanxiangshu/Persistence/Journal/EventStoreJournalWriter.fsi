@@ -7,6 +7,7 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Persistence.EventStore
+open Wanxiangshu.Foundation
 
 [<Sealed>]
 type EventStoreBlobWriter =

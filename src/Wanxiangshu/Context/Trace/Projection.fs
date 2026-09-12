@@ -2,6 +2,7 @@ namespace Wanxiangshu.Context.Trace
 
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation
 
 /// COMPANION-003 / HOST-005: the XTrace's durable projection.
 ///

@@ -1,6 +1,6 @@
 namespace Wanxiangshu.Execution.Session.ChatExecution
 
-open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 [<RequireQualifiedAccess>]

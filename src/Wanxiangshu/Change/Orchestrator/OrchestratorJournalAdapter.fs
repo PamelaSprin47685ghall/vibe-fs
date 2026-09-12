@@ -6,6 +6,7 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Foundation
 
 module OrchestratorJournalAdapter =
     let forSweep (journal: AgentJournal) : OrchestratorSweepPort =

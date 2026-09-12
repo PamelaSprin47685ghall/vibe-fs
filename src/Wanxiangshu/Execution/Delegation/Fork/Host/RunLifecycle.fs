@@ -167,11 +167,11 @@ module HostForkRunLifecycle =
         (onAccepted: PhysicalUserMessageId -> unit)
         : Task<AgentOwnerDispatchOutcome> =
         task {
-            let svc = PromptDispatcher.forJournal durable
+            let svc = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
 
             let! sent =
                 svc.SendAgentOwnerRoot
-                    sessions
+                    (DispatchSessionPort.ofSessionPort sessions)
                     childId
                     prompt
                     identitySeed

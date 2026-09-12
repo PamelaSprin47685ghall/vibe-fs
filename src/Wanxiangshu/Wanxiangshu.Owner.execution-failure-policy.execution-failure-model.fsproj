@@ -1,21 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>chat-execution</WanxiangshuSubsystem>
-    <WanxiangshuCompileShard>execution-failure-model</WanxiangshuCompileShard>
+    <WanxiangshuSubsystem>provider</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>execution-failure-vocab</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>execution-failure-policy</WanxiangshuSemanticOwner>
-    <WanxiangshuOwnerLocality>execution-failure-model</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocality>execution-failure-vocab</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-facts.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-failure.fsproj"/>
-    <Compile Include="Execution/Failure/Decision.fsi"/>
-    <Compile Include="Execution/Failure/Decision.fs"/>
-    <Compile Include="Execution/Failure/Policy.fsi"/>
-    <Compile Include="Execution/Failure/Policy.fs"/>
-    <Compile Include="Execution/Failure/Surface.fsi"/>
-    <Compile Include="Execution/Failure/Surface.fs"/>
+    <Compile Include="Execution/Failure/Model.fsi"/>
+    <Compile Include="Execution/Failure/Model.fs"/>
   </ItemGroup>
 </Project>

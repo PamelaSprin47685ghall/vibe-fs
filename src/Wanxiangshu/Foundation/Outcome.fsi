@@ -53,3 +53,22 @@ module Outcome =
         | Rejected of EventId * reason: string
         | NotAttempted of EventId * JournalUnavailable
         | CommitUnknown of EventId * JournalFailure
+/// Why a journal line was refused during a fold.
+///
+/// PERSIST-004 requires a corrupt journal to stop startup rather than be
+/// absorbed. A benign duplicate is not corruption, so the two are separated
+/// here: `FoldRejection` means the line is impossible, and the caller must fail
+/// closed.
+type FoldRejection = { Fact: string; Reason: string }
+
+module FoldRejection =
+    val reject: factName: string -> reason: string -> Result<'a, FoldRejection>
+
+/// Physical fate of a single journal append.
+type JournalAppendFailure =
+    | WriteUnknown of EventId * Outcome.JournalFailure
+    | WriterUnavailable of EventId * Outcome.JournalUnavailable
+    | FactRejected of EventId * FoldRejection
+
+module JournalAppendFailure =
+    val describe: failure: JournalAppendFailure -> string

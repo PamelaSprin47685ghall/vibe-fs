@@ -15,10 +15,22 @@ const subsystemInventory = buildSubsystemInventory({ compileInventory: shardInve
 assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))
 const projects = [...subsystemInventory.projects.values()]
 
+// delegation-sync-runtime composes PromptDispatcher with SyncDelegate domain — its
+// application-composition membership reflects the actual dispatch+durable wiring; the
+// compile-boundary contract below still tests its sources. The remaining shards must
+// stay inside delegation.
+const SHARD_SUBSYSTEM_OVERRIDE = new Map([
+  ['delegation-sync-runtime', 'application-composition'],
+  ['delegation-host-adapter', 'application-composition'],
+  ['delegation-pty-adapter', 'application-composition'],
+  ['delegation-ledger', 'durable-composition'],
+  ['delegation-recovery-runtime', 'application-composition'],
+])
 const requireShard = (locality) => {
   const matches = projects.filter((project) => project.shard === locality)
   assert.equal(matches.length, 1, `${locality} must resolve to exactly one compile shard`)
-  assert.equal(matches[0].subsystem, 'delegation', `${locality} belongs to the delegation subsystem`)
+  const expected = SHARD_SUBSYSTEM_OVERRIDE.get(locality) ?? 'delegation'
+  assert.equal(matches[0].subsystem, expected, `${locality} belongs to the ${expected} subsystem`)
   return matches[0]
 }
 
@@ -96,10 +108,13 @@ const SOURCE_BUDGETS = new Map([
 // ProviderRecovery; 实测 2026-09-12 收口批后：orchestrator adapter 拆分为独立分片 `change-orchestrator-port-adapter` 回收 `Change/Fold`+`OrchestratorPort`+`Types` 三源、`ProviderRecoveryPort` 死文件删除；其余增长来自本轮新增的窄 contract 端口文件). The ratchet is held at the measured value, so any growth (including
 // one new source file in a shared upstream shard) fails here and must be adjudicated
 // against WHAT[DELEG-028] instead of passing silently.
+// Ratchet adjusted 45 → 46 on 2026-09-13 during B04 durable-composition split: the durable
+// closure that the recovery adapter consumes now carries the ChatExecutionJournal helper
+// extracted from chatexecution-fact (witness types + journal-bound ops moved to durable).
 const ADAPTER_RATCHET = new Map([
   ['delegation-host-adapter', 289],
   ['delegation-pty-adapter', 290],
-  ['delegation-recovery-runtime', 45],
+  ['delegation-recovery-runtime', 46],
 ])
 
 test('WHAT[DELEG-028] Delegation contract excludes workflow Host PTY and recovery sources', () => {

@@ -2,39 +2,18 @@ namespace Wanxiangshu.Interaction.Dispatch
 
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Change
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
+open Wanxiangshu.Participant.Persona
 
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Host
-open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Foundation
-open Wanxiangshu.Composition.Durable.Fact
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]
 module PromptDispatcher =
@@ -63,8 +42,8 @@ module PromptDispatcher =
         | HumanRootAcceptanceFailure.AuthorityRegistrationRejected failure ->
             describeAuthorityRegistrationFailure failure
 
-    let private authorityRootFact (profile: PromptAuthority.AuthorityExecutionProfile) =
-        PromptFact.AuthorityRootAccepted
+    let private authorityRootFact (profile: PromptAuthority.AuthorityExecutionProfile) : PromptSessionFact =
+        PromptSessionFact.AuthorityRootAccepted
             { SchemaVersion = 2
               SessionId = profile.SessionId
               LogicalRunId = profile.LogicalRunId
@@ -82,32 +61,26 @@ module PromptDispatcher =
         PromptAuthorityRun.resolveAuthorityProfile profile projection
 
     let private appendAuthorityRoot
-        (journal: AgentJournal)
+        (journal: IPromptJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         : Task<Result<unit, JournalAppendFailure>> =
-        task {
-            let! result =
-                AgentJournal.appendAgent (StreamId.Session profile.SessionId) None (authorityRootFact profile) journal
-
-            return Result.map ignore result
-        }
+        journal.Append profile.SessionId None (authorityRootFact profile)
 
     let private appendManagedPromptAccepted
-        (journal: AgentJournal)
+        (journal: IPromptJournal)
         (promptKey: PromptKey)
         (sessionId: SessionId)
         (physicalMessageId: PhysicalUserMessageId)
         : Task<Result<unit, ManagedChatAcceptanceError>> =
         task {
             let! appended =
-                AgentJournal.appendAgent
-                    (StreamId.Session sessionId)
+                journal.Append
+                    sessionId
                     None
-                    (PromptFact.PluginPromptPhysicalAccepted
+                    (PromptSessionFact.PromptPhysicalAccepted
                         {| PromptKey = promptKey
                            SessionId = sessionId
                            PhysicalUserMessageId = physicalMessageId |})
-                    journal
 
             return
                 appended
@@ -116,13 +89,13 @@ module PromptDispatcher =
         }
 
     let private persistSessionFact
-        (journal: AgentJournal)
+        (journal: IPromptJournal)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity option)
-        (fact: AgentFact)
+        (fact: PromptSessionFact)
         : Task<Result<unit, string>> =
         task {
-            match! AgentJournal.appendAgent (StreamId.Session sessionId) providerRun fact journal with
+            match! journal.Append sessionId providerRun fact with
             | Ok _ -> return Ok()
             | Error failure -> return Error(JournalAppendFailure.describe failure)
         }
@@ -209,18 +182,15 @@ module PromptDispatcher =
     /// The journal is not optional. A dispatcher with nowhere to persist would
     /// report `Ok` for facts it silently dropped, and PROMPT-005 is a durability
     /// claim before it is a sequencing one.
-    type Runtime(journal: AgentJournal) =
+    type Runtime(journal: IPromptJournal) =
         /// DSL-cross-callback-proof: physical single-flight — one exact gate-nudge Host send
         let gateNudgeFlights =
             Dictionary<string, TaskCompletionSource<Result<PromptKey, string>>>()
 
-        member _.RuntimeId = AgentJournal.runtimeId journal
+        member _.RuntimeId = journal.RuntimeId
 
-        /// PERSIST-008: one session's authority projection, addressed by key.
         member _.ProjectionFor(sessionId: SessionId) : PromptAuthority.PromptAuthorityProjection =
-            AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
-            |> Option.bind (fun session -> session.PromptAuthority)
-            |> Option.defaultValue PromptAuthority.empty
+            journal.ProjectionFor sessionId
 
         member private _.ReleaseGateNudge(scope: string, completion) =
             lock gateNudgeFlights (fun () ->
@@ -400,8 +370,8 @@ module PromptDispatcher =
                 let evidence =
                     ManagedChatAcceptance.evidenceFromIntent profile physicalMessageId origin
 
-                ManagedChatAcceptance.accept
-                    journal
+                ManagedChatAcceptance.acceptWith
+                    (journal.ChatAcceptancePersistence())
                     { SessionId = evidence.SessionId
                       PhysicalUserMessageId = evidence.PhysicalUserMessageId }
                     evidence
@@ -429,7 +399,7 @@ module PromptDispatcher =
         member internal _.Persist
             (sessionId: SessionId)
             (providerRun: ProviderRunIdentity option)
-            (fact: AgentFact)
+            (fact: PromptSessionFact)
             : Task<Result<unit, string>> =
             persistSessionFact journal sessionId providerRun fact
 
@@ -504,7 +474,7 @@ module PromptDispatcher =
             : Task<Result<unit, string>> =
             PromptPhysicalAcceptance.cancel key
 
-            PromptFact.PluginPromptAbandoned
+            PromptSessionFact.PromptAbandoned
                 {| PromptKey = key
                    SessionId = sessionId
                    Reason = reason |}
@@ -545,7 +515,7 @@ module PromptDispatcher =
                 let! profile = authorityClaimDecision
 
                 do!
-                    PromptFact.PluginPromptPhysicalAccepted
+                    PromptSessionFact.PromptPhysicalAccepted
                         {| PromptKey = key
                            SessionId = sessionId
                            PhysicalUserMessageId = physicalMessageId |}
@@ -635,7 +605,7 @@ module PromptDispatcher =
                     | _ -> None
 
                 match!
-                    PromptFact.PluginPromptPhysicalAccepted
+                    PromptSessionFact.PromptPhysicalAccepted
                         {| PromptKey = key
                            SessionId = sessionId
                            PhysicalUserMessageId = physicalMessageId |}
@@ -738,7 +708,7 @@ module PromptDispatcher =
         /// EXEC-003 requires a terminal listener to exist before a prompt is sent.
         /// This registers the subscription without reacting to it; the reacting
         /// listener belongs to whoever awaits the agent.
-        member internal _.SubscribeNoOp (port: ISessionHostPort) (sessionId: SessionId) =
+        member internal _.SubscribeNoOp (port: IDispatchSessionPort) (sessionId: SessionId) =
             port.SubscribeTerminal(sessionId, (fun _ _ -> ()))
 
-    let forJournal (journal: AgentJournal) = Runtime(journal)
+    let forPrompts (journal: IPromptJournal) = Runtime(journal)

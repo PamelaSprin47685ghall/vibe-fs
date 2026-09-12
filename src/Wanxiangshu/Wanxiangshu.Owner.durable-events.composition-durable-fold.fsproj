@@ -24,7 +24,6 @@
     
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fold.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.interaction-repair-completedturn.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-ledger.fsproj"/>
     
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-fold.fsproj"/>
@@ -39,9 +38,17 @@
     <Compile Include="Composition/Durable/HostFactFold.fs"/>
     <Compile Include="Composition/Durable/DelegationProjectionBridge.fsi"/>
     <Compile Include="Composition/Durable/DelegationProjectionBridge.fs"/>
+    <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-facts.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.behavior-diagnosis.enforcer-projection.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-association.fsproj"/>
+    <Compile Include="Context/Companion/Blogger/ContextFactFold.fsi"/>
+    <Compile Include="Context/Companion/Blogger/ContextFactFold.fs"/>
     <Compile Include="Composition/Durable/DomainFamilyBridge.fsi"/>
     <Compile Include="Composition/Durable/DomainFamilyBridge.fs"/>
     <Compile Include="Composition/Durable/Fold.fsi"/>
     <Compile Include="Composition/Durable/Fold.fs"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.interaction-repair-completedturn.fsproj"/>
   </ItemGroup>
 </Project>

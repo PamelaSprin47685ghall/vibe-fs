@@ -11,6 +11,8 @@ open Wanxiangshu.Host
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Outcome
 
 /// Pair-programming provider projection owner surface. The transform owns its
 /// journal and placement invariants; callers observe only JSON messages/results.

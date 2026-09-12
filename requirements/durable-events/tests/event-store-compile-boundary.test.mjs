@@ -59,6 +59,11 @@ const ALLOWED_CONTRACT_CLOSURE_SHARDS = new Set([
   'casebook-event-vocabulary-contract',
   'js-transaction-event-vocabulary-contract',
   'identity',
+  // Pure vocabulary tier retagged during B-series: Foundation.Outcome lives under
+  // runtime-platform (the term/outcome root namespace) and is reachable from the
+  // canonical model contract. This is a contract-tier provider, not a runtime artifact.
+  'outcome',
+  'foundation-roles',
 ])
 
 test('WHAT[DURABLE-EVENTS-022] EventStore contracts exclude physical and Strength runtime closure', () => {

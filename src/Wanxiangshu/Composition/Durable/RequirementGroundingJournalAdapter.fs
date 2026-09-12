@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Foundation
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Host
 open Wanxiangshu.OpenCode.Host.RequirementGrounding

@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode.Host.PairProgramming
 
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation
 
 /// JS-native semantic owner for the durable pair-guideline projection. The
 /// typed GuidelineProjection fold remains private; states, gaps and rejection

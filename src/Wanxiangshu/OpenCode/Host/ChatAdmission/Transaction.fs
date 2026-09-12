@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Execution.Session.ChatExecution
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority

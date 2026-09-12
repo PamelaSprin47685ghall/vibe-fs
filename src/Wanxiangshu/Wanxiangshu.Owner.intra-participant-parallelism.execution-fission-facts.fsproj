@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+
     <Compile Include="Execution/Fission/Facts.fsi"/>
     <Compile Include="Execution/Fission/Facts.fs"/>
   </ItemGroup>

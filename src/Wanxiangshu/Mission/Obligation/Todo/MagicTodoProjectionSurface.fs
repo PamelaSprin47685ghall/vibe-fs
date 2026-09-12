@@ -7,6 +7,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjection
 open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Foundation
 
 /// JS-native projection and typed-fact owner for Magic Todo.
 /// The handle is a resource: F# maps, records, unions, and replay state never

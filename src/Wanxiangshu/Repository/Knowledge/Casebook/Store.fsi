@@ -29,6 +29,9 @@ module CasebookStore =
     /// True if the event type is one of the four Casebook event types.
     val isCasebookEventType: eventType: string -> bool
 
+    /// Configure the optional fatal process trip handler for semantic cuts.
+    val setFatalTripHandler: handler: (string -> string -> unit) -> unit
+
     /// Integration oracle input decoder. It accepts exactly one EventEnvelope;
     /// history ordering/iteration belongs to CanonicalIntegrator.
     val tryDecodeEnvelope: envelope: EventEnvelope -> Result<CasebookEvent, string>

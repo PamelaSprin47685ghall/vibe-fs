@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Context.Companion.Blogger
 
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation
 
 /// COMPANION-005: what a frame is. Entry and Squash are interchangeable inputs to
 /// a later squash (CTX-012 cascade). There is no Seed: the parent LWR is a child's

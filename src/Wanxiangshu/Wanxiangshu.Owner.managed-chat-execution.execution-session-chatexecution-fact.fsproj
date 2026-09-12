@@ -8,18 +8,17 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.execution-failure-policy.execution-failure-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-identityseed.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.participant-persona.fsproj"/>
-    <Compile Include="Execution/Session/ChatExecution/Fact.fsi"/>
-    <Compile Include="Execution/Session/ChatExecution/Fact.fs"/>
     <Compile Include="Execution/Session/ChatExecution/Recovery.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Recovery.fs"/>
     <Compile Include="Execution/Session/ChatExecution/RecoveryRuntime.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/RecoveryRuntime.fs"/>
     <Compile Include="Execution/Session/ChatExecution/Admission.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Admission.fs"/>
+      <ProjectReference Include="Wanxiangshu.Owner.execution-failure-policy.execution-failure-decision.fsproj"/>
   </ItemGroup>
 </Project>

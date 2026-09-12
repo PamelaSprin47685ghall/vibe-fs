@@ -8,6 +8,8 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Foundation.Identity
 
 /// JS-native WorkRecord owner for durable semantic fixtures and projections.

@@ -6,6 +6,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Composition.Durable
 
 /// PROMPT-011: reconcile prompts the Host may have accepted before the plugin
 /// crashed.
@@ -144,7 +145,7 @@ module PromptRecovery =
         | None, _
         | _, None -> Task.FromResult []
         | Some durable, Some snapshot ->
-            let runtime = PromptDispatcher.forJournal durable
+            let runtime = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
             let projections = (AgentJournal.snapshot durable).AgentProjections
 
             let unsettled =

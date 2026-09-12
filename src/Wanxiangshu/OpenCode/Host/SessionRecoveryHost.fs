@@ -8,6 +8,7 @@ open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Composition.Durable
 
 /// Optional Host capability bound to exact already-accepted physical material.
 /// Absence is not permission to create a replacement PromptClaim or resend text.

@@ -7,7 +7,7 @@
       "classification": "Admission",
       "result": "Result",
       "resultSymbol": "AdmissionAcquisitionOutcome",
-      "owner": "dispatch",
+      "owner": "application-composition",
       "what": "CHATEXEC-003, ENF-015",
       "whatOwners": {
         "CHATEXEC-003": "managed-chat-execution",
@@ -81,7 +81,7 @@
       "symbol": "RequirePermit",
       "anchor": "type RequirePermit = unit -> Task<Result<FamilyRecoveryPermit, string>>",
       "classification": "Vocabulary",
-      "owner": "durable-composition",
+      "owner": "application-composition",
       "what": "ENF-014",
       "issuers": [],
       "whatOwners": {
@@ -89,12 +89,12 @@
       }
     },
     {
-      "file": "src/Wanxiangshu/OpenCode/Host/SessionContract.fs",
+      "file": "src/Wanxiangshu/Foundation/Quiescence.fs",
       "symbol": "QuiescencePermit",
-      "anchor": "type QuiescencePermit = interface end",
+      "anchor": "type QuiescencePermit =",
       "classification": "Authority",
       "class": "Capability",
-      "owner": "host",
+      "owner": "runtime-platform",
       "what": "ENF-018, ENF-019",
       "scope": "opaque process-local token whose SessionId and attempt serial live only in the gate",
       "freshness": "only the latest ObserveIdle admission is eligible",
@@ -216,13 +216,13 @@
           "file": "src/Wanxiangshu/Context/Companion/Blogger/ContextFactFold.fs",
           "symbol": "fold",
           "anchor": "{ ProviderRun = payload.ProviderRun\n                      Kind = BlogFrameKind.Entry",
-          "owner": "context"
+          "owner": "durable-composition"
         },
         {
           "file": "src/Wanxiangshu/Context/Companion/Blogger/ContextFactFold.fs",
           "symbol": "fold",
           "anchor": "{ ProviderRun = payload.ProviderRun\n                  Kind = BlogFrameKind.Squash",
-          "owner": "context"
+          "owner": "durable-composition"
         },
         {
           "file": "src/Wanxiangshu/Context/Companion/Blogger/Runtime/CycleSurface.fs",
@@ -242,7 +242,7 @@
       "anchor": "type TerminalEvidence =",
       "classification": "Authority",
       "class": "Evidence",
-      "owner": "delegation",
+      "owner": "application-composition",
       "what": "ENF-013, ENF-014",
       "scope": "child handle + session + proven terminal payload",
       "freshness": "derived from the current durable child snapshot",
@@ -254,13 +254,13 @@
           "file": "src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs",
           "symbol": "completed",
           "anchor": "let completed (agentId: string)",
-          "owner": "delegation"
+          "owner": "application-composition"
         },
         {
           "file": "src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs",
           "symbol": "failed",
           "anchor": "let failed (agentId: string)",
-          "owner": "delegation"
+          "owner": "application-composition"
         }
       ],
       "whatOwners": {
@@ -274,7 +274,7 @@
       "anchor": "type ActiveChildReceipt =",
       "classification": "Authority",
       "class": "Receipt",
-      "owner": "delegation",
+      "owner": "application-composition",
       "what": "ENF-013, ENF-015",
       "scope": "one active child handle + child session",
       "freshness": "issued after current recovery observes the child active",
@@ -286,7 +286,7 @@
           "file": "src/Wanxiangshu/Execution/Delegation/ChildRecoveryWorkflow.fs",
           "symbol": "resolveAndCommit",
           "anchor": "ChildRecoveryResult.RecoveredActive",
-          "owner": "delegation"
+          "owner": "application-composition"
         }
       ],
       "whatOwners": {
@@ -605,7 +605,7 @@
       "anchor": "type internal ChatAdmissionBindingReceipt =",
       "classification": "Authority",
       "class": "Receipt",
-      "owner": "dispatch",
+      "owner": "application-composition",
       "what": "CHATEXEC-003, ENF-013, ENF-015",
       "scope": "the exact execution admission identity whose SessionExecutionBinding was installed, plus the binding kind that installed it",
       "freshness": "recorded only after the physical bind step returned Ok for that exact admission identity",
@@ -617,7 +617,7 @@
           "file": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs",
           "symbol": "bindingReceipt",
           "anchor": "let private bindingReceipt intent identity =",
-          "owner": "dispatch"
+          "owner": "application-composition"
         }
       ],
       "whatOwners": {
@@ -632,7 +632,7 @@
       "anchor": "type internal HostModelProjectionReceipt =",
       "classification": "Authority",
       "class": "Receipt",
-      "owner": "dispatch",
+      "owner": "application-composition",
       "what": "CHATEXEC-003, ENF-013, ENF-015",
       "scope": "the exact execution admission identity and OpenCode model projected for the leased routing target of the current transaction",
       "freshness": "recorded only after ProjectHost returned Ok inside that transaction step",
@@ -644,7 +644,7 @@
           "file": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs",
           "symbol": "projectAdmission",
           "anchor": "let private projectAdmission observe ports bound =",
-          "owner": "dispatch"
+          "owner": "application-composition"
         }
       ],
       "whatOwners": {

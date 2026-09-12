@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation
 
 [<RequireQualifiedAccess>]
 type ProviderFailureProjectionChange = ProviderFailuresSet of SessionId * ProviderFailureProjection

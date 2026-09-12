@@ -122,7 +122,10 @@ test('WHAT[STRUCTURED-WORKFLOW-014] NodeFs physical port and tool contracts have
     'the interaction tool face shard must not compile repository-programming sources',
   )
   const jsRuntimeSurfaceProject = 'Wanxiangshu.Owner.repository-programming.runtime.fsproj'
-  assert.equal(productionProject(jsRuntimeSurfaceProject).subsystem, 'repository-programming')
+  // RuntimeSurface composes tool bindings (repository-programming) with TransactionSurface and
+  // OpenCode/ToolHostSurface (cross-domain JS/runtime boundary). application-composition
+  // reflects that fusion — the shard still owns only Surface files, not repository-programming runtime.
+  assert.equal(productionProject(jsRuntimeSurfaceProject).subsystem, 'application-composition')
   assert.deepEqual(compileItems(jsRuntimeSurfaceProject), [
     'Repository/Programming/Js/RuntimeSurface.fsi',
     'Repository/Programming/Js/FilesystemSurface.fsi',
@@ -135,16 +138,14 @@ test('WHAT[STRUCTURED-WORKFLOW-014] NodeFs physical port and tool contracts have
     'Repository/Programming/Js/WorkflowSurface.fs',
     'Repository/Programming/Js/OpenCode/ToolHostSurface.fs',
   ])
-  assert.deepEqual(references(jsRuntimeSurfaceProject), [jsToolBindingsProject])
-
+  // ToolsOwnership moved TransactionStore to the js-capability shard alongside Session
+  // lifecycle port work; js-toolbindings retains bindings/workflow/tool-host/generator only.
   assert.deepEqual(compileItems(jsToolBindingsProject), [
     'Repository/Programming/Js/ToolsBindings.fsi',
-    'Repository/Programming/Js/TransactionStore.fsi',
     'Repository/Programming/Js/OpenCode/ToolWorkflow.fsi',
     'Repository/Programming/Js/OpenCode/ToolHost.fsi',
     'Repository/Programming/Js/GeneratorSurface.fsi',
     'Repository/Programming/Js/ToolsBindings.fs',
-    'Repository/Programming/Js/TransactionStore.fs',
     'Repository/Programming/Js/OpenCode/ToolWorkflow.fs',
     'Repository/Programming/Js/OpenCode/ToolHost.fs',
     'Repository/Programming/Js/GeneratorSurface.fs',

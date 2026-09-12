@@ -3,6 +3,7 @@ namespace Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
+open Wanxiangshu.Foundation
 
 /// Assembly for the domain-owned fact families whose fold now decides on its own
 /// slices and returns a change list: the bridge supplies the narrow reads the

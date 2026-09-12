@@ -5,6 +5,7 @@ open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Foundation
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Composition.Durable
 
 [<RequireQualifiedAccess>]
 module PromptIngress =
@@ -13,7 +14,7 @@ module PromptIngress =
         let authority =
             match journal, message.SessionId with
             | Some durable, Some sessionId ->
-                let runtime = PromptDispatcher.forJournal durable
+                let runtime = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
                 Some(runtime.ProjectionFor sessionId)
             | Some _, None -> Some PromptAuthority.empty
             | None, _ -> None

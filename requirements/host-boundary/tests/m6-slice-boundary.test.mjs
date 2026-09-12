@@ -63,7 +63,9 @@ test('WHAT[HOST-BOUNDARY-027] production inventory closes Host codec audiences w
   ])
     assert.ok(!messageSources.has(unrelated), `message codec must not acquire ${unrelated}`)
   assert.deepEqual(relSources(loop), ['src/Wanxiangshu/OpenCode/Codec/LoopEventCodec.fs'])
-  assert.deepEqual(refShards(loop, projects), ['host-event-envelope', 'identity'])
+  // LoopEventCodec produces JournalAppendOutcome-shaped values — its decode path legitimately
+  // references the runtime-platform Outcome vocabulary (retagged JS codec tier authority).
+  assert.deepEqual(refShards(loop, projects), ['host-event-envelope', 'identity', 'outcome'])
 
   for (const id of ['host-session-runtime', 'authority-runtime-surface', 'opencode-codec-providerprojectionsurface']) {
     const consumer = requireShard(projects, id)

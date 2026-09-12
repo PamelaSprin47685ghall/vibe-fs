@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Execution.Delegation
 
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation
 
 /// DELEG-029: Delegation-owned per-session projection state.
 /// Durable composition is the sole location that combines this into AgentProjectionSet.

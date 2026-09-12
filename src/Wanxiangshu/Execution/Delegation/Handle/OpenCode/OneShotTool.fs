@@ -15,6 +15,8 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Process
 
+open Wanxiangshu.Composition.Durable
+
 /// Complete lifecycle for synchronous one-shot Coder/Inspector tools: create,
 /// subscribe-before-send, await one terminal, then physically abort/dispose.
 module OneShotAgentTool =
@@ -65,11 +67,11 @@ module OneShotAgentTool =
             match scope.Journal with
             | None -> return Error "No journal: a one-shot agent prompt cannot be claimed"
             | Some journal ->
-                let dispatcher = PromptDispatcher.forJournal journal
+                let dispatcher = PromptDispatcher.forPrompts (PromptJournalAdapter.create journal)
                 // PROMPT-007 Detached: one-shot dispatch does not wait for PhysicalAccepted.
                 return!
                     dispatcher.SendAgentOwnerRoot
-                        scope.Sessions
+                        (DispatchSessionPort.ofSessionPort scope.Sessions)
                         childId
                         prompt
                         identitySeed

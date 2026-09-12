@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>provider</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>host</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>opencode-host-opencodeport-adapter</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>execution-model-routing</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>opencode-host-opencodeport-adapter</WanxiangshuOwnerLocality>

@@ -19,6 +19,7 @@ open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Composition.Durable
 
 [<RequireQualifiedAccess>]
 module FissionHostRequestProjection =
@@ -353,11 +354,11 @@ module FissionHost =
         laneSessionId
         =
         task {
-            let dispatcher = PromptDispatcher.forJournal durable
+            let dispatcher = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
 
             match!
                 dispatcher.SendContinuation
-                    sessionPort
+                    (DispatchSessionPort.ofSessionPort sessionPort)
                     laneSessionId
                     (takeoverPrompt aggregate)
                     PromptAuthority.ContinuationKind.FissionHandoff
@@ -553,10 +554,10 @@ module FissionHost =
             |> LlmFacing.withData [ LlmFacing.Data.stringField "completion_id" completionId ]
             |> LlmFacing.render
 
-        let dispatcher = PromptDispatcher.forJournal durable
+        let dispatcher = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
 
         dispatcher.SendContinuation
-            sessionPort
+            (DispatchSessionPort.ofSessionPort sessionPort)
             laneSessionId
             prompt
             PromptAuthority.ContinuationKind.FissionHandoff

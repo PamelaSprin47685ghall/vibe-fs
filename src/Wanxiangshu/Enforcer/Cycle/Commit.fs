@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Enforcer.Cycle
 
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Composition.Durable
 open System.Threading.Tasks
 open Wanxiangshu.Context.Companion
@@ -26,7 +27,7 @@ module EnforcerCycleCommit =
     let private classifyAppendFailure (failure: JournalAppendFailure) : CycleCommitOutcome =
         let diagnostic = JournalAppendFailure.describe failure
 
-        match JournalAppendFailure.toExecutionFailure failure with
+        match JournalAppendOutcome.toExecutionFailure failure with
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted ->
             CycleCommitOutcome.KnownNotCommitted diagnostic
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed -> CycleCommitOutcome.KnownCommitted

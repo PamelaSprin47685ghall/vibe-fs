@@ -3,7 +3,7 @@
     <WanxiangshuSemanticOwner>output-distillation</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>host-contract-toolresultbound</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
-    <WanxiangshuSubsystem>host</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>provider</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>host-contract-toolresultbound</WanxiangshuCompileShard>
   </PropertyGroup>
   <ItemGroup>

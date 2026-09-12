@@ -13,6 +13,7 @@ open Wanxiangshu.Context.Companion
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Host
 open Wanxiangshu.Execution.Failure
+open Wanxiangshu.Execution.Session.ChatExecution
 
 /// Opaque capability for one journal projection and its local writer.
 type JournalHandle private (journal: AgentJournal, release: unit -> unit) =
@@ -80,7 +81,7 @@ module JournalSurface =
 
         box
             {| failure = "PersistenceFailure"
-               commitment = physical |> JournalAppendFailure.toExecutionFailure |> commitmentLabel
+               commitment = physical |> JournalAppendOutcome.toExecutionFailure |> commitmentLabel
                diagnostic = diagnostic |}
 
     let private sessionIdOf (value: obj) : SessionId = SessionId.create (str value)

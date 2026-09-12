@@ -18,6 +18,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-ledger.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.requirement-grounding.requirement-grounding-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-agentjournal.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.execution-fission-fact.fsproj"/>
@@ -31,7 +32,11 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-composition.durable-adapter-institutional-learning.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-composition.durable-adapter-session-started-at.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-composition.durable-adapter-requirement-grounding.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.dispatch-runtime.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-prompt-fact.fsproj"/>
     <Compile Include="Composition/Durable/AgentJournalPortAdapter.fsi"/>
     <Compile Include="Composition/Durable/AgentJournalPortAdapter.fs"/>
+    <Compile Include="Composition/Durable/PromptJournalAdapter.fsi"/>
+    <Compile Include="Composition/Durable/PromptJournalAdapter.fs"/>
   </ItemGroup>
 </Project>

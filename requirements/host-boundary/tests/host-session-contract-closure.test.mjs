@@ -120,10 +120,9 @@ test('WHAT[HOST-BOUNDARY-026] host session contract compiles independently witho
 
 test('WHAT[HOST-BOUNDARY-026] Host source ownership follows subsystem inventory and physical boundaries', () => {
   const hostSources = [
-    'OpenCode/Host/SessionContract.fs',
-    'OpenCode/Signals/EventContract.fs',
+    // EventContract was retagged to runtime-platform next to Digest/Quiescence; physical
+    // host boundary ownership only applies to protocol/codec/adapter sources.
     'OpenCode/Host/Message.fs',
-    'OpenCode/Codec/OpencodeTypes.fs',
     'OpenCode/Codec/ToolHostCodec.fs',
     'OpenCode/Codec/ToolHostSurface.fs',
     'OpenCode/Host/Diagnostic.fs',
@@ -136,9 +135,35 @@ test('WHAT[HOST-BOUNDARY-026] Host source ownership follows subsystem inventory 
     assert.ok(owner, `${source} must have a unique production shard`)
     assert.equal(subsystemInventory.projects.get(owner.projectPath).subsystem, 'host', `${source} belongs to the Host subsystem`)
   }
+  // SessionContract was retagged to provider because its shape carries provider request-kind
+  // types and the dispatch layer consumes it through the boundary; keeping it in host would
+  // drag provider-typed data down into the physical codec tier.
+  const contractSource = shardInventory.sourceProject.get(join(SOURCE_ROOT, 'OpenCode/Host/SessionContract.fs'))
+  assert.ok(contractSource, 'SessionContract.fs must have a unique production shard')
+  assert.equal(
+    subsystemInventory.projects.get(contractSource.projectPath).subsystem,
+    'provider',
+    'SessionContract retagged to provider per layer direction'
+  )
   const digestOwner = shardInventory.sourceProject.get(join(SOURCE_ROOT, 'Host/Digest.fs'))
   assert.ok(digestOwner, 'HostDigest must have a unique production shard')
   assert.equal(subsystemInventory.projects.get(digestOwner.projectPath).subsystem, 'runtime-platform')
+  const eventContractSource = shardInventory.sourceProject.get(join(SOURCE_ROOT, 'OpenCode/Signals/EventContract.fs'))
+  assert.ok(eventContractSource, 'EventContract.fs must have a unique production shard')
+  assert.equal(
+    subsystemInventory.projects.get(eventContractSource.projectPath).subsystem,
+    'runtime-platform',
+    'EventContract retagged to runtime-platform',
+  )
+  // OpencodeTypes is a raw SDK decode record — retagged to provider because it's pure provider
+  // vocabulary; physical host ownership only applies to the adapter surfaces around it.
+  const opencodeTypesSource = shardInventory.sourceProject.get(join(SOURCE_ROOT, 'OpenCode/Codec/OpencodeTypes.fs'))
+  assert.ok(opencodeTypesSource, 'OpencodeTypes.fs must have a unique production shard')
+  assert.equal(
+    subsystemInventory.projects.get(opencodeTypesSource.projectPath).subsystem,
+    'provider',
+    'OpencodeTypes retagged to provider',
+  )
 
   const sessionContract = requireShard('host-session-contract')
   assert.deepEqual(
@@ -209,3 +234,4 @@ test('WHAT[HOST-BOUNDARY-026] Host source ownership follows subsystem inventory 
     'opencode-host-hostsignalbootstrap must not bypass plugin runtime composition to the delegation Host adapter',
   )
 })
+

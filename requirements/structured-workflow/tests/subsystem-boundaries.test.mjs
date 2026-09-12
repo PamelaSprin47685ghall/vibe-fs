@@ -227,7 +227,12 @@ test('WHAT[STRUCTURED-WORKFLOW-011] shared gravity wells are split by knowledge 
   const asyncSupport = project(inventory, 'Wanxiangshu.Owner.intra-participant-parallelism.foundation-async-support.fsproj')
   const fission = project(inventory, 'Wanxiangshu.Owner.intra-participant-parallelism.execution-fission-facts.fsproj')
 
-  assert.deepEqual(sources(identity), ['src/Wanxiangshu/Foundation/Identity.fs'])
+  // Foundation.Quiescence used to live in its own shard; it was merged into the identity
+  // vocabulary because role-free quiescence is still platform-tier knowledge, not a domain.
+  assert.deepEqual(sources(identity), [
+    'src/Wanxiangshu/Foundation/Identity.fs',
+    'src/Wanxiangshu/Foundation/Quiescence.fs',
+  ])
   assert.deepEqual(sources(outcome), ['src/Wanxiangshu/Foundation/Outcome.fs', 'src/Wanxiangshu/Foundation/OutcomeSurface.fs'])
   assert.deepEqual(sources(canonical), ['src/Wanxiangshu/Foundation/CanonicalJson.fs', 'src/Wanxiangshu/OpenCode/Codec/CanonicalJsonSurface.fs'])
   assert.deepEqual(sources(taskResult), ['src/Wanxiangshu/Foundation/FsToolkitFableCompat.fs', 'src/Wanxiangshu/Foundation/TaskResult.fs'])

@@ -2,6 +2,7 @@ namespace Wanxiangshu.Change
 
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Foundation
 
 type OrchestratorFactCases =
     | ManagerJobCreated of

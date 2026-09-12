@@ -10,6 +10,7 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Composition.Durable
 
 /// JS semantic boundary over the compiled session recovery host.
 ///

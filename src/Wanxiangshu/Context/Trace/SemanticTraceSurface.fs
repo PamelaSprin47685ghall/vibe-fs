@@ -10,6 +10,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Foundation
 
 /// JS proof surface for semantic-trace owner operations.
 /// Typed owner state never crosses this boundary; queries return copied plain evidence.

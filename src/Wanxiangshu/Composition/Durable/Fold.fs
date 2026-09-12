@@ -13,6 +13,7 @@ open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Foundation
 
 /// Pure envelope dispatch. Each bounded projection owns its own fold algorithm;
 /// this module only routes facts and decides which refusals are fatal.

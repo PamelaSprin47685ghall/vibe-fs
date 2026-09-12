@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Context.Prefix
 
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation
 
 /// COMPANION-009: which prefix generation is in force.
 ///

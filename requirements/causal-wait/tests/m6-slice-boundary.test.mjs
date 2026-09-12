@@ -35,7 +35,8 @@ test('WHAT[CAUSAL-009] production inventory separates contract runtime adapter m
   // B03/B07: CompletionMailbox reads delegation completion vocabulary and belongs
   // to the delegation subsystem, not pure session foundation.
   assert.equal(mailbox.subsystem, 'delegation')
-  assert.equal(proof.subsystem, 'session-lifecycle')
+  assert.equal(proof.subsystem, 'application-composition',
+    'proof surface is a JS-side Surface; it sits in application-composition per B09/B10')
 
   assert.deepEqual(relSources(contract), ['src/Wanxiangshu/Execution/Session/Wait/CausalWait.fs'])
   assert.deepEqual(relSources(runtime), [

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>host</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>provider</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>host-session-contract</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>host-boundary</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>host-session-contract</WanxiangshuOwnerLocality>
@@ -9,8 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.execution-model-routing.opencode-host-opencodeport.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-message-contract.fsproj"/>
+
     <Compile Include="OpenCode/Host/SessionContract.fsi"/>
     <Compile Include="OpenCode/Host/SessionContract.fs"/>
     <Compile Include="OpenCode/Host/SessionSnapshot.fsi"/>

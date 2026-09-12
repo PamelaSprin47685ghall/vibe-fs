@@ -9,7 +9,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-message-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.requirement-grounding.requirement-grounding-model.fsproj"/>
     <Compile Include="Host/Fact.fsi"/>
     <Compile Include="Host/Fact.fs"/>

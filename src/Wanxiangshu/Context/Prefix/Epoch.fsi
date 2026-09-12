@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Context.Prefix
 
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation
 
 type ActivePrefixEpoch =
     { EpochId: PrefixEpochId

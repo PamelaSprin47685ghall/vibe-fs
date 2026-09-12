@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Execution.Delegation.Fork.OpenCode
 
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Outcome
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity

@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Interaction.Dispatch
 
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Outcome
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
@@ -9,7 +11,7 @@ open Wanxiangshu.OpenCode
 module PromptDispatcherSend =
     type PromptDispatcher.Runtime with
         member SendAgentOwnerRoot:
-            port: ISessionHostPort ->
+            port: IDispatchSessionPort ->
             sessionId: SessionId ->
             text: string ->
             identitySeed: PromptAuthority.IdentitySeed ->
@@ -19,7 +21,7 @@ module PromptDispatcherSend =
                 Task<Result<PromptKey, string>>
 
         member SendAgentOwnerRootDetachedObserved:
-            port: ISessionHostPort ->
+            port: IDispatchSessionPort ->
             sessionId: SessionId ->
             text: string ->
             identitySeed: PromptAuthority.IdentitySeed ->
@@ -28,7 +30,7 @@ module PromptDispatcherSend =
                 Task<Result<PromptKey, string>>
 
         member SendAgentOwnerRootWithTools:
-            port: ISessionHostPort ->
+            port: IDispatchSessionPort ->
             sessionId: SessionId ->
             text: string ->
             identitySeed: PromptAuthority.IdentitySeed ->
@@ -40,7 +42,7 @@ module PromptDispatcherSend =
                 Task<Result<PromptKey, string>>
 
         member SendContinuation:
-            port: ISessionHostPort ->
+            port: IDispatchSessionPort ->
             sessionId: SessionId ->
             text: string ->
             continuation: PromptAuthority.ContinuationKind ->
@@ -51,7 +53,7 @@ module PromptDispatcherSend =
                 Task<Result<PromptKey, string>>
 
         member SendGateNudge:
-            port: ISessionHostPort ->
+            port: IDispatchSessionPort ->
             sessionId: SessionId ->
             text: string ->
             continuation: PromptAuthority.ContinuationKind ->
@@ -64,7 +66,7 @@ module PromptDispatcherSend =
                 Task<Result<PromptKey, string>>
 
         member SendContinuationWithTools:
-            port: ISessionHostPort ->
+            port: IDispatchSessionPort ->
             sessionId: SessionId ->
             text: string ->
             continuation: PromptAuthority.ContinuationKind ->
@@ -76,7 +78,7 @@ module PromptDispatcherSend =
                 Task<Result<PromptKey, string>>
 
         member SendInteractionRepair:
-            port: ISessionHostPort ->
+            port: IDispatchSessionPort ->
             sessionId: SessionId ->
             text: string ->
             requestId: BloggerRequestId ->
@@ -89,7 +91,7 @@ module PromptDispatcherSend =
                 Task<Result<PromptKey, string>>
 
         member internal SendIdleContinuation:
-            port: ISessionHostPort ->
+            port: IDispatchSessionPort ->
             sessionId: SessionId ->
             text: string ->
             continuation: PromptAuthority.ContinuationKind ->
@@ -101,7 +103,7 @@ module PromptDispatcherSend =
                 Task<PromptDispatcher.SendAttemptOutcome>
 
         member internal SendIdleGateNudge:
-            port: ISessionHostPort ->
+            port: IDispatchSessionPort ->
             sessionId: SessionId ->
             text: string ->
             continuation: PromptAuthority.ContinuationKind ->
@@ -114,7 +116,7 @@ module PromptDispatcherSend =
                 Task<PromptDispatcher.SendAttemptOutcome>
 
         member internal SendIdleInteractionRepair:
-            port: ISessionHostPort ->
+            port: IDispatchSessionPort ->
             sessionId: SessionId ->
             text: string ->
             requestId: BloggerRequestId ->

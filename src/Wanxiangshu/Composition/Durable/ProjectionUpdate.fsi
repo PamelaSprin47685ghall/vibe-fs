@@ -6,6 +6,7 @@ open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Concern
+open Wanxiangshu.Foundation
 
 module ProjectionUpdate =
     val prefixOutcome:

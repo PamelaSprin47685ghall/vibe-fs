@@ -159,11 +159,11 @@ module FissionTool =
             match laneProfile with
             | None -> return ()
             | Some activeLaneProfile ->
-                let dispatcher = PromptDispatcher.forJournal durable
+                let dispatcher = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
 
                 match!
                     dispatcher.SendContinuation
-                        scope.Sessions
+                        (DispatchSessionPort.ofSessionPort scope.Sessions)
                         lane.SessionId
                         (deliveryPrompt owner completionId payload)
                         PromptAuthority.ContinuationKind.FissionHandoff
@@ -551,11 +551,11 @@ module FissionTool =
             match! XTraceCapture.captureOpeningWithReceipt scope.Journal laneId startup [] with
             | Error _ -> return Error "fission_trace_capture_failed"
             | Ok _ ->
-                let dispatcher = PromptDispatcher.forJournal durable
+                let dispatcher = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
 
                 match!
                     dispatcher.SendContinuation
-                        scope.Sessions
+                        (DispatchSessionPort.ofSessionPort scope.Sessions)
                         laneId
                         startup
                         PromptAuthority.ContinuationKind.FissionHandoff

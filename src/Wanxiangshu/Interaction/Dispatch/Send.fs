@@ -2,35 +2,16 @@ namespace Wanxiangshu.Interaction.Dispatch
 
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Change
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 open System.Threading.Tasks
-open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Host
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation.Outcome
-open Wanxiangshu.Foundation
 
 /// PROMPT-005's four-fact send protocol, in one place.
 ///
@@ -150,7 +131,7 @@ module PromptDispatcherSend =
             : Task<Result<PromptKey, string>> =
             task {
                 let submitted (receipt: TransportReceipt) =
-                    PromptFact.PluginPromptSubmitted
+                    PromptSessionFact.PromptSubmitted
                         {| PromptKey = key
                            SessionId = sessionId
                            Receipt = receipt |}
@@ -193,7 +174,7 @@ module PromptDispatcherSend =
             // message id and not the eventual SDK Promise result. It is durable
             // before the Detached caller returns so immediate reuse/recovery sees
             // the claim as already handed to Host async enqueue.
-            PromptFact.PluginPromptSubmitted
+            PromptSessionFact.PromptSubmitted
                 {| PromptKey = key
                    SessionId = sessionId
                    Receipt = TransportReceipt.create ("accepted-detached-" + PromptKey.value key) |}
@@ -239,9 +220,7 @@ module PromptDispatcherSend =
                     | Some callback -> do! callback error
                     | None -> ()
 
-                    Diagnostic.fatal
-                        "detached-prompt-dispatch-failed"
-                        [ "session_id", SessionId.value sessionId; "result", error ]
+                    FatalProcess.trip "detached-prompt-dispatch-failed" (sprintf "session_id=%s result=%s" (SessionId.value sessionId) error)
                 }
 
             task {
@@ -260,7 +239,7 @@ module PromptDispatcherSend =
         /// them. Substituting empty strings would make "no run yet" and "a run named
         /// empty" derive the same key.
         member private this.SendAgentOwnerRootCore
-            (port: ISessionHostPort)
+            (port: IDispatchSessionPort)
             (sessionId: SessionId)
             (text: string)
             (identitySeed: PromptAuthority.IdentitySeed)
@@ -288,7 +267,7 @@ module PromptDispatcherSend =
                 let! claim = PromptAuthorityRun.claimAgentOwnerRoot key sessionId payloadDigest identitySeed
 
                 let claimed =
-                    PromptFact.PluginPromptClaimed
+                    PromptSessionFact.PromptClaimed
                         {| PromptKey = key
                            SessionId = sessionId
                            ContinuationKind = PromptDispatcher.originLabel origin
@@ -333,7 +312,7 @@ module PromptDispatcherSend =
             }
 
         member this.SendAgentOwnerRoot
-            (port: ISessionHostPort)
+            (port: IDispatchSessionPort)
             (sessionId: SessionId)
             (text: string)
             (identitySeed: PromptAuthority.IdentitySeed)
@@ -344,7 +323,7 @@ module PromptDispatcherSend =
             this.SendAgentOwnerRootCore port sessionId text identitySeed directory awaitMode onAccepted None None None
 
         member this.SendAgentOwnerRootDetachedObserved
-            (port: ISessionHostPort)
+            (port: IDispatchSessionPort)
             (sessionId: SessionId)
             (text: string)
             (identitySeed: PromptAuthority.IdentitySeed)
@@ -364,7 +343,7 @@ module PromptDispatcherSend =
                 None
 
         member this.SendAgentOwnerRootWithTools
-            (port: ISessionHostPort)
+            (port: IDispatchSessionPort)
             (sessionId: SessionId)
             (text: string)
             (identitySeed: PromptAuthority.IdentitySeed)
@@ -394,7 +373,7 @@ module PromptDispatcherSend =
         /// because PAR-008 needs one continuation kind to digest something
         /// other than its text. See `SendInteractionRepair`.
         member private this.SendClaimedContinuation
-            (port: ISessionHostPort)
+            (port: IDispatchSessionPort)
             (sessionId: SessionId)
             (text: string)
             (originLabel: string)
@@ -465,7 +444,7 @@ module PromptDispatcherSend =
             }
 
         member private this.SendContinuationWithDigestAttempt
-            (port: ISessionHostPort)
+            (port: IDispatchSessionPort)
             (sessionId: SessionId)
             (text: string)
             (payloadDigest: string)
@@ -494,7 +473,7 @@ module PromptDispatcherSend =
                     PromptAuthorityRun.claimContinuation key sessionId continuation profile payloadDigest
 
                 let claimed =
-                    PromptFact.PluginPromptClaimed
+                    PromptSessionFact.PromptClaimed
                         {| PromptKey = key
                            SessionId = sessionId
                            ContinuationKind = originLabel
@@ -522,7 +501,7 @@ module PromptDispatcherSend =
             }
 
         member private this.SendContinuationWithDigest
-            (port: ISessionHostPort)
+            (port: IDispatchSessionPort)
             (sessionId: SessionId)
             (text: string)
             (payloadDigest: string)
@@ -548,7 +527,7 @@ module PromptDispatcherSend =
             |> TaskValue.map publicResultOfAttempt
 
         member this.SendContinuation
-            (port: ISessionHostPort)
+            (port: IDispatchSessionPort)
             (sessionId: SessionId)
             (text: string)
             (continuation: PromptAuthority.ContinuationKind)
@@ -573,7 +552,7 @@ module PromptDispatcherSend =
         /// terminal-subscriber gates (for example Relay exit-required)
         /// that do not derive authority from SessionIdle.
         member this.SendGateNudge
-            (port: ISessionHostPort)
+            (port: IDispatchSessionPort)
             (sessionId: SessionId)
             (text: string)
             (continuation: PromptAuthority.ContinuationKind)
@@ -611,7 +590,7 @@ module PromptDispatcherSend =
             )
 
         member this.SendContinuationWithTools
-            (port: ISessionHostPort)
+            (port: IDispatchSessionPort)
             (sessionId: SessionId)
             (text: string)
             (continuation: PromptAuthority.ContinuationKind)
@@ -644,7 +623,7 @@ module PromptDispatcherSend =
         /// enters the claim scope, so the `ClaimSequences` that PROMPT-005 `Claimed`
         /// already writes is the counter `RepairAlreadyClaimed` reads back.
         member this.SendInteractionRepair
-            (port: ISessionHostPort)
+            (port: IDispatchSessionPort)
             (sessionId: SessionId)
             (text: string)
             (requestId: BloggerRequestId)
@@ -672,7 +651,7 @@ module PromptDispatcherSend =
         /// claim persistence. This is the only continuation send surface that
         /// may return `Superseded`.
         member internal this.SendIdleContinuation
-            (port: ISessionHostPort)
+            (port: IDispatchSessionPort)
             (sessionId: SessionId)
             (text: string)
             (continuation: PromptAuthority.ContinuationKind)
@@ -698,7 +677,7 @@ module PromptDispatcherSend =
         /// Gate reminder: exactly-once for one terminal occasion, intentionally
         /// unbounded across fresh terminals while the business gate remains open.
         member internal this.SendIdleGateNudge
-            (port: ISessionHostPort)
+            (port: IDispatchSessionPort)
             (sessionId: SessionId)
             (text: string)
             (continuation: PromptAuthority.ContinuationKind)
@@ -723,7 +702,7 @@ module PromptDispatcherSend =
                 (Some physicalAdmission)
 
         member internal this.SendIdleInteractionRepair
-            (port: ISessionHostPort)
+            (port: IDispatchSessionPort)
             (sessionId: SessionId)
             (text: string)
             (requestId: BloggerRequestId)

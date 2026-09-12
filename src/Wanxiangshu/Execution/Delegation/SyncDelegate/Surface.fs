@@ -538,7 +538,7 @@ module SyncDelegateSurface =
     let private createWithAdmissions (directory: string) (observationMode: string option) admissions : Task<obj> =
         task {
             let! journal = createJournal directory
-            let dispatcher = PromptDispatcher.Runtime(journal)
+            let dispatcher = PromptDispatcher.Runtime (PromptJournalAdapter.create journal)
 
             let! acceptedOwners = acceptOwnerRoots dispatcher admissions
             requireAcceptedOwners journal acceptedOwners

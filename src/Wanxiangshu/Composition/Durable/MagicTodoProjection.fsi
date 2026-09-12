@@ -5,6 +5,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoIdentity
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
+open Wanxiangshu.Foundation
 
 module MagicTodoProjection =
     type AcceptedCheckpointEvidence =

@@ -60,30 +60,23 @@ module ChildPromptAuthority =
             |> TaskValue.map (Result.map ignore)
 
     let ensureForLinkedChild
-        (journal: AgentJournal option)
+        (prompts: IPromptJournal option)
         (turn: ReconciledTurn)
         : System.Threading.Tasks.Task<Result<unit, string>> =
         task {
-            match journal with
-            | None -> return Ok()
-            | Some durable ->
-                let snapshot = AgentJournal.snapshot durable
-
-                let handle =
-                    Map.tryFind turn.SessionId snapshot.AgentProjections.HandleByChildSession
-
-                let activeProfile =
-                    PromptAuthorityProjectionQueries.activeProfile turn.SessionId snapshot.AgentProjections
-
+            match prompts with
+            | Some prompts ->
+                let owner = prompts.ProjectionFor turn.SessionId
+                let handle = prompts.HandleForChild turn.SessionId
+                let activeProfile = owner.ActiveLogicalRun
                 let accepted =
-                    PromptAuthorityProjectionQueries.acceptedDispatchForPhysicalMessage
-                        turn.SessionId
-                        turn.PhysicalUserMessageId
-                        snapshot.AgentProjections
+                    owner.AcceptedDispatches
+                    |> Seq.tryPick (fun (KeyValue(_, dispatch)) -> if dispatch.PhysicalUserMessageId = turn.PhysicalUserMessageId then Some dispatch else None)
                     |> Option.filter (fun claim ->
                         claim.Origin = PromptAuthority.PromptOrigin.AuthorityRoot
                                            PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
 
-                let runtime = PromptDispatcher.forJournal durable
+                let runtime = PromptDispatcher.forPrompts prompts
                 return! registerLinkedChildIfNeeded runtime turn handle activeProfile accepted
+            | None -> return Ok()
         }

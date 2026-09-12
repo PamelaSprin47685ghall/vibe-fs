@@ -3,6 +3,7 @@ namespace Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation
 
 [<RequireQualifiedAccess>]
 type CompanionProjectionChange =

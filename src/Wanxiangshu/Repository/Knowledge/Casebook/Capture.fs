@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
 open Fable.Core.JsInterop
+open Wanxiangshu.Host
 
 /// CASE-003: typed observation capture from the final execution layer.
 ///
@@ -15,7 +16,7 @@ module CasebookCapture =
         if isNull text then
             ""
         else
-            Wanxiangshu.Host.HostDigest.sha256Hex text
+            HostDigest.sha256Hex text
 
     let private text (value: obj) : string option =
         if isNull value || value = null then

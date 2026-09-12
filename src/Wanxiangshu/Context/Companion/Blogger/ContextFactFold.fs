@@ -5,6 +5,7 @@ open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation
 
 [<RequireQualifiedAccess>]
 type ContextProjectionChange =

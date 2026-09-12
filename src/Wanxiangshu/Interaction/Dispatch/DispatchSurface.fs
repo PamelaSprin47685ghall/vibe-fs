@@ -70,6 +70,23 @@ module DispatchSurface =
             member _.ListChildren(parent) = typed.ListChildren parent
             member _.FamilyRootOf(sessionId) = typed.FamilyRootOf sessionId
 
+        /// Dispatch view of the same physical host port: narrows the interface
+        /// through a dedicated member so AttachMembers never collides.
+        member this.DispatchPort : Wanxiangshu.Interaction.Dispatch.IDispatchSessionPort =
+            { new Wanxiangshu.Interaction.Dispatch.IDispatchSessionPort with
+                member _.SendPrompt(sessionId, text, options) =
+                    (this :> Wanxiangshu.OpenCode.ISessionHostPort).SendPrompt(sessionId, text, options)
+
+                member _.SubscribeTerminal(sessionId, listener) =
+                    (this :> Wanxiangshu.OpenCode.ISessionHostPort).SubscribeTerminal(sessionId, listener)
+
+                member _.SubscribeFutureTerminal(sessionId, listener) =
+                    (this :> Wanxiangshu.OpenCode.ISessionHostPort).SubscribeFutureTerminal(sessionId, listener)
+
+                member _.ReportFatalDiagnostic(operation, fields) =
+                    let delimiter = String.Join(";", fields |> List.map (fun (k, v) -> k + "=" + v))
+                    FatalProcess.trip operation delimiter }
+
     let internal sessionPort (port: obj) : Wanxiangshu.OpenCode.ISessionHostPort =
         PlainSessionPort(port) :> Wanxiangshu.OpenCode.ISessionHostPort
 
@@ -247,12 +264,12 @@ module DispatchSurface =
                            error = error
                            observation = null |}
             | Ok identitySeed ->
-                let runtime = PromptDispatcher.forJournal handle.Journal
+                let runtime = PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)
                 let adapter = PlainSessionPort(port)
 
                 let! result =
                     runtime.SendAgentOwnerRoot
-                        (adapter :> Wanxiangshu.OpenCode.ISessionHostPort)
+                        adapter.DispatchPort
                         (SessionId.create session)
                         text
                         identitySeed
@@ -332,12 +349,12 @@ module DispatchSurface =
         task {
             match PromptAuthority.tryParseContinuationKind continuation, profileOf profile with
             | Some kind, Ok authorityProfile ->
-                let runtime = PromptDispatcher.forJournal handle.Journal
+                let runtime = PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)
                 let adapter = PlainSessionPort(port)
 
                 let! result =
                     runtime.SendContinuation
-                        (adapter :> Wanxiangshu.OpenCode.ISessionHostPort)
+                        adapter.DispatchPort
                         (SessionId.create session)
                         text
                         kind
@@ -389,12 +406,12 @@ module DispatchSurface =
         task {
             match PromptAuthority.tryParseContinuationKind continuation, profileOf profile with
             | Some kind, Ok authorityProfile ->
-                let runtime = PromptDispatcher.forJournal handle.Journal
+                let runtime = PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)
                 let adapter = PlainSessionPort(port)
 
                 let send () =
                     runtime.SendGateNudge
-                        (adapter :> Wanxiangshu.OpenCode.ISessionHostPort)
+                        adapter.DispatchPort
                         (SessionId.create session)
                         text
                         kind
@@ -458,12 +475,12 @@ module DispatchSurface =
         task {
             match PromptAuthority.tryParseContinuationKind continuation, profileOf profile with
             | Some kind, Ok authorityProfile ->
-                let runtime = PromptDispatcher.forJournal handle.Journal
+                let runtime = PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)
                 let adapter = PlainSessionPort(port)
 
                 let! outcome =
                     runtime.SendIdleContinuation
-                        (adapter :> Wanxiangshu.OpenCode.ISessionHostPort)
+                        adapter.DispatchPort
                         (SessionId.create session)
                         text
                         kind
@@ -595,7 +612,7 @@ module DispatchSurface =
         : Task<obj> =
         task {
             let! result =
-                (PromptDispatcher.forJournal handle.Journal).AcceptAgentOwnerRoot
+                (PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)).AcceptAgentOwnerRoot
                     (PromptKey.create promptKey)
                     (SessionId.create session)
                     (PhysicalUserMessageId.create physicalMessageId)
@@ -638,7 +655,7 @@ module DispatchSurface =
                            error = error |}
             | Ok identitySeed ->
                 let! result =
-                    (PromptDispatcher.forJournal handle.Journal).AcceptHumanRoot
+                    (PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)).AcceptHumanRoot
                         (SessionId.create session)
                         (PhysicalUserMessageId.create physicalMessageId)
                         identitySeed
@@ -699,7 +716,7 @@ module DispatchSurface =
         : Task<obj> =
         task {
             let decision = PromptIngress.resolveDecision (Some handle.Journal) message
-            let! accepted = (PromptDispatcher.forJournal handle.Journal).AcceptManagedChatIntent decision
+            let! accepted = (PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)).AcceptManagedChatIntent decision
             return managedAcceptanceView accepted
         }
 
@@ -757,7 +774,7 @@ module DispatchSurface =
                 let identitySeed = PromptAuthority.IdentitySeed.RootSelection identity
 
                 let! result =
-                    (PromptDispatcher.forJournal handle.Journal).AcceptHumanRoot
+                    (PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)).AcceptHumanRoot
                         (SessionId.create session)
                         (PhysicalUserMessageId.create physicalMessageId)
                         (Some identitySeed)
@@ -795,7 +812,7 @@ module DispatchSurface =
                claimedAtRuntimeStartCount = claim.ClaimedAtRuntimeStartCount |}
 
     let projectionObservation (handle: JournalHandle) (session: string) : obj =
-        let runtime = PromptDispatcher.forJournal handle.Journal
+        let runtime = PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)
         let projection = runtime.ProjectionFor(SessionId.create session)
         let snapshot = AgentJournal.snapshot handle.Journal
 
@@ -945,7 +962,7 @@ module DispatchSurface =
 
     let pendingClaimCount (handle: JournalHandle) (session: string) : int =
         let projection =
-            (PromptDispatcher.forJournal handle.Journal)
+            (PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal))
                 .ProjectionFor(SessionId.create session)
 
         projection.PendingClaims |> Map.count

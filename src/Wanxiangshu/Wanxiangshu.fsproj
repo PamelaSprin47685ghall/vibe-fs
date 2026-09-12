@@ -20,6 +20,8 @@
     <Compile Include="Host/Digest.fs"/>
     <Compile Include="Foundation/Identity.fsi"/>
     <Compile Include="Foundation/Identity.fs"/>
+    <Compile Include="Foundation/Quiescence.fsi"/>
+    <Compile Include="Foundation/Quiescence.fs"/>
     <Compile Include="Foundation/GlobMatch.fsi"/>
     <Compile Include="Foundation/GlobMatch.fs"/>
     <Compile Include="Mission/Relay/Contract.fsi"/>
@@ -193,6 +195,8 @@
     <Compile Include="Interaction/Authority/Origin.fs"/>
     <Compile Include="Interaction/Authority/Facts.fsi"/>
     <Compile Include="Interaction/Authority/Facts.fs"/>
+    <Compile Include="Interaction/Authority/PromptSessionFact.fsi"/>
+    <Compile Include="Interaction/Authority/PromptSessionFact.fs"/>
     <Compile Include="Interaction/Attention/Facts.fsi"/>
     <Compile Include="Interaction/Attention/Facts.fs"/>
     <Compile Include="Interaction/Concern/Facts.fsi"/>
@@ -229,8 +233,8 @@
     <Compile Include="Execution/Failure/Surface.fs"/>
     <Compile Include="Composition/Durable/Fact.fsi"/>
     <Compile Include="Composition/Durable/Fact.fs"/>
-    <Compile Include="Execution/Session/ChatExecution/Fact.fsi"/>
-    <Compile Include="Execution/Session/ChatExecution/Fact.fs"/>
+    <Compile Include="Composition/Durable/ChatExecutionFact.fsi"/>
+    <Compile Include="Composition/Durable/ChatExecutionFact.fs"/>
     <Compile Include="Interaction/Authority/Fact.fsi"/>
     <Compile Include="Interaction/Authority/Fact.fs"/>
     <Compile Include="Composition/Durable/ProviderFailureFact.fsi"/>
@@ -573,8 +577,6 @@
     <Compile Include="Persistence/Journal/Writer.fs"/>
     <Compile Include="Composition/Durable/ProjectionState.fsi"/>
     <Compile Include="Composition/Durable/ProjectionState.fs"/>
-    <Compile Include="Composition/Durable/FoldRejection.fsi"/>
-    <Compile Include="Composition/Durable/FoldRejection.fs"/>
     <Compile Include="Composition/Durable/ProjectionUpdate.fsi"/>
     <Compile Include="Composition/Durable/ProjectionUpdate.fs"/>
     <Compile Include="Interaction/Authority/Fold.fsi"/>
@@ -621,6 +623,8 @@
     <Compile Include="Execution/Session/ChatExecution/Acceptance.fs"/>
     <Compile Include="Execution/Session/ChatExecution/Settlement.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Settlement.fs"/>
+    <Compile Include="Composition/Durable/ChatExecutionJournal.fsi"/>
+    <Compile Include="Composition/Durable/ChatExecutionJournal.fs"/>
     <Compile Include="Execution/Session/ChatExecution/Surface.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Surface.fs"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimateLedger.fsi"/>
@@ -969,6 +973,10 @@
     <Compile Include="Execution/Session/Attachment/SatelliteRuntime.fs"/>
     <Compile Include="OpenCode/Host/SatelliteSurface.fsi"/>
     <Compile Include="OpenCode/Host/SatelliteSurface.fs"/>
+    <Compile Include="Interaction/Dispatch/JournalPort.fsi"/>
+    <Compile Include="Interaction/Dispatch/JournalPort.fs"/>
+    <Compile Include="Interaction/Dispatch/DispatchSessionPort.fsi"/>
+    <Compile Include="Interaction/Dispatch/DispatchSessionPort.fs"/>
     <Compile Include="Interaction/Dispatch/PhysicalAcceptance.fsi"/>
     <Compile Include="Interaction/Dispatch/PhysicalAcceptance.fs"/>
     <Compile Include="Interaction/Dispatch/Dispatcher.fsi"/>
@@ -979,6 +987,8 @@
     <Compile Include="OpenCode/Host/ChatAdmission/TransactionSurface.fs"/>
     <Compile Include="Interaction/Dispatch/Send.fsi"/>
     <Compile Include="Interaction/Dispatch/Send.fs"/>
+    <Compile Include="Composition/Durable/PromptJournalAdapter.fsi"/>
+    <Compile Include="Composition/Durable/PromptJournalAdapter.fs"/>
     <Compile Include="Strength/Replica/Transform.fsi"/>
     <Compile Include="Strength/Replica/Transform.fs"/>
     <Compile Include="Strength/Replica/Runtime.fsi"/>

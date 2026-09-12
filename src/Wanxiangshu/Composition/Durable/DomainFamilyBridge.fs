@@ -5,6 +5,7 @@ open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
+open Wanxiangshu.Foundation
 
 /// Assembly for the domain-owned fact families whose fold now decides on its own
 /// slices and returns a change list. The bridges are the only place that turns a

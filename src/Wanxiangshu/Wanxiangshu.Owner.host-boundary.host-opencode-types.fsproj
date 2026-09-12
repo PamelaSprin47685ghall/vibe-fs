@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>host</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>provider</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>host-opencode-types</WanxiangshuCompileShard>
   </PropertyGroup>
   <ItemGroup>

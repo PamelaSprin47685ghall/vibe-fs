@@ -7,6 +7,7 @@ open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Execution.Session
+open Wanxiangshu.Foundation
 
 module HostFactFold =
 

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>dispatch</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>interaction-repair-interactionrepair</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>interaction-authority</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>interaction-repair-interactionrepair</WanxiangshuOwnerLocality>

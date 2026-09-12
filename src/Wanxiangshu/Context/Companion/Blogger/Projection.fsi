@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Context.Companion.Blogger
 
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation
 
 [<RequireQualifiedAccess>]
 type BlogFrameKind =

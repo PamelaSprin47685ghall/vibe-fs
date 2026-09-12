@@ -7,6 +7,7 @@ open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Persistence.Journal
 
 open Wanxiangshu.Interaction.Authority
@@ -20,6 +21,16 @@ open Wanxiangshu.Interaction.Repair
 /// is `None`. PROMPT-005 makes a plugin prompt a durable act: with nowhere to
 /// record the claim there is nothing legitimate to send, so these fail closed.
 module HostSessionNudge =
+
+    let private toDispatchPort (sessionPort: ISessionHostPort) : IDispatchSessionPort =
+        { new IDispatchSessionPort with
+            member _.SendPrompt(sessionId, text, opts) = sessionPort.SendPrompt(sessionId, text, opts)
+            member _.SubscribeTerminal(sessionId, listener) = sessionPort.SubscribeTerminal(sessionId, listener)
+            member _.SubscribeFutureTerminal(sessionId, listener) = sessionPort.SubscribeFutureTerminal(sessionId, listener)
+            member _.ReportFatalDiagnostic(operation, fields) =
+                let delimiter = String.Join(";", fields |> List.map (fun (k, v) -> k + "=" + v))
+                FatalProcess.trip operation delimiter }
+
 
     let tryActiveProfile (journal: AgentJournal option) (sessionId: SessionId) =
         journal
@@ -75,11 +86,11 @@ module HostSessionNudge =
             | false, None, _ -> return Error "No journal: a continuation cannot be claimed"
             | false, Some _, None -> return Error "No active authority profile"
             | false, Some durable, Some profile ->
-                let rt = PromptDispatcher.forJournal durable
+                let rt = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
 
                 return!
                     rt.SendContinuation
-                        sessionPort
+                        (toDispatchPort sessionPort)
                         sessionId
                         prompt
                         kind
@@ -135,13 +146,13 @@ module HostSessionNudge =
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         : Task<GateContinuationOutcome> =
-        let rt = PromptDispatcher.forJournal durable
+        let rt = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
 
         if rt.GateNudgeAlreadyAdmitted profile continuation gateKind terminalProviderRun then
             Task.FromResult GateContinuationOutcome.AlreadyAdmitted
         else
             rt.SendGateNudge
-                sessionPort
+                (toDispatchPort sessionPort)
                 sessionId
                 prompt
                 continuation
@@ -203,7 +214,7 @@ module HostSessionNudge =
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         : Task<Result<PhysicalUserMessageId, string>> =
-        let rt = PromptDispatcher.forJournal durable
+        let rt = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
 
         let acceptedPhysical =
             TaskCompletionSource<PhysicalUserMessageId>(TaskCreationOptions.RunContinuationsAsynchronously)
@@ -299,7 +310,7 @@ module HostSessionNudge =
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         : Task<InteractionRepairSendOutcome> =
-        let rt = PromptDispatcher.forJournal durable
+        let rt = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
 
         if rt.RepairAlreadyClaimed profile requestId terminalProviderRun repairKind then
             Task.FromResult InteractionRepairSendOutcome.AlreadyAdmitted
@@ -309,7 +320,7 @@ module HostSessionNudge =
             // to AABB. Await waits only the SendPrompt transport result; it
             // never waits for provider execution/slots.
             rt.SendInteractionRepair
-                sessionPort
+                (toDispatchPort sessionPort)
                 sessionId
                 prompt
                 requestId
@@ -423,13 +434,13 @@ module HostSessionNudge =
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         : Task<IdleContinuationOutcome> =
-        let rt = PromptDispatcher.forJournal durable
+        let rt = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
 
         if rt.GateNudgeAlreadyAdmitted profile continuation gateKind terminalProviderRun then
             Task.FromResult IdleContinuationOutcome.AlreadyAdmitted
         else
             rt.SendIdleGateNudge
-                sessionPort
+                (toDispatchPort sessionPort)
                 sessionId
                 prompt
                 continuation
@@ -557,13 +568,13 @@ module HostSessionNudge =
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         : Task<IdleContinuationOutcome> =
-        let rt = PromptDispatcher.forJournal durable
+        let rt = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
 
         if rt.RepairAlreadyClaimed profile requestId terminalProviderRun repairKind then
             Task.FromResult IdleContinuationOutcome.AlreadyAdmitted
         else
             rt.SendIdleInteractionRepair
-                sessionPort
+                (toDispatchPort sessionPort)
                 sessionId
                 prompt
                 requestId

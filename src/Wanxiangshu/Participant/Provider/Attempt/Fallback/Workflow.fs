@@ -198,7 +198,7 @@ module ProviderRecoveryWorkflow =
         match HostSessionNudge.tryActiveProfile (Some durable) turn.SessionId with
         | None -> false
         | Some profile ->
-            (PromptDispatcher.forJournal durable).GateNudgeAlreadyAdmitted
+            (PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)).GateNudgeAlreadyAdmitted
                 profile
                 PromptAuthority.ContinuationKind.ProviderRetryAttempt
                 (recoveryGateKind authorization)

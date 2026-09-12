@@ -14,7 +14,7 @@ test('WHAT[CHATEXEC-003] managed path calls one admission transaction', () => {
   assert.equal(occurrences(/ChatAdmissionTransaction\.execute/g), 1)
   assert.match(
     bootstrap,
-    /let\s+admissionTransaction\s*=\s*\n\s*journal\s*\n\s*\|> Option\.map\s*\(fun durable ->\s*\n\s*let runtime = PromptDispatcher\.forJournal durable\s*\n\s*ChatAdmissionTransaction\.production durable runtime\.AcceptManagedChatIntent\)/,
+    /let\s+admissionTransaction\s*=\s*\n\s*journal\s*\n\s*\|> Option\.map\s*\(fun durable ->\s*\n\s*let runtime = PromptDispatcher\.forPrompts \(PromptJournalAdapter\.create durable\)\s*\n\s*ChatAdmissionTransaction\.production durable runtime\.AcceptManagedChatIntent\)/,
   )
   assert.match(
     bootstrap,

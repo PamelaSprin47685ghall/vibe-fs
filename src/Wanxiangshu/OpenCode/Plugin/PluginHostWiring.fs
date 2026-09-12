@@ -44,11 +44,41 @@ module PluginHostWiring =
             let scope = boot.Scope
             let workspaceDirectory = boot.WorkspaceDirectory
 
-            let completeHost eventPort sessionPort snapshotOpt terminalKey sharedTerminalPort : Task<Host> =
+            let terminalToResult (outcome: Wanxiangshu.OpenCode.TerminalOutcome) =
+                match outcome with
+                | Wanxiangshu.OpenCode.TerminalOutcome.Completed _ -> Ok()
+                | Wanxiangshu.OpenCode.TerminalOutcome.Failed stop -> Error stop.Reason
+                | Wanxiangshu.OpenCode.TerminalOutcome.Aborted stop -> Error stop.Reason
+
+            let sendResultToUnit (outcome: Wanxiangshu.Foundation.Outcome.SendOutcome) =
+                match outcome with
+                | Wanxiangshu.Foundation.Outcome.SendOutcome.AdmittedWithReceipt _
+                | Wanxiangshu.Foundation.Outcome.SendOutcome.AdmittedWithPhysicalMessage _ -> Ok()
+                | Wanxiangshu.Foundation.Outcome.SendOutcome.Retryable r
+                | Wanxiangshu.Foundation.Outcome.SendOutcome.Fatal r
+                | Wanxiangshu.Foundation.Outcome.SendOutcome.AcceptanceUnknown r -> Error r
+
+            let completeHost eventPort (sessionPort: ISessionHostPort) snapshotOpt terminalKey sharedTerminalPort : Task<Host> =
                 task {
                     match boot.Journal with
                     | Some journal ->
-                        BookkeeperRuntime.setRuntime sessionPort (fun ownerSessionId ->
+                        let kbPort =
+                            { new Wanxiangshu.Repository.Knowledge.Casebook.ICasebookSessionPort with
+                                member _.AbortSession childId = sessionPort.AbortSession childId
+                                member _.SubscribeTerminal(childId, listener) =
+                                    sessionPort.SubscribeTerminal(childId, (fun id outcome -> listener id (terminalToResult outcome)))
+                                member _.SendPrompt(childId, text, agent) =
+                                    task {
+                                        let exactTools = Map.ofList [ "*", false; "js-bookkeeper", true ]
+                                        let opts: Wanxiangshu.OpenCode.SessionPromptOptions =
+                                            { Model = None; Agent = Some agent; Directory = None; Metadata = None; Tools = Some exactTools; BindingIntent = Wanxiangshu.OpenCode.SessionBindingIntent.Preserve }
+                                        let! outcome = sessionPort.SendPrompt(childId, text, opts)
+                                        return sendResultToUnit outcome
+                                    }
+                                member _.CreateSiblingSession(owner, title, agent) =
+                                    sessionPort.CreateSiblingSession(owner, None, { Title = Some title; Agent = Some agent; Directory = None })
+                            }
+                        BookkeeperRuntime.setPort kbPort (fun ownerSessionId ->
                             let projections = (AgentJournal.snapshot journal).AgentProjections
                             PromptAuthorityProjectionQueries.activeProfile ownerSessionId projections)
                     | None -> BookkeeperRuntime.resetRuntime ()

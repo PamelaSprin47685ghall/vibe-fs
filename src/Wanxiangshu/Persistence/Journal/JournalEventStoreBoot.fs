@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Foundation
 
 /// Host-facing EventStore journal boot port.
 ///

@@ -33,6 +33,8 @@ open Wanxiangshu.Strength.Persistence
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -122,7 +124,7 @@ module PluginHostInterop =
         | ChatAdmissionReleaseOutcome.BoundaryFailed _ -> HookSettlementEvidence.SettlementIncomplete
 
     let private persistenceOutcome failure =
-        match JournalAppendFailure.toExecutionFailure failure with
+        match JournalAppendOutcome.toExecutionFailure failure with
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted as typed ->
             typed, HookSettlementEvidence.SettlementIncomplete
         | ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed as typed ->

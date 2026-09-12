@@ -6,6 +6,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Foundation
 
 /// Plain-data owner for the HostTurnObserved durable fact.
 /// Typed execution facts and the Agent projection remain behind this boundary.
@@ -74,7 +75,7 @@ module HostTurnObservedSurface =
         | Ok fact -> factToJs fact
         | Error error -> box {| ok = false; error = error |}
 
-    let private rejectionToJs (rejection: Wanxiangshu.Composition.Durable.FoldRejection) : obj =
+    let private rejectionToJs (rejection: Wanxiangshu.Foundation.FoldRejection) : obj =
         box
             {| Fact = rejection.Fact
                Reason = rejection.Reason |}

@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Execution.Session.ChatExecution
 
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Foundation
 
 [<RequireQualifiedAccess>]
 module ChatExecutionFactFold =

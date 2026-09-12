@@ -7,8 +7,11 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
+
+open Wanxiangshu.Foundation
 
 /// Journal owner operations specific to the obligation ledger. The generic
 /// JournalSurface owns boot/release; this module owns MagicTodo facts and the

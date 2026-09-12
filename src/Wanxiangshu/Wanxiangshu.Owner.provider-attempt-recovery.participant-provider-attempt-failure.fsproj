@@ -9,8 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
-    <Compile Include="Execution/Failure/Model.fsi"/>
-    <Compile Include="Execution/Failure/Model.fs"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
     <Compile Include="Participant/Provider/Attempt/Failure.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Failure.fs"/>
     <Compile Include="Participant/Provider/Attempt/FailureSurface.fsi"/>

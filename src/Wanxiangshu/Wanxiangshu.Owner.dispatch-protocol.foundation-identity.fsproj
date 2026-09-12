@@ -9,5 +9,7 @@
   <ItemGroup>
     <Compile Include="Foundation/Identity.fsi"/>
     <Compile Include="Foundation/Identity.fs"/>
+    <Compile Include="Foundation/Quiescence.fsi"/>
+    <Compile Include="Foundation/Quiescence.fs"/>
   </ItemGroup>
 </Project>

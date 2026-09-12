@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Execution.Delegation
 
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation
 
 type DelegationSessionState =
     { Handles: AgentLinkageProjection option

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode.Host.PairProgramming
 
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation
 
 type PairProgrammingGuideline =
     { Ordinal: int64

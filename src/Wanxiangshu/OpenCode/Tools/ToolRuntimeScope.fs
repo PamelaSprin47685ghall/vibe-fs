@@ -273,7 +273,7 @@ type ToolRuntimeScope
         (agent: string)
         : Task<Role option> =
         task {
-            let runtime = PromptDispatcher.forJournal durable
+            let runtime = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
 
             let! admission =
                 taskResult {

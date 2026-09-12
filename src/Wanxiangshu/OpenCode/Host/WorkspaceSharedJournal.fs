@@ -6,6 +6,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Foundation
 
 /// Workspace-host-owned shared journal surface.
 /// Runtime paths and EventStore capabilities stay opaque; callers observe only

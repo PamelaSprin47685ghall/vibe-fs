@@ -36,6 +36,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Composition.Durable
 
 /// EXEC-002 busy-agent nudge, as a PROMPT-003 Continuation.
 module HostForkBusyNudge =
@@ -61,12 +62,12 @@ module HostForkBusyNudge =
         (prompt: string)
         =
         task {
-            let rt = PromptDispatcher.forJournal j
+            let rt = PromptDispatcher.forPrompts (PromptJournalAdapter.create j)
             let syntheticPrompt = LlmFacing.renderInstruction prompt
 
             let! sent =
                 rt.SendContinuation
-                    sessions
+                    (DispatchSessionPort.ofSessionPort sessions)
                     childId
                     syntheticPrompt
                     PromptAuthority.ContinuationKind.BusyAgentNudge

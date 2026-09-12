@@ -3,6 +3,7 @@ namespace Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Foundation
 
 module DelegationProjectionBridge =
 

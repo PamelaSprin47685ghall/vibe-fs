@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Execution.Delegation
 
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation
 
 module DelegationFactFold =
 

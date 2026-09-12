@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>chat-execution</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>execution-failure-decision</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>execution-failure-policy</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>execution-failure-decision</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.execution-failure-policy.execution-failure-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-facts.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
+    <Compile Include="Execution/Failure/Decision.fsi"/>
+    <Compile Include="Execution/Failure/Decision.fs"/>
+    <Compile Include="Execution/Failure/Policy.fsi"/>
+    <Compile Include="Execution/Failure/Surface.fsi"/>
+    <Compile Include="Execution/Failure/Policy.fs"/>
+    <Compile Include="Execution/Failure/Surface.fs"/>
+  </ItemGroup>
+</Project>

@@ -5,12 +5,10 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Resources
@@ -19,6 +17,13 @@ open Wanxiangshu.Resources
 type BookkeeperRequest =
     | CaseRefresh
     | CaseFinalize
+
+type ICasebookSessionPort =
+    abstract AbortSession: childId: SessionId -> Task<Result<unit, string>>
+    abstract SubscribeTerminal: childId: SessionId * (SessionId -> Result<unit, string> -> unit) -> IDisposable
+    abstract SendPrompt: childId: SessionId * promptText: string * agent: string -> Task<Result<unit, string>>
+    abstract CreateSiblingSession: ownerSessionId: SessionId * title: string * agent: string ->
+        Task<Result<SessionId, string>>
 
 /// Physical Bookkeeper leaf: one CreateChildSession per transaction, js-bookkeeper
 /// against process-local staging, then AbortSession.
@@ -30,7 +35,7 @@ type BookkeeperRequest =
 /// - `Ledger` — attachment bookkeeping only (runtime slot, live bindings, prompt
 ///   authorizations, completion handles under one gate). No host calls, no
 ///   staging, no authority derivation.
-/// - `Coordination` — the only place that touches `ISessionHostPort`,
+/// - `Coordination` — the only place that touches `ICasebookSessionPort`,
 ///   `BookkeeperStaging`, `PromptAuthority` derivation, terminal subscriptions
 ///   and completion settlement. It calls into `Decisions` and `Ledger` and
 ///   receives every host capability through the injected `Runtime` value.
@@ -39,10 +44,10 @@ module BookkeeperRuntime =
     type private LiveAttachment =
         { TxId: string
           OwnerSessionId: string
-          Attachment: AttachmentKind }
+          Attachment: string }
 
     type private Runtime =
-        { Sessions: ISessionHostPort
+        { Port: ICasebookSessionPort
           ResolveActiveOwner: SessionId -> PromptAuthority.AuthorityExecutionProfile option }
 
     /// Pure domain decisions: prompt/evidence shaping and receipt classification.
@@ -134,36 +139,6 @@ module BookkeeperRuntime =
 
         let canonicalAgent = ManagedAgentCatalog.bookkeeperName
 
-        let childOptions (txId: string) : OpenCodeChildOptions =
-            { Title = Some("bookkeeper:" + txId)
-              Agent = Some canonicalAgent
-              Directory = None }
-
-        let exactTools = Map.ofList [ "*", false; "js-bookkeeper", true ]
-
-        /// Pure prompt options for the already-authorized bookkeeper agent.
-        /// Takes the derived agent name; never resolves authority itself.
-        let promptOptionsFor (agent: string) : OpenCodePromptOptions =
-            { Model = None
-              Agent = Some agent
-              Directory = None
-              Metadata = None
-              Tools = Some exactTools
-              BindingIntent = SessionBindingIntent.Preserve }
-
-        [<RequireQualifiedAccess>]
-        type BookkeeperPromptReceiptDecision =
-            | AwaitTerminal
-            | Reject of string
-
-        let decideBookkeeperPromptReceipt (outcome: SendOutcome) : BookkeeperPromptReceiptDecision =
-            match outcome with
-            | Retryable reason
-            | Fatal reason
-            | AcceptanceUnknown reason -> BookkeeperPromptReceiptDecision.Reject reason
-            | AdmittedWithReceipt _
-            | AdmittedWithPhysicalMessage _ -> BookkeeperPromptReceiptDecision.AwaitTerminal
-
     /// Attachment bookkeeping only: runtime slot, live bindings, prompt
     /// authorizations and completion handles under one gate. No host calls,
     /// no staging, no authority derivation.
@@ -178,15 +153,12 @@ module BookkeeperRuntime =
         let private pendingCompletions =
             Dictionary<string, TaskCompletionSource<Result<unit, string>>>()
 
-        let set
-            (sessions: ISessionHostPort)
+        let setPort
+            (port: ICasebookSessionPort)
             (resolveActiveOwner: SessionId -> PromptAuthority.AuthorityExecutionProfile option)
             : unit =
             lock gate (fun () ->
-                runtime <-
-                    Some
-                        { Sessions = sessions
-                          ResolveActiveOwner = resolveActiveOwner })
+                runtime <- Some { Port = port; ResolveActiveOwner = resolveActiveOwner })
 
         let reset () : unit =
             lock gate (fun () ->
@@ -200,7 +172,7 @@ module BookkeeperRuntime =
                 live.[sessionId] <-
                     { TxId = txId
                       OwnerSessionId = ownerSessionId
-                      Attachment = AttachmentKind.Bookkeeper txId })
+                      Attachment = "bookkeeper:" + txId })
 
         let unbind (sessionId: string) : unit =
             lock gate (fun () ->
@@ -253,7 +225,7 @@ module BookkeeperRuntime =
     /// the injected `Runtime` value.
     module private Coordination =
 
-        let retire (sessions: ISessionHostPort) (childId: SessionId) : Task<unit> =
+        let retire (sessions: ICasebookSessionPort) (childId: SessionId) : Task<unit> =
             task {
                 try
                     let! _ = sessions.AbortSession childId
@@ -264,21 +236,12 @@ module BookkeeperRuntime =
                 Ledger.unbind (SessionId.value childId)
             }
 
-        let completeOnOutcome
-            (completion: TaskCompletionSource<Result<unit, string>>)
-            (outcome: TerminalOutcome)
-            : unit =
-            match outcome with
-            | TerminalOutcome.Completed _ -> AsyncSupport.trySetResult completion (Ok()) |> ignore
-            | TerminalOutcome.Failed stop -> AsyncSupport.trySetResult completion (Error stop.Reason) |> ignore
-            | TerminalOutcome.Aborted stop -> AsyncSupport.trySetResult completion (Error stop.Reason) |> ignore
-
         let completePhysical (sessionId: SessionId) (outcome: Result<unit, string>) : unit =
             Ledger.tryGetCompletion sessionId
             |> Option.iter (fun pending -> AsyncSupport.trySetResult pending outcome |> ignore)
 
         let awaitCompletion
-            (sessions: ISessionHostPort)
+            (sessions: ICasebookSessionPort)
             (txId: string)
             (childId: SessionId)
             (completion: TaskCompletionSource<Result<unit, string>>)
@@ -299,38 +262,25 @@ module BookkeeperRuntime =
                     return taken
             }
 
-        let settleBookkeeperPromptReceipt
-            (sessions: ISessionHostPort)
-            (txId: string)
-            (childId: SessionId)
-            (disposeSub: unit -> unit)
-            (decision: Decisions.BookkeeperPromptReceiptDecision)
-            : Task<Result<unit, string>> =
-            match decision with
-            | Decisions.BookkeeperPromptReceiptDecision.AwaitTerminal -> Task.FromResult(Ok())
-            | Decisions.BookkeeperPromptReceiptDecision.Reject reason ->
-                task {
-                    disposeSub ()
-                    BookkeeperStaging.abort txId
-                    do! retire sessions childId
-                    return Error reason
-                }
-
         let sendBookkeeperPrompt
-            (sessions: ISessionHostPort)
+            (sessions: ICasebookSessionPort)
             (txId: string)
             (childId: SessionId)
             (completion: TaskCompletionSource<Result<unit, string>>)
             (disposeSub: unit -> unit)
             (promptText: string)
-            (promptOptions: OpenCodePromptOptions)
+            (agent: string)
             : Task<Result<string * string, string>> =
-            taskResult {
-                let! receipt = sessions.SendPrompt(childId, promptText, promptOptions) |> TaskResultCE.ofTask
-
-                let receiptDecision = Decisions.decideBookkeeperPromptReceipt receipt
-                do! settleBookkeeperPromptReceipt sessions txId childId disposeSub receiptDecision
-                return! awaitCompletion sessions txId childId completion disposeSub
+            task {
+                let! res = sessions.SendPrompt(childId, promptText, agent)
+                match res with
+                | Error reason ->
+                    disposeSub ()
+                    BookkeeperStaging.abort txId
+                    do! retire sessions childId
+                    return Error reason
+                | Ok () ->
+                    return! awaitCompletion sessions txId childId completion disposeSub
             }
 
         let runChild
@@ -346,7 +296,7 @@ module BookkeeperRuntime =
             (extraTranscript: string option)
             : Task<Result<string * string, string>> =
             task {
-                let sessions = runtime.Sessions
+                let sessions = runtime.Port
                 let childKey = SessionId.value childId
                 let ownerKey = SessionId.value ownerSessionId
                 Ledger.bind childKey txId ownerKey
@@ -360,7 +310,10 @@ module BookkeeperRuntime =
                 let mutable subscription: System.IDisposable option = None
 
                 subscription <-
-                    Some(sessions.SubscribeTerminal(childId, (fun _ outcome -> completeOnOutcome completion outcome)))
+                    Some(sessions.SubscribeTerminal(childId, (fun _ outcome ->
+                        match outcome with
+                        | Ok () -> AsyncSupport.trySetResult completion (Ok()) |> ignore
+                        | Error err -> AsyncSupport.trySetResult completion (Error err) |> ignore)))
 
                 let disposeSub () =
                     subscription |> Option.iter (fun active -> active.Dispose())
@@ -376,13 +329,10 @@ module BookkeeperRuntime =
                     do! retire sessions childId
                     return Error(sprintf "bookkeeper identity seed rejected: %A" rejection)
                 | Ok participantIdentity ->
-                    let promptOptions =
-                        Decisions.promptOptionsFor (ParticipantIdentity.selectedAgent participantIdentity)
-
                     let promptText = Decisions.envelope kind ownerKey q a observations extraTranscript
                     Ledger.authorize childId (ParticipantIdentity.selectedAgent participantIdentity) promptText
 
-                    return! sendBookkeeperPrompt sessions txId childId completion disposeSub promptText promptOptions
+                    return! sendBookkeeperPrompt sessions txId childId completion disposeSub promptText (ParticipantIdentity.selectedAgent participantIdentity)
             }
 
         let activeOwnerProfile (runtime: Runtime) (ownerSessionId: SessionId) =
@@ -411,7 +361,7 @@ module BookkeeperRuntime =
                     let txId = Guid.NewGuid().ToString("N")
                     BookkeeperStaging.beginTransaction txId q a
 
-                    match! runtime.Sessions.CreateSiblingSession(ownerSessionId, None, Decisions.childOptions txId) with
+                    match! runtime.Port.CreateSiblingSession(ownerSessionId, "bookkeeper:" + txId, Decisions.canonicalAgent) with
                     | Error error ->
                         BookkeeperStaging.abort txId
                         return Error error
@@ -430,11 +380,11 @@ module BookkeeperRuntime =
                                 extraTranscript
             }
 
-    let setRuntime
-        (sessions: ISessionHostPort)
+    let setPort
+        (port: ICasebookSessionPort)
         (resolveActiveOwner: SessionId -> PromptAuthority.AuthorityExecutionProfile option)
         : unit =
-        Ledger.set sessions resolveActiveOwner
+        Ledger.setPort port resolveActiveOwner
 
     let resetRuntime () : unit = Ledger.reset ()
 

@@ -227,7 +227,7 @@ type SyncDelegateRuntime
             | None ->
                 let! _ =
                     dispatcher.SendAgentOwnerRootWithTools
-                        sessions
+                        (DispatchSessionPort.ofSessionPort sessions)
                         call.Delegate
                         providerPrompt
                         identitySeed
@@ -248,7 +248,7 @@ type SyncDelegateRuntime
                 ->
                 let! _ =
                     dispatcher.SendContinuationWithTools
-                        sessions
+                        (DispatchSessionPort.ofSessionPort sessions)
                         call.Delegate
                         providerPrompt
                         PromptAuthority.ContinuationKind.ManagedDelegationAssignment

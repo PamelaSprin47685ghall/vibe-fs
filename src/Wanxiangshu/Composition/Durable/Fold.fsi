@@ -2,6 +2,7 @@ namespace Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Foundation
 
 module Fold =
     val empty: ProjectionSet

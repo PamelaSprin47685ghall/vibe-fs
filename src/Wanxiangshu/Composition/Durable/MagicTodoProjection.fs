@@ -6,6 +6,7 @@ open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Foundation
 
 /// MagicTodoProjection — canonical todo list from facts.
 ///

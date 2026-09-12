@@ -501,7 +501,7 @@ module HostSignalBootstrap =
             let admissionTransaction =
                 journal
                 |> Option.map (fun durable ->
-                    let runtime = PromptDispatcher.forJournal durable
+                    let runtime = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
                     ChatAdmissionTransaction.production durable runtime.AcceptManagedChatIntent)
 
             let durabilityActivation =

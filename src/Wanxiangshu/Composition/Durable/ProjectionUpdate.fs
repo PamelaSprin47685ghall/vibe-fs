@@ -9,6 +9,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Enforcer.Guidance
+open Wanxiangshu.Foundation
 
 /// Shared session-scoped projection-update algebra for the fold families
 /// (formerly private helpers of `Fold`). `prefixOutcome` is shared by the

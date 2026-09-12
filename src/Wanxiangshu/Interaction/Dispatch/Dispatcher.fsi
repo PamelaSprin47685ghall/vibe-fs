@@ -2,13 +2,13 @@ namespace Wanxiangshu.Interaction.Dispatch
 
 open System
 open System.Threading.Tasks
-open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]
 module PromptDispatcher =
@@ -42,7 +42,7 @@ module PromptDispatcher =
     val internal describeIdentitySeedRejection: rejection: PromptAuthority.IdentitySeedValidationError -> string
 
     type Runtime =
-        new: journal: AgentJournal -> Runtime
+        new: journal: IPromptJournal -> Runtime
         member RuntimeId: RuntimeId
         member ProjectionFor: sessionId: SessionId -> PromptAuthority.PromptAuthorityProjection
 
@@ -56,7 +56,7 @@ module PromptDispatcher =
         member internal Persist:
             sessionId: SessionId ->
             providerRun: ProviderRunIdentity option ->
-            fact: AgentFact ->
+            fact: PromptSessionFact ->
                 Task<Result<unit, string>>
 
         member RegisterAuthority:
@@ -129,6 +129,6 @@ module PromptDispatcher =
                 bool
 
         member internal Metadata: key: PromptKey -> origin: string -> logicalRunId: LogicalRunId option -> obj
-        member internal SubscribeNoOp: port: ISessionHostPort -> sessionId: SessionId -> IDisposable
+        member internal SubscribeNoOp: port: IDispatchSessionPort -> sessionId: SessionId -> IDisposable
 
-    val forJournal: journal: AgentJournal -> Runtime
+    val forPrompts: journal: IPromptJournal -> Runtime

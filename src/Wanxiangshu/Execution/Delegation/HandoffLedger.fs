@@ -1,10 +1,12 @@
 namespace Wanxiangshu.Execution.Delegation
 
+open Wanxiangshu.Foundation.Outcome
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Foundation
 
 [<RequireQualifiedAccess>]
 module DelegationHandoffLedger =

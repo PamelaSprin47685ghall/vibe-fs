@@ -2,7 +2,7 @@ namespace Wanxiangshu.Interaction.Authority
 
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Interaction.Dispatch
 
 module ChildPromptAuthority =
-    val ensureForLinkedChild: journal: AgentJournal option -> turn: ReconciledTurn -> Task<Result<unit, string>>
+    val ensureForLinkedChild: prompts: IPromptJournal option -> turn: ReconciledTurn -> Task<Result<unit, string>>

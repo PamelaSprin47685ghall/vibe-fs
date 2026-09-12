@@ -1,35 +1,8 @@
 namespace Wanxiangshu.Context.Companion
 
-open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Enforcer.Guidance
-open Wanxiangshu.Execution.Session
-open Wanxiangshu.Execution.Session.Attachment
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
-
-open System
-open Fable.Core
-open Wanxiangshu.Foundation
+open Wanxiangshu.Context.Companion.Blogger
+open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Foundation
-open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Foundation
-open Wanxiangshu.Host
-open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 
 /// Companion state wrapper for the physical caches used at Host boundaries.
 type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort, ?sessionId: SessionId) =

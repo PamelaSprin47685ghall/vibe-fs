@@ -11,6 +11,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal
@@ -69,7 +70,7 @@ module PluginSessionWiring =
                     isUsable = (fun _ -> true)
                 )
 
-            let dispatcher = PromptDispatcher.forJournal durable
+            let dispatcher = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
 
             let registerDelegate (delegateId: SessionId) (agent: string) =
                 wired.RegisterOwned(SessionId.value delegateId)

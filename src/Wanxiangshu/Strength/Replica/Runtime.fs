@@ -261,7 +261,7 @@ module private StrengthReplicaRuntimeLogic =
             try
                 let! sent =
                     dispatcher.SendAgentOwnerRootWithTools
-                        sessions
+                        (DispatchSessionPort.ofSessionPort sessions)
                         replica
                         (LlmFacing.renderInstruction "Continue.")
                         identitySeed

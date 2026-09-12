@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>session-lifecycle</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>execution-session-wait-proof-surface</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>causal-wait</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>execution-session-wait-proof-surface</WanxiangshuOwnerLocality>

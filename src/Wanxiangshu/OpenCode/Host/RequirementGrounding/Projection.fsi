@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode.Host.RequirementGrounding
 
 open Wanxiangshu.Requirement.Grounding
+open Wanxiangshu.Foundation
 
 type RequirementGroundingProjectionState =
     { Pending: Map<string, GroundingSnapshot>

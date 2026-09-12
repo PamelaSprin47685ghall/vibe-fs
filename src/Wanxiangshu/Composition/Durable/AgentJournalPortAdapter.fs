@@ -9,6 +9,7 @@ open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation
 open Wanxiangshu.Enforcer.InstitutionalLearning
 open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Concern

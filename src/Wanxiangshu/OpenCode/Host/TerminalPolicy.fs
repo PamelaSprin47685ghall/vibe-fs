@@ -1,14 +1,10 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Collections.Generic
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Interaction.Authority
 
-/// Pure terminal admission rules; no Host transport or mutable registry.
+    /// Pure terminal admission rules; no Host transport or mutable registry.
 module TerminalPolicy =
 
     let sessionDead (port: TerminalPolicyPort option) (sessionId: SessionId) =
@@ -16,83 +12,47 @@ module TerminalPolicy =
         | Some p -> p.IsPoisoned()
         | None -> false
 
-    let private canonicalRoleOf (authority: PromptAuthority.PromptAuthorityProjection) =
-        match authority.ActiveLogicalRun, authority.LastAuthorityProfile with
-        | Some run, _ -> Some run.CanonicalRole
-        | None, Some profile -> Some profile.CanonicalRole
-        | None, None -> None
+    /// ORCH-003: the Manager guard applies when no registered OR durable parent
+    /// claims this session (unlinked + unregistered => top-level), or when the
+    /// durable role says Manager but the flow-level parent is not an Orchestrator.
+    /// `sessionParents` is the flow-level in-memory parent registry (host-owned).
+    ///
+    /// Durable-side evidence the caller supplies through `TerminalPolicyPort`:
+    /// linked child lookup `IsLinkedChild` and session canonical role
+    /// `TryCanonicalRole` — see `AgentJournalPortAdapter.forTerminalPolicy`.
 
-    /// ORCH-003: true when the session's registered parent is an Orchestrator
-    /// session (its own canonical role is Orchestrator). Only that parent
-    /// suppresses the top-level Manager guard; a HumanRoot-forked Manager stays
-    /// top-level and keeps its guard.
-    let private parentedByOrchestrator
-        (projection: AgentProjectionSet)
-        (sessionParents: Dictionary<string, string>)
-        (sessionKey: string)
-        =
-        match sessionParents.TryGetValue sessionKey with
-        | true, parentId ->
-            Map.tryFind (SessionId.create parentId) projection.Sessions
-            |> Option.bind (fun parent -> parent.PromptAuthority)
-            |> Option.bind canonicalRoleOf
-            |> Option.exists (fun role -> role = Role.Orchestrator)
-        | false, _ -> false
 
-    let private isLinkedChild (journal: AgentJournal option) (sessionKey: string) =
-        match journal with
-        | None -> false
-        | Some durable ->
-            Map.containsKey
-                (SessionId.create sessionKey)
-                (AgentJournal.snapshot durable).AgentProjections.HandleByChildSession
-
-    let private unlinkedTopLevel
-        (sessionParents: Dictionary<string, string>)
-        (journal: AgentJournal option)
-        (sessionKey: string)
-        =
-        not (sessionParents.ContainsKey sessionKey)
-        && not (isLinkedChild journal sessionKey)
-
-    let private managerOwnsTopLevel
-        (sessionParents: Dictionary<string, string>)
-        (journal: AgentJournal option)
-        (sessionKey: string)
-        (projection: AgentProjectionSet)
-        (authority: PromptAuthority.PromptAuthorityProjection)
-        =
-        match authority.ActiveLogicalRun, authority.LastAuthorityProfile with
-        | Some run, _ ->
-            run.CanonicalRole = Role.Manager
-            && not (parentedByOrchestrator projection sessionParents sessionKey)
-        | None, Some profile -> profile.CanonicalRole = Role.Manager
-        | None, None -> unlinkedTopLevel sessionParents journal sessionKey
-
-    let private sessionIsTopLevelManager
-        (sessionParents: Dictionary<string, string>)
-        (journal: AgentJournal option)
-        (sessionKey: string)
-        (projection: ProjectionSet)
-        =
-        match Map.tryFind (SessionId.create sessionKey) projection.AgentProjections.Sessions with
-        | Some session ->
-            session.PromptAuthority
-            |> Option.map (managerOwnsTopLevel sessionParents journal sessionKey projection.AgentProjections)
-            |> Option.defaultValue (unlinkedTopLevel sessionParents journal sessionKey)
-        | None -> unlinkedTopLevel sessionParents journal sessionKey
-
-    /// Manager Guard applies to any manager that still owns the review loop for its
-    /// worktree. Manager children of Orchestrator remain linked to the family root,
-    /// so parent linkage alone must not suppress the guard.
+    /// `isTopLevelManager` reads three orthogonal facts: the durable-family linked-child
+    /// predicate, the canonical role, and the host's flow-level parent map. The truth
+    /// table coerces the role-and-parent pair into a single switch — the domain fact
+    /// "weri one of: registered under orchestrator" is the only thing being tested.
+    ///
+    /// ORCH-003: the Manager guard applies when no registered OR durable parent
+    /// claims this session (unlinked + unregistered => top-level), or when the
+    /// durable role says Manager but the flow-level parent is not an Orchestrator.
+    /// Manager children of Orchestrator remain linked to the family root, so parent
+    /// linkage alone must not suppress the guard.
     let isTopLevelManager
         (sessionParents: Dictionary<string, string>)
-        (journal: AgentJournal option)
+        (port: TerminalPolicyPort option)
         (sessionKey: string)
-        =
-        match journal with
-        | None -> not (sessionParents.ContainsKey sessionKey)
-        | Some j -> sessionIsTopLevelManager sessionParents journal sessionKey (AgentJournal.snapshot j)
+        : bool =
+        let canonicalRole =
+            port |> Option.bind (fun p -> p.TryCanonicalRole(SessionId.create sessionKey))
+
+        let parent_registered = sessionParents.ContainsKey sessionKey
+
+        let parentIsOrchestrator =
+            match sessionParents.TryGetValue sessionKey, port with
+            | (true, parentId), Some p -> p.TryCanonicalRole(SessionId.create parentId) = Some Role.Orchestrator
+            | _ -> false
+
+        match canonicalRole, parent_registered, port with
+        | Some Role.Manager, _, _ -> not parentIsOrchestrator
+        | Some _, _, _ -> false
+        | None, true, _ -> false
+        | None, false, Some p -> not (p.IsLinkedChild(SessionId.create sessionKey))
+        | None, false, None -> true
 
     let private hasListableHandles (port: TerminalPolicyPort option) (sessionId: SessionId) =
         match port with

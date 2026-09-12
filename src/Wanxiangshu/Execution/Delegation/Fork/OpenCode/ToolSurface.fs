@@ -18,6 +18,7 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Execution.Session.Wait
 
@@ -389,7 +390,7 @@ module ForkToolSurface =
                 | Error error -> raise (ArgumentException error)
 
             let! journal = createJournal directory
-            let dispatcher = PromptDispatcher.Runtime(journal)
+            let dispatcher = PromptDispatcher.Runtime (PromptJournalAdapter.create journal)
 
             match! acceptOwnerRoots dispatcher admissions with
             | Error error ->

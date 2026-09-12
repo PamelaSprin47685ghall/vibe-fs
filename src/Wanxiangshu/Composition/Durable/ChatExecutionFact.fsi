@@ -1,6 +1,7 @@
-namespace Wanxiangshu.Execution.Session.ChatExecution
+namespace Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Execution.Session.ChatExecution
 
 module ChatExecutionFact =
     val inline Accepted:

@@ -4,6 +4,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch

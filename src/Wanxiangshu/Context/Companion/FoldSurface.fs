@@ -9,6 +9,7 @@ open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Foundation
 
 /// Context-owned fold oracle for durable recovery laws.
 /// It accepts plain fact/envelope data and returns plain projection summaries;
