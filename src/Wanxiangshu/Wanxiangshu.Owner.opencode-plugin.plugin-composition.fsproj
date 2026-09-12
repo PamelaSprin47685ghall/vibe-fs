@@ -3,7 +3,7 @@
     <WanxiangshuSemanticOwner>opencode-plugin</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>plugin-composition</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
-    <WanxiangshuSubsystem>dispatch</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>plugin-composition</WanxiangshuCompileShard>
   </PropertyGroup>
   <ItemGroup>

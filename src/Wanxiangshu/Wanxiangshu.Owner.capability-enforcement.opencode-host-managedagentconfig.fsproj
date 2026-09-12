@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>interaction</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>opencode-host-managedagentconfig</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>capability-enforcement</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>opencode-host-managedagentconfig</WanxiangshuOwnerLocality>
