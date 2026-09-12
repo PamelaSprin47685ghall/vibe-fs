@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Interaction.Authority
 
-open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Persona
@@ -66,22 +65,6 @@ module PromptAuthority =
         authorityKind: RootAuthorityKind ->
         participantIdentity: ParticipantIdentityEvidence ->
             Result<AuthorityExecutionProfile, string>
-
-    type AttemptExecutionProfile =
-        { Authority: AuthorityExecutionProfile
-          PhysicalUserMessageId: PhysicalUserMessageId
-          ProviderRun: ProviderRunIdentity
-          Origin: PromptOrigin
-          SystemPromptId: SystemPromptId
-          ToolCapabilitySet: Set<ToolPermission>
-          RequestKind: ProviderRequestKind
-          ProjectionChoice: XProjectionChoice }
-
-        member SessionId: SessionId
-        member LogicalRunId: LogicalRunId
-        member AuthorityRootUserMessageId: AuthorityRootUserMessageId
-        member SelectedAgent: string
-        member CanonicalRole: Role
 
     type PromptClaim =
         { PromptKey: PromptKey
@@ -188,12 +171,3 @@ module PromptAuthority =
 
     val systemPromptIdFor: role: Role -> SystemPromptId
     val toolCapabilitiesFor: role: Role -> requestKind: ProviderRequestKind -> Set<ToolPermission>
-
-    val buildAttemptExecutionProfile:
-        authority: AuthorityExecutionProfile ->
-        physicalUserMessageId: PhysicalUserMessageId ->
-        providerRun: ProviderRunIdentity ->
-        origin: PromptOrigin ->
-        requestKind: ProviderRequestKind ->
-        choice: XProjectionChoice ->
-            AttemptExecutionProfile

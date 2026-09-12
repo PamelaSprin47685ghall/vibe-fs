@@ -360,7 +360,7 @@ module ProviderFailureSurface =
                   AuthorityKind = text (field value "authorityKind")
                   IdentitySeed = identitySeedOf (field value "identitySeed") }
         | "FailureRecorded" ->
-            ProviderFailureFact.FailureRecorded
+            Wanxiangshu.Composition.Durable.ProviderFailureFact.FailureRecorded
                 {| SessionId = SessionId.create (text (field value "session"))
                    LogicalRunId = LogicalRunId.create (text (field value "logicalRun"))
                    AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text (field value "authorityRoot"))
@@ -368,13 +368,13 @@ module ProviderFailureSurface =
                    ConsecutiveFailureCount = intValue (field value "consecutiveFailureCount")
                    Reason = text (field value "reason") |}
         | "RetryExhausted" ->
-            ProviderFailureFact.RetryExhausted
+            Wanxiangshu.Composition.Durable.ProviderFailureFact.RetryExhausted
                 {| SessionId = SessionId.create (text (field value "session"))
                    LogicalRunId = LogicalRunId.create (text (field value "logicalRun"))
                    AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text (field value "authorityRoot"))
                    FinalConsecutiveFailureCount = intValue (field value "finalConsecutiveFailureCount") |}
         | "SuccessRecorded" ->
-            ProviderFailureFact.SuccessRecorded
+            Wanxiangshu.Composition.Durable.ProviderFailureFact.SuccessRecorded
                 {| SessionId = SessionId.create (text (field value "session"))
                    LogicalRunId = LogicalRunId.create (text (field value "logicalRun"))
                    AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text (field value "authorityRoot"))

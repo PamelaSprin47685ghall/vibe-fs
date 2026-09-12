@@ -3,10 +3,11 @@ namespace Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Interaction.Attempt
 open Wanxiangshu.Interaction.Authority
 
 type AttemptPlan =
-    { Profile: PromptAuthority.AttemptExecutionProfile
+    { Profile: AttemptExecutionProfile
       NoProbeReason: NoCandidateReason option }
 
 type PendingAttemptPlan =

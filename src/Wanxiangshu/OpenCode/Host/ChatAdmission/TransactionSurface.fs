@@ -10,6 +10,7 @@ open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
+open Wanxiangshu.Interaction.Attempt
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider.Attempt
@@ -28,7 +29,7 @@ module TransactionSurface =
 
         parsed
 
-    let private profileOf (value: obj) : PromptAuthority.AttemptExecutionProfile =
+    let private profileOf (value: obj) : AttemptExecutionProfile =
         let sessionId = SessionId.create (requiredText "sessionId" value?sessionId)
 
         let physicalId =
@@ -60,7 +61,7 @@ module TransactionSurface =
                 identity
             |> Result.defaultWith (fun error -> invalidArg "authority" error)
 
-        PromptAuthority.buildAttemptExecutionProfile
+        InteractionAttempt.buildAttemptExecutionProfile
             authority
             physicalId
             (ProviderRunIdentity.create (requiredText "providerRun" value?providerRun))
@@ -196,7 +197,7 @@ module TransactionSurface =
 
     let transactionScenario (evidenceValue: obj) (failurePoint: string) (stateLabel: string) : Task<obj> =
         task {
-            let profile: PromptAuthority.AttemptExecutionProfile = profileOf evidenceValue
+            let profile: AttemptExecutionProfile = profileOf evidenceValue
 
             let evidence: AcceptedChatExecutionEvidence =
                 ManagedChatAcceptance.evidenceFromIntent profile.Authority profile.PhysicalUserMessageId profile.Origin

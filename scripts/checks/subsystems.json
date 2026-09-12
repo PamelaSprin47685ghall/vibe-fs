@@ -7,6 +7,7 @@
     { "id": "context", "legacy_owners": ["context-compression", "prefix-stability", "semantic-trace"] },
     { "id": "delegation", "legacy_owners": ["delegation", "intra-participant-parallelism", "participant-horizon"] },
     { "id": "dispatch", "legacy_owners": ["dispatch-protocol"] },
+    { "id": "application-composition", "legacy_owners": [] },
     { "id": "durable-composition", "legacy_owners": [] },
     { "id": "enforcer", "legacy_owners": ["behavior-diagnosis", "degeneration-guard", "institutional-learning"] },
     { "id": "host", "legacy_owners": ["host-boundary"] },

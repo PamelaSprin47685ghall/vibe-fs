@@ -17,9 +17,5 @@
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal-contract.fsproj"/>
     <Compile Include="Execution/Session/SessionStartedAtLedger.fsi"/>
     <Compile Include="Execution/Session/SessionStartedAtLedger.fs"/>
-    <Compile Include="OpenCode/Host/PairProgrammingCalibration.fsi"/>
-    <Compile Include="OpenCode/Host/PairProgrammingCalibration.fs"/>
-    <Compile Include="OpenCode/Host/PairProgrammingCalibrationSurface.fsi"/>
-    <Compile Include="OpenCode/Host/PairProgrammingCalibrationSurface.fs"/>
   </ItemGroup>
 </Project>

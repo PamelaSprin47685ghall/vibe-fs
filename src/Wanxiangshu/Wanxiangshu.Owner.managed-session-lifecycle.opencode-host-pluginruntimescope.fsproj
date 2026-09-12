@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>session-lifecycle</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>opencode-host-pluginruntimescope</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>managed-session-lifecycle</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>opencode-host-pluginruntimescope</WanxiangshuOwnerLocality>
@@ -28,7 +28,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.session-attachment-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-horizon.opencode-host-messagevisibility.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.participant-persona.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-planner.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.dispatch-attempt-planner.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-sharedstate.fsproj"/>
     <Compile Include="OpenCode/Host/PluginRuntimeScope.fsi"/>
     <Compile Include="OpenCode/Host/PluginRuntimeScope.fs"/>

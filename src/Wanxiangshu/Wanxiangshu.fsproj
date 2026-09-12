@@ -231,12 +231,12 @@
     <Compile Include="Execution/Session/ChatExecution/Fact.fs"/>
     <Compile Include="Interaction/Authority/Fact.fsi"/>
     <Compile Include="Interaction/Authority/Fact.fs"/>
-    <Compile Include="Participant/Provider/Attempt/Fallback/Fact.fsi"/>
-    <Compile Include="Participant/Provider/Attempt/Fallback/Fact.fs"/>
+    <Compile Include="Composition/Durable/ProviderFailureFact.fsi"/>
+    <Compile Include="Composition/Durable/ProviderFailureFact.fs"/>
     <Compile Include="Execution/Delegation/Fact.fsi"/>
     <Compile Include="Execution/Delegation/Fact.fs"/>
-    <Compile Include="Context/Companion/Fact.fsi"/>
-    <Compile Include="Context/Companion/Fact.fs"/>
+    <Compile Include="Composition/Durable/CompanionFact.fsi"/>
+    <Compile Include="Composition/Durable/CompanionFact.fs"/>
     <Compile Include="Execution/Fission/Fact.fsi"/>
     <Compile Include="Execution/Fission/Fact.fs"/>
     <Compile Include="Change/Fact.fsi"/>
@@ -367,6 +367,8 @@
     <Compile Include="Interaction/Authority/Run.fs"/>
     <Compile Include="Interaction/Authority/RuntimeSurface.fsi"/>
     <Compile Include="Interaction/Authority/RuntimeSurface.fs"/>
+    <Compile Include="Interaction/Attempt/AttemptExecutionProfile.fsi"/>
+    <Compile Include="Interaction/Attempt/AttemptExecutionProfile.fs"/>
     <Compile Include="Execution/Fission/Model.fsi"/>
     <Compile Include="Execution/Fission/Model.fs"/>
     <Compile Include="Participant/Provider/Attempt/Failure.fsi"/>

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>dispatch</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>session-recovery-coordinator</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>dispatch</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>session-recovery-coordinator</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.execution-session-recovery-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <Compile Include="Execution/Session/Recovery/Coordinator.fsi"/>
+    <Compile Include="Execution/Session/Recovery/Coordinator.fs"/>
+    <Compile Include="Execution/Session/Recovery/Surface.fsi"/>
+    <Compile Include="Execution/Session/Recovery/Surface.fs"/>
+  </ItemGroup>
+</Project>

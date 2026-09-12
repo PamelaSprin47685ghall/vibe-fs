@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>session-lifecycle</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>delegation</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>execution-session-wait-completion-mailbox</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>causal-wait</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>execution-session-wait-completion-mailbox</WanxiangshuOwnerLocality>

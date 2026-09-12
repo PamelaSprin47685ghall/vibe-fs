@@ -1,6 +1,7 @@
-namespace Wanxiangshu.Context.Companion
+namespace Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Context.Companion
 
 /// Companion fact constructors — bridge from Companion-owned CompanionFactCases
 /// into the Composition-owned AgentFact outer routing union.

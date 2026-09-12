@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>interaction</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>opencode-host-pairprogrammingcalibration</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>guidance-delivery</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>opencode-host-pairprogrammingcalibration</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-promptresources.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal-contract.fsproj"/>
+    <Compile Include="OpenCode/Host/PairProgrammingCalibration.fsi"/>
+    <Compile Include="OpenCode/Host/PairProgrammingCalibration.fs"/>
+    <Compile Include="OpenCode/Host/PairProgrammingCalibrationSurface.fsi"/>
+    <Compile Include="OpenCode/Host/PairProgrammingCalibrationSurface.fs"/>
+  </ItemGroup>
+</Project>

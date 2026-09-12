@@ -31,8 +31,6 @@
     <Compile Include="Execution/Session/ChatExecution/RecoveryRuntimeSurface.fs"/>
     <Compile Include="Execution/Session/ChatExecution/Surface.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/Surface.fs"/>
-    <Compile Include="OpenCode/Host/ChatAdmission/TransactionSurface.fsi"/>
-    <Compile Include="OpenCode/Host/ChatAdmission/TransactionSurface.fs"/>
     <Compile Include="Execution/Session/ChatExecution/StatusSurface.fsi"/>
     <Compile Include="Execution/Session/ChatExecution/StatusSurface.fs"/>
   </ItemGroup>

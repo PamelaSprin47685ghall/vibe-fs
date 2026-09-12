@@ -2,6 +2,7 @@ namespace Wanxiangshu.Participant.Provider.Attempt
 
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Interaction.Attempt
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -20,7 +21,7 @@ open Wanxiangshu.Foundation.Identity
 /// `UsePrefixProbe` while its message list carries the committed prefix.
 type AttemptPlan =
     {
-        Profile: PromptAuthority.AttemptExecutionProfile
+        Profile: AttemptExecutionProfile
         /// `None` when this attempt built no probe. CTX-011 lists five ordinary reasons for
         /// that, and the caller treats them alike — it is kept so a diagnostic can say
         /// which one happened (HOST-007).
@@ -110,11 +111,11 @@ module AttemptPlanner =
                 false
                 (fun () -> Error NoCandidateReason.NoCoverage))
 
-    /// Complete the immutable attempt profile once Host observation exposes the
+    /// Binds the immutable pre-inference decision to the
     /// exact assistant run for the already-frozen physical request.
     let bindProviderRun (providerRun: ProviderRunIdentity) (pending: PendingAttemptPlan) : AttemptPlan =
         { Profile =
-            PromptAuthority.buildAttemptExecutionProfile
+            InteractionAttempt.buildAttemptExecutionProfile
                 pending.Authority
                 pending.PhysicalUserMessageId
                 providerRun

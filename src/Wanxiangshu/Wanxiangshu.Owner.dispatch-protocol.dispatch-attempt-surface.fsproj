@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>dispatch</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>dispatch-attempt-surface</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>dispatch-protocol</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>dispatch-attempt-surface</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.dispatch-attempt-planner.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-identityseed.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.prefix-stability.mission-obligation-todo-prefixepoch.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
+    <Compile Include="Participant/Provider/Attempt/PlannerSurface.fsi"/>
+    <Compile Include="Participant/Provider/Attempt/PlannerSurface.fs"/>
+  </ItemGroup>
+</Project>

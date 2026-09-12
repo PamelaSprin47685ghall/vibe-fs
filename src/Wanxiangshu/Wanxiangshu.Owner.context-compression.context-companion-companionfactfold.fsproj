@@ -11,7 +11,9 @@
     <ProjectReference Include="Wanxiangshu.Owner.behavior-diagnosis.enforcer-projection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.behavior-diagnosis.enforcer-repair.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-composition.composition-durable-contextfact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-facts.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-fold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-ledger.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.dispatch-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.session-nudge.fsproj"/>
@@ -32,10 +34,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-association.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-projection.opencode-codec-providerwiredecode.fsproj"/>
-    <Compile Include="Context/Companion/CompanionFactFold.fsi"/>
-    <Compile Include="Context/Companion/CompanionFactFold.fs"/>
-    <Compile Include="Context/Companion/Blogger/ContextFactFold.fsi"/>
-    <Compile Include="Context/Companion/Blogger/ContextFactFold.fs"/>
     <Compile Include="Context/Companion/Model.fsi"/>
     <Compile Include="Context/Companion/Model.fs"/>
     <Compile Include="Context/Companion/Runtime.fsi"/>

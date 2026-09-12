@@ -4,7 +4,6 @@ open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Participant.Provider.Attempt
 
 type BloggerMaterializationLease internal (release: unit -> unit) =

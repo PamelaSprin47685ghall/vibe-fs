@@ -10,11 +10,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-projection.participant-provider-projection-wire.fsproj"/>
-    <Compile Include="Context/Companion/Fact.fsi"/>
-    <Compile Include="Context/Companion/Fact.fs"/>
     <Compile Include="Participant/Provider/Attempt/TerminalValidity.fsi"/>
     <Compile Include="Participant/Provider/Attempt/TerminalValidity.fs"/>
     <Compile Include="Host/CompactionPolicy.fsi"/>

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>provider</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>participant-provider-attempt-fallback-fold</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>provider-attempt-recovery</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>participant-provider-attempt-fallback-fold</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-facts.fsproj"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailureFactFold.fsi"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailureFactFold.fs"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/Evidence.fsi"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/Evidence.fs"/>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>durable-composition</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>composition-durable-contextfact</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>durable-composition</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>composition-durable-contextfact</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-facts.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj"/>
+    <Compile Include="Composition/Durable/CompanionFact.fsi"/>
+    <Compile Include="Composition/Durable/CompanionFact.fs"/>
+  </ItemGroup>
+</Project>

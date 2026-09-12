@@ -32,7 +32,9 @@ test('WHAT[CAUSAL-009] production inventory separates contract runtime adapter m
   assert.equal(contract.subsystem, 'session-lifecycle')
   assert.equal(runtime.subsystem, 'session-lifecycle')
   assert.equal(adapter.subsystem, 'session-lifecycle')
-  assert.equal(mailbox.subsystem, 'session-lifecycle')
+  // B03/B07: CompletionMailbox reads delegation completion vocabulary and belongs
+  // to the delegation subsystem, not pure session foundation.
+  assert.equal(mailbox.subsystem, 'delegation')
   assert.equal(proof.subsystem, 'session-lifecycle')
 
   assert.deepEqual(relSources(contract), ['src/Wanxiangshu/Execution/Session/Wait/CausalWait.fs'])

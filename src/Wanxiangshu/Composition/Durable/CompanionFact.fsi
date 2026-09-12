@@ -1,6 +1,7 @@
-namespace Wanxiangshu.Context.Companion
+namespace Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Context.Companion
 open Wanxiangshu.Foundation.Identity
 
 module CompanionFact =

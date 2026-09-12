@@ -1,7 +1,8 @@
-namespace Wanxiangshu.Participant.Provider.Attempt.Fallback
+namespace Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 module ProviderFailureFact =
     val inline FailureRecorded:

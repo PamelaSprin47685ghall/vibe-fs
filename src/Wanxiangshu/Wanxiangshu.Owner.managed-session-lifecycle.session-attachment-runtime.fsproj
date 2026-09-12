@@ -22,9 +22,5 @@
     <Compile Include="Execution/Session/Attachment/SatelliteRuntime.fs"/>
     <Compile Include="OpenCode/Host/SatelliteSurface.fsi"/>
     <Compile Include="OpenCode/Host/SatelliteSurface.fs"/>
-    <Compile Include="Execution/Session/Recovery/Coordinator.fsi"/>
-    <Compile Include="Execution/Session/Recovery/Coordinator.fs"/>
-    <Compile Include="Execution/Session/Recovery/Surface.fsi"/>
-    <Compile Include="Execution/Session/Recovery/Surface.fs"/>
   </ItemGroup>
 </Project>
