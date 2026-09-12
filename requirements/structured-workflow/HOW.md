@@ -742,3 +742,10 @@ node scripts/build.mjs
    - **门禁与文档如实调整**：`shutdown-drain-contract`、`interrupt-boundary` 两组断言原本对 `PluginRuntimeScope.fs` 做源码文本检查——接口迁出后同条款的断言改读 `SessionRuntimeOwner.fs`；`host-session-contract-closure` 的 compile 列表断言同理纳入 `SessionRuntimeOwner.fs`；`ADAPTER_RATCHET` 如实调到实测 `280/285/280`。
    - 验证：`npm run format-build-test` 绿到底（fantomas＋check＋build＋semantic 3975＋integration＋e2e＋pack dry-run）；所有被改分片 focused-compile 列出如上。
    - 下一班入口：`ReconcileSurface`/`HostSignalBootstrap`/`TemporalSurface` 的 `Scheduler` 消费与 scope 拆分是同次排序顺序；`persistence-eventstore-surface` 的 `JournalHandle`/`JournalSurface`/`WorkspaceEventStore` 4 个外部调用约各减 41–45，可同批量同方式去证。
+
+36. **`Scheduler` 与 `ToolRuntimeScope` 各自单开分片——先迁合同再拆项目的完整收尾**（2026-09-12 第十六班）：
+   - `Scheduler.{fs,fsi}` 从 `opencode-host-pluginruntimescope` 移到新片 `dispatch-protocol.composition-turn-scheduler`；所依赖实型走其真实 owner（`TurnBinding`/`ReconcileProgram`/`HostSignal`/`QuiescenceGuard`/`ISessionSnapshotPort` 等）。`Composition/Turn/Program.fs` 不动——它按 namespace 消费同层类型。
+   - 之后 `pluginruntimescope` 仍任一COPE丢两处：`PluginRuntimeScope`（仅靠 `ISessionRuntimeOwner` 接线）与 `ToolRuntimeScope`（真实依赖 `Change.Host`/`Fork.Host`/`Recovery`/`Mission.Relay`/`Persistence.Journal`…）；双向界线不显 `Tool` → `Plugin` 类型。抽 `PluginRuntimeScope` 留 `opencode-host-pluginruntimescope`，`ToolRuntimeScope` 抽走 `opencode-tools-toolruntimescope`。
+   - 15 个消费分片审计（按文件逐行验证）：六个 tool-surface 分片全部只看 `ToolRuntimeScope` 而切到新片（每分片 .fs 数齐降 **−26**）；`fissionhostsurface` 此前已提走 scheduler；`hostsignalbootstrap`、`turnruntimepreparation`、`eventstorewritersurface` 真的需要 `PluginRuntimeScope`（或兼需 scope+scheduler），保留原边。
+   - 门禁合法变更：`causal-wait/m6-slice-boundary` 的 `mailbox must declare` 断言原指 `pluginruntimescope` 所谓「物理 mailbox 商口」——真实使用方是 `ToolRuntimeScope.fs:188/615` 的 `CompletionMailboxRuntime.create`，断言改指 `opencode-tools-toolruntimescope`；`host-session-contract-closure` 的契约编译清单承接 `SessionRuntimeOwner.fs` 由前批接入。
+   - 验证：`npm run format-build-test` 全管道绿；scheduler 新片与其余分片 focused 编译全绿（`pluginruntimescope` 870→858；`toolruntimescope` 844）。refs 1803→1811、shards 236→238 净出双枚。「`pluginruntimescope` 今以 147 层闭包坐在 SCC 边缘」的中山路已打通，但 18 节点 SCC 本身没有按本批可以解决——它仍跨了其他子系统。

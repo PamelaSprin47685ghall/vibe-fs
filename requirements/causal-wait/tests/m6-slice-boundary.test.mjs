@@ -54,7 +54,7 @@ test('WHAT[CAUSAL-009] production inventory separates contract runtime adapter m
   for (const id of [
     'delegation-runtime-surface',
     'git-integrationgate',
-    'opencode-host-pluginruntimescope',
+    'opencode-tools-toolruntimescope',
   ]) {
     const composition = requireShard(projects, id)
     assert.ok(refShards(composition, projects).includes(mailbox.shard), `${id} must declare its physical mailbox provider`)
