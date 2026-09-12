@@ -3,7 +3,7 @@
     <WanxiangshuSemanticOwner>session-ontology</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>opencode-host-sessionexecutionbinding</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
-    <WanxiangshuSubsystem>session-lifecycle</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>dispatch</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>opencode-host-sessionexecutionbinding</WanxiangshuCompileShard>
   </PropertyGroup>
   <ItemGroup>
