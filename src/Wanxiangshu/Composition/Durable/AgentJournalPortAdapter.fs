@@ -175,30 +175,7 @@ module AgentJournalPortAdapter =
                               BlobDigest = r.BlobDigest })
                 }
           CurrentProjection = fun xTrace -> XTraceMaterialization.currentProjection journal xTrace
-          RecordConfirmedSuccess =
-            fun sessionId providerRun ->
-                task {
-                    match failurePort.CurrentState sessionId with
-                    | None -> return Error "NoActiveRun: no provider failure state for session"
-                    | Some current when current.Budget.ConsecutiveFailureCount = 0 -> return Ok()
-                    | Some current ->
-                        let fact =
-                            AgentFact.ProviderFailure(
-                                ProviderFailureFactCases.SuccessRecorded
-                                    {| SessionId = sessionId
-                                       LogicalRunId = current.LogicalRunId
-                                       AuthorityRootUserMessageId = current.AuthorityRootUserMessageId
-                                       ProviderRun = providerRun |}
-                            )
-
-                        let! appended =
-                            AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) fact journal
-
-                        return
-                            appended
-                            |> Result.map (fun _ -> ())
-                            |> Result.mapError JournalAppendFailure.describe
-                }
+          RecordConfirmedSuccess = ProviderFailureLedger.recordConfirmedSuccess failurePort
           CommitPrefixRebase =
             fun sessionId providerRun rebase ->
                 task {

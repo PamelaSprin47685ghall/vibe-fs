@@ -1,8 +1,18 @@
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
     <WanxiangshuSubsystem>provider</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>participant-provider-attempt-fallback-ledger</WanxiangshuCompileShard>
-<Compile Include="Participant/Provider/Attempt/Fallback/Ledger.fsi"/><Compile Include="Participant/Provider/Attempt/Fallback/Ledger.fs"/><Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailureSurface.fsi"/><Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailureSurface.fs"/>    <ProjectReference Include="Wanxiangshu.Owner.durable-events.durable-journal-port-adapter.fsproj"/>
-<ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-surface.fsproj"/>
-<ProjectReference Include="Wanxiangshu.Owner.durable-composition.composition-durable-providerfailure-fact.fsproj"/>
-      <ProjectReference Include="Wanxiangshu.Owner.execution-model-routing.strength-policy.fsproj"/>
-  </ItemGroup></Project>
+    <WanxiangshuSemanticOwner>provider-attempt-recovery</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>participant-provider-attempt-fallback-ledger</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-facts.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.execution-failure-policy.execution-failure-model.fsproj"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/Ledger.fsi"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/Ledger.fs"/>
+  </ItemGroup>
+</Project>

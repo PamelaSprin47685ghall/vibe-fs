@@ -7,7 +7,7 @@
       "classification": "Admission",
       "result": "Result",
       "resultSymbol": "AdmissionAcquisitionOutcome",
-      "owner": "chat-execution",
+      "owner": "dispatch",
       "what": "CHATEXEC-003, ENF-015",
       "whatOwners": {
         "CHATEXEC-003": "managed-chat-execution",
@@ -605,7 +605,7 @@
       "anchor": "type internal ChatAdmissionBindingReceipt =",
       "classification": "Authority",
       "class": "Receipt",
-      "owner": "chat-execution",
+      "owner": "dispatch",
       "what": "CHATEXEC-003, ENF-013, ENF-015",
       "scope": "the exact execution admission identity whose SessionExecutionBinding was installed, plus the binding kind that installed it",
       "freshness": "recorded only after the physical bind step returned Ok for that exact admission identity",
@@ -617,7 +617,7 @@
           "file": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs",
           "symbol": "bindingReceipt",
           "anchor": "let private bindingReceipt intent identity =",
-          "owner": "chat-execution"
+          "owner": "dispatch"
         }
       ],
       "whatOwners": {
@@ -632,7 +632,7 @@
       "anchor": "type internal HostModelProjectionReceipt =",
       "classification": "Authority",
       "class": "Receipt",
-      "owner": "chat-execution",
+      "owner": "dispatch",
       "what": "CHATEXEC-003, ENF-013, ENF-015",
       "scope": "the exact execution admission identity and OpenCode model projected for the leased routing target of the current transaction",
       "freshness": "recorded only after ProjectHost returned Ok inside that transaction step",
@@ -644,7 +644,7 @@
           "file": "src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs",
           "symbol": "projectAdmission",
           "anchor": "let private projectAdmission observe ports bound =",
-          "owner": "chat-execution"
+          "owner": "dispatch"
         }
       ],
       "whatOwners": {

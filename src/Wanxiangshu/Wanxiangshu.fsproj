@@ -481,6 +481,8 @@
     <Compile Include="Participant/Provider/Attempt/Fallback/Projection.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailurePort.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailurePort.fs"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/Ledger.fsi"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/Ledger.fs"/>
     <Compile Include="Execution/Delegation/LinkageProjection.fsi"/>
     <Compile Include="Execution/Delegation/LinkageProjection.fs"/>
     <Compile Include="Execution/Delegation/JournalPort.fsi"/>
@@ -1144,8 +1146,6 @@
     <Compile Include="OpenCode/Host/TerminalPolicy.fs"/>
     <Compile Include="OpenCode/Host/TerminalPolicySurface.fsi"/>
     <Compile Include="OpenCode/Host/TerminalPolicySurface.fs"/>
-    <Compile Include="Participant/Provider/Attempt/Fallback/Ledger.fsi"/>
-    <Compile Include="Participant/Provider/Attempt/Fallback/Ledger.fs"/>
     <Compile Include="Enforcer/Continuation.fsi"/>
     <Compile Include="Enforcer/Continuation.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Workflow.fsi"/>

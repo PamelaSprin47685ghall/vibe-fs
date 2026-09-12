@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>context</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>dispatch</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>context-prefix-wire</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>prefix-stability</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>context-prefix-wire</WanxiangshuOwnerLocality>

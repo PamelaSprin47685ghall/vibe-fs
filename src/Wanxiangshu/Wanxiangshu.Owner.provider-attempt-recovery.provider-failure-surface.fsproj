@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <WanxiangshuSubsystem>provider</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>provider-failure-surface</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>provider-attempt-recovery</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>provider-failure-surface</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-facts.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-ledger.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.durable-journal-port-adapter.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-surface.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-composition.composition-durable-providerfailure-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.execution-model-routing.strength-policy.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.execution-failure-policy.execution-failure-model.fsproj"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailureSurface.fsi"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailureSurface.fs"/>
+  </ItemGroup>
+</Project>
