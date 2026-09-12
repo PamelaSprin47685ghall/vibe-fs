@@ -5,7 +5,6 @@ open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]
 type PrefixPresentationHorizon =
@@ -52,10 +51,10 @@ module XWire =
     val applyTransform:
         isReplicaSession: (SessionId -> bool) ->
         snapshot: ISessionSnapshotPort option ->
-        journal: AgentJournal option ->
+        port: WireJournalPort option ->
         attempts: AttemptPlanCapability ->
         output: obj ->
             Task<PrefixPresentationHorizon>
 
     val reconcileAttempt:
-        journal: AgentJournal option -> attempts: AttemptPlanCapability -> turn: ReconciledTurn -> Task
+        port: WireJournalPort option -> attempts: AttemptPlanCapability -> turn: ReconciledTurn -> Task

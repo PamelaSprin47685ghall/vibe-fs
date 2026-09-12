@@ -80,8 +80,15 @@ test('WHAT[PREFIX-STABILITY-009] prefix_proof_and_writeback_use_canonical_XTrace
     resolve(import.meta.dirname, '../../../src/Wanxiangshu/Context/Prefix/Wire.fs'),
     'utf8',
   )
+  const adapterSource = readFileSync(
+    resolve(import.meta.dirname, '../../../src/Wanxiangshu/Composition/Durable/AgentJournalPortAdapter.fs'),
+    'utf8',
+  )
 
-  assert.match(wireSource, /XTraceMaterialization\.currentProjection/)
+  // Wire reads canonical XTrace through the port; the adapter is where the
+  // canonical materialization call lives (it alone knows AgentJournal).
+  assert.match(wireSource, /CurrentProjection/)
+  assert.match(adapterSource, /XTraceMaterialization\.currentProjection/)
   assert.match(wireSource, /XTraceProjection\.tryTurnOfHostMessageId/)
   assert.match(wireSource, /XTraceProjection\.hostMessageIdsBeforeTurn/)
   assert.match(wireSource, /replacePrefixByHostIds/)

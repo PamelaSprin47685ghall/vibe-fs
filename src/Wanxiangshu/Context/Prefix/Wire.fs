@@ -19,7 +19,6 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]
 type PrefixPresentationHorizon =
@@ -78,12 +77,6 @@ module XWire =
         ProviderWireDecode.projectionSessionIdFromMessages output
         |> Option.map SessionId.create
 
-    let private sessionProjection (journal: AgentJournal) (sessionId: SessionId) =
-        AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
-
-    let private isCompanionSession (journal: AgentJournal) (sessionId: SessionId) =
-        SessionAssociationProjection.isCompanion sessionId (AgentJournal.snapshot journal).AgentProjections.Associations
-
     let private requireOk (result: Result<'a, string>) : 'a =
         match result with
         | Ok value -> value
@@ -95,19 +88,19 @@ module XWire =
         else
             Error(sprintf "Companion blob digest mismatch: %s" (BlobDigest.value frame.Digest))
 
-    let private readFrameBody (journal: AgentJournal) (frame: BlogFrame) : Task<Result<string, string>> =
+    let private readFrameBody (port: WireJournalPort) (frame: BlogFrame) : Task<Result<string, string>> =
         taskResult {
-            let! text = journal.Writer.BlobWriter.Read frame.TextRef
+            let! text = port.ReadBlob frame.TextRef
             do! ensureFrameDigest frame text
             return text
         }
 
-    let private readFrameBodies (journal: AgentJournal) (frames: BlogFrame list) : Task<Result<string list, string>> =
-        frames |> TaskResultList.traverseM (readFrameBody journal)
+    let private readFrameBodies (port: WireJournalPort) (frames: BlogFrame list) : Task<Result<string list, string>> =
+        frames |> TaskResultList.traverseM (readFrameBody port)
 
-    let private readFrames (journal: AgentJournal) (frames: BlogFrame list) : Task<Result<string, string>> =
+    let private readFrames (port: WireJournalPort) (frames: BlogFrame list) : Task<Result<string, string>> =
         task {
-            let! bodies = readFrameBodies journal frames
+            let! bodies = readFrameBodies port frames
             return bodies |> Result.map (fun values -> String.concat "\n\n" values)
         }
 
@@ -187,12 +180,12 @@ module XWire =
     /// COMPANION-009 / CTX-011: FrozenRecordPrefix = Opening + coverable Y frame
     /// prefix. RawGap never participates — it has no Y coverage proof.
     let private materializeFrozenRecordPrefix
-        (journal: AgentJournal)
-        (state: SessionAgentProjection)
+        (port: WireJournalPort)
+        (state: WireSessionState)
         (frames: BlogFrame list)
         : Task<Result<string, string>> =
         taskResult {
-            let! frameBodies = readFrameBodies journal frames
+            let! frameBodies = readFrameBodies port frames
 
             let opening: XTraceOpeningEvidence =
                 state.XTrace
@@ -211,11 +204,11 @@ module XWire =
         }
 
     let private candidate
-        (journal: AgentJournal)
+        (port: WireJournalPort)
         (sessionId: SessionId)
         (snapshot: ProjectionSnapshot)
         (committed: PrefixSnapshot option)
-        (state: SessionAgentProjection)
+        (state: WireSessionState)
         (requestCutoff: int)
         : Task<Result<PrefixProbe, NoCandidateReason>> =
         task {
@@ -226,9 +219,9 @@ module XWire =
                 return Error NoCandidateReason.NoCoverage
             else
                 let frames = BlogProjection.coverableFrames blog
-                let! frozenResult = materializeFrozenRecordPrefix journal state frames
+                let! frozenResult = materializeFrozenRecordPrefix port state frames
                 let frozenRecordPrefix = requireOk frozenResult
-                let! blobResult = journal.WriteBlob frozenRecordPrefix
+                let! blobResult = port.WriteBlob frozenRecordPrefix
                 let blob = requireOk blobResult
 
                 return
@@ -246,7 +239,7 @@ module XWire =
         }
 
     let private readFrozenRecordPrefixBody
-        (durable: AgentJournal)
+        (port: WireJournalPort)
         (choice: XProjectionChoice)
         (committed: PrefixSnapshot option)
         : Task<string> =
@@ -254,7 +247,7 @@ module XWire =
         | None -> Task.FromResult ""
         | Some blobRef ->
             task {
-                let! body = durable.Writer.BlobWriter.Read blobRef
+                let! body = port.ReadBlob blobRef
                 return requireOk body
             }
 
@@ -283,7 +276,7 @@ module XWire =
         |> List.filter (fun messageId -> Some messageId <> openingHostMessageId),
         openingHostMessageId
 
-    let private applyPrefix (state: SessionAgentProjection) (rawMessages: obj list) (intent: PrefixProjectionIntent) =
+    let private applyPrefix (state: WireSessionState) (rawMessages: obj list) (intent: PrefixProjectionIntent) =
         match XPrefixProjection.render intent with
         | PrefixRendered.Physical -> rawMessages
         | PrefixRendered.Synthetic activation ->
@@ -300,7 +293,7 @@ module XWire =
                 activation.Memory
 
     let private renderPrefixMessages
-        (state: SessionAgentProjection)
+        (state: WireSessionState)
         (rawMessages: obj list)
         (intent: PrefixProjectionIntent)
         (horizon: PrefixPresentationHorizon)
@@ -316,16 +309,16 @@ module XWire =
         |> fun prefixed -> ProjectionMessageEdit.suppressHostMessagesByIds prefixed staleTransport
 
     let private commitPromotablePrefixRebase
-        (durable: AgentJournal)
+        (port: WireJournalPort)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
         (plan: AttemptPlan)
         : Task<Result<unit, string>> =
         task {
-            let projections = AgentJournal.snapshot durable
+            let view = port.ReadView sessionId
 
             let epoch =
-                AgentProjection.tryFind sessionId projections.AgentProjections
+                view.State
                 |> Option.bind (fun state -> state.PrefixEpoch)
                 |> Option.defaultValue PrefixEpochProjection.empty
 
@@ -342,42 +335,35 @@ module XWire =
             match promotableProbe, decision.Promoted with
             | Some probe, true ->
                 let fact =
-                    ContextFact.PrefixRebaseCommitted
-                        {| SessionId = sessionId
-                           PreviousEpochId = probe.BasedOnEpochId
-                           NextEpochId = PrefixEpochId.next probe.BasedOnEpochId
-                           FrozenRecordPrefixRef = probe.Candidate.FrozenRecordPrefixRef
-                           FrozenRecordPrefixDigest = probe.Candidate.FrozenRecordPrefixDigest
-                           CutoffExclusive = probe.Candidate.CutoffExclusive
-                           CoveredPrefixDigest = probe.Candidate.CoveredPrefixDigest
-                           SealRoot = probe.Candidate.SealRoot
-                           SyntheticMessageId = probe.Candidate.SyntheticMessageId
-                           ProbeId = probe.ProbeId
-                           SolvingProviderRun = providerRun |}
+                    {| SessionId = sessionId
+                       PreviousEpochId = probe.BasedOnEpochId
+                       NextEpochId = PrefixEpochId.next probe.BasedOnEpochId
+                       FrozenRecordPrefixRef = probe.Candidate.FrozenRecordPrefixRef
+                       FrozenRecordPrefixDigest = probe.Candidate.FrozenRecordPrefixDigest
+                       CutoffExclusive = probe.Candidate.CutoffExclusive
+                       CoveredPrefixDigest = probe.Candidate.CoveredPrefixDigest
+                       SealRoot = probe.Candidate.SealRoot
+                       SyntheticMessageId = probe.Candidate.SyntheticMessageId
+                       ProbeId = probe.ProbeId
+                       SolvingProviderRun = providerRun |}
 
-                let! appended = AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) fact durable
-
-                return
-                    appended
-                    |> Result.map (fun _ -> ())
-                    |> Result.mapError JournalAppendFailure.describe
+                return! port.CommitPrefixRebase sessionId providerRun fact
             | _ -> return Ok()
         }
 
     let private recordSuccessfulAttempt
-        (durable: AgentJournal)
+        (port: WireJournalPort)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
         (plan: AttemptPlan)
         : Task<Result<unit, string>> =
         if ProviderRequestKind.clearsFailureCountOnSuccess plan.Profile.RequestKind then
-            let port = AgentJournalPortAdapter.forProviderFailure durable
-            ProviderFailureLedger.recordConfirmedSuccess port sessionId providerRun
+            port.RecordConfirmedSuccess sessionId providerRun
         else
             Task.FromResult(Ok())
 
     let private settleAttemptPlan
-        (durable: AgentJournal)
+        (port: WireJournalPort)
         (attempts: AttemptPlanCapability)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
@@ -387,7 +373,7 @@ module XWire =
         task {
             let! committed =
                 match outcome with
-                | AttemptOutcome.Completed -> commitPromotablePrefixRebase durable sessionId providerRun plan
+                | AttemptOutcome.Completed -> commitPromotablePrefixRebase port sessionId providerRun plan
                 | AttemptOutcome.CompletedInvalid
                 | AttemptOutcome.Failed
                 | AttemptOutcome.Aborted -> Task.FromResult(Ok())
@@ -399,7 +385,7 @@ module XWire =
 
             let! success =
                 match outcome with
-                | AttemptOutcome.Completed -> recordSuccessfulAttempt durable sessionId providerRun plan
+                | AttemptOutcome.Completed -> recordSuccessfulAttempt port sessionId providerRun plan
                 | AttemptOutcome.CompletedInvalid
                 | AttemptOutcome.Failed
                 | AttemptOutcome.Aborted -> Task.FromResult(Ok())
@@ -434,7 +420,7 @@ module XWire =
         | _ -> None
 
     let private settleVisibleToolContinuation
-        (durable: AgentJournal)
+        (port: WireJournalPort)
         (attempts: AttemptPlanCapability)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
@@ -449,23 +435,23 @@ module XWire =
 
         match plan with
         | None -> Task.FromResult(())
-        | Some plan -> settleAttemptPlan durable attempts sessionId providerRun AttemptOutcome.Completed plan
+        | Some plan -> settleAttemptPlan port attempts sessionId providerRun AttemptOutcome.Completed plan
 
     let private settleVisibleToolContinuations
-        (durable: AgentJournal)
+        (port: WireJournalPort)
         (attempts: AttemptPlanCapability)
         (sessionId: SessionId)
         (rawMessages: obj list)
         : Task =
         task {
             for providerRun, physical in rawMessages |> List.choose toolContinuationBinding |> List.distinct do
-                do! settleVisibleToolContinuation durable attempts sessionId providerRun physical
+                do! settleVisibleToolContinuation port attempts sessionId providerRun physical
         }
 
     let private applyCommittedPrefix
-        (durable: AgentJournal)
+        (port: WireJournalPort)
         (sessionId: SessionId)
-        (state: SessionAgentProjection)
+        (state: WireSessionState)
         (rawMessages: obj list)
         (output: obj)
         : Task<unit> =
@@ -484,7 +470,7 @@ module XWire =
                 Wanxiangshu.OpenCode.HostMessageProjection.replaceMessagesInPlace output transformed
             | Some committed ->
                 let choice = XProjectionChoice.UseCommittedEpoch
-                let! frozenRecordPrefixBody = readFrozenRecordPrefixBody durable choice (Some committed)
+                let! frozenRecordPrefixBody = readFrozenRecordPrefixBody port choice (Some committed)
 
                 let memoryPreamble =
                     ProviderProse.render (ProviderProse.languageOf sessionId) CompanionPrompt.MemoryPreamble Map.empty
@@ -499,14 +485,15 @@ module XWire =
         }
 
     let private applyOrdinaryCommittedPrefix
-        (durable: AgentJournal)
+        (port: WireJournalPort)
         (sessionId: SessionId)
+        (state: WireSessionState option)
         (rawMessages: obj list)
         (output: obj)
         : Task =
-        match sessionProjection durable sessionId with
+        match state with
         | None -> raise (InvalidOperationException "X-wire cannot apply a committed prefix without session projection")
-        | Some state -> applyCommittedPrefix durable sessionId state rawMessages output
+        | Some s -> applyCommittedPrefix port sessionId s rawMessages output
 
     let private authoritySummary (authority: PromptAuthority.AuthorityExecutionProfile) =
         sprintf
@@ -553,11 +540,11 @@ module XWire =
 
     let private prepareRetryCandidate
         allowProbe
-        durable
+        (port: WireJournalPort)
         sessionId
         physical
         rawMessages
-        (state: SessionAgentProjection)
+        (state: WireSessionState)
         =
         if not allowProbe then
             Task.FromResult(Error NoCandidateReason.NoCoverage)
@@ -565,15 +552,72 @@ module XWire =
             task {
                 let xTrace = state.XTrace |> Option.defaultValue XTraceProjection.empty
                 let prefix = state.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
-                let! currentResult = XTraceMaterialization.currentProjection durable xTrace
+                let! currentResult = port.CurrentProjection xTrace
                 let current = requireOk currentResult
                 let cutoff = requestStartCutoff physical rawMessages xTrace
                 let snapshot = { CurrentProjection = current }
-                return! candidate durable sessionId snapshot prefix.Snapshot state cutoff
+                return! candidate port sessionId snapshot prefix.Snapshot state cutoff
+            }
+
+    let private pendingPlanForRetry
+        (attempts: AttemptPlanCapability)
+        (sessionId: SessionId)
+        (physical: PhysicalUserMessageId)
+        (authority: PromptAuthority.AuthorityExecutionProfile)
+        : PendingAttemptPlan option =
+        match attempts.TryPendingAttemptPlan sessionId physical with
+        | Some existing when existing.Authority = authority -> Some existing
+        | Some existing ->
+            raise (
+                InvalidOperationException(
+                    sprintf
+                        "HOST-BOUNDARY-008: pending attempt plan authority conflict: existing=(%s) current=(%s)"
+                        (authoritySummary existing.Authority)
+                        (authoritySummary authority)
+                )
+            )
+        | None -> None
+
+    let private planOrBuildRetry
+        (port: WireJournalPort)
+        (attempts: AttemptPlanCapability)
+        (sessionId: SessionId)
+        (physical: PhysicalUserMessageId)
+        (authority: PromptAuthority.AuthorityExecutionProfile)
+        (failure: ProviderFailureProjection)
+        (state: WireSessionState)
+        (prefix: ActivePrefixEpoch)
+        (existingPlan: PendingAttemptPlan option)
+        (rawMessages: obj list)
+        : Task<PendingAttemptPlan> =
+        match existingPlan with
+        | Some existing -> Task.FromResult existing
+        | None ->
+            task {
+                // The retry transport row survives a successful tool step.
+                // Its presence does not authorize another cold prefix.
+                let allowProbe = mayProbe failure.Budget
+
+                let! candidateResult = prepareRetryCandidate allowProbe port sessionId physical rawMessages state
+
+                let selectProbeForPlan () = candidateResult
+
+                let pendingPlan =
+                    AttemptPlanner.freezePreInference
+                        authority
+                        physical
+                        (PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.ProviderRetryAttempt)
+                        ProviderRequestKind.WorkMain
+                        prefix.Snapshot
+                        allowProbe
+                        selectProbeForPlan
+
+                // Freeze pending plan BEFORE rendering or modifying wire output.
+                return requireAdmittedPendingPlan attempts sessionId physical pendingPlan
             }
 
     let private planProviderRetry
-        (durable: AgentJournal)
+        (port: WireJournalPort)
         (attempts: AttemptPlanCapability)
         (sessionId: SessionId)
         (physical: PhysicalUserMessageId)
@@ -581,60 +625,26 @@ module XWire =
         (rawMessages: obj list)
         : Task<PrefixPresentationHorizon> =
         task {
-            let projections = AgentJournal.snapshot durable
+            let view = port.ReadView sessionId
 
-            match
-                PromptAuthorityLedger.activeProfile sessionId projections.AgentProjections,
-                (AgentProjection.tryFind sessionId projections.AgentProjections
-                 |> Option.bind _.ProviderFailures
-                 |> ProviderFailureEvidence.tryCurrentState),
-                sessionProjection durable sessionId
-            with
+            match view.ActiveAuthorityProfile, view.ProviderFailureState, view.State with
             | Some authority, Some failure, Some state ->
                 let prefix = state.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
 
-                let existingPlan =
-                    match attempts.TryPendingAttemptPlan sessionId physical with
-                    | Some existing when existing.Authority = authority -> Some existing
-                    | Some existing ->
-                        raise (
-                            InvalidOperationException(
-                                sprintf
-                                    "HOST-BOUNDARY-008: pending attempt plan authority conflict: existing=(%s) current=(%s)"
-                                    (authoritySummary existing.Authority)
-                                    (authoritySummary authority)
-                            )
-                        )
-                    | None -> None
+                let existingPlan = pendingPlanForRetry attempts sessionId physical authority
 
                 let! admittedPlan =
-                    match existingPlan with
-                    | Some existing -> Task.FromResult existing
-                    | None ->
-                        task {
-                            // The retry transport row survives a successful tool step.
-                            // Its presence does not authorize another cold prefix.
-                            let allowProbe = mayProbe failure.Budget
-
-                            let! candidateResult =
-                                prepareRetryCandidate allowProbe durable sessionId physical rawMessages state
-
-                            let selectProbeForPlan () = candidateResult
-
-                            let pendingPlan =
-                                AttemptPlanner.freezePreInference
-                                    authority
-                                    physical
-                                    (PromptAuthority.PromptOrigin.Continuation
-                                        PromptAuthority.ContinuationKind.ProviderRetryAttempt)
-                                    ProviderRequestKind.WorkMain
-                                    prefix.Snapshot
-                                    allowProbe
-                                    selectProbeForPlan
-
-                            // Freeze pending plan BEFORE rendering or modifying wire output.
-                            return requireAdmittedPendingPlan attempts sessionId physical pendingPlan
-                        }
+                    planOrBuildRetry
+                        port
+                        attempts
+                        sessionId
+                        physical
+                        authority
+                        failure
+                        state
+                        prefix
+                        existingPlan
+                        rawMessages
 
                 let presentationHorizon =
                     admittedPlan
@@ -647,10 +657,7 @@ module XWire =
                 // COMMITTED blob for a probe attempt would inject the old prefix under
                 // the candidate's id).
                 let! frozenRecordPrefixBody =
-                    readFrozenRecordPrefixBody
-                        durable
-                        admittedPlan.ProjectionChoice
-                        admittedPlan.CommittedPrefixSnapshot
+                    readFrozenRecordPrefixBody port admittedPlan.ProjectionChoice admittedPlan.CommittedPrefixSnapshot
 
                 let memoryPreamble =
                     ProviderProse.render (ProviderProse.languageOf sessionId) CompanionPrompt.MemoryPreamble Map.empty
@@ -677,7 +684,7 @@ module XWire =
         }
 
     let private applyNonReplicaTransform
-        (durable: AgentJournal)
+        (port: WireJournalPort)
         (attempts: AttemptPlanCapability)
         (sessionId: SessionId)
         (_snapshot: ISessionSnapshotPort option)
@@ -690,7 +697,7 @@ module XWire =
             // A successful probe may have ended with tool calls. That provider
             // attempt is complete even though the Host turn continues through the
             // tool loop. Settle it before reading PrefixEpoch for this request.
-            do! settleVisibleToolContinuations durable attempts sessionId rawMessages
+            do! settleVisibleToolContinuations port attempts sessionId rawMessages
 
             let recoveryAttempt =
                 physical
@@ -700,14 +707,15 @@ module XWire =
 
             match recoveryAttempt with
             | None ->
-                do! applyOrdinaryCommittedPrefix durable sessionId rawMessages output
+                let view = port.ReadView sessionId
+                do! applyOrdinaryCommittedPrefix port sessionId view.State rawMessages output
                 return PrefixPresentationHorizon.Current
-            | Some physical -> return! planProviderRetry durable attempts sessionId physical output rawMessages
+            | Some physical -> return! planProviderRetry port attempts sessionId physical output rawMessages
         }
 
     let private applySessionTransform
         (isReplicaSession: SessionId -> bool)
-        (durable: AgentJournal)
+        (port: WireJournalPort)
         (attempts: AttemptPlanCapability)
         (sessionId: SessionId)
         (snapshot: ISessionSnapshotPort option)
@@ -717,20 +725,20 @@ module XWire =
             if isReplicaSession sessionId then
                 return PrefixPresentationHorizon.Current
             else
-                return! applyNonReplicaTransform durable attempts sessionId snapshot output
+                return! applyNonReplicaTransform port attempts sessionId snapshot output
         }
 
     let applyTransform
         (isReplicaSession: SessionId -> bool)
         (snapshot: ISessionSnapshotPort option)
-        (journal: AgentJournal option)
+        (port: WireJournalPort option)
         (attempts: AttemptPlanCapability)
         (output: obj)
         : Task<PrefixPresentationHorizon> =
         task {
-            match journal, sessionIdOfOutput output with
-            | Some durable, Some sessionId when not (isCompanionSession durable sessionId) ->
-                return! applySessionTransform isReplicaSession durable attempts sessionId snapshot output
+            match port, sessionIdOfOutput output with
+            | Some p, Some sessionId when (p.ReadView sessionId).IsCompanion |> not ->
+                return! applySessionTransform isReplicaSession p attempts sessionId snapshot output
             | _ -> return PrefixPresentationHorizon.Current
         }
 
@@ -744,7 +752,7 @@ module XWire =
         | None, ReconcileProgram.TurnAborted _ -> Some AttemptOutcome.Aborted
 
     let private reconcilePlannedAttempt
-        (durable: AgentJournal)
+        (port: WireJournalPort)
         (attempts: AttemptPlanCapability)
         (turn: ReconciledTurn)
         (plan: AttemptPlan)
@@ -753,7 +761,7 @@ module XWire =
         let decision = reconciliationDecision true outcome false false
 
         match outcome, decision.Cleared with
-        | Some settled, true -> settleAttemptPlan durable attempts turn.SessionId turn.ProviderRun settled plan
+        | Some settled, true -> settleAttemptPlan port attempts turn.SessionId turn.ProviderRun settled plan
         | _ -> Task.FromResult(())
 
     let private attemptPlanForTurn (attempts: AttemptPlanCapability) (turn: ReconciledTurn) =
@@ -762,21 +770,21 @@ module XWire =
             attempts.TryBindAttemptPlan turn.SessionId turn.PhysicalUserMessageId turn.ProviderRun)
 
     let private plannedReconciliation
-        (journal: AgentJournal option)
+        (port: WireJournalPort option)
         (attempts: AttemptPlanCapability)
         (turn: ReconciledTurn)
         =
-        journal
-        |> Option.bind (fun durable -> attemptPlanForTurn attempts turn |> Option.map (fun plan -> durable, plan))
+        port
+        |> Option.bind (fun p -> attemptPlanForTurn attempts turn |> Option.map (fun plan -> p, plan))
 
     /// Settle the physical provider attempt, not the larger Host turn.
     /// `finish=tool-calls` therefore closes a successful attempt plan while the
     /// Host tool loop continues; only a genuinely provisional snapshot keeps it.
     let reconcileAttempt
-        (journal: AgentJournal option)
+        (port: WireJournalPort option)
         (attempts: AttemptPlanCapability)
         (turn: ReconciledTurn)
         : Task =
-        match plannedReconciliation journal attempts turn with
-        | Some(durable, plan) -> reconcilePlannedAttempt durable attempts turn plan
+        match plannedReconciliation port attempts turn with
+        | Some(p, plan) -> reconcilePlannedAttempt p attempts turn plan
         | None -> Task.FromResult(())

@@ -18,7 +18,6 @@ open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Relay
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
 
 /// Host wiring for one Change manager session. One physical Manager session can host many
@@ -31,6 +30,15 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     let mutable joinInFlight = false
     let authorityUpdateGate = obj ()
     let authorityUpdatesInFlight = HashSet<string>()
+
+    // ORCH-PORT: domain-owned journal capabilities, built once from the
+    // composition-handed journal. All durable reads/appends below go through
+    // these ports; this file never touches the journal directly.
+    let sweepPortOpt =
+        deps.Journal |> Option.map AgentJournalPortAdapter.forOrchestratorSweep
+
+    let relayPortOpt =
+        deps.Journal |> Option.map AgentJournalPortAdapter.forOrchestratorRelay
 
     let gitPort = GitOperations.createWithRepo deps.RepoPath OrchestratorGit.run
 
@@ -69,9 +77,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     /// The durable job record. ORCH-003: the Manager's managed agent name lives here
     /// and nowhere else (PROMPT-008 forbids rebuilding it from the role).
     let jobRecord (jobId: ManagerJobId) =
-        deps.Journal
-        |> Option.bind (fun journal ->
-            OrchestratorProjection.tryFind jobId (AgentJournal.snapshot journal).AgentProjections.Orchestrator)
+        sweepPortOpt |> Option.bind (fun sweep -> sweep.TryJob jobId)
 
     let outcomeResult (outcome: AgentCompletionOutcome) =
         match outcome with
@@ -140,11 +146,6 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     let roadIdOf (record: ManagerJobProjection) =
         RoadId.create (SessionId.value record.ManagerSessionId)
 
-    let relayView (projection: ProjectionSet) (record: ManagerJobProjection) =
-        AgentProjection.tryFind record.ManagerSessionId projection.AgentProjections
-        |> Option.bind (fun session -> session.Relay)
-        |> Option.bind (fun relay -> Fold.view relay (roadIdOf record))
-
     let loopSignalOfRetirement (road: RoadView) (retirement: RetirementSummary) =
         match retirement.Outcome, road.Certificate with
         | RetirementOutcome.Continue, _ -> ManagerLoopSignal.Continue
@@ -170,29 +171,26 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         else
             road.LatestRetirement |> Option.map (loopSignalOfRetirement road)
 
-    let signalOfProjection projection record =
-        relayView projection record |> Option.bind loopSignalOfRoad
-
-    let requireJournalAndJob (journal: AgentJournal option) (jobId: ManagerJobId) (journalError: string) =
-        match journal, requireJobRecord jobId with
-        | None, _ -> Error journalError
+    let requireRelayAndJob (relay: OrchestratorRelayPort option) (jobId: ManagerJobId) (relayError: string) =
+        match relay, requireJobRecord jobId with
+        | None, _ -> Error relayError
         | _, Error error -> Error error
-        | Some journal, Ok record -> Ok(journal, record)
+        | Some relay, Ok record -> Ok(relay, record)
 
-    let rec awaitLoopSignalFromJournal
+    let rec awaitLoopSignalFromRelay
         (jobId: ManagerJobId)
-        (journal: AgentJournal)
+        (relay: OrchestratorRelayPort)
         (record: ManagerJobProjection)
         : Task<Result<ManagerLoopSignal, string>> =
         task {
-            let projection, revision = AgentJournal.snapshotWithRevision journal
+            let roadOpt, revision = relay.RoadSnapshot record
 
-            match signalOfProjection projection record with
+            match roadOpt |> Option.bind loopSignalOfRoad with
             | Some signal -> return Ok signal
-            | None -> return! awaitDispatchedWait jobId journal record projection revision
+            | None -> return! awaitDispatchedWait jobId relay record revision
         }
 
-    and awaitDispatchedWait jobId journal record _projection revision =
+    and awaitDispatchedWait jobId relay record revision =
         task {
             // ManagerWorkflow owns the sole physical send for the
             // `ManagerLoopGate.gateKind retirement.Id` occasion; Change only awaits
@@ -200,34 +198,19 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             match! deps.ContinueManagerLoop record.ManagerSessionId (WorktreePath.value record.WorktreePath) with
             | Error error -> return Error error
             | Ok() ->
-                let! _ = AgentJournal.awaitChangeFrom revision journal
+                do! relay.AwaitChangeFrom revision
                 return! awaitLoopSignal jobId
         }
 
     and awaitLoopSignal (jobId: ManagerJobId) : Task<Result<ManagerLoopSignal, string>> =
-        match requireJournalAndJob deps.Journal jobId "Manager session requires a durable journal" with
+        match requireRelayAndJob relayPortOpt jobId "Manager session requires a durable journal" with
         | Error error -> Task.FromResult(Error error)
-        | Ok(journal, record) -> awaitLoopSignalFromJournal jobId journal record
+        | Ok(relay, record) -> awaitLoopSignalFromRelay jobId relay record
 
-    let appendRelay (journal: AgentJournal) (record: ManagerJobProjection) (transaction: RelayTransaction) =
-        AgentJournal.appendAgent
-            (StreamId.Session record.ManagerSessionId)
-            None
-            (AgentFact.Relay(
-                RelayFactCases.TransactionCommitted
-                    {| RoadId = roadIdOf record
-                       Transaction = transaction |}
-            ))
-            journal
+    let certificateToInvalidate (relay: OrchestratorRelayPort) (record: ManagerJobProjection) =
+        let roadOpt, _ = relay.RoadSnapshot record
 
-    let appendRelayResult journal record transaction =
-        task {
-            let! result = appendRelay journal record transaction
-            return result |> Result.mapError JournalAppendFailure.describe
-        }
-
-    let certificateToInvalidate (journal: AgentJournal) (record: ManagerJobProjection) =
-        relayView (AgentJournal.snapshot journal) record
+        roadOpt
         |> Option.bind (fun road -> road.Certificate)
         |> Option.map (fun cert -> cert.Id)
 
@@ -239,26 +222,22 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             |> Result.map Some
 
     let appendInvalidation
-        (journal: AgentJournal)
+        (relay: OrchestratorRelayPort)
         (record: ManagerJobProjection)
         (transactionOpt: RelayTransaction option)
         : Task<Result<unit, string>> =
         match transactionOpt with
         | None -> Task.FromResult(Ok())
-        | Some transaction ->
-            taskResult {
-                let! _ = appendRelayResult journal record transaction
-                return ()
-            }
+        | Some transaction -> relay.AppendRelay record transaction
 
     let invalidateCertificate (jobId: ManagerJobId) reason : Task<Result<unit, string>> =
         taskResult {
-            let! journal, record =
-                requireJournalAndJob deps.Journal jobId "Certificate invalidation requires a durable journal"
+            let! relay, record =
+                requireRelayAndJob relayPortOpt jobId "Certificate invalidation requires a durable journal"
 
-            let certIdOpt = certificateToInvalidate journal record
+            let certIdOpt = certificateToInvalidate relay record
             let! transactionOpt = buildInvalidationTransaction reason certIdOpt
-            return! appendInvalidation journal record transactionOpt
+            return! appendInvalidation relay record transactionOpt
         }
 
     let tryCaptureSnapshot (worktreePath: WorktreePath) : Result<WorkspaceSnapshotId, string> =
@@ -269,17 +248,17 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         |> Result.bind (fun record -> tryCaptureSnapshot record.WorktreePath)
         |> Task.FromResult
 
-    let requireOpenRoad (journal: AgentJournal) (record: ManagerJobProjection) =
-        let projection = AgentJournal.snapshot journal
+    let requireOpenRoad (relay: OrchestratorRelayPort) (record: ManagerJobProjection) =
+        let roadOpt, _ = relay.RoadSnapshot record
 
-        relayView projection record |> Result.requireSome "Manager session is not open"
+        roadOpt |> Result.requireSome "Manager session is not open"
 
     let requireCommittedRetirement (road: RoadView) =
         road.LatestRetirement
         |> Result.requireSome "Manager loop continuation requires a committed retirement"
 
     let activateNextIfAbsent
-        (journal: AgentJournal)
+        (relay: OrchestratorRelayPort)
         (record: ManagerJobProjection)
         (road: RoadView)
         (retirement: RetirementSummary)
@@ -298,25 +277,25 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                         road.AuthorityRevision
                         snapshot
 
-                let! _ = appendRelayResult journal record opening.Transaction
+                let! _ = relay.AppendRelay record opening.Transaction
                 return opening.IncumbencyId
             }
 
     let continueLoop (jobId: ManagerJobId) : Task<Result<IncumbencyId, string>> =
         taskResult {
-            let! journal, record =
-                requireJournalAndJob deps.Journal jobId "Manager loop continuation requires a durable journal"
+            let! relay, record =
+                requireRelayAndJob relayPortOpt jobId "Manager loop continuation requires a durable journal"
 
-            let! road = requireOpenRoad journal record
+            let! road = requireOpenRoad relay record
             let! retirement = requireCommittedRetirement road
 
             let! incumbent =
                 match retirement.Outcome, road.Certificate with
-                | RetirementOutcome.Continue, _ -> activateNextIfAbsent journal record road retirement
+                | RetirementOutcome.Continue, _ -> activateNextIfAbsent relay record road retirement
                 | RetirementOutcome.Accepted certificateId, Some certificate when
                     certificate.Id = certificateId && not certificate.Valid
                     ->
-                    activateNextIfAbsent journal record road retirement
+                    activateNextIfAbsent relay record road retirement
                 | RetirementOutcome.Accepted _, _ ->
                     Task.FromResult(Error "Manager loop continuation requires an invalidated Accepted certificate")
 
@@ -384,9 +363,9 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         }
 
     let recoverJobsIfPresent (value: Orchestrator) =
-        match deps.Journal with
-        | Some journal ->
-            OrchestratorManagerJob.recoverJobs journal orchestratorId worktrees deps.RegisterChildDirectory value
+        match sweepPortOpt with
+        | Some sweep ->
+            OrchestratorManagerJob.recoverJobs sweep orchestratorId worktrees deps.RegisterChildDirectory value
         | None -> task { return () }
 
     let mapSweepError (pending: Task<Result<unit, string>>) : Task<Result<unit, string>> =
@@ -400,7 +379,9 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         taskResult {
             // Canonicalize the repo path via git common-dir so symlinked
             // spellings share one cross-process publish lock.
-            let lockRepoPath = RuntimePath.gitCommonDir deps.RepoPath
+            let lockRepoPath =
+                Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir deps.RepoPath
+
             let sweepLockPath = IntegrationGate.lockPath lockRepoPath (TargetRef.value target)
 
             // Sweep orphaned manager artifacts before resuming jobs, so a
@@ -419,10 +400,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     deps.WaitObserver
                     sweepDescriptor
                     (OrchestratorSweep.sweepLocked sweepLockPath gitPort (fun () ->
-                        deps.Journal
-                        |> Option.map (fun journal ->
-                            OrchestratorProjection.activeJobs
-                                (AgentJournal.snapshot journal).AgentProjections.Orchestrator)
+                        sweepPortOpt
+                        |> Option.map (fun sweep -> sweep.ActiveJobs())
                         |> Option.defaultValue []))
                 |> mapSweepError
 
@@ -529,7 +508,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         | Some active -> Ok active
 
     let advanceAuthorityRevision
-        (journal: AgentJournal)
+        (relay: OrchestratorRelayPort)
         (record: ManagerJobProjection)
         (road: RoadView)
         (incumbent: IncumbencyId)
@@ -548,7 +527,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     prompt
                     PromptAuthority.ContinuationKind.ManagedDelegationAssignment
                     (Some(WorktreePath.value record.WorktreePath))
-                    (Some journal)
+                    deps.Journal
                     gateKind
                     callerProviderRun
 
@@ -564,7 +543,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                           snapshot
                       ) ]
 
-            let! _ = appendRelayResult journal record transaction
+            let! _ = relay.AppendRelay record transaction
             return WorktreePath.value record.WorktreePath
         }
 
@@ -579,11 +558,11 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             do! replaceEstimateIfPresent jobId expectedToolCalls |> TaskResultCE.ofTask
             let! record = requireJobRecord jobId
 
-            let! journal =
-                deps.Journal
+            let! relay =
+                relayPortOpt
                 |> Result.requireSome "Relay authority update requires a durable journal"
 
-            let! road = requireOpenRoad journal record
+            let! road = requireOpenRoad relay record
 
             let nextRevision =
                 authorityRevisionFor record callerProviderRun callerToolCallId prompt
@@ -592,7 +571,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 return WorktreePath.value record.WorktreePath
             else
                 let! incumbent = requireActiveWorkOwnedIncumbent road
-                return! advanceAuthorityRevision journal record road incumbent nextRevision prompt callerProviderRun
+                return! advanceAuthorityRevision relay record road incumbent nextRevision prompt callerProviderRun
         }
 
     let runAuthorityUpdate (jobId: ManagerJobId) (action: unit -> Task<Result<string, string>>) =

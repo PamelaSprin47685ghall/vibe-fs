@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Fission.OpenCode
@@ -121,7 +122,8 @@ module HostTurnObserver =
                   FreezePendingAttemptPlan = scope.Recovery.FreezePendingAttemptPlan
                   TryPendingAttemptPlan = scope.Recovery.TryPendingAttemptPlan }
 
-            do! XWire.reconcileAttempt journal attempts turn
+            let wirePort = journal |> Option.map AgentJournalPortAdapter.forWire
+            do! XWire.reconcileAttempt wirePort attempts turn
             do! TurnRuntimePreparation.prepare scope.DisposeExecutorRuntime turn
 
             let! fissionHandled =
@@ -197,7 +199,8 @@ module HostTurnObserver =
                       FreezePendingAttemptPlan = scope.Recovery.FreezePendingAttemptPlan
                       TryPendingAttemptPlan = scope.Recovery.TryPendingAttemptPlan }
 
-                do! XWire.reconcileAttempt journal attempts turn
+                let wirePort = journal |> Option.map AgentJournalPortAdapter.forWire
+                do! XWire.reconcileAttempt wirePort attempts turn
                 return ()
             else
                 // SPEC-INV-013 / STRENGTH-010 / STRENGTH-007: primary turn observation

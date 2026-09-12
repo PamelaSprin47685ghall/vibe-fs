@@ -3,9 +3,8 @@ namespace Wanxiangshu.Change
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Persistence.Journal
 
-/// Lazy journal recovery for persisted ManagerJobs.
+/// Lazy durable recovery for persisted ManagerJobs.
 ///
 /// RECOVERY-FAMILY: caller must hold FamilyRecoveryPermit for the orchestrator
 /// session before starting publication programs. This module only registers
@@ -15,7 +14,7 @@ open Wanxiangshu.Persistence.Journal
 /// and ORCH-007 decides the resume action from the last durable fact.
 module OrchestratorManagerJob =
     val recoverJobs:
-        journal: AgentJournal ->
+        sweep: OrchestratorSweepPort ->
         orchestratorId: SessionId ->
         worktrees: Dictionary<string, string> ->
         registerChildDirectory: (SessionId -> string -> unit) ->

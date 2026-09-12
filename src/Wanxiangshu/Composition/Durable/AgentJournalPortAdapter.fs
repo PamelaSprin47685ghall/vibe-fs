@@ -1,16 +1,22 @@
 namespace Wanxiangshu.Composition.Durable
 
+open Wanxiangshu.Change
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Context.Companion
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Session
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Enforcer.InstitutionalLearning
 open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Requirement.Grounding
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Mission.Relay
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Host
 
@@ -210,6 +216,95 @@ module AgentJournalPortAdapter =
                     | HandleOwnership.DurableParentHandle -> true
                     | HandleOwnership.HostOwnedHidden -> false) }
 
+    let forWire (journal: AgentJournal) : WireJournalPort =
+        let failurePort = forProviderFailure journal
+
+        { ReadView =
+            fun sessionId ->
+                let snapshot = AgentJournal.snapshot journal
+                let projections = snapshot.AgentProjections
+                let sessionProj = AgentProjection.tryFind sessionId projections
+
+                let isComp =
+                    SessionAssociationProjection.isCompanion sessionId projections.Associations
+
+                let activeProf = PromptAuthorityLedger.activeProfile sessionId projections
+                let failState = sessionProj |> Option.bind (fun session -> session.ProviderFailures)
+
+                let wireState =
+                    sessionProj
+                    |> Option.map (fun s ->
+                        { XTrace = s.XTrace
+                          Blog = s.Blog
+                          PrefixEpoch = s.PrefixEpoch })
+
+                { State = wireState
+                  IsCompanion = isComp
+                  ActiveAuthorityProfile = activeProf
+                  ProviderFailureState = failState }
+          ReadBlob = fun blobRef -> journal.Writer.BlobWriter.Read blobRef
+          WriteBlob =
+            fun content ->
+                task {
+                    let! res = journal.WriteBlob content
+
+                    return
+                        res
+                        |> Result.map (fun r ->
+                            { BlobRef = r.BlobRef
+                              BlobDigest = r.BlobDigest })
+                }
+          CurrentProjection = fun xTrace -> XTraceMaterialization.currentProjection journal xTrace
+          RecordConfirmedSuccess =
+            fun sessionId providerRun ->
+                task {
+                    match failurePort.CurrentState sessionId with
+                    | None -> return Error "NoActiveRun: no provider failure state for session"
+                    | Some current when current.Budget.ConsecutiveFailureCount = 0 -> return Ok()
+                    | Some current ->
+                        let fact =
+                            AgentFact.ProviderFailure(
+                                ProviderFailureFactCases.SuccessRecorded
+                                    {| SessionId = sessionId
+                                       LogicalRunId = current.LogicalRunId
+                                       AuthorityRootUserMessageId = current.AuthorityRootUserMessageId
+                                       ProviderRun = providerRun |}
+                            )
+
+                        let! appended =
+                            AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) fact journal
+
+                        return
+                            appended
+                            |> Result.map (fun _ -> ())
+                            |> Result.mapError JournalAppendFailure.describe
+                }
+          CommitPrefixRebase =
+            fun sessionId providerRun rebase ->
+                task {
+                    let fact =
+                        ContextFact.PrefixRebaseCommitted
+                            {| SessionId = sessionId
+                               PreviousEpochId = rebase.PreviousEpochId
+                               NextEpochId = rebase.NextEpochId
+                               FrozenRecordPrefixRef = rebase.FrozenRecordPrefixRef
+                               FrozenRecordPrefixDigest = rebase.FrozenRecordPrefixDigest
+                               CutoffExclusive = rebase.CutoffExclusive
+                               CoveredPrefixDigest = rebase.CoveredPrefixDigest
+                               SealRoot = rebase.SealRoot
+                               SyntheticMessageId = rebase.SyntheticMessageId
+                               ProbeId = rebase.ProbeId
+                               SolvingProviderRun = providerRun |}
+
+                    let! appended =
+                        AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) fact journal
+
+                    return
+                        appended
+                        |> Result.map (fun _ -> ())
+                        |> Result.mapError JournalAppendFailure.describe
+                } }
+
     /// DELEG-029: durable composition is the only place that wraps delegation fact
     /// cases into the outer routing union and adapts the journal handle.
     let fromAgentJournal (journal: AgentJournal) : AgentJournalPort =
@@ -232,3 +327,53 @@ module AgentJournalPortAdapter =
                     | Error err -> return Error err
                 }
           Sha256 = HostDigest.sha256Hex }
+
+    /// ORCH-PORT: sweep reads over persisted ManagerJobs. Each member
+    /// performs exactly one journal snapshot read per call.
+    let forOrchestratorSweep (journal: AgentJournal) : OrchestratorSweepPort =
+        { ActiveJobs =
+            fun () -> OrchestratorProjection.activeJobs (AgentJournal.snapshot journal).AgentProjections.Orchestrator
+          TryJob =
+            fun jobId ->
+                OrchestratorProjection.tryFind jobId (AgentJournal.snapshot journal).AgentProjections.Orchestrator
+          Snapshot = fun () -> AgentJournal.snapshot journal }
+
+    /// ORCH-PORT: Relay reads, appends, and revision wait for one ManagerJob.
+    let forOrchestratorRelay (journal: AgentJournal) : OrchestratorRelayPort =
+        let roadIdOf (record: ManagerJobProjection) =
+            RoadId.create (SessionId.value record.ManagerSessionId)
+
+        let roadOfRecord (record: ManagerJobProjection) projection =
+            AgentProjection.tryFind record.ManagerSessionId projection.AgentProjections
+            |> Option.bind (fun session -> session.Relay)
+            |> Option.bind (fun relay -> Fold.view relay (roadIdOf record))
+
+        { RoadSnapshot =
+            fun record ->
+                let projection, revision = AgentJournal.snapshotWithRevision journal
+                roadOfRecord record projection, revision
+          AwaitChangeFrom =
+            fun revision ->
+                task {
+                    let! _ = AgentJournal.awaitChangeFrom revision journal
+                    return ()
+                }
+          AppendRelay =
+            fun record transaction ->
+                task {
+                    let! result =
+                        AgentJournal.appendAgent
+                            (StreamId.Session record.ManagerSessionId)
+                            None
+                            (AgentFact.Relay(
+                                RelayFactCases.TransactionCommitted
+                                    {| RoadId = roadIdOf record
+                                       Transaction = transaction |}
+                            ))
+                            journal
+
+                    return
+                        result
+                        |> Result.map (fun _ -> ())
+                        |> Result.mapError JournalAppendFailure.describe
+                } }

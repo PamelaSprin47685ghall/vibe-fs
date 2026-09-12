@@ -415,7 +415,8 @@ module PluginTransforms =
                   FreezePendingAttemptPlan = scope.Recovery.FreezePendingAttemptPlan
                   TryPendingAttemptPlan = scope.Recovery.TryPendingAttemptPlan }
 
-            let apply = XWire.applyTransform isReplica snapshotOpt journal attempts
+            let wirePort = journal |> Option.map AgentJournalPortAdapter.forWire
+            let apply = XWire.applyTransform isReplica snapshotOpt wirePort attempts
 
             fun relayProjection outObj ->
                 match relayProjection with
@@ -494,7 +495,8 @@ module PluginTransforms =
                           FreezePendingAttemptPlan = scope.Recovery.FreezePendingAttemptPlan
                           TryPendingAttemptPlan = scope.Recovery.TryPendingAttemptPlan }
 
-                    let! _ = XWire.applyTransform isReplica snapshotOpt journal attempts outObj
+                    let wirePort = journal |> Option.map AgentJournalPortAdapter.forWire
+                    let! _ = XWire.applyTransform isReplica snapshotOpt wirePort attempts outObj
                     return ()
                 }
           ReplicaSanitize = HostMessageProjection.sanitizeOutputMessages

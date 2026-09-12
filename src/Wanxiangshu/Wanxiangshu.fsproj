@@ -621,6 +621,12 @@
     <Compile Include="Execution/Session/SessionStartedAtLedger.fs"/>
     <Compile Include="Persistence/Journal/SharedAgentJournal.fsi"/>
     <Compile Include="Persistence/Journal/SharedAgentJournal.fs"/>
+    <Compile Include="Context/Trace/Materialization.fsi"/>
+    <Compile Include="Context/Trace/Materialization.fs"/>
+    <Compile Include="Context/Prefix/WirePort.fsi"/>
+    <Compile Include="Context/Prefix/WirePort.fs"/>
+    <Compile Include="Change/Orchestrator/OrchestratorPort.fsi"/>
+    <Compile Include="Change/Orchestrator/OrchestratorPort.fs"/>
     <Compile Include="Composition/Durable/AgentJournalPortAdapter.fsi"/>
     <Compile Include="Composition/Durable/AgentJournalPortAdapter.fs"/>
     <Compile Include="Git/Subject.fsi"/>
@@ -967,8 +973,6 @@
     <Compile Include="Interaction/Repair/CompletedTurnSurface.fs"/>
     <Compile Include="Context/Trace/Capture.fsi"/>
     <Compile Include="Context/Trace/Capture.fs"/>
-    <Compile Include="Context/Trace/Materialization.fsi"/>
-    <Compile Include="Context/Trace/Materialization.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoLocality.fsi"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoLocality.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoLocalitySurface.fsi"/>
