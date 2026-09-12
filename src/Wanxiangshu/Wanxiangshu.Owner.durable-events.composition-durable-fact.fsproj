@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>persistence</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>durable-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>composition-durable-fact</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>durable-events</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>composition-durable-fact</WanxiangshuOwnerLocality>

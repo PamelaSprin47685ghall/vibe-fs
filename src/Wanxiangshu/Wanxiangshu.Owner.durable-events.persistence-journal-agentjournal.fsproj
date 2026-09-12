@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>persistence</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>durable-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>persistence-journal-agentjournal</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>durable-events</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>persistence-journal-agentjournal</WanxiangshuOwnerLocality>

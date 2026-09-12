@@ -36,7 +36,7 @@ test('WHAT[STRUCTURED-WORKFLOW-013] attention tools consume their own port witho
   assert.equal(port?.subsystem, 'interaction', 'the port vocabulary belongs to the consumer domain')
   const adapter = [...inventory.projects.values()].find((project) =>
     project.implementationFiles.some((file) => file.endsWith('/Composition/Durable/AgentJournalPortAdapter.fs')))
-  assert.equal(adapter?.subsystem, 'persistence', 'outer routing belongs to durable composition')
+  assert.equal(adapter?.subsystem, 'durable-composition', 'outer routing belongs to durable composition')
   const registry = [...inventory.projects.values()].find((project) =>
     project.implementationFiles.some((file) => file.endsWith('/OpenCode/Tools/ToolRegistry.fs')))
   assert.ok(registry.references.includes(adapter.projectPath), 'the real registry must wire the durable adapter')

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>persistence</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>durable-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>composition-durable-fold</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>durable-events</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>composition-durable-fold</WanxiangshuOwnerLocality>
@@ -30,6 +30,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.prefix-stability.mission-obligation-todo-prefixepoch.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-fold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.requirement-grounding.host-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.requirement-grounding.requirement-grounding-projection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.requirement-grounding.requirement-grounding-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.execution-session-sessionstartedatprojection.fsproj"/>

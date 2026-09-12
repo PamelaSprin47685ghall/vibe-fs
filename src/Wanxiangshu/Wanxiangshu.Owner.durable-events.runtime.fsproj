@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>persistence</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>durable-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>durable-runtime-surface</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>durable-events</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>durable-runtime-surface</WanxiangshuOwnerLocality>
