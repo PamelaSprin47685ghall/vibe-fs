@@ -786,9 +786,9 @@ node scripts/build.mjs
    - 下批真实入口：`forWire` 的成功结算目前仍由 adapter 内部的 `RecordConfirmedSuccess` 复制决策实现（`Participant/Provider/Attempt/Fallback/Ledger.fs` 的 `recordConfirmedSuccess` 是同一份规则的唯一领域实现，后续应让 Wire 复用它并删除 adapter 副本）；Wire/delegation 等剩余消费者族的适配器再分列。
 
 41. **收口批结构校准与观测时序全量锁定**（2026-09-12 第二十一班）：
-   - **观测时序语义裁决**：`port-observation-timing.test.mjs` 4 个实时探针全绿，锁定受观语义为「每个 member 每次调用进行一次独立 live 快照读取」，绝非初始化时只截一次的静态缓存。
+   - **观测时序语义裁决**：`port-observation-timing.test.mjs` 4 例确定性断言全绿，锁定受观语义为「每个 member 每次调用进行一次独立 live 快照读取」，绝非初始化时只截一次的静态缓存。运行时探针曾以真 journal（`appendAgent` + `PromptDispatcher.AcceptHumanRoot`）验证并全绿；因 JS 边界规范不允许测试深导入 dist 内部模块，持久化的证明是源断言形态，并对旧实现源码回测确认能抓住全部 4 处构建时捕获。
    - **编译与结构实测数字**：
      - `node scripts/checks/subsystems.mjs`：26 subsystems / 245 shards / 732 sources / 1877 refs / 最大 subsystem SCC 18。
      - 闭包变动：`durable-journal-port-adapter`（hub）由 213 降至 **208**；`delegation-host-adapter` 294 降至 **289**；`delegation-pty-adapter` 295 降至 **290**；`delegation-recovery-runtime` 保持 **45**；`git-integrationgate` 415 降至 **414**。
      - 新增独立分片：`change-orchestrator-port-adapter`（148 闭包源码）、`change-fold`（140 闭包源码）。
-   - **缺口与未跑项如实记录**：`INSTRUMENTAL-LEARNING-007` 两条既有缺口保持未动；本次为收口批快速定界，未跑 integration / Long Stroke 全量端到端测试（由主任务最后统一部署）。
+   - **缺口与未跑项如实记录**：`INSTRUMENTAL-LEARNING-007` 两条既有缺口保持未动。验证已随批完成：`node scripts/check.mjs` 绿（requirement-trace 4024 测试属主完整）、语义套件 3981 绿、integration 279 绿、e2e Long Stroke 绿、`npm pack --dry-run` 绿（2068 文件）。
