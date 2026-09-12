@@ -44,6 +44,15 @@
 
 ### 7. Production-bound property testing
 
+
+### 8. 独立边界编译与合并 impact 编译的分工
+
+两种验证各管一件事，互不代替：
+
+- **独立 focused compile**（`scripts/compile-owner.mjs`）证明该 compile shard 的**声明自给自足**：scratch 工程只放入该 shard ProjectReference 闭包内的源码，闭包里多进或少进一个真实 provider，scratch 输入立刻变化。某 shard 漏声明一个真实 provider 时，该分片自己的编译是红的——即使 aggregate 或别人闭包里的更大工程依旧绿。「给某 shard 升级/平移归属」同样必须由它自己的输入指纹证明。
+- **合并 impact 编译**（`scripts/compile-impact.mjs`）证明**同一批变化的所有受影响消费者兼容**：同一批 delta 先求并集成一次 flat 编译，awaken/组装顺序按 aggregate canonical order；它不证明每个分片的声明足够，也不要求所有不相关消费者都独立重编。
+
+因此「只编极大元分片即证明全部独立边界」不成立：flat scratch 工程没有 `ProjectReference` 与 `open 解析上下文`，一个 shard 自己的闭包缺 provider，在包含该缺失 provider 的另一个更大闭包里照样被补齐成绿灯。反过来「每个分片逐一重编」也不成立：Σ(闭包) 的重复劳动违反一条线只编一次的纪律。正确的最小集合是：**承诺独立的新边界分片各自编译一次**（证明它的声明足够）；**普通影响范围走一次合并并集**（证明消费者兼容）。判断「引用删除是否安全」只比较 `compile-owner --plan-only` 的闭包文件清单是否逐分片一致，清单一致即不必重编。
 只有纯代数、幂等、单调、prefix、round-trip、排列或有限事件竞争进入 property testing。generator 只构造输入；property 直接调用注册 production Surface，并以 WHAT 已独立声明的关系或 typed rejection 判断输出。若 expected result 只能通过复制 production algorithm 得到，改用固定反例、类型约束、shared analyzer 或更高层契约测试。
 
 每项 property 保留最小固定正例与边界反例；生成域显式覆盖 production 代数的全部构造。固定独立 seed 与 `numRuns`；`fc.assert` 的失败报告保留 seed 与 shrink path。高风险性质用一个精确错误 mutant 验证 oracle 可红，再以返回的 seed/path 重放最小反例。shrunk counterexample 若代表历史缺陷，转成普通固定 regression；property 继续搜索邻域。
