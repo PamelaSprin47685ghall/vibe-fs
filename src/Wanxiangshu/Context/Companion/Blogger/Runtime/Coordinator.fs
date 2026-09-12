@@ -61,7 +61,7 @@ module BloggerCoordinator =
         (bloggerSessionId: SessionId)
         : AuthorityRootUserMessageId option =
         (AgentJournal.snapshot journal).AgentProjections
-        |> PromptAuthorityLedger.activeProfile bloggerSessionId
+        |> PromptAuthorityProjectionQueries.activeProfile bloggerSessionId
         |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)
 
     /// Exact live flight ownership: the flight registry must hold this exact request.

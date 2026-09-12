@@ -19,7 +19,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-fact.fsproj"/>
-    <Compile Include="Interaction/Authority/Child.fsi"/>
+        <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-projection-queries.fsproj"/>
+<Compile Include="Interaction/Authority/Child.fsi"/>
     <Compile Include="Interaction/Authority/Child.fs"/>
     <Compile Include="Interaction/Repair/CompletedTurn.fsi"/>
     <Compile Include="Interaction/Repair/CompletedTurn.fs"/>

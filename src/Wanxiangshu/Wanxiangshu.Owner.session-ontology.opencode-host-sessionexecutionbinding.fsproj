@@ -3,7 +3,7 @@
     <WanxiangshuSemanticOwner>session-ontology</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>opencode-host-sessionexecutionbinding</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
-    <WanxiangshuSubsystem>dispatch</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>durable-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>opencode-host-sessionexecutionbinding</WanxiangshuCompileShard>
   </PropertyGroup>
   <ItemGroup>
@@ -15,7 +15,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.execution-model-routing.opencode-host-opencodeport.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.execution-model-routing.strength-policy.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-signal-adapter.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-prompt-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-managedagent.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-fold.fsproj"/>
@@ -24,7 +24,9 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-projection.opencode-codec-providerwiredecode.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-association.fsproj"/>
-    <Compile Include="OpenCode/Host/SessionExecutionBinding.fsi"/>
+        <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-projection-queries.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.action-affordance.persistence-runtime-path.fsproj"/>
+<Compile Include="OpenCode/Host/SessionExecutionBinding.fsi"/>
     <Compile Include="OpenCode/Host/SessionExecutionBinding.fs"/>
   </ItemGroup>
 </Project>

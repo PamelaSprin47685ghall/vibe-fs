@@ -1,6 +1,8 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
 open System.Threading.Tasks
+open Wanxiangshu.Persistence.EventStore
+open Wanxiangshu.Persistence.Journal
 
 /// JS-native lifecycle boundary for the Casebook draft and observation flow.
 /// Draft storage, collector state, and Bookkeeper/Journal capabilities remain
@@ -29,12 +31,17 @@ module CasebookLifecycleSurface =
     let cleanup (sessionId: string) : unit =
         CasebookLifecycle.cleanupInspector sessionId
 
+    let private acquireStore (workspaceRoot: string) : IEventStore =
+        Wanxiangshu.OpenCode.WorkspaceEventStore.acquire (RuntimePath.gitCommonDir workspaceRoot)
+
     let tryFinalize (workspaceRoot: string) (sessionId: string) : Task<obj> =
+        let store = acquireStore workspaceRoot
+
         task {
-            match! CasebookLifecycle.tryFinalizeInspector workspaceRoot sessionId with
+            match! CasebookLifecycle.tryFinalizeInspector workspaceRoot store sessionId with
             | Ok() -> return box {| ok = true |}
             | Error message -> return box {| ok = false; error = message |}
         }
 
     let touchAccess (workspaceRoot: string) (sessionId: string) : Task<unit> =
-        CasebookLifecycle.touchAccess workspaceRoot sessionId
+        CasebookLifecycle.touchAccess workspaceRoot (acquireStore workspaceRoot) sessionId

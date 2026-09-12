@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Execution.Failure
 
 open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
 
 [<RequireQualifiedAccess>]
@@ -59,16 +58,9 @@ type ProviderRecoveryFacts =
       RetryBudget: ProviderRecoveryBudget
       Breaker: ProviderBreakerState }
 
-type ExecutionFailureInput =
-    { Failure: ExecutionFailure
-      Lifecycle: DurableExecutionLifecycle
-      ExecutionKey: ChatExecutionKey
-      Capacity: CapacityOwnership
-      Provider: ProviderRecoveryFacts }
-
 [<Sealed>]
 type ProviderRecoveryDecisionId private (value: string) =
-    member _.Value = value
+    member internal _.Value = value
     static member internal Create(value: string) = ProviderRecoveryDecisionId(value)
 
 [<Sealed>]
@@ -80,10 +72,10 @@ type ProviderRecoveryAuthorization
         providerRun: ProviderRunIdentity,
         requestKind: ProviderRequestKind
     ) =
-    member _.DecisionId = decisionId
-    member _.LogicalRun = logicalRun
-    member _.ProviderRun = providerRun
-    member _.RequestKind = requestKind
+    member internal _.DecisionId = decisionId
+    member internal _.LogicalRun = logicalRun
+    member internal _.ProviderRun = providerRun
+    member internal _.RequestKind = requestKind
 
     static member internal Create(decisionId, logicalRun, providerRun, requestKind) =
         ProviderRecoveryAuthorization(decisionId, logicalRun, providerRun, requestKind)
@@ -101,20 +93,6 @@ type CapacitySettlement =
     | ReleaseExactFence of ExactCapacityFenceReference
 
 [<RequireQualifiedAccess>]
-type ExecutionFailureResolution =
-    | PreserveCurrentFact
-    | AwaitAcceptanceReconciliation of ChatExecutionKey
-    | RetryFreshAttempt of ProviderRecoveryAuthorization
-    | TerminalizeAcceptedPreProvider of ChatExecutionKey * ChatExecutionTerminalDisposition
-    | TerminalizeProviderStarted of ChatExecutionKey * ChatExecutionTerminalDisposition
-
-[<RequireQualifiedAccess>]
 type FatalityDecision =
     | NoFatality
     | FatalAfterSettlement
-
-type ExecutionFailureDecision =
-    { Resolution: ExecutionFailureResolution
-      Breaker: BreakerDecision
-      CapacitySettlement: CapacitySettlement
-      Fatality: FatalityDecision }

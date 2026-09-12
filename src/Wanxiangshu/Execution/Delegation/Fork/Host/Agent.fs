@@ -58,8 +58,8 @@ module HostForkBinding =
         |> Option.bind (fun durable ->
             let projections = (AgentJournal.snapshot durable).AgentProjections
 
-            PromptAuthorityLedger.activeProfile childId projections
-            |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile childId projections)
+            PromptAuthorityProjectionQueries.activeProfile childId projections
+            |> Option.orElseWith (fun () -> PromptAuthorityProjectionQueries.lastAuthorityProfile childId projections)
             |> Option.bind (fun profile -> tryName profile.SelectedAgent))
 
 [<AutoOpen>]

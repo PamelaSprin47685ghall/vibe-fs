@@ -787,7 +787,7 @@ module ProviderRecoveryWorkflow =
             let projections = (AgentJournal.snapshot durable)
 
             let activeProfileOpt =
-                PromptAuthorityLedger.activeProfile turn.SessionId projections.AgentProjections
+                PromptAuthorityProjectionQueries.activeProfile turn.SessionId projections.AgentProjections
 
             let roleName =
                 activeProfileOpt

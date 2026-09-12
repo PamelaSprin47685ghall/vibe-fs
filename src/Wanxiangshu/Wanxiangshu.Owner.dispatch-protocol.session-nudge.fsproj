@@ -8,7 +8,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-root-workspace-contract.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-ledger.fsproj" />
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-async-support.fsproj" />
-    <Compile Include="Interaction/Repair/Port.fsi" />
+        <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-projection-queries.fsproj"/>
+<Compile Include="Interaction/Repair/Port.fsi" />
     <Compile Include="Interaction/Repair/Port.fs" />
     <Compile Include="Interaction/Dispatch/OpenCode/SessionNudge.fsi" />
     <Compile Include="Interaction/Dispatch/OpenCode/SessionNudge.fs" />

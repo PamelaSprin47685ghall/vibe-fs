@@ -158,7 +158,7 @@ module ManagerWorkflow =
                     |> Option.bind (fun (r: RelayState) -> Fold.view r roadId)
 
                 let profileOpt =
-                    PromptAuthorityLedger.activeProfile sessionId snapshot.AgentProjections
+                    PromptAuthorityProjectionQueries.activeProfile sessionId snapshot.AgentProjections
 
                 match roadView, profileOpt with
                 | None, Some profile when profile.CanonicalRole = Role.Manager ->

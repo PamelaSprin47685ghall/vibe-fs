@@ -3,7 +3,7 @@
     <WanxiangshuSemanticOwner>relay-retirement</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>composition-turn-workflow</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
-    <WanxiangshuSubsystem>dispatch</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>composition-turn-workflow</WanxiangshuCompileShard>
   </PropertyGroup>
   <ItemGroup>
@@ -22,7 +22,10 @@
     <ProjectReference Include="Wanxiangshu.Owner.relay-assessment.mission-relay-workspace-snapshot.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.runtime-platform-git-subject.fsproj"/>
-    <Compile Include="Mission/Manager/Workflow.fsi"/>
+        <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-projection-queries.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.action-affordance.persistence-runtime-path.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-tool-adapter.fsproj"/>
+<Compile Include="Mission/Manager/Workflow.fsi"/>
     <Compile Include="Mission/Manager/Workflow.fs"/>
     <Compile Include="Composition/Turn/Workflow.fsi"/>
     <Compile Include="Composition/Turn/Workflow.fs"/>

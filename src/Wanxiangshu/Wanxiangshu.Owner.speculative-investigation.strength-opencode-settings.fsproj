@@ -35,7 +35,9 @@
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-budget.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-prediction-predictor.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-turnevidence.fsproj"/>
-    <Compile Include="Strength/OpenCode/Settings.fsi"/>
+        <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-projection-queries.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.durable-journal-port-adapter.fsproj"/>
+<Compile Include="Strength/OpenCode/Settings.fsi"/>
     <Compile Include="Strength/OpenCode/Settings.fs"/>
     <Compile Include="Strength/OpenCode/Speculate.fsi"/>
     <Compile Include="Strength/OpenCode/Speculate.fs"/>

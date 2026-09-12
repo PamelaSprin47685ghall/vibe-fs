@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import * as workspaceHost from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
+import * as workspaceHost from '../../../dist/OpenCode/Host/WorkspaceSharedJournal.js'
 import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
 
 const POISON = 'LEAVE_UNREAD_POISON_SENTINEL_NEVER_PARSE\n{not-a-journal-envelope\n'
@@ -76,11 +76,11 @@ test('WHAT[DURABLE-EVENTS-009] SharedAgentJournal_cache_hit_returns_same_instanc
   writeFileSync(stale, POISON)
   const before = fingerprint(stale)
 
-  const first = mustOk(await workspaceHost.WorkspaceEventStoreSurface_acquire(retiredDir, opened.commonDir, process.pid, '2026-04-01T00:00:00Z'))
-  const second = mustOk(await workspaceHost.WorkspaceEventStoreSurface_acquire(retiredDir, opened.commonDir, process.pid, '2026-04-01T00:00:01Z'))
-  assert.equal(workspaceHost.WorkspaceEventStoreSurface_same(first.journal, second.journal), true)
+  const first = mustOk(await workspaceHost.acquire(retiredDir, opened.commonDir, process.pid, '2026-04-01T00:00:00Z'))
+  const second = mustOk(await workspaceHost.acquire(retiredDir, opened.commonDir, process.pid, '2026-04-01T00:00:01Z'))
+  assert.equal(workspaceHost.same(first.journal, second.journal), true)
   assert.deepEqual(fingerprint(stale), before)
 
-  workspaceHost.WorkspaceEventStoreSurface_release(first.journal)
-  workspaceHost.WorkspaceEventStoreSurface_release(second.journal)
+  workspaceHost.release(first.journal)
+  workspaceHost.release(second.journal)
 })

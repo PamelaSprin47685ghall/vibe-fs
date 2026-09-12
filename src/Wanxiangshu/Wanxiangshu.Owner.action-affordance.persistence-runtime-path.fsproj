@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>runtime-platform</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>persistence-runtime-path</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>durable-events</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>persistence-runtime-path</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.action-affordance.runtime-platform-git-subject.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.digest.fsproj"/>
+    <Compile Include="Persistence/Journal/RuntimePath.fsi"/>
+    <Compile Include="Persistence/Journal/RuntimePath.fs"/>
+  </ItemGroup>
+</Project>

@@ -20,13 +20,14 @@ const { default: plugin } = await import('wanxiangshu')
 const initSpikePlugin = plugin.server
 const { requiredNames: managedAgentNames } = await import('../../../../dist/Participant/Persona/Surface.js')
 const journalSurface = await import('../../../../dist/Persistence/Journal/Surface.js')
+const workspaceHost = await import('../../../../dist/OpenCode/Host/WorkspaceSharedJournal.js')
 const eventsSurface = await import('../../../../dist/OpenCode/Host/EventsSurface.js')
 const dispatchSurface = await import('../../../../dist/Interaction/Dispatch/DispatchSurface.js')
 const obligationJournalSurface = await import('../../../../dist/Persistence/Journal/ObligationJournalSurface.js')
 const sessionBindingSurface = await import('../../../../dist/OpenCode/Host/SessionBindingSurface.js')
 
 const withJournalRuntime = async (directory, action) => {
-  const journalResult = await journalSurface.JournalSurface_acquireSharedForWorkspace(
+  const journalResult = await workspaceHost.acquireSharedForWorkspace(
     directory,
     process.pid,
     new Date().toISOString(),
@@ -209,7 +210,7 @@ export const withExecutablePlugin = async (body, options = {}) => {
     await configureManagedPlugin(hooks)
     let runtime
     try {
-      const journalResult = await journalSurface.JournalSurface_acquireSharedForWorkspace(
+      const journalResult = await workspaceHost.acquireSharedForWorkspace(
         directory,
         process.pid,
         new Date().toISOString(),

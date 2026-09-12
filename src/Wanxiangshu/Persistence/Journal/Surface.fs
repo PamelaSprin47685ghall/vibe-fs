@@ -153,15 +153,21 @@ module JournalSurface =
         task {
             let commonDirectory = RuntimePath.gitCommonDir workspace
             let runtimeDirectory = RuntimePath.forWorkspace workspace
-            let boot = Wanxiangshu.OpenCode.WorkspaceEventStore.bootPort commonDirectory
 
-            let openJournal runtimeId processIdValue processStartedAt =
+            let openJournal (runtimeId: RuntimeId) processIdValue processStartedAt =
                 task {
-                    let! result = boot.ResumeOrCreate(runtimeId, processIdValue, processStartedAt)
+                    let integrator =
+                        CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules AuthoritativeEventTypes.isKnown
 
-                    match result with
-                    | Ok(writer, _, projection) -> return AgentJournal.createFromProjection writer projection
-                    | Error error -> return Error error
+                    let store = EventStore.createLocal commonDirectory (Guid.NewGuid().ToString("N")) integrator
+
+                    let! result =
+                        EventStoreJournalWriter.resumeOrCreate (runtimeId, processIdValue, processStartedAt, store)
+
+                    return
+                        match result with
+                        | Ok(writer, _, projection) -> AgentJournal.createFromProjection writer projection
+                        | Error error -> Error error
                 }
 
             let! result =

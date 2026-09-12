@@ -35,7 +35,7 @@ test('WHAT[STRUCTURED-WORKFLOW-013] attention tools consume their own port witho
     project.implementationFiles.some((file) => file.endsWith('/Interaction/Attention/JournalPort.fs')))
   assert.equal(port?.subsystem, 'interaction', 'the port vocabulary belongs to the consumer domain')
   const adapter = [...inventory.projects.values()].find((project) =>
-    project.implementationFiles.some((file) => file.endsWith('/Composition/Durable/AgentJournalPortAdapter.fs')))
+    project.implementationFiles.some((file) => file.endsWith('/Composition/Durable/AttentionConcernJournalAdapter.fs')))
   assert.equal(adapter?.subsystem, 'durable-composition', 'outer routing belongs to durable composition')
   const registry = [...inventory.projects.values()].find((project) =>
     project.implementationFiles.some((file) => file.endsWith('/OpenCode/Tools/ToolRegistry.fs')))
@@ -44,3 +44,4 @@ test('WHAT[STRUCTURED-WORKFLOW-013] attention tools consume their own port witho
   assert.doesNotMatch(readFileSync(registryFile, 'utf8'), /AgentFact\.Attention\b/,
     'the registry must not take ownership of durable routing')
 })
+

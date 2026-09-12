@@ -24,7 +24,7 @@ module HostSessionNudge =
     let tryActiveProfile (journal: AgentJournal option) (sessionId: SessionId) =
         journal
         |> Option.bind (fun j ->
-            PromptAuthorityLedger.activeProfile sessionId (AgentJournal.snapshot j).AgentProjections)
+            PromptAuthorityProjectionQueries.activeProfile sessionId (AgentJournal.snapshot j).AgentProjections)
 
     let activeParticipant (profile: PromptAuthority.AuthorityExecutionProfile) : string = profile.SelectedAgent
 

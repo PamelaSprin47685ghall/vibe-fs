@@ -16,7 +16,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-ledger.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-projection.opencode-codec-providerwiredecode.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
-    <Compile Include="Mission/Relay/OpenCode/NarrativeTransform.fsi"/>
+        <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-projection-queries.fsproj"/>
+<Compile Include="Mission/Relay/OpenCode/NarrativeTransform.fsi"/>
     <Compile Include="Mission/Relay/OpenCode/NarrativeTransform.fs"/>
   </ItemGroup>
 </Project>

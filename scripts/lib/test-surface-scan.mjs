@@ -1187,10 +1187,10 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
-    module: 'OpenCode/Host/WorkspaceEventStoreSurface.js',
+    module: 'OpenCode/Host/WorkspaceSharedJournal.js',
     owner: 'durable-events',
     laws: ['DURABLE-EVENTS-009', 'DURABLE-EVENTS-010'],
-    source: 'src/Wanxiangshu/OpenCode/Host/WorkspaceEventStoreSurface.fs',
+    source: 'src/Wanxiangshu/OpenCode/Host/WorkspaceSharedJournal.fs',
     representation: 'opaque-capability',
     kind: 'resource',
   },

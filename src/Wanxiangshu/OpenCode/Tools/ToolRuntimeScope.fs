@@ -243,8 +243,8 @@ type ToolRuntimeScope
         | Some durable ->
             let projections = (AgentJournal.snapshot durable).AgentProjections
 
-            PromptAuthorityLedger.activeProfile sessionId projections
-            |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile sessionId projections)
+            PromptAuthorityProjectionQueries.activeProfile sessionId projections
+            |> Option.orElseWith (fun () -> PromptAuthorityProjectionQueries.lastAuthorityProfile sessionId projections)
         | None -> None
 
     /// AGENT-007: the single Role source, or `None`.
@@ -259,7 +259,7 @@ type ToolRuntimeScope
         |> Option.map (fun profile -> profile.CanonicalRole)
 
     let humanRootIdentitySeedAdmission (durable: AgentJournal) sessionId agent =
-        PromptAuthorityLedger.activeProfile sessionId (AgentJournal.snapshot durable).AgentProjections
+        PromptAuthorityProjectionQueries.activeProfile sessionId (AgentJournal.snapshot durable).AgentProjections
         |> Option.map (fun profile -> Ok profile.IdentitySeed)
         |> Option.defaultWith (fun () ->
             ParticipantIdentity.resolveAtRoot agent

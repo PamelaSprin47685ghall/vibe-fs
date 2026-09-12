@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>chat-execution</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>participant-provider-attempt-failure</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>provider-attempt-recovery</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>participant-provider-attempt-failure</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <Compile Include="Execution/Failure/Model.fsi"/>
+    <Compile Include="Execution/Failure/Model.fs"/>
+    <Compile Include="Participant/Provider/Attempt/Failure.fsi"/>
+    <Compile Include="Participant/Provider/Attempt/Failure.fs"/>
+    <Compile Include="Participant/Provider/Attempt/FailureSurface.fsi"/>
+    <Compile Include="Participant/Provider/Attempt/FailureSurface.fs"/>
+  </ItemGroup>
+</Project>

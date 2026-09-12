@@ -34,7 +34,10 @@
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.digest.fsproj"/>
-    <Compile Include="Enforcer/Guidance/Tip.fsi"/>
+        <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-projection-queries.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.guidance-delivery.opencode-host-pairprogrammingcalibration.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.durable-journal-port-adapter.fsproj"/>
+<Compile Include="Enforcer/Guidance/Tip.fsi"/>
     <Compile Include="Enforcer/Guidance/Tip.fs"/>
     <Compile Include="OpenCode/Host/PairProgrammingThoughtTransform.fsi"/>
     <Compile Include="OpenCode/Host/PairProgrammingThoughtTransform.fs"/>

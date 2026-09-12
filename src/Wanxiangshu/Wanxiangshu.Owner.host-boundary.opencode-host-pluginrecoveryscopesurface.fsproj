@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>host</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>opencode-host-pluginrecoveryscopesurface</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>host-boundary</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>opencode-host-pluginrecoveryscopesurface</WanxiangshuOwnerLocality>

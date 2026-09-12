@@ -27,7 +27,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-strengthsurface.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-workspaceeventstore.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-surface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-obligationsurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-promptfactcodec.fsproj"/>
@@ -45,8 +44,6 @@
     <Compile Include="Persistence/EventStore/CodecSurface.fs"/>
     <Compile Include="Persistence/EventStore/MergeSurface.fsi"/>
     <Compile Include="Persistence/EventStore/MergeSurface.fs"/>
-    <Compile Include="OpenCode/Host/WorkspaceEventStoreSurface.fsi"/>
-    <Compile Include="OpenCode/Host/WorkspaceEventStoreSurface.fs"/>
     <Compile Include="Persistence/Journal/RevisionSurface.fsi"/>
     <Compile Include="Persistence/Journal/RevisionSurface.fs"/>
     <Compile Include="Persistence/Journal/CodecSurface.fsi"/>

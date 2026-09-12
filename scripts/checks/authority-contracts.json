@@ -403,7 +403,7 @@
       "symbol": "ReservationCapability",
       "anchor": "type private ReservationCapability() =",
       "classification": "Vocabulary",
-      "owner": "delegation",
+      "owner": "application-composition",
       "what": "ENF-014",
       "issuers": [],
       "whatOwners": {

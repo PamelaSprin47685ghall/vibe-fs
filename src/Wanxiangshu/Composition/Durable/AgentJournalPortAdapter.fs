@@ -125,8 +125,8 @@ module AgentJournalPortAdapter =
             fun sessionId ->
                 let projections = (AgentJournal.snapshot journal).AgentProjections
 
-                PromptAuthorityLedger.activeProfile sessionId projections
-                |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile sessionId projections)
+                PromptAuthorityProjectionQueries.activeProfile sessionId projections
+                |> Option.orElseWith (fun () -> PromptAuthorityProjectionQueries.lastAuthorityProfile sessionId projections)
           CandidateRecords =
             fun parentId ->
                 AgentJournal.handleProjection journal parentId
@@ -148,7 +148,7 @@ module AgentJournalPortAdapter =
                 let isComp =
                     SessionAssociationProjection.isCompanion sessionId projections.Associations
 
-                let activeProf = PromptAuthorityLedger.activeProfile sessionId projections
+                let activeProf = PromptAuthorityProjectionQueries.activeProfile sessionId projections
                 let failState = sessionProj |> Option.bind (fun session -> session.ProviderFailures)
 
                 let wireState =

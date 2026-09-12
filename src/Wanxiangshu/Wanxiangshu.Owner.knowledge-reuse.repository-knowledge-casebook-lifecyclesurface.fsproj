@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>host</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>repository-knowledge-casebook-lifecyclesurface</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>knowledge-reuse</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>repository-knowledge-casebook-lifecyclesurface</WanxiangshuOwnerLocality>

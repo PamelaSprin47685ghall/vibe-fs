@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>casebook-lifecycle-surface</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>knowledge-reuse</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>casebook-lifecycle-surface</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-workspaceeventstore.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.repository-knowledge-casebook-bookkeeper.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
+    <Compile Include="Repository/Knowledge/Casebook/LifecycleSurface.fsi"/>
+    <Compile Include="Repository/Knowledge/Casebook/LifecycleSurface.fs"/>
+  </ItemGroup>
+</Project>

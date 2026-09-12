@@ -52,7 +52,7 @@ module HostForkRunLifecycle =
         match journal with
         | None -> Error "No journal: an AgentOwnerRoot identity seed cannot be issued"
         | Some durable ->
-            PromptAuthorityLedger.issueCurrentOwnerIdentitySeed
+            PromptAuthorityProjectionQueries.issueCurrentOwnerIdentitySeed
                 (AgentJournal.snapshot durable).AgentProjections
                 ownerSessionId
                 childAgent
@@ -65,7 +65,7 @@ module HostForkRunLifecycle =
         | Dispatchable
 
     let private pendingDispatchObservation childId payloadDigest identitySeed projections =
-        match PromptAuthorityLedger.pendingDispatchClaim childId payloadDigest projections with
+        match PromptAuthorityProjectionQueries.pendingDispatchClaim childId payloadDigest projections with
         | Some claim when claim.IdentitySeed = identitySeed -> DurableDispatchObservation.Pending claim
         | Some _ -> DurableDispatchObservation.IdentityMismatch
         | None ->
@@ -83,13 +83,13 @@ module HostForkRunLifecycle =
         =
         let projections = (AgentJournal.snapshot durable).AgentProjections
 
-        match PromptAuthorityLedger.dispatchStatusFor childId payloadDigest projections with
-        | PromptAuthorityLedger.DispatchStatus.Accepted evidence when evidence.IdentitySeed = identitySeed ->
+        match PromptAuthorityProjectionQueries.dispatchStatusFor childId payloadDigest projections with
+        | PromptAuthorityProjectionQueries.DispatchStatus.Accepted evidence when evidence.IdentitySeed = identitySeed ->
             DurableDispatchObservation.Accepted evidence
-        | PromptAuthorityLedger.DispatchStatus.Accepted _ -> DurableDispatchObservation.IdentityMismatch
-        | PromptAuthorityLedger.DispatchStatus.Pending ->
+        | PromptAuthorityProjectionQueries.DispatchStatus.Accepted _ -> DurableDispatchObservation.IdentityMismatch
+        | PromptAuthorityProjectionQueries.DispatchStatus.Pending ->
             pendingDispatchObservation childId payloadDigest identitySeed projections
-        | PromptAuthorityLedger.DispatchStatus.Dispatchable -> DurableDispatchObservation.Dispatchable
+        | PromptAuthorityProjectionQueries.DispatchStatus.Dispatchable -> DurableDispatchObservation.Dispatchable
 
     let private classifyPendingSend
         (durable: AgentJournal)

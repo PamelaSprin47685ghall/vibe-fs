@@ -88,7 +88,7 @@ module HostForkBusyNudge =
         task {
             let snapshot = AgentJournal.snapshot j
 
-            match PromptAuthorityLedger.activeProfile childId snapshot.AgentProjections with
+            match PromptAuthorityProjectionQueries.activeProfile childId snapshot.AgentProjections with
             | None -> return Error "Busy nudge requires ActiveLogicalRun on child session"
             | Some profile -> return! sendWithProfile sessions j childId profile directory prompt
         }

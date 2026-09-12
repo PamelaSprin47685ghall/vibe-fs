@@ -50,7 +50,7 @@ module PluginHostWiring =
                     | Some journal ->
                         BookkeeperRuntime.setRuntime sessionPort (fun ownerSessionId ->
                             let projections = (AgentJournal.snapshot journal).AgentProjections
-                            PromptAuthorityLedger.activeProfile ownerSessionId projections)
+                            PromptAuthorityProjectionQueries.activeProfile ownerSessionId projections)
                     | None -> BookkeeperRuntime.resetRuntime ()
 
                     scope.AttachSharedTerminal(terminalKey, sharedTerminalPort)
@@ -107,7 +107,15 @@ module PluginHostWiring =
 
                                 BookkeeperRuntime.completePhysical terminal.SessionId outcome)
                             workspaceDirectory
-                            (Some CasebookLifecycle.tryFinalizeInspector)
+                            (let tryFinalize workspaceRoot inspectorSessionId =
+                                try
+                                    let commonDir = RuntimePath.gitCommonDir workspaceRoot
+                                    let store = WorkspaceEventStore.acquire commonDir
+                                    CasebookLifecycle.tryFinalizeInspector workspaceRoot store inspectorSessionId
+                                with ex ->
+                                    Task.FromResult(Error ex.Message)
+                            
+                            Some tryFinalize)
                             (Some CasebookLifecycle.cleanupInspector)
 
                     return

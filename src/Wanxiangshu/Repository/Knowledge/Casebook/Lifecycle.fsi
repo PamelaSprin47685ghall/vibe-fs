@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
 open System.Threading.Tasks
+open Wanxiangshu.Persistence.EventStore
 
 /// CASE-003/010: process-local Casebook session wiring — draft Q/A turns,
 /// observation drain, graceful finalize vs unexpected cleanup. Publication
@@ -28,7 +29,10 @@ module CasebookLifecycle =
     /// Graceful owner scope close: if draft has Q+A, drain observations, run
     /// exactly one CaseFinalize child session with the full turn transcript,
     /// then finalizeCase once. Unexpected cleanup never runs Bookkeeper.
-    val tryFinalizeInspector: workspaceRoot: string -> inspectorSessionId: string -> Task<Result<unit, string>>
+    /// exactly one CaseFinalize child session with the full turn transcript,
+    /// then finalizeCase once. Store is explicit to keep Knowledge domain out of
+    /// application composition.
+    val tryFinalizeInspector: workspaceRoot: string -> store: IEventStore -> inspectorSessionId: string -> Task<Result<unit, string>>
 
     /// Fresh fetch side-effect: append InspectorCaseAccessed (ignore errors).
-    val touchAccess: workspaceRoot: string -> sessionId: string -> Task<unit>
+    val touchAccess: workspaceRoot: string -> store: IEventStore -> sessionId: string -> Task<unit>

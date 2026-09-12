@@ -185,6 +185,7 @@ export const HOST_BOUNDARY_OPEN_PATHS = new Set([
   'src/Wanxiangshu/Repository/Knowledge/Casebook/FetchSurface.fs',
   'src/Wanxiangshu/Repository/Knowledge/Casebook/Index.fs',
   'src/Wanxiangshu/Repository/Knowledge/Casebook/Lifecycle.fs',
+  'src/Wanxiangshu/Repository/Knowledge/Casebook/LifecycleSurface.fs',
   'src/Wanxiangshu/Repository/Programming/Js/RuntimeSurface.fs',
   'src/Wanxiangshu/Strength/OpenCode/Speculate.fs',
   'src/Wanxiangshu/Strength/Replica/Runtime.fs',

@@ -73,10 +73,10 @@ module ChildPromptAuthority =
                     Map.tryFind turn.SessionId snapshot.AgentProjections.HandleByChildSession
 
                 let activeProfile =
-                    PromptAuthorityLedger.activeProfile turn.SessionId snapshot.AgentProjections
+                    PromptAuthorityProjectionQueries.activeProfile turn.SessionId snapshot.AgentProjections
 
                 let accepted =
-                    PromptAuthorityLedger.acceptedDispatchForPhysicalMessage
+                    PromptAuthorityProjectionQueries.acceptedDispatchForPhysicalMessage
                         turn.SessionId
                         turn.PhysicalUserMessageId
                         snapshot.AgentProjections

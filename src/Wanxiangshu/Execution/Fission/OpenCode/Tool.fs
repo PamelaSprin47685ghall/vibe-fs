@@ -154,7 +154,7 @@ module FissionTool =
         =
         task {
             let laneProfile =
-                PromptAuthorityLedger.activeProfile lane.SessionId (AgentJournal.snapshot durable).AgentProjections
+                PromptAuthorityProjectionQueries.activeProfile lane.SessionId (AgentJournal.snapshot durable).AgentProjections
 
             match laneProfile with
             | None -> return ()
@@ -762,7 +762,7 @@ module FissionTool =
         =
         task {
             let activeProfile =
-                PromptAuthorityLedger.activeProfile owner (AgentJournal.snapshot durable).AgentProjections
+                PromptAuthorityProjectionQueries.activeProfile owner (AgentJournal.snapshot durable).AgentProjections
 
             match activeProfile, scope.RuntimeFor ctx with
             | None, _

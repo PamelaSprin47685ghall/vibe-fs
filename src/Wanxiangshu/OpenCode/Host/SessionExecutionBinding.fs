@@ -619,7 +619,7 @@ module SessionExecutionBinding =
         (projection: ProjectionSet)
         =
         task {
-            match PromptAuthorityLedger.activeProfile key.SessionId projection.AgentProjections with
+            match PromptAuthorityProjectionQueries.activeProfile key.SessionId projection.AgentProjections with
             | Some authority when authority.SelectedAgent = agent ->
                 let! res = admitContinuation durable key authority
                 return res |> Result.map ignore |> Result.mapError (fun e -> sprintf "%A" e)

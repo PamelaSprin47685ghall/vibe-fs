@@ -85,7 +85,9 @@
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.process-node-timing-adapter.fsproj"/>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="OpenCode/Host/PluginHostInterop.fsi"/>
+        <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-projection-queries.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.guidance-delivery.opencode-host-pairprogrammingcalibration.fsproj"/>
+<Compile Include="OpenCode/Host/PluginHostInterop.fsi"/>
     <Compile Include="OpenCode/Host/PluginHostInterop.fs"/>
     <Compile Include="OpenCode/Host/PluginHooksSurface.fsi"/>
     <Compile Include="OpenCode/Host/PluginHooksSurface.fs"/>

@@ -34,7 +34,9 @@
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.participant-persona.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.opencode-host-sessionbindingsurface.fsproj"/>
-    <Compile Include="OpenCode/Tools/ToolRuntimeScope.fsi"/>
+        <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-projection-queries.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-tool-adapter.fsproj"/>
+<Compile Include="OpenCode/Tools/ToolRuntimeScope.fsi"/>
     <Compile Include="OpenCode/Tools/ToolRuntimeScope.fs"/>
   </ItemGroup>
 </Project>

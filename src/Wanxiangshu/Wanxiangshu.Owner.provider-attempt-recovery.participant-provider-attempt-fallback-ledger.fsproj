@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <WanxiangshuSubsystem>provider</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>chat-execution</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>participant-provider-attempt-fallback-ledger</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>provider-attempt-recovery</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>participant-provider-attempt-fallback-ledger</WanxiangshuOwnerLocality>

@@ -1,20 +1,24 @@
 namespace Wanxiangshu.Interaction.Authority
 
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation.Identity
 
+/// Prompt Authority folds (docs/what/prompt.md).
+///
+/// Each fold takes the fact payload directly.
 module PromptAuthorityLedger =
     val empty: PromptAuthority.PromptAuthorityProjection
 
+    /// Fold an AuthorityRootAccepted payload.
     val foldAuthorityRootAccepted:
         projection: PromptAuthority.PromptAuthorityProjection ->
         payload: AuthorityRootAcceptedPayload ->
             Result<PromptAuthority.PromptAuthorityProjection, string>
 
+    /// Complete a human manager after the road.
     val closeCompletedHumanRootManager:
         projection: PromptAuthority.PromptAuthorityProjection -> PromptAuthority.PromptAuthorityProjection
 
+    /// PROMPT-005 `Claimed`.
     val foldPromptClaimed:
         runtimeStartCount: int ->
         projection: PromptAuthority.PromptAuthorityProjection ->
@@ -28,6 +32,7 @@ module PromptAuthorityLedger =
                PayloadDigest: string |} ->
             PromptAuthority.PromptAuthorityProjection
 
+    /// PROMPT-005 `Submitted`: the Host call returned a transport receipt.
     val foldPromptSubmitted:
         projection: PromptAuthority.PromptAuthorityProjection ->
         fact:
@@ -36,6 +41,7 @@ module PromptAuthorityLedger =
                Receipt: TransportReceipt |} ->
             PromptAuthority.PromptAuthorityProjection
 
+    /// PROMPT-005 `PhysicalAccepted`: a real physical message resolved the claim.
     val foldPromptPhysicalAccepted:
         projection: PromptAuthority.PromptAuthorityProjection ->
         fact:
@@ -44,6 +50,7 @@ module PromptAuthorityLedger =
                PhysicalUserMessageId: PhysicalUserMessageId |} ->
             PromptAuthority.PromptAuthorityProjection
 
+    /// PROMPT-005 `Abandoned`. Must not change the Active Logical Run.
     val foldPromptAbandoned:
         projection: PromptAuthority.PromptAuthorityProjection ->
         fact:
@@ -51,45 +58,3 @@ module PromptAuthorityLedger =
                SessionId: SessionId
                Reason: PromptAbandonReason |} ->
             PromptAuthority.PromptAuthorityProjection
-
-    val projectionFor:
-        sessionId: SessionId -> agentProjections: AgentProjectionSet -> PromptAuthority.PromptAuthorityProjection option
-
-    val activeProfile:
-        sessionId: SessionId -> agentProjections: AgentProjectionSet -> PromptAuthority.AuthorityExecutionProfile option
-
-    val lastAuthorityProfile:
-        sessionId: SessionId -> agentProjections: AgentProjectionSet -> PromptAuthority.AuthorityExecutionProfile option
-
-    val pendingClaim:
-        sessionId: SessionId ->
-        promptKey: PromptKey ->
-        agentProjections: AgentProjectionSet ->
-            PromptAuthority.PromptClaim option
-
-    [<RequireQualifiedAccess>]
-    type DispatchStatus =
-        | Accepted of evidence: PromptAuthority.AcceptedDispatch
-        | Pending
-        | Dispatchable
-
-    val pendingDispatchClaim:
-        sessionId: SessionId ->
-        payloadDigest: string ->
-        agentProjections: AgentProjectionSet ->
-            PromptAuthority.PromptClaim option
-
-    val acceptedDispatchForPhysicalMessage:
-        sessionId: SessionId ->
-        physicalUserMessageId: PhysicalUserMessageId ->
-        agentProjections: AgentProjectionSet ->
-            PromptAuthority.AcceptedDispatch option
-
-    val dispatchStatusFor:
-        sessionId: SessionId -> payloadDigest: string -> agentProjections: AgentProjectionSet -> DispatchStatus
-
-    val issueCurrentOwnerIdentitySeed:
-        agentProjections: AgentProjectionSet ->
-        ownerSessionId: SessionId ->
-        childAgent: string ->
-            Result<PromptAuthority.IdentitySeed, string>

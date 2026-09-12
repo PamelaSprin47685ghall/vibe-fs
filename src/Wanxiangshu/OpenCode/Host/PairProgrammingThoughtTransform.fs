@@ -780,8 +780,8 @@ module PairProgrammingThoughtTransform =
         |> Option.bind (fun durable ->
             let projections = (AgentJournal.snapshot durable).AgentProjections
 
-            PromptAuthorityLedger.activeProfile sessionId projections
-            |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile sessionId projections)
+            PromptAuthorityProjectionQueries.activeProfile sessionId projections
+            |> Option.orElseWith (fun () -> PromptAuthorityProjectionQueries.lastAuthorityProfile sessionId projections)
             |> Option.map (fun profile -> profile.CanonicalRole)
             |> Option.orElseWith (fun () ->
                 projections.HandleByChildSession

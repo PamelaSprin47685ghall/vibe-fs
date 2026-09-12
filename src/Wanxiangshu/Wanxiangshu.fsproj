@@ -221,6 +221,8 @@
     <Compile Include="Execution/Session/ChatExecution/Facts.fs"/>
     <Compile Include="Execution/Failure/Model.fsi"/>
     <Compile Include="Execution/Failure/Model.fs"/>
+    <Compile Include="Execution/Failure/Decision.fsi"/>
+    <Compile Include="Execution/Failure/Decision.fs"/>
     <Compile Include="Execution/Failure/Policy.fsi"/>
     <Compile Include="Execution/Failure/Policy.fs"/>
     <Compile Include="Execution/Failure/Surface.fsi"/>
@@ -565,6 +567,8 @@
     <Compile Include="Execution/Session/RecoveryClosureProjection.fs"/>
     <Compile Include="Interaction/Authority/Ledger.fsi"/>
     <Compile Include="Interaction/Authority/Ledger.fs"/>
+    <Compile Include="Interaction/Authority/ProjectionQueries.fsi"/>
+    <Compile Include="Interaction/Authority/ProjectionQueries.fs"/>
     <Compile Include="Persistence/Journal/Writer.fsi"/>
     <Compile Include="Persistence/Journal/Writer.fs"/>
     <Compile Include="Composition/Durable/ProjectionState.fsi"/>
@@ -1360,8 +1364,10 @@
     <Compile Include="Repository/Programming/Js/OpenCode/ToolHost.fs"/>
     <Compile Include="OpenCode/Host/WorkspaceEventStore.fsi"/>
     <Compile Include="OpenCode/Host/WorkspaceEventStore.fs"/>
-    <Compile Include="OpenCode/Host/WorkspaceEventStoreSurface.fsi"/>
-    <Compile Include="OpenCode/Host/WorkspaceEventStoreSurface.fs"/>
+    <Compile Include="Persistence/Journal/Surface.fsi"/>
+    <Compile Include="Persistence/Journal/Surface.fs"/>
+    <Compile Include="OpenCode/Host/WorkspaceSharedJournal.fsi"/>
+    <Compile Include="OpenCode/Host/WorkspaceSharedJournal.fs"/>
     <Compile Include="Sphinx/GenericDurability.fsi"/>
     <Compile Include="Sphinx/GenericDurability.fs"/>
     <Compile Include="Sphinx/McpServer.fsi"/>
@@ -1386,8 +1392,6 @@
     <Compile Include="OpenCode/Tools/FileToolsSurface.fs"/>
     <Compile Include="OpenCode/Tools/FileMutationSurface.fsi"/>
     <Compile Include="OpenCode/Tools/FileMutationSurface.fs"/>
-    <Compile Include="Persistence/Journal/Surface.fsi"/>
-    <Compile Include="Persistence/Journal/Surface.fs"/>
     <Compile Include="OpenCode/Host/SessionRecoveryHostSurface.fsi"/>
     <Compile Include="OpenCode/Host/SessionRecoveryHostSurface.fs"/>
     <Compile Include="Execution/Session/ChatExecution/StatusSurface.fsi"/>

@@ -95,7 +95,7 @@ module RelayNarrativeTransform =
         let gateKind = ManagerLoopGate.gateKind retirement.Id
         let terminalRun = ProviderRunIdentity.create retirement.ProjectionCut.ProviderRunId
 
-        PromptAuthorityLedger.activeProfile sessionId (AgentJournal.snapshot journal).AgentProjections
+        PromptAuthorityProjectionQueries.activeProfile sessionId (AgentJournal.snapshot journal).AgentProjections
         |> Option.exists (fun profile ->
             (PromptDispatcher.forJournal journal).GateNudgeAlreadyAdmitted
                 profile

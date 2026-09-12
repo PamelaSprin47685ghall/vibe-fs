@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Execution.Failure
 
-open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider.Attempt
 
@@ -58,24 +57,17 @@ type ProviderRecoveryFacts =
       RetryBudget: ProviderRecoveryBudget
       Breaker: ProviderBreakerState }
 
-type ExecutionFailureInput =
-    { Failure: ExecutionFailure
-      Lifecycle: DurableExecutionLifecycle
-      ExecutionKey: ChatExecutionKey
-      Capacity: CapacityOwnership
-      Provider: ProviderRecoveryFacts }
-
 [<Sealed>]
 type ProviderRecoveryDecisionId =
-    member Value: string
+    member internal Value: string
     static member internal Create: value: string -> ProviderRecoveryDecisionId
 
 [<Sealed>]
 type ProviderRecoveryAuthorization =
-    member DecisionId: ProviderRecoveryDecisionId
-    member LogicalRun: LogicalRunId
-    member ProviderRun: ProviderRunIdentity
-    member RequestKind: ProviderRequestKind
+    member internal DecisionId: ProviderRecoveryDecisionId
+    member internal LogicalRun: LogicalRunId
+    member internal ProviderRun: ProviderRunIdentity
+    member internal RequestKind: ProviderRequestKind
 
     static member internal Create:
         decisionId: ProviderRecoveryDecisionId *
@@ -97,20 +89,6 @@ type CapacitySettlement =
     | ReleaseExactFence of ExactCapacityFenceReference
 
 [<RequireQualifiedAccess>]
-type ExecutionFailureResolution =
-    | PreserveCurrentFact
-    | AwaitAcceptanceReconciliation of ChatExecutionKey
-    | RetryFreshAttempt of ProviderRecoveryAuthorization
-    | TerminalizeAcceptedPreProvider of ChatExecutionKey * ChatExecutionTerminalDisposition
-    | TerminalizeProviderStarted of ChatExecutionKey * ChatExecutionTerminalDisposition
-
-[<RequireQualifiedAccess>]
 type FatalityDecision =
     | NoFatality
     | FatalAfterSettlement
-
-type ExecutionFailureDecision =
-    { Resolution: ExecutionFailureResolution
-      Breaker: BreakerDecision
-      CapacitySettlement: CapacitySettlement
-      Fatality: FatalityDecision }

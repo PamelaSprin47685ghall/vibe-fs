@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>interaction</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>mission-relay-suicidetool</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>relay-retirement</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>mission-relay-suicidetool</WanxiangshuOwnerLocality>

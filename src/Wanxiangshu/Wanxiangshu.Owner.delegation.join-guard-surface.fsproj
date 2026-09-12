@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>delegation</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>join-guard-surface</WanxiangshuCompileShard>
   </PropertyGroup>
   <ItemGroup>

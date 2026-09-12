@@ -37,7 +37,7 @@ module BloggerRecoveryProbe =
             |> Option.bind (BloggerCycleProjection.tryOpenByBlogger bloggerSessionId)
 
         let parent =
-            PromptAuthorityLedger.acceptedDispatchForPhysicalMessage bloggerSessionId physicalUserMessageId projections
+            PromptAuthorityProjectionQueries.acceptedDispatchForPhysicalMessage bloggerSessionId physicalUserMessageId projections
             |> Option.map (fun dispatch ->
                 { PromptKey = dispatch.PromptKey
                   IsRequestScopedRepair =
@@ -99,8 +99,8 @@ module BloggerRecoveryProbe =
         let projections = (AgentJournal.snapshot journal).AgentProjections
 
         match
-            PromptAuthorityLedger.activeProfile bloggerSessionId projections,
-            PromptAuthorityLedger.projectionFor bloggerSessionId projections
+            PromptAuthorityProjectionQueries.activeProfile bloggerSessionId projections,
+            PromptAuthorityProjectionQueries.projectionFor bloggerSessionId projections
         with
         | Some profile, Some authProj ->
             PromptAuthority.repairAlreadyClaimed
@@ -125,10 +125,10 @@ module BloggerRecoveryProbe =
         let payloadDigest =
             PromptAuthority.repairPayloadDigest requestId terminalRun repairKind
 
-        match PromptAuthorityLedger.dispatchStatusFor bloggerSessionId payloadDigest projections with
-        | PromptAuthorityLedger.DispatchStatus.Dispatchable -> false
-        | PromptAuthorityLedger.DispatchStatus.Pending
-        | PromptAuthorityLedger.DispatchStatus.Accepted _ -> true
+        match PromptAuthorityProjectionQueries.dispatchStatusFor bloggerSessionId payloadDigest projections with
+        | PromptAuthorityProjectionQueries.DispatchStatus.Dispatchable -> false
+        | PromptAuthorityProjectionQueries.DispatchStatus.Pending
+        | PromptAuthorityProjectionQueries.DispatchStatus.Accepted _ -> true
 
     let repairIssuedForKind
         (journal: AgentJournal)

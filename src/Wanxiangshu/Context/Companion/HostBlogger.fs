@@ -112,7 +112,7 @@ module internal CompanionHostBlogger =
         : Task<Result<PromptKey, string>> =
         task {
             match
-                PromptAuthorityLedger.issueCurrentOwnerIdentitySeed
+                PromptAuthorityProjectionQueries.issueCurrentOwnerIdentitySeed
                     (AgentJournal.snapshot journal).AgentProjections
                     deps.PrimaryId
                     deps.Participant

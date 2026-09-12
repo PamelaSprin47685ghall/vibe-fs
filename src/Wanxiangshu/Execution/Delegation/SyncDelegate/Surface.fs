@@ -792,7 +792,7 @@ module SyncDelegateSurface =
         }
 
     let private activeAuthorityRoot (harness: Harness) (child: SessionId) =
-        PromptAuthorityLedger.activeProfile child (AgentJournal.snapshot harness.Journal).AgentProjections
+        PromptAuthorityProjectionQueries.activeProfile child (AgentJournal.snapshot harness.Journal).AgentProjections
         |> Option.map (fun profile -> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
 
     let private settleReadyChild

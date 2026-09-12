@@ -3,13 +3,11 @@ namespace Wanxiangshu.Repository.Knowledge.Casebook
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Persistence.Journal
 
 /// CASE-003/010: process-local Casebook session wiring — draft Q/A turns,
 /// observation drain, graceful finalize vs unexpected cleanup. Publication
-/// goes only through WorkspaceEventStore (unified store); never AgentJournal.
+/// goes through the injected IEventStore; never global state.
 module CasebookLifecycle =
 
     /// Process-local singleton the plugin feeds; lifecycle drains it.
@@ -45,6 +43,7 @@ module CasebookLifecycle =
         collector.Drain inspectorSessionId |> ignore
 
     let private runFinalize
+        (store: IEventStore)
         (workspaceRoot: string)
         (inspectorSessionId: string)
         (draft: CasebookDraft)
@@ -52,8 +51,6 @@ module CasebookLifecycle =
         : Task<Result<unit, string>> =
         taskResult {
             try
-                let commonDir = RuntimePath.gitCommonDir workspaceRoot
-                let store = WorkspaceEventStore.acquire commonDir
                 let observations = collector.Drain inspectorSessionId
 
                 let lastQ =
@@ -90,6 +87,7 @@ module CasebookLifecycle =
         }
 
     let private finalizeWithDraft
+        (store: IEventStore)
         (workspaceRoot: string)
         (inspectorSessionId: string)
         (draft: CasebookDraft)
@@ -100,10 +98,14 @@ module CasebookLifecycle =
             | None ->
                 collector.Drain inspectorSessionId |> ignore
                 return Ok()
-            | Some a -> return! runFinalize workspaceRoot inspectorSessionId draft a
+            | Some a -> return! runFinalize store workspaceRoot inspectorSessionId draft a
         }
 
-    let private finalizeIfDrafted (workspaceRoot: string) (inspectorSessionId: string) : Task<Result<unit, string>> =
+    let private finalizeIfDrafted
+        (store: IEventStore)
+        (workspaceRoot: string)
+        (inspectorSessionId: string)
+        : Task<Result<unit, string>> =
         task {
             match CasebookDraftStore.tryTake inspectorSessionId with
             | None ->
@@ -111,16 +113,20 @@ module CasebookLifecycle =
                 return Ok()
             | Some draft ->
                 let lastAnswer = draft.Turns |> List.rev |> List.tryPick (fun turn -> turn.A)
-                return! finalizeWithDraft workspaceRoot inspectorSessionId draft lastAnswer
+                return! finalizeWithDraft store workspaceRoot inspectorSessionId draft lastAnswer
         }
 
     /// Graceful owner scope close: if draft has Q+A, drain observations, run
     /// exactly one CaseFinalize child session with the full turn transcript,
     /// then finalizeCase once. Unexpected cleanup never runs Bookkeeper.
-    let tryFinalizeInspector (workspaceRoot: string) (inspectorSessionId: string) : Task<Result<unit, string>> =
+    let tryFinalizeInspector
+        (workspaceRoot: string)
+        (store: IEventStore)
+        (inspectorSessionId: string)
+        : Task<Result<unit, string>> =
         task {
             if CasebookFeature.isEnabled workspaceRoot then
-                return! finalizeIfDrafted workspaceRoot inspectorSessionId
+                return! finalizeIfDrafted store workspaceRoot inspectorSessionId
             else
                 cleanupInspector inspectorSessionId
                 return Ok()
@@ -136,11 +142,9 @@ module CasebookLifecycle =
             | Error _ -> return ()
         }
 
-    let private touchAccessEnabled (workspaceRoot: string) (sessionId: string) : Task<unit> =
+    let private touchAccessEnabled (store: IEventStore) (sessionId: string) : Task<unit> =
         task {
             try
-                let commonDir = RuntimePath.gitCommonDir workspaceRoot
-                let store = WorkspaceEventStore.acquire commonDir
                 let! touched = CasebookWorkflow.touchCaseAccess store sessionId
                 do! refreshWhenTouched store touched
             with _ ->
@@ -148,8 +152,8 @@ module CasebookLifecycle =
         }
 
     /// Fresh fetch side-effect: append InspectorCaseAccessed (ignore errors).
-    let touchAccess (workspaceRoot: string) (sessionId: string) : Task<unit> =
+    let touchAccess (workspaceRoot: string) (store: IEventStore) (sessionId: string) : Task<unit> =
         task {
             if CasebookFeature.isEnabled workspaceRoot then
-                do! touchAccessEnabled workspaceRoot sessionId
+                do! touchAccessEnabled store sessionId
         }

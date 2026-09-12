@@ -14,7 +14,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-event-envelope.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.loop-event-codec.fsproj"/>
-    <Compile Include="OpenCode/Codec/HostEventCodec.fsi"/>
+        <ProjectReference Include="Wanxiangshu.Owner.action-affordance.persistence-runtime-path.fsproj"/>
+<Compile Include="OpenCode/Codec/HostEventCodec.fsi"/>
     <Compile Include="OpenCode/Codec/HostEventCodec.fs"/>
     <Compile Include="OpenCode/Signals/HostSignal.fsi"/>
     <Compile Include="OpenCode/Signals/HostSignal.fs"/>

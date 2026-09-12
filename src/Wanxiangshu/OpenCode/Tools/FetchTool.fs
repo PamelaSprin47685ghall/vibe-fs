@@ -62,13 +62,13 @@ module FetchTool =
     let private unavailable language =
         ToolHostCodec.tomlObjectWithInstructions [ prose language Path.Unavailable ] []
 
-    let private evaluateUpdatedFreshness language workspaceRoot sessionId (updated: Case) =
+    let private evaluateUpdatedFreshness language workspaceRoot store sessionId (updated: Case) =
         task {
             let again = CasebookReplay.replayAll workspaceRoot updated.Observations
 
             match CasebookWorkflow.checkFreshness updated again with
             | ReplayResult.Fresh ->
-                do! CasebookLifecycle.touchAccess workspaceRoot sessionId
+                do! CasebookLifecycle.touchAccess workspaceRoot store sessionId
                 return refreshed language updated.A
             | ReplayResult.Stale -> return stale language updated.A
         }
@@ -78,7 +78,7 @@ module FetchTool =
             match! CasebookWorkflow.fetchCase store 256 sessionId with
             | Error _
             | Ok None -> return stale language fallbackAnswer
-            | Ok(Some updated) -> return! evaluateUpdatedFreshness language workspaceRoot sessionId updated
+            | Ok(Some updated) -> return! evaluateUpdatedFreshness language workspaceRoot store sessionId updated
         }
 
     let private handleStaleCase language workspaceRoot store sessionId answer =
@@ -96,7 +96,7 @@ module FetchTool =
 
             match CasebookWorkflow.checkFreshness case replayed with
             | ReplayResult.Fresh ->
-                do! CasebookLifecycle.touchAccess workspaceRoot sessionId
+                do! CasebookLifecycle.touchAccess workspaceRoot store sessionId
                 return fresh language case.A
             | ReplayResult.Stale -> return! handleStaleCase language workspaceRoot store sessionId case.A
         }

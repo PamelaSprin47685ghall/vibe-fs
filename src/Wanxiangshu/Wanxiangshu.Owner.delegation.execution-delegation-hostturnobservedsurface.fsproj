@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>delegation</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>execution-delegation-hostturnobservedsurface</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>delegation</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>execution-delegation-hostturnobservedsurface</WanxiangshuOwnerLocality>

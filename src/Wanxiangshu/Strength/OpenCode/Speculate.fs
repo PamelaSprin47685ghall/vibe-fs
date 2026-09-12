@@ -712,7 +712,7 @@ module StrengthSpeculate =
             let target = ProviderRunIdentity.create assistant.Id
             let projections = AgentJournal.snapshot ports.Durable
 
-            match PromptAuthorityLedger.activeProfile owner projections.AgentProjections with
+            match PromptAuthorityProjectionQueries.activeProfile owner projections.AgentProjections with
             | None -> return ()
             | Some authority ->
                 return!

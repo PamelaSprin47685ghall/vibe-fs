@@ -17,6 +17,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-diagnostics-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-sessionquiescencegate.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-prompt-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-identityseed.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.opencode-host-chatadmission-intent.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>

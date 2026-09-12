@@ -16,7 +16,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.prefix-stability.context-prefix-candidate.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-assessment.mission-relay-workspace-snapshot.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.relay-retirement.mission-relay-suicidetool.fsproj"/>
+
     <Compile Include="Persistence/Journal/ObligationJournalSurface.fsi"/>
     <Compile Include="Persistence/Journal/ObligationJournalSurface.fs"/>
   </ItemGroup>
