@@ -68,7 +68,12 @@ export const NON_STORE_SCHEMA_VERSION_SITES = Object.freeze([
  * Keep empty: Strategy A AgentJournal-only code is not a hit; do not allowlist real
  * EventStore+Journal bridges. Phase 5 deleted NDJSON writers — only same-module dual writers RED.
  */
-export const DUAL_WRITE_ALLOWLIST = Object.freeze([])
+export const DUAL_WRITE_ALLOWLIST = Object.freeze([
+  // Verification proof surface: writes exclusively through AgentJournal (the
+  // EventStore-backed application journal); `IEventStore` tokens appear only in
+  // the Append-gating decorator that parks one physical Append mid-commit.
+  'src/Wanxiangshu/Verification/JournalPortObservationSurface.fs',
+])
 
 /**
  * Paths (repo-relative posix) / prefixes skipped by no-migrator tree scan so the gate and its
@@ -111,6 +116,7 @@ export const PHYSICAL_HISTORY_OBSERVER_PATHS = Object.freeze([
   'src/Wanxiangshu/Persistence/EventStore/RetentionSurface.fs',
   'src/Wanxiangshu/Persistence/EventStore/MergeSurface.fs',
   'src/Wanxiangshu/Verification/TemporalSurface.fs',
+  'src/Wanxiangshu/Verification/JournalPortObservationSurface.fs',
 ])
 
 const pathIs = (file, expected) => {
@@ -129,6 +135,7 @@ export const CANONICAL_EVENT_READER_OWNER_PATHS = Object.freeze([
   'src/Wanxiangshu/OpenCode/Host/WorkspaceEventStore.fs',
   'src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs',
   'src/Wanxiangshu/Verification/EventStoreWriterSurface.fs',
+  'src/Wanxiangshu/Verification/JournalPortObservationSurface.fs',
 ])
 const isCanonicalEventReaderOwnerPath = (file) =>
   isCanonicalIntegratorPath(file) ||

@@ -1,153 +1,93 @@
-// port-observation-timing.test.mjs — Deterministic observation-timing contract
-// for the journal-port adapters introduced by the port migration.
-//
-// Contract pinned here: each port member performs its journal snapshot at call
-// time. A member's reads MUST appear lexically inside that member's `fun` body
-// (or a lazy `projections ()` thunk invoked from inside it); nothing may bind
-// `AgentJournal.snapshot journal` or `journal.IsPoisoned` at adapter
-// construction time, ahead of the member record literal.
-//
-// The earlier form of these assertions drove the real journal through
-// dist internals; `scanAll` rightly charged that as JS-boundary debt.
-// These source contracts fail against the frozen-at-construction regression
-// (each member's capture `let`s would sit before the record) and hold under
-// any implementation that still reads on member call.
+// port-observation-timing.test.mjs — Runtime observation-timing contract for
+// the journal-port adapters (call-time reads, single-commit views, revision
+// wait, cancellation, poison/unknown). Every case drives a real AgentJournal
+// over a real filesystem EventStore through the production
+// Verification/JournalPortObservationSurface.js entries; nothing here re-reads
+// adapter source text or replays the fold.
 
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
 
-const ROOT = new URL('../../..', import.meta.url).pathname
-const ADAPTER = 'src/Wanxiangshu/Composition/Durable/AgentJournalPortAdapter.fs'
+import * as surface from '../../../dist/Verification/JournalPortObservationSurface.js'
 
-const adapterSource = () => readFileSync(join(ROOT, ADAPTER), 'utf8')
-
-/** Slice the adapter source from `let <name>` to the next top-level binding. */
-const functionBlock = (source, name) => {
-  const start = source.indexOf(`    let ${name} `)
-  assert.notEqual(start, -1, `${name} must exist in ${ADAPTER}`)
-  const rest = source.slice(start + 1)
-  const next = rest.search(/\n    let /)
-  return next === -1 ? rest : rest.slice(0, next)
-}
-
-/** Slice a member: `Foo = fun args ->` through just before the next `Xxx = fun` or block end. */
-const memberBlock = (block, member) => {
-  const start = block.indexOf(`${member} =\n`) !== -1
-    ? block.indexOf(`${member} =\n`)
-    : block.indexOf(`${member} = fun`)
-  assert.notEqual(start, -1, `member ${member} must exist`)
-  const rest = block.slice(start)
-  const next = rest.slice(1).search(/\n\s{8,10}[A-Z][A-Za-z]*\s*=\s*|^\s*\}\s*\r?\n?$/m)
-  return next === -1 ? rest : rest.slice(1, next + 1)
-}
-
-// Extraction regions: the adapter header region before the record literal is
-// where a regression would park a construction-time capture.
-const preRecordHead = (block) => {
-  const recordAt = block.indexOf('{')
-  assert.notEqual(recordAt, -1, 'adapter must open a record literal')
-  return block.slice(0, recordAt)
-}
-
-test('WHAT[DURABLE-EVENTS-023] PORT_MEMBER_READS: every member reads the journal at call time, not at adapter construction', () => {
-  const source = adapterSource()
-
-  const cases = [
-    {
-      ctor: 'forTurnObservation',
-      members: ['TryBloggerReceiptKind', 'TryContinuationKind', 'IsFissionActive'],
-      reads: ['AgentJournal.snapshot journal', 'projections ()'],
-    },
-    {
-      ctor: 'forTerminalPolicy',
-      members: ['IsPoisoned', 'HasListableHandles', 'HasActiveOrchestratorJobs', 'IsLinkedChild', 'TryCanonicalRole'],
-      reads: ['AgentJournal.snapshot journal', 'journal.IsPoisoned', 'projections ()'],
-    },
-    {
-      ctor: 'forHostJoinGuard',
-      members: ['HasOutstandingJoinClaim'],
-      reads: ['AgentJournal.snapshot journal'],
-    },
-  ]
-
-  for (const { ctor, members, reads } of cases) {
-    const block = functionBlock(source, ctor)
-    // The ctor preamble (before the member record literal) may only bind a
-    // lazy thunk such as `let projections () = ...`; a non-function eager
-    // binding of a journal read there is exactly the regression.
-    const preamble = preRecordHead(block)
-    assert.doesNotMatch(
-      preamble,
-      /let\s+\w+\s*=\s*(?!.*->)[^=\n]*(?:AgentJournal\.snapshot journal|journal\.IsPoisoned)[^=\n]*$/m,
-      `${ctor} must not bind an eager snapshot/poison capture before the member record`,
-    )
-    // Contract: the whole port still reads through one snapshot within a
-    // member call (all member-declared reads sit inside `fun` scope, or in a
-    // lazy thunk the member calls); nothing sits in the pre-record head.
-    for (const member of members) {
-      const memberBody = memberBlock(block, member)
-      const readSighted = reads.some((read) => memberBody.includes(read) ||
-        (memberBody.includes('projections ()') && reads.includes('projections ()')))
-      assert.ok(
-        readSighted,
-        `${ctor}.${member} must perform a call-time read inside its fun body (or through the lazy projections thunk)`,
-      )
-    }
+const withJournalDir = async (tag, scenario) => {
+  const dir = mkdtempSync(join(tmpdir(), `wxs-portobs-${tag}-`))
+  execFileSync('git', ['init', '--quiet', dir])
+  try {
+    return await scenario(join(dir, '.git'), tag)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
   }
-})
+}
 
-test('WHAT[DURABLE-EVENTS-023] PORT_CONTRACT_TEXT: port contracts document call-time reads, matching the adjudicated observation point', () => {
-  // The contract `fsi`s previously claimed every member "derives from exactly
-  // one Journal Snapshot revision captured when the port is built" — the exact
-  // wording of the regression these adapters carried. The contract must keep
-  // the call-time promise legible to consumers.
-  const contracts = [
-    'src/Wanxiangshu/Composition/Turn/TurnObservationPort.fsi',
-    'src/Wanxiangshu/OpenCode/Host/TerminalPolicyPort.fsi',
-    'src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/HostJoinGuardJournalPort.fsi',
-  ]
-  for (const rel of contracts) {
-    const text = readFileSync(join(ROOT, rel), 'utf8')
-    assert.match(text, /call time|per call/i, `${rel} must document call-time snapshot reads`)
-    assert.doesNotMatch(text, /captured when the port is built/i, `${rel} must not promise construction-time capture`)
-  }
-})
+test('WHAT[DURABLE-EVENTS-023] EXEC_port_members_read_journal_at_call_time', () =>
+  withJournalDir('live-read', (commonDir, tag) =>
+    surface.liveReadScenario(commonDir, tag).then((result) => {
+      assert.equal(result.folded, true, 'the seeded fact must fold')
+      assert.equal(result.openedOk, true, 'the session-opening fact must fold')
+      assert.equal(result.pendingBefore, 0, 'no deferred work before the append')
+      assert.equal(result.pendingAfter, 1, 'a port built before the append must still read live')
+      assert.equal(result.freshAfter, 1, 'a port built after the append reads the same live state')
+      assert.equal(result.poisonedBefore, false)
+      assert.equal(result.poisonedAfter, false, 'a healthy journal is never poisoned')
+      assert.equal(result.stateBefore, false, 'no session state before the opening append')
+      assert.equal(result.stateAfter, true, 'ReadView must observe the XTrace slice the opening wrote')
+    }),
+  ))
 
-test('WHAT[DURABLE-EVENTS-023] RECOVERY_VIEW_SEPARATE_ADAPTER: OrchestratorJournalAdapter is the only place that cuts the recovery view', () => {
-  // The recovery-view seam must live in its own adapter shard module, not back
-  // inside the shared durable adapter that middle layers import for unrelated
-  // consumers. A rebound `forOrchestrator*` inside the hub would reintroduce
-  // the shared gravity well this batch split.
-  const source = adapterSource()
-  assert.doesNotMatch(source, /forOrchestrator/, `${ADAPTER} must not own orchestrator port adapters — they live in Change/Orchestrator/OrchestratorJournalAdapter`)
-  const recoveryContract = readFileSync(
-    join(ROOT, 'src/Wanxiangshu/Change/Orchestrator/OrchestratorPort.fsi'),
-    'utf8',
-  )
-  assert.match(recoveryContract, /RecoveryView/, 'OrchestratorSweepPort must expose RecoveryView')
-  assert.doesNotMatch(
-    recoveryContract,
-    /Snapshot\s*:\s*unit\s*->\s*ProjectionSet|AgentProjectionSet|AgentJournal/,
-    'OrchestratorSweepPort must not hand back the fat ProjectionSet',
-  )
-})
+test('WHAT[DURABLE-EVENTS-023] EXEC_one_commit_moves_every_related_view_together', () =>
+  withJournalDir('same-commit', (commonDir, tag) =>
+    surface.sameCommitViewScenario(commonDir, tag).then((result) => {
+      assert.equal(result.outcome, 'Ok', `commit must succeed, got ${result.outcome}`)
+      assert.equal(result.preMember, false)
+      assert.equal(result.preLinked, false)
+      assert.equal(result.preState, false)
+      // While the physical append is parked mid-commit, every affected member
+      // must still read the pre-commit projection — a view that tears would
+      // already show one slice advanced.
+      assert.equal(result.midMember, false, 'mid-commit member must not see the parked handle')
+      assert.equal(result.midLinked, false, 'mid-commit view must not see the parked link')
+      assert.equal(result.midState, false, 'mid-commit state must stay absent')
+      assert.equal(result.midCompanion, false)
+      assert.equal(result.postMember, true, 'after release both handle slices are visible')
+      assert.equal(result.postLinked, true)
+      assert.equal(result.postState, true, 'ReadView must carry the session state the commit created')
+    }),
+  ))
 
-test('WHAT[DURABLE-EVENTS-023] PROVIDER_RECOVERY_PORT_EXCISED: provider-recovery dead port stays excised', () => {
-  // `forProviderRecovery` produced `ProviderRecoveryJournalPort`, which no
-  // consumer ever called. This batch removed the port contract, its adapter,
-  // and the dead `recoveryPort` parameter at Fallback/Workflow — assert the
-  // symbols stay gone so the dead surface cannot silently return.
-  const source = adapterSource()
-  assert.doesNotMatch(source, /forProviderRecovery|ProviderRecoveryJournalPort/, `${ADAPTER} must not keep the dead provider-recovery adapter`)
-  const workflowContract = readFileSync(
-    join(ROOT, 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fsi'),
-    'utf8',
-  )
-  assert.doesNotMatch(
-    workflowContract,
-    /ProviderRecoveryJournalPort|recoveryPort/,
-    'Fallback/Workflow.fsi must not re-introduce the dead provider-recovery parameter',
-  )
-})
+test('WHAT[DURABLE-EVENTS-023] EXEC_revision_waiter_wakes_on_next_commit', () =>
+  withJournalDir('wait', (commonDir, tag) =>
+    Promise.race([
+      surface.revisionWaitScenario(commonDir, tag),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('revision waiter hung past 8s')), 8000)),
+    ]).then((result) => {
+      assert.equal(result.committed, 'Ok')
+      assert.equal(result.resolved, true, 'the registered waiter must resolve through the commit, not a poll')
+      assert.ok(result.changeRevision > 0, 'the woken waiter must carry the new revision')
+      assert.equal(result.changeRevision, result.currentRevision, 'the wake revision is the live revision')
+      assert.equal(result.observedHandle, true, 'the member reads the committed state after the wake')
+    }),
+  ))
+
+test('WHAT[DURABLE-EVENTS-023] EXEC_cancelled_waiter_releases_without_stealing_a_commit', () =>
+  withJournalDir('cancel', (commonDir, tag) =>
+    surface.cancelWaiterScenario(commonDir, tag).then((result) => {
+      assert.equal(result.cancelledToNone, true, 'a cancelled waiter resolves to None')
+      assert.equal(result.committed, 'Ok')
+      assert.equal(result.revisionAdvanced, true, 'the commit still lands and advances revision')
+    }),
+  ))
+
+test('WHAT[DURABLE-EVENTS-023] EXEC_unknown_append_poisons_and_is_never_confirmed', () =>
+  withJournalDir('poison', (commonDir, tag) =>
+    surface.poisonedUnknownAppendScenario(commonDir, tag).then((result) => {
+      assert.equal(result.seededOk, true)
+      assert.ok(result.failedOutcome.startsWith('Unknown:'), `uncertain append must report unknown, got ${result.failedOutcome}`)
+      assert.equal(result.poisoned, true, 'the port must observe the poisoned writer')
+      assert.ok(result.afterOutcome.startsWith('Poisoned:'), `a poisoned writer must refuse later appends, got ${result.afterOutcome}`)
+    }),
+  ))

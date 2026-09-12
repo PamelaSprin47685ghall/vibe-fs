@@ -1738,6 +1738,15 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
+    module: 'Verification/JournalPortObservationSurface.js',
+    owner: 'verification-system',
+    laws: ['DURABLE-EVENTS-023'],
+    lawOwners: { 'DURABLE-EVENTS-023': 'durable-events' },
+    source: 'src/Wanxiangshu/Verification/JournalPortObservationSurface.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
     module: 'Mission/Relay/Surface.js',
     owner: 'relay-incumbency',
     laws: ['RELAY-001', 'RELAY-005', 'RELAY-006', 'RELAY-008', 'RELAY-009', 'RETIRE-007'],

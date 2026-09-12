@@ -192,8 +192,10 @@ export const HOST_BOUNDARY_OPEN_PATHS = new Set([
   'src/Wanxiangshu/Strength/Surface.fs',
   'src/Wanxiangshu/Verification/TemporalSurface.fs',
   'src/Wanxiangshu/Strength/TurnEvidence.fs',
+  // DURABLE-EVENTS-023 proof surface — reads TerminalPolicyPort / WireJournalPort
+  // types to exercise the production port adapters through real journal commits.
+  'src/Wanxiangshu/Verification/JournalPortObservationSurface.fs',
 ])
-
 export const isHostBoundaryOpenPath = (file) => {
   const normalized = norm(String(file))
   return [...HOST_BOUNDARY_OPEN_PATHS].some((path) => normalized === path || normalized.endsWith(`/${path}`))
@@ -310,7 +312,6 @@ export const NARROW_PHASE_EXEMPTIONS = new Map([
     },
   ],
 ])
-
 /**
  * Duplicate DU case-set exemptions (exact file paths, never basename).
  * Each entry maps `file:DU` to a reason or migration note.

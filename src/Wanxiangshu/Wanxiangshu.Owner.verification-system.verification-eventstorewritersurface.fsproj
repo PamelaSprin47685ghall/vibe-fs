@@ -34,9 +34,17 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.foundation-temporal-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.time-capability.process-virtual-timing.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.durable-journal-port-adapter.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.attention-regulation.interaction-attention-facts.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.composition-turn-observation-port.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.prefix-stability.context-prefix-wire-port.fsproj"/>
     <Compile Include="Verification/EventStoreWriterSurface.fsi"/>
     <Compile Include="Verification/EventStoreWriterSurface.fs"/>
     <Compile Include="Verification/TemporalSurface.fsi"/>
     <Compile Include="Verification/TemporalSurface.fs"/>
+    <Compile Include="Verification/JournalPortObservationSurface.fsi"/>
+    <Compile Include="Verification/JournalPortObservationSurface.fs"/>
   </ItemGroup>
 </Project>

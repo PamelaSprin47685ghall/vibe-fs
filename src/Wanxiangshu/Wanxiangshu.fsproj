@@ -1479,6 +1479,8 @@
     <Compile Include="Verification/EventStoreWriterSurface.fs"/>
     <Compile Include="Verification/TemporalSurface.fsi"/>
     <Compile Include="Verification/TemporalSurface.fs"/>
+    <Compile Include="Verification/JournalPortObservationSurface.fsi"/>
+    <Compile Include="Verification/JournalPortObservationSurface.fs"/>
     <Compile Include="OpenCode/Plugin/Plugin.fsi"/>
     <Compile Include="OpenCode/Plugin/Plugin.fs"/>
   </ItemGroup>
