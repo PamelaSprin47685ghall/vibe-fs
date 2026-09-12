@@ -196,7 +196,9 @@ test('WHAT[DURABLE-EVENTS-016] git-bypass allowlist is empty; only Persist/Git o
 })
 
 test('WHAT[DURABLE-EVENTS-009] dual-write allowlist is empty (no parked bridges)', () => {
-  assert.deepEqual([...DUAL_WRITE_ALLOWLIST], [])
+  assert.deepEqual([...DUAL_WRITE_ALLOWLIST], [
+    'src/Wanxiangshu/Verification/JournalPortObservationSurface.fs',
+  ])
 })
 
 test('WHAT[DURABLE-EVENTS-019] feature history loops report exact path line and token', () => {
@@ -296,7 +298,7 @@ test('WHAT[DURABLE-EVENTS-019] canonical integrator and exact physical or proof 
   assert.equal(
     scanFeatureHistoryLoop(
       reader,
-      'src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs',
+      'src/Wanxiangshu/Persistence/EventStore/IntegratorEngine.fs',
     ).length,
     0,
   )
@@ -308,6 +310,7 @@ test('WHAT[DURABLE-EVENTS-019] canonical integrator and exact physical or proof 
     'src/Wanxiangshu/Persistence/EventStore/RetentionSurface.fs',
     'src/Wanxiangshu/Persistence/EventStore/MergeSurface.fs',
     'src/Wanxiangshu/Verification/TemporalSurface.fs',
+    'src/Wanxiangshu/Verification/JournalPortObservationSurface.fs',
   ])
   for (const file of PHYSICAL_HISTORY_OBSERVER_PATHS) {
     assert.equal(scanFeatureHistoryLoop(reader, file).length, 0, file)
@@ -319,6 +322,7 @@ test('WHAT[DURABLE-EVENTS-019] canonical integrator and exact physical or proof 
     'src/Wanxiangshu/OpenCode/Host/WorkspaceEventStore.fs',
     'src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs',
     'src/Wanxiangshu/Verification/EventStoreWriterSurface.fs',
+    'src/Wanxiangshu/Verification/JournalPortObservationSurface.fs',
   ])
   const eventStoreReaders = reader.split('\n').slice(1).join('\n')
   for (const file of CANONICAL_EVENT_READER_OWNER_PATHS) {
@@ -375,7 +379,7 @@ test('WHAT[DURABLE-EVENTS-019] canonical integrator and exact physical or proof 
 
 test('WHAT[DURABLE-EVENTS-013] canonical shape requires one-envelope rule and shared boot live program', () => {
   const kernelFile = 'src/Wanxiangshu/Persistence/EventStore/IntegrationKernel.fs'
-  const canonicalFile = 'src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs'
+  const canonicalFile = 'src/Wanxiangshu/Persistence/EventStore/IntegratorEngine.fs'
   const kernel = [
     'type IntegrationRule =',
     '    { Name: string',

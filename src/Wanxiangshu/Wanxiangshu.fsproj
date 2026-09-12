@@ -1310,6 +1310,10 @@
     <Compile Include="Repository/Programming/Js/ToolsBindings.fs"/>
     <Compile Include="Repository/Programming/Js/TransactionStore.fsi"/>
     <Compile Include="Repository/Programming/Js/TransactionStore.fs"/>
+    <Compile Include="Persistence/EventStore/IntegratorEngine.fsi"/>
+    <Compile Include="Persistence/EventStore/IntegratorEngine.fs"/>
+    <Compile Include="Composition/Durable/JournalIntegration.fsi"/>
+    <Compile Include="Composition/Durable/JournalIntegration.fs"/>
     <Compile Include="Persistence/EventStore/CanonicalIntegrator.fsi"/>
     <Compile Include="Persistence/EventStore/CanonicalIntegrator.fs"/>
     <Compile Include="Sphinx/IntegrationRules.fsi"/>

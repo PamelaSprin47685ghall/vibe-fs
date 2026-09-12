@@ -20,6 +20,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.knowledge-integration-rules.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.eventstore-merge-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.persistence-eventstore-processeventlog.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-canonicalcodec.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.eventstore-git-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj"/>

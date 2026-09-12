@@ -13,7 +13,7 @@ const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.
 
 test('WHAT[DURABLE-CONVERGENCE-002] one k-way primitive is shared by integrator and sync', async () => {
   const primitive = await read('src/Wanxiangshu/Persistence/EventStore/EventKWayMerge.fs')
-  const integrator = await read('src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs')
+  const integrator = await read('src/Wanxiangshu/Persistence/EventStore/IntegratorEngine.fs')
   const sync = await read('src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs')
 
   assert.match(primitive, /module EventKWayMerge/)

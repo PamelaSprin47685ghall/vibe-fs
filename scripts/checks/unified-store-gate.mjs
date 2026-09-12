@@ -100,7 +100,7 @@ export const SCANNER_IDS = Object.freeze([
 const norm = (p) => p.replace(/\\/g, '/')
 
 const CANONICAL_INTEGRATOR_PATH =
-  'src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs'
+  'src/Wanxiangshu/Persistence/EventStore/IntegratorEngine.fs'
 const INTEGRATION_KERNEL_PATH =
   'src/Wanxiangshu/Persistence/EventStore/IntegrationKernel.fs'
 
