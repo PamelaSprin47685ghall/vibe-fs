@@ -13,10 +13,7 @@ module CasebookCapture =
 
     /// Stable content fingerprint for FileRead observations (CASE-003).
     let contentHash (text: string) : string =
-        if isNull text then
-            ""
-        else
-            HostDigest.sha256Hex text
+        if isNull text then "" else HostDigest.sha256Hex text
 
     let private text (value: obj) : string option =
         if isNull value || value = null then

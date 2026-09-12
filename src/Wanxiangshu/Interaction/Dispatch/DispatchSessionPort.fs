@@ -22,10 +22,14 @@ module DispatchSessionPort =
 
     let ofSessionPort (sessionPort: ISessionHostPort) : IDispatchSessionPort =
         { new IDispatchSessionPort with
-            member _.SendPrompt(sessionId, text, opts) = sessionPort.SendPrompt(sessionId, text, opts)
+            member _.SendPrompt(sessionId, text, opts) =
+                sessionPort.SendPrompt(sessionId, text, opts)
+
             member _.SubscribeFutureTerminal(sessionId, listener) =
                 sessionPort.SubscribeFutureTerminal(sessionId, listener)
+
             member _.SubscribeTerminal(sessionId, listener) =
                 sessionPort.SubscribeTerminal(sessionId, listener)
+
             member _.ReportFatalDiagnostic(operation, fields) =
                 FatalProcess.trip operation (String.Join(";", fields |> List.map (fun (k, v) -> k + "=" + v))) }

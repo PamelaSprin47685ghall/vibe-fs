@@ -154,7 +154,9 @@ module FissionTool =
         =
         task {
             let laneProfile =
-                PromptAuthorityProjectionQueries.activeProfile lane.SessionId (AgentJournal.snapshot durable).AgentProjections
+                PromptAuthorityProjectionQueries.activeProfile
+                    lane.SessionId
+                    (AgentJournal.snapshot durable).AgentProjections
 
             match laneProfile with
             | None -> return ()

@@ -220,7 +220,9 @@ module PromptDispatcherSend =
                     | Some callback -> do! callback error
                     | None -> ()
 
-                    FatalProcess.trip "detached-prompt-dispatch-failed" (sprintf "session_id=%s result=%s" (SessionId.value sessionId) error)
+                    FatalProcess.trip
+                        "detached-prompt-dispatch-failed"
+                        (sprintf "session_id=%s result=%s" (SessionId.value sessionId) error)
                 }
 
             task {

@@ -72,16 +72,19 @@ module DispatchSurface =
 
         /// Dispatch view of the same physical host port: narrows the interface
         /// through a dedicated member so AttachMembers never collides.
-        member this.DispatchPort : Wanxiangshu.Interaction.Dispatch.IDispatchSessionPort =
+        member this.DispatchPort: Wanxiangshu.Interaction.Dispatch.IDispatchSessionPort =
             { new Wanxiangshu.Interaction.Dispatch.IDispatchSessionPort with
                 member _.SendPrompt(sessionId, text, options) =
-                    (this :> Wanxiangshu.OpenCode.ISessionHostPort).SendPrompt(sessionId, text, options)
+                    (this :> Wanxiangshu.OpenCode.ISessionHostPort)
+                        .SendPrompt(sessionId, text, options)
 
                 member _.SubscribeTerminal(sessionId, listener) =
-                    (this :> Wanxiangshu.OpenCode.ISessionHostPort).SubscribeTerminal(sessionId, listener)
+                    (this :> Wanxiangshu.OpenCode.ISessionHostPort)
+                        .SubscribeTerminal(sessionId, listener)
 
                 member _.SubscribeFutureTerminal(sessionId, listener) =
-                    (this :> Wanxiangshu.OpenCode.ISessionHostPort).SubscribeFutureTerminal(sessionId, listener)
+                    (this :> Wanxiangshu.OpenCode.ISessionHostPort)
+                        .SubscribeFutureTerminal(sessionId, listener)
 
                 member _.ReportFatalDiagnostic(operation, fields) =
                     let delimiter = String.Join(";", fields |> List.map (fun (k, v) -> k + "=" + v))
@@ -264,7 +267,9 @@ module DispatchSurface =
                            error = error
                            observation = null |}
             | Ok identitySeed ->
-                let runtime = PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)
+                let runtime =
+                    PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)
+
                 let adapter = PlainSessionPort(port)
 
                 let! result =
@@ -349,7 +354,9 @@ module DispatchSurface =
         task {
             match PromptAuthority.tryParseContinuationKind continuation, profileOf profile with
             | Some kind, Ok authorityProfile ->
-                let runtime = PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)
+                let runtime =
+                    PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)
+
                 let adapter = PlainSessionPort(port)
 
                 let! result =
@@ -406,7 +413,9 @@ module DispatchSurface =
         task {
             match PromptAuthority.tryParseContinuationKind continuation, profileOf profile with
             | Some kind, Ok authorityProfile ->
-                let runtime = PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)
+                let runtime =
+                    PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)
+
                 let adapter = PlainSessionPort(port)
 
                 let send () =
@@ -475,7 +484,9 @@ module DispatchSurface =
         task {
             match PromptAuthority.tryParseContinuationKind continuation, profileOf profile with
             | Some kind, Ok authorityProfile ->
-                let runtime = PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)
+                let runtime =
+                    PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)
+
                 let adapter = PlainSessionPort(port)
 
                 let! outcome =
@@ -612,7 +623,8 @@ module DispatchSurface =
         : Task<obj> =
         task {
             let! result =
-                (PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)).AcceptAgentOwnerRoot
+                (PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal))
+                    .AcceptAgentOwnerRoot
                     (PromptKey.create promptKey)
                     (SessionId.create session)
                     (PhysicalUserMessageId.create physicalMessageId)
@@ -655,7 +667,8 @@ module DispatchSurface =
                            error = error |}
             | Ok identitySeed ->
                 let! result =
-                    (PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)).AcceptHumanRoot
+                    (PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal))
+                        .AcceptHumanRoot
                         (SessionId.create session)
                         (PhysicalUserMessageId.create physicalMessageId)
                         identitySeed
@@ -716,7 +729,12 @@ module DispatchSurface =
         : Task<obj> =
         task {
             let decision = PromptIngress.resolveDecision (Some handle.Journal) message
-            let! accepted = (PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)).AcceptManagedChatIntent decision
+
+            let! accepted =
+                (PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal))
+                    .AcceptManagedChatIntent
+                    decision
+
             return managedAcceptanceView accepted
         }
 
@@ -774,7 +792,8 @@ module DispatchSurface =
                 let identitySeed = PromptAuthority.IdentitySeed.RootSelection identity
 
                 let! result =
-                    (PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)).AcceptHumanRoot
+                    (PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal))
+                        .AcceptHumanRoot
                         (SessionId.create session)
                         (PhysicalUserMessageId.create physicalMessageId)
                         (Some identitySeed)
@@ -812,7 +831,9 @@ module DispatchSurface =
                claimedAtRuntimeStartCount = claim.ClaimedAtRuntimeStartCount |}
 
     let projectionObservation (handle: JournalHandle) (session: string) : obj =
-        let runtime = PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)
+        let runtime =
+            PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)
+
         let projection = runtime.ProjectionFor(SessionId.create session)
         let snapshot = AgentJournal.snapshot handle.Journal
 

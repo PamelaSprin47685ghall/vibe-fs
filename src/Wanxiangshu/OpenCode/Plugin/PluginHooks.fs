@@ -110,7 +110,8 @@ module PluginHooks =
                     let projections = (AgentJournal.snapshot durable).AgentProjections
 
                     PromptAuthorityProjectionQueries.activeProfile sessionId projections
-                    |> Option.orElseWith (fun () -> PromptAuthorityProjectionQueries.lastAuthorityProfile sessionId projections))
+                    |> Option.orElseWith (fun () ->
+                        PromptAuthorityProjectionQueries.lastAuthorityProfile sessionId projections))
                 |> Option.map (fun profile -> profile.CanonicalRole)
 
             let systemTransform = ProviderSystemTransform.createWith roleFor

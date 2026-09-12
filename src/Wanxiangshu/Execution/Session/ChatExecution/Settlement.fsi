@@ -14,8 +14,7 @@ type PreProviderSettlementError =
     | ProjectionConflictAfterCommit of ChatExecutionState
     | PersistenceFailed of JournalAppendFailure
 
-type PreProviderTerminalWitness =
-    | PreProviderTerminalWitness of ChatExecutionKey * ChatExecutionTerminalDisposition
+type PreProviderTerminalWitness = PreProviderTerminalWitness of ChatExecutionKey * ChatExecutionTerminalDisposition
 
 [<RequireQualifiedAccess>]
 module PreProviderTerminalWitness =
@@ -38,4 +37,3 @@ module PreProviderSettlement =
         evidence: AcceptedChatExecutionEvidence ->
         disposition: ChatExecutionTerminalDisposition ->
             Task<Result<PreProviderTerminalWitness, PreProviderSettlementError>>
-

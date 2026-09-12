@@ -82,36 +82,56 @@ module CasebookBookkeeperSurface =
         | Error error -> box {| ok = false; error = error |}
         | Ok owners ->
             let sessions = unbox<Wanxiangshu.OpenCode.ISessionHostPort> port
+
             let kbPort =
                 { new ICasebookSessionPort with
                     member _.AbortSession childId = sessions.AbortSession childId
+
                     member _.SubscribeTerminal(childId, listener) =
-                        sessions.SubscribeTerminal(childId, (fun id outcome ->
-                            let res =
-                                match outcome with
-                                | Wanxiangshu.OpenCode.TerminalOutcome.Completed _ -> Ok ()
-                                | Wanxiangshu.OpenCode.TerminalOutcome.Failed stop -> Error stop.Reason
-                                | Wanxiangshu.OpenCode.TerminalOutcome.Aborted stop -> Error stop.Reason
-                            listener id res))
+                        sessions.SubscribeTerminal(
+                            childId,
+                            (fun id outcome ->
+                                let res =
+                                    match outcome with
+                                    | Wanxiangshu.OpenCode.TerminalOutcome.Completed _ -> Ok()
+                                    | Wanxiangshu.OpenCode.TerminalOutcome.Failed stop -> Error stop.Reason
+                                    | Wanxiangshu.OpenCode.TerminalOutcome.Aborted stop -> Error stop.Reason
+
+                                listener id res)
+                        )
+
                     member _.SendPrompt(childId, text, agent) =
                         task {
                             let exactTools = Map.ofList [ "*", false; "js-bookkeeper", true ]
+
                             let opts: Wanxiangshu.OpenCode.SessionPromptOptions =
-                                { Model = None; Agent = Some agent; Directory = None; Metadata = None; Tools = Some exactTools; BindingIntent = Wanxiangshu.OpenCode.SessionBindingIntent.Preserve }
+                                { Model = None
+                                  Agent = Some agent
+                                  Directory = None
+                                  Metadata = None
+                                  Tools = Some exactTools
+                                  BindingIntent = Wanxiangshu.OpenCode.SessionBindingIntent.Preserve }
+
                             let! outcome = sessions.SendPrompt(childId, text, opts)
+
                             match outcome with
                             | Wanxiangshu.Foundation.Outcome.SendOutcome.AdmittedWithReceipt _
-                            | Wanxiangshu.Foundation.Outcome.SendOutcome.AdmittedWithPhysicalMessage _ -> return Ok ()
+                            | Wanxiangshu.Foundation.Outcome.SendOutcome.AdmittedWithPhysicalMessage _ -> return Ok()
                             | Wanxiangshu.Foundation.Outcome.SendOutcome.Retryable r
                             | Wanxiangshu.Foundation.Outcome.SendOutcome.Fatal r
                             | Wanxiangshu.Foundation.Outcome.SendOutcome.AcceptanceUnknown r -> return Error r
                         }
+
                     member _.CreateSiblingSession(owner, title, agent) =
-                        sessions.CreateSiblingSession(owner, None, { Title = Some title; Agent = Some agent; Directory = None })
-                }
-            BookkeeperRuntime.setPort
-                kbPort
-                (SessionId.value >> (fun sessionId -> Map.tryFind sessionId owners))
+                        sessions.CreateSiblingSession(
+                            owner,
+                            None,
+                            { Title = Some title
+                              Agent = Some agent
+                              Directory = None }
+                        ) }
+
+            BookkeeperRuntime.setPort kbPort (SessionId.value >> (fun sessionId -> Map.tryFind sessionId owners))
 
             box {| ok = true |}
 

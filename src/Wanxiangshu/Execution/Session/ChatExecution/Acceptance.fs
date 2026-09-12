@@ -12,8 +12,7 @@ open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Interaction.Authority
 
 /// Proof that the exact execution acceptance is present in the durable projection.
-type ManagedChatAcceptanceWitness =
-    | ManagedChatAcceptanceWitness of ChatExecutionKey * AcceptedChatExecutionEvidence
+type ManagedChatAcceptanceWitness = ManagedChatAcceptanceWitness of ChatExecutionKey * AcceptedChatExecutionEvidence
 
 [<RequireQualifiedAccess>]
 module ManagedChatAcceptanceWitness =
@@ -47,8 +46,7 @@ type ManagedChatAcceptancePersistence =
       AppendAccepted: ChatExecutionKey -> AcceptedChatExecutionEvidence -> Task<Result<unit, JournalAppendFailure>> }
 
 /// Proof that the exact provider step is present in the durable projection.
-type ManagedChatProviderStartedWitness =
-    | ManagedChatProviderStartedWitness of ChatExecutionKey * ProviderStartedEvidence
+type ManagedChatProviderStartedWitness = ManagedChatProviderStartedWitness of ChatExecutionKey * ProviderStartedEvidence
 
 [<RequireQualifiedAccess>]
 module ManagedChatProviderStartedWitness =
@@ -59,10 +57,7 @@ module ManagedChatProviderStartedWitness =
 
 /// Proof that the exact terminal disposition is present in the durable projection.
 type ManagedChatTerminalWitness =
-    | ManagedChatTerminalWitness of
-        ChatExecutionKey *
-        ChatExecutionTerminalEvidence *
-        ChatExecutionTerminalDisposition
+    | ManagedChatTerminalWitness of ChatExecutionKey * ChatExecutionTerminalEvidence * ChatExecutionTerminalDisposition
 
 [<RequireQualifiedAccess>]
 module ManagedChatTerminalWitness =
@@ -439,4 +434,3 @@ module ManagedChatProviderLifecycle =
                 return! terminalWitness key startedEvidence disposition persistence
             | ExistingTerminal witness -> return witness
         }
-

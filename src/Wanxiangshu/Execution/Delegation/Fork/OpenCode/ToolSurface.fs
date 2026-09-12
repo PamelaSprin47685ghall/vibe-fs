@@ -390,7 +390,7 @@ module ForkToolSurface =
                 | Error error -> raise (ArgumentException error)
 
             let! journal = createJournal directory
-            let dispatcher = PromptDispatcher.Runtime (PromptJournalAdapter.create journal)
+            let dispatcher = PromptDispatcher.Runtime(PromptJournalAdapter.create journal)
 
             match! acceptOwnerRoots dispatcher admissions with
             | Error error ->

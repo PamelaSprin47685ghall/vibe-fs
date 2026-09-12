@@ -51,9 +51,11 @@ Subsystem SCC 是首要结构债：双向依赖必须通过移动知识所有权
 
 2026-09-08，在上游提交 `58aa3d934` 运行 `node scripts/checks/subsystems.mjs`：26 subsystem、199 compile shards、702 production sources、1919 ProjectReference，shard DAG，最大 subsystem SCC 为 23 个节点。口径是 fsproj 声明及其聚合图，不是源码实际调用图或编译耗时测量。后续报告附对应代码版本和工作区差异，不把本次快照写成固定测试期望。
 
-### 3.2 GAP-033 当前缺口与关闭证据
+### 3.2 GAP-033 缺口记录与最终关闭证据（已关闭，见第 3.3 节）
 
-当前任务按 AGENTS.md 中《子系统解环施工蓝图》（B00—B11）施工；本批 B00 只整理判据与记录，不改生产。以下历史批中的「单边删引用后闭包不降，迁移无益」结论只对当时的试验方法成立：它证明的是**只删边不移消费者**没有收益，不得推广为对完整迁移（类型+全部调用路径+装配）的否定。历史数字保留原记录口径，不在后续修改中倒写。
+> 本 GAP 已在 2026-09-13 的工作区闭合，最终证据见第 3.3 节。下述 B00 部分只保留当时判定口径，不再指向一份已不存在文档：
+>
+> 2026-09-12 曾按 AGENTS.md 之《子系统解环施工蓝图》（B00—B11）施工；该蓝图已于 B11 关闭后退出 AGENTS.md，不再作为当前依据。以下历史批中的「单边删引用后闭包不降，迁移无益」结论只对当时的试验方法成立：它证明的是**只删边不移消费者**没有收益，不得推广为对完整迁移（类型+全部调用路径+装配）的否定。历史数字保留原记录口径，不在后续修改中倒写。
 
 2026-09-12 用户批准按完整消费者边界继续迁移。以下历史批次中的单边删引用实验，只证明当时那个具体改法的结果；第 32／33 条对窄查询与 journal 的否定不适用于同时迁移类型、全部路径及装配的完整方案。具体纪律见当前 AGENTS 第 3 节；不以中间一步闭包未减否定迁移，也不把删边释放量当作最终收益。
 
@@ -61,7 +63,7 @@ Subsystem SCC 是首要结构债：双向依赖必须通过移动知识所有权
 
 同批修正 DELEG-029 的测试判据：不再用 `legacyKind` 决定合法性，保留自身 port／源码身份及 foreign handle 禁令，改查真实传递源码闭包。移除全部 kind 的正例通过；伪标 contract 的 journal、物理 timing adapter，以及借 delegation port 间接传入 journal 的三个反例均被拒绝。此项只修正退役治理的残留，不宣称扩大 DELEG-029 的 PTY 行为证明。
 
-本节是 STRUCTURED-WORKFLOW-011 至 016 的实现与证明缺口记录，不新增产品条款，也不构成整表开工授权。仅处理用户任务明确覆盖的部分；相关 Worker 应显式读取本节，不依赖路径触发的自动接地。聚合状态见 `requirements/GAP.md` 的 GAP-033，保持 PARTIAL；单项修复不代表整体已可独立替换。
+本节是 STRUCTURED-WORKFLOW-011 至 016 的实现与证明缺口记录的历史版。聚合状态见 `requirements/GAP.md` 的 GAP-033（现为 CLOSED）；以下「仍缺」/「PARTIAL」均为施工过程记录，不再表示当前住态。单项修复不代表整体已可独立替换。
 
 第 3.1 节保留历史测量口径；以下逐项记录当前实现和仍缺的证据，不用历史数量约束后续合法变化。
 
@@ -794,3 +796,21 @@ node scripts/build.mjs
      - 闭包变动：`durable-journal-port-adapter`（hub）由 213 降至 **208**；`delegation-host-adapter` 294 降至 **289**；`delegation-pty-adapter` 295 降至 **290**；`delegation-recovery-runtime` 保持 **45**；`git-integrationgate` 415 降至 **414**。
      - 新增独立分片：`change-orchestrator-port-adapter`（148 闭包源码）、`change-fold`（140 闭包源码）。
    - **缺口与未跑项如实记录**：`INSTRUMENTAL-LEARNING-007` 两条既有缺口保持未动。验证已随批完成：`node scripts/check.mjs` 绿（requirement-trace 4024 测试属主完整）、语义套件 3981 绿、integration 279 绿、e2e Long Stroke 绿、`npm pack --dry-run` 绿（2068 文件）。
+
+42. **B04–B10 全量收口 —— `durable-composition` 与 `application-composition` 成为真实层，领域不再反向依赖装配层**（2026-09-13 第二十二班）：
+   - **领域层方向按蓝图 §2.3 终态落位**：`runtime-platform/participant` → `resources`/`requirements`/`persistence`/`session-lifecycle` → `provider`/`relay`/`process`/`repository-programming`/`sphinx` → `authority` → `context` → `enforcer`/`work` → `chat-execution` → `delegation`/`knowledge`/`strength` → `change` → `interaction`/`output` → `dispatch` → `host`/`durable-composition` → `application-composition` → `verification`。
+   - **`durable-composition` 持有全部持久化组合知识**：`Composition/Durable` 下的 `Fact`、`Fold`、`JournalIntegration`、`DomainFamilyBridge`、`DelegationProjectionBridge`、`HostFactFold`、`MagicTodoProjection`、`ProjectionStuff`、`AgentJournalPortAdapter`、`PromptJournalAdapter`、`ChatExecutionJournal`、`AuthoritativeVocabulary` 连同 `Persistence/Journal/AgentJournal`、`Persistence/Journal/Surface`、`Persistence/Journal/Fact`、`Execution/Session/ChatExecution/Fact.*` 外层包装、`Participant/Provider/Attempt/Fallback/JournalPort/Vocabulary` join、`.journalHostPort` 等众多窄 adapter 全部由本层 shard 承担；持久化 kernel 自身只留 canonical codec、process log、Store、merge/retention 的纯机制。
+   - **`application-composition` 守真实进程/插件生命周期装配**：`OpenCode/Plugin/PluginHost`/`PluginHooks`/`PluginRuntimeScope`/`PluginTransforms`/`PluginBoot`、`OpenCode/Tools/ToolRegistry`（全工具注册）、`OpenCode/Host/HostSignalBootstrap`/`ChatAdmission`/`TerminalPolicyPort` 接线、`Persistence/Journal/WorkspaceEventStore`、`Composition/Turn/…`、`SyncDelegate/…`、`Fork/OpenCode/…` 组装 Surface、`Sphinx/ServeEntry` 等整体迁移过来；领域只面对 `TerminalPolicyPort`/`DispatchSessionPort`/`TurnObservationPort` 等能力，不直触 Journal/Host。
+   - **Domain 反方向连线收敛为 0**：`authority`、`context`、`chat-execution`、`delegation`、`interaction`、`provider`、`dispatch`、`enforcer`、`work`、`change`、`knowledge`、`strength`、`output`、`process`、`session-lifecycle` 等业务层均不认 `Composition/Durable/*` 或 `application-composition` 顶层工厂；所有 `forXxx` adapter 都在 durable 侧实现消费方窄端口，装配层只负责把同一 PhysicalStore 上的 Journal 转化给各域。
+   - **Pure/vocab shard 归位低层**：`Foundation/Identity.fs`、`Foundation/Quiescence.fs`、`Foundation/Outcome.fs`、`Foundation/Roles.fs`、`Foundation/Temporal.fs`、Host 纯 contract `EventContract.fs`、`Digest.fs`、`Message.fs` 等经验收为 `runtime-platform`/`process`/`provider`/`host` 对应真实语义层；`OpencodeTypes` 保留 provider（纯 SDK 解码词表）；`SessionContract`/`Time/Temporal.fs` 依实际消费层级重定 owner；`foundation-temporal` 也重新落回 process。
+   - **execution-failure-model 分裂为两层**：`Model.*` 归 provider 层 `participant-provider-attempt-failure`；`Decision.*`、`Policy.*`、`Surface.*` 归 chat-execution 层 `execution-failure-decision`，解除 Provider ↔ chat-execution 的相互引用。
+   - **ChatExecution 还原 chat-execution 域的纯裁决**：`Execution/Session/ChatExecution/Fact.*`、`Facts.fs`、`Acceptance.fs`、`Settlement.fs`、`Projection.fs`、`Fold.fs` 本域域模型全留 `chat-execution`；对 Journal 的真实操作搬家 `Composition/Durable/ChatExecutionJournal.*`；`JournalAppendOutcome`/`JournalAppendFailure`/`PersistenceCommitment` 词表归 `chat-execution` 的 `Acceptance.*`。
+   - **dispatch 不再命名 durable/Host**：`Interaction/Dispatch`、`Composition/Turn`、`Interaction/Repair` 等通过 `IPromptJournal`、`IDispatchSessionPort`、`TerminalPolicyPort`、`TurnObservationJournalPort`、`HostJoinGuardJournalPort`、`TerminalTracePort`、`ProviderRecoveryPort` 等窄能力操作；`PromptDispatcher.forPrompts`/`forJournal` 等工厂入口仅供 durable 侧 `PromptJournalAdapter.create` 使用。
+   - **Host 回到纯物理协议边界**：`OpenCode/Host/Message.fs`、`Codec/*`、`Diagnostic.fs`、`Signals/*`、`SphinxMcpConfig.fs` 等 SDK/SDK 解码/边界适配仍归 `host`；任何 application 装配上层不在此层。
+   - **Application composition 拥有全部真实构造**：`PluginRuntimeScope`/`ToolRuntimeScope`/`PluginHostWiring`/`ManagedAgentConfig`/`ToolRegistry`/`Host.fs`/`HostTurnObserver`/`Lifecycle*`/`AuthoritySurface`/`OpenCodePort`/`GroundingRuntime`/`BloggerSurface`/`JournalSurface`/`DistillSurface`/`RequirementGroundingSurface` 等进入 `application-composition`；它们把 `IHostRuntime`/`ISessionHostPort`/`RootWorkspace` 与 `AgentJournal`/`IJournal` 适配到领域端口。
+   - **`Participant` 里 attempt/fallback/recovery/planner 词汇归 `provider`**；`Relay`、`Process`（`Pty`/`Runner`/`Spool`/`BoundTools`）、`Repository/Programming/Js/*`/`Capability`/`Transaction`/`Generator`、`Sphinx` 本体、用 的 `EventVocabularyContract` 均与原来位置对齐下到相应层。
+   - **最终实测**：`node scripts/checks/subsystems.mjs` → `OK — 27 subsystems, 276 compile shards, 748 sources, 2220 refs, shard DAG` 且 `cyclicComponents = []`；`up-edges` 逐向已压至 0；B04 新增 的 `durable-composition` 与 B07 新增 的 `application-composition` 各存在真实子分片；领域 0 边缘向 durable/app 反向。
+   - **测试与门禁同步更新**：`terminal-policy.test.mjs` 重写为 `TerminalPolicyPort` 的窄端口断言；`external-effect-contracts.json` 的 `prompt-dispatch` intent `physical_receipt` 符号换成 `PromptSessionFact.PromptClaimed/PromptSubmitted/PromptPhysicalAccepted`；`authority-contracts.json` 的 `QuiescencePermit`/`BloggerCycleReceipt`/`ChatAdmissionTransaction` 等 owner/issuer/file/anchor 同步至当前位置（`foundation-outcome`/`application-composition`/`chatexecution-admission`）；`dsl-ownership.mjs` 的 `HOST_BOUNDARY_OPEN_PATHS` 增补 `Interaction/Dispatch/JournalPort.fs`/`DispatchSessionPort.fs`；`delegation-compile-boundary.test.mjs` 的 `SHARD_SUBSYSTEM_OVERRIDE` 允许 `delegation-sync-runtime`/`delegation-host-adapter`/`delegation-pty-adapter`/`delegation-ledger`/`delegation-recovery-runtime` 落于 `application-composition`/`durable-composition`（因它们直接装配 PromptDispatcher/AgentJournal）；`subsystem-boundaries`、`owner-project-boundaries`、`m6-slice-boundary`、`attention-compile-boundary`、`event-store-compile-boundary`、`host-session-contract-closure`、`casebook-ownership`、`time-capability m6-slice-boundary`、`run-mjs`、`bootstrap-single-owner` 等测试断言随重 tag 正式更新；`loop-detector` envelope 重建由 `scripts/lib/derive-loop-detector-envelope.mjs` 驱动，`git ls-files --cached` 作为唯一 corpus 输入。
+   - **gate 结果**：`node scripts/check.mjs` 全绿（仍报 INSTITUTIONAL-LEARNING-007 两条既有 proof gap，与本批无关）；Fable build 通过（Wanxiangshu.Impact 1496 items）；js-surface-manifest 167 surfaces 通过；requirements `node --test` 套件 `pass 4052 / fail 0`。
+
+43. **B11 收口**：提交 `152bca7de` 承担上面全部产品代码迁移，`e63b8c841` 将 GAP-033 状态改为 CLOSED 并从 `AGENTS.md` 撤出施工蓝图。最终验收为 `node scripts/checks/subsystems.mjs` 报告 `cyclicComponents = []`、`shard DAG`、source/`fsi` 唯一归属成立；蓝图原文不再作为当前依据，记录仅追溯用。

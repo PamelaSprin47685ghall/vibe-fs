@@ -32,7 +32,8 @@ module CasebookLifecycle =
     /// exactly one CaseFinalize child session with the full turn transcript,
     /// then finalizeCase once. Store is explicit to keep Knowledge domain out of
     /// application composition.
-    val tryFinalizeInspector: workspaceRoot: string -> store: IEventStore -> inspectorSessionId: string -> Task<Result<unit, string>>
+    val tryFinalizeInspector:
+        workspaceRoot: string -> store: IEventStore -> inspectorSessionId: string -> Task<Result<unit, string>>
 
     /// Fresh fetch side-effect: append InspectorCaseAccessed (ignore errors).
     val touchAccess: workspaceRoot: string -> store: IEventStore -> sessionId: string -> Task<unit>

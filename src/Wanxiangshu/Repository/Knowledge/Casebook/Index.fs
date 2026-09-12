@@ -55,12 +55,14 @@ module CasebookIndex =
     let private fnv1aDigest (text: string) : string =
         // DSL-MUTABLE: algorithm-scratch — FNV-1a rolling hash accumulator
         let mutable hash = 2166136261u
+
         for i = 0 to text.Length - 1 do
             let c = uint32 text.[i]
             hash <- hash ^^^ (c &&& 0xFFu)
             hash <- hash * 16777619u
             hash <- hash ^^^ (c >>> 8)
             hash <- hash * 16777619u
+
         sprintf "fnv1a:%08x" hash
 
     /// Stable public locator. The suffix is a one-way catalog discriminator,

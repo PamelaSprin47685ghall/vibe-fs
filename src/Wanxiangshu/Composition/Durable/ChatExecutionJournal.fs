@@ -23,7 +23,7 @@ open Wanxiangshu.Execution.Failure
 /// `ManagedChatExecutionFlight` lives in `Acceptance.fs` but is module-private
 /// there. The same single-flight semantic is re-established here keyed by
 /// `(runtimeId, key)`; identical call sites still serialize globally.
-module private ManagedChatExecutionFlight' = 
+module private ManagedChatExecutionFlight' =
     let private gate = obj ()
     let private inFlight = Dictionary<RuntimeId * ChatExecutionKey, Task>()
 
@@ -137,7 +137,13 @@ module ManagedChatProviderLifecycle =
         (projectionChoice: XProjectionChoice)
         =
         ManagedChatExecutionFlight'.run (AgentJournal.runtimeId journal) key (fun () ->
-            ManagedChatProviderLifecycle.startWith (forJournal journal) key acceptedEvidence providerRun requestKind projectionChoice)
+            ManagedChatProviderLifecycle.startWith
+                (forJournal journal)
+                key
+                acceptedEvidence
+                providerRun
+                requestKind
+                projectionChoice)
 
     let terminal
         (journal: AgentJournal)

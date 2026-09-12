@@ -96,4 +96,3 @@ type CapacitySettlement =
 type FatalityDecision =
     | NoFatality
     | FatalAfterSettlement
-

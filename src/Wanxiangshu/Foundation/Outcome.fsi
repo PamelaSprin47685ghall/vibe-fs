@@ -53,6 +53,7 @@ module Outcome =
         | Rejected of EventId * reason: string
         | NotAttempted of EventId * JournalUnavailable
         | CommitUnknown of EventId * JournalFailure
+
 /// Why a journal line was refused during a fold.
 ///
 /// PERSIST-004 requires a corrupt journal to stop startup rather than be

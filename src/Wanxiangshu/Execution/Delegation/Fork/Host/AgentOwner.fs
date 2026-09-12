@@ -61,7 +61,13 @@ module HostForkAgentOwner =
                     PromptDispatcher.AwaitMode.Await
                     (Some accepted)
             | None, Some callback ->
-                dispatcher.SendAgentOwnerRootDetachedObserved (DispatchSessionPort.ofSessionPort sessions) childId prompt identitySeed directory callback
+                dispatcher.SendAgentOwnerRootDetachedObserved
+                    (DispatchSessionPort.ofSessionPort sessions)
+                    childId
+                    prompt
+                    identitySeed
+                    directory
+                    callback
             | None, None ->
                 // PROMPT-007 Detached: child owner root does not wait for PhysicalAccepted.
                 dispatcher.SendAgentOwnerRoot

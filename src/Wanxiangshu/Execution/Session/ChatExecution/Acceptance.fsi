@@ -9,8 +9,7 @@ open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Provider.Attempt
 
-type ManagedChatAcceptanceWitness =
-    | ManagedChatAcceptanceWitness of ChatExecutionKey * AcceptedChatExecutionEvidence
+type ManagedChatAcceptanceWitness = ManagedChatAcceptanceWitness of ChatExecutionKey * AcceptedChatExecutionEvidence
 
 [<RequireQualifiedAccess>]
 module ManagedChatAcceptanceWitness =
@@ -38,8 +37,7 @@ type ManagedChatAcceptancePersistence =
     { ReadExact: ChatExecutionKey -> ChatExecutionState option
       AppendAccepted: ChatExecutionKey -> AcceptedChatExecutionEvidence -> Task<Result<unit, JournalAppendFailure>> }
 
-type ManagedChatProviderStartedWitness =
-    | ManagedChatProviderStartedWitness of ChatExecutionKey * ProviderStartedEvidence
+type ManagedChatProviderStartedWitness = ManagedChatProviderStartedWitness of ChatExecutionKey * ProviderStartedEvidence
 
 [<RequireQualifiedAccess>]
 module ManagedChatProviderStartedWitness =
@@ -47,10 +45,7 @@ module ManagedChatProviderStartedWitness =
     val evidence: ManagedChatProviderStartedWitness -> ProviderStartedEvidence
 
 type ManagedChatTerminalWitness =
-    | ManagedChatTerminalWitness of
-        ChatExecutionKey *
-        ChatExecutionTerminalEvidence *
-        ChatExecutionTerminalDisposition
+    | ManagedChatTerminalWitness of ChatExecutionKey * ChatExecutionTerminalEvidence * ChatExecutionTerminalDisposition
 
 [<RequireQualifiedAccess>]
 module ManagedChatTerminalWitness =

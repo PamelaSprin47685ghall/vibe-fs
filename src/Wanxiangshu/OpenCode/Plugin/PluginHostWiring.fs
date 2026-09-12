@@ -58,26 +58,51 @@ module PluginHostWiring =
                 | Wanxiangshu.Foundation.Outcome.SendOutcome.Fatal r
                 | Wanxiangshu.Foundation.Outcome.SendOutcome.AcceptanceUnknown r -> Error r
 
-            let completeHost eventPort (sessionPort: ISessionHostPort) snapshotOpt terminalKey sharedTerminalPort : Task<Host> =
+            let completeHost
+                eventPort
+                (sessionPort: ISessionHostPort)
+                snapshotOpt
+                terminalKey
+                sharedTerminalPort
+                : Task<Host> =
                 task {
                     match boot.Journal with
                     | Some journal ->
                         let kbPort =
                             { new Wanxiangshu.Repository.Knowledge.Casebook.ICasebookSessionPort with
                                 member _.AbortSession childId = sessionPort.AbortSession childId
+
                                 member _.SubscribeTerminal(childId, listener) =
-                                    sessionPort.SubscribeTerminal(childId, (fun id outcome -> listener id (terminalToResult outcome)))
+                                    sessionPort.SubscribeTerminal(
+                                        childId,
+                                        (fun id outcome -> listener id (terminalToResult outcome))
+                                    )
+
                                 member _.SendPrompt(childId, text, agent) =
                                     task {
                                         let exactTools = Map.ofList [ "*", false; "js-bookkeeper", true ]
+
                                         let opts: Wanxiangshu.OpenCode.SessionPromptOptions =
-                                            { Model = None; Agent = Some agent; Directory = None; Metadata = None; Tools = Some exactTools; BindingIntent = Wanxiangshu.OpenCode.SessionBindingIntent.Preserve }
+                                            { Model = None
+                                              Agent = Some agent
+                                              Directory = None
+                                              Metadata = None
+                                              Tools = Some exactTools
+                                              BindingIntent = Wanxiangshu.OpenCode.SessionBindingIntent.Preserve }
+
                                         let! outcome = sessionPort.SendPrompt(childId, text, opts)
                                         return sendResultToUnit outcome
                                     }
+
                                 member _.CreateSiblingSession(owner, title, agent) =
-                                    sessionPort.CreateSiblingSession(owner, None, { Title = Some title; Agent = Some agent; Directory = None })
-                            }
+                                    sessionPort.CreateSiblingSession(
+                                        owner,
+                                        None,
+                                        { Title = Some title
+                                          Agent = Some agent
+                                          Directory = None }
+                                    ) }
+
                         BookkeeperRuntime.setPort kbPort (fun ownerSessionId ->
                             let projections = (AgentJournal.snapshot journal).AgentProjections
                             PromptAuthorityProjectionQueries.activeProfile ownerSessionId projections)
@@ -144,8 +169,8 @@ module PluginHostWiring =
                                     CasebookLifecycle.tryFinalizeInspector workspaceRoot store inspectorSessionId
                                 with ex ->
                                     Task.FromResult(Error ex.Message)
-                            
-                            Some tryFinalize)
+
+                             Some tryFinalize)
                             (Some CasebookLifecycle.cleanupInspector)
 
                     return

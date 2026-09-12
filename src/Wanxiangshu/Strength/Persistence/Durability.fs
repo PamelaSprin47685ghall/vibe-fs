@@ -14,8 +14,7 @@ module StrengthDurability =
     // DSL-MUTABLE: resource
     let mutable private fatalTripHandler: (string -> string -> unit) option = None
 
-    let setFatalTripHandler (handler: string -> string -> unit) : unit =
-        fatalTripHandler <- Some handler
+    let setFatalTripHandler (handler: string -> string -> unit) : unit = fatalTripHandler <- Some handler
 
     let create (store: IEventStore) : StrengthDurabilityPort =
         let loadProjection () =
@@ -48,7 +47,9 @@ module StrengthDurability =
                 | Error(PublishError.StorageInvalid error) ->
                     return StrengthPreparedPublish.StorageInvalid(sprintf "%A" error)
                 | Error(PublishError.SemanticCut cut) ->
-                    fatalTripHandler |> Option.iter (fun trip -> trip "strength-prepared-semantic-cut" cut.Reason)
+                    fatalTripHandler
+                    |> Option.iter (fun trip -> trip "strength-prepared-semantic-cut" cut.Reason)
+
                     return StrengthPreparedPublish.Rejected cut.Reason
                 | Error error -> return StrengthPreparedPublish.Rejected(sprintf "%A" error)
             }

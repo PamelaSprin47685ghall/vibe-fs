@@ -27,12 +27,7 @@ module JournalPortObservationSurface =
     /// exactly the first business fact's commit inside the store; TryCurrent
     /// and the canonical integrator pass through untouched.
     type private GatedAppendStore
-        (
-            inner: IEventStore,
-            gateAt: int,
-            entered: TaskCompletionSource<unit>,
-            release: TaskCompletionSource<unit>
-        ) =
+        (inner: IEventStore, gateAt: int, entered: TaskCompletionSource<unit>, release: TaskCompletionSource<unit>) =
         // DSL-MUTABLE: resource — parked-append counter for the single gate
         let mutable appended = 0
 
@@ -156,8 +151,7 @@ module JournalPortObservationSurface =
             let viewBefore = wire.ReadView session
             let stateBefore = Option.isSome viewBefore.State
 
-            let! appended =
-                journal.AppendAgent (StreamId.Session session) None (attentionFact session)
+            let! appended = journal.AppendAgent (StreamId.Session session) None (attentionFact session)
 
             let folded =
                 match appended with
@@ -178,8 +172,7 @@ module JournalPortObservationSurface =
 
             let poisonedAfter = terminal.IsPoisoned()
 
-            let! opened =
-                journal.AppendAgent (StreamId.Session session) None (openingFact session)
+            let! opened = journal.AppendAgent (StreamId.Session session) None (openingFact session)
 
             let openedOk =
                 match opened with
@@ -187,10 +180,9 @@ module JournalPortObservationSurface =
                 | Error _ -> false
 
             let viewAfter = wire.ReadView session
+
             let stateAfter =
-                viewAfter.State
-                |> Option.bind (fun state -> state.XTrace)
-                |> Option.isSome
+                viewAfter.State |> Option.bind (fun state -> state.XTrace) |> Option.isSome
 
             return
                 box
@@ -207,8 +199,12 @@ module JournalPortObservationSurface =
 
     let sameCommitViewScenario (commonDir: string) (writerTag: string) : Task<obj> =
         task {
-            let entered = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
-            let release = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+            let entered =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let release =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
             let inner = openStore commonDir writerTag
             let store = GatedAppendStore(inner, 2, entered, release) :> IEventStore
             use! journal = openJournal store writerTag
@@ -221,7 +217,9 @@ module JournalPortObservationSurface =
             let preLinked = terminal.IsLinkedChild child
             let preState = Option.isSome (wire.ReadView parent).State
 
-            let commitTask = journal.AppendAgent (StreamId.Session parent) None (handleLinkedFact parent child)
+            let commitTask =
+                journal.AppendAgent (StreamId.Session parent) None (handleLinkedFact parent child)
+
             do! entered.Task
 
             let midMember = terminal.HasListableHandles parent
@@ -262,8 +260,7 @@ module JournalPortObservationSurface =
 
             let fromRevision = journal.Revision
             let waiter = journal.AwaitChangeFrom fromRevision
-            let! appended =
-                journal.AppendAgent (StreamId.Session parent) None (handleLinkedFact parent child)
+            let! appended = journal.AppendAgent (StreamId.Session parent) None (handleLinkedFact parent child)
 
             // The caller-side Promise.race timeout in the test bounds the wait;
             // this task resolves only when the journal publishes a real change.
@@ -295,10 +292,8 @@ module JournalPortObservationSurface =
             let! cancelled = waiter
             let cancelledToNone = Option.isNone cancelled
 
-            let! appended =
-                journal.AppendAgent (StreamId.Session parent) None (handleLinkedFact parent child)
-            let revisionAdvanced =
-                JournalRevision.isAfter journal.Revision fromRevision
+            let! appended = journal.AppendAgent (StreamId.Session parent) None (handleLinkedFact parent child)
+            let revisionAdvanced = JournalRevision.isAfter journal.Revision fromRevision
 
             return
                 box
@@ -314,20 +309,18 @@ module JournalPortObservationSurface =
             let _, terminal, _ = portsOf journal
             let session = SessionId.create "ses-port-poison"
 
-            let! seeded =
-                journal.AppendAgent (StreamId.Session session) None (attentionFact session)
+            let! seeded = journal.AppendAgent (StreamId.Session session) None (attentionFact session)
+
             let seededOk =
                 match seeded with
                 | Ok _ -> true
                 | Error _ -> false
 
-            let! failed =
-                journal.AppendAgent (StreamId.Session session) None (missingPayloadFact session)
+            let! failed = journal.AppendAgent (StreamId.Session session) None (missingPayloadFact session)
             let failedOutcome = appendOutcomeName failed
             let poisoned = terminal.IsPoisoned()
 
-            let! after =
-                journal.AppendAgent (StreamId.Session session) None (attentionFact session)
+            let! after = journal.AppendAgent (StreamId.Session session) None (attentionFact session)
             let afterOutcome = appendOutcomeName after
 
             return

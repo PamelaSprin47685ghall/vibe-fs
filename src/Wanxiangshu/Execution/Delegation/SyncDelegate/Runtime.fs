@@ -168,7 +168,9 @@ type SyncDelegateRuntime
         : Task<Result<PromptAuthority.IdentitySeed, string>> =
         let issued =
             match
-                PromptAuthorityProjectionQueries.activeProfile ownerSessionId (AgentJournal.snapshot journal).AgentProjections
+                PromptAuthorityProjectionQueries.activeProfile
+                    ownerSessionId
+                    (AgentJournal.snapshot journal).AgentProjections
             with
             | None -> Error "AgentOwnerRoot identity seed requires the owner's active durable Logical Run"
             | Some ownerProfile ->
@@ -221,7 +223,9 @@ type SyncDelegateRuntime
                 AsyncSupport.trySetResult call.AcceptedRoot root |> ignore
 
             let activeDelegateProfile =
-                PromptAuthorityProjectionQueries.activeProfile call.Delegate (AgentJournal.snapshot journal).AgentProjections
+                PromptAuthorityProjectionQueries.activeProfile
+                    call.Delegate
+                    (AgentJournal.snapshot journal).AgentProjections
 
             match activeDelegateProfile with
             | None ->

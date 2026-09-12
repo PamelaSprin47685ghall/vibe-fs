@@ -445,7 +445,8 @@ module ProviderFailureSurface =
         (agent: string)
         : Task<obj> =
         task {
-            let runtime = PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)
+            let runtime =
+                PromptDispatcher.forPrompts (PromptJournalAdapter.create handle.Journal)
 
             let identitySeed =
                 ParticipantIdentity.resolveAtRoot agent

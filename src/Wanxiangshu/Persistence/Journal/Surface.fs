@@ -158,9 +158,12 @@ module JournalSurface =
             let openJournal (runtimeId: RuntimeId) processIdValue processStartedAt =
                 task {
                     let integrator =
-                        CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules AuthoritativeEventTypes.isKnown
+                        CanonicalIntegrator.createWithRules
+                            CanonicalIntegrator.baseRules
+                            AuthoritativeEventTypes.isKnown
 
-                    let store = EventStore.createLocal commonDirectory (Guid.NewGuid().ToString("N")) integrator
+                    let store =
+                        EventStore.createLocal commonDirectory (Guid.NewGuid().ToString("N")) integrator
 
                     let! result =
                         EventStoreJournalWriter.resumeOrCreate (runtimeId, processIdValue, processStartedAt, store)

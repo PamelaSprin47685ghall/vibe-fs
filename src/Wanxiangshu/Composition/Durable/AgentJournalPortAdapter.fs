@@ -25,11 +25,20 @@ open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 open Wanxiangshu.Context.Companion.Blogger
 
 module AgentJournalPortAdapter =
-    let forAttention (journal: AgentJournal) : AttentionJournalPort = AttentionConcernJournalAdapter.forAttention journal
-    let forConcern (journal: AgentJournal) : ConcernJournalPort = AttentionConcernJournalAdapter.forConcern journal
-    let forInstitutionalLearning (journal: AgentJournal) : InstitutionalLearningJournalPort = InstitutionalLearningJournalAdapter.forInstitutionalLearning journal
-    let forDelegatedToolEstimate (journal: AgentJournal) : DelegatedToolEstimatePort = SessionStartedAtJournalAdapter.forDelegatedToolEstimate journal
-    let forSessionStartedAt (journal: AgentJournal) : SessionStartedAtPort = SessionStartedAtJournalAdapter.forSessionStartedAt journal
+    let forAttention (journal: AgentJournal) : AttentionJournalPort =
+        AttentionConcernJournalAdapter.forAttention journal
+
+    let forConcern (journal: AgentJournal) : ConcernJournalPort =
+        AttentionConcernJournalAdapter.forConcern journal
+
+    let forInstitutionalLearning (journal: AgentJournal) : InstitutionalLearningJournalPort =
+        InstitutionalLearningJournalAdapter.forInstitutionalLearning journal
+
+    let forDelegatedToolEstimate (journal: AgentJournal) : DelegatedToolEstimatePort =
+        SessionStartedAtJournalAdapter.forDelegatedToolEstimate journal
+
+    let forSessionStartedAt (journal: AgentJournal) : SessionStartedAtPort =
+        SessionStartedAtJournalAdapter.forSessionStartedAt journal
 
     let forProviderFailure (journal: AgentJournal) : ProviderFailureJournalPort =
         { ProviderFailureJournalPort.CurrentState =
@@ -119,7 +128,8 @@ module AgentJournalPortAdapter =
                         && claim.PayloadDigest = payloadDigest))
                 |> Option.defaultValue false }
 
-    let forRequirementGrounding (journal: AgentJournal) : RequirementGroundingPort = RequirementGroundingJournalAdapter.forRequirementGrounding journal
+    let forRequirementGrounding (journal: AgentJournal) : RequirementGroundingPort =
+        RequirementGroundingJournalAdapter.forRequirementGrounding journal
 
     let forSessionResume (journal: AgentJournal) : SessionResumeJournalPort =
         { TryResumeProfile =
@@ -127,7 +137,8 @@ module AgentJournalPortAdapter =
                 let projections = (AgentJournal.snapshot journal).AgentProjections
 
                 PromptAuthorityProjectionQueries.activeProfile sessionId projections
-                |> Option.orElseWith (fun () -> PromptAuthorityProjectionQueries.lastAuthorityProfile sessionId projections)
+                |> Option.orElseWith (fun () ->
+                    PromptAuthorityProjectionQueries.lastAuthorityProfile sessionId projections)
           CandidateRecords =
             fun parentId ->
                 AgentJournal.handleProjection journal parentId
@@ -149,7 +160,9 @@ module AgentJournalPortAdapter =
                 let isComp =
                     SessionAssociationProjection.isCompanion sessionId projections.Associations
 
-                let activeProf = PromptAuthorityProjectionQueries.activeProfile sessionId projections
+                let activeProf =
+                    PromptAuthorityProjectionQueries.activeProfile sessionId projections
+
                 let failState = sessionProj |> Option.bind (fun session -> session.ProviderFailures)
 
                 let wireState =
@@ -205,4 +218,5 @@ module AgentJournalPortAdapter =
 
     /// DELEG-029: durable composition is the only place that wraps delegation fact
     /// cases into the outer routing union and adapts the journal handle.
-    let fromAgentJournal (journal: AgentJournal) : AgentJournalPort = DelegationJournalAdapter.fromAgentJournal journal
+    let fromAgentJournal (journal: AgentJournal) : AgentJournalPort =
+        DelegationJournalAdapter.fromAgentJournal journal

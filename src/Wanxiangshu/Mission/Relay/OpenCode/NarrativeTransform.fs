@@ -97,7 +97,8 @@ module RelayNarrativeTransform =
 
         PromptAuthorityProjectionQueries.activeProfile sessionId (AgentJournal.snapshot journal).AgentProjections
         |> Option.exists (fun profile ->
-            (PromptDispatcher.forPrompts (PromptJournalAdapter.create journal)).GateNudgeAlreadyAdmitted
+            (PromptDispatcher.forPrompts (PromptJournalAdapter.create journal))
+                .GateNudgeAlreadyAdmitted
                 profile
                 PromptAuthority.ContinuationKind.ManagerGuard
                 gateKind

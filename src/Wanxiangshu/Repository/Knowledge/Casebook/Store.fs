@@ -126,8 +126,7 @@ module CasebookStore =
     // DSL-MUTABLE: resource
     let mutable private fatalTripHandler: (string -> string -> unit) option = None
 
-    let setFatalTripHandler (handler: string -> string -> unit) : unit =
-        fatalTripHandler <- Some handler
+    let setFatalTripHandler (handler: string -> string -> unit) : unit = fatalTripHandler <- Some handler
 
     let private appendEvent
         (store: IEventStore)
@@ -152,7 +151,10 @@ module CasebookStore =
             | Ok receipt when AppendReceipt.cutFor eventId receipt |> Option.isSome ->
                 let cut = AppendReceipt.cutFor eventId receipt |> Option.get
                 let reason = sprintf "%s semantic cut: %s" eventType cut.Reason
-                fatalTripHandler |> Option.iter (fun trip -> trip "casebook-semantic-cut" reason)
+
+                fatalTripHandler
+                |> Option.iter (fun trip -> trip "casebook-semantic-cut" reason)
+
                 return Error reason
             | Ok _ -> return Ok eventId
             | Error err -> return Error(sprintf "%s append failed: %A" eventType err)

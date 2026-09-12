@@ -19,8 +19,9 @@ type ICasebookSessionPort =
     abstract AbortSession: childId: SessionId -> Task<Result<unit, string>>
     abstract SubscribeTerminal: childId: SessionId * (SessionId -> Result<unit, string> -> unit) -> IDisposable
     abstract SendPrompt: childId: SessionId * promptText: string * agent: string -> Task<Result<unit, string>>
-    abstract CreateSiblingSession: ownerSessionId: SessionId * title: string * agent: string ->
-        Task<Result<SessionId, string>>
+
+    abstract CreateSiblingSession:
+        ownerSessionId: SessionId * title: string * agent: string -> Task<Result<SessionId, string>>
 
 /// Physical Bookkeeper leaf: one CreateChildSession per transaction, js-bookkeeper
 /// against process-local staging, then AbortSession.

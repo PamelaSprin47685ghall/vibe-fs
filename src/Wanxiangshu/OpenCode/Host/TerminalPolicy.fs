@@ -4,7 +4,7 @@ open System.Collections.Generic
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
-    /// Pure terminal admission rules; no Host transport or mutable registry.
+/// Pure terminal admission rules; no Host transport or mutable registry.
 module TerminalPolicy =
 
     let sessionDead (port: TerminalPolicyPort option) (sessionId: SessionId) =
@@ -20,8 +20,6 @@ module TerminalPolicy =
     /// Durable-side evidence the caller supplies through `TerminalPolicyPort`:
     /// linked child lookup `IsLinkedChild` and session canonical role
     /// `TryCanonicalRole` — see `AgentJournalPortAdapter.forTerminalPolicy`.
-
-
     /// `isTopLevelManager` reads three orthogonal facts: the durable-family linked-child
     /// predicate, the canonical role, and the host's flow-level parent map. The truth
     /// table coerces the role-and-parent pair into a single switch — the domain fact

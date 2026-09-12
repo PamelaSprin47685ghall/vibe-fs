@@ -64,4 +64,5 @@ module WorkspaceEventStoreSurface =
     let release (handle: JournalHandle) : unit = handle.Dispose()
 
     /// Test whether two handles refer to the same journal instance.
-    let same (left: JournalHandle) (right: JournalHandle) : bool = obj.ReferenceEquals(left.Journal, right.Journal)
+    let same (left: JournalHandle) (right: JournalHandle) : bool =
+        obj.ReferenceEquals(left.Journal, right.Journal)

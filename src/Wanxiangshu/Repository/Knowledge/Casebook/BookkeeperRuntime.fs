@@ -22,8 +22,9 @@ type ICasebookSessionPort =
     abstract AbortSession: childId: SessionId -> Task<Result<unit, string>>
     abstract SubscribeTerminal: childId: SessionId * (SessionId -> Result<unit, string> -> unit) -> IDisposable
     abstract SendPrompt: childId: SessionId * promptText: string * agent: string -> Task<Result<unit, string>>
-    abstract CreateSiblingSession: ownerSessionId: SessionId * title: string * agent: string ->
-        Task<Result<SessionId, string>>
+
+    abstract CreateSiblingSession:
+        ownerSessionId: SessionId * title: string * agent: string -> Task<Result<SessionId, string>>
 
 /// Physical Bookkeeper leaf: one CreateChildSession per transaction, js-bookkeeper
 /// against process-local staging, then AbortSession.
@@ -158,7 +159,10 @@ module BookkeeperRuntime =
             (resolveActiveOwner: SessionId -> PromptAuthority.AuthorityExecutionProfile option)
             : unit =
             lock gate (fun () ->
-                runtime <- Some { Port = port; ResolveActiveOwner = resolveActiveOwner })
+                runtime <-
+                    Some
+                        { Port = port
+                          ResolveActiveOwner = resolveActiveOwner })
 
         let reset () : unit =
             lock gate (fun () ->
@@ -273,14 +277,14 @@ module BookkeeperRuntime =
             : Task<Result<string * string, string>> =
             task {
                 let! res = sessions.SendPrompt(childId, promptText, agent)
+
                 match res with
                 | Error reason ->
                     disposeSub ()
                     BookkeeperStaging.abort txId
                     do! retire sessions childId
                     return Error reason
-                | Ok () ->
-                    return! awaitCompletion sessions txId childId completion disposeSub
+                | Ok() -> return! awaitCompletion sessions txId childId completion disposeSub
             }
 
         let runChild
@@ -310,10 +314,15 @@ module BookkeeperRuntime =
                 let mutable subscription: System.IDisposable option = None
 
                 subscription <-
-                    Some(sessions.SubscribeTerminal(childId, (fun _ outcome ->
-                        match outcome with
-                        | Ok () -> AsyncSupport.trySetResult completion (Ok()) |> ignore
-                        | Error err -> AsyncSupport.trySetResult completion (Error err) |> ignore)))
+                    Some(
+                        sessions.SubscribeTerminal(
+                            childId,
+                            (fun _ outcome ->
+                                match outcome with
+                                | Ok() -> AsyncSupport.trySetResult completion (Ok()) |> ignore
+                                | Error err -> AsyncSupport.trySetResult completion (Error err) |> ignore)
+                        )
+                    )
 
                 let disposeSub () =
                     subscription |> Option.iter (fun active -> active.Dispose())
@@ -332,7 +341,15 @@ module BookkeeperRuntime =
                     let promptText = Decisions.envelope kind ownerKey q a observations extraTranscript
                     Ledger.authorize childId (ParticipantIdentity.selectedAgent participantIdentity) promptText
 
-                    return! sendBookkeeperPrompt sessions txId childId completion disposeSub promptText (ParticipantIdentity.selectedAgent participantIdentity)
+                    return!
+                        sendBookkeeperPrompt
+                            sessions
+                            txId
+                            childId
+                            completion
+                            disposeSub
+                            promptText
+                            (ParticipantIdentity.selectedAgent participantIdentity)
             }
 
         let activeOwnerProfile (runtime: Runtime) (ownerSessionId: SessionId) =
@@ -361,7 +378,13 @@ module BookkeeperRuntime =
                     let txId = Guid.NewGuid().ToString("N")
                     BookkeeperStaging.beginTransaction txId q a
 
-                    match! runtime.Port.CreateSiblingSession(ownerSessionId, "bookkeeper:" + txId, Decisions.canonicalAgent) with
+                    match!
+                        runtime.Port.CreateSiblingSession(
+                            ownerSessionId,
+                            "bookkeeper:" + txId,
+                            Decisions.canonicalAgent
+                        )
+                    with
                     | Error error ->
                         BookkeeperStaging.abort txId
                         return Error error

@@ -69,12 +69,14 @@ module ChildPromptAuthority =
                 let owner = prompts.ProjectionFor turn.SessionId
                 let handle = prompts.HandleForChild turn.SessionId
                 let activeProfile = owner.ActiveLogicalRun
+
                 let accepted =
                     owner.AcceptedDispatches
-                    |> Seq.tryPick (fun (KeyValue(_, dispatch)) -> if dispatch.PhysicalUserMessageId = turn.PhysicalUserMessageId then Some dispatch else None)
-                    |> Option.filter (fun claim ->
-                        claim.Origin = PromptAuthority.PromptOrigin.AuthorityRoot
-                                           PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
+                    |> Seq.map (fun (KeyValue(_, dispatch)) -> dispatch)
+                    |> Seq.tryFind (fun dispatch ->
+                        dispatch.PhysicalUserMessageId = turn.PhysicalUserMessageId
+                        && dispatch.Origin = PromptAuthority.PromptOrigin.AuthorityRoot
+                                                 PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
 
                 let runtime = PromptDispatcher.forPrompts prompts
                 return! registerLinkedChildIfNeeded runtime turn handle activeProfile accepted

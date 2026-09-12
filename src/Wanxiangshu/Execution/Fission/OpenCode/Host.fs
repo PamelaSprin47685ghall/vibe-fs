@@ -297,7 +297,8 @@ module FissionHost =
 
     let private ownerAuthority projections ownerSessionId =
         PromptAuthorityProjectionQueries.activeProfile ownerSessionId projections
-        |> Option.orElseWith (fun () -> PromptAuthorityProjectionQueries.lastAuthorityProfile ownerSessionId projections)
+        |> Option.orElseWith (fun () ->
+            PromptAuthorityProjectionQueries.lastAuthorityProfile ownerSessionId projections)
 
     let private allLaneWorkPresent (group: FissionGroupProjection) =
         group.LaneWork.Count = group.LaneCount
