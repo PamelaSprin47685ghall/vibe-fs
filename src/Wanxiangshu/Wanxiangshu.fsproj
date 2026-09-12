@@ -635,6 +635,16 @@
     <Compile Include="OpenCode/Host/TerminalPolicyPort.fs"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/HostJoinGuardJournalPort.fsi"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/HostJoinGuardJournalPort.fs"/>
+    <Compile Include="Composition/Durable/DelegationJournalAdapter.fsi"/>
+    <Compile Include="Composition/Durable/DelegationJournalAdapter.fs"/>
+    <Compile Include="Composition/Durable/AttentionConcernJournalAdapter.fsi"/>
+    <Compile Include="Composition/Durable/AttentionConcernJournalAdapter.fs"/>
+    <Compile Include="Composition/Durable/InstitutionalLearningJournalAdapter.fsi"/>
+    <Compile Include="Composition/Durable/InstitutionalLearningJournalAdapter.fs"/>
+    <Compile Include="Composition/Durable/SessionStartedAtJournalAdapter.fsi"/>
+    <Compile Include="Composition/Durable/SessionStartedAtJournalAdapter.fs"/>
+    <Compile Include="Composition/Durable/RequirementGroundingJournalAdapter.fsi"/>
+    <Compile Include="Composition/Durable/RequirementGroundingJournalAdapter.fs"/>
     <Compile Include="Composition/Durable/AgentJournalPortAdapter.fsi"/>
     <Compile Include="Composition/Durable/AgentJournalPortAdapter.fs"/>
     <Compile Include="Git/Subject.fsi"/>

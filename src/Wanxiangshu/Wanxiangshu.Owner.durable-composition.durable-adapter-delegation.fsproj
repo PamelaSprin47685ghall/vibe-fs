@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <WanxiangshuSubsystem>durable-composition</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>durable-adapter-delegation</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>durable-composition</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>durable-adapter-delegation</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-agentjournal.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-journal-port.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.digest.fsproj"/>
+    <Compile Include="Composition/Durable/DelegationJournalAdapter.fsi"/>
+    <Compile Include="Composition/Durable/DelegationJournalAdapter.fs"/>
+  </ItemGroup>
+</Project>
