@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>change</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>durable-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>change-orchestrator-port-adapter</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>change-integration</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>change-orchestrator-port-adapter</WanxiangshuOwnerLocality>
