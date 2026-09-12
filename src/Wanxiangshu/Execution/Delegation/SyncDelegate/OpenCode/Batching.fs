@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 
@@ -46,14 +47,14 @@ module SyncDelegateBatching =
         }
 
     let private resolveFromSnapshot
-        (scope: ToolRuntimeScope)
+        (snapshot: ISessionSnapshotPort option)
         (owner: SessionId)
         (providerRun: ProviderRunIdentity)
         (role: SyncDelegateRole)
         (currentCall: ToolCallId)
         : Task<SyncDelegateBatch option> =
         task {
-            match scope.Snapshot with
+            match snapshot with
             | None -> return None
             | Some snapshot ->
                 let! messages = tryReadMessages snapshot owner
@@ -91,7 +92,7 @@ module SyncDelegateBatching =
 
     let private resolveBatch
         (runtime: SyncDelegateRuntime)
-        (scope: ToolRuntimeScope)
+        (snapshot: ISessionSnapshotPort option)
         (owner: SessionId)
         (providerRun: ProviderRunIdentity)
         (role: SyncDelegateRole)
@@ -99,13 +100,13 @@ module SyncDelegateBatching =
         : Task<SyncDelegateBatch option> =
         task {
             let observed = runtime.TryObservedBatch(owner, providerRun, role, currentCall)
-            let! snapshot = resolveFromSnapshot scope owner providerRun role currentCall
-            return moreCompleteBatch observed snapshot
+            let! snapshotBatch = resolveFromSnapshot snapshot owner providerRun role currentCall
+            return moreCompleteBatch observed snapshotBatch
         }
 
     let resolve
         (runtime: SyncDelegateRuntime)
-        (scope: ToolRuntimeScope)
+        (snapshot: ISessionSnapshotPort option)
         (role: SyncDelegateRole)
         (context: HostToolContext)
         =
@@ -113,7 +114,7 @@ module SyncDelegateBatching =
             match context.ProviderRunId, context.ToolCallId with
             | Some providerRun, Some currentCall when not (String.IsNullOrWhiteSpace context.SessionId) ->
                 let owner = SessionId.create context.SessionId
-                return! resolveBatch runtime scope owner providerRun role currentCall
+                return! resolveBatch runtime snapshot owner providerRun role currentCall
             | _ -> return None
         }
 

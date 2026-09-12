@@ -8,6 +8,11 @@ open Wanxiangshu.Host
 open Wanxiangshu.Persistence.Journal
 
 /// HOST-006: observe reconciled snapshots for compaction startup gate + reanchor.
+type CompactionProbe =
+    { TryClaimStartupProbe: unit -> bool
+      ReadCompactionSettingGap: unit -> CompactionSetting option
+      IsStartupProbeOpen: unit -> bool }
+
 module HostCompactionObserver =
 
     /// Observe every reconciled snapshot for compaction pseudo-runs and reanchor
@@ -26,26 +31,22 @@ module HostCompactionObserver =
         | CompactionGateVerdict.Satisfied -> ()
         | failed -> raise (InvalidOperationException(HostCompactionPolicy.describeVerdict failed))
 
-    let private applyStartupVerdict (scope: PluginRuntimeScope) verdict =
-        if scope.TryClaimStartupProbe() then
+    let private applyStartupVerdict (probe: CompactionProbe) verdict =
+        if probe.TryClaimStartupProbe() then
             raiseOnStartupFailure verdict
 
-    let private runStartupProbe
-        (scope: PluginRuntimeScope)
-        (sessionId: SessionId)
-        (messages: SessionMessage list)
-        : unit =
-        match HostCompactionGate.judgeStartup scope.CompactionSettingGap sessionId messages with
+    let private runStartupProbe (probe: CompactionProbe) (sessionId: SessionId) (messages: SessionMessage list) : unit =
+        match HostCompactionGate.judgeStartup (probe.ReadCompactionSettingGap()) sessionId messages with
         | None -> ()
-        | Some verdict -> applyStartupVerdict scope verdict
+        | Some verdict -> applyStartupVerdict probe verdict
 
     let private observeStartupProbe
-        (scope: PluginRuntimeScope)
+        (probe: CompactionProbe)
         (sessionId: SessionId)
         (messages: SessionMessage list)
         : unit =
-        if scope.IsStartupProbeOpen then
-            runStartupProbe scope sessionId messages
+        if probe.IsStartupProbeOpen() then
+            runStartupProbe probe sessionId messages
 
     let private observedCompactions messages =
         messages
@@ -69,7 +70,7 @@ module HostCompactionObserver =
             reanchorObserved journal sessionId observed
 
     let observe
-        (scope: PluginRuntimeScope)
+        (probe: CompactionProbe)
         (journal: AgentJournal option)
         (sessionId: SessionId)
         (messages: SessionMessage list)
@@ -79,7 +80,7 @@ module HostCompactionObserver =
             // No durable-family gate is fabricated here, and Waiting is never
             // treated as Ready.
             // HOST-006 prevention layer's second half: the runtime probe.
-            observeStartupProbe scope sessionId messages
+            observeStartupProbe probe sessionId messages
 
             match journal with
             | None -> ()

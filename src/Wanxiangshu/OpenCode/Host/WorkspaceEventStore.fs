@@ -35,7 +35,10 @@ module WorkspaceEventStore =
         let active =
             lazy
                 (let writerId = Guid.NewGuid().ToString("N")
-                 let integrator = CanonicalIntegrator.createWithRules hostProgram
+
+                 let integrator =
+                     CanonicalIntegrator.createWithRules hostProgram AuthoritativeEventTypes.isKnown
+
                  EventStore.createLocal commonDir writerId integrator)
 
         { new IEventStore with

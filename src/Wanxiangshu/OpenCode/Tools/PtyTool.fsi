@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Execution.Delegation.Fork.Host
+
 /// DevOps terminal verbs — open / send / read / signal (AGENT-006).
 module PtyTool =
 
@@ -70,11 +72,18 @@ module PtyTool =
             [<Literal>]
             val SignalSent: string = "tool/signal-terminal/signal-sent"
 
+    type PtyRuntimeContext =
+        { IsDevOps: HostToolContext -> bool
+          ManagedAgentFor: HostToolContext -> ManagedAgent option
+          RuntimeFor: HostToolContext -> Result<HostForkRuntime, string>
+          DirectoryFor: string -> string option
+          WorkspaceDirectory: string option }
+
     val admission: ToolAdmission
-    val openSpec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
-    val sendSpec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
-    val readSpec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
-    val signalSpec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
+    val openSpec: factory: HostToolFactory -> context: PtyRuntimeContext -> ToolSpec
+    val sendSpec: factory: HostToolFactory -> context: PtyRuntimeContext -> ToolSpec
+    val readSpec: factory: HostToolFactory -> context: PtyRuntimeContext -> ToolSpec
+    val signalSpec: factory: HostToolFactory -> context: PtyRuntimeContext -> ToolSpec
 
     /// All four terminal verb specs.
-    val specs: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec list
+    val specs: factory: HostToolFactory -> context: PtyRuntimeContext -> ToolSpec list

@@ -5,6 +5,7 @@ open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Repository.Programming.Js.OpenCode
@@ -64,11 +65,15 @@ module RequirementGroundingRepositorySurface =
                caseName = caseName
                failureCode = failureCode
                pendingPackages =
-                RequirementGroundingRuntime.pending journal session
+                let port = AgentJournalPortAdapter.forRequirementGrounding journal
+
+                RequirementGroundingRuntime.pending port session
                 |> List.map _.PackageName
                 |> List.toArray
                pendingMaterials =
-                RequirementGroundingRuntime.pending journal session
+                let port = AgentJournalPortAdapter.forRequirementGrounding journal
+
+                RequirementGroundingRuntime.pending port session
                 |> List.collect _.Materials
                 |> List.map _.Path
                 |> List.sort

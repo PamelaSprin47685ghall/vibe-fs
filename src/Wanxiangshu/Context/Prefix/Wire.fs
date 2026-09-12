@@ -31,6 +31,13 @@ type XWireReconciliationDecision =
       Cleared: bool
       KeptPlan: bool }
 
+type AttemptPlanCapability =
+    { TryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option
+      TryBindAttemptPlan: SessionId -> PhysicalUserMessageId -> ProviderRunIdentity -> AttemptPlan option
+      ConsumeAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option
+      FreezePendingAttemptPlan: SessionId -> PhysicalUserMessageId -> PendingAttemptPlan -> PendingAttemptPlanAdmission
+      TryPendingAttemptPlan: SessionId -> PhysicalUserMessageId -> PendingAttemptPlan option }
+
 module XWire =
 
     let mayProbe (budget: ProviderFailureBudget.FailureBudget) : bool = budget.ConsecutiveFailureCount > 0
@@ -364,13 +371,14 @@ module XWire =
         (plan: AttemptPlan)
         : Task<Result<unit, string>> =
         if ProviderRequestKind.clearsFailureCountOnSuccess plan.Profile.RequestKind then
-            ProviderFailureLedger.recordConfirmedSuccess durable sessionId providerRun
+            let port = AgentJournalPortAdapter.forProviderFailure durable
+            ProviderFailureLedger.recordConfirmedSuccess port sessionId providerRun
         else
             Task.FromResult(Ok())
 
     let private settleAttemptPlan
         (durable: AgentJournal)
-        (scope: PluginRuntimeScope)
+        (attempts: AttemptPlanCapability)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
         (outcome: AttemptOutcome)
@@ -401,7 +409,7 @@ module XWire =
             |> requireOk
             |> ignore
 
-            scope.ConsumeAttemptPlan sessionId providerRun |> ignore
+            attempts.ConsumeAttemptPlan sessionId providerRun |> ignore
         }
 
     let private toolContinuationBinding
@@ -427,31 +435,31 @@ module XWire =
 
     let private settleVisibleToolContinuation
         (durable: AgentJournal)
-        (scope: PluginRuntimeScope)
+        (attempts: AttemptPlanCapability)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
         (physical: PhysicalUserMessageId option)
         : Task =
         let plan =
-            match scope.TryAttemptPlan sessionId providerRun with
+            match attempts.TryAttemptPlan sessionId providerRun with
             | Some existing -> Some existing
             | None ->
                 physical
-                |> Option.bind (fun parent -> scope.TryBindAttemptPlan sessionId parent providerRun)
+                |> Option.bind (fun parent -> attempts.TryBindAttemptPlan sessionId parent providerRun)
 
         match plan with
         | None -> Task.FromResult(())
-        | Some plan -> settleAttemptPlan durable scope sessionId providerRun AttemptOutcome.Completed plan
+        | Some plan -> settleAttemptPlan durable attempts sessionId providerRun AttemptOutcome.Completed plan
 
     let private settleVisibleToolContinuations
         (durable: AgentJournal)
-        (scope: PluginRuntimeScope)
+        (attempts: AttemptPlanCapability)
         (sessionId: SessionId)
         (rawMessages: obj list)
         : Task =
         task {
             for providerRun, physical in rawMessages |> List.choose toolContinuationBinding |> List.distinct do
-                do! settleVisibleToolContinuation durable scope sessionId providerRun physical
+                do! settleVisibleToolContinuation durable attempts sessionId providerRun physical
         }
 
     let private applyCommittedPrefix
@@ -511,12 +519,12 @@ module XWire =
             (Roles.roleLabel authority.CanonicalRole)
 
     let private requireAdmittedPendingPlan
-        (scope: PluginRuntimeScope)
+        (attempts: AttemptPlanCapability)
         (sessionId: SessionId)
         (physical: PhysicalUserMessageId)
         (pendingPlan: PendingAttemptPlan)
         : PendingAttemptPlan =
-        match scope.Recovery.FreezePendingAttemptPlan sessionId physical pendingPlan with
+        match attempts.FreezePendingAttemptPlan sessionId physical pendingPlan with
         | PendingAttemptPlanAdmission.Admitted plan -> plan
         | PendingAttemptPlanAdmission.ReplayedExisting plan -> plan
         | PendingAttemptPlanAdmission.PlanConflict(existing, attempted) when
@@ -566,7 +574,7 @@ module XWire =
 
     let private planProviderRetry
         (durable: AgentJournal)
-        (scope: PluginRuntimeScope)
+        (attempts: AttemptPlanCapability)
         (sessionId: SessionId)
         (physical: PhysicalUserMessageId)
         (output: obj)
@@ -577,14 +585,16 @@ module XWire =
 
             match
                 PromptAuthorityLedger.activeProfile sessionId projections.AgentProjections,
-                ProviderFailureEvidence.tryCurrentState sessionId projections,
+                (AgentProjection.tryFind sessionId projections.AgentProjections
+                 |> Option.bind _.ProviderFailures
+                 |> ProviderFailureEvidence.tryCurrentState),
                 sessionProjection durable sessionId
             with
             | Some authority, Some failure, Some state ->
                 let prefix = state.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
 
                 let existingPlan =
-                    match scope.Recovery.TryPendingAttemptPlan sessionId physical with
+                    match attempts.TryPendingAttemptPlan sessionId physical with
                     | Some existing when existing.Authority = authority -> Some existing
                     | Some existing ->
                         raise (
@@ -623,7 +633,7 @@ module XWire =
                                     selectProbeForPlan
 
                             // Freeze pending plan BEFORE rendering or modifying wire output.
-                            return requireAdmittedPendingPlan scope sessionId physical pendingPlan
+                            return requireAdmittedPendingPlan attempts sessionId physical pendingPlan
                         }
 
                 let presentationHorizon =
@@ -668,7 +678,7 @@ module XWire =
 
     let private applyNonReplicaTransform
         (durable: AgentJournal)
-        (scope: PluginRuntimeScope)
+        (attempts: AttemptPlanCapability)
         (sessionId: SessionId)
         (_snapshot: ISessionSnapshotPort option)
         (output: obj)
@@ -680,7 +690,7 @@ module XWire =
             // A successful probe may have ended with tool calls. That provider
             // attempt is complete even though the Host turn continues through the
             // tool loop. Settle it before reading PrefixEpoch for this request.
-            do! settleVisibleToolContinuations durable scope sessionId rawMessages
+            do! settleVisibleToolContinuations durable attempts sessionId rawMessages
 
             let recoveryAttempt =
                 physical
@@ -692,13 +702,13 @@ module XWire =
             | None ->
                 do! applyOrdinaryCommittedPrefix durable sessionId rawMessages output
                 return PrefixPresentationHorizon.Current
-            | Some physical -> return! planProviderRetry durable scope sessionId physical output rawMessages
+            | Some physical -> return! planProviderRetry durable attempts sessionId physical output rawMessages
         }
 
     let private applySessionTransform
         (isReplicaSession: SessionId -> bool)
         (durable: AgentJournal)
-        (scope: PluginRuntimeScope)
+        (attempts: AttemptPlanCapability)
         (sessionId: SessionId)
         (snapshot: ISessionSnapshotPort option)
         (output: obj)
@@ -707,20 +717,20 @@ module XWire =
             if isReplicaSession sessionId then
                 return PrefixPresentationHorizon.Current
             else
-                return! applyNonReplicaTransform durable scope sessionId snapshot output
+                return! applyNonReplicaTransform durable attempts sessionId snapshot output
         }
 
     let applyTransform
         (isReplicaSession: SessionId -> bool)
         (snapshot: ISessionSnapshotPort option)
         (journal: AgentJournal option)
-        (scope: PluginRuntimeScope)
+        (attempts: AttemptPlanCapability)
         (output: obj)
         : Task<PrefixPresentationHorizon> =
         task {
             match journal, sessionIdOfOutput output with
             | Some durable, Some sessionId when not (isCompanionSession durable sessionId) ->
-                return! applySessionTransform isReplicaSession durable scope sessionId snapshot output
+                return! applySessionTransform isReplicaSession durable attempts sessionId snapshot output
             | _ -> return PrefixPresentationHorizon.Current
         }
 
@@ -735,7 +745,7 @@ module XWire =
 
     let private reconcilePlannedAttempt
         (durable: AgentJournal)
-        (scope: PluginRuntimeScope)
+        (attempts: AttemptPlanCapability)
         (turn: ReconciledTurn)
         (plan: AttemptPlan)
         : Task =
@@ -743,26 +753,30 @@ module XWire =
         let decision = reconciliationDecision true outcome false false
 
         match outcome, decision.Cleared with
-        | Some settled, true -> settleAttemptPlan durable scope turn.SessionId turn.ProviderRun settled plan
+        | Some settled, true -> settleAttemptPlan durable attempts turn.SessionId turn.ProviderRun settled plan
         | _ -> Task.FromResult(())
 
-    let private attemptPlanForTurn (scope: PluginRuntimeScope) (turn: ReconciledTurn) =
-        scope.TryAttemptPlan turn.SessionId turn.ProviderRun
+    let private attemptPlanForTurn (attempts: AttemptPlanCapability) (turn: ReconciledTurn) =
+        attempts.TryAttemptPlan turn.SessionId turn.ProviderRun
         |> Option.orElseWith (fun () ->
-            scope.TryBindAttemptPlan turn.SessionId turn.PhysicalUserMessageId turn.ProviderRun)
+            attempts.TryBindAttemptPlan turn.SessionId turn.PhysicalUserMessageId turn.ProviderRun)
 
     let private plannedReconciliation
         (journal: AgentJournal option)
-        (scope: PluginRuntimeScope)
+        (attempts: AttemptPlanCapability)
         (turn: ReconciledTurn)
         =
         journal
-        |> Option.bind (fun durable -> attemptPlanForTurn scope turn |> Option.map (fun plan -> durable, plan))
+        |> Option.bind (fun durable -> attemptPlanForTurn attempts turn |> Option.map (fun plan -> durable, plan))
 
     /// Settle the physical provider attempt, not the larger Host turn.
     /// `finish=tool-calls` therefore closes a successful attempt plan while the
     /// Host tool loop continues; only a genuinely provisional snapshot keeps it.
-    let reconcileAttempt (journal: AgentJournal option) (scope: PluginRuntimeScope) (turn: ReconciledTurn) : Task =
-        match plannedReconciliation journal scope turn with
-        | Some(durable, plan) -> reconcilePlannedAttempt durable scope turn plan
+    let reconcileAttempt
+        (journal: AgentJournal option)
+        (attempts: AttemptPlanCapability)
+        (turn: ReconciledTurn)
+        : Task =
+        match plannedReconciliation journal attempts turn with
+        | Some(durable, plan) -> reconcilePlannedAttempt durable attempts turn plan
         | None -> Task.FromResult(())

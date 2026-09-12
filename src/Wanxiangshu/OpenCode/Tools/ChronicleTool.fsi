@@ -35,4 +35,7 @@ module ChronicleTool =
     val admission: bloggerHost: IBloggerRuntimeHost option -> ToolAdmission
 
     val spec:
-        factory: HostToolFactory -> runtime: ToolRuntimeScope -> bloggerHost: IBloggerRuntimeHost option -> ToolSpec
+        factory: HostToolFactory ->
+        terminateSession: (string * string -> System.Threading.Tasks.Task<Result<unit, string>>) ->
+        bloggerHost: IBloggerRuntimeHost option ->
+            ToolSpec

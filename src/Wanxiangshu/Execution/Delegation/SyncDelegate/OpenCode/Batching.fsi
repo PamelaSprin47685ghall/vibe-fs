@@ -3,6 +3,7 @@ namespace Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 
@@ -14,7 +15,7 @@ module SyncDelegateBatching =
 
     val resolve:
         runtime: SyncDelegateRuntime ->
-        scope: ToolRuntimeScope ->
+        snapshot: ISessionSnapshotPort option ->
         role: SyncDelegateRole ->
         context: HostToolContext ->
             Task<SyncDelegateBatch option>

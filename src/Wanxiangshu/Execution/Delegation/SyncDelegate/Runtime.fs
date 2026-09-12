@@ -284,7 +284,9 @@ type SyncDelegateRuntime
             fun sessionId expectedToolCalls ->
                 task {
                     match expectedToolCalls with
-                    | Some expected -> do! DelegatedToolEstimateLedger.replace journal sessionId expected
+                    | Some expected ->
+                        let port = AgentJournalPortAdapter.forDelegatedToolEstimate journal
+                        do! DelegatedToolEstimateLedger.replace port sessionId expected
                     | None -> ()
                 }
           SendPrompt = fun call request -> sendDelegatePrompt call request

@@ -1019,7 +1019,7 @@ module EnforcerContinuation =
     /// generic family recovery gate is deleted; Waiting is never treated as
     /// Ready.
     let private runEnforcerContinuation
-        (scope: PluginRuntimeScope)
+        (scope: IBloggerRuntimeHost)
         (journal: AgentJournal option)
         (terminateSession: SessionTermination)
         (sid: SessionId)
@@ -1029,13 +1029,13 @@ module EnforcerContinuation =
         task {
             let bloggerMessages = unbox<obj array> outObj?messages |> Array.toList
 
-            let! outcome = handleContinuation scope.BloggerRuntimeHost journal sid bloggerMessages
+            let! outcome = handleContinuation scope journal sid bloggerMessages
 
             do! applyContinuationOutcome terminateSession sid sessionId bloggerMessages outObj outcome
         }
 
     let private runEnforcerIfMainAssociated
-        (scope: PluginRuntimeScope)
+        (scope: IBloggerRuntimeHost)
         (journal: AgentJournal option)
         (durable: AgentJournal)
         (terminateSession: SessionTermination)
@@ -1050,7 +1050,7 @@ module EnforcerContinuation =
         | None -> Task.FromResult()
 
     let applyContinuation
-        (scope: PluginRuntimeScope)
+        (scope: IBloggerRuntimeHost)
         (journal: AgentJournal option)
         (terminateSession: SessionTermination)
         (projectionSessionIdOpt: string option)

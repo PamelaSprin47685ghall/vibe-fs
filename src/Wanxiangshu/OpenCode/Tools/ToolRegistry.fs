@@ -202,18 +202,31 @@ module ToolRegistry =
         let baseSpecs =
             [ yield ForkTool.managerSpec factory runtime
               yield ForkTool.resumeSpec factory runtime
-              yield! PtyTool.specs factory runtime
+              let ptyContext: PtyTool.PtyRuntimeContext =
+                  { IsDevOps = fun ctx -> runtime.IsRole(ctx, Role.DevOps)
+                    ManagedAgentFor = runtime.ManagedAgentFor
+                    RuntimeFor = runtime.RuntimeFor
+                    DirectoryFor = runtime.DirectoryFor
+                    WorkspaceDirectory = runtime.WorkspaceDirectory }
+
+              yield! PtyTool.specs factory ptyContext
               yield ForkTool.orchestratorSpec factory runtime
               yield JoinTool.spec runtime
-              yield HorizonTool.spec runtime
+
+              let horizonContext: HorizonTool.HorizonRuntimeContext =
+                  { RuntimeFor = runtime.RuntimeFor
+                    LogicalOwnerFor = runtime.LogicalOwnerFor
+                    Journal = runtime.Journal }
+
+              yield HorizonTool.spec horizonContext
               yield FissionTool.spec factory runtime
               yield ReviewTool.spec factory runtime
               yield SuicideTool.spec factory runtime
               yield ExecutorTool.runSpec factory runtime
               yield ExecutorTool.queryShellSpec factory runtime
-              yield InspectorTool.spec factory runtime syncDelegateRuntime
-              yield CoderTool.establishSpec factory runtime syncDelegateRuntime
-              yield CoderTool.repairSpec factory runtime syncDelegateRuntime
+              yield InspectorTool.spec factory runtime.WorkspaceDirectory runtime.Snapshot syncDelegateRuntime
+              yield CoderTool.establishSpec factory runtime.WorkspaceDirectory runtime.Snapshot syncDelegateRuntime
+              yield CoderTool.repairSpec factory runtime.WorkspaceDirectory runtime.Snapshot syncDelegateRuntime
               yield FileMutationTools.mvSpec factory
               yield FileMutationTools.rmSpec factory
               yield BashHoneypotTool.spec
@@ -221,7 +234,13 @@ module ToolRegistry =
               yield! AttentionTools.specs factory (journal |> Option.map AgentJournalPortAdapter.forAttention)
               yield! ConcernTools.specs factory journal
               yield! InstitutionalLearningTools.specs factory journal
-              yield ChronicleTool.spec factory runtime bloggerHost
+
+              yield
+                  ChronicleTool.spec
+                      factory
+                      (fun (sessionId, reason) -> runtime.TerminateSession(sessionId, reason))
+                      bloggerHost
+
               yield! casebookToolSpecs
               yield! generatedJsSpecs () ]
 

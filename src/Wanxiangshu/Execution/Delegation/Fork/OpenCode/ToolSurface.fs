@@ -290,7 +290,7 @@ module ForkToolSurface =
                 EventStore.createLocal
                     directory
                     (Guid.NewGuid().ToString("N"))
-                    (CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules)
+                    (CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules AuthoritativeEventTypes.isKnown)
 
             match!
                 EventStoreJournalWriter.resumeOrCreate (
@@ -613,7 +613,13 @@ module ForkToolSurface =
 
     let executeHorizon (value: obj) (owner: string) : Task<string> =
         let harness = unbox<ForkHarness> value
-        let spec = HorizonTool.spec harness.Scope
+
+        let horizonContext: HorizonTool.HorizonRuntimeContext =
+            { RuntimeFor = harness.Scope.RuntimeFor
+              LogicalOwnerFor = harness.Scope.LogicalOwnerFor
+              Journal = harness.Scope.Journal }
+
+        let spec = HorizonTool.spec horizonContext
         spec.Execute (HostToolArguments(box {| |})) (managerContext harness owner)
 
     let settle (value: obj) (owner: string) (answer: string) (providerRun: string) : Task<bool> =

@@ -5,6 +5,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -56,6 +57,11 @@ module HorizonTool =
 
         [<Literal>]
         let LatestWorkUnavailable = "tool/horizon/latest-work-unavailable"
+
+    type HorizonRuntimeContext =
+        { RuntimeFor: HostToolContext -> Result<HostForkRuntime, string>
+          LogicalOwnerFor: SessionId -> SessionId
+          Journal: AgentJournal option }
 
     let private lang (ctx: HostToolContext) =
         ProviderLanguageBinding.forSessionText ctx.SessionId
@@ -147,14 +153,16 @@ module HorizonTool =
                 do! appendHandleLines language journal snapshot runtimeByAgentId agentLines handle
         }
 
-    let private executeWithJournal language (scope: ToolRuntimeScope) context (journal: AgentJournal) =
+    let private executeWithJournal language (runtimeCtx: HorizonRuntimeContext) context (journal: AgentJournal) =
         task {
-            match scope.RuntimeFor context with
+            match runtimeCtx.RuntimeFor context with
             | Error _ -> return unavailable language Path.CannotBeSeen
             | Ok runtime ->
                 let agents, ptys = runtime.List()
                 let snapshot = AgentJournal.snapshot journal
-                let parentSessionId = SessionId.create context.SessionId |> scope.LogicalOwnerFor
+
+                let parentSessionId =
+                    SessionId.create context.SessionId |> runtimeCtx.LogicalOwnerFor
 
                 let durableHandles =
                     AgentProjection.tryFind parentSessionId snapshot.AgentProjections
@@ -179,22 +187,22 @@ module HorizonTool =
                 return ToolHostCodec.tomlObjectWithInstructions (rosterInstructions language lines) []
         }
 
-    let private execute (scope: ToolRuntimeScope) (_args: HostToolArguments) context =
+    let private execute (runtimeCtx: HorizonRuntimeContext) (_args: HostToolArguments) context =
         task {
             let language = lang context
 
-            match scope.Journal with
+            match runtimeCtx.Journal with
             | None -> return unavailable language Path.UnavailableFromContext
-            | Some journal -> return! executeWithJournal language scope context journal
+            | Some journal -> return! executeWithJournal language runtimeCtx context journal
         }
 
     let admission: ToolAdmission =
         ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Horizon)
 
-    let spec scope =
+    let spec (runtimeCtx: HorizonRuntimeContext) =
         { Name = "horizon"
           Description =
             ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Description Map.empty
           Arguments = []
           Admission = admission
-          Execute = execute scope }
+          Execute = execute runtimeCtx }

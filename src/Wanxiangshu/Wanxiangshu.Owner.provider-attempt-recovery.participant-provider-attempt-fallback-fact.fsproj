@@ -19,5 +19,7 @@
     <Compile Include="Participant/Provider/Attempt/RetryPolicy.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Projection.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Projection.fs"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailurePort.fsi"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailurePort.fs"/>
   </ItemGroup>
 </Project>

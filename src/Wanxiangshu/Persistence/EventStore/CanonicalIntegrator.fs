@@ -323,13 +323,13 @@ module CanonicalIntegrator =
                 fullReplayUsed <- true
                 true)
 
-    let private validateLocalHistory commonDir streams =
+    let private validateLocalHistory (isEventTypeKnown: string -> bool) commonDir streams =
         result {
             let events = streams |> List.collect snd
 
             do!
                 events
-                |> List.tryFind (fun envelope -> not (AuthoritativeEventTypes.isKnown envelope.EventType))
+                |> List.tryFind (fun envelope -> not (isEventTypeKnown envelope.EventType))
                 |> Option.map (fun envelope ->
                     Error(sprintf "unknown durable event type during replay: %s" envelope.EventType))
                 |> Option.defaultValue (Ok())
@@ -346,7 +346,7 @@ module CanonicalIntegrator =
 
     /// Explicit construction seam. `rules` is the complete history program
     /// in registration order; domain rules arrive from their owning modules.
-    let createWithRules (rules: IntegrationRule list) : ICanonicalIntegrator =
+    let createWithRules (rules: IntegrationRule list) (isEventTypeKnown: string -> bool) : ICanonicalIntegrator =
         requireBaseRules rules
         let program = rules
         let gate = obj ()
@@ -376,7 +376,7 @@ module CanonicalIntegrator =
                         ProcessEventLog.readStreams commonDir
                         |> Result.mapError (sprintf "cut-tail full replay read failed: %A")
 
-                    do! validateLocalHistory commonDir streams
+                    do! validateLocalHistory isEventTypeKnown commonDir streams
                     let! replayed = replay program streams
                     let replayCurrent = currentForRule rule replayed
 
@@ -517,7 +517,7 @@ module CanonicalIntegrator =
                             ProcessEventLog.readStreams commonDir
                             |> Result.mapError (sprintf "local event history read failed: %A")
 
-                        do! validateLocalHistory commonDir streams
+                        do! validateLocalHistory isEventTypeKnown commonDir streams
                         let! replayed = replay program streams
                         state <- replayed
                         loadedCommonDir <- Some commonDir
@@ -545,6 +545,8 @@ module CanonicalIntegrator =
 
                                         state <- preparedState) }
                     })
+
+            member _.IsEventTypeKnown(eventType) = isEventTypeKnown eventType
 
             member _.TryCurrent(key) =
                 lock gate (fun () -> Map.tryFind key state.Currents)

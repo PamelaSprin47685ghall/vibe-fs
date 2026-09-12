@@ -1,12 +1,10 @@
 namespace Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 open System.Threading.Tasks
-open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]
 type FailureAdmissionOutcome =
@@ -34,7 +32,7 @@ module ProviderFailureLedger =
         | false, _ -> FailureAdmissionOutcome.EpisodeSuperseded
 
     let private appendExhausted
-        (journal: AgentJournal)
+        (port: ProviderFailureJournalPort)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
         (current: ProviderFailureProjection)
@@ -42,22 +40,19 @@ module ProviderFailureLedger =
         : Task<Result<FailureAdmissionOutcome, string>> =
         task {
             let exhausted =
-                ProviderFailureFact.RetryExhausted
+                ProviderFailureFactCases.RetryExhausted
                     {| SessionId = sessionId
                        LogicalRunId = current.LogicalRunId
                        AuthorityRootUserMessageId = current.AuthorityRootUserMessageId
                        FinalConsecutiveFailureCount = finalCount |}
 
-            let! appended = AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) exhausted journal
+            let! appended = port.Append sessionId providerRun exhausted
 
-            return
-                appended
-                |> Result.map (fun _ -> FailureAdmissionOutcome.RetryExhausted)
-                |> Result.mapError JournalAppendFailure.describe
+            return appended |> Result.map (fun _ -> FailureAdmissionOutcome.RetryExhausted)
         }
 
     let private completeAdvance
-        (journal: AgentJournal)
+        (port: ProviderFailureJournalPort)
         (budgetLimit: int)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
@@ -68,11 +63,11 @@ module ProviderFailureLedger =
             match ProviderFailureBudget.verdict budgetLimit nextBudget with
             | ProviderFailureBudget.MayRetry _ -> return Ok FailureAdmissionOutcome.RetryAuthorized
             | ProviderFailureBudget.Exhausted _ ->
-                return! appendExhausted journal sessionId providerRun current nextBudget.ConsecutiveFailureCount
+                return! appendExhausted port sessionId providerRun current nextBudget.ConsecutiveFailureCount
         }
 
     let private appendFailureRecorded
-        (journal: AgentJournal)
+        (port: ProviderFailureJournalPort)
         (budgetLimit: int)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
@@ -82,7 +77,7 @@ module ProviderFailureLedger =
         : Task<Result<FailureAdmissionOutcome, string>> =
         task {
             let recorded =
-                ProviderFailureFact.FailureRecorded
+                ProviderFailureFactCases.FailureRecorded
                     {| SessionId = sessionId
                        LogicalRunId = current.LogicalRunId
                        AuthorityRootUserMessageId = current.AuthorityRootUserMessageId
@@ -90,14 +85,14 @@ module ProviderFailureLedger =
                        ConsecutiveFailureCount = nextCount
                        Reason = reason |}
 
-            let! appended = AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) recorded journal
+            let! appended = port.Append sessionId providerRun recorded
 
             match appended with
-            | Error failure -> return Error(JournalAppendFailure.describe failure)
+            | Error failure -> return Error failure
             | Ok _ ->
                 return!
                     completeAdvance
-                        journal
+                        port
                         budgetLimit
                         sessionId
                         providerRun
@@ -129,7 +124,7 @@ module ProviderFailureLedger =
             Error "Provider failure advance violates validation (consecutive failure count is not the successor)"
 
     let private recordReadyFailure
-        (journal: AgentJournal)
+        (port: ProviderFailureJournalPort)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
         (reason: string)
@@ -150,7 +145,7 @@ module ProviderFailureLedger =
             | Ok _ ->
                 return!
                     appendFailureRecorded
-                        journal
+                        port
                         ProviderFailureBudget.DefaultBudget
                         sessionId
                         providerRun
@@ -160,7 +155,7 @@ module ProviderFailureLedger =
         }
 
     let private recordAfterLicenceCheck
-        (journal: AgentJournal)
+        (port: ProviderFailureJournalPort)
         (sessionId: SessionId)
         (authorization: ProviderRecoveryAuthorization)
         (reason: string)
@@ -169,45 +164,42 @@ module ProviderFailureLedger =
         task {
             match checkRecoveryLicence authorization current with
             | Error message -> return Error message
-            | Ok ready -> return! recordReadyFailure journal sessionId authorization.ProviderRun reason ready
+            | Ok ready -> return! recordReadyFailure port sessionId authorization.ProviderRun reason ready
         }
 
     let recordAuthorizedFailure
-        (journal: AgentJournal)
+        (port: ProviderFailureJournalPort)
         (sessionId: SessionId)
         (authorization: ProviderRecoveryAuthorization)
         (reason: string)
         : Task<Result<FailureAdmissionOutcome, string>> =
         task {
-            match ProviderFailureEvidence.currentState sessionId (AgentJournal.snapshot journal) with
+            match port.CurrentState sessionId with
             | None -> return Ok FailureAdmissionOutcome.NoActiveRun
-            | Some current -> return! recordAfterLicenceCheck journal sessionId authorization reason current
+            | Some current -> return! recordAfterLicenceCheck port sessionId authorization reason current
         }
 
     let private appendSuccessFact
-        (journal: AgentJournal)
+        (port: ProviderFailureJournalPort)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
         (current: ProviderFailureProjection)
         : Task<Result<unit, string>> =
         task {
             let succeeded =
-                ProviderFailureFact.SuccessRecorded
+                ProviderFailureFactCases.SuccessRecorded
                     {| SessionId = sessionId
                        LogicalRunId = current.LogicalRunId
                        AuthorityRootUserMessageId = current.AuthorityRootUserMessageId
                        ProviderRun = providerRun |}
 
-            let! appended = AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) succeeded journal
+            let! appended = port.Append sessionId providerRun succeeded
 
-            return
-                appended
-                |> Result.map (fun _ -> ())
-                |> Result.mapError JournalAppendFailure.describe
+            return appended |> Result.map (fun _ -> ())
         }
 
     let private recordSuccessForCurrent
-        (journal: AgentJournal)
+        (port: ProviderFailureJournalPort)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
         (current: ProviderFailureProjection)
@@ -215,15 +207,15 @@ module ProviderFailureLedger =
         if current.Budget.ConsecutiveFailureCount = 0 then
             Task.FromResult(Ok())
         else
-            appendSuccessFact journal sessionId providerRun current
+            appendSuccessFact port sessionId providerRun current
 
     let recordConfirmedSuccess
-        (journal: AgentJournal)
+        (port: ProviderFailureJournalPort)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
         : Task<Result<unit, string>> =
         task {
-            match ProviderFailureEvidence.currentState sessionId (AgentJournal.snapshot journal) with
+            match port.CurrentState sessionId with
             | None -> return Error "NoActiveRun: no provider failure state for session"
-            | Some current -> return! recordSuccessForCurrent journal sessionId providerRun current
+            | Some current -> return! recordSuccessForCurrent port sessionId providerRun current
         }

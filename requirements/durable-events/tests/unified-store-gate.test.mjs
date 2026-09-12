@@ -392,6 +392,7 @@ test('WHAT[DURABLE-EVENTS-013] canonical shape requires one-envelope rule and sh
     '{ new ICanonicalIntegrator with',
     '    member _.ReloadLocal(commonDir) = replay streams',
     '    member _.PrepareLive(events) = prepareLive state events',
+    '    member _.IsEventTypeKnown(eventType) = true',
     '    member _.TryCurrent(key) = None }',
   ].join('\n')
 

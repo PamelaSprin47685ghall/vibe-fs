@@ -2,47 +2,41 @@ namespace Wanxiangshu.Execution.Delegation
 
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]
 module DelegatedToolEstimateLedger =
 
-    let tryState (journal: AgentJournal) sessionId =
-        AgentJournal.snapshot journal
-        |> fun snapshot -> AgentProjection.tryFind sessionId snapshot.AgentProjections
-        |> Option.bind (fun session -> session.DelegatedToolEstimate)
+    let tryState (port: DelegatedToolEstimatePort) sessionId = port.TryState sessionId
 
-    let tryRemaining journal sessionId =
-        tryState journal sessionId
-        |> Option.map DelegatedToolEstimateProjection.remaining
+    let tryRemaining port sessionId =
+        tryState port sessionId |> Option.map DelegatedToolEstimateProjection.remaining
 
-    let private append journal sessionId fact =
+    let private append (port: DelegatedToolEstimatePort) sessionId fact =
         task {
             try
-                let! _ = AgentJournal.appendAgent (StreamId.Session sessionId) None fact journal
+                let! _ = port.Append sessionId fact
                 return ()
             with _ ->
                 return ()
         }
 
-    let replace (journal: AgentJournal) sessionId expectedToolCalls : Task<unit> =
+    let replace (port: DelegatedToolEstimatePort) sessionId expectedToolCalls : Task<unit> =
         append
-            journal
+            port
             sessionId
-            (DelegationFact.DelegatedToolEstimateReplaced
+            (DelegationFactCases.DelegatedToolEstimateReplaced
                 {| SessionId = sessionId
                    ExpectedToolCalls = expectedToolCalls |})
 
-    let observe (journal: AgentJournal) sessionId toolCallId : Task<unit> =
+    let observe (port: DelegatedToolEstimatePort) sessionId toolCallId : Task<unit> =
         task {
-            match tryRemaining journal sessionId with
+            match tryRemaining port sessionId with
             | Some remaining when remaining > 0 ->
                 do!
                     append
-                        journal
+                        port
                         sessionId
-                        (DelegationFact.DelegatedToolCallObserved
+                        (DelegationFactCases.DelegatedToolCallObserved
                             {| SessionId = sessionId
                                ToolCallId = toolCallId |})
             | _ -> ()

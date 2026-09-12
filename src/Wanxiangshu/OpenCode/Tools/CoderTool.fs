@@ -5,6 +5,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.OpenCode
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
+open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider
@@ -142,7 +143,8 @@ module CoderTool =
     let private execute
         (toolName: string)
         (surface: Surface)
-        (scope: ToolRuntimeScope)
+        (workspaceDirectory: string option)
+        (snapshot: ISessionSnapshotPort option)
         (syncDelegate: SyncDelegateRuntime option)
         (args: HostToolArguments)
         (context: HostToolContext)
@@ -164,12 +166,12 @@ module CoderTool =
                     RepositoryWarmStart.prepareDocument
                         (SessionId.create context.SessionId)
                         Role.Coder
-                        scope.WorkspaceDirectory
+                        workspaceDirectory
                         keywords
                         charge
                     |> TaskValue.map (Result.defaultWith invalidOp)
 
-                let! batch = SyncDelegateBatching.resolve sd scope SyncDelegateRole.Coder context
+                let! batch = SyncDelegateBatching.resolve sd snapshot SyncDelegateRole.Coder context
 
                 let! result =
                     invoke sd SyncDelegateRole.Coder context charge prepareProviderPrompt batch expectedToolCalls
@@ -184,7 +186,8 @@ module CoderTool =
         (name: string)
         (surface: Surface)
         (factory: HostToolFactory)
-        (scope: ToolRuntimeScope)
+        (workspaceDirectory: string option)
+        (snapshot: ISessionSnapshotPort option)
         (syncDelegate: SyncDelegateRuntime option)
         : ToolSpec =
         let language = ProviderLanguageBinding.readGlobalPreference ()
@@ -200,18 +203,20 @@ module CoderTool =
                   factory
               "expected_tool_calls", DelegatedToolEstimate.schema language factory ]
           Admission = behaviorAdmission
-          Execute = execute name surface scope syncDelegate }
+          Execute = execute name surface workspaceDirectory snapshot syncDelegate }
 
     let establishSpec
         (factory: HostToolFactory)
-        (scope: ToolRuntimeScope)
+        (workspaceDirectory: string option)
+        (snapshot: ISessionSnapshotPort option)
         (syncDelegate: SyncDelegateRuntime option)
         : ToolSpec =
-        behaviorSpec "establish-behavior" establishSurface factory scope syncDelegate
+        behaviorSpec "establish-behavior" establishSurface factory workspaceDirectory snapshot syncDelegate
 
     let repairSpec
         (factory: HostToolFactory)
-        (scope: ToolRuntimeScope)
+        (workspaceDirectory: string option)
+        (snapshot: ISessionSnapshotPort option)
         (syncDelegate: SyncDelegateRuntime option)
         : ToolSpec =
-        behaviorSpec "repair-behavior" repairSurface factory scope syncDelegate
+        behaviorSpec "repair-behavior" repairSurface factory workspaceDirectory snapshot syncDelegate

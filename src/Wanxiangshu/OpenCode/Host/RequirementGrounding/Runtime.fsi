@@ -1,9 +1,8 @@
 namespace Wanxiangshu.OpenCode.Host.RequirementGrounding
 
 open System.Threading.Tasks
-open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Requirement.Grounding
 
 type RequirementGroundingDecision =
@@ -12,28 +11,31 @@ type RequirementGroundingDecision =
       Packages: string list }
 
 module RequirementGroundingRuntime =
-    val pending: journal: AgentJournal -> sessionId: SessionId -> GroundingSnapshot list
-    val occurrences: journal: AgentJournal -> sessionId: SessionId -> RequirementGroundingOccurrence list
-    val historyOccurrences: journal: AgentJournal -> sessionId: SessionId -> RequirementGroundingOccurrence list
-    val groundedKeys: journal: AgentJournal -> sessionId: SessionId -> string list
-    val nextOrdinal: journal: AgentJournal -> sessionId: SessionId -> int64
+    val pending: port: RequirementGroundingPort -> sessionId: SessionId -> GroundingSnapshot list
+    val occurrences: port: RequirementGroundingPort -> sessionId: SessionId -> RequirementGroundingOccurrence list
+
+    val historyOccurrences:
+        port: RequirementGroundingPort -> sessionId: SessionId -> RequirementGroundingOccurrence list
+
+    val groundedKeys: port: RequirementGroundingPort -> sessionId: SessionId -> string list
+    val nextOrdinal: port: RequirementGroundingPort -> sessionId: SessionId -> int64
 
     val requestPaths:
-        journal: AgentJournal ->
+        port: RequirementGroundingPort ->
         workspace: string ->
         sessionId: SessionId ->
         paths: string list ->
             Task<Result<RequirementGroundingDecision, string>>
 
     val observeReadPaths:
-        journal: AgentJournal ->
+        port: RequirementGroundingPort ->
         workspace: string ->
         sessionId: SessionId ->
         paths: string list ->
             Task<Result<RequirementGroundingDecision, string>>
 
     val appendAnchored:
-        journal: AgentJournal ->
+        port: RequirementGroundingPort ->
         sessionId: SessionId ->
         occurrence: RequirementGroundingOccurrence ->
-            Task<Result<ProjectionSet, JournalAppendFailure>>
+            Task<Result<unit, string>>

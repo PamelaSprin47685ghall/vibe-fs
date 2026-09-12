@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
@@ -197,15 +198,13 @@ module RequirementGroundingTransform =
           ResultGap = resultGap }
 
     let private appendOneRequested journal sessionId callGap resultGap (snapshot: GroundingSnapshot) =
-        let next =
-            RequirementGroundingRuntime.nextOrdinal journal (SessionId.create sessionId)
+        let port = AgentJournalPortAdapter.forRequirementGrounding journal
+        let next = RequirementGroundingRuntime.nextOrdinal port (SessionId.create sessionId)
 
         let value = occurrence sessionId next callGap resultGap snapshot
 
         taskResult {
-            let! _ =
-                RequirementGroundingRuntime.appendAnchored journal (SessionId.create sessionId) value
-                |> TaskResult.mapError JournalAppendFailure.describe
+            let! _ = RequirementGroundingRuntime.appendAnchored port (SessionId.create sessionId) value
 
             return ()
         }
@@ -264,7 +263,8 @@ module RequirementGroundingTransform =
                 do! appendRequested journal sessionId callGap resultGap pending
 
                 let committed =
-                    RequirementGroundingRuntime.occurrences journal (SessionId.create sessionId)
+                    let port = AgentJournalPortAdapter.forRequirementGrounding journal
+                    RequirementGroundingRuntime.occurrences port (SessionId.create sessionId)
 
                 return replay providerId realMessages committed
         }
@@ -282,11 +282,12 @@ module RequirementGroundingTransform =
         : Task<Result<obj list, string>> =
         taskResult {
             let session = SessionId.create sessionId
-            let history = RequirementGroundingRuntime.historyOccurrences journal session
-            let visibleHistory = RequirementGroundingRuntime.occurrences journal session
+            let port = AgentJournalPortAdapter.forRequirementGrounding journal
+            let history = RequirementGroundingRuntime.historyOccurrences port session
+            let visibleHistory = RequirementGroundingRuntime.occurrences port session
             let! realMessages = validateSyntheticHistory history (stripCursorHistory history rawMessages)
             let providerId = PairProgrammingThoughtTransform.providerIdFromMessages realMessages
-            let pending = RequirementGroundingRuntime.pending journal session
+            let pending = RequirementGroundingRuntime.pending port session
             return! anchorRequested journal sessionId realMessages providerId visibleHistory pending
         }
 

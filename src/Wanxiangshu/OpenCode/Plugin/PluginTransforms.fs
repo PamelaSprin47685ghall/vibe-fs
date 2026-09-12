@@ -279,7 +279,8 @@ module PluginTransforms =
             SessionExecutionBinding.beginPhysicalProviderAttemptForTransform
                 scope.Sessions.Quiescence.BeginProviderAttempt
           BindSessionStartedAt =
-            SessionStartedAtLedger.bindSessionStartedAt journal clock terminateSession Diagnostic.emit
+            let port = journal |> Option.map AgentJournalPortAdapter.forSessionStartedAt
+            SessionStartedAtLedger.bindSessionStartedAt port clock terminateSession Diagnostic.emit
           ApplyStrengthReplay = StrengthReplay.applyBeforeXTrace journal strengthDurability strengthFailFuse
           ApplyRelayProjection =
             fun sidOpt outObj ->
@@ -382,7 +383,8 @@ module PluginTransforms =
                 CompanionTransform.applyCompanionForOrdinaryMaterial
                     scope.Sessions.Companions
                     scope.Sessions.CompanionGate
-                    scope
+                    scope.Satellites
+                    scope.BloggerRuntimeHost
                     sessionPort
                     journal
 
@@ -406,7 +408,14 @@ module PluginTransforms =
             let isReplica =
                 fun (sid: SessionId) -> boot.StrengthScope.StrengthRuntime.TryFindByReplica sid |> Option.isSome
 
-            let apply = XWire.applyTransform isReplica snapshotOpt journal scope
+            let attempts: AttemptPlanCapability =
+                { TryAttemptPlan = scope.TryAttemptPlan
+                  TryBindAttemptPlan = scope.TryBindAttemptPlan
+                  ConsumeAttemptPlan = scope.ConsumeAttemptPlan
+                  FreezePendingAttemptPlan = scope.Recovery.FreezePendingAttemptPlan
+                  TryPendingAttemptPlan = scope.Recovery.TryPendingAttemptPlan }
+
+            let apply = XWire.applyTransform isReplica snapshotOpt journal attempts
 
             fun relayProjection outObj ->
                 match relayProjection with
@@ -418,14 +427,20 @@ module PluginTransforms =
                 task {
                     do!
                         EnforcerContinuation.applyContinuation
-                            scope
+                            scope.BloggerRuntimeHost
                             journal
                             terminateSession
                             projectionSessionIdOpt
                             outObj
                 }
           ApplyStrengthSpeculate =
-            StrengthSpeculate.tryApply snapshotOpt journal strengthDurability boot.StrengthScope scope
+            StrengthSpeculate.tryApply
+                snapshotOpt
+                journal
+                strengthDurability
+                boot.StrengthScope
+                scope.TryAttemptPlan
+                scope.SyncDelegateRuntime
           InjectPairGuideline =
             fun projectionSessionIdOpt sessionStartedAt outObj ->
                 task {
@@ -472,7 +487,14 @@ module PluginTransforms =
                     let isReplica =
                         fun (sid: SessionId) -> boot.StrengthScope.StrengthRuntime.TryFindByReplica sid |> Option.isSome
 
-                    let! _ = XWire.applyTransform isReplica snapshotOpt journal scope outObj
+                    let attempts: AttemptPlanCapability =
+                        { TryAttemptPlan = scope.TryAttemptPlan
+                          TryBindAttemptPlan = scope.TryBindAttemptPlan
+                          ConsumeAttemptPlan = scope.ConsumeAttemptPlan
+                          FreezePendingAttemptPlan = scope.Recovery.FreezePendingAttemptPlan
+                          TryPendingAttemptPlan = scope.Recovery.TryPendingAttemptPlan }
+
+                    let! _ = XWire.applyTransform isReplica snapshotOpt journal attempts outObj
                     return ()
                 }
           ReplicaSanitize = HostMessageProjection.sanitizeOutputMessages

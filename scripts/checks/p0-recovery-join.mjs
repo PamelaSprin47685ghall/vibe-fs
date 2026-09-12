@@ -495,7 +495,7 @@ export const RULES = [
     fileHint: 'Workflow.fs',
     pathHint: 'Participant/Provider/Attempt/Fallback/',
     pattern:
-      /(?=[\s\S]*\blet\s+private\s+recoveryOwnerSession\b[\s\S]{0,1000}ProviderRequestKind\.BloggerMain[\s\S]{0,300}SessionAssociationProjection\.tryMainSessionOf\s+failedSessionId[\s\S]{0,500}ProviderRequestKind\.WorkMain[\s\S]{0,200}Some\s+failedSessionId)(?=[\s\S]*\blet\s+private\s+requestKindFor\b[\s\S]{0,500}ChatExecutionProjection\.byKey[\s\S]{0,400}ProviderStarted[\s\S]{0,200}RequestKind)(?=[\s\S]*\bProviderFailureLedger\.recordAuthorizedFailure\s+durable\s+ownerSessionId\s+authorization\s+error\b)/,
+      /(?=[\s\S]*\blet\s+private\s+recoveryOwnerSession\b[\s\S]{0,1000}ProviderRequestKind\.BloggerMain[\s\S]{0,300}SessionAssociationProjection\.tryMainSessionOf\s+failedSessionId[\s\S]{0,500}ProviderRequestKind\.WorkMain[\s\S]{0,200}Some\s+failedSessionId)(?=[\s\S]*\blet\s+private\s+requestKindFor\b[\s\S]{0,500}ChatExecutionProjection\.byKey[\s\S]{0,400}ProviderStarted[\s\S]{0,200}RequestKind)(?=[\s\S]*\bforProviderFailure\s+durable\b[\s\S]{0,400}ProviderFailureLedger\.recordAuthorizedFailure\s+port\s+ownerSessionId\s+authorization\s+error\b)/,
     label:
       'static check: Provider failure workflow must append only to a resolved Blogger main or durably proven WorkMain owner',
     positive: true,

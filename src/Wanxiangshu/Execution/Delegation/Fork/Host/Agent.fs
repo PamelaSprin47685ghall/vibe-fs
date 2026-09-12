@@ -114,7 +114,9 @@ module HostForkAgent =
         (childId: SessionId)
         : Task<unit> =
         match journal, expectedToolCalls with
-        | Some journal, Some expected -> DelegatedToolEstimateLedger.replace journal childId expected
+        | Some journal, Some expected ->
+            let port = AgentJournalPortAdapter.forDelegatedToolEstimate journal
+            DelegatedToolEstimateLedger.replace port childId expected
         | _ -> Task.FromResult(())
 
     let private sendFirstPromptOutcome

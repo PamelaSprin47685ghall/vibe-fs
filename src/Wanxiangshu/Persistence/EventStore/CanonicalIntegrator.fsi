@@ -12,4 +12,4 @@ module CanonicalIntegrator =
 
     /// Explicit construction seam. `rules` is the complete history program
     /// in registration order and must contain the Structural and Journal rules.
-    val createWithRules: rules: IntegrationRule list -> ICanonicalIntegrator
+    val createWithRules: rules: IntegrationRule list -> isEventTypeKnown: (string -> bool) -> ICanonicalIntegrator

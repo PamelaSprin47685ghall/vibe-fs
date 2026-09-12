@@ -39,7 +39,7 @@ module JournalSurface =
                 EventStore.createLocal
                     commonDir
                     (Guid.NewGuid().ToString("N"))
-                    (CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules)
+                    (CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules AuthoritativeEventTypes.isKnown)
 
             match!
                 EventStoreJournalWriter.resumeOrCreate (

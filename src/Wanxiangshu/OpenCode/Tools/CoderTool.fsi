@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 
 /// DevOps synchronous Coder delegation via reusable SyncDelegate Session.
@@ -58,7 +59,15 @@ module CoderTool =
     val behaviorAdmission: ToolAdmission
 
     val establishSpec:
-        factory: HostToolFactory -> scope: ToolRuntimeScope -> syncDelegate: SyncDelegateRuntime option -> ToolSpec
+        factory: HostToolFactory ->
+        workspaceDirectory: string option ->
+        snapshot: ISessionSnapshotPort option ->
+        syncDelegate: SyncDelegateRuntime option ->
+            ToolSpec
 
     val repairSpec:
-        factory: HostToolFactory -> scope: ToolRuntimeScope -> syncDelegate: SyncDelegateRuntime option -> ToolSpec
+        factory: HostToolFactory ->
+        workspaceDirectory: string option ->
+        snapshot: ISessionSnapshotPort option ->
+        syncDelegate: SyncDelegateRuntime option ->
+            ToolSpec

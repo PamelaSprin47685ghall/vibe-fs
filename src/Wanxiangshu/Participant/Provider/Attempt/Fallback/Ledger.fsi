@@ -3,7 +3,6 @@ namespace Wanxiangshu.Participant.Provider.Attempt.Fallback
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]
 type FailureAdmissionOutcome =
@@ -14,11 +13,14 @@ type FailureAdmissionOutcome =
 
 module ProviderFailureLedger =
     val recordAuthorizedFailure:
-        journal: AgentJournal ->
+        port: ProviderFailureJournalPort ->
         sessionId: SessionId ->
         authorization: ProviderRecoveryAuthorization ->
         reason: string ->
             Task<Result<FailureAdmissionOutcome, string>>
 
     val recordConfirmedSuccess:
-        journal: AgentJournal -> sessionId: SessionId -> providerRun: ProviderRunIdentity -> Task<Result<unit, string>>
+        port: ProviderFailureJournalPort ->
+        sessionId: SessionId ->
+        providerRun: ProviderRunIdentity ->
+            Task<Result<unit, string>>

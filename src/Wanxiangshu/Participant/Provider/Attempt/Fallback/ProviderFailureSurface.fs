@@ -493,7 +493,11 @@ module ProviderFailureSurface =
             let providerRunId = ProviderRunIdentity.create providerRun
 
             let! result =
-                match ProviderFailureEvidence.currentState sessionId (AgentJournal.snapshot handle.Journal) with
+                let failureState =
+                    AgentProjection.tryFind sessionId (AgentJournal.snapshot handle.Journal).AgentProjections
+                    |> Option.bind _.ProviderFailures
+
+                match ProviderFailureEvidence.currentState failureState with
                 | None -> Task.FromResult(Ok FailureAdmissionOutcome.NoActiveRun)
                 | Some _ when budget <> ProviderFailureBudget.DefaultBudget ->
                     Task.FromResult(Error "provider failure budget must equal the declared default")
@@ -521,7 +525,10 @@ module ProviderFailureSurface =
 
                     match decision.Resolution with
                     | ExecutionFailureResolution.RetryFreshAttempt authorization ->
-                        ProviderFailureLedger.recordAuthorizedFailure handle.Journal sessionId authorization reason
+                        let port =
+                            Wanxiangshu.Composition.Durable.AgentJournalPortAdapter.forProviderFailure handle.Journal
+
+                        ProviderFailureLedger.recordAuthorizedFailure port sessionId authorization reason
                     | ExecutionFailureResolution.PreserveCurrentFact
                     | ExecutionFailureResolution.AwaitAcceptanceReconciliation _
                     | ExecutionFailureResolution.TerminalizeAcceptedPreProvider _
@@ -541,7 +548,13 @@ module ProviderFailureSurface =
     /// projection record, map, or closed budget representation.
     let snapshot (handle: Wanxiangshu.Persistence.Journal.JournalHandle) (session: string) : obj =
         match
-            ProviderFailureEvidence.currentState (SessionId.create session) (AgentJournal.snapshot handle.Journal)
+            let failureState =
+                AgentProjection.tryFind
+                    (SessionId.create session)
+                    (AgentJournal.snapshot handle.Journal).AgentProjections
+                |> Option.bind _.ProviderFailures in
+
+            ProviderFailureEvidence.currentState failureState
         with
         | None -> null
         | Some current ->

@@ -8,6 +8,7 @@ open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Session
+open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
@@ -164,7 +165,6 @@ module StrengthSpeculate =
           Authority: PromptAuthority.AuthorityExecutionProfile
           RawMessages: obj list
           Output: obj
-          Scope: PluginRuntimeScope
           StrengthScope: PluginStrengthScope
           Ports: BoundPorts
           Projections: ProjectionSet
@@ -215,7 +215,6 @@ module StrengthSpeculate =
 
     let private applyPublishedCandidate
         (strengthScope: PluginStrengthScope)
-        (scope: PluginRuntimeScope)
         (owner: SessionId)
         (target: ProviderRunIdentity)
         (id: StrengthDecisionId)
@@ -229,7 +228,6 @@ module StrengthSpeculate =
     let private publishPreparedCandidate
         (durability: StrengthDurabilityPort)
         (strengthScope: PluginStrengthScope)
-        (scope: PluginRuntimeScope)
         (owner: SessionId)
         (target: ProviderRunIdentity)
         (id: StrengthDecisionId)
@@ -255,7 +253,7 @@ module StrengthSpeculate =
                 failClosed strengthScope ("Strength Prepared storage invalid: " + error)
             | StrengthPreparedPublish.Rejected _ -> return ()
             | StrengthPreparedPublish.Published ->
-                applyPublishedCandidate strengthScope scope owner target id bundle output
+                applyPublishedCandidate strengthScope owner target id bundle output
                 return ()
         }
 
@@ -378,7 +376,6 @@ module StrengthSpeculate =
                     publishPreparedCandidate
                         surface.Ports.Durability
                         surface.StrengthScope
-                        surface.Scope
                         surface.Owner
                         surface.Target
                         id
@@ -463,14 +460,18 @@ module StrengthSpeculate =
         | StrengthRolloutMode.Off -> task { return () }
         | StrengthRolloutMode.Treatment -> applyTreatment surface
 
-    let private planEvidence (scope: PluginRuntimeScope) (owner: SessionId) (target: ProviderRunIdentity) =
-        match scope.TryAttemptPlan owner target with
+    let private planEvidence
+        (tryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option)
+        (owner: SessionId)
+        (target: ProviderRunIdentity)
+        =
+        match tryAttemptPlan owner target with
         | Some plan -> plan.Profile.RequestKind, AttemptPlanner.probeOf plan |> Option.isSome
         | None -> ProviderRequestKind.WorkMain, false
 
     let private buildOpportunity
         (strengthScope: PluginStrengthScope)
-        (scope: PluginRuntimeScope)
+        (syncDelegateRuntime: SyncDelegateRuntime option)
         (owner: SessionId)
         (authority: PromptAuthority.AuthorityExecutionProfile)
         (projections: ProjectionSet)
@@ -484,7 +485,7 @@ module StrengthSpeculate =
         let costsAvailable = settings.Costs.IsSome
 
         let attachedDelegate =
-            scope.SyncDelegateRuntime
+            syncDelegateRuntime
             |> Option.bind (fun sd -> sd.TryFindDelegateOwner owner)
             |> Option.isSome
 
@@ -519,7 +520,8 @@ module StrengthSpeculate =
 
     let private buildSurface
         (strengthScope: PluginStrengthScope)
-        (scope: PluginRuntimeScope)
+        (tryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option)
+        (syncDelegateRuntime: SyncDelegateRuntime option)
         (ports: BoundPorts)
         (owner: SessionId)
         (target: ProviderRunIdentity)
@@ -529,14 +531,14 @@ module StrengthSpeculate =
         (rawMessages: obj list)
         (output: obj)
         : OpportunitySurface =
-        let requestKind, hasPrefixProbe = planEvidence scope owner target
+        let requestKind, hasPrefixProbe = planEvidence tryAttemptPlan owner target
 
         let replicaAgent = Some(Roles.roleLabel authority.CanonicalRole)
 
         let opportunity =
             buildOpportunity
                 strengthScope
-                scope
+                syncDelegateRuntime
                 owner
                 authority
                 projections
@@ -576,7 +578,6 @@ module StrengthSpeculate =
           Authority = authority
           RawMessages = rawMessages
           Output = output
-          Scope = scope
           StrengthScope = strengthScope
           Ports = ports
           Projections = projections
@@ -592,7 +593,8 @@ module StrengthSpeculate =
 
     let private applyAfterRecovery
         (strengthScope: PluginStrengthScope)
-        (scope: PluginRuntimeScope)
+        (tryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option)
+        (syncDelegateRuntime: SyncDelegateRuntime option)
         (ports: BoundPorts)
         (owner: SessionId)
         (target: ProviderRunIdentity)
@@ -612,7 +614,8 @@ module StrengthSpeculate =
                 let surface =
                     buildSurface
                         strengthScope
-                        scope
+                        tryAttemptPlan
+                        syncDelegateRuntime
                         ports
                         owner
                         target
@@ -627,7 +630,8 @@ module StrengthSpeculate =
 
     let private applyWithProjection
         (strengthScope: PluginStrengthScope)
-        (scope: PluginRuntimeScope)
+        (tryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option)
+        (syncDelegateRuntime: SyncDelegateRuntime option)
         (ports: BoundPorts)
         (owner: SessionId)
         (target: ProviderRunIdentity)
@@ -647,7 +651,8 @@ module StrengthSpeculate =
                 return!
                     applyAfterRecovery
                         strengthScope
-                        scope
+                        tryAttemptPlan
+                        syncDelegateRuntime
                         ports
                         owner
                         target
@@ -661,7 +666,8 @@ module StrengthSpeculate =
 
     let private applyWithAuthority
         (strengthScope: PluginStrengthScope)
-        (scope: PluginRuntimeScope)
+        (tryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option)
+        (syncDelegateRuntime: SyncDelegateRuntime option)
         (ports: BoundPorts)
         (owner: SessionId)
         (target: ProviderRunIdentity)
@@ -679,7 +685,8 @@ module StrengthSpeculate =
                 return!
                     applyWithProjection
                         strengthScope
-                        scope
+                        tryAttemptPlan
+                        syncDelegateRuntime
                         ports
                         owner
                         target
@@ -693,7 +700,8 @@ module StrengthSpeculate =
 
     let private applyWithAssistant
         (strengthScope: PluginStrengthScope)
-        (scope: PluginRuntimeScope)
+        (tryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option)
+        (syncDelegateRuntime: SyncDelegateRuntime option)
         (ports: BoundPorts)
         (owner: SessionId)
         (rawMessages: obj list)
@@ -708,12 +716,23 @@ module StrengthSpeculate =
             | None -> return ()
             | Some authority ->
                 return!
-                    applyWithAuthority strengthScope scope ports owner target authority projections rawMessages output
+                    applyWithAuthority
+                        strengthScope
+                        tryAttemptPlan
+                        syncDelegateRuntime
+                        ports
+                        owner
+                        target
+                        authority
+                        projections
+                        rawMessages
+                        output
         }
 
     let private applyWithSnapshotMessages
         (strengthScope: PluginStrengthScope)
-        (scope: PluginRuntimeScope)
+        (tryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option)
+        (syncDelegateRuntime: SyncDelegateRuntime option)
         (ports: BoundPorts)
         (owner: SessionId)
         (rawMessages: obj list)
@@ -724,12 +743,23 @@ module StrengthSpeculate =
         task {
             match ProviderRunBinding.bindableRun (PhysicalUserMessageId.value physical) messages with
             | Error _ -> return ()
-            | Ok assistant -> return! applyWithAssistant strengthScope scope ports owner rawMessages output assistant
+            | Ok assistant ->
+                return!
+                    applyWithAssistant
+                        strengthScope
+                        tryAttemptPlan
+                        syncDelegateRuntime
+                        ports
+                        owner
+                        rawMessages
+                        output
+                        assistant
         }
 
     let private applyWithPhysicalUser
         (strengthScope: PluginStrengthScope)
-        (scope: PluginRuntimeScope)
+        (tryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option)
+        (syncDelegateRuntime: SyncDelegateRuntime option)
         (ports: BoundPorts)
         (owner: SessionId)
         (rawMessages: obj list)
@@ -742,12 +772,23 @@ module StrengthSpeculate =
             match snapshotResult with
             | Error _ -> return ()
             | Ok messages ->
-                return! applyWithSnapshotMessages strengthScope scope ports owner rawMessages output physical messages
+                return!
+                    applyWithSnapshotMessages
+                        strengthScope
+                        tryAttemptPlan
+                        syncDelegateRuntime
+                        ports
+                        owner
+                        rawMessages
+                        output
+                        physical
+                        messages
         }
 
     let private applyPrimaryOwner
         (strengthScope: PluginStrengthScope)
-        (scope: PluginRuntimeScope)
+        (tryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option)
+        (syncDelegateRuntime: SyncDelegateRuntime option)
         (ports: BoundPorts)
         (owner: SessionId)
         (output: obj)
@@ -757,12 +798,23 @@ module StrengthSpeculate =
 
             match ProviderWireCapture.lastUserMessageId rawMessages with
             | None -> return ()
-            | Some physical -> return! applyWithPhysicalUser strengthScope scope ports owner rawMessages output physical
+            | Some physical ->
+                return!
+                    applyWithPhysicalUser
+                        strengthScope
+                        tryAttemptPlan
+                        syncDelegateRuntime
+                        ports
+                        owner
+                        rawMessages
+                        output
+                        physical
         }
 
     let private applyBoundOwner
         (strengthScope: PluginStrengthScope)
-        (scope: PluginRuntimeScope)
+        (tryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option)
+        (syncDelegateRuntime: SyncDelegateRuntime option)
         (ports: BoundPorts)
         (owner: SessionId)
         (output: obj)
@@ -771,7 +823,7 @@ module StrengthSpeculate =
             if ports.Runtime.IsReplica owner then
                 return ()
             else
-                return! applyPrimaryOwner strengthScope scope ports owner output
+                return! applyPrimaryOwner strengthScope tryAttemptPlan syncDelegateRuntime ports owner output
         }
 
     let tryApply
@@ -779,7 +831,8 @@ module StrengthSpeculate =
         (journal: AgentJournal option)
         (strengthDurability: StrengthDurabilityPort option)
         (strengthScope: PluginStrengthScope)
-        (scope: PluginRuntimeScope)
+        (tryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option)
+        (syncDelegateRuntime: SyncDelegateRuntime option)
         (output: obj)
         : Task<unit> =
         task {
@@ -804,5 +857,6 @@ module StrengthSpeculate =
 
             match bound with
             | None -> return ()
-            | Some(ports, owner) -> return! applyBoundOwner strengthScope scope ports owner output
+            | Some(ports, owner) ->
+                return! applyBoundOwner strengthScope tryAttemptPlan syncDelegateRuntime ports owner output
         }

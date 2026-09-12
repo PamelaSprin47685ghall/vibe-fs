@@ -650,7 +650,10 @@ module ProviderRecoveryWorkflow =
         (authorization: ProviderRecoveryAuthorization)
         (error: string)
         =
-        ProviderFailureLedger.recordAuthorizedFailure durable ownerSessionId authorization error
+        let port =
+            Wanxiangshu.Composition.Durable.AgentJournalPortAdapter.forProviderFailure durable
+
+        ProviderFailureLedger.recordAuthorizedFailure port ownerSessionId authorization error
 
     let private admitCurrentFailure
         (durable: AgentJournal)
@@ -679,7 +682,11 @@ module ProviderRecoveryWorkflow =
         let ownerState =
             ownerSessionId
             |> Option.bind (fun owner ->
-                ProviderFailureEvidence.currentState owner projection
+                let failureState =
+                    AgentProjection.tryFind owner projection.AgentProjections
+                    |> Option.bind _.ProviderFailures
+
+                ProviderFailureEvidence.currentState failureState
                 |> Option.map (fun current -> owner, current))
 
         match ownerState with
@@ -708,7 +715,10 @@ module ProviderRecoveryWorkflow =
         | ExecutionFailureResolution.RetryFreshAttempt authorization ->
             task {
                 let! admission =
-                    ProviderFailureLedger.recordAuthorizedFailure durable ownerSessionId authorization error
+                    let port =
+                        Wanxiangshu.Composition.Durable.AgentJournalPortAdapter.forProviderFailure durable
+
+                    ProviderFailureLedger.recordAuthorizedFailure port ownerSessionId authorization error
 
                 return!
                     settleFailureAdmission
@@ -791,7 +801,11 @@ module ProviderRecoveryWorkflow =
                 |> Option.bind (fun requestKind ->
                     recoveryOwnerSession projections turn.SessionId requestKind
                     |> Option.bind (fun ownerSessionId ->
-                        ProviderFailureEvidence.currentState ownerSessionId projections
+                        let failureState =
+                            AgentProjection.tryFind ownerSessionId projections.AgentProjections
+                            |> Option.bind _.ProviderFailures
+
+                        ProviderFailureEvidence.currentState failureState
                         |> Option.map (fun current -> ownerSessionId, requestKind, current)))
 
             match hasCapacity, recoveryContext with

@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode.Host
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Foundation.Identity
@@ -42,8 +43,10 @@ module RequirementGroundingSurface =
     let requestPaths (journal: obj) (workspace: string) (sessionId: string) (paths: string array) : Task<obj> =
         task {
             let! result =
+                let port = AgentJournalPortAdapter.forRequirementGrounding (agentJournalOf journal)
+
                 RequirementGroundingRuntime.requestPaths
-                    (agentJournalOf journal)
+                    port
                     workspace
                     (SessionId.create sessionId)
                     (if isNull paths then [] else Array.toList paths)
@@ -144,11 +147,15 @@ module RequirementGroundingSurface =
         }
 
     let groundedIdentities (journal: obj) (sessionId: string) : string array =
-        RequirementGroundingRuntime.groundedKeys (agentJournalOf journal) (SessionId.create sessionId)
+        let port = AgentJournalPortAdapter.forRequirementGrounding (agentJournalOf journal)
+
+        RequirementGroundingRuntime.groundedKeys port (SessionId.create sessionId)
         |> List.toArray
 
     let pendingPackages (journal: obj) (sessionId: string) : string array =
-        RequirementGroundingRuntime.pending (agentJournalOf journal) (SessionId.create sessionId)
+        let port = AgentJournalPortAdapter.forRequirementGrounding (agentJournalOf journal)
+
+        RequirementGroundingRuntime.pending port (SessionId.create sessionId)
         |> List.map _.PackageName
         |> List.toArray
 

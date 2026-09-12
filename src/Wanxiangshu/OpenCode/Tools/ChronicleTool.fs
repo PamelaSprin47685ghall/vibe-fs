@@ -66,17 +66,17 @@ module ChronicleTool =
     let private missingTip language =
         ToolHostCodec.tomlObjectWithInstructions [ prose language Path.MissingTip ] []
 
-    let private terminateSessionIfPresent (runtime: ToolRuntimeScope) sessionId : System.Threading.Tasks.Task =
+    let private terminateSessionIfPresent terminateSession sessionId : System.Threading.Tasks.Task =
         task {
             if not (String.IsNullOrWhiteSpace sessionId) then
-                let! _ = runtime.TerminateSession(sessionId, NoLiveCycleError)
+                let! _ = terminateSession (sessionId, NoLiveCycleError)
                 ()
         }
 
-    let private applyNoLiveCycleEffect runtime (ctx: HostToolContext) : System.Threading.Tasks.Task =
+    let private applyNoLiveCycleEffect terminateSession (ctx: HostToolContext) : System.Threading.Tasks.Task =
         task {
             Diagnostic.emit "chronicle-execute" [ "session_id", ctx.SessionId; "result", NoLiveCycleError ]
-            do! terminateSessionIfPresent runtime ctx.SessionId
+            do! terminateSessionIfPresent terminateSession ctx.SessionId
         }
 
     let private resultForTip language tipRaw =
@@ -93,7 +93,7 @@ module ChronicleTool =
         | Ok _ -> resultForTip language (args.Text "tip")
 
     let private executeChronicle
-        (runtime: ToolRuntimeScope)
+        (terminateSession: string * string -> System.Threading.Tasks.Task<Result<unit, string>>)
         (bloggerHost: IBloggerRuntimeHost option)
         language
         (args: HostToolArguments)
@@ -108,7 +108,7 @@ module ChronicleTool =
             match execution with
             | ChronicleExecution.Completed _ -> return execution
             | ChronicleExecution.NoLiveCycle ->
-                do! applyNoLiveCycleEffect runtime ctx
+                do! applyNoLiveCycleEffect terminateSession ctx
                 return execution
         }
 
@@ -122,7 +122,7 @@ module ChronicleTool =
 
     let spec
         (factory: HostToolFactory)
-        (runtime: ToolRuntimeScope)
+        (terminateSession: string * string -> System.Threading.Tasks.Task<Result<unit, string>>)
         (bloggerHost: IBloggerRuntimeHost option)
         : ToolSpec =
         let fields = tipFieldNames ()
@@ -144,7 +144,7 @@ module ChronicleTool =
             fun args ctx ->
                 task {
                     let language = lang ctx
-                    let! execution = executeChronicle runtime bloggerHost language args ctx
+                    let! execution = executeChronicle terminateSession bloggerHost language args ctx
 
                     match execution with
                     | ChronicleExecution.Completed value -> return value

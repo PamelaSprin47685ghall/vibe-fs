@@ -5,6 +5,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Execution.Session
+open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
@@ -14,7 +15,8 @@ module CompanionTransform =
     val allowsBloggerCompanionForAgentName: agentName: string -> bool
 
     val coordinateBloggerContext:
-        scope: PluginRuntimeScope ->
+        satellites: SatelliteRuntime ->
+        bloggerHost: IBloggerRuntimeHost ->
         companion: CompanionHost ->
         journal: AgentJournal option ->
         context: BloggerRequestContext ->
@@ -24,7 +26,8 @@ module CompanionTransform =
     val handleCompanionTransform:
         companions: Dictionary<string, CompanionHost> ->
         gate: obj ->
-        scope: PluginRuntimeScope ->
+        satellites: SatelliteRuntime ->
+        bloggerHost: IBloggerRuntimeHost ->
         sessionPort: ISessionHostPort ->
         journal: AgentJournal option ->
         onBloggerCreated: (SessionId -> unit) option ->
@@ -36,7 +39,8 @@ module CompanionTransform =
     val applyCompanionForOrdinaryMaterial:
         companions: Dictionary<string, CompanionHost> ->
         gate: obj ->
-        scope: PluginRuntimeScope ->
+        satellites: SatelliteRuntime ->
+        bloggerHost: IBloggerRuntimeHost ->
         sessionPort: ISessionHostPort ->
         journal: AgentJournal option ->
         onBloggerCreated: (SessionId -> unit) option ->

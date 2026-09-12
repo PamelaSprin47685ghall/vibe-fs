@@ -90,12 +90,55 @@ test('WHAT[DURABLE-EVENTS-022] EventStore contracts exclude physical and Strengt
     assert.ok(!portSources.includes(forbidden), `EventStore.Port.Contract leaks ${forbidden}`)
   }
 
-  const vocabularySources = productionSources(planShard('eventstore-event-vocabulary-contract').plan)
-  assert.ok(vocabularySources.includes('Strength/EventVocabulary.fs'))
-  assert.ok(!vocabularySources.includes('Strength/Events.fs'))
-  assert.ok(!vocabularySources.some((path) => path.startsWith('Strength/Prediction/')))
-  assert.ok(!vocabularySources.some((path) => path.startsWith('Strength/Replica/')))
-  assert.ok(!vocabularySources.includes('Strength/Runtime.fs'))
+  const contractPlan = planShard('eventstore-event-vocabulary-contract').plan
+  const contractShards = new Set(
+    contractPlan.projectPaths.map((projectPath) => projectByPath.get(resolve(projectPath))?.shard),
+  )
+  for (const domainShard of [
+    'strength-event-vocabulary-contract',
+    'sphinx-event-vocabulary-contract',
+    'casebook-event-vocabulary-contract',
+    'js-transaction-event-vocabulary-contract',
+  ]) {
+    assert.ok(
+      !contractShards.has(domainShard),
+      `eventstore-event-vocabulary-contract must not contain ${domainShard} in its transitive closure`,
+    )
+  }
+
+  const contractSources = productionSources(contractPlan)
+  assert.ok(!contractSources.includes('Strength/EventVocabulary.fs'))
+  assert.ok(!contractSources.includes('Sphinx/EventVocabulary.fs'))
+  assert.ok(!contractSources.includes('Repository/Knowledge/Casebook/EventVocabulary.fs'))
+  assert.ok(!contractSources.includes('Repository/Programming/Js/EventVocabulary.fs'))
+  assert.ok(!contractSources.includes('Strength/Events.fs'))
+  assert.ok(!contractSources.includes('Strength/Runtime.fs'))
+
+  const assemblyPlan = planShard('eventstore-authoritative-vocabulary').plan
+  const assemblyShards = new Set(
+    assemblyPlan.projectPaths.map((projectPath) => projectByPath.get(resolve(projectPath))?.shard),
+  )
+  for (const domainShard of [
+    'strength-event-vocabulary-contract',
+    'sphinx-event-vocabulary-contract',
+    'casebook-event-vocabulary-contract',
+    'js-transaction-event-vocabulary-contract',
+  ]) {
+    assert.ok(
+      assemblyShards.has(domainShard),
+      `eventstore-authoritative-vocabulary must contain ${domainShard} in its transitive closure`,
+    )
+  }
+
+  const assemblySources = productionSources(assemblyPlan)
+  assert.ok(assemblySources.includes('Strength/EventVocabulary.fs'))
+  assert.ok(assemblySources.includes('Sphinx/EventVocabulary.fs'))
+  assert.ok(assemblySources.includes('Repository/Knowledge/Casebook/EventVocabulary.fs'))
+  assert.ok(assemblySources.includes('Repository/Programming/Js/EventVocabulary.fs'))
+  assert.ok(!assemblySources.includes('Strength/Events.fs'))
+  assert.ok(!assemblySources.some((path) => path.startsWith('Strength/Prediction/')))
+  assert.ok(!assemblySources.some((path) => path.startsWith('Strength/Replica/')))
+  assert.ok(!assemblySources.includes('Strength/Runtime.fs'))
 })
 
 test('WHAT[DURABLE-EVENTS-022] EventStore focused localities stay within compile budgets', () => {

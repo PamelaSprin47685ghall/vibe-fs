@@ -49,7 +49,10 @@ test('WHAT[TIME-008] production inventory separates contracts adapter verificati
 
   assert.deepEqual(relSources(capability), ['src/Wanxiangshu/Foundation/Temporal.fs'])
   assert.deepEqual(relSources(deadlineContract), ['src/Wanxiangshu/Process/Deadline.fs'])
-  assert.deepEqual(relSources(projection), ['src/Wanxiangshu/Execution/Session/SessionStartedAtProjection.fs'])
+  assert.deepEqual(relSources(projection), [
+    'src/Wanxiangshu/Execution/Session/SessionStartedAtPort.fs',
+    'src/Wanxiangshu/Execution/Session/SessionStartedAtProjection.fs',
+  ])
   assert.deepEqual(relSources(nodeAdapter), ['src/Wanxiangshu/Process/NodeTiming.fs'])
   assert.deepEqual(relSources(virtualImplementation), ['src/Wanxiangshu/Process/VirtualTiming.fs'])
   assert.deepEqual(relSources(representation), [
@@ -95,6 +98,7 @@ test('WHAT[TIME-008] production inventory separates contracts adapter verificati
   assert.deepEqual(consumersOf(projects, 'execution-session-sessionstartedatprojection'), [
     'composition-durable-fold',
     'composition-durable-projection',
+    'durable-journal-port-adapter',
     'execution-session-sessionstartedatledger',
     'foundation-temporal',
   ])

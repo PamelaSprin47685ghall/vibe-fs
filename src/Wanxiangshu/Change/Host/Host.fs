@@ -478,7 +478,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     let replaceEstimateIfPresent (jobId: ManagerJobId) (expectedToolCalls: int option) =
         match expectedToolCalls, jobRecord jobId, deps.Journal with
         | Some expected, Some record, Some journal ->
-            DelegatedToolEstimateLedger.replace journal record.ManagerSessionId expected
+            let port = AgentJournalPortAdapter.forDelegatedToolEstimate journal
+            DelegatedToolEstimateLedger.replace port record.ManagerSessionId expected
         | _ -> task { return () }
 
     let authorityRevisionFor

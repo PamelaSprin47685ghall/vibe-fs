@@ -113,9 +113,7 @@ module BlogSurface =
         EnforcerCatalog.fieldNames (EnforcerCatalogResource.load ()) |> List.toArray
 
     /// Live Blogger host owns the process-local flight/episode rendezvous.
-    /// Tests hand the opaque PluginRuntimeScope; only the host crosses here.
-    let private hostOf (value: obj) : IBloggerRuntimeHost =
-        (unbox<Wanxiangshu.OpenCode.PluginRuntimeScope> value).BloggerRuntimeHost
+    let private hostOf (value: obj) : IBloggerRuntimeHost = unbox<IBloggerRuntimeHost> value
 
     /// Real Blogger request context from a plain descriptor (Main/Squash shape
     /// shared with CompanionRuntimeSurface). Authority still comes from the

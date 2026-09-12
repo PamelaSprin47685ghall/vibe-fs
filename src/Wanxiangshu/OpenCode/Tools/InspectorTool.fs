@@ -5,6 +5,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.OpenCode
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
+open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider
@@ -83,7 +84,8 @@ module InspectorTool =
         | Error _ -> consequence context Path.Incomplete Map.empty
 
     let private execute
-        (scope: ToolRuntimeScope)
+        (workspaceDirectory: string option)
+        (snapshot: ISessionSnapshotPort option)
         (syncDelegate: SyncDelegateRuntime option)
         (args: HostToolArguments)
         (context: HostToolContext)
@@ -105,12 +107,12 @@ module InspectorTool =
                     RepositoryWarmStart.prepareDocument
                         (SessionId.create context.SessionId)
                         Role.Inspector
-                        scope.WorkspaceDirectory
+                        workspaceDirectory
                         keywords
                         charge
                     |> TaskValue.map (Result.defaultValue (LlmFacing.instruction charge))
 
-                let! batch = SyncDelegateBatching.resolve sd scope SyncDelegateRole.Inspector context
+                let! batch = SyncDelegateBatching.resolve sd snapshot SyncDelegateRole.Inspector context
 
                 let! result =
                     invoke sd SyncDelegateRole.Inspector context charge prepareProviderPrompt batch expectedToolCalls
@@ -123,7 +125,8 @@ module InspectorTool =
 
     let spec
         (factory: HostToolFactory)
-        (scope: ToolRuntimeScope)
+        (workspaceDirectory: string option)
+        (snapshot: ISessionSnapshotPort option)
         (syncDelegate: SyncDelegateRuntime option)
         : ToolSpec =
         let language = ProviderLanguageBinding.readGlobalPreference ()
@@ -139,4 +142,4 @@ module InspectorTool =
                   factory
               "expected_tool_calls", DelegatedToolEstimate.schema language factory ]
           Admission = admission
-          Execute = execute scope syncDelegate }
+          Execute = execute workspaceDirectory snapshot syncDelegate }

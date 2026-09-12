@@ -2,7 +2,7 @@ namespace Wanxiangshu.Context.Companion
 
 open System.Threading.Tasks
 
-/// Context-compression runtime owner. One opaque PluginRuntimeScope owns the
+/// Context-compression runtime owner. One opaque IBloggerRuntimeHost owns the
 /// physical Blogger park/flight/drain resources; companion recovery waiters and
 /// material offers use the same owner boundary.
 [<RequireQualifiedAccess>]

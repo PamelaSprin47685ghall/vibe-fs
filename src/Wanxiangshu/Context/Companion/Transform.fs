@@ -10,6 +10,7 @@ open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Session
+open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
@@ -45,7 +46,8 @@ module CompanionTransform =
     let private ensureCompanion
         (companions: Dictionary<string, CompanionHost>)
         (gate: obj)
-        (scope: PluginRuntimeScope)
+        (satellites: SatelliteRuntime)
+        (bloggerHost: IBloggerRuntimeHost)
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
         (onBloggerCreated: (SessionId -> unit) option)
@@ -70,7 +72,7 @@ module CompanionTransform =
                         ?restoredBloggerId = restoredBloggerId journal sessionId,
                         ?journal = journal,
                         ?bloggerDirectory = workspaceDirectory,
-                        satelliteRuntime = scope.Satellites
+                        satelliteRuntime = satellites
                     )
 
                 companions.[sessionId] <- value
@@ -105,15 +107,17 @@ module CompanionTransform =
         |> List.forall allowsBloggerCompanionForAgentName
 
     let coordinateBloggerContext
-        (scope: PluginRuntimeScope)
+        (satellites: SatelliteRuntime)
+        (bloggerHost: IBloggerRuntimeHost)
         (companion: CompanionHost)
         (journal: AgentJournal option)
         (context: BloggerRequestContext)
         : Task<BloggerCoordinator.DecisionEffect> =
-        BloggerCoordinator.onMainContext scope.BloggerRuntimeHost companion journal context
+        BloggerCoordinator.onMainContext bloggerHost companion journal context
 
     let private updateMaterializedBlogger
-        (scope: PluginRuntimeScope)
+        (satellites: SatelliteRuntime)
+        (bloggerHost: IBloggerRuntimeHost)
         (companion: CompanionHost)
         (journal: AgentJournal option)
         (sessionId: string)
@@ -141,7 +145,7 @@ module CompanionTransform =
                 with
                 | None -> return ()
                 | Some context ->
-                    let! _ = coordinateBloggerContext scope companion journal context
+                    let! _ = coordinateBloggerContext satellites bloggerHost companion journal context
 
                     return ()
         }
@@ -149,7 +153,8 @@ module CompanionTransform =
     let private transformNonSatellite
         (companions: Dictionary<string, CompanionHost>)
         (gate: obj)
-        (scope: PluginRuntimeScope)
+        (satellites: SatelliteRuntime)
+        (bloggerHost: IBloggerRuntimeHost)
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
         (onBloggerCreated: (SessionId -> unit) option)
@@ -160,7 +165,16 @@ module CompanionTransform =
         : Task<unit> =
         task {
             let companion =
-                ensureCompanion companions gate scope sessionPort journal onBloggerCreated workspaceDirectory sessionId
+                ensureCompanion
+                    companions
+                    gate
+                    satellites
+                    bloggerHost
+                    sessionPort
+                    journal
+                    onBloggerCreated
+                    workspaceDirectory
+                    sessionId
 
             // Host view unchanged (CTX-002). Coordinator owns all Blogger effects.
             replaceMessagesInPlace rawOutObj rawMessages
@@ -187,13 +201,24 @@ module CompanionTransform =
 
             let! projection = materializeCanonicalProjection journal xTrace
 
-            do! updateMaterializedBlogger scope companion journal sessionId blog xTrace observedEpoch projection
+            do!
+                updateMaterializedBlogger
+                    satellites
+                    bloggerHost
+                    companion
+                    journal
+                    sessionId
+                    blog
+                    xTrace
+                    observedEpoch
+                    projection
         }
 
     let private processSession
         (companions: Dictionary<string, CompanionHost>)
         (gate: obj)
-        (scope: PluginRuntimeScope)
+        (satellites: SatelliteRuntime)
+        (bloggerHost: IBloggerRuntimeHost)
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
         (onBloggerCreated: (SessionId -> unit) option)
@@ -216,7 +241,8 @@ module CompanionTransform =
                     transformNonSatellite
                         companions
                         gate
-                        scope
+                        satellites
+                        bloggerHost
                         sessionPort
                         journal
                         onBloggerCreated
@@ -230,7 +256,8 @@ module CompanionTransform =
     let handleCompanionTransform
         (companions: Dictionary<string, CompanionHost>)
         (gate: obj)
-        (scope: PluginRuntimeScope)
+        (satellites: SatelliteRuntime)
+        (bloggerHost: IBloggerRuntimeHost)
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
         (onBloggerCreated: (SessionId -> unit) option)
@@ -273,7 +300,8 @@ module CompanionTransform =
                     processSession
                         companions
                         gate
-                        scope
+                        satellites
+                        bloggerHost
                         sessionPort
                         journal
                         onBloggerCreated
@@ -286,7 +314,8 @@ module CompanionTransform =
     let applyCompanionForOrdinaryMaterial
         (companions: Dictionary<string, CompanionHost>)
         (gate: obj)
-        (scope: PluginRuntimeScope)
+        (satellites: SatelliteRuntime)
+        (bloggerHost: IBloggerRuntimeHost)
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
         (onBloggerCreated: (SessionId -> unit) option)
@@ -304,7 +333,8 @@ module CompanionTransform =
                     handleCompanionTransform
                         companions
                         gate
-                        scope
+                        satellites
+                        bloggerHost
                         sessionPort
                         journal
                         onBloggerCreated

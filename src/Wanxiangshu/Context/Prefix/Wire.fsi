@@ -17,6 +17,13 @@ type XWireReconciliationDecision =
       Cleared: bool
       KeptPlan: bool }
 
+type AttemptPlanCapability =
+    { TryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option
+      TryBindAttemptPlan: SessionId -> PhysicalUserMessageId -> ProviderRunIdentity -> AttemptPlan option
+      ConsumeAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option
+      FreezePendingAttemptPlan: SessionId -> PhysicalUserMessageId -> PendingAttemptPlan -> PendingAttemptPlanAdmission
+      TryPendingAttemptPlan: SessionId -> PhysicalUserMessageId -> PendingAttemptPlan option }
+
 module XWire =
 
     val mayProbe: budget: ProviderFailureBudget.FailureBudget -> bool
@@ -46,8 +53,9 @@ module XWire =
         isReplicaSession: (SessionId -> bool) ->
         snapshot: ISessionSnapshotPort option ->
         journal: AgentJournal option ->
-        scope: PluginRuntimeScope ->
+        attempts: AttemptPlanCapability ->
         output: obj ->
             Task<PrefixPresentationHorizon>
 
-    val reconcileAttempt: journal: AgentJournal option -> scope: PluginRuntimeScope -> turn: ReconciledTurn -> Task
+    val reconcileAttempt:
+        journal: AgentJournal option -> attempts: AttemptPlanCapability -> turn: ReconciledTurn -> Task

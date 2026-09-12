@@ -9,9 +9,12 @@ module EventStore =
 
     let private asAppendStorage (error: StorageInvalid) = AppendError.StorageInvalid error
 
-    let private validateVocabulary (events: EventEnvelope list) : Result<unit, StorageInvalid> =
+    let private validateVocabulary
+        (integrator: ICanonicalIntegrator)
+        (events: EventEnvelope list)
+        : Result<unit, StorageInvalid> =
         events
-        |> List.tryFind (fun head -> not (AuthoritativeEventTypes.isKnown head.EventType))
+        |> List.tryFind (fun head -> not (integrator.IsEventTypeKnown head.EventType))
         |> Option.map (fun head -> Error(StorageInvalid.UnknownEventType head.EventType))
         |> Option.defaultValue (Ok())
 
@@ -174,7 +177,7 @@ module EventStore =
         (events: EventEnvelope list)
         : Result<EventEnvelope list, StorageInvalid> =
         result {
-            do! validateVocabulary events
+            do! validateVocabulary integrator events
             let! fresh = newEventsAgainstCurrent integrator events
 
             if List.isEmpty fresh then

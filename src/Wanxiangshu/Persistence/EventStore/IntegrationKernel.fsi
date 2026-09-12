@@ -30,6 +30,7 @@ type PreparedIntegration =
 type ICanonicalIntegrator =
     abstract ReloadLocal: commonDir: string -> Result<unit, string>
     abstract PrepareLive: events: EventEnvelope list -> Result<PreparedIntegration, string>
+    abstract IsEventTypeKnown: eventType: string -> bool
     abstract TryCurrent: key: string -> obj option
     abstract TryEvent: eventId: EventId -> EventEnvelope option
     abstract TryHeads: streamId: EventStreamId -> EventId list

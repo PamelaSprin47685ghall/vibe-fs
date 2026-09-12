@@ -1,6 +1,9 @@
 namespace Wanxiangshu.Execution.Session.OpenCode
 
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Execution.Delegation.Fork.Host
+open Wanxiangshu.Persistence.Journal
 
 /// horizon() — natural-language roster of who remains at the caller's horizon.
 module HorizonTool =
@@ -46,5 +49,10 @@ module HorizonTool =
         [<Literal>]
         val LatestWorkUnavailable: string = "tool/horizon/latest-work-unavailable"
 
+    type HorizonRuntimeContext =
+        { RuntimeFor: HostToolContext -> Result<HostForkRuntime, string>
+          LogicalOwnerFor: SessionId -> SessionId
+          Journal: AgentJournal option }
+
     val admission: ToolAdmission
-    val spec: scope: ToolRuntimeScope -> ToolSpec
+    val spec: runtimeCtx: HorizonRuntimeContext -> ToolSpec

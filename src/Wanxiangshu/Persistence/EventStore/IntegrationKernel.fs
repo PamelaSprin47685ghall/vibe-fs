@@ -68,6 +68,7 @@ type ICanonicalIntegrator =
     /// Validate a live batch against Current and return the commit closure.
     /// EventStore invokes the closure only after the complete canonical lines are durable.
     abstract PrepareLive: events: EventEnvelope list -> Result<PreparedIntegration, string>
+    abstract IsEventTypeKnown: eventType: string -> bool
     abstract TryCurrent: key: string -> obj option
     abstract TryEvent: eventId: EventId -> EventEnvelope option
     abstract TryHeads: streamId: EventStreamId -> EventId list

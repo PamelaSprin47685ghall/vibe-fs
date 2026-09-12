@@ -117,7 +117,12 @@ module Surface =
             @ Wanxiangshu.Repository.Knowledge.Casebook.CasebookIntegrationRules.rules
             @ Wanxiangshu.Repository.Programming.Js.JsTransactionIntegrationRules.rules
 
-        EventStoreHandle.Create(EventStore.createLocal commonDir writerId (CanonicalIntegrator.createWithRules program))
+        EventStoreHandle.Create(
+            EventStore.createLocal
+                commonDir
+                writerId
+                (CanonicalIntegrator.createWithRules program AuthoritativeEventTypes.isKnown)
+        )
 
     /// Release a writer capability. Further operations fail rather than using a
     /// stale resource.

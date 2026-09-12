@@ -78,6 +78,13 @@ module PtyTool =
             [<Literal>]
             let SignalSent = "tool/signal-terminal/signal-sent"
 
+    type PtyRuntimeContext =
+        { IsDevOps: HostToolContext -> bool
+          ManagedAgentFor: HostToolContext -> ManagedAgent option
+          RuntimeFor: HostToolContext -> Result<HostForkRuntime, string>
+          DirectoryFor: string -> string option
+          WorkspaceDirectory: string option }
+
     let private tString = ToolHostCodec.TString
 
     let private lang (ctx: HostToolContext) =
@@ -95,10 +102,10 @@ module PtyTool =
     let private instruction (text: string) =
         ToolHostCodec.tomlObjectWithInstructions [ text ] []
 
-    let private requireDevOps (scope: ToolRuntimeScope) (context: HostToolContext) (devopsOnlyPath: string) =
+    let private requireDevOps (runtimeCtx: PtyRuntimeContext) (context: HostToolContext) (devopsOnlyPath: string) =
         let language = lang context
 
-        if not (scope.IsRole(context, Role.DevOps)) then
+        if not (runtimeCtx.IsDevOps context) then
             Error(prose language devopsOnlyPath)
         else
             Ok language
@@ -121,8 +128,12 @@ module PtyTool =
             Ok(name, command)
 
     /// Evidence → Decision: ManagedAgent required for ForkPty authority.
-    let private requireManagedAgent (language: ProviderLanguage) (scope: ToolRuntimeScope) (context: HostToolContext) =
-        scope.ManagedAgentFor context
+    let private requireManagedAgent
+        (language: ProviderLanguage)
+        (runtimeCtx: PtyRuntimeContext)
+        (context: HostToolContext)
+        =
+        runtimeCtx.ManagedAgentFor context
         |> Result.requireSome (prose language Path.OpenTerminal.AuthorityRequired)
 
     /// Evidence → Decision: terminal name must be free before ForkPty.
@@ -156,64 +167,65 @@ module PtyTool =
             ToolHostCodec.tomlObject [ "output", tString read.Output ]
 
     let private openTerminalOutcome
-        (scope: ToolRuntimeScope)
+        (runtimeCtx: PtyRuntimeContext)
         (args: HostToolArguments)
         (context: HostToolContext)
         : Task<Result<string, string>> =
         taskResult {
-            let! language = requireDevOps scope context Path.OpenTerminal.DevOpsOnly
+            let! language = requireDevOps runtimeCtx context Path.OpenTerminal.DevOpsOnly
             let! name, command = requireOpenArgs language args
-            let! runtime = scope.RuntimeFor context
-            let! agent = requireManagedAgent language scope context
+            let! runtime = runtimeCtx.RuntimeFor context
+            let! agent = requireManagedAgent language runtimeCtx context
             do! requirePtyNameAvailable language runtime name
 
             let directory =
-                scope.DirectoryFor context.SessionId |> Option.orElse scope.WorkspaceDirectory
+                runtimeCtx.DirectoryFor context.SessionId
+                |> Option.orElse runtimeCtx.WorkspaceDirectory
 
             let! id = runtime.ForkPty(command, agent, ?cwd = directory)
             return! bindOpenedTerminal language runtime name id
         }
 
     let private sendTerminalOutcome
-        (scope: ToolRuntimeScope)
+        (runtimeCtx: PtyRuntimeContext)
         (args: HostToolArguments)
         (context: HostToolContext)
         : Task<Result<string, string>> =
         taskResult {
-            let! language = requireDevOps scope context Path.SendTerminal.DevOpsOnly
+            let! language = requireDevOps runtimeCtx context Path.SendTerminal.DevOpsOnly
             let name = args.Text "name"
             let input = args.Text "input"
-            let! runtime = scope.RuntimeFor context
+            let! runtime = runtimeCtx.RuntimeFor context
             let! ptyId = requirePtyByName language Path.SendTerminal.UnknownTerminal runtime name
             let! _ = runtime.SendPty(ptyId, input, None)
             return instruction (prose language Path.SendTerminal.InputSent)
         }
 
     let private readTerminalOutcome
-        (scope: ToolRuntimeScope)
+        (runtimeCtx: PtyRuntimeContext)
         (args: HostToolArguments)
         (context: HostToolContext)
         : Task<Result<string, string>> =
         taskResult {
-            let! language = requireDevOps scope context Path.ReadTerminal.DevOpsOnly
+            let! language = requireDevOps runtimeCtx context Path.ReadTerminal.DevOpsOnly
             let name = args.Text "name"
-            let! runtime = scope.RuntimeFor context
+            let! runtime = runtimeCtx.RuntimeFor context
             let! ptyId = requirePtyByName language Path.ReadTerminal.UnknownTerminal runtime name
             let! read = runtime.SendPty(ptyId, "", None)
             return readTerminalBody language name read
         }
 
     let private signalTerminalOutcome
-        (scope: ToolRuntimeScope)
+        (runtimeCtx: PtyRuntimeContext)
         (args: HostToolArguments)
         (context: HostToolContext)
         : Task<Result<string, string>> =
         taskResult {
-            let! language = requireDevOps scope context Path.SignalTerminal.DevOpsOnly
+            let! language = requireDevOps runtimeCtx context Path.SignalTerminal.DevOpsOnly
             let name = args.Text "name"
             let signalRaw = args.Text "signal"
             let! signalValue = PtySignal.tryParse signalRaw
-            let! runtime = scope.RuntimeFor context
+            let! runtime = runtimeCtx.RuntimeFor context
             let! ptyId = requirePtyByName language Path.SignalTerminal.UnknownTerminal runtime name
             let! _ = runtime.SendPty(ptyId, "", Some signalValue)
 
@@ -226,27 +238,27 @@ module PtyTool =
                 )
         }
 
-    let private openExecute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
+    let private openExecute (runtimeCtx: PtyRuntimeContext) (args: HostToolArguments) (context: HostToolContext) =
         task {
-            let! outcome = openTerminalOutcome scope args context
+            let! outcome = openTerminalOutcome runtimeCtx args context
             return finishToolOutcome outcome
         }
 
-    let private sendExecute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
+    let private sendExecute (runtimeCtx: PtyRuntimeContext) (args: HostToolArguments) (context: HostToolContext) =
         task {
-            let! outcome = sendTerminalOutcome scope args context
+            let! outcome = sendTerminalOutcome runtimeCtx args context
             return finishToolOutcome outcome
         }
 
-    let private readExecute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
+    let private readExecute (runtimeCtx: PtyRuntimeContext) (args: HostToolArguments) (context: HostToolContext) =
         task {
-            let! outcome = readTerminalOutcome scope args context
+            let! outcome = readTerminalOutcome runtimeCtx args context
             return finishToolOutcome outcome
         }
 
-    let private signalExecute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
+    let private signalExecute (runtimeCtx: PtyRuntimeContext) (args: HostToolArguments) (context: HostToolContext) =
         task {
-            let! outcome = signalTerminalOutcome scope args context
+            let! outcome = signalTerminalOutcome runtimeCtx args context
             return finishToolOutcome outcome
         }
 
@@ -262,7 +274,7 @@ module PtyTool =
     let admission: ToolAdmission =
         ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Pty)
 
-    let openSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
+    let openSpec (factory: HostToolFactory) (context: PtyRuntimeContext) : ToolSpec =
         { Name = "open-terminal"
           Description =
             ProviderProse.render
@@ -273,9 +285,9 @@ module PtyTool =
             [ "name", ToolHostCodec.stringSchema factory
               "command", ToolHostCodec.stringSchema factory ]
           Admission = admission
-          Execute = openExecute scope }
+          Execute = openExecute context }
 
-    let sendSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
+    let sendSpec (factory: HostToolFactory) (context: PtyRuntimeContext) : ToolSpec =
         { Name = "send-terminal"
           Description =
             ProviderProse.render
@@ -286,9 +298,9 @@ module PtyTool =
             [ "name", ToolHostCodec.stringSchema factory
               "input", ToolHostCodec.stringSchema factory ]
           Admission = admission
-          Execute = sendExecute scope }
+          Execute = sendExecute context }
 
-    let readSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
+    let readSpec (factory: HostToolFactory) (context: PtyRuntimeContext) : ToolSpec =
         { Name = "read-terminal"
           Description =
             ProviderProse.render
@@ -297,9 +309,9 @@ module PtyTool =
                 Map.empty
           Arguments = [ "name", ToolHostCodec.stringSchema factory ]
           Admission = admission
-          Execute = readExecute scope }
+          Execute = readExecute context }
 
-    let signalSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
+    let signalSpec (factory: HostToolFactory) (context: PtyRuntimeContext) : ToolSpec =
         { Name = "signal-terminal"
           Description =
             ProviderProse.render
@@ -310,11 +322,11 @@ module PtyTool =
             [ "name", ToolHostCodec.stringSchema factory
               "signal", ToolHostCodec.enumSchema signalValues factory ]
           Admission = admission
-          Execute = signalExecute scope }
+          Execute = signalExecute context }
 
     /// All four terminal verb specs.
-    let specs (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec list =
-        [ openSpec factory scope
-          sendSpec factory scope
-          readSpec factory scope
-          signalSpec factory scope ]
+    let specs (factory: HostToolFactory) (context: PtyRuntimeContext) : ToolSpec list =
+        [ openSpec factory context
+          sendSpec factory context
+          readSpec factory context
+          signalSpec factory context ]

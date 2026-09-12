@@ -6,6 +6,7 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -143,7 +144,8 @@ module PluginHooks =
 
                     match journal, context.ToolCallId with
                     | Some durable, Some toolCallId when not (String.IsNullOrWhiteSpace context.SessionId) ->
-                        do! DelegatedToolEstimateLedger.observe durable (SessionId.create context.SessionId) toolCallId
+                        let port = AgentJournalPortAdapter.forDelegatedToolEstimate durable
+                        do! DelegatedToolEstimateLedger.observe port (SessionId.create context.SessionId) toolCallId
                     | _ -> ()
 
                     do! magicTodo.Before toolInput toolOutput

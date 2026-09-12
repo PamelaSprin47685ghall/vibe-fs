@@ -115,9 +115,21 @@ module PluginHooksSurface =
                       FrameDigests = [ BlobDigest.create "blogger-effect-frame" ]
                       ObservedPrefixEpochId = PrefixEpochId.create 1L }
 
-            let! first = CompanionTransform.coordinateBloggerContext scope host (Some handle.Journal) context
+            let! first =
+                CompanionTransform.coordinateBloggerContext
+                    satellites
+                    scope.BloggerRuntimeHost
+                    host
+                    (Some handle.Journal)
+                    context
 
-            let! second = CompanionTransform.coordinateBloggerContext scope host (Some handle.Journal) context
+            let! second =
+                CompanionTransform.coordinateBloggerContext
+                    satellites
+                    scope.BloggerRuntimeHost
+                    host
+                    (Some handle.Journal)
+                    context
 
             return BloggerAdapterObservation.Create(effectLabel first, effectLabel second)
         }

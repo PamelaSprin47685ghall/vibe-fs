@@ -190,7 +190,9 @@ module JournalSurface =
         (startedAt: string)
         : Task<obj> =
         task {
-            let integrator = CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules
+            let integrator =
+                CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules AuthoritativeEventTypes.isKnown
+
             let store = EventStore.createLocal (str commonDir) (str writerId) integrator
 
             let! result =

@@ -2,8 +2,12 @@ namespace Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Execution.Session
 open Wanxiangshu.Interaction.Attention
+open Wanxiangshu.Participant.Provider.Attempt.Fallback
+open Wanxiangshu.Requirement.Grounding
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Host
 
 module AgentJournalPortAdapter =
@@ -23,6 +27,128 @@ module AgentJournalPortAdapter =
                         appended
                         |> Result.map ignore
                         |> Result.mapError (fun _ -> AttentionAppendFailure.DurabilityUnavailable)
+                } }
+
+    let forDelegatedToolEstimate (journal: AgentJournal) : DelegatedToolEstimatePort =
+        { TryState =
+            fun sessionId ->
+                AgentJournal.snapshot journal
+                |> fun snapshot -> AgentProjection.tryFind sessionId snapshot.AgentProjections
+                |> Option.bind (fun session -> session.DelegatedToolEstimate)
+          Append =
+            fun sessionId fact ->
+                task {
+                    let! result =
+                        AgentJournal.appendAgent (StreamId.Session sessionId) None (AgentFact.Delegation fact) journal
+
+                    return result |> Result.map ignore |> Result.mapError JournalAppendFailure.describe
+                } }
+
+    let forSessionStartedAt (journal: AgentJournal) : SessionStartedAtPort =
+        { TryStartedAt =
+            fun sessionId ->
+                AgentJournal.snapshot journal
+                |> fun snapshot -> AgentProjection.tryFind sessionId snapshot.AgentProjections
+                |> Option.bind (fun session -> session.SessionStartedAt)
+                |> Option.map SessionStartedAtProjection.startedAt
+          Bind =
+            fun sessionId candidate ->
+                task {
+                    let existing =
+                        AgentJournal.snapshot journal
+                        |> fun snapshot -> AgentProjection.tryFind sessionId snapshot.AgentProjections
+                        |> Option.bind (fun session -> session.SessionStartedAt)
+                        |> Option.map SessionStartedAtProjection.startedAt
+
+                    match existing with
+                    | Some dt -> return Ok dt
+                    | None ->
+                        match!
+                            AgentJournal.appendAgent
+                                (StreamId.Session sessionId)
+                                None
+                                (HostFact.SessionStartedAtBound
+                                    {| SessionId = sessionId
+                                       StartedAt = candidate |})
+                                journal
+                        with
+                        | Error error -> return Error(sprintf "%A" error)
+                        | Ok projection ->
+                            match
+                                AgentProjection.tryFind sessionId projection.AgentProjections
+                                |> Option.bind (fun session -> session.SessionStartedAt)
+                                |> Option.map SessionStartedAtProjection.startedAt
+                            with
+                            | Some startedAt -> return Ok startedAt
+                            | None -> return Error "SessionStartedAtBound did not materialize its projection"
+                } }
+
+    let forProviderFailure (journal: AgentJournal) : ProviderFailureJournalPort =
+        { ProviderFailureJournalPort.CurrentState =
+            fun sessionId ->
+                AgentJournal.snapshot journal
+                |> fun snapshot -> AgentProjection.tryFind sessionId snapshot.AgentProjections
+                |> Option.bind (fun session -> session.ProviderFailures)
+          ProviderFailureJournalPort.Append =
+            fun sessionId providerRun fact ->
+                task {
+                    let! result =
+                        AgentJournal.appendAgent
+                            (StreamId.Session sessionId)
+                            (Some providerRun)
+                            (AgentFact.ProviderFailure fact)
+                            journal
+
+                    return result |> Result.map ignore |> Result.mapError JournalAppendFailure.describe
+                } }
+
+    let forRequirementGrounding (journal: AgentJournal) : RequirementGroundingPort =
+        { RequirementGroundingPort.ReadState =
+            fun sessionId ->
+                AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
+                |> Option.bind _.RequirementGrounding
+                |> Option.defaultValue RequirementGroundingProjection.empty
+          RequirementGroundingPort.AppendRequested =
+            fun sessionId snapshot ->
+                task {
+                    let! res =
+                        AgentJournal.appendAgent
+                            (StreamId.Session sessionId)
+                            None
+                            (HostFact.RequirementGroundingRequested
+                                {| SessionId = sessionId
+                                   Snapshot = snapshot |})
+                            journal
+
+                    return res |> Result.map ignore |> Result.mapError JournalAppendFailure.describe
+                }
+          RequirementGroundingPort.AppendMaterialObserved =
+            fun sessionId observation ->
+                task {
+                    let! res =
+                        AgentJournal.appendAgent
+                            (StreamId.Session sessionId)
+                            None
+                            (HostFact.RequirementGroundingMaterialObserved
+                                {| SessionId = sessionId
+                                   Observation = observation |})
+                            journal
+
+                    return res |> Result.map ignore |> Result.mapError JournalAppendFailure.describe
+                }
+          RequirementGroundingPort.AppendAnchored =
+            fun sessionId occurrence ->
+                task {
+                    let! res =
+                        AgentJournal.appendAgent
+                            (StreamId.Session sessionId)
+                            None
+                            (HostFact.RequirementGroundingAnchored
+                                {| SessionId = sessionId
+                                   Occurrence = occurrence |})
+                            journal
+
+                    return res |> Result.map ignore |> Result.mapError JournalAppendFailure.describe
                 } }
 
     /// DELEG-029: durable composition is the only place that wraps delegation fact

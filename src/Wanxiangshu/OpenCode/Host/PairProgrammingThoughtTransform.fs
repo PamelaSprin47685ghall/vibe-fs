@@ -961,7 +961,9 @@ module PairProgrammingThoughtTransform =
         : string option =
         match journal, projectionSessionIdOpt with
         | Some durable, Some sessionId ->
-            DelegatedToolEstimateLedger.tryRemaining durable (SessionId.create sessionId)
+            let port = AgentJournalPortAdapter.forDelegatedToolEstimate durable
+
+            DelegatedToolEstimateLedger.tryRemaining port (SessionId.create sessionId)
             |> Option.map (PairProgrammingCalibration.renderToolEstimate language)
         | _ -> None
 

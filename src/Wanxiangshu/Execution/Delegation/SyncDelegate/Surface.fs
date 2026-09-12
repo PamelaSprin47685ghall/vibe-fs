@@ -431,7 +431,8 @@ module SyncDelegateSurface =
 
     let private createJournal (directory: string) : Task<AgentJournal> =
         task {
-            let integrator = CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules
+            let integrator =
+                CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules AuthoritativeEventTypes.isKnown
 
             let store =
                 EventStore.createLocal directory (Guid.NewGuid().ToString("N")) integrator
@@ -738,7 +739,11 @@ module SyncDelegateSurface =
             let harness = unbox<Harness> value
 
             let spec =
-                InspectorTool.spec (ToolHostCodec.factory toolModule) harness.Scope (Some harness.Runtime)
+                InspectorTool.spec
+                    (ToolHostCodec.factory toolModule)
+                    harness.Scope.WorkspaceDirectory
+                    harness.Scope.Snapshot
+                    (Some harness.Runtime)
 
             let args =
                 HostToolArguments(

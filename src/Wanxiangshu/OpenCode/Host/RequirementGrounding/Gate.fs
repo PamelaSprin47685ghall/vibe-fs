@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Requirement.Grounding
 
@@ -47,7 +48,9 @@ module RequirementGroundingGate =
         : Task<Result<RequirementGroundingDecision, string>> =
         match journal with
         | None -> Task.FromResult(Error "requirement grounding requires a durable journal")
-        | Some durable -> RequirementGroundingRuntime.requestPaths durable workspace (SessionId.create sessionId) paths
+        | Some durable ->
+            let port = AgentJournalPortAdapter.forRequirementGrounding durable
+            RequirementGroundingRuntime.requestPaths port workspace (SessionId.create sessionId) paths
 
     let private request
         (journal: AgentJournal option)
@@ -75,7 +78,8 @@ module RequirementGroundingGate =
         match journal with
         | None -> Task.FromResult(Error "requirement grounding requires a durable journal")
         | Some durable ->
-            RequirementGroundingRuntime.observeReadPaths durable workspace (SessionId.create sessionId) paths
+            let port = AgentJournalPortAdapter.forRequirementGrounding durable
+            RequirementGroundingRuntime.observeReadPaths port workspace (SessionId.create sessionId) paths
 
     let private ignoreDecision (operation: unit -> Task<Result<RequirementGroundingDecision, string>>) : Task<unit> =
         task {

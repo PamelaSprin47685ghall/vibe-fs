@@ -1,8 +1,11 @@
 namespace Wanxiangshu.Strength.OpenCode
 
 open System.Threading.Tasks
+open Wanxiangshu.Execution.Delegation.SyncDelegate
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Strength.Persistence
 
@@ -18,6 +21,7 @@ module StrengthSpeculate =
         journal: AgentJournal option ->
         strengthDurability: StrengthDurabilityPort option ->
         strengthScope: PluginStrengthScope ->
-        scope: PluginRuntimeScope ->
+        tryAttemptPlan: (SessionId -> ProviderRunIdentity -> AttemptPlan option) ->
+        syncDelegateRuntime: SyncDelegateRuntime option ->
         output: obj ->
             Task<unit>

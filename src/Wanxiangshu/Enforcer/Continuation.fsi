@@ -120,7 +120,7 @@ module EnforcerContinuation =
             Task<ContinuationOutcome>
 
     val applyContinuation:
-        scope: PluginRuntimeScope ->
+        scope: IBloggerRuntimeHost ->
         journal: AgentJournal option ->
         terminateSession: SessionTermination ->
         projectionSessionIdOpt: string option ->

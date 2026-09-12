@@ -66,7 +66,8 @@ module OrdinaryTurnWorkflow =
         task {
             match successClearingRequest journal turn with
             | Some durable ->
-                let! _ = ProviderFailureLedger.recordConfirmedSuccess durable turn.SessionId turn.ProviderRun
+                let port = AgentJournalPortAdapter.forProviderFailure durable
+                let! _ = ProviderFailureLedger.recordConfirmedSuccess port turn.SessionId turn.ProviderRun
                 return ()
             | None -> return ()
         }

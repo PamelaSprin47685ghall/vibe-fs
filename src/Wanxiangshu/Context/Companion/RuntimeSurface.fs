@@ -9,7 +9,7 @@ open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 
-/// Context-compression runtime owner. One opaque PluginRuntimeScope owns the
+/// Context-compression runtime owner. One opaque IBloggerRuntimeHost owns the
 /// physical Blogger park/flight/drain resources; companion recovery waiters and
 /// material offers use the same owner boundary.
 [<RequireQualifiedAccess>]
@@ -27,10 +27,7 @@ module CompanionRuntimeSurface =
     let private optionalText (value: obj) : string option =
         if isNullish value then None else Some(text value)
 
-    let private scopeOf (value: obj) : Wanxiangshu.OpenCode.PluginRuntimeScope =
-        unbox<Wanxiangshu.OpenCode.PluginRuntimeScope> value
-
-    let private hostOf (value: obj) : IBloggerRuntimeHost = (scopeOf value).BloggerRuntimeHost
+    let private hostOf (value: obj) : IBloggerRuntimeHost = unbox<IBloggerRuntimeHost> value
 
     let private contextOfJs (value: obj) : BloggerRequestContext =
         match text value?kind with
@@ -212,7 +209,7 @@ module CompanionRuntimeSurface =
     /// Isolate physical shared-flight state before a semantic runtime test.
     let createScope () : obj =
         Wanxiangshu.OpenCode.SharedState.clearBloggerFlightsForTests ()
-        box (new Wanxiangshu.OpenCode.PluginRuntimeScope(None))
+        box (new Wanxiangshu.Context.Companion.Blogger.OpenCode.PluginBloggerScope())
 
     let private parkWakeToJs (wake: ParkWake) : obj =
         match wake with
@@ -228,7 +225,10 @@ module CompanionRuntimeSurface =
         | MaterialOfferDisposition.Staged -> "Staged"
 
     let dispose (scope: obj) : unit =
-        (scopeOf scope :> IDisposable).Dispose()
+        match hostOf scope with
+        | :? IDisposable as d -> d.Dispose()
+        | :? Wanxiangshu.Context.Companion.Blogger.OpenCode.PluginBloggerScope as pbs -> pbs.Dispose()
+        | _ -> ()
 
     let park (scope: obj) (sessionId: string) : Task<obj> =
         task {
@@ -284,7 +284,10 @@ module CompanionRuntimeSurface =
         |> fun host -> host.ReleaseCurrentRequest(sessionId, BloggerRequestId.create requestId)
         |> flightReleaseName
 
-    let beginBloggerShutdown (scope: obj) : unit = (scopeOf scope).Blogger.BeginShutdown()
+    let beginBloggerShutdown (scope: obj) : unit =
+        match hostOf scope with
+        | :? Wanxiangshu.Context.Companion.Blogger.OpenCode.PluginBloggerScope as pbs -> pbs.BeginShutdown()
+        | _ -> ()
 
     let claimRepairEpisode
         (scope: obj)

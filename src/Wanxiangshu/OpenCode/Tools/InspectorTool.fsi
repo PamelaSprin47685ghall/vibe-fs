@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 
 /// Synchronous Inspector delegation via reusable SyncDelegate Session.
@@ -32,4 +33,8 @@ module InspectorTool =
     val admission: ToolAdmission
 
     val spec:
-        factory: HostToolFactory -> scope: ToolRuntimeScope -> syncDelegate: SyncDelegateRuntime option -> ToolSpec
+        factory: HostToolFactory ->
+        workspaceDirectory: string option ->
+        snapshot: ISessionSnapshotPort option ->
+        syncDelegate: SyncDelegateRuntime option ->
+            ToolSpec

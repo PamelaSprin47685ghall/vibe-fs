@@ -149,7 +149,12 @@ module HostSignalBootstrap =
                     strengthPorts.ObservePrimaryTurn
                     scope
 
-            let onSnapshot = HostCompactionObserver.observe scope journal
+            let compactionProbe: CompactionProbe =
+                { TryClaimStartupProbe = (fun () -> scope.TryClaimStartupProbe())
+                  ReadCompactionSettingGap = (fun () -> scope.CompactionSettingGap)
+                  IsStartupProbeOpen = (fun () -> scope.IsStartupProbeOpen) }
+
+            let onSnapshot = HostCompactionObserver.observe compactionProbe journal
 
             let reconciler =
                 Reconciler.Scheduler(

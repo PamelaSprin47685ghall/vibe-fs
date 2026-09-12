@@ -113,7 +113,15 @@ module HostTurnObserver =
         task {
             let turn = context.Turn
             let isFissionOwner = isFissionOwnerSession journal turn.SessionId
-            do! XWire.reconcileAttempt journal scope turn
+
+            let attempts: AttemptPlanCapability =
+                { TryAttemptPlan = scope.TryAttemptPlan
+                  TryBindAttemptPlan = scope.TryBindAttemptPlan
+                  ConsumeAttemptPlan = scope.ConsumeAttemptPlan
+                  FreezePendingAttemptPlan = scope.Recovery.FreezePendingAttemptPlan
+                  TryPendingAttemptPlan = scope.Recovery.TryPendingAttemptPlan }
+
+            do! XWire.reconcileAttempt journal attempts turn
             do! TurnRuntimePreparation.prepare scope.DisposeExecutorRuntime turn
 
             let! fissionHandled =
@@ -182,7 +190,14 @@ module HostTurnObserver =
                 // only reconcile the request plan for cleanup; family recovery,
                 // owner fallback, Companion and ordinary TurnWorkflow
                 // must never observe them.
-                do! XWire.reconcileAttempt journal scope turn
+                let attempts: AttemptPlanCapability =
+                    { TryAttemptPlan = scope.TryAttemptPlan
+                      TryBindAttemptPlan = scope.TryBindAttemptPlan
+                      ConsumeAttemptPlan = scope.ConsumeAttemptPlan
+                      FreezePendingAttemptPlan = scope.Recovery.FreezePendingAttemptPlan
+                      TryPendingAttemptPlan = scope.Recovery.TryPendingAttemptPlan }
+
+                do! XWire.reconcileAttempt journal attempts turn
                 return ()
             else
                 // SPEC-INV-013 / STRENGTH-010 / STRENGTH-007: primary turn observation

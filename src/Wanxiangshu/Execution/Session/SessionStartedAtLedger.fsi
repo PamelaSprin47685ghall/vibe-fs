@@ -4,32 +4,31 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]
 module SessionStartedAtLedger =
-    val tryStartedAt: journal: AgentJournal -> sessionId: SessionId -> DateTimeOffset option
+    val tryStartedAt: port: SessionStartedAtPort -> sessionId: SessionId -> DateTimeOffset option
 
     val bind:
-        journal: AgentJournal ->
+        port: SessionStartedAtPort ->
         sessionId: SessionId ->
         candidate: DateTimeOffset ->
             Task<Result<DateTimeOffset, string>>
 
     val bindOrAbort:
-        durable: AgentJournal ->
+        port: SessionStartedAtPort ->
         sessionId: SessionId ->
         candidate: DateTimeOffset ->
             Task<Result<DateTimeOffset option, string>>
 
     val tryBindOrAbort:
-        journal: AgentJournal option ->
+        port: SessionStartedAtPort option ->
         projectionSessionIdOpt: string option ->
         sessionStartCandidate: DateTimeOffset option ->
             Task<Result<DateTimeOffset option, string>>
 
     val bindSessionStartedAt:
-        journal: AgentJournal option ->
+        journal: SessionStartedAtPort option ->
         clock: IClockPort ->
         terminateSession: (SessionId -> string -> Task<Result<unit, string>>) ->
         emitDiagnostic: (string -> (string * string) list -> unit) ->

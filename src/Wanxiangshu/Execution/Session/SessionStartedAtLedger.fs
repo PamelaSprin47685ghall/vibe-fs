@@ -2,67 +2,37 @@ namespace Wanxiangshu.Execution.Session
 
 open System
 open System.Threading.Tasks
-open Wanxiangshu.Composition.Durable.Fact
-open Wanxiangshu.Host
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Persistence.Journal
 
 [<RequireQualifiedAccess>]
 module SessionStartedAtLedger =
 
-    let tryStartedAt (journal: AgentJournal) sessionId =
-        AgentJournal.snapshot journal
-        |> fun snapshot -> AgentProjection.tryFind sessionId snapshot.AgentProjections
-        |> Option.bind (fun session -> session.SessionStartedAt)
-        |> Option.map SessionStartedAtProjection.startedAt
+    let tryStartedAt (port: SessionStartedAtPort) sessionId = port.TryStartedAt sessionId
 
-    let bind (journal: AgentJournal) sessionId (candidate: DateTimeOffset) : Task<Result<DateTimeOffset, string>> =
-        task {
-            match tryStartedAt journal sessionId with
-            | Some existing -> return Ok existing
-            | None ->
-                match!
-                    AgentJournal.appendAgent
-                        (StreamId.Session sessionId)
-                        None
-                        (HostFact.SessionStartedAtBound
-                            {| SessionId = sessionId
-                               StartedAt = candidate |})
-                        journal
-                with
-                | Error error -> return Error(sprintf "%A" error)
-                | Ok projection ->
-                    match
-                        AgentProjection.tryFind sessionId projection.AgentProjections
-                        |> Option.bind (fun session -> session.SessionStartedAt)
-                        |> Option.map SessionStartedAtProjection.startedAt
-                    with
-                    | Some startedAt -> return Ok startedAt
-                    | None -> return Error "SessionStartedAtBound did not materialize its projection"
-        }
+    let bind (port: SessionStartedAtPort) sessionId (candidate: DateTimeOffset) : Task<Result<DateTimeOffset, string>> =
+        port.Bind sessionId candidate
 
     /// HOST-013: bind session start, returning Result for composition root to handle failure.
     let bindOrAbort
-        (durable: AgentJournal)
+        (port: SessionStartedAtPort)
         (sessionId: SessionId)
         (candidate: DateTimeOffset)
         : Task<Result<DateTimeOffset option, string>> =
         task {
-            match! bind durable sessionId candidate with
+            match! bind port sessionId candidate with
             | Ok startedAt -> return Ok(Some startedAt)
             | Error reason -> return Error reason
         }
 
-    /// HOST-013: try bind session started at from optional journal/session/candidate.
+    /// HOST-013: try bind session started at from optional port/session/candidate.
     let tryBindOrAbort
-        (journal: AgentJournal option)
+        (port: SessionStartedAtPort option)
         (projectionSessionIdOpt: string option)
         (sessionStartCandidate: DateTimeOffset option)
         : Task<Result<DateTimeOffset option, string>> =
-        match journal, projectionSessionIdOpt, sessionStartCandidate with
-        | Some durable, Some sessionId, Some candidate -> bindOrAbort durable (SessionId.create sessionId) candidate
+        match port, projectionSessionIdOpt, sessionStartCandidate with
+        | Some p, Some sessionId, Some candidate -> bindOrAbort p (SessionId.create sessionId) candidate
         | _ -> Task.FromResult(Ok None)
 
     let private failSessionStartBind
@@ -85,7 +55,7 @@ module SessionStartedAtLedger =
 
     /// HOST-013: bind session start for transform boundary, logging diagnostics and terminating on error.
     let bindSessionStartedAt
-        (journal: AgentJournal option)
+        (journal: SessionStartedAtPort option)
         (clock: IClockPort)
         (terminateSession: SessionId -> string -> Task<Result<unit, string>>)
         (emitDiagnostic: string -> (string * string) list -> unit)

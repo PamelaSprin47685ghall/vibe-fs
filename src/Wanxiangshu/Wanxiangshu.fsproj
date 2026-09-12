@@ -421,6 +421,8 @@
     <Compile Include="Repository/Programming/Js/EventVocabulary.fs"/>
     <Compile Include="Persistence/EventStore/EventVocabulary.fsi"/>
     <Compile Include="Persistence/EventStore/EventVocabulary.fs"/>
+    <Compile Include="Persistence/EventStore/AuthoritativeVocabulary.fsi"/>
+    <Compile Include="Persistence/EventStore/AuthoritativeVocabulary.fs"/>
     <Compile Include="Persistence/EventStore/ProcessEventLog.fsi"/>
     <Compile Include="Persistence/EventStore/ProcessEventLog.fs"/>
     <Compile Include="Persistence/EventStore/EventKWayMerge.fsi"/>
@@ -475,6 +477,8 @@
     <Compile Include="Context/Prefix/Epoch.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Projection.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Projection.fs"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailurePort.fsi"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailurePort.fs"/>
     <Compile Include="Execution/Delegation/LinkageProjection.fsi"/>
     <Compile Include="Execution/Delegation/LinkageProjection.fs"/>
     <Compile Include="Execution/Delegation/JournalPort.fsi"/>
@@ -499,6 +503,8 @@
     <Compile Include="OpenCode/Host/PairProgramming/GuidelineSurface.fs"/>
     <Compile Include="OpenCode/Host/RequirementGrounding/Projection.fsi"/>
     <Compile Include="OpenCode/Host/RequirementGrounding/Projection.fs"/>
+    <Compile Include="OpenCode/Host/RequirementGrounding/Port.fsi"/>
+    <Compile Include="OpenCode/Host/RequirementGrounding/Port.fs"/>
     <Compile Include="Enforcer/Guidance/DeliveryProjection.fsi"/>
     <Compile Include="Enforcer/Guidance/DeliveryProjection.fs"/>
     <Compile Include="Enforcer/Guidance/DeliverySurface.fsi"/>
@@ -507,10 +513,14 @@
     <Compile Include="Execution/Fission/Projection.fs"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimateProjection.fsi"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimateProjection.fs"/>
+    <Compile Include="Execution/Delegation/DelegatedToolEstimatePort.fsi"/>
+    <Compile Include="Execution/Delegation/DelegatedToolEstimatePort.fs"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimateSurface.fsi"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimateSurface.fs"/>
     <Compile Include="Execution/Session/SessionStartedAtProjection.fsi"/>
     <Compile Include="Execution/Session/SessionStartedAtProjection.fs"/>
+    <Compile Include="Execution/Session/SessionStartedAtPort.fsi"/>
+    <Compile Include="Execution/Session/SessionStartedAtPort.fs"/>
     <Compile Include="Interaction/Attention/Projection.fsi"/>
     <Compile Include="Interaction/Attention/Projection.fs"/>
     <Compile Include="Interaction/Attention/JournalPort.fsi"/>
