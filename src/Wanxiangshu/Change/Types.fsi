@@ -61,9 +61,6 @@ type OrchestratorJournalPort =
     { AppendFact: StreamId -> AgentFact -> Task<Result<ProjectionSet, string>>
       Snapshot: unit -> ProjectionSet }
 
-module OrchestratorJournalPort =
-    val fromAgentJournal: journal: AgentJournal -> OrchestratorJournalPort
-
 type PublishGateLease = { Release: unit -> Task<unit> }
 
 type OrchestratorProgramDeps =

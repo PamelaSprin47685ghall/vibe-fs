@@ -12,6 +12,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.change-integration.change-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.change-integration.change-fold.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.change-integration.change-orchestrator-port-adapter.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-linkage-projection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-host-adapter.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-ledger.fsproj"/>

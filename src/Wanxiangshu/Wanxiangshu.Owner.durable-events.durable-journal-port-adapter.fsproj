@@ -21,12 +21,10 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-agentjournal.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.execution-fission-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.digest.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.change-integration.change-fold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.composition-turn-observation-port.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.opencode-host-chatadmission-intent.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-joinguard-port.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.interaction-dispatch-nudge.fsproj"/>
     <Compile Include="Composition/Durable/AgentJournalPortAdapter.fsi"/>
     <Compile Include="Composition/Durable/AgentJournalPortAdapter.fs"/>
   </ItemGroup>

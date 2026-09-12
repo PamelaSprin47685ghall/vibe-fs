@@ -38,8 +38,8 @@ module TurnWorkflow =
         task {
             let turn = context.Turn
 
-            // Single-snapshot fan-out: one adapter revision feeds every
-            // TurnObservationJournalPort read below.
+            // The observation port is bound once; each member re-reads the journal
+            // at call time, so a later SyncDelegate write still reaches the readers.
             let observation = journal |> Option.map AgentJournalPortAdapter.forTurnObservation
 
             // SyncDelegate path stays first and exclusive when it claims the turn

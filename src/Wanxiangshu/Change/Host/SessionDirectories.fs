@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Change.Host
 
 open System.Collections.Generic
-open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation.Identity
 
@@ -33,11 +32,8 @@ module OrchestratorSessionDirectories =
             registerLinkedChild worktrees register record
 
     let registerRestored
-        (snapshot: ProjectionSet)
-        (orchestratorId: SessionId)
+        (handles: AgentLinkageProjection option)
         (worktrees: Dictionary<string, string>)
         (register: SessionId -> string -> unit)
         =
-        Map.tryFind orchestratorId snapshot.AgentProjections.Sessions
-        |> Option.bind (fun session -> session.Handles)
-        |> Option.iter (registerHandles worktrees register)
+        handles |> Option.iter (registerHandles worktrees register)

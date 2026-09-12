@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Composition.Durable
 
-open Wanxiangshu.Change
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session
@@ -23,15 +22,12 @@ module AgentJournalPortAdapter =
     val forDelegatedToolEstimate: journal: AgentJournal -> DelegatedToolEstimatePort
     val forSessionStartedAt: journal: AgentJournal -> SessionStartedAtPort
     val forProviderFailure: journal: AgentJournal -> ProviderFailureJournalPort
-    val forProviderRecovery: journal: AgentJournal -> ProviderRecoveryJournalPort
     val forRequirementGrounding: journal: AgentJournal -> RequirementGroundingPort
     val forSessionResume: journal: AgentJournal -> SessionResumeJournalPort
     val forWire: journal: AgentJournal -> WireJournalPort
     val forTurnObservation: journal: AgentJournal -> TurnObservationJournalPort
     val forTerminalPolicy: journal: AgentJournal -> TerminalPolicyPort
     val forHostJoinGuard: journal: AgentJournal -> HostJoinGuardJournalPort
-    val forOrchestratorSweep: journal: AgentJournal -> OrchestratorSweepPort
-    val forOrchestratorRelay: journal: AgentJournal -> OrchestratorRelayPort
 
     /// DELEG-029: durable composition is the only place that wraps delegation fact
     /// cases into the outer routing union and adapts the journal handle.

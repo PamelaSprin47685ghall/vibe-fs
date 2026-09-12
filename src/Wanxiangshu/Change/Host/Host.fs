@@ -31,14 +31,11 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     let authorityUpdateGate = obj ()
     let authorityUpdatesInFlight = HashSet<string>()
 
-    // ORCH-PORT: domain-owned journal capabilities, built once from the
-    // composition-handed journal. All durable reads/appends below go through
-    // these ports; this file never touches the journal directly.
-    let sweepPortOpt =
-        deps.Journal |> Option.map AgentJournalPortAdapter.forOrchestratorSweep
+    // ORCH-PORT: domain-owned sweep/relay/engine journal capabilities built once
+    // from composition-handed journal.
+    let sweepPortOpt = deps.Journal |> Option.map OrchestratorJournalAdapter.forSweep
 
-    let relayPortOpt =
-        deps.Journal |> Option.map AgentJournalPortAdapter.forOrchestratorRelay
+    let relayPortOpt = deps.Journal |> Option.map OrchestratorJournalAdapter.forRelay
 
     let gitPort = GitOperations.createWithRepo deps.RepoPath OrchestratorGit.run
 
@@ -412,7 +409,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     relayPort,
                     deps.RepoPath,
                     target,
-                    ?journal = (deps.Journal |> Option.map OrchestratorJournalPort.fromAgentJournal),
+                    ?journal = (deps.Journal |> Option.map OrchestratorJournalAdapter.forEngine),
                     ?lockRepoPath = Some lockRepoPath
                 )
 

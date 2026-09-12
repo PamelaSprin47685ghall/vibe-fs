@@ -4,8 +4,8 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// Consumer-side journal reads needed by TerminalPolicy and OrdinaryTurnWorkflow.
-/// Each member derives from exactly one Journal Snapshot revision captured
-/// when the port is built (see AgentJournalPortAdapter.forTerminalPolicy).
+/// Each member performs exactly one journal snapshot read at call time;
+/// multiple fields within one member share that snapshot.
 type TerminalPolicyPort =
     { IsPoisoned: unit -> bool
       HasListableHandles: SessionId -> bool

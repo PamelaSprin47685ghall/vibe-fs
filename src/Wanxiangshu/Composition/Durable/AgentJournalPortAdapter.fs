@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Composition.Durable
 
-open Wanxiangshu.Change
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Context.Companion
@@ -18,12 +17,10 @@ open Wanxiangshu.Requirement.Grounding
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Mission.Relay
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Host
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode
-open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Context.Companion.Blogger
 
 module AgentJournalPortAdapter =
@@ -157,71 +154,33 @@ module AgentJournalPortAdapter =
                     return result |> Result.map ignore |> Result.mapError JournalAppendFailure.describe
                 } }
 
-    let forProviderRecovery (journal: AgentJournal) : ProviderRecoveryJournalPort =
-        { TryRequestKind =
-            fun sessionId physicalUserMessageId ->
-                (AgentJournal.snapshot journal).AgentProjections.ChatExecutions
-                |> ChatExecutionProjection.byKey
-                    { SessionId = sessionId
-                      PhysicalUserMessageId = physicalUserMessageId }
-                |> Option.bind (fun execution -> execution.ProviderStarted)
-                |> Option.map (fun started -> started.RequestKind)
-          TryMainSessionOf =
-            fun sessionId ->
-                SessionAssociationProjection.tryMainSessionOf
-                    sessionId
-                    (AgentJournal.snapshot journal).AgentProjections.Associations
-          TryBlogState =
-            fun sessionId ->
-                let session =
-                    AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
-
-                let blog =
-                    session
-                    |> Option.bind (fun s -> s.Blog)
-                    |> Option.defaultValue BlogProjection.empty
-
-                let epoch =
-                    session
-                    |> Option.bind (fun s -> s.PrefixEpoch)
-                    |> Option.map (fun p -> p.EpochId)
-                    |> Option.defaultValue PrefixEpochId.initial
-
-                Some(epoch, blog)
-          AwaitChange =
-            fun revision cancellation ->
-                task {
-                    let! res = AgentJournal.awaitChangeFromOrCancel revision cancellation journal
-                    return res |> Option.map ignore
-                } }
-
-    /// TURN-OBSERVE: the three observation reads share one Snapshot revision
-    /// captured here, then project via the domain selectors.
+    /// TURN-OBSERVE: Each member performs exactly one journal snapshot read at call time;
+    /// multiple fields within one member share that snapshot.
     let forTurnObservation (journal: AgentJournal) : TurnObservationJournalPort =
-        let projections = (AgentJournal.snapshot journal).AgentProjections
+        let projections () =
+            (AgentJournal.snapshot journal).AgentProjections
 
         { TryBloggerReceiptKind =
             fun sessionId providerRun ->
-                projections.Sessions
+                (projections ()).Sessions
                 |> Map.tryFind sessionId
                 |> Option.bind (fun session -> session.BloggerCycles)
                 |> Option.bind (BloggerCycleProjection.tryReceipt providerRun)
                 |> Option.map (fun receipt -> receipt.Kind)
           TryContinuationKind =
             fun sessionId physicalUserMessageId ->
-                projections.Sessions
+                (projections ()).Sessions
                 |> Map.tryFind sessionId
                 |> Option.bind (fun session -> session.PromptAuthority)
                 |> Option.bind (fun authority -> Map.tryFind physicalUserMessageId authority.AcceptedContinuationIds)
           IsFissionActive =
             fun sessionId ->
-                FissionProjection.tryActiveForOwner sessionId projections.Fission
+                FissionProjection.tryActiveForOwner sessionId (projections ()).Fission
                 |> Option.isSome }
 
     let forTerminalPolicy (journal: AgentJournal) : TerminalPolicyPort =
-        let snapshot = AgentJournal.snapshot journal
-        let projections = snapshot.AgentProjections
-        let isPoisoned = journal.IsPoisoned
+        let projections () =
+            (AgentJournal.snapshot journal).AgentProjections
 
         let canonicalRoleOf (authority: PromptAuthority.PromptAuthorityProjection) =
             match authority.ActiveLogicalRun, authority.LastAuthorityProfile with
@@ -229,28 +188,28 @@ module AgentJournalPortAdapter =
             | None, Some profile -> Some profile.CanonicalRole
             | None, None -> None
 
-        { IsPoisoned = fun () -> isPoisoned
+        { IsPoisoned = fun () -> journal.IsPoisoned
           HasListableHandles =
             fun sessionId ->
-                AgentProjection.tryFind sessionId projections
+                AgentProjection.tryFind sessionId (projections ())
                 |> Option.bind (fun session -> session.Handles)
                 |> Option.defaultValue HandleProjection.empty
                 |> HandleProjection.listable
                 |> List.isEmpty
                 |> not
-          HasActiveOrchestratorJobs = fun () -> AgentProjection.hasActiveOrchestratorJobs projections
-          IsLinkedChild = fun sessionId -> Map.containsKey sessionId projections.HandleByChildSession
+          HasActiveOrchestratorJobs = fun () -> AgentProjection.hasActiveOrchestratorJobs (projections ())
+          IsLinkedChild = fun sessionId -> Map.containsKey sessionId (projections ()).HandleByChildSession
           TryCanonicalRole =
             fun sessionId ->
-                Map.tryFind sessionId projections.Sessions
+                Map.tryFind sessionId (projections ()).Sessions
                 |> Option.bind (fun session -> session.PromptAuthority)
                 |> Option.bind canonicalRoleOf }
 
     let forHostJoinGuard (journal: AgentJournal) : HostJoinGuardJournalPort =
-        let projections = (AgentJournal.snapshot journal).AgentProjections
-
         { HasOutstandingJoinClaim =
             fun targetSessionId terminalProviderRun ->
+                let projections = (AgentJournal.snapshot journal).AgentProjections
+
                 let payloadDigest =
                     PromptAuthority.gateNudgePayloadDigest "runtime/background-join" terminalProviderRun
 
@@ -440,53 +399,3 @@ module AgentJournalPortAdapter =
                     | Error err -> return Error err
                 }
           Sha256 = HostDigest.sha256Hex }
-
-    /// ORCH-PORT: sweep reads over persisted ManagerJobs. Each member
-    /// performs exactly one journal snapshot read per call.
-    let forOrchestratorSweep (journal: AgentJournal) : OrchestratorSweepPort =
-        { ActiveJobs =
-            fun () -> OrchestratorProjection.activeJobs (AgentJournal.snapshot journal).AgentProjections.Orchestrator
-          TryJob =
-            fun jobId ->
-                OrchestratorProjection.tryFind jobId (AgentJournal.snapshot journal).AgentProjections.Orchestrator
-          Snapshot = fun () -> AgentJournal.snapshot journal }
-
-    /// ORCH-PORT: Relay reads, appends, and revision wait for one ManagerJob.
-    let forOrchestratorRelay (journal: AgentJournal) : OrchestratorRelayPort =
-        let roadIdOf (record: ManagerJobProjection) =
-            RoadId.create (SessionId.value record.ManagerSessionId)
-
-        let roadOfRecord (record: ManagerJobProjection) projection =
-            AgentProjection.tryFind record.ManagerSessionId projection.AgentProjections
-            |> Option.bind (fun session -> session.Relay)
-            |> Option.bind (fun relay -> Fold.view relay (roadIdOf record))
-
-        { RoadSnapshot =
-            fun record ->
-                let projection, revision = AgentJournal.snapshotWithRevision journal
-                roadOfRecord record projection, revision
-          AwaitChangeFrom =
-            fun revision ->
-                task {
-                    let! _ = AgentJournal.awaitChangeFrom revision journal
-                    return ()
-                }
-          AppendRelay =
-            fun record transaction ->
-                task {
-                    let! result =
-                        AgentJournal.appendAgent
-                            (StreamId.Session record.ManagerSessionId)
-                            None
-                            (AgentFact.Relay(
-                                RelayFactCases.TransactionCommitted
-                                    {| RoadId = roadIdOf record
-                                       Transaction = transaction |}
-                            ))
-                            journal
-
-                    return
-                        result
-                        |> Result.map (fun _ -> ())
-                        |> Result.mapError JournalAppendFailure.describe
-                } }

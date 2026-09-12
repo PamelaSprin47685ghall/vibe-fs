@@ -5,8 +5,8 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 
 /// Consumer-side journal reads needed by OrdinaryTurnWorkflow.
-/// Each member derives from exactly one Journal Snapshot revision captured
-/// when the port is built (see AgentJournalPortAdapter.forTurnObservation).
+/// Each member performs exactly one journal snapshot read at call time;
+/// multiple fields within one member share that snapshot.
 /// `PromptContinuationKind` is the type aliased as
 /// `PromptAuthority.ContinuationKind`.
 type TurnObservationJournalPort =

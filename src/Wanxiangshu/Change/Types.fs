@@ -101,17 +101,6 @@ type OrchestratorJournalPort =
     { AppendFact: StreamId -> AgentFact -> Task<Result<ProjectionSet, string>>
       Snapshot: unit -> ProjectionSet }
 
-module OrchestratorJournalPort =
-    let fromAgentJournal (journal: AgentJournal) : OrchestratorJournalPort =
-        { AppendFact =
-            fun stream fact ->
-                task {
-                    match! AgentJournal.appendAgent stream None fact journal with
-                    | Ok projection -> return Ok projection
-                    | Error failure -> return Error(JournalAppendFailure.describe failure)
-                }
-          Snapshot = fun () -> AgentJournal.snapshot journal }
-
 type PublishGateLease = { Release: unit -> Task<unit> }
 
 type OrchestratorProgramDeps =

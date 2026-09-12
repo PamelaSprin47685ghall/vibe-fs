@@ -479,8 +479,6 @@
     <Compile Include="Participant/Provider/Attempt/Fallback/Projection.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailurePort.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailurePort.fs"/>
-    <Compile Include="Participant/Provider/Attempt/Fallback/ProviderRecoveryPort.fsi"/>
-    <Compile Include="Participant/Provider/Attempt/Fallback/ProviderRecoveryPort.fs"/>
     <Compile Include="Execution/Delegation/LinkageProjection.fsi"/>
     <Compile Include="Execution/Delegation/LinkageProjection.fs"/>
     <Compile Include="Execution/Delegation/JournalPort.fsi"/>
@@ -733,6 +731,8 @@
     <Compile Include="Process/PtyApi.fs"/>
     <Compile Include="Change/Types.fsi"/>
     <Compile Include="Change/Types.fs"/>
+    <Compile Include="Change/Orchestrator/OrchestratorJournalAdapter.fsi"/>
+    <Compile Include="Change/Orchestrator/OrchestratorJournalAdapter.fs"/>
     <Compile Include="Resources/PackageResources.fsi"/>
     <Compile Include="Resources/PackageResources.fs"/>
     <Compile Include="Resources/ProviderResourceBytes.fsi"/>

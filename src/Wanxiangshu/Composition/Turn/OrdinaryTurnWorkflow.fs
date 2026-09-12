@@ -240,14 +240,11 @@ module OrdinaryTurnWorkflow =
         =
         match context.Failure with
         | Some failure ->
-            let recoveryPort = Option.map AgentJournalPortAdapter.forProviderRecovery journal
-
             ProviderRecoveryWorkflow.continueAfterConfirmedFailure
                 sessionPort
                 rootWorkspace
                 eventPort
                 journal
-                recoveryPort
                 recoveryScope
                 context.Turn
                 failure
