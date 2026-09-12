@@ -9,6 +9,7 @@ module AttentionSurface =
         member _.State = state
 
     let private stateOf (value: obj) = (unbox<BoxedState> value).State
+    let internal projection (state: obj) = stateOf state
     let private boxed state = BoxedState(state) :> obj
 
     let empty () = boxed AttentionProjection.empty

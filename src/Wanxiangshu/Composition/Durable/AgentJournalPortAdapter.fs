@@ -2,10 +2,29 @@ namespace Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Host
 
 module AgentJournalPortAdapter =
+    let forAttention (journal: AgentJournal) : AttentionJournalPort =
+        { Read = fun () -> (AgentJournal.snapshot journal).AgentProjections.Attention
+          Append =
+            fun sessionId providerRun fact ->
+                task {
+                    let! appended =
+                        AgentJournal.appendAgent
+                            (StreamId.Session sessionId)
+                            providerRun
+                            (AgentFact.Attention fact)
+                            journal
+
+                    return
+                        appended
+                        |> Result.map ignore
+                        |> Result.mapError (fun _ -> AttentionAppendFailure.DurabilityUnavailable)
+                } }
+
     /// DELEG-029: durable composition is the only place that wraps delegation fact
     /// cases into the outer routing union and adapts the journal handle.
     let fromAgentJournal (journal: AgentJournal) : AgentJournalPort =

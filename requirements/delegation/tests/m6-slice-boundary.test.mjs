@@ -8,6 +8,24 @@ import { assertFatalBoundary } from '../../structured-workflow/tests/support/m6-
 
 const ROOT = resolve(import.meta.dirname, '../../..')
 
+const assertRecoveryClosure = (inventory, root) => {
+  const visited = new Set()
+  const visit = (path) => {
+    if (visited.has(path)) return
+    visited.add(path)
+    const project = inventory.projects.get(path)
+    assert.ok(project, `referenced project must exist: ${path}`)
+    for (const file of project.implementationFiles) {
+      assert.doesNotMatch(file, /\/(?:Persistence\/(?:Journal|EventStore)|Composition\/Durable|Process|OpenCode\/Tools)\//,
+        `recovery must not acquire durable composition or physical implementations: ${file}`)
+      assert.doesNotMatch(file, /\/(?:PluginRuntimeScope|ToolRuntimeScope|HostSignalBootstrap|SharedTerminalBus)\.fs$/,
+        `recovery must not acquire a concrete host runtime: ${file}`)
+    }
+    for (const reference of project.references) visit(reference)
+  }
+  visit(root.projectPath)
+}
+
 test('WHAT[DELEG-029] delegation runtime consumes only the delegation-owned journal port', () => {
   const compileInventory = readCompileShardInventory({ repositoryRoot: ROOT })
   const subsystemInventory = buildSubsystemInventory({ compileInventory })
@@ -32,7 +50,7 @@ test('WHAT[DELEG-029] delegation runtime consumes only the delegation-owned jour
 
   // 2. The recovery runtime never reaches the durable handle, the outer routing union or the
   //    journal codec: DELEG-029 keeps those at durable composition, and the runtime consumes
-  //    only the delegation-owned port. All cross-subsystem references must be contract kind.
+  //    only its port. Check the actual transitive inputs, not retired locality labels.
   const durableCompositionOnly = new Set([
     'persistence-journal-agentjournal',
     'persistence-journal-promptfactcodec',
@@ -48,11 +66,39 @@ test('WHAT[DELEG-029] delegation runtime consumes only the delegation-owned jour
       !durableCompositionOnly.has(provider.shard),
       `${provider.shard} must not be consumed by the delegation recovery runtime (DELEG-029)`,
     )
-    assert.ok(
-      provider.legacyKind === 'contract',
-      `cross-subsystem reference ${provider.shard} (${provider.legacyKind}) is not a contract`,
-    )
   }
+  assertRecoveryClosure(subsystemInventory, recoveryRuntime)
+
+  const withoutLegacyKinds = {
+    ...subsystemInventory,
+    projects: new Map([...subsystemInventory.projects].map(([path, project]) =>
+      [path, { ...project, legacyKind: '' }])),
+  }
+  assertRecoveryClosure(withoutLegacyKinds, recoveryRuntime)
+
+  // Both a directly injected journal and a physical timing implementation must
+  // be rejected even when falsely labelled as contracts.
+  for (const shard of ['persistence-journal-agentjournal', 'process-node-timing-adapter']) {
+    const foreign = [...subsystemInventory.projects.values()].find((project) => project.shard === shard)
+    assert.ok(foreign, `real negative provider must exist: ${shard}`)
+    const projects = new Map(withoutLegacyKinds.projects)
+    projects.set(foreign.projectPath, { ...foreign, legacyKind: 'contract' })
+    projects.set(recoveryRuntime.projectPath, {
+      ...recoveryRuntime,
+      references: [...recoveryRuntime.references, foreign.projectPath],
+    })
+    assert.throws(() => assertRecoveryClosure({ ...subsystemInventory, projects }, recoveryRuntime),
+      /recovery must not acquire/)
+  }
+
+  // A same-subsystem intermediary must not hide that dependency either.
+  const journal = [...subsystemInventory.projects.values()].find((project) => project.shard === 'persistence-journal-agentjournal')
+  const portProject = [...subsystemInventory.projects.values()].find((project) => project.shard === 'delegation-journal-port')
+  assert.ok(portProject)
+  const indirect = new Map(withoutLegacyKinds.projects)
+  indirect.set(portProject.projectPath, { ...portProject, references: [...portProject.references, journal.projectPath] })
+  assert.throws(() => assertRecoveryClosure({ ...subsystemInventory, projects: indirect }, recoveryRuntime),
+    /recovery must not acquire/)
 
   // Execution/Delegation/LinkageProjection.fs must be provided by a delegation contract shard
   const linkageProject = [...subsystemInventory.projects.values()].find((project) =>
@@ -60,9 +106,9 @@ test('WHAT[DELEG-029] delegation runtime consumes only the delegation-owned jour
   )
   assert.ok(linkageProject, 'a project must compile Execution/Delegation/LinkageProjection.fs')
   assert.equal(linkageProject.subsystem, 'delegation', 'LinkageProjection project must belong to delegation subsystem')
-  assert.equal(linkageProject.legacyKind, 'contract', "LinkageProjection project must have legacyKind 'contract'")
+  assertRecoveryClosure(subsystemInventory, linkageProject)
 
-  // 3. The capability type is delegation-owned: the file declaring type AgentJournalPort is compiled by a project whose subsystem === 'delegation' and legacyKind === 'contract'
+  // 3. The capability type is owned by delegation and does not pull the implementation back in.
   let declaringProject = null
   for (const project of subsystemInventory.projects.values()) {
     const allFiles = [...project.implementationFiles, ...project.signatureFiles]
@@ -77,7 +123,7 @@ test('WHAT[DELEG-029] delegation runtime consumes only the delegation-owned jour
   }
   assert.ok(declaringProject, "a source file must declare 'type AgentJournalPort'")
   assert.equal(declaringProject.subsystem, 'delegation', 'AgentJournalPort declaring project must belong to delegation subsystem')
-  assert.equal(declaringProject.legacyKind, 'contract', "AgentJournalPort declaring project must have legacyKind 'contract'")
+  assertRecoveryClosure(subsystemInventory, declaringProject)
 
   // 4. The shard's implementation sources consume the port and never call foreign module functions
   let consumesPort = false

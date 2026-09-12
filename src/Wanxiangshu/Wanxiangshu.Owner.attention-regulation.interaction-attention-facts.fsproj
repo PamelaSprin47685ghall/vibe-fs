@@ -12,6 +12,8 @@
     <Compile Include="Interaction/Attention/Facts.fs"/>
     <Compile Include="Interaction/Attention/Projection.fsi"/>
     <Compile Include="Interaction/Attention/Projection.fs"/>
+    <Compile Include="Interaction/Attention/JournalPort.fsi"/>
+    <Compile Include="Interaction/Attention/JournalPort.fs"/>
     <Compile Include="Interaction/Attention/Surface.fsi"/>
     <Compile Include="Interaction/Attention/Surface.fs"/>
   </ItemGroup>

@@ -513,6 +513,8 @@
     <Compile Include="Execution/Session/SessionStartedAtProjection.fs"/>
     <Compile Include="Interaction/Attention/Projection.fsi"/>
     <Compile Include="Interaction/Attention/Projection.fs"/>
+    <Compile Include="Interaction/Attention/JournalPort.fsi"/>
+    <Compile Include="Interaction/Attention/JournalPort.fs"/>
     <Compile Include="Interaction/Concern/Projection.fsi"/>
     <Compile Include="Interaction/Concern/Projection.fs"/>
     <Compile Include="Enforcer/InstitutionalLearning/Projection.fsi"/>
@@ -1226,6 +1228,8 @@
     <Compile Include="OpenCode/Tools/AssumeTool.fs"/>
     <Compile Include="OpenCode/Tools/AttentionTools.fsi"/>
     <Compile Include="OpenCode/Tools/AttentionTools.fs"/>
+    <Compile Include="OpenCode/Tools/AttentionToolSurface.fsi"/>
+    <Compile Include="OpenCode/Tools/AttentionToolSurface.fs"/>
     <Compile Include="OpenCode/Tools/ConcernTools.fsi"/>
     <Compile Include="OpenCode/Tools/ConcernTools.fs"/>
     <Compile Include="OpenCode/Tools/InstitutionalLearningTools.fsi"/>

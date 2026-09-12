@@ -2,6 +2,7 @@ namespace Wanxiangshu.Interaction.Attention
 
 [<RequireQualifiedAccess>]
 module AttentionSurface =
+    val internal projection: state: obj -> AttentionProjectionState
     val empty: unit -> obj
     val record: session: string -> occurrence: string -> text: string -> state: obj -> obj
 

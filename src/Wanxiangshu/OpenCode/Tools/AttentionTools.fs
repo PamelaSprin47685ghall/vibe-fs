@@ -2,13 +2,10 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Threading.Tasks
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Resources
 
 [<RequireQualifiedAccess>]
@@ -72,22 +69,20 @@ module AttentionTools =
     let private occurrenceId (ctx: HostToolContext) =
         ctx.ToolCallId |> Option.map ToolCallId.value
 
-    let private persistDeferred durable sessionId occurrence text providerRun =
+    let private persistDeferred (durable: AttentionJournalPort) sessionId occurrence text providerRun =
         taskResult {
-            let projection = (AgentJournal.snapshot durable).AgentProjections.Attention
+            let projection = durable.Read()
 
             match AttentionProjection.tryFind sessionId occurrence projection with
             | Some _ -> return ()
             | None ->
                 let fact =
-                    AgentFact.Attention(
-                        AttentionFactCases.DeferredWorkRecorded
-                            {| SessionId = sessionId
-                               OccurrenceId = occurrence
-                               Text = text |}
-                    )
+                    AttentionFactCases.DeferredWorkRecorded
+                        {| SessionId = sessionId
+                           OccurrenceId = occurrence
+                           Text = text |}
 
-                let! _ = AgentJournal.appendAgent (StreamId.Session sessionId) providerRun fact durable
+                do! durable.Append sessionId providerRun fact
                 return ()
         }
 
@@ -101,7 +96,7 @@ module AttentionTools =
             | Error _ -> return render ctx Path.DurableUnavailable Map.empty
         }
 
-    let private deferExecute (journal: AgentJournal option) (args: HostToolArguments) (ctx: HostToolContext) =
+    let private deferExecute (journal: AttentionJournalPort option) (args: HostToolArguments) (ctx: HostToolContext) =
         task {
             let text = args.Text "new_work" |> nonBlank
 

@@ -53,6 +53,12 @@ Subsystem SCC 是首要结构债：双向依赖必须通过移动知识所有权
 
 ### 3.2 GAP-033 当前缺口与关闭证据
 
+2026-09-12 用户批准按完整消费者边界继续迁移。以下历史批次中的单边删引用实验，只证明当时那个具体改法的结果；第 32／33 条对窄查询与 journal 的否定不适用于同时迁移类型、全部路径及装配的完整方案。具体纪律见当前 AGENTS 第 3 节；不以中间一步闭包未减否定迁移，也不把删边释放量当作最终收益。
+
+本批从 `cc08c286f` 迁移 Attention 工具：`AttentionJournalPort` 由 interaction 自有 facts 分片提供，工具与签名不再消费全局 journal、projection 或 routing union；`ToolRegistry` 只接入 `AgentJournalPortAdapter.forAttention`，由 persistence 的既有 durable composition adapter 保留一次快照、原 session／provider-run 和错误／异常语义，独占 `AgentFact.Attention` 包装。真实声明前向闭包（含自身，生产 `.fs` 不重复计算 `.fsi`）由 **58 分片／152 源码降至 11／27**，其中包括新增的 port 与真实工具 Semantic Surface。装配消费者 `opencode-host-managedagentconfig` 为 181 分片／513→515 源码，`plugin-composition` 为 209／589→591；两者本来就须知道全应用，增加两份源码不能宣称为闭包收益。新边界测试在旧树因包含 `Composition/Durable/MagicTodoIdentity.fs` 失败，迁移后拒绝整个 durable aggregate 与运行时容器进入该工具闭包。全图为 26 subsystem、235 shards、716 production `.fs`、1786 refs、最大 SCC 18；GAP-033 仍为 PARTIAL。
+
+同批修正 DELEG-029 的测试判据：不再用 `legacyKind` 决定合法性，保留自身 port／源码身份及 foreign handle 禁令，改查真实传递源码闭包。移除全部 kind 的正例通过；伪标 contract 的 journal、物理 timing adapter，以及借 delegation port 间接传入 journal 的三个反例均被拒绝。此项只修正退役治理的残留，不宣称扩大 DELEG-029 的 PTY 行为证明。
+
 本节是 STRUCTURED-WORKFLOW-011 至 016 的实现与证明缺口记录，不新增产品条款，也不构成整表开工授权。仅处理用户任务明确覆盖的部分；相关 Worker 应显式读取本节，不依赖路径触发的自动接地。聚合状态见 `requirements/GAP.md` 的 GAP-033，保持 PARTIAL；单项修复不代表整体已可独立替换。
 
 第 3.1 节保留历史测量口径；以下逐项记录当前实现和仍缺的证据，不用历史数量约束后续合法变化。
@@ -679,7 +685,7 @@ node scripts/build.mjs
 | STRUCTURED-WORKFLOW-010 | `requirements/structured-workflow/tests/parallel.test.mjs::WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_results_follow_input_order_not_completion_order` |
 | STRUCTURED-WORKFLOW-011 | `requirements/structured-workflow/tests/subsystem-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-011] subsystem is the only semantic governance identity`；`requirements/structured-workflow/tests/owner-project-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-011] subsystem ownership and compile-shard graph are complete and acyclic` |
 | STRUCTURED-WORKFLOW-012 | `requirements/structured-workflow/tests/owner-impact-compile.test.mjs::WHAT[STRUCTURED-WORKFLOW-012] implementation changes exclude reverse consumers`；`requirements/structured-workflow/tests/owner-project-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-012] flat Fable projection planner produces exact closure and canonical aggregate order` |
-| STRUCTURED-WORKFLOW-013 | `requirements/structured-workflow/tests/subsystem-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-013] reusable platform shards depend on no domain subsystem`；`requirements/structured-workflow/tests/owner-project-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-013] GitGateway exposes a narrow dependency-inverted compiler boundary` |
+| STRUCTURED-WORKFLOW-013 | `requirements/structured-workflow/tests/subsystem-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-013] reusable platform shards depend on no domain subsystem`；`requirements/structured-workflow/tests/owner-project-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-013] GitGateway exposes a narrow dependency-inverted compiler boundary`；`requirements/structured-workflow/tests/attention-compile-boundary.test.mjs::WHAT[STRUCTURED-WORKFLOW-013] attention tools consume their own port without durable aggregate or runtime containers` |
 | STRUCTURED-WORKFLOW-014 | `requirements/structured-workflow/tests/owner-project-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-014] NodeFs physical port and tool contracts have isolated compiler boundaries` |
 | STRUCTURED-WORKFLOW-015 | `requirements/structured-workflow/tests/generated-module-relation.test.mjs::WHAT[STRUCTURED-WORKFLOW-015] generated artifact binds tracked inputs bytes lineage traversal and import` |
 | STRUCTURED-WORKFLOW-016 | `requirements/structured-workflow/tests/subsystem-boundaries.test.mjs::WHAT[STRUCTURED-WORKFLOW-016] release architecture has one subsystem authority` |

@@ -1,8 +1,8 @@
 namespace Wanxiangshu.OpenCode
 
-open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Interaction.Attention
 
 [<RequireQualifiedAccess>]
 module AttentionTools =
     val admission: ToolAdmission
-    val specs: factory: HostToolFactory -> journal: AgentJournal option -> ToolSpec list
+    val specs: factory: HostToolFactory -> journal: AttentionJournalPort option -> ToolSpec list

@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 open Wanxiangshu.Execution.Delegation.SyncDelegate
@@ -217,7 +218,7 @@ module ToolRegistry =
               yield FileMutationTools.rmSpec factory
               yield BashHoneypotTool.spec
               yield AssumeTool.spec factory
-              yield! AttentionTools.specs factory journal
+              yield! AttentionTools.specs factory (journal |> Option.map AgentJournalPortAdapter.forAttention)
               yield! ConcernTools.specs factory journal
               yield! InstitutionalLearningTools.specs factory journal
               yield ChronicleTool.spec factory runtime bloggerHost

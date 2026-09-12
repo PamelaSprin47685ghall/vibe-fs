@@ -20,6 +20,8 @@ DELEG-020 约束：委托语义不依赖当前工具名字面值（`fork`、`com
 
 ### durable 能力注入（DELEG-029）
 
+2026-09-12：`m6-slice-boundary.test.mjs` 不再以退役 `legacyKind` 标签裁决 recovery 的引用。仍验证本域 port 的真实源码归属、禁止外部 journal／routing union，并沿 ProjectReference 检查传递源码不得带入 durable composition、物理 process 或具体 Host 容器。全去 kind 的正例通过；伪标 contract 的真实 journal、timing adapter 及同域 port 间接带入 journal 的反例均拒绝。该检查是本条 recovery 边界的证明，不补齐尚缺的 PTY 行为证明。
+
 delegation 业务运行时（recovery、fork、fold、sync）不持有 durable store 的具体句柄，也不把领域 fact 包进外层 routing union。能力与包装位置分工如下：
 
 - **capability port 由 delegation 拥有**：`Execution/Delegation/JournalPort.fs` 声明 `AgentJournalPort`，四个成员正是运行时需要的全部操作——`AppendExecutionFact: SessionId -> ExecutionFactCases -> Task<Result<unit, string>>`、`HandleProjection: SessionId -> AgentLinkageProjection`、`ReadBlob: BlobRef -> Task<Result<string, string>>`、`WriteBlob: string -> Task<Result<BlobRef * BlobDigest, string>>`。capability 由 composition 注入，构造时必填；`None` 只表示该调用方确实没有 durable store（既有降级语义），不是可选默认。
