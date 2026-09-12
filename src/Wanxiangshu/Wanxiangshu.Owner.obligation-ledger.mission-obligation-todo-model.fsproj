@@ -11,21 +11,15 @@
     <ProjectReference Include="Wanxiangshu.Owner.prefix-stability.context-prefix-candidate.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj"/>
-    <Compile Include="Mission/Obligation/Todo/Model.fsi"/>
+        <Compile Include="Mission/Obligation/Todo/MagicTodoIdentity.fsi"/>
+    <Compile Include="Mission/Obligation/Todo/MagicTodoIdentity.fs"/>
+<Compile Include="Mission/Obligation/Todo/Model.fsi"/>
     <Compile Include="Mission/Obligation/Todo/Model.fs"/>
     <Compile Include="Mission/Obligation/Todo/ObligationCodec.fsi"/>
     <Compile Include="Mission/Obligation/Todo/ObligationCodec.fs"/>
-    <Compile Include="Mission/Obligation/Todo/PrefixEpoch.fsi"/>
-    <Compile Include="Mission/Obligation/Todo/PrefixEpoch.fs"/>
     <Compile Include="Mission/Obligation/Todo/Surface.fsi"/>
     <Compile Include="Mission/Obligation/Todo/Surface.fs"/>
     <Compile Include="Mission/Obligation/Todo/Admission.fsi"/>
     <Compile Include="Mission/Obligation/Todo/Admission.fs"/>
-    <Compile Include="Mission/Obligation/Todo/MagicTodoProjectionCodecSurface.fsi"/>
-    <Compile Include="Mission/Obligation/Todo/MagicTodoProjectionCodecSurface.fs"/>
-    <Compile Include="Mission/Obligation/Todo/MagicTodoProjectionSurface.fsi"/>
-    <Compile Include="Mission/Obligation/Todo/MagicTodoProjectionSurface.fs"/>
   </ItemGroup>
 </Project>

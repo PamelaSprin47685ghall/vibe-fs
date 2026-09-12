@@ -25,7 +25,13 @@
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj"/>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Mission/Manager/Narrative.fsi"/>
+            <Compile Include="Mission/Obligation/Todo/MagicTodoProjectionSurface.fsi"/>
+    <Compile Include="Mission/Obligation/Todo/MagicTodoProjectionSurface.fs"/>
+<Compile Include="Mission/Obligation/Todo/PrefixEpoch.fsi"/>
+    <Compile Include="Mission/Obligation/Todo/PrefixEpoch.fs"/>
+    <Compile Include="Mission/Obligation/Todo/MagicTodoProjectionCodecSurface.fsi"/>
+    <Compile Include="Mission/Obligation/Todo/MagicTodoProjectionCodecSurface.fs"/>
+<Compile Include="Mission/Manager/Narrative.fsi"/>
     <Compile Include="Mission/Manager/Narrative.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoSemanticSurface.fsi"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoSemanticSurface.fs"/>

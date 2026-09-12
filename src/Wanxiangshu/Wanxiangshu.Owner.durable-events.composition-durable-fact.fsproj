@@ -22,8 +22,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-model.fsproj"/>
-    <Compile Include="Composition/Durable/MagicTodoIdentity.fsi"/>
-    <Compile Include="Composition/Durable/MagicTodoIdentity.fs"/>
     <Compile Include="Composition/Durable/MagicTodoFacts.fsi"/>
     <Compile Include="Composition/Durable/MagicTodoFacts.fs"/>
     <Compile Include="Composition/Durable/MagicTodoFactCodec.fsi"/>

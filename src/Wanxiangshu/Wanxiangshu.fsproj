@@ -211,8 +211,8 @@
     <Compile Include="Change/Facts.fs"/>
     <Compile Include="Host/Facts.fsi"/>
     <Compile Include="Host/Facts.fs"/>
-    <Compile Include="Composition/Durable/MagicTodoIdentity.fsi"/>
-    <Compile Include="Composition/Durable/MagicTodoIdentity.fs"/>
+    <Compile Include="Mission/Obligation/Todo/MagicTodoIdentity.fsi"/>
+    <Compile Include="Mission/Obligation/Todo/MagicTodoIdentity.fs"/>
     <Compile Include="Mission/Obligation/Todo/Model.fsi"/>
     <Compile Include="Mission/Obligation/Todo/Model.fs"/>
     <Compile Include="Composition/Durable/MagicTodoFacts.fsi"/>
