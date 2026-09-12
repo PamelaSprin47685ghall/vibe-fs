@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <WanxiangshuSubsystem>provider</WanxiangshuSubsystem>
+    <WanxiangshuSubsystem>durable-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>provider-failure-surface</WanxiangshuCompileShard>
     <WanxiangshuSemanticOwner>provider-attempt-recovery</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>provider-failure-surface</WanxiangshuOwnerLocality>

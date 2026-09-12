@@ -77,6 +77,18 @@
   ],
   "contracts": [
     {
+      "file": "src/Wanxiangshu/OpenCode/Tools/DistillationRuntime.fs",
+      "symbol": "RequirePermit",
+      "anchor": "type RequirePermit = unit -> Task<Result<FamilyRecoveryPermit, string>>",
+      "classification": "Vocabulary",
+      "owner": "durable-composition",
+      "what": "ENF-014",
+      "issuers": [],
+      "whatOwners": {
+        "ENF-014": "capability-enforcement"
+      }
+    },
+    {
       "file": "src/Wanxiangshu/OpenCode/Host/SessionContract.fs",
       "symbol": "QuiescencePermit",
       "anchor": "type QuiescencePermit = interface end",
@@ -404,18 +416,6 @@
       "anchor": "type private ReservationCapability() =",
       "classification": "Vocabulary",
       "owner": "application-composition",
-      "what": "ENF-014",
-      "issuers": [],
-      "whatOwners": {
-        "ENF-014": "capability-enforcement"
-      }
-    },
-    {
-      "file": "src/Wanxiangshu/OpenCode/Tools/DistillationRuntime.fs",
-      "symbol": "RequirePermit",
-      "anchor": "type RequirePermit = unit -> Task<Result<FamilyRecoveryPermit, string>>",
-      "classification": "Vocabulary",
-      "owner": "output",
       "what": "ENF-014",
       "issuers": [],
       "whatOwners": {
