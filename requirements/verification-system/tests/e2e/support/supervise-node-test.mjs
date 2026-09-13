@@ -52,6 +52,7 @@ export async function superviseNodeTest({
   /** Per-test wall times, so every tier reports its distribution rather than just a count. */
   const durations = []
   let drained = false
+  let runnerError = null
   let child
 
   const watchdog = new Watchdog({
@@ -100,6 +101,10 @@ export async function superviseNodeTest({
       drained = true
       return
     }
+    if (event?.type === 'runner:error') {
+      runnerError = event?.data
+      return
+    }
     if (event?.type === 'test:pass') passed += 1
     if (event?.type === 'test:fail') failed += 1
     if (event?.type === 'test:pass' || event?.type === 'test:fail') {
@@ -107,7 +112,12 @@ export async function superviseNodeTest({
       if (Number.isFinite(ms)) durations.push({ name: String(event?.data?.name ?? '<test>'), ms })
     }
     if (event?.type === 'test:complete' && typeof event?.data?.file === 'string') {
-      outstanding.delete(resolve(event.data.file))
+      const isFileWrapper =
+        typeof event?.data?.name === 'string' &&
+        (event.data.name === event.data.file || resolve(event.data.name) === resolve(event.data.file))
+      if (isFileWrapper) {
+        outstanding.delete(resolve(event.data.file))
+      }
     }
 
     const progress = classifyVerdict(event)
@@ -134,6 +144,13 @@ export async function superviseNodeTest({
   if (failed > 0) process.exit(1)
 
   if (backstopFired) process.exit(1)
+
+  if (runnerError) {
+    console.error(
+      `${logPrefix}: inner runner failed with stream error: ${runnerError.message ?? runnerError.name ?? 'StreamError'}`,
+    )
+    process.exit(1)
+  }
 
   if (exit.signal !== null) {
     console.error(

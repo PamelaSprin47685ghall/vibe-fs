@@ -125,14 +125,15 @@ export function scanArchitecture(productionFiles, read) {
 }
 
 export function check(context) {
-  const sources = new Map()
+  const root = context?.root ?? process.cwd()
   const read = (path) => {
     if (context && typeof context.readText === 'function') return context.readText(path)
     if (!sources.has(path)) sources.set(path, readFileSync(path, 'utf8'))
     return sources.get(path)
   }
+  const sources = new Map()
 
-  if (!existsSync(PRODUCTION_ROOT)) {
+  if (!existsSync(join(root, PRODUCTION_ROOT))) {
     return {
       issues: [
         {
@@ -143,7 +144,9 @@ export function check(context) {
     }
   }
 
-  const productionFiles = walk(PRODUCTION_ROOT, ['.fs', '.fsproj'])
+  const productionFiles = context?.sourceFiles
+    ? context.sourceFiles()
+    : walk(join(root, PRODUCTION_ROOT), ['.fs', '.fsproj']).map((p) => relative(root, p))
   const { violations } = scanArchitecture(productionFiles, read)
 
   const issues = violations.map(({ gate, message }) => ({
@@ -155,7 +158,7 @@ export function check(context) {
 }
 
 function runCli() {
-  const result = check()
+  const result = check({ root: process.cwd() })
   if (result.issues.length === 0) {
     console.log('architecture: OK')
     process.exit(0)

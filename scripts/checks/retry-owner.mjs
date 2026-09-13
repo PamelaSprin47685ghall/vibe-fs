@@ -19,6 +19,36 @@ const sourceFiles = (root) => {
 
 export const scanRetryOwnership = (root) => {
   const files = sourceFiles(root)
+  return scanRetryOwnershipFiles(files)
+}
+
+export function check(context) {
+  const root = context?.root ?? repositoryRoot
+  let files
+  if (context?.productionFiles) {
+    files = context.productionFiles().filter(({ file }) => file.endsWith('.fs')).map(({ file, text }) => ({ path: file, text }))
+  }
+  const violations = files ? scanRetryOwnershipFiles(files) : scanRetryOwnership(root)
+  return {
+    issues: violations.map((v) => ({
+      code: 'retry-owner-violation',
+      message: v,
+    })),
+  }
+}
+
+export function runCli(argv = process.argv.slice(2)) {
+  const { issues } = check()
+  if (issues.length > 0) {
+    console.error('retry-owner FAILED:')
+    for (const issue of issues) console.error(`  - ${issue.message}`)
+    return 1
+  }
+  console.log('retry-owner OK')
+  return 0
+}
+
+export function scanRetryOwnershipFiles(files) {
   const violations = []
   const owners = files.filter(({ text }) => /module\s+ExecutionFailurePolicy\s*=/.test(text))
 
@@ -87,11 +117,6 @@ export const scanRetryOwnership = (root) => {
 
 const isMain = process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url
 if (isMain) {
-  const violations = scanRetryOwnership(repositoryRoot)
-  if (violations.length > 0) {
-    console.error('retry-owner FAILED:')
-    for (const violation of violations) console.error(`  - ${violation}`)
-    process.exit(1)
-  }
-  console.log('retry-owner OK')
+  const code = runCli()
+  if (code !== 0) process.exit(code)
 }

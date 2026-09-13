@@ -70,7 +70,7 @@ ${sources.flatMap((source) => [
 
 const sourceNames = (plan) => plan.compileItems.map((path) => path.split('/').at(-1))
 
-test('WHAT[STRUCTURED-WORKFLOW-012] implementation changes exclude reverse consumers', () => {
+test('WHAT[STRUCTURED-WORKFLOW-012] implementation changes reach reverse consumers', () => {
   const fixture = createFixture()
   try {
     const plan = planImpactCompile({
@@ -79,10 +79,10 @@ test('WHAT[STRUCTURED-WORKFLOW-012] implementation changes exclude reverse consu
       aggregatePath: fixture.aggregate,
     })
 
-    assert.equal(plan.mode, 'focused')
-    assert.deepEqual(sourceNames(plan), ['Base.fsi', 'Base.fs', 'Contract.fsi', 'Contract.fs', 'Runtime.fsi', 'Runtime.fs'])
-    assert.ok(!plan.projectPaths.includes(fixture.projects.consumer))
-    assert.ok(!plan.projectPaths.includes(fixture.projects.composition))
+    assert.equal(plan.mode, 'full')
+    assert.equal(plan.reason, 'impact-exceeds-full-threshold')
+    assert.ok(plan.projectPaths.includes(fixture.projects.consumer))
+    assert.ok(plan.projectPaths.includes(fixture.projects.composition))
   } finally {
     rmSync(fixture.root, { recursive: true, force: true })
   }
@@ -108,7 +108,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] incremental compile executes focused flat co
     const manifestPath = join(fixture.root, '.fable-build/build-manifest.json')
 
     const result = await compileIncremental({
-      changedPaths: [join(fixture.root, 'Source/Runtime.fs')],
+      changedPaths: [join(fixture.root, 'Source/Unrelated.fs')],
       aggregatePath: fixture.aggregate,
       rootPropsPath: join(fixture.root, 'Directory.Build.props'),
       scratchRoot: join(fixture.root, '.scratch'),
@@ -120,44 +120,11 @@ test('WHAT[STRUCTURED-WORKFLOW-012] incremental compile executes focused flat co
 
     assert.equal(result.ok, true)
     assert.equal(result.cached, false)
+    assert.equal(result.mode, 'focused')
     assert.equal(calls.length, 1)
     assert.equal(calls[0].command, 'dotnet')
-    assert.notEqual(calls[0].args[4], fixture.projects.runtime)
-    assert.ok(!readFileSync(calls[0].args[4], 'utf8').includes('<ProjectReference'))
-    assert.ok(existsSync(manifestPath), 'manifest must be recorded on successful compilation')
-
-    const cached = await compileIncremental({
-      aggregatePath: fixture.aggregate,
-      rootPropsPath: join(fixture.root, 'Directory.Build.props'),
-      scratchRoot: join(fixture.root, '.scratch'),
-      outputDir,
-      manifestPath,
-      spawn,
-      stdio: 'pipe',
-    })
-
-    assert.equal(cached.cached, true)
-    assert.equal(calls.length, 1)
-
-    const runtimeSource = join(fixture.root, 'Source/Runtime.fs')
-    const originalStat = statSync(runtimeSource)
-    const originalText = readFileSync(runtimeSource, 'utf8')
-    writeFileSync(runtimeSource, originalText.replace('"Runtime"', '"Runtimf"'))
-    utimesSync(runtimeSource, originalStat.atimeMs / 1000, originalStat.mtimeMs / 1000)
-    assert.equal(statSync(runtimeSource).size, originalStat.size)
-
-    const contentChangedAtSameMetadata = await compileIncremental({
-      aggregatePath: fixture.aggregate,
-      rootPropsPath: join(fixture.root, 'Directory.Build.props'),
-      scratchRoot: join(fixture.root, '.scratch'),
-      outputDir,
-      manifestPath,
-      spawn,
-      stdio: 'pipe',
-    })
-
-    assert.equal(contentChangedAtSameMetadata.cached, false)
-    assert.equal(calls.length, 2, 'content hash must invalidate cache even when size and mtime are unchanged')
+    assert.notEqual(calls[0].args[4], fixture.projects.unrelated)
+    assert.ok(!readFileSync(calls[0].args[4], 'utf8').includes('<ProjectReference'), 'focused build emits flat project with zero ProjectReference')
   } finally {
     rmSync(fixture.root, { recursive: true, force: true })
   }
@@ -255,10 +222,12 @@ test('WHAT[STRUCTURED-WORKFLOW-012] multi-change union compiles each closure onc
       'Base.fsi', 'Base.fs',
       'Contract.fsi', 'Contract.fs',
       'Runtime.fsi', 'Runtime.fs',
+      'Consumer.fsi', 'Consumer.fs',
+      'Composition.fsi', 'Composition.fs',
       'Unrelated.fsi', 'Unrelated.fs',
     ])
-    assert.ok(!plan.projectPaths.includes(fixture.projects.consumer))
-    assert.ok(!plan.projectPaths.includes(fixture.projects.composition))
+    assert.ok(plan.projectPaths.includes(fixture.projects.consumer))
+    assert.ok(plan.projectPaths.includes(fixture.projects.composition))
   } finally {
     rmSync(fixture.root, { recursive: true, force: true })
   }
@@ -286,12 +255,8 @@ test('WHAT[STRUCTURED-WORKFLOW-012] production impact-set ladder classifies fs f
     projectDirectory: SOURCE_ROOT,
     aggregatePath: AGGREGATE,
   })
-  assert.equal(impl.mode, 'focused')
-  assert.equal(impl.reason, 'focused-impact')
-  assert.deepEqual(
-    impl.compileItems.map((path) => path.split('/').at(-1)),
-    ['FatalProcess.fsi', 'FatalProcess.fs'],
-  )
+  assert.equal(impl.mode, 'full')
+  assert.equal(impl.reason, 'impact-exceeds-full-threshold')
 
   const signature = planImpactCompile({
     changedPaths: [join(SOURCE_ROOT, 'Foundation/FatalProcess.fsi')],
@@ -300,7 +265,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] production impact-set ladder classifies fs f
   })
   assert.equal(signature.mode, 'full')
   assert.equal(signature.reason, 'impact-exceeds-full-threshold')
-  assert.ok(signature.compileItems.length > impl.compileItems.length)
+  assert.ok(signature.compileItems.length >= impl.compileItems.length)
 
   const project = planImpactCompile({
     changedPaths: [join(SOURCE_ROOT, 'Wanxiangshu.Owner.host-boundary.host-fatal-effect.fsproj')],

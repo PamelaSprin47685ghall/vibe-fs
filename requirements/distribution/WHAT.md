@@ -18,7 +18,7 @@
 
 ## DISTRIBUTION-005: 编译、测试与发布消费同一份 Production Bytes
 
-`dist/**` 是系统唯一的编译产物。构建过程必须先清理旧目录再进行编译；测试套件必须直接消费该编译产物并配备防陈旧门禁（`dist/` 产物早于源码时拒绝运行）；发布流程直接打包同一份产物，严禁在 `dist/` 中引入资源的双副本。
+`dist/**` 是系统唯一的编译产物。构建过程在发布流程中必须执行 `scripts/build.mjs --clean` 进行 clean rebuild；日常开发运行增量构建；两者产出的字节必须完全一致且仅能通过真实 pack 交付。测试套件必须直接消费该编译产物并配备基于 manifest 摘要的防陈旧门禁；发布流程直接打包同一份产物，严禁在 `dist/` 中引入资源的双副本。
 
 ## DISTRIBUTION-006: 资源加载收口与缺失 Fail-Fast
 
@@ -26,7 +26,7 @@
 
 ## DISTRIBUTION-007: Release Proof 覆盖 Artifact Closure
 
-发布级证明流程（`format-build-test`）必须涵盖构建、打包模拟与解包验证全链条，通过执行 `npm pack --dry-run` 严格校验实际打包清单，确保交付物包含完整的入口代码与资源闭包。
+发布级证明流程（`verify:release`）必须涵盖构建、真实打包与解包验证全链条：执行一次真实 `npm pack` 创建 tarball，解压提取并校验成员集合仅限 `dist/` 与 `resources/`，并在非仓库目录（non-repo cwd）导入生产入口点验证。dry-run 打包模拟不足以作为发布证明。
 
 ## DISTRIBUTION-008: 语义包 Runtime Resources 完整可得
 

@@ -8,16 +8,46 @@ import { walk } from '../lib/walk.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const enforcerRoot = join(root, 'src/Wanxiangshu/Enforcer')
-const entries = walk(enforcerRoot, ['.fs']).map((path) => ({
-  path: relative(enforcerRoot, path),
-  text: readFileSync(path, 'utf8'),
-}))
-const problems = inspectEnforcerBoundsSources(entries)
 
-if (problems.length > 0) {
-  console.error('enforcer-bounds-owner FAILED:')
-  for (const problem of problems) console.error(`  - ${problem}`)
-  process.exit(1)
+export function check(context) {
+  const r = context?.root ?? root
+  const base = join(r, 'src/Wanxiangshu/Enforcer')
+  let entries
+  if (context?.productionFiles) {
+    entries = context.productionFiles()
+      .filter(({ file }) => file.startsWith('src/Wanxiangshu/Enforcer/') && file.endsWith('.fs'))
+      .map(({ file, text }) => ({
+        path: file.slice('src/Wanxiangshu/Enforcer/'.length),
+        text,
+      }))
+  } else {
+    entries = walk(base, ['.fs']).map((path) => ({
+      path: relative(base, path),
+      text: readFileSync(path, 'utf8'),
+    }))
+  }
+  const problems = inspectEnforcerBoundsSources(entries)
+  return {
+    issues: problems.map((problem) => ({
+      code: 'enforcer-bounds-violation',
+      message: problem,
+    })),
+    entriesCount: entries.length,
+  }
 }
 
-console.log(`enforcer-bounds-owner: OK — ${entries.length} Enforcer production files, one bounds decision owner`)
+export function runCli() {
+  const result = check()
+  if (result.issues.length > 0) {
+    console.error('enforcer-bounds-owner FAILED:')
+    for (const problem of result.issues) console.error(`  - ${problem.message}`)
+    return 1
+  }
+  console.log(`enforcer-bounds-owner: OK — ${result.entriesCount} Enforcer production files, one bounds decision owner`)
+  return 0
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const code = runCli()
+  if (code !== 0) process.exit(code)
+}

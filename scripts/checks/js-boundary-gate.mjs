@@ -9,9 +9,35 @@
 // fable_modules lines, so scanAll's extra canary allowlist changes nothing.
 // Run the single sweep; any A-D debt is RED.
 
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { scanAll } from '../lib/test-surface-scan.mjs'
+
+export function check(context) {
+  const root = context?.root ?? process.cwd()
+  const scanned = scanAll(join(root, 'requirements'))
+  const files = Object.keys(scanned).sort()
+  const issues = []
+  for (const file of files) {
+    for (const hit of scanned[file]) {
+      issues.push({
+        code: hit.rule,
+        path: hit.file,
+        line: hit.line,
+        message: `${hit.file}:${hit.line} [${hit.rule}] ${hit.text}`,
+      })
+    }
+  }
+  return {
+    issues,
+    debt: issues.length,
+    fileCount: files.length,
+  }
+}
+
+export function runCli(argv, root) {
+  return run({ root })
+}
 
 /** Execute the gate; returns a process status for the CLI and tests. */
 export const run = ({ root = process.cwd() } = {}) => {
@@ -31,5 +57,8 @@ export const run = ({ root = process.cwd() } = {}) => {
   return 0
 }
 
-const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href
-if (isMain) process.exit(run())
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href
+if (isMain) {
+  const code = run()
+  if (code !== 0) process.exit(code)
+}

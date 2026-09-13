@@ -1,74 +1,41 @@
-import { existsSync, statSync } from 'node:fs'
-import { relative, resolve } from 'node:path'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { assertBuildFresh, collectCompilerInputs, collectOutputs } from '../../../../scripts/lib/build-state.mjs'
 
-import { loopDetectorRepositoryInputFiles } from '../../../../scripts/lib/loop-detector-repository-corpus.mjs'
-import { walk } from '../../../../scripts/lib/walk.mjs'
-import { selectProductionModules } from './coverage-policy.mjs'
-
-const newestFile = (files) => {
-  let newest = null
-  for (const file of files) {
-    let stat
-    try {
-      stat = statSync(file)
-    } catch {
-      continue
-    }
-    if (newest === null || stat.mtimeMs > newest.mtimeMs) newest = { file, mtimeMs: stat.mtimeMs }
-  }
-  return newest
-}
+const defaultRepoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..')
 
 export const checkBuildFreshness = ({
+  root = defaultRepoRoot,
   productionRoot = 'src/Wanxiangshu',
   buildRoot = 'dist',
   repositoryRoot,
-  repositoryInputs = loopDetectorRepositoryInputFiles(repositoryRoot),
 } = {}) => {
-  const sources = collectBuildInputs({ productionRoot, repositoryInputs })
-  if (sources.length === 0) return { ok: false, reason: `no build inputs found for ${productionRoot}/` }
-
-  if (!existsSync(buildRoot)) {
-    return { ok: false, reason: `${buildRoot}/ does not exist — run: npm run format-build-test` }
-  }
-
-  const artifacts = selectProductionModules(walk(buildRoot, ['.js']))
-    .map((file) => resolve(file))
-
-  if (artifacts.length === 0) {
-    return { ok: false, reason: `${buildRoot}/ has no compiled output — run: npm run format-build-test` }
-  }
-
-  const newestSource = newestFile(sources)
-  const newestArtifact = newestFile(artifacts)
-
-  if (newestSource.mtimeMs > newestArtifact.mtimeMs) {
-    const staleBy = Math.round((newestSource.mtimeMs - newestArtifact.mtimeMs) / 1000)
+  const targetRoot = repositoryRoot ?? root
+  try {
+    const result = assertBuildFresh({ root: targetRoot })
+    const compilerInputs = collectCompilerInputs(targetRoot)
+    const outputs = collectOutputs(path.resolve(targetRoot, buildRoot))
+    return {
+      ok: true,
+      generation: result.generation,
+      sources: compilerInputs.length,
+      artifacts: Object.keys(outputs).length,
+      ...result,
+    }
+  } catch (err) {
     return {
       ok: false,
-      reason: [
-        `${buildRoot}/ is stale by ${staleBy}s — run: npm run format-build-test`,
-        `  newest source:   ${relative('.', newestSource.file)}`,
-        `  newest artifact: ${relative('.', newestArtifact.file)}`,
-      ].join('\n'),
+      code: err.code ?? 'stale',
+      path: err.path,
+      reason: err.reason ?? err.message,
     }
   }
-
-  return { ok: true, sources: sources.length, artifacts: artifacts.length }
 }
 
 export const collectBuildInputs = ({
-  productionRoot = 'src/Wanxiangshu',
+  root = defaultRepoRoot,
   repositoryRoot,
-  repositoryInputs = loopDetectorRepositoryInputFiles(repositoryRoot),
 } = {}) => {
-  const sources = [
-    ...walk(productionRoot, ['.fs']),
-    ...walk(productionRoot, ['.fsproj']),
-    ...repositoryInputs,
-  ]
-    .map((file) => resolve(file))
-    .filter((file) => !file.split(/[\\/]/).includes('.fable-build'))
-
-  return [...new Set(sources)]
+  const targetRoot = repositoryRoot ?? root
+  return collectCompilerInputs(targetRoot).map((e) => path.resolve(targetRoot, e.path))
 }

@@ -158,24 +158,61 @@ export const scanRepo = (repoRoot = process.cwd()) => {
   return { ok: violations.length === 0, violations, counts }
 }
 
-const runCli = () => {
-  const result = scanRepo(process.cwd())
+export function check(context) {
+  const repoRoot = context?.root ?? process.cwd()
+  let entries
+  if (context?.readText) {
+    entries = []
+    for (const root of PROVIDER_SCAN_ROOTS) {
+      const abs = resolve(repoRoot, root)
+      if (!existsSync(abs)) throw new Error(`provider-leak-gate: scan root missing on disk: ${root}`)
+      if (abs.endsWith('.fs')) {
+        entries.push({ file: norm(root), text: context.readText(root) })
+      } else {
+        for (const file of walk(abs, ['.fs'])) {
+          const rel = norm(file.slice(repoRoot.length + 1))
+          entries.push({ file: rel, text: context.readText(rel) })
+        }
+      }
+    }
+  } else {
+    entries = collectEntries(repoRoot)
+  }
+  const violations = scanEntries(entries)
+  return {
+    issues: violations.map((v) => ({
+      code: v.id,
+      path: v.file,
+      line: v.line,
+      message: v.text ? `${v.id} — ${v.text}` : v.id,
+    })),
+    violations,
+    ok: violations.length === 0,
+  }
+}
+
+export const runCli = () => {
+  const result = check()
 
   if (result.ok) {
     console.log('provider-leak-gate: OK — provider renderer surfaces pass Gate B (zero violations)')
-    process.exit(0)
+    return 0
   }
 
-  console.error(`provider-leak-gate: ${result.violations.length} violation(s)\n`)
+  console.error(`provider-leak-gate: ${result.issues.length} violation(s)\n`)
   for (const v of result.violations) {
     const loc = v.line ? `${v.file}:${v.line}` : v.file
     console.error(`  ${loc}: ${v.id}${v.text ? ` — ${v.text}` : ''}`)
   }
-  process.exit(1)
+  return 1
 }
+
 
 const isMain =
   process.argv[1] !== undefined &&
   resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1])
 
-if (isMain) runCli()
+if (isMain) {
+  const code = runCli()
+  if (code !== 0) process.exit(code)
+}

@@ -700,39 +700,56 @@ export const collectProductionEntries = (root = PRODUCTION_ROOT) => {
   }))
 }
 
-const runCli = () => {
-
+export function check(context) {
+  const root = context?.root ?? process.cwd()
   let production
-  try {
-    production = collectProductionEntries()
-  } catch (err) {
-    console.error(String(err && err.message ? err.message : err))
-    process.exit(1)
+  if (context?.productionFiles) {
+    production = context.productionFiles().filter(({ file }) => file.endsWith('.fs')).map(({ file, text }) => ({ file, text }))
+  } else {
+    production = collectProductionEntries(resolve(root, PRODUCTION_ROOT))
   }
-
   const violations = [
     ...scanFiles(production),
     ...scanCanonicalSharedProgram(production),
   ]
-
-  if (violations.length === 0) {
-    console.log(
-      `unified-store-gate: OK — ${production.length} production files, scanners=${SCANNER_IDS.join(',')}`,
-    )
-    process.exit(0)
+  return {
+    issues: violations.map((v) => {
+      const token = v.token === undefined ? '' : ` token='${v.token}'`
+      return {
+        code: v.id,
+        path: v.file,
+        line: v.line,
+        token: v.token,
+        message: `${v.label}${token}: ${v.text.slice(0, 160)}`,
+      }
+    }),
+    productionCount: production.length,
+    violations,
   }
+}
 
-  console.error(`unified-store-gate: ${violations.length} violation(s)\n`)
+export function runCli() {
+  const { issues, productionCount, violations } = check()
+  if (issues.length === 0) {
+    console.log(
+      `unified-store-gate: OK — ${productionCount} production files, scanners=${SCANNER_IDS.join(',')}`,
+    )
+    return 0
+  }
+  console.error(`unified-store-gate: ${issues.length} violation(s)\n`)
   for (const v of violations) {
     const token = v.token === undefined ? '' : ` token='${v.token}'`
     console.error(`  [${v.id}] ${v.file}:${v.line}${token}  ${v.label}`)
     console.error(`    ${v.text.slice(0, 160)}`)
   }
-  process.exit(1)
+  return 1
 }
 
 const isMain =
   process.argv[1] !== undefined &&
   resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1])
 
-if (isMain) runCli()
+if (isMain) {
+  const code = runCli()
+  if (code !== 0) process.exit(code)
+}

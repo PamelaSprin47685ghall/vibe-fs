@@ -19,4 +19,4 @@ jobs:
           dotnet-version-file: global.json
       - run: npm ci
       - run: dotnet tool restore
-      - run: npm run format-build-test
+      - run: npm run verify:release

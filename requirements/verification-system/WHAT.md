@@ -14,7 +14,7 @@
 4. **Long Stroke**：恰好一个真实完整的端到端（E2E）物理验收环境。
 5. **Release**：一次确定性的全量构建、打包与交付物验证。
 
-证据层序由 `package.json` 中的构建流程与 `scripts/check.mjs` 注册清单固定，层序颠倒或错置直接判为违约。顶层 `format-build-test` 只调度 read-only format、static check、clean build、unit、唯一 integration orchestrator、Long Stroke 与 pack；distribution package child 与一次 physical warmup 只由 integration orchestrator 调度。每个 leaf step 必须恰有一个父级 owner，禁止顶层与子 orchestrator 重复执行。每项可被外部登记表引用的证明，其层级只能由 verification-system 所有的 `scripts/checks/proof-levels.json` 以精确 `(path, title, what_id)` 键独立分类；消费方自报层级、缺失键或重复键均不得取得证明权威。proof-level registry 只分类已经由 requirement-system 建立的精确 WHAT↔HOW↔active test 边，不得以自身条目创建或补足该拓扑。
+证据层序由统一调度器 `scripts/verify.mjs` 与 `scripts/check.mjs` 注册清单固定，`package.json` 仅声明调度入口，层序颠倒或错置直接判为违约。日常开发入口 `format-build-test`（→ `node scripts/verify.mjs`）调度 format:check → check → build → unit → integration；发布入口 `verify:release`（→ `node scripts/verify.mjs --release`）在此基础上额外调度 clean build（--clean）、Long Stroke 与真实 package 校验。两项入口对每个 step 均保持单次运行，每个 leaf step 必须恰有一个父级 owner，禁止顶层与子 orchestrator 重复执行；distribution package child 与一次 physical warmup 只由 integration orchestrator 调度。层级登记表机制已废止，证明由实际测试行为与可执行断言独立成立。
 
 全仓禁止自建 FCS（`FSharp.Compiler.Service`）扫描：不得直接或经 wrapper、反射、`.fsx` 提取 F# typed AST、symbol/application use、推断类型或源码依赖图。全量、局部、owner/locality、fixture、report-only、CLI、CI、pre-build 与缓存/snapshot/delta/外部 evidence 复用均无豁免，不得作为门禁、报告或验收入口。正常 Fable 编译内部使用 compiler service 不在禁令范围内，但禁止为扫描取证额外启动或插桩编译器。纯源码文本与 JavaScript 静态检查仍是合法第 0 层证据。F# 编译器边界由 STRUCTURED-WORKFLOW-011 定义；不得用旧扫描结果或空 evidence 冒充当前证明。
 
@@ -69,7 +69,7 @@ Release gate 变成「最多 N 轮」或「重跑直到通过」
 
 ## VERIFICATION-SYSTEM-008: 契约面语言边界
 
-生产代码与测试代码之间存在严格的契约面语言边界：生产代码以 `.fs` 编写，语义测试以 `.mjs` 编写并直接消费编译产物（dist）。编译器输出的内部符号、中间结构与内部映射关系不属于对外契约，语义测试只能通过正式注册的 Owner 契约面（公开纯函数、序列化契约、公开端口）访问系统。测试断言必须针对完整数据结构或规范序列化文本，严禁进行仅断言真值的脆弱验证。当测试消费的编译产物落后于源码时，运行器必须拒绝执行并 fail-closed。
+生产代码与测试代码之间存在严格的契约面语言边界：生产代码以 `.fs` 编写，语义测试以 `.mjs` 编写并直接消费编译产物（dist）。编译器输出的内部符号、中间结构与内部映射关系不属于对外契约，语义测试只能通过正式注册的 Owner 契约面（公开纯函数、序列化契约、公开端口）访问系统。测试断言必须针对完整数据结构或规范序列化文本，严禁进行仅断言真值的脆弱验证。当测试消费的编译产物落后于源码时，运行器必须拒绝执行并 fail-closed；陈旧性判定由 `scripts/lib/build-state.mjs#assertBuildFresh` 内容摘要（content digests）强力裁决，严禁使用脆弱的文件修改时间（mtime）比较。
 
 属性测试的 generator 只能描述合法输入域、边界输入或精确非法 mutation，不得实现 expected decision。property 必须以 WHAT 独立声明的代数、变形关系或 typed rejection 判断注册 production Surface 的结果；严禁在测试内重建状态机、formula、decoder 或 detector 作为平行 oracle。无限或组合爆炸输入域必须固定 seed 与有限 run budget，失败必须输出并可重放 shrink path；有限小域优先穷举。无法说明 oracle 独立性的命题不得用随机生成伪装 comprehensive proof。
 
@@ -79,7 +79,7 @@ Release gate 变成「最多 N 轮」或「重跑直到通过」
 
 ## VERIFICATION-SYSTEM-010: 验收判据不可放宽
 
-已设立并冻结的验收判据（包括用例数量天花板、超时时间预算、单调递减门禁基线及断言严苛度）只能收紧，严禁单方面放宽。执行者严禁自行宣布将阻塞项或未达标项降级为不影响通过的非阻塞项；任何对验收范围的正式调整必须通过正规的规范修订程序。
+已设立并冻结的验收判据（包括用例数量天花板、超时时间预算、单调递减门禁基线、构建 manifest 摘要与内容证据的 fail-closed 契约及断言严苛度）只能收紧，严禁单方面放宽。manifest digests 与内容证据构成不可放宽的 fail-closed 验收红线。执行者严禁自行宣布将阻塞项或未达标项降级为不影响通过的非阻塞项；任何对验收范围的正式调整必须通过正规的规范修订程序。
 
 ## VERIFICATION-SYSTEM-011: 覆盖率门禁分母完整
 

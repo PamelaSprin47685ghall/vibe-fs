@@ -18,26 +18,49 @@ const walk = (directory) =>
     return statSync(path).isDirectory() ? walk(path) : path.endsWith('.fs') ? [path] : []
   })
 
-const violations = []
-for (const path of walk(sourceRoot)) {
-  const rel = relative(root, path).replaceAll('\\', '/')
-  const text = readFileSync(path, 'utf8')
-  // Architecture prose may name a forbidden legacy representation while
-  // explaining why it is forbidden. Gate executable source, not comments.
-  const codeText = text
-    .split('\n')
-    .map((line) => line.replace(/\/\/.*$/, ''))
-    .join('\n')
-
-  if (!formattingOwners.has(rel) && lowLevelTomlAccess.test(codeText)) {
-    violations.push(`${rel}: direct SyntheticToml access bypasses LlmFacing`)
+export function check(context) {
+  const r = context?.root ?? root
+  const sRoot = join(r, 'src/Wanxiangshu')
+  let entries
+  if (context?.productionFiles) {
+    entries = context.productionFiles().filter(({ file }) => file.endsWith('.fs')).map(({ file, text }) => ({ rel: file, text }))
+  } else {
+    entries = walk(sRoot).map((p) => ({
+      rel: relative(r, p).replaceAll('\\', '/'),
+      text: readFileSync(p, 'utf8'),
+    }))
+  }
+  const violations = []
+  for (const { rel, text } of entries) {
+    const codeText = text
+      .split('\n')
+      .map((line) => line.replace(/\/\/.*$/, ''))
+      .join('\n')
+    if (!formattingOwners.has(rel) && lowLevelTomlAccess.test(codeText)) {
+      violations.push(`${rel}: direct SyntheticToml access bypasses LlmFacing`)
+    }
+  }
+  return {
+    issues: violations.map((v) => ({
+      code: 'llm-facing-format-violation',
+      message: v,
+    })),
+    violations,
   }
 }
 
-if (violations.length > 0) {
-  console.error('llm-facing-format-gate: FAIL')
-  for (const violation of violations) console.error(`- ${violation}`)
-  process.exit(1)
+export function runCli() {
+  const { issues } = check()
+  if (issues.length > 0) {
+    console.error('llm-facing-format-gate: FAIL')
+    for (const issue of issues) console.error(`- ${issue.message}`)
+    return 1
+  }
+  console.log('llm-facing-format-gate: OK — LlmFacing owns synthetic LLM representation')
+  return 0
 }
 
-console.log('llm-facing-format-gate: OK — LlmFacing owns synthetic LLM representation')
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const code = runCli()
+  if (code !== 0) process.exit(code)
+}

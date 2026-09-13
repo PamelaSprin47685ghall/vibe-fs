@@ -1,8 +1,9 @@
 #!/usr/bin/env node
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { spawn } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 
 import { run as runSurfaceManifest } from './checks/js-surface-manifest.mjs'
 import { run as runModuleLinkage } from './checks/js-module-linkage.mjs'
@@ -13,6 +14,17 @@ import {
   compileIncremental,
   resetOutputDirectory,
 } from './lib/owner-compile.mjs'
+import {
+  MANIFEST_SCHEMA,
+  collectCompilerInputs,
+  collectGeneratedInputs,
+  collectArtifactInputs,
+  collectOutputs,
+  computeDigest,
+  readManifest,
+  writeManifest,
+  invalidateManifest,
+} from './lib/build-state.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const dist = path.join(root, 'dist')
@@ -53,7 +65,7 @@ function isPidRunning(pid) {
   }
 }
 
-class CrossProcessMutex {
+export class CrossProcessMutex {
   constructor(lockPath, name = 'lock') {
     this.lockPath = lockPath
     this.name = name
@@ -113,61 +125,38 @@ class CrossProcessMutex {
   }
 }
 
-// ── Fable Compile ─────────────────────────────────────────────────────────────
-
-async function compileFable() {
-  logInfo('Compiling F# with one clean full Fable invocation...')
-  resetOutputDirectory(dist)
-  const result = await compileIncremental({
-    root,
-    outputDir: dist,
-  })
-
-  if (!result.ok) {
-    fail(
-      `Fable compilation failed${result.signal ? ` by signal ${result.signal}` : ` with exit code ${result.code}`}`,
-    )
-  }
-
-  if (result.cached) {
-    fail('release build unexpectedly reused cached output')
-  } else {
-    logInfo(`compiled ${result.mode} impact (${result.compileItems?.length ?? 0} items in ${result.elapsedMs}ms)`)
-  }
-}
-
 // ── Resource & Artifact Verification ─────────────────────────────────────────
 
-async function verifyArtifacts() {
+async function verifyArtifacts(targetRoot = root) {
   // DG-004: repository is the SSOT. Derive the current envelope on every build;
   // materialize it only as an ephemeral runtime import.
   try {
-    await writeLoopDetectorEnvelopeArtifact(root)
+    await writeLoopDetectorEnvelopeArtifact(targetRoot)
   } catch (err) {
-    fail(`Failed to derive loop detector repository envelope: ${err.message}`)
+    throw new Error(`Failed to derive loop detector repository envelope: ${err.message}`)
   }
 
-  const entry = path.join(root, 'dist/OpenCode/Plugin/Plugin.js')
-  if (!fs.existsSync(entry)) fail(`missing entry artifact: ${entry}`)
+  const entry = path.join(targetRoot, 'dist/OpenCode/Plugin/Plugin.js')
+  if (!fs.existsSync(entry)) throw new Error(`missing entry artifact: ${entry}`)
 
-  const sphinxEntry = path.join(root, 'dist/Sphinx/ServeEntry.js')
-  if (!fs.existsSync(sphinxEntry)) fail(`missing sphinx entry artifact: ${sphinxEntry}`)
+  const sphinxEntry = path.join(targetRoot, 'dist/Sphinx/ServeEntry.js')
+  if (!fs.existsSync(sphinxEntry)) throw new Error(`missing sphinx entry artifact: ${sphinxEntry}`)
 
-  const enforcerRoot = path.join(root, 'resources/enforcer')
-  if (!fs.existsSync(enforcerRoot)) fail(`missing rulebook root: ${enforcerRoot}`)
+  const enforcerRoot = path.join(targetRoot, 'resources/enforcer')
+  if (!fs.existsSync(enforcerRoot)) throw new Error(`missing rulebook root: ${enforcerRoot}`)
   const ruleDirs = fs
     .readdirSync(enforcerRoot, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
-  if (ruleDirs.length < 1) fail(`enforcer rulebook has no rule directories under ${enforcerRoot}`)
+  if (ruleDirs.length < 1) throw new Error(`enforcer rulebook has no rule directories under ${enforcerRoot}`)
   const catalogJson = path.join(enforcerRoot, 'catalog.json')
-  if (fs.existsSync(catalogJson)) fail(`catalog.json must be removed after folder cutover: ${catalogJson}`)
+  if (fs.existsSync(catalogJson)) throw new Error(`catalog.json must be removed after folder cutover: ${catalogJson}`)
 
   for (const name of ['primitive-obsession', ruleDirs[0]]) {
     const enforcerMd = path.join(enforcerRoot, name, 'enforcer.md')
     const mainMd = path.join(enforcerRoot, name, 'main.md')
-    if (!fs.existsSync(enforcerMd)) fail(`missing rulebook file: ${enforcerMd}`)
-    if (!fs.existsSync(mainMd)) fail(`missing rulebook file: ${mainMd}`)
+    if (!fs.existsSync(enforcerMd)) throw new Error(`missing rulebook file: ${enforcerMd}`)
+    if (!fs.existsSync(mainMd)) throw new Error(`missing rulebook file: ${mainMd}`)
   }
 
   const providerRoles = [
@@ -184,26 +173,246 @@ async function verifyArtifacts() {
   ]
   for (const name of providerRoles) {
     for (const locale of ['en.md', 'zh-CN.md']) {
-      const rolePath = path.join(root, 'resources/provider/role', name, locale)
-      if (!fs.existsSync(rolePath)) fail(`missing Role Law: ${rolePath}`)
+      const rolePath = path.join(targetRoot, 'resources/provider/role', name, locale)
+      if (!fs.existsSync(rolePath)) throw new Error(`missing Role Law: ${rolePath}`)
     }
   }
 
   for (const leaf of ['world/common-law', 'library/ingress', 'library/closing']) {
     for (const locale of ['en.md', 'zh-CN.md']) {
-      const asset = path.join(root, 'resources/provider', leaf, locale)
-      if (!fs.existsSync(asset)) fail(`missing provider asset: ${asset}`)
+      const asset = path.join(targetRoot, 'resources/provider', leaf, locale)
+      if (!fs.existsSync(asset)) throw new Error(`missing provider asset: ${asset}`)
     }
   }
 
   // JS-SEMANTIC-SURFACE-003/005: dist surface manifest validation (post-compile).
-  if (runSurfaceManifest({ root }) !== 0) {
-    fail('js-surface-manifest: dist surface manifest validation failed')
+  if (runSurfaceManifest({ root: targetRoot }) !== 0) {
+    throw new Error('js-surface-manifest: dist surface manifest validation failed')
   }
-  if (runModuleLinkage({ root }) !== 0) {
-    fail('js-module-linkage: emitted ESM graph is not package-closed')
+  if (runModuleLinkage({ root: targetRoot }) !== 0) {
+    throw new Error('js-module-linkage: emitted ESM graph is not package-closed')
   }
 }
+
+function getToolchainIdentity() {
+  let dotnetVer = 'unknown'
+  let fableVer = 'unknown'
+  try {
+    dotnetVer = execFileSync('dotnet', ['--version'], { encoding: 'utf8' }).trim()
+  } catch {}
+  try {
+    fableVer = execFileSync('dotnet', ['tool', 'run', 'fable', '--version'], { encoding: 'utf8' }).trim()
+  } catch {}
+  return `dotnet ${dotnetVer} / fable ${fableVer}`
+}
+
+function computeCorpusDigest(generatedInputs, targetRoot) {
+  const hasher = crypto.createHash('sha256')
+  for (const entry of generatedInputs) {
+    const abs = path.resolve(targetRoot, entry.path)
+    if (fs.existsSync(abs)) {
+      hasher.update(fs.readFileSync(abs))
+    }
+  }
+  return hasher.digest('hex')
+}
+
+// ── Run Build Orchestrator ───────────────────────────────────────────────────
+
+export async function runBuild({
+  targetRoot = root,
+  clean = false,
+  stdio = 'inherit',
+} = {}) {
+  const resolvedRoot = path.resolve(targetRoot)
+  const targetDist = path.join(resolvedRoot, 'dist')
+  const lockFile = path.join(resolvedRoot, '.fable-build/build.lock')
+  const aggregatePath = path.join(resolvedRoot, 'src/Wanxiangshu/Wanxiangshu.fsproj')
+
+  const mutex = new CrossProcessMutex(lockFile, 'build lock')
+  await mutex.acquire()
+
+  try {
+    const existingManifest = readManifest({ root: resolvedRoot })
+
+    // Snapshot current inputs
+    const compilerInputs = collectCompilerInputs(resolvedRoot, aggregatePath)
+    const compilerInputDigest = computeDigest(compilerInputs)
+
+    const generatedInputs = collectGeneratedInputs(resolvedRoot)
+    const generatedInputDigest = computeDigest(generatedInputs)
+
+    const artifactInputs = collectArtifactInputs(resolvedRoot)
+    const artifactInputDigest = computeDigest(artifactInputs)
+
+    let buildMode = 'clean'
+    let changedCompilerPaths = []
+
+    if (!clean && existingManifest && existingManifest.schema === MANIFEST_SCHEMA) {
+      // Check outputs
+      const recordedOutputs = existingManifest.outputs ?? {}
+      const currentOutputs = collectOutputs(targetDist)
+      const recordedKeys = Object.keys(recordedOutputs)
+      const currentKeys = Object.keys(currentOutputs)
+
+      const outputsValid = recordedKeys.length > 0 &&
+        recordedKeys.length === currentKeys.length &&
+        recordedKeys.every((k) => currentOutputs[k] && currentOutputs[k][0] === recordedOutputs[k][0])
+
+      if (outputsValid) {
+        // Compare compiler inputs
+        const oldCompilerInputs = existingManifest.compiler?.inputs ?? []
+        const oldMap = new Map(oldCompilerInputs.map((e) => [e.path, e]))
+        const currentMap = new Map(compilerInputs.map((e) => [e.path, e]))
+
+        let topologyChanged = false
+        if (oldCompilerInputs.length !== compilerInputs.length) {
+          topologyChanged = true
+        } else {
+          for (const curr of compilerInputs) {
+            const old = oldMap.get(curr.path)
+            if (!old) {
+              topologyChanged = true
+              break
+            }
+            if (old.sha256 !== curr.sha256) {
+              changedCompilerPaths.push(path.resolve(resolvedRoot, curr.path))
+              const ext = path.extname(curr.path).toLowerCase()
+              if (ext !== '.fs' && ext !== '.fsi') {
+                topologyChanged = true
+              }
+            }
+          }
+        }
+
+        if (topologyChanged) {
+          buildMode = 'clean'
+        } else if (changedCompilerPaths.length > 0) {
+          buildMode = 'focused'
+        } else if (
+          generatedInputDigest === existingManifest.generated?.inputDigest &&
+          artifactInputDigest === existingManifest.artifacts?.inputDigest
+        ) {
+          buildMode = 'no-op'
+        } else {
+          // Non-compiler inputs changed (e.g. envelope corpus or artifacts)
+          buildMode = 'focused'
+        }
+      }
+    }
+
+    if (buildMode === 'no-op') {
+      logInfo('build up-to-date (no-op)')
+      return {
+        ok: true,
+        mode: 'no-op',
+        generation: existingManifest.generation ?? 1,
+        reused: true,
+      }
+    }
+
+    // Invalidate manifest before running compiler/writing to dist
+    invalidateManifest({ root: resolvedRoot })
+
+    const compileNeeded = buildMode === 'clean' || (buildMode === 'focused' && changedCompilerPaths.length > 0)
+
+    if (compileNeeded && buildMode === 'clean') {
+      logInfo('Compiling F# (clean)...')
+      resetOutputDirectory(targetDist)
+      const compileResult = await compileIncremental({
+        root: resolvedRoot,
+        outputDir: targetDist,
+        stdio,
+      })
+      if (!compileResult.ok) {
+        throw new Error(
+          `Fable compilation failed${compileResult.signal ? ` by signal ${compileResult.signal}` : ` with exit code ${compileResult.code}`}`,
+        )
+      }
+      logInfo(`compiled clean impact (${compileResult.compileItems?.length ?? 0} items in ${compileResult.elapsedMs}ms)`)
+    } else if (compileNeeded) {
+      logInfo('Compiling F# (focused)...')
+      const compileResult = await compileIncremental({
+        changedPaths: changedCompilerPaths.length > 0 ? changedCompilerPaths : undefined,
+        root: resolvedRoot,
+        outputDir: targetDist,
+        stdio,
+      })
+      if (!compileResult.ok) {
+        throw new Error(
+          `Fable compilation failed${compileResult.signal ? ` by signal ${compileResult.signal}` : ` with exit code ${compileResult.code}`}`,
+        )
+      }
+      logInfo(`compiled focused impact (${compileResult.compileItems?.length ?? 0} items in ${compileResult.elapsedMs}ms)`)
+    }
+
+    // Envelope & artifact verification
+    await verifyArtifacts(resolvedRoot)
+
+    // Recheck input snapshot inside lock
+    const finalCompilerInputs = collectCompilerInputs(resolvedRoot, aggregatePath)
+    const finalCompilerDigest = computeDigest(finalCompilerInputs)
+    if (finalCompilerDigest !== compilerInputDigest) {
+      throw new Error('Mid-build mutation detected: compiler inputs changed during compilation')
+    }
+
+    const finalGeneratedInputs = collectGeneratedInputs(resolvedRoot)
+    const finalGeneratedDigest = computeDigest(finalGeneratedInputs)
+    if (finalGeneratedDigest !== generatedInputDigest) {
+      throw new Error('Mid-build mutation detected: generated inputs changed during compilation')
+    }
+
+    const finalArtifactInputs = collectArtifactInputs(resolvedRoot)
+    const finalArtifactDigest = computeDigest(finalArtifactInputs)
+    if (finalArtifactDigest !== artifactInputDigest) {
+      throw new Error('Mid-build mutation detected: artifact inputs changed during compilation')
+    }
+
+    // Collect final outputs
+    const outputs = collectOutputs(targetDist)
+    const nextGeneration = (existingManifest?.generation ?? 0) + 1
+
+    const newManifest = {
+      schema: MANIFEST_SCHEMA,
+      rootIdentity: resolvedRoot,
+      aggregatePath: path.resolve(aggregatePath),
+      outputDir: path.relative(resolvedRoot, targetDist).replace(/\\/g, '/'),
+      generation: nextGeneration,
+      compiler: {
+        configuration: 'Debug',
+        toolIdentity: getToolchainIdentity(),
+        inputDigest: finalCompilerDigest,
+        inputs: finalCompilerInputs,
+      },
+      generated: {
+        inputDigest: finalGeneratedDigest,
+        corpusPathList: finalGeneratedInputs.map((e) => e.path),
+        corpusDigest: computeCorpusDigest(finalGeneratedInputs, resolvedRoot),
+        generatorIdentity: 'derive-loop-detector-envelope.mjs@v1',
+        tokenizerIdentity: 'gpt-tokenizer@4.0.0',
+      },
+      artifacts: {
+        inputDigest: finalArtifactDigest,
+        inputs: finalArtifactInputs,
+      },
+      outputs,
+    }
+
+    writeManifest({ root: resolvedRoot, manifest: newManifest })
+    logInfo(`build ok (generation ${nextGeneration})`)
+
+    return {
+      ok: true,
+      mode: buildMode,
+      generation: nextGeneration,
+      reused: false,
+    }
+  } finally {
+    mutex.release()
+  }
+}
+
+export const buildEntrypoint = runBuild
 
 // ── Clean Signal & Exit Handlers ─────────────────────────────────────────────
 
@@ -236,24 +445,25 @@ async function main() {
 
   if (process.argv.includes('--help') || process.argv.includes('-h')) {
     console.log(`
-Usage: node scripts/build.mjs
+Usage: node scripts/build.mjs [options]
 
 Options:
+  --clean      Force clean full rebuild and invalidate manifest
   --help, -h   Show this help message
 `)
     process.exit(0)
   }
 
-  const buildMutex = new CrossProcessMutex(buildLockFile, 'build lock')
-  await buildMutex.acquire()
+  const clean = process.argv.includes('--clean')
 
   try {
-    await compileFable()
-    await verifyArtifacts()
-    logInfo('build ok')
-  } finally {
-    buildMutex.release()
+    await runBuild({ targetRoot: root, clean })
+  } catch (err) {
+    fail(err.message)
   }
 }
 
-await main()
+const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+if (isDirectRun) {
+  await main()
+}

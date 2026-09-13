@@ -124,6 +124,41 @@ export function collectCausalWaitBoundaryFiles(root = ROOT) {
     }))
 }
 
+export function check(context) {
+  const root = context?.root ?? ROOT
+  let files
+  if (context?.productionFiles) {
+    const prefix = 'src/Wanxiangshu/'
+    files = context.productionFiles()
+      .filter(({ file }) => file.endsWith('.fs'))
+      .map(({ file, text }) => ({
+        rel: normalize(file.startsWith(prefix) ? file.slice(prefix.length) : file),
+        text,
+      }))
+  } else {
+    files = collectCausalWaitBoundaryFiles(root)
+  }
+  const problems = analyzeObservationBoundary(files)
+  return {
+    issues: problems.map((problem) => ({
+      code: 'causal-wait-boundary-violation',
+      message: problem,
+    })),
+    filesCount: files.length,
+  }
+}
+
+export function runCli() {
+  const { issues, filesCount } = check()
+  if (issues.length > 0) {
+    console.error('causal-wait-boundary FAILED:')
+    for (const issue of issues) console.error(`  - ${issue.message}`)
+    return 1
+  }
+  console.log(`causal-wait-boundary OK — ${filesCount} production files`)
+  return 0
+}
+
 const isMainModule = (() => {
   try {
     return import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href
@@ -133,21 +168,6 @@ const isMainModule = (() => {
 })()
 
 if (isMainModule) {
-  let files
-  try {
-    files = collectCausalWaitBoundaryFiles()
-  } catch (error) {
-    console.error(`causal-wait-boundary FAILED: ${error.message}`)
-    process.exit(1)
-  }
-
-  const problems = analyzeObservationBoundary(files)
-
-  if (problems.length > 0) {
-    console.error('causal-wait-boundary FAILED:')
-    for (const problem of problems) console.error(`  - ${problem}`)
-    process.exit(1)
-  }
-
-  console.log(`causal-wait-boundary OK — ${files.length} production files`)
+  const code = runCli()
+  if (code !== 0) process.exit(code)
 }

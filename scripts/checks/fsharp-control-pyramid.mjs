@@ -291,18 +291,44 @@ const readBaseline = (repoRoot, path) => {
   return JSON.parse(readFileSync(absolute, 'utf8'))
 }
 
-const runCli = () => {
+export function check(context) {
+  const root = context?.root ?? ROOT
+  let entries
+  if (context?.productionFiles) {
+    entries = context.productionFiles()
+      .filter(({ file }) => file.endsWith('.fs') && !norm(file).endsWith('Surface.fs'))
+      .map(({ file, text }) => ({ file, text }))
+  } else {
+    entries = collectControlPyramidEntries(root, DEFAULT_SOURCE_ROOT)
+  }
+  const hits = scanControlPyramidEntries(entries)
+  return {
+    issues: hits.map((hit) => ({
+      code: hit.kind,
+      path: hit.file,
+      line: hit.line,
+      message: `depth=${hit.depth} chain=${hit.chain.join(' → ')}: ${hit.text}`,
+      outerLine: hit.outerLine,
+      depth: hit.depth,
+      chain: hit.chain,
+      text: hit.text,
+    })),
+    hits,
+  }
+}
+
+export const runCli = (argv = process.argv.slice(2)) => {
   let options
   try {
-    options = parseArgs(process.argv.slice(2))
+    options = parseArgs(argv)
   } catch (error) {
     console.error(error.message)
-    process.exit(2)
+    return 2
   }
 
   if (options.explain) {
     console.log(CONTROL_PYRAMID_GUIDE.trim())
-    return
+    return 0
   }
 
   const entries = collectControlPyramidEntries(ROOT, options.root)
@@ -310,16 +336,16 @@ const runCli = () => {
 
   if (options.snapshot) {
     console.log(JSON.stringify(makeBaseline(hits), null, 2))
-    return
+    return 0
   }
 
   if (options.showAll || !options.baseline) {
     if (hits.length === 0) {
       console.log('fsharp-control-pyramid: clean (0 nested decisions)')
-      return
+      return 0
     }
     console.error(renderFailure(hits))
-    process.exit(1)
+    return 1
   }
 
   let result
@@ -327,7 +353,7 @@ const runCli = () => {
     result = evaluateBaseline(hits, readBaseline(ROOT, options.baseline))
   } catch (error) {
     console.error(error.message)
-    process.exit(2)
+    return 2
   }
 
   if (result.regressions.length > 0) {
@@ -341,7 +367,7 @@ const runCli = () => {
         `fsharp-control-pyramid: regression (${summary}); total debt ${result.currentTotal}/${result.baselineTotal}`,
       ),
     )
-    process.exit(1)
+    return 1
   }
 
   const improvement = result.improvements.length
@@ -350,6 +376,10 @@ const runCli = () => {
   console.log(
     `fsharp-control-pyramid: clean (debt=${result.currentTotal}, baseline=${result.baselineTotal}${improvement})`,
   )
+  return 0
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) runCli()
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  const code = runCli()
+  if (code !== 0) process.exit(code)
+}

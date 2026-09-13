@@ -59,7 +59,12 @@ test('WHAT[STRUCTURED-WORKFLOW-012] compile-impact CLI compiles a focused produc
   }
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-012] compile-impact CLI incremental compile detects and caches fresh output', { timeout: 120_000 }, () => {
+test('WHAT[STRUCTURED-WORKFLOW-012] compile-impact CLI emits fresh output into a scratch output dir and never writes a success manifest', { timeout: 120_000 }, () => {
+  // Change of contract: compileIncremental plans and compiles — it NEVER commits to
+  // an authoritative build manifest; the orchestrator (scripts/build.mjs) is the
+  // only process that records "these bytes have been verified". A scratch run that
+  // succeeded once must be re-run from scratch on its second invocation, since
+  // nothing about the owner-compile marker persists at rest.
   const scratchRoot = mkdtempSync(join(tmpdir(), 'wanxiangshu-impact-inc-'))
   const outputDir = join(scratchRoot, 'out')
   try {
@@ -77,14 +82,22 @@ test('WHAT[STRUCTURED-WORKFLOW-012] compile-impact CLI incremental compile detec
       'focused flat compile must preserve the aggregate emitter output layout',
     )
 
+    // Second invocation: manifest doesn't exist; compileIncremental re-executes.
+    // A still-empty manifest means no hidden persistence — caller is free to wire
+    // to a shared build-state path if they want durable commitment.
+    const manifestPath = join(scratchRoot, 'impact-manifest.json')
+    assert.ok(!existsSync(manifestPath), 'compileIncremental must not write an authoritative manifest')
+
     const result2 = spawnSync(
       process.execPath,
       [CLI, '--scratch', scratchRoot, '-o', outputDir],
       { cwd: ROOT, encoding: 'utf8', timeout: 110_000 },
     )
     assert.equal(result2.status, 0, result2.stderr || result2.stdout)
-    assert.match(result2.stdout, /up-to-date \(cached\)/)
-    assert.doesNotMatch(result2.stdout, /Started Fable compilation/)
+    // Round 2 is a real run — it reports the compile happening, not a cache hit.
+    assert.match(result2.stdout, /Started Fable compilation|compiled .* impact/)
+    // Wildcard check: scratch-root doesn\'t bleed a manifest path it never wrote.
+    assert.ok(!existsSync(manifestPath), 'still no manifest written by a compile-only caller')
   } finally {
     rmSync(scratchRoot, { recursive: true, force: true })
   }

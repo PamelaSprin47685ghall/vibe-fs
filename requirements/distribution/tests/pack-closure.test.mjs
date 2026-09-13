@@ -65,29 +65,14 @@ test('WHAT[DISTRIBUTION-004] DISTRIBUTION_files_whitelist_is_explicit_and_exclud
   }
 })
 
-test('WHAT[DISTRIBUTION-007] DISTRIBUTION_release_proof_covers_build_package_packing_and_artifact_checks', () => {
-  // DISTRIBUTION-007 本地 pin：release proof（format-build-test）必须包含 build/package/
+test('WHAT[DISTRIBUTION-007] DISTRIBUTION_release_proof_covers_build_package_packing_and_artifact_checks', async () => {
+  // DISTRIBUTION-007 本地 pin：release proof（verify:release）必须包含 build/package/
   // packing 与 install/import/resource availability 检查。阶梯的层序治理（谁先谁后、
   // watchdog、晋级纪律）归 verification-system；本断言只锁「release proof 覆盖 closure」。
-  const pipeline = pkg.scripts['format-build-test']
-  assert.equal(typeof pipeline, 'string', 'format-build-test must exist')
-  assert.match(pipeline, /npm run build/, 'release proof must invoke the registered build step')
-  assert.equal(pkg.scripts.build, 'wireit', 'the registered build step must execute through Wireit')
-  assert.equal(
-    pkg.wireit?.build?.command,
-    'node scripts/build.mjs',
-    'the Wireit build step must resolve to the clean Fable build owner',
-  )
-  assert.match(
-    pipeline,
-    /node requirements\/verification-system\/tests\/integration\/run\.mjs/,
-    'release proof must invoke the integration orchestrator',
-  )
-  assert.doesNotMatch(
-    pipeline,
-    /node requirements\/distribution\/tests\/integration\/package\/run\.mjs/,
-    'release sink must not duplicate the integration-owned package suite',
-  )
+  const pipeline = pkg.scripts['verify:release']
+  assert.equal(typeof pipeline, 'string', 'verify:release must exist')
+  assert.match(pipeline, /node scripts\/verify\.mjs/, 'release proof must dispatch to verify.mjs')
+
   const integration = fs.readFileSync(
     path.join(root, 'requirements/verification-system/tests/integration/run.mjs'),
     'utf8',
@@ -97,7 +82,35 @@ test('WHAT[DISTRIBUTION-007] DISTRIBUTION_release_proof_covers_build_package_pac
     /requirements\/distribution\/tests\/integration\/package\/run\.mjs/,
     'integration orchestrator must run package install/import/resources checks',
   )
-  assert.match(pipeline, /npm pack --dry-run$/, 'release proof must end with npm pack --dry-run (packing membership)')
+
+  // Drive the real orchestrator with a step spy — this proves verify:release
+  // invokes the registered build step in clean mode and the verify-package step.
+  const { verify } = await import('../../../scripts/verify.mjs')
+  const spawned = []
+  const fakeRunStep = async ({ label, argv }) => {
+    spawned.push({ label, argv: argv.map((arg) => String(arg)) })
+    return { label, ok: true, exitCode: 0, signal: null, durationMs: 0, logPath: '' }
+  }
+  const { exitCode } = await verify({ release: true, runStep: fakeRunStep })
+  assert.equal(exitCode, 0, 'release verify with green spy must succeed')
+
+  const buildCalls = spawned.filter((s) => s.label === 'build')
+  assert.equal(buildCalls.length, 1, 'release must invoke build exactly once')
+  assert.ok(
+    buildCalls[0].argv.some((arg) => arg.includes('scripts/build.mjs')),
+    'release build must resolve to scripts/build.mjs',
+  )
+  assert.ok(
+    buildCalls[0].argv.includes('--clean'),
+    'release build must pass --clean: release never publishes a stale incremental manifest',
+  )
+
+  const packageCalls = spawned.filter((s) => s.label === 'package')
+  assert.equal(packageCalls.length, 1, 'release must run the verify-package step exactly once')
+  assert.ok(
+    packageCalls[0].argv.some((arg) => arg.includes('scripts/verify-package.mjs')),
+    'release package step must resolve to scripts/verify-package.mjs',
+  )
 })
 
 test('WHAT[DISTRIBUTION-008] DISTRIBUTION_enforcer_rulebook_closure_is_complete', () => {

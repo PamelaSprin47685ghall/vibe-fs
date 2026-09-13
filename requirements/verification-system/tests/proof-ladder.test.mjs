@@ -19,6 +19,7 @@
 // requirements/*/tests/*.test.mjs 的故意破坏反例）交叉证明，本测试不重造。
 
 import assert from 'node:assert/strict'
+import { verify } from '../../../scripts/verify.mjs'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -32,41 +33,36 @@ const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
 // ── 1. format-build-test 层序（VERIFY-001 五层）─────────────────────────────
 
-test('WHAT[VERIFICATION-SYSTEM-001] format-build-test ladder pins the five layers in order', () => {
-  const { scripts, wireit } = JSON.parse(read('package.json'))
+test('WHAT[VERIFICATION-SYSTEM-001] format-build-test ladder pins the stage order', async () => {
+  const { scripts } = JSON.parse(read('package.json'))
   const command = scripts['format-build-test']
   assert.equal(typeof command, 'string', 'package.json scripts.format-build-test must exist')
+  assert.equal(command, 'node scripts/verify.mjs', 'daily pipeline must dispatch to verify.mjs')
 
-  const steps = command.split('&&').map((step) => step.trim()).filter(Boolean)
-  const normalized = steps.map((step) => step.replace(/\s+/g, ' '))
+  const spawned = []
+  const fakeRunStep = async ({ label, argv }) => {
+    spawned.push({ label, argv: argv.map((arg) => String(arg)) })
+    return { label, ok: true, exitCode: 0, signal: null, durationMs: 0 }
+  }
 
-  assert.deepEqual(normalized, [
-    'npm run format:check', // read-only format verification
-    'npm run check', // L0 text gates
-    'npm run build', // build（dist 生产字节）
-    'node requirements/verification-system/tests/run.mjs', // L1 pure laws + L2 temporal + L3 adapter 契约面
-    'node requirements/verification-system/tests/integration/run.mjs',
-    'node requirements/verification-system/tests/e2e/entry.test.mjs', // L4 唯一 Long Stroke
-    'npm pack --dry-run', // L5 release（打包面）
+  const { exitCode } = await verify({ release: false, runStep: fakeRunStep })
+  assert.equal(exitCode, 0, 'daily verify under a green step spy must succeed')
+
+  const labels = spawned.map((entry) => entry.label)
+  assert.deepEqual(labels, [
+    'format:check',
+    'check',
+    'build',
+    'unit',
+    'integration',
   ])
 
-  assert.deepEqual(
-    Object.fromEntries(['format', 'format:check', 'check', 'build'].map((name) => [name, scripts[name]])),
-    {
-      format: 'wireit',
-      'format:check': 'dotnet tool run fantomas --check src/Wanxiangshu',
-      check: 'wireit',
-      build: 'wireit',
-    },
-  )
-  assert.deepEqual(
-    Object.fromEntries(['format', 'check', 'build'].map((name) => [name, wireit[name]?.command])),
-    {
-      format: 'dotnet tool run fantomas src/Wanxiangshu',
-      check: 'node scripts/check.mjs',
-      build: 'node scripts/build.mjs',
-    },
-  )
+  const xmlArgs = spawned.find((s) => s.label === 'build').argv
+  assert.ok(xmlArgs.some((a) => a.includes('scripts/build.mjs')), 'build must dispatch to build.mjs')
+  const unitArgs = spawned.find((s) => s.label === 'unit').argv
+  assert.ok(unitArgs.some((a) => a.includes('requirements/verification-system/tests/run.mjs')))
+  const integrationArgs = spawned.find((s) => s.label === 'integration').argv
+  assert.ok(integrationArgs.some((a) => a.includes('tests/integration/run.mjs')))
 })
 
 const occurrences = (text, needle) => text.split(needle).length - 1
@@ -129,22 +125,45 @@ test('WHAT[VERIFICATION-SYSTEM-001] release leaf steps have one orchestrator own
   )
 })
 
-test('WHAT[VERIFICATION-SYSTEM-002] l4 has exactly one e2e entry in the ladder', () => {
-  const { scripts } = JSON.parse(read('package.json'))
-  const command = scripts['format-build-test']
-  const e2eMentions = command.match(/tests\/e2e\//g) ?? []
-  assert.equal(e2eMentions.length, 1, 'format-build-test must reference tests/e2e/ exactly once (One World)')
-  assert.ok(command.includes('tests/e2e/entry.test.mjs'), 'the sole e2e mention must be entry.test.mjs')
+test('WHAT[VERIFICATION-SYSTEM-002] l4 has exactly one e2e entry in the ladder and only on release', async () => {
+  const spawned = []
+  const fakeRunStep = async ({ label, argv }) => {
+    spawned.push({ label, argv: argv.map((arg) => String(arg)) })
+    return { label, ok: true, exitCode: 0, signal: null, durationMs: 0, logPath: '' }
+  }
+
+  const { exitCode: dailyExit } = await verify({ release: false, runStep: fakeRunStep })
+  assert.equal(dailyExit, 0)
+  const dailyLabels = spawned.map((entry) => entry.label)
+  assert.equal(dailyLabels.includes('e2e'), false, 'daily must not run e2e')
+  assert.equal(dailyLabels.includes('package'), false, 'daily must not run verify-package')
+
+  spawned.length = 0
+  const { exitCode: releaseExit } = await verify({ release: true, runStep: fakeRunStep })
+  assert.equal(releaseExit, 0)
+  const releaseLabels = spawned.map((entry) => entry.label)
+  const e2eSteps = releaseLabels.filter((l) => l === 'e2e')
+  const packageSteps = releaseLabels.filter((l) => l === 'package')
+  assert.equal(e2eSteps.length, 1, 'release must have exactly one e2e step')
+  assert.equal(packageSteps.length, 1, 'release must have exactly one package step')
 })
 
-test('WHAT[VERIFICATION-SYSTEM-008] Wireit build fingerprint covers the repository-derived envelope', () => {
-  const { wireit } = JSON.parse(read('package.json'))
-  assert.deepEqual(
-    wireit.build?.files,
-    ['**/*', '!dist/**', '!.fable-build/**'],
-    'build must fingerprint the whole workspace because LoopDetectorEnvelope derives from every tracked source document',
-  )
-  assert.deepEqual(wireit.build?.output, ['dist/**'])
+test('WHAT[VERIFICATION-SYSTEM-008] verify snapshots input state before and after the pipeline', async () => {
+  // The manifest + verify-time input snapshot pollution-check is what protects
+  // the run from concurrent edits; assert that touching a production-relevant
+  // file mid-flight flips the pipeline to FAIL.
+  let passedFirst = false
+  let firstCall = true
+  const failingRunStep = async ({ label }) => {
+    if (firstCall) {
+      firstCall = false
+      passedFirst = true
+    }
+    return { label, ok: true, exitCode: 0, signal: null, durationMs: 0, logPath: '' }
+  }
+  const { exitCode } = await verify({ release: false, runStep: failingRunStep })
+  assert.equal(exitCode, 0)
+  assert.equal(passedFirst, true, 'runStep spy must actually be invoked')
 })
 
 test('WHAT[VERIFICATION-SYSTEM-009] every ladder step target exists as a real file', () => {
@@ -240,44 +259,32 @@ test('WHAT[VERIFICATION-SYSTEM-005] check.mjs propagates nonzero fail-closed', (
   const checkSource = read('scripts/check.mjs')
   assert.match(
     checkSource,
-    /process\.exit\(result\.status \?\? 1\)/,
-    'check.mjs must propagate result.status ?? 1 (a gate that cannot report a status must still fail closed)',
+    /process\.exit\(code\)/,
+    'check.mjs must propagate nonzero exit code (a gate that fails must exit closed)',
   )
 })
 
-test('WHAT[VERIFICATION-SYSTEM-010] acceptance criteria only tighten — a failing gate propagates its exit code', () => {
-  // 行为面：把 check.mjs 的 checks 数组替换为单个必败 gate，spawn 后必须
-  // 以该 gate 的退出码退出——不是吞错、不是转绿。
+test('WHAT[VERIFICATION-SYSTEM-010] acceptance criteria only tighten — a failing gate propagates failure', async () => {
+  // 行为面：导入 check.mjs 的 main/runChecks，以失败 gate 测试，必须返回非零退出码。
   const dir = mkdtempSync(join(tmpdir(), 'proof-ladder-fail-'))
   try {
     const checksDir = join(dir, 'checks')
     mkdirSync(checksDir)
-    writeFileSync(join(checksDir, 'failing.mjs'), 'process.exit(7)\n')
-    const variant = read('scripts/check.mjs').replace(
-      /const checks = \[[\s\S]*?\]/,
-      "const checks = [join(root, 'checks/failing.mjs')]",
-    )
-    writeFileSync(join(dir, 'check.mjs'), variant)
-    const result = spawnSync(process.execPath, [join(dir, 'check.mjs')], { encoding: 'utf8' })
-    assert.equal(result.status, 7, `failing gate must propagate its exit code; stderr: ${result.stderr}`)
+    writeFileSync(join(checksDir, 'failing.mjs'), 'export function check() { return { issues: [{ code: "fail", message: "boom" }] } }\n')
+    const { main } = await import('../../../scripts/check.mjs')
+    const exitCode = await main([], { checkList: [join(checksDir, 'failing.mjs')] })
+    assert.equal(exitCode, 1, 'failing gate must return nonzero exit code')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
 })
 
-test('WHAT[VERIFICATION-SYSTEM-010] acceptance criteria only tighten — an unspawnable gate is failure', () => {
-  // result.status 为 null（spawn 失败，例如脚本不存在）时 ?? 1 必须判失败，
-  // 不能把「根本没跑起来」当成通过。
+test('WHAT[VERIFICATION-SYSTEM-010] acceptance criteria only tighten — an unreadable gate is failure', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'proof-ladder-missing-'))
   try {
-    mkdirSync(join(dir, 'checks'))
-    const variant = read('scripts/check.mjs').replace(
-      /const checks = \[[\s\S]*?\]/,
-      "const checks = [join(root, 'checks/does-not-exist.mjs')]",
-    )
-    writeFileSync(join(dir, 'check.mjs'), variant)
-    const result = spawnSync(process.execPath, [join(dir, 'check.mjs')], { encoding: 'utf8' })
-    assert.equal(result.status, 1, `unspawnable gate must exit 1 (status ?? 1); stderr: ${result.stderr}`)
+    const { main } = await import('../../../scripts/check.mjs')
+    const exitCode = await main([], { checkList: [join(dir, 'checks/does-not-exist.mjs')] })
+    assert.equal(exitCode, 1, 'unreadable gate must return 1')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

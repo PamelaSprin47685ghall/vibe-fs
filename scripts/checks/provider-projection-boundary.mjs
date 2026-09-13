@@ -245,6 +245,40 @@ export const scanProviderProjectionRepo = (repoRoot, files = PROVIDER_PROJECTION
   return scanProviderProjectionEntries(entries)
 }
 
+export function check(context) {
+  const root = context?.root ?? resolve(dirname(fileURLToPath(import.meta.url)), '../..')
+  const entries = PROVIDER_PROJECTION_OWNER_FILES.map((file) => {
+    const absolute = resolve(root, file)
+    if (!existsSync(absolute)) {
+      throw new Error(`provider-projection-owner: scan owner missing: ${file}`)
+    }
+    const source = context?.readText ? context.readText(file) : readFileSync(absolute, 'utf8')
+    return { file, source }
+  })
+  const violations = scanProviderProjectionEntries(entries)
+  return {
+    issues: violations.map((v) => ({
+      code: v.rule,
+      path: v.file,
+      line: v.line,
+      message: v.text,
+    })),
+  }
+}
+
+export function runCli(argv, root) {
+  const { issues } = check({ root })
+  if (issues.length === 0) {
+    console.log('provider-projection-owner: OK')
+    return 0
+  }
+  console.error('provider-projection-owner: VIOLATIONS')
+  for (const issue of issues) {
+    console.error(`  ${issue.path}:${issue.line} [${issue.code}] ${issue.message}`)
+  }
+  return 1
+}
+
 export const run = (repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')) => {
   const violations = scanProviderProjectionRepo(repoRoot)
   if (violations.length === 0) {
@@ -260,5 +294,5 @@ export const run = (repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), 
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  process.exitCode = run()
+  process.exitCode = runCli()
 }

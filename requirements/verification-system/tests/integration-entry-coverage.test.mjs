@@ -62,10 +62,10 @@ test('WHAT[VERIFICATION-SYSTEM-009] integration entry coverage delegates the exa
     assess(
       [
         'requirements/a/tests/integration/a.test.mjs',
-        'requirements/distribution/tests/integration/package/install.test.mjs',
+        'requirements/distribution/tests/integration/package/layout.test.mjs',
       ],
       ['requirements/a/tests/integration/a.test.mjs'],
-      ['requirements/distribution/tests/integration/package/install.test.mjs'],
+      ['requirements/distribution/tests/integration/package/layout.test.mjs'],
     ),
     { ok: true, missingFromEntry: [], staleEntry: [], duplicateWiring: [] },
   )
@@ -79,11 +79,11 @@ test('WHAT[VERIFICATION-SYSTEM-004] integration entry coverage goes red when a c
     assess(
       [
         'requirements/a/tests/integration/a.test.mjs',
-        'requirements/distribution/tests/integration/package/install.test.mjs',
+        'requirements/distribution/tests/integration/package/layout.test.mjs',
         'requirements/distribution/tests/integration/package/contents.test.mjs',
       ],
       ['requirements/a/tests/integration/a.test.mjs'],
-      ['requirements/distribution/tests/integration/package/install.test.mjs'],
+      ['requirements/distribution/tests/integration/package/layout.test.mjs'],
     ),
     {
       ok: false,
@@ -105,7 +105,7 @@ test('WHAT[VERIFICATION-SYSTEM-009] discoverSuiteTests lists every package *.tes
   const discovered = discoverSuiteTests(packageIntegrationDir)
   // The four real package suites are all picked up.
   assert.ok(discovered.includes('contents.test.mjs'))
-  assert.ok(discovered.includes('install.test.mjs'))
+  assert.ok(discovered.includes('layout.test.mjs'))
   assert.ok(discovered.includes('import.test.mjs'))
   assert.ok(discovered.includes('resources.test.mjs'))
   // The runner itself and any non-test file are excluded by suffix.
@@ -172,7 +172,7 @@ test('WHAT[VERIFICATION-SYSTEM-009] the real integration entry covers every disc
   assert.deepEqual(childOwnedIntegrationTests.sort(), [
     'requirements/distribution/tests/integration/package/contents.test.mjs',
     'requirements/distribution/tests/integration/package/import.test.mjs',
-    'requirements/distribution/tests/integration/package/install.test.mjs',
+    'requirements/distribution/tests/integration/package/layout.test.mjs',
     'requirements/distribution/tests/integration/package/resources.test.mjs',
   ])
 })

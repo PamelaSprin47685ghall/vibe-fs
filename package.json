@@ -23,45 +23,43 @@
     "access": "restricted"
   },
   "scripts": {
-    "format-build-test": "npm run format:check && npm run check && npm run build && node requirements/verification-system/tests/run.mjs && node requirements/verification-system/tests/integration/run.mjs && node requirements/verification-system/tests/e2e/entry.test.mjs && npm pack --dry-run",
-    "format": "wireit",
-    "format:check": "dotnet tool run fantomas --check src/Wanxiangshu",
+    "format-build-test": "node scripts/verify.mjs",
+    "verify:release": "node scripts/verify.mjs --release",
+    "format": "dotnet tool run fantomas src/Wanxiangshu",
+    "format:check": "wireit",
     "check": "wireit",
-    "build": "wireit"
+    "build": "node scripts/build.mjs",
+    "build:clean": "node scripts/build.mjs --clean"
   },
   "wireit": {
-    "format": {
-      "command": "dotnet tool run fantomas src/Wanxiangshu",
+    "format:check": {
+      "command": "dotnet tool run fantomas --check src/Wanxiangshu",
       "files": [
         "src/Wanxiangshu/**/*.fs",
+        "src/Wanxiangshu/**/*.fsi",
         "src/Wanxiangshu/**/*.fsproj",
-        ".config/dotnet-tools.json"
+        ".editorconfig",
+        "**/.editorconfig",
+        ".fantomasignore",
+        ".config/dotnet-tools.json",
+        "global.json",
+        "package.json",
+        "package-lock.json"
       ],
       "output": []
     },
     "check": {
       "command": "node scripts/check.mjs",
       "files": [
-        "scripts/checks/**",
-        "scripts/lib/**",
+        "scripts/check.mjs",
+        "scripts/checks/*",
+        "scripts/lib/*",
         "src/Wanxiangshu/**",
-        "requirements/**",
-        "proposals/**",
-        "AGENTS.md",
-        "package.json"
+        "resources/**",
+        "package.json",
+        "package-lock.json"
       ],
       "output": []
-    },
-    "build": {
-      "command": "node scripts/build.mjs",
-      "files": [
-        "**/*",
-        "!dist/**",
-        "!.fable-build/**"
-      ],
-      "output": [
-        "dist/**"
-      ]
     }
   },
   "peerDependencies": {

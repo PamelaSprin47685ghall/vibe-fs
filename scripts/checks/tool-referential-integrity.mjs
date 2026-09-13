@@ -220,27 +220,77 @@ export const scanRepo = (repoRoot = process.cwd()) => {
   return { ok: violations.length === 0, violations }
 }
 
+export function check(context) {
+  const repoRoot = context?.root ?? process.cwd()
+  const prodAbs = resolve(repoRoot, 'src/Wanxiangshu')
+  if (!existsSync(prodAbs)) {
+    return {
+      issues: [{ code: 'missing-tools-root', path: TOOLS_ROOT, message: 'Tools directory missing' }],
+    }
+  }
+
+  let entries
+  if (context?.productionFiles) {
+    entries = context.productionFiles()
+      .filter(({ file }) => file.endsWith('.fs') && isToolFile(file))
+      .map(({ file, text }) => ({ file: norm(file), text }))
+  } else {
+    const files = walk(prodAbs, ['.fs']).filter(isToolFile)
+    entries = files.map((file) => ({
+      file: norm(file.slice(repoRoot.length + 1)),
+      text: readFileSync(file, 'utf8'),
+    }))
+  }
+
+  const extra = {}
+  const staticAbs = resolve(repoRoot, STATIC_TOOLS_REL)
+  const registryAbs = resolve(repoRoot, TOOL_REGISTRY_REL)
+  const violations = []
+  if (existsSync(staticAbs)) {
+    extra.staticTools = context?.readText ? context.readText(STATIC_TOOLS_REL) : readFileSync(staticAbs, 'utf8')
+  } else {
+    violations.push({ code: 'missing-file', path: STATIC_TOOLS_REL, detail: 'StaticTools.fs missing' })
+  }
+  if (existsSync(registryAbs)) {
+    extra.toolRegistry = context?.readText ? context.readText(TOOL_REGISTRY_REL) : readFileSync(registryAbs, 'utf8')
+  } else {
+    violations.push({ code: 'missing-file', path: TOOL_REGISTRY_REL, detail: 'ToolRegistry.fs missing' })
+  }
+
+  violations.push(...scanEntries(entries, extra))
+  return {
+    issues: violations.map((v) => ({
+      code: v.code,
+      path: v.path,
+      message: v.detail ?? v.code,
+    })),
+  }
+}
+
 const formatViolation = (v) => {
   const detail = v.detail ? ` — ${v.detail}` : ''
   return `  ${v.path}: ${v.code}${detail}`
 }
 
-const runCli = () => {
+export const runCli = () => {
   const result = scanRepo()
   if (result.ok) {
     console.log(
       'tool-referential-integrity-gate: OK — each ToolSpec name has a single owner; ' +
         'StaticTools.knownToolNames aligns with registry; no legacy tool names',
     )
-    process.exit(0)
+    return 0
   }
   console.error(`tool-referential-integrity-gate: ${result.violations.length} violation(s)\n`)
   for (const v of result.violations) console.error(formatViolation(v))
-  process.exit(1)
+  return 1
 }
 
 const isMain =
   process.argv[1] !== undefined &&
   resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1])
 
-if (isMain) runCli()
+if (isMain) {
+  const code = runCli()
+  if (code !== 0) process.exit(code)
+}

@@ -1,10 +1,10 @@
-// requirements/distribution/tests/integration/package/run.mjs — sequential package integration under 3s silence.
+// requirements/distribution/tests/integration/package/run.mjs — package integration under 3s silence.
 //
 //   node tests/integration/package/run.mjs
 // Requires dist/ built (node scripts/build.mjs) before pack/install/import checks.
 //
-// Silence = WATCHDOG_TIMEOUT_MS, same dog as e2e canary. Sequential: pack/install share
-// npm cache; concurrent npm pack is not under test.
+// Silence = WATCHDOG_TIMEOUT_MS, same dog as e2e canary.
+// Workspace layout and distribution checks: merged into a single supervision call.
 
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -24,15 +24,13 @@ if (suites.length === 0) {
   process.exit(1)
 }
 
-for (const name of suites) {
-  const file = path.join(here, name)
-  console.log(`\n=== package: ${name} ===`)
-  await superviseNodeTest({
-    files: [file],
-    label: `requirements/distribution/tests/integration/package/${name}`,
-    silenceMs: WATCHDOG_TIMEOUT_MS,
-    logPrefix: `package:${name}`,
-  })
-}
+const files = suites.map((name) => path.join(here, name))
+console.log(`\n=== package integration (${files.length} suites) ===`)
+await superviseNodeTest({
+  files,
+  label: 'requirements/distribution/tests/integration/package',
+  silenceMs: WATCHDOG_TIMEOUT_MS,
+  logPrefix: 'package',
+})
 
 console.log('\npackage integration: all suites passed')

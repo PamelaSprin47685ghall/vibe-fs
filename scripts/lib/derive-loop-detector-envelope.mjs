@@ -1,4 +1,5 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Worker } from 'node:worker_threads'
@@ -55,15 +56,20 @@ const solveNormalPrior = (replay) => {
   return meanOffset / (1 - meanCoefficient)
 }
 
-const empiricalQuantile = (values, probability) => {
-  if (values.length === 0 || !(probability > 0 && probability <= 1)) {
-    throw new Error('Loop detector repository envelope has invalid empirical quantile input')
+export const envelopeBounds = (projected, lowerProbability) => {
+  if (projected.length === 0) {
+    throw new Error('Loop detector envelope has no samples')
+  }
+  if (!(lowerProbability > 0 && lowerProbability <= 1)) {
+    throw new Error('Loop detector envelope has invalid probability')
   }
 
-  const rank = Math.ceil(probability * values.length)
-  const index = Math.min(values.length - 1, rank - 1)
-  const sorted = Float64Array.from(values).sort()
-  return sorted[index]
+  const sorted = Float64Array.from(projected).sort()
+  const lowerIndex = Math.ceil(lowerProbability * sorted.length) - 1
+  return {
+    minimum: sorted[lowerIndex],
+    maximum: sorted[sorted.length - 1],
+  }
 }
 
 const evaluateEnvelope = (offsets, lambda, normalPrior) => {
@@ -75,10 +81,7 @@ const evaluateEnvelope = (offsets, lambda, normalPrior) => {
     projected[index] = coefficient * normalPrior + offsets[index]
   }
 
-  return {
-    minimum: empiricalQuantile(projected, lowerQuantileProbability),
-    maximum: empiricalQuantile(projected, upperQuantileProbability),
-  }
+  return envelopeBounds(projected, lowerQuantileProbability)
 }
 
 // encodeParallel splits the corpus only at safe line-boundary positions (after
@@ -112,12 +115,13 @@ const chunkRanges = (text, targetChunkCount) => {
 
 const encodeInProcess = (text) => Array.from(encode(text))
 
-const encodeWithWorkerThreads = (text, chunks, threadCount) =>
+const encodeWithWorkerThreads = (text, chunks, threadCount, { workerFactory = (src, opts) => new Worker(src, opts) } = {}) =>
   new Promise((resolve, reject) => {
     const results = new Array(chunks.length)
     let dispatched = 0
     let returned = 0
     let failed = false
+    const activeWorkers = new Set()
 
     const workerSource = `const { parentPort } = require('node:worker_threads')
 const { encode } = require('gpt-tokenizer/encoding/o200k_base')
@@ -130,10 +134,16 @@ parentPort.on('message', (message) => {
   parentPort.postMessage({ index: message.index, packed }, [packed.buffer])
 })`
 
-    const settle = (error) => {
+    const settle = async (error) => {
       if (failed) return
       if (error) {
         failed = true
+        const terminations = []
+        for (const worker of activeWorkers) {
+          terminations.push(worker.terminate())
+        }
+        activeWorkers.clear()
+        await Promise.all(terminations)
         reject(error)
         return
       }
@@ -153,9 +163,11 @@ parentPort.on('message', (message) => {
     }
 
     const spawnWorker = () => {
-      const worker = new Worker(workerSource, { eval: true })
+      const worker = workerFactory(workerSource, { eval: true })
+      activeWorkers.add(worker)
       worker.unref()
       worker.on('message', (message) => {
+        if (failed) return
         results[message.index] = message.packed
         returned += 1
         if (dispatched < chunks.length) {
@@ -170,9 +182,9 @@ parentPort.on('message', (message) => {
       })
       worker.on('error', (error) => {
         settle(error)
-        worker.terminate()
       })
       worker.on('exit', (code) => {
+        activeWorkers.delete(worker)
         if (code !== 0 && !failed) {
           settle(new Error(`loop detector tokenize worker exited with ${code}`))
         }
@@ -190,11 +202,11 @@ parentPort.on('message', (message) => {
     }
   })
 
-export const encodeParallel = async (text, workerCount = 0) => {
+export const encodeParallel = async (text, workerCount = 0, options = {}) => {
   if (text.length === 0) return []
 
   if (workerCount === 0) {
-    workerCount = Math.max(1, typeof process.availableParallelism === 'function' ? process.availableParallelism() : 1)
+    workerCount = Math.max(1, typeof os.availableParallelism === 'function' ? os.availableParallelism() : 1)
   }
   if (workerCount <= 1) return encodeInProcess(text)
 
@@ -203,7 +215,7 @@ export const encodeParallel = async (text, workerCount = 0) => {
   const chunks = chunkRanges(text, workerCount * 8)
   if (chunks.length <= 1) return encodeInProcess(text)
 
-  return encodeWithWorkerThreads(text, chunks, workerCount)
+  return encodeWithWorkerThreads(text, chunks, workerCount, options)
 }
 
 export const loopDetectorEnvelopeLinkageV1 = Object.freeze({

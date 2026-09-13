@@ -86,5 +86,17 @@ export function integrationNodeTestSteps(root) {
         path.join(root, 'requirements/durable-convergence/tests/integration/persist/dumb-server.test.mjs'),
       ],
     },
+    // DG-004 release-only: re-derive the envelope against the real repository corpus.
+    {
+      label: 'loop-envelope-repository.test.mjs (degeneration-guard)',
+      files: [
+        path.join(root, 'requirements/degeneration-guard/tests/integration/loop-envelope-repository.test.mjs'),
+      ],
+      releaseOnly: true,
+    },
   ]
+}
+
+export function selectIntegrationSteps(root, { releaseOnly = false } = {}) {
+  return integrationNodeTestSteps(root).filter((step) => releaseOnly || !step.releaseOnly)
 }

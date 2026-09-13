@@ -1,98 +1,215 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
 import { loopDetectorRepositoryInputFiles } from '../../../scripts/lib/loop-detector-repository-corpus.mjs'
-import { resetOutputDirectory } from '../../../scripts/lib/owner-compile.mjs'
-import { checkBuildFreshness, collectBuildInputs } from './support/build-freshness.mjs'
+import {
+  assertBuildFresh,
+  collectCompilerInputs,
+  collectGeneratedInputs,
+  collectArtifactInputs,
+  collectOutputs,
+  computeDigest,
+  readManifest,
+  writeManifest,
+  invalidateManifest,
+  MANIFEST_SCHEMA,
+} from '../../../scripts/lib/build-state.mjs'
+import { planImpactCompile, resetOutputDirectory } from '../../../scripts/lib/owner-compile.mjs'
+import { runBuild } from '../../../scripts/build.mjs'
+import { assertProductionSourcesAssigned } from '../../../scripts/lib/compile-shards.mjs'
 
-test('WHAT[VERIFICATION-SYSTEM-008] build freshness includes repository-derived artifact inputs beyond F# sources', () => {
-  const root = mkdtempSync(join(tmpdir(), 'wanxiang-build-freshness-'))
-  const productionRoot = join(root, 'src')
-  const buildRoot = join(root, 'dist')
-  const productionSource = join(productionRoot, 'Main.fs')
-  const repositoryInput = join(root, 'requirements.md')
-  const artifact = join(buildRoot, 'Main.js')
-  const gitignore = join(root, '.gitignore')
-
-  execFileSync('git', ['init', '-q', root])
-  mkdirSync(productionRoot, { recursive: true })
-  mkdirSync(buildRoot, { recursive: true })
-  writeFileSync(productionSource, 'module Main\n', 'utf8')
-  writeFileSync(repositoryInput, 'new repository corpus\n', 'utf8')
-  writeFileSync(artifact, 'export {}\n', 'utf8')
-  writeFileSync(gitignore, 'dist/\n', 'utf8')
-  execFileSync('git', ['-C', root, 'add', 'requirements.md'])
-
-  utimesSync(productionSource, 10, 10)
-  utimesSync(artifact, 20, 20)
-  utimesSync(repositoryInput, 30, 30)
-  utimesSync(gitignore, 10, 10)
-
-  const freshness = checkBuildFreshness({ productionRoot, buildRoot, repositoryRoot: root })
-
-  assert.equal(freshness.ok, false)
-  assert.match(freshness.reason, /requirements\.md/)
+test('WHAT[VERIFICATION-SYSTEM-008] assertBuildFresh succeeds on current repository build', () => {
+  const freshness = assertBuildFresh({ root: process.cwd() })
+  assert.ok(freshness.generation >= 1)
+  assert.ok(typeof freshness.compilerInputDigest === 'string')
+  assert.ok(typeof freshness.generatedInputDigest === 'string')
+  assert.ok(typeof freshness.artifactInputDigest === 'string')
 })
 
-test('WHAT[VERIFICATION-SYSTEM-008] local repository export shards are excluded from the build corpus', () => {
-  const root = mkdtempSync(join(tmpdir(), 'wanxiang-build-corpus-ignore-'))
-  try {
-    execFileSync('git', ['init', '-q', root])
-    writeFileSync(join(root, '.gitignore'), 'repomix-src-part*.xml\n', 'utf8')
-    writeFileSync(join(root, 'keep.md'), 'real repository input\n', 'utf8')
-    writeFileSync(join(root, 'repomix-src-part1.xml'), '<temporary-export/>\n', 'utf8')
-    execFileSync('git', ['-C', root, 'add', '.gitignore', 'keep.md'])
+test('WHAT[VERIFICATION-SYSTEM-008] no-op mode preserves manifest and generation', async () => {
+  const root = process.cwd()
+  const manifestBefore = readManifest({ root })
+  assert.ok(manifestBefore !== null)
 
-    const inputs = loopDetectorRepositoryInputFiles(root)
-    assert.ok(inputs.includes(join(root, 'keep.md')), 'tracked repository input must remain in the corpus')
+  const result = await runBuild({ targetRoot: root, clean: false })
+  assert.equal(result.ok, true)
+  assert.equal(result.mode, 'no-op')
+  assert.equal(result.generation, manifestBefore.generation)
+
+  const manifestAfter = readManifest({ root })
+  assert.equal(manifestAfter.generation, manifestBefore.generation)
+})
+
+test('WHAT[VERIFICATION-SYSTEM-008] manifest corruption causes assertBuildFresh to throw with code', () => {
+  const root = mkdtempSync(join(tmpdir(), 'wanxiang-corrupt-manifest-'))
+  try {
+    const buildStateDir = join(root, '.fable-build')
+    mkdirSync(buildStateDir, { recursive: true })
+    writeFileSync(join(buildStateDir, 'build-manifest.json'), '{ not valid json', 'utf8')
+
+    assert.throws(
+      () => assertBuildFresh({ root }),
+      (err) => {
+        assert.equal(err.code, 'manifest-corrupt')
+        return true
+      },
+    )
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[VERIFICATION-SYSTEM-008] missing or stale output entry causes assertBuildFresh to throw', () => {
+  const root = mkdtempSync(join(tmpdir(), 'wanxiang-stale-output-'))
+  try {
+    const buildStateDir = join(root, '.fable-build')
+    const distDir = join(root, 'dist')
+    mkdirSync(buildStateDir, { recursive: true })
+    mkdirSync(distDir, { recursive: true })
+
+    const outputA = join(distDir, 'A.js')
+    writeFileSync(outputA, 'export const a = 1\n', 'utf8')
+    const outputs = collectOutputs(distDir)
+
+    const manifest = {
+      schema: MANIFEST_SCHEMA,
+      rootIdentity: root,
+      outputDir: 'dist',
+      generation: 1,
+      compiler: { inputDigest: 'test', inputs: [] },
+      generated: { inputDigest: 'test', inputs: [] },
+      artifacts: { inputDigest: 'test', inputs: [] },
+      outputs,
+    }
+    writeManifest({ root, manifest })
+
+    // If an output file is deleted:
+    rmSync(outputA)
+    assert.throws(
+      () => assertBuildFresh({ root }),
+      (err) => {
+        assert.ok(err.code === 'output-missing' || err.code === 'output-empty')
+        return true
+      },
+    )
+
+    // If an output file is modified with stale hash:
+    writeFileSync(outputA, 'export const a = 2\n', 'utf8')
+    const outputB = join(distDir, 'B.js')
+    writeFileSync(outputB, 'export const b = 2\n', 'utf8')
+    // Reset outputs in manifest to old A.js
+    manifest.outputs = outputs
+    writeManifest({ root, manifest })
+
+    assert.throws(
+      () => assertBuildFresh({ root }),
+      (err) => {
+        assert.ok(err.code === 'output-stale' || err.code === 'output-extra')
+        return true
+      },
+    )
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[VERIFICATION-SYSTEM-008] changed .fs with unchanged .fsi triggers reverse-consumer recompile', () => {
+  const root = mkdtempSync(join(tmpdir(), 'wanxiang-inline-fsi-'))
+  try {
+    const aggregate = join(root, 'Wanxiangshu.fsproj')
+    const providerProj = join(root, 'Provider.fsproj')
+    const consumerProj = join(root, 'Consumer.fsproj')
+
+    const providerFsi = join(root, 'Provider.fsi')
+    const providerFs = join(root, 'Provider.fs')
+    const consumerFs = join(root, 'Consumer.fs')
+
+    writeFileSync(providerFsi, 'namespace Sample\n', 'utf8')
+    writeFileSync(providerFs, 'namespace Sample\nlet inline helper x = x + 1\n', 'utf8')
+    writeFileSync(consumerFs, 'namespace Sample\nlet consume x = helper x\n', 'utf8')
+
+    writeFileSync(providerProj, `<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Compile Include="${providerFsi}"/>
+    <Compile Include="${providerFs}"/>
+  </ItemGroup>
+</Project>\n`, 'utf8')
+
+    writeFileSync(consumerProj, `<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="${providerProj}"/>
+    <Compile Include="${consumerFs}"/>
+  </ItemGroup>
+</Project>\n`, 'utf8')
+
+    writeFileSync(aggregate, `<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Compile Include="${providerFsi}"/>
+    <Compile Include="${providerFs}"/>
+    <Compile Include="${consumerFs}"/>
+  </ItemGroup>
+</Project>\n`, 'utf8')
+
+    // Change .fs only (unchanged .fsi)
+    const plan = planImpactCompile({
+      changedPaths: [providerFs],
+      projectDirectory: root,
+      aggregatePath: aggregate,
+      fullThreshold: 1,
+    })
+
+    assert.equal(plan.mode, 'focused')
     assert.ok(
-      !inputs.includes(join(root, 'repomix-src-part1.xml')),
-      'ignored local repository export must never become a build-freshness input',
+      plan.projectPaths.includes(consumerProj),
+      'reverse consumer must be included when .fs implementation changes, even with unchanged .fsi',
+    )
+    assert.ok(
+      plan.compileItems.includes(consumerFs),
+      'consumer compile item must be in compile plan',
     )
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
 })
 
-test('WHAT[VERIFICATION-SYSTEM-008] generated Fable scratch projects are never freshness inputs', () => {
-  const root = mkdtempSync(join(tmpdir(), 'wanxiang-build-scratch-ignore-'))
+test('WHAT[VERIFICATION-SYSTEM-008] untracked new production source fails compile-shard inventory', () => {
+  const root = mkdtempSync(join(tmpdir(), 'wanxiang-untracked-source-'))
   try {
-    const productionRoot = join(root, 'src')
-    const source = join(productionRoot, 'Main.fs')
-    const scratch = join(productionRoot, '.fable-build', 'fingerprint', 'Wanxiangshu.Impact.fsproj')
-    mkdirSync(join(productionRoot, '.fable-build', 'fingerprint'), { recursive: true })
-    writeFileSync(source, 'module Main\n', 'utf8')
-    writeFileSync(scratch, '<Project />\n', 'utf8')
+    const sourceRoot = join(root, 'src/Wanxiangshu')
+    mkdirSync(sourceRoot, { recursive: true })
+    const aggregate = join(sourceRoot, 'Wanxiangshu.fsproj')
+    const trackedSource = join(sourceRoot, 'Tracked.fs')
+    const untrackedSource = join(sourceRoot, 'Untracked.fs')
 
-    assert.deepEqual(
-      collectBuildInputs({ productionRoot, repositoryInputs: [] }),
-      [source],
+    writeFileSync(trackedSource, 'module Tracked\n', 'utf8')
+    writeFileSync(untrackedSource, 'module Untracked\n', 'utf8')
+
+    writeFileSync(aggregate, `<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuEmitProject>true</WanxiangshuEmitProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Tracked.fs"/>
+  </ItemGroup>
+</Project>\n`, 'utf8')
+
+    assert.throws(
+      () => assertProductionSourcesAssigned({
+        repositoryRoot: root,
+        sourceRoot,
+        aggregatePath: aggregate,
+        discoveredSources: new Set([trackedSource, untrackedSource]),
+        shardImplementations: new Set([trackedSource]),
+      }),
+      /production source coverage mismatch/,
     )
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
-})
-
-test('WHAT[VERIFICATION-SYSTEM-008] release build performs one clean full compile and never accepts watch-daemon freshness guesses', () => {
-  const build = readFileSync(new URL('../../../scripts/build.mjs', import.meta.url), 'utf8')
-  const ownerCompile = readFileSync(new URL('../../../scripts/lib/owner-compile.mjs', import.meta.url), 'utf8')
-
-  assert.match(
-    build,
-    /resetOutputDirectory\(dist\)[\s\S]*compileIncremental/,
-    'release build must reset dist before invoking the unified compiler',
-  )
-  assert.match(
-    ownerCompile,
-    /'tool',[\s\S]*'run',[\s\S]*'fable',[\s\S]*'-c',[\s\S]*'Debug'/,
-    'incremental compile must preserve the established Debug configuration',
-  )
-  assert.doesNotMatch(build, /FableBarrier|fable-daemon|fable-cycle-ack|['"]--watch['"]/)
-  assert.doesNotMatch(ownerCompile, /FableBarrier|fable-daemon|fable-cycle-ack|['"]--watch['"]/)
 })
 
 test('WHAT[VERIFICATION-SYSTEM-008] release output reset physically removes stale artifacts', () => {
@@ -110,19 +227,4 @@ test('WHAT[VERIFICATION-SYSTEM-008] release output reset physically removes stal
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
-})
-
-test('WHAT[VERIFICATION-SYSTEM-008] incremental build manages clean artifact state and cleans invalid output', () => {
-  const ownerCompile = readFileSync(new URL('../../../scripts/lib/owner-compile.mjs', import.meta.url), 'utf8')
-
-  assert.match(
-    ownerCompile,
-    /removeSuccessMarker\(materialized\.markerPath\)/,
-    'invalid marker must be removed on dirty compile',
-  )
-  assert.match(
-    ownerCompile,
-    /removeOutputDirectory\(materialized\.outputPath\)/,
-    'a failed or dirty compile must clean output directory to avoid stale JS modules',
-  )
 })

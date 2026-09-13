@@ -320,28 +320,45 @@ export const scanRepo = (repoRoot = process.cwd(), catalogOverrides) => {
   return { ok: violations.length === 0, violations, semanticDirs }
 }
 
-const formatViolation = (v) => {
-  const detail = v.detail ? ` — ${v.detail}` : ''
-  return `  ${v.path}: ${v.code}${detail}`
+export function check(context) {
+  const root = context?.root ?? process.cwd()
+  const result = scanRepo(root)
+  return {
+    issues: result.violations.map((v) => ({
+      code: v.code,
+      path: v.path,
+      message: v.detail ?? v.code,
+    })),
+    semanticDirs: result.semanticDirs,
+    ok: result.ok,
+  }
 }
 
-const runCli = () => {
-  const result = scanRepo()
+export function runCli() {
+  const result = check()
   if (result.ok) {
     console.log(
       `language-parity-gate: OK — ${result.semanticDirs.length} semantic resource(s); ` +
         'each has en.md + zh-CN.md; protocol identifiers match; ' +
         'placeholders match',
     )
-    process.exit(0)
+    return 0
   }
-  console.error(`language-parity-gate: ${result.violations.length} violation(s)\n`)
-  for (const v of result.violations) console.error(formatViolation(v))
-  process.exit(1)
+  console.error(`language-parity-gate: ${result.issues.length} violation(s)\n`)
+  for (const v of result.issues) console.error(`  ${v.path}: ${v.code}${v.message ? ` — ${v.message}` : ''}`)
+  return 1
+}
+
+const formatViolation = (v) => {
+  const detail = v.detail ? ` — ${v.detail}` : ''
+  return `  ${v.path}: ${v.code}${detail}`
 }
 
 const isMain =
   process.argv[1] !== undefined &&
   resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1])
 
-if (isMain) runCli()
+if (isMain) {
+  const code = runCli()
+  if (code !== 0) process.exit(code)
+}

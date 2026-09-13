@@ -8,7 +8,7 @@ import { WATCHDOG_TIMEOUT_MS } from '../e2e/support/time-budget.js'
 import { superviseNodeTest } from '../e2e/support/supervise-node-test.mjs'
 import { assessIntegrationEntryCoverage } from '../support/integration-entry-coverage.mjs'
 import { discoverSuiteTests } from '../support/discover-suite-tests.mjs'
-import { integrationNodeTestSteps } from '../support/integration-node-test-steps.mjs'
+import { integrationNodeTestSteps, selectIntegrationSteps } from '../support/integration-node-test-steps.mjs'
 import { walk } from '../../../../scripts/lib/walk.mjs'
 
 process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
@@ -35,7 +35,7 @@ const INTEGRATION_PER_TEST_TIMEOUT_MS = Math.max(
   15_000,
 )
 
-const nodeTestSteps = integrationNodeTestSteps(root)
+const nodeTestSteps = process.env.WXS_RELEASE === '1' ? integrationNodeTestSteps(root) : selectIntegrationSteps(root)
 
 const childSteps = [
   {
@@ -56,7 +56,7 @@ const childOwnedIntegrationTests = discoverSuiteTests(packageIntegrationDir).map
 const discoveredIntegrationTests = walk(path.join(root, 'requirements'), ['.test.mjs'])
   .map(normalize)
   .filter((file) => file.includes('/tests/integration/'))
-const wiredIntegrationTests = nodeTestSteps.flatMap((step) => step.files.map(normalize))
+const wiredIntegrationTests = integrationNodeTestSteps(root).flatMap((step) => step.files.map(normalize))
 const entryCoverage = assessIntegrationEntryCoverage({
   discoveredTests: discoveredIntegrationTests,
   wiredTests: wiredIntegrationTests,

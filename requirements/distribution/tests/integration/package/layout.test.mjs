@@ -1,6 +1,6 @@
-// requirements/distribution/tests/integration/package/install.test.mjs — package layout as shipped.
+// requirements/distribution/tests/integration/package/layout.test.mjs — package layout as shipped.
 //
-// Assumes this package is already installed for the workspace (no npm install in tests).
+// Assumes this package is already installed for the workspace (workspace layout checks; no npm install in tests).
 // Asserts the on-disk package root matches what a consumer would get from `files` + main.
 
 import assert from 'node:assert/strict'
@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url'
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../..')
 const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'))
 
-test('WHAT[DISTRIBUTION-003] PACKAGE_install_layout_matches_manifest_and_main', () => {
+test('WHAT[DISTRIBUTION-003] PACKAGE_layout_matches_manifest_and_main', () => {
   assert.equal(pkg.name, 'wanxiangshu')
   assert.ok(Array.isArray(pkg.files), 'package.json files whitelist must exist')
   assert.ok(pkg.files.includes('dist/') || pkg.files.includes('dist'), 'files must include dist/')

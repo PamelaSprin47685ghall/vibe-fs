@@ -149,29 +149,37 @@ export const degradationCases = [
       );
 
       const pkg = JSON.parse(readSource('package.json'));
-      const pipeline = pkg.scripts?.['format-build-test'];
+      const dailyPipeline = pkg.scripts?.['format-build-test'];
+      const releasePipeline = pkg.scripts?.['verify:release'];
       assertTrue(
-        typeof pipeline === 'string' && pipeline.includes('tests/e2e/entry.test.mjs'),
-        'package.json format-build-test must point at tests/e2e/entry.test.mjs',
+        typeof dailyPipeline === 'string' && dailyPipeline.includes('verify.mjs'),
+        'package.json format-build-test must dispatch to scripts/verify.mjs',
       );
       assertTrue(
-        typeof pipeline === 'string' && !pipeline.includes('requirements/verification-system/tests/e2e/run.mjs'),
-        'package.json format-build-test must not target the retired multi-canary launcher',
+        typeof releasePipeline === 'string' && releasePipeline.includes('verify.mjs'),
+        'package.json verify:release must dispatch to scripts/verify.mjs',
       );
       assertTrue(
-        typeof pipeline === 'string' && !pipeline.includes('--repeat'),
-        'format-build-test must not reintroduce a --repeat release-gate pool',
+        !dailyPipeline.includes('tests/e2e/run.mjs') && !dailyPipeline.includes('requirements/verification-system/tests/e2e/run.mjs'),
+        'no retired multi-canary launcher',
       );
-      const integrationAt = typeof pipeline === 'string' ? pipeline.indexOf('tests/integration/run.mjs') : -1;
-      const e2eAt = typeof pipeline === 'string' ? pipeline.indexOf('tests/e2e/entry.test.mjs') : -1;
+      assertTrue(!dailyPipeline.includes('--repeat'), 'format-build-test must not reintroduce a --repeat release-gate pool');
+
+      const verifySource = readSource('scripts/verify.mjs');
+      const integrationAt = verifySource.indexOf('tests/integration/run.mjs');
+      const e2eAt = verifySource.indexOf('tests/e2e/entry.test.mjs');
       assertTrue(
         integrationAt >= 0 && e2eAt >= 0 && integrationAt < e2eAt,
-        'format-build-test must run the integration owner before Long Stroke e2e',
+        'verify.mjs must run integration before Long Stroke e2e',
       );
-      assertTrue(!pipeline.includes('warmup-opencode.mjs'), 'format-build-test must not duplicate integration warmup');
       assertTrue(
-        !pipeline.includes('distribution/tests/integration/package/run.mjs'),
-        'format-build-test must not duplicate the integration-owned package child',
+        verifySource.includes('tests/e2e/entry.test.mjs') && !verifySource.includes('tests/e2e/run.mjs'),
+        'the sole e2e step must remain entry.test.mjs, not the retired multi-canary launcher',
+      );
+      const packageAt = verifySource.indexOf('verify-package.mjs');
+      assertTrue(
+        packageAt >= 0 && e2eAt < packageAt,
+        'release must run verify-package after the Long Stroke',
       );
 
       const integration = readSource('requirements/verification-system/tests/integration/run.mjs');

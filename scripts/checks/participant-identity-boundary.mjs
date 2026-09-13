@@ -145,13 +145,18 @@ export const scanRepo = (root = process.cwd()) => {
  * @param {{ sourceFiles?: () => string[], readText?: (path: string) => string }} context
  */
 export function check(context) {
-  const root = process.cwd()
+  const root = context?.root ?? process.cwd()
   let entries
   if (context && typeof context.sourceFiles === 'function' && typeof context.readText === 'function') {
     const files = context.sourceFiles().filter((f) => normalize(f).startsWith(SOURCE_ROOT) && f.endsWith('.fs'))
     entries = files.map((file) => ({
       file: normalize(file),
       text: context.readText(file),
+    }))
+  } else if (context && typeof context.productionFiles === 'function') {
+    entries = context.productionFiles().filter((f) => f.file.endsWith('.fs')).map((f) => ({
+      file: normalize(f.file),
+      text: f.text ?? context.readText(f.file),
     }))
   } else {
     entries = collectEntries(root)

@@ -42,9 +42,8 @@ const inside = (root, target) => {
   return path === '' || (!path.startsWith('..') && !isAbsolute(path))
 }
 
-export function validateModuleLinkage(distRoot) {
+export function validateModuleLinkage(distRoot, files = walk(resolve(distRoot), ['.js'])) {
   const root = resolve(distRoot)
-  const files = walk(root, ['.js'])
   const programs = new Map()
   const exportsByFile = new Map()
   const violations = []
@@ -96,18 +95,49 @@ export function validateModuleLinkage(distRoot) {
   return violations.sort()
 }
 
-export function run({ root = process.cwd() } = {}) {
+export function check(context) {
+  const root = context?.root ?? process.cwd()
   const distRoot = resolve(root, 'dist')
   const violations = validateModuleLinkage(distRoot)
+  return {
+    issues: violations.map((v) => ({
+      code: 'js-module-linkage',
+      message: v,
+    })),
+  }
+}
+
+export function runCli(argv = process.argv.slice(2)) {
+  const root = process.cwd()
+  const distRoot = resolve(root, 'dist')
+  const files = walk(distRoot, ['.js'])
+  const violations = validateModuleLinkage(distRoot, files)
+
   if (violations.length > 0) {
+    violations.sort()
     console.error(`js-module-linkage: FAILED — ${violations.length} violation(s)`)
     for (const violation of violations) console.error(`  ${violation}`)
     return 1
   }
-  console.log(`js-module-linkage: OK — ${walk(distRoot, ['.js']).length} emitted modules linked`)
+  console.log(`js-module-linkage: OK — ${files.length} emitted modules linked`)
+  return 0
+}
+
+export function run({ root = process.cwd() } = {}) {
+  const distRoot = resolve(root, 'dist')
+  const files = walk(distRoot, ['.js'])
+  const violations = validateModuleLinkage(distRoot, files)
+
+  if (violations.length > 0) {
+    violations.sort()
+    console.error(`js-module-linkage: FAILED — ${violations.length} violation(s)`)
+    for (const violation of violations) console.error(`  ${violation}`)
+    return 1
+  }
+  console.log(`js-module-linkage: OK — ${files.length} emitted modules linked`)
   return 0
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  process.exitCode = run()
+  process.exitCode = runCli()
 }

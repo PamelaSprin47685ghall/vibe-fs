@@ -517,17 +517,7 @@ export function planImpactCompile({
       continue
     }
 
-    const extension = path.extname(changedPath).toLowerCase()
-    const siblingSignature = extension === '.fs' ? `${changedPath.slice(0, -3)}.fsi` : null
-    const signatureChanged = extension === '.fsi'
-      || (siblingSignature !== null && changedSet.has(siblingSignature))
-      || (siblingSignature !== null && !fs.existsSync(siblingSignature))
-
-    if (signatureChanged) {
-      addReverseConsumers(ownerProject)
-    } else {
-      roots.add(ownerProject)
-    }
+    addReverseConsumers(ownerProject)
   }
 
   if (roots.size === 0) {
@@ -1092,22 +1082,55 @@ export function detectChangedFiles({
   const resolvedManifestPath = norm(manifestPath)
   const trackedFiles = collectTrackedInputs({ root, aggregatePath })
 
-  const essentialOutputs = [
-    path.join(resolvedOutputDir, 'OpenCode/Plugin/Plugin.js'),
-    path.join(resolvedOutputDir, 'Sphinx/ServeEntry.js'),
-  ]
-
-  const isProductionOutput = resolvedOutputDir === norm(path.resolve(root, 'dist'))
-  const hasOutputs = fs.existsSync(resolvedOutputDir)
-    && hasEmittedJsFiles(resolvedOutputDir)
-    && (!isProductionOutput || essentialOutputs.every((p) => fs.existsSync(p)))
-
   let manifest = null
   if (fs.existsSync(resolvedManifestPath)) {
     try {
       manifest = JSON.parse(fs.readFileSync(resolvedManifestPath, 'utf8'))
     } catch {
       manifest = null
+    }
+  }
+
+  let hasOutputs = false
+  if (fs.existsSync(resolvedOutputDir) && hasEmittedJsFiles(resolvedOutputDir)) {
+    if (manifest && manifest.outputs && typeof manifest.outputs === 'object') {
+      // Full dist walk comparison against manifest.outputs
+      const currentOutputs = {}
+      const walkFiles = (dir) => {
+        const entries = fs.readdirSync(dir, { withFileTypes: true })
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name)
+          if (entry.isDirectory()) {
+            walkFiles(fullPath)
+          } else if (entry.isFile()) {
+            const rel = path.relative(resolvedOutputDir, fullPath).replace(/\\/g, '/')
+            const stat = fs.statSync(fullPath)
+            const hash = computeFileHash(fullPath)
+            currentOutputs[rel] = [hash, stat.size, stat.mtimeMs]
+          }
+        }
+      }
+      try {
+        walkFiles(resolvedOutputDir)
+        const recordedKeys = Object.keys(manifest.outputs)
+        const currentKeys = Object.keys(currentOutputs)
+        if (
+          recordedKeys.length > 0 &&
+          recordedKeys.length === currentKeys.length &&
+          recordedKeys.every((k) => currentOutputs[k] && currentOutputs[k][0] === manifest.outputs[k][0])
+        ) {
+          hasOutputs = true
+        }
+      } catch {
+        hasOutputs = false
+      }
+    } else {
+      const essentialOutputs = [
+        path.join(resolvedOutputDir, 'OpenCode/Plugin/Plugin.js'),
+        path.join(resolvedOutputDir, 'Sphinx/ServeEntry.js'),
+      ]
+      const isProductionOutput = resolvedOutputDir === norm(path.resolve(root, 'dist'))
+      hasOutputs = !isProductionOutput || essentialOutputs.every((p) => fs.existsSync(p))
     }
   }
 
@@ -1187,7 +1210,6 @@ export async function compileIncremental({
 
   let effectiveChangedPaths
   let isClean = false
-  let currentFilesCache = null
 
   if (Array.isArray(changedPaths)) {
     effectiveChangedPaths = [...new Set(changedPaths.map((p) => norm(p)))].sort()
@@ -1200,7 +1222,19 @@ export async function compileIncremental({
     })
     effectiveChangedPaths = detection.changedPaths
     isClean = detection.isCleanBuild
-    currentFilesCache = detection.currentFiles
+  }
+
+  const buildSnapshot = () => {
+    const tracked = collectTrackedInputs({ root, aggregatePath: resolvedAggregate })
+    const map = {}
+    for (const f of tracked) {
+      if (fs.existsSync(f)) {
+        const stat = fs.statSync(f)
+        const sha256 = computeFileHash(f)
+        map[f] = { path: f, sha256, hash: sha256, mtimeMs: stat.mtimeMs, size: stat.size }
+      }
+    }
+    return map
   }
 
   // Fast no-op cache hit when no changed paths
@@ -1218,6 +1252,8 @@ export async function compileIncremental({
         elapsedMs: 0,
         cached: true,
         outputPath: targetOutputDir,
+        fingerprint: null,
+        snapshot: buildSnapshot(),
       }
     }
     // If output is missing despite no changed paths, trigger clean compile
@@ -1245,6 +1281,8 @@ export async function compileIncremental({
       elapsedMs: 0,
       cached: true,
       outputPath: targetOutputDir,
+      fingerprint: null,
+      snapshot: buildSnapshot(),
     }
   }
 
@@ -1270,44 +1308,12 @@ export async function compileIncremental({
     spawn,
   })
 
-  if (result.ok) {
-    // Record successful build manifest
-    try {
-      const files = currentFilesCache ?? (() => {
-        const tracked = collectTrackedInputs({ root, aggregatePath: resolvedAggregate })
-        const map = {}
-        for (const f of tracked) {
-          if (fs.existsSync(f)) {
-            const stat = fs.statSync(f)
-            map[f] = { mtimeMs: stat.mtimeMs, size: stat.size, hash: computeFileHash(f) }
-          }
-        }
-        return map
-      })()
-
-      const manifestPayload = JSON.stringify({
-        schema: SCHEMA_VERSION,
-        timestamp: Date.now(),
-        aggregatePath: resolvedAggregate,
-        outputDir: result.outputPath,
-        mode: plan.mode,
-        files,
-      }, null, 2)
-
-      fs.mkdirSync(path.dirname(resolvedManifestPath), { recursive: true })
-      const tmpPath = `${resolvedManifestPath}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`
-      fs.writeFileSync(tmpPath, manifestPayload, 'utf8')
-      fs.renameSync(tmpPath, resolvedManifestPath)
-    } catch {
-      // Manifest write non-fatal
-    }
-  }
-
   return {
     ...result,
     mode: plan.mode,
     reason: plan.reason,
     changedPaths: effectiveChangedPaths,
     compileItems: plan.compileItems,
+    snapshot: buildSnapshot(),
   }
 }

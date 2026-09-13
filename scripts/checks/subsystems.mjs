@@ -87,6 +87,34 @@ export function buildSubsystemInventory({ compileInventory = readCompileShardInv
   }
 }
 
+export function check(context) {
+  const root = context?.root ?? ROOT
+  const policyPath = resolve(root, 'scripts/checks/subsystems.json')
+  const compileInventory = context?.compileInventory ? context.compileInventory() : readCompileShardInventory({ repositoryRoot: root })
+  const policyState = readSubsystemPolicy(policyPath)
+  const result = buildSubsystemInventory({ compileInventory, policyState })
+  return {
+    issues: result.violations.map((v) => ({
+      code: 'subsystems-violation',
+      message: v,
+    })),
+    // Retain full metadata on the result object for consumers
+    ...result,
+  }
+}
+
+export function runCli(argv) {
+  const result = check()
+  if (result.issues.length > 0) {
+    console.error(`subsystems: FAILED — ${result.issues.length} violation(s)`)
+    for (const issue of result.issues) console.error(`  ${issue.message}`)
+    return 1
+  }
+  const cycle = result.largestSubsystemCycle?.length > 1 ? `, largest subsystem cycle=${result.largestSubsystemCycle.length}` : ''
+  console.log(`subsystems: OK — ${result.subsystemCount} subsystems, ${result.shardCount} compile shards, ${result.sourceCount} sources, ${result.projectReferenceCount} refs, shard DAG${cycle}`)
+  return 0
+}
+
 export function checkSubsystems() {
   try {
     return buildSubsystemInventory()
@@ -96,12 +124,6 @@ export function checkSubsystems() {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const result = checkSubsystems()
-  if (!result.ok) {
-    console.error(`subsystems: FAILED — ${result.violations.length} violation(s)`)
-    for (const violation of result.violations) console.error(`  ${violation}`)
-    process.exit(1)
-  }
-  const cycle = result.largestSubsystemCycle.length > 1 ? `, largest subsystem cycle=${result.largestSubsystemCycle.length}` : ''
-  console.log(`subsystems: OK — ${result.subsystemCount} subsystems, ${result.shardCount} compile shards, ${result.sourceCount} sources, ${result.projectReferenceCount} refs, shard DAG${cycle}`)
+  const code = runCli(process.argv.slice(2))
+  if (code !== 0) process.exit(code)
 }

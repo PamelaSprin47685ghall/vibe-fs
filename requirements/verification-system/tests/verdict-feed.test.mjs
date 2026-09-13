@@ -52,7 +52,7 @@ test('WHAT[VERIFICATION-SYSTEM-006] scheduling noise is not fed at all', () => {
   // `null` rather than a background default. `test:enqueue` and `test:dequeue` fire per test before
   // anything has happened, so defaulting unknown events to background would fill the watchdog dump's
   // "last background progress" line with scheduling noise and point the reader at the wrong lane.
-  for (const type of ['test:enqueue', 'test:dequeue', 'test:start', 'test:plan', 'inner:drained']) {
+  for (const type of ['test:enqueue', 'test:dequeue', 'test:start', 'test:plan', 'inner:drained', 'runner:error']) {
     assert.equal(classifyVerdict(event(type, { file: 'x.mjs' })), null, `${type} must not be fed`)
   }
 

@@ -26,7 +26,7 @@ import { tmpdir } from 'node:os'
 import { pathToFileURL } from 'node:url'
 
 import { run } from 'node:test'
-import { spec } from 'node:test/reporters'
+import { createCompactReporter } from './compact-reporter.mjs'
 
 import {
   COVERAGE_EXCLUDE_GLOBS,
@@ -167,7 +167,8 @@ for (const type of [
   })
 }
 
-stream.compose(spec).pipe(process.stdout)
+const compactReporter = createCompactReporter()
+stream.compose(compactReporter).pipe(process.stdout)
 
 let coverageSummary = null
 if (withCoverage) {
@@ -176,11 +177,29 @@ if (withCoverage) {
   })
 }
 
-// `end` may never arrive — measured, see the header. So this awaits it without treating its absence
-// as an error: when it does not come, the parent's silence window is what ends the run.
-await new Promise((resolve) => {
-  stream.on('end', resolve)
-  stream.on('error', resolve)
+let streamError = null
+let streamDrained = false
+
+await new Promise((resolve, reject) => {
+  stream.on('end', () => {
+    streamDrained = true
+    resolve()
+  })
+  stream.on('error', (err) => {
+    streamError = err
+    process.send?.({
+      type: 'runner:error',
+      data: {
+        name: err?.name ?? 'StreamError',
+        message: err?.message ?? String(err),
+        stack: err?.stack,
+      },
+    })
+    reject(err)
+  })
+}).catch((err) => {
+  console.error(`run-inner: stream error: ${err?.message ?? err}`)
+  process.exitCode = 1
 })
 
 if (withCoverage) {
@@ -200,4 +219,6 @@ if (withCoverage) {
   }
 }
 
-process.send?.({ type: 'inner:drained' })
+if (streamDrained && !streamError) {
+  process.send?.({ type: 'inner:drained' })
+}
