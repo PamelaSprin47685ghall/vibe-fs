@@ -2,7 +2,7 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
-- 事故处置：git-hook 集成默认关闭（首次 durable admission 激活时不再安装 `reference-transaction` / `pre-push` 钩子，因而不再启动 ref 触发的 converge），待 hang 定位完成；`WANXIANG_GIT_SYNC=1` 恢复安装。仓库内已安装的两个 `Wanxiangshu HookDispatcher` 钩子已移除。事件真值仍为 `.git/wanxiang/events/<WriterId>.ndjson`，本地追加不受影响。
+- 事故：首条消息 hang。根因是 git `pre-push` 钩子进程（`resources/git/wanxiang-hook.mjs pre-push`）在 push 结束后成为孤儿（PPID 1）并卡住，但仍持有 `.git/wanxiang.lock`（`owner.json` 指向该活进程）；`ProcessEventLog.acquireStoreLock` 只在 owner pid 死亡时才判定陈旧，且以 `retries.forever` 等待，因此之后每次 durable 激活（首条消息）永久阻塞。处置：杀掉孤儿钩子进程并释放锁（本仓库实测锁1ms 可获取），git-hook 集成默认关闭（`WANXIANG_GIT_SYNC=1` 才安装），仓库内两个 `Wanxiangshu HookDispatcher` 钩子已移除；事件真值仍为 `.git/wanxiang/events/<WriterId>.ndjson`，本地追加不受影响。待办：钩子内的 converge 不得跨网络 I/O 持锁且必须有超时，`acquireStoreLock` 应有界重试并给强类型诊断。
 - 修复 HostInternal 分类误把带 synthetic 回显 part 的真实用户消息（TUI @-文件提及）视为纯 Host 合成提示，导致跳过受管 admission/模型投影、`cursor/auto` 残留并使 `chat.params` 以 PROMPT-006 drift fail-closed 的 def 缺：synthetic 判定收紧为整条消息所有 part 均为 `synthetic:true` 才归 HostInternal；INTERACTION-AUTHORITY HOW 补充混存消息约定；新增 `MISC_ingress_host_synthetic_requires_fully_injected_material` 回归测试，真实 wire payload 端到端复验为 `ExternalRootIntent` 进受管路径。
 - 审计并移除 `mission-relay-suicidetool` 与 `foundation-temporal` 对 `chat-execution/outcome` 的 2 条冗余跨 subsystem ProjectReference，彻底切断 `relay -> chat-execution` 与 `process -> chat-execution` 两条跨子系统边，全仓声明引用数降至 1874，全部通过独立 Fable 聚焦编译及消费者闭包验证。
 - 清理 `Distillation.fs` 与 `DistillationRuntime.fs` 中未使用的 `Strength` 命名空间引入，将 `process-largegatesurface` 对 `host-digest` 的宽引用收窄为 `runtime-platform/digest`，并移除其对 `execution-session-recovery-model` 与 `process-processrequest` 的 2 条冗余跨 subsystem ProjectReference，全仓声明引用数降至 1876，全部通过独立 Fable 聚焦编译及消费者闭包验证。
