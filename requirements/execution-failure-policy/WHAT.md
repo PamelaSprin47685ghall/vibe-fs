@@ -90,3 +90,7 @@ operator abort → `UserCancelled`，supersede → `Superseded`（CRASH-008 / HO
 所有生产 fatal 入口及转入该入口的边界必须纳入可检查清单。每处记录触发前提、所属状态、不可达证明或实际回归；新增入口、入口漂移和缺失证据必须使标准验证失败。性质测试调用编译后的生产实现，固定 seed 并允许重放反例；测试自造的决策模型不能代替生产实现证据。
 
 协议修复耗尽、过期回调、确定未发送和运行环境拒绝不得仅因“开发时没预料”成为 LocalInvariant。可达失败必须由所属请求或资源明确收敛；不释放其他请求的所有权，不重发 outcome unknown 的 effect，不在 fatal 后安排结算。保留的不变量熔断仍须满足 EXECFAIL-006。
+
+## EXECFAIL-011: 未分类 hook 失败必须携带自有证据
+
+hook 抛出的不可识别异常不拥有"无已接受事实、无所属执行"的免费推定。边界只能从 hook 实参证明执行身份（`sessionID` 字段或 output.messages 单一会话 + 末尾物理用户消息），能证明则以该 `ChatExecutionKey` 下发 `SettlementIncomplete`，后续处置交由相应 phase 的 settlement owner，不补造执行已干净的记录；不能证明则 key 保持 None。未知类别不升级为 process fatal，也不降级为可重试 provider 噪音——它作为不变的 rethrow 信号交给 Host，fatal 决策保留给证据齐全的 phase。

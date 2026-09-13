@@ -27,6 +27,18 @@ module PluginHooksSurface =
     let providerInputRejection message : obj =
         MagicTodoHostCodec.ProviderInputRejection message
 
+    /// Classify a thrown JS value through the real failure membrane and expose
+    /// the normalized outcome fields (failure kind, lifecycle, settlement
+    /// evidence, whether hook args proved an owned execution).
+    let normalizeHookFailureOutcome (args: obj) (context: obj) (error: obj) : obj =
+        let outcome = PluginHostInterop.normalizeHookFailure args context error
+
+        box
+            {| failure = sprintf "%A" outcome.Failure
+               lifecycle = sprintf "%A" outcome.Lifecycle
+               settlement = sprintf "%A" outcome.Settlement
+               hasExecutionKey = outcome.ExecutionKey.IsSome |}
+
     let hookFailurePolicy failure settlement : string =
         let typedFailure =
             match failure with

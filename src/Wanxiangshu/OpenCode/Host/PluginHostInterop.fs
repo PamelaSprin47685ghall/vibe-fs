@@ -90,6 +90,64 @@ module PluginHostInterop =
 
     let private emitFatalRecord operation error =
         Diagnostic.fatal operation [ "result", diagnosticErrorText error ]
+    /// Exact execution identity recoverable from the hook arguments themselves.
+    /// Session comes from a `sessionID` field (tool hooks, event/tool input) or
+    /// from the trailing transcript's single session; the physical user message
+    /// id is read from the host `output.messages`/`messages` transcript.
+    /// A hook whose arguments carry neither has no provable owned execution:
+    /// None is honest, a fabricated identity is not.
+    let private nonEmptyText (value: obj) : string option =
+        if isNull value then
+            None
+        else
+            match string value with
+            | text when String.IsNullOrWhiteSpace text -> None
+            | text -> Some text
+
+    [<Emit("$0 == null ? undefined : $0[$1]")>]
+    let private fieldValue (carrier: obj) (name: string) : obj = jsNative
+
+    let private messagesArrayOf (value: obj) : obj list =
+        if isNull value || isNull (fieldValue value "messages") then
+            []
+        else
+            try
+                unbox<obj array> (fieldValue value "messages") |> Array.toList
+            with _ ->
+                []
+
+    let private transcriptOf (args: obj) (context: obj) : obj list =
+        [ fieldValue context "output"; fieldValue args "output"; context; args ]
+        |> List.map messagesArrayOf
+        |> List.tryFind (fun transcript -> not (List.isEmpty transcript))
+        |> Option.defaultValue []
+
+    let private hookSessionId (args: obj) (context: obj) : string option =
+        [ args; fieldValue args "input"; context; fieldValue context "input" ]
+        |> List.map (fun carrier -> fieldValue carrier "sessionID")
+        |> List.tryPick nonEmptyText
+        |> Option.orElseWith (fun () ->
+            [ fieldValue context "output"; context; fieldValue args "output"; args ]
+            |> List.tryPick (fun carrier ->
+                if isNull carrier then
+                    None
+                else
+                    ProviderWireDecode.projectionSessionIdFromMessages carrier))
+
+    /// Execution identity PROVABLE from hook arguments alone: session id plus
+    /// the transcript's trailing physical user message. Absent evidence ⇒ None,
+    /// never a guessed key.
+    let internal hookArgumentsKey (args: obj) (context: obj) : ChatExecutionKey option =
+        match hookSessionId args context with
+        | None -> None
+        | Some session ->
+            ProviderWireCapture.lastUserMessageId (transcriptOf args context)
+            |> Option.map (fun physical ->
+                { SessionId = SessionId.create session
+                  PhysicalUserMessageId = physical })
+
+
+
 
     /// Host hook whose F# value stayed CURRIED after compilation.
     /// Keep this arity adaptation as a direct Emit call at the registration site:
@@ -292,19 +350,21 @@ module PluginHostInterop =
         | FatalityDecision.FatalAfterSettlement, HookSettlementEvidence.SettlementIncomplete, false ->
             HookFailurePolicy.RejectFatalBeforeSettlement
 
-    let internal normalizeHookFailure (error: obj) =
+    let internal normalizeHookFailure (args: obj) (context: obj) (error: obj) =
+        let key = hookArgumentsKey args context
+
         match error with
         | :? JournalAppendException as persistence ->
             let failure, settlement = persistenceOutcome persistence.Failure
 
             { Failure = failure
               Lifecycle = lifecycleAfterFailedTransaction settlement
-              ExecutionKey = None
+              ExecutionKey = key
               Settlement = settlement }
         | :? MagicTodoHostCodec.ProviderInputRejection ->
             { Failure = ExecutionFailure.ProtocolRejection
               Lifecycle = DurableExecutionLifecycle.NoAcceptedFact
-              ExecutionKey = None
+              ExecutionKey = key
               Settlement = HookSettlementEvidence.NoOwnedExecution }
         | :? HostSignalBootstrap.ChatAdmissionHookException as managed ->
             let failure, lifecycle, settlement = managedFailure managed.Failure
@@ -314,21 +374,30 @@ module PluginHostInterop =
               ExecutionKey = managed.ExecutionKey
               Settlement = settlement }
         | _ ->
+            // Unclassifiable: the hook's own args are the only honest evidence.
+            // A key proves an owned execution, so its settlement is incomplete
+            // until proven — never fabricated as NoAcceptedFact/NoOwnedExecution.
             { Failure = ExecutionFailure.LocalInvariant
-              Lifecycle = DurableExecutionLifecycle.NoAcceptedFact
-              ExecutionKey = None
-              Settlement = HookSettlementEvidence.NoOwnedExecution }
 
-    let private handleHookFailure operation error =
-        let outcome = normalizeHookFailure error
+              Lifecycle = DurableExecutionLifecycle.AcceptedBeforeProvider
+              ExecutionKey = key
+              Settlement = HookSettlementEvidence.SettlementIncomplete }
+
+    let private handleHookFailure operation args context error =
+        let outcome = normalizeHookFailure args context error
 
         match interpretHookFailure outcome with
         | HookFailurePolicy.RethrowUnchanged
         | HookFailurePolicy.RejectFatalBeforeSettlement -> ()
         | HookFailurePolicy.FatalAfterSettlement -> emitFatalRecord operation error
 
-    [<Emit("(args, context) => { const handle = (err) => { $2($0, err); throw err; }; try { return Promise.resolve($1(args, context)).catch(handle); } catch (err) { return handle(err); } }")>]
-    let private guardedPolicyAwareHook (operation: string) (fn: obj) (onError: string -> obj -> unit) : obj = jsNative
+    [<Emit("(args, context) => { const handle = (err) => { $2($0, args, context, err); throw err; }; try { return Promise.resolve($1(args, context)).catch(handle); } catch (err) { return handle(err); } }")>]
+    let private guardedPolicyAwareHook
+        (operation: string)
+        (fn: obj)
+        (onError: string -> obj -> obj -> obj -> unit)
+        : obj =
+        jsNative
 
     let policyAwareHook (operation: string) (adaptedHook: obj) : obj =
         guardedPolicyAwareHook operation adaptedHook handleHookFailure

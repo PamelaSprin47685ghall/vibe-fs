@@ -16,6 +16,11 @@ module PluginHooksSurface =
 
     val providerInputRejection: message: string -> obj
 
+    /// Classify a thrown JS value through the real failure membrane: typed
+    /// failure kind, lifecycle, settlement evidence, and whether the hook
+    /// arguments proved an owned execution key.
+    val normalizeHookFailureOutcome: args: obj -> context: obj -> error: obj -> obj
+
     val hookFailurePolicy: failure: string -> settlement: string -> string
 
     /// Real Coordinator -> CompanionHost -> PromptDispatcher Host adapter. The

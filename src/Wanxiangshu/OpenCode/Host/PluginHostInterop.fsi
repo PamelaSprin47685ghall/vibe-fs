@@ -61,7 +61,9 @@ module PluginHostInterop =
 
     val internal interpretHookFailure: outcome: HookFailureOutcome -> HookFailurePolicy
 
-    val internal normalizeHookFailure: error: obj -> HookFailureOutcome
+    val internal hookArgumentsKey: args: obj -> context: obj -> ChatExecutionKey option
+
+    val internal normalizeHookFailure: args: obj -> context: obj -> error: obj -> HookFailureOutcome
 
     val policyAwareHook: operation: string -> adaptedHook: obj -> obj
 

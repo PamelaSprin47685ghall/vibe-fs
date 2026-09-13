@@ -66,26 +66,52 @@ test('WHAT[HOST-BOUNDARY-014] typed membrane catches async LocalInvariant and re
   assert.equal(caught.message, 'async-invariant-broken')
 })
 
-test('WHAT[HOST-BOUNDARY-014] typed membrane calls Diagnostic.fatal before rethrow', () => {
-  // The fatal membrane calls Diagnostic.fatal (which prints a JSON line to stderr)
-  // before rethrowing. We capture stderr to observe the fatal record without
-  // monkey-patching the module binding (which is captured at import time).
+test('WHAT[HOST-BOUNDARY-014] unclassifiable hook failure rethrows with unproven settlement, no fuse until evidence lands', () => {
+  // An unrecognized exception can no longer claim NoAcceptedFact/NoOwnedExecution:
+  // the policy must refuse to settle-as-fatal before the exact settlement is
+  // proven. The error itself still crosses to the Host (fail-loud): rethrown.
   const originalWrite = process.stderr.write.bind(process.stderr)
   const captured = []
   process.stderr.write = (chunk) => { captured.push(String(chunk)); return true }
   try {
     const wrapped = PluginHooksSurface.policyAwareHook('observed-op', () => { throw new Error('observed-error') })
-    try {
-      wrapped('a', 'b')
-    } catch (_) {
-      // expected rethrow
-    }
-    const fatalLine = captured.find((line) => line.includes('"operation":"observed-op"'))
-    assert.ok(fatalLine, 'Diagnostic.fatal must print a JSON line with the operation name')
-    assert.match(fatalLine, /"result":"observed-error"/)
+    assert.throws(() => wrapped('a', 'b'), /observed-error/)
+    assert.equal(
+      captured.some((line) => line.includes('"operation":"observed-op"')),
+      false,
+      'unproven settlement evidence holds the fuse; the hook error itself is the loud signal',
+    )
+    const outcome = PluginHooksSurface.normalizeHookFailureOutcome('a', 'b', new Error('observed-error'))
+    assert.equal(outcome.failure, 'LocalInvariant')
+    assert.equal(outcome.lifecycle, 'AcceptedBeforeProvider')
+    assert.equal(outcome.settlement, 'SettlementIncomplete')
+    assert.equal(outcome.hasExecutionKey, false)
   } finally {
     process.stderr.write = originalWrite
   }
+})
+
+test('WHAT[HOST-BOUNDARY-014] hook arguments supply the owned execution key instead of a fabricated no-evidence default', () => {
+  // A transform-class hook carries the physical execution in output.messages;
+  // tool/event hooks carry sessionID directly. Unclassifiable failures inherit
+  // that exact key — never the invented 'execution that owns nothing' shape.
+  const transcript = {
+    output: {
+      messages: [
+        { info: { id: 'msg-u-1', sessionID: 'ses-hook-1', role: 'user' }, parts: [] },
+      ],
+    },
+  }
+  const outcome = PluginHooksSurface.normalizeHookFailureOutcome({}, transcript, new Error('mid-transcript fault'))
+  assert.equal(outcome.failure, 'LocalInvariant')
+  assert.equal(outcome.hasExecutionKey, true)
+  assert.equal(outcome.settlement, 'SettlementIncomplete')
+
+  const toolArgs = { sessionID: 'ses-hook-tool' }
+  const toolOutcome = PluginHooksSurface.normalizeHookFailureOutcome(toolArgs, {}, new Error('tool fault'))
+  // The key needs a physical user message; a sessionID alone proves session
+  // scope but not the exact execution — fields stay honest.
+  assert.equal(toolOutcome.hasExecutionKey, false)
 })
 
 test('WHAT[HOST-BOUNDARY-014] typed ProtocolRejection rethrows unchanged without Diagnostic.fatal', async () => {
@@ -106,7 +132,7 @@ test('WHAT[HOST-BOUNDARY-014] typed ProtocolRejection rethrows unchanged without
   }
 })
 
-test('WHAT[HOST-BOUNDARY-014] unpublished rejection shape fails closed as LocalInvariant', async () => {
+test('WHAT[HOST-BOUNDARY-014] unpublished rejection shape rethrows with unproven settlement, not a fabricated no-ownership claim', async () => {
   const originalWrite = process.stderr.write.bind(process.stderr)
   const captured = []
   process.stderr.write = (chunk) => { captured.push(String(chunk)); return true }
@@ -117,7 +143,11 @@ test('WHAT[HOST-BOUNDARY-014] unpublished rejection shape fails closed as LocalI
     )
 
     await assert.rejects(() => wrapped('args', 'ctx'), /invariant-broken/)
-    assert.equal(captured.some((line) => line.includes('"operation":"tool-before-invariant-test"')), true)
+    assert.equal(
+      captured.some((line) => line.includes('"operation":"tool-before-invariant-test"')),
+      false,
+      'unclassifiable hook failure holds the fuse: settlement is unproven, not assumed clean',
+    )
   } finally {
     process.stderr.write = originalWrite
   }
