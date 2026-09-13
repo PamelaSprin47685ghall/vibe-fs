@@ -4,6 +4,7 @@ open System.Threading.Tasks
 open Fable.Core
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.OpenCode
 
 module ReconcilePass =
@@ -69,12 +70,16 @@ module ReconcilePass =
         |> Option.map (fun observed ->
             let publish = publishTurnOf observed
 
-            match ReconcileProgram.tryFailureWitnessReason wake publish with
-            | Some reason ->
+            match ReconcileProgram.tryFailureWitness wake publish with
+            | Some(failure, reason) when
+                ReconcileProgram.failureWitnessMintsTerminal
+                    failure
+                    (not (CompletedTurnClassifier.formalContentUnusable observed.Parts))
+                ->
                 { observed with
                     Outcome = ReconcileProgram.TurnFailed reason
                     Observation = None }
-            | None -> observed)
+            | _ -> observed)
 
     let private observeIfPresent
         (isCurrent: SessionId -> int -> bool)

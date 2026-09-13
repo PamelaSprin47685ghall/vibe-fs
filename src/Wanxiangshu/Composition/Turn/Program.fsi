@@ -64,6 +64,8 @@ module ReconcileProgram =
     val isTerminalOutcome: outcome: TurnOutcome -> bool
     val tryFailureWitness: wake: ReconcileWake -> turn: PublishTurn -> (ExecutionFailure * string) option
     val tryFailureWitnessReason: wake: ReconcileWake -> turn: PublishTurn -> string option
+
+    val failureWitnessMintsTerminal: failure: ExecutionFailure -> contentUsable: bool -> bool
     val decideStep: wake: ReconcileWake -> evidence: ReconcileEvidence -> ReconcileDecision
     val decisionName: decision: ReconcileDecision -> string
     val consumeKey: turn: PublishTurn -> string

@@ -131,6 +131,22 @@ delegate 只消费 verdict（`Ok unit` 保持调用 pending，`Error reason` 才
     resource recovery never starts provider recovery and never publishes a
     lazy requeue.
 
+12. **PAR-008 routing — unusable content is repair, not a provider failure**:
+    an attempt that reports an error while its formal visible text is unusable
+    (empty / XML-only, the shared `TerminalValidity` gate) is content damage.
+    `Interaction/Repair/CompletedTurn.fs` (`classifyErroredContent`) keeps it on
+    `TurnNeedsContinuation`, and
+    `Composition/Turn/ReconcilePass.fs` (`materializeFailureWitness` +
+    `ReconcileProgram.failureWitnessMintsTerminal`) refuses to mint a
+    provider-failure terminal unless the decoded class is a confirmed provider
+    class. The turn therefore reaches
+    `OrdinaryTurnWorkflow → InteractionRepairWorkflow.repairMissingFinalReport`
+    — the idle-gated repair nudge that replaces the dead-ended context before
+    the next physical attempt — and never advances the failure budget or reports
+    a terminal to the caller. A confirmed provider class (transient/permanent)
+    still terminalizes with the policy owning retry vs terminal, so ordinary
+    provider fallback is unchanged.
+
 ## Final production path
 
 - `src/Wanxiangshu/Participant/Provider/Attempt/FailureBudget.fs`
@@ -176,7 +192,7 @@ DEPENDS ON:
 | PAR-005 | `requirements/provider-attempt-recovery/tests/failure-budget.test.mjs::WHAT[PAR-005] the_default_automatic_retry_budget_is_twelve`; `requirements/provider-attempt-recovery/tests/provider-failure-ledger.test.mjs::WHAT[PAR-005] twelfth_failure_admission_is_retry_exhausted` |
 | PAR-006 | `requirements/provider-attempt-recovery/tests/retry-policy.test.mjs::WHAT[PAR-006] retry_keeps_fixed_participant_with_decoupled_model_routing` |
 | PAR-007 | `requirements/provider-attempt-recovery/tests/failure-budget.test.mjs::WHAT[PAR-007] each_rejection_names_a_different_cause` |
-| PAR-008 | `requirements/provider-attempt-recovery/tests/retry-policy.test.mjs::WHAT[PAR-008] an_invalid_terminal_earns_at_most_one_repair_and_never_advances` |
+| PAR-008 | `requirements/provider-attempt-recovery/tests/retry-policy.test.mjs::WHAT[PAR-008] an_invalid_terminal_earns_at_most_one_repair_and_never_advances`; `requirements/provider-attempt-recovery/tests/retry-policy.test.mjs::WHAT[PAR-008] an_errored_attempt_with_unusable_content_never_mints_a_provider_terminal` |
 | PAR-009 | `requirements/provider-attempt-recovery/tests/failure-budget.test.mjs::WHAT[PAR-009] the_domain_count_is_reachable_only_through_a_confirmed_failure` |
 | PAR-010 | `requirements/provider-attempt-recovery/tests/retry-policy.test.mjs::WHAT[PAR-010] blogger_retry_dispatch_selects_squash_when_material_exists_and_main_otherwise` |
 | PAR-011 | `requirements/provider-attempt-recovery/tests/retry-policy.test.mjs::WHAT[PAR-011] retry_decision_is_material_based_and_physically_bound` |

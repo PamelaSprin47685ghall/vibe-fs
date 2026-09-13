@@ -66,7 +66,11 @@ module CompletedTurnSurface =
         CompletedTurnClassifier.hasToolCallPart (partsOf parts)
 
     let isAbortErrorName (name: string) : bool =
-        CompletedTurnClassifier.isAbortErrorName (optionalText (box name))
+        CompletedTurnClassifier.isAbortErrorName (optionalText name)
+
+    /// PAR-008: formal content that cannot be a terminal (empty / XML-only).
+    let formalContentUnusable (parts: obj) : bool =
+        CompletedTurnClassifier.formalContentUnusable (partsOf parts)
 
     let classifyOutcome (completed: bool) (finish: string) (errorName: string) (parts: obj) : obj =
         CompletedTurnClassifier.classifyOutcome

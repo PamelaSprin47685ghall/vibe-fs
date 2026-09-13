@@ -245,6 +245,25 @@ module ReconcileSurface =
     let consumeKey (turn: obj) : string =
         ReconcileProgram.consumeKey (turnOf turn)
 
+    let private failureOfLabel (label: string) : ExecutionFailure =
+        match label with
+        | "ProviderTransient" -> ExecutionFailure.ProviderTransient
+        | "ProviderPermanent" -> ExecutionFailure.ProviderPermanent
+        | "LocalInvariant" -> ExecutionFailure.LocalInvariant
+        | "ProtocolRejection" -> ExecutionFailure.ProtocolRejection
+        | "AuthorizationDenied" -> ExecutionFailure.AuthorizationDenied
+        | "UserCancelled" -> ExecutionFailure.UserCancelled
+        | "Superseded" -> ExecutionFailure.Superseded
+        | "CapacityQueueFull" -> ExecutionFailure.CapacityQueueFull
+        | "AcceptanceUnknown" -> ExecutionFailure.AcceptanceUnknown
+        | "StreamInterruptedAfterFirstToken" -> ExecutionFailure.StreamInterruptedAfterFirstToken
+        | other -> invalidArg "failure" (sprintf "unknown failure label: %s" other)
+
+    /// PAR-008: a failure witness mints a provider-failure terminal only for a
+    /// confirmed provider class, or when the attempt's formal content is usable.
+    let failureWitnessMintsTerminal (failure: string) (contentUsable: bool) : bool =
+        ReconcileProgram.failureWitnessMintsTerminal (failureOfLabel failure) contentUsable
+
     let provisionalHas (maps: obj) (turn: obj) : bool =
         (mapsOf maps).provisionalHas (turnOf turn)
 

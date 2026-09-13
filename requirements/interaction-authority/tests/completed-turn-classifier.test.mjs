@@ -56,7 +56,25 @@ test('WHAT[INTERACTION-AUTHORITY-004] RECON_classify_abort_error_name_wins', () 
 })
 
 test('WHAT[INTERACTION-AUTHORITY-004] RECON_classify_completed_error_is_failed', () => {
-  assert.deepEqual(classify(true, undefined, 'StreamDied'), { kind: 'TurnFailed', reason: 'StreamDied' })
+  assert.deepEqual(classify(true, undefined, 'StreamDied', [text('half an answer')]), {
+    kind: 'TurnFailed',
+    reason: 'StreamDied',
+  })
+  // PAR-008: an errored attempt without usable formal content is content damage,
+  // not a provider request failure — it earns bounded interaction repair.
+  assert.equal(classify(true, undefined, 'StreamDied').kind, 'TurnNeedsContinuation')
+  assert.match(classify(true, undefined, 'StreamDied', [reasoning('thoughts only')]).reason, /empty terminal/)
+  assert.match(classify(true, undefined, 'StreamDied', [text('<tool_call>read</tool_call>')]).reason, /XML-only terminal/)
+})
+
+test('WHAT[PAR-008] RECON_formal_content_gate_is_shared_with_terminal_validity', () => {
+  assert.equal(turns.formalContentUnusable(null), true)
+  assert.equal(turns.formalContentUnusable([]), true)
+  assert.equal(turns.formalContentUnusable([reasoning('only thoughts')]), true)
+  assert.equal(turns.formalContentUnusable([text('   ')]), true)
+  assert.equal(turns.formalContentUnusable([text('<tool_call>read</tool_call>')]), true)
+  assert.equal(turns.formalContentUnusable([text('a real answer')]), false)
+  assert.equal(turns.formalContentUnusable([text('a real answer'), reasoning('and thinking')]), false)
 })
 
 test('WHAT[INTERACTION-AUTHORITY-004] RECON_classify_abort_finish_is_case_insensitive', () => {
@@ -66,9 +84,18 @@ test('WHAT[INTERACTION-AUTHORITY-004] RECON_classify_abort_finish_is_case_insens
 })
 
 test('WHAT[INTERACTION-AUTHORITY-004] RECON_classify_error_uses_name_or_finish', () => {
-  assert.deepEqual(classify(false, 'error', 'ProviderBoom'), { kind: 'TurnFailed', reason: 'ProviderBoom' })
-  assert.deepEqual(classify(false, 'error'), { kind: 'TurnFailed', reason: 'assistant finish=error' })
-  assert.deepEqual(classify(false, 'Error', 'AbortError'), { kind: 'TurnAborted', reason: 'AbortError' })
+  assert.deepEqual(classify(false, 'error', 'ProviderBoom', [text('partial answer')]), {
+    kind: 'TurnFailed',
+    reason: 'ProviderBoom',
+  })
+  assert.deepEqual(classify(false, 'error', undefined, [text('partial answer')]), {
+    kind: 'TurnFailed',
+    reason: 'assistant finish=error',
+  })
+  assert.deepEqual(classify(false, 'Error', 'AbortError', [text('partial')]), {
+    kind: 'TurnAborted',
+    reason: 'AbortError',
+  })
 })
 
 test('WHAT[INTERACTION-AUTHORITY-004] RECON_stop_requires_usable_formal_text', () => {
@@ -147,7 +174,13 @@ test('WHAT[INTERACTION-AUTHORITY-004] RECON_buildTurn_without_agent_uses_fallbac
     'ses_build_turn_fail',
     'user-2',
     'user-2',
-    { id: 'asst-10', finish: 'error', errorName: 'Timeout', completed: true, parts: [] },
+    {
+      id: 'asst-10',
+      finish: 'error',
+      errorName: 'Timeout',
+      completed: true,
+      parts: [text('partial answer before the error')],
+    },
     'coder',
     undefined,
   )

@@ -140,6 +140,15 @@ module ReconcileProgram =
     let tryFailureWitnessReason wake turn =
         tryFailureWitness wake turn |> Option.map snd
 
+    /// PAR-008: only a confirmed provider failure may mint a provider-failure
+    /// terminal. An errored attempt whose formal content is unusable (empty /
+    /// XML-only) belongs to bounded Interaction Repair instead.
+    let failureWitnessMintsTerminal (failure: ExecutionFailure) (contentUsable: bool) : bool =
+        match failure with
+        | ExecutionFailure.ProviderTransient
+        | ExecutionFailure.ProviderPermanent -> true
+        | _ -> contentUsable
+
     let private unknownDecision (wake: ReconcileWake) =
         match wake with
         | ReconcileWake.IdleWake _ ->

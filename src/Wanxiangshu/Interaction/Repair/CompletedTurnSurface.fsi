@@ -5,6 +5,7 @@ module CompletedTurnSurface =
     val partsSessionText: parts: obj -> string
     val hasToolCallPart: parts: obj -> bool
     val isAbortErrorName: name: string -> bool
+    val formalContentUnusable: parts: obj -> bool
     val classifyOutcome: completed: bool -> finish: string -> errorName: string -> parts: obj -> obj
     val needsInteractionRepair: role: string -> completed: bool -> finish: string -> parts: obj -> bool
     val repairDefectDecision: currentAttemptIsRepair: bool -> completed: bool -> finish: string -> parts: obj -> string

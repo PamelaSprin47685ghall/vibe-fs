@@ -61,6 +61,7 @@ module ReconcileSurface =
     val decisionName: decision: obj -> string
 
     val consumeKey: turn: obj -> string
+    val failureWitnessMintsTerminal: failure: string -> contentUsable: bool -> bool
 
     val provisionalHas: maps: obj -> turn: obj -> bool
 
