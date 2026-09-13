@@ -11,7 +11,6 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
-import * as tar from 'tar'
 
 import {
   REPO_ROOT,
@@ -35,38 +34,6 @@ const walkFs = (dir) => {
   }
   return out
 }
-
-test('WHAT[DISTRIBUTION-003] DISTRIBUTION_manifest_entry_matches_exports_and_shipped_path', () => {
-  assert.equal(typeof pkg.main, 'string', 'main must be declared')
-  assert.equal(pkg.exports['.'], pkg.main, 'exports["."] must equal main')
-  assert.match(pkg.main, /^\.?\/?dist\//, 'main must live under dist/')
-  assert.ok(exists(pkg.main), `main must exist on disk: ${pkg.main}`)
-})
-
-test('WHAT[DISTRIBUTION-004] DISTRIBUTION_files_whitelist_is_explicit_and_excludes_dev_test_legacy', () => {
-  assert.ok(Array.isArray(pkg.files), 'package.json files whitelist must exist')
-  assert.ok(
-    pkg.files.some((f) => normalize(f) === 'dist'),
-    'files whitelist must include dist/ (compiled runtime code)',
-  )
-  assert.ok(
-    pkg.files.some((f) => normalize(f) === 'resources'),
-    'files whitelist must include resources/ (runtime semantic resources)',
-  )
-  for (const entry of pkg.files) {
-    const normalized = normalize(entry)
-    for (const banned of ['src', 'tests', 'scripts', 'docs', 'artifacts', 'spec']) {
-      assert.ok(
-        normalized !== banned && !normalized.startsWith(`${banned}/`),
-        `files whitelist must not ship ${banned}*, found ${entry}`,
-      )
-    }
-    assert.ok(
-      !normalized.endsWith('.fs') && !normalized.endsWith('.fsproj'),
-      `files whitelist must not ship F# sources, found ${entry}`,
-    )
-  }
-})
 
 test('WHAT[DISTRIBUTION-007] DISTRIBUTION_release_proof_covers_build_package_packing_and_artifact_checks', async () => {
   const pipeline = pkg.scripts['verify:release']
@@ -117,6 +84,7 @@ test('WHAT[DISTRIBUTION-007] DISTRIBUTION_release_proof_covers_build_package_pac
 })
 
 test('WHAT[DISTRIBUTION-007] P1-P4: validateArchiveEntries rejects missing, extra, digest-mismatch, and link entries', async () => {
+  const tar = await import('tar')
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wx-negative-archive-test-'))
   const src = path.join(tmp, 'src')
   fs.mkdirSync(path.join(src, 'package'), { recursive: true })

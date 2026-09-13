@@ -170,6 +170,7 @@ test('WHAT[VERIFICATION-SYSTEM-009] the real integration entry covers every disc
   })
   assert.equal(result.ok, true, JSON.stringify(result, null, 2))
   assert.deepEqual(childOwnedIntegrationTests.sort(), [
+    'requirements/distribution/tests/integration/package/consumption.test.mjs',
     'requirements/distribution/tests/integration/package/contents.test.mjs',
     'requirements/distribution/tests/integration/package/import.test.mjs',
     'requirements/distribution/tests/integration/package/layout.test.mjs',
