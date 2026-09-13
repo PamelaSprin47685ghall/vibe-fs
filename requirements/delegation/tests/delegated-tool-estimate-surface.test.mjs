@@ -1,6 +1,5 @@
 // DELEG-022 estimate projection crosses the registered owner surface as plain data.
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import * as estimate from '../../../dist/Execution/Delegation/DelegatedToolEstimateSurface.js'
 
@@ -21,13 +20,12 @@ test('WHAT[DELEG-022] DELEG_022_each_distinct_real_tool_call_decrements_once_and
   assert.deepEqual(estimate.replay(2, ['call-1', 'call-1', 'call-2', 'call-3']), { remaining: 0, countedCalls: 2 })
 })
 
-test('WHAT[DELEG-022] DELEG_022_projection_is_incremental_not_a_transcript_or_xtrace_scan', () => {
-  const source = readFileSync(
-    new URL('../../../src/Wanxiangshu/Execution/Delegation/DelegatedToolEstimateProjection.fs', import.meta.url),
-    'utf8',
-  )
-  for (const forbidden of ['XTrace', 'transcript', 'messages', 'Dictionary<', 'mutable ']) {
-    assert.equal(source.includes(forbidden), false, `projection must not depend on ${forbidden}`)
-  }
-  assert.match(source, /Set<ToolCallId>/)
+test('WHAT[DELEG-022] DELEG_022_projection_is_incremental_and_deduplicates_calls', () => {
+  // Incremental behavior: duplicate tool calls do not double decrement;
+  // different tool calls decrement each time until saturation at zero.
+  const state = estimate.replay(5, ['call-a', 'call-b', 'call-a', 'call-c', 'call-b'])
+  assert.deepEqual(state, { remaining: 2, countedCalls: 3 })
+  
+  const saturated = estimate.replay(2, ['call-1', 'call-2', 'call-3', 'call-4'])
+  assert.deepEqual(saturated, { remaining: 0, countedCalls: 2 })
 })

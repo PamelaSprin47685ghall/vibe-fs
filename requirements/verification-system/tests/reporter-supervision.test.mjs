@@ -1,12 +1,15 @@
 // requirements/verification-system/tests/reporter-supervision.test.mjs
 //
-// Proof for P6:
+// Proof for P6 & T6:
 // 1. Compact vs verbose reporters yield identical verdict counts and match exact expected counts.
 // 2. Leaf test:complete does NOT remove file from supervisor outstanding set; file wrapper does.
 //    (a) Table of synthetic events tested against isFileCompletionEvent (including suffix non-ambiguity).
 //    (b) Real child (run-inner.mjs) running two-leaf fixture with IPC messages verifying arrival order and completion predicate.
 // 3. drainTestStream contract: error -> runner:error, not drained; end -> drained:true.
-//    Real run-inner child normal execution delivers inner:drained at the end of the chain.
+//    Real run-inner child normal execution delivers runner:summary before inner:drained at the end of the chain.
+// 4. TestRunState: single stats owner, handling same leaf name across files, nested subtests, and container failures.
+// 5. Injected state sharing guard: createCompactReporter shares state with TestRunState.
+// 6. Supervisor failure handling: missing summary / runner:error leads to failure.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -16,8 +19,15 @@ import { PassThrough } from 'node:stream'
 import { fileURLToPath } from 'node:url'
 
 import { createCompactReporter } from './support/compact-reporter.mjs'
-import { isFileCompletionEvent } from './support/test-run-state.mjs'
+import {
+  createRunState,
+  applyEvent,
+  summarize,
+  isFileCompletionEvent,
+  TestRunState,
+} from './support/test-run-state.mjs'
 import { drainTestStream } from './support/run-inner.mjs'
+import { superviseNodeTest } from './e2e/support/supervise-node-test.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '../../..')
@@ -243,7 +253,7 @@ test('WHAT[P6-REPORTER-003] drainTestStream contract and inner:drained event del
   assert.equal(endResult.error, null, 'must return error:null on clean end')
   assert.equal(endMessages.length, 0, 'must not send error on clean end')
 
-  // 3. Real child spawn: run-inner with fixture completes cleanly and delivers inner:drained
+  // 3. Real child spawn: run-inner with fixture completes cleanly and delivers runner:summary before inner:drained
   const fixturePath = path.join(here, 'support/fixtures/all-pass.fixture.mjs')
   const child = spawn(process.execPath, [innerRunner, fixturePath], {
     stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
@@ -255,8 +265,169 @@ test('WHAT[P6-REPORTER-003] drainTestStream contract and inner:drained event del
 
   const exitCode = await new Promise((res) => child.on('exit', res))
   assert.equal(exitCode, 0, 'child must exit 0 on clean run')
-  assert.ok(
-    childMessages.some((m) => m.type === 'inner:drained'),
-    'must receive inner:drained event from child upon successful stream completion',
-  )
+
+  const summaryIndex = childMessages.findIndex((m) => m.type === 'runner:summary')
+  const drainedIndex = childMessages.findIndex((m) => m.type === 'inner:drained')
+
+  assert.ok(summaryIndex !== -1, 'must receive runner:summary event from child')
+  assert.ok(drainedIndex !== -1, 'must receive inner:drained event from child')
+  assert.ok(summaryIndex < drainedIndex, 'runner:summary must precede inner:drained')
+
+  const summaryData = childMessages[summaryIndex].data
+  assert.equal(summaryData.filesCompleted, 1)
+  assert.equal(summaryData.passed, 1)
+  assert.equal(summaryData.failed, 0)
+})
+
+test('WHAT[T6-STATE-001] TestRunState handles identical leaf names across different files without collision', () => {
+  const state = createRunState()
+  const file1 = path.resolve('/path/to/test-a.mjs')
+  const file2 = path.resolve('/path/to/test-b.mjs')
+
+  applyEvent(state, {
+    type: 'test:pass',
+    data: { name: 'common name', file: file1, nesting: 0, details: { duration_ms: 10 } },
+  })
+  applyEvent(state, {
+    type: 'test:fail',
+    data: { name: 'common name', file: file2, nesting: 0, details: { duration_ms: 20, error: new Error('err in b') } },
+  })
+
+  const sum = summarize(state)
+  assert.equal(sum.files, 2)
+  assert.equal(sum.passed, 1)
+  assert.equal(sum.failed, 1)
+  assert.equal(sum.leafDurations.length, 2)
+  assert.equal(sum.failures.length, 1)
+  assert.equal(sum.failures[0].file, file2)
+})
+
+test('WHAT[T6-STATE-002] TestRunState differentiates nested subtests with same name under same file', () => {
+  const state = createRunState()
+  const file = path.resolve('/path/to/nested.mjs')
+
+  // test 1 at nesting 0, subtest 1 at nesting 1
+  applyEvent(state, {
+    type: 'test:pass',
+    data: { name: 'work item', file, nesting: 0, testId: 1, details: { duration_ms: 5 } },
+  })
+  applyEvent(state, {
+    type: 'test:pass',
+    data: { name: 'work item', file, nesting: 1, testId: 2, parentId: 1, details: { duration_ms: 3 } },
+  })
+
+  const sum = summarize(state)
+  assert.equal(sum.files, 1)
+  assert.equal(sum.passed, 2, 'both leaf tests must be counted individually without deduplication collision')
+  assert.equal(sum.failed, 0)
+  assert.equal(sum.leafDurations.length, 2)
+})
+
+test('WHAT[T6-STATE-003] container suite failures count into containerFailures and not failed count', () => {
+  const state = createRunState()
+  const file = path.resolve('/path/to/suite.mjs')
+
+  // 1 pass leaf
+  applyEvent(state, {
+    type: 'test:pass',
+    data: { name: 'leaf 1', file, nesting: 1, details: { type: 'test', duration_ms: 5 } },
+  })
+
+  // 1 fail leaf
+  applyEvent(state, {
+    type: 'test:fail',
+    data: {
+      name: 'leaf 2',
+      file,
+      nesting: 1,
+      details: {
+        type: 'test',
+        duration_ms: 10,
+        error: { code: 'ERR_TEST_FAILURE', failureType: 'testCodeFailure', cause: new Error('leaf 2 fail') },
+      },
+    },
+  })
+
+  // Suite container failure (subtestsFailed)
+  applyEvent(state, {
+    type: 'test:fail',
+    data: {
+      name: 'outer suite',
+      file,
+      nesting: 0,
+      details: {
+        type: 'suite',
+        duration_ms: 15,
+        error: { code: 'ERR_TEST_FAILURE', failureType: 'subtestsFailed', cause: '1 subtest failed' },
+      },
+    },
+  })
+
+  const sum = summarize(state)
+  assert.equal(sum.passed, 1, 'passed must be 1')
+  assert.equal(sum.failed, 1, 'failed must be 1 (only the leaf fail, not the suite fail)')
+  assert.equal(sum.containerFailures, 1, 'containerFailures must record the suite failure')
+  assert.equal(sum.failures.length, 1, 'failures list only contains leaf failure')
+  assert.equal(sum.failures[0].name, 'leaf 2')
+})
+
+test('WHAT[T6-STATE-004] createCompactReporter shares state with TestRunState instance', async () => {
+  const injectedState = createRunState()
+  const reporter = createCompactReporter({
+    state: injectedState,
+    stdout: { write() {} },
+    stderr: { write() {} },
+  })
+
+  assert.ok(reporter.state instanceof TestRunState, 'reporter must expose its state')
+  assert.equal(reporter.state, injectedState, 'reporter must use the injected state instance')
+
+  const targetFile = path.resolve('/test/shared-state.mjs')
+  async function* eventSrc() {
+    yield {
+      type: 'test:pass',
+      data: { name: 'leaf', file: targetFile, nesting: 0, details: { duration_ms: 12 } },
+    }
+    yield {
+      type: 'test:complete',
+      data: { name: targetFile, file: targetFile, nesting: 0 },
+    }
+  }
+
+  for await (const _ of reporter(eventSrc())) {}
+
+  const sum = summarize(injectedState)
+  assert.equal(sum.passed, 1)
+  assert.equal(sum.filesCompleted, 1)
+})
+
+test('WHAT[T6-STATE-005] supervisor aborts when inner runner fails without summary or with runner:error', async () => {
+  const fakeInner = path.join(here, 'support/fixtures/overrun-then-pass.fixture.mjs')
+
+  // Running an inner that is NOT run-inner.mjs means it will not send runner:summary
+  // superviseNodeTest will log error and exit(1)
+  const child = spawn(process.execPath, [
+    '-e',
+    `
+    import { superviseNodeTest } from './requirements/verification-system/tests/e2e/support/supervise-node-test.mjs';
+    await superviseNodeTest({
+      files: ['requirements/verification-system/tests/support/fixtures/all-pass.fixture.mjs'],
+      label: 'test-no-summary',
+      silenceMs: 2000,
+      inner: '${fakeInner}',
+    });
+    `,
+  ], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: cleanEnv(),
+  })
+
+  let stderr = ''
+  child.stderr.on('data', (chunk) => {
+    stderr += chunk.toString()
+  })
+
+  const exitCode = await new Promise((res) => child.on('exit', res))
+  assert.equal(exitCode, 1, 'supervisor must exit 1 when inner runner emits no summary')
+  assert.match(stderr, /failed to provide authoritative summary/)
 })

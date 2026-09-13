@@ -14,11 +14,11 @@
 
 ## JS-SEMANTIC-SURFACE-003: 值得独立测试的 law 必须有独立 semantic owner + JS surface
 
-任何值得独立验证的语义定理或业务规则，必须归属于明确的 package owner，且该 owner 必须为其提供 JS 原生的 Surface 承载。Surface proof authority 只来自 active primary WHAT callback 的文件内静态可达执行闭包：该 callback 的直接 terminal use、其实际调用的 exact lexical local helper，以及被 exact `fast-check` runner 消费的 property/async-property callback。局部 higher-order helper 只有在可达函数体实际调用对应形参时，才可传递该调用点的 callback。shadow、dead helper、未被 runner 消费的 callback、其他 law callback、非 terminal alias 与 assignment target 均不得制造证据。执行闭包只证明该 proof 确实穿越 production Surface，不宣称静态证明 assertion 的完整数据因果。Surface 必须在所属领域边界处负责完成 JavaScript 原生数据表示与内部领域模型之间的双向适配与转换，严禁建立跨越所有业务领域的集中式上帝外观（god facade）。
+任何值得独立验证的语义定理或业务规则，必须归属于明确的 package owner，且该 owner 必须为其提供 JS 原生的 Surface 承载。Surface 的门禁是物理边界存在性，不是执行语义证明：每条注册必须具备 module + owner + source + representation + kind；`laws` 所列每个 law id 必须真实存在于 owner（或 `lawOwners` 指向包）的 WHAT.md 标题中——`laws` 只是该 surface 承载哪些 WHAT 命题的静态描述，不授予任何 import 权限；生产 source 必须存在且被 `Wanxiangshu.fsproj` 编译；`dist/` 下必须存在已发射的 surface 模块；至少一个 `.test.mjs` 必须以静态 import 语法（`import … from '…dist/<module>'` 或 `import('…dist/<module>')`）引用该 surface。门禁只检查 import 语法的存在性：import binding 是否被实际执行、测试断言语义是否成立，由测试本身负责，门禁不评判。Surface 必须在所属领域边界处负责完成 JavaScript 原生数据表示与内部领域模型之间的双向适配与转换，严禁建立跨越所有业务领域的集中式上帝外观（god facade）。不存在 callback 可达执行闭包检查，不存在 consumer 包授权检查，不存在 `SURFACE_CONSUMERS` 登记：任何测试都可以 import 任何 surface，跨包依赖不需要显式授权。
 
 ## JS-SEMANTIC-SURFACE-004: 不拥有独立 law 的 helper 不直接测试
 
-不具备独立业务失败含义的内部辅助函数、局部夹具或中间工具，严禁作为独立的测试对象直接编写测试用例。内部实现的行为与正确性必须完全通过其所属 Owner 契约面的公开行为进行端到端证明。重命名、内联或替换内部数据结构不得导致测试用例修改。
+是否为 helper 单独编写测试用例，按该 helper 是否具备独立失败价值判断。不具备独立业务失败含义的内部辅助函数、局部夹具或中间工具，不得作为独立的测试对象直接编写测试用例：其行为与正确性由所属 Owner 契约面的公开行为端到端覆盖，重命名、内联或替换内部数据结构不得导致测试用例修改。具备独立失败含义的 helper 允许直接测试，门禁不要求 helper 挂靠任何 law。门禁保留对全语义测试区的 debt 扫描与 support→support 传递边可达性检查，只用于发现隐藏的内部实现依赖，不用于授予或撤销测试资格。
 
 ## JS-SEMANTIC-SURFACE-005: semantic data 跨边界必须是 JS-native representation
 

@@ -61,13 +61,46 @@ import { DIAGNOSTIC_RACE_MS, WATCHDOG_TIMEOUT_MS } from './time-budget.js';
 
 export class Watchdog {
   /**
-   * @param {{ timeoutMs?: number, label?: string, onTimeout?: () => Promise<void> | void }} opts
+   * @param {{
+   *   timeoutMs?: number,
+   *   label?: string,
+   *   onTimeout?: () => Promise<void> | void,
+   *   deps?: {
+   *     clock?: { nowMs: () => number },
+   *     timers?: { schedule: (ms: number, cb: () => void) => any, cancel: (handle: any) => void },
+   *     diagnostic?: { write: (msg: string) => void },
+   *     terminate?: () => void,
+   *   }
+   * }} opts
    *
    * `timeoutMs` defaults to the centralized silence window; 「静默窗口集中定义为唯一常量」. A
    * caller may narrow it (gate cases run at 150ms so a case costs milliseconds), but not omit
    * it into a literal — there is no fallback number in this file.
+   *
+   * Optional `deps` enables deterministic virtual-time testing while preserving all default
+   * production semantics when omitted:
+   * - `clock.nowMs()`: defaults to `Date.now`
+   * - `timers.schedule(ms, cb)` / `timers.cancel(handle)`: defaults to `setTimeout(cb, ms)` (with `unref`) / `clearTimeout(handle)`
+   * - `diagnostic.write(msg)`: defaults to `console.error(msg)`
+   * - `terminate()`: defaults to `process.exit(1)`
    */
-  constructor({ timeoutMs = WATCHDOG_TIMEOUT_MS, label, onTimeout } = {}) {
+  constructor({ timeoutMs = WATCHDOG_TIMEOUT_MS, label, onTimeout, deps } = {}) {
+    this._clock = {
+      nowMs: deps?.clock?.nowMs || (() => Date.now()),
+    };
+    this._timers = {
+      schedule: deps?.timers?.schedule || ((ms, cb) => {
+        const t = setTimeout(cb, ms);
+        t.unref?.();
+        return t;
+      }),
+      cancel: deps?.timers?.cancel || ((h) => clearTimeout(h)),
+    };
+    this._diagnostic = {
+      write: deps?.diagnostic?.write || ((msg) => console.error(msg)),
+    };
+    this._terminate = deps?.terminate || (() => process.exit(1));
+
     if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
       throw new Error(`Watchdog requires a positive silence window, got ${timeoutMs}`);
     }
@@ -79,7 +112,7 @@ export class Watchdog {
     // The clock starts at construction, so the window before the first step is covered too
     // (「覆盖必须无缝」). 'start' / 'startup' are what the dump then reports, and a dump saying
     // the last progress was the start is a true statement about a scenario that never moved.
-    this._lastProgressAt = Date.now();
+    this._lastProgressAt = this._clock.nowMs();
     this._lastProgress = { reason: 'start', lane: 'startup', expectationId: null };
     this._lastBackground = null;
     this._stopped = false;
@@ -104,12 +137,12 @@ export class Watchdog {
 
     if (!blocking) {
       this._backgroundCount += 1;
-      this._lastBackground = { at: Date.now(), reason, lane, expectationId };
+      this._lastBackground = { at: this._clock.nowMs(), reason, lane, expectationId };
       return;
     }
 
     this._blockingCount += 1;
-    this._lastProgressAt = Date.now();
+    this._lastProgressAt = this._clock.nowMs();
     this._lastProgress = { reason, lane, expectationId };
     this._arm();
   }
@@ -117,7 +150,7 @@ export class Watchdog {
   /** Disarm for good: the scenario reached its verdict, so silence no longer means anything. */
   stop() {
     this._stopped = true;
-    clearTimeout(this._timer);
+    this._timers.cancel(this._timer);
     this._timer = null;
   }
 
@@ -135,22 +168,18 @@ export class Watchdog {
   }
 
   _arm() {
-    clearTimeout(this._timer);
-    this._timer = setTimeout(() => {
-      this._fire().catch(() => process.exit(1));
+    this._timers.cancel(this._timer);
+    this._timer = this._timers.schedule(this._timeoutMs, () => {
+      this._fire().catch(() => this._terminate());
     }, this._timeoutMs);
-    // 「计时器必须不持有事件循环」. Without this, a scenario that closed every other handle would
-    // still be held to the end of the silence window and then be declared hung — measured at
-    // 2004ms of a 2000ms window with the call removed.
-    this._timer.unref?.();
   }
 
   async _fire() {
     if (this._stopped) return;
     this._stopped = true;
 
-    console.error(
-      `WATCHDOG: '${this._label}' silent for ${Date.now() - this._lastProgressAt}ms ` +
+    this._diagnostic.write(
+      `WATCHDOG: '${this._label}' silent for ${this._clock.nowMs() - this._lastProgressAt}ms ` +
       `(limit ${this._timeoutMs}ms); ${this._blockingCount} blocking progress update(s), ` +
       `last progress: ${this._lastProgress.reason} lane=${this._lastProgress.lane} ` +
       `expectation=${this._lastProgress.expectationId || 'none'}`,
@@ -159,8 +188,8 @@ export class Watchdog {
       // Printed only when a background lane actually ran. An age line for a lane that never
       // reported would read as a stalled sidecar and send the reader after a lane that does
       // not exist.
-      console.error(
-        `WATCHDOG: background progress ${Date.now() - this._lastBackground.at}ms ago: ` +
+      this._diagnostic.write(
+        `WATCHDOG: background progress ${this._clock.nowMs() - this._lastBackground.at}ms ago: ` +
         `${this._lastBackground.reason} lane=${this._lastBackground.lane} ` +
         `(${this._backgroundCount} background update(s), none of them renewals)`,
       );
@@ -173,7 +202,7 @@ export class Watchdog {
       if (this._onTimeout) {
         await Promise.race([
           this._onTimeout(),
-          new Promise((resolve) => setTimeout(resolve, DIAGNOSTIC_RACE_MS)),
+          new Promise((resolve) => this._timers.schedule(DIAGNOSTIC_RACE_MS, resolve)),
         ]);
       }
     } catch {}
@@ -183,7 +212,7 @@ export class Watchdog {
     try {
       process.stderr.write('');
     } catch {}
-    process.exit(1);
+    this._terminate();
   }
 }
 

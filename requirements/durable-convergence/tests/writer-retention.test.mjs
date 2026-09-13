@@ -261,15 +261,54 @@ test('WHAT[DURABLE-CONVERGENCE-011] declared manifest must cover every remote wr
   })
 })
 
-test('WHAT[DURABLE-CONVERGENCE-011] source binds activity to blob oid and never derives it from fetch mtime', () => {
-  const source = readFileSync(new URL('../../../src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs', import.meta.url), 'utf8')
-  const log = readFileSync(new URL('../../../src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs', import.meta.url), 'utf8')
-  assert.match(source, /writer-manifest/)
-  assert.match(source, /writerManifestVersion = "v2"/)
-  assert.match(source, /BlobOid[\s\S]*LastActivityMs/)
-  assert.match(source, /nextExpiry|NextExpiry/)
-  assert.match(log, /readSync/)
-  assert.match(log, /lastIndexOfLf|readLastCompleteLine/)
-  assert.match(log, /ObservedAt/)
-  assert.doesNotMatch(source, /fetch[^\n]*Date\.now|Date\.now[^\n]*fetch/i)
+test('WHAT[DURABLE-CONVERGENCE-011] writer lifecycle observes active, expiry, and reactivation without mtime resurrection', async () => {
+  await withRepo(async (repo, commonDir) => {
+    const HOUR = 60 * 60 * 1000
+    const born = Date.parse('2026-08-20T00:00:00Z')
+    const eventsDir = join(commonDir, 'wanxiang', 'events')
+    const writerPath = join(eventsDir, 'writer-lifecycle.ndjson')
+
+    const writeJournalLine = (event) => {
+      mkdirSync(eventsDir, { recursive: true })
+      const line = JSON.stringify({
+        event_id: event.id,
+        event_type: 'JournalEnvelope',
+        parents: event.parents,
+        payload: { ObservedAt: new Date(event.observedAt).toISOString() },
+        payload_refs: [],
+        stream_id: event.stream,
+      }) + '\n'
+      writeFileSync(writerPath, line, { flag: 'a' })
+    }
+
+    // 1. Initial event at born
+    writeJournalLine({ id: A, stream: 'retention/lifecycle', parents: [], observedAt: born })
+
+    // Active at born + 12h: retained and materialized in remote snapshot
+    assert.deepEqual(retention.retainedWriterIdsAt(commonDir, born + 12 * HOUR), ['writer-lifecycle'])
+    const snap1 = await retention.syncAt(repo, commonDir, null, born + 12 * HOUR)
+    assert.equal(snap1.ok, true, snap1.ok ? '' : JSON.stringify(snap1.error))
+    const writers1 = execFileSync('git', ['-C', repo, 'ls-tree', `${snap1.root}:writers`], { encoding: 'utf8' })
+    assert.match(writers1, /writer-lifecycle\.ndjson/)
+
+    // Expired at born + 25h: even if file mtime is artificially touched to "now", durable ObservedAt governs
+    assert.deepEqual(retention.retainedWriterIdsAt(commonDir, born + 25 * HOUR), [])
+    utimesSync(writerPath, (born + 25 * HOUR) / 1000, (born + 25 * HOUR) / 1000)
+    assert.deepEqual(retention.retainedWriterIdsAt(commonDir, born + 25 * HOUR), [], 'refreshed mtime cannot revive expired journal writer')
+
+    // Sync at born + 25h purges expired writer from local disk and new snapshot
+    const snap2 = await retention.syncAt(repo, commonDir, snap1.root, born + 25 * HOUR)
+    assert.equal(snap2.ok, true, snap2.ok ? '' : JSON.stringify(snap2.error))
+    assert.equal(existsSync(writerPath), false, 'expired writer removed from disk')
+    const writers2 = execFileSync('git', ['-C', repo, 'ls-tree', `${snap2.root}:writers`], { encoding: 'utf8' })
+    assert.equal(writers2.trim(), '', 'expired writer removed from remote tree')
+
+    // 2. Reactivation by writing a new event at born + 26h
+    writeJournalLine({ id: B, stream: 'retention/lifecycle', parents: [A], observedAt: born + 26 * HOUR })
+    assert.deepEqual(retention.retainedWriterIdsAt(commonDir, born + 27 * HOUR), ['writer-lifecycle'], 'reactivated writer is retained')
+    const snap3 = await retention.syncAt(repo, commonDir, snap2.root, born + 27 * HOUR)
+    assert.equal(snap3.ok, true, snap3.ok ? '' : JSON.stringify(snap3.error))
+    const writers3 = execFileSync('git', ['-C', repo, 'ls-tree', `${snap3.root}:writers`], { encoding: 'utf8' })
+    assert.match(writers3, /writer-lifecycle\.ndjson/, 'reactivated writer rematerialized in snapshot')
+  })
 })

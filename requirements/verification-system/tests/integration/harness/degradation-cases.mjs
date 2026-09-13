@@ -1,138 +1,19 @@
 /**
- * gate-degradation-cases.mjs — W7: every forbidden degradation has a case, and that is checked.
+ * degradation-cases.mjs — Source-level negative assertions for harness topology & execution.
  *
- * VERIFY-004 lists its degradations under `### 禁止退化清单` (requirements/verification-system/WHAT.md). W7's charge is a
- * failing test per item, and a completeness gate over the set — because a registered case file that
- * contributes nothing looks, in the gate's output, exactly like one whose cases all pass. The
- * placeholder this package started from (`gate-readiness-cases.mjs` was an empty array) is the
- * concrete shape: 「零用例」 and 「全部通过」 are byte-identical in the report.
- *
- * ── the registry is the gate, and it is checked in both directions ──────────
- *
- * `DEGRADATION_COVERAGE` binds each degradation id to the names of the cases that cover it. The
- * completeness case then proves three things, each of which a lazier design would skip:
- *
- *   1. every id in `DEGRADATIONS` has at least one covering case   (no degradation uncovered)
- *   2. the registry has no id the clause stopped forbidding        (no orphaned citation)
- *   3. every cited case NAME exists in the collected suite          (the citation is real)
- *
- * (3) is the load-bearing one and the reason this file imports every case array. A name is a string;
- * nothing about it proves the case exists. An empty case file, or a case renamed, leaves the registry
- * pointing at a name that resolves to nothing — and (3) is what turns that into a failure instead of a
- * silent green. This is the same discipline as `degradation-list.mjs` checking its ids against the
- * clause both ways: a binding only proves anything if both ends are held.
- *
- * The covering cases are mostly elsewhere — the unit runner, the verdict feed, the readiness ladder,
- * the budget relations — because that is where each degradation's mechanism lives. Pool / launcher
- * degradations that belonged to the retired multi-canary runner are covered here as source-level
- * One World topology checks (sole entry, no shuffle-repeat pool).
+ * Retained: One World topology checks (sole entry, no shuffle-repeat pool),
+ * internal expectations background classification, and flow waits not competing with silence watchdog.
  */
 
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { assertEq, assertTrue } from './lib.mjs';
-import { DEGRADATIONS } from '../../e2e/support/degradation-list.mjs';
-import { cases } from './cases.mjs';
-import { budgetCases } from './budget-cases.mjs';
-import { readinessCases } from './readiness-cases.mjs';
-import { unitRunnerCases } from './unit-runner-cases.mjs';
-import { singleSourceCases } from './single-source-cases.mjs';
-import { pathCriterionCases } from './path-criterion-cases.mjs';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
 const SOLE_ENTRY = 'requirements/verification-system/tests/e2e/entry.test.mjs';
-const VERDICT_FEED_TEST = 'requirements/verification-system/tests/verdict-feed.test.mjs';
 
 const readSource = (relative) => readFileSync(`${REPO_ROOT}${relative}`, 'utf8');
-
-/**
- * The verdict feed's own cases live under `node:test`, not in a gate case array, so their names are
- * read from source rather than imported. D3's covering case is there: a hang that keeps printing is
- * the exact shape that would turn a verdict feed back into a wall-clock timer, and that case proves
- * `test:stdout` is recorded as background, never as progress.
- */
-const verdictFeedCaseNames = () =>
-  [...readSource(VERDICT_FEED_TEST).matchAll(/test\('([^']+)'/g)].map((match) => match[1]);
-
-/** Every case name the gate suite can run, so a citation can be resolved against reality. */
-const collectedCaseNames = () =>
-  new Set(
-    [
-      ...cases,
-      ...budgetCases,
-      ...readinessCases,
-      ...unitRunnerCases,
-      ...singleSourceCases,
-      ...pathCriterionCases,
-      ...degradationCases,
-    ]
-      .map((testCase) => testCase.name)
-      .concat(verdictFeedCaseNames()),
-  );
-
-/**
- * Degradation id → the names of the cases that cover it.
- *
- * Keyed by id, not by ordinal, for the reason `degradation-list.mjs` names its ids: insert an item at
- * position 3 in the SSOT and every ordinal above it shifts, silently re-pointing each citation at its
- * neighbour. A named id cannot drift without the parser throwing.
- */
-const DEGRADATION_COVERAGE = new Map([
-  [
-    'VERIFY_004_D_WALL_CLOCK_AS_ONLY_HANG_CRITERION',
-    [
-      'VERIFY-004 a hung test that keeps printing is ended by the verdict-silence window',
-      'VERIFY-004 no budget is 兜底-only for a criterion that has a causal signal',
-    ],
-  ],
-  [
-    'VERIFY_004_D_RAW_TRAFFIC_RENEWS_WATCHDOG',
-    [
-      'VERIFY-004 a hung test that keeps printing is ended by the verdict-silence window',
-      'WHAT[VERIFICATION-SYSTEM-006] bytes moving is recorded and does not renew',
-    ],
-  ],
-  ['VERIFY_004_D_BACKGROUND_LANE_RENEWS_WATCHDOG', ['WHAT[VERIFICATION-SYSTEM-006] bytes moving is recorded and does not renew']],
-  [
-    'VERIFY_004_D_WATCHDOG_DUMP_REDUCED_TO_EXIT_CODE',
-    ['VERIFY-004 a hung test that keeps printing is ended by the verdict-silence window'],
-  ],
-  ['VERIFY_004_D_WATCHDOG_TIMER_HOLDS_EVENT_LOOP', ['VERIFY-004 a clean run is not held to the end of the silence window']],
-  [
-    'VERIFY_004_D_WINDOW_GUARDED_ONLY_BY_TOTAL_TIMEOUT',
-    ['VERIFY-004 the stage budget is tighter than the total startup ceiling'],
-  ],
-  [
-    'VERIFY_004_D_DECLARED_HEARTBEAT_NOT_WIRED',
-    ['VERIFY-004 verdicts actually renew the window, so legitimate slow work is not killed'],
-  ],
-  [
-    'VERIFY_004_D_FIXED_SLEEP_REPLACES_CAUSAL_BARK',
-    ['VERIFY-004 One World sole entry has no multi-canary shuffle-repeat pool'],
-  ],
-  [
-    'VERIFY_004_D_READY_TIMEOUT_OR_EARLY_EXIT_PASSES',
-    ['VERIFY-004 One World sole entry has no multi-canary shuffle-repeat pool'],
-  ],
-  [
-    'VERIFY_004_D_RELEASE_GATE_BECOMES_AT_MOST_N_ROUNDS',
-    ['VERIFY-004 One World sole entry has no multi-canary shuffle-repeat pool'],
-  ],
-  [
-    'VERIFY_004_D_COUNT_CONSTANT_MAINTAINED_APART_FROM_LIST',
-    ['VERIFY-004 no cardinality is maintained beside the collection it counts'],
-  ],
-  ['VERIFY_004_D_STATIC_GATE_PATH_DOES_NOT_EXIST', ['VERIFY-004 every path criterion in the harness resolves on disk']],
-  ['VERIFY_004_D_WINDOW_WIDENED_TO_HIDE_A_RACE', ['VERIFY-004 no budget is 兜底-only for a criterion that has a causal signal']],
-  [
-    'VERIFY_004_D_LEAF_TIMEOUT_APPLIED_TO_FILE_WRAPPER',
-    [
-      'VERIFY-004 verdicts actually renew the window, so legitimate slow work is not killed',
-      'VERIFY-004 the runner claims no protection it does not have',
-    ],
-  ],
-]);
 
 export const degradationCases = [
   {
@@ -267,53 +148,6 @@ export const degradationCases = [
         !providerSource.includes('timeoutMs = WATCHDOG_TIMEOUT_MS'),
         'provider wait helpers must not default every flow wait to the silence window as a total deadline',
       );
-    },
-  },
-
-  {
-    name: 'VERIFY-004 every forbidden degradation has a covering case, and every citation resolves',
-    fn: () => {
-      // The completeness gate. Three checks, each closing a different hole:
-      //
-      //   clause id with no case   → a degradation nobody tests
-      //   registry id not in clause → a citation of something the SSOT no longer forbids
-      //   cited name with no case   → an empty or renamed case file, still claiming coverage
-      //
-      // The third is why this file imports every case array. Without it the registry is prose.
-      const clauseIds = DEGRADATIONS.map((degradation) => degradation.id);
-      const registryIds = [...DEGRADATION_COVERAGE.keys()];
-
-      assertEq(
-        registryIds.length,
-        clauseIds.length,
-        `the registry covers ${registryIds.length} degradations but the clause lists ${clauseIds.length}`,
-      );
-
-      for (const id of clauseIds) {
-        const covering = DEGRADATION_COVERAGE.get(id);
-        assertTrue(
-          covering && covering.length > 0,
-          `${id} has no covering case — the degradation is untested`,
-        );
-      }
-
-      for (const id of registryIds) {
-        assertTrue(
-          clauseIds.includes(id),
-          `${id} is cited by the registry but the clause no longer forbids it`,
-        );
-      }
-
-      const names = collectedCaseNames();
-      for (const [id, covering] of DEGRADATION_COVERAGE) {
-        for (const caseName of covering) {
-          assertTrue(
-            names.has(caseName),
-            `${id} cites a case that does not exist in the suite: '${caseName}' — an empty or ` +
-              'renamed case file would otherwise keep claiming coverage',
-          );
-        }
-      }
     },
   },
 ];

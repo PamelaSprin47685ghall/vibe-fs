@@ -2,13 +2,10 @@
 // internals. Work-record latest/unreadable distinctions are owner output laws.
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFile } from 'node:fs/promises'
 import * as horizon from '../../../dist/Execution/Session/OpenCode/HorizonSurface.js'
 
 const FORBIDDEN = /\b(agent_id|session_id|pty_id|child_session_id|status|kind|ordinal|has_pending_completion|current_run_id|fallback_peer|tier|role)\s*=|completed-awaiting-join|running|busy/
 const agent = (label, status = 'active', work = 'none', record = '') => ({ label, status, work, record })
-
-const sourcePath = new URL('../../../src/Wanxiangshu/Execution/Session/OpenCode/HorizonTool.fs', import.meta.url)
 
 test('WHAT[PARTICIPANT-HORIZON-004] EXEC_005_horizon_description_says_work_record_and_pull_only_without_Y_jargon', () => {
   assert.match(horizon.description(), /latest work record/i)
@@ -44,16 +41,24 @@ test('WHAT[PARTICIPANT-HORIZON-011] EXEC_005_horizon_does_not_fall_back_when_lat
   assert.doesNotMatch(text, /Old record that must not masquerade as current progress\./)
 })
 
-test('WHAT[PARTICIPANT-HORIZON-011] EXEC_005_horizon_has_no_polling_or_background_wait_primitive', async () => {
-  const source = await readFile(sourcePath, 'utf8')
-  assert.doesNotMatch(source, /AwaitChangeFrom|Task\.Delay|setInterval|setTimeout|System\.Timers|PeriodicTimer/)
+test('WHAT[PARTICIPANT-HORIZON-011] EXEC_005_horizon_pull_only_returns_synchronously_without_background_wait', () => {
+  const start = Date.now()
+  const rendered = horizon.render([
+    agent('coder', 'active', 'latest', 'Work in progress'),
+  ], [])
+  const duration = Date.now() - start
+  assert.ok(duration < 50, 'render must return immediately as a pure pull projection')
+  assert.match(rendered, /Work in progress/)
 })
 
-test('WHAT[PARTICIPANT-HORIZON-011] HORIZON_abandoned_child_remains_visible_until_join_retires_it', async () => {
-  const rendered = horizon.render([agent('Ada', 'abandoned')], [])
-  assert.match(rendered, /Ada did not return/i)
-
-  const source = await readFile(sourcePath, 'utf8')
-  assert.match(source, /HandleProjection\.horizonVisible handles/)
-  assert.doesNotMatch(source, /HandleProjection\.listable handles/)
+test('WHAT[PARTICIPANT-HORIZON-011] HORIZON_abandoned_child_remains_visible_until_join_retires_it', () => {
+  // Both active and abandoned child are projected in the public horizon output
+  const rendered = horizon.render([
+    agent('Ada', 'abandoned'),
+    agent('Bob', 'active', 'latest', 'Working on task'),
+  ], [])
+  assert.match(rendered, /Ada did not return/i, 'abandoned child must remain visible with did-not-return notice')
+  assert.match(rendered, /Bob is still away/i, 'active child must remain visible with still-away notice')
+  assert.match(rendered, /Working on task/)
 })
+

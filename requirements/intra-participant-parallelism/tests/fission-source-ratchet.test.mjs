@@ -121,34 +121,13 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-014] Degeneration guard remains control
   assert.match(host, /FissionTakeoverSettlementDecision\.YieldToTurnWorkflow/)
 })
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-012] Fission role eligibility comes from ToolPermission.Fission for current office vocabulary', () => {
-  const officeCapability = read('src/Wanxiangshu/Foundation/OfficeCapability.fs')
-  const roles = read('src/Wanxiangshu/Foundation/Roles.fs')
-  const registry = read('src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs')
-  const owner = read('src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs')
-  assert.match(registry, /"fission",\s*FissionTool\.admission/)
-  assert.match(
-    owner,
-    /let\s+admission:\s*ToolAdmission\s*=\s*ToolAdmission\.OfficeRole\(fun\s+_\s+r\s*->\s*OfficeCapability\.isAllowed\s+r\s+ToolPermission\.Fission\)/,
-  )
-  assert.doesNotMatch(roles, /ToolPermission/, 'Roles owns only Role/AgentTier; the permission matrix is OfficeCapability')
+import * as tr from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
 
+test('WHAT[INTRA-PARTICIPANT-PARALLELISM-012] Fission role eligibility resolves OfficeRole admission across all roles', () => {
   for (const role of ['Manager', 'Coder', 'Inspector', 'Browser', 'Inquiry']) {
-    const block = new RegExp(`\\| Role\\.${role} ->[\\s\\S]{0,900}?ToolPermission\\.Fission`)
-    assert.match(officeCapability, block, `${role} must own the Fission consequence`)
+    assert.equal(tr.rolePredicate('fission', role), true, `${role} must have fission permission`)
   }
   for (const role of ['Orchestrator', 'DevOps', 'Reviewer', 'Blogger', 'Distiller']) {
-    const arm = new RegExp(`\\| Role\\.${role} ->([^\\n]*(?:\\n(?!\\s*\\| Role\\.).*){0,16})`)
-    const text = arm.exec(officeCapability)?.[0] ?? ''
-    assert.doesNotMatch(text, /ToolPermission\.Fission/, `${role} must not own Fission`)
+    assert.equal(tr.rolePredicate('fission', role), false, `${role} must not have fission permission`)
   }
-})
-
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-003] sibling creation is a distinct Host capability from managed-child creation', () => {
-  const sessions = read('src/Wanxiangshu/OpenCode/Host/Sessions.fs')
-  const port = read('src/Wanxiangshu/OpenCode/Host/OpenCodePort.fs')
-  assert.match(sessions, /CreateSiblingSession/)
-  assert.match(sessions, /TryGetParentSession/)
-  assert.match(port, /CreateSession/)
-  assert.match(port, /parentID/)
 })

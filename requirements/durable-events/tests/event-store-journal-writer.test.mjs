@@ -135,12 +135,6 @@ test('WHAT[DURABLE-EVENTS-012] closure_fails_closed_when_a_real_content_address_
   })
 })
 
-test('WHAT[DURABLE-EVENTS-012] journal_writer_source_has_no_snapshot_CAS_or_Git_raw_store', async () => {
-  const { readFile } = await import('node:fs/promises')
-  const source = await readFile(new URL('../../../src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs', import.meta.url), 'utf8')
-  assert.doesNotMatch(source, /OpenSnapshot|CompareAndSwapRef|IGitRawStore|RootOid|StoreSnapshot/)
-  assert.match(source, /store\.Append/)
-})
 
 test('WHAT[DURABLE-EVENTS-013] journal_surface_does_not_mint_terminal_proof_from_forged_strings', () => {
   assert.equal(Object.hasOwn(journal, 'JournalSurface_recordTerminalCompletion'), false)

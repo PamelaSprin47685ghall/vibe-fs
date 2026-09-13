@@ -4,7 +4,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import fc from 'fast-check'
-import { planImpactCompile } from '../../../scripts/lib/owner-compile.mjs'
+import {
+  planImpactCompile,
+  planImpactFromInventory,
+  readImpactInventory,
+} from '../../../scripts/lib/owner-compile.mjs'
 
 const TOPOLOGIES = ['chain', 'diamond', 'fanout', 'arbitrary']
 const SEED = 0x494d5043
@@ -55,44 +59,70 @@ const graphCase = (topology) => fc.integer({ min: 5, max: 9 }).chain((nodeCount)
   references: referencesFor(topology, nodeCount, generated.rawReferences),
 })))
 
-const writeFixture = (graph) => {
-  const root = mkdtempSync(join(tmpdir(), 'wanxiangshu-impact-property-'))
+const projectName = (node) => `Owner.${String(node).padStart(2, '0')}.fsproj`
+
+// Pure in-memory inventory: mirrors the on-disk fixture layout (one .fsi + one
+// .fs per project, aggregate in aggregateOrder) without touching the fs.
+const buildInventory = (graph) => {
+  const root = '/memory-impact'
   const sourceDirectory = join(root, 'Source')
-  mkdirSync(sourceDirectory)
-  writeFileSync(join(root, 'Directory.Build.props'), '<Project/>\n')
+  const projects = new Map()
+  const sourceOwner = new Map()
+  const projectPaths = []
 
-  const projects = Array.from({ length: graph.nodeCount }, (_, node) => {
-    const sourceName = `Node${node}`
-    const projectPath = join(root, `Owner.${String(node).padStart(2, '0')}.fsproj`)
-    writeFileSync(join(sourceDirectory, `${sourceName}.fsi`), `namespace Fixture\nval node${node}: string\n`)
-    writeFileSync(join(sourceDirectory, `${sourceName}.fs`), `namespace Fixture\nlet node${node} = "${node}"\n`)
+  for (let node = 0; node < graph.nodeCount; node += 1) {
+    const projectPath = join(root, projectName(node))
+    const compileItems = [
+      join(sourceDirectory, `Node${node}.fsi`),
+      join(sourceDirectory, `Node${node}.fs`),
+    ]
+    const references = graph.references[node].map((provider) => join(root, projectName(provider)))
+    projects.set(projectPath, {
+      path: projectPath,
+      dir: root,
+      rawText: `<memory project ${node}>`,
+      references,
+      compileItems,
+    })
+    projectPaths.push(projectPath)
+    for (const sourcePath of compileItems) {
+      sourceOwner.set(sourcePath, projectPath)
+    }
+  }
 
-    const references = graph.referenceOrderFlags[node]
-      ? [...graph.references[node]].reverse()
-      : graph.references[node]
-    writeFileSync(projectPath, `<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-${references.map((provider) => `    <ProjectReference Include="Owner.${String(provider).padStart(2, '0')}.fsproj"/>`).join('\n')}
-    <Compile Include="Source/${sourceName}.fsi"/>
-    <Compile Include="Source/${sourceName}.fs"/>
-  </ItemGroup>
-</Project>
-`)
-    return projectPath
-  })
+  const aggregateCompileItems = graph.aggregateOrder.flatMap((node) => [
+    join(sourceDirectory, `Node${node}.fsi`),
+    join(sourceDirectory, `Node${node}.fs`),
+  ])
+  const aggregatePath = join(root, 'Aggregate.fsproj')
+  const aggregate = {
+    path: aggregatePath,
+    dir: root,
+    rawText: '<memory aggregate>',
+    compileItems: aggregateCompileItems,
+  }
 
-  const aggregate = join(root, 'Aggregate.fsproj')
-  writeFileSync(aggregate, `<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-${graph.aggregateOrder.flatMap((node) => [
-    `    <Compile Include="Source/Node${node}.fsi"/>`,
-    `    <Compile Include="Source/Node${node}.fs"/>`,
-  ]).join('\n')}
-  </ItemGroup>
-</Project>
-`)
+  const reverseReferences = new Map(projectPaths.map((projectPath) => [projectPath, new Set()]))
+  for (const [consumerPath, project] of projects) {
+    for (const providerPath of project.references) {
+      reverseReferences.get(providerPath).add(consumerPath)
+    }
+  }
 
-  return { aggregate, projects, root, sourceDirectory }
+  return {
+    aggregate: aggregatePath,
+    projects: projectPaths,
+    root,
+    sourceDirectory,
+    inventory: {
+      aggregate,
+      projectDirectory: root,
+      projectPaths,
+      projects,
+      sourceOwner,
+      reverseReferences,
+    },
+  }
 }
 
 const changePaths = (fixture, changes) => changes.map(({ node, extension }) =>
@@ -106,10 +136,9 @@ const compileItemsForProjects = (fixture, graph, projectPaths) => graph.aggregat
   ])
 
 const focusedPlan = (fixture, changes) => {
-  const plan = planImpactCompile({
+  const plan = planImpactFromInventory({
+    inventory: fixture.inventory,
     changedPaths: changePaths(fixture, changes),
-    projectDirectory: fixture.root,
-    aggregatePath: fixture.aggregate,
     fullThreshold: 1,
   })
 
@@ -127,52 +156,46 @@ const assertSubset = (subset, superset) => {
 }
 
 const verifyGraph = (graph) => {
-  const fixture = writeFixture(graph)
-  try {
-    const implementationChanges = graph.changeNodes.map((node) => ({ node, extension: 'fs' }))
-    const signatureChanges = graph.changeNodes.map((node) => ({ node, extension: 'fsi' }))
-    const mixedChanges = graph.changeNodes.map((node) => ({
-      node,
-      extension: graph.signatureFlags[node] ? 'fsi' : 'fs',
-    }))
+  const fixture = buildInventory(graph)
+  const implementationChanges = graph.changeNodes.map((node) => ({ node, extension: 'fs' }))
+  const signatureChanges = graph.changeNodes.map((node) => ({ node, extension: 'fsi' }))
+  const mixedChanges = graph.changeNodes.map((node) => ({
+    node,
+    extension: graph.signatureFlags[node] ? 'fsi' : 'fs',
+  }))
 
-    const implementationPlan = focusedPlan(fixture, implementationChanges)
-    const signaturePlan = focusedPlan(fixture, signatureChanges)
-    const mixedPlan = focusedPlan(fixture, mixedChanges)
+  const implementationPlan = focusedPlan(fixture, implementationChanges)
+  const signaturePlan = focusedPlan(fixture, signatureChanges)
+  const mixedPlan = focusedPlan(fixture, mixedChanges)
 
-    for (const plan of [implementationPlan, signaturePlan, mixedPlan]) {
-      assertCanonicalFlatInputs(fixture, graph, plan)
-      for (const node of graph.changeNodes) assert.ok(plan.projectPaths.includes(fixture.projects[node]))
-    }
-    assertSubset(new Set(implementationPlan.projectPaths), new Set(signaturePlan.projectPaths))
+  for (const plan of [implementationPlan, signaturePlan, mixedPlan]) {
+    assertCanonicalFlatInputs(fixture, graph, plan)
+    for (const node of graph.changeNodes) assert.ok(plan.projectPaths.includes(fixture.projects[node]))
+  }
+  assertSubset(new Set(implementationPlan.projectPaths), new Set(signaturePlan.projectPaths))
 
-    const reorderedPlan = planImpactCompile({
-      changedPaths: [...changePaths(fixture, mixedChanges).reverse(), ...changePaths(fixture, mixedChanges)],
-      projectDirectory: fixture.root,
-      aggregatePath: fixture.aggregate,
-      fullThreshold: 1,
+  const reorderedPlan = planImpactFromInventory({
+    inventory: fixture.inventory,
+    changedPaths: [...changePaths(fixture, mixedChanges).reverse(), ...changePaths(fixture, mixedChanges)],
+    fullThreshold: 1,
+  })
+  assert.deepEqual(reorderedPlan.projectPaths, mixedPlan.projectPaths)
+  assert.deepEqual(reorderedPlan.compileItems, mixedPlan.compileItems)
+
+  const singleChangeUnion = new Set(mixedChanges.flatMap((change) => focusedPlan(fixture, [change]).projectPaths))
+  assert.deepEqual(new Set(mixedPlan.projectPaths), singleChangeUnion)
+
+  const disconnectedProject = fixture.projects.at(-1)
+  assert.ok(!mixedPlan.projectPaths.includes(disconnectedProject))
+
+  for (const changedPath of [fixture.projects[graph.changeNodes[0]], join(fixture.root, 'Directory.Build.props')]) {
+    const fullPlan = planImpactFromInventory({
+      inventory: fixture.inventory,
+      changedPaths: [changedPath],
     })
-    assert.deepEqual(reorderedPlan.projectPaths, mixedPlan.projectPaths)
-    assert.deepEqual(reorderedPlan.compileItems, mixedPlan.compileItems)
-
-    const singleChangeUnion = new Set(mixedChanges.flatMap((change) => focusedPlan(fixture, [change]).projectPaths))
-    assert.deepEqual(new Set(mixedPlan.projectPaths), singleChangeUnion)
-
-    const disconnectedProject = fixture.projects.at(-1)
-    assert.ok(!mixedPlan.projectPaths.includes(disconnectedProject))
-
-    for (const changedPath of [fixture.projects[graph.changeNodes[0]], join(fixture.root, 'Directory.Build.props')]) {
-      const fullPlan = planImpactCompile({
-        changedPaths: [changedPath],
-        projectDirectory: fixture.root,
-        aggregatePath: fixture.aggregate,
-      })
-      assert.equal(fullPlan.mode, 'full')
-      assert.deepEqual(fullPlan.projectPaths, [...fixture.projects].sort())
-      assert.deepEqual(fullPlan.compileItems, compileItemsForProjects(fixture, graph, new Set(fixture.projects)))
-    }
-  } finally {
-    rmSync(fixture.root, { recursive: true, force: true })
+    assert.equal(fullPlan.mode, 'full')
+    assert.deepEqual(fullPlan.projectPaths, [...fixture.projects].sort())
+    assert.deepEqual(fullPlan.compileItems, compileItemsForProjects(fixture, graph, new Set(fixture.projects)))
   }
 }
 
@@ -182,5 +205,59 @@ test('WHAT[STRUCTURED-WORKFLOW-012] generated impact DAGs preserve change union 
       seed: SEED + index,
       numRuns: RUNS_PER_TOPOLOGY,
     })
+  }
+})
+
+// Single fs-backed parity case: the on-disk XML fixture must plan identically
+// through the legacy entry and through readImpactInventory + planning.
+const writeDiskFixture = () => {
+  const root = mkdtempSync(join(tmpdir(), 'wanxiangshu-impact-parity-'))
+  const sourceDirectory = join(root, 'Source')
+  mkdirSync(sourceDirectory)
+  writeFileSync(join(root, 'Directory.Build.props'), '<Project/>\n')
+
+  const nodes = [0, 1, 2]
+  const projects = nodes.map((node) => {
+    const sourceName = `Node${node}`
+    const projectPath = join(root, projectName(node))
+    writeFileSync(join(sourceDirectory, `${sourceName}.fsi`), `namespace Fixture\nval node${node}: string\n`)
+    writeFileSync(join(sourceDirectory, `${sourceName}.fs`), `namespace Fixture\nlet node${node} = "${node}"\n`)
+    const refs = node === 0
+      ? []
+      : [`    <ProjectReference Include="${projectName(node - 1)}"/>`]
+    writeFileSync(projectPath, `<Project Sdk="Microsoft.NET.Sdk">\n  <ItemGroup>\n${refs.join('\n')}${refs.length > 0 ? '\n' : ''}    <Compile Include="Source/${sourceName}.fsi"/>\n    <Compile Include="Source/${sourceName}.fs"/>\n  </ItemGroup>\n</Project>\n`)
+    return projectPath
+  })
+
+  const aggregate = join(root, 'Aggregate.fsproj')
+  writeFileSync(aggregate, `<Project Sdk="Microsoft.NET.Sdk">\n  <ItemGroup>\n${nodes.flatMap((node) => [
+    `    <Compile Include="Source/Node${node}.fsi"/>`,
+    `    <Compile Include="Source/Node${node}.fs"/>`,
+  ]).join('\n')}\n  </ItemGroup>\n</Project>\n`)
+
+  return { aggregate, projects, root, sourceDirectory }
+}
+
+test('WHAT[STRUCTURED-WORKFLOW-012] disk inventory plans identically through the split stages', () => {
+  const fixture = writeDiskFixture()
+  try {
+    for (const changedPaths of [
+      [join(fixture.sourceDirectory, 'Node1.fs')],
+      [fixture.projects[0]],
+    ]) {
+      const legacy = planImpactCompile({
+        changedPaths,
+        projectDirectory: fixture.root,
+        aggregatePath: fixture.aggregate,
+      })
+      const inventory = readImpactInventory({
+        projectDirectory: fixture.root,
+        aggregatePath: fixture.aggregate,
+      })
+      const split = planImpactFromInventory({ inventory, changedPaths })
+      assert.deepEqual(split, legacy)
+    }
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true })
   }
 })

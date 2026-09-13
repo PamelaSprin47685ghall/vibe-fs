@@ -31,7 +31,6 @@ export const REQUIREMENTS_ROOT = join(
 /** Compiler/build verification: subject is the emitted artifact, not semantics. */
 export const BUILD_VERIFICATION_FILES = new Set([
   'requirements/verification-system/tests/guide-contract.test.mjs',
-  'requirements/verification-system/tests/domain.meta.test.mjs',
   // Its subject is the coverage/build runner itself, including the literal
   // fable_modules exclusion that keeps the coverage denominator honest.
   'requirements/verification-system/tests/coverage-gate.test.mjs',

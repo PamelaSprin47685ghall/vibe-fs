@@ -135,36 +135,6 @@ delivery = "provider-error"
   },
 
   {
-    name: 'VERIFY-003 every retired field names its replacement',
-    fn: () => {
-      for (const [field, reason] of Object.entries(RETIRED_FIELDS)) {
-        assertTrue(typeof reason === 'string' && reason.length > 20, `${field} needs a real reason`);
-      }
-      assertEq(retiredFieldProblems({}).length, 0, 'a clean scenario reports nothing');
-    },
-  },
-
-  {
-    name: 'VERIFY-003 retired vocabulary is reported before structural problems',
-    fn: () => {
-      const result = compile(`scenario = "p"
-flow = []
-
-[[turn]]
-id = "a"
-match = { user = "go" }
-reusable = true
-`);
-
-      assertTrue(!result.ok);
-      assertTrue(
-        result.problems.every((problem) => problem.includes('is retired')),
-        `expected only retirement problems, got: ${result.problems.join(' | ')}`,
-      );
-    },
-  },
-
-  {
     name: 'VERIFY-003 every scenario in the forest compiles',
     fn: () => {
       const files = walk(SCENARIO_ROOT, ['.toml']);

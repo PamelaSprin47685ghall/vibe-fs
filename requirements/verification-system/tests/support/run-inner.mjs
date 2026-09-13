@@ -24,9 +24,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { finished } from 'node:stream/promises'
 
 import { run } from 'node:test'
 import { createCompactReporter } from './compact-reporter.mjs'
+import { createRunState, applyEvent, summarize } from './test-run-state.mjs'
 
 import {
   COVERAGE_EXCLUDE_GLOBS,
@@ -176,6 +178,8 @@ async function main() {
       : {}),
   })
 
+  const runState = createRunState()
+
   // Every event, not just verdicts. The classifier in `verdict-feed.mjs` decides what renews; sending
   // only the blocking kinds would move that decision into this file and leave the parent unable to
   // report background progress in its dump.
@@ -187,25 +191,31 @@ async function main() {
     'test:diagnostic',
     'test:stderr',
     'test:stdout',
+    'test:summary',
   ]) {
     stream.on(type, (data) => {
-      process.send?.({
-        type,
-        data: {
-          name: data?.name,
-          file: data?.file,
-          nesting: data?.nesting,
-          // Duration rides along with the verdict so the parent can report the tier's timing
-          // distribution. One number per verdict, measured by node:test — the alternative was a
-          // second timing mechanism in the parent for something already measured here.
-          durationMs: data?.details?.duration_ms,
-        },
-      })
+      applyEvent(runState, { type, data })
+
+      if (type !== 'test:summary') {
+        process.send?.({
+          type,
+          data: {
+            name: data?.name,
+            file: data?.file,
+            nesting: data?.nesting,
+            // Duration rides along with the verdict so the parent can report the tier's timing
+            // distribution. One number per verdict, measured by node:test — the alternative was a
+            // second timing mechanism in the parent for something already measured here.
+            durationMs: data?.details?.duration_ms,
+          },
+        })
+      }
     })
   }
 
-  const compactReporter = createCompactReporter()
-  stream.compose(compactReporter).pipe(process.stdout)
+  const compactReporter = createCompactReporter({ state: runState })
+  const composedStream = stream.compose(compactReporter)
+  composedStream.pipe(process.stdout)
 
   let coverageSummary = null
   if (withCoverage) {
@@ -218,6 +228,11 @@ async function main() {
     stream,
     send: (message) => process.send?.(message),
   })
+
+  // 等待 reporter stream 完全写完
+  try {
+    await finished(composedStream)
+  } catch {}
 
   if (streamError) {
     console.error(`run-inner: stream error: ${streamError?.message ?? streamError}`)
@@ -242,6 +257,10 @@ async function main() {
   }
 
   if (streamDrained && !streamError) {
+    process.send?.({
+      type: 'runner:summary',
+      data: summarize(runState),
+    })
     process.send?.({ type: 'inner:drained' })
   }
 }

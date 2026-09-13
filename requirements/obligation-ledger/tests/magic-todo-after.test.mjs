@@ -1,43 +1,70 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { createHash } from 'node:crypto'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
-import * as todo from '../../../dist/Mission/Obligation/Todo/MagicTodoSemanticSurface.js'
+import * as journal from '../../../dist/Persistence/Journal/Surface.js'
+import * as host from '../../../dist/Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.js'
+import * as membrane from '../../../dist/Mission/Obligation/Todo/MagicTodoMembraneSurface.js'
 
-const here = dirname(fileURLToPath(import.meta.url))
-const membraneSource = join(
-  here,
-  '../../../src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs',
-)
+process.env.WANXIANGSHU_NO_FATAL_EXIT = '1'
 
-test('WHAT[OBLIGATION-LEDGER-020] quality judgement belongs to independent assessment without dedicated process reviewers', () => {
-  const source = readFileSync(membraneSource, 'utf8')
-  assert.doesNotMatch(source, /NeedsDedicatedEnlist/, 'checkpoints must not create dedicated process reviewers')
-  assert.doesNotMatch(source, /NeedsEnsureReview/, 'checkpoints must not derive process review duties')
-})
+const sha256Hex = (value) => createHash('sha256').update(value).digest('hex')
 
-test('WHAT[OBLIGATION-LEDGER-025] deferred prepare synchronizes the Host snapshot before freezing ReviewFrontier', () => {
-  const source = readFileSync(membraneSource, 'utf8')
-  const locate = source.indexOf('SessionSnapshot.locateToolCall callId messages')
-  const prefix = source.indexOf('messages |> List.takeWhile (fun message -> message.Id <> currentRunId)')
-  const capture = source.indexOf('XTraceCapture.captureSessionMessagesWithReceipt (Some durable) sessionId priorMessages')
-  const resolve = source.indexOf('MagicTodoLocality.resolve sessionId messages (AgentJournal.snapshot durable) callId')
-  assert.ok(locate > 0, 'deferred prepare must identify the exact current provider run from the Host snapshot')
-  assert.ok(prefix > locate, 'only the complete transcript before the current provider run may be synchronized')
-  assert.ok(capture > prefix, 'the prior transcript must be synchronized into XTrace')
-  assert.ok(resolve > capture, 'ReviewFrontier must be localized only after the synchronized XTrace snapshot is current')
-  assert.match(source, /\| Error error ->/, 'typed capture failures must remain explicit')
-  assert.match(source, /\| Ok _ -> \(\)/, 'the receipt may be discarded only after successful capture')
-  assert.doesNotMatch(
-    source,
-    /captureSessionMessages(?:WithReceipt)? \(Some durable\) sessionId messages/,
-    'the current pending tool message must not be durably captured before its input materializes',
-  )
-})
+const openJournal = async (runtime = 'rt_magic_todo_after') => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-magic-todo-after-'))
+  const boot = await journal.JournalSurface_boot(directory, runtime, 4242, '2026-08-11T00:00:00Z')
+  assert.equal(boot.ok, true, boot.ok ? '' : boot.error)
+  return {
+    handle: boot.journal,
+    close: () => {
+      journal.JournalSurface_dispose(boot.journal)
+      rmSync(directory, { recursive: true, force: true })
+    },
+  }
+}
 
-test('WHAT[OBLIGATION-LEDGER-026] after hook accepts checkpoint durably and enriches T1 revelation', () => {
-  const source = readFileSync(membraneSource, 'utf8')
-  assert.match(source, /MagicTodoFact\.TodoWriteAccepted accepted/, 'after hook writes TodoWriteAccepted fact')
-  assert.match(source, /enrichAcceptedResult/, 'after hook enriches accepted result')
+const withJournal = async (body, runtime = 'rt_magic_todo_after') => {
+  const opened = await openJournal(runtime)
+  try {
+    return await body(opened.handle)
+  } finally {
+    opened.close()
+  }
+}
+
+test('WHAT[OBLIGATION-LEDGER-026] after hook accepts checkpoint durably and enriches T1 revelation', async () => {
+  await withJournal(async (handle) => {
+    const sessionId = 'ses-after-test'
+    const incumbencyId = 'life-after-test'
+    const callId = 'call-after-1'
+    const obligations = [{ name: 'task-1', horizon: 'near', work: 'Do work' }]
+
+    // Open life
+    const openRes = await membrane.MagicTodoMembraneSurface_openLife(handle, sessionId, incumbencyId)
+    assert.equal(openRes.ok, true)
+
+    // Prepare checkpoint
+    const args = { planComplete: true, workingOn: 'task-1', obligations }
+    const canonical = host.canonicalInput(args)
+    const digest = host.canonicalInputDigest(sha256Hex, args)
+    const prep = await membrane.MagicTodoMembraneSurface_prepare(
+      handle, sessionId, callId, canonical, digest, true, obligations, 0,
+    )
+    assert.equal(prep.ok, true, prep.ok ? '' : JSON.stringify(prep.error))
+
+    // Accept checkpoint (after hook logic)
+    const accepted = await membrane.MagicTodoMembraneSurface_accept(
+      handle, prep.value.bridge, 'LiveAfterSuccess', digest, sha256Hex('physical-output-after-test'),
+    )
+    assert.equal(accepted.ok, true, accepted.ok ? '' : JSON.stringify(accepted.error))
+
+    // After hook verified:
+    // 1. Snapshot has latched firstPlanCommitment
+    const snap = membrane.MagicTodoMembraneSurface_snapshot(handle, incumbencyId)
+    assert.equal(snap.firstPlanCommitment, prep.value.prepared.todoWriteId)
+    // 2. T1 revelation enriched result
+    assert.match(accepted.value.enrichedResult, /Manager who will carry it is you|The road is yours/i)
+  })
 })

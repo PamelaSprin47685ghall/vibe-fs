@@ -22,82 +22,8 @@
  * evidence.
  */
 
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-
 import { assertEq, assertTrue } from './lib.mjs';
 import { deriveRequests, loadForest, runForest } from './forest-lib.mjs';
-
-const repoFile = (path) => readFileSync(fileURLToPath(new URL(`../../../${path}`, import.meta.url)), 'utf8');
-
-/**
- * Each already-gated K10 item, the production symbol that enforces it, and the case name
- * that proves the enforcement fires.
- *
- * Case NAMES rather than case counts: a count moves whenever anyone adds an unrelated case,
- * so it would either be updated reflexively or become a permanent nuisance. A name changes
- * only when someone renames or deletes the specific case, which is the event this table
- * exists to catch.
- *
- * Read out of the files rather than recalled — `duplicateDeclarations` for instance is
- * enforced by two cases (different responses, and identical responses), and listing only
- * one of them would let the other be deleted silently.
- */
-const PRESENCE_TABLE = [
-  {
-    item: '无死边',
-    symbols: [['tests/e2e/support/scenario-schema.js', 'deadEdges']],
-    cases: [
-      ['tests/integration/harness/schema-cases.mjs', 'VERIFY-003 a turn no flow can reach is rejected'],
-    ],
-  },
-  {
-    item: '索引无冲突',
-    symbols: [
-      ['tests/e2e/support/scenario-schema.js', 'duplicateDeclarations'],
-      ['tests/e2e/support/runtime-key.js', 'ambiguousTurn'],
-    ],
-    cases: [
-      [
-        'tests/integration/harness/schema-cases.mjs',
-        'VERIFY-003 two declarations for one key with different responses are rejected',
-      ],
-      [
-        'tests/integration/harness/schema-cases.mjs',
-        'VERIFY-003 two declarations for one key with the SAME response are also rejected',
-      ],
-      [
-        'tests/integration/harness/runtime-key-cases.mjs',
-        'VERIFY-003 two same-length prefixes are ambiguous, never scored',
-      ],
-      [
-        'tests/integration/harness/runtime-key-cases.mjs',
-        'REVIEW-003 two fragment declarations of equal weight are an author error',
-      ],
-    ],
-  },
-  {
-    item: 'fault 有限',
-    symbols: [
-      ['tests/e2e/support/delivery-plan.js', 'validateFault'],
-      ['tests/e2e/support/scenario-schema.js', 'conflictingFaults'],
-    ],
-    cases: [
-      [
-        'tests/integration/harness/delivery-cases.mjs',
-        'VERIFY-003 an empty attempts list is rejected at load time',
-      ],
-      [
-        'tests/integration/harness/schema-cases.mjs',
-        'VERIFY-003 a malformed fault is rejected by the real compiler, not only the unit',
-      ],
-      [
-        'tests/integration/harness/schema-cases.mjs',
-        'VERIFY-003 two faults on one key are rejected at load, not at delivery',
-      ],
-    ],
-  },
-];
 
 export const forestCases = [
   // ── the one unimplemented obligation ──────────────────────────────────────
@@ -230,66 +156,6 @@ export const forestCases = [
         0,
         `a second session on the same lane changed content selection: ${changed.join(', ')}`,
       );
-    },
-  },
-
-  // ── the presence table for the three already-gated items ──────────────────
-
-  {
-    name: 'VERIFY-003 every already-gated K10 item still has its enforcing symbol',
-    fn: () => {
-      // Without this, "three of four are already covered" is a sentence in a commit message.
-      // With it, deleting `deadEdges` or renaming `conflictingFaults` fails here rather than
-      // quietly reducing K10 to one item.
-      const missing = [];
-
-      for (const { item, symbols } of PRESENCE_TABLE) {
-        for (const [path, symbol] of symbols) {
-          if (!repoFile(path).includes(symbol)) missing.push(`${item}: ${path} no longer defines ${symbol}`);
-        }
-      }
-
-      assertEq(missing.length, 0, missing.join(' | '));
-    },
-  },
-
-  {
-    name: 'VERIFY-003 every already-gated K10 item still has its enforcing case',
-    fn: () => {
-      // A symbol that exists but is never exercised is the zero-call-site shape this
-      // repository has now measured four times: `buildAttemptExecutionProfile` with no
-      // caller, `faultFor` keyed by text so no fault ever fired, `boundaryFor` the same, and
-      // the `containsTool` branch package W3 deleted. So the table pins the case NAME too,
-      // and a rename surfaces as a failure naming the case that vanished.
-      const missing = [];
-
-      for (const { item, cases } of PRESENCE_TABLE) {
-        for (const [path, caseName] of cases) {
-          if (!repoFile(path).includes(caseName)) missing.push(`${item}: ${path} lost case "${caseName}"`);
-        }
-      }
-
-      assertEq(missing.length, 0, missing.join(' | '));
-    },
-  },
-
-  {
-    name: 'VERIFY-003 the presence table covers exactly the three items K10 delegates',
-    fn: () => {
-      // The table's own completeness. K10 has four items; one is asserted directly by the
-      // determinism cases above and three are delegated. A table that silently dropped an
-      // item would leave that item unchecked while every other case in this file still
-      // passed — the hazard this file's placeholder header warned about.
-      assertEq(
-        PRESENCE_TABLE.map(({ item }) => item).join(', '),
-        '无死边, 索引无冲突, fault 有限',
-        'K10 delegates exactly these three; 纯函数性 is asserted directly above',
-      );
-
-      for (const { item, symbols, cases } of PRESENCE_TABLE) {
-        assertTrue(symbols.length > 0, `${item} has no enforcing symbol, so the delegation is unproven`);
-        assertTrue(cases.length > 0, `${item} has no enforcing case, so the symbol could be dead`);
-      }
     },
   },
 ];

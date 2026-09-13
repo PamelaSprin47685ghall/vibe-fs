@@ -29,6 +29,10 @@ const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 const relativePath = (path) => relative(process.cwd(), path).replace(/\\/g, '/')
 const distImport = (prefix, module) => `${prefix}dist/${module}`
 
+const wholeScan = scanAll(join(ROOT, 'requirements'))
+const wholeSemanticFiles = new Set(semanticTestFiles(join(ROOT, 'requirements')).map(relativePath))
+const wholeSemanticImportEdges = semanticImportEdges(join(ROOT, 'requirements'))
+
 const validateSurfaceFixture = (body) => {
   const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-surface-execution-closure-'))
   const paths = {
@@ -77,7 +81,7 @@ test('WHAT[JS-SEMANTIC-SURFACE-001] JS_SURFACE_001_all_semantic_tests_are_mjs', 
 // ── 002: the gate observes actual whole-corpus debt ─────────────────────────
 
 test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002_forbidden_patterns_absent_from_semantic_tests', () => {
-  assert.deepEqual(scanAll(), {}, 'no semantic test may carry forbidden patterns')
+  assert.deepEqual(wholeScan, {}, 'no semantic test may carry forbidden patterns')
 })
 
 test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002c_whole_semantic_test_zone_is_scanned', () => {
@@ -120,17 +124,9 @@ test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002c_whole_semantic_test_zone_is_
 // ── 003: law → owner → surface → compiled surface → contract evidence ────────
 
 test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_law_owner_surface_registry', () => {
+  assert.ok(SURFACE_MANIFEST.length > 0)
   const failures = validateSurfaceManifest(SURFACE_MANIFEST, ROOT)
   assert.deepEqual(failures, [], failures.join('\n'))
-})
-
-test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_every_registered_surface_has_a_contract_test', () => {
-  assert.ok(SURFACE_MANIFEST.length > 0)
-  assert.deepEqual(validateSurfaceManifest(SURFACE_MANIFEST, ROOT), [])
-})
-
-test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002b_registered_surfaces_exist_in_the_production_source_tree', () => {
-  assert.deepEqual(validateSurfaceManifest(SURFACE_MANIFEST, ROOT), [])
 })
 
 test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_manifest_rejects_unemitted_or_unauthorized_evidence', () => {
@@ -177,16 +173,14 @@ test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_manifest_rejects_unemitted_or
 // ── 004: a debt-bearing helper is not a new direct test subject ─────────────
 
 test('WHAT[JS-SEMANTIC-SURFACE-004] JS_SURFACE_004_helper_not_directly_tested', () => {
-  const scan = scanAll()
-  const files = new Set(semanticTestFiles().map(relativePath))
   const violations = []
 
-  for (const { importer, target } of semanticImportEdges()) {
+  for (const { importer, target } of wholeSemanticImportEdges) {
     const importerRel = relativePath(importer)
     const targetRel = relativePath(target)
-    if (!files.has(targetRel) || targetRel.endsWith('.test.mjs')) continue
+    if (!wholeSemanticFiles.has(targetRel) || targetRel.endsWith('.test.mjs')) continue
     if (targetRel.endsWith('verification-system/tests/support/js-contract.mjs')) continue
-    if ((scan[targetRel] ?? []).length === 0) continue
+    if ((wholeScan[targetRel] ?? []).length === 0) continue
     violations.push(`${importerRel} imports debt-bearing helper ${targetRel}`)
   }
 

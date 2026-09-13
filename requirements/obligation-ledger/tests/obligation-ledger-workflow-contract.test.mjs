@@ -1,75 +1,92 @@
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import test from 'node:test'
+import {
+  prepareCheckpoint,
+  acceptCheckpoint,
+  PreparationAttempt$2,
+} from '../../../dist/Mission/Obligation/LedgerWorkflow.js'
+import { FSharpResult$2 } from '../../../dist/fable_modules/fable-library-js.5.13.0/Result.js'
+import * as projection from '../../../dist/Composition/Durable/MagicTodoProjection.js'
+import * as projectionSurface from '../../../dist/Mission/Obligation/Todo/MagicTodoProjectionSurface.js'
+import * as relay from '../../../dist/Mission/Relay/Surface.js'
 
-const root = new URL('../../../', import.meta.url).pathname
-const read = (path) => readFileSync(join(root, path), 'utf8')
+test('WHAT[OBLIGATION-LEDGER-018] business sequencing is a direct F# CE, executing preparation and acceptance without foreign state machines', async () => {
+  // 1. prepareCheckpoint executes admission directly and returns typed Ok
+  let prepareAttempted = false
+  const prepOk = await prepareCheckpoint(() => {
+    prepareAttempted = true
+    return Promise.resolve(new PreparationAttempt$2(0, ['prepared-checkpoint-data']))
+  })
+  assert.equal(prepareAttempted, true)
+  assert.equal(prepOk.tag, 0)
+  assert.equal(prepOk.fields[0], 'prepared-checkpoint-data')
 
-const workflowPath = 'src/Wanxiangshu/Mission/Obligation/LedgerWorkflow.fs'
+  // 2. prepareCheckpoint short-circuits on failure with typed AttemptFailed
+  const prepFailed = await prepareCheckpoint(() => {
+    return Promise.resolve(new PreparationAttempt$2(1, ['admission-denied']))
+  })
+  assert.equal(prepFailed.tag, 1)
+  assert.equal(prepFailed.fields[0].fields[0], 'admission-denied')
 
-test('WHAT[OBLIGATION-LEDGER-018] business sequencing is a direct F# CE, not a second runtime', () => {
-  assert.equal(existsSync(join(root, workflowPath)), true, `${workflowPath} must own the business workflow`)
-  const source = read(workflowPath)
+  // 3. acceptCheckpoint executes durability effect and returns typed Ok
+  let acceptAttempted = false
+  const accOk = await acceptCheckpoint(() => {
+    acceptAttempted = true
+    return Promise.resolve(new FSharpResult$2(0, ['accepted-checkpoint-data']))
+  })
+  assert.equal(acceptAttempted, true)
+  assert.equal(accOk.tag, 0)
+  assert.equal(accOk.fields[0], 'accepted-checkpoint-data')
 
-  assert.match(source, /taskResult\s*\{|task\s*\{/, 'business sequencing is a direct F# CE (task/taskResult), not a second runtime')
-  assert.match(source, /let!|match!|return!/)
-  assert.doesNotMatch(source, /type\s+\w*(Command|Reply|Stage|Phase|NextAction|ProgramCounter)\b/)
-  assert.doesNotMatch(source, /module\s+\w*Interpreter\b|\binterpret\b|\bfromTask\b|Flow\.lift/)
+  // 4. acceptCheckpoint maps error into typed AcceptFailed
+  const accFail = await acceptCheckpoint(() => {
+    return Promise.resolve(new FSharpResult$2(1, ['append-failed']))
+  })
+  assert.equal(accFail.tag, 1)
+  assert.equal(accFail.fields[0].fields[0], 'append-failed')
 })
 
-test('WHAT[OBLIGATION-LEDGER-018] hot-path queries use incremental projection facts, never AcceptedOrder replay', () => {
-  const projection = read('src/Wanxiangshu/Composition/Durable/MagicTodoProjection.fs')
-  for (const field of [
-    'FirstAcceptedCheckpoint',
-    'LatestAcceptedCheckpoint',
-    'FirstPlanCommitment',
-    'LatestCommittedCheckpoint',
-    'PreviousCommittedCheckpoint',
-  ]) {
-    assert.match(projection, new RegExp(`\\b${field}\\b`), `projection must incrementally carry ${field}`)
-  }
-
-  assert.doesNotMatch(projection, /\bAcceptedOrder\b|\bAcceptedIds\b|\bacceptedOrder\b/, 'production projection no longer stores an accepted-history query chain')
-
-  for (const path of [
-    'src/Wanxiangshu/Mission/Manager/Workflow.fs',
-    'src/Wanxiangshu/Mission/Relay/OpenCode/SuicideTool.fs',
-    'src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs',
-  ]) {
-    assert.doesNotMatch(read(path), /\.AcceptedOrder\b|acceptedOrder\s+/, `${path} must consume O(1) projection queries`)
-  }
-})
-
-test('WHAT[OBLIGATION-LEDGER-018] recovery contract is fact reentry, not a resumable workflow position', () => {
-  const facts = read('src/Wanxiangshu/Composition/Durable/MagicTodoFacts.fs')
-  const projection = read('src/Wanxiangshu/Composition/Durable/MagicTodoProjection.fs')
-
-  assert.doesNotMatch(facts, /PlanningStage|ReviewStage|NextAction|ResumeAt|ProgramCounter|AwaitingReview\s*:/)
-  assert.doesNotMatch(projection, /PlanningStage|ReviewStage|NextAction|ResumeAt|ProgramCounter/)
-  assert.match(projection, /foldPrepared/)
-  assert.match(projection, /foldAccepted/)
-})
-
-test('WHAT[OBLIGATION-LEDGER-018] Manager authority root on incumbency opening is derived from durable Relay facts, not transient PromptAuthority profiles', () => {
-  const fold = read('src/Wanxiangshu/Mission/Relay/Fold.fs')
-  assert.match(
-    fold,
-    /AuthorityMessageIds = \[ authorityMessageId \]/,
-    'AuthorityMessageIds on Road/Incumbency opening must be derived from durable authority facts',
-  )
-  assert.doesNotMatch(
-    fold,
-    /PromptAuthorityLedger/,
-    'Relay Fold must not reconstruct authority root from transient PromptAuthorityLedger profile',
-  )
-})
-
-test('WHAT[OBLIGATION-LEDGER-018] ObligationLedgerWorkflow is isolated from foreign domain dependencies', () => {
-  const workflow = read('src/Wanxiangshu/Mission/Obligation/LedgerWorkflow.fs')
-  assert.doesNotMatch(
-    workflow,
-    /open\s+Wanxiangshu\.(Change|Interaction|Mission\.Finality|Mission\.Manager|Mission\.Review|Mission\.WorkRecord|Participant|Strength)/,
-    'ObligationLedgerWorkflow must not import foreign domains',
-  )
+test('WHAT[OBLIGATION-LEDGER-018] hot-path queries use incremental projection facts on IncumbencyMagicTodoState', () => {
+  const fact = (caseName, payload) => JSON.stringify({ case: caseName, ...payload })
+  const prepared = fact('TodoWritePrepared', {
+    ManagerSessionId: 'ses-1',
+    IncumbencyId: 'test-life',
+    TodoWriteId: 'tw-1',
+    ToolCallId: 'call-1',
+    ToolPartOrdinal: 1,
+    BaseTodoRef: 'base-ref',
+    BaseTodoDigest: 'base-digest',
+    ProposedTodoRef: 'prop-ref',
+    ProposedTodoDigest: 'prop-digest',
+    PlanCompleteDeclared: true,
+    ProviderInputDigest: 'in-digest',
+    ReviewFrontier: { Sequence: 10 },
+    SemanticVersion: 'magic-v1',
+  })
+  const accepted = fact('TodoWriteAccepted', {
+    IncumbencyId: 'test-life',
+    TodoWriteId: 'tw-1',
+    ToolCallId: 'call-1',
+    PreparedFactRef: 'evt-1',
+    InputDigest: 'in-digest',
+    OutputDigest: 'out-digest',
+    PhysicalSuccessEvidence: 'LiveAfterSuccess',
+    SemanticVersion: 'magic-v1',
+  })
+  const handle = projectionSurface.MagicTodoProjectionSurface_create()
+  projectionSurface.MagicTodoProjectionSurface_fold(handle, 'evt-1', prepared)
+  projectionSurface.MagicTodoProjectionSurface_fold(handle, 'evt-2', accepted)
+  const view = projectionSurface.MagicTodoProjectionSurface_view(handle, 'test-life')
+  assert.ok(view, 'view must exist for folded incumbency')
+  assert.equal('firstAcceptedCheckpoint' in view, true)
+  assert.equal('latestAcceptedCheckpoint' in view, true)
+  assert.equal('firstPlanCommitment' in view, true)
+  assert.equal('latestCommittedCheckpoint' in view, true)
+  assert.equal('previousCommittedCheckpoint' in view, true)
+  assert.equal('acceptedOrder' in view, false)
+  assert.equal('acceptedIds' in view, false)
+  assert.equal(view.firstAcceptedCheckpoint, 'tw-1')
+  assert.equal(view.latestAcceptedCheckpoint, 'tw-1')
+  assert.equal(view.firstPlanCommitment, 'tw-1')
+  assert.equal(view.latestCommittedCheckpoint, 'tw-1')
 })

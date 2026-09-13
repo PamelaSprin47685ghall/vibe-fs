@@ -141,3 +141,33 @@ test('WHAT[DURABLE-EVENTS-007] PERSIST_005_unknown_case_is_a_decode_error', () =
   const decoded = factCodec.decode('{"NoSuchFactCase":{"X":1}}')
   assert.equal(decoded.ok, false)
 })
+
+test('WHAT[DURABLE-EVENTS-009] Fact_codec_reports_migration_markers_as_data_errors', () => {
+  const markers = [
+    'FailuresOnCurrentSide',
+    'IsDead',
+    'TotalFailures',
+    'BaseModelID',
+    'BaseProviderID',
+    'EffectiveModelID',
+    'EffectiveProviderID',
+  ]
+
+  for (const marker of markers) {
+    const line = JSON.stringify({ Fact: ['Agent', ['FallbackCursorAdvanced', { [marker]: 1 }]] })
+    assert.equal(factCodec.containsLegacyFallbackFields(line), true, `${marker} must be refused`)
+    const decoded = factCodec.decode(line)
+    assert.equal(decoded.ok, false)
+    assert.equal(decoded.error, factCodec.pre050MigrationMessage)
+  }
+})
+
+test('WHAT[DURABLE-EVENTS-007] Fact_codec_distinguishes_current_and_malformed_lines', () => {
+  const current = factCodec.decode(factCodec.encode(runtimeStarted()))
+  assert.equal(current.ok, true, current.ok ? '' : current.error)
+  assert.equal(current.case, 'RuntimeStarted')
+
+  const malformed = factCodec.decode('{not json')
+  assert.equal(malformed.ok, false)
+  assert.equal(typeof malformed.error, 'string')
+})

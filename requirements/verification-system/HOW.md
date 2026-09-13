@@ -38,11 +38,10 @@
 - 验证生产语义测试中零深度导入（deep dist imports）、零混淆导出探测（mangled name lookup）以及零底层编译器表示依赖。
 - 确保所有公开给测试的入口均在 `SURFACE_MANIFEST` 中完成完备注册并有明确命题授权。
 
-### 6. 非机械度量断言（`no-line-count-check`）
+### 6. 非机械度量政策
 
-`tests/no-line-count-check.test.mjs` 结构化验证仓库的所有门禁与检查套件中，不存在任何形式的文件行数或尺寸限制逻辑，确保质量保障专注于真实的架构语义和规范不变量。
+行数不是门禁，门禁系统不设置文件行数或尺寸机械限制逻辑，确保质量保障专注于真实的架构语义和规范不变量。
 
-### 7. Production-bound property testing
 
 
 ### 8. 独立边界编译与合并 impact 编译的分工
@@ -80,5 +79,5 @@
 | VERIFICATION-SYSTEM-009 | `requirements/verification-system/tests/integration-entry-coverage.test.mjs::WHAT[VERIFICATION-SYSTEM-009] integration entry coverage accepts an exact reachable set`；`requirements/verification-system/tests/repository-closure-gates.test.mjs::WHAT[VERIFICATION-SYSTEM-009] repository closure gates reject an unassigned production source and package member` |
 | VERIFICATION-SYSTEM-010 | `requirements/verification-system/tests/proof-ladder.test.mjs::WHAT[VERIFICATION-SYSTEM-010] acceptance criteria only tighten — a failing gate propagates its exit code` |
 | VERIFICATION-SYSTEM-011 | `requirements/verification-system/tests/coverage-gate.test.mjs::WHAT[VERIFICATION-SYSTEM-011] parseCoverageThreshold accepts valid positive finite numbers` |
-| VERIFICATION-SYSTEM-012 | `requirements/verification-system/tests/no-line-count-check.test.mjs::WHAT[VERIFICATION-SYSTEM-012] no line-count check wording in package or gates` |
+| VERIFICATION-SYSTEM-012 | 规范性条款（行数不是门禁，不做机械行数检查；详见 WHAT.md，已退役元扫描器） |
 | VERIFICATION-SYSTEM-013 | `requirements/verification-system/tests/js-boundary-gate.test.mjs::WHAT[VERIFICATION-SYSTEM-013] product_semantic_debt_is_zero` |

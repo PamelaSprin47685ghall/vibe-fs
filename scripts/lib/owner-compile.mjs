@@ -440,9 +440,21 @@ export function planImpactCompile({
     throw new Error(`fullThreshold must be within (0, 1], got ${fullThreshold}`)
   }
 
+  const inventory = readImpactInventory({ projectDirectory, aggregatePath })
+  return planImpactFromInventory({ inventory, changedPaths, fullThreshold, isClean })
+  }
+
+/**
+ * Reads the on-disk owner topology into an immutable inventory for planning.
+ *
+ * Owns every filesystem touch of the impact planner: aggregate parse,
+ * project discovery, per-project parse, duplicate-compile and
+ * outside-topology validation, and the reverse-reference index. The returned
+ * inventory is treated as immutable by planImpactFromInventory.
+ */
+export function readImpactInventory({ projectDirectory, aggregatePath = DEFAULT_AGGREGATE_PATH } = {}) {
   const aggregate = parseAggregateProject(aggregatePath)
   const resolvedProjectDirectory = norm(projectDirectory ?? path.dirname(aggregate.path))
-  const normalizedChanges = [...new Set(changedPaths.map((changedPath) => norm(changedPath)))].sort()
   const projectPaths = discoverOwnerProjects(resolvedProjectDirectory, aggregate.path)
   const projects = new Map(projectPaths.map((projectPath) => [projectPath, parseProjectFile(projectPath)]))
   const sourceOwner = new Map()
@@ -465,6 +477,56 @@ export function planImpactCompile({
     }
   }
 
+  const reverseReferences = new Map(projectPaths.map((projectPath) => [projectPath, new Set()]))
+  for (const [consumerPath, project] of projects) {
+    for (const providerPath of project.references) {
+      reverseReferences.get(providerPath).add(consumerPath)
+    }
+  }
+
+  return {
+      aggregate,
+    projectDirectory: resolvedProjectDirectory,
+    projectPaths: Object.freeze([...projectPaths]),
+      projects,
+    sourceOwner,
+    reverseReferences,
+  }
+  }
+
+/**
+ * Pure impact planning over an inventory from readImpactInventory.
+ *
+ * Performs no filesystem access: requiresFullImpact/toolchain check, reverse
+ * reachability from changed sources, forward closure, aggregate-drift check,
+ * and the fullThreshold/clean-build promotion. Throws the same errors as
+ * planImpactCompile for bad changedPaths/fullThreshold, cycles, unmapped
+ * sources, and aggregate drift.
+ */
+export function planImpactFromInventory({ inventory, changedPaths, fullThreshold = 0.6, isClean = false } = {}) {
+  if (!Array.isArray(changedPaths) || changedPaths.length === 0) {
+    throw new Error('changedPaths must contain at least one path for planImpactCompile')
+  }
+  if (!(fullThreshold > 0 && fullThreshold <= 1)) {
+    throw new Error(`fullThreshold must be within (0, 1], got ${fullThreshold}`)
+  }
+  if (!inventory || !inventory.aggregate || !inventory.projects || !inventory.sourceOwner) {
+    throw new Error('inventory from readImpactInventory is required for planImpactFromInventory')
+  }
+
+  const { aggregate, projects, sourceOwner } = inventory
+  const projectPaths = inventory.projectPaths ?? [...projects.keys()]
+  const reverseReferences = inventory.reverseReferences ?? (() => {
+    const index = new Map(projectPaths.map((projectPath) => [projectPath, new Set()]))
+  for (const [consumerPath, project] of projects) {
+    for (const providerPath of project.references) {
+        index.get(providerPath)?.add(consumerPath)
+      }
+    }
+    return index
+  })()
+
+  const normalizedChanges = [...new Set(changedPaths.map((changedPath) => norm(changedPath)))].sort()
   const allProjects = new Set(projectPaths)
   if (normalizedChanges.some((changedPath) => requiresFullImpact(changedPath, aggregate.path))) {
     return impactPlan({
@@ -478,14 +540,6 @@ export function planImpactCompile({
     })
   }
 
-  const reverseReferences = new Map(projectPaths.map((projectPath) => [projectPath, new Set()]))
-  for (const [consumerPath, project] of projects) {
-    for (const providerPath of project.references) {
-      reverseReferences.get(providerPath).add(consumerPath)
-    }
-  }
-
-  const changedSet = new Set(normalizedChanges)
   const roots = new Set()
 
   const addReverseConsumers = (projectPath) => {

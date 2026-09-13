@@ -15,43 +15,94 @@ const sandboxHooks = () => {
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
-test('WHAT[DURABLE-EVENTS-018] HOOK_activation_ensure_installs_both_hooks_and_remote_fetch_refspec_without_running_sync', () => {
-  const source = read('src/Wanxiangshu/Git/Hook/Dispatcher.fs')
-  assert.match(source, /HookKind\.ReferenceTransaction/)
-  assert.match(source, /HookKind\.PrePush/)
-  assert.match(source, /remote\.%s\.fetch/)
-  assert.match(source, /StoreRef\.remoteTracking/)
-  assert.match(source, /let ensure .*Result<unit, string>/s)
-  assert.doesNotMatch(source, /WriterStreamSync|GitGateway\.converge|member _\.(Fetch|Pull|Push)/,
-    'activation ensure must install the membrane, not perform synchronization')
+test('WHAT[DURABLE-EVENTS-018] HOOK_activation_ensure_installs_both_hooks_and_remote_fetch_refspec_without_running_sync', async () => {
+  const { execFileSync } = await import('node:child_process')
+  const repo = mkdtempSync(join(tmpdir(), 'wxs-hook-ensure-'))
+  try {
+    execFileSync('git', ['init', '--quiet', repo])
+    execFileSync('git', ['-C', repo, 'remote', 'add', 'origin', 'https://example.com/repo.git'])
+
+    const ok = Hook.ensure(repo)
+    assert.equal(ok, true, 'Hook.ensure must succeed for an initialized repository')
+
+    const gitDir = join(repo, '.git')
+    const prePushPath = join(gitDir, 'hooks', 'pre-push')
+    const refTxPath = join(gitDir, 'hooks', 'reference-transaction')
+    assert.equal(readFileSync(prePushPath, 'utf8').includes(MARKER), true, 'pre-push hook must be installed and owned')
+    assert.equal(readFileSync(refTxPath, 'utf8').includes(MARKER), true, 'reference-transaction hook must be installed and owned')
+
+    const fetchSpecs = execFileSync('git', ['-C', repo, 'config', '--get-all', 'remote.origin.fetch'], { encoding: 'utf8' })
+    assert.match(fetchSpecs, /\+refs\/wanxiang\/store:refs\/wanxiang\/remotes\/origin\/store/,
+      'ensure must configure the remote tracking fetch refspec')
+  } finally {
+    rmSync(repo, { recursive: true, force: true })
+  }
 })
 
-test('WHAT[DURABLE-EVENTS-018] HOOK_shim_resolves_node_from_environment_not_installer_host_execPath', () => {
-  const dispatcher = read('src/Wanxiangshu/Git/Hook/Dispatcher.fs')
-  const runner = read('resources/git/wanxiang-hook.mjs')
-  assert.match(runner, /^#!\/usr\/bin\/env node/)
-  assert.doesNotMatch(dispatcher, /process\.execPath|nodeExecutable/,
-    'hook must survive after an OpenCode/Bun installer process exits')
-  assert.match(dispatcher, /exec \/usr\/bin\/env node %s %s/,
-    'shim must resolve Node independently and pass the packaged runner as data, not as the installer executable')
+test('WHAT[DURABLE-EVENTS-018] HOOK_shim_resolves_node_from_environment_not_installer_host_execPath', async () => {
+  const { execFileSync } = await import('node:child_process')
+  const repo = mkdtempSync(join(tmpdir(), 'wxs-hook-shim-'))
+  try {
+    execFileSync('git', ['init', '--quiet', repo])
+    assert.equal(Hook.ensure(repo), true)
+
+    const prePush = readFileSync(join(repo, '.git', 'hooks', 'pre-push'), 'utf8')
+    const refTx = readFileSync(join(repo, '.git', 'hooks', 'reference-transaction'), 'utf8')
+
+    for (const shim of [prePush, refTx]) {
+      assert.match(shim, /^#!\/bin\/sh/)
+      assert.match(shim, /exec \/usr\/bin\/env node/)
+      assert.doesNotMatch(shim, new RegExp(process.execPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+        'shim must resolve Node from environment, not hardcode the installer host process.execPath')
+    }
+  } finally {
+    rmSync(repo, { recursive: true, force: true })
+  }
 })
 
-test('WHAT[DURABLE-EVENTS-018] HOOK_reference_transaction_and_pre_push_launch_the_same_independent_full_converge_runtime', () => {
-  const dispatcher = read('src/Wanxiangshu/Git/Hook/Dispatcher.fs')
-  const sync = read('src/Wanxiangshu/Git/Hook/Sync.fs')
-  const runner = read('resources/git/wanxiang-hook.mjs')
+test('WHAT[DURABLE-EVENTS-018] HOOK_reference_transaction_and_pre_push_launch_the_same_independent_full_converge_runtime', async () => {
+  const { spawnSync } = await import('node:child_process')
+  const runner = join(process.cwd(), 'resources/git/wanxiang-hook.mjs')
 
-  assert.match(dispatcher, /resources\/git/)
-  assert.match(dispatcher, /WANXIANG_GIT_SYNC_ACTIVE/)
-  assert.match(sync, /runPrePush/)
-  assert.match(sync, /runReferenceTransaction/)
-  assert.match(sync, /converge remote None/)
-  assert.match(sync, /converge remote observed/)
-  const syncCode = sync.split('\n').filter((line) => !line.trimStart().startsWith('///')).join('\n')
-  assert.doesNotMatch(syncCode, /WorkspaceEventStore|CanonicalIntegrator|PluginHost|IEventStore/)
-  assert.match(runner, /reference-transaction/)
-  assert.match(runner, /pre-push/)
-  assert.doesNotMatch(runner, /WorkspaceEventStore|CanonicalIntegrator|PluginHost/)
+  // 1. Re-entrance guard: WANXIANG_GIT_SYNC_ACTIVE=1 exits cleanly immediately
+  const reentrant = spawnSync(process.execPath, [runner, 'pre-push', 'origin'], {
+    env: { ...process.env, WANXIANG_GIT_SYNC_ACTIVE: '1' },
+  })
+  assert.equal(reentrant.status, 0, 'active sync must short-circuit without error')
+
+  // 2. reference-transaction with non-committed state exits cleanly
+  const nonCommitted = spawnSync(process.execPath, [runner, 'reference-transaction', 'prepared'], {
+    input: '',
+  })
+  assert.equal(nonCommitted.status, 0, 'non-committed reference-transaction state must exit 0')
+
+  // 3. reference-transaction with non-store ref input exits cleanly
+  const nonStoreRef = spawnSync(process.execPath, [runner, 'reference-transaction', 'committed'], {
+    input: '0000000000000000000000000000000000000000 1111111111111111111111111111111111111111 refs/heads/main\n',
+  })
+  assert.equal(nonStoreRef.status, 0, 'unrelated branch reference transaction must exit 0')
+
+  // 4. Unknown hook kind exits with error status 1
+  const unknown = spawnSync(process.execPath, [runner, 'unknown-hook-kind'], {
+    encoding: 'utf8',
+  })
+  assert.equal(unknown.status, 1)
+  assert.match(unknown.stderr, /unknown hook kind: unknown-hook-kind/i)
+
+  // 5. Pre-push requires non-empty remote name
+  const emptyRemote = spawnSync(process.execPath, [runner, 'pre-push', ''], {
+    encoding: 'utf8',
+  })
+  assert.equal(emptyRemote.status, 1)
+  assert.match(emptyRemote.stderr, /requires the Git remote name/i)
+
+  // 6. Direct surface calls verify typed error handling
+  const HookSync = await import('../../../dist/Git/Hook/Sync.js')
+  const prePushErr = await HookSync.runPrePush('')
+  assert.match(prePushErr, /requires the Git remote name/i)
+
+  const nonCommittedResult = await HookSync.runReferenceTransaction('prepared', '')
+  assert.equal(nonCommittedResult, undefined)
 })
 
 test('WHAT[DURABLE-EVENTS-018] HOOK_classification_preserves_foreign_hooks', () => {

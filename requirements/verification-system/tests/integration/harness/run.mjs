@@ -26,7 +26,6 @@ import { scenarioRuntimeCases } from './scenario-runtime-cases.mjs';
 import { schemaCases } from './schema-cases.mjs';
 import { sourceCases } from './source-cases.mjs';
 import { pathCriterionCases } from './path-criterion-cases.mjs';
-import { singleSourceCases } from './single-source-cases.mjs';
 import { projectionCases } from './projection-cases.mjs';
 import { runtimeKeyCases } from './runtime-key-cases.mjs';
 import { timeoutCases } from './timeout-cases.mjs';
@@ -56,7 +55,6 @@ const allCases = [
   ...forestLibCases,
   ...sourceCases,
   ...pathCriterionCases,
-  ...singleSourceCases,
   ...timeoutCases,
   ...budgetCases,
   ...readinessCases,

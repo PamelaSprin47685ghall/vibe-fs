@@ -6,10 +6,18 @@
 // each complete local writer file is exactly one Git blob at the sync boundary.
 
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
 
+import * as eventStore from '../../../dist/Persistence/EventStore/Surface.js'
+import * as retention from '../../../dist/Persistence/EventStore/RetentionSurface.js'
+
 const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
+const make = (id, stream, parents = []) => ({ id, stream, type: 'JobRequested', parents, payload: {}, payloadRefs: [] })
 
 test('WHAT[DURABLE-CONVERGENCE-002] one k-way primitive is shared by integrator and sync', async () => {
   const primitive = await read('src/Wanxiangshu/Persistence/EventStore/EventKWayMerge.fs')
@@ -33,15 +41,76 @@ test('WHAT[DURABLE-CONVERGENCE-002] k-way cursor readiness is one finite state n
 })
 
 test('WHAT[DURABLE-CONVERGENCE-003] sync blobifies each complete writer file once without segments or index', async () => {
-  const source = await read('src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs')
+  const root = mkdtempSync(join(tmpdir(), 'wxs-writer-blobify-'))
+  const repoA = join(root, 'a')
+  const repoB = join(root, 'b')
+  execFileSync('git', ['init', '-q', repoA])
+  execFileSync('git', ['init', '-q', repoB])
+  const commonA = join(repoA, '.git')
+  const commonB = join(repoB, '.git')
 
-  assert.match(source, /WriterId|writerId/)
-  assert.match(source, /WriteBlob/)
-  assert.doesNotMatch(source, /SegmentMaxBytes|segment|chunk|index\/|EventId.*Oid|delta/i)
+  const now = Date.now()
+  const A = 'a'.repeat(40)
+  const B = 'b'.repeat(40)
+  const C = 'c'.repeat(40)
 
-  // Contract shape: materialization iterates writer files, writing one blob for the complete bytes.
-  assert.match(source, /materialize.*writer|writer.*materialize/is)
-  assert.doesNotMatch(source, /splitWriter|rotateWriter|writerSegment|writerChunk/i)
+  try {
+    // 1. Repo A appends an event to writer-a and syncs to a snapshot
+    const handleA = eventStore.create(commonA, 'writer-a')
+    await eventStore.append(handleA, [make(A, 'stream/1')])
+    eventStore.dispose(handleA)
+
+    const syncA1 = await retention.syncAt(repoA, commonA, null, now)
+    assert.equal(syncA1.ok, true, syncA1.ok ? '' : JSON.stringify(syncA1.error))
+
+    // Prove complete writer file is exactly one Git blob in writers/ tree
+    const treeA = execFileSync('git', ['-C', repoA, 'ls-tree', `${syncA1.root}:writers`], { encoding: 'utf8' })
+    assert.match(treeA.trim(), /^100644 blob [0-9a-f]{40}\twriter-a\.ndjson$/)
+
+    const blobOidA = treeA.trim().split(/\s+/)[2]
+    const blobContentA = execFileSync('git', ['-C', repoA, 'cat-file', '-p', blobOidA], { encoding: 'utf8' })
+    const fileContentA = readFileSync(join(commonA, 'wanxiang', 'events', 'writer-a.ndjson'), 'utf8')
+    assert.equal(blobContentA, fileContentA, 'entire local writer file is one Git blob without segments')
+
+    // 2. Repo B has writer-b, fetches Repo A objects, and syncs against rootA -> convergence
+    execFileSync('git', ['-C', repoB, 'fetch', '-q', repoA, syncA1.root])
+    const handleB = eventStore.create(commonB, 'writer-b')
+    await eventStore.append(handleB, [make(B, 'stream/2')])
+    eventStore.dispose(handleB)
+
+    const syncB1 = await retention.syncAt(repoB, commonB, syncA1.root, now)
+    assert.equal(syncB1.ok, true, syncB1.ok ? '' : JSON.stringify(syncB1.error))
+    assert.equal(existsSync(join(commonB, 'wanxiang', 'events', 'writer-a.ndjson')), true)
+    assert.equal(existsSync(join(commonB, 'wanxiang', 'events', 'writer-b.ndjson')), true)
+
+    // 3. Repeat sync on Repo B is idempotent
+    const syncB2 = await retention.syncAt(repoB, commonB, syncB1.root, now)
+    assert.equal(syncB2.ok, true)
+    assert.equal(syncB2.root, syncB1.root, 'repeat sync produces identical snapshot root')
+
+    // 4. Two offline sides converge to identical snapshot root
+    execFileSync('git', ['-C', repoA, 'fetch', '-q', repoB, syncB1.root])
+    const syncA2 = await retention.syncAt(repoA, commonA, syncB1.root, now)
+    assert.equal(syncA2.ok, true)
+    assert.equal(syncA2.root, syncB1.root, 'two sides converge to identical snapshot root')
+    assert.equal(existsSync(join(commonA, 'wanxiang', 'events', 'writer-b.ndjson')), true)
+
+    // 5. Corrupted / divergent writer history fails closed
+    const canonicalLine = (event) => JSON.stringify({
+      event_id: event.id,
+      event_type: event.type,
+      parents: [...event.parents].sort(),
+      payload: event.payload,
+      payload_refs: [...event.payloadRefs].sort(),
+      stream_id: event.stream,
+    }) + '\n'
+    writeFileSync(join(commonA, 'wanxiang', 'events', 'writer-b.ndjson'), canonicalLine(make(C, 'stream/divergent')))
+    const syncDivergent = await retention.syncAt(repoA, commonA, syncB1.root, now)
+    assert.equal(syncDivergent.ok, false, 'divergent writer history must fail closed')
+    assert.match(String(syncDivergent.error), /writer history diverged/i)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 
 test('WHAT[DURABLE-CONVERGENCE-008] activation only ensures hooks and user Git process runs full sync', async () => {

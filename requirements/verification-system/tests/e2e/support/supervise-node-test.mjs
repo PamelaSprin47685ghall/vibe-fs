@@ -48,10 +48,7 @@ export async function superviseNodeTest({
 
   // Absolute paths: test:complete reports absolute `data.file`.
   const outstanding = new Set(files.map((file) => resolve(file)))
-  let passed = 0
-  let failed = 0
-  /** Per-test wall times, so every tier reports its distribution rather than just a count. */
-  const durations = []
+  let runnerSummary = null
   let drained = false
   let runnerError = null
   let child
@@ -60,7 +57,9 @@ export async function superviseNodeTest({
     timeoutMs: silenceMs,
     label,
     onTimeout: () => {
-      if (failed === 0 && outstanding.size === 0) {
+      const passedCount = runnerSummary?.passed ?? 0
+      const failedCount = runnerSummary?.failed ?? 0
+      if (failedCount === 0 && outstanding.size === 0) {
         console.error(
           `${logPrefix}: every verdict passed but the child would not exit — ` +
             'a handle the suite created is still open',
@@ -71,7 +70,7 @@ export async function superviseNodeTest({
             `${[...outstanding].map((file) => relative(process.cwd(), file)).join(', ')}`,
         )
       }
-      console.error(`${logPrefix}: ${passed} passed, ${failed} failed before the silence`)
+      console.error(`${logPrefix}: ${passedCount} passed, ${failedCount} failed before the silence`)
       try {
         process.stderr.write('')
       } catch {}
@@ -98,6 +97,10 @@ export async function superviseNodeTest({
   backstop.unref()
 
   child.on('message', (event) => {
+    if (event?.type === 'runner:summary') {
+      runnerSummary = event?.data
+      return
+    }
     if (event?.type === 'inner:drained') {
       drained = true
       return
@@ -105,12 +108,6 @@ export async function superviseNodeTest({
     if (event?.type === 'runner:error') {
       runnerError = event?.data
       return
-    }
-    if (event?.type === 'test:pass') passed += 1
-    if (event?.type === 'test:fail') failed += 1
-    if (event?.type === 'test:pass' || event?.type === 'test:fail') {
-      const ms = Number(event?.data?.durationMs)
-      if (Number.isFinite(ms)) durations.push({ name: String(event?.data?.name ?? '<test>'), ms })
     }
     if (isFileCompletionEvent(event)) {
       outstanding.delete(resolve(event.data.file))
@@ -131,7 +128,15 @@ export async function superviseNodeTest({
   watchdog.stop()
   clearTimeout(backstop)
 
-  reportDurationDistribution(logPrefix, durations)
+  if (!runnerSummary) {
+    console.error(`${logPrefix}: inner runner failed to provide authoritative summary`)
+  }
+
+  const passed = runnerSummary?.passed ?? 0
+  const failed = runnerSummary?.failed ?? 0
+  const leafDurations = runnerSummary?.leafDurations ?? []
+
+  reportDurationDistribution(logPrefix, leafDurations)
 
   console.error(
     `\n${logPrefix}: ${passed} passed, ${failed} failed (authoritative; the spec reporter undercounts on timeout)`,
@@ -158,6 +163,10 @@ export async function superviseNodeTest({
   if (exit.code !== 0) {
     console.error(`${logPrefix}: inner runner exited ${exit.code}`)
     process.exit(exit.code ?? 1)
+  }
+
+  if (!runnerSummary) {
+    process.exit(1)
   }
 
   if (!drained) {

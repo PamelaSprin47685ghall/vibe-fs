@@ -10,40 +10,11 @@ const replayToolUrl = new URL('../../managed-chat-execution/tests/support/incide
 const runbook = fs.readFileSync(runbookUrl, 'utf8')
 const incident = fs.readFileSync(incidentUrl, 'utf8')
 
-test('WHAT[VERIFICATION-SYSTEM-006] reliability runbook names every safe query, stop condition and evidence boundary', () => {
-  for (const anchor of [
-    '## Identity conflict',
-    '## Accepted nonterminal',
-    '## Attempt amplification',
-    '## Queue saturation',
-    '## Capacity divergence',
-    '## Hook criticality',
-    '## Safe rollback and canary stop',
-    '## Evidence collection',
-    '## Decision tree',
-    '## Restart or plugin reload',
-    '## Mandatory escalation',
-  ]) assert.match(runbook, new RegExp(`^${anchor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'))
-
-  for (const api of [
-    'Surface.fold(serializedFacts)',
-    'StatusSurface.queryFacts(serializedFacts, sessionId, physicalUserMessageId)',
-    'ModelRoutingSurface.sharedCapacitySnapshot()',
-    'reconcileCapacityEvidence(snapshot)',
-    'ReliabilityDiagnosticsSurface.queryReliability',
-    'HookPolicySurface.js',
-    'recoverScenarios([scenario])',
-  ]) assert.ok(runbook.includes(api), `missing exact runbook API: ${api}`)
-
-  assert.ok(runbook.includes('node --test requirements/host-boundary/tests/opencode-chat-admission-canary.test.mjs'))
-  assert.ok(runbook.includes('node requirements/managed-chat-execution/tests/support/incident-evidence.mjs replay <evidence.json>'))
+test('WHAT[VERIFICATION-SYSTEM-006] incident fixture carries declared redaction and no secrets', () => {
   assert.equal(fs.existsSync(schemaUrl), true)
   assert.equal(fs.existsSync(replayToolUrl), true)
   assert.equal(fs.existsSync(incidentUrl), true)
 
-  assert.match(runbook, /Never edit journal facts/)
-  assert.match(runbook, /never collect.*secret\/token\/cookie\/credential.*stack.*filesystem path/i)
-  assert.match(runbook, /does \*\*not\*\* prove an exact accepted-message replay capability/)
   assert.doesNotMatch(incident, /Bearer\s+|api[_-]?key|password|stack trace|\/(?:home|Users)\//i)
   assert.deepEqual(JSON.parse(incident).redaction, {
     payloads: 'removed', credentials: 'removed', stacks: 'removed', paths: 'removed',

@@ -7,6 +7,7 @@
 // Failures always print full details.
 
 import util from 'node:util'
+import { createRunState, isFileWrapper, applyEvent, summarize } from './test-run-state.mjs'
 
 export function isVerbose(options = {}) {
   if (options.verbose !== undefined) return Boolean(options.verbose)
@@ -23,34 +24,16 @@ export function isVerbose(options = {}) {
  * @param {NodeJS.WritableStream} [options.stdout]
  * @param {NodeJS.WritableStream} [options.stderr]
  * @param {Function} [options.onSummary]
- * @returns {AsyncGeneratorFunction}
+ * @param {import('./test-run-state.mjs').TestRunState} [options.state]
+ * @returns {AsyncGeneratorFunction & { state: import('./test-run-state.mjs').TestRunState }}
  */
 export function createCompactReporter(options = {}) {
   const verbose = isVerbose(options)
   const out = options.stdout ?? process.stdout
   const err = options.stderr ?? process.stderr
+  const state = options.state ?? createRunState()
 
-  return async function* compactReporter(source) {
-    const startTime = Date.now()
-    let wallMs = 0
-    let sumTestMs = 0
-    let passed = 0
-    let failed = 0
-    let skipped = 0
-    let todo = 0
-    let cancelled = 0
-    const fileSet = new Set()
-    const byFileMap = new Map()
-    const failures = []
-
-    const getFileRecord = (file) => {
-      const key = file || '(unknown)'
-      if (!byFileMap.has(key)) {
-        byFileMap.set(key, { file: key, testCount: 0, passed: 0, failed: 0, durationMs: 0 })
-      }
-      return byFileMap.get(key)
-    }
-
+  const reporterFn = async function* compactReporter(source) {
     for await (const event of source) {
       const type = event?.type
       const data = event?.data ?? {}
@@ -64,85 +47,42 @@ export function createCompactReporter(options = {}) {
         continue
       }
 
-      if (type === 'test:pass' || type === 'test:fail') {
+      applyEvent(state, event)
+
+      if (verbose && (type === 'test:pass' || type === 'test:fail')) {
         const isSuite = data.details?.type === 'suite'
-        const isFileWrapper =
-          typeof data.file === 'string' &&
-          typeof data.name === 'string' &&
-          (data.file === data.name || data.file.endsWith(data.name))
+        const isSubtestsParent = data.details?.error?.failureType === 'subtestsFailed'
+        const isWrapper = isFileWrapper(event)
 
-        // In node:test, file wrapper or suite containers should not count as individual leaf tests
-        if (isFileWrapper || isSuite) {
-          continue
-        }
+        if (!isSuite && !isSubtestsParent && !isWrapper) {
+          const name = data.name ?? '<unnamed>'
+          const ms = Number(data.details?.duration_ms ?? data.durationMs)
+          const duration = Number.isFinite(ms) && ms >= 0 ? ms : 0
+          const isSkip = Boolean(data.skip)
+          const isTodo = Boolean(data.todo)
+          const isCancelled = Boolean(data.cancelled || data.details?.error?.failureType === 'testAborted')
 
-        const filePath = typeof data.file === 'string' ? data.file : ''
-        if (filePath) fileSet.add(filePath)
-        const fileRecord = getFileRecord(filePath)
-        fileRecord.testCount += 1
-
-        const ms = Number(data.details?.duration_ms)
-        const duration = Number.isFinite(ms) && ms >= 0 ? ms : 0
-        sumTestMs += duration
-        fileRecord.durationMs += duration
-
-        const isSkip = Boolean(data.skip)
-        const isTodo = Boolean(data.todo)
-        const isCancelled = Boolean(data.cancelled)
-
-        if (type === 'test:fail') {
-          failed += 1
-          fileRecord.failed += 1
-          failures.push({
-            name: data.name ?? '<unnamed>',
-            file: data.file,
-            line: data.line,
-            column: data.column,
-            durationMs: duration,
-            error: data.details?.error,
-          })
-
-          const failLine = `✖ ${data.name ?? '<unnamed>'} (${duration.toFixed(3)}ms)\n`
-          if (verbose) {
-            out.write(failLine)
-          }
-        } else if (isSkip) {
-          skipped += 1
-          if (verbose) {
-            out.write(`﹣ ${data.name ?? '<unnamed>'} (${duration.toFixed(3)}ms) # SKIP\n`)
-          }
-        } else if (isTodo) {
-          todo += 1
-          if (verbose) {
-            out.write(`✔ ${data.name ?? '<unnamed>'} (${duration.toFixed(3)}ms) # TODO\n`)
-          }
-        } else if (isCancelled) {
-          cancelled += 1
-          if (verbose) {
-            out.write(`✖ ${data.name ?? '<unnamed>'} (${duration.toFixed(3)}ms) # CANCELLED\n`)
-          }
-        } else {
-          passed += 1
-          fileRecord.passed += 1
-          if (verbose) {
-            out.write(`✔ ${data.name ?? '<unnamed>'} (${duration.toFixed(3)}ms)\n`)
+          if (type === 'test:fail') {
+            out.write(`✖ ${name} (${duration.toFixed(3)}ms)\n`)
+          } else if (isSkip) {
+            out.write(`﹣ ${name} (${duration.toFixed(3)}ms) # SKIP\n`)
+          } else if (isTodo) {
+            out.write(`✔ ${name} (${duration.toFixed(3)}ms) # TODO\n`)
+          } else if (isCancelled) {
+            out.write(`✖ ${name} (${duration.toFixed(3)}ms) # CANCELLED\n`)
+          } else {
+            out.write(`✔ ${name} (${duration.toFixed(3)}ms)\n`)
           }
         }
       }
-
-      if (type === 'test:summary' && Number.isFinite(data.duration_ms)) {
-        wallMs = data.duration_ms
-      }
     }
 
-    if (wallMs === 0) {
-      wallMs = Date.now() - startTime
-    }
+    const summary = summarize(state)
 
     // Always print failures if any
-    if (failures.length > 0) {
+    if (summary.failures.length > 0) {
       err.write('\n✖ failing tests:\n\n')
-      for (const f of failures) {
+      for (const f of summary.failures) {
         const loc = f.file ? `test at ${f.file}${f.line ? `:${f.line}:${f.column || 1}` : ''}\n` : ''
         err.write(`${loc}✖ ${f.name} (${f.durationMs.toFixed(3)}ms)\n`)
         const errObj = f.error?.cause ?? f.error
@@ -157,28 +97,18 @@ export function createCompactReporter(options = {}) {
       }
     }
 
-    const byFile = Array.from(byFileMap.values())
-    const summary = {
-      files: fileSet.size,
-      passed,
-      failed,
-      skipped,
-      todo,
-      cancelled,
-      wallMs,
-      sumTestMs,
-      byFile,
-    }
-
     // Default mode prints compact summary to stderr
     const summaryText =
-      `\n[test-summary] ${fileSet.size} file(s), ${passed} passed, ${failed} failed` +
-      (skipped > 0 ? `, ${skipped} skipped` : '') +
-      (todo > 0 ? `, ${todo} todo` : '') +
-      (cancelled > 0 ? `, ${cancelled} cancelled` : '') +
-      ` (${(wallMs / 1000).toFixed(2)}s wall, ${(sumTestMs / 1000).toFixed(2)}s test time)\n`
+      `\n[test-summary] ${summary.files} file(s), ${summary.passed} passed, ${summary.failed} failed` +
+      (summary.skipped > 0 ? `, ${summary.skipped} skipped` : '') +
+      (summary.todo > 0 ? `, ${summary.todo} todo` : '') +
+      (summary.cancelled > 0 ? `, ${summary.cancelled} cancelled` : '') +
+      ` (${(summary.wallMs / 1000).toFixed(2)}s wall, ${(summary.sumTestMs / 1000).toFixed(2)}s test time)\n`
     err.write(summaryText)
 
     options.onSummary?.(summary)
   }
+
+  reporterFn.state = state
+  return reporterFn
 }

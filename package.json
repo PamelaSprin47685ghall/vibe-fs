@@ -83,6 +83,7 @@
     "fast-check": "4.9.0",
     "opencode-ai": "1.18.29",
     "smol-toml": "1.8.0",
+    "tar": "^7.5.22",
     "wireit": "^0.14.13"
   }
 }
