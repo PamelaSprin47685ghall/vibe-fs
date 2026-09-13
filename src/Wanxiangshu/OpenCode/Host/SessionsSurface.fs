@@ -202,7 +202,7 @@ module SessionsSurface =
         }
 
     /// MANAGED-SESSION-016 already-terminal: a lifecycle-terminated attempt is
-    /// idempotent success without touching the Host transport, while a
+    /// permitted to abort on the Host transport, while a
     /// non-terminal non-managed attempt is still rejected with zero transport
     /// calls. The returned view contains values, never the adapter.
     let interruptTerminatedAdapterProbe () : Task<obj> =

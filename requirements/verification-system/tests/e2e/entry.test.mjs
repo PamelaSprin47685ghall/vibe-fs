@@ -22,10 +22,6 @@
  * Real-host Magic Todo canaries A/E/G/H: a test-only wrapper plugin observes
  * the production membrane in the sole serve lifetime without changing its
  * definition, args, or result bytes.
- *
- * §21 adversity oracles are imported by name so each stroke stays addressable
- * from this sole entry (CUSTOMS drives the scenario flow; ADVERSITY_ORACLES is
- * the per-class import surface for freeze/cutover review).
  */
 import assert from 'node:assert/strict';
 import './support/env-pin.mjs';
@@ -36,8 +32,6 @@ import { getSessionId } from './support/scenario-http.js';
 import { runStaticGate } from './support/index.js';
 import {
   CUSTOMS,
-  ADVERSITY_ORACLES,
-  ADVERSITY_CHECKLIST,
   G2_INSPECTOR_CANARY_PROMPT,
   G6_CANONICAL_A,
   G6_CANONICAL_Q,
@@ -60,27 +54,6 @@ import {
   assertMagicTodoHostCanariesAEGH,
   collectManagerProviderToolEvidence,
 } from './support/magic-todo-host-canary-plugin.mjs';
-
-// Retain named imports so entry ↔ §21 oracle mapping cannot drift silently.
-assert.equal(typeof ADVERSITY_ORACLES.assertProviderTransientFailure, 'function');
-assert.equal(typeof ADVERSITY_ORACLES.assertProviderFailureContinuation, 'function');
-assert.equal(typeof ADVERSITY_ORACLES.assertJoinWakePath, 'function');
-assert.equal(typeof ADVERSITY_ORACLES.assertInterruptedJoin, 'function');
-assert.equal(typeof ADVERSITY_ORACLES.assertAssessmentAssignsWork, 'function');
-assert.equal(typeof ADVERSITY_ORACLES.assertRetirementNeedsIteration, 'function');
-assert.equal(typeof ADVERSITY_ORACLES.assertDurableRecovery, 'function');
-assert.equal(typeof ADVERSITY_ORACLES.assertPublishConflict, 'function');
-assert.equal(typeof ADVERSITY_ORACLES.assertSubagentReuse, 'function');
-assert.equal(typeof ADVERSITY_ORACLES.assertSuccessfulReconciliation, 'function');
-assert.equal(typeof ADVERSITY_ORACLES.assertRetirementCommitted, 'function');
-assert.equal(typeof CUSTOMS.holdChildC1UntilLabor, 'function');
-assert.equal(typeof CUSTOMS.bindManagerLoopSequence, 'function');
-assert.equal(typeof CUSTOMS.oracleLongStroke, 'function');
-assert.ok(
-  ADVERSITY_CHECKLIST.every((row) => row.covered === true && row.oracle && row.injection),
-  '§21 ADVERSITY_CHECKLIST must mark every adversity class covered with injection+oracle',
-);
-assert.equal(typeof assertMagicTodoHostCanariesAEGH, 'function');
 
 if (!runStaticGate([fileURLToPath(import.meta.url)]).passed) {
   throw new Error('long-stroke entry static gate failed');

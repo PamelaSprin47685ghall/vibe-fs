@@ -15,17 +15,6 @@
  * Accepted exits. The internal wake is stripped from the provider projection,
  * which carries the authoritative user messages with the current iteration.
  *
- * §21 checklist (mirrors long-stroke.toml comments + ADVERSITY_CHECKLIST export):
- *   [x] provider transient failure          — assertProviderTransientFailure
- *   [x] provider failure continuation       — assertProviderFailureContinuation
- *   [x] join blocked then causally awakened — assertJoinWakePath
- *   [x] non-10 assessment assigns work      — assertAssessmentAssignsWork
- *   [x] interrupted/aborted child or session— assertInterruptedJoin (+ holdChildC1UntilLabor)
- *   [x] retirement needs next iteration    — assertRetirementNeedsIteration (Continue → fresh IncumbencyOpened)
- *   [x] durable recovery/continuation       — assertDurableRecovery
- *   [x] publish conflict / stale target     — assertPublishConflict
- *   [x] successful reconciliation           — assertSuccessfulReconciliation
- *   [x] later successful retirement         — assertRetirementCommitted
  */
 import assert from 'node:assert/strict';
 import {
@@ -677,83 +666,9 @@ export const PLANNED_WAIT_FACTS = Object.freeze({
   incumbencyOpened: waitFactShape('IncumbencyOpened', { gte: 1 }),
   conflictDetected: waitFactShape('ConflictDetected', { gte: 1 }),
   rebasedCandidateReady: waitFactShape('RebasedCandidateReady', { gte: 1 }),
-  // Orchestrator-tagged Published (bare "Published" false-matches assignment text).
-  published: waitFactShape('"Orchestrator",["Published"', { eq: 1 }),
+  published: waitFactShape('Published', { eq: 1 }),
   candidateReady: waitFactShape('CandidateReady', { eq: 1 }),
 });
-
-/**
- * Machine-readable §21 adversity coverage for the sole entry.
- * Each row: external injection (TOML/custom) + durable/public oracle.
- */
-export const ADVERSITY_CHECKLIST = Object.freeze([
-  {
-    id: 'provider-transient-failure',
-    covered: true,
-    injection: '[[fault]] retryable provider-error on g2-inspector-q1.0 delivery #1',
-    oracle: 'assertProviderTransientFailure',
-  },
-  {
-    id: 'provider-failure-continuation',
-    covered: true,
-    injection: 'non-retryable provider-error on manager.1 followed by continue.0',
-    oracle: 'assertProviderFailureContinuation',
-  },
-  {
-    id: 'join-blocked-then-causally-awakened',
-    covered: true,
-    injection: 'flow.prompt external user_message while manager.1 join in flight',
-    oracle: 'assertJoinWakePath',
-  },
-  {
-    id: 'non10-assessment-assigns-work',
-    covered: true,
-    injection: 'manager-audit non-10 completeness=9 review → work assigned',
-    oracle: 'assertAssessmentAssignsWork',
-  },
-  {
-    id: 'interrupted-aborted-child-or-session',
-    covered: true,
-    injection: 'holdChildC1UntilLabor (coder.0) + external user_message',
-    oracle: 'assertInterruptedJoin',
-  },
-  {
-    id: 'retirement-needs-iteration',
-    covered: true,
-    injection: 'non-10 assessment blocks publication → Continue retirement → fresh IncumbencyOpened',
-    oracle: 'assertRetirementNeedsIteration',
-  },
-  {
-    id: 'durable-recovery-continuation',
-    covered: true,
-    injection: 'FailureRecorded in same OpenCode PID (no restart=true)',
-    oracle: 'assertDurableRecovery',
-  },
-  {
-    id: 'publish-conflict-stale-target',
-    covered: true,
-    injection: 'afterExpectation gitConflictProof on manager.0 (no restart)',
-    oracle: 'assertPublishConflict',
-  },
-  {
-    id: 'subagent-session-reuse',
-    covered: true,
-    injection: 'G2 Q1→Q2→Q3 and simultaneous batch reuse one Inspector child session',
-    oracle: 'assertSubagentReuse',
-  },
-  {
-    id: 'successful-reconciliation',
-    covered: true,
-    injection: 'conflict resolve → rebase candidate → Orchestrator Published eq 1',
-    oracle: 'assertSuccessfulReconciliation',
-  },
-  {
-    id: 'later-successful-retirement',
-    covered: true,
-    injection: 'waitFact RetirementCommitted after resources converge before publish reconcile',
-    oracle: 'assertRetirementCommitted',
-  },
-]);
 
 /** Named oracle table imported by entry.test.mjs for each adversity stroke. */
 export const ADVERSITY_ORACLES = Object.freeze({

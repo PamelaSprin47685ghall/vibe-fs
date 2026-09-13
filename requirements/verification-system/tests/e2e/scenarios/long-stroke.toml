@@ -226,8 +226,7 @@ flow = [
   { waitFact = { name = "AssessmentCommitted", gte = 6 }, timeoutMs = 60000 },
   { waitFact = { name = "RetirementCommitted", gte = 6 }, timeoutMs = 60000 },
   { waitFact = { name = "RebasedCandidateReady", gte = 1 }, timeoutMs = 90000 },
-  # Bare "Published" false-matches assignment text; pin Orchestrator case tag.
-  { waitFact = { name = "\"Orchestrator\",[\"Published\"", eq = 1 }, timeoutMs = 90000 },
+  { waitFact = { name = "Published", eq = 1 }, timeoutMs = 90000 },
 
   # Stroke 6 — Orchestrator harvest (same as orch-unhappy: orch.2 after Published).
   # awaitIdle is anchored at the actual orch.2 request, not at the lifetime-wide

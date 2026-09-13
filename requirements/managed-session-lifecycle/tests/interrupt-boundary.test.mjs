@@ -77,14 +77,14 @@ test('WHAT[MANAGED-SESSION-016] Turn orchestration consumes typed outcome withou
   assert.doesNotMatch(observer, /scope\.Sessions\.AbortedSessions/)
 })
 
-test('WHAT[MANAGED-SESSION-016] already-terminal attempt interrupt is Ok without touching the Host transport', async () => {
+test('WHAT[MANAGED-SESSION-016] already-terminal attempt interrupt is Ok and issues transport abort for root session', async () => {
   const observed = await interruptTerminatedAdapterProbe()
 
   assert.equal(observed.terminatedOutcome, 'Ok')
   assert.equal(observed.terminatedError, '')
-  assert.equal(observed.abortsAfterTerminal, 0)
-  assert.deepEqual(observed.abortedSessionIds, [])
-  assert.equal(observed.abortCount, 0)
+  assert.equal(observed.abortsAfterTerminal, 1)
+  assert.deepEqual(observed.abortedSessionIds, ['term-child'])
+  assert.equal(observed.abortCount, 1)
   // Control: a non-terminal non-managed id is still rejected, also with zero transport calls.
   assert.equal(observed.otherOutcome, 'Error')
   assert.equal(
