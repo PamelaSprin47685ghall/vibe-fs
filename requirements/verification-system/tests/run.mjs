@@ -34,6 +34,11 @@ process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
 const REQUIREMENTS_ROOT = 'requirements'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
+if (process.env.TESTS_MJS_FILES && process.env.TESTS_MJS_FILES.trim() !== '') {
+  const fileCount = process.env.TESTS_MJS_FILES.split(',').map((f) => f.trim()).filter(Boolean).length
+  console.error(`runner: scoped 使用 TESTS_MJS_FILES=${fileCount} files`)
+}
+
 const skipStaleness = process.argv.includes('--skip-staleness-check')
 if (process.env.NODE_TEST_CONCURRENCY !== undefined) {
   assertConcurrency(process.env.NODE_TEST_CONCURRENCY)

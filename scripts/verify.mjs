@@ -12,7 +12,17 @@ import { collectVerificationInputs, computeDigest, diffVerificationInputs } from
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
-export function verificationSteps({ root = ROOT, release = false }) {
+export function getTestEnv({ verbose = false, hostEnv = process.env, extra = {} } = {}) {
+  const { TESTS_MJS_FILES, ...cleanEnv } = hostEnv
+  return {
+    ...cleanEnv,
+    ...(verbose ? { NODE_TEST_VERBOSE: '1' } : {}),
+    WXS_E2E_QUIET: '1',
+    ...extra,
+  }
+}
+
+export function verificationSteps({ root = ROOT, release = false, verbose = false, env: hostEnv = process.env } = {}) {
   const steps = [
     {
       label: 'format:check',
@@ -33,13 +43,14 @@ export function verificationSteps({ root = ROOT, release = false }) {
       label: 'unit',
       cmd: process.execPath,
       argv: [path.join(root, 'requirements/verification-system/tests/run.mjs')],
+      env: getTestEnv({ verbose, hostEnv }),
     },
     {
       label: 'integration',
       cmd: process.execPath,
       argv: [path.join(root, 'requirements/verification-system/tests/integration/run.mjs')],
       timeoutMs: release ? 1_200_000 : 600_000,
-      env: release ? { WXS_RELEASE: '1' } : {},
+      env: getTestEnv({ verbose, hostEnv, extra: release ? { WXS_RELEASE: '1' } : {} }),
     },
   ]
 
@@ -50,12 +61,14 @@ export function verificationSteps({ root = ROOT, release = false }) {
         cmd: process.execPath,
         argv: [path.join(root, 'requirements/verification-system/tests/e2e/entry.test.mjs')],
         timeoutMs: 1_500_000,
+        env: getTestEnv({ verbose, hostEnv }),
       },
       {
         label: 'package',
         cmd: process.execPath,
         argv: [path.join(root, 'scripts/verify-package.mjs')],
         timeoutMs: 600_000,
+        env: getTestEnv({ verbose, hostEnv }),
       },
     )
   }
@@ -86,10 +99,17 @@ function defaultRunStepFactory(root, verbose, output) {
 
     let child
     try {
+      const childEnv = env ? { ...env } : (() => {
+        const { TESTS_MJS_FILES, ...cleanEnv } = process.env
+        return cleanEnv
+      })()
+      if (childEnv.WXS_RELEASE === undefined) {
+        childEnv.WXS_RELEASE = '0'
+      }
       child = spawn(cmd, argv, {
         cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env, ...env, WXS_RELEASE: env?.WXS_RELEASE ?? '0' },
+        env: childEnv,
       })
     } catch (spawnError) {
       clearTimeout(timer)
@@ -162,6 +182,7 @@ export async function verify({
   root = ROOT,
   release = false,
   verbose = false,
+  profile = false,
   runStep: runStepOverride,
   output = process.stdout,
   logDirectory,
@@ -171,7 +192,7 @@ export async function verify({
   const runLogDir = allocateRunLogDir(baseLogDir)
 
   const stepRunner = runStepOverride ?? defaultRunStepFactory(resolvedRoot, verbose, output)
-  const plannedSteps = verificationSteps({ root: resolvedRoot, release })
+  const plannedSteps = verificationSteps({ root: resolvedRoot, release, verbose })
   const mode = release ? 'release' : 'daily'
   const runStart = Date.now()
 
@@ -229,10 +250,12 @@ export async function verify({
     if (res.ok) {
       stepResults.push({
         label: res.label ?? stepPlan.label,
+        stage: res.label ?? stepPlan.label,
         status: 'ok',
         exitCode: res.exitCode ?? 0,
         signal: res.signal ?? null,
         durationMs,
+        wallMs: durationMs,
       })
       output.write(`  ${stepPlan.label.padEnd(14)} OK  ${(durationMs / 1000).toFixed(1)}s\n`)
     } else {
@@ -240,10 +263,12 @@ export async function verify({
       failureReason = `step-failed:${stepPlan.label}`
       stepResults.push({
         label: res.label ?? stepPlan.label,
+        stage: res.label ?? stepPlan.label,
         status: 'failed',
         exitCode: res.exitCode ?? 1,
         signal: res.signal ?? null,
         durationMs,
+        wallMs: durationMs,
         ...(res.error ? { error: res.error } : {}),
       })
       output.write(`  ${stepPlan.label.padEnd(14)} FAIL(${res.exitCode ?? 1})  ${(durationMs / 1000).toFixed(1)}s\n`)
@@ -275,6 +300,13 @@ export async function verify({
       output.write(`FAIL: inputs changed mid-run (${inputChanges.reason}) — re-run verify on a stable tree\n`)
     }
     output.write(`FAIL  verify ${mode}  ${(wallMs / 1000).toFixed(1)}s\n`)
+    if (profile) {
+      output.write(`\nFAIL verify ${mode} · 各阶段耗时:\n`)
+      for (const s of stepResults) {
+        output.write(`  ${s.label.padEnd(14)} ${s.wallMs ?? 0}ms\n`)
+      }
+      output.write(`  ${JSON.stringify(stepResults.map((s) => ({ stage: s.label, wallMs: s.wallMs ?? 0 })))}\n`)
+    }
     return {
       mode,
       steps: stepResults,
@@ -284,10 +316,18 @@ export async function verify({
       wallMs,
       logDirectory: runLogDir,
       exitCode: 1,
+      profile: stepResults.map((s) => ({ stage: s.label, wallMs: s.wallMs ?? 0 })),
     }
   }
 
   output.write(`PASS  verify ${mode}  ${(wallMs / 1000).toFixed(1)}s\n`)
+  if (profile) {
+    output.write(`\nPASS verify ${mode} · 各阶段耗时:\n`)
+    for (const s of stepResults) {
+      output.write(`  ${s.label.padEnd(14)} ${s.wallMs ?? 0}ms\n`)
+    }
+    output.write(`  ${JSON.stringify(stepResults.map((s) => ({ stage: s.label, wallMs: s.wallMs ?? 0 })))}\n`)
+  }
   return {
     mode,
     steps: stepResults,
@@ -295,6 +335,7 @@ export async function verify({
     wallMs,
     logDirectory: runLogDir,
     exitCode: 0,
+    profile: stepResults.map((s) => ({ stage: s.label, wallMs: s.wallMs ?? 0 })),
   }
 }
 
@@ -302,14 +343,17 @@ async function main() {
   const argv = process.argv.slice(2)
   let release = false
   let verbose = false
+  let profile = false
 
   for (const arg of argv) {
     if (arg === '--release') {
       release = true
     } else if (arg === '--verbose') {
       verbose = true
+    } else if (arg === '--profile') {
+      profile = true
     } else if (arg === '-h' || arg === '--help') {
-      process.stdout.write('Usage: node scripts/verify.mjs [--release] [--verbose]\n')
+      process.stdout.write('Usage: node scripts/verify.mjs [--release] [--verbose] [--profile]\n')
       process.exit(0)
     } else {
       process.stderr.write(`Unknown option: ${arg}\n`)
@@ -317,7 +361,7 @@ async function main() {
     }
   }
 
-  const result = await verify({ release, verbose })
+  const result = await verify({ release, verbose, profile })
   process.exitCode = result.exitCode
 }
 

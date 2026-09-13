@@ -7,7 +7,7 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { collectVerificationInputs, diffVerificationInputs } from '../../../scripts/lib/build-state.mjs'
-import { verify } from '../../../scripts/verify.mjs'
+import { verify, verificationSteps } from '../../../scripts/verify.mjs'
 
 function setupFixtureRepo() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-inputs-fixture-'))
@@ -191,4 +191,21 @@ test('verify with isolated logDirectory creates run dir and latest link without 
     fs.rmSync(fixture, { recursive: true, force: true })
     fs.rmSync(isolatedLogs, { recursive: true, force: true })
   }
+})
+
+test('verificationSteps excludes TESTS_MJS_FILES from unit and integration step environments', () => {
+  const hostEnvWithOverride = {
+    PATH: process.env.PATH || '',
+    TESTS_MJS_FILES: 'some-test-override.test.mjs',
+    HOME: process.env.HOME || '',
+  }
+  const steps = verificationSteps({ root: '.', release: false, verbose: true, env: hostEnvWithOverride })
+  const unitStep = steps.find((s) => s.label === 'unit')
+  const integrationStep = steps.find((s) => s.label === 'integration')
+  assert.ok(unitStep, 'unit step should be defined')
+  assert.ok(integrationStep, 'integration step should be defined')
+  assert.equal('TESTS_MJS_FILES' in unitStep.env, false, 'unit step env must not contain TESTS_MJS_FILES')
+  assert.equal('TESTS_MJS_FILES' in integrationStep.env, false, 'integration step env must not contain TESTS_MJS_FILES')
+  assert.equal(unitStep.env.NODE_TEST_VERBOSE, '1')
+  assert.equal(unitStep.env.WXS_E2E_QUIET, '1')
 })

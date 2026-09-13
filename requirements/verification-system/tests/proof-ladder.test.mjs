@@ -16,7 +16,7 @@
 // requirements/*/tests/*.test.mjs 的故意破坏反例）交叉证明，本测试不重造。
 
 import assert from 'node:assert/strict'
-import { verify } from '../../../scripts/verify.mjs'
+import { verify, verificationSteps } from '../../../scripts/verify.mjs'
 import { checks } from '../../../scripts/check.mjs'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -315,5 +315,89 @@ test('WHAT[VERIFICATION-SYSTEM-010] acceptance criteria only tighten — an unre
     assert.equal(exitCode, 1, 'unreadable gate must return 1')
   } finally {
     rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+// ── 4. verify step scoping and environment isolation ─────────────────────────
+
+test('WHAT[VERIFICATION-SYSTEM-001] verify step env strips TESTS_MJS_FILES and propagates verbose flag', () => {
+  const hostEnvWithOverride = {
+    ...process.env,
+    TESTS_MJS_FILES: 'requirements/verification-system/tests/fake.test.mjs',
+  }
+
+  const dailyStepsVerbose = verificationSteps({
+    root: ROOT,
+    release: false,
+    verbose: true,
+    env: hostEnvWithOverride,
+  })
+  const unitVerbose = dailyStepsVerbose.find((s) => s.label === 'unit')
+  const integrationVerbose = dailyStepsVerbose.find((s) => s.label === 'integration')
+
+  assert.ok(unitVerbose, 'unit step must exist')
+  assert.ok(integrationVerbose, 'integration step must exist')
+  assert.equal('TESTS_MJS_FILES' in unitVerbose.env, false, 'unit step env must not contain TESTS_MJS_FILES')
+  assert.equal('TESTS_MJS_FILES' in integrationVerbose.env, false, 'integration step env must not contain TESTS_MJS_FILES')
+  assert.equal(unitVerbose.env.NODE_TEST_VERBOSE, '1', 'unit step env must receive NODE_TEST_VERBOSE=1 when verbose=true')
+  assert.equal(integrationVerbose.env.NODE_TEST_VERBOSE, '1', 'integration step env must receive NODE_TEST_VERBOSE=1 when verbose=true')
+  assert.equal(unitVerbose.env.WXS_E2E_QUIET, '1', 'unit step env must keep WXS_E2E_QUIET')
+  assert.equal(integrationVerbose.env.WXS_E2E_QUIET, '1', 'integration step env must keep WXS_E2E_QUIET')
+
+  const dailyStepsNonVerbose = verificationSteps({
+    root: ROOT,
+    release: false,
+    verbose: false,
+    env: hostEnvWithOverride,
+  })
+  const unitNonVerbose = dailyStepsNonVerbose.find((s) => s.label === 'unit')
+  assert.equal('NODE_TEST_VERBOSE' in unitNonVerbose.env, false, 'unit step env must not set NODE_TEST_VERBOSE when verbose=false')
+
+  const releaseSteps = verificationSteps({
+    root: ROOT,
+    release: true,
+    verbose: true,
+    env: hostEnvWithOverride,
+  })
+  const e2e = releaseSteps.find((s) => s.label === 'e2e')
+  const pkg = releaseSteps.find((s) => s.label === 'package')
+  assert.ok(e2e && pkg)
+  assert.equal('TESTS_MJS_FILES' in e2e.env, false, 'e2e step env must not contain TESTS_MJS_FILES')
+  assert.equal('TESTS_MJS_FILES' in pkg.env, false, 'package step env must not contain TESTS_MJS_FILES')
+})
+
+test('WHAT[VERIFICATION-SYSTEM-001] verify --profile emits stage timings and returns profile array', async () => {
+  const tmpLogDir = mkdtempSync(join(tmpdir(), 'proof-ladder-profile-'))
+  const sink = createMemorySink()
+  const fakeRunStep = async ({ label }) => ({
+    label,
+    ok: true,
+    exitCode: 0,
+    signal: null,
+    durationMs: 25,
+  })
+
+  try {
+    const result = await verify({
+      release: false,
+      verbose: false,
+      profile: true,
+      runStep: fakeRunStep,
+      output: sink,
+      logDirectory: tmpLogDir,
+    })
+
+    assert.equal(result.exitCode, 0)
+    assert.ok(Array.isArray(result.profile), 'verify result must contain profile array')
+    assert.equal(result.profile.length, 5)
+    assert.deepEqual(
+      result.profile.map((p) => p.stage),
+      ['format:check', 'check', 'build', 'unit', 'integration'],
+    )
+    assert.ok(result.steps.every((s) => typeof s.wallMs === 'number'), 'each step must have wallMs')
+    assert.match(sink.output, /PASS verify daily · 各阶段耗时:/)
+    assert.match(sink.output, /format:check\s+25ms/)
+  } finally {
+    rmSync(tmpLogDir, { recursive: true, force: true })
   }
 })

@@ -14,7 +14,7 @@
 4. **Long Stroke**：恰好一个真实完整的端到端（E2E）物理验收环境。
 5. **Release**：一次确定性的全量构建、打包与交付物验证。
 
-证据层序由统一调度器 `scripts/verify.mjs` 与 `scripts/check.mjs` 注册清单固定，`package.json` 仅声明调度入口，层序颠倒或错置直接判为违约。日常开发入口 `format-build-test`（→ `node scripts/verify.mjs`）调度 format:check → check → build → unit → integration；发布入口 `verify:release`（→ `node scripts/verify.mjs --release`）在此基础上额外调度 clean build（--clean）、Long Stroke 与真实 package 校验。两项入口对每个 step 均保持单次运行，每个 leaf step 必须恰有一个父级 owner，禁止顶层与子 orchestrator 重复执行；distribution package child 与一次 physical warmup 只由 integration orchestrator 调度。层级登记表机制已废止，证明由实际测试行为与可执行断言独立成立。
+证据层序由统一调度器保证：`scripts/verify.mjs` 导出 `verificationSteps` 作为唯一固定执行阶段列表（format:check → check → build → unit → integration，release 模式追加 e2e 与 package），`package.json` 仅声明调度入口，执行层序由真实固定调度器强力保证，不再要求同一编排代码书写顺序外部的写法锁定，层序颠倒或错置直接判为违约。日常开发入口 `format-build-test`（→ `node scripts/verify.mjs`）按序调度固定阶段；发布入口 `verify:release`（→ `node scripts/verify.mjs --release`）在此基础上额外调度 clean build（--clean）、Long Stroke 与真实 package 校验。两项入口对每个 step 均保持单次运行，每个 leaf step 必须恰有一个父级 owner，禁止顶层与子 orchestrator 重复执行；distribution package child 与一次 physical warmup 只由 integration orchestrator 调度。层级登记表机制已废止，证明由实际测试行为与可执行断言独立成立。
 
 全仓禁止自建 FCS（`FSharp.Compiler.Service`）扫描：不得直接或经 wrapper、反射、`.fsx` 提取 F# typed AST、symbol/application use、推断类型或源码依赖图。全量、局部、owner/locality、fixture、report-only、CLI、CI、pre-build 与缓存/snapshot/delta/外部 evidence 复用均无豁免，不得作为门禁、报告或验收入口。正常 Fable 编译内部使用 compiler service 不在禁令范围内，但禁止为扫描取证额外启动或插桩编译器。纯源码文本与 JavaScript 静态检查仍是合法第 0 层证据。F# 编译器边界由 STRUCTURED-WORKFLOW-011 定义；不得用旧扫描结果或空 evidence 冒充当前证明。
 
@@ -30,11 +30,11 @@ provider recovery 的 Pure/Temporal 层必须用 fast-check 对 production Fable
 
 ## VERIFICATION-SYSTEM-004: verifier 必须可红
 
-所有门禁（gate）、验证器（verifier）及测试断言必须具备真实有效的失败能力（可红性）。每个静态门禁必须拥有配套的回归测试，通过受控的反例输入证明门禁能够准确识别违约并退出非零状态。严禁为了通过测试而主动弱化或削弱断言条件。
+所有门禁（gate）、验证器（verifier）及测试断言必须具备真实有效的失败能力（可红性）。每个静态门禁必须拥有配套的回归测试，通过受控的反例输入证明门禁能够准确识别违约并退出非零状态。verifier 自测必须运行实际 verifier 并通过真实输入变异或受控的 spy `runStep` 注入证明失败能力，严禁在测试内复制决策逻辑或以静态表面矩阵冒充回归。严禁为了通过测试而主动弱化或削弱断言条件。
 
 ## VERIFICATION-SYSTEM-005: fail-closed
 
-所有门禁、运行器与基础设施在遭遇数据损坏、协议失配、不可解析的边界状态或未知异常时，必须安全失败并向上传播非零退出码，严禁吞没异常假装通过。`scripts/check.mjs` 必须确保单个门禁的失败状态能够可靠传播至顶层入口；子进程无法启动或异常崩溃一律严格判定为失败。
+所有门禁、运行器与基础设施在遭遇数据损坏、协议失配、不可解析的边界状态或未知异常时，必须安全失败并向上传播非零退出码，严禁吞没异常假装通过。`scripts/check.mjs` 必须确保单个门禁的失败状态能够可靠传播至顶层入口；调度器与子进程执行器在 step 失败或异常崩溃时一律中断后续未执行阶段并向上传播非零退出状态，严禁以局部忽略或假绿通过。
 
 ## VERIFICATION-SYSTEM-006: 因果推进门禁
 
@@ -43,6 +43,8 @@ provider recovery 的 Pure/Temporal 层必须用 fast-check 对 production Fable
 process-isolated test runner 必须区分叶子测试与承载整份文件的 child process：叶子测试的局部 timeout 只能约束该测试，严禁把同一预算施加到文件 wrapper 并把模块加载、调度等待或同文件其他健康测试误判为叶子超时。全 suite backstop 属于外部 supervisor 的物理兜底；它不得通过一个共享 AbortSignal 向每个文件 worker 复制监听器，也不得取代 verdict-silence criterion。需要 timeout-and-forget 的叶子测试必须在自身声明该预算。
 
 ### 禁止退化清单
+
+禁止退化清单作为架构演进与时序监督的不变导向保留，不再要求条目文本与测试用例表建立 1:1 机器解析与用例存在性绑定；其防退化语义由因果监督机制、看门狗断言与实际时序测试成立。
 
 ```text
 把 wall-clock 总超时当作唯一挂死判据
@@ -69,7 +71,7 @@ Release gate 变成「最多 N 轮」或「重跑直到通过」
 
 ## VERIFICATION-SYSTEM-008: 契约面语言边界
 
-生产代码与测试代码之间存在严格的契约面语言边界：生产代码以 `.fs` 编写，语义测试以 `.mjs` 编写并直接消费编译产物（dist）。编译器输出的内部符号、中间结构与内部映射关系不属于对外契约，语义测试只能通过正式注册的 Owner 契约面（公开纯函数、序列化契约、公开端口）访问系统。测试断言必须针对完整数据结构或规范序列化文本，严禁进行仅断言真值的脆弱验证。当测试消费的编译产物落后于源码时，运行器必须拒绝执行并 fail-closed；陈旧性判定由 `scripts/lib/build-state.mjs#assertBuildFresh` 内容摘要（content digests）强力裁决，严禁使用脆弱的文件修改时间（mtime）比较。
+生产代码与测试代码之间存在严格的契约面语言边界：生产代码以 `.fs` 编写，语义测试以 `.mjs` 编写并直接消费编译产物（dist）。编译器输出的内部符号、中间结构与内部映射关系不属于对外契约，语义测试只能通过正式注册的 Owner 契约面（公开纯函数、序列化契约、公开端口）访问系统。测试断言必须针对完整数据结构或规范序列化文本，严禁进行仅断言真值的脆弱验证。当测试消费的编译产物落后于源码时，运行器必须拒绝执行并 fail-closed；陈旧性判定由 `scripts/lib/build-state.mjs#assertBuildFresh` 内容摘要（content digests）强力裁决，严禁使用脆弱的文件修改时间（mtime）比较。删除冗余、失效证明或无独立失败价值的纯文案断言并不等同于降低 retained contract：系统对所有已确立并保留的业务规范不变量（retained contract）的守护与锁定机制持续有效，任何实质性削弱保留契约的行为仍被绝对禁止。
 
 属性测试的 generator 只能描述合法输入域、边界输入或精确非法 mutation，不得实现 expected decision。property 必须以 WHAT 独立声明的代数、变形关系或 typed rejection 判断注册 production Surface 的结果；严禁在测试内重建状态机、formula、decoder 或 detector 作为平行 oracle。无限或组合爆炸输入域必须固定 seed 与有限 run budget，失败必须输出并可重放 shrink path；有限小域优先穷举。无法说明 oracle 独立性的命题不得用随机生成伪装 comprehensive proof。
 
@@ -79,7 +81,7 @@ Release gate 变成「最多 N 轮」或「重跑直到通过」
 
 ## VERIFICATION-SYSTEM-010: 验收判据不可放宽
 
-已设立并冻结的验收判据（包括用例数量天花板、超时时间预算、单调递减门禁基线、构建 manifest 摘要与内容证据的 fail-closed 契约及断言严苛度）只能收紧，严禁单方面放宽。manifest digests 与内容证据构成不可放宽的 fail-closed 验收红线。覆盖率是显式诊断工具，报告必须由 build receipt+dedicated run 生成；无 80% 全局阈值。显式入口总是产出报告；覆盖率数据缺失、损坏或推后运行间被改则非零退出。执行者严禁自行宣布将阻塞项或未达标项降级为不影响通过的非阻塞项；任何对验收范围的正式调整必须通过正规的规范修订程序。
+已设立并冻结的验收判据（包括用例数量天花板、超时时间预算、单调递减门禁基线、构建 manifest 摘要与内容证据的 fail-closed 契约及断言严苛度）只能收紧，严禁单方面放宽。manifest digests 与内容证据构成不可放宽的 fail-closed 验收红线。删除冗余或失效治理断言不属于放宽验收红线，但严禁以精简为由削弱 retained contract 的有效保护。覆盖率是显式诊断工具，报告必须由 build receipt+dedicated run 生成；无 80% 全局阈值。显式入口总是产出报告；覆盖率数据缺失、损坏或推后运行间被改则非零退出。执行者严禁自行宣布将阻塞项或未达标项降级为不影响通过的非阻塞项；任何对验收范围的正式调整必须通过正规的规范修订程序。
 
 ## VERIFICATION-SYSTEM-011: 覆盖率门禁分母完整
 
@@ -87,7 +89,7 @@ Release gate 变成「最多 N 轮」或「重跑直到通过」
 
 ## VERIFICATION-SYSTEM-012: 行数不是门禁，不做机械行数检查
 
-门禁系统只针对明确的语义违规、架构越界与规范不变量进行拦截，严禁设立机械的文件行数硬门禁或 advisory 警告。行数是代码演进的伴生表象而非缺陷根因，机械的行数限制会导致代码被不合理地碎片化拆分为无意义的辅助文件。系统通过明确的架构命名约束与语义边界守卫代码质量，而不依赖行数指标。
+门禁系统只针对明确的语义违规、架构越界与规范不变量进行拦截，严禁设立机械的文件行数硬门禁或 advisory 警告，亦不再为证明政策存在而设立机械扫描器门禁。行数是代码演进的伴生表象而非缺陷根因，机械的行数限制会导致代码被不合理地碎片化拆分为无意义的辅助文件。系统通过明确的架构命名约束与语义边界守卫代码质量，而不依赖行数指标。
 
 ## VERIFICATION-SYSTEM-013: JS 语义边界终态清零
 

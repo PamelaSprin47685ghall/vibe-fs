@@ -12,8 +12,9 @@
 - 顶层 release sink 只调用 unit、唯一 integration orchestrator、Long Stroke 与 pack。integration orchestrator 在任何 integration child 前恰好 warmup 一次，并唯一调度 distribution package child；顶层不得重复这两个 leaf step。`proof-ladder.test.mjs` 同时对真实组合与 duplicate-owner mutants 判 RED。
 - build fingerprint 覆盖整个 workspace，仅排除自身 `dist/` 与 `.fable-build/` 输出；因为 `LoopDetectorEnvelope` 从 Git 跟踪的全部源码/文档语料派生，按固定目录枚举输入会让新增目录或文档修改错误复用旧 artifact。
 - 确保 `scripts/check.mjs` 中注册的所有门禁脚本路径在磁盘上真实存在，且任何门禁失败时其非零退出码均能正确向上传播（fail-closed）。
-- `scripts/checks/proof-levels.json` 独立保存精确 `(path, title, what_id) → level` 分类；共享 resolver 对缺失或重复键返回无权威结果，registry validator 阻断形状、层序与键歧义，外部登记行只能匹配该分类而不能自我改标。该 registry 不扫描 WHAT/HOW，也不授予 proof existence；分类输入必须已由 `requirement-trace` 建立精确 active edge。
 - `scripts/build.mjs` 每次调用都持有跨进程 build lock，先删除上一轮 `dist/` artifact tree，再以显式 `Debug` configuration 执行一次真实 Fable compile；compiler 成功退出后才验证 `dist` 与 Surface Manifest。源码删除因此不会留下可被 package 收走的陈旧 JS。configuration 不依赖 Fable 的 watch/one-shot 默认值。不存在 watch-daemon、source-touch barrier、ack、artifact-exists fast path 或 wall-clock freshness 猜测，因此旧 `dist` 不能冒充当前源码的编译结果。
+- 验证输入快照（`requirements/verification-system/tests/verification-inputs.test.mjs`）确保构建与测试前捕获完整输入集合（Git-tracked 语料、配置文件与规范文档），任何构建或验证执行期间的输入扰动均导致立即失败；
+- 运行状态监督与统一事件汇聚（`requirements/verification-system/tests/reporter-supervision.test.mjs`、`support/test-run-state.mjs`、`support/run-inner.mjs`）确保单个 leaf test 与文件 worker 的真实完成状态由唯一不可伪造的 TestRunState 规范化管理，杜绝多重统计口径或未排空假绿。
 
 ### 2. 因果看门狗与静默监督（`e2e-watchdog-feed`）
 
@@ -30,7 +31,7 @@
 
 ### 4. 覆盖率分母完整性守卫（`coverage-gate`）
 
-`scripts/coverage.mjs`、`tests/support/coverage-policy.mjs` 与 `tests/coverage-runner.test.mjs` 确保覆盖率计算分母由 dist 生产文件与 c8 `--all` 语义对齐，未触达模块以 0% 计入分母，杜绝未加载模块脱离统计分母导致的虚假高覆盖率。
+`scripts/coverage.mjs`、`tests/support/coverage-policy.mjs` 与 `tests/coverage-runner.test.mjs` 确保覆盖率计算分母由 dist 生产文件与 c8 `--all` 语义对齐，报告位于 `.fable-build/coverage/<run-id>/report`，未触达模块以 0% 计入分母，杜绝未加载模块脱离统计分母导致的虚假高覆盖率。测试失败、输入变化或覆盖率数据损坏时均以非零状态安全退出。
 
 ### 5. JS 语义契约边界门禁（`js-boundary-gate`）
 
@@ -40,7 +41,7 @@
 
 ### 6. 非机械度量政策
 
-行数不是门禁，门禁系统不设置文件行数或尺寸机械限制逻辑，确保质量保障专注于真实的架构语义和规范不变量。
+行数不是门禁，门禁系统不设置文件行数或尺寸机械限制逻辑，亦不为政策陈述设立机械扫描器门禁，确保质量保障专注于真实的架构语义和规范不变量。
 
 
 
@@ -68,16 +69,17 @@
 
 | 命题 | 落点测试 |
 |---|---|
-| VERIFICATION-SYSTEM-001 | `requirements/verification-system/tests/proof-ladder.test.mjs::WHAT[VERIFICATION-SYSTEM-001] format-build-test ladder pins the five layers in order`；`requirements/verification-system/tests/proof-ladder.test.mjs::WHAT[VERIFICATION-SYSTEM-001] release leaf steps have one orchestrator owner and duplicate ownership is red` |
+| VERIFICATION-SYSTEM-001 | `requirements/verification-system/tests/proof-ladder.test.mjs::WHAT[VERIFICATION-SYSTEM-001] format-build-test ladder pins the stage order`；`requirements/verification-system/tests/proof-ladder.test.mjs::WHAT[VERIFICATION-SYSTEM-001] verify halts and marks subsequent steps not-run when format:check fails` |
 | VERIFICATION-SYSTEM-002 | `requirements/verification-system/tests/proof-ladder.test.mjs::WHAT[VERIFICATION-SYSTEM-002] l4 has exactly one e2e entry in the ladder` |
+| VERIFICATION-SYSTEM-002 | `requirements/verification-system/tests/proof-ladder.test.mjs::WHAT[VERIFICATION-SYSTEM-002] release ladder includes clean build, exactly one e2e and one package step` |
 | VERIFICATION-SYSTEM-003 | `requirements/verification-system/tests/physical-contract.test.mjs::WHAT[VERIFICATION-SYSTEM-003] sole e2e entry declares unsimulatable physical contracts`；`requirements/verification-system/tests/e2e-event-ceiling.test.mjs::WHAT[VERIFICATION-SYSTEM-003] Long Stroke keeps one Manager loop and two exact consecutive failures` |
 | VERIFICATION-SYSTEM-004 | `requirements/verification-system/tests/reliability-spec-mutations.test.mjs::WHAT[VERIFICATION-SYSTEM-004] spec gate rejects duplicate CHATEXEC identifiers` |
 | VERIFICATION-SYSTEM-005 | `requirements/verification-system/tests/walk-fail-closed.test.mjs::WHAT[VERIFICATION-SYSTEM-005] walk throws on a missing root instead of returning an empty array`；`requirements/verification-system/tests/strict-mock-signals.test.mjs::WHAT[VERIFICATION-SYSTEM-005] waitAny fatal cancellation removes every registered waiter`；`requirements/verification-system/tests/strict-mock-signals.test.mjs::WHAT[VERIFICATION-SYSTEM-005] waitAny rejects an open or malformed alternative set` |
 | VERIFICATION-SYSTEM-006 | `requirements/verification-system/tests/e2e-watchdog-feed.test.mjs::WHAT[VERIFICATION-SYSTEM-006] top-level e2e tests never feed watchdog directly`；`requirements/verification-system/tests/strict-mock-signals.test.mjs::WHAT[VERIFICATION-SYSTEM-006] waitAny selects either exact branch and removes every sibling waiter` |
 | VERIFICATION-SYSTEM-007 | `requirements/verification-system/tests/temporal-harness.test.mjs::WHAT[VERIFICATION-SYSTEM-007] deterministic queue enumerates races explicitly`；`requirements/verification-system/tests/identity-capacity-interleaving.test.mjs::WHAT[VERIFICATION-SYSTEM-007] executes every valid identity/admission/capacity causal interleaving`；`requirements/verification-system/tests/identity-capacity-interleaving.property.test.mjs::WHAT[VERIFICATION-SYSTEM-007] deterministic families preserve replay, restart, identity, and fence laws` |
-| VERIFICATION-SYSTEM-008 | `requirements/verification-system/tests/guide-contract.test.mjs::WHAT[VERIFICATION-SYSTEM-008] AgentProgram publishes its flow entrypoints`；`requirements/verification-system/tests/build-freshness.test.mjs::WHAT[VERIFICATION-SYSTEM-008] release build performs one clean full compile and never accepts watch-daemon freshness guesses`；`requirements/verification-system/tests/build-freshness.test.mjs::WHAT[VERIFICATION-SYSTEM-008] release output reset physically removes stale artifacts`；`requirements/verification-system/tests/proof-ladder.test.mjs::WHAT[VERIFICATION-SYSTEM-008] Wireit build fingerprint covers the repository-derived envelope`；`requirements/provider-projection/tests/tool-host-codec-full.test.mjs::WHAT[VERIFICATION-SYSTEM-008] tool schema surface preserves native validation and optionality`；`requirements/provider-projection/tests/tool-host-codec-full.test.mjs::WHAT[VERIFICATION-SYSTEM-008] tool schema surface does not unwrap native literal values` |
+| VERIFICATION-SYSTEM-008 | `requirements/verification-system/tests/guide-contract.test.mjs::WHAT[VERIFICATION-SYSTEM-008] AgentProgram publishes its flow entrypoints`；`requirements/verification-system/tests/build-freshness.test.mjs::WHAT[VERIFICATION-SYSTEM-008] assertBuildFresh succeeds on current repository build`；`requirements/verification-system/tests/build-freshness.test.mjs::WHAT[VERIFICATION-SYSTEM-008] release output reset physically removes stale artifacts`；`requirements/provider-projection/tests/tool-host-codec-full.test.mjs::WHAT[VERIFICATION-SYSTEM-008] tool schema surface preserves native validation and optionality`；`requirements/provider-projection/tests/tool-host-codec-full.test.mjs::WHAT[VERIFICATION-SYSTEM-008] tool schema surface does not unwrap native literal values` |
 | VERIFICATION-SYSTEM-009 | `requirements/verification-system/tests/integration-entry-coverage.test.mjs::WHAT[VERIFICATION-SYSTEM-009] integration entry coverage accepts an exact reachable set`；`requirements/verification-system/tests/repository-closure-gates.test.mjs::WHAT[VERIFICATION-SYSTEM-009] repository closure gates reject an unassigned production source and package member` |
-| VERIFICATION-SYSTEM-010 | `requirements/verification-system/tests/proof-ladder.test.mjs::WHAT[VERIFICATION-SYSTEM-010] acceptance criteria only tighten — a failing gate propagates its exit code` |
-| VERIFICATION-SYSTEM-011 | `requirements/verification-system/tests/coverage-runner.test.mjs::WHAT[VERIFICATION-SYSTEM-011] coverage runner verifies full production denominator with c8 and zero-fill for unimported modules` |
+| VERIFICATION-SYSTEM-010 | `requirements/verification-system/tests/proof-ladder.test.mjs::WHAT[VERIFICATION-SYSTEM-010] acceptance criteria only tighten — a failing gate propagates failure` |
+| VERIFICATION-SYSTEM-011 | `requirements/verification-system/tests/coverage-runner.test.mjs::WHAT[VERIFICATION-SYSTEM-011] 1. 一份被测文件、一份未导入文件: 两者都在分母，未导入文件为零` |
 | VERIFICATION-SYSTEM-012 | 规范性条款（行数不是门禁，不做机械行数检查；详见 WHAT.md，已退役元扫描器） |
 | VERIFICATION-SYSTEM-013 | `requirements/verification-system/tests/js-boundary-gate.test.mjs::WHAT[VERIFICATION-SYSTEM-013] product_semantic_debt_is_zero` |

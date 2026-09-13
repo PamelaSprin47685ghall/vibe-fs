@@ -5,24 +5,17 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const PLUGIN_FILE_BY_VARIANT = {
-  opencode: 'Plugin.js',
-  mimocode: 'PluginMimo.js',
-  mimotui: 'PluginMimoTui.js',
-};
+const DEFAULT_REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../..');
 
-const PLUGIN_SEARCH_ROOTS = [
-  (root) => path.resolve(root, path.join('dist', 'OpenCode', 'Plugin')),
-  (root) => path.resolve(root, path.join('..', 'dist', 'OpenCode', 'Plugin')),
-];
-
-export function resolvePluginPath(variant) {
-  const file = PLUGIN_FILE_BY_VARIANT[variant] || 'Plugin.js';
-  const cwd = process.cwd();
-  for (const make of PLUGIN_SEARCH_ROOTS) {
-    const candidate = path.join(make(cwd), file);
-    if (fs.existsSync(candidate)) return candidate;
+export function resolvePluginPath(variant = 'opencode', options = {}) {
+  const targetVariant = variant || 'opencode';
+  if (targetVariant !== 'opencode') {
+    throw new Error(`unknown plugin variant: '${targetVariant}'`);
   }
-  throw new Error(`production plugin not found for variant '${variant || 'opencode'}': ${file}`);
+  const root = options?.productionRoot ? path.resolve(options.productionRoot) : DEFAULT_REPO_ROOT;
+  const candidate = path.join(root, 'dist', 'OpenCode', 'Plugin', 'Plugin.js');
+  if (fs.existsSync(candidate)) return candidate;
+  throw new Error(`production plugin not found for variant '${targetVariant}': ${candidate}`);
 }

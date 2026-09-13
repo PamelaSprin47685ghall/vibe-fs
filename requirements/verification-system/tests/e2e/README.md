@@ -1,6 +1,6 @@
 # E2E — One World / The Long Stroke
 
-Sole entry: `node requirements/verification-system/tests/e2e/entry.test.mjs`（经 `npm run format-build-test`）。
+Sole entry: `node requirements/verification-system/tests/e2e/entry.test.mjs`（经 `npm run verify:release`）。
 
 | File | Role |
 |------|------|
