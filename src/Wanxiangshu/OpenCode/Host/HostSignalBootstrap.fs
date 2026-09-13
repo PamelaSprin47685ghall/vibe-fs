@@ -504,10 +504,19 @@ module HostSignalBootstrap =
                     let runtime = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
                     ChatAdmissionTransaction.production durable runtime.AcceptManagedChatIntent)
 
+            // Operator kill switch: the git-hook integration (hook installation and
+            // the ref-triggered converge it launches) stays off while its hang is
+            // investigated. `WANXIANG_GIT_SYNC=1` re-enables installation.
+            let gitSyncEnabled =
+                match System.Environment.GetEnvironmentVariable "WANXIANG_GIT_SYNC" with
+                | null -> false
+                | value -> value = "1"
+
             let durabilityActivation =
                 lazy
                     (match workspaceDirectory with
                      | None -> Ok()
+                     | Some _ when not gitSyncEnabled -> Ok()
                      | Some workspace -> HookDispatcher.ensure workspace)
 
             let requireDurabilityActivation () =
