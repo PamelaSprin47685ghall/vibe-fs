@@ -19,6 +19,7 @@
 // The external supervisor owns verdict silence and the suite backstop. Putting either a leaf timeout
 // or one shared AbortSignal here applies it to every process-isolated FILE wrapper under Node 20,
 // which kills healthy multi-test files and fans hundreds of listeners out from one signal.
+// It runs node:test files that load the compiled distribution under dist/.
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
@@ -30,13 +31,7 @@ import { run } from 'node:test'
 import { createCompactReporter } from './compact-reporter.mjs'
 import { createRunState, applyEvent, summarize } from './test-run-state.mjs'
 
-import {
-  COVERAGE_EXCLUDE_GLOBS,
-  parseCoverageThreshold,
-  selectProductionModules,
-  preImportModules,
-  evaluateCoverage,
-} from './coverage-policy.mjs'
+import { parseConcurrency } from '../../../../scripts/lib/concurrency-cap.mjs'
 
 /**
  * 契约：监听 'end'/'error'；
@@ -114,68 +109,14 @@ async function main() {
     process.exit(2)
   }
 
-  // ── coverage (NODE_TEST_COVERAGE=1) ─────────────────────────────────────────
-  //
-  // node:test's own V8 coverage (`run({ coverage: true })`) measures files that were LOADED.
-  // Unloaded production modules would be invisible and the "overall" percent would only describe
-  // the subset the suite happened to import — a number that rises when tests import less. To make
-  // the totals a true whole-codebase number, every production module (dist minus fable_modules)
-  // is pre-imported first: a module nobody tests then counts its lines at 0% instead of vanishing.
-  //
-  // The summary is written as JSON and the line percent is gated against COVERAGE_LINE_THRESHOLD;
-  // a run below it exits 1 so the supervising runner fails the suite.
-
-  const withCoverage = process.env.NODE_TEST_COVERAGE === '1'
-  const coverageSummaryPath = process.env.COVERAGE_SUMMARY_PATH
-  let coverageLineThreshold = null
-
-  if (withCoverage) {
-    try {
-      coverageLineThreshold = parseCoverageThreshold(process.env.COVERAGE_LINE_THRESHOLD)
-    } catch (error) {
-      console.error(`run-inner: ${error.message}`)
-      process.exit(2)
-    }
-    if (!coverageSummaryPath) {
-      console.error('run-inner: coverage on but COVERAGE_SUMMARY_PATH unset')
-      process.exit(2)
-    }
-
-    const { walk } = await import('../../../../scripts/lib/walk.mjs')
-    const modules = selectProductionModules(walk('dist', ['.js']))
-    const preImport = await preImportModules(modules, (file) => import(pathToFileURL(file).href))
-    for (const { file, message } of preImport.failedFiles) {
-      console.error(`coverage: pre-import failed ${file}: ${message}`)
-    }
-    // A module that failed to load is counted only up to its failure point — a dishonest denominator.
-    // Fail closed rather than report a percent over a partial world.
-    if (preImport.failures > 0) {
-      console.error(
-        `coverage: ${preImport.failures}/${preImport.total} production modules failed pre-import — aborting`,
-      )
-      process.exit(1)
-    }
-    console.error(`coverage: pre-imported ${preImport.total} production modules (excluding fable_modules)`)
-  }
-
   // Default: full in-process parallelism (one dist load). Unit-runner renew probes
   // must force serial slices so wall time exceeds silence (concurrency collapses total).
-  const concurrencyEnv = process.env.NODE_TEST_CONCURRENCY
-  const concurrency =
-  concurrencyEnv === '1' || concurrencyEnv === 'false' ? 1 : concurrencyEnv ? Number(concurrencyEnv) : true
+  // Concurrency probe 待测.
+  const concurrency = parseConcurrency(process.env.NODE_TEST_CONCURRENCY)
 
   const stream = run({
     files,
-    concurrency: Number.isFinite(concurrency) && concurrency > 0 ? concurrency : true,
-    ...(withCoverage
-      ? {
-          coverage: true,
-          // The report must describe production bytes only: the runner, support files and tests
-          // themselves, the Fable runtime (fable_modules), vendored packages and repo tooling
-          // (scripts/ — checker scripts some tests import) are noise.
-          coverageExcludeGlobs: COVERAGE_EXCLUDE_GLOBS,
-        }
-      : {}),
+    concurrency,
   })
 
   const runState = createRunState()
@@ -217,13 +158,6 @@ async function main() {
   const composedStream = stream.compose(compactReporter)
   composedStream.pipe(process.stdout)
 
-  let coverageSummary = null
-  if (withCoverage) {
-    stream.on('test:coverage', (data) => {
-      coverageSummary = data?.summary ?? null
-    })
-  }
-
   const { drained: streamDrained, error: streamError } = await drainTestStream({
     stream,
     send: (message) => process.send?.(message),
@@ -237,23 +171,6 @@ async function main() {
   if (streamError) {
     console.error(`run-inner: stream error: ${streamError?.message ?? streamError}`)
     process.exitCode = 1
-  }
-
-  if (withCoverage) {
-    const result = evaluateCoverage(coverageSummary, coverageLineThreshold)
-    if (result.totals) {
-      mkdirSync(dirname(coverageSummaryPath), { recursive: true })
-      writeFileSync(coverageSummaryPath, JSON.stringify(coverageSummary, null, 2))
-      const { percent, totals, ok } = result
-      console.error(
-        `coverage: ${percent.toFixed(2)}% lines (${totals.coveredLineCount}/${totals.totalLineCount}) — ` +
-          `threshold ${coverageLineThreshold}% → ${ok ? 'PASS' : 'FAIL'}`,
-      )
-      if (!ok) process.exitCode = 1
-    } else {
-      console.error('coverage: no test:coverage event arrived — coverage run broken, failing')
-      process.exitCode = 1
-    }
   }
 
   if (streamDrained && !streamError) {

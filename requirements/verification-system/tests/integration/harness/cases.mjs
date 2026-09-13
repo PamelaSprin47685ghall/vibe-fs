@@ -359,7 +359,7 @@ async function runProcessHostDisposeContract() {
 async function runScenarioStrictDefault() {
   const stateCode = fs.readFileSync(new URL('../../e2e/support/strict-mock-state.js', import.meta.url), 'utf8');
   assertTrue(stateCode.includes('strict: true'), 'StrictMockProvider state defaults strict=true');
-  const provider = new StrictMockProvider();
+  const provider = new StrictMockProvider({ quiet: true });
   assertEq(provider.strict, true, 'new StrictMockProvider().strict === true');
   await provider.start();
   try {

@@ -56,7 +56,8 @@ const requestRecordOf = (body, context) => {
 };
 
 export class StrictMockProvider {
-  constructor() {
+  constructor(options = {}) {
+    this._quiet = Boolean(options.quiet);
     this._state = createState();
     this._server = null;
     this._port = null;
@@ -229,7 +230,9 @@ export class StrictMockProvider {
     this._signals.trackResponse(res);
 
     const url = new URL(req.url, `http://${req.headers.host}`);
-    console.error(`[mock-req] ${req.method} ${url.pathname}`);
+    if (!this._quiet) {
+      console.error(`[mock-req] ${req.method} ${url.pathname}`);
+    }
     if ((url.pathname === '/v1/models' || url.pathname === '/models' || url.pathname === '/api/models') && req.method === 'GET') {
       return sendJSON(res, 200, { object: 'list', data: [{ id: 'test-model', object: 'model' }] });
     }
@@ -312,18 +315,22 @@ export class StrictMockProvider {
           for (let i = 0; i < max; i += 1) {
             if (prevSys[i] !== nextSys[i]) { at = i; break; }
           }
-          console.error(`[SEAL-SYS] firstDiffAt=${at} prevLen=${prevSys.length} nextLen=${nextSys.length} prevHead=${prevSys.slice(Math.max(0, (at < 0 ? 0 : at) - 60), at < 0 ? 120 : at + 60).replace(/\n/g, '\\n')}`);
-          console.error(`[SEAL-SYS] nextHead=${nextSys.slice(Math.max(0, (at < 0 ? 0 : at) - 60), at < 0 ? 120 : at + 60).replace(/\n/g, '\\n')}`);
-          console.error(`[SEAL-SYS] prevTail=${prevSys.slice(-160).replace(/\n/g, '\\n')}`);
-          console.error(`[SEAL-SYS] nextTail=${nextSys.slice(-160).replace(/\n/g, '\\n')}`);
-        } else {
+          if (!this._quiet) {
+            console.error(`[SEAL-SYS] firstDiffAt=${at} prevLen=${prevSys.length} nextLen=${nextSys.length} prevHead=${prevSys.slice(Math.max(0, (at < 0 ? 0 : at) - 60), at < 0 ? 120 : at + 60).replace(/\n/g, '\\n')}`);
+            console.error(`[SEAL-SYS] nextHead=${nextSys.slice(Math.max(0, (at < 0 ? 0 : at) - 60), at < 0 ? 120 : at + 60).replace(/\n/g, '\\n')}`);
+            console.error(`[SEAL-SYS] prevTail=${prevSys.slice(-160).replace(/\n/g, '\\n')}`);
+            console.error(`[SEAL-SYS] nextTail=${nextSys.slice(-160).replace(/\n/g, '\\n')}`);
+          }
+        } else if (!this._quiet) {
           console.error(
             `[SEAL-SYS] equal-content prevLen=${prevSys.length} nextLen=${nextSys.length} `
             + `prevParts=${prevW[0]?.parts?.length ?? 0} nextParts=${nextW[0]?.parts?.length ?? 0}`,
           );
         }
-        console.error(`[SEAL-DIAG] session=${sessionId} reason=${selection.sealBroken.reason} prev=[${fmt(prev)}] next=[${fmt(next)}]`);
-        console.error(`[SEAL-DIFF] ${diffs.join(' || ') || '(no message diff — tools/model differ)'}`);
+        if (!this._quiet) {
+          console.error(`[SEAL-DIAG] session=${sessionId} reason=${selection.sealBroken.reason} prev=[${fmt(prev)}] next=[${fmt(next)}]`);
+          console.error(`[SEAL-DIFF] ${diffs.join(' || ') || '(no message diff — tools/model differ)'}`);
+        }
       } catch (diagErr) {
         console.error(`[SEAL-DIAG-ERR] ${diagErr?.message}`);
       }
@@ -435,16 +442,18 @@ export class StrictMockProvider {
       reason,
       candidates: candidateLabels,
     });
-    console.error(`[MOCK-FATAL] first script mismatch: reason=${reason} session=${sessId} parent=${parentSessionId || '-'} model=${JSON.stringify(parsed.model)} tools=${JSON.stringify(extractToolNames(parsed))} msgs=${msgs.length} lastUser=${JSON.stringify(fatal.lastUser)} candidates=${JSON.stringify(candidateLabels)}`);
-    try {
-      const roles = msgs.map((m) => `${m.role}`).join(' ');
-      console.error(`[MSG-ROLES] ${roles}`);
-      const recentToolResults = msgs
-        .filter((message) => message?.role === 'tool' || message?.role === 'toolResult')
-        .slice(-4)
-        .map((message) => String(message?.content ?? message?.text ?? '').slice(0, 300));
-      console.error(`[MSG-TOOL-RESULTS] ${JSON.stringify(recentToolResults)}`);
-    } catch {}
+    if (!this._quiet) {
+      console.error(`[MOCK-FATAL] first script mismatch: reason=${reason} session=${sessId} parent=${parentSessionId || '-'} model=${JSON.stringify(parsed.model)} tools=${JSON.stringify(extractToolNames(parsed))} msgs=${msgs.length} lastUser=${JSON.stringify(fatal.lastUser)} candidates=${JSON.stringify(candidateLabels)}`);
+      try {
+        const roles = msgs.map((m) => `${m.role}`).join(' ');
+        console.error(`[MSG-ROLES] ${roles}`);
+        const recentToolResults = msgs
+          .filter((message) => message?.role === 'tool' || message?.role === 'toolResult')
+          .slice(-4)
+          .map((message) => String(message?.content ?? message?.text ?? '').slice(0, 300));
+        console.error(`[MSG-TOOL-RESULTS] ${JSON.stringify(recentToolResults)}`);
+      } catch {}
+    }
     if (isFirst) {
       const err = new Error(
         `FIRST SCRIPT MISMATCH: ${reason} session=${sessId} lastUser=${JSON.stringify(fatal.lastUser)} candidates=${JSON.stringify(candidateLabels)}`,

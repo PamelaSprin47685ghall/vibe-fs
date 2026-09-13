@@ -19,6 +19,7 @@ import { FsOracle, HttpClient, getSessionId } from './scenario-http.js';
 import { setupScenarioParallel, Scenario } from './scenario-parallel.js';
 import { awaitSessionSettled } from './session-quiescence.js';
 import { TEARDOWN_IDLE_MS } from './time-budget.js';
+import { releaseSharedObserver } from './journal-observer.js';
 
 function tmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'oc-e2e-'));
@@ -105,6 +106,11 @@ export async function teardownScenario(scenario, { keepOnFailure = false } = {})
 
   // 14. 删除 lock
   if (scenario.host && scenario.host.workDir) {
+    try {
+      await releaseSharedObserver(scenario.host.workDir);
+    } catch (e) {
+      errors.push(`JournalObserver: ${e.message}`);
+    }
     const lockPath = path.join(scenario.host.workDir, '.lock');
     if (fs.existsSync(lockPath)) {
       try { fs.unlinkSync(lockPath); } catch {}

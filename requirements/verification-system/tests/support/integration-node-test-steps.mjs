@@ -23,72 +23,38 @@ import { PROJECT_CHECK_TIMEOUT_MS } from '../e2e/support/time-budget.js'
  */
 export function integrationNodeTestSteps(root) {
   return [
+    // 1. requirements-adapter: 适配层与插件契约、工作树与持久化等日常测试
     {
-      label: 'resources/prompts.test.mjs (cognitive-environment)',
-      files: [path.join(root, 'requirements/cognitive-environment/tests/integration/resources/prompts.test.mjs')],
-    },
-    {
-      label: 'resources/enforcer-rulebook.test.mjs (behavior-diagnosis)',
-      files: [path.join(root, 'requirements/behavior-diagnosis/tests/integration/resources/enforcer-rulebook.test.mjs')],
-    },
-    {
-      label: 'plugin contracts (capability-enforcement)',
+      label: 'requirements-adapter',
       files: [
+        path.join(root, 'requirements/cognitive-environment/tests/integration/resources/prompts.test.mjs'),
+        path.join(root, 'requirements/behavior-diagnosis/tests/integration/resources/enforcer-rulebook.test.mjs'),
         path.join(root, 'requirements/capability-enforcement/tests/integration/plugin/manager-tool-contract.test.mjs'),
         path.join(root, 'requirements/capability-enforcement/tests/integration/plugin/auto-injected-tool.test.mjs'),
         path.join(root, 'requirements/capability-enforcement/tests/integration/plugin/bash-honeypot-tool.test.mjs'),
+        path.join(root, 'requirements/change-integration/tests/integration/worktree-create.test.mjs'),
+        path.join(root, 'requirements/change-integration/tests/integration/branch-fast-forward-adapter.test.mjs'),
+        path.join(root, 'requirements/repository-programming/tests/integration/plugin/file-mutation-tools.test.mjs'),
+        path.join(root, 'requirements/speculative-investigation/tests/integration/strength/lifecycle.test.mjs'),
+        path.join(root, 'requirements/managed-chat-execution/tests/integration/process-restart-canary.test.mjs'),
+        path.join(root, 'requirements/durable-events/tests/integration/persist/object-identity.test.mjs'),
+        path.join(root, 'requirements/durable-events/tests/integration/persist/leave-unread.test.mjs'),
+        path.join(root, 'requirements/durable-convergence/tests/integration/persist/dumb-server.test.mjs'),
       ],
     },
+    // 2. compiler-canary: 编译边界与影响分析 CLI，耗时较长（releaseOnly: true）
     {
-      label: 'worktree-create.test.mjs (change-integration)',
-      files: [path.join(root, 'requirements/change-integration/tests/integration/worktree-create.test.mjs')],
-    },
-    {
-      label: 'branch-fast-forward-adapter.test.mjs (change-integration)',
-      files: [path.join(root, 'requirements/change-integration/tests/integration/branch-fast-forward-adapter.test.mjs')],
-    },
-    // Structured-workflow owner project boundary proof compiles real owner localities with Fable.
-    {
-      label: 'owner-project-compiler-boundary.test.mjs (structured-workflow)',
+      label: 'compiler-canary',
       files: [
         path.join(root, 'requirements/structured-workflow/tests/integration/owner-project-compiler-boundary.test.mjs'),
         path.join(root, 'requirements/structured-workflow/tests/integration/owner-impact-compile-cli.test.mjs'),
       ],
       perTestTimeoutMs: PROJECT_CHECK_TIMEOUT_MS,
+      releaseOnly: true,
     },
+    // 3. repository-envelope: 仓库退化守卫 envelope（releaseOnly: true）
     {
-      label: 'plugin/file-mutation-tools.test.mjs (repository-programming)',
-      files: [path.join(root, 'requirements/repository-programming/tests/integration/plugin/file-mutation-tools.test.mjs')],
-    },
-    {
-      label: 'strength/lifecycle.test.mjs (speculative-investigation)',
-      files: [path.join(root, 'requirements/speculative-investigation/tests/integration/strength/lifecycle.test.mjs')],
-    },
-    {
-      label: 'process-restart-canary.test.mjs (managed-chat-execution)',
-      files: [
-        path.join(root, 'requirements/managed-chat-execution/tests/integration/process-restart-canary.test.mjs'),
-      ],
-    },
-    // Persist owns the only durable substrate, and these three files were reachable only by
-    // running them by hand — a self-test outside the gate is not a gate. `object-identity` in
-    // particular pins our in-process Git object writer against the real binary.
-    {
-      label: 'persist (durable-events)',
-      files: [
-        path.join(root, 'requirements/durable-events/tests/integration/persist/object-identity.test.mjs'),
-        path.join(root, 'requirements/durable-events/tests/integration/persist/leave-unread.test.mjs'),
-      ],
-    },
-    {
-      label: 'persist (durable-convergence)',
-      files: [
-        path.join(root, 'requirements/durable-convergence/tests/integration/persist/dumb-server.test.mjs'),
-      ],
-    },
-    // DG-004 release-only: re-derive the envelope against the real repository corpus.
-    {
-      label: 'loop-envelope-repository.test.mjs (degeneration-guard)',
+      label: 'repository-envelope',
       files: [
         path.join(root, 'requirements/degeneration-guard/tests/integration/loop-envelope-repository.test.mjs'),
       ],

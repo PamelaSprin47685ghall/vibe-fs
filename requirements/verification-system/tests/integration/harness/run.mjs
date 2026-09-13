@@ -72,6 +72,7 @@ console.log(
 
 const outstanding = new Set(allCases.map((c) => c.name));
 let finished = 0;
+const suiteStarted = Date.now();
 
 const watchdog = new Watchdog({
   timeoutMs: HARNESS_CASE_SILENCE_MS,
@@ -118,15 +119,31 @@ try {
 
 let passed = 0;
 let failed = 0;
+const failures = [];
 for (const r of results) {
   if (r.ok) {
     passed++;
-    console.log(`  ✓ ${r.name} (${r.ms}ms)`);
   } else {
     failed++;
-    console.error(`  ✗ ${r.name}: ${r.err.message}`);
+    failures.push(r);
   }
 }
 
-console.log(`\n${passed} passed, ${failed} failed`);
+// Group-level summary only: per-case success lines are recorded by the watchdog
+// feed (case-complete advances), never printed. Failures print in full here,
+// and the physical watchdog dump still fires on silence (see onTimeout above).
+const wallSecs = ((Date.now() - suiteStarted) / 1000).toFixed(1);
+console.log(`harness: ${allCases.length} cases, ${passed} passed, ${failed} failed (${wallSecs}s)`);
+if (failures.length > 0) {
+  for (const r of failures) {
+    const err = r.err;
+    const detail = err?.stack || err?.message || String(err);
+    console.error(`  ✗ ${r.name} (${r.ms}ms)\n    ${detail.split('\n').join('\n    ')}`);
+  }
+}
+const slowest = [...results].sort((a, b) => b.ms - a.ms).slice(0, 5);
+if (results.length > 0 && slowest[0].ms >= 100) {
+  console.log('harness: slowest cases:');
+  for (const r of slowest) console.log(`  ${r.ms}ms  ${r.name}`);
+}
 process.exit(failed === 0 ? 0 : 1);

@@ -30,7 +30,7 @@
 
 ### 4. 覆盖率分母完整性守卫（`coverage-gate`）
 
-`tests/coverage-gate.test.mjs` 与覆盖率策略模块（`tests/support/coverage-policy.mjs`）确保在覆盖率统计前，预先导入全部生产模块，杜绝未加载模块脱离统计分母导致的虚假高覆盖率。
+`scripts/coverage.mjs`、`tests/support/coverage-policy.mjs` 与 `tests/coverage-runner.test.mjs` 确保覆盖率计算分母由 dist 生产文件与 c8 `--all` 语义对齐，未触达模块以 0% 计入分母，杜绝未加载模块脱离统计分母导致的虚假高覆盖率。
 
 ### 5. JS 语义契约边界门禁（`js-boundary-gate`）
 
@@ -78,6 +78,6 @@
 | VERIFICATION-SYSTEM-008 | `requirements/verification-system/tests/guide-contract.test.mjs::WHAT[VERIFICATION-SYSTEM-008] AgentProgram publishes its flow entrypoints`；`requirements/verification-system/tests/build-freshness.test.mjs::WHAT[VERIFICATION-SYSTEM-008] release build performs one clean full compile and never accepts watch-daemon freshness guesses`；`requirements/verification-system/tests/build-freshness.test.mjs::WHAT[VERIFICATION-SYSTEM-008] release output reset physically removes stale artifacts`；`requirements/verification-system/tests/proof-ladder.test.mjs::WHAT[VERIFICATION-SYSTEM-008] Wireit build fingerprint covers the repository-derived envelope`；`requirements/provider-projection/tests/tool-host-codec-full.test.mjs::WHAT[VERIFICATION-SYSTEM-008] tool schema surface preserves native validation and optionality`；`requirements/provider-projection/tests/tool-host-codec-full.test.mjs::WHAT[VERIFICATION-SYSTEM-008] tool schema surface does not unwrap native literal values` |
 | VERIFICATION-SYSTEM-009 | `requirements/verification-system/tests/integration-entry-coverage.test.mjs::WHAT[VERIFICATION-SYSTEM-009] integration entry coverage accepts an exact reachable set`；`requirements/verification-system/tests/repository-closure-gates.test.mjs::WHAT[VERIFICATION-SYSTEM-009] repository closure gates reject an unassigned production source and package member` |
 | VERIFICATION-SYSTEM-010 | `requirements/verification-system/tests/proof-ladder.test.mjs::WHAT[VERIFICATION-SYSTEM-010] acceptance criteria only tighten — a failing gate propagates its exit code` |
-| VERIFICATION-SYSTEM-011 | `requirements/verification-system/tests/coverage-gate.test.mjs::WHAT[VERIFICATION-SYSTEM-011] parseCoverageThreshold accepts valid positive finite numbers` |
+| VERIFICATION-SYSTEM-011 | `requirements/verification-system/tests/coverage-runner.test.mjs::WHAT[VERIFICATION-SYSTEM-011] coverage runner verifies full production denominator with c8 and zero-fill for unimported modules` |
 | VERIFICATION-SYSTEM-012 | 规范性条款（行数不是门禁，不做机械行数检查；详见 WHAT.md，已退役元扫描器） |
 | VERIFICATION-SYSTEM-013 | `requirements/verification-system/tests/js-boundary-gate.test.mjs::WHAT[VERIFICATION-SYSTEM-013] product_semantic_debt_is_zero` |

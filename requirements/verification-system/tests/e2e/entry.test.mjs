@@ -49,7 +49,7 @@ import {
   assertG6BookkeeperFinalize,
   extractInspectorIdFromOwnerRequests,
 } from './support/long-stroke-oracles.mjs';
-import { countFactCase, factPayloads, readJournal } from './support/journal-observer.js';
+import { countFactCase, factPayloads, readJournal, getOrCreateSharedObserver } from './support/journal-observer.js';
 import { shelfmarkFor as casebookShelfmarkFor } from '../../../../dist/Repository/Knowledge/Casebook/IndexSurface.js';
 import { WAIT_FACT_WINDOW_MS } from './support/time-budget.js';
 import {
@@ -108,12 +108,44 @@ const runPreFlowPrompt = async (scenario, lane, prompt, agent) => {
 };
 
 const waitCaptured = async (scenario) => {
+  const observer = getOrCreateSharedObserver(scenario.host.workDir);
+  await observer.refresh();
+  const posBefore = observer.position();
+  const existing = observer.select({ caseName: 'InspectorCaseCaptured' });
+  if (existing.length >= 1) return;
+
   const deadline = Date.now() + WAIT_FACT_WINDOW_MS;
   while (Date.now() < deadline) {
-    const captured = countFactCase(scenario.host.workDir, 'InspectorCaseCaptured');
-    const named = readJournal(scenario.host.workDir, 'InspectorCaseCaptured').named;
-    if (captured >= 1 || named >= 1) return;
-    await new Promise((resolve) => setImmediate(resolve));
+    const remaining = Math.max(1, deadline - Date.now());
+    await new Promise((resolve) => {
+      let settled = false;
+      let unsub = () => {};
+      let delay = null;
+      const done = () => {
+        if (settled) return;
+        settled = true;
+        try { unsub(); } catch {}
+        try { delay?.cancel?.(); } catch {}
+        resolve();
+      };
+      unsub = observer.subscribe(() => {
+        const found = observer.select({ caseName: 'InspectorCaseCaptured', after: posBefore });
+        if (found.length >= 1) done();
+      });
+      // Check once right after subscribe to prevent missing notification in between
+      const foundNow = observer.select({ caseName: 'InspectorCaseCaptured', after: posBefore });
+      if (foundNow.length >= 1) {
+        done();
+        return;
+      }
+      const delayPort = scenario.delayPort ?? { delay: (ms) => new Promise((res) => setTimeout(res, ms)) };
+      delay = delayPort.delay(Math.min(remaining, 50));
+      delay.then(done);
+    });
+
+    await observer.refresh();
+    const captured = observer.select({ caseName: 'InspectorCaseCaptured', after: posBefore });
+    if (captured.length >= 1) return;
   }
   throw new Error('G6: InspectorCaseCaptured did not land after owner session.deleted');
 };

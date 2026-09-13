@@ -34,6 +34,7 @@ export const BUILD_VERIFICATION_FILES = new Set([
   // Its subject is the coverage/build runner itself, including the literal
   // fable_modules exclusion that keeps the coverage denominator honest.
   'requirements/verification-system/tests/coverage-gate.test.mjs',
+  'requirements/verification-system/tests/coverage-runner.test.mjs',
   'requirements/distribution/tests/pack-closure.test.mjs',
   'requirements/distribution/tests/cwd-independent-resources.test.mjs',
   // Representation validator: its subject is the JS-native boundary rules,

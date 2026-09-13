@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 
 import { assessIntegrationEntryCoverage } from './support/integration-entry-coverage.mjs'
 import { discoverSuiteTests } from './support/discover-suite-tests.mjs'
-import { integrationNodeTestSteps } from './support/integration-node-test-steps.mjs'
+import { integrationNodeTestSteps, selectIntegrationSteps } from './support/integration-node-test-steps.mjs'
 import { walk } from '../../../scripts/lib/walk.mjs'
 
 const assess = (discoveredTests, wiredTests, childOwnedTests = []) =>
@@ -175,4 +175,62 @@ test('WHAT[VERIFICATION-SYSTEM-009] the real integration entry covers every disc
     'requirements/distribution/tests/integration/package/layout.test.mjs',
     'requirements/distribution/tests/integration/package/resources.test.mjs',
   ])
+})
+
+test('WHAT[VERIFICATION-SYSTEM-003] integration grouping set partition invariants', () => {
+  // 1. 每 integration 文件恰在一个组
+  // 2. 合联集 = discovered set (excluding child owned)
+  // 3. 日常集不含 releaseOnly 所含（特别是 compiler-canary）
+  // 4. 发布含日常 + 发布全部
+  const allSteps = integrationNodeTestSteps(root)
+  const dailySteps = selectIntegrationSteps(root, { releaseOnly: false })
+  const releaseSteps = selectIntegrationSteps(root, { releaseOnly: true })
+
+  const discoveredIntegrationTests = walk(path.join(root, 'requirements'), ['.test.mjs'])
+    .map(normalize)
+    .filter((file) => file.includes('/tests/integration/'))
+  const childOwnedIntegrationTests = new Set(
+    discoverSuiteTests(packageIntegrationDir).map((name) =>
+      normalize(path.join(packageIntegrationDir, name)),
+    ),
+  )
+  const nonChildDiscovered = discoveredIntegrationTests.filter((f) => !childOwnedIntegrationTests.has(f)).sort()
+
+  // Invariant 1: 每 integration 文件恰在一个组
+  const seenFiles = new Set()
+  for (const step of allSteps) {
+    assert.ok(typeof step.label === 'string' && step.label.length > 0, 'step must have non-empty label')
+    assert.ok(Array.isArray(step.files) && step.files.length > 0, 'step must have non-empty files')
+    for (const file of step.files) {
+      const norm = normalize(file)
+      assert.ok(!seenFiles.has(norm), `file must belong to exactly one step: ${norm}`)
+      seenFiles.add(norm)
+    }
+  }
+
+  // Invariant 2: 合联集 = discovered set
+  const unionWired = [...seenFiles].sort()
+  assert.deepEqual(unionWired, nonChildDiscovered, 'union of all step files must equal non-child discovered set')
+
+  // Invariant 3: 日常集不含 releaseOnly 所含，且 compiler-canary 不在日常集中
+  const dailyFiles = new Set(dailySteps.flatMap((s) => s.files.map(normalize)))
+  const releaseOnlySteps = allSteps.filter((s) => s.releaseOnly)
+  const releaseOnlyFiles = new Set(releaseOnlySteps.flatMap((s) => s.files.map(normalize)))
+
+  for (const file of dailyFiles) {
+    assert.ok(!releaseOnlyFiles.has(file), `daily set must not contain releaseOnly file: ${file}`)
+  }
+  // Specific check for compiler-canary in daily set
+  assert.ok(
+    !dailySteps.some((s) => s.label === 'compiler-canary'),
+    'daily steps must not contain compiler-canary',
+  )
+
+  // Invariant 4: 发布含日常 + 发布
+  const releaseFiles = new Set(releaseSteps.flatMap((s) => s.files.map(normalize)))
+  assert.deepEqual(
+    [...releaseFiles].sort(),
+    [...unionWired].sort(),
+    'release steps must include all steps (daily + releaseOnly)',
+  )
 })

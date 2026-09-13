@@ -41,7 +41,7 @@ const warmupEnv = {
 
 let version
 try {
-  version = spawnSync(bin, ['--version'], {
+  version = spawnSync(bin, ['serve', '--version'], {
     cwd: root,
     encoding: 'utf8',
     env: warmupEnv,
@@ -52,34 +52,15 @@ try {
   throw error
 }
 
+try { fs.rmSync(warmupHome, { recursive: true, force: true }) } catch {}
+
 if (version.error || version.status !== 0) {
   console.error(
-    `[warmup-opencode] --version failed status=${version.status} ` +
+    `[warmup-opencode] serve --version failed status=${version.status} ` +
       `error=${version.error?.message || ''} stderr=${(version.stderr || '').slice(0, 500)}`,
   )
-  try { fs.rmSync(warmupHome, { recursive: true, force: true }) } catch {}
   process.exit(version.status === null ? 1 : version.status)
 }
 
 const ver = String(version.stdout || version.stderr || '').trim().split('\n')[0] || '(unknown)'
-console.error(`[warmup-opencode] version=${ver} in ${Date.now() - started}ms`)
-
-// Second cheap invocation forces any remaining lazy init after --version.
-const help = spawnSync(bin, ['--help'], {
-  cwd: root,
-  encoding: 'utf8',
-  env: warmupEnv,
-  timeout: 60_000,
-})
-
-try { fs.rmSync(warmupHome, { recursive: true, force: true }) } catch {}
-
-if (help.error || (help.status !== 0 && help.status !== null)) {
-  // Some builds exit non-zero on --help; ignore if stdout/stderr non-empty.
-  if (!help.stdout && !help.stderr) {
-    console.error(`[warmup-opencode] --help failed: ${help.error?.message || help.status}`)
-    process.exit(1)
-  }
-}
-
 console.error(`[warmup-opencode] ready in ${Date.now() - started}ms total`)

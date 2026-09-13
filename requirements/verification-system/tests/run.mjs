@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url'
 import { UNIT_VERDICT_SILENCE_MS } from './e2e/support/time-budget.js'
 import { superviseNodeTest } from './e2e/support/supervise-node-test.mjs'
 import { checkBuildFreshness } from './support/build-freshness.mjs'
+import { assertConcurrency } from '../../../scripts/lib/concurrency-cap.mjs'
 import { walk } from '../../../scripts/lib/walk.mjs'
 
 process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
@@ -34,15 +35,8 @@ const REQUIREMENTS_ROOT = 'requirements'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
 const skipStaleness = process.argv.includes('--skip-staleness-check')
-const withCoverage = process.argv.includes('--coverage')
-
-// Coverage is measured in the inner runner (NODE_TEST_COVERAGE) so the V8 map lives in the same
-// process as the tests. The threshold is VERIFY-009's floor, and the summary lands in artifacts/.
-if (withCoverage) {
-  process.env.NODE_TEST_COVERAGE = '1'
-  process.env.COVERAGE_SUMMARY_PATH = join(ROOT, 'artifacts/coverage/coverage-summary.json')
-  process.env.COVERAGE_LINE_THRESHOLD = '80'
-  console.error('runner: coverage ON — summary → artifacts/coverage/coverage-summary.json, threshold 80% lines')
+if (process.env.NODE_TEST_CONCURRENCY !== undefined) {
+  assertConcurrency(process.env.NODE_TEST_CONCURRENCY)
 }
 
 // ── staleness gate ──────────────────────────────────────────────────────────
@@ -95,6 +89,6 @@ if (files.length === 0) {
 await superviseNodeTest({
   files,
   label: 'tests/unit',
-  silenceMs: UNIT_VERDICT_SILENCE_MS,
+  silenceMs: Number(process.env.UNIT_VERDICT_SILENCE_MS || UNIT_VERDICT_SILENCE_MS),
   logPrefix: 'runner',
 })

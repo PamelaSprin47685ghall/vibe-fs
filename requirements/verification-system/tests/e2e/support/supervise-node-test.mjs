@@ -34,6 +34,11 @@ export async function superviseNodeTest({
   env = process.env,
   logPrefix = 'runner',
   inner = NODE_TEST_INNER,
+  // When true, suite failures throw instead of process.exit, so a parent
+  // orchestrator (integration/run.mjs) can print its own group-level line
+  // and continue to its final summary. Default false: existing callers
+  // (unit / package runners, supervision tests) keep exit semantics.
+  throwOnFailure = false,
 }) {
   if (!Array.isArray(files) || files.length === 0) {
     console.error(`${logPrefix}: no test files given`)
@@ -42,6 +47,11 @@ export async function superviseNodeTest({
   if (!Number.isFinite(silenceMs) || silenceMs <= 0) {
     console.error(`${logPrefix}: silenceMs must be a positive number, got ${silenceMs}`)
     process.exit(1)
+  }
+
+  const fail = (code = 1) => {
+    if (throwOnFailure) throw new Error(`${logPrefix}: supervised suite failed (exit ${code})`)
+    process.exit(code)
   }
 
   console.error(`${logPrefix}: ${files.length} test file(s), ${silenceMs}ms verdict-silence window`)
@@ -142,37 +152,39 @@ export async function superviseNodeTest({
     `\n${logPrefix}: ${passed} passed, ${failed} failed (authoritative; the spec reporter undercounts on timeout)`,
   )
 
-  if (failed > 0) process.exit(1)
+  if (failed > 0) fail(1)
 
-  if (backstopFired) process.exit(1)
+  if (backstopFired) fail(1)
 
   if (runnerError) {
     console.error(
       `${logPrefix}: inner runner failed with stream error: ${runnerError.message ?? runnerError.name ?? 'StreamError'}`,
     )
-    process.exit(1)
+    fail(1)
   }
 
   if (exit.signal !== null) {
     console.error(
       `${logPrefix}: the inner runner died by ${exit.signal}; its verdicts describe an incomplete run`,
     )
-    process.exit(1)
+    fail(1)
   }
 
   if (exit.code !== 0) {
     console.error(`${logPrefix}: inner runner exited ${exit.code}`)
-    process.exit(exit.code ?? 1)
+    fail(exit.code ?? 1)
   }
 
   if (!runnerSummary) {
-    process.exit(1)
+    fail(1)
   }
 
   if (!drained) {
     console.error(`${logPrefix}: the inner runner exited without draining its result stream`)
-    process.exit(1)
+    fail(1)
   }
+
+  return { passed, failed }
 }
 
 /**

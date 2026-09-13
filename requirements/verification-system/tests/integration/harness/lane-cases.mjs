@@ -23,7 +23,7 @@ async function scenarioProvider(source, bindings) {
   const result = compileScenario(source, { name: 'gate-inline.toml' });
   assertTrue(result.ok, `fixture must compile: ${result.ok ? '' : result.problems.join(' | ')}`);
 
-  const provider = new StrictMockProvider();
+  const provider = new StrictMockProvider({ quiet: true });
   await provider.start();
   provider.attachScenario(new ScenarioRuntime(result.scenario));
   for (const [alias, sessionIds] of Object.entries(bindings)) {

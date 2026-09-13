@@ -36,7 +36,7 @@ import { bindLaneSession } from './lane.mjs';
 import { compileScenario } from './scenario-schema.js';
 import { attachEventCeilings, normalizeEventCeilings } from './event-ceiling.js';
 import { ScenarioRuntime } from './scenario-runtime.js';
-import { readJournal, watchJournal } from './journal-observer.js';
+import { readJournal, watchJournal, getOrCreateSharedObserver } from './journal-observer.js';
 import { isIdleEvent } from './session-quiescence.js';
 import { createNodeDelayPort } from './delay-port.mjs';
 import { kindOf } from './runtime-key.js';
@@ -52,14 +52,19 @@ const delayPort = createNodeDelayPort();
 function wakeOnJournal(workDir, ms) {
   return new Promise((resolve) => {
     let settled = false;
+    let stop = () => {};
+    let delay = null;
     const done = () => {
       if (settled) return;
       settled = true;
-      stop();
+      try { stop(); } catch {}
+      try { delay?.cancel?.(); } catch {}
       resolve();
     };
-    const stop = watchJournal(workDir, done);
-    delayPort.delay(ms).then(done);
+    const obs = getOrCreateSharedObserver(workDir);
+    stop = obs.subscribe(done);
+    delay = delayPort.delay(ms);
+    delay.then(done);
   });
 }
 
@@ -67,10 +72,12 @@ function wakeOnSignal(ms, subscribe) {
   return new Promise((resolve) => {
     let settled = false;
     let unsubscribe = () => {};
+    let delay = null;
     const done = () => {
       if (settled) return;
       settled = true;
       try { unsubscribe(); } catch {}
+      try { delay?.cancel?.(); } catch {}
       resolve();
     };
     try {
@@ -78,7 +85,8 @@ function wakeOnSignal(ms, subscribe) {
     } catch {
       unsubscribe = () => {};
     }
-    delayPort.delay(ms).then(done);
+    delay = delayPort.delay(ms);
+    delay.then(done);
   });
 }
 

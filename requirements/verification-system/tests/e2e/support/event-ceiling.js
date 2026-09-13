@@ -15,7 +15,7 @@
  * Exceeding either bound fails the canary immediately (no silence wait).
  */
 
-import { readJournal, watchJournal, journalFactTail } from './journal-observer.js';
+import { readJournal, watchJournal, journalFactTail, getOrCreateSharedObserver } from './journal-observer.js';
 
 export const SSE_EXCLUDED_TYPES = new Set(['server.heartbeat']);
 
@@ -70,12 +70,19 @@ export function attachEventCeilings(scenario, ceilings, { onBreach } = {}) {
   let unsubSse = null;
   let stopJournalWatch = null;
 
-  const snapshot = () => ({
-    journalEvents,
-    sseEvents,
-    maxJournalEvents: maxJournal ?? null,
-    maxSseEvents: maxSse ?? null,
-  });
+  const snapshot = () => {
+    const obs = (maxJournal !== undefined && scenario.host?.workDir) ? getOrCreateSharedObserver(scenario.host.workDir) : null;
+    const counts = obs?.counts?.();
+    return {
+      journalEvents,
+      sseEvents,
+      appends: counts?.appends ?? journalEvents,
+      uniqueEvents: counts?.uniqueEvents ?? journalEvents,
+      sseFrames: sseEvents,
+      maxJournalEvents: maxJournal ?? null,
+      maxSseEvents: maxSse ?? null,
+    };
+  };
 
   const breach = (kind, observed, limit) => {
     if (stopped) return;
@@ -116,7 +123,13 @@ export function attachEventCeilings(scenario, ceilings, { onBreach } = {}) {
 
   const checkJournal = () => {
     if (stopped || maxJournal === undefined) return;
-    journalEvents = readJournal(scenario.host.workDir).total;
+    const obs = scenario.host?.workDir ? getOrCreateSharedObserver(scenario.host.workDir) : null;
+    if (obs) {
+      obs.refresh().catch(() => {});
+      journalEvents = obs.counts().uniqueEvents;
+    } else {
+      journalEvents = readJournal(scenario.host.workDir).total;
+    }
     if (journalEvents > maxJournal) breach('maxJournalEvents', journalEvents, maxJournal);
   };
 
