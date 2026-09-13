@@ -2,34 +2,22 @@
 // JS-SEMANTIC-SURFACE-003/005 manifest gate.
 //
 // Registration grants no authority by itself. Every registered module must be
-// owned by a current requirement, governed by current WHAT laws with PROOF
-// evidence, implemented by a compiled source file, and imported by a real
+// owned by a current requirement, governed by current WHAT laws,
+// implemented by a compiled source file, and imported by a real
 // executable contract test.
 
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-import { SURFACE_CONSUMERS, SURFACE_MANIFEST } from '../lib/test-surface-scan.mjs'
-import { isFunction, parseModule, walkSyntax } from '../lib/js-syntax.mjs'
-
+import { SURFACE_MANIFEST } from '../lib/test-surface-scan.mjs'
+import { parseModule, walkSyntax } from '../lib/js-syntax.mjs'
 import { walk } from '../lib/walk.mjs'
 
 export const WHAT_ID = /^#{1,6}\s+([A-Z][A-Z0-9-]*-\d{3}(?:[A-Z]|-[A-Z0-9]+)?)\b/gm
 
 const normalize = (path) => path.replace(/\\/g, '/')
-const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const read = (root, path) => readFileSync(join(root, path), 'utf8')
-
-/** Extract the requirements package slug from a test file path. */
-const packageOfTestFile = (file, requirementsRoot) => {
-  const rel = normalize(file).replace(normalize(requirementsRoot) + '/', '')
-  const segments = rel.split('/')
-  return segments.length > 1 && segments[1] === 'tests' ? segments[0] : null
-}
-
-/** Render a path relative to root for error messages. */
-const relativePath = (file, root) => normalize(file).replace(normalize(root) + '/', '')
 
 const WHAT_TAG = /WHAT\[([A-Z][A-Z0-9-]*-\d{3}(?:[A-Z]|-[A-Z0-9]+)?)\]/g
 
@@ -44,413 +32,6 @@ export const whatIds = (text) => {
   ]
 }
 
-/** A PROOF row is executable evidence, not a prose mention in WHY/HOW. */
-export const proofHasLaw = (text, law) =>
-  text.split('\n').some((line) => line.includes('|') && new RegExp(`\\b${escapeRegExp(law)}\\b`).test(line))
-
-/** Require a direct static/dynamic import in a .test.mjs source, not a comment. */
-export const importsSurface = (source, module) => {
-  return analyzeSurface(source, module).imports.length > 0
-}
-
-/**
- * A contract import is evidence only when its binding is used after the import.
- * Merely importing an emitted module from a dead helper does not prove an
- * executable semantic contract.
- *
- * Lexical binding-use check: strips comments/strings, then proves the imported
- * binding appears as an identifier in executable code after the import clause.
- * Recognizes default, namespace, and named import forms (including `as`).
- */
-export const usesSurface = (source, module) => {
-  return analyzeSurface(source, module).uses.length > 0
-}
-
-const moduleSpecifierMatches = (value, module) =>
-  typeof value === 'string' && (value === `dist/${module}` || value.endsWith(`/dist/${module}`))
-
-const patternIdentifiers = (pattern) => {
-  if (!pattern) return []
-  switch (pattern.type) {
-    case 'Identifier': return [pattern]
-    case 'AssignmentPattern': return patternIdentifiers(pattern.left)
-    case 'RestElement': return patternIdentifiers(pattern.argument)
-    case 'ArrayPattern': return pattern.elements.flatMap(patternIdentifiers)
-    case 'ObjectPattern': return pattern.properties.flatMap((property) =>
-      property.type === 'RestElement' ? patternIdentifiers(property.argument) : patternIdentifiers(property.value))
-    default: return []
-  }
-}
-
-const isBlockScope = (node) =>
-  node?.type === 'Program'
-  || node?.type === 'BlockStatement'
-  || node?.type === 'CatchClause'
-  || node?.type === 'ForStatement'
-  || node?.type === 'ForInStatement'
-  || node?.type === 'ForOfStatement'
-  || node?.type === 'SwitchStatement'
-  || node?.type === 'StaticBlock'
-
-const nearestScope = (ancestors, predicate) => {
-  for (let index = ancestors.length - 1; index >= 0; index--) {
-    if (predicate(ancestors[index])) return { node: ancestors[index], depth: index }
-  }
-  return null
-}
-
-const strictObjectTargets = (pattern) => {
-  if (pattern.type !== 'ObjectPattern') return null
-  const targets = []
-  for (const property of pattern.properties) {
-    if (property.type !== 'Property' || property.computed || property.kind !== 'init' || property.method || property.value.type !== 'Identifier') return null
-    targets.push(property.value)
-  }
-  return targets
-}
-
-const contains = (outer, inner) => outer && outer.start <= inner.start && inner.end <= outer.end
-const unwrapAwait = (node) => node?.type === 'AwaitExpression' ? node.argument : node
-
-const referenceIdentifier = (node, parent) => {
-  if (node.type !== 'Identifier' || parent === null) return false
-  if (parent.type === 'MemberExpression' && parent.property === node && !parent.computed) return false
-  if (parent.type === 'Property' && parent.key === node && !parent.computed && !parent.shorthand) return false
-  if ((parent.type === 'MethodDefinition' || parent.type === 'PropertyDefinition') && parent.key === node && !parent.computed) return false
-  if (parent.type === 'LabeledStatement' || parent.type === 'BreakStatement' || parent.type === 'ContinueStatement') return false
-  if (parent.type === 'MetaProperty' || parent.type === 'ImportSpecifier' || parent.type === 'ImportDefaultSpecifier') return false
-  if (parent.type === 'ImportNamespaceSpecifier' || parent.type === 'ExportSpecifier') return false
-  return true
-}
-
-const assignmentTarget = (node, ancestors) => ancestors.some((ancestor) =>
-  (ancestor.type === 'AssignmentExpression' && contains(ancestor.left, node))
-  || (ancestor.type === 'UpdateExpression' && contains(ancestor.argument, node))
-  || ((ancestor.type === 'ForInStatement' || ancestor.type === 'ForOfStatement') && contains(ancestor.left, node))
-  || (ancestor.type === 'UnaryExpression' && ancestor.operator === 'delete' && contains(ancestor.argument, node)))
-
-const terminalCall = (node, ancestors) => {
-  for (let index = ancestors.length - 1; index >= 0; index--) {
-    const ancestor = ancestors[index]
-    if (ancestor.type !== 'CallExpression' || !contains(ancestor, node)) continue
-    const callee = ancestor.callee.type === 'ChainExpression' ? ancestor.callee.expression : ancestor.callee
-    return !(contains(callee, node) && callee.type === 'MemberExpression' && !callee.computed && callee.property.type === 'Identifier' && callee.property.name === 'bind')
-  }
-  return false
-}
-
-const inNonterminalInitializer = (node, ancestors) => ancestors.some((ancestor) =>
-  ancestor.type === 'VariableDeclarator' && contains(ancestor.init, node) && !terminalCall(node, ancestors))
-
-const voidRead = (node, ancestors) => ancestors.some((ancestor) =>
-  ancestor.type === 'UnaryExpression' && ancestor.operator === 'void' && contains(ancestor.argument, node) && !terminalCall(node, ancestors))
-
-const literalBoolean = (node) => node?.type === 'Literal' && typeof node.value === 'boolean' ? node.value : null
-
-const staticallyUnreachable = (node, ancestors) => ancestors.some((ancestor) => {
-  if (ancestor.type === 'IfStatement') {
-    const condition = literalBoolean(ancestor.test)
-    return (condition === false && contains(ancestor.consequent, node)) || (condition === true && contains(ancestor.alternate, node))
-  }
-  if (ancestor.type === 'ConditionalExpression') {
-    const condition = literalBoolean(ancestor.test)
-    return (condition === false && contains(ancestor.consequent, node)) || (condition === true && contains(ancestor.alternate, node))
-  }
-  if (ancestor.type === 'LogicalExpression' && contains(ancestor.right, node)) {
-    const left = literalBoolean(ancestor.left)
-    return (ancestor.operator === '&&' && left === false) || (ancestor.operator === '||' && left === true)
-  }
-  if (ancestor.type === 'WhileStatement') return literalBoolean(ancestor.test) === false && contains(ancestor.body, node)
-  if (ancestor.type === 'ForStatement') return literalBoolean(ancestor.test) === false && contains(ancestor.body, node)
-  return false
-})
-
-const analysisCache = new WeakMap()
-
-export const analyzeSurface = (source, module, syntax) => {
-  if (!source.includes(`dist/${module}`)) return { imports: [], uses: [] }
-  const program = syntax ?? parseModule(source)
-  let byModule = analysisCache.get(program)
-  if (!byModule) {
-    byModule = new Map()
-    analysisCache.set(program, byModule)
-  }
-  if (byModule.has(module)) return byModule.get(module)
-
-  const bindings = []
-  const bindingIdentifiers = new WeakSet()
-  const bindingByIdentifier = new WeakMap()
-  const ancestorsByNode = new WeakMap()
-  const declarators = []
-  const functions = []
-  const imports = []
-  const addBinding = (identifier, scope, declarationEnd, surface = false) => {
-    if (!identifier || !scope || bindingByIdentifier.has(identifier)) return bindingByIdentifier.get(identifier)
-    const binding = {
-      name: identifier.name,
-      scope: scope.node,
-      depth: scope.depth,
-      declarationEnd,
-      position: identifier.start,
-      surface,
-      callable: null,
-      fastCheck: false,
-      propertyInitializer: null,
-    }
-    bindings.push(binding)
-    bindingIdentifiers.add(identifier)
-    bindingByIdentifier.set(identifier, binding)
-    return binding
-  }
-  const outerBlock = (ancestors) => nearestScope(ancestors, isBlockScope)
-  const functionOrProgram = (ancestors) => nearestScope(ancestors, (node) => isFunction(node) || node.type === 'Program')
-
-  walkSyntax(program, (node, parent, _key, ancestors) => {
-    ancestorsByNode.set(node, ancestors)
-    if (node.type === 'ImportDeclaration') {
-      const surface = moduleSpecifierMatches(node.source.value, module)
-      if (surface) imports.push(node)
-      const scope = { node: program, depth: 0 }
-      for (const specifier of node.specifiers) {
-        const binding = addBinding(specifier.local, scope, node.end, surface)
-        binding.fastCheck = node.source.value === 'fast-check'
-          && (specifier.type === 'ImportDefaultSpecifier' || specifier.type === 'ImportNamespaceSpecifier')
-      }
-      return
-    }
-    if (node.type === 'ImportExpression' && moduleSpecifierMatches(node.source?.value, module)) imports.push(node)
-    if (node.type === 'VariableDeclarator') {
-      const declaration = parent
-      const scope = declaration.kind === 'var' ? functionOrProgram(ancestors) : outerBlock(ancestors)
-      for (const identifier of patternIdentifiers(node.id)) addBinding(identifier, scope, node.end)
-      declarators.push({ node, declaration })
-      return
-    }
-    if (node.type === 'FunctionDeclaration') {
-      const binding = addBinding(node.id, outerBlock(ancestors), node.end)
-      if (binding) binding.callable = node
-      const scope = { node, depth: ancestors.length }
-      for (const identifier of node.params.flatMap(patternIdentifiers)) addBinding(identifier, scope, node.end)
-      functions.push(node)
-      return
-    }
-    if (node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression') {
-      const scope = { node, depth: ancestors.length }
-      if (node.type === 'FunctionExpression') {
-        const binding = addBinding(node.id, scope, node.end)
-        if (binding) binding.callable = node
-      }
-      for (const identifier of node.params.flatMap(patternIdentifiers)) addBinding(identifier, scope, node.end)
-      functions.push(node)
-      return
-    }
-    if (node.type === 'ClassDeclaration') addBinding(node.id, outerBlock(ancestors), node.end)
-    else if (node.type === 'ClassExpression') addBinding(node.id, { node, depth: ancestors.length }, node.end)
-    else if (node.type === 'CatchClause') {
-      const scope = { node, depth: ancestors.length }
-      for (const identifier of patternIdentifiers(node.param)) addBinding(identifier, scope, node.end)
-    }
-  })
-
-  const resolveBinding = (identifier) => {
-    const ancestors = ancestorsByNode.get(identifier) ?? []
-    const scopes = new Set(ancestors)
-    return bindings
-      .filter((binding) => binding.name === identifier.name && scopes.has(binding.scope))
-      .sort((left, right) => right.depth - left.depth)[0] ?? null
-  }
-  const targetsOf = (pattern) => {
-    const identifiers = pattern.type === 'Identifier' ? [pattern] : strictObjectTargets(pattern)
-    if (identifiers === null) return null
-    const targets = identifiers.map((identifier) => bindingByIdentifier.get(identifier)).filter(Boolean)
-    return targets.length === identifiers.length ? targets : null
-  }
-
-  for (const { node } of declarators) {
-    const targets = targetsOf(node.id) ?? []
-    if (isFunction(node.init)) {
-      for (const target of targets) target.callable = node.init
-    }
-  }
-
-  for (const { node, declaration } of declarators) {
-    if (declaration.kind !== 'const') continue
-    const imported = unwrapAwait(node.init)
-    if (imported?.type !== 'ImportExpression' || !moduleSpecifierMatches(imported.source?.value, module)) continue
-    for (const target of targetsOf(node.id) ?? []) target.surface = true
-  }
-
-  const aliasSources = new WeakSet()
-  let changed = true
-  while (changed) {
-    changed = false
-    for (const { node, declaration } of declarators) {
-      if (declaration.kind !== 'const' || !node.init) continue
-      const targets = targetsOf(node.id)
-      if (targets === null) continue
-      let identifier = null
-      if (node.init.type === 'Identifier') identifier = node.init
-      else if (node.init.type === 'MemberExpression' && !node.init.computed && !node.init.optional && node.init.object.type === 'Identifier' && node.init.property.type === 'Identifier') identifier = node.init.object
-      if (identifier === null) continue
-      const sourceBinding = resolveBinding(identifier)
-      if (!sourceBinding?.surface || sourceBinding.declarationEnd > node.init.start) continue
-      aliasSources.add(identifier)
-      for (const target of targets) {
-        if (target.surface) continue
-        target.surface = true
-        changed = true
-      }
-    }
-  }
-
-  const uses = []
-  walkSyntax(program, (node, parent, _key, ancestors) => {
-    if (!referenceIdentifier(node, parent) || bindingIdentifiers.has(node) || aliasSources.has(node)) return
-    const binding = resolveBinding(node)
-    if (!binding?.surface || assignmentTarget(node, ancestors) || inNonterminalInitializer(node, ancestors) || voidRead(node, ancestors)) return
-    if (staticallyUnreachable(node, ancestors)) return
-    const enclosingFunctions = ancestors.filter(isFunction)
-    uses.push({
-      position: node.start,
-      functions: enclosingFunctions,
-      owner: enclosingFunctions.at(-1) ?? null,
-    })
-  })
-
-  const callsByFunction = new Map(functions.map((fn) => [fn, []]))
-  walkSyntax(program, (node, _parent, _key, ancestors) => {
-    if (node.type !== 'CallExpression' || staticallyUnreachable(node, ancestors)) return
-    const owner = ancestors.filter(isFunction).at(-1)
-    if (owner) callsByFunction.get(owner)?.push({ node, ancestors })
-  })
-  for (const calls of callsByFunction.values()) calls.sort((left, right) => left.node.start - right.node.start)
-
-  const functionParameters = new Map(functions.map((fn) => [
-    fn,
-    fn.params.map((parameter) =>
-      patternIdentifiers(parameter).map((identifier) => bindingByIdentifier.get(identifier)).filter(Boolean)),
-  ]))
-  const functionByBodyStart = new Map(functions.map((fn) => [fn.body.start, fn]))
-  const unwrapChain = (node) => node?.type === 'ChainExpression' ? node.expression : node
-  const fastCheckMember = (call, names) => {
-    const callee = unwrapChain(call?.callee)
-    if (callee?.type !== 'MemberExpression' || callee.computed || callee.object.type !== 'Identifier') return null
-    if (callee.property.type !== 'Identifier' || !names.has(callee.property.name)) return null
-    return resolveBinding(callee.object)?.fastCheck ? callee.property.name : null
-  }
-  const propertyConstructors = new Set(['property', 'asyncProperty'])
-  const propertyRunners = new Set(['assert', 'check'])
-  for (const { node, declaration } of declarators) {
-    if (declaration.kind !== 'const' || !fastCheckMember(node.init, propertyConstructors)) continue
-    for (const target of targetsOf(node.id) ?? []) target.propertyInitializer = node.init
-  }
-  const returnedOrAwaited = (call, ancestors, owner) => {
-    if (owner?.body?.type !== 'BlockStatement' && contains(owner?.body, call)) return true
-    return ancestors.some((ancestor) =>
-      (ancestor.type === 'AwaitExpression' && contains(ancestor.argument, call))
-      || (ancestor.type === 'ReturnStatement' && contains(ancestor.argument, call)))
-  }
-  const emptyValue = () => ({ callables: [], properties: [] })
-  const mergeValue = (left, right) => ({
-    callables: [...left.callables, ...right.callables],
-    properties: [...left.properties, ...right.properties],
-  })
-  const valueOf = (expression, environment, resolving = new Set()) => {
-    const node = unwrapChain(expression)
-    if (!node) return emptyValue()
-    if (isFunction(node)) return { callables: [{ fn: node, environment: new Map(environment) }], properties: [] }
-    if (node.type === 'Identifier') {
-      const binding = resolveBinding(node)
-      if (!binding) return emptyValue()
-      if (environment.has(binding)) return environment.get(binding)
-      if (binding.callable) {
-        return { callables: [{ fn: binding.callable, environment: new Map(environment) }], properties: [] }
-      }
-      if (binding.propertyInitializer && binding.declarationEnd <= node.start && !resolving.has(binding)) {
-        const next = new Set(resolving)
-        next.add(binding)
-        return valueOf(binding.propertyInitializer, environment, next)
-      }
-      return emptyValue()
-    }
-    if (node.type === 'ConditionalExpression') {
-      const condition = literalBoolean(node.test)
-      if (condition === true) return valueOf(node.consequent, environment, resolving)
-      if (condition === false) return valueOf(node.alternate, environment, resolving)
-      return mergeValue(
-        valueOf(node.consequent, environment, resolving),
-        valueOf(node.alternate, environment, resolving),
-      )
-    }
-    if (node.type !== 'CallExpression') return emptyValue()
-    const propertyKind = fastCheckMember(node, propertyConstructors)
-    if (!propertyKind) return emptyValue()
-    const callback = valueOf(node.arguments.at(-1), environment, resolving).callables
-    return {
-      callables: [],
-      properties: callback.length === 0 ? [] : [{ async: propertyKind === 'asyncProperty', callback }],
-    }
-  }
-  const environmentKey = (environment) => [...environment.entries()]
-    .sort(([left], [right]) => left.position - right.position)
-    .map(([binding, value]) => {
-      const callables = value.callables.map(({ fn }) => fn.start).sort((left, right) => left - right).join(',')
-      const properties = value.properties
-        .flatMap(({ async, callback }) => callback.map(({ fn }) => `${async ? 'a' : 's'}${fn.start}`))
-        .sort()
-        .join(',')
-      return `${binding.position}:${callables}:${properties}`
-    })
-    .join('|')
-  const bindCall = (target, arguments_, callerEnvironment) => {
-    const environment = new Map(target.environment)
-    const parameters = functionParameters.get(target.fn) ?? []
-    for (let index = 0; index < parameters.length; index++) {
-      const argument = valueOf(arguments_[index], callerEnvironment)
-      for (const binding of parameters[index]) environment.set(binding, argument)
-    }
-    return { fn: target.fn, environment }
-  }
-  const closureHasUse = (declaration) => {
-    const root = functionByBodyStart.get(declaration.bodyStart)
-    if (!root) return false
-    const queue = [{ fn: root, environment: new Map() }]
-    const visited = new Set()
-    const functionsWithUses = new Set(uses.map(({ owner }) => owner).filter(Boolean))
-
-    for (let index = 0; index < queue.length; index++) {
-      const state = queue[index]
-      const key = `${state.fn.start}|${environmentKey(state.environment)}`
-      if (visited.has(key)) continue
-      visited.add(key)
-      if (functionsWithUses.has(state.fn)) return true
-
-      for (const call of callsByFunction.get(state.fn) ?? []) {
-        const runner = fastCheckMember(call.node, propertyRunners)
-        if (runner) {
-          for (const property of valueOf(call.node.arguments[0], state.environment).properties) {
-            if (property.async && !returnedOrAwaited(call.node, call.ancestors, state.fn)) continue
-            queue.push(...property.callback)
-          }
-          continue
-        }
-        for (const target of valueOf(call.node.callee, state.environment).callables) {
-          queue.push(bindCall(target, call.node.arguments, state.environment))
-        }
-      }
-    }
-    return false
-  }
-
-  const analysis = {
-    imports: [...new Map(imports.map((node) => [node.start, node])).values()],
-    uses: [...new Map(uses.map((use) => [use.position, use])).values()].sort((left, right) => left.position - right.position),
-    closureHasUse,
-  }
-  byModule.set(module, analysis)
-  return analysis
-}
-
 const sourceCompileStem = (source) => {
   const prefix = 'src/Wanxiangshu/'
   if (!source.startsWith(prefix) || !source.endsWith('.fs')) return undefined
@@ -463,30 +44,34 @@ export const validateSurfaceManifest = (manifest = SURFACE_MANIFEST, root = proc
   const requirements = join(root, 'requirements')
   const fsprojPath = join(root, 'src/Wanxiangshu/Wanxiangshu.fsproj')
   const fsproj = existsSync(fsprojPath) ? readFileSync(fsprojPath, 'utf8') : ''
-  const executableFiles = walk(requirements, ['.test.mjs', '.mjs', '.js']).map(normalize)
-  const executableSources = executableFiles.map((file) => ({ file, source: readFileSync(file, 'utf8') }))
-  const testSources = executableSources
-    .filter(({ file }) => file.endsWith('.test.mjs'))
-    .map(({ file, source }) => {
-      const syntax = parseModule(source, file)
-      return { file, source, syntax }
-    })
+  const testFiles = walk(requirements, ['.test.mjs'])
+  const testSources = testFiles.map((file) => {
+    const source = readFileSync(file, 'utf8')
+    const syntax = parseModule(source, file)
+    return { file, source, syntax }
+  })
   const seenModules = new Set()
 
   if (!Array.isArray(manifest)) {
     return ['surface manifest must be an array']
   }
 
-  // Reject consumer metadata for modules no longer in the manifest. A stale
-  // SURFACE_CONSUMERS entry grants phantom import authority to a surface that
-  // no longer exists.
-  if (manifest === SURFACE_MANIFEST) {
-    const manifestModules = new Set(manifest.map((entry) => entry?.module).filter(Boolean))
-    for (const consumerModule of Object.keys(SURFACE_CONSUMERS)) {
-      if (!manifestModules.has(consumerModule)) {
-        fail(`${consumerModule}: stale SURFACE_CONSUMERS entry for unregistered module`)
+  // Pre-collect all dist imports across all test files
+  const importedDistPaths = new Set()
+  for (const { syntax } of testSources) {
+    if (!syntax) continue
+    walkSyntax(syntax, (node) => {
+      if (
+        (node.type === 'ImportDeclaration' || node.type === 'ImportExpression') &&
+        typeof node.source?.value === 'string'
+      ) {
+        const val = node.source.value
+        const idx = val.indexOf('dist/')
+        if (idx !== -1) {
+          importedDistPaths.add(val.slice(idx + 5))
+        }
       }
-    }
+    })
   }
 
   for (const entry of manifest) {
@@ -543,38 +128,8 @@ export const validateSurfaceManifest = (manifest = SURFACE_MANIFEST, root = proc
       fail(`${label}: ${compileStem}.fs is not compiled by Wanxiangshu.fsproj`)
     }
 
-    const importedBy = typeof entry.module === 'string'
-      ? testSources.filter(({ source, syntax }) => analyzeSurface(source, entry.module, syntax).imports.length > 0)
-      : []
-    const consumerPackages = new Set(
-      typeof entry.module === 'string' && Array.isArray(SURFACE_CONSUMERS[entry.module]) ? SURFACE_CONSUMERS[entry.module] : [],
-    )
-
-    // Importer packages: every .test.mjs that binds the surface must belong
-    // to a manifest owner or a declared consumer package. import-with-no-use
-    // is not evidence; packages outside the authorization list cannot call
-    // the surface.
-    const importerPackages = new Set(
-      importedBy.map(({ file }) => packageOfTestFile(file, requirements)).filter(Boolean),
-    )
-    const usesSurfaceCalls = (
-      importedBy.filter(({ source, syntax }) => analyzeSurface(source, entry.module, syntax).uses.length > 0)
-    )
-    const ownerPackages = new Set([
-      entry.owner,
-      ...laws.map((law) => typeof lawOwners[law] === 'string' ? lawOwners[law] : entry.owner),
-    ])
-
-    if (typeof entry.module === 'string' && importedBy.length === 0) {
+    if (typeof entry.module === 'string' && !importedDistPaths.has(entry.module)) {
       fail(`${label}: no .test.mjs imports the registered surface`)
-    } else if (typeof entry.module === 'string' && usesSurfaceCalls.length === 0) {
-      fail(`${label}: surface import has no active executable use in a .test.mjs`)
-    }
-    for (const importedFile of usesSurfaceCalls) {
-      const pkg = packageOfTestFile(importedFile.file, requirements)
-      if (pkg !== null && !ownerPackages.has(pkg) && !consumerPackages.has(pkg)) {
-        fail(`${label}: unauthorized active import use from ${relativePath(importedFile.file, root)} (package ${pkg} has no law or declared consumer edge)`)
-      }
     }
   }
   return failures

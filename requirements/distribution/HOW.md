@@ -15,7 +15,7 @@ Package Layout (package.json 设置 main, exports, files 白名单)
   ↓
 PackageResources (基于 import.meta.url 独立解析 resources/**)
   ↓
-Release Proof (npm pack --dry-run 验证 tarball 清单)
+Release Proof (npm pack 真实打包、归档成员闭包与隔离外部消费验证)
 ```
 
 ## 核心机制
@@ -37,7 +37,7 @@ Release Proof (npm pack --dry-run 验证 tarball 清单)
 
 ### 4. 发布级闭包证明 (Release Proof & Packing Verification)
 
-- 在发布前执行全流程验证，最终阶段调用 `npm pack --dry-run` 导出实际生成的 tarball 包含项清单，验证入口脚本与所有语义包的资源目录均被完整收录。
+- 在发布前执行全流程验证，调用真实 `npm pack` 产出 tarball，由 `verify-package.mjs` 流式校验成员闭包、防止路径逃逸与非普通文件、比对完整 digest，解压至隔离外部目录并在独立 consumer 中完成无仓库开发依赖的入口导入与资源读取验证。
 
 ## 验证与测试落点
 

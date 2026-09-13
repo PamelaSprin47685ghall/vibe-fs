@@ -1,7 +1,6 @@
-// requirements/distribution/tests/integration/package/layout.test.mjs — package layout as shipped.
-//
-// Assumes this package is already installed for the workspace (workspace layout checks; no npm install in tests).
-// Asserts the on-disk package root matches what a consumer would get from `files` + main.
+// requirements/distribution/tests/integration/package/layout.test.mjs
+// Package layout manifest declaration test.
+// Full package layout and archive verification is governed by verifyPackage.
 
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
@@ -20,15 +19,6 @@ test('WHAT[DISTRIBUTION-003] PACKAGE_layout_matches_manifest_and_main', () => {
     pkg.files.includes('resources/') || pkg.files.includes('resources'),
     'files must include resources/',
   )
-
-  const main = path.join(repoRoot, pkg.main || 'dist/OpenCode/Plugin/Plugin.js')
-  assert.ok(fs.existsSync(main), `main entry must exist: ${main}`)
-  assert.ok(fs.existsSync(path.join(repoRoot, 'package.json')))
-  assert.ok(fs.existsSync(path.join(repoRoot, 'dist', 'OpenCode', 'Plugin', 'Plugin.js')))
-  assert.ok(
-    fs.existsSync(path.join(repoRoot, 'resources', 'enforcer', 'primitive-obsession', 'enforcer.md')),
-  )
-  assert.ok(fs.existsSync(path.join(repoRoot, 'resources', 'enforcer', 'primitive-obsession', 'main.md')))
   assert.equal(
     fs.existsSync(path.join(repoRoot, 'resources', 'enforcer', 'catalog.json')),
     false,

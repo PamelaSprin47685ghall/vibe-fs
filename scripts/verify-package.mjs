@@ -1,23 +1,33 @@
 // scripts/verify-package.mjs
 // DISTRIBUTION-007 real pack+extract+consume proof.
 //
-// Performs real `npm pack --json`, extracts tarball to temporary outside directory,
-// validates member closure and archive integrity, imports Plugin.js outside repo cwd,
-// and ensures build freshness before and after pack.
+// Performs real `npm pack --json --ignore-scripts --pack-destination <runDir>`,
+// streams members via `tar`, strictly validates normalized archive paths,
+// compares complete closure (manifest outputs dist + git tracked resources + root files)
+// and content digests, extracts into an isolated temporary directory,
+// and executes an isolated external consumer test without borrowing repo node_modules.
 
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
+import * as tar from 'tar'
 
-import { assertBuildFresh } from './lib/build-state.mjs'
+import {
+  assertBuildFresh,
+  collectArtifactInputs,
+  collectOutputs,
+  readManifest,
+} from './lib/build-state.mjs'
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url))
 export const REPO_ROOT = path.resolve(MODULE_DIR, '..')
+export const DEFAULT_PACK_RUN_DIR = path.join(REPO_ROOT, '.fable-build/verify-logs/package')
 
-// Banned prefixes and extensions for archive members
+export const ROOT_FILE_WHITELIST = ['package.json', 'README.md', 'LICENSE']
+
 export const BANNED_PREFIXES = [
   'src/',
   'src',
@@ -35,22 +45,7 @@ export const BANNED_PREFIXES = [
   '.github',
 ]
 
-export const BANNED_PATTERNS = [
-  /\.log$/i,
-]
-
-export const REQUIRED_MEMBERS = [
-  'package.json',
-  'README.md',
-  'LICENSE',
-  'dist/OpenCode/Plugin/Plugin.js',
-  'resources/enforcer/primitive-obsession/enforcer.md',
-  'resources/enforcer/primitive-obsession/main.md',
-  'resources/provider/role/manager/en.md',
-  'resources/provider/role/manager/zh-CN.md',
-  'resources/provider/world/common-law/en.md',
-  'resources/provider/world/common-law/zh-CN.md',
-]
+export const BANNED_PATTERNS = [/\.log$/i]
 
 export function createVerificationError(code, filePath, reason) {
   const err = new Error(reason)
@@ -61,11 +56,9 @@ export function createVerificationError(code, filePath, reason) {
 }
 
 /**
- * Normalizes an archive entry path by stripping leading 'package/' prefix if present,
- * and normalizing backslashes to forward slashes.
+ * Normalizes an archive entry path:
+ * Must begin with 'package/', strips it, normalizes slashes, strips leading './'.
  */
-// 'package/' is a tar layout convention, not a repo-relative path — kept as a constant
-// so the static path-criterion gate (VERIFY-004) doesn't misread it as a locator.
 const TAR_PACKAGE_PREFIX = 'package/'
 
 export function normalizeMemberPath(entryPath) {
@@ -77,15 +70,11 @@ export function normalizeMemberPath(entryPath) {
     return ''
   }
   if (normalized.startsWith(TAR_PACKAGE_PREFIX)) {
-    normalized = normalized.slice(TAR_PACKAGE_PREFIX.length)
+    return normalized.slice(TAR_PACKAGE_PREFIX.length)
   }
   return normalized
 }
 
-/**
- * Validates whether an archive member path contains path-traversal attempts.
- * Throws verification error if traversal detected.
- */
 export function checkPathTraversal(member) {
   const raw = String(member).replace(/\\/g, '/')
   if (path.isAbsolute(raw) || raw.startsWith('/') || raw.startsWith('\\')) {
@@ -105,9 +94,6 @@ export function checkPathTraversal(member) {
   }
 }
 
-/**
- * Checks if a member path is banned according to package boundary rules.
- */
 export function isBannedMember(member) {
   const norm = normalizeMemberPath(member)
   if (!norm) return false
@@ -129,96 +115,207 @@ export function isBannedMember(member) {
 }
 
 /**
- * Checks for duplicate members in a list.
+ * Derives expected package member closure.
+ * expected = (manifest.outputs || disk dist) U (git tracked resources) U (root whitelist present)
+ * Returns Map<relativeMemberPath, { sha256, size, fullSourcePath }>
  */
-export function assertDuplicateMembers(members) {
-  const seen = new Set()
-  for (const raw of members) {
-    const norm = normalizeMemberPath(raw)
-    if (!norm) continue
-    if (seen.has(norm)) {
-      throw createVerificationError(
-        'duplicate-member',
-        norm,
-        `Duplicate member in package archive: ${norm}`,
-      )
+export function deriveExpectedClosure({ root = REPO_ROOT } = {}) {
+  const resolvedRoot = path.resolve(root)
+  const manifest = readManifest({ root: resolvedRoot })
+
+  const distOutputs = manifest?.outputs ?? collectOutputs(path.join(resolvedRoot, 'dist'))
+  const resourceInputs = collectArtifactInputs(resolvedRoot)
+
+  const expected = new Map()
+
+  // 1. Dist outputs: relative paths under dist/
+  for (const [relPathUnderDist, meta] of Object.entries(distOutputs)) {
+    const normRel = path.posix.join('dist', relPathUnderDist.replace(/\\/g, '/'))
+    const sha256 = Array.isArray(meta) ? meta[0] : meta?.sha256
+    const size = Array.isArray(meta) ? meta[1] : meta?.size
+    const fullSourcePath = path.join(resolvedRoot, normRel)
+    expected.set(normRel, { sha256, size, fullSourcePath })
+  }
+
+  // 2. Resources inputs: paths already relative to resolvedRoot ('resources/...')
+  for (const res of resourceInputs) {
+    const normRel = res.path.replace(/\\/g, '/')
+    const fullSourcePath = path.join(resolvedRoot, normRel)
+    expected.set(normRel, {
+      sha256: res.sha256,
+      size: res.size,
+      fullSourcePath,
+    })
+  }
+
+  // 3. Root whitelist files (only if they exist on disk)
+  for (const rootFile of ROOT_FILE_WHITELIST) {
+    const fullSourcePath = path.join(resolvedRoot, rootFile)
+    if (fs.existsSync(fullSourcePath)) {
+      const stat = fs.statSync(fullSourcePath)
+      const buf = fs.readFileSync(fullSourcePath)
+      const sha256 = crypto.createHash('sha256').update(buf).digest('hex')
+      expected.set(rootFile, {
+        sha256,
+        size: stat.size,
+        fullSourcePath,
+      })
     }
-    seen.add(norm)
+  }
+
+  return expected
+}
+
+/**
+ * Validates tarball stream entries directly without extracting first.
+ * Enforces:
+ * - paths must start with 'package/'
+ * - no path traversal
+ * - no duplicate entries
+ * - ordinary files only (reject links, special entries, directories with content)
+ * - content sha256 match against expected closure
+ * - no missing, no extra members
+ *
+ * @param {string} tarballPath
+ * @param {Map<string, {sha256: string, size: number}>} expectedClosure
+ * @returns {Promise<{ memberCount: number, totalBytes: number, issues: Array<{code: string, path: string, message: string}>, members: Map<string, {sha256: string, size: number}> }>}
+ */
+export async function validateArchiveEntries(tarballPath, expectedClosure) {
+  const issues = []
+  const seenMembers = new Map()
+
+  await tar.t({
+    file: tarballPath,
+    onReadEntry: (entry) => {
+      const rawPath = entry.path
+
+      // Directory entries in tarball are allowed if harmless, but we only track files
+      if (entry.type === 'Directory') {
+        return
+      }
+
+      if (entry.type !== 'File') {
+        issues.push({
+          code: 'non-regular-entry',
+          path: rawPath,
+          message: `Archive entry is not a regular file (${entry.type}): ${rawPath}`,
+        })
+        return
+      }
+
+      const normalizedRaw = String(rawPath).replace(/\\/g, '/')
+      if (!normalizedRaw.startsWith(TAR_PACKAGE_PREFIX)) {
+        issues.push({
+          code: 'invalid-prefix',
+          path: rawPath,
+          message: `Archive entry does not start with '${TAR_PACKAGE_PREFIX}': ${rawPath}`,
+        })
+        return
+      }
+
+      const member = normalizeMemberPath(rawPath)
+      if (!member) {
+        return
+      }
+
+      try {
+        checkPathTraversal(member)
+      } catch (err) {
+        issues.push({
+          code: err.code,
+          path: member,
+          message: err.reason,
+        })
+        return
+      }
+
+      if (isBannedMember(member)) {
+        issues.push({
+          code: 'infiltrated-member',
+          path: member,
+          message: `Archive contains infiltrated/banned member: ${member}`,
+        })
+        return
+      }
+
+      if (seenMembers.has(member)) {
+        issues.push({
+          code: 'duplicate-member',
+          path: member,
+          message: `Duplicate member in archive: ${member}`,
+        })
+        return
+      }
+
+      const bufs = []
+      entry.on('data', (chunk) => bufs.push(chunk))
+      entry.on('end', () => {
+        const buf = Buffer.concat(bufs)
+        const digest = crypto.createHash('sha256').update(buf).digest('hex')
+        seenMembers.set(member, {
+          size: buf.length,
+          sha256: digest,
+        })
+      })
+    },
+  })
+
+  // Compare against expected closure
+  if (expectedClosure) {
+    for (const [expectedPath, expectedMeta] of expectedClosure.entries()) {
+      if (!seenMembers.has(expectedPath)) {
+        issues.push({
+          code: 'missing-member',
+          path: expectedPath,
+          message: `Expected member missing from archive: ${expectedPath}`,
+        })
+      } else {
+        const actualMeta = seenMembers.get(expectedPath)
+        if (actualMeta.sha256 !== expectedMeta.sha256) {
+          issues.push({
+            code: 'digest-mismatch',
+            path: expectedPath,
+            message: `Digest mismatch for ${expectedPath}: expected ${expectedMeta.sha256}, got ${actualMeta.sha256}`,
+          })
+        }
+      }
+    }
+
+    for (const [actualPath] of seenMembers.entries()) {
+      if (!expectedClosure.has(actualPath)) {
+        issues.push({
+          code: 'extra-member',
+          path: actualPath,
+          message: `Unexpected extra member in archive: ${actualPath}`,
+        })
+      }
+    }
+  }
+
+  let totalBytes = 0
+  for (const meta of seenMembers.values()) {
+    totalBytes += meta.size
+  }
+
+  return {
+    memberCount: seenMembers.size,
+    totalBytes,
+    issues,
+    members: seenMembers,
   }
 }
 
 /**
- * Pure helper to validate a list of archive members against packaging rules.
- * @param {string[]|Array<{path: string}>} members
+ * Public validateArtifact helper for unit testing.
  */
-export function validateMemberList(members) {
-  if (!Array.isArray(members)) {
-    throw createVerificationError(
-      'invalid-manifest',
-      'manifest',
-      'Members list must be an array',
-    )
+export async function validateArtifact(tarballPath, expectedClosure) {
+  const result = await validateArchiveEntries(tarballPath, expectedClosure)
+  return {
+    ok: result.issues.length === 0,
+    ...result,
   }
-
-  const rawList = members.map((m) => (typeof m === 'string' ? m : m?.path))
-  for (const member of rawList) {
-    if (typeof member !== 'string') {
-      throw createVerificationError(
-        'invalid-manifest',
-        String(member),
-        `Archive member path is not a string: ${member}`,
-      )
-    }
-    checkPathTraversal(member)
-  }
-
-  assertDuplicateMembers(rawList)
-
-  const normalizedSet = new Set()
-  for (const raw of rawList) {
-    const norm = normalizeMemberPath(raw)
-    if (!norm) continue
-
-    if (isBannedMember(norm)) {
-      throw createVerificationError(
-        'infiltrated-member',
-        norm,
-        `Archive contains infiltrated/banned member: ${norm}`,
-      )
-    }
-
-    // Must belong to allowed trees or root package files
-    const isRootAllowed = norm === 'package.json' || norm === 'README.md' || norm === 'LICENSE'
-    const isTreeAllowed = norm.startsWith('dist/') || norm.startsWith('resources/')
-
-    if (!isRootAllowed && !isTreeAllowed) {
-      throw createVerificationError(
-        'unauthorized-member',
-        norm,
-        `Archive member outside authorized trees (dist/, resources/, package.json, README.md, LICENSE): ${norm}`,
-      )
-    }
-
-    normalizedSet.add(norm)
-  }
-
-  for (const required of REQUIRED_MEMBERS) {
-    if (!normalizedSet.has(required)) {
-      throw createVerificationError(
-        'missing-required-member',
-        required,
-        `Missing required member in package archive: ${required}`,
-      )
-    }
-  }
-
-  return true
 }
 
-/**
- * Pure helper to parse npm pack --json stdout.
- * Asserts valid JSON, exactly one package result, and matches expected package name.
- */
 export function parsePackResult(jsonOutput, expectedName = 'wanxiangshu') {
   let parsed
   try {
@@ -298,269 +395,301 @@ function spawnProcess(cmd, args, options = {}) {
 }
 
 /**
- * Recursively walks directory collecting relative paths and file stats.
+ * Runs an isolated external consumer test against the extracted package.
+ * Prepares runtime dependencies in an outside directory via npm ci --omit=dev,
+ * places the extracted package under node_modules/wanxiangshu,
+ * and executes consumer script with bare `import('wanxiangshu')` asserting default export shape.
  */
-function walkExtractedDirectory(dir, base = dir) {
-  const results = []
-  if (!fs.existsSync(dir)) return results
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name)
-    if (entry.isDirectory()) {
-      results.push(...walkExtractedDirectory(full, base))
-    } else if (entry.isFile()) {
-      const rel = path.relative(base, full).replace(/\\/g, '/')
-      const stat = fs.statSync(full)
-      results.push({ rel, full, size: stat.size })
-    }
+export async function runExternalConsumer({
+  root = REPO_ROOT,
+  tarballPath,
+  extractedPackageDir,
+  scratchDir,
+}) {
+  const resolvedRoot = path.resolve(root)
+
+  // 1. Prepare isolated runtime root
+  const isolatedRoot = path.join(scratchDir, 'runtime-root')
+  fs.mkdirSync(isolatedRoot, { recursive: true })
+
+  fs.copyFileSync(path.join(resolvedRoot, 'package.json'), path.join(isolatedRoot, 'package.json'))
+  fs.copyFileSync(
+    path.join(resolvedRoot, 'package-lock.json'),
+    path.join(isolatedRoot, 'package-lock.json'),
+  )
+
+  // Run npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+  try {
+    execFileSync(
+      'npm',
+      ['ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'],
+      {
+        cwd: isolatedRoot,
+        stdio: 'pipe',
+      },
+    )
+  } catch (err) {
+    throw createVerificationError(
+      'consumer-ci-failed',
+      isolatedRoot,
+      `npm ci --omit=dev failed in isolated runtime root: ${err.message}`,
+    )
   }
-  return results
+
+  // 2. Put extracted package under isolated node_modules/wanxiangshu
+  const targetPkgDir = path.join(isolatedRoot, 'node_modules', 'wanxiangshu')
+  if (fs.existsSync(targetPkgDir)) {
+    fs.rmSync(targetPkgDir, { recursive: true, force: true })
+  }
+  fs.cpSync(extractedPackageDir, targetPkgDir, { recursive: true })
+
+  // 3. Create consumer/ directory outside with separate package.json
+  const consumerDir = path.join(scratchDir, 'consumer')
+  fs.mkdirSync(consumerDir, { recursive: true })
+
+  fs.writeFileSync(
+    path.join(consumerDir, 'package.json'),
+    JSON.stringify(
+      {
+        name: 'external-test-consumer',
+        version: '1.0.0',
+        type: 'module',
+      },
+      null,
+      2,
+    ),
+    'utf8',
+  )
+
+  // Link isolatedRoot/node_modules into consumerDir
+  const consumerNodeModules = path.join(consumerDir, 'node_modules')
+  if (!fs.existsSync(consumerNodeModules)) {
+    fs.symlinkSync(path.join(isolatedRoot, 'node_modules'), consumerNodeModules, 'junction')
+  }
+
+  const consumerScript = `
+    import pkg from 'wanxiangshu';
+    import assert from 'node:assert/strict';
+
+    if (!pkg || typeof pkg !== 'object') {
+      console.error('wanxiangshu default export is not an object:', pkg);
+      process.exit(2);
+    }
+
+    if (pkg.id !== 'wanxiangshu-next') {
+      console.error('wanxiangshu default export id mismatch:', pkg.id);
+      process.exit(3);
+    }
+
+    if (typeof pkg.server !== 'function') {
+      console.error('wanxiangshu default export server is not a function:', typeof pkg.server);
+      process.exit(4);
+    }
+
+    // Read a runtime resource via package export or package structure
+    import fs from 'node:fs';
+    import path from 'node:path';
+
+    // Locate wanxiangshu in node_modules
+    const pkgRoot = path.resolve('node_modules/wanxiangshu');
+
+    const enLaw = path.join(pkgRoot, 'resources/provider/world/common-law/en.md');
+    const zhLaw = path.join(pkgRoot, 'resources/provider/world/common-law/zh-CN.md');
+    const roleEn = path.join(pkgRoot, 'resources/provider/role/manager/en.md');
+
+    assert.ok(fs.existsSync(enLaw), 'resources/provider/world/common-law/en.md missing in consumed package');
+    assert.ok(fs.existsSync(zhLaw), 'resources/provider/world/common-law/zh-CN.md missing in consumed package');
+    assert.ok(fs.existsSync(roleEn), 'resources/provider/role/manager/en.md missing in consumed package');
+
+    assert.ok(fs.readFileSync(enLaw, 'utf8').trim().length > 0, 'en common law is empty');
+    assert.ok(fs.readFileSync(zhLaw, 'utf8').trim().length > 0, 'zh common law is empty');
+    assert.ok(fs.readFileSync(roleEn, 'utf8').trim().length > 0, 'role en law is empty');
+
+    process.exit(0);
+  `
+
+  fs.writeFileSync(path.join(consumerDir, 'consume.mjs'), consumerScript, 'utf8')
+
+  const isolatedEnv = {
+    PATH: process.env.PATH,
+    NODE_PATH: undefined,
+    NODE_OPTIONS: undefined,
+    HOME: path.join(scratchDir, 'home'),
+    USERPROFILE: path.join(scratchDir, 'home'),
+  }
+  fs.mkdirSync(isolatedEnv.HOME, { recursive: true })
+
+  const runResult = await spawnProcess(process.execPath, ['consume.mjs'], {
+    cwd: consumerDir,
+    env: isolatedEnv,
+  })
+
+  if (runResult.code !== 0) {
+    throw createVerificationError(
+      'external-consumer-failed',
+      consumerDir,
+      `External consumer failed with code ${runResult.code}: ${runResult.stderr || runResult.stdout}`,
+    )
+  }
+
+  return true
 }
 
 /**
- * Verifies the package artifact end-to-end.
- * @param {{ root?: string }} options
- * @returns {Promise<{ ok: true, artifactPath: string, fileCount: number, totalBytes: number, generation: number }>}
+ * Verifies package closure and integrity end-to-end.
+ *
+ * @param {{ root?: string, runDir?: string, skipConsumer?: boolean }} options
+ * @returns {Promise<{ ok: boolean, artifactPath: string, tarballDigest: string, memberCount: number, totalBytes: number, issues: Array<{code: string, path: string, message: string}>, generation: number }>}
  */
-export async function verifyPackage({ root = REPO_ROOT } = {}) {
+export async function verifyPackage({
+  root = REPO_ROOT,
+  runDir = DEFAULT_PACK_RUN_DIR,
+  skipConsumer = false,
+} = {}) {
   const resolvedRoot = path.resolve(root)
+  const resolvedRunDir = path.resolve(runDir)
+  fs.mkdirSync(resolvedRunDir, { recursive: true })
 
   // Phase 1: assertBuildFresh before pack
   const initialFresh = assertBuildFresh({ root: resolvedRoot })
   const generation = initialFresh.generation
 
-  const tmpDirs = []
-  const cleanupTmpDirs = () => {
-    for (const dir of tmpDirs) {
-      try {
-        fs.rmSync(dir, { recursive: true, force: true })
-      } catch {}
-    }
+  // Derive expected closure before pack
+  const expectedClosure = deriveExpectedClosure({ root: resolvedRoot })
+
+  // Phase 2: npm pack --json --ignore-scripts --pack-destination <runDir>
+  let packResult
+  try {
+    packResult = await spawnProcess(
+      'npm',
+      ['pack', '--json', '--ignore-scripts', '--pack-destination', resolvedRunDir],
+      { cwd: resolvedRoot },
+    )
+  } catch (err) {
+    throw createVerificationError(
+      'pack-spawn-failed',
+      'npm',
+      `npm pack failed to spawn: ${err.message}`,
+    )
   }
 
-  try {
-    // Prepare temporary staging directories
-    const packTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wx-pack-dest-'))
-    tmpDirs.push(packTmpDir)
+  if (packResult.code !== 0) {
+    throw createVerificationError(
+      'pack-failed',
+      'npm pack',
+      `npm pack exited with code ${packResult.code}: ${packResult.stderr || packResult.stdout}`,
+    )
+  }
 
-    const extractTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wx-pack-ext-'))
-    tmpDirs.push(extractTmpDir)
+  const packEntry = parsePackResult(packResult.stdout, 'wanxiangshu')
+  const tgzPath = path.join(resolvedRunDir, packEntry.filename)
+  if (!fs.existsSync(tgzPath)) {
+    throw createVerificationError(
+      'tarball-missing',
+      tgzPath,
+      `Packed tarball not found at ${tgzPath}`,
+    )
+  }
 
-    const homeTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wx-pack-home-'))
-    tmpDirs.push(homeTmpDir)
+  const tgzBuffer = fs.readFileSync(tgzPath)
+  const tarballDigest = crypto.createHash('sha256').update(tgzBuffer).digest('hex')
 
-    // Phase 2: npm pack --json --pack-destination <tmp>
-    let packResult
-    try {
-      packResult = await spawnProcess('npm', ['pack', '--json', '--pack-destination', packTmpDir], {
-        cwd: resolvedRoot,
-      })
-    } catch (err) {
-      throw createVerificationError('pack-spawn-failed', 'npm', `npm pack failed to spawn: ${err.message}`)
-    }
-
-    if (packResult.code !== 0) {
-      throw createVerificationError(
-        'pack-failed',
-        'npm pack',
-        `npm pack exited with code ${packResult.code}: ${packResult.stderr || packResult.stdout}`,
-      )
-    }
-
-    // Phase 3: parse pack result & assert tarball exists
-    const packEntry = parsePackResult(packResult.stdout, 'wanxiangshu')
-    const tgzPath = path.join(packTmpDir, packEntry.filename)
-    if (!fs.existsSync(tgzPath)) {
-      throw createVerificationError(
-        'tarball-missing',
-        tgzPath,
-        `Expected packed tarball not found at ${tgzPath}`,
-      )
-    }
-
-    const tgzStat = fs.statSync(tgzPath)
-    if (tgzStat.size === 0) {
-      throw createVerificationError(
-        'tarball-empty',
-        tgzPath,
-        `Packed tarball is 0 bytes: ${tgzPath}`,
-      )
-    }
-
-    // Phase 4: extract via tar to extractTmpDir
-    let tarResult
-    try {
-      tarResult = await spawnProcess('tar', ['-xzf', tgzPath, '-C', extractTmpDir])
-    } catch (err) {
-      throw createVerificationError('tar-spawn-failed', 'tar', `tar extraction failed to spawn: ${err.message}`)
-    }
-
-    if (tarResult.code !== 0) {
-      throw createVerificationError(
-        'tar-extract-failed',
-        tgzPath,
-        `tar extraction failed with code ${tarResult.code}: ${tarResult.stderr || tarResult.stdout}`,
-      )
-    }
-
-    const packageDir = path.join(extractTmpDir, 'package')
-    if (!fs.existsSync(packageDir)) {
-      throw createVerificationError(
-        'tar-package-missing',
-        packageDir,
-        `Archive did not extract to expected 'package/' directory`,
-      )
-    }
-
-    // Phase 5: enumerate extracted files & validate members
-    const extractedFiles = walkExtractedDirectory(packageDir)
-    const memberRelPaths = extractedFiles.map((f) => f.rel)
-
-    validateMemberList(memberRelPaths)
-
-    // Validate against pack manifest files list if present in npm pack json
-    if (Array.isArray(packEntry.files)) {
-      validateMemberList(packEntry.files.map((f) => f.path))
-    }
-
-    // Phase 6: validate package.json in archive
-    const archivedPkgJsonPath = path.join(packageDir, 'package.json')
-    if (!fs.existsSync(archivedPkgJsonPath)) {
-      throw createVerificationError(
-        'package-json-missing',
-        archivedPkgJsonPath,
-        'package.json missing from extracted package archive',
-      )
-    }
-
-    let archivedPkg
-    try {
-      archivedPkg = JSON.parse(fs.readFileSync(archivedPkgJsonPath, 'utf8'))
-    } catch (err) {
-      throw createVerificationError(
-        'package-json-corrupted',
-        archivedPkgJsonPath,
-        `Archived package.json is not valid JSON: ${err.message}`,
-      )
-    }
-
-    if (archivedPkg.name !== 'wanxiangshu') {
-      throw createVerificationError(
-        'package-name-mismatch',
-        archivedPkgJsonPath,
-        `Archived package.json has unexpected name '${archivedPkg.name}'`,
-      )
-    }
-
-    // Phase 7: import plugin from outside-repo cwd
-    const pluginPath = path.join(packageDir, 'dist/OpenCode/Plugin/Plugin.js')
-    if (!fs.existsSync(pluginPath)) {
-      throw createVerificationError(
-        'plugin-missing',
-        pluginPath,
-        `Archived plugin entry missing at ${pluginPath}`,
-      )
-    }
-
-    const repoNodeModules = path.join(resolvedRoot, 'node_modules')
-    const packageNodeModules = path.join(packageDir, 'node_modules')
-    if (fs.existsSync(repoNodeModules) && !fs.existsSync(packageNodeModules)) {
-      fs.symlinkSync(repoNodeModules, packageNodeModules, 'junction')
-    }
-
-    const importCode = `
-      import('${pathToFileURL(pluginPath).href}')
-        .then((m) => {
-          if (!m || (typeof m !== 'object' && typeof m !== 'function')) {
-            console.error('Plugin export is not an object or function');
-            process.exit(2);
-          }
-          process.exit(0);
-        })
-        .catch((err) => {
-          console.error(err);
-          process.exit(1);
-        });
-    `
-
-    let importResult
-    try {
-      importResult = await spawnProcess('node', ['--input-type=module', '-e', importCode], {
-        cwd: extractTmpDir, // OUTSIDE repo cwd
-        env: {
-          ...process.env,
-          HOME: homeTmpDir,
-        },
-      })
-    } catch (err) {
-      throw createVerificationError(
-        'import-spawn-failed',
-        pluginPath,
-        `Failed to spawn node for plugin import: ${err.message}`,
-      )
-    }
-
-    if (importResult.code !== 0) {
-      throw createVerificationError(
-        'plugin-import-failed',
-        pluginPath,
-        `Plugin import from outside-repo cwd failed with code ${importResult.code}: ${importResult.stderr || importResult.stdout}`,
-      )
-    }
-
-    // Phase 8: recheck generation and freshness
-    const finalFresh = assertBuildFresh({ root: resolvedRoot })
-    if (finalFresh.generation !== initialFresh.generation) {
-      throw createVerificationError(
-        'generation-changed',
-        resolvedRoot,
-        `Build generation changed mid-verification: was ${initialFresh.generation}, now ${finalFresh.generation}`,
-      )
-    }
-
-    if (
-      finalFresh.compilerInputDigest !== initialFresh.compilerInputDigest ||
-      finalFresh.generatedInputDigest !== initialFresh.generatedInputDigest ||
-      finalFresh.artifactInputDigest !== initialFresh.artifactInputDigest
-    ) {
-      throw createVerificationError(
-        'digest-changed',
-        resolvedRoot,
-        'Production inputs or artifacts digest changed mid-pack verification',
-      )
-    }
-
-    const totalBytes = extractedFiles.reduce((sum, f) => sum + f.size, 0)
-    const fileCount = extractedFiles.length
-
-    // Phase 9: cleanup tmp dirs
-    cleanupTmpDirs()
-
-    return {
-      ok: true,
-      artifactPath: tgzPath,
-      fileCount,
-      totalBytes,
-      generation,
-    }
-  } catch (err) {
-    cleanupTmpDirs()
+  // Phase 3: Stream validate tarball entries against expected closure
+  const validation = await validateArchiveEntries(tgzPath, expectedClosure)
+  if (validation.issues.length > 0) {
+    const firstIssue = validation.issues[0]
+    const err = createVerificationError(
+      firstIssue.code,
+      firstIssue.path,
+      `Archive validation failed: ${firstIssue.message}`,
+    )
+    err.issues = validation.issues
     throw err
+  }
+
+  // Phase 4: Extract to scratch directory for external consumer
+  const scratchDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wx-consumer-scratch-'))
+  const extractedPackageDir = path.join(scratchDir, 'package')
+
+  try {
+    // Restricted extraction of validated tarball
+    await tar.x({
+      file: tgzPath,
+      cwd: scratchDir,
+      strict: true,
+    })
+
+    if (!skipConsumer) {
+      await runExternalConsumer({
+        root: resolvedRoot,
+        tarballPath: tgzPath,
+        extractedPackageDir,
+        scratchDir,
+      })
+    }
+  } finally {
+    try {
+      fs.rmSync(scratchDir, { recursive: true, force: true })
+    } catch {}
+  }
+
+  // Phase 5: Recheck build generation and freshness
+  const finalFresh = assertBuildFresh({ root: resolvedRoot })
+  if (finalFresh.generation !== initialFresh.generation) {
+    throw createVerificationError(
+      'generation-changed',
+      resolvedRoot,
+      `Build generation changed mid-verification: was ${initialFresh.generation}, now ${finalFresh.generation}`,
+    )
+  }
+
+  if (
+    finalFresh.compilerInputDigest !== initialFresh.compilerInputDigest ||
+    finalFresh.generatedInputDigest !== initialFresh.generatedInputDigest ||
+    finalFresh.artifactInputDigest !== initialFresh.artifactInputDigest
+  ) {
+    throw createVerificationError(
+      'digest-changed',
+      resolvedRoot,
+      'Production inputs or artifacts digest changed mid-pack verification',
+    )
+  }
+
+  return {
+    ok: true,
+    artifactPath: tgzPath,
+    tarballDigest,
+    memberCount: validation.memberCount,
+    totalBytes: validation.totalBytes,
+    issues: validation.issues,
+    generation,
   }
 }
 
 // CLI entrypoint
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))
+) {
   try {
     const result = await verifyPackage({ root: REPO_ROOT })
     console.log(`[verify-package] OK: package verified successfully`)
-    console.log(`  generation: ${result.generation}`)
-    console.log(`  files:      ${result.fileCount}`)
-    console.log(`  totalBytes: ${result.totalBytes}`)
+    console.log(`  generation:    ${result.generation}`)
+    console.log(`  members:       ${result.memberCount}`)
+    console.log(`  totalBytes:    ${result.totalBytes}`)
+    console.log(`  tarballDigest: ${result.tarballDigest}`)
+    console.log(`  artifactPath:  ${result.artifactPath}`)
     process.exit(0)
   } catch (err) {
     console.error(`[verify-package] FAILED: ${err.reason || err.message}`)
     if (err.code) console.error(`  code: ${err.code}`)
     if (err.path) console.error(`  path: ${err.path}`)
+    if (Array.isArray(err.issues)) {
+      console.error(`  total issues: ${err.issues.length}`)
+      for (const issue of err.issues.slice(0, 10)) {
+        console.error(`    [${issue.code}] ${issue.path}: ${issue.message}`)
+      }
+    }
     if (err.stack && !err.reason) console.error(err.stack)
     process.exit(1)
   }

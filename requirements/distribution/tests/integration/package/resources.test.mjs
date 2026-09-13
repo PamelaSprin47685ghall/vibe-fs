@@ -55,31 +55,4 @@ test('WHAT[DISTRIBUTION-008] PACKAGE_resources_provider_role_laws_and_rulebook_p
     false,
     'catalog.json must not ship after rulebook folder cutover',
   )
-  const dirs = fs
-    .readdirSync(enforcerDir, { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => d.name)
-  assert.ok(dirs.length > 0, 'rulebook must contain at least one rule directory')
-  for (const name of dirs) {
-    assert.ok(
-      fs.existsSync(path.join(enforcerDir, name, 'enforcer.md')),
-      `missing enforcer.md for ${name}`,
-    )
-    assert.ok(fs.existsSync(path.join(enforcerDir, name, 'main.md')), `missing main.md for ${name}`)
-  }
-})
-
-test('WHAT[DISTRIBUTION-008] PACKAGE_resources_fixed_relative_path_from_PackageResources_module', () => {
-  const packageResourcesJs = path.join(repoRoot, 'dist', 'Resources', 'PackageResources.js')
-  assert.ok(fs.existsSync(packageResourcesJs), 'PackageResources.js must exist under dist')
-
-  const fromModule = path.resolve(path.dirname(packageResourcesJs), '../..', 'resources')
-  const expected = path.join(repoRoot, 'resources')
-  assert.equal(
-    path.normalize(fromModule),
-    path.normalize(expected),
-    'PackageResources ../../resources must resolve to package resources/',
-  )
-  assert.ok(fs.existsSync(path.join(fromModule, 'enforcer', 'primitive-obsession', 'enforcer.md')))
-  assert.ok(fs.existsSync(path.join(fromModule, 'provider', 'role', 'manager', 'en.md')))
 })

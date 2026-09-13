@@ -10,8 +10,6 @@
 
 `js-semantic-surface` 的核心存在理由是：**在实现世界与测试世界之间建立不可逾越的机器化隔离边界。** 生产代码（F#）拥有实现自由，测试代码（JavaScript）通过稳定、原生（JS-native）、显式声明的 Semantic Surface 访问系统并验证语义不变量。
 
-测试中的生产调用不必都写在 `test` callback 的第一层：共享的局部 helper 与 property callback 会在同一 proof 的实际执行链上。只承认第一层会逼使作者添加无语义的装饰性直接调用；只搜索文件中是否出现调用，又会让 dead helper 或其他 WHAT 借出虚假证据。因此门禁必须在每个 active primary WHAT 的独立执行闭包内归因 Surface use。
-
 ## 核心张力与元规则定位
 
 业务产品包（如 `managed-session-lifecycle`、`delegation`）拥有各自领域的具体产品语义，并有责任对外暴露对应的 Semantic Surface。`js-semantic-surface` 不拥有具体业务契约，它拥有的是**测试边界与数据表示的元规则**：

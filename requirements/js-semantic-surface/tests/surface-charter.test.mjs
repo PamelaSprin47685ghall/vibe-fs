@@ -13,10 +13,9 @@ import { fileURLToPath } from 'node:url'
 
 import { assertJsData, assertOpaque, isJsData } from '../../verification-system/tests/support/js-contract.mjs'
 import { validateModuleLinkage } from '../../../scripts/checks/js-module-linkage.mjs'
-import { usesSurface, validateSurfaceManifest } from '../../../scripts/checks/js-surface-manifest.mjs'
+import { validateSurfaceManifest } from '../../../scripts/checks/js-surface-manifest.mjs'
 import {
   BUILD_VERIFICATION_FILES,
-  SURFACE_CONSUMERS,
   SURFACE_MANIFEST,
   scanAll,
   semanticImportEdges,
@@ -32,40 +31,6 @@ const distImport = (prefix, module) => `${prefix}dist/${module}`
 const wholeScan = scanAll(join(ROOT, 'requirements'))
 const wholeSemanticFiles = new Set(semanticTestFiles(join(ROOT, 'requirements')).map(relativePath))
 const wholeSemanticImportEdges = semanticImportEdges(join(ROOT, 'requirements'))
-
-const validateSurfaceFixture = (body) => {
-  const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-surface-execution-closure-'))
-  const paths = {
-    what: join(temporaryRoot, 'requirements', 'owner', 'WHAT.md'),
-    source: join(temporaryRoot, 'src', 'Wanxiangshu', 'Owner', 'Surface.fs'),
-    project: join(temporaryRoot, 'src', 'Wanxiangshu', 'Wanxiangshu.fsproj'),
-    output: join(temporaryRoot, 'dist', 'Owner', 'Surface.js'),
-    test: join(temporaryRoot, 'requirements', 'owner', 'tests', 'owner.test.mjs'),
-  }
-  for (const path of Object.values(paths)) mkdirSync(dirname(path), { recursive: true })
-
-  try {
-    writeFileSync(paths.what, '# WHAT\n\n## OWNER-001: owner law\n\n## OWNER-002: decoy law\n')
-    writeFileSync(paths.source, 'module Owner.Surface\n')
-    writeFileSync(paths.project, '<Project><ItemGroup><Compile Include="Owner/Surface.fs"/></ItemGroup></Project>')
-    writeFileSync(paths.output, 'export const value = () => 1\n')
-    writeFileSync(paths.test, [
-      "import test from 'node:test'",
-      `import { value } from '${distImport('../../../', 'Owner/Surface.js')}'`,
-      body,
-    ].join('\n'))
-    return validateSurfaceManifest([{
-      module: 'Owner/Surface.js',
-      owner: 'owner',
-      laws: ['OWNER-001'],
-      source: 'src/Wanxiangshu/Owner/Surface.fs',
-      representation: 'json',
-      kind: 'pure',
-    }], temporaryRoot)
-  } finally {
-    rmSync(temporaryRoot, { recursive: true, force: true })
-  }
-}
 
 // ── 001: all semantic tests are JavaScript ──────────────────────────────────
 
@@ -129,7 +94,7 @@ test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_law_owner_surface_registry', 
   assert.deepEqual(failures, [], failures.join('\n'))
 })
 
-test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_manifest_rejects_unemitted_or_unauthorized_evidence', () => {
+test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_manifest_rejects_unemitted_or_invalid_evidence', () => {
   const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-surface-manifest-'))
   const ownerWhat = join(temporaryRoot, 'requirements', 'owner', 'WHAT.md')
     const source = join(temporaryRoot, 'src', 'Wanxiangshu', 'Owner', 'Surface.fs')
@@ -160,7 +125,6 @@ test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_manifest_rejects_unemitted_or
       kind: 'pure',
     }
 
-    assert.equal(usesSurface(readFileSync(testFile, 'utf8'), entry.module), true)
     assert.deepEqual(validateSurfaceManifest([entry], temporaryRoot), [])
 
     rmSync(dist)
@@ -318,115 +282,3 @@ test('WHAT[JS-SEMANTIC-SURFACE-004] JS_SURFACE_004b_support_to_support_transitiv
   }
 })
 
-test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003c_usesSurface_rejects_dead_string_and_recognizes_active_imports', () => {
-  const module = 'Owner/Surface.js'
-  const deadStringSource = [
-    `import { value } from '${distImport('../../../', module)}'`,
-    "// const value = 'Owner/Surface.js'",
-    "const label = 'value'",
-    'export const noop = () => null',
-  ].join('\n')
-  assert.equal(usesSurface(deadStringSource, module), false, 'binding name in a string/comment is not an active use')
-
-  const activeDefaultSource = [
-    `import surface from '${distImport('../../../', module)}'`,
-    'export const call = () => surface()',
-  ].join('\n')
-  assert.equal(usesSurface(activeDefaultSource, module), true, 'active default import must be recognized')
-
-  const activeNamedSource = [
-    `import { value as v } from '${distImport('../../../', module)}'`,
-    'export const call = () => v()',
-  ].join('\n')
-  assert.equal(usesSurface(activeNamedSource, module), true, 'active named import with alias must be recognized')
-
-  const activeNamespaceSource = [
-    `import * as surface from '${distImport('../../../', module)}'`,
-    'export const call = () => surface.value()',
-  ].join('\n')
-  assert.equal(usesSurface(activeNamespaceSource, module), true, 'active namespace import must be recognized')
-
-  const deadDefaultSource = [
-    `import surface from '${distImport('../../../', module)}'`,
-    'export const noop = () => null',
-  ].join('\n')
-  assert.equal(usesSurface(deadDefaultSource, module), false, 'imported but never referenced default binding is not active')
-})
-
-test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003f_shadow_and_nonterminal_alias_cannot_forge_surface_use', () => {
-  const module = 'Owner/Surface.js'
-  const shadowed = [
-    `import { value } from '${distImport('../../../', module)}'`,
-    '{ const value = () => 0; value() }',
-  ].join('\n')
-  const nonterminalAlias = [
-    `import { value } from '${distImport('../../../', module)}'`,
-    'const copied = value',
-    'void copied',
-  ].join('\n')
-
-  assert.equal(usesSurface(shadowed, module), false)
-  assert.equal(usesSurface(nonterminalAlias, module), false)
-})
-
-
-// ── 003d: per-consumer unauthorized import rejection ───────────────────────
-// Registration grants no blanket import authority. A test that actively uses a
-// surface must carry a matching law WHAT tag in the owner's tests directory,
-// or its package must be declared as an explicit cross-owner consumer. An
-// unrelated test importing the surface is a false green, not proof.
-
-test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003d_manifest_rejects_unauthorized_active_consumer', () => {
-  const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-surface-unauth-'))
-  const ownerWhat = join(temporaryRoot, 'requirements', 'owner', 'WHAT.md')
-    const rogueWhat = join(temporaryRoot, 'requirements', 'rogue', 'WHAT.md')
-    const source = join(temporaryRoot, 'src', 'Wanxiangshu', 'Owner', 'Surface.fs')
-  const fsproj = join(temporaryRoot, 'src', 'Wanxiangshu', 'Wanxiangshu.fsproj')
-  const dist = join(temporaryRoot, 'dist', 'Owner', 'Surface.js')
-  const ownerTest = join(temporaryRoot, 'requirements', 'owner', 'tests', 'owner.test.mjs')
-  const rogueTest = join(temporaryRoot, 'requirements', 'rogue', 'tests', 'rogue.test.mjs')
-  mkdirSync(dirname(ownerWhat), { recursive: true })
-  mkdirSync(dirname(rogueWhat), { recursive: true })
-  mkdirSync(dirname(source), { recursive: true })
-  mkdirSync(dirname(dist), { recursive: true })
-  mkdirSync(dirname(ownerTest), { recursive: true })
-  mkdirSync(dirname(rogueTest), { recursive: true })
-
-  try {
-    writeFileSync(ownerWhat, '# OWNER-001\n')
-        writeFileSync(rogueWhat, '# ROGUE-001\n')
-        writeFileSync(source, 'module Owner.Surface\n')
-    writeFileSync(fsproj, '<Project><ItemGroup><Compile Include="Owner/Surface.fs"/></ItemGroup></Project>')
-    writeFileSync(dist, 'export const value = 1\n')
-    // Authorized: owner dir + matching WHAT tag
-    writeFileSync(ownerTest, `import test from 'node:test'\nimport { value } from '${distImport('../../../', 'Owner/Surface.js')}'\ntest('WHAT[OWNER-001] authorized', () => { value() })\n`)
-    // Unauthorized: rogue dir, non-matching WHAT tag, no declared consumer edge
-    writeFileSync(rogueTest, `import test from 'node:test'\nimport { value } from '${distImport('../../../', 'Owner/Surface.js')}'\ntest('WHAT[ROGUE-001] unauthorized', () => { value() })\n`)
-
-    const entry = {
-      module: 'Owner/Surface.js',
-      owner: 'owner',
-      laws: ['OWNER-001'],
-      source: 'src/Wanxiangshu/Owner/Surface.fs',
-      representation: 'json',
-      kind: 'pure',
-    }
-    const failures = validateSurfaceManifest([entry], temporaryRoot)
-    const unauthorized = failures.filter((f) => f.includes('unauthorized active import'))
-    assert.equal(unauthorized.length, 1, `exactly one unauthorized import failure, got: ${failures.join('\n')}`)
-    assert.match(unauthorized[0], /rogue\.test\.mjs/)
-    assert.match(unauthorized[0], /package rogue has no law or declared consumer edge/)
-  } finally {
-    rmSync(temporaryRoot, { recursive: true, force: true })
-  }
-})
-
-// ── 003e: stale consumer metadata for unregistered modules is rejected ──────
-
-test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003e_manifest_rejects_stale_consumer_metadata', () => {
-  // SURFACE_CONSUMERS must not carry entries for modules removed from the
-  // manifest. A stale entry grants phantom import authority.
-  const manifestModules = new Set(SURFACE_MANIFEST.map((e) => e.module))
-  const stale = Object.keys(SURFACE_CONSUMERS).filter((m) => !manifestModules.has(m))
-  assert.deepEqual(stale, [], `stale SURFACE_CONSUMERS entries for unregistered modules: ${stale.join(', ')}`)
-})

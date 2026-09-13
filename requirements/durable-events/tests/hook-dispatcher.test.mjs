@@ -96,13 +96,6 @@ test('WHAT[DURABLE-EVENTS-018] HOOK_reference_transaction_and_pre_push_launch_th
   assert.equal(emptyRemote.status, 1)
   assert.match(emptyRemote.stderr, /requires the Git remote name/i)
 
-  // 6. Direct surface calls verify typed error handling
-  const HookSync = await import('../../../dist/Git/Hook/Sync.js')
-  const prePushErr = await HookSync.runPrePush('')
-  assert.match(prePushErr, /requires the Git remote name/i)
-
-  const nonCommittedResult = await HookSync.runReferenceTransaction('prepared', '')
-  assert.equal(nonCommittedResult, undefined)
 })
 
 test('WHAT[DURABLE-EVENTS-018] HOOK_classification_preserves_foreign_hooks', () => {

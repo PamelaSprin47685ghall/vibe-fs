@@ -1,49 +1,47 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  prepareCheckpoint,
-  acceptCheckpoint,
-  PreparationAttempt$2,
-} from '../../../dist/Mission/Obligation/LedgerWorkflow.js'
-import { FSharpResult$2 } from '../../../dist/fable_modules/fable-library-js.5.13.0/Result.js'
-import * as projection from '../../../dist/Composition/Durable/MagicTodoProjection.js'
+import { createHash } from 'node:crypto'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import * as journal from '../../../dist/Persistence/Journal/Surface.js'
+import * as host from '../../../dist/Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.js'
+import * as membrane from '../../../dist/Mission/Obligation/Todo/MagicTodoMembraneSurface.js'
 import * as projectionSurface from '../../../dist/Mission/Obligation/Todo/MagicTodoProjectionSurface.js'
-import * as relay from '../../../dist/Mission/Relay/Surface.js'
 
-test('WHAT[OBLIGATION-LEDGER-018] business sequencing is a direct F# CE, executing preparation and acceptance without foreign state machines', async () => {
-  // 1. prepareCheckpoint executes admission directly and returns typed Ok
-  let prepareAttempted = false
-  const prepOk = await prepareCheckpoint(() => {
-    prepareAttempted = true
-    return Promise.resolve(new PreparationAttempt$2(0, ['prepared-checkpoint-data']))
-  })
-  assert.equal(prepareAttempted, true)
-  assert.equal(prepOk.tag, 0)
-  assert.equal(prepOk.fields[0], 'prepared-checkpoint-data')
+const sha256Hex = (value) => createHash('sha256').update(value).digest('hex')
 
-  // 2. prepareCheckpoint short-circuits on failure with typed AttemptFailed
-  const prepFailed = await prepareCheckpoint(() => {
-    return Promise.resolve(new PreparationAttempt$2(1, ['admission-denied']))
-  })
-  assert.equal(prepFailed.tag, 1)
-  assert.equal(prepFailed.fields[0].fields[0], 'admission-denied')
+test('WHAT[OBLIGATION-LEDGER-018] business sequencing prepares and accepts checkpoints through public membrane surface', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-ob-ledger-workflow-'))
+  const boot = await journal.JournalSurface_boot(directory, 'rt_ob_workflow', 101, '2026-08-11T00:00:00Z')
+  assert.equal(boot.ok, true)
+  try {
+    const handle = boot.journal
+    const sessionId = 'ses-workflow-1'
+    const incumbencyId = 'life-workflow-1'
+    const callId = 'call-wf-1'
+    const obligations = [{ name: 'task-1', horizon: 'near', work: 'Do work' }]
 
-  // 3. acceptCheckpoint executes durability effect and returns typed Ok
-  let acceptAttempted = false
-  const accOk = await acceptCheckpoint(() => {
-    acceptAttempted = true
-    return Promise.resolve(new FSharpResult$2(0, ['accepted-checkpoint-data']))
-  })
-  assert.equal(acceptAttempted, true)
-  assert.equal(accOk.tag, 0)
-  assert.equal(accOk.fields[0], 'accepted-checkpoint-data')
+    const openRes = await membrane.MagicTodoMembraneSurface_openLife(handle, sessionId, incumbencyId)
+    assert.equal(openRes.ok, true)
 
-  // 4. acceptCheckpoint maps error into typed AcceptFailed
-  const accFail = await acceptCheckpoint(() => {
-    return Promise.resolve(new FSharpResult$2(1, ['append-failed']))
-  })
-  assert.equal(accFail.tag, 1)
-  assert.equal(accFail.fields[0].fields[0], 'append-failed')
+    const args = { planComplete: true, workingOn: 'task-1', obligations }
+    const canonical = host.canonicalInput(args)
+    const digest = host.canonicalInputDigest(sha256Hex, args)
+
+    const prep = await membrane.MagicTodoMembraneSurface_prepare(
+      handle, sessionId, callId, canonical, digest, true, obligations, 0,
+    )
+    assert.equal(prep.ok, true)
+
+    const accepted = await membrane.MagicTodoMembraneSurface_accept(
+      handle, prep.value.bridge, 'LiveAfterSuccess', digest, sha256Hex('output-wf'),
+    )
+    assert.equal(accepted.ok, true)
+  } finally {
+    journal.JournalSurface_dispose(boot.journal)
+    rmSync(directory, { recursive: true, force: true })
+  }
 })
 
 test('WHAT[OBLIGATION-LEDGER-018] hot-path queries use incremental projection facts on IncumbencyMagicTodoState', () => {

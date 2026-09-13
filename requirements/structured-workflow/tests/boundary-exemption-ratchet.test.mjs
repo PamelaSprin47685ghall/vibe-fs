@@ -36,3 +36,13 @@ test('WHAT[STRUCTURED-WORKFLOW-006] SuicideTool admission gate requires OfficeRo
   assert.equal(tr.rolePredicate('suicide', 'Orchestrator'), false)
   assert.equal(tr.rolePredicate('suicide', 'Inspector'), false)
 })
+
+test('WHAT[STRUCTURED-WORKFLOW-006] SuicideTool retirement freeze fence order rejects concurrent and stale admissions without session abort', () => {
+  const frozen = retirement.freeze('inc-mgr-1', 100)
+  assert.equal(retirement.fenceAppliesTo(frozen, 'inc-mgr-1'), true)
+  assert.equal(retirement.fenceAppliesTo(frozen, 'inc-other'), false)
+  assert.deepEqual(retirement.admitResource(frozen, 100), { ok: false, error: 'IncumbencyAdmissionsFrozen' })
+  assert.deepEqual(retirement.admitResource(frozen, 99), { ok: false, error: 'StaleIncumbencyAdmissionFence' })
+  const decision = retirement.decide([], {})
+  assert.deepEqual(decision, { decision: 'Retire' })
+})

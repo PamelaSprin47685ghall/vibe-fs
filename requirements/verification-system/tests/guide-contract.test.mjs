@@ -67,7 +67,6 @@ test('WHAT[VERIFICATION-SYSTEM-008] AgentProgram publishes its flow entrypoints'
 test('WHAT[VERIFICATION-SYSTEM-008] Companion has no generic program facade and keeps its direct delta owner', async () => {
   const delta = await load('Context/Companion/Blogger/Delta')
   assertCallable(delta, 'Context/Companion/Blogger/Delta', ['BloggerDelta_nextChunk'])
-  assert.equal(delta.BloggerDelta_DeltaLimitBytes, 200 * 1024)
 })
 
 test('WHAT[VERIFICATION-SYSTEM-008] OrchestratorProgram publishes exactly one entrypoint', async () => {

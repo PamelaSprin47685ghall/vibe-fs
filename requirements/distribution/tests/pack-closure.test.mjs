@@ -1,31 +1,33 @@
 // requirements/distribution/tests/pack-closure.test.mjs
-// DISTRIBUTION-001/003/004/006/007/008 oracle：artifact 同时携带编译代码与 runtime
-// semantic resources、manifest/exports ↔ shipped paths 一致、files whitelist 排除
-// 开发/测试/legacy authority、资源 I/O 仅限 Infrastructure/Resources/、release proof
-// 覆盖 closure、所有声明 runtime resource 的 semantic packages 的资源在 shipped
-// closure 中完整可得。
-//
-// 不 spawn `npm pack`（与 tests/integration/package/* 头注释同一设计决定）；真实
-// tarball membership 由 release proof L5 `npm pack --dry-run` 承担（见 HOW.md）。
-// 本测试读仓库内 package.json + dist/ + resources/ 的实际路径，作为 pack 的静态前置。
-// 只 import：node: 内置。
+// DISTRIBUTION-001/003/004/006/007/008 oracle:
+// Artifact carries compiled code and runtime semantic resources together in a single closure.
+// Validates manifest/exports alignment, files whitelist, full closure derivation,
+// archive stream verification (happy path & synthetic negative fixtures), and release proof pipeline.
 
 import assert from 'node:assert/strict'
+import crypto from 'node:crypto'
 import fs from 'node:fs'
-import path from 'node:path'
 import os from 'node:os'
+import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import * as tar from 'tar'
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
+import {
+  REPO_ROOT,
+  deriveExpectedClosure,
+  validateArchiveEntries,
+  validateArtifact,
+} from '../../../scripts/verify-package.mjs'
+
+const root = REPO_ROOT
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
 const exists = (relative) => fs.existsSync(path.join(root, relative))
-
 const normalize = (entry) => String(entry).replace(/\\/g, '/').replace(/\/+$/, '')
 
-// 递归收集 dir 下所有 .fs 文件（相对生产树的静态 I/O 审计用）。
 const walkFs = (dir) => {
   const out = []
+  if (!fs.existsSync(dir)) return out
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name)
     if (entry.isDirectory()) out.push(...walkFs(full))
@@ -67,29 +69,18 @@ test('WHAT[DISTRIBUTION-004] DISTRIBUTION_files_whitelist_is_explicit_and_exclud
 })
 
 test('WHAT[DISTRIBUTION-007] DISTRIBUTION_release_proof_covers_build_package_packing_and_artifact_checks', async () => {
-  // DISTRIBUTION-007 本地 pin：release proof（verify:release）必须包含 build/package/
-  // packing 与 install/import/resource availability 检查。阶梯的层序治理（谁先谁后、
-  // watchdog、晋级纪律）归 verification-system；本断言只锁「release proof 覆盖 closure」。
   const pipeline = pkg.scripts['verify:release']
   assert.equal(typeof pipeline, 'string', 'verify:release must exist')
   assert.match(pipeline, /node scripts\/verify\.mjs/, 'release proof must dispatch to verify.mjs')
 
-  const integration = fs.readFileSync(
-    path.join(root, 'requirements/verification-system/tests/integration/run.mjs'),
-    'utf8',
-  )
-  assert.match(
-    integration,
-    /requirements\/distribution\/tests\/integration\/package\/run\.mjs/,
-    'integration orchestrator must run package install/import/resources checks',
-  )
-
-  // Drive the real orchestrator with a step spy — this proves verify:release
-  // invokes the registered build step in clean mode and the verify-package step.
   const { verify } = await import('../../../scripts/verify.mjs')
   const tmpLogDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pack-closure-verify-'))
   let buf = ''
-  const memorySink = { write(chunk) { buf += chunk } }
+  const memorySink = {
+    write(chunk) {
+      buf += chunk
+    },
+  }
   const spawned = []
   const fakeRunStep = async ({ label, argv }) => {
     spawned.push({ label, argv: argv.map((arg) => String(arg)) })
@@ -102,43 +93,87 @@ test('WHAT[DISTRIBUTION-007] DISTRIBUTION_release_proof_covers_build_package_pac
       output: memorySink,
       logDirectory: tmpLogDir,
     })
-  assert.equal(exitCode, 0, 'release verify with green spy must succeed')
+    assert.equal(exitCode, 0, 'release verify with green spy must succeed')
 
-  const releaseLabels = spawned.map((s) => s.label)
-  const integrationIdx = releaseLabels.indexOf('integration')
-  const e2eIdx = releaseLabels.indexOf('e2e')
-  const packageIdx = releaseLabels.indexOf('package')
-  assert.ok(integrationIdx >= 0 && e2eIdx >= 0 && integrationIdx < e2eIdx, 'integration must precede e2e')
-  assert.ok(packageIdx >= 0 && e2eIdx < packageIdx, 'package must follow e2e')
+    const releaseLabels = spawned.map((s) => s.label)
+    const integrationIdx = releaseLabels.indexOf('integration')
+    const e2eIdx = releaseLabels.indexOf('e2e')
+    const packageIdx = releaseLabels.indexOf('package')
+    assert.ok(
+      integrationIdx >= 0 && e2eIdx >= 0 && integrationIdx < e2eIdx,
+      'integration must precede e2e',
+    )
+    assert.ok(packageIdx >= 0 && e2eIdx < packageIdx, 'package must follow e2e')
 
-  const e2eCalls = spawned.filter((s) => s.label === 'e2e')
-  assert.equal(e2eCalls.length, 1, 'release must run e2e exactly once')
-
-  const buildCalls = spawned.filter((s) => s.label === 'build')
-  assert.equal(buildCalls.length, 1, 'release must invoke build exactly once')
-  assert.ok(
-    buildCalls[0].argv.some((arg) => arg.includes('scripts/build.mjs')),
-    'release build must resolve to scripts/build.mjs',
-  )
-  assert.ok(
-    buildCalls[0].argv.includes('--clean'),
-    'release build must pass --clean: release never publishes a stale incremental manifest',
-  )
-
-  const packageCalls = spawned.filter((s) => s.label === 'package')
-  assert.equal(packageCalls.length, 1, 'release must run the verify-package step exactly once')
-  assert.ok(
-    packageCalls[0].argv.some((arg) => arg.includes('scripts/verify-package.mjs')),
-    'release package step must resolve to scripts/verify-package.mjs',
-  )
+    const packageCalls = spawned.filter((s) => s.label === 'package')
+    assert.equal(packageCalls.length, 1, 'release must run the verify-package step exactly once')
+    assert.ok(
+      packageCalls[0].argv.some((arg) => arg.includes('scripts/verify-package.mjs')),
+      'release package step must resolve to scripts/verify-package.mjs',
+    )
   } finally {
     fs.rmSync(tmpLogDir, { recursive: true, force: true })
   }
 })
 
+test('WHAT[DISTRIBUTION-007] P1-P4: validateArchiveEntries rejects missing, extra, digest-mismatch, and link entries', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wx-negative-archive-test-'))
+  const src = path.join(tmp, 'src')
+  fs.mkdirSync(path.join(src, 'package'), { recursive: true })
+
+  // 1. Create a base synthetic tarball
+  fs.writeFileSync(path.join(src, 'package', 'package.json'), '{"name":"wanxiangshu"}')
+  fs.writeFileSync(path.join(src, 'package', 'README.md'), '# Wanxiangshu')
+  fs.writeFileSync(path.join(src, 'package', 'extra-rogue.js'), 'console.log("bad")')
+  fs.symlinkSync('README.md', path.join(src, 'package', 'symlink.md'))
+
+  const tgzPath = path.join(tmp, 'synthetic.tgz')
+  await tar.c({ gzip: true, file: tgzPath, cwd: src }, ['package'])
+
+  // Define an expected closure with:
+  // - package.json (with WRONG digest to test digest-mismatch P3)
+  // - README.md (normal)
+  // - dist/OpenCode/Plugin/Plugin.js (missing in archive to test missing-member P1)
+  const expectedClosure = new Map([
+    [
+      'package.json',
+      {
+        sha256: '0000000000000000000000000000000000000000000000000000000000000000',
+        size: 20,
+      },
+    ],
+    [
+      'README.md',
+      {
+        sha256: crypto
+          .createHash('sha256')
+          .update('# Wanxiangshu')
+          .digest('hex'),
+        size: 13,
+      },
+    ],
+    [
+      'dist/OpenCode/Plugin/Plugin.js',
+      {
+        sha256: '1111111111111111111111111111111111111111111111111111111111111111',
+        size: 100,
+      },
+    ],
+  ])
+
+  const res = await validateArchiveEntries(tgzPath, expectedClosure)
+  assert.ok(res.issues.length >= 4, 'should record all distinct negative issues')
+
+  const codes = new Set(res.issues.map((i) => i.code))
+  assert.ok(codes.has('missing-member'), 'P1: should detect missing member')
+  assert.ok(codes.has('extra-member'), 'P2: should detect extra unexpected member')
+  assert.ok(codes.has('digest-mismatch'), 'P3: should detect digest mismatch')
+  assert.ok(codes.has('non-regular-entry'), 'P4: should detect non-regular entry (symlink)')
+
+  fs.rmSync(tmp, { recursive: true, force: true })
+})
+
 test('WHAT[DISTRIBUTION-008] DISTRIBUTION_enforcer_rulebook_closure_is_complete', () => {
-  // resources/enforcer/<TipName>/{enforcer.md,main.md} → behavior-diagnosis 声明的资源。
-  // 闭包规则：目录枚举到的每个 tip 双文件都必须存在（不是硬编码名单）。
   const enforcerRoot = path.join(root, 'resources', 'enforcer')
   const tipDirs = fs
     .readdirSync(enforcerRoot, { withFileTypes: true })
@@ -152,9 +187,6 @@ test('WHAT[DISTRIBUTION-008] DISTRIBUTION_enforcer_rulebook_closure_is_complete'
 })
 
 test('WHAT[DISTRIBUTION-008] DISTRIBUTION_provider_resource_closure_is_language_complete', () => {
-  // resources/provider/** → 各 provider 语义包（office-capability / provider-language /
-  // cognitive-environment / action-affordance / delegation / …）声明的资源。
-  // 闭包规则：role 每角色双语、world/library 共享资产双语。
   const roleRoot = path.join(root, 'resources', 'provider', 'role')
   const roles = fs
     .readdirSync(roleRoot, { withFileTypes: true })
@@ -178,9 +210,6 @@ test('WHAT[DISTRIBUTION-008] DISTRIBUTION_provider_resource_closure_is_language_
 })
 
 test('WHAT[DISTRIBUTION-001] DISTRIBUTION_artifact_carries_compiled_code_and_runtime_resources_together', () => {
-  // 安装产物（npm tarball / 已安装包）必须同时包含 production entrypoint 的编译代码
-  // 与全部 runtime semantic resources——两者作为同一个 artifact 交付（closure 单点），
-  // 不存在「代码从 A 渠道、资源从 B 渠道」的分发。
   const required = [
     'dist/OpenCode/Plugin/Plugin.js',
     'resources/provider/role/manager/en.md',
@@ -197,8 +226,6 @@ test('WHAT[DISTRIBUTION-001] DISTRIBUTION_artifact_carries_compiled_code_and_run
     const text = fs.readFileSync(path.join(root, relative), 'utf8')
     assert.ok(text.trim().length > 0, `runtime semantic resource must be non-empty: ${relative}`)
   }
-  // closure 单点：唯一携带渠道是 package.json files 白名单（dist/ + resources/ 同包发布），
-  // 不存在独立于该 artifact 的资源渠道。
   assert.ok(Array.isArray(pkg.files), 'files whitelist must exist')
   assert.ok(
     pkg.files.some((f) => normalize(f) === 'dist') &&
@@ -208,13 +235,13 @@ test('WHAT[DISTRIBUTION-001] DISTRIBUTION_artifact_carries_compiled_code_and_run
 })
 
 test('WHAT[DISTRIBUTION-006] DISTRIBUTION_resource_io_lives_only_under_infrastructure_resources', () => {
-  // package resource 的 I/O 只发生在 src/Wanxiangshu/Resources/（PackageResources 等），
-  // 其它生产源码不得直接引用 PackageResources. 读取资源（散落读取无法审计 closure）。
-  // 静态镜像 scripts/checks/architecture.mjs 门 ⑥ resource-boundary。
   const resourcesDir = path.join(root, 'src', 'Wanxiangshu', 'Resources')
   const productionFiles = walkFs(path.join(root, 'src', 'Wanxiangshu'))
   const offenders = productionFiles.filter(
-    (f) => !f.startsWith(resourcesDir) && f.endsWith('.fs') && /PackageResources\./.test(fs.readFileSync(f, 'utf8')),
+    (f) =>
+      !f.startsWith(resourcesDir) &&
+      f.endsWith('.fs') &&
+      /PackageResources\./.test(fs.readFileSync(f, 'utf8')),
   )
   assert.deepEqual(
     offenders,
