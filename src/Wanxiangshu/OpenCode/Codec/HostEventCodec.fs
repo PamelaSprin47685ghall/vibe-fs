@@ -131,34 +131,20 @@ module HostEventCodec =
         else
             "provider failure"
 
-    let private statusCodeOf (error: obj) : string =
-        if isNull error then
-            ""
-        elif not (isNull error?status) then
-            string error?status
-        elif not (isNull error?statusCode) then
-            string error?statusCode
-        elif not (isNull error?data) && not (isNull error?data?statusCode) then
-            string error?data?statusCode
-        else
-            ""
 
     let private failureOf (error: obj) : ExecutionFailure =
-        match errorNameOf error, statusCodeOf error with
-        | ("MessageAbortedError" | "AbortError"), _ -> ExecutionFailure.UserCancelled
-        | "SupersededError", _ -> ExecutionFailure.Superseded
-        | "StreamInterruptedError", _ -> ExecutionFailure.StreamInterruptedAfterFirstToken
-        | ("TimeoutError" | "OverloadedError" | "RateLimitError" | "ProviderUnavailableError"), _ ->
-            ExecutionFailure.ProviderTransient
-        | ("PermissionDeniedError" | "AuthorizationError"), _
-        | _, ("401" | "403") -> ExecutionFailure.AuthorizationDenied
-        | ("ProviderAuthError" | "AuthenticationError" | "InvalidRequestError"), _ -> ExecutionFailure.ProviderPermanent
-        | _, ("408" | "409" | "425" | "429" | "500" | "502" | "503" | "504") -> ExecutionFailure.ProviderTransient
-        | _, ("400" | "402" | "404" | "405" | "406" | "410" | "413" | "415" | "422") ->
-            ExecutionFailure.ProviderPermanent
-        | "ProviderError", _ -> ExecutionFailure.ProviderPermanent
-        | "", "" -> ExecutionFailure.ProtocolRejection
-        | _, _ -> ExecutionFailure.LocalInvariant
+        // Operator decision: every Host-reported error is a provider error.
+        // Wanxiangshu classifies nothing at this boundary — retry, budget and
+        // context replacement are owned by the provider recovery path. Only two
+        // typed control signals stay distinct: operator abort (HOST-002/004,
+        // CRASH-008) and supersede (a newer attempt already owns the fact).
+        // Semantic failures such as tool-call errors never reach here: OpenCode
+        // resolves them inside its own loop and reports parts, not session errors.
+        match errorNameOf error with
+        | "MessageAbortedError"
+        | "AbortError" -> ExecutionFailure.UserCancelled
+        | "SupersededError" -> ExecutionFailure.Superseded
+        | _ -> ExecutionFailure.ProviderTransient
 
     let private decodeSessionErrorFor (sessionId: SessionId) (raw: obj) : HostSignal option =
         let properties = raw?properties
@@ -177,16 +163,7 @@ module HostEventCodec =
             // continuation capability; it must never be mistaken for
             // ProviderFailure (which would wrongly advance fallback).
             Some(AttemptAborted observation)
-        | ExecutionFailure.LocalInvariant
-        | ExecutionFailure.ProtocolRejection
-        | ExecutionFailure.AuthorizationDenied
-        | ExecutionFailure.Superseded
-        | ExecutionFailure.CapacityQueueFull
-        | ExecutionFailure.ProviderTransient
-        | ExecutionFailure.ProviderPermanent
-        | ExecutionFailure.AcceptanceUnknown
-        | ExecutionFailure.StreamInterruptedAfterFirstToken
-        | ExecutionFailure.PersistenceFailure _ -> Some(ProviderFailure observation)
+        | _ -> Some(ProviderFailure observation)
 
     let private decodeSessionError (raw: obj) : HostSignal option =
         match HostEventEnvelope.trySessionId raw with
@@ -279,16 +256,7 @@ module HostEventCodec =
         | ExecutionFailure.UserCancelled
         | ExecutionFailure.Superseded ->
             Some(HostProviderTerminalOutcome.Cancelled failure, Some ChatExecutionTerminalDisposition.Cancelled)
-        | ExecutionFailure.StreamInterruptedAfterFirstToken ->
-            Some(HostProviderTerminalOutcome.Interrupted failure, Some ChatExecutionTerminalDisposition.Failed)
-        | ExecutionFailure.ProviderTransient
-        | ExecutionFailure.ProviderPermanent
-        | ExecutionFailure.LocalInvariant
-        | ExecutionFailure.ProtocolRejection
-        | ExecutionFailure.AuthorizationDenied
-        | ExecutionFailure.CapacityQueueFull
-        | ExecutionFailure.AcceptanceUnknown
-        | ExecutionFailure.PersistenceFailure _ -> Some(HostProviderTerminalOutcome.ProviderFailure failure, None)
+        | _ -> Some(HostProviderTerminalOutcome.ProviderFailure failure, None)
 
     let private terminalOutcomeOf
         (info: obj)

@@ -14,7 +14,7 @@ Host 不为同一 ProviderRunIdentity 发起第二次 provider request。后续�
 
 ## HOSTFAIL-004: 非认领错误保持 Host 默认 fail-loud
 
-plugin/config/schema/permission/user validation、filesystem/Git/tool contract、unknown class、用户 cancel 与无恢复计划的错误不得被全局吞掉。未知错误默认使用 Host presentation。
+plugin/config/schema/permission/user validation、filesystem/Git/tool contract、unknown class、用户 cancel 与无恢复计划的错误不得被全局吞掉。未知错误默认使用 Host presentation。Host 上报的 `session.error` 不属此列：它一律由 provider recovery 接管（EXECFAIL-009），预算耗尽后仍按 HOSTFAIL-006 产生唯一 typed terminal。
 
 ## HOSTFAIL-005: provider recovery 只有一个 durable owner
 

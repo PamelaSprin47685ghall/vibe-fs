@@ -44,7 +44,7 @@ ExecutionFailureResolution =
 
 ## EXECFAIL-003: 只有已确认 provider 类别可授权 retry
 
-`ProviderTransient` 与 `ProviderPermanent` 是仅有可进入 provider retry 裁决的类别。`ProviderRecoveryFacts` 只携带一个 `RetryBudget（Available | Exhausted）`、一个 `Breaker（Closed | Open）`、`ProviderRequestKind` 与两个 run identity，不存在第二预算维度。已确认 provider 失败在 `ProviderStarted × Closed × Available × 可恢复 request kind` 时输出 `RetryFreshAttempt`；`Open` 或 `Exhausted` 时输出 terminal；`NoAcceptedFact`、`AcceptedBeforeProvider`、`Terminal` phase 永不重试；`StrengthReplica` 永不消耗 owner recovery。类别本身不保证一定继续。其余类别始终不输出 retry。特别地，`AcceptanceUnknown` 只能进入 durable reconciliation，`StreamInterruptedAfterFirstToken` 不得自动重放可能已产生可见 token 的 effect；解码为非 provider 类别的 unknown、timeout 文案、cancel、tool-policy、join-control、pre-accept refusal 永不进入 retry 裁决。
+`ProviderTransient` 与 `ProviderPermanent` 是仅有可进入 provider retry 裁决的类别。`ProviderRecoveryFacts` 只携带一个 `RetryBudget（Available | Exhausted）`、一个 `Breaker（Closed | Open）`、`ProviderRequestKind` 与两个 run identity，不存在第二预算维度。已确认 provider 失败在 `ProviderStarted × Closed × Available × 可恢复 request kind` 时输出 `RetryFreshAttempt`；`Open` 或 `Exhausted` 时输出 terminal；`NoAcceptedFact`、`AcceptedBeforeProvider`、`Terminal` phase 永不重试；`StrengthReplica` 永不消耗 owner recovery。类别本身不保证一定继续。其余类别始终不输出 retry。特别地，`AcceptanceUnknown` 只能进入 durable reconciliation，`StreamInterruptedAfterFirstToken` 不得自动重放可能已产生可见 token 的 effect；解码为非 provider 类别的 unknown、timeout 文案、cancel、tool-policy、join-control、pre-accept refusal 永不进入 retry 裁决（Host 错误边界自身的解码结果一律为 provider 类别，见 EXECFAIL-009）。
 
 任一 `RetryFreshAttempt` 必须携带不可由 caller 构造的 sealed authorization，精确绑定一个稳定 logical operation (`LogicalRunId`)、本次 physical attempt (`ProviderRunIdentity`)、request kind 与由三者纯派生的稳定 policy decision identity。Provider 恢复 prompt 标识精确包含 `ProviderRecoveryDecisionId` 与源 `ProviderRunIdentity`，对外可见文本保持完全一致。同一 typed decision 重放得到相同 decision identity；新的失败 provider run 建立新 identity。相同 authorization identity 的重复物理发射由 ledger owner 去重，不由 Policy 去重。
 
@@ -69,3 +69,18 @@ ExecutionFailureResolution =
 ## EXECFAIL-008: 决策与恢复时间无关
 
 policy 与 interpreter 的推进仅由 typed input、durable fact、capacity event、Host terminal evidence 或 persistence result 驱动。deadline、sleep、elapsed time、轮询次数与错误文本不得授权 retry、breaker transition、capacity settlement、terminal resolution 或 fatality。
+
+## EXECFAIL-009: Host 错误边界不做失败分类
+
+除非 typed control，Host 上报的任何错误一律解码为 `ProviderTransient`：
+operator abort → `UserCancelled`，supersede → `Superseded`（CRASH-008 / HOST-002）。
+工具调用等语义错误由 OpenCode 在自己的循环内解决，以 part 而非 session error 呈现，不经过本边界。
+
+理由：边界处没有可信证据区分 upstream 失败类别；任何“猜类别”的终点都是把 provider 噪音变成调用方可见的终态。
+重试、预算与上下文替换由 provider recovery 路径独占决定（PAR-005/PAR-008/PAR-019），
+预算耗尽仍按 HOSTFAIL-006 产生唯一 typed terminal。
+本边界不削弱 HOSTFAIL-004：plugin/config/schema/permission 等 **hook 失败**仍 fail-loud。
+
+`LocalInvariant`、`ProtocolRejection`、`AuthorizationDenied`、`StreamInterruptedAfterFirstToken` 等类别仍保留在封闭代数中，
+由 provider adapter、持久化边界与 legacy 解码使用；EXECFAIL-003 关于“这些类别永不进入 retry”的约束适用于这些边界。
+重试必须以替换上下文的方式发出（PAR-011 wire 重建 prefix、丢弃旧 retry 行、`ProviderRetryAttempt` continuation），不得盲目重放已产生可见输出的 attempt。

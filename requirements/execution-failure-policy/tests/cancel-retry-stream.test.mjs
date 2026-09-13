@@ -122,7 +122,7 @@ test('WHAT[EXECFAIL-002] cancel/retry/stream matrix is interpreted by registered
     physicalUserMessageId: executionKey.physicalUserMessageId,
     providerRun: provider.providerRun,
     outcome: 'ProviderFailure',
-    failure: 'ProviderPermanent',
+    failure: 'ProviderTransient',
     disposition: '',
   })
   assert.deepEqual(
@@ -183,6 +183,9 @@ test('WHAT[EXECFAIL-002] cancel/retry/stream matrix is interpreted by registered
   assert.equal(supersededAdmission.providerCount, 0)
   assert.equal(supersededAdmission.admission.activeCapacity, 0)
 
+  // The policy algebra still closes this class (provider adapter / legacy
+  // boundaries may mint it); the Host error boundary itself now reports every
+  // error as a provider failure.
   const interrupted = decide('StreamInterruptedAfterFirstToken')
   assertNoRecovery(interrupted)
   assert.equal(interrupted.resolution, 'TerminalizeProviderStarted')
@@ -191,9 +194,9 @@ test('WHAT[EXECFAIL-002] cancel/retry/stream matrix is interpreted by registered
     sessionId: executionKey.sessionId,
     physicalUserMessageId: executionKey.physicalUserMessageId,
     providerRun: provider.providerRun,
-    outcome: 'Interrupted',
-    failure: 'StreamInterruptedAfterFirstToken',
-    disposition: 'Failed',
+    outcome: 'ProviderFailure',
+    failure: 'ProviderTransient',
+    disposition: '',
   })
   assert.deepEqual(
     await recovery.interpretFailurePolicy(

@@ -125,9 +125,9 @@ test('WHAT[CHATEXEC-006] exact cancel and interruption become closed typed termi
     sessionId: 'ses-terminal',
     physicalUserMessageId: 'msg-terminal',
     providerRun: 'run-terminal',
-    outcome: 'Interrupted',
-    failure: 'StreamInterruptedAfterFirstToken',
-    disposition: 'Failed',
+    outcome: 'ProviderFailure',
+    failure: 'ProviderTransient',
+    disposition: '',
   })
 })
 

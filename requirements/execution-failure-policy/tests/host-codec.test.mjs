@@ -10,8 +10,11 @@ const sessionError = (error) => ({
 
 test('WHAT[EXECFAIL-001] Host adapter returns closed typed failures from structural evidence', () => {
   assert.equal(signals.tryDecode(sessionError({ name: 'TimeoutError', message: 'fatal wording' })).failure, 'ProviderTransient')
-  assert.equal(signals.tryDecode(sessionError({ name: 'ProviderAuthError', message: 'retry wording' })).failure, 'ProviderPermanent')
-  assert.equal(signals.tryDecode(sessionError({ name: 'PermissionDeniedError', message: 'retry wording' })).failure, 'AuthorizationDenied')
+  // The Host boundary classifies nothing: every reported error is a provider
+  // error. Only typed control signals stay distinct.
+  for (const name of ['ProviderAuthError', 'PermissionDeniedError', 'ProviderError', 'StreamInterruptedError', 'whatever', undefined]) {
+    assert.equal(signals.tryDecode(sessionError({ name })).failure, 'ProviderTransient', String(name))
+  }
   assert.equal(signals.tryDecode(sessionError({ name: 'MessageAbortedError' })).failure, 'UserCancelled')
   assert.equal(signals.tryDecode(sessionError({ name: 'SupersededError' })).failure, 'Superseded')
 })
