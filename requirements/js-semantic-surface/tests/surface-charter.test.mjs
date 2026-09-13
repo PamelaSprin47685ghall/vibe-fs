@@ -12,7 +12,6 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import { assertJsData, assertOpaque, isJsData } from '../../verification-system/tests/support/js-contract.mjs'
-import { isBuildVerificationOnlyBaseline, run as runBoundaryGate } from '../../../scripts/checks/js-boundary-gate.mjs'
 import { validateModuleLinkage } from '../../../scripts/checks/js-module-linkage.mjs'
 import { usesSurface, validateSurfaceManifest } from '../../../scripts/checks/js-surface-manifest.mjs'
 import {
@@ -78,31 +77,7 @@ test('WHAT[JS-SEMANTIC-SURFACE-001] JS_SURFACE_001_all_semantic_tests_are_mjs', 
 // ── 002: the gate observes actual whole-corpus debt ─────────────────────────
 
 test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002_forbidden_patterns_absent_from_semantic_tests', () => {
-  const actual = scanAll()
-  const baselinePath = join(ROOT, 'scripts/checks/js-boundary-baseline.json')
-  const baseline = existsSync(baselinePath) ? JSON.parse(readFileSync(baselinePath, 'utf8')) : {}
-  const excess = []
-
-  for (const file of Reflect.ownKeys(actual)) {
-    const allowed = baseline[file] ?? {}
-    const byRule = {}
-    for (const hit of actual[file]) byRule[hit.rule] = (byRule[hit.rule] ?? 0) + 1
-    for (const rule of Reflect.ownKeys(byRule)) {
-      if (byRule[rule] > (allowed[rule] ?? 0)) excess.push(`${file}: ${rule} ${allowed[rule] ?? 0} -> ${byRule[rule]}`)
-    }
-    if (!Object.prototype.hasOwnProperty.call(baseline, file)) excess.push(`${file}: NEW debt`)
-  }
-
-  assert.deepEqual(excess, [], `forbidden patterns beyond the approved migration ledger must be absent: ${excess.join('; ')}`)
-  if (!existsSync(baselinePath)) {
-    assert.deepEqual(actual, {}, 'the ledger may disappear only after absolute zero')
-  } else if (Object.keys(actual).length === 0) {
-    assert.equal(
-      isBuildVerificationOnlyBaseline(baseline),
-      true,
-      'zero semantic debt requires a deleted ledger or explicit build-verification exemptions',
-    )
-  }
+  assert.deepEqual(scanAll(), {}, 'no semantic test may carry forbidden patterns')
 })
 
 test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002c_whole_semantic_test_zone_is_scanned', () => {
@@ -137,32 +112,6 @@ test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002c_whole_semantic_test_zone_is_
         'generated fixture must report emitted-name discovery and both mangled prefix/suffix lookups',
       )
     }
-  } finally {
-    rmSync(temporaryRoot, { recursive: true, force: true })
-  }
-})
-
-test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002d_zero-debt_generate_removes_empty_ledger', () => {
-  const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-boundary-ledger-'))
-  const baselinePath = join(temporaryRoot, 'js-boundary-baseline.json')
-  try {
-    writeFileSync(baselinePath, '{}\n')
-    assert.equal(runBoundaryGate({ args: ['--generate', `--out=${baselinePath}`], root: ROOT }), 0)
-    assert.equal(existsSync(baselinePath), false)
-  } finally {
-    rmSync(temporaryRoot, { recursive: true, force: true })
-  }
-})
-
-test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002e_build-verification_ledger_exemption_survives_zero-debt_cleanup', () => {
-  const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-boundary-exemption-'))
-  const baselinePath = join(temporaryRoot, 'js-boundary-baseline.json')
-  const exemption = { [BUILD_VERIFICATION_FILES.values().next().value]: { 'fable-modules': 1 } }
-  try {
-    writeFileSync(baselinePath, `${JSON.stringify(exemption)}\n`)
-    assert.equal(runBoundaryGate({ args: ['--generate', `--out=${baselinePath}`], root: ROOT }), 0)
-    assert.deepEqual(JSON.parse(readFileSync(baselinePath, 'utf8')), exemption)
-    assert.equal(runBoundaryGate({ args: [`--out=${baselinePath}`], root: ROOT }), 0)
   } finally {
     rmSync(temporaryRoot, { recursive: true, force: true })
   }
@@ -228,8 +177,6 @@ test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_manifest_rejects_unemitted_or
 // ── 004: a debt-bearing helper is not a new direct test subject ─────────────
 
 test('WHAT[JS-SEMANTIC-SURFACE-004] JS_SURFACE_004_helper_not_directly_tested', () => {
-  const baselinePath = join(ROOT, 'scripts/checks/js-boundary-baseline.json')
-  const baseline = existsSync(baselinePath) ? JSON.parse(readFileSync(baselinePath, 'utf8')) : {}
   const scan = scanAll()
   const files = new Set(semanticTestFiles().map(relativePath))
   const violations = []
@@ -240,7 +187,6 @@ test('WHAT[JS-SEMANTIC-SURFACE-004] JS_SURFACE_004_helper_not_directly_tested', 
     if (!files.has(targetRel) || targetRel.endsWith('.test.mjs')) continue
     if (targetRel.endsWith('verification-system/tests/support/js-contract.mjs')) continue
     if ((scan[targetRel] ?? []).length === 0) continue
-    if (Object.prototype.hasOwnProperty.call(baseline, targetRel)) continue
     violations.push(`${importerRel} imports debt-bearing helper ${targetRel}`)
   }
 

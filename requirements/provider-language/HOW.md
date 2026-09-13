@@ -27,5 +27,4 @@
 | PROVIDER-LANGUAGE-007 | `requirements/provider-language/tests/provider-prose-and-preference.test.mjs::WHAT[PROVIDER-LANGUAGE-007] substitute replaces values and fails closed on missing or leftover` |
 | PROVIDER-LANGUAGE-008 | `requirements/provider-language/tests/provider-language.test.mjs::WHAT[PROVIDER-LANGUAGE-008] bound language loads its own locale leaf` |
 | PROVIDER-LANGUAGE-009 | `requirements/provider-language/tests/provider-prose-and-preference.test.mjs::WHAT[PROVIDER-LANGUAGE-009] render layer never translates or substitutes owning prose` |
-| PROVIDER-LANGUAGE-010 | `requirements/provider-language/tests/language-parity-gate.test.mjs::WHAT[PROVIDER-LANGUAGE-010] semantic anchor parity detects missing zh id` |
 | PROVIDER-LANGUAGE-011 | `requirements/provider-language/tests/language-parity-gate.test.mjs::WHAT[PROVIDER-LANGUAGE-011] identifier parity mismatch reports semantic and diff` |

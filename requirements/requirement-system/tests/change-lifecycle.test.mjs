@@ -19,7 +19,7 @@ import test from 'node:test'
 import {
   activeBodyViolations,
   frozenOriginViolations,
-} from '../../../scripts/checks/spec-rules.mjs'
+} from '../../../scripts/lib/spec-rules.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')

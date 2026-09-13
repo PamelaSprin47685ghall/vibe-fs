@@ -14,7 +14,6 @@
 /resources/provider/tool/fork/**
 /resources/provider/tool/commission/**
 /resources/provider/tool/join/**
-/scripts/checks/dsl-ownership.mjs
 /scripts/checks/tool-referential-integrity.mjs
 /src/Wanxiangshu/Execution/Agent/Errors.fs
 /src/Wanxiangshu/Execution/Agent/Program.fs

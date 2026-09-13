@@ -11,7 +11,7 @@ import {
   markdownLocalLinks,
   navigationProblems,
   unknownClauseReferences,
-} from '../../../scripts/checks/spec-rules.mjs'
+} from '../../../scripts/lib/spec-rules.mjs'
 
 const PREFIXES = ['ARCH', 'GOV', 'HOST']
 
@@ -98,7 +98,7 @@ test('WHAT[REQUIREMENT-SYSTEM-008] spec gate finds Clause-shaped headings for an
 
 test('WHAT[REQUIREMENT-SYSTEM-005] formalClauseDefinitionHeadings surfaces clause definitions from routing files', () => {
   // README/AGENTS/CHANGELOG 不是规范正文（无裸规范权威）；识别器必须仍能发现
-  // 路由文件里的产品条款定义，使 scripts/checks/spec.mjs 的「正式条款只能定义在
+  // 路由文件里的产品条款定义，使 scripts/lib/spec-rules.mjs 的 duplicateClauseDefinitions「正式条款只能定义在
   // package WHAT.md」gate 可以拒绝它。
   assert.deepEqual(
     formalClauseDefinitionHeadings([
@@ -122,7 +122,7 @@ test('WHAT[REQUIREMENT-SYSTEM-012] formalClauseDefinitionHeadings separates CHG-
 
 test('WHAT[REQUIREMENT-SYSTEM-009] formalClauseDefinitionHeadings still recognizes a product clause defined in a Change file', () => {
   // Change 文件不得承担正式定义职责；formalClauseDefinitionHeadings 必须仍能识别
-  // Change 文件里的产品条款定义（ARCH-001），由 scripts/checks/spec.mjs 的
+  // Change 文件里的产品条款定义（ARCH-001），由 scripts/lib/spec-rules.mjs 的 duplicateClauseDefinitions
   //「正式定义只在 WHAT.md」gate 拒绝它。
   assert.deepEqual(
     formalClauseDefinitionHeadings([

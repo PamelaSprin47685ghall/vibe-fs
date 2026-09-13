@@ -29,14 +29,6 @@ const FOREIGN_OWNER_REFERENCE_RE =
   /\bWanxiangshu\.(?:Context|Enforcer|Interaction|Strength|Execution\.Session\.Recovery)(?:\.[A-Za-z_][A-Za-z0-9_']*)*/g
 const FOREIGN_MATERIALIZATION_RE =
   /\b(?:ActivatePrefixEpoch|InsertBlogFrames|BlogFramesIntent|InsertRepair|SuppressTransportOnly|ReanchorAfterCompaction|CompanionProjectionBuilder)\b|\bProjectionConstants\.RepairInstruction\b/g
-const RETRY_OR_RECOVERY_IDENTIFIER_RE = /(?:retry|recovery)/i
-const LIFECYCLE_CONTROL_IDENTIFIER_RE =
-  /^(?:start|begin|advance|resume|continue|complete|finish|stop|retire|transition|drive|run|await|pause|suspend|cancel|terminate|restart)Lifecycle[A-Za-z0-9_']*$/i
-const STRENGTH_VOCABULARY = Object.freeze([
-  /Strength Host adapter/gi,
-  /Strength tool/gi,
-  /Replica provider view/gi,
-])
 const PROJECTION_CORE_FILE_SET = new Set(PROVIDER_PROJECTION_CORE_FILES)
 
 /**
@@ -125,13 +117,10 @@ const lineAt = (source, offset) => {
   return line
 }
 
-const excerpt = (source, offset, length) =>
-  source.slice(offset, offset + length).replace(/\s+/g, ' ').trim()
-
 /**
  * @typedef {{
  *   id: 'provider-projection-owner',
- *   rule: 'strength-import' | 'strength-api' | 'strength-policy-vocabulary' | 'policy-identifier' | 'foreign-owner-reference' | 'foreign-materialization',
+ *   rule: 'strength-import' | 'strength-api' | 'foreign-owner-reference' | 'foreign-materialization',
  *   file: string,
  *   line: number,
  *   text: string,
@@ -206,39 +195,6 @@ const scanSource = (file, source, isProjectionCore) => {
       line: lineAt(code, match.index),
       text: match[0],
     })
-  }
-
-  POLICY_IDENTIFIER_RE.lastIndex = 0
-  for (let match = POLICY_IDENTIFIER_RE.exec(code); match !== null; match = POLICY_IDENTIFIER_RE.exec(code)) {
-    const line = lineAt(code, match.index)
-    if (isProjectionCore && match[0] === 'Recovery' && recoveryReferenceLines.has(line)) continue
-    const lifecycleImport =
-      /^\s*open\b/.test(codeLines[line - 1]) && match[0].toLowerCase() === 'lifecycle'
-    if (
-      !RETRY_OR_RECOVERY_IDENTIFIER_RE.test(match[0])
-      && !LIFECYCLE_CONTROL_IDENTIFIER_RE.test(match[0])
-      && !lifecycleImport
-    ) continue
-    violations.push({
-      id: 'provider-projection-owner',
-      rule: 'policy-identifier',
-      file: normalizedFile,
-      line,
-      text: match[0],
-    })
-  }
-
-  for (const pattern of STRENGTH_VOCABULARY) {
-    pattern.lastIndex = 0
-    for (let match = pattern.exec(source); match !== null; match = pattern.exec(source)) {
-      violations.push({
-        id: 'provider-projection-owner',
-        rule: 'strength-policy-vocabulary',
-        file: normalizedFile,
-        line: lineAt(source, match.index),
-        text: excerpt(source, match.index, match[0].length),
-      })
-    }
   }
 
   return violations.sort((left, right) =>

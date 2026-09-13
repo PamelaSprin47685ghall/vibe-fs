@@ -5,258 +5,182 @@
 // ExplicitResumeSuppression branch isolation paths without illegal deep dist imports.
 
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import test from 'node:test'
+import { createWithCaps, NormalTransformCapabilities, TransformBranchCapabilities, TraceTransformCapture } from '../../../dist/OpenCode/Plugin/PluginTransforms.js'
+import { PrefixPresentationHorizon } from '../../../dist/Context/Prefix/Wire.js'
+import { StrengthReplicaRuntime } from '../../../dist/Strength/Replica/Runtime.js'
 
-const root = resolve(import.meta.dirname, '../../..')
-const read = (path) => readFileSync(resolve(root, path), 'utf8')
+const EXPECTED_ORDER = [
+  'BeginPhysicalProviderAttempt',
+  'BindSessionStartedAt',
+  'ApplyRelayProjection',
+  'ApplyStrengthReplay',
+  'CaptureXTraceMessages',
+  'CommitStrengthTrace',
+  'RefreshCompanionXTrace',
+  'ApplyCompanion',
+  'ApplyXWire',
+  'FreezeProviderAttemptPlan',
+  'ApplyEnforcerContinuation',
+  'ApplyStrengthSpeculate',
+  'InjectPairGuideline',
+  'ProjectRequirementGrounding',
+  'InjectBloggerChronicle',
+  'SanitizeMessages',
+]
 
-test('WHAT[HOST-BOUNDARY-019] PluginTransforms declares NormalTransformCapabilities record with exact 16 named fields', () => {
-  const text = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
+const makeRecordingCaps = (opts = {}) => {
+  const trace = []
+  const fnBegin = (sid, out) => { trace.push('BeginPhysicalProviderAttempt'); return Promise.resolve() }
+  const fnStarted = (sid) => { trace.push('BindSessionStartedAt'); return Promise.resolve(null) }
+  const fnReplay = (sid, out) => { trace.push('ApplyStrengthReplay'); return Promise.resolve([]) }
+  const fnRelay = (sid, out) => { trace.push('ApplyRelayProjection'); return Promise.resolve({ tag: 0 }) }
+  const fnCapture = (sid, out) => { trace.push('CaptureXTraceMessages'); return Promise.resolve(new TraceTransformCapture([], null)) }
+  const fnCommit = (sid, cur, plans) => { trace.push('CommitStrengthTrace'); return Promise.resolve() }
+  const fnRefresh = (sid, cur) => { trace.push('RefreshCompanionXTrace') }
+  const fnCompanion = (relay, sid, inO, outO) => { trace.push('ApplyCompanion'); return Promise.resolve() }
+  const fnXWire = (relay, outO) => { trace.push('ApplyXWire'); return Promise.resolve(opts.horizon ?? PrefixPresentationHorizon.Current) }
+  const fnFreeze = (sid, outO) => { trace.push('FreezeProviderAttemptPlan'); return Promise.resolve() }
+  const fnEnforcer = (sid, outO) => { trace.push('ApplyEnforcerContinuation'); return Promise.resolve() }
+  const fnSpeculate = (outO) => { trace.push('ApplyStrengthSpeculate'); return Promise.resolve() }
+  const fnPair = (sid, started, outO) => { trace.push('InjectPairGuideline'); return Promise.resolve() }
+  const fnGrounding = (sid, outO) => { trace.push('ProjectRequirementGrounding'); return Promise.resolve() }
+  const fnBlogger = (sid, outO) => { trace.push('InjectBloggerChronicle') }
+  const fnSanitize = (outO) => { trace.push('SanitizeMessages') }
 
-  assert.match(text, /type\s+NormalTransformCapabilities\s*=/)
-  assert.match(text, /BeginPhysicalProviderAttempt:\s*string option -> obj -> Task<unit>/)
-  assert.match(text, /BindSessionStartedAt:\s*string option -> Task<DateTimeOffset option>/)
-  assert.match(text, /ApplyRelayProjection:\s*string option -> obj -> Task<RelayProjectionDisposition>/)
-  assert.match(text, /ApplyStrengthReplay:\s*string option -> obj -> Task<StrengthReplayPlan list>/)
-  assert.match(text, /CaptureXTraceMessages:\s*string option -> obj -> Task<TraceTransformCapture>/)
-  assert.match(text, /CommitStrengthTrace:\s*string option -> XTraceProjectionState option -> StrengthReplayPlan list -> Task<unit>/)
-  assert.match(text, /RefreshCompanionXTrace:\s*string option -> XTraceProjectionState option -> unit/)
-  assert.match(
-    text,
-    /ApplyCompanion:\s*RelayProjectionDisposition -> string option -> obj -> obj -> Task<unit>/,
+  const caps = new NormalTransformCapabilities(
+    fnBegin,
+    fnStarted,
+    opts.swap3and4 ? fnRelay : fnReplay,
+    opts.swap3and4 ? fnReplay : fnRelay,
+    fnCapture,
+    fnCommit,
+    fnRefresh,
+    fnCompanion,
+    fnXWire,
+    fnFreeze,
+    fnEnforcer,
+    fnSpeculate,
+    fnPair,
+    fnGrounding,
+    fnBlogger,
+    fnSanitize,
   )
-  assert.match(text, /ApplyXWire:\s*RelayProjectionDisposition -> obj -> Task<PrefixPresentationHorizon>/)
-  assert.match(text, /FreezeProviderAttemptPlan:\s*string option -> obj -> Task<unit>/)
-  assert.match(text, /ApplyEnforcerContinuation:\s*string option -> obj -> Task<unit>/)
-  assert.match(text, /ApplyStrengthSpeculate:\s*obj -> Task<unit>/)
-  assert.match(text, /InjectPairGuideline:\s*string option -> DateTimeOffset option -> obj -> Task<unit>/)
-  assert.match(text, /ProjectRequirementGrounding:\s*string option -> obj -> Task<unit>/)
-  assert.match(text, /InjectBloggerChronicle:\s*string option -> obj -> unit/)
-  assert.match(text, /SanitizeMessages:\s*obj -> unit/)
-  assert.doesNotMatch(text, /ApplyManagerNarrative/)
-  assert.doesNotMatch(text, /InterruptAfterSubmittedJudgement/)
-})
+  return { caps, trace }
+}
 
-test('WHAT[HOST-BOUNDARY-019] tentative prefix probe horizon suppresses historical auxiliary projection in the same physical request', () => {
-  const text = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
-  const start = text.indexOf('let normalTransform')
-  assert.ok(start >= 0)
-  const end = text.indexOf('let createWithCaps', start)
-  const body = text.slice(start, end)
-
-  assert.match(body, /let!\s+prefixHorizon\s*=\s*caps\.ApplyXWire\s+relayProjection\s+outObj/)
-
-  assert.match(body, /if\s+prefixHorizon\s*=\s*PrefixPresentationHorizon\.Current\s+then/)
-
-  const guardAt = body.indexOf('if prefixHorizon = PrefixPresentationHorizon.Current then')
-  const speculateAt = body.indexOf('caps.ApplyStrengthSpeculate')
-  const pairAt = body.indexOf('caps.InjectPairGuideline')
-  const groundingAt = body.indexOf('caps.ProjectRequirementGrounding')
-  const chronicleAt = body.indexOf('caps.InjectBloggerChronicle')
-
-  assert.ok(guardAt < speculateAt && speculateAt < pairAt && pairAt < groundingAt)
-  assert.ok(groundingAt < chronicleAt, 'Blogger-only chronicle projection remains outside the WorkMain auxiliary guard')
-})
-
-test('WHAT[HOST-BOUNDARY-019] normalTransform executes exact 16-step static score in order', () => {
-  const text = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
-
-  const orderingSteps = [
-    'BeginPhysicalProviderAttempt',
-    'BindSessionStartedAt',
-    'ApplyRelayProjection',
-    'ApplyStrengthReplay',
-    'CaptureXTraceMessages',
-    'CommitStrengthTrace',
-    'RefreshCompanionXTrace',
-    'ApplyCompanion',
-    'ApplyXWire',
-    'FreezeProviderAttemptPlan',
-    'ApplyEnforcerContinuation',
-    'ApplyStrengthSpeculate',
-    'InjectPairGuideline',
-    'ProjectRequirementGrounding',
-    'InjectBloggerChronicle',
-    'SanitizeMessages',
-  ]
-
-  const allLines = text.split('\n')
-  const normalTransformStart = allLines.findIndex((l) => /^\s*let\s+(?:private\s+)?normalTransform\b/.test(l))
-  assert.ok(normalTransformStart >= 0, 'normalTransform function must exist in PluginTransforms.fs')
-
-  const startIndent = allLines[normalTransformStart].length - allLines[normalTransformStart].trimStart().length
-  let normalTransformEnd = allLines.length
-  for (let i = normalTransformStart + 1; i < allLines.length; i++) {
-    const line = allLines[i]
-    if (line.trim() === '') continue
-    const indent = line.length - line.trimStart().length
-    if (indent <= startIndent && /^\s*let\s/.test(line)) {
-      normalTransformEnd = i
-      break
-    }
-  }
-
-  const bodyLines = allLines.slice(normalTransformStart, normalTransformEnd)
-  const stepLines = []
-  for (let i = 0; i < orderingSteps.length; i++) {
-    const step = orderingSteps[i]
-    const foundIdx = bodyLines.findIndex((l) => l.includes(`caps.${step}`))
-    assert.ok(foundIdx >= 0, `normalTransform must call capability step ${i + 1}: caps.${step}`)
-    stepLines.push(normalTransformStart + foundIdx + 1)
-  }
-
-  for (let i = 0; i < stepLines.length - 1; i++) {
-    assert.ok(
-      stepLines[i] < stepLines[i + 1],
-      `step ${i + 1} (${orderingSteps[i]} at line ${stepLines[i]}) must precede step ${i + 2} (${orderingSteps[i + 1]} at line ${stepLines[i + 1]})`,
-    )
-  }
-})
-
-test('WHAT[HOST-BOUNDARY-019] strength replica branch executes replica sequence via explicit TransformMode and excludes normal transform', () => {
-  const text = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
-
-  // New explicit mode shape — would be red if reverted to implicit ordinaryProviderTransform
-  assert.match(text, /type\s+private\s+TransformMode/)
-  assert.match(text, /\|\s*ExplicitResumeDisclosure/)
-  assert.match(text, /\|\s*StrengthReplica\s+of\s+StrengthReplicaRuntime/)
-  assert.match(text, /\|\s*Ordinary/)
-  assert.match(text, /let\s+private\s+determineTransformMode/)
-  assert.match(text, /match\s+branches\.IsExplicitResume[\s\S]*?,\s*branches\.ReplicaRuntime/)
-  assert.match(text, /let\s+private\s+failIfReplicaDecisionLost/)
-  assert.doesNotMatch(text, /let\s+private\s+ordinaryProviderTransform\b/)
-  assert.doesNotMatch(text, /let\s+private\s+requireReplicaHandled\b/)
-  assert.doesNotMatch(text, /let\s+private\s+strengthReplicaRuntime\b/)
-
-  const allLines = text.split('\n')
-  const createStart = allLines.findIndex((l) => /^\s*let\s+createWithCaps\b/.test(l))
-  assert.ok(createStart >= 0, 'createWithCaps must exist in PluginTransforms.fs')
-
-  const startIndent = allLines[createStart].length - allLines[createStart].trimStart().length
-  let createEnd = allLines.length
-  for (let i = createStart + 1; i < allLines.length; i++) {
-    const line = allLines[i]
-    if (line.trim() === '') continue
-    const indent = line.length - line.trimStart().length
-    if (indent <= startIndent && /^\s*let\s+create\b/.test(line)) {
-      createEnd = i
-      break
-    }
-  }
-
-  const body = allLines.slice(createStart, createEnd).join('\n')
-
-  assert.match(body, /match\s+determineTransformMode\s+branches\s+projectionSessionIdOpt\s+outObj\s+with/)
-  assert.match(body, /\|\s*StrengthReplica\s+runtime\s*->/)
-  assert.match(body, /projectionSessionIdOpt\s*\|\>\s*Option\.iter\s+branches\.RegisterOwned/)
-  assert.match(body, /do!\s+branches\.ReplicaXWire\s+outObj/)
-  assert.match(body, /do!\s+caps\.FreezeProviderAttemptPlan\s+projectionSessionIdOpt\s+outObj/)
-  assert.match(body, /let!\s+handled\s*=\s*runtime\.HandleTransform\s+outObj/)
-  assert.match(body, /failIfReplicaDecisionLost\s+handled/)
-  assert.match(body, /branches\.ReplicaSanitize\s+outObj/)
-  assert.match(body, /\|\s*Ordinary\s*->[\s\S]*?do!\s+normalTransform\s+caps\s+projectionSessionIdOpt\s+inObj\s+outObj/)
-  assert.ok(body.indexOf('branches.ReplicaXWire') < body.indexOf('caps.FreezeProviderAttemptPlan'))
-  assert.ok(body.indexOf('caps.FreezeProviderAttemptPlan') < body.indexOf('runtime.HandleTransform'))
-})
-
-test('WHAT[CHATEXEC-005] user-only transform cannot manufacture ProviderStarted from public Host evidence', () => {
-  const transform = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
-  const binding = read('src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs')
-
-  assert.match(transform, /freezeProviderAttemptPlanForTransform/)
-  assert.match(binding, /let\s+freezeProviderAttemptPlanForTransform/)
-  assert.doesNotMatch(transform, /persistProviderStartedForTransform|PersistProviderStarted|ManagedChatProviderLifecycle\.providerStarted/)
-  assert.doesNotMatch(binding, /let\s+persistProviderStartedForTransform/)
-  assert.match(binding, /let\s+persistProviderStartedFromObservation[\s\S]*?ExactProviderStartObservation/)
-})
-
-test('WHAT[HOST-BOUNDARY-019] explicit resume suppression short-circuits via TransformMode before ordinary provider transform', () => {
-  const text = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
-
-  const allLines = text.split('\n')
-  const createStart = allLines.findIndex((l) => /^\s*let\s+createWithCaps\b/.test(l))
-  assert.ok(createStart >= 0, 'createWithCaps must exist in PluginTransforms.fs')
-
-  const startIndent = allLines[createStart].length - allLines[createStart].trimStart().length
-  let createEnd = allLines.length
-  for (let i = createStart + 1; i < allLines.length; i++) {
-    const line = allLines[i]
-    if (line.trim() === '') continue
-    const indent = line.length - line.trimStart().length
-    if (indent <= startIndent && /^\s*let\s+create\b/.test(line)) {
-      createEnd = i
-      break
-    }
-  }
-
-  const body = allLines.slice(createStart, createEnd).join('\n')
-
-  assert.match(body, /match\s+determineTransformMode\s+branches\s+projectionSessionIdOpt\s+outObj\s+with/)
-  assert.match(body, /\|\s*ExplicitResumeDisclosure\s*->[\s\S]*?branches\.ExplicitResumeSanitize\s+outObj/)
-  assert.doesNotMatch(body, /if\s+branches\.IsExplicitResume\s+projectionSessionIdOpt\s+outObj\s+then/)
-  assert.doesNotMatch(body, /do!\s+ordinaryProviderTransform\s+caps\s+branches/)
-  const explicitIdx = body.indexOf('ExplicitResumeDisclosure')
-  const replicaIdx = body.indexOf('StrengthReplica runtime')
-  const ordinaryIdx = body.indexOf('| Ordinary')
-  assert.ok(explicitIdx >= 0 && replicaIdx >= 0 && ordinaryIdx >= 0, 'all three TransformMode cases must be wired')
-  assert.ok(explicitIdx < replicaIdx && replicaIdx < ordinaryIdx, 'TransformMode cases must be ExplicitResumeDisclosure -> StrengthReplica -> Ordinary')
-})
-
-test('WHAT[HOST-BOUNDARY-019] create entry delegates to createWithCaps and default capabilities', () => {
-  const text = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
-
-  assert.match(text, /let\s+defaultCapabilities\s*\(boot:\s*PluginBoot\.Boot\)\s*\(host:\s*PluginHostWiring\.Host\)\s*:\s*NormalTransformCapabilities/)
-  assert.match(text, /let\s+defaultBranchCapabilities\s*\(boot:\s*PluginBoot\.Boot\)\s*\(host:\s*PluginHostWiring\.Host\)\s*:\s*TransformBranchCapabilities/)
-  assert.match(
-    text,
-    /let\s+create\s*\(boot:\s*PluginBoot\.Boot\)\s*\(host:\s*PluginHostWiring\.Host\)[\s\S]*?let\s+caps\s*=\s*defaultCapabilities\s+boot\s+host[\s\S]*?let\s+branches\s*=\s*defaultBranchCapabilities\s+boot\s+host[\s\S]*?createWithCaps\s+caps\s+branches/,
+test('WHAT[HOST-BOUNDARY-019] normalTransform executes exact 16-step canonical sequence on production createWithCaps', async () => {
+  const { caps, trace } = makeRecordingCaps({ horizon: PrefixPresentationHorizon.Current })
+  const branches = new TransformBranchCapabilities(
+    () => false,
+    () => {},
+    () => null,
+    () => Promise.resolve(),
+    () => {},
+    () => {},
   )
+  const transform = createWithCaps(caps, branches)
+  await transform({ sessionID: 's-1' })({ messages: [] })
+
+  assert.deepEqual(trace, EXPECTED_ORDER)
+  assert.equal(trace.length, 16)
 })
 
-test('WHAT[HOST-BOUNDARY-019] ordered transform proof falsifiability check: swapped steps fail assertion', () => {
-  const correctOrder = [
-    'BeginPhysicalProviderAttempt',
-    'BindSessionStartedAt',
-    'ApplyRelayProjection',
-    'ApplyStrengthReplay',
-    'CaptureXTraceMessages',
-    'CommitStrengthTrace',
-    'RefreshCompanionXTrace',
-    'ApplyCompanion',
-    'ApplyXWire',
-    'FreezeProviderAttemptPlan',
-    'ApplyEnforcerContinuation',
-    'ApplyStrengthSpeculate',
-    'InjectPairGuideline',
-    'ProjectRequirementGrounding',
-    'InjectBloggerChronicle',
-    'SanitizeMessages',
-  ]
+test('WHAT[HOST-BOUNDARY-019] counterexample: swapping two stub functions causes trace to differ', async () => {
+  const normal = makeRecordingCaps({ horizon: PrefixPresentationHorizon.Current, swap3and4: false })
+  const swapped = makeRecordingCaps({ horizon: PrefixPresentationHorizon.Current, swap3and4: true })
 
-  const swappedOrder = [
-    'BeginPhysicalProviderAttempt',
-    'BindSessionStartedAt',
-    'CaptureXTraceMessages',
-    'RefreshCompanionXTrace', // Swapped: refresh before commit
-    'CommitStrengthTrace',
-    'ApplyRelayProjection',
-    'ApplyStrengthReplay', // Also out of order with capture
-    'ApplyCompanion',
-    'ApplyXWire',
-    'FreezeProviderAttemptPlan',
-    'ApplyEnforcerContinuation',
-    'ApplyStrengthSpeculate',
-    'InjectPairGuideline',
-    'ProjectRequirementGrounding',
-    'InjectBloggerChronicle',
-    'SanitizeMessages',
-  ]
-
-  assert.throws(
-    () => assert.deepEqual(swappedOrder, correctOrder),
-    assert.AssertionError,
-    'Falsifiability: swapped transform steps must fail equality assertion',
+  const branches = new TransformBranchCapabilities(
+    () => false,
+    () => {},
+    () => null,
+    () => Promise.resolve(),
+    () => {},
+    () => {},
   )
+
+  await createWithCaps(normal.caps, branches)({ sessionID: 's-normal' })({ messages: [] })
+  await createWithCaps(swapped.caps, branches)({ sessionID: 's-swapped' })({ messages: [] })
+
+  assert.notDeepEqual(swapped.trace, normal.trace)
+  assert.notDeepEqual(swapped.trace, EXPECTED_ORDER)
+})
+
+test('WHAT[HOST-BOUNDARY-019] tentative prefix probe horizon suppresses historical auxiliary projection in the same physical request', async () => {
+  const { caps, trace } = makeRecordingCaps({ horizon: PrefixPresentationHorizon.TentativeCold })
+  const branches = new TransformBranchCapabilities(
+    () => false,
+    () => {},
+    () => null,
+    () => Promise.resolve(),
+    () => {},
+    () => {},
+  )
+  const transform = createWithCaps(caps, branches)
+  await transform({ sessionID: 's-tentative' })({ messages: [] })
+
+  // Under TentativeCold, steps 12-14 (ApplyStrengthSpeculate, InjectPairGuideline, ProjectRequirementGrounding)
+  // are suppressed, while InjectBloggerChronicle and SanitizeMessages still run.
+  assert.equal(trace.includes('ApplyStrengthSpeculate'), false)
+  assert.equal(trace.includes('InjectPairGuideline'), false)
+  assert.equal(trace.includes('ProjectRequirementGrounding'), false)
+  assert.equal(trace.includes('InjectBloggerChronicle'), true)
+  assert.equal(trace.includes('SanitizeMessages'), true)
+  assert.equal(trace.length, 13)
+})
+
+test('WHAT[HOST-BOUNDARY-019] branch probe: ReplicaRuntime runs only replica steps', async () => {
+  const replicaTrace = []
+  const caps = new NormalTransformCapabilities(
+    ...Array.from({ length: 16 }, () => () => { replicaTrace.push('unwantedNormalStep'); return Promise.resolve() }),
+  )
+  caps.FreezeProviderAttemptPlan = (sid, outO) => { replicaTrace.push('FreezeProviderAttemptPlan'); return Promise.resolve() }
+
+  const runtime = new StrengthReplicaRuntime(
+    null, null, null, null, '/tmp', 65536, null, null,
+  )
+  runtime.byReplica.set('s-replica', {
+    Replica: 's-replica',
+    SemanticTerminal: { tag: 1 },
+  })
+
+  const branches = new TransformBranchCapabilities(
+    () => false,
+    (sid) => { replicaTrace.push('RegisterOwned:' + sid) },
+    () => runtime,
+    () => { replicaTrace.push('ReplicaXWire'); return Promise.resolve() },
+    () => { replicaTrace.push('ReplicaSanitize') },
+    () => { replicaTrace.push('ExplicitResumeSanitize') },
+  )
+
+  const transform = createWithCaps(caps, branches)
+  await transform({ sessionID: 's-replica' })({ messages: [{ info: { sessionID: 's-replica' } }] })
+
+  assert.deepEqual(replicaTrace, [
+    'RegisterOwned:s-replica',
+    'ReplicaXWire',
+    'FreezeProviderAttemptPlan',
+    'ReplicaSanitize',
+  ])
+  assert.equal(replicaTrace.includes('unwantedNormalStep'), false)
+})
+
+test('WHAT[HOST-BOUNDARY-019] branch probe: IsExplicitResume runs only ExplicitResumeSanitize and exits', async () => {
+  const resumeTrace = []
+  const caps = new NormalTransformCapabilities(
+    ...Array.from({ length: 16 }, () => () => { resumeTrace.push('unwantedNormalStep'); return Promise.resolve() }),
+  )
+  const branches = new TransformBranchCapabilities(
+    () => true,
+    () => { resumeTrace.push('RegisterOwned') },
+    () => null,
+    () => { resumeTrace.push('ReplicaXWire'); return Promise.resolve() },
+    () => { resumeTrace.push('ReplicaSanitize') },
+    () => { resumeTrace.push('ExplicitResumeSanitize') },
+  )
+
+  const transform = createWithCaps(caps, branches)
+  await transform({ sessionID: 's-resume' })({ messages: [] })
+
+  assert.deepEqual(resumeTrace, ['ExplicitResumeSanitize'])
 })

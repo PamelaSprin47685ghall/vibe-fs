@@ -46,8 +46,6 @@
 - `Execution/Session/Wait` owner 外禁止 `IWaitSnapshotReader`、`DiagnosticWaitSnapshot`、registry、semantic Surface与已删除的`CausalWaitHub`；唯一bridge出口是`PluginHostWiring`调用`CausalWaitBridge.target`构造注入sink。业务writer只能消费composition注入的`IWaitObserver`。
 - `.wanxiangshu/diagnostics/causal-waits.json` 是 owner-owned locator；production owner 外出现即失败，防止绕过 typed reader 直接读取桥接文件。
 - F# 注释与字符串中的符号由 `maskFSharpTrivia` 排除，作为 false-positive decoy；locator 字符串本身不是 decoy，因为它就是可读取诊断文件的协议地址。
-- gate 在每次 `scripts/check.mjs` 中先执行 legal baseline 与 Journal、Fact、未来 decision path、global hub、module-open alias、locator六类精确mutation。每个mutation必须实际改变fixture，且只产生预期单一violation。
-- 原有关键迁移点 bare Task await 与 `Registry.fs` 的 `DSL-MUTABLE` 标注继续由同一次全树采集执行。
 
 机械保证边界：该门禁证明受支持 F# source path 中不存在上述读取能力或 locator，不声称完成通用跨语言数据流证明。行为测试补足 capability 因果：observer 能写、reader 能读、二者不可互换；WHAT 与 oracle 的业务正确性仍由 owner review 负责。
 

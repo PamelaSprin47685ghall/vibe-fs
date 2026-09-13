@@ -87,36 +87,3 @@ test('WHAT[PID-001] rejects SessionId keyed identity cache', () => {
   }
 })
 
-test('WHAT[PID-001] rejects SessionPersona revival', () => {
-  const root = mkdtempSync(join(tmpdir(), 'participant-identity-boundary-'))
-
-  try {
-    writePassingBoundary(root)
-    writeFixture(
-      root,
-      'src/Wanxiangshu/OpenCode/Host/RevivedIdentityBinding.fs',
-      [
-        'namespace Wanxiangshu.OpenCode.Host',
-        'let bindIdentity (persona: SessionPersona) = persona',
-      ].join('\n'),
-    )
-
-    const result = spawnSync(process.execPath, [gate], {
-      cwd: root,
-      encoding: 'utf8',
-    })
-
-    assert.equal(result.error, undefined, result.error?.message)
-    assert.equal(result.status, 1, `stdout:\n${result.stdout}\nstderr:\n${result.stderr}`)
-    assert.equal(
-      result.stderr,
-      [
-        'participant-identity-boundary: 1 violation(s)',
-        "  src/Wanxiangshu/OpenCode/Host/RevivedIdentityBinding.fs:2 [retired-identity-token] retired identity token 'SessionPersona' is forbidden in production source",
-        '',
-      ].join('\n'),
-    )
-  } finally {
-    rmSync(root, { recursive: true, force: true })
-  }
-})

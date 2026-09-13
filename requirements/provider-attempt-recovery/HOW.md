@@ -177,7 +177,7 @@ DEPENDS ON:
 | PAR-017 | `requirements/context-compression/tests/blogger-runtime.test.mjs::WHAT[PAR-017] Blogger retry replaces exact physical ownership before the next binding` |
 | PAR-018 | `requirements/provider-attempt-recovery/tests/retry-policy.test.mjs::WHAT[PAR-018] recovery_retry_unlocks_only_on_durable_material_without_waiters` |
 
-P0 recovery re-entry proof: `requirements/structured-workflow/tests/recovery-reentry.test.mjs`; hard gate: `scripts/checks/p0-recovery-join.mjs`. The gate also constrains Blogger failures to resolve the exact main session before ledger append, and `NoActiveRun` to stop recovery.
+P0 recovery re-entry proof: `requirements/structured-workflow/tests/recovery-reentry.test.mjs`; production failure ledger and recovery owner proofs: `requirements/provider-attempt-recovery/tests/provider-failure-ledger.test.mjs`.
 | PAR-019 | `requirements/provider-attempt-recovery/tests/retry-owner.test.mjs::WHAT[PAR-019] one policy owner licenses every provider recovery attempt`; `requirements/verification-system/tests/retry-owner.test.mjs::WHAT[PAR-019] rejects nested physical retry owner`; `requirements/verification-system/tests/retry-owner.test.mjs::WHAT[PAR-019] rejects retry classification from diagnostic text` |
 | PAR-020 | `requirements/provider-attempt-recovery/tests/failure-budget.test.mjs::WHAT[PAR-020] budget_replay_exposes_domain_evidence_without_resume_authority` |
 | PAR-002 legacy bytes | `requirements/provider-attempt-recovery/tests/failure-budget-decoder.test.mjs::WHAT[PAR-002] legacy_fallback_bytes_decode_one_way_and_never_re_encode_offsets` |

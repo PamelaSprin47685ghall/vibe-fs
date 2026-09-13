@@ -7,7 +7,6 @@
 /src/Wanxiangshu/Context/Trace/**
 /src/Wanxiangshu/OpenCode/Host/ProviderRunBinding.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs
-/scripts/checks/semantic-anchors.mjs
 /src/Wanxiangshu/Strength/Frame.fs
 /src/Wanxiangshu/Strength/Lifecycle.fs
 /src/Wanxiangshu/Strength/OpenCode/PluginScope.fs

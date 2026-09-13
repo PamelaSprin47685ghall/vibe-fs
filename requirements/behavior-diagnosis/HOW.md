@@ -65,6 +65,6 @@
 | BD-014 | `requirements/behavior-diagnosis/tests/tip-v2-contract.test.mjs::WHAT[BD-014] ENFORCER_TIP_08_each_committed_cycle_records_exactly_one_tip` |
 | BD-015 | `requirements/behavior-diagnosis/tests/observation-pair.test.mjs::WHAT[BD-015] RULEBOOK_OBS_001_zip_equal_length_pairs_tip_then_frame` |
 | BD-016 | `requirements/behavior-diagnosis/tests/observation-projection.test.mjs::WHAT[BD-016] OBS_PROJ_003_squash_co_moves_tips_and_frames_as_observation` |
-| BD-017 | `requirements/behavior-diagnosis/tests/enforcer-cycle-protocol.test.mjs::WHAT[BD-017] ENFORCER_061_empty_calls_rebuilds_without_fatal` |
+| BD-017 | `requirements/behavior-diagnosis/tests/enforcer-cycle-protocol.test.mjs::WHAT[BD-017] ENFORCER_061_empty_calls_rebuilds_without_fatal`；`requirements/behavior-diagnosis/tests/enforcer-153-rejudge.test.mjs::WHAT[BD-017] concurrent gate nudge deduplicates at the dispatch boundary`；`requirements/behavior-diagnosis/tests/enforcer-153-rejudge.test.mjs::WHAT[BD-017] authority gate-nudge admission is required before any physical send` |
 | BD-018 | `requirements/behavior-diagnosis/tests/rulebook-system-composition.test.mjs::WHAT[BD-018] BEHAVIOR_DIAGNOSIS_SYSTEM_005_rulebook_revision_freezes_system_prompt_and_tool_definitions` |
 | BD-019 | `requirements/behavior-diagnosis/tests/m6-fatal-boundary.test.mjs::WHAT[BD-019] Enforcer fatal requires typed settlement and one injected fuse` |

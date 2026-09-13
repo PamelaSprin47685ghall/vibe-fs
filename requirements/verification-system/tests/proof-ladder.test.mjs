@@ -197,18 +197,6 @@ test('WHAT[VERIFICATION-SYSTEM-009] every wired gate path exists', () => {
   }
 })
 
-test('WHAT[VERIFICATION-SYSTEM-005] subsystem structure gate precedes every semantic consumer gate', () => {
-  const checkSource = read('scripts/check.mjs')
-  const wired = wiredGates(checkSource)
-  const subsystems = wired.indexOf('subsystems.mjs')
-  assert.ok(subsystems >= 0)
-  for (const consumer of [
-    'dsl-ownership.mjs',
-    'authority-boundary.mjs',
-    'semantic-decorator-invariant.mjs',
-  ]) assert.ok(subsystems < wired.indexOf(consumer), `${consumer} must run after the subsystem structure gate`)
-})
-
 test('WHAT[VERIFICATION-SYSTEM-009] no custom FCS executable remains after the full-repo ban', () => {
   // GAP-031 全仓自定义 FCS 禁令：扫描链是被删除，不是被禁用。任何自定义 FCS
   // 可执行物（驱动 FSharp.Compiler.Service 的 .fsx，或 shell 到 `dotnet fsi` /

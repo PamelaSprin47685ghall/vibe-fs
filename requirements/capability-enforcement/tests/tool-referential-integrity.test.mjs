@@ -5,6 +5,9 @@
 // 半边（same name = 唯一合同）在 action-affordance 包测试内。
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { rolePredicate } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
+import { generateRole } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
+import { allRoleLabels } from '../../../dist/Foundation/RolesSurface.js'
 import {
   LEGACY_FORBIDDEN_NAMES,
   extractKnownToolNames,
@@ -72,4 +75,32 @@ test('WHAT[ENF-009] gate_a_extract_known_tool_names', () => {
 test('WHAT[ENF-009] gate_a_repo_scan_is_green', () => {
   const result = scanRepo()
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
+})
+
+test('WHAT[ENF-008] registered_js_tools_match_js_tool_generator_output', () => {
+  for (const role of allRoleLabels) {
+    const generated = generateRole(role, 'en')
+    const toolName = `js-${role}`
+    const admitted = rolePredicate(toolName, role)
+    if (generated) {
+      assert.equal(admitted, true, `Role ${role} has generated surface ${generated.toolName} but ToolRegistry denied it`)
+      assert.equal(generated.toolName, toolName, `Generator tool name mismatch for ${role}`)
+    } else {
+      assert.equal(admitted, false, `Role ${role} has no generated surface but ToolRegistry admitted ${toolName}`)
+    }
+  }
+})
+
+test('WHAT[ENF-012] registered_js_tools_reject_cross_role_execution', () => {
+  for (const caller of allRoleLabels) {
+    for (const target of allRoleLabels) {
+      if (caller === target) continue
+      const toolName = `js-${target}`
+      assert.equal(
+        rolePredicate(toolName, caller),
+        false,
+        `ToolRegistry must deny cross-role execution: ${caller} calling ${toolName}`,
+      )
+    }
+  }
 })

@@ -4,7 +4,6 @@
 
 /resources/provider/tool/**
 /src/Wanxiangshu/OpenCode/Tools/**
-/scripts/checks/semantic-anchors.mjs
 /scripts/checks/language-parity-gate.mjs
 /scripts/checks/tool-referential-integrity.mjs
 /requirements/office-capability/tests/eval/provider-office-boundary/**

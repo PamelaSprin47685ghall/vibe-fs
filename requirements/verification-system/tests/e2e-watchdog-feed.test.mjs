@@ -16,7 +16,7 @@ import {
   SOLE_ENTRY,
   e2eTestCaseFiles,
   scanE2EWatchdogFeed,
-} from '../../../scripts/checks/e2e-watchdog-feed.mjs'
+} from './e2e/support/watchdog-feed-scan.mjs'
 
 test('WHAT[VERIFICATION-SYSTEM-002] sole top-level e2e entry is entry.test.mjs', () => {
   // One World：第 4 层恰好一个真实 E2E 入口。顶层文件清单必须包含

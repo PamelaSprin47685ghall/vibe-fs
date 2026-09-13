@@ -26,13 +26,11 @@ PromptResources.systemForRole (语言 lang, 角色 role)
 | 命题 | 落点测试 |
 |---|---|
 | COGNITIVE-ENVIRONMENT-001 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-001] CE_prompt_015_one_system_prompt_per_role` |
-| COGNITIVE-ENVIRONMENT-002 | `requirements/cognitive-environment/tests/semantic-anchor-parity.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-002] gate_c_semantic_anchor_parity_detects_missing_zh_id` |
 | COGNITIVE-ENVIRONMENT-003 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-003] CE_prompt_015_canonical_composition_common_law_role_law_office_library` |
 | COGNITIVE-ENVIRONMENT-004 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-004] CE_prompt_015_system_prompt_does_not_enumerate_runtime_tool_surface` |
 | COGNITIVE-ENVIRONMENT-005 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-005] CE_prompt_015_no_tier_split_duplicates` |
 | COGNITIVE-ENVIRONMENT-006 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-006] CE_prompt_016_library_ingress_books_do_not_enlarge_authority` |
 | COGNITIVE-ENVIRONMENT-007 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-007] CE_prompt_016_library_ingress_teaches_craft_within_existing_authority` |
-| COGNITIVE-ENVIRONMENT-008 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-008] CE_prompt_016_office_library_closing_books_older_than_assignment` |
 | COGNITIVE-ENVIRONMENT-009 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-009] CE_prompt_016_office_library_closing_work_not_forced_to_resemble_book` |
 | COGNITIVE-ENVIRONMENT-010 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-010] CE_010_lifecycle_texts_orient_without_educating_or_replacing_system_prompt` |
 | COGNITIVE-ENVIRONMENT-011 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs::WHAT[COGNITIVE-ENVIRONMENT-011] CE_011_transient_texts_do_not_rewrite_role_self_model` |

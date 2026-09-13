@@ -17,7 +17,6 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 import * as promptResources from '../../../dist/Resources/PromptSurface.js'
-import { ROLE_SEMANTIC_ANCHORS } from '../../../scripts/checks/semantic-anchors.mjs'
 
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '../../..')
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
@@ -117,20 +116,6 @@ test('WHAT[COGNITIVE-ENVIRONMENT-009] CE_prompt_016_office_library_closing_work_
   for (const locale of ['en', 'zh-CN']) {
     const text = read(`resources/provider/library/closing/${locale}.md`)
     assert.match(text, /do not force the work|不?要强|不要.*模仿|Don't force/i)
-  }
-})
-
-test('WHAT[COGNITIVE-ENVIRONMENT-008] CE_role_law_cognition_anchors_present_in_both_locales', () => {
-  for (const role of ROLE_LAW_ROLES) {
-    const anchors = ROLE_SEMANTIC_ANCHORS[role]
-    assert.ok(anchors, `catalog missing role: ${role}`)
-    const en = read(`resources/provider/role/${role}/en.md`)
-    const zh = read(`resources/provider/role/${role}/zh-CN.md`)
-    for (const { id, en: enRe, zh: zhRe } of anchors) {
-      if (MIRRORED_BY_OFFICE_CAPABILITY.has(id)) continue
-      assert.match(en, enRe, `${role}/en.md missing anchor ${id}`)
-      assert.match(zh, zhRe, `${role}/zh-CN.md missing anchor ${id}`)
-    }
   }
 })
 

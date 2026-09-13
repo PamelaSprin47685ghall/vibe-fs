@@ -15,7 +15,6 @@
 /resources/provider/role/orchestrator/**
 /resources/provider/tool/fork/**
 /resources/provider/tool/inspect/**
-/scripts/checks/semantic-anchors.mjs
 /scripts/checks/language-parity-gate.mjs
 /requirements/capability-enforcement/tests/agent-permission-gate.test.mjs
 /requirements/capability-enforcement/tests/inquiry-permissions.test.mjs

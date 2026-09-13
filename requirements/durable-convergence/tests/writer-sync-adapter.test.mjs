@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { writerSyncAdapterScenario } from '../../../dist/Persistence/EventStore/RetentionSurface.js'
+import { retainedWriterIdsAt, syncAt, writerSyncAdapterScenario } from '../../../dist/Persistence/EventStore/RetentionSurface.js'
 
 const canonicalLine = (id, stream) => JSON.stringify({
   event_id: id,
@@ -69,5 +70,34 @@ test('WHAT[DURABLE-CONVERGENCE-009] Adapter: writer sync preserves exact identit
     ])
   } finally {
     rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[DURABLE-CONVERGENCE-009] Adapter: writer sync with absent remote creates the local-only snapshot without error', async () => {
+  const repo = mkdtempSync(join(tmpdir(), 'wxs-writer-sync-remote-absent-'))
+  execFileSync('git', ['init', '-q', repo])
+  const commonDir = join(repo, '.git')
+  const nowMs = Date.now()
+
+  try {
+    const events = join(commonDir, 'wanxiang', 'events')
+    mkdirSync(events, { recursive: true })
+    writeFileSync(join(events, 'writer-local.ndjson'), canonicalLine('a'.repeat(40), '1'.repeat(40)))
+
+    // remote-absent ambiguity state: a null remote root must materialize the
+    // local-only candidate through production syncAt, never fail closed.
+    const result = await syncAt(repo, commonDir, null, nowMs)
+    assert.equal(result.ok, true, JSON.stringify(result))
+
+    const rootEntries = execFileSync('git', ['-C', repo, 'ls-tree', result.root], { encoding: 'utf8' })
+    assert.match(rootEntries, /\twriters$/m)
+    assert.match(rootEntries, /\tpayloads$/m)
+    assert.match(rootEntries, /\twriter-manifest$/m)
+
+    const writers = execFileSync('git', ['-C', repo, 'ls-tree', `${result.root}:writers`], { encoding: 'utf8' })
+    assert.match(writers, /writer-local\.ndjson$/m)
+    assert.deepEqual(retainedWriterIdsAt(commonDir, nowMs), ['writer-local'])
+  } finally {
+    rmSync(repo, { recursive: true, force: true })
   }
 })

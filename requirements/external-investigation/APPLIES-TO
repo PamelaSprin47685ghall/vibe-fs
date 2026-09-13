@@ -7,5 +7,4 @@
 /src/Wanxiangshu/OpenCode/Host/StealthBrowserMcpConfig.fs
 /src/Wanxiangshu/OpenCode/Host/StealthBrowserMcpConfigSurface.fs
 /src/Wanxiangshu/Participant/Persona/**
-/scripts/checks/semantic-anchors.mjs
 /scripts/checks/language-parity-gate.mjs

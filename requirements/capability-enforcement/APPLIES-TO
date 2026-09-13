@@ -11,11 +11,8 @@
 /src/Wanxiangshu/OpenCode/Host/ManagerConfig.fs
 /src/Wanxiangshu/Repository/Programming/Js/Capability.fs
 /src/Wanxiangshu/Repository/Programming/Js/OpenCode/**
-/scripts/checks/capability-isomorphism-gate.mjs
 /scripts/checks/js-surface-gate.mjs
 /scripts/checks/tool-referential-integrity.mjs
-/scripts/checks/authority-boundary.mjs
-/scripts/checks/authority-contracts.json
 /src/Wanxiangshu/Foundation/Identity.fs
 /src/Wanxiangshu/OpenCode/Host/SessionQuiescenceGate.fs
 /src/Wanxiangshu/OpenCode/Host/QuiescenceSurface.fs

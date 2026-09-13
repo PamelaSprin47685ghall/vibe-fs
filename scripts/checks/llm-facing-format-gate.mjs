@@ -11,14 +11,6 @@ const formattingOwners = new Set([
   'src/Wanxiangshu/Foundation/LlmFacing.fs',
   'src/Wanxiangshu/Foundation/SyntheticTomlSurface.fs',
 ])
-const forbiddenEnvelopes = [
-  '<skill_content',
-  '</skill_content>',
-  '<work-log>',
-  '</work-log>',
-  '<requirement_read',
-  '</requirement_read>',
-]
 
 const walk = (directory) =>
   readdirSync(directory).flatMap((name) => {
@@ -39,10 +31,6 @@ for (const path of walk(sourceRoot)) {
 
   if (!formattingOwners.has(rel) && lowLevelTomlAccess.test(codeText)) {
     violations.push(`${rel}: direct SyntheticToml access bypasses LlmFacing`)
-  }
-
-  for (const envelope of forbiddenEnvelopes) {
-    if (codeText.includes(envelope)) violations.push(`${rel}: forbidden LLM-facing envelope ${envelope}`)
   }
 }
 

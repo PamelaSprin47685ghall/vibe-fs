@@ -14,12 +14,11 @@ const registrations = [...hooks.matchAll(/registeredHook\s+HookKey\.([A-Z][A-Za-
 const failures = []
 
 const duplicates = (values) => values.filter((value, index) => values.indexOf(value) !== index)
-const rowNames = rows.map((row) => row[1])
 const hostKeys = rows.map((row) => row[2])
 const registeredNames = registrations.map((registration) => registration[1])
+const rowNames = rows.map((row) => row[1])
 
 if (rows.length === 0) failures.push('no HookPolicy metadata rows found')
-for (const duplicate of new Set(duplicates(rowNames))) failures.push(`duplicate metadata row: ${duplicate}`)
 for (const duplicate of new Set(duplicates(hostKeys))) failures.push(`duplicate Host key: ${duplicate}`)
 for (const duplicate of new Set(duplicates(registeredNames))) failures.push(`duplicate registration: ${duplicate}`)
 

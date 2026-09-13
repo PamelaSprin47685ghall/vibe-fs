@@ -7,3 +7,4 @@ module SessionsSurface =
     val physicalParents: parents: obj -> children: obj -> string array
     val interruptAttemptAdapterProbe: unit -> Task<obj>
     val interruptRejectedAdapterProbe: unit -> Task<obj>
+    val interruptTerminatedAdapterProbe: unit -> Task<obj>

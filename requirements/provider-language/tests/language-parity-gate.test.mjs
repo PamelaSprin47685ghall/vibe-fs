@@ -10,25 +10,16 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
 import {
-  LEGACY_PROVIDER_PROSE_REL,
-  LEGACY_PROVIDER_RESOURCES_REL,
   LOCALE_FILES,
   PROVIDER_ROOT,
-  PROVIDER_RESOURCES_REL,
   extractCodeSpans,
   extractPlaceholders,
   extractProtocolIdentifiers,
-  listSemanticResourceDirs,
-  scanForbiddenLegacyProviderPaths,
   scanIdentifierParity,
-  scanLegacyProviderResourcesPolicy,
   scanParity,
   scanPlaceholderParity,
   scanProviderLanguageBinding,
-  scanProviderResourcesHook,
   scanRepo,
-  scanSemanticAnchorCatalog,
-  scanSemanticAnchorParity,
 } from '../../../scripts/checks/language-parity-gate.mjs'
 
 const GOOD_HOOK = `
@@ -76,17 +67,6 @@ test('WHAT[PROVIDER-LANGUAGE-006] parity detects missing zh-CN leaf', () => {
 test('WHAT[PROVIDER-LANGUAGE-006] parity detects missing en leaf in the real tree', () => {
   const violations = scanParity(['role/manager'], resolve(process.cwd(), PROVIDER_ROOT))
   assert.equal(violations.length, 0)
-})
-
-test('WHAT[PROVIDER-LANGUAGE-006] Participant/Provider owner hook requires the language pair', () => {
-  assert.equal(
-    PROVIDER_RESOURCES_REL,
-    'src/Wanxiangshu/Participant/Provider/ProviderResources.fs',
-  )
-  assert.equal(scanProviderResourcesHook(GOOD_HOOK).length, 0)
-  const red = scanProviderResourcesHook('module ProviderResources = let x = 1')
-  assert.ok(red.some((v) => v.code === 'missing-require-language-pair'))
-  assert.ok(red.every((v) => v.path === PROVIDER_RESOURCES_REL))
 })
 
 test('WHAT[PROVIDER-LANGUAGE-006] Host binding only observes raw preference and delegates', () => {
@@ -142,47 +122,6 @@ module ProviderLanguageBinding =
         v.detail === 'provider-language aliases belong to Participant/Provider owner, not Host',
     ),
   )
-})
-
-test('WHAT[PROVIDER-LANGUAGE-006] language policy is rejected at legacy Resources path', () => {
-  assert.deepEqual(
-    scanLegacyProviderResourcesPolicy(`
-module ProviderResources =
-    let requireLanguagePair path = ProviderLanguage.resourceFileName path
-`),
-    [
-      {
-        code: 'provider-language-policy',
-        path: LEGACY_PROVIDER_RESOURCES_REL,
-        detail: 'provider-language policy belongs to Participant/Provider/ProviderResources.fs',
-      },
-    ],
-  )
-})
-
-test('WHAT[PROVIDER-LANGUAGE-006] legacy ProviderResources and ProviderProse paths are forbidden', () => {
-  assert.deepEqual(
-    scanForbiddenLegacyProviderPaths([LEGACY_PROVIDER_PROSE_REL, LEGACY_PROVIDER_RESOURCES_REL]),
-    [
-      {
-        code: 'forbidden-legacy-path',
-        path: LEGACY_PROVIDER_RESOURCES_REL,
-        detail: 'legacy ProviderResources path must be absent',
-      },
-      {
-        code: 'forbidden-legacy-path',
-        path: LEGACY_PROVIDER_PROSE_REL,
-        detail: 'legacy ProviderProse path must be absent',
-      },
-    ],
-  )
-})
-
-test('WHAT[PROVIDER-LANGUAGE-010] repo lists role semantic dirs for the catalog', () => {
-  const root = resolve(process.cwd())
-  const semanticDirs = listSemanticResourceDirs(resolve(root, PROVIDER_ROOT))
-  assert.ok(semanticDirs.includes('role/manager'))
-  assert.ok(semanticDirs.includes('role/coder'))
 })
 
 test('WHAT[PROVIDER-LANGUAGE-008] repo scan is green across every semantic surface', () => {
@@ -298,39 +237,3 @@ test('WHAT[PROVIDER-LANGUAGE-007] placeholder extraction dedupes and skips plain
   assert.deepEqual([...extractPlaceholders('no holes')].sort(), [])
 })
 
-test('WHAT[PROVIDER-LANGUAGE-010] semantic anchor parity detects missing zh id', () => {
-  const fx = makeProviderFixture()
-  try {
-    const catalog = {
-      manager: [{ id: 'arms-length-planning', en: /arm'?s[- ]length/i, zh: /一臂之距/ }],
-    }
-    fx.writePair('role/manager', "Arm's-length planning governs.", '一臂之距 规划。')
-    assert.deepEqual(scanSemanticAnchorParity(fx.providerAbs, catalog), [])
-
-    fx.writePair('role/manager', "Arm's-length planning governs.", '规划由依赖证明其正当。')
-    const red = scanSemanticAnchorParity(fx.providerAbs, catalog)
-    assert.equal(red.length, 1)
-    assert.equal(red[0].code, 'semantic-anchor')
-    assert.equal(red[0].path, 'resources/provider/role/manager/zh-CN.md')
-    assert.match(red[0].detail ?? '', /missing arms-length-planning/)
-  } finally {
-    fx.dispose()
-  }
-})
-
-test('WHAT[PROVIDER-LANGUAGE-010] every role law directory must appear in the catalog', () => {
-  const fx = makeProviderFixture()
-  try {
-    fx.writePair('role/manager', 'x', 'y')
-    fx.writePair('role/uncatalogued', 'x', 'y')
-    const violations = scanSemanticAnchorCatalog(
-      ['role/manager', 'role/uncatalogued', 'tool/demo'],
-      { manager: [] },
-    )
-    assert.equal(violations.length, 1)
-    assert.equal(violations[0].code, 'semantic-anchor-catalog')
-    assert.equal(violations[0].path, 'resources/provider/role/uncatalogued')
-  } finally {
-    fx.dispose()
-  }
-})

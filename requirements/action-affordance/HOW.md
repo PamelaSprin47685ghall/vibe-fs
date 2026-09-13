@@ -23,8 +23,7 @@
 
 | 命题 | 落点测试 |
 |---|---|
-| ACTION-AFFORDANCE-001 | `requirements/action-affordance/tests/action-affordance.test.mjs::WHAT[ACTION-AFFORDANCE-001] AA_prompt_020_tool_descriptions_carry_contract_anchors_in_both_locales` |
-| ACTION-AFFORDANCE-002 | `requirements/action-affordance/tests/action-affordance.test.mjs::WHAT[ACTION-AFFORDANCE-002] AA_prompt_020_high_risk_verbs_have_semantic_anchor_catalog` |
+| ACTION-AFFORDANCE-001 | `requirements/action-affordance/tests/action-affordance.test.mjs::WHAT[ACTION-AFFORDANCE-001] AA_assume_contract_answers_act_fit_boundary_return_and_argument` |
 | ACTION-AFFORDANCE-003 | `requirements/action-affordance/tests/action-affordance.test.mjs::WHAT[ACTION-AFFORDANCE-003] AA_prompt_020_inspect_contract_names_the_not_performed_act` |
 | ACTION-AFFORDANCE-004 | `requirements/action-affordance/tests/action-affordance.test.mjs::WHAT[ACTION-AFFORDANCE-004] AA_prompt_020_repair_behavior_contract_defines_mechanical` |
 | ACTION-AFFORDANCE-005 | `requirements/action-affordance/tests/action-affordance.test.mjs::WHAT[ACTION-AFFORDANCE-005] AA_prompt_020_establish_behavior_contract_separates_mutation_from_execution` |
@@ -35,5 +34,5 @@
 | ACTION-AFFORDANCE-010 | `requirements/action-affordance/tests/action-affordance.test.mjs::WHAT[ACTION-AFFORDANCE-010] AA_prompt_020_fork_contract_answers_whom_work_is_entrusted_to` |
 | ACTION-AFFORDANCE-011 | `requirements/action-affordance/tests/action-affordance.test.mjs::WHAT[ACTION-AFFORDANCE-011] AA_prompt_021_callers_see_the_boundary_mirror_not_just_callee_role_law` |
 | ACTION-AFFORDANCE-012 | `requirements/action-affordance/tests/action-affordance.test.mjs::WHAT[ACTION-AFFORDANCE-012] AA_prompt_020_inspect_caller_forbidden_charge_is_named` |
-| ACTION-AFFORDANCE-013 | `requirements/action-affordance/tests/tool-description-anchors.test.mjs::WHAT[ACTION-AFFORDANCE-013] gate_c_tool_description_anchor_parity_detects_missing_zh_id` |
+| ACTION-AFFORDANCE-013 | `requirements/action-affordance/tests/action-affordance.test.mjs::WHAT[ACTION-AFFORDANCE-013] AA_prompt_020_success_returns_establish_bounded_consequence` |
 | ACTION-AFFORDANCE-014 | `requirements/action-affordance/tests/action-affordance.test.mjs::WHAT[ACTION-AFFORDANCE-014] AA_assume_contract_is_update_then_query_over_one_free_form_canvas` |

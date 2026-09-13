@@ -17,7 +17,7 @@ Office Consequence Model (语义唯一事实源)
    - `Foundation/OfficeCapability.fs` 唯一定义 `ToolPermission`、`permissions` 与 `isAllowed`。`Foundation/Roles.fs`/`RolesSurface.fs` 只拥有 identity vocabulary，不含 capability matrix。
    - `Participant/Persona/OfficeCapabilitySurface.fs` 把 typed consequence 投影为 JS-native label array；跨 owner 测试不读取 F# DU representation。
    - 域模型定义五大可 fork 职位的 Entitled Consequence 与 Non-consequence 清单。
-   - 同一后果事实通过 `semantic-anchors.mjs` 中的 `OFFICE_CAPABILITY_ANCHORS` 锚点绑定，由 Gate F 确保 Manager、fork 工具描述及各角色 Role Law 中双语表达完全一致。
+   - 同一后果事实通过 `office-capability-integrity.test.mjs` 确保 Manager、fork 工具描述及各角色 Role Law 中双语表达完全一致。
 
 2. **不可互换性防护**：
    - 提示词与工具描述中明确携带各 Office 的负边界（negatives）。

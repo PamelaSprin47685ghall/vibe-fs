@@ -200,3 +200,46 @@ module SessionsSurface =
                           "virtualTimes", box [| 0; 10; 1000 |]
                           "trace", box trace ]
         }
+
+    /// MANAGED-SESSION-016 already-terminal: a lifecycle-terminated attempt is
+    /// idempotent success without touching the Host transport, while a
+    /// non-terminal non-managed attempt is still rejected with zero transport
+    /// calls. The returned view contains values, never the adapter.
+    let interruptTerminatedAdapterProbe () : Task<obj> =
+        task {
+            let terminalId = SessionId.create "term-child"
+            let otherId = SessionId.create "other-root"
+            let transport = ControlledOpenCodePort(terminalId, false)
+
+            let sessions =
+                InjectedSessionPort(
+                    Some(transport :> IOpenCodePort),
+                    ControlledEventPort() :> IEventObservationPort,
+                    ?isLifecycleTerminated = Some(fun sessionId -> sessionId = terminalId)
+                )
+                :> ISessionHostPort
+
+            let! terminalOutcome = sessions.InterruptAttempt terminalId
+            let abortsAfterTerminal = transport.Aborts.Length
+            let! otherOutcome = sessions.InterruptAttempt otherId
+
+            let outcomeName, error =
+                match terminalOutcome with
+                | Ok() -> "Ok", ""
+                | Error rejection -> "Error", rejection
+
+            let otherName, otherError =
+                match otherOutcome with
+                | Ok() -> "Ok", ""
+                | Error rejection -> "Error", rejection
+
+            return
+                createObj
+                    [ "terminatedOutcome", box outcomeName
+                      "terminatedError", box error
+                      "abortsAfterTerminal", box abortsAfterTerminal
+                      "abortedSessionIds", box transport.Aborts
+                      "otherOutcome", box otherName
+                      "otherError", box otherError
+                      "abortCount", box transport.Aborts.Length ]
+        }

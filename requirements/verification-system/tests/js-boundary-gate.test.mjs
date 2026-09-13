@@ -15,7 +15,7 @@ import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
-import { run as runBoundaryGate, packageLocalContracts } from '../../../scripts/checks/js-boundary-gate.mjs'
+import { run as runBoundaryGate } from '../../../scripts/checks/js-boundary-gate.mjs'
 import {
   BUILD_VERIFICATION_FILES,
   HOST_PHYSICAL_CANARY_FILES,
@@ -32,11 +32,6 @@ test('WHAT[VERIFICATION-SYSTEM-013] product_semantic_debt_is_zero', () => {
 
 test('WHAT[VERIFICATION-SYSTEM-013] boundary_gate_passes_at_terminal_state', () => {
   assert.equal(runBoundaryGate({ root: ROOT }), 0)
-})
-
-test('WHAT[VERIFICATION-SYSTEM-013] no_package_local_contract_adapters', () => {
-  assert.deepEqual(packageLocalContracts(ROOT), [],
-    'no *-contract.mjs adapter may exist outside verification-system')
 })
 
 test('WHAT[VERIFICATION-SYSTEM-013] exemptions_are_only_compiler_distribution_or_host_canary', () => {

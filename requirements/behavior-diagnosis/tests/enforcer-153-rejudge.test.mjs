@@ -1,72 +1,128 @@
-// ENFORCER-153: Blogger recovery facts from semantic claim + transcript.
+// ENFORCER-153: Blogger recovery facts from semantic claim + transcript —
+// proved through registered surfaces only (no deep internal imports).
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import * as turns from '../../../dist/Interaction/Repair/CompletedTurnSurface.js'
+import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 
-const ROOT = new URL('../../../', import.meta.url).pathname
-const enforcerSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Enforcer/Continuation.fs'), 'utf8')
-const interactionRepairSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs'), 'utf8')
-const sessionNudgeSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs'), 'utf8')
-const pluginTransformsSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs'), 'utf8')
-const probeSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs'), 'utf8')
+const text = (value) => [{ type: 'text', text: value }]
 
-test('WHAT[BD-017] ENFORCER_153_snapshot_rejudge_uses_named_chronicle_toolparts', () => {
-  assert.match(probeSrc, /ToolParts/, 'snapshot recovery must use named SessionToolPart evidence')
-  assert.doesNotMatch(probeSrc, /name = "blog"/, 'legacy blog tool alias must not drive recovery')
+const capturingPort = (captured) => ({
+  SubscribeTerminal: () => ({ Dispose: () => {} }),
+  SendPrompt: async (session, payload, options) => {
+    captured.push({ session, text: payload, options })
+    return dispatch.admittedWithReceipt('receipt-153')
+  },
 })
 
-test('WHAT[BD-017] ENFORCER_153_probe_exposes_pure_facts_not_stage_reconstruction', () => {
-  assert.doesNotMatch(probeSrc, /type InvalidTerminalRepairState/, 'no InvalidTerminalRepairState DU')
-  assert.doesNotMatch(probeSrc, /rejudgeFromEvidence/, 'no rejudgeFromEvidence in probe')
-  assert.doesNotMatch(probeSrc, /rejudgeToolRecovery/, 'no rejudgeToolRecovery in probe')
-  assert.doesNotMatch(probeSrc, /repairStateForInvalidTerminal/, 'no repairStateForInvalidTerminal in probe')
-  assert.match(probeSrc, /BloggerMissingToolRepairKind = "blogger-missing-tool"/)
-  assert.match(probeSrc, /BloggerAabbRepairKind = "blogger-aabb"/)
-  assert.match(probeSrc, /val repairClaimedForKind|let repairClaimedForKind/)
-  assert.match(probeSrc, /val terminalRequestOwnershipForPhysicalMessage|let terminalRequestOwnershipForPhysicalMessage/)
+const managerOwner = {
+  kind: 'RootSelection',
+  ownerSession: null,
+  ownerLogicalRun: null,
+  ownerAuthorityRoot: null,
+  participantIdentity: {
+    participant: 'manager',
+    role: 'manager',
+    selectedTier: 'deep',
+    persona: 'Lead',
+    personaCatalogVersion: 1,
+    origin: 'ResolvedAtRoot',
+  },
+}
+
+ test('WHAT[BD-017] repeated invalid turns re-open repair and stable terminals complete it', () => {
+  // decideRepairDefect is exercised only through the registered
+  // CompletedTurnSurface name mapping: in-flight/currentRepair attempts await
+  // terminal, fresh invalid terminals re-request, repairs never exhaust.
+  assert.equal(turns.repairDefectDecision(false, false, null, []), 'RequestRepair')
+  assert.equal(turns.repairDefectDecision(true, false, null, []), 'AwaitRepairTerminal')
+  assert.equal(turns.repairDefectDecision(true, false, 'tool-calls', []), 'AwaitRepairTerminal')
+  assert.equal(turns.repairDefectDecision(true, true, 'length', []), 'RequestRepair')
+  assert.equal(turns.repairDefectDecision(true, true, 'stop', text('done')), 'NoRepair')
 })
 
-test('WHAT[BD-017] ENFORCER_153_idle_forwards_exact_blogger_repair_to_the_single_owner', () => {
-  assert.match(interactionRepairSrc, /BloggerCoordinator\.observeIdleRepair/)
-  assert.doesNotMatch(
-    interactionRepairSrc,
-    /ProviderRecoveryWorkflow|admitPolicyAuthorizedFailure|FailureAdmissionOutcome|sendAabb/,
-    'InteractionRepair may submit the observation but cannot interpret Blogger repair or provider retry',
-  )
+test('WHAT[BD-017] concurrent gate nudge deduplicates at the dispatch boundary', async () => {
+  // Two nudges on the same terminal occasion must collapse to exactly one
+  // physical send; a second admission observes the first result. This is the
+  // AlreadyAdmitted-not-Failed contract proven at the physical boundary.
+  const base = mkdtempSync(join(tmpdir(), 'wxs-enf153-nudge-'))
+  try {
+    const opened = await journal.JournalSurface_bootWithWriterId(
+      base,
+      'writer-153',
+      'rt-153',
+      4242,
+      '2026-01-01T00:00:00Z',
+    )
+    assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
+    try {
+      const owner = await dispatch.acceptHumanRootSelection(
+        opened.journal,
+        'ses_153_owner',
+        'msg-153-owner',
+        managerOwner,
+      )
+      assert.equal(owner.ok, true, owner.ok ? '' : owner.error)
+
+      const captured = []
+      const results = await dispatch.sendGateNudgesConcurrently(
+        capturingPort(captured),
+        opened.journal,
+        'ses_153',
+        'nudge text',
+        'BusyAgentNudge',
+        'interaction-repair',
+        'run-153',
+        owner.profile,
+      )
+      assert.equal(results.length, 2)
+      assert.equal(results[0].ok, true, JSON.stringify(results[0]))
+      assert.equal(results[1].ok, true, 'second nudge on same occasion joins, never fails')
+      assert.equal(captured.length, 1, `a deduplicated nudge sends once, got ${captured.length}`)
+    } finally {
+      journal.JournalSurface_dispose(opened.journal)
+    }
+  } finally {
+    rmSync(base, { recursive: true, force: true })
+  }
 })
 
-test('WHAT[BD-017] ENFORCER_065_chronicle_tool_error_defers_to_the_host_tool_loop_instead_of_repairing', () => {
-  assert.match(
-    enforcerSrc,
-    /hasErroredBlogAttempt[\s\S]{0,520}ctx\.Project ctx\.RawMessages/,
-    'an errored chronicle call is still inside the Host tool loop and must not spend repair/retry budget',
-  )
-  assert.doesNotMatch(
-    enforcerSrc,
-    /hasErroredBlogAttempt[\s\S]{0,220}decideErroredBlog/,
-    'tool errors must not jump directly into Blogger repair',
-  )
-})
-
-test('WHAT[BD-017] ENFORCER_066_first_protocol_nudge_is_idle_owned_never_sent_from_transform', () => {
-  assert.doesNotMatch(
-    pluginTransformsSrc,
-    /trySendInteractionRepair/,
-    'the provider transform wiring must not possess a physical interaction-repair sender',
-  )
-})
-
-test('WHAT[BD-017] duplicate_nudge_admission_is_idempotent_not_AABB_failure', () => {
-  assert.match(sessionNudgeSrc, /IdleContinuationOutcome\.AlreadyAdmitted/)
-  assert.doesNotMatch(
-    sessionNudgeSrc,
-    /IdleContinuationOutcome\.Failed\s+"Interaction repair already claimed/,
-    'a racing duplicate claim is admission evidence, not a failed repair',
-  )
-  assert.doesNotMatch(
-    interactionRepairSrc,
-    /IndexOf\("already claimed"/,
-    'AABB must never recover typed idempotency by parsing error prose',
-  )
+test('WHAT[BD-017] authority gate-nudge admission is required before any physical send', async () => {
+  // Without an agent-owner profile the surface's profileOf resolves an error:
+  // the nudge is refused before any physical SendPrompt reaches the port.
+  const base = mkdtempSync(join(tmpdir(), 'wxs-enf153-gate-'))
+  try {
+    const opened = await journal.JournalSurface_bootWithWriterId(
+      base,
+      'writer-153g',
+      'rt-153g',
+      4243,
+      '2026-01-01T00:00:00Z',
+    )
+    assert.equal(opened.ok, true)
+    try {
+      const captured = []
+      const results = await dispatch.sendGateNudgesConcurrently(
+        capturingPort(captured),
+        opened.journal,
+        'ses_noroot_153',
+        'nudge',
+        'BusyAgentNudge',
+        'interaction-repair',
+        'run-153',
+        { authorityKind: 'AgentOwnerRoot', identitySeed: { kind: 'NoSuchSeed' } },
+      )
+      assert.equal(results.every((r) => !r.ok), true)
+      assert.ok(results.every((r) => /identity seed|seed kind/i.test(r.error ?? '')), JSON.stringify(results))
+      assert.equal(captured.length, 0, 'no profile → no physical send')
+    } finally {
+      journal.JournalSurface_dispose(opened.journal)
+    }
+  } finally {
+    rmSync(base, { recursive: true, force: true })
+  }
 })

@@ -41,6 +41,40 @@ export const formalClauseDefinitionHeadings = (text, prefixes) => {
   return clauseDefinitionHeadings(text).filter(({ id }) => known.has(id.split('-')[0]))
 }
 
+/**
+ * Fail-closed duplicate clause check extracted from the retired spec gate.
+ *
+ * Pure: takes WHAT.md entries `{ file, pkg, text }`, returns violation objects
+ * `{ file, line, msg }`. Reports every repeated clause ID and every prefix
+ * owned by more than one package; the first definition wins, all later ones
+ * are violations. Callers decide what to feed (live tree or temp fixture).
+ */
+export const duplicateClauseDefinitions = (entries) => {
+  const definitions = new Map() // id -> { file, line }
+  const prefixOwner = new Map() // PREFIX -> pkg
+  const findings = []
+  for (const { file, pkg, text } of entries) {
+    for (const { id, line } of clauseDefinitionHeadings(text)) {
+      const previous = definitions.get(id)
+      if (previous) {
+        findings.push({
+          file,
+          line,
+          msg: `条款 ID 重复定义：${id}（已在 ${previous.file}:${previous.line} 定义）`,
+        })
+        continue
+      }
+      definitions.set(id, { file, line })
+      const prefix = id.split('-')[0]
+      const owner = prefixOwner.get(prefix)
+      if (owner && owner !== pkg)
+        findings.push({ file, line, msg: `前缀 ${prefix}- 被多包定义：${owner} 与 ${pkg}` })
+      else prefixOwner.set(prefix, pkg)
+    }
+  }
+  return findings
+}
+
 /** Return references to the retired workflow directories under docs. */
 export const legacyWorkflowPathReferences = (text) => {
   const findings = []

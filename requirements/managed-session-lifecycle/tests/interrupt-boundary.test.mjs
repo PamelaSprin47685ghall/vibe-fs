@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import {
   interruptAttemptAdapterProbe,
   interruptRejectedAdapterProbe,
+  interruptTerminatedAdapterProbe,
 } from '../../../dist/OpenCode/Host/SessionsSurface.js'
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
@@ -74,4 +75,20 @@ test('WHAT[MANAGED-SESSION-016] Turn orchestration consumes typed outcome withou
   assert.doesNotMatch(ordinary, /abortedSessions/)
   assert.doesNotMatch(workflow, /abortedSessions/)
   assert.doesNotMatch(observer, /scope\.Sessions\.AbortedSessions/)
+})
+
+test('WHAT[MANAGED-SESSION-016] already-terminal attempt interrupt is Ok without touching the Host transport', async () => {
+  const observed = await interruptTerminatedAdapterProbe()
+
+  assert.equal(observed.terminatedOutcome, 'Ok')
+  assert.equal(observed.terminatedError, '')
+  assert.equal(observed.abortsAfterTerminal, 0)
+  assert.deepEqual(observed.abortedSessionIds, [])
+  assert.equal(observed.abortCount, 0)
+  // Control: a non-terminal non-managed id is still rejected, also with zero transport calls.
+  assert.equal(observed.otherOutcome, 'Error')
+  assert.equal(
+    observed.otherError,
+    'MANAGED-SESSION-016: user-facing/root session may only be interrupted by the external user',
+  )
 })

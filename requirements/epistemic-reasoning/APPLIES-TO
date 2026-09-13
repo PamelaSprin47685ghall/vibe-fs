@@ -4,7 +4,6 @@
 
 /src/Wanxiangshu/Sphinx/**
 /resources/provider/role/inquiry/**
-/scripts/checks/semantic-anchors.mjs
 /src/Wanxiangshu/Sphinx/Absorb.fs
 /src/Wanxiangshu/Sphinx/Bayes.fs
 /src/Wanxiangshu/Sphinx/Closure.fs

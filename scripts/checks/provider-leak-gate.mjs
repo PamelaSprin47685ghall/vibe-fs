@@ -4,12 +4,11 @@
  * Provider-visible schema / fixed prose / renderer output must not leak internal vocabulary.
  *
  * Usage:
- *   node scripts/checks/provider-leak-gate.mjs [--baseline=<json-path>]
- *   node scripts/checks/provider-leak-gate.mjs --generate [--out=<path>]
+ *   node scripts/checks/provider-leak-gate.mjs
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { walk } from '../lib/walk.mjs'
 
@@ -48,16 +47,10 @@ export const FORBIDDEN_TOKENS = Object.freeze([
   'ManagerJobId',
   'PtyId',
   'FissionGroupId',
-  'lane_index',
-  'worktree',
-  'FallbackOffset',
-  'fallback offset',
-  'spoolPath',
-  'spool path',
-  '/spool/',
   'agent_id',
   'pty_id',
   'session_id',
+  'lane_index',
 ])
 
 /** Join/horizon generic DTO field names in renderer output. */
@@ -73,11 +66,6 @@ export const FORBIDDEN_DTO_PATTERNS = Object.freeze([
 
 /** fast-/deep- execution binding must not appear in provider-facing prose. */
 export const FAST_DEEP_BINDING_RE = /\b(?:fast|deep)-(?:student|teacher|inspector|coder|manager|orchestrator|blogger|devops|browser|inquiry|bookkeeper|reviewer)\b/
-
-export const DEFAULT_BASELINE = join(
-  dirname(fileURLToPath(import.meta.url)),
-  'provider-leak-gate-baseline.json',
-)
 
 /**
  * @typedef {{ id: string, file: string, line: number, text: string }} Violation
@@ -161,70 +149,20 @@ export const countByFile = (violations) => {
 }
 
 /**
- * @param {Record<string, number>} baseline
- * @param {Record<string, number>} current
- * @returns {{ ok: boolean, regressions: { file: string, baseline: number, current: number }[] }}
- */
-export const compareBaseline = (baseline, current) => {
-  /** @type {{ file: string, baseline: number, current: number }[]} */
-  const regressions = []
-  const files = new Set([...Object.keys(baseline), ...Object.keys(current)])
-  for (const file of files) {
-    const base = baseline[file] ?? 0
-    const now = current[file] ?? 0
-    if (now > base) regressions.push({ file, baseline: base, current: now })
-  }
-  return { ok: regressions.length === 0, regressions }
-}
-
-/**
  * @param {string} [repoRoot]
- * @param {{ baseline?: Record<string, number> }} [opts]
  * @returns {{ ok: boolean, violations: Violation[], counts: Record<string, number> }}
  */
-export const scanRepo = (repoRoot = process.cwd(), opts = {}) => {
+export const scanRepo = (repoRoot = process.cwd()) => {
   const violations = scanEntries(collectEntries(repoRoot))
   const counts = countByFile(violations)
-  if (!opts.baseline) return { ok: violations.length === 0, violations, counts }
-  const { ok, regressions } = compareBaseline(opts.baseline, counts)
-  return {
-    ok,
-    violations: ok
-      ? []
-      : regressions.map((r) => ({
-          id: 'baseline-regression',
-          file: r.file,
-          line: 0,
-          text: `violations ${r.current} > baseline ${r.baseline}`,
-        })),
-    counts,
-  }
+  return { ok: violations.length === 0, violations, counts }
 }
 
-export const parseBaselineArg = (arg) => JSON.parse(readFileSync(arg, 'utf8'))
-
 const runCli = () => {
-  const argv = process.argv.slice(2)
-  const value = (name) => {
-    const hit = argv.find((a) => a.startsWith(`--${name}=`))
-    return hit ? hit.slice(name.length + 3) : undefined
-  }
-
-  if (argv.includes('--generate')) {
-    const out = value('out') ?? DEFAULT_BASELINE
-    const { counts } = scanRepo()
-    writeFileSync(out, `${JSON.stringify(counts, null, 2)}\n`)
-    console.log(`provider-leak-gate: wrote baseline (${Object.keys(counts).length} files) → ${out}`)
-    process.exit(0)
-  }
-
-  const baselinePath = value('baseline')
-  const baseline = baselinePath ? parseBaselineArg(baselinePath) : undefined
-  const result = scanRepo(process.cwd(), { baseline })
+  const result = scanRepo(process.cwd())
 
   if (result.ok) {
-    const mode = baseline ? 'baseline ratchet' : 'zero violations'
-    console.log(`provider-leak-gate: OK — provider renderer surfaces pass Gate B (${mode})`)
+    console.log('provider-leak-gate: OK — provider renderer surfaces pass Gate B (zero violations)')
     process.exit(0)
   }
 

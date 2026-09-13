@@ -1,27 +1,23 @@
-#!/usr/bin/env node
-// e2e watchdog-feed gate (ce.md §11.1).
+// Runner-owned e2e watchdog-feed scanner (moved from scripts/checks/e2e-watchdog-feed.mjs).
 // Top-level e2e tests must NOT call `watchdog.advance(`
 // (or `watchdog?.advance(`) directly — only tests/e2e/support/* causal
 // primitives may feed the watchdog. Any direct feed in scope is a violation.
 //
-// Modes:
-//   node scripts/checks/e2e-watchdog-feed.mjs     exit 0 clean, exit 1 on violation
-//
 // Scope EXACTLY: top-level e2e/*.test.mjs in the verification-system package
-// (requirements/verification-system/tests/e2e/ — the One World sole entry,
-// relocated from tests/e2e during the requirements cutover).
+// (requirements/verification-system/tests/e2e/ — the One World sole entry).
 // Do not require e2e/cases/; missing or empty cases/ is fine.
 // e2e/support/* are the allowed feeders and are never flagged.
 
 import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-// Repo root resolved from this script's location (scripts/checks -> root),
-// so runCli works regardless of the caller's cwd.
-export const ROOT = fileURLToPath(new URL('../..', import.meta.url))
+// Repo root resolved from this module's location
+// (requirements/verification-system/tests/e2e/support -> root),
+// so e2eTestCaseFiles works regardless of the caller's cwd.
+export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../..')
 
-// Only top-level e2e/*.test.mjs files are forbidden by ce.md §11.1 under One World.
+// Only top-level e2e/*.test.mjs files are forbidden under One World.
 // Support files are the allowed causal feeders and must never be flagged.
 export const WATCHDOG_FEED_PATTERN = /\bwatchdog\??\.\s*advance\s*\(/
 
@@ -57,7 +53,7 @@ export const scanE2EWatchdogFeed = (files) => {
  * Build the One World file list: top-level tests/e2e/*.test.mjs only.
  * Does not recurse into cases/ or support/. Missing or empty cases/ is ignored.
  *
- * Fail-closed invariants (ce.md §11.1 / One World sole entry):
+ * Fail-closed invariants (One World sole entry):
  *   - The e2e root must exist, be readable, and be a directory — otherwise
  *     this throws (never returns [] to mask a missing/unreadable root).
  *   - The sole top-level entry {@link SOLE_ENTRY} must be present — otherwise
@@ -108,32 +104,3 @@ export const e2eTestCaseFiles = (root = ROOT) => {
 
   return files
 }
-
-const runCli = () => {
-  let files
-  try {
-    files = e2eTestCaseFiles()
-  } catch (err) {
-    console.error(err.message)
-    process.exit(1)
-  }
-
-  const violations = scanE2EWatchdogFeed(files)
-
-  if (violations.length === 0) {
-    console.log(`e2e-watchdog-feed: OK — ${files.length} top-level e2e test file(s)`)
-    process.exit(0)
-  }
-
-  console.error(`e2e-watchdog-feed: ${violations.length} violation(s) — ${files.length} files\n`)
-  for (const v of violations) {
-    console.error(`  {{${v.file.replace(ROOT.replace(/\\/g, '/'), '').replace(/^\//, '')}:${v.line}}  ${v.text}`)
-  }
-  process.exit(1)
-}
-
-const isMain =
-  process.argv[1] !== undefined &&
-  resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1])
-
-if (isMain) runCli()

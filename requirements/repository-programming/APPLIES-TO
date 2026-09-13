@@ -12,7 +12,6 @@
 /resources/provider/tool/mv/**
 /resources/provider/tool/rm/**
 /scripts/checks/js-surface-gate.mjs
-/scripts/checks/semantic-anchors.mjs
 /src/Wanxiangshu/Repository/Programming/Js/Anchor.fs
 /src/Wanxiangshu/Repository/Programming/Js/AnchorFs.fs
 /src/Wanxiangshu/Repository/Programming/Js/Capability.fs

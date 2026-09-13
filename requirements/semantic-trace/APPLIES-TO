@@ -7,4 +7,3 @@
 /src/Wanxiangshu/Context/Companion/CompanionFactFold.fs
 /src/Wanxiangshu/OpenCode/Codec/ProviderWireCapture.fs
 /src/Wanxiangshu/Persistence/Journal/FactCodec.fs
-/scripts/checks/semantic-anchors.mjs

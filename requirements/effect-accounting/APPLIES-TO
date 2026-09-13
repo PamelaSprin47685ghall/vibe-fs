@@ -12,5 +12,4 @@
 /src/Wanxiangshu/Repository/Programming/Js/Transaction.fs
 /src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs
 /src/Wanxiangshu/Persistence/Journal/FactCodec.fs
-/scripts/checks/p0-recovery-join.mjs
 /requirements/change-integration/tests/runtime.test.mjs

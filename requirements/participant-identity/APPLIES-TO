@@ -22,5 +22,4 @@
 /src/Wanxiangshu/OpenCode/Host/SessionsSurface.fs
 /resources/provider/role/**
 /scripts/checks/participant-identity-boundary.mjs
-/scripts/checks/semantic-anchors.mjs
 /requirements/prefix-stability/tests/system-prompt-stability.test.mjs

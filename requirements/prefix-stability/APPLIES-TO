@@ -10,7 +10,6 @@
 /src/Wanxiangshu/OpenCode/Host/RequirementGrounding/**
 /src/Wanxiangshu/Composition/Durable/Fold.fs
 /src/Wanxiangshu/Mission/Obligation/Todo/PrefixEpoch.fs
-/scripts/checks/semantic-anchors.mjs
 /requirements/context-compression/tests/companion-projection.test.mjs
 /requirements/context-compression/tests/probe-selection.test.mjs
 /requirements/context-compression/tests/host-compaction-policy.test.mjs

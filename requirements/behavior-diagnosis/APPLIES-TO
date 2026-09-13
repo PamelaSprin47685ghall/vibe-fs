@@ -8,7 +8,6 @@
 /src/Wanxiangshu/Composition/Durable/Fact.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs
 /src/Wanxiangshu/Persistence/Journal/FactCodec.fs
-/scripts/checks/semantic-anchors.mjs
 /scripts/checks/language-parity-gate.mjs
 /src/Wanxiangshu/Enforcer/BlogSurface.fs
 /src/Wanxiangshu/Enforcer/Catalog.fs

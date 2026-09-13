@@ -55,3 +55,17 @@ module RecoverySurface =
             let! values = PromptRecovery.reconcile (Some handle.Journal) (Some snapshot)
             return values |> List.map outcomeView |> List.toArray
         }
+
+    /// snapshot-unreadable ambiguity state: the Host snapshot port fails, so
+    /// production reconcile must report Unreadable without proving or deleting
+    /// the claim. The failing port is the only fixture; journal, dispatcher,
+    /// and outcome projection all run production code.
+    let reconcileWithUnreadableSnapshot (handle: JournalHandle) (reason: string) : Task<obj array> =
+        task {
+            let snapshot =
+                { new ISessionSnapshotPort with
+                    member _.GetMessages(_sessionId) = Task.FromResult(Error reason) }
+
+            let! values = PromptRecovery.reconcile (Some handle.Journal) (Some snapshot)
+            return values |> List.map outcomeView |> List.toArray
+        }

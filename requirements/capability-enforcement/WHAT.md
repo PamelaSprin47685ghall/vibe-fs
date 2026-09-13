@@ -54,7 +54,7 @@ Host 侧展示给模型的工具 Schema 与运行时执行拦截 Gate 必须双�
 
 ## ENF-014: owner 单点发行；manifest 以 exact file + symbol + source/proof anchor fail closed
 
-每个敏感权威声明必须在 `authority-contracts.json` 正向登记 exact file、symbol、六类分类、owner、WHAT 与声明/发行 proof anchor。anchor 移动或消失、敏感声明未分类、非登记 owner/issuer 构造权威值均使 gate 失败；严禁 name-only allowlist、baseline 或 suppression。
+每个敏感权威声明由其真实 owner 单点发行，并在其所属 subsystem 的公开端口与类型系统（Evidence / Decision / Witness / Capability / Receipt / PhysicalHandle）中显式定义。各消费点执行 exact subject、版本与必要 digest 的准入核验；严禁 name-only allowlist、baseline 或 suppression。
 
 ## ENF-015: authority scope 必须精确绑定 current subject + version/sequence + 必要 digest
 

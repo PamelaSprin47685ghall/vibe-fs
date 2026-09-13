@@ -287,3 +287,44 @@ test('WHAT[DISPATCH-PROTOCOL-007] DP_007_restarts_never_auto_abandon_an_unresolv
     rmSync(base, { recursive: true, force: true })
   }
 })
+
+test('WHAT[DISPATCH-PROTOCOL-008] DP_008_snapshot_unreadable_is_no_proof_and_keeps_the_claim_pending', async () => {
+  const unreadableBase = mkdtempSync(join(tmpdir(), 'wxs-dp008-unreadable-'))
+  try {
+    const unreadableFirst = await journal.JournalSurface_bootWithWriterId(unreadableBase, 'writer-dp008-unreadable-1', 'rt_1', 4242, '2026-01-01T00:00:00Z')
+    assert.equal(unreadableFirst.ok, true, unreadableFirst.ok ? '' : JSON.stringify(unreadableFirst.error))
+    try {
+      const unreadableCaptured = []
+      const unreadableSent = await sendAgentOwnerRoot(
+        capturingPort(unreadableCaptured),
+        unreadableFirst.journal,
+        'ses_008_unreadable',
+        'crash before acceptance',
+      )
+      assert.equal(unreadableSent.ok, true, unreadableSent.ok ? '' : unreadableSent.error)
+      assert.equal(dispatch.pendingClaimCount(unreadableFirst.journal, 'ses_008_unreadable'), 1)
+
+      // snapshot-unreadable ambiguity state: the Host snapshot port fails, so
+      // production reconcile must report Unreadable — never Proven — while the
+      // claim stays pending and nothing is resent.
+      const unreadableOutcomes = await recovery.reconcileWithUnreadableSnapshot(
+        unreadableFirst.journal,
+        'snapshot unreadable: GetMessages failed',
+      )
+      assert.equal(unreadableOutcomes.length, 1)
+      assert.equal(unreadableOutcomes[0].outcome, 'Unreadable')
+      assert.equal(unreadableOutcomes[0].session, 'ses_008_unreadable')
+      assert.match(String(unreadableOutcomes[0].reason), /unreadable/)
+      assert.equal(
+        dispatch.pendingClaimCount(unreadableFirst.journal, 'ses_008_unreadable'),
+        1,
+        'the claim is neither marked Proven nor deleted',
+      )
+      assert.equal(unreadableCaptured.length, 1, 'unreadable snapshot must not trigger a resend')
+    } finally {
+      journal.JournalSurface_dispose(unreadableFirst.journal)
+    }
+  } finally {
+    rmSync(unreadableBase, { recursive: true, force: true })
+  }
+})

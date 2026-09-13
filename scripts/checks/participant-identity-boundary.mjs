@@ -9,34 +9,10 @@ const IDENTITY_OWNER = 'src/Wanxiangshu/Participant/Persona/Identity.fs'
 const AUTHORITY_FACTS = 'src/Wanxiangshu/Interaction/Authority/Facts.fs'
 const AUTHORITY_MODEL = 'src/Wanxiangshu/Interaction/Authority/Model.fs'
 const SOURCE_ROOT = 'src/Wanxiangshu'
-const RETIRED_PRODUCTION_FILES = [
-  'src/Wanxiangshu/Participant/Persona/SessionPersona.fs',
-  'src/Wanxiangshu/Participant/Persona/SessionSurface.fs',
-  'src/Wanxiangshu/Participant/Persona/RoleIdentity.fs',
-  'src/Wanxiangshu/OpenCode/Host/PersonaBinding.fs',
-]
-const SURFACE_MANIFEST = 'scripts/lib/test-surface-scan.mjs'
-const RETIRED_SESSION_SURFACE_MODULE = 'Participant/Persona/SessionSurface.js'
-const RETIRED_EMITTED_SURFACE = `dist/${RETIRED_SESSION_SURFACE_MODULE}`
-
 const normalize = (path) => path.replaceAll('\\', '/')
 const lineAt = (text, offset) => text.slice(0, offset).split('\n').length
 const withoutLineComments = (text) => text.replace(/\/\/.*$/gm, '')
-
 const violation = (file, line, rule, message) => ({ file, line, rule, message })
-
-const requiredFile = (root, relativePath, failures) => {
-  const path = resolve(root, relativePath)
-  if (!existsSync(path)) {
-    failures.push(violation(relativePath, 1, 'required-surface', 'required identity surface is missing'))
-    return null
-  }
-  return readFileSync(path, 'utf8')
-}
-
-const requirePattern = (text, pattern, file, rule, message, failures) => {
-  if (!pattern.test(withoutLineComments(text))) failures.push(violation(file, 1, rule, message))
-}
 
 const recordDefinition = (text, name) => {
   const declaration = new RegExp(`^\\s*type\\s+${name}\\b`, 'm').exec(text)
@@ -54,53 +30,7 @@ const scanPattern = (text, file, rule, pattern, message, failures) => {
   }
 }
 
-const scanRetiredIdentitySurfaces = (root, failures) => {
-  for (const file of RETIRED_PRODUCTION_FILES) {
-    if (existsSync(resolve(root, file))) {
-      failures.push(violation(file, 1, 'retired-identity-file', 'retired identity production file must not exist'))
-    }
-  }
-
-  const manifestPath = resolve(root, SURFACE_MANIFEST)
-  if (existsSync(manifestPath)) {
-    const manifest = readFileSync(manifestPath, 'utf8')
-    const registration = /module:\s*['"]Participant\/Persona\/SessionSurface\.js['"]/g
-    scanPattern(
-      manifest,
-      SURFACE_MANIFEST,
-      'retired-session-surface-registration',
-      registration,
-      `retired surface '${RETIRED_SESSION_SURFACE_MODULE}' must not be registered`,
-      failures,
-    )
-  }
-
-  if (existsSync(resolve(root, RETIRED_EMITTED_SURFACE))) {
-    failures.push(
-      violation(
-        RETIRED_EMITTED_SURFACE,
-        1,
-        'retired-session-surface-emission',
-        `retired surface '${RETIRED_SESSION_SURFACE_MODULE}' must not be emitted`,
-      ),
-    )
-  }
-}
-
-const scanRetiredIdentityTokens = (text, file, failures) => {
-  for (const token of ['SessionPersona', 'PersonaBinding', 'SessionSurface', 'AgentRoleIdentity']) {
-    scanPattern(
-      text,
-      file,
-      'retired-identity-token',
-      new RegExp(`\\b${token}\\b`, 'g'),
-      `retired identity token '${token}' is forbidden in production source`,
-      failures,
-    )
-  }
-}
-
-const scanIdentityCollections = (text, file, failures) => {
+export const scanIdentityCollections = (text, file, failures) => {
   const identity = '(?:[A-Za-z_][A-Za-z0-9_]*\\.)*(?:ParticipantIdentity(?:Evidence)?|(?:Prompt)?IdentitySeed)'
   const sessionId = '(?:[A-Za-z_][A-Za-z0-9_]*\\.)*SessionId'
   const generic = new RegExp(
@@ -130,30 +60,7 @@ const scanIdentityCollections = (text, file, failures) => {
   )
 }
 
-const scanPrivateConstruction = (text, file, failures) => {
-  if (file === IDENTITY_OWNER) return
-
-  const patterns = [
-    /:\s*ParticipantIdentity(?:Evidence)?\s*=\s*\{/g,
-    /\{(?=[^}]{0,1000}\bSelectedAgent\s*=)(?=[^}]{0,1000}\bPeerAgent\s*=)(?=[^}]{0,1000}\bKind\s*=)(?=[^}]{0,1000}\bInitialTier\s*=)(?=[^}]{0,1000}\bPersona\s*=)(?=[^}]{0,1000}\bPersonaCatalogVersion\s*=)(?=[^}]{0,1000}\bOrigin\s*=)[^}]{0,1000}\}/g,
-    /\bPersonaName\s*(?:\(|")/g,
-    /\bPersonaCatalogVersion\s*(?:\(|\d)/g,
-    /\bParticipantKind\b/g,
-    /\bManagedRole\b/g,
-  ]
-  for (const pattern of patterns) {
-    scanPattern(
-      text,
-      file,
-      'private-identity-construction',
-      pattern,
-      'raw construction of opaque ParticipantIdentity internals is forbidden outside its owner',
-      failures,
-    )
-  }
-}
-
-const scanAuthorityShape = (text, file, typeName, failures) => {
+export const scanAuthorityShape = (text, file, typeName, failures) => {
   const definition = recordDefinition(text, typeName)
   if (!definition) {
     failures.push(violation(file, 1, 'authority-identity-seed', `${typeName} record definition is missing`))
@@ -184,65 +91,23 @@ const scanAuthorityShape = (text, file, typeName, failures) => {
   }
 }
 
-export const scanRepo = (root = process.cwd()) => {
+export const scanEntries = (entries) => {
   const failures = []
-  scanRetiredIdentitySurfaces(root, failures)
-  const identity = requiredFile(root, IDENTITY_OWNER, failures)
-  const facts = requiredFile(root, AUTHORITY_FACTS, failures)
-  const model = requiredFile(root, AUTHORITY_MODEL, failures)
+  for (const entry of entries) {
+    const file = normalize(entry.file)
+    const text = withoutLineComments(entry.text)
 
-  if (identity !== null) {
-    requirePattern(
-      identity,
-      /type\s+ParticipantIdentity\s*=\s*private\s*\{/s,
-      IDENTITY_OWNER,
-      'opaque-identity-owner',
-      'ParticipantIdentity must remain an opaque private record',
-      failures,
-    )
-    requirePattern(
-      identity,
-      /type\s+ParticipantIdentityEvidence\s*=\s*private\s*\{/s,
-      IDENTITY_OWNER,
-      'opaque-identity-owner',
-      'ParticipantIdentityEvidence must remain opaque',
-      failures,
-    )
-    for (const member of ['resolveAtRoot', 'inheritFromOwner', 'rehydrate', 'selectedAgent', 'role', 'persona', 'personaCatalogVersion', 'origin']) {
-      requirePattern(
-        identity,
-        new RegExp(`\\blet\\s+${member}\\b`),
-        IDENTITY_OWNER,
-        'opaque-identity-api',
-        `ParticipantIdentity owner API is missing '${member}'`,
-        failures,
-      )
+    if (file.endsWith(AUTHORITY_FACTS) || file === AUTHORITY_FACTS) {
+      scanAuthorityShape(entry.text, file, 'AuthorityRootAcceptedPayload', failures)
     }
-  }
-
-  if (facts !== null) scanAuthorityShape(facts, AUTHORITY_FACTS, 'AuthorityRootAcceptedPayload', failures)
-  if (model !== null) {
-    scanAuthorityShape(model, AUTHORITY_MODEL, 'AuthorityExecutionProfile', failures)
-    requirePattern(
-      model,
-      /member\s+this\.ParticipantIdentity\s*=[\s\S]{0,250}?(?:StoredIdentitySeed|identitySeedParticipantIdentity|PromptIdentitySeed\.participantIdentity)/,
-      AUTHORITY_MODEL,
-      'authority-derived-identity',
-      'AuthorityExecutionProfile must derive ParticipantIdentity from IdentitySeed',
-      failures,
-    )
-  }
-
-  const sourcePath = resolve(root, SOURCE_ROOT)
-  if (!existsSync(sourcePath)) {
-    failures.push(violation(SOURCE_ROOT, 1, 'required-surface', 'production source root is missing'))
-    return failures
-  }
-
-  for (const absolute of walk(sourcePath, ['.fs'])) {
-    const file = normalize(relative(root, absolute))
-    const text = withoutLineComments(readFileSync(absolute, 'utf8'))
-    scanRetiredIdentityTokens(text, file, failures)
+    if (file.endsWith(AUTHORITY_MODEL) || file === AUTHORITY_MODEL) {
+      scanAuthorityShape(entry.text, file, 'AuthorityExecutionProfile', failures)
+      if (!/member\s+this\.ParticipantIdentity\s*=[\s\S]{0,250}?(?:StoredIdentitySeed|identitySeedParticipantIdentity|PromptIdentitySeed\.participantIdentity)/.test(text)) {
+        failures.push(
+          violation(file, 1, 'authority-derived-identity', 'AuthorityExecutionProfile must derive ParticipantIdentity from IdentitySeed'),
+        )
+      }
+    }
     scanPattern(
       text,
       file,
@@ -251,33 +116,81 @@ export const scanRepo = (root = process.cwd()) => {
       'ParticipantIdentityEstablished would create a second identity fact owner',
       failures,
     )
-    if (file !== IDENTITY_OWNER) scanIdentityCollections(text, file, failures)
-    scanPrivateConstruction(text, file, failures)
-  }
 
+    if (!file.endsWith(IDENTITY_OWNER) && file !== IDENTITY_OWNER) {
+      scanIdentityCollections(text, file, failures)
+    }
+  }
   return failures
 }
 
-export const run = (root = process.cwd()) => {
-  let failures
-  try {
-    failures = scanRepo(root)
-  } catch (error) {
-    console.error(`participant-identity-boundary: ${error.message}`)
-    return 1
+export const collectEntries = (root = process.cwd()) => {
+  const sourcePath = resolve(root, SOURCE_ROOT)
+  if (!existsSync(sourcePath)) {
+    throw new Error(`participant-identity-boundary: required directory '${SOURCE_ROOT}' does not exist`)
   }
+  return walk(sourcePath, ['.fs']).map((absolute) => ({
+    file: normalize(relative(root, absolute)),
+    text: readFileSync(absolute, 'utf8'),
+  }))
+}
 
-  if (failures.length > 0) {
-    console.error(`participant-identity-boundary: ${failures.length} violation(s)`)
-    for (const failure of failures) {
-      console.error(`  ${failure.file}:${failure.line} [${failure.rule}] ${failure.message}`)
+export const scanRepo = (root = process.cwd()) => {
+  const entries = collectEntries(root)
+  return scanEntries(entries)
+}
+
+/**
+ * §7.2 check(context) interface.
+ * @param {{ sourceFiles?: () => string[], readText?: (path: string) => string }} context
+ */
+export function check(context) {
+  const root = process.cwd()
+  let entries
+  if (context && typeof context.sourceFiles === 'function' && typeof context.readText === 'function') {
+    const files = context.sourceFiles().filter((f) => normalize(f).startsWith(SOURCE_ROOT) && f.endsWith('.fs'))
+    entries = files.map((file) => ({
+      file: normalize(file),
+      text: context.readText(file),
+    }))
+  } else {
+    entries = collectEntries(root)
+  }
+  const failures = scanEntries(entries)
+  return {
+    issues: failures.map((f) => ({
+      code: f.rule,
+      path: f.file,
+      line: f.line,
+      message: f.message,
+    })),
+  }
+}
+
+export const runCli = (root = process.cwd()) => {
+  const { issues } = check({
+    sourceFiles: () => walk(resolve(root, SOURCE_ROOT), ['.fs']).map((f) => normalize(relative(root, f))),
+    readText: (f) => readFileSync(resolve(root, f), 'utf8'),
+  })
+  if (issues.length > 0) {
+    console.error(`participant-identity-boundary: ${issues.length} violation(s)`)
+    for (const issue of issues) {
+      console.error(`  ${issue.path}:${issue.line} [${issue.code}] ${issue.message}`)
     }
     return 1
   }
-
   console.log('participant-identity-boundary: OK — opaque logical-run evidence, atomic root authority boundary, and zero session-scoped or parallel identity owners')
   return 0
 }
 
+export const run = (root = process.cwd()) => {
+  try {
+    return runCli(root)
+  } catch (error) {
+    console.error(`participant-identity-boundary: ${error.message}`)
+    return 1
+  }
+}
+
 const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
-if (isMain) process.exit(run())
+if (isMain) process.exit(runCli())

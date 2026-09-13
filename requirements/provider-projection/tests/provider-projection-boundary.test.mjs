@@ -103,38 +103,6 @@ test('WHAT[PROVIDER-PROJECTION-007] Strength writeback API names are rejected pr
   )
 })
 
-test('WHAT[PROVIDER-PROJECTION-007] each Strength policy phrase is rejected precisely', () => {
-  for (const phrase of ['Strength Host adapter', 'Strength tool', 'Replica provider view']) {
-    assert.deepEqual(
-      violationFor(`module Fixture\nlet error = "${phrase}"\n`),
-      [expectedViolation('strength-policy-vocabulary', 2, phrase)],
-    )
-  }
-})
-
-test('WHAT[PROVIDER-PROJECTION-007] each policy decision identifier is rejected precisely', () => {
-  for (const identifier of ['retryDecision', 'RecoveryDisposition', 'advanceLifecycle']) {
-    assert.deepEqual(
-      violationFor(`module Fixture\nlet ${identifier} value = value\n`),
-      [expectedViolation('policy-identifier', 2, identifier)],
-    )
-  }
-})
-
-test('WHAT[PROVIDER-PROJECTION-007] projection conflict lifecycle vocabulary remains legal', () => {
-  assert.deepEqual(
-    violationFor('module Fixture\ntype ProjectionConflict = ConflictingPrefixLifecycle\n'),
-    [],
-  )
-})
-
-test('WHAT[PROVIDER-PROJECTION-007] lifecycle control imports are rejected precisely', () => {
-  assert.deepEqual(
-    violationFor('namespace Fixture\nopen Wanxiangshu.Execution.Session.Lifecycle\n'),
-    [expectedViolation('policy-identifier', 2, 'Lifecycle')],
-  )
-})
-
 test('WHAT[PROVIDER-PROJECTION-007] production provider projection owners are policy-free', () => {
   assert.deepEqual(
     scanProviderProjectionRepo(ROOT),

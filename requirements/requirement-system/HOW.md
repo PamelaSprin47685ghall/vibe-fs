@@ -13,9 +13,9 @@
 - **目录无外部越界**：`requirements/` 目录下不存在 `INDEX.md` 之外的任何未授权目录。
 - **依赖声明子集约束**：每个包文档中声明的 `DEPENDS ON` 集合必须是 `INDEX.md` 依赖骨架中定义边的子集。
 
-### 2. 规范语法与引用门禁（`spec gate`）
+### 2. 规范语法与引用 helpers（`spec-rules` lib）
 
-`scripts/checks/spec.mjs` 与 `scripts/checks/spec-rules.mjs`（由 `tests/spec-rules.test.mjs` 提供全面回归保障）负责静态文本规则检查：
+`scripts/lib/spec-rules.mjs`（由 `tests/spec-rules.test.mjs` 提供回归保障；条款重复定义 fail-closed 由 `tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-008] duplicate definitions retain every location and never acquire authority` 与 lib `duplicateClauseDefinitions` 覆盖）负责静态文本规则检查：
 - 确保正式条款 ID 只能在所属包的 `WHAT.md` 中定义，禁止重定义与跨文件越权定义。
 - 检查跨包条款引用的可解析性，防止悬空引用。
 - 确保导航文件（如 README）仅作路由指向，禁止定义正式规范。

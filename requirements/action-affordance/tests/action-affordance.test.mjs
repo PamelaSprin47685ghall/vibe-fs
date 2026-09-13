@@ -16,8 +16,6 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
-import { TOOL_DESCRIPTION_ANCHORS } from '../../../scripts/checks/semantic-anchors.mjs'
-
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '../../..')
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
@@ -36,31 +34,6 @@ const HIGH_RISK_TOOLS = Object.freeze([
 ])
 
 const readTool = (tool, locale) => read(`resources/provider/tool/${tool}/description/${locale}.md`)
-
-test('WHAT[ACTION-AFFORDANCE-002] AA_prompt_020_high_risk_verbs_have_semantic_anchor_catalog', () => {
-  for (const tool of HIGH_RISK_TOOLS) {
-    assert.ok(tool in TOOL_DESCRIPTION_ANCHORS, `Gate C high-risk minimum set must include ${tool}`)
-  }
-  assert.equal(
-    Object.getOwnPropertyNames(TOOL_DESCRIPTION_ANCHORS).length,
-    HIGH_RISK_TOOLS.length,
-    'Gate C anchor catalog must contain exactly the high-risk minimum set',
-  )
-})
-
-test('WHAT[ACTION-AFFORDANCE-001] AA_prompt_020_tool_descriptions_carry_contract_anchors_in_both_locales', () => {
-  for (const tool of HIGH_RISK_TOOLS) {
-    const anchors = TOOL_DESCRIPTION_ANCHORS[tool]
-    assert.ok(Array.isArray(anchors) && anchors.length > 0, `${tool} must carry at least one anchor`)
-    for (const locale of LOCALES) {
-      const text = readTool(tool, locale)
-      for (const { id, en, zh } of anchors) {
-        const re = locale === 'en' ? en : zh
-        assert.match(text, re, `${tool}/${locale}.md missing anchor ${id}`)
-      }
-    }
-  }
-})
 
 test('WHAT[ACTION-AFFORDANCE-001] AA_assume_contract_answers_act_fit_boundary_return_and_argument', () => {
   for (const locale of LOCALES) {

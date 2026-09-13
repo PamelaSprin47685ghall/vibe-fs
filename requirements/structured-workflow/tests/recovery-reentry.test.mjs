@@ -12,136 +12,15 @@
 // production source — build-verification (guide-contract.test.mjs) proves the
 // emitted modules load and export callable functions.
 
-// NOTE (static lexical scope): PROVIDER_RECOVERY_GATE_FIXTURES below are
-// synthetic source strings that exercise the static lexical checker in
-// scripts/checks/p0-recovery-join.mjs. Hitting a fixture id proves the
-// checker rejects that regression text — never runtime proof of the
-// production behavior itself.
-
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import * as reconcile from '../../../dist/Composition/Turn/ReconcileSurface.js'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { RULES, scanText } from '../../../scripts/checks/p0-recovery-join.mjs'
 
 const ROOT = new URL('../../../', import.meta.url).pathname
 const readSrc = (rel) => readFileSync(join(ROOT, rel), 'utf8')
-
-const PROVIDER_RECOVERY_GATE_FIXTURES = [
-  {
-    id: 'provider-request-kind-owner',
-    file: 'src/Wanxiangshu/Context/Prefix/Candidate.fs',
-    source: 'type ProviderRequestKind = WorkMain | BloggerMain | BloggerSquash',
-  },
-  {
-    id: 'provider-recovery-role-classification',
-    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs',
-    source: 'let classify turn = match turn.Role with | Role.Blogger -> BloggerMain | _ -> WorkMain',
-  },
-  {
-    id: 'provider-recovery-error-string-classification',
-    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs',
-    source: 'let classify error = if error.Contains("rate limit") then BloggerSquash else BloggerMain',
-  },
-  {
-    id: 'no-active-run-continues-recovery',
-    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs',
-    source: '| FailureAdmissionOutcome.NoActiveRun -> continueAdvancedFailure turn error',
-  },
-  {
-    id: 'provider-recovery-time-control',
-    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs',
-    source: 'do! Task.Delay(TimeSpan.FromSeconds 1.)',
-  },
-  {
-    id: 'provider-recovery-process-local-success',
-    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs',
-    source: 'if recoveryFlight.ContainsKey sessionId then return Ok FailureAdmissionOutcome.RetryAuthorized',
-  },
-  {
-    id: 'old-fallback-surface-import',
-    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs',
-    source: 'open Wanxiangshu.Participant.Provider.Attempt.Fallback.CursorSurface',
-  },
-  {
-    id: 'old-fallback-surface-compile-entry',
-    file: 'src/Wanxiangshu/Wanxiangshu.fsproj',
-    source: '<Compile Include="Participant\\Provider\\Attempt\\Fallback\\CursorSurface.fs" />',
-  },
-  {
-    // Stale algebra RED fixtures (never positive): the exact-stale contract
-    // text must trip the stale-algebras static check.
-    id: 'stale-provider-failure-algebra',
-    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs',
-    source: [
-      'type ConfirmedFailureOutcome =',
-      '    | RecoveryAdvanced of RecoveryOpportunity',
-      '    | RecoveryExhausted',
-      '    | AlreadyRecorded',
-      '    | NoActiveRun',
-      '    | RetryScheduled',
-      'type ConfirmedFailurePort = SessionId -> ProviderRunIdentity -> string -> Task<Result<ConfirmedFailureOutcome, string>>',
-    ].join('\n'),
-  },
-  {
-    id: 'stale-provider-failure-algebra',
-    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs',
-    source: 'FallbackLedger.recordAuthorizedFailure durable turn.SessionId authorization error',
-  },
-  {
-    // Near-miss RED fixtures for the exact-contract positives: each lacks the
-    // live FailureAdmissionOutcome/ProviderFailureLedger shape, so the
-    // positive reports it missing — static lexical rejection, not runtime proof.
-    id: 'failure-admission-outcome-contract',
-    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs',
-    source: [
-      'type ConfirmedFailureOutcome =',
-      '    | RecoveryAdvanced of RecoveryOpportunity',
-      '    | RecoveryExhausted',
-      '    | AlreadyRecorded',
-      '    | NoActiveRun',
-      '    | RetryScheduled',
-    ].join('\n'),
-  },
-  {
-    id: 'workflow-failure-admission-exhaustive',
-    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs',
-    source: 'let settle = function | ConfirmedFailureOutcome.RecoveryAdvanced opportunity -> opportunity',
-  },
-  {
-    id: 'workflow-main-session-failure-owner',
-    file: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs',
-    source: [
-      'let ownerSessionId = mainSessionOfBloggerProjection projection turn.SessionId |> Option.defaultValue turn.SessionId',
-      'FallbackLedger.recordAuthorizedFailure durable turn.SessionId authorization error',
-    ].join('\n'),
-  },
-  {
-    id: 'interaction-repair-no-direct-failure-ledger',
-    file: 'src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs',
-    source: 'FallbackLedger.recordAuthorizedFailure journal turn.SessionId authorization reason',
-  },
-]
-
-test('WHAT[STRUCTURED-WORKFLOW-003] SW_009_provider_recovery_gate_has_permanent_red_fixtures', () => {
-  for (const fixture of PROVIDER_RECOVERY_GATE_FIXTURES) {
-    const hits = scanText(fixture.source, fixture.file)
-    assert.ok(
-      hits.some(({ id }) => id === fixture.id),
-      `${fixture.id} must reject its synthetic regression; got ${hits.map(({ id }) => id).join(', ')}`,
-    )
-  }
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-003] SW_009_provider_recovery_rules_are_production_scoped', () => {
-  for (const { id } of PROVIDER_RECOVERY_GATE_FIXTURES) {
-    const rule = RULES.find((candidate) => candidate.id === id)
-    assert.ok(rule, `missing provider recovery production rule ${id}`)
-    assert.ok(rule.fileHint || rule.pathHint, `${id} must carry a narrow production file/path hint`)
-  }
-})
 
 test('WHAT[STRUCTURED-WORKFLOW-003] SW_009_reconcile_domain_is_observation_stabilization_not_a_program', () => {
   // The registered ReconcileSurface is the owner contract: callers observe

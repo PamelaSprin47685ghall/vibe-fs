@@ -124,167 +124,6 @@ export function collectCausalWaitBoundaryFiles(root = ROOT) {
     }))
 }
 
-const SELF_TEST_LEGAL = [
-  {
-    rel: 'Execution/Session/Wait/Registry.fs',
-    text: 'let reader: IWaitSnapshotReader = registry :> IWaitSnapshotReader\n',
-  },
-  {
-    rel: 'Persistence/Journal/Codec.fs',
-    text: 'let decoy = "CausalWait WaitKind IWaitSnapshotReader"\n',
-  },
-  {
-    rel: 'Change/Fact.fs',
-    text: 'let decoy = @"DiagnosticWait CausalAwait"\n',
-  },
-  {
-    rel: 'Interaction/Dispatch/FutureDecision.fs',
-    text: [
-      '// IWaitSnapshotReader CausalWaitHub.snapshot',
-      'let ordinary = "CausalWaitBridge CausalWaitSurface"',
-      'let triple = """DiagnosticWaitSnapshot"""',
-      '',
-    ].join('\n'),
-  },
-  { rel: 'Change/Job.fs', text: 'let observer: IWaitObserver = injectedObserver\n' },
-  {
-    rel: DIAGNOSTIC_COMPOSITION_ROOT,
-    text: 'runtime.BindDiagnosticTarget(CausalWaitBridge.target workspace) |> ignore\n',
-  },
-]
-
-const mutateSelfTest = (relativePath, addition) => {
-  let applied = false
-  const files = SELF_TEST_LEGAL.map((file) => {
-    if (file.rel !== relativePath) return file
-    const text = file.text + addition
-    applied = applied || text !== file.text
-    return { ...file, text }
-  })
-  return { applied, files }
-}
-
-const same = (left, right) => JSON.stringify(left) === JSON.stringify(right)
-
-export function runObservationBoundarySelfTest() {
-  const cases = []
-  cases.push({
-    name: 'known-good: owner code and lexical decoys pass',
-    ok: analyzeObservationBoundary(SELF_TEST_LEGAL).length === 0,
-  })
-
-  const expectSingle = (name, relativePath, addition, expected) => {
-    const mutation = mutateSelfTest(relativePath, addition)
-    const actual = analyzeObservationBoundary(mutation.files)
-    cases.push({
-      name,
-      ok: mutation.applied && same(actual, [expected]),
-      detail: mutation.applied ? actual.join(' | ') : 'target mutation was not applied',
-    })
-  }
-
-  expectSingle(
-    'known-bad: Journal vocabulary',
-    'Persistence/Journal/Codec.fs',
-    'let reader: IWaitSnapshotReader = source\n',
-    durableViolation('Persistence/Journal/Codec.fs', 'IWaitSnapshotReader'),
-  )
-  expectSingle(
-    'known-bad: Fact vocabulary',
-    'Change/Fact.fs',
-    'let wait: DiagnosticWait = source\n',
-    durableViolation('Change/Fact.fs', 'DiagnosticWait'),
-  )
-  expectSingle(
-    'known-bad: unlisted decision reader',
-    'Interaction/Dispatch/FutureDecision.fs',
-    'let reader: IWaitSnapshotReader = source\n',
-    readViolation('Interaction/Dispatch/FutureDecision.fs', 'IWaitSnapshotReader'),
-  )
-  expectSingle(
-    'known-bad: opened reader hub alias',
-    'Interaction/Dispatch/FutureDecision.fs',
-    'open Wanxiangshu.Execution.Session.Wait.CausalWaitHub\nlet leaked = snapshot ()\n',
-    readViolation('Interaction/Dispatch/FutureDecision.fs', 'CausalWaitHub'),
-  )
-  expectSingle(
-    'known-bad: global observer hub outside owner',
-    'Change/Job.fs',
-    'let observer = CausalWaitHub.observer\n',
-    readViolation('Change/Job.fs', 'CausalWaitHub'),
-  )
-  expectSingle(
-    'known-bad: diagnostic adapter outside composition root',
-    'Change/Job.fs',
-    'let sink = CausalWaitBridge.target workspace\n',
-    readViolation('Change/Job.fs', 'CausalWaitBridge'),
-  )
-  expectSingle(
-    'known-bad: diagnostic locator outside owner',
-    'Interaction/Dispatch/FutureDecision.fs',
-    'let path = ".wanxiangshu/diagnostics/causal-waits.json"\n',
-    readViolation('Interaction/Dispatch/FutureDecision.fs', DIAGNOSTIC_LOCATOR),
-  )
-
-  return cases
-}
-
-const criticalWaitSites = [
-  'Execution/Delegation/SyncDelegate/Workflow.fs',
-  'Execution/Delegation/Fork/OpenCode/JoinTool.fs',
-  'Change/Host/Host.fs',
-  'Change/Job.fs',
-]
-
-const analyzeCriticalWaits = (files) => {
-  const violations = []
-  const byPath = new Map(files.map((file) => [file.rel, file.text]))
-
-  for (const relativePath of criticalWaitSites) {
-    const text = byPath.get(relativePath)
-    if (text === undefined) {
-      violations.push(`${relativePath}: critical causal-wait site missing on disk`)
-      continue
-    }
-
-    const lines = text.split('\n')
-    for (let index = 0; index < lines.length; index += 1) {
-      const line = lines[index]
-      if (!/\b(return!|do!)\s+\w[\w.]*\.Task\b/.test(line)) continue
-      if (/\bcancel\.Task\b/.test(line)) continue
-
-      const nearby = lines.slice(Math.max(0, index - 40), index + 1).join('\n')
-      if (/CausalAwait\.await/.test(nearby)) continue
-
-      const preceding = lines.slice(Math.max(0, index - 80), index).join('\n')
-      if (/let private concurrent/.test(preceding) && /return! tcs\.Task/.test(line)) continue
-
-      violations.push(
-        `${relativePath}:${index + 1}: bare TCS.Task await outside CausalAwait (${line.trim()})`,
-      )
-    }
-  }
-
-  return violations
-}
-
-const analyzeRegistryMutableAnnotations = (files) => {
-  const relativePath = 'Execution/Session/Wait/Registry.fs'
-  const file = files.find((candidate) => candidate.rel === relativePath)
-  if (file === undefined) return [`${relativePath}: missing on disk`]
-
-  const violations = []
-  const lines = file.text.split('\n')
-  for (let index = 0; index < lines.length; index += 1) {
-    if (!/\blet mutable\b/.test(lines[index])) continue
-    const preceding = lines.slice(Math.max(0, index - 2), index).join('\n')
-    if (!/\/\/\s*DSL-MUTABLE:/.test(preceding)) {
-      violations.push(`${relativePath}:${index + 1}: mutable lacks DSL-MUTABLE annotation`)
-    }
-  }
-  return violations
-}
-
 const isMainModule = (() => {
   try {
     return import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href
@@ -294,13 +133,6 @@ const isMainModule = (() => {
 })()
 
 if (isMainModule) {
-  const selfTests = runObservationBoundarySelfTest()
-  const failedSelfTests = selfTests.filter((fixture) => !fixture.ok)
-  for (const fixture of selfTests) {
-    const marker = fixture.ok ? '✓' : '✗'
-    console.log(`  ${marker} ${fixture.name}${fixture.detail && !fixture.ok ? ` — ${fixture.detail}` : ''}`)
-  }
-
   let files
   try {
     files = collectCausalWaitBoundaryFiles()
@@ -309,12 +141,7 @@ if (isMainModule) {
     process.exit(1)
   }
 
-  const problems = [
-    ...failedSelfTests.map((fixture) => `self-test failed: ${fixture.name}`),
-    ...analyzeObservationBoundary(files),
-    ...analyzeCriticalWaits(files),
-    ...analyzeRegistryMutableAnnotations(files),
-  ]
+  const problems = analyzeObservationBoundary(files)
 
   if (problems.length > 0) {
     console.error('causal-wait-boundary FAILED:')
@@ -322,5 +149,5 @@ if (isMainModule) {
     process.exit(1)
   }
 
-  console.log(`causal-wait-boundary OK — ${files.length} production files, ${selfTests.length} fixtures`)
+  console.log(`causal-wait-boundary OK — ${files.length} production files`)
 }

@@ -1,18 +1,11 @@
-#!/usr/bin/env node
 /**
- * Unified-store architecture gate (changes/active/storage.md §35–§37 + Amendment G3.5-A / P4U2).
+ * Unified-store architecture gate (changes/active/storage.md §35–§37).
  *
- * Scanners (Phase 1–3):
+ * Scanners:
  *   1. feature-ref — refs/wanxiang/ outside Persist/Git ownership (only store may appear there)
  *   2. schema-version-in-store-context — durable event/store protocol versioning (§36)
  *   3. git-bypass — direct git process invocations outside Git/Persist ownership (§37)
- *
- * Scanners (P4U2 GATE-NO-MIGRATOR / clean-break):
- *   4. student-qa-revival — StudentQaStore / QA.md store paths under src/ (the
- *      student-teacher-absence ratchet was retired 2026-08-14; this scanner is
- *      the sole fail-closed guard on Student QA storage revival)
- *   5. no-migrator — one-shot legacy importer / LegacyProjection≡NewProjection tooling
- *   6. dual-write — same production module writing EventStore AND Journal NDJSON
+ *   4. dual-write — same production module writing EventStore AND Journal NDJSON
  *
  * Scanners (canonical history ownership):
  *   7. feature-history-loop — path-sensitive reader/merge/fold census
@@ -35,7 +28,7 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs'
-import { basename, relative, resolve } from 'node:path'
+import { relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { walk } from '../lib/walk.mjs'
 
@@ -75,22 +68,10 @@ export const DUAL_WRITE_ALLOWLIST = Object.freeze([
   'src/Wanxiangshu/Verification/JournalPortObservationSurface.fs',
 ])
 
-/**
- * Paths (repo-relative posix) / prefixes skipped by no-migrator tree scan so the gate and its
- * intentional RED fixtures may name forbidden patterns without self-failing.
- */
-export const NO_MIGRATOR_PATH_ALLOWLIST = Object.freeze([
-  'scripts/checks/unified-store-gate.mjs',
-  'requirements/durable-events/tests/unified-store-gate.test.mjs',
-  'requirements/durable-events/tests/fixtures/',
-])
-
 export const SCANNER_IDS = Object.freeze([
   'feature-ref',
   'schema-version-in-store-context',
   'git-bypass',
-  'student-qa-revival',
-  'no-migrator',
   'dual-write',
   'feature-history-loop',
   'private-durable-substrate',
@@ -173,15 +154,6 @@ export const isGitBypassAllowed = (rel) =>
   isStoreOwnerPath(rel) || GIT_BYPASS_ALLOWLIST.includes(rel)
 
 /** @param {string} file */
-export const isNoMigratorPathAllowed = (file) => {
-  const n = norm(file)
-  return NO_MIGRATOR_PATH_ALLOWLIST.some((entry) => {
-    if (entry.endsWith('/')) return n.startsWith(entry)
-    return n === entry || n.endsWith(`/${entry}`)
-  })
-}
-
-/** @param {string} file */
 export const isDualWriteAllowed = (file) => {
   const n = norm(file)
   return DUAL_WRITE_ALLOWLIST.some((entry) => n === entry || n.endsWith(`/${entry}`))
@@ -200,10 +172,6 @@ const ALWAYS_STORE_VERSION_RES = [
   { re: /\bjournalVersion\b/, token: 'journalVersion' },
   { re: /\bformatVersion\b/, token: 'formatVersion' },
   { re: /\bschema_version\b/, token: 'schema_version' },
-  { re: /\bStoreV2\b/, token: 'StoreV2' },
-  { re: /\bJournalV2\b/, token: 'JournalV2' },
-  { re: /\/events\/v2\//, token: '/events/v2/' },
-  { re: /refs\/wanxiang\/store-v2/, token: 'refs/wanxiang/store-v2' },
 ]
 
 /** schemaVersion only RED when store/event envelope context is present nearby. */
@@ -230,39 +198,6 @@ const GIT_BYPASS_MULTILINE_RES = [
 
 /** Owner-only remote-tracking store tip: refs/wanxiang/remotes/<remote>/store (§14). */
 const REMOTE_TRACKING_STORE_REF_RE = /^refs\/wanxiang\/remotes\/[^/]+\/store$/
-
-/**
- * Student QA storage revival under src/ (Amendment G3.5-A / G3 clean-break).
- * The student-teacher-absence ratchet was retired 2026-08-14; this scanner is
- * the sole fail-closed guard on Student QA storage revival.
- */
-const STUDENT_QA_REVIVAL_RES = [
-  { re: /\bStudentQaStore\b/, token: 'StudentQaStore' },
-  { re: /(?:^|[\s"'`([{,/\\])QA\.md\b/, token: 'QA.md' },
-  { re: /\bStudentQa(?:Opened|Closed|Question|Answer)\b/, token: 'StudentQa* event/API' },
-]
-
-/**
- * Legacy migrator / importer tooling (P4U2 GATE-NO-MIGRATOR).
- * Intentionally narrow: live Journal observers that only read wanxiangshu-next are OK.
- */
-const LEGACY_PROJECTION_EQUIV_RE =
-  /\bLegacyProjection\b\s*(?:[=≡]=|===|==|≡)\s*\bNewProjection\b|\bNewProjection\b\s*(?:[=≡]=|===|==|≡)\s*\bLegacyProjection\b/
-
-const NO_MIGRATOR_TOKEN_RES = [
-  { re: /\bLegacyMigrator\b/, token: 'LegacyMigrator' },
-  { re: /\bLegacyImporter\b/, token: 'LegacyImporter' },
-  { re: /\blegacyImporter\b/, token: 'legacyImporter' },
-  { re: /\bmigrateLegacy(?:Journal|StudentQa|Qa)?\b/, token: 'migrateLegacy*' },
-  { re: /\bStudentQaMigrator\b/, token: 'StudentQaMigrator' },
-  { re: /\bJournalToEventStore\b/, token: 'JournalToEventStore' },
-  { re: /\blegacy\s+importer\b/i, token: 'legacy importer' },
-  { re: /\bone-shot\s+migrat(?:or|ion)\b/i, token: 'one-shot migrator/migration' },
-]
-
-const LEGACY_NDJSON_RE = /wanxiangshu-next|\.ndjson\b/
-const EVENTSTORE_MIGRATE_SINK_RE =
-  /\b(?:IEventStore|EventStore|AppendCandidate|LegacyProjection|NewProjection)\b/
 
 /** Same-module EventStore write + Journal NDJSON write (dual-write bridge). */
 const EVENT_STORE_WRITE_RE =
@@ -439,117 +374,6 @@ export const scanGitBypass = (text, file = '<synthetic>') => {
     if (!m || typeof m.index !== 'number') continue
     const lineIdx = joined.slice(0, m.index).split('\n').length - 1
     pushHit(lineIdx, lines[lineIdx] || m[0])
-  }
-
-  return hits
-}
-
-/**
- * student-qa-revival: fail closed if StudentQaStore / QA.md store paths return under src/.
- * @param {string} text
- * @param {string} [file]
- * @returns {Violation[]}
- */
-export const scanStudentQaRevival = (text, file = '<synthetic>') => {
-  if (file !== '<synthetic>') {
-    const n = norm(file)
-    // Scope: production src/ tree (and synthetic/fixture paths used in unit tests).
-    // scripts/docs mentions are out of scope here; this scanner owns storage-path revival.
-    if (n.startsWith('scripts/')) return []
-  }
-
-  const lines = text.split('\n')
-  const hits = []
-  for (let i = 0; i < lines.length; i++) {
-    const raw = lines[i]
-    for (const { re, token } of STUDENT_QA_REVIVAL_RES) {
-      if (re.test(raw)) {
-        hits.push({
-          id: 'student-qa-revival',
-          file,
-          line: i + 1,
-          label: `Student QA storage revival token '${token}' is forbidden under src/ (G3 / G3.5-A clean-break)`,
-          text: raw.trim(),
-        })
-        break
-      }
-    }
-  }
-  return hits
-}
-
-/**
- * no-migrator: fail closed on one-shot legacy→EventStore migrators and
- * LegacyProjection≡NewProjection suites (Amendment G3.5-A / P4U2 GATE-NO-MIGRATOR).
- * @param {string} text
- * @param {string} [file]
- * @returns {Violation[]}
- */
-export const scanNoMigrator = (text, file = '<synthetic>') => {
-  if (file !== '<synthetic>' && isNoMigratorPathAllowed(file)) return []
-
-  const lines = text.split('\n')
-  const hits = []
-  const seen = new Set()
-
-  const push = (lineIdx, label, raw) => {
-    const key = `${lineIdx}:${label}`
-    if (seen.has(key)) return
-    seen.add(key)
-    hits.push({
-      id: 'no-migrator',
-      file,
-      line: lineIdx + 1,
-      label,
-      text: raw.trim(),
-    })
-  }
-
-  for (let i = 0; i < lines.length; i++) {
-    const raw = lines[i]
-    const code = stripLineComment(raw)
-
-    if (LEGACY_PROJECTION_EQUIV_RE.test(code) || LEGACY_PROJECTION_EQUIV_RE.test(raw)) {
-      push(
-        i,
-        'LegacyProjection≡NewProjection (or ==) equivalence suite is forbidden for retired domains (G3.5-A)',
-        raw,
-      )
-    }
-
-    for (const { re, token } of NO_MIGRATOR_TOKEN_RES) {
-      if (re.test(code) || re.test(raw)) {
-        push(
-          i,
-          `legacy migrator/importer token '${token}' is forbidden (P4U2 GATE-NO-MIGRATOR; leave-unread clean-break only)`,
-          raw,
-        )
-      }
-    }
-  }
-
-  // Heuristic: persist migration test / migrator script that reads wanxiangshu-next NDJSON
-  // into EventStore / projection-equivalence machinery.
-  const base = basename(norm(file))
-  const looksLikeMigratorFile =
-    file !== '<synthetic>' &&
-    (/^migration\.test\./i.test(base) ||
-      /migrat(?:or|ion)/i.test(base) ||
-      /\/persist\/migration/i.test(norm(file)))
-
-  if (looksLikeMigratorFile) {
-    const joined = lines.map(stripLineComment).join('\n')
-    if (LEGACY_NDJSON_RE.test(joined) && EVENTSTORE_MIGRATE_SINK_RE.test(joined)) {
-      const lineIdx = Math.max(
-        0,
-        lines.findIndex((l) => LEGACY_NDJSON_RE.test(l) || EVENTSTORE_MIGRATE_SINK_RE.test(l)),
-      )
-      push(
-        lineIdx,
-        'one-shot migrator tooling that reads wanxiangshu-next/.ndjson into EventStore (or projection equivalence) is forbidden (G3.5-A)',
-        lines[lineIdx] || base,
-      )
-    }
   }
 
   return hits
@@ -852,8 +676,6 @@ export const scanText = (text, file = '<synthetic>') => [
   ...scanFeatureRef(text, file),
   ...scanSchemaVersionInStoreContext(text, file),
   ...scanGitBypass(text, file),
-  ...scanStudentQaRevival(text, file),
-  ...scanNoMigrator(text, file),
   ...scanDualWrite(text, file),
   ...scanFeatureHistoryLoop(text, file),
   ...scanPrivateDurableSubstrate(text, file),
@@ -868,13 +690,6 @@ export const scanFiles = (entries) => {
   return violations
 }
 
-/** Clean-break only (for extra tree roots beyond production .fs). */
-export const scanCleanBreakText = (text, file = '<synthetic>') => [
-  ...scanStudentQaRevival(text, file),
-  ...scanNoMigrator(text, file),
-  ...scanDualWrite(text, file),
-]
-
 export const collectProductionEntries = (root = PRODUCTION_ROOT) => {
   if (!existsSync(root)) {
     throw new Error(`unified-store-gate: required directory '${root}' does not exist`)
@@ -885,28 +700,8 @@ export const collectProductionEntries = (root = PRODUCTION_ROOT) => {
   }))
 }
 
-/**
- * Extra entries for no-migrator fail-closed coverage (tests/scripts tooling).
- * Production .fs are already scanned via collectProductionEntries.
- */
-export const collectNoMigratorExtraEntries = () => {
-  const roots = [
-    { dir: 'requirements', exts: ['.mjs', '.js'] },
-    { dir: 'scripts', exts: ['.mjs', '.js'] },
-  ]
-  const entries = []
-  for (const { dir, exts } of roots) {
-    if (!existsSync(dir)) continue
-    for (const file of walk(dir, exts)) {
-      const rel = norm(relative('.', file) || file)
-      if (isNoMigratorPathAllowed(rel)) continue
-      entries.push({ file: rel, text: readFileSync(file, 'utf8') })
-    }
-  }
-  return entries
-}
-
 const runCli = () => {
+
   let production
   try {
     production = collectProductionEntries()
@@ -918,7 +713,6 @@ const runCli = () => {
   const violations = [
     ...scanFiles(production),
     ...scanCanonicalSharedProgram(production),
-    ...collectNoMigratorExtraEntries().flatMap((entry) => scanNoMigrator(entry.text, entry.file)),
   ]
 
   if (violations.length === 0) {

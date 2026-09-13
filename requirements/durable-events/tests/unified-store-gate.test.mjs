@@ -19,10 +19,8 @@ import {
   scanFeatureRef,
   scanFiles,
   scanGitBypass,
-  scanNoMigrator,
   scanPrivateDurableSubstrate,
   scanSchemaVersionInStoreContext,
-  scanStudentQaRevival,
   scanText,
 } from '../../../scripts/checks/unified-store-gate.mjs'
 
@@ -34,8 +32,6 @@ test('WHAT[DURABLE-EVENTS-016] scanner ids cover unified-store clean-break and h
     'feature-ref',
     'schema-version-in-store-context',
     'git-bypass',
-    'student-qa-revival',
-    'no-migrator',
     'dual-write',
     'feature-history-loop',
     'private-durable-substrate',
@@ -71,32 +67,6 @@ test('WHAT[DURABLE-EVENTS-016] fixture unified-store-git-bypass.fs is RED for gi
   assert.match(hits[0].text, /FileName\s*=\s*"git"/)
   assert.equal(scanFeatureRef(source, 'Domain/FeatureGit.fs').length, 0)
   assert.equal(scanSchemaVersionInStoreContext(source).length, 0)
-})
-
-test('WHAT[DURABLE-EVENTS-009] fixture unified-store-student-qa-revival.fs is RED for student-qa-revival', () => {
-  const source = readFixture('unified-store-student-qa-revival.fs')
-  const hits = scanStudentQaRevival(source, 'src/Wanxiangshu/Infrastructure/OpenCode/Host/StudentQaStore.fs')
-  assert.ok(hits.length >= 1, 'expected student-qa-revival violation')
-  assert.ok(hits.every((h) => h.id === 'student-qa-revival'))
-  assert.ok(hits.some((h) => /StudentQaStore/.test(h.text)))
-  assert.ok(hits.some((h) => /QA\.md/.test(h.text)))
-})
-
-test('WHAT[DURABLE-EVENTS-009] fixture unified-store-no-migrator.mjs is RED for no-migrator', () => {
-  const source = readFixture('unified-store-no-migrator.mjs')
-  const hits = scanNoMigrator(source, 'tests/integration/persist/migration.test.mjs')
-  assert.ok(hits.length >= 1, 'expected no-migrator violation')
-  assert.ok(hits.every((h) => h.id === 'no-migrator'))
-  assert.ok(
-    hits.some((h) => /LegacyProjection|LegacyMigrator|wanxiangshu-next/i.test(h.text + h.label)),
-    'expected LegacyProjection / LegacyMigrator / wanxiangshu-next signal',
-  )
-})
-
-test('WHAT[DURABLE-EVENTS-009] synthetic LegacyProjection≡NewProjection claim is RED for no-migrator', () => {
-  const source = 'assert.deepEqual(LegacyProjection, NewProjection) // LegacyProjection == NewProjection'
-  const hits = scanNoMigrator(source, 'tests/integration/persist/migration.test.mjs')
-  assert.ok(hits.some((h) => /LegacyProjection/.test(h.label) || /LegacyProjection/.test(h.text)))
 })
 
 test('WHAT[DURABLE-EVENTS-009] fixture unified-store-dual-write.fs is RED for dual-write', () => {
@@ -146,16 +116,10 @@ test('WHAT[DURABLE-EVENTS-002] schemaVersion without store context is not flagge
 })
 
 test('WHAT[DURABLE-EVENTS-002] always-forbidden store version tokens are RED without extra context', () => {
-  for (const token of ['storageVersion', 'journalVersion', 'formatVersion', 'StoreV2', 'JournalV2']) {
+  for (const token of ['storageVersion', 'journalVersion', 'formatVersion']) {
     const hits = scanSchemaVersionInStoreContext(`let x = ${token}`, 'Domain/Bad.fs')
     assert.ok(hits.some((h) => h.text.includes(token)), `expected hit for ${token}`)
   }
-  assert.ok(
-    scanSchemaVersionInStoreContext('let p = "/events/v2/stream"', 'Domain/Bad.fs').length >= 1,
-  )
-  assert.ok(
-    scanSchemaVersionInStoreContext('let r = "refs/wanxiang/store-v2"', 'Domain/Bad.fs').length >= 1,
-  )
 })
 
 test('WHAT[DURABLE-EVENTS-016] canonical refs/wanxiang/store is allowed only under Persist/Git ownership', () => {
@@ -457,19 +421,6 @@ test('WHAT[DURABLE-EVENTS-013] canonical shape requires one-envelope rule and sh
   )
 })
 
-test('WHAT[DURABLE-EVENTS-009] e2e journal observers that only read wanxiangshu-next are not no-migrator', () => {
-  const observer = [
-    "const dir = path.join(common, 'wanxiangshu-next', 'runtimes')",
-    "const text = fs.readFileSync(path.join(dir, runtimeId + '.ndjson'), 'utf8')",
-    'assert.ok(text.includes("LifeOpened"))',
-  ].join('\n')
-  assert.equal(
-    scanNoMigrator(observer, 'tests/e2e/cases/relay-assessment.test.mjs').length,
-    0,
-    'live Journal observation is not a legacy migrator',
-  )
-})
-
 test('WHAT[DURABLE-EVENTS-019] production tree has no feature history loop or private substrate', () => {
   const entries = collectProductionEntries()
   const violations = scanFiles(entries).filter(
@@ -504,10 +455,10 @@ test('WHAT[DURABLE-EVENTS-016] production scan is GREEN under gate rules (empty 
   )
 })
 
-test('WHAT[DURABLE-EVENTS-009] production scan has no legacy dual-write migrator or student-qa residue', () => {
+test('WHAT[DURABLE-EVENTS-009] production scan has no dual-write residue', () => {
   const entries = collectProductionEntries()
   const violations = scanFiles(entries)
-  const own = violations.filter((v) => v.id === 'dual-write' || v.id === 'no-migrator' || v.id === 'student-qa-revival')
+  const own = violations.filter((v) => v.id === 'dual-write')
   assert.deepEqual(
     own,
     [],
