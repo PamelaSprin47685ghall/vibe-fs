@@ -28,6 +28,7 @@
  * the per-class import surface for freeze/cutover review).
  */
 import assert from 'node:assert/strict';
+import './support/env-pin.mjs';
 import { fileURLToPath } from 'node:url';
 import { runCanary } from './support/scenario-driver.mjs';
 import { bindLaneSession } from './support/lane.mjs';
