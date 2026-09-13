@@ -4,6 +4,7 @@
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { walk } from '../lib/walk.mjs'
 
 const PRODUCTION_ROOT = 'src/Wanxiangshu'
@@ -13,309 +14,169 @@ const OWNER_FSPROJ = /^src\/Wanxiangshu\/Wanxiangshu\.Owner\..+\.fsproj$/
 const PURE_DIRS = [`${PRODUCTION_ROOT}/Foundation/`]
 const RESOURCE_DIR = `${PRODUCTION_ROOT}/Resources/`
 const UPPER_NAMESPACES = ['Wanxiangshu.OpenCode', 'Wanxiangshu.Session', 'Wanxiangshu.Process']
-const LEGACY_TOKENS = [
-  'docs/evidence',
-  'docs/archive',
-  'SSOT/',
-  'STATUS/',
-  'vibe-fs',
-  'tests-mjs',
-  'testkit',
-  'Wanxiangshu.Next',
-]
-const HOST_SOURCE_PATH = /(?:\.\.\/opencode|packages)\/[\w.-]+(?:\/[\w.-]+)*\/src\//
 const PACKAGE_RESOURCE_READ = /PackageResources\./
 
-const violations = []
-const fail = (gate, message) => violations.push({ gate, message })
 const norm = (path) => path.replace(/\\/g, '/')
 const isFs = (path) => path.endsWith('.fs')
 
-const sources = new Map()
-const read = (path) => {
-  if (!sources.has(path)) sources.set(path, readFileSync(path, 'utf8'))
-  return sources.get(path)
+export function scanArchitecture(productionFiles, read) {
+  const violations = []
+  const fail = (gate, message) => violations.push({ gate, message })
+
+  const productionFs = productionFiles.filter(isFs).map(norm)
+
+  // ① sole F# source root under src/
+  {
+    if (!existsSync(SRC_ROOT) || !statSync(SRC_ROOT).isDirectory()) {
+      fail('source-root', `${SRC_ROOT}/ missing`)
+    } else {
+      for (const entry of readdirSync(SRC_ROOT, { withFileTypes: true })) {
+        const full = join(SRC_ROOT, entry.name)
+        if (entry.isDirectory()) {
+          if (entry.name !== 'Wanxiangshu') {
+            const stray = walk(full, ['.fs', '.fsproj'])
+            if (stray.length > 0) {
+              fail('source-root', `${full}/ contains F# sources; only ${PRODUCTION_ROOT}/ is allowed`)
+            }
+          }
+        } else if (entry.name.endsWith('.fs') || entry.name.endsWith('.fsproj')) {
+          fail('source-root', `${full}: F# source outside ${PRODUCTION_ROOT}/`)
+        }
+      }
+    }
+    const outside = walk(SRC_ROOT, ['.fs', '.fsproj']).filter((file) => {
+      const rel = norm(relative('.', file))
+      return rel !== PRODUCTION_ROOT && !rel.startsWith(`${PRODUCTION_ROOT}/`)
+    })
+    for (const file of outside) fail('source-root', `${norm(file)}: F# source outside ${PRODUCTION_ROOT}/`)
+  }
+
+  // ② each .fs belongs to exactly one owner-locality project; flattened Fable emit mirrors the same set.
+  {
+    if (!existsSync(FSPROJ)) {
+      fail('fsproj-drift', `${FSPROJ} does not exist`)
+    } else {
+      const aggregate = read(FSPROJ)
+      if (!/<WanxiangshuEmitProject>true<\/WanxiangshuEmitProject>/.test(aggregate)) {
+        fail('fsproj-drift', `${FSPROJ}: flattened Fable emitter marker is missing`)
+      }
+      if (/<ProjectReference\s+Include=/.test(aggregate)) {
+        fail('fsproj-drift', `${FSPROJ}: flattened Fable emitter must not ProjectReference owner localities`)
+      }
+      const ownerProjects = productionFiles.filter((file) => OWNER_FSPROJ.test(norm(file)))
+      const declared = ownerProjects.flatMap((project) => {
+        const text = read(project)
+        return [...text.matchAll(/<Compile\s+Include="([^"]+\.fs)"\s*\/?\s*>/g)].map((m) =>
+          norm(`${PRODUCTION_ROOT}/${m[1]}`),
+        )
+      })
+      const counts = new Map()
+      for (const path of declared) counts.set(path, (counts.get(path) ?? 0) + 1)
+      const onDisk = new Set(productionFs)
+
+      for (const [path, n] of counts) {
+        if (n > 1) fail('fsproj-drift', `${path}: compiled by ${n} owner-locality projects`)
+        if (!onDisk.has(path)) fail('fsproj-drift', `owner-locality project declares '${path}' which does not exist`)
+      }
+      for (const path of onDisk) {
+        if (!counts.has(path)) fail('fsproj-drift', `${path}: on disk but not compiled by an owner-locality project`)
+      }
+
+      const emitDeclared = [...aggregate.matchAll(/<Compile\s+Include="([^"]+\.fs)"\s*\/?\s*>/g)].map((m) =>
+        norm(`${PRODUCTION_ROOT}/${m[1]}`),
+      )
+      const emitSet = new Set(emitDeclared)
+      if (emitSet.size !== emitDeclared.length) fail('fsproj-drift', `${FSPROJ}: duplicate production Compile entry`)
+      for (const path of onDisk) {
+        if (!emitSet.has(path)) fail('fsproj-drift', `${FSPROJ}: flattened emit misses '${path}'`)
+      }
+      for (const path of emitSet) {
+        if (!onDisk.has(path)) fail('fsproj-drift', `${FSPROJ}: flattened emit declares missing '${path}'`)
+      }
+    }
+  }
+
+  // ⑤ Kernel/Domain must not reference upper infrastructure namespaces
+  for (const file of productionFs) {
+    if (!PURE_DIRS.some((dir) => file.startsWith(dir))) continue
+    const text = read(file)
+    for (const upper of UPPER_NAMESPACES) {
+      if (text.includes(upper)) fail('dependency-direction', `${file}: pure core references '${upper}'`)
+    }
+  }
+
+  // ⑤ Kernel/Domain must not use Fable.Core.JsInterop
+  for (const file of productionFs) {
+    if (!PURE_DIRS.some((dir) => file.startsWith(dir))) continue
+    if (read(file).includes('Fable.Core.JsInterop')) {
+      fail('host-boundary', `${file}: pure core must not use Fable.Core.JsInterop`)
+    }
+  }
+
+  // ⑥ package resource reads only under Infrastructure/Resources/
+  for (const file of productionFs) {
+    if (file.startsWith(RESOURCE_DIR)) continue
+    if (PACKAGE_RESOURCE_READ.test(read(file))) {
+      fail('resource-boundary', `${file}: package resource I/O must live under ${RESOURCE_DIR}`)
+    }
+  }
+
+  return { violations, productionFsCount: productionFs.length }
 }
 
-if (!existsSync(PRODUCTION_ROOT)) {
-  console.error(`architecture: required directory '${PRODUCTION_ROOT}' does not exist`)
+export function check(context) {
+  const sources = new Map()
+  const read = (path) => {
+    if (context && typeof context.readText === 'function') return context.readText(path)
+    if (!sources.has(path)) sources.set(path, readFileSync(path, 'utf8'))
+    return sources.get(path)
+  }
+
+  if (!existsSync(PRODUCTION_ROOT)) {
+    return {
+      issues: [
+        {
+          code: 'architecture-root-missing',
+          message: `architecture: required directory '${PRODUCTION_ROOT}' does not exist`,
+        },
+      ],
+    }
+  }
+
+  const productionFiles = walk(PRODUCTION_ROOT, ['.fs', '.fsproj'])
+  const { violations } = scanArchitecture(productionFiles, read)
+
+  const issues = violations.map(({ gate, message }) => ({
+    code: gate,
+    message,
+  }))
+
+  return { issues }
+}
+
+function runCli() {
+  const result = check()
+  if (result.issues.length === 0) {
+    console.log('architecture: OK')
+    process.exit(0)
+  }
+
+  const byGate = new Map()
+  for (const { code, message } of result.issues) {
+    if (!byGate.has(code)) byGate.set(code, [])
+    byGate.get(code).push(message)
+  }
+
+  console.error(`architecture: ${result.issues.length} violation(s)\n`)
+  for (const [gate, messages] of byGate) {
+    console.error(`${gate} (${messages.length})`)
+    for (const message of messages) console.error(`  ${message}`)
+    console.error('')
+  }
   process.exit(1)
 }
 
-const productionFiles = walk(PRODUCTION_ROOT, ['.fs', '.fsproj'])
-const productionFs = productionFiles.filter(isFs).map(norm)
-
-// ① sole F# source root under src/
-{
-  if (!existsSync(SRC_ROOT) || !statSync(SRC_ROOT).isDirectory()) {
-    fail('source-root', `${SRC_ROOT}/ missing`)
-  } else {
-    for (const entry of readdirSync(SRC_ROOT, { withFileTypes: true })) {
-      const full = join(SRC_ROOT, entry.name)
-      if (entry.isDirectory()) {
-        if (entry.name !== 'Wanxiangshu') {
-          const stray = walk(full, ['.fs', '.fsproj'])
-          if (stray.length > 0) {
-            fail('source-root', `${full}/ contains F# sources; only ${PRODUCTION_ROOT}/ is allowed`)
-          }
-        }
-      } else if (entry.name.endsWith('.fs') || entry.name.endsWith('.fsproj')) {
-        fail('source-root', `${full}: F# source outside ${PRODUCTION_ROOT}/`)
-      }
-    }
-  }
-  const outside = walk(SRC_ROOT, ['.fs', '.fsproj']).filter((file) => {
-    const rel = norm(relative('.', file))
-    return rel !== PRODUCTION_ROOT && !rel.startsWith(`${PRODUCTION_ROOT}/`)
-  })
-  for (const file of outside) fail('source-root', `${norm(file)}: F# source outside ${PRODUCTION_ROOT}/`)
+const isEntry = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]
+if (isEntry) {
+  runCli()
 }
-
-// ② each .fs belongs to exactly one owner-locality project; flattened Fable emit mirrors the same set.
-{
-  if (!existsSync(FSPROJ)) {
-    fail('fsproj-drift', `${FSPROJ} does not exist`)
-  } else {
-    const aggregate = read(FSPROJ)
-    if (!/<WanxiangshuEmitProject>true<\/WanxiangshuEmitProject>/.test(aggregate)) {
-      fail('fsproj-drift', `${FSPROJ}: flattened Fable emitter marker is missing`)
-    }
-    if (/<ProjectReference\s+Include=/.test(aggregate)) {
-      fail('fsproj-drift', `${FSPROJ}: flattened Fable emitter must not ProjectReference owner localities`)
-    }
-    const ownerProjects = productionFiles.filter((file) => OWNER_FSPROJ.test(norm(file)))
-    if (ownerProjects.length < 2) fail('fsproj-drift', `${PRODUCTION_ROOT}: owner-locality projects missing`)
-    const declared = ownerProjects.flatMap((project) => {
-      const text = read(project)
-      return [...text.matchAll(/<Compile\s+Include="([^"]+\.fs)"\s*\/?\s*>/g)].map((m) =>
-        norm(`${PRODUCTION_ROOT}/${m[1]}`),
-      )
-    })
-    const counts = new Map()
-    for (const path of declared) counts.set(path, (counts.get(path) ?? 0) + 1)
-    const onDisk = new Set(productionFs)
-
-    for (const [path, n] of counts) {
-      if (n > 1) fail('fsproj-drift', `${path}: compiled by ${n} owner-locality projects`)
-      if (!onDisk.has(path)) fail('fsproj-drift', `owner-locality project declares '${path}' which does not exist`)
-    }
-    for (const path of onDisk) {
-      if (!counts.has(path)) fail('fsproj-drift', `${path}: on disk but not compiled by an owner-locality project`)
-    }
-
-    const emitDeclared = [...aggregate.matchAll(/<Compile\s+Include="([^"]+\.fs)"\s*\/?\s*>/g)].map((m) =>
-      norm(`${PRODUCTION_ROOT}/${m[1]}`),
-    )
-    const emitSet = new Set(emitDeclared)
-    if (emitSet.size !== emitDeclared.length) fail('fsproj-drift', `${FSPROJ}: duplicate production Compile entry`)
-    for (const path of onDisk) {
-      if (!emitSet.has(path)) fail('fsproj-drift', `${FSPROJ}: flattened emit misses '${path}'`)
-    }
-    for (const path of emitSet) {
-      if (!onDisk.has(path)) fail('fsproj-drift', `${FSPROJ}: flattened emit declares missing '${path}'`)
-    }
-  }
-}
-
-// ④ Finality observes reviewer facts; ReviewerWorkflow is the sole continuation writer.
-{
-  const obsoletePaths = [
-    `${PRODUCTION_ROOT}/Infrastructure/OpenCode/Tools/FinalityController.fs`,
-    `${PRODUCTION_ROOT}/OpenCode/Tools/FinalityController.fs`,
-  ]
-  for (const finalityPath of obsoletePaths) {
-    if (existsSync(finalityPath)) {
-      fail('obsolete-controller', `${finalityPath} must be deleted (rabbit S7/S8)`)
-    }
-  }
-}
-
-// ⑤ Kernel/Domain must not reference upper infrastructure namespaces
-for (const file of productionFs) {
-  if (!PURE_DIRS.some((dir) => file.startsWith(dir))) continue
-  const text = read(file)
-  for (const upper of UPPER_NAMESPACES) {
-    if (text.includes(upper)) fail('dependency-direction', `${file}: pure core references '${upper}'`)
-  }
-}
-
-// ⑤ Kernel/Domain must not use Fable.Core.JsInterop
-for (const file of productionFs) {
-  if (!PURE_DIRS.some((dir) => file.startsWith(dir))) continue
-  if (read(file).includes('Fable.Core.JsInterop')) {
-    fail('host-boundary', `${file}: pure core must not use Fable.Core.JsInterop`)
-  }
-}
-
-// ⑥ package resource reads only under Infrastructure/Resources/
-for (const file of productionFs) {
-  if (file.startsWith(RESOURCE_DIR)) continue
-  if (PACKAGE_RESOURCE_READ.test(read(file))) {
-    fail('resource-boundary', `${file}: package resource I/O must live under ${RESOURCE_DIR}`)
-  }
-}
-
-// ⑦ no generated F# sources
-for (const file of productionFiles) {
-  if (norm(file).endsWith('.gen.fs')) fail('no-gen-fs', `${norm(file)}: generated F# is forbidden`)
-}
-
-// ⑧ no legacy paths / names
-const referencesLegacySrc = (text) => {
-  const withoutHostCitations = text.replace(new RegExp(HOST_SOURCE_PATH.source, 'g'), '')
-  return (
-    withoutHostCitations.includes('../src') ||
-    withoutHostCitations.includes('..\\src') ||
-    withoutHostCitations.includes('/src/') ||
-    withoutHostCitations.includes('\\src\\')
-  )
-}
-
-for (const file of productionFs) {
-  const text = read(file)
-  if (referencesLegacySrc(text)) fail('legacy-vocabulary', `${file}: forbidden reference to legacy src path`)
-  for (const token of LEGACY_TOKENS) {
-    if (text.includes(token)) fail('legacy-vocabulary', `${file}: forbidden legacy token '${token}'`)
-  }
-}
-
-// ⑨ RECOVERY-FAMILY: no local recovery-gate bypass; constructor must not start restore.
-{
-  const forbiddenCallers = [
-    'PromptRecovery.RecoveryGate',
-    'AttachRecoveryGate',
-    'AttachBloggerRecoveryGate',
-  ]
-  for (const file of productionFs) {
-    const text = read(file)
-    // Domain DSL may name RecoveryGate only as history; production wiring must not.
-    if (file.includes('/Execution/Session/Recovery/Model.fs')) continue
-    for (const token of forbiddenCallers) {
-      if (text.includes(token)) {
-        fail('recovery-family', `${file}: forbidden local recovery gate '${token}'`)
-      }
-    }
-  }
-
-  const forkRuntime = `${PRODUCTION_ROOT}/Execution/Delegation/Fork/Host/Runtime.fs`
-  if (existsSync(forkRuntime)) {
-    const text = read(forkRuntime)
-    if (/do\s+recoveryTask\s*<-\s*restoreChildren/.test(text)) {
-      fail('recovery-family', `${forkRuntime}: constructor must not start restoreChildren`)
-    }
-    // GREEN-4: second recovery ownership must not reappear (code only; comments ok).
-    const codeOnly = text
-      .split('\n')
-      .filter((l) => !/^\s*\/\//.test(l) && !/^\s*\*/.test(l))
-      .join('\n')
-    if (/\brecoveryTask\b/.test(codeOnly)) {
-      fail('recovery-family', `${forkRuntime}: recoveryTask must not exist (SessionRecoveryWorkflow owns restore)`)
-    }
-    if (/member[^\n]*AwaitRecovery/.test(codeOnly) || /EnsureChildRestoreStarted/.test(codeOnly)) {
-      fail('recovery-family', `${forkRuntime}: AwaitRecovery / EnsureChildRestoreStarted deleted (GREEN-4)`)
-    }
-  }
-
-  const dsl = `${PRODUCTION_ROOT}/Execution/Session/Recovery/Model.fs`
-  if (!existsSync(dsl)) {
-    fail('recovery-family', `${dsl}: SessionRecovery DSL missing`)
-  } else {
-    const text = read(dsl)
-    if (!/type FamilyRecoveryPermit\s*=\s*\n\s*private/.test(text) && !/FamilyRecoveryPermit\s*=\s*private/.test(text)) {
-      fail('recovery-family', `${dsl}: FamilyRecoveryPermit must be private`)
-    }
-  }
-}
-
-// ⑩ TURN-COMPLETION-PLUMBING (ce.md §15 / rabbit S2): OrdinaryTurnWorkflow may
-// classify outcomes and TerminalReporter owns physical completion. Neither may
-// hold bounded-context Manager/Reviewer/Finality policy. TurnCompletionProgram deleted.
-{
-  const plumbingFiles = [
-    `${PRODUCTION_ROOT}/Composition/Turn/OrdinaryTurnWorkflow.fs`,
-    `${PRODUCTION_ROOT}/Context/Trace/TerminalReporter.fs`,
-  ]
-  const forbidden = [
-    'Role.Manager',
-    'Role.Reviewer',
-    'SyncDelegateRuntime',
-    'ManagerLifecycleGate',
-    'ReviewerGuardState',
-    'ReviewerEvidence',
-    'HostReviewGuard',
-    'Finality',
-    'ManagerIdleEncouragement',
-    'ReviewConfirmation',
-    'ReviewerGuard',
-  ]
-  for (const file of plumbingFiles) {
-    const text = read(file)
-    for (const token of forbidden) {
-      // OrdinaryTurnWorkflow legitimately matches Role only via Turn.Role option
-      // for loop-kill/path routing — forbid Manager/Reviewer *business* tokens above.
-      if (token === 'Role.Manager' || token === 'Role.Reviewer') continue
-      if (text.includes(token)) {
-        fail('turn-completion-plumbing', `${file}: bounded-context token '${token}' is forbidden`)
-      }
-    }
-  }
-  if (existsSync(`${PRODUCTION_ROOT}/Composition/Turn/TurnCompletionProgram.fs`)) {
-    fail(
-      'turn-completion-plumbing',
-      `${PRODUCTION_ROOT}/Composition/Turn/TurnCompletionProgram.fs must be deleted (rabbit S2)`,
-    )
-  }
-}
-
-// ⑪ FINALITY-REVIEW-OWNER (ce.md SEC4.3): the Finality workflow enlists a review
-// cohort and aggregates witnesses, but it must NOT own the reviewer continuation
-// decision — ReviewerWorkflow is the sole business owner of reviewer sends. If
-// a Finality file directly decides a reviewer continuation kind or drives the
-// reviewer-state machine, it is a second writer and the gate is RED.
-//
-// The allowed boundary: Finality may open barriers, send the INITIAL assignment,
-// wait for facts, aggregate, short-circuit REVISE, and collect confirmed witnesses.
-// It must not call the reviewer workflow or any continuation transport primitive.
-{
-  const finalityFiles = ['FinalityController', 'FinalityTool', 'FinalityReviewCohort']
-  const forbiddenReviewerDecision = [
-    'ReviewerGuardState',
-    'ReviewerEvidence',
-    'ReviewerWorkflow',
-    'requestPerfectConfirmation',
-    'nudgeReviewer',
-    'HostReviewGuard',
-    'ReviewerVerdictGuard',
-    'PromptAuthority.ContinuationKind.ReviewConfirmation',
-    'PromptAuthority.ContinuationKind.ReviewerGuard',
-  ]
-  for (const file of productionFs) {
-    const base = file.split('/').pop().replace(/\.fs$/, '')
-    if (!finalityFiles.some((name) => base === name)) continue
-    const text = read(file)
-    for (const token of forbiddenReviewerDecision) {
-      if (text.includes(token)) {
-        fail('finality-review-owner', `${file}: Finality must not own reviewer continuation '${token}'`)
-      }
-    }
-  }
-}
-
-if (violations.length === 0) {
-  console.log(`architecture: OK — ${productionFs.length} 文件`)
-  process.exit(0)
-}
-
-const byGate = new Map()
-for (const { gate, message } of violations) {
-  if (!byGate.has(gate)) byGate.set(gate, [])
-  byGate.get(gate).push(message)
-}
-
-console.error(`architecture: ${violations.length} violation(s) — ${productionFs.length} 文件\n`)
-for (const [gate, messages] of byGate) {
-  console.error(`${gate} (${messages.length})`)
-  for (const message of messages) console.error(`  ${message}`)
-  console.error('')
-}
-process.exit(1)

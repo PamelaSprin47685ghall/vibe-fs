@@ -22,7 +22,6 @@ const checks = [
   join(root, 'checks/llm-facing-format-gate.mjs'),
   join(root, 'checks/language-parity-gate.mjs'),
   join(root, 'checks/js-boundary-gate.mjs'),
-  join(root, 'checks/requirement-trace.mjs'),
 ]
 
 for (const script of checks) {

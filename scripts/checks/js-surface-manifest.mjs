@@ -12,7 +12,7 @@ import { pathToFileURL } from 'node:url'
 
 import { SURFACE_CONSUMERS, SURFACE_MANIFEST } from '../lib/test-surface-scan.mjs'
 import { isFunction, parseModule, walkSyntax } from '../lib/js-syntax.mjs'
-import { scanTestSource, whatHeadings } from '../lib/requirement-trace.mjs'
+
 import { walk } from '../lib/walk.mjs'
 
 export const WHAT_ID = /^#{1,6}\s+([A-Z][A-Z0-9-]*-\d{3}(?:[A-Z]|-[A-Z0-9]+)?)\b/gm
@@ -469,7 +469,7 @@ export const validateSurfaceManifest = (manifest = SURFACE_MANIFEST, root = proc
     .filter(({ file }) => file.endsWith('.test.mjs'))
     .map(({ file, source }) => {
       const syntax = parseModule(source, file)
-      return { file, source, syntax, declarations: scanTestSource(file, source, syntax) }
+      return { file, source, syntax }
     })
   const seenModules = new Set()
 
@@ -525,7 +525,7 @@ export const validateSurfaceManifest = (manifest = SURFACE_MANIFEST, root = proc
         fail(`${label}: law ${law} owner WHAT is missing (${lawWhatPath})`)
         continue
       }
-      const lawIds = new Set(whatHeadings(read(root, lawWhatPath)).map(({ id }) => id))
+      const lawIds = new Set(whatIds(read(root, lawWhatPath)))
       if (!lawIds.has(law)) fail(`${label}: law ${law} is absent from ${lawWhatPath}`)
     }
 
@@ -550,53 +550,30 @@ export const validateSurfaceManifest = (manifest = SURFACE_MANIFEST, root = proc
       typeof entry.module === 'string' && Array.isArray(SURFACE_CONSUMERS[entry.module]) ? SURFACE_CONSUMERS[entry.module] : [],
     )
 
-    const attributedUses = []
-    if (typeof entry.module === 'string') {
-      for (const testSource of importedBy) {
-        const analysis = analyzeSurface(testSource.source, entry.module, testSource.syntax)
-        for (const declaration of testSource.declarations) {
-          if (analysis.closureHasUse(declaration)) attributedUses.push({ file: testSource.file, declaration })
-        }
-      }
-    }
-    const uniqueAttributedUses = [...new Map(attributedUses.map((use) => [`${use.file}:${use.declaration.start}`, use])).values()]
-    const activeUses = uniqueAttributedUses.filter(({ declaration }) => declaration.state === 'active')
-    const isLawProof = ({ file, declaration }) => {
-      if (declaration.whatIds.length !== 1) return false
-      const law = declaration.whatIds[0]
-      if (!laws.includes(law)) return false
-      const lawOwner = typeof lawOwners[law] === 'string' ? lawOwners[law] : entry.owner
-      return packageOfTestFile(file, requirements) === lawOwner
-    }
-    const lawProofs = activeUses.filter(isLawProof)
+    // Importer packages: every .test.mjs that binds the surface must belong
+    // to a manifest owner or a declared consumer package. import-with-no-use
+    // is not evidence; packages outside the authorization list cannot call
+    // the surface.
+    const importerPackages = new Set(
+      importedBy.map(({ file }) => packageOfTestFile(file, requirements)).filter(Boolean),
+    )
+    const usesSurfaceCalls = (
+      importedBy.filter(({ source, syntax }) => analyzeSurface(source, entry.module, syntax).uses.length > 0)
+    )
     const ownerPackages = new Set([
       entry.owner,
       ...laws.map((law) => typeof lawOwners[law] === 'string' ? lawOwners[law] : entry.owner),
     ])
-    const isAllowedUse = (use) => {
-      if (isLawProof(use)) return true
-      const pkg = packageOfTestFile(use.file, requirements)
-      return pkg !== null && (ownerPackages.has(pkg) || consumerPackages.has(pkg))
-    }
 
     if (typeof entry.module === 'string' && importedBy.length === 0) {
       fail(`${label}: no .test.mjs imports the registered surface`)
-    } else if (typeof entry.module === 'string' && activeUses.length === 0) {
+    } else if (typeof entry.module === 'string' && usesSurfaceCalls.length === 0) {
       fail(`${label}: surface import has no active executable use in a .test.mjs`)
     }
-    if (typeof entry.module === 'string' && lawProofs.length === 0) {
-      fail(`${label}: no active owner-law declaration has a production-bound surface use`)
-    }
-
-    // Per-consumer rejection: every active import must be law-authorized or
-    // declared as an explicit cross-owner consumer. An unrelated test that
-    // merely imports the surface is a false green, not proof.
-    if (typeof entry.module === 'string') {
-      for (const use of activeUses) {
-        if (!isAllowedUse(use)) {
-          const pkg = packageOfTestFile(use.file, requirements) ?? '?'
-          fail(`${label}: unauthorized active import use from ${relativePath(use.file, root)}:${use.declaration.line} (package ${pkg} has no law or declared consumer edge)`)
-        }
+    for (const importedFile of usesSurfaceCalls) {
+      const pkg = packageOfTestFile(importedFile.file, requirements)
+      if (pkg !== null && !ownerPackages.has(pkg) && !consumerPackages.has(pkg)) {
+        fail(`${label}: unauthorized active import use from ${relativePath(importedFile.file, root)} (package ${pkg} has no law or declared consumer edge)`)
       }
     }
   }

@@ -15,21 +15,11 @@
 
 ### 2. 规范语法与引用 helpers（`spec-rules` lib）
 
-`scripts/lib/spec-rules.mjs`（由 `tests/spec-rules.test.mjs` 提供回归保障；条款重复定义 fail-closed 由 `tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-008] duplicate definitions retain every location and never acquire authority` 与 lib `duplicateClauseDefinitions` 覆盖）负责静态文本规则检查：
+`scripts/lib/spec-rules.mjs`（由 `tests/spec-rules.test.mjs` 提供回归保障；条款重复定义 fail-closed 由 lib `duplicateClauseDefinitions` 覆盖，回归落点为 `tests/reliability-spec-mutations.test.mjs` 和 `tests/spec-rules.test.mjs`）负责静态文本规则检查：
 - 确保正式条款 ID 只能在所属包的 `WHAT.md` 中定义，禁止重定义与跨文件越权定义。
 - 检查跨包条款引用的可解析性，防止悬空引用。
 - 确保导航文件（如 README）仅作路由指向，禁止定义正式规范。
 - 严禁代码和规范引用已废止的历史归档路径。
-
-### 3. 双向证据追踪系统（`requirement-trace`）
-
-`scripts/checks/requirement-trace.mjs` 与 `tests/requirement-trace.test.mjs` 实现规范与测试的双向映射：
-- 由共享 Acorn syntax core 解析全量测试；只有真实 `node:test` import 绑定上的顶层 `test()`，或其 callback 参数绑定上的直接 `t.test()`，才能取得命题权威。遮蔽绑定、间接注册、缺 callback、动态 skip/todo 与未绑定 context 一律 fail-closed。
-- 从合格调用点提取 `WHAT[<PACKAGE-NNN>]` 标签并验证其唯一性与合法性；字符串、注释、regex、方法同名与 template body 均不能伪造测试。
-- 为每个命题 ID 保留全部定义位置；仅为恰有一个定义的 ID 建立权威映射，同包重复与跨包多 owner 均以全部位置 fail-closed。
-- 识别并阻断孤儿测试与多 primary 标签；无 active test、无 HOW proof edge 单独输出为 GAP，不进入失败列表。共享图仍保留 unproved/proofMissing，不为缺口补造 proof edge。
-- 由共享的精确标题解析器解析 `HOW.md` 的 `(path, title)` 锚点；裸路径、零匹配或多匹配均产生缺失/悬空证明诊断且不取得 HOW 权威，同一命题可以保留多个独立证明边。
-- `requirement-trace` 是 WHAT↔HOW↔active test 拓扑的唯一 owner。release/migration ledger、合同册与 proof-level registry 不重复解析或关闭 WHAT；后者只能消费已由本图精确解析的测试身份。
 
 ### 4. 变更生命周期约束（`change-lifecycle`）
 
@@ -48,7 +38,7 @@
 | REQUIREMENT-SYSTEM-005 | `requirements/requirement-system/tests/spec-rules.test.mjs::WHAT[REQUIREMENT-SYSTEM-005] formalClauseDefinitionHeadings surfaces clause definitions from routing files` |
 | REQUIREMENT-SYSTEM-006 | `requirements/requirement-system/tests/meta-verifier.test.mjs::WHAT[REQUIREMENT-SYSTEM-006] tree entry and INDEX name the same package set` |
 | REQUIREMENT-SYSTEM-007 | `requirements/requirement-system/tests/spec-rules.test.mjs::WHAT[REQUIREMENT-SYSTEM-007] spec gate requires exact README coverage of formal files` |
-| REQUIREMENT-SYSTEM-008 | `requirements/requirement-system/tests/spec-rules.test.mjs::WHAT[REQUIREMENT-SYSTEM-008] spec gate rejects unknown and suffixed clause-looking references`；`requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-008] duplicate definitions retain every location and never acquire authority` |
+| REQUIREMENT-SYSTEM-008 | `requirements/requirement-system/tests/spec-rules.test.mjs::WHAT[REQUIREMENT-SYSTEM-008] spec gate rejects unknown and suffixed clause-looking references`；`requirements/verification-system/tests/reliability-spec-mutations.test.mjs::WHAT[VERIFICATION-SYSTEM-004] spec gate rejects duplicate CHATEXEC identifiers` |
 | REQUIREMENT-SYSTEM-009 | `requirements/requirement-system/tests/spec-rules.test.mjs::WHAT[REQUIREMENT-SYSTEM-009] formalClauseDefinitionHeadings still recognizes a product clause defined in a Change file` |
 | REQUIREMENT-SYSTEM-010 | `requirements/requirement-system/tests/spec-rules.test.mjs::WHAT[REQUIREMENT-SYSTEM-010] spec gate detects retired workflow paths` |
 | REQUIREMENT-SYSTEM-011 | `requirements/requirement-system/tests/spec-rules.test.mjs::WHAT[REQUIREMENT-SYSTEM-011] spec gate rejects proposed and specific completed dependencies but allows active scope` |
@@ -58,5 +48,4 @@
 | REQUIREMENT-SYSTEM-015 | `requirements/requirement-system/tests/change-lifecycle.test.mjs::WHAT[REQUIREMENT-SYSTEM-015] AGENTS.md keeps the small-fix exemption` |
 | REQUIREMENT-SYSTEM-016 | `requirements/requirement-system/tests/meta-verifier.test.mjs::WHAT[REQUIREMENT-SYSTEM-016] declared DEPENDS ON stays within the INDEX skeleton` |
 | REQUIREMENT-SYSTEM-017 | `requirements/requirement-system/tests/meta-verifier.test.mjs::WHAT[REQUIREMENT-SYSTEM-017] meta-verifier executes as the machine proof` |
-| REQUIREMENT-SYSTEM-018 | `requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] proof gaps do not fail the CLI but invalid declared proofs do` |
-| REQUIREMENT-SYSTEM-018 | `requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] only executable node:test bindings with callbacks create active trace declarations`；`requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] exact proof-title resolution is reusable and never guesses`；`requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] graph preserves proof portfolios and rejects orphan or multi-primary tests`；`requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] graph closes exact proof anchors and rejects stale anchors`；`requirements/requirement-system/tests/requirement-trace.test.mjs::WHAT[REQUIREMENT-SYSTEM-018] unrelated external proof inventory cannot close a WHAT` |
+| REQUIREMENT-SYSTEM-018 | retired with the trace machinery; live proofs sit under the package's own HOW rows and test titles

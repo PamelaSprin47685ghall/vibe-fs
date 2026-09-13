@@ -85,6 +85,39 @@ function sameSet(left, right) {
   return true
 }
 
+export function assertProductionSourcesAssigned({
+  repositoryRoot = REPOSITORY_ROOT,
+  sourceRoot = resolve(repositoryRoot, 'src/Wanxiangshu'),
+  aggregatePath = resolve(sourceRoot, 'Wanxiangshu.fsproj'),
+  discoveredSources = new Set(productionSources(sourceRoot)),
+  shardImplementations = new Set(),
+  aggregate = parseAggregate(aggregatePath),
+} = {}) {
+  if (!sameSet(shardImplementations, discoveredSources)) {
+    const unassigned = [...discoveredSources].filter((source) => !shardImplementations.has(source)).map((source) => repoPath(repositoryRoot, source))
+    const stale = [...shardImplementations].filter((source) => !discoveredSources.has(source)).map((source) => repoPath(repositoryRoot, source))
+    throw new Error(`production source coverage mismatch unassigned=[${unassigned.slice(0, 12).join(', ')}] stale=[${stale.slice(0, 12).join(', ')}]`)
+  }
+  const srcDir = resolve(repositoryRoot, 'src')
+  if (existsSync(srcDir)) {
+    for (const entry of readdirSync(srcDir, { withFileTypes: true })) {
+      const fullPath = resolve(srcDir, entry.name)
+      if (entry.isDirectory() && entry.name !== 'Wanxiangshu') {
+        const stray = productionSources(fullPath)
+        if (stray.length > 0) throw new Error(`${repoPath(repositoryRoot, fullPath)}: F# sources outside ${repoPath(repositoryRoot, sourceRoot)}`)
+      } else if (entry.isFile() && (entry.name.endsWith('.fs') || entry.name.endsWith('.fsproj'))) {
+        throw new Error(`${repoPath(repositoryRoot, fullPath)}: F# source outside ${repoPath(repositoryRoot, sourceRoot)}`)
+      }
+    }
+  }
+  if (aggregate.text.includes('<WanxiangshuEmitProject>') && !/<WanxiangshuEmitProject>true<\/WanxiangshuEmitProject>/.test(aggregate.text)) {
+    throw new Error(`${repoPath(repositoryRoot, aggregatePath)}: flattened Fable emitter marker <WanxiangshuEmitProject> is missing`)
+  }
+  if (new Set(aggregate.implementationFiles).size !== aggregate.implementationFiles.length) {
+    throw new Error(`${repoPath(repositoryRoot, aggregatePath)}: duplicate production Compile implementation entry`)
+  }
+}
+
 export function readCompileShardInventory({
   repositoryRoot = REPOSITORY_ROOT,
   sourceRoot = resolve(repositoryRoot, 'src/Wanxiangshu'),
@@ -136,11 +169,14 @@ export function readCompileShardInventory({
   if (!sameSet(shardImplementations, new Set(aggregate.implementationFiles))) throw new Error('aggregate .fs compile set differs from compile-shard union')
   if (!sameSet(shardSignatures, new Set(aggregate.signatureFiles))) throw new Error('aggregate .fsi compile set differs from compile-shard union')
   const discoveredSources = new Set(productionSources(sourceRoot))
-  if (!sameSet(shardImplementations, discoveredSources)) {
-    const unassigned = [...discoveredSources].filter((source) => !shardImplementations.has(source)).map((source) => repoPath(repositoryRoot, source))
-    const stale = [...shardImplementations].filter((source) => !discoveredSources.has(source)).map((source) => repoPath(repositoryRoot, source))
-    throw new Error(`production source coverage mismatch unassigned=[${unassigned.slice(0, 12).join(', ')}] stale=[${stale.slice(0, 12).join(', ')}]`)
-  }
+  assertProductionSourcesAssigned({
+    repositoryRoot,
+    sourceRoot,
+    aggregatePath,
+    discoveredSources,
+    shardImplementations,
+    aggregate,
+  })
 
   return {
     repositoryRoot,
