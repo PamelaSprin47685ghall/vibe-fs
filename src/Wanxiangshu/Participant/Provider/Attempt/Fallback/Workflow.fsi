@@ -12,14 +12,6 @@ open Wanxiangshu.Persistence.Journal
 module ProviderRecoveryWorkflow =
     val awaitRecoveryMaterial: host: IBloggerRuntimeHost -> durable: AgentJournal -> mainSessionId: SessionId -> Task
 
-    val admitPolicyAuthorizedFailure:
-        durable: AgentJournal ->
-        turn: ReconciledTurn ->
-        failure: ExecutionFailure ->
-        requestKind: ProviderRequestKind ->
-        error: string ->
-            Task<Result<FailureAdmissionOutcome, string>>
-
     val continueAfterConfirmedFailure:
         sessionPort: ISessionHostPort ->
         rootWorkspace: IRootWorkspaceReader ->
@@ -31,3 +23,13 @@ module ProviderRecoveryWorkflow =
         error: string ->
         continuationPrompt: string ->
             Task
+
+    val continueDelegateCallAfterConfirmedFailure:
+        sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
+        scope: IBloggerRuntimeHost ->
+        durable: AgentJournal ->
+        turn: ReconciledTurn ->
+        failure: ExecutionFailure ->
+        error: string ->
+            Task<RetryVerdict>

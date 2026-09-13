@@ -40,6 +40,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.execution-model-routing.strength-policy.fsproj"/>
         <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-projection-queries.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.change-integration.git-integrationgate.fsproj"/>
+<Compile Include="Participant/Provider/Attempt/Fallback/Retry.fsi"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/Retry.fs"/>
 <Compile Include="Participant/Provider/Attempt/Fallback/Workflow.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Workflow.fs"/>
   </ItemGroup>

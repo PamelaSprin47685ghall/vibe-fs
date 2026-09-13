@@ -46,7 +46,7 @@ module TurnWorkflow =
             // (Inspector/Coder dedicated sessions). Do not break this ownership.
             let! syncDelegateHandled =
                 match syncDelegate with
-                | Some runtime -> runtime.HandleTurn(turn, context.Quiescence)
+                | Some runtime -> runtime.HandleTurn(turn, context.Failure, context.Quiescence)
                 | None -> Task.FromResult false
 
             if syncDelegateHandled then

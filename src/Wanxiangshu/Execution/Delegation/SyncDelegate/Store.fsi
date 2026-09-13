@@ -17,6 +17,7 @@ and internal SyncDelegateCall =
       Agent: string
       Invocations: SyncDelegateInvocation list
       AcceptedRoot: TaskCompletionSource<AuthorityRootUserMessageId>
+      mutable AcceptedPhysical: PhysicalUserMessageId option
       mutable AcceptedAuthorityRoot: AuthorityRootUserMessageId option
       mutable TerminalFailureScope: SyncDelegateTerminalFailureScope option
       Answer: TaskCompletionSource<Result<string, string>> }

@@ -2,6 +2,17 @@
 
 ## Architecture and core mechanism
 
+### Retry decorator（唯一 retry 引擎）
+
+`Fallback/Retry.fs` 的 `Retry.attempt` 是唯一的 retry 决策执行点：纯策略（`ExecutionFailurePolicy.decide`）
+→ `RetryPorts.Admit`（`ProviderFailureLedger` 仍是唯一写者）→ `RetryPorts.Redispatch`（路径插件）
+→ `Dispatched | Superseded | Terminal`。普通 turn、Blogger 与 dedicated SyncDelegate child 共用
+同一引擎、同一预算与同一 licence；路径只提供 redispatch 策略与 terminal sink。
+
+dedicated delegate child 的插件是 `ProviderRecoveryWorkflow.continueDelegateCallAfterConfirmedFailure`；
+delegate 只消费 verdict（`Ok unit` 保持调用 pending，`Error reason` 才终结），因此单次瞬态尝试失败
+不再直接失败调用方（DELEG-023）。
+
 ### Failure budget algebra and single writer
 
 - **ProviderRequestKind + ProviderFailureBudget**:

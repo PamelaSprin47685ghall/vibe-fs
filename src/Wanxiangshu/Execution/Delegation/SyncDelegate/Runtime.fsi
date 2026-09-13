@@ -11,10 +11,18 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Persistence.Journal
 
 module internal SyncDelegatePhysicalIdentity =
     val title: scope: ReuseScopeId -> role: SyncDelegateRole -> agentName: string -> string
+
+/// Retry-decorator plug for dedicated delegate children (DELEG-023): the caller
+/// observes only the decorator's verdict, never a single transient attempt
+/// failure. `Ok unit` keeps the invocation pending (a fresh attempt was admitted
+/// or the episode was superseded); `Error reason` folds it as terminal.
+type SyncDelegateRetryPort =
+    { Retry: ReconciledTurn -> Wanxiangshu.Execution.Failure.ExecutionFailure -> string -> Task<Result<unit, string>> }
 
 type SyncDelegateRuntime =
     new:
@@ -31,6 +39,7 @@ type SyncDelegateRuntime =
         quiescence: ISessionQuiescenceGate *
         workRecordFor: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>) *
         handoff: ReusableHandoffPort *
+        retryPort: SyncDelegateRetryPort *
         ?toolMapForRole: (Role -> Map<string, bool>) *
         ?workspaceDirectory: string *
         ?onInspectorPrompt: (string -> string -> unit) *
@@ -75,7 +84,12 @@ type SyncDelegateRuntime =
         ?expectedToolCalls: int ->
             Task<Result<SyncDelegateInvocationResult, string>>
 
-    member HandleTurn: turn: ReconciledTurn * permit: QuiescencePermit option -> Task<bool>
+    member HandleTurn:
+        turn: ReconciledTurn *
+        failure: Wanxiangshu.Execution.Failure.ExecutionFailure option *
+        permit: QuiescencePermit option ->
+            Task<bool>
+
     member HasOpeningCursor: sessionId: SessionId -> bool
     member AwaitAssignmentReady: sessionId: SessionId -> Task<bool>
     member CancelSession: sessionId: SessionId -> unit

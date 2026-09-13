@@ -15,16 +15,21 @@ type internal SyncDelegateTerminalFailureScope =
 /// Reused continuations require their exact physical prompt on ReconciledTurn.
 /// DSL-state-combination: physical — live call resource couples accepted root and exact terminal scope for causal settlement.
 and internal SyncDelegateCall =
-    { Owner: SessionId
-      OwnerScope: ReuseScopeId
-      Role: SyncDelegateRole
-      Delegate: SessionId
-      Agent: string
-      Invocations: SyncDelegateInvocation list
-      AcceptedRoot: TaskCompletionSource<AuthorityRootUserMessageId>
-      mutable AcceptedAuthorityRoot: AuthorityRootUserMessageId option
-      mutable TerminalFailureScope: SyncDelegateTerminalFailureScope option
-      Answer: TaskCompletionSource<Result<string, string>> }
+    {
+        Owner: SessionId
+        OwnerScope: ReuseScopeId
+        Role: SyncDelegateRole
+        Delegate: SessionId
+        Agent: string
+        Invocations: SyncDelegateInvocation list
+        AcceptedRoot: TaskCompletionSource<AuthorityRootUserMessageId>
+        /// Exact physical prompt of this invocation's accepted attempt; retry
+        /// attempts of the same call are its ProviderRetryAttempt continuations.
+        mutable AcceptedPhysical: PhysicalUserMessageId option
+        mutable AcceptedAuthorityRoot: AuthorityRootUserMessageId option
+        mutable TerminalFailureScope: SyncDelegateTerminalFailureScope option
+        Answer: TaskCompletionSource<Result<string, string>>
+    }
 
 /// A single caller's pending invocation to a sync delegate.
 /// DSL-state-combination: physical — StartCursor is a process-local resource coordinate fixed after the delegate session exists.
@@ -440,6 +445,7 @@ type internal SyncDelegateCallStore() as this =
                       Agent = agent
                       Invocations = invocations
                       AcceptedRoot = acceptedRoot
+                      AcceptedPhysical = None
                       AcceptedAuthorityRoot = None
                       TerminalFailureScope = None
                       Answer = answer }

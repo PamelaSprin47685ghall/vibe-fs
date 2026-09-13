@@ -224,18 +224,6 @@ module ProviderRecoveryWorkflow =
             (recoveryGateKind authorization)
             authorization.ProviderRun
 
-    let private handleContinuation
-        (eventPort: IEventObservationPort)
-        (turn: ReconciledTurn)
-        (error: string)
-        (continuation: HostSessionNudge.GateContinuationOutcome)
-        =
-        match continuation with
-        | HostSessionNudge.GateContinuationOutcome.Sent _
-        | HostSessionNudge.GateContinuationOutcome.AlreadyAdmitted
-        | HostSessionNudge.GateContinuationOutcome.Retired -> ()
-        | HostSessionNudge.GateContinuationOutcome.Failed _ -> notifyFailure eventPort turn error
-
     let private bloggerPromptKey =
         function
         | HostSessionNudge.GateContinuationOutcome.Sent key -> Ok(Some key)
@@ -258,7 +246,6 @@ module ProviderRecoveryWorkflow =
     let rec private sendStagedBloggerContinuation
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
-        (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
@@ -266,7 +253,7 @@ module ProviderRecoveryWorkflow =
         (ctx: BloggerRequestContext)
         (prompt: string)
         (failureReason: string)
-        : Task =
+        : Task<RetryVerdict> =
         task {
             let! outcome =
                 taskResult {
@@ -281,36 +268,23 @@ module ProviderRecoveryWorkflow =
                     do! bindBloggerPrompt scope durable ctx promptKey
                 }
 
-            return! settleBloggerContinuationFailure eventPort durable scope turn ctx failureReason outcome
-        }
-
-    and private settleBloggerContinuationFailure
-        (eventPort: IEventObservationPort)
-        (durable: AgentJournal)
-        (scope: IBloggerRuntimeHost)
-        (turn: ReconciledTurn)
-        (ctx: BloggerRequestContext)
-        (failureReason: string)
-        outcome
-        : Task =
-        task {
             match outcome with
-            | Ok() -> ()
-            | Error(BloggerContinuationFailure.Materialize reason) -> notifyFailure eventPort turn reason
+            | Ok() -> return RetryVerdict.Dispatched
+            | Error(BloggerContinuationFailure.Materialize reason) -> return RetryVerdict.Terminal reason
             | Error(BloggerContinuationFailure.Send reason) ->
                 do! BloggerCoordinator.abandonContinuationContext scope durable ctx reason
-                notifyFailure eventPort turn failureReason
+                return RetryVerdict.Terminal failureReason
             | Error(BloggerContinuationFailure.Bind reason) ->
                 do! BloggerCoordinator.abandonContinuationContext scope durable ctx reason
-                notifyFailure eventPort turn reason
+                return RetryVerdict.Terminal reason
             | Error BloggerContinuationFailure.Retired ->
                 do! BloggerCoordinator.abandonContinuationContext scope durable ctx "recovery target retired"
+                return RetryVerdict.Superseded
         }
 
     let private replaceFailedBloggerRequest
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
-        (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
@@ -319,7 +293,7 @@ module ProviderRecoveryWorkflow =
         (next: BloggerRequestContext)
         (prompt: string)
         (failureReason: string)
-        : Task =
+        : Task<RetryVerdict> =
         task {
             do! BloggerCoordinator.abandonContinuationContext scope durable failed "provider-attempt-failed"
 
@@ -327,7 +301,6 @@ module ProviderRecoveryWorkflow =
                 sendStagedBloggerContinuation
                     sessionPort
                     rootWorkspace
-                    eventPort
                     durable
                     scope
                     turn
@@ -340,7 +313,6 @@ module ProviderRecoveryWorkflow =
     let private continueFailedBloggerMain
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
-        (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
@@ -350,13 +322,12 @@ module ProviderRecoveryWorkflow =
         (error: string)
         (squash: BloggerRequestContext option)
         (failed: BloggerRequestContext)
-        : Task =
+        : Task<RetryVerdict> =
         match BloggerRetryPolicy.nextRequest ProviderRequestKind.BloggerMain squash.IsSome, squash with
         | Ok ProviderRequestKind.BloggerSquash, Some squashCtx ->
             replaceFailedBloggerRequest
                 sessionPort
                 rootWorkspace
-                eventPort
                 durable
                 scope
                 turn
@@ -369,7 +340,6 @@ module ProviderRecoveryWorkflow =
             replaceFailedBloggerRequest
                 sessionPort
                 rootWorkspace
-                eventPort
                 durable
                 scope
                 turn
@@ -379,14 +349,11 @@ module ProviderRecoveryWorkflow =
                 continuationPrompt
                 error
         | Ok _, _
-        | Error _, _ ->
-            notifyFailure eventPort turn "Blogger recovery produced an invalid next request kind"
-            Task.FromResult(()) :> Task
+        | Error _, _ -> Task.FromResult(RetryVerdict.Terminal "Blogger recovery produced an invalid next request kind")
 
     let private rebuildMainAfterFailedSquash
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
-        (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
@@ -395,16 +362,15 @@ module ProviderRecoveryWorkflow =
         (continuationPrompt: string)
         (error: string)
         (failed: BloggerRequestContext)
-        : Task =
+        : Task<RetryVerdict> =
         task {
             match! BloggerMainContext.fromJournal scope durable mainSessionId turn.SessionId with
-            | None -> notifyFailure eventPort turn "Blogger squash failed and no main material can be rebuilt"
+            | None -> return RetryVerdict.Terminal "Blogger squash failed and no main material can be rebuilt"
             | Some main ->
                 return!
                     replaceFailedBloggerRequest
                         sessionPort
                         rootWorkspace
-                        eventPort
                         durable
                         scope
                         turn
@@ -418,7 +384,6 @@ module ProviderRecoveryWorkflow =
     let private continueFailedBloggerSquash
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
-        (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
@@ -428,16 +393,14 @@ module ProviderRecoveryWorkflow =
         (error: string)
         (squash: BloggerRequestContext option)
         (failed: BloggerRequestContext)
-        : Task =
+        : Task<RetryVerdict> =
         match BloggerRetryPolicy.nextRequest ProviderRequestKind.BloggerSquash squash.IsSome with
         | Error _ ->
-            notifyFailure eventPort turn "Blogger squash recovery produced an invalid next request kind"
-            Task.FromResult(()) :> Task
+            Task.FromResult(RetryVerdict.Terminal "Blogger squash recovery produced an invalid next request kind")
         | Ok ProviderRequestKind.BloggerMain ->
             rebuildMainAfterFailedSquash
                 sessionPort
                 rootWorkspace
-                eventPort
                 durable
                 scope
                 turn
@@ -446,14 +409,11 @@ module ProviderRecoveryWorkflow =
                 continuationPrompt
                 error
                 failed
-        | Ok _ ->
-            notifyFailure eventPort turn "Blogger squash recovery did not return to main"
-            Task.FromResult(()) :> Task
+        | Ok _ -> Task.FromResult(RetryVerdict.Terminal "Blogger squash recovery did not return to main")
 
     let private continueBlogger
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
-        (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
@@ -461,19 +421,18 @@ module ProviderRecoveryWorkflow =
         (mainSessionId: SessionId)
         (continuationPrompt: string)
         (error: string)
-        : Task =
+        : Task<RetryVerdict> =
         task {
             let current = scope.TryPeekCurrentRequest(SessionId.value turn.SessionId)
             let squash = recoverySquashContext durable mainSessionId turn.SessionId
 
             match current with
-            | None -> notifyFailure eventPort turn "Blogger recovery has no owned request context"
+            | None -> return RetryVerdict.Terminal "Blogger recovery has no owned request context"
             | Some((BloggerRequestContext.Main _) as failed) ->
                 return!
                     continueFailedBloggerMain
                         sessionPort
                         rootWorkspace
-                        eventPort
                         durable
                         scope
                         turn
@@ -488,7 +447,6 @@ module ProviderRecoveryWorkflow =
                     continueFailedBloggerSquash
                         sessionPort
                         rootWorkspace
-                        eventPort
                         durable
                         scope
                         turn
@@ -503,147 +461,95 @@ module ProviderRecoveryWorkflow =
     let private continueWorkMain
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
-        (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
         (authorization: ProviderRecoveryAuthorization)
         (continuationPrompt: string)
         (error: string)
-        : Task =
+        : Task<RetryVerdict> =
         task {
             do! awaitRecoveryMaterial scope durable turn.SessionId
 
             let! continuation =
                 sendRecoveryContinuation sessionPort rootWorkspace turn durable authorization continuationPrompt
 
-            handleContinuation eventPort turn error continuation
+            return
+                match continuation with
+                | HostSessionNudge.GateContinuationOutcome.Sent _
+                | HostSessionNudge.GateContinuationOutcome.AlreadyAdmitted -> RetryVerdict.Dispatched
+                | HostSessionNudge.GateContinuationOutcome.Retired -> RetryVerdict.Superseded
+                | HostSessionNudge.GateContinuationOutcome.Failed _ -> RetryVerdict.Terminal error
         }
 
-    let private continueAdvancedFailure
+    /// Path plug of the retry decorator: perform this path's physical re-entry
+    /// for one licensed attempt and report the verdict.
+    let rec private redispatchAfterFailure
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
-        (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
-        (turn: ReconciledTurn)
-        (authorization: ProviderRecoveryAuthorization)
         (continuationPrompt: string)
-        (error: string)
-        : Task =
-        let linkedMainSession =
-            match authorization.RequestKind with
-            | ProviderRequestKind.BloggerMain
-            | ProviderRequestKind.BloggerSquash -> mainSessionOfBlogger durable turn.SessionId
-            | ProviderRequestKind.WorkMain
-            | ProviderRequestKind.InteractionRepair
-            | ProviderRequestKind.StrengthReplica -> None
+        (failureReason: string)
+        (authorization: ProviderRecoveryAuthorization)
+        (input: RetryAttempt)
+        : Task<RetryVerdict> =
+        task {
+            match recoveryAlreadyAdmitted durable input.Turn authorization, input.RequestKind with
+            | true, _ -> return RetryVerdict.Superseded
+            | false, (ProviderRequestKind.BloggerMain | ProviderRequestKind.BloggerSquash) ->
+                return!
+                    dispatchBloggerAfterFailure
+                        sessionPort
+                        rootWorkspace
+                        durable
+                        scope
+                        continuationPrompt
+                        failureReason
+                        authorization
+                        input
+            | false, (ProviderRequestKind.WorkMain | ProviderRequestKind.InteractionRepair) ->
+                return!
+                    continueWorkMain
+                        sessionPort
+                        rootWorkspace
+                        durable
+                        scope
+                        input.Turn
+                        authorization
+                        continuationPrompt
+                        failureReason
+            | false, ProviderRequestKind.StrengthReplica ->
+                // The policy never licenses a replica recovery; fail closed.
+                return RetryVerdict.Superseded
+        }
 
-        match recoveryAlreadyAdmitted durable turn authorization, authorization.RequestKind, linkedMainSession with
-        | true, _, _ -> Task.FromResult(()) :> Task
-        | false, (ProviderRequestKind.BloggerMain | ProviderRequestKind.BloggerSquash), Some mainSessionId ->
-            continueBlogger
-                sessionPort
-                rootWorkspace
-                eventPort
-                durable
-                scope
-                turn
-                authorization
-                mainSessionId
-                continuationPrompt
-                error
-        | false, (ProviderRequestKind.BloggerMain | ProviderRequestKind.BloggerSquash), None ->
-            notifyFailure eventPort turn "Confirmed Blogger provider failure has no linked main session"
-            Task.FromResult(()) :> Task
-        | false, (ProviderRequestKind.WorkMain | ProviderRequestKind.InteractionRepair), _ ->
-            continueWorkMain
-                sessionPort
-                rootWorkspace
-                eventPort
-                durable
-                scope
-                turn
-                authorization
-                continuationPrompt
-                error
-        | false, ProviderRequestKind.StrengthReplica, _ ->
-            notifyFailure eventPort turn "Strength replica provider failure cannot authorize automatic recovery"
-            Task.FromResult(()) :> Task
-
-    let private settleFailureAdmission
+    and dispatchBloggerAfterFailure
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
-        (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
-        (turn: ReconciledTurn)
-        (authorization: ProviderRecoveryAuthorization)
         (continuationPrompt: string)
-        (error: string)
-        admission
-        : Task =
-        match admission with
-        | Error reason ->
-            notifyFailure eventPort turn reason
-            Task.FromResult(()) :> Task
-        | Ok FailureAdmissionOutcome.RetryExhausted ->
-            notifyFailure eventPort turn error
-            Task.FromResult(()) :> Task
-        | Ok FailureAdmissionOutcome.EpisodeSuperseded -> Task.FromResult(()) :> Task
-        | Ok FailureAdmissionOutcome.NoActiveRun ->
-            notifyFailure eventPort turn "Confirmed provider failure has no active provider run"
-            Task.FromResult(()) :> Task
-        | Ok FailureAdmissionOutcome.RetryAuthorized ->
-            continueAdvancedFailure
-                sessionPort
-                rootWorkspace
-                eventPort
-                durable
-                scope
-                turn
-                authorization
-                continuationPrompt
-                error
-
-    let private recoveryDecision
-        (turn: ReconciledTurn)
-        (failure: ExecutionFailure)
-        (current: ProviderFailureProjection)
-        (requestKind: ProviderRequestKind)
-        =
-        let providerFailureBudget =
-            if ProviderFailureProjection.mayRetry ProviderFailureBudget.DefaultBudget current then
-                ProviderRecoveryBudget.Available
-            else
-                ProviderRecoveryBudget.Exhausted
-
-        ExecutionFailurePolicy.decide
-            { Failure = failure
-              Lifecycle = DurableExecutionLifecycle.ProviderStarted
-              ExecutionKey =
-                { SessionId = turn.SessionId
-                  PhysicalUserMessageId = turn.PhysicalUserMessageId }
-              Capacity = CapacityOwnership.NoCapacityFence
-              Provider =
-                { LogicalRun = current.LogicalRunId
-                  ProviderRun = turn.ProviderRun
-                  RequestKind = requestKind
-                  RetryBudget = providerFailureBudget
-                  Breaker = ProviderBreakerState.Closed } }
-
-    let private recoveryAuthorization
-        (turn: ReconciledTurn)
-        (failure: ExecutionFailure)
-        (current: ProviderFailureProjection)
-        (requestKind: ProviderRequestKind)
-        =
-        match (recoveryDecision turn failure current requestKind).Resolution with
-        | ExecutionFailureResolution.RetryFreshAttempt authorization -> Some authorization
-        | ExecutionFailureResolution.PreserveCurrentFact
-        | ExecutionFailureResolution.AwaitAcceptanceReconciliation _
-        | ExecutionFailureResolution.TerminalizeAcceptedPreProvider _
-        | ExecutionFailureResolution.TerminalizeProviderStarted _ -> None
+        (failureReason: string)
+        (authorization: ProviderRecoveryAuthorization)
+        (input: RetryAttempt)
+        : Task<RetryVerdict> =
+        task {
+            match mainSessionOfBlogger durable input.Turn.SessionId with
+            | None -> return RetryVerdict.Terminal "Confirmed Blogger provider failure has no linked main session"
+            | Some mainSessionId ->
+                return!
+                    continueBlogger
+                        sessionPort
+                        rootWorkspace
+                        durable
+                        scope
+                        input.Turn
+                        authorization
+                        mainSessionId
+                        continuationPrompt
+                        failureReason
+        }
 
     let private admitAuthorizedFailure
         (durable: AgentJournal)
@@ -656,111 +562,6 @@ module ProviderRecoveryWorkflow =
 
         ProviderFailureLedger.recordAuthorizedFailure port ownerSessionId authorization error
 
-    let private admitCurrentFailure
-        (durable: AgentJournal)
-        (ownerSessionId: SessionId)
-        (turn: ReconciledTurn)
-        (failure: ExecutionFailure)
-        (requestKind: ProviderRequestKind)
-        (error: string)
-        (current: ProviderFailureProjection)
-        =
-        match recoveryAuthorization turn failure current requestKind with
-        | None -> Task.FromResult(Ok FailureAdmissionOutcome.RetryExhausted)
-        | Some authorization -> admitAuthorizedFailure durable ownerSessionId authorization error
-
-    let admitPolicyAuthorizedFailure
-        (durable: AgentJournal)
-        (turn: ReconciledTurn)
-        (failure: ExecutionFailure)
-        (requestKind: ProviderRequestKind)
-        (error: string)
-        : Task<Result<FailureAdmissionOutcome, string>> =
-        let projection = AgentJournal.snapshot durable
-
-        let ownerSessionId = recoveryOwnerSession projection turn.SessionId requestKind
-
-        let ownerState =
-            ownerSessionId
-            |> Option.bind (fun owner ->
-                let failureState =
-                    AgentProjection.tryFind owner projection.AgentProjections
-                    |> Option.bind _.ProviderFailures
-
-                ProviderFailureEvidence.currentState failureState
-                |> Option.map (fun current -> owner, current))
-
-        match ownerState with
-        | None -> Task.FromResult(Ok FailureAdmissionOutcome.NoActiveRun)
-        | Some(owner, current) -> admitCurrentFailure durable owner turn failure requestKind error current
-
-    let private executeRecoveryResolution
-        (sessionPort: ISessionHostPort)
-        (rootWorkspace: IRootWorkspaceReader)
-        (eventPort: IEventObservationPort)
-        (durable: AgentJournal)
-        (scope: IBloggerRuntimeHost)
-        (turn: ReconciledTurn)
-        (ownerSessionId: SessionId)
-        (continuationPrompt: string)
-        (error: string)
-        (decision: ExecutionFailureDecision)
-        : Task =
-        match decision.Resolution with
-        | ExecutionFailureResolution.PreserveCurrentFact
-        | ExecutionFailureResolution.AwaitAcceptanceReconciliation _ -> Task.FromResult(()) :> Task
-        | ExecutionFailureResolution.TerminalizeAcceptedPreProvider _
-        | ExecutionFailureResolution.TerminalizeProviderStarted _ ->
-            notifyFailure eventPort turn error
-            Task.FromResult(()) :> Task
-        | ExecutionFailureResolution.RetryFreshAttempt authorization ->
-            task {
-                let! admission =
-                    let port =
-                        Wanxiangshu.Composition.Durable.AgentJournalPortAdapter.forProviderFailure durable
-
-                    ProviderFailureLedger.recordAuthorizedFailure port ownerSessionId authorization error
-
-                return!
-                    settleFailureAdmission
-                        sessionPort
-                        rootWorkspace
-                        eventPort
-                        durable
-                        scope
-                        turn
-                        authorization
-                        continuationPrompt
-                        error
-                        admission
-            }
-
-    let private executeAuthorizedRecovery
-        (sessionPort: ISessionHostPort)
-        (rootWorkspace: IRootWorkspaceReader)
-        (eventPort: IEventObservationPort)
-        (durable: AgentJournal)
-        (scope: IBloggerRuntimeHost)
-        (turn: ReconciledTurn)
-        (ownerSessionId: SessionId)
-        (failure: ExecutionFailure)
-        (continuationPrompt: string)
-        (error: string)
-        (current: ProviderFailureProjection)
-        (requestKind: ProviderRequestKind)
-        =
-        recoveryDecision turn failure current requestKind
-        |> executeRecoveryResolution
-            sessionPort
-            rootWorkspace
-            eventPort
-            durable
-            scope
-            turn
-            ownerSessionId
-            continuationPrompt
-            error
-
     let private providerOfTarget (target: Wanxiangshu.OpenCode.ModelRoutingTarget) : string =
         let slash = target.Model.IndexOf '/'
 
@@ -769,7 +570,7 @@ module ProviderRecoveryWorkflow =
         else
             target.Model
 
-    let private continueDurableFailure
+    let rec private continueDurableFailure
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
         (eventPort: IEventObservationPort)
@@ -814,20 +615,54 @@ module ProviderRecoveryWorkflow =
             | true, None -> notifyFailure eventPort turn error
             | true, Some(ownerSessionId, requestKind, current) ->
                 return!
-                    executeAuthorizedRecovery
+                    retryConfirmedFailure
                         sessionPort
                         rootWorkspace
                         eventPort
                         durable
                         scope
                         turn
-                        ownerSessionId
                         failure
                         continuationPrompt
                         error
-                        current
+                        ownerSessionId
                         requestKind
+                        current
         }
+
+    and retryConfirmedFailure
+        (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (scope: IBloggerRuntimeHost)
+        (turn: ReconciledTurn)
+        (failure: ExecutionFailure)
+        (continuationPrompt: string)
+        (error: string)
+        (ownerSessionId: SessionId)
+        (requestKind: ProviderRequestKind)
+        (current: ProviderFailureProjection)
+        : Task =
+        task {
+            let! verdict =
+                Retry.attempt
+                    { Admit = fun authorization -> admitAuthorizedFailure durable ownerSessionId authorization error
+                      Redispatch =
+                        redispatchAfterFailure sessionPort rootWorkspace durable scope continuationPrompt error }
+                    { Turn = turn
+                      Failure = failure
+                      OwnerSession = ownerSessionId
+                      RequestKind = requestKind
+                      Current = current
+                      Error = error }
+
+            match verdict with
+            | RetryVerdict.Dispatched
+            | RetryVerdict.Superseded -> ()
+            | RetryVerdict.Terminal reason -> notifyFailure eventPort turn reason
+        }
+        :> Task
 
     /// Confirmed provider failure handling.
     ///
@@ -865,3 +700,66 @@ module ProviderRecoveryWorkflow =
                         error
         }
         :> Task
+
+    /// Retry-decorator plug for one dedicated delegate child (DELEG-023).
+    ///
+    /// The caller observes only the verdict: a single transient attempt failure
+    /// never reaches it. Recovery reuses the same policy, ledger and WorkMain
+    /// redispatch as the ordinary turn path.
+    let continueDelegateCallAfterConfirmedFailure
+        (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
+        (scope: IBloggerRuntimeHost)
+        (durable: AgentJournal)
+        (turn: ReconciledTurn)
+        (failure: ExecutionFailure)
+        (error: string)
+        : Task<RetryVerdict> =
+        task {
+            match ModelRouting.takeProviderRunTarget turn.ProviderRun with
+            | Some target -> ModelRouting.markProviderFailed (providerOfTarget target)
+            | None -> ()
+
+            let projections = AgentJournal.snapshot durable
+
+            let roleName =
+                PromptAuthorityProjectionQueries.activeProfile turn.SessionId projections.AgentProjections
+                |> Option.map (fun profile -> Roles.roleLabel profile.CanonicalRole)
+                |> Option.defaultValue ""
+
+            let hasCapacity = roleName = "" || ModelRouting.hasTheoreticalCapacity roleName
+
+            let recoveryContext =
+                requestKindFor durable turn
+                |> Option.bind (fun requestKind ->
+                    recoveryOwnerSession projections turn.SessionId requestKind
+                    |> Option.bind (fun ownerSessionId ->
+                        let failureState =
+                            AgentProjection.tryFind ownerSessionId projections.AgentProjections
+                            |> Option.bind _.ProviderFailures
+
+                        ProviderFailureEvidence.currentState failureState
+                        |> Option.map (fun current -> ownerSessionId, requestKind, current)))
+
+            match hasCapacity, recoveryContext with
+            | false, _ -> return RetryVerdict.Terminal "All candidate providers exhausted (zero capacity)"
+            | true, None -> return RetryVerdict.Terminal error
+            | true, Some(ownerSessionId, requestKind, current) ->
+                return!
+                    Retry.attempt
+                        { Admit = fun authorization -> admitAuthorizedFailure durable ownerSessionId authorization error
+                          Redispatch =
+                            redispatchAfterFailure
+                                sessionPort
+                                rootWorkspace
+                                durable
+                                scope
+                                (ProviderProse.documentFor turn.SessionId RuntimeNudge.ProviderRetry Map.empty)
+                                error }
+                        { Turn = turn
+                          Failure = failure
+                          OwnerSession = ownerSessionId
+                          RequestKind = requestKind
+                          Current = current
+                          Error = error }
+        }

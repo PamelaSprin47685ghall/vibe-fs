@@ -258,20 +258,28 @@ test('WHAT[DELEG-023] SYNC_RUNTIME_transient_turn_failure_stays_child_local_unti
     const pending = sync.invoke(h, 'owner-retry', 'Inspector', 'retry charge')
     await waitForChild(h, 'owner-retry', 'Inspector')
     await waitForPromptCount(h, 'owner-retry', 'Inspector', 1)
-    assert.equal(await sync.observeTurn(h, 'owner-retry', 'Inspector', 'TurnFailed', '', 'run-retry-1'), false)
+    // The retry decorator admits a fresh attempt: the failure stays child-local
+    // and the caller keeps waiting on the same invocation.
+    sync.scriptRetry(h, ['dispatched'])
+    assert.equal(await sync.observeTurn(h, 'owner-retry', 'Inspector', 'TurnFailed', '', 'run-retry-1'), true)
+    assert.equal(sync.retryCalls(h), 1, 'the transient failure must ask the shared retry decorator')
+    assert.equal(sync.dispatchRetryAttempt(h, 'owner-retry', 'Inspector'), true)
     assert.equal(await sync.observeTurn(h, 'owner-retry', 'Inspector', 'TurnCompleted', 'retry WorkRecord', 'run-retry-2'), true)
     const result = await pending
     assert.equal(result.ok, true)
     assert.match(result.value, /retry WorkRecord/)
   } finally { sync.dispose(h) }
 
-  const retry = sync.retryDisposition(['TurnFailed', 'RetryAvailable'])
-  assert.equal(retry.result, 'ChildLocalRetry')
-  assert.equal(retry.callerFailure, false)
-  const exhausted = sync.retryDisposition(['TurnFailed', 'TurnFailed'])
-  assert.equal(exhausted.result, 'ExhaustedFailure')
-  assert.equal(exhausted.callerFailure, true)
-  const completed = sync.retryDisposition(['TurnFailed', 'RetryAvailable', 'Completed'])
-  assert.equal(completed.result, 'WorkRecord')
-  assert.equal(completed.callerFailure, false)
+  // Only the decorator's terminal verdict reaches the caller; a later observation
+  // of the settled invocation is an idempotent no-op.
+  const exhausted = await live('owner-exhausted')
+  try {
+    sync.scriptRetry(exhausted, ['terminal:provider retry budget exhausted'])
+    const pending = sync.invoke(exhausted, 'owner-exhausted', 'Inspector', 'exhausted charge')
+    await waitForChild(exhausted, 'owner-exhausted', 'Inspector')
+    await waitForPromptCount(exhausted, 'owner-exhausted', 'Inspector', 1)
+    assert.equal(await sync.observeTurn(exhausted, 'owner-exhausted', 'Inspector', 'TurnFailed', '', 'run-exhausted-1'), true)
+    assert.deepEqual(await pending, { ok: false, error: 'SyncDelegate run failed: provider retry budget exhausted' })
+    assert.equal(sync.retryCalls(exhausted), 1)
+  } finally { sync.dispose(exhausted) }
 })

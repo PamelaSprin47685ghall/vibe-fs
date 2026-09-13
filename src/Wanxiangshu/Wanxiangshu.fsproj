@@ -1162,6 +1162,8 @@
     <Compile Include="OpenCode/Host/TerminalPolicySurface.fs"/>
     <Compile Include="Enforcer/Continuation.fsi"/>
     <Compile Include="Enforcer/Continuation.fs"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/Retry.fsi"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/Retry.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Workflow.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Workflow.fs"/>
     <Compile Include="Interaction/Repair/InteractionRepair.fsi"/>

@@ -9,6 +9,7 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
@@ -29,6 +30,21 @@ open Wanxiangshu.Persistence.Journal
 /// observe only invocation promises and child identities.
 [<RequireQualifiedAccess>]
 module SyncDelegateSurface =
+    /// Test-side plug of the retry decorator: the harness records each verdict
+    /// request so a landing test can prove a transient failure stayed child-local
+    /// (DELEG-023) before only the terminal verdict failed the call.
+    type private RetryScript() =
+        let queue = Queue<Result<unit, string>>()
+        let mutable calls = 0
+
+        member _.Push(verdict: Result<unit, string>) = queue.Enqueue verdict
+        member _.Calls = calls
+
+        member _.Next(error: string) : Result<unit, string> =
+            calls <- calls + 1
+
+            if queue.Count = 0 then Error error else queue.Dequeue()
+
     type private PromptReadiness() =
         let admitted = Dictionary<string, int>()
         let completed = Dictionary<string, int>()
@@ -157,7 +173,8 @@ module SyncDelegateSurface =
             scope: ToolRuntimeScope,
             sessions: SessionPort,
             readiness: PromptReadiness,
-            children: ResizeArray<SessionId>
+            children: ResizeArray<SessionId>,
+            retryScript: RetryScript
         ) =
         member _.Journal = journal
         member _.Runtime = runtime
@@ -165,6 +182,7 @@ module SyncDelegateSurface =
         member _.Sessions = sessions
         member _.Readiness = readiness
         member _.Children = children
+        member _.RetryScript = retryScript
         member _.OwnerSession(owner: string) = SessionId.create owner
 
         member _.Dispose() =
@@ -568,6 +586,8 @@ module SyncDelegateSurface =
 
             let handoffPort = DelegationHandoffLedger.port workRecordCapability journal
 
+            let retryScript = RetryScript()
+
             let runtime =
                 new SyncDelegateRuntime(
                     sessions,
@@ -580,6 +600,7 @@ module SyncDelegateSurface =
                     gate,
                     workRecordFor,
                     handoffPort,
+                    { Retry = fun _ _ error -> Task.FromResult(retryScript.Next error) },
                     workspaceDirectory = directory
                 )
 
@@ -603,7 +624,7 @@ module SyncDelegateSurface =
                     workRecordCapability = workRecordCapability
                 )
 
-            return box (Harness(journal, runtime, scope, sessionPort, readiness, children))
+            return box (Harness(journal, runtime, scope, sessionPort, readiness, children, retryScript))
         }
 
     /// Create a real SyncDelegateRuntime with an opaque journal and Host port.
@@ -781,9 +802,14 @@ module SyncDelegateSurface =
                     | Error error -> box {| ok = false; error = error |}
         }
 
-    let private handleTurn (harness: Harness) (child: SessionId) (turn: ReconciledTurn) =
+    let private handleTurn
+        (harness: Harness)
+        (child: SessionId)
+        (failure: ExecutionFailure option)
+        (turn: ReconciledTurn)
+        =
         task {
-            let! handled = harness.Runtime.HandleTurn(turn, None)
+            let! handled = harness.Runtime.HandleTurn(turn, failure, None)
 
             if handled then
                 harness.Readiness.Complete child
@@ -813,6 +839,7 @@ module SyncDelegateSurface =
         handleTurn
             harness
             child
+            None
             { SessionId = child
               PhysicalUserMessageId = physical
               AuthorityRootUserMessageId = AuthorityRootUserMessageId.create authorityRoot
@@ -931,6 +958,13 @@ module SyncDelegateSurface =
                             else
                                 [||]
 
+                        // A reconciled failure carries the confirmed typed witness;
+                        // the injected retry decorator owns what happens next.
+                        let failure =
+                            match outcome with
+                            | ReconcileProgram.TurnFailed _ -> Some ExecutionFailure.ProviderTransient
+                            | _ -> None
+
                         let turn =
                             { SessionId = child
                               PhysicalUserMessageId = physical
@@ -945,7 +979,7 @@ module SyncDelegateSurface =
                               Outcome = outcome
                               Observation = None }
 
-                        return! handleTurn harness child turn
+                        return! handleTurn harness child failure turn
                     | _ -> return false
         }
 
@@ -1192,22 +1226,35 @@ module SyncDelegateSurface =
                workRecord = workRecord
                authorityTransferred = false |}
 
-    let retryDisposition (outcomes: string array) : obj =
-        if outcomes |> Array.exists ((=) "Completed") then
-            box
-                {| result = "WorkRecord"
-                   childLocalFailures = 0
-                   callerFailure = false |}
-        elif outcomes |> Array.exists ((=) "RetryAvailable") then
-            box
-                {| result = "ChildLocalRetry"
-                   childLocalFailures = outcomes |> Array.filter ((=) "TurnFailed") |> Array.length
-                   callerFailure = false |}
-        else
-            box
-                {| result = "ExhaustedFailure"
-                   childLocalFailures = outcomes |> Array.filter ((=) "TurnFailed") |> Array.length
-                   callerFailure = true |}
+    /// Script the retry decorator's verdicts for the next confirmed failures:
+    /// `"dispatched"`, `"superseded"` or `"terminal:<reason>"`.
+    let scriptRetry (value: obj) (verdicts: string array) : unit =
+        let harness = unbox<Harness> value
+
+        for verdict in verdicts do
+            match verdict.Split(':', 2) with
+            | [| "dispatched" |] -> harness.RetryScript.Push(Ok())
+            | [| "superseded" |] -> harness.RetryScript.Push(Ok())
+            | [| "terminal"; reason |] -> harness.RetryScript.Push(Error reason)
+            | _ -> invalidArg "verdicts" (sprintf "unknown retry verdict script: %s" verdict)
+
+    /// How many times the decorated path asked the retry decorator for a verdict.
+    let retryCalls (value: obj) : int =
+        (unbox<Harness> value).RetryScript.Calls
+
+    /// Model the Host accepting the retry attempt the decorator dispatched: the
+    /// same child receives a fresh ready prompt, exactly as in production.
+    let dispatchRetryAttempt (value: obj) (owner: string) (role: string) : bool =
+        let harness = unbox<Harness> value
+
+        match roleOf role with
+        | Error _ -> false
+        | Ok role ->
+            match harness.Runtime.TryFind(harness.OwnerSession owner, role) with
+            | None -> false
+            | Some child ->
+                harness.Readiness.Mark(child, "provider-retry-attempt")
+                true
 
     let dispose (value: obj) : unit =
         unbox<Harness> value |> fun harness -> harness.Dispose()

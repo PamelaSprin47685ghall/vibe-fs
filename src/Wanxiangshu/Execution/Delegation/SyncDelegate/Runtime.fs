@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Execution.Delegation.SyncDelegate
 
 open Wanxiangshu.Context.Companion.Blogger.Runtime
+open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Attachment
@@ -53,6 +54,13 @@ module internal SyncDelegatePhysicalIdentity =
             (Uri.EscapeDataString(SyncDelegate.roleLabel role))
             (Uri.EscapeDataString agentName)
 
+/// Retry-decorator plug for dedicated delegate children (DELEG-023): the caller
+/// observes only the decorator's verdict, never a single transient attempt
+/// failure. `Ok unit` keeps the invocation pending (a fresh attempt was admitted
+/// or the episode was superseded); `Error reason` folds it as terminal.
+type SyncDelegateRetryPort =
+    { Retry: ReconciledTurn -> Wanxiangshu.Execution.Failure.ExecutionFailure -> string -> Task<Result<unit, string>> }
+
 /// EXEC-026 / EXEC-031: reusable SyncDelegate CE (Acquire → GetOrCreate → Send →
 /// ordinary Completion → bounded WorkRecord). No return tool / dual-await.
 ///
@@ -73,6 +81,7 @@ type SyncDelegateRuntime
         quiescence: ISessionQuiescenceGate,
         workRecordFor: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>,
         handoff: ReusableHandoffPort,
+        retryPort: SyncDelegateRetryPort,
         ?toolMapForRole: Role -> Map<string, bool>,
         ?workspaceDirectory: string,
         /// Casebook draft hooks (wired from SpikePlugin → CasebookLifecycle; compile-order seam).
@@ -82,6 +91,7 @@ type SyncDelegateRuntime
     ) =
     let store = SyncDelegateCallStore()
     let directory = workspaceDirectory
+    let retry = retryPort.Retry
     let noteInspectorPrompt = defaultArg onInspectorPrompt (fun _ _ -> ())
     let noteInspectorAnswer = defaultArg onInspectorAnswer (fun _ _ -> ())
     let cleanupInspectorDraft = defaultArg onInspectorCleanup (fun _ -> ())
@@ -217,7 +227,8 @@ type SyncDelegateRuntime
 
             let! identitySeed = issueCurrentOwnerIdentitySeed call.Owner call.Agent
 
-            let accept root scope =
+            let accept physical root scope =
+                call.AcceptedPhysical <- Some physical
                 call.AcceptedAuthorityRoot <- Some root
                 call.TerminalFailureScope <- Some scope
                 AsyncSupport.trySetResult call.AcceptedRoot root |> ignore
@@ -239,7 +250,7 @@ type SyncDelegateRuntime
                         PromptDispatcher.AwaitMode.Await
                         (Some(fun physical ->
                             let root = PhysicalUserMessageId.promoteToAuthorityRoot physical
-                            accept root (FreshAuthorityRoot root)))
+                            accept physical root (FreshAuthorityRoot root)))
                         tools
                         None
 
@@ -260,7 +271,7 @@ type SyncDelegateRuntime
                         directory
                         PromptDispatcher.AwaitMode.Await
                         (Some(fun physical ->
-                            accept profile.AuthorityRootUserMessageId (ExistingAuthorityContinuation physical)))
+                            accept physical profile.AuthorityRootUserMessageId (ExistingAuthorityContinuation physical)))
                         tools
 
                 ()
@@ -359,6 +370,28 @@ type SyncDelegateRuntime
                 return finishCompletedCall turn.SessionId call workRecord
         }
 
+    /// DELEG-025 causal identity: a turn belongs to this invocation iff its
+    /// physical is the exact accepted prompt of this call, or it is a
+    /// ProviderRetryAttempt continuation of the same accepted authority root
+    /// (the retry attempts the decorator dispatched for this call).
+    let belongsToCall (call: SyncDelegateCall) (turn: ReconciledTurn) =
+        let sameAcceptedPhysical =
+            match call.AcceptedPhysical with
+            | Some physical -> physical = turn.PhysicalUserMessageId
+            | None -> false
+
+        let isRetryAttemptContinuation =
+            match call.AcceptedAuthorityRoot with
+            | Some root when root = turn.AuthorityRootUserMessageId ->
+                (AgentJournal.snapshot journal).AgentProjections
+                |> PromptAuthorityProjectionQueries.projectionFor turn.SessionId
+                |> Option.bind (fun authority ->
+                    Map.tryFind turn.PhysicalUserMessageId authority.AcceptedContinuationIds)
+                |> Option.exists (fun kind -> kind = PromptAuthority.ContinuationKind.ProviderRetryAttempt)
+            | _ -> false
+
+        sameAcceptedPhysical || isRetryAttemptContinuation
+
     let popIfAcceptanceMatches
         (store: SyncDelegateCallStore)
         (turn: ReconciledTurn)
@@ -368,13 +401,7 @@ type SyncDelegateRuntime
             let! expectedRoot = call.AcceptedRoot.Task
 
             return
-                if
-                    expectedRoot = turn.AuthorityRootUserMessageId
-                    && (match call.TerminalFailureScope with
-                        | Some(FreshAuthorityRoot root) -> root = turn.AuthorityRootUserMessageId
-                        | Some(ExistingAuthorityContinuation physical) -> physical = turn.PhysicalUserMessageId
-                        | None -> false)
-                then
+                if expectedRoot = turn.AuthorityRootUserMessageId && belongsToCall call turn then
                     store.TryPopCallByDelegate turn.SessionId
                 else
                     None
@@ -410,21 +437,23 @@ type SyncDelegateRuntime
             | None -> return false
         }
 
-    let handleFailedContinuationTurn (turn: ReconciledTurn) error =
+    /// One confirmed provider failure for a pending call. The injected retry
+    /// decorator owns policy, budget admission and physical re-entry (DELEG-023):
+    /// a single transient failure never fails the call; only a terminal verdict
+    /// does. Turns outside this invocation's accepted attempts stay ordinary.
+    let rec handleFailedAttemptTurn (turn: ReconciledTurn) (failure: ExecutionFailure option) error =
         task {
-            let continuation =
-                store.TryPeekCallByDelegate turn.SessionId
-                |> Option.filter (fun call ->
-                    call.Invocations
-                    |> List.forall (fun invocation -> invocation.StartCursor.IsSome)
-                    && (match call.TerminalFailureScope with
-                        | Some(ExistingAuthorityContinuation _) -> true
-                        | Some(FreshAuthorityRoot _)
-                        | None -> false))
+            match store.TryPeekCallByDelegate turn.SessionId with
+            | Some call when belongsToCall call turn && failure.IsSome ->
+                return! settleFailedAttempt turn failure.Value error call
+            | _ -> return false
+        }
 
-            match continuation with
-            | Some call -> return! failMatchingTerminalCall turn error call
-            | None -> return false
+    and settleFailedAttempt (turn: ReconciledTurn) (failure: ExecutionFailure) error (call: SyncDelegateCall) =
+        task {
+            match! retry turn failure error with
+            | Ok() -> return true
+            | Error reason -> return! failMatchingTerminalCall turn reason call
         }
 
     let singletonResult taskResult =
@@ -528,16 +557,17 @@ type SyncDelegateRuntime
             (Some batch)
             prepareProviderPrompt
 
-    member _.HandleTurn(turn: ReconciledTurn, permit: QuiescencePermit option) : Task<bool> =
+    member _.HandleTurn
+        (turn: ReconciledTurn, failure: ExecutionFailure option, permit: QuiescencePermit option)
+        : Task<bool> =
         task {
             match turn.Role, turn.Outcome with
             | Some(Role.Inspector | Role.Coder), ReconcileProgram.TurnCompleted -> return! handleCompletedRoleTurn turn
             | Some(Role.Inspector | Role.Coder), ReconcileProgram.TurnFailed error ->
-                return! handleFailedContinuationTurn turn error
+                return! handleFailedAttemptTurn turn failure error
             | _ ->
-                // Fresh-root TurnFailed, TurnInProgress and TurnNeedsContinuation
-                // remain child-local for provider recovery. A reused
-                // continuation can fail only through its exact physical turn above.
+                // TurnInProgress and TurnNeedsContinuation remain child-local;
+                // a turn outside this call's accepted attempts is not ours.
                 return false
         }
 

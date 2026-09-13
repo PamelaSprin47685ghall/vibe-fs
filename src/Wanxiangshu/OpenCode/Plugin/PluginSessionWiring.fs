@@ -14,6 +14,7 @@ open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Provider.Attempt
+open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Strength.Replica
@@ -39,6 +40,29 @@ module PluginSessionWiring =
             match ManagedAgent.tryParse agent with
             | Some managed -> wired.BindActiveRun replicaId managed.Role workspaceDirectory
             | None -> ()
+
+        /// The retry decorator's real plug for dedicated delegate children: the
+        /// provider-owned engine decides, admits and re-dispatches; the delegate
+        /// observes only continue-vs-terminal (DELEG-023).
+        let delegateRetryPort (durable: AgentJournal) : SyncDelegateRetryPort =
+            { Retry =
+                fun turn failure error ->
+                    task {
+                        let! verdict =
+                            ProviderRecoveryWorkflow.continueDelegateCallAfterConfirmedFailure
+                                sessionPort
+                                host.RootWorkspace
+                                scope.BloggerRuntimeHost
+                                durable
+                                turn
+                                failure
+                                error
+
+                        match verdict with
+                        | RetryVerdict.Dispatched
+                        | RetryVerdict.Superseded -> return Ok()
+                        | RetryVerdict.Terminal reason -> return Error reason
+                    } }
 
         let seedDurableSessions (durable: AgentJournal) =
             let snapshot = AgentJournal.snapshot durable
@@ -101,6 +125,7 @@ module PluginSessionWiring =
                             range
                             providerRun),
                     DelegationHandoffLedger.port workRecordCapability durable,
+                    delegateRetryPort durable,
                     toolMapForRole =
                         (fun role ->
                             PromptAuthority.toolCapabilitiesFor role ProviderRequestKind.WorkMain

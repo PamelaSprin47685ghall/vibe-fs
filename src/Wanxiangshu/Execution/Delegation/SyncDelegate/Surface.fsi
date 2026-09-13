@@ -80,5 +80,14 @@ module SyncDelegateSurface =
 
     val serializationDecision: firstScope: string -> secondScope: string -> sameProviderRun: bool -> obj
     val evidenceBoundary: charge: string -> workRecord: string -> obj
-    val retryDisposition: outcomes: string array -> obj
+
+    /// Script the retry decorator's verdicts for the next confirmed failures:
+    /// `"dispatched"`, `"superseded"` or `"terminal:<reason>"`.
+    val scriptRetry: value: obj -> verdicts: string array -> unit
+
+    /// How many times the decorated path asked the retry decorator for a verdict.
+    val retryCalls: value: obj -> int
+
+    /// Model the Host accepting the retry attempt the decorator dispatched.
+    val dispatchRetryAttempt: value: obj -> owner: string -> role: string -> bool
     val dispose: value: obj -> unit
