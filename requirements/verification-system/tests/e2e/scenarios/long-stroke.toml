@@ -163,9 +163,9 @@ flow = [
   # The initial HumanRoot prompt and every owner-opened incarnation reuse the same
   # authority-first manager-loop entry; the binder varies review results by durable attempt.
   { wait = "manager-loop.0" },
-  # HumanRoot preflow baseline: +2 AssessmentCommitted before the main spine, so the
-  # first main assessment lands at 3. Preserves the main-spine delta (exactly one new).
-  { waitFact = { name = "AssessmentCommitted", eq = 3 }, timeoutMs = 60000 },
+  # Manager loop first main assessment (session = "child"): precisely 1 for this road/branch,
+  # decoupled from preflow/world AssessmentCommitted total.
+  { waitFact = { name = "AssessmentCommitted", eq = 1, session = "child" }, timeoutMs = 60000 },
   { wait = "manager-loop.1" },
   # The held child request proves the forked run is active before the idle join
   # attempt. Without this causal barrier, join may correctly report NothingToJoin

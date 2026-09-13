@@ -64,9 +64,9 @@ export function publicToolResults(requests, expectedName) {
 /**
  * Build a waitFact table matching TOML `{ waitFact = { name, eq|gte, renewOn? } }`.
  * @param {string} name
- * @param {{ eq?: number, gte?: number, renewOn?: string[] }} [opts]
+ * @param {{ eq?: number, gte?: number, renewOn?: string[], session?: string }} [opts]
  */
-export function waitFactShape(name, { eq, gte, renewOn = [] } = {}) {
+export function waitFactShape(name, { eq, gte, renewOn = [], session } = {}) {
   assert.ok(typeof name === 'string' && name.length > 0, 'waitFact name required');
   assert.ok(
     (eq !== undefined) !== (gte !== undefined) || (eq === undefined && gte === undefined),
@@ -78,6 +78,7 @@ export function waitFactShape(name, { eq, gte, renewOn = [] } = {}) {
   const shape = { name, renewOn: [...renewOn] };
   if (eq !== undefined) shape.eq = eq;
   if (gte !== undefined) shape.gte = gte;
+  if (session !== undefined) shape.session = session;
   return shape;
 }
 

@@ -71,11 +71,10 @@ export function extractFactCasesAndIdentities(envelope, event) {
       }
       for (const item of fact) walkFact(item);
     } else if (fact && typeof fact === 'object') {
-      if (typeof fact.sessionId === 'string') sessionId = sessionId ?? fact.sessionId;
-      if (typeof fact.session_id === 'string') sessionId = sessionId ?? fact.session_id;
-      if (typeof fact.logicalRunId === 'string') logicalRun = logicalRun ?? fact.logicalRunId;
-      if (typeof fact.logical_run_id === 'string') logicalRun = logicalRun ?? fact.logical_run_id;
-      if (typeof fact.logicalRun === 'string') logicalRun = logicalRun ?? fact.logicalRun;
+      const sid = fact.sessionId ?? fact.session_id ?? fact.SessionId ?? fact.sessionID ?? fact.RoadId ?? fact.ManagerSessionId ?? fact.ChildSessionId;
+      if (typeof sid === 'string') sessionId = sessionId ?? sid;
+      const lrid = fact.logicalRunId ?? fact.logical_run_id ?? fact.LogicalRunId ?? fact.logicalRun;
+      if (typeof lrid === 'string') logicalRun = logicalRun ?? lrid;
       for (const val of Object.values(fact)) walkFact(val);
     }
   };

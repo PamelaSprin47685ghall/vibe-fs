@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <ImpactFixtureMark>1</ImpactFixtureMark>
+  </PropertyGroup>
+  <!-- Resolves in place. Tests copy this fixture to a temp dir and re-point
+       the import at the absolute repo root, so the copy stays compilable. -->
+  <Import Project="../../../../../../Directory.Build.props" />
+</Project>

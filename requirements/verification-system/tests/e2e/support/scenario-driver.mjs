@@ -225,9 +225,17 @@ async function sendPrompt(scenario, sessionId, prompt) {
  * 存在，但不得是唯一或首要的判据」): the primary criterion is now the silence budget, which fires
  * first in every case where nothing is happening, and this bound only catches livelock.
  */
-export async function awaitFactBarrier(scenario, step) {
+export async function awaitFactBarrier(scenario, step, ctx = null) {
   const name = step.waitFact.name;
   const renewOn = step.waitFact.renewOn ?? [];
+  const targetSession =
+    step.waitFact.session === 'child'
+      ? ctx?.childId
+      : step.waitFact.session === 'self'
+        ? ctx?.sessionId
+        : step.waitFact.session
+          ? (ctx?.sessions?.[step.waitFact.session] ?? step.waitFact.session)
+          : null;
   const need = step.waitFact.eq !== undefined ? step.waitFact.eq : step.waitFact.gte !== undefined ? step.waitFact.gte : 1;
   const cmp = step.waitFact.eq !== undefined
     ? (n) => n === need
@@ -235,12 +243,22 @@ export async function awaitFactBarrier(scenario, step) {
   const lane = step.lane || `fact:${name}`;
   const deadline = Date.now() + (step.timeoutMs || WAIT_FACT_WINDOW_MS);
 
+  const readCurrentFactCount = () => {
+    if (targetSession) {
+      const obs = getOrCreateSharedObserver(scenario.host.workDir);
+      obs.refresh?.();
+      const matched = obs.select({ caseName: name, sessionId: targetSession });
+      return { named: matched.length, total: obs.counts().uniqueEvents, renew: 0 };
+    }
+    return readJournal(scenario.host.workDir, name, renewOn);
+  };
+
   // VERIFY-004: a waitFact with an explicit timeout is a bounded wait step —
   // widen the silence window to that bound so a slow-but-progressing promote
   // is not killed by the default 5s silence watchdog mid-poll.
   scenario.watchdog?.setWindow(step.timeoutMs ?? null);
   try {
-  let observed = readJournal(scenario.host.workDir, name, renewOn);
+  let observed = readCurrentFactCount();
   if (step.waitFact.eq !== undefined && observed.named > need) {
     assert.fail(
       `waitFact ${name} overshot eq ${need} (got ${observed.named}); use gte when the producer can race past the exact count`,
@@ -251,7 +269,7 @@ export async function awaitFactBarrier(scenario, step) {
     // Journal watch wakes on local .git/wanxiang/events writer-file changes; ≤FACT_WAKE_GUARD_MS wall guard is fallback only.
     await wakeOnJournal(scenario.host.workDir, Math.min(remaining, FACT_WAKE_GUARD_MS));
 
-    const next = readJournal(scenario.host.workDir, name, renewOn);
+    const next = readCurrentFactCount();
     // Livelock guard: journal growth without the awaited fact still trips the
     // scenario's declared exact event ceiling (primary over silence alone).
     scenario.eventCeilings?.checkJournal?.();
@@ -412,7 +430,7 @@ async function runFlow(scenario, doc, ctx) {
       return;
     }
     if (step.waitFact) {
-      await awaitFactBarrier(scenario, step);
+      await awaitFactBarrier(scenario, step, ctx);
       return;
     }
     if (step.armIdle) {
