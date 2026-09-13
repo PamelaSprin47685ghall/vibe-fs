@@ -54,6 +54,23 @@ test('WHAT[CONTEXT-COMPRESSION-003] CTX_003_delta_limit_is_200_KiB', () => {
   // An input contract, not an estimate: never compared to a model window, never
   // scaled by provider. Exported as a plain value so this test can read it.
   assert.equal(delta.limitBytes, 200 * 1024)
+
+  // Threshold proof: a single part of 200 KiB exactly is within the chunk boundary,
+  // whereas 200 KiB + 1 byte exceeds the limit and triggers deterministic truncation/marking.
+  const limit = 200 * 1024
+  const atLimitText = 'a'.repeat(limit - 300) // leaves room for TOML framing within 200 KiB
+  const atLimitMessages = delta.messages([{ role: 'user', parts: [delta.text(atLimitText)] }])
+  const atLimitChunk = delta.nextChunk({ limit, cursor: origin, messages: atLimitMessages })
+  assert.ok(atLimitChunk, 'fits within 200 KiB limit')
+  assert.equal(atLimitChunk.itemCount, 1)
+  assert.deepEqual(atLimitChunk.truncatedFlags, [false])
+
+  const overLimitText = 'b'.repeat(limit + 500)
+  const overLimitMessages = delta.messages([{ role: 'user', parts: [delta.text(overLimitText)] }])
+  const overLimitChunk = delta.nextChunk({ limit, cursor: origin, messages: overLimitMessages })
+  assert.ok(overLimitChunk, 'handles oversized part at 200 KiB boundary')
+  assert.equal(overLimitChunk.itemCount, 1)
+  assert.deepEqual(overLimitChunk.truncatedFlags, [true])
 })
 
 // ── nothing to consume ─────────────────────────────────────────────────────

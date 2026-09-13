@@ -128,7 +128,7 @@ export async function superviseNodeTest({
   watchdog.stop()
   clearTimeout(backstop)
 
-  if (!runnerSummary) {
+  if (!runnerSummary && exit.signal === null) {
     console.error(`${logPrefix}: inner runner failed to provide authoritative summary`)
   }
 

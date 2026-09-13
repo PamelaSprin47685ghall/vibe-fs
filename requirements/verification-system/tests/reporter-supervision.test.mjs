@@ -402,7 +402,7 @@ test('WHAT[T6-STATE-004] createCompactReporter shares state with TestRunState in
 })
 
 test('WHAT[T6-STATE-005] supervisor aborts when inner runner fails without summary or with runner:error', async () => {
-  const fakeInner = path.join(here, 'support/fixtures/overrun-then-pass.fixture.mjs')
+  const fakeInner = path.join(here, 'support/fixtures/all-pass.fixture.mjs')
 
   // Running an inner that is NOT run-inner.mjs means it will not send runner:summary
   // superviseNodeTest will log error and exit(1)
