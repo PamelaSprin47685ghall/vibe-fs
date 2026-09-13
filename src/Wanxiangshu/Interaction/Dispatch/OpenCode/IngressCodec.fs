@@ -193,7 +193,16 @@ module PromptIngressCodec =
             |> Option.exists (fun mode -> mode.Equals("compaction", StringComparison.OrdinalIgnoreCase)))
 
     let private isHostSynthetic (output: obj) =
-        parts output |> Array.exists (fun part -> isTrueProperty part "synthetic")
+        let messageParts = parts output
+
+        // Only material the Host generated outright is HostInternal. A real user
+        // message still carries host-injected synthetic echoes (for example the
+        // TUI's @-file read output) next to its own parts; treating that mixture
+        // as synthetic would let user-authored content bypass managed admission
+        // and arrive at the provider with the uncontrolled TUI model selection
+        // still attached.
+        messageParts.Length > 0
+        && Array.forall (fun part -> isTrueProperty part "synthetic") messageParts
 
     let private sessionIdCarrierOfPart (sess: obj) : TextCarrier =
         if isNull sess then

@@ -17,6 +17,8 @@
    - 未命中任何规则 → fail-closed `UnknownOrigin`
 
    Session cache、Host physical parent 与消息字段形态不进入 resolution；显式 external agent 只作为与 participant 比对的输入。
+   
+   `HostInternal` 的 synthetic 判定只覆盖**整条**由 Host 合成的消息（每个 part 都标 `synthetic:true`）。用户在 TUI 中提及文件时，Host 注入的 synthetic 回显 part 与真实用户 part 混存于同一物理消息；混存消息不是 HostInternal，进入正常来源判定并执行受管 admission/model 投影，用户 TUI 模型选择被覆盖。
 
 3. **权威事实折叠（Authority Fold）**：
    identity 与 authority 投影严格从同一 `AuthorityRootAccepted` 重放 `(SessionId, LogicalRunId, AuthorityRootId, ExpectedClosureKind, ParticipantIdentityEvidence, per-physical target/lease)`，内存不维护独立可变 authority/identity 副本。它向 Host 与 execution 发布 exact profile view，而不复制身份解析规则；固定 participant/Role 来自 evidence，当前 per-physical target/lease 来自 execution binding。

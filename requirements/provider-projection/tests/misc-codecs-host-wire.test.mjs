@@ -185,6 +185,17 @@ test('WHAT[PROVIDER-PROJECTION-003] MISC_ingress_host_synthetic_detection', () =
   assert.equal(decodeIngress({}, {}).isHostSynthetic, false)
 })
 
+test('WHAT[PROVIDER-PROJECTION-003] MISC_ingress_host_synthetic_requires_fully_injected_material', () => {
+  // A user message that mentions a file gains host-injected synthetic read
+  // echoes alongside its real parts. Only material the Host generated outright
+  // is HostInternal; mixed payloads are external user material.
+  assert.equal(decodeIngress({}, { parts: [{ type: 'text', text: 'a' }, { synthetic: true }] }).isHostSynthetic, false)
+  assert.equal(decodeIngress({}, { parts: [{ synthetic: true }, { type: 'text', text: 'a' }] }).isHostSynthetic, false)
+  assert.equal(decodeIngress({}, { parts: [{ synthetic: true }, { type: 'file' }] }).isHostSynthetic, false)
+  assert.equal(decodeIngress({}, { parts: [{ synthetic: true }, {}] }).isHostSynthetic, false)
+  assert.equal(decodeIngress({}, { parts: [{ synthetic: true }, { synthetic: true }] }).isHostSynthetic, true)
+})
+
 test('WHAT[PROVIDER-PROJECTION-003] MISC_ingress_text_joins_text_parts_and_filters_blanks', () => {
   const msg = decodeIngress({}, { parts: [{ type: 'text', text: 'one' }, { type: 'text', text: '   ' }, { type: 'tool-call', tool: 'x' }, { type: 'text', text: 'two' }] })
   assert.equal(msg.text, 'one\ntwo')
