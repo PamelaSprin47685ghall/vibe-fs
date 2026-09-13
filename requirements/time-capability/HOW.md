@@ -36,6 +36,7 @@
 
 ### 6. 业务层全局时间禁令门禁（`ambient-time-forbidden`）
 
+`scripts/lib/raw-time-scan.mjs` 先遍历完整 `src/Wanxiangshu/`，再按精确文件路径排除已审查的物理时钟、timer、Host 与持久化适配器。例外不接受目录前缀；新 sibling 默认进入扫描（纯源码文本token扫描，非FCS）。生产根或声明的 scan root 不存在时 collector 直接失败；它不再是常驻门禁，TIME-004 的证明由单元测试直接驱动同一 scanner。
 `scripts/checks/g4r-ce-vocabulary.mjs` 先遍历完整 `src/Wanxiangshu/`，再按精确文件路径排除已审查的物理时钟、timer、Host 与持久化适配器。例外不接受目录前缀；新 sibling 默认进入扫描（纯源码文本token扫描，非FCS）。生产根或声明的 scan root 不存在时 collector 直接失败，CLI 永久 hard-fail，不存在 soft phase。
 
 `tests/ambient-time-forbidden.test.mjs` 调用与 CLI 相同的 analyzer，分别固定 clean production、全树 collector、单 token mutation + allowlist sibling decoy、missing-root fail-closed。TIME-004 是 source absence/architecture law，不登记到 `Process/Surface.js`；Surface Manifest 只约束 runtime semantic boundary，不能证明全生产树不存在 ambient-time token。
@@ -46,6 +47,7 @@
 
 ### 8. Temporal边界的production行为proof
 
+`tests/ambient-time-forbidden.test.mjs` 直接调用 lib analyzer
 `Process/Surface.js`直接投影production `IClockPort`、`ITimerPort`、`Deadline`、Node adapter与virtual implementation。TIME-008的行为proof固定三个可区分错误世界：两个capability实例不得共享推进状态；`Deadline`只随显式clock input变化且不积累隐藏状态；构造Node capability不得改变virtual clock/timer。第四个proof直接读取正式owner-project inventory，固定六个production locality的source闭集及每个consumer按已声明ProjectReference/closures推导的最窄引用；它不做fresh compiler census，不扫描源码、不重建dependency analyzer、不执行任何自定义FCS扫描。Node物理时钟与timer的外界正确性属于adapter canary，不用墙钟容差或真实timer等待伪装成确定性unit proof。
 
 ---

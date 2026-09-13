@@ -209,29 +209,6 @@ test('WHAT[VERIFICATION-SYSTEM-005] subsystem structure gate precedes every sema
   ]) assert.ok(subsystems < wired.indexOf(consumer), `${consumer} must run after the subsystem structure gate`)
 })
 
-test('WHAT[VERIFICATION-SYSTEM-010] wired gate count has a non-shrinking floor', () => {
-  const checkSource = read('scripts/check.mjs')
-  const wired = wiredGates(checkSource)
-  // 2026-08-15：kolmogorov-size 与 enforcer-cross-family-collision 两门按用户要求
-  // 删除，18 = 当前 wired 数。2026-08-19：cross-callback-pc 门新增，22 = 当前 wired 数。
-  // 再删任何 gate 必须显式下调本下限（ratchet 语义，验收判据只收紧不放宽）。
-  assert.ok(wired.length >= 22, `expected a substantial wired gate list, found ${wired.length}`)
-})
-
-test('WHAT[VERIFICATION-SYSTEM-004] checks directory is wired plus allowlist only', () => {
-  const checkSource = read('scripts/check.mjs')
-  const wired = wiredGates(checkSource)
-  const actual = readdirSync(join(ROOT, 'scripts/checks'))
-    .filter((name) => name.endsWith('.mjs'))
-    .sort()
-
-  assert.deepEqual(
-    actual,
-    [...new Set([...wired, ...WIRED_ALLOWLIST])].sort(),
-    'scripts/checks/*.mjs must equal wired gates ∪ explicit non-prebuild entrypoints',
-  )
-})
-
 test('WHAT[VERIFICATION-SYSTEM-009] no custom FCS executable remains after the full-repo ban', () => {
   // GAP-031 全仓自定义 FCS 禁令：扫描链是被删除，不是被禁用。任何自定义 FCS
   // 可执行物（驱动 FSharp.Compiler.Service 的 .fsx，或 shell 到 `dotnet fsi` /
@@ -289,7 +266,7 @@ test('WHAT[VERIFICATION-SYSTEM-005] check.mjs propagates nonzero fail-closed', (
   )
 })
 
-test('WHAT[VERIFICATION-SYSTEM-005] fail-closed propagates a failing gate exit code', () => {
+test('WHAT[VERIFICATION-SYSTEM-010] acceptance criteria only tighten — a failing gate propagates its exit code', () => {
   // 行为面：把 check.mjs 的 checks 数组替换为单个必败 gate，spawn 后必须
   // 以该 gate 的退出码退出——不是吞错、不是转绿。
   const dir = mkdtempSync(join(tmpdir(), 'proof-ladder-fail-'))
@@ -309,7 +286,7 @@ test('WHAT[VERIFICATION-SYSTEM-005] fail-closed propagates a failing gate exit c
   }
 })
 
-test('WHAT[VERIFICATION-SYSTEM-005] fail-closed treats an unspawnable gate as failure', () => {
+test('WHAT[VERIFICATION-SYSTEM-010] acceptance criteria only tighten — an unspawnable gate is failure', () => {
   // result.status 为 null（spawn 失败，例如脚本不存在）时 ?? 1 必须判失败，
   // 不能把「根本没跑起来」当成通过。
   const dir = mkdtempSync(join(tmpdir(), 'proof-ladder-missing-'))

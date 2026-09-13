@@ -186,11 +186,12 @@ test('WHAT[STRUCTURED-WORKFLOW-004] CONTROL_PYRAMID_many_hits_print_locations_bu
     },
   ])
 
-  assert.equal(output.match(/F# CONTROL PYRAMID — REPAIR MANUAL/g)?.length, 1)
+  assert.equal(output.match(/F# CONTROL PYRAMID — REPAIR MANUAL/g), null)
   assert.match(output, /a\.fs:10/)
   assert.match(output, /b\.fs:20/)
   assert.match(output, /c\.fs:30/)
   assert.match(output, /match → match!/)
+  assert.match(output, /--explain/)
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-004] CONTROL_PYRAMID_tutorial_prerequisites_are_repo_concrete_and_cannot_be_shrunk', () => {

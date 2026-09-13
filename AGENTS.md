@@ -243,7 +243,7 @@ unit 的慢项如下：
 | 5 | subsystems.mjs | 保留，作为共享工程清单入口 | 唯一源文件归属、签名配对、闭包完整、DAG、基础设施依赖方向 |
 | 6 | dsl-ownership.mjs | 退役启发式治理，迁走必要边界 | 大 DU 阈值、解释注释、状态形状与复杂度推断不再管；越权／副作用边界交类型、窄扫描与行为测试 |
 | 7 | authority-boundary.mjs | 退役权威登记册式检查 | 能力创建／消费／不可持久化等命题用真实端口、序列化和 private/.fsi canary 证明；不靠类型后缀和注释获得权威 |
-| 8 | fsharp-control-pyramid.mjs | 退役 | 不用缩进和嵌套数量裁决业务表达；专属 guide 与 baseline 接口一起清理 |
+| 8 | fsharp-control-pyramid.mjs | 禁止退役 | 缩进和嵌套数量确实能裁决业务表达；但需要精简输出 |
 | 9 | plugin-transforms-invariant.mjs | 改为组合顺序行为测试 | 同一输入的投影、处理次序、次数与禁止旁路；不锁死装配源码文字 |
 | 10 | interaction-repair-invariant.mjs | 改为状态／时序回归 | 非终态不能误修复、in-flight 不重复、合法修复不制造 exhaustion |
 | 11 | retry-owner.mjs | 保留最小属主约束 | 只允许已定义重试层裁决；重试次数、终止与副作用唯一性由行为证明 |
@@ -265,7 +265,7 @@ unit 的慢项如下：
 | 27 | language-parity-gate.mjs | 保留资源契约部分 | 双语文件、协议标识、占位符一致；语义 anchor 词汇清单和作文深度考核退出 |
 | 28 | prompt-depth-ratchet.mjs | 退役 | prompt 是否有指定词和指定解释层数，不是产品正确性证明 |
 | 29 | provider-prose-ownership.mjs | 退役 prose 治理和 baseline | 保留真实 provider leak 与序列化边界；不维护英文散文命中债务 |
-| 30 | g4r-ce-vocabulary.mjs | 退役迁移词汇门禁 | 因果计时与时间注入由测试证明；不继续搜旧 controller 名字 |
+| 30 | g4r-ce-vocabulary.mjs | 退役迁移词汇门禁 | 因果计时与时间注入由测试证明；不继续搜旧 controller 名字；raw-time 环境时间扫描器迁入 `scripts/lib/raw-time-scan.mjs`，由 TIME-004 正式测试直接消费，不再作为常驻门禁 |
 | 31 | test-boundary.mjs | 与下一项合并 | 测试不得深层导入未公开的生成实现 |
 | 32 | js-boundary-gate.mjs | 保留单一实现 | 一份实际 Surface 入口清单、一遍 JS 语法扫描；删除已清零的兼容债务治理附件 |
 | 33 | e2e-watchdog-feed.mjs | 并入 runner 的小范围回归 | 顶层场景不能拿原始流量喂狗；保留 watchdog 的真实因果与挂死测试 |

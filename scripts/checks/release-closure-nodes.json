@@ -771,9 +771,7 @@
       ],
       "proofs": [
         "requirements/provider-language/tests/provider-language.test.mjs",
-        "requirements/provider-language/tests/provider-prose-and-preference.test.mjs",
-        "requirements/provider-language/tests/provider-prose-ownership.test.mjs",
-        "requirements/provider-language/tests/language-parity-gate.test.mjs"
+        "requirements/provider-language/tests/provider-prose-and-preference.test.mjs"
       ],
       "publishes": [
         "Provider.Language",

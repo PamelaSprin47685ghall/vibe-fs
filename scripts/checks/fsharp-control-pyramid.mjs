@@ -261,7 +261,7 @@ export const renderFailure = (hits, heading = `fsharp-control-pyramid: ${hits.le
       '',
     )
   }
-  lines.push(CONTROL_PYRAMID_GUIDE.trimStart())
+  lines.push('run `node scripts/checks/fsharp-control-pyramid.mjs --explain` for the repair manual')
   return lines.join('\n')
 }
 

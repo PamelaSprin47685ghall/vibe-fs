@@ -8,15 +8,15 @@ import { dirname, join, resolve } from 'node:path'
 import {
   RAW_TIME_SCAN_ROOTS,
   collectRawTimeScanEntries,
-  scanG4RCeVocabulary,
   scanRawTimeEntries,
-} from '../../../scripts/checks/g4r-ce-vocabulary.mjs'
+  scanRawTimeProduction,
+} from '../../../scripts/lib/raw-time-scan.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 const PRODUCTION_ROOT = join(ROOT, 'src', 'Wanxiangshu')
 
 test('WHAT[TIME-004] domain_application_session_contain_no_raw_time_tokens', () => {
-  const hits = scanG4RCeVocabulary(ROOT).rawTime
+  const hits = scanRawTimeProduction(ROOT)
   assert.equal(
     hits.length,
     0,

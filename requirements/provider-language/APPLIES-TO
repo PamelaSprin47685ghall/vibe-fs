@@ -12,6 +12,6 @@
 /src/Wanxiangshu/Resources/PackageResources.fs
 /src/Wanxiangshu/Resources/ProviderResourceBytes.fs
 /scripts/checks/language-parity-gate.mjs
-/scripts/checks/provider-prose-ownership.mjs
+
 /scripts/checks/semantic-anchors.mjs
 /requirements/prefix-stability/tests/system-prompt-stability.test.mjs

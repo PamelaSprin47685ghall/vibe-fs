@@ -19,6 +19,22 @@ import {
   nameOf,
   requireLanguagePair,
 } from '../../../dist/Participant/Provider/LanguageSurface.js'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const ROOT = resolve(fileURLToPath(import.meta.url), '../../../..')
+const SRC_ROOT = join(ROOT, 'src/Wanxiangshu')
+
+const walk = (dir) => {
+  const out = []
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) out.push(...walk(full))
+    else if (entry.name.endsWith('.fs')) out.push(full)
+  }
+  return out
+}
 
 const english = 'English'
 const simplifiedChinese = 'SimplifiedChinese'
@@ -62,6 +78,45 @@ test('WHAT[PROVIDER-LANGUAGE-006] require language pair fails closed on missing 
 test('WHAT[PROVIDER-LANGUAGE-004] unbound session language is English (first touch)', () => {
   const sid = 'ses_prose_unbound'
   assert.equal(nameOf(languageOfSession(sid)), english)
+})
+
+test('WHAT[PROVIDER-LANGUAGE-005] production feature code carries no inline bilingual literal branch', () => {
+  // Class A prose lives only under resources/provider; feature code may not
+  // smuggle natural-language locale forks. Scan every production .fs for the
+  // giveaway shape `match ... with | ... -> "en text" | ... -> "zh text"`.
+  const suspicious = []
+  for (const file of walk(SRC_ROOT)) {
+    const text = readFileSync(file, 'utf8')
+    const rel = file.slice(ROOT.length + 1).replace(/\\/g, '/')
+    if (/match\s+\w*[Ll]ang\w*[\s\S]{0,200}\|[^\n]*->[^\n]*zh\/zh-CN/i.test(text)) {
+      suspicious.push(rel)
+    }
+  }
+  assert.deepEqual(suspicious, [], 'business logic must not hardcode bilingual literal branches')
+})
+
+test('WHAT[PROVIDER-LANGUAGE-009] render layer never translates or substitutes owning prose', () => {
+  // Render/layout owns substitution only; semantic content passes through
+  // verbatim — the layer never invents, translates, or corrects the prose it
+  // renders. A zh value survives byte-identical; a wrong-locale value is not
+  // machine-corrected. Loading stays centralized: requireLanguagePair owns the
+  // semantic path and fails missing leaves instead of fabricating content.
+  assert.equal(substitute('{{x}}', { x: '会话连接已断开' }), '会话连接已断开')
+  assert.throws(
+    () => requireLanguagePair('role/__does-not-exist__'),
+    /missing/,
+    'a missing semantic path must fail, not fabricate prose or fall back',
+  )
+})
+
+test('WHAT[PROVIDER-LANGUAGE-005] Class A prose loads through the resource layer, both locales', () => {
+  // Three-way ownership proof: semantic content is read via ProviderResources-
+  // owned paths under resources/provider, which currently contains role/manager
+  // en.md + zh-CN.md — not embedded in any .fs file.
+  for (const leaf of ['en.md', 'zh-CN.md']) {
+    const text = readFileSync(join(ROOT, 'resources/provider/role/manager', leaf), 'utf8')
+    assert.ok(text.trim().length > 0, `resources/provider/role/manager/${leaf} empty`)
+  }
 })
 
 test('WHAT[PROVIDER-LANGUAGE-002] bound session language follows the session binding', () => {

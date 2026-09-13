@@ -11,4 +11,4 @@
 /src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs
 /src/Wanxiangshu/OpenCode/Host/SessionBindingSurface.fs
 /src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperRuntime.fs
-/scripts/checks/session-ownership-ratchet.mjs
+

@@ -12,7 +12,7 @@
 /src/Wanxiangshu/Verification/TemporalSurface.fs
 /src/Wanxiangshu/OpenCode/Host/PairProgrammingCalibration.fs
 /src/Wanxiangshu/OpenCode/Host/PairProgrammingCalibrationSurface.fs
-/scripts/checks/g4r-ce-vocabulary.mjs
+/scripts/lib/raw-time-scan.mjs
 /requirements/process-execution/tests/process-wait.test.mjs
 /requirements/process-execution/tests/process-runner.test.mjs
 /requirements/process-execution/tests/handle-process.test.mjs

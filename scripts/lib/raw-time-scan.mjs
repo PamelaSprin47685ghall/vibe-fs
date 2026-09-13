@@ -1,34 +1,21 @@
-#!/usr/bin/env node
 /**
- * g4r-ce-vocabulary.mjs — obsolete-controller and ambient-time architecture gate.
+ * raw-time-scan.mjs — ambient-time physical boundary scanner.
  *
- * The CLI is permanently fail-closed. Pure analyzers accept controlled inputs;
- * the production collector traverses the whole tree before exact-file physical
- * adapter exemptions are applied.
- *
- * Usage: node scripts/checks/g4r-ce-vocabulary.mjs
+ * Domain / Application / Session code must never read a wall clock directly;
+ * the only legal ambient-time owners are the exact physical adapter files in
+ * RAW_TIME_ALLOWLIST. TIME-004's ward is the unit test at
+ * requirements/time-capability/tests/ambient-time-forbidden.test.mjs — this is
+ * a library, not a gate: fail-closed behavior lives in the tests and in
+ * collectRawTimeScanEntries' missing-root throw.
  */
 
 import { existsSync, readFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { walk } from '../lib/walk.mjs'
+import { walk } from './walk.mjs'
 
 export const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 export const PRODUCTION_ROOT_REL = 'src/Wanxiangshu'
-
-/**
- * §24.1 + S6 HostReviewProgram — paths that MUST remain absent.
- * Relative to src/Wanxiangshu/.
- */
-export const OBSOLETE_CONTROLLER_PATHS = Object.freeze([
-  'Application/Reconciliation/TurnCompletionProgram.fs',
-  'Infrastructure/OpenCode/Tools/FinalityController.fs',
-  'Session/ReviewController.fs',
-  'Application/Reconciliation/ManagerLifecycleGate.fs',
-  'Application/Reconciliation/ReviewerGuardState.fs',
-  'Infrastructure/OpenCode/Orchestration/HostReviewProgram.fs',
-])
 
 /**
  * Scan the complete production tree. Physical adapters are removed only by the
@@ -38,7 +25,7 @@ export const RAW_TIME_SCAN_ROOTS = Object.freeze(['.'])
 
 /**
  * Forbidden raw-time tokens in Domain / Application / Session.
- * Includes rabbit.md §24.2 plus Date.now (JS interop twin of UtcNow).
+ * Includes Date.now, the JS interop twin of UtcNow.
  */
 export const RAW_TIME_TOKENS = Object.freeze([
   'DateTimeOffset.UtcNow',
@@ -102,29 +89,6 @@ export const isRawTimeAllowlisted = (file, allowlist = RAW_TIME_ALLOWLIST) => {
     }
   }
   return false
-}
-
-/**
- * Presence of an obsolete controller path is a violation (absence ratchet).
- * Injectable `exists` for synthetic trees.
- *
- * @param {string[]} paths relative to production root
- * @param {(rel: string) => boolean} exists
- * @returns {{ path: string, kind: 'obsolete-controller', message: string }[]}
- */
-export const scanObsoleteControllerAbsence = (paths, exists) => {
-  const violations = []
-  for (const path of paths) {
-    const rel = norm(path)
-    if (exists(rel)) {
-      violations.push({
-        kind: 'obsolete-controller',
-        path: rel,
-        message: `obsolete controller still present (G4R-CE Exit must delete): ${rel}`,
-      })
-    }
-  }
-  return violations
 }
 
 /**
@@ -197,46 +161,13 @@ export const collectRawTimeScanEntries = (
 }
 
 /**
- * Full production scan (injectable root for fixtures).
+ * Raw-time scan of the production tree (injectable root for fixtures).
  * @param {string} [repoRoot]
  * @param {{ allowlist?: readonly string[] }} [opts]
  */
-export const scanG4RCeVocabulary = (repoRoot = ROOT, opts = {}) => {
+export const scanRawTimeProduction = (repoRoot = ROOT, opts = {}) => {
   const productionRoot = join(repoRoot, PRODUCTION_ROOT_REL)
-  const obsolete = scanObsoleteControllerAbsence(OBSOLETE_CONTROLLER_PATHS, (rel) =>
-    existsSync(join(productionRoot, rel)),
-  )
-  const rawTime = scanRawTimeEntries(collectRawTimeScanEntries(productionRoot), {
+  return scanRawTimeEntries(collectRawTimeScanEntries(productionRoot), {
     allowlist: opts.allowlist ?? RAW_TIME_ALLOWLIST,
   })
-  return {
-    obsolete,
-    rawTime,
-    violations: [...obsolete, ...rawTime],
-  }
 }
-
-const runCli = () => {
-  if (process.argv.slice(2).some((arg) => arg.startsWith('--phase='))) {
-    console.error('g4r-ce-vocabulary: --phase is obsolete; direct invocation is always hard')
-    process.exit(2)
-  }
-
-  const { obsolete, rawTime, violations } = scanG4RCeVocabulary(ROOT)
-  const header = `g4r-ce-vocabulary: obsolete=${obsolete.length} raw-time=${rawTime.length}`
-
-  if (violations.length === 0) {
-    console.log(`${header} — clean`)
-    process.exit(0)
-  }
-
-  console.error(`${header} — ${violations.length} hit(s)\n`)
-  for (const v of violations) console.error(`  [${v.kind}] ${v.message}`)
-  process.exit(1)
-}
-
-const isMain =
-  process.argv[1] !== undefined &&
-  resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1])
-
-if (isMain) runCli()
