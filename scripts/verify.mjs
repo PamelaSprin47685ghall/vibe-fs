@@ -8,287 +8,317 @@ import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
-import crypto from 'node:crypto'
+import { collectVerificationInputs, computeDigest, diffVerificationInputs } from './lib/build-state.mjs'
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const VERIFY_LOGS_DIR = path.join(root, '.fable-build', 'verify-logs')
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
-function parseArgs(argv) {
-  const args = new Set(argv)
-  return {
-    release: args.has('--release'),
-    verbose: args.has('--verbose'),
+export function verificationSteps({ root = ROOT, release = false }) {
+  const steps = [
+    {
+      label: 'format:check',
+      cmd: 'npm',
+      argv: ['run', 'format:check'],
+    },
+    {
+      label: 'check',
+      cmd: 'npm',
+      argv: ['run', 'check'],
+    },
+    {
+      label: 'build',
+      cmd: process.execPath,
+      argv: [path.join(root, 'scripts/build.mjs'), ...(release ? ['--clean'] : [])],
+    },
+    {
+      label: 'unit',
+      cmd: process.execPath,
+      argv: [path.join(root, 'requirements/verification-system/tests/run.mjs')],
+    },
+    {
+      label: 'integration',
+      cmd: process.execPath,
+      argv: [path.join(root, 'requirements/verification-system/tests/integration/run.mjs')],
+      timeoutMs: release ? 1_200_000 : 600_000,
+      env: release ? { WXS_RELEASE: '1' } : {},
+    },
+  ]
+
+  if (release) {
+    steps.push(
+      {
+        label: 'e2e',
+        cmd: process.execPath,
+        argv: [path.join(root, 'requirements/verification-system/tests/e2e/entry.test.mjs')],
+        timeoutMs: 1_500_000,
+      },
+      {
+        label: 'package',
+        cmd: process.execPath,
+        argv: [path.join(root, 'scripts/verify-package.mjs')],
+        timeoutMs: 600_000,
+      },
+    )
   }
+
+  return steps
 }
 
-function logSection(label) {
-  process.stderr.write(`\n=== verify: ${label} ===\n`)
-}
+function defaultRunStepFactory(root, verbose, output) {
+  return async function defaultRunStep({
+    label,
+    cmd = process.execPath,
+    argv,
+    env,
+    timeoutMs = 600_000,
+    logDir,
+    cwd = root,
+  }) {
+    const startedAt = Date.now()
+    const stepLog = path.join(logDir, `${label.replace(/:/g, '-')}.log`)
+    const logStream = fs.createWriteStream(stepLog, { flags: 'w' })
 
-function logInfo(msg) {
-  process.stderr.write(`[verify] ${msg}\n`)
-}
+    let killed = false
+    const timer = setTimeout(() => {
+      killed = true
+      child.kill('SIGKILL')
+    }, timeoutMs)
+    timer.unref()
 
-function hashTreeFiles(root) {
-  const files = []
-
-  const walk = (dir) => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const abs = path.join(dir, entry.name)
-      if (entry.isDirectory()) {
-        const rel = path.relative(root, abs).split(path.sep).join('/')
-        if (
-          rel.startsWith('dist/') ||
-          rel.startsWith('.fable-build') ||
-          rel.startsWith('node_modules') ||
-          rel.startsWith('.git')
-        ) {
-          continue
-        }
-        walk(abs)
-      } else if (entry.isFile()) {
-        const rel = path.relative(root, abs).split(path.sep).join('/')
-        if (rel === 'package.json' || rel === 'package-lock.json') {
-          files.push(rel)
-        }
+    let child
+    try {
+      child = spawn(cmd, argv, {
+        cwd,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env, ...env, WXS_RELEASE: env?.WXS_RELEASE ?? '0' },
+      })
+    } catch (spawnError) {
+      clearTimeout(timer)
+      logStream.end()
+      return {
+        label,
+        exitCode: 1,
+        signal: null,
+        killed: false,
+        durationMs: Date.now() - startedAt,
+        logPath: path.relative(root, stepLog),
+        ok: false,
+        error: spawnError,
       }
     }
-  }
-  walk(path.join(root, 'src'))
-  walk(path.join(root, 'scripts'))
-  walk(path.join(root, 'requirements'))
-  walk(path.join(root, 'resources'))
-  walk(path.join(root, '.github'))
-  return files.sort()
-}
 
-function digestFile(file) {
-  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
-}
+    child.stdout.on('data', (chunk) => {
+      logStream.write(chunk)
+      if (verbose) output.write(chunk)
+    })
+    child.stderr.on('data', (chunk) => {
+      logStream.write(chunk)
+      process.stderr.write(chunk)
+    })
 
-function takeInputSnapshot(root) {
-  const files = hashTreeFiles(root)
-  const snapshot = {}
-  for (const rel of files) {
-    snapshot[rel] = digestFile(path.join(root, rel))
-  }
-  return snapshot
-}
+    const exit = await new Promise((resolveExit) => {
+      child.on('error', (error) => resolveExit({ code: 1, signal: null, error }))
+      child.on('close', (code, signal) => resolveExit({ code: code ?? 1, signal }))
+    })
 
-function snapshotsEqual(a, b) {
-  const aKeys = Object.keys(a)
-  const bKeys = Object.keys(b)
-  if (aKeys.length !== bKeys.length) {
-    return { equal: false, reason: 'file-set-changed' }
-  }
-  for (const key of aKeys) {
-    if (a[key] !== b[key]) {
-      return { equal: false, reason: `content-changed:${key}` }
+    clearTimeout(timer)
+    logStream.end()
+
+    return {
+      label,
+      exitCode: exit.code ?? 1,
+      signal: exit.signal,
+      killed,
+      durationMs: Date.now() - startedAt,
+      logPath: path.relative(root, stepLog),
+      ok: exit.code === 0 && !exit.signal && !killed,
+      ...(exit.error ? { error: exit.error } : {}),
     }
   }
-  return { equal: true }
 }
 
-let verboseMode = false
-
-async function runStep({ label, cmd = process.execPath, argv, env, timeoutMs = 600_000, logDir }) {
-  const startedAt = Date.now()
-  const stepLog = path.join(logDir, `${label}.log`)
-  const logStream = fs.createWriteStream(stepLog, { flags: 'w' })
-
-  let killed = false
-  const timer = setTimeout(() => {
-    killed = true
-    child.kill('SIGKILL')
-  }, timeoutMs)
-  timer.unref()
-
-  const child = spawn(cmd, argv, {
-    cwd: root,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, ...env, WXS_RELEASE: env?.WXS_RELEASE ?? '0' },
-  })
-
-  child.stdout.on('data', (chunk) => {
-    logStream.write(chunk)
-    if (verboseMode) process.stdout.write(chunk)
-  })
-  child.stderr.on('data', (chunk) => {
-    logStream.write(chunk)
-    process.stderr.write(chunk)
-  })
-
-  const exit = await new Promise((resolveExit) => {
-    child.on('error', (error) => resolveExit({ code: 1, signal: null, error }))
-    child.on('close', (code, signal) => resolveExit({ code: code ?? 1, signal }))
-  })
-
-  clearTimeout(timer)
-  logStream.end()
-
-  return {
-    label,
-    exitCode: exit.code ?? 1,
-    signal: exit.signal,
-    killed,
-    durationMs: Date.now() - startedAt,
-    logPath: path.relative(root, stepLog),
-    ok: exit.code === 0 && !exit.signal && !killed,
+function allocateRunLogDir(baseLogDir) {
+  fs.mkdirSync(baseLogDir, { recursive: true })
+  const baseStamp = new Date().toISOString().replace(/[:.]/g, '-')
+  let stamp = baseStamp
+  let seq = 1
+  while (fs.existsSync(path.join(baseLogDir, stamp))) {
+    stamp = `${baseStamp}-${seq++}`
   }
-}
-
-/**
- * Run the verification pipeline. Exported so tests can inject a fake runStep
- * and observe the step trace without executing real subprocesses.
- */
-export async function verify({ release = false, verbose = false, runStep: runStepOverride }) {
-  const step = runStepOverride ?? runStep
-
-  fs.mkdirSync(VERIFY_LOGS_DIR, { recursive: true })
-  const runStamp = new Date().toISOString().replace(/[:.]/g, '-')
-  const runLogDir = path.join(VERIFY_LOGS_DIR, runStamp)
+  const runLogDir = path.join(baseLogDir, stamp)
   fs.mkdirSync(runLogDir, { recursive: true })
-  const latestLink = path.join(VERIFY_LOGS_DIR, 'latest')
+
+  const latestLink = path.join(baseLogDir, 'latest')
   try {
     fs.unlinkSync(latestLink)
   } catch {}
   try {
-    fs.symlinkSync(runStamp, latestLink, 'dir')
+    fs.symlinkSync(stamp, latestLink, 'dir')
   } catch {}
 
-  verboseMode = verbose
-  const inputSnapshot = takeInputSnapshot(root)
-  const initialDigest = crypto
-    .createHash('sha256')
-    .update(JSON.stringify(inputSnapshot))
-    .digest('hex')
-    .slice(0, 16)
-  const runStart = Date.now()
-
-  logSection(`verify ${release ? 'release' : 'daily'}  inputs=${initialDigest}`)
-
-  const results = []
-  const markStep = (result) => {
-    results.push(result)
-    const tag = result.ok ? 'OK' : `FAIL(${result.exitCode})`
-    logInfo(`${result.label.padEnd(14)} ${tag}  ${result.durationMs}ms  ${result.logPath ?? ''}`)
-  }
-
-  markStep(
-    await step({
-      label: 'format:check',
-      cmd: 'npm',
-      argv: ['run', 'format:check'],
-      logDir: runLogDir,
-    }),
-  )
-  if (!results.at(-1).ok) return summarizeAndExit(release, results, inputSnapshot, { runStart })
-
-  markStep(
-    await step({
-      label: 'check',
-      cmd: 'npm',
-      argv: ['run', 'check'],
-      logDir: runLogDir,
-    }),
-  )
-  if (!results.at(-1).ok) return summarizeAndExit(release, results, inputSnapshot, { runStart })
-
-  markStep(
-    await step({
-      label: 'build',
-      argv: [path.join(root, 'scripts/build.mjs'), ...(release ? ['--clean'] : [])],
-      logDir: runLogDir,
-    }),
-  )
-  if (!results.at(-1).ok) return summarizeAndExit(release, results, inputSnapshot, { runStart })
-
-  markStep(
-    await step({
-      label: 'unit',
-      argv: [
-        path.join(root, 'requirements/verification-system/tests/run.mjs'),
-        '--skip-staleness-check',
-      ],
-      logDir: runLogDir,
-    }),
-  )
-  if (!results.at(-1).ok) return summarizeAndExit(release, results, inputSnapshot, { runStart })
-
-  markStep(
-    await step({
-      label: 'integration',
-      argv: [path.join(root, 'requirements/verification-system/tests/integration/run.mjs')],
-      logDir: runLogDir,
-      timeoutMs: release ? 1_200_000 : 600_000,
-      env: release ? { WXS_RELEASE: '1' } : {},
-    }),
-  )
-  if (!results.at(-1).ok) return summarizeAndExit(release, results, inputSnapshot, { runStart })
-
-  if (release) {
-    markStep(
-      await step({
-        label: 'e2e',
-        argv: [path.join(root, 'requirements/verification-system/tests/e2e/entry.test.mjs')],
-        logDir: runLogDir,
-        timeoutMs: 1_500_000,
-      }),
-    )
-    if (!results.at(-1).ok) return summarizeAndExit(release, results, inputSnapshot, { runStart })
-
-    markStep(
-      await step({
-        label: 'package',
-        argv: [path.join(root, 'scripts/verify-package.mjs')],
-        logDir: runLogDir,
-        timeoutMs: 600_000,
-      }),
-    )
-    if (!results.at(-1).ok) return summarizeAndExit(release, results, inputSnapshot, { runStart })
-  }
-
-  return summarizeAndExit(release, results, inputSnapshot, { runStart })
+  return runLogDir
 }
 
-function summarizeAndExit(release, results, inputSnapshot, { runStart = Date.now() }) {
-  const finalSnapshot = takeInputSnapshot(root)
-  const diff = snapshotsEqual(inputSnapshot, finalSnapshot)
+export async function verify({
+  root = ROOT,
+  release = false,
+  verbose = false,
+  runStep: runStepOverride,
+  output = process.stdout,
+  logDirectory,
+} = {}) {
+  const resolvedRoot = path.resolve(root)
+  const baseLogDir = logDirectory ? path.resolve(logDirectory) : path.join(resolvedRoot, '.fable-build', 'verify-logs')
+  const runLogDir = allocateRunLogDir(baseLogDir)
+
+  const stepRunner = runStepOverride ?? defaultRunStepFactory(resolvedRoot, verbose, output)
+  const plannedSteps = verificationSteps({ root: resolvedRoot, release })
+  const mode = release ? 'release' : 'daily'
+  const runStart = Date.now()
+
+  let beforeInputs
+  try {
+    beforeInputs = collectVerificationInputs(resolvedRoot)
+  } catch (err) {
+    const wallMs = Date.now() - runStart
+    output.write(`\n=== verify: ${mode}  inputs=error ===\n`)
+    output.write(`FAIL: input collection error: ${err.message}\n`)
+    return {
+      mode,
+      steps: plannedSteps.map((p) => ({ label: p.label, status: 'not-run' })),
+      outcome: 'fail',
+      failureReason: `input-collection-failed: ${err.message}`,
+      wallMs,
+      logDirectory: runLogDir,
+      exitCode: 1,
+    }
+  }
+
+  const initialDigest = computeDigest(beforeInputs).slice(0, 16)
+  output.write(`\n=== verify: ${mode}  inputs=${initialDigest} ===\n`)
+
+  const stepResults = []
+  let pipelineFailed = false
+  let failureReason
+
+  for (let i = 0; i < plannedSteps.length; i++) {
+    const stepPlan = plannedSteps[i]
+    if (pipelineFailed) {
+      stepResults.push({ label: stepPlan.label, status: 'not-run' })
+      continue
+    }
+
+    let res
+    try {
+      res = await stepRunner({
+        ...stepPlan,
+        logDir: runLogDir,
+        cwd: resolvedRoot,
+      })
+    } catch (err) {
+      res = {
+        label: stepPlan.label,
+        ok: false,
+        exitCode: 1,
+        signal: null,
+        durationMs: 0,
+        error: err,
+      }
+    }
+
+    const durationMs = res.durationMs ?? 0
+    if (res.ok) {
+      stepResults.push({
+        label: res.label ?? stepPlan.label,
+        status: 'ok',
+        exitCode: res.exitCode ?? 0,
+        signal: res.signal ?? null,
+        durationMs,
+      })
+      output.write(`  ${stepPlan.label.padEnd(14)} OK  ${(durationMs / 1000).toFixed(1)}s\n`)
+    } else {
+      pipelineFailed = true
+      failureReason = `step-failed:${stepPlan.label}`
+      stepResults.push({
+        label: res.label ?? stepPlan.label,
+        status: 'failed',
+        exitCode: res.exitCode ?? 1,
+        signal: res.signal ?? null,
+        durationMs,
+        ...(res.error ? { error: res.error } : {}),
+      })
+      output.write(`  ${stepPlan.label.padEnd(14)} FAIL(${res.exitCode ?? 1})  ${(durationMs / 1000).toFixed(1)}s\n`)
+    }
+  }
+
+  let afterInputs
+  let inputChanges
+  try {
+    afterInputs = collectVerificationInputs(resolvedRoot)
+    const diff = diffVerificationInputs(beforeInputs, afterInputs)
+    if (!diff.equal) {
+      inputChanges = diff
+      if (!pipelineFailed) {
+        pipelineFailed = true
+        failureReason = `inputs-changed:${diff.reason}`
+      }
+    }
+  } catch (err) {
+    if (!pipelineFailed) {
+      pipelineFailed = true
+      failureReason = `after-input-collection-failed: ${err.message}`
+    }
+  }
+
   const wallMs = Date.now() - runStart
-
-  let allPass = true
-  for (const result of results) {
-    const tag = result.ok ? 'OK' : `FAIL(${result.exitCode})`
-    if (!result.ok) allPass = false
-    process.stdout.write(`  ${result.label.padEnd(14)} ${tag}  ${(result.durationMs / 1000).toFixed(1)}s\n`)
+  if (pipelineFailed) {
+    if (inputChanges) {
+      output.write(`FAIL: inputs changed mid-run (${inputChanges.reason}) — re-run verify on a stable tree\n`)
+    }
+    output.write(`FAIL  verify ${mode}  ${(wallMs / 1000).toFixed(1)}s\n`)
+    return {
+      mode,
+      steps: stepResults,
+      outcome: 'fail',
+      ...(failureReason ? { failureReason } : {}),
+      ...(inputChanges ? { inputChanges } : {}),
+      wallMs,
+      logDirectory: runLogDir,
+      exitCode: 1,
+    }
   }
 
-  if (!allPass) {
-    process.stdout.write(`FAIL  verify ${release ? 'release' : 'daily'}  ${(wallMs / 1000).toFixed(1)}s\n`)
-    return { exitCode: 1, wallMs }
+  output.write(`PASS  verify ${mode}  ${(wallMs / 1000).toFixed(1)}s\n`)
+  return {
+    mode,
+    steps: stepResults,
+    outcome: 'pass',
+    wallMs,
+    logDirectory: runLogDir,
+    exitCode: 0,
   }
-
-  if (!diff.equal) {
-    process.stdout.write(
-      `FAIL: inputs changed mid-run (${diff.reason}) — re-run verify on a stable tree\n`,
-    )
-    return { exitCode: 1, wallMs }
-  }
-
-  process.stdout.write(`PASS  verify ${release ? 'release' : 'daily'}  ${(wallMs / 1000).toFixed(1)}s\n`)
-  return { exitCode: 0, wallMs }
 }
 
 async function main() {
-  const { release, verbose } = parseArgs(process.argv.slice(2))
+  const argv = process.argv.slice(2)
+  let release = false
+  let verbose = false
 
-  if (process.argv.includes('--help') || process.argv.includes('-h')) {
-    process.stdout.write(`Usage: node scripts/verify.mjs [--release] [--verbose]\n`)
-    process.exit(0)
+  for (const arg of argv) {
+    if (arg === '--release') {
+      release = true
+    } else if (arg === '--verbose') {
+      verbose = true
+    } else if (arg === '-h' || arg === '--help') {
+      process.stdout.write('Usage: node scripts/verify.mjs [--release] [--verbose]\n')
+      process.exit(0)
+    } else {
+      process.stderr.write(`Unknown option: ${arg}\n`)
+      process.exit(2)
+    }
   }
 
-  const { exitCode } = await verify({ release, verbose })
-  process.exit(exitCode)
+  const result = await verify({ release, verbose })
+  process.exitCode = result.exitCode
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

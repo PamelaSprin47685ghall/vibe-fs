@@ -31,7 +31,7 @@ import { walk } from '../../../scripts/lib/walk.mjs'
 process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
 
 const REQUIREMENTS_ROOT = 'requirements'
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
 const skipStaleness = process.argv.includes('--skip-staleness-check')
 const withCoverage = process.argv.includes('--coverage')

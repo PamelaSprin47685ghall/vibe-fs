@@ -30,6 +30,117 @@ export function computeDigest(entries) {
   return hasher.digest('hex')
 }
 
+const REQUIRED_VERIFICATION_DIRS = ['src', 'scripts', 'requirements', 'resources']
+const OPTIONAL_VERIFICATION_DIRS = ['.github', '.config']
+const SKIP_DIR_NAMES = new Set([
+  'node_modules',
+  '.git',
+  'dist',
+  '.fable-build',
+  'artifacts',
+  'coverage',
+  '.wireit',
+  'bin',
+  'obj',
+  '.reasonix',
+  '.nuget',
+])
+
+function isIgnoredVerificationFile(fileName) {
+  if (fileName === '.env.example') return false
+  if (fileName.startsWith('.env')) return true
+  if (fileName.endsWith('.pem') || fileName.endsWith('.key') || fileName.endsWith('.tgz')) return true
+  return false
+}
+
+export function collectVerificationInputs(root = REPO_ROOT) {
+  const resolvedRoot = path.resolve(root)
+
+  for (const dirName of REQUIRED_VERIFICATION_DIRS) {
+    const dirPath = path.join(resolvedRoot, dirName)
+    if (!fs.existsSync(dirPath) || !fs.statSync(dirPath).isDirectory()) {
+      const err = new Error(`Verification inputs required root directory missing: ${dirPath}`)
+      err.code = 'verification-inputs-root-missing'
+      err.path = dirPath
+      throw err
+    }
+  }
+
+  const collectedMap = new Map()
+
+  const rootEntries = fs.readdirSync(resolvedRoot, { withFileTypes: true })
+  for (const entry of rootEntries) {
+    if (entry.isFile() && !isIgnoredVerificationFile(entry.name)) {
+      const absPath = path.join(resolvedRoot, entry.name)
+      const rel = relPath(resolvedRoot, absPath)
+      const stat = fs.statSync(absPath)
+      const sha256 = computeFileHash(absPath)
+      collectedMap.set(rel, {
+        path: rel,
+        sha256,
+        size: stat.size,
+        mtimeMs: stat.mtimeMs,
+      })
+    }
+  }
+
+  function walk(currentDir) {
+    const entries = fs.readdirSync(currentDir, { withFileTypes: true })
+    for (const entry of entries) {
+      const fullPath = path.join(currentDir, entry.name)
+      if (entry.isDirectory()) {
+        if (SKIP_DIR_NAMES.has(entry.name)) continue
+        walk(fullPath)
+      } else if (entry.isFile()) {
+        if (isIgnoredVerificationFile(entry.name)) continue
+        const rel = relPath(resolvedRoot, fullPath)
+        const stat = fs.statSync(fullPath)
+        const sha256 = computeFileHash(fullPath)
+        collectedMap.set(rel, {
+          path: rel,
+          sha256,
+          size: stat.size,
+          mtimeMs: stat.mtimeMs,
+        })
+      }
+    }
+  }
+
+  for (const dirName of REQUIRED_VERIFICATION_DIRS) {
+    walk(path.join(resolvedRoot, dirName))
+  }
+
+  for (const dirName of OPTIONAL_VERIFICATION_DIRS) {
+    const dirPath = path.join(resolvedRoot, dirName)
+    if (fs.existsSync(dirPath) && fs.statSync(dirPath).isDirectory()) {
+      walk(dirPath)
+    }
+  }
+
+  return Array.from(collectedMap.values()).sort((a, b) => a.path.localeCompare(b.path))
+}
+
+export function diffVerificationInputs(before, after) {
+  const beforeMap = new Map(before.map((e) => [e.path, e]))
+  const afterMap = new Map(after.map((e) => [e.path, e]))
+
+  if (beforeMap.size !== afterMap.size) {
+    return { equal: false, reason: 'file-set-changed' }
+  }
+
+  for (const [p, bEntry] of beforeMap.entries()) {
+    const aEntry = afterMap.get(p)
+    if (!aEntry) {
+      return { equal: false, reason: 'file-set-changed' }
+    }
+    if (bEntry.sha256 !== aEntry.sha256) {
+      return { equal: false, reason: `content-changed:${p}` }
+    }
+  }
+
+  return { equal: true }
+}
+
 export function collectCompilerInputs(root = REPO_ROOT, aggregatePath) {
   const resolvedRoot = path.resolve(root)
   const resolvedAggregate = aggregatePath

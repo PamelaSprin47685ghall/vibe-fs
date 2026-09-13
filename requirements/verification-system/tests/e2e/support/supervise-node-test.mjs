@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url'
 import { Watchdog } from './watchdog.js'
 import { SUITE_BACKSTOP_MS } from './time-budget.js'
 import { classifyVerdict } from '../../support/verdict-feed.mjs'
+import { isFileCompletionEvent } from '../../support/test-run-state.mjs'
 
 export const NODE_TEST_INNER = fileURLToPath(new URL('../../support/run-inner.mjs', import.meta.url))
 
@@ -111,13 +112,8 @@ export async function superviseNodeTest({
       const ms = Number(event?.data?.durationMs)
       if (Number.isFinite(ms)) durations.push({ name: String(event?.data?.name ?? '<test>'), ms })
     }
-    if (event?.type === 'test:complete' && typeof event?.data?.file === 'string') {
-      const isFileWrapper =
-        typeof event?.data?.name === 'string' &&
-        (event.data.name === event.data.file || resolve(event.data.name) === resolve(event.data.file))
-      if (isFileWrapper) {
-        outstanding.delete(resolve(event.data.file))
-      }
+    if (isFileCompletionEvent(event)) {
+      outstanding.delete(resolve(event.data.file))
     }
 
     const progress = classifyVerdict(event)

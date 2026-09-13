@@ -3,33 +3,42 @@
 // VERIFICATION-SYSTEM-001 / 002 / 005 / 009（Oracle 3，HANDOFF §29）。
 //
 // proof ladder（VERIFY-001 五层）的唯一机器载体是 package.json 的
-// `format-build-test` 与 scripts/check.mjs 的 wired gate 清单。两者都是
-// 散文之外的纯文本事实，不 pin 就会静默漂移：层序被重排、gate 被接线到
-// 不存在的路径、fail-closed 传播被改成吞错——都不会有任何测试变红。
+ // `format-build-test` 与 scripts/check.mjs 的 wired gate 清单。
+ // 本测试验证 verify 调度阶梯与 check 门禁。
 //
 // 本测试只 pin 三个事实：
-//   1. format-build-test 的层序（read-only format → L0 text gates → Wireit
-//      build → unit → integration orchestrator → L4 e2e/entry（恰一个）→
-//      L5 npm pack --dry-run），以及每个 Wireit step 解析到的真实仓库命令；
-//   2. check.mjs 的 wired gate 清单：每个 wired 路径存在；
-//      scripts/checks/*.mjs == wired ∪ explicit non-prebuild entrypoints；
-//   3. check.mjs fail-closed：`process.exit(result.status ?? 1)` 传播非零。
+//   1. format-build-test 的层序（format:check → check → build → unit → integration，release 追加 e2e 与 package），
+//      以及 step 失败中断与传播行为；
+//   2. check.mjs 的 wired gate 清单：每个 wired 路径存在且 scripts/checks 目录内 gate 对齐；
+//   3. check.mjs fail-closed 传播非零。
 //
 // 「可红」由现有 per-gate red fixture（tests/unit/verify/*.test.mjs 与
 // requirements/*/tests/*.test.mjs 的故意破坏反例）交叉证明，本测试不重造。
 
 import assert from 'node:assert/strict'
 import { verify } from '../../../scripts/verify.mjs'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { checks } from '../../../scripts/check.mjs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
-import { spawnSync } from 'node:child_process'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
+
+function createMemorySink() {
+  let buf = ''
+  return {
+    write(chunk) {
+      buf += chunk
+    },
+    get output() {
+      return buf
+    },
+  }
+  }
 
 // ── 1. format-build-test 层序（VERIFY-001 五层）─────────────────────────────
 
@@ -39,14 +48,27 @@ test('WHAT[VERIFICATION-SYSTEM-001] format-build-test ladder pins the stage orde
   assert.equal(typeof command, 'string', 'package.json scripts.format-build-test must exist')
   assert.equal(command, 'node scripts/verify.mjs', 'daily pipeline must dispatch to verify.mjs')
 
+  const tmpLogDir = mkdtempSync(join(tmpdir(), 'proof-ladder-logs-'))
+  const sink = createMemorySink()
   const spawned = []
   const fakeRunStep = async ({ label, argv }) => {
     spawned.push({ label, argv: argv.map((arg) => String(arg)) })
     return { label, ok: true, exitCode: 0, signal: null, durationMs: 0 }
   }
 
-  const { exitCode } = await verify({ release: false, runStep: fakeRunStep })
-  assert.equal(exitCode, 0, 'daily verify under a green step spy must succeed')
+  try {
+    const defaultLatest = join(ROOT, '.fable-build/verify-logs/latest')
+    const beforeLink = existsSync(defaultLatest) ? readlinkSync(defaultLatest) : null
+
+    const result = await verify({
+      release: false,
+      runStep: fakeRunStep,
+      output: sink,
+      logDirectory: tmpLogDir,
+})
+    assert.equal(result.exitCode, 0, 'daily verify under a green step spy must succeed')
+    assert.equal(result.outcome, 'pass')
+    assert.ok(result.steps.every((s) => s.status === 'ok'))
 
   const labels = spawned.map((entry) => entry.label)
   assert.deepEqual(labels, [
@@ -57,114 +79,108 @@ test('WHAT[VERIFICATION-SYSTEM-001] format-build-test ladder pins the stage orde
     'integration',
   ])
 
-  const xmlArgs = spawned.find((s) => s.label === 'build').argv
-  assert.ok(xmlArgs.some((a) => a.includes('scripts/build.mjs')), 'build must dispatch to build.mjs')
+    const buildArgs = spawned.find((s) => s.label === 'build').argv
+    assert.ok(buildArgs.some((a) => a.includes('scripts/build.mjs')), 'build must dispatch to build.mjs')
+    assert.ok(existsSync(buildArgs[0]), 'build target must exist as real file')
   const unitArgs = spawned.find((s) => s.label === 'unit').argv
   assert.ok(unitArgs.some((a) => a.includes('requirements/verification-system/tests/run.mjs')))
+    assert.ok(existsSync(unitArgs[0]), 'unit target must exist as real file')
   const integrationArgs = spawned.find((s) => s.label === 'integration').argv
   assert.ok(integrationArgs.some((a) => a.includes('tests/integration/run.mjs')))
+    assert.ok(existsSync(integrationArgs[0]), 'integration target must exist as real file')
+
+    assert.match(sink.output, /PASS  verify daily/)
+    const afterLink = existsSync(defaultLatest) ? readlinkSync(defaultLatest) : null
+    assert.equal(afterLink, beforeLink, 'default verify-logs/latest must not be modified')
+  } finally {
+    rmSync(tmpLogDir, { recursive: true, force: true })
+  }
 })
 
-const occurrences = (text, needle) => text.split(needle).length - 1
-
-const releaseOwnershipViolations = (pipeline, integrationSource) => [
-  ...(occurrences(pipeline, 'requirements/distribution/tests/integration/package/run.mjs') === 0
-    ? []
-    : ['top-level-package-owner']),
-  ...(occurrences(pipeline, 'scripts/warmup-opencode.mjs') === 0 ? [] : ['top-level-warmup-owner']),
-  ...(occurrences(integrationSource, 'requirements/distribution/tests/integration/package/run.mjs') === 1
-    ? []
-    : ['integration-package-owner']),
-  ...(occurrences(integrationSource, 'scripts/warmup-opencode.mjs') === 1
-    ? []
-    : ['integration-warmup-owner']),
-]
-
-test('WHAT[VERIFICATION-SYSTEM-001] release leaf steps have one orchestrator owner and duplicate ownership is red', () => {
-  const { scripts } = JSON.parse(read('package.json'))
-  const pipeline = scripts['format-build-test']
-  const integrationSource = read('requirements/verification-system/tests/integration/run.mjs')
-  const duplicateWarmup = `${integrationSource}\nspawnSync(process.execPath, [path.join(root, 'scripts/warmup-opencode.mjs')])`
-  const duplicatePackage = `${integrationSource}\nspawnSync(process.execPath, [path.join(root, 'requirements/distribution/tests/integration/package/run.mjs')])`
-  assert.deepEqual(releaseOwnershipViolations(pipeline, integrationSource), [])
-  assert.match(
-    integrationSource,
-    /spawnSync\(process\.execPath, \[path\.join\(root, 'scripts\/warmup-opencode\.mjs'\)\]/,
-    'integration warmup path must feed the executed process spawn',
-  )
-  assert.match(
-    integrationSource,
-    /args: \[path\.join\(root, 'requirements\/distribution\/tests\/integration\/package\/run\.mjs'\)\]/,
-    'distribution package path must feed an integration child step',
-  )
-  assert.match(
-    integrationSource,
-    /for \(const step of childSteps\)[\s\S]*spawnSync\(process\.execPath, step\.args,/,
-    'integration child steps must be executed exactly by the declared child runner',
-  )
-
-  assert.ok(
-    releaseOwnershipViolations(
-      `${pipeline} && node requirements/distribution/tests/integration/package/run.mjs`,
-      integrationSource,
-    ).includes('top-level-package-owner'),
-  )
-  assert.ok(
-    releaseOwnershipViolations(`${pipeline} && node scripts/warmup-opencode.mjs`, integrationSource)
-      .includes('top-level-warmup-owner'),
-  )
-  assert.ok(
-    releaseOwnershipViolations(pipeline, duplicateWarmup).includes('integration-warmup-owner'),
-  )
-  assert.ok(
-    releaseOwnershipViolations(pipeline, duplicatePackage).includes('integration-package-owner'),
-  )
-  assert.ok(
-    integrationSource.indexOf('scripts/warmup-opencode.mjs') < integrationSource.indexOf('for (const step of nodeTestSteps)'),
-    'integration warmup must precede every node:test integration child',
-  )
-})
-
-test('WHAT[VERIFICATION-SYSTEM-002] l4 has exactly one e2e entry in the ladder and only on release', async () => {
+test('WHAT[VERIFICATION-SYSTEM-002] release ladder includes clean build, exactly one e2e and one package step', async () => {
+  const tmpLogDir = mkdtempSync(join(tmpdir(), 'proof-ladder-release-'))
+  const sink = createMemorySink()
   const spawned = []
   const fakeRunStep = async ({ label, argv }) => {
     spawned.push({ label, argv: argv.map((arg) => String(arg)) })
-    return { label, ok: true, exitCode: 0, signal: null, durationMs: 0, logPath: '' }
+    return { label, ok: true, exitCode: 0, signal: null, durationMs: 0 }
   }
 
-  const { exitCode: dailyExit } = await verify({ release: false, runStep: fakeRunStep })
-  assert.equal(dailyExit, 0)
-  const dailyLabels = spawned.map((entry) => entry.label)
-  assert.equal(dailyLabels.includes('e2e'), false, 'daily must not run e2e')
-  assert.equal(dailyLabels.includes('package'), false, 'daily must not run verify-package')
-
-  spawned.length = 0
-  const { exitCode: releaseExit } = await verify({ release: true, runStep: fakeRunStep })
-  assert.equal(releaseExit, 0)
-  const releaseLabels = spawned.map((entry) => entry.label)
-  const e2eSteps = releaseLabels.filter((l) => l === 'e2e')
-  const packageSteps = releaseLabels.filter((l) => l === 'package')
-  assert.equal(e2eSteps.length, 1, 'release must have exactly one e2e step')
-  assert.equal(packageSteps.length, 1, 'release must have exactly one package step')
+  try {
+    const { exitCode, outcome, steps } = await verify({
+      release: true,
+      runStep: fakeRunStep,
+      output: sink,
+      logDirectory: tmpLogDir,
 })
-
-test('WHAT[VERIFICATION-SYSTEM-008] verify snapshots input state before and after the pipeline', async () => {
-  // The manifest + verify-time input snapshot pollution-check is what protects
-  // the run from concurrent edits; assert that touching a production-relevant
-  // file mid-flight flips the pipeline to FAIL.
-  let passedFirst = false
-  let firstCall = true
-  const failingRunStep = async ({ label }) => {
-    if (firstCall) {
-      firstCall = false
-      passedFirst = true
-    }
-    return { label, ok: true, exitCode: 0, signal: null, durationMs: 0, logPath: '' }
-  }
-  const { exitCode } = await verify({ release: false, runStep: failingRunStep })
   assert.equal(exitCode, 0)
-  assert.equal(passedFirst, true, 'runStep spy must actually be invoked')
+    assert.equal(outcome, 'pass')
+    assert.ok(steps.every((s) => s.status === 'ok'))
+
+  const releaseLabels = spawned.map((entry) => entry.label)
+    assert.deepEqual(releaseLabels, [
+    'format:check',
+    'check',
+    'build',
+    'unit',
+    'integration',
+      'e2e',
+      'package',
+  ])
+
+    const buildCall = spawned.find((s) => s.label === 'build')
+    assert.ok(buildCall.argv.includes('--clean'), 'release build argv must contain --clean')
+
+    const e2eCalls = spawned.filter((s) => s.label === 'e2e')
+    assert.equal(e2eCalls.length, 1, 'release must have exactly one e2e step')
+    assert.ok(existsSync(e2eCalls[0].argv[0]), 'e2e target must exist as real file')
+
+    const packageCalls = spawned.filter((s) => s.label === 'package')
+    assert.equal(packageCalls.length, 1, 'release must have exactly one package step')
+    assert.ok(existsSync(packageCalls[0].argv[0]), 'package target must exist as real file')
+
+    assert.match(sink.output, /PASS  verify release/)
+  } finally {
+    rmSync(tmpLogDir, { recursive: true, force: true })
+  }
 })
+
+for (const failingLabel of ['format:check', 'check', 'build']) {
+  test(`WHAT[VERIFICATION-SYSTEM-001] verify halts and marks subsequent steps not-run when ${failingLabel} fails`, async () => {
+    const tmpLogDir = mkdtempSync(join(tmpdir(), 'proof-ladder-fail-'))
+    const sink = createMemorySink()
+  const spawned = []
+  const fakeRunStep = async ({ label, argv }) => {
+      spawned.push(label)
+      if (label === failingLabel) {
+        return { label, ok: false, exitCode: 1, signal: null, durationMs: 5 }
+  }
+      return { label, ok: true, exitCode: 0, signal: null, durationMs: 5 }
+    }
+
+    try {
+      const result = await verify({
+        release: false,
+        runStep: fakeRunStep,
+        output: sink,
+        logDirectory: tmpLogDir,
+})
+      assert.equal(result.exitCode, 1)
+      assert.equal(result.outcome, 'fail')
+      assert.equal(spawned.at(-1), failingLabel, `execution must stop after ${failingLabel}`)
+
+      const failedIdx = result.steps.findIndex((s) => s.label === failingLabel)
+      assert.ok(failedIdx >= 0)
+      assert.equal(result.steps[failedIdx].status, 'failed')
+      for (let i = failedIdx + 1; i < result.steps.length; i++) {
+        assert.equal(result.steps[i].status, 'not-run', `step ${result.steps[i].label} must be marked not-run`)
+    }
+      assert.match(sink.output, /FAIL  verify daily/)
+    } finally {
+      rmSync(tmpLogDir, { recursive: true, force: true })
+    }
+})
+  }
 
 test('WHAT[VERIFICATION-SYSTEM-009] every ladder step target exists as a real file', () => {
   // 层序里的每个入口都必须是真实文件：指向不存在文件的命令恒为「没跑到」，
@@ -185,26 +201,38 @@ test('WHAT[VERIFICATION-SYSTEM-009] every ladder step target exists as a real fi
 
 // ── 2. check.mjs wired gate 清单 ─────────────────────────────────────────────
 
-/** 解析 check.mjs 的 checks 数组，返回 wired basename 清单（保持声明顺序）。 */
-const wiredGates = (checkSource) => {
-  const match = /const checks = \[([\s\S]*?)\n\]/.exec(checkSource)
-  assert.ok(match, 'check.mjs must declare const checks = [...]')
-  const names = []
-  for (const entry of match[1].matchAll(/join\(root,\s*'checks\/([^']+)'\)/g)) {
-    names.push(entry[1])
-  }
-  return names
-}
-
-test('WHAT[VERIFICATION-SYSTEM-009] every wired gate path exists', () => {
-  const checkSource = read('scripts/check.mjs')
-  const wired = wiredGates(checkSource)
-  for (const name of wired) {
+test('WHAT[VERIFICATION-SYSTEM-009] every wired gate path exists and checks set matches scripts/checks directory', () => {
+  for (const gatePath of checks) {
     assert.ok(
-      existsSync(join(ROOT, 'scripts/checks', name)),
-      `check.mjs wires a gate that does not exist: scripts/checks/${name}`,
+      existsSync(gatePath),
+      `check.mjs wires a gate that does not exist: ${gatePath}`,
     )
   }
+
+  const dirEntries = readdirSync(join(ROOT, 'scripts/checks'))
+  const fsxFiles = dirEntries.filter((f) => f.endsWith('.fsx'))
+  assert.deepEqual(fsxFiles, [], 'scripts/checks must contain no .fsx custom compiler executables')
+
+  // Data files that are not gate scripts
+  const nonGateFiles = new Set([
+    'owner-impact-corpus.json',
+    'subsystems.json',
+    'release-closure-nodes.json',
+    // Helper / non-gate modules:
+    'fsharp-control-pyramid-guide.mjs',
+    'js-module-linkage.mjs',
+    'js-surface-gate.mjs',
+    'js-surface-manifest.mjs',
+  ])
+
+  const wiredBasenames = new Set(checks.map((p) => basename(p)))
+  const gateScriptsInDir = dirEntries.filter((f) => f.endsWith('.mjs') && !nonGateFiles.has(f))
+
+  assert.deepEqual(
+    [...wiredBasenames].sort(),
+    gateScriptsInDir.sort(),
+    'checks registered in check.mjs must equal gate scripts in scripts/checks',
+  )
 })
 
 test('WHAT[VERIFICATION-SYSTEM-009] no custom FCS executable remains after the full-repo ban', () => {

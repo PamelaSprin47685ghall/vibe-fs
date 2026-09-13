@@ -13,6 +13,7 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
+import os from 'node:os'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
@@ -86,13 +87,32 @@ test('WHAT[DISTRIBUTION-007] DISTRIBUTION_release_proof_covers_build_package_pac
   // Drive the real orchestrator with a step spy — this proves verify:release
   // invokes the registered build step in clean mode and the verify-package step.
   const { verify } = await import('../../../scripts/verify.mjs')
+  const tmpLogDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pack-closure-verify-'))
+  let buf = ''
+  const memorySink = { write(chunk) { buf += chunk } }
   const spawned = []
   const fakeRunStep = async ({ label, argv }) => {
     spawned.push({ label, argv: argv.map((arg) => String(arg)) })
     return { label, ok: true, exitCode: 0, signal: null, durationMs: 0, logPath: '' }
   }
-  const { exitCode } = await verify({ release: true, runStep: fakeRunStep })
+  try {
+    const { exitCode } = await verify({
+      release: true,
+      runStep: fakeRunStep,
+      output: memorySink,
+      logDirectory: tmpLogDir,
+    })
   assert.equal(exitCode, 0, 'release verify with green spy must succeed')
+
+  const releaseLabels = spawned.map((s) => s.label)
+  const integrationIdx = releaseLabels.indexOf('integration')
+  const e2eIdx = releaseLabels.indexOf('e2e')
+  const packageIdx = releaseLabels.indexOf('package')
+  assert.ok(integrationIdx >= 0 && e2eIdx >= 0 && integrationIdx < e2eIdx, 'integration must precede e2e')
+  assert.ok(packageIdx >= 0 && e2eIdx < packageIdx, 'package must follow e2e')
+
+  const e2eCalls = spawned.filter((s) => s.label === 'e2e')
+  assert.equal(e2eCalls.length, 1, 'release must run e2e exactly once')
 
   const buildCalls = spawned.filter((s) => s.label === 'build')
   assert.equal(buildCalls.length, 1, 'release must invoke build exactly once')
@@ -111,6 +131,9 @@ test('WHAT[DISTRIBUTION-007] DISTRIBUTION_release_proof_covers_build_package_pac
     packageCalls[0].argv.some((arg) => arg.includes('scripts/verify-package.mjs')),
     'release package step must resolve to scripts/verify-package.mjs',
   )
+  } finally {
+    fs.rmSync(tmpLogDir, { recursive: true, force: true })
+  }
 })
 
 test('WHAT[DISTRIBUTION-008] DISTRIBUTION_enforcer_rulebook_closure_is_complete', () => {

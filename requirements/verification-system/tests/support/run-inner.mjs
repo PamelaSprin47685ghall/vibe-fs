@@ -21,9 +21,9 @@
 // which kills healthy multi-test files and fans hundreds of listeners out from one signal.
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { run } from 'node:test'
 import { createCompactReporter } from './compact-reporter.mjs'
@@ -36,189 +36,216 @@ import {
   evaluateCoverage,
 } from './coverage-policy.mjs'
 
-// Fatal semantics stay physical in production. The verification child opts out
-// explicitly so tests can inspect the fatal classification and durable aftermath
-// without killing the whole test tier. Production code never infers this from
-// NODE_TEST_CONTEXT or any other Host-owned environment variable.
-const originalHome = process.env.HOME || process.env.USERPROFILE
-process.env.WANXIANGSHU_NO_FATAL_EXIT = '1'
+/**
+ * 契约：监听 'end'/'error'；
+ * end → { drained: true, error: null }；
+ * error → send({ type: 'runner:error', data: { name, message, stack } }) 后返回 { drained: false, error }；
+ * end/error 竞态先到者胜，不可二次 resolve。
+ *
+ * @param {{
+ *   stream: import('node:stream').Readable | import('node:events').EventEmitter,
+ *   send?: (message: any) => void,
+ * }} opts
+ * @returns {Promise<{ drained: boolean, error: any }>}
+ */
+export function drainTestStream({ stream, send = (message) => process.send?.(message) }) {
+  return new Promise((res) => {
+    let settled = false
+    stream.on('end', () => {
+      if (settled) return
+      settled = true
+      res({ drained: true, error: null })
+    })
+    stream.on('error', (err) => {
+      if (settled) return
+      settled = true
+      send?.({
+        type: 'runner:error',
+        data: {
+          name: err?.name ?? 'StreamError',
+          message: err?.message ?? String(err),
+          stack: err?.stack,
+        },
+      })
+      res({ drained: false, error: err })
+    })
+  })
+}
 
-// Isolate HOME / USERPROFILE for the node:test inner runner so any test or
-// pre-import that touches ~/.config/opencode defaults to a throwaway temporary
-// directory rather than the developer's real user configuration directory.
-// Keep the .NET CLI tool store independent: compiler canaries must still resolve
-// the repository-pinned local Fable tool after application HOME is isolated.
-process.env.DOTNET_CLI_HOME ??= process.env.HOME
-const runnerTestHome = mkdtempSync(join(tmpdir(), 'wxs-runner-home-'))
-const runnerRoutingDir = join(runnerTestHome, '.config', 'opencode')
-mkdirSync(runnerRoutingDir, { recursive: true })
-writeFileSync(
-  join(runnerRoutingDir, 'wanxiangshu.mjs'),
-  `export default function route(role, running) {
+async function main() {
+  // Fatal semantics stay physical in production. The verification child opts out
+  // explicitly so tests can inspect the fatal classification and durable aftermath
+  // without killing the whole test tier. Production code never infers this from
+  // NODE_TEST_CONTEXT or any other Host-owned environment variable.
+  const originalHome = process.env.HOME || process.env.USERPROFILE
+  process.env.WANXIANGSHU_NO_FATAL_EXIT = '1'
+
+  // Isolate HOME / USERPROFILE for the node:test inner runner so any test or
+  // pre-import that touches ~/.config/opencode defaults to a throwaway temporary
+  // directory rather than the developer's real user configuration directory.
+  // Keep the .NET CLI tool store independent: compiler canaries must still resolve
+  // the repository-pinned local Fable tool after application HOME is isolated.
+  process.env.DOTNET_CLI_HOME ??= process.env.HOME
+  const runnerTestHome = mkdtempSync(join(tmpdir(), 'wxs-runner-home-'))
+  const runnerRoutingDir = join(runnerTestHome, '.config', 'opencode')
+  mkdirSync(runnerRoutingDir, { recursive: true })
+  writeFileSync(
+    join(runnerRoutingDir, 'wanxiangshu.mjs'),
+    `export default function route(role, running) {
   if (!new Set(['manager', 'orchestrator', 'coder', 'inspector', 'browser', 'inquiry', 'reviewer', 'devops', 'distiller', 'blogger', 'bookkeeper', 'predictor']).has(role)) throw new Error('unexpected managed role: ' + role)
   return { model: 'provider/' + role + '-model', reasoning: 'none' }
 }\n`,
-  'utf8',
-)
-process.env.HOME = runnerTestHome
-process.env.USERPROFILE = runnerTestHome
-if (originalHome) process.env.DOTNET_CLI_HOME = originalHome
+    'utf8',
+  )
+  process.env.HOME = runnerTestHome
+  process.env.USERPROFILE = runnerTestHome
+  if (originalHome) process.env.DOTNET_CLI_HOME = originalHome
 
-process.on('exit', () => {
-  try { rmSync(runnerTestHome, { recursive: true, force: true }) } catch {}
-})
+  process.on('exit', () => {
+    try { rmSync(runnerTestHome, { recursive: true, force: true }) } catch {}
+  })
 
-const files = process.argv.slice(2).filter((argument) => argument.endsWith('.mjs'))
+  const files = process.argv.slice(2).filter((argument) => argument.endsWith('.mjs'))
 
-if (files.length === 0) {
-  console.error('run-inner: no test files given')
-  process.exit(2)
-}
-
-// ── coverage (NODE_TEST_COVERAGE=1) ─────────────────────────────────────────
-//
-// node:test's own V8 coverage (`run({ coverage: true })`) measures files that were LOADED.
-// Unloaded production modules would be invisible and the "overall" percent would only describe
-// the subset the suite happened to import — a number that rises when tests import less. To make
-// the totals a true whole-codebase number, every production module (dist minus fable_modules)
-// is pre-imported first: a module nobody tests then counts its lines at 0% instead of vanishing.
-//
-// The summary is written as JSON and the line percent is gated against COVERAGE_LINE_THRESHOLD;
-// a run below it exits 1 so the supervising runner fails the suite.
-
-const withCoverage = process.env.NODE_TEST_COVERAGE === '1'
-const coverageSummaryPath = process.env.COVERAGE_SUMMARY_PATH
-let coverageLineThreshold = null
-
-if (withCoverage) {
-  try {
-    coverageLineThreshold = parseCoverageThreshold(process.env.COVERAGE_LINE_THRESHOLD)
-  } catch (error) {
-    console.error(`run-inner: ${error.message}`)
-    process.exit(2)
-  }
-  if (!coverageSummaryPath) {
-    console.error('run-inner: coverage on but COVERAGE_SUMMARY_PATH unset')
+  if (files.length === 0) {
+    console.error('run-inner: no test files given')
     process.exit(2)
   }
 
-  const { walk } = await import('../../../scripts/lib/walk.mjs')
-  const modules = selectProductionModules(walk('dist', ['.js']))
-  const preImport = await preImportModules(modules, (file) => import(pathToFileURL(file).href))
-  for (const { file, message } of preImport.failedFiles) {
-    console.error(`coverage: pre-import failed ${file}: ${message}`)
-  }
-  // A module that failed to load is counted only up to its failure point — a dishonest denominator.
-  // Fail closed rather than report a percent over a partial world.
-  if (preImport.failures > 0) {
-    console.error(
-      `coverage: ${preImport.failures}/${preImport.total} production modules failed pre-import — aborting`,
-    )
-    process.exit(1)
-  }
-  console.error(`coverage: pre-imported ${preImport.total} production modules (excluding fable_modules)`)
-}
+  // ── coverage (NODE_TEST_COVERAGE=1) ─────────────────────────────────────────
+  //
+  // node:test's own V8 coverage (`run({ coverage: true })`) measures files that were LOADED.
+  // Unloaded production modules would be invisible and the "overall" percent would only describe
+  // the subset the suite happened to import — a number that rises when tests import less. To make
+  // the totals a true whole-codebase number, every production module (dist minus fable_modules)
+  // is pre-imported first: a module nobody tests then counts its lines at 0% instead of vanishing.
+  //
+  // The summary is written as JSON and the line percent is gated against COVERAGE_LINE_THRESHOLD;
+  // a run below it exits 1 so the supervising runner fails the suite.
 
-// Default: full in-process parallelism (one dist load). Unit-runner renew probes
-// must force serial slices so wall time exceeds silence (concurrency collapses total).
-const concurrencyEnv = process.env.NODE_TEST_CONCURRENCY
-const concurrency =
+  const withCoverage = process.env.NODE_TEST_COVERAGE === '1'
+  const coverageSummaryPath = process.env.COVERAGE_SUMMARY_PATH
+  let coverageLineThreshold = null
+
+  if (withCoverage) {
+    try {
+      coverageLineThreshold = parseCoverageThreshold(process.env.COVERAGE_LINE_THRESHOLD)
+    } catch (error) {
+      console.error(`run-inner: ${error.message}`)
+      process.exit(2)
+    }
+    if (!coverageSummaryPath) {
+      console.error('run-inner: coverage on but COVERAGE_SUMMARY_PATH unset')
+      process.exit(2)
+    }
+
+    const { walk } = await import('../../../../scripts/lib/walk.mjs')
+    const modules = selectProductionModules(walk('dist', ['.js']))
+    const preImport = await preImportModules(modules, (file) => import(pathToFileURL(file).href))
+    for (const { file, message } of preImport.failedFiles) {
+      console.error(`coverage: pre-import failed ${file}: ${message}`)
+    }
+    // A module that failed to load is counted only up to its failure point — a dishonest denominator.
+    // Fail closed rather than report a percent over a partial world.
+    if (preImport.failures > 0) {
+      console.error(
+        `coverage: ${preImport.failures}/${preImport.total} production modules failed pre-import — aborting`,
+      )
+      process.exit(1)
+    }
+    console.error(`coverage: pre-imported ${preImport.total} production modules (excluding fable_modules)`)
+  }
+
+  // Default: full in-process parallelism (one dist load). Unit-runner renew probes
+  // must force serial slices so wall time exceeds silence (concurrency collapses total).
+  const concurrencyEnv = process.env.NODE_TEST_CONCURRENCY
+  const concurrency =
   concurrencyEnv === '1' || concurrencyEnv === 'false' ? 1 : concurrencyEnv ? Number(concurrencyEnv) : true
 
-const stream = run({
-  files,
-  concurrency: Number.isFinite(concurrency) && concurrency > 0 ? concurrency : true,
-  ...(withCoverage
-    ? {
-        coverage: true,
-        // The report must describe production bytes only: the runner, support files and tests
-        // themselves, the Fable runtime (fable_modules), vendored packages and repo tooling
-        // (scripts/ — checker scripts some tests import) are noise.
-        coverageExcludeGlobs: COVERAGE_EXCLUDE_GLOBS,
-      }
-    : {}),
-})
+  const stream = run({
+    files,
+    concurrency: Number.isFinite(concurrency) && concurrency > 0 ? concurrency : true,
+    ...(withCoverage
+      ? {
+          coverage: true,
+          // The report must describe production bytes only: the runner, support files and tests
+          // themselves, the Fable runtime (fable_modules), vendored packages and repo tooling
+          // (scripts/ — checker scripts some tests import) are noise.
+          coverageExcludeGlobs: COVERAGE_EXCLUDE_GLOBS,
+        }
+      : {}),
+  })
 
-// Every event, not just verdicts. The classifier in `verdict-feed.mjs` decides what renews; sending
-// only the blocking kinds would move that decision into this file and leave the parent unable to
-// report background progress in its dump.
-for (const type of [
-  'test:start',
-  'test:pass',
-  'test:fail',
-  'test:complete',
-  'test:diagnostic',
-  'test:stderr',
-  'test:stdout',
-]) {
-  stream.on(type, (data) => {
-    process.send?.({
-      type,
-      data: {
-        name: data?.name,
-        file: data?.file,
-        nesting: data?.nesting,
-        // Duration rides along with the verdict so the parent can report the tier's timing
-        // distribution. One number per verdict, measured by node:test — the alternative was a
-        // second timing mechanism in the parent for something already measured here.
-        durationMs: data?.details?.duration_ms,
-      },
+  // Every event, not just verdicts. The classifier in `verdict-feed.mjs` decides what renews; sending
+  // only the blocking kinds would move that decision into this file and leave the parent unable to
+  // report background progress in its dump.
+  for (const type of [
+    'test:start',
+    'test:pass',
+    'test:fail',
+    'test:complete',
+    'test:diagnostic',
+    'test:stderr',
+    'test:stdout',
+  ]) {
+    stream.on(type, (data) => {
+      process.send?.({
+        type,
+        data: {
+          name: data?.name,
+          file: data?.file,
+          nesting: data?.nesting,
+          // Duration rides along with the verdict so the parent can report the tier's timing
+          // distribution. One number per verdict, measured by node:test — the alternative was a
+          // second timing mechanism in the parent for something already measured here.
+          durationMs: data?.details?.duration_ms,
+        },
+      })
     })
-  })
-}
+  }
 
-const compactReporter = createCompactReporter()
-stream.compose(compactReporter).pipe(process.stdout)
+  const compactReporter = createCompactReporter()
+  stream.compose(compactReporter).pipe(process.stdout)
 
-let coverageSummary = null
-if (withCoverage) {
-  stream.on('test:coverage', (data) => {
-    coverageSummary = data?.summary ?? null
-  })
-}
-
-let streamError = null
-let streamDrained = false
-
-await new Promise((resolve, reject) => {
-  stream.on('end', () => {
-    streamDrained = true
-    resolve()
-  })
-  stream.on('error', (err) => {
-    streamError = err
-    process.send?.({
-      type: 'runner:error',
-      data: {
-        name: err?.name ?? 'StreamError',
-        message: err?.message ?? String(err),
-        stack: err?.stack,
-      },
+  let coverageSummary = null
+  if (withCoverage) {
+    stream.on('test:coverage', (data) => {
+      coverageSummary = data?.summary ?? null
     })
-    reject(err)
-  })
-}).catch((err) => {
-  console.error(`run-inner: stream error: ${err?.message ?? err}`)
-  process.exitCode = 1
-})
+  }
 
-if (withCoverage) {
-  const result = evaluateCoverage(coverageSummary, coverageLineThreshold)
-  if (result.totals) {
-    mkdirSync(dirname(coverageSummaryPath), { recursive: true })
-    writeFileSync(coverageSummaryPath, JSON.stringify(coverageSummary, null, 2))
-    const { percent, totals, ok } = result
-    console.error(
-      `coverage: ${percent.toFixed(2)}% lines (${totals.coveredLineCount}/${totals.totalLineCount}) — ` +
-        `threshold ${coverageLineThreshold}% → ${ok ? 'PASS' : 'FAIL'}`,
-    )
-    if (!ok) process.exitCode = 1
-  } else {
-    console.error('coverage: no test:coverage event arrived — coverage run broken, failing')
+  const { drained: streamDrained, error: streamError } = await drainTestStream({
+    stream,
+    send: (message) => process.send?.(message),
+  })
+
+  if (streamError) {
+    console.error(`run-inner: stream error: ${streamError?.message ?? streamError}`)
     process.exitCode = 1
+  }
+
+  if (withCoverage) {
+    const result = evaluateCoverage(coverageSummary, coverageLineThreshold)
+    if (result.totals) {
+      mkdirSync(dirname(coverageSummaryPath), { recursive: true })
+      writeFileSync(coverageSummaryPath, JSON.stringify(coverageSummary, null, 2))
+      const { percent, totals, ok } = result
+      console.error(
+        `coverage: ${percent.toFixed(2)}% lines (${totals.coveredLineCount}/${totals.totalLineCount}) — ` +
+          `threshold ${coverageLineThreshold}% → ${ok ? 'PASS' : 'FAIL'}`,
+      )
+      if (!ok) process.exitCode = 1
+    } else {
+      console.error('coverage: no test:coverage event arrived — coverage run broken, failing')
+      process.exitCode = 1
+    }
+  }
+
+  if (streamDrained && !streamError) {
+    process.send?.({ type: 'inner:drained' })
   }
 }
 
-if (streamDrained && !streamError) {
-  process.send?.({ type: 'inner:drained' })
+if (typeof process.argv[1] === 'string' && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  await main()
 }
