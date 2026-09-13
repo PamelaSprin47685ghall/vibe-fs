@@ -87,1207 +87,1007 @@
 
 ---
 
-# CLEAN：验证入口精简与增量构建收口方案
+# CLEAN：测试精简、提速与输出收口
 
-调研日期：2026-09-13。代码基线：master，bbddd0c85。
+调研日期：2026-09-13。代码基线：master，ec6c363bd。本文是第二轮待实施方案，不是完成记录。
 
-本文是待实施方案，不是已完成记录，也不替代 requirements 中的现行合同。本次交付只增加本文，不修改构建、门禁、测试或 CI。下文的新命令、新接口和预期结果均指实施后的目标；实测结果单独列在第 2 节。
+本轮只交付 CLEAN.md，不实施测试删除、生产代码修改、运行器改造或规范修订。文中的“新增、删除、迁移”均为后续施工动作。实测与推断分开记录；没有测过的性能不写成收益。
 
-## 1. 先定取舍
+## 1. 这次做什么
 
-这次工作的重点不是把 34 个检查藏到一行输出后面，而是少做不值得做的事。
+上轮已经完成日常／发布入口拆分、部分门禁退役、构建内容凭据、共享检查上下文、compact reporter 和真实包验证。本轮不重做这些工程，也不把上轮已删除的 deadcode 等检查重新列入施工。
 
-推荐终态：
+现在要解决的是：一些测试还在检查脚手架的样子，而不是系统的行为；一些真正有价值的测试反复做相同准备；测试自己的运行器还存在空证明、重复计数和日志混杂。
 
-1. format-build-test 成为日常验证入口：只读格式检查、少量有效静态检查、可信增量构建、产品回归和必要物理适配器测试。
-2. verify:release 成为发布验证入口：在同一条执行链中使用干净全量构建，再跑产品回归、发布专属证明、唯一 Long Stroke 和真实包验证。CI 明确调用这个入口。
-3. 删除无业务错误探测力的门禁及其自证测试。剩下的检查共享文件读取和工程清单，不再每个检查启动一个 Node 进程、遍历一次全仓。
-4. 不缓存测试成功结果，不先做自动 affected-test 选择，不新建任务图框架。先减少重复计算，再考虑更细的调度。
-5. 默认输出只保留阶段、结果、耗时和需要处理的问题。详细测试名、编译日志和耗时分布按需展开；失败信息不能被精简掉。
+推荐顺序：
 
-必须保留的底线是：产物确实对应当前输入，必要测试确实运行，失败不会被吞掉，权限、恢复、持久化、Host、进程和分发边界仍然有能变红的证明。
+1. 先补运行器的真实回归，防止删完测试后，只剩一个更快的假绿灯。
+2. 直接删除纯文案、注释、历史迁移清单和重复全仓扫描测试；不要把它们搬到另一个每次仍运行的 audit 入口。
+3. 对混合测试逐条处理：保留真实行为和反例，删掉只锁源码写法的部分。确实缺行为证明的，先补再删。
+4. 优化必要测试的输入准备、重复解析、时间推进和调度。不要先减随机轮数、放宽超时或缓存测试成功。
+5. 终端只显示当前层级的结果。完整失败、诊断和重放信息保留在本次日志中，不用正则过滤器伪造安静。
 
-本方案不再次拆分生产工程，不改产品行为，不引入自建 FCS 扫描，不使用 dotnet build，不引入远程缓存、后台编译守护进程、通用插件式检查框架或全仓 mutation 平台。
+不设“至少删掉多少项”“测试文件必须少于多少个”的指标。目标是少做无效工作，不是把数量压成另一个治理目标。
 
-### 1.1 优先级
+### 1.1 不动的边界
 
-| 优先级 | 工作 | 原因 |
-|---|---|---|
-| 第一批 | 删除 deadcode 与数量、写法、旧迁移清单门禁；替换逐测试刷屏 | 已有直接成本证据，改动边界相对清楚 |
-| 第二批 | 修正构建凭据、新鲜度、失效范围与失败发布顺序 | 默认启用增量前的正确性前提 |
-| 第三批 | 合并保留检查的扫描；减少真实语料重复派生；合并零散测试进程 | 去掉实际重复劳动 |
-| 最后一批 | 切换日常／发布入口，迁移 CI，删除旧路径 | 避免中途出现一个看似成功但少验了一层的入口 |
+保留 Fable 编译目标，不使用 dotnet build；不重拆生产工程；不引入自建 FCS 扫描；不添加通用任务图、测试插件平台、全仓 mutation 框架或测试成功缓存；不把普通验证改成只跑 Git 差异关联用例。
 
-不把“剩余门禁必须有多少个”“文件必须减少多少行”“必须快一倍”作为验收条件。检查数量、代码行数都不是质量本身。
+保留权限拒绝、身份隔离、持久化失败、恢复与重放、取消与重复投递、真实 Host/进程/Git、产物新鲜度、JS 链接和真实包闭包的证明。
 
-## 2. 已核实的现状
+“删治理测试”不等于“删测试基础设施测试”。监督器能不能杀掉挂死进程、报告有没有把失败丢掉，本来就是必须测试的行为。
 
-### 2.1 当前调用链
+## 2. 本轮实际看到了什么
 
-package.json 中的入口实际是：
+### 2.1 当前入口，不沿用旧方案里的命令链
+
+package.json 目前声明：
 
 ```text
-npm run format-build-test
-  ├─ npm run format:check
-  │    └─ dotnet tool run fantomas --check src/Wanxiangshu
-  ├─ npm run check
-  │    └─ Wireit → scripts/check.mjs → 34 个串行 Node 子进程
-  ├─ npm run build
-  │    └─ Wireit → scripts/build.mjs
-  │         ├─ build.lock
-  │         ├─ 删除 dist
-  │         ├─ compileIncremental → 一次全量 Fable 编译
-  │         ├─ 重新派生 LoopDetectorEnvelope
-  │         ├─ 资源、Surface Manifest、JS linkage 检查
-  │         └─ 释放锁
-  ├─ requirements/verification-system/tests/run.mjs
-  ├─ requirements/verification-system/tests/integration/run.mjs
-  │    ├─ 一次 OpenCode warmup
-  │    ├─ 11 组 node:test 步骤，组间串行
-  │    ├─ distribution/package 子入口
-  │    └─ verification-system/harness 子入口
-  ├─ requirements/verification-system/tests/e2e/entry.test.mjs
-  └─ npm pack --dry-run
+format-build-test → node scripts/verify.mjs
+verify:release    → node scripts/verify.mjs --release
+build             → node scripts/build.mjs
+build:clean       → node scripts/build.mjs --clean
+check             → wireit
+format:check      → wireit
 ```
 
-这里要分清两件事：Wireit 命中缓存时会跳过整个 build；但只要 scripts/build.mjs 真正执行，compileFable 就先调用 resetOutputDirectory(dist)，并拒绝 cached 结果。这条入口仍是发布式全量构建，不是日常增量构建。
+scripts/verify.mjs 的日常链是 format:check → check → build → unit → integration；release 使用 --clean 构建，再增加 e2e 和 package。
 
-因此不能简单说“增量编译没有实现”。增量规划已经在 scripts/lib/owner-compile.mjs 中实现；问题是日常入口尚未接上它，而且接上之前还有产物一致性需要补齐。
+unit 由 requirements/verification-system/tests/run.mjs 发现测试，经 supervise-node-test.mjs 启动 run-inner.mjs。后者仍使用 node:test 的文件进程隔离，外层监督器负责静默与物理 backstop。
 
-### 2.2 本次实测
+integration 另有 integration-node-test-steps.mjs 清单，并串行启动 distribution/package 与 verification-system/harness 两个 child。harness 不是 node:test reporter 的消费者，而是自己的 case 数组和 8 个并发 worker。
 
-使用已有正式入口，没有为计时改写测试或增加临时测试程序。机器运行环境为 Node v26.5.0、npm 11.17.0、.NET SDK 10.0.111。package.json 声明 npm@11.12.1、Node >=20；CI 当前实际选择 Node 20。两者不能混为同一个验证环境。
+关键事实：owner-project-compiler-boundary.test.mjs 与 owner-impact-compile-cli.test.mjs 所在组目前没有 releaseOnly 标记。selectIntegrationSteps 的默认过滤只排除带标记的组，所以这组仍在日常链中。不能因 verify.mjs 的注释称其“release-only”，就当迁移已完成。
 
-| 命令 | 结果 | 墙钟耗时 | 说明 |
+当前根目录没有 CLEAN.md；AGENTS.md 后半段保留了上一轮方案全文。它描述的 bbddd0c85、34 个检查、3983 个测试等是旧基线，不应覆盖本轮对实际代码的判断。本文不修改 AGENTS.md。
+
+### 2.2 实测环境与范围
+
+本机 Node v26.5.0、npm 11.17.0。调研开始和写文档前 Git 工作树均干净，HEAD 均为 ec6c363bd。
+
+使用现有正式入口计时，没有用一次性探针充当验收。所有下列运行均发生在新增本文之前，使用当时已有 dist；新鲜度检查报告 1781 个输入、874 个产物。未进行冷构建，也未运行整个 format-build-test 或 verify:release。
+
+| 运行 | 结果 | 墙钟 | 边界 |
 |---|---|---:|---|
-| node scripts/check.mjs | 通过 | 21.066 秒 | 绕过 Wireit，测检查本体 |
-| node scripts/checks/deadcode.mjs | 通过，debt=0 | 14.505 秒 | 单独测死代码检查 |
-| node requirements/verification-system/tests/run.mjs | 3983 项通过，0 失败 | 20.170 秒 | 644 个文件；使用工作区已有 dist |
+| 全 unit 正式入口 | 退出 0；发现 625 个文件 | 17.873 秒 | reporter 与 supervisor 计数不同，见下文 |
+| Surface charter 单文件，串行 | 17 项通过 | 外壳 4.825 秒；runner 约 4.40 秒 | 显式 TESTS_MJS_FILES；不是全量验证 |
+| capacity-soak 单文件，串行 | 2 项通过 | 外壳 2.718 秒；runner 约 2.30 秒 | 显式 TESTS_MJS_FILES；不是全量验证 |
+| harness 正式入口 | 279 项通过，0 失败 | 10.287 秒 | 8 worker；不等于 integration 或 Long Stroke 通过 |
 
-静态检查报告：748 个生产 .fs 文件、276 个编译分片、27 个 subsystem、2220 条 ProjectReference。requirement-trace 报告 814 条 WHAT、4026 个静态识别的测试登记；这不是本次 unit 实际执行数，不能拿它替代 3983 个运行结果。
+全 unit 的 compact reporter 报告 624 个文件、3660 passed、0 failed；supervisor 报告 3661 passed、0 failed。两者口径尚未统一，本文不把任意一个数字冒充已核实的叶子测试总数。
 
-requirement-trace 还报告 INSTITUTIONAL-LEARNING-007 缺少 active test 和 HOW proof row。这是同一条款的两个缺口诊断，当前设计允许它们非阻塞。删除 trace 脚本不等于修复或关闭该缺口。
+全 unit 的 test time 约 88.1 秒，外壳 user time 192.676 秒、sys time 37.138 秒。并发下这些值不是墙钟；不能把慢项相加后称为可节省的总等待时间。
 
-deadcode 的单独耗时约为静态链耗时的 69%。这是两次运行的比值，不是严格剖析分摊；缓存与机器负载会影响数值。但它已足够说明：继续优化小检查的进程启动，收益不如先删除这个低价值重扫描。
+### 2.3 有定位价值的慢项
 
-unit 的慢项如下：
+| 项目 | 全 unit 中 | 单文件中 | 结论 |
+|---|---:|---:|---|
+| HOST-BOUNDARY-023 installed OpenCode admission canary | 6.254 秒 | 未单测 | 真实 Host 边界，不能因慢删除 |
+| EMR-014 seeded bounded admission soak | 5.832 秒 | 2.074 秒 | 资源争用放大耗时；尚不能断言全是算法问题 |
+| EMR-003 process restart/capacity | 4.283 秒 | 未单测 | 真实重启语义保留 |
+| JS_SURFACE_003_law_owner_surface_registry | 3.999 秒 | 1.496 秒 | 与下两项执行同一 validator |
+| JS_SURFACE_003_every_registered_surface_has_a_contract_test | 3.174 秒 | 1.333 秒 | 重复全仓调用 |
+| JS_SURFACE_002b_registered_surfaces_exist_in_the_production_source_tree | 未列进全量 top 5 | 1.224 秒 | 第三次重复全仓调用 |
 
-| 测试 | 本次报告耗时 | 判断 |
-|---|---:|---|
-| DG-004：runtime envelope 从当前仓库重新派生并核对 | 12.615 秒 | 有重复读取、重复 tokenize 和重复真实语料计算 |
-| HOST-BOUNDARY-023：已安装 OpenCode admission 契约 | 6.624 秒 | 真实 Host 契约，不能因慢就删 |
-| EMR-014：seeded bounded admission soak | 5.992 秒 | 先检查循环与观测成本，保留公平性／对账命题 |
-| JS-SEMANTIC-SURFACE-003：Surface registry | 4.669 秒 | 应拆开实际入口完整性与证明登记治理 |
-| EMR-003：process restart 与 capacity 重建 | 4.575 秒 | 真正的重启边界，优先保留 |
+单文件 Surface 的三次相同 validator 调用合计约 4.05 秒，17 项测试总 test time 约 4.27 秒。这是本轮最明确的重复计算证据。不同运行的冷热状态与负载不同，不能据此保证全链等额提速。
 
-各测试耗时之和为 112.2 秒，整条 unit 的墙钟是 20.170 秒。并发测试的耗时不可直接相加后当作用户等待时间，更不能把前三个慢项相加当作可节省时间。
+harness 的主要慢项包括：verdict 续期约 8.926 秒、持续打印的挂死 child 约 7.033 秒、恢复默认 watchdog 窗口约 5.032 秒、泄漏 handle 约 3.597 秒，以及 waitFact 的约 2 秒等待。很多扫描／清单用例只有 0–36 毫秒：它们值得删主要因为维护成本与误报，不是因为能省几秒。
 
-本次未执行 format、重新构建、integration、Long Stroke、pack 或完整 format-build-test。没有冷构建、发布链总耗时和优化后耗时数据。unit 开始时通过的是现行新鲜度检查，不是本方案提出的内容凭据验证。
+### 2.4 已确认的薄弱点
 
-### 2.3 已确认的浪费和薄弱点
-
-| 位置 | 当前行为 | 处理方向 |
+| 位置 | 实际行为 | 本轮处置 |
 |---|---|---|
-| scripts/checks/deadcode.mjs::scanDeadBindings | 每个 private 名字重新扫描整仓拼接文本 | 删除，不为它另造缓存 |
-| tests/proof-ladder.test.mjs | 锁死命令原文、数组写法、Wireit 配置和门禁数量下限 22 | 改测实际调度、失败传播、执行完整性 |
-| scripts/check.mjs | 34 次进程启动，多份源码／规范树重复扫描 | 保留规则同进程运行，共享本次快照 |
-| scripts/build.mjs::compileFable | 实际执行即删 dist | 分出可信增量与显式 clean 模式 |
-| tests/support/build-freshness.mjs | 最新源码 mtime 与最新 JS mtime 比较 | 改为输入、输出内容凭据 |
-| owner-compile.mjs::compileIncremental | 编译成功即写 manifest，早于生成物和后置验证；写失败被吞掉 | 最终成功凭据由整个构建的唯一属主提交 |
-| owner-compile.mjs::detectChangedFiles | 输出判断主要是有 JS 和两个入口存在 | 校验完整输出集合与内容 |
-| package.json::wireit.check.files | 未列 scripts/check.mjs、resources/** | 精确补全保留检查的输入依赖 |
-| package.json::wireit.format.files | 有 .fs、.fsproj，遗漏 .fsi 和格式配置 | 取消写入式格式缓存；只缓存只读检查 |
-| run-inner.mjs | spec reporter 打印每个成功测试 | 换成结构化事件摘要，不过滤人类日志 |
-| supervise-node-test.mjs | 每组重复统计说明与 top 5 | 总入口汇总，详细分布仅 profile 时显示 |
-| distribution/package/run.mjs | 四个小套件各起一个 supervisor | 合并调度，保持文件进程隔离 |
-| distribution/package/install.test.mjs | 名为 install，实际只检查工作区布局 | 改名并明确证据边界，发布另验真实包 |
+| scripts/verify.mjs::hashTreeFiles | 从 src/scripts/requirements/resources/.github 往下走，却只收相对仓库根等于 package.json 或 package-lock.json 的文件；也没遍历根目录这两个文件 | 选择器逻辑收不到预期输入；补真实文件变更回归 |
+| proof-ladder.test.mjs 的 snapshots input state 用例 | 注释声称修改中途输入；实际只设布尔值、spy 返回成功，并断言 exitCode=0 | 删除空证明，改为真实 fixture 中修改输入且必须失败 |
+| reporter-supervision.test.mjs 的 single leaf completion 用例 | 测试内复制 handleComplete，没有调用 supervisor 实现 | 测同一个真实状态函数与真实进程路径 |
+| 同文件的 stream error 用例 | 写出独立临时 runner，测试它自己发送 runner:error | 不证明 run-inner.mjs；改为真实 drain 路径的注入失败 |
+| compact-reporter.mjs 与 supervisor | 一个过滤容器，另一个累加所有 pass/fail；IPC 还丢掉 skip/todo、details.type 等字段 | 一个统计属主；保留完整必要元数据 |
+| compact-reporter.mjs | 原样透传测试 stdout/stderr；失败到流结束才集中打印 | 成功原始日志入文件；失败尽早显示，不等可能挂死的 end |
+| proof-ladder.test.mjs::verify 调用 | spy 仍触发真实日志目录/latest 链接和终端打印 | 注入根目录、输出接收器、日志目录，不污染工作区 |
+| surface-charter.test.mjs | 三次 validateSurfaceManifest(SURFACE_MANIFEST, ROOT)，另有多个 scanAll | 删除重复真实仓库扫描；validator 用小型反例测试 |
+| harness/run.mjs | 自建 279 case runner 逐项打印通过；expected fatal 也出现在顶层 | 对 expected child 输出做局部捕获；只汇总真实结果 |
+| run-inner.mjs 的 coverage 分支 | 动态 import ../../../scripts/lib/walk.mjs 少一级；实际指向 requirements/scripts | 补 coverage 真实入口测试，不只测 coverage-policy 纯函数 |
+| run.mjs 的 ROOT | 从 tests 向上两级落在 requirements，而非仓库根；coverage 输出目录随之错位 | 单一 root 解析；本轮未运行 coverage，不能称已复现其全部问题 |
 
-## 3. 删除的标准与不可删除的东西
+输入快照的缺陷由代码路径直接推出；没有为复现而改写用户源文件。现场出现的 inputs=44136fa355b3678a 与空对象摘要一致，也与这一判断相符。其修复必须由新增的永久 fixture 回归验证，不能只再补一条源码字符串检查。
 
-### 3.1 什么值得删
+## 3. 判定一条测试值不值得留下
 
-一项检查如果只证明以下事实，就不应每次构建都收税：旧文件名没有复活、目录仍叫旧名字、代码仍按某段字符串写、某张问卷填满、测试标题与三份登记表逐字一致、检查数量没有下降、声明旁边有指定格式的解释文字。
+### 3.1 用“能抓住什么错误”判断，不用标题判断
 
-名字、路径和源代码文本可以服务于很窄的边界检查，但不能自动升级为行为证明。换个局部变量名就红、换个实现却能绕过的检查，最需要重新审视。
+留下前，写清三个事实：调用的是哪个实际入口；故意引入哪种错误它会红；已有哪个测试是否已经覆盖同一个错误、同一个边界和同一个观察。
 
-删除一个门禁时一并处理：执行入口、专用配置／baseline、只证明该门禁自身的测试、HOW 映射、证明登记消费者和废弃说明。不保留永远返回成功的壳，不转成默认仍全量跑的 audit，不建一个退休清单让后人继续维护。
+示例：
 
-### 3.2 什么不能靠“已经多工程”来删
-
-当前编译器契约测试已经明确：Fable 会合并 ProjectReference 源码；internal 不是普通 .NET 程序集防火墙；顶层 private module 也不等于外部工程不可访问。模块内 private binding 和 .fsi 隐藏实现符号才有相应 canary。
-
-证据位置：requirements/structured-workflow/tests/integration/owner-project-compiler-boundary.test.mjs。
-
-所以不能用“现在有 276 个工程了”替代以下证明：能力不能伪造、越权调用被拒绝、恢复不能制造成功、持久化失败不能推进权威状态、资源读取不能越过属主、源码合并后私有实现仍不可见。
-
-也不能把“合并 impact 编译成功”当作所有独立工程声明都完备。一个更大的闭包可能恰好补齐另一个工程漏掉的 provider。新增或改变独立边界时，仍要编译该边界自己的声明闭包；普通变更只需一次受影响并集，不应逐一重编全部分片。
-
-### 3.3 测试删减只按命题，不按文件大小
-
-先问一个测试让哪个真实错误变红。能直接发现恢复、隔离、并发、序列化、Host 或分发错误的测试保留。若只是读取源码并断言旧名字、旧数组长度、旧注释存在，删除或替换。
-
-同一个文件可能同时包含这两种测试，必须逐项处理，不能整目录删除。旧 JSON 合同册中指向的行为测试也不能随合同册一起删。
-
-## 4. 34 个静态入口的处置表
-
-表中“退役”指删除该独立脚本及其仅为自证而存在的附件；“改为行为证明”要求替代测试先落地并能变红，再撤原规则；“合并”要求规则迁完后删除旧入口。不是先注释掉，等待以后补。
-
-这张表是按已读实现、调用关系和实跑输出作出的实施决策。对包含多种规则的大脚本，执行时仍须按第 4.1 节逐条归类；不能把表中建议当作已经逐条证明其全部规则冗余。
-
-| # | 当前 scripts/checks 下的入口 | 决策 | 最终保留的实质 |
-|---:|---|---|---|
-| 1 | spec.mjs | 退役全仓文书门禁 | WHAT 保持规范权威；不再每次构建检查文档全套布局、历史路径和散文格式 |
-| 2 | architecture.mjs | 拆解后合并 | 工程输入完整性并入 compile-shards；实际依赖方向、资源 I/O 越界留下；旧迁移名字退出 |
-| 3 | participant-identity-boundary.mjs | 保留并收窄 | logical run／session 身份不能混用、权威身份创建边界；去掉能由类型与行为测试重复证明的拼写约束 |
-| 4 | provider-projection-boundary.mjs | 保留并收窄 | provider 只能看到其应有投影，不能旁路读取内部权威状态 |
-| 5 | subsystems.mjs | 保留，作为共享工程清单入口 | 唯一源文件归属、签名配对、闭包完整、DAG、基础设施依赖方向 |
-| 6 | dsl-ownership.mjs | 退役启发式治理，迁走必要边界 | 大 DU 阈值、解释注释、状态形状与复杂度推断不再管；越权／副作用边界交类型、窄扫描与行为测试 |
-| 7 | authority-boundary.mjs | 退役权威登记册式检查 | 能力创建／消费／不可持久化等命题用真实端口、序列化和 private/.fsi canary 证明；不靠类型后缀和注释获得权威 |
-| 8 | fsharp-control-pyramid.mjs | 禁止退役 | 缩进和嵌套数量确实能裁决业务表达；但需要精简输出 |
-| 9 | plugin-transforms-invariant.mjs | 改为组合顺序行为测试 | 同一输入的投影、处理次序、次数与禁止旁路；不锁死装配源码文字 |
-| 10 | interaction-repair-invariant.mjs | 改为状态／时序回归 | 非终态不能误修复、in-flight 不重复、合法修复不制造 exhaustion |
-| 11 | retry-owner.mjs | 保留最小属主约束 | 只允许已定义重试层裁决；重试次数、终止与副作用唯一性由行为证明 |
-| 12 | enforcer-bounds-owner.mjs | 保留并合并扫描 | 边界值和拒绝决策只能有一个生产属主；不在每个消费者复制公式 |
-| 13 | hook-policy.mjs | 保留真实 Host 接线契约 | 实际 hook 集合、注册、策略齐备；不固定与事实无关的数量常量 |
-| 14 | semantic-decorator-invariant.mjs | 退役 | 删除精确源码片段及多字段说明登记；保留回调次数、顺序、取消、失败短路的现有行为测试 |
-| 15 | deadcode.mjs | 优先直接退役 | 当前词法计数不构成可靠死代码证明；无需替它发明另一个近似分析器 |
-| 16 | p0-recovery-join.mjs | 按命题迁完后退役 | aborted 不能伪装 joinable completion、丢失恢复证据不能变成功；保留 typed result／恢复行为反例 |
-| 17 | causal-wait-boundary.mjs | 保留必要读取边界，移走自测输出 | 因果等待只能消费其属主事实；合成反例进入正式 unit，不在每次 CLI 内逐项打印 |
-| 18 | cross-callback-pc.mjs | 退役启发式词法门禁 | 当前输出已承认 exemptions 和 coverage gaps；跨回调因果问题交取消、恢复、重放测试 |
-| 19 | session-ownership-ratchet.mjs | 退役 | 删除 AttachmentKind 名字清单和烟雾问卷；保留实际会话归属、复用、隔离测试 |
-| 20 | js-surface-gate.mjs | 退役旧角色／文件名禁令 | 是否可调用、生成是否完整由真实工具注册和 Surface 边界测试证明 |
-| 21 | capability-isomorphism-gate.mjs | 合并到能力／工具注册契约 | 从生产 registry 推导 Host schema 与 JS 投影，比较实际结果；不再 grep 旧实现 token |
-| 22 | unified-store-gate.mjs | 保留最小持久化越界守卫 | 唯一 durable substrate、禁止旁路物理写入；历史模型名字黑名单退出 |
-| 23 | external-effect-reconciliation.mjs | 退役人工合同册验证 | 保留 11 类外部效果真实的请求、接收、歧义、恢复、幂等反例；不以合同 JSON 完整代替这些证明 |
-| 24 | tool-referential-integrity.mjs | 保留 | ToolSpec 名字唯一，实际工具注册与调用暴露一致；旧工具名禁令单独删除 |
-| 25 | provider-leak-gate.mjs | 保留且限定投影出口 | 内部控制字段／协议不得泄漏给 provider；不要扩大成全仓文风检查 |
-| 26 | llm-facing-format-gate.mjs | 保留表示边界，去掉写法束缚 | 同一种合成表示走同一生产编码路径；输出结构用精确行为断言 |
-| 27 | language-parity-gate.mjs | 保留资源契约部分 | 双语文件、协议标识、占位符一致；语义 anchor 词汇清单和作文深度考核退出 |
-| 28 | prompt-depth-ratchet.mjs | 退役 | prompt 是否有指定词和指定解释层数，不是产品正确性证明 |
-| 29 | provider-prose-ownership.mjs | 退役 prose 治理和 baseline | 保留真实 provider leak 与序列化边界；不维护英文散文命中债务 |
-| 30 | g4r-ce-vocabulary.mjs | 退役迁移词汇门禁 | 因果计时与时间注入由测试证明；不继续搜旧 controller 名字；raw-time 环境时间扫描器迁入 `scripts/lib/raw-time-scan.mjs`，由 TIME-004 正式测试直接消费，不再作为常驻门禁 |
-| 31 | test-boundary.mjs | 与下一项合并 | 测试不得深层导入未公开的生成实现 |
-| 32 | js-boundary-gate.mjs | 保留单一实现 | 一份实际 Surface 入口清单、一遍 JS 语法扫描；删除已清零的兼容债务治理附件 |
-| 33 | e2e-watchdog-feed.mjs | 并入 runner 的小范围回归 | 顶层场景不能拿原始流量喂狗；保留 watchdog 的真实因果与挂死测试 |
-| 34 | requirement-trace.mjs | 退役精确标题双向登记门禁 | 保留产品测试和问题记录；不再以 WHAT↔HOW↔test 标题全等计算“证明权威” |
-
-### 4.1 混合脚本怎样拆
-
-不要把整份大脚本平移到一个新文件后宣称精简。以 architecture、dsl-ownership、p0-recovery-join、unified-store 为例，每条规则只有四种归宿：
-
-| 规则性质 | 归宿 |
+| 断言 | 判断 |
 |---|---|
-| 编译器能够直接判定的声明／可见性错误 | 正常编译和最小编译器 canary |
-| 真正的静态物理边界，如禁止非属主执行资源 I/O | 保留的边界检查，读取共享源码快照 |
-| 运行行为，如失败后不能完成 join | owner 包内的产品测试 |
-| 命名、注释、退役路径、阈值、问卷 | 删除，不转移 |
+| McpContract.fs 包含 Not a scheduler 注释 | 只锁注释；删 |
+| 未授权调用进入真实 tool handler 后，被 typed rejection 拒绝且没有 Host 调用 | 真实权限边界；留 |
+| 测试自己的 helper 能识别自己构造的源码字符串 | 只有 helper 确实服务于必要门禁时才值得留；否则整条链删 |
+| 相同 validator 对同一仓库调用三次 | 留一处实际接线或由 build 唯一拥有；其余删 |
+| 同一事件重复应用，不产生第二份 durable effect | 真正幂等性；留 |
+| 旧内部文件名不能重新出现 | 一般是迁移遗留；删 |
+| 旧持久化输入必须被当前 decoder 明确拒绝 | 仍在输入边界上的兼容／拒绝合同；留 |
+| 提示资源里的 protocol id、占位符、字段语法和双语配对 | 运行时资产合同；不因读取 .md 就删 |
+| HOW 必须包含某句解释 | 文档写法治理；删 |
 
-每个迁移后的行为命题至少保留一个合法输入和一个精确反例。反例必须调用生产 Surface 或真实边界，不在测试中复制一份算法再对自己断言。
+### 3.2 四种施工动作
 
-### 4.2 不是只改 check.mjs 数组
+删除：断言只锁脚手架，且没有独立行为需要接替。连同专用 helper、fixture、baseline、注册行和失效 HOW 引用一起退役。
 
-以下消费者必须一起迁移，否则表面上删了门，背后仍在计算原来的文书图：
+合并：边界、输入和观察完全相同，只是拆成多个标题。保留可定位的 case 名；不要把所有测试塞进一个失败后无法分辨来源的大函数。
 
-```text
-scripts/lib/requirement-trace.mjs
-  ├─ checks/authority-boundary.mjs
-  ├─ checks/semantic-decorator-invariant.mjs
-  ├─ checks/external-effect-reconciliation.mjs
-  ├─ checks/js-surface-manifest.mjs
-  └─ checks/requirement-trace.mjs
-```
+替换：旧测试想守住的是有效业务约束，却只看源码。先写调用真实入口的正反例，再删除源码断言。
 
-前三者完成行为替代后退出。js-surface-manifest 保留真实源码／产物／测试导入边界，删除对精确 HOW 行和标题的证明权威计算。最后再删除无人消费的 trace 实现、proof-levels.json 和专属测试；不能先删库，再靠空结果或白名单让消费者绿。
+保留并优化：语义和反例有效。只减少重复准备、重解析、墙钟等待和不合理并发，不改变被检查的事实。
 
-authority-contracts.json、external-effect-contracts.json、session-ownership-matrix.json、provider-prose-ownership-baseline.json、deadcode-baseline.json，以及已清零的 JS boundary 债务附件，都应按实际引用完成同批清理。release-closure-nodes.json、owner-impact-corpus.json、subsystems.json 等名字相似的文件不能顺手删除：必须先查使用者，仍定义当前编译或实际测试输入的保留。
+### 3.3 禁止以精简为名发生的退化
 
-## 5. 先修订现行合同，再改变执行含义
+不能把 unknown、skip、todo、未启动、未完成的文件算成通过；不能只校验 expected 与 expected；不能为了安静把 stderr 全丢弃；不能缩减 seed/domain/rounds 后仍声称证明相同范围；不能把“unit 全绿”写成“发布全绿”；不能因删了 trace 登记器就宣布原来的 GAP 已闭合。
 
-现行规范确实要求固定整串命令、clean build、proof-level 登记及完整 trace。它们不是改一段 npm script 就能合法绕开的实现细节。本次只提出修订方案；实施时将下面的合同调整与对应代码／测试作为同一项工作对齐。
+测试文件不是处置单位，断言才是。混合文件里的一条脆弱断言不构成删除整个文件的依据。
 
-| 文件与条款 | 修订要点 | 不改变的部分 |
+## 4. 删除与替换清单：验证体系自身
+
+以下清单以已经读到的实现为依据。路径省略的共同前缀是 requirements/verification-system/tests/。后续施工时先读整个目标文件，保留本表没有授权删除的行为。
+
+| 文件／用例 | 动作 | 删除理由／保留落点 |
 |---|---|---|
-| verification-system/WHAT.md：001 | 固定“必要证明层”的语义，不固定 shell 原文；明确日常与发布入口；删除精确标题的层级授权登记 | 发布仍有完整证明顺序，每个实际步骤恰一个执行属主 |
-| verification-system/WHAT.md：008 | 新鲜度改为输入与输出内容相符；允许可信增量 | 测试必须消费当前生产字节，不能偷跑旧产物 |
-| verification-system/WHAT.md：010 | 允许有依据地撤销低价值检查；不再以门禁个数或旧 baseline 的存在限制删减 | 真实产品断言不能为变绿而放松，范围调整须明确说明 |
-| verification-system/HOW.md | 更新入口、缓存、报告、构建凭据及测试落点 | 不把计划写成已经验证过的事实 |
-| distribution/WHAT.md：005 | 日常允许增量；发布明确 clean；两者都要求同一批已验生产字节 | 不重新编译后直接发布未经测试的新 dist |
-| distribution/WHAT.md：007 | 发布属主改为 verify:release；从只展示 dry-run 改为一次真实 pack、内容与解包消费验证 | 代码和资源的完整交付闭包 |
-| requirement-system/WHAT.md：006、016、017、018 | 去掉全仓文书布局、依赖骨架与精确测试标题的常驻构建门禁；HOW 保留导航作用 | WHAT 的规范权威、命题归属、ID 稳定、真实问题不能被假称关闭 |
-| js-semantic-surface、verification-system 中的 Surface 合同 | 保留公开契约入口与实现隔离，删除精确证明登记授权 | 不开放深层 dist 私有导入，不复活兼容 facade |
-| degeneration-guard 的 DG-004 及 HOW | 日常允许经当前语料内容凭据复用；真实全仓独立重算放在发布层 | 数值仍来自当前仓库，不回填手写数值快照 |
-| 各退役门禁的 owner HOW | 以实际行为测试替代旧 checker 落点，删除已失效的精确引用 | 产品命题和已经存在的有效回归 |
+| degradation-list.test.mjs | 退役整文件及专用文案解析链 | 重复固定 14 条中文、ID 对、顺序和行号；不是 watchdog 证明 |
+| e2e/support/degradation-list.mjs | 随消费者迁移后删除 | 规范散文不应成为运行测试的数据库；先移除 harness 的“每项必须有 case 引用”关联 |
+| proof-ladder.test.mjs 的命令 exact string 断言 | 删除写法锁定 | package 入口可有薄封装；保留实际 plan、顺序、选区和失败传播 |
+| proof-ladder.test.mjs 的 releaseOwnershipViolations | 删除字符串计数器与 duplicate 字符串 mutant | 用真实调度结果证明每个 leaf 只执行一次，不数代码中出现几次路径 |
+| proof-ladder.test.mjs 的 wiredGates 正则 | 删除源码数组解析 | 检查实际导出的阶段／检查列表及实际执行，不要求 const checks 的某种布局 |
+| proof-ladder.test.mjs 的输入快照 spy | 立即替换 | 当前没有制造输入变化，正是空证明 |
+| reporter-supervision.test.mjs 的 single leaf completion | 替换测试内镜像函数 | 新测试直接导入实际运行路径用的状态函数；再通过真实 child 验文件完成 |
+| reporter-supervision.test.mjs 的 stream error | 替换独立 mock runner | 向真实 drain 函数注入抛错事件流；真实 supervisor 验证非零和无 drained |
+| reporter-supervision.test.mjs 的 compact/verbose 比较 | 保留但加强 | 两套同错也会相等；必须同时等于手写的精确期望计数，并检查失败内容 |
+| reliability-runbook.test.mjs | 删除目录标题和 API 文案断言 | 留操作手册，不让改写自然语言触发测试；incident 的脱敏数据断言迁到证据导出／重放测试 |
+| guide-contract.test.mjs | 拆分后退役大部分 | 删除“旧模块导入必须失败”和精确导出名单；真实模块闭包归 build；独立数据／调用约束迁领域 suite |
+| domain.meta.test.mjs | 按领域搬迁、比较后去重 | 文件名像 meta，内容却有 deadline 时区、codec、重放、provider failure 行为，不能整体删除 |
+| no-line-count-check.test.mjs | 建议随规范修订退役 | 不再用一个扫描器检查“没有另一种扫描器”；行数政策仍由规范说明，不新建反治理门禁 |
+| js-boundary-gate.test.mjs | 去掉重复真实全仓扫描，保留窄反例 | 未授权 deep import 和表示泄漏仍应被实际保留门禁拒绝；不要重复跑同一整仓现状 |
+| build-freshness.test.mjs | 保留、补运行中污染与 fixture 隔离 | 内容凭据是日常增量的前提，不是治理装饰 |
+| integration-entry-coverage.test.mjs | 保留、调整成 daily/release 集合测试 | 发现测试必须有一个可运行入口；缺失、重复、悬空都要能红 |
+| verdict-feed.test.mjs、strict-mock-signals.test.mjs | 保留 | verdict 续期、background 不续期、waitAny 取消与监听器清理有独立失败价值 |
+| scenario-turn-registry.test.mjs、temporal-harness.test.mjs | 保留真实时序行为 | 不因“测 harness”而删去防假绿、重放和因果一致性证明 |
+| walk-fail-closed.test.mjs | 保留 | 缺根、不可读目录、符号链接等不能悄悄缩小扫描集合 |
 
-若实施者发现某条拟删规则还承载未覆盖的产品命题，应先补该命题的测试，不能把“用户要求精简”解释为允许降低产品正确性。
+guide-contract.test.mjs 中的 200 KiB 等数值有可能是产品边界，不应随旧模块名断言一起删除。先把真实大小边界转入拥有该语义的测试，使用临界值前后两个输入证明，再删除原断言。
 
-proof-ladder.test.mjs 中以下测试直接撤销，而不是修改常量继续维持旧观念：
+domain.meta.test.mjs 的具体转移：deadline 偏移／时区到 process-execution；Journal 和 Fact codec 到 durable-events；context 重放到 context-compression；provider failure 去重和预算到 provider-attempt-recovery。没有相同反例的先搬原行为，不把“同一个 WHAT 已有测试”当作重复证明。
 
-- wired gate count has a non-shrinking floor。
-- 对 format-build-test 整串字符串、Wireit.files 数组原文和 checks 数组写法的深度全等。
-- 对 process.exit 表达式原文的正则检查。
-- checks 目录必须等于 wired 集合加一张例外清单的自我治理。
+## 5. Surface 测试：先删重复，再删登记治理
 
-替代测试验证真实执行结果：阶段失败后停止、缺失程序非零、release 包含唯一物理入口、没有重复 warmup／pack、选定套件发现完整、构建失败不能继续 unit。不要再用另一段字符串解析器检查新的编排器写法。
+落点：requirements/js-semantic-surface/tests/surface-charter.test.mjs、scripts/checks/js-surface-manifest.mjs、scripts/lib/test-surface-scan.mjs。
 
-## 6. 目标命令与执行顺序
+### 5.1 17 项现有测试的逐项取舍
 
-### 6.1 package.json 目标形状
-
-以下是接口设计，不是已经存在的命令：
-
-```json
-{
-  "scripts": {
-    "format-build-test": "node scripts/verify.mjs",
-    "verify:release": "node scripts/verify.mjs --release",
-    "format": "dotnet tool run fantomas src/Wanxiangshu",
-    "format:check": "wireit",
-    "check": "wireit",
-    "build": "node scripts/build.mjs",
-    "build:clean": "node scripts/build.mjs --clean"
-  }
-}
-```
-
-取消 build 外层 Wireit。构建的失效判断由现有 owner-compile 及统一构建凭据负责，不让外层文件缓存与内层增量状态争夺所有权。Wireit 仍可服务于无输出的只读格式／静态检查，不因要收口构建就替换整个工具链。
-
-取消 format 的写入式缓存。用户主动执行 format 就运行格式化；日常总入口只运行 format:check，不修改提交内容。
-
-### 6.2 日常入口
-
-```text
-format-build-test
-  1. format:check
-  2. check
-  3. build：无变化复用；有变化按已证明的增量范围编译
-  4. unit：全部保留下来的产品／验证基础设施回归
-  5. integration：必要 Host、Git、进程、持久化、资源与工作区分发契约
-  6. 核对本次构建 generation 与输入未变化，输出总结果
-```
-
-只减少不需要每次支付的证明，不偷偷把 unit 改成“只跑改动目录”。修改实现即使不改变 .fsi，也可能影响远处消费者的运行行为，所以第一版仍跑全部保留的 unit。
-
-### 6.3 发布入口
-
-```text
-verify:release
-  1. format:check
-  2. check
-  3. build --clean：真实全量 Fable 编译，不接受 no-op
-  4. 与日常相同的 unit
-  5. integration --release
-       日常物理契约
-       + 编译器边界 canary
-       + 全仓 LoopDetectorEnvelope 独立重算证明
-  6. 唯一 Long Stroke
-  7. verify-package：一次真实 pack、解包与消费验证
-  8. 再核对 generation、输入与打包字节一致，输出总结果
-```
-
-不要实现成“先调用 format-build-test，再 clean build，再重跑所有测试”。两个入口共享同一个固定阶段定义，构建模式不同，发布增加少数步骤；一次调用只构建一套待验证字节。
-
-OpenCode warmup 仍由 integration 的唯一属主执行一次。没有用到 Host 的纯资源检查不需要为自身增加 warmup。Long Stroke 不分池、不重试、不启动第二个世界。
-
-### 6.4 CI 与单独运行
-
-.github/workflows/ci.yml 的最后一步改为 npm run verify:release。若将来另设快速 PR 检查，它不能替代合并／发布所需的完整结果；本轮不增加一套复杂 CI 分流。
-
-已有 requirement 文件的定向执行能力保留。定向执行必须显示范围，不能输出“全仓验证通过”。完整入口拒绝 TESTS_MJS_FILES、跳过新鲜度、意外 name pattern 等缩窄验证范围的外部设置；runner 自测所需的受控 fixture 调用仍通过自己的正式测试入口进行。
-
-本地 Node 26 通过不能替代 CI 的 Node 20。新 reporter 与子进程协议先以 Node 20 可用接口设计，并在两种环境验证；不为本次精简顺带升级最低 Node 版本。
-
-## 7. 程序落点：复用已有工具，只补缺失边界
-
-### 7.1 文件职责
-
-| 文件 | 改动 | 唯一职责 |
+| 标题中的稳定部分 | 动作 | 接替方式 |
 |---|---|---|
-| scripts/verify.mjs，新建 | 解析 release／verbose／profile，按固定阶段调用现有入口 | 整次验证的执行顺序与最终结论 |
-| scripts/check.mjs，改造 | 导入保留检查，创建一次 context，返回结构化诊断 | 静态检查编排，不再维护 34 个子进程 |
-| scripts/lib/check-context.mjs，新建 | 本次调用内缓存文件列表、文本和工程清单 | 同一输入只读一次，不跨运行持久缓存 |
-| scripts/build.mjs，改造 | 支持普通／clean，持有写锁，运行编译、派生和后置验证 | 生产构建的唯一成功提交点 |
-| scripts/lib/owner-compile.mjs，改造 | 修正失效范围与输出维护，返回编译结果 | Fable 编译规划与执行，不自行宣布整次构建成功 |
-| scripts/lib/compile-shards.mjs，复用 | 提供检查与规划共用的清单数据 | 工程、源文件、签名与引用的唯一事实集合 |
-| scripts/lib/build-state.mjs，新建或从 owner-compile 精确抽取 | 统一读取、验证、失效、提交现有 build-manifest | 构建与测试共用的新鲜度规则 |
-| scripts/lib/derive-loop-detector-envelope.mjs，改造 | 少一次排序，修正并行度 API，允许内容相同复用 | 当前语料到唯一 envelope 产物的派生 |
-| tests/support/build-freshness.mjs，改造 | 调用 build-state 的只读验证 | 适配测试入口，不再自建 mtime 规则 |
-| tests/support/run-inner.mjs，改造 | 保留进程隔离和环境隔离，调整 reporter／错误处理 | node:test 事件源 |
-| tests/support/compact-reporter.mjs，新建 | 从结构化事件生成默认／详细输出 | 显示，不决定通过或喂 watchdog |
-| tests/e2e/support/supervise-node-test.mjs，改造 | 保留外部监督，返回准确结果与诊断 | 测试进程生命期、完整性、挂死和失败 |
-| tests/support/integration-node-test-steps.mjs，改造 | 只为少数发布专属文件标记 releaseOnly | 测试文件唯一接线表，不登记每个测试标题 |
-| scripts/verify-package.mjs，新建 | 一次 pack、检查内容、解包后消费 | 真实发布 artifact 验证 |
+| JS_SURFACE_001_all_semantic_tests_are_mjs | 合并到一次测试发现／边界扫描 | 不单独再 walk 全 requirements；保留不支持测试后缀的负例 |
+| JS_SURFACE_002_forbidden_patterns_absent_from_semantic_tests | 不在 unit 重复全仓现状扫描 | 正式 check 已承担实际门禁；unit 保留 scanner 反例 |
+| JS_SURFACE_002c_whole_semantic_test_zone_is_scanned | 保留 | 临时 support/.mjs/.js 里的越界应被发现；这是扫描范围的真实反例 |
+| JS_SURFACE_003_law_owner_surface_registry | 过渡期作为三次扫描的唯一一次；终态归 build | validator 自测不再读真实仓库 |
+| JS_SURFACE_003_every_registered_surface_has_a_contract_test | 删除重复调用 | 与上一项同函数、同输入、同输出；没有第二个错误模型 |
+| JS_SURFACE_002b_registered_surfaces_exist_in_the_production_source_tree | 删除重复调用 | 源文件缺失的能力由 fixture 反例证明，实际仓库由 build 校验 |
+| JS_SURFACE_003_manifest_rejects_unemitted_or_unauthorized_evidence | 改名、缩小 fixture | 已读实现的反例是删除 dist，保留 missing emitted；标题不能继续声称测了所有授权 |
+| JS_SURFACE_004_helper_not_directly_tested | 删除“helper 必须有 law”的治理部分 | helper 中的 deep import 仍由实际边界扫描递归覆盖 |
+| JS_SURFACE_005_js_native_representation_rules | 保留，整理成纯数据表 | validator 是边界工具；把 bad DU、日期、非普通对象等反例放在一处 |
+| JS_SURFACE_006_fable_representation_not_contract | 删除按隔离名单文件内容猜用途的断言 | 是否有 quarantine 由明确执行目的决定，不看文件是否写了 FSharp/dist 等词 |
+| JS_SURFACE_006_emitted_relative_imports_are_package_closed_and_named_exports_link | 保留 | 调用实际 validateModuleLinkage；缺模块、缺导出和逃出 dist 的 fixture 有价值 |
+| JS_SURFACE_002f_template_dist_import_is_detected | 保留 | 防模板字符串绕过 import 边界扫描 |
+| JS_SURFACE_004b_support_to_support_transitive_edge_is_scanned | 保留 | 防 support 链绕过扫描 |
+| JS_SURFACE_003c_usesSurface_rejects_dead_string_and_recognizes_active_imports | 在取消静态 proof authority 后删除 | 不是产品行为；不再对测试作者的调用闭包发证明许可证 |
+| JS_SURFACE_003f_shadow_and_nonterminal_alias_cannot_forge_surface_use | 同上 | 不保留只服务于退役 authority 计算的 scope 引擎测试 |
+| JS_SURFACE_003d_manifest_rejects_unauthorized_active_consumer | 随测试包 consumer 授权登记一起退役 | 不影响产品运行时权限；语义测试可通过正式公共 surface 验跨域合同 |
+| JS_SURFACE_003e_manifest_rejects_stale_consumer_metadata | 随 SURFACE_CONSUMERS 生命周期退役 | 不留下已不再参与决策的登记表和检查 |
 
-表中的 tests/support 等缩写均位于 requirements/verification-system/tests 下；包专属测试继续放在自己的 requirements/<owner>/tests 中。
+上表后五项中涉及取消 proof authority 的动作，必须先修订 JS-SEMANTIC-SURFACE-003。当前 WHAT 明确要求静态可达 callback 闭包，因此不能先删除实现、再解释“只是优化”。第一步删除两次完全重复扫描不需要改变此语义。
 
-不再额外建立 Scheduler、GateRegistry、ProofStore、CacheProvider、PolicyEngine 等类。固定的几步流程用数组和函数足够。不要为一个输出行引入日志级别配置系统。
+### 5.2 推荐终态
 
-### 7.2 检查接口
+Surface 清单只管理物理接口边界：哪些模块是合法公共 surface、对应哪个生产源文件、跨边界用什么数据表示。必要时保留 owner 作为领域归属，但不再用 laws、lawOwners、consumer 包名和测试 callback 静态分析授予证明权威。
 
-保留检查统一返回数据。模块导入不运行 CLI、不打印成功、不调用 process.exit、不跑内部 fixture。
+运行时权限仍由生产 Capability/Authority 和实际拒绝测试守卫。不要把“测试文件属于哪个 requirements 包”混同为产品调用者的权限。
+
+真实仓库上的校验只由 build/post-build 持有一份。结构反例放在 unit：manifest 非数组、重复模块、缺 source、未编译 source、缺 emitted module、非法相对路径、导入缺失和解析失败。
+
+删除 active-use 分析前，查清 analyzeSurface、usesSurface、importsSurface、proofHasLaw 等导出的实际调用。仍被必要扫描器使用的语法能力留在 scripts/lib/js-syntax.mjs；不能为了删一个治理 validator 把所有 JS import 解析也一起删掉。
+
+### 5.3 即使暂不修订合同，也能先省掉什么
+
+先做两件无争议的事：三次全仓 validator 变成一次；把同一调用内 WHAT 文档解析缓存为 Map<package, lawIds>，而不是每个 surface/law 重新读文件。暂时保留的 callback 分析只解析每个测试文件一次。
+
+不要建立磁盘级“测试证明缓存”。本次内存快照用完即弃；删除文件、换 fixture 根、修改内容后不能继承上一轮扫描的绿色结果。
+
+## 6. 源码与文档形状测试：按断言拆，不按文件扫光
+
+### 6.1 已精读的典型：boundary-exemption-ratchet.test.mjs
+
+路径：requirements/structured-workflow/tests/boundary-exemption-ratchet.test.mjs。
+
+直接删除以下七项的文案／注释断言：
+
+```text
+McpContract_fs_carries_not_a_scheduler_comment
+EPI_013_WHT_records_protocol_boundary_exemption
+SW_017_WHT_records_protocol_boundary_exemption_conditions
+CHGINT_006_WHT_states_no_fold_and_no_ResumeAtXxx
+SW_003_WHT_carries_SW003_vs_SW009_disambiguation
+CHGINT_HOW_restates_no_fold_constraint
+RETIREMENT_WHT_documents_retirement_dispatch_and_blockers
+```
+
+它们分别锁英文注释、中文解释、章节消歧、HOW 重述和条款名出现。产品 continuation、持久化、退休流程不因这些文本匹配而被证明。
+
+其余三项先替换：
+
+| 旧用例 | 真实回归应怎样写 |
+|---|---|
+| production_source_has_no_ResumeAtXxx_durable_log_pattern | 调用实际重放／义务查询入口，给定中断前事实与新物理观察，检查重新推导的义务，不依赖恢复地址字段 |
+| SuicideTool_fs_defines_spec_executePrepared_and_retirement_freeze | 调实际 tool handler；无 Finality 权限时拒绝且不产生 effect，有权且满足条件时才可进入退休 |
+| SuicideTool_fs_freezes_retirement_without_session_abort | 通过真实边界 port 记录因果 trace，验证 freeze 在后续检查前；任何分支不得产生 session-scoped abort |
+
+替换测试优先放在 relay-retirement 的现有 suite，而不是新造 verification-system 通用 façade。缺少测试入口时，只开放领域已有承诺的窄合同面，不导出内部状态机全部字段。
+
+### 6.2 源码检索发现的下一批候选
+
+以下文件已命中明确的源码字符串断言，但本轮没有逐条读完其中全部测试。因此这里授权的是“定位并替换命中的断言”，不是批量删除整文件。未核实的其他断言默认保留。
+
+| 文件 | 已见问题 | 实施落点与接替行为 |
+|---|---|---|
+| structured-workflow/tests/error-handling-vocabulary.test.mjs | 检查 TaskResultBuilder、TryFinally、Using、While、For 和 open 的写法 | 用真实 Fable builder 执行 success/error/throw/dispose，验证结果与清理；语法存在由编译器决定 |
+| obligation-ledger/tests/obligation-ledger-workflow-contract.test.mjs | 检查 task/taskResult 与 let!/return! 字符串 | 验实际顺序、typed Error 短路与 effect 不发生 |
+| obligation-ledger/tests/magic-todo-after.test.mjs | 检查 Error/Ok 分支、TodoWriteAccepted、enrichAcceptedResult 名字 | 注入 capture 拒绝/成功，验持久化、返回值和后续动作是否发生 |
+| effect-accounting/tests/pre050-effect-marker.test.mjs | marker 在源码中存在 | 将真实旧输入交 decoder，验 typed rejection；旧输入合同未退役前不删拒绝能力 |
+| durable-events/tests/hook-dispatcher.test.mjs | 检查 HookKind、fetch、remoteTracking 与函数签名文本 | 调 hook dispatcher，核验传给 Git/transport 的精确命令和错误处理 |
+| durable-events/tests/event-store-journal-writer.test.mjs | 检查 store.Append 名字 | 验 append 成功前无内存权威推进；失败后不产生后继事实 |
+| durable-events/tests/event-store-append.test.mjs | 检查若干 FatalProcess.trip 字符串 | 用隔离进程或真实注入 fuse 验语义损坏时 fatal 分类及 durable aftermath |
+| durable-events/tests/local-process-event-log.test.mjs | 检查 AppendAllText/appendFileSync、目录变量名 | 写两条真实事件后检查追加字节、重启可读、尾部损坏处理 |
+| durable-convergence/tests/writer-retention.test.mjs | writer-manifest、版本字面量、BlobOid/LastActivityMs、nextExpiry 文本 | 以虚拟时间和真实 retention 入口验到期／未到期／重新活跃的行为 |
+| durable-convergence/tests/writer-stream-sync.test.mjs | WriteBlob、WriterId、materialize 的源码词汇 | 以两端实际状态证明 sync 后收敛、重复 sync 幂等、损坏失败 |
+| speculative-investigation/tests/dry-run-shadow.test.mjs | 检查 CreateChildSession/Detached 等名字 | 用实际 lifecycle port trace 验 shadow 与 live effect 分离 |
+| interaction-authority/tests/terminal-policy.test.mjs | 检查 Role.Manager 与父子关系变量名 | 对顶层 manager、linked child、非 manager 输入做实际 terminal policy 表驱动测试 |
+| participant-horizon/tests/horizon-surface.test.mjs | 检查 HandleProjection.horizonVisible 名字 | 直接验证两个身份看到的 public projection，不凭调用名断言隔离 |
+| work-record/tests/work-record-sections.test.mjs | 源码包含标题、旧标题不存在 | 验真实 render 的完整 section 结构与空段省略；用户可见标题确属协议时保留精确值 |
+| delegation/tests/delegated-tool-estimate-surface.test.mjs | 检查 Set<ToolCallId> 及 forbidden token | 用重复 ToolCallId 输入验不重复计数；跨边界只返回必要投影 |
+| intra-participant-parallelism/tests/fission-source-ratchet.test.mjs | 源码调用／命名守卫 | 先核查现有 fission-domain 和 lifecycle 行为；只删除有接替的形状断言 |
+
+这一步不改 production 算法来迎合测试。原实现若本来正确，只调整测试入口和输入；若新行为测试暴露真实缺陷，单独修根因并记录旧败新胜。
+
+### 6.3 不能误删的“看起来也像静态检查”
+
+ProjectReference DAG、每份源码的唯一归属、.fsi 配对、禁止遗漏编译输入，是多工程构建的真实结构合同，仍需校验。已有 delegation 的闭包数字预算写进了 WHAT，不能当作普通重复测试擅自取消；要调整数字政策时，另行同步该条款，不在本轮顺手抹去。
+
+同样，provider 资源内的字段语法、占位符、locale 配对和禁止泄漏的内部标识，属于产品输出边界，不是普通说明文档。测试恰好读取 .md，不是删除理由。
+
+## 7. 规则库与领域测试的重复准备
+
+### 7.1 已确认的重复
+
+requirements/behavior-diagnosis/tests/catalog.test.mjs 与 tip-v2-contract.test.mjs 都验证真实 120 项目录、名称集合、字段对应关系。catalog.test.mjs 内又通过 rules() 多次取得相同真实资源。
+
+tip-v2-contract.test.mjs 不是纯治理文件。它还验证 missing tip、unknown tip 映射、重复 cycle 拒绝、RecentTips 的长度与顺序、squash 边界、pairing 和 assistant-step protocol。不能因开头两项重复就删整文件。
+
+### 7.2 明确迁移表
+
+| 现有内容 | 目标 |
+|---|---|
+| TIP_01、TIP_02_and_16 的真实目录计数／集合重复 | 在 catalog 的一次实际资产合同中合并，删重复用例 |
+| catalog 的 ruleId/fieldName/ordinal/nonempty 检查 | 同一加载结果上做多个清晰断言；失败指出 ruleId，不反复读目录 |
+| TIP_05/06/07 与 codec 的类似解码 | 逐条对照输入与拒绝种类；只有完全等价的才删，保留未知 tip、空值和精确映射的不同边界 |
+| TIP_08–12 的重复、顺序、cap、squash | 迁入 observation 所属行为文件或保留原文件；不再为选一个字段重复加载 120 项目录 |
+| TIP_13/14 与 observation-pair/projection 的重叠 | 比较 exact input/output 与边界；保留唯一的未配对项和 cycleId 反例 |
+| TIP_15 的 0/1/多 call protocol | 与 enforcer-cycle-protocol.test.mjs 对照；保留完整分类结果，不退化成 acceptedCalls 的真值断言 |
+| 旧字段 Scores/family/catalogOrdinal 不存在 | 若只记录迁移史则删除；若字段泄漏仍是当前序列化禁令，则在真实 DTO 输出里校验一次 |
+
+120 的产品目录合同与“至少要有 N 个测试”不是一回事。当前产品仍承诺目录数量时，保留一个权威资产测试，不把数值变成 rules.length 与 rules.length 的自我比较。
+
+### 7.3 夹具设计
+
+真实资产测试每个 suite 只加载一次只读资源。测试不修改共享资源；需要变更资源的用例使用独立临时根，不能修改真实 resources/ 再恢复。
+
+纯 decoder／fold 测试优先使用明确的小输入。字段必须来自产品合法有限域时，使用一个稳定的合法例值；不要为了获取一个可用 ruleId 调用五次 fieldNames()。当测试的目的就是校验资源加载或资源变化，应继续走真实 loader，不能缓存掉待测读取。
+
+scope 只到 suite／file，不做跨 worker 全局对象缓存；不得共享 journal、runtime、随机生成器、临时时钟或可变 host mock。共享不可变 fixture 不等于共享被测状态。
+
+## 8. harness 的 279 项：删自证，留下执行可靠性
+
+### 8.1 单独算账
+
+requirements/verification-system/tests/integration/harness/run.mjs 有自己的 allCases、worker、Watchdog 和结果打印。这 279 项不会被修改 compact-reporter.mjs 自动优化。
+
+终态不急于把它们全部翻译成 node:test。先在现有 runner 上删除无价值 case、隔离日志、返回结构化结果；强行一次性迁移会把执行生命周期也改掉，反而扩大风险。
+
+### 8.2 可直接退役的治理链
+
+| 位置／已运行的 case | 动作 | 理由 |
+|---|---|---|
+| single-source-cases.mjs 的四个 cardinality scanner case | 整组退役，删除专用扫描器 | 通过变量名、英文复数规则、数组字面量猜两个概念是不是同一数量；成本主要是维护扫描器 |
+| source-cases.mjs：every retired field names its replacement | 删除 explanation 长度 >20 等断言 | 解释长短不决定拒绝行为 |
+| source-cases.mjs：retired vocabulary is reported before structural problems | 取消诊断先后写法锁定，保留明确拒绝与定位 | 用户需要知道哪里错，不需要固定错误被哪段旧迁移说明先报告 |
+| mutation-cases.mjs 中 K10 enforcing symbol／case／presence table 三项 | 退役 presence 自证 | 不能用符号、case 名和表存在代替真实拒绝；先保留下方实际 mutation 行为 |
+| degradation-cases.mjs：every forbidden degradation has a covering case, and every citation resolves | 退役文案到 case 登记关联 | 不维护第二张 proof completeness 数据库；具体挂死和续期反例保留 |
+| path-criterion-cases.mjs 的源码路径猜测器 | 用实际入口的 missing root／unwired file fixture 替换后退役 | 运行配置在运行时验证，不再解析三种方法和三种引号风格 |
+| 多处 every scenario in forest compiles | 合并一次真实森林加载 | source-cases 与 forest loader 已有重复；反例中的坏文件、漏文件仍保留 |
+| stages 的精确打印次数／输出 marker 子串约束 | 在迁移到明确 stage 事件后删除 | 不能直接先删；若当前 Host 就绪识别还靠这些 marker，先完成事件接线 |
+
+不是所有带 retired 字样的 case 都应退役。source-cases.mjs 调真实 compileScenario 拒绝未知／旧输入字段的测试，是输入边界证明。应把零散历史名字整理成“未知字段与不支持语法拒绝”的小表，保留真实 parser 调用，而非全部删除。
+
+### 8.3 明确保留的行为族
+
+保持 schema 编译的拒绝能力：重复键、模糊声明、悬空 fault/wait、错误 runtimeStep、非法 optional/must、坏 TOML、部分结果不能流出。
+
+保持 runtime 匹配：同输入确定性、最长合法前缀、歧义拒绝、不同 lane/step 隔离、retry 复用相同内容、seal 的追加与重写边界。
+
+保持物理契约：子进程 HOME/环境隔离、临时目录与 listen(0)、健康检查期限、进程回收、SSE 重连、监听器释放、未完成 child 与非零退出。
+
+保持 watchdog 的可红性：持续打印不能续命；真实 verdict 能续命；绿 verdict 后泄漏 handle 仍失败；结束干净不能被 watchdog timer 拖住；timeout 前有诊断。
+
+没有逐项核实的其他 harness case 暂时保留。本表不授权把 arch010、schema、delivery、runtime-key 等整组按名字删除。
+
+## 9. 先补运行器的真证明，再精简其他测试
+
+### 9.1 让 verify 在 fixture 中运行，而不是只让 spawn 返回成功
+
+主要修改 scripts/verify.mjs。保留固定执行顺序，不另造可配置工作流框架。将当前耦合的三件事分开：确定阶段、执行阶段、展示结果。
+
+建议接口如下。名字是目标设计，不是当前已存在的 API。
 
 ```js
-/**
- * @typedef {{
- *   code: string,
- *   path?: string,
- *   line?: number,
- *   message: string
- * }} CheckIssue
- */
+export function verificationSteps({ root, release }) { /* 固定阶段数组 */ }
 
-// 示例接口；不要求为每条规则再包一层类。
-export function check(context) {
-  return {
-    issues: [],
-  }
-}
+export async function verify({
+  root,
+  release = false,
+  verbose = false,
+  runStep,
+  output,
+  logDirectory,
+}) { /* 实际采集输入、执行固定阶段、比较输入、返回结果 */ }
 ```
 
-scripts/check.mjs 先建立工程结构，再执行依赖该结构的规则。清单损坏、源目录缺失、读取失败立即失败，不将空集合交给后续检查伪装为“没有问题”。结构正常时，彼此独立的检查可以一次报告全部违规，按 path、line、code 稳定排序。
+CLI 为这些参数提供真实默认值；测试提供临时 root、内存 output 和临时 logDirectory，只替换物理 runStep。不要注入一个永远相同的 snapshot，这会再次绕过最需要验证的部分。
 
- CLI 最外层根据结果设置退出码。常规违规为 1；参数错误为 2；信号退出保持 130／143。不可启动、不可读取、解析失败不能返回成功。内部检查不自行结束整个进程，便于组合和回归测试。
+建议结果包含 mode、stages、outcome、inputChanges、wallMs、logDirectory。库函数返回结果，不调用 process.exit；CLI 只在最外层设置 process.exitCode。失败后不执行后继依赖阶段，保留尚未执行阶段为 not-run，不能把较短的 results 数组渲染成全流程完成。
 
-### 7.3 检查 context 的范围
+verify 本身就是唯一阶段顺序来源。测试断言关键因果关系与实际调用轨迹：format/check 失败不构建；build 失败不测试；日常不运行 release leaf；release 的 build 带 --clean；每个测试／包步骤一次。不要另抄一份规范表再验证两张表相等。
 
-推荐只包含这些实际需要的能力：
+### 9.2 输入快照的正确范围
+
+复用 scripts/lib/build-state.mjs 已有 collectCompilerInputs、collectGeneratedInputs、collectArtifactInputs 和 computeDigest；另收测试运行所需的 verification inputs。收集器可以放在同模块，避免为一件事新增配置平台。
+
+verification inputs 至少覆盖实际使用的测试／support／fixture、scripts、资源、工程与签名、工具配置、package.json/package-lock.json、格式配置及 CI 配置。构建输入与验证输入有重叠是正常的，最终按规范化相对路径去重；不要把“只有两个 package 文件”误写成整个树的过滤条件。
+
+快照是排序后的路径集合与逐文件内容摘要，不是最大 mtime，不是文件总数。目录成员增删必须可见；未跟踪但会被测试发现的源码或 fixture 也必须可见。生成物、日志、node_modules、.git 内部文件不作为验证源再次递归输入；依赖版本通过 lockfile 与实际运行环境标识记录。
+
+收集器必须拒绝缺少必要根和读取失败，不能 catch 后给空集合。两个空快照相等不构成成功。路径选择和数据摘要分开测试：前者验覆盖集合，后者验内容变化。
+
+新增永久回归建议放 requirements/verification-system/tests/verification-inputs.test.mjs：创建最小仓库 fixture，包含 src、scripts、requirements、resources、.github、package 文件和构建配置。fake runStep 在指定阶段真正执行 writeFile、rename、unlink；最终必须得到 input-changed 和非零。不同测试各用独立目录，不能碰用户真实源码。
+
+用例包括：修改 .fs、.fsi、测试、support、运行资源、package-lock；新增被发现的测试；删除一个输入；只修改忽略的日志；读取失败；根路径错误；同大小同 mtime 内容被替换。既测收集集合，也测整条 verify 结果。
+
+前后快照只能发现端点变化，不能保证发现中途修改后又恢复的 ABA。本文不把它称为文件系统事务。正式 release 应在 CI 的隔离工作区运行；本地边编辑边验证出现污染应失败，但没有隔离就不能承诺对所有并发写入具有强一致性。
+
+### 9.3 消除 --skip-staleness-check 的默认旁路
+
+当前 verify 已构建后仍向 unit 传 --skip-staleness-check。先修正快照，再让正式 unit 走 assertBuildFresh 内容验证。对于目前规模，一次正确的 hash 校验比维护“相信父进程”的隐式协议简单。
+
+后续只有测量证明 hash 重复形成瓶颈，才考虑把同一不可变构建凭据向子进程传递；不能凭环境变量 BUILD_OK=1 绕过。测试自己要求跳过新鲜度的 runner fixture 必须明确标注为基础设施自测，不得流入正式日常／发布 verdict。
+
+### 9.4 覆盖率分支也必须走真实入口
+
+先修正 run-inner.mjs 的相对 import 与 run.mjs 的仓库 root。然后用最小实际项目／runner fixture 驱动 --coverage，而不是只验证 parseCoverageThreshold。
+
+证明三个事实：未加载的生产模块仍在分母里；发生模块导入错误不能继续报告好看的百分比；产物摘要写到指定目录且低于阈值确实返回非零。要用实际 Node 进程验证父 runner 的预导入如何进入 worker 覆盖率汇总，不凭注释假定它有效。
+
+本轮没有跑 coverage，因此这里只认定上述路径错误和测试覆盖缺口，不宣称已核实覆盖率数值。覆盖率继续保持显式选择，不为了这轮精简把它强塞进每次日常链，也不取消现有分母合同。
+
+## 10. 一个统计属主，显示不参与判定
+
+### 10.1 当前双计数为什么必须结束
+
+现在 run-inner 把原始事件发给父进程，又把同一个流交 reporter。reporter 自己识别叶子、suite 和文件 wrapper；supervisor 则直接数所有 test:pass/test:fail。多写一份逻辑没有增加可靠性，只产生了本次 3660/3661 的分歧。
+
+终态由内层实际消费 TestsStream 的一份状态计算结果，reporter 只显示，supervisor 只监督其生命周期。父进程仍有独立失败权：child 崩溃、静默超时、backstop、缺少结束确认、日志写失败，都可以使整层失败，不能被内层的 green summary 抵消。
+
+### 10.2 最小程序落点
+
+新增 requirements/verification-system/tests/support/test-run-state.mjs，集中放事件规范化和累计状态；不要再建立 event bus。run-inner.mjs 调用它，compact-reporter.mjs 消费它的结果，reporter-supervision.test.mjs 直接测试同一函数。
 
 ```text
-createCheckContext(root)
-  sourceFiles()                 一次发现 .fs/.fsi/.fsproj
-  testFiles()                   一次发现测试与支持模块
-  resourceFiles()               一次发现当前资源
-  readText(relativePath)        Map 缓存本次读取
-  readFSharpCode(relativePath)  保留行位置的去注释视图，仅按需计算
-  compileInventory()           一次解析工程与归属
+Node TestsStream
+  → 版本适配／事件规范化
+  → 一个 TestRunState
+      ├─ 进度通知 → supervisor watchdog
+      ├─ 失败详情 → renderer／本次日志
+      └─ 完成结果 → renderer + supervisor
 ```
 
-文件列表使用一致的排序和忽略规则。新加入、尚未 Git add 的生产源文件也必须参加“磁盘源文件是否纳入工程”的检查；不能因为 Git 没跟踪就让未编译的源文件消失。
+规范化结果至少区分叶子结束、文件结束、容器失败、输出、诊断和运行器错误。测试名不能当唯一 ID；不同文件同名、同文件 nested subtest、suite 容器都可能存在。身份以文件、实际父子关系及该运行中的事件身份组合，不把标题当主键。
 
-词法工具复用已有 scripts/lib/fsharp-source.mjs 等实现，先核对其支持的字符串／注释形式，不再复制多个略有差异的去注释器。不把有限词法扫描宣传成 F# 类型或控制流分析。
+文件完成必须来源于真实文件执行完成事件，不能因为其中一个 test:complete 到达就移出 outstanding。也不能用 file.endsWith(testName) 之类后缀判断：一个恰好叫文件尾部名字的叶子不能关掉整个文件。
 
-context 只活在一次检查中。第一版不做持久化 AST、不做跨运行依赖追踪、不造文件 watcher。外层 Wireit 已能跳过完全未变化的只读检查；内层只需避免同一趟重复读盘。
+取消、skip、todo 要独立记录，且不能计入 passed。容器虽不算叶子，容器上的导入失败、hook 失败、取消或异常退出仍然是失败；去掉容器计数不能顺便把容器错误去掉。
 
-### 7.4 工程清单不要重写两套
+### 10.3 兼容 Node 20 与本机 Node 26
 
-readCompileShardInventory 已经检查唯一归属、sibling .fsi、缺失引用、DAG、aggregate 与磁盘输入集合。architecture 中同类检查应迁到这里，保留对 aggregate 重复项、必要顺序等真实约束，不在删除旧实现时丢失它们。
+当前 CI 明确使用 Node 20，开发机是 26.5.0。Node 当前在线文档的版本比本机更新，不能把文档中新出现的 test:summary 字段直接当作这两个环境都具备的协议。[N1]
 
-owner-compile 的 XML 读取比简单清单正则承担更多输入校验。共享工程模型时先保留这些拒绝能力，不为统一接口改用一个更弱的正则解析器。正确顺序是抽出同一份已验证数据，再让两边消费，而不是同时重写两个解析器。
+先用永久 fixture 在两个支持环境实际运行：普通叶子、嵌套、同名、skip、todo、导入异常、before/after 异常、显式 timeout、空文件和正常退出。用这些执行结果确定当前需要的事件适配，而不是在测试内手造一个想象中的 Node 事件格式。
 
-新数据至少包含：projects、sourceOwner、forwardReferences、reverseReferences、aggregateOrder。构造成本为文件读取加 O(V + E)，其中本次 V=276、E=2220。一次 delta 求根集合，再用 visited 集合做闭包并集；不能给每个根重新生成完整闭包再反复合并。
+原生 summary 在当前版本可用时用来核对结束统计；不可用时只走经该版本 fixture 证明过的适配路径，不猜字段。必要生命周期事件丢失或格式无法识别时返回明确 runner-error，不能伪造 filesCompleted=filesPlanned。
 
-当前 planImpactCompile 已有大部分线性图算法，最值得改的是重复解析与正确的失效边界，不是把 DFS 换一个名字。
+不为了方便写 reporter 擅自抬高 engines，也不静默取消 Node 20 CI。若确实要升级支持版本，属于单独的运行环境变更。
 
-### 7.5 几个需要固定的内部接口
+### 10.4 结束协议
 
-接口应小到可以直接注入假文件系统／假命令执行器进行正式单元测试，而不需要为每个失败场景启动整个仓库。
+保留父子 IPC，但将最终确认与实际排空绑定。建议 inner 的正常结束顺序是：
 
 ```text
-build({ root, clean, verbose })
-  → { mode, reason, generation, changedSources, affectedShards, elapsedMs }
-
-assertBuildFresh({ root })
-  → { generation, compilerInputDigest, generatedInputDigest, artifactInputDigest }
-  失败时抛出含 code／path／reason 的错误
-
-commitBuildState({ root, state })
-  只在完整构建成功后调用；写入失败抛错
-
-superviseNodeTest({ files, label, ...现有监督参数 })
-  → { selectedFiles, passed, failed, cancelled, skipped, todo,
-      wallMs, drained, exitCode, signal }
-
-verify({ root, release, verbose, profile, runStep })
-  固定阶段顺序；任一失败即不启动后续阶段
+源测试流正常结束
+→ 事件状态完成，检查文件集合与叶子结果
+→ renderer 和日志 sink 写完，确认无错误
+→ 发送一次 runner:summary
+→ 发送一次 inner:drained
+→ 关闭 IPC，进程自然退出
 ```
 
-reason 解释实际模式选择，例如 no-change、source-change、generated-input-change、toolchain-change、missing-output；它服务诊断，不另建需要多处同步的政策登记表。
+错误流、formatter 抛错、日志写失败、文件未完成、异常退出，均不能进入这条正常确认链。不要仅监听源流 end，却不等待 compose/pipeline 的下游消费结束。Node 的写流有背压和结束语义，调用 end 不等于已经写完；使用 finished/pipeline 或等价的显式结束处理。[N2]
 
-verify 在任何检查开始之前，对本次格式／静态／测试的有效输入集合取得一个内存快照；结束时比较路径集合与内容。新发现的未跟踪测试文件也属于验证输入，不能只靠生成器的 Git 跟踪语料清单代表测试范围。这个快照只防止本次执行期间被编辑，不持久化、不缓存测试结果。
+supervisor 正常通过需要同时满足：没有失败／runner-error／超时；child exit=0 且无 signal；本次计划文件均完成；收到唯一合法 summary 与 drained；必要的输出写入成功。所有叶子绿而 child 留着 handle 不退出，仍由现有物理监督判失败。
 
-测试 runStep 时注入一个只记录启动事件与返回结果的函数。断言实际 trace 中 build 在 unit 前、release 才启动 Long Stroke、某阶段失败后后续未启动；不要读取 verify.mjs 源码来查字符串。
+父进程的“当前已完成数”来自同一状态的进度通知，不再独立解释 raw pass/fail。日志流量只记录为背景，不给 watchdog 续期。不要为了安静而删掉 background 信息，因为超时诊断仍需知道“最后在做什么”。
 
-## 8. 增量构建：先可信，再接入默认入口
+### 10.5 把当前两项镜像测试换成真实路径测试
 
-### 8.1 分开三类输入
+将 run-inner 的流消费整理为一个被 CLI 实际调用的导出函数，例如 drainTestStream({ stream, state, output, send })。为它提供抛错的 async iterator 是合法边界注入，因为运行器实际用的是同一个 drain 函数；复制一段错误处理代码再运行则不是。
 
-同一个仓库变更不一定需要重编 F#，但可能需要重做生成物或资源验证。
+保留少量真实 child fixture 验外层：导入错误、持续打印但不完成、绿叶子后 handle 泄漏、正常快速结束。错误消息要来自实际 run-inner/supervisor，而非专门为用例写一个假 runner 证明假 runner 自己正常。
 
-| 输入集合 | 例子 | 影响 |
-|---|---|---|
-| compilerInputs | .fs、.fsi、工程、props/targets、global.json、Fable 工具配置、编译脚本及其依赖、相关依赖锁定信息 | 编译范围与生成 JS |
-| generatedInputs | 当前 Git 跟踪的 source/document 路径集合及工作区字节、派生器及其依赖、tokenizer 版本 | LoopDetectorEnvelope |
-| artifactInputs | 资源、package.json 的分发面、Surface 入口与后置检查实现 | 资源与产物闭包验证 |
+compact/verbose 两种模式的测试不仅彼此相等，还必须等于手写的期望对象。例如一个成功、一个断言失败、一个跳过、一个 todo，加一个导入失败容器，期望 passed=1，leafFailed=1，skipped=1，todo=1，containerFailures=1，整体失败。最终展示可将失败归纳，但底层不能丢掉这两类错误。
 
-上述集合可以重叠。例如资源 Markdown 属于语料，改它会使 envelope 失效；package-lock.json 本身不是语料，但 tokenizer 版本来自依赖解析，所以锁文件变化不能被排除在派生器的失效判断外。
+## 11. 测试算法优化：删重复计算，不删观察
 
-完整输入集合不要只依赖手写的几个主脚本名。新增 build-state、共享工程解析、派生 helper 后，它们都属于对应工具输入。第一版允许对 scripts/lib 的相关构建工具采用略宽的明确集合，宁可多算一次，不要漏掉真正的依赖。
+### 11.1 Surface 扫描从笛卡尔遍历改为输入索引
 
-global.json、实际选择的 SDK／Fable 版本、配置模式 Debug 都要纳入工具身份。依赖安装以锁文件和 npm ci 为基础；本轮不为 node_modules 实现逐文件远程可信供应链缓存。
+当前 validateSurfaceManifest 对每个 surface 遍历全部测试文件，虽有字符串前置过滤，仍重复做 M×T 次候选判断；每次整仓调用又重新读取和解析。M 是 surface 数，T 是测试文件数。
 
-### 8.2 沿用一个构建 manifest
+第一步已经确定：删除两次完全重复调用。第二步在剩余实际校验中，先遍历一次输入，形成 module → import edges、source → compile membership、package → parsed metadata 的 Map。需要检查的每一条边只访问对应模块，不再从全部测试反向过滤。
 
-复用 .fable-build/build-manifest.json，升级 schema。不另外放 compile-success.json、test-freshness.json、envelope-ready.json 三份各自宣布成功的文件。
+如果正式取消 callback proof authority，就连同它的静态调用闭包遍历删除，不为已退役问题做算法优化。若过渡期间保留，则 AST 只解析一次，按实际 import edge 调分析，不为每个无关 surface 重建作用域索引。
 
-建议内容如下。字段是边界设计，最终名称可按现有代码风格调整：
+目标工作量是读取／解析输入总量，加上实际导入边和清单项的遍历；排序只发生在最终确定性输出阶段。不能承诺所有正则与 AST 操作严格线性，但可以消除明确的“每项都重读全仓”。
+
+内存缓存只存在于本次 context，fixture root 是其身份的一部分。模块级永久 canonicalRegistry、按路径不按内容缓存、由文件 mtime 猜有效，都不应重新引入。
+
+### 11.2 owner-impact 属性测试：把文件系统留给边界测试
+
+现有 owner-impact-compile.property.test.mjs 对 chain/diamond/fanout/arbitrary 各生成 25 个图。每个图落盘 .fsproj/.fs/.fsi，再对 impl、signature、mixed、reordered、single-change union 和 config change 多次调用 planner。大量重复读写不是所要证明的图性质。
+
+在 scripts/lib/owner-compile.mjs 内明确分成两段：readImpactInventory 读取并验证项目输入；planImpactFromInventory 只接收不可变 inventory 和 changed paths，计算真实 plan。原 planImpactCompile 保留为两者组合，所有 CLI／生产构建仍经过同一纯 planner，不保留第二套算法。
+
+属性测试把生成的图直接转成 inventory，调用 planImpactFromInventory。保持现有 seed、100 个总样本及性质：并集、重复变更幂等、签名影响单调、aggregate canonical order、互不相关分片不进入、配置变化触发 full。fullThreshold 边界、未知源码、环和非法引用保留固定反例。
+
+另留少量物理适配测试：一个正常工程夹具、一个缺失 provider、一个重复 Compile、一个坏 XML／路径，以及输入文件增删。用相同小图分别经过 readImpactInventory+planner 与既有 CLI，核验结果一致。真实 Fable 编译边界仍由发布 canary 证明；在内存里生成图不等于证明 Fable 私有性。
+
+这项改造涉及生产构建 planner，必须先用现有固定反例锁定结果，再抽纯函数。不要把图算法复制到 test helper，也不要顺手改变 inline／签名／full fallback 规则。
+
+### 11.3 Watchdog：时间判断虚拟化，物理终止保留
+
+当前 Watchdog 直接使用 Date.now、setTimeout、clearTimeout、console 和 process.exit。为时序测试做最小依赖注入：clock.nowMs、schedule/cancel、diagnostic sink、terminate。真实默认实现仍用原生计时和非阻塞 timer；不引入通用调度器类层级。
+
+现有 createVirtualClock 返回 nowMs、advance 和 port.delay；port.delay 的返回值具有 delay()/cancel()。它不是原生 Timeout，不能假装直接塞给 clearTimeout。写一个薄适配器把虚拟 delay 转为 callback 调度，取消后不再触发回调，并处理取消结果，避免 unhandled rejection。
+
+用虚拟时钟直接测试：首次启动窗口、blocking 续期、background 不续期、stop 取消、临界点前后、setWindow 与恢复默认窗口、timeout 只触发一次、诊断先于 terminate。当前 setWindow(null) 恢复的是中央 WATCHDOG_TIMEOUT_MS，不是构造参数中的局部 override；先保持这个实际语义，不能在提速时暗改。
+
+这类测试不再真实等 5 秒。不要全局替换 Date.now/setTimeout：harness 当前 8 个 worker 同进程并发，全局 monkey patch 会串扰其他 case。
+
+原生 timer.unref、进程组清理、真实 stderr、信号与泄漏 handle 必须继续由实际 child 证明。虚拟时钟证明期限计算，不能证明操作系统已经回收进程。保留代表性的物理挂死用例，不把全部物理边界换成 mock。
+
+### 11.4 Capacity soak：先减少争用，再动算法
+
+createAuditor 已经使用 owner Set、ledger Map、token Set，不要再提一个“把查找改成 Map”的空优化。它在每次 operation 后检查容量、引用完整性、去重、counter 单调和 reconciliation；这些观察是该测试的价值。
+
+保持 seed=0x36c0ffee、rounds=32、queueWidth=32、lineageCycles=64、capacity=4 和当前 retained bound。先删旁边的重复全仓扫描、控制文件并发，再重测此项。本轮单独 2.074 秒而全量中 5.832 秒，已表明争用值得先处理。
+
+如仍需优化，分别计时 capacitySnapshot、reconcileCapacityEvidence、结构比较与 fixture 创建。这个分段测量应成为可重用 profile 输出，而不是每次散落 console.time。若生产 snapshot 本身慢，单独优化生产投影，不在测试内用另一份预期快照替代生产结果。
+
+第二次 capacitySnapshot 是为了证明 reconcile 不改变被测状态，不能无条件删。可以把相同的非变异性质集中到一组更明确的回归，但必须说明从“每次 operation 都查”变成“选定边界查”减少了哪一层覆盖，并据此修订测试意图；本轮默认不做这一步。
+
+### 11.5 其余属性测试
+
+先保留 durable merge、tail truncation、provider recovery、subagent reuse、wire algebra 等真正调用 production 的性质。文件叫 property 不表示需要保留；但没有读过全部 oracle 也不能直接宣布它是脚手架。
+
+fast-check 的 seed、run budget 与失败重放配置应显式绑定每项测试；保留 shrink path，失败日志不得裁掉它们。[N3] 小有限域用穷举，大域用有界生成。不要用更多随机次数代替缺失的错误输入，也不要因测试变慢只减 numRuns。
+
+减少状态空间只在能证明等价时做。例如两个独立操作可交换，需要先有真实 production 的交换律证明；不能按“最终输出相同”合并所有历史，因为不同历史可能涉及不同 effect、身份或失败路径。
+
+## 12. 调度：只保留日常与发布两种正式范围
+
+### 12.1 日常入口的测试范围
+
+format-build-test 继续执行全部保留的日常产品回归和必要适配器测试。不要引入一串 quick/medium/governance/core/smoke 名称让使用者猜测自己漏验了什么。
+
+现有 unit 名字可以暂留，但报告中说明它包含纯逻辑、确定性时序及部分物理适配器，不把名字当作证据层级。实际需要真实 Host 的 admission canary 不因迁到 integration 就少跑一次；需要跨文件移位时，发现入口也同步调整，保证日常集合仍含它且只含一次。
+
+### 12.2 发布专属范围
+
+owner-project-compiler-boundary.test.mjs 与 owner-impact-compile-cli.test.mjs 所在组明确标为 releaseOnly。它们是工具链／真实编译边界 canary，不需要每次业务改动都重新启动一批 Fable；修改构建工具的人仍应显式运行该组。
+
+loop-envelope-repository.test.mjs 已经标为 releaseOnly，保留独立真实语料重算。不要因为 unit 中不再全仓重算，就删掉发布层独立 oracle。
+
+release 保留日常回归、clean build、编译边界、全仓 envelope、唯一 Long Stroke、真实 package。CI 已经运行 npm run verify:release，不要在本轮再改回日常入口，也不要让 --release 先跑完一个日常构建、再重建一次 clean 产物。
+
+测试选区用实际文件集合验证：日常集合无重复，发布集合覆盖日常并增加明确发布项，所有发现到的 integration 测试恰有一个可执行 owner。测试只核对集合与实际执行，不维护“发布用例至少几个”的数字门槛。
+
+### 12.3 合并父进程，不误称共享了文件 worker
+
+resources/prompts、enforcer-rulebook 与其他不共享可变物理资源的小 integration 文件，可以合成一次 superviseNodeTest 调用。原来每组打印一套 banner、统计和 top5，现在只有组级汇总。
+
+保留 Node 的文件进程隔离。把多个文件放在一个 run({files}) 中，只减少外层 supervisor／runner 的重复初始化，并不意味着这些文件共享了一次 dist import。不能把“单父 runner”宣传成“所有测试只有一次模块加载”。
+
+同一资源的纯断言要真正复用昂贵准备，应该在同一领域文件里围绕同一不可变 fixture 组织；不是把不同文件搬到同一目录。不要为共享缓存取消所有文件隔离。
+
+Host、compiler、npm pack/install、真实共享 store 的并发按物理资源分组处理；同一资源不可竞争时串行，互不相关时才并发。不要把每个 child 的 CPU 并发都乘到外层 8 worker 上。
+
+### 12.4 并发参数收口
+
+保留一个显式正整数并发参数。旧 NODE_TEST_CONCURRENCY=false 如继续支持，只作为明确的 serial 别名；NaN、0、负数、Infinity 必须报参数错误，不能悄悄退回 true。
+
+默认值先保留当前策略，再在相同机器上对 2、4、8 和默认并发做 profile，比较总墙钟、Host/soak 尾部耗时和内存峰值。选择较小且稳定的值，不先宣布 8 就是最优。CPU 数只是容量线索，不能代表多个 Fable/Host 子进程的合适并发。
+
+编译器 canary 内部的 Promise.all 也有物理成本；发布组单独执行时再测其并发，不与几百个 unit worker 一起竞争。没有瓶颈证据，不改造中央资源调度器。
+
+### 12.5 局部运行不能冒充正式全量
+
+保留 TESTS_MJS_FILES 作为现有局部／harness 入口，但正式 verify 默认拒绝外部悄悄缩小发现集合。局部执行报告必须显式标明 scoped、文件集合和未运行的范围。
+
+不根据 test 标题自动判断是否昂贵，不根据注释自动分类，不扫描 WHAT 给测试打调度许可证。范围配置只服务执行需要，由固定入口的实际集合定义。
+
+## 13. 终端输出设计：一层只说一层的事
+
+### 13.1 日常成功输出
+
+以下只演示布局；N、F 和耗时均为占位，不是优化后的实测数据。
 
 ```text
-schema
-rootIdentity / aggregatePath / outputDir
-generation
-compiler
-  configuration
-  toolIdentity
-  inputDigest
-  inputs: sorted(relativePath, contentHash)
-generated
-  inputDigest
-  selectedInputs: sorted(relativePath, contentHash)
-  generatorIdentity
-artifacts
-  inputDigest
-  inputs: sorted(relativePath, contentHash)
-outputs: sorted(relativePath, contentHash)
-sourceOutputs: 当前已证明输出映射所需的最小信息
+verify daily
+  format       ok       <time>
+  checks       ok       <time>
+  build        no-op    <time>
+  tests        ok       <time>   N passed · F files
+  integration  ok       <time>   N passed · F files
+
+PASS daily · <wall time>
 ```
 
-generation 只在实际产物发布成功时生成新值；无变化复用时保持不变。它用于发现测试期间发生的构建替换，不是用来替代内容验证。
+build 的 no-op 指复用已校验的产物，不意味着 tests 可以 no-op。不要输出 cached tests passed，因为本方案不缓存测试成功结果。
 
-mtime 和 size 可以保留为诊断信息，但不能作为成功依据。源码变了再恢复 mtime、两个文件恰好同 size，都必须由内容 hash 判定。当前 computeFileHash 的逐文件 SHA-256 值得保留，不应“优化”为仅比较时间。
+单独执行 unit 时，它自己显示一份摘要；从 verify 启动时，摘要交父级显示。不能内层打印一份 [test-summary]，父层再打印 authoritative，再在 verify 末尾重复所有阶段。harness 单独跑也按同一原则显示一份结果。
 
-路径使用仓库相对路径进行集合比较；工程与输出根身份明确验证，不能将一个 scratch 工程的成功记录误认成生产 dist。摘要采用已存在的 canonical 编码或有明确长度边界的编码，不能直接拼接可能产生歧义的字符串。
-
-outputs 覆盖完整生产产物集合，而不只是 Plugin.js 与 Sphinx/ServeEntry.js。缺一个叶子模块、增加一份已删除源码的旧 JS、修改某个 JS 内容，都应使凭据失效。资源作为输入和实际分发集合检查，不在 dist 里复制一份。
-
-### 8.3 成功发布顺序
-
-构建步骤必须按以下因果顺序执行：
-
-```text
-取得 build.lock
-  → 读取并验证旧 manifest
-  → 获取当前输入快照
-  → 决定 no-op / focused / full
-  → 若要修改产物，先使旧成功 manifest 失效
-  → 编译与清理该模式应更新的输出
-  → 派生或核验 envelope
-  → 检查入口、资源、Surface、ESM linkage
-  → 核对构建期间输入未变化
-  → 收集最终输出集合与 hash
-  → 临时文件写入完整 manifest，原子 rename
-释放 build.lock
-```
-
-任何一步失败都不能留下可以宣称“当前构建成功”的 manifest。旧 dist 可以保留给人排查，但测试必须拒绝消费。manifest 写入失败是构建失败，不再 catch 后继续绿。
-
-compileIncremental 只返回编译结果与本次使用的输入信息；scripts/build.mjs 是唯一最终提交者。compileOwnerProject 的 scratch success marker 只描述该 scratch 编译，不能承担生产构建凭据的职责。
-
-当前 compileOwnerProject 即便发现有效 scratch marker 仍会执行 Fable；不要把它误读成已经缓存了整个编译结果。no-op 的主要判定发生在 compileIncremental 前段。保留现有 restore assets 复用，不把 NuGet restore 也无谓清空。
-
-### 8.4 模式选择
-
-| 情况 | 目标模式 |
-|---|---|
-| manifest 完整，三类输入和输出均一致 | no-op，不启动 Fable，不重复 tokenize |
-| 只有非编译语料变更 | 保留编译 JS，只更新 envelope 并做必要后置验证 |
-| 只有不参与语料的资源／打包元数据变更 | 按真实输入分类验证；不凭文件扩展名武断跳过 |
-| 普通实现／签名变更且影响和输出映射均可证明 | 一次 focused 并集编译 |
-| 工程、工具链、拓扑变更，源文件增加／删除／重命名 | full，并清理旧 dist |
-| manifest 损坏、输出缺失／被改写／多出陈旧模块 | full，并清理旧 dist |
-| 影响比例超过现有 fullThreshold | full；暂不改变 0.6，待测量后再讨论 |
-| --clean | 无条件清理并真实 full compile，不能返回 cached |
-| 输入非法、缺 provider、图有环、读取失败 | 直接失败，不用 full compile 掩盖结构错误 |
-
-失效时转 full 是事前明确的构建模式选择，不是失败后自动重试至通过。Fable 编译失败、测试失败、未知异常必须原样失败。
-
-detectChangedFiles 应比较 oldPaths 与 currentPaths 的集合差，不只检查旧文件是否从磁盘消失。从工程移除但仍留在磁盘的文件，同样是输入拓扑变化，并应被源文件归属检查拒绝或明确处理。
-
-### 8.5 不能把 .fsi 未变当作输出不变的充分条件
-
-当前规划将稳定 .fsi 对应的 .fs 修改限制为 owner 的正向依赖闭包。这对某些非内联实现可能成立，但不是所有 Fable 输出的通用保证。
-
-仓库实际存在公开 val inline，如 Composition/Durable/ChatExecutionFact.fsi、Composition/Durable/CompanionFact.fsi、Host/Fact.fsi、Change/Fact.fsi；还有 Literal。F# inline 可能把实现展开到调用方。[E5]
-
-因此这里有一个需要正式编译 canary 验证的风险：provider 的签名不变，inline 实现变化，消费者的旧 JS 仍嵌着旧行为。本次没有执行该缺陷复现，不能写成已经证实线上存在错误；但默认增量切换前必须排除它。
-
-第一版采用容易说明正确的策略：任何 .fs／.fsi 实质内容变化，都先求 owning shard 的反向消费者闭包，再对该集合求正向依赖并集，最后按 aggregate 顺序编译一次。这样可能比当前算法多编一些文件，但保留了 no-op、文档变化不重编、局部闭包等收益。
-
-不通过简单 grep inline 来冒充完整 specialization 分析，不引入 FCS 补洞。以后要重新缩小普通 .fs 影响范围，必须拿实际 Fable 行为和独立 canary 证明受支持的边界，不能只凭类型签名做推断。
-
-新增的永久 canary 至少包含：
-
-- provider 暴露 inline，.fsi 不变，改变实现后，focused 消费者与 clean 消费者返回同一个新值。
-- 已移除引用的消费者必须红，不能被另一个大闭包补齐。
-- 泛型／Literal 等会影响消费者输出的代表性情形。
-- 导出符号改动后，旧消费者导入不能由陈旧 JS 假装满足。
-
-落点：requirements/structured-workflow/tests/fixtures/owner-project-boundary 和对应 integration 编译器测试；纯影响集合反例进入该包现有 owner-impact 规划测试。
-
-### 8.6 focused 产物清理也要有证明
-
-不只源文件删除会产生陈旧 JS。同一路径的 F# 文件改成仅类型／内联等内容后，编译器可能不再产生旧模块。单纯在旧 dist 上覆盖新输出仍可能留尸体。
-
-第一版不引入复杂的分片产物事务仓库。采用一个明确策略：
-
-1. 基于仓库当前 Fable 输出约定，提取一个小的 source→emitted path 映射函数，并用真实 compiler fixture 证明它支持的形态。
-2. 对 focused 编译集合，在编译前移除归属该集合的旧 JS；保留未受影响且已由旧 manifest 核验的输出。
-3. Fable 编译后重新枚举实际输出，检查入口、Surface、模块链接，再提交完整 outputs 清单。
-4. 输出映射无法确定、工具链改变、拓扑变化或遇到不支持的生成形态时，事前选择 clean full，不能猜路径删文件。
-
-共享的 Fable runtime 文件不能按某个业务 owner 的输出随意删除。生产源码输出、运行库输出、手工派生 envelope 必须区分归属。映射规则以实际 Fable emit fixture 为准，不根据 .fs 文件名机械推断后直接上生产入口。
-
-回归必须包含“曾输出 JS 的文件，现在不再输出”的物理场景。若本轮无法证明 focused 输出清理的全部支持范围，可以先交付 no-op／派生物分离快路径，其他变化明确走 full；不得以不完整 focused 路径换取表面提速。
-
-### 8.7 测试期间不得换产物
-
-不把 build.lock 粗暴地从父入口持有到整套测试结束，再让子 build 请求同一把锁；那会制造自锁，也会把编译器 fixture 与生产构建混在一起。
-
-日常和发布入口在 build 后记录 generation 与输入摘要，在 unit／integration／E2E 前后及最后核验同一构建仍有效。任何生产构建要改 dist，必须先使旧 manifest 失效。测试过程中发现另一构建替换了产物，整次结果判为不完整，不能继续宣布通过。
-
-单独运行 unit／integration 也执行同一个新鲜度契约，而不是依赖“调用者应该先 build”。编译器 fixture 的输出必须继续使用自己的隔离临时目录，不能碰生产 dist。
-
-源码在检查／编译／测试期间被改动，同样需要在最终验证输入核对时报告。这里保证普通并发编辑不会得到静默绿灯；不宣称它是抵抗恶意文件竞态的安全快照系统。
-
-不实现自动重跑。诊断直接说明：本次验证使用的输入或产物已改变，请对当前内容重新运行。
-
-## 9. 格式与静态缓存：保留简单工具，修正输入
-
-### 9.1 Fantomas
-
-format 只供用户主动改写，format:check 只读。Fantomas 的 check 与忽略文件行为由其官方接口决定，不自己比对格式化输出。[E3]
-
-只读缓存必须至少覆盖：
-
-```text
-src/Wanxiangshu/**/*.fs
-src/Wanxiangshu/**/*.fsi
-src/Wanxiangshu/**/*.fsproj
-.editorconfig 及生效的嵌套 .editorconfig
-.fantomasignore（存在或后来新增都要被发现）
-.config/dotnet-tools.json
-global.json
-package.json / package-lock.json 中相关工具配置
-```
-
-处理方法是让 Wireit 运行已声明的实际命令，并将上述规则作为输入 glob。先用仓库所固定的 Wireit 版本做新增／删除配置文件的回归，再确认 glob 行为；不能把不存在的可选文件当必需文件导致首次运行直接报错。
-
-若仓库还接受根目录之外的格式配置，必须显式决定支持边界。不能让个人上级目录的配置无声影响结果，却不进入缓存键。优先让仓库配置自足，而不是为任意主目录状态造缓存。
-
-不把已通过格式检查的旧缓存当作“可以自动改文件”的授权。format-build-test 全程保持只读检查语义。
-
-### 9.2 check 的 Wireit 输入
-
-保留检查的第一版缓存可以略宽，但必须正确。至少包含 scripts/check.mjs、保留 checks／lib、src、resources、实际测试边界扫描范围、package.json 和锁文件。全仓文书门禁退出后，AGENTS、proposals 和与产物无关的说明文档不再因为“治理”使 check 失效。
-
-资源变化是否影响 envelope 由构建输入负责，不要误以为从 check.files 去掉一个文档就能绕过生成物更新。
-
-Wireit 对有 output 的任务默认清理输出；这也是 build 不继续套在 Wireit 里的原因之一。[E2] 不用一个 clean:false 开关替代第 8 节的陈旧产物维护。没有这些正确性工作，仅移除 resetOutputDirectory 同样不够。
-
-### 9.3 不增加第三层检查缓存
-
-首版只保留 Wireit 的整步只读缓存和构建 manifest。不要再加 per-rule JSON、每文件结果数据库、长期 AST 缓存和自动 cache repair。先测删减后的静态链；若已经很轻，优化就到此为止。
-
-## 10. 测试调度与删减
-
-### 10.1 unit 保留什么
-
-保留生产纯函数、状态机、时序、序列化、幂等、取消、恢复、权限以及 runner 正确性的回归。fast-check 的固定 seed、numRuns、shrink path 与已发生缺陷的固定反例不动；不能为了变快随意砍生成次数。
-
-删除仅服务于已退役治理器的测试。例如 deadcode-scan、旧控制金字塔判据、门禁数量下限、旧问卷完整性及精确说明表格式。若测试文件还包含产品断言，拆开而非整文件删。
-
-保留的 checker 自测用小的明确输入，不反复读取真实全仓。纯扫描器用几个字符串／文件条目证明能红；另保留一次实际接线验证，证明真实仓库确实扫描到正确范围。不能让每个反例都完整重建一次源码与规范图。
-
-### 10.2 只搬出两类明确的发布专属工作
-
-首轮从日常路径搬出：
-
-| 工作 | 发布落点 | 何时主动定向运行 |
-|---|---|---|
-| 固定 Fable 工具链语义的多工程／可见性 canary | 现有 structured-workflow integration 文件，标记 releaseOnly | 编译器、工程模型、签名、增量算法变化时 |
-| 真实整个仓库 envelope 的独立重算 oracle | 新建 degeneration-guard/tests/integration/loop-envelope-repository.test.mjs | 派生器、tokenizer、语料选择规则变化时 |
-
-编译规划的纯测试、envelope 的小输入定律、Host admission、process restart、持久化与 Git 适配器测试仍在日常入口。不能把所有慢项都塞进 release，让日常变成只有字符串断言的空架子。
-
-从 loop-detector.test.mjs 搬走的是那个真实全仓重算测试，不是整个文件。新的 integration 文件必须被真实发布入口接线，HOW 同步更新，不允许变成仅手工可运行的遗漏文件。
-
-### 10.3 integration 只维护一次接线事实
-
-继续使用 integrationNodeTestSteps，不再另建第二份 YAML／JSON 套件登记库。只有确实不同的发布专属文件增加 releaseOnly 标记。
-
-完整性验证分两步：
-
-```text
-全部已发现 integration 文件
-  = 常规 steps ∪ 发布专属 steps ∪ 子入口实际拥有的文件
-
-任意两个执行属主的集合交集为空
-```
-
-日常模式有意不执行 releaseOnly，不属于漏接线；但 release 模式必须覆盖上面的整个集合。既要测漏掉新文件会红，也要测重复注册会红。
-
-保留现有 discoverSuiteTests 和 integration-entry-coverage 的行为价值。这不是文书治理：测试不接线就根本不会执行。
-
-### 10.4 四个 package 小文件只监督一次
-
-distribution/tests/integration/package/run.mjs 当前按文件串行启动 supervisor，注释称 pack/install 共享 npm cache，但四个文件明确不执行 npm pack/install。
-
-改为一次 superviseNodeTest({ files: suites })，仍由 node:test 隔离各文件。install.test.mjs 改名为 layout.test.mjs，说明它证明工作区的包布局，不证明真正安装。对应发现、HOW 与引用一起迁移。
-
-真实 pack 不放进这个日常小套件，也不在 integration 和顶层各跑一次；由发布尾部的 verify-package 唯一执行。
-
-其他 integration 的资源小文件也可合并进同一次监督调用。真实 Host、共享缓存、可变全局环境和临时目录未证明隔离之前，不能仅因“可并行”就全部 Promise.all。
-
-### 10.5 进程隔离与并行度
-
-run-inner.mjs 中“in-process、one dist load”的注释与当前 node:test 默认文件进程隔离不一致。改注释，不为了让注释成立而关闭隔离。每个文件独立进程是现有测试环境隔离的一部分。[E1]
-
-保留 HOME／USERPROFILE 临时目录和独立 DOTNET_CLI_HOME。不要为省初始化时间让所有测试共同修改开发者配置，也不要把 WANXIANGSHU_NO_FATAL_EXIT 变成生产端根据测试环境偷偷推断的行为。
-
-并行度作为已有 NODE_TEST_CONCURRENCY 的明确正整数输入校验，非法值直接报参数错误。测试 1、2、4、8 等少量实际配置的墙钟、峰值内存与尾部延迟，再确定默认值；不把机器核数当作无限启动 .NET 编译器和 tokenizer worker 的理由。
-
-当前编译器 canary 内一次 Promise.all 启动九个 Fable 进程。移到发布层后仍可用小的有界并发执行同一组 fixture，避免与单元文件池同时争抢 CPU／内存。worker 数量限制是调度，不是降低测试覆盖。
-
-本轮不合并整个 unit 到一个 Node 进程，不做永久 worker 池，不缓存“测试曾通过”，不做按 Git diff 推断测试覆盖。收益不足以补偿这些方案带来的隐式状态。
-
-## 11. LoopDetectorEnvelope：最值得动的算法热点
-
-### 11.1 当前重复在哪里
-
-scripts/lib/derive-loop-detector-envelope.mjs 的实际链路是：读取当前选中语料 → 拼接 → tokenize → affine replay → 求 prior → 对投影值求两个分位数 → 写 JS。
-
-现在 evaluateEnvelope 为下界和上界分别调用 empiricalQuantile；两次调用各复制并排序整个 Float64Array。上界概率为 1，实际就是最大值。
-
-requirements/degeneration-guard/tests/loop-detector.test.mjs 的全仓测试先再次调用 writeLoopDetectorEnvelopeArtifact，再读取真实语料、再 tokenize 一次以运行独立 referenceEnvelope。加上 build，真实全仓的派生／编码确实被反复支付。
-
-这里应拆成两种职责：日常确认“当前输入和已产出的字节对应”；发布确认“真实全仓经过独立算法核对仍正确”。独立 oracle 不该被删除，也不必在每次未变化的日常验证里重新 tokenize 整个仓库。
-
-### 11.2 第一项算法改动：只排序一次
-
-保持原来的经验分位数定义，rank = ceil(p × N)，下标为 rank - 1。一次排序同时给出下界和最大值。
-
-```js
-function envelopeBounds(projected, lowerProbability) {
-  if (projected.length === 0) {
-    throw new Error('Loop detector envelope has no samples')
-  }
-  if (!(lowerProbability > 0 && lowerProbability <= 1)) {
-    throw new Error('Loop detector envelope has invalid probability')
-  }
-  const sorted = Float64Array.from(projected).sort()
-  const lowerIndex = Math.ceil(lowerProbability * sorted.length) - 1
-  return {
-    minimum: sorted[lowerIndex],
-    maximum: sorted[sorted.length - 1],
-  }
-}
-```
-
-这是方案示例。实际修改应在现有 evaluateEnvelope 中完成，不为一段排序另建通用统计库。它仍是 O(N log N)，但去掉一次全数组排序与复制，保持完全相同的次序统计定义。
-
-先做这个直接改动。只有 profile 证明排序仍是主要成本，再考虑线性扫描最大值加第 k 小选择；不要一开始手写复杂 quickselect，使重复值、边界概率和最坏复杂度成为新负担。
-
-affine replay 的累加次序、指数计算、序列拼接顺序和 artifactSource 的数值输出精度不随本次性能改造改变。浮点运算不能任意并行重排后宣称“差不多就一样”。
-
-### 11.3 第二项：修正并行接口，但不盲目增加 worker
-
-encodeParallel 当前从 process.availableParallelism 探测并行度。标准接口属于 node:os。[E4]
-
-改为导入 availableParallelism，使用经校验的上限；将 workerCount 作为可注入参数，便于永久测试覆盖。修正接口后实际进程数可能骤增，所以必须先验证内存和调度，而不是把所有核都填满。
-
-已有 safeSplitPosition 是试图保持整流 tokenizer 等价的分块约定，不是“按行切就天然正确”。必须比较完整 token 数组，不只比较 token 数或最终统计值。中文、Unicode、连续换行、斜线、空白、极长行以及文本接缝都要有小输入反例。
-
-不能独立 tokenize 每个文件后拼接来缓存。当前语义是 texts.join('\n') 后编码，BPE 可能跨接缝合并；改变编码边界就可能改变 envelope。
-
-worker 的失败收口也要先修：任一 worker 错误，或在返回所分配结果前退出，整次派生失败；终止并等待其余 worker 退出；不得仅 terminate 出错的那一个。unref 不等于释放任务，也不保证其他 worker 不再写回结果。
-
-小输入直接串行，大语料的 worker 数由实际测量决定。单元文件并发、Fable 并发和 tokenize 并发不能各自假设拥有整台机器。
-
-### 11.4 第三项：复用当前输入对应的生成物
-
-沿用 generated-artifact-v1.mjs 的 selected input、blob digest 和生成产物信息，将其并入第 8 节的构建 manifest，而不是另造一份手写数值快照。
-
-复用必须同时满足：语料选中的路径集合没变、每条路径的工作区内容没变、派生器及依赖没变、tokenizer 身份没变、生成 JS 本身没被改写。仅比较源码或 envelope mtime 不够。
-
-loopDetectorRepositoryInputFiles 使用 git ls-files --cached，再读取工作区字节。必须保留这个事实边界：
-
-- 已跟踪文件的未暂存修改会使内容失效，不能只 hash Git index blob。
-- 新增 Git 跟踪路径会改变集合，即使其内容在磁盘上早已存在。
-- 被跟踪但从工作区删除的路径按当前 selector 规则移出；删除也必须体现在摘要里。
-- 新的未跟踪笔记当前不进入语料。CLEAN.md 在本次写入后尚未跟踪时也是如此；以后被 Git 跟踪则按同一规则参与，不能为提速专门排除它。
-- package-lock 不属于语料文本，不代表 tokenizer 依赖更新可以复用旧派生结果。
-
-只在一次阶段内共享已读的 selectedInputs 与 texts，减少重复 I/O。第一版不保存几百万 token 的跨运行缓存，不做每文件 BPE 缓存，也不更改语料选择范围来掩盖性能问题。
-
-### 11.5 测试落点
-
-日常保留：小语料的独立 reference、单 token／多 token 定律、分位数重复值和边界、selectedInputs 的读取覆盖、非法路径拒绝、生成 JS 与记录 hash 的一致性、缓存失效矩阵。
-
-发布保留：真实当前仓库的独立重算，比较实际 production Surface 与当前语料导出的 prior／bounds。测试依然不能把生成器自己的中间结果直接当 expected 值。允许共享同一份原始输入与 tokenize 结果以减少重复编码，但独立数值 oracle 保持独立，且另有编码完整等价测试。
-
-目标不是固定写死“12615ms 必须变成某个数”，而是证明日常不再重复进行这项整仓计算，发布中也不重复做同一份输入编码。
-
-## 12. Surface、ESM 和资源检查如何收窄
-
-### 12.1 Surface 的两部分分开
-
-保留真正的入口约束：注册的公开 Surface 有对应生产源码和产物，所需导出存在，测试不得转而深层导入内部实现。去掉“测试必须具有某个精确标题、HOW 必须有相同文字、证明册给它授予权威”的部分。
-
-scripts/checks/js-surface-manifest.mjs 当前兼做这两件事，还有对测试 binding 使用的复杂词法判定。改造时先把产物闭包验证从证明治理中分出来，不把整个脚本统一视作无用或统一保留。
-
-真正调用生产 Surface 的测试失败，由 node:test 的实际结果裁决。一个源码扫描器看到 import 后出现某个标识符，不足以替代函数确实被测试，更不能成为新的 coverage 指标。
-
-### 12.2 一次解析 emitted modules
-
-scripts/checks/js-module-linkage.mjs 当前已经对每份 JS 解析一次，建立导出表再查相对导入；主要需要去掉 CLI 为显示数量而进行的第二次 walk，并与后置入口检查共享这份本次 inventory。
-
-建议 validateModuleLinkage 返回 { issues, moduleCount }，调用者直接使用。若 Surface 后置检查也需要相同 AST，则传入同一份 Map；不要在每个 Surface 条目中再次 parse 全仓测试文件。
-
-当前 linkage 主要覆盖静态相对 import 的目标与 named export，不是完整的 ESM 链接器。re-export、动态 import、package imports alias 和裸依赖不能因为该门为绿就宣称全部验证。Plugin/Sphinx 入口与 package import 的实际消费测试继续承担相应边界。
-
-第一版对最终 dist 做一次完整线性枚举／语法链接即可。不要为这点工作造 AST 磁盘缓存或另一个模块图持久数据库。
-
-### 12.3 资源检查从消费者需求出发
-
-保留实际存在的语言对、占位符和协议字段一致性，资源缺失必须失败。删除作文 anchor、固定深度、泛化 prose debt 等写法治理。
-
-scripts/build.mjs::verifyArtifacts 当前对部分 rule 目录和角色做手写抽样检查。应复用生产资源目录／registry 的完整发现结果及现有资源契约测试，不继续维护“抽样第一个目录加一个固定名字”的半套清单。
-
-工具注册、Hook 注册和语义资源都有生产事实来源。以该来源推导期望集合，不再复制一份固定角色数／目录数作第二真源。有效 ID、协议字段或真实对外资源集合的严格相等依然可以检查；删除的是与事实脱节的重复常量。
-
-## 13. 输出设计：成功简洁，失败完整
-
-### 13.1 默认成功输出
-
-下面是版式示意，<...> 表示实际运行时数据，不是本次测得的目标耗时：
-
-```text
-verify  daily
-  format       OK       <elapsed>  cached
-  checks       OK       <elapsed>  <sources> sources
-  build        OK       <elapsed>  focused, <affected>/<total> shards
-  unit         OK       <elapsed>  <passed> passed
-  integration  OK       <elapsed>  <passed> passed
-PASS  <wall time>  inputs and build unchanged
-```
-
-no-op 构建显示 reused：输入与产物已核对；不能显示“已重新编译”。release 额外显示 clean、Long Stroke 和 package 阶段，明确这才是完整发布验证。
-
-并非必须机械固定在几行。已有警告、skip、todo、资源诊断或失败时增加必要信息，不为了“干净”藏问题，也不建立终端行数硬门禁。
-
-不要在正常运行时重复打印每个 verifier 的 OK、已知反例名、80 字符横幅、每组 top 5、同一套测试的两个总数，以及 npm pack 的全文件列表。
+非 TTY 使用普通逐阶段行，不输出光标控制符和假进度动画；TTY 可以更新当前阶段一行。长阶段只显示阶段名和真实已完成数量，不为了保持热闹重复成功测试名。显示刷新不是 watchdog 的因果进展。
 
 ### 13.2 失败输出
 
 ```text
-verify  daily
-  format       OK       <elapsed>
-  checks       OK       <elapsed>
-  build        FAIL     <elapsed>
+FAIL tests · 1 failed · 2 files incomplete
 
-src/.../Consumer.fs:<line>: compiler diagnostic
-  <original error and source context>
+requirements/<owner>/tests/<file>.test.mjs:<line>
+  <完整测试标题>
+  expected: <断言期望>
+  actual:   <实际值>
+  cause:    <原始失败原因及有用调用栈>
 
-Stopped before unit.
-Log: .fable-build/verify-logs/<run>/build.log
-FAIL  <wall time>
+未执行：integration
+日志：.fable-build/verify-logs/<run>/tests.log
 ```
 
-测试失败显示完整名字、文件位置、实际／期望、原始错误链和有用堆栈；超时显示最后一个因果 verdict、尚未完成范围、后台活动、子进程退出／信号及日志位置。默认失败输出就应足以定位问题，不要求用户先猜一个 --verbose 才知道为什么红。
+每个独立失败都要有可定位的条目。相同子测试失败向上传播形成的容器重复消息可以折叠成一个因果链，但不能少报独立失败。seed、shrink path、反例输入、错误 code、expected/actual、文件和行号保留。
 
-受控反例测试故意启动失败子进程，其输出归该测试上下文；它通过时可以不刷屏，但其断言失败时必须展示这些输出。不要全局过滤包含 error／warning 的行。
+第一次真实失败到达就展示，不等可能永远不到的 end；末尾只补充总状态与未完成集合。失败后仍运行的同层独立测试是否收尾，沿用明确策略；后继依赖阶段不得继续。若进程崩溃没有结构化错误，展示该 child 的有界日志尾部及完整日志路径。
 
-### 13.3 verbose 与 profile
+### 13.3 日志分流与夹具隔离
 
-仅增加两个与显示有关的选项：
+stdout/stderr 不是成功／失败协议。字符串含 FAIL 的 expected fixture 不能把顶层染红；stderr 没输出也不能代表通过。判定来自真实退出与结构化结果。
+
+改造分三层：
+
+1. 测试内启动的预期失败 child：测试自己捕获其输出，断言 code、诊断和清理结果；只有断言失败时展示捕获内容。
+2. 产品 canary／Sphinx 等正常诊断：进入本次按 suite/child 归属的日志，不默认把完整 JSON 倾倒到终端；遇到真实失败立即显示诊断摘要。
+3. verify 的真实 warnings、参数错误、构建错误和 runner-error：以明确类型显示，不能统一重定向 stderr 到黑洞。
+
+mock verify 必须使用临时目录与内存 sink，不能创建真实 latest 链接，更不能打印 PASS verify release 让读者误以为已运行发布。单独加一项回归，验证 spy 模式执行没有向调用方外部终端或真实日志目录写入。
+
+并发 case 不用全局替换 console.log/console.error 来静默；那会互相截走日志。对实际可注入 logger 传局部 sink；不可注入的第三方程序在 child 边界捕获。暂时无法区分的诊断完整保存在 suite 日志中，不作内容猜测式丢弃。
+
+### 13.4 详细与性能模式
+
+只增加或打通两个明确选项：--verbose 显示执行细节；--profile 显示耗时分布。两者不改变选择文件、测试参数、超时和判定。未知参数直接拒绝。
+
+verify 必须把显示设置传给 Node 测试入口和 harness；不能只打开父级 stdout，而内层仍不知道 verbose。单独 runner 可继续识别 NODE_TEST_VERBOSE，正式入口统一转换一次。
+
+profile 默认只记录每文件墙钟、每层墙钟、叶子耗时和必要的慢项，不为每条成功断言再加一套时钟。区分并发工作量之和与用户等待时间。只有 profile 才排序 top5；普通模式不每组重复分位数。
+
+不建立历史性能数据库。一次运行产物放现有 .fable-build/verify-logs 下；一次 profile 比较可记录到实施提交说明，不能因此给仓库再添指标治理平台。
+
+### 13.5 日志的可靠边界
+
+每个真实执行有独立目录，避免内层 fixture 改 latest。stdout 与 stderr 保留通道标记；接收顺序只是日志观察顺序，不能冒充跨进程全局因果顺序。
+
+内存只保留有界 tail，完整流写文件并处理背压；不能把所有输出累加进字符串等 suite 结束。文件写入失败要报告基础设施失败，不能仍打印 PASS 后才发现磁盘满。
+
+默认摘要不显示每个成功日志文件路径，失败或 verbose 再给定位信息。保留必要的脱敏：不能为方便排障把用户 HOME 配置、凭据、请求秘密或任意文件内容塞入日志。已有 incident 脱敏的行为测试随导出工具保留。
+
+## 14. 必须保留的测试布局
+
+不要把此表变成另一份强制 registry。它只是施工时辨别责任的说明，实际运行仍由现有发现入口负责。
+
+| 领域 | 必留的错误模型 | 优先优化什么 |
+|---|---|---|
+| 身份／权限／admission | 跨身份误用、重复 acceptance、stale fence、未授权 effect | 缩小 fixture，不删真实入口拒绝 |
+| durable events | 写盘失败、损坏尾、重复事件、codec 不兼容、重启重放 | 纯 fold 小输入；保留少量真实物理追加 |
+| durable convergence | merge 幂等／交换／结合及其适用前提、partial sync、retention | 避免为每个纯性质起完整仓库；保留实际 Git／传输契约 |
+| provider recovery | terminal 吸收、stale/duplicate、互斥 resolution、最多一次 effect | 固定 seed 的真实 Surface 性质与最小反例 |
+| Host／process | SDK 可观察契约、生命周期、超时与 handle 回收 | 物理实例复用仅限同一明确定义的生命周期；不共享全局脏状态 |
+| compiler／build | 输入闭包、.fsi 隐藏、inline 传播、失败不发布、缺输出、新鲜度 | 纯 planner 属性在内存；真实 Fable canary 到 release |
+| resources／distribution | 完整语义资源、定位不依赖 cwd、真实包可导入 | 一次资产遍历，真实包只验一次 |
+| test infrastructure | 漏执行、假绿、错误统计、失控输出、静默不回收 | 真正运行同一状态／drain 函数，小型进程负例 |
+
+编译器可以拦截的类型错误，不需要再检查某行源码拼写；但“代码编译了”不能替代合法输入产生正确结果。同理，接口存在、能 import，不等于该业务行为正确。
+
+## 15. 规范调整范围：先说清要取消哪种义务
+
+本轮的用户目标支持继续裁减治理性测试，但具体规范修订仍应与实现原子对齐。不要用保留中的“判据只收紧”条款去维护已经决定退役的无效门禁，也不要借精简取消有效行为保障。
+
+| 规范／说明 | 建议修改 | 不改什么 |
+|---|---|---|
+| verification-system WHAT 001 | 执行层序由真实固定调度器保证；允许移除重复接线与写法检查 | 日常／发布集合、一次执行、唯一 Long Stroke、clean release |
+| verification-system WHAT 004、005 | 明确 verifier 自测必须运行实际 verifier；禁止测试内复制决策冒充回归 | 可红、异常失败、非零传播 |
+| verification-system WHAT 006 及 HOW | 不再要求中文退化清单与 case 表逐条绑定；列出实际监督行为与测试落点 | causal silence、诊断、background 不续期、物理回收 |
+| verification-system WHAT 008、010 | 明确删除冗余／无效证明不等于降低 retained contract；新鲜度与内容摘要仍是硬要求 | 失败不能改成 warning，不能放宽超时／manifest 判据 |
+| verification-system WHAT 011 | 如实际 worker coverage 机制需调整，仅修 HOW 或精确机制描述 | 全生产模块分母与缺失报告失败 |
+| verification-system WHAT 012 | 删除为政策存在再建扫描器的 HOW 落点 | 不以代码行数作为质量门槛 |
+| js-semantic-surface WHAT 003 | 取消静态 callback reachability 与 consumer/law 登记授予 proof authority 的规定 | 领域归属、真实公共 Surface、生产行为 oracle |
+| js-semantic-surface WHAT 004 | 以独立失败价值判断 helper 测试；不为内部纯函数发 law 许可证 | 不测纯实现协作、不暴露无意义内部状态 |
+| js-semantic-surface WHAT 002、005、006 | 只同步接口检查的新落点 | 公共边界、JS-native 数据、禁止 mangled 私用、完整 JS linkage |
+| structured-workflow 相关 HOW | 删除注释／文案豁免测试引用，指向真实 continuation／退休行为 | 领域控制流和权力归属 |
+| 各领域 HOW | 去掉被删除的 exact path/title 引用，把搬迁行为指到新归属 | 唯一产品语义、未完成 GAP 的真实状态 |
+
+无需重新生成 proof-levels、requirement-trace 或每测试 law 授权数据库。既有 WHAT 标题标签可以保留作导航；新增测试使用正确的领域命题，不再延续 P6-REPORTER 一类施工批次标签冒充产品合同。
+
+若遇到本文未授权的产品语义调整，例如改变容量上限、允许新权限、放宽恢复拒绝、改变闭包预算，停止该局部改动并单独记录。不影响其他已明确的测试精简继续推进。
+
+## 16. 程序落点总图
+
+尽量改现有模块。新增模块只有确实出现一个被运行器和测试共同使用的概念时才成立。
+
+| 位置 | 施工内容 | 交付后的责任 |
+|---|---|---|
+| scripts/verify.mjs | 固定 plan 导出；root/output/logDirectory 注入；正确快照；无默认 staleness 旁路；单份阶段输出 | 验证执行的唯一外层属主 |
+| scripts/lib/build-state.mjs | 复用内容摘要与输入收集；加入明确验证输入选择 | 输入／输出内容凭据，不负责展示 |
+| scripts/lib/owner-compile.mjs | 从已有 planner 抽 read inventory 与纯 plan 两段 | CLI 与 property 调同一个真实算法 |
+| scripts/checks/js-surface-manifest.mjs | 先去重读写，后按规范修订退役 proof authority 分析 | 窄 Surface 物理边界验证 |
+| scripts/lib/test-surface-scan.mjs | 清理失效 laws/consumer 元数据消费者；保留必要 import／representation 扫描 | 测试边界，不是 proof 登记中心 |
+| verification-system/tests/run.mjs | 修 ROOT；校验局部选择和并发参数；把显示交同一输出策略 | 单元／领域 suite 的真实发现入口 |
+| verification-system/tests/support/run-inner.mjs | 正常化事件、调用实际 drain、覆盖率路径、完整 flush/error | Node TestsStream 的唯一消费与统计 |
+| verification-system/tests/support/test-run-state.mjs（新增） | 规范化事件、文件完成、叶子统计与容器失败 | 唯一运行状态；无文件 I/O、无终端输出 |
+| verification-system/tests/support/compact-reporter.mjs | 去掉自有计数；接收结果；即时失败；完整错误信息 | 只做显示，不决定 PASS |
+| verification-system/tests/e2e/support/supervise-node-test.mjs | 消费 canonical 结果；验证完整结束；保留进程组监督 | 物理生命周期，不再二次累加 pass/fail |
+| verification-system/tests/e2e/support/watchdog.js | 最小 clock/timer/output/terminate 端口 | 保留原生默认行为，时间逻辑可确定验证 |
+| verification-system/tests/support/integration-node-test-steps.mjs | 正确 releaseOnly；合并合适的小组；固定范围集合 | 文件到执行组的唯一映射 |
+| verification-system/tests/integration/run.mjs | 消费组选区，统一输出；不从源码字符串推断接线 | 一次 warmup、一次各 integration child |
+| verification-system/tests/integration/harness/run.mjs | 删除退役 case 接线；输出注入；捕获 expected diagnostics；返回一份结果 | 保留已有 case 执行与物理监督，不重造框架 |
+| verification-system/tests/reporter-supervision.test.mjs | 删除两份镜像逻辑，改跑真实状态／drain／child | 防错误结果与假绿 |
+| verification-system/tests/verification-inputs.test.mjs（新增） | 真正创建、修改、增加、删除 fixture 文件 | 证明 snapshot 覆盖集合与输入污染会红 |
+| verification-system/tests/support/fixtures/ | 必要的正常、异常、挂死、skip/todo 等 child fixture | 可重复的真实物理负例，命名不可被普通发现扫入 |
+| 各领域现有 *.test.mjs 与 HOW | 迁移有价值断言，合并重复准备，删除文字治理 | 测试跟随真正语义属主 |
+| .github/workflows/ci.yml | 保留 release；增加必要的 runner 兼容性验证安排 | 支持版本真实通过，不凭本机推断 CI |
+
+不必为每一行新增文件。watchdog 的虚拟时间回归可放现有 timeout/budget 测试；source checker 反例可留现有文件。新增 test-run-state 是为了消除已经存在的两份真源，不是为了把一个函数拆成五个模块。
+
+## 17. 分批施工计划
+
+每批完成顺序：确认要保留的行为 → 让新反例在旧路径上红 → 修改实现／删除重复 → 跑该范围 → 清理失效引用 → 独立提交。只删除文案型测试的批次不需要人为造一条假的产品失败；其证据是断言确实没有调用产品或必要 verifier，并且依赖已清干净。
+
+### T0：锁住真实 runner 缺口
+
+改 verification-inputs.test.mjs、proof-ladder.test.mjs、reporter-supervision.test.mjs 及最小支撑接口。首先让三种错误显式变红：验证期间真的改文件；删除实际文件完成处理；实际消费流中抛错。
+
+在旧代码上，snapshot 测试应因 verify 错判成功而失败；runner 测试应证明调用的是 run-inner 使用的函数，而非测试自己的复制品。完成 root/output/logDirectory 注入后，断言测试没有污染真实 verify-logs/latest。
+
+验收：固定阶段的实际轨迹、错误传播、mock 安静、fixture 清理。此批不删除领域测试，不调整随机预算，也不切 releaseOnly。
+
+### T1：去掉已经证实的重复工作
+
+改 surface-charter.test.mjs 的三次 validator 为一次；对同一文件中重复的 scanAll 现状调用按职责收口。合并 catalog/TIP_01/TIP_02 的重复真实资产检查，保留其他业务输入。
+
+暂不删除 JSSEM003 的静态 proof authority，避免把小优化与规范变更绑在一起。重复调用去掉后，运行相同的 Surface 单文件 profile，与第 2 节的基线对比；记录执行范围变了什么，不要求固定提速比例。
+
+验收：missing emitted／deep import／支持文件扫描等负例仍红，资源数量／字段／加载行为仍对。用例减少应能逐条对应删除表，而不是只报少了几十项。
+
+### T2：退役纯文案和历史清单治理
+
+处理 degradation-list 文案链、boundary-exemption 的七个纯文字断言、runbook 标题/API 文案、harness cardinality 与 K10 presence 表。先删除消费者接线，再删只剩它们使用的 helper/fixture。
+
+保留 runbook 的人类说明；迁走 incident 数据脱敏断言；保留真实 compileScenario、watchdog、runtime selection 反例。不保留一个返回空数组的 parser 壳，让旧 case 表假装还有效。
+
+验收：领域行为 suite 通过、harness 能正常加载，必要反例仍失败；HOW 不指向已删路径。不要求“检查目录等于固定 allowlist”，只检查实际 import 没有断链。
+
+### T3：取消 Surface proof 登记治理
+
+先修订 JS-SEMANTIC-SURFACE-003/004 及对应 HOW，再删除 callback authority、consumer/law 授权登记和只服务它们的自证测试。保留最小公共 Surface 物理边界与完整 emitted ESM linkage。
+
+从所有调用点移除旧 API，不能只从主入口跳过而留下整套 latent scanner。仍被窄 import checker 使用的 parse/scan 能力留在已有语法模块。
+
+验收：正式 build 仍对缺 emitted module、named import 不存在、越界相对路径失败；合法公共 Surface 的领域测试可运行。不得因为测试文件换包目录就出现新的运行时权限含义。
+
+### T4：替换业务源码字符串断言
+
+按领域逐个小提交，不一次改完第 6 节所有文件。先处理退休权限、持久化失败和恢复，因为误删的损失最大；再处理无副作用的 projection/render/codec。
+
+每项保留原命题，使用实际入口和明确输入观察结果。仅在真实业务边界必须有调用约束时记录 port trace，例如禁止第二次 durable append；不把私有 helper 调用次数换个名字重新钉死。
+
+验收：旧违规行为使新测试失败，正常行为通过；无未知内部字段被开放为 test-only API。搬迁 domain.meta 时逐项确认时区、旧 codec 拒绝和 provider 去重没有消失。
+
+### T5：算法与夹具提速
+
+抽 owner-impact 的生产纯 planner，property 走内存图；保留小型文件解析契约和真实 Fable canary。给 Watchdog 注入局部虚拟时间端口，将期限语义的真实等待替换为离散推进。
+
+保持 capacity soak 参数和每步关键观察，重测独立与全套差异。真正资源瓶颈应出现在 profile 数据里，再决定是否单独优化生产 snapshot；本批不靠删第二次 snapshot 直接得分。
+
+验收：旧 seeds、固定反例、输出集合与时序语义一致；Watchdog 物理 child、timer 不拖进程和清理仍通过。并发测试不修改全局时间或共享 journal。
+
+### T6：一个统计器和一套显示
+
+引入 test-run-state，run-inner 与 reporter 真正使用同一结果。supervisor 删除二次计数，补 complete/summary/drained/exit 联合验证。修 coverage 的实际路径，并补可运行入口测试。
+
+日志按第 13 节分流；失败到达即显示；下游写入失败不能继续 drained。harness 不再每项通过打印，预期 mock fatal 被所属 case 捕获。
+
+验收：Node 20 与26.5 的实际 fixture；compact/verbose/profile 的选区与最终判定完全一致；输入同一套失败时不能丢 expected/actual/cause/seed。普通成功运行无模拟发布 PASS 和 giant Host JSON。
+
+### T7：调度收口
+
+为 compiler group 补 releaseOnly；保留已经存在的 envelope releaseOnly。合并小型 integration 的外层调度，确认 warmup/child 不重复，真实 Host admission 若搬家依然每天验一次。
+
+用 runtime plan 和集合测试防漏接线。参数非法、外部 TESTS_MJS_FILES 偷缩正式范围、空选择都失败。明确显示 scoped 与 release-exclusive 不同概念。
+
+验收：日常集合正确；release 包含日常与全部发布项；没有测试既由 unit 发现又由 integration 启动；改动某个必要文件路径后缺失会被入口发现，而不是静默少跑。
+
+### T8：清理引用并做最终验收
+
+逐个检查删除文件的 import、HOW 映射、APPLIES-TO、fixtures 和旧环境变量。不要重新生成退役的 proof registry；也不要只降低计数断言让它变绿。
+
+完成后运行日常与发布入口，记录真实环境、范围、exit code、墙钟与失败信息。用相同机器比较改前／改后；把仍无法完成的验证明确写出来，而非声称“测试都过了”。
+
+最终交付应删除旧代码，不保留两份 reporter、一份始终空返回的 scanner、一条永远启用的 compatibility 路径，或一个没人使用的 pass count。
+
+### 17.1 批次依赖
 
 ```text
-npm run format-build-test -- --verbose
-npm run format-build-test -- --profile
-npm run verify:release -- --profile
+T0 真实运行器回归
+ ├─ T1 重复扫描／资产去重
+ ├─ T2 文案与历史清单退役
+ └─ T6 统一结果与显示
+
+T1 + T2 → T3 Surface 治理退役
+T0 → T4 业务形状替换
+T0 → T5 算法与夹具
+T3 + T5 + T6 → T7 调度收口
+T4 + T7 → T8 最终验收
 ```
 
-verbose 展开完整工具与测试输出；profile 增加检查分项、构建失效原因、阶段墙钟、慢测试与并行配置，并可写一个 .fable-build/verify-profile.json 便于比较。profile 不是通关证书，不供任何产品逻辑消费。
-
-数值明确区分 wallMs、sumTestMs 与 CPU 时间。sumTestMs 不是墙钟。默认无需排序所有测试；要展示 top k 时可以只维护很小的候选集。若 profile 需要分位数，用一份数值数组排序即可，不为几十毫秒的统计另造流式算法框架。
-
-TTY 可以用同一行更新当前阶段，非 TTY 使用稳定普通文本。颜色只用于支持的终端，尊重无颜色设置；不在 CI 原始日志输出强制 ANSI 控制码。进度动画只负责显示，永远不喂 watchdog。
-
-## 14. reporter 改造不得破坏测试监督
-
-### 14.1 结果、监督、显示各管一件事
-
-```text
-node:test TestsStream
-  ├─ IPC：verdict／执行状态 → supervisor → 权威运行结果
-  └─ compact reporter：默认摘要或 verbose 详情
-
-supervisor
-  ├─ classifyVerdict → watchdog
-  ├─ 文件范围、退出／信号、drained、失败与取消
-  └─ 返回结构化 suite result → verify 的阶段摘要
-```
-
-不能把 spec 文本经过 grep 再数通过数，也不能靠某行含 PASS 决定成功。Node 官方支持直接消费 TestsStream 的自定义 reporter，应从事件入手。[E1]
-
-现有 IPC 只传 name、file、nesting、durationMs 等字段。补足计数所需的 skip／todo／错误分类及真实 file wrapper 识别信息；失败详情可以由 child reporter 写入受监督的 stderr。不要把原始 Error 对象当作跨进程一定无损的 JSON，需要显式保留其关键字段或已格式化的原始诊断。
-
-计数只认一套归一化规则。同一测试的 test:complete 与随后 test:pass／fail 不能重复计数，suite 和文件 wrapper 也不能当作额外叶子通过。嵌套测试用真实 node:test fixture 验证，不用只含一层 test 的假事件样本证明全部正确。
-
-### 14.2 明确保留的监督语义
-
-外部 supervisor、verdict-silence watchdog、最终物理 backstop、进程组清理和临时 HOME 继续存在。它们不是要删的脚手架。
-
-当前 classifyVerdict 接受 test:pass、test:fail、test:complete 作为 verdict。test:complete 按执行完成报告，pass／fail 则可能受定义顺序约束。[E1] 精简 reporter 时不能只保留排好序的漂亮结果，从而让其他文件的实际完成进展失去喂狗机会。
-
-stdout、stderr、diagnostic、等待动画、构建心跳都不能重置 verdict 静默时钟。后台活动可以记录进诊断，但不能使一个不停打印的挂死测试永远不超时。
-
-不把 per-test timeout 施加到承载多项测试的整个文件 wrapper，不使用一个共享 AbortSignal 扇出数百监听器，不扩大时间预算掩盖竞态，不增加 retry-until-pass。
-
-### 14.3 借这次改造补两个错误路径
-
-第一，run-inner.mjs 当前把 stream 的 end 与 error 都 resolve 到同一条后续路径，随后发送 inner:drained。改为 error 明确失败，不得在未完整排空时发送成功 drained。先有错误 fixture，再改实现。
-
-第二，supervise-node-test.mjs 当前遇到任意带 file 的 test:complete 就从 outstanding 删除该文件。单个测试完成不等于整份文件完成。[E1] 应根据实际 file wrapper 终结信号管理文件状态；对 Node 20 与 26 分别验证，不能靠测试名字恰好等于文件路径来猜。
-
-若某个受支持版本没有足够可靠的公开文件终结信息，保留“完成状态尚未确认”，记录该文件最后 verdict；直到整条结果流正常排空且 child 退出，才确认整体执行结束。不要为提前显示一个完成数引入 Node 私有 API。此时超时诊断必须使用“尚未确认”，不能把已见过 verdict 的文件误称为从未执行。
-
-文件状态首先用于正确诊断。最终成功还必须同时满足：选定范围确实执行、无真实失败／取消、child 正常退出、结果流排空、没有 backstop／silence 超时。某一份文件提前产生一次通过，不足以提前宣告整个文件完成。
-
-### 14.4 子进程输出和退出收口
-
-改用异步 spawn 捕获长阶段输出时，stdout 和 stderr 都要及时消费。等待 close 后再结束报告，避免 exit 已发生但最后的诊断还在管道中。spawn error、信号、非零退出和 reporter 自己抛错全部向上传播。
-
-不要使用固定 maxBuffer 的 exec 把数千条日志攒满后才读取，也不要无限字符串拼接保存所有成功输出。默认把完整日志流式写入 .fable-build/verify-logs/<run>/，内存只保留用于即时诊断的有界尾部。
-
-日志空间有界：正常成功后只保留有限的近期运行；失败日志保留并提示位置。达到单次日志容量上限时明确报告“日志超出记录预算”并失败，不静默截断关键错误再报告成功。日志写入失败同样不能假装已有完整诊断。
-
-这些日志不参加格式、静态或构建输入，也不进入 npm 包。profile JSON 同理。把日志写到当前 build 的宽输入 glob 里会造成自我失效循环，必须在验收中覆盖。
-
-Ctrl-C／SIGTERM 转发到本次拥有的子进程，停止新阶段，清理已启动的进程和临时目录，再以对应非零码退出。现有负 PID 进程组方式面向 POSIX；本次环境和 CI 是 Linux，不顺带宣称已解决 Windows 进程树清理。
-
-## 15. 发布只验证一个真实包
-
-### 15.1 不再拿工作区布局冒充安装证明
-
-当前四个 package integration 文件只是工作区分发契约。保留它们的真实价值，但名称和 HOW 要如实说明。npm pack --dry-run 也只模拟打包，不生成可供解包的正式 tarball。[E6]
-
-本方案选择一次真实 npm pack，而不是先 dry-run 再 pack。新的 scripts/verify-package.mjs 由发布入口在唯一 Long Stroke 之后调用。
-
-### 15.2 执行步骤
-
-1. 核验待打包的 generation 与前面测试消费的一致。
-2. 在仓库外创建临时目标目录，执行 npm pack --json --pack-destination <temp>。参数以 argv 数组传递，不拼 shell 字符串。
-3. 检查退出码、JSON 可解析、只有当前包的一条结果、声明的 archive 确实存在。不能把 stdout 里偶然出现的 JSON 片段当成功。
-4. 根据 npm 的实际 files 列表检查入口、全部 dist 和 runtime resources、package manifest 一致；拒绝源码、tests、scripts、requirements、缓存、日志混入。
-5. 在独立目录解包，枚举实际成员，与 pack 清单和构建输出 hash 核对。禁止越界路径与异常成员类型。使用明确可用的标准解包工具，不手写 tar 解析器；缺少工具时给出失败诊断，不跳过。
-6. 从仓库外的 CWD 导入解包后的包入口，检查 package imports alias、必要导出与 module-relative 资源定位。用临时 HOME，不接触开发者配置。
-7. 再核对生产 generation／输入／打包字节未改变。finally 清理本次临时目录，成功只输出包名、文件数、体积和结果。
-
-npm 自动包含的 package.json、README、LICENSE 等正常元文件，按 npm 的实际打包规则处理，不能机械地因为不在 dist／resources 下就拒绝。[E6] 仍然禁止把这些自动规则变成允许任意根目录文件的通配例外。
-
-### 15.3 不把依赖安装变成新的重负担
-
-解包消费测试使用当前已安装并锁定的生产依赖。可在临时 app 的 node_modules 中连接这些依赖，再将解包目录作为 wanxiangshu 包；不能把原工作区的 wanxiangshu 或原 dist 链进去，否则测试又退回工作区自证。
-
-这证明“交付 artifact 在已有正确依赖的环境中可加载”，不宣称完成了空机器联网 npm install。真实依赖解析仍由 npm ci 和现有版本契约承担。本轮不新增联网安装循环，不执行 npm publish，不改包的发布权限。
-
-npm 生命周期脚本若导致 pack 时再次修改 dist，前后 hash／generation 必须使本次验证失败。不能在 build/test 之后偷偷 prepare 出另一份字节，再以为刚才测试覆盖了它。
-
-### 15.4 永久测试
-
-requirements/distribution/tests/pack-artifact.test.mjs 覆盖清单解析、缺入口、缺资源、混入源码、重复／越界成员、JSON 损坏、非零退出、同一 generation 的字节比较等小输入逻辑。真实 archive 的创建与消费由 verify:release 正式执行，不给每个 unit 反例都真实 pack 一次。
-
-scripts/verify-package.mjs 只负责这件具体事，不扩展为 npm 发布平台。现有 contents、resources、import 和改名后的 layout 测试继续证明其各自边界。
-
-## 16. 实施批次
-
-每批应能独立审查，并保留一个能运行的正式入口。下面是依赖顺序，不是要求一次提交全部完成；是否 Git commit 由实际执行指令决定。
-
-### P0：固定测量方法和回归入口
-
-先记录当前 branch、revision、Node/npm/SDK/Fable 版本、测试文件数和第 2 节同口径计时。新鲜度修复前，不拿旧 dist 的 unit 结果证明新构建算法。
-
-确认将要使用的永久测试位置：
-
-| 领域 | 优先使用的现有位置 |
-|---|---|
-| 构建新鲜度 | verification-system/tests/build-freshness.test.mjs |
-| 静态入口与失败传播 | verification-system/tests/proof-ladder.test.mjs、repository-closure-gates.test.mjs |
-| integration 发现 | verification-system/tests/integration-entry-coverage.test.mjs |
-| runner、watchdog | verification-system/tests/integration/harness、verdict-feed.test.mjs、e2e-watchdog-feed.test.mjs |
-| 多工程编译与 impact | structured-workflow/tests 现有 owner-compile／owner-impact 测试与 compiler-boundary integration |
-| envelope | degeneration-guard/tests/loop-detector.test.mjs |
-| 分发 | distribution/tests/integration/package |
-
-先把针对本次改动的反例加进这些正式位置，不在仓库根目录造临时测试脚本。需要新的 fixture 时和相应测试一起长期保留；不污染真实生产源码或 dist。
-
-完成标志：每项拟改的执行边界都有明确测试属主，基线数据与未测范围分开记录。
-
-### P1：先去掉有直接证据的低价值成本
-
-改动重点：check.mjs、deadcode.mjs、deadcode-baseline.json、deadcode-scan.test.mjs、proof-ladder 中数量／源码写法断言，以及相关 WHAT/HOW。
-
-先撤数量下限和“checks 目录必须全接线”的自我治理，再删除 deadcode 入口与专属附件。不要把 debt 0 留作一张永远空的清单。
-
-控制金字塔、prompt-depth、session 问卷等纯治理规则可在确认没有夹带产品断言后按同一方法删除；source gate 的真实边界部分留待 P2。
-
-验证：原来保留的产品测试照跑；失败 gate／不可启动 gate 的行为反例仍红；重新测 node scripts/check.mjs。报告实际差值，不提前宣称整条 format-build-test 已节省 14.5 秒。
-
-完成标志：不存在 retired checker 的空壳和仅为它服务的测试；不是仅从数组中暂时隐藏。
-
-### P2：替代混合门禁，退出证明登记链
-
-按第 4 节逐条处理 authority、decorator、p0 recovery、DSL、external effect 等脚本。先保留／补齐生产反例，再撤精确源码片段、类型后缀、注释和表格登记。
-
-对外部效果至少逐一核对 canonical append、writer sync、worktree create、branch fast-forward、prompt dispatch、todo write、JS transaction、provider execution、managed child、managed attempt interrupt、bounded process。原合同册移除，但这些边界的 actual acceptance、歧义和恢复断言不能凭空消失。
-
-同步拆开 js-surface-manifest 的物理完整性与 HOW/title 治理。最后移除没人再需要的 trace、proof-level 与其他登记文件。
-
-验证：保留行为测试、Surface 深层导入反例、private/.fsi compiler canary、恢复错误不得伪装成功的回归。旧 HOW 的声明引用跟着调整；INSTITUTIONAL-LEARNING-007 等既有缺口保持如实未关闭。
-
-完成标志：静态检查不再为了判一个物理边界而重建整仓 WHAT↔HOW↔test graph；删除文件不留活消费者。
-
-### P3：合并保留扫描，修正只读缓存
-
-创建 check-context；将保留脚本改为纯导出；check.mjs 同进程运行；compile-shards 吸收重复工程清单校验；test-boundary 与 js-boundary 合并；post-build linkage 返回 moduleCount 而不再 walk 第二遍。
-
-修正 format:check 与 check 的 Wireit 输入。验证只改 .fsi、.editorconfig、check.mjs 或 resources 时，相应检查不能误命中旧缓存。
-
-将 causal-wait CLI 中的合成 fixture 挪到正式 unit。保留一个对真实扫描根目录的接线测试，不把每项规则都变成一次全仓进程。
-
-完成标志：保留检查共享本次输入，任何缺失／不可读／解析失败都不被当空集合；源码只改局部写法不再撞上已经退役的规则。
-
-### P4：构建凭据与增量正确性
-
-先加第 17 节构建反例，再修改 owner-compile、build-state、build.mjs 和 build-freshness。
-
-将最终 manifest 提交移动到全部后置验证之后，补完整输入／输出集合，校验 tool identity 和根身份，修正集合差、inline 消费者失效、focused 旧产物清理，保留 build.lock。
-
-scripts/build.mjs 提供可调用函数和受保护 CLI 入口。普通与 --clean 共用同一核心，不复制两条构建实现。旧发布入口在切换前仍能明确获得 clean 语义。
-
-验证分两层：小输入验证计划、缓存和失败状态；正式 Fable fixture 验证源合并、inline、输出消失、同一输入的 clean／focused 结果。需要比较完整产物集合、关键导出和行为；对可确定性的 fixture 进一步比较 JS 字节，不用“能 import”代替全部正确性。
-
-完成标志：损坏状态只能明确失败或安全重建；普通 no-op 确实不启动 Fable；--clean 确实启动；失败后不存在有效成功凭据。未证明的 focused 形态仍走 full。
-
-### P5：优化 envelope 并拆开日常／发布证明
-
-先改一次排序，再修正并行度接口和 worker 失败清理。保持 tokenizer 序列、数值定义与输出精度不变。
-
-接入统一 manifest 的生成物输入摘要，避免语料未变时重复 tokenize。移动真实仓库重算测试到 degeneration-guard 的 integration 文件，保留小输入独立 oracle。
-
-发布专属分类可在此定义，但 P8 原子切换前，旧正式发布入口仍执行这些测试；不能在两批之间出现 CI 已经漏验、而新入口尚未接好的窗口。
-
-完成标志：只改文档不重编 F#；当前语料确有变化时 envelope 不能复用；生成器／tokenizer 变更使缓存失效；发布仍独立核对真实语料。
-
-### P6：reporter、supervisor 与小套件合并
-
-改 compact-reporter、run-inner、supervise-node-test，修复 error→drained 和叶子完成误当文件完成的路径；四个 package 小文件只调用一个 supervisor。
-
-verify 的最终摘要消费结构化结果，不从每个子命令的文本里反向提取统计。默认输出短，但慢／挂死时仍能展示当前阶段和最后进展；不改 watchdog 预算。
-
-验证：正常通过、断言失败、取消、嵌套失败、模块加载失败、无测试、只有噪声输出的挂死、结果已通过但进程未退出、stream error、日志写失败和 Ctrl-C。非 TTY 无控制码，verbose 与 compact 的退出码／结果一致。
-
-完成标志：显示可以切换，测试结论与 watchdog 判据不能随显示模式改变。
-
-### P7：接上唯一真实包验证
-
-创建 verify-package 与 distribution 的小输入回归。将 install.test.mjs 更名为 layout.test.mjs，修正“pack/install 共用 npm cache”的旧注释。
-
-发布包验证实际创建 archive、核对清单、解包、外部 CWD 消费。一次调用只 pack 一次，没有网络安装和 publish。资源缺失、源码混入、入口 alias 断裂都必须红。
-
-完成标志：能说明它到底验证了什么环境，不再靠文件名 install 或 dry-run 输出暗示不存在的安装证明。
-
-### P8：原子切换入口、CI 和说明
-
-新增 verify.mjs，更新 package.json、integration profile 和 .github/workflows/ci.yml；将所有发布专属文件真正归入 verify:release，移除旧顶层 dry-run。删除 build 的 Wireit 层，而不是让两套缓存长期并存。
-
-同步 verification-system／distribution／requirement-system 等 WHAT/HOW、README 的运行命令和相关测试。AGENTS 只修正入口导航，不向其中塞一套新规范。
-
-最后执行一次完整日常、一轮干净发布、一轮无改动复用，以及第 17 节的关键增量／失败矩阵。性能对比只在验证语义一致的场景之间比较。
-
-完成标志：两个入口名字、实际执行、CI 和说明相符；生产与测试语义没有减少；仅剩被明确保留的检查；没有无意义兼容命令和退休登记表。
-
-## 17. 验收矩阵
-
-表中反例应落在正式测试／fixture 中，不直接破坏工作区生产文件。无须每行一个新测试文件，同一边界的数据驱动用例放在一起即可。
-
-### 17.1 静态检查与调度
-
-| 场景 | 必须观察到的结果 |
-|---|---|
-| 生产 .fs 未进入任何工程，包括未 Git 跟踪的新文件 | 静态检查失败，不能因扫描只看 Git 而漏掉 |
-| 同一源属于两个 shard／引用不存在／图出现环 | 明确结构错误，后续语义检查不消费坏清单 |
-| .fsi 遗漏、孤立或编译顺序不合法 | 静态结构或正式编译失败，不能把集合相等当顺序正确 |
-| 实际资源／provider 投影越界 | 保留边界反例失败 |
-| 仅重命名无语义局部变量、调整等价代码写法 | 不因已退役的源码模板约束失败 |
-| 某个保留 checker 抛异常／缺扫描根 | 顶层非零，不能报告 0 issues |
-| 新 integration 文件未接线／同文件重复接线 | 完整性测试失败 |
-| 日常跳过明确的 releaseOnly | 输出标明日常范围；不是全发布成功 |
-| release 模式漏 compiler canary 或全仓 envelope oracle | 调度回归失败 |
-| 外部设置 TESTS_MJS_FILES／skip freshness 缩小完整入口 | 参数或范围错误，不静默接受 |
-| 退役 checker 的纯自测被删除 | 产品测试仍正常发现；不由数量下限阻止删减 |
-
-### 17.2 构建与缓存
-
-| 场景 | 必须观察到的结果 |
-|---|---|
-| 完全无变更，完整成功 manifest 与输出 | no-op，Fable 调用 0 次，envelope tokenize 0 次 |
-| 相同输入 --clean | 真实完整 Fable 调用 1 次；不复用旧 compile success |
-| 普通实现变化 | 一次已证明的影响并集；行为与干净构建一致 |
-| .fsi 变化 | 包含反向消费者；不遗漏消费者导入／导出更新 |
-| inline 实现变、.fsi 不变 | 消费者使用新实现，与 clean 相同 |
-| 删除／新增／改名源文件或改变工程归属 | full 或明确结构失败，无旧模块残留 |
-| 源文件从工程移除但仍在磁盘 | 路径集合差／唯一归属检查发现，不以 existsSync 跳过 |
-| 某个选中源不再生成 JS | 旧 JS 被移除，不能继续提供不存在的导出 |
-| 只改变已跟踪语料文档 | F# 不重编，envelope 重新派生并核验 |
-| 新增 Git 跟踪语料路径／删除已跟踪路径 | selector 集合摘要变化 |
-| 修改未跟踪且不属生产／资源输入的笔记 | 不无谓改变 compiler key；不冒充已被语料纳入 |
-| tokenizer、派生器、依赖锁改变 | 相应生成物失效 |
-| global.json、Fable 配置、编译 helper 改变 | compiler identity／input key 失效 |
-| 内容改了但 mtime／size 保持 | 由 hash 发现，不能复用 |
-| dist 中缺叶子模块、内容被改、多出陈旧模块 | 完整输出校验失效，安全重建或失败 |
-| manifest 损坏／schema 旧／属于其他 outputDir | 不复用，不拿 scratch 结果冒充生产 |
-| 编译失败、后置 linkage 失败、manifest 写入失败 | 整次失败，没有有效成功 manifest |
-| 构建中断／测试期间另一个构建改 dist | 无假绿，清楚说明输入或 generation 改变 |
-| 日志／profile 写入 | 不导致下一次构建自我失效，不进入包 |
-| 仅 .fsi 或 formatter 配置变化 | 格式缓存正确失效 |
-| 仅 check.mjs 或被检查资源变化 | 静态缓存正确失效 |
-
-### 17.3 数值与并行
-
-| 场景 | 必须观察到的结果 |
-|---|---|
-| 单样本、重复值、极值、下界概率边界 | 一次排序与原经验分位数定义相同 |
-| 空语料／非法概率 | 明确失败 |
-| 多种 Unicode／换行／文件拼接边界 | 串行与并行 token 数组逐项一致 |
-| 单 worker 与多 worker | 相同输入产生相同有效产物与统计值 |
-| worker 出错或无结果提前退出 | 派生失败，其余 worker 被清理，不挂住入口 |
-| 缓存生成 JS 被篡改 | hash 不符，不能拿正确输入键掩盖错误输出 |
-| 小输入独立 oracle 与生产 Surface | 真实生产行为正确，测试没有复制生产决策作为 expected |
-| 当前真实仓库发布重算 | prior／bounds 与当前语料及 production Surface 一致 |
-
-### 17.4 报告与失败路径
-
-| 场景 | 必须观察到的结果 |
-|---|---|
-| 全部通过 | 阶段摘要与实际结果一致，无逐叶子成功刷屏 |
-| 叶子／嵌套断言失败 | 错误链、文件位置、实际／期望可见；顶层非零 |
-| skip／todo | 单列，不计为 passed，不宣称该命题已得到通过证明 |
-| 取消、模块加载失败、发现范围为空 | 非零，不能由文件 wrapper 的成功状态覆盖 |
-| 一个叶子通过，后续同文件挂死 | 文件未提前宣称完成；watchdog 正常触发 |
-| 不停 stdout／stderr，但没有 verdict | 静默 watchdog 仍触发 |
-| stream error 后 child 正常退出 | 没有成功 drained，顶层失败 |
-| verdict 全部通过但进程仍持有事件循环 | 外部 supervisor 保持监督，不能提前返回绿 |
-| 重复 complete／pass 事件，suite／file wrapper | 不双计叶子，不把容器算新增测试 |
-| compact 与 verbose | 运行范围、退出码、失败数和喂狗语义相同 |
-| 日志管道末尾才出现错误／日志无法写入 | 不丢末尾诊断；输出故障不被吞掉 |
-| Ctrl-C／SIGTERM | 非零、无遗留本次子进程、不启动后续步骤 |
-| Node 20 与当前本地 Node | 对同组正式 runner fixture 得到一致判定 |
-
-### 17.5 分发与最终发布
-
-| 场景 | 必须观察到的结果 |
-|---|---|
-| 正常发布验证 | clean 1 次、产品测试一轮、Long Stroke 1 个世界、pack 1 次 |
-| 缺少资源／入口／imports alias 的目标 | 解包消费或清单核对失败 |
-| 包中混入 src、tests、scripts、requirements、日志 | 真实 archive 检查失败 |
-| 从仓库外 CWD 消费 | 资源依然从解包模块位置读取，不回退原仓库 |
-| pack 非零／JSON 损坏／没有实际 archive | 发布失败 |
-| pack 生命周期修改 dist | 字节／generation 核验失败，不能发布另一次构建 |
-| 全流程看似测试全绿但发生未执行范围／产物变化 | 不发布完整 PASS 结论 |
-
-Coverage 当前为可选路径，不是本次基线 unit 的默认工作。保留启用时全部生产模块的分母与未加载模块的计入方式，不以少预导入模块、排除难覆盖模块或调低阈值提速。发布／日常拆分也不借机改变既有 coverage 合同。
-
-## 18. 测量方法与收益判定
-
-### 18.1 先比较同一种工作
-
-分别记录：无变化复用、单个普通实现变更、签名／inline 变更、文档变更、工具链变化后的 full、完整发布。冷启动与热启动分开；不同 Node／SDK 和不同并行度不混在一列比较。
-
-日常删掉完整 E2E 后与旧发布入口比较，可以说明用户日常等待缩短，但不能称为“同等发布验证快了多少”。发布前后要比较包含相同必要物理证明的链路。
-
-每个代表性日常场景在无其他重任务时跑少量重复，记录中位数、范围、阶段耗时和峰值内存；完整发布至少有一轮明确成功记录。不要在 CI 加脆弱的绝对秒数门槛。
-
-### 18.2 可执行计时方式
-
-本次环境没有 /usr/bin/time，使用 Bash 自带 time 即可。以下新入口和 --profile 仅在相应批次实施后可用：
+图是语义依赖，不要求工具盲目并行。相同 runner/support 文件的重叠修改必须串行；各领域独立断言审阅可并行，公共接口确定后再迁调用方。
+
+## 18. 永久验收矩阵
+
+这些是实际回归用例的设计，不是要再落一张机器 proof 登记表。正常用例与故意违约用例成对存在；错误注入不修改用户真实工作区。
+
+### 18.1 输入、范围与阶段
+
+| 输入／故障 | 必须观察到 | 落点 |
+|---|---|---|
+| fixture 中途修改 .fs/.fsi／测试／support／资源 | verify 非零，指出变化路径 | verification-inputs.test.mjs |
+| 中途新增／删除被发现输入 | 文件集合变化，不能 PASS | 同上 |
+| 同大小同 mtime 替换内容 | 内容摘要变化，不能 PASS | 同上 |
+| 只新增本次忽略日志 | 输入快照不变 | 同上 |
+| 缺少必要输入根／读取失败 | 明确失败，不返回空快照 | 同上 |
+| format 或 check 返回非零 | build 及后续没有执行 | proof-ladder.test.mjs |
+| build 失败或产物凭据无效 | unit 没运行或新鲜度拒绝，不能跳过校验 | build-freshness/proof-ladder |
+| --release | 恰一轮 clean build，恰一轮 E2E/package | proof-ladder |
+| 日常运行 | 不含 release-only 编译器／envelope／E2E/package leaf | integration-entry-coverage/proof-ladder |
+| 某 integration 文件未接线／重复接线 | 入口失败并指明路径 | integration-entry-coverage |
+| 正式 verify 携带局部 override | 拒绝缩小范围，或明确进入非正式 scoped 模式 | runner／CLI fixture |
+| 空文件列表／非法并发／未知参数 | 参数失败，不回退宽松默认 | runner／CLI fixture |
+
+### 18.2 结果流与日志
+
+| 输入／故障 | 必须观察到 | 落点 |
+|---|---|---|
+| 一个成功、失败、skip、todo，加容器失败 | 精确独立计数，整体失败 | reporter-supervision |
+| 两个文件同名叶子、嵌套同名子测试 | 身份不冲突、不重复扣完成数 | 同上 |
+| 叶子恰好叫文件名后缀 | 不能被当文件 wrapper | 同上 |
+| 首个叶子结束，第二个挂住 | 文件仍 outstanding，最终监督失败 | 真实 child fixture |
+| 模块导入异常，尚无叶子 | 文件／容器失败可见，不显示0失败通过 | 同上 |
+| before/after 出错 | 失败不因容器过滤而消失 | 同上 |
+| 源流 error | runner-error；无正常 drained；非零 | 实际 drain 函数测试 |
+| reporter 抛错／sink 写失败 | 无正常完成确认，整体失败 | 同上 |
+| 日志写流慢、有背压 | 不丢块、不无限积压，完成前写完 | 输出边界测试 |
+| 先有一个失败，后有挂死 | 首个失败及时展示，最后报未完成集合 | 真实 child fixture |
+| 绿结果后留下 interval/server | 父级非零并回收该组进程 | 真实 supervisor fixture |
+| child 信号退出／无法 spawn | 非零，保留信号或启动错误 | 同上 |
+| child exit0 但缺 summary/drained | incomplete，不得 PASS | 同上 |
+| 正常快速结束 | 无多余等满 watchdog 窗口 | 物理退出 fixture |
+| compact/verbose/profile 三模式 | 相同文件、计数、判定；只显示不同 | reporter + entry 契约 |
+| expected failure fixture 输出 FAIL | 外层仍由断言判定；成功终端不混入假故障 | harness output 契约 |
+| mock verify 运行 | 不改真实 latest，不写真实终端 | proof-ladder/output 注入测试 |
+
+### 18.3 算法与业务保真
+
+| 输入／故障 | 必须观察到 | 落点 |
+|---|---|---|
+| Surface 缺 emitted module、缺 named export、越界 import | 实际 build validator 失败 | Surface／linkage 小 fixture |
+| support 再导入 support 隐藏 deep import | 必要边界扫描仍发现 | surface-charter 保留反例 |
+| 大 graph 多次 plan，同一变更重复或重排 | 输出 canonical、幂等、无重复 | owner-impact property |
+| signature 影响、断开分片、配置变化 | 原规则保持；不能漏消费者或假 focused | 同上及固定反例 |
+| 真实工程缺 provider／.fsi 隐藏符号被使用 | Fable compile 红 | release compiler canary |
+| watchdog background 与 blocking 输入 | 只有后者续期；边界前后确定 | 注入虚拟时钟的真实 Watchdog |
+| stop、setWindow(null)、取消后的回调 | 无泄漏、无迟到触发、默认语义不变 | 同上 |
+| 原 capacity seed 与参数 | 每步引用／容量／fence／reconciliation 仍验证 | capacity-soak |
+| rulebook 实际资源丢失／重复／坏字段 | loader 或 validator 红 | catalog 一次真实资产测试 |
+| 0、1、多 chronicle call，空／未知 tip | 原错误及分类保持 | codec／cycle protocol |
+| 未授权退休、冻结后检查、中断 | 拒绝与 effect 因果正确，无 session abort | relay-retirement 行为测试 |
+| append 失败／尾损坏／重复恢复 | 权威状态不越过 durable 事实 | durable 领域 suite |
+| 未加载模块＋坏模块的 coverage fixture | 分母完整；坏模块不报虚假高覆盖 | 真实 coverage 入口测试 |
+
+## 19. 执行命令与验证阶梯
+
+### 19.1 本轮已经执行的基线命令
+
+从仓库根执行，TIMEFORMAT 使用 Bash 内置 time。本机没有 /usr/bin/time，不依赖它。
 
 ```bash
-TIMEFORMAT=$'wall=%3R user=%3U sys=%3S'
+node --version
+npm --version
+git status --short
+git rev-parse --short HEAD
 
-# 检查本体，不混入 Wireit 的命中收益。
-time node scripts/check.mjs
+TIMEFORMAT='unit wall=%3R user=%3U sys=%3S'
+time node requirements/verification-system/tests/run.mjs
 
-# 构建正确性及重复调用。
-time npm run build:clean
-time npm run build
+TIMEFORMAT='surface wall=%3R user=%3U sys=%3S'
+time TESTS_MJS_FILES=requirements/js-semantic-surface/tests/surface-charter.test.mjs \
+  NODE_TEST_CONCURRENCY=1 NODE_TEST_VERBOSE=1 \
+  node requirements/verification-system/tests/run.mjs
 
-# 日常与发布分别记录。
-time npm run format-build-test -- --profile
-time npm run verify:release -- --profile
+TIMEFORMAT='capacity wall=%3R user=%3U sys=%3S'
+time TESTS_MJS_FILES=requirements/execution-model-routing/tests/capacity-soak.test.mjs \
+  NODE_TEST_CONCURRENCY=1 NODE_TEST_VERBOSE=1 \
+  node requirements/verification-system/tests/run.mjs
+
+TIMEFORMAT='harness wall=%3R user=%3U sys=%3S'
+time node requirements/verification-system/tests/integration/harness/run.mjs
 ```
 
-重定向到 tee 时启用 pipefail，或直接使用 runner 产生的日志。不能把 tee 的 0 当作真实验证退出码。禁止通过临时禁用测试、改超时或替换生产源码来制造性能数据。
+这些结果是第 2 节的调研证据，不是后续实现后的验收结果。正式验证入口有输出，没有把返回码管道给 grep 后误读为成功。
 
-### 18.3 可以期待什么，不能承诺什么
+### 19.2 后续每批的最小验证
 
-最明确的直接收益来自删除 deadcode 的整仓重复计数。真实语料计算不再在每次日常 unit 中重复，也是结构性收益。no-op／文档变更不再触发 full Fable，才会把已经实现的增量能力兑现到主入口。
+纯测试／JS runner 的局部红绿循环先跑对应真实入口或 node --test 的明确文件。消费 dist 的测试必须先确认构建内容凭据有效；输入变更后按仓库正常构建流程刷新，不能习惯性使用 --skip-staleness-check。
 
-共享扫描、一次排序、合并小套件和减少成功输出应有额外收益，但需要新测量。不能从本次静态 21.066 秒与 unit 20.170 秒推断完整命令总耗时，也不能承诺具体倍数。
-
-最终报告至少给出：删掉了什么实际工作、仍覆盖什么必要风险、五类代表性变更的编译模式、是否触发 tokenizer、实际运行测试范围、墙钟对比。不要只报告“日志从几千行变成几行”。
-
-## 19. 最后清理与停止条件
-
-最后检查退役脚本的 import、npm 命令、HOW 引用、baseline、proof-level 消费者和单纯自证测试。无人调用的旧工具删除；仍定义当前构建事实的工具保留。不为证明“已经删除”再写一个遍历全仓的常驻负面清单。
-
-具体要避免的收尾错误：
-
-- 把 34 个旧 checker 原封不动塞到新入口，只改变显示。
-- 把被删的治理迁到 test 文件或 release，然后仍全量执行。
-- 同时保留 Wireit build cache、owner manifest 和第二份 freshness 文件。
-- 用 .fsi 未变、两个入口存在或某个最新 mtime 宣称全部产物新鲜。
-- 用更大的 timeout、更少的 fast-check 样本或重试掩盖调度／竞态问题。
-- 把 retired rule 改成空函数或永久豁免，而不是移除。
-- 为将来可能的需求预建通用任务图、长期 AST 缓存或证明数据库。
-
-满足以下事实就停止本轮扩张：日常入口简洁可用，必要反例会红，增量命中可信，CI 完整发布通过，真实包可消费，输出可直接定位失败。余下低成本检查没有明确热点证据，就不继续折腾。
-
-## 20. 证据与查阅入口
-
-### 20.1 仓库证据
-
-本文中的“当前行为”来自以下实际文件和本次执行，不以旧计划代替实现：
-
-| 证据 | 查阅位置 |
-|---|---|
-| 主命令、Wireit 输入与输出 | package.json；.github/workflows/ci.yml |
-| 34 个 gate、顺序与退出传播 | scripts/check.mjs |
-| clean dist 与构建后置检查 | scripts/build.mjs::compileFable、verifyArtifacts、main |
-| 当前增量规则与成功 marker | scripts/lib/owner-compile.mjs::planImpactCompile、materializeOwnerCompile、compileOwnerProject、detectChangedFiles、compileIncremental |
-| 工程清单与图 | scripts/lib/compile-shards.mjs::readCompileShardInventory；checks/subsystems.mjs |
-| 死代码复杂度 | scripts/checks/deadcode.mjs |
-| 固定命令／数量下限 | requirements/verification-system/tests/proof-ladder.test.mjs |
-| mtime 新鲜度 | requirements/verification-system/tests/support/build-freshness.mjs |
-| 实际测试发现与监督 | verification-system/tests/run.mjs、integration/run.mjs、support/run-inner.mjs、e2e/support/supervise-node-test.mjs、support/verdict-feed.mjs |
-| Fable 合并与 .fsi canary | structured-workflow/tests/integration/owner-project-compiler-boundary.test.mjs |
-| 语料输入与重复计算 | scripts/lib/loop-detector-repository-corpus.mjs、derive-loop-detector-envelope.mjs；degeneration-guard/tests/loop-detector.test.mjs |
-| Surface 与 linkage 的边界 | scripts/checks/js-surface-manifest.mjs、js-module-linkage.mjs |
-| 包布局不等于安装 | distribution/tests/integration/package 下的 run、contents、resources、install、import 文件 |
-| 需要正式修订的旧约束 | verification-system、distribution、requirement-system 的 WHAT.md 与对应 HOW.md |
-
-表中的 verification-system、structured-workflow、degeneration-guard、distribution 均位于 requirements/ 下。行号会随实施变化，所以以真实函数与文件为落点，不建立一份需要长期跟着更新的行号数据库。
-
-### 20.2 外部接口依据
-
-外部资料只用于核对工具接口，不替代仓库自己的 canary。访问日期为 2026-09-13；Wireit 等仍以仓库锁定版本的实际行为做回归。
-
-| 标记 | 官方资料 | 本文使用范围 |
+| 批次 | 最小验证 | 扩大验证的条件 |
 |---|---|---|
-| E1 | Node 20 Test runner：`https://nodejs.org/docs/latest-v20.x/api/test.html` | 文件进程隔离、自定义 reporter、TestsStream 事件及完成／报告顺序 |
-| E2 | Wireit README：`https://github.com/google/wireit/blob/main/README.md` | files／output 缓存和默认输出清理 |
-| E3 | Fantomas Formatting Check：`https://fsprojects.github.io/fantomas/docs/end-users/FormattingCheck.html`；Ignore Files：`https://fsprojects.github.io/fantomas/docs/end-users/IgnoreFiles.html` | 只读检查与忽略文件 |
-| E4 | Node 20 os：`https://nodejs.org/docs/latest-v20.x/api/os.html#osavailableparallelism` | availableParallelism 属于 node:os |
-| E5 | Microsoft F# Inline Functions：`https://learn.microsoft.com/en-us/dotnet/fsharp/language-reference/functions/inline-functions` | inline 展开到调用方；仓库增量影响范围仍须 Fable canary 确认 |
-| E6 | npm 11 pack：`https://docs.npmjs.com/cli/v11/commands/npm-pack/`；package.json：`https://docs.npmjs.com/cli/v11/configuring-npm/package-json/` | dry-run／真实 archive、JSON、目标目录与自动包含的包文件 |
+| T0 | 新 verification-inputs 与修订后的 proof-ladder、reporter-supervision | 改实际默认 runner 后跑全 unit |
+| T1 | Surface charter、catalog、tip-v2 相关 suite | 更改公共 loader 或 Surface metadata 时跑领域集合和 build |
+| T2 | 受影响领域与 harness | 删除公用 helper 后跑所有实际 importer 所在范围 |
+| T3 | 必要边界 scanner 反例、build、全 unit | 改 shared import scanner 必须检查全部消费者 |
+| T4 | 对应领域行为 suite | Host／durable／跨域端口改动时跑对应真实 integration |
+| T5 | owner-impact 固定/property、Watchdog 时间与物理 child | 改编译器输入 planner 时跑真实 compiler group |
+| T6 | 真实 Node fixture、reporter、supervisor、coverage fixture、harness | 必须在 Node20 与本机版本分别验证事件边界 |
+| T7 | 日常／发布计划与发现集合测试 | 最终跑两种正式入口，确认实际选区 |
+| T8 | format-build-test 与 verify:release | 失败不重跑到绿；定位根因并补永久回归 |
 
-最终要交付的不是一套更精巧的治理机器，而是更少的重复工作、更可靠的当前产物，以及失败时不需要翻屏寻找的诊断。
+新增 verification-inputs.test.mjs 等文件目前只是设计，不能在尚未实现时把它们列为“已运行通过”。正式回归放 requirements 对应包内，不以 /tmp 下手写一次性命令代替提交后的自动化测试。
+
+### 19.3 实现完成后使用的入口
+
+下列 --profile/--verbose 行为是本方案要求打通的目标，不表示当前每层已经正确传播了这些选项。
+
+```bash
+npm run format-build-test
+npm run verify:release
+
+npm run format-build-test -- --profile
+npm run format-build-test -- --verbose
+```
+
+release 单次运行内部只编译一次 clean 产物；独立执行日常和 release 是为了验两个入口各自的行为，不是让 release 内部重复两轮构建。正常开发无需每次把上述四条全部执行一遍。
+
+失败的命令保留其失败结论，不用更窄子集的绿色结果覆盖。局部 run 可用于定位，但最后要恢复实际受影响的正式范围。
+
+## 20. 怎么判断这轮是真的精简了
+
+### 20.1 正确性先于耗时
+
+先检查是否消除了四种假绿来源：空输入快照、测试内复制 runner、两个统计口径、流未排空就确认完成。随后确认没有因为删检查而失去产品拒绝、持久化和物理回收能力。
+
+一个原本无效的测试删除后，不需要另一个无效测试来证明它已经删除；一个真实约束的弱测试删除前，则必须有明确接替。审查依据是具体反例与实际调用，不是总用例数不变。
+
+### 20.2 性能比较口径
+
+同一机器、同一 Node／依赖、相同资源负载，分开记录冷构建、已有产物的日常运行、单独 unit、单独 harness 和 release。不要拿本次有产物 unit 与未来冷 release 比速度。
+
+对轻量可重复的目标运行可取五次墙钟的中位数，同时列出范围和离散程度；物理 Host/release 成本较高时减少基准重复并说明样本数。profile 是测量，不是把不稳定测试反复跑到通过。
+
+记录：阶段墙钟、叶子耗时总量、慢文件、实际 worker 数、额外 compiler/Host 进程数、默认终端行数、日志字节与可用时的峰值内存。不要为了每个指标安装一套新监控依赖；没有测到的留空。
+
+### 20.3 可以预期、但不能预先承诺的收益
+
+| 动作 | 证据 | 合理预期 |
+|---|---|---|
+| Surface 三次同输入变一次 | 本次后两次合计约2.56秒 | 确定减少两次相同计算，不保证全量墙钟等额减少 |
+| 取消 static proof authority | 现有约450行级别的分析链及专用反例 | 减少长期维护与 AST 工作；先完成规范修订 |
+| owner-impact 生成图不逐次落盘 | 当前100个样本均写项目／源文件再多次解析 | 减少系统调用与重复 XML 解析；保持100样本与原性质 |
+| Watchdog 时间用例离散推进 | harness 中恢复默认窗口约5.03秒 | 时间语义测试不再等满真实窗口；物理子进程用例仍有真实成本 |
+| 收敛默认输出 | 当前 unit 原始JSON、模拟PASS；harness279行通过 | 成功日志只剩阶段摘要，故障更容易看见 |
+| 并发实测后收口 | soak 单独2.07秒／全量5.83秒 | 可能缩短慢尾和降低资源峰值；不能仅凭CPU核数定结论 |
+
+不制定“删掉30%测试”“日常必须5秒内”一类无依据硬指标。只要求本次消掉的工作不以另一个 runner、baseline 或 registry 形式重新出现；保留测试的实际判别能力不下降。
+
+### 20.4 最终交付检查
+
+确认所有删除有对应理由，所有混合文件保留的行为仍在；无 dangling import、旧环境变量、无人消费的 helper、虚假迁移 façade；README/HOW 指向实际入口，GAP 未被绿色计数冒充关闭。
+
+确认默认输出没有每项通过、模拟发布成功、expected fatal 故障墙；真实失败仍有位置、原因、反例和日志，count 和 exit verdict 来自同一运行事实；中断不会留下本次 child process。
+
+确认正式日常没有被局部环境变量缩小，发布独有测试真正执行，所有 manifest 内容证据与真实包闭包仍有效。最后检查 Git 只包含本轮有意提交的源码／测试／文档，不包含 dist、日志、临时目录和用户配置。
+
+## 21. 调研边界与依据
+
+### 21.1 本文覆盖到哪里
+
+本轮实际运行了全 unit 和独立 harness，并精读了编排／结果流、Surface charter、部分元测试、规则库、capacity soak、owner-impact property 和关键 harness 源码。第 6.2 节明确标出仅检索到形状断言、尚未逐条精读的候选。
+
+没有声称人工审过625份 unit 文件和279个 harness case 的全部断言；没有声称已经确定最终应该删除多少条；没有测过整个 integration、clean build、E2E、真实 package 或 coverage。最终删减数量应在逐项迁移完成后由实际运行结果给出，而不是在计划阶段编造。
+
+当前测试通过只能说明当前入口的已有断言通过，不能反证本文发现的空证明不存在。输入快照用例正说明：测试可以绿，但所声称的事情根本没测。
+
+### 21.2 仓库依据索引
+
+| 主题 | 可复核位置 |
+|---|---|
+| 实际执行范围 | package.json；scripts/verify.mjs；.github/workflows/ci.yml |
+| 快照缺陷与空证明 | verify.mjs::hashTreeFiles/takeInputSnapshot；proof-ladder.test.mjs 的 snapshots input state 用例 |
+| 双计数与丢字段 | compact-reporter.mjs；run-inner.mjs 的 IPC 事件投影；supervise-node-test.mjs 的 pass/fail 累加 |
+| 镜像 runner 测试 | reporter-supervision.test.mjs 的 handleComplete 和临时 runnerScript |
+| 重复 Surface 整仓校验 | surface-charter.test.mjs 的三个 validateSurfaceManifest 调用 |
+| 仍在运行的登记治理 | js-surface-manifest.mjs::analyzeSurface/validateSurfaceManifest；js-semantic-surface/WHAT.md 的003条 |
+| 文案／注释测试 | boundary-exemption-ratchet.test.mjs；degradation-list.test.mjs；reliability-runbook.test.mjs |
+| 真实混合行为 | domain.meta.test.mjs；behavior-diagnosis/tests/catalog.test.mjs 与 tip-v2-contract.test.mjs |
+| 图性质的物理重复准备 | structured-workflow/tests/owner-impact-compile.property.test.mjs::writeFixture/verifyGraph |
+| 容量逐步校验 | execution-model-routing/tests/capacity-soak.test.mjs::createAuditor |
+| 独立 harness 与慢等待 | integration/harness/run.mjs；timeout/budget/unit-runner 等 case；e2e/support/watchdog.js |
+| 现有虚拟时钟接口 | verification-system/tests/support/temporal-harness.mjs::createVirtualClock |
+| 发布组选择 | integration-node-test-steps.mjs::integrationNodeTestSteps/selectIntegrationSteps |
+| 内容凭据 | scripts/lib/build-state.mjs；verification-system/tests/support/build-freshness.mjs |
+
+索引中的短路径按正文给出的对应目录解析；所有结论绑定 ec6c363bd。本方案实施时若 HEAD 已改变，先复核相关实际代码，不恢复已经被用户删掉或替换的路径。
+
+### 21.3 外部技术依据
+
+- [N1] Node.js 官方 Test runner 文档：https://nodejs.org/api/test.html 。调研页面为26.8.2；用于核对 TestsStream、reporter 与执行模型，不代表本机或CI已升级。
+- [N2] Node.js 官方 Stream 文档：https://nodejs.org/api/stream.html 。用于核对背压、pipeline/finished 与错误／结束边界。
+- [N3] fast-check 官方 Configuration：https://fast-check.dev/docs/configuration/ 。用于核对每次 assert 的 seed、run budget、报告配置及其作用范围。
+- [N4] Node.js 20 官方 Test runner 文档：https://nodejs.org/docs/latest-v20.x/api/test.html 。调研页面为20.20.2；它没有把 test:summary 列为公开事件，因此不能让当前CI依赖新版本才公开的 summary 协议。
+
+外部文档用于校准库边界；仓库实际调用和支持版本上的永久可执行 fixture 才能证明本项目接线正确。本文没有引入第三方测试框架或把新版本 API 当作已安装能力。
+
+### 21.4 本次交付与构建语料的关系
+
+本次新增的唯一文件是 CLEAN.md。它是待实施计划，不是新的产品规范，不应被复制到 AGENTS.md 变成长期执行负担。
+
+仓库的 LoopDetector 语料选择会读取 Git 跟踪的源码／文档。本文被纳入 Git 后，也可能成为该构建输入的一部分；此前的测试基线不能据此宣称覆盖了新增文档后的最新产物。下一次正常构建应按内容凭据刷新相关派生物，不手工修改 dist 来伪造新鲜度。
+
+本轮新增文档后只核验文件内容与差异，未重跑发布链。实施各批后，再按第19节完成对应验证。
