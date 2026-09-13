@@ -72,6 +72,9 @@ module CompanionRuntimeSurface =
         | BloggerRequestContext.Main main ->
             box
                 {| kind = "Main"
+                   requestId = BloggerRequestId.value main.RequestId
+                   mainSession = SessionId.value main.MainSessionId
+                   bloggerSession = SessionId.value main.BloggerSessionId
                    items = main.Items |> List.map BloggerDeltaItemWire.toJs |> List.toArray
                    toml = main.Toml
                    previousIngested = int main.PreviousIngestedThroughSequence
@@ -85,6 +88,9 @@ module CompanionRuntimeSurface =
         | BloggerRequestContext.Squash squash ->
             box
                 {| kind = "Squash"
+                   requestId = BloggerRequestId.value squash.RequestId
+                   mainSession = SessionId.value squash.MainSessionId
+                   bloggerSession = SessionId.value squash.BloggerSessionId
                    coveredFrameCount = squash.CoveredFrameCount |}
 
     let main (value: obj) : obj =

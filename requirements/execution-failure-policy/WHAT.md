@@ -84,3 +84,9 @@ operator abort → `UserCancelled`，supersede → `Superseded`（CRASH-008 / HO
 `LocalInvariant`、`ProtocolRejection`、`AuthorizationDenied`、`StreamInterruptedAfterFirstToken` 等类别仍保留在封闭代数中，
 由 provider adapter、持久化边界与 legacy 解码使用；EXECFAIL-003 关于“这些类别永不进入 retry”的约束适用于这些边界。
 重试必须以替换上下文的方式发出（PAR-011 wire 重建 prefix、丢弃旧 retry 行、`ProviderRetryAttempt` continuation），不得盲目重放已产生可见输出的 attempt。
+
+## EXECFAIL-010: 致命入口逐处有据
+
+所有生产 fatal 入口及转入该入口的边界必须纳入可检查清单。每处记录触发前提、所属状态、不可达证明或实际回归；新增入口、入口漂移和缺失证据必须使标准验证失败。性质测试调用编译后的生产实现，固定 seed 并允许重放反例；测试自造的决策模型不能代替生产实现证据。
+
+协议修复耗尽、过期回调、确定未发送和运行环境拒绝不得仅因“开发时没预料”成为 LocalInvariant。可达失败必须由所属请求或资源明确收敛；不释放其他请求的所有权，不重发 outcome unknown 的 effect，不在 fatal 后安排结算。保留的不变量熔断仍须满足 EXECFAIL-006。

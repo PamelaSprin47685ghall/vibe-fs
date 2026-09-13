@@ -82,11 +82,13 @@ type BloggerRepairRendezvous =
     new: identity: BloggerRepairEpisodeIdentity * onCompleted: (unit -> unit) -> BloggerRepairRendezvous
     member Identity: BloggerRepairEpisodeIdentity
     member Completion: Task
+    member TerminalFailure: exn option
     member Start: workflow: (unit -> Task) -> bool
     member Post: observation: BloggerRepairObservation -> Task<BloggerRepairOutcome>
     member Receive: unit -> Task<BloggerRepairEnvelope option>
     member Resolve: envelope: BloggerRepairEnvelope * outcome: BloggerRepairOutcome -> unit
     member Cancel: unit -> unit
+    member Fail: ex: exn -> unit
 
 type IBloggerRuntimeHost =
     abstract Cancellation: CancellationToken

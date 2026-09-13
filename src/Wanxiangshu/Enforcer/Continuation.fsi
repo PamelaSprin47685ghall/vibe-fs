@@ -126,3 +126,13 @@ module EnforcerContinuation =
         projectionSessionIdOpt: string option ->
         outObj: obj ->
             Task
+
+    /// Stop-ordering boundary: the admission barrier lands before the detached
+    /// physical abort is requested; the abort outcome never reopens admission.
+    val internal applyPhysicalStop:
+        terminateSession: SessionTermination ->
+        sid: SessionId ->
+        sessionId: string ->
+        physicalUserMessageId: PhysicalUserMessageId option ->
+        reason: string ->
+            unit

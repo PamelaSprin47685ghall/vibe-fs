@@ -108,17 +108,16 @@ module EnforcerContinuation =
         | Some c -> Task.FromResult(Some c)
         | None -> EnforcerFrameRecovery.resolveCycleContext ctx.Scope ctx.Durable ctx.Owner ctx.BloggerSessionId
 
-    let private fatalProjectRaw
+    let private abandonThenStop
         (ctx: Context)
         (sessionKey: string)
         (currentCtx: BloggerRequestContext option)
         (reason: string)
         : Task<ContinuationOutcome> =
         task {
-            Diagnostic.fatal "enforcer-cycle-failed" [ "session_id", sessionKey; "result", reason ]
             do! BloggerAbandon.openRequest ctx.Durable ctx.Owner ctx.BloggerSessionId currentCtx reason
             currentCtx |> Option.iter (releaseExact ctx sessionKey)
-            return ctx.Project ctx.RawMessages
+            return ctx.Stop reason
         }
 
     /// Evidence → Decision: live cycle for interrupted blog → recovery or stop.
@@ -147,15 +146,11 @@ module EnforcerContinuation =
                 | BloggerRepairOutcome.SupersededIgnored -> return ctx.Project ctx.RawMessages
                 | BloggerRepairOutcome.UnownedIdleIgnored ->
                     return ctx.Stop "unowned-interrupted-blog-without-CurrentRequest"
-                | BloggerRepairOutcome.AbandonedExhausted
+                | BloggerRepairOutcome.AbandonedExhausted ->
+                    return ctx.Stop "blogger-protocol-repair-exhausted"
                 | BloggerRepairOutcome.NudgeSent _
-                | BloggerRepairOutcome.AabbSent _
-                | BloggerRepairOutcome.Completed ->
-                    Diagnostic.fatal
-                        "enforcer-cycle-failed"
-                        [ "session_id", sessionKey; "result", "blog tool interrupted after AABB" ]
-
-                    return ctx.Project ctx.RawMessages
+                | BloggerRepairOutcome.AabbSent _ -> return ctx.Project ctx.RawMessages
+                | BloggerRepairOutcome.Completed -> return ctx.Stop "blogger-protocol-repair-completed"
             }
         | None -> Task.FromResult(ctx.Stop "unowned-interrupted-blog-without-CurrentRequest")
 
@@ -190,16 +185,11 @@ module EnforcerContinuation =
                 | BloggerRepairOutcome.SupersededIgnored -> return ctx.Project ctx.RawMessages
                 | BloggerRepairOutcome.UnownedIdleIgnored ->
                     return ctx.Stop "unowned-invalid-blog-cycle-without-CurrentRequest"
-                | BloggerRepairOutcome.AbandonedExhausted
+                | BloggerRepairOutcome.AbandonedExhausted ->
+                    return ctx.Stop "blogger-protocol-repair-exhausted"
                 | BloggerRepairOutcome.NudgeSent _
-                | BloggerRepairOutcome.AabbSent _
-                | BloggerRepairOutcome.Completed ->
-                    Diagnostic.fatal
-                        "enforcer-cycle-failed"
-                        [ "session_id", sessionKey
-                          "result", ("invalid terminal after AABB; " + reason) ]
-
-                    return ctx.Project ctx.RawMessages
+                | BloggerRepairOutcome.AabbSent _ -> return ctx.Project ctx.RawMessages
+                | BloggerRepairOutcome.Completed -> return ctx.Stop "blogger-protocol-repair-completed"
             }
 
     let private terminalWasSuperseded
@@ -265,7 +255,7 @@ module EnforcerContinuation =
                 return ctx.Project rebuilt
             elif String.IsNullOrWhiteSpace messageId then
                 return!
-                    fatalProjectRaw ctx sessionKey currentCtx "blog cycle has no provable provider run (ENFORCER-043)"
+                    abandonThenStop ctx sessionKey currentCtx "blog cycle has no provable provider run (ENFORCER-043)"
             else
                 let providerRun = ProviderRunIdentity.create messageId
                 return! decideCompletedInvalidCardinality ctx sessionKey currentCtx providerRun callCount
@@ -350,7 +340,7 @@ module EnforcerContinuation =
         : Task<ContinuationOutcome> =
         task {
             match! materializeCatchUp ctx live with
-            | Error reason -> return! fatalProjectRaw ctx sessionKey (Some live) reason
+            | Error reason -> return! abandonThenStop ctx sessionKey (Some live) reason
             | Ok() ->
                 let! rebuilt = resumeWithContext ctx live
                 return ctx.Project rebuilt
@@ -506,9 +496,19 @@ module EnforcerContinuation =
         (reason: string)
         : Task<CycleDisposition> =
         task {
-            Diagnostic.fatal "enforcer-cycle-failed" [ "session_id", sessionKey; "result", reason ]
-            do! BloggerAbandon.openRequest ctx.Durable mainSessionId ctx.BloggerSessionId liveCtx reason
+            // Settlement first, fuse last: the durable abandon and the exact flight
+            // release are this cycle's closing acts. The process dies on fuse
+            // either way, so abandonment evidence is attempted and reported before
+            // the fatal record, never scheduled after it.
+            try
+                do! BloggerAbandon.openRequest ctx.Durable mainSessionId ctx.BloggerSessionId liveCtx reason
+            with ex ->
+                Diagnostic.emit
+                    "enforcer-cycle-settlement-failed"
+                    [ "session_id", sessionKey; "result", "abandonment evidence failed: " + ex.Message ]
+
             liveCtx |> Option.iter (releaseExact ctx sessionKey)
+            Diagnostic.fatal "enforcer-cycle-failed" [ "session_id", sessionKey; "result", reason ]
             return CycleDisposition.Working
         }
 
@@ -544,11 +544,21 @@ module EnforcerContinuation =
                 | BloggerRepairOutcome.PendingRepairWait -> return CycleDisposition.Working
                 | BloggerRepairOutcome.SupersededIgnored -> return CycleDisposition.Working
                 | BloggerRepairOutcome.UnownedIdleIgnored -> return CycleDisposition.Working
-                | BloggerRepairOutcome.AbandonedExhausted
+                | BloggerRepairOutcome.AbandonedExhausted ->
+                    // The coordinator already settled this exact request:
+                    // abandonment is durable and the flight was released inside
+                    // the episode. The transform joins the catch-up lane for
+                    // the next material rather than fusing the process.
+                    return CycleDisposition.AbandonThenCatchUp
                 | BloggerRepairOutcome.NudgeSent _
                 | BloggerRepairOutcome.AabbSent _
                 | BloggerRepairOutcome.Completed ->
-                    Diagnostic.fatal "enforcer-cycle-failed" [ "session_id", sessionKey; "result", reason ]
+                    // A transform observation can never yield a send-kind reply;
+                    // a mismatched outcome violates the rendezvous contract.
+                    Diagnostic.fatal
+                        "enforcer-repair-outcome-mismatch"
+                        [ "session_id", sessionKey; "result", reason ]
+
                     return CycleDisposition.Working
         }
 
@@ -867,26 +877,11 @@ module EnforcerContinuation =
         }
 
 
-    /// Prefer non-empty preferred; else fallback. Never invent a blank list when
-    /// either side has content. Both empty is an invariant break: blanking Host
-    /// transcript yields provider 400 (messages cannot be empty).
-    let private ensureNonEmpty (preferred: obj list) (fallback: obj list) : obj list =
-        if not (List.isEmpty preferred) then
-            preferred
-        elif not (List.isEmpty fallback) then
-            fallback
-        else
-            Diagnostic.fatal
-                "enforcer-empty-projection"
-                [ "result", "ensureNonEmpty: both preferred and fallback are empty" ]
-
-            preferred
-
     let private projectMessages (messages: obj list) (fallback: obj list) : ContinuationOutcome =
-        ContinuationOutcome.ProjectMessages(ensureNonEmpty messages fallback)
+        ContinuationOutcome.ProjectMessages(if List.isEmpty messages then fallback else messages)
 
-    let private stopPhysicalRun (messages: obj list) (fallback: obj list) (reason: string) : ContinuationOutcome =
-        ContinuationOutcome.StopPhysicalRun(ensureNonEmpty messages fallback, reason)
+    let private stopPhysicalRun (messages: obj list) (reason: string) : ContinuationOutcome =
+        ContinuationOutcome.StopPhysicalRun(messages, reason)
 
     let private isEmptyTextCycleFailure (reason: string) : bool =
         reason = EnforcerCycleDecode.EmptyTextError
@@ -906,7 +901,7 @@ module EnforcerContinuation =
             let project (msgs: obj list) = projectMessages msgs rawMessages
 
             let stop (reason: string) =
-                stopPhysicalRun rawMessages rawMessages reason
+                stopPhysicalRun rawMessages reason
 
             let mainSessionId =
                 journal
@@ -955,38 +950,50 @@ module EnforcerContinuation =
     let private messagesOrRaw (bloggerMessages: obj list) (messages: obj list) : obj list =
         if List.isEmpty messages then bloggerMessages else messages
 
-    let private handlePhysicalStopResult
+    /// The stop decision's binding act: retire the exact in-flight step and the
+    /// physical execution custody BEFORE the physical abort resolves. The next
+    /// provider admission for this execution is fenced out from this instant;
+    /// a slow, rejected, or thrown abort can never reopen it.
+    let internal barPhysicalProviderAdmission
         (sid: SessionId)
-        (sessionId: string)
-        (physicalUserMessageId: PhysicalUserMessageId option)
-        result
+        (physicalUserMessageId: PhysicalUserMessageId)
         =
-        match result with
-        | Ok() ->
-            physicalUserMessageId
-            |> Option.iter (fun physical ->
-                ModelRouting.suppressProviderStep sid physical
-                ModelRouting.releasePhysicalExecution sid physical |> ignore)
-        | Error error ->
-            Diagnostic.emit "enforcer-stop-physical-run" [ "session_id", sessionId; "result", "abort-error: " + error ]
+        ModelRouting.suppressProviderStep sid physicalUserMessageId
+        ModelRouting.releasePhysicalExecution sid physicalUserMessageId |> ignore
 
+    /// Detached Host-side abort requested only after the admission barrier is
+    /// up. Its outcome is diagnostic evidence; it carries no authority over
+    /// whether the execution may run again.
     let private requestPhysicalStop
         (terminateSession: SessionTermination)
         (sid: SessionId)
         (sessionId: string)
-        (physicalUserMessageId: PhysicalUserMessageId option)
         (reason: string)
         =
         task {
             try
-                let! result = terminateSession sid reason
-                handlePhysicalStopResult sid sessionId physicalUserMessageId result
+                match! terminateSession sid reason with
+                | Ok() -> ()
+                | Error error ->
+                    Diagnostic.emit "enforcer-stop-physical-run" [ "session_id", sessionId; "result", "abort-error: " + error ]
             with ex ->
                 Diagnostic.emit
                     "enforcer-stop-physical-run"
                     [ "session_id", sessionId; "result", "abort-exception: " + ex.Message ]
         }
         |> ignore
+
+    /// Stop ordering: suppress + retire the exact physical execution first,
+    /// then issue the physical abort as an independent observation.
+    let internal applyPhysicalStop
+        (terminateSession: SessionTermination)
+        (sid: SessionId)
+        (sessionId: string)
+        (physicalUserMessageId: PhysicalUserMessageId option)
+        (reason: string)
+        =
+        physicalUserMessageId |> Option.iter (barPhysicalProviderAdmission sid)
+        requestPhysicalStop terminateSession sid sessionId reason
 
     let private applyContinuationOutcome
         (terminateSession: SessionTermination)
@@ -1007,7 +1014,7 @@ module EnforcerContinuation =
 
                 Diagnostic.emit "enforcer-stop-physical-run" [ "session_id", sessionId; "result", reason ]
 
-                requestPhysicalStop
+                applyPhysicalStop
                     terminateSession
                     sid
                     sessionId

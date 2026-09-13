@@ -20,6 +20,11 @@ type MagicTodoAppendReceipt =
     { EventId: EventId
       Projection: ProjectionSet }
 
+type JournalAppendException =
+    inherit Exception
+    new: failure: JournalAppendFailure -> JournalAppendException
+    member Failure: JournalAppendFailure
+
 
 type AgentJournal =
     interface IAsyncDisposable

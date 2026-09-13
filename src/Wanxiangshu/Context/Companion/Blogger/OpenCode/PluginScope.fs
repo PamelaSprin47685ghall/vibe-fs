@@ -110,7 +110,11 @@ type PluginBloggerScope() =
     let removeOwnedRepairEpisode (bloggerSid: SessionId) (identity: BloggerRepairEpisodeIdentity) =
         lock episodeGate (fun () ->
             match episodes.TryGetValue bloggerSid with
-            | true, current when isSameRepairEpisode current identity ->
+            // A terminally failed episode stays registered: the durable abandon
+            // outcome is unknown, so a fresh episode would re-spend the repair
+            // budget on an unsettled request. Late claims observe the stored
+            // failure through the same rendezvous.
+            | true, current when isSameRepairEpisode current identity && current.TerminalFailure.IsNone ->
                 episodes.Remove bloggerSid |> ignore
                 episodeCompletions.Remove current.Completion |> ignore
             | _ -> ())

@@ -294,6 +294,13 @@ module PluginHostInterop =
 
     let internal normalizeHookFailure (error: obj) =
         match error with
+        | :? JournalAppendException as persistence ->
+            let failure, settlement = persistenceOutcome persistence.Failure
+
+            { Failure = failure
+              Lifecycle = lifecycleAfterFailedTransaction settlement
+              ExecutionKey = None
+              Settlement = settlement }
         | :? MagicTodoHostCodec.ProviderInputRejection ->
             { Failure = ExecutionFailure.ProtocolRejection
               Lifecycle = DurableExecutionLifecycle.NoAcceptedFact

@@ -52,8 +52,9 @@ module BloggerAbandon =
                        BloggerSessionId = bloggerSessionId
                        Reason = reason |}
 
-            let! _ = AgentJournal.appendAgent (StreamId.Session mainSessionId) None fact journal
-            return ()
+            match! AgentJournal.appendAgent (StreamId.Session mainSessionId) None fact journal with
+            | Ok _ -> return ()
+            | Error failure -> return raise (JournalAppendException failure)
         }
 
     /// Prefer typed context RequestId; else abandon the open materialization for this Blogger.

@@ -92,6 +92,12 @@ module BloggerCoordinator =
                     (Some request)
                     reason
 
+            match
+                BloggerRuntimeHost.releaseCurrentRequest scope (SessionId.value identity.BloggerSessionId) request
+            with
+            | Ok() -> ()
+            | Error releaseErr -> FatalProcess.trip "blogger-flight-release-conflict" releaseErr
+
             match eventPort with
             | Some port ->
                 port.NotifyTerminal
@@ -99,12 +105,6 @@ module BloggerCoordinator =
                     (TerminalOutcome.Failed(TerminalStop.forAuthority identity.AuthorityRoot reason))
                 |> ignore
             | None -> ()
-
-            match
-                BloggerRuntimeHost.releaseCurrentRequest scope (SessionId.value identity.BloggerSessionId) request
-            with
-            | Ok() -> ()
-            | Error releaseErr -> FatalProcess.trip "blogger-flight-release-conflict" releaseErr
         }
 
     let claimFlightLease
@@ -139,8 +139,11 @@ module BloggerCoordinator =
                     do! abandonEpisode scope journal request identity eventPort reason
                     reply envelope BloggerRepairOutcome.AbandonedExhausted
                 with ex ->
-                    reply envelope BloggerRepairOutcome.AbandonedExhausted
-                    FatalProcess.trip "blogger-repair-abandon-failed" ex.Message
+                    // Settlement failure is shared evidence, not a fabricated
+                    // success: every observer — this envelope, queued posts, and
+                    // later arrivals — rejects on the same exception. No terminal
+                    // was emitted and the exact flight is retained.
+                    rendezvous.Fail ex
             }
 
         let tryNudgePhysical ports permit run : Task<Result<HostSessionNudge.IdleContinuationOutcome, string>> =

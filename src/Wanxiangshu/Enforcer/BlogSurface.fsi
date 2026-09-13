@@ -22,6 +22,25 @@ module BlogSurface =
 
     val tipFieldNames: unit -> string array
 
+    val continueTerminal:
+        scope: obj ->
+        journal: obj ->
+        request: obj ->
+        messageId: string ->
+        callCount: int ->
+        rawMessages: obj ->
+            System.Threading.Tasks.Task<obj>
+
+    /// Drive the real stop boundary: the admission barrier lands before the
+    /// detached physical abort is requested. `terminate` is the Host
+    /// termination capability as `sessionId -> reason -> Promise`.
+    val applyPhysicalStop:
+        terminate: obj ->
+        sessionId: string ->
+        physicalUserMessageId: string ->
+        reason: string ->
+            unit
+
     /// Drive the real transform repair entry: observed terminal/tool facts in,
     /// coordinator verdict out. The exact live request and terminal run cross
     /// explicitly; `rawMessages` is the plain Host transcript.

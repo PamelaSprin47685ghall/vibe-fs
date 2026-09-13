@@ -471,6 +471,18 @@ module ModelRoutingSurface =
     let sharedCapacitySnapshot () : obj =
         ModelRouting.capacitySnapshot () |> capacitySnapshotObject
 
+    /// Enter a provider step on the process-shared runtime — the same
+    /// execution-scoped admission the real transform boundary must satisfy.
+    let sharedEnterProviderStep
+        (sessionId: string)
+        (physicalUserMessageId: string)
+        (visibleProviderRuns: string array)
+        : Task =
+        ModelRouting.enterProviderStep
+            (SessionId.create sessionId)
+            (PhysicalUserMessageId.create physicalUserMessageId)
+            (visibleProviderRuns |> Set.ofArray |> Set.map ProviderRunIdentity.create)
+
     let commitSharedExecutionAdmission (token: obj) (observed: obj) : obj =
         match leaseOf token with
         | None -> CapacityTransitionOutcome.StaleFence |> transitionOutcomeObject

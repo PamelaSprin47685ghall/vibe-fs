@@ -30,6 +30,10 @@ module BlogSurface =
     let private invokeRawTask (value: obj) (name: string) (args: obj array) : System.Threading.Tasks.Task<obj> =
         jsNative
 
+    [<Emit("Promise.resolve($0($1, $2))")>]
+    let private invokeTermination (terminate: obj) (sessionId: string) (reason: string) : System.Threading.Tasks.Task<obj> =
+        jsNative
+
     [<Emit("$0[$1](...$2)")>]
     let private invokeRawDisposable (value: obj) (name: string) (args: obj array) : IDisposable = jsNative
 
@@ -170,6 +174,75 @@ module BlogSurface =
                 Some(unbox<AgentJournal> value)
             else
                 Some(unbox<AgentJournal> nested)
+
+    let continueTerminal
+        (scope: obj)
+        (journal: obj)
+        (request: obj)
+        (messageId: string)
+        (callCount: int)
+        (rawMessages: obj)
+        : System.Threading.Tasks.Task<obj> =
+        task {
+            let exact = requestOf request
+            let durable = journalOf journal |> Option.get
+            let messages = arrayOf rawMessages |> Array.toList
+
+            let context: EnforcerContinuation.Context =
+                { Scope = hostOf scope
+                  Journal = Some durable
+                  Durable = durable
+                  Owner = BloggerRequestContext.mainSessionId exact
+                  BloggerSessionId = BloggerRequestContext.bloggerSessionId exact
+                  RawMessages = messages
+                  Project = EnforcerContinuation.ContinuationOutcome.ProjectMessages
+                  Stop = fun reason -> EnforcerContinuation.ContinuationOutcome.StopPhysicalRun(messages, reason)
+                  RefreshMainContext = fun _ _ -> System.Threading.Tasks.Task.FromResult(Some exact)
+                  IsEmptyTextCycleFailure = fun reason -> reason = ChronicleExecution.EmptyTextError }
+
+            let! outcome = EnforcerContinuation.invalidCardinalityBranch context messageId callCount true
+
+            return
+                match outcome with
+                | EnforcerContinuation.ContinuationOutcome.ProjectMessages projected ->
+                    box {| kind = "ProjectMessages"; messages = List.toArray projected |}
+                | EnforcerContinuation.ContinuationOutcome.StopPhysicalRun(projected, reason) ->
+                    box {| kind = "StopPhysicalRun"; messages = List.toArray projected; reason = reason |}
+        }
+
+    /// Drive the real stop boundary: the admission barrier lands before the
+    /// detached physical abort is requested. `terminate` is the Host
+    /// termination capability as a JS function `sessionId -> reason ->
+    /// Promise<null|{ok:true}|{ok:false,error:string}>`; the exact execution
+    /// and session ids cross as plain strings.
+    let applyPhysicalStop
+        (terminate: obj)
+        (sessionId: string)
+        (physicalUserMessageId: string)
+        (reason: string)
+        =
+        let terminateSession (sid: SessionId) (why: string) : System.Threading.Tasks.Task<Result<unit, string>> =
+            task {
+                try
+                    let! result = invokeRawTask terminate "call" [| box terminate; box (SessionId.value sid); box why |]
+
+                    if isNullish result || unbox<bool> result?ok then
+                        return Ok()
+                    else
+                        return Error(text result?error)
+                with ex ->
+                    return Error ex.Message
+        }
+
+        EnforcerContinuation.applyPhysicalStop
+            terminateSession
+            (SessionId.create sessionId)
+            sessionId
+            (if String.IsNullOrWhiteSpace physicalUserMessageId then
+                 None
+             else
+                 Some(PhysicalUserMessageId.create physicalUserMessageId))
+            reason
 
     /// Complete reconciled turn for the idle repair entry. Only the fields the
     /// coordinator reads (session, physical message, run, directory,

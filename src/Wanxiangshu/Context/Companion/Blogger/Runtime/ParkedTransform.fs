@@ -126,10 +126,17 @@ type BloggerRepairRendezvous(identity: BloggerRepairEpisodeIdentity, onCompleted
 
     // DSL-MUTABLE: resource — one-shot repair episode admission (Available -> Claimed | Revoked)
     let mutable admission = Available
+    // DSL-MUTABLE: resource — terminal settlement failure replayed to late observers
+    let mutable terminalError: exn option = None
 
     member _.Identity: BloggerRepairEpisodeIdentity = identity
 
     member _.Completion: Task = completion.Task :> Task
+
+    /// Terminal settlement failure observed by the owner episode. Some means
+    /// every observer of this episode already received, or will receive, this
+    /// exact exception; the owner never settles it as a benign outcome.
+    member _.TerminalFailure: exn option = terminalError
 
     member private _.ClaimWorkflowSlot() : bool =
         lock gate (fun () ->
@@ -209,8 +216,11 @@ type BloggerRepairRendezvous(identity: BloggerRepairEpisodeIdentity, onCompleted
             AsyncSupport.trySetResult receiver (Some envelope) |> ignore
             reply.Task
         | None when not accepted ->
-            AsyncSupport.trySetResult reply BloggerRepairOutcome.AbandonedExhausted
-            |> ignore
+            match terminalError with
+            | Some ex -> reply.SetException ex
+            | None ->
+                AsyncSupport.trySetResult reply BloggerRepairOutcome.AbandonedExhausted
+                |> ignore
 
             reply.Task
         | None -> reply.Task
@@ -222,7 +232,16 @@ type BloggerRepairRendezvous(identity: BloggerRepairEpisodeIdentity, onCompleted
                 inFlight.Add envelope.Reply |> ignore
                 Task.FromResult(Some envelope)
             elif admission = Revoked then
-                Task.FromResult(None)
+                match terminalError with
+                | Some ex ->
+                    let faulted =
+                        TaskCompletionSource<BloggerRepairEnvelope option>(
+                            TaskCreationOptions.RunContinuationsAsynchronously
+                        )
+
+                    faulted.SetException ex
+                    faulted.Task
+                | None -> Task.FromResult(None)
             else
                 let waiter =
                     TaskCompletionSource<BloggerRepairEnvelope option>(
@@ -273,6 +292,49 @@ type BloggerRepairRendezvous(identity: BloggerRepairEpisodeIdentity, onCompleted
         if completeWithoutWorkflow then
             AsyncSupport.trySetResult completion () |> ignore
             onCompleted ()
+
+    /// Settlement failure is terminal for the whole episode, not one reply:
+    /// the durable outcome is unknown, so every pending, waiting, and
+    /// in-flight observer — and every later Post — rejects on this exact
+    /// exception. Never reports abandonment as committed.
+    member _.Fail(ex: exn) : unit =
+        let pending, outstanding, processing =
+            lock gate (fun () ->
+                if admission = Revoked then
+                    [], [], []
+                else
+                    terminalError <- Some ex
+                    admission <- Revoked
+
+                    let pendingReplies =
+                        [ while inbox.Count > 0 do
+                              yield inbox.Dequeue() ]
+
+                    let pendingReceives =
+                        [ while waiters.Count > 0 do
+                              yield waiters.Dequeue() ]
+
+                    let processingReplies = inFlight |> Seq.toList
+                    inFlight.Clear()
+                    pendingReplies, pendingReceives, processingReplies)
+
+        for envelope in pending do
+            try
+                envelope.Reply.SetException ex
+            with _ ->
+                ()
+
+        for waiter in outstanding do
+            try
+                waiter.SetException ex
+            with _ ->
+                ()
+
+        for reply in processing do
+            try
+                reply.SetException ex
+            with _ ->
+                ()
 
 /// Material mailbox + physical flight lease (R05/R06).
 ///

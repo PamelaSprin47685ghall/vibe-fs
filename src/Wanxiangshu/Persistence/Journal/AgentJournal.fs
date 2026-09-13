@@ -28,6 +28,10 @@ type MagicTodoAppendReceipt =
     { EventId: EventId
       Projection: ProjectionSet }
 
+type JournalAppendException(failure: JournalAppendFailure) =
+    inherit Exception(JournalAppendFailure.describe failure)
+    member _.Failure = failure
+
 
 module private AgentJournalInternals =
 

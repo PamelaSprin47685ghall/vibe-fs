@@ -15,7 +15,8 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, rmSync } from 'node:fs'
+import fc from 'fast-check'
+import { chmodSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -124,7 +125,17 @@ const setupOwner = async (t) => {
   // BlogSurface.journalOf reads a structural `Journal` member or the raw
   // AgentJournal; the boot handle wraps the live AgentJournal in `.journal`.
   const durable = opened.journal.journal
-  return { ids, durable, scope, request, ports, calls }
+  return {
+    ids,
+    durable,
+    handle: opened.journal,
+    scope,
+    request,
+    ports,
+    calls,
+    dir,
+    writerFile: join(dir, 'wanxiang', 'events', `writer-blog-${n}.ndjson`),
+  }
 }
 
 // quiescent: false => the turn carries no permit => the tool-not-quiescent
@@ -226,6 +237,156 @@ test('WHAT[ENF-021] next_terminal_sends_at_most_one_aabb_then_abandons', async (
   assert.equal(typeof calls.eventNotify[0][0], 'string')
   assert.equal(calls.eventNotify[0][0], ids.blogger)
   assert.equal(runtime.tryGetFlight(scope, ids.blogger), null)
+})
+
+const captureFatal = async (work) => {
+  const previousExit = process.env.WANXIANGSHU_NO_FATAL_EXIT
+  const previousError = console.error
+  const records = []
+  process.env.WANXIANGSHU_NO_FATAL_EXIT = '1'
+  console.error = (...args) => records.push(args.join(' '))
+  try {
+    return { value: await work(), records }
+  } finally {
+    console.error = previousError
+    if (previousExit === undefined) delete process.env.WANXIANGSHU_NO_FATAL_EXIT
+    else process.env.WANXIANGSHU_NO_FATAL_EXIT = previousExit
+  }
+}
+
+test('WHAT[ENF-021] exhausted repair stops its real continuation without a process fatal', async (t) => {
+  const { ids, durable, scope, request, ports, calls } = await setupOwner(t)
+  await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-1'))
+  await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-2'))
+  const messages = [{ info: { id: 'run-3', role: 'assistant', time: { completed: 1 } }, parts: [] }]
+
+  const { value, records } = await captureFatal(() =>
+    blog.continueTerminal(scope, durable, request, 'run-3', 0, messages),
+  )
+
+  assert.equal(value.kind, 'StopPhysicalRun')
+  assert.deepEqual(value.messages, messages)
+  assert.deepEqual(records, [])
+  assert.equal(calls.sendPrompt.length, 2)
+  assert.equal(calls.eventNotify.length, 1)
+  assert.equal(runtime.tryGetFlight(scope, ids.blogger), null)
+})
+
+test('WHAT[ENF-021] terminal without provider identity stops only the exact request', async (t) => {
+  const { durable, scope, request, ids } = await setupOwner(t)
+  const messages = [{ info: { role: 'assistant', time: { completed: 1 } }, parts: [] }]
+  const { value, records } = await captureFatal(() =>
+    blog.continueTerminal(scope, durable, request, '', 0, messages),
+  )
+  assert.equal(value.kind, 'StopPhysicalRun')
+  assert.deepEqual(records, [])
+  assert.equal(runtime.tryGetFlight(scope, ids.blogger), null)
+})
+
+test('WHAT[ENF-021] failed durable abandon retains its flight and never reports settlement', async (t) => {
+  const { durable, handle, scope, request, ids } = await setupOwner(t)
+  journal.JournalSurface_dispose(handle)
+  const { records } = await captureFatal(async () => {
+    await assert.rejects(() => blog.continueTerminal(scope, durable, request, '', 0, []))
+  })
+  assert.deepEqual(records, [])
+  assert.equal(runtime.tryGetFlight(scope, ids.blogger).requestId, ids.request)
+})
+
+test('WHAT[ENF-021] repair settlement failure rejects every waiting observer without fatal or release', async (t) => {
+  const { durable, handle, scope, request, ids, ports, calls } = await setupOwner(t)
+  await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-1'))
+  await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-2'))
+  journal.JournalSurface_dispose(handle)
+  const { value, records } = await captureFatal(() => Promise.allSettled([
+    blog.observeTransformRepair(scope, durable, request, 'run-3', []),
+    blog.observeTransformRepair(scope, durable, request, 'run-4', []),
+  ]))
+  assert.deepEqual(value.map(result => result.status), ['rejected', 'rejected'])
+  assert.equal(value[0].reason, value[1].reason, 'all observers receive the exact same failure')
+  assert.deepEqual(records, [])
+  assert.equal(calls.eventNotify.length, 0)
+  assert.equal(runtime.tryGetFlight(scope, ids.blogger).requestId, ids.request)
+})
+
+test('WHAT[ENF-021] unknown abandon commit still rejects every observer without release', async (t) => {
+  const { durable, scope, request, ids, ports, calls, writerFile } = await setupOwner(t)
+  await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-1'))
+  await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-2'))
+  // Physical write failure mid-append: the durable outcome is Unknown, not
+  // NotAttempted — the abandon may or may not be recorded.
+  chmodSync(writerFile, 0o400)
+  const { value, records } = await captureFatal(() => Promise.allSettled([
+    blog.observeTransformRepair(scope, durable, request, 'run-3', []),
+    blog.observeTransformRepair(scope, durable, request, 'run-4', []),
+  ]))
+  assert.deepEqual(value.map(result => result.status), ['rejected', 'rejected'])
+  assert.equal(value[0].reason, value[1].reason, 'all observers receive the exact same failure')
+  assert.match(String(value[0].reason), /append outcome unknown/)
+  assert.deepEqual(records, [])
+  assert.equal(calls.eventNotify.length, 0)
+  assert.equal(runtime.tryGetFlight(scope, ids.blogger).requestId, ids.request)
+})
+
+test('WHAT[ENF-021] late observers after settlement failure get the same failure and no new budget', async (t) => {
+  const { durable, handle, scope, request, ids, ports, calls } = await setupOwner(t)
+  await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-1'))
+  await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-2'))
+  journal.JournalSurface_dispose(handle)
+  const { value: first, records } = await captureFatal(() => Promise.allSettled([
+    blog.observeTransformRepair(scope, durable, request, 'run-3', []),
+  ]))
+  assert.equal(first[0].status, 'rejected')
+  const failure = first[0].reason
+
+  const late = await Promise.allSettled([
+    blog.observeTransformRepair(scope, durable, request, 'run-5', []),
+    blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-5')),
+  ])
+  assert.deepEqual(late.map(result => result.status), ['rejected', 'rejected'])
+  assert.equal(late[0].reason, failure, 'late transform posts replay the stored failure')
+  assert.equal(late[1].reason, failure, 'late idle posts replay the stored failure')
+  assert.match(
+    runtime.claimRepairEpisode(scope, 'req-blog-superseding', ids.physical, ids.main, ids.blogger),
+    /^Error:Claimed request req-blog-superseding does not match active flight/,
+  )
+  assert.deepEqual(records, [])
+  assert.equal(calls.sendPrompt.length, 2, 'a failed episode never re-opens the repair budget')
+  assert.equal(calls.eventNotify.length, 0)
+  assert.equal(runtime.tryGetFlight(scope, ids.blogger).requestId, ids.request)
+})
+
+test('WHAT[ENF-021] generated duplicate and interleaved repair observations preserve bounded effects', async () => {
+  await fc.assert(fc.asyncProperty(
+    fc.array(fc.record({ idle: fc.boolean(), duplicate: fc.boolean(), quiescent: fc.boolean() }), { maxLength: 20 }),
+    async (trace) => {
+      const cleanups = []
+      const owner = await setupOwner({ after: fn => cleanups.push(fn) })
+      const { durable, scope, request, ids, ports, calls } = owner
+      try {
+        const { records } = await captureFatal(async () => {
+          let run = 0
+          for (const observation of trace) {
+            if (!observation.duplicate) run += 1
+            const providerRun = `generated-run-${run}`
+            if (observation.idle) {
+              await blog.observeIdleRepair(scope, durable, request,
+                idleObservation(ports, ids, providerRun, observation))
+            } else {
+              const messages = [{ info: { id: providerRun, role: 'assistant', time: { completed: 1 } }, parts: [] }]
+              await blog.continueTerminal(scope, durable, request, providerRun, 0, messages)
+            }
+            assert.ok(calls.sendPrompt.length <= 2, 'one nudge and at most one physical AABB')
+            assert.ok(calls.eventNotify.length <= 1, 'one terminal per exact repair episode')
+            if (calls.eventNotify.length > 0) assert.equal(runtime.tryGetFlight(scope, ids.blogger), null)
+          }
+        })
+        assert.deepEqual(records, [])
+      } finally {
+        for (const cleanup of cleanups.reverse()) await cleanup()
+      }
+    },
+  ), { seed: 20260914, numRuns: 60 })
 })
 
 test('WHAT[ENF-021] transform_and_idle_interleave_resolves_to_single_owner', async (t) => {

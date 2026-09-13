@@ -72,16 +72,16 @@ module InteractionRepairWorkflow =
                 // Journal/authority/transport failures are Wanxiangshu invariant
                 // failures, not model behavior. In production fatal kills the
                 // process; the terminal signal keeps node:test fail-closed too.
-                Diagnostic.fatal
-                    "interaction-repair-infrastructure-failed"
-                    [ "session_id", SessionId.value turn.SessionId; "result", error ]
-
                 eventPort.NotifyTerminal
                     turn.SessionId
                     (TerminalOutcome.Failed(
                         TerminalStop.forAuthority turn.AuthorityRootUserMessageId ("WANXIANGSHU_FATAL: " + error)
                     ))
                 |> ignore
+
+                Diagnostic.fatal
+                    "interaction-repair-infrastructure-failed"
+                    [ "session_id", SessionId.value turn.SessionId; "result", error ]
         }
         :> Task
 
@@ -139,14 +139,14 @@ module InteractionRepairWorkflow =
         (turn: ReconciledTurn)
         (reason: string)
         =
-        Diagnostic.fatal
-            "blogger-protocol-repair-failed"
-            [ "session_id", SessionId.value turn.SessionId; "result", reason ]
-
         eventPort.NotifyTerminal
             turn.SessionId
             (TerminalOutcome.Failed(TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason))
         |> ignore
+
+        Diagnostic.fatal
+            "blogger-protocol-repair-failed"
+            [ "session_id", SessionId.value turn.SessionId; "result", reason ]
 
 
     /// Blogger has a stricter terminal protocol than ordinary agents: prose-only

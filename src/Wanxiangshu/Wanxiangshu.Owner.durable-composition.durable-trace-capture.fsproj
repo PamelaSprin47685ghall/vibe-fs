@@ -17,6 +17,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-agentjournal.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-message-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-identityseed.fsproj"/>
