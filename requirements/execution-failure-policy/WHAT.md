@@ -94,3 +94,11 @@ operator abort → `UserCancelled`，supersede → `Superseded`（CRASH-008 / HO
 ## EXECFAIL-011: 未分类 hook 失败必须携带自有证据
 
 hook 抛出的不可识别异常不拥有"无已接受事实、无所属执行"的免费推定。边界只能从 hook 实参证明执行身份（`sessionID` 字段或 output.messages 单一会话 + 末尾物理用户消息），能证明则以该 `ChatExecutionKey` 下发 `SettlementIncomplete`，后续处置交由相应 phase 的 settlement owner，不补造执行已干净的记录；不能证明则 key 保持 None。未知类别不升级为 process fatal，也不降级为可重试 provider 噪音——它作为不变的 rethrow 信号交给 Host，fatal 决策保留给证据齐全的 phase。
+
+## EXECFAIL-012: StopPhysicalRun 先落 admission barrier，物理 abort 独立观测
+
+Enforcer 返回 `StopPhysicalRun` 时必须先把确切 execution 的 provider admission 钉死（suppress in-flight step + release custody），其后才是 detached Host abort 且其结果仅为诊断。abort 在途、拒绝、抛错都不允许恢复该 execution 的 provider admission；其他 request/execution 不受影响。
+
+## EXECFAIL-013: unhandled fatal 分支不可合并不同 lifecycle
+
+单次空的 transform 文本、协议违例的 repair outcome（send-kind 回报 transform observe）、committed/unknown settlement 毁约等到 fatal 的入口必须按 commitment 语义分解成各自路径：成功结算的请求加入 catch-up，协议违例保留 fuse，SettlementIncomplete/Unknown 不得未经证据落为"未执行"。同一 fatal operation 不得吞掉不同寿命期的精确处置。

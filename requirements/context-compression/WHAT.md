@@ -103,3 +103,7 @@ Context compression 与 provider retry 的 correctness path 严禁读取 wall cl
 Blogger claim/release conflict、semantic cut与compression invariant必须携带exact BloggerSession/RequestId及当前durable settlement evidence形成typed incident；superseded callback无权fatal。runtime只接受composition注入的mandatory fatal capability，不得直接引用physical adapter。同一incident只有一次report与kill，fatal不得改写flight或durable projection。
 
 协议修复预算耗尽是所属 physical attempt 的终态，不是进程不变量破坏。continuation 必须消费 coordinator 已结算的结果并返回 `StopPhysicalRun`，不得继续把原消息交给 provider，也不得杀死其他会话。缺失 provider identity 的外部终态只能关闭确切请求并停止该 attempt；不能编造 provider run。需要放弃请求的不变量分支先完成 durable abandon 与 exact release，再执行熔断。
+
+## CONTEXT-COMPRESSION-026: 修复结算失败以共享失败收束，不得伪造成功
+
+repair episode 的 durable abandon 失败时，rendezvous 进入终态失败：所有已接收未完成的观察者、入队请求与后续到达的旧/新 observer 都以同一异常拒绝；不发送 terminal 通知，不释放 exact flight，不重新打开预算。episode 以失败态保留注册，防止同一请求以新 budget 重启。
