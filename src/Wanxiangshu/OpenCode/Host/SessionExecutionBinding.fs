@@ -574,42 +574,45 @@ module SessionExecutionBinding =
         ManagedChatAcceptance.accept durable key evidence
 
     let private admitExternalRoot (durable: AgentJournal) (key: ChatExecutionKey) (agent: string) =
-        task {
-            match ParticipantIdentity.resolveAtRoot agent with
-            | Ok identity ->
-                let logicalRunId =
-                    LogicalRunId.create (sprintf "run-%s-1" (SessionId.value key.SessionId))
+        let logicalRunId =
+            LogicalRunId.create (sprintf "run-%s-1" (SessionId.value key.SessionId))
 
-                let rootUserMsgId =
-                    AuthorityRootUserMessageId.create (PhysicalUserMessageId.value key.PhysicalUserMessageId)
+        let rootUserMsgId =
+            AuthorityRootUserMessageId.create (PhysicalUserMessageId.value key.PhysicalUserMessageId)
 
-                let rootPayload: AuthorityRootAcceptedPayload =
-                    { SchemaVersion = 1
-                      SessionId = key.SessionId
-                      LogicalRunId = logicalRunId
-                      AuthorityRootUserMessageId = rootUserMsgId
-                      AuthorityKind = "HumanRoot"
-                      IdentitySeed = PromptAuthority.IdentitySeed.RootSelection identity }
+        taskResult {
+            let! identity = ParticipantIdentity.resolveAtRoot agent |> Result.mapError (sprintf "%A")
 
-                let! _ =
-                    AgentJournal.appendAgent
-                        (StreamId.Session key.SessionId)
-                        None
-                        (PromptFact.AuthorityRootAccepted rootPayload)
-                        durable
+            let rootPayload: AuthorityRootAcceptedPayload =
+                { SchemaVersion = 2
+                  SessionId = key.SessionId
+                  LogicalRunId = logicalRunId
+                  AuthorityRootUserMessageId = rootUserMsgId
+                  AuthorityKind = "HumanRoot"
+                  IdentitySeed = PromptAuthority.IdentitySeed.RootSelection identity }
 
-                let evidence: AcceptedChatExecutionEvidence =
-                    { SessionId = key.SessionId
-                      LogicalRunId = logicalRunId
-                      AuthorityRootUserMessageId = rootUserMsgId
-                      AuthorityKind = PromptRootAuthorityKind.HumanRoot
-                      PhysicalUserMessageId = key.PhysicalUserMessageId
-                      IdentitySeed = PromptAuthority.IdentitySeed.RootSelection identity
-                      Origin = PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot }
+            let! _ =
+                AgentJournal.appendAgent
+                    (StreamId.Session key.SessionId)
+                    None
+                    (PromptFact.AuthorityRootAccepted rootPayload)
+                    durable
+                |> TaskResult.mapError (sprintf "%A")
 
-                let! res = ManagedChatAcceptance.accept durable key evidence
-                return res |> Result.map ignore |> Result.mapError (fun e -> sprintf "%A" e)
-            | Error err -> return Error(sprintf "%A" err)
+            let evidence: AcceptedChatExecutionEvidence =
+                { SessionId = key.SessionId
+                  LogicalRunId = logicalRunId
+                  AuthorityRootUserMessageId = rootUserMsgId
+                  AuthorityKind = PromptRootAuthorityKind.HumanRoot
+                  PhysicalUserMessageId = key.PhysicalUserMessageId
+                  IdentitySeed = PromptAuthority.IdentitySeed.RootSelection identity
+                  Origin = PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot }
+
+            let! _ =
+                ManagedChatAcceptance.accept durable key evidence
+                |> TaskResult.mapError (sprintf "%A")
+
+            return ()
         }
 
     let private establishAdmission
