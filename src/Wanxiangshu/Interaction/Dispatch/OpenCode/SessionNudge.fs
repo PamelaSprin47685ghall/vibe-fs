@@ -27,15 +27,12 @@ module HostSessionNudge =
             member _.SendPrompt(sessionId, text, opts) =
                 sessionPort.SendPrompt(sessionId, text, opts)
 
-            member _.SubscribeTerminal(sessionId, listener) =
-                sessionPort.SubscribeTerminal(sessionId, listener)
-
             member _.SubscribeFutureTerminal(sessionId, listener) =
                 sessionPort.SubscribeFutureTerminal(sessionId, listener)
 
-            member _.ReportFatalDiagnostic(operation, fields) =
-                let delimiter = String.Join(";", fields |> List.map (fun (k, v) -> k + "=" + v))
-                FatalProcess.trip operation delimiter }
+            member _.SubscribeTerminal(sessionId, listener) =
+                sessionPort.SubscribeTerminal(sessionId, listener)
+            }
 
 
     let tryActiveProfile (journal: AgentJournal option) (sessionId: SessionId) =

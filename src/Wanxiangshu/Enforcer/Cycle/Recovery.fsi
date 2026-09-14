@@ -14,6 +14,16 @@ module EnforcerFrameRecovery =
         | DigestMismatch of digest: string
         | EpochMismatch
 
+    [<RequireQualifiedAccess>]
+    type CycleContextReloadRejection =
+        | BlobUnreadable of reason: string
+        | BlobCorrupt of reason: string
+        | UnsupportedRequestKind of kind: string
+        | ItemsUndecodable of reason: string
+        | InvariantViolated of Wanxiangshu.Context.Companion.Blogger.BloggerRequestRejection
+
+    val reloadRejectionLabel: rejection: CycleContextReloadRejection -> string
+
     val loadEffectiveFrames:
         Wanxiangshu.Persistence.Journal.AgentJournal ->
         Wanxiangshu.Foundation.Identity.SessionId ->
@@ -37,6 +47,16 @@ module EnforcerFrameRecovery =
         Wanxiangshu.Persistence.Journal.AgentJournal ->
         Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequest ->
             System.Threading.Tasks.Task<Wanxiangshu.Context.Companion.Blogger.BloggerRequestContext option>
+
+    val tryReloadRequestContextDetailed:
+        Wanxiangshu.Persistence.Journal.AgentJournal ->
+        Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequest ->
+            System.Threading.Tasks.Task<
+                Result<
+                    Wanxiangshu.Context.Companion.Blogger.BloggerRequestContext,
+                    CycleContextReloadRejection
+                 >
+             >
 
     val tryLiveCycleContext:
         Wanxiangshu.Context.Companion.Blogger.Runtime.IBloggerRuntimeHost ->

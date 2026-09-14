@@ -37,7 +37,8 @@ module internal SyncDelegateWorkflow =
           Directory: string option
           ReplaceToolEstimate: SessionId -> int option -> Task<unit>
           SendPrompt: SyncDelegateCall -> SyncDelegatePromptRequest -> Task<Result<PreparedDelegationHandoff, string>>
-          CheckpointCompletedHandoff: SessionId -> PreparedDelegationHandoff -> Task<Result<unit, string>>
+          CheckpointCompletedHandoff:
+              SessionId -> PreparedDelegationHandoff -> Task<HandoffCheckpointSettlement>
           TripFatal: string -> string -> unit
           ResolveBoundAgent: SessionId -> string option
           DescribeWait: SyncDelegateWait -> DiagnosticWait
@@ -158,10 +159,25 @@ module internal SyncDelegateWorkflow =
         (handoff: PreparedDelegationHandoff)
         : Task<Result<unit, string>> =
         task {
-            match! deps.CheckpointCompletedHandoff owner handoff with
-            | Ok() -> return Ok()
-            | Error error ->
-                let detail = sprintf "delegation completed-handoff append failed: %s" error
+            // DELEG-031: the checkpoint returns the settlement itself, not a nested
+            // Result to flatten. The completed child is already proven — the caller
+            // below delivers the already-earned WorkRecord whatever the commitment
+            // says. Only the PhaseConflict invariant cut escalates through the
+            // injected fuse; NotCommitted/Unknown preserve the pending-evidence
+            // state for the next invocation's durable re-read, never a re-execution.
+            let! settled = deps.CheckpointCompletedHandoff owner handoff
+
+            match settled.Commitment with
+            | HandoffCheckpointCommitment.Committed
+            | HandoffCheckpointCommitment.NotCommitted _
+            | HandoffCheckpointCommitment.Unknown _ -> return Ok()
+            | HandoffCheckpointCommitment.PhaseConflict reason ->
+                let detail =
+                    sprintf
+                        "delegation completed-handoff invariant cut at route %s: %s"
+                        (DelegationHandoffRoute.value settled.Identity.Route)
+                        reason
+
                 deps.TripFatal "SyncDelegate.checkpointCompletedHandoff" detail
                 return raise (System.InvalidOperationException detail)
         }
@@ -189,6 +205,10 @@ module internal SyncDelegateWorkflow =
                     (deps.DescribeWait(DelegateCompletion(batchOwner, delegateSession, role)))
                     call.Answer.Task
 
+            // DELEG-031: settlement attempt precedes the caller's observation of
+            // success, but its commitment never rewrites the proven completion.
+            // NotCommitted/Unknown preserve pending-evidence; the earned
+            // WorkRecord is delivered either way. Only PhaseConflict escalates.
             do! checkpointCompletedOrCrash deps batchOwner handoff
             return workRecord
         }

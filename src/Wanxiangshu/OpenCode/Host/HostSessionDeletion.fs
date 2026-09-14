@@ -8,6 +8,7 @@ open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Enforcer.Guidance
+open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Delegation.Handle
@@ -72,52 +73,77 @@ module HostSessionDeletion =
             SessionDeletionPreparation(resolvedParent, inspectorStaged, inspectorToFinalize)
 
     /// Finalize the staged Inspector case before later session cleanup drops its
-    /// physical identity. Failure is diagnostic and process-fatal.
+    /// physical identity. The exact settlement is captured FIRST; only a durably
+    /// settled finalize releases the identity (InspectorFinalizeSettlement.
+    /// releasesIdentity). NotCommitted/Unknown/PhaseConflict RETAIN the identity
+    /// so a later recovery can resume the exact finalize — the outer evidence
+    /// lifetime decision below never drops an identity it still needs.
     let private finalizeInspectorAtRoot
-        (finalizeInspector: string -> string -> Task<Result<unit, string>>)
+        (finalizeInspector: string -> string -> Task<InspectorFinalizeSettlement>)
         (root: string)
         (inspectorId: SessionId)
-        : Task =
-        task {
-            match! finalizeInspector root (SessionId.value inspectorId) with
-            | Ok() -> ()
-            | Error error ->
-                Diagnostic.fatal
-                    "inspector-case-finalization-failed"
-                    [ "session_id", SessionId.value inspectorId; "result", error ]
-
-                return
-                    invalidOp (
-                        sprintf "CASE-003: Inspector %s finalization failed: %s" (SessionId.value inspectorId) error
-                    )
-        }
+        : Task<InspectorFinalizeSettlement> =
+        finalizeInspector root (SessionId.value inspectorId)
 
     let private finalizeInspectorIfRoot
         (workspaceDirectory: string option)
-        (finalizeInspector: string -> string -> Task<Result<unit, string>>)
+        (finalizeInspector: string -> string -> Task<InspectorFinalizeSettlement>)
         (inspectorId: SessionId)
-        : Task =
+        : Task<InspectorFinalizeSettlement option> =
         match workspaceDirectory with
-        | Some root -> finalizeInspectorAtRoot finalizeInspector root inspectorId
-        | None -> Task.FromResult() :> Task
+        | Some root ->
+            task {
+                let! settled = finalizeInspectorAtRoot finalizeInspector root inspectorId
+                return Some settled
+            }
+        | None -> Task.FromResult None
 
     let private finalizeStagedInspector
         (scope: PluginRuntimeScope)
         (workspaceDirectory: string option)
-        (finalizeInspector: string -> string -> Task<Result<unit, string>>)
+        (finalizeInspector: string -> string -> Task<InspectorFinalizeSettlement>)
         (inspectorId: SessionId)
         : Task =
         task {
-            try
-                do! finalizeInspectorIfRoot workspaceDirectory finalizeInspector inspectorId
-            finally
-                scope.DropSessionIdentity(SessionId.value inspectorId)
+            // F35: capture the exact finalize evidence BEFORE deciding identity
+            // lifetime. The identity drop below is explicit and owner-driven —
+            // it runs only for a durably settled finalize, never in a finally
+            // that would also erase the identity a failed finalize still needs.
+            let! settlementOpt = finalizeInspectorIfRoot workspaceDirectory finalizeInspector inspectorId
+
+            match settlementOpt with
+            | None -> ()
+            | Some settled ->
+                match settled.Commitment with
+                | InspectorFinalizeCommitment.Finalized
+                | InspectorFinalizeCommitment.NothingToFinalize ->
+                    scope.DropSessionIdentity(SessionId.value inspectorId)
+                | InspectorFinalizeCommitment.NotCommitted reason
+                | InspectorFinalizeCommitment.Unknown reason ->
+                    // Retain the identity: a later recovery must be able to
+                    // resume this exact finalize. Expected/best-effort, never a
+                    // recovery decision — the commitment itself is the evidence.
+                    Diagnostic.emit
+                        "inspector-case-finalization-pending"
+                        [ "session_id", SessionId.value inspectorId; "result", reason ]
+                | InspectorFinalizeCommitment.PhaseConflict reason ->
+                    Diagnostic.fatal
+                        "inspector-case-finalization-failed"
+                        [ "session_id", SessionId.value inspectorId; "result", reason ]
+
+                    return
+                        invalidOp (
+                            sprintf
+                                "CASE-003: Inspector %s finalization conflict: %s"
+                                (SessionId.value inspectorId)
+                                reason
+                        )
         }
 
     let finalizePreparedInspector
         (scope: PluginRuntimeScope)
         (workspaceDirectory: string option)
-        (finalizeInspector: string -> string -> Task<Result<unit, string>>)
+        (finalizeInspector: string -> string -> Task<InspectorFinalizeSettlement>)
         (SessionDeletionPreparation(_, _, inspectorToFinalize))
         : Task =
         inspectorToFinalize

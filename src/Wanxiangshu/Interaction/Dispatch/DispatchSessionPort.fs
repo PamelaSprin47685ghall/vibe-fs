@@ -11,12 +11,11 @@ type IDispatchSessionPort =
     abstract SendPrompt: sessionId: SessionId * text: string * opts: OpenCodePromptOptions -> Task<SendOutcome>
     abstract SubscribeFutureTerminal: sessionId: SessionId * listener: TerminalCompletionListener -> IDisposable
     abstract SubscribeTerminal: sessionId: SessionId * listener: TerminalCompletionListener -> IDisposable
-    abstract ReportFatalDiagnostic: operation: string * fields: (string * string) list -> unit
 
 
 /// Narrow adapter: the real `ISessionHostPort` is a superset; this port only
-/// observes send/terminal plus durable-side fatal reporting (JournalAppendFailure
-/// is a value, not a process-level abort).
+/// observes send/terminal: durable-side failures arrive back inside SendOutcome
+/// or DetachedSendListener verdicts, never through a process-level reporter.
 [<RequireQualifiedAccess>]
 module DispatchSessionPort =
 
@@ -29,7 +28,4 @@ module DispatchSessionPort =
                 sessionPort.SubscribeFutureTerminal(sessionId, listener)
 
             member _.SubscribeTerminal(sessionId, listener) =
-                sessionPort.SubscribeTerminal(sessionId, listener)
-
-            member _.ReportFatalDiagnostic(operation, fields) =
-                FatalProcess.trip operation (String.Join(";", fields |> List.map (fun (k, v) -> k + "=" + v))) }
+                sessionPort.SubscribeTerminal(sessionId, listener) }

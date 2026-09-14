@@ -118,14 +118,29 @@ module PluginHooksSurface =
                 )
 
             let context =
-                BloggerRequestContext.Squash
-                    { RequestId = BloggerRequestId.create requestId
-                      MainSessionId = SessionId.create mainSession
-                      BloggerSessionId = SessionId.create bloggerSession
-                      FrameEpochId = FrameEpochId.create 1L
-                      CoveredFrameCount = 1
-                      FrameDigests = [ BlobDigest.create "blogger-effect-frame" ]
-                      ObservedPrefixEpochId = PrefixEpochId.create 1L }
+                BloggerRequestContext.Squash(
+                    match
+                        BloggerRequestMaterial.createSquash
+                            { RequestId =
+                                BloggerRequestContext.squashRequestId
+                                    (SessionId.create mainSession)
+                                    (SessionId.create bloggerSession)
+                                    (FrameEpochId.create 1L)
+                                    1
+                                    [ BlobDigest.create "blogger-effect-frame" ]
+                              MainSessionId = SessionId.create mainSession
+                              BloggerSessionId = SessionId.create bloggerSession
+                              FrameEpochId = FrameEpochId.create 1L
+                              CoveredFrameCount = 1
+                              FrameDigests = [ BlobDigest.create "blogger-effect-frame" ]
+                              ObservedPrefixEpochId = PrefixEpochId.create 1L }
+                    with
+                    | Ok verified -> verified
+                    | Error rejection ->
+                        invalidOp (
+                            sprintf "coordinateBloggerUnresolvedTwice staged an unverifiable context: %A" rejection
+                        )
+                )
 
             let! first =
                 CompanionTransform.coordinateBloggerContext

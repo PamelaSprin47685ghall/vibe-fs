@@ -185,6 +185,7 @@ module SemanticTraceSurface =
     let private captureError error =
         match error with
         | XTraceCaptureError.Refused reason -> reason
+        | XTraceCaptureError.StorageAppendFailed failure -> JournalAppendFailure.describe failure
         | XTraceCaptureError.StorageFailed reason -> reason
 
     let private identityView identity =

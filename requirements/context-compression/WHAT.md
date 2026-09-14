@@ -106,4 +106,8 @@ Blogger claim/release conflict、semantic cut与compression invariant必须携�
 
 ## CONTEXT-COMPRESSION-026: 修复结算失败以共享失败收束，不得伪造成功
 
+## CONTEXT-COMPRESSION-027: Blogger 请求构造权只属于 owner，恢复先解码再验证
+
+`BloggerMainRequestContext` 与 `BloggerSquashRequestContext` 的 record 字段只读：外部代码可以模式匹配与读取字段，但不能组装任意 `PreviousIngestedThroughSequence`／`NextIngestedThroughSequence`／`DeltaDigest`／`Toml`／epoch 组合。唯一构造入口是 `BloggerRequestMaterial.createMain`／`createSquash`（validating constructor），失败为 typed `BloggerRequestRejection`，永不产生部分 record。构造保证：`nextIngested > prevIngested`；`DeltaDigest = SHA256(Toml)`；epoch 为合法 generation；Squash 的 `CoveredFrameCount ≥ 1` 且与 `FrameDigests` 长度一致。`RequestId` 是 owner 在 materialization 时计算并冻结的 durable 身份（`mainRequestId`／`squashRequestId` canonical hash），构造与恢复只携带、不从 blob 内容重算。live 派生（`mainContextFromChunk`／`tryBuildSquashContext`）与恢复解码走同一构造器；恢复先解码未验证数据再验证，损坏／版本不兼容／I-O 不可用的 durable 输入分别成为 `CycleContextReloadRejection` 的独立分支（`BlobCorrupt`／`UnsupportedRequestKind`／`ItemsUndecodable`／`InvariantViolated`／`BlobUnreadable`），不得坍缩为 `None` 或零默认值。旧 epoch 请求不得借恢复取得当前提交权：恢复沿用 durable open 的 frozen epoch，commit 仍以 staged coverage 与 live projection 的一致性裁决。
+
 repair episode 的 durable abandon 失败时，rendezvous 进入终态失败：所有已接收未完成的观察者、入队请求与后续到达的旧/新 observer 都以同一异常拒绝；不发送 terminal 通知，不释放 exact flight，不重新打开预算。episode 以失败态保留注册，防止同一请求以新 budget 重启。

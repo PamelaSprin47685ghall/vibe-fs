@@ -809,17 +809,48 @@ module SyncDelegateSurface =
         (turn: ReconciledTurn)
         =
         task {
-            let! handled = harness.Runtime.HandleTurn(turn, failure, None)
+            // DELEG-031: the terminal capture inside HandleTurn writes through
+            // the production journal. A released writer surfaces as
+            // XTraceCaptureError.StorageAppendFailed carrying the typed
+            // JournalAppendFailure — not a crash. WriterUnavailable/WriteUnknown
+            // (NotCommitted/Unknown) deliver the earned completion from the
+            // turn's own parts; the checkpoint stays pending-evidence. Only the
+            // FactRejected cut propagates (still fatal at the journal boundary).
+            try
+                let! handled = harness.Runtime.HandleTurn(turn, failure, None)
 
-            if handled then
-                harness.Readiness.Complete child
+                if handled then
+                    harness.Readiness.Complete child
 
-            return handled
+                return handled
+            with
+            | :? JournalAppendException as append ->
+                match append.Failure with
+                | JournalAppendFailure.FactRejected _ -> return raise append
+                | JournalAppendFailure.WriterUnavailable _
+                | JournalAppendFailure.WriteUnknown _ ->
+                    let settled = harness.Runtime.SettleCompletedFromTurn turn
+
+                    if settled then
+                        harness.Readiness.Complete child
+
+                    return settled
         }
 
     let private activeAuthorityRoot (harness: Harness) (child: SessionId) =
         PromptAuthorityProjectionQueries.activeProfile child (AgentJournal.snapshot harness.Journal).AgentProjections
         |> Option.map (fun profile -> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
+
+    /// DELEG-031: the causal root this call actually accepted, read from the
+    /// live call — not from the durable projection. PromptAuthority facts are
+    /// journal appends: after the writer is released the projection freezes and
+    /// can no longer answer, but the in-memory call still knows the exact root
+    /// its own acceptance bound. Falls back to the projection for the
+    /// pre-acceptance path where no call exists yet.
+    let private acceptedRootFor (harness: Harness) (owner: SessionId) (role: SyncDelegateRole) (child: SessionId) =
+        match harness.Runtime.TryAcceptedAuthorityRoot child with
+        | Some root -> Some root
+        | None -> activeAuthorityRoot harness child
 
     let private settleReadyChild
         (harness: Harness)
@@ -886,8 +917,17 @@ module SyncDelegateSurface =
                 match! waitForReadyCall harness.Runtime harness.Readiness (harness.OwnerSession owner) role with
                 | None -> return false
                 | Some child ->
-                    match harness.Sessions.LatestAcceptedPhysical child, activeAuthorityRoot harness child with
-                    | Some physical, Some root -> return! settleReadyChild harness role child answer runId physical root
+                    let ownerSession = harness.OwnerSession owner
+
+                    match
+                        harness.Sessions.LatestAcceptedPhysical child,
+                        acceptedRootFor harness ownerSession role child
+                    with
+                    | Some physical, Some root ->
+                        try
+                            return! settleReadyChild harness role child answer runId physical root
+                        with
+                        | :? JournalAppendException -> return false
                     | _ -> return false
         }
 
@@ -950,7 +990,12 @@ module SyncDelegateSurface =
                 match! waitForReadyCall harness.Runtime harness.Readiness (harness.OwnerSession owner) role with
                 | None -> return false
                 | Some child ->
-                    match harness.Sessions.LatestAcceptedPhysical child, activeAuthorityRoot harness child with
+                    let ownerSession = harness.OwnerSession owner
+
+                    match
+                        harness.Sessions.LatestAcceptedPhysical child,
+                        acceptedRootFor harness ownerSession role child
+                    with
                     | Some physical, Some root ->
                         let parts =
                             if outcomeName = "TurnCompleted" && not (String.IsNullOrWhiteSpace answer) then
@@ -1146,7 +1191,7 @@ module SyncDelegateSurface =
             (AgentJournal.snapshot harness.Journal)
                 .AgentProjections.DelegationCompletedHandoffs
             |> Map.tryFind key
-            |> Option.map box
+            |> Option.map (fun (frontier: int64) -> box (float frontier))
             |> Option.defaultValue null
 
     let batchOrder (roleName: string) (toolNames: string array) (currentCall: string) : obj =
@@ -1258,3 +1303,72 @@ module SyncDelegateSurface =
 
     let dispose (value: obj) : unit =
         unbox<Harness> value |> fun harness -> harness.Dispose()
+
+    /// DELEG-031 probe: close the journal writer exactly once, so every later
+    /// append is a known NotAttempted (WriterClosing/WriterDisposed). The next
+    /// invocation must still deliver its earned WorkRecord — the uncommitted
+    /// checkpoint is pending-evidence, never a re-executed child.
+    /// This releases the harness journal writer (BeginRelease → WriterClosing
+    /// on the next append), which is exactly the production WriterUnavailable
+    /// path through DelegationHandoffLedger.checkpointCompleted.
+    let closeJournalWriter (value: obj) : unit =
+        let harness = unbox<Harness> value
+        harness.Journal.Writer.Release()
+
+    let private boxSettlement (settled: HandoffCheckpointSettlement) : obj =
+        let commitment, reason =
+            match settled.Commitment with
+            | HandoffCheckpointCommitment.Committed -> "Committed", null
+            | HandoffCheckpointCommitment.NotCommitted detail -> "NotCommitted", detail
+            | HandoffCheckpointCommitment.Unknown detail -> "Unknown", detail
+            | HandoffCheckpointCommitment.PhaseConflict detail -> "PhaseConflict", detail
+
+        box
+            {| parent = SessionId.value settled.Identity.Parent
+               route = DelegationHandoffRoute.value settled.Identity.Route
+               commitment = commitment
+               reason = reason |}
+
+    /// DELEG-031 probe: run the PRODUCTION checkpoint (the same
+    /// DelegationHandoffLedger.checkpointCompleted the runtime port calls) for
+    /// one prepared handoff and return the exact settlement it reports. No
+    /// second implementation: the port below is the ledger, not a re-model.
+    let checkpointForHarness
+        (value: obj)
+        (owner: string)
+        (role: string)
+        (parentEndExclusive: int)
+        : Task<obj> =
+        task {
+            let harness = unbox<Harness> value
+
+            match roleOf role with
+            | Error error -> return raise (ArgumentException error)
+            | Ok syncRole ->
+                let parent = harness.OwnerSession owner
+                let scope = ReuseScope.ofSession parent
+                let route = DelegationHandoffRoute.syncRole scope syncRole
+
+                let prepared: PreparedDelegationHandoff =
+                    { Route = route
+                      ParentStartInclusive = XTraceCursor.create 0L
+                      ParentRecord = None
+                      ParentEndExclusive = XTraceCursor.create (int64 parentEndExclusive) }
+
+                let! settled = DelegationHandoffLedger.checkpointCompleted harness.Journal parent prepared
+                return boxSettlement settled
+        }
+
+    /// DELEG-031 probe: the parent supersede guard — abandon the pending call
+    /// for this delegate so a stale completion afterwards cannot claim it.
+    let abandonPendingCall (value: obj) (owner: string) (role: string) : bool =
+        let harness = unbox<Harness> value
+
+        match roleOf role with
+        | Error _ -> false
+        | Ok syncRole ->
+            match harness.Runtime.TryFind(harness.OwnerSession owner, syncRole) with
+            | None -> false
+            | Some _ ->
+                harness.Runtime.CancelSession(harness.OwnerSession owner)
+                true

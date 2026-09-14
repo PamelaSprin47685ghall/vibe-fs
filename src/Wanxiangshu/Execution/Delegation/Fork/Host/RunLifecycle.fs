@@ -253,32 +253,55 @@ module HostForkRunLifecycle =
             run.AuthorityRoot
             |> Option.exists (fun root -> TerminalStop.belongsTo root stop)
 
-    let private checkpointCompletedOrCrash
+    /// DELEG-031: the handoff port travels with the prepared handoff as one slot
+    /// (`Some slot` proves the capability was present at PrepareHandoff time).
+    /// A run whose `Handoff` slot is `None` has no completion checkpoint to
+    /// write — capability absence is therefore decided here structurally, not by
+    /// a late fatal, and `complete` never re-checks a construction-time fact.
+    let private checkpointSlot (handoffPort: ReusableHandoffPort option) (run: PendingHostRun) =
+        match run.Handoff with
+        | None -> None
+        | Some handoff ->
+            match handoffPort with
+            | Some port -> Some(port, handoff)
+            | None ->
+                // Structural invariant: a prepared handoff is only ever produced
+                // by this runtime's own PrepareHandoff, which returns Error when
+                // the port is absent — so a run can never hold Some handoff while
+                // its runtime holds None port. Fail closed if wiring ever breaks.
+                raise (
+                    InvalidOperationException "reusable fork run has no handoff capability: prepared handoff without a handoff port"
+                )
+
+    let private settleCompletedHandoff
         (handoffPort: ReusableHandoffPort option)
         (parentId: SessionId)
         (run: PendingHostRun)
         : Task =
-        let fail detail =
-            FatalProcess.trip "HostForkRunLifecycle.checkpointCompletedHandoff" detail
-            raise (InvalidOperationException detail)
-
-        let requireCheckpoint =
-            function
-            | Ok() -> ()
-            | Error error -> fail (sprintf "delegation completed-handoff append failed: %s" error)
-
-        let checkpoint =
-            match run.Handoff, handoffPort with
-            | None, _ -> None
-            | Some handoff, Some port -> Some(port, handoff)
-            | Some _, None -> fail "reusable fork run has no handoff capability"
-
-        match checkpoint with
+        match checkpointSlot handoffPort run with
         | None -> Task.FromResult(()) :> Task
         | Some(port, handoff) ->
             task {
-                let! result = port.CheckpointCompleted parentId handoff
-                return requireCheckpoint result
+                // DELEG-031: the checkpoint returns its own settlement — a pending
+                // completion is delivered whatever the commitment says. The child
+                // already finished; NotCommitted/Unknown preserve pending-evidence
+                // for the next invocation's durable re-read and never re-execute
+                // the child. Only the PhaseConflict invariant cut escalates.
+                let! settled = port.CheckpointCompleted parentId handoff
+
+                match settled.Commitment with
+                | HandoffCheckpointCommitment.Committed
+                | HandoffCheckpointCommitment.NotCommitted _
+                | HandoffCheckpointCommitment.Unknown _ -> ()
+                | HandoffCheckpointCommitment.PhaseConflict reason ->
+                    let detail =
+                        sprintf
+                            "delegation completed-handoff invariant cut at route %s: %s"
+                            (DelegationHandoffRoute.value settled.Identity.Route)
+                            reason
+
+                    FatalProcess.trip "HostForkRunLifecycle.checkpointCompletedHandoff" detail
+                    return raise (InvalidOperationException detail)
             }
             :> Task
 
@@ -430,7 +453,12 @@ module HostForkRunLifecycle =
         | Completed result when not (completionBelongsToRun run result) -> Task.FromResult(())
         | Completed result ->
             task {
-                do! checkpointCompletedOrCrash handoffPort parentId run
+                // DELEG-031: settlement is attempted before delivery, but the
+                // proven completion is delivered whatever the commitment says —
+                // neither announced early (this await precedes the SetResult
+                // below) nor forgotten. Only PhaseConflict escalates, after
+                // which no delivery can follow.
+                do! settleCompletedHandoff handoffPort parentId run
 
                 let agentOutcome =
                     AgentCompletion.completed

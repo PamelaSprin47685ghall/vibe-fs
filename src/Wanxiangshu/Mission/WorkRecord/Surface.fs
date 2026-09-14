@@ -76,6 +76,7 @@ module WorkRecordSurface =
     let private captureError error =
         match error with
         | XTraceCaptureError.Refused reason -> reason
+        | XTraceCaptureError.StorageAppendFailed failure -> JournalAppendFailure.describe failure
         | XTraceCaptureError.StorageFailed reason -> reason
 
     /// COMPANION-003: capture an OpeningPrompt through the canonical XTrace owner.

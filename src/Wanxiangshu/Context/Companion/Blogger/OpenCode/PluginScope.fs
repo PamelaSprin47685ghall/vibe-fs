@@ -132,8 +132,17 @@ type PluginBloggerScope() =
         match episodes.TryGetValue bloggerSid with
         | true, existing when isSameRepairEpisode existing identity -> Ok existing
         | true, existing ->
-            Error
-                $"Conflicting episode already active for {SessionId.value bloggerSid}: existing req {BloggerRequestId.value existing.Identity.RequestId} root {AuthorityRootUserMessageId.value existing.Identity.AuthorityRoot}"
+            // A terminally failed episode stays registered forever: its abandon
+            // outcome is unknown, so a fresh episode would re-spend repair budget
+            // on a request whose settlement was never proven. A merely-cancelled
+            // episode (terminal release/retire without settlement fault) is
+            // reclaimable — the slot is evidence-free once its flight is gone.
+            if existing.TerminalFailure.IsSome || not existing.IsRevoked then
+                Error
+                    $"Conflicting episode already active for {SessionId.value bloggerSid}: existing req {BloggerRequestId.value existing.Identity.RequestId} root {AuthorityRootUserMessageId.value existing.Identity.AuthorityRoot}"
+            else
+                episodes.Remove bloggerSid |> ignore
+                Ok(createRegisteredRepairEpisode bloggerSid identity)
         | false, _ -> Ok(createRegisteredRepairEpisode bloggerSid identity)
 
     let claimRepairEpisodeSlot (bloggerSid: SessionId) (identity: BloggerRepairEpisodeIdentity) =
@@ -321,6 +330,13 @@ type PluginBloggerScope() =
 
         member this.DrainRepairEpisodes() : Task =
             let tasksToAwait = snapshotRepairCompletions ()
+
+            // Cancel each live episode before awaiting so a workflow parked on
+            // Receive cannot hold the drain open forever; episode slot removal
+            // still runs through onCompleted.
+            lock episodeGate (fun () ->
+                for KeyValue(_, rendezvous) in episodes do
+                    rendezvous.Cancel())
 
             task {
                 let! firstFault = drainAllRepair (tasksToAwait |> Array.toList) None

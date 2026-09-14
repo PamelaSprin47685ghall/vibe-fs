@@ -356,12 +356,35 @@ type SyncDelegateRuntime
             store.FailCall(call, "EXEC-031: Completed without bounded WorkRecord")
             true
 
+    /// DELEG-031: the completion the child physically produced, independent of
+    /// whether its terminal trace durably committed. Used only when the
+    /// terminal capture itself reports the write was NotCommitted/Unknown: the
+    /// earned completion is delivered from the turn's own parts, never dropped
+    /// and never re-executed.
+    let finishCompletedCallFromTurn (turn: ReconciledTurn) (call: SyncDelegateCall) =
+        match CompletedTurnClassifier.partsSessionText turn.Parts with
+        | record when not (System.String.IsNullOrWhiteSpace record) ->
+            noteInspectorIfRole call turn.SessionId record
+            AsyncSupport.trySetResult call.Answer (Ok record) |> ignore
+            true
+        | _ ->
+            store.FailCall(call, "EXEC-031: Completed without bounded WorkRecord")
+            true
+
     let handleCompletedCall (turn: ReconciledTurn) (call: SyncDelegateCall) =
         task {
             // Completion marker for ManagerLife. HandleTurn
             // does not use Terminal to build the inspect payload;
             // the bounded WorkRecord is the invocation's parts range.
             match! XTraceCapture.captureTerminalWithReceipt (Some journal) turn with
+            // DELEG-031: the terminal trace write is settlement evidence, not
+            // the completion itself. WriterUnavailable/WriteUnknown means the
+            // child physically finished but the evidence did not commit:
+            // deliver the earned completion from the turn's own parts (neither
+            // forgotten nor re-executed); the checkpoint stays pending-evidence.
+            | Error(XTraceCaptureError.StorageAppendFailed(Wanxiangshu.Foundation.JournalAppendFailure.WriterUnavailable _))
+            | Error(XTraceCaptureError.StorageAppendFailed(Wanxiangshu.Foundation.JournalAppendFailure.WriteUnknown _)) ->
+                return finishCompletedCallFromTurn turn call
             | Error error ->
                 store.FailCall(call, sprintf "sync delegate terminal trace capture failed: %A" error)
                 return true
@@ -578,6 +601,37 @@ type SyncDelegateRuntime
             call.Invocations.Length > 0
             && call.Invocations
                |> List.forall (fun invocation -> invocation.StartCursor.IsSome)
+        | None -> false
+
+    /// DELEG-031 probe seam: the exact authority root this delegate's live call
+    /// accepted, without consulting the durable projection (which freezes once
+    /// the journal writer is released).
+    member _.TryAcceptedAuthorityRoot(sessionId: SessionId) : string option =
+        match store.TryPeekCallByDelegate sessionId with
+        | Some call ->
+            match call.AcceptedAuthorityRoot with
+            | Some root -> Some(AuthorityRootUserMessageId.value root)
+            | None -> None
+        | None -> None
+
+    /// DELEG-031: settle a completed turn from its own parts when the terminal
+    /// trace capture reports NotCommitted/Unknown. True iff a live call
+    /// consumed the turn. The checkpoint stays pending-evidence; the earned
+    /// completion is delivered from the turn, never dropped, never re-executed.
+    member _.SettleCompletedFromTurn(turn: ReconciledTurn) : bool =
+        match store.TryPeekCallByDelegate turn.SessionId with
+        | Some call ->
+            // The completion the child physically produced, independent of
+            // whether its terminal trace durably committed: deliver from the
+            // turn's own parts, never dropped, never re-executed.
+            match CompletedTurnClassifier.partsSessionText turn.Parts with
+            | record when not (System.String.IsNullOrWhiteSpace record) ->
+                noteInspectorIfRole call turn.SessionId record
+                AsyncSupport.trySetResult call.Answer (Ok record) |> ignore
+                true
+            | _ ->
+                store.FailCall(call, "EXEC-031: Completed without bounded WorkRecord")
+                true
         | None -> false
 
     member _.AwaitAssignmentReady(sessionId: SessionId) : Task<bool> =

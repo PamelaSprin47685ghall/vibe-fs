@@ -97,3 +97,7 @@ Git 同步所需 object/ref 类型与 `IGitRawStore` 只能位于独立 physical
 ## DURABLE-EVENTS-024: semantic cut fatal 必须先settle再经mandatory capability执行
 
 semantic fold失败必须先durable写入对应bad fact与`ProjectionCutTail`，取得committed或unknown settlement evidence，再构造typed fatal incident。caller只持有构造时必填的fatal capability；不得直接引用`FatalProcess` physical implementation、optional/default fallback、module-global binding或service locator。同一incident只有一个report owner与一个kill owner，重复调用及fatal-before-settlement一律拒绝。
+
+## DURABLE-EVENTS-025: persistence cut stores禁optional fatal hook，唯一fatal owner在composition
+
+`StrengthDurability` 与 `CasebookStore` 不得保留 module-global optional `fatalTripHandler`（默认 None、从未注册即为 dead capability）：semantic-cut 分支只返回 typed 结果（`StrengthPreparedPublish.Rejected` / `Error reason`），fatal 决策唯一归属 composition 侧既有 owner（Strength `Append` 侧 `PluginStrengthPorts.commitAppendResult` 的 `Diagnostic.fatal "strength-semantic-cut"`；`PublishPrepared` 侧 `Rejected` 即为 owner 可观测的 cut-settled 信号）。`JsToolsTransactionStore.appendPrepared/appendCommitted` 的 `FatalProcess.trip "js-transaction-semantic-cut"` 是同一 boundary 的 process-fatal 实现：cut 已由 Integrator 先行 durable settle（bad fact + `ProjectionCutTail` 同一次 append 落盘）才 trip。Prepared cut 前无任何 file effect；Committed cut 后 recovery 按 Committed/Unknown 精确区分，Unknown 永不视为 not-written。法律依据见 `requirements/durable-events/tests/` 下 Prepared/Committed cut 回归测试与各 owning package 的 WHAT-025/013/006 条款。

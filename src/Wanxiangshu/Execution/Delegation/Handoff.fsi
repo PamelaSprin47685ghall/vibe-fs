@@ -17,9 +17,34 @@ type PreparedDelegationHandoff =
       ParentRecord: string option
       ParentEndExclusive: XTraceCursor }
 
+type HandoffCheckpointIdentity =
+    { Parent: SessionId
+      Route: DelegationHandoffRoute }
+
+[<RequireQualifiedAccess>]
+type HandoffCheckpointCommitment =
+    | Committed
+    | NotCommitted of reason: string
+    | Unknown of reason: string
+    | PhaseConflict of reason: string
+
+type HandoffCheckpointSettlement =
+    { Identity: HandoffCheckpointIdentity
+      Commitment: HandoffCheckpointCommitment }
+
+[<RequireQualifiedAccess>]
+module HandoffCheckpointSettlement =
+    val committed: parent: SessionId -> handoff: PreparedDelegationHandoff -> HandoffCheckpointSettlement
+    val notCommitted:
+        parent: SessionId -> handoff: PreparedDelegationHandoff -> reason: string -> HandoffCheckpointSettlement
+    val unknown:
+        parent: SessionId -> handoff: PreparedDelegationHandoff -> reason: string -> HandoffCheckpointSettlement
+    val phaseConflict:
+        parent: SessionId -> handoff: PreparedDelegationHandoff -> reason: string -> HandoffCheckpointSettlement
+
 type ReusableHandoffPort =
     { Prepare: SessionId -> DelegationHandoffRoute -> Task<PreparedDelegationHandoff>
-      CheckpointCompleted: SessionId -> PreparedDelegationHandoff -> Task<Result<unit, string>> }
+      CheckpointCompleted: SessionId -> PreparedDelegationHandoff -> Task<HandoffCheckpointSettlement> }
 
 [<RequireQualifiedAccess>]
 module DelegationHandoff =

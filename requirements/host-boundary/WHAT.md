@@ -133,6 +133,8 @@ Host signal subscription必须返回closed `HostSignalSubscriptionError`与`Loca
 
 `FatalProcessPort` contract只含immutable incident vocabulary与capability type，不得含value、factory或Node import。唯一fatal adapter拥有该路径的`console.error`、`process.kill`与`process.exit`；所有caller由composition获得mandatory capability，普通contract/runtime/adapter不得直接引用physical implementation。fatal前置settlement由caller owner提供typed evidence；同一incident只允许一次report与一次kill。
 
+物理退出语义由真实子进程证明，不由 harness flag 证明：`requirements/host-boundary/tests/fatal-process-exit.test.mjs` 经 `tests/fixtures/fatal-process-child.fixture.mjs` 触发编译后的 `FatalProcess.trip` / `Diagnostic.fatal` 真实路径，父进程观察硬退出（平台交付 signal 则断言 signal，`process.exit(1)` 回退则断言 code 1，不硬编码 Unix），并重开此前已提交的 store 验证 durable 事实幸存；console renderer 抛错、stdio 关闭、重复 incident 均不得绕过 fuse 或产生第二次 report；正常拒绝、stale callback、修复耗尽路径必须 exit 0。SIGKILL 语义不得为让 finally 运行而弱化。
+
 ## HOST-BOUNDARY-030: raw Host membrane 只接受精确 JavaScript 类型
 
 布尔marker只接受primitive `true | false`；字符串、数字、对象、boxed value均不得借truthiness成为compaction、synthetic或abort。parts只接受真实Array，其他值安全投影为空且hook不得抛异常。session event与`session.get`响应中的SessionId、parentID、agent只接受原始非空白primitive string，禁止`string value`制造领域值。所有dynamic reader必须在Fable边界执行显式JavaScript type predicate；正确性不得依赖`unbox`、异常捕获或下游字符串函数偶然拒绝。

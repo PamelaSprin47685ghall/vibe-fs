@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Repository.Knowledge.Casebook
 
 /// SessionDeleted teardown: LoopSensor / Strength / SyncDelegate / Quiescence / Dispose.
 /// Caller supplies `signalReconciler` so this module never owns the Scheduler.
@@ -25,7 +26,7 @@ module HostSessionDeletion =
     val finalizePreparedInspector:
         scope: PluginRuntimeScope ->
         workspaceDirectory: string option ->
-        finalizeInspector: (string -> string -> Task<Result<unit, string>>) ->
+        finalizeInspector: (string -> string -> Task<InspectorFinalizeSettlement>) ->
         preparation: SessionDeletionPreparation ->
             Task
 

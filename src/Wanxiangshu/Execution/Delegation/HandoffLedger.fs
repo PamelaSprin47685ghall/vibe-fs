@@ -54,7 +54,7 @@ module DelegationHandoffLedger =
         (journal: AgentJournal)
         (parent: SessionId)
         (handoff: PreparedDelegationHandoff)
-        : Task<Result<unit, string>> =
+        : Task<HandoffCheckpointSettlement> =
         task {
             let! appended =
                 AgentJournal.appendAgent
@@ -66,7 +66,25 @@ module DelegationHandoffLedger =
                            ParentEndExclusive = XTraceCursor.sequence handoff.ParentEndExclusive |})
                     journal
 
-            return appended |> Result.map ignore |> Result.mapError JournalAppendFailure.describe
+            // PERSIST-002 / DELEG-031: the failure taxonomy is the settlement.
+            // WriterUnavailable is known-not-committed; WriteUnknown stays
+            // pending-evidence (never auto-retried or re-emitted); FactRejected
+            // is the frontier invariant cut (retreat/negative) and is reported
+            // as PhaseConflict for the owner to escalate, never collapsed to a
+            // bare string.
+            return
+                match appended with
+                | Ok _ -> HandoffCheckpointSettlement.committed parent handoff
+                | Error failure ->
+                    let reason = JournalAppendFailure.describe failure
+
+                    match failure with
+                    | JournalAppendFailure.WriterUnavailable _ ->
+                        HandoffCheckpointSettlement.notCommitted parent handoff reason
+                    | JournalAppendFailure.WriteUnknown _ ->
+                        HandoffCheckpointSettlement.unknown parent handoff reason
+                    | JournalAppendFailure.FactRejected _ ->
+                        HandoffCheckpointSettlement.phaseConflict parent handoff reason
         }
 
     let port (workRecord: DelegationWorkRecordCapability) (journal: AgentJournal) : ReusableHandoffPort =

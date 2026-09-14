@@ -180,12 +180,60 @@ module PromptDispatcherSend =
                    Receipt = TransportReceipt.create ("accepted-detached-" + PromptKey.value key) |}
             |> this.Persist sessionId None
 
+        /// The detached envelope's eventual verdict routed to this exact
+        /// PromptKey: OwnedSettled means the caller-visible path already
+        /// decided; Refused licenses aborting the claim (nothing reached the
+        /// Host); OutcomeUnknown keeps the claim pending on durable evidence.
+        /// Nothing else — no fatal, no resend, no fabricated success.
+        member internal this.SettleDetachedSend
+            (key: PromptKey)
+            (sessionId: SessionId)
+            (verdict: DetachedSendVerdict)
+            (onFailure: (string -> Task) option)
+            : Task =
+            task {
+                match verdict with
+                | DetachedSendVerdict.OwnedSettled ->
+                    // The sendTask or a synchronous throw already decided the
+                    // caller-visible outcome; a late arrival must not re-settle.
+                    ()
+                | DetachedSendVerdict.Refused reason ->
+                    let! result = this.Abandon key sessionId (PromptAbandonReason.SendFailed reason)
+
+                    match result with
+                    | Ok() -> ()
+                    | Error persistError ->
+                        Diagnostic.emit
+                            "detached-prompt-abandon-uncommitted"
+                            [ "session_id", SessionId.value sessionId; "result", persistError ]
+                | DetachedSendVerdict.OutcomeUnknown reason ->
+                    // PROMPT-011: never resent, never abandoned — the claim
+                    // stays Pending on durable evidence until chat.message
+                    // proves physical acceptance or a later explicit abandon
+                    // closes it.
+                    Diagnostic.emit
+                        "detached-prompt-outcome-unknown"
+                        [ "session_id", SessionId.value sessionId
+                          "result",
+                          sprintf "PromptKey %s outcome indeterminate: %s" (PromptKey.value key) reason ]
+
+                match verdict, onFailure with
+                | DetachedSendVerdict.OwnedSettled, _
+                | _, None -> ()
+                | _, Some callback ->
+                    try
+                        do! callback (sprintf "%A" verdict)
+                    with ex ->
+                        Diagnostic.emit
+                            "detached-prompt-observer-failed"
+                            [ "session_id", SessionId.value sessionId; "result", ex.Message ]
+            }
+
         /// PROMPT-007: observe a Host send after a Detached caller has already
-        /// received its PromptKey. Any later non-success is no longer a normal
-        /// tool consequence: the caller cannot safely retract its success or
-        /// decide whether resending would duplicate a physical message, so the
-        /// current process must stop. Submitted is not rewritten here: the local
-        /// invocation receipt was already durable before caller return.
+        /// received its PromptKey. The synchronous sendTask verdict and the
+        /// eventual detached verdict both route through SettleDetachedSend —
+        /// the same typed owner evidence. Nothing fails the whole process for
+        /// a late Host transport result.
         member private this.ObserveDetachedSend
             (key: PromptKey)
             (sessionId: SessionId)
@@ -199,38 +247,22 @@ module PromptDispatcherSend =
                     // Detached never races chat.message by writing
                     // PhysicalAccepted from an SDK return value. The exact
                     // Host ingress is the sole physical-identity authority.
-                    Ok()
+                    DetachedSendVerdict.OwnedSettled
                 | Retryable error
-                | Fatal error -> Error error
-                | AcceptanceUnknown reason ->
-                    Error(sprintf "Acceptance unknown for PromptKey %s: %s" (PromptKey.value key) reason)
-
-            let settle =
-                task {
-                    try
-                        let! outcome = sendTask
-                        return classifyDetachedOutcome outcome
-                    with ex ->
-                        return Error ex.Message
-                }
-
-            let failDetached error =
-                task {
-                    match onFailure with
-                    | Some callback -> do! callback error
-                    | None -> ()
-
-                    FatalProcess.trip
-                        "detached-prompt-dispatch-failed"
-                        (sprintf "session_id=%s result=%s" (SessionId.value sessionId) error)
-                }
+                | Fatal error -> DetachedSendVerdict.Refused error
+                | AcceptanceUnknown reason -> DetachedSendVerdict.OutcomeUnknown reason
 
             task {
-                let! settled = settle
+                let! verdict =
+                    task {
+                        try
+                            let! outcome = sendTask
+                            return classifyDetachedOutcome outcome
+                        with ex ->
+                            return DetachedSendVerdict.OutcomeUnknown ex.Message
+                    }
 
-                match settled with
-                | Ok() -> ()
-                | Error error -> do! failDetached error
+                do! this.SettleDetachedSend key sessionId verdict onFailure
             }
             |> ignore
 
@@ -290,7 +322,12 @@ module PromptDispatcherSend =
                       Directory = directory
                       Metadata = Some(this.Metadata key (PromptDispatcher.originLabel origin) None)
                       Tools = tools
-                      BindingIntent = SessionBindingIntent.Preserve }
+                      BindingIntent = SessionBindingIntent.Preserve
+                      DetachedListener =
+                        match awaitMode with
+                        | PromptDispatcher.AwaitMode.Detached ->
+                            Some(fun verdict -> this.SettleDetachedSend key sessionId verdict onDetachedFailure)
+                        | PromptDispatcher.AwaitMode.Await -> None }
 
                 match awaitMode, onAccepted with
                 | PromptDispatcher.AwaitMode.Await, Some callback -> PromptPhysicalAcceptance.register key callback
@@ -396,7 +433,13 @@ module PromptDispatcherSend =
                       Directory = directory
                       Metadata = Some(this.Metadata key originLabel (Some profile.LogicalRunId))
                       Tools = tools
-                      BindingIntent = SessionBindingIntent.Preserve }
+                      BindingIntent = SessionBindingIntent.Preserve
+                      DetachedListener =
+                        match awaitMode with
+                        | PromptDispatcher.AwaitMode.Detached ->
+                            Some(fun verdict -> this.SettleDetachedSend key sessionId verdict None)
+                        | PromptDispatcher.AwaitMode.Await -> None }
+
 
                 match awaitMode, onAccepted with
                 | PromptDispatcher.AwaitMode.Await, Some callback -> PromptPhysicalAcceptance.register key callback

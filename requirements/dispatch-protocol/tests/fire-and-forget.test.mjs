@@ -5,13 +5,14 @@
 // SendChildPromptFireAndForget port may exist.
 
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import * as contract from '../../../dist/OpenCode/Host/OpenCodeContract.js'
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 
 const hash = (value) => `H(${value})`

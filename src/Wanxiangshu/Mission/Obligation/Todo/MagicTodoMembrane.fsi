@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Context.Trace
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
@@ -47,14 +48,14 @@ module MagicTodoMembrane =
         | BlobWrite of reason: string
         | BlobDigestMismatch of label: string
         | BlobDecode of reason: string
-        | JournalAppend of reason: string
+        | JournalAppend of JournalAppendFailure
         | ProjectionInconsistent of reason: string
 
     [<RequireQualifiedAccess>]
     type AcceptRejection =
         | InputDigestMismatch
         | OutputDigestMismatch
-        | JournalAppend of reason: string
+        | JournalAppend of JournalAppendFailure
 
     val prepare:
         journal: AgentJournal ->

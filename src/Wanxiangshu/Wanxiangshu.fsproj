@@ -413,6 +413,8 @@
     <Compile Include="Repository/Programming/Js/Transaction.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Model.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/Model.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/Settlement.fsi"/>
+    <Compile Include="Repository/Knowledge/Casebook/Settlement.fs"/>
     <Compile Include="Persistence/EventStore/StoreTypes.fsi"/>
     <Compile Include="Persistence/EventStore/StoreTypes.fs"/>
     <Compile Include="Persistence/EventStore/Port.fsi"/>
@@ -1204,16 +1206,12 @@
     <Compile Include="OpenCode/Host/HostTurnObserver.fs"/>
     <Compile Include="OpenCode/Host/HostCompactionObserver.fsi"/>
     <Compile Include="OpenCode/Host/HostCompactionObserver.fs"/>
-    <Compile Include="OpenCode/Host/HostSessionDeletion.fsi"/>
-    <Compile Include="OpenCode/Host/HostSessionDeletion.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Observation.fsi"/>
     <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Observation.fs"/>
     <Compile Include="Execution/Delegation/Handle/OpenCode/JoinWake.fsi"/>
     <Compile Include="Execution/Delegation/Handle/OpenCode/JoinWake.fs"/>
     <Compile Include="OpenCode/Codec/ToolHostCodec.fsi"/>
     <Compile Include="OpenCode/Codec/ToolHostCodec.fs"/>
-    <Compile Include="OpenCode/Host/HostSignalBootstrap.fsi"/>
-    <Compile Include="OpenCode/Host/HostSignalBootstrap.fs"/>
     <Compile Include="OpenCode/Tools/DistillationRuntime.fsi"/>
     <Compile Include="OpenCode/Tools/DistillationRuntime.fs"/>
     <Compile Include="OpenCode/Tools/Distillation.fsi"/>
@@ -1462,6 +1460,10 @@
     <Compile Include="OpenCode/Host/ChatParamsHook.fs"/>
     <Compile Include="OpenCode/Host/ChatParamsSurface.fsi"/>
     <Compile Include="OpenCode/Host/ChatParamsSurface.fs"/>
+    <Compile Include="OpenCode/Host/HostSessionDeletion.fsi"/>
+    <Compile Include="OpenCode/Host/HostSessionDeletion.fs"/>
+    <Compile Include="OpenCode/Host/HostSignalBootstrap.fsi"/>
+    <Compile Include="OpenCode/Host/HostSignalBootstrap.fs"/>
     <Compile Include="OpenCode/Host/PluginHostInterop.fsi"/>
     <Compile Include="OpenCode/Host/PluginHostInterop.fs"/>
 
@@ -1517,3 +1519,6 @@
     <Compile Include="OpenCode/Plugin/Plugin.fs"/>
   </ItemGroup>
 </Project>
+
+
+

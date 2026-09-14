@@ -83,3 +83,7 @@ logical session cancel 或 delete 获得终止授权后，lifecycle owner 必须
 ## MANAGED-SESSION-021: lifecycle fatal晚于exact drain且只经注入fuse执行
 
 session delete、turn observation或strength semantic-cut incident必须先完成其要求的exact execution settlement、child drain与durable closure evidence；process/plugin detach无权fatal。lifecycle/Host runtime只接受composition注入的mandatory fatal capability，不得直接引用physical adapter、optional/default/global fallback。同一incident只允许一次report与kill，fatal不得伪造session terminal或child abandon。
+
+## MANAGED-SESSION-022: inspector finalize 以 closed settlement 收口；identity 保留由 owner 显式决定
+
+`tryFinalizeInspector` 返回 `InspectorFinalizeSettlement`（`InspectorFinalizeCommitment`：`Finalized`、`NothingToFinalize`、`NotCommitted`、`Unknown`、`PhaseConflict`），恒带 exact inspector identity。Bookkeeper 不可用归 `NotCommitted`；store 写入失败归 `NotCommitted`；archive 已提交但 index refresh 失败归 `Unknown`（不重 archive）；重复 finalize 命中 CASE-010 exactly-one 归 `PhaseConflict`。仅 `Finalized`/`NothingToFinalize`（`releasesIdentity = true`）释放 identity；`NotCommitted`/`Unknown`/`PhaseConflict` 保留 identity 供后续 resume/取证。`HostSessionDeletion.finalizeStagedInspector` 先捕获 exact settlement 再决定 identity 去留：无 unconditional finally 删除 identity。

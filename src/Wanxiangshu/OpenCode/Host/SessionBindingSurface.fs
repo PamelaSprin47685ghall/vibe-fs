@@ -35,7 +35,8 @@ module SessionBindingSurface =
             if overrideBinding then
                 SessionBindingIntent.ExplicitExecutionOverride
             else
-                SessionBindingIntent.Preserve }
+                SessionBindingIntent.Preserve
+          DetachedListener = None }
 
     let private resultObject (project: 'a -> obj) (result: Result<'a, string>) : obj =
         match result with

@@ -125,40 +125,84 @@ module BlogSurface =
     let private requestOf (value: obj) : BloggerRequestContext =
         match text value?kind with
         | "Squash" ->
-            BloggerRequestContext.Squash
-                { RequestId = BloggerRequestId.create (text value?requestId)
-                  MainSessionId = SessionId.create (text value?mainSession)
-                  BloggerSessionId = SessionId.create (text value?bloggerSession)
-                  FrameEpochId = FrameEpochId.create (int64Value value?frameEpoch)
-                  CoveredFrameCount = intValue value?coveredFrameCount
-                  FrameDigests =
-                    (if isNullish value?digests then
-                         [||]
-                     else
-                         unbox<string array> value?digests)
-                    |> Array.toList
-                    |> List.map BlobDigest.create
+            let mainSessionId = SessionId.create (text value?mainSession)
+            let bloggerSessionId = SessionId.create (text value?bloggerSession)
+            let frameEpoch = FrameEpochId.create (int64Value value?frameEpoch)
+            let coveredFrameCount = intValue value?coveredFrameCount
+
+            let frameDigests =
+                (if isNullish value?digests then
+                     [||]
+                 else
+                     unbox<string array> value?digests)
+                |> Array.toList
+                |> List.map BlobDigest.create
+
+            let requestId =
+                if System.String.IsNullOrWhiteSpace(text value?requestId) then
+                    BloggerRequestContext.squashRequestId
+                        mainSessionId
+                        bloggerSessionId
+                        frameEpoch
+                        coveredFrameCount
+                        frameDigests
+                else
+                    BloggerRequestId.create (text value?requestId)
+
+            let candidate: BloggerSquashRequestInput =
+                { RequestId = requestId
+                  MainSessionId = mainSessionId
+                  BloggerSessionId = bloggerSessionId
+                  FrameEpochId = frameEpoch
+                  CoveredFrameCount = coveredFrameCount
+                  FrameDigests = frameDigests
                   ObservedPrefixEpochId = PrefixEpochId.create (int64Value value?observedEpoch) }
+
+            match BloggerRequestMaterial.createSquash candidate with
+            | Ok verified -> BloggerRequestContext.Squash verified
+            | Error rejection -> invalidArg "request" (sprintf "squash request rejected: %A" rejection)
         | _ ->
             let items =
                 match BloggerDeltaItemWire.tryListOfJs value?items with
                 | Ok parsed -> parsed
                 | Error error -> invalidArg "items" error
 
-            BloggerRequestContext.Main
-                { RequestId = BloggerRequestId.create (text value?requestId)
-                  MainSessionId = SessionId.create (text value?mainSession)
-                  BloggerSessionId = SessionId.create (text value?bloggerSession)
+            let mainSessionId = SessionId.create (text value?mainSession)
+            let bloggerSessionId = SessionId.create (text value?bloggerSession)
+            let toml = text value?toml
+            let previousIngested = int64Value value?previousIngested
+            let nextIngested = int64Value value?nextIngested
+            let deltaDigest = BlobDigest.create (HostDigest.sha256Hex toml)
+
+            let requestId =
+                if System.String.IsNullOrWhiteSpace(text value?requestId) then
+                    BloggerRequestContext.mainRequestId
+                        mainSessionId
+                        bloggerSessionId
+                        deltaDigest
+                        previousIngested
+                        nextIngested
+                else
+                    BloggerRequestId.create (text value?requestId)
+
+            let candidate: BloggerMainRequestInput =
+                { RequestId = requestId
+                  MainSessionId = mainSessionId
+                  BloggerSessionId = bloggerSessionId
                   Items = items
-                  Toml = text value?toml
-                  PreviousIngestedThroughSequence = int64Value value?previousIngested
-                  NextIngestedThroughSequence = int64Value value?nextIngested
+                  Toml = toml
+                  PreviousIngestedThroughSequence = previousIngested
+                  NextIngestedThroughSequence = nextIngested
                   PreviousCoverableTurnCutoffExclusive = intValue value?previousCutoff
                   NextCoverableTurnCutoffExclusive = intValue value?nextCutoff
                   NextCoveredPrefixDigest = text value?nextDigest
                   FrameEpochId = FrameEpochId.create (int64Value value?frameEpoch)
-                  DeltaDigest = BlobDigest.create (text value?deltaDigest)
+                  DeltaDigest = deltaDigest
                   ObservedPrefixEpochId = PrefixEpochId.create (int64Value value?observedEpoch) }
+
+            match BloggerRequestMaterial.createMain candidate with
+            | Ok verified -> BloggerRequestContext.Main verified
+            | Error rejection -> invalidArg "request" (sprintf "main request rejected: %A" rejection)
 
     /// Opaque journal capability from JS. `JournalSurface_boot` hands out a
     /// handle whose `Journal` member is internal to this assembly, so the

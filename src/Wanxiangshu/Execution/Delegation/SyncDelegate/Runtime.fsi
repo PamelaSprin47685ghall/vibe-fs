@@ -92,6 +92,11 @@ type SyncDelegateRuntime =
 
     member HasOpeningCursor: sessionId: SessionId -> bool
     member AwaitAssignmentReady: sessionId: SessionId -> Task<bool>
+    member TryAcceptedAuthorityRoot: sessionId: SessionId -> string option
+    /// DELEG-031: settle a completed turn from its own parts when the terminal
+    /// trace capture reports NotCommitted/Unknown. True iff a live call
+    /// consumed the turn.
+    member SettleCompletedFromTurn: turn: ReconciledTurn -> bool
     member CancelSession: sessionId: SessionId -> unit
     member Dispose: unit -> unit
     interface IDisposable

@@ -79,7 +79,14 @@ module InteractionRepairWorkflow =
                     ))
                 |> ignore
 
-                Diagnostic.fatal
+                // sendRepair already staged rejection as the terminal effect:
+                // fail-closed means neither a swallowed error nor a second
+                // process exit. The emitted record keeps the full error for
+                // wire-side forensics while the run survives for recovery.
+                // (The Failed terminal on the own turn IS the settlement
+                // receipt — abandoning the process after it would orphan any
+                // intact retries and fabricate a transport-level crash.)
+                Diagnostic.emit
                     "interaction-repair-infrastructure-failed"
                     [ "session_id", SessionId.value turn.SessionId; "result", error ]
         }
@@ -134,7 +141,11 @@ module InteractionRepairWorkflow =
         | CompletedTurnClassifier.RepairDefectDecision.AwaitRepairTerminal
         | CompletedTurnClassifier.RepairDefectDecision.NoRepair -> AsyncSupport.completedTask ()
 
-    let private notifyBloggerProtocolFailure
+    /// The `None` arm of `repairBloggerProtocol`: a reached-for journal that some
+    /// composition paths never install is an assembly gap, not a semantic cut.
+    /// The caller already showed the Failed terminal; kiling the process here
+    /// erases the durable trace a future replay could use to explain destruction.
+    let private notifyBloggerProtocolAudited
         (eventPort: IEventObservationPort)
         (turn: ReconciledTurn)
         (reason: string)
@@ -144,7 +155,7 @@ module InteractionRepairWorkflow =
             (TerminalOutcome.Failed(TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason))
         |> ignore
 
-        Diagnostic.fatal
+        Diagnostic.emit
             "blogger-protocol-repair-failed"
             [ "session_id", SessionId.value turn.SessionId; "result", reason ]
 
@@ -220,7 +231,7 @@ module InteractionRepairWorkflow =
 
         match journal, liveRequest with
         | None, _ ->
-            notifyBloggerProtocolFailure eventPort context.Turn "blogger protocol repair requires an AgentJournal"
+            notifyBloggerProtocolAudited eventPort context.Turn "blogger protocol repair requires an AgentJournal"
             AsyncSupport.completedTask ()
         | Some _, None ->
             Diagnostic.emit

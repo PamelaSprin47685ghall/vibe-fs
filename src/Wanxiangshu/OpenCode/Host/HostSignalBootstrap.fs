@@ -20,6 +20,7 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
 
@@ -94,13 +95,20 @@ module HostSignalBootstrap =
         (workspaceDirectory: string option)
         /// Owner-scope graceful close: finalize inspector draft once (root → inspectorSessionId).
         /// Returns a Task so SessionDeleted can await CaseFinalize before CancelSession.
-        (tryFinalizeInspector: (string -> string -> Task<Result<unit, string>>) option)
+        (tryFinalizeInspector:
+                (string -> string -> Task<InspectorFinalizeSettlement>) option)
         /// Unexpected / residual draft cleanup (inspectorSessionId).
         (cleanupInspector: (string -> unit) option)
         : Task<WiredSignals> =
         task {
             let finalizeInspector =
-                defaultArg tryFinalizeInspector (fun _ _ -> Task.FromResult(Ok()))
+                    defaultArg
+                        tryFinalizeInspector
+                        (fun _ inspectorSessionId ->
+                            Task.FromResult(
+                                InspectorFinalizeSettlement.nothingToFinalize
+                                    inspectorSessionId
+                            ))
 
             let cleanupInspectorDraft = defaultArg cleanupInspector (fun _ -> ())
 

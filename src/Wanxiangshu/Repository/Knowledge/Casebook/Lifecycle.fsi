@@ -33,7 +33,10 @@ module CasebookLifecycle =
     /// then finalizeCase once. Store is explicit to keep Knowledge domain out of
     /// application composition.
     val tryFinalizeInspector:
-        workspaceRoot: string -> store: IEventStore -> inspectorSessionId: string -> Task<Result<unit, string>>
+        workspaceRoot: string ->
+        store: IEventStore ->
+        inspectorSessionId: string ->
+            Task<InspectorFinalizeSettlement>
 
     /// Fresh fetch side-effect: append InspectorCaseAccessed (ignore errors).
     val touchAccess: workspaceRoot: string -> store: IEventStore -> sessionId: string -> Task<unit>

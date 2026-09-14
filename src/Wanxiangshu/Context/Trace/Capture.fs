@@ -56,6 +56,7 @@ type XTraceCaptureIdentity =
 [<RequireQualifiedAccess>]
 type XTraceCaptureError =
     | Refused of string
+    | StorageAppendFailed of JournalAppendFailure
     | StorageFailed of string
 
 type XTraceCaptureReceipt =
@@ -141,9 +142,7 @@ module XTraceCapture =
             | Error failure ->
                 return
                     raise (
-                        InvalidOperationException(
-                            sprintf "XTrace append failed: %s" (JournalAppendFailure.describe failure)
-                        )
+                        JournalAppendException failure
                     )
         }
 
@@ -877,7 +876,10 @@ module XTraceCapture =
                 do! capture ()
                 let after = xTraceOf durable sessionId
                 return Ok(captureReceipt identity before after)
-            with ex ->
+            with
+            | :? JournalAppendException as append ->
+                return Error(XTraceCaptureError.StorageAppendFailed append.Failure)
+            | ex ->
                 return Error(XTraceCaptureError.StorageFailed ex.Message)
         }
 
@@ -1044,7 +1046,10 @@ module XTraceCapture =
         task {
             try
                 return! capture ()
-            with ex ->
+            with
+            | :? JournalAppendException as append ->
+                return Error(XTraceCaptureError.StorageAppendFailed append.Failure)
+            | ex ->
                 return Error(XTraceCaptureError.StorageFailed ex.Message)
         }
 

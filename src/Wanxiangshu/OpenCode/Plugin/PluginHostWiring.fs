@@ -88,7 +88,8 @@ module PluginHostWiring =
                                               Directory = None
                                               Metadata = None
                                               Tools = Some exactTools
-                                              BindingIntent = Wanxiangshu.OpenCode.SessionBindingIntent.Preserve }
+                                              BindingIntent = Wanxiangshu.OpenCode.SessionBindingIntent.Preserve
+                                              DetachedListener = None }
 
                                         let! outcome = sessionPort.SendPrompt(childId, text, opts)
                                         return sendResultToUnit outcome
@@ -166,9 +167,24 @@ module PluginHostWiring =
                                 try
                                     let commonDir = RuntimePath.gitCommonDir workspaceRoot
                                     let store = WorkspaceEventStore.acquire commonDir
-                                    CasebookLifecycle.tryFinalizeInspector workspaceRoot store inspectorSessionId
+                                    task {
+                                        try
+                                            return!
+                                                CasebookLifecycle.tryFinalizeInspector workspaceRoot store inspectorSessionId
+
+                                        with ex ->
+                                            // A thrown boundary error (store acquisition or
+                                            // lifecycle bug) has indeterminate durability:
+                                            // report Unknown and retain the identity.
+                                            return InspectorFinalizeSettlement.unknown inspectorSessionId ex.Message
+                                    }
+
                                 with ex ->
-                                    Task.FromResult(Error ex.Message)
+                                    // Acquiring the store itself failed — the same
+                                    // indeterminate-durability verdict applies.
+                                    Task.FromResult(
+                                        InspectorFinalizeSettlement.unknown inspectorSessionId ex.Message
+                                    )
 
                              Some tryFinalize)
                             (Some CasebookLifecycle.cleanupInspector)

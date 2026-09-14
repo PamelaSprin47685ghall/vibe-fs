@@ -22,6 +22,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-ownership.fsproj"/>
     <Compile Include="Repository/Knowledge/Casebook/Model.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/Model.fs"/>
+    <Compile Include="Repository/Knowledge/Casebook/Settlement.fsi"/>
+    <Compile Include="Repository/Knowledge/Casebook/Settlement.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Capture.fsi"/>
     <Compile Include="Repository/Knowledge/Casebook/Capture.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Store.fsi"/>

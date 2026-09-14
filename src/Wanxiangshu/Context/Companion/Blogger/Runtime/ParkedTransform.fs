@@ -138,6 +138,12 @@ type BloggerRepairRendezvous(identity: BloggerRepairEpisodeIdentity, onCompleted
     /// exact exception; the owner never settles it as a benign outcome.
     member _.TerminalFailure: exn option = terminalError
 
+    /// Admission currently foreclosed: Cancel/Fail both land here. The owner
+    /// distinguishes a no-budget-yet-cancelled slot (reclaimable) from a
+    /// settlement-failed slot (must stay because its durable outcome is
+    /// unknown) via TerminalFailure.
+    member _.IsRevoked: bool = admission = Revoked
+
     member private _.ClaimWorkflowSlot() : bool =
         lock gate (fun () ->
             match admission with

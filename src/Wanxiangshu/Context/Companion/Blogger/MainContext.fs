@@ -109,35 +109,32 @@ module BloggerMainContext =
             let deltaDigest = BlobDigest.create (HostDigest.sha256Hex chunk.Toml)
 
             let requestId =
-                BloggerRequestId.create (
-                    HostDigest.sha256Hex (
-                        String.concat
-                            "|"
-                            [ SessionId.value mainSessionId
-                              SessionId.value bloggerSessionId
-                              "main"
-                              BlobDigest.value deltaDigest
-                              string previousSeq
-                              string nextSeq ]
-                    )
-                )
+                BloggerRequestContext.mainRequestId
+                    mainSessionId
+                    bloggerSessionId
+                    deltaDigest
+                    previousSeq
+                    nextSeq
 
-            Some(
-                BloggerRequestContext.Main
-                    { RequestId = requestId
-                      MainSessionId = mainSessionId
-                      BloggerSessionId = bloggerSessionId
-                      Items = chunk.Items
-                      Toml = chunk.Toml
-                      PreviousIngestedThroughSequence = previousSeq
-                      NextIngestedThroughSequence = nextSeq
-                      PreviousCoverableTurnCutoffExclusive = blog.Coverage.CoverableTurnCutoffExclusive
-                      NextCoverableTurnCutoffExclusive = chunk.NextCoverableTurnCutoffExclusive
-                      NextCoveredPrefixDigest = nextDigest
-                      FrameEpochId = blog.FrameEpochId
-                      DeltaDigest = deltaDigest
-                      ObservedPrefixEpochId = observedEpoch }
-            )
+            let candidate: BloggerMainRequestInput =
+                { RequestId = requestId
+                  MainSessionId = mainSessionId
+                  BloggerSessionId = bloggerSessionId
+                  Items = chunk.Items
+                  Toml = chunk.Toml
+                  PreviousIngestedThroughSequence = previousSeq
+                  NextIngestedThroughSequence = nextSeq
+                  PreviousCoverableTurnCutoffExclusive = blog.Coverage.CoverableTurnCutoffExclusive
+                  NextCoverableTurnCutoffExclusive = chunk.NextCoverableTurnCutoffExclusive
+                  NextCoveredPrefixDigest = nextDigest
+                  FrameEpochId = blog.FrameEpochId
+                  DeltaDigest = deltaDigest
+                  ObservedPrefixEpochId = observedEpoch }
+
+            match BloggerRequestMaterial.createMain candidate with
+            | Ok verified -> Some(BloggerRequestContext.Main verified)
+            | Error rejection ->
+                raise (InvalidOperationException(sprintf "mainContextFromChunk staged an unverifiable context: %A" rejection))
 
     let hasMaterial
         (journal: AgentJournal option)

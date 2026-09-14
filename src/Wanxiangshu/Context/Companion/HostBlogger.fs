@@ -80,27 +80,21 @@ module internal CompanionHostBlogger =
             let digests = selected |> List.map (fun f -> f.Digest)
 
             let requestId =
-                BloggerRequestId.create (
-                    HostDigest.sha256Hex (
-                        String.concat
-                            "|"
-                            [ SessionId.value mainSessionId
-                              SessionId.value bloggerSessionId
-                              "squash"
-                              string (FrameEpochId.value blog.FrameEpochId)
-                              string k
-                              (digests |> List.map BlobDigest.value |> String.concat ",") ]
-                    )
-                )
+                BloggerRequestContext.squashRequestId mainSessionId bloggerSessionId blog.FrameEpochId k digests
 
-            BloggerRequestContext.Squash
+            let candidate: BloggerSquashRequestInput =
                 { RequestId = requestId
                   MainSessionId = mainSessionId
                   BloggerSessionId = bloggerSessionId
                   FrameEpochId = blog.FrameEpochId
                   CoveredFrameCount = k
                   FrameDigests = digests
-                  ObservedPrefixEpochId = observedEpoch })
+                  ObservedPrefixEpochId = observedEpoch }
+
+            match BloggerRequestMaterial.createSquash candidate with
+            | Ok verified -> BloggerRequestContext.Squash verified
+            | Error rejection ->
+                invalidOp (sprintf "tryBuildSquashContext staged an unverifiable context: %A" rejection))
 
 
     let private sendBloggerRoot

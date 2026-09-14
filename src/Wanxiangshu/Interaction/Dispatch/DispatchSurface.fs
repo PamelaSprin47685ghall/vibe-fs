@@ -85,10 +85,7 @@ module DispatchSurface =
                 member _.SubscribeFutureTerminal(sessionId, listener) =
                     (this :> Wanxiangshu.OpenCode.ISessionHostPort)
                         .SubscribeFutureTerminal(sessionId, listener)
-
-                member _.ReportFatalDiagnostic(operation, fields) =
-                    let delimiter = String.Join(";", fields |> List.map (fun (k, v) -> k + "=" + v))
-                    FatalProcess.trip operation delimiter }
+                }
 
     let internal sessionPort (port: obj) : Wanxiangshu.OpenCode.ISessionHostPort =
         PlainSessionPort(port) :> Wanxiangshu.OpenCode.ISessionHostPort

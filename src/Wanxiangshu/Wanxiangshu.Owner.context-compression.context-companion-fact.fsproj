@@ -13,8 +13,9 @@
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-projection.participant-provider-projection-wire.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.digest.fsproj"/>
     <Compile Include="Participant/Provider/Attempt/TerminalValidity.fsi"/>
-    <Compile Include="Participant/Provider/Attempt/TerminalValidity.fs"/>
+
     <Compile Include="Host/CompactionPolicy.fsi"/>
     <Compile Include="Host/CompactionPolicy.fs"/>
     <Compile Include="Context/Companion/Blogger/Toml.fsi"/>

@@ -8,13 +8,15 @@ open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
+open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host
 open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Context.Companion.Blogger.Runtime
+
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation.Identity
@@ -242,6 +244,40 @@ module EnforcerFrameRecovery =
             return rebuilt |> Option.defaultValue fallback
         }
 
+    /// Why a durable open request could not be reloaded as a typed context.
+    /// W6: corrupt, version-incompatible and unreadable durable input are
+    /// distinct typed rejections — never a silent None/zero default.
+    [<RequireQualifiedAccess>]
+    type CycleContextReloadRejection =
+        /// The context blob could not be read (I/O unavailable).
+        | BlobUnreadable of reason: string
+        /// The context blob is not parseable JSON.
+        | BlobCorrupt of reason: string
+        /// The durable request kind names no known context shape.
+        | UnsupportedRequestKind of kind: string
+        /// The blob's delta items do not decode.
+        | ItemsUndecodable of reason: string
+        /// The decoded candidate violates the request invariants.
+        | InvariantViolated of BloggerRequestRejection
+
+    let reloadRejectionLabel (rejection: CycleContextReloadRejection) : string =
+        match rejection with
+        | CycleContextReloadRejection.BlobUnreadable reason -> $"context blob unreadable: {reason}"
+        | CycleContextReloadRejection.BlobCorrupt reason -> $"context blob corrupt: {reason}"
+        | CycleContextReloadRejection.UnsupportedRequestKind kind -> $"unsupported request kind: {kind}"
+        | CycleContextReloadRejection.ItemsUndecodable reason -> $"delta items undecodable: {reason}"
+        | CycleContextReloadRejection.InvariantViolated rejection ->
+            match rejection with
+            | BloggerRequestRejection.CoverageDidNotAdvance(previous, next) ->
+                $"coverage did not advance: previous {previous} next {next}"
+            | BloggerRequestRejection.DeltaDigestMismatch(expected, actual) ->
+                $"delta digest mismatch: expected {expected} actual {actual}"
+            | BloggerRequestRejection.EpochNotCoherent(field, value) ->
+                $"epoch not coherent: {field} value {value}"
+            | BloggerRequestRejection.EmptySquashCoverage -> "squash covers no frames"
+            | BloggerRequestRejection.SquashCoverageMismatch(declared, carried) ->
+                $"squash coverage mismatch: declared {declared} carried {carried}"
+
     let private hasJsonKey (raw: obj) (key: string) : bool =
         emitJsExpr (raw, key) "$0 != null && Object.prototype.hasOwnProperty.call($0, $1)"
 
@@ -294,28 +330,44 @@ module EnforcerFrameRecovery =
         else
             BlobDigest.create (HostDigest.sha256Hex toml)
 
-    let private decodeParsedContext (openReq: OpenBloggerRequest) (raw: obj) : BloggerRequestContext option =
-        if openReq.RequestKind = "squash" then
-            let covered =
-                asInt raw "covered_frame_count"
-                |> Option.defaultValue (List.length openReq.SelectedFrameDigests)
+    /// Decode unverified durable data, validate the §4.2 invariants, then
+    /// construct through the same validating constructor as live derivation
+    /// (W6). Every rejection is typed; nothing falls back to None or a zero
+    /// default. Squash shape follows the trusted durable coverage; Main
+    /// fields come from the blob with durable defaults only where the blob
+    /// is silent.
+    let private decodeSquashContext
+        (openReq: OpenBloggerRequest)
+        (raw: obj)
+        : Result<BloggerRequestContext, CycleContextReloadRejection> =
+        let covered =
+            asInt raw "covered_frame_count"
+            |> Option.defaultValue (List.length openReq.SelectedFrameDigests)
 
-            Some(
-                BloggerRequestContext.Squash
-                    { RequestId = openReq.RequestId
-                      MainSessionId = openReq.MainSessionId
-                      BloggerSessionId = openReq.BloggerSessionId
-                      FrameEpochId = openReq.FrameEpochId
-                      CoveredFrameCount = covered
-                      FrameDigests = openReq.SelectedFrameDigests
-                      ObservedPrefixEpochId = openReq.ObservedPrefixEpochId }
-            )
-        else
-            let toml = asString raw "toml"
-            let deltaDigestRaw = asString raw "delta_digest"
-            let deltaDigest = resolveDeltaDigest openReq toml deltaDigestRaw
-            let items = BloggerDeltaItemWire.tryListOfJs raw?items |> Result.toOption
+        let candidate: BloggerSquashRequestInput =
+            { RequestId = openReq.RequestId
+              MainSessionId = openReq.MainSessionId
+              BloggerSessionId = openReq.BloggerSessionId
+              FrameEpochId = openReq.FrameEpochId
+              CoveredFrameCount = covered
+              FrameDigests = openReq.SelectedFrameDigests
+              ObservedPrefixEpochId = openReq.ObservedPrefixEpochId }
 
+        BloggerRequestMaterial.createSquash candidate
+        |> Result.map BloggerRequestContext.Squash
+        |> Result.mapError CycleContextReloadRejection.InvariantViolated
+
+    let private decodeMainContext
+        (openReq: OpenBloggerRequest)
+        (raw: obj)
+        : Result<BloggerRequestContext, CycleContextReloadRejection> =
+        let toml = asString raw "toml"
+        let deltaDigestRaw = asString raw "delta_digest"
+        let deltaDigest = resolveDeltaDigest openReq toml deltaDigestRaw
+
+        match BloggerDeltaItemWire.tryListOfJs raw?items with
+        | Error reason -> Error(CycleContextReloadRejection.ItemsUndecodable reason)
+        | Ok typedItems ->
             let prevIngest =
                 asInt64 raw "prev_ingest"
                 |> Option.defaultValue openReq.PreviousIngestedThroughSequence
@@ -324,39 +376,74 @@ module EnforcerFrameRecovery =
                 asInt64 raw "next_ingest"
                 |> Option.defaultValue openReq.NextIngestedThroughSequence
 
-            items
-            |> Option.map (fun typedItems ->
-                BloggerRequestContext.Main
-                    { RequestId = openReq.RequestId
-                      MainSessionId = openReq.MainSessionId
-                      BloggerSessionId = openReq.BloggerSessionId
-                      Items = typedItems
-                      Toml = toml
-                      PreviousIngestedThroughSequence = prevIngest
-                      NextIngestedThroughSequence = nextIngest
-                      PreviousCoverableTurnCutoffExclusive = asInt raw "prev_cutoff" |> Option.defaultValue 0
-                      NextCoverableTurnCutoffExclusive = asInt raw "next_cutoff" |> Option.defaultValue 0
-                      NextCoveredPrefixDigest = asString raw "next_prefix_digest"
-                      FrameEpochId = openReq.FrameEpochId
-                      DeltaDigest = deltaDigest
-                      ObservedPrefixEpochId = openReq.ObservedPrefixEpochId })
+            let candidate: BloggerMainRequestInput =
+                { RequestId = openReq.RequestId
+                  MainSessionId = openReq.MainSessionId
+                  BloggerSessionId = openReq.BloggerSessionId
+                  Items = typedItems
+                  Toml = toml
+                  PreviousIngestedThroughSequence = prevIngest
+                  NextIngestedThroughSequence = nextIngest
+                  PreviousCoverableTurnCutoffExclusive =
+                    asInt raw "prev_cutoff"
+                    |> Option.defaultValue 0
+                  NextCoverableTurnCutoffExclusive = asInt raw "next_cutoff" |> Option.defaultValue 0
+                  NextCoveredPrefixDigest = asString raw "next_prefix_digest"
+                  FrameEpochId = openReq.FrameEpochId
+                  DeltaDigest = deltaDigest
+                  ObservedPrefixEpochId = openReq.ObservedPrefixEpochId }
 
-    let private decodeRequestContextJson (openReq: OpenBloggerRequest) (json: string) : BloggerRequestContext option =
+            BloggerRequestMaterial.createMain candidate
+            |> Result.map BloggerRequestContext.Main
+            |> Result.mapError CycleContextReloadRejection.InvariantViolated
+
+    let private decodeParsedContext
+        (openReq: OpenBloggerRequest)
+        (raw: obj)
+        : Result<BloggerRequestContext, CycleContextReloadRejection> =
+        match OpenBloggerRequest.providerRequestKind openReq with
+        | Ok ProviderRequestKind.BloggerSquash -> decodeSquashContext openReq raw
+        | Ok ProviderRequestKind.BloggerMain -> decodeMainContext openReq raw
+        | Ok _ -> Error(CycleContextReloadRejection.UnsupportedRequestKind openReq.RequestKind)
+        | Error _ -> Error(CycleContextReloadRejection.UnsupportedRequestKind openReq.RequestKind)
+
+    let private decodeRequestContextJson
+        (openReq: OpenBloggerRequest)
+        (json: string)
+        : Result<BloggerRequestContext, CycleContextReloadRejection> =
         try
             decodeParsedContext openReq (Fable.Core.JS.JSON.parse json)
-        with _ ->
-            None
+        with ex ->
+            Error(CycleContextReloadRejection.BlobCorrupt ex.Message)
+
+    /// C5: inverse of BloggerCoordinator.materializeRequest blob.
+    /// Decodes unverified durable data and validates the same invariants as
+    /// live construction; a corrupt, version-incompatible or unreadable blob
+    /// becomes its own typed rejection — never None or a zero default.
+    let tryReloadRequestContextDetailed
+        (journal: AgentJournal)
+        (openReq: OpenBloggerRequest)
+        : Task<Result<BloggerRequestContext, CycleContextReloadRejection>> =
+        task {
+            match! journal.Writer.BlobWriter.Read openReq.ContextRef with
+            | Error reason -> return Error(CycleContextReloadRejection.BlobUnreadable reason)
+            | Ok json -> return decodeRequestContextJson openReq json
+        }
 
     /// C5: inverse of BloggerCoordinator.materializeRequest blob.
     /// Full typed context — never leave cutoff/digest at zero defaults.
+    /// Rebuild/empty-calls shape: a typed rejection fails closed to None so
+    /// the caller keeps its rawMessages fallback (Continuation.fs reads this
+    /// contract; the detailed rejection is available from
+    /// `tryReloadRequestContextDetailed`).
     let tryReloadRequestContext
         (journal: AgentJournal)
         (openReq: OpenBloggerRequest)
         : Task<BloggerRequestContext option> =
         task {
-            match! journal.Writer.BlobWriter.Read openReq.ContextRef with
+            match! tryReloadRequestContextDetailed journal openReq with
+            | Ok ctx -> return Some ctx
             | Error _ -> return None
-            | Ok json -> return decodeRequestContextJson openReq json
         }
 
     /// Live commit authority: InFlight payload only.

@@ -160,11 +160,11 @@ module MagicTodoHostCodec =
         let args: obj = output?args
 
         if isNull args then
-            Diagnostic.fatal
-                "magic-todo-infrastructure-failed"
-                [ "result", "todowrite before hook output.args is required" ]
-
-            failwith "unreachable after Diagnostic.fatal"
+            // HOST contract violation: the before-hook receives the tool call
+            // envelope — the membrane owns nothing yet, so decline instead of
+            // killing the process. Policy classifies this as ProtocolRejection
+            // + NoOwnedExecution.
+            raise (ProviderInputRejection "todowrite before hook output.args is required")
 
         let todos =
             rows

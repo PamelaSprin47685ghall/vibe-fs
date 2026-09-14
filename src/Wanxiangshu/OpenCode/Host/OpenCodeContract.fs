@@ -10,13 +10,35 @@ type SessionBindingIntent =
     | Preserve
     | ExplicitExecutionOverride
 
+/// What a detached prompt_async's eventual transport verdict means for the
+/// dispatch owner. OwnedSettled: the caller-visible path (sendTask or a
+/// synchronous throw) already produced an outcome — the observer must not
+/// adjudicate a second time. Refused: the transport proved the payload was
+/// never accepted — the owner may abandon the claim. OutcomeUnknown: the
+/// result cannot be read either way — the claim stays pending on durable
+/// evidence and must never be resent or assumed lost.
+[<RequireQualifiedAccess>]
+type DetachedSendVerdict =
+    | OwnedSettled
+    | Refused of reason: string
+    | OutcomeUnknown of reason: string
+
+/// Out-of-band delivery channel a SendPrompt caller leaves for the eventual
+/// detached enqueue result. The owning session's dispatch layer registers the
+/// callback keyed by its own PromptKey; a send that carries no listener simply
+/// has no owner for a late verdict.
+type DetachedSendListener = DetachedSendVerdict -> Task
+
 type OpenCodePromptOptions =
     { Model: OpencodeModel option
       Agent: string option
       Directory: string option
       Metadata: obj option
       Tools: Map<string, bool> option
-      BindingIntent: SessionBindingIntent }
+      BindingIntent: SessionBindingIntent
+      /// Out-of-band listener for the eventual detached enqueue result. None
+      /// when the caller's returned sendTask settles the send itself.
+      DetachedListener: DetachedSendListener option }
 
 type IPromptPort =
     abstract SendPrompt:

@@ -83,6 +83,7 @@ type BloggerRepairRendezvous =
     member Identity: BloggerRepairEpisodeIdentity
     member Completion: Task
     member TerminalFailure: exn option
+    member IsRevoked: bool
     member Start: workflow: (unit -> Task) -> bool
     member Post: observation: BloggerRepairObservation -> Task<BloggerRepairOutcome>
     member Receive: unit -> Task<BloggerRepairEnvelope option>

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Mission.Obligation.Todo
 
 open System.Threading.Tasks
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
 
 /// JS-native effect-shell owner for the Magic Todo membrane.
@@ -51,4 +52,15 @@ module MagicTodoMembraneSurface =
         callId: string ->
         args: obj ->
         executor: obj ->
+            Task<obj>
+
+    /// Exercise the real Host `before` hook under exactly the runtime
+    /// `MagicTodoHostHooks.create` produces. `hookJournal = None` supplies a
+    /// membrane without a durable journal. Ownership semantics are resolved
+    /// by `normalizeHookFailure`; this surface only names the thrown kind.
+    val runHooksBefore:
+        hookJournal: AgentJournal option ->
+        snapshot: ISessionSnapshotPort option ->
+        input: obj ->
+        output: obj ->
             Task<obj>

@@ -12,6 +12,7 @@ export const checks = [
   join(root, 'checks/participant-identity-boundary.mjs'),
   join(root, 'checks/provider-projection-boundary.mjs'),
   join(root, 'checks/subsystems.mjs'),
+  join(root, 'checks/fatal-inventory-gate.mjs'),
   join(root, 'checks/fsharp-control-pyramid.mjs'),
   join(root, 'checks/retry-owner.mjs'),
   join(root, 'checks/enforcer-bounds-owner.mjs'),

@@ -110,7 +110,8 @@ module CasebookBookkeeperSurface =
                                   Directory = None
                                   Metadata = None
                                   Tools = Some exactTools
-                                  BindingIntent = Wanxiangshu.OpenCode.SessionBindingIntent.Preserve }
+                                  BindingIntent = Wanxiangshu.OpenCode.SessionBindingIntent.Preserve
+                                  DetachedListener = None }
 
                             let! outcome = sessions.SendPrompt(childId, text, opts)
 

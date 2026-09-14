@@ -91,3 +91,15 @@ module SyncDelegateSurface =
     /// Model the Host accepting the retry attempt the decorator dispatched.
     val dispatchRetryAttempt: value: obj -> owner: string -> role: string -> bool
     val dispose: value: obj -> unit
+
+    /// DELEG-031 probe: close the journal writer so later appends are known
+    /// NotAttempted; the next invocation must still deliver its WorkRecord.
+    val closeJournalWriter: value: obj -> unit
+
+    /// DELEG-031 probe: run the production checkpoint for one prepared handoff
+    /// and return the boxed settlement it reports.
+    val checkpointForHarness: value: obj -> owner: string -> role: string -> parentEndExclusive: int -> Task<obj>
+
+    /// DELEG-031 probe: abandon the pending call for this delegate (parent
+    /// supersede guard) so a stale completion afterwards cannot claim it.
+    val abandonPendingCall: value: obj -> owner: string -> role: string -> bool

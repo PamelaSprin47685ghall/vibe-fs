@@ -7,6 +7,7 @@ open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Repository.Knowledge.Casebook
 
 module HostSignalBootstrap =
 
@@ -61,6 +62,6 @@ module HostSignalBootstrap =
         tryConsumeHostInternalPrompt: (SessionId -> string option -> string option -> bool) ->
         observeHostInternalTerminal: (ExactProviderTerminalObservation -> unit) ->
         workspaceDirectory: string option ->
-        tryFinalizeInspector: (string -> string -> Task<Result<unit, string>>) option ->
+        tryFinalizeInspector: (string -> string -> Task<InspectorFinalizeSettlement>) option ->
         cleanupInspector: (string -> unit) option ->
             Task<WiredSignals>

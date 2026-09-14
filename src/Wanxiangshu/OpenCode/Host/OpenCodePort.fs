@@ -122,31 +122,81 @@ module OpenCodePortAdapter =
     [<Emit("fetch($0, $1)")>]
     let private jsFetch (url: string) (init: obj) : Task<obj> = jsNative
 
-    /// `prompt_async` is an enqueue boundary, not the lifetime of the child run.
-    /// Observe its eventual transport failure without making the caller await it.
-    /// Once a Detached caller has returned, an asynchronous rejection is an
-    /// acceptance-unknown invariant: fail the process rather than continue and
-    /// risk a second logical send.
-    let private observeSdkPromptDispatch (sessionId: SessionId) (work: Task<obj>) =
+    /// Deliver the eventual detached enqueue verdict to the owning dispatch
+    /// layer — never adjudicated here. OwnedSettled is a no-op refusal to
+    /// re-settle; Refused and OutcomeUnknown re-enter the session's own
+    /// PromptKey handler. A caller that carried no listener has no owner for
+    /// a late verdict, so the port records honest diagnostic evidence rather
+    /// than claiming a fused invariant.
+    let private deliverDetachedVerdict
+        (sessionId: SessionId)
+        (listener: DetachedSendListener option)
+        (verdict: DetachedSendVerdict)
+        : Task =
+        match verdict with
+        | DetachedSendVerdict.OwnedSettled -> Task.FromResult()
+        | _ ->
+            match listener with
+            | Some deliver ->
+                task {
+                    try
+                        do! deliver verdict
+                    with ex ->
+                        Diagnostic.emit
+                            "prompt-async-dispatch-listener-failed"
+                            [ "session_id", SessionId.value sessionId
+                              "result", sprintf "%A listener fault: %s" verdict ex.Message ]
+                }
+            | None ->
+                Diagnostic.emit
+                    "prompt-async-unowned-late-verdict"
+                    [ "session_id", SessionId.value sessionId; "result", sprintf "%A" verdict ]
+
+                Task.FromResult()
+
+    /// `prompt_async` is an enqueue boundary, not the lifetime of the child
+    /// run. A rejection after the caller already owns the key is not an
+    /// acceptance-unknown invariant; it is evidence for that key's owner.
+    /// This observer exists so the pending task is never silently discarded
+    /// and its verdict always reaches the exact PromptKey handler.
+    let private observeSdkPromptDispatch
+        (sessionId: SessionId)
+        (listener: DetachedSendListener option)
+        (work: Task<obj>)
+        =
         task {
             try
                 let! _ = work
-                return ()
+                do! deliverDetachedVerdict sessionId listener DetachedSendVerdict.OwnedSettled
             with ex ->
-                Diagnostic.fatal
-                    "prompt-async-dispatch-failed"
-                    [ "session_id", SessionId.value sessionId; "result", ex.Message ]
+                // A synchronous `SendPrompt` throw returned `Fatal`/`Retryable`
+                // already — it never reaches this observer. An async rejection
+                // is the only surviving verdict: `OutcomeUnknown` to the owner.
+                do!
+                    deliverDetachedVerdict
+                        sessionId
+                        listener
+                        (DetachedSendVerdict.OutcomeUnknown ex.Message)
         }
         |> ignore
 
-    let private observeHttpPromptDispatch (sessionId: SessionId) (work: Task<Result<obj, string>>) =
+    let private observeHttpPromptDispatch
+        (sessionId: SessionId)
+        (listener: DetachedSendListener option)
+        (work: Task<Result<obj, string>>)
+        =
         task {
             match! work with
-            | Ok _ -> ()
+            | Ok _ ->
+                do! deliverDetachedVerdict sessionId listener DetachedSendVerdict.OwnedSettled
             | Error error ->
-                Diagnostic.fatal
-                    "prompt-async-dispatch-failed"
-                    [ "session_id", SessionId.value sessionId; "result", error ]
+                let verdict =
+                    if error.StartsWith("HTTP ", System.StringComparison.Ordinal) then
+                        DetachedSendVerdict.Refused error
+                    else
+                        DetachedSendVerdict.OutcomeUnknown error
+
+                do! deliverDetachedVerdict sessionId listener verdict
         }
         |> ignore
 
@@ -212,7 +262,7 @@ module OpenCodePortAdapter =
                         let sessObj = client?session
                         let promptFn = sessObj?promptAsync
                         let pending = unbox<Task<obj>> (promptFn?call (sessObj, payload))
-                        observeSdkPromptDispatch sessionId pending
+                        observeSdkPromptDispatch sessionId opts.DetachedListener pending
                         // The SDK contract for promptAsync is enqueue-and-return.
                         // Do not await the Promise: OpenCode may keep it pending
                         // through scheduler/hooks/provider execution. Physical
@@ -429,7 +479,7 @@ module OpenCodePortAdapter =
                                  ) ])
                            |> Option.defaultValue [])
 
-                    observeHttpPromptDispatch sessionId (postJson $"/session/{sId}/prompt_async" (createObj bodyFields))
+                    observeHttpPromptDispatch sessionId opts.DetachedListener (postJson $"/session/{sId}/prompt_async" (createObj bodyFields))
 
                     // HTTP prompt_async has the same enqueue semantics as the SDK
                     // surface. Never hold a fork/repair tool open on the response;

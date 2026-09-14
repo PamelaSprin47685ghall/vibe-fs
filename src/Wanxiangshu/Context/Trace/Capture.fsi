@@ -19,6 +19,7 @@ type XTraceCaptureIdentity =
 [<RequireQualifiedAccess>]
 type XTraceCaptureError =
     | Refused of string
+    | StorageAppendFailed of JournalAppendFailure
     | StorageFailed of string
 
 type XTraceCaptureReceipt =

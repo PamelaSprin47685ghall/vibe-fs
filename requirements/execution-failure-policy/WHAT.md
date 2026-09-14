@@ -91,6 +91,10 @@ operator abort → `UserCancelled`，supersede → `Superseded`（CRASH-008 / HO
 
 协议修复耗尽、过期回调、确定未发送和运行环境拒绝不得仅因“开发时没预料”成为 LocalInvariant。可达失败必须由所属请求或资源明确收敛；不释放其他请求的所有权，不重发 outcome unknown 的 effect，不在 fatal 后安排结算。保留的不变量熔断仍须满足 EXECFAIL-006。
 
+## EXECFAIL-010b: fatal 清单是机器可检查的入口索引
+
+`requirements/execution-failure-policy/fatal-inventory.json` 是 EXECFAIL-010 的机器可检查索引，不是第二套策略：每条记录以稳定 ID（附录 A 的 F 系列、附录 B 的 T 系列、附录 C 的 C/X 系列，见 AGENTS.md 提案）登记 owner requirement、source symbol、触发分支、输入来源、exact identity、phase、被断言的不变量、提交/资源处置、影响范围、证据类型、正式测试 ID 与状态（`Open|Proved|PropertyChecked|FixedWithRegression|RetainedFuse|ExcludedWithEvidence`）。定位一律按 source symbol + operation 字符串，禁用行号。`scripts/checks/fatal-inventory-gate.mjs`（已接入 `scripts/check.mjs`）在三种情形下失败：扫描到无清单行的 fatal/trip 调用（含 `TripFatal` 点自由绑定与 `ReportFatalDiagnostic` 转接的一跳别名）；清单行的 operation 字符串离开其 source 文件（证据过期）；`FixedWithRegression` 行点名的测试文件不存在。附录 C 的受管子进程 kill、signal-0 存活探测、`TextDecoder fatal:true`、`SendOutcome.Fatal` 联合分支按 `ExcludedWithEvidence` 登记，不进入 fatal 账。
+
 ## EXECFAIL-011: 未分类 hook 失败必须携带自有证据
 
 hook 抛出的不可识别异常不拥有"无已接受事实、无所属执行"的免费推定。边界只能从 hook 实参证明执行身份（`sessionID` 字段或 output.messages 单一会话 + 末尾物理用户消息），能证明则以该 `ChatExecutionKey` 下发 `SettlementIncomplete`，后续处置交由相应 phase 的 settlement owner，不补造执行已干净的记录；不能证明则 key 保持 None。未知类别不升级为 process fatal，也不降级为可重试 provider 噪音——它作为不变的 rethrow 信号交给 Host，fatal 决策保留给证据齐全的 phase。

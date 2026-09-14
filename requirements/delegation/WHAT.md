@@ -119,3 +119,7 @@ Delegation领域constructor只产生`DelegationFactCases`、`ExecutionFactCases`
 ## DELEG-030: delegation fatal escalation 只消费mandatory injected fuse
 
 handoff checkpoint或sync invariant失败由delegation owner构造typed incident；caller必须先保留已发生effect与durable settlement，再调用构造时必填的fatal capability。fork/sync runtime不得直接引用fatal physical adapter，不得用optional/default/global fallback；同一incident只允许一次report与一次kill。
+
+## DELEG-031: reusable completion checkpoint 以 closed settlement 收口，不以 string 失败
+
+`CheckpointCompleted`/`CheckpointCompletedHandoff` 返回 `HandoffCheckpointSettlement`（`HandoffCheckpointCommitment`：`Committed`、`NotCommitted`、`Unknown`、`PhaseConflict`），恒带 exact parent + route identity。WriterUnavailable → `NotCommitted`（已知未写）；WriteUnknown → `Unknown`（pending-evidence，不自动重试、不重发）；frontier fold cut（retreat/negative）→ `PhaseConflict`（确切 invariant 违例）。`NotCommitted`/`Unknown` 不改写已证成的 child 完成：SyncDelegate 照常交付已赚得的 WorkRecord，fork 照常交付 proven completion，绝不重跑已完成 child；`Unknown` 由下一次 invocation 重读 durable frontier 收敛。仅 `PhaseConflict` 经注入 fuse 熔断。Handoff capability 缺失是构造期事实（`PrepareHandoff` 未产出 prepared 即无 checkpoint 可写），不在 completion 路径上再 fatal。

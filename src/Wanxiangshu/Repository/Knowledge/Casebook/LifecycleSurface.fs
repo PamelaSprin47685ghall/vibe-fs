@@ -38,9 +38,16 @@ module CasebookLifecycleSurface =
         let store = acquireStore workspaceRoot
 
         task {
-            match! CasebookLifecycle.tryFinalizeInspector workspaceRoot store sessionId with
-            | Ok() -> return box {| ok = true |}
-            | Error message -> return box {| ok = false; error = message |}
+            let! settled = CasebookLifecycle.tryFinalizeInspector workspaceRoot store sessionId
+
+            return
+                match settled.Commitment with
+                | InspectorFinalizeCommitment.Finalized
+                | InspectorFinalizeCommitment.NothingToFinalize -> box {| ok = true |}
+                | InspectorFinalizeCommitment.NotCommitted reason
+                | InspectorFinalizeCommitment.Unknown reason
+                | InspectorFinalizeCommitment.PhaseConflict reason ->
+                    box {| ok = false; error = reason |}
         }
 
     let touchAccess (workspaceRoot: string) (sessionId: string) : Task<unit> =

@@ -84,7 +84,15 @@ module EnforcerContinuation =
     let private releaseExact (ctx: Context) (sessionKey: string) (exact: BloggerRequestContext) =
         match BloggerRuntimeHost.releaseCurrentRequest ctx.Scope sessionKey exact with
         | Ok() -> ()
-        | Error reason -> FatalProcess.trip "blogger-flight-release-conflict" reason
+        | Error reason ->
+            // Exact-owner release conflict: the flight slot moved to a foreign
+            // request between our claim and this release — the same race a
+            // superseded repair episode produces. Killing the process here
+            // would turn a routine supersedure into a crash; the released slot
+            // is never touched, so decline and keep the evidence path retraced.
+            Diagnostic.emit
+                "blogger-flight-release-conflict"
+                [ "session_id", sessionKey; "result", reason ]
 
     /// Release whatever exact request is currently observed, if any. Only
     /// used where the exact context is not already in hand; the peeked
@@ -383,10 +391,20 @@ module EnforcerContinuation =
                 ctx.Scope.CancelParked sessionKey
                 return ctx.Stop "park-resumed-main-sealed"
             else
-                // Exact claim: already-ours refreshes, empty claims, foreign trips.
-                BloggerRuntimeHost.requireCurrentRequest ctx.Scope sessionKey live
-                let! rebuilt = resumeWithContext ctx live
-                return ctx.Project rebuilt
+                // Exact claim: already-ours refreshes, empty claims, foreign
+                // declines. A foreign identity here means this parked resume
+                // arrived after the parked context was superseded — the correct
+                // outcome is ctx.Stop (committed evidence preserved), not a
+                // fatal trip over a routine supersede.
+                match BloggerRuntimeHost.claimCurrentRequest ctx.Scope sessionKey live with
+                | Ok() ->
+                    let! rebuilt = resumeWithContext ctx live
+                    return ctx.Project rebuilt
+                | Error reason ->
+                    Diagnostic.emit
+                        "blogger-flight-claim-conflict"
+                        [ "session_id", sessionKey; "result", reason ]
+                    return ctx.Stop "park-resumed-foreign-flight"
         }
 
     let private afterParkResumed
@@ -466,14 +484,22 @@ module EnforcerContinuation =
         : ContinuationOutcome =
         match EnforcerRepair.tryOpenByBlogger ctx.Durable mainSessionId ctx.BloggerSessionId with
         | Some _ ->
-            Diagnostic.fatal "enforcer-cycle-failed" [ "session_id", sessionKey; "result", "missing CurrentRequest" ]
-
+            // A durable open-by-blogger exists but the live cycle context is
+            // gone — request was superseded mid-flight. Keeping the process
+            // alive and projecting the unmodified raw messages is the honest
+            // response: the still-owned frame simply stays uncommitted until
+            // the owner revives it.
+            Diagnostic.emit
+                "enforcer-cycle-failed"
+                [ "session_id", sessionKey; "result", "missing CurrentRequest" ]
             ctx.Project ctx.RawMessages
         | None ->
-            Diagnostic.fatal
+            // Same rule for the no-authority branch: absence of the durable
+            // open cycle means nothing this process owns, so a completed
+            // foreign blog part must be left untouched.
+            Diagnostic.emit
                 "enforcer-cycle-failed"
                 [ "session_id", sessionKey; "result", "live blog without cycle authority" ]
-
             ctx.Project ctx.RawMessages
 
     /// Evidence → Decision: assistant completed → stop; else unowned live fatal project.
@@ -602,7 +628,13 @@ module EnforcerContinuation =
             | EnforcerCycleCommit.CycleCommitOutcome.KnownNotCommitted reason ->
                 return! abandonStaleDisposition ctx mainSessionId sessionKey liveCtx reason
             | EnforcerCycleCommit.CycleCommitOutcome.CommitUnknown reason ->
-                Diagnostic.fatal "enforcer-cycle-commit-unknown" [ "session_id", sessionKey; "result", reason ]
+                // The durable commit evidence is indeterminate — keep the exact
+                // request in-flight. The caller keeps the pending marker and
+                // projects again; the write is not lost to a premature process
+                // exit masking durable evidence.
+                Diagnostic.emit
+                    "enforcer-cycle-commit-unknown"
+                    [ "session_id", sessionKey; "result", reason ]
                 return CycleDisposition.CommitUnknown
         }
 
@@ -641,7 +673,9 @@ module EnforcerContinuation =
             | EnforcerCycleCommit.CycleCommitOutcome.KnownNotCommitted reason ->
                 return! abandonStaleDisposition ctx mainSessionId sessionKey liveCtx reason
             | EnforcerCycleCommit.CycleCommitOutcome.CommitUnknown reason ->
-                Diagnostic.fatal "enforcer-cycle-commit-unknown" [ "session_id", sessionKey; "result", reason ]
+                Diagnostic.emit
+                    "enforcer-cycle-commit-unknown"
+                    [ "session_id", sessionKey; "result", reason ]
                 return CycleDisposition.CommitUnknown
         }
 

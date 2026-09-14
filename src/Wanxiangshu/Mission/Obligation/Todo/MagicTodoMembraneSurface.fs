@@ -4,8 +4,11 @@ open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Context.Trace
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
+open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
+open Wanxiangshu.Mission.Obligation.Todo.OpenCode
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
@@ -266,4 +269,35 @@ module MagicTodoMembraneSurface =
                     {| output = hostOutput
                        incumbency = snap
                        life = snap |}
+        }
+
+    /// Exercise the real Host hook set without provisioning the physical
+    /// executor — for failure-path tests. The captured exception's JS
+    /// constructor name flows back as `kind`, so the membrane's refusals are
+    /// observable without touching process-exit wiring. Ownership semantics at
+    /// the policy boundary are verified by `normalizeHookFailure`, not by
+    /// re-walking the thrown object here.
+    let runHooksBefore
+        (hookJournal: AgentJournal option)
+        (snapshot: ISessionSnapshotPort option)
+        (input: obj)
+        (output: obj)
+        : Task<obj> =
+        task {
+            let hooks = MagicTodoHostHooks.create hookJournal snapshot
+
+            try
+                do! hooks.Before input output
+                return box {| kind = "resolved"; reason = null |}
+            with
+            | :? MagicTodoHostCodec.ProviderInputRejection as rejection ->
+                return box {| kind = "provider_input_rejected"; reason = rejection.Message |}
+            | :? JournalAppendException as persistence ->
+                return
+                    box
+                        {| kind = "journal_append"
+                           reason = JournalAppendFailure.describe persistence.Failure |}
+            | ex ->
+                return box {| kind = "unexpected"; reason = ex.Message |}
+
         }

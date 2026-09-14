@@ -396,7 +396,8 @@ module ModelRoutingSurface =
           Directory = optionalText (field value [ "directory"; "Directory" ])
           Metadata = optionalObject (field value [ "metadata"; "Metadata" ])
           Tools = toolsOf value
-          BindingIntent = bindingIntentOf value }
+          BindingIntent = bindingIntentOf value
+          DetachedListener = None }
 
     let private outcomeToJs (outcome: SendOutcome) : obj =
         match outcome with

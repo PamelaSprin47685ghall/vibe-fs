@@ -7,6 +7,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 
 /// Context-compression runtime owner. One opaque IBloggerRuntimeHost owns the
@@ -32,40 +33,92 @@ module CompanionRuntimeSurface =
     let private contextOfJs (value: obj) : BloggerRequestContext =
         match text value?kind with
         | "Squash" ->
-            BloggerRequestContext.Squash
-                { RequestId = BloggerRequestId.create (text value?requestId)
-                  MainSessionId = SessionId.create (text value?mainSession)
-                  BloggerSessionId = SessionId.create (text value?bloggerSession)
-                  FrameEpochId = FrameEpochId.create (int64Value value?frameEpoch)
-                  CoveredFrameCount = intValue value?coveredFrameCount
-                  FrameDigests =
-                    (if isNullish value?digests then
-                         [||]
-                     else
-                         unbox<string array> value?digests)
-                    |> Array.toList
-                    |> List.map BlobDigest.create
+            let mainSessionId = SessionId.create (text value?mainSession)
+            let bloggerSessionId = SessionId.create (text value?bloggerSession)
+            let frameEpoch = FrameEpochId.create (int64Value value?frameEpoch)
+            let coveredFrameCount = intValue value?coveredFrameCount
+
+            let frameDigests =
+                (if isNullish value?digests then
+                     [||]
+                 else
+                     unbox<string array> value?digests)
+                |> Array.toList
+                |> List.map BlobDigest.create
+
+            let requestId =
+                // Canonical Squash identity when no requestId is carried. An
+                // explicit requestId is honored: the caller is the exact owner
+                // identity, and epoch refresh under the same requestId must
+                // remain an in-place Refreshed claim rather than Conflict.
+                let rawId = if isNullish value?requestId then "" else text value?requestId
+                if System.String.IsNullOrWhiteSpace rawId then
+                    BloggerRequestContext.squashRequestId
+                        mainSessionId
+                        bloggerSessionId
+                        frameEpoch
+                        coveredFrameCount
+                        frameDigests
+                else BloggerRequestId.create rawId
+
+            let candidate: BloggerSquashRequestInput =
+                { RequestId = requestId
+                  MainSessionId = mainSessionId
+                  BloggerSessionId = bloggerSessionId
+                  FrameEpochId = frameEpoch
+                  CoveredFrameCount = coveredFrameCount
+                  FrameDigests = frameDigests
                   ObservedPrefixEpochId = PrefixEpochId.create (int64Value value?observedEpoch) }
+
+            match BloggerRequestMaterial.createSquash candidate with
+            | Ok verified -> BloggerRequestContext.Squash verified
+            | Error rejection -> invalidArg "context" (sprintf "squash context rejected: %A" rejection)
         | _ ->
             let items =
                 match BloggerDeltaItemWire.tryListOfJs value?items with
                 | Ok parsed -> parsed
                 | Error error -> invalidArg "items" error
 
-            BloggerRequestContext.Main
-                { RequestId = BloggerRequestId.create (text value?requestId)
-                  MainSessionId = SessionId.create (text value?mainSession)
-                  BloggerSessionId = SessionId.create (text value?bloggerSession)
+            let mainSessionId = SessionId.create (text value?mainSession)
+            let bloggerSessionId = SessionId.create (text value?bloggerSession)
+            let toml = text value?toml
+            let previousIngested = int64Value value?previousIngested
+            let nextIngested = int64Value value?nextIngested
+            let deltaDigest = BlobDigest.create (HostDigest.sha256Hex toml)
+
+            let requestId =
+                // Canonical Main identity when no requestId is carried. An
+                // explicit requestId is honored: the caller carries exact
+                // request identity, and epoch refresh under the same requestId
+                // must stay an in-place Refreshed claim rather than Conflict.
+                let rawId = if isNullish value?requestId then "" else text value?requestId
+                if System.String.IsNullOrWhiteSpace rawId then
+                    BloggerRequestContext.mainRequestId
+                        mainSessionId
+                        bloggerSessionId
+                        deltaDigest
+                        previousIngested
+                        nextIngested
+                else BloggerRequestId.create rawId
+
+            let candidate: BloggerMainRequestInput =
+                { RequestId = requestId
+                  MainSessionId = mainSessionId
+                  BloggerSessionId = bloggerSessionId
                   Items = items
-                  Toml = text value?toml
-                  PreviousIngestedThroughSequence = int64Value value?previousIngested
-                  NextIngestedThroughSequence = int64Value value?nextIngested
+                  Toml = toml
+                  PreviousIngestedThroughSequence = previousIngested
+                  NextIngestedThroughSequence = nextIngested
                   PreviousCoverableTurnCutoffExclusive = intValue value?previousCutoff
                   NextCoverableTurnCutoffExclusive = intValue value?nextCutoff
                   NextCoveredPrefixDigest = text value?nextDigest
                   FrameEpochId = FrameEpochId.create (int64Value value?frameEpoch)
-                  DeltaDigest = BlobDigest.create (text value?deltaDigest)
+                  DeltaDigest = deltaDigest
                   ObservedPrefixEpochId = PrefixEpochId.create (int64Value value?observedEpoch) }
+
+            match BloggerRequestMaterial.createMain candidate with
+            | Ok verified -> BloggerRequestContext.Main verified
+            | Error rejection -> invalidArg "context" (sprintf "main context rejected: %A" rejection)
 
     let private contextToJs (value: BloggerRequestContext) : obj =
         match value with
@@ -97,10 +150,12 @@ module CompanionRuntimeSurface =
         box
             {| kind = "Main"
                requestId =
-                if isNullish value?requestId then
-                    "request-main"
-                else
-                    text value?requestId
+                // No default: an absent requestId is handed through as null so
+                // the inner contextOfJs derives canonical Main identity from
+                // deltaDigest + coverage. Emitting a literal once pinned every
+                // request to 'request-main', collapsing foreign claims into
+                // Refreshed.
+                if isNullish value?requestId then null else text value?requestId
                mainSession =
                 if isNullish value?mainSession then
                     "ses-main"
@@ -169,10 +224,9 @@ module CompanionRuntimeSurface =
         box
             {| kind = "Squash"
                requestId =
-                if isNullish value?requestId then
-                    "request-squash"
-                else
-                    text value?requestId
+                // Same rule as `main`: absent requestId stays null so the
+                // canonical squashRequestId derivation runs inside the ctx.
+                if isNullish value?requestId then null else text value?requestId
                mainSession =
                 if isNullish value?mainSession then
                     "ses-main"
