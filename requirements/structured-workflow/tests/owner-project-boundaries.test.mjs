@@ -289,7 +289,12 @@ test('WHAT[STRUCTURED-WORKFLOW-012] flat Fable projection materializes zero Proj
 
     // Scratch Directory.Build.props must define isolated ArtifactsDir and import root props
     const scratchProps = readFileSync(join(materialized.scratchDir, 'Directory.Build.props'), 'utf8')
-    assert.match(scratchProps, /<ArtifactsDir>\$\(MSBuildThisFileDirectory\)artifacts\/<\/ArtifactsDir>/)
+    // WP3 split cache: ArtifactsDir anchors at the restore fingerprint so
+    // a body-only .fs edit keeps project.assets.json warm; the literal
+    // macro form or an absolute /restore-<fp>/artifacts/ path are both
+    // accepted — what must be true is that ArtifactsDir exists and binds
+    // `artifacts/`.
+    assert.match(scratchProps, /<ArtifactsDir>(?:[^<]*)artifacts\/<\/ArtifactsDir>/, 'scratch props must set ArtifactsDir to an artifacts/ dir')
     assert.match(scratchProps, /<NuGetAudit>false<\/NuGetAudit>/)
     assert.match(scratchProps, new RegExp(`<Import Project="${rootPropsPath}"\\s*/>`))
 
@@ -510,17 +515,27 @@ test('WHAT[STRUCTURED-WORKFLOW-012] flat Fable projection materialization escape
     assert.notEqual(
       materializedAfterSigChange.projectPath,
       initialMaterialized.projectPath,
-      'signature source byte change must isolate project path',
+      'signature source byte change must isolate project path — flat project contents list items and land under artifactDir',
     )
     assert.notEqual(
       materializedAfterSigChange.outputPath,
       initialMaterialized.outputPath,
       'signature source byte change must isolate output path',
     )
-    assert.notEqual(
+    assert.equal(
       materializedAfterSigChange.assetsPath,
       initialMaterialized.assetsPath,
-      'signature source byte change must isolate assets path',
+      'signature source byte change must NOT isolate assets path — assets identity binds to the project graph, not sources',
+    )
+    assert.notEqual(
+      materializedAfterSigChange.artifactFingerprint,
+      initialMaterialized.artifactFingerprint,
+      'signature byte change must invalidate artifact fingerprint',
+    )
+    assert.equal(
+      materializedAfterSigChange.restoreFingerprint,
+      initialMaterialized.restoreFingerprint,
+      'signature byte change must preserve restore fingerprint — the split is what powers incremental restore reuse',
     )
 
     // 2. Invalidation proof: mutating implementation source file bytes invalidates fingerprint and isolates scratch/output
@@ -547,17 +562,17 @@ test('WHAT[STRUCTURED-WORKFLOW-012] flat Fable projection materialization escape
     assert.notEqual(
       materializedAfterSrcChange.projectPath,
       materializedAfterSigChange.projectPath,
-      'implementation source byte change must isolate project path',
+      'implementation source byte change must isolate project path — flat project contents list items and land under artifactDir',
     )
     assert.notEqual(
       materializedAfterSrcChange.outputPath,
       materializedAfterSigChange.outputPath,
       'implementation source byte change must isolate output path',
     )
-    assert.notEqual(
+    assert.equal(
       materializedAfterSrcChange.assetsPath,
       materializedAfterSigChange.assetsPath,
-      'implementation source byte change must isolate assets path',
+      'implementation source byte change must share the assets path — .assets.json is restore-identity-owned',
     )
 
     // 3. Cache stability proof: unchanged inputs with same plan must produce identical fingerprint and reuse scratch/output

@@ -544,6 +544,13 @@ function registerSignalHandlers() {
 async function main() {
   registerSignalHandlers()
 
+  const knownOptions = new Set(['--clean', '--plan', '--help', '-h'])
+  const unknown = process.argv.slice(2).filter((arg) => arg.startsWith('-') && !knownOptions.has(arg))
+  if (unknown.length > 0) {
+    console.error(`unknown option(s): ${unknown.join(', ')}`)
+    process.exit(1)
+  }
+
   if (process.argv.includes('--help') || process.argv.includes('-h')) {
     console.log(`
 Usage: node scripts/build.mjs [options]

@@ -5,12 +5,14 @@
 // reintroduces the wrapper aggregate, either physically or by re-wiring a
 // production script to read its bytes. This test builds a parallel fixture
 // root and runs the gate's check function against both an absent-directory
-// baseline and three poisoning shapes:
+// baseline and poisoning shapes:
 //
 //   1) the file exists again (aggregate-resurrected)
 //   2) a script still hard-codes its path (aggregate-access)
 //   3) the compile-order manifest is missing or drops declared sources
 //      (order-manifest-missing / order-manifest-drift)
+//   4) build.mjs resets dist outside --clean (unconditional-clean)
+//   5) build.mjs silently accepts unknown argv (unknown-arg-silent)
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -26,31 +28,36 @@ const { check } = await import(join(ReP, 'scripts/checks/aggregate-retired.mjs')
 
 const fixtureRoot = () => {
   const dir = mkdtempSync(join(tmpdir(), 'aggregate-retired-fixture-'))
-  // The gate reads these two directory trees:
-  //   src/Wanxiangshu   → shards + compile-order.txt
-  //   scripts           → production pipeline code we scan for leakage
   mkdirSync(join(dir, 'src', 'Wanxiangshu'), { recursive: true })
   mkdirSync(join(dir, 'scripts'), { recursive: true })
   return dir
 }
 
+const writeShimShard = (dir, extraSources = []) => {
+  const sources = ['Shim', ...extraSources]
+  writeFileSync(
+    join(dir, 'src/Wanxiangshu/Wanxiangshu.Owner.test.shim.fsproj'),
+    `<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+${sources.flatMap((s) => [`    <Compile Include="${s}.fsi"/>`, `    <Compile Include="${s}.fs"/>`]).join('\n')}
+  </ItemGroup>
+</Project>`,
+  )
+  for (const s of sources) {
+    writeFileSync(join(dir, 'src/Wanxiangshu', `${s}.fsi`), `namespace ${s}\n`)
+    writeFileSync(join(dir, 'src/Wanxiangshu', `${s}.fs`), `namespace ${s}\nlet ${s.toLowerCase()} = 0\n`)
+  }
+}
+
+const writeManifest = (dir, sources) => {
+  writeFileSync(join(dir, 'src/Wanxiangshu/compile-order.txt'), sources.flatMap((s) => [`${s}.fsi`, `${s}.fs`]).join('\n') + '\n')
+}
+
 test('WHAT[STRUCTURED-WORKFLOW-011] RETIRED-GATE: aggregate deleted → check stays green on minimal fixture', () => {
   const dir = fixtureRoot()
   try {
-    // Minimal viable shard inventory — one shard, one pair, matching manifest.
-    writeFileSync(
-      join(dir, 'src/Wanxiangshu/Wanxiangshu.Owner.test.shim.fsproj'),
-      `<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><WanxiangshuSubsystem>test</WanxiangshuSubsystem></PropertyGroup>
-  <ItemGroup>
-    <Compile Include="Shim.fsi"/>
-    <Compile Include="Shim.fs"/>
-  </ItemGroup>
-</Project>`,
-    )
-    writeFileSync(join(dir, 'src/Wanxiangshu/Shim.fsi'), 'namespace Shim\n')
-    writeFileSync(join(dir, 'src/Wanxiangshu/Shim.fs'), 'namespace Shim\nlet x = 1\n')
-    writeFileSync(join(dir, 'src/Wanxiangshu/compile-order.txt'), 'Shim.fsi\nShim.fs\n')
+    writeShimShard(dir)
+    writeManifest(dir, ['Shim'])
     writeFileSync(join(dir, 'scripts/noop.mjs'), '// nothing\n')
 
     const result = check({ root: dir })
@@ -104,28 +111,62 @@ test('WHAT[STRUCTURED-WORKFLOW-011] RETIRED-GATE: compile-order manifest missing
   const dir = fixtureRoot()
   try {
     writeFileSync(join(dir, 'scripts/noop.mjs'), '// nothing\n')
-    writeFileSync(
-      join(dir, 'src/Wanxiangshu/Wanxiangshu.Owner.test.shim.fsproj'),
-      `<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <Compile Include="Shim.fsi"/>
-    <Compile Include="Shim.fs"/>
-    <Compile Include="Orphan.fsi"/>
-    <Compile Include="Orphan.fs"/>
-  </ItemGroup>
-</Project>`,
-    )
-    writeFileSync(join(dir, 'src/Wanxiangshu/Shim.fsi'), 'namespace X\n')
-    writeFileSync(join(dir, 'src/Wanxiangshu/Shim.fs'), 'namespace X\nlet a = 1\n')
-    writeFileSync(join(dir, 'src/Wanxiangshu/Orphan.fsi'), 'namespace X\n')
-    writeFileSync(join(dir, 'src/Wanxiangshu/Orphan.fs'), 'namespace X\nlet b = 2\n')
-    // Manifest declares only the first pair — Orphan.fs must flag drift.
-    writeFileSync(join(dir, 'src/Wanxiangshu/compile-order.txt'), 'Shim.fsi\nShim.fs\n')
+    writeShimShard(dir, ['Orphan'])
+    // Manifest declares only Shim — Orphan.fs must flag drift.
+    writeManifest(dir, ['Shim'])
 
     const result = check({ root: dir })
     const drift = result.issues.find((issue) => issue.code === 'order-manifest-drift')
     assert.ok(drift, 'manifest that silently drops a shard source must fail the gate')
     assert.match(drift.message, /Orphan\./)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] RETIRED-GATE: unconditional resetOutputDirectory in build.mjs → red', () => {
+  const dir = fixtureRoot()
+  try {
+    writeShimShard(dir)
+    writeManifest(dir, ['Shim'])
+    // An argv-parsing build.mjs whose reset is NOT behind --clean.
+    // Accepting argv cleanly removes the second gate's noise; the only
+    // signal here is the unguarded resetOutputDirectory call.
+    writeFileSync(
+      join(dir, 'scripts/build.mjs'),
+      `const unknown = process.argv.slice(2).filter((a) => !['--clean', '--plan', '--help', '-h'].includes(a))
+if (unknown.length > 0) { console.error('unknown option(s)'); process.exit(1) }
+import { resetOutputDirectory } from './x.mjs'
+resetOutputDirectory('dist')
+console.log('build done')
+`,
+    )
+
+    const result = check({ root: dir })
+    const red = result.issues.find((issue) => issue.code === 'unconditional-clean')
+    assert.ok(red, 'resetOutputDirectory without --clean gating must fail the gate')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-011] RETIRED-GATE: build.mjs that accepts unknown argv → red', () => {
+  const dir = fixtureRoot()
+  try {
+    writeShimShard(dir)
+    writeManifest(dir, ['Shim'])
+    // A build.mjs that swallows argv entirely — the unknown-arg check must
+    // catch the missing strict parse.
+    writeFileSync(
+      join(dir, 'scripts/build.mjs'),
+      `const argv = process.argv.slice(2)
+console.log('build done', argv.length)
+`,
+    )
+
+    const result = check({ root: dir })
+    const red = result.issues.find((issue) => issue.code === 'unknown-arg-silent')
+    assert.ok(red, 'build.mjs that silently accepts unknown argv must fail the gate')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

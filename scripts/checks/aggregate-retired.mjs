@@ -106,6 +106,45 @@ export function check(ctx = {}) {
     }
   }
 
+  // ④ Build driver must not silently rest dist — any unconditional clean
+  // destroys incremental semantics the spec demands. The only legitimate
+  // reset site is gated on `buildMode === 'clean'` (the --clean flag); any
+  // other unconditional call would remove the pure-incremental path.
+  const buildScript = join(root, 'scripts/build.mjs')
+  if (existsSync(buildScript)) {
+    const source = readFileSync(buildScript, 'utf8')
+    const resetCalls = [...source.matchAll(/resetOutputDirectory\s*\(\s*([^,*)]+)/g)]
+    for (const call of resetCalls) {
+      const callOffset = call.index ?? 0
+      // Look only at the nearest enclosing statement blocks, not arbitrary
+      // backwards text — a '--clean' string in a help banner must not
+      // satisfy this gate. An indented reset sits inside a guarded block;
+      // a top-level unconditional reset is at column 0.
+      const lineStart = source.lastIndexOf('\n', callOffset - 1) + 1
+      const column = callOffset - lineStart
+      const precedingBlock = source.slice(Math.max(0, callOffset - 300), callOffset)
+      const guarded =
+        column > 0 // inside a block
+        && /\bif\s*\(|buildMode\s*===\s*'clean'|--clean\b|clean:\s*true/.test(precedingBlock)
+      if (!guarded) {
+        issues.push({
+          code: 'unconditional-clean',
+          path: 'scripts/build.mjs',
+          message: `resetOutputDirectory at offset ${callOffset} is not guarded by '--clean' / buildMode='clean'`,
+        })
+      }
+    }
+    // ⑤ --plan is the only read-only preview; unknown flags must hard-fail
+    // before any side-effect. Check the unknown-arg gate exists.
+    if (!/unknown option\(s\)/i.test(source) || !/process\.argv\.slice\(2\)/.test(source)) {
+      issues.push({
+        code: 'unknown-arg-silent',
+        path: 'scripts/build.mjs',
+        message: 'build.mjs does not error on unknown argv flags — --plan/--clean must be an exhaustive surface',
+      })
+    }
+  }
+
   return { issues }
 }
 

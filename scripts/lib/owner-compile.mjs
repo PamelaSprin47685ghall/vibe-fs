@@ -959,48 +959,64 @@ export function materializeOwnerCompile(plan, {
   }
   const rootPropsContent = fs.readFileSync(resolvedRootPropsPath, 'utf8')
 
-  // Compute SHA-256 fingerprint binding all inputs
-  const hasher = crypto.createHash('sha256')
-  hasher.update(`schema:${SCHEMA_VERSION}\n`)
-  hasher.update(`candidate:${plan.candidatePath}\n`)
-  hasher.update(`aggregatePath:${plan.aggregatePath}\n`)
-  hasher.update(`aggregateContent:${plan.aggregateContent}\n`)
-  hasher.update(`rootPropsPath:${resolvedRootPropsPath}\n`)
-  hasher.update(`rootPropsContent:${rootPropsContent}\n`)
+  // WP3: split cache identity. `restoreFingerprint` binds only what `dotnet
+  // restore` cares about — candidate identity, the project XML contents it
+  // resolves transitive refs through, and the props/lockfile/toolchain
+  // surface. Source bytes do NOT participate, so a body-only .fs edit
+  // reuses the same restore assets instead of forcing a cold restore.
+  // `artifactFingerprint` is the emitted-JS identity: restore fingerprint
+  // plus each compile item's bytes — exactly the inputs Fable needs to
+  // decide whether to emit again.
+  const restoreHasher = crypto.createHash('sha256')
+  restoreHasher.update(`schema:${SCHEMA_VERSION}\n`)
+  restoreHasher.update(`candidate:${plan.candidatePath}\n`)
+  restoreHasher.update(`aggregatePath:${plan.aggregatePath}\n`)
+  restoreHasher.update(`aggregateContent:${plan.aggregateContent}\n`)
+  restoreHasher.update(`rootPropsPath:${resolvedRootPropsPath}\n`)
+  restoreHasher.update(`rootPropsContent:${rootPropsContent}\n`)
 
   for (const p of plan.projectPaths) {
-    hasher.update(`projectPath:${p}\n`)
+    restoreHasher.update(`projectPath:${p}\n`)
     const content = plan.projectContents?.get(p) ?? fs.readFileSync(p, 'utf8')
-    hasher.update(`projectContent:${content}\n`)
+    restoreHasher.update(`projectContent:${content}\n`)
   }
 
+  const restoreFingerprint = restoreHasher.digest('hex')
+
+  const artifactHasher = crypto.createHash('sha256')
+  artifactHasher.update(`restore:${restoreFingerprint}\n`)
   for (const item of plan.compileItems) {
     if (!fs.existsSync(item)) {
       throw new Error(`Compile source file does not exist: ${item}`)
     }
-    hasher.update(`compileItem:${item}\n`)
+    artifactHasher.update(`compileItem:${item}\n`)
     const fileBytes = fs.readFileSync(item)
-    hasher.update(fileBytes)
-    hasher.update('\n')
+    artifactHasher.update(fileBytes)
+    artifactHasher.update('\n')
   }
 
-  const fingerprint = hasher.digest('hex')
+  const artifactFingerprint = artifactHasher.digest('hex')
 
-  const fingerprintDir = norm(path.join(resolvedScratchRoot, fingerprint))
-  const outputCompileInstance = crypto.createHash('sha256').update(fingerprintDir).digest('hex').slice(0, 16)
+  const fingerprint = artifactFingerprint
+  const restoreDir = norm(path.join(resolvedScratchRoot, `restore-${restoreFingerprint}`))
+  const artifactDir = norm(path.join(resolvedScratchRoot, `artifact-${artifactFingerprint}`))
+  const outputCompileInstance = crypto.createHash('sha256').update(artifactDir).digest('hex').slice(0, 16)
   // Anchor flat-project output under the source directory; with the wrapper
   // aggregate retired, we no longer have its path to anchor against.
   const flatAnchor = plan.aggregatePath ? path.dirname(plan.aggregatePath) : path.resolve(REPO_ROOT, 'src/Wanxiangshu')
   const generatedProjectDir = outputDir
     ? norm(path.join(flatAnchor, '.fable-build/output-compile', fingerprint, outputCompileInstance))
-    : fingerprintDir
+    : artifactDir
   const generatedProjectPath = norm(path.join(generatedProjectDir, plan.candidateBasename))
   const scratchPropsPath = norm(path.join(generatedProjectDir, 'Directory.Build.props'))
 
   const projectName = path.basename(plan.candidateBasename, path.extname(plan.candidateBasename))
-  const assetsPath = norm(path.join(fingerprintDir, 'artifacts', 'obj', projectName, 'project.assets.json'))
-  const finalOutputDir = outputDir ? norm(outputDir) : norm(path.join(fingerprintDir, 'out'))
-  const markerPath = norm(path.join(fingerprintDir, '.success'))
+  // Restore identity owns the obj/assets slot; artifact identity owns the
+  // emission marker + scratch output. Mixing them would force a restore on
+  // every body-only source edit.
+  const assetsPath = norm(path.join(restoreDir, 'artifacts', 'obj', projectName, 'project.assets.json'))
+  const finalOutputDir = outputDir ? norm(outputDir) : norm(path.join(artifactDir, 'out'))
+  const markerPath = norm(path.join(artifactDir, '.success'))
 
   // Generate flat fsproj XML
   // With the aggregate retired, aggregateContent is empty: we emit a
@@ -1011,8 +1027,8 @@ export function materializeOwnerCompile(plan, {
 
   // Generate scratch Directory.Build.props setting isolated ArtifactsDir then importing root props
   const artifactRoot = outputDir
-    ? `${norm(path.join(fingerprintDir, 'artifacts'))}/`
-    : '$(MSBuildThisFileDirectory)artifacts/'
+    ? `${norm(path.join(restoreDir, 'artifacts'))}/`
+    : `${norm(path.join(restoreDir, 'artifacts'))}/`
   // W5: the canonical flat project sits under a scratch dir, far from
   // src/Wanxiangshu's walk-up props chain. Import the production-level
   // props explicitly so Wanxiangshu.Impact picks up the same package
@@ -1048,7 +1064,10 @@ ${sourcePropsImport}  <Import Project="${escapeXmlAttr(resolvedRootPropsPath)}" 
     markerPath,
     successMarkerPath: markerPath,
     fingerprint,
-    scratchDir: fingerprintDir,
+    restoreFingerprint,
+    artifactFingerprint,
+    scratchDir: artifactDir,
+    restoreDir,
     projectDir: generatedProjectDir,
     candidateBasename: plan.candidateBasename,
   }
