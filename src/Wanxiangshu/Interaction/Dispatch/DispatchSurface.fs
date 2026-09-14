@@ -84,8 +84,7 @@ module DispatchSurface =
 
                 member _.SubscribeFutureTerminal(sessionId, listener) =
                     (this :> Wanxiangshu.OpenCode.ISessionHostPort)
-                        .SubscribeFutureTerminal(sessionId, listener)
-                }
+                        .SubscribeFutureTerminal(sessionId, listener) }
 
     let internal sessionPort (port: obj) : Wanxiangshu.OpenCode.ISessionHostPort =
         PlainSessionPort(port) :> Wanxiangshu.OpenCode.ISessionHostPort

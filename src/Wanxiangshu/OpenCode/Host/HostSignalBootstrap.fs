@@ -101,13 +101,8 @@ module HostSignalBootstrap =
         : Task<WiredSignals> =
         task {
             let finalizeInspector =
-                    defaultArg
-                        tryFinalizeInspector
-                        (fun _ inspectorSessionId ->
-                            Task.FromResult(
-                                InspectorFinalizeSettlement.nothingToFinalize
-                                    inspectorSessionId
-                            ))
+                defaultArg tryFinalizeInspector (fun _ inspectorSessionId ->
+                    Task.FromResult(InspectorFinalizeSettlement.nothingToFinalize inspectorSessionId))
 
             let cleanupInspectorDraft = defaultArg cleanupInspector (fun _ -> ())
 

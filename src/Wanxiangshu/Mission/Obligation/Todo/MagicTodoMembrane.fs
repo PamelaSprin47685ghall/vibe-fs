@@ -470,16 +470,6 @@ module MagicTodoHostHooks =
           Before: obj -> obj -> Task<unit>
           After: obj -> obj -> Task<unit> }
 
-    let private fatalInfrastructure (sessionText: string) (reason: string) : 'T =
-        let fields =
-            if String.IsNullOrWhiteSpace sessionText then
-                [ "result", reason ]
-            else
-                [ "session_id", sessionText; "result", reason ]
-
-        Diagnostic.fatal "magic-todo-infrastructure-failed" fields
-        failwith ("unreachable after Diagnostic.fatal: " + reason)
-
     /// HOST contract refusal: the hook can decline without owning anything.
     /// normalizeHookFailure maps ProviderInputRejection to ProtocolRejection +
     /// NoAcceptedFact + NoOwnedExecution — honest because every use site below
@@ -520,10 +510,8 @@ module MagicTodoHostHooks =
             sprintf "todowrite obligation.name must be non-empty at index %d" ordinal
         | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.DuplicateObligationName name) ->
             sprintf "todowrite duplicate obligation name '%s'" name
-        | MagicTodoMembrane.PrepareRejection.Admission rejection ->
-            sprintf "todowrite admission refused: %A" rejection
-        | MagicTodoMembrane.PrepareRejection.NoActiveIncumbency ->
-            "todowrite requires an active incumbency"
+        | MagicTodoMembrane.PrepareRejection.Admission rejection -> sprintf "todowrite admission refused: %A" rejection
+        | MagicTodoMembrane.PrepareRejection.NoActiveIncumbency -> "todowrite requires an active incumbency"
         | MagicTodoMembrane.PrepareRejection.UnexpectedToolName actual ->
             sprintf "todowrite admission resolved tool '%s'" actual
         | MagicTodoMembrane.PrepareRejection.SnapshotInputMismatch ->
@@ -534,8 +522,7 @@ module MagicTodoHostHooks =
             sprintf "todowrite durable blob unavailable: %s" reason
         | MagicTodoMembrane.PrepareRejection.BlobDigestMismatch label ->
             sprintf "todowrite blob digest mismatch at %s" label
-        | MagicTodoMembrane.PrepareRejection.JournalAppend failure ->
-            JournalAppendFailure.describe failure
+        | MagicTodoMembrane.PrepareRejection.JournalAppend failure -> JournalAppendFailure.describe failure
         | MagicTodoMembrane.PrepareRejection.ProjectionInconsistent reason ->
             sprintf "todowrite projection inconsistent: %s" reason
 
@@ -572,14 +559,13 @@ module MagicTodoHostHooks =
     let private prepareInvariantOutcome (sessionText: string) (reason: MagicTodoMembrane.PrepareRejection) =
         match syntaxPrepareFailure reason with
         | Some syntax -> ObligationLedgerWorkflow.PreparationAttempt.Failed syntax
-        | None -> refuseHookCall (sprintf "Magic Todo prepare refused: %s" (describePrepareRejection sessionText reason))
+        | None ->
+            refuseHookCall (sprintf "Magic Todo prepare refused: %s" (describePrepareRejection sessionText reason))
 
     let private preparationFailure (sessionText: string) (reason: MagicTodoMembrane.PrepareRejection) =
         match reason with
-        | MagicTodoMembrane.PrepareRejection.JournalAppend failure ->
-            raise (JournalAppendException failure)
-        | reason ->
-            prepareInvariantOutcome sessionText reason
+        | MagicTodoMembrane.PrepareRejection.JournalAppend failure -> raise (JournalAppendException failure)
+        | reason -> prepareInvariantOutcome sessionText reason
 
     let private admitPreparationAttempt
         (durable: AgentJournal)
@@ -640,8 +626,7 @@ module MagicTodoHostHooks =
             let currentProviderRun =
                 match SessionSnapshot.locateToolCall callId messages with
                 | Ok located -> located.ProviderRun
-                | Error reason ->
-                    refuseHookCall (sprintf "todowrite snapshot locality failed: %A" reason)
+                | Error reason -> refuseHookCall (sprintf "todowrite snapshot locality failed: %A" reason)
 
             let priorMessages =
                 let currentRunId = ProviderRunIdentity.value currentProviderRun
@@ -654,8 +639,7 @@ module MagicTodoHostHooks =
             // accounts for current-message parts before this call without persisting
             // the unmaterialized call itself.
             match! XTraceCapture.captureSessionMessagesWithReceipt (Some durable) sessionId priorMessages with
-            | Error(XTraceCaptureError.StorageAppendFailed failure) ->
-                raise (JournalAppendException failure)
+            | Error(XTraceCaptureError.StorageAppendFailed failure) -> raise (JournalAppendException failure)
             | Error(XTraceCaptureError.Refused reason)
             | Error(XTraceCaptureError.StorageFailed reason) ->
                 refuseHookCall (sprintf "todowrite XTrace transcript-prefix capture refused: %s" reason)
@@ -697,24 +681,15 @@ module MagicTodoHostHooks =
         if not (String.IsNullOrEmpty accepted.EnrichedResult) then
             MagicTodoHostCodec.replaceEnrichedResult output accepted.EnrichedResult
 
-    let private acceptRejectionOutcome
-        (sessionText: string)
-        (rejection: MagicTodoMembrane.AcceptRejection)
-        : unit =
+    let private acceptRejectionOutcome (sessionText: string) (rejection: MagicTodoMembrane.AcceptRejection) : unit =
         match rejection with
-        | MagicTodoMembrane.AcceptRejection.JournalAppend failure ->
-            raise (JournalAppendException failure)
+        | MagicTodoMembrane.AcceptRejection.JournalAppend failure -> raise (JournalAppendException failure)
         | MagicTodoMembrane.AcceptRejection.InputDigestMismatch
         | MagicTodoMembrane.AcceptRejection.OutputDigestMismatch ->
             // The physical tool effect already ran: claiming NoOwnedExecution
             // via ProviderInputRejection would lie. Settlement is genuinely
             // incomplete — fail loud, keep the owned execution visible.
-            invalidOp (
-                sprintf
-                    "Magic Todo accept rejected physical evidence for %s: %A"
-                    sessionText
-                    rejection
-            )
+            invalidOp (sprintf "Magic Todo accept rejected physical evidence for %s: %A" sessionText rejection)
 
     let private acceptResolvedCheckpoint sessionText outcome (output: obj) =
         match outcome with
@@ -771,9 +746,7 @@ module MagicTodoHostHooks =
                 match bridges.TryGetValue key with
                 | false, _ ->
                     refuseHookCall (
-                        sprintf
-                            "Magic Todo after hook has no deferred prepare for %s"
-                            (bridgeKey sessionText callText)
+                        sprintf "Magic Todo after hook has no deferred prepare for %s" (bridgeKey sessionText callText)
                     )
                 | true, value -> value
 

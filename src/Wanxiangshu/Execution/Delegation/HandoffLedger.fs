@@ -62,12 +62,9 @@ module DelegationHandoffLedger =
         let reason = JournalAppendFailure.describe failure
 
         match failure with
-        | JournalAppendFailure.WriterUnavailable _ ->
-            HandoffCheckpointSettlement.notCommitted parent handoff reason
-        | JournalAppendFailure.WriteUnknown _ ->
-            HandoffCheckpointSettlement.unknown parent handoff reason
-        | JournalAppendFailure.FactRejected _ ->
-            HandoffCheckpointSettlement.phaseConflict parent handoff reason
+        | JournalAppendFailure.WriterUnavailable _ -> HandoffCheckpointSettlement.notCommitted parent handoff reason
+        | JournalAppendFailure.WriteUnknown _ -> HandoffCheckpointSettlement.unknown parent handoff reason
+        | JournalAppendFailure.FactRejected _ -> HandoffCheckpointSettlement.phaseConflict parent handoff reason
 
     let checkpointCompleted
         (journal: AgentJournal)

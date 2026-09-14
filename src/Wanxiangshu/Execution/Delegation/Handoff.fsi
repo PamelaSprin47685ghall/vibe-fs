@@ -35,10 +35,13 @@ type HandoffCheckpointSettlement =
 [<RequireQualifiedAccess>]
 module HandoffCheckpointSettlement =
     val committed: parent: SessionId -> handoff: PreparedDelegationHandoff -> HandoffCheckpointSettlement
+
     val notCommitted:
         parent: SessionId -> handoff: PreparedDelegationHandoff -> reason: string -> HandoffCheckpointSettlement
+
     val unknown:
         parent: SessionId -> handoff: PreparedDelegationHandoff -> reason: string -> HandoffCheckpointSettlement
+
     val phaseConflict:
         parent: SessionId -> handoff: PreparedDelegationHandoff -> reason: string -> HandoffCheckpointSettlement
 

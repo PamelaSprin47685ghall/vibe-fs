@@ -31,8 +31,7 @@ module HostSessionNudge =
                 sessionPort.SubscribeFutureTerminal(sessionId, listener)
 
             member _.SubscribeTerminal(sessionId, listener) =
-                sessionPort.SubscribeTerminal(sessionId, listener)
-            }
+                sessionPort.SubscribeTerminal(sessionId, listener) }
 
 
     let tryActiveProfile (journal: AgentJournal option) (sessionId: SessionId) =

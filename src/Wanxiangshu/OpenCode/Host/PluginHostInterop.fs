@@ -90,6 +90,7 @@ module PluginHostInterop =
 
     let private emitFatalRecord operation error =
         Diagnostic.fatal operation [ "result", diagnosticErrorText error ]
+
     /// Exact execution identity recoverable from the hook arguments themselves.
     /// Session comes from a `sessionID` field (tool hooks, event/tool input) or
     /// from the trailing transcript's single session; the physical user message
@@ -101,8 +102,7 @@ module PluginHostInterop =
             None
         else
             string value
-            |> fun text ->
-                if String.IsNullOrWhiteSpace text then None else Some text
+            |> fun text -> if String.IsNullOrWhiteSpace text then None else Some text
 
     [<Emit("$0 == null ? undefined : $0[$1]")>]
     let private fieldValue (carrier: obj) (name: string) : obj = jsNative
@@ -125,10 +125,7 @@ module PluginHostInterop =
         | _ -> tryArray raw
 
     let private messagesArrayOf (value: obj) : obj list =
-        if isNull value then
-            []
-        else
-            messagesFieldOf value
+        if isNull value then [] else messagesFieldOf value
 
     let private transcriptOf (args: obj) (context: obj) : obj list =
         [ fieldValue context "output"; fieldValue args "output"; context; args ]

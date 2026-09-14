@@ -107,8 +107,7 @@ module HostSessionDeletion =
         : unit =
         match settled.Commitment with
         | InspectorFinalizeCommitment.Finalized
-        | InspectorFinalizeCommitment.NothingToFinalize ->
-            scope.DropSessionIdentity(SessionId.value inspectorId)
+        | InspectorFinalizeCommitment.NothingToFinalize -> scope.DropSessionIdentity(SessionId.value inspectorId)
         | InspectorFinalizeCommitment.NotCommitted reason
         | InspectorFinalizeCommitment.Unknown reason ->
             // Retain the identity: a later recovery must be able to
@@ -122,7 +121,11 @@ module HostSessionDeletion =
                 "inspector-case-finalization-failed"
                 [ "session_id", SessionId.value inspectorId; "result", reason ]
 
-            raise (invalidOp (sprintf "CASE-003: Inspector %s finalization conflict: %s" (SessionId.value inspectorId) reason))
+            raise (
+                invalidOp (
+                    sprintf "CASE-003: Inspector %s finalization conflict: %s" (SessionId.value inspectorId) reason
+                )
+            )
 
     let private finalizeStagedInspector
         (scope: PluginRuntimeScope)

@@ -172,8 +172,7 @@ module OpenCodePortAdapter =
         : Task =
         match verdict with
         | DetachedSendVerdict.OwnedSettled -> Task.FromResult()
-        | _ ->
-            deliverVerdictTo sessionId listener verdict
+        | _ -> deliverVerdictTo sessionId listener verdict
 
     /// Classify a detached settlement rejection: an HTTP adapter knows a
     /// refusal happened only when the response carried meaningful transport
@@ -204,11 +203,7 @@ module OpenCodePortAdapter =
                 // A synchronous `SendPrompt` throw returned `Fatal`/`Retryable`
                 // already — it never reaches this observer. An async rejection
                 // is the only surviving verdict: `OutcomeUnknown` to the owner.
-                do!
-                    deliverDetachedVerdict
-                        sessionId
-                        listener
-                        (DetachedSendVerdict.OutcomeUnknown ex.Message)
+                do! deliverDetachedVerdict sessionId listener (DetachedSendVerdict.OutcomeUnknown ex.Message)
         }
         |> ignore
 
@@ -219,8 +214,7 @@ module OpenCodePortAdapter =
         =
         task {
             match! work with
-            | Ok _ ->
-                do! deliverDetachedVerdict sessionId listener DetachedSendVerdict.OwnedSettled
+            | Ok _ -> do! deliverDetachedVerdict sessionId listener DetachedSendVerdict.OwnedSettled
             | Error error ->
                 let verdict = verdictForDetachedError error
                 do! deliverDetachedVerdict sessionId listener verdict
@@ -506,7 +500,10 @@ module OpenCodePortAdapter =
                                  ) ])
                            |> Option.defaultValue [])
 
-                    observeHttpPromptDispatch sessionId opts.DetachedListener (postJson $"/session/{sId}/prompt_async" (createObj bodyFields))
+                    observeHttpPromptDispatch
+                        sessionId
+                        opts.DetachedListener
+                        (postJson $"/session/{sId}/prompt_async" (createObj bodyFields))
 
                     // HTTP prompt_async has the same enqueue semantics as the SDK
                     // surface. Never hold a fork/repair tool open on the response;

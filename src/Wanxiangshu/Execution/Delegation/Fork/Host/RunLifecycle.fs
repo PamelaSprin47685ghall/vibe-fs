@@ -270,7 +270,8 @@ module HostForkRunLifecycle =
         | Some port -> Some(port, handoff)
         | None ->
             raise (
-                InvalidOperationException "reusable fork run has no handoff capability: prepared handoff without a handoff port"
+                InvalidOperationException
+                    "reusable fork run has no handoff capability: prepared handoff without a handoff port"
             )
 
     let private checkpointSlot (handoffPort: ReusableHandoffPort option) (run: PendingHostRun) =

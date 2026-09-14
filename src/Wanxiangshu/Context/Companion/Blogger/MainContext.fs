@@ -74,13 +74,13 @@ module BloggerMainContext =
     /// materialization. Refuses at birth when coverage cannot strictly
     /// advance: an unmapped next cursor or a next sequence at or below the
     /// previous ingested sequence returns None so no BloggerMain is started.
-    let private mainCandidateOutcome
-        (candidate: BloggerMainRequestInput)
-        : BloggerRequestContext option =
+    let private mainCandidateOutcome (candidate: BloggerMainRequestInput) : BloggerRequestContext option =
         match BloggerRequestMaterial.createMain candidate with
         | Ok verified -> Some(BloggerRequestContext.Main verified)
         | Error rejection ->
-            raise (InvalidOperationException(sprintf "mainContextFromChunk staged an unverifiable context: %A" rejection))
+            raise (
+                InvalidOperationException(sprintf "mainContextFromChunk staged an unverifiable context: %A" rejection)
+            )
 
     let mainContextFromChunk
         (mainSessionId: SessionId)
@@ -116,12 +116,7 @@ module BloggerMainContext =
             let deltaDigest = BlobDigest.create (HostDigest.sha256Hex chunk.Toml)
 
             let requestId =
-                BloggerRequestContext.mainRequestId
-                    mainSessionId
-                    bloggerSessionId
-                    deltaDigest
-                    previousSeq
-                    nextSeq
+                BloggerRequestContext.mainRequestId mainSessionId bloggerSessionId deltaDigest previousSeq nextSeq
 
             let candidate: BloggerMainRequestInput =
                 { RequestId = requestId

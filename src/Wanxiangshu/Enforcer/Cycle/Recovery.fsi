@@ -52,10 +52,7 @@ module EnforcerFrameRecovery =
         Wanxiangshu.Persistence.Journal.AgentJournal ->
         Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequest ->
             System.Threading.Tasks.Task<
-                Result<
-                    Wanxiangshu.Context.Companion.Blogger.BloggerRequestContext,
-                    CycleContextReloadRejection
-                 >
+                Result<Wanxiangshu.Context.Companion.Blogger.BloggerRequestContext, CycleContextReloadRejection>
              >
 
     val tryLiveCycleContext:

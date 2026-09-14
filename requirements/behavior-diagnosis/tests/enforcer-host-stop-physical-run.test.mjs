@@ -10,19 +10,20 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 test('WHAT[BD-017] ENFORCER_stopPhysicalRun_argument_order_is_messages_then_fallback', () => {
-  // Definition: stopPhysicalRun (messages) (fallback) (reason).
-  // Call sites must pass (rawMessages, fallback, reason), not swapped.
+  // Definition: stopPhysicalRun (messages) (reason) — the fallback lambda is
+  // gone (ENFORCER-047: stop decision has no heal path today). Injection
+  // site is the ctx.Stop lambda in mkCtx; call sites pass rawMessages + reason.
   const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
   const continuation = readFileSync(join(root, 'src/Wanxiangshu/Enforcer/Continuation.fs'), 'utf8')
 
   assert.match(
     continuation,
-    /let private stopPhysicalRun\s*\(messages: obj list\)\s*\(fallback: obj list\)\s*\(reason: string\)/,
-    'definition order is messages, fallback, reason',
+    /let private stopPhysicalRun\s*\(messages: obj list\)\s*\(reason: string\)/,
+    'definition order is messages then reason (no fallback since ENFORCER-047)',
   )
   // The only remaining direct call site is the ctx.Stop injection in mkCtx
-  // (first arg rawMessages on both sides); continuation branches go through
-  // ctx.Stop and must not re-call stopPhysicalRun directly.
+  // (`stop (reason) → stopPhysicalRun rawMessages reason`); continuation
+  // branches go through ctx.Stop and must not re-call stopPhysicalRun directly.
   const calls = [...continuation.matchAll(/stopPhysicalRun\s+(\w+)\s+(\w+)\s+/g)].map((m) => [
     m[1],
     m[2],
@@ -32,7 +33,12 @@ test('WHAT[BD-017] ENFORCER_stopPhysicalRun_argument_order_is_messages_then_fall
     assert.equal(
       first,
       'rawMessages',
-      `stopPhysicalRun first arg must be rawMessages, got ${first} ${second}`,
+      `stopPhysicalRun first arg must be rawMessages (the ctx.Stop injection), got ${first} ${second}`,
+    )
+    assert.equal(
+      second,
+      'reason',
+      `stopPhysicalRun second arg must be reason (not fallback), got ${first} ${second}`,
     )
   }
 })

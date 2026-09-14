@@ -35,11 +35,7 @@ module BlogSurface =
     /// detached physical abort is requested. `terminate` is the Host
     /// termination capability as `sessionId -> reason -> Promise`.
     val applyPhysicalStop:
-        terminate: obj ->
-        sessionId: string ->
-        physicalUserMessageId: string ->
-        reason: string ->
-            unit
+        terminate: obj -> sessionId: string -> physicalUserMessageId: string -> reason: string -> unit
 
     /// Drive the real transform repair entry: observed terminal/tool facts in,
     /// coordinator verdict out. The exact live request and terminal run cross

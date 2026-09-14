@@ -31,7 +31,11 @@ module BlogSurface =
         jsNative
 
     [<Emit("Promise.resolve($0($1, $2))")>]
-    let private invokeTermination (terminate: obj) (sessionId: string) (reason: string) : System.Threading.Tasks.Task<obj> =
+    let private invokeTermination
+        (terminate: obj)
+        (sessionId: string)
+        (reason: string)
+        : System.Threading.Tasks.Task<obj> =
         jsNative
 
     [<Emit("$0[$1](...$2)")>]
@@ -249,9 +253,14 @@ module BlogSurface =
             return
                 match outcome with
                 | EnforcerContinuation.ContinuationOutcome.ProjectMessages projected ->
-                    box {| kind = "ProjectMessages"; messages = List.toArray projected |}
+                    box
+                        {| kind = "ProjectMessages"
+                           messages = List.toArray projected |}
                 | EnforcerContinuation.ContinuationOutcome.StopPhysicalRun(projected, reason) ->
-                    box {| kind = "StopPhysicalRun"; messages = List.toArray projected; reason = reason |}
+                    box
+                        {| kind = "StopPhysicalRun"
+                           messages = List.toArray projected
+                           reason = reason |}
         }
 
     /// Drive the real stop boundary: the admission barrier lands before the
@@ -259,12 +268,7 @@ module BlogSurface =
     /// termination capability as a JS function `sessionId -> reason ->
     /// Promise<null|{ok:true}|{ok:false,error:string}>`; the exact execution
     /// and session ids cross as plain strings.
-    let applyPhysicalStop
-        (terminate: obj)
-        (sessionId: string)
-        (physicalUserMessageId: string)
-        (reason: string)
-        =
+    let applyPhysicalStop (terminate: obj) (sessionId: string) (physicalUserMessageId: string) (reason: string) =
         let terminateSession (sid: SessionId) (why: string) : System.Threading.Tasks.Task<Result<unit, string>> =
             task {
                 try
@@ -276,7 +280,7 @@ module BlogSurface =
                         return Error(text result?error)
                 with ex ->
                     return Error ex.Message
-        }
+            }
 
         EnforcerContinuation.applyPhysicalStop
             terminateSession

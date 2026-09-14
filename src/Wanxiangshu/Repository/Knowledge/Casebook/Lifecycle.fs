@@ -62,8 +62,7 @@ module CasebookLifecycle =
         (existing: Result<Case option, string>)
         : InspectorFinalizeSettlement option =
         match existing with
-        | Error reason ->
-            Some(InspectorFinalizeSettlement.notCommitted inspectorSessionId reason)
+        | Error reason -> Some(InspectorFinalizeSettlement.notCommitted inspectorSessionId reason)
         | Ok(Some case) ->
             Some(
                 InspectorFinalizeSettlement.phaseConflict
@@ -75,7 +74,10 @@ module CasebookLifecycle =
     /// Refresh the read-model index and settle the settlement. The durable
     /// archive already committed, so an index-rebuild failure must report
     /// Unknown — the evidence is no longer re-ignorable either direction.
-    let private refreshIndexThenSettle (store: IEventStore) (inspectorSessionId: string) : Task<InspectorFinalizeSettlement> =
+    let private refreshIndexThenSettle
+        (store: IEventStore)
+        (inspectorSessionId: string)
+        : Task<InspectorFinalizeSettlement> =
         task {
             try
                 let! _ = CasebookIndex.refresh store 256
@@ -100,8 +102,7 @@ module CasebookLifecycle =
             match! CasebookWorkflow.finalizeCase store case with
             | Error reason when reason.Contains "already finalized" ->
                 return InspectorFinalizeSettlement.phaseConflict inspectorSessionId reason
-            | Error reason ->
-                return InspectorFinalizeSettlement.notCommitted inspectorSessionId reason
+            | Error reason -> return InspectorFinalizeSettlement.notCommitted inspectorSessionId reason
             | Ok() ->
                 CasebookIndex.invalidate ()
                 return! refreshIndexThenSettle store inspectorSessionId
@@ -129,8 +130,7 @@ module CasebookLifecycle =
                     transcript
 
             match spawned with
-            | Error reason ->
-                return InspectorFinalizeSettlement.notCommitted inspectorSessionId reason
+            | Error reason -> return InspectorFinalizeSettlement.notCommitted inspectorSessionId reason
             | Ok(q', a') ->
                 let case: Case =
                     { SessionId = inspectorSessionId
@@ -268,4 +268,3 @@ module CasebookLifecycle =
             if CasebookFeature.isEnabled workspaceRoot then
                 do! touchAccessEnabled store sessionId
         }
-

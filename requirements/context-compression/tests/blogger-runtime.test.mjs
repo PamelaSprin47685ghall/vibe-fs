@@ -10,6 +10,8 @@ const parkedTransform = owner
 
 const main = () => ctx.main({ toml: 'work' })
 const main2 = () => ctx.main({ toml: 'more' })
+const mainRequest = () => ctx.main({ requestId: 'request-main', toml: 'work' })
+const mainRequest2 = () => ctx.main({ requestId: 'request-more', toml: 'more' })
 const KEY = 'ses-blog'
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_idle_plus_material_starts', () => {
@@ -37,7 +39,8 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_open_producer_between_steps_sta
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_cycle_commit_clears_flight', () => {
   const scope = parkedTransform.scope()
-  parkedTransform.claimCurrentRequest(scope, KEY, main())
+  const requested = mainRequest()
+  parkedTransform.claimCurrentRequest(scope, KEY, requested)
   assert.notEqual(parkedTransform.tryGetFlight(scope, KEY), null)
   assert.equal(parkedTransform.peekCurrentRequest(scope, KEY)?.toml, 'work')
 
@@ -59,7 +62,8 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_idle_plus_parked_waiter_offers'
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_clear_flight_is_idempotent', () => {
   // Physical clear: second clear on empty ownership is a no-op (no NotInFlight cell error).
   const scope = parkedTransform.scope()
-  parkedTransform.claimCurrentRequest(scope, KEY, main())
+  const requested = mainRequest()
+  parkedTransform.claimCurrentRequest(scope, KEY, requested)
   parkedTransform.releaseCurrentRequest(scope, KEY, 'request-main')
   assert.equal(parkedTransform.tryGetFlight(scope, KEY), null)
   parkedTransform.releaseCurrentRequest(scope, KEY, 'request-main')
@@ -88,7 +92,8 @@ test('WHAT[PAR-017] Blogger retry replaces exact physical ownership before the n
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_squash_commit_clears_flight', () => {
   // Squash commit path uses the same physical clear as cycle commit.
   const scope = parkedTransform.scope()
-  parkedTransform.claimCurrentRequest(scope, KEY, main())
+  const requested = mainRequest()
+  parkedTransform.claimCurrentRequest(scope, KEY, requested)
   assert.notEqual(parkedTransform.tryGetFlight(scope, KEY), null)
   parkedTransform.releaseCurrentRequest(scope, KEY, 'request-main')
   assert.equal(parkedTransform.tryGetFlight(scope, KEY), null)
@@ -99,7 +104,8 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_session_delete_is_registry_remo
   // DSL-003: owner lifetime is the physical registry — session delete removes
   // flight ownership. There is no Disposed state tag.
   const scope = parkedTransform.scope()
-  parkedTransform.claimCurrentRequest(scope, KEY, main())
+  const requested = mainRequest()
+  parkedTransform.claimCurrentRequest(scope, KEY, requested)
   assert.notEqual(parkedTransform.tryGetFlight(scope, KEY), null)
   parkedTransform.releaseCurrentRequest(scope, KEY, 'request-main')
   assert.equal(parkedTransform.tryGetFlight(scope, KEY), null)
@@ -108,8 +114,12 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_session_delete_is_registry_remo
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_two_inflight_contexts_cannot_coexist', () => {
   // hasFlight already true → Skip; production keeps the registered flight.
   const scope = parkedTransform.scope()
-  assert.equal(parkedTransform.claimCurrentRequest(scope, KEY, main()), 'Claimed')
-  assert.equal(parkedTransform.claimCurrentRequest(scope, KEY, ctx.main({ requestId: 'req-second', toml: 'more' })), 'Conflict:request-main')
+  const claimed = mainRequest()
+  assert.equal(parkedTransform.claimCurrentRequest(scope, KEY, claimed), 'Claimed')
+  assert.equal(
+    parkedTransform.claimCurrentRequest(scope, KEY, ctx.main({ requestId: 'req-second', toml: 'more' })),
+    'Conflict:request-main',
+  )
   assert.equal(parkedTransform.tryGetFlight(scope, KEY)?.toml, 'work')
   assert.notEqual(parkedTransform.tryGetFlight(scope, KEY)?.toml, 'more')
 })

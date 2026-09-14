@@ -23,10 +23,7 @@ module ModelRoutingSurface =
     /// Enter a provider step on the process-shared runtime — the same
     /// execution-scoped admission the real transform boundary must satisfy.
     val sharedEnterProviderStep:
-        sessionId: string ->
-        physicalUserMessageId: string ->
-        visibleProviderRuns: string array ->
-            Task
+        sessionId: string -> physicalUserMessageId: string -> visibleProviderRuns: string array -> Task
 
     val invokeScheduler: scheduler: obj -> role: string -> running: obj -> previous: obj -> obj
     val createRuntime: scheduler: obj -> obj

@@ -215,8 +215,7 @@ module PromptDispatcherSend =
                     // The sendTask or a synchronous throw already decided the
                     // caller-visible outcome; a late arrival must not re-settle.
                     ()
-                | DetachedSendVerdict.Refused reason ->
-                    return! this.SettleDetachedSendRefused key sessionId reason
+                | DetachedSendVerdict.Refused reason -> return! this.SettleDetachedSendRefused key sessionId reason
                 | DetachedSendVerdict.OutcomeUnknown reason ->
                     // PROMPT-011: never resent, never abandoned — the claim
                     // stays Pending on durable evidence until chat.message
@@ -225,8 +224,7 @@ module PromptDispatcherSend =
                     Diagnostic.emit
                         "detached-prompt-outcome-unknown"
                         [ "session_id", SessionId.value sessionId
-                          "result",
-                          sprintf "PromptKey %s outcome indeterminate: %s" (PromptKey.value key) reason ]
+                          "result", sprintf "PromptKey %s outcome indeterminate: %s" (PromptKey.value key) reason ]
 
                 match verdict, onFailure with
                 | DetachedSendVerdict.OwnedSettled, _
@@ -775,14 +773,11 @@ module PromptDispatcherSend =
                 None
                 None
                 (Some physicalAdmission)
+
         /// Refused arm of SettleDetachedSend — kept flat so the outer match
         /// stays a single level; persistence errors report through the
         /// diagnostic lane rather than a second nested match arm.
-        member private this.SettleDetachedSendRefused
-            (key: PromptKey)
-            (sessionId: SessionId)
-            (reason: string)
-            : Task =
+        member private this.SettleDetachedSendRefused (key: PromptKey) (sessionId: SessionId) (reason: string) : Task =
             task {
                 let! result = this.Abandon key sessionId (PromptAbandonReason.SendFailed reason)
 
@@ -793,4 +788,3 @@ module PromptDispatcherSend =
                         "detached-prompt-abandon-uncommitted"
                         [ "session_id", SessionId.value sessionId; "result", persistError ]
             }
-

@@ -46,8 +46,7 @@ module CasebookLifecycleSurface =
                 | InspectorFinalizeCommitment.NothingToFinalize -> box {| ok = true |}
                 | InspectorFinalizeCommitment.NotCommitted reason
                 | InspectorFinalizeCommitment.Unknown reason
-                | InspectorFinalizeCommitment.PhaseConflict reason ->
-                    box {| ok = false; error = reason |}
+                | InspectorFinalizeCommitment.PhaseConflict reason -> box {| ok = false; error = reason |}
         }
 
     let touchAccess (workspaceRoot: string) (sessionId: string) : Task<unit> =

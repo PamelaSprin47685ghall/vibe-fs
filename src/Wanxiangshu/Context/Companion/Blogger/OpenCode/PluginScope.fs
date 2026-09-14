@@ -147,8 +147,7 @@ type PluginBloggerScope() =
     let decideRepairEpisodeSlot (bloggerSid: SessionId) (identity: BloggerRepairEpisodeIdentity) =
         match episodes.TryGetValue bloggerSid with
         | true, existing when isSameRepairEpisode existing identity -> Ok existing
-        | true, existing ->
-            displacedRepairEpisodeSlot bloggerSid identity existing
+        | true, existing -> displacedRepairEpisodeSlot bloggerSid identity existing
         | false, _ -> Ok(createRegisteredRepairEpisode bloggerSid identity)
 
     let claimRepairEpisodeSlot (bloggerSid: SessionId) (identity: BloggerRepairEpisodeIdentity) =

@@ -823,8 +823,7 @@ module SyncDelegateSurface =
                     harness.Readiness.Complete child
 
                 return handled
-            with
-            | :? JournalAppendException as append ->
+            with :? JournalAppendException as append ->
                 match append.Failure with
                 | JournalAppendFailure.FactRejected _ -> return raise append
                 | JournalAppendFailure.WriterUnavailable _
@@ -920,14 +919,13 @@ module SyncDelegateSurface =
                     let ownerSession = harness.OwnerSession owner
 
                     match
-                        harness.Sessions.LatestAcceptedPhysical child,
-                        acceptedRootFor harness ownerSession role child
+                        harness.Sessions.LatestAcceptedPhysical child, acceptedRootFor harness ownerSession role child
                     with
                     | Some physical, Some root ->
                         try
                             return! settleReadyChild harness role child answer runId physical root
-                        with
-                        | :? JournalAppendException -> return false
+                        with :? JournalAppendException ->
+                            return false
                     | _ -> return false
         }
 
@@ -993,8 +991,7 @@ module SyncDelegateSurface =
                     let ownerSession = harness.OwnerSession owner
 
                     match
-                        harness.Sessions.LatestAcceptedPhysical child,
-                        acceptedRootFor harness ownerSession role child
+                        harness.Sessions.LatestAcceptedPhysical child, acceptedRootFor harness ownerSession role child
                     with
                     | Some physical, Some root ->
                         let parts =
@@ -1333,12 +1330,7 @@ module SyncDelegateSurface =
     /// DelegationHandoffLedger.checkpointCompleted the runtime port calls) for
     /// one prepared handoff and return the exact settlement it reports. No
     /// second implementation: the port below is the ledger, not a re-model.
-    let checkpointForHarness
-        (value: obj)
-        (owner: string)
-        (role: string)
-        (parentEndExclusive: int)
-        : Task<obj> =
+    let checkpointForHarness (value: obj) (owner: string) (role: string) (parentEndExclusive: int) : Task<obj> =
         task {
             let harness = unbox<Harness> value
 

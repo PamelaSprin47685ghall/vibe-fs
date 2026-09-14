@@ -14,6 +14,9 @@ module DelegationHandoffLedger =
             Task<PreparedDelegationHandoff>
 
     val checkpointCompleted:
-        journal: AgentJournal -> parent: SessionId -> handoff: PreparedDelegationHandoff -> Task<HandoffCheckpointSettlement>
+        journal: AgentJournal ->
+        parent: SessionId ->
+        handoff: PreparedDelegationHandoff ->
+            Task<HandoffCheckpointSettlement>
 
     val port: workRecord: DelegationWorkRecordCapability -> journal: AgentJournal -> ReusableHandoffPort

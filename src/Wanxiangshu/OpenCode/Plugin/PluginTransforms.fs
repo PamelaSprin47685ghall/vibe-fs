@@ -353,8 +353,7 @@ module PluginTransforms =
                             return
                                 { RawMessages = rawMessages
                                   Current = captured.Current }
-                        | Error(XTraceCaptureError.Refused reason) ->
-                            return raiseFailClosed strengthFailFuse reason
+                        | Error(XTraceCaptureError.Refused reason) -> return raiseFailClosed strengthFailFuse reason
                         | Error(XTraceCaptureError.StorageAppendFailed failure) ->
                             return raiseFailClosed strengthFailFuse (JournalAppendFailure.describe failure)
                         | Error(XTraceCaptureError.StorageFailed reason) ->

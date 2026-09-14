@@ -291,13 +291,19 @@ module MagicTodoMembraneSurface =
                 return box {| kind = "resolved"; reason = null |}
             with
             | :? MagicTodoHostCodec.ProviderInputRejection as rejection ->
-                return box {| kind = "provider_input_rejected"; reason = rejection.Message |}
+                return
+                    box
+                        {| kind = "provider_input_rejected"
+                           reason = rejection.Message |}
             | :? JournalAppendException as persistence ->
                 return
                     box
                         {| kind = "journal_append"
                            reason = JournalAppendFailure.describe persistence.Failure |}
             | ex ->
-                return box {| kind = "unexpected"; reason = ex.Message |}
+                return
+                    box
+                        {| kind = "unexpected"
+                           reason = ex.Message |}
 
         }

@@ -268,8 +268,7 @@ module EnforcerFrameRecovery =
             $"coverage did not advance: previous {previous} next {next}"
         | BloggerRequestRejection.DeltaDigestMismatch(expected, actual) ->
             $"delta digest mismatch: expected {expected} actual {actual}"
-        | BloggerRequestRejection.EpochNotCoherent(field, value) ->
-            $"epoch not coherent: {field} value {value}"
+        | BloggerRequestRejection.EpochNotCoherent(field, value) -> $"epoch not coherent: {field} value {value}"
         | BloggerRequestRejection.EmptySquashCoverage -> "squash covers no frames"
         | BloggerRequestRejection.SquashCoverageMismatch(declared, carried) ->
             $"squash coverage mismatch: declared {declared} carried {carried}"
@@ -280,8 +279,7 @@ module EnforcerFrameRecovery =
         | CycleContextReloadRejection.BlobCorrupt reason -> $"context blob corrupt: {reason}"
         | CycleContextReloadRejection.UnsupportedRequestKind kind -> $"unsupported request kind: {kind}"
         | CycleContextReloadRejection.ItemsUndecodable reason -> $"delta items undecodable: {reason}"
-        | CycleContextReloadRejection.InvariantViolated rejection ->
-            describeInvariantRejection rejection
+        | CycleContextReloadRejection.InvariantViolated rejection -> describeInvariantRejection rejection
 
     let private hasJsonKey (raw: obj) (key: string) : bool =
         emitJsExpr (raw, key) "$0 != null && Object.prototype.hasOwnProperty.call($0, $1)"
@@ -389,9 +387,7 @@ module EnforcerFrameRecovery =
                   Toml = toml
                   PreviousIngestedThroughSequence = prevIngest
                   NextIngestedThroughSequence = nextIngest
-                  PreviousCoverableTurnCutoffExclusive =
-                    asInt raw "prev_cutoff"
-                    |> Option.defaultValue 0
+                  PreviousCoverableTurnCutoffExclusive = asInt raw "prev_cutoff" |> Option.defaultValue 0
                   NextCoverableTurnCutoffExclusive = asInt raw "next_cutoff" |> Option.defaultValue 0
                   NextCoveredPrefixDigest = asString raw "next_prefix_digest"
                   FrameEpochId = openReq.FrameEpochId

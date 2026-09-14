@@ -13,7 +13,6 @@ open Wanxiangshu.Host
 /// must use the frozen epoch, not the live PrefixEpoch at tool-return time.
 ///
 /// Why a request context was refused at construction or recovery decode.
-
 /// Typed so recovery can distinguish corrupt, version-incompatible and
 /// unreadable durable input instead of collapsing them to None (W6).
 [<RequireQualifiedAccess>]
@@ -77,10 +76,18 @@ type BloggerMainRequestContext =
     member this.BloggerSessionId = this.StoredBloggerSessionId
     member this.Items = this.StoredItems
     member this.Toml = this.StoredToml
-    member this.PreviousIngestedThroughSequence = this.StoredPreviousIngestedThroughSequence
+
+    member this.PreviousIngestedThroughSequence =
+        this.StoredPreviousIngestedThroughSequence
+
     member this.NextIngestedThroughSequence = this.StoredNextIngestedThroughSequence
-    member this.PreviousCoverableTurnCutoffExclusive = this.StoredPreviousCoverableTurnCutoffExclusive
-    member this.NextCoverableTurnCutoffExclusive = this.StoredNextCoverableTurnCutoffExclusive
+
+    member this.PreviousCoverableTurnCutoffExclusive =
+        this.StoredPreviousCoverableTurnCutoffExclusive
+
+    member this.NextCoverableTurnCutoffExclusive =
+        this.StoredNextCoverableTurnCutoffExclusive
+
     member this.NextCoveredPrefixDigest = this.StoredNextCoveredPrefixDigest
     member this.FrameEpochId = this.StoredFrameEpochId
     member this.DeltaDigest = this.StoredDeltaDigest
@@ -246,28 +253,27 @@ module BloggerRequestMaterial =
     /// Finalization arm (declared first so the outer check stays a single
     /// `if` pyramid level under fantomas + the nesting lint).
     let private finalizeMain (input: BloggerMainRequestInput) =
-                match
-                    checkEpoch "FrameEpochId" (FrameEpochId.value input.FrameEpochId),
-                    checkEpoch "ObservedPrefixEpochId" (PrefixEpochId.value input.ObservedPrefixEpochId)
-                with
-                | Error rejection, _
-                | _, Error rejection -> Error rejection
-                | Ok(), Ok() ->
-                    Ok
-                        { StoredRequestId = input.RequestId
-                          StoredMainSessionId = input.MainSessionId
-                          StoredBloggerSessionId = input.BloggerSessionId
-                          StoredItems = input.Items
-                          StoredToml = input.Toml
-                          StoredPreviousIngestedThroughSequence = input.PreviousIngestedThroughSequence
-                          StoredNextIngestedThroughSequence = input.NextIngestedThroughSequence
-                          StoredPreviousCoverableTurnCutoffExclusive =
-                            input.PreviousCoverableTurnCutoffExclusive
-                          StoredNextCoverableTurnCutoffExclusive = input.NextCoverableTurnCutoffExclusive
-                          StoredNextCoveredPrefixDigest = input.NextCoveredPrefixDigest
-                          StoredFrameEpochId = input.FrameEpochId
-                          StoredDeltaDigest = input.DeltaDigest
-                          StoredObservedPrefixEpochId = input.ObservedPrefixEpochId }
+        match
+            checkEpoch "FrameEpochId" (FrameEpochId.value input.FrameEpochId),
+            checkEpoch "ObservedPrefixEpochId" (PrefixEpochId.value input.ObservedPrefixEpochId)
+        with
+        | Error rejection, _
+        | _, Error rejection -> Error rejection
+        | Ok(), Ok() ->
+            Ok
+                { StoredRequestId = input.RequestId
+                  StoredMainSessionId = input.MainSessionId
+                  StoredBloggerSessionId = input.BloggerSessionId
+                  StoredItems = input.Items
+                  StoredToml = input.Toml
+                  StoredPreviousIngestedThroughSequence = input.PreviousIngestedThroughSequence
+                  StoredNextIngestedThroughSequence = input.NextIngestedThroughSequence
+                  StoredPreviousCoverableTurnCutoffExclusive = input.PreviousCoverableTurnCutoffExclusive
+                  StoredNextCoverableTurnCutoffExclusive = input.NextCoverableTurnCutoffExclusive
+                  StoredNextCoveredPrefixDigest = input.NextCoveredPrefixDigest
+                  StoredFrameEpochId = input.FrameEpochId
+                  StoredDeltaDigest = input.DeltaDigest
+                  StoredObservedPrefixEpochId = input.ObservedPrefixEpochId }
 
     let createMain (input: BloggerMainRequestInput) : Result<BloggerMainRequestContext, BloggerRequestRejection> =
 
@@ -294,9 +300,7 @@ module BloggerRequestMaterial =
     /// delta digest; its checks are a non-empty covered count agreeing with
     /// the carried digests, plus coherent epochs. The request id is the
     /// owner's frozen identity, carried like Main.
-    let createSquash
-        (input: BloggerSquashRequestInput)
-        : Result<BloggerSquashRequestContext, BloggerRequestRejection> =
+    let createSquash (input: BloggerSquashRequestInput) : Result<BloggerSquashRequestContext, BloggerRequestRejection> =
         if input.CoveredFrameCount < 1 then
             Error BloggerRequestRejection.EmptySquashCoverage
         elif List.length input.FrameDigests <> input.CoveredFrameCount then

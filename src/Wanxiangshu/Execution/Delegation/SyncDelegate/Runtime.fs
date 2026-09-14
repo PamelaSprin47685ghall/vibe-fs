@@ -626,8 +626,7 @@ type SyncDelegateRuntime
     /// the journal writer is released).
     member _.TryAcceptedAuthorityRoot(sessionId: SessionId) : string option =
         match store.TryPeekCallByDelegate sessionId with
-        | Some call ->
-            Option.map (AuthorityRootUserMessageId.value) call.AcceptedAuthorityRoot
+        | Some call -> Option.map (AuthorityRootUserMessageId.value) call.AcceptedAuthorityRoot
         | None -> None
 
     /// DELEG-031: settle a completed turn from its own parts when the terminal

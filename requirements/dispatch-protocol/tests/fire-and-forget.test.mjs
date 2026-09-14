@@ -5,7 +5,8 @@
 // SendChildPromptFireAndForget port may exist.
 
 import assert from 'node:assert/strict'
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -220,4 +221,217 @@ test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_continuation_same_claim_pa
 
 test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_await_mode_constructors_exist', () => {
   assert.deepEqual(dispatch.awaitModeObservation(), { await: 'Await', detached: 'Detached' })
+})
+
+// ── PROMPT-007 DetachedSendVerdict rail ──────────────────────────────────────
+//
+// The W4 rail replaced the old detached fatal funnel with a typed verdict
+// delivered to the exact PromptKey owner: tag 1 Refused licenses an explicit
+// Abandon(SendFailed); tag 2 OutcomeUnknown keeps the claim Pending on
+// durable evidence (never resent, never auto-abandoned); tag 0 OwnedSettled
+// and any late/duplicate delivery after settlement is a no-op. The fake
+// ports below capture opts.DetachedListener — the out-of-band channel the
+// production SendPrompt caller leaves for the eventual detached verdict —
+// and drive it directly, so every assertion below exercises the compiled
+// SettleDetachedSend owner path (dist/OpenCode/Host/OpenCodeContract.js
+// DetachedSendVerdict tag 1 = Refused, tag 2 = OutcomeUnknown).
+
+const Verdict = contract.DetachedSendVerdict
+const refused = (reason) => new Verdict(1, [reason])
+const outcomeUnknown = (reason) => new Verdict(2, [reason])
+
+const verdictPort = (captured, outcome) => ({
+  SubscribeTerminal: () => ({ Dispose: () => {} }),
+  SendPrompt: async (session, text, options) => {
+    captured.push({ session, text, options })
+    return outcome()
+  },
+})
+
+const waitForSettledClaims = async (handle, session, count, message) => {
+  const deadline = Date.now() + 1500
+  for (;;) {
+    if (dispatch.pendingClaimCount(handle, session) === count) return
+    if (Date.now() >= deadline) {
+      assert.equal(dispatch.pendingClaimCount(handle, session), count, message)
+    }
+    await new Promise((resolve) => setImmediate(resolve))
+  }
+}
+
+const journalLines = (base, writerId) =>
+  readFileSync(join(base, '.git', 'wanxiang', 'events', `${writerId}.ndjson`), 'utf8')
+    .trim()
+    .split('\n')
+
+const openGitJournal = async (base, writerId, runtimeId) => {
+  execFileSync('git', ['init', '--quiet', base])
+  const opened = await journal.JournalSurface_bootWithWriterId(
+    join(base, '.git'),
+    writerId,
+    runtimeId,
+    4242,
+    '2026-01-01T00:00:00Z',
+  )
+  assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
+  return opened
+}
+
+const sendDetachedRoot = async (port, handle, session, text, seed) => {
+  const sent = await dispatch.sendAgentOwnerRoot(port, handle, session, text, seed)
+  assert.equal(sent.ok, true, sent.ok ? '' : sent.error)
+  return sent
+}
+
+test('WHAT[DISPATCH-PROTOCOL-007] PROMPT_007_detached_refused_abandons_send_failed_without_resend', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'wxs-prompt-007-refused-'))
+  const writerId = 'writer-007-refused'
+  const opened = await openGitJournal(base, writerId, 'rt-007-refused')
+  try {
+    const owner = await acceptOwner(opened.journal, 'ses_007_refused_owner')
+    const seed = authority.issueInheritedIdentitySeed('coder', owner).value
+    const captured = []
+    const sent = await sendDetachedRoot(
+      verdictPort(captured, () => dispatch.retryable('host refused before accept')),
+      opened.journal,
+      'ses_007_refused',
+      'detached refused send',
+      seed,
+    )
+    assert.equal(typeof captured[0].options.DetachedListener, 'function', 'Detached must leave its verdict listener on the send options')
+    await waitForSettledClaims(opened.journal, 'ses_007_refused', 0, 'Refused must abandon the exact claim')
+    assert.equal(captured.length, 1, 'Refused must never re-emit the physical send')
+    const abandoned = journalLines(base, writerId).filter((line) => line.includes('PluginPromptAbandoned'))
+    assert.equal(abandoned.length, 1, 'Refused must write exactly one durable Abandoned fact')
+    assert.ok(abandoned[0].includes(sent.key), 'the Abandoned fact must name the exact PromptKey')
+    assert.ok(abandoned[0].includes('SendFailed'), 'the Abandoned fact must carry the SendFailed reason')
+    assert.ok(abandoned[0].includes('host refused before accept'), 'the Abandoned fact must carry the refusal evidence')
+  } finally {
+    journal.JournalSurface_dispose(opened.journal)
+    rmSync(base, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[DISPATCH-PROTOCOL-007] PROMPT_007_detached_outcome_unknown_keeps_claim_pending_never_resends', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'wxs-prompt-007-unknown-'))
+  const writerId = 'writer-007-unknown'
+  const opened = await openGitJournal(base, writerId, 'rt-007-unknown')
+  try {
+    const owner = await acceptOwner(opened.journal, 'ses_007_unknown_owner')
+    const seed = authority.issueInheritedIdentitySeed('coder', owner).value
+    const captured = []
+    await sendDetachedRoot(
+      verdictPort(captured, () => dispatch.acceptanceUnknown('response lost after enqueue')),
+      opened.journal,
+      'ses_007_unknown',
+      'detached unknown send',
+      seed,
+    )
+    await waitForSettledClaims(opened.journal, 'ses_007_unknown', 1, 'OutcomeUnknown must keep the claim Pending')
+    assert.equal(captured.length, 1, 'OutcomeUnknown must never auto-resend the physical send')
+    assert.equal(
+      journalLines(base, writerId).filter((line) => line.includes('PluginPromptAbandoned')).length,
+      0,
+      'OutcomeUnknown must never write an Abandoned fact',
+    )
+    const pending = dispatch.projectionObservation(opened.journal, 'ses_007_unknown').pendingClaims
+    assert.equal(pending.length, 1, 'pending evidence must stay observable for later Host reconciliation')
+    assert.ok(String(pending[0].receipt).length > 0, 'the pending claim keeps its durable Submitted receipt')
+  } finally {
+    journal.JournalSurface_dispose(opened.journal)
+    rmSync(base, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_late_listener_verdict_routes_to_exact_owner', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'wxs-prompt-007-late-'))
+  const writerId = 'writer-007-late'
+  const opened = await openGitJournal(base, writerId, 'rt-007-late')
+  try {
+    const owner = await acceptOwner(opened.journal, 'ses_007_late_owner')
+    const seed = authority.issueInheritedIdentitySeed('coder', owner).value
+    const captured = []
+    const sent = await sendDetachedRoot(
+      verdictPort(captured, () => dispatch.admittedWithReceipt('accepted-007-late')),
+      opened.journal,
+      'ses_007_late',
+      'detached late verdict send',
+      seed,
+    )
+    const listener = captured[0].options.DetachedListener
+    assert.equal(typeof listener, 'function', 'Detached must leave its verdict listener on the send options')
+    await waitForSettledClaims(opened.journal, 'ses_007_late', 1, 'admission keeps the claim Pending')
+    await listener(refused('late transport refusal after admission'))
+    await waitForSettledClaims(opened.journal, 'ses_007_late', 0, 'late Refused must abandon the exact claim')
+    assert.equal(captured.length, 1, 'late Refused must not re-emit the physical send')
+    const abandoned = journalLines(base, writerId).filter((line) => line.includes('PluginPromptAbandoned'))
+    assert.equal(abandoned.length, 1, 'late Refused must write exactly one durable Abandoned fact')
+    assert.ok(abandoned[0].includes(sent.key), 'the late Abandoned fact must name the exact PromptKey')
+    assert.ok(abandoned[0].includes('SendFailed'), 'the late Abandoned fact must carry the SendFailed reason')
+  } finally {
+    journal.JournalSurface_dispose(opened.journal)
+    rmSync(base, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_late_unknown_keeps_claim_then_refused_abandons', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'wxs-prompt-007-dup-'))
+  const writerId = 'writer-007-dup'
+  const opened = await openGitJournal(base, writerId, 'rt-007-dup')
+  try {
+    const owner = await acceptOwner(opened.journal, 'ses_007_dup_owner')
+    const seed = authority.issueInheritedIdentitySeed('coder', owner).value
+    const captured = []
+    await sendDetachedRoot(
+      verdictPort(captured, () => dispatch.admittedWithReceipt('accepted-007-dup')),
+      opened.journal,
+      'ses_007_dup',
+      'detached duplicate verdict send',
+      seed,
+    )
+    const listener = captured[0].options.DetachedListener
+    await listener(outcomeUnknown('first late verdict loses the response'))
+    await waitForSettledClaims(opened.journal, 'ses_007_dup', 1, 'late OutcomeUnknown must keep the claim Pending')
+    await listener(refused('second late verdict refuses after unknown'))
+    await waitForSettledClaims(opened.journal, 'ses_007_dup', 0, 'the later Refused still abandons the exact claim')
+    assert.equal(captured.length, 1, 'late verdicts must never re-emit the physical send')
+    assert.equal(
+      journalLines(base, writerId).filter((line) => line.includes('PluginPromptAbandoned')).length,
+      1,
+      'unknown-then-refused must settle the durable claim exactly once',
+    )
+  } finally {
+    journal.JournalSurface_dispose(opened.journal)
+    rmSync(base, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_owned_settled_late_delivery_writes_no_fact', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'wxs-prompt-007-owned-'))
+  const writerId = 'writer-007-owned'
+  const opened = await openGitJournal(base, writerId, 'rt-007-owned')
+  try {
+    const owner = await acceptOwner(opened.journal, 'ses_007_owned_owner')
+    const seed = authority.issueInheritedIdentitySeed('coder', owner).value
+    const captured = []
+    await sendDetachedRoot(
+      verdictPort(captured, () => dispatch.admittedWithReceipt('accepted-007-owned')),
+      opened.journal,
+      'ses_007_owned',
+      'detached owned settled send',
+      seed,
+    )
+    const listener = captured[0].options.DetachedListener
+    await listener(Verdict.OwnedSettled)
+    await waitForSettledClaims(opened.journal, 'ses_007_owned', 1, 'OwnedSettled must leave the Pending claim untouched')
+    assert.equal(captured.length, 1, 'OwnedSettled late delivery must never re-emit the physical send')
+    assert.equal(
+      journalLines(base, writerId).filter((line) => line.includes('PluginPromptAbandoned')).length,
+      0,
+      'OwnedSettled late delivery must write no durable fact',
+    )
+  } finally {
+    journal.JournalSurface_dispose(opened.journal)
+    rmSync(base, { recursive: true, force: true })
+  }
 })

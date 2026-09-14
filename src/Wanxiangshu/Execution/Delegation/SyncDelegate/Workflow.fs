@@ -37,8 +37,7 @@ module internal SyncDelegateWorkflow =
           Directory: string option
           ReplaceToolEstimate: SessionId -> int option -> Task<unit>
           SendPrompt: SyncDelegateCall -> SyncDelegatePromptRequest -> Task<Result<PreparedDelegationHandoff, string>>
-          CheckpointCompletedHandoff:
-              SessionId -> PreparedDelegationHandoff -> Task<HandoffCheckpointSettlement>
+          CheckpointCompletedHandoff: SessionId -> PreparedDelegationHandoff -> Task<HandoffCheckpointSettlement>
           TripFatal: string -> string -> unit
           ResolveBoundAgent: SessionId -> string option
           DescribeWait: SyncDelegateWait -> DiagnosticWait

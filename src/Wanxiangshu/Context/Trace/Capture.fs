@@ -139,11 +139,7 @@ module XTraceCapture =
         task {
             match! AgentJournal.appendAgent (StreamId.Session sessionId) run fact journal with
             | Ok _ -> return ()
-            | Error failure ->
-                return
-                    raise (
-                        JournalAppendException failure
-                    )
+            | Error failure -> return raise (JournalAppendException failure)
         }
 
     let private requireBlobWritten (context: string) (result: Result<'a, string>) : 'a =
@@ -877,10 +873,8 @@ module XTraceCapture =
                 let after = xTraceOf durable sessionId
                 return Ok(captureReceipt identity before after)
             with
-            | :? JournalAppendException as append ->
-                return Error(XTraceCaptureError.StorageAppendFailed append.Failure)
-            | ex ->
-                return Error(XTraceCaptureError.StorageFailed ex.Message)
+            | :? JournalAppendException as append -> return Error(XTraceCaptureError.StorageAppendFailed append.Failure)
+            | ex -> return Error(XTraceCaptureError.StorageFailed ex.Message)
         }
 
     let private captureTailGate = obj ()
@@ -1047,10 +1041,8 @@ module XTraceCapture =
             try
                 return! capture ()
             with
-            | :? JournalAppendException as append ->
-                return Error(XTraceCaptureError.StorageAppendFailed append.Failure)
-            | ex ->
-                return Error(XTraceCaptureError.StorageFailed ex.Message)
+            | :? JournalAppendException as append -> return Error(XTraceCaptureError.StorageAppendFailed append.Failure)
+            | ex -> return Error(XTraceCaptureError.StorageFailed ex.Message)
         }
 
     let private captureObservedDurable journal durable sessionId observations =

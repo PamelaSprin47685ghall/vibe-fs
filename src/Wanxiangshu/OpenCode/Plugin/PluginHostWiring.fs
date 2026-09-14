@@ -25,8 +25,7 @@ module PluginHostWiring =
     let private tryFinalizeWithin workspaceRoot store inspectorSessionId =
         task {
             try
-                return!
-                    CasebookLifecycle.tryFinalizeInspector workspaceRoot store inspectorSessionId
+                return! CasebookLifecycle.tryFinalizeInspector workspaceRoot store inspectorSessionId
 
             with ex ->
                 // A thrown boundary error (store acquisition or lifecycle
@@ -46,9 +45,7 @@ module PluginHostWiring =
             tryFinalizeWithin workspaceRoot store inspectorSessionId
 
         with ex ->
-            Task.FromResult(
-                InspectorFinalizeSettlement.unknown inspectorSessionId ex.Message
-            )
+            Task.FromResult(InspectorFinalizeSettlement.unknown inspectorSessionId ex.Message)
 
     /// Composition-root handle for everything the Host needs after boot:
     /// the ports `HostSignalBootstrap.wire` produced plus the durability

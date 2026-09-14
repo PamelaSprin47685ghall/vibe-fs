@@ -136,5 +136,4 @@ module BloggerRequestContext =
 module BloggerRequestMaterial =
     val createMain: input: BloggerMainRequestInput -> Result<BloggerMainRequestContext, BloggerRequestRejection>
 
-    val createSquash:
-        input: BloggerSquashRequestInput -> Result<BloggerSquashRequestContext, BloggerRequestRejection>
+    val createSquash: input: BloggerSquashRequestInput -> Result<BloggerSquashRequestContext, BloggerRequestRejection>

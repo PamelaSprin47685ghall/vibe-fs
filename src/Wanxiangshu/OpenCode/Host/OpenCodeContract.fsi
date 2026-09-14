@@ -30,15 +30,17 @@ type DetachedSendVerdict =
 type DetachedSendListener = DetachedSendVerdict -> Task
 
 type OpenCodePromptOptions =
-    { Model: OpencodeModel option
-      Agent: string option
-      Directory: string option
-      Metadata: obj option
-      Tools: Map<string, bool> option
-      BindingIntent: SessionBindingIntent
-      /// Out-of-band listener for the eventual detached enqueue result. None
-      /// when the caller's returned sendTask settles the send itself.
-      DetachedListener: DetachedSendListener option }
+    {
+        Model: OpencodeModel option
+        Agent: string option
+        Directory: string option
+        Metadata: obj option
+        Tools: Map<string, bool> option
+        BindingIntent: SessionBindingIntent
+        /// Out-of-band listener for the eventual detached enqueue result. None
+        /// when the caller's returned sendTask settles the send itself.
+        DetachedListener: DetachedSendListener option
+    }
 
 type IPromptPort =
     abstract SendPrompt:

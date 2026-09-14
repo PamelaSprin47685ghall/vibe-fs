@@ -117,9 +117,7 @@ type private RepairAdmission =
 module private ReceiveTerminal =
     let failure (ex: exn) : Task<BloggerRepairEnvelope option> =
         let faulted =
-            TaskCompletionSource<BloggerRepairEnvelope option>(
-                TaskCreationOptions.RunContinuationsAsynchronously
-            )
+            TaskCompletionSource<BloggerRepairEnvelope option>(TaskCreationOptions.RunContinuationsAsynchronously)
 
         faulted.SetException ex
         faulted.Task
@@ -256,8 +254,7 @@ type BloggerRepairRendezvous(identity: BloggerRepairEpisodeIdentity, onCompleted
         | Some receiver ->
             AsyncSupport.trySetResult receiver (Some envelope) |> ignore
             reply.Task
-        | None when not accepted ->
-            RendezvousReply.refusing terminalError reply
+        | None when not accepted -> RendezvousReply.refusing terminalError reply
         | None -> reply.Task
 
     member _.Receive() : Task<BloggerRepairEnvelope option> =

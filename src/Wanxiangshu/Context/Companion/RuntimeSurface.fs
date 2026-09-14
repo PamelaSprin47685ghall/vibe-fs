@@ -51,7 +51,12 @@ module CompanionRuntimeSurface =
                 // explicit requestId is honored: the caller is the exact owner
                 // identity, and epoch refresh under the same requestId must
                 // remain an in-place Refreshed claim rather than Conflict.
-                let rawId = if isNullish value?requestId then "" else text value?requestId
+                let rawId =
+                    if isNullish value?requestId then
+                        ""
+                    else
+                        text value?requestId
+
                 if System.String.IsNullOrWhiteSpace rawId then
                     BloggerRequestContext.squashRequestId
                         mainSessionId
@@ -59,7 +64,8 @@ module CompanionRuntimeSurface =
                         frameEpoch
                         coveredFrameCount
                         frameDigests
-                else BloggerRequestId.create rawId
+                else
+                    BloggerRequestId.create rawId
 
             let candidate: BloggerSquashRequestInput =
                 { RequestId = requestId
@@ -91,7 +97,12 @@ module CompanionRuntimeSurface =
                 // explicit requestId is honored: the caller carries exact
                 // request identity, and epoch refresh under the same requestId
                 // must stay an in-place Refreshed claim rather than Conflict.
-                let rawId = if isNullish value?requestId then "" else text value?requestId
+                let rawId =
+                    if isNullish value?requestId then
+                        ""
+                    else
+                        text value?requestId
+
                 if System.String.IsNullOrWhiteSpace rawId then
                     BloggerRequestContext.mainRequestId
                         mainSessionId
@@ -99,7 +110,8 @@ module CompanionRuntimeSurface =
                         deltaDigest
                         previousIngested
                         nextIngested
-                else BloggerRequestId.create rawId
+                else
+                    BloggerRequestId.create rawId
 
             let candidate: BloggerMainRequestInput =
                 { RequestId = requestId
@@ -155,7 +167,10 @@ module CompanionRuntimeSurface =
                 // deltaDigest + coverage. Emitting a literal once pinned every
                 // request to 'request-main', collapsing foreign claims into
                 // Refreshed.
-                if isNullish value?requestId then null else text value?requestId
+                if isNullish value?requestId then
+                    null
+                else
+                    text value?requestId
                mainSession =
                 if isNullish value?mainSession then
                     "ses-main"
@@ -226,7 +241,10 @@ module CompanionRuntimeSurface =
                requestId =
                 // Same rule as `main`: absent requestId stays null so the
                 // canonical squashRequestId derivation runs inside the ctx.
-                if isNullish value?requestId then null else text value?requestId
+                if isNullish value?requestId then
+                    null
+                else
+                    text value?requestId
                mainSession =
                 if isNullish value?mainSession then
                     "ses-main"

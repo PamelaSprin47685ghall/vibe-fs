@@ -44,7 +44,9 @@ type HandoffCheckpointSettlement =
 module HandoffCheckpointSettlement =
 
     let committed (parent: SessionId) (handoff: PreparedDelegationHandoff) : HandoffCheckpointSettlement =
-        { Identity = { Parent = parent; Route = handoff.Route }
+        { Identity =
+            { Parent = parent
+              Route = handoff.Route }
           Commitment = HandoffCheckpointCommitment.Committed }
 
     let notCommitted
@@ -52,7 +54,9 @@ module HandoffCheckpointSettlement =
         (handoff: PreparedDelegationHandoff)
         (reason: string)
         : HandoffCheckpointSettlement =
-        { Identity = { Parent = parent; Route = handoff.Route }
+        { Identity =
+            { Parent = parent
+              Route = handoff.Route }
           Commitment = HandoffCheckpointCommitment.NotCommitted reason }
 
     let unknown
@@ -60,7 +64,9 @@ module HandoffCheckpointSettlement =
         (handoff: PreparedDelegationHandoff)
         (reason: string)
         : HandoffCheckpointSettlement =
-        { Identity = { Parent = parent; Route = handoff.Route }
+        { Identity =
+            { Parent = parent
+              Route = handoff.Route }
           Commitment = HandoffCheckpointCommitment.Unknown reason }
 
     let phaseConflict
@@ -68,7 +74,9 @@ module HandoffCheckpointSettlement =
         (handoff: PreparedDelegationHandoff)
         (reason: string)
         : HandoffCheckpointSettlement =
-        { Identity = { Parent = parent; Route = handoff.Route }
+        { Identity =
+            { Parent = parent
+              Route = handoff.Route }
           Commitment = HandoffCheckpointCommitment.PhaseConflict reason }
 
 type ReusableHandoffPort =

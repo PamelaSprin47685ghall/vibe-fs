@@ -90,9 +90,7 @@ module EnforcerContinuation =
             // superseded repair episode produces. Killing the process here
             // would turn a routine supersedure into a crash; the released slot
             // is never touched, so decline and keep the evidence path retraced.
-            Diagnostic.emit
-                "blogger-flight-release-conflict"
-                [ "session_id", sessionKey; "result", reason ]
+            Diagnostic.emit "blogger-flight-release-conflict" [ "session_id", sessionKey; "result", reason ]
 
     /// Release whatever exact request is currently observed, if any. Only
     /// used where the exact context is not already in hand; the peeked
@@ -154,8 +152,7 @@ module EnforcerContinuation =
                 | BloggerRepairOutcome.SupersededIgnored -> return ctx.Project ctx.RawMessages
                 | BloggerRepairOutcome.UnownedIdleIgnored ->
                     return ctx.Stop "unowned-interrupted-blog-without-CurrentRequest"
-                | BloggerRepairOutcome.AbandonedExhausted ->
-                    return ctx.Stop "blogger-protocol-repair-exhausted"
+                | BloggerRepairOutcome.AbandonedExhausted -> return ctx.Stop "blogger-protocol-repair-exhausted"
                 | BloggerRepairOutcome.NudgeSent _
                 | BloggerRepairOutcome.AabbSent _ -> return ctx.Project ctx.RawMessages
                 | BloggerRepairOutcome.Completed -> return ctx.Stop "blogger-protocol-repair-completed"
@@ -193,8 +190,7 @@ module EnforcerContinuation =
                 | BloggerRepairOutcome.SupersededIgnored -> return ctx.Project ctx.RawMessages
                 | BloggerRepairOutcome.UnownedIdleIgnored ->
                     return ctx.Stop "unowned-invalid-blog-cycle-without-CurrentRequest"
-                | BloggerRepairOutcome.AbandonedExhausted ->
-                    return ctx.Stop "blogger-protocol-repair-exhausted"
+                | BloggerRepairOutcome.AbandonedExhausted -> return ctx.Stop "blogger-protocol-repair-exhausted"
                 | BloggerRepairOutcome.NudgeSent _
                 | BloggerRepairOutcome.AabbSent _ -> return ctx.Project ctx.RawMessages
                 | BloggerRepairOutcome.Completed -> return ctx.Stop "blogger-protocol-repair-completed"
@@ -395,9 +391,7 @@ module EnforcerContinuation =
                 let! rebuilt = resumeWithContext ctx live
                 return ctx.Project rebuilt
             | Error reason ->
-                Diagnostic.emit
-                    "blogger-flight-claim-conflict"
-                    [ "session_id", sessionKey; "result", reason ]
+                Diagnostic.emit "blogger-flight-claim-conflict" [ "session_id", sessionKey; "result", reason ]
                 return ctx.Stop "park-resumed-foreign-flight"
         }
 
@@ -419,6 +413,7 @@ module EnforcerContinuation =
                 // fatal trip over a routine supersede.
                 return! resumeAfterClaim ctx sessionKey live
         }
+
     let private afterParkResumed
         (ctx: Context)
         (mainSessionId: SessionId)
@@ -501,9 +496,7 @@ module EnforcerContinuation =
             // alive and projecting the unmodified raw messages is the honest
             // response: the still-owned frame simply stays uncommitted until
             // the owner revives it.
-            Diagnostic.emit
-                "enforcer-cycle-failed"
-                [ "session_id", sessionKey; "result", "missing CurrentRequest" ]
+            Diagnostic.emit "enforcer-cycle-failed" [ "session_id", sessionKey; "result", "missing CurrentRequest" ]
             ctx.Project ctx.RawMessages
         | None ->
             // Same rule for the no-authority branch: absence of the durable
@@ -512,6 +505,7 @@ module EnforcerContinuation =
             Diagnostic.emit
                 "enforcer-cycle-failed"
                 [ "session_id", sessionKey; "result", "live blog without cycle authority" ]
+
             ctx.Project ctx.RawMessages
 
     /// Evidence → Decision: assistant completed → stop; else unowned live fatal project.
@@ -543,7 +537,8 @@ module EnforcerContinuation =
             with ex ->
                 Diagnostic.emit
                     "enforcer-cycle-settlement-failed"
-                    [ "session_id", sessionKey; "result", "abandonment evidence failed: " + ex.Message ]
+                    [ "session_id", sessionKey
+                      "result", "abandonment evidence failed: " + ex.Message ]
 
             liveCtx |> Option.iter (releaseExact ctx sessionKey)
             Diagnostic.fatal "enforcer-cycle-failed" [ "session_id", sessionKey; "result", reason ]
@@ -593,9 +588,7 @@ module EnforcerContinuation =
                 | BloggerRepairOutcome.Completed ->
                     // A transform observation can never yield a send-kind reply;
                     // a mismatched outcome violates the rendezvous contract.
-                    Diagnostic.fatal
-                        "enforcer-repair-outcome-mismatch"
-                        [ "session_id", sessionKey; "result", reason ]
+                    Diagnostic.fatal "enforcer-repair-outcome-mismatch" [ "session_id", sessionKey; "result", reason ]
 
                     return CycleDisposition.Working
         }
@@ -644,9 +637,7 @@ module EnforcerContinuation =
                 // request in-flight. The caller keeps the pending marker and
                 // projects again; the write is not lost to a premature process
                 // exit masking durable evidence.
-                Diagnostic.emit
-                    "enforcer-cycle-commit-unknown"
-                    [ "session_id", sessionKey; "result", reason ]
+                Diagnostic.emit "enforcer-cycle-commit-unknown" [ "session_id", sessionKey; "result", reason ]
                 return CycleDisposition.CommitUnknown
         }
 
@@ -685,9 +676,7 @@ module EnforcerContinuation =
             | EnforcerCycleCommit.CycleCommitOutcome.KnownNotCommitted reason ->
                 return! abandonStaleDisposition ctx mainSessionId sessionKey liveCtx reason
             | EnforcerCycleCommit.CycleCommitOutcome.CommitUnknown reason ->
-                Diagnostic.emit
-                    "enforcer-cycle-commit-unknown"
-                    [ "session_id", sessionKey; "result", reason ]
+                Diagnostic.emit "enforcer-cycle-commit-unknown" [ "session_id", sessionKey; "result", reason ]
                 return CycleDisposition.CommitUnknown
         }
 
@@ -946,8 +935,7 @@ module EnforcerContinuation =
         task {
             let project (msgs: obj list) = projectMessages msgs rawMessages
 
-            let stop (reason: string) =
-                stopPhysicalRun rawMessages reason
+            let stop (reason: string) = stopPhysicalRun rawMessages reason
 
             let mainSessionId =
                 journal
@@ -1000,10 +988,7 @@ module EnforcerContinuation =
     /// physical execution custody BEFORE the physical abort resolves. The next
     /// provider admission for this execution is fenced out from this instant;
     /// a slow, rejected, or thrown abort can never reopen it.
-    let internal barPhysicalProviderAdmission
-        (sid: SessionId)
-        (physicalUserMessageId: PhysicalUserMessageId)
-        =
+    let internal barPhysicalProviderAdmission (sid: SessionId) (physicalUserMessageId: PhysicalUserMessageId) =
         ModelRouting.suppressProviderStep sid physicalUserMessageId
         ModelRouting.releasePhysicalExecution sid physicalUserMessageId |> ignore
 
@@ -1022,7 +1007,9 @@ module EnforcerContinuation =
             match! terminateSession sid reason with
             | Ok() -> ()
             | Error error ->
-                Diagnostic.emit "enforcer-stop-physical-run" [ "session_id", sessionId; "result", "abort-error: " + error ]
+                Diagnostic.emit
+                    "enforcer-stop-physical-run"
+                    [ "session_id", sessionId; "result", "abort-error: " + error ]
         }
 
     let private requestPhysicalStop

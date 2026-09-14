@@ -100,7 +100,8 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_CurrentRequest_is_physical_flig
   const key = 'ses-blogger'
 
   assert.equal(runtime.tryGetFlight(scope, key), null)
-  runtime.claimCurrentRequest(scope, key, main('coverage-delta'))
+  const requested = runtime.main({ requestId: 'request-main', toml: 'coverage-delta' })
+  runtime.claimCurrentRequest(scope, key, requested)
   assert.notEqual(runtime.tryGetFlight(scope, key), null)
   assert.equal(runtime.tryGetFlight(scope, key)?.toml, 'coverage-delta')
   runtime.releaseCurrentRequest(scope, key, 'request-main')

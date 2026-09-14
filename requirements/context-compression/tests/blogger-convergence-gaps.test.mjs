@@ -244,14 +244,21 @@ test('WHAT[CONTEXT-COMPRESSION-018] C0_squash_path_does_not_SubscribeTerminal', 
 
 test('WHAT[CONTEXT-COMPRESSION-018] C0_squash_constructs_typed_BloggerRequestContext_Squash_in_production', () => {
   // Domain type + match arms exist; production must CONSTRUCT Squash context for send/commit.
-  // Pattern match (`| BloggerRequestContext.Squash _`) is not construction.
+  // W6 cutover: the constructor is `BloggerRequestMaterial.createSquash` piped
+  // into `BloggerRequestContext.Squash` — the squash payload is validated inline,
+  // never built from a positional record. Pattern-match alone doesn't count.
   const constructors = prodFiles.filter((file) => {
     const text = readFileSync(file, 'utf8')
-    return /BloggerRequestContext\.Squash\s*\{/.test(text) || /BloggerRequestContext\.Squash\s*\n\s*\{/.test(text)
+    return (
+      /Result\.map\s+BloggerRequestContext\.Squash/.test(text)
+      || /Ok\s+verified\s*->\s*BloggerRequestContext\.Squash\s+verified/.test(text)
+      || /BloggerRequestContext\.Squash\(.*createSquash/.test(text)
+      || /createSquash[\s\S]{0,200}BloggerRequestContext\.Squash/.test(text)
+    )
   }).map(rel)
   assert.ok(
     constructors.length > 0,
-    'no production construction of BloggerRequestContext.Squash { ... } — typed squash context is domain-only',
+    'no production construction of BloggerRequestContext.Squash via createSquash — typed squash context is domain-only',
   )
 })
 
