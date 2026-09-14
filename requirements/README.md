@@ -27,7 +27,7 @@ grounding 由 `requirement-grounding` package 拥有。
 
 已知 proof gap 聚合台账见 [GAP.md](GAP.md)；包清单与依赖骨架见 [INDEX.md](INDEX.md)。
 
-## 54 包索引
+## 56 包索引
 
 ### 1. Requirement system
 | Package | 一句话 WHY |

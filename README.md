@@ -110,11 +110,11 @@ Distiller、Blogger 等由编排路径调用，不作为单独“安装角色”
 
 | 角色 | 典型工具面 | 说明 |
 |------|------------|------|
-| Orchestrator | `fork-manager`, `join`, `horizon` | 顶层编排 |
-| Manager | `fork-manager`, `join`, `horizon`, `todowrite`, `review`, `suicide`, `fission` | 独立评估、任务分解与责任推进；单次可见任务为评估、按指派修复、退出，循环 Continue/Accepted 裁决由系统执行 |
+| Orchestrator | `fork`, `join`, `horizon` | 顶层编排 |
+| Manager | `fork`, `join`, `horizon`, `todowrite`, `review`, `suicide`, `fission` | 独立评估、任务分解与责任推进；单次可见任务为评估、按指派修复、退出，循环 Continue/Accepted 裁决由系统执行 |
 | Coder | `read`, `write`, `edit`, `glob`, `grep`, `inspect`, `fetch`, `fission` | 源码修改 |
 | Inspector | `read`, `glob`, `grep`, `query-shell`, `fetch`, `fission` | 只读调查 |
-| DevOps | `fork-pty`, `executor`, `inspect`, `behavior` 等 | 进程与环境 |
+| DevOps | `open-terminal`, `run`, `inspect`, `behavior` 等 | 进程与环境 |
 | Browser | `read`, `glob`, `grep`, `stealth-browser-mcp`, `fission` | 浏览类任务 |
 | Inquiry | `inspect`, `sphinx`, `fission` | 语义调查与分析 |
 | Distiller | 无工具 | 输出蒸馏/摘要 |

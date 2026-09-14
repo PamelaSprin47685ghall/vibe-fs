@@ -1,6 +1,6 @@
 # relay-assessment — WHAT
 
-## ASSESS-001: review schema 恰有八个必填 0..10 整数
+## ASSESS-001: review schema 恰有八个必填 PERFECT/REVISE/N/A 评级
 
 `review` 工具接受 `language_algorithms`、`simplicity`、`structure`、`granularity`、`tests_evidence`、`logic_reliability_boundaries`、`caller_ergonomics`、`completeness` 八个必填维度评分与可选 `note` 参数。每个维度评分必须为 `"PERFECT"`、`"REVISE"` 或 `"N/A"` 三个枚举量之一；禁止缺省维度、未知字段、整数、浮点、null、总 verdict 与平均分。额外 `note` 参数必须是字符串，仅用来写文本，不返回，不做其他用途。
 
@@ -30,4 +30,4 @@ schema、范围、narrative、snapshot freshness 或 exact binding 校验失败�
 
 ## ASSESS-008: 评审前后信息时域隔离
 
-评审被接纳前，迭代可见的 Role、账本与工具描述只能包含独立只读的评估请求文档（`runtime/manager-assess`、`tool/review/description`），不得包含任何评审后指派文档（`runtime/manager-work`、`runtime/manager-finish`）。评审被接纳后，结果按分数选择恰好一条当前指令：非全 10 选择修复指派（`runtime/manager-work`），全 10 选择关闭退场（`runtime/manager-finish`）。评审前可见内容不得陈述低分承接修复、满分结束工作或还存在下一次迭代；循环机制只存在于 durable fold 与 projection，不存在于 provider 可见文本。
+评审被接纳前，迭代可见的 Role、账本与工具描述只能包含独立只读的评估请求文档（`runtime/manager-assess`、`tool/review/description`），不得包含任何评审后指派文档（`runtime/manager-work`、`runtime/manager-finish`）。评审被接纳后，结果按评审向量选择恰好一条当前指令：存在任一 REVISE 选择修复指派（`runtime/manager-work`），无任何 REVISE（全 PERFECT 或 N/A）选择关闭退场（`runtime/manager-finish`）。评审前可见内容不得陈述低分承接修复、满分结束工作或还存在下一次迭代；循环机制只存在于 durable fold 与 projection，不存在于 provider 可见文本。

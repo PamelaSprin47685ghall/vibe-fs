@@ -6,7 +6,7 @@
 
 ## DELEG-002: 同一 Office 的 calling 名只差 persona/depth，不差 authority
 
-属于同一 Office 的不同 calling 别名（如 fast 与 deep 档位）仅在 persona 风格与推理深度上存在差异，不改变该 Office 的权能与权限。
+属于同一 Office 的不同 calling 别名（如 fast 与 deep 档位，仅作为向后兼容参数保留，不具有独立路由权威）仅在 persona 风格与推理深度上存在差异，不改变该 Office 的权能与权限。
 
 ## DELEG-003: 独立 road 与 same-road continuation 硬区分，各占独立工具
 
@@ -38,7 +38,7 @@
 
 ## DELEG-010: owner effective tier 决定 delegate tier
 
-委派绑定的档位由调用方有效 tier 确定性映射（fast 对应 fast，deep 对应 deep），模型不可自选目标 target。复用既有 child 时严格沿用其已绑定 managed agent。
+委派绑定的档位由调用方有效 tier 映射（fast/deep 作为向下兼容参数，不赋予额外权限与模型选择权），模型不可自选目标 target。复用既有 child 时严格沿用其已绑定 managed agent。
 
 ## DELEG-011: 无 return 通道；ordinary completion 结束 batch
 

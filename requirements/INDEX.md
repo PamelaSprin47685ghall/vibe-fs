@@ -1,6 +1,6 @@
 # Package index
 
-当前设计得到 **54 张 boundary card**。54 不是目标，也不是稳定 API；它只是当前按独立 WHY、failure meaning 与 independent-change test 得出的结果。后续全仓反向覆盖若发现 ORPHAN / OVERLAP / GARBAGE，应继续拆并。
+当前设计得到 **56 张 boundary card**。56 不是目标，也不是稳定 API；它只是当前按独立 WHY、failure meaning 与 independent-change test 得出的结果。后续全仓反向覆盖若发现 ORPHAN / OVERLAP / GARBAGE，应继续拆并。
 
 ## 1. Requirement system
 
@@ -139,7 +139,7 @@
 - 新增 `capability-enforcement`：office consequence 与 schema/runtime gate 同构是两个不同 WHY。
 - 新增 `external-investigation`：Browser 的 provenance-bearing external evidence 不能塞进 local repository investigation。
 - 新增 `work-record`：canonical bounded work statement 被 delegation、process review、Finality 共用，不能继续藏在 Companion/Review 下。
-- 新增 `requirement-grounding`：路径命中的规范与测试需要自动、去重、可重放地进入开发上下文，且首次 mutation 必须先 grounding。
+- 新增 `requirement-grounding`：路径命中的规范与测试需要自动、去重、可重放地进入开发上下文，弱介入不阻断 mutation。
 - 新增 `attention-regulation` / `concern-routing` / `institutional-learning`：最终微原语不是一个“大认知工具包”。`enough/abandon/defer`、`subscribe/publish`、`celebrate/regret → Enhancer` 分属注意力、通信、制度学习三个独立 failure domain；既有 `assume` 保持在 `cognitive-environment`，不重复设计。
 
 # 依赖骨架
