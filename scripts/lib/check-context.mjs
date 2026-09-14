@@ -80,7 +80,7 @@ export const createCheckContext = (opts = {}) => {
   // Lazily-loaded compile inventory: shared across  every gate that needs it.
   let inventory
   const compileInventory = () => {
-    if (!inventory) inventory = readCompileShardInventory({ repositoryRoot: root, sourceRoot: join(root, PRODUCTION_ROOT), aggregatePath: join(root, PRODUCTION_ROOT, 'Wanxiangshu.fsproj') })
+    if (!inventory) inventory = readCompileShardInventory({ repositoryRoot: root, sourceRoot: join(root, PRODUCTION_ROOT), aggregatePath: null })
     return inventory
   }
 

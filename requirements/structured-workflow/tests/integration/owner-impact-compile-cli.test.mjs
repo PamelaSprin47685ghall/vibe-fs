@@ -8,7 +8,11 @@ import { hasEmittedJsFiles } from '../../../../scripts/lib/owner-compile.mjs'
 
 const ROOT = resolve(import.meta.dirname, '../../../..')
 const FIXTURE = join(ROOT, 'requirements/structured-workflow/tests/fixtures/impact-cli')
-const CLI = join(ROOT, 'scripts/compile-impact.mjs')
+// compile-impact.mjs was retired in W4: this shim mirrors its surface (accepts
+// the same --aggregate/--projects/--props/--scratch/-o flags and runs one real
+// Fable compile via compileIncremental) so these tests continue to hit real
+// emitted JS at the same layer of responsibility.
+const CLI = join(ROOT, 'requirements/structured-workflow/tests/fixtures/impact-cli-wrapper.mjs')
 
 // Original three CLI rounds (full-repo compiles of src/Wanxiangshu) mapped onto
 // the small fixture graph: Core (shared foundation) <- Alpha, Core <- Beta.
@@ -55,7 +59,9 @@ const copyFixture = () => {
   <PropertyGroup>
     <ImpactFixtureMark>1</ImpactFixtureMark>
   </PropertyGroup>
-  <Import Project="${ROOT}/Directory.Build.props" />
+  <!-- The aggregate fsproj the fixture ships carries its own PackageReference;
+     importing repo props from here would NU1504 on duplicate package items -->
+  <Import Project="${join(ROOT, 'Directory.Build.props')}" />
 </Project>
 `,
     'utf8',
@@ -176,6 +182,58 @@ test('WHAT[STRUCTURED-WORKFLOW-012] compile-impact CLI emits fresh output into a
       !existsSync(join(outputDir, 'Foundation', 'FatalProcess.js')),
       'auto-detect emit stays fixture-scoped, never production sources',
     )
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+// Real Fable regression for the inline/literal carve-out: a .fs body change
+// that replaces the emitted code at the call site MUST widen the plan even
+// though no .fsi changed. Beta is a pure consumer of Core; if the planner
+// dropped it, Beta's stale emitted JS would keep running the old inline body.
+test('WHAT[STRUCTURED-WORKFLOW-012] compile-impact CLI re-emits reverse consumers for inline body changes', { timeout: 120_000 }, () => {
+  const dir = copyFixture()
+  try {
+    const { flags, outputDir } = baseArgs(dir)
+    const coreFs = join(dir, 'Core', 'Core.fs')
+    const alphaFs = join(dir, 'Alpha', 'Alpha.fs')
+
+    // Rewrite Core to carry an inline function and a [<Literal>] — both forms
+    // emit at the call site even though no .fsi will change.
+    writeFileSync(
+      coreFs,
+      'namespace ImpactFixture\n\nmodule Core =\n    let baseValue = 1\n\n    [<Literal>]\n    let tag = "core-tag"\n\n    let inline seeded (x: string) =\n        x + "original"\n',
+      'utf8',
+    )
+    // Alpha calls the inline into its emitted JS — an inline body change must
+    // re-emit Alpha, not just Core.
+    writeFileSync(
+      alphaFs,
+      'namespace ImpactFixture\n\nmodule Alpha =\n    let value = Core.seeded (string Core.baseValue)\n',
+      'utf8',
+    )
+
+    // Baseline full compile so Alpha bytes exist before the inline body mutates.
+    const props = join(dir, 'Directory.Build.props')
+    writeFileSync(props, `${readFileSync(props, 'utf8')}<!-- baseline -->\n`, 'utf8')
+    const baseline = runCli([props, ...flags])
+    assert.equal(baseline.status, 0, baseline.stderr || baseline.stdout)
+    const baselineAlpha = readFileSync(join(outputDir, 'Alpha', 'Alpha.js'), 'utf8')
+    assert.ok(baselineAlpha.includes('original'), 'baseline must embed the original inline body')
+
+    // Mutate only Core's inline body — same .fs, unchanged surface, different
+    // emitted code. The planner must classify it as signature-risky and re-
+    // schedule the Alpha consumer for re-emit.
+    writeFileSync(
+      coreFs,
+      'namespace ImpactFixture\n\nmodule Core =\n    let baseValue = 1\n\n    [<Literal>]\n    let tag = "core-tag"\n\n    let inline seeded (x: string) =\n        x + "mutated"\n',
+      'utf8',
+    )
+    const focused = runCli([coreFs, ...flags])
+    assert.equal(focused.status, 0, focused.stderr || focused.stdout)
+    const mutatedAlpha = readFileSync(join(outputDir, 'Alpha', 'Alpha.js'), 'utf8')
+    assert.ok(mutatedAlpha.includes('mutated'), 'inline body change must re-emit consumer bytes')
+    assert.notEqual(mutatedAlpha, baselineAlpha, 'Alpha emit must differ after the inline body change')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

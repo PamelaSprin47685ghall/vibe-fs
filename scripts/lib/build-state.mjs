@@ -143,13 +143,10 @@ export function diffVerificationInputs(before, after) {
 
 export function collectCompilerInputs(root = REPO_ROOT, aggregatePath) {
   const resolvedRoot = path.resolve(root)
-  const resolvedAggregate = aggregatePath
-    ? path.resolve(aggregatePath)
-    : path.resolve(resolvedRoot, 'src/Wanxiangshu/Wanxiangshu.fsproj')
 
   const tracked = collectTrackedInputs({
     root: resolvedRoot,
-    aggregatePath: resolvedAggregate,
+    aggregatePath: aggregatePath ? path.resolve(aggregatePath) : null,
   })
 
   const results = []

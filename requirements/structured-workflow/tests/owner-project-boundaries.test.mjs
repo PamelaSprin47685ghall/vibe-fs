@@ -29,9 +29,18 @@ function references(projectName) {
 }
 
 test('WHAT[STRUCTURED-WORKFLOW-011] flattened Fable emitter mirrors compile-shard source coverage', () => {
-  const rootProject = readFileSync(join(SRC, 'Wanxiangshu.fsproj'), 'utf8')
-  assert.match(rootProject, /<WanxiangshuEmitProject>true<\/WanxiangshuEmitProject>/)
-  assert.doesNotMatch(rootProject, /<ProjectReference Include=/, 'emit project must not source-merge owner project graph')
+  // W5 cutover: the wrapper aggregate is gone. The canonical compile-order
+  // manifest is the final answer to "what does one real Fable call compile";
+  // the compile-shard inventory already enforces coverage + DAG shape.
+  const order = readFileSync(join(SRC, 'compile-order.txt'), 'utf8')
+  const orderedSources = order.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.endsWith('.fs'))
+  assert.ok(orderedSources.length > 0)
+  const inventorySources = [...inventory.compileInventory.projects.values()].flatMap((entry) => entry.implementationFiles)
+  assert.equal(
+    new Set(orderedSources.map((line) => join(SRC, line))).size,
+    new Set(inventorySources).size,
+    'manifest must cover exactly the shard-declared production sources',
+  )
 
   const props = readFileSync(join(SRC, 'Directory.Build.props'), 'utf8')
   assert.match(props, /<DisableTransitiveProjectReferences>true<\/DisableTransitiveProjectReferences>/)

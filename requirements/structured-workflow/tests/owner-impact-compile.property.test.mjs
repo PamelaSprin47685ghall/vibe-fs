@@ -174,6 +174,22 @@ const verifyGraph = (graph) => {
   }
   assertSubset(new Set(implementationPlan.projectPaths), new Set(signaturePlan.projectPaths))
 
+  // SPEC: a plain .fs body change must select exactly the forward closure
+  // of the changed shards — never pull reverse consumers in. Compute the
+  // forward closure independently and assert equality.
+  const forwardSet = new Set()
+  const pushForward = (projectPath) => {
+    if (forwardSet.has(projectPath)) return
+    forwardSet.add(projectPath)
+    for (const ref of fixture.inventory.projects.get(projectPath).references) pushForward(ref)
+  }
+  for (const node of graph.changeNodes) pushForward(fixture.projects[node])
+  assert.deepEqual(
+    [...implementationPlan.projectPaths].sort(),
+    [...forwardSet].sort(),
+    'implementation changes select only the forward dependency closure, never reverse consumers',
+  )
+
   const reorderedPlan = planImpactFromInventory({
     inventory: fixture.inventory,
     changedPaths: [...changePaths(fixture, mixedChanges).reverse(), ...changePaths(fixture, mixedChanges)],

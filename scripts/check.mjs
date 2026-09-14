@@ -9,6 +9,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)))
 
 export const checks = [
   join(root, 'checks/architecture.mjs'),
+  join(root, 'checks/aggregate-retired.mjs'),
   join(root, 'checks/participant-identity-boundary.mjs'),
   join(root, 'checks/provider-projection-boundary.mjs'),
   join(root, 'checks/subsystems.mjs'),

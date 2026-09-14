@@ -8,7 +8,12 @@ const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = path.resolve(MODULE_DIR, '../..')
 
 export const SCHEMA_VERSION = 'owner-compile-v3'
-export const DEFAULT_AGGREGATE_PATH = path.resolve(REPO_ROOT, 'src/Wanxiangshu/Wanxiangshu.fsproj')
+// WP5 cutover: the wrapper aggregate fsproj is physically deleted; every
+// `aggregatePath` parameter below is an exclusion pattern (a path to skip
+// during owner project discovery), never a live file a caller must open.
+// The canonical source list + order live inside the compile-shard graph
+// itself plus the compile-order.txt manifest.
+
 export const DEFAULT_SCRATCH_ROOT = path.resolve(REPO_ROOT, '.fable-build/owner-compile')
 export const DEFAULT_ROOT_PROPS_PATH = path.resolve(REPO_ROOT, 'Directory.Build.props')
 export const DEFAULT_BUILD_MANIFEST_PATH = path.resolve(REPO_ROOT, '.fable-build/build-manifest.json')
@@ -269,15 +274,18 @@ function parseAggregateProject(aggregatePath) {
  * no aggregate drift).
  * Orders compile items strictly according to canonical aggregate document order.
  */
-export function planOwnerCompile({ projectPath, aggregatePath = DEFAULT_AGGREGATE_PATH } = {}) {
+export function planOwnerCompile({ projectPath, aggregatePath = null } = {}) {
   if (!projectPath) {
     throw new Error('projectPath is required for planOwnerCompile')
   }
 
   const resolvedProjectPath = norm(projectPath)
-  const resolvedAggregatePath = norm(aggregatePath)
+  const resolvedAggregatePath = aggregatePath ? norm(aggregatePath) : null
 
-  const aggregate = parseAggregateProject(resolvedAggregatePath)
+  const aggregateExists = resolvedAggregatePath !== null && fs.existsSync(resolvedAggregatePath)
+  const aggregate = aggregateExists
+    ? parseAggregateProject(resolvedAggregatePath)
+    : { path: resolvedAggregatePath, dir: resolvedAggregatePath ? path.dirname(resolvedAggregatePath) : null, rawText: '', compileItems: [], missing: true }
   const aggregateCompileSet = new Set(aggregate.compileItems)
 
   const closureProjects = new Map()
@@ -323,16 +331,22 @@ export function planOwnerCompile({ projectPath, aggregatePath = DEFAULT_AGGREGAT
     }
   }
 
-  // Check that every closure item exists in aggregate
-  for (const [src, owner] of sourceToOwnerProject.entries()) {
-    if (!aggregateCompileSet.has(src)) {
-      throw new Error(`Closure compile item absent from aggregate project: "${src}" (compiled in ${owner})`)
+  if (aggregateExists) {
+    // Wrapper still alive: enforce set parity between shard-declared items
+    // and the aggregate (same shape compile-shards requires).
+    for (const [src, owner] of sourceToOwnerProject.entries()) {
+      if (!aggregateCompileSet.has(src)) {
+        throw new Error(`Closure compile item absent from aggregate project: "${src}" (compiled in ${owner})`)
+      }
     }
   }
 
-  // Stable-filter aggregate compile document order
+  // WP2: compile order is canonical shard-DAG order, never the aggregate
+  // document order once the wrapper file is gone. Order is identical this
+  // run whether the aggregate exists or not — the difference is only whether
+  // a file-side drift check ran.
   const closureSourcesSet = new Set(sourceToOwnerProject.keys())
-  const orderedCompileItems = aggregate.compileItems.filter((src) => closureSourcesSet.has(src))
+  const orderedCompileItems = canonicalImpactOrder([...closureProjects.keys()], closureProjects)
 
   const sortedProjectPaths = [...closureProjects.keys()].sort()
 
@@ -368,11 +382,12 @@ function requiresFullImpact(changedPath, aggregatePath) {
     || path.extname(changedPath).toLowerCase() === '.fsproj'
     || FULL_IMPACT_BASENAMES.has(basename)
     || /(?:^|\/)\.config\/dotnet-tools\.json$/.test(changedPath)
-    || /(?:^|\/)scripts\/(?:build|compile-impact)\.mjs$/.test(changedPath)
+    || /(?:^|\/)scripts\/build\.mjs$/.test(changedPath)
     || /(?:^|\/)scripts\/lib\/owner-compile\.mjs$/.test(changedPath)
 }
 
 function discoverOwnerProjects(projectDirectory, aggregatePath) {
+  const resolvedExclusion = aggregatePath ? norm(aggregatePath) : null
   const resolvedDirectory = norm(projectDirectory)
   if (!fs.existsSync(resolvedDirectory) || !fs.statSync(resolvedDirectory).isDirectory()) {
     throw new Error(`Owner project directory does not exist: ${resolvedDirectory}`)
@@ -381,7 +396,22 @@ function discoverOwnerProjects(projectDirectory, aggregatePath) {
   return fs.readdirSync(resolvedDirectory, { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith('.fsproj'))
     .map((entry) => norm(path.join(resolvedDirectory, entry.name)))
-    .filter((projectPath) => projectPath !== aggregatePath)
+    // Exclude the wrapper aggregate by identity (caller may still pass its
+    // path during the migration window) AND by content marker when the
+    // caller did not name it (or passed a stale path while the physical
+    // file is still on disk). Recognized emitter aliases cover the
+    // production name and the two fixture conventions.
+    .filter((projectPath) => resolvedExclusion === null || projectPath !== resolvedExclusion)
+    .filter((projectPath) => !/\/(Wanxiangshu|Aggregate)\.fsproj$/.test(projectPath))
+    .filter((projectPath) => {
+      try {
+        const text = fs.readFileSync(projectPath, 'utf8')
+        if (text.includes('<WanxiangshuEmitProject>')) return false
+        return true
+      } catch {
+        return true
+      }
+    })
     .sort()
 }
 
@@ -407,8 +437,12 @@ function impactPlan({
     reason,
     changedPaths,
     rootProjectPaths: [...roots].sort(),
-    candidatePath: aggregate.path,
-    projectPath: aggregate.path,
+    // With the aggregate retired there is no fsproj anchoring the flat
+    // impact project — synthesize a stable virtual path so fingerprinting
+    // and scratch naming still work, and downstream consumers can
+    // `path.dirname(candidatePath)` without special-casing null.
+    candidatePath: aggregate.path ?? 'impact-generated/Wanxiangshu.Impact.fsproj',
+    projectPath: aggregate.path ?? 'impact-generated/Wanxiangshu.Impact.fsproj',
     candidateBasename: 'Wanxiangshu.Impact.fsproj',
     aggregatePath: aggregate.path,
     projectPaths,
@@ -429,7 +463,7 @@ function impactPlan({
 export function planImpactCompile({
   changedPaths,
   projectDirectory,
-  aggregatePath = DEFAULT_AGGREGATE_PATH,
+  aggregatePath = null,
   fullThreshold = 0.6,
   isClean = false,
 } = {}) {
@@ -441,8 +475,68 @@ export function planImpactCompile({
   }
 
   const inventory = readImpactInventory({ projectDirectory, aggregatePath })
-  return planImpactFromInventory({ inventory, changedPaths, fullThreshold, isClean })
+  // Filesystem-facing pre-pass (the pure planner never touches disk):
+  //  - production .fs/.fsi that exists but owns no shard → hard error;
+  //    an unowned source must not be silently covered by a full compile.
+  //  - changed sources that no longer exist at all (delete/rename) → full
+  //    plan so retired JS outputs are cleared, not reused.
+  //  - paired .fs bodies whose source contains `inline` / `[<Literal>]` or
+  //    that lack a sibling .fsi are signature-risky — treat the change like
+  //    an .fsi change and pull every reverse consumer.
+  const signatureRiskPaths = new Set()
+  const removedSources = []
+  const unmappedExisting = []
+  for (const changedPath of changedPaths) {
+    const normalized = norm(changedPath)
+    const extension = path.extname(normalized).toLowerCase()
+    if (extension !== '.fs' && extension !== '.fsi') continue
+    if (!fs.existsSync(normalized)) {
+      removedSources.push(normalized)
+      continue
   }
+    if (!inventory.sourceOwner.has(normalized)) {
+      unmappedExisting.push(normalized)
+      continue
+  }
+    if (extension === '.fs') {
+      const signaturePath = normalized.replace(/\.fs$/i, '.fsi')
+      const text = fs.readFileSync(normalized, 'utf8')
+      if (!inventory.sourceOwner.has(signaturePath)
+        || SIGNATURE_RISK_SOURCE_PATTERN.test(text)) {
+        signatureRiskPaths.add(normalized)
+  }
+    }
+  }
+
+  if (unmappedExisting.length > 0) {
+    throw new Error(
+      `Unmapped production source change (declared in no owner shard): ${unmappedExisting.join(', ')}. ` +
+      'Register the file in an owner fsproj — a silent full compile must not cover missing ownership.',
+    )
+  }
+  if (removedSources.length > 0) {
+    return planImpactFromInventory({
+      inventory,
+  changedPaths,
+      fullThreshold,
+      isClean,
+      forceFullReason: 'source-graph-change',
+    })
+  }
+  return planImpactFromInventory({
+    inventory,
+  changedPaths,
+    fullThreshold,
+    isClean,
+    signatureRiskPaths,
+  })
+   }
+
+// An implementation body that still changes what callers compile against:
+// `let inline ...`, `member inline`, `[<Literal>]` constants and `inline fun`
+// lambdas are emitted at the call site even when the sibling .fsi is
+// unchanged, so the reverse-consumer impact of a signature change applies.
+const SIGNATURE_RISK_SOURCE_PATTERN = /\[\s*<\s*Literal[^\]>]*>\s*\]|\b(?:let|member|static\s+member|and)\s+inline\b|\binline\s+fun\b/
 
 /**
  * Reads the on-disk owner topology into an immutable inventory for planning.
@@ -452,9 +546,20 @@ export function planImpactCompile({
  * outside-topology validation, and the reverse-reference index. The returned
  * inventory is treated as immutable by planImpactFromInventory.
  */
-export function readImpactInventory({ projectDirectory, aggregatePath = DEFAULT_AGGREGATE_PATH } = {}) {
-  const aggregate = parseAggregateProject(aggregatePath)
-  const resolvedProjectDirectory = norm(projectDirectory ?? path.dirname(aggregate.path))
+export function readImpactInventory({ projectDirectory, aggregatePath = null } = {}) {
+  const aggregateExists = aggregatePath != null && fs.existsSync(norm(aggregatePath))
+  const aggregate = aggregateExists
+    ? parseAggregateProject(aggregatePath)
+    : {
+        path: aggregatePath ? norm(aggregatePath) : null,
+        dir: aggregatePath ? path.dirname(norm(aggregatePath)) : null,
+        rawText: '',
+        compileItems: [],
+        missing: true,
+      }
+  const resolvedProjectDirectory = norm(
+    projectDirectory ?? (aggregate.dir ?? process.cwd()),
+  )
   const projectPaths = discoverOwnerProjects(resolvedProjectDirectory, aggregate.path)
   const projects = new Map(projectPaths.map((projectPath) => [projectPath, parseProjectFile(projectPath)]))
   const sourceOwner = new Map()
@@ -477,6 +582,31 @@ export function readImpactInventory({ projectDirectory, aggregatePath = DEFAULT_
     }
   }
 
+  // WP2 cutover: the shard graph is the single source for the compile set and
+  // its order. Even when the aggregate file still exists during migration its
+  // job is reduced to drift-checking — the canonical sequence is always
+  // derived from declared shard order so the inventory alone can re-emit a
+  // correct flat project after the wrapper file is deleted.
+  const canonicalItemsBase = canonicalImpactOrder(projectPaths, projects)
+  const canonicalOrderFile = norm(path.join(resolvedProjectDirectory, 'compile-order.txt'))
+  const canonicalItems = fs.existsSync(canonicalOrderFile)
+    ? (() => {
+        const lines = fs.readFileSync(canonicalOrderFile, 'utf8')
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter((line) => line && !line.startsWith('#'))
+        const order = lines.map((line) => norm(path.resolve(resolvedProjectDirectory, line)))
+        const known = new Set(order)
+        const supplement = [...projects.values()]
+          .flatMap((proj) => proj.compileItems)
+          .filter((item) => !known.has(item))
+        return [...order, ...supplement]
+      })()
+    : canonicalItemsBase
+  const declaredAggregateSet = aggregateExists ? new Set(aggregate.compileItems) : null
+  aggregate.compileItems = canonicalItems
+  aggregate.missing = !aggregateExists
+
   const reverseReferences = new Map(projectPaths.map((projectPath) => [projectPath, new Set()]))
   for (const [consumerPath, project] of projects) {
     for (const providerPath of project.references) {
@@ -486,6 +616,8 @@ export function readImpactInventory({ projectDirectory, aggregatePath = DEFAULT_
 
   return {
       aggregate,
+      aggregateMissing: !aggregateExists,
+      declaredAggregateSet,
     projectDirectory: resolvedProjectDirectory,
     projectPaths: Object.freeze([...projectPaths]),
       projects,
@@ -495,15 +627,60 @@ export function readImpactInventory({ projectDirectory, aggregatePath = DEFAULT_
   }
 
 /**
+ * Canonical compile-item order derived purely from the owner DAG, used when
+ * no aggregate fsproj is available to dictate order. Deterministic: DFS
+ * post-order over lexically-sorted project keys, each shard contributing its
+ * declared `<Compile>` sequence.
+ */
+function canonicalImpactOrder(projectPaths, projects) {
+  const orderedPaths = []
+  const visited = new Set()
+  const stackFrame = new Set()
+  const visit = (projectPath) => {
+    if (visited.has(projectPath)) return
+    if (stackFrame.has(projectPath)) {
+      throw new Error(`ProjectReference cycle detected via ${projectPath}`)
+    }
+    stackFrame.add(projectPath)
+    const references = [...projects.get(projectPath).references].sort((a, b) => {
+      const left = projects.get(a)?.path ?? a
+      const right = projects.get(b)?.path ?? b
+      return left.localeCompare(right)
+    })
+    for (const reference of references) visit(reference)
+    stackFrame.delete(projectPath)
+    visited.add(projectPath)
+    orderedPaths.push(projectPath)
+  }
+  for (const projectPath of [...projectPaths].sort()) visit(projectPath)
+
+  const seen = new Set()
+  const items = []
+  for (const projectPath of orderedPaths) {
+    for (const item of projects.get(projectPath).compileItems) {
+      if (!seen.has(item)) {
+        seen.add(item)
+        items.push(item)
+      }
+    }
+  }
+  return items
+}
+
+/**
  * Pure impact planning over an inventory from readImpactInventory.
  *
- * Performs no filesystem access: requiresFullImpact/toolchain check, reverse
- * reachability from changed sources, forward closure, aggregate-drift check,
- * and the fullThreshold/clean-build promotion. Throws the same errors as
- * planImpactCompile for bad changedPaths/fullThreshold, cycles, unmapped
- * sources, and aggregate drift.
+ * Performs no filesystem access: requiresFullImpact/toolchain check, signature
+ * risk fan-out (reverse consumers), forward closure, aggregate-drift check,
+ * and the fullThreshold/clean-build promotion. `signatureRiskPaths` is an
+ * optional set of changed .fs paths that must behave like a signature change
+ * (inline / [<Literal>] bodies, or a .fs with no paired .fsi). `forceFullReason`
+ * promotes the plan to `full` with that reason without walking the graph — used
+ * for deleted/renamed production sources whose ownership went stale.
+ * Throws the same errors as planImpactCompile for bad
+ * changedPaths/fullThreshold, cycles, and aggregate drift.
  */
-export function planImpactFromInventory({ inventory, changedPaths, fullThreshold = 0.6, isClean = false } = {}) {
+export function planImpactFromInventory({ inventory, changedPaths, fullThreshold = 0.6, isClean = false, signatureRiskPaths, forceFullReason } = {}) {
   if (!Array.isArray(changedPaths) || changedPaths.length === 0) {
     throw new Error('changedPaths must contain at least one path for planImpactCompile')
   }
@@ -540,24 +717,45 @@ export function planImpactFromInventory({ inventory, changedPaths, fullThreshold
     })
   }
 
+  if (forceFullReason) {
+    return impactPlan({
+      mode: 'full',
+      aggregate,
+      projects,
+      roots: allProjects,
+      selectedProjects: allProjects,
+      changedPaths: normalizedChanges,
+      reason: forceFullReason,
+    })
+  }
+
   const roots = new Set()
 
+  const addRoot = (projectPath) => {
+    if (!roots.has(projectPath)) roots.add(projectPath)
+  }
+
   const addReverseConsumers = (projectPath) => {
+    const explored = new Set()
     const pending = [projectPath]
     while (pending.length > 0) {
       const current = pending.pop()
-      if (roots.has(current)) {
+      if (explored.has(current)) {
         continue
       }
-      roots.add(current)
+      explored.add(current)
+      addRoot(current)
       pending.push(...reverseReferences.get(current))
     }
   }
 
+  const signatureRisks = signatureRiskPaths ?? new Set()
+
   for (const changedPath of normalizedChanges) {
     const ownerProject = sourceOwner.get(changedPath)
     if (!ownerProject) {
-      if (['.fs', '.fsi'].includes(path.extname(changedPath).toLowerCase())) {
+      const extension = path.extname(changedPath).toLowerCase()
+      if (extension === '.fs' || extension === '.fsi') {
         return impactPlan({
           mode: 'full',
           aggregate,
@@ -571,7 +769,11 @@ export function planImpactFromInventory({ inventory, changedPaths, fullThreshold
       continue
     }
 
-    addReverseConsumers(ownerProject)
+    addRoot(ownerProject)
+    const extension = path.extname(changedPath).toLowerCase()
+    if (extension === '.fsi' || signatureRisks.has(changedPath)) {
+      addReverseConsumers(ownerProject)
+    }
   }
 
   if (roots.size === 0) {
@@ -612,11 +814,17 @@ export function planImpactFromInventory({ inventory, changedPaths, fullThreshold
     addForwardClosure(rootProject, [])
   }
 
-  const aggregateSet = new Set(aggregate.compileItems)
+  // Membership check: every item in the compiled closure must be one this
+  // planner actually derived from the shard graph — either through the
+  // declared aggregate (kept while the wrapper file survives) or through the
+  // canonical inventory order when the file is gone.
+  const declaredSet = inventory.declaredAggregateSet
+    ? inventory.declaredAggregateSet
+    : new Set(aggregate.compileItems)
   for (const projectPath of selectedProjects) {
     for (const sourcePath of projects.get(projectPath).compileItems) {
-      if (!aggregateSet.has(sourcePath)) {
-        throw new Error(`Impact compile item absent from aggregate project: "${sourcePath}" (compiled in ${projectPath})`)
+      if (!declaredSet.has(sourcePath)) {
+        throw new Error(`Impact compile item absent from production inventory: "${sourcePath}" (compiled in ${projectPath})`)
       }
     }
   }
@@ -670,8 +878,38 @@ function writeIfChanged(filePath, content) {
  * Generates the flat fsproj XML by preserving the aggregate non-Compile XML shell
  * and rewriting kept Compile paths to absolute paths in aggregate document order.
  */
-function generateFlatProjectXml(aggregateContent, aggregatePath, orderedCompileItems) {
-  const aggregateDir = path.dirname(aggregatePath)
+function generateFlatProjectXml(aggregateContent, aggregateDir, aggregatePathForContext, orderedCompileItems) {
+  if (!aggregateContent || aggregateContent.trim().length === 0) {
+    // Post-W5: no wrapper aggregate — emit a canonical, minimal flat project
+    // that names its shared props partner explicitly. The props file next to
+    // the shard graph (src/Wanxiangshu/Directory.Build.props) owns package
+    // references and toolchain settings; importing it here lets the flat
+    // materialized project inherit them without re-declaring.
+    const includes = orderedCompileItems
+      .map((abs) => `    <Compile Include="${escapeXmlAttr(abs)}"/>`)
+      .join('\n')
+    // Package imports flow through the project-referenced chain:<br/>
+    // the generated Wanxiangshu.Impact name already matches the Wanxiangshu.*
+    // item-group condition in src/Wanxiangshu/Directory.Build.props for the
+    // repository-local scratch dir, or explicitly via the test-time
+    // --props injection for fixture-only runs. Never Import that file inside
+    // this XML — props item groups that fire on the MSBuildProjectName would
+    // double-evaluate into NU1504 duplicate PackageReference failures.
+    return `<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Wanxiangshu</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
+    <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
+  </PropertyGroup>
+
+  <ItemGroup>
+${includes}
+  </ItemGroup>
+</Project>`
+  }
+
   const compileSet = new Set(orderedCompileItems)
 
   let xml = aggregateContent
@@ -680,7 +918,7 @@ function generateFlatProjectXml(aggregateContent, aggregatePath, orderedCompileI
   xml = xml.replace(/<Compile\b([^>]*?)(?:\/>|>([\s\S]*?)<\/Compile>)/gi, (match, attrs) => {
     const incMatch = attrs.match(/\bInclude=(["'])(.*?)\1/i)
     if (!incMatch) return ''
-    const decodedInclude = decodeXmlAttr(incMatch[2], aggregatePath)
+    const decodedInclude = decodeXmlAttr(incMatch[2], aggregatePathForContext)
     const abs = norm(path.resolve(aggregateDir, decodedInclude))
     if (!compileSet.has(abs)) return ''
     return `<Compile Include="${escapeXmlAttr(abs)}"/>`
@@ -750,8 +988,11 @@ export function materializeOwnerCompile(plan, {
 
   const fingerprintDir = norm(path.join(resolvedScratchRoot, fingerprint))
   const outputCompileInstance = crypto.createHash('sha256').update(fingerprintDir).digest('hex').slice(0, 16)
+  // Anchor flat-project output under the source directory; with the wrapper
+  // aggregate retired, we no longer have its path to anchor against.
+  const flatAnchor = plan.aggregatePath ? path.dirname(plan.aggregatePath) : path.resolve(REPO_ROOT, 'src/Wanxiangshu')
   const generatedProjectDir = outputDir
-    ? norm(path.join(path.dirname(plan.aggregatePath), '.fable-build/output-compile', fingerprint, outputCompileInstance))
+    ? norm(path.join(flatAnchor, '.fable-build/output-compile', fingerprint, outputCompileInstance))
     : fingerprintDir
   const generatedProjectPath = norm(path.join(generatedProjectDir, plan.candidateBasename))
   const scratchPropsPath = norm(path.join(generatedProjectDir, 'Directory.Build.props'))
@@ -762,21 +1003,40 @@ export function materializeOwnerCompile(plan, {
   const markerPath = norm(path.join(fingerprintDir, '.success'))
 
   // Generate flat fsproj XML
-  const flatXml = generateFlatProjectXml(plan.aggregateContent, plan.aggregatePath, plan.compileItems)
+  // With the aggregate retired, aggregateContent is empty: we emit a
+  // synthetic flat project (Sdk + canonical absolute items). The aggregatePath
+  // argument only feeds path resolution for rewritten `Include` attrs in the
+  // legacy content branch — pass the scratch dir as the anchor either way.
+  const flatXml = generateFlatProjectXml(plan.aggregateContent, flatAnchor, plan.aggregatePath ?? flatAnchor, plan.compileItems)
 
   // Generate scratch Directory.Build.props setting isolated ArtifactsDir then importing root props
   const artifactRoot = outputDir
     ? `${norm(path.join(fingerprintDir, 'artifacts'))}/`
     : '$(MSBuildThisFileDirectory)artifacts/'
+  // W5: the canonical flat project sits under a scratch dir, far from
+  // src/Wanxiangshu's walk-up props chain. Import the production-level
+  // props explicitly so Wanxiangshu.Impact picks up the same package
+  // references every shard does. When a test fixture supplies a custom
+  // --props this file IS the shared source partner (no extra hop needed).
+  const sourceRootDefaultProps = norm(path.resolve(REPO_ROOT, 'src/Wanxiangshu/Directory.Build.props'))
+  const sourcePropsPath = resolvedRootPropsPath === norm(DEFAULT_ROOT_PROPS_PATH)
+    ? sourceRootDefaultProps
+    : resolvedRootPropsPath
+  const sourcePropsImport = fs.existsSync(sourcePropsPath) && sourcePropsPath !== resolvedRootPropsPath
+    ? `  <Import Project="${escapeXmlAttr(sourcePropsPath)}" />\n`
+    : ''
+  // W5: generated flat project sits under scratch — it does not inherit
+  // the props chain that would normally resolve walk-up from src/Wanxiangshu.
+  // Import the production-level props explicitly so Wanxiangshu.Impact picks
+  // up packages (FSharp.Core/Fable.Core/etc.) the same way shard projects do.
   const scratchPropsContent = `<Project>
   <PropertyGroup>
     <ArtifactsDir>${escapeXmlAttr(artifactRoot)}</ArtifactsDir>
     <NuGetAudit>false</NuGetAudit>
   </PropertyGroup>
-  <Import Project="${escapeXmlAttr(resolvedRootPropsPath)}" />
+${sourcePropsImport}  <Import Project="${escapeXmlAttr(resolvedRootPropsPath)}" />
 </Project>
 `
-
   // Write if changed
   writeIfChanged(generatedProjectPath, flatXml)
   writeIfChanged(scratchPropsPath, scratchPropsContent)
@@ -908,7 +1168,7 @@ export function resetOutputDirectory(outputDir) {
  */
 export async function compileOwnerProject({
   projectPath,
-  aggregatePath = DEFAULT_AGGREGATE_PATH,
+  aggregatePath = null,
   scratchRoot,
   rootPropsPath = DEFAULT_ROOT_PROPS_PATH,
   outputDir,
@@ -941,6 +1201,13 @@ export async function compileOwnerProject({
 
   const hasAssets = fs.existsSync(materialized.assetsPath)
 
+  // Cache discipline:
+  // - Focused plans live under a fingerprint-addressed scratch dir — the
+  //   input identity pins the cache correctly, so Fable's own cache is safe
+  //   to reuse. Dropping --noCache here is the actual speedup the spec asks
+  //   for: the fingerprint already rules out stale reuse.
+  // - Forced `clean` builds still pass --noCache so a changed fingerprint
+  //   plus cache rebuild can't sneak a stale cache entry past verification.
   const args = [
     'tool',
     'run',
@@ -952,8 +1219,11 @@ export async function compileOwnerProject({
     '-o',
     materialized.outputPath,
     '--noGitignore',
-    '--noCache',
   ]
+
+  if (plan.forceCompileCache === false) {
+    args.push('--noCache')
+  }
 
   if (hasAssets) {
     args.push('--noRestore')
@@ -1083,18 +1353,26 @@ export function computeFileHash(filePath) {
  */
 export function collectTrackedInputs({
   root = REPO_ROOT,
-  aggregatePath = DEFAULT_AGGREGATE_PATH,
+  aggregatePath = null,
   projectDirectory,
 } = {}) {
-  const resolvedAggregate = norm(aggregatePath)
-  const resolvedProjectDirectory = norm(projectDirectory ?? path.dirname(resolvedAggregate))
-  const aggregate = parseAggregateProject(resolvedAggregate)
+  const resolvedAggregate = aggregatePath ? norm(aggregatePath) : null
+  const resolvedProjectDirectory = norm(
+    projectDirectory ?? (resolvedAggregate ? path.dirname(resolvedAggregate) : path.resolve(root, 'src/Wanxiangshu')),
+  )
+  // WP2: the source list derives from the shard inventory — when the
+  // aggregate wrapper file exists it still exists on disk and is hashed
+  // (drift guard), but compile sources compile from shard declarations.
   const projectPaths = discoverOwnerProjects(resolvedProjectDirectory, resolvedAggregate)
+  const projects = new Map(projectPaths.map((p) => [p, parseProjectFile(p)]))
+  const sourcePaths = canonicalImpactOrder(projectPaths, projects)
 
   const tracked = new Set()
-  tracked.add(resolvedAggregate)
+  if (resolvedAggregate && fs.existsSync(resolvedAggregate)) {
+    tracked.add(resolvedAggregate)
+  }
 
-  for (const item of aggregate.compileItems) {
+  for (const item of sourcePaths) {
     tracked.add(item)
   }
 
@@ -1109,7 +1387,7 @@ export function collectTrackedInputs({
     path.resolve(root, 'package-lock.json'),
     path.resolve(root, '.config/dotnet-tools.json'),
     path.resolve(root, 'scripts/build.mjs'),
-    path.resolve(root, 'scripts/compile-impact.mjs'),
+
     path.resolve(root, 'scripts/lib/owner-compile.mjs'),
     path.resolve(resolvedProjectDirectory, 'Directory.Build.props'),
   ]
@@ -1128,7 +1406,7 @@ export function collectTrackedInputs({
  */
 export function detectChangedFiles({
   root = REPO_ROOT,
-  aggregatePath = DEFAULT_AGGREGATE_PATH,
+  aggregatePath = null,
   manifestPath = DEFAULT_BUILD_MANIFEST_PATH,
   outputDir,
 } = {}) {
@@ -1247,7 +1525,7 @@ export function detectChangedFiles({
 export async function compileIncremental({
   changedPaths,
   root = REPO_ROOT,
-  aggregatePath = DEFAULT_AGGREGATE_PATH,
+  aggregatePath = null,
   outputDir,
   scratchRoot,
   rootPropsPath = DEFAULT_ROOT_PROPS_PATH,
@@ -1260,7 +1538,7 @@ export async function compileIncremental({
   const resolvedOutputDir = outputDir ? norm(outputDir) : undefined
   const targetOutputDir = resolvedOutputDir ?? norm(path.resolve(root, 'dist'))
   const resolvedManifestPath = norm(manifestPath)
-  const resolvedAggregate = norm(aggregatePath)
+  const resolvedAggregate = aggregatePath ? norm(aggregatePath) : null
 
   let effectiveChangedPaths
   let isClean = false
@@ -1319,9 +1597,17 @@ export async function compileIncremental({
     changedPaths: effectiveChangedPaths,
     aggregatePath: resolvedAggregate,
     fullThreshold,
-    projectDirectory: path.dirname(resolvedAggregate),
+    projectDirectory: resolvedAggregate ? path.dirname(resolvedAggregate) : path.resolve(root, 'src/Wanxiangshu'),
     isClean,
   })
+
+  // A `--clean` or `full` plan forces Fable to bypass its own cache: the
+  // narrower a plan, the more a fingerprint-addressed scratch already pins
+  // the inputs and the compiler cache is harmless; the broader the plan the
+  // more we want a cold rebuild to re-verify the emitted bytes.
+  if (isClean || plan.mode === 'full') {
+    plan.forceCompileCache = false
+  }
 
   if (plan.mode === 'none') {
     return {

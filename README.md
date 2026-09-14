@@ -185,6 +185,7 @@ npm run format-build-test
 | 命令 | 作用 |
 |------|------|
 | `npm run format-build-test` | Fantomas 写盘 → `scripts/check.mjs` → 编译 → unit → integration → package → warmup → Long Stroke e2e → `npm pack --dry-run` |
+| `node scripts/build.mjs --plan` | 只读计划报告：`mode`/`reason`/`changedInputs`/`selectedShards`/`compileItems`/`fableCompileInvocations`，不写 `dist/` |
 
 ### 测试分层
 

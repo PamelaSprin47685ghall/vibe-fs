@@ -5,7 +5,9 @@
     <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
     <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
   </PropertyGroup>
-  <ItemGroup Condition="$([System.String]::Copy('$(MSBuildProjectName)').StartsWith('Wanxiangshu.Owner.'))">
+  <!-- Packages attach to every Wanxiangshu.* projection — the canonical flat
+       build project (Wanxiangshu.Impact) must see FSharp.Core/Fable.Core/etc. too. -->
+  <ItemGroup Condition="$([System.String]::Copy('$(MSBuildProjectName)').StartsWith('Wanxiangshu.'))">
     <PackageReference Include="FSharp.Core" Version="10.1.203"/>
     <PackageReference Include="Fable.Core" Version="5.0.0"/>
     <PackageReference Include="FsToolkit.ErrorHandling" Version="5.2.0"/>

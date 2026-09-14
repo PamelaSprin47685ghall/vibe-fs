@@ -108,10 +108,19 @@ test('WHAT[STRUCTURED-WORKFLOW-012] inventory rejects bad topology inputs and pl
       /lacks <Project> root/,
     )
 
-    // Bad aggregate path never reaches planning.
+    // W2 cutover: a missing aggregate fsproj is tolerated — the shard graph
+    // alone is the canonical inventory source now and the planner can
+    // synthesize the canonical compile order without it. The owner graph
+    // still rejects malformed projects.
+    writeProject(fixture.root, 1, { references: [0], compileItems: ['Source/Node1.fsi', 'Source/Node1.fs'] })
+    const tolerated = readImpactInventory({ projectDirectory: fixture.root, aggregatePath: join(fixture.root, 'Nope.fsproj') })
+    assert.equal(tolerated.aggregateMissing, true)
+    assert.equal(tolerated.projects.size, 2)
+    assert.equal(tolerated.aggregate.compileItems.length, 4)
+    writeFileSync(join(fixture.root, projectName(1)), 'not xml at all\n')
     assert.throws(
-      () => readImpactInventory({ projectDirectory: fixture.root, aggregatePath: join(fixture.root, 'Nope.fsproj') }),
-      /Aggregate project file does not exist/,
+      () => readImpactInventory({ projectDirectory: fixture.root, aggregatePath: fixture.aggregate }),
+      /lacks <Project> root/,
     )
 
     // Planning-stage input validation matches the legacy entry errors.

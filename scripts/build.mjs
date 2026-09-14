@@ -13,6 +13,8 @@ import {
 import {
   compileIncremental,
   resetOutputDirectory,
+  readImpactInventory,
+  planImpactFromInventory,
 } from './lib/owner-compile.mjs'
 import {
   MANIFEST_SCHEMA,
@@ -227,8 +229,6 @@ export async function runBuild({
   const resolvedRoot = path.resolve(targetRoot)
   const targetDist = path.join(resolvedRoot, 'dist')
   const lockFile = path.join(resolvedRoot, '.fable-build/build.lock')
-  const aggregatePath = path.join(resolvedRoot, 'src/Wanxiangshu/Wanxiangshu.fsproj')
-
   const mutex = new CrossProcessMutex(lockFile, 'build lock')
   await mutex.acquire()
 
@@ -236,7 +236,11 @@ export async function runBuild({
     const existingManifest = readManifest({ root: resolvedRoot })
 
     // Snapshot current inputs
-    const compilerInputs = collectCompilerInputs(resolvedRoot, aggregatePath)
+    // WP5 cutover: the wrapper aggregate fsproj is deleted. collectCompilerInputs
+    // reads through the compile-shard inventory itself — passing the null
+    // aggregate says "no wrapper to exclude", letting shards be the only
+    // source of truth without placeholder plumbing.
+    const compilerInputs = collectCompilerInputs(resolvedRoot, null)
     const compilerInputDigest = computeDigest(compilerInputs)
 
     const generatedInputs = collectGeneratedInputs(resolvedRoot)
@@ -350,7 +354,7 @@ export async function runBuild({
     await verifyArtifacts(resolvedRoot)
 
     // Recheck input snapshot inside lock
-    const finalCompilerInputs = collectCompilerInputs(resolvedRoot, aggregatePath)
+    const finalCompilerInputs = collectCompilerInputs(resolvedRoot, null)
     const finalCompilerDigest = computeDigest(finalCompilerInputs)
     if (finalCompilerDigest !== compilerInputDigest) {
       throw new Error('Mid-build mutation detected: compiler inputs changed during compilation')
@@ -375,7 +379,7 @@ export async function runBuild({
     const newManifest = {
       schema: MANIFEST_SCHEMA,
       rootIdentity: resolvedRoot,
-      aggregatePath: path.resolve(aggregatePath),
+      shardInventoryDirectory: 'src/Wanxiangshu',
       outputDir: path.relative(resolvedRoot, targetDist).replace(/\\/g, '/'),
       generation: nextGeneration,
       compiler: {
@@ -414,6 +418,103 @@ export async function runBuild({
 
 export const buildEntrypoint = runBuild
 
+/**
+ * Compare current compiler inputs against the manifest-recorded snapshot to
+ * surface the actual changed paths the next build would act on. Cheap
+ * content-hash diff keyed by sha256 — identical semantics to `detectChangedFiles`.
+ */
+function diffInputsForPlan({ resolvedRoot, manifest, compilerInputs }) {
+  const previous = new Map(
+    (manifest.compiler?.inputs ?? []).map((entry) => [
+      path.resolve(resolvedRoot, entry.path),
+      entry,
+    ]),
+  )
+  const changedInputs = []
+  const previousKept = new Set()
+  for (const entry of compilerInputs) {
+    const abs = path.resolve(resolvedRoot, entry.path)
+    previousKept.add(abs)
+    const before = previous.get(abs)
+    if (!before || before.sha256 !== entry.sha256) changedInputs.push(abs)
+  }
+  for (const abs of previous.keys()) {
+    if (!previousKept.has(abs)) changedInputs.push(abs)
+  }
+  return changedInputs
+}
+
+
+/**
+ * WP4: read-only preview of what the next `npm run build` would do. Uses the
+ * same manifest/digest path the build itself reads — no compiler spawn, no
+ * manifest write, no dist write. Returns the structured plan; callers can
+ * print or inspect `plan.fableCompileInvocations` and `selectedShards`.
+ */
+export async function planBuild({
+  targetRoot = root,
+} = {}) {
+  const resolvedRoot = path.resolve(targetRoot)
+  const buildStateDirectory = path.join(resolvedRoot, '.fable-build')
+  const manifestPath = path.join(buildStateDirectory, 'build-manifest.json')
+  const manifest = readManifest({ root: resolvedRoot })
+  const compilerInputs = collectCompilerInputs(resolvedRoot, null)
+  const compilerInputDigest = computeDigest(compilerInputs)
+  const generatedInputs = collectGeneratedInputs(resolvedRoot)
+  const generatedInputDigest = computeDigest(generatedInputs)
+  const artifactInputs = collectArtifactInputs(resolvedRoot)
+  const artifactInputDigest = computeDigest(artifactInputs)
+
+
+  const missingDist = !fs.existsSync(path.join(resolvedRoot, 'dist'))
+  const compilerInputsMatch = manifest.compiler?.inputDigest === compilerInputDigest
+  const generatedInputsMatch = manifest.generated?.inputDigest === generatedInputDigest
+  const artifactInputsMatch = manifest.artifacts?.inputDigest === artifactInputDigest
+
+  if (compilerInputsMatch && generatedInputsMatch && artifactInputsMatch && !missingDist) {
+    return {
+      mode: 'no-op',
+      reason: 'build up-to-date',
+      changedInputs: [],
+      selectedShards: [],
+      compileItems: [],
+      fableCompileInvocations: 0,
+      manifestPath,
+      compilerInputDigest,
+      generatedInputDigest,
+      artifactInputDigest,
+    }
+  }
+
+  const changedInputs = diffInputsForPlan({ resolvedRoot, manifest, compilerInputs })
+
+  const inventory = readImpactInventory({
+    projectDirectory: path.join(resolvedRoot, 'src/Wanxiangshu'),
+  })
+  const plan = planImpactFromInventory({
+    inventory,
+    changedPaths: changedInputs.length > 0
+      ? changedInputs
+      : compilerInputs.map((entry) => path.resolve(resolvedRoot, entry.path)),
+    fullThreshold: 0.6,
+    isClean: false,
+  })
+
+  return {
+    mode: plan.mode,
+    reason: plan.reason,
+    changedInputs: changedInputs.map((abs) => path.relative(resolvedRoot, abs).replace(/\\/g, '/')),
+    selectedShards: plan.projectPaths,
+    compileItems: plan.compileItems,
+    fableCompileInvocations: 1,
+    manifestPath,
+    compilerInputDigest,
+    generatedInputDigest,
+    artifactInputDigest,
+    missingDist,
+  }
+}
+
 // ── Clean Signal & Exit Handlers ─────────────────────────────────────────────
 
 function registerSignalHandlers() {
@@ -449,12 +550,31 @@ Usage: node scripts/build.mjs [options]
 
 Options:
   --clean      Force clean full rebuild and invalidate manifest
+  --plan       Compute and print the next build plan as JSON; no compile,
+               resource emit, manifest, or dist write is performed
   --help, -h   Show this help message
 `)
     process.exit(0)
   }
 
   const clean = process.argv.includes('--clean')
+  const plan = process.argv.includes('--plan')
+
+  if (plan && clean) {
+    console.error('--plan is a read-only preview and cannot be combined with --clean')
+    process.exit(1)
+  }
+
+  if (plan) {
+    try {
+      const report = await planBuild({ targetRoot: root })
+      console.log(JSON.stringify(report, null, 2))
+      process.exit(0)
+    } catch (err) {
+      console.error(`[build:plan] ${err.message}`)
+      process.exit(1)
+    }
+  }
 
   try {
     await runBuild({ targetRoot: root, clean })

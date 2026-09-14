@@ -18,7 +18,9 @@ import { fileURLToPath } from 'node:url'
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 
-const fsproj = read('src/Wanxiangshu/Wanxiangshu.fsproj')
+// Packages declared in the shared props — the wrapper aggregate is gone; the
+// canonical flat project imports this same props file.
+const fsproj = read('src/Wanxiangshu/Directory.Build.props')
 const spike = read('src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs')
 const interop = read('src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs')
 

@@ -8,8 +8,6 @@ import { planOwnerCompile } from '../../../scripts/lib/owner-compile.mjs'
 
 const ROOT = resolve(import.meta.dirname, '../../..')
 const SOURCE_ROOT = join(ROOT, 'src/Wanxiangshu')
-const AGGREGATE = join(SOURCE_ROOT, 'Wanxiangshu.fsproj')
-
 const shardInventory = readCompileShardInventory({ repositoryRoot: ROOT })
 const subsystemInventory = buildSubsystemInventory({ compileInventory: shardInventory })
 assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))
@@ -36,7 +34,7 @@ const requireShard = (locality) => {
 
 const inspectShard = (locality) => {
   const project = requireShard(locality)
-  const plan = planOwnerCompile({ projectPath: project.projectPath, aggregatePath: AGGREGATE })
+  const plan = planOwnerCompile({ projectPath: project.projectPath, aggregatePath: null })
   const sources = plan.compileItems
     .filter((path) => path.endsWith('.fs'))
     .map((path) => path.slice(SOURCE_ROOT.length + 1).replaceAll('\\', '/'))
@@ -145,11 +143,12 @@ test('WHAT[DELEG-028] Delegation contract excludes workflow Host PTY and recover
 })
 
 test('WHAT[DELEG-028] Delegation focused localities stay within compile budgets', () => {
-  const aggregateSources = readFileSync(AGGREGATE, 'utf8')
-    .match(/<Compile\s+Include="([^"]+\.fs)"/g)
-    .map((m) => m.replace(/<Compile\s+Include="/, '').replace('"', ''))
-    .filter((include) => include.endsWith('.fs')).length
-  assert.ok(aggregateSources > 0, 'aggregate must declare production sources')
+  // W5 cutover: the aggregate fsproj is gone. Count total .fs from the
+  // compile-order manifest — the canonical declaration of what the build
+  // actually compiles.
+  const aggregateSources = readFileSync(join(SOURCE_ROOT, 'compile-order.txt'), 'utf8')
+    .split(/\r?\n/).map((line) => line.trim()).filter((line) => line.endsWith('.fs')).length
+  assert.ok(aggregateSources > 0, 'compile-order manifest must declare production sources')
   const fullFallbackCeiling = Math.floor(aggregateSources * 0.6)
 
   for (const [locality, budget] of SOURCE_BUDGETS) {

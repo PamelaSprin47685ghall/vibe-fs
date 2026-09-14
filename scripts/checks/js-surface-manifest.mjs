@@ -42,8 +42,17 @@ export const validateSurfaceManifest = (manifest = SURFACE_MANIFEST, root = proc
   const failures = []
   const fail = (message) => failures.push(message)
   const requirements = join(root, 'requirements')
-  const fsprojPath = join(root, 'src/Wanxiangshu/Wanxiangshu.fsproj')
-  const fsproj = existsSync(fsprojPath) ? readFileSync(fsprojPath, 'utf8') : ''
+  // W5 cutover: the wrapper aggregate is deleted. Production sources are
+  // enumerated by walking shard .fsproj declarations — that single set is
+  // what a test source label must name before the code below accepts it.
+  const productionSources = new Set()
+  const shardRoot = join(root, 'src/Wanxiangshu')
+  for (const file of walk(shardRoot, ['.fsproj'])) {
+    const text = readFileSync(file, 'utf8')
+    for (const match of text.matchAll(/<Compile\s+Include="([^"]+\.fs)"\s*\/?\s*>/g)) {
+      productionSources.add(match[1].replace(/\\/g, '/'))
+    }
+  }
   const testFiles = walk(requirements, ['.test.mjs'])
   const testSources = testFiles.map((file) => {
     const source = readFileSync(file, 'utf8')
@@ -124,8 +133,12 @@ export const validateSurfaceManifest = (manifest = SURFACE_MANIFEST, root = proc
     const compileStem = sourceCompileStem(entry.source ?? '')
     if (!compileStem) {
       fail(`${label}: source must be a src/Wanxiangshu .fs path`)
-    } else if (!fsproj.includes(`<Compile Include="${compileStem}.fs"/>`)) {
-      fail(`${label}: ${compileStem}.fs is not compiled by Wanxiangshu.fsproj`)
+    } else {
+      // compileStem is already repo-root-relative under src/Wanxiangshu/.
+      const rel = `${compileStem}.fs`.replace(/\\/g, '/')
+      if (!productionSources.has(rel)) {
+        fail(`${label}: ${compileStem}.fs is not compiled by the canonical source inventory`)
+      }
     }
 
     if (typeof entry.module === 'string' && !importedDistPaths.has(entry.module)) {

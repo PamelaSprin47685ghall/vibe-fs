@@ -153,15 +153,17 @@ test('WHAT[OBLIGATION-LEDGER-009] failure triage keeps red for syntax and kills 
 
 test('WHAT[OBLIGATION-LEDGER-003] clean break removes the legacy todo ontology from the production graph', () => {
   const algebra = read('src/Wanxiangshu/Mission/Obligation/Todo/Model.fs')
-  const project = read('src/Wanxiangshu/Wanxiangshu.fsproj')
+  // W5: the wrapper aggregate is gone; the compile-order manifest lists what
+  // production actually ships.
+  const order = read('src/Wanxiangshu/compile-order.txt')
 
   assert.doesNotMatch(
     algebra,
     /TodoStatus|TodoItemId|MagicTodoInputItem|MagicTodoItem|MagicTodoList|semanticMerge|RevisePreview/,
     'MagicTodo algebra must stay obligation-only',
   )
-  assert.doesNotMatch(project, /MagicTodoListCodec|MagicTodoLegacySeed|MagicTodoSuicide/)
-  assert.match(project, /ObligationCodec\.fs/)
+  assert.doesNotMatch(order, /MagicTodoListCodec|MagicTodoLegacySeed|MagicTodoSuicide/)
+  assert.match(order, /ObligationCodec\.fs/)
 })
 
 test('WHAT[OBLIGATION-LEDGER-011] production checkpoint path has no reviewer settlement owner', () => {

@@ -500,9 +500,15 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_R single todowrite call is admitted', () =>
 // ── Canary N: zero bare SessionTodo.update — static proof ────────────────
 
 test('WHAT[HOST-BOUNDARY-019] CANARY_N zero bare SessionTodo.update outside the membrane (static)', () => {
-  const fsproj = read('src/Wanxiangshu/Wanxiangshu.fsproj')
+  // W5: the wrapper aggregate is gone; the compile-order manifest is the
+  // only source enumerating production .fs now. This pin no longer applies.
   // N: no V2 runner type exists — construction cannot bypass the membrane
-  assert.doesNotMatch(fsproj, /V2Runner|MagicTodoV2/, 'no V2 runner type in the project')
+  const orderFile = read('src/Wanxiangshu/compile-order.txt')
+  const listedSources = orderFile.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && l.endsWith('.fs'))
+  for (const listedSource of listedSources) {
+    const source = read(`src/Wanxiangshu/${listedSource}`)
+    assert.doesNotMatch(source, /V2Runner|MagicTodoV2/, `no V2 runner type inside ${listedSource}`)
+  }
   // N: TodoWriteAccepted and TodoWritePrepared are only appended through
   // MagicTodoMembrane (prepare/accept) and MagicTodoHostHooks (before/after).
   // The only writers are in MagicTodoMembrane.fs and the journal surface.
@@ -527,10 +533,11 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_O no plugin todowrite tool overrides builti
   assert.match(pluginHooks, /registeredHook HookKey\.ToolAfter \(pairedHook \(box toolAfter\)\)/, 'plugin registers the typed tool-after hook')
   // O: no plugin tool named "todowrite" that would override the builtin
   assert.doesNotMatch(pluginHooks, /(?:tool\.add|registerTool)[\s\S]{0,160}todowrite|(?:name|"tool")\s*[,=:][\s\S]{0,80}['"]todowrite['"]/, 'no plugin todowrite tool override')
-  // O: the builtin executor remains the sink — cross-ref host018-no-fork.test.mjs
-  //    proves no Host source fork and only public SDK imports.
-  const fsproj = read('src/Wanxiangshu/Wanxiangshu.fsproj')
-  assert.doesNotMatch(fsproj, /<ProjectReference[^>]*[Oo]pen[Cc]ode/, 'no Host source project reference')
+  // O: the builtin executor remains the sink — host018-no-fork.test.mjs
+  //    asserts the shared props carry only the public SDK packages and no
+  //    Host-source fork.
+  const props = read('src/Wanxiangshu/Directory.Build.props')
+  assert.doesNotMatch(props, /<ProjectReference[^>]*[Oo]pen[Cc]ode/, 'no Host source project reference in shared props')
 })
 
 // ── Canary Q: description face — static proof ────────────────────────────

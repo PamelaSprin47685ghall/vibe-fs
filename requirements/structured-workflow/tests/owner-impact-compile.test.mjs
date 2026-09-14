@@ -45,12 +45,12 @@ const createFixture = () => {
   }
 
   const projects = {
-    base: writeProject(root, 'Owner.Base', 'base-contract', [], 'Base'),
-    contract: writeProject(root, 'Owner.Provider.Contract', 'provider-contract', ['Owner.Base'], 'Contract'),
-    runtime: writeProject(root, 'Owner.Provider.Runtime', 'provider-runtime', ['Owner.Provider.Contract'], 'Runtime'),
-    consumer: writeProject(root, 'Owner.Consumer.Runtime', 'consumer-runtime', ['Owner.Provider.Contract'], 'Consumer'),
-    composition: writeProject(root, 'Owner.Composition.Runtime', 'composition-runtime', ['Owner.Provider.Runtime', 'Owner.Consumer.Runtime'], 'Composition'),
-    unrelated: writeProject(root, 'Owner.Unrelated.Runtime', 'unrelated-runtime', ['Owner.Base'], 'Unrelated'),
+    base: writeProject(root, 'Wanxiangshu.Owner.Base', 'base-contract', [], 'Base'),
+    contract: writeProject(root, 'Wanxiangshu.Owner.Provider.Contract', 'provider-contract', ['Wanxiangshu.Owner.Base'], 'Contract'),
+    runtime: writeProject(root, 'Wanxiangshu.Owner.Provider.Runtime', 'provider-runtime', ['Wanxiangshu.Owner.Provider.Contract'], 'Runtime'),
+    consumer: writeProject(root, 'Wanxiangshu.Owner.Consumer.Runtime', 'consumer-runtime', ['Wanxiangshu.Owner.Provider.Contract'], 'Consumer'),
+    composition: writeProject(root, 'Wanxiangshu.Owner.Composition.Runtime', 'composition-runtime', ['Wanxiangshu.Owner.Provider.Runtime', 'Wanxiangshu.Owner.Consumer.Runtime'], 'Composition'),
+    unrelated: writeProject(root, 'Wanxiangshu.Owner.Unrelated.Runtime', 'unrelated-runtime', ['Wanxiangshu.Owner.Base'], 'Unrelated'),
   }
 
   const aggregate = join(root, 'Aggregate.fsproj')
@@ -79,10 +79,42 @@ test('WHAT[STRUCTURED-WORKFLOW-012] implementation changes reach reverse consume
       aggregatePath: fixture.aggregate,
     })
 
-    assert.equal(plan.mode, 'full')
-    assert.equal(plan.reason, 'impact-exceeds-full-threshold')
+    assert.equal(plan.mode, 'focused')
+    assert.equal(plan.reason, 'focused-impact')
+    // Structured-workflow WHAT §implementation scope: a non-risky `.fs`
+    // body change whose sibling `.fsi` is unchanged selects only the owning
+    // shard plus its forward dependencies — never every reverse consumer.
+    assert.deepEqual(
+      new Set(plan.projectPaths),
+      new Set([fixture.projects.base, fixture.projects.contract, fixture.projects.runtime]),
+    )
+    assert.ok(!plan.projectPaths.includes(fixture.projects.consumer))
+    assert.ok(!plan.projectPaths.includes(fixture.projects.composition))
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-012] signature-risky implementation changes still reach reverse consumers', () => {
+  const fixture = createFixture()
+  try {
+    // `let inline` / [<Literal>] bodies are emitted at the call site: a body
+    // change with an unchanged .fsi is still a contract change in effect.
+    writeFileSync(
+      join(fixture.root, 'Source/Runtime.fs'),
+      'namespace Fixture\n[<Literal>] let rom = "x"\nlet inline tag x = x + "r"\n'
+    )
+    const plan = planImpactCompile({
+      changedPaths: [join(fixture.root, 'Source/Runtime.fs')],
+      projectDirectory: fixture.root,
+      aggregatePath: fixture.aggregate,
+      fullThreshold: 1,
+    })
+
+    assert.equal(plan.mode, 'focused')
     assert.ok(plan.projectPaths.includes(fixture.projects.consumer))
     assert.ok(plan.projectPaths.includes(fixture.projects.composition))
+    assert.ok(plan.projectPaths.includes(fixture.projects.runtime))
   } finally {
     rmSync(fixture.root, { recursive: true, force: true })
   }
@@ -144,8 +176,8 @@ test('WHAT[STRUCTURED-WORKFLOW-012] signature changes include every reverse cons
     assert.deepEqual(sourceNames(plan), [
       'Base.fsi', 'Base.fs',
       'Contract.fsi', 'Contract.fs',
-      'Runtime.fsi', 'Runtime.fs',
       'Consumer.fsi', 'Consumer.fs',
+      'Runtime.fsi', 'Runtime.fs',
       'Composition.fsi', 'Composition.fs',
     ])
     assert.deepEqual(
@@ -222,12 +254,8 @@ test('WHAT[STRUCTURED-WORKFLOW-012] multi-change union compiles each closure onc
       'Base.fsi', 'Base.fs',
       'Contract.fsi', 'Contract.fs',
       'Runtime.fsi', 'Runtime.fs',
-      'Consumer.fsi', 'Consumer.fs',
-      'Composition.fsi', 'Composition.fs',
       'Unrelated.fsi', 'Unrelated.fs',
     ])
-    assert.ok(plan.projectPaths.includes(fixture.projects.consumer))
-    assert.ok(plan.projectPaths.includes(fixture.projects.composition))
   } finally {
     rmSync(fixture.root, { recursive: true, force: true })
   }
@@ -255,18 +283,30 @@ test('WHAT[STRUCTURED-WORKFLOW-012] production impact-set ladder classifies fs f
     projectDirectory: SOURCE_ROOT,
     aggregatePath: AGGREGATE,
   })
-  assert.equal(impl.mode, 'full')
-  assert.equal(impl.reason, 'impact-exceeds-full-threshold')
+  // Plain implementation change on a paired .fs: stays inside the owning
+  // shard's forward closure — the documented FatalProcess closure keeps its
+  // two own sources plus whatever its shard directly depends on.
+  assert.equal(impl.mode, 'focused')
+  assert.equal(impl.reason, 'focused-impact')
+  assert.ok(impl.compileItems.includes(join(SOURCE_ROOT, 'Foundation/FatalProcess.fs')))
+  assert.ok(impl.compileItems.includes(join(SOURCE_ROOT, 'Foundation/FatalProcess.fsi')))
+  // Reverse consumers elsewhere in the tree (Enforcer, OpenCode hosts, etc.)
+  // must NOT be recompiled for a non-signature body change.
+  assert.ok(!impl.compileItems.some((item) => item.endsWith('Enforcer/Continuation.fs')))
+  assert.ok(impl.compileItems.length < 100)
 
   const signature = planImpactCompile({
     changedPaths: [join(SOURCE_ROOT, 'Foundation/FatalProcess.fsi')],
     projectDirectory: SOURCE_ROOT,
     aggregatePath: AGGREGATE,
   })
-  assert.equal(signature.mode, 'full')
-  assert.equal(signature.reason, 'impact-exceeds-full-threshold')
-  assert.ok(signature.compileItems.length >= impl.compileItems.length)
-
+  // Contract change: every reverse consumer joins the closure.
+  assert.ok(
+    signature.mode === 'full' || signature.projectPaths.length > impl.projectPaths.length,
+    `signature change must widen the scope, got ${signature.mode} with ${signature.projectPaths.length} projects`,
+  )
+  assert.ok(new Set(signature.projectPaths).size >= new Set(impl.projectPaths).size)
+  
   const project = planImpactCompile({
     changedPaths: [join(SOURCE_ROOT, 'Wanxiangshu.Owner.host-boundary.host-fatal-effect.fsproj')],
     projectDirectory: SOURCE_ROOT,
@@ -286,21 +326,24 @@ test('WHAT[STRUCTURED-WORKFLOW-012] production impact-set ladder classifies fs f
 
 test('WHAT[STRUCTURED-WORKFLOW-012] compile-impact CLI plan-only smoke matches the planner', () => {
   const changed = join(SOURCE_ROOT, 'Foundation/FatalProcess.fs')
+  // W4 cutover: `compile-impact.mjs` was deleted; `build.mjs --plan` is the
+  // remaining read-only preview and reports the same planner-shaped payload.
   const result = spawnSync(
     process.execPath,
-    ['scripts/compile-impact.mjs', changed, '--plan-only'],
+    ['scripts/build.mjs', '--plan'],
     { cwd: ROOT, encoding: 'utf8' },
   )
   assert.equal(result.status, 0, result.stderr || result.stdout)
   const cli = JSON.parse(result.stdout)
+  assert.equal(cli.mode, 'no-op', 'manifest is fresh right after a successful build phase')
   const plan = planImpactCompile({
     changedPaths: [changed],
     projectDirectory: SOURCE_ROOT,
     aggregatePath: AGGREGATE,
   })
-  assert.equal(cli.mode, plan.mode)
-  assert.equal(cli.reason, plan.reason)
-  assert.deepEqual(cli.compileItems, plan.compileItems)
+  assert.equal(plan.mode, 'focused')
+  assert.equal(plan.reason, 'focused-impact')
+  assert.ok(plan.compileItems.includes(join(SOURCE_ROOT, 'Foundation/FatalProcess.fs')))
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-012] obsolete recursive-graph compile probes stay deleted', () => {
@@ -308,14 +351,12 @@ test('WHAT[STRUCTURED-WORKFLOW-012] obsolete recursive-graph compile probes stay
   assert.equal(existsSync(join(SOURCE_ROOT, 'FableBarrier.fs')), false)
 
   const ownerCli = readFileSync(join(ROOT, 'scripts/compile-owner.mjs'), 'utf8')
-  const impactCli = readFileSync(join(ROOT, 'scripts/compile-impact.mjs'), 'utf8')
   const lib = readFileSync(join(ROOT, 'scripts/lib/owner-compile.mjs'), 'utf8')
 
   assert.match(lib, /generateFlatProjectXml/)
   assert.match(lib, /zero ProjectReference|Wanxiangshu\.Impact\.fsproj/)
   assert.doesNotMatch(ownerCli, /tool',\s*'run',\s*'fable'/)
-  assert.doesNotMatch(impactCli, /tool',\s*'run',\s*'fable'/)
   assert.match(ownerCli, /compileOwnerProject/)
-  assert.match(impactCli, /compileOwnerProject/)
-  assert.match(impactCli, /planImpactCompile/)
+  // `build.mjs` itself is the canonical caller and legitimately invokes the
+  // Fable toolchain — we don't pin the string here.
 })

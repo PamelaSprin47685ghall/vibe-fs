@@ -2,7 +2,7 @@
   "schema_version": 1,
   "purpose": "m6-owner-impact-report-only",
   "baseline_commit": "e6268f35a8a3bbff6587960160bd4ceb3b64dbc3",
-  "aggregate_path": "src/Wanxiangshu/Wanxiangshu.fsproj",
+
   "project_directory": "src/Wanxiangshu",
   "full_threshold": 0.6,
   "lockfile_path": "package-lock.json",

@@ -7,8 +7,6 @@ import { planOwnerCompile } from '../../../scripts/lib/owner-compile.mjs'
 
 const ROOT = resolve(import.meta.dirname, '../../..')
 const SOURCE_ROOT = join(ROOT, 'src/Wanxiangshu')
-const AGGREGATE = join(SOURCE_ROOT, 'Wanxiangshu.fsproj')
-
 const shardInventory = readCompileShardInventory({ repositoryRoot: ROOT })
 const subsystemInventory = buildSubsystemInventory({ compileInventory: shardInventory })
 assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))
@@ -26,7 +24,7 @@ const planShard = (shard) => {
   const project = requireShard(shard)
   return {
     project,
-    plan: planOwnerCompile({ projectPath: project.projectPath, aggregatePath: AGGREGATE }),
+    plan: planOwnerCompile({ projectPath: project.projectPath, aggregatePath: null }),
   }
 }
 

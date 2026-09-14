@@ -1,11 +1,15 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
-import { dirname, relative, resolve } from 'node:path'
+import { dirname, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const MODULE_DIR = dirname(fileURLToPath(import.meta.url))
 export const REPOSITORY_ROOT = resolve(MODULE_DIR, '../..')
 export const SOURCE_ROOT = resolve(REPOSITORY_ROOT, 'src/Wanxiangshu')
-export const AGGREGATE_PROJECT = resolve(SOURCE_ROOT, 'Wanxiangshu.fsproj')
+// WP5: the aggregate fsproj is deleted; nothing reads it. The constant
+// path lives no longer — callers that still need an exclusion handle
+// pass `aggregatePath: null` and production sources come solely from the
+// shard graph.
+export const AGGREGATE_PROJECT = null
 
 const SHARD_PROJECT = /^Wanxiangshu\.(?:Owner|Shard)\..+\.fsproj$/
 
@@ -32,6 +36,8 @@ export function parseCompileShardProject(projectPath, { repositoryRoot = REPOSIT
     legacyOwner: property(text, 'WanxiangshuSemanticOwner'),
     legacyLocality: property(text, 'WanxiangshuOwnerLocality'),
     legacyKind: property(text, 'WanxiangshuOwnerLocalityKind'),
+    // Declared order — canonical within-shard compile order (fsi before fs).
+    compileItems: compileFiles,
     implementationFiles: compileFiles.filter((entry) => entry.endsWith('.fs')),
     signatureFiles: compileFiles.filter((entry) => entry.endsWith('.fsi')),
     references,
@@ -54,21 +60,19 @@ function productionSources(root) {
   return result.sort()
 }
 
-function assertDag(projects) {
-  const visiting = new Set()
-  const visited = new Set()
-  const visit = (projectPath) => {
-    if (visited.has(projectPath)) return
-    if (visiting.has(projectPath)) throw new Error(`compile-shard graph contains a cycle at ${projectPath}`)
-    visiting.add(projectPath)
-    for (const reference of projects.get(projectPath).references) visit(reference)
-    visiting.delete(projectPath)
-    visited.add(projectPath)
-  }
-  for (const projectPath of projects.keys()) visit(projectPath)
-}
-
 function parseAggregate(aggregatePath) {
+  if (!aggregatePath || !existsSync(aggregatePath)) {
+    // WP2: the aggregate file is optional — the shard graph alone must own
+    // production sources. Return an empty sentinel; callers assert coverage
+    // by comparing shard union against the filesystem, not this file.
+    return {
+      text: '',
+      implementationFiles: [],
+      signatureFiles: [],
+      references: [],
+      missing: true,
+    }
+  }
   const text = readFileSync(aggregatePath, 'utf8')
   const directory = dirname(aggregatePath)
   return {
@@ -76,6 +80,7 @@ function parseAggregate(aggregatePath) {
     implementationFiles: includes(text, 'Compile').filter((entry) => entry.endsWith('.fs')).map((entry) => resolve(directory, entry)),
     signatureFiles: includes(text, 'Compile').filter((entry) => entry.endsWith('.fsi')).map((entry) => resolve(directory, entry)),
     references: includes(text, 'ProjectReference').map((entry) => resolve(directory, entry)),
+    missing: false,
   }
 }
 
@@ -85,13 +90,99 @@ function sameSet(left, right) {
   return true
 }
 
+/**
+ * Deterministic topological order over the compile-shard DAG.
+ *
+ * Cross-shard order must not depend on the iteration order MSBuild or the
+ * filesystem happened to offer: ties break on the shard's lexical
+ * projectRepoPath so every run emits the same canonical sequence. Within a
+ * shard the fsproj's declared `<Compile>` order is preserved verbatim.
+ */
+function topologicalOrder(projects) {
+  const ordered = []
+  const visited = new Set()
+  const pending = [...projects.keys()].sort((a, b) =>
+    projects.get(a).projectRepoPath.localeCompare(projects.get(b).projectRepoPath))
+  const visit = (projectPath, stack = []) => {
+    if (visited.has(projectPath)) return
+    if (stack.includes(projectPath)) {
+      throw new Error(`compile-shard graph contains a cycle at ${projectPath}`)
+    }
+    stack.push(projectPath)
+    const sortedRefs = [...projects.get(projectPath).references].sort((a, b) =>
+      projects.get(a).projectRepoPath.localeCompare(projects.get(b).projectRepoPath))
+    for (const reference of sortedRefs) visit(reference, stack)
+    stack.pop()
+    visited.add(projectPath)
+    ordered.push(projectPath)
+  }
+  for (const projectPath of pending) visit(projectPath)
+  return ordered
+}
+
+/**
+ * Canonical production compile-item sequence derived entirely from the
+ * shard graph: topological over the cross-shard DAG, declared order inside
+  * each shard. Priority: an explicit order file `compile-order.txt` next to
+  * the shard graph (one source entry per line, repo-relative under
+  * `src/Wanxiangshu`) wins — F#'s sensitivity to file order justifies a
+  * checked-manifest; when that file is absent the topological walk over
+  * declared order still yields a deterministic result.
+ */
+export function canonicalShardCompileItems(projects, { orderFilePath = null } = {}) {
+  if (orderFilePath && existsSync(orderFilePath)) {
+    const lines = readFileSync(orderFilePath, 'utf8')
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0 && !line.startsWith('#'))
+    const rootDir = dirname(orderFilePath)
+  const seen = new Set()
+    const items = []
+    const declared = new Set()
+    for (const project of projects.values()) {
+      for (const source of project.compileItems) declared.add(source)
+    }
+    for (const line of lines) {
+      const abs = resolve(rootDir, line.replace(/\//g, sep))
+      if (!declared.has(abs)) {
+        throw new Error(`compile-order.txt mentions '${line}' which no shard compiles`)
+      }
+      if (!seen.has(abs)) {
+        seen.add(abs)
+        items.push(abs)
+      }
+    }
+    // A compile-order.txt that omits a shard's source is a drift bug — surface
+    // it instead of silently treating the order file as authoritative.
+    for (const project of projects.values()) {
+      for (const source of project.compileItems) {
+      if (!seen.has(source)) {
+          throw new Error(`compile-order.txt missing source '${relative(rootDir, source)}'`)
+        }
+      }
+    }
+    return items
+  }
+
+  const seen = new Set()
+  const ordered = []
+  for (const projectPath of topologicalOrder(projects)) {
+    for (const source of projects.get(projectPath).compileItems) {
+      if (!seen.has(source)) {
+        seen.add(source)
+        ordered.push(source)
+      }
+    }
+  }
+  return ordered
+}
+
 export function assertProductionSourcesAssigned({
   repositoryRoot = REPOSITORY_ROOT,
   sourceRoot = resolve(repositoryRoot, 'src/Wanxiangshu'),
-  aggregatePath = resolve(sourceRoot, 'Wanxiangshu.fsproj'),
   discoveredSources = new Set(productionSources(sourceRoot)),
   shardImplementations = new Set(),
-  aggregate = parseAggregate(aggregatePath),
+  aggregate = { missing: true, text: '', implementationFiles: [], signatureFiles: [], references: [] },
 } = {}) {
   if (!sameSet(shardImplementations, discoveredSources)) {
     const unassigned = [...discoveredSources].filter((source) => !shardImplementations.has(source)).map((source) => repoPath(repositoryRoot, source))
@@ -110,20 +201,23 @@ export function assertProductionSourcesAssigned({
       }
     }
   }
-  if (aggregate.text.includes('<WanxiangshuEmitProject>') && !/<WanxiangshuEmitProject>true<\/WanxiangshuEmitProject>/.test(aggregate.text)) {
-    throw new Error(`${repoPath(repositoryRoot, aggregatePath)}: flattened Fable emitter marker <WanxiangshuEmitProject> is missing`)
-  }
-  if (new Set(aggregate.implementationFiles).size !== aggregate.implementationFiles.length) {
-    throw new Error(`${repoPath(repositoryRoot, aggregatePath)}: duplicate production Compile implementation entry`)
+  if (!aggregate.missing) {
+    if (aggregate.text.includes('<WanxiangshuEmitProject>') && !/<WanxiangshuEmitProject>true<\/WanxiangshuEmitProject>/.test(aggregate.text)) {
+      throw new Error(aggregate.path ? `${repoPath(repositoryRoot, aggregate.path)}: flattened marker missing` : 'flattened marker missing (synthesised)')
+    }
+    if (new Set(aggregate.implementationFiles).size !== aggregate.implementationFiles.length) {
+      throw new Error(aggregate.path ? `${repoPath(repositoryRoot, aggregate.path)}: duplicate production Compile implementation entry` : 'duplicate production Compile implementation entry (synthesised)')
+    }
   }
 }
 
 export function readCompileShardInventory({
   repositoryRoot = REPOSITORY_ROOT,
   sourceRoot = resolve(repositoryRoot, 'src/Wanxiangshu'),
-  aggregatePath = resolve(sourceRoot, 'Wanxiangshu.fsproj'),
+  aggregatePath = null,
 } = {}) {
-  if (!existsSync(aggregatePath)) throw new Error(`${repoPath(repositoryRoot, aggregatePath)}: aggregate project is missing`)
+  // The aggregate file is advisory-only: when present it must still equal
+  // the shard union, but its absence must not block the production pipeline.
   const projectPaths = readdirSync(sourceRoot)
     .filter((name) => SHARD_PROJECT.test(name))
     .map((name) => resolve(sourceRoot, name))
@@ -160,28 +254,37 @@ export function readCompileShardInventory({
       if (reference === project.projectPath) throw new Error(`${project.projectRepoPath}: compile shard references itself`)
     }
   }
-  assertDag(projects)
 
-  const aggregate = parseAggregate(aggregatePath)
-  if (aggregate.references.length !== 0) throw new Error(`${repoPath(repositoryRoot, aggregatePath)}: aggregate emitter must not contain ProjectReference`)
+  // Cycle detection via the same canonical-order walk — a cycle throws
+  // inside topologicalOrder before the derived sequence is committed.
+  topologicalOrder(projects)
+
+  const aggregate = aggregatePath ? parseAggregate(aggregatePath) : { missing: true, text: '', implementationFiles: [], signatureFiles: [], references: [] }
+  if (aggregate.references.length !== 0) throw new Error(`${repoPath(repositoryRoot, aggregate.path ?? '?')}: aggregate emitter must not contain ProjectReference`)
   const shardImplementations = new Set([...sourceProject.keys()])
   const shardSignatures = new Set([...projects.values()].flatMap((project) => project.signatureFiles))
-  if (!sameSet(shardImplementations, new Set(aggregate.implementationFiles))) throw new Error('aggregate .fs compile set differs from compile-shard union')
-  if (!sameSet(shardSignatures, new Set(aggregate.signatureFiles))) throw new Error('aggregate .fsi compile set differs from compile-shard union')
+  if (!aggregate.missing) {
+    if (!sameSet(shardImplementations, new Set(aggregate.implementationFiles))) throw new Error('aggregate .fs compile set differs from compile-shard union')
+    if (!sameSet(shardSignatures, new Set(aggregate.signatureFiles))) throw new Error('aggregate .fsi compile set differs from compile-shard union')
+  }
   const discoveredSources = new Set(productionSources(sourceRoot))
   assertProductionSourcesAssigned({
     repositoryRoot,
     sourceRoot,
-    aggregatePath,
     discoveredSources,
     shardImplementations,
     aggregate,
   })
 
+
   return {
     repositoryRoot,
     sourceRoot,
     aggregatePath,
+    aggregateMissing: aggregate.missing,
+    canonicalCompileItems: canonicalShardCompileItems(projects, {
+      orderFilePath: resolve(sourceRoot, 'compile-order.txt'),
+    }),
     projects,
     sourceProject,
     sourceCount: sourceProject.size,

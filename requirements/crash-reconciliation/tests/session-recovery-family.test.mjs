@@ -44,12 +44,18 @@ test('WHAT[CRASH-017] RECOVERY_FAMILY_plugin_load_only_attaches_physical_recover
 test('WHAT[CRASH-013] RECOVERY_FAMILY_combine_and_coordinator_ownership_moved', () => {
   const domain = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Model.fs'), 'utf8')
   const coordinator = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Coordinator.fs'), 'utf8')
-  const fsproj = readFileSync(join(ROOT, 'src/Wanxiangshu/Wanxiangshu.fsproj'), 'utf8')
+  // W5 cutover: ownership is declared on the owning shard, not the wrapper
+  // aggregate. Recovery stays under dispatch-protocol's session-recovery
+  // shard.
+  const shard = readFileSync(
+    join(ROOT, 'src/Wanxiangshu/Wanxiangshu.Owner.dispatch.session-recovery-coordinator.fsproj'),
+    'utf8',
+  )
   assert.match(domain, /let combine \(outcomes: SessionRecovery list\)/)
   assert.match(coordinator, /module FamilyRecoveryCoordinator/)
   assert.match(coordinator, /let runOnce/)
   assert.doesNotMatch(coordinator, /recoverFamilyDirect|SessionRecoveryPorts|authorizeFamilyResume/)
-  assert.match(fsproj, /Execution\/Session\/Recovery\/Coordinator\.fs/)
+  assert.match(shard, /Execution\/Session\/Recovery\/Coordinator\.fs/)
 })
 
 test('WHAT[CRASH-010] RECOVERY_FAMILY_handle_family_types_and_permit_rules', () => {

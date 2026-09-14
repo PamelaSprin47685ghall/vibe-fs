@@ -5,12 +5,12 @@ import {
   compileOwnerProject,
   materializeOwnerCompile,
   planOwnerCompile,
-  DEFAULT_AGGREGATE_PATH,
   DEFAULT_ROOT_PROPS_PATH,
   DEFAULT_SCRATCH_ROOT,
 } from './lib/owner-compile.mjs'
 
 const OWNER_PROJECT_BASENAME_PATTERN = /^Wanxiangshu\.Owner\..+\.fsproj$/
+const REPOSITORY_ROOT_CANON = resolve(import.meta.dirname, '..')
 
 function printHelp() {
   console.log(`
@@ -19,9 +19,7 @@ Usage: node scripts/compile-owner.mjs <project.fsproj> [options]
 Arguments:
   <project.fsproj>       Path to candidate owner fsproj file (required; basename must match Wanxiangshu.Owner.*.fsproj)
 
-Options:
-  --aggregate <path>     Path to aggregate Wanxiangshu.fsproj (default: src/Wanxiangshu/Wanxiangshu.fsproj)
-  --scratch <path>       Scratch build root (default: .fable-build/owner-compile)
+Options:  --scratch <path>       Scratch build root (default: .fable-build/owner-compile)
   --props <path>         Root Directory.Build.props path (default: Directory.Build.props)
   --output, -o <path>    Output directory for compiled artifacts
   --plan-only            Only compute and print compilation plan as JSON
@@ -32,7 +30,6 @@ Options:
 
 function parseArgs(args) {
   let projectPath = null
-  let aggregatePath = DEFAULT_AGGREGATE_PATH
   let scratchRoot = DEFAULT_SCRATCH_ROOT
   let rootPropsPath = DEFAULT_ROOT_PROPS_PATH
   let outputDir = null
@@ -48,19 +45,6 @@ function parseArgs(args) {
       planOnly = true
     } else if (arg === '--materialize-only') {
       materializeOnly = true
-    } else if (arg === '--aggregate' || arg.startsWith('--aggregate=')) {
-      let val
-      if (arg.startsWith('--aggregate=')) {
-        val = arg.slice('--aggregate='.length)
-      } else {
-        val = args[++i]
-      }
-      if (!val || val.startsWith('-')) {
-        console.error(`Error: option '--aggregate' requires a value`)
-        printHelp()
-        process.exit(1)
-      }
-      aggregatePath = resolve(val)
     } else if (arg === '--scratch' || arg.startsWith('--scratch=')) {
       let val
       if (arg.startsWith('--scratch=')) {
@@ -130,7 +114,6 @@ function parseArgs(args) {
 
   return {
     projectPath,
-    aggregatePath,
     scratchRoot,
     rootPropsPath,
     outputDir,
@@ -142,11 +125,20 @@ function parseArgs(args) {
 async function main() {
   const options = parseArgs(process.argv.slice(2))
 
+  // compile-owner is a scratch reporter — it may never emit to the canonical
+  // production output (dist). The only legal producer of dist bytes is
+  // `npm run build`; letting a helper write them would let a stale plan
+  // walk past the canonical manifest.
+  const canonicalDist = resolve(REPOSITORY_ROOT_CANON, 'dist')
+  if (options.outputDir && resolve(options.outputDir) === canonicalDist) {
+    console.error(`Error: --output may not be the canonical dist dir (use npm run build instead)`)
+    process.exit(1)
+  }
+
   if (options.planOnly) {
     try {
       const plan = planOwnerCompile({
         projectPath: options.projectPath,
-        aggregatePath: options.aggregatePath,
       })
       console.log(JSON.stringify({
         candidatePath: plan.candidatePath,
@@ -166,7 +158,6 @@ async function main() {
     try {
       const plan = planOwnerCompile({
         projectPath: options.projectPath,
-        aggregatePath: options.aggregatePath,
       })
       const materialized = materializeOwnerCompile(plan, {
         scratchRoot: options.scratchRoot,
@@ -184,7 +175,6 @@ async function main() {
   try {
     const result = await compileOwnerProject({
       projectPath: options.projectPath,
-      aggregatePath: options.aggregatePath,
       scratchRoot: options.scratchRoot,
       rootPropsPath: options.rootPropsPath,
       outputDir: options.outputDir,

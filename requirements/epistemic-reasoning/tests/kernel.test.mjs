@@ -116,9 +116,12 @@ test('WHAT[EPI-002] fsharp_kernel_has_no_agent_host_domain_dependency_and_sdk_st
     if (name !== 'McpServer.fs') assert.doesNotMatch(source, /@modelcontextprotocol\/sdk|\bzod\b/)
   }
 
-  const project = readFileSync(join(root, 'src/Wanxiangshu/Wanxiangshu.fsproj'), 'utf8')
-  assert.match(project, /Sphinx\/Types\.fs/)
-  assert.match(project, /Sphinx\/McpServer\.fs/)
+  // W5: the wrapper aggregate is gone — the compile-order manifest is the
+  // authoritative production enumeration. Sphinx sources must still be
+  // compiled into the canonical pipeline.
+  const order = readFileSync(join(root, 'src/Wanxiangshu/compile-order.txt'), 'utf8')
+  assert.match(order, /Sphinx\/Types\.fs/)
+  assert.match(order, /Sphinx\/McpServer\.fs/)
 
   const build = readFileSync(join(root, 'scripts/build.mjs'), 'utf8')
   assert.doesNotMatch(build, /fs\.cpSync\([^\n]*sphinx/i)

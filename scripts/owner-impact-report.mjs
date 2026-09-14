@@ -98,7 +98,9 @@ export const OWNER_IMPACT_TIMING_COMMANDS = Object.freeze([
 ])
 
 const OWNER_IMPACT_CONFIG = Object.freeze({
-  aggregate_path: 'src/Wanxiangshu/Wanxiangshu.fsproj',
+  // Post-W5: the aggregate path is a recovery-file concept only. The
+  // reference corpus no longer anchors its existence — source of truth
+  // is the shard inventory + compile-order manifest.
   project_directory: 'src/Wanxiangshu',
   full_threshold: 0.6,
   lockfile_path: 'package-lock.json',
@@ -262,14 +264,13 @@ const repositoryIdentity = (root, path) => relative(root, path).replaceAll('\\',
 
 export const measureOwnerImpactStructureV1 = (corpusInput, { root = ROOT } = {}) => {
   const corpus = validateOwnerImpactCorpusV1(corpusInput)
-  const aggregatePath = resolve(root, corpus.aggregate_path)
   const projectDirectory = resolve(root, corpus.project_directory)
   return [...corpus.stable_cases, ...corpus.control_cases]
     .map((row) => {
       const plan = planImpactCompile({
         changedPaths: [resolve(root, row.successor_path)],
         projectDirectory,
-        aggregatePath,
+        aggregatePath: null,
         fullThreshold: corpus.full_threshold,
       })
       return {
