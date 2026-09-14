@@ -1376,9 +1376,9 @@ export function collectTrackedInputs({
   projectDirectory,
 } = {}) {
   const resolvedAggregate = aggregatePath ? norm(aggregatePath) : null
-  const resolvedProjectDirectory = norm(
-    projectDirectory ?? (resolvedAggregate ? path.dirname(resolvedAggregate) : path.resolve(root, 'src/Wanxiangshu')),
-  )
+  const resolvedProjectDirectory = projectDirectory
+    ? norm(projectDirectory)
+    : norm(resolvedAggregate ? path.dirname(resolvedAggregate) : path.resolve(root, 'src/Wanxiangshu'))
   // WP2: the source list derives from the shard inventory — when the
   // aggregate wrapper file exists it still exists on disk and is hashed
   // (drift guard), but compile sources compile from shard declarations.
@@ -1425,13 +1425,14 @@ export function collectTrackedInputs({
  */
 export function detectChangedFiles({
   root = REPO_ROOT,
+  projectDirectory,
   aggregatePath = null,
   manifestPath = DEFAULT_BUILD_MANIFEST_PATH,
   outputDir,
 } = {}) {
   const resolvedOutputDir = norm(outputDir ?? path.resolve(root, 'dist'))
   const resolvedManifestPath = norm(manifestPath)
-  const trackedFiles = collectTrackedInputs({ root, aggregatePath })
+  const trackedFiles = collectTrackedInputs({ root, aggregatePath, projectDirectory })
 
   let manifest = null
   if (fs.existsSync(resolvedManifestPath)) {
@@ -1544,6 +1545,7 @@ export function detectChangedFiles({
 export async function compileIncremental({
   changedPaths,
   root = REPO_ROOT,
+  projectDirectory,
   aggregatePath = null,
   outputDir,
   scratchRoot,
@@ -1558,6 +1560,7 @@ export async function compileIncremental({
   const targetOutputDir = resolvedOutputDir ?? norm(path.resolve(root, 'dist'))
   const resolvedManifestPath = norm(manifestPath)
   const resolvedAggregate = aggregatePath ? norm(aggregatePath) : null
+  const resolvedProjectDirectory = projectDirectory ?? (resolvedAggregate ? path.dirname(resolvedAggregate) : path.resolve(root, 'src/Wanxiangshu'))
 
   let effectiveChangedPaths
   let isClean = false
@@ -1567,6 +1570,7 @@ export async function compileIncremental({
   } else {
     const detection = detectChangedFiles({
       root,
+      projectDirectory: resolvedProjectDirectory,
       aggregatePath: resolvedAggregate,
       manifestPath: resolvedManifestPath,
       outputDir: targetOutputDir,
@@ -1576,7 +1580,7 @@ export async function compileIncremental({
   }
 
   const buildSnapshot = () => {
-    const tracked = collectTrackedInputs({ root, aggregatePath: resolvedAggregate })
+    const tracked = collectTrackedInputs({ root, aggregatePath: resolvedAggregate, projectDirectory: resolvedProjectDirectory })
     const map = {}
     for (const f of tracked) {
       if (fs.existsSync(f)) {
@@ -1609,14 +1613,14 @@ export async function compileIncremental({
     }
     // If output is missing despite no changed paths, trigger clean compile
     isClean = true
-    effectiveChangedPaths = collectTrackedInputs({ root, aggregatePath: resolvedAggregate })
+    effectiveChangedPaths = collectTrackedInputs({ root, aggregatePath: resolvedAggregate, projectDirectory: resolvedProjectDirectory })
   }
 
   const plan = planImpactCompile({
     changedPaths: effectiveChangedPaths,
     aggregatePath: resolvedAggregate,
     fullThreshold,
-    projectDirectory: resolvedAggregate ? path.dirname(resolvedAggregate) : path.resolve(root, 'src/Wanxiangshu'),
+    projectDirectory: projectDirectory ?? (resolvedAggregate ? path.dirname(resolvedAggregate) : path.resolve(root, 'src/Wanxiangshu')),
     isClean,
   })
 
@@ -1645,8 +1649,13 @@ export async function compileIncremental({
     }
   }
 
-  // For clean build, wipe and recreate output directory so deleted files leave no stale JS
-  if (isClean) {
+  // Resetting output covers both triggered shapes: a caller `clean` (full
+  // rebuild) and a `full` plan (source deleted / fsproj / toolchain change —
+  // the emitted set is re-computed from scratch and any leftover artifact
+  // would falsely look live). A `focused` plan on un-stale files must not
+  // reset — that would defeat incrementalism.
+  const needsFullReset = isClean || plan.mode === 'full'
+  if (needsFullReset) {
     if (resolvedOutputDir && fs.existsSync(resolvedOutputDir)) {
       fs.rmSync(resolvedOutputDir, { recursive: true, force: true })
     }

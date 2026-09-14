@@ -10,6 +10,8 @@
     <PackageReference Include="Fable.Core" Version="5.0.0"/>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Core/Core.fs"/>
+    <ProjectReference Include="Wanxiangshu.Owner.fixture.core.fsproj"/>
+    <Compile Include="Alpha/Alpha.fsi"/>
+    <Compile Include="Alpha/Alpha.fs"/>
   </ItemGroup>
 </Project>

@@ -1,7 +1,6 @@
 <?xml version="1.0"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuEmitProject>true</WanxiangshuEmitProject>
     <TargetFramework>net10.0</TargetFramework>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
@@ -11,9 +10,7 @@
     <PackageReference Include="Fable.Core" Version="5.0.0"/>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Core/Core.fsi"/>
     <Compile Include="Core/Core.fs"/>
-    <Compile Include="Alpha/Alpha.fs"/>
-    <Compile Include="Beta/BetaOne.fs"/>
-    <Compile Include="Beta/BetaTwo.fs"/>
   </ItemGroup>
 </Project>
