@@ -268,6 +268,10 @@ module ModelRouting =
         // DSL-MUTABLE: resource — one exact provider-run witness per live session
         let targetByProviderRun = Dictionary<string, struct (string * ModelRoutingTarget)>()
         let latestProviderRunBySession = Dictionary<string, string>()
+        // DSL-MUTABLE: resource — one recovery retry target per session: the
+        // single-consumption binding written when a confirmed provider failure
+        // keeps its target (PAR-021). Consumed by the next fresh admission.
+        let recoveryRetryTargetBySession = Dictionary<string, ModelRoutingTarget>()
         let admissionQueue = ExecutionAdmissionQueue(gate, transitionCounters)
         let admissionOwner = ExecutionCapacityOwner(transitionCounters)
         // DSL-MUTABLE: resource — process-local scheduler poison
@@ -318,13 +322,44 @@ module ModelRouting =
             | true, latest when latest = providerRun -> latestProviderRunBySession.Remove sessionId |> ignore
             | _ -> ()
 
-        let takeProviderRunTarget providerRun =
+        let takeProviderRunWitness providerRun =
             match targetByProviderRun.TryGetValue providerRun with
             | true, struct (sessionId, target) ->
                 targetByProviderRun.Remove providerRun |> ignore
                 forgetLatestProviderRunIfCurrent sessionId providerRun
+                Some(sessionId, target)
+            | false, _ -> None
+
+        let takeProviderRunTarget providerRun =
+            takeProviderRunWitness providerRun |> Option.map snd
+
+        let takeRecoveryRetryTarget sessionId =
+            match recoveryRetryTargetBySession.TryGetValue sessionId with
+            | true, target ->
+                recoveryRetryTargetBySession.Remove sessionId |> ignore
                 Some target
             | false, _ -> None
+
+        let retainFailedTargetOfRun sessionId providerRun =
+            match takeProviderRunWitness providerRun with
+            | Some(witnessSession, target) when witnessSession = sessionId ->
+                recoveryRetryTargetBySession.[sessionId] <- target
+                Some target
+            | Some _
+            | None -> None
+
+        let markProviderOfTarget (target: ModelRoutingTarget) =
+            if not (isNull markFailedFn) && isFunction markFailedFn then
+                callScheduler markFailedFn (targetProvider target) [||] null |> ignore
+
+        // PAR-021: a confirmed provider failure that kept its target binds this
+        // session's next fresh admission to that target; the binding is consumed
+        // once, and only a still-active replaced execution can otherwise supply
+        // the ordinary previous hint.
+        let recoveryPreviousTarget sessionId =
+            match takeRecoveryRetryTarget sessionId with
+            | Some target -> Some target
+            | None -> activePhysicalTarget sessionId
 
         let ensureHealthy () = fatalError |> Option.iter raise
 
@@ -426,6 +461,7 @@ module ModelRouting =
         let retireCurrentExecution sessionId =
             let changed = activeBySession.Remove sessionId
             retireProviderRunTarget sessionId
+            recoveryRetryTargetBySession.Remove sessionId |> ignore
             capacity.ReleaseSession sessionId |> ignore
 
             if admissionQueue.ContainsSession sessionId then
@@ -585,7 +621,7 @@ module ModelRouting =
             | Some current -> current
             | None ->
                 let oldPhysicalUserMessageId = currentPhysicalUserMessageId sessionId
-                let previous = activePhysicalTarget sessionId
+                let previous = recoveryPreviousTarget sessionId
                 activeBySession.Remove sessionId |> ignore
                 supersedeCurrentDemand sessionId
 
@@ -1021,9 +1057,27 @@ module ModelRouting =
         member _.TakeProviderRunTarget(providerRun: string) : ModelRoutingTarget option =
             lock gate (fun () -> takeProviderRunTarget providerRun)
 
-        member _.MarkProviderFailed(provider: string) =
-            if not (isNull markFailedFn) && isFunction markFailedFn then
-                callScheduler markFailedFn provider [||] null |> ignore
+        /// PAR-021: the failed attempt itself carried the LWR-replaced context,
+        /// so its confirmed failure condemns the provider of the exact witness
+        /// target. The witness is single-consumption: duplicate observations,
+        /// stale callbacks, cancellations and unknown submissions hold no
+        /// second permission.
+        member _.CondemnFailedTarget(providerRun: string) : ModelRoutingTarget option =
+            lock gate (fun () ->
+                match takeProviderRunWitness (providerRun.Trim()) with
+                | Some(_, target) ->
+                    markProviderOfTarget target
+                    Some target
+                | None -> None)
+
+        /// PAR-021: the failed attempt carried the original context, so its
+        /// provider is kept and the next fresh admission of this session is
+        /// bound to the exact failed target for the LWR retry. The witness
+        /// must belong to this session and the binding is consumed once.
+        member _.RetainFailedTargetForRetry(sessionId: string, providerRun: string) : ModelRoutingTarget option =
+            match normalizeSessionId sessionId with
+            | None -> None
+            | Some normSessionId -> lock gate (fun () -> retainFailedTargetOfRun normSessionId (providerRun.Trim()))
 
         member _.HasTheoreticalCapacity(role: string) : bool =
             lock gate (fun () -> hasTheoreticalCapacityLocked role)
@@ -1066,7 +1120,15 @@ module ModelRouting =
     let internal takeProviderRunTarget (providerRun: ProviderRunIdentity) : ModelRoutingTarget option =
         current().TakeProviderRunTarget(ProviderRunIdentity.value providerRun)
 
-    let internal markProviderFailed (provider: string) : unit = current().MarkProviderFailed provider
+    let internal condemnFailedTarget (providerRun: ProviderRunIdentity) : ModelRoutingTarget option =
+        current().CondemnFailedTarget(ProviderRunIdentity.value providerRun)
+
+    let internal retainFailedTargetForRetry
+        (sessionId: SessionId)
+        (providerRun: ProviderRunIdentity)
+        : ModelRoutingTarget option =
+        current()
+            .RetainFailedTargetForRetry(SessionId.value sessionId, ProviderRunIdentity.value providerRun)
 
     let internal hasTheoreticalCapacity (role: string) : bool = current().HasTheoreticalCapacity role
 

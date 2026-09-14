@@ -30,10 +30,11 @@ ProviderRunIdentity); one failure causes at most one physical send.
 
 One confirmed failure adds 1 to the consecutive failure count and, while the
 budget is not spent, yields an exact typed failure licence. The failed
-physical provider is handled by ModelRouting; the budget never switches
-roles and never stands for the physical provider pool. A main business
-request success writes a success fact and resets the consecutive failure
-count to zero.
+physical provider is settled by ModelRouting under PAR-021: the failure keeps
+its target for the LWR retry, and only a failed LWR retry condemns the
+provider. The budget never switches roles and never stands for the physical
+provider pool. A main business request success writes a success fact and
+resets the consecutive failure count to zero.
 
 The request kind of a failure recovery is read only from the durable
 `ChatExecutionState.ProviderStarted.RequestKind` matching
@@ -180,3 +181,13 @@ It carries no callback, continuation, next action, physical request
 permission or workflow entry. Replaying the same durable facts yields the
 same budget view. Every retry still consumes its exact typed failure licence
 and the retry policy still decides the execution content.
+
+## PAR-021: 首次失败保留物理目标；LWR 重试失败才驱逐 provider
+
+一次已确认的 provider 类失败驱逐物理 provider 只有一个合法依据：失败的 attempt 本身就是已发出的 LWR 重试。
+
+- 判定只读 exact physical request 的 durable 接受事实：该 `PhysicalUserMessageId` 已被接受为 `ProviderRetryAttempt` continuation。连续失败计数、失败序号、错误文本与进程内状态都不能推断“已试过 LWR”。
+- 失败 attempt 不是 LWR 重试（携带原上下文）时：严禁标记该 provider 失败；恢复重投绑定原物理目标——同一 session 的下一次 fresh admission 以失败 attempt 的 exact target 作为调度偏好（单次消费）——并以 LWR 替换上下文发起（CTX-010/CTX-011 的 `FrozenRecordPrefix` 探针）。
+- 失败 attempt 是 LWR 重试时：其物理 provider 被永久 poison，后续重投由调度器轮换到其它候选目标；既不改变 participant identity，也不改变预算代数。
+- 权限只属于确切的失败与确切的 attempt：provider-run witness 单次消费，因此重复通知、旧回调、取消与提交未知都不能再取得该权限；未取得 typed `RetryFreshAttempt` licence 的失败同样不结算目标。
+- ordinary 恢复、sync delegate 装饰器与恢复重入共用同一规则：结算只发生在 `Retry.attempt` 授权且尚未 dispatch 的 redispatch 内，LWR 重试事实与失败目标绑定在同一处读取。

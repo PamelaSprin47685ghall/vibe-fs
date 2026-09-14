@@ -482,6 +482,32 @@ module ProviderRecoveryWorkflow =
                 | HostSessionNudge.GateContinuationOutcome.Failed _ -> RetryVerdict.Terminal error
         }
 
+    /// PAR-021: the one durable fact the recovery target settlement consumes.
+    /// The failed attempt was the LWR retry iff its exact physical request was
+    /// accepted as a `ProviderRetryAttempt` continuation — never inferred from
+    /// a failure ordinal.
+    let failedAttemptWasLwrRetry
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        : bool =
+        let kind =
+            (AgentJournalPortAdapter.forTurnObservation durable).TryContinuationKind sessionId physicalUserMessageId
+
+        kind = Some PromptAuthority.ContinuationKind.ProviderRetryAttempt
+
+    /// PAR-021: the single target settlement for one confirmed provider failure,
+    /// shared by ordinary recovery, the SyncDelegate decorator and recovery
+    /// re-entry. A failed LWR retry condemns its provider; every other failure
+    /// keeps the provider and binds the next fresh admission of this session to
+    /// the failed target for the LWR retry.
+    let private settleFailedAttemptTarget (durable: AgentJournal) (turn: ReconciledTurn) =
+        if failedAttemptWasLwrRetry durable turn.SessionId turn.PhysicalUserMessageId then
+            ModelRouting.condemnFailedTarget turn.ProviderRun |> ignore
+        else
+            ModelRouting.retainFailedTargetForRetry turn.SessionId turn.ProviderRun
+            |> ignore
+
     /// Path plug of the retry decorator: perform this path's physical re-entry
     /// for one licensed attempt and report the verdict.
     let rec private redispatchAfterFailure
@@ -495,7 +521,15 @@ module ProviderRecoveryWorkflow =
         (input: RetryAttempt)
         : Task<RetryVerdict> =
         task {
-            match recoveryAlreadyAdmitted durable input.Turn authorization, input.RequestKind with
+            let admitted = recoveryAlreadyAdmitted durable input.Turn authorization
+
+            // PAR-021: only a licensed, not-yet-dispatched redispatch settles
+            // the failed target; the witness and the durable prompt claim each
+            // hold exactly one permission.
+            if not admitted then
+                settleFailedAttemptTarget durable input.Turn
+
+            match admitted, input.RequestKind with
             | true, _ -> return RetryVerdict.Superseded
             | false, (ProviderRequestKind.BloggerMain | ProviderRequestKind.BloggerSquash) ->
                 return!
@@ -562,14 +596,6 @@ module ProviderRecoveryWorkflow =
 
         ProviderFailureLedger.recordAuthorizedFailure port ownerSessionId authorization error
 
-    let private providerOfTarget (target: Wanxiangshu.OpenCode.ModelRoutingTarget) : string =
-        let slash = target.Model.IndexOf '/'
-
-        if slash > 0 then
-            target.Model.Substring(0, slash)
-        else
-            target.Model
-
     let rec private continueDurableFailure
         (sessionPort: ISessionHostPort)
         (rootWorkspace: IRootWorkspaceReader)
@@ -582,10 +608,6 @@ module ProviderRecoveryWorkflow =
         (error: string)
         : Task =
         task {
-            match ModelRouting.takeProviderRunTarget turn.ProviderRun with
-            | Some target -> ModelRouting.markProviderFailed (providerOfTarget target)
-            | None -> ()
-
             let projections = (AgentJournal.snapshot durable)
 
             let activeProfileOpt =
@@ -716,10 +738,6 @@ module ProviderRecoveryWorkflow =
         (error: string)
         : Task<RetryVerdict> =
         task {
-            match ModelRouting.takeProviderRunTarget turn.ProviderRun with
-            | Some target -> ModelRouting.markProviderFailed (providerOfTarget target)
-            | None -> ()
-
             let projections = AgentJournal.snapshot durable
 
             let roleName =

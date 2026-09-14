@@ -72,6 +72,11 @@ module ModelRouting =
 
         member EndProviderStep: sessionId: string * physicalUserMessageId: string * providerRun: string -> unit
         member TakeProviderRunTarget: providerRun: string -> ModelRoutingTarget option
+
+        member CondemnFailedTarget: providerRun: string -> ModelRoutingTarget option
+
+        member RetainFailedTargetForRetry: sessionId: string * providerRun: string -> ModelRoutingTarget option
+
         member SuppressProviderStep: sessionId: string * physicalUserMessageId: string -> unit
         member SnapshotOccupied: unit -> ModelRoutingTarget array
         member PendingCount: int
@@ -81,7 +86,12 @@ module ModelRouting =
     val initialize: unit -> Task
 
     val internal takeProviderRunTarget: providerRun: ProviderRunIdentity -> ModelRoutingTarget option
-    val internal markProviderFailed: provider: string -> unit
+
+    val internal condemnFailedTarget: providerRun: ProviderRunIdentity -> ModelRoutingTarget option
+
+    val internal retainFailedTargetForRetry:
+        sessionId: SessionId -> providerRun: ProviderRunIdentity -> ModelRoutingTarget option
+
     val internal hasTheoreticalCapacity: role: string -> bool
 
     val internal acquireExecutionAdmission:

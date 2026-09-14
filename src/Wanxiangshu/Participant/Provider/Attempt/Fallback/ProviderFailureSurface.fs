@@ -545,6 +545,20 @@ module ProviderFailureSurface =
                 | Error error -> box {| ok = false; error = error |}
         }
 
+    /// PAR-021: the durable dispatch fact behind one confirmed failure's target
+    /// settlement — true only when that exact physical request was accepted as
+    /// a `ProviderRetryAttempt` continuation, i.e. the attempt carried the
+    /// LWR-replaced context. Never derived from a failure ordinal.
+    let wasLwrRetryAttempt
+        (handle: Wanxiangshu.Persistence.Journal.JournalHandle)
+        (session: string)
+        (physicalMessage: string)
+        : bool =
+        ProviderRecoveryWorkflow.failedAttemptWasLwrRetry
+            handle.Journal
+            (SessionId.create session)
+            (PhysicalUserMessageId.create physicalMessage)
+
     /// Read the durable provider failure budget for one session without exposing the
     /// projection record, map, or closed budget representation.
     let snapshot (handle: Wanxiangshu.Persistence.Journal.JournalHandle) (session: string) : obj =

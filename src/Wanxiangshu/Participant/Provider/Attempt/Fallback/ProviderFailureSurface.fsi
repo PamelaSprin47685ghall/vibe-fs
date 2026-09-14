@@ -23,4 +23,8 @@ module ProviderFailureSurface =
     val recordConfirmedFailure:
         handle: JournalHandle -> budget: int -> session: string -> providerRun: string -> reason: string -> Task<obj>
 
+    /// PAR-021: the durable `ProviderRetryAttempt` dispatch fact of one failed
+    /// physical attempt — the fact the recovery target settlement consumes.
+    val wasLwrRetryAttempt: handle: JournalHandle -> session: string -> physicalMessage: string -> bool
+
     val snapshot: handle: JournalHandle -> session: string -> obj

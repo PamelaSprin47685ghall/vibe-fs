@@ -100,12 +100,15 @@ delegate 只消费 verdict（`Ok unit` 保持调用 pending，`Error reason` 才
    the exact physical ChatExecution durable ProviderStarted evidence.
    Squash/repair success writes no SuccessRecorded; only WorkMain/BloggerMain
    success clears the failure count.
-8. **Identity isolation**: budget advance spends budget and rotates the
-   provider target; it never changes identity. No execution-selected agent
-   field exists; provider rotation happens only in the model layer. Every
-   attempt reuses the same durable logical participant run identity, Persona,
-   language, CanonicalRole, Authority identity and system prompt bytes; the
-   controller cannot issue a new identity.
+8. **Identity isolation and target settlement**: budget advance spends budget
+   and settles the failed physical target under PAR-021 — the first failure
+   keeps the provider and binds the session's next fresh admission to the
+   failed target for the LWR-replaced retry; only a failed LWR retry poisons
+   the provider and the following dispatch rotates. It never changes identity.
+   No execution-selected agent field exists; provider rotation happens only in
+   the model layer. Every attempt reuses the same durable logical participant
+   run identity, Persona, language, CanonicalRole, Authority identity and
+   system prompt bytes; the controller cannot issue a new identity.
 9. **Single budget projection**: `LogicalRunId` is the stable logical
    operation identity; the Host-created fresh `ProviderRunIdentity` is the
    physical attempt identity. `ProviderFailureProjection.mayRetry` against
@@ -146,6 +149,21 @@ delegate 只消费 verdict（`Ok unit` 保持调用 pending，`Error reason` 才
     a terminal to the caller. A confirmed provider class (transient/permanent)
     still terminalizes with the policy owning retry vs terminal, so ordinary
     provider fallback is unchanged.
+
+13. **PAR-021 target settlement — one rule for every recovery entry**: the
+    settlement runs inside `Retry.attempt`'s licensed redispatch (the single
+    engine shared by the ordinary turn path, Blogger recovery and dedicated
+    SyncDelegate children), after the durable prompt claim proved this
+    dispatch is the first one for that failure. `Fallback/Workflow.fs` reads
+    one durable fact — whether the failed attempt's exact physical request was
+    accepted as a `ProviderRetryAttempt` continuation — and settles the exact
+    failed witness (EMR-006/EMR-017) once: an LWR retry's own failure condemns
+    its provider (`ModelRouting.CondemnFailedTarget`), every other failure
+    keeps the provider and binds the session's next fresh admission to the
+    failed target (`ModelRouting.RetainFailedTargetForRetry`). Duplicate
+    notifications, stale callbacks, cancellations, unknown submissions and
+    unlicensed failures stop before the settlement; the witness and the
+    retry binding are each consumed exactly once.
 
 ## Final production path
 
@@ -207,5 +225,6 @@ DEPENDS ON:
 P0 recovery re-entry proof: `requirements/structured-workflow/tests/recovery-reentry.test.mjs`; production failure ledger and recovery owner proofs: `requirements/provider-attempt-recovery/tests/provider-failure-ledger.test.mjs`.
 | PAR-019 | `requirements/provider-attempt-recovery/tests/retry-owner.test.mjs::WHAT[PAR-019] one policy owner licenses every provider recovery attempt`; `requirements/verification-system/tests/retry-owner.test.mjs::WHAT[PAR-019] rejects nested physical retry owner`; `requirements/verification-system/tests/retry-owner.test.mjs::WHAT[PAR-019] rejects retry classification from diagnostic text` |
 | PAR-020 | `requirements/provider-attempt-recovery/tests/failure-budget.test.mjs::WHAT[PAR-020] budget_replay_exposes_domain_evidence_without_resume_authority` |
+| PAR-021 | `requirements/provider-attempt-recovery/tests/lwr-retry-before-condemn.test.mjs::WHAT[PAR-021] first_failure_keeps_the_original_target_for_the_lwr_retry`；`requirements/provider-attempt-recovery/tests/lwr-retry-before-condemn.test.mjs::WHAT[PAR-021] only_the_failed_lwr_retry_condemns_the_provider_and_rotates`；`requirements/provider-attempt-recovery/tests/lwr-retry-before-condemn.test.mjs::WHAT[PAR-021] the_settlement_fact_is_the_durable_provider_retry_attempt_acceptance`；`requirements/provider-attempt-recovery/tests/lwr-retry-before-condemn.test.mjs::WHAT[PAR-021] the_lwr_retry_payload_replaces_the_covered_prefix_with_the_work_record`；`requirements/provider-attempt-recovery/tests/lwr-retry-before-condemn.test.mjs::WHAT[PAR-021] ordinary_recovery_and_the_delegate_decorator_share_one_settlement` |
 | PAR-002 legacy bytes | `requirements/provider-attempt-recovery/tests/failure-budget-decoder.test.mjs::WHAT[PAR-002] legacy_fallback_bytes_decode_one_way_and_never_re_encode_offsets` |
 | PAR-011 plan freeze | `requirements/provider-attempt-recovery/tests/freeze-admission.test.mjs::WHAT[PAR-011] same-key same-plan replays the admitted plan` |

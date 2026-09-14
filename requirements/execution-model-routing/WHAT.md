@@ -87,3 +87,12 @@ Reliability query 的 queue depth、active lease 与 duplicate/stale/conflict fe
 ## EMR-016: routing fatal绑定exact fence settlement并经注入fuse执行
 
 fatal incident必须携带exact execution key、capacity fence及`Committed | Unknown` settlement evidence；未settle、stale fence与coarse session identity无权fatal。routing/Host port只接受composition注入的mandatory fatal capability，不得直接引用physical adapter。同一incident只允许一次report与kill，fatal不得修复、清零或释放capacity state。
+
+## EMR-017: provider 恢复重投的原目标绑定与失败驱逐
+
+provider 恢复的一次已确认失败由 `ModelRouting` 结算失败 attempt 的 exact witness（EMR-006），且只有两种结局：
+
+- 保留目标：为同一 `SessionId` 写入一次单次消费的 recovery retry 绑定；该 session 的下一次 fresh admission 以该 target 作为调度偏好（优先于被原子取代执行提供的 `previous`），绑定随之被消费，无论该 admission 成功、排队还是被更新物理消息取代。
+- 驱逐目标：其 provider 在进程生命周期内被 poison，后续 fresh admission 回到普通调度。
+
+两种结局都只属于该 exact witness：witness 单次消费，重复或过期证据不产生第二结局；无 witness（例如进程重启后）不产生任何结局。recovery retry 绑定不是 session 级 previous 缓存：它只由失败结算从 exact witness 显式写入、只服务该 session 的下一次 fresh admission，并在 force cleanup（`ReleaseExecution`）时清除。

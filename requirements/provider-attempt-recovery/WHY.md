@@ -40,11 +40,13 @@ remain, and when to stop completely.**
   same failure event re-enters the same durable claim and never sends a
   second physical request; a new failed provider run opens a new claim and
   sends a new physical request.
-- **Provider health vs failure budget**: `ModelRouting` permanently poisons
-  the failed physical provider; the failure budget only counts consecutive
-  failures and the budget. The two are orthogonal: the budget never revives a
-  failed provider, and the provider health table never rewrites the logical
-  participant identity.
+- **Provider health vs failure budget**: `ModelRouting` poisons a physical
+  provider only when that provider's LWR-context retry is itself confirmed
+  failed (PAR-021); a first failure keeps the provider and binds the retry to
+  the failed target, so provider health is never decided by a failure ordinal.
+  The failure budget only counts consecutive failures and the budget. The two
+  are orthogonal: the budget never revives a failed provider, and the provider
+  health table never rewrites the logical participant identity.
 
 ## What a boundary violation means
 
