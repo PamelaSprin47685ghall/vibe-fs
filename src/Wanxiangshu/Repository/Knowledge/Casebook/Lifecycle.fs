@@ -42,6 +42,152 @@ module CasebookLifecycle =
         CasebookDraftStore.clear inspectorSessionId
         collector.Drain inspectorSessionId |> ignore
 
+    /// Run the durable case-scope probe for `inspectorSessionId`. Aborts on store
+    /// error so the dispatch below only sees a verdict-bearing Result.
+    let private probeExistingScope
+        (store: IEventStore)
+        (inspectorSessionId: string)
+        : Task<Result<Case option, string>> =
+        task {
+            match! CasebookWorkflow.fetchCase store 0 inspectorSessionId with
+            | Error reason -> return Error(sprintf "cannot confirm case scope %s: %s" inspectorSessionId reason)
+            | Ok existing -> return Ok existing
+        }
+
+    /// A `Some` case already settled under this scope: refuse the spawn
+    /// outright, keeping the original case's evidence. A `None` verdict means
+    /// the archive may proceed.
+    let private dispositionOfExistingScope
+        (inspectorSessionId: string)
+        (existing: Result<Case option, string>)
+        : InspectorFinalizeSettlement option =
+        match existing with
+        | Error reason ->
+            Some(InspectorFinalizeSettlement.notCommitted inspectorSessionId reason)
+        | Ok(Some case) ->
+            Some(
+                InspectorFinalizeSettlement.phaseConflict
+                    inspectorSessionId
+                    (sprintf "case already finalized for scope %s" case.SessionId)
+            )
+        | Ok None -> None
+
+    /// Refresh the read-model index and settle the settlement. The durable
+    /// archive already committed, so an index-rebuild failure must report
+    /// Unknown — the evidence is no longer re-ignorable either direction.
+    let private refreshIndexThenSettle (store: IEventStore) (inspectorSessionId: string) : Task<InspectorFinalizeSettlement> =
+        task {
+            try
+                let! _ = CasebookIndex.refresh store 256
+                return InspectorFinalizeSettlement.finalized inspectorSessionId
+            with ex ->
+                // The case is archived; only the read-model refresh
+                // failed. The finalize itself committed — report it
+                // as Unknown rather than NotCommitted so nobody
+                // re-archives the same case.
+                return InspectorFinalizeSettlement.unknown inspectorSessionId ex.Message
+        }
+
+    /// Persist the produced Case record (the durable finalize hop) and rename
+    /// its outcome to a typed settlement. The index refresh rides the Ok arm,
+    /// never re-archiving `already finalized` or dropping NotCommitted.
+    let private archiveCase
+        (store: IEventStore)
+        (inspectorSessionId: string)
+        (case: Case)
+        : Task<InspectorFinalizeSettlement> =
+        task {
+            match! CasebookWorkflow.finalizeCase store case with
+            | Error reason when reason.Contains "already finalized" ->
+                return InspectorFinalizeSettlement.phaseConflict inspectorSessionId reason
+            | Error reason ->
+                return InspectorFinalizeSettlement.notCommitted inspectorSessionId reason
+            | Ok() ->
+                CasebookIndex.invalidate ()
+                return! refreshIndexThenSettle store inspectorSessionId
+        }
+
+    /// Spawn the CaseFinalize child, shape its result into the final
+    /// settlement. On error the draft is already taken and no durable write
+    /// happened, so NotCommitted is honest and the identity is retained.
+    let private spawnFinalize
+        (inspectorSessionId: string)
+        (lastQ: string)
+        (a: string)
+        (observations: Observation list)
+        (transcript: string option)
+        (store: IEventStore)
+        : Task<InspectorFinalizeSettlement> =
+        task {
+            let! spawned =
+                BookkeeperRuntime.runTransaction
+                    BookkeeperRequest.CaseFinalize
+                    (SessionId.create inspectorSessionId)
+                    lastQ
+                    a
+                    observations
+                    transcript
+
+            match spawned with
+            | Error reason ->
+                return InspectorFinalizeSettlement.notCommitted inspectorSessionId reason
+            | Ok(q', a') ->
+                let case: Case =
+                    { SessionId = inspectorSessionId
+                      Q = q'
+                      A = a'
+                      Observations = observations
+                      LastAccessOrder = 0L }
+
+                return! archiveCase store inspectorSessionId case
+        }
+
+    /// Decision arm of `dispatchFinalize` — probe + spawn wiring, separated
+    /// so the outer `try` sees a single named subflow, not two matches.
+    let private continueFinalizeDecision
+        (store: IEventStore)
+        (inspectorSessionId: string)
+        (draft: CasebookDraft)
+        (a: string)
+        : Task<InspectorFinalizeSettlement> =
+        task {
+            let observations = collector.Drain inspectorSessionId
+
+            let lastQ =
+                draft.Turns
+                |> List.tryLast
+                |> Option.map (fun turn -> turn.Q)
+                |> Option.defaultValue ""
+
+            let transcript = CasebookDraftStore.transcript draft.Turns
+
+            let! existing = probeExistingScope store inspectorSessionId
+
+            match dispositionOfExistingScope inspectorSessionId existing with
+            | Some settled -> return settled
+            | None -> return! spawnFinalize inspectorSessionId lastQ a observations (Some transcript) store
+        }
+
+    /// Stage-chain dispatch over a prepared draft: probe existing scope, visit
+    /// Bookkeeper if free, or archive the produced Case. Every stage is owned
+    /// by its own one-`match` function above; the only `match` here is the
+    /// early-exit over `dispositionOfExistingScope`'s optional verdict.
+    let private dispatchFinalize
+        (store: IEventStore)
+        (_workspaceRoot: string)
+        (inspectorSessionId: string)
+        (draft: CasebookDraft)
+        (a: string)
+        : Task<InspectorFinalizeSettlement> =
+        task {
+            try
+                let! result = continueFinalizeDecision store inspectorSessionId draft a
+                return result
+            with ex ->
+                collector.Drain inspectorSessionId |> ignore
+                return InspectorFinalizeSettlement.unknown inspectorSessionId ex.Message
+        }
+
     let private runFinalize
         (store: IEventStore)
         (workspaceRoot: string)
@@ -49,85 +195,7 @@ module CasebookLifecycle =
         (draft: CasebookDraft)
         (a: string)
         : Task<InspectorFinalizeSettlement> =
-        task {
-            try
-                let observations = collector.Drain inspectorSessionId
-
-                let lastQ =
-                    draft.Turns
-                    |> List.tryLast
-                    |> Option.map (fun turn -> turn.Q)
-                    |> Option.defaultValue ""
-
-                let transcript = CasebookDraftStore.transcript draft.Turns
-
-                match!
-                    task {
-                        match! CasebookWorkflow.fetchCase store 0 inspectorSessionId with
-                        | Error reason -> return Error(sprintf "cannot confirm case scope %s: %s" inspectorSessionId reason)
-                        | Ok existing -> return Ok existing
-                    }
-                with
-                | Error reason ->
-                    // The store could not even confirm whether a case for this
-                    // scope already exists: the finalize was never attempted
-                    // and no durable effect could have happened.
-                    return InspectorFinalizeSettlement.notCommitted inspectorSessionId reason
-                | Ok(Some case) ->
-                    // Already-finalized scope: refuse BEFORE launching a
-                    // Bookkeeper child so a duplicate finalize never executes
-                    // the completion a second time. The original case stays
-                    // intact and the identity is retained for incident
-                    // evidence.
-                    return InspectorFinalizeSettlement.phaseConflict inspectorSessionId (sprintf "case already finalized for scope %s" case.SessionId)
-                | Ok None ->
-                match!
-                    BookkeeperRuntime.runTransaction
-                        BookkeeperRequest.CaseFinalize
-                        (SessionId.create inspectorSessionId)
-                        lastQ
-                        a
-                        observations
-                        (Some transcript)
-                with
-                | Error reason ->
-                    // The draft was already taken and the failure happened
-                    // before any durable write: the finalize was never attempted
-                    // against the store. Identity is retained for resume.
-                    return InspectorFinalizeSettlement.notCommitted inspectorSessionId reason
-                | Ok(q', a') ->
-                    let case: Case =
-                        { SessionId = inspectorSessionId
-                          Q = q'
-                          A = a'
-                          Observations = observations
-                          LastAccessOrder = 0L }
-
-                    // CASE-010 exactly-one: the store already holds this case —
-                    // the finalize raced a prior completion. The completion is
-                    // neither re-executed nor forgotten; report the conflict and
-                    // retain the identity for the incident evidence.
-                    match! CasebookWorkflow.finalizeCase store case with
-                    | Error reason when reason.Contains "already finalized" ->
-                        return InspectorFinalizeSettlement.phaseConflict inspectorSessionId reason
-                    | Error reason ->
-                        return InspectorFinalizeSettlement.notCommitted inspectorSessionId reason
-                    | Ok() ->
-                        CasebookIndex.invalidate ()
-
-                        try
-                            let! _ = CasebookIndex.refresh store 256
-                            return InspectorFinalizeSettlement.finalized inspectorSessionId
-                        with ex ->
-                            // The case is archived; only the read-model refresh
-                            // failed. The finalize itself committed — report it
-                            // as Unknown rather than NotCommitted so nobody
-                            // re-archives the same case.
-                            return InspectorFinalizeSettlement.unknown inspectorSessionId ex.Message
-            with ex ->
-                collector.Drain inspectorSessionId |> ignore
-                return InspectorFinalizeSettlement.unknown inspectorSessionId ex.Message
-        }
+        dispatchFinalize store workspaceRoot inspectorSessionId draft a
 
     let private finalizeWithDraft
         (store: IEventStore)
@@ -200,3 +268,4 @@ module CasebookLifecycle =
             if CasebookFeature.isEnabled workspaceRoot then
                 do! touchAccessEnabled store sessionId
         }
+

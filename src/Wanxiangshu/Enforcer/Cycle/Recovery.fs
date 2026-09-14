@@ -260,6 +260,20 @@ module EnforcerFrameRecovery =
         /// The decoded candidate violates the request invariants.
         | InvariantViolated of BloggerRequestRejection
 
+    /// BloggerRequestRejection → flat description; kept at module level so the
+    /// outer `reloadRejectionLabel` never carries a second pyramid level.
+    let describeInvariantRejection (rejection: BloggerRequestRejection) : string =
+        match rejection with
+        | BloggerRequestRejection.CoverageDidNotAdvance(previous, next) ->
+            $"coverage did not advance: previous {previous} next {next}"
+        | BloggerRequestRejection.DeltaDigestMismatch(expected, actual) ->
+            $"delta digest mismatch: expected {expected} actual {actual}"
+        | BloggerRequestRejection.EpochNotCoherent(field, value) ->
+            $"epoch not coherent: {field} value {value}"
+        | BloggerRequestRejection.EmptySquashCoverage -> "squash covers no frames"
+        | BloggerRequestRejection.SquashCoverageMismatch(declared, carried) ->
+            $"squash coverage mismatch: declared {declared} carried {carried}"
+
     let reloadRejectionLabel (rejection: CycleContextReloadRejection) : string =
         match rejection with
         | CycleContextReloadRejection.BlobUnreadable reason -> $"context blob unreadable: {reason}"
@@ -267,16 +281,7 @@ module EnforcerFrameRecovery =
         | CycleContextReloadRejection.UnsupportedRequestKind kind -> $"unsupported request kind: {kind}"
         | CycleContextReloadRejection.ItemsUndecodable reason -> $"delta items undecodable: {reason}"
         | CycleContextReloadRejection.InvariantViolated rejection ->
-            match rejection with
-            | BloggerRequestRejection.CoverageDidNotAdvance(previous, next) ->
-                $"coverage did not advance: previous {previous} next {next}"
-            | BloggerRequestRejection.DeltaDigestMismatch(expected, actual) ->
-                $"delta digest mismatch: expected {expected} actual {actual}"
-            | BloggerRequestRejection.EpochNotCoherent(field, value) ->
-                $"epoch not coherent: {field} value {value}"
-            | BloggerRequestRejection.EmptySquashCoverage -> "squash covers no frames"
-            | BloggerRequestRejection.SquashCoverageMismatch(declared, carried) ->
-                $"squash coverage mismatch: declared {declared} carried {carried}"
+            describeInvariantRejection rejection
 
     let private hasJsonKey (raw: obj) (key: string) : bool =
         emitJsExpr (raw, key) "$0 != null && Object.prototype.hasOwnProperty.call($0, $1)"

@@ -128,21 +128,27 @@ type PluginBloggerScope() =
         episodeCompletions.Add(created.Completion)
         created
 
+    /// Displaced-episode arbitration: terminally-failed or still-revoked
+    /// foreign slot → error; merely-cancelled (never-completed) slot → evict
+    /// and install the fresh episode. Prevents a stale terminal from
+    /// re-pending repair budget on a slot whose evidence was never proven.
+    let displacedRepairEpisodeSlot
+        (bloggerSid: SessionId)
+        (identity: BloggerRepairEpisodeIdentity)
+        (existing: BloggerRepairRendezvous)
+        =
+        if existing.TerminalFailure.IsSome || not existing.IsRevoked then
+            Error
+                $"Conflicting episode already active for {SessionId.value bloggerSid}: existing req {BloggerRequestId.value existing.Identity.RequestId} root {AuthorityRootUserMessageId.value existing.Identity.AuthorityRoot}"
+        else
+            episodes.Remove bloggerSid |> ignore
+            Ok(createRegisteredRepairEpisode bloggerSid identity)
+
     let decideRepairEpisodeSlot (bloggerSid: SessionId) (identity: BloggerRepairEpisodeIdentity) =
         match episodes.TryGetValue bloggerSid with
         | true, existing when isSameRepairEpisode existing identity -> Ok existing
         | true, existing ->
-            // A terminally failed episode stays registered forever: its abandon
-            // outcome is unknown, so a fresh episode would re-spend repair budget
-            // on a request whose settlement was never proven. A merely-cancelled
-            // episode (terminal release/retire without settlement fault) is
-            // reclaimable — the slot is evidence-free once its flight is gone.
-            if existing.TerminalFailure.IsSome || not existing.IsRevoked then
-                Error
-                    $"Conflicting episode already active for {SessionId.value bloggerSid}: existing req {BloggerRequestId.value existing.Identity.RequestId} root {AuthorityRootUserMessageId.value existing.Identity.AuthorityRoot}"
-            else
-                episodes.Remove bloggerSid |> ignore
-                Ok(createRegisteredRepairEpisode bloggerSid identity)
+            displacedRepairEpisodeSlot bloggerSid identity existing
         | false, _ -> Ok(createRegisteredRepairEpisode bloggerSid identity)
 
     let claimRepairEpisodeSlot (bloggerSid: SessionId) (identity: BloggerRepairEpisodeIdentity) =

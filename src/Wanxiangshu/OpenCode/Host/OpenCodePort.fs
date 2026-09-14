@@ -128,6 +128,43 @@ module OpenCodePortAdapter =
     /// PromptKey handler. A caller that carried no listener has no owner for
     /// a late verdict, so the port records honest diagnostic evidence rather
     /// than claiming a fused invariant.
+    /// Single-level listener call — try/do captured here so the caller's
+    /// match stays arm-only; failures land on the diagnostic lane.
+    let private runListener
+        (sessionId: SessionId)
+        (verdict: DetachedSendVerdict)
+        (deliver: DetachedSendListener)
+        : Task =
+        task {
+            try
+                do! deliver verdict
+            with ex ->
+                Diagnostic.emit
+                    "prompt-async-dispatch-listener-failed"
+                    [ "session_id", SessionId.value sessionId
+                      "result", sprintf "%A listener fault: %s" verdict ex.Message ]
+        }
+
+    /// Push a non-OwnedSettled detached verdict into the caller-registered
+    /// listener; a None listener emits its own evidence rather than fabricating
+    /// ownership of a late decision.
+    let private deliverVerdictTo
+        (sessionId: SessionId)
+        (listener: DetachedSendListener option)
+        (verdict: DetachedSendVerdict)
+        : Task =
+        task {
+            match listener with
+            | Some deliver -> return! runListener sessionId verdict deliver
+            | None -> ()
+        }
+
+    /// Deliver the eventual detached enqueue verdict to the owning dispatch
+    /// layer — never adjudicated here. OwnedSettled is a no-op refusal to
+    /// re-settle; Refused and OutcomeUnknown re-enter the session's own
+    /// PromptKey handler. A caller that carried no listener has no owner for
+    /// a late verdict, so the port records honest diagnostic evidence rather
+    /// than claiming a fused invariant.
     let private deliverDetachedVerdict
         (sessionId: SessionId)
         (listener: DetachedSendListener option)
@@ -136,23 +173,18 @@ module OpenCodePortAdapter =
         match verdict with
         | DetachedSendVerdict.OwnedSettled -> Task.FromResult()
         | _ ->
-            match listener with
-            | Some deliver ->
-                task {
-                    try
-                        do! deliver verdict
-                    with ex ->
-                        Diagnostic.emit
-                            "prompt-async-dispatch-listener-failed"
-                            [ "session_id", SessionId.value sessionId
-                              "result", sprintf "%A listener fault: %s" verdict ex.Message ]
-                }
-            | None ->
-                Diagnostic.emit
-                    "prompt-async-unowned-late-verdict"
-                    [ "session_id", SessionId.value sessionId; "result", sprintf "%A" verdict ]
+            deliverVerdictTo sessionId listener verdict
 
-                Task.FromResult()
+    /// Classify a detached settlement rejection: an HTTP adapter knows a
+    /// refusal happened only when the response carried meaningful transport
+    /// context; every other failure is outcome-unknown. Plain promise
+    /// rejects land on the same path as transport refusals per ENF- words
+    /// below — distinguishable callers split it.
+    let private verdictForDetachedError (error: string) : DetachedSendVerdict =
+        if error.StartsWith("HTTP ", System.StringComparison.Ordinal) then
+            DetachedSendVerdict.Refused error
+        else
+            DetachedSendVerdict.OutcomeUnknown error
 
     /// `prompt_async` is an enqueue boundary, not the lifetime of the child
     /// run. A rejection after the caller already owns the key is not an
@@ -190,12 +222,7 @@ module OpenCodePortAdapter =
             | Ok _ ->
                 do! deliverDetachedVerdict sessionId listener DetachedSendVerdict.OwnedSettled
             | Error error ->
-                let verdict =
-                    if error.StartsWith("HTTP ", System.StringComparison.Ordinal) then
-                        DetachedSendVerdict.Refused error
-                    else
-                        DetachedSendVerdict.OutcomeUnknown error
-
+                let verdict = verdictForDetachedError error
                 do! deliverDetachedVerdict sessionId listener verdict
         }
         |> ignore

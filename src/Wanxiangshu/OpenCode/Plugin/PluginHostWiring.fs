@@ -18,6 +18,38 @@ open Wanxiangshu.Strength.Persistence
 
 module PluginHostWiring =
 
+    /// Graceful close: finalize the root-owned inspector draft through the
+    /// workspace store once. Acquiring the store is pre-validated by the
+    /// outer `try`; once held, lifecycle failures report via the task's
+    /// settled signature instead of retrying the pyramid.
+    let private tryFinalizeWithin workspaceRoot store inspectorSessionId =
+        task {
+            try
+                return!
+                    CasebookLifecycle.tryFinalizeInspector workspaceRoot store inspectorSessionId
+
+            with ex ->
+                // A thrown boundary error (store acquisition or lifecycle
+                // bug) has indeterminate durability: report Unknown and
+                // retain the identity.
+                return InspectorFinalizeSettlement.unknown inspectorSessionId ex.Message
+        }
+
+    /// Workspace root–InspectorSessionId → settlement. The two layers of
+    /// indeterminate-durability failure compose at the module boundary: store
+    /// acquisition collapses to Unknown, lifecycle failure does too, and the
+    /// detached Task is handed to the caller unchanged.
+    let private tryFinalize workspaceRoot inspectorSessionId =
+        try
+            let commonDir = RuntimePath.gitCommonDir workspaceRoot
+            let store = WorkspaceEventStore.acquire commonDir
+            tryFinalizeWithin workspaceRoot store inspectorSessionId
+
+        with ex ->
+            Task.FromResult(
+                InspectorFinalizeSettlement.unknown inspectorSessionId ex.Message
+            )
+
     /// Composition-root handle for everything the Host needs after boot:
     /// the ports `HostSignalBootstrap.wire` produced plus the durability
     /// handle and the shared-terminal acquisition from `PluginHost.createHost`.
@@ -163,30 +195,7 @@ module PluginHostWiring =
 
                                 BookkeeperRuntime.completePhysical terminal.SessionId outcome)
                             workspaceDirectory
-                            (let tryFinalize workspaceRoot inspectorSessionId =
-                                try
-                                    let commonDir = RuntimePath.gitCommonDir workspaceRoot
-                                    let store = WorkspaceEventStore.acquire commonDir
-                                    task {
-                                        try
-                                            return!
-                                                CasebookLifecycle.tryFinalizeInspector workspaceRoot store inspectorSessionId
-
-                                        with ex ->
-                                            // A thrown boundary error (store acquisition or
-                                            // lifecycle bug) has indeterminate durability:
-                                            // report Unknown and retain the identity.
-                                            return InspectorFinalizeSettlement.unknown inspectorSessionId ex.Message
-                                    }
-
-                                with ex ->
-                                    // Acquiring the store itself failed — the same
-                                    // indeterminate-durability verdict applies.
-                                    Task.FromResult(
-                                        InspectorFinalizeSettlement.unknown inspectorSessionId ex.Message
-                                    )
-
-                             Some tryFinalize)
+                            (Some tryFinalize)
                             (Some CasebookLifecycle.cleanupInspector)
 
                     return

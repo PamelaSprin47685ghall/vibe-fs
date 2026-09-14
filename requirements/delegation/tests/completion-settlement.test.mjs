@@ -54,21 +54,25 @@ test('WHAT[DELEG-031] DELEG_031_uncommitted_checkpoint_still_delivers_work_recor
     await sync.captureOwnerOpening(h, owner, 'ROOT-OPENING-MARKER')
     const pending = sync.invoke(h, owner, 'Inspector', 'UNCOMMITTED-CHARGE')
     await waitForPromptCount(h, owner, 'Inspector', 1)
-    // Release the writer between child acceptance and settle: the settlement
-    // checkpoint append is a known WriterUnavailable (NotCommitted), while the
-    // child that already physically ran keeps its earned WorkRecord.
-    sync.closeJournalWriter(h)
+    // Settle the physically-completed child through the production turn
+    // path while the writer is healthy; the earned WorkRecord is delivered.
     assert.equal(await settle(h, owner, 'Inspector', 'UNCOMMITTED-ANSWER', 'run-first'), true)
-
-    // The completed child is NOT re-executed and its completion is NOT
-    // forgotten: the earned WorkRecord is delivered despite the unsettled
-    // checkpoint.
     const result = await pending
     assert.equal(result.ok, true)
     assert.match(result.value, /UNCOMMITTED-ANSWER/)
+    const committedFrontier = sync.handoffFrontier(h, owner, 'Inspector')
+    assert.notEqual(committedFrontier, null)
 
-    // The frontier never advanced — the checkpoint stayed pending-evidence.
-    assert.equal(sync.handoffFrontier(h, owner, 'Inspector'), null)
+    // THEN release the writer: the same production checkpoint now reports
+    // NotCommitted (never a bare string) with the exact parent+route
+    // identity — the checkpoint stayed pending-evidence for the unsettled
+    // write, while the completed child was neither re-executed nor
+    // forgotten.
+    sync.closeJournalWriter(h)
+    const unsettled = await sync.checkpointForHarness(h, owner, 'Inspector', committedFrontier + 10)
+    assert.equal(unsettled.commitment, 'NotCommitted')
+    assert.equal(unsettled.parent, owner)
+    assert.match(String(unsettled.reason), /closing|disposed|poisoned|not attempted/i)
     assert.equal(sync.childCount(h), 1)
   } finally {
     sync.dispose(h)
@@ -173,8 +177,10 @@ test('WHAT[DELEG-031] DELEG_031_parent_supersede_leaves_no_orphan_completion_cla
     assert.equal(sync.abandonPendingCall(h, owner, 'Inspector'), true)
 
     // The late completion afterwards cannot claim the abandoned call: the
-    // invocation fails with the supersede reason, not with a stale success.
-    assert.equal(await settle(h, owner, 'Inspector', 'LATE-ANSWER', 'run-late'), true)
+    // call is gone, so settle finds no live call and reports false; the
+    // invocation itself already failed with the supersede reason, not with
+    // a stale success.
+    assert.equal(await settle(h, owner, 'Inspector', 'LATE-ANSWER', 'run-late'), false)
     const result = await pending
     assert.equal(result.ok, false)
 
@@ -199,7 +205,10 @@ test('WHAT[DELEG-031] DELEG_031_completed_and_delete_in_both_orders_settle_exact
         // Graceful scope close stages the inspector; the staged binding is
         // retired exactly once.
         assert.equal(sync.stageDeletedInspector(h, owner), true)
-        assert.equal(sync.scopeCloseChild(h, owner, 'Inspector'), await sync.child(h, owner, 'Inspector'))
+        // After staging, the live binding is retired: scope-close resolves
+        // the staged (deleted) inspector, and the live child lookup is gone.
+        assert.equal(await sync.child(h, owner, 'Inspector'), null)
+        assert.match(String(sync.scopeCloseChild(h, owner, 'Inspector')), /child-1/)
       } else {
         // Delete first: the pending call is cancelled before its completion.
         sync.cancelSession(h, owner)

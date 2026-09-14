@@ -566,14 +566,20 @@ module MagicTodoHostHooks =
         | Some value -> value
         | None -> refuseHookCall reason
 
+    /// Non-append prepare rejection: semantic syntax errors feed the
+    /// model-visible Failed rail; anything else (blob IO, locality, etc.)
+    /// refuses through the host contract from inside the checkpoint.
+    let private prepareInvariantOutcome (sessionText: string) (reason: MagicTodoMembrane.PrepareRejection) =
+        match syntaxPrepareFailure reason with
+        | Some syntax -> ObligationLedgerWorkflow.PreparationAttempt.Failed syntax
+        | None -> refuseHookCall (sprintf "Magic Todo prepare refused: %s" (describePrepareRejection sessionText reason))
+
     let private preparationFailure (sessionText: string) (reason: MagicTodoMembrane.PrepareRejection) =
         match reason with
         | MagicTodoMembrane.PrepareRejection.JournalAppend failure ->
             raise (JournalAppendException failure)
-        | _ ->
-            match syntaxPrepareFailure reason with
-            | Some syntax -> ObligationLedgerWorkflow.PreparationAttempt.Failed syntax
-            | None -> refuseHookCall (sprintf "Magic Todo prepare refused: %s" (describePrepareRejection sessionText reason))
+        | reason ->
+            prepareInvariantOutcome sessionText reason
 
     let private admitPreparationAttempt
         (durable: AgentJournal)
@@ -691,24 +697,29 @@ module MagicTodoHostHooks =
         if not (String.IsNullOrEmpty accepted.EnrichedResult) then
             MagicTodoHostCodec.replaceEnrichedResult output accepted.EnrichedResult
 
+    let private acceptRejectionOutcome
+        (sessionText: string)
+        (rejection: MagicTodoMembrane.AcceptRejection)
+        : unit =
+        match rejection with
+        | MagicTodoMembrane.AcceptRejection.JournalAppend failure ->
+            raise (JournalAppendException failure)
+        | MagicTodoMembrane.AcceptRejection.InputDigestMismatch
+        | MagicTodoMembrane.AcceptRejection.OutputDigestMismatch ->
+            // The physical tool effect already ran: claiming NoOwnedExecution
+            // via ProviderInputRejection would lie. Settlement is genuinely
+            // incomplete — fail loud, keep the owned execution visible.
+            invalidOp (
+                sprintf
+                    "Magic Todo accept rejected physical evidence for %s: %A"
+                    sessionText
+                    rejection
+            )
+
     let private acceptResolvedCheckpoint sessionText outcome (output: obj) =
         match outcome with
         | Error(ObligationLedgerWorkflow.AcceptanceFailure.AcceptFailed rejection) ->
-            match rejection with
-            | MagicTodoMembrane.AcceptRejection.JournalAppend failure ->
-                raise (JournalAppendException failure)
-            | MagicTodoMembrane.AcceptRejection.InputDigestMismatch
-            | MagicTodoMembrane.AcceptRejection.OutputDigestMismatch ->
-                // The physical tool effect already ran: claiming NoOwnedExecution
-                // via ProviderInputRejection would lie. Settlement is genuinely
-                // incomplete — the hook arbiter keeps the fuse to the policy
-                // table instead of killing the process.
-                invalidOp (
-                    sprintf
-                        "Magic Todo accept rejected physical evidence for %s: %A"
-                        sessionText
-                        rejection
-                )
+            acceptRejectionOutcome sessionText rejection
         | Ok accepted -> applyEnrichedResult output accepted
 
     let private acceptAfterPrepare

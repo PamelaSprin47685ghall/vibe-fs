@@ -50,6 +50,25 @@ module DelegationHandoffLedger =
                   ParentEndExclusive = XTraceRange.endExclusive handoff.Range }
         }
 
+    /// PERSIST-002 / DELEG-031 classification: the failure taxonomy IS the
+    /// settlement. WriterUnavailable is known-not-committed; WriteUnknown
+    /// stays pending-evidence; FactRejected is the frontier invariant cut —
+    /// PhaseConflict for the owner, never collapsed to a bare string.
+    let private settlementFromAppend
+        (parent: SessionId)
+        (handoff: PreparedDelegationHandoff)
+        (failure: JournalAppendFailure)
+        : HandoffCheckpointSettlement =
+        let reason = JournalAppendFailure.describe failure
+
+        match failure with
+        | JournalAppendFailure.WriterUnavailable _ ->
+            HandoffCheckpointSettlement.notCommitted parent handoff reason
+        | JournalAppendFailure.WriteUnknown _ ->
+            HandoffCheckpointSettlement.unknown parent handoff reason
+        | JournalAppendFailure.FactRejected _ ->
+            HandoffCheckpointSettlement.phaseConflict parent handoff reason
+
     let checkpointCompleted
         (journal: AgentJournal)
         (parent: SessionId)
@@ -75,16 +94,7 @@ module DelegationHandoffLedger =
             return
                 match appended with
                 | Ok _ -> HandoffCheckpointSettlement.committed parent handoff
-                | Error failure ->
-                    let reason = JournalAppendFailure.describe failure
-
-                    match failure with
-                    | JournalAppendFailure.WriterUnavailable _ ->
-                        HandoffCheckpointSettlement.notCommitted parent handoff reason
-                    | JournalAppendFailure.WriteUnknown _ ->
-                        HandoffCheckpointSettlement.unknown parent handoff reason
-                    | JournalAppendFailure.FactRejected _ ->
-                        HandoffCheckpointSettlement.phaseConflict parent handoff reason
+                | Error failure -> settlementFromAppend parent handoff failure
         }
 
     let port (workRecord: DelegationWorkRecordCapability) (journal: AgentJournal) : ReusableHandoffPort =

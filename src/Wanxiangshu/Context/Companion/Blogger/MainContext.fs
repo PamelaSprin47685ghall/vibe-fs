@@ -71,10 +71,17 @@ module BloggerMainContext =
             )
 
     /// Build the staged offer context from the same delta the coordinator
-    /// computed. Freezes RequestId and ObservedPrefixEpochId at
     /// materialization. Refuses at birth when coverage cannot strictly
     /// advance: an unmapped next cursor or a next sequence at or below the
     /// previous ingested sequence returns None so no BloggerMain is started.
+    let private mainCandidateOutcome
+        (candidate: BloggerMainRequestInput)
+        : BloggerRequestContext option =
+        match BloggerRequestMaterial.createMain candidate with
+        | Ok verified -> Some(BloggerRequestContext.Main verified)
+        | Error rejection ->
+            raise (InvalidOperationException(sprintf "mainContextFromChunk staged an unverifiable context: %A" rejection))
+
     let mainContextFromChunk
         (mainSessionId: SessionId)
         (bloggerSessionId: SessionId)
@@ -131,10 +138,7 @@ module BloggerMainContext =
                   DeltaDigest = deltaDigest
                   ObservedPrefixEpochId = observedEpoch }
 
-            match BloggerRequestMaterial.createMain candidate with
-            | Ok verified -> Some(BloggerRequestContext.Main verified)
-            | Error rejection ->
-                raise (InvalidOperationException(sprintf "mainContextFromChunk staged an unverifiable context: %A" rejection))
+            mainCandidateOutcome candidate
 
     let hasMaterial
         (journal: AgentJournal option)

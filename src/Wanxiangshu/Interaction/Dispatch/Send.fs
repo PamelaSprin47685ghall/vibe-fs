@@ -115,6 +115,24 @@ module PromptDispatcherSend =
     let private physicalSendAdmission (admission: (unit -> Result<unit, QuiescencePermitFailure>) option) =
         admission |> Option.map (fun admit -> admit ()) |> Option.defaultValue (Ok())
 
+    /// Detached dispatch observer: the success rail stays silent, the
+    /// failure rail receives exactly one string form of the typed verdict.
+    /// Pulled out as a module-level helper to flatten the consumer's pyramid
+    /// — the try/wrap stays at one level in both this file's bodies.
+    let private notifyDetachedFailureListener
+        (sessionId: SessionId)
+        (verdict: DetachedSendVerdict)
+        (callback: string -> Task)
+        : Task =
+        task {
+            try
+                do! callback (sprintf "%A" verdict)
+            with ex ->
+                Diagnostic.emit
+                    "detached-prompt-observer-failed"
+                    [ "session_id", SessionId.value sessionId; "result", ex.Message ]
+        }
+
     type PromptDispatcher.Runtime with
 
         /// Record the Host's answer and report what the caller may conclude.
@@ -198,14 +216,7 @@ module PromptDispatcherSend =
                     // caller-visible outcome; a late arrival must not re-settle.
                     ()
                 | DetachedSendVerdict.Refused reason ->
-                    let! result = this.Abandon key sessionId (PromptAbandonReason.SendFailed reason)
-
-                    match result with
-                    | Ok() -> ()
-                    | Error persistError ->
-                        Diagnostic.emit
-                            "detached-prompt-abandon-uncommitted"
-                            [ "session_id", SessionId.value sessionId; "result", persistError ]
+                    return! this.SettleDetachedSendRefused key sessionId reason
                 | DetachedSendVerdict.OutcomeUnknown reason ->
                     // PROMPT-011: never resent, never abandoned — the claim
                     // stays Pending on durable evidence until chat.message
@@ -220,13 +231,7 @@ module PromptDispatcherSend =
                 match verdict, onFailure with
                 | DetachedSendVerdict.OwnedSettled, _
                 | _, None -> ()
-                | _, Some callback ->
-                    try
-                        do! callback (sprintf "%A" verdict)
-                    with ex ->
-                        Diagnostic.emit
-                            "detached-prompt-observer-failed"
-                            [ "session_id", SessionId.value sessionId; "result", ex.Message ]
+                | verdict, Some callback -> return! notifyDetachedFailureListener sessionId verdict callback
             }
 
         /// PROMPT-007: observe a Host send after a Detached caller has already
@@ -770,3 +775,22 @@ module PromptDispatcherSend =
                 None
                 None
                 (Some physicalAdmission)
+        /// Refused arm of SettleDetachedSend — kept flat so the outer match
+        /// stays a single level; persistence errors report through the
+        /// diagnostic lane rather than a second nested match arm.
+        member private this.SettleDetachedSendRefused
+            (key: PromptKey)
+            (sessionId: SessionId)
+            (reason: string)
+            : Task =
+            task {
+                let! result = this.Abandon key sessionId (PromptAbandonReason.SendFailed reason)
+
+                match result with
+                | Ok() -> ()
+                | Error persistError ->
+                    Diagnostic.emit
+                        "detached-prompt-abandon-uncommitted"
+                        [ "session_id", SessionId.value sessionId; "result", persistError ]
+            }
+

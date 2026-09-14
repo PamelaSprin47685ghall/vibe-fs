@@ -98,6 +98,32 @@ module HostSessionDeletion =
             }
         | None -> Task.FromResult None
 
+    /// One settle dispatch at top level so the match inside
+    /// `finalizeStagedInspector` stays a single pyramid level.
+    let private finalizeDisposition
+        (scope: PluginRuntimeScope)
+        (inspectorId: SessionId)
+        (settled: InspectorFinalizeSettlement)
+        : unit =
+        match settled.Commitment with
+        | InspectorFinalizeCommitment.Finalized
+        | InspectorFinalizeCommitment.NothingToFinalize ->
+            scope.DropSessionIdentity(SessionId.value inspectorId)
+        | InspectorFinalizeCommitment.NotCommitted reason
+        | InspectorFinalizeCommitment.Unknown reason ->
+            // Retain the identity: a later recovery must be able to
+            // resume this exact finalize. Expected/best-effort, never a
+            // recovery decision — the commitment itself is the evidence.
+            Diagnostic.emit
+                "inspector-case-finalization-pending"
+                [ "session_id", SessionId.value inspectorId; "result", reason ]
+        | InspectorFinalizeCommitment.PhaseConflict reason ->
+            Diagnostic.fatal
+                "inspector-case-finalization-failed"
+                [ "session_id", SessionId.value inspectorId; "result", reason ]
+
+            raise (invalidOp (sprintf "CASE-003: Inspector %s finalization conflict: %s" (SessionId.value inspectorId) reason))
+
     let private finalizeStagedInspector
         (scope: PluginRuntimeScope)
         (workspaceDirectory: string option)
@@ -113,31 +139,7 @@ module HostSessionDeletion =
 
             match settlementOpt with
             | None -> ()
-            | Some settled ->
-                match settled.Commitment with
-                | InspectorFinalizeCommitment.Finalized
-                | InspectorFinalizeCommitment.NothingToFinalize ->
-                    scope.DropSessionIdentity(SessionId.value inspectorId)
-                | InspectorFinalizeCommitment.NotCommitted reason
-                | InspectorFinalizeCommitment.Unknown reason ->
-                    // Retain the identity: a later recovery must be able to
-                    // resume this exact finalize. Expected/best-effort, never a
-                    // recovery decision — the commitment itself is the evidence.
-                    Diagnostic.emit
-                        "inspector-case-finalization-pending"
-                        [ "session_id", SessionId.value inspectorId; "result", reason ]
-                | InspectorFinalizeCommitment.PhaseConflict reason ->
-                    Diagnostic.fatal
-                        "inspector-case-finalization-failed"
-                        [ "session_id", SessionId.value inspectorId; "result", reason ]
-
-                    return
-                        invalidOp (
-                            sprintf
-                                "CASE-003: Inspector %s finalization conflict: %s"
-                                (SessionId.value inspectorId)
-                                reason
-                        )
+            | Some settled -> finalizeDisposition scope inspectorId settled
         }
 
     let finalizePreparedInspector

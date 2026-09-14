@@ -258,20 +258,46 @@ module HostForkRunLifecycle =
     /// A run whose `Handoff` slot is `None` has no completion checkpoint to
     /// write — capability absence is therefore decided here structurally, not by
     /// a late fatal, and `complete` never re-checks a construction-time fact.
+    /// Prepared-handoff capability arbitration: `Some port`/`Some handoff`
+    /// pair married, capability-absent prepared handoff → structural
+    /// invariant violation. Kept at module level so `checkpointSlot` stays
+    /// single-level — the nested match is delegated here, not inlined.
+    let private checkpointSlotFor
+        (handoffPort: ReusableHandoffPort option)
+        (handoff: PreparedDelegationHandoff)
+        : (ReusableHandoffPort * PreparedDelegationHandoff) option =
+        match handoffPort with
+        | Some port -> Some(port, handoff)
+        | None ->
+            raise (
+                InvalidOperationException "reusable fork run has no handoff capability: prepared handoff without a handoff port"
+            )
+
     let private checkpointSlot (handoffPort: ReusableHandoffPort option) (run: PendingHostRun) =
         match run.Handoff with
         | None -> None
-        | Some handoff ->
-            match handoffPort with
-            | Some port -> Some(port, handoff)
-            | None ->
-                // Structural invariant: a prepared handoff is only ever produced
-                // by this runtime's own PrepareHandoff, which returns Error when
-                // the port is absent — so a run can never hold Some handoff while
-                // its runtime holds None port. Fail closed if wiring ever breaks.
-                raise (
-                    InvalidOperationException "reusable fork run has no handoff capability: prepared handoff without a handoff port"
-                )
+        | Some handoff -> checkpointSlotFor handoffPort handoff
+
+    /// Commitment switchboard for a CheckpointCompleted settlement. Non-conflict
+    /// outcomes are sunk to unit; PhaseConflict is the retained inventor's
+    /// authority — it trips the process because no settlement path exists at
+    /// that level.
+    let private checkpointOutcomePort (settled: HandoffCheckpointSettlement) : Task =
+        task {
+            match settled.Commitment with
+            | HandoffCheckpointCommitment.Committed
+            | HandoffCheckpointCommitment.NotCommitted _
+            | HandoffCheckpointCommitment.Unknown _ -> ()
+            | HandoffCheckpointCommitment.PhaseConflict reason ->
+                let detail =
+                    sprintf
+                        "delegation completed-handoff invariant cut at route %s: %s"
+                        (DelegationHandoffRoute.value settled.Identity.Route)
+                        reason
+
+                FatalProcess.trip "HostForkRunLifecycle.checkpointCompletedHandoff" detail
+        }
+        :> Task
 
     let private settleCompletedHandoff
         (handoffPort: ReusableHandoffPort option)
@@ -288,20 +314,7 @@ module HostForkRunLifecycle =
                 // for the next invocation's durable re-read and never re-execute
                 // the child. Only the PhaseConflict invariant cut escalates.
                 let! settled = port.CheckpointCompleted parentId handoff
-
-                match settled.Commitment with
-                | HandoffCheckpointCommitment.Committed
-                | HandoffCheckpointCommitment.NotCommitted _
-                | HandoffCheckpointCommitment.Unknown _ -> ()
-                | HandoffCheckpointCommitment.PhaseConflict reason ->
-                    let detail =
-                        sprintf
-                            "delegation completed-handoff invariant cut at route %s: %s"
-                            (DelegationHandoffRoute.value settled.Identity.Route)
-                            reason
-
-                    FatalProcess.trip "HostForkRunLifecycle.checkpointCompletedHandoff" detail
-                    return raise (InvalidOperationException detail)
+                return! checkpointOutcomePort settled
             }
             :> Task
 

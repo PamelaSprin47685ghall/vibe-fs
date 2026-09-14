@@ -42,14 +42,14 @@ const honestMain = (pick) => {
   const nonce = randomUUID()
   return {
     kind: 'Main',
-    mainSession: `ses-main-${pick.tag}-${nonce}`,
-    bloggerSession: `ses-blog-${pick.tag}-${nonce}`,
+    mainSession: `ses-main-${pick.mark}-${nonce}`,
+    bloggerSession: `ses-blog-${pick.mark}-${nonce}`,
     toml: pick.toml,
     previousIngested,
     nextIngested,
     previousCutoff: pick.previousCutoff,
     nextCutoff: pick.previousCutoff + pick.cutoffAdvance,
-    nextDigest: `nd-${pick.tag}`,
+    nextDigest: `nd-${pick.mark}`,
     frameEpoch: pick.frameEpoch,
     observedEpoch: pick.observedEpoch,
   }
@@ -57,8 +57,8 @@ const honestMain = (pick) => {
 
 const honestSquash = (pick) => ({
   kind: 'Squash',
-  mainSession: `ses-main-${pick.tag}-${randomUUID()}`,
-  bloggerSession: `ses-blog-${pick.tag}-${randomUUID()}`,
+  mainSession: `ses-main-${pick.mark}-${randomUUID()}`,
+  bloggerSession: `ses-blog-${pick.mark}-${randomUUID()}`,
   frameEpoch: pick.frameEpoch,
   observedEpoch: pick.observedEpoch,
   coveredFrameCount: pick.digests.length,
@@ -78,14 +78,14 @@ const expectedSquashContext = (descriptor) => ({
   carried: descriptor.digests.length,
 })
 
-const arbitraryTag = fc
+const arbitraryMark = fc
   .string({ minLength: 1, maxLength: 8 })
   .filter((s) => s.trim() !== '' && !s.includes('|') && !s.includes(',') && !s.includes('"'))
 const arbitraryToml = fc.string({ minLength: 1, maxLength: 64 }).filter((s) => !s.includes('\u0000'))
 const arbitraryEpoch = fc.integer({ min: 0, max: 8 })
 
 const arbitraryMainPick = fc.record({
-  tag: arbitraryTag,
+  mark: arbitraryMark,
   toml: arbitraryToml,
   previousIngested: fc.integer({ min: 0, max: 40 }),
   advance: fc.integer({ min: 0, max: 5 }),
@@ -96,7 +96,7 @@ const arbitraryMainPick = fc.record({
 })
 
 const arbitrarySquashPick = fc.record({
-  tag: arbitraryTag,
+  mark: arbitraryMark,
   frameEpoch: arbitraryEpoch,
   observedEpoch: arbitraryEpoch,
   digests: fc.array(fc.string({ minLength: 1, maxLength: 12 }), { minLength: 1, maxLength: 4 }),

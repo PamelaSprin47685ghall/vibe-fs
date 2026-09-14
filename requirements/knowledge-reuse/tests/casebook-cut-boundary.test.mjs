@@ -25,7 +25,7 @@ const makeDir = (prefix) => mkdtempSync(join(tmpdir(), prefix))
 
 const openStore = (commonDir) => {
   const handle = createEventStore(commonDir, randomUUID().replaceAll('-', ''))
-  return { handle, close: () => disposeEventStore(handle) }
+  return { store: handle, close: () => disposeEventStore(handle) }
 }
 
 const caseRec = (sessionId, q, a, observations) => ({ sessionId, q, a, observations, lastAccessOrder: 0 })

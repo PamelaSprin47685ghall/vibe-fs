@@ -243,23 +243,9 @@ module BloggerRequestMaterial =
     /// request id is the owner's frozen materialization identity (durable
     /// open record); it is carried, never recomputed from blob content.
     /// Failure is a typed rejection, never a partial record.
-    let createMain (input: BloggerMainRequestInput) : Result<BloggerMainRequestContext, BloggerRequestRejection> =
-
-        if input.NextIngestedThroughSequence <= input.PreviousIngestedThroughSequence then
-            Error(
-                BloggerRequestRejection.CoverageDidNotAdvance(
-                    input.PreviousIngestedThroughSequence,
-                    input.NextIngestedThroughSequence
-                )
-            )
-
-        else
-            let expectedDigest = HostDigest.sha256Hex input.Toml
-            let actualDigest = BlobDigest.value input.DeltaDigest
-
-            if actualDigest <> expectedDigest then
-                Error(BloggerRequestRejection.DeltaDigestMismatch(expectedDigest, actualDigest))
-            else
+    /// Finalization arm (declared first so the outer check stays a single
+    /// `if` pyramid level under fantomas + the nesting lint).
+    let private finalizeMain (input: BloggerMainRequestInput) =
                 match
                     checkEpoch "FrameEpochId" (FrameEpochId.value input.FrameEpochId),
                     checkEpoch "ObservedPrefixEpochId" (PrefixEpochId.value input.ObservedPrefixEpochId)
@@ -282,6 +268,27 @@ module BloggerRequestMaterial =
                           StoredFrameEpochId = input.FrameEpochId
                           StoredDeltaDigest = input.DeltaDigest
                           StoredObservedPrefixEpochId = input.ObservedPrefixEpochId }
+
+    let createMain (input: BloggerMainRequestInput) : Result<BloggerMainRequestContext, BloggerRequestRejection> =
+
+        if input.NextIngestedThroughSequence <= input.PreviousIngestedThroughSequence then
+            Error(
+                BloggerRequestRejection.CoverageDidNotAdvance(
+                    input.PreviousIngestedThroughSequence,
+                    input.NextIngestedThroughSequence
+                )
+            )
+
+        elif BlobDigest.value input.DeltaDigest <> HostDigest.sha256Hex input.Toml then
+            Error(
+                BloggerRequestRejection.DeltaDigestMismatch(
+                    HostDigest.sha256Hex input.Toml,
+                    BlobDigest.value input.DeltaDigest
+                )
+            )
+
+        else
+            finalizeMain input
 
     /// Validate one Squash candidate. Squash carries no ingest window or
     /// delta digest; its checks are a non-empty covered count agreeing with

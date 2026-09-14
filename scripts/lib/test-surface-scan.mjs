@@ -55,6 +55,9 @@ export const HOST_PHYSICAL_CANARY_FILES = new Set([
   'requirements/host-boundary/tests/host010-run-id-equivalence.test.mjs',
   'requirements/host-boundary/tests/magic-todo-host-canaries.test.mjs',
   'requirements/host-boundary/tests/session-snapshot-locality.test.mjs',
+  // Physical-exit canary: the child must reach the real Diagnostic.fatal and
+  // FatalProcess.trip links — a wire-level invariant, not a test seam.
+  'requirements/host-boundary/tests/fixtures/fatal-process-child.fixture.mjs',
 ])
 
 /**
@@ -916,6 +919,30 @@ export const SURFACE_MANIFEST = [
     owner: 'obligation-ledger',
     laws: ['OBLIGATION-LEDGER-017', 'OBLIGATION-LEDGER-018'],
     source: 'src/Wanxiangshu/Persistence/Journal/ObligationEnvelopeSurface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
+    module: 'Enforcer/Cycle/Recovery.js',
+    owner: 'context-compression',
+    laws: ['CONTEXT-COMPRESSION-027'],
+    source: 'src/Wanxiangshu/Enforcer/Cycle/Recovery.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
+    module: 'Context/Companion/Blogger/Request.js',
+    owner: 'context-compression',
+    laws: ['CONTEXT-COMPRESSION-024', 'CONTEXT-COMPRESSION-027'],
+    source: 'src/Wanxiangshu/Context/Companion/Blogger/Request.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
+    module: 'OpenCode/Host/OpenCodeContract.js',
+    owner: 'dispatch-protocol',
+    laws: ['DISPATCH-PROTOCOL-009'],
+    source: 'src/Wanxiangshu/OpenCode/Host/OpenCodeContract.fs',
     representation: 'json',
     kind: 'pure',
   },

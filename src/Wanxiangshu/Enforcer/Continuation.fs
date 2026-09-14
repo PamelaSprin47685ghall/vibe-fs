@@ -380,6 +380,27 @@ module EnforcerContinuation =
                 return! refreshGapAfterPark ctx mainSessionId sessionKey caughtUpReason
         }
 
+    /// Parked-resume adjudication: claim succeeded → continue building
+    /// context; claim conflict → emit + ctx.Stop so the foreign owner stays
+    /// the only writer of this frame, never a fatal trip over a routine
+    /// supersede.
+    let private resumeAfterClaim
+        (ctx: Context)
+        (sessionKey: string)
+        (live: BloggerRequestContext)
+        : Task<ContinuationOutcome> =
+        task {
+            match BloggerRuntimeHost.claimCurrentRequest ctx.Scope sessionKey live with
+            | Ok() ->
+                let! rebuilt = resumeWithContext ctx live
+                return ctx.Project rebuilt
+            | Error reason ->
+                Diagnostic.emit
+                    "blogger-flight-claim-conflict"
+                    [ "session_id", sessionKey; "result", reason ]
+                return ctx.Stop "park-resumed-foreign-flight"
+        }
+
     let private projectAfterParkWake
         (ctx: Context)
         (mainSessionId: SessionId)
@@ -396,17 +417,8 @@ module EnforcerContinuation =
                 // arrived after the parked context was superseded — the correct
                 // outcome is ctx.Stop (committed evidence preserved), not a
                 // fatal trip over a routine supersede.
-                match BloggerRuntimeHost.claimCurrentRequest ctx.Scope sessionKey live with
-                | Ok() ->
-                    let! rebuilt = resumeWithContext ctx live
-                    return ctx.Project rebuilt
-                | Error reason ->
-                    Diagnostic.emit
-                        "blogger-flight-claim-conflict"
-                        [ "session_id", sessionKey; "result", reason ]
-                    return ctx.Stop "park-resumed-foreign-flight"
+                return! resumeAfterClaim ctx sessionKey live
         }
-
     let private afterParkResumed
         (ctx: Context)
         (mainSessionId: SessionId)
@@ -998,6 +1010,21 @@ module EnforcerContinuation =
     /// Detached Host-side abort requested only after the admission barrier is
     /// up. Its outcome is diagnostic evidence; it carries no authority over
     /// whether the execution may run again.
+    /// The real awaited call — separate function so the outer `task` never
+    /// carries a nested match under a `try` guard.
+    let private awaitPhysicalStop
+        (terminateSession: SessionTermination)
+        (sid: SessionId)
+        (sessionId: string)
+        (reason: string)
+        : Task =
+        task {
+            match! terminateSession sid reason with
+            | Ok() -> ()
+            | Error error ->
+                Diagnostic.emit "enforcer-stop-physical-run" [ "session_id", sessionId; "result", "abort-error: " + error ]
+        }
+
     let private requestPhysicalStop
         (terminateSession: SessionTermination)
         (sid: SessionId)
@@ -1006,10 +1033,7 @@ module EnforcerContinuation =
         =
         task {
             try
-                match! terminateSession sid reason with
-                | Ok() -> ()
-                | Error error ->
-                    Diagnostic.emit "enforcer-stop-physical-run" [ "session_id", sessionId; "result", "abort-error: " + error ]
+                return! awaitPhysicalStop terminateSession sid sessionId reason
             with ex ->
                 Diagnostic.emit
                     "enforcer-stop-physical-run"

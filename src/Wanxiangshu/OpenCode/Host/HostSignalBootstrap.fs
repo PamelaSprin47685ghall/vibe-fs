@@ -95,8 +95,7 @@ module HostSignalBootstrap =
         (workspaceDirectory: string option)
         /// Owner-scope graceful close: finalize inspector draft once (root → inspectorSessionId).
         /// Returns a Task so SessionDeleted can await CaseFinalize before CancelSession.
-        (tryFinalizeInspector:
-                (string -> string -> Task<InspectorFinalizeSettlement>) option)
+        (tryFinalizeInspector: (string -> string -> Task<InspectorFinalizeSettlement>) option)
         /// Unexpected / residual draft cleanup (inspectorSessionId).
         (cleanupInspector: (string -> unit) option)
         : Task<WiredSignals> =

@@ -100,21 +100,35 @@ module PluginHostInterop =
         if isNull value then
             None
         else
-            match string value with
-            | text when String.IsNullOrWhiteSpace text -> None
-            | text -> Some text
+            string value
+            |> fun text ->
+                if String.IsNullOrWhiteSpace text then None else Some text
 
     [<Emit("$0 == null ? undefined : $0[$1]")>]
     let private fieldValue (carrier: obj) (name: string) : obj = jsNative
 
+    /// Fable-safe array unbox: a non-array typed field returns [] instead of
+    /// throwing across the boundary.
+    let private tryArray (raw: obj) : obj list =
+        try
+            unbox<obj array> raw |> Array.toList
+        with _ ->
+            []
+
+    /// Decode `value.messages` into an F# list or silently return [] — kept
+    /// apart so `messagesArrayOf`'s `if` stays flat under the pyramid lint.
+    let private messagesFieldOf (value: obj) : obj list =
+        let raw = fieldValue value "messages"
+
+        match raw with
+        | null -> []
+        | _ -> tryArray raw
+
     let private messagesArrayOf (value: obj) : obj list =
-        if isNull value || isNull (fieldValue value "messages") then
+        if isNull value then
             []
         else
-            try
-                unbox<obj array> (fieldValue value "messages") |> Array.toList
-            with _ ->
-                []
+            messagesFieldOf value
 
     let private transcriptOf (args: obj) (context: obj) : obj list =
         [ fieldValue context "output"; fieldValue args "output"; context; args ]

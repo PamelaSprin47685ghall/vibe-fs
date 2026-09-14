@@ -61,6 +61,24 @@ module internal SyncDelegatePhysicalIdentity =
 type SyncDelegateRetryPort =
     { Retry: ReconciledTurn -> Wanxiangshu.Execution.Failure.ExecutionFailure -> string -> Task<Result<unit, string>> }
 
+/// Job-owned helpers for the DELEG-031 settle path. Module scope keeps the
+/// member body flat while still seeing store/race primitives.
+module internal SyncDelegateInternals =
+    let settleCompletedFromParts
+        (noteInspectorIfRole: SyncDelegateCall -> SessionId -> string -> unit)
+        (store: SyncDelegateCallStore)
+        (call: SyncDelegateCall)
+        (turn: ReconciledTurn)
+        : bool =
+        match CompletedTurnClassifier.partsSessionText turn.Parts with
+        | record when not (System.String.IsNullOrWhiteSpace record) ->
+            noteInspectorIfRole call turn.SessionId record
+            AsyncSupport.trySetResult call.Answer (Ok record) |> ignore
+            true
+        | _ ->
+            store.FailCall(call, "EXEC-031: Completed without bounded WorkRecord")
+            true
+
 /// EXEC-026 / EXEC-031: reusable SyncDelegate CE (Acquire → GetOrCreate → Send →
 /// ordinary Completion → bounded WorkRecord). No return tool / dual-await.
 ///
@@ -609,9 +627,7 @@ type SyncDelegateRuntime
     member _.TryAcceptedAuthorityRoot(sessionId: SessionId) : string option =
         match store.TryPeekCallByDelegate sessionId with
         | Some call ->
-            match call.AcceptedAuthorityRoot with
-            | Some root -> Some(AuthorityRootUserMessageId.value root)
-            | None -> None
+            Option.map (AuthorityRootUserMessageId.value) call.AcceptedAuthorityRoot
         | None -> None
 
     /// DELEG-031: settle a completed turn from its own parts when the terminal
@@ -620,18 +636,7 @@ type SyncDelegateRuntime
     /// completion is delivered from the turn, never dropped, never re-executed.
     member _.SettleCompletedFromTurn(turn: ReconciledTurn) : bool =
         match store.TryPeekCallByDelegate turn.SessionId with
-        | Some call ->
-            // The completion the child physically produced, independent of
-            // whether its terminal trace durably committed: deliver from the
-            // turn's own parts, never dropped, never re-executed.
-            match CompletedTurnClassifier.partsSessionText turn.Parts with
-            | record when not (System.String.IsNullOrWhiteSpace record) ->
-                noteInspectorIfRole call turn.SessionId record
-                AsyncSupport.trySetResult call.Answer (Ok record) |> ignore
-                true
-            | _ ->
-                store.FailCall(call, "EXEC-031: Completed without bounded WorkRecord")
-                true
+        | Some call -> SyncDelegateInternals.settleCompletedFromParts noteInspectorIfRole store call turn
         | None -> false
 
     member _.AwaitAssignmentReady(sessionId: SessionId) : Task<bool> =

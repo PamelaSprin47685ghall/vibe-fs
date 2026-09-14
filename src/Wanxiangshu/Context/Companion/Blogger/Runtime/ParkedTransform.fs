@@ -110,6 +110,41 @@ type private RepairAdmission =
     | Claimed
     | Revoked
 
+/// Receive arm for a revoked rendezvous with a terminal fault: synthesizes
+/// the faulted placeholder so `Receive`'s next `let!` sees a real error
+/// instead of an empty eviction. Kept at namespace level so each branch
+/// stays one level under the pyramid lint.
+module private ReceiveTerminal =
+    let failure (ex: exn) : Task<BloggerRepairEnvelope option> =
+        let faulted =
+            TaskCompletionSource<BloggerRepairEnvelope option>(
+                TaskCreationOptions.RunContinuationsAsynchronously
+            )
+
+        faulted.SetException ex
+        faulted.Task
+
+    /// Both arms of Revoked at one level — fault carrier or nil.
+    let revoked (terminalError: exn option) : Task<BloggerRepairEnvelope option> =
+        match terminalError with
+        | Some ex -> failure ex
+        | None -> Task.FromResult None
+
+/// Refusal dispatch for a revoked rendezvous: lands the recorded terminal
+/// failure or, absent evidence, the exhausted-abandon marker. Module-level
+/// so the caller's match arm stays at a single level.
+module private RendezvousReply =
+    let refusing (terminalError: exn option) (reply: TaskCompletionSource<BloggerRepairOutcome>) =
+        match terminalError with
+        | Some ex -> reply.SetException ex
+        | None ->
+            AsyncSupport.trySetResult reply BloggerRepairOutcome.AbandonedExhausted
+            |> ignore
+
+        reply.Task
+
+
+
 type BloggerRepairRendezvous(identity: BloggerRepairEpisodeIdentity, onCompleted: unit -> unit) =
     let gate = obj ()
     // DSL-MUTABLE: resource — FIFO repair inbox, receiver waiters, one-shot workflow latch
@@ -222,13 +257,7 @@ type BloggerRepairRendezvous(identity: BloggerRepairEpisodeIdentity, onCompleted
             AsyncSupport.trySetResult receiver (Some envelope) |> ignore
             reply.Task
         | None when not accepted ->
-            match terminalError with
-            | Some ex -> reply.SetException ex
-            | None ->
-                AsyncSupport.trySetResult reply BloggerRepairOutcome.AbandonedExhausted
-                |> ignore
-
-            reply.Task
+            RendezvousReply.refusing terminalError reply
         | None -> reply.Task
 
     member _.Receive() : Task<BloggerRepairEnvelope option> =
@@ -238,16 +267,7 @@ type BloggerRepairRendezvous(identity: BloggerRepairEpisodeIdentity, onCompleted
                 inFlight.Add envelope.Reply |> ignore
                 Task.FromResult(Some envelope)
             elif admission = Revoked then
-                match terminalError with
-                | Some ex ->
-                    let faulted =
-                        TaskCompletionSource<BloggerRepairEnvelope option>(
-                            TaskCreationOptions.RunContinuationsAsynchronously
-                        )
-
-                    faulted.SetException ex
-                    faulted.Task
-                | None -> Task.FromResult(None)
+                ReceiveTerminal.revoked terminalError
             else
                 let waiter =
                     TaskCompletionSource<BloggerRepairEnvelope option>(
@@ -324,23 +344,20 @@ type BloggerRepairRendezvous(identity: BloggerRepairEpisodeIdentity, onCompleted
                     inFlight.Clear()
                     pendingReplies, pendingReceives, processingReplies)
 
-        for envelope in pending do
+        let safeFailOne (tcs: TaskCompletionSource<'T>) =
             try
-                envelope.Reply.SetException ex
+                tcs.SetException ex
             with _ ->
                 ()
+
+        for envelope in pending do
+            safeFailOne envelope.Reply
 
         for waiter in outstanding do
-            try
-                waiter.SetException ex
-            with _ ->
-                ()
+            safeFailOne waiter
 
         for reply in processing do
-            try
-                reply.SetException ex
-            with _ ->
-                ()
+            safeFailOne reply
 
 /// Material mailbox + physical flight lease (R05/R06).
 ///
