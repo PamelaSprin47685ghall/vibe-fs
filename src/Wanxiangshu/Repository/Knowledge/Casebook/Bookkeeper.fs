@@ -17,7 +17,7 @@ module CasebookBookkeeper =
         (case: Case)
         : Task<Result<bool, string>> =
         taskResult {
-            let freeze = CasebookReplay.replayAll root case.Observations
+            let! freeze = CasebookReplay.replayAll root case.Observations |> TaskResultCE.ofTask
 
             let! q', a' =
                 BookkeeperRuntime.runTransaction
@@ -28,7 +28,7 @@ module CasebookBookkeeper =
                     freeze
                     None
 
-            let verify = CasebookReplay.replayAll root case.Observations
+            let! verify = CasebookReplay.replayAll root case.Observations |> TaskResultCE.ofTask
 
             match Observations.classifyReplay freeze verify with
             | ReplayResult.Stale ->

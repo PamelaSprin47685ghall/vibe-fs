@@ -1,0 +1,167 @@
+import assert from 'node:assert/strict'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import test from 'node:test'
+import { read, write, edit, toolName } from '../../../dist/OpenCode/Tools/FileToolsSurface.js'
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs'
+import {
+import { generate } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
+
+// VERIFY-009 coverage: static read/write/edit tools through their registered
+// owner surface. Native Node fs is used only for fixture setup/observations.
+
+
+const sandbox = () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-filetools-'))
+  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
+}
+
+// JS runtime bindings and sandbox integration. The injected api is the only
+// model authority; reads/searches are JSON values and mutations only stage.
+
+
+  createApi,
+  api as apiOf,
+  stagedCount,
+  stagedKinds,
+  run,
+} from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
+
+const sandbox = () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-bindings-'))
+  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
+}
+
+const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')
+
+// JS-012/015: transaction decisions consume plain mutation facts; durable
+// effects stay behind the EventStore-backed owner surfaces.
+
+
+  validateSingleIntent,
+  validateTargets,
+  validateFreshness,
+  preflight,
+  commitPlan,
+  rollbackPlan,
+} from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
+
+const ok = (result) => result.ok
+const codeOf = (result) => result.code
+const rewrite = (path, originalText, newText) => ({ kind: 'rewrite', path, originalText, newText })
+const create = (path, text) => ({ kind: 'create', path, text })
+
+const current = { 'a.txt': 'current' }
+
+test('WHAT[REPOSITORY-PROGRAMMING-010] FILETOOLS_write_creates_file_and_reports_size', async () => {
+  const { dir, cleanup } = sandbox()
+  const path = join(dir, 'out.txt')
+  const output = await write(dir, JSON.stringify({ filePath: path, content: 'written by test' }))
+  assert.equal(readFileSync(path, 'utf8'), 'written by test')
+  assert.match(output.result, /^Wrote .+ \(\d+ bytes\)$/)
+  assert.equal(output.truncated, false)
+  cleanup()
+})
+
+test('WHAT[REPOSITORY-PROGRAMMING-010] FILETOOLS_write_refuses_unparseable_payload', async () => {
+  const { dir, cleanup } = sandbox()
+  const output = await write(dir, 'not json at all')
+  assert.match(output.result, /^Failed to parse JSON payload for write tool: /)
+  cleanup()
+})
+
+test('WHAT[REPOSITORY-PROGRAMMING-010] FILETOOLS_edit_replaces_exact_match', async () => {
+  const { dir, cleanup } = sandbox()
+  const path = join(dir, 'edit.txt')
+  writeFileSync(path, 'alpha beta gamma')
+  const output = await edit(dir, JSON.stringify({ filePath: path, oldString: 'beta', newString: 'BETA' }))
+  assert.equal(output.result, `Edited ${path}`)
+  assert.equal(readFileSync(path, 'utf8'), 'alpha BETA gamma')
+  cleanup()
+})
+
+test('WHAT[REPOSITORY-PROGRAMMING-010] FILETOOLS_edit_reports_missing_file', async () => {
+  const { dir, cleanup } = sandbox()
+  const path = join(dir, 'missing.txt')
+  const output = await edit(dir, JSON.stringify({ filePath: path, oldString: 'x', newString: 'y' }))
+  assert.equal(output.result, `File not found: ${path}`)
+  cleanup()
+})
+
+test('WHAT[REPOSITORY-PROGRAMMING-010] FILETOOLS_edit_reports_absent_old_string', async () => {
+  const { dir, cleanup } = sandbox()
+  const path = join(dir, 'no-match.txt')
+  writeFileSync(path, 'nothing to replace')
+  const output = await edit(dir, JSON.stringify({ filePath: path, oldString: 'zzz', newString: 'y' }))
+  assert.equal(output.result, `oldString not found in file ${path}`)
+  assert.equal(readFileSync(path, 'utf8'), 'nothing to replace')
+  cleanup()
+})
+
+test('WHAT[REPOSITORY-PROGRAMMING-010] FILETOOLS_edit_refuses_unparseable_payload', async () => {
+  const { dir, cleanup } = sandbox()
+  const output = await edit(dir, '{broken')
+  assert.match(output.result, /^Invalid edit payload: /)
+  cleanup()
+})
+
+test('WHAT[REPOSITORY-PROGRAMMING-010] JS008_012_bindings_rewrite_requires_existing_target', () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'old text', 'utf8')
+    const binding = createApi(dir)
+    const result = apiOf(binding).js.edit('a.txt', 'new text')
+    assert.equal(result.ok, true)
+    const missing = apiOf(binding).js.edit('nope.txt', 'x')
+    assert.equal(missing.ok, false)
+    assert.equal(missing.code, 'FILE_NOT_FOUND')
+  } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[REPOSITORY-PROGRAMMING-010] JS009_012_bindings_write_stages_create', () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    const binding = createApi(dir)
+    const result = apiOf(binding).js.write('new.txt', 'fresh')
+    assert.equal(result.ok, true)
+    assert.equal(stagedCount(binding), 1)
+    assert.deepEqual(stagedKinds(binding), ['Create'])
+  } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[REPOSITORY-PROGRAMMING-010] JS009_bindings_write_rejects_an_existing_target_before_staging', () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'existing.txt'), 'external', 'utf8')
+    const binding = createApi(dir)
+    const result = apiOf(binding).js.write('existing.txt', 'tool')
+    assert.equal(result.ok, false)
+    assert.equal(result.code, 'FILE_ALREADY_EXISTS')
+    assert.equal(stagedCount(binding), 0)
+  } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[REPOSITORY-PROGRAMMING-010] JS026_same_path_once_rejects_duplicate_mutation_targets', () => {
+  const dup = [rewrite('a.txt', 'x', 'y'), create('a.txt', 'z')]
+  const result = validateSingleIntent(dup)
+  assert.equal(ok(result), false)
+  assert.equal(codeOf(result), 'DUPLICATE_MUTATION_TARGET')
+
+  const distinct = [rewrite('a.txt', 'x', 'y'), create('b.txt', 'z')]
+  assert.equal(ok(validateSingleIntent(distinct)), true)
+})
+
+test('WHAT[REPOSITORY-PROGRAMMING-010] JS008_009_rewrite_requires_existing_target_create_requires_missing', () => {
+  const existing = ['a.txt']
+  assert.equal(ok(validateTargets(existing, [rewrite('a.txt', 'x', 'y')])), true)
+  assert.equal(codeOf(validateTargets(existing, [rewrite('missing.txt', 'x', 'y')])), 'FILE_NOT_FOUND')
+  assert.equal(ok(validateTargets(existing, [create('new.txt', 'n')])), true)
+  assert.equal(codeOf(validateTargets(existing, [create('a.txt', 'n')])), 'FILE_ALREADY_EXISTS')
+})

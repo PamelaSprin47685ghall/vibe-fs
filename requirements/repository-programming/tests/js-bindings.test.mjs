@@ -55,13 +55,13 @@ test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_bindings_path_boundary_denies_escap
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_bindings_glob_lists_matching_paths', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_bindings_glob_lists_matching_paths', async () => {
   const { dir, cleanup } = sandbox()
   try {
     mkdirSync(join(dir, 'src'))
     writeFileSync(join(dir, 'src', 'a.fs'), 'x', 'utf8')
     writeFileSync(join(dir, 'src', 'b.txt'), 'y', 'utf8')
-    const result = apiOf(createApi(dir)).js.glob('src/*.fs')
+    const result = await apiOf(createApi(dir)).js.glob('src/*.fs')
     assert.equal(result.ok, true)
     assert.deepEqual(result.paths, ['src/a.fs'])
     assert.equal('truncated' in result, false)
@@ -70,11 +70,11 @@ test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_bindings_glob_lists_matching_paths'
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-009] JS010_bindings_grep_returns_matches', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-009] JS010_bindings_grep_returns_matches', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'one two one', 'utf8')
-    const result = apiOf(createApi(dir)).js.grep('one', '*.txt')
+    const result = await apiOf(createApi(dir)).js.grep('one', '*.txt')
     assert.equal(result.ok, true)
     assert.deepEqual(result.matches.map((m) => m.text), ['one', 'one'])
     assert.deepEqual(result.matches.map((m) => m.path), ['a.txt', 'a.txt'])

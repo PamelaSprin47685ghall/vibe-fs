@@ -13,27 +13,44 @@ module CasebookReplay =
         | Ok text -> Some(CasebookCapture.contentHash text)
         | Error _ -> None
 
-    let private replayGlob root pattern =
-        match JsGlobFs.glob root pattern with
-        | Ok listing -> Some(Observation.GlobResult(pattern, listing.Paths))
-        | Error _ -> None
+    let private replayGlob root pattern : System.Threading.Tasks.Task<Observation option> =
+        task {
+            let! globRes = JsGlobFs.glob root pattern
+            match globRes with
+            | Ok listing -> return Some(Observation.GlobResult(pattern, listing.Paths))
+            | Error _ -> return None
+        }
 
-    let private replayGrep root pattern =
-        match JsAnchorFs.grep root (AnchorSpec.Regex pattern) "**/*" with
-        | Ok listing ->
-            let matches = listing.Matches |> List.map (fun hit -> hit.Path, hit.Line, hit.Text)
-            Some(Observation.GrepResult(pattern, matches))
-        | Error _ -> None
+    let private replayGrep root pattern : System.Threading.Tasks.Task<Observation option> =
+        task {
+            let! grepRes = JsAnchorFs.grep root (AnchorSpec.Regex pattern) "**/*"
+            match grepRes with
+            | Ok listing ->
+                let matches = listing.Matches |> List.map (fun hit -> hit.Path, hit.Line, hit.Text)
+                return Some(Observation.GrepResult(pattern, matches))
+            | Error _ -> return None
+        }
 
     /// Replay one observation; None = the observation cannot be reproduced
     /// (missing file / unreadable) — that is a change signal.
-    let replayOne (root: string) (observation: Observation) : Observation option =
-        match observation with
-        | Observation.FileRead(path, _) ->
-            readHash root path |> Option.map (fun hash -> Observation.FileRead(path, hash))
-        | Observation.GlobResult(pattern, _) -> replayGlob root pattern
-        | Observation.GrepResult(pattern, _) -> replayGrep root pattern
+    let replayOne (root: string) (observation: Observation) : System.Threading.Tasks.Task<Observation option> =
+        task {
+            match observation with
+            | Observation.FileRead(path, _) ->
+                return readHash root path |> Option.map (fun hash -> Observation.FileRead(path, hash))
+            | Observation.GlobResult(pattern, _) -> return! replayGlob root pattern
+            | Observation.GrepResult(pattern, _) -> return! replayGrep root pattern
+        }
 
     /// Replay the whole stored observation set. Missing any single
     /// observation (deleted file, unreadable) → Stale.
-    let replayAll (root: string) (stored: Observation list) : Observation list = stored |> List.choose (replayOne root)
+    let replayAll (root: string) (stored: Observation list) : System.Threading.Tasks.Task<Observation list> =
+        task {
+            let results = ResizeArray<Observation>()
+            for obs in stored do
+                let! replayed = replayOne root obs
+                match replayed with
+                | Some o -> results.Add o
+                | None -> ()
+            return Seq.toList results
+        }

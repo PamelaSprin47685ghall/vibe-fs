@@ -403,7 +403,7 @@ module JsCanonicalDescription =
     let private grepStub (prose: Prose) =
         fill
             """
-  async grep(needle, pattern = "**/*") {
+  async grep(needle, pattern) {
     // {{comment_host_capability}}
   }"""
             [ "comment_host_capability", prose.CommentHostCapability ]
@@ -933,7 +933,7 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
               if has capabilities JsCapability.Glob then
                   fill
                       """  async glob(pattern) {
-    const result = this._api.js.glob(pattern);
+    const result = await this._api.js.glob(pattern);
     {{rethrow_host}}
     return { paths: result.paths };
   }"""
@@ -941,8 +941,8 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
               if has capabilities JsCapability.Grep then
                   fill
                       """
-  async grep(needle, pattern = "**/*") {
-    const result = this._api.js.grep(needle, pattern);
+  async grep(needle, pattern) {
+    const result = await this._api.js.grep(needle, pattern);
     {{rethrow_host}}
     return { matches: result.matches };
   }"""

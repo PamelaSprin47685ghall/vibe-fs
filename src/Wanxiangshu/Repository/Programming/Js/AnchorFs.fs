@@ -9,6 +9,11 @@ open FsToolkit.ErrorHandling
 /// (JS-012).
 module JsAnchorFs =
 
+    [<Emit("new Promise((resolve) => setImmediate(resolve))")>]
+    let private yieldEventLoop () : System.Threading.Tasks.Task<unit> = jsNative
+
+    let private YIELD_SCAN_BATCH_SIZE = 32
+
     [<Import("join", "node:path")>]
     let private pathJoin (a: string) (b: string) : string = jsNative
 
@@ -141,20 +146,32 @@ module JsAnchorFs =
 
     /// JS-020: Host grep over gitignore-selected UTF-8 files. Full result —
     /// no internal bound; the Host tool-result bound tail-keeps the tail.
-    let grep (root: string) (spec: AnchorSpec) (pattern: string) : Result<JsGrepListing, JsFailure> =
-        let globPattern =
+    let grep (root: string) (spec: AnchorSpec) (pattern: string) : System.Threading.Tasks.Task<Result<JsGrepListing, JsFailure>> =
+        task {
             if System.String.IsNullOrEmpty pattern then
-                "**/*"
+                return Error JsFailure.AnchorInvalidPattern
             else
-                pattern
+                let! globRes = JsGlobFs.glob root pattern
+                match globRes with
+                | Error failure -> return Error failure
+                | Ok listing ->
+                    let scanned = ResizeArray<JsReadSnapshot * JsGrepHit list>()
+                    let mutable count = 0
+                    for path in listing.Paths do
+                        count <- count + 1
+                        if count % YIELD_SCAN_BATCH_SIZE = 0 then
+                            do! yieldEventLoop ()
+                        match grepPath root spec path with
+                        | Some item -> scanned.Add item
+                        | None -> ()
 
-        result {
-            let! listing = JsGlobFs.glob root globPattern
-            let scanned = listing.Paths |> List.choose (grepPath root spec)
+                    let matches = scanned |> Seq.collect snd |> Seq.toList
+                    let snapshots = scanned |> Seq.map fst |> Seq.toList
 
-            return
-                { Matches = scanned |> List.collect snd
-                  ReadSnapshots = scanned |> List.map fst }
+                    return
+                        Ok
+                            { Matches = matches
+                              ReadSnapshots = snapshots }
         }
 
     /// Index of the nth occurrence of an exact needle, scanning forward

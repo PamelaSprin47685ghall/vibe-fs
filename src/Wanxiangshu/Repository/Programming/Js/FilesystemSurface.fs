@@ -59,13 +59,17 @@ module JsFilesystemSurface =
         | Ok value -> box {| ok = true; value = value |}
         | Error failure -> failureResult failure
 
-    let glob (root: string) (pattern: string) : obj =
-        match JsGlobFs.glob root pattern with
-        | Ok listing ->
-            box
-                {| ok = true
-                   value = box {| paths = listing.Paths |> List.toArray |} |}
-        | Error failure -> failureResult failure
+    let glob (root: string) (pattern: string) : System.Threading.Tasks.Task<obj> =
+        task {
+            let! globRes = JsGlobFs.glob root pattern
+            match globRes with
+            | Ok listing ->
+                return
+                    box
+                        {| ok = true
+                           value = box {| paths = listing.Paths |> List.toArray |} |}
+            | Error failure -> return failureResult failure
+        }
 
     let findAnchor (textValue: string) (declaration: obj) (occurrence: int) : obj =
         match JsAnchorFs.findAnchor textValue (anchorOf declaration) occurrence with
@@ -83,23 +87,26 @@ module JsFilesystemSurface =
                    value = [| box startIndex; box endIndex |] |}
         | Error failure -> failureResult failure
 
-    let grep (root: string) (declaration: obj) (pattern: string) : obj =
-        match JsAnchorFs.grep root (anchorOf declaration) pattern with
-        | Error failure -> failureResult failure
-        | Ok listing ->
-            let matches =
-                listing.Matches
-                |> List.map (fun hit ->
+    let grep (root: string) (declaration: obj) (pattern: string) : System.Threading.Tasks.Task<obj> =
+        task {
+            let! grepRes = JsAnchorFs.grep root (anchorOf declaration) pattern
+            match grepRes with
+            | Error failure -> return failureResult failure
+            | Ok listing ->
+                let matches =
+                    listing.Matches
+                    |> List.map (fun hit ->
+                        box
+                            {| path = hit.Path
+                               line = hit.Line
+                               column = hit.Column
+                               text = hit.Text |})
+                    |> List.toArray
+                return
                     box
-                        {| path = hit.Path
-                           line = hit.Line
-                           column = hit.Column
-                           text = hit.Text |})
-                |> List.toArray
-
-            box
-                {| ok = true
-                   value = box {| matches = matches |} |}
+                        {| ok = true
+                           value = box {| matches = matches |} |}
+        }
 
     let commitPlan (root: string) (plan: obj array) : obj =
         match JsMutationFs.commitPlan root (planOf (box plan)) with

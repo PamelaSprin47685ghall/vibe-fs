@@ -10,6 +10,11 @@ open Wanxiangshu.Foundation
 /// (JS-012).
 module JsGlobFs =
 
+    [<Emit("new Promise((resolve) => setImmediate(resolve))")>]
+    let private yieldEventLoop () : System.Threading.Tasks.Task<unit> = jsNative
+
+    let private YIELD_BATCH_SIZE = 64
+
     [<Import("readdirSync", "node:fs")>]
     let private readdirSync (path: string) : string array = jsNative
 
@@ -237,13 +242,16 @@ module JsGlobFs =
         for entry in entries do
             classifyVisibleEntry rules rel dir entry |> applyVisibleEntry files walk
 
-    let private collectVisibleFiles (root: string) : string list =
+    let private collectVisibleFiles (root: string) : System.Threading.Tasks.Task<string list> =
         // DSL-MUTABLE: algorithm-scratch — visible file accumulator
         let files = ResizeArray<string>()
         // DSL-MUTABLE: algorithm-scratch — ignore rule accumulator
         let rules = ResizeArray<IgnoreRule>()
+        // DSL-MUTABLE: algorithm-scratch — step counter for yielding
+        let mutable steps = 0
 
-        let rec walk (dir: string) (rel: string) =
+        let rec walk (dir: string) (rel: string) : System.Threading.Tasks.Task<unit> =
+            task {
             let nested = loadIgnoreFile (pathJoin dir ".gitignore") rel
             let mark = rules.Count
 
@@ -259,25 +267,39 @@ module JsGlobFs =
             for rule in nested do
                 rules.Add(rule)
 
+            steps <- steps + 1
+            if steps % YIELD_BATCH_SIZE = 0 then
+                do! yieldEventLoop ()
+
             try
-                processDirectoryEntries rules files walk dir rel (tryListDirectory dir)
+                let entries = tryListDirectory dir
+                for entry in entries do
+                    match classifyVisibleEntry rules rel dir entry with
+                    | SkipEntry -> ()
+                    | RecurseDirectory(full, childRel) -> do! walk full childRel
+                    | EmitFile childRel -> files.Add(childRel.Replace('\\', '/'))
             finally
                 rules.RemoveRange(mark, rules.Count - mark)
+            }
 
-        walk root ""
-        List.ofSeq files
+        task {
+            do! walk root ""
+            return List.ofSeq files
+        }
 
     /// JS-007: gitignore-style glob. Full deterministic enumeration — no
     /// internal bound. An oversized result is tail-kept once, by the Host
     /// tool-result bound at the final boundary.
-    let glob (root: string) (pattern: string) : Result<JsGlobListing, JsFailure> =
-        result {
-            let! matchers = compileUserPatterns pattern
-
-            let paths =
-                collectVisibleFiles root
-                |> List.filter (fun rel -> Array.exists (fun re -> GlobMatch.testCompiled re rel) matchers)
-                |> List.sort
-
-            return { Paths = paths }
+    let glob (root: string) (pattern: string) : System.Threading.Tasks.Task<Result<JsGlobListing, JsFailure>> =
+        task {
+            let matchers = compileUserPatterns pattern
+            match matchers with
+            | Error failure -> return Error failure
+            | Ok compiledMatchers ->
+                let! visible = collectVisibleFiles root
+                let paths =
+                    visible
+                    |> List.filter (fun rel -> Array.exists (fun re -> GlobMatch.testCompiled re rel) compiledMatchers)
+                    |> List.sort
+                return Ok { Paths = paths }
         }

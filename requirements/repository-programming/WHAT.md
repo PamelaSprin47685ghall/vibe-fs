@@ -41,7 +41,7 @@
 
 ## REPOSITORY-PROGRAMMING-009: Grep Capability 投影
 
-`Grep` capability 投影为宿主环境的 `grep(needle, pattern)` 原语：needle 支持字面字符串或正则表达式，pattern 沿用 glob 规则过滤文件。搜索在选中的严格 UTF-8 文件上执行，不可读或非 UTF-8 文件静默跳过而不中断全局执行；返回包含行列位置与匹配文本的结构化结果。单独拥有 Read+Glob 而无 Grep capability 时不得生成该原语。
+`Grep` capability 投影为宿主环境的 `grep(needle, pattern)` 原语：needle 支持字面字符串或正则表达式，pattern 为必填参数并沿用 glob 规则过滤文件。搜索在选中的严格 UTF-8 文件上执行，不可读或非 UTF-8 文件静默跳过而不中断全局执行；返回包含行列位置与匹配文本的结构化结果。单独拥有 Read+Glob 而无 Grep capability 时不得生成该原语。
 
 ## REPOSITORY-PROGRAMMING-010: Rewrite 与 Write 分离
 

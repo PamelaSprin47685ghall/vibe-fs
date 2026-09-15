@@ -8,8 +8,8 @@ module CasebookReplay =
 
     /// Replay one observation; None = the observation cannot be reproduced
     /// (missing file / unreadable) — that is a change signal.
-    val replayOne: root: string -> observation: Observation -> Observation option
+    val replayOne: root: string -> observation: Observation -> System.Threading.Tasks.Task<Observation option>
 
     /// Replay the whole stored observation set. Missing any single
     /// observation (deleted file, unreadable) → Stale.
-    val replayAll: root: string -> stored: Observation list -> Observation list
+    val replayAll: root: string -> stored: Observation list -> System.Threading.Tasks.Task<Observation list>

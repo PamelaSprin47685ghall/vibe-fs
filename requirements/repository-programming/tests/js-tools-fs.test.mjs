@@ -71,7 +71,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-007] JS006_requireUnique_refuses_ambiguous_anc
   assert.equal(codeOf(requireUnique(text, exact('z'))), 'ANCHOR_NOT_FOUND')
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_glob_deterministic_enumeration', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_glob_deterministic_enumeration', async () => {
   const { dir, cleanup } = sandbox()
   try {
     mkdirSync(join(dir, 'src'))
@@ -81,21 +81,21 @@ test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_glob_deterministic_enumeration', ()
     writeFileSync(join(dir, 'src', 'deep', 'c.fs'), 'c', 'utf8')
     writeFileSync(join(dir, 'readme.md'), 'r', 'utf8')
 
-    const all = unwrap(glob(dir, '**/*.fs'))
+    const all = unwrap(await glob(dir, '**/*.fs'))
     assert.deepEqual(all.paths, ['src/a.fs', 'src/b.fs', 'src/deep/c.fs'])
     assert.equal('truncated' in all, false)
-    const nested = unwrap(glob(dir, '*.fs'))
+    const nested = unwrap(await glob(dir, '*.fs'))
     assert.deepEqual(nested.paths, ['src/a.fs', 'src/b.fs', 'src/deep/c.fs'])
-    const shallow = unwrap(glob(dir, 'src/*.fs'))
+    const shallow = unwrap(await glob(dir, 'src/*.fs'))
     assert.deepEqual(shallow.paths, ['src/a.fs', 'src/b.fs'])
-    const zeroStar = unwrap(glob(dir, 'src/**/*.fs'))
+    const zeroStar = unwrap(await glob(dir, 'src/**/*.fs'))
     assert.deepEqual(zeroStar.paths, ['src/a.fs', 'src/b.fs', 'src/deep/c.fs'])
   } finally {
     cleanup()
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_glob_gitignore_skips_git_and_ignored', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_glob_gitignore_skips_git_and_ignored', async () => {
   const { dir, cleanup } = sandbox()
   try {
     mkdirSync(join(dir, '.git', 'objects'), { recursive: true })
@@ -108,7 +108,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_glob_gitignore_skips_git_and_ignore
     writeFileSync(join(dir, 'readme.md'), 'r', 'utf8')
     writeFileSync(join(dir, '.gitignore'), 'secret.txt\n/dist/\n', 'utf8')
 
-    const listing = unwrap(glob(dir, '**/*'))
+    const listing = unwrap(await glob(dir, '**/*'))
     const paths = listing.paths
     assert.equal(paths.some((p) => p.startsWith('.git/') || p === '.git'), false)
     assert.equal(paths.includes('secret.txt'), false)
@@ -117,14 +117,14 @@ test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_glob_gitignore_skips_git_and_ignore
     assert.equal(paths.includes('readme.md'), true)
     assert.equal(paths.includes('.gitignore'), true)
 
-    const braces = unwrap(glob(dir, '**/*.{fs,md}'))
+    const braces = unwrap(await glob(dir, '**/*.{fs,md}'))
     assert.deepEqual(braces.paths, ['readme.md', 'src/keep.fs'])
   } finally {
     cleanup()
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-009] JS020_grep_returns_line_column_and_skips_ignored', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-009] JS020_grep_returns_line_column_and_skips_ignored', async () => {
   const { dir, cleanup } = sandbox()
   try {
     mkdirSync(join(dir, 'src'))
@@ -133,7 +133,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-009] JS020_grep_returns_line_column_and_skips_
     writeFileSync(join(dir, 'dist', 'skip.js'), 'TODO: hidden\n', 'utf8')
     writeFileSync(join(dir, '.gitignore'), '/dist/\n', 'utf8')
 
-    const listing = unwrap(grep(dir, regex('TODO:.+'), 'src/**/*.fs'))
+    const listing = unwrap(await grep(dir, regex('TODO:.+'), 'src/**/*.fs'))
     const hits = listing.matches
     assert.equal(hits.length, 1)
     assert.equal(hits[0].path, 'src/a.fs')

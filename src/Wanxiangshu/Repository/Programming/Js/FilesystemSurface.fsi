@@ -7,9 +7,9 @@ namespace Wanxiangshu.Repository.Programming.Js
 module JsFilesystemSurface =
 
     val readUtf8: path: string -> obj
-    val glob: root: string -> pattern: string -> obj
+    val glob: root: string -> pattern: string -> System.Threading.Tasks.Task<obj>
     val findAnchor: textValue: string -> declaration: obj -> occurrence: int -> obj
     val requireUnique: textValue: string -> declaration: obj -> obj
-    val grep: root: string -> declaration: obj -> pattern: string -> obj
+    val grep: root: string -> declaration: obj -> pattern: string -> System.Threading.Tasks.Task<obj>
     val commitPlan: root: string -> plan: obj array -> obj
     val rollbackPlan: root: string -> plan: obj array -> unit

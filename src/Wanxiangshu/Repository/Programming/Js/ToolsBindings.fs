@@ -95,35 +95,39 @@ module JsToolsBindings =
                             |> renderOutcome
                         "glob"
                         ==> fun (pattern: string) ->
-                            match JsGlobFs.glob root pattern with
-                            | Ok listing -> createObj [ "ok" ==> true; "paths" ==> (List.toArray listing.Paths) ]
-                            | Error failure -> failureObj failure
+                            task {
+                                let! globRes = JsGlobFs.glob root pattern
+                                match globRes with
+                                | Ok listing -> return createObj [ "ok" ==> true; "paths" ==> (List.toArray listing.Paths) ]
+                                | Error failure -> return failureObj failure
+                            }
                         "grep"
                         ==> fun (needle: obj) (pattern: string) ->
-                            let globPattern =
-                                if isUndefined pattern || System.String.IsNullOrEmpty pattern then
-                                    "**/*"
+                            task {
+                                if isUndefined pattern || not (isString pattern) || System.String.IsNullOrEmpty pattern then
+                                    return failureObj JsFailure.AnchorInvalidPattern
                                 else
-                                    pattern
-
-                            result {
-                                let! spec = anchorOf needle
-                                do! requireNonEmptyExact spec
-                                let! listing = JsAnchorFs.grep root spec globPattern
-                                listing.ReadSnapshots |> List.iter readSnapshots.Add
-
-                                let matches =
-                                    listing.Matches
-                                    |> List.map (fun hit ->
-                                        createObj
-                                            [ "path" ==> hit.Path
-                                              "line" ==> hit.Line
-                                              "column" ==> hit.Column
-                                              "text" ==> hit.Text ])
-
-                                return createObj [ "ok" ==> true; "matches" ==> (List.toArray matches) ]
+                                    match anchorOf needle with
+                                    | Error failure -> return failureObj failure
+                                    | Ok spec ->
+                                        match requireNonEmptyExact spec with
+                                        | Error failure -> return failureObj failure
+                                        | Ok () ->
+                                            let! grepRes = JsAnchorFs.grep root spec pattern
+                                            match grepRes with
+                                            | Error failure -> return failureObj failure
+                                            | Ok listing ->
+                                                listing.ReadSnapshots |> List.iter readSnapshots.Add
+                                                let matches =
+                                                    listing.Matches
+                                                    |> List.map (fun hit ->
+                                                        createObj
+                                                            [ "path" ==> hit.Path
+                                                              "line" ==> hit.Line
+                                                              "column" ==> hit.Column
+                                                              "text" ==> hit.Text ])
+                                                return createObj [ "ok" ==> true; "matches" ==> (List.toArray matches) ]
                             }
-                            |> renderOutcome
                         "edit"
                         ==> fun (path: string) (newText: obj) ->
                             let replacement = string newText

@@ -63,10 +63,13 @@ module CasebookWorkflow =
     let checkFreshness (stored: Case) (replayed: Observation list) : ReplayResult =
         Observations.classifyReplay stored.Observations replayed
 
-    let private staleNeedsRefresh (case: Case) (root: string) =
-        match checkFreshness case (CasebookReplay.replayAll root case.Observations) with
-        | ReplayResult.Fresh -> false
-        | ReplayResult.Stale -> true
+    let private staleNeedsRefresh (case: Case) (root: string) : Task<bool> =
+        task {
+            let! replayed = CasebookReplay.replayAll root case.Observations
+            match checkFreshness case replayed with
+            | ReplayResult.Fresh -> return false
+            | ReplayResult.Stale -> return true
+        }
 
     /// CASE-006: the full refresh decision — fetch the Case, replay against
     /// the current worktree, and report whether a Bookkeeper revision is
@@ -82,7 +85,7 @@ module CasebookWorkflow =
 
             match caseOpt with
             | None -> return false
-            | Some case -> return staleNeedsRefresh case root
+            | Some case -> return! staleNeedsRefresh case root |> TaskResultCE.ofTask
         }
 
     let refreshCase

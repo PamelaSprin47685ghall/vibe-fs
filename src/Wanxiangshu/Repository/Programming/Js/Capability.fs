@@ -90,9 +90,9 @@ module JsFragmentRegistry =
     let grep: JsCapabilityFragment =
         { Capability = JsCapability.Grep
           MemberName = "grep"
-          Signature = "async grep(needle, pattern = \"**/*\")"
+          Signature = "async grep(needle, pattern)"
           Description =
-            "grep(needle, pattern = \"**/*\") — search UTF-8 files selected by the same "
+            "grep(needle, pattern) — search UTF-8 files selected by the same "
             + "gitignore-style glob. needle is a non-empty string or RegExp. Returns "
             + "{ matches } with 1-based line/column. Does not grant file()."
           CanonicalExample =

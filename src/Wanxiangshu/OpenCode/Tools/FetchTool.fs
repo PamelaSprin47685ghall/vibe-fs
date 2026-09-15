@@ -64,7 +64,7 @@ module FetchTool =
 
     let private evaluateUpdatedFreshness language workspaceRoot store sessionId (updated: Case) =
         task {
-            let again = CasebookReplay.replayAll workspaceRoot updated.Observations
+            let! again = CasebookReplay.replayAll workspaceRoot updated.Observations
 
             match CasebookWorkflow.checkFreshness updated again with
             | ReplayResult.Fresh ->
@@ -92,7 +92,7 @@ module FetchTool =
     let private handleResolvedCase language workspaceRoot store (case: Case) =
         task {
             let sessionId = case.SessionId
-            let replayed = CasebookReplay.replayAll workspaceRoot case.Observations
+            let! replayed = CasebookReplay.replayAll workspaceRoot case.Observations
 
             match CasebookWorkflow.checkFreshness case replayed with
             | ReplayResult.Fresh ->
