@@ -330,13 +330,11 @@ type HostForkRuntime
                         pending.IdentitySeed
                         (this.DirectoryOf agentId)
                         pending.Prompt
-                        (fun physical ->
-                            pendingRunForAgent ()
-                            |> Option.iter (fun run -> HostForkRunLifecycle.bindAuthorityRoot run physical))
+                        (fun _ -> ())
 
                 return
                     match sent with
-                    | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted ->
+                    | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted _ ->
                         lock gate (fun () -> deferredFirstPrompts.Remove agentId |> ignore)
                         Ok()
                     | HostForkRunLifecycle.AgentOwnerDispatchOutcome.AcceptanceUncertain _ ->
@@ -465,8 +463,13 @@ type HostForkRuntime
         |> ignore
 
     member this.InstallRun
-        (agentId: string, childId: SessionId, role: Role, ?preparedHandoff: PreparedDelegationHandoff)
-        =
+        (
+            agentId: string,
+            childId: SessionId,
+            role: Role,
+            authorityRoot: AuthorityRootUserMessageId,
+            ?preparedHandoff: PreparedDelegationHandoff
+        ) =
         lock gate (fun () -> processOwnedAgents.Add agentId |> ignore)
 
         let run =
@@ -484,6 +487,7 @@ type HostForkRuntime
                 agentId
                 childId
                 role
+                authorityRoot
 
         runtime.BindChildSession(agentId, childId)
         runStarted childId role (directoryOf agentId)

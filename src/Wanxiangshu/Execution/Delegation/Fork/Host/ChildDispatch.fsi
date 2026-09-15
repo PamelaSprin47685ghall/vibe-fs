@@ -35,6 +35,7 @@ module HostForkChildDispatch =
                 -> Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>) ->
         sendBusyNudge: (string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>) ->
         onRunStarted: (SessionId -> Role -> unit) ->
+        relink: (unit -> Task<Result<unit, string>>) ->
         preparedHandoff: PreparedDelegationHandoff option ->
         agentId: string ->
         childId: SessionId ->

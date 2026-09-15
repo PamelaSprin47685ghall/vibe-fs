@@ -39,12 +39,14 @@ test('WHAT[EMR-009] EMR_009_sdk_prompt_projects_model_without_nested_variant_and
   assert.deepEqual(payload.model, { providerID: 'provider', modelID: 'model' })
 })
 
-test('WHAT[EMR-004] EMR_004_sdk_prompt_async_enqueue_never_waits_for_the_host_run_promise', async () => {
+test('WHAT[EMR-004] EMR_004_sdk_prompt_async_awaits_host_enqueue_and_surfaces_enqueue_rejection', async () => {
   let releaseHost
+  let rejectHost
   let invoked = false
   const hostRun = new Promise((resolve) => {
     releaseHost = resolve
   })
+  const failingRun = new Promise((_, reject) => { rejectHost = reject })
   const client = {
     session: {
       promptAsync: () => {
@@ -55,23 +57,22 @@ test('WHAT[EMR-004] EMR_004_sdk_prompt_async_enqueue_never_waits_for_the_host_ru
   }
   const port = createSdkClientPort(client)
 
-  let settled = false
+
   const sending = sendPrompt(
     port,
     'session-detached',
     'start child work',
     promptOptions({ agent: 'devops' }),
-  ).then((value) => {
-    settled = true
-    return value
-  })
-
-  await new Promise((resolve) => setImmediate(resolve))
-  assert.equal(invoked, true, 'the Host enqueue API is invoked')
-  assert.equal(settled, true, 'SendPrompt must return at enqueue, not when the child run promise settles')
-
-  await sending
+  )
   releaseHost({})
+  const result = await sending
+  assert.equal(invoked, true, 'the Host enqueue API is invoked')
+  assert.match(JSON.stringify(result), /AdmittedWithReceipt/i)
+
+  const failingPort = createSdkClientPort({ session: { promptAsync: () => failingRun } })
+  rejectHost(new Error('Host enqueue refused'))
+  const failed = await sendPrompt(failingPort, 'session-failing', 'refused work', promptOptions({ agent: 'devops' }))
+  assert.match(JSON.stringify(failed), /Fatal|refused/i)
 })
 
 test('WHAT[EMR-008] EMR_008_sdk_prompt_never_recovers_a_model_from_agent_or_host_inventory', async () => {

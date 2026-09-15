@@ -96,7 +96,11 @@ type HostForkRuntime =
     member Complete: run: PendingHostRun * outcome: TerminalOutcome -> unit
 
     member InstallRun:
-        agentId: string * childId: SessionId * role: Role * ?preparedHandoff: PreparedDelegationHandoff ->
+        agentId: string *
+        childId: SessionId *
+        role: Role *
+        authorityRoot: AuthorityRootUserMessageId *
+        ?preparedHandoff: PreparedDelegationHandoff ->
             PendingHostRun
 
     member FailRun: run: PendingHostRun * error: string -> Task

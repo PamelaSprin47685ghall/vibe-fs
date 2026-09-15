@@ -84,7 +84,7 @@ const stubClient = (createdIds, prompts, messages, abortedIds) => {
   // 同一个空数组，子会话的认领永远 StillPending → join RECOVERY_BLOCKED
   // （`pending claim unknown ...`）。
   const messagesBySession = new Map() // sessionId -> message[]
-  return {
+  const self = {
     __pushHostMessage: (sessionId, message) => {
       const perSession = messagesBySession.get(sessionId) ?? []
       perSession.push(message)
@@ -159,6 +159,14 @@ const stubClient = (createdIds, prompts, messages, abortedIds) => {
         } else {
           promptedWaiters.set(sessionId, null) // 已就绪：后来的 awaitPrompted 立即返回
         }
+        const hk = self.__hooks;
+        if (hk && hk['chat.message']) {
+          try {
+            await hk['chat.message']({ sessionID: sessionId, messageID: message.id, agent: args?.body?.agent }, { message, parts: message.parts })
+          } catch (err) {
+            console.log('HOOK CHAT MESSAGE FAILED:', err)
+          }
+        }
         return {}
       },
       delete: async () => ({}),
@@ -168,6 +176,7 @@ const stubClient = (createdIds, prompts, messages, abortedIds) => {
       },
     },
   }
+  return self
 }
 
 /** 等待生产对某个子会话发出首个 prompt——即其 terminal 订阅已安装的就绪信号。 */
@@ -207,6 +216,7 @@ export const withExecutablePlugin = async (body, options = {}) => {
       directory,
       events: options.events ?? { listen: () => () => {} },
     })
+    client.__hooks = hooks
     await configureManagedPlugin(hooks)
     let runtime
     try {
@@ -531,6 +541,7 @@ export const withPluginClient = async (client, body) => {
       directory,
       events: { listen: () => () => {} },
     })
+    client.__hooks = hooks
     try {
       await body(hooks, directory)
     } finally {

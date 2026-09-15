@@ -13,7 +13,7 @@ open Wanxiangshu.Persistence.Journal
 module HostForkRunLifecycle =
     [<RequireQualifiedAccess>]
     type AgentOwnerDispatchOutcome =
-        | Accepted
+        | Accepted of physicalUserMessageId: PhysicalUserMessageId * authorityRoot: AuthorityRootUserMessageId
         | AcceptanceUncertain of string
         | Rejected of string
 
@@ -64,8 +64,6 @@ module HostForkRunLifecycle =
         onAccepted: (PhysicalUserMessageId -> unit) ->
             Task<AgentOwnerDispatchOutcome>
 
-    val bindAuthorityRoot: run: PendingHostRun -> physical: PhysicalUserMessageId -> unit
-
     val complete:
         gate: obj ->
         pendingRuns: Dictionary<string, PendingHostRun> ->
@@ -92,6 +90,7 @@ module HostForkRunLifecycle =
         agentId: string ->
         childId: SessionId ->
         role: Role ->
+        authorityRoot: AuthorityRootUserMessageId ->
             PendingHostRun
 
     val settleParentCancelled:

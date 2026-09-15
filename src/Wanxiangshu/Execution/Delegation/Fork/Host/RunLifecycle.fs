@@ -40,7 +40,7 @@ module HostForkRunLifecycle =
 
     [<RequireQualifiedAccess>]
     type AgentOwnerDispatchOutcome =
-        | Accepted
+        | Accepted of physicalUserMessageId: PhysicalUserMessageId * authorityRoot: AuthorityRootUserMessageId
         | AcceptanceUncertain of string
         | Rejected of string
 
@@ -129,11 +129,12 @@ module HostForkRunLifecycle =
         let payloadDigest = HostDigest.sha256Hex prompt
 
         let accepted (evidence: PromptAuthority.AcceptedDispatch) =
-            // Close the race where PhysicalAccepted landed after the dispatcher
-            // cancelled its synchronous waiter but before we inspected durable
-            // evidence. Binding the same root twice is idempotent assignment.
             onAccepted evidence.PhysicalUserMessageId
-            AgentOwnerDispatchOutcome.Accepted
+
+            AgentOwnerDispatchOutcome.Accepted(
+                evidence.PhysicalUserMessageId,
+                PhysicalUserMessageId.promoteToAuthorityRoot evidence.PhysicalUserMessageId
+            )
 
         match durableDispatchObservation durable childId payloadDigest identitySeed with
         | DurableDispatchObservation.Accepted evidence -> accepted evidence
@@ -143,10 +144,17 @@ module HostForkRunLifecycle =
         | DurableDispatchObservation.Pending claim ->
             classifyPendingSend durable childId payloadDigest identitySeed claim onAccepted accepted error
 
-    let private classifySendSuccess durable childId identitySeed prompt =
+    let private classifySendSuccess durable childId identitySeed prompt onAccepted =
         match durableDispatchObservation durable childId (HostDigest.sha256Hex prompt) identitySeed with
-        | DurableDispatchObservation.Accepted _
-        | DurableDispatchObservation.Pending _ -> AgentOwnerDispatchOutcome.Accepted
+        | DurableDispatchObservation.Accepted evidence ->
+            onAccepted evidence.PhysicalUserMessageId
+
+            AgentOwnerDispatchOutcome.Accepted(
+                evidence.PhysicalUserMessageId,
+                PhysicalUserMessageId.promoteToAuthorityRoot evidence.PhysicalUserMessageId
+            )
+        | DurableDispatchObservation.Pending _ ->
+            AgentOwnerDispatchOutcome.AcceptanceUncertain "Prompt submitted but physical acceptance unconfirmed"
         | DurableDispatchObservation.IdentityMismatch ->
             AgentOwnerDispatchOutcome.Rejected "Durable child dispatch identity witness does not match this owner run"
         | DurableDispatchObservation.Dispatchable ->
@@ -154,7 +162,7 @@ module HostForkRunLifecycle =
 
     let private interpretDispatchResult durable childId identitySeed prompt onAccepted =
         function
-        | Ok _ -> classifySendSuccess durable childId identitySeed prompt
+        | Ok _ -> classifySendSuccess durable childId identitySeed prompt onAccepted
         | Error error -> classifySendError durable childId identitySeed prompt onAccepted error
 
     let private sendAgentOwnerRootWithJournal
@@ -238,20 +246,17 @@ module HostForkRunLifecycle =
         fun (agentId: string) childId (_role: Role) identitySeed prompt onAccepted ->
             sendChildPrompt sessions parentId journal childId identitySeed (directoryOf agentId) prompt onAccepted
 
-    let bindAuthorityRoot (run: PendingHostRun) (physical: PhysicalUserMessageId) =
-        run.AuthorityRoot <- Some(PhysicalUserMessageId.promoteToAuthorityRoot physical)
-
     let private completionBelongsToRun (run: PendingHostRun) (result: AgentRunResult) =
         match run.Handoff with
         | None -> true
-        | Some _ -> run.AuthorityRoot = Some result.AuthorityRootUserMessageId
+        | Some _ -> run.AuthorityRoot = result.AuthorityRootUserMessageId
 
     let private stopBelongsToRun (run: PendingHostRun) (stop: TerminalStop) =
         match run.Handoff with
         | None -> true
         | Some _ ->
-            run.AuthorityRoot
-            |> Option.exists (fun root -> TerminalStop.belongsTo root stop)
+            let root = run.AuthorityRoot
+            TerminalStop.belongsTo root stop
 
     /// DELEG-031: the handoff port travels with the prepared handoff as one slot
     /// (`Some slot` proves the capability was present at PrepareHandoff time).
@@ -526,6 +531,7 @@ module HostForkRunLifecycle =
         (agentId: string)
         (childId: SessionId)
         (role: Role)
+        (authorityRoot: AuthorityRootUserMessageId)
         =
         let run =
             { Token = obj ()
@@ -534,7 +540,7 @@ module HostForkRunLifecycle =
               Role = role
               StartCursor = xTraceHead childId
               Handoff = handoff
-              AuthorityRoot = None
+              AuthorityRoot = authorityRoot
               Source = HostPendingRun.completionSource ()
               Subscription = None
               Finished = false }

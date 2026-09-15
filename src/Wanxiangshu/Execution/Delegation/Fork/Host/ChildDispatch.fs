@@ -97,18 +97,6 @@ module HostForkChildDispatch =
             children.Clear()
             pendingRuns.Clear())
 
-    let private decideExistingSendAcceptance
-        (sent: HostForkRunLifecycle.AgentOwnerDispatchOutcome)
-        (result: ForkResult)
-        =
-        match sent, result with
-        | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted, (ForkResult.Nudged _ | ForkResult.Created _) ->
-            Ok result
-        | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted, _ -> Error "Existing agent did not accept a new run"
-        | HostForkRunLifecycle.AgentOwnerDispatchOutcome.AcceptanceUncertain _, _ ->
-            Ok(ForkResult.DispatchUncertain result.AgentId)
-        | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Rejected err, _ -> Error err
-
     let private nudgeBusyChild
         (sendBusyNudge: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
         (agentId: string)
@@ -128,6 +116,11 @@ module HostForkChildDispatch =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
+        (childWorkRecordForRun: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>)
+        (xTraceHead: SessionId -> XTraceCursor)
+        (trackOwnedWork: (unit -> Task) -> unit)
+        (runtime: ForkRuntime)
+        (onRunStarted: SessionId -> Role -> unit)
         (handoffPort: ReusableHandoffPort option)
         (sendChildPrompt:
             string
@@ -141,28 +134,49 @@ module HostForkChildDispatch =
         (childId: SessionId)
         (role: Role)
         (identitySeed: PromptAuthority.IdentitySeed)
+        (relink: unit -> Task<Result<unit, string>>)
+        (preparedHandoff: PreparedDelegationHandoff option)
         (prompt: string)
+        (agent: string)
         (enrichedPrompt: string option)
-        (run: PendingHostRun)
-        (result: ForkResult)
         : Task<Result<ForkResult, string>> =
         taskResult {
-            HostForkRunLifecycle.markReady gate pendingRuns journal parentId sessions run None
             let payload = Option.defaultValue prompt enrichedPrompt
 
             let! sent =
-                sendChildPrompt agentId childId role identitySeed payload (HostForkRunLifecycle.bindAuthorityRoot run)
+                sendChildPrompt agentId childId role identitySeed payload (fun _ -> ())
                 |> TaskResultCE.ofTask
 
-            match decideExistingSendAcceptance sent result with
-            | Ok accepted -> return accepted
-            | Error err ->
-                do!
-                    HostForkRunLifecycle.failRun gate pendingRuns journal parentId sessions handoffPort run err
-                    |> awaitUnit
-                    |> TaskResultCE.ofTask
+            match sent with
+            | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted(_, authorityRoot) ->
+                let! _ = relink ()
 
-                return! Error err
+                let run =
+                    HostForkRunLifecycle.installRun
+                        gate
+                        pendingRuns
+                        journal
+                        parentId
+                        sessions
+                        childWorkRecordForRun
+                        xTraceHead
+                        trackOwnedWork
+                        handoffPort
+                        preparedHandoff
+                        agentId
+                        childId
+                        role
+                        authorityRoot
+
+                onRunStarted childId role
+
+                let result =
+                    runtime.Fork(agentId, role, agent, runWork = (fun () -> run.Source.Task))
+
+                return result
+            | HostForkRunLifecycle.AgentOwnerDispatchOutcome.AcceptanceUncertain _ ->
+                return ForkResult.DispatchUncertain agentId
+            | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Rejected err -> return! Error err
         }
 
     let private dispatchIdleExistingChild
@@ -185,6 +199,7 @@ module HostForkChildDispatch =
                 -> (PhysicalUserMessageId -> unit)
                 -> Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>)
         (onRunStarted: SessionId -> Role -> unit)
+        (relink: unit -> Task<Result<unit, string>>)
         (preparedHandoff: PreparedDelegationHandoff option)
         (agentId: string)
         (childId: SessionId)
@@ -196,53 +211,9 @@ module HostForkChildDispatch =
         taskResult {
             let! identitySeed = HostForkRunLifecycle.issueCurrentOwnerIdentitySeed journal parentId agent
 
-            // Idle existing child: new AgentOwnerRoot work via ordinary send.
-            //
-            // A first-prompt fork (the `enrichedPrompt` Some case) carries the
-            // same ARCH-010 payload a brand-new child would receive. The fork
-            // boundary must produce one shape for "the child's round
-            // assignment" whether the session is fresh or restored from the
-            // journal — measured: a post-restart review fork that sent the raw
-            // opening prompt broke every canary declaration anchored on the
-            // envelope, while a busy nudge (a continuation) must stay raw.
-            let run =
-                HostForkRunLifecycle.installRun
-                    gate
-                    pendingRuns
-                    journal
-                    parentId
-                    sessions
-                    childWorkRecordForRun
-                    xTraceHead
-                    trackOwnedWork
-                    handoffPort
-                    preparedHandoff
-                    agentId
-                    childId
-                    role
-
-            onRunStarted childId role
-
-            let result =
-                runtime.Fork(agentId, role, agent, runWork = (fun () -> run.Source.Task))
-
-            match result with
-            | ForkResult.NotFound _ ->
-                do!
-                    HostForkRunLifecycle.failRun
-                        gate
-                        pendingRuns
-                        journal
-                        parentId
-                        sessions
-                        handoffPort
-                        run
-                        "Fork runtime is cancelled"
-                    |> awaitUnit
-                    |> TaskResultCE.ofTask
-
+            if runtime.IsCancelled then
                 return! Error "Fork runtime is cancelled"
-            | _ ->
+            else
                 return!
                     completeIdleExistingSend
                         gate
@@ -250,16 +221,22 @@ module HostForkChildDispatch =
                         journal
                         parentId
                         sessions
+                        childWorkRecordForRun
+                        xTraceHead
+                        trackOwnedWork
+                        runtime
+                        onRunStarted
                         handoffPort
                         sendChildPrompt
                         agentId
                         childId
                         role
                         identitySeed
+                        relink
+                        preparedHandoff
                         prompt
+                        agent
                         enrichedPrompt
-                        run
-                        result
         }
 
     /// Sends a prompt to an already-linked child: if a run is active for this
@@ -290,6 +267,7 @@ module HostForkChildDispatch =
                 -> Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>)
         (sendBusyNudge: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
         (onRunStarted: SessionId -> Role -> unit)
+        (relink: unit -> Task<Result<unit, string>>)
         (preparedHandoff: PreparedDelegationHandoff option)
         (agentId: string)
         (childId: SessionId)
@@ -327,6 +305,7 @@ module HostForkChildDispatch =
                         handoffPort
                         sendChildPrompt
                         onRunStarted
+                        relink
                         preparedHandoff
                         agentId
                         childId

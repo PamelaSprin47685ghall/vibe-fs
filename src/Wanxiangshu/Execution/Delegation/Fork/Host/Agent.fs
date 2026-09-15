@@ -119,114 +119,6 @@ module HostForkAgent =
             DelegatedToolEstimateLedger.replace port childId expected
         | _ -> Task.FromResult(())
 
-    let private sendFirstPromptOutcome
-        (runtime: HostForkRuntime)
-        (run: PendingHostRun)
-        (agentId: string)
-        (childId: SessionId)
-        (identitySeed: PromptAuthority.IdentitySeed)
-        (enrichedPrompt: string)
-        (result: ForkResult)
-        : Task<Result<ForkResult, string>> =
-        task {
-            let! sent =
-                HostForkAgentOwner.sendFirstPromptObserved
-                    runtime.Sessions
-                    runtime.Journal
-                    childId
-                    identitySeed
-                    (runtime.DirectoryOf agentId)
-                    enrichedPrompt
-                    (HostForkRunLifecycle.bindAuthorityRoot run)
-
-            match sent with
-            | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted -> return Ok result
-            | HostForkRunLifecycle.AgentOwnerDispatchOutcome.AcceptanceUncertain _ ->
-                return Ok(ForkResult.DispatchUncertain result.AgentId)
-            | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Rejected err ->
-                do! runtime.FailRun(run, err)
-                return Error err
-        }
-
-    let private finishSuccessfulNewChild
-        (runtime: HostForkRuntime)
-        (agentId: string)
-        (childId: SessionId)
-        (identitySeed: PromptAuthority.IdentitySeed)
-        (prompt: string)
-        (requirements: string list)
-        (enrichedPrompt: string)
-        (isFirstPrompt: bool)
-        (deferSend: bool)
-        (expectedToolCalls: int option)
-        (run: PendingHostRun)
-        (result: ForkResult)
-        : Task<Result<ForkResult, string>> =
-        taskResult {
-            runtime.MarkReady(run)
-
-            // COMPANION-003 / EXEC-006: the child's OpeningMaterial is the ORIGINAL
-            // fork assignment and authoritative requirements, NOT the rendered
-            // envelope (which carries commissioner_record and would nest the
-            // parent LWR recursively). Captured before the first prompt is sent;
-            // idempotent.
-            if isFirstPrompt then
-                let! _ =
-                    XTraceCapture.captureOpeningWithReceipt runtime.Journal childId prompt requirements
-                    |> TaskResult.mapError (fun error -> sprintf "fork opening trace capture failed: %A" error)
-
-                ()
-
-            do!
-                maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
-                |> TaskResultCE.ofTask
-
-            if deferSend && isFirstPrompt then
-                runtime.DeferredFirstPrompts.[agentId] <-
-                    {| ChildId = childId
-                       IdentitySeed = identitySeed
-                       Prompt = enrichedPrompt |}
-
-                return result
-            else
-                return! sendFirstPromptOutcome runtime run agentId childId identitySeed enrichedPrompt result
-        }
-
-    let private afterRuntimeFork
-        (runtime: HostForkRuntime)
-        (agentId: string)
-        (childId: SessionId)
-        (identitySeed: PromptAuthority.IdentitySeed)
-        (prompt: string)
-        (requirements: string list)
-        (enrichedPrompt: string)
-        (isFirstPrompt: bool)
-        (deferSend: bool)
-        (expectedToolCalls: int option)
-        (run: PendingHostRun)
-        (result: ForkResult)
-        : Task<Result<ForkResult, string>> =
-        match result with
-        | ForkResult.NotFound _ ->
-            task {
-                do! runtime.FailRun(run, "Fork runtime is cancelled")
-                return Error "Fork runtime is cancelled"
-            }
-        | _ ->
-            finishSuccessfulNewChild
-                runtime
-                agentId
-                childId
-                identitySeed
-                prompt
-                requirements
-                enrichedPrompt
-                isFirstPrompt
-                deferSend
-                expectedToolCalls
-                run
-                result
-
     let private afterLinkage
         (runtime: HostForkRuntime)
         (agentId: string)
@@ -251,34 +143,59 @@ module HostForkAgent =
             }
         | Ok() ->
             task {
-                let run =
-                    runtime.InstallRun(agentId, childId, role, ?preparedHandoff = preparedHandoff)
-
                 lock runtime.Gate (fun () -> runtime.Children.[agentId] <- childId)
 
                 runtime.ChildCreated agentId role childId
                 runtime.ChildCreatedDir agentId childId (runtime.DirectoryOf agentId)
 
-                // GLORY-033: the fork surface no longer opens barriers. An
-                // incumbent cannot fork an unauthorized role, and every
-                // Host-owned barrier opens at its dedicated site.
-                let result =
-                    runtime.Runtime.Fork(agentId, role, agentName, runWork = (fun () -> run.Source.Task))
+                if isFirstPrompt then
+                    let! _ =
+                        XTraceCapture.captureOpeningWithReceipt runtime.Journal childId prompt requirements
+                        |> TaskResult.mapError (fun error -> sprintf "fork opening trace capture failed: %A" error)
 
-                return!
-                    afterRuntimeFork
-                        runtime
-                        agentId
-                        childId
-                        identitySeed
-                        prompt
-                        requirements
-                        enrichedPrompt
-                        isFirstPrompt
-                        deferSend
-                        expectedToolCalls
-                        run
-                        result
+                    ()
+
+                do!
+                    maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
+                    |> TaskResultCE.ofTask
+                    |> TaskValue.map ignore
+
+                if deferSend && isFirstPrompt then
+                    runtime.DeferredFirstPrompts.[agentId] <-
+                        {| ChildId = childId
+                           IdentitySeed = identitySeed
+                           Prompt = enrichedPrompt |}
+
+                    return Ok(ForkResult.Created agentId)
+                else
+                    let! sent =
+                        HostForkAgentOwner.sendFirstPromptObserved
+                            runtime.Sessions
+                            runtime.Journal
+                            childId
+                            identitySeed
+                            (runtime.DirectoryOf agentId)
+                            enrichedPrompt
+                            (fun _ -> ())
+
+                    match sent with
+                    | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted(_, authorityRoot) ->
+                        let run =
+                            runtime.InstallRun(
+                                agentId,
+                                childId,
+                                role,
+                                authorityRoot,
+                                ?preparedHandoff = preparedHandoff
+                            )
+
+                        let result =
+                            runtime.Runtime.Fork(agentId, role, agentName, runWork = (fun () -> run.Source.Task))
+
+                        return Ok result
+                    | HostForkRunLifecycle.AgentOwnerDispatchOutcome.AcceptanceUncertain _ ->
+                        return Ok(ForkResult.DispatchUncertain agentId)
+                    | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Rejected err -> return Error err
             }
 
     let private forkNewChild
@@ -373,6 +290,20 @@ module HostForkAgent =
             | Some sendAgent ->
                 do! maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
 
+                let relink () =
+                    let journalPort =
+                        runtime.Journal |> Option.map AgentJournalPortAdapter.fromAgentJournal
+
+                    HandleController.linkNamed
+                        journalPort
+                        runtime.ParentId
+                        agentId
+                        childId
+                        sendAgent
+                        sendAgent
+                        role
+                        runtime.HandleOwnership
+
                 return!
                     HostForkChildDispatch.sendToExistingChild
                         runtime.Gate
@@ -388,6 +319,7 @@ module HostForkAgent =
                         runtime.SendChildPrompt
                         runtime.SendBusyNudge
                         (fun child role -> runtime.RunStarted child role (runtime.DirectoryOf agentId))
+                        relink
                         preparedHandoff
                         agentId
                         childId
@@ -460,7 +392,7 @@ module HostForkAgent =
                     )
             }
 
-    let private reuseAfterRelink
+    let private reuseWithManagedAgent
         (runtime: HostForkRuntime)
         (agentId: string)
         (childId: SessionId)
@@ -470,12 +402,34 @@ module HostForkAgent =
         (renderedPrompt: string option)
         (wasDormant: bool)
         (preparedHandoff: PreparedDelegationHandoff option)
-        (linkResult: Result<unit, string>)
         : Task<Result<ForkResult, string>> =
-        match linkResult with
-        | Error linkError -> Task.FromResult(Error linkError)
-        | Ok() ->
-            task {
+        task {
+
+            let providerBynameOpt =
+                runtime.Journal
+                |> Option.bind (fun durable ->
+                    AgentJournal.handleProjection durable runtime.ParentId
+                    |> HandleProjection.tryFind (HandleController.agentHandle agentId))
+                |> Option.map (fun handle -> handle.Byname)
+                |> Option.filter (String.IsNullOrWhiteSpace >> not)
+
+            match providerBynameOpt with
+            | None -> return Error(sprintf "Agent handle '%s' has no provider byname" agentId)
+            | Some providerByname ->
+                let relink () =
+                    let journalPort =
+                        runtime.Journal |> Option.map AgentJournalPortAdapter.fromAgentJournal
+
+                    HandleController.linkNamed
+                        journalPort
+                        runtime.ParentId
+                        agentId
+                        childId
+                        agentName
+                        providerByname
+                        role
+                        runtime.HandleOwnership
+
                 runtime.ActivateDormantChildIfNeeded(wasDormant, agentId, childId, role)
                 let! enriched = resolveReuseEnrichedPrompt runtime prompt renderedPrompt
 
@@ -494,6 +448,7 @@ module HostForkAgent =
                         runtime.SendChildPrompt
                         runtime.SendBusyNudge
                         (fun child role -> runtime.RunStarted child role (runtime.DirectoryOf agentId))
+                        relink
                         preparedHandoff
                         agentId
                         childId
@@ -501,57 +456,6 @@ module HostForkAgent =
                         prompt
                         agentName
                         enriched
-            }
-
-    let private reuseWithManagedAgent
-        (runtime: HostForkRuntime)
-        (agentId: string)
-        (childId: SessionId)
-        (role: Role)
-        (agentName: string)
-        (prompt: string)
-        (renderedPrompt: string option)
-        (wasDormant: bool)
-        (preparedHandoff: PreparedDelegationHandoff option)
-        : Task<Result<ForkResult, string>> =
-        task {
-            let journalPort =
-                runtime.Journal |> Option.map AgentJournalPortAdapter.fromAgentJournal
-
-            let providerBynameOpt =
-                runtime.Journal
-                |> Option.bind (fun durable ->
-                    AgentJournal.handleProjection durable runtime.ParentId
-                    |> HandleProjection.tryFind (HandleController.agentHandle agentId))
-                |> Option.map (fun handle -> handle.Byname)
-                |> Option.filter (String.IsNullOrWhiteSpace >> not)
-
-            match providerBynameOpt with
-            | None -> return Error(sprintf "Agent handle '%s' has no provider byname" agentId)
-            | Some providerByname ->
-                let! linkResult =
-                    HandleController.linkNamed
-                        journalPort
-                        runtime.ParentId
-                        agentId
-                        childId
-                        agentName
-                        providerByname
-                        role
-                        runtime.HandleOwnership
-
-                return!
-                    reuseAfterRelink
-                        runtime
-                        agentId
-                        childId
-                        role
-                        agentName
-                        prompt
-                        renderedPrompt
-                        wasDormant
-                        preparedHandoff
-                        linkResult
         }
 
     let private reuseLiveChild

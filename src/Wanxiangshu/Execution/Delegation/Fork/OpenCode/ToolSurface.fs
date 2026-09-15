@@ -383,6 +383,8 @@ module ForkToolSurface =
         }
 
     let createRuntime (directory: string) (owners: obj) : Task<obj> =
+        emitJsExpr () "process.env.WANXIANGSHU_ADMISSION_TIMEOUT_MS = '100'" |> ignore
+
         task {
             let admissions =
                 match ownerAdmissions owners with
@@ -439,6 +441,8 @@ module ForkToolSurface =
                     childWorkRecordForRun = childWorkRecordForRun,
                     workRecordCapability = workRecordCapability
                 )
+
+            scope.AttachCurrentProcessJoinMode "ready"
 
             return box (ForkHarness(journal, scope, sessionPort, ownerAgents))
         }
@@ -621,6 +625,11 @@ module ForkToolSurface =
               Journal = harness.Scope.Journal }
 
         let spec = HorizonTool.spec horizonContext
+        spec.Execute (HostToolArguments(box {| |})) (managerContext harness owner)
+
+    let executeJoin (value: obj) (owner: string) : Task<string> =
+        let harness = unbox<ForkHarness> value
+        let spec = JoinTool.spec harness.Scope
         spec.Execute (HostToolArguments(box {| |})) (managerContext harness owner)
 
     let settle (value: obj) (owner: string) (answer: string) (providerRun: string) : Task<bool> =

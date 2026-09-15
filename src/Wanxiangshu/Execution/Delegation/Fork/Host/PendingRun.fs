@@ -32,7 +32,7 @@ type PendingHostRun =
       Role: Role
       StartCursor: XTraceCursor
       Handoff: PreparedDelegationHandoff option
-      mutable AuthorityRoot: AuthorityRootUserMessageId option
+      AuthorityRoot: AuthorityRootUserMessageId
       Source: TaskCompletionSource<AgentCompletionOutcome>
       mutable Subscription: IDisposable option
       mutable Finished: bool }

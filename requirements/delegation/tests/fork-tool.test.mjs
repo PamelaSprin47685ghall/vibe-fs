@@ -42,6 +42,7 @@ test('WHAT[DELEG-019] FORK_TOOL_payload_has_assignment_and_requirements', () => 
   assert.match(wire, /one/)
   assert.match(wire, /two/)
 })
+
 test('WHAT[DELEG-019] FORK_TOOL_unknown_calling_is_generic_denial', () => {
   assert.match(fork.unavailableCalling('en', false), /Unknown or unavailable calling/)
 })
@@ -146,6 +147,47 @@ test('WHAT[DELEG-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_and_lea
   }
 })
 
+test('WHAT[DELEG-026] RESUME_synchronous_admission_with_async_work_and_join_isolation', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-resume-sync-admit-'))
+  const owner = 'manager-resume-sync-admit'
+  const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
+
+  try {
+    // 1. Initial fork
+    const first = forkTool.executeManagerFork(runtime, toolModule, owner, 'coder', 'Ada', 'INITIAL-CHARGE')
+    await waitForPromptCount(runtime, 1)
+    assert.equal(forkTool.acceptPrompt(runtime, 0), true)
+    assert.match(await first, /Ada/)
+    assert.equal(await forkTool.settle(runtime, owner, 'FIRST-ANSWER', 'fork-run-1'), true)
+    const firstJoined = await forkTool.executeJoin(runtime, owner)
+    assert.match(firstJoined, /FIRST-ANSWER/)
+
+    // 2. Resume dispatch without physical acceptance must not complete successfully or create ghost run
+    forkTool.nextPromptAdmittedWithReceipt(runtime, 'accepted-receipt-only')
+    const unconfirmedResume = await forkTool.executeManagerResume(runtime, toolModule, owner, '', 'Ada', 'UNCONFIRMED-CHARGE')
+    assert.match(unconfirmedResume, /uncertain|不确定|may already have been accepted|可能已/i)
+    assert.doesNotMatch(unconfirmedResume, /carries this charge now|现已接下这项托付/i)
+
+    // 3. Join sees nothing to join because unconfirmed dispatch was not installed into pending runs
+    const joinResult = await forkTool.executeJoin(runtime, owner)
+    assert.match(joinResult, /NothingToJoin|无可等待|没有/i)
+
+    // 4. Confirmed resume accepts and publishes assignment
+    const second = forkTool.executeManagerResume(runtime, toolModule, owner, '', 'Ada', 'CONFIRMED-CHARGE')
+    await waitForPromptCount(runtime, 3)
+    assert.equal(forkTool.acceptPrompt(runtime, 1), true)
+    assert.match(await second, /Ada/)
+    assert.match(await second, /carries this charge now|现已接下这项托付/i)
+
+    // 5. Completion with matching authority root settles the new assignment
+    assert.equal(await forkTool.settle(runtime, owner, 'SECOND-ANSWER', 'fork-run-2'), true)
+    const secondJoined = await forkTool.executeJoin(runtime, owner)
+    assert.match(secondJoined, /SECOND-ANSWER/)
+  } finally {
+    forkTool.disposeRuntime(runtime)
+  }
+})
+
 test('WHAT[DELEG-003] FORK_TOOL_requires_calling_and_resume_rejects_calling', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-split-'))
   const owner = 'manager-fork-split'
@@ -207,9 +249,9 @@ test('WHAT[DELEG-026] FORK_TOOL_acceptance_unknown_never_claims_charge_was_not_p
   }
 })
 
-test('WHAT[DELEG-026] FORK_TOOL_transport_receipt_confirms_placement_without_fabricating_physical_acceptance', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-receipt-pending-'))
-  const owner = 'manager-receipt-pending'
+test('WHAT[DELEG-026] FORK_TOOL_unconfirmed_dispatch_reports_uncertain_and_never_leaves_ghost_run_for_join', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-unconfirmed-'))
+  const owner = 'manager-unconfirmed'
   const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
 
   try {
@@ -224,20 +266,16 @@ test('WHAT[DELEG-026] FORK_TOOL_transport_receipt_confirms_placement_without_fab
       'RECEIPT-PENDING-FORK-CHARGE',
     )
 
-    assert.doesNotMatch(result, /could not complete the charge|could not be placed|无法托付|uncertain|不确定/i)
-    assert.match(result, /carries this charge now|现已接下这项托付/i)
-    assert.equal(
-      await forkTool.settle(runtime, owner, 'UNPROVEN-ANSWER', 'unproven-run'),
-      false,
-      'placement receipt must not manufacture a physical authority root for completion',
-    )
-    assert.equal(forkTool.childCount(runtime), 1)
+    // Unconfirmed dispatch (transport receipt without physical acceptance) must report uncertain,
+    // never claim placement success (carries this charge now)
+    assert.match(result, /uncertain|不确定|may already have been accepted|可能已/i)
+    assert.doesNotMatch(result, /carries this charge now|现已接下这项托付/i)
+
+    // Join must NOT hang waiting on an unconfirmed dispatch; it must report NothingToJoin / no active runs
+    const joinResult = await forkTool.executeJoin(runtime, owner)
+    assert.match(joinResult, /NothingToJoin|无可等待|没有/i)
+
     assert.equal(forkTool.promptCount(runtime), 1)
-    assert.equal(
-      forkTool.durableLifecycleByname(runtime, owner, 'Ada'),
-      'Active',
-      'transport admission without PhysicalAccepted must preserve the pending run for exact ingress evidence',
-    )
   } finally {
     forkTool.disposeRuntime(runtime)
   }

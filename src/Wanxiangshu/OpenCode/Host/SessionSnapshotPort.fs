@@ -349,7 +349,7 @@ module SessionSnapshotPort =
             | None -> createObj []
 
         interface ISessionSnapshotPort with
-            member _.GetMessages(sessionId) =
+            member this.GetMessages(sessionId) =
                 taskResult {
                     try
                         let sessObj = client?session

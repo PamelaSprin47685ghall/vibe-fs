@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Interaction.Dispatch
 
 open Wanxiangshu.OpenCode
+open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 
 open System.Threading.Tasks
@@ -66,17 +67,72 @@ module PromptDispatcherSend =
 
     let private awaitPhysicalAwareSend
         (key: PromptKey)
+        (sessionId: SessionId)
+        (persist: PromptSessionFact -> Task<Result<unit, string>>)
+        (acceptPhysical: PhysicalUserMessageId -> Task<Result<unit, string>>)
+        (abandon: PromptAbandonReason -> string -> Task<Result<unit, string>>)
         (sendTask: Task<SendOutcome>)
-        (record: SendOutcome -> Task<Result<PromptKey, string>>)
+        (confirmationWaiterOpt: Task<PromptPhysicalOutcome option> option)
         : Task<Result<PromptKey, string>> =
         task {
             try
                 let! outcome = sendTask
-                let! result = record outcome
-                return cancelPhysicalOnError key result
+
+                match outcome with
+                | AdmittedWithReceipt receipt ->
+                    let! persisted =
+                        persist (
+                            PromptSessionFact.PromptSubmitted
+                                {| PromptKey = key
+                                   SessionId = sessionId
+                                   Receipt = receipt |}
+                        )
+
+                    match persisted with
+                    | Error err ->
+                        PromptPhysicalAcceptance.cancel key
+                        return Error err
+                    | Ok() ->
+                        match confirmationWaiterOpt with
+                        | None -> return Ok key
+                        | Some confirmationTask ->
+                            let! confirmation = confirmationTask
+
+                            match confirmation with
+                            | Some(PromptPhysicalOutcome.Accepted _) -> return Ok key
+                            | Some(PromptPhysicalOutcome.Rejected reason) ->
+                                return Error(sprintf "Prompt admission rejected: %s" reason)
+                            | None ->
+                                return
+                                    Error(
+                                        sprintf
+                                            "Acceptance unknown for PromptKey %s: confirmation timed out"
+                                            (PromptKey.value key)
+                                    )
+                | AdmittedWithPhysicalMessage physicalId ->
+                    let submitted r =
+                        persist (
+                            PromptSessionFact.PromptSubmitted
+                                {| PromptKey = key
+                                   SessionId = sessionId
+                                   Receipt = r |}
+                        )
+
+                    return! handleAdmittedPhysical submitted acceptPhysical physicalId key
+                | Retryable error ->
+                    PromptPhysicalAcceptance.cancel key
+                    let! _ = abandon (PromptAbandonReason.SendFailed error) error
+                    return Error error
+                | Fatal error ->
+                    PromptPhysicalAcceptance.cancel key
+                    let! _ = abandon (PromptAbandonReason.SendFailed error) error
+                    return Error error
+                | AcceptanceUnknown reason ->
+                    PromptPhysicalAcceptance.cancel key
+                    return Error(sprintf "Acceptance unknown for PromptKey %s: %s" (PromptKey.value key) reason)
             with ex ->
                 PromptPhysicalAcceptance.cancel key
-                return raise ex
+                return Error ex.Message
         }
 
     let private publicResultOfAttempt =
@@ -332,9 +388,13 @@ module PromptDispatcherSend =
                             Some(fun verdict -> this.SettleDetachedSend key sessionId verdict onDetachedFailure)
                         | PromptDispatcher.AwaitMode.Await -> None }
 
-                match awaitMode, onAccepted with
-                | PromptDispatcher.AwaitMode.Await, Some callback -> PromptPhysicalAcceptance.register key callback
-                | _ -> ()
+                let confirmationWaiterOpt =
+                    match awaitMode, onAccepted with
+                    | PromptDispatcher.AwaitMode.Await, Some callback ->
+                        PromptPhysicalAcceptance.register key callback
+                        let confirmationTask = PromptPhysicalAcceptance.awaitConfirmation key None
+                        Some confirmationTask
+                    | _ -> None
 
                 let sendTask = port.SendPrompt(sessionId, text, options)
 
@@ -349,8 +409,15 @@ module PromptDispatcherSend =
                     return key
                 | PromptDispatcher.AwaitMode.Await ->
                     return!
-                        awaitPhysicalAwareSend key sendTask (fun outcome ->
-                            this.RecordSendOutcome key sessionId outcome acceptFn)
+                        awaitPhysicalAwareSend
+                            key
+                            sessionId
+                            (fun fact -> this.Persist sessionId None fact)
+                            acceptFn
+                            (fun reason error ->
+                                this.Abandon key sessionId reason |> TaskValue.map (fun _ -> Error error))
+                            sendTask
+                            confirmationWaiterOpt
             }
 
         member this.SendAgentOwnerRoot

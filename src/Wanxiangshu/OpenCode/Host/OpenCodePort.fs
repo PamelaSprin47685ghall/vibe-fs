@@ -128,99 +128,6 @@ module OpenCodePortAdapter =
     /// PromptKey handler. A caller that carried no listener has no owner for
     /// a late verdict, so the port records honest diagnostic evidence rather
     /// than claiming a fused invariant.
-    /// Single-level listener call — try/do captured here so the caller's
-    /// match stays arm-only; failures land on the diagnostic lane.
-    let private runListener
-        (sessionId: SessionId)
-        (verdict: DetachedSendVerdict)
-        (deliver: DetachedSendListener)
-        : Task =
-        task {
-            try
-                do! deliver verdict
-            with ex ->
-                Diagnostic.emit
-                    "prompt-async-dispatch-listener-failed"
-                    [ "session_id", SessionId.value sessionId
-                      "result", sprintf "%A listener fault: %s" verdict ex.Message ]
-        }
-
-    /// Push a non-OwnedSettled detached verdict into the caller-registered
-    /// listener; a None listener emits its own evidence rather than fabricating
-    /// ownership of a late decision.
-    let private deliverVerdictTo
-        (sessionId: SessionId)
-        (listener: DetachedSendListener option)
-        (verdict: DetachedSendVerdict)
-        : Task =
-        task {
-            match listener with
-            | Some deliver -> return! runListener sessionId verdict deliver
-            | None -> ()
-        }
-
-    /// Deliver the eventual detached enqueue verdict to the owning dispatch
-    /// layer — never adjudicated here. OwnedSettled is a no-op refusal to
-    /// re-settle; Refused and OutcomeUnknown re-enter the session's own
-    /// PromptKey handler. A caller that carried no listener has no owner for
-    /// a late verdict, so the port records honest diagnostic evidence rather
-    /// than claiming a fused invariant.
-    let private deliverDetachedVerdict
-        (sessionId: SessionId)
-        (listener: DetachedSendListener option)
-        (verdict: DetachedSendVerdict)
-        : Task =
-        match verdict with
-        | DetachedSendVerdict.OwnedSettled -> Task.FromResult()
-        | _ -> deliverVerdictTo sessionId listener verdict
-
-    /// Classify a detached settlement rejection: an HTTP adapter knows a
-    /// refusal happened only when the response carried meaningful transport
-    /// context; every other failure is outcome-unknown. Plain promise
-    /// rejects land on the same path as transport refusals per ENF- words
-    /// below — distinguishable callers split it.
-    let private verdictForDetachedError (error: string) : DetachedSendVerdict =
-        if error.StartsWith("HTTP ", System.StringComparison.Ordinal) then
-            DetachedSendVerdict.Refused error
-        else
-            DetachedSendVerdict.OutcomeUnknown error
-
-    /// `prompt_async` is an enqueue boundary, not the lifetime of the child
-    /// run. A rejection after the caller already owns the key is not an
-    /// acceptance-unknown invariant; it is evidence for that key's owner.
-    /// This observer exists so the pending task is never silently discarded
-    /// and its verdict always reaches the exact PromptKey handler.
-    let private observeSdkPromptDispatch
-        (sessionId: SessionId)
-        (listener: DetachedSendListener option)
-        (work: Task<obj>)
-        =
-        task {
-            try
-                let! _ = work
-                do! deliverDetachedVerdict sessionId listener DetachedSendVerdict.OwnedSettled
-            with ex ->
-                // A synchronous `SendPrompt` throw returned `Fatal`/`Retryable`
-                // already — it never reaches this observer. An async rejection
-                // is the only surviving verdict: `OutcomeUnknown` to the owner.
-                do! deliverDetachedVerdict sessionId listener (DetachedSendVerdict.OutcomeUnknown ex.Message)
-        }
-        |> ignore
-
-    let private observeHttpPromptDispatch
-        (sessionId: SessionId)
-        (listener: DetachedSendListener option)
-        (work: Task<Result<obj, string>>)
-        =
-        task {
-            match! work with
-            | Ok _ -> do! deliverDetachedVerdict sessionId listener DetachedSendVerdict.OwnedSettled
-            | Error error ->
-                let verdict = verdictForDetachedError error
-                do! deliverDetachedVerdict sessionId listener verdict
-        }
-        |> ignore
-
     type SdkClientPort(client: obj, workspaceDirectory: string option) =
         let headersObj (directory: string option) =
             match directory |> Option.orElse workspaceDirectory with
@@ -228,7 +135,7 @@ module OpenCodePortAdapter =
             | None -> createObj []
 
         interface IOpenCodePort with
-            member _.SendPrompt (sessionId: SessionId) text opts =
+            member this.SendPrompt (sessionId: SessionId) text opts =
                 task {
                     let sId = SessionId.value sessionId
                     // Host PromptInput has no top-level correlation field. Put
@@ -283,17 +190,13 @@ module OpenCodePortAdapter =
                         let sessObj = client?session
                         let promptFn = sessObj?promptAsync
                         let pending = unbox<Task<obj>> (promptFn?call (sessObj, payload))
-                        observeSdkPromptDispatch sessionId opts.DetachedListener pending
-                        // The SDK contract for promptAsync is enqueue-and-return.
-                        // Do not await the Promise: OpenCode may keep it pending
-                        // through scheduler/hooks/provider execution. Physical
-                        // acceptance is established later by chat.message/PromptKey.
+                        let! _ = pending
                         return AdmittedWithReceipt(TransportReceipt.create (sprintf "accepted-%s" sId))
                     with ex ->
                         return Fatal ex.Message
                 }
 
-            member _.AbortSession(sessionId: SessionId) =
+            member this.AbortSession(sessionId: SessionId) =
                 taskResult {
                     try
                         let sId = SessionId.value sessionId
@@ -309,7 +212,7 @@ module OpenCodePortAdapter =
                         return! Error ex.Message
                 }
 
-            member _.CreateSession (parentId: SessionId option) opts =
+            member this.CreateSession (parentId: SessionId option) opts =
                 taskResult {
                     let parentFields =
                         parentId
@@ -345,7 +248,7 @@ module OpenCodePortAdapter =
                         return! Error ex.Message
                 }
 
-            member _.GetSessionParent(sessionId: SessionId) =
+            member this.GetSessionParent(sessionId: SessionId) =
                 taskResult {
                     try
                         let sId = SessionId.value sessionId
@@ -364,7 +267,7 @@ module OpenCodePortAdapter =
                         return! Error ex.Message
                 }
 
-            member _.CreateChildSession (parentId: SessionId) opts =
+            member this.CreateChildSession (parentId: SessionId) opts =
                 taskResult {
                     let pId = SessionId.value parentId
 
@@ -393,7 +296,7 @@ module OpenCodePortAdapter =
                         return! Error ex.Message
                 }
 
-            member _.ListChildren(parentId: SessionId) =
+            member this.ListChildren(parentId: SessionId) =
                 taskResult {
                     try
                         let pId = SessionId.value parentId
@@ -409,7 +312,7 @@ module OpenCodePortAdapter =
                         return! Error ex.Message
                 }
 
-            member _.CloseChildSession(childId: SessionId) =
+            member this.CloseChildSession(childId: SessionId) =
                 taskResult {
                     try
                         let cId = SessionId.value childId
@@ -500,15 +403,15 @@ module OpenCodePortAdapter =
                                  ) ])
                            |> Option.defaultValue [])
 
-                    observeHttpPromptDispatch
-                        sessionId
-                        opts.DetachedListener
-                        (postJson $"/session/{sId}/prompt_async" (createObj bodyFields))
+                    let! response = postJson $"/session/{sId}/prompt_async" (createObj bodyFields)
 
-                    // HTTP prompt_async has the same enqueue semantics as the SDK
-                    // surface. Never hold a fork/repair tool open on the response;
-                    // chat.message is the later physical-acceptance boundary.
-                    return AdmittedWithReceipt(TransportReceipt.create (sprintf "accepted-%s" sId))
+                    match response with
+                    | Ok _ -> return AdmittedWithReceipt(TransportReceipt.create (sprintf "accepted-%s" sId))
+                    | Error error ->
+                        if error.StartsWith("HTTP ", System.StringComparison.Ordinal) then
+                            return Fatal error
+                        else
+                            return AcceptanceUnknown error
                 }
 
             member _.AbortSession(sessionId: SessionId) =

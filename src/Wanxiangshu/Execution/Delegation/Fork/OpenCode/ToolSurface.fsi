@@ -41,6 +41,7 @@ module ForkToolSurface =
     val cancelOwnerChildren: value: obj -> owner: string -> Task
     val detachToolRuntime: value: obj -> Task
     val durableLifecycleByname: value: obj -> owner: string -> byname: string -> obj
+    val executeJoin: value: obj -> owner: string -> Task<string>
     val executeHorizon: value: obj -> owner: string -> Task<string>
     val settle: value: obj -> owner: string -> answer: string -> providerRun: string -> Task<bool>
     val disposeRuntime: value: obj -> unit

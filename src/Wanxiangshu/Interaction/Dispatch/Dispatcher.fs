@@ -84,7 +84,7 @@ module PromptDispatcher =
 
             return
                 appended
-                |> Result.map (fun _ -> PromptPhysicalAcceptance.accepted promptKey physicalMessageId)
+                |> Result.map ignore
                 |> Result.mapError ManagedChatAcceptance.persistenceError
         }
 
@@ -387,7 +387,9 @@ module PromptDispatcher =
             | ChatAdmissionIntent.Decision.PendingPromptIntent evidence ->
                 taskResult {
                     let! profile = this.AcceptPendingManagedPrompt evidence
-                    return! accept profile evidence.Key.PhysicalUserMessageId evidence.Origin
+                    let! witness = accept profile evidence.Key.PhysicalUserMessageId evidence.Origin
+                    PromptPhysicalAcceptance.accepted evidence.PromptKey evidence.Key.PhysicalUserMessageId
+                    return witness
                 }
             | _ ->
                 Task.FromResult(

@@ -110,13 +110,9 @@ const SOURCE_BUDGETS = new Map([
 // closure that the recovery adapter consumes now carries the ChatExecutionJournal helper
 // extracted from chatexecution-fact (witness types + journal-bound ops moved to durable).
 const ADAPTER_RATCHET = new Map([
-  // 290 on 2026-09-14 — batch hoisted `Handler.raise ProviderInputRejection`
-  // path and `settleCompletedFromParts` extraction; both land inside the
-  // adapter closure without altering dependencies the shard actually
-  // reaches (new source additions stay in existing referenced modules).
-  ['delegation-host-adapter', 291],
-  // 291 on 2026-09-14 — shares the same adapter closure growth as host.
-  ['delegation-pty-adapter', 291],
+  // 295/296 on 2026-09-15 — dispatch-runtime imports host-diagnostics-runtime for Diagnostic.emit correlation.
+  ['delegation-host-adapter', 295],
+  ['delegation-pty-adapter', 296],
   // 47 on 2026-09-14 — this batch hoisted Runtime.fs settleCompletedFromParts
   // into a module-internal SyncDelegateInternals module (namespace-scoped files
   // cannot hold bare top-level `let`); ratchet raised one slot to hold the

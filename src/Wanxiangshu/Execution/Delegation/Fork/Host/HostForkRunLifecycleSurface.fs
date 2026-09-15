@@ -32,7 +32,7 @@ type HostForkRunLifecycleHandle
               Role = Role.Coder
               StartCursor = XTraceCursor.create 0L
               Handoff = None
-              AuthorityRoot = None
+              AuthorityRoot = AuthorityRootUserMessageId.create "surface-authority-root"
               Source = HostPendingRun.completionSource ()
               Subscription = None
               Finished = false }

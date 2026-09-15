@@ -18,6 +18,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.managed-chat-execution.execution-session-chatexecution-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.participant-persona.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-diagnostics-runtime.fsproj"/>
     <Compile Include="Interaction/Dispatch/JournalPort.fsi"/>
     <Compile Include="Interaction/Dispatch/JournalPort.fs"/>
     <Compile Include="Interaction/Dispatch/DispatchSessionPort.fsi"/>
