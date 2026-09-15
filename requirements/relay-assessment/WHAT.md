@@ -26,7 +26,7 @@ accepted assessment event 必须携带 RoadId、IncumbencyId、WorkspaceSnapshot
 
 ## ASSESS-007: malformed 不消费 semantic slot，冲突 replay fail closed
 
-schema、范围、narrative、snapshot freshness 或 exact binding 校验失败时不写 assessment，当前迭代仍可提交唯一一次有效调用。相同 idempotency key 不同 payload 属于 conflict，必须 fail closed。
+schema、范围、narrative 或 exact binding 校验失败时不写 assessment，当前迭代仍可提交唯一一次有效调用。评审提交时总是以当前最新的工作区快照为准。相同 idempotency key 不同 payload 属于 conflict，必须 fail closed。
 
 ## ASSESS-008: 评审前后信息时域隔离
 

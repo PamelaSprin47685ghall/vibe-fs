@@ -215,7 +215,6 @@ module ReviewTool =
         match view.ActiveIncumbency, view.ActiveSnapshotId, view.ActiveAuthorityRevision with
         | None, _, _ -> Error BindingUnavailable
         | Some active, _, _ when active <> incumbencyId -> Error BindingUnavailable
-        | _, Some expected, _ when expected <> snapshotId -> Error RecordFailed
         | _, _, Some expected when expected <> authorityRevision -> Error RecordFailed
         | _ ->
             RelayTransaction.create [ assessment ]

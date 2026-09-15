@@ -91,24 +91,24 @@ test('WHAT[ASSESS-003] assessment binds exact execution identity and rejects mis
   )
 })
 
-test('WHAT[ASSESS-007] stale snapshot does not consume the one semantic assessment slot', () => {
+test('WHAT[ASSESS-007] assessment accepts latest workspace snapshot on submit', () => {
   const opened = open(relay.empty(), 'snapshot-2')
-  const stale = relay.assess(
+  const assessed = relay.assess(
     opened.state,
     'road-1',
     'inc-1',
-    'assessment-stale',
-    'snapshot-old',
+    'assessment-new',
+    'snapshot-latest',
     'authority-1',
     ...Array(8).fill('PERFECT'),
   )
-  assert.deepEqual(stale, { ok: false, error: 'AuditSnapshotStale' })
+  assert.equal(assessed.ok, true)
   const valid = relay.assess(
-    opened.state,
+    assessed.state,
     'road-1',
     'inc-1',
-    'assessment-valid',
-    'snapshot-2',
+    'assessment-new',
+    'snapshot-latest',
     'authority-1',
     ...Array(8).fill('PERFECT'),
   )

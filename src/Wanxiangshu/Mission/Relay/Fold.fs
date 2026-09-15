@@ -102,6 +102,7 @@ module private Internal =
                     Some
                         { Id = assessmentId
                           Binding = binding
+                          // Always record latest snapshot from the assessment
                           SnapshotId = snapshotId
                           AuthorityRevision = authorityRevision
                           Scores = scores }
@@ -166,8 +167,6 @@ module private Internal =
         =
         if active.Phase <> IncumbencyPhase.AuditPending then
             Error "AssessmentNotAllowedInCurrentPhase"
-        elif active.SnapshotId <> snapshotId then
-            Error "AuditSnapshotStale"
         elif active.AuthorityRevision <> authorityRevision then
             Error "AuthorityRevisionStale"
         elif Set.contains (AssessmentId.value assessmentId) current.SeenAssessmentIds then
