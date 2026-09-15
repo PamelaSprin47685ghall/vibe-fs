@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Foundation
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
@@ -545,19 +546,67 @@ module ProviderFailureSurface =
                 | Error error -> box {| ok = false; error = error |}
         }
 
+    /// PAR-021 test seam: establish the exact durable `Accepted` +
+    /// `ProviderStarted` facts for one physical request and provider run.
+    let establishProviderRun
+        (handle: Wanxiangshu.Persistence.Journal.JournalHandle)
+        (session: string)
+        (physicalMessage: string)
+        (providerRun: string)
+        : Task<obj> =
+        task {
+            let durable = handle.Journal
+
+            let identity =
+                ParticipantIdentity.resolveAtRoot "coder"
+                |> Result.defaultWith (fun error -> invalidArg "providerRun" $"invalid identity: {error}")
+
+            let accepted: AcceptedChatExecutionEvidence =
+                { SessionId = SessionId.create session
+                  LogicalRunId = LogicalRunId.create $"run-{physicalMessage}"
+                  AuthorityRootUserMessageId = AuthorityRootUserMessageId.create physicalMessage
+                  AuthorityKind = PromptRootAuthorityKind.HumanRoot
+                  IdentitySeed = PromptIdentitySeed.RootSelection identity
+                  PhysicalUserMessageId = PhysicalUserMessageId.create physicalMessage
+                  Origin = PromptOrigin.AuthorityRoot PromptRootAuthorityKind.HumanRoot }
+
+            let key: ChatExecutionKey =
+                { SessionId = accepted.SessionId
+                  PhysicalUserMessageId = accepted.PhysicalUserMessageId }
+
+            let! acceptance = ManagedChatAcceptance.accept durable key accepted
+
+            match acceptance with
+            | Error _ -> return box {| ok = false |}
+            | Ok _ ->
+                let! started =
+                    ManagedChatProviderLifecycle.providerStarted
+                        durable
+                        key
+                        accepted
+                        (ProviderRunIdentity.create providerRun)
+                        ProviderRequestKind.WorkMain
+                        XProjectionChoice.UseCommittedEpoch
+
+                return box {| ok = Result.isOk started |}
+        }
+
     /// PAR-021: the durable dispatch fact behind one confirmed failure's target
     /// settlement — true only when that exact physical request was accepted as
-    /// a `ProviderRetryAttempt` continuation, i.e. the attempt carried the
-    /// LWR-replaced context. Never derived from a failure ordinal.
+    /// a `ProviderRetryAttempt` continuation AND the failed provider run is the
+    /// exact run that established the request's durable `ProviderStarted`.
+    /// Never derived from a failure ordinal.
     let wasLwrRetryAttempt
         (handle: Wanxiangshu.Persistence.Journal.JournalHandle)
         (session: string)
         (physicalMessage: string)
+        (providerRun: string)
         : bool =
         ProviderRecoveryWorkflow.failedAttemptWasLwrRetry
             handle.Journal
             (SessionId.create session)
             (PhysicalUserMessageId.create physicalMessage)
+            (ProviderRunIdentity.create providerRun)
 
     /// Read the durable provider failure budget for one session without exposing the
     /// projection record, map, or closed budget representation.

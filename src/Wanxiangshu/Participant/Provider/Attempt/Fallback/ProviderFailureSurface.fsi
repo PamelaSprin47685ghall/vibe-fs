@@ -25,6 +25,14 @@ module ProviderFailureSurface =
 
     /// PAR-021: the durable `ProviderRetryAttempt` dispatch fact of one failed
     /// physical attempt — the fact the recovery target settlement consumes.
-    val wasLwrRetryAttempt: handle: JournalHandle -> session: string -> physicalMessage: string -> bool
+    /// True only when the failed provider run is the exact run that established
+    /// the request's durable `ProviderStarted`.
+    /// PAR-021 test seam: establish durable `Accepted` + `ProviderStarted`
+    /// facts for one physical request and provider run.
+    val establishProviderRun:
+        handle: JournalHandle -> session: string -> physicalMessage: string -> providerRun: string -> Task<obj>
+
+    val wasLwrRetryAttempt:
+        handle: JournalHandle -> session: string -> physicalMessage: string -> providerRun: string -> bool
 
     val snapshot: handle: JournalHandle -> session: string -> obj

@@ -15,7 +15,11 @@ module ProviderRecoveryWorkflow =
     /// PAR-021: the one durable fact the recovery target settlement consumes —
     /// the failed attempt itself was the LWR retry.
     val failedAttemptWasLwrRetry:
-        durable: AgentJournal -> sessionId: SessionId -> physicalUserMessageId: PhysicalUserMessageId -> bool
+        durable: AgentJournal ->
+        sessionId: SessionId ->
+        physicalUserMessageId: PhysicalUserMessageId ->
+        providerRun: ProviderRunIdentity ->
+            bool
 
     val continueAfterConfirmedFailure:
         sessionPort: ISessionHostPort ->

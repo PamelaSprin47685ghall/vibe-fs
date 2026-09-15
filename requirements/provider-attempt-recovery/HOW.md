@@ -155,9 +155,13 @@ delegate 只消费 verdict（`Ok unit` 保持调用 pending，`Error reason` 才
     engine shared by the ordinary turn path, Blogger recovery and dedicated
     SyncDelegate children), after the durable prompt claim proved this
     dispatch is the first one for that failure. `Fallback/Workflow.fs` reads
-    one durable fact — whether the failed attempt's exact physical request was
-    accepted as a `ProviderRetryAttempt` continuation — and settles the exact
-    failed witness (EMR-006/EMR-017) once: an LWR retry's own failure condemns
+    two durable facts — whether the failed attempt's exact physical request was
+    accepted as a `ProviderRetryAttempt` continuation, and whether the failed
+    provider run is the exact run that established that request's durable
+    `ProviderStarted` (one physical message drives several provider steps, so
+    a later step of a successful retry episode is not the LWR retry itself) —
+    and settles the exact failed witness (EMR-006/EMR-017) once: an LWR
+    retry's own failure condemns
     its provider (`ModelRouting.CondemnFailedTarget`), every other failure
     keeps the provider and binds the session's next fresh admission to the
     failed target (`ModelRouting.RetainFailedTargetForRetry`). Duplicate

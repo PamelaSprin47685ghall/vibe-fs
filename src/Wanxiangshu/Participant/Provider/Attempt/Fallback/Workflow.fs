@@ -482,19 +482,34 @@ module ProviderRecoveryWorkflow =
                 | HostSessionNudge.GateContinuationOutcome.Failed _ -> RetryVerdict.Terminal error
         }
 
-    /// PAR-021: the one durable fact the recovery target settlement consumes.
+    /// PAR-021: the two durable facts the recovery target settlement consumes.
     /// The failed attempt was the LWR retry iff its exact physical request was
-    /// accepted as a `ProviderRetryAttempt` continuation — never inferred from
-    /// a failure ordinal.
+    /// accepted as a `ProviderRetryAttempt` continuation AND the failed provider
+    /// run is the exact run that established that request's durable
+    /// `ProviderStarted`. One physical message drives several provider steps, so
+    /// the continuation kind alone is not per-attempt: after an LWR retry's first
+    /// step succeeds, a later step of the same message would otherwise wrongly
+    /// condemn the provider on its first failure. Never inferred from a failure
+    /// ordinal.
     let failedAttemptWasLwrRetry
         (durable: AgentJournal)
         (sessionId: SessionId)
         (physicalUserMessageId: PhysicalUserMessageId)
+        (providerRun: ProviderRunIdentity)
         : bool =
         let kind =
             (AgentJournalPortAdapter.forTurnObservation durable).TryContinuationKind sessionId physicalUserMessageId
 
+        let establishedRun =
+            (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
+            |> ChatExecutionProjection.byKey
+                { SessionId = sessionId
+                  PhysicalUserMessageId = physicalUserMessageId }
+            |> Option.bind (fun execution -> execution.ProviderStarted)
+            |> Option.map (fun started -> started.ProviderRun)
+
         kind = Some PromptAuthority.ContinuationKind.ProviderRetryAttempt
+        && establishedRun = Some providerRun
 
     /// PAR-021: the single target settlement for one confirmed provider failure,
     /// shared by ordinary recovery, the SyncDelegate decorator and recovery
@@ -502,7 +517,7 @@ module ProviderRecoveryWorkflow =
     /// keeps the provider and binds the next fresh admission of this session to
     /// the failed target for the LWR retry.
     let private settleFailedAttemptTarget (durable: AgentJournal) (turn: ReconciledTurn) =
-        if failedAttemptWasLwrRetry durable turn.SessionId turn.PhysicalUserMessageId then
+        if failedAttemptWasLwrRetry durable turn.SessionId turn.PhysicalUserMessageId turn.ProviderRun then
             ModelRouting.condemnFailedTarget turn.ProviderRun |> ignore
         else
             ModelRouting.retainFailedTargetForRetry turn.SessionId turn.ProviderRun

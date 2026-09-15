@@ -186,7 +186,7 @@ and the retry policy still decides the execution content.
 
 一次已确认的 provider 类失败驱逐物理 provider 只有一个合法依据：失败的 attempt 本身就是已发出的 LWR 重试。
 
-- 判定只读 exact physical request 的 durable 接受事实：该 `PhysicalUserMessageId` 已被接受为 `ProviderRetryAttempt` continuation。连续失败计数、失败序号、错误文本与进程内状态都不能推断“已试过 LWR”。
+- 判定只读两条 durable 事实：该 `PhysicalUserMessageId` 已被接受为 `ProviderRetryAttempt` continuation，且失败的 `ProviderRunIdentity` 正是为该请求建立 durable `ProviderStarted` 的那个 run。一个物理消息驱动多个 provider step：重试 episode 的后续 step 失败不是 LWR 重试自身失败。连续失败计数、失败序号、错误文本与进程内状态都不能推断“已试过 LWR”。
 - 失败 attempt 不是 LWR 重试（携带原上下文）时：严禁标记该 provider 失败；恢复重投绑定原物理目标——同一 session 的下一次 fresh admission 以失败 attempt 的 exact target 作为调度偏好（单次消费）——并以 LWR 替换上下文发起（CTX-010/CTX-011 的 `FrozenRecordPrefix` 探针）。
 - 失败 attempt 是 LWR 重试时：其物理 provider 被永久 poison，后续重投由调度器轮换到其它候选目标；既不改变 participant identity，也不改变预算代数。
 - 权限只属于确切的失败与确切的 attempt：provider-run witness 单次消费，因此重复通知、旧回调、取消与提交未知都不能再取得该权限；未取得 typed `RetryFreshAttempt` licence 的失败同样不结算目标。
