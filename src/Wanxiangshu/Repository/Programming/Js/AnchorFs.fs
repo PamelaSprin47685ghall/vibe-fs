@@ -12,8 +12,6 @@ module JsAnchorFs =
     [<Emit("new Promise((resolve) => setImmediate(resolve))")>]
     let private yieldEventLoop () : System.Threading.Tasks.Task<unit> = jsNative
 
-    let private YIELD_SCAN_BATCH_SIZE = 32
-
     [<Import("join", "node:path")>]
     let private pathJoin (a: string) (b: string) : string = jsNative
 
@@ -156,11 +154,8 @@ module JsAnchorFs =
                 | Error failure -> return Error failure
                 | Ok listing ->
                     let scanned = ResizeArray<JsReadSnapshot * JsGrepHit list>()
-                    let mutable count = 0
                     for path in listing.Paths do
-                        count <- count + 1
-                        if count % YIELD_SCAN_BATCH_SIZE = 0 then
-                            do! yieldEventLoop ()
+                        do! yieldEventLoop ()
                         match grepPath root spec path with
                         | Some item -> scanned.Add item
                         | None -> ()

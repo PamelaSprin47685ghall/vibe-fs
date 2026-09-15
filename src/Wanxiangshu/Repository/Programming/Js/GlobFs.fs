@@ -13,8 +13,6 @@ module JsGlobFs =
     [<Emit("new Promise((resolve) => setImmediate(resolve))")>]
     let private yieldEventLoop () : System.Threading.Tasks.Task<unit> = jsNative
 
-    let private YIELD_BATCH_SIZE = 64
-
     [<Import("readdirSync", "node:fs")>]
     let private readdirSync (path: string) : string array = jsNative
 
@@ -247,8 +245,6 @@ module JsGlobFs =
         let files = ResizeArray<string>()
         // DSL-MUTABLE: algorithm-scratch — ignore rule accumulator
         let rules = ResizeArray<IgnoreRule>()
-        // DSL-MUTABLE: algorithm-scratch — step counter for yielding
-        let mutable steps = 0
 
         let rec walk (dir: string) (rel: string) : System.Threading.Tasks.Task<unit> =
             task {
@@ -267,9 +263,7 @@ module JsGlobFs =
             for rule in nested do
                 rules.Add(rule)
 
-            steps <- steps + 1
-            if steps % YIELD_BATCH_SIZE = 0 then
-                do! yieldEventLoop ()
+            do! yieldEventLoop ()
 
             try
                 let entries = tryListDirectory dir
@@ -277,7 +271,9 @@ module JsGlobFs =
                     match classifyVisibleEntry rules rel dir entry with
                     | SkipEntry -> ()
                     | RecurseDirectory(full, childRel) -> do! walk full childRel
-                    | EmitFile childRel -> files.Add(childRel.Replace('\\', '/'))
+                    | EmitFile childRel ->
+                        do! yieldEventLoop ()
+                        files.Add(childRel.Replace('\\', '/'))
             finally
                 rules.RemoveRange(mark, rules.Count - mark)
             }
