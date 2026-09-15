@@ -28,6 +28,7 @@ open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Resources
 open Wanxiangshu.Foundation
+open Wanxiangshu.Ablation
 
 /// Managed agent Host-config gate. This owns catalog projection and Wanxiangshu-owned
 /// non-model fields. Physical model routing is exclusively owned by ModelRouting.
@@ -155,6 +156,10 @@ module ManagedAgentConfig =
             created
 
     let private applyNamedOwnedFields (agents: obj) (inventory: ManagedAgentInventory) (name: string) : unit =
+        if not (AblationSettings.allowsPrimaryAgent name) then
+            let entry = ensureAgentEntry agents name
+            entry?hidden <- true
+        else
         match ownedConfigForName inventory name with
         | None -> ()
         | Some owned -> assignOwnedFields (ensureAgentEntry agents name) owned

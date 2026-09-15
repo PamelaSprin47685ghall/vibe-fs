@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open Fable.Core.JsInterop
+open Wanxiangshu.Ablation
 
 /// AGENT-026: env → launch decision → Host `config.mcp.stealth-browser-mcp`.
 /// Stealth-browser-only launch decision. Not shared McpLaunch — avoids uvx case pollution.
@@ -26,6 +27,9 @@ module StealthBrowserMcpConfig =
         | _ -> false
 
     let launchFrom (read: string -> string option) : Launch =
+        if not (AblationRegistry.isActive (AblationNodeId.create "external-investigation") (AblationSettings.current ())) then
+            Launch.Disabled
+        else
         let disabled = envValue read "STEALTH_BROWSER_MCP_DISABLED"
         let fixture = envValue read "STEALTH_BROWSER_MCP_FIXTURE"
         let testMode = envValue read "WANXIANGSHU_TEST"

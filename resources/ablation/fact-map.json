@@ -1,0 +1,19 @@
+{
+  "facts": {
+    "AgentFact.Prompt": "interaction-authority",
+    "AgentFact.ProviderFailure": "provider-attempt-recovery",
+    "AgentFact.Relay": "relay-incumbency",
+    "AgentFact.Execution": "delegation",
+    "AgentFact.Orchestrator": "change-integration",
+    "AgentFact.Companion": "context-compression",
+    "AgentFact.Context": "semantic-trace",
+    "AgentFact.Host": "requirement-grounding",
+    "AgentFact.Fission": "intra-participant-parallelism",
+    "AgentFact.Delegation": "delegation",
+    "AgentFact.Attention": "attention-regulation",
+    "AgentFact.Concern": "concern-routing",
+    "AgentFact.InstitutionalLearning": "institutional-learning",
+    "AgentFact.ChatExecution": "managed-chat-execution",
+    "MagicTodo": "obligation-ledger"
+  }
+}

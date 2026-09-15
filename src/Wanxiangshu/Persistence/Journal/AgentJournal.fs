@@ -17,6 +17,7 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Execution.Failure
+open Wanxiangshu.Ablation
 
 /// One successful fold after append. Wake payload for revision subscribers.
 /// No retained history: only the latest change is kept for the recheck path.
@@ -67,6 +68,30 @@ module private AgentJournalInternals =
     let notifyWaiters (notify: (TaskCompletionSource<JournalChange option> * JournalChange) list) =
         for tcs, change in notify do
             AsyncSupport.trySetResult tcs (Some change) |> ignore
+
+    let agentFactTag (fact: AgentFact) =
+        match fact with
+        | AgentFact.Prompt _ -> "AgentFact.Prompt"
+        | AgentFact.ProviderFailure _ -> "AgentFact.ProviderFailure"
+        | AgentFact.Relay _ -> "AgentFact.Relay"
+        | AgentFact.Execution _ -> "AgentFact.Execution"
+        | AgentFact.Orchestrator _ -> "AgentFact.Orchestrator"
+        | AgentFact.Companion _ -> "AgentFact.Companion"
+        | AgentFact.Context _ -> "AgentFact.Context"
+        | AgentFact.Host _ -> "AgentFact.Host"
+        | AgentFact.Fission _ -> "AgentFact.Fission"
+        | AgentFact.Delegation _ -> "AgentFact.Delegation"
+        | AgentFact.Attention _ -> "AgentFact.Attention"
+        | AgentFact.Concern _ -> "AgentFact.Concern"
+        | AgentFact.InstitutionalLearning _ -> "AgentFact.InstitutionalLearning"
+        | AgentFact.ChatExecution _ -> "AgentFact.ChatExecution"
+
+    let rejectAblation (factTag: string) =
+        FactRejected(
+            EventId.create "ablation-denied",
+            { Fact = factTag
+              Reason = AblationGate.deniedFactPath }
+        )
 
 open AgentJournalInternals
 
@@ -162,9 +187,14 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
         (fact: AgentFact)
         : Task<Result<ProjectionSet, JournalAppendFailure>> =
         task {
-            match! this.AppendEnvelope stream providerRun (Fact.Agent fact) with
-            | Ok(updated, _) -> return Ok updated
-            | Error err -> return Error err
+            let tag = agentFactTag fact
+
+            if AblationGate.factDenied tag then
+                return Error(rejectAblation tag)
+            else
+                match! this.AppendEnvelope stream providerRun (Fact.Agent fact) with
+                | Ok(updated, _) -> return Ok updated
+                | Error err -> return Error err
         }
 
     /// Append a Magic Todo fact and return its durable envelope identity.
@@ -177,13 +207,16 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
         (fact: MagicTodoFact)
         : Task<Result<MagicTodoAppendReceipt, JournalAppendFailure>> =
         task {
-            match! this.AppendEnvelope stream providerRun (Fact.MagicTodo fact) with
-            | Ok(updated, envelope) ->
-                return
-                    Ok
-                        { EventId = envelope.EventId
-                          Projection = updated }
-            | Error err -> return Error err
+            if AblationGate.factDenied "MagicTodo" then
+                return Error(rejectAblation "MagicTodo")
+            else
+                match! this.AppendEnvelope stream providerRun (Fact.MagicTodo fact) with
+                | Ok(updated, envelope) ->
+                    return
+                        Ok
+                            { EventId = envelope.EventId
+                              Projection = updated }
+                | Error err -> return Error err
         }
 
     member private this.PublishCommitted(envelope: Envelope) =

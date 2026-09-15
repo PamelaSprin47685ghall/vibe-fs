@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open Wanxiangshu.Sphinx
+open Wanxiangshu.Ablation
 
 open System
 open Fable.Core
@@ -49,6 +50,9 @@ module SphinxMcpConfig =
         | _ -> false
 
     let launchFrom (read: string -> string option) : Launch =
+        if not (AblationRegistry.isActive (AblationNodeId.create "epistemic-reasoning") (AblationSettings.current ())) then
+            Launch.Disabled
+        else
         let disabled = envValue read "SPHINX_MCP_DISABLED"
         let fixture = envValue read "SPHINX_MCP_FIXTURE"
         let testMode = envValue read "WANXIANGSHU_TEST"

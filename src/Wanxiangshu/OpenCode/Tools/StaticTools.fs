@@ -4,6 +4,7 @@ open Wanxiangshu.Sphinx
 
 open System
 open Fable.Core.JsInterop
+open Wanxiangshu.Ablation
 open Wanxiangshu.Foundation
 
 
@@ -136,6 +137,7 @@ module StaticTools =
              || name = "regret"
              || Set.contains name allowedNames))
         |> Map.ofList
+        |> AblationGate.filterToolPermissionMap
 
     let private defaultPermission allowed name =
         if Set.contains name allowed then "allow" else "deny"
@@ -147,6 +149,9 @@ module StaticTools =
             "deny"
 
     let private permissionFor allowed role name =
+        if not (AblationSettings.allowsToolSchema name) then
+            "deny"
+        else
         match name, role with
         | "commission", Role.Manager -> "deny"
         | "fork", Role.Orchestrator -> "deny"

@@ -13,6 +13,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Ablation
 
 /// JS-native Host boundary surface for Fission turn absorption.
 ///
@@ -24,7 +25,9 @@ module FissionHostSurface =
     /// INTRA-PARTICIPANT-PARALLELISM-013: expose the exact request-local
     /// provider tool projection without exposing Host session registries.
     let projectFissionToolVisibility (hasPhysicalParent: bool) (tools: obj) : obj =
-        if FissionRequestProjection.apply hasPhysicalParent then
+        if not (AblationSettings.fissionVisible ()) then
+            tools?fission <- box false
+        elif FissionRequestProjection.apply hasPhysicalParent then
             tools?fission <- box false
 
         tools

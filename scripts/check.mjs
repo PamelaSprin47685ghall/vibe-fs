@@ -25,6 +25,7 @@ export const checks = [
   join(root, 'checks/llm-facing-format-gate.mjs'),
   join(root, 'checks/language-parity-gate.mjs'),
   join(root, 'checks/js-boundary-gate.mjs'),
+  join(root, 'checks/ablation-manifest.mjs'),
 ]
 
 export async function runChecks(options = {}) {

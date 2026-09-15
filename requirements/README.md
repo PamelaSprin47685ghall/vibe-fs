@@ -27,13 +27,14 @@ grounding 由 `requirement-grounding` package 拥有。
 
 已知 proof gap 聚合台账见 [GAP.md](GAP.md)；包清单与依赖骨架见 [INDEX.md](INDEX.md)。
 
-## 56 包索引
+## 57 包索引
 
 ### 1. Requirement system
 | Package | 一句话 WHY |
 |---|---|
 | [requirement-system](requirement-system/WHAT.md) | 当前接受的产品真理必须有唯一 package owner、显式依赖与唯一 proof ownership。 |
 | [verification-system](verification-system/WHAT.md) | requirement acceptance 必须由分层、可失败、可重放的证据体系定义。 |
+| [feature-ablation](feature-ablation/WHAT.md) | 巡检与渐进验收需要正式消融开关与 DAG，使下游未审机制可零影响关停而不改源码。 |
 | [js-semantic-surface](js-semantic-surface/WHAT.md) | 语义测试只能经正式、稳定、JS-native 的 semantic surface 进入；Fable runtime representation 不属于 semantic contract。 |
 
 ### 2. Programming / causality

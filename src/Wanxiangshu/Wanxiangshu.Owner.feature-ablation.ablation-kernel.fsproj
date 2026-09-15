@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>runtime-platform</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>ablation-kernel</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>feature-ablation</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>ablation-kernel</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Ablation/Model.fs"/>
+    <Compile Include="Ablation/Manifest.fs"/>
+    <Compile Include="Ablation/ToolMap.fs"/>
+    <Compile Include="Ablation/FactMap.fs"/>
+    <Compile Include="Ablation/Settings.fs"/>
+    <Compile Include="Ablation/Gate.fs"/>
+    <Compile Include="Ablation/Surface.fsi"/>
+    <Compile Include="Ablation/Surface.fs"/>
+  </ItemGroup>
+</Project>

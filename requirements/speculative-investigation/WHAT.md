@@ -53,3 +53,7 @@ Replica 的普通执行失败仅终止当前投机决策，主会话正常继续
 显式 DryRun 模式创建并运行真实的 `StrengthReplica` 物理子会话，作为可观察的内部执行暴露给宿主环境。Owner 主路径启动 DryRun 后立即继续推进，**绝不等待 DryRun 完成或其超时**。DryRun 可真实执行只读请求并记录宿主审计日志，但其产物不映射回 Owner 上下文，不生成 `StrengthCandidatePrepared` 或 `StrengthCandidatePromoted` 事件，不影响主会话的恢复与终结状态。
 
 DryRun 自身不拥有 wall-clock deadline。它先由自己的 K gate 或真实 Replica terminal 收口；若这些尚未发生而 Owner 的 exact `TargetProviderRun` 已经终结，则以该 target terminal 作为 observation horizon 的因果结束点并取消仍活着的 Replica。谁先发生谁收口，不比较毫秒。Harness watchdog 仅负责识别整个物理系统失去进展，不参与 Strength 业务语义。
+
+## SPEC-INV-014: Ablation 优先于 rollout env
+
+当 `feature-ablation` 将 `speculative-investigation` 节点设为 ablated 时，Strength 必须强制等价 Off，优先于 `WANXIANGSHU_STRENGTH_MODE` 的非 off 值。节点 borrowed/active 时，Strength env 继续控制 Shadow/DryRun/Treatment（见 `feature-ablation` ABL-008）。

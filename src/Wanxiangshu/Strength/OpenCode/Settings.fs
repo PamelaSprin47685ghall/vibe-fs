@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Strength.OpenCode
 
 open System
+open Wanxiangshu.Ablation
 open Wanxiangshu.Strength
 
 /// STRENGTH-010/011: Host-owned rollout settings. Malformed or incomplete cost
@@ -35,6 +36,9 @@ module StrengthSettings =
         | Some text -> parseNonNegativeInt fallback text
 
     let private mode () =
+        if AblationSettings.strengthForcedOff () then
+            StrengthRolloutMode.Off
+        else
         match
             env "WANXIANGSHU_STRENGTH_MODE"
             |> Option.map (fun value -> value.ToLowerInvariant())

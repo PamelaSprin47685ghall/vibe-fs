@@ -1396,6 +1396,14 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
+    module: 'Ablation/Surface.js',
+    owner: 'feature-ablation',
+    laws: ['ABL-001', 'ABL-002', 'ABL-003', 'ABL-004', 'ABL-005', 'ABL-006', 'ABL-007', 'ABL-008', 'ABL-009', 'ABL-010'],
+    source: 'src/Wanxiangshu/Ablation/Surface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
     module: 'Strength/Surface.js',
     owner: 'speculative-investigation',
     laws: [

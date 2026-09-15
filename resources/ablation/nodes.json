@@ -1,0 +1,8095 @@
+{
+  "version": "ablation-v1",
+  "nodes": [
+    {
+      "id": "feature-ablation",
+      "package": "feature-ablation",
+      "station": 0,
+      "kind": "package"
+    },
+    {
+      "id": "requirement-system",
+      "package": "requirement-system",
+      "station": 1,
+      "kind": "package"
+    },
+    {
+      "id": "verification-system",
+      "package": "verification-system",
+      "station": 2,
+      "kind": "package"
+    },
+    {
+      "id": "js-semantic-surface",
+      "package": "js-semantic-surface",
+      "station": 3,
+      "kind": "package"
+    },
+    {
+      "id": "structured-workflow",
+      "package": "structured-workflow",
+      "station": 4,
+      "kind": "package"
+    },
+    {
+      "id": "host-boundary",
+      "package": "host-boundary",
+      "station": 5,
+      "kind": "package"
+    },
+    {
+      "id": "session-ontology",
+      "package": "session-ontology",
+      "station": 6,
+      "kind": "package"
+    },
+    {
+      "id": "participant-identity",
+      "package": "participant-identity",
+      "station": 7,
+      "kind": "package"
+    },
+    {
+      "id": "provider-language",
+      "package": "provider-language",
+      "station": 8,
+      "kind": "package"
+    },
+    {
+      "id": "office-capability",
+      "package": "office-capability",
+      "station": 9,
+      "kind": "package"
+    },
+    {
+      "id": "capability-enforcement",
+      "package": "capability-enforcement",
+      "station": 10,
+      "kind": "package"
+    },
+    {
+      "id": "cognitive-environment",
+      "package": "cognitive-environment",
+      "station": 11,
+      "kind": "package"
+    },
+    {
+      "id": "action-affordance",
+      "package": "action-affordance",
+      "station": 12,
+      "kind": "package"
+    },
+    {
+      "id": "participant-horizon",
+      "package": "participant-horizon",
+      "station": 13,
+      "kind": "package"
+    },
+    {
+      "id": "provider-projection",
+      "package": "provider-projection",
+      "station": 14,
+      "kind": "package"
+    },
+    {
+      "id": "repository-investigation",
+      "package": "repository-investigation",
+      "station": 15,
+      "kind": "package"
+    },
+    {
+      "id": "requirement-grounding",
+      "package": "requirement-grounding",
+      "station": 16,
+      "kind": "package"
+    },
+    {
+      "id": "repository-programming",
+      "package": "repository-programming",
+      "station": 17,
+      "kind": "package"
+    },
+    {
+      "id": "time-capability",
+      "package": "time-capability",
+      "station": 18,
+      "kind": "package"
+    },
+    {
+      "id": "process-execution",
+      "package": "process-execution",
+      "station": 19,
+      "kind": "package"
+    },
+    {
+      "id": "output-distillation",
+      "package": "output-distillation",
+      "station": 20,
+      "kind": "package"
+    },
+    {
+      "id": "causal-wait",
+      "package": "causal-wait",
+      "station": 21,
+      "kind": "package"
+    },
+    {
+      "id": "durable-events",
+      "package": "durable-events",
+      "station": 22,
+      "kind": "package"
+    },
+    {
+      "id": "effect-accounting",
+      "package": "effect-accounting",
+      "station": 23,
+      "kind": "package"
+    },
+    {
+      "id": "semantic-trace",
+      "package": "semantic-trace",
+      "station": 24,
+      "kind": "package"
+    },
+    {
+      "id": "context-compression",
+      "package": "context-compression",
+      "station": 25,
+      "kind": "package"
+    },
+    {
+      "id": "prefix-stability",
+      "package": "prefix-stability",
+      "station": 26,
+      "kind": "package"
+    },
+    {
+      "id": "work-record",
+      "package": "work-record",
+      "station": 27,
+      "kind": "package"
+    },
+    {
+      "id": "behavior-diagnosis",
+      "package": "behavior-diagnosis",
+      "station": 28,
+      "kind": "package"
+    },
+    {
+      "id": "guidance-delivery",
+      "package": "guidance-delivery",
+      "station": 29,
+      "kind": "package"
+    },
+    {
+      "id": "attention-regulation",
+      "package": "attention-regulation",
+      "station": 30,
+      "kind": "package"
+    },
+    {
+      "id": "execution-failure-policy",
+      "package": "execution-failure-policy",
+      "station": 31,
+      "kind": "package"
+    },
+    {
+      "id": "interaction-authority",
+      "package": "interaction-authority",
+      "station": 32,
+      "kind": "package"
+    },
+    {
+      "id": "managed-chat-execution",
+      "package": "managed-chat-execution",
+      "station": 33,
+      "kind": "package"
+    },
+    {
+      "id": "execution-model-routing",
+      "package": "execution-model-routing",
+      "station": 34,
+      "kind": "package"
+    },
+    {
+      "id": "managed-session-lifecycle",
+      "package": "managed-session-lifecycle",
+      "station": 35,
+      "kind": "package"
+    },
+    {
+      "id": "dispatch-protocol",
+      "package": "dispatch-protocol",
+      "station": 36,
+      "kind": "package"
+    },
+    {
+      "id": "provider-attempt-recovery",
+      "package": "provider-attempt-recovery",
+      "station": 37,
+      "kind": "package"
+    },
+    {
+      "id": "host-provider-failure-ownership",
+      "package": "host-provider-failure-ownership",
+      "station": 38,
+      "kind": "package"
+    },
+    {
+      "id": "degeneration-guard",
+      "package": "degeneration-guard",
+      "station": 39,
+      "kind": "package"
+    },
+    {
+      "id": "crash-reconciliation",
+      "package": "crash-reconciliation",
+      "station": 40,
+      "kind": "package"
+    },
+    {
+      "id": "durable-convergence",
+      "package": "durable-convergence",
+      "station": 41,
+      "kind": "package"
+    },
+    {
+      "id": "delegation",
+      "package": "delegation",
+      "station": 42,
+      "kind": "package"
+    },
+    {
+      "id": "concern-routing",
+      "package": "concern-routing",
+      "station": 43,
+      "kind": "package"
+    },
+    {
+      "id": "intra-participant-parallelism",
+      "package": "intra-participant-parallelism",
+      "station": 44,
+      "kind": "package"
+    },
+    {
+      "id": "knowledge-reuse",
+      "package": "knowledge-reuse",
+      "station": 45,
+      "kind": "package"
+    },
+    {
+      "id": "external-investigation",
+      "package": "external-investigation",
+      "station": 46,
+      "kind": "package"
+    },
+    {
+      "id": "epistemic-reasoning",
+      "package": "epistemic-reasoning",
+      "station": 47,
+      "kind": "package"
+    },
+    {
+      "id": "speculative-investigation",
+      "package": "speculative-investigation",
+      "station": 48,
+      "kind": "package"
+    },
+    {
+      "id": "institutional-learning",
+      "package": "institutional-learning",
+      "station": 49,
+      "kind": "package"
+    },
+    {
+      "id": "obligation-ledger",
+      "package": "obligation-ledger",
+      "station": 50,
+      "kind": "package"
+    },
+    {
+      "id": "relay-incumbency",
+      "package": "relay-incumbency",
+      "station": 51,
+      "kind": "package"
+    },
+    {
+      "id": "relay-assessment",
+      "package": "relay-assessment",
+      "station": 52,
+      "kind": "package"
+    },
+    {
+      "id": "relay-context-projection",
+      "package": "relay-context-projection",
+      "station": 53,
+      "kind": "package"
+    },
+    {
+      "id": "relay-retirement",
+      "package": "relay-retirement",
+      "station": 54,
+      "kind": "package"
+    },
+    {
+      "id": "change-integration",
+      "package": "change-integration",
+      "station": 55,
+      "kind": "package"
+    },
+    {
+      "id": "distribution",
+      "package": "distribution",
+      "station": 56,
+      "kind": "package"
+    },
+    {
+      "id": "delegation.sync-delegate",
+      "package": "delegation",
+      "station": 42,
+      "parent": "delegation",
+      "kind": "slice"
+    },
+    {
+      "id": "delegation.async-fork",
+      "package": "delegation",
+      "station": 42,
+      "parent": "delegation",
+      "kind": "slice"
+    },
+    {
+      "id": "change-integration.orchestrator-tools",
+      "package": "change-integration",
+      "station": 55,
+      "parent": "change-integration",
+      "kind": "slice"
+    }
+  ],
+  "edges": [
+    {
+      "from": "requirement-system",
+      "to": "verification-system",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "js-semantic-surface",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "structured-workflow",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "host-boundary",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "session-ontology",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "participant-identity",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "provider-language",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "office-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "capability-enforcement",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "cognitive-environment",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "action-affordance",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "participant-horizon",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "provider-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "repository-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "requirement-grounding",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "repository-programming",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "time-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "process-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "output-distillation",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "causal-wait",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "durable-events",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "effect-accounting",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "semantic-trace",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-system",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "js-semantic-surface",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "structured-workflow",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "host-boundary",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "session-ontology",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "participant-identity",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "provider-language",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "office-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "capability-enforcement",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "cognitive-environment",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "action-affordance",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "participant-horizon",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "provider-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "repository-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "requirement-grounding",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "repository-programming",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "time-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "process-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "output-distillation",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "causal-wait",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "durable-events",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "effect-accounting",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "semantic-trace",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "verification-system",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "structured-workflow",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "host-boundary",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "session-ontology",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "participant-identity",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "provider-language",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "office-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "capability-enforcement",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "cognitive-environment",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "action-affordance",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "participant-horizon",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "provider-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "repository-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "requirement-grounding",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "repository-programming",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "time-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "process-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "output-distillation",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "causal-wait",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "durable-events",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "effect-accounting",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "semantic-trace",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "js-semantic-surface",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "host-boundary",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "session-ontology",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "participant-identity",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "provider-language",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "office-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "capability-enforcement",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "cognitive-environment",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "action-affordance",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "participant-horizon",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "provider-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "repository-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "requirement-grounding",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "repository-programming",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "time-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "process-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "output-distillation",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "causal-wait",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "durable-events",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "effect-accounting",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "semantic-trace",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "structured-workflow",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "session-ontology",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "participant-identity",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "provider-language",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "office-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "capability-enforcement",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "cognitive-environment",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "action-affordance",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "participant-horizon",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "provider-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "repository-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "requirement-grounding",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "repository-programming",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "time-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "process-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "output-distillation",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "causal-wait",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "durable-events",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "effect-accounting",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "semantic-trace",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-boundary",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "participant-identity",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "provider-language",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "office-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "capability-enforcement",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "cognitive-environment",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "action-affordance",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "participant-horizon",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "provider-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "repository-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "requirement-grounding",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "repository-programming",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "time-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "process-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "output-distillation",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "causal-wait",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "durable-events",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "effect-accounting",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "semantic-trace",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "session-ontology",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "provider-language",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "office-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "capability-enforcement",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "cognitive-environment",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "action-affordance",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "participant-horizon",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "provider-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "repository-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "requirement-grounding",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "repository-programming",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "time-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "process-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "output-distillation",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "causal-wait",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "durable-events",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "effect-accounting",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "semantic-trace",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-identity",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "office-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "capability-enforcement",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "cognitive-environment",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "action-affordance",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "participant-horizon",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "provider-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "repository-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "requirement-grounding",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "repository-programming",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "time-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "process-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "output-distillation",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "causal-wait",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "durable-events",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "effect-accounting",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "semantic-trace",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-language",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "capability-enforcement",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "cognitive-environment",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "action-affordance",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "participant-horizon",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "provider-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "repository-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "requirement-grounding",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "repository-programming",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "time-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "process-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "output-distillation",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "causal-wait",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "durable-events",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "effect-accounting",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "semantic-trace",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "office-capability",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "cognitive-environment",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "action-affordance",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "participant-horizon",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "provider-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "repository-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "requirement-grounding",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "repository-programming",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "time-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "process-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "output-distillation",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "causal-wait",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "durable-events",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "effect-accounting",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "semantic-trace",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "capability-enforcement",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "action-affordance",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "participant-horizon",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "provider-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "repository-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "requirement-grounding",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "repository-programming",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "time-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "process-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "output-distillation",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "causal-wait",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "durable-events",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "effect-accounting",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "semantic-trace",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "cognitive-environment",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "participant-horizon",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "provider-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "repository-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "requirement-grounding",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "repository-programming",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "time-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "process-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "output-distillation",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "causal-wait",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "durable-events",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "effect-accounting",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "semantic-trace",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "action-affordance",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "provider-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "repository-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "requirement-grounding",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "repository-programming",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "time-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "process-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "output-distillation",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "causal-wait",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "durable-events",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "effect-accounting",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "semantic-trace",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "participant-horizon",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "repository-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "requirement-grounding",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "repository-programming",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "time-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "process-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "output-distillation",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "causal-wait",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "durable-events",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "effect-accounting",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "semantic-trace",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-projection",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "requirement-grounding",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "repository-programming",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "time-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "process-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "output-distillation",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "causal-wait",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "durable-events",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "effect-accounting",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "semantic-trace",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "repository-programming",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "time-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "process-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "output-distillation",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "causal-wait",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "durable-events",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "effect-accounting",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "semantic-trace",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "requirement-grounding",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "time-capability",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "process-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "output-distillation",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "causal-wait",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "durable-events",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "effect-accounting",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "semantic-trace",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "repository-programming",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "process-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "output-distillation",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "causal-wait",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "durable-events",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "effect-accounting",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "semantic-trace",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "time-capability",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "output-distillation",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "causal-wait",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "durable-events",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "effect-accounting",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "semantic-trace",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "process-execution",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "causal-wait",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "durable-events",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "effect-accounting",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "semantic-trace",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "output-distillation",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "durable-events",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "effect-accounting",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "semantic-trace",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "causal-wait",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "effect-accounting",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "semantic-trace",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-events",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "semantic-trace",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "effect-accounting",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "context-compression",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "semantic-trace",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "prefix-stability",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "context-compression",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "work-record",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "prefix-stability",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "behavior-diagnosis",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "work-record",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "guidance-delivery",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "behavior-diagnosis",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "attention-regulation",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "guidance-delivery",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "execution-failure-policy",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "attention-regulation",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "interaction-authority",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-failure-policy",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "managed-chat-execution",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "interaction-authority",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-chat-execution",
+      "to": "execution-model-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-chat-execution",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-chat-execution",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-chat-execution",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-chat-execution",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-chat-execution",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-chat-execution",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-chat-execution",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-chat-execution",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-chat-execution",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-chat-execution",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-chat-execution",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-chat-execution",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-chat-execution",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-chat-execution",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-chat-execution",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-chat-execution",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-chat-execution",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-chat-execution",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-chat-execution",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-chat-execution",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-chat-execution",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-chat-execution",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-model-routing",
+      "to": "managed-session-lifecycle",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-model-routing",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-model-routing",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-model-routing",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-model-routing",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-model-routing",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-model-routing",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-model-routing",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-model-routing",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-model-routing",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-model-routing",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-model-routing",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-model-routing",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-model-routing",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-model-routing",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-model-routing",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-model-routing",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-model-routing",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-model-routing",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-model-routing",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-model-routing",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "execution-model-routing",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-session-lifecycle",
+      "to": "dispatch-protocol",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-session-lifecycle",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-session-lifecycle",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-session-lifecycle",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-session-lifecycle",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-session-lifecycle",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-session-lifecycle",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-session-lifecycle",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-session-lifecycle",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-session-lifecycle",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-session-lifecycle",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-session-lifecycle",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-session-lifecycle",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-session-lifecycle",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-session-lifecycle",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-session-lifecycle",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-session-lifecycle",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-session-lifecycle",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-session-lifecycle",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-session-lifecycle",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-session-lifecycle",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "dispatch-protocol",
+      "to": "provider-attempt-recovery",
+      "kind": "station-order"
+    },
+    {
+      "from": "dispatch-protocol",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "dispatch-protocol",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "dispatch-protocol",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "dispatch-protocol",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "dispatch-protocol",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "dispatch-protocol",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "dispatch-protocol",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "dispatch-protocol",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "dispatch-protocol",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "dispatch-protocol",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "dispatch-protocol",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "dispatch-protocol",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "dispatch-protocol",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "dispatch-protocol",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "dispatch-protocol",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "dispatch-protocol",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "dispatch-protocol",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "dispatch-protocol",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "dispatch-protocol",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-attempt-recovery",
+      "to": "host-provider-failure-ownership",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-attempt-recovery",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-attempt-recovery",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-attempt-recovery",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-attempt-recovery",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-attempt-recovery",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-attempt-recovery",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-attempt-recovery",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-attempt-recovery",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-attempt-recovery",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-attempt-recovery",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-attempt-recovery",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-attempt-recovery",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-attempt-recovery",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-attempt-recovery",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-attempt-recovery",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-attempt-recovery",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-attempt-recovery",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "provider-attempt-recovery",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-provider-failure-ownership",
+      "to": "degeneration-guard",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-provider-failure-ownership",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-provider-failure-ownership",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-provider-failure-ownership",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-provider-failure-ownership",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-provider-failure-ownership",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-provider-failure-ownership",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-provider-failure-ownership",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-provider-failure-ownership",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-provider-failure-ownership",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-provider-failure-ownership",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-provider-failure-ownership",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-provider-failure-ownership",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-provider-failure-ownership",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-provider-failure-ownership",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-provider-failure-ownership",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-provider-failure-ownership",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "host-provider-failure-ownership",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "degeneration-guard",
+      "to": "crash-reconciliation",
+      "kind": "station-order"
+    },
+    {
+      "from": "degeneration-guard",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "degeneration-guard",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "degeneration-guard",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "degeneration-guard",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "degeneration-guard",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "degeneration-guard",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "degeneration-guard",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "degeneration-guard",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "degeneration-guard",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "degeneration-guard",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "degeneration-guard",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "degeneration-guard",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "degeneration-guard",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "degeneration-guard",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "degeneration-guard",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "degeneration-guard",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "crash-reconciliation",
+      "to": "durable-convergence",
+      "kind": "station-order"
+    },
+    {
+      "from": "crash-reconciliation",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "crash-reconciliation",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "crash-reconciliation",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "crash-reconciliation",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "crash-reconciliation",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "crash-reconciliation",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "crash-reconciliation",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "crash-reconciliation",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "crash-reconciliation",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "crash-reconciliation",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "crash-reconciliation",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "crash-reconciliation",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "crash-reconciliation",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "crash-reconciliation",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "crash-reconciliation",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-convergence",
+      "to": "delegation",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-convergence",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-convergence",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-convergence",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-convergence",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-convergence",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-convergence",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-convergence",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-convergence",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-convergence",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-convergence",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-convergence",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-convergence",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-convergence",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "durable-convergence",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "delegation",
+      "to": "concern-routing",
+      "kind": "station-order"
+    },
+    {
+      "from": "delegation",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "delegation",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "delegation",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "delegation",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "delegation",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "delegation",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "delegation",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "delegation",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "delegation",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "delegation",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "delegation",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "delegation",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "delegation",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "concern-routing",
+      "to": "intra-participant-parallelism",
+      "kind": "station-order"
+    },
+    {
+      "from": "concern-routing",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "concern-routing",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "concern-routing",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "concern-routing",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "concern-routing",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "concern-routing",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "concern-routing",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "concern-routing",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "concern-routing",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "concern-routing",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "concern-routing",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "concern-routing",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "intra-participant-parallelism",
+      "to": "knowledge-reuse",
+      "kind": "station-order"
+    },
+    {
+      "from": "intra-participant-parallelism",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "intra-participant-parallelism",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "intra-participant-parallelism",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "intra-participant-parallelism",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "intra-participant-parallelism",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "intra-participant-parallelism",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "intra-participant-parallelism",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "intra-participant-parallelism",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "intra-participant-parallelism",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "intra-participant-parallelism",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "intra-participant-parallelism",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "knowledge-reuse",
+      "to": "external-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "knowledge-reuse",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "knowledge-reuse",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "knowledge-reuse",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "knowledge-reuse",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "knowledge-reuse",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "knowledge-reuse",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "knowledge-reuse",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "knowledge-reuse",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "knowledge-reuse",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "knowledge-reuse",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "external-investigation",
+      "to": "epistemic-reasoning",
+      "kind": "station-order"
+    },
+    {
+      "from": "external-investigation",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "external-investigation",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "external-investigation",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "external-investigation",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "external-investigation",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "external-investigation",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "external-investigation",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "external-investigation",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "external-investigation",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "epistemic-reasoning",
+      "to": "speculative-investigation",
+      "kind": "station-order"
+    },
+    {
+      "from": "epistemic-reasoning",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "epistemic-reasoning",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "epistemic-reasoning",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "epistemic-reasoning",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "epistemic-reasoning",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "epistemic-reasoning",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "epistemic-reasoning",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "epistemic-reasoning",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "speculative-investigation",
+      "to": "institutional-learning",
+      "kind": "station-order"
+    },
+    {
+      "from": "speculative-investigation",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "speculative-investigation",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "speculative-investigation",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "speculative-investigation",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "speculative-investigation",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "speculative-investigation",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "speculative-investigation",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "institutional-learning",
+      "to": "obligation-ledger",
+      "kind": "station-order"
+    },
+    {
+      "from": "institutional-learning",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "institutional-learning",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "institutional-learning",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "institutional-learning",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "institutional-learning",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "institutional-learning",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "obligation-ledger",
+      "to": "relay-incumbency",
+      "kind": "station-order"
+    },
+    {
+      "from": "obligation-ledger",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "obligation-ledger",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "obligation-ledger",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "obligation-ledger",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "obligation-ledger",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "relay-incumbency",
+      "to": "relay-assessment",
+      "kind": "station-order"
+    },
+    {
+      "from": "relay-incumbency",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "relay-incumbency",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "relay-incumbency",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "relay-incumbency",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "relay-assessment",
+      "to": "relay-context-projection",
+      "kind": "station-order"
+    },
+    {
+      "from": "relay-assessment",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "relay-assessment",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "relay-assessment",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "relay-context-projection",
+      "to": "relay-retirement",
+      "kind": "station-order"
+    },
+    {
+      "from": "relay-context-projection",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "relay-context-projection",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "relay-retirement",
+      "to": "change-integration",
+      "kind": "station-order"
+    },
+    {
+      "from": "relay-retirement",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "change-integration",
+      "to": "distribution",
+      "kind": "station-order"
+    },
+    {
+      "from": "managed-session-lifecycle",
+      "to": "delegation.sync-delegate",
+      "kind": "borrow"
+    },
+    {
+      "from": "repository-investigation",
+      "to": "delegation.sync-delegate",
+      "kind": "borrow"
+    },
+    {
+      "from": "office-capability",
+      "to": "delegation.sync-delegate",
+      "kind": "borrow"
+    },
+    {
+      "from": "delegation",
+      "to": "delegation.async-fork",
+      "kind": "parent"
+    },
+    {
+      "from": "change-integration",
+      "to": "change-integration.orchestrator-tools",
+      "kind": "parent"
+    }
+  ]
+}

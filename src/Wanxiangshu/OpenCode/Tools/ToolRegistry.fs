@@ -19,6 +19,7 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Repository.Programming.Js.OpenCode
+open Wanxiangshu.Ablation
 
 /// Assembly-only registry: tool behavior lives in one vertical verb module;
 /// per-session resources live in ToolRuntimeScope.
@@ -32,6 +33,9 @@ module ToolRegistry =
     module Path =
         [<Literal>]
         let DeniedRole = "tool/registry/denied-role"
+
+        [<Literal>]
+        let DeniedAblation = "tool/registry/denied-ablation"
 
         [<Literal>]
         let DeniedStrength = "tool/registry/denied-strength"
@@ -349,7 +353,13 @@ module ToolRegistry =
 
             let executeAfterBoundary args (ctx: HostToolContext) =
                 task {
-                    if isStrengthReplica ctx then
+                    if AblationGate.toolDenied spec.Name then
+                        return
+                            denied
+                                ctx
+                                Path.DeniedAblation
+                                (Map [ "tool", spec.Name ])
+                    elif isStrengthReplica ctx then
                         // STRENGTH-004: Host-native read/glob/grep are the entire replica surface.
                         return denied ctx Path.DeniedStrength Map.empty
                     else
