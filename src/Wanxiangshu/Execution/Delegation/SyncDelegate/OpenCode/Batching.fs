@@ -1,12 +1,17 @@
 namespace Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
 
 open System
+open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
+open Wanxiangshu.Foundation
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
+open ToolHostCodec
 
 [<RequireQualifiedAccess>]
 module SyncDelegateBatching =
@@ -120,3 +125,136 @@ module SyncDelegateBatching =
 
     let mergedInstruction language canonicalCall =
         ProviderProse.render language MergedReference (Map [ "call", ToolCallId.value canonicalCall ])
+
+    type private DeferredCall =
+        { CallId: ToolCallId
+          Charge: string
+          Keywords: string
+          Estimate: int option }
+
+    let private pendingInspections = Dictionary<string, ResizeArray<DeferredCall>>()
+    let private durableReplacedResults = Dictionary<string, string>()
+
+    [<Emit("Promise.all($0)")>]
+    let private promiseAll (promises: Task<'T> array) : Task<'T array> = jsNative
+
+    let stageDeferredInspection
+        (sessionId: string)
+        (callId: ToolCallId)
+        (charge: string)
+        (keywords: string)
+        (estimate: int option)
+        : string =
+        lock pendingInspections (fun () ->
+            let list =
+                match pendingInspections.TryGetValue sessionId with
+                | true, existing -> existing
+                | false, _ ->
+                    let created = ResizeArray<DeferredCall>()
+                    pendingInspections.[sessionId] <- created
+                    created
+
+            list.Add
+                { CallId = callId
+                  Charge = charge
+                  Keywords = keywords
+                  Estimate = estimate }
+
+            tomlObjectWithInstructions
+                [ sprintf "Inspector charge accepted and deferred for batch execution: %s" charge ]
+                [])
+
+    let settleDeferredInspections
+        (runtime: SyncDelegateRuntime)
+        (workspaceDirectory: string option)
+        (sessionId: string)
+        : Task<unit> =
+        task {
+            let callsOpt =
+                lock pendingInspections (fun () ->
+                    match pendingInspections.TryGetValue sessionId with
+                    | true, list when list.Count > 0 ->
+                        let copy = list |> Seq.toList
+                        pendingInspections.Remove sessionId |> ignore
+                        Some copy
+                    | _ -> None)
+
+            match callsOpt with
+            | None -> ()
+            | Some calls ->
+                let callOrder = calls |> List.map (fun c -> c.CallId)
+                let combinedCharge = calls |> List.map (fun c -> c.Charge) |> String.concat "\n"
+
+                let firstCall = List.head calls
+
+                let tasks =
+                    calls
+                    |> List.map (fun call ->
+                        let batch =
+                            { ProviderRun = ProviderRunIdentity.create "deferred-batch"
+                              CallOrder = callOrder
+                              CurrentCall = call.CallId }
+
+                        let preparePrompt () =
+                            Task.FromResult(LlmFacing.instructions (calls |> List.map (fun c -> c.Charge)))
+
+                        runtime.InvokeBatchPrepared(
+                            sessionId,
+                            SyncDelegateRole.Inspector,
+                            combinedCharge,
+                            batch,
+                            preparePrompt,
+                            ?expectedToolCalls = call.Estimate
+                        ))
+
+                let! results = promiseAll (List.toArray tasks)
+                let lang = ProviderLanguageBinding.forSessionText sessionId
+
+                lock durableReplacedResults (fun () ->
+                    for i in 0 .. calls.Length - 1 do
+                        let call = calls.[i]
+                        let res = results.[i]
+
+                        let outputText =
+                            match res with
+                            | Ok(SyncDelegateInvocationResult.WorkRecord workRecord) ->
+                                tomlObjectWithInstructions [ workRecord ] []
+                            | Ok(SyncDelegateInvocationResult.MergedInto canonicalCall) ->
+                                tomlObjectWithInstructions [ mergedInstruction lang canonicalCall ] []
+                            | Error err -> tomlObjectWithInstructions [ sprintf "Inspector failed: %s" err ] []
+
+                        durableReplacedResults.[ToolCallId.value call.CallId] <- outputText)
+        }
+
+    let applyReplacedResults (messages: obj list) : obj list =
+        lock durableReplacedResults (fun () ->
+            if durableReplacedResults.Count = 0 then
+                messages
+            else
+                for msg in messages do
+                    if not (isNull msg) && not (isNull msg?parts) then
+                        let parts = unbox<obj array> msg?parts
+
+                        for part in parts do
+                            if not (isNull part) && string (part?``type``) = "tool" then
+                                let callId = string (part?callID)
+
+                                match durableReplacedResults.TryGetValue callId with
+                                | true, replacement ->
+                                    if not (isNull part?state) then
+                                        part?state?output <- replacement
+                                | false, _ -> ()
+                    elif not (isNull msg) && string (msg?role) = "tool" then
+                        let callId =
+                            if not (isNull msg?tool_call_id) then
+                                string (msg?tool_call_id)
+                            elif not (isNull msg?toolCallId) then
+                                string (msg?toolCallId)
+                            else
+                                ""
+
+                        match durableReplacedResults.TryGetValue callId with
+                        | true, replacement -> msg?content <- replacement
+                        | false, _ -> ()
+
+                messages)

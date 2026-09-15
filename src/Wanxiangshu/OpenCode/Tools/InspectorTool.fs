@@ -103,21 +103,38 @@ module InspectorTool =
             | Some _, false, Error _, _ -> return consequence context DelegatedToolEstimate.InvalidPath Map.empty
             | Some _, false, Ok _, true -> return consequence context Path.NeedsCharge (Map [ "tool", "inspect" ])
             | Some sd, false, Ok expectedToolCalls, false ->
-                let prepareProviderPrompt () =
-                    RepositoryWarmStart.prepareDocument
-                        (SessionId.create context.SessionId)
-                        Role.Inspector
-                        workspaceDirectory
-                        keywords
-                        charge
-                    |> TaskValue.map (Result.defaultValue (LlmFacing.instruction charge))
+                match context.ToolCallId with
+                | Some callId ->
+                    return
+                        SyncDelegateBatching.stageDeferredInspection
+                            context.SessionId
+                            callId
+                            charge
+                            keywords
+                            expectedToolCalls
+                | None ->
+                    let prepareProviderPrompt () =
+                        RepositoryWarmStart.prepareDocument
+                            (SessionId.create context.SessionId)
+                            Role.Inspector
+                            workspaceDirectory
+                            keywords
+                            charge
+                        |> TaskValue.map (Result.defaultValue (LlmFacing.instruction charge))
 
-                let! batch = SyncDelegateBatching.resolve sd snapshot SyncDelegateRole.Inspector context
+                    let! batch = SyncDelegateBatching.resolve sd snapshot SyncDelegateRole.Inspector context
 
-                let! result =
-                    invoke sd SyncDelegateRole.Inspector context charge prepareProviderPrompt batch expectedToolCalls
+                    let! result =
+                        invoke
+                            sd
+                            SyncDelegateRole.Inspector
+                            context
+                            charge
+                            prepareProviderPrompt
+                            batch
+                            expectedToolCalls
 
-                return renderResult context result
+                    return renderResult context result
         }
 
     let admission: ToolAdmission =

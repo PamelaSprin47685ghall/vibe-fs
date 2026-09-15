@@ -30,6 +30,7 @@ module PluginTransforms =
           InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
           ProjectRequirementGrounding: string option -> obj -> Task<unit>
           InjectBloggerChronicle: string option -> obj -> unit
+          SettleAndReplaceDeferredInspections: string option -> obj -> Task<unit>
           SanitizeMessages: obj -> unit }
 
     type TransformBranchCapabilities =

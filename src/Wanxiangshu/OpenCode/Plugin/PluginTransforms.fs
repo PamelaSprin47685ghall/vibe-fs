@@ -15,6 +15,7 @@ open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.SyncDelegate
+open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Execution.Session.Recovery
@@ -114,6 +115,7 @@ module PluginTransforms =
           InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
           ProjectRequirementGrounding: string option -> obj -> Task<unit>
           InjectBloggerChronicle: string option -> obj -> unit
+          SettleAndReplaceDeferredInspections: string option -> obj -> Task<unit>
           SanitizeMessages: obj -> unit }
 
     type TransformBranchCapabilities =
@@ -466,6 +468,18 @@ module PluginTransforms =
                     projectionSessionIdOpt
                     (languageFor projectionSessionIdOpt)
                     outObj
+          SettleAndReplaceDeferredInspections =
+            fun projectionSessionIdOpt outObj ->
+                task {
+                    match projectionSessionIdOpt, scope.SyncDelegateRuntime with
+                    | Some sid, Some sd -> do! SyncDelegateBatching.settleDeferredInspections sd workspaceDirectory sid
+                    | _ -> ()
+
+                    if not (isNull outObj) && not (isNull outObj?messages) then
+                        let currentMessages = unbox<obj array> outObj?messages |> Array.toList
+                        let replaced = SyncDelegateBatching.applyReplacedResults currentMessages
+                        HostMessageProjection.replaceMessagesInPlace outObj replaced
+                }
           SanitizeMessages = HostMessageProjection.sanitizeOutputMessages }
 
     let defaultBranchCapabilities (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) : TransformBranchCapabilities =
@@ -520,6 +534,7 @@ module PluginTransforms =
             // 3. Relay projection cut + manager-loop opening. This MUST run
             // before every trace/compaction owner so retired raw history cannot
             // be reintroduced later in the composition.
+            do! caps.SettleAndReplaceDeferredInspections projectionSessionIdOpt outObj
             let! relayProjection = caps.ApplyRelayProjection projectionSessionIdOpt outObj
 
             if relayProjection = RelayProjectionDisposition.RetiredAttemptStopped then
@@ -566,6 +581,9 @@ module PluginTransforms =
 
             // 15. BloggerChronicleText.maybeInject
             caps.InjectBloggerChronicle projectionSessionIdOpt outObj
+
+            // 15.1 Re-apply replaced inspection results after any intermediate insertions
+            do! caps.SettleAndReplaceDeferredInspections projectionSessionIdOpt outObj
 
             // 16. HostMessageProjection.sanitizeMessages
             caps.SanitizeMessages outObj
