@@ -608,7 +608,12 @@ module ModelRouting =
                 drainDemands ()
                 issueAdmission sessionId physicalUserMessageId role participant target
             | None ->
-                admissionQueue.Enqueue(sessionId, physicalUserMessageId, role, participant, lenderSessionId, previous)
+                // RouteFresh may have retired the superseded execution, which frees capacity.
+                // The freed slot must trigger a queue recompute immediately.
+                let enqueued =
+                    admissionQueue.Enqueue(sessionId, physicalUserMessageId, role, participant, lenderSessionId, previous)
+                drainDemands ()
+                enqueued
 
         let acquireFreshOrAdopt
             sessionId

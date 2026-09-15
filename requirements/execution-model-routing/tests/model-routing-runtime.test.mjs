@@ -180,6 +180,26 @@ test('WHAT[EMR-004] EMR_004_required_null_waits_for_an_occupancy_event_then_retr
   assert.equal(snapshotOccupied(runtime).length, 1)
 })
 
+test('WHAT[EMR-013] superseded slot freed inside the same turn recomputes the waiting queue', { timeout: 5000 }, async () => {
+  const only = target('provider/only')
+  const runningCounts = []
+  const route = (_role, running) => {
+    runningCounts.push(running.length)
+    return running.length < 1 ? only : null
+  }
+  const runtime = createRuntime(route)
+
+  await acquireTarget(runtime, 'session', 'msg-1', 'coder', 'alice')
+  endProviderStep(runtime, 'session', 'msg-1', 'run-1')
+
+  const retry = await acquireManaged(runtime, 'session', 'msg-2', 'coder', 'alice')
+  assert.equal(retry.kind, 'Acquired', 'superseded occupancy reaches the first schedule, its retire frees the slot, and the queued demand drains in the same turn')
+  assert.equal(key(retry.target), 'provider/only|none')
+  assert.equal(pendingCount(runtime), 0)
+  assert.equal(snapshotOccupied(runtime).length, 1)
+  assert.deepEqual(runningCounts, [0, 1, 0])
+})
+
 test('WHAT[EMR-004] EMR_004_newer_physical_message_cancels_superseded_pending_demand', async () => {
   const runtime = createRuntime((role) => role === 'inspector' ? null : target(`provider/${role}`))
 
