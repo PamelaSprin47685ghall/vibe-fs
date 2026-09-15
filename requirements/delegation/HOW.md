@@ -115,4 +115,6 @@ CompletionMailbox、Change VerdictMailbox 与 HostForkJoin 的 journal／fission
 
 ## GAP
 
+- `sync-stream-seal`（OPEN）：流式 Inspector 首个调用只看见单项前缀时会立即派发，后续同 ProviderRun 调用被 active batch 拒绝。等待 `step-finish` 的候选修复已撤回：2026-09-15 使用 OpenCode 1.18.29 的 AI-SDK runtime 跑 Long Stroke，G2 第一个单独 inspect 就卡住，Host transcript 只有 `step-start` 与 running tool，180 秒 watchdog 超时。该路径的 `step-finish`／message Finish 在工具结果之后，不可作为工具内部等待条件；native runtime 的源码时序不能代替 AI-SDK Host 契约。要保持 DELEG-008／012，Host 必须提供工具结果之前的完整有序调用列表或其结束信号；否则需先批准显式批量工具契约。不得用固定延时或拆成多个 canonical WorkRecord 假装满足原条款。
+
 - `GAP-027`（CLOSED）：旧 reusable handoff 以 physical child `SessionId` 持有 cursor，并在 prompt 已 dispatch 后追加可失败 bookkeeping；旧 sticky terminal 还能跨 invocation 重放，fork idle reuse 又会立即返回旧/全生命周期结果，active new charge 还会混入 `BusyAgentNudge`。现已收口为 direct F# CE：logical-route frontier 只由 completed-handoff fact 推导；same-road fork/SyncDelegate 都执行 `prepare delta → dispatch → await own causal completion → bounded callee LWR → checkpoint`；fresh-only terminal observation 与 Authority Root 共同阻断上一轮 Completed/Failed；active assignment 明确拒绝；HostForkRuntime 的 bounded WorkRecord projector 为必需 capability，不能再构造“可完成但无 invocation delta”的 runtime。真实 fork tool 与 inspector/coder reuse 回归均已覆盖，authoritative runner 3405/3405 green。
