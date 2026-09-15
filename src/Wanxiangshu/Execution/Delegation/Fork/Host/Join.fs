@@ -57,7 +57,12 @@ module HostForkJoin =
         | Done of Result<JoinWaitOutcome<JoinItem>, ForkError>
         | Retry
 
-    let private currentProcessHandle (runtime: HostForkRuntime) (record: HandleRecord) =
+    /// HOST-BOUNDARY-021 / EXEC-009: a durable handle is actionable only while
+    /// THIS process owns its agent. After a restart the journal still carries the
+    /// previous process's handles; join must not consume them and the horizon
+    /// roster must not present them. Join admission and HorizonTool share this
+    /// one predicate so the two surfaces cannot disagree.
+    let currentProcessHandle (runtime: HostForkRuntime) (record: HandleRecord) =
         match HandleId.tryAgent record.Handle with
         | None -> false
         | Some handleId -> runtime.OwnsAgent(AgentHandleId.value handleId)

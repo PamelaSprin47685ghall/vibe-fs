@@ -1,12 +1,17 @@
 namespace Wanxiangshu.Execution.Delegation.Fork.Host
 
 open System.Threading.Tasks
+open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
 open Wanxiangshu.Execution.Session.Wait
 
 module HostForkJoin =
+    /// HOST-BOUNDARY-021: the current process's ownership cut over durable
+    /// handles. Join admission and the horizon roster both answer through it.
+    val currentProcessHandle: runtime: HostForkRuntime -> record: HandleRecord -> bool
+
     val joinAvailable:
         runtime: HostForkRuntime ->
         maxCount: int ->

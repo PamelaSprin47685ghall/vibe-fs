@@ -147,10 +147,15 @@ module HorizonTool =
         else
             lines
 
-    let private appendHandleLinesForRoster language journal snapshot runtimeByAgentId agentLines handles =
+    let private appendHandleLinesForRoster language journal snapshot runtimeByAgentId runtime agentLines handles =
         task {
             for handle in HandleProjection.horizonVisible handles do
-                do! appendHandleLines language journal snapshot runtimeByAgentId agentLines handle
+                // HOST-BOUNDARY-021: the roster answers only for the current
+                // process. Durable handles from a dead process stay inert until
+                // explicit reuse reopens the line; Join refuses them, so the
+                // horizon must not present them either.
+                if HostForkJoin.currentProcessHandle runtime handle then
+                    do! appendHandleLines language journal snapshot runtimeByAgentId agentLines handle
         }
 
     let private executeWithJournal language (runtimeCtx: HorizonRuntimeContext) context (journal: AgentJournal) =
@@ -174,7 +179,16 @@ module HorizonTool =
 
                 // DSL-MUTABLE: algorithm-scratch — agent line accumulator
                 let agentLines = ResizeArray<string>()
-                do! appendHandleLinesForRoster language journal snapshot runtimeByAgentId agentLines durableHandles
+
+                do!
+                    appendHandleLinesForRoster
+                        language
+                        journal
+                        snapshot
+                        runtimeByAgentId
+                        runtime
+                        agentLines
+                        durableHandles
 
                 let agentLines = agentLines |> Seq.toList
 
