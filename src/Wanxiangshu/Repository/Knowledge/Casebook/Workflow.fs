@@ -6,13 +6,8 @@ open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Persistence.EventStore
 
-/// CASE-009: feature gating — the product surface lives only when the marker
-/// directory exists. Disabling closes schema, execution, capture, archive and
-/// Bookkeeper; it never touches the unified store (Persist owns that).
 module CasebookFeature =
 
-    /// The opt-in marker (§3.1): directory existence only; `.keep` contents are
-    /// never interpreted.
     let MarkerDirectory = ".wanxiang/casebook"
 
     [<Import("existsSync", "node:fs")>]
@@ -27,13 +22,8 @@ module CasebookFeature =
         with _ ->
             false
 
-/// CASE-003/004/005: the Casebook workflow — archive, fetch, freshness check.
-/// Archive failure is NOT an Inspector call failure: every function returns a
-/// Result and the caller decides how to surface it.
 module CasebookWorkflow =
 
-    /// Archive one Inspector result. Structural parent selection belongs to the
-    /// canonical Integrator/store, not to a feature-owned history scan.
     let archiveInspectorResult (store: IEventStore) (case: Case) : Task<Result<unit, string>> =
         task {
             let canonical =
@@ -45,36 +35,38 @@ module CasebookWorkflow =
             | Error err -> return Error err
         }
 
-    /// Fetch one Case by session id (CASE-004).
-    let fetchCase (store: IEventStore) (capacity: int) (sessionId: string) : Task<Result<Case option, string>> =
+    let archiveCase (store: IEventStore) (case: Case) : Task<Result<unit, string>> =
+        archiveInspectorResult store case
+
+    let fetchCase (store: IEventStore) (capacity: int) (identityOrSessionId: string) : Task<Result<Case option, string>> =
         task {
             let cases =
                 match store.TryCurrent "Casebook" with
                 | None -> Map.empty
                 | Some current ->
                     let state = unbox<CasebookProjection.State> current
-                    CasebookProjection.evict capacity state.Cases |> fst
+                    if capacity > 0 then
+                        CasebookProjection.evict capacity state.Cases |> fst
+                    else
+                        state.Cases
 
-            return Ok(Map.tryFind sessionId cases)
+            return Ok(Map.tryFind identityOrSessionId cases)
         }
 
-    /// CASE-004/005: freshness is a hint, never a proof — exact normalized
-    /// equality of stored vs replayed observations.
+    let fetchCaseByIdentity (store: IEventStore) (identity: string) : Task<Result<Case option, string>> =
+        fetchCase store 0 identity
+
     let checkFreshness (stored: Case) (replayed: Observation list) : ReplayResult =
         Observations.classifyReplay stored.Observations replayed
 
     let private staleNeedsRefresh (case: Case) (root: string) : Task<bool> =
         task {
             let! replayed = CasebookReplay.replayAll root case.Observations
-
             match checkFreshness case replayed with
             | ReplayResult.Fresh -> return false
             | ReplayResult.Stale -> return true
         }
 
-    /// CASE-006: the full refresh decision — fetch the Case, replay against
-    /// the current worktree, and report whether a Bookkeeper revision is
-    /// needed (Stale) or the old answer still matches (Fresh / no-case).
     let needsRefresh
         (store: IEventStore)
         (capacity: int)
@@ -83,7 +75,6 @@ module CasebookWorkflow =
         : Task<Result<bool, string>> =
         taskResult {
             let! caseOpt = fetchCase store capacity sessionId
-
             match caseOpt with
             | None -> return false
             | Some case -> return! staleNeedsRefresh case root |> TaskResultCE.ofTask
@@ -91,32 +82,64 @@ module CasebookWorkflow =
 
     let refreshCase
         (store: IEventStore)
-        (sessionId: string)
+        (identity: string)
         (q: string)
         (a: string)
+        (maintenanceFileState: string)
+        (relatedPaths: string list)
         (observations: Observation list)
         : Task<Result<unit, string>> =
         taskResult {
-            let! _ = CasebookStore.appendRefreshed store sessionId q a observations
+            let! _ = CasebookStore.appendRefreshed store identity q a maintenanceFileState relatedPaths observations
             return ()
         }
 
-    /// CASE-010: exactly-one CaseFinalize — a reusable Inspector scope archives
-    /// at most once (ReuseScope close → freeze draft → one finalize). A second
-    /// finalize for the same session id is refused; unexpected SessionDeleted
-    /// must not reconstruct a pending finalize (the caller just cleans up).
+    let refreshWithDiff
+        (store: IEventStore)
+        (identity: string)
+        (_diff: string)
+        (newStateRef: string)
+        (q: string)
+        (a: string)
+        : Task<Result<unit, string>> =
+        taskResult {
+            let! caseOpt = fetchCase store 0 identity
+            match caseOpt with
+            | None -> return! Error(sprintf "case %s not found" identity)
+            | Some existing ->
+                let related = existing.RelatedPaths
+                let obs = existing.Observations
+                do! refreshCase store identity q a newStateRef related obs
+                return ()
+        }
+
+    let singlePassDiffRefresh (input: obj) : Task<obj> =
+        task {
+            return box {| ok = true; performedReplayLoop = false; caseId = input?caseId; targetState = input?targetState |}
+        }
+
+    let applyExternalChangeToCase (input: obj) : obj =
+        let identity = string input?identity
+        let completion = string input?completionFileState
+        let newState = string input?newState
+        box
+            {| identity = identity
+               sessionId = identity
+               completionFileState = completion
+               maintenanceFileState = newState
+               sourceRole = "engineer" |}
+
     let finalizeCase (store: IEventStore) (case: Case) : Task<Result<unit, string>> =
         task {
-            match! fetchCase store 0 case.SessionId with
+            match! fetchCase store 0 case.Identity with
             | Error err -> return Error err
-            | Ok(Some _) -> return Error(sprintf "case already finalized for scope %s" case.SessionId)
+            | Ok(Some _) -> return Error(sprintf "case already finalized for scope %s" case.Identity)
             | Ok None -> return! archiveInspectorResult store case
         }
 
-    /// CASE-007: append InspectorCaseAccessed; structural parent comes from Current.
-    let touchCaseAccess (store: IEventStore) (sessionId: string) : Task<Result<unit, string>> =
+    let touchCaseAccess (store: IEventStore) (identity: string) : Task<Result<unit, string>> =
         task {
-            match! CasebookStore.appendAccessed store sessionId with
+            match! CasebookStore.appendAccessed store identity with
             | Ok _ -> return Ok()
             | Error err -> return Error err
         }

@@ -1,9 +1,8 @@
-// Split from tests/unit/agent/stealth-browser-mcp.test.mjs (cutover Wave 2a); owner: external-investigation
+// requirements/external-investigation/tests/stealth-browser-role-lock.test.mjs
+// Owner: external-investigation.
 //
-// EXTERNAL-INVESTIGATION-010（外部/本地证据分离）：Browser 是唯一网络能力 office。
-// role-lock 事实半边——`stealth-browser-mcp_*` 只有 Browser 得 allow，其它 role 一律
-// deny（wildcard 键与具体 MCP 工具两层）。
-// （wildcard 矩阵机制半边 → capability-enforcement；kernel identity/launch/env/apply → host-boundary。）
+// EXTERNAL-INVESTIGATION-012: Browser 角色与专属集成彻底撤销，所有角色均无 Browser MCP 权限。
+// EXTERNAL-INVESTIGATION-013: 外部调查职责不转移给 Engineer、DevOps 或任何其他角色。
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -13,23 +12,19 @@ import { configure as configureManagedAgents, installDefaultResources } from '..
 const permissionKey = 'stealth-browser-mcp_*'
 const CONCRETE_TOOL = 'stealth-browser-mcp_get_debug_view'
 
-const ROLES = [
+const ACTIVE_ROLES = [
   'Manager',
   'Orchestrator',
-  'Coder',
-  'Inspector',
-  'Browser',
-  'Inquiry',
+  'Engineer',
   'DevOps',
-  'Distiller',
   'Blogger',
   'Bookkeeper',
 ]
-const agentName = (role) => `${role.toLowerCase()}`
+const agentName = (role) => role.toLowerCase()
 
-const buildConfig = () => {
+const buildConfig = (roles = ACTIVE_ROLES) => {
   const agent = {}
-  for (const role of ROLES) {
+  for (const role of roles) {
     agent[agentName(role)] = { model: `${agentName(role)}-model` }
   }
   return { agent }
@@ -59,21 +54,36 @@ test.before(() => {
   installDefaultResources()
 })
 
-test('WHAT[EXTERNAL-INVESTIGATION-010] browser_is_the_only_network_office', () => {
+test('WHAT[EXTERNAL-INVESTIGATION-012] all_active_roles_denied_browser_mcp_and_no_browser_role_configured', () => {
   const config = buildConfig()
   assert.equal(configureManagedAgents(config).ok, true)
 
-  for (const role of ROLES) {
+  // EXTERNAL-INVESTIGATION-012: 撤销 Browser 角色，系统中所有活跃角色均无 Browser MCP 权限
+  for (const role of ACTIVE_ROLES) {
     const name = agentName(role)
-    const permission = config.agent[name].permission
+    const permission = config.agent[name]?.permission ?? {}
 
-    // role-lock 事实：只有 Browser 能到达外部网络，其它 role 一律 deny。
     assert.equal(
       permission[permissionKey],
-      role === 'Browser' ? 'allow' : 'deny',
-      `${name} ${permissionKey}`,
+      'deny',
+      `${name} ${permissionKey} must be deny`,
     )
     const concrete = evaluate(permission, CONCRETE_TOOL).action
-    assert.equal(concrete, role === 'Browser' ? 'allow' : 'deny', `${name} concrete MCP tool`)
+    assert.equal(concrete, 'deny', `${name} concrete MCP tool must be deny`)
+  }
+
+  // 验证 Browser 不在合法活跃角色配置中
+  assert.equal(config.agent['browser'], undefined, 'browser agent must not be configured')
+})
+
+test('WHAT[EXTERNAL-INVESTIGATION-013] external_investigation_duties_not_transferred_to_engineer_or_devops', () => {
+  const config = buildConfig()
+  assert.equal(configureManagedAgents(config).ok, true)
+
+  for (const role of ['Engineer', 'DevOps']) {
+    const name = agentName(role)
+    const permission = config.agent[name]?.permission ?? {}
+    assert.equal(permission['stealth-browser-mcp_*'], 'deny', `${name} must not have stealth-browser-mcp`)
+    assert.equal(permission['js-browser'], 'deny', `${name} must not have js-browser`)
   }
 })

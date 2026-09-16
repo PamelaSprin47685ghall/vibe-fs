@@ -6,6 +6,7 @@ namespace Wanxiangshu.Foundation
 type Role =
     | Manager
     | Orchestrator
+    | Engineer
     | Coder
     | Inspector
     | Browser
@@ -18,6 +19,7 @@ module Roles =
 
     let all: Role list =
         [ Role.Manager
+          Role.Engineer
           Role.Coder
           Role.Inspector
           Role.DevOps
@@ -32,6 +34,7 @@ module Roles =
         match role with
         | Role.Manager -> "manager"
         | Role.Orchestrator -> "orchestrator"
+        | Role.Engineer -> "engineer"
         | Role.Coder -> "coder"
         | Role.Inspector -> "inspector"
         | Role.DevOps -> "devops"
@@ -44,6 +47,7 @@ module Roles =
         match value.ToLowerInvariant() with
         | "manager" -> Some Role.Manager
         | "orchestrator" -> Some Role.Orchestrator
+        | "engineer" -> Some Role.Engineer
         | "coder" -> Some Role.Coder
         | "inspector" -> Some Role.Inspector
         | "devops" -> Some Role.DevOps

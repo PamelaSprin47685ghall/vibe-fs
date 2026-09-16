@@ -32,9 +32,9 @@ XTrace 提供确定性的半开区间定位能力，支持按起始点与排他�
 
 游标创建、序列化、比较、coverage 与 range containment 必须由 trace owner 操作完成；消费者不得通过 `.Sequence` 重写这些公式。
 
-## SEMANTIC-TRACE-007: XTrace 是 Y delta / prefix proof / LWR gap / terminal 的单一 source
+## SEMANTIC-TRACE-007: XTrace 是 Y delta / prefix proof / LWR gap / terminal / 案例来源的单一 source
 
-下游的增量压缩输入（delta）、`CoveredPrefixDigest` / prefix step-5 proof、生命周期工作记录缺口（LWR gap）与终端输出捕获均以 XTrace 为单一事实源。`XTraceMaterialization.currentProjection` 是 canonical X semantic projection 的唯一物化入口；请求级 provider presentation（Manager narrative、Strength replay 的临时呈现、guideline、grounding、repair 等）不得被持久化为 prefix coverage 的证明宇宙，也不得在下一请求中被拿来与其自身的旧 presentation hash 对账。针对不同消费场景采用确定的同源投影规则，严禁针对同一历史片段维护多套相互冲突的解析逻辑。
+下游的增量压缩输入（delta）、`CoveredPrefixDigest` / prefix step-5 proof、生命周期工作记录缺口（LWR gap）、案例来源（Case sourceTrace）与终端输出捕获均以 XTrace 为单一事实源。`XTraceMaterialization.currentProjection` 是 canonical X semantic projection 的唯一物化入口；请求级 provider presentation（Manager narrative、Strength replay 的临时呈现、guideline、grounding、repair 等）不得被持久化为 prefix coverage 的证明宇宙，也不得在下一请求中被拿来与其自身的旧 presentation hash 对账。针对不同消费场景采用确定的同源投影规则，严禁针对同一历史片段维护多套相互冲突的解析逻辑。
 
 有界 canonical projection 与 WorkRecord render 同样由 `XTraceMaterialization` 直接实现。捕获返回 typed receipt/error，terminal completion 返回 typed completion evidence；composition root 只安排顺序，不读取 owner state 推断捕获结果。
 
@@ -49,3 +49,11 @@ XTrace 提供确定性的半开区间定位能力，支持按起始点与排他�
 ## SEMANTIC-TRACE-010: Opening 在 trace 内 preserved
 
 初始任务材料（OpeningMaterial）严格对应会话起始至初始边界之间的 XTrace 区间。该区间内的根本性承诺与初始交付物作为宪章性材料完整保留，不作为普通偶发工具滤除，同一文本重放幂等，异构文本尝试覆写直接拒绝。
+
+## SEMANTIC-TRACE-011: Fission keyed convergence 与多 Present 轨迹归并
+
+在 Engineer 发生 Fission 时，各 execution lane 生成 keyed 溯源部件。汇聚收敛时按确定性 keyed convergence 规则合并，完整保留各路工作归属与因果发生关系，严禁按偶然到达时间拼接。整项工作的终止形成统一的 XTrace 终结前沿，供 WorkRecord 与 Casebook 一次性消费。
+
+## SEMANTIC-TRACE-012: 独立 Invocation 范围与 Resume 边界
+
+同一物理 Session 的多次 resume 产生多段严格隔离的 invocation 区间 `[InvocationStartCursor..InvocationEndCursor)`。每次 invocation 拥有明确的起点与终点游标，下游消费者（WorkRecord 物化、Casebook 归档）按精确区间提取事实，严禁跨越 resume 边界将多段独立工作混合为一个单一轨迹。

@@ -15,6 +15,7 @@ module ManagedAgentCatalog =
         match persona with
         | Persona.Director -> "director"
         | Persona.Lead -> "lead"
+        | Persona.Engineer -> "engineer"
         | Persona.Coder -> "coder"
         | Persona.Investigator -> "investigator"
         | Persona.Operator -> "operator"
@@ -34,8 +35,8 @@ module ManagedAgentCatalog =
         | "lead"
         | "manager"
         | "coordinator" -> Some Persona.Lead
-        | "coder"
-        | "engineer" -> Some Persona.Coder
+        | "engineer" -> Some Persona.Engineer
+        | "coder" -> Some Persona.Coder
         | "investigator"
         | "inspector"
         | "scout" -> Some Persona.Investigator
@@ -67,10 +68,10 @@ module ManagedAgentCatalog =
 
     let allInternalRoles: Role list = allRoles |> List.filter Roles.isInternal
 
-    /// Manager fork-agent enum (AGENT-009 / GLORY-031):
-    /// No orchestrator/manager/blogger/distiller.
+    /// Manager fork-agent enum (AGENT-009 / GLORY-031 / proposal §7.1):
+    /// Only Engineer is forkable by Manager.
     let managerForkableRoles: Role list =
-        [ Role.Coder; Role.Inspector; Role.DevOps; Role.Browser; Role.Inquiry ]
+        [ Role.Engineer ]
 
     /// InternalLeaf Bookkeeper — not a public Role.
     let bookkeeperNames: string list = [ "bookkeeper" ]
@@ -91,6 +92,8 @@ module ManagedAgentCatalog =
     let inspectorToolNames: string list = [ Roles.roleLabel Role.Inspector ]
 
     let coderToolNames: string list = [ Roles.roleLabel Role.Coder ]
+
+    let engineerToolNames: string list = [ Roles.roleLabel Role.Engineer ]
 
     let legacyAgentNames: Set<string> =
         set [ "build"; "plan"; "student"; "teacher"; "meditator"; "executor" ]

@@ -9,6 +9,7 @@ module PromptResources =
         function
         | Role.Manager -> "role/manager"
         | Role.Orchestrator -> "role/orchestrator"
+        | Role.Engineer -> "role/engineer"
         | Role.Coder -> "role/coder"
         | Role.Inspector -> "role/inspector"
         | Role.Browser -> "role/browser"
@@ -25,6 +26,7 @@ module PromptResources =
           "library/scarcity"
           "library/relay/quality-ledger"
           "role/manager"
+          "role/engineer"
           "role/coder"
           "role/devops"
           "role/inspector"
@@ -41,6 +43,7 @@ module PromptResources =
     let private libraryPaths =
         function
         | Role.Manager -> [ "library/kolmogorov"; "library/scarcity"; "library/relay/quality-ledger" ]
+        | Role.Engineer
         | Role.Coder -> [ "library/kolmogorov" ]
         | Role.Inspector
         | Role.DevOps -> [ "library/scarcity" ]
@@ -88,6 +91,7 @@ module PromptResources =
 
     let loadForLanguage (lang: ProviderLanguage) : PromptCatalog =
         { ManagerSystemPrompt = systemForRole lang Role.Manager
+          EngineerSystemPrompt = systemForRole lang Role.Engineer
           CoderSystemPrompt = systemForRole lang Role.Coder
           DevopsSystemPrompt = systemForRole lang Role.DevOps
           InspectorSystemPrompt = systemForRole lang Role.Inspector

@@ -36,11 +36,17 @@ module CasebookIndexSurface =
 
     let private caseToJs (case: Case) : obj =
         box
-            {| sessionId = case.SessionId
+            {| identity = case.Identity
+               sessionId = case.Identity
+               sourceTrace = case.SourceTrace
                q = case.Q
                a = case.A
-               observations = case.Observations |> List.map observationToJs |> List.toArray
-               lastAccessOrder = case.LastAccessOrder |}
+               relatedPaths = case.RelatedPaths |> List.toArray
+               completionFileState = case.CompletionFileState
+               maintenanceFileState = case.MaintenanceFileState
+               accessOrder = case.AccessOrder
+               lastAccessOrder = case.AccessOrder
+               observations = case.Observations |> List.map observationToJs |> List.toArray |}
 
     let private entryToJs (entry: CasebookIndex.Entry) : obj =
         box

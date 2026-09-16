@@ -91,6 +91,7 @@ module StrengthSurface =
     let private permissionLabel permission =
         match permission with
         | ToolPermission.Fork -> "Fork"
+        | ToolPermission.Resume -> "Resume"
         | ToolPermission.Join -> "Join"
         | ToolPermission.Horizon -> "Horizon"
         | ToolPermission.TodoWrite -> "TodoWrite"
@@ -528,6 +529,7 @@ module StrengthSurface =
 
             match role with
             | Role.Manager -> prompts.ManagerSystemPrompt
+            | Role.Engineer -> prompts.EngineerSystemPrompt
             | Role.Coder -> prompts.CoderSystemPrompt
             | Role.DevOps -> prompts.DevopsSystemPrompt
             | Role.Inspector -> prompts.InspectorSystemPrompt

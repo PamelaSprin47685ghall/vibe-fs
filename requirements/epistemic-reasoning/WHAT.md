@@ -134,3 +134,19 @@ Stop plugin 可基于 decision-equivalence posterior、tested framing family 内
 ## EPI-030: Legacy Adapter 黄金轨迹保持可观察兼容
 
 默认 Legacy profile 必须经 `旧 MCP → Legacy Adapter → Sphinx Core events → Legacy renderer` 重放冻结的 programming-quality transcript，并保持 request/nextTool 顺序、每次 accepted observation 的 revision、最终 epistemic basis、answer 与 `stop-dominates`。唯一明确翻转的旧行为是 process restart：handle 现在恢复为同一 durable inquiry；旧 `restart invalidates handles` 不再是合法特征。
+
+## EPI-031: Sphinx 探究流程全程序控制，无 Inquiry 角色与模型驾驶层
+
+Sphinx 探究的预算控制、工作项调度、认识状态推进与终止收束完全由程序控制。外部调用方（如 Manager 或 Orchestrator）通过高层工具入口输入问题、约束与预算即可直接获得有界探究结果、证据界限或明确未决后果；调用方不再通过 yield/nextTool/phase 逐轮驾驶探究循环。Inquiry 角色、Persona、Prompt 及模型槽位彻底移除，不作为独立参与者存在。
+
+## EPI-032: 内部 Engineer 调研只读、同步、有预算、可取消且无 Fission 与 DevOps 权能
+
+当 Sphinx 程序内部需要建立代码或语义事实时，同步调用内部只读 Engineer 工作实例进行本地调查。内部 Engineer 本次调用授权严格受限：仅限本地代码与事实只读调查，受调用预算与生命周期约束，完成指定调研后立即返回程序调用点；严禁修改工作树、严禁执行真实命令或差遣 DevOps、严禁递归调用 Sphinx、严禁使用 Fission。
+
+## EPI-033: 结果接纳按工作身份幂等且防止晚到与重复购买
+
+调研结果的接纳严格绑定 `(WorkId, attempt)` 工作身份进行幂等判定。已完成且已接纳的调研结果在外部重试或程序恢复时不得重复购买；晚到或与当前 attempt 不匹配的调研结果一律丢弃或按陈旧处理，严禁误接纳为当前工作项结果。
+
+## EPI-034: 取消全链贯穿父工具、子 Engineer 与结果接纳
+
+父级高层 Sphinx 调用被取消时，取消信号必须完整贯穿至底层正在执行的子 Engineer 实例、进程/会话资源释放以及结果接纳层。取消后立即执行 clean drain，阻断任何在途结果的吸收与持久化，严禁遗留孤儿子会话或在取消后吸收迟到结果。

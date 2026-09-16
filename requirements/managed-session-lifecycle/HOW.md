@@ -26,6 +26,11 @@
 - **Run closure barrier**：容器复用路径在 execution settlement 与受权 child drain 完成后，调用 `interaction-authority` 持久化 exact LogicalRun closure；只有 run-matched durable closure witness 才允许 `participant-identity` 为同一 `SessionId` 安装 fresh evidence。detach、idle 与 association removal 不参与此判断。
 - **有序清理**：明确会话终止时遵循严格的异步排空序列，先切断新工作准入，依次等待 execution settlement barrier、后台调和、经授权的子会话级联取消与持久化写入，再建立 exact run closure，最后发布 lifecycle terminal 并释放或复用底层容器；仅 process shutdown 时则执行无业务终态的 detach 后释放 durable substrate。
 
+### 4. 身份替换收束与固定 DevOps 恢复机制
+
+- **旧身份显式收束**：当探测到历史遗留的未闭合旧会话（如 Coder、Inspector、Browser）时，Lifecycle Manager 通过 `CancelAndDrain` 或显式退休流程驱动其进入 `HandleAbandoned` 或 `HandleRetired` 终态，并关闭其关联通道。历史解码仅供只读重放，不向当前权限目录透传。
+- **固定 DevOps 恢复单一权威**：同一道路上的 DevOps 绑定键为 `(RoadId, Role.DevOps)`。物理故障恢复时执行 `ReplacePhysicalSession`，原子使旧物理会话退役并绑定新物理会话，保证全局单一可执行权威。恢复时锁定原 ModelTarget 与 Persona，并在道路关闭时触发 PTY `SIGTERM → SIGKILL` 级联排空。
+
 ## DEPENDS ON
 
 - `session-ontology`

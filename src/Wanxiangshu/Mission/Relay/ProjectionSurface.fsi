@@ -8,3 +8,5 @@ module ProjectionSurface =
         retiredRunIds: string array ->
         authorityMessageIds: string array ->
             obj
+
+    val projectDevOpsFacts: input: obj -> obj

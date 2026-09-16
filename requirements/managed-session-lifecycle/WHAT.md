@@ -87,3 +87,15 @@ session delete、turn observation或strength semantic-cut incident必须先完�
 ## MANAGED-SESSION-022: inspector finalize 以 closed settlement 收口；identity 保留由 owner 显式决定
 
 `tryFinalizeInspector` 返回 `InspectorFinalizeSettlement`（`InspectorFinalizeCommitment`：`Finalized`、`NothingToFinalize`、`NotCommitted`、`Unknown`、`PhaseConflict`），恒带 exact inspector identity。Bookkeeper 不可用归 `NotCommitted`；store 写入失败归 `NotCommitted`；archive 已提交但 index refresh 失败归 `Unknown`（不重 archive）；重复 finalize 命中 CASE-010 exactly-one 归 `PhaseConflict`。仅 `Finalized`/`NothingToFinalize`（`releasesIdentity = true`）释放 identity；`NotCommitted`/`Unknown`/`PhaseConflict` 保留 identity 供后续 resume/取证。`HostSessionDeletion.finalizeStagedInspector` 先捕获 exact settlement 再决定 identity 去留：无 unconditional finally 删除 identity。
+
+## MANAGED-SESSION-023: 身份替换后旧活跃会话显式收束与新任务仅接纳新身份
+
+新任务与新建子会话仅接受合法新身份集合（Engineer、DevOps、Manager、Orchestrator、Blogger 等），严禁为已废止旧角色（Coder、Inspector、Browser、Inquiry、Distiller）创建新会话。
+历史 EventStore 事件原样保留，历史中记录的旧身份事实解码严格隔离在历史边界；系统严禁在活跃生命周期中将旧 Inspector/Coder 自动升权或解析为具备写入/Fission 权限的 Engineer。
+当系统在运行或重启中观察到残留的旧角色活跃会话时，生命周期管理器必须按既有中断/退休规则（`CancelAndDrain` 或显式 retirement）对其执行显式收束，写入终态并排空资源，严禁将其自动恢复为合法活跃运行链。
+
+## MANAGED-SESSION-024: 固定 DevOps 崩溃恢复的单一逻辑执行权威与进程收束
+
+同一道路内固定绑定的 DevOps 具有唯一的逻辑操作员权威。当 DevOps 物理会话发生崩溃或故障恢复时，系统允许替换底层物理 Session，但必须确保逻辑操作员同一时刻至多对应一个可执行物理权威。
+恢复过程严格沿用初始化时已绑定的模型与 Persona 规则，严禁通过 resume 切换或重置模型。
+崩溃恢复严禁重复执行未决的物理命令；底层真实物理进程与 PTY 会话必须随 DevOps 会话及道路的关闭彻底排空与收束，禁止残留任何孤儿进程。

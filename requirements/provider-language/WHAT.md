@@ -46,3 +46,12 @@
 ## PROVIDER-LANGUAGE-011: 协议标识符在所有语言中保持全局唯一不变
 
 工具名称、参数名称、协议字段、枚举值等机器标识符在所有语言环境中保持不变。相同的标识符在任何语言下均严格指向完全一致的契约。
+
+## PROVIDER-LANGUAGE-012: 核心角色双语 Prompt 语义一致与同源认知
+
+核心角色（Engineer、DevOps、Manager 及 Sphinx 内部调研 Engineer）的 System Prompt、Role Law、工具描述及示例在中英文双语版本间必须严格保持语义一致与同源认知：
+1. **Engineer**：明确负责本地事实调查与源码工作，无真实执行权，完成即返回；明确是唯一允许使用 Fission 的角色；
+2. **DevOps**：明确具备完整本地工程能力与真实执行能力，拥有非架构级直接修复授权；明确自身不能 Fission，不创建/差遣其他工程代理；
+3. **Manager**：明确管理任意数量 Engineer 与唯一固定 DevOps；明确自身不能 Fission，不创建管理分身；
+4. **Sphinx 内部 Engineer**：明确本次调用仅调研现有本地事实，无修改、无执行、无 Fission 权；
+5. **删除违规示例**：严禁在任何双语提示词或说明中保留「Manager 可分身」「DevOps 可分身」等违背权限矩阵的文字或示例。

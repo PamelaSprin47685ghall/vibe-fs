@@ -21,8 +21,8 @@ const evidence = (overrides = {}) => ({
     ownerLogicalRun: null,
     ownerAuthorityRoot: null,
     participantIdentity: {
-      selectedAgent: 'coder',
-      canonicalRole: 'coder',
+      selectedAgent: 'engineer',
+      canonicalRole: 'engineer',
       selectedTier: 'deep',
       persona: 'Coder',
       personaCatalogVersion: 1,

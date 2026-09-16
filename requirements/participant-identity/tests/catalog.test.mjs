@@ -13,16 +13,17 @@ const identity = await import('../../../dist/Participant/Persona/Surface.js')
 const EXPECTED_ROLES = [
   'manager',
   'orchestrator',
-  'coder',
-  'inspector',
-  'browser',
-  'inquiry',
+  'engineer',
   'devops',
-  'distiller',
   'blogger',
 ]
 
 const EXPECTED_LEGACY = [
+  'coder',
+  'inspector',
+  'browser',
+  'inquiry',
+  'distiller',
   'build',
   'plan',
   'student',
@@ -34,29 +35,25 @@ const EXPECTED_LEGACY = [
 const EXPECTED_PERSONAS = {
   orchestrator: 'Director',
   manager: 'Lead',
-  coder: 'Coder',
-  inspector: 'Investigator',
+  engineer: 'Engineer',
   devops: 'Operator',
-  browser: 'Researcher',
-  inquiry: 'Analyst',
   blogger: 'Chronicler',
-  distiller: 'Distiller',
 }
 
-test('WHAT[PID-001] catalog_has_exactly_ten_canonical_roles', () => {
+test('WHAT[PID-001] catalog_has_canonical_roles', () => {
   assertJsData(identity.allRoleLabels, 'allRoleLabels')
   assert.deepEqual([...identity.allRoleLabels].sort(), [...EXPECTED_ROLES].sort())
-  assert.equal(identity.allRoleLabels.length, 9)
-  assert.equal(identity.allPublicRoleLabels.length + identity.allInternalRoleLabels.length, 9)
+  assert.equal(identity.allRoleLabels.length, 5)
+  assert.equal(identity.allPublicRoleLabels.length + identity.allInternalRoleLabels.length, 5)
   assert.deepEqual(
     [...identity.allPublicRoleLabels, ...identity.allInternalRoleLabels].sort(),
     [...EXPECTED_ROLES].sort(),
   )
 })
 
-test('WHAT[PID-001] required_names_are_canonical_and_include_twelve_agents', () => {
+test('WHAT[PID-001] required_names_are_canonical_and_include_managed_agents', () => {
   assertJsData(identity.requiredNames, 'requiredNames')
-  assert.equal(identity.requiredNames.length, 11)
+  assert.equal(identity.requiredNames.length, 7)
   for (const role of EXPECTED_ROLES) {
     assert.equal(identity.isManagedName(role), true)
   }

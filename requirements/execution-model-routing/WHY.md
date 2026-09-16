@@ -23,6 +23,11 @@ MJS 表达策略        ──► (role, running, previous) -> { model, reasonin
 - **先接受、后占用**：只有 `(SessionId, PhysicalUserMessageId)` 已由 `managed-chat-execution` durable 接受后，才可进入 bounded typed queue 或获取 exact opaque capacity fence；未接受意图不占容量。
 - **确切结算**：容量 fence 具有不可伪造 identity 与 epoch，只能被同一次物理 admission 的 settlement 原子消费；失败后果由 `execution-failure-policy` 决定，不由路由器解析错误文本。
 
+## 核心不变量扩充
+
+- **新角色集合路由与旧槽位解耦**：调度权威以 Engineer、DevOps、Manager、Orchestrator、Blogger 等新集合为准；配置不再要求 Coder/Inspector/Browser/Inquiry/Distiller 等旧角色槽位。
+- **DevOps 模型绑定持久性**：DevOps 模型在道路初始化时确立并持久化，后续 resume 与恢复必须严格沿用既有绑定，严禁借 resume 换模型。
+
 ## 破裂后果
 
 - 配置多源分叉，模型池变更破坏运行时核心代码。
@@ -37,6 +42,9 @@ MJS 表达策略        ──► (role, running, previous) -> { model, reasonin
 - `participant-identity`：提供 CanonicalRole 与稳定 Persona 构成的 canonical participant identity 定义（routing identity 只使用 fixed canonical Role，participant 随 acquire 输入显式传递）。
 - `managed-session-lifecycle`：提供 managed session 生命周期边界与销毁信号。
 - `host-boundary`：提供 plugin 启动、物理 message/hook 拦截与 Host 消息改写边界。
+
+- 配置仍强依赖已废止角色的模型槽位，阻碍新角色集合的正常部署。
+- DevOps 在 resume 过程中发生模型漂移，破坏固定执行权威的模型一致性。
 
 ## DEPENDS ON
 

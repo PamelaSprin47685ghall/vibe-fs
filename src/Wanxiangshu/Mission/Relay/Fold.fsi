@@ -15,7 +15,8 @@ type RoadView =
       RetiredIncumbencies: IncumbencyId list
       RetiredProviderRunIds: Set<string>
       Certificate: QualityCertificate option
-      LatestRetirement: RetirementSummary option }
+      LatestRetirement: RetirementSummary option
+      BoundDevOps: string option }
 
 module Fold =
     val empty: RelayState
@@ -29,6 +30,12 @@ module Decision =
         incumbentId: IncumbencyId ->
         snapshotId: WorkspaceSnapshotId ->
         authorityRevision: AuthorityRevision ->
+            Result<RelayState, string>
+
+    val bindRoadDevOps:
+        state: RelayState ->
+        roadId: RoadId ->
+        devopsId: string ->
             Result<RelayState, string>
 
     val assess:

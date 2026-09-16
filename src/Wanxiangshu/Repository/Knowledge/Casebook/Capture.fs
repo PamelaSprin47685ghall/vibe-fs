@@ -1,14 +1,44 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
+open System
+open System.Collections.Generic
+open System.Threading.Tasks
+open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Host
+open Wanxiangshu.Repository.Programming.Js
 
-/// CASE-003: typed observation capture from the final execution layer.
-///
-/// Captures happen at the Host tool-execution boundary (tool.execute.after:
-/// args + rendered output) — never from transcript text. Capture is
-/// best-effort: an unparseable execution yields None, which only means one
-/// fewer change-detection opportunity, never a failed Inspector call.
+/// Access tracker for substantive file access collection.
+type AccessTracker() =
+    let paths = HashSet<string>()
+
+    member _.RecordRead(path: string, _contentHash: string) : unit =
+        if not (String.IsNullOrWhiteSpace path) then paths.Add path |> ignore
+
+    member _.RecordCreate(path: string) : unit =
+        if not (String.IsNullOrWhiteSpace path) then paths.Add path |> ignore
+
+    member _.RecordEdit(path: string) : unit =
+        if not (String.IsNullOrWhiteSpace path) then paths.Add path |> ignore
+
+    member _.RecordDelete(path: string) : unit =
+        if not (String.IsNullOrWhiteSpace path) then paths.Add path |> ignore
+
+    member _.RecordMove(source: string, destination: string) : unit =
+        if not (String.IsNullOrWhiteSpace source) then paths.Add source |> ignore
+        if not (String.IsNullOrWhiteSpace destination) then paths.Add destination |> ignore
+
+    member _.RecordGrep(_pattern: string, _path: string) : unit = ()
+    member _.RecordGlob(_pattern: string) : unit = ()
+
+    member _.RecordAttemptedMutation(path: string, committed: bool) : unit =
+        if committed && not (String.IsNullOrWhiteSpace path) then
+            paths.Add path |> ignore
+
+    member _.GetRelatedPaths() : string list =
+        paths |> Seq.toList |> List.sort
+
+/// CASE-003 / KR-003 / KR-014: typed observation capture and substantive access.
 module CasebookCapture =
 
     /// Stable content fingerprint for FileRead observations (CASE-003).
@@ -89,7 +119,7 @@ module CasebookCapture =
         let rec go (chars: char list) (current: string) (inQuote: bool) (acc: string list) : string list =
             match chars with
             | [] -> List.rev (if current = "" then acc else current :: acc)
-            | '\'' :: rest -> go rest current (not inQuote) acc
+            | ''' :: rest -> go rest current (not inQuote) acc
             | c :: rest when (c = ' ' || c = '\t') && not inQuote ->
                 go rest "" false (if current = "" then acc else current :: acc)
             | c :: rest -> go rest (current + string c) inQuote acc
@@ -107,9 +137,6 @@ module CasebookCapture =
         | file :: _ -> Some file
 
     let private sedReadFile (rest: string list) =
-        // sed -n 'SCRIPT' file — the script is the first non-option
-        // token (quotes already stripped by tokenize), the file is the
-        // one after it. A bare `sed file` (no script) is skipped.
         match rest |> List.skipWhile (fun token -> token.StartsWith "-") with
         | _script :: file :: _ -> Some(Observation.FileRead(file, contentHash ""))
         | _ -> None
@@ -122,9 +149,6 @@ module CasebookCapture =
         | "cat" :: rest
         | "head" :: rest
         | "tail" :: rest ->
-            // Skip options and their values (-n 30, -100, -f); the first
-            // remaining token is the file. `cat file | grep bar` lands here
-            // too and counts as reading file.
             firstReadFile rest
             |> Option.map (fun file -> Observation.FileRead(file, contentHash ""))
         | "sed" :: rest -> sedReadFile rest
@@ -132,5 +156,151 @@ module CasebookCapture =
 
     let ofExecCommand (command: string) : Observation option =
         if System.String.IsNullOrWhiteSpace command then None
-        elif command.Contains "$(" || command.Contains "`" then None
+        elif command.Contains "$(" || command.Contains "\`" then None
         else tokenize command |> dispatchExecTokens
+
+    // ---- Substantive Access & Dual Baselines (KR-003, KR-004, KR-010, KR-014) ----
+
+    let isSubstantiveTool (toolName: string) : bool =
+        match toolName with
+        | "read" | "write" | "edit" | "mv" | "rm" | "create" | "rewrite" -> true
+        | _ -> false
+
+    let createAccessTracker () : AccessTracker = AccessTracker()
+
+    let recordSubstantiveAccess (tracker: AccessTracker) (toolName: string) (args: obj) (committed: bool) : unit =
+        match toolName with
+        | "read" ->
+            match pathArg args with
+            | Some p -> tracker.RecordRead(p, "")
+            | None -> ()
+        | "write" | "create" ->
+            match pathArg args with
+            | Some p -> tracker.RecordAttemptedMutation(p, committed)
+            | None -> ()
+        | "edit" | "rewrite" ->
+            match pathArg args with
+            | Some p -> tracker.RecordAttemptedMutation(p, committed)
+            | None -> ()
+        | "rm" | "delete" ->
+            match pathArg args with
+            | Some p -> tracker.RecordAttemptedMutation(p, committed)
+            | None -> ()
+        | "mv" | "move" ->
+            if committed then
+                let src = args?source |> text
+                let dst = args?destination |> text
+                match src, dst with
+                | Some s, Some d -> tracker.RecordMove(s, d)
+                | _ -> ()
+        | _ -> ()
+
+    let mergeFissionSubstantiveAccess (preFission: string list) (laneAccesses: string list list) : string list =
+        let allPaths = HashSet<string>()
+        for p in preFission do
+            if not (String.IsNullOrWhiteSpace p) then allPaths.Add p |> ignore
+        for lane in laneAccesses do
+            for p in lane do
+                if not (String.IsNullOrWhiteSpace p) then allPaths.Add p |> ignore
+        allPaths |> Seq.toList |> List.sort
+
+    let caseIdentityForInvocation (sessionId: string) (invocationId: string) : string =
+        sprintf "%s:%s" sessionId invocationId
+
+    let truncateDiffForBudget (diff: string) (budget: int) : obj =
+        if diff.Length <= budget then
+            box
+                {| text = diff
+                   isTruncated = false
+                   notice = "" |}
+        else
+            let notice = "\n[... diff truncated / 差异已截断 ...]\n"
+            let available = max 0 (budget - notice.Length)
+            let headLen = available / 2
+            let tailLen = available - headLen
+            let headText = diff.Substring(0, min headLen diff.Length)
+            let tailStart = max 0 (diff.Length - tailLen)
+            let tailText = diff.Substring(tailStart)
+            let truncatedText = headText + notice + tailText
+            box
+                {| text = truncatedText
+                   isTruncated = true
+                   notice = "diff truncated to budget" |}
+
+    [<Emit("new Map()")>]
+    let private newJsMap () : obj = jsNative
+
+    [<Emit("$0.set($1, $2)")>]
+    let private jsMapSet (map: obj) (key: obj) (value: obj) : unit = jsNative
+
+    [<Emit("$0.get($1)")>]
+    let private jsMapGet (map: obj) (key: obj) : obj = jsNative
+
+    [<Emit("$0.keys()")>]
+    let private jsMapKeys (map: obj) : obj = jsNative
+
+    [<Emit("Array.from($0)")>]
+    let private jsArrayFrom (iterable: obj) : obj array = jsNative
+
+    [<Emit("$0 && typeof $0.get === 'function'")>]
+    let private isJsMap (value: obj) : bool = jsNative
+
+    let freezeCompletionState (workspaceRoot: string) (paths: string list) : Task<obj> =
+        task {
+            let resultMap = newJsMap ()
+            for relPath in paths do
+                let fullPath = JsMutationFs.resolveToolPath workspaceRoot relPath
+                if JsMutationFs.existsPath fullPath then
+                    match JsUtf8Fs.readUtf8Classified fullPath with
+                    | Ok text ->
+                        let entry = box {| kind = "Present"; contentHash = contentHash text; content = text |}
+                        jsMapSet resultMap (box relPath) entry
+                    | Error _ ->
+                        let entry = box {| kind = "Missing" |}
+                        jsMapSet resultMap (box relPath) entry
+                else
+                    let entry = box {| kind = "Missing" |}
+                    jsMapSet resultMap (box relPath) entry
+            return resultMap
+        }
+
+    let computeMaintenanceDiff (workspaceRoot: string) (baseline: obj) : Task<obj> =
+        task {
+            let mutable hasDiff = false
+            let diffLines = ResizeArray<string>()
+
+            let keys =
+                if isJsMap baseline then
+                    jsArrayFrom (jsMapKeys baseline) |> Array.map string |> Array.toList
+                else
+                    []
+
+            for relPath in keys do
+                let baseEntry = jsMapGet baseline (box relPath)
+                let baseKind = if isNull baseEntry then "Missing" else string (baseEntry?kind)
+                let baseHash = if isNull baseEntry then "" else string (baseEntry?contentHash)
+                let baseContent = if isNull baseEntry || isNull (baseEntry?content) then "" else string (baseEntry?content)
+
+                let fullPath = JsMutationFs.resolveToolPath workspaceRoot relPath
+                if JsMutationFs.existsPath fullPath then
+                    match JsUtf8Fs.readUtf8Classified fullPath with
+                    | Ok curText ->
+                        let curHash = contentHash curText
+                        if baseKind = "Missing" then
+                            hasDiff <- true
+                            diffLines.Add(sprintf "diff --git a/%s b/%s\nnew file\n--- /dev/null\n+++ b/%s\n+%s" relPath relPath relPath curText)
+                        elif baseHash <> curHash then
+                            hasDiff <- true
+                            diffLines.Add(sprintf "diff --git a/%s b/%s\n--- a/%s\n+++ b/%s\n-%s\n+%s" relPath relPath relPath relPath baseContent curText)
+                    | Error _ ->
+                        if baseKind = "Present" then
+                            hasDiff <- true
+                            diffLines.Add(sprintf "diff --git a/%s b/%s\ndeleted file\n--- a/%s\n+++ /dev/null\n-%s" relPath relPath relPath baseContent)
+                else
+                    if baseKind = "Present" then
+                        hasDiff <- true
+                        diffLines.Add(sprintf "diff --git a/%s b/%s\ndeleted file\n--- a/%s\n+++ /dev/null\n-%s" relPath relPath relPath baseContent)
+
+            let diffSummary = String.concat "\n" diffLines
+            return box {| hasDiff = hasDiff; diffSummary = diffSummary |}
+        }

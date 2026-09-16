@@ -21,7 +21,7 @@
 
 ## REPOSITORY-PROGRAMMING-004: 生成工具名门禁
 
-工具执行入口仅接受当前 Attempt 的生成 surface 中合法拥有的 `js-*` 主工具名。调用未授权角色对应的工具名或旧 Attempt 残留名字必须 fail closed，工具名合法不可作为脱离当前 Attempt 权限执行的依据。
+工具执行入口仅接受当前 Attempt 的生成 surface 中合法拥有的 `js-*` 主工具名（如 `js-engineer`、`js-devops`）。调用未授权角色对应的工具名或旧 Attempt 残留名字必须 fail closed，工具名合法不可作为脱离当前 Attempt 权限执行的依据。
 
 ## REPOSITORY-PROGRAMMING-005: 编程面与推荐诚实性
 
@@ -155,3 +155,17 @@
 ## REPOSITORY-PROGRAMMING-025: transaction fatal先settle cut-tail再经注入fuse执行
 
 JS transaction invariant failure必须先完成CAS-preserving rollback或durable semantic cut-tail并取得committed/unknown settlement evidence，再构造typed incident。TransactionStore只接受composition注入的mandatory fatal capability，不得直接引用physical adapter、optional/default/global fallback。同一incident只允许一次report与kill；stale snapshot、第三方change与普通edit rejection保持typed nonfatal，fatal不得覆盖working tree。
+
+## REPOSITORY-PROGRAMMING-026: 事务 ReadSnapshots 与案例实质访问严格分离
+
+事务只读快照集合（`ReadSnapshots`，包含 `grep` 扫描为了匹配而在内部读取的文件）专用于保障单次事务的快照隔离与 Preflight 冲突检测，严禁直接作为案例的关联文件集合。��例系统的实质访问（Substantive Access）独立记录：
+1. 仅记录显式 `read`（含 `file()`）的规范路径与成功提交（Committed）的修改/创建/删除/移动路径；
+2. 提交前的 `effectPaths` 仅代表修改意图而非已发生修改；未完成提交、校验失败或回滚的事务严禁向案例追加修改访问；
+3. 程序内部执行 `grep` 触发的文件读取属于搜索引擎实现细节，严禁计入案例实质访问。
+
+## REPOSITORY-PROGRAMMING-027: Engineer 与 DevOps 统一文件工具与编程面生成
+
+`JsToolGenerator` 与直接文件工具集为 Engineer 和 DevOps 提供统一的文件系统交互面：
+1. **直接文件工具**：配备 `Read`、`Write`、`Edit`、`Glob`、`Grep`、`Move` (`mv`)、`Remove` (`rm`)；
+2. **编程主工具**：按授予的 `ToolCapabilitySet` 动态生成 `js-engineer` 与 `js-devops`；
+3. **一致的安全沙箱与事务边界**：直接工具与 JS 工具共享相同的路径越界拦截、UTF-8 校验、符号链接防护以及 All-or-Nothing 事务语义。

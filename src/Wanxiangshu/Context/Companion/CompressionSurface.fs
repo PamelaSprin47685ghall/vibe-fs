@@ -157,6 +157,7 @@ module CompressionSurface =
     let private permissionLabel (permission: ToolPermission) : string =
         match permission with
         | ToolPermission.Fork -> "Fork"
+        | ToolPermission.Resume -> "Resume"
         | ToolPermission.Join -> "Join"
         | ToolPermission.Horizon -> "Horizon"
         | ToolPermission.TodoWrite -> "TodoWrite"

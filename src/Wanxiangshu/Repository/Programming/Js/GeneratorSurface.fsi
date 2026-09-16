@@ -12,6 +12,7 @@ module JsGeneratorSurface =
     val typedRole: role: string -> language: string -> JsSurface option
     val generate: role: string -> permissionLabels: string array -> language: string -> obj
     val generateRole: role: string -> language: string -> obj
+    val generateSurfaceForRole: role: string -> permissionLabels: string array -> obj
     val isGeneratedToolName: role: string -> permissionLabels: string array -> toolName: string -> bool
     val memberBinding: role: string -> permissionLabels: string array -> memberName: string -> obj
     val permissionLabels: role: string -> string array

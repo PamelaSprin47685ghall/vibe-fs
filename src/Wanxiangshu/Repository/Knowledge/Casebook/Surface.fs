@@ -1,33 +1,20 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
+open System
+open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Persistence.EventStore
 
-/// JS-native semantic surface for Casebook laws (PR 7 exemplar).
-///
-/// A JS test expresses observations / events / cases in plain JS:
-///
-/// ```js
-/// const normalized = casebook.normalize([
-///   { kind: 'file-read', path: 'a.txt', contentHash: 'h1' },
-///   { kind: 'file-read', path: 'a.txt', contentHash: 'h1' },
-/// ])
-/// // [{ kind: 'file-read', path: 'a.txt', contentHash: 'h1' }]
-///
-/// const world = casebook.emptyWorld()
-/// const next = casebook.applyEvent(world,
-///   { kind: 'case-captured', case: { sessionId: 's1', q: 'Q', a: 'A', observations: [] } })
-/// // { ok: true, world: { accessCounter: 1, cases: [{ sessionId: 's1', ... }] } }
-/// ```
-///
-/// The F# `Observation` / `CasebookEvent` / `Case` unions stay inside the
-/// surface; translation happens at the owner boundary
-/// (JS-SEMANTIC-SURFACE-002/003/005). `store` is the opaque EventStoreHandle
-/// created by EventStoreSurface — passed back, never inspected by JS.
 module CasebookSurface =
 
     let private storeOf (value: obj) : IEventStore = (unbox<EventStoreHandle> value).Store
+
+    let private stringsOf (v: obj) : string array =
+        if isNull v then [||] else unbox<string array> v
+
+    let private arrayOf (v: obj) : obj array =
+        if isNull v then [||] else unbox<obj array> v
 
     // ── Observation translation (JS ↔ F#) ────────────────────────────────────
 
@@ -54,18 +41,13 @@ module CasebookSurface =
                    pattern = pattern
                    matches = flat |}
 
-    /// Stable SHA-256 fingerprint for a JS-native FileRead observation.
     let contentHash (text: string) : string = CasebookCapture.contentHash text
 
-    /// Capture a typed observation from a tool execution. An unrecognized or
-    /// incomplete execution returns `null`, not an F# option.
     let capture (toolName: string) (args: obj) (output: string) : obj =
         match CasebookCapture.capture toolName args output with
         | None -> null
         | Some observation -> observationToJs observation
 
-    /// Parse a typed executor read command. Unsupported shell forms return
-    /// `null`; the parser never exposes its F# option representation.
     let ofExecCommand (command: string) : obj =
         match CasebookCapture.ofExecCommand command with
         | None -> null
@@ -73,9 +55,6 @@ module CasebookSurface =
 
     let private observationOfJs (value: obj) : Result<Observation, string> =
         let kind = string (value?kind)
-
-        let stringsOf (v: obj) : string array = unbox<string array> v
-        let arrayOf (v: obj) : obj array = unbox<obj array> v
         let intOfJs (v: obj) : int = int (string v)
 
         match kind with
@@ -98,39 +77,86 @@ module CasebookSurface =
 
     let private caseToJs (case: Case) : obj =
         box
-            {| sessionId = case.SessionId
+            {| identity = case.Identity
+               sessionId = case.Identity
+               sourceTrace = case.SourceTrace
                q = case.Q
                a = case.A
-               observations = case.Observations |> List.map observationToJs |> List.toArray
-               lastAccessOrder = case.LastAccessOrder |}
+               relatedPaths = case.RelatedPaths |> List.toArray
+               completionFileState = case.CompletionFileState
+               maintenanceFileState = case.MaintenanceFileState
+               accessOrder = case.AccessOrder
+               lastAccessOrder = case.AccessOrder
+               observations = case.Observations |> List.map observationToJs |> List.toArray |}
+
+    let private observationsOfJs (value: obj) : Result<Observation list, string> =
+        let rec loop (acc: Observation list) (remaining: obj list) =
+            match remaining with
+            | [] -> Ok(List.rev acc)
+            | item :: rest ->
+                observationOfJs item
+                |> Result.bind (fun observation -> loop (observation :: acc) rest)
+
+        loop [] (arrayOf value |> Array.toList)
 
     let private caseOfJs (value: obj) : Result<Case, string> =
-        let arrayOf (v: obj) : obj array = unbox<obj array> v
+        let identity =
+            if not (isNull (value?identity)) && not (String.IsNullOrWhiteSpace (string value?identity)) then
+                string value?identity
+            elif not (isNull (value?sessionId)) && not (String.IsNullOrWhiteSpace (string value?sessionId)) then
+                string value?sessionId
+            else
+                ""
 
-        let observations =
-            arrayOf (value?observations)
-            |> Array.toList
-            |> List.map observationOfJs
-            |> List.fold
-                (fun acc item ->
-                    match acc, item with
-                    | Error message, _ -> Error message
-                    | _, Error message -> Error message
-                    | Ok list, Ok observation -> Ok(observation :: list))
-                (Ok [])
+        let sourceTrace =
+            if not (isNull (value?sourceTrace)) then string value?sourceTrace else ""
 
-        observations
+        let q = if not (isNull (value?q)) then string value?q else ""
+        let a = if not (isNull (value?a)) then string value?a else ""
+
+        let relatedPaths =
+            if not (isNull (value?relatedPaths)) then
+                stringsOf (value?relatedPaths) |> Array.toList
+            else
+                []
+
+        let completionFileState =
+            if not (isNull (value?completionFileState)) then string value?completionFileState else ""
+
+        let maintenanceFileState =
+            if not (isNull (value?maintenanceFileState)) then
+                string value?maintenanceFileState
+            else
+                completionFileState
+
+        let accessOrder =
+            if not (isNull (value?accessOrder)) then
+                int64 (string value?accessOrder)
+            elif not (isNull (value?lastAccessOrder)) then
+                int64 (string value?lastAccessOrder)
+            else
+                0L
+
+        let observationsResult =
+            if not (isNull (value?observations)) then
+                observationsOfJs (value?observations)
+            else
+                Ok []
+
+        observationsResult
         |> Result.map (fun obs ->
-            { SessionId = string (value?sessionId)
-              Q = string (value?q)
-              A = string (value?a)
-              Observations = Observations.normalize (List.rev obs)
-              LastAccessOrder = int64 (value?lastAccessOrder) })
+            { Identity = identity
+              SourceTrace = sourceTrace
+              Q = q
+              A = a
+              RelatedPaths = relatedPaths
+              CompletionFileState = completionFileState
+              MaintenanceFileState = maintenanceFileState
+              AccessOrder = accessOrder
+              Observations = Observations.normalize obs })
 
-    // ── CASE-003: normalize — dedupe by identity, canonical order ────────────
+    // ── Normalization & Replay ───────────────────────────────────────────────
 
-    /// Normalize a JS observation array: same identity → one entry; glob
-    /// paths order-insensitive. Returns the normalized JS array.
     let normalize (observations: obj array) : obj array =
         observations
         |> Array.toList
@@ -143,8 +169,6 @@ module CasebookSurface =
         |> List.map observationToJs
         |> List.toArray
 
-    /// CASE-003 replay classification:
-    /// `'fresh'` only on exact normalized equality, `'stale'` otherwise.
     let classifyReplay (stored: obj array) (replayed: obj array) : string =
         let storedObs =
             stored
@@ -168,30 +192,52 @@ module CasebookSurface =
         | ReplayResult.Fresh -> "fresh"
         | ReplayResult.Stale -> "stale"
 
-    // ── CASE-002/007/008: single-event projection (JS-shaped) ────────────────
-
-    /// Parse a JS observations array; fails closed on the first unknown kind.
-    let private observationsOfJs (value: obj) : Result<Observation list, string> =
-        let rec loop (acc: Observation list) (remaining: obj list) =
-            match remaining with
-            | [] -> Ok(List.rev acc)
-            | item :: rest ->
-                observationOfJs item
-                |> Result.bind (fun observation -> loop (observation :: acc) rest)
-
-        loop [] (unbox<obj array> value |> Array.toList)
+    // ── Projection & Events ──────────────────────────────────────────────────
 
     let private eventOfJs (value: obj) : Result<CasebookEvent, string> =
         let kind = string (value?kind)
 
         match kind with
-        | "case-captured" -> caseOfJs (value?``case``) |> Result.map CasebookEvent.CaseCaptured
+        | "case-captured" -> caseOfJs (value?case) |> Result.map CasebookEvent.CaseCaptured
         | "case-refreshed" ->
-            observationsOfJs (value?observations)
-            |> Result.map (fun obs ->
-                CasebookEvent.CaseRefreshed(string (value?sessionId), string (value?q), string (value?a), obs))
-        | "case-accessed" -> Ok(CasebookEvent.CaseAccessed(string (value?sessionId)))
-        | "case-evicted" -> Ok(CasebookEvent.CaseEvicted(string (value?sessionId)))
+            let identity =
+                if not (isNull (value?identity)) && not (String.IsNullOrWhiteSpace (string value?identity)) then
+                    string value?identity
+                else
+                    string value?sessionId
+
+            let q = string value?q
+            let a = string value?a
+            let maintenanceFileState =
+                if not (isNull (value?maintenanceFileState)) then string value?maintenanceFileState else ""
+            let relatedPaths =
+                if not (isNull (value?relatedPaths)) then
+                    stringsOf (value?relatedPaths) |> Array.toList
+                else
+                    []
+            let observations =
+                if not (isNull (value?observations)) then
+                    match observationsOfJs (value?observations) with
+                    | Ok obs -> obs
+                    | Error _ -> []
+                else
+                    []
+
+            Ok(CasebookEvent.CaseRefreshed(identity, q, a, maintenanceFileState, relatedPaths, observations))
+        | "case-accessed" ->
+            let identity =
+                if not (isNull (value?identity)) && not (String.IsNullOrWhiteSpace (string value?identity)) then
+                    string value?identity
+                else
+                    string value?sessionId
+            Ok(CasebookEvent.CaseAccessed identity)
+        | "case-evicted" ->
+            let identity =
+                if not (isNull (value?identity)) && not (String.IsNullOrWhiteSpace (string value?identity)) then
+                    string value?identity
+                else
+                    string value?sessionId
+            Ok(CasebookEvent.CaseEvicted identity)
         | other -> Error $"unknown casebook event kind: {other}"
 
     let private stateToJs (state: CasebookProjection.State) : obj =
@@ -207,7 +253,7 @@ module CasebookSurface =
 
     let private stateOfJs (world: obj) : Result<CasebookProjection.State, string> =
         let cases =
-            unbox<obj array> (world?cases)
+            arrayOf (world?cases)
             |> Array.toList
             |> List.map caseOfJs
             |> List.fold
@@ -215,7 +261,7 @@ module CasebookSurface =
                     match accumulated, item with
                     | Error message, _ -> Error message
                     | _, Error message -> Error message
-                    | Ok parsed, Ok case -> Ok(Map.add case.SessionId case parsed))
+                    | Ok parsed, Ok case -> Ok(Map.add case.Identity case parsed))
                 (Ok Map.empty)
 
         cases
@@ -223,11 +269,8 @@ module CasebookSurface =
             { AccessCounter = int64 (string (world?accessCounter))
               Cases = parsed })
 
-    /// Return the empty JS-native projection passed to `applyEvent`.
     let emptyWorld () : obj = stateToJs CasebookProjection.emptyState
 
-    /// Apply exactly one JS casebook event through the owner projection oracle.
-    /// Returns `{ ok: true, world }` or `{ ok: false, error }`.
     let applyEvent (world: obj) (event: obj) : obj =
         match stateOfJs world, eventOfJs event with
         | Error message, _
@@ -236,12 +279,11 @@ module CasebookSurface =
             let next = CasebookProjection.apply state parsed
             box {| ok = true; world = stateToJs next |}
 
-    /// CASE-008 LRU eviction. JS Cases in, `{ kept, victims }` out.
     let evict (capacity: int) (cases: obj array) : obj =
         let parsed =
             cases
             |> Array.toList
-            |> List.map (fun value -> caseOfJs value |> Result.map (fun case -> case.SessionId, case))
+            |> List.map (fun value -> caseOfJs value |> Result.map (fun case -> case.Identity, case))
             |> List.choose (fun item ->
                 match item with
                 | Ok c -> Some c
@@ -254,42 +296,38 @@ module CasebookSurface =
             {| kept = kept |> Map.toList |> List.map (fun (_, case) -> caseToJs case) |> List.toArray
                victims = List.toArray victims |}
 
-    // ── CASE-010 / archive: store-bound workflows (opaque IEventStore) ────────
+    // ── Workflows ────────────────────────────────────────────────────────────
 
-    /// Execute one store workflow over a parsed Case (single decision layer).
     let private runWorkflowTask
-        (workflow: IEventStore -> Case -> System.Threading.Tasks.Task<Result<unit, string>>)
+        (workflow: IEventStore -> Case -> Task<Result<unit, string>>)
         (store: IEventStore)
         (parsed: Case)
-        : System.Threading.Tasks.Task<obj> =
+        : Task<obj> =
         task {
             match! workflow store parsed with
             | Ok() -> return box {| ok = true |}
             | Error message -> return box {| ok = false; error = message |}
         }
 
-    /// CASE-010 exactly-once finalize. `{ ok: true } | { ok: false, error }`.
     let private runStoreWorkflow
-        (workflow: IEventStore -> Case -> System.Threading.Tasks.Task<Result<unit, string>>)
+        (workflow: IEventStore -> Case -> Task<Result<unit, string>>)
         (store: IEventStore)
         (case: obj)
-        : System.Threading.Tasks.Task<obj> =
+        : Task<obj> =
         match caseOfJs case with
-        | Error message -> System.Threading.Tasks.Task.FromResult(box {| ok = false; error = message |})
+        | Error message -> Task.FromResult(box {| ok = false; error = message |})
         | Ok parsed -> runWorkflowTask workflow store parsed
 
     let private runUnitResult
-        (operation: System.Threading.Tasks.Task<Result<unit, string>>)
-        : System.Threading.Tasks.Task<obj> =
+        (operation: Task<Result<unit, string>>)
+        : Task<obj> =
         task {
             match! operation with
             | Ok() -> return box {| ok = true |}
             | Error message -> return box {| ok = false; error = message |}
         }
 
-    /// Read one Case from the durable Current projection. The store is an
-    /// opaque capability; both the result envelope and Case are JS-native.
-    let fetchCase (store: obj) (capacity: int) (sessionId: string) : System.Threading.Tasks.Task<obj> =
+    let fetchCase (store: obj) (capacity: int) (sessionId: string) : Task<obj> =
         let internalStore = storeOf store
 
         task {
@@ -301,28 +339,49 @@ module CasebookSurface =
             | Ok(Some case) -> return box {| ok = true; value = caseToJs case |}
         }
 
-    /// Append a Refreshed event after translating observations at the owner
-    /// boundary.
+    let fetchCaseByIdentity (store: obj) (identity: string) : Task<obj> =
+        let internalStore = storeOf store
+
+        task {
+            match! CasebookWorkflow.fetchCaseByIdentity internalStore identity with
+            | Error _
+            | Ok None ->
+                let value: obj = null
+                return value
+            | Ok(Some case) -> return caseToJs case
+        }
+
     let refresh
         (store: obj)
         (sessionId: string)
         (q: string)
         (a: string)
         (observations: obj array)
-        : System.Threading.Tasks.Task<obj> =
+        : Task<obj> =
         let internalStore = storeOf store
 
         match observationsOfJs (box observations) with
-        | Error message -> System.Threading.Tasks.Task.FromResult(box {| ok = false; error = message |})
-        | Ok parsed -> runUnitResult (CasebookWorkflow.refreshCase internalStore sessionId q a parsed)
+        | Error message -> Task.FromResult(box {| ok = false; error = message |})
+        | Ok parsed -> runUnitResult (CasebookWorkflow.refreshCase internalStore sessionId q a "" [] parsed)
 
-    /// Report whether replay against the current worktree requires refresh.
+    let refreshWithDiff
+        (store: obj)
+        (identity: string)
+        (diff: string)
+        (newStateRef: string)
+        (updates: obj)
+        : Task<obj> =
+        let internalStore = storeOf store
+        let q = if isNull (updates?q) then "" else string updates?q
+        let a = if isNull (updates?a) then "" else string updates?a
+        runUnitResult (CasebookWorkflow.refreshWithDiff internalStore identity diff newStateRef q a)
+
     let needsRefresh
         (store: obj)
         (capacity: int)
         (sessionId: string)
         (root: string)
-        : System.Threading.Tasks.Task<obj> =
+        : Task<obj> =
         let internalStore = storeOf store
 
         task {
@@ -331,13 +390,11 @@ module CasebookSurface =
             | Error message -> return box {| ok = false; error = message |}
         }
 
-    /// Append a CaseAccessed event through the Casebook workflow owner.
-    let touchAccess (store: obj) (sessionId: string) : System.Threading.Tasks.Task<obj> =
+    let touchAccess (store: obj) (sessionId: string) : Task<obj> =
         let internalStore = storeOf store
         runUnitResult (CasebookWorkflow.touchCaseAccess internalStore sessionId)
 
-    /// Append an eviction tombstone through the durable Casebook store owner.
-    let evictCase (store: obj) (sessionId: string) : System.Threading.Tasks.Task<obj> =
+    let evictCase (store: obj) (sessionId: string) : Task<obj> =
         let internalStore = storeOf store
 
         task {
@@ -346,15 +403,61 @@ module CasebookSurface =
             | Error message -> return box {| ok = false; error = message |}
         }
 
-    /// Feature marker gate exposed without leaking the workflow module.
     let featureEnabled (workspaceRoot: string) : bool = CasebookFeature.isEnabled workspaceRoot
 
-    /// CASE-010 exactly-once finalize. `{ ok: true } | { ok: false, error }`.
-    let finalize (store: obj) (case: obj) : System.Threading.Tasks.Task<obj> =
+    let finalize (store: obj) (case: obj) : Task<obj> =
         let internalStore = storeOf store
         runStoreWorkflow CasebookWorkflow.finalizeCase internalStore case
 
-    /// Archive one Inspector result. `{ ok: true } | { ok: false, error }`.
-    let archive (store: obj) (case: obj) : System.Threading.Tasks.Task<obj> =
+    let archive (store: obj) (case: obj) : Task<obj> =
         let internalStore = storeOf store
         runStoreWorkflow CasebookWorkflow.archiveInspectorResult internalStore case
+
+    let archiveCase (store: obj) (case: obj) : Task<obj> =
+        archive store case
+
+    // ── KR-003, KR-004, KR-010, KR-014, KR-015 Exports ──────────────────────
+
+    let recordSubstantiveAccess (tracker: obj) (toolName: string) (args: obj) (committed: bool) : unit =
+        let t = unbox<AccessTracker> tracker
+        CasebookCapture.recordSubstantiveAccess t toolName args committed
+
+    let createAccessTracker () : obj =
+        box (CasebookCapture.createAccessTracker ())
+
+    let isSubstantiveTool (toolName: string) : bool =
+        CasebookCapture.isSubstantiveTool toolName
+
+    let freezeCompletionState (workspaceRoot: string) (paths: obj) : Task<obj> =
+        let pathList =
+            if isNull paths then []
+            elif emitJsExpr paths "Array.isArray($0)" then
+                stringsOf paths |> Array.toList
+            else
+                []
+        CasebookCapture.freezeCompletionState workspaceRoot pathList
+
+    let computeMaintenanceDiff (workspaceRoot: string) (baseline: obj) : Task<obj> =
+        CasebookCapture.computeMaintenanceDiff workspaceRoot baseline
+
+    let caseIdentityForInvocation (sessionId: string) (invocationId: string) : string =
+        CasebookCapture.caseIdentityForInvocation sessionId invocationId
+
+    let mergeFissionSubstantiveAccess (preFission: obj) (laneAccesses: obj) : obj =
+        let pre = stringsOf preFission |> Array.toList
+        let lanes =
+            arrayOf laneAccesses
+            |> Array.map (fun l -> stringsOf l |> Array.toList)
+            |> Array.toList
+        CasebookCapture.mergeFissionSubstantiveAccess pre lanes
+        |> List.toArray
+        |> box
+
+    let truncateDiffForBudget (diff: string) (budget: int) : obj =
+        CasebookCapture.truncateDiffForBudget diff budget
+
+    let singlePassDiffRefresh (input: obj) : Task<obj> =
+        CasebookWorkflow.singlePassDiffRefresh input
+
+    let applyExternalChangeToCase (input: obj) : obj =
+        CasebookWorkflow.applyExternalChangeToCase input

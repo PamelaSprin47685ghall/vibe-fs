@@ -10,6 +10,11 @@ module Spool =
         { Path: string
           mutable BytesWritten: int64 }
 
+    type TailInput =
+        { Bytes: byte array
+          Truncated: bool
+          TotalObservedBytes: int64 }
+
     val chunkCount: bytes: int64 -> int
     val startStreamingSpool: unit -> StreamingSpool
     val appendStreamingSpool: spool: StreamingSpool -> bytes: byte array -> unit
@@ -17,4 +22,7 @@ module Spool =
     val readChunks: path: string -> consume: (byte array -> Task<unit>) -> Task<unit>
     val chunkBytes: chunkSize: int -> bytes: byte array -> byte array array
     val spoolBytesToTempFile: bytes: byte array -> string * int64 * int
+    val retainLatestBytes: limit: int -> current: byte array -> next: byte array -> byte array
+    val alignUtf8Tail: bytes: byte array -> byte array
+    val readLatestTail: limitBytes: int -> path: string -> Task<TailInput>
     val delete: path: string -> unit

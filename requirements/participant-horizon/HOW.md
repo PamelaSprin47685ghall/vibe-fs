@@ -24,8 +24,14 @@ provider-leak-gate.mjs
 
 2. **Gate B 反向防泄露门禁**：
    - 静态检查器 `provider-leak-gate.mjs` 扫描所有面向模型组装提示词与工具描述的代码，禁止 `SessionId`、`AgentId`、`ManagerJobId`、`PtyId`、`status`、`code` 等标记出现在输出流中。
-   - 对隐藏角色（如 Distiller、Blogger）的调用在解析层统一按通用不存在处理，避免错误信息泄露内部拓扑。
+   - 对隐藏角色（如 Blogger、Bookkeeper、Predictor 以及已退役旧角色）的调用在解析层统一按通用不存在处理�避免错误信息泄露内部拓扑。
+
+3. **Manager 视界与公共选择集合收拢**：
+   - Manager 的 fork 工具描述与 Schema 仅公开 `engineer` 候选，不再提供 Coder、Inspector、Browser、Inquiry、DevOps 等选项。
+   - DevOps 仅由合法 Runtime 绑定，模型视界中只见其 Byname 并在 `resume` 中作为既有目标续做。
+   - Manager 的并行来自 fork 多名 Engineer，Manager 自身无 Fission 工具或分身指示。
 
 ## GAP
 
+- `PARTICIPANT-HORIZON-015`（OPEN）：Manager 并行来自多名 Engineer 且视界中禁止 Manager Fission 与虚假分身拓扑，待 P1/P2 提示词与工具 Schema 完全收拢后闭合。
 - `GAP-028`（CLOSED）：Horizon 已改用独立 `HandleProjection.horizonVisible`，父级可见 `Abandoned` 在 Join 消费并 `Retired` 前持续留在 roster；fork 首 prompt 的 `AcceptanceUnknown` 由 durable PromptAuthority `Pending` claim 接管恢复，保留 terminal observer 与单次物理发送，不再合成 `HandleCompleted` 或返回“未放置”。`horizon-surface.test.mjs`、`host-fork-restart-lifecycle.test.mjs` 与真实 `fork-tool.test.mjs` 回归均已绿；核心实现落于 `2953a0978`。

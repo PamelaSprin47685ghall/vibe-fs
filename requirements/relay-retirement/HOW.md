@@ -8,7 +8,7 @@
 - `src/Wanxiangshu/Mission/Manager/Workflow.fs(.fsi)`：normal-terminal 观测从 active incumbent、accepted assessment transport 与 exact bound certificate 选择 `runtime/manager-assess`、`runtime/manager-work`、`runtime/manager-finish`；同一 owner CE 在 physical stop 前冻结 exact retirement/authority continuation context，再串行执行 stop → 开启迭代 → `ManagerLoopGate` enqueue。进入 opening 前重读 durable context；并发 exact observation 以 RetirementId 派生相同 IncumbencyId 并由 Relay fold 幂等收敛，gate admission 保证一个 physical prompt。显式证书失效后的 Change ContinueLoop 调用同一 owner；transport receipt 与 physical acceptance 仍由各自事实区分。
 - `src/Wanxiangshu/Mission/Relay/OpenCode/NarrativeTransform.fs(.fsi)` 与 `src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs(.fsi)`：退休请求拦截与 durable context cut；`RetiredAttemptStopped` 向 Manager owner 提供成对的 `suppressProviderStep + releasePhysicalExecution + InterruptAttempt` capability，owner 返回后清空旧请求，防止已退休 Manager 占住父任务借出的 model-capacity token。transform 不直接解释 Continue，也不直接开启或发送下一迭代。
 - `src/Wanxiangshu/Composition/Durable/Fold.fs`：Continue 与 Accepted 都清除 Relay active incumbency；Continue 保留承载 Road 的 LogicalRun authority并由 owner 显式开启下一迭代，Accepted 关闭 HumanRoot Manager authority（证书失效后允许普通新迭代）。
-- `src/Wanxiangshu/Mission/Relay/Contract.fs(.fsi)`：`ManagerLoopGate`、`RetirementOutcome`、`ProjectionCut`、`RetirementSummary`。
+- `src/Wanxiangshu/Mission/Relay/Contract.fs(.fsi)`：`ManagerLoopGate`、`RetirementOutcome`、`ProjectionCut`、`RetirementSummary`；Road 级别固定 DevOps 资源跨 Continue 退休保留与道路终结物理收束合同。
 
 ## 依赖关系
 

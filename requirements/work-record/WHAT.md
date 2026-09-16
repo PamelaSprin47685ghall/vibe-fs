@@ -6,7 +6,7 @@
 
 ## WORK-RECORD-002: 边界是因果的，不是会话的
 
-一次 invocation 的边界严格由 XTrace 因果范围定义（`InvocationStartCursor..InvocationEndCursor`），而非对话中的最近转折或 transcript 下标。因果边界对所有观察者保持客观一致。
+一次 invocation 的边界严格由 XTrace 因果范围定义（`[InvocationStartCursor..InvocationEndCursor)`），而非对话中的最近转折或 transcript 下标。因果边界对所有观察者保持客观一致。
 
 ## WORK-RECORD-003: Chronicle 与 Recent work 描述表示，不是「谁看过」
 
@@ -14,7 +14,7 @@ Chronicle 表示已由 Y 沉淀的 frame；Recent work 表示 Y 尚未覆盖的 
 
 ## WORK-RECORD-004: reuse 保留记忆，但不扩大下一次 record
 
-可复用的 session 可留存跨调用记忆，但每个语义 batch 仅物化当前 `InvocationStartCursor..InvocationEndCursor` 范围内的 record。先前的 frame 与 trace 不得进入本次 record，后续的 Chronicle 与 terminal 亦不得反向污染已完成 range 的重物化。
+可复用的 session 可留存跨调用记忆，但每个语义 batch 仅物化当前 `[InvocationStartCursor..InvocationEndCursor)` 范围内的 record。先前的 frame 与 trace 不得进入本次 record，后续的 Chronicle 与 terminal 亦不得反向污染已完成 range 的重物化。同一 Session 的多次 resume 生成各自独立的 bounded record。
 
 ## WORK-RECORD-005: Recent work ≠ receiver-relative recentness
 
@@ -63,3 +63,7 @@ RecordCoverage（XTrace 游标，可位于 turn 中间）与 PrefixCoverage（�
 ## WORK-RECORD-016: process/finality/sync 一律 request-range bounded
 
 process review、Finality 与 SyncDelegate 消费的 LWR 一律为 request-range bounded，不得使用 session head 冒充特定 checkpoint、review 或 FinalityRequest 的 bounded LWR。同生命周期内复用的 process reviewer 必须按已知范围连续分段，起点不得被后续全局 OpeningBoundary 推进所追溯改写。
+
+## WORK-RECORD-017: Fission 汇聚生成单次 Invocation Canonical Record
+
+在发生 Engineer Fission 的场景下，多 lane 的执行记录在最终收敛接管后统一汇聚为该次逻辑 invocation 的单一 canonical WorkRecord。禁止为中间未完成的各子 lane 分别生成向属主暴露的独立碎片 record，确保父级 Manager 或调度方获得一致、完整的单次工作陈述。

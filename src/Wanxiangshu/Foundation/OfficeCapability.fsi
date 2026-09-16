@@ -3,6 +3,7 @@ namespace Wanxiangshu.Foundation
 [<RequireQualifiedAccess>]
 type ToolPermission =
     | Fork
+    | Resume
     | Join
     | Horizon
     | TodoWrite

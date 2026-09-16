@@ -28,18 +28,6 @@ type ICasebookSessionPort =
 
 /// Physical Bookkeeper leaf: one CreateChildSession per transaction, js-bookkeeper
 /// against process-local staging, then AbortSession.
-///
-/// Internal split (single file pair, public .fsi unchanged):
-/// - `Decisions` — pure domain logic over plain data (prompt shaping, evidence
-///   rendering, receipt classification). No host port, no resolver, no staging,
-///   no mutable ledger, no task primitives.
-/// - `Ledger` — attachment bookkeeping only (runtime slot, live bindings, prompt
-///   authorizations, completion handles under one gate). No host calls, no
-///   staging, no authority derivation.
-/// - `Coordination` — the only place that touches `ICasebookSessionPort`,
-///   `BookkeeperStaging`, `PromptAuthority` derivation, terminal subscriptions
-///   and completion settlement. It calls into `Decisions` and `Ledger` and
-///   receives every host capability through the injected `Runtime` value.
 module BookkeeperRuntime =
 
     type private LiveAttachment =
@@ -52,7 +40,6 @@ module BookkeeperRuntime =
           ResolveActiveOwner: SessionId -> PromptAuthority.AuthorityExecutionProfile option }
 
     /// Pure domain decisions: prompt/evidence shaping and receipt classification.
-    /// No host port, no resolver, no staging, no mutable state.
     module private Decisions =
 
         let systemInstructions (ownerSessionId: string) =
@@ -76,34 +63,15 @@ module BookkeeperRuntime =
                     "grep " + pattern + " " + flat)
             |> String.concat "\n"
 
-        let evidenceBlocks (observations: Observation list) : LlmFacing.DataBlock list =
-            observations
-            |> Observations.normalize
-            |> List.map (fun observation ->
-                match observation with
-                | Observation.FileRead(path, hash) ->
-                    LlmFacing.Data.tableArray
-                        "evidence"
-                        [ LlmFacing.Data.stringMember "kind" "file_read"
-                          LlmFacing.Data.stringMember "path" path
-                          LlmFacing.Data.stringMember "hash" hash ]
-                | Observation.GlobResult(pattern, paths) ->
-                    LlmFacing.Data.tableArray
-                        "evidence"
-                        [ LlmFacing.Data.stringMember "kind" "glob"
-                          LlmFacing.Data.stringMember "pattern" pattern
-                          LlmFacing.Data.stringMember "paths" (paths |> List.sort |> String.concat "\n") ]
-                | Observation.GrepResult(pattern, matches) ->
-                    let flat =
-                        matches
-                        |> List.map (fun (path, index, text) -> sprintf "%s:%d:%s" path index text)
-                        |> String.concat "\n"
-
-                    LlmFacing.Data.tableArray
-                        "evidence"
-                        [ LlmFacing.Data.stringMember "kind" "grep"
-                          LlmFacing.Data.stringMember "pattern" pattern
-                          LlmFacing.Data.stringMember "matches" flat ])
+        let createRefreshPrompt (q: string) (a: string) (relatedPaths: string list) (diff: string) : string =
+            LlmFacing.instructions (systemInstructions "")
+            |> LlmFacing.withData
+                [ LlmFacing.Data.table "request" [ LlmFacing.Data.stringMember "kind" "CaseRefresh" ]
+                  LlmFacing.Data.table "question" [ LlmFacing.Data.stringMember "content" q ]
+                  LlmFacing.Data.table "answer" [ LlmFacing.Data.stringMember "content" a ]
+                  LlmFacing.Data.table "related_paths" [ LlmFacing.Data.stringMember "paths" (relatedPaths |> String.concat "\n") ]
+                  LlmFacing.Data.table "diff" [ LlmFacing.Data.stringMember "content" diff ] ]
+            |> LlmFacing.render
 
         let envelope
             (kind: BookkeeperRequest)
@@ -113,36 +81,38 @@ module BookkeeperRuntime =
             (observations: Observation list)
             (extraTranscript: string option)
             : string =
-            let kindLabel =
-                match kind with
-                | BookkeeperRequest.CaseRefresh -> "CaseRefresh"
-                | BookkeeperRequest.CaseFinalize -> "CaseFinalize"
+            match kind with
+            | BookkeeperRequest.CaseRefresh ->
+                let diffText = extraTranscript |> Option.defaultValue ""
+                let related = observations |> List.choose (function Observation.FileRead(p, _) -> Some p | _ -> None)
+                createRefreshPrompt q a related diffText
+            | BookkeeperRequest.CaseFinalize ->
+                let kindLabel = "CaseFinalize"
+                let transcriptBlock =
+                    match extraTranscript with
+                    | Some text when not (String.IsNullOrWhiteSpace text) ->
+                        [ LlmFacing.Data.table "transcript" [ LlmFacing.Data.stringMember "content" text ] ]
+                    | _ -> []
 
-            let transcriptBlock =
-                match kind, extraTranscript with
-                | BookkeeperRequest.CaseFinalize, Some text when not (String.IsNullOrWhiteSpace text) ->
-                    [ LlmFacing.Data.table "transcript" [ LlmFacing.Data.stringMember "content" text ] ]
-                | _ -> []
-
-            LlmFacing.instructions (systemInstructions ownerSessionId)
-            |> LlmFacing.withData (
-                [ LlmFacing.Data.table "request" [ LlmFacing.Data.stringMember "kind" kindLabel ]
-                  LlmFacing.Data.table "case" [ LlmFacing.Data.stringMember "session_id" ownerSessionId ]
-                  LlmFacing.Data.table "question" [ LlmFacing.Data.stringMember "content" q ]
-                  LlmFacing.Data.table "answer" [ LlmFacing.Data.stringMember "content" a ]
-                  LlmFacing.Data.table
-                      "repository_change"
-                      [ LlmFacing.Data.stringMember "patch" (evidencePatch observations) ] ]
-                @ evidenceBlocks observations
-                @ transcriptBlock
-            )
-            |> LlmFacing.render
+                LlmFacing.instructions (systemInstructions ownerSessionId)
+                |> LlmFacing.withData (
+                    [ LlmFacing.Data.table "request" [ LlmFacing.Data.stringMember "kind" kindLabel ]
+                      LlmFacing.Data.table "case" [ LlmFacing.Data.stringMember "session_id" ownerSessionId ]
+                      LlmFacing.Data.table "question" [ LlmFacing.Data.stringMember "content" q ]
+                      LlmFacing.Data.table "answer" [ LlmFacing.Data.stringMember "content" a ]
+                      LlmFacing.Data.table
+                          "repository_change"
+                          [ LlmFacing.Data.stringMember "patch" (evidencePatch observations) ] ]
+                    @ transcriptBlock
+                )
+                |> LlmFacing.render
 
         let canonicalAgent = ManagedAgentCatalog.bookkeeperName
 
-    /// Attachment bookkeeping only: runtime slot, live bindings, prompt
-    /// authorizations and completion handles under one gate. No host calls,
-    /// no staging, no authority derivation.
+    let createRefreshPrompt (q: string) (a: string) (relatedPaths: string list) (diff: string) : string =
+        Decisions.createRefreshPrompt q a relatedPaths diff
+
+    /// Attachment bookkeeping only.
     module private Ledger =
 
         let private gate = obj ()
@@ -222,11 +192,7 @@ module BookkeeperRuntime =
 
         let current () : Runtime option = lock gate (fun () -> runtime)
 
-    /// Host-effect coordination: the only place that touches `ISessionHostPort`,
-    /// `BookkeeperStaging`, `PromptAuthority` derivation, terminal subscriptions
-    /// and completion settlement. Pure shaping comes from `Decisions`, mutable
-    /// bookkeeping goes through `Ledger`, and every host capability arrives via
-    /// the injected `Runtime` value.
+    /// Host-effect coordination.
     module private Coordination =
 
         let retire (sessions: ICasebookSessionPort) (childId: SessionId) : Task<unit> =

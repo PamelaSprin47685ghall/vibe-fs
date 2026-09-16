@@ -4,6 +4,7 @@ namespace Wanxiangshu.Foundation
 type Role =
     | Manager
     | Orchestrator
+    | Engineer
     | Coder
     | Inspector
     | Browser

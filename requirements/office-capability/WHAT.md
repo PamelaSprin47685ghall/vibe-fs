@@ -4,15 +4,6 @@
 
 Office capability 由该职位有权产生的后果（Entitled Consequence）定义，严禁以 persona 名称、工具可达性或权限矩阵清单作为能力事实。调用方必须依据 Office 的承诺与后果进行认知和委托。
 
-## OFF-002: canonical 五分法：五类可 fork office 各有唯一 entitled consequence 与 non-consequence
-
-Manager 可 fork 的五类 Office 构成 canonical 五分法，各自具备明确的权能与边界：
-- **Coder**：有权变更仓库源代码（实现、修复、重构、tests-as-source、受托配置）；不做项目运行、测试构建执行、运行证据认证以及未受托的产品决策。
-- **Inspector**：有权建立本地已存在事实的证据；不做代码修改、修复实现、测试运行或创造新行为证据。
-- **DevOps**：有权对运行中的环境行动并产生行为证据；不做产品含义发明或直接的代码编写修改。
-- **Browser**：有权建立带有溯源凭据（provenance）的外部事实；不做仓库内部修改，亦不将外部可能性自动转化为仓库义务。
-- **Inquiry**：有权对未决问题进行语义理解与假设推演；不做代码变更、环境执行或将思想冒充为证据。
-
 ## OFF-003: 同一 office 的 authority 不变
 
 同一 Office 的权能与权限集合保持完全一致。每个 Role 恰对应一个 Persona，不存在 fast/deep 档位或组合名解析语义。
@@ -23,44 +14,63 @@ Office 能力是纯粹的后果模型，权限矩阵仅是其在执行层的投�
 
 ## OFF-005: 单一语义所有权、多处投影：consequence 在所有决策面同 ID 命中，不得漂移
 
-同一条 Entitled Consequence 会同时投影到 Manager Role Law、fork 工具描述、各 Office 的自我模型以及调用方边界镜像中。各处投影文案可以因语境调整，但语义内核必须同源一致，严禁出现分叉。
+同一条 Entitled Consequence 会同时投影到 Manager Role Law、fork/resume 工具描述、各 Office 的自我模型以及调用方边界镜像中。各处投影文案可以因语境调整，但语义内核必须同源一致，严禁出现分叉。
 
 ## OFF-006: offices 不可互换：禁止把 office 当可互换通用 agent
 
-各 Office 具备不可替代的领域边界：Coder 不是缺乏 Shell 的 Operator；Inspector 不是权限受限的 Coder；DevOps 不是任意难题的通用逃生口；Inquiry 不是证据见证者；Browser 也不是本地仓库调查员。
+各 Office 具备不可替代的领域边界：Engineer 不是真实命令执行器；DevOps 不是架构/产品决策者，亦不负责差遣其他代理；Manager 不是工作区代码修改者或文件检视者；Sphinx 是程序工作流而非通用代理。
 
-## OFF-007: Manager 无普通工具：不读文件、不跑终端、不改仓库、不 inspect
+## OFF-007: Manager 无普通工具：不读文件、不跑终端、不改仓库、不 inspect，无 Fission
 
-Manager 的核心权能是统筹、委托与集成，不亲自建立仓库具体事实。Manager 面向模型的工具仅限于 fork、join、horizon、fission、todowrite、review、suicide 等编排、记账与评审接口，不具备文件读写、终端运行或直接 inspect 的能力，从一而终依靠委派与收集工作。
+Manager 的核心权能是统筹、委托、评估与集成，不亲自建立仓库具体事实。Manager 面向模型的工具仅限于 fork (仅 Engineer)、resume (仅固定 DevOps)、join、horizon、todowrite、review、suicide 等编排、记账与评审接口，不具备文件读写、终端运行或直接 inspect 的能力，严禁使用 Fission，从一而终依靠委派与收集工作。
 
-## OFF-008: Coder consequence = repository source mutation；non-consequence = 运行项目/认证证据/未被托付的决定
+## OFF-011: Manager consequence = 完整管理与编排权能；non-consequence = 亲自修改工作树与使用 Fission
 
-Coder 专注于书写层面的修改（代码、配置、静态测试）。项目实际运行与动态行为证据的获取由 DevOps 负责；Coder 不得自行执行测试并认证运行时证据。
-
-## OFF-009: Inspector consequence = 已存在事实的证据；non-consequence = 修改/修复/当验证代理
-
-Inspector 仅通过因果只读手段对仓库既有状态取证。Inspector 严禁进行代码修改、实现补丁，亦不得作为常规的构建验证代理。
-
-## OFF-010: DevOps consequence = 运维行动与行为证据；non-consequence = 发明产品含义/直接 write-edit
-
-DevOps 拥有进程与终端执行权，负责产生行为证据。对源代码的修改必须通过委派由 Coder 完成，DevOps 自身不直接进行自由的 write 或 edit 操作。
-
-## OFF-011: Manager consequence = 完整管理权能；non-consequence = 亲自修改工作树
-
-Manager 在任何活跃任期阶段（包括评审前与接责后）均具备从一而终的完整管理与记账权能（Fork, Join, Horizon, TodoWrite, Fission, ReviewAssessment, Finality）。Manager 拥有权能并不等同于已有执行任务，有能力无任务完全合法。Manager 严禁以自己的双手亲自执行工作区源码修改、代码编写或检视调查（建立 repository 事实必须从一而终委派 Coder/DevOps/Inspector）。
+Manager 在任何活跃任期阶段（包括评审前与接责后）均具备从一而终的完整管理与记账权能（Fork, Resume, Join, Horizon, TodoWrite, ReviewAssessment, Finality）。Manager 拥有权能并不等同于已有执行任务，有能力无任务完全合法。Manager 严禁以自己的双手亲自执行工作区源码修改、代码编写或检视调查，亦不得使用 Fission。
 
 ## OFF-012: Orchestrator consequence = commission manager；不 commission 其它 office
 
-Orchestrator 仅负责为顶层道路委任或接续 Manager，不直接委任其它子级 Office，亦不直接介入具体的微观执行。
-
-## OFF-013: Browser consequence = 带 provenance 的外部事实；non-consequence = 实现仓库工作/把外部可能性变成仓库义务
-
-Browser 负责采集与求证外部网络事实，并附带可验证的溯源信息（provenance）。外部发现不直接构成仓库义务，Browser 亦不承担仓库内部代码实现。
-
-## OFF-014: Inquiry consequence = 对未决问题的语义理解；non-consequence = 改变 source/执行世界/把思想变成证据
-
-Inquiry 专注于复杂概念辨析、假设生成与未决问题分析。Inquiry 不改变仓库、不触发外部执行，亦不得将推理假设视同已证实证据。
+Orchestrator 仅负责为顶层道路委任或接续 Manager，不直接委任其它子级 Office，亦不直接介入具体的微观执行，不使用 Fission。
 
 ## OFF-015: Predictor 是内部机制专用角色，不参与普通调度与工具门禁
 
 Predictor 仅为 Strength 降级指定廉价 provider/model，不进入 Manager 公开 fork 候选、不参与普通 participant 调度、不拥有工具门禁规则、不暴露给用户可见接口。Predictor 只在内部强度机制中使用。
+
+## OFF-016: Engineer consequence = 本地事实调查与源码工作；non-consequence = 真实命令执行 / 差遣 DevOps / 外部网络浏览；独享 Fission
+
+Engineer 专注于本地事实调查与源码工作：
+- **Entitled consequence**：读取、创建、修改、移动、删除仓库文件；完成业务与架构实现、重构；编写测试源码。
+- **Non-consequence**：不执行真实构建与测试命令，不调用或差遣 DevOps，不承担外部网络浏览职责。完成本次工作或到达需要 Manager 决策的边界时立即返回。
+- **Fission 独享**：Engineer 是全系统**唯一具备 Fission 角色能力**的 Office。Fission 仅代表同一 Engineer 的多个 execution lane，必须收敛为一次返回。
+
+## OFF-017: DevOps consequence = Engineer 全部本地工程能力 + 真实执行/终端/进程管理 + 角色固有非架构级修复授权；non-consequence = 发明架构/产品含义 / 削弱验证 / fork 或差遣其他代理 / Fission
+
+DevOps 拥有完整的运维执行与直接工程修复权能：
+- **Entitled consequence**：拥有 Engineer 的全部本地工程能力（文件读、写、改、移、删）；拥有真实命令执行（Exec）、终端与进程管理（Pty）；拥有**角色固有的非架构级修复授权**——在执行中观察到非架构级缺陷或测试失败时，应自行调查、直接修改源码、补充必要回归测试并重新验证，无需 Manager 逐次授权，亦不受任何 `allowRepair` 式开关限制。
+- **Non-consequence**：不发明架构、产品含义、兼容性或安全政策；不通过削弱断言或绕过门禁制造成功；到达架构与产品边界时交回 Manager；自身不 fork、不 resume 其他代理，不使用 Fission。
+
+## OFF-018: Sphinx consequence = 程序控制探究流程、工作项、预算、续行和收束；可同步调用只读 Engineer 调研；non-consequence = 充当独立 Role/Persona / 拥有独立 Fission 身份 / 保留 Inquiry 驾驶层
+
+Sphinx 是完全由程序控制的探究流程（epistemic workflow）：
+- **Entitled consequence**：程序驱动探究步骤推进、工作项决策、预算控制、续行与收束；在需要语义调研时，由程序同步调用只读 Engineer 获取本地事实证据。
+- **Non-consequence**：Sphinx 不是 Role、Persona 或普通 subagent；不拥有独立 Fission 身份；内部 Engineer 调研调用不具备修改、真实执行、DevOps 调度、Fission 或递归探究权限；彻底废止 Inquiry 模型驾驶层。
+
+## 需求演进记录（已撤销条款）
+
+### [已撤销] OFF-002: canonical 五分法：五类可 fork office 各有唯一 entitled consequence 与 non-consequence
+- **撤销原因**：旧 Coder/Inspector/DevOps/Browser/Inquiry 五分法撤销。本地事实调查与源码实现统一收敛至 Engineer（OFF-016）；DevOps 获得完整直接工程能力与固有自修授权（OFF-017）；探究流程收敛为程序化 Sphinx 工作流（OFF-018）；删除 Browser 角色与 Inquiry 角色。
+
+### [已撤销] OFF-008: Coder consequence = repository source mutation；non-consequence = 运行项目/认证证据/未被托付的决定
+- **撤销原因**：Coder 身份与 Inspector 身份合并为统一的 Engineer，由 OFF-016 承接。
+
+### [已撤销] OFF-009: Inspector consequence = 已存在事实的证据；non-consequence = 修改/修复/当验证代理
+- **撤销原因**：本地已存在事实调查权能并入 Engineer，由 OFF-016 承接。
+
+### [已撤销] OFF-010: DevOps consequence = 运维行动与行为证据；non-consequence = 发明产品含义/直接 write-edit
+- **撤销原因**：撤销「禁止 DevOps 直接 write-edit / 需通过委派 Coder 完成修改」的限制。DevOps 直接获得完整本地工程能力与角色固有非架构级自修授权，由 OFF-017 承接。
+
+### [已撤销] OFF-013: Browser consequence = 带 provenance 的外部事实；non-consequence = 实现仓库工作/把外部可能性变成仓库义务
+- **撤销原因**：Browser 角色及仓库拥有的 Browser MCP 集成全链清除，外部网络调查职责不转交任何其他角色。
+
+### [已撤销] OFF-014: Inquiry consequence = 对未决问题的语义理解；non-consequence = 改变 source/执行世界/把思想变成证据
+- **撤销原因**：Inquiry 角色及其模型驾驶层彻底废止，由程序化 Sphinx 探究流程（OFF-018）替代。

@@ -42,8 +42,28 @@
 
 ## PROC-011: Run 与 Query-Shell 具备对等执行参数能力且非 Distiller Office
 
-`run`（DevOps）与 `query-shell`（Inspector）工具代表单次有界执行的物理能力，对等支持并严格校验 `command`、`deadline_seconds`、`output_budget_bytes` 与 `world_lock` 等参数，并在前置拦截非法输入，其职责仅限于物理命令执行或静态观察，绝不承担内容摘要或结果蒸馏职责。
+`run` 与 `query-shell` 工具代表单次有界执行的物理能力，对等支持并严格校验 `command`、`deadline_seconds`、`output_budget_bytes` 与 `world_lock` 等参数，并在前置拦截非法输入，其职责仅限于物理命令执行或静态观察，绝不承担内容摘要或结果蒸馏职责。
 
 ## PROC-012: process与PTY contract只发布纯词汇和窄capability type
 
 process request/outcome/error、one-shot capability type及owner-pure PTY request/result vocabulary必须与Node child-process/PTY adapter、spool/output runtime分居。contract不得携带`ManagedAgent`、`TaskCompletionSource`、mutable handle、capability value/factory或Node import。Node process与Node PTY各由唯一adapter实现；delegation与其它runtime只消费composition注入的窄capability，PTY adapter不得反向引用delegation Host/Fork runtime。
+
+## PROC-013: 大输出零 Distiller 与预算内原始留尾截断
+
+在任何命令执行与物理输出处理中，全系统启动的 Distiller 模型会话数量必须严格为 0。小于预算的输出原样完整返回；超出预算的超大输出执行确定性的截头取尾处理，直接保留预算内的未修改原始尾部字节。系统如实承认能力损失：尾部不保证包含全部关键错误，若错误发生在被截掉的更早部分则不在尾部中，不再保留「关键错误必定保留」承诺。
+
+## PROC-014: 真实程序事实不从日志推断且截断声明明确
+
+程序事实（退出码、signal、超时、取消与真实终结）必须且仅能由底层物理执行事件确立，绝不从日志或输出文本启发式推断，亦不随输出尾部被截断而丢失。发送 signal 绝不等于进程已退出。当物理输出发生截断时，输出结果必须包含明确的截断声明与必要定位提示（说明更早输出已截断、仅保留最近尾部），防止调用方将局部尾部误判为完整运行记录。
+
+## PROC-015: 显式字节预算计量与 UTF-8 截断边界安全
+
+输出上限必须由显式的字节预算参数决定，严禁无条件沿用 `Spool.ChunkSizeBytes`（200 KiB）作为所有工具的固定上限。预算严格以 UTF-8 编码字节数计量，严禁以字符数冒充。留尾截断必须严格在合法的 UTF-8 字符/码点边界处切断，严禁在多字节序列中间断开产生乱码。最终面向 provider-visible 的完整结果（包含程序事实、截断声明、包装格式与原始尾部）必须严格在约定总预算内。
+
+## PROC-016: Large Gate 大输出单持有者互斥门禁与并发保护
+
+对于估算产出大体积日志的物理执行，执行前必须获取单持有者门禁（Large Gate）。输出预算估算必须与门禁获取逻辑一致，未获取到门禁的请求在 FIFO 队列中排队并支持基于 Token 的幂等取消，确保全系统同一时刻仅有一个大输出流占用内存与分析资源。
+
+## PROC-017: 自定义工具文本结果确定性留尾截断
+
+插件工具向宿主回传长文本结果时，在达到宿主全局限制前必须完成确定性留尾截断（ToolResultBound）。截断时必须注入固定的截断提示标记并优先保留最新的完整尾部行，保证最终结果满足边界要求且不再被宿主二次随机截断。

@@ -8,11 +8,17 @@
 
 ## 核心张力
 
+- **角色与能力目录同步**：消融节点与工具映射必须同步新角色体系，废止 Browser/Distiller/Inquiry 等旧角色，同时保证 Sphinx 等保留能力拥有完全独立的消融开关，不受其他能力撤销的连带影响。
+- **编号迁移不静默错位**：消融 DAG 与 Profile 编号迁移必须保持拓扑单调与显式对应，严禁静默错位。
+
 - **零影响**：Ablated 状态下 owner 路径必须与从未装载该机制时一致（对齐 speculative-investigation 的零影响基线精神）。
 - **Borrowed ≠ Active**：基础设施借用（如 SyncDelegate 调查链）允许有限切面，但不产生完整下游语义。
 - **消融 DAG ≠ 语义依赖 INDEX**：巡检展开顺序由主审站驱动；语义 prerequisite 边仅在有明确 borrow 约束时进入消融图。
 
 ## 违约状态（RED）
+
+- 撤销 Browser 等旧角色时连带误关 Sphinx（epistemic-reasoning）等独立能力。
+- Ablation 节点或编号迁移导致 profile 与 DAG 静默错位。
 
 1. 靠注释、条件编译或未文档化分支隐藏下游机制，而非走正式开关。
 2. Ablated 包仍向 provider 暴露工具 schema 或可执行入口。

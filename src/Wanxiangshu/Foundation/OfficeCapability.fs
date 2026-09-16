@@ -4,6 +4,7 @@ namespace Wanxiangshu.Foundation
 [<RequireQualifiedAccess>]
 type ToolPermission =
     | Fork
+    | Resume
     | Join
     | Horizon
     /// Manager-only living-obligation checkpoint surface.
@@ -48,13 +49,25 @@ module OfficeCapability =
         | Role.Manager ->
             set
                 [ ToolPermission.Fork
+                  ToolPermission.Resume
                   ToolPermission.Join
                   ToolPermission.Horizon
                   ToolPermission.TodoWrite
-                  ToolPermission.Fission
                   ToolPermission.ReviewAssessment
                   ToolPermission.Finality ]
         | Role.Orchestrator -> set [ ToolPermission.Fork; ToolPermission.Join; ToolPermission.Horizon ]
+        | Role.Engineer ->
+            set
+                [ ToolPermission.Read
+                  ToolPermission.Write
+                  ToolPermission.Edit
+                  ToolPermission.Glob
+                  ToolPermission.Grep
+                  ToolPermission.Move
+                  ToolPermission.Remove
+                  ToolPermission.BashHoneypot
+                  ToolPermission.Fetch
+                  ToolPermission.Fission ]
         | Role.Coder ->
             set
                 [ ToolPermission.Read
@@ -66,35 +79,34 @@ module OfficeCapability =
                   ToolPermission.Remove
                   ToolPermission.BashHoneypot
                   ToolPermission.Inspect
-                  ToolPermission.Fetch
-                  ToolPermission.Fission ]
+                  ToolPermission.Fetch ]
         | Role.Inspector ->
             set
                 [ ToolPermission.Read
                   ToolPermission.Glob
                   ToolPermission.Grep
                   ToolPermission.Exec
-                  ToolPermission.Fetch
-                  ToolPermission.Fission ]
+                  ToolPermission.Fetch ]
         | Role.Browser ->
             set
                 [ ToolPermission.Read
                   ToolPermission.Glob
                   ToolPermission.Grep
-                  ToolPermission.Network
-                  ToolPermission.Fission ]
-        | Role.Inquiry -> set [ ToolPermission.Inspect; ToolPermission.Sphinx; ToolPermission.Fission ]
+                  ToolPermission.Network ]
+        | Role.Inquiry -> set [ ToolPermission.Inspect; ToolPermission.Sphinx ]
         | Role.DevOps ->
             set
-                [ ToolPermission.Pty
-                  ToolPermission.Exec
-                  ToolPermission.Join
-                  ToolPermission.Horizon
-                  ToolPermission.Read
+                [ ToolPermission.Read
+                  ToolPermission.Write
+                  ToolPermission.Edit
                   ToolPermission.Glob
                   ToolPermission.Grep
-                  ToolPermission.Inspect
-                  ToolPermission.Behavior ]
+                  ToolPermission.Move
+                  ToolPermission.Remove
+                  ToolPermission.Exec
+                  ToolPermission.Pty
+                  ToolPermission.Join
+                  ToolPermission.Horizon ]
         | Role.Distiller -> Set.empty
         // ENFORCER-010: Blogger's tool set is exactly { chronicle }.
         | Role.Blogger -> set [ ToolPermission.Chronicle ]

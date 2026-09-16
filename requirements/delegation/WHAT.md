@@ -10,11 +10,11 @@
 
 ## DELEG-003: 独立 road 与 same-road continuation 硬区分，各占独立工具
 
-委托区分新独立道路与既有道路续做，两者是不同的工具契约：`fork` 必填 calling 创建新独立道路；`resume` 必填 name 续做既有道路，复用该 person 的完整历史与已绑定 persona/depth，传入 calling 是类型化拒绝。同一目标的后续阶段、纠正、重试均属同一道路，不因工作量大或阶段演进而另建新道路。
+委托区分新独立道路与既有道路续做，两者是不同的工具契约：`fork` 必填 calling（Manager 仅限 `engineer`）创建新独立道路；`resume` 必填 name 续做既有道路（包括续做既有 Engineer 道路，或调用 Manager 道路唯一绑定的固定 DevOps），复用该 person 的完整历史与已绑定配置，传入 calling 是类型化拒绝。同一目标的后续阶段、纠正、重试均属同一道路，不因工作量大或阶段演进而另建新道路。
 
 ## DELEG-004: 不同 contract 必须不同名
 
-语义不同的委托契约必须使用不同工具名（如 Orchestrator 的 `commission` 代表独立集成道路，Manager 的 `fork` 代表使命内 witness）。同一工具名在全系统命名唯一且确定性的语义契约。
+语义不同的委托契约必须使用不同工具名（如 Orchestrator 的 `commission` 代表独立集成道路，Manager 的 `fork` 代表派出独立 Engineer，`resume` 代表续做既有道路或调用固定 DevOps）。同一工具名在全系统命名唯一且确定性的语义契约。
 
 ## DELEG-005: 机器拓扑永不进入委托面
 
@@ -22,11 +22,11 @@
 
 ## DELEG-006: fork 成功仅 Byname 承接 charge；续做沿用已绑定 binding
 
-新建 fork 成功后果仅体现 Byname 承接 charge 的语义事实。续做时按 Byname 识别既有 participant，并严格沿用已绑定的 execution binding 与模型档位，禁止篡改已绑定的深度或实现。
+新建 fork（Manager 仅限 Engineer）成功后果仅体现 Byname 承接 charge 的语义事实。续做时按 Byname 识别既有 participant（包括固定绑定的 DevOps），严格沿用已绑定的 execution binding 与模型档位，禁止篡改已绑定的深度或实现。
 
-## DELEG-007: SyncDelegate DAG 有环即错
+## DELEG-007: SyncDelegate DAG 有环即错，收敛为 Sphinx 程序内部同步 Engineer 调研
 
-同步委托依赖关系必须构成严格有向无环图（DAG）。允许预定义的单向委托边（如 Inquiry/Coder/DevOps 到 Inspector，DevOps 到 Coder），严禁任何反向或成环委托。
+同步委托依赖关系必须构成严格有向无环图（DAG）。撤销活跃业务角色间的任意同步委托（如旧 Inquiry/Coder/DevOps 到 Inspector，DevOps 到 Coder 等）；保留并收敛为 Sphinx 程序工作流内部在需要语义事实时同步调用只读 Engineer 调研。被调用的只读 Engineer 仅调研现有本地事实，完成本次调研即返回程序调用点，不具备文件写入、真实执行、DevOps 差遣、Fission 或递归调用权限。
 
 ## DELEG-008: sync batch 成员与顺序由 Host tool-call 集合决定
 
@@ -64,7 +64,7 @@ Join 等待遇外部用户输入、操作员取消或超时终止时，产生 `I
 
 `horizon()` 是按需拉取的瞬时快照，严禁建立后台轮询、订阅或自动推送。快照仅反映当前在场名册与各 child 最新的 durable 工作记录。
 
-## DELEG-017: 返回结果只改变 caller 认识，不自动转移 authority`
+## DELEG-017: 返回结果只改变 caller 认识，不自动转移 authority
 
 委托返回的 WorkRecord 或建议仅作为调用方决策的证据输入，不自动改变全局请求的推进方向，不授予调用方额外权能，亦不免除其既定义务。
 
@@ -92,7 +92,7 @@ fork 携带的 attachment 仅将指定同伴的历史工作记录作为只读数
 
 复用既有 participant 发起新工作时，每次调用都是宿主 F# CE 中的一次独立 invocation，不建立 durable `Stage/Phase/ActiveWorkUnit` 或第二状态机。invocation 属于稳定 logical route：resume continuation 由 Byname 标识，SyncDelegate 由 caller scope + dedicated role 标识；物理 `SessionId` 只是本次执行目标，不拥有 handoff 连续性。
 
-work unit 的输入窗口为该 route 上“上一已完成 work unit 的 parent frontier”到本次 admission 时 parent XTrace head 的 delta LifecycleWorkRecord；route 首次 work unit 使用当前 parent LifecycleWorkRecord（含 Opening）作为初始背景。prompt = 本次新 charge + 该 parent record。**同步**委托（`inspect`、`establish-behavior`、`repair-behavior`）必须等待本 work unit 自己的完成，并只返回 callee 在本 work unit XTrace 范围内的 bounded delta LifecycleWorkRecord；**异步** `fork` 与 `resume`（后者即 same-road continuation）只负责原子 admission + dispatch，成功即返回“该 Byname 已承接本次 charge”的放置后果，绝不等待 callee completion、绝不直接返回 WorkRecord。fork completion 的唯一 pull 边界是 `join` / `horizon`。
+work unit 的输入窗口为该 route 上“上一已完成 work unit 的 parent frontier”到本次 admission 时 parent XTrace head 的 delta LifecycleWorkRecord；route 首次 work unit 使用当前 parent LifecycleWorkRecord（含 Opening）作为初始背景。prompt = 本次新 charge + 该 parent record。**同步**委托必须等待本 work unit 自己的完成，并只返回 callee 在本 work unit XTrace 范围内的 bounded delta LifecycleWorkRecord；**异步** `fork` 与 `resume`（后者即 same-road continuation 与固定 DevOps 调用）只负责原子 admission + dispatch，成功即返回“该 Byname 已承接本次 charge”的放置后果，绝不等待 callee completion、绝不直接返回 WorkRecord。fork 与 resume completion 的唯一 pull 边界是 `join` / `horizon`。
 
 ## DELEG-025: work unit completion 由 causal identity 决定，不由订阅时刻决定
 
@@ -104,22 +104,26 @@ terminal 能完成或失败 work unit，当且仅当它属于该 work unit 实�
 
 ## DELEG-027: 新 assignment 不得伪装成 busy nudge
 
-同一 logical route 同时至多一个 active work unit。已有 work unit 未终结时到来的新 assignment 必须明确拒绝；`BusyAgentNudge` 只允许作为既有 LogicalRun 的内部 continuation，不得承载新的 fork/synchronous charge。前一 work unit 已完成后，同一 participant 必须立即可承接下一 work unit，无需依赖 join 消费或重新创建 participant。
+同一 logical route 同时至多一个 active work unit。已有 work unit 未终结时到来的新 assignment 必须明确拒绝；`BusyAgentNudge` 只允许作为既有 LogicalRun 的内部 continuation，不得承载新的 fork/resume/synchronous charge。前一 work unit 已完成后，同一 participant 必须立即可承接下一 work unit，无需依赖 join 消费或重新创建 participant。
 
 ## DELEG-028: Delegation contract/runtime 编译闭包必须按 effect 边界分层
 
 `Delegation.Contract` 只拥有 command/result、fact、typed payload、logical route、completion evidence 与 injected capability；`Delegation.Fold` 只实现纯投影；`Delegation.Ledger` 仅在 composition 边界把 fold 连接到 canonical `AgentJournal`；`Delegation.Sync.Runtime`、`Delegation.Fork.Runtime` 与 `Delegation.Recovery.Runtime` 消费 contract/fold 并实现各自 CE。Host callback/dispatch 与 PTY 分别位于 `Delegation.Host.Adapter`、`Delegation.Pty.Adapter`，只能由 composition root 绑定。Contract 的 direct/transitive ProjectReference closure 不得包含 Host、OpenCode tool、PTY、process、EventStore runtime、sync/fork workflow 或 recovery runtime。
 
-`Delegation.Contract` 的 transitive production `.fs` 不得超过 100。fold/runtime/sync/fork localities 的 transitive production `.fs` 以 185 为 target；adapter locality（`Delegation.Host.Adapter`、`Delegation.Pty.Adapter`）按其 charter 必须组装 durable spine、wait、host signal 与 managed-agent 物理 vocabularies，closure 由此被上游共享 spine 主导，其闭包以全仓 production `.fs` 的 60% 为 hard ceiling（超过即 full fallback，不伪装为 focused compile），实测规模（2026-09-15：host 295、pty 296、recovery 47；较 289/290 的增长来自 dispatch-runtime 引入 host-diagnostics-runtime 以保证同步确认与失败审计闭环）作为回归 ratchet——任何增长必须伴随本条修订；fold/runtime localities 的闭包由 delegation 自有 contract 分片与少量 foundation/identity vocabulary 构成，recovery 已收缩到 47，185 仍是其上限目标而非现状。composition locality 豁免规模预算。owner compile 必须把选定 locality 的 transitive ProjectReference 扁平化为唯一编译计划，单次调用的 Compile Include 必须保持拓扑偏序；`build.mjs` 严禁退回目录通配。
+`Delegation.Contract` 的 transitive production `.fs` 不得超过 100。fold/runtime/sync/fork localities 的 transitive production `.fs` 以 185 为 target；adapter locality（`Delegation.Host.Adapter`、`Delegation.Pty.Adapter`）按其 charter 必须组装 durable spine、wait、host signal 与 managed-agent 物理 vocabularies，closure 由此被上游共享 spine 主导，其闭包以全仓 production `.fs` 的 60% 为 hard ceiling（超过即 full fallback，不伪装为 focused compile），实测规模作为回归 ratchet——任何增长必须伴随本条修订；fold/runtime localities 的闭包由 delegation 自有 contract 分片与少量 foundation/identity vocabulary 构成。owner compile 必须把选定 locality 的 transitive ProjectReference 扁平化为唯一编译计划，单次调用的 Compile Include 必须保持拓扑偏序；`build.mjs` 严禁退回目录通配。
 
 ## DELEG-029: Delegation runtime、PTY 与 durable outer routing 必须单向注入
 
-Delegation领域constructor只产生`DelegationFactCases`、`ExecutionFactCases`或等价typed intent；linkage、estimate、handoff frontier、child handle index与closed rejection由delegation-owned pure fold/decision拥有。durable composition是把这些case包入`AgentFact`并组合projection的唯一位置。Host runtime、recovery、fork、fold与sync只消费delegation-owned append/query/wait/clock/PTY capability types；PTY adapter不得读取`HostForkRuntime`、Fork runtime、Process implementation、Gate、Dictionary、registry或TCS。Temporal、CausalWait及Process physical implementations只由composition构造最窄capability并注入。
+Delegation 领域 constructor 只产生 `DelegationFactCases`、`ExecutionFactCases` 或等价 typed intent；linkage、estimate、handoff frontier、child handle index 与 closed rejection 由 delegation-owned pure fold/decision 拥有。durable composition 是把这些 case 包入 `AgentFact` 并组合 projection 的唯一位置。Host runtime、recovery、fork、fold 与 sync 只消费 delegation-owned append/query/wait/clock/PTY capability types；PTY adapter 不得读取 `HostForkRuntime`、Fork runtime、Process implementation、Gate、Dictionary、registry 或 TCS。Temporal、CausalWait 及 Process physical implementations 只由 composition 构造最窄 capability 并注入。
 
-## DELEG-030: delegation fatal escalation 只消费mandatory injected fuse
+## DELEG-030: delegation fatal escalation 只消费 mandatory injected fuse
 
-handoff checkpoint或sync invariant失败由delegation owner构造typed incident；caller必须先保留已发生effect与durable settlement，再调用构造时必填的fatal capability。fork/sync runtime不得直接引用fatal physical adapter，不得用optional/default/global fallback；同一incident只允许一次report与一次kill。
+handoff checkpoint 或 sync invariant 失败由 delegation owner 构造 typed incident；caller 必须先保留已发生 effect 与 durable settlement，再调用构造时必填的 fatal capability。fork/sync runtime 不得直接引用 fatal physical adapter，不得用 optional/default/global fallback；同一 incident 只允许一次 report 与一次 kill。
 
 ## DELEG-031: reusable completion checkpoint 以 closed settlement 收口，不以 string 失败
 
 `CheckpointCompleted`/`CheckpointCompletedHandoff` 返回 `HandoffCheckpointSettlement`（`HandoffCheckpointCommitment`：`Committed`、`NotCommitted`、`Unknown`、`PhaseConflict`），恒带 exact parent + route identity。WriterUnavailable → `NotCommitted`（已知未写）；WriteUnknown → `Unknown`（pending-evidence，不自动重试、不重发）；frontier fold cut（retreat/negative）→ `PhaseConflict`（确切 invariant 违例）。`NotCommitted`/`Unknown` 不改写已证成的 child 完成：SyncDelegate 照常交付已赚得的 WorkRecord，fork 照常交付 proven completion，绝不重跑已完成 child；`Unknown` 由下一次 invocation 重读 durable frontier 收敛。仅 `PhaseConflict` 经注入 fuse 熔断。Handoff capability 缺失是构造期事实（`PrepareHandoff` 未产出 prepared 即无 checkpoint 可写），不在 completion 路径上再 fatal。
+
+## DELEG-032: Engineer 完成即返回，禁止跨角色与向后委托差遣
+
+Engineer 负责本地事实调查与源码读写实现，本次工作完成或到达需要 Manager 决策的边界时立即向 Manager 返回，不得自行组织验证链，严禁直接调用、包装或转发任务给 DevOps。DevOps 同样不得创建或差遣其他工程子代理。需要运行验证或进一步组织工作时，由 Manager 统一调度。

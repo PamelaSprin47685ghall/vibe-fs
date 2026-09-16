@@ -17,9 +17,6 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const readRole = (role, locale) => readFileSync(join(ROOT, 'resources/provider/role', role, locale), 'utf8')
 
 test('WHAT[OFF-004] capability_is_consequence_model_not_tool_whitelist_transcription', () => {
-  // The manager law names offices by what they can establish or change (the
-  // consequence), never by the instruments inside them (ARCH-017: consequence
-  // model, not a whitelist transcription).
   const en = readRole('manager', 'en.md')
   const zh = readRole('manager', 'zh-CN.md')
   assert.match(en, /Know another office by its promises, not by its keys/i)
@@ -28,19 +25,16 @@ test('WHAT[OFF-004] capability_is_consequence_model_not_tool_whitelist_transcrip
   assert.match(zh, /而不是看它内部隐藏着什么工具/)
 })
 
-test('WHAT[OFF-007] manager_has_no_personal_repository_witness', () => {
-  // Manager's entitled consequence is coordination; it must not establish
-  // repository facts with its own hands (ROLE_SEMANTIC_ANCHORS.manager
-  // no-personal-repository-witness projection, both locales).
+test('WHAT[OFF-007] manager_has_no_personal_repository_witness_and_no_fission', () => {
   const en = readRole('manager', 'en.md')
   const zh = readRole('manager', 'zh-CN.md')
   assert.match(en, /do not establish repository facts with your own hands/i)
   assert.match(zh, /不以自己的双手去建立 repository 事实/)
+  assert.doesNotMatch(en, /fission/i, 'Manager must not carry fission affordance')
+  assert.doesNotMatch(zh, /fission|裂变/, 'Manager must not carry fission affordance')
 })
 
 test('WHAT[OFF-011] manager_audit_pending_consequence_is_readonly_assessment_not_mutation', () => {
-  // Manager in AuditPending phase has read-only inspection and ReviewAssessment
-  // permissions; it cannot mutate the worktree (OFF-011).
   const en = readRole('manager', 'en.md')
   const zh = readRole('manager', 'zh-CN.md')
   assert.match(en, /do not establish repository facts with your own hands/i)
@@ -48,8 +42,6 @@ test('WHAT[OFF-011] manager_audit_pending_consequence_is_readonly_assessment_not
 })
 
 test('WHAT[OFF-012] orchestrator_commissions_manager_roads_not_phases', () => {
-  // Orchestrator commissions independent destinations (each with its own
-  // Manager), never technical phases or machine machinery (AGENT-015).
   const en = readRole('orchestrator', 'en.md')
   const zh = readRole('orchestrator', 'zh-CN.md')
   assert.match(en, /You commission independent destinations, not technical phases/i)
@@ -58,25 +50,24 @@ test('WHAT[OFF-012] orchestrator_commissions_manager_roads_not_phases', () => {
   assert.match(zh, /给它自己的 Manager，给它自己的道路/)
 })
 
-test('WHAT[OFF-013] browser_consequence_is_external_facts_with_provenance_not_local_repo', () => {
-  // Browser establishes facts from the external world with provenance; the
-  // local repository is not web evidence (ARCH-017 Browser row).
-  const en = readRole('browser', 'en.md')
-  const zh = readRole('browser', 'zh-CN.md')
-  assert.match(en, /establish facts from the Internet and[\s\S]{0,60}other external web sources/i)
-  assert.match(en, /Do not inspect the local repository/i)
-  assert.match(zh, /从 Internet 与其他外部 web sources 建立事实/)
-  assert.match(zh, /本地 repository，就去检查/)
+test('WHAT[OFF-016] engineer_role_law_carries_investigation_mutation_and_exclusive_fission', () => {
+  const en = readRole('engineer', 'en.md')
+  const zh = readRole('engineer', 'zh-CN.md')
+  assert.match(en, /local facts|read, create, modify, move, delete/i)
+  assert.match(en, /only.*fission/i)
+  assert.match(en, /do not execute real commands|do not.*devops/i)
+  assert.match(zh, /本地事实调查.*源码/i)
+  assert.match(zh, /唯一允许使用 Fission/i)
+  assert.match(zh, /不执行真实命令.*不.*DevOps/i)
 })
 
-test('WHAT[OFF-014] inquiry_consequence_is_semantic_understanding_not_evidence_minting', () => {
-  // Inquiry contributes semantic intelligence; thinking twice does not turn a
-  // thought into evidence — it must not mint evidence from ideas (ARCH-017
-  // Inquiry row).
-  const en = readRole('inquiry', 'en.md')
-  const zh = readRole('inquiry', 'zh-CN.md')
-  assert.match(en, /semantic intelligence/i)
-  assert.match(en, /A thought does not become an observation by being thought twice/i)
-  assert.match(zh, /语义智能/)
-  assert.match(zh, /一个想法不会因为被想了两次，就变成 observation/)
+test('WHAT[OFF-017] devops_role_law_carries_execution_and_inherent_repair_without_allow_repair_toggle', () => {
+  const en = readRole('devops', 'en.md')
+  const zh = readRole('devops', 'zh-CN.md')
+  assert.match(en, /operational objective|execution/i)
+  assert.match(en, /non-architectural|repair/i)
+  assert.doesNotMatch(en, /allowRepair|managerApprovedMutation/i)
+  assert.match(zh, /运维.*执行|真实执行/i)
+  assert.match(zh, /非架构级.*修复/i)
+  assert.doesNotMatch(zh, /allowRepair|需 Manager 批准才可修改源码/i)
 })

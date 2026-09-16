@@ -20,36 +20,36 @@ import {
 const TOOL_NAMES = [
   'fork', 'resume', 'commission', 'join', 'horizon', 'todowrite', 'fission',
   'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm',
-  'bash-honeypot', 'assume', 'inspect', 'establish-behavior', 'repair-behavior',
+  'bash-honeypot', 'assume',
   'enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret',
-  'run', 'query-shell', 'stealth-browser-mcp', 'sphinx', 'review',
-  'chronicle', 'fetch',
+  'run', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
+  'review', 'chronicle', 'fetch', 'suicide',
 ]
 
 const PLUGIN_TOOL_NAMES = [
   'fork', 'resume', 'commission', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
-  'join', 'horizon', 'fission', 'review', 'suicide', 'run', 'query-shell', 'inspect',
-  'establish-behavior', 'repair-behavior', 'mv', 'rm', 'bash-honeypot', 'assume', 'chronicle',
+  'join', 'horizon', 'fission', 'review', 'suicide', 'run',
+  'mv', 'rm', 'bash-honeypot', 'assume', 'chronicle',
   'enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret',
-  'js-browser', 'js-coder', 'js-devops', 'js-inspector',
+  'js-engineer', 'js-devops',
 ]
 
 const HOST_OWNED_TOOL_NAMES = [
-  'todowrite', 'read', 'write', 'edit', 'glob', 'grep', 'skill', 'stealth-browser-mcp', 'sphinx',
+  'todowrite', 'read', 'write', 'edit', 'glob', 'grep', 'skill',
 ]
 
-const ROLE_NAMES = ['orchestrator', 'manager', 'coder', 'inspector', 'devops', 'browser', 'inquiry', 'blogger', 'distiller']
+const ROLE_NAMES = ['orchestrator', 'manager', 'engineer', 'devops', 'blogger']
 const COGNITIVE_TOOLS = ['enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret']
 const ALLOWED = {
   orchestrator: ['commission', 'join', 'horizon', 'assume', ...COGNITIVE_TOOLS],
-  manager: ['fork', 'resume', 'join', 'horizon', 'todowrite', 'fission', 'review', 'assume', ...COGNITIVE_TOOLS],
-  coder: ['fission', 'read', 'write', 'edit', 'glob', 'grep', 'inspect', 'fetch', 'mv', 'rm', 'bash-honeypot', 'assume', ...COGNITIVE_TOOLS],
-  inspector: ['fission', 'read', 'glob', 'grep', 'query-shell', 'fetch', 'assume', ...COGNITIVE_TOOLS],
-  devops: ['join', 'horizon', 'read', 'glob', 'grep', 'inspect', 'run', 'establish-behavior', 'repair-behavior', 'assume', ...COGNITIVE_TOOLS],
-  browser: ['fission', 'read', 'glob', 'grep', 'stealth-browser-mcp', 'assume', ...COGNITIVE_TOOLS],
-  inquiry: ['fission', 'inspect', 'sphinx', 'assume', ...COGNITIVE_TOOLS],
+  manager: ['fork', 'resume', 'join', 'horizon', 'todowrite', 'review', 'suicide', 'assume', ...COGNITIVE_TOOLS],
+  engineer: ['fission', 'read', 'write', 'edit', 'glob', 'grep', 'fetch', 'mv', 'rm', 'bash-honeypot', 'assume', ...COGNITIVE_TOOLS],
+  devops: [
+    'join', 'horizon', 'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'run',
+    'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
+    'assume', ...COGNITIVE_TOOLS,
+  ],
   blogger: ['chronicle'],
-  distiller: [],
 }
 
 const withSession = (messages, sessionID = 'ses-capability-manager') =>
@@ -78,7 +78,7 @@ test('WHAT[ENF-010] MANAGER_plugin_registers_only_plugin_owned_capability_tools'
     for (const toolName of HOST_OWNED_TOOL_NAMES) {
       assert.equal(hooks.tool[toolName], undefined, `${toolName} stays Host-owned`)
     }
-    const forbidden = ['auto-injected', '-', 'tool', 'bash', 'shell']
+    const forbidden = ['auto-injected', '-', 'tool', 'bash', 'shell', 'inspect', 'establish-behavior', 'repair-behavior', 'query-shell', 'js-browser', 'js-coder', 'js-inspector']
     for (const toolName of forbidden) assert.equal(hooks.tool[toolName], undefined, `${toolName} must not be an export`)
   })
 })
@@ -168,26 +168,18 @@ test('WHAT[ENF-010] ASSUME_updates_then_queries_one_persistent_jq_canvas_in_one_
 
 test('WHAT[ENF-010] MANAGER_calling_enum_uses_personas_while_name_remains_a_free_byname', async () => {
   await withPlugin(async (hooks) => {
-    const managerPersonas = [
-      'coder', 'investigator', 'operator', 'researcher', 'analyst',
-    ]
+    const managerPersonas = ['engineer']
     for (const calling of managerPersonas) {
       assert.equal(hooks.tool.fork.args.calling.safeParse(calling).success, true, `fork.calling=${calling}`)
     }
-    for (const calling of ['navigator', 'engineer', 'coordinator', 'lead', 'director']) {
+    for (const calling of ['coder', 'investigator', 'operator', 'devops', 'researcher', 'analyst', 'coordinator', 'lead', 'director']) {
       assert.equal(hooks.tool.fork.args.calling.safeParse(calling).success, false, `fork rejects ${calling}`)
     }
     for (const calling of ['lead']) {
       assert.equal(hooks.tool.commission.args.calling.safeParse(calling).success, true, `commission.calling=${calling}`)
     }
-    for (const calling of ['coordinator', 'director', 'coder', 'navigator']) {
+    for (const calling of ['coordinator', 'director', 'coder', 'engineer', 'navigator']) {
       assert.equal(hooks.tool.commission.args.calling.safeParse(calling).success, false, `commission rejects ${calling}`)
-    }
-    for (const managedName of ['fast-coder', 'deep-coder', 'fast-manager', 'deep-manager']) {
-      assert.equal(hooks.tool.fork.args.calling.safeParse(managedName).success, false, `fork rejects ${managedName}`)
-      assert.equal(hooks.tool.commission.args.calling.safeParse(managedName).success, false, `commission rejects ${managedName}`)
-      assert.equal(hooks.tool.fork.args.name.safeParse(managedName).success, true, `fork.name is free-form byname`)
-      assert.equal(hooks.tool.commission.args.name.safeParse(managedName).success, true, `commission.name is free-form byname`)
     }
   })
 })
@@ -201,7 +193,7 @@ test('WHAT[ENF-011] MANAGER_config_projects_owned_permissions_with_default_deny'
       const permission = config.agent[role].permission
       for (const toolName of TOOL_NAMES) {
         const expected = ALLOWED[role].includes(toolName) ? 'allow' : 'deny'
-        const key = toolName === 'stealth-browser-mcp' ? 'stealth-browser-mcp_*' : toolName === 'sphinx' ? 'sphinx_*' : toolName
+        const key = toolName
         assert.equal(permission[key], expected, `${role}.${key}`)
       }
       assert.equal(permission.external_directory, 'allow', `${role}.external_directory`)
@@ -214,7 +206,6 @@ test('WHAT[ENF-001] MANAGER_role_permission_matrix_is_owned_by_RolesSurface', ()
   for (const role of ROLE_NAMES) {
     const labels = permissions(role)
     assert.ok(Array.isArray(labels), role)
-    if (role === 'distiller') assert.deepEqual(labels, [])
     if (role === 'blogger') assert.deepEqual(labels, ['Chronicle'])
   }
 })
@@ -255,15 +246,20 @@ test('WHAT[ENF-010] MANAGER_legacy_agent_configuration_is_rejected_after_owned_p
   })
 })
 
-test('WHAT[ENF-009] MANAGER_non_repository_fork_keywords_are_rejected_before_child_creation', async () => {
-  await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, 'ses-manager-contract', 'manager')
-    await grantWorkOwned(runtime, 'ses-manager-contract')
-    const result = await hooks.tool.fork.execute(
-      { calling: 'researcher', name: 'Web Road', charge: 'browse', keywords: 'repository clue' },
-      { sessionID: 'ses-manager-contract', agent: 'manager' },
+test('WHAT[ENF-022] MANAGER_fission_is_denied_for_manager_and_devops', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    await acceptAuthorityRoot(runtime, 'ses-mgr-fission', 'manager')
+    const resMgr = await hooks.tool.fission.execute(
+      { prompts: ['lane 1', 'lane 2'] },
+      { sessionID: 'ses-mgr-fission', agent: 'manager' },
     )
-    assert.match(result, /fork targets Coder, Inspector, or DevOps|fork 目标为 Coder、Inspector 或 DevOps/i)
-    assert.equal(createdIds.length, 0)
+    assert.match(resMgr, /only available to Engineer|仅 Engineer 允许|denied/i)
+
+    await acceptAuthorityRoot(runtime, 'ses-devops-fission', 'devops')
+    const resDevOps = await hooks.tool.fission.execute(
+      { prompts: ['lane 1', 'lane 2'] },
+      { sessionID: 'ses-devops-fission', agent: 'devops' },
+    )
+    assert.match(resDevOps, /only available to Engineer|仅 Engineer 允许|denied/i)
   })
 })

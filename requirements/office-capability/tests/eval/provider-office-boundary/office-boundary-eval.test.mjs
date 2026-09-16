@@ -13,7 +13,7 @@ import { ORACLES, evaluateCase } from './oracles.mjs'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../../../..')
 const HERE = dirname(fileURLToPath(import.meta.url))
 
-/** Shared case shape + oracle red/green assertion (kept per-case after the split). */
+/** Shared case shape + oracle red/green assertion. */
 const assertCaseShape = (c) => {
   assert.equal(typeof c.id, 'string', c.id)
   assert.equal(typeof c.setup, 'string', c.id)
@@ -32,25 +32,25 @@ test('WHAT[OFF-006] office_boundary_eval_corpus_has_id_setup_oracles_and_synthet
   assert.deepEqual(
     CASES.map((c) => c.id).sort(),
     [
-      'coder-inspect-ownership',
       'devops-does-not-choose-among-valid-behaviors',
-      'inspector-refuses-repair',
+      'devops-inherent-repair',
+      'engineer-local-investigation-and-mutation',
       'manager-mixed-mission',
     ],
   )
 })
 
-test('WHAT[OFF-008] office_boundary_eval_coder_inspect_ownership_case_is_red_and_green', () => {
-  const c = CASES.find((x) => x.id === 'coder-inspect-ownership')
+test('WHAT[OFF-016] office_boundary_eval_engineer_local_investigation_case_is_red_and_green', () => {
+  const c = CASES.find((x) => x.id === 'engineer-local-investigation-and-mutation')
   assertCaseShape(c)
 })
 
-test('WHAT[OFF-009] office_boundary_eval_inspector_refuses_repair_case_is_red_and_green', () => {
-  const c = CASES.find((x) => x.id === 'inspector-refuses-repair')
+test('WHAT[OFF-017] office_boundary_eval_devops_inherent_repair_case_is_red_and_green', () => {
+  const c = CASES.find((x) => x.id === 'devops-inherent-repair')
   assertCaseShape(c)
 })
 
-test('WHAT[OFF-010] office_boundary_eval_devops_does_not_choose_case_is_red_and_green', () => {
+test('WHAT[OFF-017] office_boundary_eval_devops_does_not_choose_case_is_red_and_green', () => {
   const c = CASES.find((x) => x.id === 'devops-does-not-choose-among-valid-behaviors')
   assertCaseShape(c)
 })
@@ -60,13 +60,7 @@ test('WHAT[OFF-006] office_boundary_eval_manager_mixed_mission_case_is_red_and_g
   assertCaseShape(c)
 })
 
-test('WHAT[OFF-008] office_boundary_eval_coder_inspect_oracle_is_charge_text_not_a_filter_module', () => {
-  const c = CASES.find((x) => x.id === 'coder-inspect-ownership')
-  assert.ok(c.fail_if_inspect_charge_matches instanceof RegExp)
-  assert.match(c.notes, /not a production filter/)
-})
-
-test('WHAT[OFF-008] office_boundary_eval_oracles_are_not_wired_into_production_tools', () => {
+test('WHAT[OFF-006] office_boundary_eval_oracles_are_not_wired_into_production_tools', () => {
   const sources = [
     readFileSync(join(HERE, 'oracles.mjs'), 'utf8'),
     readFileSync(join(HERE, 'corpus.mjs'), 'utf8'),
@@ -83,9 +77,7 @@ test('WHAT[OFF-008] office_boundary_eval_oracles_are_not_wired_into_production_t
     for (const name of readdirSync(dir)) {
       if (!name.endsWith('.fs')) continue
       const text = readFileSync(join(dir, name), 'utf8')
-      assert.doesNotMatch(text, /fail_if_inspect_charge_matches/, name)
-      assert.doesNotMatch(text, /coder-inspect-ownership/, name)
-      assert.doesNotMatch(text, /\\b\(fix\|edit\|implement\|write\|modify\)\\b/, name)
+      assert.doesNotMatch(text, /engineer-local-investigation-and-mutation/, name)
     }
   }
 })

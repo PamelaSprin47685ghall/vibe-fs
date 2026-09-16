@@ -10,6 +10,10 @@
 - **不隶属于 `provider-projection`**：Projection 负责将语义意图转化为确定性的字节布局；Language 确定会话所使用的语言。
 - **不隶属于认知引导**：语言是承载散文文本的会话基础设施，而非散文本身的业务语义。
 
+## 核心不变量扩充
+
+- **双语 Prompt 语义同源与一致认知**：Engineer、DevOps、Manager、Sphinx 内部 Engineer 的中英文 Prompt 语义严格一致同源，Manager 认知、角色自我模型与工具说明互不矛盾；严禁残留「Manager 可分身」「DevOps 可分身」的示例或表述，Fission 严格为 Engineer 专属。
+
 ## 失败模式（RED）
 
 - **混合语言世界**：同一会话内出现多种自然语言混合（例如中文 System Prompt 配对英文工具契约），破坏认知一致性。
@@ -20,6 +24,9 @@
 ## 独立变化能力
 
 新增支持的 Locale 或调整资源组织方式，无需修改身份、感知范围或投影代数的任何命题；反之亦然。
+
+- 中英文版本提示词对同一角色能力出现分歧（如英文版允许某角色 Fission 而中文版禁止）。
+- 提示词中保留 Manager/DevOps 分身等违规示例，诱导模型产生越权尝试。
 
 ## DEPENDS ON
 

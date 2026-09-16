@@ -1,12 +1,5 @@
+// requirements/capability-enforcement/tests/internal-leaf-tool-authority.test.mjs
 // ENF-006 regression: an internal-only tool is admitted by its own authority.
-//
-// The Bookkeeper is an internal leaf whose prompt is HostInternal, so its
-// session never carries a public PromptAuthority profile and never resolves a
-// public Role. When the execute gate resolved a public Role for EVERY tool, the
-// Bookkeeper's own `js-bookkeeper` was denied `tool/registry/denied-unestablished`
-// before its admission ran: the tool was open to nobody, the CaseFinalize
-// transaction committed the unreshaped draft Q/A, and the canonical Case never
-// existed for `fetch` to resolve.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -14,7 +7,7 @@ import test from 'node:test'
 import { admissionAuthority, privateAttachmentAdmits, rolePredicate } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
 import { allRoleLabels } from '../../../dist/Foundation/RolesSurface.js'
 
-const OFFICE_TOOLS = ['inspect', 'fetch', 'review', 'join', 'chronicle', 'run', 'fork', 'resume']
+const OFFICE_TOOLS = ['fetch', 'review', 'join', 'chronicle', 'run', 'fork', 'resume']
 
 test('WHAT[ENF-006] internal_leaf_tool_declares_attachment_authority_not_a_public_office', () => {
   assert.equal(admissionAuthority('js-bookkeeper'), 'private-attachment')

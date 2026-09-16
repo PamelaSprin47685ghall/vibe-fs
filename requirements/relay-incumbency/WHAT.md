@@ -35,3 +35,15 @@ AuthorityRevision、WorkspaceSnapshotId、requirement digest、target/base horiz
 ## RELAY-009: active authority update 是 durable revision，不是普通 prompt
 
 已有 active 迭代接纳追加要求时，必须以 expected previous `AuthorityRevision`、精确 `IncumbencyId`、新 `AuthorityRevision`、物理 accepted authority message 与 fresh `WorkspaceSnapshotId` 写入同一 Relay authority update。fold 原子推进 Road 与 active 迭代的 revision/snapshot，并使旧有效 QualityCertificate 失效；同一精确 update 重放幂等，stale previous revision、错误 incumbent 或冲突 replay 必须 fail closed。单独发送 continuation 不构成 authority change，retired 迭代也永远不能成为 authority update 目标。
+
+## RELAY-010: 道路唯一逻辑 DevOps 与有效 Manager 控制权交接
+
+同一 open Road 拥有唯一的逻辑 DevOps 执行实体，当前有效 Incumbency（活跃 Manager）持有该 DevOps 的调用与控制权（通过 resume 调用与 join/horizon 观测）。新 Manager 迭代就位时自动获得该固定 DevOps 的调用权，旧任 Manager 退休（Continue）或失效后立即失去新派工与调用权。
+
+## RELAY-011: 已接收工作与进程的任期连续性与归属明确
+
+固定 DevOps 跨 Manager 迭代保留执行事实、终端状态、环境连续性与未决后台进程。已接收的 assignment 与运行中进程具有明确的 owner；旧任 Manager 退出不得导致执行完成记录丢失，新任 Manager 亦不得将前任未决工作的完成误认为新派任务的结果。DevOps 的物理会话可以因故障恢复而替换，但同一个逻辑 DevOps 不得同时对应两个可执行权威。
+
+## RELAY-012: 固定 DevOps 初始绑定与恢复的唯一性及幂等性
+
+固定 DevOps 绑定的初始化、晚到创建结果、接收状态不明与崩溃恢复必须满足唯一性与幂等性：同一道路在运行时初次绑定一个逻辑 DevOps 并持久化，之后仅允许 resume，禁止通过 fork 创建第二名 DevOps；接收结果不明时保留原 PromptKey 与恢复权，不盲目重发亦不新建操作员；不再支持或测试 Manager 分身并发共享 DevOps 的前提。

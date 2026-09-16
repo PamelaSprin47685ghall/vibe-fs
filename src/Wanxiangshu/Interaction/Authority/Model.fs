@@ -534,6 +534,7 @@ module PromptAuthority =
 
     let private strengthReplicaEligibleRole =
         function
+        | Role.Engineer
         | Role.Coder
         | Role.Inspector
         | Role.DevOps

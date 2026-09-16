@@ -4,6 +4,8 @@ type AdmissionFence
 type NudgeState
 
 val decide: resources: obj array -> ignoredQualityState: obj -> obj
+val decideWithRoadResources:
+    incumbencyResources: obj array -> roadResources: obj array -> qualityState: obj -> obj
 val freeze: incumbentId: string -> eventPosition: int -> AdmissionFence
 val fenceAppliesTo: fence: AdmissionFence -> incumbentId: string -> bool
 val admitResource: fence: AdmissionFence -> eventPosition: int -> obj

@@ -38,3 +38,8 @@ Release Proof (npm pack 真实打包、归档成员闭包与隔离外部消费�
 ### 4. 发布级闭包证明 (Release Proof & Packing Verification)
 
 - 在发布前执行全流程验证，调用真实 `npm pack` 产出 tarball，由 `verify-package.mjs` 流式校验成员闭包、防止路径逃逸与非普通文件、比对完整 digest，解压至隔离外部目录并在独立 consumer 中完成无仓库开发依赖的入口导入与资源读取验证。
+
+### 5. 活跃注册与资源同步门禁 (Active Registration & Surface Gate)
+
+- `scripts/checks/js-surface-gate.mjs` 与打包发布检查确保所有活跃角色（如 Engineer、DevOps）的工具 surface（`js-engineer`、`js-devops`）已生成并导出，且 `resources/provider/role/` 下仅包含合法活跃角色的双语资源。
+- 任何被废弃的工具或角色在打包白名单中必须被彻底清除，杜绝死资源混入发布包。

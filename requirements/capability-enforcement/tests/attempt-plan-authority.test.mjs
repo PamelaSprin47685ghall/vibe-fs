@@ -1,4 +1,4 @@
-// Split from tests/unit/context/attempt-plan.test.mjs (cutover Wave 2a); owner: capability-enforcement.
+// requirements/capability-enforcement/tests/attempt-plan-authority.test.mjs
 //
 // ENF-001 / ENF-003 / ENF-004: the AttemptExecutionProfile is the single origin
 // of a request's role, tools and request kind — everything derivable is derived
@@ -12,13 +12,11 @@ import { plan } from '../../../dist/Participant/Provider/Attempt/PlannerSurface.
 // ── PROMPT-008: everything derivable is derived ────────────────────────────
 
 test('WHAT[ENF-001] PROMPT_008_the_profile_derives_role_prompt_and_tools_from_the_authority', () => {
-  // The caller supplies only the canonical role, tier and request kind. The
-  // owner surface constructs the profile through AttemptPlanner.plan.
-  const planned = plan({ role: 'coder', tier: 'fast', kind: 'work-main' })
+  const planned = plan({ role: 'engineer', tier: 'fast', kind: 'work-main' })
 
   assert.equal(planned.ok, true, planned.error)
-  assert.equal(planned.canonicalRole, 'coder')
-  assert.equal(planned.systemPromptId, 'coder', 'AGENT-001: derived from the role alone')
+  assert.equal(planned.canonicalRole, 'engineer')
+  assert.equal(planned.systemPromptId, 'engineer', 'AGENT-001: derived from the role alone')
   assert.deepEqual(planned.toolCapabilities, [
     'BashHoneypot',
     'Edit',
@@ -26,7 +24,6 @@ test('WHAT[ENF-001] PROMPT_008_the_profile_derives_role_prompt_and_tools_from_th
     'Fission',
     'Glob',
     'Grep',
-    'Inspect',
     'Move',
     'Read',
     'Remove',
@@ -35,8 +32,8 @@ test('WHAT[ENF-001] PROMPT_008_the_profile_derives_role_prompt_and_tools_from_th
 })
 
 test('WHAT[ENF-004] AGENT_010_the_tier_does_not_reach_the_system_prompt_or_the_tool_set', () => {
-  const fast = plan({ role: 'coder', tier: 'fast', kind: 'work-main' })
-  const deep = plan({ role: 'coder', tier: 'deep', kind: 'work-main' })
+  const fast = plan({ role: 'engineer', tier: 'fast', kind: 'work-main' })
+  const deep = plan({ role: 'engineer', tier: 'deep', kind: 'work-main' })
 
   assert.equal(fast.ok, true, fast.error)
   assert.equal(deep.ok, true, deep.error)
@@ -46,7 +43,7 @@ test('WHAT[ENF-004] AGENT_010_the_tier_does_not_reach_the_system_prompt_or_the_t
 
 test('WHAT[ENF-003] PROMPT_008_the_request_kind_is_carried_not_inferred', () => {
   for (const kind of ['work-main', 'blogger-main', 'blogger-squash', 'interaction-repair']) {
-    const planned = plan({ role: 'coder', tier: 'fast', kind })
+    const planned = plan({ role: 'engineer', tier: 'fast', kind })
     assert.equal(planned.ok, true, planned.error)
     assert.equal(planned.requestKind, kind)
   }

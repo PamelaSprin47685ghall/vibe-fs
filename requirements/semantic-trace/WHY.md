@@ -2,7 +2,7 @@
 
 ## 领域价值与核心矛盾
 
-工作会话（Work Session）的生命周期跨越多次模型尝试、后备执行绑定切换（Peer Fallback）、宿主上下文重锚（compaction / reanchor）与最终审查。各环节均需确切回溯“当时究竟发生了什么”。
+工作会话（Work Session）的生命周期跨越多次模型尝试、后备执行绑定切换（Peer Fallback）、Fission 多 Present 展开与收敛、会话 Resume、宿主上下文重锚（compaction / reanchor）与最终审查。各环节均需确切回溯“当时究竟发生了什么”。
 
 核心矛盾在于：**宿主传输层的瞬态表示与坐标系会随重锚、模型切换与重试而发生漂移，不能直接作为因果真相**。如果依赖宿主消息数组下标或动态摘要，历史记录将随视图变化而失真。
 
@@ -13,12 +13,15 @@
 1. **唯一原始历史**：XTrace 是会话生命周期内唯一的 append-only 原始语义事实源，游标严格单调递增，严禁回退或覆写。
 2. **类型化捕获边界**：仅捕获对语义决策有效的 prompt、assistant 正文、推理内容与工具调用/结果，剔除 UI 变化、耗时、计费及底层运行时传输标记。
 3. **分段 Provenance 与物理标识解耦**：溯源信息按 provider run 进行分段标记；语义渲染输出保持纯净，不泄露内部 call_id 与传输标识。
-4. **稳定区间与单一数据源**：以半开区间形式提供精确的语义截面，下游的增量消费（delta）与生命周期记录（LWR gap）均同源派生自 XTrace。
+4. **稳定区间与单一数据源**：以半开区间形式提供精确的语义截面，下游的增量消费（delta）、生命周期记录（LWR gap）与案例归档（Casebook sourceTrace）均同源派生自 XTrace。
 5. **未发生材料绝不入迹**：未确认的投机执行、失败的探测尝试等未定事实严禁写入 XTrace；宿主上下文压缩（compaction）绝不删除已持久化的语义历史。
-6. **Owner-owned representation**：projection state、cursor 与 append refs 不作为跨 owner 数据结构发布；消费者只获得 trace owner 计算出的稳定 semantic views、evidence、ranges、capture receipts 与 completion outcomes，避免在 15 个消费者内复制 frontier/identity 公式。
+6. **Owner-owned representation**：projection state、cursor 与 append refs 不作为跨 owner 数据结构发布；消费者只获得 trace owner 计算出的稳定 semantic views、evidence、ranges、capture receipts 与 completion outcomes。
+7. **Keyed Convergence 与 Resume 边界**：Fission 的多路并发轨迹按 keyed 规则确定性汇聚；同一 Session 的多次 resume 划分为明确的独立 invocation 范围，不互相污染。
 
 ## 破坏后果
 
 - **因果依据断裂**：下游审计与评审无法证明工作记录所对应的真实历史前沿（frontier），导致审查依据失真。
 - **历史被污染或回滚**：未发生的投机探索被误记为历史事实，或宿主重锚导致已持久化的历史被清空。
 - **解析分叉**：不同下游消费者对同一段历史产生相互矛盾的文本解析。
+- **Fission 汇聚丢失**：多 lane 并行工作因偶然到达顺序错乱拼接，导致归档与复查丢失因果归属。
+

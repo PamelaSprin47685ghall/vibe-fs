@@ -42,6 +42,7 @@ module HandleFoldSurface =
 
     let private parseRole (value: obj) : Result<Role, {| kind: string; value: string |}> =
         match string value with
+        | "Engineer" -> Ok Role.Engineer
         | "Coder" -> Ok Role.Coder
         | "DevOps" -> Ok Role.DevOps
         | "Manager" -> Ok Role.Manager

@@ -62,3 +62,5 @@ module Surface =
     val authority: state: RelayState -> road: string -> obj
     val certificate: state: RelayState -> road: string -> obj
     val retirement: state: RelayState -> road: string -> obj
+    val roadDevOps: state: RelayState -> road: string -> obj
+    val bindRoadDevOps: state: RelayState -> road: string -> devopsId: string -> obj

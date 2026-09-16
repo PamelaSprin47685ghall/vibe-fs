@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.EventStore
@@ -62,43 +63,40 @@ module FetchTool =
     let private unavailable language =
         ToolHostCodec.tomlObjectWithInstructions [ prose language Path.Unavailable ] []
 
-    let private evaluateUpdatedFreshness language workspaceRoot store sessionId (updated: Case) =
-        task {
-            let! again = CasebookReplay.replayAll workspaceRoot updated.Observations
-
-            match CasebookWorkflow.checkFreshness updated again with
-            | ReplayResult.Fresh ->
-                do! CasebookLifecycle.touchAccess workspaceRoot store sessionId
-                return refreshed language updated.A
-            | ReplayResult.Stale -> return stale language updated.A
-        }
-
-    let private tryFetchRefreshed language workspaceRoot store sessionId fallbackAnswer =
-        task {
-            match! CasebookWorkflow.fetchCase store 256 sessionId with
-            | Error _
-            | Ok None -> return stale language fallbackAnswer
-            | Ok(Some updated) -> return! evaluateUpdatedFreshness language workspaceRoot store sessionId updated
-        }
-
-    let private handleStaleCase language workspaceRoot store sessionId answer =
-        task {
-            match! CasebookBookkeeper.refreshStale store workspaceRoot sessionId with
-            | Ok true -> return! tryFetchRefreshed language workspaceRoot store sessionId answer
-            | Ok false
-            | Error _ -> return stale language answer
-        }
+    let private extractPaths (case: Case) : string list =
+        if not (List.isEmpty case.RelatedPaths) then
+            case.RelatedPaths
+        else
+            case.Observations
+            |> List.choose (function
+                | Observation.FileRead(path, _) -> Some path
+                | _ -> None)
+            |> List.distinct
+            |> List.sort
 
     let private handleResolvedCase language workspaceRoot store (case: Case) =
         task {
-            let sessionId = case.SessionId
-            let! replayed = CasebookReplay.replayAll workspaceRoot case.Observations
+            let identity = case.Identity
+            let paths = extractPaths case
+            let! targetState = CasebookCapture.freezeCompletionState workspaceRoot paths
+            let! diffObj = CasebookCapture.computeMaintenanceDiff workspaceRoot targetState
+            let hasDiff = unbox<bool> (diffObj?hasDiff)
 
-            match CasebookWorkflow.checkFreshness case replayed with
-            | ReplayResult.Fresh ->
-                do! CasebookLifecycle.touchAccess workspaceRoot store sessionId
+            if not hasDiff then
+                do! CasebookLifecycle.touchAccess workspaceRoot store identity
                 return fresh language case.A
-            | ReplayResult.Stale -> return! handleStaleCase language workspaceRoot store sessionId case.A
+            else
+                match! CasebookBookkeeper.refreshStale store workspaceRoot identity with
+                | Ok true ->
+                    match! CasebookWorkflow.fetchCase store 256 identity with
+                    | Ok(Some updated) ->
+                        do! CasebookLifecycle.touchAccess workspaceRoot store identity
+                        return refreshed language updated.A
+                    | _ -> return stale language case.A
+                | Ok false ->
+                    do! CasebookLifecycle.touchAccess workspaceRoot store identity
+                    return fresh language case.A
+                | Error _ -> return stale language case.A
         }
 
     let private runFetch
@@ -132,7 +130,7 @@ module FetchTool =
                 work)
 
     let admission: ToolAdmission =
-        ToolAdmission.OfficeRole(fun _ r -> r = Role.Inspector || r = Role.Coder)
+        ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Fetch)
 
     let spec (factory: HostToolFactory) (workspaceRoot: string) (store: IEventStore) : ToolSpec =
         { Name = "fetch"

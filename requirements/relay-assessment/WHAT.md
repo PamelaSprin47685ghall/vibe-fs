@@ -31,3 +31,11 @@ schema、范围、narrative 或 exact binding 校验失败时不写 assessment�
 ## ASSESS-008: 评审前后信息时域隔离
 
 评审被接纳前，迭代可见的 Role、账本与工具描述只能包含独立只读的评估请求文档（`runtime/manager-assess`、`tool/review/description`），不得包含任何评审后指派文档（`runtime/manager-work`、`runtime/manager-finish`）。评审被接纳后，结果按评审向量选择恰好一条当前指令：存在任一 REVISE 选择修复指派（`runtime/manager-work`），无任何 REVISE（全 PERFECT 或 N/A）选择关闭退场（`runtime/manager-finish`）。评审前可见内容不得陈述低分承接修复、满分结束工作或还存在下一次迭代；循环机制只存在于 durable fold 与 projection，不存在于 provider 可见文本。
+
+## ASSESS-009: 独立评估由只读 Engineer 支持且实现者不自定答案
+
+Manager 独立评估依赖任务与证据隔离，不依赖专职 Inspector 角色名称，改由只读的 Engineer 工作实例建立客观代码事实与证据。实现者（此前负责实现与修复的 Engineer 或 DevOps）的完成报告与自我主张仅作为待核实线索，严禁直接替代评估者的独立判断或绑定为评审的最终评分；评估者必须基于当前快照的独立调查给出八维打分。
+
+## ASSESS-010: DevOps 自修改变快照使旧评估与证书失效且不可冒充新改动验证
+
+DevOps 具有角色固有的非架构级源码修复授权，在执行验证过程中可能直接修改工作区；Manager 不得假定交由 DevOps 的任务仅为纯读与运行。一旦工作区快照因修复而改变，旧快照上建立的任何测试结果、评估记录或 QualityCertificate 立即失效，严禁搬移至新改动上冒充验证；必须在最新快照上由下一独立迭代重新执行独立 assessment。

@@ -118,6 +118,7 @@ module ManagedAgentConfig =
         match role with
         | Role.Manager -> StaticTools.managerAgentConfig (Some prompts.ManagerSystemPrompt)
         | Role.Orchestrator -> StaticTools.orchestratorAgentConfig (Some prompts.OrchestratorSystemPrompt)
+        | Role.Engineer -> StaticTools.engineerAgentConfig (Some prompts.EngineerSystemPrompt)
         | Role.Coder -> StaticTools.coderAgentConfig (Some prompts.CoderSystemPrompt)
         | Role.Inspector -> StaticTools.inspectorAgentConfig (Some prompts.InspectorSystemPrompt)
         | Role.DevOps -> StaticTools.devopsAgentConfig (Some prompts.DevopsSystemPrompt)

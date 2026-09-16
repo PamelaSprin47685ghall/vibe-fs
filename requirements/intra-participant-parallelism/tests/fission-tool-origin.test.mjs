@@ -64,13 +64,13 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] real root chat message carries a r
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] a bound child retains fission when the physical parent cache is empty', async () => {
   await withExecutablePlugin(async (hooks) => {
     const sessionID = 'fission-bound-child-provider-surface'
-    bindManagedChild('fission-binding-parent', sessionID, 'manager')
+    bindManagedChild('fission-binding-parent', sessionID, 'engineer')
     const output = {
       message: {
         id: 'msg-fission-bound-child-provider-surface',
         role: 'user',
         sessionID,
-        agent: 'manager',
+        agent: 'engineer',
         model: { providerID: 'host', modelID: 'placeholder' },
         tools: { fork: true, fission: true },
       },
@@ -78,7 +78,7 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] a bound child retains fission when
     }
 
     try {
-      await hooks['chat.message']({ sessionID, agent: 'manager' }, output)
+      await hooks['chat.message']({ sessionID, agent: 'engineer' }, output)
       assert.equal(output.message.tools.fission, true)
       assert.equal(output.message.tools.fork, true)
     } finally {

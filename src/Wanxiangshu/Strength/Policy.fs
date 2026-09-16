@@ -44,7 +44,7 @@ type StrengthDecision =
 
 module StrengthPolicy =
 
-    let eligibleRoles = set [ Role.Coder; Role.Inspector; Role.DevOps; Role.Inquiry ]
+    let eligibleRoles = set [ Role.Engineer; Role.Coder; Role.Inspector; Role.DevOps; Role.Inquiry ]
 
     let eligibility (opportunity: StrengthOpportunity) : StrengthEligibility =
         if not opportunity.IsRootWork then

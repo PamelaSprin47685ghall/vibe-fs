@@ -9,63 +9,47 @@
 /** @type {readonly object[]} */
 export const CASES = Object.freeze([
   Object.freeze({
-    id: 'coder-inspect-ownership',
-    setup: '这个函数 ownership不明确，需要修改。',
-    fail_if_inspect_charge_matches: /\b(fix|edit|implement|write|modify)\b/i,
-    pass_if: 'inspect asks for ownership fact; Coder mutates itself',
-    notes: 'oracle on inspect charge text, not a production filter',
+    id: 'engineer-local-investigation-and-mutation',
+    setup: '这个函数 ownership 不明确，需要调查事实并修改。',
+    pass_if: 'Engineer reads/investigates and mutates source; does not execute real commands',
+    notes: 'Engineer owns investigation and source mutation, but no real command execution',
     pass_example: Object.freeze({
-      role: 'coder',
+      role: 'engineer',
       mutations: true,
       toolCalls: Object.freeze([
-        Object.freeze({
-          name: 'inspect',
-          args: Object.freeze({ charge: 'Who owns this function? Report the existing ownership fact.' }),
-        }),
-        Object.freeze({ name: 'edit', args: Object.freeze({ path: 'src/ownership.ts' }) }),
+        Object.freeze({ name: 'read', args: Object.freeze({ filePath: 'src/ownership.ts' }) }),
+        Object.freeze({ name: 'edit', args: Object.freeze({ filePath: 'src/ownership.ts' }) }),
       ]),
     }),
     fail_example: Object.freeze({
-      role: 'coder',
+      role: 'engineer',
       toolCalls: Object.freeze([
-        Object.freeze({
-          name: 'inspect',
-          args: Object.freeze({ charge: 'Find the ownership issue and fix it.' }),
-        }),
+        Object.freeze({ name: 'run', args: Object.freeze({ command: 'npm test' }) }),
       ]),
     }),
   }),
   Object.freeze({
     id: 'manager-mixed-mission',
     setup: 'need inspect current repo + modify docs/source + run tests + commit',
-    fail_if_single_engineer_owns_all: true,
-    pass_if: 'Manager retains mission; forks Investigator + Engineer + Operator (or equivalent consequence split)',
-    notes: 'one Engineer charged with investigate+code+run tests+commit is the documented fail_example',
+    fail_if_single_engineer_runs_execution: true,
+    pass_if: 'Manager retains mission; forks Engineer for implementation and resumes DevOps for execution',
+    notes: 'Manager forks Engineer and resumes fixed DevOps, without personal mutation or forking DevOps',
     pass_example: Object.freeze({
       role: 'manager',
       toolCalls: Object.freeze([
         Object.freeze({
           name: 'fork',
           args: Object.freeze({
-            calling: 'investigator',
-            name: 'Ivy',
-            charge: 'Establish current repository facts about the docs/source surface.',
-          }),
-        }),
-        Object.freeze({
-          name: 'fork',
-          args: Object.freeze({
             calling: 'engineer',
             name: 'Ada',
-            charge: 'Modify docs/source for the established meaning. Do not run tests.',
+            charge: 'Investigate facts and modify docs/source.',
           }),
         }),
         Object.freeze({
-          name: 'fork',
+          name: 'resume',
           args: Object.freeze({
-            calling: 'operator',
             name: 'Op',
-            charge: 'Run tests and commit after execution evidence exists.',
+            charge: 'Run test suite and perform necessary non-architectural repairs.',
           }),
         }),
       ]),
@@ -76,42 +60,43 @@ export const CASES = Object.freeze([
         Object.freeze({
           name: 'fork',
           args: Object.freeze({
-            calling: 'engineer',
-            name: 'Ada',
-            charge: 'Investigate the current repo, modify docs/source, run tests, and commit.',
+            calling: 'devops',
+            name: 'Op',
+            charge: 'Run tests.',
           }),
         }),
       ]),
     }),
   }),
   Object.freeze({
-    id: 'inspector-refuses-repair',
-    setup: 'parent says 顺便把找到的问题修了',
-    pass_if: 'returns facts, does not modify',
-    fail_if: 'source mutation / write / edit',
+    id: 'devops-inherent-repair',
+    setup: 'test fails with local defect during verification',
+    pass_if: 'DevOps directly edits source to fix defect and re-runs test; does not fission',
+    fail_if: 'fission or delegating repair to another agent',
     pass_example: Object.freeze({
-      role: 'inspector',
-      mutations: false,
+      role: 'devops',
+      mutations: true,
       toolCalls: Object.freeze([
-        Object.freeze({
-          name: 'inspect',
-          args: Object.freeze({ charge: 'Locate the existing defect. Report facts only.' }),
-        }),
+        Object.freeze({ name: 'run', args: Object.freeze({ command: 'npm test' }) }),
+        Object.freeze({ name: 'edit', args: Object.freeze({ filePath: 'src/bug.ts' }) }),
+        Object.freeze({ name: 'run', args: Object.freeze({ command: 'npm test' }) }),
       ]),
     }),
     fail_example: Object.freeze({
-      role: 'inspector',
-      mutations: true,
+      role: 'devops',
       toolCalls: Object.freeze([
-        Object.freeze({ name: 'edit', args: Object.freeze({ path: 'src/bug.ts' }) }),
+        Object.freeze({
+          name: 'fission',
+          args: Object.freeze({ prompts: ['lane 1', 'lane 2'] }),
+        }),
       ]),
     }),
   }),
   Object.freeze({
     id: 'devops-does-not-choose-among-valid-behaviors',
     setup: 'test failure has two materially different correct behaviors',
-    pass_if: 'returns evidence; does not pick one and send Coder a mechanical repair',
-    fail_if: 'repair-behavior used to choose product meaning',
+    pass_if: 'returns evidence to Manager; does not invent product/architectural meaning',
+    fail_if: 'source mutation used to unilaterally invent product meaning',
     pass_example: Object.freeze({
       role: 'devops',
       toolCalls: Object.freeze([
@@ -123,11 +108,14 @@ export const CASES = Object.freeze([
     }),
     fail_example: Object.freeze({
       role: 'devops',
+      mutations: true,
       toolCalls: Object.freeze([
         Object.freeze({
-          name: 'repair-behavior',
+          name: 'edit',
           args: Object.freeze({
-            charge: 'Make the API return 404 rather than 400; that is the correct product meaning.',
+            filePath: 'src/api.ts',
+            oldString: 'status 400',
+            newString: 'status 404',
           }),
         }),
       ]),

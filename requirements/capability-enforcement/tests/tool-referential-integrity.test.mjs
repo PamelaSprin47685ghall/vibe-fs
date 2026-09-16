@@ -1,8 +1,7 @@
-// Split from tests/unit/verify/tool-referential-integrity.test.mjs (cutover Wave 2a); owner: capability-enforcement
-//
+// requirements/capability-enforcement/tests/tool-referential-integrity.test.mjs
 // ARCH-016 Gate A — tool referential integrity (no dist), ENF-009 名称/结构执行面：
-// legacy 名称黑名单、静态 known-tool registry 成员、repo 全绿。semantic act contract
-// 半边（same name = 唯一合同）在 action-affordance 包测试内。
+// legacy 名称黑名单、静态 known-tool registry 成员、repo 全绿。
+
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { rolePredicate } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
@@ -28,6 +27,7 @@ const STATIC_TOOLS_SNIPPET = `
 module StaticTools =
     let knownToolNames =
         [ "fork"
+          "resume"
           "commission"
           "join"
           "horizon" ]
@@ -45,6 +45,7 @@ module ToolRegistry =
 test('WHAT[ENF-009] gate_a_documents_legacy_forbidden_names', () => {
   assert.ok(LEGACY_FORBIDDEN_NAMES.includes('verdict'))
   assert.ok(LEGACY_FORBIDDEN_NAMES.includes('list'))
+  assert.ok(LEGACY_FORBIDDEN_NAMES.includes('inspect'))
 })
 
 test('WHAT[ENF-009] gate_a_legacy_tool_name_is_red', () => {
@@ -53,23 +54,23 @@ test('WHAT[ENF-009] gate_a_legacy_tool_name_is_red', () => {
 })
 
 test('WHAT[ENF-009] gate_a_unknown_tool_not_in_static_is_red', () => {
-  const inspectSpec = `
-module InspectorTool =
+  const customSpec = `
+module CustomTool =
     let spec factory scope syncDelegate =
-        { Name = "inspect"
-          Description = "inspect"
+        { Name = "custom-unknown"
+          Description = "custom"
           Arguments = []
           Execute = fun _ _ -> task { return "" } }
 `
-  const violations = scanEntries([{ file: 'InspectorTool.fs', text: inspectSpec }], {
+  const violations = scanEntries([{ file: 'CustomTool.fs', text: customSpec }], {
     staticTools: STATIC_TOOLS_SNIPPET,
     toolRegistry: REGISTRY_SNIPPET,
   })
-  assert.ok(violations.some((v) => v.code === 'unknown-tool-not-in-static' && v.detail?.includes('inspect')))
+  assert.ok(violations.some((v) => v.code === 'unknown-tool-not-in-static' && v.detail?.includes('custom-unknown')))
 })
 
 test('WHAT[ENF-009] gate_a_extract_known_tool_names', () => {
-  assert.deepEqual(extractKnownToolNames(STATIC_TOOLS_SNIPPET), ['fork', 'commission', 'join', 'horizon'])
+  assert.deepEqual(extractKnownToolNames(STATIC_TOOLS_SNIPPET), ['fork', 'resume', 'commission', 'join', 'horizon'])
 })
 
 test('WHAT[ENF-009] gate_a_repo_scan_is_green', () => {

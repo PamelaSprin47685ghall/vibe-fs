@@ -81,7 +81,7 @@ module ToolRegistry =
           "celebrate", InstitutionalLearningTools.admission
           "regret", InstitutionalLearningTools.admission
           "chronicle", ChronicleTool.admission bloggerHost
-          "fetch", ToolAdmission.OfficeRole(fun _ r -> r = Role.Inspector || r = Role.Coder)
+          "fetch", ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Fetch)
           "js-bookkeeper", JsBookkeeperTool.admission ]
 
     let private tryAdmissionFor (specName: string) (bloggerHost: IBloggerRuntimeHost option) : ToolAdmission option =
@@ -260,7 +260,7 @@ module ToolRegistry =
             let managerPermission =
                 match spec.Name with
                 | "fork" -> Some ToolPermission.Fork
-                | "resume" -> Some ToolPermission.Fork
+                | "resume" -> Some ToolPermission.Resume
                 | "join" -> Some ToolPermission.Join
                 | "horizon" -> Some ToolPermission.Horizon
                 | "fission" -> Some ToolPermission.Fission

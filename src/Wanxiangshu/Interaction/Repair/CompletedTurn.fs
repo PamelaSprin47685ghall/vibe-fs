@@ -51,6 +51,7 @@ module CompletedTurnClassifier =
         function
         | Some Role.Manager
         | Some Role.Orchestrator
+        | Some Role.Engineer
         | Some Role.Coder
         | Some Role.Inspector
         | Some Role.DevOps

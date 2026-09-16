@@ -32,3 +32,7 @@ projection 只是对 durable facts 的确定性过滤：相同 facts 产生相�
 ## PROJ-008: authority message chain 跨 cut 保留，普通前任消息与内部 wake 不借机穿透
 
 初始 root authority message 与之后每个 durable accepted `AuthorityRevision` 对应的物理 authority message 都是 Road 的权威输入，projection 必须按 typed message identity 保留它们，即使它们位于 predecessor cut 之前。除此之外的 predecessor user/assistant/tool/nudge 原始消息仍必须被 cut；内部 loop wake continuation 即使形如 user message，也因其非 authority 身份而被移除；不得为了保留追加要求而放宽成“保留所有 user message”或文本匹配例外。
+
+## PROJ-009: 固定 DevOps 执行事实与前任上下文隔离
+
+下一任 Manager 的 provider 上下文投影严格遵循 cut 边界与 review-first 起点，不继承前任 Manager 的私有思考过程、prompt 历史或交互细节。固定 DevOps 的最新执行产物、修改事实与运行结果通过共享工作区快照与显式工作记录/检查接口对新任可见；投影严禁通过回放前任私有 prompt 还原 DevOps 状态，亦严禁在 provider 消息中混合已退休 Manager 的任何交互消息或假定 Manager 分身的多路交互。

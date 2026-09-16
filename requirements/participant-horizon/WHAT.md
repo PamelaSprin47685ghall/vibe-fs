@@ -12,7 +12,7 @@
 
 ## PARTICIPANT-HORIZON-002: 内部机器拓扑不穿过 horizon
 
-任何底层机器拓扑标识（包括 `SessionId`、`AgentId`、`ManagerJobId`、`PtyId`、`FissionGroupId`、`lane_index`、`worktree` 路径、重试 offset、`fast-*`/`deep-*` 绑定自称以及内部 spool 路径）严禁出现在面向模型的提示词、工具参数或返回值中。
+任何底层机器拓扑标识（包括 `SessionId`、`AgentId`、`ManagerJobId`、`PtyId`�`FissionGroupId`、`lane_index`、`worktree` 路径、重试 offset、`fast-*`/`deep-*` 绑定自称以及内部 spool 路径）严禁出现在面向模型的提示词、工具参数或返回值中。
 
 ## PARTICIPANT-HORIZON-003: 通用状态 DTO 不投影，后果用自然语言
 
@@ -32,7 +32,7 @@
 
 ## PARTICIPANT-HORIZON-007: 内部参与者不进入 provider-visible surface
 
-Blogger、Distiller、Bookkeeper 等内部辅助角色严禁出现在模型可见的 enum、Schema、fork 候选或参数说明中。底层的批处理任务切片与内部 session 标识严禁进入工具面。
+Blogger、Bookkeeper、Predictor 等内部辅助角色严禁出现在模型可见的 enum、Schema、fork 候选或参数说明中。底层的批处理任务切片与内部 session 标识严禁进入工具面。
 
 ## PARTICIPANT-HORIZON-008: 隐藏 review 编排不进 Manager horizon
 
@@ -41,14 +41,15 @@ assessment 结论只以原子物化的质量义务与工作权形式进入账本
 
 ## PARTICIPANT-HORIZON-009: 隐藏 target 只返回 generic unavailable
 
-当模型尝试访问或调度不可见的目标（如 Distiller 等内部角色）时，系统仅返回通用的不可用拒绝响应，禁止在拒绝文案中提及该目标的存在或说明其为内部专有。
+当模型尝试访问或调度不可见的目标（如 Predictor、Bookkeeper 或已废弃旧角色）时，系统仅返回通用的不可用拒绝响应，禁止在拒绝文案中提及该目标的存在或说明其为内部专有。
 
-## PARTICIPANT-HORIZON-010: fork/commission 可见集合
+## PARTICIPANT-HORIZON-010: fork/commission 可见集合与固定 DevOps 语义
 
-- Manager `fork` 仅可见：coder、inspector、devops、browser、inquiry（各一个本名版本）。
-- Orchestrator `commission` 仅可见：manager。
+- Manager `fork` 仅可见：`engineer`（单一本名版本）；Manager 严禁通过 `fork` 启动 DevOps、旧角色或内部身份。
+- Orchestrator `commission` 仅可见：`manager`。
+- 固定 DevOps 由合法 Runtime 绑定创建，在模型视界中仅以稳定 Byname 呈现，仅通过 `resume` 续做调用，严禁出现在 `fork` 的候选名单中。
 - `horizon()` 仅返回在场名册的 Byname 或 TerminalName，不暴露底层 id。
-- Blogger、Distiller、Bookkeeper 等内部角色严禁出现在可 fork 集合中。
+- Blogger、Bookkeeper、Predictor 等内部角色以及已退出的旧角色（coder、inspector、browser、inquiry、distiller）严禁出现在可 fork 集合中。
 
 ## PARTICIPANT-HORIZON-011: `horizon()` 是 pull-only snapshot
 
@@ -58,7 +59,7 @@ assessment 结论只以原子物化的质量义务与工作权形式进入账本
 
 ## PARTICIPANT-HORIZON-012: warm-start hints 只向有 repository 证据 authority 的角色准入
 
-仓库热启动线索（WarmStart hints）仅向有权直接接触仓库证据的角色（Coder、Inspector、DevOps）准入。其余角色仅可沿调用链传递关键词，不得接收仓库代码片段。
+仓库热启动线索（WarmStart hints）仅向有权直接接触仓库证据的角色（Engineer、DevOps）准入。其余角色仅可沿调用链传递关键词，不得接收仓库代码片段。
 
 ## PARTICIPANT-HORIZON-013: hints 是 data，不是 instruction/proof/history
 
@@ -67,3 +68,7 @@ assessment 结论只以原子物化的质量义务与工作权形式进入账本
 ## PARTICIPANT-HORIZON-014: 虚假 affordance / 不可达路径不穿越
 
 视界中严禁展示指向已不存在实体的路径或标识，工具与动作名称仅表达真实的语义动作，不将无法执行的内部机器状态伪装成可选动作。
+
+## PARTICIPANT-HORIZON-015: Manager 并行来自派出多名 Engineer 而非自身分身
+
+Manager 在视界中通过 fork 派出多名独立的 Engineer 获得任务并行，Manager 自身禁止使用 Fission 分身。Manager 的 horizon 与工具视界中严禁展示 Manager 自身分身、分身共享 DevOps 或管理分裂等虚假 affordance。各 Engineer 子会话独立在场并按稳定 Byname 呈现在 horizon 名册中。

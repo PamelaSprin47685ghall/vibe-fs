@@ -2,32 +2,39 @@ namespace Wanxiangshu.Repository.Knowledge.Casebook
 
 open System.Collections.Generic
 
-/// CASE-003: per-session observation collector, fed by the Host
-/// tool.execute.after boundary (args + rendered output — never transcript
-/// text). Capture is best-effort: unparseable executions are skipped; the
-/// buffer is drained into an archive when the Inspector session terminates
-/// (the caller decides when — collector never decides lifecycle).
+/// CASE-003 / KR-003: per-session observation and substantive access collector.
 type CasebookObservationCollector() =
 
-    // DSL-MUTABLE: resource — per-session observation buffer registry
     let buffers = Dictionary<string, ResizeArray<Observation>>()
+    let trackers = Dictionary<string, AccessTracker>()
 
     let appendObservation sessionId observation =
         match buffers.TryGetValue sessionId with
         | true, buffer -> buffer.Add observation
         | false, _ ->
-            // DSL-MUTABLE: algorithm-scratch — new observation buffer for dictionary insert
             let buffer = ResizeArray<Observation>()
             buffer.Add observation
             buffers.[sessionId] <- buffer
 
-    /// Record one tool execution's observation for a session.
+    let getTracker sessionId =
+        match trackers.TryGetValue sessionId with
+        | true, tracker -> tracker
+        | false, _ ->
+            let tracker = CasebookCapture.createAccessTracker ()
+            trackers.[sessionId] <- tracker
+            tracker
+
     member _.Collect(sessionId: string, toolName: string, args: obj, output: string) : unit =
+        let tracker = getTracker sessionId
+        CasebookCapture.recordSubstantiveAccess tracker toolName args true
         match CasebookCapture.capture toolName args output with
         | None -> ()
         | Some observation -> appendObservation sessionId observation
 
-    /// Observations collected so far for a session (normalized).
+    member _.RecordSubstantive(sessionId: string, toolName: string, args: obj, committed: bool) : unit =
+        let tracker = getTracker sessionId
+        CasebookCapture.recordSubstantiveAccess tracker toolName args committed
+
     member _.Drain(sessionId: string) : Observation list =
         match buffers.TryGetValue sessionId with
         | true, buffer ->
@@ -35,6 +42,21 @@ type CasebookObservationCollector() =
             buffers.Remove sessionId |> ignore
             snapshot
         | false, _ -> []
+
+    member _.DrainPaths(sessionId: string) : string list =
+        match trackers.TryGetValue sessionId with
+        | true, tracker ->
+            let paths = tracker.GetRelatedPaths()
+            trackers.Remove sessionId |> ignore
+            paths
+        | false, _ -> []
+
+    member _.DrainTracker(sessionId: string) : AccessTracker =
+        match trackers.TryGetValue sessionId with
+        | true, tracker ->
+            trackers.Remove sessionId |> ignore
+            tracker
+        | false, _ -> CasebookCapture.createAccessTracker ()
 
     member _.Count(sessionId: string) : int =
         match buffers.TryGetValue sessionId with

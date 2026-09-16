@@ -11,7 +11,8 @@ LifecycleWorkRecord（LWR）提供跨边界传递的单一结构化工作记录�
 
 1. **Full-lifecycle 物化**：从全局快照与 XTrace 游标物化完整生命周期记录。
 2. **Bounded 物化**：根据指定的 `BoundedRange`（`[StartInclusive, EndExclusive)`）过滤 frames 与 trace 范围，计算局部 coverage，并默认将 `includeOpening` 置为 false。带 `ProviderRun` 的 run-bounded 投影把范围起点推进到本 invocation 首个 assistant part，确保 caller 已知的 user charge 不进入子→父 LWR。
-3. **分向投影控制**：通过 `includeOpening` 参数控制是否在最终 Markdown 中渲染 Opening 节，段落为空时整段省略，段落标识由外层 wire 注入。
+3. **分向投影控制**：通过 `includeOpening` 参数控制是否在最终 Markdown 中渲染 Opening 节，段落为空时整段省略，段落标识�外层 wire 注入。
+4. **Fission 汇聚物化**：在 Fission 场景下，物化器消费经由 `semantic-trace` deterministic keyed convergence 汇聚后的单次 invocation 范围 trace，生成唯一的 canonical LWR。
 
 ## 依赖关系
 

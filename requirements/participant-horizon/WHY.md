@@ -14,19 +14,23 @@
 若将底层状态无节制地暴露给参与者，会导致严重退化：
 - **参与者注意力耗散**：参与者被迫解析底层的 DTO 状态码与机器标识，将推理能力浪费在机器内部实现上。
 - **终结机制与隐藏编排泄密**：如果内部 Reviewer、双重确认屏障对 Manager 可见，Manager 会试图操纵评审流程，使终结协议退化为博弈。
-- **推断错误 Authority**：暴露底层机器执行档位（如 `fast-*`）会诱导模型通过词汇推断能力，破坏后果定义。
+- **推断错误 Authority 与虚假分身**：暴露底层机器执行档位（如 `fast-*`）或虚假的分身功能会诱导模型通过词汇推断能力，破坏后果定义。
+- **Manager 错误理解并行来源**：Manager 的并行来自于通过 fork 派出多名独立的 Engineer，而不是来自 Manager 自身的分身（Fission）；Manager 分身共享 DevOps 等虚假拓扑会严重破坏管理职责的一致性。
+- **DevOps 出现多重实例幻觉**：固定 DevOps 由合法 Runtime 绑定创建，模型在视界中仅见稳定 Byname，仅通过 resume 续做调用，绝不出现在 fork 候选名单中。
 
 `participant-horizon` 的核心不变量：
 - **正向准入律**：信息进入模型视界必须通过六问决策过滤器，仅准入「会改变下一步合法行动」的最小必要事实。
 - **机器拓扑隐匿**：底层 SessionId、AgentId、JobId、PtyId、worktree 路径及机器自称等严禁穿透视界。
 - **状态 DTO 转化为自然语言后果**：禁止向模型暴露通用的 `status`、`code`、`count` 等 DTO 字段；超时、中断与等待结束一律使用自然语言后果表达。
-- **隐藏面不可见**：内部辅助角色（Blogger、Distiller、Bookkeeper）与评审编排流程对常规执行角色绝对隐匿。
+- **隐藏面不可见**：内部辅助角色（Blogger、Bookkeeper、Predictor）与评审编排流程对常规执行角色绝对隐匿。
+- **fork 候选仅限合法公共角色**：Manager 的 fork 候选仅限 Engineer；Orchestrator 的 commission 候选仅限 Manager；固定 DevOps 仅在 resume 中可见 Byname。
 
 ## 破裂后果
 
 - 机器底层标识泄露至模型提示词或工具返回结果中，污染模型输出。
 - 模型捕获到内部评审角色的存在并尝试直接调度，破坏不可抵赖的质量保证体系。
 - 超时与错误以状态码形式暴露，诱导模型尝试非法的低级重试。
+- Manager 尝试自我 Fission 或在 fork 列表中看见 DevOps / Coder / Inspector / Browser / Inquiry / Distiller，造成职责边界紊乱。
 
 ## 边界与关系
 

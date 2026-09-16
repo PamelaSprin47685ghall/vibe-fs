@@ -7,5 +7,9 @@ module CasebookEventTypes =
     val Refreshed: string
     val Accessed: string
     val Evicted: string
+    val LegacyCaptured: string
+    val LegacyRefreshed: string
+    val LegacyAccessed: string
+    val LegacyEvicted: string
     val all: string list
     val isCasebookEvent: eventType: string -> bool

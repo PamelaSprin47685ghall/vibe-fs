@@ -158,3 +158,8 @@ module ProjectionSurface =
         box
             {| audit = messages
                provider = provider |}
+
+    let projectDevOpsFacts (_input: obj) : obj =
+        box
+            {| visibleInWorkspace = true
+               injectedIntoProviderTranscript = false |}

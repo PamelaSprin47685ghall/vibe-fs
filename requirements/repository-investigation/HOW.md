@@ -5,12 +5,12 @@
 ### 1. 证据漏斗与取证边界
 
 1. **Evidence Funnel 机制**：
-   - Inspector 角色遵循证据漏斗模型：`fact → cheapest adequate observation → evidence → consequence`；
-   - 只读约束在工具层面强制生效：Inspector 仅配备静态读取工具（如 `read`、`glob`、`grep` 及只读 `query-shell`），不具备文件修改或破坏性执行权限；
-   - `query-shell` 严格执行命令负清单（禁止 `build`、`test`、`lint`、`typecheck`、应用启动与迁移等），仅允许 `git status`、`git diff`、`stat` 等静态元数据查询。
+   - 调查流程遵循证据漏斗模型：`fact → cheapest adequate observation → evidence → consequence`；
+   - 只读约束在工具层面强制生效：只读观察工具（如 `read`、`glob`、`grep`）及 JS 编程面中的只读原语只提供静态只读能力，不具备破坏性执行权限；
+   - 静态元数据查询（如 `git log`、`git status`、`stat` 等）属于合法的静态观察。
 
 2. **定位与溯源编码**：
-   - 提取的证据必须记录规范化定位符：文件路径、精确行区间与内容指纹，确保后续重放与复核具备确定性基准。
+   - 提取的证据必须记录规范化定位符：文件路径、精确行区间与内容指纹，确保后续复核具备确定性基准。
 
 ### 2. Warm-Start 并行管线与 Fail-Open 语义
 
@@ -22,6 +22,3 @@
    - 检索命中条目经 `stableDedupeHints`（按路径、起止行与正文）稳定去重；
    - 渲染阶段执行双重硬界限制（最大提示条目数与字节上限），超限时按整条 hint 剔除，保证数据结构完整；
    - 检索过程中的任何单项失败、超时或服务未就绪均安全 fail-open，返回原始任务描述，不阻断主线流程。
-   - `OpenCode/Tools/CoderTool.fs` 静态调用 `RepositoryWarmStart.prepareDocument`，由原 runtime 拥有上述 fail-open；adapter 不再动态加载模块、解码 Fable union 或吞掉所有异常。正常 `Ok` 文档直接传给 SyncDelegate；typed `Error` 为不变量失败，Task fault／取消继续传播，不另造成功结果。
-
-`ForkTool.prepareForkPromptWithRecord` 同样静态调用 `RepositoryWarmStart.appendToBaseDocument`：原始 relay document、关键词准入与无关键词零工作保持不变；查询级 fail-open 仍由 WarmStart 拥有，adapter 不再通过 null／默认原文掩盖 typed Error、Task fault 或取消。既有 WarmStart suite 证明 runtime 的查询失败与角色／路径边界，Fork suite 证明实际工具准入和派发；尚无直接注入 Fork adapter fault／取消的专门回归，不将前者冒充后者。

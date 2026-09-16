@@ -1,31 +1,55 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
-/// CASE-003: typed observation capture from the final execution layer.
-///
-/// Captures happen at the Host tool-execution boundary (tool.execute.after:
-/// args + rendered output) — never from transcript text. Capture is
-/// best-effort: an unparseable execution yields None, which only means one
-/// fewer change-detection opportunity, never a failed Inspector call.
+open System.Threading.Tasks
+
+/// Access tracker for substantive file access collection.
+type AccessTracker =
+    new: unit -> AccessTracker
+    member RecordRead: path: string * contentHash: string -> unit
+    member RecordCreate: path: string -> unit
+    member RecordEdit: path: string -> unit
+    member RecordDelete: path: string -> unit
+    member RecordMove: source: string * destination: string -> unit
+    member RecordGrep: pattern: string * path: string -> unit
+    member RecordGlob: pattern: string -> unit
+    member RecordAttemptedMutation: path: string * committed: bool -> unit
+    member GetRelatedPaths: unit -> string list
+
+/// CASE-003 / KR-003 / KR-014: typed observation capture and substantive access.
 module CasebookCapture =
 
-    /// Stable content fingerprint for FileRead observations (CASE-003).
+    /// Stable content fingerprint.
     val contentHash: text: string -> string
 
-    /// read: args.path + rendered output → FileRead (hash of the observed text).
     val ofReadExecution: args: obj -> output: string -> Observation option
-
-    /// glob: output lines are the matched relative paths (rendered one per
-    /// line); pattern comes from args (pattern / glob / query, best-effort).
     val ofGlobExecution: args: obj -> output: string -> Observation option
-
-    /// grep: pattern from args; matches rendered as "path:line:index:text"
-    /// lines — parse best-effort, keep the raw text for the match payload.
     val ofGrepExecution: args: obj -> output: string -> Observation option
 
-    /// Dispatch by tool name (CASE-003).
+    /// Dispatch by tool name.
     val capture: toolName: string -> args: obj -> output: string -> Observation option
 
-    /// §63: parse a typed shell command and, if it denotes a single-file read,
-    /// return a FileRead observation (content hash empty because output is not
-    /// available from the command text).
     val ofExecCommand: command: string -> Observation option
+
+    /// KR-003 / KR-014: Check if tool is substantive.
+    val isSubstantiveTool: toolName: string -> bool
+
+    /// Create an access tracker.
+    val createAccessTracker: unit -> AccessTracker
+
+    /// Record substantive access onto a tracker.
+    val recordSubstantiveAccess: tracker: AccessTracker -> toolName: string -> args: obj -> committed: bool -> unit
+
+    /// KR-010: Merge fission lane substantive accesses.
+    val mergeFissionSubstantiveAccess: preFission: string list -> laneAccesses: string list list -> string list
+
+    /// KR-010: Scoped case identity for an invocation.
+    val caseIdentityForInvocation: sessionId: string -> invocationId: string -> string
+
+    /// KR-014: Budget truncation for large diffs.
+    val truncateDiffForBudget: diff: string -> budget: int -> obj
+
+    /// KR-004: Freeze completion file state baseline.
+    val freezeCompletionState: workspaceRoot: string -> paths: string list -> Task<obj>
+
+    /// KR-004 / KR-005: Compute diff between baseline and current workspace.
+    val computeMaintenanceDiff: workspaceRoot: string -> baseline: obj -> Task<obj>

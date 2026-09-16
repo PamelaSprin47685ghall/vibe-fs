@@ -217,25 +217,6 @@ module ExecutorTool =
 
         tomlObject fields
 
-    let private familyPermit (scope: ToolRuntimeScope) (root: SessionId) : Task<Result<FamilyRecoveryPermit, string>> =
-        task {
-            let! recovery = scope.RequireCurrentProcessJoin root
-
-            match recovery with
-            | FamilyRecovery.FamilyBlocked _ -> return Error "RECOVERY_BLOCKED:"
-            | FamilyRecovery.FamilyWaiting _ -> return Error "RECOVERY_WAITING:"
-            | FamilyRecovery.FamilyReady permit -> return Ok permit
-        }
-
-    let private distillationRuntime
-        (scope: ToolRuntimeScope)
-        (context: HostToolContext)
-        (requirePermit: DistillationRuntime.RequirePermit)
-        =
-        match scope.Journal with
-        | Some journal -> Distillation.asDistillationRuntime (scope.ExecutorRuntimeFor context) journal requirePermit
-        | None -> Distillation.ofForkRuntime (ForkRuntime())
-
     let internal spooledInstructions (summary: string) =
         if System.String.IsNullOrWhiteSpace summary then
             []
@@ -245,56 +226,45 @@ module ExecutorTool =
     let internal formatSpooledOutcome (exitCode: int) (summary: string) =
         ToolHostCodec.tomlObjectWithInstructions (spooledInstructions summary) [ "exit_code", TInt exitCode ]
 
-    let private condenseWithAuthority
-        (scope: ToolRuntimeScope)
-        (language: ProviderLanguage)
-        (context: HostToolContext)
-        (exitCode: int)
-        (spoolPath: string)
-        =
-        task {
-            let root = SessionId.create context.SessionId
-            let requirePermit () = familyPermit scope root
-            let! permitResult = requirePermit ()
-
-            match permitResult with
-            | Error msg when msg.StartsWith("RECOVERY_BLOCKED", System.StringComparison.Ordinal) ->
-                return consequence (prose language Path.Run.LargeOutputRecoveryBlocked)
-            | Error _
-            | Ok _ ->
-                let runtime = distillationRuntime scope context requirePermit
-                let! summary = Distillation.distillSpool runtime spoolPath language
-                return formatSpooledOutcome exitCode summary
-        }
-
-    let private condenseOrBlock
-        (scope: ToolRuntimeScope)
-        (language: ProviderLanguage)
-        (context: HostToolContext)
-        (exitCode: int)
-        (spoolPath: string)
-        =
-        if String.IsNullOrWhiteSpace context.SessionId then
-            task { return consequence (prose language Path.Run.CannotCondenseUntilAuthority) }
-        else
-            condenseWithAuthority scope language context exitCode spoolPath
-
     let private finalizeSpooled
         (scope: ToolRuntimeScope)
         (language: ProviderLanguage)
         (context: HostToolContext)
+        (budgetBytes: int64)
         (exitCode: int)
         (spoolPath: string)
         =
         task {
             try
-                return! condenseOrBlock scope language context exitCode spoolPath
+                if String.IsNullOrWhiteSpace context.SessionId then
+                    return consequence (prose language Path.Run.CannotCondenseUntilAuthority)
+                else
+                    let root = SessionId.create context.SessionId
+                    let! recovery = scope.RequireCurrentProcessJoin root
+
+                    match recovery with
+                    | FamilyRecovery.FamilyBlocked _ ->
+                        return consequence (prose language Path.Run.LargeOutputRecoveryBlocked)
+                    | FamilyRecovery.FamilyWaiting _
+                    | FamilyRecovery.FamilyReady _ ->
+                        let limitBytes = int (min (int64 Int32.MaxValue) budgetBytes)
+                        let! tail = Spool.readLatestTail limitBytes spoolPath
+                        let rawTail = Encoding.UTF8.GetString tail.Bytes
+
+                        let summary =
+                            if tail.Truncated then
+                                ProviderProse.render language Distillation.Path.InputTruncated (Map [ "account", rawTail ])
+                            else
+                                rawTail
+
+                        return formatSpooledOutcome exitCode summary
             finally
                 Spool.delete spoolPath
         }
 
     let private interpretOutcome
         (scope: ToolRuntimeScope)
+        (request: Request)
         (language: ProviderLanguage)
         (context: HostToolContext)
         (result: Result<ProcessOutcome, ProcessError>)
@@ -304,7 +274,7 @@ module ExecutorTool =
         | Ok(ProcessOutcome.Completed(exitCode, stdout, stderr, _)) ->
             task { return completedToml exitCode stdout stderr }
         | Ok(ProcessOutcome.Spooled(exitCode, spoolPath, _totalBytes, _chunkCount)) ->
-            finalizeSpooled scope language context exitCode spoolPath
+            finalizeSpooled scope language context request.OutputBudgetBytes exitCode spoolPath
 
     let private runPrepared
         (scope: ToolRuntimeScope)
@@ -342,7 +312,7 @@ module ExecutorTool =
                 finally
                     detachAbort ()
 
-            return! interpretOutcome scope language context result
+            return! interpretOutcome scope request language context result
         }
 
     let private execute (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =

@@ -58,3 +58,15 @@ Relay incumbent 工作、assessment、certificate invalidation、rebase、confli
 ## CHGINT-014: stale certificate 与 Git machine facts 永远不能被模型满分覆盖
 
 certificate snapshot 与当前 workspace 不一致、存在 unmerged entries、target/base 已变化或 ff-only CAS 条件不成立时，必须在进入共享 ref mutation 前 fail closed / invalidation + loop continuation。`8×10` 只产生质量候选，不能把这些机器事实翻译成“仍然 perfect，所以继续发布”。
+
+## CHGINT-015: 修复改变工作树后必须重新验证与证书失效
+
+当 DevOps 在执行过程中自行修复或 Engineer 提交新改动导致工作区快照发生推进时，此前快照上建立的任何评估结论、测试证据及 QualityCertificate 立即失效；必须在最新快照上重新执行验证与独立 assessment。严禁将旧快照的证书或测试结果搬移复用至新状态。
+
+## CHGINT-016: 并行 Engineer 与 DevOps 不得无协调修改同一验证对象
+
+并行运行的 Engineer 与 DevOps 不得无协调地修改同一验证对象；Manager 必须通过明确的任务边界隔离或固定快照保证验证对象的一致性。严禁以修改前后文件哈希相同冒充运行期间未发生变更，严禁引入未经证明的「自动架构分类器」绕过验证边界。
+
+## CHGINT-017: 多道路汇聚后必须重新验证且保留证书失效合同
+
+Orchestrator 区分互补道路集成与竞争道路取舍；各独立道路在各自 worktree 上的独立通过不等于多道路汇聚结果通过。合流与变基后必须在最终工作树上执行汇聚后验证，并保留既有的变基冲突失效与重新独立 assessment 合同，严禁跳过汇聚后验证直接发布。

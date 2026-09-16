@@ -4,6 +4,7 @@ namespace Wanxiangshu.Resources
 /// Common Law → Role Law → inherited Office Library.
 type PromptCatalog =
     { ManagerSystemPrompt: string
+      EngineerSystemPrompt: string
       CoderSystemPrompt: string
       DevopsSystemPrompt: string
       InspectorSystemPrompt: string

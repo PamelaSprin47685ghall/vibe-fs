@@ -29,6 +29,7 @@ module JoinSurface =
         match text value with
         | "Manager" -> Some Role.Manager
         | "Orchestrator" -> Some Role.Orchestrator
+        | "Engineer" -> Some Role.Engineer
         | "Coder" -> Some Role.Coder
         | "Inspector" -> Some Role.Inspector
         | "DevOps" -> Some Role.DevOps

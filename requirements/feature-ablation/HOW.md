@@ -28,7 +28,7 @@ Profile 按巡检段落展开：`station-05`…`station-56` 使用 segment 解�
 | P1 | [`ManagedAgentConfig.fs`](../../src/Wanxiangshu/OpenCode/Host/ManagedAgentConfig.fs) | manager/orchestrator/browser/inquiry hidden |
 | P1 | [`FissionHostSurface.fs`](../../src/Wanxiangshu/OpenCode/Host/FissionHostSurface.fs) | `intra-participant-parallelism` ablated ⇒ 隐藏 fission |
 | P2 | [`SphinxMcpConfig.fs`](../../src/Wanxiangshu/OpenCode/Host/SphinxMcpConfig.fs) | `epistemic-reasoning` ablated ⇒ Disabled |
-| P2 | [`StealthBrowserMcpConfig.fs`](../../src/Wanxiangshu/OpenCode/Host/StealthBrowserMcpConfig.fs) | `external-investigation` ablated ⇒ Disabled |
+| P2 | [已废除] | `external-investigation` 已彻底撤销 |
 | P3 | [`AgentJournal.fs`](../../src/Wanxiangshu/Persistence/Journal/AgentJournal.fs) | `fact-map` ablated ⇒ `journal/denied-ablation` |
 
 ## 56 包 hook census（living）
@@ -80,7 +80,7 @@ Profile 按巡检段落展开：`station-05`…`station-56` 使用 segment 解�
 | concern-routing | 43 | subscribe/publish | F 段 active≤49 |
 | intra-participant-parallelism | 44 | fission tool/schema | F 段 active≤49 |
 | knowledge-reuse | 45 | chronicle/fetch | F 段 active≤49 |
-| external-investigation | 46 | browser MCP/agent | F 段 active≤49 |
+| external-investigation | 46 | [已撤销] | 历史占位 |
 | epistemic-reasoning | 47 | sphinx MCP/agent | F 段 active≤49 |
 | speculative-investigation | 48 | Strength pipeline | F 段 active≤49；profile≤14 强制 Off |
 | institutional-learning | 49 | celebrate/regret | F 段 active≤49 |

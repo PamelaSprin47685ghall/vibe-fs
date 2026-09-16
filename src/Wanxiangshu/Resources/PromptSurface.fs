@@ -17,6 +17,7 @@ module PromptSurface =
     let private catalogToJs (catalog: PromptCatalog) : obj =
         box
             {| ManagerSystemPrompt = catalog.ManagerSystemPrompt
+               EngineerSystemPrompt = catalog.EngineerSystemPrompt
                CoderSystemPrompt = catalog.CoderSystemPrompt
                DevopsSystemPrompt = catalog.DevopsSystemPrompt
                InspectorSystemPrompt = catalog.InspectorSystemPrompt
@@ -28,6 +29,7 @@ module PromptSurface =
 
     let private catalogValues (catalog: PromptCatalog) : string array =
         [| catalog.ManagerSystemPrompt
+           catalog.EngineerSystemPrompt
            catalog.CoderSystemPrompt
            catalog.DevopsSystemPrompt
            catalog.InspectorSystemPrompt

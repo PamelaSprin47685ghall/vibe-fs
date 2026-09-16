@@ -6,11 +6,9 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.EventStore
 
-/// CASE-007: Casebook durable facts through the unified EventStore — the only
+/// CASE-007 / KR-007: Casebook durable facts through the unified EventStore — the only
 /// persistence a Case may use (no feature ref / manifest tree / second
-/// authority). Event types: InspectorCaseCaptured / InspectorCaseRefreshed /
-/// InspectorCaseAccessed / InspectorCaseEvicted; Q/A/observations ride the
-/// event payload (large bodies via PayloadRef in later phases).
+/// authority).
 module CasebookStore =
 
     let CasebookStream = "casebook"
@@ -75,18 +73,42 @@ module CasebookStore =
 
     let private encodeCase (case: Case) : JsonValue =
         Encode.object
-            [ "session_id", Encode.string case.SessionId
+            [ "identity", Encode.string case.Identity
+              "session_id", Encode.string case.Identity
+              "source_trace", Encode.string case.SourceTrace
               "q", Encode.string case.Q
               "a", Encode.string case.A
+              "related_paths", Encode.list (List.map Encode.string case.RelatedPaths)
+              "completion_file_state", Encode.string case.CompletionFileState
+              "maintenance_file_state", Encode.string case.MaintenanceFileState
+              "access_order", Encode.int64 case.AccessOrder
               "observations", Encode.list (List.map encodeObservation case.Observations) ]
 
     let private decodeCase: Decoder<Case> =
         Decode.object (fun get ->
-            { SessionId = get.Required.Field "session_id" Decode.string
-              Q = get.Required.Field "q" Decode.string
-              A = get.Required.Field "a" Decode.string
-              Observations = get.Required.Field "observations" (Decode.list decodeObservation)
-              LastAccessOrder = 0L })
+            let identity =
+                match get.Optional.Field "identity" Decode.string with
+                | Some id when not (System.String.IsNullOrWhiteSpace id) -> id
+                | _ -> get.Required.Field "session_id" Decode.string
+
+            let sourceTrace = get.Optional.Field "source_trace" Decode.string |> Option.defaultValue ""
+            let q = get.Required.Field "q" Decode.string
+            let a = get.Required.Field "a" Decode.string
+            let relatedPaths = get.Optional.Field "related_paths" (Decode.list Decode.string) |> Option.defaultValue []
+            let completionFileState = get.Optional.Field "completion_file_state" Decode.string |> Option.defaultValue ""
+            let maintenanceFileState = get.Optional.Field "maintenance_file_state" Decode.string |> Option.defaultValue completionFileState
+            let accessOrder = get.Optional.Field "access_order" Decode.int64 |> Option.defaultValue 0L
+            let observations = get.Optional.Field "observations" (Decode.list decodeObservation) |> Option.defaultValue []
+
+            { Identity = identity
+              SourceTrace = sourceTrace
+              Q = q
+              A = a
+              RelatedPaths = relatedPaths
+              CompletionFileState = completionFileState
+              MaintenanceFileState = maintenanceFileState
+              AccessOrder = accessOrder
+              Observations = observations })
 
     // ---- single-event integration codec ----------------------------------
 
@@ -96,30 +118,51 @@ module CasebookStore =
     let private decodeRefreshed (payload: JsonValue) : Result<CasebookEvent, string> =
         let decoder =
             Decode.object (fun get ->
-                (get.Required.Field "session_id" Decode.string,
-                 get.Required.Field "q" Decode.string,
-                 get.Required.Field "a" Decode.string,
-                 get.Required.Field "observations" (Decode.list decodeObservation)))
+                let identity =
+                    match get.Optional.Field "identity" Decode.string with
+                    | Some id when not (System.String.IsNullOrWhiteSpace id) -> id
+                    | _ -> get.Required.Field "session_id" Decode.string
+
+                let q = get.Required.Field "q" Decode.string
+                let a = get.Required.Field "a" Decode.string
+                let maintenanceFileState = get.Optional.Field "maintenance_file_state" Decode.string |> Option.defaultValue ""
+                let relatedPaths = get.Optional.Field "related_paths" (Decode.list Decode.string) |> Option.defaultValue []
+                let observations = get.Optional.Field "observations" (Decode.list decodeObservation) |> Option.defaultValue []
+                (identity, q, a, maintenanceFileState, relatedPaths, observations))
 
         Decode.fromValue "$" decoder payload
-        |> Result.map (fun (sessionId, q, a, observations) ->
-            CasebookEvent.CaseRefreshed(sessionId, q, a, observations))
+        |> Result.map (fun (identity, q, a, maintenanceFileState, relatedPaths, observations) ->
+            CasebookEvent.CaseRefreshed(identity, q, a, maintenanceFileState, relatedPaths, observations))
 
     /// Integration oracle input decoder. It accepts exactly one EventEnvelope;
     /// history ordering/iteration belongs to CanonicalIntegrator.
     let tryDecodeEnvelope (envelope: EventEnvelope) : Result<CasebookEvent, string> =
-        match envelope.EventType with
-        | eventType when eventType = CapturedEventType ->
+        let eventType = envelope.EventType
+        if eventType = CapturedEventType || eventType = CasebookEventTypes.LegacyCaptured then
             Decode.fromValue "$" decodeCase envelope.Payload
             |> Result.map CasebookEvent.CaseCaptured
-        | eventType when eventType = RefreshedEventType -> decodeRefreshed envelope.Payload
-        | eventType when eventType = AccessedEventType ->
-            Decode.fromValue "$" (Decode.field "session_id" Decode.string) envelope.Payload
+        elif eventType = RefreshedEventType || eventType = CasebookEventTypes.LegacyRefreshed then
+            decodeRefreshed envelope.Payload
+        elif eventType = AccessedEventType || eventType = CasebookEventTypes.LegacyAccessed then
+            let decodeId =
+                Decode.object (fun get ->
+                    match get.Optional.Field "identity" Decode.string with
+                    | Some id when not (System.String.IsNullOrWhiteSpace id) -> id
+                    | _ -> get.Required.Field "session_id" Decode.string)
+
+            Decode.fromValue "$" decodeId envelope.Payload
             |> Result.map CasebookEvent.CaseAccessed
-        | eventType when eventType = EvictedEventType ->
-            Decode.fromValue "$" (Decode.field "session_id" Decode.string) envelope.Payload
+        elif eventType = EvictedEventType || eventType = CasebookEventTypes.LegacyEvicted then
+            let decodeId =
+                Decode.object (fun get ->
+                    match get.Optional.Field "identity" Decode.string with
+                    | Some id when not (System.String.IsNullOrWhiteSpace id) -> id
+                    | _ -> get.Required.Field "session_id" Decode.string)
+
+            Decode.fromValue "$" decodeId envelope.Payload
             |> Result.map CasebookEvent.CaseEvicted
-        | other -> Error(sprintf "not a Casebook event: %s" other)
+        else
+            Error(sprintf "not a Casebook event: %s" eventType)
 
     // ---- append -----------------------------------------------------------
 
@@ -156,22 +199,27 @@ module CasebookStore =
 
     let appendRefreshed
         (store: IEventStore)
-        (sessionId: string)
+        (identity: string)
         (q: string)
         (a: string)
+        (maintenanceFileState: string)
+        (relatedPaths: string list)
         (observations: Observation list)
         : Task<Result<EventId, string>> =
         let payload =
             Encode.object
-                [ "session_id", Encode.string sessionId
+                [ "identity", Encode.string identity
+                  "session_id", Encode.string identity
                   "q", Encode.string q
                   "a", Encode.string a
+                  "maintenance_file_state", Encode.string maintenanceFileState
+                  "related_paths", Encode.list (List.map Encode.string relatedPaths)
                   "observations", Encode.list (List.map encodeObservation observations) ]
 
         appendEvent store RefreshedEventType payload
 
-    let appendAccessed (store: IEventStore) (sessionId: string) : Task<Result<EventId, string>> =
-        appendEvent store AccessedEventType (Encode.object [ "session_id", Encode.string sessionId ])
+    let appendAccessed (store: IEventStore) (identity: string) : Task<Result<EventId, string>> =
+        appendEvent store AccessedEventType (Encode.object [ "identity", Encode.string identity; "session_id", Encode.string identity ])
 
-    let appendEvicted (store: IEventStore) (sessionId: string) : Task<Result<EventId, string>> =
-        appendEvent store EvictedEventType (Encode.object [ "session_id", Encode.string sessionId ])
+    let appendEvicted (store: IEventStore) (identity: string) : Task<Result<EventId, string>> =
+        appendEvent store EvictedEventType (Encode.object [ "identity", Encode.string identity; "session_id", Encode.string identity ])

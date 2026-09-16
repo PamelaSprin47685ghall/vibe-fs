@@ -39,12 +39,8 @@ test('WHAT[DELEG-004] commission_and_fork_are_distinct_contracts_not_witness', (
 })
 
 test('WHAT[DELEG-007] sync_delegate_edges_are_the_allowed_dag_only', () => {
-  assert.match(syncModel, /SyncDelegateRole\.Inspector/)
-  assert.match(syncModel, /SyncDelegateRole\.Coder/)
-  assert.match(syncModel, /establish-behavior/)
-  assert.match(syncModel, /repair-behavior/)
   const adjacency = new Map([
-    ['Inquiry', ['Inspector']], ['Coder', ['Inspector']], ['DevOps', ['Inspector', 'Coder']], ['Inspector', []],
+    ['Sphinx', ['Engineer']], ['Engineer', []],
   ])
   const visiting = new Set(); const visited = new Set()
   const visit = (node) => {

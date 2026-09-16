@@ -1112,6 +1112,7 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
     let ultraExample (prose: Prose) (roleName: string) (capabilities: Set<JsCapability>) : JsExample option =
         let candidate =
             match roleName.Trim().ToLowerInvariant() with
+            | "engineer"
             | "coder" -> Some(set [ JsCapability.Read; JsCapability.Grep; JsCapability.Edit ], prose.UltraCoder)
             | "inspector" -> Some(set [ JsCapability.Read; JsCapability.Grep ], inspectorUltra)
             | "manager" -> Some(set [ JsCapability.Read; JsCapability.Grep ], managerUltra)

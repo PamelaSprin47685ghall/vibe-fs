@@ -35,3 +35,9 @@
 ## DISTRIBUTION-009: 交付物归档成员校验与路径逃逸拒绝
 
 打包交付物（tarball）归档流解析必须对包成员执行严格的结构边界与完整性校验：归档条目路径必须规范化为相对包根目录的安全路径，严禁包含目录遍历（`..`）或绝对路径；必须拒绝符号链接等非普通文件条目；严禁混入开发、测试、源码（`src/`）、内部脚本与构建元数据等违规资产；必须严格验证 `npm pack` 生成结果的结构与包名一致性，异常时立即失败拒绝。
+
+## DISTRIBUTION-010: 打包资源与活动注册同步
+
+安装产物（npm tarball）中的运行时资源（`resources/**`）与编译产物（`dist/**`）必须与当前合法活跃角色集合（Engineer、DevOps、Manager、Orchestrator、Blogger 等）严格保持一致。
+严禁在发布产物中包含已废止角色（Coder、Inspector、Browser、Inquiry、Distiller）的活跃注册代码、死资源文件或陈旧工具映射。
+`js-engineer`、`js-devops` 与 `js-bookkeeper` 等新工具 surface 必须在编译代码、surface manifest 与资源清单中完整且一致地导出，不存在未同步的孤立注册。

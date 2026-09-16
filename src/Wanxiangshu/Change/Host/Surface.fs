@@ -97,6 +97,7 @@ module OrchestratorHostSurface =
         match stringOf value with
         | "Manager" -> Some Role.Manager
         | "Orchestrator" -> Some Role.Orchestrator
+        | "Engineer" -> Some Role.Engineer
         | "Coder" -> Some Role.Coder
         | "Inspector" -> Some Role.Inspector
         | "Browser" -> Some Role.Browser

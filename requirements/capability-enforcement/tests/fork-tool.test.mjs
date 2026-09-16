@@ -1,4 +1,4 @@
-// ENF-009/010: fork and commission are exercised through the real plugin
+// ENF-009/010/024: fork and commission are exercised through the real plugin
 // registrations. Host-built zod schemas are inspected by declared argument name;
 // no internal ToolSpec/RuntimeScope representation crosses this test boundary.
 
@@ -22,8 +22,8 @@ test('WHAT[ENF-009] FORK_specs_expose_expected_names_and_only_manager_fork_carri
 test('WHAT[ENF-009] FORK_disposed_or_unbound_execution_surfaces_natural_execution_consequence', async () => {
   await withExecutablePlugin(async (hooks) => {
     const result = await hooks.tool.fork.execute(
-      { calling: 'coder', name: 'Ada', charge: 'do work' },
-      { sessionID: '', agent: 'coder' },
+      { calling: 'engineer', name: 'Ada', charge: 'do work' },
+      { sessionID: '', agent: 'engineer' },
     )
     assert.match(result, /cannot be placed from this execution context|caller's authority is established|调用方权威确立之前/i)
     assert.doesNotMatch(result, /sessionID|\berror\s*=/i)
@@ -33,7 +33,7 @@ test('WHAT[ENF-009] FORK_disposed_or_unbound_execution_surfaces_natural_executio
 test('WHAT[ENF-010] FORK_orchestrator_missing_authority_is_refused_without_session_identity', async () => {
   await withExecutablePlugin(async (hooks) => {
     const result = await hooks.tool.commission.execute(
-      { calling: 'coordinator', name: 'North Road', charge: 'x' },
+      { calling: 'lead', name: 'North Road', charge: 'x' },
       { sessionID: '', agent: 'orchestrator' },
     )
     assert.match(result, /caller's authority is established|调用方权威确立之前/i)
@@ -41,16 +41,15 @@ test('WHAT[ENF-010] FORK_orchestrator_missing_authority_is_refused_without_sessi
   })
 })
 
-test('WHAT[ENF-009] FORK_non_repository_target_rejects_nonempty_warm_start_keywords_before_creation', async () => {
+test('WHAT[ENF-024] FORK_manager_fork_rejects_devops_calling', async () => {
   await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, 'ses-fork', 'manager')
-    await grantWorkOwned(runtime, 'ses-fork')
+    await acceptAuthorityRoot(runtime, 'ses-fork-devops', 'manager')
+    await grantWorkOwned(runtime, 'ses-fork-devops')
     const result = await hooks.tool.fork.execute(
-      { calling: 'researcher', name: 'Web Road', charge: 'browse', keywords: 'repository clue' },
-      { sessionID: 'ses-fork', agent: 'manager' },
+      { calling: 'devops', name: 'Op', charge: 'run tests' },
+      { sessionID: 'ses-fork-devops', agent: 'manager' },
     )
-    assert.match(result, /only available when fork targets Coder, Inspector, or DevOps|仅当 fork 目标为 Coder、Inspector 或 DevOps/i)
-    assert.doesNotMatch(result, /\berror\s*=/i)
+    assert.match(result, /cannot fork DevOps|fork only targets Engineer|只能 fork Engineer/i)
     assert.equal(createdIds.length, 0)
   })
 })

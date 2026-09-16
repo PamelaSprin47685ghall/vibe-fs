@@ -13,3 +13,6 @@
 
 3. **结构对称性与防退化门禁**：
    - `language-parity-gate` 检查资源文件成对存在、占位符集合一致、标识符不翻译以及语义锚点双语覆盖。
+
+4. **双语 Role Prompt 同源性校验**：
+   - `language-parity-gate` 增加针对核心角色 Prompt 语义断言：扫描 `resources/provider/role/` 下各角色中英文文本，确保 Fission 专属性关键词（如 "only role permitted to use fission" / "唯一允许使用 Fission 的角色"）成对出现，并强力拦截 Manager/DevOps 提示词中的任何分身词汇。

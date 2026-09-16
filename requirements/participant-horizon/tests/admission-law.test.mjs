@@ -72,14 +72,14 @@ test('WHAT[PARTICIPANT-HORIZON-008] PH_glory_002_030_manager_surface_hides_revie
   }
 })
 
-test('WHAT[PARTICIPANT-HORIZON-010] PH_agent_009_fork_visible_set_is_exactly_the_five_forkable_offices', () => {
-  const fiveOffices = [/Coder/i, /Scout|Investigator/i, /Technician|Operator/i, /Navigator|Researcher/i, /Analyst|Inquirer/i]
+test('WHAT[PARTICIPANT-HORIZON-010] PH_agent_009_fork_visible_set_is_strictly_engineer', () => {
   for (const locale of LOCALES) {
     const fork = read(`resources/provider/tool/fork/description/${locale}.md`)
-    for (const office of fiveOffices) {
-      assert.match(fork, office, `fork/${locale}.md must present every forkable office`)
-    }
+    assert.match(fork, /Engineer/i, `fork/${locale}.md must present Engineer`)
     assert.doesNotMatch(fork, /\bReviewer\b/i, `fork/${locale}.md must not offer Reviewer`)
+    assert.doesNotMatch(fork, /\bDevOps\b/i, `fork/${locale}.md must not offer DevOps`)
+    assert.doesNotMatch(fork, /\bCoder\b/i, `fork/${locale}.md must not offer Coder`)
+    assert.doesNotMatch(fork, /\bInspector\b/i, `fork/${locale}.md must not offer Inspector`)
   }
 })
 

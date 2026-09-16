@@ -13,7 +13,8 @@ module StaticTools =
     /// One permission may expand to several provider verb names (Pty, Behavior, Exec).
     let toolNames (p: ToolPermission) : string list =
         match p with
-        | ToolPermission.Fork -> [ "fork"; "resume" ]
+        | ToolPermission.Fork -> [ "fork" ]
+        | ToolPermission.Resume -> [ "resume" ]
         | ToolPermission.Join -> [ "join" ]
         | ToolPermission.Horizon -> [ "horizon" ]
         | ToolPermission.TodoWrite -> [ "todowrite" ]
@@ -105,6 +106,7 @@ module StaticTools =
           "chronicle"
           "fetch"
           "suicide"
+          "js-engineer"
           "js-manager"
           "js-orchestrator"
           "js-coder"
@@ -157,11 +159,11 @@ module StaticTools =
         | true, "commission", Role.Orchestrator -> "allow"
         | true, ("open-terminal" | "send-terminal" | "read-terminal" | "signal-terminal"), Role.DevOps -> "allow"
         | true, "fork", Role.DevOps -> "deny"
+        | true, "resume", Role.DevOps -> "deny"
         | true, "query-shell", Role.Inspector -> "allow"
         | true, "run", Role.Inspector -> "deny"
         | true, "run", Role.DevOps -> "allow"
         | true, "query-shell", Role.DevOps -> "deny"
-        | true, ("write" | "edit"), Role.DevOps -> "deny"
         | true, "skill", _ -> "allow"
         | true, "assume", (Role.Blogger | Role.Distiller) -> "deny"
         | true, "assume", _ -> "allow"
@@ -217,6 +219,8 @@ module StaticTools =
     let managerAgentConfig (prompt: string option) : obj = primaryAgent Role.Manager prompt
 
     let orchestratorAgentConfig (prompt: string option) : obj = primaryAgent Role.Orchestrator prompt
+
+    let engineerAgentConfig (prompt: string option) : obj = primaryAgent Role.Engineer prompt
 
     let coderAgentConfig (prompt: string option) : obj = primaryAgent Role.Coder prompt
 

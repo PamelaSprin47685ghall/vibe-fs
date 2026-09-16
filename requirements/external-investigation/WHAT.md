@@ -1,45 +1,57 @@
 # external-investigation — WHAT
 
-## EXTERNAL-INVESTIGATION-001: 外部事实必须携带完整溯源建立
+本文件是 `external-investigation` 的**废止声明与演进记录**。本包所有业务功能与角色规范均已撤销，不再作为活跃生产系统的执行规范。
 
-从公开网络获取外部事实必须携带完整溯源（provenance）：明确记录事实来源的规范位置、相关版本或日期，以及使该断言成立的绑定条件，确保其他见证者能够准确定位并核实该事实。
+---
 
-## EXTERNAL-INVESTIGATION-002: 可达性不决定所有权（provenance-not-reachability）
+## EXTERNAL-INVESTIGATION-001: [已撤销] 外部事实溯源建立要求
 
-网络路径的可达性不代表对内容的权威所有权。网页能够被打开、截图、下载或代理缓存，均不改变其外部远岸证据的本质，不能仅因技术可达就赋予其权威地位。
+条款撤销。Browser 角色与外部网络调查功能已废止。
 
-## EXTERNAL-INVESTIGATION-003: 外部证据跨表示形式仍保持远岸属性（far-shore）
+## EXTERNAL-INVESTIGATION-002: [已撤销] 可达性不决定所有权
 
-外部获取的证据在被渲染为截图、转换为文本或下载暂存后，其本质依然属于远岸主张。任何本地表示形式的变化均不改变其外部证据属性。
+条款撤销。Browser 角色与外部网络调查功能已废止。
 
-## EXTERNAL-INVESTIGATION-004: 优先选择最接近事实源头的来源（source-closest）
+## EXTERNAL-INVESTIGATION-003: [已撤销] 外部证据远岸属性
 
-必须优先选择与所要建立的事实最为匹配、最接近源头的证据源（例如：API 规范源自官方 Spec，变更历史源自 Changelog 与 Release Notes，行为事实源自现场受控观察）。严禁机械化依赖通用的官方首选仪式。
+条款撤销。Browser 角色与外部网络调查功能已废止。
 
-## EXTERNAL-INVESTIGATION-005: 视觉特有事实必须采用视觉观察（visual-truth）
+## EXTERNAL-INVESTIGATION-004: [已撤销] 最接近源头证据源要求
 
-对于界面布局、渲染后视觉状态、空状态及显示异常等仅在视觉呈现中成立的事实，必须直接读取视觉证据，严禁为纯视觉事实捏造文字替代描述。
+条款撤销。Browser 角色与外部网络调查功能已废止。
 
-## EXTERNAL-INVESTIGATION-006: 严格保留使事实成立的限定条件（condition-preserved）
+## EXTERNAL-INVESTIGATION-005: [已撤销] 视觉观察事实要求
 
-远岸事实所附带的版本号、发布日期、运行环境、适用范围及特性开关等条件，必须与断言一同带回。严禁在压缩过程中剔除关键限定条件，将特定条件下的观察误传为通用真理。
+条款撤销。Browser 角色与外部网络调查功能已废止。
 
-## EXTERNAL-INVESTIGATION-007: 推断严禁冒充直接观察（inference-not-observation）
+## EXTERNAL-INVESTIGATION-006: [已撤销] 限定条件保留要求
 
-必须严格区分来源明确陈述的直接观察与基于观察做出的推断。推断必须显式标注，确保后续见证者可以在认可原始证据的同时独立评估或拒绝该推断。
+条款撤销。Browser 角色与外部网络调查功能已废止。
 
-## EXTERNAL-INVESTIGATION-008: 来源分歧必须如实保留而不得静默平均（disagreement-not-averaged）
+## EXTERNAL-INVESTIGATION-007: [已撤销] 推断与直接观察隔离
 
-当多个可靠来源发生冲突时，必须如实陈述各方主张及其成立条件，保留分歧本身。严禁将相互冲突的权威主张折中平均为虚假的置信度。
+条款撤销。Browser 角色与外部网络调查功能已废止。
 
-## EXTERNAL-INVESTIGATION-009: 带回的确定性不得超越远岸源头（no-cross-sea-certainty）
+## EXTERNAL-INVESTIGATION-008: [已撤销] 来源分歧保留要求
 
-带回结论的确定性上限严格受限于远岸证据本身提供的支持力度。严禁因表述顺畅或主观猜测而虚增确定性，严禁为源头未说明的原因进行无依据脑补。
+条款撤销。Browser 角色与外部网络调查功能已废止。
 
-## EXTERNAL-INVESTIGATION-010: 外部网络调查与本地仓库调查权限严格隔离
+## EXTERNAL-INVESTIGATION-009: [已撤销] 确定性不得超越源头
 
-外部浏览能力仅限于建立公开网络事实。具备网络能力的浏览器角色严禁越界检查本地仓库；当任务涉及本地代码时，必须将本地分析留给具备对应职责的角色。
+条款撤销。Browser 角色与外部网络调查功能已废止。
 
-## EXTERNAL-INVESTIGATION-011: 外部事实不自动转化为仓库开发义务
+## EXTERNAL-INVESTIGATION-010: [已撤销] 外部网络调查与本地权限隔离
 
-外部事实仅用于说明外部世界的现状，网络上的推荐做法或外部变更绝不自动产生本地仓库的开发或修改义务。任何外部发现必须经由相应 Office 的职责裁决与正式流程方可转化为任务。
+条款撤销。Browser 角色与外部网络调查功能已废止。
+
+## EXTERNAL-INVESTIGATION-011: [已撤销] 外部事实不转化为开发义务
+
+条款撤销。Browser 角色与外部网络调查功能已废止。
+
+## EXTERNAL-INVESTIGATION-012: Browser 角色与专属集成全链撤销且无替代代理
+
+Browser 角色、专属 MCP 适配器（`StealthBrowserMcp`）以及相关启动配置、环境变量（`STEALTH_BROWSER_MCP_*`）与工具别名（`js-browser`）已彻底从系统中清除。系统中不存在任何公开或私有的 Browser 代理实体，亦不建立任何替代代理或空壳代理。
+
+## EXTERNAL-INVESTIGATION-013: 外部调查职责不转移且禁止通过通用执行工具复活
+
+外部网络事实调查与网页浏览职责彻底撤销，不得转移给 Engineer、DevOps 或 Manager 等任何其他角色承担。DevOps 执行已有构建流程时的正常依赖下载不构成外部调查；但严禁任何角色通过 `curl`、`wget`、通用 shell 脚本或临时 JavaScript 代码包装复活外部调查能力。

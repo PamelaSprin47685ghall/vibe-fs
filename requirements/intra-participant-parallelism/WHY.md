@@ -4,11 +4,11 @@
 
 当一项工作内部存在可分离的并发执行切片时，层级委托（Delegation）会将“增加并发执行容量”错误表达为“创建新的 participant”，导致父子拓扑、句柄、join 义务与责任所有权发生不必要的切分。而单会话内并发模型流又会破坏单线 attempt、前缀稳定性与转录假设。
 
-本包的核心价值在于：**允许同一个 logical participant 临时拥有多个平等的 execution presents，并在整个裂变生命周期中保持 identity、authority、子会话管辖权、外部责任与最终 completion 归属严格唯一**。
+本包的核心价值在于：**允许同一个 logical participant（仅限 Engineer 子会话）临时拥有多个平等的 execution presents，并在整个裂变生命周期中保持 identity、authority、子会话管辖权、外部责任与最终 completion 归属严格唯一**。Manager 并行通过派出多名独立 Engineer 实现，不再通过 Manager 分身裂变。
 
 ## 核心不变量
 
-1. **一人多 Present**：Fission 仅增加物理执行通路（lanes），不创建新的业务身份或句柄；所有 lanes 共享同一个 logical identity 与 responsibility owner。
+1. **一人多 Present（仅限 Engineer）**：Fission 仅增加同一 Engineer 的物理执行通路（lanes），不创建新的业务身份或句柄；所有 lanes 共享同一个 logical identity 与 responsibility owner。Manager、DevOps 等非 Engineer 角色一律禁止裂变。
 2. **全有或全无准入（All-or-None Admission）**：所有 lanes 的创建与启动必须原子生效；任一失败则全量回滚，旧 caller 继续运行且不受干扰。
 3. **控制面先行，Fission 后收口**：旧物理执行者在全量 lanes 建立后静默退休，不产生业务中止。任一 lane 或最终接管 present 遭遇 nudge、provider recovery/AABB、degeneration-guard interruption 时，先由这些能力的 owner 完成同一 logical run 的 successor；Fission 只消费 successor 之后真正稳定的 completion，整个 group 最终仅向父级交付一次 terminal completion。
 4. **既有债权广播与后续债权亲和**：裂变前的未完成子任务向所有 lanes 广播；裂变后各 lane 新发起的子任务归属于该发起 lane。

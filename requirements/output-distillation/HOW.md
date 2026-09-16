@@ -1,15 +1,34 @@
 # output-distillation — HOW
 
-## 架构机制
+## 演进与迁移架构
 
-### 蒸馏管线与失败降级
+`output-distillation` 包已转为撤销声明与演进记录，其有效条款已全部迁入 `process-execution`：
 
-1. **单窗口截断**：消费流式落盘的 `spool` 文件时只保留最近一个 `Spool.ChunkSizeBytes`（200 KiB）窗口。前面的窗口读过即丢，不进入数组，不创建 map task。若读到第二个窗口，记录 `truncated=true`。
-2. **单 Distiller**：非空 spool 只启动一个私有 fast Distiller，payload 仅为 bounded tail。成功且 `truncated=true` 时，在摘要外层加入明确的“更早输出已截断”声明。不存在 merge prompt、reduce fan-in 或层级 Distiller。
-3. **失败降级策略**：唯一 Distiller 失败或超时时，按 owned agent id 幂等执行一次 `CancelAgent`，返回 `condensation-failed` + 同一 bounded raw tail，拒绝虚构成功。
-4. **叶子运行时生命周期**：Distiller 子会话被标记为 `HostOwnedHidden`，生命周期由宿主管控；Companion eligibility 对 Distiller 返回 false，因此该子会话不会再派生 Blogger。
+| 旧条款编号 | 旧条款主题 | 演进状态 | 新规范落点 |
+| --- | --- | --- | --- |
+| DISTILL-001 | 大输出固定成本提炼 | 撤销 | `process-execution` / PROC-013 |
+| DISTILL-002 | 关键事实区分性保留 | 撤销 | `process-execution` / PROC-013 |
+| DISTILL-003 | 截断谦逊声明 | 迁出 | `process-execution` / PROC-014 |
+| DISTILL-004 | 禁止自动 fan-out/reduce | 撤销 | 无（模型蒸馏删除） |
+| DISTILL-005 | 摘要自包含与可定位性 | 迁出 | `process-execution` / PROC-014 |
+| DISTILL-006 | 唯一 Distiller 失败降级 | 撤销 | 无（模型蒸馏删除） |
+| DISTILL-007 | Spool 窗口消费 | 迁出 | `process-execution` / PROC-015 |
+| DISTILL-008 | Distiller await 与 permit | 撤销 | 无（模型蒸馏删除） |
+| DISTILL-009 | Distiller 叶子运行时约束 | 撤销 | 无（角色已删除） |
+| DISTILL-010 | Distiller 权能约束 | 撤销 | 无（角色已删除） |
+| DISTILL-011 | Large Gate 预算互斥门禁 | 迁出 | `process-execution` / PROC-016 |
+| DISTILL-012 | 自定义工具留尾截断 | 迁出 | `process-execution` / PROC-017 |
+| DISTILL-013 | 蒸馏仪表盘禁令 | 撤销 | 无（模型蒸馏删除） |
+| DISTILL-014 | 零 Distiller 负向保证 | 新增 | `distiller-role-contract.test.mjs` |
 
-### 大输出门禁与确定性留尾截断
+## 物理清理与负向测试策略
 
-- **Large Gate 互斥**：对于估算产出大体积日志的进程，执行前必须获取单持有者的 `LargeGate`。未获取到门禁的执行请求在 FIFO 队列中排队，确保全系统同一时刻仅有一个大输出流占用内存与分析资源。
-- **留尾截断（ToolResultBound）**：插件工具回传长文本时，在达到宿主全局限制前完成留尾截断。注入固定的截断提示标记并优先保留最新的完整尾部行，消除宿主默认头部截断导致最新日志丢失的不确定性。
+1. **废止测试清理**：
+   - 删除了断言已废止模型蒸馏行为的测试（`distiller-fragment-humility.test.mjs`、`executor-summarize.test.mjs`、`reconcile-supervisor-distill.test.mjs`、`executor-tool.test.mjs`）；
+   - 将原 Large Gate（PROC-016）与 ToolResultBound（PROC-017）测试完整迁移至 `process-execution/tests/`，删除了本包侧的重复测试（`large-gate.test.mjs`、`large-gate-runner.test.mjs`、`tool-host-codec-full.test.mjs`），消除双主维护。
+2. **唯一负向测试保留**：
+   - 保留 `distiller-role-contract.test.mjs` 作为本包唯一的演进负向验证测试，绑定 `WHAT[DISTILL-014]`，严格断言系统角色枚举中无 Distiller、配置中无 Distiller 代理、且角色资源目录已被删除。
+
+## DEPENDS ON
+
+- `process-execution`

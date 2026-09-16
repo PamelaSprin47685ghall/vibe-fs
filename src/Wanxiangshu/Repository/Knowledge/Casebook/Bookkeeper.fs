@@ -1,14 +1,26 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
+open System
 open System.Threading.Tasks
+open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.EventStore
 
-/// CASE-006 Host Bookkeeper — freeze replayed observations, run one CaseRefresh
-/// child session, stability-verify, then publish InspectorCaseRefreshed.
+/// CASE-006 / KR-006 / KR-015: Host Bookkeeper — single-pass diff refresh.
 /// Missing session port or transaction Error keeps the old Case.
 module CasebookBookkeeper =
+
+    let private extractPaths (case: Case) : string list =
+        if not (List.isEmpty case.RelatedPaths) then
+            case.RelatedPaths
+        else
+            case.Observations
+            |> List.choose (function
+                | Observation.FileRead(path, _) -> Some path
+                | _ -> None)
+            |> List.distinct
+            |> List.sort
 
     let private refreshPresentCase
         (store: IEventStore)
@@ -17,24 +29,31 @@ module CasebookBookkeeper =
         (case: Case)
         : Task<Result<bool, string>> =
         taskResult {
-            let! freeze = CasebookReplay.replayAll root case.Observations |> TaskResultCE.ofTask
+            let paths = extractPaths case
+            let! targetState = CasebookCapture.freezeCompletionState root paths |> TaskResultCE.ofTask
+            let! diffObj = CasebookCapture.computeMaintenanceDiff root targetState |> TaskResultCE.ofTask
+            let hasDiff = unbox<bool> (diffObj?hasDiff)
+            let diffSummary = unbox<string> (diffObj?diffSummary)
 
-            let! q', a' =
-                BookkeeperRuntime.runTransaction
-                    BookkeeperRequest.CaseRefresh
-                    (SessionId.create sessionId)
-                    case.Q
-                    case.A
-                    freeze
-                    None
+            if not hasDiff then
+                return false
+            else
+                let! (q', a') =
+                    BookkeeperRuntime.runTransaction
+                        BookkeeperRequest.CaseRefresh
+                        (SessionId.create sessionId)
+                        case.Q
+                        case.A
+                        case.Observations
+                        (Some diffSummary)
 
-            let! verify = CasebookReplay.replayAll root case.Observations |> TaskResultCE.ofTask
+                let newStateRef =
+                    if String.IsNullOrWhiteSpace diffSummary then
+                        case.MaintenanceFileState
+                    else
+                        sprintf "state-%s" (CasebookCapture.contentHash diffSummary)
 
-            match Observations.classifyReplay freeze verify with
-            | ReplayResult.Stale ->
-                return! Error "casebook synthesis unstable: worktree changed during bookkeeper transaction"
-            | ReplayResult.Fresh ->
-                do! CasebookWorkflow.refreshCase store sessionId q' a' freeze
+                do! CasebookWorkflow.refreshCase store case.Identity q' a' newStateRef paths case.Observations
                 CasebookIndex.invalidate ()
                 let! _ = CasebookIndex.refresh store 256 |> TaskResultCE.ofTask
                 return true
@@ -53,15 +72,7 @@ module CasebookBookkeeper =
             | Some case -> return! refreshPresentCase store root sessionId case
         }
 
-    /// Returns Ok true when a Refreshed event was published; Ok false when
-    /// Fresh / no-case (nothing to do). Error on store, transaction, or
-    /// stability-verify failure — the old Case is left intact.
     let refreshStale (store: IEventStore) (root: string) (sessionId: string) : Task<Result<bool, string>> =
         taskResult {
-            let! needs = CasebookWorkflow.needsRefresh store 256 sessionId root
-
-            if not needs then
-                return false
-            else
-                return! refreshIfCasePresent store root sessionId
+            return! refreshIfCasePresent store root sessionId
         }

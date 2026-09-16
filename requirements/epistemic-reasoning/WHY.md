@@ -6,6 +6,14 @@
 
 Sphinx 的识别目标必须诚实。若两个外部世界在所有允许协议下诱导相同回答分布，仅观察 LLM 回答的系统无法区分它们。无外部可信源时，Sphinx 识别的是模型初始判断、协议下反思判断、稳定模式、自我预测校准及问法效应；只有额外来源支持的命题才可标为 externally-grounded claim。
 
+## 程序化工作流与角色收敛
+
+Sphinx 探究流程完全由程序控制（Programmatic Workflow）：预算分配、工作项调度、认识状态推进、方法激活与终止收束完全归程序控制，外部调用者（如 Manager/Orchestrator）不再通过 Inquiry 角色或 yield/nextTool 逐轮手动驾驶。Inquiry 角色及其模型槽位彻底移除。
+
+在程序推进过程中需要建立代码或语义事实时，Sphinx 同步调用内部只读 Engineer 工作实例。该实例仅限只读调查，受预算与取消约束，完成即返回程序调用点，不具备修改工作区、真实执行、差遣 DevOps、递归探究或 Fission 权能。
+
+结果接纳按 `(WorkId, attempt)` 工作身份幂等进行，防止晚到结果误接纳与已完成结果的重复购买。取消信号贯穿父工具、子 Engineer 与结果接纳全链条，确保无孤儿执行与无脏状态提交。
+
 ## Sphinx-GEC 边界
 
 Sphinx Generalized Epistemic Calculus 是带类型超边、证书偏序和可替换消元算子的探究运行时。Core 只拥有不含认识论立场的机制：
@@ -37,6 +45,7 @@ Bellman 是决策节点上的固定点表现，不是与 Bayes、A*、MCTS 并�
 8. MCP 与 OpenCode Host 只翻译同一 Core work/event contract。相同 canonical 事件序列必须得到相同语义状态与 hash。
 9. work 推进、取消和恢复只由 durable fact 与 typed physical observation驱动；wall clock、lease expiry、sleep、polling 不得裁决业务状态。
 10. 最终输出区分 model-belief、reflective-model-belief、cross-branch consensus、protocol-stable judgment 与 externally-grounded claim，不把稳定相信误报成外部真理。
+11. 探究流程全程序化��无 Inquiry 角色，内部 Engineer 同步只读且结果接纳按工作身份幂等。
 
 ## 破坏形态
 
@@ -50,7 +59,10 @@ Bellman 是决策节点上的固定点表现，不是与 Bayes、A*、MCTS 并�
 - 让 sibling 回答、当前排名或聚合倾向泄漏到盲化 branch；
 - 用 SQLite、私有日志、第二 projection formula 或 process-local handle 证明 durable success；
 - 用 timeout 推断 lease 失效或 inquiry 完成；
-- 两个 Host 各自实现图、证书、调度或停止逻辑。
+- 两个 Host 各自实现图、证书、调度或停止逻辑；
+- 恢复 Inquiry 角色或模型逐轮驾驶循环；
+- 内部 Engineer 发生写操作、执行命令、差遣 DevOps、递归或 Fission；
+- 调研结果跨 attempt 误接纳或重复购买。
 
 ## DEPENDS ON
 

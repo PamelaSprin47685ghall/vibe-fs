@@ -4,4 +4,6 @@
 
 Relay 把一条道路上的生产身份收敛成一次只存在一个的当前迭代。每一次迭代都从相同的权威起点出发：当前的用户需求原文与当前的工作区快照。迭代之间不传递私有上下文，不复活前任，不为“第一任”或“后继”设立不同的状态机。每一任都做一次独立的 assessment；发现问题的人原位接责，确认无问题的工作以证书收尾，离场只受真实资源 closure 约束。
 
+Manager 的并发来自派出多名独立的 Engineer，而不是来自 Manager 分身裂变。每条道路拥有唯一的固定 DevOps 执行实体，当前活跃的 Manager 持有其控制与派工权。当 Manager 发生任期交接（Continue 退休）时，固定 DevOps 及其运行环境与后台进程平滑跨任期保持连续，旧任立即失去新派工权，新任获得控制权，已接收任务与完成记录严格归属、不丢不串。
+
 Road 的需求本身也会继续演化。追加要求不能只是给当前物理 session 多发一句 prompt：那样 durable 状态仍认为旧需求有效，证书与后续 projection 也无法知道 authority 已改变。追加要求必须推进 Road 的 `AuthorityRevision`；若已有 active 迭代，还要把新 revision 与新的 workspace snapshot 一起绑定到该迭代，保留精确 authority message 作为后续迭代可见的权威历史。

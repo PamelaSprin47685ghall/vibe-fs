@@ -88,3 +88,13 @@ Authority 的 durable terminal interpreter 校验 source witness 与 accepted ro
 ## INTERACTION-AUTHORITY-020: repair fatal绑定exact claim settlement与注入fuse
 
 只有typed repair invariant incident可以请求fatal；当前 agent-free PromptKey claim、Submitted/PhysicalAccepted与fresh terminal判定必须先形成exact settlement evidence。InteractionRepair不得直接引用fatal physical adapter、optional/default/global fallback；composition注入mandatory capability。同一incident只允许一次report与kill，普通exhaustion或可恢复send failure不得升级为fatal。
+
+## INTERACTION-AUTHORITY-021: 历史事件不可变与旧身份不升权
+
+历史 EventStore 事实保持原样，历史事件中记录的旧身份（Coder、Inspector、Browser、Inquiry、Distiller）仅用于历史审计、会话回溯与不变重放，严禁重写事件日志。
+历史旧身份解码严格隔离在历史边界，严禁在活跃权限计算或执行准入中将旧 Inspector/Coder 静默升级为新 Engineer 权限；新交互只接纳当前合法身份集合（Engineer、DevOps、Manager、Orchestrator、Blogger 等），非法或遗留身份的交互请求必须 fail-closed 阻断。
+
+## INTERACTION-AUTHORITY-022: DevOps 恢复与续行保持固定模型与执行权威
+
+DevOps 的固定绑定由道路初始化确立，其模型配置与 Persona 在生命周期内不可变。
+后续所有的 resume 与 continuation 必须严格沿用既有绑定，严禁借 resume 动态切换模型或切换到非绑定模型；多次物理尝试或崩溃恢复均必须收束为同一逻辑执行权威，严禁形成多个并行生效的 DevOps 权威。

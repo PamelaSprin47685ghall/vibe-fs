@@ -19,6 +19,7 @@ module JsGeneratorSurface =
     let private permissionOf (label: string) : ToolPermission option =
         match label with
         | "Fork" -> Some ToolPermission.Fork
+        | "Resume" -> Some ToolPermission.Resume
         | "Join" -> Some ToolPermission.Join
         | "Horizon" -> Some ToolPermission.Horizon
         | "TodoWrite" -> Some ToolPermission.TodoWrite
@@ -46,6 +47,7 @@ module JsGeneratorSurface =
     let private permissionLabel permission =
         match permission with
         | ToolPermission.Fork -> "Fork"
+        | ToolPermission.Resume -> "Resume"
         | ToolPermission.Join -> "Join"
         | ToolPermission.Horizon -> "Horizon"
         | ToolPermission.TodoWrite -> "TodoWrite"
@@ -138,6 +140,9 @@ module JsGeneratorSurface =
     /// Generate from the canonical role permission projection.
     let generateRole (role: string) (language: string) : obj =
         typedRole role language |> Option.map surfaceToJs |> Option.toObj
+
+    let generateSurfaceForRole (role: string) (permissionLabels: string array) : obj =
+        generate role permissionLabels "en"
 
     let isGeneratedToolName (role: string) (permissionLabels: string array) (toolName: string) : bool =
         if not (roleExists role) then

@@ -18,28 +18,31 @@ module ObservationIdentity =
     /// CASE-003: derive the canonical identity of an observation.
     val ofObservation: observation: Observation -> ObservationIdentity
 
-/// DSL-class: DurableFact — CASE-002: the logical Case materials. Q is the
-/// verbatim Inspector initial prompt; A is the verbatim ToolResult body;
-/// observations are the replayable evidence behind A.
+/// DSL-class: DurableFact — CASE-002 / KR-002: minimal Case model with dual baselines.
+/// Identity is the stable logical case identity (scoped to invocation).
 type Case =
     {
-        SessionId: string
+        Identity: string
+        SourceTrace: string
         Q: string
         A: string
+        RelatedPaths: string list
+        CompletionFileState: string
+        MaintenanceFileState: string
+        AccessOrder: int64
         Observations: Observation list
-        /// Projection-derived access order (monotonic counter — never a wall
-        /// clock; CASE-008/G4R time boundary).
-        LastAccessOrder: int64
     }
+    member SessionId: string
+    member LastAccessOrder: int64
 
-/// DSL-class: DurableFact — CASE-007: the Casebook domain events. Physical
+/// DSL-class: DurableFact — CASE-007 / KR-007: the Casebook domain events. Physical
 /// persistence is the unified EventStore; these are the fold inputs.
 [<RequireQualifiedAccess>]
 type CasebookEvent =
     | CaseCaptured of Case
-    | CaseRefreshed of sessionId: string * q: string * a: string * observations: Observation list
-    | CaseAccessed of sessionId: string
-    | CaseEvicted of sessionId: string
+    | CaseRefreshed of identity: string * q: string * a: string * maintenanceFileState: string * relatedPaths: string list * observations: Observation list
+    | CaseAccessed of identity: string
+    | CaseEvicted of identity: string
 
 /// DSL-class: Decision — CASE-004/005: the replay classification. No-delta is
 /// only a freshness hint, never a correctness proof.
@@ -59,7 +62,7 @@ module Observations =
     val classifyReplay: stored: Observation list -> replayed: Observation list -> ReplayResult
 
 /// DSL-class: Decision — CASE-008: the CasebookProjection fold. Captured
-/// inserts/replaces a Case; Refreshed replaces Q/A/observations; Accessed
+/// inserts/replaces a Case; Refreshed replaces Q/A/maintenance/related; Accessed
 /// bumps the derived access order; Evicted removes. Same-Case concurrent
 /// forks surface as DomainConflict at the EventStore layer and converge via
 /// later resolution/refresh/evict events — never via revision/wall_clock LWW.
@@ -83,5 +86,5 @@ module CasebookProjection =
 
     /// CASE-008: LRU eviction — keep the capacity most-recently-accessed
     /// Cases; the evicted session ids are returned so the caller can append
-    /// InspectorCaseEvicted facts (tombstones are events too).
+    /// Evicted facts (tombstones are events too).
     val evict: capacity: int -> cases: Map<string, Case> -> Map<string, Case> * string list

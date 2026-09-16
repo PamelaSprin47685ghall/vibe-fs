@@ -14,13 +14,19 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Repository.Programming.Js.OpenCode
 
-/// JS-native owner boundary for the Bookkeeper runtime and its staged provider
-/// transaction. Session ports remain opaque capabilities; staging snapshots,
-/// result envelopes, and tool metadata are plain JavaScript values.
 module CasebookBookkeeperSurface =
 
     [<Emit("$0 == null")>]
     let private isNullish (value: obj) : bool = jsNative
+
+    let createRefreshPrompt (input: obj) : string =
+        let q = if isNullish (input?q) then "" else string input?q
+        let a = if isNullish (input?a) then "" else string input?a
+        let diff = if isNullish (input?diff) then "" else string input?diff
+        let relatedPaths =
+            if isNullish (input?relatedPaths) then []
+            else unbox<string array> (input?relatedPaths) |> Array.toList
+        BookkeeperRuntime.createRefreshPrompt q a relatedPaths diff
 
     let private requiredString (fieldName: string) (value: obj) : Result<string, string> =
         let isString: bool = emitJsExpr value "typeof $0 === 'string'"
@@ -76,7 +82,6 @@ module CasebookBookkeeperSurface =
                 else
                     Ok lookup)
 
-    /// Configure the Host session capability with explicit immutable authority owners.
     let setRuntime (port: obj) (ownerDescriptors: obj) : obj =
         match ownerLookup ownerDescriptors with
         | Error error -> box {| ok = false; error = error |}
@@ -165,8 +170,6 @@ module CasebookBookkeeperSurface =
     let take (txId: string) : obj =
         BookkeeperStaging.take txId |> stagedToJs
 
-    /// Execute one provider program against the currently bound transaction.
-    /// Host argument/context decoding and ToolResultBound remain owner-private.
     let runProgram (sessionId: string) (program: string) : Task<string> =
         let args =
             Wanxiangshu.OpenCode.HostToolArguments(createObj [ "program" ==> program ])
@@ -184,7 +187,6 @@ module CasebookBookkeeperSurface =
             return ToolResultBound.bound result
         }
 
-    /// Provider-visible metadata without exposing ToolSpec or HostSchema.
     let contract (toolModule: obj) : obj =
         let spec =
             JsBookkeeperTool.spec (Wanxiangshu.OpenCode.ToolHostCodec.factory toolModule)
@@ -194,9 +196,6 @@ module CasebookBookkeeperSurface =
                description = spec.Description
                argumentNames = spec.Arguments |> List.map fst |> List.toArray |}
 
-    // These constructors keep the injected session capability opaque to JS
-    // tests. They are only useful for implementing a test Host port; no DU
-    // representation is returned by the semantic operations above.
     let sessionId (value: string) : obj = box (SessionId.create value)
 
     let sessionValue (value: obj) : string =

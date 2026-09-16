@@ -15,13 +15,9 @@ const errOf = (result) => result.error
 const NAMES = [
   'manager',
   'orchestrator',
-  'coder',
-  'inspector',
+  'engineer',
   'devops',
-  'browser',
-  'inquiry',
   'blogger',
-  'distiller',
   'bookkeeper',
   'predictor',
 ]
@@ -38,7 +34,7 @@ test('WHAT[ENF-010] MACFG_validate_rejects_null_config_and_legacy_agent', () => 
 test('WHAT[ENF-011] MACFG_validate_accepts_empty_agent_map_and_projects_full_catalog', () => {
   const empty = okOf(validate({}))
   assert.equal(empty.ok, true, empty.ok ? '' : empty.error)
-  assert.equal(empty.bindingNames.length, 10)
+  assert.equal(empty.bindingNames.length, 5)
   const blankMap = okOf(validate({ agent: {} }))
   assert.equal(blankMap.ok, true, blankMap.ok ? '' : blankMap.error)
 })
@@ -47,17 +43,19 @@ test('WHAT[ENF-010] MACFG_validate_rejects_legacy_agent_present', () => {
   const cfg = fullConfig()
   cfg.agent.build = {}
   assert.match(errOf(validate(cfg)), /build/)
+  cfg.agent.coder = {}
+  assert.match(errOf(validate(cfg)), /coder/)
 })
 
 test('WHAT[ENF-011] MACFG_validate_accepts_missing_equal_and_arbitrary_model_fields', () => {
   const cfg = fullConfig()
   cfg.agent.manager.model = 'provider/shared'
-  cfg.agent.coder.model = ''
-  cfg.agent.inspector.model = { anything: 'host-owned-and-ignored' }
+  cfg.agent.engineer.model = ''
+  cfg.agent.devops.model = { anything: 'host-owned-and-ignored' }
 
   const result = okOf(validate(cfg))
   assert.equal(result.ok, true, result.ok ? '' : result.error)
-  assert.equal(result.bindingNames.length, 10, 'bookkeeper is presence-checked but has no Role binding')
+  assert.equal(result.bindingNames.length, 5, 'bookkeeper and predictor have no active Role binding')
 })
 
 test('WHAT[ENF-011] MACFG_applyOwnedFields_writes_owned_keys_and_never_touches_model', () => {
@@ -67,7 +65,6 @@ test('WHAT[ENF-011] MACFG_applyOwnedFields_writes_owned_keys_and_never_touches_m
   assert.equal(result.ok, true, result.ok ? '' : result.error)
 
   assert.equal(cfg.compaction.auto, false)
-  assert.equal(cfg.mcp['stealth-browser-mcp'].type, 'local')
   for (const name of NAMES) {
     const entry = cfg.agent[name]
     assert.ok(entry.mode !== undefined, `${name} must receive owned mode`)
@@ -93,7 +90,6 @@ test('WHAT[ENF-011] MACFG_applyOwnedFields_skips_null_config_and_projects_missin
 })
 
 test('WHAT[ENF-011] MACFG_applyOwnedFields_honors_chat_max_retries_env', () => {
-  // HOSTFAIL-001 / AGENTS.md §13.2: Wanxiangshu plugin forces chatMaxRetries to zero unconditionally
   const cfg = fullConfig()
   const result = configure(cfg)
   assert.equal(result.ok, true, result.ok ? '' : result.error)
@@ -113,7 +109,7 @@ test('WHAT[ENF-011] MACFG_configureFromHostConfig_projects_missing_catalog_witho
   const cfg = {}
   const result = configure(cfg)
   assert.equal(result.ok, true, result.ok ? '' : result.error)
-  assert.equal(result.bindingNames.length, 10)
+  assert.equal(result.bindingNames.length, 5)
   for (const name of NAMES) {
     const entry = cfg.agent[name]
     assert.ok(entry.mode !== undefined, `${name} must be projected`)

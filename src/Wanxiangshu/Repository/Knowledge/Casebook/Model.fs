@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
+open System
+
 /// DSL-class: DurableFact — CASE-003: one typed observation captured from the
 /// final execution layer (builtin read/glob/grep Host execution). Never
 /// inferred from transcript text; capture may be incomplete.
@@ -32,28 +34,31 @@ module ObservationIdentity =
 
         ObservationIdentity raw
 
-/// DSL-class: DurableFact — CASE-002: the logical Case materials. Q is the
-/// verbatim Inspector initial prompt; A is the verbatim ToolResult body;
-/// observations are the replayable evidence behind A.
+/// DSL-class: DurableFact — CASE-002 / KR-002: minimal Case model with dual baselines.
+/// Identity is the stable logical case identity (scoped to invocation).
 type Case =
     {
-        SessionId: string
+        Identity: string
+        SourceTrace: string
         Q: string
         A: string
+        RelatedPaths: string list
+        CompletionFileState: string
+        MaintenanceFileState: string
+        AccessOrder: int64
         Observations: Observation list
-        /// Projection-derived access order (monotonic counter — never a wall
-        /// clock; CASE-008/G4R time boundary).
-        LastAccessOrder: int64
     }
+    member this.SessionId = this.Identity
+    member this.LastAccessOrder = this.AccessOrder
 
-/// DSL-class: DurableFact — CASE-007: the Casebook domain events. Physical
+/// DSL-class: DurableFact — CASE-007 / KR-007: the Casebook domain events. Physical
 /// persistence is the unified EventStore; these are the fold inputs.
 [<RequireQualifiedAccess>]
 type CasebookEvent =
     | CaseCaptured of Case
-    | CaseRefreshed of sessionId: string * q: string * a: string * observations: Observation list
-    | CaseAccessed of sessionId: string
-    | CaseEvicted of sessionId: string
+    | CaseRefreshed of identity: string * q: string * a: string * maintenanceFileState: string * relatedPaths: string list * observations: Observation list
+    | CaseAccessed of identity: string
+    | CaseEvicted of identity: string
 
 /// DSL-class: Decision — CASE-004/005: the replay classification. No-delta is
 /// only a freshness hint, never a correctness proof.
@@ -91,7 +96,7 @@ module Observations =
             ReplayResult.Stale
 
 /// DSL-class: Decision — CASE-008: the CasebookProjection fold. Captured
-/// inserts/replaces a Case; Refreshed replaces Q/A/observations; Accessed
+/// inserts/replaces a Case; Refreshed replaces Q/A/maintenance/related; Accessed
 /// bumps the derived access order; Evicted removes. Same-Case concurrent
 /// forks surface as DomainConflict at the EventStore layer and converge via
 /// later resolution/refresh/evict events — never via revision/wall_clock LWW.
@@ -110,29 +115,31 @@ module CasebookProjection =
 
     let empty: Map<string, Case> = emptyState.Cases
 
-    let private refreshCase state sessionId q a observations =
-        match Map.tryFind sessionId state.Cases with
+    let private refreshCase state identity q a maintenanceFileState relatedPaths observations =
+        match Map.tryFind identity state.Cases with
         | Some existing ->
             let updated =
                 { existing with
                     Q = q
                     A = a
+                    MaintenanceFileState = if String.IsNullOrEmpty maintenanceFileState then existing.MaintenanceFileState else maintenanceFileState
+                    RelatedPaths = if List.isEmpty relatedPaths then existing.RelatedPaths else relatedPaths
                     Observations = Observations.normalize observations
-                    LastAccessOrder = state.AccessCounter }
+                    AccessOrder = state.AccessCounter }
 
             { AccessCounter = state.AccessCounter + 1L
-              Cases = Map.add sessionId updated state.Cases }
+              Cases = Map.add identity updated state.Cases }
         | None -> state
 
-    let private accessCase state sessionId =
-        match Map.tryFind sessionId state.Cases with
+    let private accessCase state identity =
+        match Map.tryFind identity state.Cases with
         | Some existing ->
             let touched =
                 { existing with
-                    LastAccessOrder = state.AccessCounter }
+                    AccessOrder = state.AccessCounter }
 
             { AccessCounter = state.AccessCounter + 1L
-              Cases = Map.add sessionId touched state.Cases }
+              Cases = Map.add identity touched state.Cases }
         | None -> state
 
     let apply (state: State) (event: CasebookEvent) : State =
@@ -141,22 +148,23 @@ module CasebookProjection =
             let withAccess =
                 { case with
                     Observations = Observations.normalize case.Observations
-                    LastAccessOrder = state.AccessCounter }
+                    AccessOrder = state.AccessCounter }
 
             { AccessCounter = state.AccessCounter + 1L
-              Cases = Map.add case.SessionId withAccess state.Cases }
-        | CasebookEvent.CaseRefreshed(sessionId, q, a, observations) -> refreshCase state sessionId q a observations
-        | CasebookEvent.CaseAccessed sessionId -> accessCase state sessionId
-        | CasebookEvent.CaseEvicted sessionId ->
+              Cases = Map.add case.Identity withAccess state.Cases }
+        | CasebookEvent.CaseRefreshed(identity, q, a, maintenanceFileState, relatedPaths, observations) ->
+            refreshCase state identity q a maintenanceFileState relatedPaths observations
+        | CasebookEvent.CaseAccessed identity -> accessCase state identity
+        | CasebookEvent.CaseEvicted identity ->
             { state with
-                Cases = Map.remove sessionId state.Cases }
+                Cases = Map.remove identity state.Cases }
 
     // No history-fold API by design. CanonicalIntegrator is the sole history
     // enumerator and registers `apply` as this module's one-event oracle.
 
     /// CASE-008: LRU eviction — keep the capacity most-recently-accessed
     /// Cases; the evicted session ids are returned so the caller can append
-    /// InspectorCaseEvicted facts (tombstones are events too).
+    /// Evicted facts (tombstones are events too).
     let evict (capacity: int) (cases: Map<string, Case>) : Map<string, Case> * string list =
         if capacity <= 0 || Map.count cases <= capacity then
             cases, []
@@ -164,7 +172,7 @@ module CasebookProjection =
             let victims =
                 cases
                 |> Map.toList
-                |> List.sortBy (fun (_, case) -> case.LastAccessOrder)
+                |> List.sortBy (fun (_, case) -> case.AccessOrder)
                 |> List.take (Map.count cases - capacity)
                 |> List.map fst
 

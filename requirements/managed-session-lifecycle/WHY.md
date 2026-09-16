@@ -15,6 +15,9 @@
 
 ## 核心不变量
 
+- 身份替换后旧活跃会话必须按既有中断/退休机制显式收束，新任务仅接纳合法新身份（Engineer/DevOps），历史事件保持原样且旧身份不静默升权。
+- 同一道路拥有唯一的固定 DevOps 逻辑执行权威；物理会话崩溃恢复后保持单一权威，真实进程随会话生命周期彻底收束，恢复严格沿用原绑定模型/Persona。
+
 - Handle 生命周期遵循严格的四态模型：`Active → CompletedAwaitingJoin → Retired` 与 `Active | CompletedAwaitingJoin → Abandoned`。
 - Completion cell 实行单赋值竞争，首个到达的完成事实具有唯一权威。
 - 内部尝试中断必须显式闭合后继处理者（successor）或转化为明确的 Failed 终态，防止孤儿尝试挂死父级 join。
@@ -28,3 +31,5 @@
 - 内部错误将局部 attempt 中断放大为整棵会话树的逻辑取消，导致根会话意外退出。
 - 插件释放持久化存储时仍有未排空的异步写入，引发写入损坏与悬挂异常。
 - session deletion、turn observer与strength cut若直接执行Host fatal effect，可能绕开exact execution/child settlement并让同一lifecycle incident被多个callback重复kill。
+- 身份演进时未显式收束旧活跃会话，导致历史 Inspector/Coder 产生未受权写入或静默升权。
+- DevOps 崩溃恢复产生双重物理执行权威，或在 resume/恢复过程中篡改模型绑定与泄漏孤儿子进程。

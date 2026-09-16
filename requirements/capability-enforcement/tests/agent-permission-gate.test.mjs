@@ -1,11 +1,5 @@
 // requirements/capability-enforcement/tests/agent-permission-gate.test.mjs —
-// AGENT-002 / AGENT-006 / AGENT-007, moved from tests/unit/plugin/.
-//
-// Regression: the plugin's `config` hook (ManagedAgentConfig.configureFromHostConfig)
-// writes Wanxiangshu-owned mode/permission/prompt onto the Host's live config
-// object. A validation failure elsewhere in the config used to short-circuit
-// BEFORE any write, so every managed agent fell back to Host defaults — whose
-// `"*": "allow"` baseline opened bash for Coder/Inspector/Manager alike.
+// AGENT-002 / AGENT-006 / AGENT-007
 //
 // These tests drive the real dist entry and assert the writes the Host's
 // Agent.state consumes: the `permission` object with a concrete `"*": "deny"`
@@ -25,12 +19,8 @@ installDefaultResources()
 const ROLES = [
   'Manager',
   'Orchestrator',
-  'Coder',
-  'Inspector',
-  'Browser',
-  'Inquiry',
+  'Engineer',
   'DevOps',
-  'Distiller',
   'Blogger',
 ]
 
@@ -53,7 +43,7 @@ const wildcardMatch = (input, pattern) => {
   const normalized = input.replaceAll('\\', '/')
   let escaped = pattern
     .replaceAll('\\', '/')
-    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    .replace(/[.+^$${}()|[\]\\]/g, '\\$&')
     .replace(/\*/g, '.*')
     .replace(/\?/g, '.')
   if (escaped.endsWith(' .*')) escaped = escaped.slice(0, -3) + '( .*)?'
@@ -107,11 +97,7 @@ const allowList = (config, name) => {
     'grep',
     'mv',
     'rm',
-    'inspect',
     'run',
-    'query-shell',
-    'establish-behavior',
-    'repair-behavior',
     'fork',
     'resume',
     'commission',
@@ -123,8 +109,6 @@ const allowList = (config, name) => {
     'horizon',
     'todowrite',
     'fission',
-    'stealth-browser-mcp_*',
-    'sphinx_*',
     'review',
     'chronicle',
     'fetch',
@@ -137,23 +121,21 @@ const allowList = (config, name) => {
 // AGENT-006 matrix (tool names as they reach the Host permission schema).
 const HOST_UTILITY_ALLOW = ['skill']
 const COGNITIVE_UTILITY_ALLOW = ['assume']
-const cognitiveUtilityAllowFor = (role) => role === 'Blogger' || role === 'Distiller' ? [] : COGNITIVE_UTILITY_ALLOW
+const cognitiveUtilityAllowFor = (role) => role === 'Blogger' ? [] : COGNITIVE_UTILITY_ALLOW
 
 const ROLE_ALLOW = {
-  Manager: ['fork', 'resume', 'join', 'horizon', 'todowrite', 'fission', 'suicide', 'review'],
+  Manager: ['fork', 'resume', 'join', 'horizon', 'todowrite', 'suicide', 'review'],
   Orchestrator: ['commission', 'join', 'horizon'],
-  Coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspect', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission'],
-  Inspector: ['read', 'glob', 'grep', 'query-shell', 'fetch', 'fission'],
-  Browser: ['read', 'glob', 'grep', 'stealth-browser-mcp_*', 'fission'],
-  Inquiry: ['inspect', 'sphinx_*', 'fission'],
+  Engineer: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission'],
   DevOps: [
     'read',
+    'write',
+    'edit',
     'glob',
     'grep',
-    'inspect',
+    'mv',
+    'rm',
     'run',
-    'establish-behavior',
-    'repair-behavior',
     'join',
     'horizon',
     'open-terminal',
@@ -161,7 +143,6 @@ const ROLE_ALLOW = {
     'read-terminal',
     'signal-terminal',
   ],
-  Distiller: [],
   Blogger: ['chronicle'],
 }
 
@@ -185,8 +166,6 @@ test('WHAT[ENF-004] AGENT_010_canonical_agents_carry_stable_allow_sets', () => {
   assert.equal(configureManagedAgents(first).ok, true)
   assert.equal(configureManagedAgents(second).ok, true)
 
-  // Single-version world: no fast-/deep- tiers. Each canonical agent's allow
-  // set is stable across independent configurations.
   for (const role of ROLES) {
     assert.deepEqual(allowList(first, agentName(role)), allowList(second, agentName(role)))
   }
@@ -209,9 +188,6 @@ test('WHAT[ENF-002] AGENT_006_role_tool_matrix_reaches_the_host_schema', () => {
 })
 
 test('WHAT[ENF-010] AGENT_007_bash_stays_denied_even_when_the_gate_fails', () => {
-  // The live-config regression: a catalog validation failure used to
-  // short-circuit BEFORE any write. The error path is a legacy agent name
-  // (build/plan/student/teacher/meditator/executor or underscore shape).
   const config = buildConfig()
   config.agent.build = { model: 'some-model' }
   const outcome = configureManagedAgents(config)
@@ -242,10 +218,10 @@ test('WHAT[ENF-010] AGENT_007_validation_error_is_still_reported', () => {
 
 test('WHAT[ENF-011] AGENT_002_missing_agent_is_projected_on_configure', () => {
   const config = buildConfig()
-  delete config.agent.coder
+  delete config.agent.engineer
   const outcome = configureManagedAgents(config)
   assert.equal(outcome.ok, true, outcome.error)
-  const entry = config.agent.coder
+  const entry = config.agent.engineer
   assert.equal(entry.mode, 'primary')
   assert.equal(entry.permission['*'], 'deny')
   assert.ok(typeof entry.prompt === 'string' && entry.prompt.length > 0)
@@ -272,8 +248,6 @@ test('WHAT[ENF-011] AGENT_002_owned_writes_never_touch_the_model_binding', () =>
 })
 
 test('WHAT[ENF-002] office_capability_permissions_agree_with_the_host_schema_matrix', () => {
-  // Same matrix, expressed at the domain layer: the Host permission object is
-  // built from OfficeCapability.permissions, so the two must agree per role.
   const permissionOf = (toolName) =>
     ({
       fork: 'Fork',
@@ -295,13 +269,7 @@ test('WHAT[ENF-002] office_capability_permissions_agree_with_the_host_schema_mat
       mv: 'Move',
       rm: 'Remove',
       'bash-honeypot': 'BashHoneypot',
-      inspect: 'Inspect',
-      'sphinx_*': 'Sphinx',
       run: 'Exec',
-      'query-shell': 'Exec',
-      'establish-behavior': 'Behavior',
-      'repair-behavior': 'Behavior',
-      'stealth-browser-mcp_*': 'Network',
       review: 'ReviewAssessment',
       chronicle: 'Chronicle',
       fetch: 'Fetch',
@@ -329,7 +297,7 @@ test('WHAT[ENF-006] ASSUME_is_a_non_authority_utility_for_interactive_roles_only
   const config = buildConfig()
   assert.equal(configureManagedAgents(config).ok, true)
   for (const role of ROLES) {
-    const expected = role === 'Blogger' || role === 'Distiller' ? 'deny' : 'allow'
+    const expected = role === 'Blogger' ? 'deny' : 'allow'
     assert.equal(
       evaluate(mergedRules(config, agentName(role)), 'assume', '*').action,
       expected,
@@ -339,8 +307,6 @@ test('WHAT[ENF-006] ASSUME_is_a_non_authority_utility_for_interactive_roles_only
 })
 
 test('WHAT[ENF-011] AGENT_019_external_directory_overrides_host_default_ask', () => {
-  // AGENT-019: Host agent.ts defaults external_directory:* = ask. Managed agents
-  // must emit a trailing allow so findLast cancels the Host ask on any external path.
   const config = buildConfig()
   assert.equal(configureManagedAgents(config).ok, true)
 
@@ -354,5 +320,23 @@ test('WHAT[ENF-011] AGENT_019_external_directory_overrides_host_default_ask', ()
       'allow',
       `${name} permission object must set external_directory allow`,
     )
+  }
+})
+
+test('WHAT[ENF-022] fission_is_strictly_denied_in_host_schema_for_non_engineer_roles', () => {
+  const config = buildConfig()
+  assert.equal(configureManagedAgents(config).ok, true)
+  assert.equal(evaluate(mergedRules(config, 'engineer'), 'fission', '*').action, 'allow')
+  assert.equal(evaluate(mergedRules(config, 'manager'), 'fission', '*').action, 'deny')
+  assert.equal(evaluate(mergedRules(config, 'orchestrator'), 'fission', '*').action, 'deny')
+  assert.equal(evaluate(mergedRules(config, 'devops'), 'fission', '*').action, 'deny')
+  assert.equal(evaluate(mergedRules(config, 'blogger'), 'fission', '*').action, 'deny')
+})
+
+test('WHAT[ENF-023] devops_host_schema_contains_direct_mutation_tools', () => {
+  const config = buildConfig()
+  assert.equal(configureManagedAgents(config).ok, true)
+  for (const tool of ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'run']) {
+    assert.equal(evaluate(mergedRules(config, 'devops'), tool, '*').action, 'allow', `devops must allow ${tool}`)
   }
 })

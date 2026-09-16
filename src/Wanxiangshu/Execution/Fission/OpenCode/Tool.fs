@@ -769,6 +769,10 @@ module FissionTool =
             match activeProfile, scope.RuntimeFor ctx with
             | None, _
             | _, Error _ -> return consequence language Path.Unavailable
+            | Some profile, _ when
+                profile.CanonicalRole <> Role.Engineer
+                || not (OfficeCapability.isAllowed profile.CanonicalRole ToolPermission.Fission) ->
+                return consequence language Path.Unavailable
             | Some profile, Ok ownerRuntime ->
                 return! admitWhenEventPortReady scope durable ctx language parsed toolCallId owner profile ownerRuntime
         }
@@ -850,7 +854,7 @@ module FissionTool =
         }
 
     let admission: ToolAdmission =
-        ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Fission)
+        ToolAdmission.OfficeRole(fun _ r -> r = Role.Engineer && OfficeCapability.isAllowed r ToolPermission.Fission)
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         { Name = "fission"

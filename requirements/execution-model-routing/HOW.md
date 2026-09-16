@@ -48,6 +48,11 @@ ModelRoutingRuntime (进程单例，管理 Lease multiset 与 Capacity Token)
 
 `ChatParamsHook`、`ChatAdmissionTransaction` 及 admission 的两个证明 Surface 静态消费 `SessionExecutionBinding` 的既有 public contract。provider 校验、物理执行绑定／释放与 exact binding count 不再经过动态模块查找、手写 union 或缺失模块时的 no-op／零值。`chat.params` 仍只观察既有绑定，不取得调度 authority；绑定异常仍进入 transaction 的既有 pre-provider settlement。`interaction-authority/tests/chat-params-hook.test.mjs` 与 `managed-chat-execution/tests/pre-provider-settlement.test.mjs` 分别执行真实 hook 和 exact 绑定／释放路径，不以源码函数名匹配代替行为证明。
 
+### 新角色集合路由与 DevOps 模型锁定
+
+- **新角色调度矩阵**：MJS `route(role, running, previous)` 处理 `engineer`、`devops`、`manager`、`orchestrator`、`blogger`。遗留角色名直接返回 `null` 或抛出未识别角色错误。
+- **DevOps 绑定持久性**：DevOps 首次 acquire 时建立的 target 记录于道路持久化元数据中，后续所有 resume 请求直接提取该固定 target，绕过常规 MJS 动态重新选型，确保模型锁定。
+
 ## SDK 类型编译边界
 
 在 `cd6ef0ded` 上，`OpenCodeContract` 与 `strength-policy` 的宽 Host 引用收窄到零引用 `host-opencode-types`，复用原 `OpencodeTypes.fs/.fsi`，不改 SDK 字段、routing decision 或公开签名。前者仅需 `OpencodeModel`、Identity 与 Outcome；后者十四个源码／签名输入中，只有 `ModelRouting` pair 消费 `OpencodeModel`。SDK wire 类型演进与终端事件、MessagePart、摘要实现分离，不把模型类型搬入无领域 platform。

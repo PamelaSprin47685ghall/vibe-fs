@@ -6,6 +6,7 @@ open Wanxiangshu.Foundation
 type Persona =
     | Director
     | Lead
+    | Engineer
     | Coder
     | Investigator
     | Operator

@@ -29,17 +29,17 @@ const admitManagedRoot = async (hooks, sessionID = 'ses-auto-injected') => {
       id: `root-${sessionID}`,
       role: 'user',
       sessionID,
-      agent: 'coder',
+      agent: 'engineer',
       model: { providerID: 'host', modelID: 'placeholder' },
     },
     parts: [],
   }
-  await hooks['chat.message']({ sessionID, agent: 'coder' }, output)
+  await hooks['chat.message']({ sessionID, agent: 'engineer' }, output)
 }
 
 test('WHAT[ENF-006] AUTOINJ_skill_wire_stays_host_owned_and_is_not_plugin_registered', async () => {
   assert.equal(markerToolName, 'skill')
-  assert.equal(rolePredicate('skill', 'coder'), false, 'Host-owned skill is not a plugin role tool')
+  assert.equal(rolePredicate('skill', 'engineer'), false, 'Host-owned skill is not a plugin role tool')
   assert.equal(rolePredicate('skill', 'manager'), false)
   assert.equal(rolePredicate('skill', 'blogger'), false)
 
@@ -128,9 +128,6 @@ test('WHAT[ENF-006] AUTOINJ_tryInject_rewrites_active_call_without_synthetic_inj
     assert.equal(rewrittenActive.parts[0].state.status, 'completed')
     assert.match(rewrittenActive.parts[0].state.output, /DENIED/)
 
-    // Canonical cursor mode: zero synthetic skill messages. Guidance travels
-    // only as NUL+BOM suffix on terminal real tool results, so a synthetic-free
-    // input produces no synthetic injection row.
     const synthetic = transformed.messages.find(
       (message) => message.info?.source === markerSource,
     )

@@ -26,7 +26,8 @@ type private RoadState =
       RetiredProviderRunIds: Set<string>
       SeenAssessmentIds: Set<string>
       Certificate: QualityCertificate option
-      LatestRetirement: RetirementSummary option }
+      LatestRetirement: RetirementSummary option
+      BoundDevOps: string option }
 
 type RelayState = private RelayState of Map<string, RoadState>
 
@@ -43,7 +44,8 @@ type RoadView =
       RetiredIncumbencies: IncumbencyId list
       RetiredProviderRunIds: Set<string>
       Certificate: QualityCertificate option
-      LatestRetirement: RetirementSummary option }
+      LatestRetirement: RetirementSummary option
+      BoundDevOps: string option }
 
 module private Internal =
     let private key roadId = RoadId.value roadId
@@ -480,6 +482,13 @@ module private Internal =
     let private openRoad roadId state eventRoadId authorityRevision authorityMessageId =
         match eventRoadId = roadId, road roadId state with
         | false, _ -> Error "RoadIdentityMismatch"
+        | true, Some current when current.AuthorityRevisions.IsEmpty ->
+            { current with
+                AuthorityRevision = authorityRevision
+                AuthorityRevisions = [ authorityRevision ]
+                AuthorityMessageIds = [ authorityMessageId ] }
+            |> fun opened -> update roadId opened state
+            |> Ok
         | true, Some _ -> Error "RoadAlreadyOpen"
         | true, None ->
             { AuthorityRevision = authorityRevision
@@ -490,9 +499,38 @@ module private Internal =
               RetiredProviderRunIds = Set.empty
               SeenAssessmentIds = Set.empty
               Certificate = None
-              LatestRetirement = None }
+              LatestRetirement = None
+              BoundDevOps = Some ("devops:" + RoadId.value roadId) }
             |> fun opened -> update roadId opened state
             |> Ok
+
+    let private bindDevOps roadId state eventRoadId devopsId =
+        if eventRoadId <> roadId then
+            Error "RoadIdentityMismatch"
+        else
+            match road roadId state with
+            | None ->
+                let authorityRevision = AuthorityRevision.create ""
+                { AuthorityRevision = authorityRevision
+                  AuthorityRevisions = []
+                  AuthorityMessageIds = []
+                  Active = None
+                  Retired = []
+                  RetiredProviderRunIds = Set.empty
+                  SeenAssessmentIds = Set.empty
+                  Certificate = None
+                  LatestRetirement = None
+                  BoundDevOps = Some devopsId }
+                |> fun opened -> update roadId opened state
+                |> Ok
+            | Some current ->
+                match current.BoundDevOps with
+                | Some existing when existing = devopsId -> Ok state
+                | Some existing when existing <> devopsId && existing <> ("devops:" + RoadId.value roadId) ->
+                    Error "RoadDevOpsAlreadyBound"
+                | _ ->
+                    let updated = { current with BoundDevOps = Some devopsId }
+                    update roadId updated state |> Ok
 
     let private makePendingIncumbency (current: RoadState) incumbentId snapshotId =
         { Id = incumbentId
@@ -597,6 +635,8 @@ module private Internal =
         match event with
         | RelayEvent.RoadOpened(eventRoadId, authorityRevision, authorityMessageId) ->
             openRoad roadId state eventRoadId authorityRevision authorityMessageId
+        | RelayEvent.RoadDevOpsBound(eventRoadId, devopsId) ->
+            bindDevOps roadId state eventRoadId devopsId
         | RelayEvent.IncumbencyOpened(incumbentId, snapshotId) -> openIncumbency roadId state incumbentId snapshotId
         | RelayEvent.AssessmentCommitted(assessmentId, incumbencyId, binding, snapshotId, authorityRevision, scores) ->
             result {
@@ -665,7 +705,8 @@ module Fold =
               RetiredIncumbencies = road.Retired
               RetiredProviderRunIds = road.RetiredProviderRunIds
               Certificate = road.Certificate
-              LatestRetirement = road.LatestRetirement })
+              LatestRetirement = road.LatestRetirement
+              BoundDevOps = road.BoundDevOps })
 
 module Decision =
     let private commit state roadId events =
@@ -684,8 +725,29 @@ module Decision =
                 roadId
                 [ RelayEvent.RoadOpened(roadId, authorityRevision, authorityMessageId)
                   RelayEvent.IncumbencyOpened(incumbentId, snapshotId) ]
+        | Some view when view.AuthorityRevisions.IsEmpty ->
+            let authorityMessageId =
+                PhysicalUserMessageId.create (AuthorityRevision.value authorityRevision)
+
+            commit
+                state
+                roadId
+                [ RelayEvent.RoadOpened(roadId, authorityRevision, authorityMessageId)
+                  RelayEvent.IncumbencyOpened(incumbentId, snapshotId) ]
         | Some view when view.AuthorityRevision <> authorityRevision -> Error "AuthorityRevisionMismatch"
         | Some _ -> commit state roadId [ RelayEvent.IncumbencyOpened(incumbentId, snapshotId) ]
+
+    let bindRoadDevOps state roadId devopsId =
+        match Fold.view state roadId with
+        | None ->
+            commit state roadId [ RelayEvent.RoadDevOpsBound(roadId, devopsId) ]
+        | Some view ->
+            match view.BoundDevOps with
+            | Some existing when existing = devopsId -> Ok state
+            | Some existing when existing <> devopsId && existing <> ("devops:" + RoadId.value roadId) ->
+                Error "RoadDevOpsAlreadyBound"
+            | _ ->
+                commit state roadId [ RelayEvent.RoadDevOpsBound(roadId, devopsId) ]
 
     let advanceAuthority state roadId incumbentId expected next authorityMessageId snapshotId =
         commit

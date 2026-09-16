@@ -10,6 +10,7 @@ module OfficeCapabilitySurface =
     let private permissionOf (label: string) : ToolPermission option =
         match label with
         | "Fork" -> Some ToolPermission.Fork
+        | "Resume" -> Some ToolPermission.Resume
         | "Join" -> Some ToolPermission.Join
         | "Horizon" -> Some ToolPermission.Horizon
         | "TodoWrite" -> Some ToolPermission.TodoWrite
@@ -37,6 +38,7 @@ module OfficeCapabilitySurface =
     let private permissionLabel (permission: ToolPermission) : string =
         match permission with
         | ToolPermission.Fork -> "Fork"
+        | ToolPermission.Resume -> "Resume"
         | ToolPermission.Join -> "Join"
         | ToolPermission.Horizon -> "Horizon"
         | ToolPermission.TodoWrite -> "TodoWrite"
@@ -62,6 +64,7 @@ module OfficeCapabilitySurface =
 
     let private officeName role =
         match role with
+        | Role.Engineer -> "Engineer"
         | Role.Coder -> "Coder"
         | Role.Inspector -> "Inspector"
         | Role.DevOps -> "DevOps"
@@ -69,7 +72,7 @@ module OfficeCapabilitySurface =
         | Role.Inquiry -> "Inquiry"
         | _ -> failwith "OfficeCapabilitySurface: catalog contains a non-forkable role"
 
-    /// OFF-002 / ARCH-017: the canonical manager fork office consequence set.
+    /// OFF-007 / ARCH-017: the canonical manager fork office consequence set.
     let managerForkableOffices () : string array =
         ManagedAgentCatalog.managerForkableRoles |> List.map officeName |> List.toArray
 

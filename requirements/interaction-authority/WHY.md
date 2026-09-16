@@ -14,6 +14,9 @@
 
 ## 2. 核心不变量与破坏后果
 
+- **历史事件原样与旧身份不升权**：历史 EventStore 严禁重写；历史事件中的旧身份（Coder/Inspector 等）解码隔离在历史边界，解析历史时不自动升级为可写/可裂变的 Engineer 权限。
+- **DevOps 恢复与续行锁定固定模型与单一权威**：同一道路上的固定 DevOps 拥有唯一的逻辑权威；resume 与崩溃恢复严格沿用原绑定的模型与 Persona，严禁借 resume 换模型。
+
 - **PhysicalUserMessage ≠ AuthorityTurn**：物理层消息必须经由显式、受控的提升函数在物理落地证明后才能升级为 AuthorityRoot；若破坏，任意中间件即可劫持会话权限。
 - **Continuation 严格受限**：Continuation 必须继承既有 Root 权威，禁止新建 RunId、修改 participant 或重置 Fallback 预算；若破坏，自动修复会无限死循环。新物理目标的路由绝不改变 participant。
 - **任期退出不等于授权结束**：Manager 的非满分退休只移交 Incumbency，不终结承载整条 Road 的 LogicalRun。提前清空 active authority 会使后继被正式 admission 拒绝；读取历史 profile 不能修复已经关闭的授权。
@@ -22,6 +25,9 @@
 - **原子 Profile 不可拼装**：执行 profile 必须携带 accepted root 内的版本化 identity evidence，禁止从历史消息、Session cache、物理 parent 或显式 agent 文本动态拼凑 participant 身份。
 - **证据保管不等于身份所有权**：本包持久化并精确暴露 identity evidence，以便重放与审计；固定 participant、Role、Persona 与 provenance/version 的解析、不可变性及替换规则仍只属于 `participant-identity`。当前 per-physical target/lease 只属于 execution binding。
 - **物理 Session 不等于 logical run**：authority profile 与 identity evidence 都以 exact logical run 为作用域；每种 HumanRoot/AgentOwnerRoot lifecycle 必须先收敛为 exact durable closure，SessionId 才可承载新授权。idle/timeout 与物理 topology 不是 closure。
+
+- 破坏历史不可变性，重写 EventStore 或将历史 Inspector 静默升权为可写/可裂变 Engineer。
+- DevOps 续行时允许篡改模型绑定，导致执行身份与容量策略撕裂。
 
 ## DEPENDS ON
 

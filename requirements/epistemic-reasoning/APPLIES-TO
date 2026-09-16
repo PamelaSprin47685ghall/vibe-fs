@@ -3,7 +3,6 @@
 # Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
 
 /src/Wanxiangshu/Sphinx/**
-/resources/provider/role/inquiry/**
 /src/Wanxiangshu/Sphinx/Absorb.fs
 /src/Wanxiangshu/Sphinx/Bayes.fs
 /src/Wanxiangshu/Sphinx/Closure.fs

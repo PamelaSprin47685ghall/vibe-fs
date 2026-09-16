@@ -3,6 +3,7 @@ namespace Wanxiangshu.Mission.Relay
 [<RequireQualifiedAccess>]
 type RelayEvent =
     | RoadOpened of RoadId * AuthorityRevision * PhysicalUserMessageId
+    | RoadDevOpsBound of RoadId * devopsId: string
     | IncumbencyOpened of IncumbencyId * WorkspaceSnapshotId
     | AssessmentCommitted of
         AssessmentId *

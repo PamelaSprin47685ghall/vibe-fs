@@ -48,7 +48,7 @@ Fission 准入必须原子地建立全部 N 条 lanes。任一 lane 的创建、
 
 ## INTRA-PARTICIPANT-PARALLELISM-012: eligibility 单一 consequence source
 
-Fission 的角色权能准入必须从 office consequence 的单一源头投影至模型可见 schema 与运行时门禁，相同 office 的不同档位权限严格一致。仅具备裂变权能的角色（如 Manager、Coder、Inspector、Browser、Inquiry）可调用裂变。
+Fission 的角色权能准入必须从 office consequence 的单一源头投影至模型可见 schema 与运行时门禁，相同 office 的不同档位权限严格一致。唯一具备裂变角色能力的是已证明的 Engineer（即 CanonicalRole=Engineer 且本次授权包含 Fission）；Manager、DevOps、Orchestrator、Blogger、Bookkeeper、Predictor 及其他非 Engineer 角色一律禁止。
 
 ## INTRA-PARTICIPANT-PARALLELISM-013: subsession-only origin
 
@@ -65,3 +65,9 @@ Ring convergence 的顺序只由 canonical lane index/count 决定。V1 的 ring
 ## INTRA-PARTICIPANT-PARALLELISM-016: Result traversal preserves input cardinality and order
 
 Foundation 的 `TaskResultList.traverseM` 是按输入基数有界的顺序 Result traversal，不是 retry。mapper 对每个已到达输入严格调用一次并保持输入顺序；成功时到达全部输入，首个 `Error` 原样短路且不得调用其后的输入，空输入不得调用 mapper。取消与异常沿 mapper task 传播且停止 traversal；该组合不拥有 deadline 或 recovery policy。
+
+## INTRA-PARTICIPANT-PARALLELISM-017: Fission 准入判定公式与主体边界
+
+Fission 的准入判定公式为：`已证明 CanonicalRole=Engineer ∧ 本次授权含 Fission ∧ subsession 来源 ∧ 无活跃 group ∧ 其他现有准入条件成立`。
+
+唯一可赋予 Fission 的角色是已证明的 Engineer；角色名、Persona 别名、工具参数、自称身份或被附上的 Engineer 工作记录均不能授予该能力。Manager 各任期状态（包括完整能力、评估前、接责后、清理窗口等）、Orchestrator、DevOps、Blogger、Bookkeeper、Predictor、未知或内部辅助身份一律拒绝；Engineer 根会话、已经在活跃 Fission group 中的 Engineer lane、Sphinx 内部只读 Engineer 均拒绝；历史 Manager Fission 状态仅可供历史读取与回放，严禁据此重建 lane、恢复执行或提升权限。

@@ -1,9 +1,8 @@
 /**
  * office-capability — package-owned live-repo canary (ARCH-017 / Gate F).
  *
- * The five forkable offices are the canonical 五分法; their entitled
- * consequence must hit every decision surface: Manager Role Law (worldview),
- * fork description (call-time choice), and each office's own Role Law
+ * Entitled consequence must hit every decision surface: Manager Role Law (worldview),
+ * fork/resume description (call-time choice), and each office's own Role Law
  * (self-model). Projection wording may differ; the consequence must not.
  *
  * this file is the live-repo canary that scans the real resources.
@@ -27,69 +26,38 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const PROVIDER = join(ROOT, 'resources/provider')
 const read = (rel) => readFileSync(join(PROVIDER, rel), 'utf8')
 
-// ── ARCH-017 five-office consequence catalog (ids mirror OFFICE_CAPABILITY_ANCHORS) ──
-const FIVE_OFFICES = [
+// ── Canonical active offices consequence catalog ──
+const ACTIVE_OFFICES = [
   {
-    id: 'coder-mutation',
-    managerEn: /entrust mutation to a Coder/i,
-    managerZh: /把 mutation 托付给 Coder/,
-    forkEn: /Coder \/ Engineer[\s\S]{0,120}Changes repository source/,
-    forkZh: /Coder \/ Engineer[\s\S]{0,80}改变 repository source/,
-    lawEn: /changing the written world/,
-    lawZh: /书写出来的世界/,
+    id: 'engineer-investigation-mutation',
+    managerEn: /entrust.*Engineer/i,
+    managerZh: /托付.*Engineer/,
+    forkEn: /Engineer[sS]{0,160}local facts[sS]{0,80}source/i,
+    forkZh: /Engineer[sS]{0,120}本地事实[sS]{0,80}源码/,
+    lawEn: /local facts|changing the written world|implement.*refactor/i,
+    lawZh: /本地事实|书写出来的世界|源码/,
   },
   {
-    id: 'inspector-existing-facts',
-    managerEn: /entrust an Inspector/i,
-    managerZh: /托付 Inspector/,
-    forkEn: /Scout \/ Investigator[\s\S]{0,160}already exist in the repository/,
-    forkZh: /Scout \/ Investigator[\s\S]{0,80}已经存在的事实/,
-    lawEn: /establish facts that already exist in the repository/,
-    lawZh: /repository 中已经存在的事实/,
-  },
-  {
-    id: 'devops-execution',
-    managerEn: /entrust DevOps/i,
-    managerZh: /托付 DevOps/,
-    forkEn: /Technician \/ Operator[\s\S]{0,160}running world/,
-    forkZh: /Technician \/ Operator[\s\S]{0,80}运行中的世界/,
-    lawEn: /operational objective[\s\S]{0,60}honest[\s\S]{0,3}closure/,
-    lawZh: /operational objective/,
-  },
-  {
-    id: 'browser-external-provenance',
-    managerEn: /entrust a Browser/i,
-    managerZh: /托付 Browser/,
-    forkEn: /Navigator \/ Researcher[\s\S]{0,160}external world with provenance/,
-    forkZh: /Navigator \/ Researcher[\s\S]{0,80}外部世界的事实/,
-    lawEn: /establish facts from the Internet and[\s\S]{0,60}other external web sources/,
-    lawZh: /从 Internet 与其他外部 web sources 建立事实/,
-  },
-  {
-    id: 'inquiry-reasoning',
-    managerEn: /entrust Inquiry/i,
-    managerZh: /托付 Inquiry/,
-    forkEn: /Analyst \/ Inquirer[\s\S]{0,160}not yet clear/,
-    forkZh: /Analyst \/ Inquirer[\s\S]{0,80}尚无明确答案/,
-    lawEn: /semantic intelligence/,
-    lawZh: /语义智能|semantic intelligence/,
+    id: 'devops-execution-repair',
+    managerEn: /DevOps/i,
+    managerZh: /DevOps/,
+    forkEn: /DevOps[sS]{0,160}execution[sS]{0,80}repair/i,
+    forkZh: /DevOps[sS]{0,120}执行[sS]{0,80}修复/,
+    lawEn: /operational objective|non-architectural repair/i,
+    lawZh: /operational objective|非架构级.*修复/,
   },
 ]
 
-test('WHAT[OFF-002] OFF_002_managed_catalog_forkable_offices_are_exactly_the_five_canonical_offices', () => {
-  assert.deepEqual(managerForkableOffices(), ['Coder', 'Inspector', 'DevOps', 'Browser', 'Inquiry'])
+test('WHAT[OFF-007] OFF_007_manager_forkable_offices_is_strictly_engineer', () => {
+  assert.deepEqual(managerForkableOffices(), ['Engineer'])
 })
 
 test('WHAT[ENF-002] office_permission_surface_matches_the_canonical_roles_matrix', () => {
   const matrix = [
-    ['manager', ['Finality', 'Fission', 'Fork', 'Horizon', 'Join', 'ReviewAssessment', 'TodoWrite']],
+    ['manager', ['Finality', 'Fork', 'Horizon', 'Join', 'ReviewAssessment', 'TodoWrite']],
     ['orchestrator', ['Fork', 'Horizon', 'Join']],
-    ['coder', ['BashHoneypot', 'Edit', 'Fetch', 'Fission', 'Glob', 'Grep', 'Inspect', 'Move', 'Read', 'Remove', 'Write']],
-    ['inspector', ['Exec', 'Fetch', 'Fission', 'Glob', 'Grep', 'Read']],
-    ['browser', ['Fission', 'Glob', 'Grep', 'Network', 'Read']],
-    ['inquiry', ['Fission', 'Inspect', 'Sphinx']],
-    ['devops', ['Behavior', 'Exec', 'Glob', 'Grep', 'Horizon', 'Inspect', 'Join', 'Pty', 'Read']],
-    ['distiller', []],
+    ['engineer', ['BashHoneypot', 'Edit', 'Fetch', 'Fission', 'Glob', 'Grep', 'Move', 'Read', 'Remove', 'Write']],
+    ['devops', ['Edit', 'Exec', 'Glob', 'Grep', 'Horizon', 'Join', 'Move', 'Pty', 'Read', 'Remove', 'Write']],
     ['blogger', ['Chronicle']],
   ]
 
@@ -99,18 +67,50 @@ test('WHAT[ENF-002] office_permission_surface_matches_the_canonical_roles_matrix
   }
 
   assert.deepEqual(permissions('not-a-role'), [], 'unknown role fails closed to empty set')
+  assert.deepEqual(permissions('coder'), [], 'retired role fails closed to empty set')
+  assert.deepEqual(permissions('inspector'), [], 'retired role fails closed to empty set')
+  assert.deepEqual(permissions('browser'), [], 'retired role fails closed to empty set')
+  assert.deepEqual(permissions('inquiry'), [], 'retired role fails closed to empty set')
+  assert.deepEqual(permissions('distiller'), [], 'retired role fails closed to empty set')
 })
 
 test('WHAT[ENF-002] office_permission_surface_denies_outside_the_matrix', () => {
-  assert.equal(isAllowed('inquiry', 'Inspect'), true)
-  assert.equal(isAllowed('inquiry', 'Sphinx'), true)
-  assert.equal(isAllowed('inquiry', 'Fission'), true)
-  assert.equal(isAllowed('inquiry', 'Read'), false, 'Inquiry lacks Read')
+  // Engineer permissions
+  assert.equal(isAllowed('engineer', 'Fission'), true, 'Engineer has Fission')
+  assert.equal(isAllowed('engineer', 'Read'), true, 'Engineer has Read')
+  assert.equal(isAllowed('engineer', 'Write'), true, 'Engineer has Write')
+  assert.equal(isAllowed('engineer', 'Exec'), false, 'Engineer lacks Exec')
+  assert.equal(isAllowed('engineer', 'Pty'), false, 'Engineer lacks Pty')
+
+  // DevOps permissions
+  assert.equal(isAllowed('devops', 'Exec'), true, 'DevOps has Exec')
+  assert.equal(isAllowed('devops', 'Pty'), true, 'DevOps has Pty')
+  assert.equal(isAllowed('devops', 'Write'), true, 'DevOps has Write')
+  assert.equal(isAllowed('devops', 'Edit'), true, 'DevOps has Edit')
+  assert.equal(isAllowed('devops', 'Fission'), false, 'DevOps lacks Fission')
+  assert.equal(isAllowed('devops', 'Fork'), false, 'DevOps lacks Fork')
+
+  // Manager permissions
+  assert.equal(isAllowed('manager', 'Fork'), true, 'Manager has Fork')
+  assert.equal(isAllowed('manager', 'Finality'), true, 'Manager has Finality')
+  assert.equal(isAllowed('manager', 'Fission'), false, 'Manager lacks Fission')
+  assert.equal(isAllowed('manager', 'Write'), false, 'Manager lacks Write')
+  assert.equal(isAllowed('manager', 'Exec'), false, 'Manager lacks Exec')
+
+  // Orchestrator permissions
+  assert.equal(isAllowed('orchestrator', 'Fork'), true, 'Orchestrator has Fork')
+  assert.equal(isAllowed('orchestrator', 'Fission'), false, 'Orchestrator lacks Fission')
+
+  // Blogger permissions
   assert.equal(isAllowed('blogger', 'Chronicle'), true, 'Blogger has exactly Chronicle')
   assert.equal(isAllowed('blogger', 'Fork'), false, 'Blogger lacks Fork')
-  assert.equal(isAllowed('manager', 'Finality'), true, 'Manager has Finality')
+  assert.equal(isAllowed('blogger', 'Fission'), false, 'Blogger lacks Fission')
+
+  // Retired & unknown roles
   assert.equal(isAllowed('unknown-role', 'Fork'), false, 'unknown role → deny')
-  assert.equal(isAllowed('manager', 'UnknownPermission'), false, 'unknown permission → deny')
+  assert.equal(isAllowed('browser', 'Network'), false, 'retired browser → deny')
+  assert.equal(isAllowed('inquiry', 'Sphinx'), false, 'retired inquiry → deny')
+  assert.equal(isAllowed('coder', 'Write'), false, 'retired coder → deny')
 })
 
 test('WHAT[OFF-005] OFF_005_each_office_consequence_hits_manager_law_and_fork_description_in_both_locales', () => {
@@ -120,7 +120,7 @@ test('WHAT[OFF-005] OFF_005_each_office_consequence_hits_manager_law_and_fork_de
     forkEn: read('tool/fork/description/en.md'),
     forkZh: read('tool/fork/description/zh-CN.md'),
   }
-  for (const office of FIVE_OFFICES) {
+  for (const office of ACTIVE_OFFICES) {
     for (const key of ['managerEn', 'managerZh', 'forkEn', 'forkZh']) {
       assert.match(
         surfaces[key],
@@ -131,39 +131,18 @@ test('WHAT[OFF-005] OFF_005_each_office_consequence_hits_manager_law_and_fork_de
   }
 })
 
-test('WHAT[OFF-002] OFF_002_each_office_role_law_carries_its_entitled_consequence', () => {
-  for (const office of FIVE_OFFICES) {
-    assert.match(read(`role/${office.id.split('-')[0]}/en.md`), office.lawEn, `${office.id} law en`)
-    assert.match(read(`role/${office.id.split('-')[0]}/zh-CN.md`), office.lawZh, `${office.id} law zh`)
-  }
-})
-
 test('WHAT[OFF-006] OFF_006_offices_are_not_interchangeable_general_purpose_agents', () => {
   const managerEn = read('role/manager/en.md')
   const managerZh = read('role/manager/zh-CN.md')
   assert.match(managerEn, /Do not treat these offices as interchangeable/i)
-  assert.match(managerEn, /A Coder is not an Operator/i)
-  assert.match(managerZh, /可互换|碰巧没有 shell/)
-  assert.match(managerZh, /Coder 不是碰巧没有 shell 的 Operator/)
+  assert.match(managerEn, /Engineer is not an Operator|DevOps is not.*architect/i)
+  assert.match(managerZh, /可互换|Engineer 不是.*DevOps 不是/)
 
   // fork must not read as "commission a witness" (delegation is by consequence).
   assert.doesNotMatch(read('tool/fork/description/en.md'), /Commission another witness/i)
 })
 
-test('WHAT[OFF-003] OFF_003_two_calling_names_differ_in_persona_and_depth_not_authority', () => {
-  assert.match(
-    read('tool/fork/description/en.md'),
-    /differ in persona and reasoning depth,\s*not in the office's authority/i,
-  )
-  assert.match(
-    read('tool/fork/description/zh-CN.md'),
-    /区别在 persona 与 reasoning depth，不改变该 Office 的 authority/,
-  )
-})
-
 test('WHAT[OFF-001] OFF_001_office_capability_is_consequence_not_tool_whitelist', () => {
-  // The manager law names offices by what they can establish or change,
-  // not by their instruments (ARCH-017: "not a list of names").
   const managerEn = read('role/manager/en.md')
   assert.match(managerEn, /Know another office by its promises, not by its keys/i)
   assert.match(managerEn, /not by the instruments hidden[\s\S]{0,20}inside it/i)
@@ -175,4 +154,21 @@ test('WHAT[OFF-015] predictor_is_internal_mechanism_role_not_forkable_or_schedul
   const forkZh = read('tool/fork/description/zh-CN.md')
   assert.doesNotMatch(forkEn, /\bpredictor\b/i)
   assert.doesNotMatch(forkZh, /predictor/)
+})
+
+test('WHAT[OFF-016] OFF_016_engineer_is_the_only_office_entitled_to_fission', () => {
+  assert.equal(isAllowed('engineer', 'Fission'), true)
+  assert.equal(isAllowed('manager', 'Fission'), false)
+  assert.equal(isAllowed('orchestrator', 'Fission'), false)
+  assert.equal(isAllowed('devops', 'Fission'), false)
+  assert.equal(isAllowed('blogger', 'Fission'), false)
+})
+
+test('WHAT[OFF-017] OFF_017_devops_has_inherent_mutation_authority_without_allow_repair_toggle', () => {
+  assert.equal(isAllowed('devops', 'Write'), true)
+  assert.equal(isAllowed('devops', 'Edit'), true)
+  assert.equal(isAllowed('devops', 'Move'), true)
+  assert.equal(isAllowed('devops', 'Remove'), true)
+  assert.equal(isAllowed('devops', 'Exec'), true)
+  assert.equal(isAllowed('devops', 'Pty'), true)
 })

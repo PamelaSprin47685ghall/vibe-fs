@@ -1,4 +1,4 @@
-// Split from tests/unit/strength/host-canary-k0.test.mjs (cutover Wave 2a); owner: capability-enforcement
+// requirements/capability-enforcement/tests/strength-replica-execution-gate.test.mjs
 //
 // ENF-005: replica 收窄 — the Strength replica's execution gate denies
 // write/edit/executor/fork/join/network tools, and the replica host tool map
@@ -16,15 +16,13 @@ import {
 } from '../../../dist/Strength/Surface.js'
 
 test('WHAT[ENF-005] STRENGTH_004_005_policy_execution_gate_denies_write_edit_executor_fork_join_network', () => {
-  // Not the live Host execution-gate canary. Same capability set the schema is
-  // built from: forged mutating/network/session tools stay outside the replica.
-  const allowed = new Set(capabilities('coder'))
-  const denied = ['Write', 'Edit', 'Exec', 'Fork', 'Join', 'Horizon', 'Network', 'Pty']
+  const allowed = new Set(capabilities('engineer'))
+  const denied = ['Write', 'Edit', 'Exec', 'Fork', 'Join', 'Horizon', 'Network', 'Pty', 'Fission']
   for (const permission of denied) {
     assert.equal(allowed.has(permission), false, permission)
   }
 
-  for (const tool of ['write', 'edit', 'run', 'fork', 'resume', 'join', 'network', 'bash', 'horizon']) {
+  for (const tool of ['write', 'edit', 'run', 'fork', 'resume', 'join', 'network', 'bash', 'horizon', 'fission']) {
     assert.equal(isAllowedTool(tool), false, tool)
   }
   assert.equal(isAllowedTool('read'), true)

@@ -229,3 +229,20 @@ module Surface =
                        authorityRevision = AuthorityRevision.value retirement.AuthorityRevision |}
             | None -> null
         | None -> null
+
+    let roadDevOps state road =
+        match Fold.view state (RoadId.create road) with
+        | None -> null
+        | Some roadView ->
+            let defaultDevops = "devops:" + road
+            let devopsId = defaultArg roadView.BoundDevOps defaultDevops
+            let incumbentId =
+                roadView.ActiveIncumbency
+                |> Option.map IncumbencyId.value
+                |> nullableString
+            box
+                {| devopsId = devopsId
+                   incumbentId = incumbentId |}
+
+    let bindRoadDevOps state road devopsId =
+        Decision.bindRoadDevOps state (RoadId.create road) devopsId |> result

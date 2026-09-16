@@ -8,6 +8,7 @@ open Wanxiangshu.Foundation
 type Persona =
     | Director
     | Lead
+    | Engineer
     | Coder
     | Investigator
     | Operator
@@ -26,6 +27,7 @@ module Persona =
         match persona with
         | Persona.Director -> "Director"
         | Persona.Lead -> "Lead"
+        | Persona.Engineer -> "Engineer"
         | Persona.Coder -> "Coder"
         | Persona.Investigator -> "Investigator"
         | Persona.Operator -> "Operator"
@@ -41,6 +43,7 @@ module Persona =
         match label with
         | "Director" -> Some Persona.Director
         | "Lead" -> Some Persona.Lead
+        | "Engineer" -> Some Persona.Engineer
         | "Coder" -> Some Persona.Coder
         | "Investigator" -> Some Persona.Investigator
         | "Operator" -> Some Persona.Operator
@@ -63,6 +66,7 @@ module PersonaCatalog =
         match role with
         | Role.Orchestrator -> Persona.Director
         | Role.Manager -> Persona.Lead
+        | Role.Engineer -> Persona.Engineer
         | Role.Coder -> Persona.Coder
         | Role.Inspector -> Persona.Investigator
         | Role.DevOps -> Persona.Operator

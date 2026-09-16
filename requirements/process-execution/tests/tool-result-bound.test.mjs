@@ -1,10 +1,14 @@
-// Tool-host truncation semantics through the owner surface.
+// requirements/process-execution/tests/tool-result-bound.test.mjs
+// Owner: process-execution.
+//
+// PROC-017: 自定义工具文本结果确定性留尾截断
+
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
 const { registerBounded } = await import('../../../dist/OpenCode/Codec/ToolHostSurface.js')
 
-test('WHAT[DISTILL-012] CODEC_register_applies_tool_with_uncurried_execute_and_bounds_result', async () => {
+test('WHAT[PROC-017] custom_tool_output_undergoes_deterministic_tail_truncation', async () => {
   const registrations = []
   const fakeTool = (definition) => {
     registrations.push(definition)

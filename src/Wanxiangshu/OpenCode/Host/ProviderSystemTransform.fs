@@ -17,6 +17,7 @@ module ProviderSystemTransform =
         function
         | Role.Manager -> catalog.ManagerSystemPrompt
         | Role.Orchestrator -> catalog.OrchestratorSystemPrompt
+        | Role.Engineer -> catalog.EngineerSystemPrompt
         | Role.Coder -> catalog.CoderSystemPrompt
         | Role.Inspector -> catalog.InspectorSystemPrompt
         | Role.Browser -> catalog.BrowserSystemPrompt

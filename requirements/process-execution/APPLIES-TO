@@ -14,6 +14,9 @@
 /src/Wanxiangshu/Process/PtySupervisor.fs
 /src/Wanxiangshu/Process/PtyTypes.fs
 /src/Wanxiangshu/Process/Spool.fs
+/src/Wanxiangshu/Process/LargeGate.fs
+/src/Wanxiangshu/Process/LargeGateSurface.fs
+/src/Wanxiangshu/Host/Contract/ToolResultBound.fs
 /src/Wanxiangshu/OpenCode/Tools/PtyTool.fs
 /src/Wanxiangshu/OpenCode/Tools/ExecutorTool.fs
 /src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs

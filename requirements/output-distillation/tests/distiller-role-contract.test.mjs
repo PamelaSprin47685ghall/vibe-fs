@@ -2,52 +2,51 @@
 //
 // Owner: output-distillation.
 //
-// DISTILL-009: the one bounded-tail Distiller is a private leaf runtime. Its
-// managed identity must never become a public `fork` / `horizon` target or
-// acquire a Blogger companion.
-// DISTILL-010: the role has no execution, mutation, or judgement permissions;
-// the provider-visible `run` verb is the only execution surface and invokes
-// distillation internally.
+// DISTILL-014: 任意输出规模零 Distiller 模型会话与彻底去角色化。
+// 验证 Distiller 角色及资源从系统角色目录与配置中彻底移除（P5 实施前必红，P5 后转绿）。
 
 import assert from 'node:assert/strict'
+import { existsSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
-import { assertJsData } from '../../verification-system/tests/support/js-contract.mjs'
 
-const {
-  roleLabel,
-  managedAgentName,
-  isInternalRuntime,
-  canBeForkedOrHorizonTarget,
-  hasBloggerCompanion,
-  permissionLabels,
-  executionToolName,
-  contract,
-} = await import('../../../dist/OpenCode/Tools/DistillationSurface.js')
+import { allRoleLabels, allInternalRoleLabels } from '../../../dist/Foundation/RolesSurface.js'
+import { configure as configureManagedAgents, installDefaultResources } from '../../../dist/OpenCode/Host/ManagedAgentConfigSurface.js'
 
-test('WHAT[DISTILL-009] distiller_is_private_leaf_runtime_without_public_target_or_blogger_companion', () => {
-  assertJsData(contract, 'distiller contract')
-  assertJsData(roleLabel, 'roleLabel')
-  assertJsData(managedAgentName, 'managedAgentName')
-  assertJsData(isInternalRuntime, 'isInternalRuntime')
-  assertJsData(canBeForkedOrHorizonTarget, 'canBeForkedOrHorizonTarget')
-  assertJsData(hasBloggerCompanion, 'hasBloggerCompanion')
-  assertJsData(permissionLabels, 'permissionLabels')
-  assertJsData(executionToolName, 'executionToolName')
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 
-  assert.equal(roleLabel, 'distiller')
-  assert.equal(canBeForkedOrHorizonTarget, false)
-  assert.equal(managedAgentName, 'distiller')
-  assert.equal(isInternalRuntime, true)
-  assert.equal(contract.internalRuntime, true)
-  assert.equal(contract.publicTarget, false)
-  assert.equal(contract.managedAgent, 'distiller')
-  assert.equal(hasBloggerCompanion, false)
-  assert.equal(contract.bloggerCompanion, false)
+test.before(() => {
+  installDefaultResources()
 })
 
-test('WHAT[DISTILL-010] distiller_carries_no_execution_or_judgement_permissions_and_run_is_the_only_execution_surface', () => {
-  assert.deepEqual(permissionLabels, [], 'Distiller must carry zero tool permissions')
-  assert.deepEqual(contract.permissions, [])
-  assert.equal(executionToolName, 'run', 'the execution tool surface is `run`; distill is not a separate provider tool')
-  assert.equal(contract.executionTool, 'run')
+test('WHAT[DISTILL-014] distiller_role_is_completely_removed_from_role_catalogs_and_configs', () => {
+  // 1. Roles 集合中不得存在 "distiller"
+  assert.equal(
+    allRoleLabels.includes('distiller'),
+    false,
+    'allRoleLabels must not contain "distiller"',
+  )
+  assert.equal(
+    allInternalRoleLabels.includes('distiller'),
+    false,
+    'allInternalRoleLabels must not contain "distiller"',
+  )
+
+  // 2. ManagedAgentConfig 不得生成 distiller 代理配置
+  const config = { agent: {} }
+  for (const role of ['manager', 'orchestrator', 'engineer', 'devops', 'blogger', 'bookkeeper']) {
+    config.agent[role] = { model: `${role}-model` }
+  }
+  const result = configureManagedAgents(config)
+  assert.equal(result.ok, true)
+  assert.equal(config.agent['distiller'], undefined, 'distiller agent must not be configured')
+
+  // 3. 角色资源目录 resources/provider/role/distiller/ 必须已被彻底删除
+  const distillerRoleDir = join(ROOT, 'resources/provider/role/distiller')
+  assert.equal(
+    existsSync(distillerRoleDir),
+    false,
+    'resources/provider/role/distiller directory must be deleted',
+  )
 })

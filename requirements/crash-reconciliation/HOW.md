@@ -14,6 +14,11 @@
 2. **Materialize 与 Binding**：在真实的 `chat.message` 中将 briefing 注入为带有专用 marker 的 visible user part，并绑定到精确的 `(SessionId, PhysicalUserMessageId)`。
 3. **Disclosure-Only 抑制**：命中显式续传 binding 的请求跳过普通的 business routing、Persona 强制与自动 continuation，仅执行基础的 wire sanitization，确保业务效果完全由 LLM 后续显式 tool call 驱动。
 
+### DevOps 崩溃调和与命令去重
+
+- **单一物理会话映射**：Reconciler 扫描到处于崩溃断点的 DevOps 时，若存在未决任务，仅将断点事实作为 disclosure briefing 提供给新物理会话，不重放任何历史 shell 命令。
+- **模型与权限不可变**：恢复生成的物理会话上下文严格继承 durable 记录的 `BoundModel` 与 `BoundPersona`，直接阻断任何模型漂移尝试。
+
 ## 依赖关系
 
 DEPENDS ON:

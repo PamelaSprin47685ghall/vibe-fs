@@ -9,7 +9,7 @@ import test from 'node:test'
 import { markerSource } from '../../../../../dist/OpenCode/Host/PairProgrammingThoughtSurface.js'
 import { withExecutablePlugin, acceptAuthorityRoot } from '../../../../verification-system/tests/support/plugin-fixture.mjs'
 
-const withSession = (messages, sessionID = 'coder-auto-injected') =>
+const withSession = (messages, sessionID = 'engineer-auto-injected') =>
   messages.map((message, index) => ({
     ...message,
     info: {
@@ -22,13 +22,13 @@ const withSession = (messages, sessionID = 'coder-auto-injected') =>
 
 test('WHAT[ENF-006] HOST_013_skill_stays_host_owned_and_legacy_marker_is_not_plugin_registered', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, 'coder-auto-injected', 'coder')
+    await acceptAuthorityRoot(runtime, 'engineer-auto-injected', 'engineer')
     assert.equal(hooks.tool['auto-injected'], undefined, 'legacy auto-injected must not be in hooks.tool')
     assert.equal(hooks.tool.skill, undefined, 'skill remains Host-owned rather than plugin-registered')
 
     const transformed = {
       messages: withSession([
-        { role: 'user', info: { id: 'root-coder-auto-injected' }, parts: [{ type: 'text', text: 'start' }] },
+        { role: 'user', info: { id: 'root-engineer-auto-injected' }, parts: [{ type: 'text', text: 'start' }] },
         { role: 'assistant', info: { id: 'c1' }, parts: [{ type: 'tool', tool: 'read', callID: 't1', state: { status: 'pending', input: {}, time: { start: 0 } } }] },
         { role: 'assistant', info: { id: 'r1' }, parts: [{ type: 'tool', tool: 'read', callID: 't1', state: { status: 'completed', input: {}, output: 'ok1', time: { start: 0, end: 0 } } }] },
       ]),

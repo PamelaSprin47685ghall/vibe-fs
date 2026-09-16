@@ -12,6 +12,7 @@ module StaticTools =
     val permissionObj: role: Role -> obj
     val managerAgentConfig: prompt: string option -> obj
     val orchestratorAgentConfig: prompt: string option -> obj
+    val engineerAgentConfig: prompt: string option -> obj
     val coderAgentConfig: prompt: string option -> obj
     val bloggerAgentConfig: prompt: string -> obj
     val distillerAgentConfig: prompt: string -> obj

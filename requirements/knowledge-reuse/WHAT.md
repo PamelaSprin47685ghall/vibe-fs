@@ -2,33 +2,60 @@
 
 ## KNOWLEDGE-REUSE-001: Casebook 是尽力而为的语义缓存而非真理系统
 
-Inspector Casebook 属于 best-effort 语义缓存：每个 Case 保存针对特定问题的 Q&A 与对应支撑该答案的可重放仓库观察。后续 Inspector 可通过 `fetch` 读取并在当前工作区重放观察。Casebook 不作为代码库真理系统，不维护全局提交历史，不保证历史答案等价于当前规范，严禁使用时间戳裁决有效性，且执行过程严禁修改目标工作区。
+Casebook 属于 best-effort 语义缓存：每个 Case 保存针对特定工程问题的 Q&A 与对应支撑该答案的实质访问路径及完整文件状态基线。后续调用可通过 `fetch` 读取并根据文件差异进行维护。Casebook 不作为代码库真理系统，不保证历史答案等价于当前规范，严禁使用时间戳裁决有效性，且执行过程严禁对工作区产生意外破坏。对外仅描述「关联文件未检测到变化」或「已根据所提供差异维护」，严禁宣称「案例已验证正确」。
 
-## KNOWLEDGE-REUSE-002: Case 结构由逐字问答与可重放观察构成
+## KNOWLEDGE-REUSE-002: Case 最小数据模型与双基线引用
 
-Case 的问题字段（Q）逐字等于原始 Inspector 的初始任务描述（不经过任何摘要）；答案字段（A）逐字等于实际 Inspector 工具执行返回的规范正文；Observations 包含该答案所依据的全部类型化仓库观察。Bookkeeper 可在维护时调整 Q 或 A，最终 A 仍须满足工具结果大小边界。
+Case 结构由以下核心事实构成：
+1. `identity`：本次逻辑工程工作的稳定案例身份（复用 invocation 因果身份，不以物理 SessionId 为唯一标识）；
+2. `sourceTrace`：不可变轨迹引用及其工作范围；
+3. `question / answer`：可维护的逐字初始任务描述与规范结果正文；
+4. `relatedPaths`：实质访问路径的去重集合；
+5. `completionFileState`：轨迹结束时的完整文件状态引用（B），永不改写；
+6. `maintenanceFileState`：最近一次成功维护所对应的完整文件状态引用（维护推进 B→C→D）；
+7. `accessOrder`：由访问事件派生的单调访问序。
+初始时两个文件状态引用指向同一份存储引用，不复制完整文件。
 
-## KNOWLEDGE-REUSE-003: 观察捕获基于工具类型化结果而非文本推断
+## KNOWLEDGE-REUSE-003: 实质访问采集合同
 
-Observation 必须且仅能从只读工具的类型化执行结果中捕获（读取文件对应 `FileRead`、文件检索对应 `GlobResult`、文本搜索对应 `GrepResult`），严禁从大模型输出文本中反向推断。若部分命令无法被类型化识别，不阻止当前 Case 的归档，仅代表未来重放时少一次差异比对机会。
+关联文件路径必须且仅能从工具层面的**实质访问**中采集：
+- **成功读取**：成功读取文件正文（含局部读取）记录规范路径，关联整个文件，不维护行级依赖；
+- **成功创建**：记录新路径；
+- **成功修改**：记录目标路径；
+- **成功删除**：记录原路径，结束状态允许为 `Missing`；
+- **成功移动／重命名**：同时关联旧路径与新路径；
+- **排除项**：`grep`、`glob`、目录列表（`ls`）、只展示符号位置的导航、模型在回答/附件/命令字符串中提及的路径，均**不构成实质访问**，严禁计入关联；
+- **执行失败**：工具执行失败或未提交的修改意图不记录修改，但此前已发生的真实读取仍可记录。
+采集必须在实际工具执行层完成，严禁由模型主动上报，不设行数阈值，不构造静态依赖闭包。
 
-## KNOWLEDGE-REUSE-004: `fetch` 语义由公开 Shelfmark 与前置重放驱动
+## KNOWLEDGE-REUSE-004: 结束边界冻结基线与外部变化
 
-`fetch(shelfmark)` 仅接收公开的 Shelfmark 标识符，不暴露内部持久化会话标识。执行时首先针对当前工作区只读重放全部已记录的 observations：
-- 若未检测到任何环境差异，直接返回精确的规范答案 A，并注明未发现证据变更（作为新鲜度提示）；
-- 若检测到环境差异，触发 Bookkeeper 尝试刷新 Case；刷新成功则返回更新后的规范答案，刷新失败则安全退避并返回旧答案 A，同时明确标注其为陈旧记录。
+逻辑工程工作结束时，立即固定 `sourceTrace` 与 `relatedPaths`，并冻结本次结束时的完整文件状态基线（`completionFileState` = B）。
+- 完整状态精确区分 `Present(内容引用)` 与 `Missing(当时不存在)`，读取失败/权限错误不得作为 Missing 处理；
+- 「外部变化」指本段轨迹之外的一切修改（包括其他工作、DevOps 修复、或同一 Engineer 的下一次 resume）；
+- DevOps 的修复按 B→C 更新相关案例，但不成为 Engineer 来源，亦不单独产生伪造的 Engineer 案例。
 
-## KNOWLEDGE-REUSE-005: 新鲜度指示不构成正确性证明且允许返回陈旧记录
+## KNOWLEDGE-REUSE-005: `fetch` 语义由公开 Shelfmark 与真实 Diff 驱动
 
-任何重放无差异的结果仅作为新鲜度提示，不构成当前代码库状态的必然证明。维护流程失败不导致 `fetch` 抛错：Bookkeeper 刷新失败时保留旧 Case 并返回旧答案，容忍过时是系统预期的正常产品语义。
+`fetch(shelfmark)` 仅接收公开的 Shelfmark 标识符，不暴露内部持久化会话标识。执行时：
+1. 读取旧案及其维护基线 B；
+2. 捕获一次关联文件在当前工作区的目标状态 T，并计算真实 diff（B → T）；
+3. **无差异**：直接返回旧案正文，并声明关联文件未检测到变化；
+4. **有差异**：触发 Bookkeeper 传入旧案与真实 diff 执行 `CaseRefresh`；
+   - 刷新成功：将更新后的案例正文与新基线 `maintenanceFileState = T` 在同一事件边界原子提交，并返回新正文；
+   - 刷新失败：安全退避，保留旧案与原维护基线 B，返回旧正文并明确标注维护未完成；
+5. 一次目标捕获，不做前后 replay 循环或稳定性重试，容忍过时是系统预期的正常产品语义。
 
 ## KNOWLEDGE-REUSE-006: Bookkeeper 契约与单程序原子维护边界
 
-私有 Bookkeeper 代理提供 `CaseRefresh` 与 `CaseFinalize` 两类请求契约。其操作工具严格限定为唯一的 `js-bookkeeper(program)`：单个 JavaScript 程序代表一次原子 staged 变换，`setQuestion` 与 `setAnswer` 在单次程序中至多调用一次，零修改属于合法操作。Bookkeeper 严禁获得文件系统读写权限。
+私有 Bookkeeper 代理提供 `CaseFinalize`（初次按轨迹整理）与 `CaseRefresh`（按旧案+真实 diff 更新）两类请求契约：
+- **无仓库调查权**：Bookkeeper 没有仓库 `read`/`glob`/`grep`、无完整新旧文件、无 Inspector 调查权限，只能通过 `js-bookkeeper` 访问并编辑正在维护的案例自身；
+- **单程序原子操作**：单个 JavaScript 程序代表一次原子 staged 变换，`setQuestion` 与 `setAnswer` 在单次程序中至多调用一次，零修改属于合法操作；
+- **正文与基线原子提交**：Bookkeeper 可以判定 diff 与结论无关而保持正文不变，成功后仍推进维护基线；失败则正文与基线均不推进。
 
 ## KNOWLEDGE-REUSE-007: Casebook 持久权威归于统一 EventStore
 
-Casebook 的持久化权威唯一归属于统一的 `EventStore`：由 `InspectorCaseCaptured`、`InspectorCaseRefreshed`、`InspectorCaseAccessed` 与 `InspectorCaseEvicted` 事件以及对应的 `CasebookProjection` fold 构成，大文本通过 PayloadRef 引用存储。严禁设立独立的 Git 分支、文件数据库或私有日志作为第二真源。
+Casebook 的持久化权威唯一归属于统一的 `EventStore`：由 `InspectorCaseCaptured`（或 `EngineerCaseCaptured`）、`InspectorCaseRefreshed`（或 `EngineerCaseRefreshed`）、`InspectorCaseAccessed` 与 `InspectorCaseEvicted` 事件以及对应的 `CasebookProjection` fold 构成，大文本与文件状态通过 PayloadRef 引用存储。严禁设立独立的分支、文件数据库或私有日志作为第二真源。
 
 ## KNOWLEDGE-REUSE-008: LRU 淘汰以事件表达且访问序单调派生
 
@@ -38,9 +65,12 @@ Casebook 维护容量有界的 LRU 缓存：条目淘汰通过追加 `InspectorC
 
 当仓库缺少 Casebook marker 目录时，系统在提示词层面不注入 `fetch` 工具描述，在执行层面直接拒绝 `fetch` 执行，不构建 Casebook 索引，不追加任何 Casebook 相关事件，保证未启用特性的仓库行为完全中立。
 
-## KNOWLEDGE-REUSE-010: Inspector 生命周期保证作用域内仅 Finalize 一次
+## KNOWLEDGE-REUSE-010: 逻辑 Engineer 轨迹生命周期与 Fission 收敛归档
 
-对于非复用 Inspector 作用域，会在会话结束时归档捕获结果；对于复用 Inspector 作用域，在整个调用期间仅暂存草稿，直到 ReuseScope 关闭时触发恰好一次 `CaseFinalize`。严禁在每个回合、空闲时刻或定时器触发时重复执行 finalize。异常删除的会话仅执行清理，不追加持久化事件。
+案例归档以一次逻辑 Engineer 工作轨迹为唯一来源：
+1. **单次归档**：正常完成（实现、调查或交回边界）触发恰好一次 `CaseFinalize`；同一 Session 多次 resume 产生多段独立来源与案例，不互相覆盖；
+2. **Fission 合并**：若发生 Fission，逻辑工作包含裂变前工作、各 lane 的 keyed 记录与实质访问，以及确定性收敛与最终 takeover；访问路径取并集，全部收敛后冻结一次文件状态，只归档一次；
+3. **忽略重复与晚到事件**：单 lane 完成、晚到 terminal、重复事件或中间压缩事件严禁触发单独归档；异常取消的会话执行清理，不追加持久化事件。
 
 ## KNOWLEDGE-REUSE-011: 并发分叉显式表达为 DomainConflict 且禁止 LWW
 
@@ -48,8 +78,16 @@ Casebook 维护容量有界的 LRU 缓存：条目淘汰通过追加 `InspectorC
 
 ## KNOWLEDGE-REUSE-012: 公开索引仅暴露低信任 Shelfmark 与规范问题
 
-面向外部模型的 `CasebookIndexSnapshot` 属于低信任数据：模型仅可见 `{ shelfmark, canonical question }` 元组。Shelfmark 作为稳定的公开寻址标识，在内部解析为持久化 Case 身份，严禁将内部会话状态、新鲜度标记或机器私有字段泄漏至索引。
+面向外部模型的 `CasebookIndexSnapshot` 属于低信任数据：模型仅可见 `{ shelfmark, canonical question }` 元组。Shelfmark 作为稳定的公开寻址标识，在内部解析为持久化 Case 身份，严禁将内部会话状态、会话拓扑、新鲜度标记或机器私有字段泄漏至索引。
 
 ## KNOWLEDGE-REUSE-013: Casebook fatal先settle补偿事实再经注入fuse执行
 
 Casebook semantic conflict必须先写入对应durable failure/cut-tail并取得committed或unknown settlement evidence，再构造typed incident。Store/runtime只接受composition注入的mandatory fatal capability；不得直接引用physical adapter、optional/default/global fallback。同一incident只允许一次report与kill，fatal不得修改Case projection、epoch或freshness。
+
+## KNOWLEDGE-REUSE-014: 预算与截断诚实性
+
+大轨迹与大 diff 必须遵守预算限制，执行截头取尾处理，并保留明确的截断声明与变更路径信息。Bookkeeper 严禁将仅见尾部声称已审阅全部变更；无法做出有效更新时保留旧案与旧基线，严禁通过反复重试、模型蒸馏或读取全仓文件绕过预算。
+
+## KNOWLEDGE-REUSE-015: 废止严格 Replay 与稳定性校验循环
+
+彻底废除基于 `FileRead/GlobResult/GrepResult` 集合相等性判定的严格 replay 机制，废除刷新前后的 `replay-before / replay-after` 稳定性循环。案例的新鲜度维护完全基于真实文件 diff 进行单次迁移。

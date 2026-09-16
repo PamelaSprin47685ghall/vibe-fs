@@ -1,13 +1,3 @@
 # Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
 # requirements/output-distillation/** is covered implicitly and must not be listed here.
-# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
-
-/src/Wanxiangshu/OpenCode/Tools/Distillation.fs
-/src/Wanxiangshu/OpenCode/Tools/DistillationRuntime.fs
-/src/Wanxiangshu/OpenCode/Tools/DistillationSurface.fs
-/src/Wanxiangshu/Context/Companion/Transform.fs
-/src/Wanxiangshu/Host/Contract/ToolResultBound.fs
-/src/Wanxiangshu/Process/LargeGate.fs
-/src/Wanxiangshu/Process/LargeGateSurface.fs
-/src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs
-/resources/provider/tool/distill/**
+# Package is retracted; valid output paths migrated to requirements/process-execution/APPLIES-TO.

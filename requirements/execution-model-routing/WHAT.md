@@ -96,3 +96,13 @@ provider 恢复的一次已确认失败由 `ModelRouting` 结算失败 attempt �
 - 驱逐目标：其 provider 在进程生命周期内被 poison，后续 fresh admission 回到普通调度。
 
 两种结局都只属于该 exact witness：witness 单次消费，重复或过期证据不产生第二结局；无 witness（例如进程重启后）不产生任何结局。recovery retry 绑定不是 session 级 previous 缓存：它只由失败结算从 exact witness 显式写入、只服务该 session 的下一次 fresh admission，并在 force cleanup（`ReleaseExecution`）时清除。
+
+## EMR-018: 新角色集合模型路由与旧角色槽位解耦
+
+Wanxiangshu 的模型调度权威以当前合法角色集合（Engineer、DevOps、Manager、Orchestrator、Blogger 等）为唯一合法输入。
+推荐策略模板与 MJS 调度器不再要求或依赖 Coder、Inspector、Browser、Inquiry、Distiller 等旧角色模型槽位；若调度输入为已废除角色，系统必须 fail closed，严禁为其分配模型租约或发起 provider 物理准入。
+
+## EMR-019: 固定 DevOps 模型绑定持久性与禁止通过 resume 换模型
+
+同一道路内固定绑定的 DevOps 的 ModelTarget 由道路初始化阶段确定并持久化记录。
+后续该道路内所有针对 DevOps 的 resume、续行或崩溃恢复，必须严格继承并复用该既有 ModelTarget，严禁通过 resume 参数或运行时策略重新分配、篡改或覆盖 DevOps 的物理模型。

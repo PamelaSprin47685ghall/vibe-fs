@@ -399,7 +399,11 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Foundation/RolesSurface.js',
     owner: 'capability-enforcement',
-    laws: ['ENF-002'],
+    laws: ['ENF-002', 'MANAGED-SESSION-023', 'MANAGED-SESSION-024'],
+    lawOwners: {
+      'MANAGED-SESSION-023': 'managed-session-lifecycle',
+      'MANAGED-SESSION-024': 'managed-session-lifecycle',
+    },
     source: 'src/Wanxiangshu/Foundation/RolesSurface.fs',
     representation: 'json',
     kind: 'pure',
@@ -445,7 +449,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'OpenCode/Host/ExplicitResumeSurface.js',
     owner: 'crash-reconciliation',
-    laws: ['CRASH-018'],
+    laws: ['CRASH-018', 'CRASH-020'],
     source: 'src/Wanxiangshu/OpenCode/Host/ExplicitResumeSurface.fs',
     representation: 'json',
     kind: 'pure',
@@ -1654,7 +1658,11 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Participant/Persona/OfficeCapabilitySurface.js',
     owner: 'office-capability',
-    laws: ['OFF-002'],
+    laws: ['OFF-007', 'INTERACTION-AUTHORITY-021', 'INTERACTION-AUTHORITY-022'],
+    lawOwners: {
+      'INTERACTION-AUTHORITY-021': 'interaction-authority',
+      'INTERACTION-AUTHORITY-022': 'interaction-authority',
+    },
     source: 'src/Wanxiangshu/Participant/Persona/OfficeCapabilitySurface.fs',
     representation: 'json',
     kind: 'pure',
@@ -1819,7 +1827,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Mission/Relay/Surface.js',
     owner: 'relay-incumbency',
-    laws: ['RELAY-001', 'RELAY-005', 'RELAY-006', 'RELAY-008', 'RELAY-009', 'RETIRE-007'],
+    laws: ['RELAY-001', 'RELAY-005', 'RELAY-006', 'RELAY-008', 'RELAY-009', 'RELAY-010', 'RELAY-011', 'RELAY-012', 'RETIRE-007'],
     lawOwners: { 'RETIRE-007': 'relay-retirement' },
     source: 'src/Wanxiangshu/Mission/Relay/Surface.fs',
     representation: 'json',
@@ -1836,7 +1844,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Mission/Relay/Retirement/Surface.js',
     owner: 'relay-retirement',
-    laws: ['RETIRE-002', 'RETIRE-003', 'RETIRE-004', 'RETIRE-006'],
+    laws: ['RETIRE-002', 'RETIRE-003', 'RETIRE-004', 'RETIRE-006', 'RETIRE-009'],
     source: 'src/Wanxiangshu/Mission/Relay/Retirement/Surface.fs',
     representation: 'json',
     kind: 'pure',
@@ -1844,7 +1852,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Mission/Relay/ProjectionSurface.js',
     owner: 'relay-context-projection',
-    laws: ['PROJ-004', 'PROJ-006', 'PROJ-008'],
+    laws: ['PROJ-004', 'PROJ-006', 'PROJ-008', 'PROJ-009'],
     source: 'src/Wanxiangshu/Mission/Relay/ProjectionSurface.fs',
     representation: 'json',
     kind: 'pure',

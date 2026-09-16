@@ -14,7 +14,7 @@ Host 侧展示给模型的工具 Schema 与运行时执行拦截 Gate 必须双�
 
 ## ENF-004: execution tier 不改变同 office 的 authority：同一 CanonicalRole 的权限集与 tier 无关
 
-同一 Office 的工具权限集完全由 `CanonicalRole` 决定，与执行档位无关。执行档位仅代表底层机器与推理深度，不影响权限矩阵。托管 agent 使用 canonical bare 名称 (`manager`/`coder`/…/`predictor`)，不再有 `fast-`/`deep-` 前缀。
+同一 Office 的工具权限集完全由 `CanonicalRole` 决定，与执行档位无关。执行档位仅代表底层机器与推理深度，不影响权限矩阵。托管 agent 使用 canonical bare 名称 (`manager`/`orchestrator`/`engineer`/`devops`/`blogger`/`bookkeeper`/`predictor`)，不再有 `fast-`/`deep-` 前缀。
 
 ## ENF-005: request-specific replica/leaf 可进一步收窄：StrengthReplica 只 {Read; Glob; Grep}
 
@@ -26,15 +26,15 @@ Host 侧展示给模型的工具 Schema 与运行时执行拦截 Gate 必须双�
 
 ## ENF-007: Host-native/MCP/plugin 等不同技术来源的 actions 服从同一 semantic capability policy
 
-无论工具来源于 Host 原生、MCP 外部集成还是插件内部注册，其权限控制均由唯一的领域能力令牌（如 `Network` 映射至 `stealth-browser-mcp_*`，`Sphinx` 映射至 `sphinx_*`）统管，严禁为不同技术来源维护独立的权限映射表。
+无论工具来源于 Host 原生、MCP 外部集成还是插件内部注册，其权限控制均由唯一的领域能力令牌统管。彻底废止 Network 权限与 `stealth-browser-mcp_*`；Sphinx MCP 经程控工作流调用，严禁为不同技术来源维护独立的权限映射表。
 
 ## ENF-008: js-* 编程面四层同构：capability → base-class member → description → example → runtime gate
 
-针对 JS 文件系统能力：若角色缺少对应 capability，则代码生成器生成的基类中不包含对应方法、工具描述中不提及该方法、示例代码中不展示该方法，且底层运行时 Gate 同样拦截对该方法的调用。所有 `js-*` 工具规范必须由代码生成器运行时生成。
+针对 JS 文件系统能力：若角色缺少对应 capability，则代码生成器生成的基类中不包含对应方法、工具描述中不提及该方法、示例代码中不展示该方法，且底层运行时 Gate 同样拦截对该方法的调用。面向活跃角色的编程工具生成 `js-engineer` 与 `js-devops`，删除 `js-coder`、`js-inspector` 与 `js-browser`。
 
 ## ENF-009: 工具名引用完整性：same tool name → 唯一 schema owner + 唯一 semantic contract
 
-全系统内同一工具名必须对应唯一的参数 Schema 定义与唯一确定的生命周期、语义动作及返回契约。禁止不同角色在同一工具名下共享存在语义分歧的契约。
+全系统内同一工具名必须对应唯一的参数 Schema 定义与唯一确定的生命周期、语义动作及返回契约。禁止不同角色在同一工具名下共享存在语义分歧的契约。`fork` 与 `resume` 属于不同生命周期契约，必须保持严格独立。
 
 ## ENF-010: 双层 fail-closed：Role 未定 → 工具集空/拒绝执行；Host 配置异常仍写 deny 默认
 
@@ -83,3 +83,25 @@ Witness、Capability 与 Receipt 的合同必须声明 subject、版本/序列�
 ## ENF-021: Blogger repair 单一 owner 发行物理效果：同 episode 幂等、quiescence 门控、耗尽一次性 abandon
 
 Blogger 缺失工具修复的认领与物理发送只能由 `BloggerCoordinator.observeTransformRepair / observeIdleRepair` 这一唯一 compiled owner 发行。同一 repair episode 内重复观察必须幂等等待、不重复认领亦不重复发送；非 quiescent 观察不产生认领、不消耗发送预算；nudge 与 aabb 各至多发送一次，耗尽后一次性 abandon 并释放 flight；journal 缺失时直接 abandon 且零物理发送。runtime shutdown 必须与 episode admission 原子关闸，关闸后新认领被拒，已认领 episode 被取消并可 drain。
+
+## ENF-022: Fission 仅准入已证明的 CanonicalRole 为 Engineer，其他角色与内部身份一律在运行入口与门禁 fail-closed 拒绝
+
+Fission 能力在运行入口（Admission Gate）的准入逻辑严格限定为：
+```text
+允许 Fission = 已证明的 CanonicalRole 为 Engineer
+             ∧ 本次执行授权包含 Fission
+             ∧ 已有 subsession 来源条件成立
+             ∧ 没有活跃 Fission group
+             ∧ 其他现有准入条件成立
+```
+唯一可赋予 Fission 的角色是 Engineer。Manager、Orchestrator、DevOps、Blogger、Bookkeeper、Predictor 以及任何未决或内部辅助身份调用 Fission 时，必须在运行时入口与 ToolRegistry 门禁直接拒绝（fail-closed），绝不只从 Schema 隐藏。
+
+## ENF-023: DevOps 角色固有直接源码修改与测试编写权能，禁止 allowRepair 等逐次授权开关
+
+DevOps 角色原生具备完整的本地工程文件操作能力（Read, Write, Edit, Glob, Grep, Move, Remove）与真实执行能力（Exec, Pty）。在执行验证过程中遇到非架构级缺陷时，DevOps 拥有直接调查、修改源码、补充回归测试并重新验证的固有法定授权。系统严禁引入 `allowRepair`、`managerApprovedMutation`、`canFixAfterFailure` 等逐次审批参数，亦不得保留「只有 Manager 明确允许才可以改源码」的提示词暗门。
+
+## ENF-024: Fork 与 Resume 权能分离：Manager fork 仅准入 Engineer，固定 DevOps 仅允许经 resume 续做且同一道路至多一个活跃工作单元
+
+`fork` 与 `resume` 在模型参数、生命周期与门禁上严格分离：
+- `fork`：仅允许 Manager 创建新的独立 Engineer 子会话；严禁 fork DevOps 或 fork 其他角色。
+- `resume`：用于 Manager 续做既有固定 DevOps 道路；同一道路同时至多允许一个活跃的 DevOps 工作单元。DevOps 忙时明确拒绝新的 assignment，不将新任务伪装为 nudge，亦不得通过新建操作员绕过忙碌状态。
