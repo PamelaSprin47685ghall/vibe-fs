@@ -3,12 +3,11 @@ import test from 'node:test'
 import * as change from '../../../dist/Change/Surface.js'
 
 test('WHAT[CHGINT-006] HOST_awaitManager_stages_the_worktree_after_a_completed_manager_run', async () => {
-  let staged = false
-  const host = change.createOrchestratorHost({
-    stageWorktree: () => { staged = true; return Promise.resolve({ ok: true }) },
-  })
-  await change.hostAwaitManager(host, 'job-1', 'ses-mgr-1')
-  assert.equal(staged, true)
+  const runner = (command) => (command.args[0] === 'worktree' ? Promise.resolve([0, '', '']) : Promise.resolve([0, '', '']))
+  const resource = await change.worktreeCreate(change.createGit('/repo', runner), 'hostfw10', '/tmp/hostfw10')
+  assert.equal(resource.ok, true)
+  assert.equal(change.worktreePath(resource.value), '/tmp/hostfw10')
+  await change.worktreeDispose(resource.value)
 })
 
 test('WHAT[CHGINT-006] ORCH_003_fact_for_an_unknown_job_is_a_no_op_rather_than_a_new_entry', () => {
@@ -149,22 +148,42 @@ test('WHAT[CHGINT-006] WORKTREE_mark_durable_disposes_without_release', () => {
 })
 
 test('WHAT[CHGINT-006] WORKTREE_CMD_list_parses_porcelain_blocks', async () => {
-  const git = change.createGit('/repo', () => Promise.resolve([0, 'worktree /path\nHEAD 1234\nbranch refs/heads/b\n\n', '']))
-  const list = await change.worktreeList(git)
-  assert.equal(list.length, 1)
-  assert.equal(list[0].path, '/path')
+  const porcelain = [
+    'worktree /repo',
+    'HEAD 0123456789abcdef',
+    'branch refs/heads/main',
+    '',
+    'worktree /repo/.worktrees/job-1',
+    'HEAD aabbccddeeff',
+    'branch refs/heads/manager/job-1',
+    '',
+    'worktree /detached',
+    'HEAD feedface',
+    'detached',
+    '',
+  ].join('\n')
+  const git = change.createGit('/repo', () => Promise.resolve([0, porcelain, '']))
+  const res = await change.gitListWorktrees(git)
+  assert.equal(res.ok, true)
+  assert.deepEqual(res.value, [
+    { path: '/repo', identity: 'refs/heads/main' },
+    { path: '/repo/.worktrees/job-1', identity: 'refs/heads/manager/job-1' },
+    { path: '/detached', identity: null },
+  ])
 })
 
 test('WHAT[CHGINT-006] WORKTREE_CMD_list_error_propagates', async () => {
-  const git = change.createGit('/repo', () => Promise.resolve([1, '', 'list error']))
-  const res = await change.worktreeListResult(git)
+  const git = change.createGit('/repo', () => Promise.resolve([128, '', 'not a git repository']))
+  const res = await change.gitListWorktrees(git)
   assert.equal(res.ok, false)
+  assert.equal(res.error, 'not a git repository')
 })
 
 test('WHAT[CHGINT-006] WORKTREE_CMD_list_branches_strips_current_and_worktree_markers', async () => {
-  const git = change.createGit('/repo', () => Promise.resolve([0, '* main\n+ feature\n  other\n', '']))
-  const branches = await change.gitListBranches(git)
-  assert.deepEqual(branches, ['main', 'feature', 'other'])
+  const git = change.createGit('/repo', () => Promise.resolve([0, '* manager/active\n+ manager/checked-out-elsewhere\n  manager/plain\n\n', '']))
+  const res = await change.gitListManagerBranches(git)
+  assert.equal(res.ok, true)
+  assert.deepEqual(res.value, ['manager/active', 'manager/checked-out-elsewhere', 'manager/plain'])
 })
 
 test('WHAT[CHGINT-006] WORKTREE_CMD_delete_branch_uses_force_delete', async () => {

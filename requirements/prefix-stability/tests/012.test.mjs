@@ -30,6 +30,9 @@ const rebase = (state, { previousEpoch, nextEpoch, cutoff, digest, seal, prefixD
     state,
   )
 
+const reanchor = (state, { previousEpoch, nextEpoch, observedRun = 'msg_compaction' }) =>
+  prefix.applyReanchor({ previousEpoch, nextEpoch, observedRun }, state)
+
 // ── the initial state and the retired state are one state ───────────────────
 
 test('WHAT[PREFIX-STABILITY-012] PREFIX_STABILITY_committed_reanchor_survives_subsequent_failure', () => {

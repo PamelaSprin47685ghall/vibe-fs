@@ -60,6 +60,9 @@ const rebase = (state, { previousEpoch, nextEpoch, cutoff, digest, seal, prefixD
     state,
   )
 
+const reanchor = (state, { previousEpoch, nextEpoch, observedRun = 'msg_compaction' }) =>
+  prefix.applyReanchor({ previousEpoch, nextEpoch, observedRun }, state)
+
 // ── the initial state and the retired state are one state ───────────────────
 
 test('WHAT[PREFIX-STABILITY-002] COMPANION_009_no_snapshot_means_send_raw_history', () => {

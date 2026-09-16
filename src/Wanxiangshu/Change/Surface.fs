@@ -272,9 +272,60 @@ module ChangeSurface =
         | Some value -> jobObject value
         | None -> null
 
+    let private getProjection (state: obj) : OrchestratorProjection option =
+        if isNullish state then None
+        elif state :? ProjectionHandle then Some (state :?> ProjectionHandle).Projection
+        else
+            let v = property state "projection"
+            if not (isNullish v) && v :? OrchestratorProjection then Some (v :?> OrchestratorProjection)
+            else
+                let wrapped = property state "value"
+                if not (isNullish wrapped) && wrapped :? ProjectionHandle then Some (wrapped :?> ProjectionHandle).Projection
+                else None
+
     let activeJobs (projection: obj) : obj array =
-        let current = (projection :?> ProjectionHandle).Projection
-        OrchestratorProjection.activeJobs current |> List.map jobObject |> List.toArray
+        match getProjection projection with
+        | Some current -> OrchestratorProjection.activeJobs current |> List.map jobObject |> List.toArray
+        | None -> [||]
+
+    let find (projection: obj) (job: string) : obj =
+        match getProjection projection with
+        | Some current ->
+            match OrchestratorProjection.tryFind (jobId job) current with
+            | Some value -> jobObject value
+            | None -> null
+        | None -> null
+
+    let job (state: obj) (jobIdVal: string) : obj =
+        find state jobIdVal
+
+    let jobForSession (state: obj) (sessionIdVal: string) : obj =
+        match getProjection state with
+        | Some current ->
+            let sid = SessionId.create (stringOf sessionIdVal)
+            match OrchestratorProjection.tryFindByManagerSession sid current with
+            | Some value -> jobObject value
+            | None -> null
+        | None -> null
+
+    let isTerminal (state: obj) (jobIdVal: string) : bool =
+        match getProjection state with
+        | Some current ->
+            match OrchestratorProjection.tryFind (jobId jobIdVal) current with
+            | Some j -> j.Terminal.IsSome
+            | None -> false
+        | None -> false
+
+    let isOutstanding (state: obj) (jobIdVal: string) : bool =
+        match getProjection state with
+        | Some current ->
+            match OrchestratorProjection.tryFind (jobId jobIdVal) current with
+            | Some j -> j.Terminal.IsNone
+            | None -> false
+        | None -> false
+
+    let dropEphemeral (state: obj) : obj =
+        state
 
     /// ORCH-007 domain classification for a rebased candidate. Returns a
     /// physical-world classification, not a program counter.

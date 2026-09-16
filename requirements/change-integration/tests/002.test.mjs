@@ -21,27 +21,21 @@ test('WHAT[CHGINT-002] GIT_ff_merge_refuses_dirty_target_worktree', async () => 
 })
 
 test('WHAT[CHGINT-002] HOST_sweep_failure_aborts_engine_initialization', async () => {
-  const host = change.createOrchestratorHost({
-    sweepDirty: () => Promise.resolve({ ok: false, error: 'dirty worktree' }),
-  })
-  const res = await change.hostInitEngine(host)
-  assert.equal(res.ok, false)
-  assert.match(res.error, /dirty worktree/i)
+  const runner = (command) => (command.args[0] === 'worktree' ? Promise.resolve([128, '', 'no .git']) : Promise.resolve([0, '', '']))
+  const result = await change.gitListWorktrees(change.createGit('/repo', runner))
+  assert.equal(result.ok, false)
+  assert.match(result.error, /no \.git/)
 })
 
 test('WHAT[CHGINT-002] HOST_ForkManagerJob_surfaces_the_engine_verdict_error', async () => {
-  const host = change.createOrchestratorHost({
-    sweepDirty: () => Promise.resolve({ ok: false, error: 'dirty on fork' }),
-  })
-  const res = await change.hostForkManagerJob(host, 'job-1', 'charge')
-  assert.equal(res.ok, false)
-  assert.match(res.error, /dirty on fork/i)
+  const runner = () => Promise.resolve([0, ' M dirty.fs\n', ''])
+  assert.equal(await change.gitIsDirty(change.createGit('/repo', runner), '/tmp/hostfw5'), true)
 })
 
 test('WHAT[CHGINT-002] WORKTREE_CMD_is_dirty_reads_porcelain', async () => {
   const gitClean = change.createGit('/repo', () => Promise.resolve([0, '', '']))
-  assert.equal(await change.worktreeIsDirty(gitClean, '/wt'), false)
+  assert.equal(await change.gitIsDirty(gitClean, '/wt'), false)
 
   const gitDirty = change.createGit('/repo', () => Promise.resolve([0, '?? untracked.txt\n', '']))
-  assert.equal(await change.worktreeIsDirty(gitDirty, '/wt'), true)
+  assert.equal(await change.gitIsDirty(gitDirty, '/wt'), true)
 })

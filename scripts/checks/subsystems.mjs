@@ -115,9 +115,12 @@ export function runCli(argv) {
   return 0
 }
 
-export function checkSubsystems() {
+export function checkSubsystems(root = ROOT) {
   try {
-    return buildSubsystemInventory()
+    const policyPath = resolve(root, 'scripts/checks/subsystems.json')
+    const compileInventory = readCompileShardInventory({ repositoryRoot: root })
+    const policyState = readSubsystemPolicy(policyPath)
+    return buildSubsystemInventory({ compileInventory, policyState })
   } catch (error) {
     return { ok: false, violations: [error instanceof Error ? error.message : String(error)] }
   }

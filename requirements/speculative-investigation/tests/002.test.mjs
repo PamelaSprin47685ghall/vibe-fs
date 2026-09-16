@@ -26,6 +26,7 @@ const eligibleOpportunity = {
   predictorAvailable: true,
   costModelAvailable: true,
 }
+const base = eligibleOpportunity
 const prediction = { P1: 0.9, P2: 0.8, evidenceCount: 100 }
 const values = { V0: 0, V1: 5, V2: 8 }
 const config = { K1Margin: 1, K2Margin: 2, K2MinimumEvidence: 20 }

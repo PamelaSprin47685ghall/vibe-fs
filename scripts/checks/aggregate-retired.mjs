@@ -148,6 +148,12 @@ export function check(ctx = {}) {
   return { issues }
 }
 
+export function checkAggregateRetired(rootOrCtx) {
+  const ctx = typeof rootOrCtx === 'string' ? { root: rootOrCtx } : (rootOrCtx ?? {})
+  const res = check(ctx)
+  return { ok: res.issues.length === 0, issues: res.issues }
+}
+
 export function main() {
   const result = check({ root: process.cwd() })
   if (result.issues.length === 0) {

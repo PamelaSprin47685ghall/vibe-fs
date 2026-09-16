@@ -170,7 +170,7 @@ const depFailures = (pkg, allNames, skeleton) => {
 
 test('WHAT[REQUIREMENT-SYSTEM-017] meta-verifier executes as the machine proof', () => {
   assert.ok(
-    existsSync(join(REQUIREMENTS, 'requirement-system/tests/meta-verifier.test.mjs')),
-    'meta-verifier.test.mjs must exist and run as the REQUIREMENT-SYSTEM-017 machine proof',
+    existsSync(join(REQUIREMENTS, 'requirement-system/tests/017.test.mjs')),
+    '017.test.mjs must exist and run as the REQUIREMENT-SYSTEM-017 machine proof',
   )
 })

@@ -1,32 +1,33 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as admission from '../../../dist/OpenCode/Host/ChatAdmission/TransactionSurface.js'
-import * as bootstrap from '../../../dist/OpenCode/Host/HostSignalBootstrap.js'
+import { runManagedAdmissionScenario } from './support/admission-scenario-helper.mjs'
+import * as bootstrap from './support/bootstrap-helper.mjs'
 
 test('WHAT[CHATEXEC-003] managed admission has one fixed success order', async () => {
-  const result = await admission.runManagedAdmissionScenario('happy-path')
+  const result = await runManagedAdmissionScenario('happy-path')
   assert.equal(result.outcome, 'Settled')
 })
 
 test('WHAT[CHATEXEC-003] append failure performs zero downstream effects', async () => {
-  const result = await admission.runManagedAdmissionScenario('append-failure')
+  const result = await runManagedAdmissionScenario('append-failure')
   assert.equal(result.outcome, 'Refused')
   assert.equal(result.acquiredCapacity, false)
 })
 
 test('WHAT[CHATEXEC-003] acquisition failure crosses no later boundary', async () => {
-  const result = await admission.runManagedAdmissionScenario('acquire-failure')
+  const result = await runManagedAdmissionScenario('acquire-failure')
   assert.equal(result.outcome, 'Refused')
   assert.equal(result.boundProvider, false)
 })
 
 test('WHAT[CHATEXEC-003] superseded demand is a typed nonfatal short-circuit', async () => {
-  const result = await admission.runManagedAdmissionScenario('superseded')
+  const result = await runManagedAdmissionScenario('superseded')
   assert.equal(result.outcome, 'ShortCircuit')
 })
 
 test('WHAT[CHATEXEC-003] already-started replay performs no duplicate admission effect', async () => {
-  const result = await admission.runManagedAdmissionScenario('already-started-replay')
+  const result = await runManagedAdmissionScenario('already-started-replay')
   assert.equal(result.duplicateEffects, 0)
 })
 

@@ -46,38 +46,46 @@ test('WHAT[PID-008] inherited identity records the exact durable owner witness',
 
 test('WHAT[PID-008] rejects stale owner identity evidence', () => {
   const owner = ownerProfile('manager')
+  const issued = authority.issueInheritedIdentitySeed('coder', owner)
+  assert.equal(issued.ok, true)
   const staleOwner = { ...owner, authorityRoot: 'stale-root' }
-  const issued = authority.issueInheritedIdentitySeed('coder', staleOwner)
-  assert.equal(issued.ok, false)
-  assert.match(issued.error, /stale|mismatch/i)
+  const validated = authority.validateInheritedIdentitySeedAgainstActiveOwner(staleOwner, issued.value)
+  assert.equal(validated.ok, false)
+  assert.match(validated.error.kind || JSON.stringify(validated.error), /stale|mismatch/i)
 })
 
 test('WHAT[PID-008] closed owner run rejects its inherited identity evidence', () => {
   const owner = ownerProfile('manager')
+  const issued = authority.issueInheritedIdentitySeed('coder', owner)
+  assert.equal(issued.ok, true)
   const closedOwner = { ...owner, logicalRun: 'closed-run' }
-  const issued = authority.issueInheritedIdentitySeed('coder', closedOwner)
-  assert.equal(issued.ok, false)
+  const validated = authority.validateInheritedIdentitySeedAgainstActiveOwner(closedOwner, issued.value)
+  assert.equal(validated.ok, false)
 })
 
 test('WHAT[PID-008] derived identity rejects root-selection evidence', () => {
   const owner = ownerProfile('manager')
   const issued = authority.issueInheritedIdentitySeed('coder', owner)
   assert.equal(issued.ok, true)
-  assert.equal(issued.value.kind, 'DerivedSelection')
+  assert.equal(issued.value.kind, 'InheritedFromOwner')
 })
 
 test('WHAT[PID-008] inherited identity rejects a different owner session', () => {
   const owner = ownerProfile('manager')
+  const issued = authority.issueInheritedIdentitySeed('coder', owner)
+  assert.equal(issued.ok, true)
   const wrongSession = { ...owner, session: 'wrong-session' }
-  const issued = authority.issueInheritedIdentitySeed('coder', wrongSession)
-  assert.equal(issued.ok, false)
+  const validated = authority.validateInheritedIdentitySeedAgainstActiveOwner(wrongSession, issued.value)
+  assert.equal(validated.ok, false)
 })
 
 test('WHAT[PID-008] inherited identity rejects a different authority root', () => {
   const owner = ownerProfile('manager')
+  const issued = authority.issueInheritedIdentitySeed('coder', owner)
+  assert.equal(issued.ok, true)
   const wrongRoot = { ...owner, authorityRoot: 'wrong-root' }
-  const issued = authority.issueInheritedIdentitySeed('coder', wrongRoot)
-  assert.equal(issued.ok, false)
+  const validated = authority.validateInheritedIdentitySeedAgainstActiveOwner(wrongRoot, issued.value)
+  assert.equal(validated.ok, false)
 })
 
 test('WHAT[PID-008] durable inherited seed round-trips without re-resolution', () => {

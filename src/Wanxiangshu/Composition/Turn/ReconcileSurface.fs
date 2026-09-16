@@ -195,6 +195,17 @@ module ReconcileSurface =
             {| kind = "AbortWake"
                hasQuiescence = false |}
 
+    let isAbortControlPlaneWake (wake: obj) : bool =
+        if isNull wake then
+            false
+        else
+            let kind =
+                try
+                    wake?kind
+                with _ ->
+                    ""
+            kind = "AbortWake"
+
     let mergeWakeKind (currentPhysical: string) (previous: obj) (incoming: obj) =
         ReconcileProgram.mergeWake
             (if System.String.IsNullOrWhiteSpace currentPhysical then

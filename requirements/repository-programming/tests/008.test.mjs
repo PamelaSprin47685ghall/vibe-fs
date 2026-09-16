@@ -30,13 +30,13 @@ test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_bindings_path_boundary_denies_escap
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_bindings_glob_lists_matching_paths', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_bindings_glob_lists_matching_paths', async () => {
   const { dir, cleanup } = sandbox()
   try {
     mkdirSync(join(dir, 'src'))
     writeFileSync(join(dir, 'src', 'a.fs'), 'x', 'utf8')
     writeFileSync(join(dir, 'src', 'b.txt'), 'y', 'utf8')
-    const result = apiOf(createApi(dir)).js.glob('src/*.fs')
+    const result = await apiOf(createApi(dir)).js.glob('src/*.fs')
     assert.equal(result.ok, true)
     assert.deepEqual(result.paths, ['src/a.fs'])
     assert.equal('truncated' in result, false)

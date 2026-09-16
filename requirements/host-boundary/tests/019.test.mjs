@@ -13,6 +13,7 @@ import { StrengthReplicaRuntime } from '../../../dist/Strength/Replica/Runtime.j
 const EXPECTED_ORDER = [
   'BeginPhysicalProviderAttempt',
   'BindSessionStartedAt',
+  'SettleAndReplaceDeferredInspections',
   'ApplyRelayProjection',
   'ApplyStrengthReplay',
   'CaptureXTraceMessages',
@@ -26,6 +27,7 @@ const EXPECTED_ORDER = [
   'InjectPairGuideline',
   'ProjectRequirementGrounding',
   'InjectBloggerChronicle',
+  'SettleAndReplaceDeferredInspections',
   'SanitizeMessages',
 ]
 
@@ -46,6 +48,7 @@ const makeRecordingCaps = (opts = {}) => {
   const fnPair = (sid, started, outO) => { trace.push('InjectPairGuideline'); return Promise.resolve() }
   const fnGrounding = (sid, outO) => { trace.push('ProjectRequirementGrounding'); return Promise.resolve() }
   const fnBlogger = (sid, outO) => { trace.push('InjectBloggerChronicle') }
+  const fnSettle = (sid, outO) => { trace.push('SettleAndReplaceDeferredInspections'); return Promise.resolve() }
   const fnSanitize = (outO) => { trace.push('SanitizeMessages') }
 
   const caps = new NormalTransformCapabilities(
@@ -64,6 +67,7 @@ const makeRecordingCaps = (opts = {}) => {
     fnPair,
     fnGrounding,
     fnBlogger,
+    fnSettle,
     fnSanitize,
   )
   return { caps, trace }
@@ -83,7 +87,7 @@ test('WHAT[HOST-BOUNDARY-019] normalTransform executes exact 16-step canonical s
   await transform({ sessionID: 's-1' })({ messages: [] })
 
   assert.deepEqual(trace, EXPECTED_ORDER)
-  assert.equal(trace.length, 16)
+  assert.equal(trace.length, EXPECTED_ORDER.length)
 })
 
 test('WHAT[HOST-BOUNDARY-019] counterexample: swapping two stub functions causes trace to differ', async () => {
@@ -126,13 +130,13 @@ test('WHAT[HOST-BOUNDARY-019] tentative prefix probe horizon suppresses historic
   assert.equal(trace.includes('ProjectRequirementGrounding'), false)
   assert.equal(trace.includes('InjectBloggerChronicle'), true)
   assert.equal(trace.includes('SanitizeMessages'), true)
-  assert.equal(trace.length, 13)
+  assert.equal(trace.length, EXPECTED_ORDER.length - 3)
 })
 
 test('WHAT[HOST-BOUNDARY-019] branch probe: ReplicaRuntime runs only replica steps', async () => {
   const replicaTrace = []
   const caps = new NormalTransformCapabilities(
-    ...Array.from({ length: 16 }, () => () => { replicaTrace.push('unwantedNormalStep'); return Promise.resolve() }),
+    ...Array.from({ length: 17 }, () => () => { replicaTrace.push('unwantedNormalStep'); return Promise.resolve() }),
   )
   caps.FreezeProviderAttemptPlan = (sid, outO) => { replicaTrace.push('FreezeProviderAttemptPlan'); return Promise.resolve() }
 

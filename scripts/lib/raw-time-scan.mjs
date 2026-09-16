@@ -47,6 +47,7 @@ export const RAW_TIME_ALLOWLIST = Object.freeze([
   'Execution/Delegation/Fork/OpenCode/JoinTool.fs',
   'Execution/Delegation/Fork/OpenCode/ToolSurface.fs',
   'Execution/Delegation/SyncDelegate/Surface.fs',
+  'Interaction/Dispatch/PhysicalAcceptance.fs',
   'OpenCode/Host/PairProgrammingThoughtSurface.fs',
   'OpenCode/Host/PluginHost.fs',
   'OpenCode/Host/RequirementGroundingRepositorySurface.fs',

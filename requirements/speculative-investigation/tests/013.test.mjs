@@ -128,6 +128,19 @@ test('WHAT[SPEC-INV-013] SPEC_INV_013_DryRun_visibility_is_not_a_fake_diagnostic
   assert.doesNotMatch(branch(host, '| StrengthRolloutMode.DryRun ->', '| StrengthRolloutMode.Off ->'), /fake|simulate|synthetic replica/i)
 })
 
+const replicaBinding = (owner, replica, decision, budget) =>
+  Strength.runtimeBinding(
+    owner,
+    replica,
+    decision,
+    `run-${decision}`,
+    'Coder',
+    budget,
+    65536,
+    `sem-${decision}`,
+    [{ role: 'user', parts: [{ kind: 'text', text: 'owner mirror' }] }],
+  )
+
 test('WHAT[SPEC-INV-013] STRENGTH_013_dry_run_closes_only_at_the_exact_owner_target_run', async () => {
   const handle = Strength.replicaRuntimeCreate(65536)
   const attached = Strength.replicaAttach(handle, replicaBinding('owner-dry', 'replica-dry', 'dec-dry', 'K1'), 'DryRun')

@@ -39,6 +39,7 @@ module ReconcileSurface =
     val failureWakeFor: physical: string -> obj
 
     val abortWake: unit -> obj
+    val isAbortControlPlaneWake: wake: obj -> bool
 
     val mergeWakeKind: currentPhysical: string -> previous: obj -> incoming: obj -> string
 

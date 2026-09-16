@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import * as Parallel from '../../../dist/Foundation/Parallel.js'
+import * as Parallel from '../../../dist/Foundation/ParallelSurface.js'
 import * as ReconcileSurface from '../../../dist/Composition/Turn/ReconcileSurface.js'
-import * as parallelSurface from '../../../dist/Foundation/ParallelSurface.js'
 
 test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_results_follow_input_order_not_completion_order', async () => {
   const items = [10, 2, 5]
@@ -65,20 +64,19 @@ test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_all_allocated_permits_are_released_
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_pre_canceled_token_rejects_immediately_with_zero_invocations', async () => {
-  const ac = new AbortController()
-  ac.abort()
-  await assert.rejects(() => Parallel.mapBounded(2, async (x) => x, [1, 2], ac.signal))
+  const token = Parallel.cancelledToken()
+  await assert.rejects(() => Parallel.mapBounded(2, async (x) => x, [1, 2], token))
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_cancellation_signal_mid_flight_prevents_subsequent_items', async () => {
-  const ac = new AbortController()
+  const token = Parallel.liveToken()
   let count = 0
   await assert.rejects(async () => {
     await Parallel.mapBounded(1, async (x) => {
       count++
-      if (x === 1) ac.abort()
+      if (x === 1) Parallel.cancel(token)
       return x
-    }, [1, 2, 3], ac.signal)
+    }, [1, 2, 3], token)
   })
   assert.equal(count, 1)
 })

@@ -421,17 +421,22 @@ type SyncDelegateRuntime
             | Some physical -> physical = turn.PhysicalUserMessageId
             | None -> false
 
-        let isRetryAttemptContinuation =
+        let isSameAuthorityContinuation =
             match call.AcceptedAuthorityRoot with
             | Some root when root = turn.AuthorityRootUserMessageId ->
                 (AgentJournal.snapshot journal).AgentProjections
                 |> PromptAuthorityProjectionQueries.projectionFor turn.SessionId
                 |> Option.bind (fun authority ->
                     Map.tryFind turn.PhysicalUserMessageId authority.AcceptedContinuationIds)
-                |> Option.exists (fun kind -> kind = PromptAuthority.ContinuationKind.ProviderRetryAttempt)
+                |> Option.exists (fun kind ->
+                    match kind with
+                    | PromptAuthority.ContinuationKind.ProviderRetryAttempt
+                    | PromptAuthority.ContinuationKind.DegenerationGuard
+                    | PromptAuthority.ContinuationKind.InteractionRepair -> true
+                    | _ -> false)
             | _ -> false
 
-        sameAcceptedPhysical || isRetryAttemptContinuation
+        sameAcceptedPhysical || isSameAuthorityContinuation
 
     let popIfAcceptanceMatches
         (store: SyncDelegateCallStore)

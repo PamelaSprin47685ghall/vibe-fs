@@ -15,6 +15,16 @@ module ChangeSurface =
 
     val activeJobs: projection: obj -> obj array
 
+    val job: state: obj -> jobId: string -> obj
+
+    val jobForSession: state: obj -> sessionId: string -> obj
+
+    val isTerminal: state: obj -> jobId: string -> bool
+
+    val isOutstanding: state: obj -> jobId: string -> bool
+
+    val dropEphemeral: state: obj -> obj
+
     val classifyRebasedCandidate: head: obj -> rebasedCommit: string -> targetHeadSnapshot: string -> obj
 
     val classifyPublishClaim: head: obj -> rebasedCommit: string -> expectedHead: string -> obj
@@ -41,12 +51,22 @@ module ChangeSurface =
     val observeManagerLoopBurst: count: int -> Task<obj>
     val gitFreezeTargetBranch: git: obj -> Task<obj>
 
+    val gitFreezeTargetBranchResult: git: obj -> Task<obj>
+
     val gitRebase: git: obj -> path: string -> targetRef: string -> Task<obj>
+
+    val gitRebaseContinue: git: obj -> Task<obj>
+
+    val gitStageAll: git: obj -> Task<obj>
+
+    val gitCandidateCommit: git: obj -> msg: string -> Task<obj>
 
     val gitFfMerge:
         git: obj -> path: string -> targetRef: string -> expectedHead: string -> pinnedCandidate: string -> Task<obj>
 
     val gitConflictedFiles: git: obj -> path: string -> Task<obj>
+
+    val gitConflictedFilesResult: git: obj -> Task<obj>
 
     val gitHasRebaseHead: git: obj -> path: string -> Task<bool>
 

@@ -437,6 +437,18 @@ test('WHAT[PREFIX-STABILITY-001] H13_01_canonical_multi_tool_sequence_is_an_appe
 
 // ── H13-02: history never relocates with the current placement ──────────────
 
+/** 32-bit LCG — same seed, same sequence (join-completion-property precedent). */
+const mulberry32 = (seed) => {
+  let a = seed >>> 0
+  return () => {
+    a |= 0
+    a = (a + 0x6d2b79f5) | 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
 test('WHAT[PREFIX-STABILITY-001] H13_08_n_round_property_prefix_law_holds', async () => {  const rand = mulberry32(0x1357)
   const session = 'h13-08'
   const rounds = 8

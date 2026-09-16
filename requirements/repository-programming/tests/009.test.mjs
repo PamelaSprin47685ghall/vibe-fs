@@ -20,11 +20,11 @@ const unwrap = (result) => {
   return result.value
 }
 
-test('WHAT[REPOSITORY-PROGRAMMING-009] JS010_bindings_grep_returns_matches', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-009] JS010_bindings_grep_returns_matches', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'one two one', 'utf8')
-    const result = apiOf(createApi(dir)).js.grep('one', '*.txt')
+    const result = await apiOf(createApi(dir)).js.grep('one', '*.txt')
     assert.equal(result.ok, true)
     assert.deepEqual(result.matches.map((m) => m.text), ['one', 'one'])
     assert.deepEqual(result.matches.map((m) => m.path), ['a.txt', 'a.txt'])

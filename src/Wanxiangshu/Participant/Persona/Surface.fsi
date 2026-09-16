@@ -6,6 +6,7 @@ module PersonaSurface =
     val allInternalRoleLabels: string array
     val requiredNames: string array
     val legacyNames: string array
+    val currentCatalogVersion: string
     val nameOf: string -> string -> string
     val isManagedName: string -> bool
     val isLegacyName: string -> bool

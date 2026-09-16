@@ -1,10 +1,16 @@
 AssemblyInfo.fsi
 AssemblyInfo.fs
+Ablation/Model.fsi
 Ablation/Model.fs
+Ablation/Manifest.fsi
 Ablation/Manifest.fs
+Ablation/ToolMap.fsi
 Ablation/ToolMap.fs
+Ablation/FactMap.fsi
 Ablation/FactMap.fs
+Ablation/Settings.fsi
 Ablation/Settings.fs
+Ablation/Gate.fsi
 Ablation/Gate.fs
 Ablation/Surface.fsi
 Ablation/Surface.fs

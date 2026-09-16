@@ -12,6 +12,35 @@ const {
 
 const target = (model = 'provider/shared', reasoning = 'none') => ({ model, reasoning })
 
+const defaultIdentity = {
+  sessionId: 'session-1',
+  physicalUserMessageId: 'physical-1',
+  role: 'coder',
+  participant: 'alice',
+}
+const identity = (overrides = {}) => ({
+  ...defaultIdentity,
+  target: target(),
+  ...overrides,
+})
+
+const acquire = async (runtime, exact = identity()) => {
+  const outcome = await acquireExecutionAdmission(
+    runtime,
+    exact.sessionId,
+    exact.physicalUserMessageId,
+    exact.role,
+    exact.participant,
+    null,
+  )
+  assert.equal(outcome.kind, 'Acquired')
+  return outcome.lease
+}
+
+const conflict = (outcome) => {
+  assert.deepEqual(outcome, { kind: 'Conflict' })
+}
+
 test('WHAT[EMR-012] capacity lifecycle admits every legal fenced transition', async () => {
   const runtime = createRuntime(() => target())
   const acquisition = await acquireExecutionAdmission(

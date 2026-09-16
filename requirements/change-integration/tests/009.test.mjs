@@ -2,11 +2,27 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as change from '../../../dist/Change/Surface.js'
 
-test('WHAT[CHGINT-009] manager loop keeps the durable job worktree', async () => {
-  const host = change.createOrchestratorHost({
-    sweepDirty: () => Promise.resolve({ ok: true }),
-  })
-  assert.ok(host)
+const job = (id, path = `/tmp/${id}`) => ({
+  jobId: id,
+  managerSessionId: `ses-${id}`,
+  managerAgent: 'manager',
+  byname: id,
+  worktreeIdentity: `manager/${id}`,
+  worktreePath: path,
+  targetRef: 'refs/heads/main',
+  targetBranchFrozen: 'refs/heads/main',
+})
+
+test('WHAT[CHGINT-009] manager loop keeps the durable job worktree', () => {
+  let projection = change.createJob(change.empty(), job('hostfw8', '/tmp/wt-hostfw8'))
+  projection = change.recordFact(projection, 'hostfw8', change.fact('CandidateReady', {
+    candidateCommit: 'c1',
+    workspaceSnapshotId: 'snapshot-1',
+    qualityCertificateId: 'certificate-1',
+  }))
+  const continued = change.find(projection, 'hostfw8')
+  assert.equal(continued.worktreePath, '/tmp/wt-hostfw8')
+  assert.deepEqual(continued.facts, ['CandidateReady'])
 })
 
 test('WHAT[CHGINT-009] ORCH_006_the_worktree_is_located_by_identity_and_the_path_is_only_diagnostic', () => {

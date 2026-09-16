@@ -7,11 +7,17 @@
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Ablation/Model.fsi"/>
     <Compile Include="Ablation/Model.fs"/>
+    <Compile Include="Ablation/Manifest.fsi"/>
     <Compile Include="Ablation/Manifest.fs"/>
+    <Compile Include="Ablation/ToolMap.fsi"/>
     <Compile Include="Ablation/ToolMap.fs"/>
+    <Compile Include="Ablation/FactMap.fsi"/>
     <Compile Include="Ablation/FactMap.fs"/>
+    <Compile Include="Ablation/Settings.fsi"/>
     <Compile Include="Ablation/Settings.fs"/>
+    <Compile Include="Ablation/Gate.fsi"/>
     <Compile Include="Ablation/Gate.fs"/>
     <Compile Include="Ablation/Surface.fsi"/>
     <Compile Include="Ablation/Surface.fs"/>

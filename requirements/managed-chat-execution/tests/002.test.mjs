@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import * as chatExecution from '../../../dist/Execution/Session/ChatExecution/Surface.js'
+import { acceptManagedChat, providerStarted, terminal } from './support/chat-wire.mjs'
 
 const fixture = readFileSync(
   new URL('./fixtures/chat-execution-v1.json', import.meta.url),
@@ -26,7 +27,7 @@ const started = factWire('ProviderStarted', {
   Key: keyWire,
   SchemaVersion: 1,
 })
-const terminal = factWire('Terminal', {
+const terminalFact = factWire('Terminal', {
   Disposition: 'Completed',
   Evidence: ['AfterProviderStart', startedEvidence],
   Key: keyWire,
@@ -46,7 +47,7 @@ test('WHAT[CHATEXEC-002] schema v1 Accepted ProviderStarted and Terminal round-t
   assert.doesNotMatch(acceptedCanonical, /PeerAgent|EffectiveAgent/, 'canonical encoding drops raw v1 legacy agent fields')
   assert.equal(canonicalize(acceptedCanonical), acceptedCanonical, 'canonical bytes are a fixed point')
 
-  const history = [acceptedCanonical, canonicalize(started), canonicalize(terminal)]
+  const history = [acceptedCanonical, canonicalize(started), canonicalize(terminalFact)]
   for (const line of history) assert.equal(canonicalize(line), line)
 
   const replayed = chatExecution.fold(history)
@@ -96,7 +97,7 @@ test('WHAT[CHATEXEC-002] unknown schema version fails closed during production f
 
 test('WHAT[CHATEXEC-002] online prefix integration equals replay from the same canonical facts', () => {
   const key = { sessionId: 'ses-facts-replay', physicalUserMessageId: 'msg-user-replay' }
-  const accepted = chatExecution.acceptManagedChat('run-replay', 'msg-root-replay', 'HumanRoot', {
+  const accepted = acceptManagedChat('run-replay', 'msg-root-replay', 'HumanRoot', {
     kind: 'RootSelection',
     ownerSession: null,
     ownerLogicalRun: null,
@@ -109,10 +110,10 @@ test('WHAT[CHATEXEC-002] online prefix integration equals replay from the same c
       role: 'coder',
     },
   }, key, 'work-main')
-  const start = chatExecution.providerStarted(key, 'run-replay-provider', 'use-committed-epoch', 'work-main')
-  const terminal = chatExecution.terminal(key, 'run-replay-provider', 'Completed')
+  const start = providerStarted(key, 'run-replay-provider', 'use-committed-epoch', 'work-main')
+  const term = terminal(key, 'run-replay-provider', 'Completed')
 
-  const folded = chatExecution.fold([accepted, start, terminal])
+  const folded = chatExecution.fold([accepted, start, term])
   assert.equal(folded.ok, true, folded.error)
   assert.equal(folded.value[0].phase, 'Terminal')
   assert.equal(folded.value[0].disposition, 'Completed')
@@ -120,7 +121,7 @@ test('WHAT[CHATEXEC-002] online prefix integration equals replay from the same c
 
 test('WHAT[CHATEXEC-002] writes ProviderStarted before provider work', () => {
   const key = { sessionId: 'ses-start-1', physicalUserMessageId: 'msg-start-1' }
-  const accepted = chatExecution.acceptManagedChat('run-1', 'msg-root-1', 'HumanRoot', {
+  const accepted = acceptManagedChat('run-1', 'msg-root-1', 'HumanRoot', {
     kind: 'RootSelection',
     ownerSession: null,
     ownerLogicalRun: null,
@@ -133,7 +134,7 @@ test('WHAT[CHATEXEC-002] writes ProviderStarted before provider work', () => {
       role: 'coder',
     },
   }, key, 'work-main')
-  const start = chatExecution.providerStarted(key, 'provider-run-1', 'use-committed-epoch', 'work-main')
+  const start = providerStarted(key, 'provider-run-1', 'use-committed-epoch', 'work-main')
   const folded = chatExecution.fold([accepted, start])
   assert.equal(folded.ok, true)
   assert.equal(folded.value[0].phase, 'ProviderStarted')
@@ -141,7 +142,7 @@ test('WHAT[CHATEXEC-002] writes ProviderStarted before provider work', () => {
 
 test('WHAT[CHATEXEC-002] each uncertain ProviderStarted append leaves projection accepted', () => {
   const key = { sessionId: 'ses-start-2', physicalUserMessageId: 'msg-start-2' }
-  const accepted = chatExecution.acceptManagedChat('run-2', 'msg-root-2', 'HumanRoot', {
+  const accepted = acceptManagedChat('run-2', 'msg-root-2', 'HumanRoot', {
     kind: 'RootSelection',
     ownerSession: null,
     ownerLogicalRun: null,

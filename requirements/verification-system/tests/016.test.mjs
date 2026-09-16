@@ -142,7 +142,7 @@ test('WHAT[VERIFICATION-SYSTEM-016] verify detects mid-flight inputs change via 
       assert.equal(cleanResult.exitCode, 0, 'clean verify must succeed with 0')
       assert.equal(cleanResult.outcome, 'pass')
     } finally {
-      rmSync(cleanLogs, { recursive: true, force: true })
+      fs.rmSync(cleanLogs, { recursive: true, force: true })
     }
   } finally {
     fs.rmSync(fixture, { recursive: true, force: true })

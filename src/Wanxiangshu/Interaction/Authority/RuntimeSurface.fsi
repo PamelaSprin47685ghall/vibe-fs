@@ -72,3 +72,5 @@ module RuntimeSurface =
         providerRun: string ->
         projection: obj ->
             bool
+
+    val validateAuthorityRoot: ownerProfile: obj -> bool

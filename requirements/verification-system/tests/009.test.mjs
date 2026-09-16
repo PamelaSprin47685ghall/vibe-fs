@@ -111,8 +111,8 @@ test('WHAT[VERIFICATION-SYSTEM-009] repository closure gates reject an unassigne
 
     mkdirSync(join(fixture, 'requirements/distribution/tests'), { recursive: true })
     copyFileSync(
-      join(ROOT, 'requirements/distribution/tests/package-policy.test.mjs'),
-      join(fixture, 'requirements/distribution/tests/package-policy.test.mjs'),
+      join(ROOT, 'requirements/distribution/tests/004.test.mjs'),
+      join(fixture, 'requirements/distribution/tests/004.test.mjs'),
     )
     write(fixture, 'package.json', JSON.stringify({
       main: './dist/OpenCode/Plugin/Plugin.js',
@@ -127,7 +127,7 @@ test('WHAT[VERIFICATION-SYSTEM-009] repository closure gates reject an unassigne
     const packageGate = runNode(fixture, [
       '--test',
       '--test-name-pattern=DISTRIBUTION_files_whitelist_is_explicit',
-      'requirements/distribution/tests/package-policy.test.mjs',
+      'requirements/distribution/tests/004.test.mjs',
     ])
     assert.equal(packageGate.status, 1, packageGate.stderr || packageGate.stdout)
     assert.match(`${packageGate.stdout}\n${packageGate.stderr}`, /files whitelist must include dist/)
