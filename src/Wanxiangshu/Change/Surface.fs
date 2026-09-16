@@ -21,8 +21,10 @@ module ChangeSurface =
     type private ProjectionHandle(projection: OrchestratorProjection) =
         member _.Projection = projection
 
-    type private GitHandle(port: GitPort) =
+    type private GitHandle(port: GitPort, repo: string, runner: Command -> Task<int * string * string>) =
         member _.Port = port
+        member _.repo = repo
+        member _.Runner = runner
 
     type private WorktreeHandle(resource: WorktreeResource) =
         member _.Resource = resource
@@ -265,23 +267,23 @@ module ChangeSurface =
         let current = (projection :?> ProjectionHandle).Projection
         ProjectionHandle(recordFactValue current (jobId job) value) :> obj
 
-    let find (projection: obj) (job: string) : obj =
-        let current = (projection :?> ProjectionHandle).Projection
-
-        match OrchestratorProjection.tryFind (jobId job) current with
-        | Some value -> jobObject value
-        | None -> null
-
     let private getProjection (state: obj) : OrchestratorProjection option =
-        if isNullish state then None
-        elif state :? ProjectionHandle then Some (state :?> ProjectionHandle).Projection
+        if isNullish state then
+            None
+        elif state :? ProjectionHandle then
+            Some (state :?> ProjectionHandle).Projection
         else
             let v = property state "projection"
-            if not (isNullish v) && v :? OrchestratorProjection then Some (v :?> OrchestratorProjection)
+
+            if not (isNullish v) && v :? OrchestratorProjection then
+                Some(v :?> OrchestratorProjection)
             else
                 let wrapped = property state "value"
-                if not (isNullish wrapped) && wrapped :? ProjectionHandle then Some (wrapped :?> ProjectionHandle).Projection
-                else None
+
+                if not (isNullish wrapped) && wrapped :? ProjectionHandle then
+                    Some (wrapped :?> ProjectionHandle).Projection
+                else
+                    None
 
     let activeJobs (projection: obj) : obj array =
         match getProjection projection with
@@ -296,36 +298,35 @@ module ChangeSurface =
             | None -> null
         | None -> null
 
-    let job (state: obj) (jobIdVal: string) : obj =
-        find state jobIdVal
+    let job (state: obj) (jobId: string) : obj = find state jobId
 
-    let jobForSession (state: obj) (sessionIdVal: string) : obj =
+    let jobForSession (state: obj) (sessionId: string) : obj =
         match getProjection state with
         | Some current ->
-            let sid = SessionId.create (stringOf sessionIdVal)
+            let sid = SessionId.create (stringOf sessionId)
+
             match OrchestratorProjection.tryFindByManagerSession sid current with
             | Some value -> jobObject value
             | None -> null
         | None -> null
 
-    let isTerminal (state: obj) (jobIdVal: string) : bool =
+    let isTerminal (state: obj) (jobId: string) : bool =
         match getProjection state with
         | Some current ->
-            match OrchestratorProjection.tryFind (jobId jobIdVal) current with
+            match OrchestratorProjection.tryFind (ManagerJobId.create (stringOf jobId)) current with
             | Some j -> j.Terminal.IsSome
             | None -> false
         | None -> false
 
-    let isOutstanding (state: obj) (jobIdVal: string) : bool =
+    let isOutstanding (state: obj) (jobId: string) : bool =
         match getProjection state with
         | Some current ->
-            match OrchestratorProjection.tryFind (jobId jobIdVal) current with
+            match OrchestratorProjection.tryFind (ManagerJobId.create (stringOf jobId)) current with
             | Some j -> j.Terminal.IsNone
             | None -> false
         | None -> false
 
-    let dropEphemeral (state: obj) : obj =
-        state
+    let dropEphemeral (state: obj) : obj = state
 
     /// ORCH-007 domain classification for a rebased candidate. Returns a
     /// physical-world classification, not a program counter.
@@ -1555,9 +1556,19 @@ module ChangeSurface =
             return int (string values.[0]), stringOf values.[1], stringOf values.[2]
         }
 
+    let private gitCommand repo args : Command =
+        { FileName = "git"
+          Arguments = args
+          WorkingDirectory = Some repo
+          Environment = None
+          Stdin = None
+          Deadline = None
+          PtyOptions = None }
+
     let createGit (repo: string) (runner: obj) : obj =
-        let port = GitOperations.createWithRepo repo (invokeRunner runner)
-        GitHandle port :> obj
+        let r = invokeRunner runner
+        let port = GitOperations.createWithRepo repo r
+        GitHandle(port, repo, r) :> obj
 
     let private resultObject (result: Result<'T, string>) (valueOf: 'T -> obj) : obj =
         match result with
@@ -1573,10 +1584,61 @@ module ChangeSurface =
             return resultObject result (fun value -> box (TargetRef.value value))
         }
 
+    let gitFreezeTargetBranchResult (git: obj) : Task<obj> =
+        task {
+            let! result = (git :?> GitHandle).Port.FreezeTargetBranch()
+            return resultObject result (fun value -> box (TargetRef.value value))
+        }
+
     let gitRebase (git: obj) (path: string) (targetRef: string) : Task<obj> =
         task {
             let! result = (git :?> GitHandle).Port.Rebase (WorktreePath.create path) (TargetRef.create targetRef)
             return resultObject result (fun _ -> null)
+        }
+
+    let gitRebaseContinue (git: obj) : Task<obj> =
+        task {
+            let handle = git :?> GitHandle
+
+            let! code, stdout, stderr =
+                handle.Runner(gitCommand handle.repo [ "-c"; "core.editor=true"; "rebase"; "--continue" ])
+
+            let res =
+                if code = 0 then
+                    Ok()
+                else
+                    Error(if String.IsNullOrWhiteSpace stderr then stdout else stderr)
+
+            return resultObject res (fun _ -> null)
+        }
+
+    let gitStageAll (git: obj) : Task<obj> =
+        task {
+            let handle = git :?> GitHandle
+            let! code, stdout, stderr = handle.Runner(gitCommand handle.repo [ "add"; "-A" ])
+
+            let res =
+                if code = 0 then
+                    Ok()
+                else
+                    Error(if String.IsNullOrWhiteSpace stderr then stdout else stderr)
+
+            return resultObject res (fun _ -> null)
+        }
+
+    let gitCandidateCommit (git: obj) (msg: string) : Task<obj> =
+        task {
+            let handle = git :?> GitHandle
+            let! _ = handle.Runner(gitCommand handle.repo [ "update-ref"; "-d"; "REBASE_HEAD" ])
+            let! code, stdout, stderr = handle.Runner(gitCommand handle.repo [ "commit"; "-m"; msg ])
+
+            let res =
+                if code = 0 then
+                    Ok()
+                else
+                    Error(if String.IsNullOrWhiteSpace stderr then stdout else stderr)
+
+            return resultObject res (fun _ -> null)
         }
 
     let gitFfMerge
@@ -1600,6 +1662,13 @@ module ChangeSurface =
     let gitConflictedFiles (git: obj) (path: string) : Task<obj> =
         task {
             let! result = (git :?> GitHandle).Port.ConflictedFiles(WorktreePath.create path)
+            return resultObject result (fun values -> values |> List.toArray |> Array.map box |> box)
+        }
+
+    let gitConflictedFilesResult (git: obj) : Task<obj> =
+        task {
+            let handle = git :?> GitHandle
+            let! result = handle.Port.ConflictedFiles(WorktreePath.create handle.repo)
             return resultObject result (fun values -> values |> List.toArray |> Array.map box |> box)
         }
 
