@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url'
 
 const {
   describeRun,
+  queryShell: executeQueryShell,
   run: executeRun,
   runToolName,
 } = await import('../../../dist/OpenCode/Tools/ExecutorToolSurface.js')
@@ -32,6 +33,8 @@ const toolModule = { tool: { schema: fakeSchema } }
 const context = (sessionID = 'ses-exec') => ({ sessionID })
 const run = (args, ctx = context(), recovery = '') =>
   executeRun(toolModule, {}, args, ctx, recovery)
+const queryShell = (args, ctx = context(), recovery = '') =>
+  executeQueryShell(toolModule, {}, args, ctx, recovery)
 
 const parseToml = (text) =>
   Object.fromEntries(
@@ -60,6 +63,17 @@ test('WHAT[PROC-005] RUN_non_positive_deadline_is_rejected', async () => {
     const result = await run({ command: 'true', deadline_seconds: value })
     assert.match(result, /(?:deadline_seconds must be a finite positive number|deadline_seconds 必须是有限正数)/, `value=${value}`)
   }
+})
+
+test('WHAT[PROC-005] QUERY_SHELL_non_positive_deadline_and_invalid_output_budget_are_rejected', async () => {
+  for (const value of [0, -5, Number.NaN, Number.POSITIVE_INFINITY]) {
+    const result = await queryShell({ command: 'true', deadline_seconds: value })
+    assert.match(result, /(?:deadline_seconds must be a finite positive number|deadline_seconds 必须是有限正数)/, `value=${value}`)
+  }
+  const negative = await queryShell({ command: 'true', output_budget_bytes: -1 })
+  assert.match(negative, /(?:output_budget_bytes must be a finite non-negative integer|output_budget_bytes 必须是有限非负整数)/)
+  const fractional = await queryShell({ command: 'true', output_budget_bytes: 1.5 })
+  assert.match(fractional, /(?:output_budget_bytes must be an integer|output_budget_bytes 必须是整数)/)
 })
 
 test('WHAT[PROC-005] RUN_invalid_output_budget_is_rejected', async () => {

@@ -6,8 +6,11 @@ import test from 'node:test'
 
 const {
   describeRun,
+  describeQueryShell,
   run: executeRun,
+  queryShell: executeQueryShell,
   runToolName,
+  queryShellToolName,
 } = await import('../../../dist/OpenCode/Tools/ExecutorToolSurface.js')
 const { contextDecode, contextView } = await import('../../../dist/OpenCode/Codec/ToolHostSurface.js')
 
@@ -28,6 +31,8 @@ const toolModule = { tool: { schema: fakeSchema } }
 const context = (sessionID = 'ses-exec') => ({ sessionID })
 const run = (args, ctx = context(), recovery = '') =>
   executeRun(toolModule, {}, args, ctx, recovery)
+const queryShell = (args, ctx = context(), recovery = '') =>
+  executeQueryShell(toolModule, {}, args, ctx, recovery)
 
 const parseToml = (text) =>
   Object.fromEntries(
@@ -47,6 +52,16 @@ test('WHAT[PROC-011] RUN_surface_names_the_provider_execution_verb', () => {
   assert.equal(tool.name, 'run')
   assert.match(tool.description, /deadline_seconds (?:and|与) output_budget_bytes/)
   assert.deepEqual(tool.arguments, ['command', 'deadline_seconds', 'output_budget_bytes', 'world_lock'])
+})
+
+test('WHAT[PROC-011] QUERY_SHELL_surface_shares_identical_parameter_capability_with_run', () => {
+  assert.equal(queryShellToolName, 'query-shell')
+  const tool = describeQueryShell(toolModule)
+  assert.equal(tool.name, 'query-shell')
+  assert.match(tool.description, /deadline_seconds (?:and|与) output_budget_bytes/)
+  assert.deepEqual(tool.arguments, ['command', 'deadline_seconds', 'output_budget_bytes', 'world_lock'])
+  const runTool = describeRun(toolModule)
+  assert.deepEqual(tool.arguments, runTool.arguments)
 })
 
 test('WHAT[PROC-011] RUN_host_context_codec_exposes_plain_snapshot', () => {
@@ -82,6 +97,11 @@ test('WHAT[PROC-011] RUN_deadline_overrun_returns_the_fixed_timeout_consequence'
   const result = await run({ command: 'sleep 5', deadline_seconds: 0.01, output_budget_bytes: 16 })
   assert.doesNotMatch(result, /TimeoutExceeded|\berror\s*=/)
   assert.match(result, /(?:The command was still running when its allowed time ended, so it was stopped\.|command 在允许时间结束时仍在运行，因此已被停止。)/)
+})
+
+test('WHAT[PROC-011] QUERY_SHELL_deadline_overrun_and_world_lock_behave_identically_to_run', async () => {
+  const timeout = await queryShell({ command: 'sleep 5', deadline_seconds: 0.01, output_budget_bytes: 16 })
+  assert.match(timeout, /(?:The command was still running when its allowed time ended, so it was stopped\.|command 在允许时间结束时仍在运行，因此已被停止。)/)
 })
 
 test('WHAT[PROC-011] RUN_world_lock_is_accepted', async () => {

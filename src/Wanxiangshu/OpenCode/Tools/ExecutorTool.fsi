@@ -66,6 +66,15 @@ module ExecutorTool =
             [<Literal>]
             val MissingCommand: string = "tool/query-shell/missing-command"
 
+            [<Literal>]
+            val ArgDeadlineSeconds: string = "tool/query-shell/arg-deadline_seconds"
+
+            [<Literal>]
+            val ArgOutputBudgetBytes: string = "tool/query-shell/arg-output_budget_bytes"
+
+            [<Literal>]
+            val ArgWorldLock: string = "tool/query-shell/arg-world_lock"
+
     /// Provider-visible execution verb. Distillation is invoked inside this
     /// tool and is never a separate provider verb (PROC-011 / DISTILL-010).
     [<Literal>]

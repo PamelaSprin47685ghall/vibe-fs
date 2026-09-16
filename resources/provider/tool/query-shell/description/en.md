@@ -4,6 +4,12 @@ This is observation, not execution.
 
 This tool is Inspector-only.
 
+deadline_seconds and output_budget_bytes express how much scarce time and
+attention you are willing to spend.
+world_lock expresses whether this query should occupy the LargeGate.
+
+These are economic commitments, not runtime predictions.
+
 Appropriate:
     git status
     git diff
