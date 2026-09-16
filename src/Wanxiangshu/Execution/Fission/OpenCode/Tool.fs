@@ -771,7 +771,8 @@ module FissionTool =
             | _, Error _ -> return consequence language Path.Unavailable
             | Some profile, _ when
                 profile.CanonicalRole <> Role.Engineer
-                || not (OfficeCapability.isAllowed profile.CanonicalRole ToolPermission.Fission) ->
+                || not (OfficeCapability.isAllowed profile.CanonicalRole ToolPermission.Fission)
+                ->
                 return consequence language Path.Unavailable
             | Some profile, Ok ownerRuntime ->
                 return! admitWhenEventPortReady scope durable ctx language parsed toolCallId owner profile ownerRuntime

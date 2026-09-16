@@ -15,7 +15,7 @@ import { installDefaultResources } from '../../../dist/OpenCode/Host/ManagedAgen
 installDefaultResources()
 
 const OWNER = 'ses_owner_prompt'
-const roles = ['Manager', 'Coder', 'Inspector', 'DevOps', 'Browser', 'Inquiry', 'Distiller', 'Blogger']
+const roles = ['Manager', 'Orchestrator', 'Engineer', 'DevOps', 'Blogger']
 const profile = (role, tier = 'Fast', kind = 'WorkMain') => planner.plan({ role, tier, kind })
 
 // ── PROMPT-019: resources are distinct from their role identity ───────────
@@ -43,18 +43,14 @@ test('WHAT[PREFIX-STABILITY-007] PROMPT_019_each_canonical_role_has_one_stable_p
 })
 
 test('WHAT[PREFIX-STABILITY-007] PROMPT_019_participant_identity_preserved_across_tiers_not_prompt_identity', () => {
-  const inspectorFast = delegation.vocabulary('Inspector', 'Fast', OWNER)
-  const inspectorDeep = delegation.vocabulary('Inspector', 'Deep', OWNER)
-  const coderFast = delegation.vocabulary('Coder', 'Fast', OWNER)
-  const coderDeep = delegation.vocabulary('Coder', 'Deep', OWNER)
+  const engineerFast = delegation.vocabulary('Engineer', 'Fast', OWNER)
+  const engineerDeep = delegation.vocabulary('Engineer', 'Deep', OWNER)
 
   // Single-version world: participant and role identity are fixed on every
   // tier — identity is preserved without tying prompt bytes to physical tier.
-  assert.equal(inspectorFast.agent, 'inspector')
-  assert.equal(inspectorDeep.agent, 'inspector')
-  assert.equal(coderFast.agent, 'coder')
-  assert.equal(coderDeep.agent, 'coder')
-  for (const attempt of [profile('Inspector', 'Fast'), profile('Inspector', 'Deep'), profile('Coder', 'Fast'), profile('Coder', 'Deep')]) {
+  assert.equal(engineerFast.agent, 'engineer')
+  assert.equal(engineerDeep.agent, 'engineer')
+  for (const attempt of [profile('Engineer', 'Fast'), profile('Engineer', 'Deep')]) {
     assert.equal(attempt.participantIdentity.participant, attempt.participant)
     assert.equal(attempt.participantIdentity.selectedTier, 'deep')
   }
@@ -80,11 +76,11 @@ test('WHAT[PREFIX-STABILITY-007] PROMPT_019_role_identity_does_not_inherit_attem
 test('WHAT[PREFIX-STABILITY-007] PROMPT_019_role_and_tier_capabilities_remain_explicit', () => {
   const managerFast = profile('Manager', 'Fast')
   const managerDeep = profile('Manager', 'Deep')
-  const inspectorFast = profile('Inspector', 'Fast')
+  const engineerFast = profile('Engineer', 'Fast')
 
   assert.ok(managerFast.toolCapabilities.length > 0)
   assert.ok(managerDeep.toolCapabilities.length > 0)
-  assert.ok(inspectorFast.toolCapabilities.length > 0)
+  assert.ok(engineerFast.toolCapabilities.length > 0)
   assert.deepEqual(managerFast.toolCapabilities, managerDeep.toolCapabilities)
-  assert.notDeepEqual(managerFast.toolCapabilities, inspectorFast.toolCapabilities)
+  assert.notDeepEqual(managerFast.toolCapabilities, engineerFast.toolCapabilities)
 })

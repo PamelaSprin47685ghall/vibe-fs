@@ -63,7 +63,7 @@ const acceptedFact = (profile) => ({
 test('WHAT[SESSION-ONTOLOGY-015] physical SessionId reuse requires durable logical-run closure', () => {
   const session = 'ses-reusable-container'
   const first = root(session, 'msg-container-a', 'manager')
-  const second = root(session, 'msg-container-b', 'coder')
+  const second = root(session, 'msg-container-b', 'engineer')
   const scenario = temporal.sessionReuseIdentityScenario(
     acceptedFact(first),
     acceptedFact(second),
@@ -74,7 +74,7 @@ test('WHAT[SESSION-ONTOLOGY-015] physical SessionId reuse requires durable logic
   assert.equal(scenario.afterLife.sessions[session].activeLogicalRun, null)
   assert.equal(scenario.online.sessions[session].activeLogicalRun.session, session)
   assert.equal(scenario.online.sessions[session].activeLogicalRun.logicalRun, second.logicalRun)
-  assert.equal(scenario.online.sessions[session].activeLogicalRun.participantIdentity.role, 'coder')
+  assert.equal(scenario.online.sessions[session].activeLogicalRun.participantIdentity.role, 'engineer')
   assert.notEqual(first.logicalRun, second.logicalRun)
   assert.deepEqual(scenario.replayed, scenario.online)
 })

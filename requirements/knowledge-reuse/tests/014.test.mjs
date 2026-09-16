@@ -137,7 +137,9 @@ test('WHAT[KNOWLEDGE-REUSE-006] T23_bookkeeper_refresh_receives_diff_only_and_ha
   assert.match(prompt, /Old Q/)
   assert.match(prompt, /Old A/)
   assert.match(prompt, /diff/)
-  assert.doesNotMatch(prompt, /read|glob|grep|query-shell/i)
+  assert.match(prompt, /Do not read the repository/)
+  assert.doesNotMatch(prompt, /\[(?:transcript|file_contents|observations)\]/i,
+    'maintenance must not receive a replay trace or full file payloads')
 })
 
 test('WHAT[KNOWLEDGE-REUSE-010] T21_multiple_resumes_in_same_session_create_independent_case_records', async () => {

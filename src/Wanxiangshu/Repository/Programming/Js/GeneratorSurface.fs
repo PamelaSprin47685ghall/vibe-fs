@@ -31,11 +31,8 @@ module JsGeneratorSurface =
         | "Grep" -> Some ToolPermission.Grep
         | "Move" -> Some ToolPermission.Move
         | "Remove" -> Some ToolPermission.Remove
-        | "Inspect" -> Some ToolPermission.Inspect
-        | "Behavior" -> Some ToolPermission.Behavior
         | "Exec" -> Some ToolPermission.Exec
         | "Pty" -> Some ToolPermission.Pty
-        | "Network" -> Some ToolPermission.Network
         | "ReviewAssessment" -> Some ToolPermission.ReviewAssessment
         | "Chronicle" -> Some ToolPermission.Chronicle
         | "Fetch" -> Some ToolPermission.Fetch
@@ -59,11 +56,8 @@ module JsGeneratorSurface =
         | ToolPermission.Grep -> "Grep"
         | ToolPermission.Move -> "Move"
         | ToolPermission.Remove -> "Remove"
-        | ToolPermission.Inspect -> "Inspect"
-        | ToolPermission.Behavior -> "Behavior"
         | ToolPermission.Exec -> "Exec"
         | ToolPermission.Pty -> "Pty"
-        | ToolPermission.Network -> "Network"
         | ToolPermission.ReviewAssessment -> "ReviewAssessment"
         | ToolPermission.Chronicle -> "Chronicle"
         | ToolPermission.Fetch -> "Fetch"
@@ -88,7 +82,14 @@ module JsGeneratorSurface =
         labels |> Array.choose permissionOf |> Set.ofArray
 
     let private canonicalLabels (role: string) =
-        match Roles.tryParseRole role with
+        match
+            Roles.tryParseRole role
+            |> Option.bind (fun r ->
+                if Roles.all |> List.contains r then
+                    Some r
+                else
+                    Some Role.Engineer)
+        with
         | None -> [||]
         | Some parsed -> OfficeCapability.permissions parsed |> Set.toArray |> Array.map permissionLabel
 

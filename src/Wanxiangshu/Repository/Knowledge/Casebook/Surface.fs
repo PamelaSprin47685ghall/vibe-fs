@@ -101,15 +101,24 @@ module CasebookSurface =
 
     let private caseOfJs (value: obj) : Result<Case, string> =
         let identity =
-            if not (isNull (value?identity)) && not (String.IsNullOrWhiteSpace (string value?identity)) then
+            if
+                not (isNull (value?identity))
+                && not (String.IsNullOrWhiteSpace(string value?identity))
+            then
                 string value?identity
-            elif not (isNull (value?sessionId)) && not (String.IsNullOrWhiteSpace (string value?sessionId)) then
+            elif
+                not (isNull (value?sessionId))
+                && not (String.IsNullOrWhiteSpace(string value?sessionId))
+            then
                 string value?sessionId
             else
                 ""
 
         let sourceTrace =
-            if not (isNull (value?sourceTrace)) then string value?sourceTrace else ""
+            if not (isNull (value?sourceTrace)) then
+                string value?sourceTrace
+            else
+                ""
 
         let q = if not (isNull (value?q)) then string value?q else ""
         let a = if not (isNull (value?a)) then string value?a else ""
@@ -121,7 +130,10 @@ module CasebookSurface =
                 []
 
         let completionFileState =
-            if not (isNull (value?completionFileState)) then string value?completionFileState else ""
+            if not (isNull (value?completionFileState)) then
+                string value?completionFileState
+            else
+                ""
 
         let maintenanceFileState =
             if not (isNull (value?maintenanceFileState)) then
@@ -201,20 +213,29 @@ module CasebookSurface =
         | "case-captured" -> caseOfJs (value?case) |> Result.map CasebookEvent.CaseCaptured
         | "case-refreshed" ->
             let identity =
-                if not (isNull (value?identity)) && not (String.IsNullOrWhiteSpace (string value?identity)) then
+                if
+                    not (isNull (value?identity))
+                    && not (String.IsNullOrWhiteSpace(string value?identity))
+                then
                     string value?identity
                 else
                     string value?sessionId
 
             let q = string value?q
             let a = string value?a
+
             let maintenanceFileState =
-                if not (isNull (value?maintenanceFileState)) then string value?maintenanceFileState else ""
+                if not (isNull (value?maintenanceFileState)) then
+                    string value?maintenanceFileState
+                else
+                    ""
+
             let relatedPaths =
                 if not (isNull (value?relatedPaths)) then
                     stringsOf (value?relatedPaths) |> Array.toList
                 else
                     []
+
             let observations =
                 if not (isNull (value?observations)) then
                     match observationsOfJs (value?observations) with
@@ -226,17 +247,25 @@ module CasebookSurface =
             Ok(CasebookEvent.CaseRefreshed(identity, q, a, maintenanceFileState, relatedPaths, observations))
         | "case-accessed" ->
             let identity =
-                if not (isNull (value?identity)) && not (String.IsNullOrWhiteSpace (string value?identity)) then
+                if
+                    not (isNull (value?identity))
+                    && not (String.IsNullOrWhiteSpace(string value?identity))
+                then
                     string value?identity
                 else
                     string value?sessionId
+
             Ok(CasebookEvent.CaseAccessed identity)
         | "case-evicted" ->
             let identity =
-                if not (isNull (value?identity)) && not (String.IsNullOrWhiteSpace (string value?identity)) then
+                if
+                    not (isNull (value?identity))
+                    && not (String.IsNullOrWhiteSpace(string value?identity))
+                then
                     string value?identity
                 else
                     string value?sessionId
+
             Ok(CasebookEvent.CaseEvicted identity)
         | other -> Error $"unknown casebook event kind: {other}"
 
@@ -318,9 +347,7 @@ module CasebookSurface =
         | Error message -> Task.FromResult(box {| ok = false; error = message |})
         | Ok parsed -> runWorkflowTask workflow store parsed
 
-    let private runUnitResult
-        (operation: Task<Result<unit, string>>)
-        : Task<obj> =
+    let private runUnitResult (operation: Task<Result<unit, string>>) : Task<obj> =
         task {
             match! operation with
             | Ok() -> return box {| ok = true |}
@@ -351,13 +378,7 @@ module CasebookSurface =
             | Ok(Some case) -> return caseToJs case
         }
 
-    let refresh
-        (store: obj)
-        (sessionId: string)
-        (q: string)
-        (a: string)
-        (observations: obj array)
-        : Task<obj> =
+    let refresh (store: obj) (sessionId: string) (q: string) (a: string) (observations: obj array) : Task<obj> =
         let internalStore = storeOf store
 
         match observationsOfJs (box observations) with
@@ -376,12 +397,7 @@ module CasebookSurface =
         let a = if isNull (updates?a) then "" else string updates?a
         runUnitResult (CasebookWorkflow.refreshWithDiff internalStore identity diff newStateRef q a)
 
-    let needsRefresh
-        (store: obj)
-        (capacity: int)
-        (sessionId: string)
-        (root: string)
-        : Task<obj> =
+    let needsRefresh (store: obj) (capacity: int) (sessionId: string) (root: string) : Task<obj> =
         let internalStore = storeOf store
 
         task {
@@ -411,30 +427,59 @@ module CasebookSurface =
 
     let archive (store: obj) (case: obj) : Task<obj> =
         let internalStore = storeOf store
-        runStoreWorkflow CasebookWorkflow.archiveInspectorResult internalStore case
+        runStoreWorkflow CasebookWorkflow.archiveCase internalStore case
 
-    let archiveCase (store: obj) (case: obj) : Task<obj> =
-        archive store case
+    let archiveCase (store: obj) (case: obj) : Task<obj> = archive store case
 
     // ── KR-003, KR-004, KR-010, KR-014, KR-015 Exports ──────────────────────
 
     let recordSubstantiveAccess (tracker: obj) (toolName: string) (args: obj) (committed: bool) : unit =
-        let t = unbox<AccessTracker> tracker
+        let t =
+            if not (isNull tracker) && emitJsExpr tracker "$0._tracker !== undefined" then
+                unbox<AccessTracker> (tracker?_tracker)
+            else
+                unbox<AccessTracker> tracker
+
         CasebookCapture.recordSubstantiveAccess t toolName args committed
 
     let createAccessTracker () : obj =
-        box (CasebookCapture.createAccessTracker ())
+        let tracker = CasebookCapture.createAccessTracker ()
+
+        box
+            {| recordRead = fun (path: string) (hash: string) -> tracker.RecordRead(path, hash)
+               recordCreate = fun (path: string) -> tracker.RecordCreate(path)
+               recordEdit = fun (path: string) -> tracker.RecordEdit(path)
+               recordDelete = fun (path: string) -> tracker.RecordDelete(path)
+               recordMove = fun (src: string) (dst: string) -> tracker.RecordMove(src, dst)
+               recordGrep = fun (pat: string) (path: string) -> tracker.RecordGrep(pat, path)
+               recordGlob = fun (pat: string) -> tracker.RecordGlob(pat)
+               recordAttemptedMutation =
+                fun (path: string) (committed: bool) -> tracker.RecordAttemptedMutation(path, committed)
+               getRelatedPaths = fun () -> tracker.GetRelatedPaths() |> List.toArray
+               RecordRead = fun (path: string) (hash: string) -> tracker.RecordRead(path, hash)
+               RecordCreate = fun (path: string) -> tracker.RecordCreate(path)
+               RecordEdit = fun (path: string) -> tracker.RecordEdit(path)
+               RecordDelete = fun (path: string) -> tracker.RecordDelete(path)
+               RecordMove = fun (src: string) (dst: string) -> tracker.RecordMove(src, dst)
+               RecordGrep = fun (pat: string) (path: string) -> tracker.RecordGrep(pat, path)
+               RecordGlob = fun (pat: string) -> tracker.RecordGlob(pat)
+               RecordAttemptedMutation =
+                fun (path: string) (committed: bool) -> tracker.RecordAttemptedMutation(path, committed)
+               GetRelatedPaths = fun () -> tracker.GetRelatedPaths() |> List.toArray
+               _tracker = tracker |}
 
     let isSubstantiveTool (toolName: string) : bool =
         CasebookCapture.isSubstantiveTool toolName
 
     let freezeCompletionState (workspaceRoot: string) (paths: obj) : Task<obj> =
         let pathList =
-            if isNull paths then []
+            if isNull paths then
+                []
             elif emitJsExpr paths "Array.isArray($0)" then
                 stringsOf paths |> Array.toList
             else
                 []
+
         CasebookCapture.freezeCompletionState workspaceRoot pathList
 
     let computeMaintenanceDiff (workspaceRoot: string) (baseline: obj) : Task<obj> =
@@ -445,13 +490,13 @@ module CasebookSurface =
 
     let mergeFissionSubstantiveAccess (preFission: obj) (laneAccesses: obj) : obj =
         let pre = stringsOf preFission |> Array.toList
+
         let lanes =
             arrayOf laneAccesses
             |> Array.map (fun l -> stringsOf l |> Array.toList)
             |> Array.toList
-        CasebookCapture.mergeFissionSubstantiveAccess pre lanes
-        |> List.toArray
-        |> box
+
+        CasebookCapture.mergeFissionSubstantiveAccess pre lanes |> List.toArray |> box
 
     let truncateDiffForBudget (diff: string) (budget: int) : obj =
         CasebookCapture.truncateDiffForBudget diff budget

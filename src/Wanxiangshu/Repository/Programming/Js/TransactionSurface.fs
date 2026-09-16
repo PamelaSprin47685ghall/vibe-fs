@@ -229,3 +229,28 @@ module JsTransactionSurface =
         JsToolsTransactionStore.createPersistence (eventStoreOf store)
 
     let createPersistence (store: obj) : obj = persistenceOf store |> box
+
+    let createTransactionContext () : obj =
+        let readSnapshots = System.Collections.Generic.HashSet<string>()
+        let explicitReads = System.Collections.Generic.HashSet<string>()
+        let stagedWrites = System.Collections.Generic.Dictionary<string, string>()
+        let mutable isAborted = false
+        let mutable isCommitted = false
+
+        box
+            {| recordGrepScan =
+                fun (paths: string array) ->
+                    for p in paths do
+                        readSnapshots.Add p |> ignore
+               recordExplicitRead =
+                fun (path: string) ->
+                    readSnapshots.Add path |> ignore
+                    explicitReads.Add path |> ignore
+               stageWrite = fun (path: string) (content: string) -> stagedWrites.[path] <- content
+               abort = fun () -> isAborted <- true
+               commit =
+                fun () ->
+                    if not isAborted then
+                        isCommitted <- true
+               getReadSnapshots = fun () -> readSnapshots |> Seq.toArray
+               getSubstantiveAccess = fun () -> explicitReads |> Seq.toArray |}

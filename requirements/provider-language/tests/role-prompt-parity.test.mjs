@@ -25,9 +25,8 @@ test('WHAT[PROVIDER-LANGUAGE-012] bilingual prompts maintain parity on fission e
   const mgrEn = readIfExists('resources/provider/role/manager/en.md')
   assert.ok(mgrZh, 'resources/provider/role/manager/zh-CN.md must exist')
   assert.ok(mgrEn, 'resources/provider/role/manager/en.md must exist')
-
-  assert.match(mgrZh, /不能 Fission|禁止 Fission/i, 'Manager zh prompt must forbid fission')
-  assert.match(mgrEn, /cannot Fission|must not Fission/i, 'Manager en prompt must forbid fission')
+  assert.match(mgrZh, /不能(?:使用)?\s*Fission/, 'Manager zh prompt must explicitly forbid fission')
+  assert.match(mgrEn, /cannot (?:use )?Fission/i, 'Manager en prompt must explicitly forbid fission')
   assert.doesNotMatch(mgrZh, /Manager 可分身|管理分身/i, 'Manager zh prompt must not contain manager fission claims')
 
   // 3. DevOps prompt: direct repair authorization and forbids fission

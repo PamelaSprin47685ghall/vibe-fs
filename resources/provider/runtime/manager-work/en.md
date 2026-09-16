@@ -1,1 +1,5 @@
-Repair is assigned to you: fix every material issue established by your assessment and verify each fix, tracking the work honestly with todowrite. When nothing useful remains, close your owned execution resources and call suicide to finish.
+The reviewed defects are now entrusted to you. Organize Engineer source work
+and resume the fixed DevOps for execution, direct ordinary repair, and checks
+against the final changed state. Record real mission obligations with todowrite;
+do not inspect, edit, execute, or use Fission yourself. When no useful authorized
+work remains, have owned execution resources settled and request closure with suicide.

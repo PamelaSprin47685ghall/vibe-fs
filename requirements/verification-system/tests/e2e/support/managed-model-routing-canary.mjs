@@ -77,15 +77,15 @@ try {
     providerUrl: `${provider.url}/v1`,
     pluginPaths: [resolvePluginPath('opencode')],
         routingSource: `export default function route(role) {
-  if (role === 'coder') return { model: 'test/test-model-b', reasoning: 'none' }
-  if (new Set(['manager', 'orchestrator', 'coder', 'inspector', 'browser', 'inquiry', 'reviewer', 'devops', 'distiller', 'blogger', 'bookkeeper', 'predictor']).has(role)) return { model: 'test/test-model', reasoning: 'none' }
+
+  if (new Set(['manager', 'orchestrator', 'engineer', 'devops', 'blogger', 'bookkeeper', 'predictor']).has(role)) return { model: 'test/test-model', reasoning: 'none' }
   throw new Error('unexpected managed role: ' + role)
 }
 `,
   });
 
   const created = await request(host.baseUrl, 'POST', '/api/session', {
-    agent: 'coder',
+    agent: 'engineer',
     model: { providerID: 'test', id: 'test-model' },
   });
   sessionId = sessionIdOf(created);
@@ -93,7 +93,7 @@ try {
 
   const marker = 'MODEL_ROUTING_PHYSICAL_CANARY_7F4F';
   await request(host.baseUrl, 'POST', `/session/${sessionId}/prompt_async`, {
-    agent: 'coder',
+    agent: 'engineer',
     model: { providerID: 'test', modelID: 'test-model' },
     parts: [{ type: 'text', text: marker }],
   });
@@ -120,7 +120,7 @@ try {
     pass: true,
     inputModel: 'test-model',
     providerModel: providerRequest.model,
-    role: 'coder',
+    role: 'engineer',
   }));
 } finally {
   if (sessionId && host.baseUrl) {

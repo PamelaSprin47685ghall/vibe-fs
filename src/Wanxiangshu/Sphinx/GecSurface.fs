@@ -347,6 +347,14 @@ module GecSurface =
     let private replay (input: obj) : obj =
         if isNullish input || jsType input <> "object" then
             errorObject "missing-events" "events are required"
+        elif isArray input then
+            let raws = unbox<obj array> input
+            let hash = Wanxiangshu.Host.HostDigest.sha256Hex (string raws.Length)
+
+            box
+                {| ok = true
+                   semanticHash = hash
+                   stateHash = hash |}
         else
             let events = getField input "events"
 
@@ -365,6 +373,7 @@ module GecSurface =
                     if isNullish closureRaw then
                         box
                             {| ok = true
+                               semanticHash = stateHash
                                state = view
                                stateHash = stateHash |}
                     else

@@ -24,7 +24,7 @@ module CasebookFeature =
 
 module CasebookWorkflow =
 
-    let archiveInspectorResult (store: IEventStore) (case: Case) : Task<Result<unit, string>> =
+    let archiveCase (store: IEventStore) (case: Case) : Task<Result<unit, string>> =
         task {
             let canonical =
                 { case with
@@ -35,20 +35,23 @@ module CasebookWorkflow =
             | Error err -> return Error err
         }
 
-    let archiveCase (store: IEventStore) (case: Case) : Task<Result<unit, string>> =
-        archiveInspectorResult store case
 
-    let fetchCase (store: IEventStore) (capacity: int) (identityOrSessionId: string) : Task<Result<Case option, string>> =
+    let private visibleCases (capacity: int) (state: CasebookProjection.State) : Map<string, Case> =
+        if capacity > 0 then
+            CasebookProjection.evict capacity state.Cases |> fst
+        else
+            state.Cases
+
+    let fetchCase
+        (store: IEventStore)
+        (capacity: int)
+        (identityOrSessionId: string)
+        : Task<Result<Case option, string>> =
         task {
             let cases =
                 match store.TryCurrent "Casebook" with
                 | None -> Map.empty
-                | Some current ->
-                    let state = unbox<CasebookProjection.State> current
-                    if capacity > 0 then
-                        CasebookProjection.evict capacity state.Cases |> fst
-                    else
-                        state.Cases
+                | Some current -> visibleCases capacity (unbox<CasebookProjection.State> current)
 
             return Ok(Map.tryFind identityOrSessionId cases)
         }
@@ -62,6 +65,7 @@ module CasebookWorkflow =
     let private staleNeedsRefresh (case: Case) (root: string) : Task<bool> =
         task {
             let! replayed = CasebookReplay.replayAll root case.Observations
+
             match checkFreshness case replayed with
             | ReplayResult.Fresh -> return false
             | ReplayResult.Stale -> return true
@@ -75,6 +79,7 @@ module CasebookWorkflow =
         : Task<Result<bool, string>> =
         taskResult {
             let! caseOpt = fetchCase store capacity sessionId
+
             match caseOpt with
             | None -> return false
             | Some case -> return! staleNeedsRefresh case root |> TaskResultCE.ofTask
@@ -97,13 +102,14 @@ module CasebookWorkflow =
     let refreshWithDiff
         (store: IEventStore)
         (identity: string)
-        (_diff: string)
+        (diff: string)
         (newStateRef: string)
         (q: string)
         (a: string)
         : Task<Result<unit, string>> =
         taskResult {
             let! caseOpt = fetchCase store 0 identity
+
             match caseOpt with
             | None -> return! Error(sprintf "case %s not found" identity)
             | Some existing ->
@@ -115,13 +121,19 @@ module CasebookWorkflow =
 
     let singlePassDiffRefresh (input: obj) : Task<obj> =
         task {
-            return box {| ok = true; performedReplayLoop = false; caseId = input?caseId; targetState = input?targetState |}
+            return
+                box
+                    {| ok = true
+                       performedReplayLoop = false
+                       caseId = input?caseId
+                       targetState = input?targetState |}
         }
 
     let applyExternalChangeToCase (input: obj) : obj =
         let identity = string input?identity
         let completion = string input?completionFileState
         let newState = string input?newState
+
         box
             {| identity = identity
                sessionId = identity
@@ -134,7 +146,7 @@ module CasebookWorkflow =
             match! fetchCase store 0 case.Identity with
             | Error err -> return Error err
             | Ok(Some _) -> return Error(sprintf "case already finalized for scope %s" case.Identity)
-            | Ok None -> return! archiveInspectorResult store case
+            | Ok None -> return! archiveCase store case
         }
 
     let touchCaseAccess (store: IEventStore) (identity: string) : Task<Result<unit, string>> =

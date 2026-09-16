@@ -27,6 +27,7 @@ type CasebookObservationCollector() =
     member _.Collect(sessionId: string, toolName: string, args: obj, output: string) : unit =
         let tracker = getTracker sessionId
         CasebookCapture.recordSubstantiveAccess tracker toolName args true
+
         match CasebookCapture.capture toolName args output with
         | None -> ()
         | Some observation -> appendObservation sessionId observation

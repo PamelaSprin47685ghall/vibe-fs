@@ -280,13 +280,7 @@ export function assertPublishConflict(workDir, label = 'long-stroke') {
   );
 }
 
-/** §21 / MANAGED-SESSION-020: serial Inspector work reuses one physical child session. */
-export function assertSubagentReuse(scenario) {
-  const { inspectorSessionId } = assertG2InspectorPrefixLaw(scenario);
-  assert.ok(inspectorSessionId, 'long-stroke: Inspector reuse must preserve one physical child session');
-}
-
-/** §21: successful reconciliation — Orchestrator Published case exactly once. */
+/** §21 / MANAGED-SESSION-020: serial Engineer charges reuse one physical child session. */
 export function assertSuccessfulReconciliation(workDir, label = 'long-stroke') {
   // countFactCase digs to the innermost DU case name (`Published`). Do NOT pass the
   // waitFact substring `"Orchestrator",["Published"` — that is only for readJournal
@@ -308,10 +302,10 @@ export function assertRetirementCommitted(workDir, label = 'long-stroke') {
 }
 
 /**
- * Hold first coder write incomplete until the active user message is admitted,
- * so drain-before-interrupt cannot harvest a completed child (manager-unhappy /
- * temporal-ownership holdChild shape). Orch-shell uses coder.0; legacy id
- * child-c1.0 still accepted.
+ * Hold the first engineer write incomplete until the active user message is
+ * admitted, so drain-before-interrupt cannot harvest a completed child
+ * (manager-unhappy / temporal-ownership holdChild shape). Orch-shell uses
+ * engineer.0; legacy id child-c1.0 still accepted.
  */
 export async function holdChildC1UntilLabor(scenario) {
   const runtime = scenario.provider?._scenario;
@@ -324,12 +318,12 @@ export async function holdChildC1UntilLabor(scenario) {
 
   let held = 0;
   for (const entry of runtime.scenario.entries) {
-    if (entry.id === 'coder.0' || entry.id === 'child-c1.0') {
+    if (entry.id === 'engineer.0' || entry.id === 'child-c1.0') {
       entry.respond = { ...entry.respond, waitUntil: childHold };
       held += 1;
     }
   }
-  assert.ok(held >= 1, 'long-stroke: holdChildC1UntilLabor needs coder.0 (or legacy child-c1.0)');
+  assert.ok(held >= 1, 'long-stroke: holdChildC1UntilLabor needs engineer.0 (or legacy child-c1.0)');
 
   scenario.releaseHeldChild = () => {
     releaseChild?.();
@@ -433,7 +427,7 @@ export async function bindManagerLoopSequence(scenario) {
               type: 'tool-call',
               tool: 'fork',
               args: {
-                calling: 'coder',
+                calling: 'engineer',
                 name: 'Conflict Resolver',
                 charge: 'Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary',
               },
@@ -465,6 +459,62 @@ export async function bindManagerLoopSequence(scenario) {
     }
     originalConsume(body, selection, context);
   };
+}
+
+const lastUserText = (body) => {
+  const messages = Array.isArray(body?.messages) ? body.messages : [];
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i]?.role === 'user') return contentText(messages[i].content);
+  }
+  return '';
+};
+
+const requestTools = (body) =>
+  (Array.isArray(body?.tools) ? body.tools : [])
+    .map((tool) => tool?.function?.name ?? tool?.name)
+    .filter((name) => typeof name === 'string');
+
+const chatRequests = (requests) =>
+  (requests ?? []).filter((body) => {
+    const messages = Array.isArray(body?.messages) ? body.messages : [];
+    return !messages.slice(0, 4).some(
+      (message) => typeof message?.content === 'string' && message.content.startsWith('Generate a title for this conversation:'),
+    );
+  });
+
+const taggedValue = (value) => (Array.isArray(value) ? value.at(-1) : value);
+
+export async function retireCompanionForDeletion(scenario, ownerSessionId) {
+  const findBloggerSessionId = () =>
+    factPayloads(scenario.host.workDir, 'CompanionBloggerLinked')
+      .filter((payload) => taggedValue(payload?.SessionId) === ownerSessionId)
+      .map((payload) => taggedValue(payload?.BloggerSessionId))
+      .find((sessionId) => typeof sessionId === 'string' && sessionId.length > 0) ?? null;
+
+  let bloggerSessionId = findBloggerSessionId();
+  if (bloggerSessionId === null) {
+    bloggerSessionId = await new Promise((resolve, reject) => {
+      let stop = () => {};
+      const timer = setTimeout(() => {
+        stop();
+        reject(new Error(`Companion Blogger was not linked for owner ${ownerSessionId}`));
+      }, WAIT_FACT_WINDOW_MS);
+      stop = watchJournal(scenario.host.workDir, () => {
+        scenario.eventCeilings?.checkJournal?.();
+        const found = findBloggerSessionId();
+        if (found === null) return;
+        clearTimeout(timer);
+        stop();
+        resolve(found);
+      });
+    });
+  }
+
+  const aborted = await scenario.client.abort(bloggerSessionId);
+  assert.equal(aborted.ok, true, `Companion Blogger ${bloggerSessionId} abort failed`);
+  const settled = await awaitSessionSettled(scenario, bloggerSessionId, WAIT_FACT_WINDOW_MS);
+  assert.equal(settled, true, `Companion Blogger ${bloggerSessionId} did not settle`);
+  return bloggerSessionId;
 }
 
 export function assertNativeReadProbeTimeline(scenario) {
@@ -546,7 +596,6 @@ export async function oracleLongStroke(scenario, ctx) {
   assertRetirementNeedsIteration(workDir);
   assertRetirementCommitted(workDir);
   assertPublishConflict(workDir);
-  assertSubagentReuse(scenario);
   assertSuccessfulReconciliation(workDir);
   assertNativeReadProbeTimeline(scenario);
 
@@ -680,186 +729,9 @@ export const ADVERSITY_ORACLES = Object.freeze({
   assertRetirementNeedsIteration,
   assertDurableRecovery,
   assertPublishConflict,
-  assertSubagentReuse,
   assertSuccessfulReconciliation,
   assertRetirementCommitted,
 });
-
-export const G2_INSPECTOR_CANARY_PROMPT =
-  'G2_INSPECTOR_PREFIX_CANARY: reuse one inspector for Q1, Q2, then Q3.';
-export const G2_Q1 = 'G2Q1: who owns PromptAuthority?';
-export const G2_Q2 = 'G2Q2: what is ReuseScope?';
-export const G2_Q3 = 'G2Q3: when does CaseFinalize run?';
-const G2_Q1_WIRE = '# G2Q1: who owns PromptAuthority?';
-const G2_Q2_WIRE = '# G2Q2: what is ReuseScope?';
-const G2_Q3_WIRE = '# G2Q3: when does CaseFinalize run?';
-export const G2_A1 = 'G2A1: Host owns PromptAuthority.';
-export const G2_A2 = 'G2A2: Owner session scope for one Inspector.';
-export const G2_A3 = 'G2A3: On owner ReuseScope close.';
-export const G2_BATCH_Q1 = 'G2B1: establish the first repository fact.';
-export const G2_BATCH_Q2 = 'G2B2: establish the second repository fact.';
-export const G2_BATCH_Q3 = 'G2B3: establish the third repository fact.';
-export const G2_BATCH_A = 'G2B: all three repository facts were established together.';
-export const G6_CANONICAL_Q = 'What is the Inspector reuse contract?';
-export const G6_CANONICAL_A = 'One Inspector child, serial Q/A, finalize on owner close.';
-export const G6_FETCH_CANARY_PROMPT = 'G6_CASEBOOK_FETCH_CANARY: fetch the finalized Inspector case.';
-
-const lastUserText = (body) => {
-  const messages = Array.isArray(body?.messages) ? body.messages : [];
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    if (messages[i]?.role === 'user') return contentText(messages[i].content);
-  }
-  return '';
-};
-
-const requestTools = (body) =>
-  (Array.isArray(body?.tools) ? body.tools : [])
-    .map((tool) => tool?.function?.name ?? tool?.name)
-    .filter((name) => typeof name === 'string');
-
-const chatRequests = (requests) =>
-  (requests ?? []).filter((body) => {
-    const messages = Array.isArray(body?.messages) ? body.messages : [];
-    return !messages.slice(0, 4).some(
-      (message) => typeof message?.content === 'string' && message.content.startsWith('Generate a title for this conversation:'),
-    );
-  });
-
-export function extractInspectorIdFromOwnerRequests(requests) {
-  const chats = chatRequests(requests ?? []);
-  for (const body of chats) {
-    const text = lastUserText(body);
-    if (text.startsWith(G2_Q1_WIRE) || text.startsWith(G2_Q2_WIRE) || text.startsWith(G2_Q3_WIRE)) {
-      const sid = body.sessionID;
-      if (typeof sid === 'string' && sid.length > 0) return sid;
-    }
-  }
-  for (const text of publicToolResults(requests, 'inspect')) {
-    const match = String(text).match(/session_id\s*=\s*"([^"]+)"/);
-    if (match) return match[1];
-  }
-  return null;
-}
-
-const taggedValue = (value) => (Array.isArray(value) ? value.at(-1) : value);
-
-export async function retireCompanionForDeletion(scenario, ownerSessionId) {
-  const findBloggerSessionId = () =>
-    factPayloads(scenario.host.workDir, 'CompanionBloggerLinked')
-      .filter((payload) => taggedValue(payload?.SessionId) === ownerSessionId)
-      .map((payload) => taggedValue(payload?.BloggerSessionId))
-      .find((sessionId) => typeof sessionId === 'string' && sessionId.length > 0) ?? null;
-
-  let bloggerSessionId = findBloggerSessionId();
-  if (bloggerSessionId === null) {
-    bloggerSessionId = await new Promise((resolve, reject) => {
-      let stop = () => {};
-      const timer = setTimeout(() => {
-        stop();
-        reject(new Error(`Companion Blogger was not linked for owner ${ownerSessionId}`));
-      }, WAIT_FACT_WINDOW_MS);
-      stop = watchJournal(scenario.host.workDir, () => {
-        scenario.eventCeilings?.checkJournal?.();
-        const found = findBloggerSessionId();
-        if (found === null) return;
-        clearTimeout(timer);
-        stop();
-        resolve(found);
-      });
-    });
-  }
-
-  const aborted = await scenario.client.abort(bloggerSessionId);
-  assert.equal(aborted.ok, true, `Companion Blogger ${bloggerSessionId} abort failed`);
-  const settled = await awaitSessionSettled(scenario, bloggerSessionId, WAIT_FACT_WINDOW_MS);
-  assert.equal(settled, true, `Companion Blogger ${bloggerSessionId} did not settle`);
-  return bloggerSessionId;
-}
-
-/**
- * G2 PREFIX LAW on the reused Inspector child (mock LLM + real OpenCode).
- * Uses Domain isAppendOnlyPrefix via provider-wire.js — not a second helper.
- */
-export function assertG2InspectorBatchCoalescing(scenario, expectedInspectorSessionId) {
-  const requests = chatRequests(scenario.provider.requests);
-  const batches = requests.filter((body) => {
-    if (body?.sessionID !== expectedInspectorSessionId) return false;
-    const text = lastUserText(body);
-    return [G2_BATCH_Q1, G2_BATCH_Q2, G2_BATCH_Q3].every((question) => text.includes(question));
-  });
-  assert.equal(batches.length, 1, 'G2 batch: three simultaneous inspect calls must become one Inspector provider request');
-  assert.equal(
-    batches[0].sessionID,
-    expectedInspectorSessionId,
-    'G2 batch: simultaneous inspect batch must reuse the dedicated Inspector session',
-  );
-  assert.equal(
-    scenario.provider.matchCount('g2-inspector-batch.0'),
-    1,
-    'G2 batch: combined Inspector provider request must be delivered exactly once',
-  );
-
-  const failures = publicToolResults(scenario.provider.requests, 'inspect')
-    .filter((text) => /could not complete|未能完成/i.test(String(text)));
-  assert.deepEqual(failures, [], 'G2 batch: sibling inspect calls must not fail while the canonical call remains in flight');
-}
-
-export function assertG2InspectorPrefixLaw(scenario) {
-  const requests = chatRequests(scenario.provider.requests);
-  const q1 = requests.filter((body) => lastUserText(body).startsWith(G2_Q1_WIRE));
-  const q2 = requests.filter((body) => lastUserText(body).startsWith(G2_Q2_WIRE));
-  const q3 = requests.filter((body) => lastUserText(body).startsWith(G2_Q3_WIRE));
-  // Each Inspector question begins with the SyncDelegate SendPrompt wire pinned by
-  // g2-inspector-qN.0. After EXEC-031 the child completes with ordinary assistant
-  // text — no return tool on the wire.
-  assert.ok(q1.length >= 2, 'G2: Inspector Q1 must record both faulted attempt and retry');
-  assert.ok(q2.length >= 1, 'G2: Inspector Q2 provider request missing');
-  assert.ok(q3.length >= 1, 'G2: Inspector Q3 provider request missing');
-
-  const sessionId = q1[0].sessionID;
-  assert.ok(typeof sessionId === 'string' && sessionId.length > 0, 'G2: Inspector Q1 missing sessionID');
-  assert.equal(q2[0].sessionID, sessionId, 'G2: Q2 must reuse the Inspector SessionId');
-  assert.equal(q3[0].sessionID, sessionId, 'G2: Q3 must reuse the Inspector SessionId');
-
-  const modelOf = (body) => (typeof body?.model === 'string' ? body.model : body?.model?.id ?? body?.model?.modelID);
-  const model = modelOf(q1[0]);
-  assert.ok(typeof model === 'string' && model.length > 0, 'G2: Inspector wire ModelId missing');
-  assert.equal(modelOf(q2[0]), model, 'G2: same model Q1→Q2');
-  assert.equal(modelOf(q3[0]), model, 'G2: same model Q2→Q3');
-
-  const wire1 = wireOf(q1[q1.length - 1]);
-  const wire2 = wireOf(q2[0]);
-  const wire3 = wireOf(q3[0]);
-  assert.equal(sealHolds(wire1, q2[0]), true, 'G2: sealHolds Q1 prefix-of Q2');
-  assert.equal(sealHolds(wire2, q3[0]), true, 'G2: sealHolds Q2 prefix-of Q3');
-  assert.equal(isAppendOnlyPrefix(wire1, wire2), true, 'G2 PREFIX LAW isAppendOnlyPrefix(Q1,Q2)');
-  assert.equal(isAppendOnlyPrefix(wire2, wire3), true, 'G2 PREFIX LAW isAppendOnlyPrefix(Q2,Q3)');
-  assert.equal(isAppendOnlyPrefix(wire2, wire1), false, 'G2: prefix is directional');
-  return { inspectorSessionId: sessionId, model };
-}
-
-/**
- * G6 Host path (mock LLM Bookkeeper): CaseFinalize envelope + js-bookkeeper + captured fact.
- * Fetch is asserted separately once session_id is known.
- */
-export function assertG6BookkeeperFinalize(scenario) {
-  const requests = chatRequests(scenario.provider.requests);
-  const finalize = requests.filter(
-    (body) => lastUserText(body).includes('CaseFinalize') && requestTools(body).includes('js-bookkeeper'),
-  );
-  assert.ok(finalize.length >= 1, 'G6: Bookkeeper CaseFinalize provider request with js-bookkeeper missing');
-  assert.equal(
-    scenario.provider.matchCount('g6-bookkeeper-finalize.0') >= 1,
-    true,
-    'G6: one atomic js-bookkeeper program must reshape the staged Case',
-  );
-  const captured = countFactCase(scenario.host.workDir, 'InspectorCaseCaptured');
-  const named = readJournal(scenario.host.workDir, 'InspectorCaseCaptured').named;
-  assert.ok(
-    captured >= 1 || named >= 1,
-    `G6: InspectorCaseCaptured missing (countFact=${captured} named=${named})`,
-  );
-}
 
 export const HUMANROOT_MANAGER_LOOP_CANARY_PROMPT =
   'HUMANROOT_MANAGER_LOOP_CANARY: run the independent HumanRoot manager assessment check.';

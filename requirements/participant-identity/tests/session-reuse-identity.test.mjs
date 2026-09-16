@@ -24,7 +24,7 @@ const rootSeed = ({ participant, role, persona }) => ({
 })
 
 const managerSeed = rootSeed({ participant: 'manager', role: 'manager', persona: 'Lead' })
-const coderSeed = rootSeed({ participant: 'coder', role: 'coder', persona: 'Coder' })
+const coderSeed = rootSeed({ participant: 'engineer', role: 'engineer', persona: 'Engineer' })
 
 const createRoot = (physical, seed) => {
   const result = authority.createAuthorityRoot(
@@ -94,7 +94,7 @@ test('WHAT[PID-009] reuses SessionId with a fresh closed-run identity', () => {
     assert.match(wrongClose.error, /logical-run close mismatch/)
   }
 
-  const oldInheritedSeed = authority.issueInheritedIdentitySeed('inspector', first)
+  const oldInheritedSeed = authority.issueInheritedIdentitySeed('engineer', first)
   assert.equal(oldInheritedSeed.ok, true, oldInheritedSeed.ok ? '' : oldInheritedSeed.error)
 
   const closedFirst = authority.closeAuthority(

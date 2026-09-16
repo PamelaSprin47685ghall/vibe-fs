@@ -14,15 +14,11 @@ const identity = await import('../../../dist/Participant/Persona/Surface.js')
 const EXPECTED = {
   orchestrator: { role: 'orchestrator', persona: 'Director' },
   manager: { role: 'manager', persona: 'Lead' },
-  coder: { role: 'coder', persona: 'Coder' },
-  inspector: { role: 'inspector', persona: 'Investigator' },
+  engineer: { role: 'engineer', persona: 'Engineer' },
   devops: { role: 'devops', persona: 'Operator' },
-  browser: { role: 'browser', persona: 'Researcher' },
-  inquiry: { role: 'inquiry', persona: 'Analyst' },
   blogger: { role: 'blogger', persona: 'Chronicler' },
-  distiller: { role: 'distiller', persona: 'Distiller' },
   bookkeeper: { role: 'bookkeeper', persona: 'Curator' },
-  predictor: { role: 'inspector', persona: 'Investigator' },
+  predictor: { role: 'engineer', persona: 'Engineer' },
 }
 
 const expectedView = (name, origin = 'ResolvedAtRoot') => ({
@@ -94,15 +90,15 @@ test('WHAT[PID-001] rejects legacy, malformed, blank, and unknown participant na
 })
 
 test('WHAT[PID-003] rejects blank Persona and unsupported catalog version', () => {
-  assertError(rehydrate({ ...expectedView('coder'), persona: '  ' }), 'BlankPersona')
+  assertError(rehydrate({ ...expectedView('engineer'), persona: '  ' }), 'BlankPersona')
   assertError(
-    rehydrate({ ...expectedView('coder'), catalogVersion: 2 }),
+    rehydrate({ ...expectedView('engineer'), catalogVersion: 2 }),
     'UnsupportedPersonaCatalogVersion',
   )
 })
 
 test('WHAT[PID-001] rejects independently supplied role, persona, and origin', () => {
-  const canonical = expectedView('coder')
+  const canonical = expectedView('engineer')
   const mismatches = [
     [{ ...canonical, role: 'devops' }, 'RoleMismatch'],
     [{ ...canonical, persona: 'Lead' }, 'PersonaMismatch'],
@@ -110,12 +106,12 @@ test('WHAT[PID-001] rejects independently supplied role, persona, and origin', (
   ]
 
   for (const [input, error] of mismatches) {
-    assertError(rehydrate(input, error === 'OriginMismatch' ? 'coder' : ''), error)
+    assertError(rehydrate(input, error === 'OriginMismatch' ? 'engineer' : ''), error)
   }
 })
 
 test('WHAT[PID-002] the retired peer slot is ignored and never affects identity', () => {
-  const canonical = expectedView('coder')
+  const canonical = expectedView('engineer')
   const withLegacyPeer = identity.rehydrateParticipantIdentity(
     '',
     canonical.name,
@@ -131,20 +127,20 @@ test('WHAT[PID-002] the retired peer slot is ignored and never affects identity'
 })
 
 test('WHAT[PID-008] inherited identity requires the exact current owner Persona and version', () => {
-  const inherited = identity.inheritParticipantIdentityFromOwner('coder', 'manager')
+  const inherited = identity.inheritParticipantIdentityFromOwner('engineer', 'manager')
   assertJsData(inherited, 'inherited identity')
   assert.equal(inherited.ok, true)
   assert.equal(inherited.error, null)
   assertCanonicalIdentity(
     inherited.identity,
-    { ...expectedView('coder', 'InheritedFromOwner'), persona: 'Lead' },
+    { ...expectedView('engineer', 'InheritedFromOwner'), persona: 'Lead' },
     'inherited',
   )
 
   const restored = rehydrate(inherited.identity, 'manager')
   assertJsData(restored, 'rehydrated inherited identity')
   assert.equal(restored.ok, true)
-  assertCanonicalIdentity(restored.identity, { ...expectedView('coder', 'InheritedFromOwner'), persona: 'Lead' }, 'rehydrated inherited')
+  assertCanonicalIdentity(restored.identity, { ...expectedView('engineer', 'InheritedFromOwner'), persona: 'Lead' }, 'rehydrated inherited')
 
   assertError(rehydrate(inherited.identity), 'OwnerRequired')
   assertError(

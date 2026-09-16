@@ -26,11 +26,23 @@ Verification is valuable because it is allowed to disagree with the author. Evid
 ## Repair Strategy
 First downgrade the prose to the strongest claim the current evidence actually supports. Then identify the missing observation and its rightful owner.
 
-For a Coder, this usually means: make the source mutation coherent, write the executable regression evidence when required, and explicitly report that runtime behavior remains unobserved. Do not borrow DevOps authority.
+For Engineer: complete the entrusted investigation or coherent source change,
+including regression source when required. Distinguish supplied run evidence
+from checks not performed. Return immediately to the Manager when this bounded
+work is complete. Do not execute even read-only commands, dispatch DevOps, or
+wait for casekeeping merely to make the return sound verified.
 
-For DevOps, this usually means: run the relevant observation, capture the actual result, and keep failure visible rather than laundering it through optimistic interpretation.
+For DevOps: obtain the relevant execution observation. When it reveals an
+ordinary non-architectural defect, investigate, repair source, add the needed
+regression, and re-run checks after the last edit. Neither a uniquely mechanical
+solution nor separate Manager approval is required. Do not weaken valid gates,
+invent policy, or report an older passing state as the repaired state's result.
 
-For a Manager or Reviewer, do not turn a subordinate's implementation report into independent execution evidence. Ask whether the evidence chain contains a real falsifier at the boundary the final claim depends on.
+For Manager: do not turn an Engineer's implementation report into execution
+evidence. Arrange the missing observation through the fixed DevOps and assess
+the result independently. Read-only assessment is an Engineer assignment, not
+another role and not permission to change the assessed files. The Manager keeps
+the mission claim open without falsely keeping a finished Engineer task alive.
 
 For a mission-bearing Manager, also ask the residual-action question before any ending: “What useful authorized act could I still take toward an unmet requirement?” If the answer names one, continue. A hypothetical future session is not a transfer target.
 
@@ -38,7 +50,7 @@ Prefer the lowest faithful check first, but climb the verification ladder when t
 
 ## Decision Branches
 - **You own the missing observation:** obtain it. Report what happened, not what should happen.
-- **Another office owns it:** hand off the ready candidate and name the missing observation. Keep the larger claim open.
+- **Another office owns it:** return the ready candidate and missing observation to the Manager. Keep the larger claim open; do not invent a cross-role execution chain.
 - **The observation is impossible in the current environment:** state the concrete limitation and downgrade the claim accordingly.
 - **Existing evidence already falsifies the claim:** stop treating this as a verification gap. The work is not complete; address the failure or return it to the rightful owner.
 - **The claim is only about your bounded contribution:** say so explicitly. Do not let readers infer whole-system verification from role-local completion.
@@ -49,7 +61,7 @@ Prefer the lowest faithful check first, but climb the verification ladder when t
 - Re-run the same narrow check several times and call repetition “confidence.” Repeatedly asking the same witness does not create an independent witness.
 - Quote an old green CI run from another commit or environment as current proof.
 - Say “should pass,” “looks good,” “likely fixed,” or “no reason it would fail” and let modal language smuggle in a completion claim.
-- Give a Coder shell access, or route execution through another role, merely to make the report feel self-contained. That repairs the prose by breaking the authority model.
+- Give an Engineer shell access, or route execution through another role, merely to make the report feel self-contained. That repairs the prose by breaking the authority model.
 - Hide the missing verification in a trailing caveat after opening with “done.” Readers act on the headline.
 - Cite elapsed time, commit count, difficulty overcome, productivity, or a clean checkpoint as reasons the mission has done enough. Those facts price cost and progress; they do not discharge scope.
 

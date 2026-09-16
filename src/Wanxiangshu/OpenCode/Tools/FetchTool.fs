@@ -74,29 +74,44 @@ module FetchTool =
             |> List.distinct
             |> List.sort
 
+    /// Serve the maintained body of a case reported as changed, or stay stale.
+    let private serveMaintained language workspaceRoot store identity (cachedAnswer: string) =
+        task {
+            let! latest = CasebookWorkflow.fetchCase store 256 identity
+
+            match latest with
+            | Ok(Some updated) ->
+                do! CasebookLifecycle.touchAccess workspaceRoot store identity
+                return refreshed language updated.A
+            | _ -> return stale language cachedAnswer
+        }
+
+    /// Maintain the case from the provided diff, then serve the maintained body.
+    let private refreshFromDiff language workspaceRoot store identity (cachedAnswer: string) =
+        task {
+            let! changed = CasebookBookkeeper.refreshStale store workspaceRoot identity
+
+            match changed with
+            | Ok true -> return! serveMaintained language workspaceRoot store identity cachedAnswer
+            | Ok false -> return fresh language cachedAnswer
+            | Error _ -> return stale language cachedAnswer
+        }
+
     let private handleResolvedCase language workspaceRoot store (case: Case) =
         task {
             let identity = case.Identity
-            let paths = extractPaths case
-            let! targetState = CasebookCapture.freezeCompletionState workspaceRoot paths
-            let! diffObj = CasebookCapture.computeMaintenanceDiff workspaceRoot targetState
+
+            let baseline =
+                CasebookCapture.baselineFromObservations case.Observations case.RelatedPaths
+
+            let! diffObj = CasebookCapture.computeMaintenanceDiff workspaceRoot baseline
             let hasDiff = unbox<bool> (diffObj?hasDiff)
 
             if not hasDiff then
                 do! CasebookLifecycle.touchAccess workspaceRoot store identity
                 return fresh language case.A
             else
-                match! CasebookBookkeeper.refreshStale store workspaceRoot identity with
-                | Ok true ->
-                    match! CasebookWorkflow.fetchCase store 256 identity with
-                    | Ok(Some updated) ->
-                        do! CasebookLifecycle.touchAccess workspaceRoot store identity
-                        return refreshed language updated.A
-                    | _ -> return stale language case.A
-                | Ok false ->
-                    do! CasebookLifecycle.touchAccess workspaceRoot store identity
-                    return fresh language case.A
-                | Error _ -> return stale language case.A
+                return! refreshFromDiff language workspaceRoot store identity case.A
         }
 
     let private runFetch

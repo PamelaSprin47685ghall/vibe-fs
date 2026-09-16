@@ -113,7 +113,7 @@ test('WHAT[VERIFICATION-SYSTEM-003] Long Stroke keeps one Manager loop and two e
   );
 
   const loopTools = ['fork', 'resume', 'join', 'horizon', 'review', 'suicide'];
-  const managerTools = ['fork', 'join', 'horizon', 'fission', 'todowrite', 'suicide'];
+  const managerTools = ['fork', 'resume', 'join', 'horizon', 'todowrite', 'suicide'];
   const request = (turn, step) => ({
     messages: [
       { role: 'user', content: turn },
@@ -130,7 +130,7 @@ test('WHAT[VERIFICATION-SYSTEM-003] Long Stroke keeps one Manager loop and two e
   );
 
   const assessUser =
-    '# Establish read-only evidence about the current delivery through the entitled offices. Judge it independently on all eight dimensions, then submit the review tool once.';
+    '# Entrust read-only Engineer work to establish facts about the current deliverable, including absent or incomplete work.';
   const loopRequest = (turn, step) => ({
     messages: [
       { role: 'user', content: turn },

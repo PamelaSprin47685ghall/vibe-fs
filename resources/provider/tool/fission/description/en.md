@@ -1,9 +1,19 @@
-Temporarily divide this same logical participant into several coequal execution presents.
+Expand this Engineer's current assignment into independent execution lanes.
+Only Engineer may use Fission, only in an authorized subsession with no active
+group. A root session, another role, or an internal read-only Sphinx invocation
+cannot use it. An active lane cannot split recursively.
 
-Use fission only when this agent is running in a subsession and its own assigned work contains multiple genuinely separable slices whose parallel execution will reduce latency. A user-facing/root session must not fission. Fission separable work, not merely plentiful work.
+prompts is a string array containing at least two non-blank local charges.
+Each may contain newlines. Assign different factual questions or non-overlapping
+write regions. Shared contracts must settle before dependent edits. Independent
+work justifies a split; plentiful work or duplicate searches do not.
 
-prompts is a string array with at least two elements. Each non-blank element is one lane's exact local charge; a lane prompt may contain its own newlines.
+The current physical present is replaced only after all lanes are established.
+Every lane keeps the same Engineer identity, authority, responsibility, parent,
+and shared worktree. Fission grants no command execution, DevOps dispatch, or
+new agent ownership. It is not fork.
 
-Fission does not delegate to new agents. Every lane keeps the same logical identity, office, authority, parent relation, child ownership and shared worktree. Existing external work from before the split is shared; work newly initiated by a lane remains completion-affined to that lane.
-
-The current physical present is replaced only after every lane is established. Your parent still observes one logical participant and one final completion.
+Each lane contributes to convergence, not a separate Manager-facing completion.
+The converged continuation returns one final result for this assignment. Its
+combined file access and trace form one case source after logical completion;
+do not wait for casekeeping or claim completion on behalf of unfinished lanes.

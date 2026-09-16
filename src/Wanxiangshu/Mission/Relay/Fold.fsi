@@ -32,11 +32,7 @@ module Decision =
         authorityRevision: AuthorityRevision ->
             Result<RelayState, string>
 
-    val bindRoadDevOps:
-        state: RelayState ->
-        roadId: RoadId ->
-        devopsId: string ->
-            Result<RelayState, string>
+    val bindRoadDevOps: state: RelayState -> roadId: RoadId -> devopsId: string -> Result<RelayState, string>
 
     val assess:
         state: RelayState ->

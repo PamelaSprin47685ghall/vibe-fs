@@ -5,7 +5,7 @@ import test from 'node:test'
 
 const ROOT = new URL('../../..', import.meta.url).pathname
 
-test('WHAT[DISTRIBUTION-010] distribution artifact contains active registrations and surface consistency', () => {
+test('WHAT[DISTRIBUTION-010] distribution artifact contains active registrations and surface consistency', async () => {
   const roleDir = join(ROOT, 'resources/provider/role')
   assert.ok(existsSync(roleDir), 'resources/provider/role directory must exist')
   const roles = readdirSync(roleDir)
@@ -23,11 +23,8 @@ test('WHAT[DISTRIBUTION-010] distribution artifact contains active registrations
   assert.equal(roles.includes('distiller'), false, 'deprecated distiller role directory must be removed')
 
   // Tool surfaces consistency: js-engineer must exist, js-coder/js-inspector must be removed
-  const jsDir = join(ROOT, 'src/Wanxiangshu/Repository/Programming/Js')
-  if (existsSync(jsDir)) {
-    const jsFiles = readdirSync(jsDir)
-    assert.ok(jsFiles.some((f) => f.includes('Engineer')), 'Js Programming directory must contain Engineer surface')
-    assert.equal(jsFiles.some((f) => f.includes('Coder')), false, 'Js Programming directory must not contain Coder surface')
-    assert.equal(jsFiles.some((f) => f.includes('Inspector')), false, 'Js Programming directory must not contain Inspector surface')
-  }
+  const rolesSurface = await import('../../../dist/Foundation/RolesSurface.js')
+  assert.ok(rolesSurface.allRoleLabels.includes('engineer'), 'Roles surface must contain engineer')
+  assert.equal(rolesSurface.allRoleLabels.includes('coder'), false, 'Roles surface must not contain coder')
+  assert.equal(rolesSurface.allRoleLabels.includes('inspector'), false, 'Roles surface must not contain inspector')
 })

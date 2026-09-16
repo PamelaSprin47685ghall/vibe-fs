@@ -82,8 +82,8 @@ const assertNoLegacyIdentityFields = (value, label) => {
 }
 
 test('WHAT[PID-005] provider planning selects the system prompt and tool set from profile Role', () => {
-  const coderMain = attemptPlan('coder', 'work-main')
-  const coderAgain = attemptPlan('coder', 'work-main')
+  const coderMain = attemptPlan('engineer', 'work-main')
+  const coderAgain = attemptPlan('engineer', 'work-main')
   const devops = attemptPlan('devops', 'work-main')
 
   assert.equal(coderMain.systemPromptId, coderMain.participantIdentity.role)
@@ -98,8 +98,8 @@ test('WHAT[PID-005] provider planning selects the system prompt and tool set fro
 })
 
 test('WHAT[PID-002] ProviderAttempt carries its ParticipantIdentity as one nested value', () => {
-  const attempt = attemptPlan('inspector', 'work-main')
-  const expected = canonicalIdentityOf('inspector')
+  const attempt = attemptPlan('engineer', 'work-main')
+  const expected = canonicalIdentityOf('engineer')
 
   assert.equal(attempt.participant, expected.participant)
   assert.equal(attempt.role, expected.role)
@@ -108,8 +108,8 @@ test('WHAT[PID-002] ProviderAttempt carries its ParticipantIdentity as one neste
 })
 
 test('WHAT[PID-006] fresh physical retries preserve ParticipantIdentity while the failure budget advances', () => {
-  const first = attemptPlan('coder', 'work-main')
-  const expected = canonicalIdentityOf('coder')
+  const first = attemptPlan('engineer', 'work-main')
+  const expected = canonicalIdentityOf('engineer')
 
   // Fresh physical provider runs for the same fixed Role resolve the exact
   // same participant identity; only the ProviderFailureBudget moves.
@@ -120,7 +120,7 @@ test('WHAT[PID-006] fresh physical retries preserve ParticipantIdentity while th
   let count = 0
   for (const providerRun of providerRuns) {
     count += 1
-    const retry = attemptPlan('coder', 'work-main')
+    const retry = attemptPlan('engineer', 'work-main')
     assertCanonicalIdentity(retry.participantIdentity, expected, `retry ${providerRun}`)
 
     const applied = ProviderFailure.providerFailureProjection.applyFailure(
@@ -136,14 +136,14 @@ test('WHAT[PID-006] fresh physical retries preserve ParticipantIdentity while th
   assert.equal(read.failures, providerRuns.length)
   assert.equal(read.exhausted, false)
 
-  const last = attemptPlan('coder', 'work-main')
+  const last = attemptPlan('engineer', 'work-main')
   assertCanonicalIdentity(last.participantIdentity, expected, 'post-retry identity')
 })
 
 test('WHAT[PID-006] durable provider failure fold preserves the exact IdentitySeed', () => {
-  const canonical = canonicalIdentityOf('coder')
+  const canonical = canonicalIdentityOf('engineer')
   const seed = {
-    ...rootSelection('coder'),
+    ...rootSelection('engineer'),
     participantIdentity: {
       ...canonical,
       selectedAgent: canonical.participant,
@@ -207,11 +207,11 @@ test('WHAT[PID-004] terminal dispatch preserves the exact IdentitySeed', () => {
 })
 
 test('WHAT[PID-008] child identity inherits the parent Persona and version across roles', () => {
-  const parent = rootProfile('coder', 'ses_identity_parent')
-  const child = inheritedSeed('inspector', parent)
+  const parent = rootProfile('engineer', 'ses_identity_parent')
+  const child = inheritedSeed('manager', parent)
 
-  assert.equal(child.participantIdentity.participant, 'inspector')
-  assert.equal(child.participantIdentity.role, 'inspector')
+  assert.equal(child.participantIdentity.participant, 'manager')
+  assert.equal(child.participantIdentity.role, 'manager')
   assert.deepEqual(personaVersion(child.participantIdentity), personaVersion(parent.participantIdentity))
   assert.equal(child.ownerSession, parent.session)
   assert.equal(child.ownerLogicalRun, parent.logicalRun)
@@ -219,17 +219,17 @@ test('WHAT[PID-008] child identity inherits the parent Persona and version acros
 })
 
 test('WHAT[PID-004] Strength replica inherits owner Persona and version with the same participant', () => {
-  const owner = rootProfile('coder', 'ses_identity_strength_owner')
-  const replica = inheritedSeed('coder', owner)
+  const owner = rootProfile('engineer', 'ses_identity_strength_owner')
+  const replica = inheritedSeed('engineer', owner)
 
   assert.equal(replica.participantIdentity.participant, owner.participantIdentity.participant)
   assert.equal(replica.participantIdentity.role, owner.participantIdentity.role)
   assert.equal(
-    attemptPlan('coder', 'work-main').participantIdentity.participant,
+    attemptPlan('engineer', 'work-main').participantIdentity.participant,
     replica.participantIdentity.participant,
   )
   assert.deepEqual(personaVersion(replica.participantIdentity), personaVersion(owner.participantIdentity))
-  assert.equal(Strength.systemPromptIdForRole(replica.participantIdentity.role), 'coder')
+  assert.equal(Strength.systemPromptIdForRole(replica.participantIdentity.role), 'engineer')
   assert.deepEqual(
     new Set(Strength.readonlyCapabilities(replica.participantIdentity.role, 'strength-replica')),
     new Set(['Read', 'Glob', 'Grep']),
@@ -237,11 +237,11 @@ test('WHAT[PID-004] Strength replica inherits owner Persona and version with the
 })
 
 test('WHAT[PID-004] Fission lane inherits owner Persona and version without physical-parent inference', () => {
-  const owner = rootProfile('inspector', 'ses_identity_fission_owner')
-  const laneIdentity = inheritedSeed('inspector', owner)
+  const owner = rootProfile('engineer', 'ses_identity_fission_owner')
+  const laneIdentity = inheritedSeed('engineer', owner)
   const lane = Fission.startedLane(2, 'ses_unrelated_physical_parent', 'inspect lane')
 
-  assert.equal(laneIdentity.participantIdentity.participant, 'inspector')
+  assert.equal(laneIdentity.participantIdentity.participant, 'engineer')
   assert.equal(laneIdentity.participantIdentity.role, owner.participantIdentity.role)
   assert.deepEqual(personaVersion(laneIdentity.participantIdentity), personaVersion(owner.participantIdentity))
   assert.equal(laneIdentity.ownerLogicalRun, owner.logicalRun)
@@ -267,7 +267,7 @@ test('WHAT[PID-007] Bookkeeper has private identity and no public Role', () => {
 })
 
 test('WHAT[PID-004] raw legacy PeerAgent/EffectiveAgent/cursor fields are ignored and never re-encoded', () => {
-  const canonical = canonicalIdentityOf('coder')
+  const canonical = canonicalIdentityOf('engineer')
   const legacySeed = {
     kind: 'RootSelection',
     ownerSession: null,
@@ -275,8 +275,8 @@ test('WHAT[PID-004] raw legacy PeerAgent/EffectiveAgent/cursor fields are ignore
     ownerAuthorityRoot: null,
     participantIdentity: {
       ...canonical,
-      peerAgent: 'coder',
-      PeerAgent: 'coder',
+      peerAgent: 'engineer',
+      effectiveAgent: 'reviewer',
       effectiveAgent: 'coder',
       EffectiveAgent: 'coder',
     },
@@ -284,7 +284,7 @@ test('WHAT[PID-004] raw legacy PeerAgent/EffectiveAgent/cursor fields are ignore
     effectiveAgent: 'coder',
   }
 
-  const profile = rootProfile('coder', 'ses_identity_legacy_drop')
+  const profile = rootProfile('engineer', 'ses_identity_legacy_drop')
   const accepted = Runtime.createAuthorityRoot(
     hash,
     'runtime-participant-identity-consumers',
@@ -298,6 +298,6 @@ test('WHAT[PID-004] raw legacy PeerAgent/EffectiveAgent/cursor fields are ignore
   assertNoLegacyIdentityFields(accepted.value, 'accepted legacy-dropped profile')
   assert.deepEqual(accepted.value.participantIdentity, profile.participantIdentity)
 
-  const plan = attemptPlan('coder', 'work-main')
+  const plan = attemptPlan('engineer', 'work-main')
   assertNoLegacyIdentityFields(plan, 'attemptPlan output')
 })

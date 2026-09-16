@@ -22,6 +22,63 @@ module CasebookBookkeeper =
             |> List.distinct
             |> List.sort
 
+    let private presentHashIn (targetState: obj) (p: string) : string option =
+        let entry = emitJsExpr (targetState, p) "$0.get($1)"
+
+        if isNull entry || unbox<string> (entry?kind) <> "Present" then
+            None
+        else
+            Some(unbox<string> (entry?contentHash))
+
+    /// A read observation keeps its path but adopts the maintained content hash.
+    let private rehashReadObservation (targetState: obj) (obs: Observation) : Observation option =
+        match obs with
+        | Observation.FileRead(p, _) -> presentHashIn targetState p |> Option.map (fun h -> Observation.FileRead(p, h))
+        | other -> Some other
+
+    let private storedStateRef (case: Case) (diffSummary: string) : string =
+        if String.IsNullOrWhiteSpace diffSummary then
+            case.MaintenanceFileState
+        else
+            sprintf "state-%s" (CasebookCapture.contentHash diffSummary)
+
+    /// Run the Bookkeeper transaction with the real diff and publish the result.
+    let private applyRefresh
+        (store: IEventStore)
+        (sessionId: string)
+        (paths: string list)
+        (targetState: obj)
+        (diffSummary: string)
+        (case: Case)
+        : Task<Result<bool, string>> =
+        taskResult {
+            let! (q', a') =
+                BookkeeperRuntime.runTransaction
+                    BookkeeperRequest.CaseRefresh
+                    (SessionId.create sessionId)
+                    case.Q
+                    case.A
+                    case.Observations
+                    (Some diffSummary)
+
+            let updatedObservations =
+                case.Observations |> List.choose (rehashReadObservation targetState)
+
+            do!
+                CasebookWorkflow.refreshCase
+                    store
+                    case.Identity
+                    q'
+                    a'
+                    (storedStateRef case diffSummary)
+                    paths
+                    updatedObservations
+
+            CasebookIndex.invalidate ()
+            let! _ = CasebookIndex.refresh store 256 |> TaskResultCE.ofTask
+            return true
+        }
+
     let private refreshPresentCase
         (store: IEventStore)
         (root: string)
@@ -30,33 +87,19 @@ module CasebookBookkeeper =
         : Task<Result<bool, string>> =
         taskResult {
             let paths = extractPaths case
+
+            let baseline =
+                CasebookCapture.baselineFromObservations case.Observations case.RelatedPaths
+
+            let! diffObj = CasebookCapture.computeMaintenanceDiff root baseline |> TaskResultCE.ofTask
             let! targetState = CasebookCapture.freezeCompletionState root paths |> TaskResultCE.ofTask
-            let! diffObj = CasebookCapture.computeMaintenanceDiff root targetState |> TaskResultCE.ofTask
             let hasDiff = unbox<bool> (diffObj?hasDiff)
             let diffSummary = unbox<string> (diffObj?diffSummary)
 
-            if not hasDiff then
-                return false
+            if hasDiff then
+                return! applyRefresh store sessionId paths targetState diffSummary case
             else
-                let! (q', a') =
-                    BookkeeperRuntime.runTransaction
-                        BookkeeperRequest.CaseRefresh
-                        (SessionId.create sessionId)
-                        case.Q
-                        case.A
-                        case.Observations
-                        (Some diffSummary)
-
-                let newStateRef =
-                    if String.IsNullOrWhiteSpace diffSummary then
-                        case.MaintenanceFileState
-                    else
-                        sprintf "state-%s" (CasebookCapture.contentHash diffSummary)
-
-                do! CasebookWorkflow.refreshCase store case.Identity q' a' newStateRef paths case.Observations
-                CasebookIndex.invalidate ()
-                let! _ = CasebookIndex.refresh store 256 |> TaskResultCE.ofTask
-                return true
+                return false
         }
 
     let private refreshIfCasePresent
@@ -73,6 +116,4 @@ module CasebookBookkeeper =
         }
 
     let refreshStale (store: IEventStore) (root: string) (sessionId: string) : Task<Result<bool, string>> =
-        taskResult {
-            return! refreshIfCasePresent store root sessionId
-        }
+        taskResult { return! refreshIfCasePresent store root sessionId }

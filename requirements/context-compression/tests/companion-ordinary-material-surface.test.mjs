@@ -41,7 +41,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] explicit-resume nudge path with marked suppr
     const sessionID = 'ses_explicit_resume_nudge_suppression'
     const continueID = 'msg-continue-nudge-1'
 
-    await acceptAuthorityRoot(runtime, sessionID, 'coder')
+    await acceptAuthorityRoot(runtime, sessionID, 'engineer')
 
     const commandOutput = { parts: [] }
     await hooks['command.execute.before'](

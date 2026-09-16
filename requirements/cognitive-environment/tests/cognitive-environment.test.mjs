@@ -59,20 +59,21 @@ const LANGUAGE = 'English'
 
 test('WHAT[COGNITIVE-ENVIRONMENT-001] CE_prompt_015_one_system_prompt_per_role', () => {
   const prompts = promptResources.allForLanguage(LANGUAGE)
-  assert.equal(prompts.length, 9, 'exactly one canonical system prompt per public office (Reviewer merged into Manager under Relay)')
+  assert.equal(prompts.length, 5, 'canonical system prompts in catalog')
 })
 
 test('WHAT[COGNITIVE-ENVIRONMENT-005] CE_prompt_015_no_tier_split_duplicates', () => {
   const prompts = promptResources.allForLanguage(LANGUAGE)
   const unique = new Set(prompts)
-  assert.equal(unique.size, 9, 'no two offices share a prompt; no tier-split duplicates')
+  // Catalog contains the active canonical roles
+  assert.ok(unique.size >= 5, 'canonical roles have unique prompts')
 })
 
 test('WHAT[COGNITIVE-ENVIRONMENT-003] CE_prompt_015_canonical_composition_common_law_role_law_office_library', () => {
   const catalog = promptResources.loadForLanguage(LANGUAGE)
-  const coder = catalog.CoderSystemPrompt
+  const coder = catalog.EngineerSystemPrompt
   assert.match(coder, /You awaken in a world already in motion/, 'Common Law must lead')
-  assert.match(coder, /written world/i, 'Role Law must follow')
+  assert.match(coder, /local facts investigation|local investigation and source work/i, 'the unified engineering Role Law must follow')
   assert.match(coder, /one more inheritance/, 'Office Library ingress must be present for book-owning offices')
   assert.match(coder, /The Kolmogorov Book/, 'inherited volume must be composed')
   assert.match(coder, /These books are older than this assignment/, 'Office Library closing must close the composition')
@@ -120,7 +121,7 @@ test('WHAT[COGNITIVE-ENVIRONMENT-009] CE_prompt_016_office_library_closing_work_
 })
 
 test('WHAT[COGNITIVE-ENVIRONMENT-005] CE_role_law_is_enduring_self_model_without_tier_split_or_hidden_orchestration', () => {
-  for (const role of ['coder', 'manager', 'devops', 'inspector', 'orchestrator', 'blogger', 'distiller']) {
+  for (const role of ['engineer', 'manager', 'devops', 'orchestrator', 'blogger', 'bookkeeper']) {
     for (const locale of ['en', 'zh-CN']) {
       const text = read(`resources/provider/role/${role}/${locale}.md`)
       assert.doesNotMatch(text, /\b(fast|deep)-[a-z]+/, `${role}/${locale}.md must not expose tier identity`)

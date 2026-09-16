@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import * as jsSurface from '../../../dist/Repository/Programming/Js/Surface.js'
+import * as jsSurface from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
 
 test('WHAT[REPOSITORY-PROGRAMMING-026] T18_transaction_read_snapshots_and_substantive_access_are_strictly_separated', async () => {
   // Proves that files read during grep scanning enter ReadSnapshots for CAS conflict checking,

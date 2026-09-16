@@ -19,10 +19,9 @@ module SyncDelegateSurface =
     /// the complete physical reconciliation transaction and its result.
     val concurrentAttachedGetOrCreateScenario: unit -> Task<obj>
 
-    /// Execute the real InspectorTool specification against the opaque scope and
-    /// SyncDelegate runtime. Tool arguments/context are translated here so the
-    /// semantic caller never imports ToolHostCodec or InspectorTool internals.
-    val executeInspector: value: obj -> toolModule: obj -> owner: string -> charge: string -> Task<string>
+    /// Run one internal Engineer research charge through the SyncDelegate
+    /// runtime; the charge stays data and never becomes a tool-module surface.
+    val executeEngineerCharge: value: obj -> owner: string -> charge: string -> Task<string>
 
     /// Invoke one ordinary managed delegation. The returned promise remains
     /// pending until `settle` receives a reconciled provider turn.
@@ -53,7 +52,7 @@ module SyncDelegateSurface =
             Task<bool>
 
     val child: value: obj -> owner: string -> role: string -> obj
-    val stageDeletedInspector: value: obj -> owner: string -> bool
+    val stageDeletedDelegate: value: obj -> owner: string -> bool
     val scopeCloseChild: value: obj -> owner: string -> role: string -> obj
     val cancelSession: value: obj -> session: string -> unit
     val vocabulary: roleName: string -> tierName: string -> scope: string -> obj

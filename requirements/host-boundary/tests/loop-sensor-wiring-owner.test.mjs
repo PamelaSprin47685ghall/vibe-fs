@@ -10,7 +10,7 @@ test('WHAT[HOST-BOUNDARY-013] bootstrap interrupts owned physical children but e
     await acceptAuthorityRoot(runtime, root, 'manager')
     await grantWorkOwned(runtime, root)
     const result = await hooks.tool.fork.execute(
-      { calling: 'coder', name: 'Ada', charge: 'inspect the repository' },
+      { calling: 'engineer', name: 'Ada', charge: 'inspect the repository' },
       { sessionID: root, agent: 'manager' },
     )
     assert.equal(createdIds.length, 1, result)

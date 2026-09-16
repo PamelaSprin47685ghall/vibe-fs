@@ -62,6 +62,6 @@ module HostSignalBootstrap =
         tryConsumeHostInternalPrompt: (SessionId -> string option -> string option -> bool) ->
         observeHostInternalTerminal: (ExactProviderTerminalObservation -> unit) ->
         workspaceDirectory: string option ->
-        tryFinalizeInspector: (string -> string -> Task<InspectorFinalizeSettlement>) option ->
-        cleanupInspector: (string -> unit) option ->
+        tryFinalizeDraft: (string -> string -> Task<CaseFinalizeSettlement>) option ->
+        cleanupDraft: (string -> unit) option ->
             Task<WiredSignals>

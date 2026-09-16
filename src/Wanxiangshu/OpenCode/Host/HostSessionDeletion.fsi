@@ -11,10 +11,10 @@ module HostSessionDeletion =
     type SessionDeletionPreparation =
         private | SessionDeletionPreparation of
             parent: SessionId option *
-            inspectorStaged: bool *
-            inspectorToFinalize: SessionId option
+            delegateStaged: bool *
+            delegateToFinalize: SessionId option
 
-    /// Capture parent topology and retire the live Inspector binding synchronously
+    /// Capture parent topology and retire the live Delegate binding synchronously
     /// at Host event admission. Child and owner cleanup may await independently,
     /// but their semantic order is now fixed by the public event stream.
     val prepare:
@@ -23,16 +23,16 @@ module HostSessionDeletion =
         parentSessionIdOpt: SessionId option ->
             SessionDeletionPreparation
 
-    val finalizePreparedInspector:
+    val finalizePreparedDelegate:
         scope: PluginRuntimeScope ->
         workspaceDirectory: string option ->
-        finalizeInspector: (string -> string -> Task<InspectorFinalizeSettlement>) ->
+        finalizeDelegate: (string -> string -> Task<CaseFinalizeSettlement>) ->
         preparation: SessionDeletionPreparation ->
             Task
 
     val handle:
         scope: PluginRuntimeScope ->
-        cleanupInspectorDraft: (string -> unit) ->
+        cleanupDelegateDraft: (string -> unit) ->
         signalReconciler: (HostSignal -> unit) ->
         sessionId: SessionId ->
         onSessionDeleted: (SessionId -> unit) option ->

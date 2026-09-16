@@ -328,15 +328,24 @@ export function parsePackResult(jsonOutput, expectedName = 'wanxiangshu') {
     )
   }
 
-  if (!Array.isArray(parsed) || parsed.length !== 1) {
+  // npm <=11 prints an array of entries; npm >=12 prints an object keyed by
+  // package name. Both shapes must yield exactly one pack result.
+  const entries =
+    Array.isArray(parsed)
+      ? parsed
+      : parsed !== null && typeof parsed === 'object'
+        ? Object.values(parsed)
+        : null
+
+  if (entries === null || entries.length !== 1) {
     throw createVerificationError(
       'pack-result-count',
       'npm pack',
-      `Expected exactly 1 pack result entry, got ${Array.isArray(parsed) ? parsed.length : typeof parsed}`,
+      `Expected exactly 1 pack result entry, got ${entries === null ? typeof parsed : entries.length}`,
     )
   }
 
-  const entry = parsed[0]
+  const entry = entries[0]
   if (!entry || typeof entry !== 'object') {
     throw createVerificationError(
       'pack-result-invalid',

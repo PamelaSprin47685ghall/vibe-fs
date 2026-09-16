@@ -1,2 +1,3 @@
-resume 继续当前 mission 中已经认识的人，从不叫起新人。
-传 calling 是 fork 的决定。只用 resume 加同一个 name，或用 fork 创建新人。
+resume 从不叫起新人，且不重新选择角色。要创建新人，请用 fork。
+只传已有 name 和新 charge，不传 calling。
+不要 fork 替代 DevOps，继续使用固定绑定。

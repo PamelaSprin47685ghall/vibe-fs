@@ -209,8 +209,8 @@ test('WHAT[PAR-011] freeze under the wrong session key is an identity mismatch',
   const scope = RecoveryScope.createRecoveryScope()
   const plan = buildPlan({})
   assert.equal(plan.view.session, 'ses-1')
-  assert.equal(plan.view.agent, 'coder')
-  assert.equal(plan.view.role, 'coder')
+  assert.equal(plan.view.agent, 'engineer')
+  assert.equal(plan.view.role, 'engineer')
 
   const mismatch = RecoveryScope.freezeAttemptPlan(scope, 'ses-other', 'phys-1', plan.handle)
   assert.equal(mismatch.outcome, 'IdentityMismatch')
@@ -287,8 +287,8 @@ test('WHAT[PAR-011] same run and root with a different participant conflicts', (
     root: 'root-same',
     physical: 'phys-who',
   })
-  assert.equal(coderPlan.view.agent, 'coder')
-  assert.equal(coderPlan.view.role, 'coder')
+  assert.equal(coderPlan.view.agent, 'engineer')
+  assert.equal(coderPlan.view.role, 'engineer')
   assert.equal(RecoveryScope.freezeAttemptPlan(scope, 'ses-who', 'phys-who', coderPlan.handle).outcome, 'Admitted')
 
   const inspectorPlan = buildPlan({
@@ -296,18 +296,18 @@ test('WHAT[PAR-011] same run and root with a different participant conflicts', (
     logicalRun: 'run-same',
     root: 'root-same',
     physical: 'phys-who',
-    agent: 'inspector',
+    agent: 'devops',
   })
   assert.equal(inspectorPlan.ok, true)
-  assert.equal(inspectorPlan.view.agent, 'inspector')
-  assert.equal(inspectorPlan.view.role, 'inspector')
+  assert.equal(inspectorPlan.view.agent, 'devops')
+  assert.equal(inspectorPlan.view.role, 'devops')
   assert.equal(inspectorPlan.view.logicalRunId, 'run-same')
   assert.equal(inspectorPlan.view.root, 'root-same')
 
   const conflict = RecoveryScope.freezeAttemptPlan(scope, 'ses-who', 'phys-who', inspectorPlan.handle)
   assert.equal(conflict.outcome, 'PlanConflict')
-  assert.equal(conflict.existing.agent, 'coder')
-  assert.equal(conflict.attempted.agent, 'inspector')
+  assert.equal(conflict.existing.agent, 'engineer')
+  assert.equal(conflict.attempted.agent, 'devops')
   assert.equal(conflict.existing.logicalRunId, 'run-same')
   assert.equal(conflict.attempted.logicalRunId, 'run-same')
 
@@ -318,7 +318,7 @@ test('WHAT[PAR-011] same run and root with a different participant conflicts', (
 
   const bound = RecoveryScope.bindAttempt(scope, 'ses-who', 'phys-who', 'run-who')
   assert.equal(bound.bound, true)
-  assert.equal(bound.view.agent, 'coder')
+  assert.equal(bound.view.agent, 'engineer')
 })
 
 test('WHAT[PAR-011] same run and root with a different role conflicts', () => {
@@ -341,7 +341,7 @@ test('WHAT[PAR-011] same run and root with a different role conflicts', () => {
   assert.equal(devopsPlan.view.role, 'devops')
   const conflict = RecoveryScope.freezeAttemptPlan(scope, 'ses-role', 'phys-role', devopsPlan.handle)
   assert.equal(conflict.outcome, 'PlanConflict')
-  assert.equal(conflict.existing.role, 'coder')
+  assert.equal(conflict.existing.role, 'engineer')
   assert.equal(conflict.attempted.role, 'devops')
 })
 

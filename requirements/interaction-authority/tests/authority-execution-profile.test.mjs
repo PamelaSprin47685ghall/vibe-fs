@@ -12,20 +12,20 @@ const rootSelection = (participantIdentity) => ({
   participantIdentity,
 })
 
-const coderIdentity = {
-  participant: 'coder',
-  role: 'coder',
+const engineerIdentity = {
+  participant: 'engineer',
+  role: 'engineer',
   selectedTier: 'deep',
-  persona: 'Coder',
+  persona: 'Engineer',
   personaCatalogVersion: 1,
   origin: 'ResolvedAtRoot',
 }
 
 // Fixed authority view: selectedTier is input-only compat and never re-emitted.
-const coderIdentityView = {
-  participant: 'coder',
-  role: 'coder',
-  persona: 'Coder',
+const engineerIdentityView = {
+  participant: 'engineer',
+  role: 'engineer',
+  persona: 'Engineer',
   personaCatalogVersion: 1,
   origin: 'ResolvedAtRoot',
 }
@@ -37,7 +37,7 @@ const createRoot = () => {
     'ses-profile',
     'HumanRoot',
     'msg-profile',
-    rootSelection(coderIdentity),
+    rootSelection(engineerIdentity),
   )
   assert.equal(result.ok, true, result.error)
   return result.value
@@ -63,9 +63,9 @@ test('WHAT[INTERACTION-AUTHORITY-003] valid authority profiles carry one atomic 
     },
   )
   assert.equal(profile.identitySeed.kind, 'RootSelection')
-  assert.deepEqual(profile.identitySeed.participantIdentity, coderIdentityView)
+  assert.deepEqual(profile.identitySeed.participantIdentity, engineerIdentityView)
   assert.deepEqual(profile.participantIdentity, identityOf(profile))
-  assert.deepEqual(profile.participantIdentity, coderIdentityView)
+  assert.deepEqual(profile.participantIdentity, engineerIdentityView)
   for (const field of Object.keys(profile.participantIdentity)) {
     assert.equal(Object.hasOwn(profile, field), false, `${field} was duplicated outside participantIdentity`)
   }

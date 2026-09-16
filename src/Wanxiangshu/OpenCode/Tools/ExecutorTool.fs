@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open System.Text
 open System.Threading
 open System.Threading.Tasks
 open ToolHostCodec
@@ -61,7 +62,10 @@ module ExecutorTool =
             let CannotRunFromContext = "tool/run/cannot-run-from-context"
 
             [<Literal>]
-            let CannotCondenseUntilAuthority = "tool/run/cannot-condense-until-authority"
+            let CannotReadOutputUntilAuthority = "tool/run/cannot-read-output-until-authority"
+
+            [<Literal>]
+            let OutputTruncated = "tool/run/output-truncated"
 
             [<Literal>]
             let LargeOutputRecoveryBlocked = "tool/run/large-output-recovery-blocked"
@@ -209,22 +213,76 @@ module ExecutorTool =
 
     let private completedToml (exitCode: int) (stdout: string) (stderr: string) =
         let fields =
-            [ yield "exit_code", TInt exitCode
-              if not (String.IsNullOrWhiteSpace stdout) then
-                  yield "stdout", TString stdout
-              if not (String.IsNullOrWhiteSpace stderr) then
-                  yield "stderr", TString stderr ]
+            [ "exit_code", TInt exitCode
+              "stdout", TString(if isNull stdout then "" else stdout)
+              "stderr", TString(if isNull stderr then "" else stderr) ]
 
         tomlObject fields
 
-    let internal spooledInstructions (summary: string) =
-        if System.String.IsNullOrWhiteSpace summary then
-            []
-        else
-            [ summary ]
+    let internal formatSpooledOutcome (exitCode: int) (output: string) =
+        tomlObject [ "exit_code", TInt exitCode; "output", TString output ]
 
-    let internal formatSpooledOutcome (exitCode: int) (summary: string) =
-        ToolHostCodec.tomlObjectWithInstructions (spooledInstructions summary) [ "exit_code", TInt exitCode ]
+    let private formatTruncatedOutcome language limitBytes exitCode output =
+        let notice =
+            ProviderProse.render language Path.Run.OutputTruncated (Map [ "budget_bytes", string limitBytes ])
+
+        ToolHostCodec.tomlObjectWithInstructions
+            [ notice ]
+            [ "exit_code", TInt exitCode
+              "output", TString output
+              "output_truncated", TBool true ]
+
+    let private formatTailOutcome language limitBytes exitCode truncated output =
+        match truncated with
+        | true -> formatTruncatedOutcome language limitBytes exitCode output
+        | false -> formatSpooledOutcome exitCode output
+
+    let private readSpooledTail (language: ProviderLanguage) (budgetBytes: int64) (exitCode: int) (spoolPath: string) =
+        task {
+            let limitBytes = int (min (int64 Int32.MaxValue) budgetBytes)
+            let! tail = Spool.readLatestTail limitBytes spoolPath
+            let rawTail = Encoding.UTF8.GetString tail.Bytes
+            return formatTailOutcome language limitBytes exitCode tail.Truncated rawTail
+        }
+
+    let private finalizeSpooledWithAuthority
+        (scope: ToolRuntimeScope)
+        (language: ProviderLanguage)
+        (root: SessionId)
+        (budgetBytes: int64)
+        (exitCode: int)
+        (spoolPath: string)
+        =
+        task {
+            let! recovery = scope.RequireCurrentProcessJoin root
+
+            match recovery with
+            | FamilyRecovery.FamilyBlocked _ -> return consequence (prose language Path.Run.LargeOutputRecoveryBlocked)
+            | FamilyRecovery.FamilyWaiting _
+            | FamilyRecovery.FamilyReady _ -> return! readSpooledTail language budgetBytes exitCode spoolPath
+        }
+
+    let private finalizeSpooledBody
+        (scope: ToolRuntimeScope)
+        (language: ProviderLanguage)
+        (context: HostToolContext)
+        (budgetBytes: int64)
+        (exitCode: int)
+        (spoolPath: string)
+        =
+        task {
+            if String.IsNullOrWhiteSpace context.SessionId then
+                return consequence (prose language Path.Run.CannotReadOutputUntilAuthority)
+            else
+                return!
+                    finalizeSpooledWithAuthority
+                        scope
+                        language
+                        (SessionId.create context.SessionId)
+                        budgetBytes
+                        exitCode
+                        spoolPath
+        }
 
     let private finalizeSpooled
         (scope: ToolRuntimeScope)
@@ -236,31 +294,36 @@ module ExecutorTool =
         =
         task {
             try
-                if String.IsNullOrWhiteSpace context.SessionId then
-                    return consequence (prose language Path.Run.CannotCondenseUntilAuthority)
-                else
-                    let root = SessionId.create context.SessionId
-                    let! recovery = scope.RequireCurrentProcessJoin root
-
-                    match recovery with
-                    | FamilyRecovery.FamilyBlocked _ ->
-                        return consequence (prose language Path.Run.LargeOutputRecoveryBlocked)
-                    | FamilyRecovery.FamilyWaiting _
-                    | FamilyRecovery.FamilyReady _ ->
-                        let limitBytes = int (min (int64 Int32.MaxValue) budgetBytes)
-                        let! tail = Spool.readLatestTail limitBytes spoolPath
-                        let rawTail = Encoding.UTF8.GetString tail.Bytes
-
-                        let summary =
-                            if tail.Truncated then
-                                ProviderProse.render language Distillation.Path.InputTruncated (Map [ "account", rawTail ])
-                            else
-                                rawTail
-
-                        return formatSpooledOutcome exitCode summary
+                return! finalizeSpooledBody scope language context budgetBytes exitCode spoolPath
             finally
                 Spool.delete spoolPath
         }
+
+    let private truncateCompleted
+        (language: ProviderLanguage)
+        (budgetBytes: int64)
+        (exitCode: int)
+        (fullBytes: byte array)
+        =
+        let limitBytes = int (min (int64 Int32.MaxValue) budgetBytes)
+        let tail = Spool.retainLatestBytes limitBytes [||] fullBytes |> Spool.alignUtf8Tail
+        let rawTail = Encoding.UTF8.GetString tail
+        formatTruncatedOutcome language limitBytes exitCode rawTail
+
+    let private completedOutcome
+        (language: ProviderLanguage)
+        (budgetBytes: int64)
+        (exitCode: int)
+        (stdout: string)
+        (stderr: string)
+        =
+        let fullBytes =
+            Encoding.UTF8.GetBytes(stdout + (if String.IsNullOrEmpty stderr then "" else "\n" + stderr))
+
+        if int64 fullBytes.Length > budgetBytes then
+            truncateCompleted language budgetBytes exitCode fullBytes
+        else
+            completedToml exitCode stdout stderr
 
     let private interpretOutcome
         (scope: ToolRuntimeScope)
@@ -272,7 +335,7 @@ module ExecutorTool =
         match result with
         | Error processError -> task { return processConsequence language processError }
         | Ok(ProcessOutcome.Completed(exitCode, stdout, stderr, _)) ->
-            task { return completedToml exitCode stdout stderr }
+            task { return completedOutcome language request.OutputBudgetBytes exitCode stdout stderr }
         | Ok(ProcessOutcome.Spooled(exitCode, spoolPath, _totalBytes, _chunkCount)) ->
             finalizeSpooled scope language context request.OutputBudgetBytes exitCode spoolPath
 

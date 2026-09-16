@@ -26,7 +26,8 @@ module CasebookSurface =
 
     val refresh: store: obj -> sessionId: string -> q: string -> a: string -> observations: obj array -> Task<obj>
 
-    val refreshWithDiff: store: obj -> identity: string -> diff: string -> newStateRef: string -> updates: obj -> Task<obj>
+    val refreshWithDiff:
+        store: obj -> identity: string -> diff: string -> newStateRef: string -> updates: obj -> Task<obj>
 
     val needsRefresh: store: obj -> capacity: int -> sessionId: string -> root: string -> Task<obj>
 

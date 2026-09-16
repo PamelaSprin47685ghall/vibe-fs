@@ -197,7 +197,7 @@ const assertOwner = (owner, evidence) => {
 export const defaultFamily = Object.freeze({
   name: 'manager-coder-single',
   parentAgent: 'manager',
-  childAgent: 'coder',
+  childAgent: 'engineer',
   capacity: 2,
   replay: false,
   duplicateDelivery: false,

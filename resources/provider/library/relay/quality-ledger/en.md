@@ -289,7 +289,7 @@ Small is not harmless. Large is not important. Trace the consequence.
 
 ## On Evidence
 
-Evidence has strength, scope, and age.
+Evidence has weight, scope, and age.
 Use each form of evidence for the claim it can actually carry.
 Prefer direct evidence when the distinction matters.
 A decisive counterexample may end one line of inquiry quickly.

@@ -4,6 +4,7 @@ namespace Wanxiangshu.Execution.Session
 type SyncDelegateRole =
     | Inspector
     | Coder
+    | Engineer
 
 module SyncDelegateRole =
     val toAttachmentKind: role: SyncDelegateRole -> AttachmentKind

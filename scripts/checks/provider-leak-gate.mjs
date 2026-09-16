@@ -24,8 +24,6 @@ export const PROVIDER_SCAN_ROOTS = Object.freeze([
   'src/Wanxiangshu/OpenCode/Tools/PtyTool.fs',
   'src/Wanxiangshu/OpenCode/Tools/ExecutorTool.fs',
   'src/Wanxiangshu/Mission/Relay/OpenCode/ReviewTool.fs',
-  'src/Wanxiangshu/OpenCode/Tools/CoderTool.fs',
-  'src/Wanxiangshu/OpenCode/Tools/InspectorTool.fs',
   'src/Wanxiangshu/Repository/Programming/Js/OpenCode/BookkeeperTool.fs',
   'src/Wanxiangshu/OpenCode/Tools/FetchTool.fs',
   'src/Wanxiangshu/Mission/Relay/OpenCode/SuicideTool.fs',

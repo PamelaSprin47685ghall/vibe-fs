@@ -18,16 +18,7 @@ type Role =
 module Roles =
 
     let all: Role list =
-        [ Role.Manager
-          Role.Engineer
-          Role.Coder
-          Role.Inspector
-          Role.DevOps
-          Role.Browser
-          Role.Inquiry
-          Role.Orchestrator
-          Role.Distiller
-          Role.Blogger ]
+        [ Role.Orchestrator; Role.Manager; Role.Engineer; Role.DevOps; Role.Blogger ]
 
     /// Canonical wire label for a role (lowercase, AGENT-001 vocabulary).
     let roleLabel (role: Role) : string =
@@ -35,26 +26,26 @@ module Roles =
         | Role.Manager -> "manager"
         | Role.Orchestrator -> "orchestrator"
         | Role.Engineer -> "engineer"
+        | Role.DevOps -> "devops"
+        | Role.Blogger -> "blogger"
         | Role.Coder -> "coder"
         | Role.Inspector -> "inspector"
-        | Role.DevOps -> "devops"
         | Role.Browser -> "browser"
         | Role.Inquiry -> "inquiry"
         | Role.Distiller -> "distiller"
-        | Role.Blogger -> "blogger"
 
     let tryParseRole (value: string) : Role option =
         match value.ToLowerInvariant() with
         | "manager" -> Some Role.Manager
         | "orchestrator" -> Some Role.Orchestrator
         | "engineer" -> Some Role.Engineer
+        | "devops" -> Some Role.DevOps
+        | "blogger" -> Some Role.Blogger
         | "coder" -> Some Role.Coder
         | "inspector" -> Some Role.Inspector
-        | "devops" -> Some Role.DevOps
         | "browser" -> Some Role.Browser
         | "inquiry" -> Some Role.Inquiry
         | "distiller" -> Some Role.Distiller
-        | "blogger" -> Some Role.Blogger
         | _ -> None
 
     /// AGENT-008 / ENF-006: Distiller and Blogger are private runtimes, not

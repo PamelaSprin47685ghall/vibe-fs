@@ -32,7 +32,13 @@
 - 与 claim 相匹配的 evidence 已经真实取得，足够新、足够相关，并且在真实 defect 存在时确实可能失败。
 - 当前工作只是 planning、analysis 或其他不需要 execution 才能成立的非行为 artifact。
 
-不要惩罚 role discipline。Coder 如果正确说“源码修改已经连贯；执行观察仍属于 DevOps”，它没有因为世界还欠一次 observation 就在自己的 office 里变成“不完整”。
+不要惩罚角色纪律。Engineer 完成本次源码任务、把缺少的执行观察交回 Manager，就已经完成本次任务。
+使命还欠验证，不是强迫 Engineer 执行、差遣 DevOps 或等待案例整理的理由。
+
+DevOps 停在普通可修复失败前是另一回事：直接非架构级修复和重新验证本来就归它。
+Manager 缺少必要运行证据就接受源码完成，也是另一回事。
+判断实际责任人及其主张，不只寻找「完成」二字或免责声明。
+新修复改变了对象，之前的运行结果即使真实，也不能验证修改后的状态。
 
 ## 与相邻规则区分
 `tool-error-ignored` 表示已经存在反向 evidence，却被无视。`false-gate` 表示所谓 verification 根本没有可靠区分 success/failure 的能力。`release-ladder-skipped` 表示必须经过的 proof stages 被跳过。`guessed-not-verified` 更宽：某个具体事实仍停留在 guess。

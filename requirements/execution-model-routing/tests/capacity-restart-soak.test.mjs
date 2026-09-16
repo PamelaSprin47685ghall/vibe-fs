@@ -40,7 +40,7 @@ assert.deepEqual(afterReload, initial, 'plugin reload preserves the process sing
 const exact = {
   sessionId: 'restart-session-' + cycle,
   physicalUserMessageId: 'restart-physical-' + cycle,
-  role: 'coder',
+  role: 'engineer',
   participant: 'restart-owner',
 }
 const first = await routing.acquireSharedExecutionAdmission(

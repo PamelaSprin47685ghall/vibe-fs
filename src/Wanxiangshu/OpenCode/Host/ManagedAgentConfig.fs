@@ -112,27 +112,29 @@ module ManagedAgentConfig =
         else
             entry?options?temperature <- 1.0
 
-    let private ownedConfigForRole (role: Role) : obj =
+    /// Only active roles receive a Host agent entry; retired identities are
+    /// never projected into a live provider configuration.
+    let private ownedConfigForRole (role: Role) : obj option =
         let prompts = RuntimeResources.current().Prompts
 
         match role with
-        | Role.Manager -> StaticTools.managerAgentConfig (Some prompts.ManagerSystemPrompt)
-        | Role.Orchestrator -> StaticTools.orchestratorAgentConfig (Some prompts.OrchestratorSystemPrompt)
-        | Role.Engineer -> StaticTools.engineerAgentConfig (Some prompts.EngineerSystemPrompt)
-        | Role.Coder -> StaticTools.coderAgentConfig (Some prompts.CoderSystemPrompt)
-        | Role.Inspector -> StaticTools.inspectorAgentConfig (Some prompts.InspectorSystemPrompt)
-        | Role.DevOps -> StaticTools.devopsAgentConfig (Some prompts.DevopsSystemPrompt)
-        | Role.Browser -> StaticTools.browserAgentConfig (Some prompts.BrowserSystemPrompt)
-        | Role.Inquiry -> StaticTools.inquiryAgentConfig (Some prompts.InquirySystemPrompt)
-        | Role.Blogger -> StaticTools.bloggerAgentConfig prompts.BloggerSystemPrompt
-        | Role.Distiller -> StaticTools.distillerAgentConfig prompts.DistillerSystemPrompt
+        | Role.Manager -> Some(StaticTools.managerAgentConfig (Some prompts.ManagerSystemPrompt))
+        | Role.Orchestrator -> Some(StaticTools.orchestratorAgentConfig (Some prompts.OrchestratorSystemPrompt))
+        | Role.Engineer -> Some(StaticTools.engineerAgentConfig (Some prompts.EngineerSystemPrompt))
+        | Role.DevOps -> Some(StaticTools.devopsAgentConfig (Some prompts.DevopsSystemPrompt))
+        | Role.Blogger -> Some(StaticTools.bloggerAgentConfig prompts.BloggerSystemPrompt)
+        | Role.Coder
+        | Role.Inspector
+        | Role.Browser
+        | Role.Inquiry
+        | Role.Distiller -> None
 
     let private dynamicConfigForName (inventory: ManagedAgentInventory) (name: string) : obj option =
         match Map.tryFind name inventory.Bindings with
-        | Some binding -> Some(ownedConfigForRole binding.Agent.Role)
+        | Some binding -> ownedConfigForRole binding.Agent.Role
         | None ->
             ManagedAgent.tryParse name
-            |> Option.map (fun managed -> ownedConfigForRole managed.Role)
+            |> Option.bind (fun managed -> ownedConfigForRole managed.Role)
 
     let private ownedConfigForName (inventory: ManagedAgentInventory) (name: string) : obj option =
         if ManagedAgentCatalog.isBookkeeperName name then
@@ -187,7 +189,6 @@ module ManagedAgentConfig =
     /// AGENT-007's first layer is fail-closed: a validation failure elsewhere in the
     /// config must not silently drop every permission write.
     let applyOwnedFields (config: obj) (inventory: ManagedAgentInventory) : unit =
-        StealthBrowserMcpConfig.apply config (StealthBrowserMcpConfig.launchFromEnvironment ())
         SphinxMcpConfig.apply config (SphinxMcpConfig.launchFromEnvironment ())
 
         if isNull config then

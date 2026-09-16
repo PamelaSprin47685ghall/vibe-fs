@@ -304,8 +304,8 @@ type internal SyncDelegateCallStore() as this =
     // DSL-MUTABLE: resource — at most one live call per dedicated delegate session
     let callsByDelegate = Dictionary<string, SyncDelegateCall>()
     /// DSL-cross-callback-proof: physical — retired child identity retained only for draft/session cleanup
-    // DSL-MUTABLE: resource — retired Inspector ids staged between child and owner SessionDeleted
-    let deletedInspectorsByOwnerScope = Dictionary<string, SessionId>()
+    // DSL-MUTABLE: resource — retired delegate ids staged between child and owner SessionDeleted
+    let deletedDelegatesByOwnerScope = Dictionary<string, SessionId>()
     /// DSL-cross-callback-proof: physical waiter — rendezvous buffer until the Host-declared ProviderRun call set is complete
     // DSL-MUTABLE: resource — incomplete semantic batches by (scope, role)
     let pendingBatches = Dictionary<string * SyncDelegateRole, PendingBatch>()
@@ -469,42 +469,42 @@ type internal SyncDelegateCallStore() as this =
 
                 Ok(call, registration))
 
-    member _.TryTakeDeletedInspector(scope: ReuseScopeId) : SessionId option =
+    member _.TryTakeDeletedDelegate(scope: ReuseScopeId) : SessionId option =
         lock gate (fun () ->
             let key = scopeKey scope
 
-            match deletedInspectorsByOwnerScope.TryGetValue key with
+            match deletedDelegatesByOwnerScope.TryGetValue key with
             | true, sessionId ->
-                deletedInspectorsByOwnerScope.Remove key |> ignore
+                deletedDelegatesByOwnerScope.Remove key |> ignore
                 Some sessionId
             | false, _ -> None)
 
-    member _.TryGetDeletedInspector(scope: ReuseScopeId) : SessionId option =
+    member _.TryGetDeletedDelegate(scope: ReuseScopeId) : SessionId option =
         lock gate (fun () ->
-            match deletedInspectorsByOwnerScope.TryGetValue(scopeKey scope) with
+            match deletedDelegatesByOwnerScope.TryGetValue(scopeKey scope) with
             | true, sessionId -> Some sessionId
             | false, _ -> None)
 
-    member _.PutDeletedInspector(scope: ReuseScopeId, inspectorSessionId: SessionId) : SessionId option =
+    member _.PutDeletedDelegate(scope: ReuseScopeId, delegateSessionId: SessionId) : SessionId option =
         lock gate (fun () ->
             let key = scopeKey scope
 
             let previous =
-                match deletedInspectorsByOwnerScope.TryGetValue key with
+                match deletedDelegatesByOwnerScope.TryGetValue key with
                 | true, sessionId -> Some sessionId
                 | false, _ -> None
 
-            deletedInspectorsByOwnerScope.[key] <- inspectorSessionId
+            deletedDelegatesByOwnerScope.[key] <- delegateSessionId
             previous)
 
-    member _.ClearDeletedInspector(scope: ReuseScopeId) : SessionId option =
+    member _.ClearDeletedDelegate(scope: ReuseScopeId) : SessionId option =
         lock gate (fun () ->
             let key = scopeKey scope
 
-            match deletedInspectorsByOwnerScope.TryGetValue key with
-            | true, inspectorId ->
-                deletedInspectorsByOwnerScope.Remove key |> ignore
-                Some inspectorId
+            match deletedDelegatesByOwnerScope.TryGetValue key with
+            | true, delegateId ->
+                deletedDelegatesByOwnerScope.Remove key |> ignore
+                Some delegateId
             | false, _ -> None)
 
     /// Dispose path: fail every live/pending invocation and clear all indexes.
@@ -521,12 +521,12 @@ type internal SyncDelegateCallStore() as this =
             for list in callsByOwnerScope.Values do
                 failCalls (fun call error -> this.FailCall(call, error)) (list |> Seq.toList) disposedError
 
-            let retiredInspectors = deletedInspectorsByOwnerScope.Values |> Seq.toList
+            let retiredDelegates = deletedDelegatesByOwnerScope.Values |> Seq.toList
 
             pendingBatches.Clear()
             activeBatches.Clear()
             observedProviderRuns.Clear()
             callsByOwnerScope.Clear()
             callsByDelegate.Clear()
-            deletedInspectorsByOwnerScope.Clear()
-            retiredInspectors)
+            deletedDelegatesByOwnerScope.Clear()
+            retiredDelegates)

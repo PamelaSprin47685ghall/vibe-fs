@@ -103,11 +103,8 @@ module StrengthSurface =
         | ToolPermission.Grep -> "Grep"
         | ToolPermission.Move -> "Move"
         | ToolPermission.Remove -> "Remove"
-        | ToolPermission.Inspect -> "Inspect"
-        | ToolPermission.Behavior -> "Behavior"
         | ToolPermission.Exec -> "Exec"
         | ToolPermission.Pty -> "Pty"
-        | ToolPermission.Network -> "Network"
         | ToolPermission.ReviewAssessment -> "ReviewAssessment"
         | ToolPermission.Chronicle -> "Chronicle"
         | ToolPermission.Fetch -> "Fetch"
@@ -530,14 +527,14 @@ module StrengthSurface =
             match role with
             | Role.Manager -> prompts.ManagerSystemPrompt
             | Role.Engineer -> prompts.EngineerSystemPrompt
-            | Role.Coder -> prompts.CoderSystemPrompt
             | Role.DevOps -> prompts.DevopsSystemPrompt
-            | Role.Inspector -> prompts.InspectorSystemPrompt
-            | Role.Browser -> prompts.BrowserSystemPrompt
-            | Role.Inquiry -> prompts.InquirySystemPrompt
             | Role.Orchestrator -> prompts.OrchestratorSystemPrompt
-            | Role.Distiller -> prompts.DistillerSystemPrompt
             | Role.Blogger -> prompts.BloggerSystemPrompt
+            | Role.Coder
+            | Role.Inspector
+            | Role.Browser
+            | Role.Inquiry
+            | Role.Distiller -> ""
 
     let clearsFailureCountOnSuccess (requestKind: string) =
         match requestKindResult (box requestKind) with

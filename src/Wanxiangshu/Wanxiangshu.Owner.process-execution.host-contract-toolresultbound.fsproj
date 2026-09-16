@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSemanticOwner>process-execution</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>host-contract-toolresultbound</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+    <WanxiangshuSubsystem>provider</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>host-contract-toolresultbound</WanxiangshuCompileShard>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
+    <Compile Include="Host/Contract/ToolResultBound.fsi"/>
+    <Compile Include="Host/Contract/ToolResultBound.fs"/>
+  </ItemGroup>
+</Project>

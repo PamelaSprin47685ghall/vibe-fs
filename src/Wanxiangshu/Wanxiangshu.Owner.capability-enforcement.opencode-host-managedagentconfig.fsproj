@@ -25,7 +25,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-runtimeresources.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.distribution.resources-enforcercatalogresource.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-agentjournal.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.external-investigation.opencode-host-stealthbrowsermcp.fsproj"/>
+    
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.sphinx-host-adapter.fsproj"/>
@@ -42,8 +42,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.relay-assessment.mission-relay-reviewtool.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-retirement.mission-relay-suicidetool.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.requirement-grounding.opencode-host-requirementgrounding-runtime.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.repository-investigation.opencode-tools-inspectortool.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.repository-programming.opencode-tools-codertool.fsproj"/>
+    
+    
     <ProjectReference Include="Wanxiangshu.Owner.interaction.opencode-tools-filemutationtools.fsproj"/>
 
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-toolbindings.fsproj"/>

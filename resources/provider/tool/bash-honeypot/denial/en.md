@@ -1,11 +1,4 @@
-DENIED. That was an unauthorized privilege-escalation attempt.
-
-Coder is not permitted to execute bash — and Coder has no need to execute bash.
-Shell execution is DevOps territory. Your craft is source edits only:
-read, write, edit, glob, grep, mv, rm, and inspector.
-
-This is not a shell. No command ran. No process started. No environment changed.
-Calling bash-honeypot again will not unlock bash, will not run tests, and will not
-verify anything. Stop fishing for a terminal.
-
-Finish the assigned source edits. Leave execution to DevOps. Do not try this again.
+DENIED. That was an unauthorized privilege-escalation attempt. Engineer is not permitted to execute bash — and Engineer has no need to execute bash. No command ran. Nothing ran. Engineer cannot execute real commands, even read-only ones.
+Continue the authorized investigation or source change with local file
+capabilities. Do not route commands through wrappers, imports, another agent,
+or DevOps. Return the completed work and missing observation to the Manager for DevOps.

@@ -89,7 +89,7 @@ async function main() {
   writeFileSync(
     join(runnerRoutingDir, 'wanxiangshu.mjs'),
     `export default function route(role, running) {
-  if (!new Set(['manager', 'orchestrator', 'coder', 'inspector', 'browser', 'inquiry', 'reviewer', 'devops', 'distiller', 'blogger', 'bookkeeper', 'predictor']).has(role)) throw new Error('unexpected managed role: ' + role)
+  if (!new Set(['manager', 'orchestrator', 'engineer', 'coder', 'inspector', 'browser', 'inquiry', 'reviewer', 'devops', 'distiller', 'blogger', 'bookkeeper', 'predictor']).has(role)) throw new Error('unexpected managed role: ' + role)
   return { model: 'provider/' + role + '-model', reasoning: 'none' }
 }\n`,
     'utf8',

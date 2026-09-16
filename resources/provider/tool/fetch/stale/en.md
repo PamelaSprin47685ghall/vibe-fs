@@ -1,1 +1,2 @@
-The Casebook could not reconcile the answer with the new evidence. Treat what follows as an older account.
+Maintenance could not establish an updated account from the supplied file diff.
+Treat the following answer as older knowledge, not current verified evidence.

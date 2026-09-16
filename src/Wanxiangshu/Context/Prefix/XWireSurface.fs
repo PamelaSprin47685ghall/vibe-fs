@@ -626,7 +626,7 @@ module XWireSurface =
 
                 if not (String.IsNullOrEmpty agent) then agent
                 elif not (String.IsNullOrEmpty role) then role
-                else ManagedAgentCatalog.nameOf Role.Coder
+                else ManagedAgentCatalog.nameOf Role.Engineer
 
             let authorityResult =
                 ParticipantIdentity.resolveAtRoot canonicalName

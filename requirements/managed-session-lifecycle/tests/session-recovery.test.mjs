@@ -28,16 +28,16 @@ test('WHAT[MANAGED-SESSION-013] session_recovery_contract_reenlist_filters_hidde
   const parent = 'ses_parent'
   
   // Link durable public child
-  const r1 = HandleSurface.apply(state, { op: 'link', handle: 'agent:coder', child: 'ses_child_1', agent: 'coder', role: 'Coder', ownership: 'DurableParentHandle' })
+  const r1 = HandleSurface.apply(state, { op: 'link', handle: 'agent:engineer', child: 'ses_child_1', agent: 'engineer', role: 'Engineer', ownership: 'DurableParentHandle' })
   state = r1.state
 
-  // Link host-owned hidden child (e.g. distiller / reviewer)
-  const r2 = HandleSurface.apply(state, { op: 'link', handle: 'agent:distiller', child: 'ses_distiller_1', agent: 'distiller', role: 'Distiller', ownership: 'HostOwnedHidden' })
+  // Link host-owned hidden child (e.g. a host executor run leaf)
+  const r2 = HandleSurface.apply(state, { op: 'link', handle: 'agent:executor', child: 'ses_executor_1', agent: 'executor', role: 'DevOps', ownership: 'HostOwnedHidden' })
   state = r2.state
 
   const listable = HandleSurface.views(state).listable
   assert.equal(listable.length, 1)
-  assert.equal(listable[0], 'agent:coder')
+  assert.equal(listable[0], 'agent:engineer')
   assert.equal(HandleSurface.read(state, listable[0]).child, 'ses_child_1')
 })
 
@@ -76,9 +76,9 @@ test('WHAT[MANAGED-SESSION-013] session_recovery_contract_authorizes_family_with
 })
 
 test('WHAT[MANAGED-SESSION-001] session_recovery_contract_attached_runtime_single_owner_pure_evidence', async () => {
-  const result = await AttachmentSurface.scenario('owner_1', 'Inspector', 'inspector', 'inspector', true)
+  const result = await AttachmentSurface.scenario('owner_1', 'Engineer', 'engineer', 'engineer', true)
   assert.equal(result.created, 1)
   assert.equal(result.firstChild, 'child-1')
   assert.equal(result.secondChild, 'child-1')
-  assert.equal(result.firstAgent, 'inspector')
+  assert.equal(result.firstAgent, 'engineer')
 })

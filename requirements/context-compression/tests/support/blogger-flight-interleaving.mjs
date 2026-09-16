@@ -143,7 +143,7 @@ const capacityTarget = { model: 'provider/shared', reasoning: 'none' }
 const capacityScheduler = () => capacityTarget
 
 const executionEvidence = (sessionId, physicalUserMessageId) => {
-  const identity = identityFor('coder')
+  const identity = identityFor('engineer')
   return {
     sessionId,
     physicalUserMessageId,
@@ -167,7 +167,7 @@ const executionEvidence = (sessionId, physicalUserMessageId) => {
 }
 
 const acquireCommittedCapacity = async (capacityRuntime, sessionId, physicalUserMessageId, lenderSessionId = null) => {
-  const identity = identityFor('coder')
+  const identity = identityFor('engineer')
   const acquisition = await routing.acquireExecutionAdmission(
     capacityRuntime,
     sessionId,

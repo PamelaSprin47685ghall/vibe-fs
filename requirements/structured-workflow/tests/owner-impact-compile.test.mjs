@@ -331,7 +331,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] compile-impact CLI plan-only smoke matches t
   const result = spawnSync(
     process.execPath,
     ['scripts/build.mjs', '--plan'],
-    { cwd: ROOT, encoding: 'utf8' },
+    { maxBuffer: 10 * 1024 * 1024, cwd: ROOT, encoding: 'utf8' },
   )
   assert.equal(result.status, 0, result.stderr || result.stdout)
   const cli = JSON.parse(result.stdout)

@@ -1,1 +1,1 @@
-这个 participant 已有一个活动中的 Fission group。请先继续当前 lanes 并完成收敛，再进行下一次 fission。
+这名 Engineer 已有活动中的 Fission group。继续本路任务并收敛已有工作，不递归裂变，不创建替代组。

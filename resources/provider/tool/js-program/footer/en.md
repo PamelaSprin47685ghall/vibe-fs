@@ -14,6 +14,6 @@ only when it genuinely cannot express the job, and validate the result before
 you let the transaction commit.
 
 Remember the authority order: evidence beats confidence; Host-owned semantics
-beat hand-rolled replicas; a red invariant beats a plausible-looking prefix.
+beat hand-rolled duplicates; a red invariant beats a plausible-looking prefix.
 Use the guardrail or prove the guardrail cannot carry the job. Do not invent a
 third category called "probably fine".

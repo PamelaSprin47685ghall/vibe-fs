@@ -23,7 +23,6 @@ const TOOL_CAPABILITIES = [
   'Fission',
   'Glob',
   'Grep',
-  'Inspect',
   'Move',
   'Read',
   'Remove',
@@ -31,29 +30,29 @@ const TOOL_CAPABILITIES = [
 ]
 
 test('WHAT[PAR-013] participant_identity_role_and_persona_remain_immutable_across_retries', () => {
-  const first = planner.plan({ role: 'coder', kind: 'work-main' })
-  const second = planner.plan({ role: 'coder', kind: 'work-main' })
+  const first = planner.plan({ role: 'engineer', kind: 'work-main' })
+  const second = planner.plan({ role: 'engineer', kind: 'work-main' })
 
-  assert.equal(first.participant, 'coder')
-  assert.equal(second.participant, 'coder')
+  assert.equal(first.participant, 'engineer')
+  assert.equal(second.participant, 'engineer')
   assert.deepEqual(first.participantIdentity, second.participantIdentity)
   assert.equal(first.systemPromptId, second.systemPromptId)
   assert.deepEqual(first.toolCapabilities, second.toolCapabilities)
 
   assert.deepEqual(first.participantIdentity, {
-    selectedAgent: 'coder',
-    canonicalRole: 'coder',
-    role: 'coder',
-    participant: 'coder',
+    selectedAgent: 'engineer',
+    canonicalRole: 'engineer',
+    role: 'engineer',
+    participant: 'engineer',
     selectedTier: 'deep',
-    persona: 'Coder',
+    persona: 'Engineer',
     personaCatalogVersion: 1,
     origin: 'ResolvedAtRoot',
   })
 })
 
 test('WHAT[PAR-013] plans_derive_system_prompt_and_tools_from_the_fixed_role', () => {
-  const planned = attemptPurpose.plan({ role: 'coder', kind: 'work-main' })
+  const planned = attemptPurpose.plan({ role: 'engineer', kind: 'work-main' })
 
   assert.equal(planned.ok, true)
   assert.equal(planned.systemPromptId, planned.participantIdentity.canonicalRole)
@@ -61,7 +60,7 @@ test('WHAT[PAR-013] plans_derive_system_prompt_and_tools_from_the_fixed_role', (
 })
 
 test('WHAT[PAR-011] plans_carry_no_budget_snapshot', () => {
-  const planned = planner.plan({ role: 'coder', kind: 'work-main' })
+  const planned = planner.plan({ role: 'engineer', kind: 'work-main' })
 
   for (const key of ['failures', 'budget', 'consecutiveFailureCount', 'count', 'exhausted']) {
     assert.equal(key in planned, false, `plan must not carry ${key}`)
@@ -137,7 +136,7 @@ test('WHAT[PAR-008] an_errored_attempt_with_unusable_content_never_mints_a_provi
 
 test('WHAT[PAR-008] only_a_probe_attempt_with_a_usable_terminal_may_promote', () => {
   const withProbe = planner.plan({
-    role: 'coder',
+    role: 'engineer',
     kind: 'work-main',
     policyAllowsProbe: true,
     probe: {
@@ -161,7 +160,7 @@ test('WHAT[PAR-008] only_a_probe_attempt_with_a_usable_terminal_may_promote', ()
 })
 
 test('WHAT[PAR-011] an_attempt_without_a_probe_cannot_promote_even_on_success', () => {
-  const withoutProbe = planner.plan({ role: 'coder', kind: 'work-main', policyAllowsProbe: false })
+  const withoutProbe = planner.plan({ role: 'engineer', kind: 'work-main', policyAllowsProbe: false })
   assert.equal(planner.promotableProbeId(withoutProbe, 'Completed'), null)
 })
 

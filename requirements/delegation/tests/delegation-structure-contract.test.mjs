@@ -25,12 +25,6 @@ test('WHAT[DELEG-001] manager_role_law_entrusts_by_consequence_not_persona', () 
   assert.match(pair.zh, /托付|consequence/i)
 })
 
-test('WHAT[DELEG-002] calling_names_differ_in_persona_depth_not_authority', () => {
-  const pair = readProviderPair('tool/fork/description')
-  assert.match(pair.en, /persona[\s\S]{0,120}authority/i)
-  assert.match(pair.zh, /persona[\s\S]{0,120}authority/i)
-})
-
 test('WHAT[DELEG-004] commission_and_fork_are_distinct_contracts_not_witness', () => {
   const pair = readProviderPair('tool/fork/description')
   assert.match(forkTool, /managerSpec/)

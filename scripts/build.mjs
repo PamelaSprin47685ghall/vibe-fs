@@ -163,13 +163,9 @@ async function verifyArtifacts(targetRoot = root) {
 
   const providerRoles = [
     'manager',
-    'coder',
+    'engineer',
     'devops',
-    'inspector',
-    'browser',
-    'inquiry',
     'orchestrator',
-    'distiller',
     'blogger',
     'bookkeeper',
   ]
@@ -575,8 +571,8 @@ Options:
   if (plan) {
     try {
       const report = await planBuild({ targetRoot: root })
-      console.log(JSON.stringify(report, null, 2))
-      process.exit(0)
+      process.stdout.write(JSON.stringify(report, null, 2) + '\n')
+      return
     } catch (err) {
       console.error(`[build:plan] ${err.message}`)
       process.exit(1)

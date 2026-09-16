@@ -47,6 +47,8 @@ module PersonaSurface =
             || name.ToLowerInvariant() = "predictor"
         then
             true
+        elif ManagedAgentCatalog.isLegacyAgentName (name.ToLowerInvariant()) then
+            false
         else
             (Roles.tryParseRole (name.ToLowerInvariant())).IsSome
 

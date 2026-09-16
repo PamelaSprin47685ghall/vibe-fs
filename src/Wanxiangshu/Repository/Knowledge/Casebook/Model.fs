@@ -37,17 +37,16 @@ module ObservationIdentity =
 /// DSL-class: DurableFact — CASE-002 / KR-002: minimal Case model with dual baselines.
 /// Identity is the stable logical case identity (scoped to invocation).
 type Case =
-    {
-        Identity: string
-        SourceTrace: string
-        Q: string
-        A: string
-        RelatedPaths: string list
-        CompletionFileState: string
-        MaintenanceFileState: string
-        AccessOrder: int64
-        Observations: Observation list
-    }
+    { Identity: string
+      SourceTrace: string
+      Q: string
+      A: string
+      RelatedPaths: string list
+      CompletionFileState: string
+      MaintenanceFileState: string
+      AccessOrder: int64
+      Observations: Observation list }
+
     member this.SessionId = this.Identity
     member this.LastAccessOrder = this.AccessOrder
 
@@ -56,7 +55,13 @@ type Case =
 [<RequireQualifiedAccess>]
 type CasebookEvent =
     | CaseCaptured of Case
-    | CaseRefreshed of identity: string * q: string * a: string * maintenanceFileState: string * relatedPaths: string list * observations: Observation list
+    | CaseRefreshed of
+        identity: string *
+        q: string *
+        a: string *
+        maintenanceFileState: string *
+        relatedPaths: string list *
+        observations: Observation list
     | CaseAccessed of identity: string
     | CaseEvicted of identity: string
 
@@ -115,6 +120,15 @@ module CasebookProjection =
 
     let empty: Map<string, Case> = emptyState.Cases
 
+    let private preferNonEmptyText (candidate: string) (fallback: string) : string =
+        if String.IsNullOrEmpty candidate then
+            fallback
+        else
+            candidate
+
+    let private preferNonEmptyList (candidate: 'a list) (fallback: 'a list) : 'a list =
+        if List.isEmpty candidate then fallback else candidate
+
     let private refreshCase state identity q a maintenanceFileState relatedPaths observations =
         match Map.tryFind identity state.Cases with
         | Some existing ->
@@ -122,8 +136,8 @@ module CasebookProjection =
                 { existing with
                     Q = q
                     A = a
-                    MaintenanceFileState = if String.IsNullOrEmpty maintenanceFileState then existing.MaintenanceFileState else maintenanceFileState
-                    RelatedPaths = if List.isEmpty relatedPaths then existing.RelatedPaths else relatedPaths
+                    MaintenanceFileState = preferNonEmptyText maintenanceFileState existing.MaintenanceFileState
+                    RelatedPaths = preferNonEmptyList relatedPaths existing.RelatedPaths
                     Observations = Observations.normalize observations
                     AccessOrder = state.AccessCounter }
 

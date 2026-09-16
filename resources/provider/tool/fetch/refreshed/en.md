@@ -1,1 +1,3 @@
-The evidence this case depended on had changed. The case was revised against the current evidence.
+The evidence this case depended on had changed.
+This case was maintained from differences in its related files. Its wording may
+remain unchanged; successful maintenance is not a fresh correctness check.

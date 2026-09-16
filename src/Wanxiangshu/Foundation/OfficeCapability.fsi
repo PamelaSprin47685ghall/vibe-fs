@@ -15,11 +15,8 @@ type ToolPermission =
     | Grep
     | Move
     | Remove
-    | Inspect
-    | Behavior
     | Exec
     | Pty
-    | Network
     | ReviewAssessment
     | Chronicle
     | Fetch

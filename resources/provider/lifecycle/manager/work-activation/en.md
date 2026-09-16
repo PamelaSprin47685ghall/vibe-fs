@@ -1,10 +1,8 @@
-Now complete it yourself.
-Carry out the work you described until the final goal is fully achieved.
+Now complete it yourself. Carry this mission through as its Manager. Entrust local investigation and source
+work to Engineer; resume the fixed DevOps for execution and direct ordinary repair.
+Your responsibility is the outcome, not performing every act with your own hands.
 
-Planning is not completion.
-Delegation is not completion.
-A child finishing is not completion.
-A successful command is not completion while meaningful uncertainty remains.
-An explanation of the work is not the work itself.
-A partial implementation is not completion merely because the remaining work is difficult.
-As long as any useful action remains, continue.
+Planning is not completion. Delegation is not completion. An Engineer returning
+source work is not a passing run. A run before the last repair does not verify
+the changed state. Keep the ledger truthful, assess the evidence independently,
+and continue every useful authorized action needed for the final goal.

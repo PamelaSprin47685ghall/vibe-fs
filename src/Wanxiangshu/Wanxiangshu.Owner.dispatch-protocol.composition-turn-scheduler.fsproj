@@ -15,7 +15,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-signal-adapter.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-async-support.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.output-distillation.host-contract-toolresultbound.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.process-execution.host-contract-toolresultbound.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <Compile Include="Composition/Turn/Scheduler.fsi"/>
     <Compile Include="Composition/Turn/Scheduler.fs"/>

@@ -10,13 +10,13 @@ module PromptResources =
         | Role.Manager -> "role/manager"
         | Role.Orchestrator -> "role/orchestrator"
         | Role.Engineer -> "role/engineer"
-        | Role.Coder -> "role/coder"
-        | Role.Inspector -> "role/inspector"
-        | Role.Browser -> "role/browser"
-        | Role.Inquiry -> "role/inquiry"
         | Role.DevOps -> "role/devops"
-        | Role.Distiller -> "role/distiller"
         | Role.Blogger -> "role/blogger"
+        | Role.Coder
+        | Role.Inspector
+        | Role.Browser
+        | Role.Inquiry
+        | Role.Distiller -> invalidArg "role" "Retired roles have no provider prompt."
 
     let private semanticPaths =
         [ "world/common-law"
@@ -27,13 +27,8 @@ module PromptResources =
           "library/relay/quality-ledger"
           "role/manager"
           "role/engineer"
-          "role/coder"
           "role/devops"
-          "role/inspector"
-          "role/browser"
-          "role/inquiry"
           "role/orchestrator"
-          "role/distiller"
           "role/blogger"
           "role/bookkeeper" ]
 
@@ -43,10 +38,8 @@ module PromptResources =
     let private libraryPaths =
         function
         | Role.Manager -> [ "library/kolmogorov"; "library/scarcity"; "library/relay/quality-ledger" ]
-        | Role.Engineer
-        | Role.Coder -> [ "library/kolmogorov" ]
-        | Role.Inspector
-        | Role.DevOps -> [ "library/scarcity" ]
+        | Role.Engineer -> [ "library/kolmogorov" ]
+        | Role.DevOps -> [ "library/kolmogorov"; "library/scarcity" ]
         | _ -> []
 
     let private composeInstructions (parts: string list) =
@@ -92,13 +85,8 @@ module PromptResources =
     let loadForLanguage (lang: ProviderLanguage) : PromptCatalog =
         { ManagerSystemPrompt = systemForRole lang Role.Manager
           EngineerSystemPrompt = systemForRole lang Role.Engineer
-          CoderSystemPrompt = systemForRole lang Role.Coder
           DevopsSystemPrompt = systemForRole lang Role.DevOps
-          InspectorSystemPrompt = systemForRole lang Role.Inspector
-          BrowserSystemPrompt = systemForRole lang Role.Browser
-          InquirySystemPrompt = systemForRole lang Role.Inquiry
           OrchestratorSystemPrompt = systemForRole lang Role.Orchestrator
-          DistillerSystemPrompt = systemForRole lang Role.Distiller
           BloggerSystemPrompt = systemForRole lang Role.Blogger }
 
     let load () : PromptCatalog =

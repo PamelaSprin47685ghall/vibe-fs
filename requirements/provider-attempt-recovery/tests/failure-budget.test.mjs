@@ -29,9 +29,9 @@ const ROOT = 'msg_u1'
 const ROOT_SELECTION_IDENTITY_SEED = {
   kind: 'RootSelection',
   participantIdentity: {
-    selectedAgent: 'coder',
-    canonicalRole: 'coder',
-    persona: 'Coder',
+    selectedAgent: 'engineer',
+    canonicalRole: 'engineer',
+    persona: 'Engineer',
     personaCatalogVersion: 1,
     origin: 'ResolvedAtRoot',
   },

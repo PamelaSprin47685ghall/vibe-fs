@@ -17,8 +17,6 @@ module ManagedAgentCatalog =
     val requiredNames: string list
     val managerForkableNames: string list
     val orchestratorForkableNames: string list
-    val inspectorToolNames: string list
-    val coderToolNames: string list
     val engineerToolNames: string list
     val legacyAgentNames: Set<string>
     val isLegacyAgentName: string -> bool

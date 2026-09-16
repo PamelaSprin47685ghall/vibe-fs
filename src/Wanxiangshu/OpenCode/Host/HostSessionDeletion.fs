@@ -30,24 +30,24 @@ module HostSessionDeletion =
     type SessionDeletionPreparation =
         private | SessionDeletionPreparation of
             parent: SessionId option *
-            inspectorStaged: bool *
-            inspectorToFinalize: SessionId option
+            delegateStaged: bool *
+            delegateToFinalize: SessionId option
 
-    let private stageDeletedInspector
+    let private stageDeletedDelegate
         (runtime: SyncDelegateRuntime)
         (sessionId: SessionId)
         (fallbackParent: SessionId option)
         : SessionId option * bool =
-        match runtime.StageDeletedInspectorBySession sessionId with
+        match runtime.StageDeletedDelegateBySession sessionId with
         | Some ownerSessionId -> Some ownerSessionId, true
         | None ->
-            let inspectorStaged =
+            let delegateStaged =
                 fallbackParent
-                |> Option.exists (fun parentSessionId -> runtime.StageDeletedInspector(parentSessionId, sessionId))
+                |> Option.exists (fun parentSessionId -> runtime.StageDeletedDelegate(parentSessionId, sessionId))
 
-            fallbackParent, inspectorStaged
+            fallbackParent, delegateStaged
 
-    /// Capture parent topology and retire the live Inspector binding synchronously
+    /// Capture parent topology and retire the live Delegate binding synchronously
     /// at Host event admission. Child and owner cleanup may await independently,
     /// but their semantic order is now fixed by the public event stream.
     let prepare
@@ -65,100 +65,96 @@ module HostSessionDeletion =
         match scope.SyncDelegateRuntime with
         | None -> SessionDeletionPreparation(parent, false, None)
         | Some runtime ->
-            let resolvedParent, inspectorStaged = stageDeletedInspector runtime sessionId parent
+            let resolvedParent, delegateStaged = stageDeletedDelegate runtime sessionId parent
 
-            let inspectorToFinalize =
-                runtime.TryFindForScopeClose(sessionId, SyncDelegateRole.Inspector)
+            let delegateToFinalize =
+                runtime.TryFindForScopeClose(sessionId, SyncDelegateRole.Engineer)
 
-            SessionDeletionPreparation(resolvedParent, inspectorStaged, inspectorToFinalize)
+            SessionDeletionPreparation(resolvedParent, delegateStaged, delegateToFinalize)
 
-    /// Finalize the staged Inspector case before later session cleanup drops its
+    /// Finalize the staged Delegate case before later session cleanup drops its
     /// physical identity. The exact settlement is captured FIRST; only a durably
-    /// settled finalize releases the identity (InspectorFinalizeSettlement.
+    /// settled finalize releases the identity (CaseFinalizeSettlement.
     /// releasesIdentity). NotCommitted/Unknown/PhaseConflict RETAIN the identity
     /// so a later recovery can resume the exact finalize — the outer evidence
     /// lifetime decision below never drops an identity it still needs.
-    let private finalizeInspectorAtRoot
-        (finalizeInspector: string -> string -> Task<InspectorFinalizeSettlement>)
+    let private finalizeDelegateAtRoot
+        (finalizeDelegate: string -> string -> Task<CaseFinalizeSettlement>)
         (root: string)
-        (inspectorId: SessionId)
-        : Task<InspectorFinalizeSettlement> =
-        finalizeInspector root (SessionId.value inspectorId)
+        (delegateId: SessionId)
+        : Task<CaseFinalizeSettlement> =
+        finalizeDelegate root (SessionId.value delegateId)
 
-    let private finalizeInspectorIfRoot
+    let private finalizeDelegateIfRoot
         (workspaceDirectory: string option)
-        (finalizeInspector: string -> string -> Task<InspectorFinalizeSettlement>)
-        (inspectorId: SessionId)
-        : Task<InspectorFinalizeSettlement option> =
+        (finalizeDelegate: string -> string -> Task<CaseFinalizeSettlement>)
+        (delegateId: SessionId)
+        : Task<CaseFinalizeSettlement option> =
         match workspaceDirectory with
         | Some root ->
             task {
-                let! settled = finalizeInspectorAtRoot finalizeInspector root inspectorId
+                let! settled = finalizeDelegateAtRoot finalizeDelegate root delegateId
                 return Some settled
             }
         | None -> Task.FromResult None
 
     /// One settle dispatch at top level so the match inside
-    /// `finalizeStagedInspector` stays a single pyramid level.
+    /// `finalizeStagedDelegate` stays a single pyramid level.
     let private finalizeDisposition
         (scope: PluginRuntimeScope)
-        (inspectorId: SessionId)
-        (settled: InspectorFinalizeSettlement)
+        (delegateId: SessionId)
+        (settled: CaseFinalizeSettlement)
         : unit =
         match settled.Commitment with
-        | InspectorFinalizeCommitment.Finalized
-        | InspectorFinalizeCommitment.NothingToFinalize -> scope.DropSessionIdentity(SessionId.value inspectorId)
-        | InspectorFinalizeCommitment.NotCommitted reason
-        | InspectorFinalizeCommitment.Unknown reason ->
+        | CaseFinalizeCommitment.Finalized
+        | CaseFinalizeCommitment.NothingToFinalize -> scope.DropSessionIdentity(SessionId.value delegateId)
+        | CaseFinalizeCommitment.NotCommitted reason
+        | CaseFinalizeCommitment.Unknown reason ->
             // Retain the identity: a later recovery must be able to
             // resume this exact finalize. Expected/best-effort, never a
             // recovery decision — the commitment itself is the evidence.
-            Diagnostic.emit
-                "inspector-case-finalization-pending"
-                [ "session_id", SessionId.value inspectorId; "result", reason ]
-        | InspectorFinalizeCommitment.PhaseConflict reason ->
-            Diagnostic.fatal
-                "inspector-case-finalization-failed"
-                [ "session_id", SessionId.value inspectorId; "result", reason ]
+            Diagnostic.emit "case-finalization-pending" [ "session_id", SessionId.value delegateId; "result", reason ]
+        | CaseFinalizeCommitment.PhaseConflict reason ->
+            Diagnostic.fatal "case-finalization-failed" [ "session_id", SessionId.value delegateId; "result", reason ]
 
             raise (
                 invalidOp (
-                    sprintf "CASE-003: Inspector %s finalization conflict: %s" (SessionId.value inspectorId) reason
+                    sprintf "CASE-003: delegate %s finalization conflict: %s" (SessionId.value delegateId) reason
                 )
             )
 
-    let private finalizeStagedInspector
+    let private finalizeStagedDelegate
         (scope: PluginRuntimeScope)
         (workspaceDirectory: string option)
-        (finalizeInspector: string -> string -> Task<InspectorFinalizeSettlement>)
-        (inspectorId: SessionId)
+        (finalizeDelegate: string -> string -> Task<CaseFinalizeSettlement>)
+        (delegateId: SessionId)
         : Task =
         task {
             // F35: capture the exact finalize evidence BEFORE deciding identity
             // lifetime. The identity drop below is explicit and owner-driven —
             // it runs only for a durably settled finalize, never in a finally
             // that would also erase the identity a failed finalize still needs.
-            let! settlementOpt = finalizeInspectorIfRoot workspaceDirectory finalizeInspector inspectorId
+            let! settlementOpt = finalizeDelegateIfRoot workspaceDirectory finalizeDelegate delegateId
 
             match settlementOpt with
             | None -> ()
-            | Some settled -> finalizeDisposition scope inspectorId settled
+            | Some settled -> finalizeDisposition scope delegateId settled
         }
 
-    let finalizePreparedInspector
+    let finalizePreparedDelegate
         (scope: PluginRuntimeScope)
         (workspaceDirectory: string option)
-        (finalizeInspector: string -> string -> Task<InspectorFinalizeSettlement>)
-        (SessionDeletionPreparation(_, _, inspectorToFinalize))
+        (finalizeDelegate: string -> string -> Task<CaseFinalizeSettlement>)
+        (SessionDeletionPreparation(_, _, delegateToFinalize))
         : Task =
-        inspectorToFinalize
-        |> Option.map (finalizeStagedInspector scope workspaceDirectory finalizeInspector)
+        delegateToFinalize
+        |> Option.map (finalizeStagedDelegate scope workspaceDirectory finalizeDelegate)
         |> Option.defaultValue (Task.FromResult() :> Task)
 
     let private cleanupRuntime
         (scope: PluginRuntimeScope)
         (runtimeOpt: SyncDelegateRuntime option)
-        (cleanupInspectorDraft: string -> unit)
+        (cleanupDelegateDraft: string -> unit)
         (sessionId: SessionId)
         : Task =
         task {
@@ -166,16 +162,16 @@ module HostSessionDeletion =
             | Some runtime -> runtime.CancelSession sessionId
             | None -> ()
 
-            cleanupInspectorDraft (SessionId.value sessionId)
+            cleanupDelegateDraft (SessionId.value sessionId)
         }
 
     let handle
         (scope: PluginRuntimeScope)
-        (cleanupInspectorDraft: string -> unit)
+        (cleanupDelegateDraft: string -> unit)
         (signalReconciler: HostSignal -> unit)
         (sessionId: SessionId)
         (onSessionDeleted: (SessionId -> unit) option)
-        (SessionDeletionPreparation(parentSessionIdOpt, stagedInspector, _))
+        (SessionDeletionPreparation(parentSessionIdOpt, stagedDelegate, _))
         : Task =
         scope.LoopSensor.DropSession sessionId
 
@@ -186,7 +182,7 @@ module HostSessionDeletion =
         onSessionDeleted |> Option.iter (fun onDeleted -> onDeleted sessionId)
 
         // OpenCode recursively emits child SessionDeleted before the owner
-        // SessionDeleted. An attached Inspector child must retire its live
+        // SessionDeleted. An attached Delegate child must retire its live
         // binding without clearing the Casebook draft; the later owner
         // event is the graceful ReuseScope-close signal that finalizes it.
         // A continued owner Invoke consumes the staged child as unexpected
@@ -194,8 +190,8 @@ module HostSessionDeletion =
         let signal = SessionDeleted(sessionId, parentSessionIdOpt)
 
         task {
-            if not stagedInspector then
-                do! cleanupRuntime scope scope.SyncDelegateRuntime cleanupInspectorDraft sessionId
+            if not stagedDelegate then
+                do! cleanupRuntime scope scope.SyncDelegateRuntime cleanupDelegateDraft sessionId
 
             scope.Sessions.Quiescence.DropSession sessionId
             ExplicitResumeSuppression.dropSession sessionId

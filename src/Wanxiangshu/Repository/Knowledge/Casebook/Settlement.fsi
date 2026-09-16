@@ -1,30 +1,30 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
-/// CASE-003 / DELEG-031 (F35): the inspector finalize outcome is a closed
+/// CASE-003 / DELEG-031 (F35): the case finalize outcome is a closed
 /// settlement, never a bare Result&lt;unit, string&gt;. `Finalized` and
 /// `NothingToFinalize` both release the identity; `NotCommitted` and
 /// `Unknown` RETAIN it so a later recovery can resume the exact finalize;
 /// `PhaseConflict` is the exactly-one invariant cut. The identity is always
 /// carried so the deletion owner can decide retention explicitly.
-type InspectorFinalizeIdentity = { InspectorSessionId: string }
+type CaseFinalizeIdentity = { DelegateSessionId: string }
 
 [<RequireQualifiedAccess>]
-type InspectorFinalizeCommitment =
+type CaseFinalizeCommitment =
     | Finalized
     | NothingToFinalize
     | NotCommitted of reason: string
     | Unknown of reason: string
     | PhaseConflict of reason: string
 
-type InspectorFinalizeSettlement =
-    { Identity: InspectorFinalizeIdentity
-      Commitment: InspectorFinalizeCommitment }
+type CaseFinalizeSettlement =
+    { Identity: CaseFinalizeIdentity
+      Commitment: CaseFinalizeCommitment }
 
 [<RequireQualifiedAccess>]
-module InspectorFinalizeSettlement =
-    val finalized: inspectorSessionId: string -> InspectorFinalizeSettlement
-    val nothingToFinalize: inspectorSessionId: string -> InspectorFinalizeSettlement
-    val notCommitted: inspectorSessionId: string -> reason: string -> InspectorFinalizeSettlement
-    val unknown: inspectorSessionId: string -> reason: string -> InspectorFinalizeSettlement
-    val phaseConflict: inspectorSessionId: string -> reason: string -> InspectorFinalizeSettlement
-    val releasesIdentity: settlement: InspectorFinalizeSettlement -> bool
+module CaseFinalizeSettlement =
+    val finalized: delegateSessionId: string -> CaseFinalizeSettlement
+    val nothingToFinalize: delegateSessionId: string -> CaseFinalizeSettlement
+    val notCommitted: delegateSessionId: string -> reason: string -> CaseFinalizeSettlement
+    val unknown: delegateSessionId: string -> reason: string -> CaseFinalizeSettlement
+    val phaseConflict: delegateSessionId: string -> reason: string -> CaseFinalizeSettlement
+    val releasesIdentity: settlement: CaseFinalizeSettlement -> bool

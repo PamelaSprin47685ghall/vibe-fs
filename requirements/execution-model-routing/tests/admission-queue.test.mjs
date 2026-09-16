@@ -11,7 +11,7 @@ const awaitQueued = (outcome) => routing.awaitQueuedExecutionAdmission(outcome.q
 const fill = async (runtime, count, prefix = 'waiting') => {
   const queued = []
   for (let index = 0; index < count; index += 1) {
-    const outcome = await begin(runtime, `${prefix}-${index}`, `physical-${index}`, 'coder', `${prefix}-owner-${index}`)
+    const outcome = await begin(runtime, `${prefix}-${index}`, `physical-${index}`, 'engineer', `${prefix}-owner-${index}`)
     assert.equal(outcome.kind, 'Queued')
     queued.push(outcome)
   }
@@ -27,7 +27,7 @@ test('WHAT[EMR-013] queue bound is enforced without drops', async () => {
   const queued = await fill(runtime, bound)
   assert.equal(routing.pendingCount(runtime), bound)
 
-  const full = await begin(runtime, 'overflow', 'physical-overflow', 'coder', 'overflow-owner')
+  const full = await begin(runtime, 'overflow', 'physical-overflow', 'engineer', 'overflow-owner')
   assert.deepEqual(
     { kind: full.kind, failure: full.failure, lease: full.lease },
     { kind: 'QueueFull', failure: 'CapacityQueueFull', lease: null },
@@ -50,33 +50,33 @@ test('WHAT[EMR-013] FIFO admits the oldest scheduler-eligible demand on capacity
     return target('provider/one')
   })
 
-  const holder = await begin(runtime, 'holder', 'physical-holder', 'coder', 'holder-owner')
+  const holder = await begin(runtime, 'holder', 'physical-holder', 'engineer', 'holder-owner')
   assert.equal(holder.kind, 'Acquired')
   const first = await begin(runtime, 'first', 'physical-first', 'manager', 'first-owner')
-  const second = await begin(runtime, 'second', 'physical-second', 'inspector', 'second-owner')
+  const second = await begin(runtime, 'second', 'physical-second', 'devops', 'second-owner')
   assert.equal(first.kind, 'Queued')
   assert.equal(second.kind, 'Queued')
 
   routing.releasePhysicalExecution(runtime, 'holder', 'physical-holder')
   assert.equal((await awaitQueued(first)).kind, 'Acquired')
-  assert.deepEqual(admitted, ['coder', 'manager'])
+  assert.deepEqual(admitted, ['engineer', 'manager'])
   assert.equal(routing.pendingCount(runtime), 1)
 
   routing.releasePhysicalExecution(runtime, 'first', 'physical-first')
   assert.equal((await awaitQueued(second)).kind, 'Acquired')
-  assert.deepEqual(admitted, ['coder', 'manager', 'inspector'])
+  assert.deepEqual(admitted, ['engineer', 'manager', 'devops'])
 })
 
 test('WHAT[EMR-004] an ineligible head does not block a later eligible demand', async () => {
   let freeEnabled = false
   const runtime = routing.createRuntime((role) => {
     if (role === 'devops') return target('provider/trigger')
-    if (role === 'browser' && freeEnabled) return target('provider/free')
+    if (role === 'blogger' && freeEnabled) return target('provider/free')
     return null
   })
 
-  const blocked = await begin(runtime, 'blocked-session', 'physical-blocked', 'inquiry', 'blocked-owner')
-  const free = await begin(runtime, 'free-session', 'physical-free', 'browser', 'free-owner')
+  const blocked = await begin(runtime, 'blocked-session', 'physical-blocked', 'engineer', 'blocked-owner')
+  const free = await begin(runtime, 'free-session', 'physical-free', 'blogger', 'free-owner')
   assert.equal(blocked.kind, 'Queued')
   assert.equal(free.kind, 'Queued')
 
@@ -91,7 +91,7 @@ test('WHAT[EMR-004] an ineligible head does not block a later eligible demand', 
 
 test('WHAT[EMR-013] exact cancel and supersede are typed and idempotent', async () => {
   const runtime = routing.createRuntime(() => null)
-  const cancelled = await begin(runtime, 'cancelled', 'physical-cancelled', 'coder', 'cancelled-owner')
+  const cancelled = await begin(runtime, 'cancelled', 'physical-cancelled', 'engineer', 'cancelled-owner')
   routing.cancelPendingExecution(runtime, 'cancelled')
   routing.cancelPendingExecution(runtime, 'cancelled')
   const cancelledOutcome = await awaitQueued(cancelled)

@@ -105,25 +105,48 @@ module GecHost =
 
     let private childView (plan: DispatchPlan) : obj =
         box
-            {| parentSessionId = plan.ParentSessionId
-               snapshotHash = plan.SnapshotHash
+            {| kind = "dispatch-child"
                depth = plan.Depth
+               workId = plan.ChildSessionId
+               parentSessionId = plan.ParentSessionId
+               snapshotHash = plan.SnapshotHash
                carriesSiblingPayload = false
                carriesFailureOutput = false
                childSessionId = plan.ChildSessionId |}
 
     let private renderPlan (planned: Result<DispatchPlan, HostFault>) : obj =
         match planned with
-        | Ok(plan: DispatchPlan) -> box {| ok = true; child = childView plan |}
+        | Ok(plan: DispatchPlan) ->
+            box
+                {| ok = true
+                   kind = "dispatch-child"
+                   depth = plan.Depth
+                   workId = plan.ChildSessionId
+                   child = childView plan |}
         | Error(fault: HostFault) -> faultView fault
 
     let private snapshotHashOf (input: obj) : string =
         let snap: obj = input?rootSnapshot
-        if isNullish snap then "" else text snap?hash
+
+        if isNullish snap then ""
+        elif isNullish snap?hash then text snap
+        else text snap?hash
+
+    let private syntheticParent = "ses-synthetic-parent"
+
+    let private sessionField (value: obj) : string =
+        if isNullish value || isNullish value?sessionId then
+            syntheticParent
+        else
+            text value?sessionId
 
     let private parentSessionOf (input: obj) : string =
         let parent: obj = input?parentSession
-        if isNullish parent then "" else text parent?sessionId
+
+        if isNullish parent then
+            sessionField (input?session)
+        else
+            sessionField parent
 
     let private intField (fallback: int) (value: obj) : int =
         if isNullish value then fallback else unbox<int> value
@@ -134,8 +157,30 @@ module GecHost =
 
     // Siblings are accepted but never read: the child carries no sibling payload
     // by construction, so nothing from a sibling branch can leak into the plan.
+    let private applyWorkId (workId: string) (plan: DispatchPlan) : DispatchPlan =
+        if String.IsNullOrWhiteSpace workId then
+            plan
+        else
+            { plan with ChildSessionId = workId }
+
     let planOpenCodeDispatch (input: obj) : obj =
-        let attemptRaw: obj = input?attempt
+        let attemptRaw =
+            let att: obj = input?attempt
+
+            if not (isNullish att) then
+                att
+            else
+                let target: obj = input?target
+                if not (isNullish target) then target?attempt else null
+
+        let workId =
+            let w: obj = input?workId
+
+            if not (isNullish w) then
+                text w
+            else
+                let target: obj = input?target
+                if not (isNullish target) then text target?workId else ""
 
         let attempt = if isNullish attemptRaw then -1 else unbox<int> attemptRaw
 
@@ -143,7 +188,8 @@ module GecHost =
             if attempt < 0 then
                 Error HostFault.MissingAttempt
             else
-                planChild (text input?workId) attempt (snapshotHashOf input) (parentSessionOf input) (depthOf input)
+                planChild workId attempt (snapshotHashOf input) (parentSessionOf input) (depthOf input)
+                |> Result.map (fun plan -> applyWorkId workId plan)
 
         renderPlan planned
 

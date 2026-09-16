@@ -13,18 +13,20 @@ open Wanxiangshu.Resources
 /// Wanxiangshu-owned system-prompt segment without disturbing Host/AGENTS text.
 module ProviderSystemTransform =
 
+    /// Only active roles own a projected segment; retired identities are
+    /// decoded for history but never rewrite a live system prompt.
     let private catalogPrompt (catalog: PromptCatalog) =
         function
-        | Role.Manager -> catalog.ManagerSystemPrompt
-        | Role.Orchestrator -> catalog.OrchestratorSystemPrompt
-        | Role.Engineer -> catalog.EngineerSystemPrompt
-        | Role.Coder -> catalog.CoderSystemPrompt
-        | Role.Inspector -> catalog.InspectorSystemPrompt
-        | Role.Browser -> catalog.BrowserSystemPrompt
-        | Role.Inquiry -> catalog.InquirySystemPrompt
-        | Role.DevOps -> catalog.DevopsSystemPrompt
-        | Role.Distiller -> catalog.DistillerSystemPrompt
-        | Role.Blogger -> catalog.BloggerSystemPrompt
+        | Role.Manager -> Some catalog.ManagerSystemPrompt
+        | Role.Orchestrator -> Some catalog.OrchestratorSystemPrompt
+        | Role.Engineer -> Some catalog.EngineerSystemPrompt
+        | Role.DevOps -> Some catalog.DevopsSystemPrompt
+        | Role.Blogger -> Some catalog.BloggerSystemPrompt
+        | Role.Coder
+        | Role.Inspector
+        | Role.Browser
+        | Role.Inquiry
+        | Role.Distiller -> None
 
     let private localizedRolePrompt lang role =
         match role with
@@ -64,12 +66,15 @@ module ProviderSystemTransform =
             false
 
     let private replaceRoleSystem (role: SessionId -> Role option) sid lang output system =
-        match role sid with
+        let refresh =
+            role sid
+            |> Option.bind (fun r ->
+                catalogPrompt (RuntimeResources.current().Prompts) r
+                |> Option.map (fun oldPrompt -> oldPrompt, localizedRolePrompt lang r))
+
+        match refresh with
         | None -> ()
-        | Some r ->
-            let oldPrompt = catalogPrompt (RuntimeResources.current().Prompts) r
-            let nextPrompt = localizedRolePrompt lang r
-            output?system <- replaceOwnedSegment oldPrompt nextPrompt system
+        | Some(oldPrompt, nextPrompt) -> output?system <- replaceOwnedSegment oldPrompt nextPrompt system
 
     let private transformSystem (role: SessionId -> Role option) sessionText output system =
         let sid = SessionId.create sessionText

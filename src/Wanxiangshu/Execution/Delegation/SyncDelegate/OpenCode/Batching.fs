@@ -161,7 +161,7 @@ module SyncDelegateBatching =
                   Estimate = estimate }
 
             tomlObjectWithInstructions
-                [ sprintf "Inspector charge accepted and deferred for batch execution: %s" charge ]
+                [ sprintf "Engineer charge accepted and deferred for batch execution: %s" charge ]
                 [])
 
     let settleDeferredInspections
@@ -200,7 +200,7 @@ module SyncDelegateBatching =
 
                         runtime.InvokeBatchPrepared(
                             sessionId,
-                            SyncDelegateRole.Inspector,
+                            SyncDelegateRole.Engineer,
                             combinedCharge,
                             batch,
                             preparePrompt,
@@ -221,7 +221,7 @@ module SyncDelegateBatching =
                                 tomlObjectWithInstructions [ workRecord ] []
                             | Ok(SyncDelegateInvocationResult.MergedInto canonicalCall) ->
                                 tomlObjectWithInstructions [ mergedInstruction lang canonicalCall ] []
-                            | Error err -> tomlObjectWithInstructions [ sprintf "Inspector failed: %s" err ] []
+                            | Error err -> tomlObjectWithInstructions [ sprintf "Engineer charge failed: %s" err ] []
 
                         durableReplacedResults.[ToolCallId.value call.CallId] <- outputText)
         }

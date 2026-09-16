@@ -45,7 +45,7 @@ const bindExecution = async (role) => {
 test('WHAT[CONTEXT-COMPRESSION-025] stop decision fences provider admission before the abort resolves', async (t) => {
   await routing.initialize()
   const ids = await bindExecution('blogger')
-  const other = await bindExecution('coder')
+  const other = await bindExecution('engineer')
 
   // Positive control: admission is live for the exact execution before stop.
   await routing.sharedEnterProviderStep(ids.session, ids.physical, [])

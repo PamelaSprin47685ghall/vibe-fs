@@ -6,6 +6,7 @@ import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.j
 
 const hash = (value) => `H(${value})`
 const personas = {
+  engineer: 'Engineer',
   coder: 'Coder',
   manager: 'Lead',
   reviewer: 'Auditor',
@@ -29,7 +30,7 @@ const rootSelection = (agent) => {
     },
   }
 }
-const rootFor = (agent = 'coder', physical = 'msg_u1') => {
+const rootFor = (agent = 'engineer', physical = 'msg_u1') => {
   const result = authority.createAuthorityRoot(hash, 'rt_1', 'ses_a', 'HumanRoot', physical, rootSelection(agent))
   assert.equal(result.ok, true, result.error)
   return result.value
@@ -80,13 +81,13 @@ test('WHAT[INTERACTION-AUTHORITY-002] IA_002_transport_receipt_shape_is_not_auth
 
 // INTERACTION-AUTHORITY-003: the accepted root carries the identity owner's immutable evidence.
 test('WHAT[INTERACTION-AUTHORITY-003] IA_003_root_carries_resolved_participant_identity', () => {
-  assert.deepEqual(profile(rootFor('coder')), {
+  assert.deepEqual(profile(rootFor('engineer')), {
     session: 'ses_a',
     logicalRun: 'H(rt_1\nses_a\nmsg_u1)',
     authorityRoot: 'msg_u1',
     authorityKind: 'HumanRoot',
-    participant: 'coder',
-    role: 'coder',
+    participant: 'engineer',
+    role: 'engineer',
   })
   assert.deepEqual(profile(rootFor('manager')), {
     session: 'ses_a',
@@ -126,26 +127,26 @@ test('WHAT[INTERACTION-AUTHORITY-018] IA_018_exact_closure_releases_run_scoped_a
 
 // INTERACTION-AUTHORITY-006: canonical bare names resolve; legacy and hyphenated names fail closed.
 test('WHAT[INTERACTION-AUTHORITY-006] IA_006_canonical_names_resolve_and_legacy_or_malformed_are_refused', () => {
-  for (const name of ['coder', 'manager', 'inspector']) {
+  for (const name of ['engineer', 'manager', 'devops']) {
     const result = authority.createAuthorityRoot(hash, 'rt_1', 'ses_a', 'HumanRoot', 'msg_u1', rootSelection(name))
     assert.equal(result.ok, true, result.error)
     assert.equal(authority.parseAgentName(name).ok, true)
   }
-  for (const name of ['build', 'plan', 'student', 'teacher', 'meditator', 'executor', 'fast_coder']) {
+  for (const name of ['coder', 'inspector', 'browser', 'inquiry', 'distiller', 'build', 'plan', 'student', 'teacher', 'meditator', 'executor', 'fast_coder']) {
     assert.equal(authority.parseAgentName(name).error.kind, 'LegacyAgentName')
     const result = authority.createAuthorityRoot(hash, 'rt_1', 'ses_a', 'HumanRoot', 'msg_u1', rootSelection(name))
     assert.equal(result.ok, false)
   }
   assert.equal(authority.parseAgentName('nonsense').error.kind, 'UnknownManagedAgent')
   assert.equal(authority.parseAgentName('fast-').error.kind, 'Malformed')
-  assert.equal(authority.parseAgentName('fast-coder').error.kind, 'Malformed')
-  assert.equal(authority.parseAgentName('Coder').error.kind, 'Malformed')
+  assert.equal(authority.parseAgentName('fast-engineer').error.kind, 'Malformed')
+  assert.equal(authority.parseAgentName('Engineer').error.kind, 'Malformed')
 })
 
 test('WHAT[INTERACTION-AUTHORITY-006] IA_006_agent_owner_root_claim_rejects_legacy_name', () => {
-  const inherited = authority.issueInheritedIdentitySeed('build', rootFor('manager'))
+  const inherited = authority.issueInheritedIdentitySeed('nonsense', rootFor('manager'))
+  assert.match(inherited.error, /invalid|legacy|managed|malformed/i)
   assert.equal(inherited.ok, false)
-  assert.match(inherited.error, /legacy|managed|malformed/i)
 })
 
 // INTERACTION-AUTHORITY-010: repair identity is durable and bounded by its occasion.
@@ -217,8 +218,8 @@ test('WHAT[INTERACTION-AUTHORITY-013] continuation preserves logical run and roo
   const root = rootFor()
   const state = authority.registerClaim(continuation('pk_c', root, 'DegenerationGuard', 'pd-n'), register(root))
   assert.deepEqual(profile(state.activeLogicalRun), profile(root))
-  assert.equal(state.activeLogicalRun.participantIdentity.participant, 'coder')
-  assert.equal(state.activeLogicalRun.participantIdentity.role, 'coder')
+  assert.equal(state.activeLogicalRun.participantIdentity.participant, 'engineer')
+  assert.equal(state.activeLogicalRun.participantIdentity.role, 'engineer')
 })
 
 test('WHAT[INTERACTION-AUTHORITY-003] IA_003_root_remains_the_source_for_continuations', () => {

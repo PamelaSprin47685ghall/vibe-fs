@@ -47,7 +47,7 @@ import {
  * Which lanes this request could belong to — a SET, not one name.
  *
  * A lane is addressed by the session the Host issued, and aliases exist because a
- * scenario names sessions before they exist (`manager`, `coder-after`). The
+ * scenario names sessions before they exist (`manager`, `engineer-after`). The
  * binding is established when the Host mints the real id; HOST-008 makes the
  * association durable and the mock is told it rather than inferring it.
  *

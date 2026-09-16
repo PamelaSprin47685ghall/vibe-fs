@@ -22,30 +22,30 @@ module PluginHostWiring =
     /// workspace store once. Acquiring the store is pre-validated by the
     /// outer `try`; once held, lifecycle failures report via the task's
     /// settled signature instead of retrying the pyramid.
-    let private tryFinalizeWithin workspaceRoot store inspectorSessionId =
+    let private tryFinalizeWithin workspaceRoot store delegateSessionId =
         task {
             try
-                return! CasebookLifecycle.tryFinalizeInspector workspaceRoot store inspectorSessionId
+                return! CasebookLifecycle.tryFinalizeDraft workspaceRoot store delegateSessionId
 
             with ex ->
                 // A thrown boundary error (store acquisition or lifecycle
                 // bug) has indeterminate durability: report Unknown and
                 // retain the identity.
-                return InspectorFinalizeSettlement.unknown inspectorSessionId ex.Message
+                return CaseFinalizeSettlement.unknown delegateSessionId ex.Message
         }
 
-    /// Workspace root–InspectorSessionId → settlement. The two layers of
+    /// Workspace root–DelegateSessionId → settlement. The two layers of
     /// indeterminate-durability failure compose at the module boundary: store
     /// acquisition collapses to Unknown, lifecycle failure does too, and the
     /// detached Task is handed to the caller unchanged.
-    let private tryFinalize workspaceRoot inspectorSessionId =
+    let private tryFinalize workspaceRoot delegateSessionId =
         try
             let commonDir = RuntimePath.gitCommonDir workspaceRoot
             let store = WorkspaceEventStore.acquire commonDir
-            tryFinalizeWithin workspaceRoot store inspectorSessionId
+            tryFinalizeWithin workspaceRoot store delegateSessionId
 
         with ex ->
-            Task.FromResult(InspectorFinalizeSettlement.unknown inspectorSessionId ex.Message)
+            Task.FromResult(CaseFinalizeSettlement.unknown delegateSessionId ex.Message)
 
     /// Composition-root handle for everything the Host needs after boot:
     /// the ports `HostSignalBootstrap.wire` produced plus the durability
@@ -193,7 +193,7 @@ module PluginHostWiring =
                                 BookkeeperRuntime.completePhysical terminal.SessionId outcome)
                             workspaceDirectory
                             (Some tryFinalize)
-                            (Some CasebookLifecycle.cleanupInspector)
+                            (Some CasebookLifecycle.cleanupDraft)
 
                     return
                         { EventPort = eventPort

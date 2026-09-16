@@ -4,7 +4,7 @@ import test from 'node:test'
 import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 
 const target = { model: 'provider/shared', reasoning: 'none' }
-const identity = (sessionId, physicalUserMessageId, role = 'coder', participant = `${sessionId}-owner`) => ({
+const identity = (sessionId, physicalUserMessageId, role = 'engineer', participant = `${sessionId}-owner`) => ({
   sessionId,
   physicalUserMessageId,
   role,

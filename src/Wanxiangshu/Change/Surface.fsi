@@ -8,6 +8,9 @@ module ChangeSurface =
     val empty: unit -> obj
 
     val createJob: projection: obj -> payload: obj -> obj
+    val createJobResult: projection: obj -> payload: obj -> obj
+    val applyFact: state: obj -> factObj: obj -> obj
+    val jobView: state: obj -> jobIdStr: string -> obj
 
     val recordFact: projection: obj -> job: string -> value: obj -> obj
 

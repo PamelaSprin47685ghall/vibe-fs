@@ -30,16 +30,16 @@ test('WHAT[DELEG-031] DELEG_031_committed_checkpoint_advances_frontier_and_deliv
   const h = await live(owner)
   try {
     await sync.captureOwnerOpening(h, owner, 'ROOT-OPENING-MARKER')
-    const pending = sync.invoke(h, owner, 'Inspector', 'FIRST-CHARGE')
-    await waitForPromptCount(h, owner, 'Inspector', 1)
-    assert.equal(sync.handoffFrontier(h, owner, 'Inspector'), null)
-    assert.equal(await settle(h, owner, 'Inspector', 'FIRST-ANSWER', 'run-first'), true)
+    const pending = sync.invoke(h, owner, 'Engineer', 'FIRST-CHARGE')
+    await waitForPromptCount(h, owner, 'Engineer', 1)
+    assert.equal(sync.handoffFrontier(h, owner, 'Engineer'), null)
+    assert.equal(await settle(h, owner, 'Engineer', 'FIRST-ANSWER', 'run-first'), true)
     const result = await pending
     assert.equal(result.ok, true)
     assert.match(result.value, /FIRST-ANSWER/)
 
     // The production checkpoint for this exact parent+route commits: frontier advances.
-    const frontier = sync.handoffFrontier(h, owner, 'Inspector')
+    const frontier = sync.handoffFrontier(h, owner, 'Engineer')
     assert.notEqual(frontier, null)
     assert.equal(typeof frontier, 'number')
   } finally {
@@ -52,15 +52,15 @@ test('WHAT[DELEG-031] DELEG_031_uncommitted_checkpoint_still_delivers_work_recor
   const h = await live(owner)
   try {
     await sync.captureOwnerOpening(h, owner, 'ROOT-OPENING-MARKER')
-    const pending = sync.invoke(h, owner, 'Inspector', 'UNCOMMITTED-CHARGE')
-    await waitForPromptCount(h, owner, 'Inspector', 1)
+    const pending = sync.invoke(h, owner, 'Engineer', 'UNCOMMITTED-CHARGE')
+    await waitForPromptCount(h, owner, 'Engineer', 1)
     // Settle the physically-completed child through the production turn
     // path while the writer is healthy; the earned WorkRecord is delivered.
-    assert.equal(await settle(h, owner, 'Inspector', 'UNCOMMITTED-ANSWER', 'run-first'), true)
+    assert.equal(await settle(h, owner, 'Engineer', 'UNCOMMITTED-ANSWER', 'run-first'), true)
     const result = await pending
     assert.equal(result.ok, true)
     assert.match(result.value, /UNCOMMITTED-ANSWER/)
-    const committedFrontier = sync.handoffFrontier(h, owner, 'Inspector')
+    const committedFrontier = sync.handoffFrontier(h, owner, 'Engineer')
     assert.notEqual(committedFrontier, null)
 
     // THEN release the writer: the same production checkpoint now reports
@@ -69,7 +69,7 @@ test('WHAT[DELEG-031] DELEG_031_uncommitted_checkpoint_still_delivers_work_recor
     // write, while the completed child was neither re-executed nor
     // forgotten.
     sync.closeJournalWriter(h)
-    const unsettled = await sync.checkpointForHarness(h, owner, 'Inspector', committedFrontier + 10)
+    const unsettled = await sync.checkpointForHarness(h, owner, 'Engineer', committedFrontier + 10)
     assert.equal(unsettled.commitment, 'NotCommitted')
     assert.equal(unsettled.parent, owner)
     assert.match(String(unsettled.reason), /closing|disposed|poisoned|not attempted/i)
@@ -85,17 +85,17 @@ test('WHAT[DELEG-031] DELEG_031_checkpoint_probe_reports_typed_settlement_with_e
   try {
     // Committed path: the production checkpoint reports Committed with the
     // exact parent + route identity.
-    const first = await sync.checkpointForHarness(h, owner, 'Inspector', 7)
+    const first = await sync.checkpointForHarness(h, owner, 'Engineer', 7)
     assert.equal(first.commitment, 'Committed')
     assert.equal(first.parent, owner)
-    assert.match(first.route, /inspector/)
+    assert.match(first.route, /engineer/)
     assert.equal(first.reason, null)
 
     // NotCommitted path: after the writer is released, the same production
     // checkpoint reports NotCommitted (never a bare string) with the same
     // exact identity — and the second call does NOT re-emit a duplicate.
     sync.closeJournalWriter(h)
-    const second = await sync.checkpointForHarness(h, owner, 'Inspector', 7)
+    const second = await sync.checkpointForHarness(h, owner, 'Engineer', 7)
     assert.equal(second.commitment, 'NotCommitted')
     assert.equal(second.parent, owner)
     assert.equal(second.route, first.route)
@@ -109,18 +109,18 @@ test('WHAT[DELEG-031] DELEG_031_duplicate_completion_is_idempotent_and_never_ree
   const owner = 'owner-deleg031-duplicate'
   const h = await live(owner)
   try {
-    const first = sync.invoke(h, owner, 'Inspector', 'FIRST')
-    await waitForPromptCount(h, owner, 'Inspector', 1)
-    assert.equal(await settle(h, owner, 'Inspector', 'FIRST-ANSWER', 'run-first'), true)
+    const first = sync.invoke(h, owner, 'Engineer', 'FIRST')
+    await waitForPromptCount(h, owner, 'Engineer', 1)
+    assert.equal(await settle(h, owner, 'Engineer', 'FIRST-ANSWER', 'run-first'), true)
     assert.equal((await first).ok, true)
-    const frontierAfterFirst = sync.handoffFrontier(h, owner, 'Inspector')
+    const frontierAfterFirst = sync.handoffFrontier(h, owner, 'Engineer')
     assert.notEqual(frontierAfterFirst, null)
 
     // A duplicate completion for the same authority root cannot claim a new
     // call: the next invocation still reuses the same child exactly once.
-    const second = sync.invoke(h, owner, 'Inspector', 'SECOND')
-    await waitForPromptCount(h, owner, 'Inspector', 2)
-    assert.equal(await settle(h, owner, 'Inspector', 'SECOND-ANSWER', 'run-second'), true)
+    const second = sync.invoke(h, owner, 'Engineer', 'SECOND')
+    await waitForPromptCount(h, owner, 'Engineer', 2)
+    assert.equal(await settle(h, owner, 'Engineer', 'SECOND-ANSWER', 'run-second'), true)
     const secondResult = await second
     assert.equal(secondResult.ok, true)
     assert.match(secondResult.value, /SECOND-ANSWER/)
@@ -129,7 +129,7 @@ test('WHAT[DELEG-031] DELEG_031_duplicate_completion_is_idempotent_and_never_ree
 
     // The checkpoint for an already-recorded window is at least the first
     // frontier — never a retreat, never a second execution.
-    const frontierAfterSecond = sync.handoffFrontier(h, owner, 'Inspector')
+    const frontierAfterSecond = sync.handoffFrontier(h, owner, 'Engineer')
     assert.ok(frontierAfterSecond >= frontierAfterFirst)
   } finally {
     sync.dispose(h)
@@ -140,23 +140,23 @@ test('WHAT[DELEG-031] DELEG_031_stale_authority_completion_cannot_claim_a_new_ca
   const owner = 'owner-deleg031-stale'
   const h = await live(owner)
   try {
-    const first = sync.invoke(h, owner, 'Inspector', 'FIRST')
-    await waitForPromptCount(h, owner, 'Inspector', 1)
-    assert.equal(await settle(h, owner, 'Inspector', 'FIRST-ANSWER', 'run-first'), true)
+    const first = sync.invoke(h, owner, 'Engineer', 'FIRST')
+    await waitForPromptCount(h, owner, 'Engineer', 1)
+    assert.equal(await settle(h, owner, 'Engineer', 'FIRST-ANSWER', 'run-first'), true)
     assert.equal((await first).ok, true)
 
-    const second = sync.invoke(h, owner, 'Inspector', 'SECOND')
-    await waitForPromptCount(h, owner, 'Inspector', 2)
+    const second = sync.invoke(h, owner, 'Engineer', 'SECOND')
+    await waitForPromptCount(h, owner, 'Engineer', 2)
 
     // A stale completion under a superseded authority root is rejected: the
     // pending call stays pending and no checkpoint advances for it.
     assert.equal(
-      await sync.settleWithAuthorityRoot(h, owner, 'Inspector', 'STALE-ANSWER', 'run-stale', 'old-authority-root'),
+      await sync.settleWithAuthorityRoot(h, owner, 'Engineer', 'STALE-ANSWER', 'run-stale', 'old-authority-root'),
       false,
     )
     assert.deepEqual(await remainsPending(second), { kind: 'pending' })
 
-    assert.equal(await settle(h, owner, 'Inspector', 'SECOND-ANSWER', 'run-second'), true)
+    assert.equal(await settle(h, owner, 'Engineer', 'SECOND-ANSWER', 'run-second'), true)
     const secondResult = await second
     assert.equal(secondResult.ok, true)
     assert.match(secondResult.value, /SECOND-ANSWER/)
@@ -170,22 +170,22 @@ test('WHAT[DELEG-031] DELEG_031_parent_supersede_leaves_no_orphan_completion_cla
   const owner = 'owner-deleg031-supersede'
   const h = await live(owner)
   try {
-    const pending = sync.invoke(h, owner, 'Inspector', 'SUPERSEDED-CHARGE')
-    await waitForPromptCount(h, owner, 'Inspector', 1)
+    const pending = sync.invoke(h, owner, 'Engineer', 'SUPERSEDED-CHARGE')
+    await waitForPromptCount(h, owner, 'Engineer', 1)
 
     // Parent supersedes the call before its completion arrives.
-    assert.equal(sync.abandonPendingCall(h, owner, 'Inspector'), true)
+    assert.equal(sync.abandonPendingCall(h, owner, 'Engineer'), true)
 
     // The late completion afterwards cannot claim the abandoned call: the
     // call is gone, so settle finds no live call and reports false; the
     // invocation itself already failed with the supersede reason, not with
     // a stale success.
-    assert.equal(await settle(h, owner, 'Inspector', 'LATE-ANSWER', 'run-late'), false)
+    assert.equal(await settle(h, owner, 'Engineer', 'LATE-ANSWER', 'run-late'), false)
     const result = await pending
     assert.equal(result.ok, false)
 
     // The abandoned call leaves no completed frontier behind.
-    assert.equal(sync.handoffFrontier(h, owner, 'Inspector'), null)
+    assert.equal(sync.handoffFrontier(h, owner, 'Engineer'), null)
   } finally {
     sync.dispose(h)
   }
@@ -196,19 +196,19 @@ test('WHAT[DELEG-031] DELEG_031_completed_and_delete_in_both_orders_settle_exact
     const owner = `owner-deleg031-order-${order}`
     const h = await live(owner)
     try {
-      const pending = sync.invoke(h, owner, 'Inspector', `CHARGE-${order}`)
-      await waitForPromptCount(h, owner, 'Inspector', 1)
+      const pending = sync.invoke(h, owner, 'Engineer', `CHARGE-${order}`)
+      await waitForPromptCount(h, owner, 'Engineer', 1)
 
       if (order === 'complete-then-delete') {
-        assert.equal(await settle(h, owner, 'Inspector', `ANSWER-${order}`, 'run-order'), true)
+        assert.equal(await settle(h, owner, 'Engineer', `ANSWER-${order}`, 'run-order'), true)
         assert.equal((await pending).ok, true)
-        // Graceful scope close stages the inspector; the staged binding is
+        // Graceful scope close stages the delegate; the staged binding is
         // retired exactly once.
-        assert.equal(sync.stageDeletedInspector(h, owner), true)
+        assert.equal(sync.stageDeletedDelegate(h, owner), true)
         // After staging, the live binding is retired: scope-close resolves
-        // the staged (deleted) inspector, and the live child lookup is gone.
-        assert.equal(await sync.child(h, owner, 'Inspector'), null)
-        assert.match(String(sync.scopeCloseChild(h, owner, 'Inspector')), /child-1/)
+        // the staged (deleted) delegate, and the live child lookup is gone.
+        assert.equal(await sync.child(h, owner, 'Engineer'), null)
+        assert.match(String(sync.scopeCloseChild(h, owner, 'Engineer')), /child-1/)
       } else {
         // Delete first: the pending call is cancelled before its completion.
         sync.cancelSession(h, owner)

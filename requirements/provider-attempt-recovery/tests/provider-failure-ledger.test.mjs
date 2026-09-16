@@ -229,7 +229,7 @@ test('WHAT[PAR-014] a_continuation_has_a_unique_accounted_and_budgeted_occasion'
 })
 
 async function acceptHumanRoot(journal, userMessageId) {
-  const accepted = await failureAcceptHumanRoot(journal, SESSION, userMessageId, 'coder')
+  const accepted = await failureAcceptHumanRoot(journal, SESSION, userMessageId, 'engineer')
   assert.equal(accepted.ok, true, `AcceptHumanRoot failed: ${accepted.error}`)
 }
 

@@ -5,11 +5,6 @@ namespace Wanxiangshu.Resources
 type PromptCatalog =
     { ManagerSystemPrompt: string
       EngineerSystemPrompt: string
-      CoderSystemPrompt: string
       DevopsSystemPrompt: string
-      InspectorSystemPrompt: string
-      BrowserSystemPrompt: string
-      InquirySystemPrompt: string
       OrchestratorSystemPrompt: string
-      DistillerSystemPrompt: string
       BloggerSystemPrompt: string }

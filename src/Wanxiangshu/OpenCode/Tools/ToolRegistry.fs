@@ -34,6 +34,10 @@ module ToolRegistry =
         [<Literal>]
         let DeniedRole = "tool/registry/denied-role"
 
+        /// Fission is Engineer-only; its denial names the sole entitled role.
+        [<Literal>]
+        let DeniedFission = "tool/registry/denied-fission"
+
         [<Literal>]
         let DeniedAblation = "tool/registry/denied-ablation"
 
@@ -65,10 +69,6 @@ module ToolRegistry =
           "review", ReviewTool.admission
           "suicide", SuicideTool.admission
           "run", ExecutorTool.runAdmission
-          "query-shell", ExecutorTool.queryShellAdmission
-          "inspect", InspectorTool.admission
-          "establish-behavior", CoderTool.behaviorAdmission
-          "repair-behavior", CoderTool.behaviorAdmission
           "mv", FileMutationTools.mvAdmission
           "rm", FileMutationTools.rmAdmission
           "bash-honeypot", BashHoneypotTool.admission
@@ -227,10 +227,6 @@ module ToolRegistry =
               yield ReviewTool.spec factory runtime
               yield SuicideTool.spec factory runtime
               yield ExecutorTool.runSpec factory runtime
-              yield ExecutorTool.queryShellSpec factory runtime
-              yield InspectorTool.spec factory runtime.WorkspaceDirectory runtime.Snapshot syncDelegateRuntime
-              yield CoderTool.establishSpec factory runtime.WorkspaceDirectory runtime.Snapshot syncDelegateRuntime
-              yield CoderTool.repairSpec factory runtime.WorkspaceDirectory runtime.Snapshot syncDelegateRuntime
               yield FileMutationTools.mvSpec factory
               yield FileMutationTools.rmSpec factory
               yield BashHoneypotTool.spec
@@ -272,7 +268,13 @@ module ToolRegistry =
                 ToolHostCodec.tomlObjectWithInstructions [ ProviderProse.render (lang ctx) path subs ] []
 
             let denyRole (ctx: HostToolContext) (role: Role) =
-                denied ctx Path.DeniedRole (Map [ "tool", spec.Name; "role", sprintf "%A" role ])
+                let path =
+                    if spec.Name = "fission" then
+                        Path.DeniedFission
+                    else
+                        Path.DeniedRole
+
+                denied ctx path (Map [ "tool", spec.Name; "role", sprintf "%A" role ])
 
             // The current capability decides; the denial stays action-focused
             // and never echoes internal loop state.

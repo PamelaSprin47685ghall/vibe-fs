@@ -44,8 +44,6 @@ module ManagedAgent =
     let requiredNames = ManagedAgentCatalog.requiredNames
     let managerForkableNames = ManagedAgentCatalog.managerForkableNames
     let orchestratorForkableNames = ManagedAgentCatalog.orchestratorForkableNames
-    let inspectorToolNames = ManagedAgentCatalog.inspectorToolNames
-    let coderToolNames = ManagedAgentCatalog.coderToolNames
 
     let private mapIdentityError value error =
         match error with
@@ -91,14 +89,12 @@ module ManagedAgent =
         agent.Visibility = AgentVisibility.Internal
 
     let private unknownAgentSuggestion (name: string) =
-        if name.IndexOf("inspect", StringComparison.OrdinalIgnoreCase) >= 0 then
-            " Use 'inspector'."
-        elif name.IndexOf("review", StringComparison.OrdinalIgnoreCase) >= 0 then
+        if name.IndexOf("review", StringComparison.OrdinalIgnoreCase) >= 0 then
             " Use 'manager'."
         elif name.IndexOf("manager", StringComparison.OrdinalIgnoreCase) >= 0 then
             " Use 'manager'."
-        elif name.IndexOf("coder", StringComparison.OrdinalIgnoreCase) >= 0 then
-            " Use 'coder'."
+        elif name.IndexOf("engineer", StringComparison.OrdinalIgnoreCase) >= 0 then
+            " Use 'engineer'."
         else
             " Use a valid canonical managed agent name."
 

@@ -58,14 +58,9 @@ function makeConfig(llmUrl, pluginPaths = [], opts = {}) {
   const managedAgents = {
     orchestrator: { model: 'test/test-model' },
     manager: { model: 'test/test-model' },
-    coder: { model: 'test/test-model' },
-    inspector: { model: 'test/test-model' },
+    engineer: { model: 'test/test-model' },
     devops: { model: 'test/test-model' },
-    browser: { model: 'test/test-model' },
-    inquiry: { model: 'test/test-model' },
-    reviewer: { model: 'test/test-model' },
     blogger: { model: 'test/test-model' },
-    distiller: { model: 'test/test-model' },
     bookkeeper: { model: 'test/test-model' },
     predictor: { model: 'test/test-model' },
   };
@@ -112,21 +107,6 @@ function makeConfig(llmUrl, pluginPaths = [], opts = {}) {
 }
 
 /**
- * Create a fixture uvx shim that redirects to the stealth MCP fixture.
- */
-function createFixtureUvx(scenarioDir, fixturePath) {
-  const dir = path.join(scenarioDir, 'mcp-bin');
-  fs.mkdirSync(dir, { recursive: true });
-  const shim = path.join(dir, process.platform === 'win32' ? 'uvx.cmd' : 'uvx');
-  const body = process.platform === 'win32'
-    ? `@echo off\r\nnode "${fixturePath}"\r\n`
-    : `#!/usr/bin/env bash\nset -euo pipefail\nexec node "${fixturePath}"\n`;
-  fs.writeFileSync(shim, body, 'utf8');
-  if (process.platform !== 'win32') fs.chmodSync(shim, 0o755);
-  return dir;
-}
-
-/**
  * Build a fully isolated environment object.
  *
  * Returns ONLY the variables that MUST be overridden for a clean scenario.
@@ -140,7 +120,6 @@ function createFixtureUvx(scenarioDir, fixturePath) {
  * @param {string} [opts.model] - Model ID string (default "test/test-model")
  * @param {string} [opts.apiKey] - Provider API key
  * @param {string} [opts.routingSource] - Exact isolated ~/.config/opencode/wanxiangshu.mjs body
- * @param {string} [opts.mcpFixturePath] - Path to stealth MCP fixture
  * @param {object} [opts.extraEnv] - Additional env vars for this test
  * @returns {object} Environment key-value object to merge over process.env
  */
@@ -163,9 +142,10 @@ export function createIsolatedEnv(opts) {
   // recommended providers into a test provider process.
   const routingDir = path.join(home, '.config', 'opencode');
   fs.mkdirSync(routingDir, { recursive: true });
-  const routingSource = opts.routingSource || `export default function route(role) {
-  if (new Set(['manager', 'orchestrator', 'coder', 'inspector', 'browser', 'inquiry', 'reviewer', 'devops', 'distiller', 'blogger', 'bookkeeper', 'predictor']).has(role)) return { model: 'test/test-model', reasoning: 'none' }
-  throw new Error('unexpected managed role: ' + role)
+  const routingSource = `export const hasTheoreticalCapacity = () => true;
+export default function route(role, running, previous) {
+  if (new Set(['manager', 'orchestrator', 'engineer', 'devops', 'blogger', 'bookkeeper', 'predictor']).has(role)) return { model: 'test/test-model', reasoning: 'none' }
+  throw new Error('unexpected managed role: ' + role + ' | stack: ' + new Error().stack)
 }\n`;
   fs.writeFileSync(path.join(routingDir, 'wanxiangshu.mjs'), routingSource, 'utf8');
 
@@ -190,11 +170,6 @@ export function createIsolatedEnv(opts) {
 
   const mockApiBase = llmUrl.replace(/\/v1$/, '') + '/api';
   const config = makeConfig(llmUrl, opts.pluginPaths, opts);
-  const fixturePath = opts.mcpFixturePath || '';
-  const fixtureUvxDir = opts.mcpFixturePath
-    ? createFixtureUvx(scenarioDir, opts.mcpFixturePath)
-    : null;
-
   const extraEnv = opts.extraEnv || {};
   return {
     // extraEnv first, so non-isolation variables pass through; isolation vars below will always win.
@@ -239,10 +214,6 @@ export function createIsolatedEnv(opts) {
     WANXIANGSHU_PROVIDER_LANGUAGE: 'en',
     WANXIANGSHU_DIAG: '1',
 
-    // Optional MCP fixture
-    STEALTH_BROWSER_MCP_FIXTURE: fixturePath,
-    PATH: fixtureUvxDir
-      ? `${fixtureUvxDir}${path.delimiter}${extraEnv.PATH || process.env.PATH || ''}`
-      : (extraEnv.PATH || process.env.PATH || ''),
+    PATH: extraEnv.PATH || process.env.PATH || '',
   };
 }

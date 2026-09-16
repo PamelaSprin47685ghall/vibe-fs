@@ -30,3 +30,5 @@ module WorkRecordSurface =
 
     /// COMPANION-015 / EXEC-031: render one request-range bounded WorkRecord without exposing typed cursors.
     val lifecycleWorkRecordBounded: handle: JournalHandle -> sessionId: string -> range: obj -> Task<obj>
+
+    val materializeFissionInvocationRecord: convergedTrace: obj -> string

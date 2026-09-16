@@ -93,10 +93,10 @@ test('WHAT[REPOSITORY-PROGRAMMING-001] JS001_role_projection_is_exactly_roles_pe
 
 test('WHAT[REPOSITORY-PROGRAMMING-003] JS002_generation_is_deterministic_and_names_js_role', () => {
   const perms = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep, ToolPermission.Edit, ToolPermission.Write)
-  const a = generate('Coder', perms, 'en')
-  const b = generate('Coder', perms, 'en')
+  const a = generate('Engineer', perms, 'en')
+  const b = generate('Engineer', perms, 'en')
   assert.equal(isSome(a) && isSome(b), true)
-  assert.equal(a.toolName, 'js-coder')
+  assert.equal(a.toolName, 'js-engineer')
   assert.equal(a.description, b.description)
   assert.equal(a.baseClassSource, b.baseClassSource)
   assert.deepEqual(a.examples, b.examples)
@@ -104,7 +104,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-003] JS002_generation_is_deterministic_and_nam
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_capability_exactness_plus_one_ultra_example_coder', () => {
-  const result = surface('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'])
+  const result = surface('Engineer', ['Read', 'Write', 'Edit', 'Glob', 'Grep'])
   assert.equal(isSome(result), true)
   const layers = layersOf(result)
   assert.deepEqual(Object.keys(layers).sort(), ['edit', 'file', 'glob', 'grep', 'rewrite', 'write'])
@@ -125,7 +125,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_capability_exactness_plus_one_ultra
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_absent_capability_is_absent_in_all_four_layers', () => {
-  const result = surface('Inspector', ['Read', 'Glob', 'Grep']) // no Edit / Write
+  const result = surface('Engineer', ['Read', 'Glob', 'Grep']) // no Edit / Write
   assert.equal(isSome(result), true)
   assert.deepEqual(memberNames(result), ['file', 'glob', 'grep'])
   assert.equal(result.description.includes('edit(path'), false)
@@ -137,7 +137,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_absent_capability_is_absent_in_all_
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_edit_guidance_never_names_missing_read_or_write_members', () => {
-  const editOnly = surface('Coder', ['Edit'])
+  const editOnly = surface('Engineer', ['Edit'])
   assert.deepEqual(memberNames(editOnly), ['edit', 'rewrite'])
   for (const unavailable of [
     'file(matches)',
@@ -149,12 +149,12 @@ test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_edit_guidance_never_names_missing_r
   }
   assert.doesNotMatch(editOnly.description, /(^|[^A-Za-z0-9_])write\(path/m)
 
-  const readEdit = surface('Coder', ['Read', 'Edit'])
+  const readEdit = surface('Engineer', ['Read', 'Edit'])
   assert.deepEqual(memberNames(readEdit), ['file', 'edit', 'rewrite'])
   assert.equal(readEdit.description.includes('file(matches) + text() + rewrite()'), true)
   assert.doesNotMatch(readEdit.description, /(^|[^A-Za-z0-9_])write\(path/m)
 
-  const editWrite = surface('Coder', ['Edit', 'Write'])
+  const editWrite = surface('Engineer', ['Edit', 'Write'])
   assert.deepEqual(memberNames(editWrite), ['edit', 'rewrite', 'write'])
   assert.equal(editWrite.description.includes('file(matches)'), false)
   assert.equal(editWrite.description.includes('file(path'), false)
@@ -164,38 +164,38 @@ test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_edit_guidance_never_names_missing_r
 
 test('WHAT[REPOSITORY-PROGRAMMING-004] JS001_generated_name_gate_rejects_forged_names', () => {
   const perms = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep)
-  assert.equal(isGeneratedToolName('Inspector', perms, 'js-inspector'), true)
-  assert.equal(isGeneratedToolName('Inspector', perms, 'js-coder'), false)
-  assert.equal(isGeneratedToolName('Inspector', perms, 'read'), false)
+  assert.equal(isGeneratedToolName('Engineer', perms, 'js-engineer'), true)
+  assert.equal(isGeneratedToolName('Engineer', perms, 'js-devops'), false)
+  assert.equal(isGeneratedToolName('Engineer', perms, 'read'), false)
   // a role without the capability set never admits its own name
-  assert.equal(isGeneratedToolName('Coder', caps(ToolPermission.Fork), 'js-coder'), false)
+  assert.equal(isGeneratedToolName('Engineer', caps(ToolPermission.Fork), 'js-engineer'), false)
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_member_gate_binds_present_members_only', () => {
   const perms = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep)
-  assert.equal(memberBinding('Inspector', perms, 'file'), 'js.read')
-  assert.equal(memberBinding('Inspector', perms, 'glob'), 'js.glob')
-  assert.equal(memberBinding('Inspector', perms, 'grep'), 'js.grep')
-  assert.equal(memberBinding('Inspector', perms, 'edit'), undefined)
-  assert.equal(memberBinding('Inspector', perms, 'rewrite'), undefined)
-  assert.equal(memberBinding('Inspector', perms, 'write'), undefined)
-  assert.equal(memberBinding('Inquiry', caps(ToolPermission.Inspect), 'file'), undefined)
+  assert.equal(memberBinding('Engineer', perms, 'file'), 'js.read')
+  assert.equal(memberBinding('Engineer', perms, 'glob'), 'js.glob')
+  assert.equal(memberBinding('Engineer', perms, 'grep'), 'js.grep')
+  assert.equal(memberBinding('Engineer', perms, 'edit'), undefined)
+  assert.equal(memberBinding('Engineer', perms, 'rewrite'), undefined)
+  assert.equal(memberBinding('Engineer', perms, 'write'), undefined)
+  assert.equal(memberBinding('Blogger', caps(ToolPermission.Chronicle), 'file'), undefined)
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-003] JS002_same_capabilities_share_mechanics_but_role_shapes_the_ultra_example', () => {
-  const shared = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep)
-  const inspector = generate('Inspector', shared, 'en')
-  const manager = generate('Manager', shared, 'en')
-  assert.equal(inspector.baseClassSource, manager.baseClassSource)
-  assert.deepEqual(memberNames(inspector), memberNames(manager))
-  assert.notEqual(inspector.description, manager.description)
-  assert.match(inspector.description, /RetryPolicy/)
-  assert.match(manager.description, /staleReferences/)
+  const shared = caps(ToolPermission.Read, ToolPermission.Edit, ToolPermission.Glob, ToolPermission.Grep)
+  const engineer = generate('Engineer', shared, 'en')
+  const devops = generate('DevOps', shared, 'en')
+  assert.equal(engineer.baseClassSource, devops.baseClassSource)
+  assert.deepEqual(memberNames(engineer), memberNames(devops))
+  assert.notEqual(engineer.description, devops.description)
+  assert.match(engineer.description, /oldApi → newApi/)
+  assert.match(devops.description, /candidateTests/)
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-001] JS001_non_fs_permissions_never_produce_members', () => {
   for (const name of PERMISSION_NAMES.filter((n) => !['Read', 'Write', 'Edit', 'Glob', 'Grep'].includes(n))) {
-    const result = generate('Coder', caps(toolPermissionByName[name]), 'en')
+    const result = generate('Engineer', caps(toolPermissionByName[name]), 'en')
     assert.equal(isNone(result), true, `${name} alone must not generate a surface`)
   }
 })
@@ -203,14 +203,14 @@ test('WHAT[REPOSITORY-PROGRAMMING-001] JS001_non_fs_permissions_never_produce_me
 test('WHAT[REPOSITORY-PROGRAMMING-003] JS004_fast_deep_profiles_generate_identical_surfaces', () => {
   // Tier never reaches the generator: capability is role-only (AGENT-001).
   // The same capability set from a deep Coder yields byte-identical output.
-  const fast = generate('Coder', caps(ToolPermission.Read, ToolPermission.Glob), 'en')
-  const deep = generate('Coder', caps(ToolPermission.Read, ToolPermission.Glob), 'en')
+  const fast = generate('Engineer', caps(ToolPermission.Read, ToolPermission.Glob), 'en')
+  const deep = generate('Engineer', caps(ToolPermission.Read, ToolPermission.Glob), 'en')
   assert.equal(fast.baseClassSource, deep.baseClassSource)
   assert.equal(fast.description, deep.description)
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-005] JS002_description_embeds_spec_base_class_rules_and_one_ultra_example', () => {
-  const coder = surface('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'])
+  const coder = surface('Engineer', ['Read', 'Write', 'Edit', 'Glob', 'Grep'])
   for (const token of [
     'class JsProgram',
     'class Js extends JsProgram',
@@ -233,19 +233,12 @@ test('WHAT[REPOSITORY-PROGRAMMING-005] JS002_description_embeds_spec_base_class_
   }
   assert.equal(coder.description.includes('_api'), false)
   assert.equal(coder.description.includes('js.read'), false)
-  const inspector = surface('Inspector', ['Read', 'Glob', 'Grep'])
-  assert.equal(inspector.description.includes('HOST_READ_IMMUTABLE_UTF8_SNAPSHOT'), true)
-  assert.equal(inspector.description.includes('RetryPolicy'), true)
-  assert.equal(inspector.description.includes('this.rewrite'), false)
-  assert.equal(inspector.description.includes('this.edit'), false)
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-003] JS010_each_filesystem_role_gets_exactly_one_distinct_ultra_example', () => {
   const markers = {
-    Coder: /oldApi → newApi/,
-    Inspector: /RetryPolicy/,
+    Engineer: /oldApi → newApi/,
     DevOps: /candidateTests/,
-    Browser: /WidgetOptions/,
   }
 
   for (const [role, marker] of Object.entries(markers)) {
@@ -257,7 +250,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-003] JS010_each_filesystem_role_gets_exactly_o
 })
 
 test('WHAT[REPOSITORY-PROGRAMMING-005] JS010_description_never_dilutes_the_ultra_example', () => {
-  for (const role of ['Coder', 'Inspector', 'DevOps', 'Browser']) {
+  for (const role of ['Engineer', 'DevOps']) {
     const result = surface(role, rolePermissions(role.toLowerCase()))
     const classes = result.description.match(/class Js extends JsProgram/g) ?? []
     assert.equal(classes.length, 1, `${role} description must not dilute the Ultra Example with toy examples`)

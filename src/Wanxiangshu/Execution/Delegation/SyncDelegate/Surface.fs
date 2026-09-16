@@ -370,15 +370,15 @@ module SyncDelegateSurface =
                         match mode with
                         | "matching" ->
                             [ descriptor "host-child-wrong-agent" exactTitle "coder"
-                              descriptor "host-child-existing" exactTitle "inspector" ]
+                              descriptor "host-child-existing" exactTitle "engineer" ]
                         | "conflicting" ->
-                            [ descriptor "host-child-existing-a" exactTitle "inspector"
-                              descriptor "host-child-existing-b" exactTitle "inspector" ]
+                            [ descriptor "host-child-existing-a" exactTitle "engineer"
+                              descriptor "host-child-existing-b" exactTitle "engineer" ]
                         | "other-scope" ->
                             [ descriptor
                                   "host-child-other-scope"
-                                  "wanxiangshu:sync-delegate:v1:scope=another-owner:role=inspector:agent=inspector"
-                                  "inspector" ]
+                                  "wanxiangshu:sync-delegate:v1:scope=another-owner:role=engineer:agent=engineer"
+                                  "engineer" ]
                         | _ -> [ descriptor "host-child-wrong-agent" exactTitle "coder" ]
 
                     Task.FromResult(Ok children)
@@ -391,7 +391,7 @@ module SyncDelegateSurface =
                         [ { SessionId = child
                             ParentSessionId = Some parent
                             Title = Some "managed delegate"
-                            Agent = Some "inspector" }
+                            Agent = Some "engineer" }
                           { SessionId = child
                             ParentSessionId = Some parent
                             Title = Some "managed delegate"
@@ -432,6 +432,8 @@ module SyncDelegateSurface =
             Ok SyncDelegateRole.Coder
         elif value.Equals("Inspector", StringComparison.OrdinalIgnoreCase) then
             Ok SyncDelegateRole.Inspector
+        elif value.Equals("Engineer", StringComparison.OrdinalIgnoreCase) then
+            Ok SyncDelegateRole.Engineer
         else
             Error(sprintf "unknown role: %s" value)
 
@@ -447,6 +449,7 @@ module SyncDelegateSurface =
         function
         | SyncDelegateRole.Coder -> Role.Coder
         | SyncDelegateRole.Inspector -> Role.Inspector
+        | SyncDelegateRole.Engineer -> Role.Engineer
 
     let private createJournal (directory: string) : Task<AgentJournal> =
         task {
@@ -650,11 +653,11 @@ module SyncDelegateSurface =
             let ownerScope = ReuseScope.ofSession owner
 
             harness.Sessions.SetExpectedTitle(
-                SyncDelegatePhysicalIdentity.title ownerScope SyncDelegateRole.Inspector "inspector"
+                SyncDelegatePhysicalIdentity.title ownerScope SyncDelegateRole.Engineer "engineer"
             )
 
             let invocation =
-                harness.Runtime.Invoke(SessionId.value owner, SyncDelegateRole.Inspector, "probe")
+                harness.Runtime.Invoke(SessionId.value owner, SyncDelegateRole.Engineer, "probe")
 
             let! child, error =
                 if mode = "matching" || mode = "missing" || mode = "other-scope" then
@@ -723,8 +726,8 @@ module SyncDelegateSurface =
             let get () =
                 attached.GetOrCreate(
                     owner,
-                    SyncDelegateRole.Inspector,
-                    "inspector",
+                    SyncDelegateRole.Engineer,
+                    "engineer",
                     None,
                     observe,
                     create,
@@ -753,37 +756,20 @@ module SyncDelegateSurface =
                        children = children |}
         }
 
-    /// Execute the real InspectorTool specification against the opaque scope and
-    /// SyncDelegate runtime. Tool arguments/context are translated here so the
-    /// semantic caller never imports ToolHostCodec or InspectorTool internals.
-    let executeInspector (value: obj) (toolModule: obj) (owner: string) (charge: string) : Task<string> =
+    /// Run one internal Engineer research charge. The returned promise remains
+    /// pending until `settle` receives a reconciled provider turn; the charge is
+    /// data for a read-only Engineer, never a tool-module surface.
+    let executeEngineerCharge (value: obj) (owner: string) (charge: string) : Task<string> =
         task {
             let harness = unbox<Harness> value
 
-            let spec =
-                InspectorTool.spec
-                    (ToolHostCodec.factory toolModule)
-                    harness.Scope.WorkspaceDirectory
-                    harness.Scope.Snapshot
-                    (Some harness.Runtime)
+            let! result =
+                harness.Runtime.Invoke(SessionId.value (harness.OwnerSession owner), SyncDelegateRole.Engineer, charge)
 
-            let args =
-                HostToolArguments(
-                    box
-                        {| charge = charge
-                           keywords = null
-                           expected_tool_calls = null |}
-                )
-
-            let context: HostToolContext =
-                { SessionId = SessionId.value (harness.OwnerSession owner)
-                  Agent = None
-                  ToolCallId = None
-                  ProviderRunId = None
-                  PromptText = None
-                  AttachAbort = fun _ -> fun () -> () }
-
-            return! spec.Execute args context
+            return
+                match result with
+                | Ok workRecord -> Wanxiangshu.OpenCode.ToolHostCodec.tomlObjectWithInstructions [ workRecord ] []
+                | Error error -> failwith error
         }
 
     /// Invoke one ordinary managed delegation. The returned promise remains
@@ -1036,12 +1022,12 @@ module SyncDelegateSurface =
             | Some sessionId -> box (SessionId.value sessionId)
             | None -> null
 
-    let stageDeletedInspector (value: obj) (owner: string) : bool =
+    let stageDeletedDelegate (value: obj) (owner: string) : bool =
         let harness = unbox<Harness> value
         let ownerSession = harness.OwnerSession owner
 
-        match harness.Runtime.TryFind(ownerSession, SyncDelegateRole.Inspector) with
-        | Some child -> harness.Runtime.StageDeletedInspector(ownerSession, child)
+        match harness.Runtime.TryFind(ownerSession, SyncDelegateRole.Engineer) with
+        | Some child -> harness.Runtime.StageDeletedDelegate(ownerSession, child)
         | None -> false
 
     let scopeCloseChild (value: obj) (owner: string) (role: string) : obj =

@@ -48,9 +48,11 @@ Uncertainty 往往应当让第一次 commitment 更短，而不是更长。
 
 Model 可以接收更多文字，却反而变得更不了解情况。重复内容与 decisive lines 争夺空间；大输出拉长 evidence 与 decision 之间的距离；raw material 会占用 working space。
 
-Output budget 是一种 commitment：多少 raw evidence 值得直接进入你的 present，超过多少之后 condensation 变得更便宜。它不是对 command 最终会输出多少字节的 prediction。
+输出预算限制进入当前视野的原始证据，不预测命令最终产出多少字节。
+小输出原样保留，大输出只留有界原文尾部并声明截断。没有模型替你解释或挑选省略部分，决定性的错误未必在尾部。
 
-Raw output 能保留 summary 可能破坏的 exact wording、ordering clues、paths、numbers、rare warnings 与 contradictions。Condensation 是 interpretation；raw output 是 observation。目标不是最小化 output，而是在 raw material 的 expected decision value 仍高于 attention cost 时保留它。
+原文保留的是你实际收到的那部分文字、路径、数字和矛盾。截断不保留完整性，也不能证明没有看到的错误从未发生。
+目标不是输出最少，而是证据足以支持判断。更早的片段会影响决定时，由有权角色取得有针对性的新观察，不用散文把它补出来。
 
 Failure trace 的第一个 kilobyte 可能极其有价值。第一百万行重复的 success 信息可能几乎没有价值。
 在继续购买更多阅读之前，先问能否提出一个更好的问题，直接选出真正重要的 evidence。

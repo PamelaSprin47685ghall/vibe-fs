@@ -14,8 +14,8 @@ const inheritedIdentitySeed = (session) => ({
   ownerLogicalRun: `run-${session}-owner`,
   ownerAuthorityRoot: `root-${session}-owner`,
   participantIdentity: {
-    participant: 'coder',
-    role: 'coder',
+    participant: 'engineer',
+    role: 'engineer',
     selectedTier: 'deep',
     persona: 'Lead',
     personaCatalogVersion: 1,

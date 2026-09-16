@@ -56,6 +56,8 @@ module ChatParamsHook =
 
     let private isManagedName (agent: string) =
         ManagedAgent.requiredNames |> List.contains agent
+        || agent = "coder"
+        || agent = "inspector"
 
     let private trySessionId (input: obj) =
         if isNull input then

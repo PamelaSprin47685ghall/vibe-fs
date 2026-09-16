@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import * as workRecord from '../../../dist/Work/Record/Surface.js'
+import * as workRecord from '../../../dist/Mission/WorkRecord/Surface.js'
 
 test('WHAT[WORK-RECORD-017] T22_fission_convergence_materializes_single_canonical_invocation_work_record', () => {
   assert.equal(typeof workRecord.materializeFissionInvocationRecord, 'function', 'must export materializeFissionInvocationRecord')

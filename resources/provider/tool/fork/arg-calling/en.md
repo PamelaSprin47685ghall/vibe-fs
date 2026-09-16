@@ -1,6 +1,3 @@
-Required. The office/persona to entrust when calling a new person.
-
-Choose according to the kind of consequence required, using the office
-boundaries in this tool description.
-
-To continue an existing person by name, use resume instead.
+Required for a new Engineer: use Engineer. This chooses the engineering office,
+not a speed or reasoning-depth alias. DevOps is runtime-bound and cannot be
+forked. Continuing an existing participant uses resume without calling.

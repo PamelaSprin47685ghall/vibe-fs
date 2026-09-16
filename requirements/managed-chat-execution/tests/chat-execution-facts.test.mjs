@@ -25,10 +25,10 @@ const acceptedWire = (physicalUserMessageId, overrides = {}) => {
       {
         InitialTier: 'deep',
         Origin: 'ResolvedAtRoot',
-        Persona: 'Coder',
+        Persona: 'Engineer',
         PersonaCatalogVersion: 1,
-        Role: 'coder',
-        SelectedAgent: 'coder',
+        Role: 'engineer',
+        SelectedAgent: 'engineer',
       },
     ],
     PhysicalUserMessageId: tagged('PhysicalUserMessageId', physicalUserMessageId),
@@ -218,7 +218,7 @@ test('WHAT[CHATEXEC-010] cancel and delete settle every exact projected executio
     const sessionId = `ses-${lifecycle}-drain`
     const messageIds = [`msg-${lifecycle}-a`, `msg-${lifecycle}-b`]
     const identities = [
-      { role: 'coder', participant: 'coder' },
+      { role: 'engineer', participant: 'engineer' },
       { role: 'inspector', participant: 'inspector' },
     ]
     const runtimes = new Map()

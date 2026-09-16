@@ -12,14 +12,14 @@ module CasebookLifecycle =
 
     val isEnabled: unit -> bool
 
-    val notePrompt: inspectorSessionId: string -> q: string -> unit
+    val notePrompt: delegateSessionId: string -> q: string -> unit
 
-    val noteAnswer: inspectorSessionId: string -> a: string -> unit
+    val noteAnswer: delegateSessionId: string -> a: string -> unit
 
-    val cleanupInspector: inspectorSessionId: string -> unit
+    val cleanupDraft: delegateSessionId: string -> unit
 
-    val tryFinalizeInspector:
-        workspaceRoot: string -> store: IEventStore -> inspectorSessionId: string -> Task<InspectorFinalizeSettlement>
+    val tryFinalizeDraft:
+        workspaceRoot: string -> store: IEventStore -> delegateSessionId: string -> Task<CaseFinalizeSettlement>
 
     val finalizeEngineerCase:
         store: IEventStore ->
@@ -29,6 +29,6 @@ module CasebookLifecycle =
         a: string ->
         relatedPaths: string list ->
         completionStateRef: string ->
-            Task<InspectorFinalizeSettlement>
+            Task<CaseFinalizeSettlement>
 
     val touchAccess: workspaceRoot: string -> store: IEventStore -> sessionId: string -> Task<unit>

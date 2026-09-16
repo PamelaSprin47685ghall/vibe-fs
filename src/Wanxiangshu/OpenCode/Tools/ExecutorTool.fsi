@@ -50,7 +50,10 @@ module ExecutorTool =
             val CannotRunFromContext: string = "tool/run/cannot-run-from-context"
 
             [<Literal>]
-            val CannotCondenseUntilAuthority: string = "tool/run/cannot-condense-until-authority"
+            val CannotReadOutputUntilAuthority: string = "tool/run/cannot-read-output-until-authority"
+
+            [<Literal>]
+            val OutputTruncated: string = "tool/run/output-truncated"
 
             [<Literal>]
             val LargeOutputRecoveryBlocked: string = "tool/run/large-output-recovery-blocked"
@@ -75,8 +78,7 @@ module ExecutorTool =
             [<Literal>]
             val ArgWorldLock: string = "tool/query-shell/arg-world_lock"
 
-    /// Provider-visible execution verb. Distillation is invoked inside this
-    /// tool and is never a separate provider verb (PROC-011 / DISTILL-010).
+    /// Provider-visible bounded execution with raw, explicitly truncated output.
     [<Literal>]
     val RunToolName: string = "run"
 
@@ -91,4 +93,4 @@ module ExecutorTool =
     val runSpec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
     val queryShellSpec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
 
-    val internal formatSpooledOutcome: exitCode: int -> summary: string -> string
+    val internal formatSpooledOutcome: exitCode: int -> output: string -> string

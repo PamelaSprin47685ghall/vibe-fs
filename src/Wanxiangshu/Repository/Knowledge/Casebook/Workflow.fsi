@@ -13,12 +13,17 @@ module CasebookFeature =
 /// CASE-003/004/005 / KR-004/005/015: Casebook workflow.
 module CasebookWorkflow =
 
-    val archiveInspectorResult: store: IEventStore -> case: Case -> Task<Result<unit, string>>
     val archiveCase: store: IEventStore -> case: Case -> Task<Result<unit, string>>
-    val fetchCase: store: IEventStore -> capacity: int -> identityOrSessionId: string -> Task<Result<Case option, string>>
+
+    val fetchCase:
+        store: IEventStore -> capacity: int -> identityOrSessionId: string -> Task<Result<Case option, string>>
+
     val fetchCaseByIdentity: store: IEventStore -> identity: string -> Task<Result<Case option, string>>
     val checkFreshness: stored: Case -> replayed: Observation list -> ReplayResult
-    val needsRefresh: store: IEventStore -> capacity: int -> sessionId: string -> root: string -> Task<Result<bool, string>>
+
+    val needsRefresh:
+        store: IEventStore -> capacity: int -> sessionId: string -> root: string -> Task<Result<bool, string>>
+
     val refreshCase:
         store: IEventStore ->
         identity: string ->

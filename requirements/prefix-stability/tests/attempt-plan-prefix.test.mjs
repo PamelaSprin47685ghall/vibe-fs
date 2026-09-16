@@ -36,7 +36,7 @@ test('WHAT[PREFIX-STABILITY-003] CTX_010_a_discarded_probe_leaves_the_committed_
   const committed = snapshotAt(4)
 
   const failed = planner.attemptPlan({
-    role: 'Coder',
+    role: 'Engineer',
     tier: 'Fast',
     kind: 'WorkMain',
     mayRecover: true,

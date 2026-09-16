@@ -96,3 +96,50 @@ module JsToolGenerator =
             members
             |> List.tryFind (fun fragment -> fragment.MemberName = memberName)
             |> Option.map (fun fragment -> fragment.RuntimeBindingKey))
+
+/// Transaction context supporting separation of ReadSnapshots and SubstantiveAccess (RP-026 / T18 / T19).
+type JsTransactionContext() =
+    let readSnapshots = System.Collections.Generic.HashSet<string>()
+    let explicitReads = System.Collections.Generic.HashSet<string>()
+    let stagedWrites = System.Collections.Generic.Dictionary<string, string>()
+    let mutable isAborted = false
+    let mutable isCommitted = false
+
+    member _.RecordGrepScan(paths: string seq) : unit =
+        for p in paths do
+            readSnapshots.Add p |> ignore
+
+    member _.recordGrepScan(paths: string array) : unit =
+        for p in paths do
+            readSnapshots.Add p |> ignore
+
+    member _.RecordExplicitRead(path: string) : unit =
+        readSnapshots.Add path |> ignore
+        explicitReads.Add path |> ignore
+
+    member _.recordExplicitRead(path: string) : unit =
+        readSnapshots.Add path |> ignore
+        explicitReads.Add path |> ignore
+
+    member _.StageWrite(path: string, content: string) : unit = stagedWrites.[path] <- content
+
+    member _.stageWrite(path: string, content: string) : unit = stagedWrites.[path] <- content
+
+    member _.Abort() : unit = isAborted <- true
+    member _.abort() : unit = isAborted <- true
+
+    member _.Commit() : unit =
+        if not isAborted then
+            isCommitted <- true
+
+    member _.commit() : unit =
+        if not isAborted then
+            isCommitted <- true
+
+    member _.GetReadSnapshots() : string array = readSnapshots |> Seq.toArray
+    member _.getReadSnapshots() : string array = readSnapshots |> Seq.toArray
+    member _.GetSubstantiveAccess() : string array = explicitReads |> Seq.toArray
+    member _.getSubstantiveAccess() : string array = explicitReads |> Seq.toArray
+
+module JsSurfaceExports =
+    let createTransactionContext () : JsTransactionContext = JsTransactionContext()

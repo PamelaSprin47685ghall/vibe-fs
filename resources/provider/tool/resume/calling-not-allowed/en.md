@@ -1,2 +1,3 @@
-resume continues a person already known in this mission; it never calls a new one.
-Passing calling is a fork decision. Use resume with the same name only, or use fork to create a new person.
+resume never calls a new one and cannot select a role. Use fork to create a new participant.
+Pass the existing name and new charge without
+calling. Do not fork a replacement DevOps; continue the fixed binding.

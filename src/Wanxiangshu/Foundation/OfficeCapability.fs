@@ -18,20 +18,17 @@ type ToolPermission =
     | Grep
     | Move
     | Remove
-    | Inspect
-    | Behavior
     | Exec
     | Pty
-    | Network
     | ReviewAssessment
     | Chronicle
-    /// CASE-009: conditional Casebook read surface for Coder/Inspector.
+    /// CASE-009: conditional Casebook read surface for Engineer.
     | Fetch
     /// GLORY-036: the Manager's own end-of-life tool (`suicide`).
     | Finality
-    /// Coder-only honeypot: visible as `bash-honeypot`, never a real shell.
+    /// Engineer honeypot: visible as `bash-honeypot`, never a real shell.
     | BashHoneypot
-    /// AGENT-030: Inquiry-only Sphinx MCP wildcard (`sphinx_*`).
+    /// AGENT-030: Sphinx MCP wildcard (`sphinx_*`) for the programmatic workflow entry.
     | Sphinx
 
 [<RequireQualifiedAccess>]
@@ -68,32 +65,10 @@ module OfficeCapability =
                   ToolPermission.BashHoneypot
                   ToolPermission.Fetch
                   ToolPermission.Fission ]
-        | Role.Coder ->
-            set
-                [ ToolPermission.Read
-                  ToolPermission.Write
-                  ToolPermission.Edit
-                  ToolPermission.Glob
-                  ToolPermission.Grep
-                  ToolPermission.Move
-                  ToolPermission.Remove
-                  ToolPermission.BashHoneypot
-                  ToolPermission.Inspect
-                  ToolPermission.Fetch ]
-        | Role.Inspector ->
-            set
-                [ ToolPermission.Read
-                  ToolPermission.Glob
-                  ToolPermission.Grep
-                  ToolPermission.Exec
-                  ToolPermission.Fetch ]
-        | Role.Browser ->
-            set
-                [ ToolPermission.Read
-                  ToolPermission.Glob
-                  ToolPermission.Grep
-                  ToolPermission.Network ]
-        | Role.Inquiry -> set [ ToolPermission.Inspect; ToolPermission.Sphinx ]
+        | Role.Coder -> Set.empty
+        | Role.Inspector -> Set.empty
+        | Role.Browser -> Set.empty
+        | Role.Inquiry -> Set.empty
         | Role.DevOps ->
             set
                 [ ToolPermission.Read
@@ -112,7 +87,10 @@ module OfficeCapability =
         | Role.Blogger -> set [ ToolPermission.Chronicle ]
 
     let isAllowed (role: Role) (permission: ToolPermission) : bool =
-        permissions role |> Set.contains permission
+        if Roles.all |> List.contains role then
+            permissions role |> Set.contains permission
+        else
+            false
 
     /// Manager gate over exact RoadView facts. No phase enum crosses this
     /// boundary: retired/no-active grants nothing, a cleanup blocker confines

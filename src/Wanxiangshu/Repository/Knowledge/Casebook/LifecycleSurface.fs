@@ -29,7 +29,7 @@ module CasebookLifecycleSurface =
         CasebookLifecycle.collector.Count sessionId
 
     let cleanup (sessionId: string) : unit =
-        CasebookLifecycle.cleanupInspector sessionId
+        CasebookLifecycle.cleanupDraft sessionId
 
     let private acquireStore (workspaceRoot: string) : IEventStore =
         Wanxiangshu.OpenCode.WorkspaceEventStore.acquire (RuntimePath.gitCommonDir workspaceRoot)
@@ -38,15 +38,15 @@ module CasebookLifecycleSurface =
         let store = acquireStore workspaceRoot
 
         task {
-            let! settled = CasebookLifecycle.tryFinalizeInspector workspaceRoot store sessionId
+            let! settled = CasebookLifecycle.tryFinalizeDraft workspaceRoot store sessionId
 
             return
                 match settled.Commitment with
-                | InspectorFinalizeCommitment.Finalized
-                | InspectorFinalizeCommitment.NothingToFinalize -> box {| ok = true |}
-                | InspectorFinalizeCommitment.NotCommitted reason
-                | InspectorFinalizeCommitment.Unknown reason
-                | InspectorFinalizeCommitment.PhaseConflict reason -> box {| ok = false; error = reason |}
+                | CaseFinalizeCommitment.Finalized
+                | CaseFinalizeCommitment.NothingToFinalize -> box {| ok = true |}
+                | CaseFinalizeCommitment.NotCommitted reason
+                | CaseFinalizeCommitment.Unknown reason
+                | CaseFinalizeCommitment.PhaseConflict reason -> box {| ok = false; error = reason |}
         }
 
     let touchAccess (workspaceRoot: string) (sessionId: string) : Task<unit> =

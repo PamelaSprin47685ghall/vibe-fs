@@ -114,7 +114,7 @@ module CompressionSurface =
 
     let private roleResult value : Result<Role, string> =
         if isNullish value then
-            Ok Role.Coder
+            Ok Role.Engineer
         else
             match Roles.tryParseRole (text value) with
             | Some role -> Ok role
@@ -169,11 +169,8 @@ module CompressionSurface =
         | ToolPermission.Grep -> "Grep"
         | ToolPermission.Move -> "Move"
         | ToolPermission.Remove -> "Remove"
-        | ToolPermission.Inspect -> "Inspect"
-        | ToolPermission.Behavior -> "Behavior"
         | ToolPermission.Exec -> "Exec"
         | ToolPermission.Pty -> "Pty"
-        | ToolPermission.Network -> "Network"
         | ToolPermission.ReviewAssessment -> "ReviewAssessment"
         | ToolPermission.Chronicle -> "Chronicle"
         | ToolPermission.Fetch -> "Fetch"
@@ -269,6 +266,7 @@ module CompressionSurface =
     let attemptPlanner =
         box
             {| plan = (fun value -> attemptPlanWithHandle value)
+               attemptPlan = (fun value -> attemptPlan value)
                promotableProbeId = (fun value outcome -> promotableProbeId value outcome) |}
 
     let private terminalValidityResult (value: string) : Result<unit, TerminalValidity.Rejection> =

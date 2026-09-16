@@ -5,6 +5,15 @@ open System.Threading.Tasks
 /// Access tracker for substantive file access collection.
 type AccessTracker =
     new: unit -> AccessTracker
+    member recordRead: path: string * contentHash: string -> unit
+    member recordCreate: path: string -> unit
+    member recordEdit: path: string -> unit
+    member recordDelete: path: string -> unit
+    member recordMove: source: string * destination: string -> unit
+    member recordGrep: pattern: string * path: string -> unit
+    member recordGlob: pattern: string -> unit
+    member recordAttemptedMutation: path: string * committed: bool -> unit
+    member getRelatedPaths: unit -> string array
     member RecordRead: path: string * contentHash: string -> unit
     member RecordCreate: path: string -> unit
     member RecordEdit: path: string -> unit
@@ -35,6 +44,7 @@ module CasebookCapture =
 
     /// Create an access tracker.
     val createAccessTracker: unit -> AccessTracker
+    val baselineFromObservations: observations: Observation list -> relatedPaths: string list -> obj
 
     /// Record substantive access onto a tracker.
     val recordSubstantiveAccess: tracker: AccessTracker -> toolName: string -> args: obj -> committed: bool -> unit

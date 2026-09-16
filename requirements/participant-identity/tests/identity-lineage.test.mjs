@@ -50,7 +50,7 @@ const inheritedSeed = (child, owner) => {
 
 test('WHAT[PID-008] inherited identity records the exact durable owner witness', () => {
   const owner = rootProfile()
-  const seed = inheritedSeed('coder', owner)
+  const seed = inheritedSeed('engineer', owner)
 
   assert.deepEqual(
     {
@@ -75,8 +75,8 @@ test('WHAT[PID-008] inherited identity records the exact durable owner witness',
       origin: seed.participantIdentity.origin,
     },
     {
-      participant: 'coder',
-      role: 'coder',
+      participant: 'engineer',
+      role: 'engineer',
       persona: owner.participantIdentity.persona,
       personaCatalogVersion: owner.participantIdentity.personaCatalogVersion,
       origin: 'InheritedFromOwner',
@@ -85,7 +85,7 @@ test('WHAT[PID-008] inherited identity records the exact durable owner witness',
 })
 
 test('WHAT[PID-008] rejects stale owner identity evidence', () => {
-  const seed = inheritedSeed('inspector', rootProfile())
+  const seed = inheritedSeed('devops', rootProfile())
   const currentOwnerRun = rootProfile('ses_owner', 'msg_fresh_owner_root')
 
   const validation = authority.validateInheritedIdentitySeed(currentOwnerRun, seed)
@@ -180,13 +180,13 @@ test('WHAT[PID-008] durable inherited seed round-trips without re-resolution', (
 })
 
 test('WHAT[PID-008] raw legacy PeerAgent fields are ignored and never re-encoded', () => {
-  const canonical = canonicalIdentityOf('inspector')
+  const canonical = canonicalIdentityOf('engineer')
   const legacySeed = {
     kind: 'RootSelection',
     ownerSession: null,
     ownerLogicalRun: null,
     ownerAuthorityRoot: null,
-    participantIdentity: { ...canonical, peerAgent: 'inspector', PeerAgent: 'inspector' },
+    participantIdentity: { ...canonical, peerAgent: 'engineer', PeerAgent: 'engineer' },
   }
   const created = authority.createAuthorityRoot(
     H,

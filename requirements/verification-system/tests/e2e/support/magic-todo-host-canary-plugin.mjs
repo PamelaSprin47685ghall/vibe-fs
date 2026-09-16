@@ -432,7 +432,7 @@ export const assertMagicTodoHostCanariesAEGH = (dir, opts = {}) => {
       `HOST_CANARY_MANAGER: Manager provider wire must advertise the production todowrite membrane: ${JSON.stringify(managerProviderWire)}`,
     );
   }
-  for (const required of ['fork', 'horizon', 'join', 'fission', 'todowrite', 'suicide']) {
+  for (const required of ['fork', 'horizon', 'join', 'resume', 'todowrite', 'suicide']) {
     if (!managerProviderWire.unionTools.includes(required)) {
       throw new Error(`HOST_CANARY_MANAGER: missing Manager tool ${required}`);
     }

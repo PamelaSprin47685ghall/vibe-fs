@@ -27,9 +27,9 @@ const currentPayload = {
     ownerLogicalRun: null,
     ownerAuthorityRoot: null,
     participantIdentity: {
-      participant: 'coder',
-      role: 'coder',
-      persona: 'Coder',
+      participant: 'engineer',
+      role: 'engineer',
+      persona: 'Engineer',
       personaCatalogVersion: 1,
       origin: 'ResolvedAtRoot',
     },
@@ -48,8 +48,8 @@ const inheritedPayload = {
     ownerLogicalRun: 'run-authority-owner',
     ownerAuthorityRoot: 'root-authority-owner',
     participantIdentity: {
-      participant: 'coder',
-      role: 'coder',
+      participant: 'engineer',
+      role: 'engineer',
       persona: 'Lead',
       personaCatalogVersion: 1,
       origin: 'InheritedFromOwner',
@@ -215,9 +215,9 @@ test('WHAT[INTERACTION-AUTHORITY-003] stale legacy peer fields normalize to cano
   const decoded = factCodec.decode(stale)
   assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
   assert.deepEqual(decoded.payload.IdentitySeed.participantIdentity, {
-    participant: 'coder',
-    role: 'coder',
-    persona: 'Coder',
+    participant: 'engineer',
+    role: 'engineer',
+    persona: 'Engineer',
     personaCatalogVersion: 1,
     origin: 'ResolvedAtRoot',
 })
@@ -233,11 +233,11 @@ test('WHAT[INTERACTION-AUTHORITY-003] malformed schema-v2 identity fails closed 
 
 test('WHAT[INTERACTION-AUTHORITY-003] mismatched schema-v2 identity fails closed precisely', () => {
   const mismatch = replacePayload(factCodec.encode(currentFact()), (payload) => {
-    identityInSeed(payload.IdentitySeed).Persona = 'Engineer'
+    identityInSeed(payload.IdentitySeed).Persona = 'Auditor'
   })
   assertDecodeErrorAcrossReplayRoutes(
     mismatch,
-    /participant identity Persona mismatch: expected Coder, got Engineer/,
+    /participant identity Persona mismatch: expected Engineer, got Auditor/,
   )
 })
 

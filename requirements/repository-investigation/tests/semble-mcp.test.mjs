@@ -11,7 +11,7 @@ import * as semble from '../../../dist/Repository/Investigation/SembleSurface.js
 
 const here = dirname(fileURLToPath(import.meta.url))
 const fixturePath = join(here, '../../verification-system/tests/support/semble-mcp-fixture.js')
-const ROLES = ['Manager', 'Orchestrator', 'Coder', 'Inspector', 'Browser', 'Inquiry', 'DevOps', 'Distiller', 'Blogger', 'Bookkeeper']
+const ROLES = ['Manager', 'Orchestrator', 'Engineer', 'DevOps', 'Blogger', 'Bookkeeper']
 const agentName = (role) => `${role.toLowerCase()}`
 const uvxFrom = (ref) => ['uvx', '--from', `semble[mcp] @ git+https://github.com/MinishLab/semble.git@${ref}`, 'semble']
 
@@ -106,7 +106,7 @@ test('WHAT[REPOSITORY-INVESTIGATION-001] AGENT_027_configure_does_not_inject_hos
   const config = buildConfig()
   assert.equal(managedAgentConfig.configure(config).ok, true)
   assert.equal(config.mcp?.[semble.serverName], undefined)
-  assert.equal(config.mcp?.['stealth-browser-mcp']?.type, 'local')
+  assert.equal(config.mcp?.['stealth-browser-mcp'], undefined)
   for (const role of ROLES) {
     const permission = config.agent[agentName(role)].permission
     assert.equal(permission.semble, undefined, `${agentName(role)} semble`)

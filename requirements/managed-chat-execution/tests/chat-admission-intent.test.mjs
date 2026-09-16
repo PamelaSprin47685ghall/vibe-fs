@@ -29,7 +29,7 @@ test('WHAT[INTERACTION-AUTHORITY-005] exhaustive chat admission intent table', (
     promptKey: 'prompt-1',
     sessionId: 'ses-chat',
     origin: 'InteractionRepair',
-    participant: 'coder',
+    participant: 'engineer',
   }
 
   const cases = [
@@ -40,13 +40,13 @@ test('WHAT[INTERACTION-AUTHORITY-005] exhaustive chat admission intent table', (
     },
     {
       label: 'fresh external managed root',
-      decoded: message({ explicitAgent: 'coder' }),
+      decoded: message({ explicitAgent: 'engineer' }),
       expected: {
         case: 'ExternalRootIntent',
         sessionId: 'ses-chat',
         physicalUserMessageId: 'msg-chat',
-        explicitAgent: 'coder',
-        participant: 'coder',
+        explicitAgent: 'engineer',
+        participant: 'engineer',
         origin: 'HumanRoot',
         identitySeed: 'RootSelection',
       },
@@ -60,7 +60,7 @@ test('WHAT[INTERACTION-AUTHORITY-005] exhaustive chat admission intent table', (
         sessionId: 'ses-chat',
         physicalUserMessageId: 'msg-chat',
         promptKey: 'prompt-1',
-        participant: 'coder',
+        participant: 'engineer',
         origin: 'InteractionRepair',
         identitySeed: 'RootSelection',
       },
@@ -84,7 +84,7 @@ test('WHAT[INTERACTION-AUTHORITY-005] exhaustive chat admission intent table', (
 
 test('WHAT[INTERACTION-AUTHORITY-007] unknown origin is rejected while active', () => {
   assert.deepEqual(
-    decide(message(), snapshot({ activeParticipant: 'coder', activeKind: 'HumanRoot' })),
+    decide(message(), snapshot({ activeParticipant: 'engineer', activeKind: 'HumanRoot' })),
     { case: 'Reject', reason: 'UnknownOriginWhileActive' },
   )
 })
@@ -92,8 +92,8 @@ test('WHAT[INTERACTION-AUTHORITY-007] unknown origin is rejected while active', 
 test('WHAT[INTERACTION-AUTHORITY-009] explicit agent cannot infer HumanRoot while active', () => {
   assert.deepEqual(
     decide(
-      message({ explicitAgent: 'inspector' }),
-      snapshot({ activeParticipant: 'coder', activeKind: 'HumanRoot' }),
+      message({ explicitAgent: 'manager' }),
+      snapshot({ activeParticipant: 'engineer', activeKind: 'HumanRoot' }),
     ),
     { case: 'Reject', reason: 'UnknownOriginWhileActive' },
   )
@@ -102,21 +102,21 @@ test('WHAT[INTERACTION-AUTHORITY-009] explicit agent cannot infer HumanRoot whil
 test('WHAT[INTERACTION-AUTHORITY-009] matching user agent continues the exact active root', () => {
   assert.deepEqual(
     decide(
-      message({ explicitAgent: 'coder' }),
-      snapshot({ activeParticipant: 'coder', activeKind: 'HumanRoot' }),
+      message({ explicitAgent: 'engineer' }),
+      snapshot({ activeParticipant: 'engineer', activeKind: 'HumanRoot' }),
     ),
     {
       case: 'ActiveHumanContinuationIntent',
       sessionId: 'ses-chat',
       physicalUserMessageId: 'msg-chat',
-      participant: 'coder',
+      participant: 'engineer',
       origin: 'HumanMessage',
     },
   )
 })
 
 test('WHAT[INTERACTION-AUTHORITY-005] rejects managed intent without physical message identity', () => {
-  assert.deepEqual(decide(message({ physicalUserMessageId: null, explicitAgent: 'coder' })), {
+  assert.deepEqual(decide(message({ physicalUserMessageId: null, explicitAgent: 'engineer' })), {
     case: 'Reject',
     reason: 'ManagedIntentMissingPhysicalUserMessageId',
   })
@@ -130,7 +130,7 @@ test('WHAT[INTERACTION-AUTHORITY-005] rejects managed intent without physical me
             promptKey: 'prompt-1',
             sessionId: 'ses-chat',
             origin: 'InteractionRepair',
-            participant: 'coder',
+            participant: 'engineer',
           },
         ],
       }),
@@ -141,7 +141,7 @@ test('WHAT[INTERACTION-AUTHORITY-005] rejects managed intent without physical me
 
 test('WHAT[INTERACTION-AUTHORITY-005] rejects insufficient exact identity evidence', () => {
   const rows = [
-    [message({ sessionId: null, explicitAgent: 'coder' }), 'ManagedIntentMissingSessionId'],
+    [message({ sessionId: null, explicitAgent: 'engineer' }), 'ManagedIntentMissingSessionId'],
     [message({ explicitAgent: 'legacy-coder' }), 'InvalidExplicitAgent'],
     [message({ promptKey: 'missing' }), 'PromptKeyNotClaimed'],
   ]
@@ -158,7 +158,7 @@ test('WHAT[INTERACTION-AUTHORITY-008] accepted Host identity outranks claim and 
         promptKey: 'prompt-1',
         sessionId: 'ses-chat',
         origin: 'InteractionRepair',
-        participant: 'coder',
+        participant: 'engineer',
       },
     ],
     acceptedContinuations: [{ physicalUserMessageId: 'msg-chat', origin: 'JoinGuard' }],
@@ -174,7 +174,7 @@ test('WHAT[INTERACTION-AUTHORITY-008] registered AgentOwnerRoot outranks externa
   assert.deepEqual(
     decide(
       message({ promptKey: 'unclaimed-owner-root', explicitAgent: 'reviewer' }),
-      snapshot({ activeParticipant: 'coder', activeKind: 'AgentOwnerRoot' }),
+      snapshot({ activeParticipant: 'engineer', activeKind: 'AgentOwnerRoot' }),
     ),
     { case: 'Reject', reason: 'AgentOwnerRootPromptNotClaimed' },
   )
@@ -187,7 +187,7 @@ test('WHAT[INTERACTION-AUTHORITY-008] plugin claim is frozen even if the later p
         promptKey: 'prompt-1',
         sessionId: 'ses-chat',
         origin: 'InteractionRepair',
-        participant: 'coder',
+        participant: 'engineer',
       },
     ],
   })
@@ -198,7 +198,7 @@ test('WHAT[INTERACTION-AUTHORITY-008] plugin claim is frozen even if the later p
 
   assert.equal(resolved.case, 'PendingPromptIntent')
   assert.equal(resolved.promptKey, 'prompt-1')
-  assert.equal(resolved.participant, 'coder')
+  assert.equal(resolved.participant, 'engineer')
   assert.equal('effectiveAgent' in resolved, false, 'intent carries no EffectiveAgent')
   assert.equal('selectedAgent' in resolved, false, 'intent carries no SelectedAgent')
 })

@@ -42,8 +42,9 @@ module BookkeeperRuntime =
     /// Pure domain decisions: prompt/evidence shaping and receipt classification.
     module private Decisions =
 
-        let systemInstructions (ownerSessionId: string) =
-            PromptResources.bookkeeperInstructionTextsFor (ProviderProse.languageOf (SessionId.create ownerSessionId))
+        let requestInstructions (lang: ProviderLanguage) (path: string) =
+            PromptResources.bookkeeperInstructionTextsFor lang
+            @ [ ProviderProse.render lang path Map.empty ]
 
         let evidencePatch (observations: Observation list) : string =
             observations
@@ -63,15 +64,28 @@ module BookkeeperRuntime =
                     "grep " + pattern + " " + flat)
             |> String.concat "\n"
 
-        let createRefreshPrompt (q: string) (a: string) (relatedPaths: string list) (diff: string) : string =
-            LlmFacing.instructions (systemInstructions "")
+        let createRefreshPrompt
+            (lang: ProviderLanguage)
+            (q: string)
+            (a: string)
+            (relatedPaths: string list)
+            (diff: string)
+            : string =
+            LlmFacing.instructions (requestInstructions lang "casebook/refresh")
             |> LlmFacing.withData
                 [ LlmFacing.Data.table "request" [ LlmFacing.Data.stringMember "kind" "CaseRefresh" ]
                   LlmFacing.Data.table "question" [ LlmFacing.Data.stringMember "content" q ]
                   LlmFacing.Data.table "answer" [ LlmFacing.Data.stringMember "content" a ]
-                  LlmFacing.Data.table "related_paths" [ LlmFacing.Data.stringMember "paths" (relatedPaths |> String.concat "\n") ]
+                  LlmFacing.Data.table
+                      "related_paths"
+                      [ LlmFacing.Data.stringMember "paths" (relatedPaths |> String.concat "\n") ]
                   LlmFacing.Data.table "diff" [ LlmFacing.Data.stringMember "content" diff ] ]
             |> LlmFacing.render
+
+        let private transcriptTable (textOpt: string option) : LlmFacing.DataBlock list =
+            match textOpt |> Option.filter (String.IsNullOrWhiteSpace >> not) with
+            | Some text -> [ LlmFacing.Data.table "transcript" [ LlmFacing.Data.stringMember "content" text ] ]
+            | None -> []
 
         let envelope
             (kind: BookkeeperRequest)
@@ -84,25 +98,30 @@ module BookkeeperRuntime =
             match kind with
             | BookkeeperRequest.CaseRefresh ->
                 let diffText = extraTranscript |> Option.defaultValue ""
-                let related = observations |> List.choose (function Observation.FileRead(p, _) -> Some p | _ -> None)
-                createRefreshPrompt q a related diffText
+
+                let related =
+                    observations
+                    |> List.choose (function
+                        | Observation.FileRead(p, _) -> Some p
+                        | _ -> None)
+
+                createRefreshPrompt (ProviderProse.languageOf (SessionId.create ownerSessionId)) q a related diffText
             | BookkeeperRequest.CaseFinalize ->
                 let kindLabel = "CaseFinalize"
-                let transcriptBlock =
-                    match extraTranscript with
-                    | Some text when not (String.IsNullOrWhiteSpace text) ->
-                        [ LlmFacing.Data.table "transcript" [ LlmFacing.Data.stringMember "content" text ] ]
-                    | _ -> []
 
-                LlmFacing.instructions (systemInstructions ownerSessionId)
+                let transcriptBlock = transcriptTable extraTranscript
+
+                LlmFacing.instructions (
+                    requestInstructions (ProviderProse.languageOf (SessionId.create ownerSessionId)) "casebook/finalize"
+                )
                 |> LlmFacing.withData (
                     [ LlmFacing.Data.table "request" [ LlmFacing.Data.stringMember "kind" kindLabel ]
                       LlmFacing.Data.table "case" [ LlmFacing.Data.stringMember "session_id" ownerSessionId ]
                       LlmFacing.Data.table "question" [ LlmFacing.Data.stringMember "content" q ]
                       LlmFacing.Data.table "answer" [ LlmFacing.Data.stringMember "content" a ]
                       LlmFacing.Data.table
-                          "repository_change"
-                          [ LlmFacing.Data.stringMember "patch" (evidencePatch observations) ] ]
+                          "source_observations"
+                          [ LlmFacing.Data.stringMember "records" (evidencePatch observations) ] ]
                     @ transcriptBlock
                 )
                 |> LlmFacing.render
@@ -110,7 +129,16 @@ module BookkeeperRuntime =
         let canonicalAgent = ManagedAgentCatalog.bookkeeperName
 
     let createRefreshPrompt (q: string) (a: string) (relatedPaths: string list) (diff: string) : string =
-        Decisions.createRefreshPrompt q a relatedPaths diff
+        Decisions.createRefreshPrompt ProviderLanguage.English q a relatedPaths diff
+
+    let createRefreshPromptFor
+        (lang: ProviderLanguage)
+        (q: string)
+        (a: string)
+        (relatedPaths: string list)
+        (diff: string)
+        : string =
+        Decisions.createRefreshPrompt lang q a relatedPaths diff
 
     /// Attachment bookkeeping only.
     module private Ledger =

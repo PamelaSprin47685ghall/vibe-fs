@@ -70,7 +70,7 @@ test('WHAT[PID-008] SyncDelegate identity inherits its exact owner Persona and v
   )
   assert.equal(created.ok, true, created.ok ? '' : created.error)
   const owner = created.value
-  const issued = authority.issueInheritedIdentitySeed('inspector', owner)
+  const issued = authority.issueInheritedIdentitySeed('engineer', owner)
   assert.equal(issued.ok, true, issued.ok ? '' : issued.error)
 
   assert.deepEqual(
@@ -84,8 +84,8 @@ test('WHAT[PID-008] SyncDelegate identity inherits its exact owner Persona and v
       ownerAuthorityRoot: issued.value.ownerAuthorityRoot,
     },
     {
-      participant: 'inspector',
-      role: 'inspector',
+      participant: 'engineer',
+      role: 'engineer',
       persona: owner.participantIdentity.persona,
       personaCatalogVersion: owner.participantIdentity.personaCatalogVersion,
       ownerSession: owner.session,

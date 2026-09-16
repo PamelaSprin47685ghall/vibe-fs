@@ -236,10 +236,10 @@ module Surface =
         | Some roadView ->
             let defaultDevops = "devops:" + road
             let devopsId = defaultArg roadView.BoundDevOps defaultDevops
+
             let incumbentId =
-                roadView.ActiveIncumbency
-                |> Option.map IncumbencyId.value
-                |> nullableString
+                roadView.ActiveIncumbency |> Option.map IncumbencyId.value |> nullableString
+
             box
                 {| devopsId = devopsId
                    incumbentId = incumbentId |}

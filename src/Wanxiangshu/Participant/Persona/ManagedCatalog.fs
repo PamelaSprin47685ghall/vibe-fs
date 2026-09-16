@@ -70,8 +70,7 @@ module ManagedAgentCatalog =
 
     /// Manager fork-agent enum (AGENT-009 / GLORY-031 / proposal §7.1):
     /// Only Engineer is forkable by Manager.
-    let managerForkableRoles: Role list =
-        [ Role.Engineer ]
+    let managerForkableRoles: Role list = [ Role.Engineer ]
 
     /// InternalLeaf Bookkeeper — not a public Role.
     let bookkeeperNames: string list = [ "bookkeeper" ]
@@ -89,14 +88,21 @@ module ManagedAgentCatalog =
 
     let orchestratorForkableNames: string list = [ Roles.roleLabel Role.Manager ]
 
-    let inspectorToolNames: string list = [ Roles.roleLabel Role.Inspector ]
-
-    let coderToolNames: string list = [ Roles.roleLabel Role.Coder ]
-
     let engineerToolNames: string list = [ Roles.roleLabel Role.Engineer ]
 
     let legacyAgentNames: Set<string> =
-        set [ "build"; "plan"; "student"; "teacher"; "meditator"; "executor" ]
+        set
+            [ "coder"
+              "inspector"
+              "browser"
+              "inquiry"
+              "distiller"
+              "build"
+              "plan"
+              "student"
+              "teacher"
+              "meditator"
+              "executor" ]
 
     let isLegacyAgentName (lower: string) : bool =
         legacyAgentNames.Contains lower || lower.Contains("_")

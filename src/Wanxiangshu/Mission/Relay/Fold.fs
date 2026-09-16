@@ -500,37 +500,50 @@ module private Internal =
               SeenAssessmentIds = Set.empty
               Certificate = None
               LatestRetirement = None
-              BoundDevOps = Some ("devops:" + RoadId.value roadId) }
+              BoundDevOps = Some("devops:" + RoadId.value roadId) }
             |> fun opened -> update roadId opened state
             |> Ok
+
+    let private isForeignDevOps roadId (existing: string) (devopsId: string) =
+        existing <> devopsId && existing <> ("devops:" + RoadId.value roadId)
+
+    let private applyDevOpsBinding roadId state (current: RoadState) devopsId =
+        match current.BoundDevOps with
+        | Some existing when existing = devopsId -> Ok state
+        | Some existing when isForeignDevOps roadId existing devopsId -> Error "RoadDevOpsAlreadyBound"
+        | _ ->
+            update
+                roadId
+                { current with
+                    BoundDevOps = Some devopsId }
+                state
+            |> Ok
+
+    let private openRoadForDevOps roadId state devopsId =
+        let opened =
+            { AuthorityRevision = AuthorityRevision.create ""
+              AuthorityRevisions = []
+              AuthorityMessageIds = []
+              Active = None
+              Retired = []
+              RetiredProviderRunIds = Set.empty
+              SeenAssessmentIds = Set.empty
+              Certificate = None
+              LatestRetirement = None
+              BoundDevOps = Some devopsId }
+
+        update roadId opened state |> Ok
+
+    let private applyDevOpsToRoad roadId state (existing: RoadState option) devopsId =
+        match existing with
+        | None -> openRoadForDevOps roadId state devopsId
+        | Some current -> applyDevOpsBinding roadId state current devopsId
 
     let private bindDevOps roadId state eventRoadId devopsId =
         if eventRoadId <> roadId then
             Error "RoadIdentityMismatch"
         else
-            match road roadId state with
-            | None ->
-                let authorityRevision = AuthorityRevision.create ""
-                { AuthorityRevision = authorityRevision
-                  AuthorityRevisions = []
-                  AuthorityMessageIds = []
-                  Active = None
-                  Retired = []
-                  RetiredProviderRunIds = Set.empty
-                  SeenAssessmentIds = Set.empty
-                  Certificate = None
-                  LatestRetirement = None
-                  BoundDevOps = Some devopsId }
-                |> fun opened -> update roadId opened state
-                |> Ok
-            | Some current ->
-                match current.BoundDevOps with
-                | Some existing when existing = devopsId -> Ok state
-                | Some existing when existing <> devopsId && existing <> ("devops:" + RoadId.value roadId) ->
-                    Error "RoadDevOpsAlreadyBound"
-                | _ ->
-                    let updated = { current with BoundDevOps = Some devopsId }
-                    update roadId updated state |> Ok
+            applyDevOpsToRoad roadId state (road roadId state) devopsId
 
     let private makePendingIncumbency (current: RoadState) incumbentId snapshotId =
         { Id = incumbentId
@@ -635,8 +648,7 @@ module private Internal =
         match event with
         | RelayEvent.RoadOpened(eventRoadId, authorityRevision, authorityMessageId) ->
             openRoad roadId state eventRoadId authorityRevision authorityMessageId
-        | RelayEvent.RoadDevOpsBound(eventRoadId, devopsId) ->
-            bindDevOps roadId state eventRoadId devopsId
+        | RelayEvent.RoadDevOpsBound(eventRoadId, devopsId) -> bindDevOps roadId state eventRoadId devopsId
         | RelayEvent.IncumbencyOpened(incumbentId, snapshotId) -> openIncumbency roadId state incumbentId snapshotId
         | RelayEvent.AssessmentCommitted(assessmentId, incumbencyId, binding, snapshotId, authorityRevision, scores) ->
             result {
@@ -737,17 +749,19 @@ module Decision =
         | Some view when view.AuthorityRevision <> authorityRevision -> Error "AuthorityRevisionMismatch"
         | Some _ -> commit state roadId [ RelayEvent.IncumbencyOpened(incumbentId, snapshotId) ]
 
+    let private isForeignDevOps roadId (existing: string) (devopsId: string) =
+        existing <> devopsId && existing <> ("devops:" + RoadId.value roadId)
+
+    let private applyRoadDevOpsBinding state roadId (view: RoadView) devopsId =
+        match view.BoundDevOps with
+        | Some existing when existing = devopsId -> Ok state
+        | Some existing when isForeignDevOps roadId existing devopsId -> Error "RoadDevOpsAlreadyBound"
+        | _ -> commit state roadId [ RelayEvent.RoadDevOpsBound(roadId, devopsId) ]
+
     let bindRoadDevOps state roadId devopsId =
         match Fold.view state roadId with
-        | None ->
-            commit state roadId [ RelayEvent.RoadDevOpsBound(roadId, devopsId) ]
-        | Some view ->
-            match view.BoundDevOps with
-            | Some existing when existing = devopsId -> Ok state
-            | Some existing when existing <> devopsId && existing <> ("devops:" + RoadId.value roadId) ->
-                Error "RoadDevOpsAlreadyBound"
-            | _ ->
-                commit state roadId [ RelayEvent.RoadDevOpsBound(roadId, devopsId) ]
+        | None -> commit state roadId [ RelayEvent.RoadDevOpsBound(roadId, devopsId) ]
+        | Some view -> applyRoadDevOpsBinding state roadId view devopsId
 
     let advanceAuthority state roadId incumbentId expected next authorityMessageId snapshotId =
         commit

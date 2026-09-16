@@ -43,6 +43,7 @@ test('WHAT[ENF-010] MACFG_validate_rejects_legacy_agent_present', () => {
   const cfg = fullConfig()
   cfg.agent.build = {}
   assert.match(errOf(validate(cfg)), /build/)
+  delete cfg.agent.build
   cfg.agent.coder = {}
   assert.match(errOf(validate(cfg)), /coder/)
 })

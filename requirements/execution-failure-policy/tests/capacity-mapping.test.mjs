@@ -5,7 +5,7 @@ import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 
 const target = { model: 'provider/model', reasoning: 'none' }
 const identity = (physicalUserMessageId) => ({
-  sessionId: 'session-capacity', physicalUserMessageId, role: 'coder', participant: 'coder',
+  sessionId: 'session-capacity', physicalUserMessageId, role: 'engineer', participant: 'engineer',
   target,
 })
 
@@ -14,8 +14,8 @@ const acquire = (runtime, physicalUserMessageId) =>
     runtime,
     'session-capacity',
     physicalUserMessageId,
-    'coder',
-    'coder',
+    'engineer',
+    'engineer',
     null,
   )
 

@@ -101,3 +101,7 @@ module SemanticTraceSurface =
     val currentProjection: handle: JournalHandle -> sessionId: string -> Task<obj>
     val currentProjectionBetween: handle: JournalHandle -> sessionId: string -> range: obj -> Task<obj>
     val renderRange: handle: JournalHandle -> sessionId: string -> range: obj -> Task<string>
+    val mergeKeyedLaneTraces: lanesObj: obj -> obj array
+    val emptyTrace: unit -> obj
+    val createInvocationBoundary: traceObj: obj -> invId: string -> obj
+    val isDisjointRange: range1: obj -> range2: obj -> bool

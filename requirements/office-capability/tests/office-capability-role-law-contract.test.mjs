@@ -30,8 +30,8 @@ test('WHAT[OFF-007] manager_has_no_personal_repository_witness_and_no_fission', 
   const zh = readRole('manager', 'zh-CN.md')
   assert.match(en, /do not establish repository facts with your own hands/i)
   assert.match(zh, /不以自己的双手去建立 repository 事实/)
-  assert.doesNotMatch(en, /fission/i, 'Manager must not carry fission affordance')
-  assert.doesNotMatch(zh, /fission|裂变/, 'Manager must not carry fission affordance')
+  assert.match(en, /cannot (?:use )?Fission/i, 'Manager must explicitly deny fission')
+  assert.match(zh, /不能(?:使用)?\s*Fission/, 'Manager must explicitly deny fission')
 })
 
 test('WHAT[OFF-011] manager_audit_pending_consequence_is_readonly_assessment_not_mutation', () => {
@@ -55,10 +55,11 @@ test('WHAT[OFF-016] engineer_role_law_carries_investigation_mutation_and_exclusi
   const zh = readRole('engineer', 'zh-CN.md')
   assert.match(en, /local facts|read, create, modify, move, delete/i)
   assert.match(en, /only.*fission/i)
-  assert.match(en, /do not execute real commands|do not.*devops/i)
+  assert.match(en, /do not execute real commands|do not.*devops|not execute real commands/i)
   assert.match(zh, /本地事实调查.*源码/i)
-  assert.match(zh, /唯一允许使用 Fission/i)
-  assert.match(zh, /不执行真实命令.*不.*DevOps/i)
+  assert.match(zh, /唯一允许使用 Fission|唯一具备 Fission/i)
+  assert.match(zh, /不执行真实命令，即使是只读命令也不例外/)
+  assert.match(zh, /不要借[\s\S]{0,80}DevOps[\s\S]{0,30}绕过/)
 })
 
 test('WHAT[OFF-017] devops_role_law_carries_execution_and_inherent_repair_without_allow_repair_toggle', () => {

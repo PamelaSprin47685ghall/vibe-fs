@@ -41,7 +41,8 @@ module Persona =
 
     let tryParse (label: string) : Persona option =
         match label with
-        | "Director" -> Some Persona.Director
+        | "Director"
+        | "DirectorV1" -> Some Persona.Director
         | "Lead" -> Some Persona.Lead
         | "Engineer" -> Some Persona.Engineer
         | "Coder" -> Some Persona.Coder
@@ -67,12 +68,12 @@ module PersonaCatalog =
         | Role.Orchestrator -> Persona.Director
         | Role.Manager -> Persona.Lead
         | Role.Engineer -> Persona.Engineer
+        | Role.DevOps -> Persona.Operator
+        | Role.Blogger -> Persona.Chronicler
         | Role.Coder -> Persona.Coder
         | Role.Inspector -> Persona.Investigator
-        | Role.DevOps -> Persona.Operator
         | Role.Browser -> Persona.Researcher
         | Role.Inquiry -> Persona.Analyst
-        | Role.Blogger -> Persona.Chronicler
         | Role.Distiller -> Persona.Distiller
 
     let bookkeeperPersona () : Persona = Persona.Curator

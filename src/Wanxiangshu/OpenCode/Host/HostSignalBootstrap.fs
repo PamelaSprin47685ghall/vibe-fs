@@ -93,18 +93,18 @@ module HostSignalBootstrap =
         (observeHostInternalTerminal: ExactProviderTerminalObservation -> unit)
         /// Workspace root for graceful Casebook finalize (SpikePlugin → CasebookLifecycle).
         (workspaceDirectory: string option)
-        /// Owner-scope graceful close: finalize inspector draft once (root → inspectorSessionId).
+        /// Owner-scope graceful close: finalize inspector draft once (root → delegateSessionId).
         /// Returns a Task so SessionDeleted can await CaseFinalize before CancelSession.
-        (tryFinalizeInspector: (string -> string -> Task<InspectorFinalizeSettlement>) option)
-        /// Unexpected / residual draft cleanup (inspectorSessionId).
-        (cleanupInspector: (string -> unit) option)
+        (tryFinalizeDraft: (string -> string -> Task<CaseFinalizeSettlement>) option)
+        /// Unexpected / residual draft cleanup (delegateSessionId).
+        (cleanupDraft: (string -> unit) option)
         : Task<WiredSignals> =
         task {
-            let finalizeInspector =
-                defaultArg tryFinalizeInspector (fun _ inspectorSessionId ->
-                    Task.FromResult(InspectorFinalizeSettlement.nothingToFinalize inspectorSessionId))
+            let finalizeDelegate =
+                defaultArg tryFinalizeDraft (fun _ delegateSessionId ->
+                    Task.FromResult(CaseFinalizeSettlement.nothingToFinalize delegateSessionId))
 
-            let cleanupInspectorDraft = defaultArg cleanupInspector (fun _ -> ())
+            let cleanupDelegateDraft = defaultArg cleanupDraft (fun _ -> ())
 
             let snapshot =
                 match snapshotOpt with
@@ -224,10 +224,10 @@ module HostSignalBootstrap =
                     scope.RunBackground(fun () ->
                         task {
                             do!
-                                HostSessionDeletion.finalizePreparedInspector
+                                HostSessionDeletion.finalizePreparedDelegate
                                     scope
                                     workspaceDirectory
-                                    finalizeInspector
+                                    finalizeDelegate
                                     deletion
 
                             ProviderAttemptStopFence.shared.Revoke sessionId
@@ -242,7 +242,7 @@ module HostSignalBootstrap =
                             do!
                                 HostSessionDeletion.handle
                                     scope
-                                    cleanupInspectorDraft
+                                    cleanupDelegateDraft
                                     reconciler.Signal
                                     sessionId
                                     strengthPorts.OnSessionDeleted

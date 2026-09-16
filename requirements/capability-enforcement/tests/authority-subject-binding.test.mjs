@@ -25,7 +25,7 @@ const evidence = (overrides = {}) => ({
       selectedAgent: 'engineer',
       canonicalRole: 'engineer',
       selectedTier: 'deep',
-      persona: 'Coder',
+      persona: 'Engineer',
       personaCatalogVersion: 1,
       origin: 'ResolvedAtRoot',
     },

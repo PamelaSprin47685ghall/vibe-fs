@@ -16,13 +16,21 @@ Office 能力是纯粹的后果模型，权限矩阵仅是其在执行层的投�
 
 同一条 Entitled Consequence 会同时投影到 Manager Role Law、fork/resume 工具描述、各 Office 的自我模型以及调用方边界镜像中。各处投影文案可以因语境调整，但语义内核必须同源一致，严禁出现分叉。
 
+角色合并必须重写完整工作链，不能只换名称或在旧说明前追加新规则。共同法、角色自述、派工与接力提示、工具说明、错误提示、案例整理、输出截断、纪律提示和模型配置都必须讲述同一套当前职责。中英文同时生效。
+
+Engineer 的调查不包含任何真实命令执行，即使命令只读；只读调研是本次任务约束，不是另一个角色。DevOps 的普通修复允许既定需求内的工程判断，不以「只有唯一机械操作」或逐次批准为前提。Manager 必须区分 Engineer 完成、DevOps 运行和自修后的重新验证、自己作出的验收判断。
+
+已撤销角色、同步委托和模型蒸馏不得继续以可加载提示词、工具建议、旧别名或模型池留在 resources/。普通浏览器测试与一般探究用语不属于旧角色，不作关键词式误删。资源回归须覆盖实际分发资源及其调用接点，而非只检查角色目录。
+
 ## OFF-006: offices 不可互换：禁止把 office 当可互换通用 agent
 
 各 Office 具备不可替代的领域边界：Engineer 不是真实命令执行器；DevOps 不是架构/产品决策者，亦不负责差遣其他代理；Manager 不是工作区代码修改者或文件检视者；Sphinx 是程序工作流而非通用代理。
 
 ## OFF-007: Manager 无普通工具：不读文件、不跑终端、不改仓库、不 inspect，无 Fission
 
-Manager 的核心权能是统筹、委托、评估与集成，不亲自建立仓库具体事实。Manager 面向模型的工具仅限于 fork (仅 Engineer)、resume (仅固定 DevOps)、join、horizon、todowrite、review、suicide 等编排、记账与评审接口，不具备文件读写、终端运行或直接 inspect 的能力，严禁使用 Fission，从一而终依靠委派与收集工作。
+Manager 的核心权能是统筹、委托、评估与集成，不亲自建立仓库具体事实。Manager 面向模型的工具仅限于 fork (仅 Engineer)、resume (已有 Engineer 续做或固定 DevOps)、join、horizon、todowrite、review、suicide 等编排、记账与评审接口，不具备文件读写、终端运行或直接 inspect 的能力，严禁使用 Fission，从一而终依靠委派与收集工作。
+
+resume 的同道路续做语义归 DELEG-003、DELEG-024 所有。「DevOps 只能通过 resume 调用」不等于「resume 只能用于 DevOps」；续做不能改变已有角色、已绑定配置或控制权，也不能创建替代 DevOps。
 
 ## OFF-011: Manager consequence = 完整管理与编排权能；non-consequence = 亲自修改工作树与使用 Fission
 

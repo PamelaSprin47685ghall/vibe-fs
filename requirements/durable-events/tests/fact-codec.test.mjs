@@ -44,7 +44,7 @@ const handleLinked = (overrides = {}) => ({
     Handle: 'h-hl',
     TargetAgent: 'coder',
     Byname: 'Rhea',
-    CanonicalRole: 'Coder',
+    CanonicalRole: 'Engineer',
     Ownership: 'DurableParentHandle',
     ...overrides,
   },

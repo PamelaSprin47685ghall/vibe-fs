@@ -27,13 +27,13 @@ const {
   portList,
 } = await import('../../../dist/Process/Surface.js')
 
-const agent = { Name: 'distiller' }
+const agent = { Name: 'devops' }
 const bytes = new TextEncoder().encode('hi')
 const write = ptyCommandWrite(bytes)
 const signalOf = (name) => ptyCommandSignal(name)
 const id = (value) => ptyId(value)
 const forkDefault = (port, value, command = 'echo hi') =>
-  portFork(port, command, 'distiller', value === undefined ? undefined : id(value), undefined)
+  portFork(port, command, 'devops', value === undefined ? undefined : id(value), undefined)
 const success = { ok: true, value: undefined }
 const failure = (error) => ({ ok: false, error })
 const exitSignal = () => {
@@ -64,7 +64,7 @@ test('WHAT[PROC-001] PORT_ctor_keeps_supplied_sender_and_handler', async () => {
   assert.deepEqual(await portSend(port, pid, write), success)
   assert.deepEqual(seen, ['Write'])
   assert.equal(portList(port).ptys.length, 1)
-  assert.equal(portList(port).ptys[0].agent, 'distiller')
+  assert.equal(portList(port).ptys[0].agent, 'devops')
 
   portComplete(port, pid, { ok: true, value: 'done' })
   assert.equal(receivedEvents.length, 1)
@@ -109,7 +109,7 @@ test('WHAT[PROC-001] PORT_fork_honors_explicit_id_and_cwd', async () => {
       return success
     },
   })
-  const pid = portFork(port, 'ls -la', 'distiller', id('pty-custom'), '/srv')
+  const pid = portFork(port, 'ls -la', 'devops', id('pty-custom'), '/srv')
   assert.equal(ptyIdView(pid), 'pty-custom')
   assert.deepEqual(seen, [['pty-custom', 'ls -la', '/srv']])
 })
@@ -421,7 +421,7 @@ test('WHAT[PROC-007] PORT_list_reports_active_handles', () => {
   assert.equal(listed.ptys.length, 1)
   assert.equal(listed.ptys[0].command, 'tail -f')
   assert.equal(listed.ptys[0].id, 'pty-ls')
-  assert.equal(listed.ptys[0].agent, 'distiller')
+  assert.equal(listed.ptys[0].agent, 'devops')
   assert.ok(typeof listed.ptys[0].startedAt === 'string')
 
   portComplete(port, pid, { ok: true, value: 'done' })

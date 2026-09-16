@@ -7,6 +7,7 @@ import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.j
 
 const hash = (value) => `H(${value})`
 const personas = {
+  engineer: 'Engineer',
   coder: 'Coder',
   manager: 'Lead',
   reviewer: 'Auditor',
@@ -43,7 +44,7 @@ const inheritedSelection = (agent, physical) => {
   assert.equal(inherited.ok, true, inherited.error)
   return inherited.value
 }
-const rootFor = (agent = 'coder', physical = 'msg_u1', kind = 'HumanRoot') => {
+const rootFor = (agent = 'engineer', physical = 'msg_u1', kind = 'HumanRoot') => {
   const seed = kind === 'AgentOwnerRoot' ? inheritedSelection(agent, physical) : rootSelection(agent)
   const result = authority.createAuthorityRoot(hash, 'rt_1', 'ses_a', kind, physical, seed)
   assert.equal(result.ok, true, result.error)
@@ -77,8 +78,8 @@ test('WHAT[INTERACTION-AUTHORITY-004] IA_004_continuation_inherits_run_and_root'
       origin: 'Continuation',
       logicalRun: 'H(rt_1\nses_a\nmsg_u1)',
       authorityRoot: 'msg_u1',
-      participant: 'coder',
-      role: 'coder',
+      participant: 'engineer',
+      role: 'engineer',
     },
   )
 
@@ -109,7 +110,7 @@ test('WHAT[INTERACTION-AUTHORITY-005] IA_005_every_continuation_kind_is_parseabl
 
 // INTERACTION-AUTHORITY-008/009: accepted > claimed > compaction > owner root > unknown.
 test('WHAT[INTERACTION-AUTHORITY-008] IA_008_resolution_order_is_accepted_then_claimed_then_compaction_then_root', () => {
-  const root = rootFor('coder', 'msg_u1', 'AgentOwnerRoot')
+  const root = rootFor('engineer', 'msg_u1', 'AgentOwnerRoot')
   let state = register(root)
 
   const claimed = authority.claimContinuation('pk_claimed', 'ses_a', 'ManagerGuard', root, 'pd-c')
@@ -148,7 +149,7 @@ test('WHAT[INTERACTION-AUTHORITY-008] IA_008_accepted_continuation_outranks_comp
 })
 
 test('WHAT[INTERACTION-AUTHORITY-009] IA_009_pure_resolution_never_infers_human_root', () => {
-  const root = rootFor('coder', 'msg_u1', 'HumanRoot')
+  const root = rootFor('engineer', 'msg_u1', 'HumanRoot')
   const state = register(root)
   assert.equal(state.activeLogicalRun.authorityKind, 'HumanRoot')
   assert.equal(authority.resolveKnownOrigin('msg_new', 'pk_any', false, state), 'UnknownOrigin')
@@ -174,7 +175,7 @@ test('WHAT[INTERACTION-AUTHORITY-007] IA_007_unknown_origin_changes_no_projectio
   const state = register(root)
   const before = JSON.stringify(state)
   assert.equal(authority.resolveKnownOrigin('msg_never_proven', 'pk_never_proven', false, state), 'UnknownOrigin')
-  assert.deepEqual(intent.resolve({ sessionId: 'ses_a', physicalUserMessageId: 'msg_never_proven', explicitAgent: null, promptKey: null, hostCompaction: false, hostSynthetic: false }, { available: true, activeAgent: 'coder', activeKind: 'HumanRoot', claims: [], acceptedContinuations: [] }), { case: 'Reject', reason: 'UnknownOriginWhileActive' })
+  assert.deepEqual(intent.resolve({ sessionId: 'ses_a', physicalUserMessageId: 'msg_never_proven', explicitAgent: null, promptKey: null, hostCompaction: false, hostSynthetic: false }, { available: true, activeAgent: 'engineer', activeKind: 'HumanRoot', claims: [], acceptedContinuations: [] }), { case: 'Reject', reason: 'UnknownOriginWhileActive' })
   assert.equal(JSON.stringify(state), before)
 })
 

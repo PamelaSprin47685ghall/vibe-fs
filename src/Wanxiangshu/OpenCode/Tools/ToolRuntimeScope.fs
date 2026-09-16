@@ -619,11 +619,11 @@ type ToolRuntimeScope
                         NodeTiming.raceExit,
                         ?journal = journal,
                         onChildCreated = (fun _ role childId -> registerChild ctx.SessionId role childId),
-                        // EXEC-014: map/reduce Distiller children are Host-owned and
+                        // EXEC-014: host executor leaves are Host-owned and
                         // parent-invisible. A DurableParentHandle would leak every
                         // worker into the caller's list/join/guard (EXEC-016) and
                         // block suicide with "join before end" long after `run`
-                        // returned the distilled summary.
+                        // returned its bounded result.
                         ownership = HandleOwnership.HostOwnedHidden
                     )
 

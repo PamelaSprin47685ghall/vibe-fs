@@ -26,11 +26,14 @@ Verification 的价值，恰恰在于它被允许反驳作者。一个永远不�
 ## 修复策略
 先把 prose 降级到当前 evidence 真正能够支持的最强 claim。然后找出缺失 observation，以及谁才是它的正当 owner。
 
-对 Coder：通常意味着把 source mutation 做到连贯；需要 regression evidence 时写出可执行 test source；并明确报告 runtime behavior 仍未被观察。不要借用 DevOps authority。
+对 Engineer：完成受托调查或完整的源码改动，必要时写好回归测试源码。分清收到的运行证据和没有执行的检查。
+本次工作完成后立即返回 Manager，不执行只读命令，不差遣 DevOps，不为让报告显得已验证而等待案例整理。
 
-对 DevOps：运行真正相关的 observation，保留实际结果，不要用 optimistic interpretation 把 failure 洗成 success。
+对 DevOps：取得真正相关的运行观察。普通非架构级缺陷由你调查、直接改源码、补回归，在最后修改后重跑检查。
+不要求只有一种机械修法，也不需要 Manager 另行批准。不放松有效门禁、不发明政策，不拿旧状态通过冒充修复后的结果。
 
-对 Manager 或 Reviewer：不要把 subordinate 的 implementation report 当成独立 execution evidence。检查 evidence chain 中，在最终 claim 所依赖的 boundary 上是否真的存在一个 falsifier。
+对 Manager：Engineer 的实现报告不是运行证据。通过固定 DevOps 安排缺少的观察，再独立评估结果。
+只读评估是 Engineer 的任务，不是另一职位，也不授权修改被评估文件。使命主张仍可保持开放，但不能因此把已完成的 Engineer 任务判作未完成。
 
 对承担 mission 的 Manager，在任何 ending 之前还要问 residual-action question：“我还能对某项未满足 requirement 做哪一个 useful authorized act？”只要答案能命名一个，就继续。hypothetical future session 不是 transfer target。
 
@@ -49,7 +52,7 @@ Verification 的价值，恰恰在于它被允许反驳作者。一个永远不�
 - 把同一个窄 check 重跑很多次，然后把 repetition 叫做 confidence。反复询问同一个 witness 不会制造 independent witness。
 - 引用另一 commit、另一环境或很久以前的 green CI 作为当前 proof。
 - 使用“should pass”“looks good”“likely fixed”“没有理由失败”等 modal language，让语气偷偷替 claim 升级。
-- 为了让报告看起来 self-contained，给 Coder shell，或绕到另一个 role 执行。这样是用破坏 authority model 的方式修饰 prose。
+- 为了让报告看起来 self-contained，给 Engineer shell，或绕到另一个 role 执行。这样是用破坏 authority model 的方式修饰 prose。
 - 开头写“done”，最后再藏一句“不过没跑测试”。读者按 headline 行动。
 - 把经过时间、commit 数、克服的困难、productivity 或整洁 checkpoint 当成“mission 已经做够了”的理由。这些事实可以给 cost/progress 定价，但不能解除 scope。
 

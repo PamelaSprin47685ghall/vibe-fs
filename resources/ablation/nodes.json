@@ -278,12 +278,6 @@
       "kind": "package"
     },
     {
-      "id": "external-investigation",
-      "package": "external-investigation",
-      "station": 46,
-      "kind": "package"
-    },
-    {
       "id": "epistemic-reasoning",
       "package": "epistemic-reasoning",
       "station": 47,
@@ -363,6 +357,12 @@
       "station": 55,
       "parent": "change-integration",
       "kind": "slice"
+    },
+    {
+      "id": "external-investigation",
+      "package": "external-investigation",
+      "station": 46,
+      "kind": "package"
     }
   ],
   "edges": [
@@ -588,11 +588,6 @@
     },
     {
       "from": "requirement-system",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "requirement-system",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -858,11 +853,6 @@
     },
     {
       "from": "verification-system",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "verification-system",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -1123,11 +1113,6 @@
     },
     {
       "from": "js-semantic-surface",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "js-semantic-surface",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -1383,11 +1368,6 @@
     },
     {
       "from": "structured-workflow",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "structured-workflow",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -1638,11 +1618,6 @@
     },
     {
       "from": "host-boundary",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "host-boundary",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -1888,11 +1863,6 @@
     },
     {
       "from": "session-ontology",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "session-ontology",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -2133,11 +2103,6 @@
     },
     {
       "from": "participant-identity",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "participant-identity",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -2373,11 +2338,6 @@
     },
     {
       "from": "provider-language",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "provider-language",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -2608,11 +2568,6 @@
     },
     {
       "from": "office-capability",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "office-capability",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -2838,11 +2793,6 @@
     },
     {
       "from": "capability-enforcement",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "capability-enforcement",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -3063,11 +3013,6 @@
     },
     {
       "from": "cognitive-environment",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "cognitive-environment",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -3283,11 +3228,6 @@
     },
     {
       "from": "action-affordance",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "action-affordance",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -3498,11 +3438,6 @@
     },
     {
       "from": "participant-horizon",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "participant-horizon",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -3708,11 +3643,6 @@
     },
     {
       "from": "provider-projection",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "provider-projection",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -3913,11 +3843,6 @@
     },
     {
       "from": "repository-investigation",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "repository-investigation",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -4113,11 +4038,6 @@
     },
     {
       "from": "requirement-grounding",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "requirement-grounding",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -4308,11 +4228,6 @@
     },
     {
       "from": "repository-programming",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "repository-programming",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -4498,11 +4413,6 @@
     },
     {
       "from": "time-capability",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "time-capability",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -4683,11 +4593,6 @@
     },
     {
       "from": "process-execution",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "process-execution",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -4863,11 +4768,6 @@
     },
     {
       "from": "output-distillation",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -5038,11 +4938,6 @@
     },
     {
       "from": "causal-wait",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "causal-wait",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -5208,11 +5103,6 @@
     },
     {
       "from": "durable-events",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "durable-events",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -5373,11 +5263,6 @@
     },
     {
       "from": "effect-accounting",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "effect-accounting",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -5533,11 +5418,6 @@
     },
     {
       "from": "semantic-trace",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "semantic-trace",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -5688,11 +5568,6 @@
     },
     {
       "from": "context-compression",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "context-compression",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -5838,11 +5713,6 @@
     },
     {
       "from": "prefix-stability",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "prefix-stability",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -5983,11 +5853,6 @@
     },
     {
       "from": "work-record",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "work-record",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -6123,11 +5988,6 @@
     },
     {
       "from": "behavior-diagnosis",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "behavior-diagnosis",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -6258,11 +6118,6 @@
     },
     {
       "from": "guidance-delivery",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "guidance-delivery",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -6388,11 +6243,6 @@
     },
     {
       "from": "attention-regulation",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "attention-regulation",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -6513,11 +6363,6 @@
     },
     {
       "from": "execution-failure-policy",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "execution-failure-policy",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -6633,11 +6478,6 @@
     },
     {
       "from": "interaction-authority",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "interaction-authority",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -6748,11 +6588,6 @@
     },
     {
       "from": "managed-chat-execution",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "managed-chat-execution",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -6858,11 +6693,6 @@
     },
     {
       "from": "execution-model-routing",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "execution-model-routing",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -6963,11 +6793,6 @@
     },
     {
       "from": "managed-session-lifecycle",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "managed-session-lifecycle",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -7063,11 +6888,6 @@
     },
     {
       "from": "dispatch-protocol",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "dispatch-protocol",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -7158,11 +6978,6 @@
     },
     {
       "from": "provider-attempt-recovery",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "provider-attempt-recovery",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -7248,11 +7063,6 @@
     },
     {
       "from": "host-provider-failure-ownership",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "host-provider-failure-ownership",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -7333,11 +7143,6 @@
     },
     {
       "from": "degeneration-guard",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "degeneration-guard",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -7413,11 +7218,6 @@
     },
     {
       "from": "crash-reconciliation",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "crash-reconciliation",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -7488,11 +7288,6 @@
     },
     {
       "from": "durable-convergence",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "durable-convergence",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -7558,11 +7353,6 @@
     },
     {
       "from": "delegation",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "delegation",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -7623,11 +7413,6 @@
     },
     {
       "from": "concern-routing",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "concern-routing",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -7683,11 +7468,6 @@
     },
     {
       "from": "intra-participant-parallelism",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "intra-participant-parallelism",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -7738,11 +7518,6 @@
     },
     {
       "from": "knowledge-reuse",
-      "to": "external-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "knowledge-reuse",
       "to": "epistemic-reasoning",
       "kind": "station-order"
     },
@@ -7788,56 +7563,6 @@
     },
     {
       "from": "knowledge-reuse",
-      "to": "distribution",
-      "kind": "station-order"
-    },
-    {
-      "from": "external-investigation",
-      "to": "epistemic-reasoning",
-      "kind": "station-order"
-    },
-    {
-      "from": "external-investigation",
-      "to": "speculative-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "external-investigation",
-      "to": "institutional-learning",
-      "kind": "station-order"
-    },
-    {
-      "from": "external-investigation",
-      "to": "obligation-ledger",
-      "kind": "station-order"
-    },
-    {
-      "from": "external-investigation",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "external-investigation",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "external-investigation",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "external-investigation",
-      "to": "relay-retirement",
-      "kind": "station-order"
-    },
-    {
-      "from": "external-investigation",
-      "to": "change-integration",
-      "kind": "station-order"
-    },
-    {
-      "from": "external-investigation",
       "to": "distribution",
       "kind": "station-order"
     },

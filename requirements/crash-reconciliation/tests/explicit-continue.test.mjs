@@ -50,7 +50,7 @@ test('WHAT[CRASH-018] CRASH_018_real_command_material_materializes_briefing_and_
 
     // Durable history survives restart, while the new process intentionally has
     // no SessionExecutionBinding user-facing agent observation yet.
-    await acceptAuthorityRoot(runtime, sessionID, 'coder')
+    await acceptAuthorityRoot(runtime, sessionID, 'engineer')
 
     const commandOutput = { parts: [] }
     await hooks['command.execute.before'](
@@ -143,7 +143,7 @@ test('WHAT[CRASH-018] CRASH_018_transform_uses_exact_physical_binding_when_host_
     const sessionID = 'ses_continue_exact_binding'
     const continueID = 'msg-continue-exact-binding'
 
-    await acceptAuthorityRoot(runtime, sessionID, 'coder')
+    await acceptAuthorityRoot(runtime, sessionID, 'engineer')
 
     const commandOutput = { parts: [] }
     await hooks['command.execute.before'](

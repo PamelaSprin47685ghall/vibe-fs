@@ -1,9 +1,13 @@
-暂时把同一个 logical participant 展开成若干对等 execution presents。
+把这名 Engineer 的当前任务展开为独立执行的多条 lane。
+只有 Engineer 可以使用 Fission，且本次须为获准的子会话、没有活动中的 group。
+根会话、其他角色和 Sphinx 内部只读调用不能使用。活动 lane 不能递归裂变。
 
-只有当本 agent 正运行在 subsession 中，且你自己承接的工作里存在多个真正可分离、并行能降低延迟的切片时，才使用 fission。user-facing/root session 不得 fission。应裂分可分离工作，而不是仅仅因为工作很多就裂分。
+prompts 是字符串数组，至少有两项非空的本地任务，各项可以包含换行。
+分派不同事实问题或不重叠的写入区域。共享契约先定，依赖它的改动后做。
+独立工作才值得拆分；工作多或重复搜索都不是理由。
 
-prompts 是 String Array，至少两个 element。每个非空白 element 恰好对应一条 lane，并原样成为该 lane 的本地 charge；单条 lane prompt 可以包含自己的换行。
+只有全部 lane 建立后，才替换当前物理执行。各路保留同一 Engineer 身份、权限、责任、父级与共享工作树。
+Fission 不授予命令执行、DevOps 调度或新代理所有权，不是 fork。
 
-Fission 不是把工作委托给新的 agent。所有 lanes 保持同一 logical identity、office、authority、parent relation、child ownership 与共享 worktree。裂变前已经在外面的工作属于共享既有债权；裂变后某 lane 新发起的工作，其 completion 只归该 lane。
-
-只有全部 lanes 都建立成功后，当前 physical present 才会被替换。你的 parent 仍只观察到一个 logical participant 和一次最终 completion。
+各路先收敛，不分别向 Manager 宣布完成。收敛后的接续工作为本次任务只返回一个最终结果。
+合并后的文件访问和轨迹在逻辑完成后形成一份案例来源；不等待整理，也不替尚未结束的 lane 宣布完成。

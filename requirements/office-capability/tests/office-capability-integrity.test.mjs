@@ -32,19 +32,10 @@ const ACTIVE_OFFICES = [
     id: 'engineer-investigation-mutation',
     managerEn: /entrust.*Engineer/i,
     managerZh: /托付.*Engineer/,
-    forkEn: /Engineer[sS]{0,160}local facts[sS]{0,80}source/i,
-    forkZh: /Engineer[sS]{0,120}本地事实[sS]{0,80}源码/,
+    forkEn: /Engineer[\s\S]{0,160}local facts[\s\S]{0,80}source/i,
+    forkZh: /Engineer[\s\S]{0,120}本地事实[\s\S]{0,80}源码/,
     lawEn: /local facts|changing the written world|implement.*refactor/i,
     lawZh: /本地事实|书写出来的世界|源码/,
-  },
-  {
-    id: 'devops-execution-repair',
-    managerEn: /DevOps/i,
-    managerZh: /DevOps/,
-    forkEn: /DevOps[sS]{0,160}execution[sS]{0,80}repair/i,
-    forkZh: /DevOps[sS]{0,120}执行[sS]{0,80}修复/,
-    lawEn: /operational objective|non-architectural repair/i,
-    lawZh: /operational objective|非架构级.*修复/,
   },
 ]
 
@@ -54,7 +45,7 @@ test('WHAT[OFF-007] OFF_007_manager_forkable_offices_is_strictly_engineer', () =
 
 test('WHAT[ENF-002] office_permission_surface_matches_the_canonical_roles_matrix', () => {
   const matrix = [
-    ['manager', ['Finality', 'Fork', 'Horizon', 'Join', 'ReviewAssessment', 'TodoWrite']],
+    ['manager', ['Finality', 'Fork', 'Horizon', 'Join', 'Resume', 'ReviewAssessment', 'TodoWrite']],
     ['orchestrator', ['Fork', 'Horizon', 'Join']],
     ['engineer', ['BashHoneypot', 'Edit', 'Fetch', 'Fission', 'Glob', 'Grep', 'Move', 'Read', 'Remove', 'Write']],
     ['devops', ['Edit', 'Exec', 'Glob', 'Grep', 'Horizon', 'Join', 'Move', 'Pty', 'Read', 'Remove', 'Write']],

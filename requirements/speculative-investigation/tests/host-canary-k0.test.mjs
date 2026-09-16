@@ -94,9 +94,9 @@ test('WHAT[SPEC-INV-004] STRENGTH_014_policy_strength_replica_is_internal_leaf_a
 
 
 test('WHAT[SPEC-INV-004] STRENGTH_004_007_policy_same_role_prompt_has_no_replica_identity', () => {
-  const coderId = Strength.systemPromptIdForRole('Coder')
-  assert.equal(coderId, Strength.systemPromptIdForRole('Coder'))
-  const prompt = Strength.systemPromptForRole('Coder')
+  const engId = Strength.systemPromptIdForRole('Engineer')
+  assert.equal(engId, Strength.systemPromptIdForRole('Engineer'))
+  const prompt = Strength.systemPromptForRole('Engineer')
   assert.ok(prompt.length > 0)
   assert.doesNotMatch(prompt, /strength|replica|prefetch/i)
 })

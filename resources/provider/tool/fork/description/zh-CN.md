@@ -1,40 +1,12 @@
-把一项有边界的工作托付给当前 mission 中的另一个 Office。
+通过 fork Engineer 托付本地事实调查与仓库源码工作。
+调查、实现、重构、回归测试源码和文档属于同一职位。只读任务返回事实，不修改正在评估的文件。
 
-根据你需要得到的后果选择 Office：
+传入 calling = Engineer、独立的人类可读 name，以及 charge。
+说明目标、约束、相关证据和待决边界，不规定隐藏工具。
+Engineer 不执行命令、不浏览网页、不差遣其他执行角色。完成后返回 Manager，不自行组织验证，也不等待案例整理。
 
-Coder / Engineer
-    改变 repository source。
-    用于实现、修复、重构、把测试写入源码、documentation 变更，以及其他已经明确交托其含义的连贯 mutation。
-    它可以使用其他地方已经产生的 runtime evidence。
-    它不会运行项目，也不会认证行为证据。
+独立问题和不重叠的源码工作可以交给不同 Engineer。
+fork 创建另一名 Engineer，不创建 Manager 分身或 Fission lane。获准的 Fission 只展开 Engineer 自己的任务。
 
-Scout / Investigator
-    建立 repository 中已经存在的事实。
-    它在因果意义上是只读的：可以检查 source、history、configuration、metadata 与已有 artifacts，
-    但不会修改 source，也不会运行项目来制造新的行为证据。
-
-Technician / Operator
-    对运行中的世界采取行动，并产生 operational evidence。
-    用于 build、test、command、process、terminal、migration、benchmark、
-    runtime diagnosis 与行为验证。
-    当现有 evidence 已经决定修正含义时，它可以安排一次 source repair。
-    它不负责发明产品或架构含义。
-
-Navigator / Researcher
-    带着 provenance 建立外部世界的事实。
-    用于 web research、upstream documentation、标准、当前外部事实、
-    visual evidence、竞品以及其他远岸来源。
-    它不是 repository implementation Office。
-
-Analyst / Inquirer
-    调查尚无明确答案的问题。
-    用于 hypothesis、semantic distinctions、竞争性解释，以及结构化 inquiry。
-    它不会修改 repository，也不会制造行为证据。
-
-属于同一 Office 的两个 calling 名称区别在 persona 与 reasoning depth，不改变该 Office 的 authority。
-
-请交托你需要的后果、真正相关的 constraints，以及重要的 evidence 或 boundary。
-不要替另一个 Office 指定它隐藏的 tools。
-
-fork 叫起新人：传 calling + name + charge。
-继续当前 mission 中已经认识的人时，用 resume 并使用同一个 name。
+不能创建执行角色，包括第一名。真实执行和直接非架构级修复使用运行时提供的固定执行操作员，通过 resume 托付。
+继续已有参与者时，以原 name 调用 resume，不另选角色，也不创建替身。

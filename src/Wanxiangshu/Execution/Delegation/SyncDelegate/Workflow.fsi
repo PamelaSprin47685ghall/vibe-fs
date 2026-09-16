@@ -29,8 +29,8 @@ module internal SyncDelegateWorkflow =
                   -> Task<Result<SessionId, string>>
           BindChild: SessionId -> SessionId -> string -> unit
           OnDelegateReady: SessionId -> string -> unit
-          NoteInspectorPrompt: string -> string -> unit
-          CleanupInspectorDraft: string -> unit
+          NoteDelegatePrompt: string -> string -> unit
+          CleanupDelegateDraft: string -> unit
           Directory: string option
           ReplaceToolEstimate: SessionId -> int option -> Task<unit>
           SendPrompt: SyncDelegateCall -> SyncDelegatePromptRequest -> Task<Result<PreparedDelegationHandoff, string>>

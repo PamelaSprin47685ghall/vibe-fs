@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as RolesSurface from '../../../dist/Foundation/RolesSurface.js'
-import { Role } from '../../../dist/Foundation/Roles.js'
 
 test('WHAT[MANAGED-SESSION-023] new tasks reject legacy roles and legacy active sessions are explicitly retired', () => {
   const publicLabels = RolesSurface.allPublicRoleLabels
@@ -19,13 +18,12 @@ test('WHAT[MANAGED-SESSION-023] new tasks reject legacy roles and legacy active 
 })
 
 test('WHAT[MANAGED-SESSION-024] fixed DevOps crash recovery maintains single logical authority and locks bound model', () => {
-  // Check Role cases to verify Role union is consolidated
-  const cases = (new Role(0, [])).cases()
-  assert.ok(cases.includes('Engineer'), 'Role union must contain Engineer')
-  assert.ok(cases.includes('DevOps'), 'Role union must contain DevOps')
-  assert.equal(cases.includes('Coder'), false, 'Role union must not contain Coder')
-  assert.equal(cases.includes('Inspector'), false, 'Role union must not contain Inspector')
-  assert.equal(cases.includes('Browser'), false, 'Role union must not contain Browser')
-  assert.equal(cases.includes('Inquiry'), false, 'Role union must not contain Inquiry')
-  assert.equal(cases.includes('Distiller'), false, 'Role union must not contain Distiller')
+  const all = RolesSurface.allRoleLabels
+  assert.ok(all.includes('engineer'), 'Role labels must contain engineer')
+  assert.ok(all.includes('devops'), 'Role labels must contain devops')
+  assert.equal(all.includes('coder'), false, 'Role labels must not contain coder')
+  assert.equal(all.includes('inspector'), false, 'Role labels must not contain inspector')
+  assert.equal(all.includes('browser'), false, 'Role labels must not contain browser')
+  assert.equal(all.includes('inquiry'), false, 'Role labels must not contain inquiry')
+  assert.equal(all.includes('distiller'), false, 'Role labels must not contain distiller')
 })

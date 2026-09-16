@@ -619,6 +619,45 @@ module SemanticTraceSurface =
             | Error error -> return raise (InvalidOperationException error)
         }
 
+    // ── SEMANTIC-TRACE-011 / 012 helpers ───────────────────────────────────────
+
+    let mergeKeyedLaneTraces (lanesObj: obj) : obj array =
+        let lanes = arrayOf lanesObj
+        let sortedLanes = lanes |> Array.sortBy (fun l -> text (field l "laneKey"))
+
+        sortedLanes
+        |> Array.collect (fun l ->
+            let laneKey = text (field l "laneKey")
+            let parts = arrayOf (field l "parts")
+
+            parts
+            |> Array.sortBy (fun p -> int (text (field p "ordinal")))
+            |> Array.map (fun p ->
+                box
+                    {| laneKey = laneKey
+                       ordinal = field p "ordinal"
+                       text = field p "text" |}))
+
+    let emptyTrace () : obj = box {| currentSequence = ref 0L |}
+
+    let createInvocationBoundary (traceObj: obj) (invId: string) : obj =
+        let r: ref<int64> = unbox (field traceObj "currentSequence")
+        let start = r.Value
+        r.Value <- r.Value + 10L
+        let endEx = r.Value
+
+        box
+            {| invocationId = invId
+               startCursor = start
+               range = box {| start = start; ``end`` = endEx |} |}
+
+    let isDisjointRange (range1: obj) (range2: obj) : bool =
+        let s1 = int64 (text (field range1 "start"))
+        let e1 = int64 (text (field range1 "end"))
+        let s2 = int64 (text (field range2 "start"))
+        let e2 = int64 (text (field range2 "end"))
+        e1 <= s2 || e2 <= s1
+
     let currentProjectionBetween (handle: JournalHandle) (sessionId: string) (range: obj) : Task<obj> =
         task {
             let trace = traceOf handle sessionId

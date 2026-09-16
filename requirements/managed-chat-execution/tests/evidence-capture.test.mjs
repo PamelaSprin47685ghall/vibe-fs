@@ -29,7 +29,7 @@ const causalRecord = {
   promptKey: null,
   providerRunIdentity: null,
   participant: 'Bearer operator-secret at /home/operator/private/key',
-  role: 'coder',
+  role: 'engineer',
   providerRequestKind: 'work-main',
   transition: { from: null, to: 'Accepted' },
   failureClass: 'PersistenceFailure',

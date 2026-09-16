@@ -90,14 +90,14 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] a bound child retains fission when
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] forced root fission rejects origin before parsing prompts', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'fission-root-origin'
-    await acceptAuthorityRoot(runtime, sessionID, 'manager')
+    await acceptAuthorityRoot(runtime, sessionID, 'engineer')
     await grantWorkOwned(runtime, sessionID)
 
     const result = await hooks.tool.fission.execute(
       { prompts: 'only one lane' },
       {
         sessionID,
-        agent: 'manager',
+        agent: 'engineer',
         callID: 'call-root-fission',
         messageID: 'run-root-fission',
       },

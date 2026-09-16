@@ -65,14 +65,14 @@ type SyncDelegateRetryPort =
 /// member body flat while still seeing store/race primitives.
 module internal SyncDelegateInternals =
     let settleCompletedFromParts
-        (noteInspectorIfRole: SyncDelegateCall -> SessionId -> string -> unit)
+        (noteDelegateIfRole: SyncDelegateCall -> SessionId -> string -> unit)
         (store: SyncDelegateCallStore)
         (call: SyncDelegateCall)
         (turn: ReconciledTurn)
         : bool =
         match CompletedTurnClassifier.partsSessionText turn.Parts with
         | record when not (System.String.IsNullOrWhiteSpace record) ->
-            noteInspectorIfRole call turn.SessionId record
+            noteDelegateIfRole call turn.SessionId record
             AsyncSupport.trySetResult call.Answer (Ok record) |> ignore
             true
         | _ ->
@@ -103,16 +103,16 @@ type SyncDelegateRuntime
         ?toolMapForRole: Role -> Map<string, bool>,
         ?workspaceDirectory: string,
         /// Casebook draft hooks (wired from SpikePlugin → CasebookLifecycle; compile-order seam).
-        ?onInspectorPrompt: string -> string -> unit,
-        ?onInspectorAnswer: string -> string -> unit,
-        ?onInspectorCleanup: string -> unit
+        ?onDelegatePrompt: string -> string -> unit,
+        ?onDelegateAnswer: string -> string -> unit,
+        ?onDelegateCleanup: string -> unit
     ) =
     let store = SyncDelegateCallStore()
     let directory = workspaceDirectory
     let retry = retryPort.Retry
-    let noteInspectorPrompt = defaultArg onInspectorPrompt (fun _ _ -> ())
-    let noteInspectorAnswer = defaultArg onInspectorAnswer (fun _ _ -> ())
-    let cleanupInspectorDraft = defaultArg onInspectorCleanup (fun _ -> ())
+    let noteDelegatePrompt = defaultArg onDelegatePrompt (fun _ _ -> ())
+    let noteDelegateAnswer = defaultArg onDelegateAnswer (fun _ _ -> ())
+    let cleanupDelegateDraft = defaultArg onDelegateCleanup (fun _ -> ())
     let projectWorkRecord = workRecordFor
 
     let sessionKey (sessionId: SessionId) = SessionId.value sessionId
@@ -123,6 +123,7 @@ type SyncDelegateRuntime
         function
         | SyncDelegateRole.Inspector -> Role.Inspector
         | SyncDelegateRole.Coder -> Role.Coder
+        | SyncDelegateRole.Engineer -> Role.Engineer
 
     // EXEC-031: SyncDelegate uses ordinary WorkMain tools — no Return permission.
     let toolMap role =
@@ -276,8 +277,9 @@ type SyncDelegateRuntime
             | Some profile when
                 profile.AuthorityKind = PromptAuthority.RootAuthorityKind.AgentOwnerRoot
                 && profile.IdentitySeed = identitySeed
-                && profile.SelectedAgent = call.Agent
-                && profile.CanonicalRole = canonicalRole call.Role
+                && (profile.SelectedAgent = call.Agent || profile.SelectedAgent = "engineer")
+                && (profile.CanonicalRole = canonicalRole call.Role
+                    || profile.CanonicalRole = Role.Engineer)
                 ->
                 let! _ =
                     dispatcher.SendContinuationWithTools
@@ -310,8 +312,8 @@ type SyncDelegateRuntime
           CreateChild = createChild
           BindChild = bindChild
           OnDelegateReady = onDelegateReady
-          NoteInspectorPrompt = noteInspectorPrompt
-          CleanupInspectorDraft = cleanupInspectorDraft
+          NoteDelegatePrompt = noteDelegatePrompt
+          CleanupDelegateDraft = cleanupDelegateDraft
           Directory = directory
           ReplaceToolEstimate =
             fun sessionId expectedToolCalls ->
@@ -356,14 +358,14 @@ type SyncDelegateRuntime
         | Some startCursor ->
             projectWorkRecord turnSessionId (XTraceRange.create (XTraceCursor.create startCursor) endCursor) providerRun
 
-    let noteInspectorIfRole (call: SyncDelegateCall) turnSessionId record =
-        if call.Role = SyncDelegateRole.Inspector then
-            noteInspectorAnswer (sessionKey turnSessionId) record
+    let noteDelegateIfRole (call: SyncDelegateCall) turnSessionId record =
+        if call.Role = SyncDelegateRole.Inspector || call.Role = SyncDelegateRole.Engineer then
+            noteDelegateAnswer (sessionKey turnSessionId) record
 
     let finishCompletedCall turnSessionId (call: SyncDelegateCall) workRecord =
         match workRecord with
         | Some record when not (String.IsNullOrWhiteSpace record) ->
-            noteInspectorIfRole call turnSessionId record
+            noteDelegateIfRole call turnSessionId record
             AsyncSupport.trySetResult call.Answer (Ok record) |> ignore
             true
         | _ ->
@@ -382,7 +384,7 @@ type SyncDelegateRuntime
     let finishCompletedCallFromTurn (turn: ReconciledTurn) (call: SyncDelegateCall) =
         match CompletedTurnClassifier.partsSessionText turn.Parts with
         | record when not (System.String.IsNullOrWhiteSpace record) ->
-            noteInspectorIfRole call turn.SessionId record
+            noteDelegateIfRole call turn.SessionId record
             AsyncSupport.trySetResult call.Answer (Ok record) |> ignore
             true
         | _ ->
@@ -528,40 +530,41 @@ type SyncDelegateRuntime
     member _.TryFindDelegateOwner(delegateSessionId: SessionId) : SessionId option =
         attached.TryFindOwner(delegateSessionId, SyncDelegateRole.Inspector)
         |> Option.orElseWith (fun () -> attached.TryFindOwner(delegateSessionId, SyncDelegateRole.Coder))
+        |> Option.orElseWith (fun () -> attached.TryFindOwner(delegateSessionId, SyncDelegateRole.Engineer))
 
     member _.TryFindForScopeClose(ownerSessionId: SessionId, role: SyncDelegateRole) =
         match attached.TryFind(ownerSessionId, role) with
         | Some sessionId -> Some sessionId
-        | None when role = SyncDelegateRole.Inspector ->
+        | None when role = SyncDelegateRole.Engineer || role = SyncDelegateRole.Inspector ->
             let ownerScope = ReuseScope.ofSession ownerSessionId
-            store.TryGetDeletedInspector ownerScope
+            store.TryGetDeletedDelegate ownerScope
         | None -> None
 
-    member _.StageDeletedInspector(ownerSessionId: SessionId, inspectorSessionId: SessionId) : bool =
-        match attached.TryFind(ownerSessionId, SyncDelegateRole.Inspector) with
-        | Some bound when bound = inspectorSessionId ->
-            failPoppedCalls inspectorSessionId "Sync delegate Inspector session was deleted"
+    member _.StageDeletedDelegate(ownerSessionId: SessionId, delegateSessionId: SessionId) : bool =
+        match attached.TryFind(ownerSessionId, SyncDelegateRole.Engineer) with
+        | Some bound when bound = delegateSessionId ->
+            failPoppedCalls delegateSessionId "Sync delegate session was deleted"
 
-            attached.Remove(ownerSessionId, SyncDelegateRole.Inspector) |> ignore
+            attached.Remove(ownerSessionId, SyncDelegateRole.Engineer) |> ignore
 
             let ownerScope = ReuseScope.ofSession ownerSessionId
 
-            let replaced = store.PutDeletedInspector(ownerScope, inspectorSessionId)
+            let replaced = store.PutDeletedDelegate(ownerScope, delegateSessionId)
 
             replaced
-            |> Option.filter (fun previous -> previous <> inspectorSessionId)
-            |> Option.iter (fun previous -> cleanupInspectorDraft (sessionKey previous))
+            |> Option.filter (fun previous -> previous <> delegateSessionId)
+            |> Option.iter (fun previous -> cleanupDelegateDraft (sessionKey previous))
 
             true
         | _ ->
             let ownerScope = ReuseScope.ofSession ownerSessionId
 
-            store.TryGetDeletedInspector ownerScope
-            |> Option.exists (fun staged -> staged = inspectorSessionId)
+            store.TryGetDeletedDelegate ownerScope
+            |> Option.exists (fun staged -> staged = delegateSessionId)
 
-    member this.StageDeletedInspectorBySession(inspectorSessionId: SessionId) : SessionId option =
-        attached.TryFindOwner(inspectorSessionId, SyncDelegateRole.Inspector)
-        |> Option.filter (fun ownerSessionId -> this.StageDeletedInspector(ownerSessionId, inspectorSessionId))
+    member this.StageDeletedDelegateBySession(delegateSessionId: SessionId) : SessionId option =
+        attached.TryFindOwner(delegateSessionId, SyncDelegateRole.Engineer)
+        |> Option.filter (fun ownerSessionId -> this.StageDeletedDelegate(ownerSessionId, delegateSessionId))
 
     member _.Invoke
         (ownerSessionKey: string, role: SyncDelegateRole, charge: string, ?expectedToolCalls: int)
@@ -607,8 +610,9 @@ type SyncDelegateRuntime
         : Task<bool> =
         task {
             match turn.Role, turn.Outcome with
-            | Some(Role.Inspector | Role.Coder), ReconcileProgram.TurnCompleted -> return! handleCompletedRoleTurn turn
-            | Some(Role.Inspector | Role.Coder), ReconcileProgram.TurnFailed error ->
+            | Some(Role.Inspector | Role.Coder | Role.Engineer), ReconcileProgram.TurnCompleted ->
+                return! handleCompletedRoleTurn turn
+            | Some(Role.Inspector | Role.Coder | Role.Engineer), ReconcileProgram.TurnFailed error ->
                 return! handleFailedAttemptTurn turn failure error
             | _ ->
                 // TurnInProgress and TurnNeedsContinuation remain child-local;
@@ -639,7 +643,7 @@ type SyncDelegateRuntime
     /// completion is delivered from the turn, never dropped, never re-executed.
     member _.SettleCompletedFromTurn(turn: ReconciledTurn) : bool =
         match store.TryPeekCallByDelegate turn.SessionId with
-        | Some call -> SyncDelegateInternals.settleCompletedFromParts noteInspectorIfRole store call turn
+        | Some call -> SyncDelegateInternals.settleCompletedFromParts noteDelegateIfRole store call turn
         | None -> false
 
     member _.AwaitAssignmentReady(sessionId: SessionId) : Task<bool> =
@@ -665,27 +669,30 @@ type SyncDelegateRuntime
 
         popAll ()
 
-        let inspectorOwned = attached.TryFind(sessionId, SyncDelegateRole.Inspector)
+        let delegateOwned = attached.TryFind(sessionId, SyncDelegateRole.Inspector)
 
-        let stagedInspectorOwned = store.ClearDeletedInspector asOwnerScope
+        let stagedDelegateOwned = store.ClearDeletedDelegate asOwnerScope
 
         attached.RemoveByDelegateSession sessionId |> ignore
 
-        for role in [ SyncDelegateRole.Inspector; SyncDelegateRole.Coder ] do
+        for role in
+            [ SyncDelegateRole.Inspector
+              SyncDelegateRole.Coder
+              SyncDelegateRole.Engineer ] do
             attached.Remove(sessionId, role) |> ignore
 
-        inspectorOwned |> Option.iter (fun id -> cleanupInspectorDraft (sessionKey id))
+        delegateOwned |> Option.iter (fun id -> cleanupDelegateDraft (sessionKey id))
 
-        stagedInspectorOwned
-        |> Option.iter (fun id -> cleanupInspectorDraft (sessionKey id))
+        stagedDelegateOwned
+        |> Option.iter (fun id -> cleanupDelegateDraft (sessionKey id))
 
-        cleanupInspectorDraft (sessionKey sessionId)
+        cleanupDelegateDraft (sessionKey sessionId)
 
     member _.Dispose() =
-        let retiredInspectors = store.ClearAll()
+        let retiredDelegates = store.ClearAll()
 
-        for inspectorId in retiredInspectors do
-            cleanupInspectorDraft (sessionKey inspectorId)
+        for delegateId in retiredDelegates do
+            cleanupDelegateDraft (sessionKey delegateId)
 
         attached.Clear()
 

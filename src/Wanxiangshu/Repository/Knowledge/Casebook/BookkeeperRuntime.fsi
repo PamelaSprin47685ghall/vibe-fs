@@ -29,6 +29,9 @@ module BookkeeperRuntime =
 
     val createRefreshPrompt: q: string -> a: string -> relatedPaths: string list -> diff: string -> string
 
+    val createRefreshPromptFor:
+        lang: ProviderLanguage -> q: string -> a: string -> relatedPaths: string list -> diff: string -> string
+
     val setPort:
         port: ICasebookSessionPort ->
         resolveActiveOwner: (SessionId -> PromptAuthority.AuthorityExecutionProfile option) ->

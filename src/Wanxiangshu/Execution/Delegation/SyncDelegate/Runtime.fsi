@@ -42,9 +42,9 @@ type SyncDelegateRuntime =
         retryPort: SyncDelegateRetryPort *
         ?toolMapForRole: (Role -> Map<string, bool>) *
         ?workspaceDirectory: string *
-        ?onInspectorPrompt: (string -> string -> unit) *
-        ?onInspectorAnswer: (string -> string -> unit) *
-        ?onInspectorCleanup: (string -> unit) ->
+        ?onDelegatePrompt: (string -> string -> unit) *
+        ?onDelegateAnswer: (string -> string -> unit) *
+        ?onDelegateCleanup: (string -> unit) ->
             SyncDelegateRuntime
 
     member Attached: IAttachedSessionPort
@@ -60,8 +60,8 @@ type SyncDelegateRuntime =
     member TryFind: ownerSessionId: SessionId * role: SyncDelegateRole -> SessionId option
     member TryFindDelegateOwner: delegateSessionId: SessionId -> SessionId option
     member TryFindForScopeClose: ownerSessionId: SessionId * role: SyncDelegateRole -> SessionId option
-    member StageDeletedInspector: ownerSessionId: SessionId * inspectorSessionId: SessionId -> bool
-    member StageDeletedInspectorBySession: inspectorSessionId: SessionId -> SessionId option
+    member StageDeletedDelegate: ownerSessionId: SessionId * delegateSessionId: SessionId -> bool
+    member StageDeletedDelegateBySession: delegateSessionId: SessionId -> SessionId option
 
     member Invoke:
         ownerSessionKey: string * role: SyncDelegateRole * charge: string * ?expectedToolCalls: int ->

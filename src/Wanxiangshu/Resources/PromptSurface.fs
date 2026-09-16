@@ -18,25 +18,15 @@ module PromptSurface =
         box
             {| ManagerSystemPrompt = catalog.ManagerSystemPrompt
                EngineerSystemPrompt = catalog.EngineerSystemPrompt
-               CoderSystemPrompt = catalog.CoderSystemPrompt
                DevopsSystemPrompt = catalog.DevopsSystemPrompt
-               InspectorSystemPrompt = catalog.InspectorSystemPrompt
-               BrowserSystemPrompt = catalog.BrowserSystemPrompt
-               InquirySystemPrompt = catalog.InquirySystemPrompt
                OrchestratorSystemPrompt = catalog.OrchestratorSystemPrompt
-               DistillerSystemPrompt = catalog.DistillerSystemPrompt
                BloggerSystemPrompt = catalog.BloggerSystemPrompt |}
 
     let private catalogValues (catalog: PromptCatalog) : string array =
         [| catalog.ManagerSystemPrompt
            catalog.EngineerSystemPrompt
-           catalog.CoderSystemPrompt
            catalog.DevopsSystemPrompt
-           catalog.InspectorSystemPrompt
-           catalog.BrowserSystemPrompt
-           catalog.InquirySystemPrompt
            catalog.OrchestratorSystemPrompt
-           catalog.DistillerSystemPrompt
            catalog.BloggerSystemPrompt |]
 
     let private ruleToJs (rule: obj) : obj =

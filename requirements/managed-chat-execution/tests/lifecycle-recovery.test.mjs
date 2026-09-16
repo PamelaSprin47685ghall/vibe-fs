@@ -188,10 +188,10 @@ const plainEvidence = (sessionId, physicalUserMessageId) => ({
     ownerLogicalRun: null,
     ownerAuthorityRoot: null,
     participantIdentity: {
-      selectedAgent: 'coder',
-      canonicalRole: 'coder',
+      selectedAgent: 'engineer',
+      canonicalRole: 'engineer',
       selectedTier: 'deep',
-      persona: 'Coder',
+      persona: 'Engineer',
       personaCatalogVersion: 1,
       origin: 'ResolvedAtRoot',
     },

@@ -237,7 +237,7 @@ Small 不等于 harmless。Large 不等于 important。追踪 consequence。
 
 ## 关于 Evidence
 
-Evidence 有 strength、scope 与 age。
+Evidence 有 weight、scope 与 age。
 让每一种 evidence 只承担它真正能够承载的 claim。
 当 distinction 重要时，优先 direct evidence。
 一个 decisive counterexample 可以迅速结束一条 inquiry。

@@ -71,7 +71,13 @@ module JsCanonicalDescription =
         val UltraUnavailable: string = "tool/js-program/ultra-unavailable"
 
         [<Literal>]
-        val UltraCoder: string = "tool/js-program/ultra-coder"
+        val UltraEngineering: string = "tool/js-program/ultra-engineering"
+
+        [<Literal>]
+        val UltraInvestigation: string = "tool/js-program/ultra-investigation"
+
+        [<Literal>]
+        val UltraDevOps: string = "tool/js-program/ultra-devops"
 
         [<Literal>]
         val MechanicalSemantic: string = "tool/js-program/mechanical-semantic"
@@ -188,7 +194,9 @@ module JsCanonicalDescription =
           MutationRules: string
           UltraFraming: string
           UltraUnavailable: string
-          UltraCoder: string
+          UltraEngineering: string
+          UltraInvestigation: string
+          UltraDevOps: string
           MechanicalSemantic: string
           CommentAnchorOwnSearch: string
           CommentIgnoreGy: string

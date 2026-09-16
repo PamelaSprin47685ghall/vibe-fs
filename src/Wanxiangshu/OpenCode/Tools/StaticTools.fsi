@@ -13,11 +13,6 @@ module StaticTools =
     val managerAgentConfig: prompt: string option -> obj
     val orchestratorAgentConfig: prompt: string option -> obj
     val engineerAgentConfig: prompt: string option -> obj
-    val coderAgentConfig: prompt: string option -> obj
     val bloggerAgentConfig: prompt: string -> obj
-    val distillerAgentConfig: prompt: string -> obj
-    val inquiryAgentConfig: prompt: string option -> obj
     val bookkeeperAgentConfig: prompt: string -> obj
-    val browserAgentConfig: prompt: string option -> obj
-    val inspectorAgentConfig: prompt: string option -> obj
     val devopsAgentConfig: prompt: string option -> obj

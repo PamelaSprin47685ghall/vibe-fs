@@ -11,22 +11,30 @@ const simplifiedChinese = 'SimplifiedChinese'
 
 const PROMPT_FIELDS = [
   'ManagerSystemPrompt',
-  'CoderSystemPrompt',
+  'EngineerSystemPrompt',
   'DevopsSystemPrompt',
+  'OrchestratorSystemPrompt',
+  'BloggerSystemPrompt',
+]
+
+// Retired offices keep historical decoders, never a live prompt slot.
+const RETIRED_PROMPT_FIELDS = [
+  'CoderSystemPrompt',
   'InspectorSystemPrompt',
   'BrowserSystemPrompt',
   'InquirySystemPrompt',
-  'OrchestratorSystemPrompt',
   'DistillerSystemPrompt',
-  'BloggerSystemPrompt',
 ]
 
 const promptEntries = (catalog) => PROMPT_FIELDS.map((field) => [field, catalog[field]])
 
-const assertNineNonEmpty = (catalog, label) => {
+const assertActiveNonEmpty = (catalog, label) => {
   for (const field of PROMPT_FIELDS) {
     assert.equal(typeof catalog[field], 'string', `${label}: ${field}`)
     assert.ok(catalog[field].trim().length > 0, `${label}: ${field} non-empty`)
+  }
+  for (const field of RETIRED_PROMPT_FIELDS) {
+    assert.equal(catalog[field], undefined, `${label}: retired ${field} must not exist`)
   }
   assert.equal(catalog.ReviewerSystemPrompt, undefined)
   assert.equal(catalog.StudentSystemPrompt, undefined)
@@ -44,8 +52,10 @@ const inOrder = (text, needles) => {
 }
 
 const ROLE_PATHS = [
-  'role/manager', 'role/coder', 'role/devops', 'role/inspector',
-  'role/browser', 'role/inquiry', 'role/orchestrator', 'role/distiller', 'role/blogger', 'role/bookkeeper',
+  'role/manager', 'role/engineer', 'role/devops', 'role/orchestrator', 'role/blogger', 'role/bookkeeper',
+]
+const RETIRED_ROLE_PATHS = [
+  'role/coder', 'role/inspector', 'role/browser', 'role/inquiry', 'role/distiller',
 ]
 const SHARED_PATHS = [
   'world/common-law', 'library/ingress', 'library/closing', 'library/kolmogorov',
@@ -66,8 +76,8 @@ test('WHAT[DISTRIBUTION-002] PROMPT_resources_load_from_package_independent_of_c
   const previous = process.cwd()
   try {
     process.chdir('/')
-    assertNineNonEmpty(promptResources.load(), 'PromptResources')
-    assertNineNonEmpty(promptResources.runtimeLoad().Prompts, 'RuntimeResources')
+    assertActiveNonEmpty(promptResources.load(), 'PromptResources')
+    assertActiveNonEmpty(promptResources.runtimeLoad().Prompts, 'RuntimeResources')
   } finally {
     process.chdir(previous)
   }
@@ -76,11 +86,11 @@ test('WHAT[DISTRIBUTION-002] PROMPT_resources_load_from_package_independent_of_c
 test('WHAT[COGNITIVE-ENVIRONMENT-003] PROMPT_composition_common_law_role_law_then_inherited_library', () => {
   const prompts = promptResources.load()
   inOrder(prompts.ManagerSystemPrompt, ['# # Common Law', '# # Management', '# # Office Library', '# # The Kolmogorov Book', '# # The Book of Scarcity'])
-  inOrder(prompts.CoderSystemPrompt, ['# # Common Law', '# # Mutation', '# # Office Library', '# # The Kolmogorov Book'])
-  inOrder(prompts.InspectorSystemPrompt, ['# # Common Law', '# # Evidence', '# # Office Library', '# # The Book of Scarcity'])
-  inOrder(prompts.DevopsSystemPrompt, ['# # Common Law', '# # The Engine Room', '# # Office Library', '# # The Book of Scarcity'])
+  inOrder(prompts.EngineerSystemPrompt, ['# # Common Law', '# # Engineering', '# # Office Library', '# # The Kolmogorov Book'])
+  assert.doesNotMatch(prompts.EngineerSystemPrompt, /# # The Book of Scarcity/)
+  inOrder(prompts.DevopsSystemPrompt, ['# # Common Law', '# # The Engine Room', '# # Office Library', '# # The Kolmogorov Book', '# # The Book of Scarcity'])
 
-  for (const field of ['OrchestratorSystemPrompt', 'BrowserSystemPrompt', 'InquirySystemPrompt', 'DistillerSystemPrompt', 'BloggerSystemPrompt']) {
+  for (const field of ['OrchestratorSystemPrompt', 'BloggerSystemPrompt']) {
     assert.match(prompts[field], /^# # Common Law/)
     assert.doesNotMatch(prompts[field], /# # Office Library/)
   }
@@ -90,8 +100,8 @@ test('WHAT[COGNITIVE-ENVIRONMENT-001] PROMPT_common_law_discourages_ascii_art_in
   const en = promptResources.loadForLanguage(english)
   const zh = promptResources.loadForLanguage(simplifiedChinese)
 
-  for (const text of Object.values(en)) assert.match(text, /avoid ASCII art where possible/)
-  for (const text of Object.values(zh)) assert.match(text, /输出尽量不要使用 ASCII art/)
+  for (const [, text] of promptEntries(en)) assert.match(text, /avoid ASCII art where possible/)
+  for (const [, text] of promptEntries(zh)) assert.match(text, /输出尽量不要使用 ASCII art/)
 })
 
 test('WHAT[COGNITIVE-ENVIRONMENT-004] PROMPT_role_laws_are_identity_not_tool_inventory', () => {
@@ -100,9 +110,10 @@ test('WHAT[COGNITIVE-ENVIRONMENT-004] PROMPT_role_laws_are_identity_not_tool_inv
     assert.doesNotMatch(law, forbiddenRoleToolInventory, path)
   }
 
-  const inquiry = providerLanguage.readText(english, 'role/inquiry')
-  assert.match(inquiry, /Inspector/)
-  assert.doesNotMatch(inquiry, /sphinx_start|sphinx_resume/)
+  for (const path of RETIRED_ROLE_PATHS) {
+    assert.equal(providerLanguage.exists(english, path), false, `${path} must not ship a Role Law`)
+    assert.equal(providerLanguage.exists(simplifiedChinese, path), false, `${path} must not ship a Role Law`)
+  }
 })
 
 test('WHAT[PROVIDER-LANGUAGE-006] PROMPT_017_world_role_library_all_have_en_zh_parity', () => {
@@ -116,7 +127,7 @@ test('WHAT[PROVIDER-LANGUAGE-006] PROMPT_017_world_role_library_all_have_en_zh_p
 test('WHAT[PROVIDER-LANGUAGE-006] PROMPT_017_zh_cn_is_authored_chinese_not_an_english_copy', () => {
   const en = promptResources.loadForLanguage(english)
   const zh = promptResources.loadForLanguage(simplifiedChinese)
-  assertNineNonEmpty(zh, 'zh-CN')
+  assertActiveNonEmpty(zh, 'zh-CN')
 
   for (const field of PROMPT_FIELDS) {
     assert.notEqual(zh[field], en[field], field)
@@ -130,7 +141,7 @@ test('WHAT[COGNITIVE-ENVIRONMENT-003] PROMPT_bookkeeper_inherits_common_law_and_
   const zh = promptResources.loadBookkeeperSystemFor(simplifiedChinese)
   inOrder(en, ['# # Common Law', '# # The Casebook'])
   assert.match(zh, /^# # 共同法/)
-  assert.match(zh, /# # Casebook/)
+  assert.match(zh, /# # 案例簿/)
 })
 
 test('WHAT[COGNITIVE-ENVIRONMENT-005] PROMPT_no_legacy_provider_ontology_in_composed_prompts', () => {

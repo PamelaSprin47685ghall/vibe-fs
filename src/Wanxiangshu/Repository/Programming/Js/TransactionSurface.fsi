@@ -37,3 +37,4 @@ module JsTransactionSurface =
     val internal persistenceOf: store: obj -> IJsTransactionPersistence
 
     val createPersistence: store: obj -> obj
+    val createTransactionContext: unit -> obj

@@ -27,10 +27,10 @@ const plainEvidence = (key = durableKey) => ({
     ownerLogicalRun: null,
     ownerAuthorityRoot: null,
     participantIdentity: {
-      selectedAgent: 'coder',
-      canonicalRole: 'coder',
+      selectedAgent: 'engineer',
+      canonicalRole: 'engineer',
       selectedTier: 'deep',
-      persona: 'Coder',
+      persona: 'Engineer',
       personaCatalogVersion: 1,
       origin: 'ResolvedAtRoot',
     },
@@ -217,17 +217,17 @@ test('WHAT[CHATEXEC-004] fixed admission counterworlds distinguish every intent 
         `${row.label}: terminal disposition`,
       )
     } else {
-      assert.equal(result.intent?.evidence.participant, 'coder', `${row.label}: intent participant`)
-      assert.equal(result.intent?.evidence.role, 'coder', `${row.label}: intent role`)
+      assert.equal(result.intent?.evidence.participant, 'engineer', `${row.label}: intent participant`)
+      assert.equal(result.intent?.evidence.role, 'engineer', `${row.label}: intent role`)
       assert.equal('effectiveAgent' in result.intent?.evidence, false, `${row.label}: intent carries no EffectiveAgent`)
       assert.deepEqual(
         result.intent?.evidence.identitySeed.participantIdentity,
         {
           origin: 'ResolvedAtRoot',
-          participant: 'coder',
-          persona: 'Coder',
+          participant: 'engineer',
+          persona: 'Engineer',
           personaCatalogVersion: 1,
-          role: 'coder',
+          role: 'engineer',
         },
         `${row.label}: intent identity`,
       )

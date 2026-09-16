@@ -76,7 +76,13 @@ module JsCanonicalDescription =
         let UltraUnavailable = "tool/js-program/ultra-unavailable"
 
         [<Literal>]
-        let UltraCoder = "tool/js-program/ultra-coder"
+        let UltraEngineering = "tool/js-program/ultra-engineering"
+
+        [<Literal>]
+        let UltraInvestigation = "tool/js-program/ultra-investigation"
+
+        [<Literal>]
+        let UltraDevOps = "tool/js-program/ultra-devops"
 
         [<Literal>]
         let MechanicalSemantic = "tool/js-program/mechanical-semantic"
@@ -193,7 +199,9 @@ module JsCanonicalDescription =
           MutationRules: string
           UltraFraming: string
           UltraUnavailable: string
-          UltraCoder: string
+          UltraEngineering: string
+          UltraInvestigation: string
+          UltraDevOps: string
           MechanicalSemantic: string
           CommentAnchorOwnSearch: string
           CommentIgnoreGy: string
@@ -1025,99 +1033,13 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
 
         String.concat "\n\n" blocks
 
-    let private inspectorUltra =
-        """class Js extends JsProgram {
-  async run() {
-    const declarations = await this.grep(/\b(?:type|module)\s+RetryPolicy\b/, "src/**/*.fs");
-    const paths = [...new Set(declarations.matches.map(x => x.path))];
-    if (paths.length === 0) {
-      const usages = await this.grep(/\bRetryPolicy\b/, "{src,tests}/**/*.fs");
-      return { declarations: [], usages: usages.matches };
-    }
-    const evidence = await Promise.all(paths.map(async path => {
-      try {
-        const file = await this.file(path, [["hit", "afterHit", /\b(?:type|module)\s+RetryPolicy\b/]]);
-        return { path, excerpt: file.text("hit-220", "hit+900"), anchorMatched: true };
-      } catch {
-        const file = await this.file(path);
-        return { path, excerpt: file.text("^", "^+1100"), anchorMatched: false };
-      }
-    }));
-    return { declarations: declarations.matches, evidence };
-  }
-}"""
-
-    let private managerUltra =
-        """class Js extends JsProgram {
-  async run() {
-    const stale = await this.grep(/\boldApi\b/, "src/**/*.{js,ts}");
-    if (stale.matches.length > 0) {
-      const paths = [...new Set(stale.matches.map(x => x.path))].slice(0, 6);
-      const evidence = await Promise.all(paths.map(async path => {
-        const file = await this.file(path);
-        return { path, excerpt: file.text("^", "^+900") };
-      }));
-      return { staleReferences: stale.matches, evidence };
-    }
-    const migrated = await this.grep(/\bnewApi\b/, "src/**/*.{js,ts}");
-    return { staleReferences: [], migratedReferences: migrated.matches };
-  }
-}"""
-
-    let private devOpsUltra =
-        """class Js extends JsProgram {
-  async run() {
-    const manifests = await this.glob("package.json");
-    if (!manifests.paths.includes("package.json")) return { rootPackage: null };
-    const pkg = JSON.parse((await this.file("package.json")).text());
-    const testScript = pkg.scripts?.test ?? null;
-    if (!testScript) return { rootPackage: "package.json", testScript: null, scripts: Object.keys(pkg.scripts || {}) };
-    const tests = await this.glob("tests/**/*recovery*.{test,spec}.{js,ts,mjs}");
-    if (tests.paths.length === 0) {
-      const hits = await this.grep(/RecoveryClosure|recovery/i, "tests/**/*.{js,ts,mjs}");
-      return { testScript, candidateTests: [...new Set(hits.matches.map(x => x.path))] };
-    }
-    return {
-      packageManager: typeof pkg.packageManager === "string" ? pkg.packageManager : null,
-      testScript,
-      candidateTests: tests.paths,
-    };
-  }
-}"""
-
-    let private browserUltra =
-        """class Js extends JsProgram {
-  async run() {
-    const hits = await this.grep(/\bWidgetOptions\b/, "artifacts/web/**/*.md");
-    if (hits.matches.length === 0) {
-      const indirect = await this.grep(/widget options|configuration object|deprecated/i, "artifacts/web/**/*.md");
-      return { exact: [], indirect: indirect.matches };
-    }
-    const paths = [...new Set(hits.matches.map(x => x.path))];
-    const sources = await Promise.all(paths.map(async path => {
-      const file = await this.file(path);
-      const text = file.text();
-      const at = text.search(/\bWidgetOptions\b/);
-      return {
-        path,
-        url: /^URL:\s*(.+)$/m.exec(text)?.[1]?.trim() ?? null,
-        version: /^Version:\s*(.+)$/m.exec(text)?.[1]?.trim() ?? null,
-        excerpt: text.slice(Math.max(0, at - 250), at + 1000),
-      };
-    }));
-    return { sources };
-  }
-}"""
-
     let ultraExample (prose: Prose) (roleName: string) (capabilities: Set<JsCapability>) : JsExample option =
         let candidate =
             match roleName.Trim().ToLowerInvariant() with
-            | "engineer"
-            | "coder" -> Some(set [ JsCapability.Read; JsCapability.Grep; JsCapability.Edit ], prose.UltraCoder)
-            | "inspector" -> Some(set [ JsCapability.Read; JsCapability.Grep ], inspectorUltra)
-            | "manager" -> Some(set [ JsCapability.Read; JsCapability.Grep ], managerUltra)
-            | "devops" -> Some(set [ JsCapability.Read; JsCapability.Glob; JsCapability.Grep ], devOpsUltra)
-            | "browser" -> Some(set [ JsCapability.Read; JsCapability.Grep ], browserUltra)
+            | "engineer" when has capabilities JsCapability.Edit ->
+                Some(set [ JsCapability.Read; JsCapability.Grep; JsCapability.Edit ], prose.UltraEngineering)
+            | "engineer" -> Some(set [ JsCapability.Read; JsCapability.Grep ], prose.UltraInvestigation)
+            | "devops" -> Some(set [ JsCapability.Read; JsCapability.Edit ], prose.UltraDevOps)
             | _ -> None
 
         candidate

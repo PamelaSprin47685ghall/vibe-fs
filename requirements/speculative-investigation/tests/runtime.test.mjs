@@ -25,7 +25,7 @@ const rootSelection = (agent) => {
     },
   }
 }
-const ownerProfile = (agent = 'coder') => {
+const ownerProfile = (agent = 'engineer') => {
   const result = authority.createAuthorityRoot(
     H,
     'runtime-special-lineage',
@@ -197,8 +197,8 @@ test('WHAT[SPEC-INV-013] STRENGTH_013_dry_run_closes_only_at_the_exact_owner_tar
 })
 
 test('WHAT[PID-008] Strength replica inherits the owner Persona and exact authority lineage', () => {
-  const owner = ownerProfile('coder')
-  const issued = authority.issueInheritedIdentitySeed('coder', owner)
+  const owner = ownerProfile('engineer')
+  const issued = authority.issueInheritedIdentitySeed('engineer', owner)
   assert.equal(issued.ok, true, issued.ok ? '' : issued.error)
 
   assert.deepEqual(
@@ -220,8 +220,8 @@ test('WHAT[PID-008] Strength replica inherits the owner Persona and exact author
 })
 
 test('WHAT[PID-008] Fission lane carries owner-issued identity lineage', () => {
-  const owner = ownerProfile('coder')
-  const issued = authority.issueInheritedIdentitySeed('coder', owner)
+  const owner = ownerProfile('engineer')
+  const issued = authority.issueInheritedIdentitySeed('engineer', owner)
   assert.equal(issued.ok, true, issued.ok ? '' : issued.error)
 
   assert.deepEqual(authority.validateInheritedIdentitySeed(owner, issued.value), {

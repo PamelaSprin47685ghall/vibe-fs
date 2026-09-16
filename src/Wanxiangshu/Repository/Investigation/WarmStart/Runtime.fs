@@ -84,7 +84,7 @@ module RepositoryWarmStart =
                 // None = true zero-work fast path. Callers preserve their base prompt byte-for-byte.
                 return Ok None
             elif not (RepositoryWarmStartPrompt.isDirectConsumer role) then
-                return Error "repository warm-start keywords are only available to Coder, Inspector, or DevOps targets"
+                return Error "repository warm-start keywords are only available to Engineer or DevOps targets"
             else
                 return! collectAtWorkspace search workspaceDirectory keywords
         }

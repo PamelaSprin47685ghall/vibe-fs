@@ -251,7 +251,7 @@ test('WHAT[ENF-002] office_capability_permissions_agree_with_the_host_schema_mat
   const permissionOf = (toolName) =>
     ({
       fork: 'Fork',
-      resume: 'Fork',
+      resume: 'Resume',
       commission: 'Fork',
       'open-terminal': 'Pty',
       'send-terminal': 'Pty',

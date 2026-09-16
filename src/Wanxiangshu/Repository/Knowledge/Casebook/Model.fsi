@@ -21,17 +21,16 @@ module ObservationIdentity =
 /// DSL-class: DurableFact — CASE-002 / KR-002: minimal Case model with dual baselines.
 /// Identity is the stable logical case identity (scoped to invocation).
 type Case =
-    {
-        Identity: string
-        SourceTrace: string
-        Q: string
-        A: string
-        RelatedPaths: string list
-        CompletionFileState: string
-        MaintenanceFileState: string
-        AccessOrder: int64
-        Observations: Observation list
-    }
+    { Identity: string
+      SourceTrace: string
+      Q: string
+      A: string
+      RelatedPaths: string list
+      CompletionFileState: string
+      MaintenanceFileState: string
+      AccessOrder: int64
+      Observations: Observation list }
+
     member SessionId: string
     member LastAccessOrder: int64
 
@@ -40,7 +39,13 @@ type Case =
 [<RequireQualifiedAccess>]
 type CasebookEvent =
     | CaseCaptured of Case
-    | CaseRefreshed of identity: string * q: string * a: string * maintenanceFileState: string * relatedPaths: string list * observations: Observation list
+    | CaseRefreshed of
+        identity: string *
+        q: string *
+        a: string *
+        maintenanceFileState: string *
+        relatedPaths: string list *
+        observations: Observation list
     | CaseAccessed of identity: string
     | CaseEvicted of identity: string
 

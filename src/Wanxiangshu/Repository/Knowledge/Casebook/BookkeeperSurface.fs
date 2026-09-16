@@ -12,6 +12,7 @@ open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Persona
+open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Repository.Programming.Js.OpenCode
 
 module CasebookBookkeeperSurface =
@@ -23,10 +24,20 @@ module CasebookBookkeeperSurface =
         let q = if isNullish (input?q) then "" else string input?q
         let a = if isNullish (input?a) then "" else string input?a
         let diff = if isNullish (input?diff) then "" else string input?diff
+
         let relatedPaths =
-            if isNullish (input?relatedPaths) then []
-            else unbox<string array> (input?relatedPaths) |> Array.toList
-        BookkeeperRuntime.createRefreshPrompt q a relatedPaths diff
+            if isNullish (input?relatedPaths) then
+                []
+            else
+                unbox<string array> (input?relatedPaths) |> Array.toList
+
+        let language =
+            if isNullish (input?language) then
+                ProviderLanguage.English
+            else
+                ProviderLanguage.parse (string input?language)
+
+        BookkeeperRuntime.createRefreshPromptFor language q a relatedPaths diff
 
     let private requiredString (fieldName: string) (value: obj) : Result<string, string> =
         let isString: bool = emitJsExpr value "typeof $0 === 'string'"
@@ -50,7 +61,11 @@ module CasebookBookkeeperSurface =
                 let! agent = requiredString "agent" descriptor?agent
 
                 let! rootSelection =
-                    ParticipantIdentity.resolveAtRoot agent
+                    (match ParticipantIdentity.resolveAtRoot agent with
+                     | Ok s -> Ok s
+                     | Error(ParticipantIdentityError.LegacyParticipantName _) ->
+                         ParticipantIdentity.resolveAtRoot "engineer"
+                     | Error e -> Error e)
                     |> Result.map PromptAuthority.IdentitySeed.RootSelection
                     |> Result.mapError (sprintf "invalid bookkeeper owner descriptor agent: %A")
 
@@ -212,12 +227,15 @@ module CasebookBookkeeperSurface =
     let aborted () : obj = box (Ok())
 
     let completed (value: string) : obj =
+        // Synthetic leaf terminal: the Bookkeeper leaf runs under the owner
+        // descriptor's converged research identity, and this tag only labels
+        // the child turn for reconciliation consumers that ignore it.
         box (
             Wanxiangshu.OpenCode.TerminalOutcome.Completed
                 { SessionId = SessionId.create value
                   AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "bookkeeper"
                   ProviderRun = ProviderRunIdentity.create "bookkeeper"
-                  Role = Role.Inspector
+                  Role = Role.Engineer
                   Directory = None
                   TerminalText = "bookkeeper completed"
                   TurnFormalText = "bookkeeper completed" }

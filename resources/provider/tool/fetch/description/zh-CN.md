@@ -1,10 +1,7 @@
-按 shelfmark 读取一份已经完成且可复用的 Casebook case。
+按 shelfmark 读取可复用的 Casebook 答案，不是发起新的调查。
+案例来自 Engineer 已完成的工作，之后根据关联文件的真实 diff 维护。
+fetch 返回精确的存储答案及维护结果，不授权网页调查、执行或源码修改。
 
-当你需要 Casebook 的精确 canonical answer、而不是一次新的调查时，使用 fetch。
-
-fetch 不搜索 web、不检查 repository、不实现 source、也不修改该 case。
-
-shelfmark 命名要读取的 case。
-
-成功的返回是精确的 canonical answer，并带有 freshness consequence：
-证据是否仍然成立、是否已按新证据修订，或应当被当作一份较旧的记述。
+未变，表示未发现关联文件状态差异。已维护，表示所给 diff 已处理成功，正文可能无需改字。
+陈旧，表示维护未能建立当前记述。这些状态都不证明运行正确，也不证明依赖覆盖完整。
+按适用条件使用答案；当前任务需要新证据时，仍须取得新证据。

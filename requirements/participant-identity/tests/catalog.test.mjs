@@ -67,11 +67,7 @@ test('WHAT[PID-002] persona_catalog_maps_roles_to_single_persona', () => {
   }
   assert.equal(identity.bookkeeperPersona(''), 'Curator')
   assert.equal(identity.resolveParticipantIdentityAtRoot('bookkeeper').identity.persona, 'Curator')
-  assert.equal(identity.resolveParticipantIdentityAtRoot('predictor').identity.persona, 'Investigator')
-  assert.equal(
-    identity.resolveParticipantIdentityAtRoot('predictor').identity.persona,
-    personaLabel('inspector'),
-  )
+  assert.equal(identity.resolveParticipantIdentityAtRoot('predictor').identity.persona, 'Engineer')
 })
 
 test('WHAT[PID-002] all_legacy_bare_names_are_rejected', () => {

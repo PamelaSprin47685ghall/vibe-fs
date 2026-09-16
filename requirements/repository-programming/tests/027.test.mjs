@@ -13,12 +13,12 @@ test('WHAT[REPOSITORY-PROGRAMMING-027] JS027_js_engineer_and_js_devops_generated
 
   const engineerSurface = jsGenerator.generateSurfaceForRole('Engineer', ['Read', 'Write', 'Edit', 'Glob', 'Grep'])
   assert.equal(engineerSurface.toolName, 'js-engineer')
-  assert.match(engineerSurface.description, /edit(path, changes)/)
-  assert.match(engineerSurface.description, /file(path, matches)/)
-  assert.match(engineerSurface.description, /glob(pattern)/)
-  assert.match(engineerSurface.description, /grep(needle, pattern)/)
+  assert.match(engineerSurface.description, /edit\(path,\s*changes\)/)
+  assert.match(engineerSurface.description, /file\(path/)
+  assert.match(engineerSurface.description, /glob\(pattern\)/)
+  assert.match(engineerSurface.description, /grep\(needle,\s*pattern\)/)
 
   const devopsSurface = jsGenerator.generateSurfaceForRole('DevOps', ['Read', 'Write', 'Edit', 'Glob', 'Grep'])
   assert.equal(devopsSurface.toolName, 'js-devops')
-  assert.match(devopsSurface.description, /edit(path, changes)/)
+  assert.match(devopsSurface.description, /edit\(path,\s*changes\)/)
 })

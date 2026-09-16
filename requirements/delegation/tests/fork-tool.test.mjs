@@ -88,7 +88,7 @@ test('WHAT[DELEG-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_and_lea
       runtime,
       toolModule,
       owner,
-      'coder',
+      'engineer',
       'Ada',
       'FIRST-FORK-CHARGE',
     )
@@ -154,7 +154,7 @@ test('WHAT[DELEG-026] RESUME_synchronous_admission_with_async_work_and_join_isol
 
   try {
     // 1. Initial fork
-    const first = forkTool.executeManagerFork(runtime, toolModule, owner, 'coder', 'Ada', 'INITIAL-CHARGE')
+    const first = forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', 'Ada', 'INITIAL-CHARGE')
     await waitForPromptCount(runtime, 1)
     assert.equal(forkTool.acceptPrompt(runtime, 0), true)
     assert.match(await first, /Ada/)
@@ -209,7 +209,7 @@ test('WHAT[DELEG-003] FORK_TOOL_requires_calling_and_resume_rejects_calling', as
       runtime,
       toolModule,
       owner,
-      'coder',
+      'engineer',
       'Ada',
       'RESUME-REJECTS-CALLING',
     )
@@ -233,7 +233,7 @@ test('WHAT[DELEG-026] FORK_TOOL_acceptance_unknown_never_claims_charge_was_not_p
       runtime,
       toolModule,
       owner,
-      'coder',
+      'engineer',
       'Ada',
       'UNCERTAIN-FORK-CHARGE',
     )
@@ -261,7 +261,7 @@ test('WHAT[DELEG-026] FORK_TOOL_unconfirmed_dispatch_reports_uncertain_and_never
       runtime,
       toolModule,
       owner,
-      'coder',
+      'engineer',
       'Ada',
       'RECEIPT-PENDING-FORK-CHARGE',
     )
@@ -287,7 +287,7 @@ test('WHAT[PARTICIPANT-HORIZON-011] FORK_TOOL_abandoned_child_does_not_vanish_fr
   const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
 
   try {
-    const placed = forkTool.executeManagerFork(runtime, toolModule, owner, 'coder', 'Ada', 'VISIBLE-CHARGE')
+    const placed = forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', 'Ada', 'VISIBLE-CHARGE')
     await waitForPromptCount(runtime, 1)
     assert.equal(forkTool.acceptPrompt(runtime, 0), true)
     assert.match(await placed, /Ada/)
@@ -310,7 +310,7 @@ test('WHAT[MANAGED-SESSION-018] FORK_TOOL_process_detach_preserves_durable_activ
   const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
 
   try {
-    const placed = forkTool.executeManagerFork(runtime, toolModule, owner, 'coder', 'Ada', 'SURVIVE-PLUGIN-RELOAD')
+    const placed = forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', 'Ada', 'SURVIVE-PLUGIN-RELOAD')
     await waitForPromptCount(runtime, 1)
     assert.equal(forkTool.acceptPrompt(runtime, 0), true)
     assert.match(await placed, /Ada/)

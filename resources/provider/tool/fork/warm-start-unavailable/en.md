@@ -1,1 +1,2 @@
-repository warm-start keywords are only available when fork targets Coder, Inspector, or DevOps
+Repository warm-start keywords apply only when fork targets Engineer. They do
+not authorize another role or create a DevOps; use the fixed binding for DevOps.

@@ -30,7 +30,7 @@ const input = {
   diagnostics: [{
     operation: 'AcceptedPersisted', logicalRunId: 'run-chat-fixture', sessionId: 'ses-chat-fixture',
     authorityRootUserMessageId: 'msg-chat-root', physicalUserMessageId: 'msg-chat-fixture', promptKey: null,
-    providerRunIdentity: null, participant: 'coder', role: 'coder', providerRequestKind: 'work-main',
+    providerRunIdentity: null, participant: 'engineer', role: 'engineer', providerRequestKind: 'work-main',
     transition: { from: null, to: 'Accepted' }, failureClass: null, resolution: null,
     capacityState: 'Released', capacityFence: null, hook: 'chat.message',
     policyClass: 'Workflow', recoveryDecision: 'ResumeAdmission', persistenceCommitment: 'Committed',
@@ -77,8 +77,8 @@ test('WHAT[CHATEXEC-014] agent-028 session-only binding is hostile; current owne
     ],
   )
   for (const entry of projected.value) {
-    assert.equal(entry.identity.participant, 'coder')
-    assert.equal(entry.identity.role, 'coder')
+    assert.equal(entry.identity.participant, 'engineer')
+    assert.equal(entry.identity.role, 'engineer')
     assert.equal('effectiveAgent' in entry.identity, false, 'projection carries no EffectiveAgent')
   }
   const recovery = await recoverScenarios([agent028.currentModel.recoveryScenario])
@@ -101,7 +101,7 @@ test('WHAT[CHATEXEC-014] agent-028 legacy agent fields are hostile: dropped on r
     return result.value
   }
 
-  const coderLegacy = canonicalOf(hostileFact('message-agent-028-a', 'coder'))
+  const coderLegacy = canonicalOf(hostileFact('message-agent-028-a', 'engineer'))
   const reviewerLegacy = canonicalOf(hostileFact('message-agent-028-a', 'reviewer'))
   assert.equal(coderLegacy, reviewerLegacy, 'legacy-only agent difference must vanish on re-encoding')
   assert.doesNotMatch(coderLegacy, /PeerAgent|EffectiveAgent/, 'current encoding drops legacy agent fields')
@@ -110,8 +110,8 @@ test('WHAT[CHATEXEC-014] agent-028 legacy agent fields are hostile: dropped on r
   assert.equal(folded.ok, true, folded.ok ? '' : folded.error)
   assert.equal(folded.value.length, 1)
   assert.equal(folded.value[0].phase, 'Accepted')
-  assert.equal(folded.value[0].identity.participant, 'coder', 'conflicting legacy fields cannot alter canonical participant')
-  assert.equal(folded.value[0].identity.role, 'coder')
+  assert.equal(folded.value[0].identity.participant, 'engineer', 'conflicting legacy fields cannot alter canonical participant')
+  assert.equal(folded.value[0].identity.role, 'engineer')
 })
 
 test('WHAT[CHATEXEC-014] duplicate replay is idempotent and does not accumulate authority', async () => {

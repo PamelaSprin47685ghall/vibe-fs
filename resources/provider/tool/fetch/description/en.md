@@ -1,13 +1,10 @@
-Retrieve a completed, reusable Casebook case by shelfmark.
+Retrieve a reusable Casebook answer by shelfmark, not a new investigation.
+The case is knowledge from completed Engineer work, maintained against real
+diffs in related files. fetch returns the exact stored answer and its maintenance
+consequence; it does not authorize web research, execution, or source changes.
 
-Use fetch when you need the Casebook's exact canonical answer, not a new
-investigation.
-
-fetch does not search the web, inspect the repository, implement source, or
-modify the case.
-
-shelfmark names the case to retrieve.
-
-A successful return is the exact canonical answer together with a freshness
-consequence: whether the evidence still holds, was revised, or should be
-treated as an older account.
+Unchanged means no relevant file-state difference was found. Refreshed means
+maintenance succeeded from the supplied diff, possibly without a prose change.
+Stale means maintenance did not establish a current account. None proves current
+runtime correctness or complete dependency coverage. Use the answer within its
+conditions and obtain current evidence when the present task requires it.

@@ -12,7 +12,7 @@ test('WHAT[DELEG-021] ONESHOT_TOOL_requires_nonempty_charge', () => {
 })
 test('WHAT[DELEG-021] ONESHOT_TOOL_role_is_coder_or_inspector_not_generic_agent', () => {
   assert.equal(sync.vocabulary('Coder', 'Fast', 's').role, 'coder')
-  assert.equal(sync.vocabulary('Inspector', 'Fast', 's').role, 'inspector')
+  assert.equal(sync.vocabulary('Engineer', 'Fast', 's').role, 'engineer')
 })
 test('WHAT[DELEG-021] ONESHOT_TOOL_pending_completion_is_not_fabricated', () => {
   assert.doesNotMatch(tool, /return.*completed.*without|fake|placeholder/i)

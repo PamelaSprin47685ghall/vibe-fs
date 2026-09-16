@@ -26,10 +26,10 @@ const evidence = (overrides = {}) => ({
     ownerLogicalRun: null,
     ownerAuthorityRoot: null,
     participantIdentity: {
-      selectedAgent: 'coder',
-      canonicalRole: 'coder',
+      selectedAgent: 'engineer',
+      canonicalRole: 'engineer',
       selectedTier: 'deep',
-      persona: 'Coder',
+      persona: 'Engineer',
       personaCatalogVersion: 1,
       origin: 'ResolvedAtRoot',
     },
@@ -99,7 +99,7 @@ test('WHAT[CHATEXEC-011] external and plugin roots share AcceptManagedChatIntent
     )
     assert.equal(owner.ok, true, owner.error)
 
-    const inherited = authority.issueInheritedIdentitySeed('coder', owner.profile)
+    const inherited = authority.issueInheritedIdentitySeed('engineer', owner.profile)
     assert.equal(inherited.ok, true, inherited.error)
 
     const sent = await dispatch.sendAgentOwnerRoot(
@@ -116,7 +116,7 @@ test('WHAT[CHATEXEC-011] external and plugin roots share AcceptManagedChatIntent
       'ses-plugin',
       'msg-plugin',
       sent.key,
-      'coder',
+      'engineer',
     )
     assert.equal(plugin.ok, true, plugin.error)
     assert.equal(plugin.origin, 'AgentOwnerRoot')
@@ -129,15 +129,15 @@ test('WHAT[CHATEXEC-004] durable acceptance is projected before its witness exis
   assert.equal(result.ok, true, JSON.stringify(result.error))
   assert.deepEqual(result.trace, ['Read', 'Append', 'Committed', 'ReRead', 'Witness'])
   assert.deepEqual(result.witness.key, key)
-  assert.equal(result.witness.evidence.participant, 'coder')
-  assert.equal(result.witness.evidence.role, 'coder')
+  assert.equal(result.witness.evidence.participant, 'engineer')
+  assert.equal(result.witness.evidence.role, 'engineer')
   assert.equal('effectiveAgent' in result.witness.evidence, false, 'witness carries no EffectiveAgent')
   assert.deepEqual(result.witness.evidence.identitySeed.participantIdentity, {
     origin: 'ResolvedAtRoot',
-    participant: 'coder',
-    persona: 'Coder',
+    participant: 'engineer',
+    persona: 'Engineer',
     personaCatalogVersion: 1,
-    role: 'coder',
+    role: 'engineer',
   })
   assert.equal(result.acceptanceAppendCount, 1)
   assert.equal(result.capacityEffectCount, 0)

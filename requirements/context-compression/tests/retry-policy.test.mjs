@@ -21,17 +21,17 @@ const budget = failureOwner.budget
 test('WHAT[CONTEXT-COMPRESSION-006] role is fixed across retry attempts and consecutive failures', () => {
   const planner = compression.attemptPlanner
 
-  const plan0 = planner.plan({ kind: requestKind.workMain, role: 'coder', policyAllowsProbe: false, noCandidateReason: 'NoCoverage' })
-  const plan1 = planner.plan({ kind: requestKind.workMain, role: 'coder', policyAllowsProbe: false, noCandidateReason: 'NoCoverage' })
-  const plan2 = planner.plan({ kind: requestKind.workMain, role: 'coder', policyAllowsProbe: true, noCandidateReason: 'NoCoverage' })
+  const plan0 = planner.plan({ kind: requestKind.workMain, role: 'engineer', policyAllowsProbe: false, noCandidateReason: 'NoCoverage' })
+  const plan1 = planner.plan({ kind: requestKind.workMain, role: 'engineer', policyAllowsProbe: false, noCandidateReason: 'NoCoverage' })
+  const plan2 = planner.plan({ kind: requestKind.workMain, role: 'engineer', policyAllowsProbe: true, noCandidateReason: 'NoCoverage' })
 
-  assert.equal(plan0.participant, 'coder')
-  assert.equal(plan1.participant, 'coder')
-  assert.equal(plan2.participant, 'coder')
+  assert.equal(plan0.participant, 'engineer')
+  assert.equal(plan1.participant, 'engineer')
+  assert.equal(plan2.participant, 'engineer')
 
-  assert.equal(plan0.participantIdentity.canonicalRole, 'coder')
-  assert.equal(plan1.participantIdentity.canonicalRole, 'coder')
-  assert.equal(plan2.participantIdentity.canonicalRole, 'coder')
+  assert.equal(plan0.participantIdentity.canonicalRole, 'engineer')
+  assert.equal(plan1.participantIdentity.canonicalRole, 'engineer')
+  assert.equal(plan2.participantIdentity.canonicalRole, 'engineer')
 
   for (const plan of [plan0, plan1, plan2]) {
     assert.equal('budget' in plan, false, 'plans carry no budget snapshot')

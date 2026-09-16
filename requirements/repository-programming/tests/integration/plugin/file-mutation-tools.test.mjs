@@ -23,13 +23,13 @@ const isDirectory = (path) => existsSync(path) && statSync(path).isDirectory()
 
 test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_017_mv_moves_a_file', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, 'coder-mv-file', 'coder')
+    await acceptAuthorityRoot(runtime, 'engineer-mv-file', 'engineer')
     const source = join(directory, 'alpha.txt')
     const destination = join(directory, 'beta.txt')
     writeFileSync(source, 'payload')
 
     const result = parseToml(
-      await hooks.tool.mv.execute({ source, destination }, { sessionID: 'coder-mv-file', agent: 'coder' }),
+      await hooks.tool.mv.execute({ source, destination }, { sessionID: 'engineer-mv-file', agent: 'engineer' }),
     )
 
     assert.equal(result.moved, source)
@@ -41,14 +41,14 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_017_mv_moves_a_file', async () => {
 
 test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_017_mv_renames_a_directory', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, 'coder-mv-dir', 'coder')
+    await acceptAuthorityRoot(runtime, 'engineer-mv-dir', 'engineer')
     const source = join(directory, 'old-dir')
     const destination = join(directory, 'new-dir')
     mkdirSync(source)
     writeFileSync(join(source, 'inner.txt'), 'payload')
 
     const result = parseToml(
-      await hooks.tool.mv.execute({ source, destination }, { sessionID: 'coder-mv-dir', agent: 'coder' }),
+      await hooks.tool.mv.execute({ source, destination }, { sessionID: 'engineer-mv-dir', agent: 'engineer' }),
     )
 
     assert.equal(result.moved, source)
@@ -60,10 +60,10 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_017_mv_renames_a_directory', async 
 
 test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_017_mv_missing_source_returns_error', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, 'coder-mv-missing', 'coder')
+    await acceptAuthorityRoot(runtime, 'engineer-mv-missing', 'engineer')
     const text = await hooks.tool.mv.execute(
       { source: join(directory, 'nope.txt'), destination: join(directory, 'x.txt') },
-      { sessionID: 'coder-mv-missing', agent: 'coder' },
+      { sessionID: 'engineer-mv-missing', agent: 'engineer' },
     )
     assert.match(text, /No such file or directory/)
     assert.equal(parseToml(text).error, undefined)
@@ -72,12 +72,12 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_017_mv_missing_source_returns_error
 
 test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_018_rm_removes_a_file', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, 'coder-rm-file', 'coder')
+    await acceptAuthorityRoot(runtime, 'engineer-rm-file', 'engineer')
     const path = join(directory, 'trash.txt')
     writeFileSync(path, 'payload')
 
     const result = parseToml(
-      await hooks.tool.rm.execute({ path }, { sessionID: 'coder-rm-file', agent: 'coder' }),
+      await hooks.tool.rm.execute({ path }, { sessionID: 'engineer-rm-file', agent: 'engineer' }),
     )
 
     assert.equal(result.removed, path)
@@ -87,12 +87,12 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_018_rm_removes_a_file', async () =>
 
 test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_018_rm_removes_an_empty_directory', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, 'coder-rm-empty-dir', 'coder')
+    await acceptAuthorityRoot(runtime, 'engineer-rm-empty-dir', 'engineer')
     const path = join(directory, 'empty-dir')
     mkdirSync(path)
 
     const result = parseToml(
-      await hooks.tool.rm.execute({ path }, { sessionID: 'coder-rm-empty-dir', agent: 'coder' }),
+      await hooks.tool.rm.execute({ path }, { sessionID: 'engineer-rm-empty-dir', agent: 'engineer' }),
     )
 
     assert.equal(result.removed, path)
@@ -102,12 +102,12 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_018_rm_removes_an_empty_directory',
 
 test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_018_rm_refuses_a_non_empty_directory', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, 'coder-rm-nonempty', 'coder')
+    await acceptAuthorityRoot(runtime, 'engineer-rm-nonempty', 'engineer')
     const path = join(directory, 'non-empty-dir')
     mkdirSync(path)
     writeFileSync(join(path, 'inner.txt'), 'payload')
 
-    const text = await hooks.tool.rm.execute({ path }, { sessionID: 'coder-rm-nonempty', agent: 'coder' })
+    const text = await hooks.tool.rm.execute({ path }, { sessionID: 'engineer-rm-nonempty', agent: 'engineer' })
 
     assert.match(text, /directory not empty/)
     assert.equal(parseToml(text).error, undefined)
@@ -118,10 +118,10 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_018_rm_refuses_a_non_empty_director
 
 test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_018_rm_missing_path_returns_error', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
-    await acceptAuthorityRoot(runtime, 'coder-rm-missing', 'coder')
+    await acceptAuthorityRoot(runtime, 'engineer-rm-missing', 'engineer')
     const text = await hooks.tool.rm.execute(
       { path: join(directory, 'nope.txt') },
-      { sessionID: 'coder-rm-missing', agent: 'coder' },
+      { sessionID: 'engineer-rm-missing', agent: 'engineer' },
     )
     assert.match(text, /No such file or directory/)
     assert.equal(parseToml(text).error, undefined)

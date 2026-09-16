@@ -32,8 +32,8 @@ module internal SyncDelegateWorkflow =
                   -> Task<Result<SessionId, string>>
           BindChild: SessionId -> SessionId -> string -> unit
           OnDelegateReady: SessionId -> string -> unit
-          NoteInspectorPrompt: string -> string -> unit
-          CleanupInspectorDraft: string -> unit
+          NoteDelegatePrompt: string -> string -> unit
+          CleanupDelegateDraft: string -> unit
           Directory: string option
           ReplaceToolEstimate: SessionId -> int option -> Task<unit>
           SendPrompt: SyncDelegateCall -> SyncDelegatePromptRequest -> Task<Result<PreparedDelegationHandoff, string>>
@@ -87,16 +87,17 @@ module internal SyncDelegateWorkflow =
         store.ReleaseAdmission(ownerScope, role)
         completeError invocations error
 
-    let private maybeCleanupInspector
+    let private maybeCleanupDelegateDraft
         (store: SyncDelegateCallStore)
         (deps: Dependencies)
         (ownerScope: ReuseScopeId)
         (role: SyncDelegateRole)
         =
         match role with
-        | SyncDelegateRole.Inspector ->
-            store.TryTakeDeletedInspector ownerScope
-            |> Option.iter (fun sessionId -> deps.CleanupInspectorDraft(SessionId.value sessionId))
+        | SyncDelegateRole.Inspector
+        | SyncDelegateRole.Engineer ->
+            store.TryTakeDeletedDelegate ownerScope
+            |> Option.iter (fun sessionId -> deps.CleanupDelegateDraft(SessionId.value sessionId))
         | SyncDelegateRole.Coder -> ()
 
     let private sumExpectedToolCalls (invocations: SyncDelegateInvocation list) =
@@ -196,8 +197,8 @@ module internal SyncDelegateWorkflow =
 
             let! handoff = deps.SendPrompt call request
 
-            if role = SyncDelegateRole.Inspector then
-                deps.NoteInspectorPrompt (SessionId.value delegateSession) request.Charge
+            if role = SyncDelegateRole.Inspector || role = SyncDelegateRole.Engineer then
+                deps.NoteDelegatePrompt (SessionId.value delegateSession) request.Charge
 
             let! workRecord =
                 deps.AwaitWorkRecord
@@ -367,7 +368,7 @@ module internal SyncDelegateWorkflow =
         : Task<unit> =
         let first = List.head invocations
         let batchOwner = first.Owner
-        maybeCleanupInspector store deps ownerScope role
+        maybeCleanupDelegateDraft store deps ownerScope role
 
         runReadyWithRole store deps ownerScope role batchOwner invocations
 

@@ -83,6 +83,25 @@ test('parsePackResult accepts single valid npm pack json output', () => {
   assert.equal(parsed.filename, 'wanxiangshu-0.9.0.tgz')
 })
 
+test('parsePackResult accepts the npm >=12 name-keyed pack json shape', () => {
+  const validOutput = JSON.stringify({
+    wanxiangshu: {
+      id: 'wanxiangshu@0.9.0',
+      name: 'wanxiangshu',
+      version: '0.9.0',
+      filename: 'wanxiangshu-0.9.0.tgz',
+    },
+  })
+
+  const parsed = parsePackResult(validOutput, 'wanxiangshu')
+  assert.equal(parsed.name, 'wanxiangshu')
+  assert.equal(parsed.filename, 'wanxiangshu-0.9.0.tgz')
+  assert.throws(
+    () => parsePackResult(JSON.stringify({ first: { name: 'a' }, second: { name: 'b' } }), 'wanxiangshu'),
+    (err) => err.code === 'pack-result-count',
+  )
+})
+
 test('parsePackResult rejects malformed json, wrong count, and mismatched package name', () => {
   assert.throws(
     () => parsePackResult('not-json'),

@@ -11,16 +11,12 @@ import { fileURLToPath } from 'node:url'
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../..')
 
 const PROVIDER_ROLES = [
-  'blogger',
-  'bookkeeper',
-  'browser',
-  'coder',
-  'devops',
-  'distiller',
-  'inquiry',
-  'inspector',
+  'engineer',
   'manager',
   'orchestrator',
+  'devops',
+  'blogger',
+  'bookkeeper',
 ]
 
 test('WHAT[DISTRIBUTION-008] PACKAGE_resources_provider_role_laws_and_rulebook_present_after_install', () => {
@@ -42,7 +38,7 @@ test('WHAT[DISTRIBUTION-008] PACKAGE_resources_provider_role_laws_and_rulebook_p
       assert.ok(text.trim().length > 0, `Role Law ${role}/${locale} must be non-empty`)
     }
   }
-  assert.equal(PROVIDER_ROLES.length, 10)
+  assert.equal(PROVIDER_ROLES.length, 6)
 
   for (const leaf of ['world/common-law/en.md', 'world/common-law/zh-CN.md']) {
     const full = path.join(providerDir, leaf)

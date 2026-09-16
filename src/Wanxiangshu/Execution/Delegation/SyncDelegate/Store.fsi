@@ -65,8 +65,8 @@ type internal SyncDelegateCallStore =
         invocations: SyncDelegateInvocation list ->
             Result<SyncDelegateCall * IDisposable, string>
 
-    member TryTakeDeletedInspector: scope: ReuseScopeId -> SessionId option
-    member TryGetDeletedInspector: scope: ReuseScopeId -> SessionId option
-    member PutDeletedInspector: scope: ReuseScopeId * inspectorSessionId: SessionId -> SessionId option
-    member ClearDeletedInspector: scope: ReuseScopeId -> SessionId option
+    member TryTakeDeletedDelegate: scope: ReuseScopeId -> SessionId option
+    member TryGetDeletedDelegate: scope: ReuseScopeId -> SessionId option
+    member PutDeletedDelegate: scope: ReuseScopeId * delegateSessionId: SessionId -> SessionId option
+    member ClearDeletedDelegate: scope: ReuseScopeId -> SessionId option
     member ClearAll: unit -> SessionId list

@@ -27,11 +27,8 @@ module StaticTools =
         | ToolPermission.Move -> [ "mv" ]
         | ToolPermission.Remove -> [ "rm" ]
         | ToolPermission.BashHoneypot -> [ "bash-honeypot" ]
-        | ToolPermission.Inspect -> [ "inspect" ]
-        | ToolPermission.Behavior -> [ "establish-behavior"; "repair-behavior" ]
-        | ToolPermission.Exec -> [ "run"; "query-shell" ]
+        | ToolPermission.Exec -> [ "run" ]
         | ToolPermission.Pty -> [ "open-terminal"; "send-terminal"; "read-terminal"; "signal-terminal" ]
-        | ToolPermission.Network -> [ StealthBrowserMcp.permissionKey ]
         | ToolPermission.Sphinx -> [ SphinxMcp.permissionKey ]
         | ToolPermission.ReviewAssessment -> [ "review" ]
         | ToolPermission.Chronicle -> [ "chronicle" ]
@@ -95,12 +92,7 @@ module StaticTools =
           "mv"
           "rm"
           "bash-honeypot"
-          "inspect"
-          "establish-behavior"
-          "repair-behavior"
           "run"
-          "query-shell"
-          StealthBrowserMcp.permissionKey
           SphinxMcp.permissionKey
           "review"
           "chronicle"
@@ -109,12 +101,7 @@ module StaticTools =
           "js-engineer"
           "js-manager"
           "js-orchestrator"
-          "js-coder"
-          "js-inspector"
-          "js-browser"
-          "js-inquiry"
           "js-devops"
-          "js-distiller"
           "js-blogger"
           "js-bookkeeper" ]
 
@@ -160,16 +147,12 @@ module StaticTools =
         | true, ("open-terminal" | "send-terminal" | "read-terminal" | "signal-terminal"), Role.DevOps -> "allow"
         | true, "fork", Role.DevOps -> "deny"
         | true, "resume", Role.DevOps -> "deny"
-        | true, "query-shell", Role.Inspector -> "allow"
-        | true, "run", Role.Inspector -> "deny"
         | true, "run", Role.DevOps -> "allow"
-        | true, "query-shell", Role.DevOps -> "deny"
         | true, "skill", _ -> "allow"
-        | true, "assume", (Role.Blogger | Role.Distiller) -> "deny"
+        | true, "assume", Role.Blogger -> "deny"
         | true, "assume", _ -> "allow"
-        | true,
-          ("enough" | "abandon" | "defer" | "subscribe" | "publish" | "celebrate" | "regret"),
-          (Role.Blogger | Role.Distiller) -> "deny"
+        | true, ("enough" | "abandon" | "defer" | "subscribe" | "publish" | "celebrate" | "regret"), Role.Blogger ->
+            "deny"
         | true, ("enough" | "abandon" | "defer" | "subscribe" | "publish" | "celebrate" | "regret"), _ -> "allow"
         | true, "js-bookkeeper", _ -> "deny"
         | true, name, _ when name.StartsWith "js-" -> jsPermission role name
@@ -222,30 +205,24 @@ module StaticTools =
 
     let engineerAgentConfig (prompt: string option) : obj = primaryAgent Role.Engineer prompt
 
-    let coderAgentConfig (prompt: string option) : obj = primaryAgent Role.Coder prompt
-
     /// Companion Session Y: tool set is exactly { chronicle } (ENFORCER-010).
     /// System prompt for B-record distillation with chronicle tool protocol.
     let bloggerAgentConfig (prompt: string) : obj = hiddenAgent Role.Blogger prompt
 
-    /// Role.Distiller: no tools; system prompt for map/reduce output summarization.
-    /// Distinct from Tool.run (OS command tool used by DevOps).
-    let distillerAgentConfig (prompt: string) : obj = hiddenAgent Role.Distiller prompt
-
-    let inquiryAgentConfig (prompt: string option) : obj = primaryAgent Role.Inquiry prompt
-
     /// InternalLeaf Bookkeeper Host stub (AGENT-002): hidden; ToolRegistry gates js-bookkeeper by attachment.
     let bookkeeperAgentConfig (prompt: string) : obj =
+        let pairs =
+            [ yield "*", box "deny"
+              yield "external_directory", box "allow"
+              for name in knownToolNames do
+                  yield name, box "deny" ]
+
         createObj
             [ "mode", box "primary"
               "hidden", box true
-              "permission", permissionObj Role.Distiller
+              "permission", box (createObj pairs)
               "prompt", box prompt
               "temperature", box 1.0
               "options", box (createObj [ "temperature", box 1.0 ]) ]
-
-    let browserAgentConfig (prompt: string option) : obj = primaryAgent Role.Browser prompt
-
-    let inspectorAgentConfig (prompt: string option) : obj = primaryAgent Role.Inspector prompt
 
     let devopsAgentConfig (prompt: string option) : obj = primaryAgent Role.DevOps prompt

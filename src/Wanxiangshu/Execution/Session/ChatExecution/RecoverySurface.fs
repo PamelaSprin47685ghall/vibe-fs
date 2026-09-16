@@ -12,7 +12,7 @@ module RecoverySurface =
 
     let private accepted (suffix: string) : AcceptedChatExecutionEvidence =
         let identity =
-            ParticipantIdentity.resolveAtRoot "coder"
+            ParticipantIdentity.resolveAtRoot "engineer"
             |> Result.defaultWith (fun error -> invalidOp $"cannot construct proof identity: {error}")
 
         { SessionId = SessionId.create $"session-{suffix}"

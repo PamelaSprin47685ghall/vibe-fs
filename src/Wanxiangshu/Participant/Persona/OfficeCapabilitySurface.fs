@@ -22,11 +22,8 @@ module OfficeCapabilitySurface =
         | "Grep" -> Some ToolPermission.Grep
         | "Move" -> Some ToolPermission.Move
         | "Remove" -> Some ToolPermission.Remove
-        | "Inspect" -> Some ToolPermission.Inspect
-        | "Behavior" -> Some ToolPermission.Behavior
         | "Exec" -> Some ToolPermission.Exec
         | "Pty" -> Some ToolPermission.Pty
-        | "Network" -> Some ToolPermission.Network
         | "ReviewAssessment" -> Some ToolPermission.ReviewAssessment
         | "Chronicle" -> Some ToolPermission.Chronicle
         | "Fetch" -> Some ToolPermission.Fetch
@@ -50,11 +47,8 @@ module OfficeCapabilitySurface =
         | ToolPermission.Grep -> "Grep"
         | ToolPermission.Move -> "Move"
         | ToolPermission.Remove -> "Remove"
-        | ToolPermission.Inspect -> "Inspect"
-        | ToolPermission.Behavior -> "Behavior"
         | ToolPermission.Exec -> "Exec"
         | ToolPermission.Pty -> "Pty"
-        | ToolPermission.Network -> "Network"
         | ToolPermission.ReviewAssessment -> "ReviewAssessment"
         | ToolPermission.Chronicle -> "Chronicle"
         | ToolPermission.Fetch -> "Fetch"
@@ -79,7 +73,8 @@ module OfficeCapabilitySurface =
     /// Sorted permission labels for a role. Unknown role fails closed.
     let permissions (roleLabel: string) : string array =
         match Roles.tryParseRole roleLabel with
-        | None -> [||]
+        | None
+        | Some(Role.Coder | Role.Inspector | Role.Browser | Role.Inquiry | Role.Distiller) -> [||]
         | Some role ->
             OfficeCapability.permissions role
             |> Set.toList
@@ -90,5 +85,5 @@ module OfficeCapabilitySurface =
     /// Unknown role or permission is denied.
     let isAllowed (roleLabel: string) (permissionLabel: string) : bool =
         match Roles.tryParseRole roleLabel, permissionOf permissionLabel with
-        | Some role, Some permission -> OfficeCapability.isAllowed role permission
+        | Some role, Some permission when Roles.all |> List.contains role -> OfficeCapability.isAllowed role permission
         | _ -> false

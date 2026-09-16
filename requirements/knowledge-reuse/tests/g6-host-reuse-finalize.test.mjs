@@ -42,11 +42,11 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_G_host_reusable_inspector_one_finalize_then_c
 
     for (let i = 0; i < QUESTIONS.length; i += 1) {
       const [question, answer] = QUESTIONS[i]
-      const pending = syncDelegate.invoke(runtime, owner, 'Inspector', question)
-      await syncDelegate.awaitPromptCount(runtime, owner, 'Inspector', i + 1)
-      assert.equal(syncDelegate.acceptPrompt(runtime, owner, 'Inspector', i), true)
+      const pending = syncDelegate.invoke(runtime, owner, 'Engineer', question)
+      await syncDelegate.awaitPromptCount(runtime, owner, 'Engineer', i + 1)
+      assert.equal(syncDelegate.acceptPrompt(runtime, owner, 'Engineer', i), true)
       assert.equal(syncDelegate.childCount(runtime), 1, `Inspector Q${i + 1} did not reuse a single child`)
-      const child = syncDelegate.child(runtime, owner, 'Inspector')
+      const child = syncDelegate.child(runtime, owner, 'Engineer')
       assert.notEqual(child, null)
       if (i === 0) {
         delegateId = child
@@ -55,7 +55,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_G_host_reusable_inspector_one_finalize_then_c
       }
 
       lifecycle.notePrompt(delegateId, question)
-      assert.equal(await syncDelegate.settle(runtime, owner, 'Inspector', answer, `asst_q${i + 1}`), true)
+      assert.equal(await syncDelegate.settle(runtime, owner, 'Engineer', answer, `asst_q${i + 1}`), true)
       const done = await pending
       assert.equal(done.ok, true, done.ok ? '' : done.error)
       assert.match(String(done.value), new RegExp(answer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))

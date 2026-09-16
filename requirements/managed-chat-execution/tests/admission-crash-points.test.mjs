@@ -12,7 +12,7 @@ const evidence = (cut) => ({
   authorityRootUserMessageId: `root-crash-${cut}`,
   identitySeed: {
     participantIdentity: {
-      selectedAgent: 'coder',
+      selectedAgent: 'engineer',
     },
   },
   providerRun: `provider-crash-${cut}`,
@@ -29,10 +29,10 @@ const action = (kind, cut, extra = {}) => ({
       ownerLogicalRun: null,
       ownerAuthorityRoot: null,
       participantIdentity: {
-        selectedAgent: 'coder',
-        canonicalRole: 'coder',
+        selectedAgent: 'engineer',
+        canonicalRole: 'engineer',
         selectedTier: 'deep',
-        persona: 'Coder',
+        persona: 'Engineer',
         personaCatalogVersion: 1,
         origin: 'ResolvedAtRoot',
       },

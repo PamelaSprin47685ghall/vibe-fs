@@ -558,7 +558,7 @@ module ProviderFailureSurface =
             let durable = handle.Journal
 
             let identity =
-                ParticipantIdentity.resolveAtRoot "coder"
+                ParticipantIdentity.resolveAtRoot "engineer"
                 |> Result.defaultWith (fun error -> invalidArg "providerRun" $"invalid identity: {error}")
 
             let accepted: AcceptedChatExecutionEvidence =

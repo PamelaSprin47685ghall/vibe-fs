@@ -36,8 +36,6 @@ module RepositoryWarmStartPrompt =
     let isDirectConsumer (role: Role) =
         match role with
         | Role.Engineer
-        | Role.Coder
-        | Role.Inspector
         | Role.DevOps -> true
         | _ -> false
 

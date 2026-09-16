@@ -7,8 +7,9 @@ open Wanxiangshu.Foundation.Identity
 
 type SyncDelegateRole = Wanxiangshu.Execution.Session.SyncDelegateRole
 
-/// EXEC-026 / HOST-008: SyncDelegate vocabulary — dedicated Inspector/Coder
-/// ownership keys and AttachmentKind mapping. Runtime/tools are wired later; this module is types + helpers only.
+/// EXEC-026 / HOST-008: SyncDelegate vocabulary — dedicated ownership keys and
+/// AttachmentKind mapping. Engineer is the live research delegate; the retired
+/// `inspector` and `coder` labels survive only to decode historical wires.
 /// EXEC-026: reuse-scope half of the dedicated SyncDelegate key.
 /// Prefer a local wrapper here over churning Identity.fs.
 type ReuseScopeId = private ReuseScopeId of string
@@ -43,17 +44,22 @@ module SyncDelegate =
 
     let tryRoleOfToolName (name: string) =
         match name.Trim().ToLowerInvariant() with
+        // Historical decoder: the retired inspect/behavior tools no longer exist
+        // as live specs, but old journals still name them.
         | "inspect" -> Some SyncDelegateRole.Inspector
         | "establish-behavior"
         | "repair-behavior" -> Some SyncDelegateRole.Coder
+        | "engineer" -> Some SyncDelegateRole.Engineer
         | _ -> None
 
     /// EXEC-026: canonical wire role label for a dedicated SyncDelegate
-    /// (`inspector` / `coder`). Sole definition — Session/ layer references this.
+    /// (`engineer`; `inspector`/`coder` are historical decodes). Sole
+    /// definition — Session/ layer references this.
     let roleLabel (role: SyncDelegateRole) : string =
         match role with
         | SyncDelegateRole.Inspector -> "inspector"
         | SyncDelegateRole.Coder -> "coder"
+        | SyncDelegateRole.Engineer -> "engineer"
 
     /// HOST-008: SyncDelegateRole → AttachmentKind for Work+Attached registration.
     let delegateRoleToAttachment (role: SyncDelegateRole) : AttachmentKind = SyncDelegateRole.toAttachmentKind role

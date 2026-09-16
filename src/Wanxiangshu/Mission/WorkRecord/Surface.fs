@@ -100,6 +100,21 @@ module WorkRecordSurface =
             | Error error -> return raise (InvalidOperationException(captureError error))
         }
 
+    let materializeFissionInvocationRecord (convergedTrace: obj) : string =
+        let takeover =
+            if isNull (convergedTrace?takeoverStatement) then
+                ""
+            else
+                string convergedTrace?takeoverStatement
+
+        let sb = System.Text.StringBuilder()
+        sb.AppendLine("Recent work:") |> ignore
+
+        if not (String.IsNullOrWhiteSpace takeover) then
+            sb.AppendLine(takeover) |> ignore
+
+        sb.ToString()
+
     /// COMPANION-012: capture a plain semantic projection and return its inclusive last cursor.
     let captureProjection (handle: JournalHandle) (sessionId: string) (projection: obj) : Task<obj> =
         task {

@@ -132,7 +132,7 @@ test('WHAT[REPOSITORY-INVESTIGATION-009] AGENT_032_searches_all_independent_keyw
     const pending = warmStart.prepareWithSearch(
       searchFn,
       sid,
-      'Inspector',
+      'Engineer',
       root,
       'slow\nbroken\nfast',
       'inspect charge',
@@ -163,7 +163,7 @@ test('WHAT[REPOSITORY-INVESTIGATION-007] AGENT_032_zero_keywords_is_byte_exact_z
   }
 
   try {
-    const zero = await warmStart.prepareWithSearch(searchFn, sid, 'Browser', root, ' \r\n ', 'raw charge')
+    const zero = await warmStart.prepareWithSearch(searchFn, sid, 'Blogger', root, ' \r\n ', 'raw charge')
     assert.deepEqual(zero, { ok: true, value: '# raw charge\n' })
     assert.equal(calls, 0)
   } finally {
@@ -182,10 +182,10 @@ test('WHAT[REPOSITORY-INVESTIGATION-008] AGENT_032_nonconsumer_nonempty_keywords
   try {
     const denied = await warmStart.prepareWithSearch(searchFn, sid, 'Browser', root, 'repo', 'raw charge')
     assert.equal(denied.ok, false)
-    assert.match(denied.error, /only available to Coder, Inspector, or DevOps/)
+    assert.match(denied.error, /only available to Engineer or DevOps/)
     assert.equal(calls, 0)
 
-    const noWorkspace = await warmStart.appendToBaseWithSearch(searchFn, sid, 'Coder', undefined, 'repo', 'base')
+    const noWorkspace = await warmStart.appendToBaseWithSearch(searchFn, sid, 'Engineer', undefined, 'repo', 'base')
     assert.deepEqual(noWorkspace, { ok: true, value: '# base\n' })
     assert.equal(calls, 0)
   } finally {

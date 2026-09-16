@@ -70,15 +70,16 @@ A model can receive more text and become less informed. Repetition competes
 with decisive lines, large output separates evidence from decisions, and raw
 material consumes working space.
 
-An output budget is a commitment about how much raw evidence deserves to enter
-your present before condensation becomes cheaper. It is not a prediction of
-how much the command will emit.
+An output budget limits how much raw evidence enters your present. It does not
+predict how much a command emits. Small output remains intact; oversized output
+keeps a bounded raw tail with a truncation notice. No model interprets or selects
+the omitted material for you, and the tail need not contain the decisive error.
 
-Raw output preserves exact wording, ordering clues, paths, numbers, rare
-warnings, and contradictions that a summary may destroy. A condensation is an
-interpretation; raw output is an observation. The aim is not to minimize
-output, but to preserve raw material while its expected decision value exceeds
-its attention cost.
+Raw output preserves the exact words, paths, numbers, and contradictions in the
+part you actually receive. Truncation preserves neither completeness nor proof
+that an absent error never happened. The aim is not the least output, but enough
+relevant evidence to decide. When an earlier fragment matters, obtain a focused
+observation through the entitled office rather than reconstructing it in prose.
 
 The first kilobyte of a failure trace may be extremely valuable. The millionth
 repeated success line may be almost worthless. Before paying to read more, ask

@@ -15,17 +15,11 @@ let decide (resources: obj array) (_: obj) =
             {| decision = "BlockedByResources"
                blockers = resources |}
 
-let decideWithRoadResources (incumbencyResources: obj array) (_roadResources: obj array) (_qualityState: obj) =
+let decideWithRoadResources (incumbencyResources: obj array) (roadResources: obj array) (qualityState: obj) =
     if incumbencyResources.Length = 0 then
-        box {| decision = "Retire"; outcome = "Continue" |}
-    else
         box
-            {| decision = "BlockedByResources"
-               blockers = incumbencyResources |}
-
-let decideWithRoadResources (incumbencyResources: obj array) (_roadResources: obj array) (_qualityState: obj) =
-    if isNull incumbencyResources || incumbencyResources.Length = 0 then
-        box {| decision = "Retire"; outcome = "Continue" |}
+            {| decision = "Retire"
+               outcome = "Continue" |}
     else
         box
             {| decision = "BlockedByResources"

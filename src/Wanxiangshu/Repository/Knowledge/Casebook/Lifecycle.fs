@@ -24,87 +24,84 @@ module CasebookLifecycle =
     let isEnabled () : bool =
         lock stateGate (fun () -> enabledWorkspace.IsSome)
 
-    let notePrompt (inspectorSessionId: string) (q: string) : unit =
-        CasebookDraftStore.setQ inspectorSessionId q
+    let notePrompt (delegateSessionId: string) (q: string) : unit =
+        CasebookDraftStore.setQ delegateSessionId q
 
-    let noteAnswer (inspectorSessionId: string) (a: string) : unit =
-        CasebookDraftStore.setA inspectorSessionId a
+    let noteAnswer (delegateSessionId: string) (a: string) : unit =
+        CasebookDraftStore.setA delegateSessionId a
 
-    let cleanupInspector (inspectorSessionId: string) : unit =
-        CasebookDraftStore.clear inspectorSessionId
-        collector.Drain inspectorSessionId |> ignore
+    let cleanupDraft (delegateSessionId: string) : unit =
+        CasebookDraftStore.clear delegateSessionId
+        collector.Drain delegateSessionId |> ignore
 
     let private probeExistingScope
         (store: IEventStore)
-        (inspectorSessionId: string)
+        (delegateSessionId: string)
         : Task<Result<Case option, string>> =
         task {
-            match! CasebookWorkflow.fetchCase store 0 inspectorSessionId with
-            | Error reason -> return Error(sprintf "cannot confirm case scope %s: %s" inspectorSessionId reason)
+            match! CasebookWorkflow.fetchCase store 0 delegateSessionId with
+            | Error reason -> return Error(sprintf "cannot confirm case scope %s: %s" delegateSessionId reason)
             | Ok existing -> return Ok existing
         }
 
     let private dispositionOfExistingScope
-        (inspectorSessionId: string)
+        (delegateSessionId: string)
         (existing: Result<Case option, string>)
-        : InspectorFinalizeSettlement option =
+        : CaseFinalizeSettlement option =
         match existing with
-        | Error reason -> Some(InspectorFinalizeSettlement.notCommitted inspectorSessionId reason)
+        | Error reason -> Some(CaseFinalizeSettlement.notCommitted delegateSessionId reason)
         | Ok(Some case) ->
             Some(
-                InspectorFinalizeSettlement.phaseConflict
-                    inspectorSessionId
+                CaseFinalizeSettlement.phaseConflict
+                    delegateSessionId
                     (sprintf "case already finalized for scope %s" case.Identity)
             )
         | Ok None -> None
 
-    let private refreshIndexThenSettle
-        (store: IEventStore)
-        (inspectorSessionId: string)
-        : Task<InspectorFinalizeSettlement> =
+    let private refreshIndexThenSettle (store: IEventStore) (delegateSessionId: string) : Task<CaseFinalizeSettlement> =
         task {
             try
                 let! _ = CasebookIndex.refresh store 256
-                return InspectorFinalizeSettlement.finalized inspectorSessionId
+                return CaseFinalizeSettlement.finalized delegateSessionId
             with ex ->
-                return InspectorFinalizeSettlement.unknown inspectorSessionId ex.Message
+                return CaseFinalizeSettlement.unknown delegateSessionId ex.Message
         }
 
     let private archiveCase
         (store: IEventStore)
-        (inspectorSessionId: string)
+        (delegateSessionId: string)
         (case: Case)
-        : Task<InspectorFinalizeSettlement> =
+        : Task<CaseFinalizeSettlement> =
         task {
             match! CasebookWorkflow.finalizeCase store case with
             | Error reason when reason.Contains "already finalized" ->
-                return InspectorFinalizeSettlement.phaseConflict inspectorSessionId reason
-            | Error reason -> return InspectorFinalizeSettlement.notCommitted inspectorSessionId reason
+                return CaseFinalizeSettlement.phaseConflict delegateSessionId reason
+            | Error reason -> return CaseFinalizeSettlement.notCommitted delegateSessionId reason
             | Ok() ->
                 CasebookIndex.invalidate ()
-                return! refreshIndexThenSettle store inspectorSessionId
+                return! refreshIndexThenSettle store delegateSessionId
         }
 
     let private spawnFinalize
-        (inspectorSessionId: string)
+        (delegateSessionId: string)
         (lastQ: string)
         (a: string)
         (observations: Observation list)
         (transcript: string option)
         (store: IEventStore)
-        : Task<InspectorFinalizeSettlement> =
+        : Task<CaseFinalizeSettlement> =
         task {
             let! spawned =
                 BookkeeperRuntime.runTransaction
                     BookkeeperRequest.CaseFinalize
-                    (SessionId.create inspectorSessionId)
+                    (SessionId.create delegateSessionId)
                     lastQ
                     a
                     observations
                     transcript
 
             match spawned with
-            | Error reason -> return InspectorFinalizeSettlement.notCommitted inspectorSessionId reason
+            | Error reason -> return CaseFinalizeSettlement.notCommitted delegateSessionId reason
             | Ok(q', a') ->
                 let related =
                     observations
@@ -115,8 +112,8 @@ module CasebookLifecycle =
                     |> List.sort
 
                 let case: Case =
-                    { Identity = inspectorSessionId
-                      SourceTrace = inspectorSessionId
+                    { Identity = delegateSessionId
+                      SourceTrace = delegateSessionId
                       Q = q'
                       A = a'
                       RelatedPaths = related
@@ -125,17 +122,17 @@ module CasebookLifecycle =
                       AccessOrder = 0L
                       Observations = observations }
 
-                return! archiveCase store inspectorSessionId case
+                return! archiveCase store delegateSessionId case
         }
 
     let private continueFinalizeDecision
         (store: IEventStore)
-        (inspectorSessionId: string)
+        (delegateSessionId: string)
         (draft: CasebookDraft)
         (a: string)
-        : Task<InspectorFinalizeSettlement> =
+        : Task<CaseFinalizeSettlement> =
         task {
-            let observations = collector.Drain inspectorSessionId
+            let observations = collector.Drain delegateSessionId
 
             let lastQ =
                 draft.Turns
@@ -145,79 +142,79 @@ module CasebookLifecycle =
 
             let transcript = CasebookDraftStore.transcript draft.Turns
 
-            let! existing = probeExistingScope store inspectorSessionId
+            let! existing = probeExistingScope store delegateSessionId
 
-            match dispositionOfExistingScope inspectorSessionId existing with
+            match dispositionOfExistingScope delegateSessionId existing with
             | Some settled -> return settled
-            | None -> return! spawnFinalize inspectorSessionId lastQ a observations (Some transcript) store
+            | None -> return! spawnFinalize delegateSessionId lastQ a observations (Some transcript) store
         }
 
     let private dispatchFinalize
         (store: IEventStore)
         (_workspaceRoot: string)
-        (inspectorSessionId: string)
+        (delegateSessionId: string)
         (draft: CasebookDraft)
         (a: string)
-        : Task<InspectorFinalizeSettlement> =
+        : Task<CaseFinalizeSettlement> =
         task {
             try
-                let! result = continueFinalizeDecision store inspectorSessionId draft a
+                let! result = continueFinalizeDecision store delegateSessionId draft a
                 return result
             with ex ->
-                collector.Drain inspectorSessionId |> ignore
-                return InspectorFinalizeSettlement.unknown inspectorSessionId ex.Message
+                collector.Drain delegateSessionId |> ignore
+                return CaseFinalizeSettlement.unknown delegateSessionId ex.Message
         }
 
     let private runFinalize
         (store: IEventStore)
         (workspaceRoot: string)
-        (inspectorSessionId: string)
+        (delegateSessionId: string)
         (draft: CasebookDraft)
         (a: string)
-        : Task<InspectorFinalizeSettlement> =
-        dispatchFinalize store workspaceRoot inspectorSessionId draft a
+        : Task<CaseFinalizeSettlement> =
+        dispatchFinalize store workspaceRoot delegateSessionId draft a
 
     let private finalizeWithDraft
         (store: IEventStore)
         (workspaceRoot: string)
-        (inspectorSessionId: string)
+        (delegateSessionId: string)
         (draft: CasebookDraft)
         (lastAnswer: string option)
-        : Task<InspectorFinalizeSettlement> =
+        : Task<CaseFinalizeSettlement> =
         task {
             match lastAnswer with
             | None ->
-                collector.Drain inspectorSessionId |> ignore
-                return InspectorFinalizeSettlement.nothingToFinalize inspectorSessionId
-            | Some a -> return! runFinalize store workspaceRoot inspectorSessionId draft a
+                collector.Drain delegateSessionId |> ignore
+                return CaseFinalizeSettlement.nothingToFinalize delegateSessionId
+            | Some a -> return! runFinalize store workspaceRoot delegateSessionId draft a
         }
 
     let private finalizeIfDrafted
         (store: IEventStore)
         (workspaceRoot: string)
-        (inspectorSessionId: string)
-        : Task<InspectorFinalizeSettlement> =
+        (delegateSessionId: string)
+        : Task<CaseFinalizeSettlement> =
         task {
-            match CasebookDraftStore.tryTake inspectorSessionId with
+            match CasebookDraftStore.tryTake delegateSessionId with
             | None ->
-                collector.Drain inspectorSessionId |> ignore
-                return InspectorFinalizeSettlement.nothingToFinalize inspectorSessionId
+                collector.Drain delegateSessionId |> ignore
+                return CaseFinalizeSettlement.nothingToFinalize delegateSessionId
             | Some draft ->
                 let lastAnswer = draft.Turns |> List.rev |> List.tryPick (fun turn -> turn.A)
-                return! finalizeWithDraft store workspaceRoot inspectorSessionId draft lastAnswer
+                return! finalizeWithDraft store workspaceRoot delegateSessionId draft lastAnswer
         }
 
-    let tryFinalizeInspector
+    let tryFinalizeDraft
         (workspaceRoot: string)
         (store: IEventStore)
-        (inspectorSessionId: string)
-        : Task<InspectorFinalizeSettlement> =
+        (delegateSessionId: string)
+        : Task<CaseFinalizeSettlement> =
         task {
             if CasebookFeature.isEnabled workspaceRoot then
-                return! finalizeIfDrafted store workspaceRoot inspectorSessionId
+                return! finalizeIfDrafted store workspaceRoot delegateSessionId
             else
-                cleanupInspector inspectorSessionId
-                return InspectorFinalizeSettlement.nothingToFinalize inspectorSessionId
+                cleanupDraft delegateSessionId
+                return CaseFinalizeSettlement.nothingToFinalize delegateSessionId
         }
 
     let finalizeEngineerCase
@@ -228,7 +225,7 @@ module CasebookLifecycle =
         (a: string)
         (relatedPaths: string list)
         (completionStateRef: string)
-        : Task<InspectorFinalizeSettlement> =
+        : Task<CaseFinalizeSettlement> =
         task {
             let case: Case =
                 { Identity = identity

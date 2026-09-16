@@ -32,19 +32,11 @@ import { getSessionId } from './support/scenario-http.js';
 import { runStaticGate } from './support/index.js';
 import {
   CUSTOMS,
-  G2_INSPECTOR_CANARY_PROMPT,
-  G6_CANONICAL_A,
-  G6_CANONICAL_Q,
   HUMANROOT_MANAGER_LOOP_CANARY_PROMPT,
   assertHumanRootManagerLoop,
   retireCompanionForDeletion,
-  assertG2InspectorBatchCoalescing,
-  assertG2InspectorPrefixLaw,
-  assertG6BookkeeperFinalize,
-  extractInspectorIdFromOwnerRequests,
 } from './support/long-stroke-oracles.mjs';
-import { countFactCase, factPayloads, readJournal, getOrCreateSharedObserver } from './support/journal-observer.js';
-import { shelfmarkFor as casebookShelfmarkFor } from '../../../../dist/Repository/Knowledge/Casebook/IndexSurface.js';
+import { factPayloads } from './support/journal-observer.js';
 import { WAIT_FACT_WINDOW_MS } from './support/time-budget.js';
 import {
   getOpencodeSpawnCount,
@@ -80,52 +72,9 @@ const runPreFlowPrompt = async (scenario, lane, prompt, agent) => {
   await turn.awaitTerminal();
 };
 
-const waitCaptured = async (scenario) => {
-  const observer = getOrCreateSharedObserver(scenario.host.workDir);
-  await observer.refresh();
-  const posBefore = observer.position();
-  const existing = observer.select({ caseName: 'InspectorCaseCaptured' });
-  if (existing.length >= 1) return;
-
-  const deadline = Date.now() + WAIT_FACT_WINDOW_MS;
-  while (Date.now() < deadline) {
-    const remaining = Math.max(1, deadline - Date.now());
-    await new Promise((resolve) => {
-      let settled = false;
-      let unsub = () => {};
-      let delay = null;
-      const done = () => {
-        if (settled) return;
-        settled = true;
-        try { unsub(); } catch {}
-        try { delay?.cancel?.(); } catch {}
-        resolve();
-      };
-      unsub = observer.subscribe(() => {
-        const found = observer.select({ caseName: 'InspectorCaseCaptured', after: posBefore });
-        if (found.length >= 1) done();
-      });
-      // Check once right after subscribe to prevent missing notification in between
-      const foundNow = observer.select({ caseName: 'InspectorCaseCaptured', after: posBefore });
-      if (foundNow.length >= 1) {
-        done();
-        return;
-      }
-      const delayPort = scenario.delayPort ?? { delay: (ms) => new Promise((res) => setTimeout(res, ms)) };
-      delay = delayPort.delay(Math.min(remaining, 50));
-      delay.then(done);
-    });
-
-    await observer.refresh();
-    const captured = observer.select({ caseName: 'InspectorCaseCaptured', after: posBefore });
-    if (captured.length >= 1) return;
-  }
-  throw new Error('G6: InspectorCaseCaptured did not land after owner session.deleted');
-};
-
 const preFlowCanaries = async (scenario) => {
   await CUSTOMS.bindManagerLoopSequence(scenario);
-  await runPreFlowPrompt(scenario, 'strength-canary-owner', STRENGTH_HOST_CANARY_PROMPT, 'coder');
+  await runPreFlowPrompt(scenario, 'strength-canary-owner', STRENGTH_HOST_CANARY_PROMPT, 'engineer');
 
   assert.equal(
     scenario.provider.matchCount('strength-canary-replica.0'),
@@ -140,45 +89,6 @@ const preFlowCanaries = async (scenario) => {
   // undeclared request #3 remains fatal under strict scenario matching. The
   // exact K2 "allow #2, block #3" state-machine law is proved without clocks in
   // speculative-investigation/replica-transform.test.mjs.
-
-  scenario.provider._state.rewriteToolArgs = (entry, args) => {
-    if (entry?.turnId === 'coder' && args?.shelfmark === '$inspector-case') {
-      const inspectorId = extractInspectorIdFromOwnerRequests(scenario.provider.requests);
-      assert.ok(inspectorId, 'G6 fetch rewrite needs the Inspector durable identity to derive its shelfmark');
-      return { shelfmark: casebookShelfmarkFor(inspectorId, G6_CANONICAL_Q) };
-    }
-    return undefined;
-  };
-
-  const inspectorOwner = await scenario.client.createSession({ title: 'G2 inspector owner' });
-  const inspectorOwnerId = getSessionId(inspectorOwner);
-  assert.ok(inspectorOwnerId, `g2-inspector-owner session creation failed: ${JSON.stringify(inspectorOwner)}`);
-  if (!scenario.sessionIds.includes(inspectorOwnerId)) scenario.sessionIds.push(inspectorOwnerId);
-  bindLaneSession(scenario.provider, inspectorOwnerId, 'g2-inspector-owner');
-
-  const inspectorTurn = scenario.turn.start(inspectorOwnerId);
-  const inspectorPrompt = await scenario.client.request('POST', `/session/${inspectorOwnerId}/prompt_async`, {
-    body: {
-      messageID: 'msg-g2-inspector-owner',
-      parts: [{ type: 'text', text: G2_INSPECTOR_CANARY_PROMPT }],
-      agent: 'coder',
-    },
-  });
-  assert.ok(inspectorPrompt.ok, `g2 inspector prompt failed: ${JSON.stringify(inspectorPrompt.data)}`);
-  await inspectorTurn.awaitTerminal();
-
-  const g2 = assertG2InspectorPrefixLaw(scenario);
-  scenario.g6InspectorSessionId = g2.inspectorSessionId;
-  assertG2InspectorBatchCoalescing(scenario, g2.inspectorSessionId);
-  await Promise.all([
-    retireCompanionForDeletion(scenario, inspectorOwnerId),
-    retireCompanionForDeletion(scenario, g2.inspectorSessionId),
-  ]);
-
-  const deleted = await scenario.client.deleteSession(inspectorOwnerId);
-  assert.ok(deleted.ok, `G6 owner session.deleted failed: ${JSON.stringify(deleted.data)}`);
-  await waitCaptured(scenario);
-  assertG6BookkeeperFinalize(scenario);
 
   // HumanRoot manager loop canary (sole serve, before orchestrator main flow).
   // Direct HumanRoot Manager — the main spine uses AgentOwnerRoot. First iteration
@@ -231,21 +141,6 @@ const awaitManagerJoinRunning = async (scenario, ctx) => {
   await scenario.events.awaitEvent(isRunningJoin, null);
 };
 
-const assertG6ColdFetch = async (scenario) => {
-  const fetchResults = (scenario.provider.requests ?? [])
-    .flatMap((request) => request?.messages ?? [])
-    .filter((message) => message?.role === 'tool' || message?.role === 'toolResult')
-    .map((message) => String(message?.content ?? ''));
-  assert.ok(
-    fetchResults.some(
-      (text) =>
-        text.includes('No change was found in the evidence this answer depended on.')
-        && text.includes(G6_CANONICAL_A),
-    ),
-    `G6 fetch must return the no-change consequence plus canonical A from the later Coder session; inspector=${scenario.g6InspectorSessionId ?? 'unknown'} results=${JSON.stringify(fetchResults).slice(0, 1200)}`,
-  );
-};
-
 /**
  * Long-stroke custom that freezes real-host A/E/G/H from pure-observer wrapper
  * artifacts after the adversity spine and before expectSatisfied / teardown.
@@ -277,7 +172,6 @@ const code = await runCanary('long-stroke', {
   customs: {
     ...CUSTOMS,
     awaitManagerJoinRunning,
-    assertG6ColdFetch,
     assertHostCanariesAEGH,
   },
 });

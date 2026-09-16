@@ -3,9 +3,9 @@
 // `previous` is the last successful physical execution target for this session,
 // or null for a new conversation. It is a preference hint, not occupancy.
 // Return a target to acquire it, or null to wait for an occupancy change.
-// `role` is always a canonical lowercase role name (manager, orchestrator,
-// coder, inspector, devops, browser, inquiry, blogger, distiller,
-// bookkeeper, predictor). Unknown roles fail closed.
+// Public roles: manager, orchestrator, engineer, devops, blogger.
+// bookkeeper and predictor are internal runtime mechanisms, not dispatch targets.
+// A model choice does not change role authority. Retired and unknown roles fail closed.
 
 // Provider-level concurrency limits (maximum concurrent active leases per provider).
 const PROVIDER_LIMITS = {
@@ -82,24 +82,10 @@ const PREMIUM = [
   ['neuralwatt/glm-5.2-flex', 'high'],
 ]
 
-const BROWSER_A = [
-  ['ollama-cloud/minimax-m3', 'none'],
-]
-
-const BROWSER_B = [
-  ['opencode-go/minimax-m3', 'none'],
-]
-
-const CODER_POOL = [
+const ENGINEER_POOL = [
   ...PREMIUM,
   ...STANDARD,
   ...FLASH,
-]
-
-const INSPECTOR_POOL = [
-  ...FLASH,
-  ...STANDARD,
-  ...CHEAP_A,
 ]
 
 const MANAGER_POOL = [
@@ -117,22 +103,7 @@ const DEVOPS_POOL = [
   ...STANDARD,
 ]
 
-const INQUIRY_POOL = [
-  ...STANDARD,
-  ...FLASH,
-]
-
-const BROWSER_POOL = [
-  ...BROWSER_A,
-  ...BROWSER_B,
-]
-
 const BLOGGER_POOL = [
-  ...CHEAP_A,
-  ...CHEAP_B,
-]
-
-const DISTILLER_POOL = [
   ...CHEAP_A,
   ...CHEAP_B,
 ]
@@ -148,15 +119,11 @@ const PREDICTOR_POOL = [
 ]
 
 const pools = new Map([
-  ['coder', CODER_POOL],
-  ['inspector', INSPECTOR_POOL],
+  ['engineer', ENGINEER_POOL],
   ['manager', MANAGER_POOL],
   ['orchestrator', ORCHESTRATOR_POOL],
   ['devops', DEVOPS_POOL],
-  ['inquiry', INQUIRY_POOL],
-  ['browser', BROWSER_POOL],
   ['blogger', BLOGGER_POOL],
-  ['distiller', DISTILLER_POOL],
   ['bookkeeper', BOOKKEEPER_POOL],
   ['predictor', PREDICTOR_POOL],
 ])
@@ -171,7 +138,10 @@ export const hasTheoreticalCapacity = (role) => {
 }
 
 export default function route(role, running, previous) {
+  if (role === 'devops' && previous) {
+    return previous
+  }
   const candidates = pools.get(role)
-  if (!candidates) throw new Error(`unknown model-routing role: ${role}`)
+  if (!candidates) return null
   return pick(running, previous, candidates)
 }

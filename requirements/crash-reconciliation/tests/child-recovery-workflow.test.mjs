@@ -135,7 +135,7 @@ test('WHAT[CRASH-006] VERIFY_008_provider_failure_admission_ordered_sequence', a
     assert.equal(r1.outcome, 'NoActiveRun')
 
     // Start logical run
-    await failureOwner.acceptHumanRoot(journal, session, 'msg_u_gap5', 'coder')
+    await failureOwner.acceptHumanRoot(journal, session, 'msg_u_gap5', 'engineer')
 
     // 2. RetryAuthorized
     const r2 = await failureOwner.recordConfirmedFailure(journal, failureOwner.budget.defaultBudget, session, 'run-1', 'err')
@@ -178,7 +178,7 @@ test('WHAT[CRASH-006] VERIFY_008_workflow_main_session_failure_owner_proven_rout
 
   try {
     await failureOwner.acceptHumanRoot(journal, mainSession, 'msg_u_main', 'blogger')
-    await failureOwner.acceptHumanRoot(journal, workSession, 'msg_u_work', 'coder')
+    await failureOwner.acceptHumanRoot(journal, workSession, 'msg_u_work', 'engineer')
 
     // WorkMain failure records on the work session and increments its failures
     const resWork = await failureOwner.recordConfirmedFailure(

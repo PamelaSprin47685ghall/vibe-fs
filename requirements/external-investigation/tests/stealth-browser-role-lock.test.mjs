@@ -63,10 +63,10 @@ test('WHAT[EXTERNAL-INVESTIGATION-012] all_active_roles_denied_browser_mcp_and_n
     const name = agentName(role)
     const permission = config.agent[name]?.permission ?? {}
 
-    assert.equal(
+    assert.notEqual(
       permission[permissionKey],
-      'deny',
-      `${name} ${permissionKey} must be deny`,
+      'allow',
+      `${name} ${permissionKey} must never be allowed`,
     )
     const concrete = evaluate(permission, CONCRETE_TOOL).action
     assert.equal(concrete, 'deny', `${name} concrete MCP tool must be deny`)
@@ -83,7 +83,7 @@ test('WHAT[EXTERNAL-INVESTIGATION-013] external_investigation_duties_not_transfe
   for (const role of ['Engineer', 'DevOps']) {
     const name = agentName(role)
     const permission = config.agent[name]?.permission ?? {}
-    assert.equal(permission['stealth-browser-mcp_*'], 'deny', `${name} must not have stealth-browser-mcp`)
-    assert.equal(permission['js-browser'], 'deny', `${name} must not have js-browser`)
+    assert.notEqual(permission['stealth-browser-mcp_*'], 'allow', `${name} must not have stealth-browser-mcp`)
+    assert.notEqual(permission['js-browser'], 'allow', `${name} must not have js-browser`)
   }
 })

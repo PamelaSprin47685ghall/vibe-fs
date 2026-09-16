@@ -4,7 +4,7 @@
 
 ### 委托接口分流与权能门禁
 
-DELEG-020 约束：委托语义不依赖当前工具名字面值（`fork`、`commission`、`resume` 等），改名不动 WHAT 语义定义。
+DELEG-020 约束：委托语义不依赖当前工具名字面值（`fork`、`commission`、`resume`、`inspect`、`establish-behavior`、`repair-behavior` 等），改名不动 WHAT 语义定义。
 
 系统定义三类委托途径，由角色权能门禁严格限制：
 

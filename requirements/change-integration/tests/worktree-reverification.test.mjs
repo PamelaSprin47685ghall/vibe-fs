@@ -18,7 +18,7 @@ const payload = (overrides = {}) => ({
 })
 
 test('WHAT[CHGINT-015] worktree mutation during repair invalidates previous certificate and forces re-verification', () => {
-  const initial = change.createJob(change.empty(), payload())
+  const initial = change.createJobResult(change.empty(), payload())
   assert.equal(initial.ok, true)
 
   // Candidate produced on snapshot-1 with certificate-1
@@ -56,7 +56,7 @@ test('WHAT[CHGINT-015] worktree mutation during repair invalidates previous cert
 })
 
 test('WHAT[CHGINT-016] parallel engineer and devops mutations require task boundary and forbid hash-equality bypass', () => {
-  const initial = change.createJob(change.empty(), payload())
+  const initial = change.createJobResult(change.empty(), payload())
   assert.equal(initial.ok, true)
 
   // Manager job must maintain explicit snapshot identity without skipping verification via hash-only equality
@@ -79,9 +79,9 @@ test('WHAT[CHGINT-017] multi-road confluence requires post-integration verificat
   const jobB = 'job_b'
   let state = change.empty()
 
-  const initA = change.createJob(state, payload({ jobId: jobA, worktreeIdentity: 'wt_a' }))
+  const initA = change.createJobResult(state, payload({ jobId: jobA, worktreeIdentity: 'wt_a' }))
   assert.equal(initA.ok, true)
-  const initB = change.createJob(initA.state, payload({ jobId: jobB, worktreeIdentity: 'wt_b' }))
+  const initB = change.createJobResult(initA.state, payload({ jobId: jobB, worktreeIdentity: 'wt_b' }))
   assert.equal(initB.ok, true)
 
   // Both roads pass independently in their own worktrees
@@ -106,7 +106,7 @@ test('WHAT[CHGINT-017] multi-road confluence requires post-integration verificat
   assert.equal(candB.ok, true)
 
   // When Road A publishes first, target advances to commit_a
-  const claimedA = change.applyFact(candB.state, change.fact('PublishClaimed', { expectedHead: 'root', targetCommit: 'commit_a' }))
+  const claimedA = change.applyFact(candB.state, change.fact('PublishClaimed', { jobId: jobA, expectedHead: 'root', targetCommit: 'commit_a' }))
   assert.equal(claimedA.ok, true)
   const pubA = change.applyFact(claimedA.state, change.fact('Published', { publishedCommit: 'commit_a' }))
   assert.equal(pubA.ok, true)
@@ -115,6 +115,7 @@ test('WHAT[CHGINT-017] multi-road confluence requires post-integration verificat
   const rebaseB = change.applyFact(
     pubA.state,
     change.fact('CertificateInvalidated', {
+      jobId: jobB,
       workspaceSnapshotId: 'snap_b_stale',
       reason: 'TargetAdvanced',
     }),

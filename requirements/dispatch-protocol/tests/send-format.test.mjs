@@ -23,6 +23,7 @@ const capturingPort = () => ({
 })
 
 const personas = {
+  engineer: 'Engineer',
   coder: 'Coder',
   manager: 'Lead',
 }
@@ -44,7 +45,7 @@ const rootSelection = (participant) => {
   }
 }
 
-const profileFor = (runtime = 'rt-send', session = 'ses_006', physical = 'msg_u1', participant = 'coder') => {
+const profileFor = (runtime = 'rt-send', session = 'ses_006', physical = 'msg_u1', participant = 'engineer') => {
   const built = authority.createAuthorityRoot(hash, runtime, session, 'HumanRoot', physical, rootSelection(participant))
   assert.equal(built.ok, true, built.ok ? '' : built.error)
   return built.value
@@ -99,7 +100,7 @@ test('WHAT[DISPATCH-PROTOCOL-010] PROMPT_006_send_payload_carries_participant_an
     assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
     try {
       const owner = await acceptOwner(opened.journal, 'ses_006_owner')
-      const seed = authority.issueInheritedIdentitySeed('coder', owner).value
+      const seed = authority.issueInheritedIdentitySeed('engineer', owner).value
       const ownerRoot = await dispatch.sendAgentOwnerRoot(
         capturingPort(),
         opened.journal,
@@ -128,12 +129,12 @@ test('WHAT[DISPATCH-PROTOCOL-010] PROMPT_006_send_payload_carries_participant_an
 
       assert.deepEqual(
         { agent: captured[0].agent, model: captured[0].model },
-        { agent: 'coder', model: null },
+        { agent: 'engineer', model: null },
         'SendAgentOwnerRoot must carry Agent = fixed participant and Model = None',
       )
       assert.deepEqual(
         { agent: captured[1].agent, model: captured[1].model },
-        { agent: 'coder', model: null },
+        { agent: 'engineer', model: null },
         'SendContinuation must carry Agent = fixed participant and Model = None',
       )
 
@@ -153,7 +154,7 @@ test('WHAT[DISPATCH-PROTOCOL-011] PROMPT_006_send_payload_carries_prompt_key_met
     assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
     try {
       const owner = await acceptOwner(opened.journal, 'ses_006m_owner')
-      const seed = authority.issueInheritedIdentitySeed('coder', owner).value
+      const seed = authority.issueInheritedIdentitySeed('engineer', owner).value
       const ownerRoot = await dispatch.sendAgentOwnerRoot(
         capturingPort(),
         opened.journal,
@@ -167,7 +168,7 @@ test('WHAT[DISPATCH-PROTOCOL-011] PROMPT_006_send_payload_carries_prompt_key_met
         'ses_006m',
         'retry the fixed participant',
         'ProviderRetryAttempt',
-        profileFor('rt-send-meta', 'ses_006m', 'msg_u1', 'coder'),
+        profileFor('rt-send-meta', 'ses_006m', 'msg_u1', 'engineer'),
         'Await',
       )
 
@@ -238,7 +239,7 @@ test('WHAT[DISPATCH-PROTOCOL-012] DP_012_physical_acceptance_hands_exact_claim_i
     assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
     try {
       const owner = await acceptOwner(opened.journal, 'ses_dispatch_handoff_owner')
-      const inherited = authority.issueInheritedIdentitySeed('coder', owner)
+      const inherited = authority.issueInheritedIdentitySeed('engineer', owner)
       assert.equal(inherited.ok, true, inherited.ok ? '' : inherited.error)
 
       const sent = await dispatch.sendAgentOwnerRoot(
@@ -256,10 +257,10 @@ test('WHAT[DISPATCH-PROTOCOL-012] DP_012_physical_acceptance_hands_exact_claim_i
       assert.deepEqual(claimed[0].identitySeed, inherited.value)
       assert.deepEqual(claimed[0].identitySeed.participantIdentity, {
         origin: 'InheritedFromOwner',
-        participant: 'coder',
+        participant: 'engineer',
         persona: 'Lead',
         personaCatalogVersion: 1,
-        role: 'coder',
+        role: 'engineer',
       })
 
       const wrongClaim = await dispatch.acceptManagedPromptClaim(
@@ -267,7 +268,7 @@ test('WHAT[DISPATCH-PROTOCOL-012] DP_012_physical_acceptance_hands_exact_claim_i
         'ses_dispatch_handoff',
         'msg_dispatch_handoff',
         `${sent.key}-wrong`,
-        'coder',
+        'engineer',
       )
       assert.equal(wrongClaim.ok, false, 'managed acceptance must reject a non-exact PromptKey')
       assert.equal(dispatch.pendingClaimCount(opened.journal, 'ses_dispatch_handoff'), 1)
@@ -277,21 +278,17 @@ test('WHAT[DISPATCH-PROTOCOL-012] DP_012_physical_acceptance_hands_exact_claim_i
         'ses_dispatch_handoff',
         'msg_dispatch_handoff',
         sent.key,
-        'coder',
+        'engineer',
       )
-      assert.deepEqual(
-        accepted,
-        {
-          ok: true,
-          error: null,
-          sessionId: 'ses_dispatch_handoff',
-          physicalUserMessageId: 'msg_dispatch_handoff',
-          origin: 'AgentOwnerRoot',
-          participant: 'coder',
-          role: 'coder',
-        },
-        'the durable managed-execution witness must carry the exact physical identity and participant+role',
-      )
+      assert.deepEqual(accepted, {
+        ok: true,
+        error: null,
+        sessionId: 'ses_dispatch_handoff',
+        physicalUserMessageId: 'msg_dispatch_handoff',
+        origin: 'AgentOwnerRoot',
+        participant: 'engineer',
+        role: 'engineer',
+      }, 'the durable managed-execution witness must carry the exact physical identity and participant+role')
       assert.equal(dispatch.pendingClaimCount(opened.journal, 'ses_dispatch_handoff'), 0)
     } finally {
       journal.JournalSurface_dispose(opened.journal)

@@ -36,7 +36,7 @@ const admit = async (runtime, sessionId, physicalUserMessageId) => {
     runtime,
     sessionId,
     physicalUserMessageId,
-    'coder',
+    'engineer',
     'alice',
     '',
   )
@@ -46,7 +46,7 @@ const admit = async (runtime, sessionId, physicalUserMessageId) => {
   const settlement = routing.commitExecutionAdmission(runtime, acquisition.lease, {
     sessionId,
     physicalUserMessageId,
-    role: 'coder',
+    role: 'engineer',
     participant: 'alice',
     target,
   })
@@ -174,14 +174,14 @@ const rootSelection = (participant) => ({
     participant,
     role: participant,
     selectedTier: 'deep',
-    persona: 'Coder',
+    persona: 'Engineer',
     personaCatalogVersion: 1,
     origin: 'ResolvedAtRoot',
   },
 })
 
 const profileFor = (session, physical) => {
-  const built = authority.createAuthorityRoot(hash, 'rt-lwr-fact', session, 'HumanRoot', physical, rootSelection('coder'))
+  const built = authority.createAuthorityRoot(hash, 'rt-lwr-fact', session, 'HumanRoot', physical, rootSelection('engineer'))
   assert.equal(built.ok, true, built.ok ? '' : built.error)
   return built.value
 }
@@ -205,7 +205,7 @@ test('WHAT[PAR-021] the_settlement_fact_is_the_durable_provider_retry_attempt_ac
 
   try {
     const handle = created.journal
-    const accepted = await failureOwner.acceptHumanRoot(handle, 'ses_lwr_fact', 'msg_root', 'coder')
+    const accepted = await failureOwner.acceptHumanRoot(handle, 'ses_lwr_fact', 'msg_root', 'engineer')
     assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error)
 
 

@@ -1,5 +1,2 @@
-必填。叫起新人时要托付的 office/persona。
-
-按所需后果的种类选择，并以本工具描述中的 Office 边界为准。
-
-按 name 继续已有的人时，改用 resume。
+创建 Engineer 时必填，值为 Engineer。这里选择工程职位，不选择速度或推理深度别名。
+DevOps 由运行时绑定，不能 fork。继续已有参与者用 resume，不传 calling。

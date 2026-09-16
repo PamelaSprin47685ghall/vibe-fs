@@ -26,7 +26,7 @@ const remainsPending = async (promise) =>
   ])
 
 test('WHAT[DELEG-021] SYNC_RUNTIME_each_supported_role_admits_one_managed_child_and_settles_answer', async () => {
-  for (const role of ['Inspector', 'Coder']) {
+  for (const role of ['Engineer', 'Coder']) {
     const owner = `owner-sync-${role.toLowerCase()}`
     const h = await live(owner)
     try {
@@ -47,19 +47,19 @@ test('WHAT[DELEG-021] SYNC_RUNTIME_each_supported_role_admits_one_managed_child_
 test('WHAT[DELEG-025] SYNC_RUNTIME_late_failure_from_previous_authority_root_cannot_fail_reused_call', async () => {
   const h = await live('owner-failure-causality')
   try {
-    const first = sync.invoke(h, 'owner-failure-causality', 'Inspector', 'FIRST')
-    await waitForPromptCount(h, 'owner-failure-causality', 'Inspector', 1)
-    assert.equal(await settle(h, 'owner-failure-causality', 'Inspector', 'FIRST-ANSWER', 'run-first'), true)
+    const first = sync.invoke(h, 'owner-failure-causality', 'Engineer', 'FIRST')
+    await waitForPromptCount(h, 'owner-failure-causality', 'Engineer', 1)
+    assert.equal(await settle(h, 'owner-failure-causality', 'Engineer', 'FIRST-ANSWER', 'run-first'), true)
     assert.equal((await first).ok, true)
 
-    const second = sync.invoke(h, 'owner-failure-causality', 'Inspector', 'SECOND')
-    await waitForPromptCount(h, 'owner-failure-causality', 'Inspector', 2)
+    const second = sync.invoke(h, 'owner-failure-causality', 'Engineer', 'SECOND')
+    await waitForPromptCount(h, 'owner-failure-causality', 'Engineer', 2)
 
     assert.equal(
       await sync.failWithAuthorityRoot(
         h,
         'owner-failure-causality',
-        'Inspector',
+        'Engineer',
         'late previous failure',
         'msg-physical-1',
       ),
@@ -71,7 +71,7 @@ test('WHAT[DELEG-025] SYNC_RUNTIME_late_failure_from_previous_authority_root_can
       await sync.failWithAuthorityRoot(
         h,
         'owner-failure-causality',
-        'Inspector',
+        'Engineer',
         'coarse current-root failure',
         'msg-physical-1',
       ),
@@ -83,7 +83,7 @@ test('WHAT[DELEG-025] SYNC_RUNTIME_late_failure_from_previous_authority_root_can
       await sync.observeTurn(
         h,
         'owner-failure-causality',
-        'Inspector',
+        'Engineer',
         'TurnFailed',
         'current failure',
         'run-second',
@@ -97,24 +97,24 @@ test('WHAT[DELEG-025] SYNC_RUNTIME_late_failure_from_previous_authority_root_can
 test('WHAT[DELEG-010] SYNC_RUNTIME_same_role_reuses_one_child_after_completion', async () => {
   const h = await live('owner-sync')
   try {
-    const first = sync.invoke(h, 'owner-sync', 'Inspector', 'first')
-    const firstChild = await waitForChild(h, 'owner-sync', 'Inspector')
-    await waitForPromptCount(h, 'owner-sync', 'Inspector', 1)
-    assert.equal(await settle(h, 'owner-sync', 'Inspector', 'first answer', 'run-first'), true)
+    const first = sync.invoke(h, 'owner-sync', 'Engineer', 'first')
+    const firstChild = await waitForChild(h, 'owner-sync', 'Engineer')
+    await waitForPromptCount(h, 'owner-sync', 'Engineer', 1)
+    assert.equal(await settle(h, 'owner-sync', 'Engineer', 'first answer', 'run-first'), true)
     const firstResult = await first
     assert.equal(firstResult.ok, true)
     assert.match(firstResult.value, /Recent work/)
     assert.match(firstResult.value, /first answer/)
 
-    const second = sync.invoke(h, 'owner-sync', 'Inspector', 'second')
-    assert.equal(await waitForChild(h, 'owner-sync', 'Inspector'), firstChild)
+    const second = sync.invoke(h, 'owner-sync', 'Engineer', 'second')
+    assert.equal(await waitForChild(h, 'owner-sync', 'Engineer'), firstChild)
     const immediate = await Promise.race([
       second.then((value) => ({ kind: 'resolved', value })),
       new Promise((resolve) => setImmediate(() => resolve({ kind: 'pending' }))),
     ])
     assert.deepEqual(immediate, { kind: 'pending' }, 'fresh reuse must remain pending until its own completion')
-    await waitForPromptCount(h, 'owner-sync', 'Inspector', 2)
-    assert.equal(await settle(h, 'owner-sync', 'Inspector', 'second answer', 'run-second'), true)
+    await waitForPromptCount(h, 'owner-sync', 'Engineer', 2)
+    assert.equal(await settle(h, 'owner-sync', 'Engineer', 'second answer', 'run-second'), true)
     const secondResult = await second
     assert.equal(secondResult.ok, true)
     assert.match(secondResult.value, /Recent work/)
@@ -170,7 +170,7 @@ const verifyReusableHandoff = async (role) => {
 }
 
 test('WHAT[DELEG-024] SYNC_RUNTIME_inspector_reuse_sends_parent_delta_waits_for_own_root_and_returns_own_child_delta', async () => {
-  await verifyReusableHandoff('Inspector')
+  await verifyReusableHandoff('Engineer')
 })
 
 test('WHAT[DELEG-024] SYNC_RUNTIME_coder_reuse_sends_parent_delta_waits_for_own_root_and_returns_own_child_delta', async () => {
@@ -179,8 +179,8 @@ test('WHAT[DELEG-024] SYNC_RUNTIME_coder_reuse_sends_parent_delta_waits_for_own_
 
 
 test('WHAT[DELEG-008] SYNC_RUNTIME_provider_tool_call_collection_preserves_role_order', () => {
-  const batch = sync.batchOrder('Inspector', ['inspect', 'establish-behavior', 'inspect'], 'inspect')
-  assert.deepEqual(batch.order, ['inspect', 'inspect'])
+  const batch = sync.batchOrder('Engineer', ['engineer', 'establish-behavior', 'engineer'], 'engineer')
+  assert.deepEqual(batch.order, ['engineer', 'engineer'])
   assert.equal(batch.currentPresent, true)
   const coder = sync.batchOrder('Coder', ['inspect', 'establish-behavior', 'repair-behavior'], 'repair-behavior')
   assert.deepEqual(coder.order, ['establish-behavior', 'repair-behavior'])
@@ -193,7 +193,7 @@ test('WHAT[DELEG-021] SYNC_RUNTIME_unknown_role_and_outcome_fail_closed_at_every
     assert.deepEqual(await sync.invoke(h, 'owner-invalid', 'Mystery', 'charge'), { ok: false, error: 'unknown role: Mystery' })
     assert.deepEqual(await sync.invoke(h, 'owner-invalid', '', 'charge'), { ok: false, error: 'role is required' })
     assert.equal(await sync.settle(h, 'owner-invalid', 'Mystery', 'answer'), false)
-    assert.equal(await sync.observeTurn(h, 'owner-invalid', 'Inspector', 'UnexpectedOutcome', '', 'run-invalid'), false)
+    assert.equal(await sync.observeTurn(h, 'owner-invalid', 'Engineer', 'UnexpectedOutcome', '', 'run-invalid'), false)
     assert.equal(sync.child(h, 'owner-invalid', 'Mystery'), null)
     assert.deepEqual(sync.vocabulary('Mystery', 'Fast', 'scope'), { ok: false, error: 'unknown role: Mystery' })
     assert.deepEqual(sync.batchOrder('Mystery', ['inspect'], 'inspect'), { ok: false, error: 'unknown role: Mystery' })
@@ -217,10 +217,10 @@ test('WHAT[DELEG-009] SYNC_RUNTIME_same_reuse_scope_serializes_distinct_provider
 test('WHAT[DELEG-011] SYNC_RUNTIME_ordinary_completion_settles_batch_without_return_channel', async () => {
   const h = await live('owner-ordinary')
   try {
-    const pending = sync.invoke(h, 'owner-ordinary', 'Inspector', 'ordinary charge')
-    await waitForChild(h, 'owner-ordinary', 'Inspector')
-    await waitForPromptCount(h, 'owner-ordinary', 'Inspector', 1)
-    assert.equal(await settle(h, 'owner-ordinary', 'Inspector', 'ordinary WorkRecord', 'run-ordinary'), true)
+    const pending = sync.invoke(h, 'owner-ordinary', 'Engineer', 'ordinary charge')
+    await waitForChild(h, 'owner-ordinary', 'Engineer')
+    await waitForPromptCount(h, 'owner-ordinary', 'Engineer', 1)
+    assert.equal(await settle(h, 'owner-ordinary', 'Engineer', 'ordinary WorkRecord', 'run-ordinary'), true)
     const result = await pending
     assert.equal(result.ok, true)
     assert.match(result.value, /ordinary WorkRecord/)
@@ -231,11 +231,11 @@ test('WHAT[DELEG-011] SYNC_RUNTIME_ordinary_completion_settles_batch_without_ret
 test('WHAT[DELEG-012] SYNC_RUNTIME_first_provider_call_receives_canonical_record_and_sibling_receives_reference', async () => {
   const h = await live('owner-canonical')
   try {
-    const first = sync.invokeBatch(h, 'owner-canonical', 'Inspector', 'first charge', 'run-canonical', 'call-first', ['call-first', 'call-second'])
-    const second = sync.invokeBatch(h, 'owner-canonical', 'Inspector', 'second charge', 'run-canonical', 'call-second', ['call-first', 'call-second'])
-    await waitForChild(h, 'owner-canonical', 'Inspector')
-    await waitForPromptCount(h, 'owner-canonical', 'Inspector', 1)
-    assert.equal(await settle(h, 'owner-canonical', 'Inspector', 'canonical WorkRecord', 'run-canonical'), true)
+    const first = sync.invokeBatch(h, 'owner-canonical', 'Engineer', 'first charge', 'run-canonical', 'call-first', ['call-first', 'call-second'])
+    const second = sync.invokeBatch(h, 'owner-canonical', 'Engineer', 'second charge', 'run-canonical', 'call-second', ['call-first', 'call-second'])
+    await waitForChild(h, 'owner-canonical', 'Engineer')
+    await waitForPromptCount(h, 'owner-canonical', 'Engineer', 1)
+    assert.equal(await settle(h, 'owner-canonical', 'Engineer', 'canonical WorkRecord', 'run-canonical'), true)
     const firstResult = await first
     const secondResult = await second
     assert.equal(firstResult.kind, 'WorkRecord')
@@ -255,16 +255,16 @@ test('WHAT[DELEG-017] SYNC_RUNTIME_work_record_is_evidence_and_does_not_transfer
 test('WHAT[DELEG-023] SYNC_RUNTIME_transient_turn_failure_stays_child_local_until_exhausted', async () => {
   const h = await live('owner-retry')
   try {
-    const pending = sync.invoke(h, 'owner-retry', 'Inspector', 'retry charge')
-    await waitForChild(h, 'owner-retry', 'Inspector')
-    await waitForPromptCount(h, 'owner-retry', 'Inspector', 1)
+    const pending = sync.invoke(h, 'owner-retry', 'Engineer', 'retry charge')
+    await waitForChild(h, 'owner-retry', 'Engineer')
+    await waitForPromptCount(h, 'owner-retry', 'Engineer', 1)
     // The retry decorator admits a fresh attempt: the failure stays child-local
     // and the caller keeps waiting on the same invocation.
     sync.scriptRetry(h, ['dispatched'])
-    assert.equal(await sync.observeTurn(h, 'owner-retry', 'Inspector', 'TurnFailed', '', 'run-retry-1'), true)
+    assert.equal(await sync.observeTurn(h, 'owner-retry', 'Engineer', 'TurnFailed', '', 'run-retry-1'), true)
     assert.equal(sync.retryCalls(h), 1, 'the transient failure must ask the shared retry decorator')
-    assert.equal(sync.dispatchRetryAttempt(h, 'owner-retry', 'Inspector'), true)
-    assert.equal(await sync.observeTurn(h, 'owner-retry', 'Inspector', 'TurnCompleted', 'retry WorkRecord', 'run-retry-2'), true)
+    assert.equal(sync.dispatchRetryAttempt(h, 'owner-retry', 'Engineer'), true)
+    assert.equal(await sync.observeTurn(h, 'owner-retry', 'Engineer', 'TurnCompleted', 'retry WorkRecord', 'run-retry-2'), true)
     const result = await pending
     assert.equal(result.ok, true)
     assert.match(result.value, /retry WorkRecord/)
@@ -275,10 +275,10 @@ test('WHAT[DELEG-023] SYNC_RUNTIME_transient_turn_failure_stays_child_local_unti
   const exhausted = await live('owner-exhausted')
   try {
     sync.scriptRetry(exhausted, ['terminal:provider retry budget exhausted'])
-    const pending = sync.invoke(exhausted, 'owner-exhausted', 'Inspector', 'exhausted charge')
-    await waitForChild(exhausted, 'owner-exhausted', 'Inspector')
-    await waitForPromptCount(exhausted, 'owner-exhausted', 'Inspector', 1)
-    assert.equal(await sync.observeTurn(exhausted, 'owner-exhausted', 'Inspector', 'TurnFailed', '', 'run-exhausted-1'), true)
+    const pending = sync.invoke(exhausted, 'owner-exhausted', 'Engineer', 'exhausted charge')
+    await waitForChild(exhausted, 'owner-exhausted', 'Engineer')
+    await waitForPromptCount(exhausted, 'owner-exhausted', 'Engineer', 1)
+    assert.equal(await sync.observeTurn(exhausted, 'owner-exhausted', 'Engineer', 'TurnFailed', '', 'run-exhausted-1'), true)
     assert.deepEqual(await pending, { ok: false, error: 'SyncDelegate run failed: provider retry budget exhausted' })
     assert.equal(sync.retryCalls(exhausted), 1)
   } finally { sync.dispose(exhausted) }

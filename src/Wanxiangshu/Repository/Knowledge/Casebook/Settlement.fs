@@ -1,54 +1,54 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
-/// CASE-003 / DELEG-031 (F35): the inspector finalize outcome is a closed
+/// CASE-003 / DELEG-031 (F35): the case finalize outcome is a closed
 /// settlement, never a bare Result&lt;unit, string&gt;. `Finalized` and
 /// `NothingToFinalize` both release the identity; `NotCommitted` and
 /// `Unknown` RETAIN it so a later recovery can resume the exact finalize;
 /// `PhaseConflict` is the exactly-one invariant cut. The identity is always
 /// carried so the deletion owner can decide retention explicitly.
-type InspectorFinalizeIdentity = { InspectorSessionId: string }
+type CaseFinalizeIdentity = { DelegateSessionId: string }
 
 [<RequireQualifiedAccess>]
-type InspectorFinalizeCommitment =
+type CaseFinalizeCommitment =
     | Finalized
     | NothingToFinalize
     | NotCommitted of reason: string
     | Unknown of reason: string
     | PhaseConflict of reason: string
 
-type InspectorFinalizeSettlement =
-    { Identity: InspectorFinalizeIdentity
-      Commitment: InspectorFinalizeCommitment }
+type CaseFinalizeSettlement =
+    { Identity: CaseFinalizeIdentity
+      Commitment: CaseFinalizeCommitment }
 
 [<RequireQualifiedAccess>]
-module InspectorFinalizeSettlement =
+module CaseFinalizeSettlement =
 
-    let finalized (inspectorSessionId: string) : InspectorFinalizeSettlement =
-        { Identity = { InspectorSessionId = inspectorSessionId }
-          Commitment = InspectorFinalizeCommitment.Finalized }
+    let finalized (delegateSessionId: string) : CaseFinalizeSettlement =
+        { Identity = { DelegateSessionId = delegateSessionId }
+          Commitment = CaseFinalizeCommitment.Finalized }
 
-    let nothingToFinalize (inspectorSessionId: string) : InspectorFinalizeSettlement =
-        { Identity = { InspectorSessionId = inspectorSessionId }
-          Commitment = InspectorFinalizeCommitment.NothingToFinalize }
+    let nothingToFinalize (delegateSessionId: string) : CaseFinalizeSettlement =
+        { Identity = { DelegateSessionId = delegateSessionId }
+          Commitment = CaseFinalizeCommitment.NothingToFinalize }
 
-    let notCommitted (inspectorSessionId: string) (reason: string) : InspectorFinalizeSettlement =
-        { Identity = { InspectorSessionId = inspectorSessionId }
-          Commitment = InspectorFinalizeCommitment.NotCommitted reason }
+    let notCommitted (delegateSessionId: string) (reason: string) : CaseFinalizeSettlement =
+        { Identity = { DelegateSessionId = delegateSessionId }
+          Commitment = CaseFinalizeCommitment.NotCommitted reason }
 
-    let unknown (inspectorSessionId: string) (reason: string) : InspectorFinalizeSettlement =
-        { Identity = { InspectorSessionId = inspectorSessionId }
-          Commitment = InspectorFinalizeCommitment.Unknown reason }
+    let unknown (delegateSessionId: string) (reason: string) : CaseFinalizeSettlement =
+        { Identity = { DelegateSessionId = delegateSessionId }
+          Commitment = CaseFinalizeCommitment.Unknown reason }
 
-    let phaseConflict (inspectorSessionId: string) (reason: string) : InspectorFinalizeSettlement =
-        { Identity = { InspectorSessionId = inspectorSessionId }
-          Commitment = InspectorFinalizeCommitment.PhaseConflict reason }
+    let phaseConflict (delegateSessionId: string) (reason: string) : CaseFinalizeSettlement =
+        { Identity = { DelegateSessionId = delegateSessionId }
+          Commitment = CaseFinalizeCommitment.PhaseConflict reason }
 
     /// Owner retention decision: only a durably-settled finalize releases the
     /// identity. NotCommitted/Unknown retain it so a later recovery can resume
     /// the exact finalize; PhaseConflict retains it for the invariant incident
     /// evidence instead of dropping it in a finally.
-    let releasesIdentity (settlement: InspectorFinalizeSettlement) : bool =
+    let releasesIdentity (settlement: CaseFinalizeSettlement) : bool =
         match settlement.Commitment with
-        | InspectorFinalizeCommitment.Finalized
-        | InspectorFinalizeCommitment.NothingToFinalize -> true
+        | CaseFinalizeCommitment.Finalized
+        | CaseFinalizeCommitment.NothingToFinalize -> true
         | _ -> false

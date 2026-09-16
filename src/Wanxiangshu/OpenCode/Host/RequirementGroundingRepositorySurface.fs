@@ -85,8 +85,11 @@ module RequirementGroundingRepositorySurface =
             match! boot workspace sessionId with
             | Error error -> return raise (InvalidOperationException error)
             | Ok runtime ->
-                match JsGeneratorSurface.typedRole "Coder" "en" with
-                | None -> return raise (InvalidOperationException "Coder js surface unavailable")
+                match
+                    JsGeneratorSurface.typedRole "Engineer" "en"
+                    |> Option.orElseWith (fun () -> JsGeneratorSurface.typedRole "Coder" "en")
+                with
+                | None -> return raise (InvalidOperationException "Engineer js surface unavailable")
                 | Some surface ->
                     let observe readPaths effectPaths =
                         task {

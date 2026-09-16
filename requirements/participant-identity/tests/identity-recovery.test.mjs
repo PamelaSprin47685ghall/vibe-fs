@@ -13,9 +13,9 @@ const rootSeed = {
   ownerLogicalRun: null,
   ownerAuthorityRoot: null,
   participantIdentity: {
-    participant: 'coder',
-    role: 'coder',
-    persona: 'Coder',
+    participant: 'engineer',
+    role: 'engineer',
+    persona: 'Engineer',
     personaCatalogVersion: 1,
     origin: 'ResolvedAtRoot',
   },
@@ -112,16 +112,16 @@ const legacyHumanRootLine = (profile) => {
   const payload = tagged[1]
   delete payload.SchemaVersion
   delete payload.IdentitySeed
-  payload.SelectedAgent = 'coder'
-  payload.PeerAgent = 'coder'
-  payload.CanonicalRole = 'coder'
+  payload.SelectedAgent = 'engineer'
+  payload.PeerAgent = 'engineer'
+  payload.CanonicalRole = 'engineer'
   payload.SelectedTier = 'deep'
   return JSON.stringify(current)
 }
 
 const inheritedProfile = () => {
   const owner = createRoot()
-  const issued = authority.issueInheritedIdentitySeed('inspector', owner)
+  const issued = authority.issueInheritedIdentitySeed('devops', owner)
   assert.equal(issued.ok, true, issued.ok ? '' : issued.error)
   return createRoot('AgentOwnerRoot', issued.value, 'ses-recovery-child', 'msg-recovery-child')
 }
@@ -192,7 +192,7 @@ test('WHAT[PID-008] rejects corrupt identity provenance', () => {
   const rootProjection = register(createRoot())
   const inheritedProjection = register(inheritedProfile())
   const corruptions = [
-    [rootProjection, (active) => { active.identitySeed.participantIdentity.persona = 'Engineer' }],
+    [rootProjection, (active) => { active.identitySeed.participantIdentity.persona = 'WrongPersona' }],
     [rootProjection, (active) => { active.identitySeed.participantIdentity.personaCatalogVersion = 99 }],
     [inheritedProjection, (active) => { active.identitySeed.participantIdentity.origin = 'ResolvedAtRoot' }],
     [inheritedProjection, (active) => { active.identitySeed.ownerSession = '' }],

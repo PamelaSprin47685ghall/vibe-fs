@@ -36,7 +36,7 @@ module SessionRecoveryHostSurface =
 
     let private acceptedEvidence (sessionId: string) (physicalUserMessageId: string) : AcceptedChatExecutionEvidence =
         let identity =
-            ParticipantIdentity.resolveAtRoot "coder"
+            ParticipantIdentity.resolveAtRoot "engineer"
             |> Result.defaultWith (fun error -> invalidOp (sprintf "%A" error))
 
         { SessionId = SessionId.create sessionId

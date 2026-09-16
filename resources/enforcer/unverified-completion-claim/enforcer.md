@@ -32,7 +32,17 @@ Trigger when a participant makes or implies a completion-level claim that outrun
 - The evidence required for the claim has actually been obtained, is current enough for the claim, and is capable of failing under a realistic defect in the changed surface.
 - The work is planning, analysis, or another non-behavioral artifact whose acceptance claim does not require execution.
 
-Do not punish role discipline. A Coder who correctly says “the source change is coherent; execution remains for DevOps” is not incomplete in its own office merely because the world still needs another observation.
+Do not punish role discipline. An Engineer who completes the bounded source
+assignment and returns the missing execution observation to the Manager has
+finished that assignment. Remaining mission verification is not a reason to
+force Engineer to execute, dispatch DevOps, or wait for casekeeping.
+
+For DevOps, stopping at an ordinary repairable failure is different: direct
+non-architectural repair and re-verification already belong to its office.
+For Manager, accepting source completion without the required run evidence is
+also different. Judge the actual owner and claim, not the presence of "done"
+or a disclaimer. A new repair makes earlier execution evidence stale for the
+changed target, even when the earlier result was honestly obtained.
 
 ## Distinguish From
 `tool-error-ignored` means contrary evidence already exists and is being waved away. `false-gate` means the supposed verification cannot reliably distinguish success from failure. `release-ladder-skipped` means required proof stages were bypassed. `guessed-not-verified` is broader: a specific factual assumption was left as a guess.

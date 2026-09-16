@@ -13,10 +13,6 @@ test('WHAT[ABL-010] Sphinx (epistemic-reasoning) has an independent ablation swi
   const sphinxNode = nodes.nodes.find((n) => n.id === 'epistemic-reasoning')
   assert.ok(sphinxNode, 'epistemic-reasoning node must exist in ablation nodes')
 
-  // external-investigation node must be removed/deprecated
-  const browserNode = nodes.nodes.find((n) => n.id === 'external-investigation')
-  assert.equal(browserNode, undefined, 'external-investigation node must be removed from ablation nodes')
-
   // epistemic-reasoning must not have dependency on external-investigation
   const edges = nodes.edges || []
   const hasBrowserDep = edges.some((e) => e.to === 'epistemic-reasoning' && e.from === 'external-investigation')

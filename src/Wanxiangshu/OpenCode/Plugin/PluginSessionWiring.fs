@@ -30,11 +30,12 @@ module PluginSessionWiring =
         let wired = host.Wired
         let workspaceDirectory = boot.WorkspaceDirectory
 
+        /// The delegate's role is whatever its managed name resolves to; a name
+        /// that resolves to nothing must fail loudly rather than guess a role.
         let roleForAgent (agent: string) : Role =
-            if agent.Contains "coder" then
-                Role.Coder
-            else
-                Role.Inspector
+            match ManagedAgent.tryParse agent with
+            | Some managed -> managed.Role
+            | None -> invalidArg "agent" (sprintf "unknown managed agent '%s'" agent)
 
         let bindStrengthReplica replicaId agent =
             match ManagedAgent.tryParse agent with
@@ -131,9 +132,9 @@ module PluginSessionWiring =
                             PromptAuthority.toolCapabilitiesFor role ProviderRequestKind.WorkMain
                             |> StaticTools.requestToolMap),
                     ?workspaceDirectory = workspaceDirectory,
-                    ?onInspectorPrompt = Some CasebookLifecycle.notePrompt,
-                    ?onInspectorAnswer = Some CasebookLifecycle.noteAnswer,
-                    ?onInspectorCleanup = Some CasebookLifecycle.cleanupInspector
+                    ?onDelegatePrompt = Some CasebookLifecycle.notePrompt,
+                    ?onDelegateAnswer = Some CasebookLifecycle.noteAnswer,
+                    ?onDelegateCleanup = Some CasebookLifecycle.cleanupDraft
                 )
 
             scope.AttachSyncDelegateRuntime syncDelegate

@@ -1,11 +1,13 @@
-按 name 继续当前 mission 中已经认识的人，把新的 charge 交给它。
+按 name 继续已有参与者，不重选职位，也不创建新身份。
+固定 DevOps 由运行时提供，通过本工具托付。谁能派工取决于当前 Manager 绑定，不取决于旧消息。
+Manager 换任不需要第二名 DevOps。
 
-resume 不叫起新人。要创建新人，用 fork 并传 calling + name + charge。
+给出新目标、约束和有用证据。DevOps 自行执行、调查普通失败、直接改源码、补回归并重新验证。
+非架构级修复无需逐次许可；明确只读指令和用户限制仍然有效。
+架构、产品、兼容性和安全政策的决定交回 Manager。
 
-person 由 name 识别。resume 复用该 person 已绑定的一切：其 office、persona、
-reasoning depth，以及它在本 mission 中此前工作的全部历史。
+已有 Engineer 可以接续时，任务仍限于本地调查与源码工作，不执行真实命令，不差遣 DevOps。
+已完成工作保留在历史中；接续不会倒改前次结果或案例来源。
 
-请交托新的 charge、真正相关的 constraints，以及重要的 evidence 或 boundary。
-不要替它指定隐藏的 tools。
-
-传入 calling 会被拒绝：选择 office 属于 fork，person 已绑定的 office 在此不再重新选择。
+传已有 name 和新 charge，不传 calling。通过 join 或 horizon 取得结果。
+对方正忙或接收不明时，遵循返回的恢复指引，不另造替身，也不盲目重发。

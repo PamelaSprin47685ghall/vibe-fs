@@ -278,9 +278,9 @@ export const ROOT_SELECTION_IDENTITY_SEED = {
   OwnerLogicalRunId: null,
   OwnerAuthorityRootUserMessageId: null,
   ParticipantIdentity: {
-    participant: 'coder',
-    role: 'coder',
-    Persona: 'Coder',
+    participant: 'engineer',
+    role: 'engineer',
+    Persona: 'Engineer',
     PersonaCatalogVersion: 1,
     Origin: 'ResolvedAtRoot',
   },

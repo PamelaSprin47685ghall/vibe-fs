@@ -21,6 +21,7 @@ const findClaim = (projection, key) => projection.pendingClaims.find((claim) => 
 const promptOrigin = (kind) => authority.originForContinuation(kind)
 
 const personas = {
+  engineer: 'Engineer',
   coder: 'Coder',
   manager: 'Lead',
 }
@@ -63,7 +64,7 @@ const profileOf = () => {
     SESSION,
     'HumanRoot',
     'msg_u1',
-    rootSelection('coder'),
+    rootSelection('engineer'),
   )
   assert.equal(built.ok, true, built.ok ? '' : built.error)
   return built.value
@@ -315,13 +316,13 @@ test('WHAT[DISPATCH-PROTOCOL-002] DP_002_claim_records_payload_digest_and_partic
 
 test('WHAT[DISPATCH-PROTOCOL-005] DP_005_legacy_identity_fields_are_dropped_never_reencoded', () => {
   const legacyIdentity = {
-    participant: 'coder',
+    participant: 'engineer',
     selectedAgent: 'stale-selected',
     peerAgent: 'stale-peer',
-    role: 'coder',
+    role: 'engineer',
     canonicalRole: 'stale-role',
     selectedTier: 'deep',
-    persona: 'Coder',
+    persona: 'Engineer',
     personaCatalogVersion: 1,
     origin: 'ResolvedAtRoot',
   }
@@ -344,10 +345,10 @@ test('WHAT[DISPATCH-PROTOCOL-005] DP_005_legacy_identity_fields_are_dropped_neve
     built.value.participantIdentity,
     {
       origin: 'ResolvedAtRoot',
-      participant: 'coder',
-      persona: 'Coder',
+      participant: 'engineer',
+      persona: 'Engineer',
       personaCatalogVersion: 1,
-      role: 'coder',
+      role: 'engineer',
     },
     'legacy peer/selectedAgent/canonicalRole fields must fold into canonical participant',
   )
@@ -373,10 +374,10 @@ test('WHAT[DISPATCH-PROTOCOL-005] DP_005_legacy_identity_fields_are_dropped_neve
     reparsed.participantIdentity,
     {
       origin: 'InheritedFromOwner',
-      participant: 'coder',
-      persona: 'Coder',
+      participant: 'engineer',
+      persona: 'Engineer',
       personaCatalogVersion: 1,
-      role: 'coder',
+      role: 'engineer',
     },
   )
 })
