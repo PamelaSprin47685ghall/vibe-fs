@@ -204,6 +204,7 @@ module ReconcileSurface =
                     wake?kind
                 with _ ->
                     ""
+
             kind = "AbortWake"
 
     let mergeWakeKind (currentPhysical: string) (previous: obj) (incoming: obj) =

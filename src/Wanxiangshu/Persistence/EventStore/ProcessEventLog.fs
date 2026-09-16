@@ -52,24 +52,30 @@ module ProcessEventLog =
 
         return Object.assign({}, nodeFs, {
             mkdir: function(dirPath, cb) {
-                nodeFs.mkdir(dirPath, function(err) {
-                    if (!err) {
-                        try {
-                            nodeFs.writeFileSync(nodePath.join(dirPath, 'owner.json'), JSON.stringify({ pid: process.pid, time: Date.now() }));
-                        } catch (_) {}
-                    }
-                    cb(err);
-                });
+                try {
+                    nodeFs.mkdirSync(dirPath);
+                    try {
+                        nodeFs.writeFileSync(nodePath.join(dirPath, 'owner.json'), JSON.stringify({ pid: process.pid, time: Date.now() }));
+                    } catch (_) {}
+                    if (typeof cb === 'function') cb(null);
+                } catch (err) {
+                    if (typeof cb === 'function') cb(err);
+                }
             },
             rmdir: function(dirPath, cb) {
-                nodeFs.rm(dirPath, { recursive: true, force: true }, cb);
+                try {
+                    nodeFs.rmSync(dirPath, { recursive: true, force: true });
+                    if (typeof cb === 'function') cb(null);
+                } catch (err) {
+                    if (typeof cb === 'function') cb(err);
+                }
             },
             rmdirSync: function(dirPath) {
                 nodeFs.rmSync(dirPath, { recursive: true, force: true });
             },
             stat: function(dirPath, cb) {
-                nodeFs.stat(dirPath, function(err, stat) {
-                    if (err) return cb(err);
+                try {
+                    var stat = nodeFs.statSync(dirPath);
                     try {
                         var ownerFile = nodePath.join(dirPath, 'owner.json');
                         if (nodeFs.existsSync(ownerFile)) {
@@ -81,8 +87,10 @@ module ProcessEventLog =
                             }
                         }
                     } catch (_) {}
-                    cb(null, stat);
-                });
+                    if (typeof cb === 'function') cb(null, stat);
+                } catch (err) {
+                    if (typeof cb === 'function') cb(err);
+                }
             }
         });
     })($0, $1)

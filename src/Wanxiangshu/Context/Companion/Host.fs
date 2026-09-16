@@ -380,7 +380,7 @@ type CompanionHost
             companion.RecordBloggerClosed())
 
         previousBloggerId
-        |> Option.iter (fun sid -> sessions.InterruptAttempt(sid) |> ignore)
+        |> Option.iter (fun sid -> sessions.AbortSession(sid) |> ignore)
 
     member _.Memory = companion.Memory
 

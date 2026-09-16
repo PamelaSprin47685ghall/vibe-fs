@@ -187,11 +187,23 @@ module ChangeSurface =
                    DiagnosticsDigest = stringField payload [ "diagnosticsDigest"; "DiagnosticsDigest" ] |}
                 projection
         | "RebasedCandidateReady" ->
+            let targetHead =
+                let t = field payload [ "targetHead"; "targetHeadSnapshot"; "TargetHeadSnapshot" ]
+
+                if isNullish t then
+                    field payload [ "rebasedCommit"; "RebasedCommit" ]
+                else
+                    t
+
+            let ws =
+                let w = field payload [ "workspaceSnapshotId"; "WorkspaceSnapshotId" ]
+                if isNullish w then box "snap-synthetic" else w
+
             OrchestratorProjection.recordRebasedCandidateReady
                 managerJobId
                 {| RebasedCommit = commit (field payload [ "rebasedCommit"; "RebasedCommit" ])
-                   TargetHeadSnapshot = commit (field payload [ "targetHeadSnapshot"; "TargetHeadSnapshot" ])
-                   WorkspaceSnapshotId = snapshotId (field payload [ "workspaceSnapshotId"; "WorkspaceSnapshotId" ]) |}
+                   TargetHeadSnapshot = commit targetHead
+                   WorkspaceSnapshotId = snapshotId ws |}
                 projection
         | "PublishClaimed" ->
             let job = OrchestratorProjection.tryFind managerJobId projection
@@ -291,7 +303,13 @@ module ChangeSurface =
         | None -> [||]
 
     let find (projection: obj) (job: string) : obj =
-        match getProjection projection with
+        let projHandle =
+            if not (isNullish projection) && stringField projection [ "ok" ] = "true" then
+                field projection [ "value" ]
+            else
+                projection
+
+        match getProjection projHandle with
         | Some current ->
             match OrchestratorProjection.tryFind (jobId job) current with
             | Some value -> jobObject value
@@ -467,14 +485,42 @@ module ChangeSurface =
 
     let private applyEvent (projection: OrchestratorProjection) (event: obj) : Result<OrchestratorProjection, string> =
         let kind = stringField event [ "kind"; "case"; "type" ]
-        let payload = field event [ "payload"; "value"; "data" ]
+
+        let payload =
+            let p = field event [ "payload"; "value"; "data" ]
+            if isNullish p then event else p
 
         match kind with
         | "ManagerJobCreated" -> Ok(OrchestratorProjection.createJob (createPayload payload) projection)
         | "PublishClaimed" -> foldPublishClaimed projection (jobId (field payload [ "jobId"; "ManagerJobId" ])) payload
         | "CandidateReady"
-        | "ConflictDetected"
-        | "RebasedCandidateReady"
+        | "ConflictDetected" ->
+            Ok(recordFactValue projection (jobId (field payload [ "jobId"; "ManagerJobId" ])) (fact kind payload))
+        | "RebasedCandidateReady" ->
+            let targetHead =
+                let t = field payload [ "targetHead"; "targetHeadSnapshot"; "TargetHeadSnapshot" ]
+
+                if isNullish t then
+                    field payload [ "rebasedCommit"; "RebasedCommit" ]
+                else
+                    t
+
+            let ws =
+                let w = field payload [ "workspaceSnapshotId"; "WorkspaceSnapshotId" ]
+                if isNullish w then box "snap-synthetic" else w
+
+            let normalizedPayload =
+                box
+                    {| rebasedCommit = field payload [ "rebasedCommit"; "RebasedCommit" ]
+                       targetHeadSnapshot = targetHead
+                       workspaceSnapshotId = ws |}
+
+            Ok(
+                recordFactValue
+                    projection
+                    (jobId (field payload [ "jobId"; "ManagerJobId" ]))
+                    (fact kind normalizedPayload)
+            )
         | "Published"
         | "JobFailed"
         | "JobAbandoned" ->
@@ -1556,15 +1602,6 @@ module ChangeSurface =
             return int (string values.[0]), stringOf values.[1], stringOf values.[2]
         }
 
-    let private gitCommand repo args : Command =
-        { FileName = "git"
-          Arguments = args
-          WorkingDirectory = Some repo
-          Environment = None
-          Stdin = None
-          Deadline = None
-          PtyOptions = None }
-
     let createGit (repo: string) (runner: obj) : obj =
         let r = invokeRunner runner
         let port = GitOperations.createWithRepo repo r
@@ -1599,45 +1636,21 @@ module ChangeSurface =
     let gitRebaseContinue (git: obj) : Task<obj> =
         task {
             let handle = git :?> GitHandle
-
-            let! code, stdout, stderr =
-                handle.Runner(gitCommand handle.repo [ "-c"; "core.editor=true"; "rebase"; "--continue" ])
-
-            let res =
-                if code = 0 then
-                    Ok()
-                else
-                    Error(if String.IsNullOrWhiteSpace stderr then stdout else stderr)
-
+            let! res = GitOperations.continueRebase handle.Runner handle.repo
             return resultObject res (fun _ -> null)
         }
 
     let gitStageAll (git: obj) : Task<obj> =
         task {
             let handle = git :?> GitHandle
-            let! code, stdout, stderr = handle.Runner(gitCommand handle.repo [ "add"; "-A" ])
-
-            let res =
-                if code = 0 then
-                    Ok()
-                else
-                    Error(if String.IsNullOrWhiteSpace stderr then stdout else stderr)
-
+            let! res = GitOperations.stageAll handle.Runner handle.repo
             return resultObject res (fun _ -> null)
         }
 
     let gitCandidateCommit (git: obj) (msg: string) : Task<obj> =
         task {
             let handle = git :?> GitHandle
-            let! _ = handle.Runner(gitCommand handle.repo [ "update-ref"; "-d"; "REBASE_HEAD" ])
-            let! code, stdout, stderr = handle.Runner(gitCommand handle.repo [ "commit"; "-m"; msg ])
-
-            let res =
-                if code = 0 then
-                    Ok()
-                else
-                    Error(if String.IsNullOrWhiteSpace stderr then stdout else stderr)
-
+            let! res = GitOperations.candidateCommit handle.Runner handle.repo msg
             return resultObject res (fun _ -> null)
         }
 

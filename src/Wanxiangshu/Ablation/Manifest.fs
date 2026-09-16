@@ -62,11 +62,9 @@ module AblationManifest =
         if not (existsSync path) then
             Error(MissingManifest path)
         else
-            let text = readFileSync (path, "utf8")
-
-            match Decode.fromString decoder text with
-            | Ok value -> Ok value
-            | Error reason -> Error(InvalidManifest(sprintf "%s: %s" path reason))
+            readFileSync (path, "utf8")
+            |> Decode.fromString decoder
+            |> Result.mapError (fun reason -> InvalidManifest(sprintf "%s: %s" path reason))
 
     let loadNodes () =
         readJson (pathJoin (resourcesDir (), "nodes.json")) decodeDocument
@@ -146,21 +144,19 @@ module AblationManifest =
         document.Nodes |> List.map (fun node -> AblationNodeId.create node.Id)
 
     let private modesFromProfile (document: ManifestDocument) (name: string) (profiles: ProfilesDocument) =
+        let nodeMode profileModes (node: ManifestNode) acc =
+            match profileModes |> Map.tryFind node.Id with
+            | None -> Ok(Map.add (AblationNodeId.create node.Id) AblationMode.Ablated acc)
+            | Some raw ->
+                AblationMode.parse raw
+                |> Option.map (fun mode -> Ok(Map.add (AblationNodeId.create node.Id) mode acc))
+                |> Option.defaultValue (Error(InvalidMode(node.Id, raw)))
+
         match profiles.Profiles |> Map.tryFind name with
         | None -> Error(UnknownProfile name)
         | Some profileModes ->
             document.Nodes
-            |> List.fold
-                (fun state node ->
-                    state
-                    |> Result.bind (fun acc ->
-                        match profileModes |> Map.tryFind node.Id with
-                        | Some raw ->
-                            match AblationMode.parse raw with
-                            | Some mode -> Ok(Map.add (AblationNodeId.create node.Id) mode acc)
-                            | None -> Error(InvalidMode(node.Id, raw))
-                        | None -> Ok(Map.add (AblationNodeId.create node.Id) AblationMode.Ablated acc)))
-                (Ok Map.empty)
+            |> List.fold (fun state node -> state |> Result.bind (nodeMode profileModes node)) (Ok Map.empty)
 
     let buildRegistry
         (document: ManifestDocument)

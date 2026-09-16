@@ -42,15 +42,28 @@ type ProviderAttemptStopFence() =
 
     let sessionPrefix (sessionId: SessionId) = SessionId.value sessionId + separator
 
+    let triggerWaiter (waiter: TaskCompletionSource<unit>) =
+        try
+            waiter.SetResult(())
+        with _ ->
+            ()
+
     let releaseWaiter (key: string) =
         match waiters.TryGetValue key with
         | true, waiter ->
             waiters.Remove key |> ignore
-            try
-                waiter.SetResult(())
-            with _ ->
-                ()
+            triggerWaiter waiter
         | false, _ -> ()
+
+    let getOrCreateWaiter (key: string) =
+        match waiters.TryGetValue key with
+        | true, existing -> existing
+        | false, _ ->
+            let c =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            waiters.[key] <- c
+            c
 
     member _.Observe(sessionId: SessionId, providerRun: ProviderRunIdentity) : unit =
         lock gate (fun () ->
@@ -66,7 +79,10 @@ type ProviderAttemptStopFence() =
             let pending =
                 waiters
                 |> Seq.choose (fun (KeyValue(key, _)) ->
-                    if key.StartsWith(prefix, System.StringComparison.Ordinal) then Some key else None)
+                    if key.StartsWith(prefix, System.StringComparison.Ordinal) then
+                        Some key
+                    else
+                        None)
                 |> Seq.toArray
 
             for key in pending do
@@ -82,15 +98,7 @@ type ProviderAttemptStopFence() =
             elif stopped.Contains key then
                 Task.FromResult true
             else
-                let waiter =
-                    match waiters.TryGetValue key with
-                    | true, existing -> existing
-                    | false, _ ->
-                        let created =
-                            TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-                        waiters.[key] <- created
-                        created
+                let waiter = getOrCreateWaiter key
 
                 task {
                     do! waiter.Task

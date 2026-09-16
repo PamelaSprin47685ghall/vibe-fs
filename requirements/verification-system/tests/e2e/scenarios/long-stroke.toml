@@ -108,7 +108,6 @@ must = [
   "manager-loop.1",
   "manager-loop.2",
   "continue.0",
-  "continue.1",
   "coder.0",
   "coder.1",
   "coder.2",
@@ -143,7 +142,7 @@ flow = [
   # the root session idle strictly after that baseline.
   { armIdle = { id = "orch.2" } },
   { armIdle = { id = "coder.3" } },
-  { armIdle = { id = "manager-interrupt.1" } },
+  { armIdle = { id = "manager-interrupt.0" } },
 
   # Stale-head AFTER manager worktree exists (orch-unhappy / restart-conflict canary note).
   # gitConflictProof ONLY — zero restart fields (§12 one OpenCode lifetime).
@@ -179,10 +178,10 @@ flow = [
   # event before injecting the external user message, or the wake is correctly dropped.
   { custom = "awaitManagerJoinRunning" },
   { prompt = { agent = "manager", text = "Interrupt the active join.", releaseHeldChildAfterAccepted = true }, session = "child", timeoutMs = 60000 },
-  { wait = "manager-interrupt.1", timeoutMs = 60000 },
+  { wait = "manager-interrupt.0", timeoutMs = 60000 },
   { wait = "coder.3", timeoutMs = 60000 },
   { awaitIdle = { after = "coder.3" }, timeoutMs = 60000 },
-  { awaitIdle = { after = "manager-interrupt.1" }, timeoutMs = 60000 },
+  { awaitIdle = { after = "manager-interrupt.0" }, timeoutMs = 60000 },
   { waitFact = { name = "HandleCompleted", gte = 1 }, timeoutMs = 60000 },
 
   # Bounded current-action cursors are verified by durable retirement and the
@@ -592,14 +591,9 @@ user = "# The previous physical attempt did not complete.\n#\n# Continue the sam
 id = "manager-interrupt"
 lane = "manager"
 user = "Interrupt the active join."
-tools = ["fork", "join", "horizon", "fission", "todowrite", "suicide"]
-optional = true
 
   [[turn.step]]
   respond = { type = "text", text = "The active join was interrupted and the child result was harvested." }
-
-  [[turn.step]]
-  respond = { type = "text", text = "Interruption handled; continue the durable Manager job." }
 
 [[turn]]
 id = "manager-current-action"

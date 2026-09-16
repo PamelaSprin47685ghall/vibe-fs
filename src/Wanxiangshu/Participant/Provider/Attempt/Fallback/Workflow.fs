@@ -550,8 +550,7 @@ module ProviderRecoveryWorkflow =
             // (`SessionRunState.ensureRunning` joins the dying run instead of
             // starting the new turn), so the fence — not this workflow — owns
             // the dispatch occasion.
-            let! hostStopped =
-                ProviderAttemptStopFence.shared.AwaitStop(input.Turn.SessionId, input.Turn.ProviderRun)
+            let! hostStopped = ProviderAttemptStopFence.shared.AwaitStop(input.Turn.SessionId, input.Turn.ProviderRun)
 
             match admitted, hostStopped, input.RequestKind with
             | true, _, _ -> return RetryVerdict.Superseded

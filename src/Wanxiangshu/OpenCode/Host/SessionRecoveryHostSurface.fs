@@ -297,10 +297,7 @@ module SessionRecoveryHostSurface =
     /// whole observable effect (port invocations + manual interventions).
     let signalSessionQuiesced (handle: RecoveryHostHandle) (sessionId: string) : Task<obj> =
         task {
-            do!
-                handle.Host.Signal(
-                    ChatExecutionRecoveryLifecycleEvent.SessionQuiesced(SessionId.create sessionId)
-                )
+            do! handle.Host.Signal(ChatExecutionRecoveryLifecycleEvent.SessionQuiesced(SessionId.create sessionId))
 
             return
                 box

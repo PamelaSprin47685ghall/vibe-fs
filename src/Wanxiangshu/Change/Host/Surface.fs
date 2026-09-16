@@ -8,6 +8,7 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
+open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Persistence.Journal
 
 /// JS-native owner for the OrchestratorHost semantic harness.

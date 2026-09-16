@@ -52,10 +52,7 @@ module CasebookReplay =
 
             for obs in stored do
                 let! replayed = replayOne root obs
-
-                match replayed with
-                | Some o -> results.Add o
-                | None -> ()
+                replayed |> Option.iter results.Add
 
             return Seq.toList results
         }

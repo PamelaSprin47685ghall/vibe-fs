@@ -94,18 +94,14 @@ module PersonaSurface =
         | ParticipantIdentityError.UnsupportedLegacyAuthorityKind _ -> "UnsupportedLegacyAuthorityKind"
         | ParticipantIdentityError.UnprovableLegacyAuthorityIdentity _ -> "UnprovableLegacyAuthorityIdentity"
 
-    let private capitalize (s: string) : string =
-        if System.String.IsNullOrEmpty s then s
-        else string (System.Char.ToUpperInvariant s.[0]) + s.Substring(1)
-
     let private identityToJs evidence : obj =
         box
             {| name = ParticipantIdentity.selectedAgent evidence
-               role = ParticipantIdentity.roleLabel evidence |> capitalize
+               role = ParticipantIdentity.roleLabel evidence
                initialTier = "deep"
-               peer = null
+               peer = ParticipantIdentity.selectedAgent evidence
                persona = ParticipantIdentity.persona evidence
-               catalogVersion = string (ParticipantIdentity.personaCatalogVersion evidence)
+               catalogVersion = ParticipantIdentity.personaCatalogVersion evidence
                origin = ParticipantIdentity.origin evidence |> originLabel |}
 
     let private identityResult result : obj =

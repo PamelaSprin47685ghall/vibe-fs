@@ -113,29 +113,35 @@ module JsToolsBindings =
                                 then
                                     return failureObj JsFailure.AnchorInvalidPattern
                                 else
-                                    match anchorOf needle with
+                                    let specRes =
+                                        result {
+                                            let! spec = anchorOf needle
+                                            do! requireNonEmptyExact spec
+                                            return spec
+                                        }
+
+                                    let! grepRes =
+                                        task {
+                                            match specRes with
+                                            | Error e -> return Error e
+                                            | Ok spec -> return! JsAnchorFs.grep root spec pattern
+                                        }
+
+                                    match grepRes with
                                     | Error failure -> return failureObj failure
-                                    | Ok spec ->
-                                        match requireNonEmptyExact spec with
-                                        | Error failure -> return failureObj failure
-                                        | Ok() ->
-                                            let! grepRes = JsAnchorFs.grep root spec pattern
+                                    | Ok(listing: JsAnchorFs.JsGrepListing) ->
+                                        listing.ReadSnapshots |> List.iter readSnapshots.Add
 
-                                            match grepRes with
-                                            | Error failure -> return failureObj failure
-                                            | Ok listing ->
-                                                listing.ReadSnapshots |> List.iter readSnapshots.Add
+                                        let matches =
+                                            listing.Matches
+                                            |> List.map (fun hit ->
+                                                createObj
+                                                    [ "path" ==> hit.Path
+                                                      "line" ==> hit.Line
+                                                      "column" ==> hit.Column
+                                                      "text" ==> hit.Text ])
 
-                                                let matches =
-                                                    listing.Matches
-                                                    |> List.map (fun hit ->
-                                                        createObj
-                                                            [ "path" ==> hit.Path
-                                                              "line" ==> hit.Line
-                                                              "column" ==> hit.Column
-                                                              "text" ==> hit.Text ])
-
-                                                return createObj [ "ok" ==> true; "matches" ==> (List.toArray matches) ]
+                                        return createObj [ "ok" ==> true; "matches" ==> (List.toArray matches) ]
                             }
                         "edit"
                         ==> fun (path: string) (newText: obj) ->

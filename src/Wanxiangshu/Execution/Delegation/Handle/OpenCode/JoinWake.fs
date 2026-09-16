@@ -15,7 +15,7 @@ module JoinWake =
         | ChatAdmissionIntent.Decision.ExternalRootIntent evidence -> registry.SignalUserMessage evidence.Key.SessionId
         | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence ->
             registry.SignalUserMessage evidence.Key.SessionId
+        | ChatAdmissionIntent.Decision.PendingPromptIntent evidence -> registry.SignalUserMessage evidence.Key.SessionId
         | ChatAdmissionIntent.Decision.NoManagedExecution _
-        | ChatAdmissionIntent.Decision.PendingPromptIntent _
         | ChatAdmissionIntent.Decision.HostInternal _
         | ChatAdmissionIntent.Decision.Reject _ -> ()

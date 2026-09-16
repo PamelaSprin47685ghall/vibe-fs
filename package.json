@@ -18,6 +18,11 @@
   "engines": {
     "node": ">=20"
   },
+  "allowScripts": {
+    "@waishnav/devspace": true,
+    "better-sqlite3": true,
+    "node-pty": true
+  },
   "packageManager": "npm@11.12.1",
   "publishConfig": {
     "access": "restricted"

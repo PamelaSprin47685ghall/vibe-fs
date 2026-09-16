@@ -243,8 +243,35 @@ module JsGlobFs =
     let private collectVisibleFiles (root: string) : System.Threading.Tasks.Task<string list> =
         // DSL-MUTABLE: algorithm-scratch — visible file accumulator
         let files = ResizeArray<string>()
-        // DSL-MUTABLE: algorithm-scratch — ignore rule accumulator
         let rules = ResizeArray<IgnoreRule>()
+
+        let stepEntry
+            (rulesList: ResizeArray<IgnoreRule>)
+            (walkFn: string -> string -> System.Threading.Tasks.Task<unit>)
+            dir
+            rel
+            entry
+            =
+            task {
+                match classifyVisibleEntry rulesList rel dir entry with
+                | SkipEntry -> ()
+                | RecurseDirectory(full, childRel) -> do! walkFn full childRel
+                | EmitFile childRel ->
+                    files.Add(childRel.Replace('\\', '/'))
+                    do! yieldEventLoop ()
+            }
+
+        let rec visitEntries
+            (rulesList: ResizeArray<IgnoreRule>)
+            (walkFn: string -> string -> System.Threading.Tasks.Task<unit>)
+            (dir: string)
+            (rel: string)
+            (entries: string list)
+            =
+            task {
+                for entry in entries do
+                    do! stepEntry rulesList walkFn dir rel entry
+            }
 
         let rec walk (dir: string) (rel: string) : System.Threading.Tasks.Task<unit> =
             task {
@@ -267,14 +294,7 @@ module JsGlobFs =
 
                 try
                     let entries = tryListDirectory dir
-
-                    for entry in entries do
-                        match classifyVisibleEntry rules rel dir entry with
-                        | SkipEntry -> ()
-                        | RecurseDirectory(full, childRel) -> do! walk full childRel
-                        | EmitFile childRel ->
-                            do! yieldEventLoop ()
-                            files.Add(childRel.Replace('\\', '/'))
+                    do! visitEntries rules walk dir rel entries
                 finally
                     rules.RemoveRange(mark, rules.Count - mark)
             }

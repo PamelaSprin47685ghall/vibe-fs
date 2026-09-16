@@ -428,8 +428,7 @@ type SyncDelegateRuntime
                 |> PromptAuthorityProjectionQueries.projectionFor turn.SessionId
                 |> Option.bind (fun authority ->
                     Map.tryFind turn.PhysicalUserMessageId authority.AcceptedContinuationIds)
-                |> Option.exists (fun kind ->
-                    match kind with
+                |> Option.exists (function
                     | PromptAuthority.ContinuationKind.ProviderRetryAttempt
                     | PromptAuthority.ContinuationKind.DegenerationGuard
                     | PromptAuthority.ContinuationKind.InteractionRepair -> true

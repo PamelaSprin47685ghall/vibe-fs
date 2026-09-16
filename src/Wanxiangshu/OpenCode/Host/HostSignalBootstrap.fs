@@ -116,55 +116,7 @@ module HostSignalBootstrap =
 
             journal
             |> Option.iter (fun durable ->
-                // PAR-023: the production accepted-material capability. It never resends
-                // text and never mints a replacement PromptClaim: the exact material the
-                // Host accepted but never executed is settled terminal, and the turn
-                // failure is reported so no waiter can hang on it.
-                let settleAcceptedNonExecution (request: PreProviderResumeRequest) : Task<bool> =
-                    task {
-                        let! settled =
-                            PreProviderSettlement.settle
-                                durable
-                                request.ExecutionKey
-                                request.AcceptedEvidence
-                                ChatExecutionTerminalDisposition.Rejected
-
-                        match settled with
-                        | Error error ->
-                            Diagnostic.emit
-                                "accepted-non-execution-settlement-failed"
-                                [ "session_id", SessionId.value request.ExecutionKey.SessionId
-                                  "physical_user_message_id",
-                                  PhysicalUserMessageId.value request.ExecutionKey.PhysicalUserMessageId
-                                  "error", string error ]
-
-                            return false
-                        | Ok _ ->
-                            ModelRouting.releasePhysicalExecution
-                                request.ExecutionKey.SessionId
-                                request.ExecutionKey.PhysicalUserMessageId
-                            |> ignore
-
-                            eventPort.NotifyTerminal
-                                request.ExecutionKey.SessionId
-                                (TerminalOutcome.Failed(
-                                    TerminalStop.forAuthority
-                                        request.AcceptedEvidence.AuthorityRootUserMessageId
-                                        "PA-023: the Host accepted this provider retry and never executed it"
-                                ))
-                            |> ignore
-
-                            return true
-                    }
-
-                let recovery =
-                    SessionRecoveryHost(
-                        durable,
-                        snapshot,
-                        scope.Recovery,
-                        Some { ResumeAccepted = settleAcceptedNonExecution }
-                    )
-
+                let recovery = SessionRecoveryHost(durable, snapshot, scope.Recovery, None)
                 scope.AttachChatRecoveryRuntime recovery
 
                 scope.AttachDurabilityActivation(fun () ->
@@ -248,11 +200,6 @@ module HostSignalBootstrap =
                     // process-local — never journalled.
                     let permit = scope.Sessions.Quiescence.ObserveIdle sessionId
                     reconciler.SignalIdle(sessionId, permit)
-                    // PAR-023: the idle observation also carries the accepted-but-never-
-                    // executed obligation. The sweep is narrow (Accepted ∧ ¬ProviderStarted)
-                    // and stays event-driven — it never polls.
-                    scope.RunBackground(fun () ->
-                        scope.SignalChatRecovery(ChatExecutionRecoveryLifecycleEvent.SessionQuiesced sessionId))
                 | ProviderRetry _
                 | ProviderFailure _ -> reconciler.Signal signal
                 // HOST-002/004: operator abort immediately revokes the current
@@ -710,7 +657,9 @@ module HostSignalBootstrap =
                     continueUnmanagedChatMessage intent
                     Task.FromResult()
                 | ChatAdmissionIntent.Decision.Reject rejection, _, _ -> rejectedChatMessage (IntentRejected rejection)
-                | ChatAdmissionIntent.Decision.ExternalRootIntent _, Some durable, Some createTransaction
+                | ChatAdmissionIntent.Decision.ExternalRootIntent _, Some durable, Some createTransaction ->
+                    JoinWake.observeChatMessage scope.Sessions.JoinInterrupts intent
+                    admitManagedChatMessage durable createTransaction intent output
                 | ChatAdmissionIntent.Decision.PendingPromptIntent _, Some durable, Some createTransaction ->
                     admitManagedChatMessage durable createTransaction intent output
                 | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent _, Some durable, Some createTransaction ->
@@ -839,6 +788,7 @@ module HostSignalBootstrap =
                             // can enqueue after this message is accepted and supersede
                             // its model-routing lease before chat.params.
                             observePhysicalAdmission output sessionId physicalId
+                            JoinWake.observeChatMessage scope.Sessions.JoinInterrupts intent
                         | _ -> ()
 
                         if explicitResume then

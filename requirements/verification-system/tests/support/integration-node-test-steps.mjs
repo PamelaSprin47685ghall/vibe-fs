@@ -2,6 +2,7 @@ import path from 'node:path'
 
 import { PROJECT_CHECK_TIMEOUT_MS } from '../e2e/support/time-budget.js'
 
+
 /**
  * The wired node:test integration steps — the single source of truth for which
  * non-child-owned integration tests the entry supervises. Shared by
@@ -18,7 +19,7 @@ import { PROJECT_CHECK_TIMEOUT_MS } from '../e2e/support/time-budget.js'
  * cannot claim headroom for the dog while telling node:test a shorter story.
  *
  * @param {string} root repository root (absolute)
- * @returns {{ label: string, files: string[], perTestTimeoutMs?: number, releaseOnly?: boolean }[]}
+ * @returns {{ label: string, files: string[], perTestTimeoutMs?: number }[]}
  */
 export function integrationNodeTestSteps(root) {
   return [
@@ -26,37 +27,27 @@ export function integrationNodeTestSteps(root) {
     {
       label: 'requirements-adapter',
       files: [
-        path.join(root, 'requirements/cognitive-environment/tests/integration/001.test.mjs'),
-        path.join(root, 'requirements/cognitive-environment/tests/integration/003.test.mjs'),
-        path.join(root, 'requirements/cognitive-environment/tests/integration/004.test.mjs'),
-        path.join(root, 'requirements/cognitive-environment/tests/integration/005.test.mjs'),
-        path.join(root, 'requirements/behavior-diagnosis/tests/integration/001.test.mjs'),
-        path.join(root, 'requirements/behavior-diagnosis/tests/integration/002.test.mjs'),
-        path.join(root, 'requirements/behavior-diagnosis/tests/integration/004.test.mjs'),
-        path.join(root, 'requirements/behavior-diagnosis/tests/integration/005.test.mjs'),
-        path.join(root, 'requirements/capability-enforcement/tests/integration/plugin/001.test.mjs'),
-        path.join(root, 'requirements/capability-enforcement/tests/integration/plugin/006.test.mjs'),
-        path.join(root, 'requirements/capability-enforcement/tests/integration/plugin/009.test.mjs'),
-        path.join(root, 'requirements/capability-enforcement/tests/integration/plugin/010.test.mjs'),
-        path.join(root, 'requirements/capability-enforcement/tests/integration/plugin/011.test.mjs'),
-        path.join(root, 'requirements/change-integration/tests/integration/002.test.mjs'),
-        path.join(root, 'requirements/change-integration/tests/integration/005.test.mjs'),
-        path.join(root, 'requirements/change-integration/tests/integration/008.test.mjs'),
-        path.join(root, 'requirements/repository-programming/tests/integration/plugin/020.test.mjs'),
-        path.join(root, 'requirements/speculative-investigation/tests/integration/strength/008.test.mjs'),
-        path.join(root, 'requirements/managed-chat-execution/tests/integration/009.test.mjs'),
-        path.join(root, 'requirements/durable-events/tests/integration/003.test.mjs'),
-        path.join(root, 'requirements/durable-events/tests/integration/009.test.mjs'),
-        path.join(root, 'requirements/durable-convergence/tests/integration/008.test.mjs'),
-        path.join(root, 'requirements/durable-convergence/tests/integration/009.test.mjs'),
+        path.join(root, 'requirements/cognitive-environment/tests/integration/resources/prompts.test.mjs'),
+        path.join(root, 'requirements/behavior-diagnosis/tests/integration/resources/enforcer-rulebook.test.mjs'),
+        path.join(root, 'requirements/capability-enforcement/tests/integration/plugin/manager-tool-contract.test.mjs'),
+        path.join(root, 'requirements/capability-enforcement/tests/integration/plugin/auto-injected-tool.test.mjs'),
+        path.join(root, 'requirements/capability-enforcement/tests/integration/plugin/bash-honeypot-tool.test.mjs'),
+        path.join(root, 'requirements/change-integration/tests/integration/worktree-create.test.mjs'),
+        path.join(root, 'requirements/change-integration/tests/integration/branch-fast-forward-adapter.test.mjs'),
+        path.join(root, 'requirements/repository-programming/tests/integration/plugin/file-mutation-tools.test.mjs'),
+        path.join(root, 'requirements/speculative-investigation/tests/integration/strength/lifecycle.test.mjs'),
+        path.join(root, 'requirements/managed-chat-execution/tests/integration/process-restart-canary.test.mjs'),
+        path.join(root, 'requirements/durable-events/tests/integration/persist/object-identity.test.mjs'),
+        path.join(root, 'requirements/durable-events/tests/integration/persist/leave-unread.test.mjs'),
+        path.join(root, 'requirements/durable-convergence/tests/integration/persist/dumb-server.test.mjs'),
       ],
     },
     // 2. compiler-canary: 编译边界与影响分析 CLI，耗时较长（releaseOnly: true）
     {
       label: 'compiler-canary',
       files: [
-        path.join(root, 'requirements/structured-workflow/tests/integration/011.test.mjs'),
-        path.join(root, 'requirements/structured-workflow/tests/integration/012.test.mjs'),
+        path.join(root, 'requirements/structured-workflow/tests/integration/owner-project-compiler-boundary.test.mjs'),
+        path.join(root, 'requirements/structured-workflow/tests/integration/owner-impact-compile-cli.test.mjs'),
       ],
       perTestTimeoutMs: PROJECT_CHECK_TIMEOUT_MS,
       releaseOnly: true,
@@ -65,7 +56,7 @@ export function integrationNodeTestSteps(root) {
     {
       label: 'repository-envelope',
       files: [
-        path.join(root, 'requirements/degeneration-guard/tests/integration/004.test.mjs'),
+        path.join(root, 'requirements/degeneration-guard/tests/integration/loop-envelope-repository.test.mjs'),
       ],
       releaseOnly: true,
     },

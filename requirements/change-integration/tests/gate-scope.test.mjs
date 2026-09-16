@@ -1,0 +1,163 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+
+const change = await import('../../../dist/Change/Surface.js')
+
+test('WHAT[CHGINT-001] fresh quality candidate runs the full publish lifecycle to Published', async () => {
+  const observation = await change.observeRelayProgram('fresh')
+
+  assert.deepEqual(observation.verdict, { kind: 'Published', detail: 'rebased-1' })
+  assert.deepEqual(observation.invalidations, ['InitialRebaseRequired'])
+  assert.deepEqual(observation.continuations, ['surface-loop-1'])
+
+  assert.deepEqual(observation.timeline, [
+    'await:Candidate',
+    'fact:CandidateReady',
+    'invalidate:InitialRebaseRequired',
+    'git:rebase',
+    'git:read-head:rebased-1',
+    'fact:RebasedCandidateReady',
+    'continue:surface-loop-1',
+    'await:Candidate',
+    'gate:acquire',
+    'git:read-head:rebased-1',
+    'fact:PublishClaimed',
+    'git:ff:rebased-1',
+    'fact:Published',
+    'relay:terminate',
+    'gate:release',
+    'relay:terminate',
+  ])
+})
+
+test('WHAT[CHGINT-010] rebase work holds the gate only for the ff mutation', async () => {
+  const observation = await change.observeRelayProgram('fresh')
+
+  assert.deepEqual(observation.rebaseGateHeld, [false])
+  assert.deepEqual(observation.ffGateHeld, [true])
+  assert.deepEqual(observation.ffExpectedHeads, ['target-1'])
+  assert.equal(observation.gateAcquireCount, 1)
+  assert.equal(observation.gateReleaseCount, 1)
+  assert.equal(observation.gateHeldAfterRun, false)
+})
+
+test('WHAT[CHGINT-005] rebase conflict records machine fact and continues the loop outside the gate', async () => {
+  const observation = await change.observeRelayProgram('rebase-conflict')
+
+  assert.deepEqual(observation.facts, ['CandidateReady', 'ConflictDetected'])
+  assert.deepEqual(observation.invalidations, ['InitialRebaseRequired'])
+  assert.deepEqual(observation.continuations, ['surface-loop-1'])
+})
+
+test('WHAT[CHGINT-010] conflict resolution never acquires the publish gate', async () => {
+  const observation = await change.observeRelayProgram('rebase-conflict')
+
+  assert.deepEqual(observation.rebaseGateHeld, [false])
+  assert.deepEqual(observation.ffGateHeld, [])
+  assert.equal(observation.gateAcquireCount, 0)
+  assert.equal(observation.gateHeldAfterRun, false)
+})
+
+test('WHAT[CHGINT-013] target movement before publish invalidates the certificate and continues the loop without entering the gate', async () => {
+  const observation = await change.observeRelayProgram('target-moved')
+
+  assert.deepEqual(observation.invalidations, ['TargetAdvanced'])
+  assert.deepEqual(observation.continuations, ['surface-loop-1'])
+  assert.deepEqual(observation.rebaseGateHeld, [false])
+  assert.deepEqual(observation.ffGateHeld, [])
+  assert.equal(observation.gateAcquireCount, 0)
+  assert.equal(observation.facts.includes('Published'), false)
+})
+
+test('WHAT[CHGINT-013] CAS miss invalidates certificate rebases and continues the loop after releasing the gate', async () => {
+  const observation = await change.observeRelayProgram('cas-miss')
+
+  assert.deepEqual(observation.ffGateHeld, [true])
+  assert.deepEqual(observation.ffExpectedHeads, ['target-1'])
+  assert.equal(observation.gateAcquireCount, 1)
+  assert.equal(observation.gateReleaseCount, 1)
+  assert.deepEqual(observation.invalidations, ['PublishCasMissed'])
+  assert.deepEqual(observation.continuations, ['surface-loop-1'])
+  assert.deepEqual(observation.rebaseGateHeld, [false])
+  assert.equal(observation.facts.includes('Published'), false)
+
+  const release = observation.timeline.indexOf('gate:release')
+  const invalidate = observation.timeline.indexOf('invalidate:PublishCasMissed')
+  const rebase = observation.timeline.indexOf('git:rebase')
+  const continuation = observation.timeline.indexOf('continue:surface-loop-1')
+  assert.ok(release < invalidate && invalidate < rebase && rebase < continuation)
+})
+
+test('WHAT[CHGINT-014] stale certificate never reaches publish gate', async () => {
+  const observation = await change.observeRelayProgram('stale-certificate')
+
+  assert.deepEqual(observation.invalidations, ['WorkspaceChangedAfterAssessment'])
+  assert.deepEqual(observation.continuations, ['surface-loop-1'])
+  assert.deepEqual(observation.ffGateHeld, [])
+  assert.equal(observation.gateAcquireCount, 0)
+  assert.deepEqual(observation.facts, [])
+})
+
+test('WHAT[CHGINT-005] artifact conflict continues the loop outside the gate', async () => {
+  const observation = await change.observeRelayProgram('artifact-conflict')
+
+  assert.deepEqual(observation.facts, ['ConflictDetected'])
+  assert.deepEqual(observation.invalidations, ['ArtifactAdmissionUnmerged'])
+  assert.deepEqual(observation.continuations, ['surface-loop-1'])
+})
+
+test('WHAT[CHGINT-014] Git conflict facts override model-perfect publication', async () => {
+  const observation = await change.observeRelayProgram('artifact-conflict')
+
+  assert.deepEqual(observation.facts, ['ConflictDetected'])
+  assert.equal(observation.facts.includes('Published'), false)
+  assert.deepEqual(observation.ffGateHeld, [])
+  assert.equal(observation.gateAcquireCount, 0)
+})
+
+test('WHAT[CHGINT-001] retirement without a valid certificate continues the loop', async () => {
+  const observation = await change.observeRelayProgram('retired')
+
+  assert.deepEqual(observation.continuations, ['surface-loop-1'])
+  assert.deepEqual(observation.invalidations, [])
+  assert.equal(observation.timeline[0], 'await:Continue')
+  assert.equal(observation.timeline[1], 'continue:surface-loop-1')
+  assert.equal(observation.timeline[2], 'await:ExceptionalTerminal')
+})
+
+test('WHAT[CHGINT-010] 10,000 Continue signals complete the real manager loop with exact effects and balanced resources', async () => {
+  const observation = await change.observeManagerLoopBurst(10000)
+
+  assert.deepEqual(observation.verdict, { kind: 'IntegrationFailed', detail: 'burst-complete' })
+  assert.equal(observation.continuationCount, 10000)
+  assert.equal(observation.signalCount, 10001)
+  assert.equal(observation.gateAcquireCount, 0)
+  assert.equal(observation.gateReleaseCount, 0)
+  assert.equal(observation.gateHeldAfterRun, false)
+  assert.equal(observation.factCount, 0)
+  assert.equal(observation.gitCallCount, 0)
+  assert.equal(observation.continuations, undefined)
+  assert.equal(observation.timeline, undefined)
+})
+
+test('WHAT[CHGINT-013] CAS miss appends the complete claim then a superseding rebased record, continues once, publishes at most once', async () => {
+  const observation = await change.observeRelayProgram('cas-miss')
+
+  assert.deepEqual(observation.facts, ['PublishClaimed', 'RebasedCandidateReady'])
+  assert.deepEqual(observation.invalidations, ['PublishCasMissed'])
+  assert.deepEqual(observation.continuations, ['surface-loop-1'])
+  assert.ok(observation.ffCalls <= 1)
+  assert.equal(observation.facts.includes('Published'), false)
+  assert.equal(observation.gateAcquireCount, 1)
+  assert.equal(observation.gateReleaseCount, 1)
+})
+
+test('WHAT[CHGINT-013] target movement appends a superseding rebased record and continues once without publishing', async () => {
+  const observation = await change.observeRelayProgram('target-moved')
+
+  assert.deepEqual(observation.facts, ['CandidateReady', 'RebasedCandidateReady'])
+  assert.deepEqual(observation.invalidations, ['TargetAdvanced'])
+  assert.deepEqual(observation.continuations, ['surface-loop-1'])
+  assert.equal(observation.facts.includes('Published'), false)
+  assert.equal(observation.gateAcquireCount, 0)
+})

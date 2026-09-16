@@ -55,14 +55,11 @@ module AblationSettings =
     let mutable private cached: AblationRegistry option = None
 
     let current () : AblationRegistry =
-        match cached with
-        | Some registry -> registry
-        | None ->
-            match load () with
-            | Ok registry ->
-                cached <- Some registry
-                registry
-            | Error _ -> productionFallback ()
+        cached
+        |> Option.defaultWith (fun () ->
+            let reg = load () |> Result.defaultWith (fun _ -> productionFallback ())
+            cached <- Some reg
+            reg)
 
     let resetCache () = cached <- None
 

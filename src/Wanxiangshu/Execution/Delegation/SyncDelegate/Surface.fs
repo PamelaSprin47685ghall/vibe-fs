@@ -9,6 +9,7 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Wait
@@ -1364,3 +1365,15 @@ module SyncDelegateSurface =
             | Some _ ->
                 harness.Runtime.CancelSession(harness.OwnerSession owner)
                 true
+
+    let stageDeferredInspection
+        (sessionId: string)
+        (callId: string)
+        (charge: string)
+        (keywords: string)
+        (estimate: int option)
+        : string =
+        SyncDelegateBatching.stageDeferredInspection sessionId (ToolCallId.create callId) charge keywords estimate
+
+    let applyReplacedResults (messages: obj list) : obj list =
+        SyncDelegateBatching.applyReplacedResults messages

@@ -248,9 +248,6 @@ export const withExecutablePlugin = async (body, options = {}) => {
       // a deterministic teardown barrier before releasing the last writer ref.
       await hooks.dispose()
       if (runtime !== undefined) {
-        for (let attempt = 0; attempt < 100 && !createdIds.every((id) => abortedIds.includes(id)); attempt += 1) {
-          await new Promise((resolve) => setTimeout(resolve, 0))
-        }
         try {
           eventsSurface.releaseSharedForWorkspace(directory, runtime.terminalPort)
         } finally {

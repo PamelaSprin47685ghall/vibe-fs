@@ -11,6 +11,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.foundation-globmatch.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.office-capability.foundation-officecapability.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.eventstore-git-contract.fsproj"/>
 
     <Compile Include="Repository/Programming/Js/Capability.fsi"/>
     <Compile Include="Repository/Programming/Js/Capability.fs"/>

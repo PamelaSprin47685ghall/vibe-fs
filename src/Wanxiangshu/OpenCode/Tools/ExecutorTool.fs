@@ -358,7 +358,7 @@ module ExecutorTool =
         ToolAdmission.OfficeRole(fun _ r -> r = Role.DevOps)
 
     let queryShellAdmission: ToolAdmission =
-        ToolAdmission.OfficeRole(fun _ _ -> false)
+        ToolAdmission.OfficeRole(fun _ r -> r = Role.Inspector)
 
     let runSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         let language = ProviderLanguageBinding.readGlobalPreference ()

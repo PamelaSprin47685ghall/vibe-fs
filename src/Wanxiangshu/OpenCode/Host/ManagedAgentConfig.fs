@@ -159,10 +159,9 @@ module ManagedAgentConfig =
         if not (AblationSettings.allowsPrimaryAgent name) then
             let entry = ensureAgentEntry agents name
             entry?hidden <- true
-        else
-            match ownedConfigForName inventory name with
-            | None -> ()
-            | Some owned -> assignOwnedFields (ensureAgentEntry agents name) owned
+        elif Option.isSome (ownedConfigForName inventory name) then
+            let owned = Option.get (ownedConfigForName inventory name)
+            assignOwnedFields (ensureAgentEntry agents name) owned
 
     let private ensureExperimental (config: obj) : obj =
         if isNull config?experimental then

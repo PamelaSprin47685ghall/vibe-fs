@@ -73,6 +73,7 @@ module OfficeCapability =
                 [ ToolPermission.Read
                   ToolPermission.Glob
                   ToolPermission.Grep
+                  ToolPermission.Exec
                   ToolPermission.Fetch
                   ToolPermission.Fission ]
         | Role.Browser ->

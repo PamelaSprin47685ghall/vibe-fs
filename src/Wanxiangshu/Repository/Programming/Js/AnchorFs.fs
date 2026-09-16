@@ -149,32 +149,31 @@ module JsAnchorFs =
         (spec: AnchorSpec)
         (pattern: string)
         : System.Threading.Tasks.Task<Result<JsGrepListing, JsFailure>> =
-        task {
-            if System.String.IsNullOrEmpty pattern then
-                return Error JsFailure.AnchorInvalidPattern
-            else
-                let! globRes = JsGlobFs.glob root pattern
+        let scanPaths paths =
+            task {
+                let scanned = ResizeArray<JsReadSnapshot * JsGrepHit list>()
 
-                match globRes with
-                | Error failure -> return Error failure
-                | Ok listing ->
-                    let scanned = ResizeArray<JsReadSnapshot * JsGrepHit list>()
+                for path in paths do
+                    do! yieldEventLoop ()
+                    grepPath root spec path |> Option.iter scanned.Add
 
-                    for path in listing.Paths do
-                        do! yieldEventLoop ()
+                return
+                    Ok
+                        { Matches = scanned |> Seq.collect snd |> Seq.toList
+                          ReadSnapshots = scanned |> Seq.map fst |> Seq.toList }
+            }
 
-                        match grepPath root spec path with
-                        | Some item -> scanned.Add item
-                        | None -> ()
+        let runGrep pat =
+            task {
+                match! JsGlobFs.glob root pat with
+                | Error e -> return Error e
+                | Ok l -> return! scanPaths l.Paths
+            }
 
-                    let matches = scanned |> Seq.collect snd |> Seq.toList
-                    let snapshots = scanned |> Seq.map fst |> Seq.toList
-
-                    return
-                        Ok
-                            { Matches = matches
-                              ReadSnapshots = snapshots }
-        }
+        if System.String.IsNullOrEmpty pattern then
+            System.Threading.Tasks.Task.FromResult(Error JsFailure.AnchorInvalidPattern)
+        else
+            runGrep pattern
 
     /// Index of the nth occurrence of an exact needle, scanning forward
     /// from fromIndex (ordinal). -1 when absent.

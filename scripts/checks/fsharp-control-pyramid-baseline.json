@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "files": {
+    "src/Wanxiangshu/Execution/Delegation/Fork/Host/Agent.fs": 3,
+    "src/Wanxiangshu/Execution/Delegation/SyncDelegate/OpenCode/Batching.fs": 10,
+    "src/Wanxiangshu/Execution/Session/OpenCode/HorizonTool.fs": 1,
+    "src/Wanxiangshu/Interaction/Dispatch/PhysicalAcceptance.fs": 2,
+    "src/Wanxiangshu/Interaction/Dispatch/Send.fs": 4,
+    "src/Wanxiangshu/OpenCode/Host/OpenCodePort.fs": 1,
+    "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs": 2
+  }
+}

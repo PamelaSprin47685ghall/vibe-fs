@@ -200,7 +200,7 @@ module GitOperations =
             return! mergeFf runner repoPath pinnedCandidate
         }
 
-    let private continueRebase (runner: Command -> Task<int * string * string>) dir =
+    let continueRebase (runner: Command -> Task<int * string * string>) dir =
         task {
             // Stage any Manager/Coder resolution before continue (ORCH-003).
             // Predecessor's finalizeWorktree should already have staged, but a
@@ -213,6 +213,19 @@ module GitOperations =
                 let! code, stdout, stderr = runner (command dir [ "-c"; "core.editor=true"; "rebase"; "--continue" ])
 
                 return if code = 0 then Ok() else Error(failure stdout stderr)
+        }
+
+    let stageAll (runner: Command -> Task<int * string * string>) dir =
+        task {
+            let! code, stdout, stderr = runner (command dir [ "add"; "-A" ])
+            return if code = 0 then Ok() else Error(failure stdout stderr)
+        }
+
+    let candidateCommit (runner: Command -> Task<int * string * string>) dir (msg: string) =
+        task {
+            let! _ = runner (command dir [ "update-ref"; "-d"; "REBASE_HEAD" ])
+            let! code, stdout, stderr = runner (command dir [ "commit"; "-m"; msg ])
+            return if code = 0 then Ok() else Error(failure stdout stderr)
         }
 
     let private freshRebase (runner: Command -> Task<int * string * string>) dir (target: TargetRef) =

@@ -103,3 +103,8 @@ module SyncDelegateSurface =
     /// DELEG-031 probe: abandon the pending call for this delegate (parent
     /// supersede guard) so a stale completion afterwards cannot claim it.
     val abandonPendingCall: value: obj -> owner: string -> role: string -> bool
+
+    val stageDeferredInspection:
+        sessionId: string -> callId: string -> charge: string -> keywords: string -> estimate: int option -> string
+
+    val applyReplacedResults: messages: obj list -> obj list

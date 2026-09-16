@@ -422,7 +422,6 @@ type HostForkRuntime
                 pendingRuns.Clear()
                 children.Clear()
                 dormantChildren.Clear()
-                processOwnedAgents.Clear()
                 deferredFirstPrompts.Clear()
                 ptyRuns.Clear()
                 terminalByName.Clear()

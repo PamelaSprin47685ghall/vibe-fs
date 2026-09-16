@@ -5,7 +5,7 @@
  *   - Static analysis: checks for standalone fixed sleeps.
  *
  * G4R-4 retired the multi-canary `runStabilityGate` repeat/shuffle path.
- * Long Stroke (`tests/e2e/014.test.mjs`) is the sole top-level E2E entry and
+ * Long Stroke (`tests/e2e/entry.test.mjs`) is the sole top-level E2E entry and
  * uses `runStaticGate` only.
  */
 

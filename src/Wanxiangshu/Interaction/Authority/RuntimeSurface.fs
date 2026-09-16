@@ -138,14 +138,10 @@ module RuntimeSurface =
         | Ok profile -> profile
         | Error error -> invalidArg "profile" error
 
-    let private capitalize (s: string) : string =
-        if System.String.IsNullOrEmpty s then s
-        else string (System.Char.ToUpperInvariant s.[0]) + s.Substring(1)
-
     let private participantIdentityToJs (identity: ParticipantIdentityEvidence) : obj =
         box
             {| participant = ParticipantIdentity.selectedAgent identity
-               role = ParticipantIdentity.roleLabel identity |> capitalize
+               role = ParticipantIdentity.roleLabel identity
                persona = ParticipantIdentity.persona identity
                personaCatalogVersion = ParticipantIdentity.personaCatalogVersion identity
                origin =

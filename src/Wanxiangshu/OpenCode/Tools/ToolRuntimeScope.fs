@@ -21,6 +21,8 @@ open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
+open Wanxiangshu.OpenCode.Host
+
 
 /// Owns every per-session tool runtime.
 ///
@@ -207,7 +209,7 @@ type ToolRuntimeScope
         lock gate (fun () ->
             match disposed, runtimes.TryGetValue ownerKey with
             | true, _ -> Error "Tool runtime scope is disposed"
-            | false, (true, runtime) when not runtime.IsCancelled -> Ok runtime
+            | false, (true, runtime) -> Ok runtime
             | false, _ ->
                 let runtime = createRuntime ownerKey
                 runtimes.[ownerKey] <- runtime
@@ -697,9 +699,7 @@ type ToolRuntimeScope
                 let owned = ResizeArray<HostForkRuntime>()
 
                 match runtimes.TryGetValue sessionId with
-                | true, runtime ->
-                    runtimes.Remove sessionId |> ignore
-                    owned.Add runtime
+                | true, runtime -> owned.Add runtime
                 | false, _ -> ()
 
                 match executorRuntimes.TryGetValue sessionId with

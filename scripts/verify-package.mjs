@@ -411,6 +411,11 @@ export async function runExternalConsumer({
   // 1. Prepare isolated runtime root
   const isolatedRoot = path.join(scratchDir, 'runtime-root')
   fs.mkdirSync(isolatedRoot, { recursive: true })
+  // Write clean empty npmrc files to prevent parent or user configuration pollution
+  const emptyNpmrc = path.join(isolatedRoot, '.empty-npmrc')
+  fs.writeFileSync(emptyNpmrc, '')
+  const emptyGlobalNpmrc = path.join(isolatedRoot, '.empty-global-npmrc')
+  fs.writeFileSync(emptyGlobalNpmrc, '')
 
   fs.copyFileSync(path.join(resolvedRoot, 'package.json'), path.join(isolatedRoot, 'package.json'))
   fs.copyFileSync(
@@ -418,13 +423,17 @@ export async function runExternalConsumer({
     path.join(isolatedRoot, 'package-lock.json'),
   )
 
+
   // Run npm ci --omit=dev --ignore-scripts --no-audit --no-fund
   try {
+    const cleanEnv = { ...process.env, npm_config_userconfig: emptyNpmrc, npm_config_globalconfig: emptyGlobalNpmrc }
+    delete cleanEnv.npm_config_allow_scripts
     execFileSync(
-      'npm',
+      process.platform === 'win32' ? 'npm.cmd' : 'npm',
       ['ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'],
       {
         cwd: isolatedRoot,
+        env: cleanEnv,
         stdio: 'pipe',
       },
     )

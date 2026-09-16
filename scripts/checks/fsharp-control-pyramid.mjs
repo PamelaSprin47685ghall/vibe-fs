@@ -293,6 +293,8 @@ const readBaseline = (repoRoot, path) => {
 
 export function check(context) {
   const root = context?.root ?? ROOT
+  const baselinePath = resolve(root, 'scripts/checks/fsharp-control-pyramid-baseline.json')
+  const baseline = existsSync(baselinePath) ? readBaseline(root, baselinePath) : undefined
   let entries
   if (context?.productionFiles) {
     entries = context.productionFiles()
@@ -302,6 +304,26 @@ export function check(context) {
     entries = collectControlPyramidEntries(root, DEFAULT_SOURCE_ROOT)
   }
   const hits = scanControlPyramidEntries(entries)
+  if (baseline) {
+    const evaluated = evaluateBaseline(hits, baseline)
+    if (evaluated.regressions.length > 0) {
+      const regressedHits = evaluated.regressions.flatMap((entry) => entry.hits)
+      return {
+        issues: regressedHits.map((hit) => ({
+          code: hit.kind,
+          path: hit.file,
+          line: hit.line,
+          message: `depth=${hit.depth} chain=${hit.chain.join(' → ')}: ${hit.text}`,
+          outerLine: hit.outerLine,
+          depth: hit.depth,
+          chain: hit.chain,
+          text: hit.text,
+        })),
+        hits,
+      }
+    }
+    return { issues: [], hits }
+  }
   return {
     issues: hits.map((hit) => ({
       code: hit.kind,
