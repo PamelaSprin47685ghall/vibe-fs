@@ -51,16 +51,3 @@
 `Process/Surface.js`直接投影production `IClockPort`、`ITimerPort`、`Deadline`、Node adapter与virtual implementation。TIME-008的行为proof固定三个可区分错误世界：两个capability实例不得共享推进状态；`Deadline`只随显式clock input变化且不积累隐藏状态；构造Node capability不得改变virtual clock/timer。第四个proof直接读取正式owner-project inventory，固定六个production locality的source闭集及每个consumer按已声明ProjectReference/closures推导的最窄引用；它不做fresh compiler census，不扫描源码、不重建dependency analyzer、不执行任何自定义FCS扫描。Node物理时钟与timer的外界正确性属于adapter canary，不用墙钟容差或真实timer等待伪装成确定性unit proof。
 
 ---
-
-## 验证与测试落点
-
-| 命题 | 落点测试 |
-|---|---|
-| TIME-001 | `requirements/time-capability/tests/clock-port-virtual.test.mjs::WHAT[TIME-001] TIME_001_virtual_clocks_are_independent_not_ambient` |
-| TIME-002 | `requirements/time-capability/tests/deadline-typed.test.mjs::WHAT[TIME-002] TIME_002_deadline_of_budget_and_remaining_are_pure_clock_functions` |
-| TIME-003 | `requirements/time-capability/tests/timer-port.test.mjs::WHAT[TIME-003] VERIFY_004_virtual_timer_fires_exactly_when_advanced_past_deadline` |
-| TIME-004 | `requirements/time-capability/tests/ambient-time-forbidden.test.mjs::WHAT[TIME-004] domain_application_session_contain_no_raw_time_tokens` |
-| TIME-005 | `requirements/time-capability/tests/deadline-typed.test.mjs::WHAT[TIME-005] TIME_005_verdict_follows_injected_clock_not_value` |
-| TIME-006 | `requirements/time-capability/tests/until-signal-or-deadline.test.mjs::WHAT[TIME-006] THEOREM_untilSignalOrDeadline_deadline_without_material_is_WaitTimedOut` |
-| TIME-007 | `requirements/time-capability/tests/pair-session-elapsed.test.mjs::WHAT[TIME-007] TIME_007_session_started_at_is_bind_once_to_first_prompt_sample`；`requirements/time-capability/tests/session-started-at-bind-surface.test.mjs::WHAT[TIME-007] SessionStartedAtLedger owns bindSessionStartedAt entry point for transform boundary` |
-| TIME-008 | `requirements/time-capability/tests/m6-slice-boundary.test.mjs::WHAT[TIME-008] production inventory separates contracts adapter verification and representation`；`requirements/time-capability/tests/m6-slice-boundary.test.mjs::WHAT[TIME-008] clock and timer capabilities are opaque instance-bound values`；`requirements/time-capability/tests/m6-slice-boundary.test.mjs::WHAT[TIME-008] Deadline is immutable and decided only by explicit clock input`；`requirements/time-capability/tests/m6-slice-boundary.test.mjs::WHAT[TIME-008] Node capability construction cannot mutate virtual time`；`requirements/time-capability/tests/m6-slice-boundary.test.mjs::WHAT[TIME-008] temporal contracts exclude Node adapters mutable timers and SessionStartedAt projection` |

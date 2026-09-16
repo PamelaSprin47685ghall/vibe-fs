@@ -16,6 +16,7 @@ module CasebookReplay =
     let private replayGlob root pattern : System.Threading.Tasks.Task<Observation option> =
         task {
             let! globRes = JsGlobFs.glob root pattern
+
             match globRes with
             | Ok listing -> return Some(Observation.GlobResult(pattern, listing.Paths))
             | Error _ -> return None
@@ -24,6 +25,7 @@ module CasebookReplay =
     let private replayGrep root pattern : System.Threading.Tasks.Task<Observation option> =
         task {
             let! grepRes = JsAnchorFs.grep root (AnchorSpec.Regex pattern) "**/*"
+
             match grepRes with
             | Ok listing ->
                 let matches = listing.Matches |> List.map (fun hit -> hit.Path, hit.Line, hit.Text)
@@ -47,10 +49,13 @@ module CasebookReplay =
     let replayAll (root: string) (stored: Observation list) : System.Threading.Tasks.Task<Observation list> =
         task {
             let results = ResizeArray<Observation>()
+
             for obs in stored do
                 let! replayed = replayOne root obs
+
                 match replayed with
                 | Some o -> results.Add o
                 | None -> ()
+
             return Seq.toList results
         }

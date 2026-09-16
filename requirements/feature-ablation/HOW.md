@@ -95,18 +95,6 @@ Profile 按巡检段落展开：`station-05`…`station-56` 使用 segment 解�
 
 子节点：`delegation.sync-delegate`、`delegation.async-fork`、`change-integration.orchestrator-tools` 见 [`nodes.json`](../../resources/ablation/nodes.json)。
 
-## 验证落点
-
-| 命题 | 测试 |
-|---|---|
-| ABL-001 / ABL-003 / ABL-004 | [`tests/dag-manifest.test.mjs`](tests/dag-manifest.test.mjs) |
-| ABL-006 / ABL-004 / ABL-008 | [`tests/settings.test.mjs`](tests/settings.test.mjs) |
-| ABL-009 | [`tests/tool-map.test.mjs`](tests/tool-map.test.mjs) |
-| ABL-005 / ABL-010 / Borrowed | [`tests/station-gate.test.mjs`](tests/station-gate.test.mjs) |
-| ABL-007 / ABL-011 | [`tests/fact-gate.test.mjs`](tests/fact-gate.test.mjs) |
-| ABL-011 fact-map | [`tests/fact-map.test.mjs`](tests/fact-map.test.mjs) |
-| Manifest 门禁 | [`scripts/checks/ablation-manifest.mjs`](../../scripts/checks/ablation-manifest.mjs) |
-| Profile 巡检 | [`scripts/ablation/verify-profile.mjs`](../../scripts/ablation/verify-profile.mjs) |
 
 ## GAP
 

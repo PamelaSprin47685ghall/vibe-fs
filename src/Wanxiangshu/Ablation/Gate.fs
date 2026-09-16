@@ -13,7 +13,10 @@ module AblationGate =
     let filterToolPermissionMap (permissions: Map<string, bool>) =
         permissions
         |> Map.map (fun name allowed ->
-            if allowed && not (AblationSettings.allowsToolSchema name) then false else allowed)
+            if allowed && not (AblationSettings.allowsToolSchema name) then
+                false
+            else
+                allowed)
 
     let filterKnownToolNames (names: string list) =
         names |> List.filter AblationSettings.allowsToolSchema

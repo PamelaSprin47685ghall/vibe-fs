@@ -50,17 +50,19 @@ module SphinxMcpConfig =
         | _ -> false
 
     let launchFrom (read: string -> string option) : Launch =
-        if not (AblationRegistry.isActive (AblationNodeId.create "epistemic-reasoning") (AblationSettings.current ())) then
+        if
+            not (AblationRegistry.isActive (AblationNodeId.create "epistemic-reasoning") (AblationSettings.current ()))
+        then
             Launch.Disabled
         else
-        let disabled = envValue read "SPHINX_MCP_DISABLED"
-        let fixture = envValue read "SPHINX_MCP_FIXTURE"
-        let testMode = envValue read "WANXIANGSHU_TEST"
+            let disabled = envValue read "SPHINX_MCP_DISABLED"
+            let fixture = envValue read "SPHINX_MCP_FIXTURE"
+            let testMode = envValue read "WANXIANGSHU_TEST"
 
-        if isTruthy disabled then Launch.Disabled
-        elif fixture <> "" then Launch.Fixture fixture
-        elif isTruthy testMode then Launch.Disabled
-        else Launch.Local(defaultServerEntry ())
+            if isTruthy disabled then Launch.Disabled
+            elif fixture <> "" then Launch.Fixture fixture
+            elif isTruthy testMode then Launch.Disabled
+            else Launch.Local(defaultServerEntry ())
 
     let private nonBlankVarValue (value: obj) =
         let text = string value

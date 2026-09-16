@@ -58,37 +58,6 @@ proof files，并补充跨包的 repair、Host adapter 与 external-adapter proo
 24 条 WHAT 语义与 crash reconciliation、typed park、Host compaction 和 terminal
 validity 证明共同落在同一个 closure 上。
 
-## 验证与测试落点
-
-| 命题 | 落点测试 |
-|---|---|
-| CONTEXT-COMPRESSION-001 | `requirements/context-compression/tests/ctx-capacity-observation-forbidden.test.mjs::WHAT[CONTEXT-COMPRESSION-001] CTX_001_context_compression_owner_never_observes_forbidden_capacity_synonyms` |
-| CONTEXT-COMPRESSION-002 | `requirements/context-compression/tests/retry-policy.test.mjs::WHAT[CONTEXT-COMPRESSION-002] retry dispatch reacts only to confirmed failure material`；`requirements/context-compression/tests/attempt-plan-probe-eligibility.test.mjs::WHAT[CONTEXT-COMPRESSION-002] successful retry tool steps keep the committed prefix despite new coverage` |
-| CONTEXT-COMPRESSION-003 | `requirements/context-compression/tests/blogger-delta.test.mjs::WHAT[CONTEXT-COMPRESSION-003] CTX_003_no_chunk_exceeds_the_limit` |
-| CONTEXT-COMPRESSION-004 | `requirements/context-compression/tests/terminal-validity.test.mjs::WHAT[CONTEXT-COMPRESSION-004] CTX_004_empty_terminal_is_not_a_result` |
-| CONTEXT-COMPRESSION-005 | `requirements/context-compression/tests/retry-policy.test.mjs::WHAT[CONTEXT-COMPRESSION-005] every recorded failure consumes exactly one budget unit` |
-| CONTEXT-COMPRESSION-006 | `requirements/context-compression/tests/retry-policy.test.mjs::WHAT[CONTEXT-COMPRESSION-006] consecutive failures consume the failure budget and exhaustion halts auto-retry`；`requirements/context-compression/tests/retry-policy.test.mjs::WHAT[CONTEXT-COMPRESSION-006] prefix probe is selected when policy allows and candidate exists` |
-| CONTEXT-COMPRESSION-007 | `requirements/context-compression/tests/companion-retry-policy.test.mjs::WHAT[CONTEXT-COMPRESSION-007] same_failed_kind_with_same_material_always_selects_the_same_next_request` |
-| CONTEXT-COMPRESSION-008 | `requirements/context-compression/tests/retry-policy.test.mjs::WHAT[CONTEXT-COMPRESSION-008] only work_main requests may carry prefix probe` |
-| CONTEXT-COMPRESSION-009 | `requirements/context-compression/tests/probe-selection.test.mjs::WHAT[CONTEXT-COMPRESSION-009] CTX_010_the_probe_records_the_epoch_it_was_built_from` |
-| CONTEXT-COMPRESSION-010 | `requirements/context-compression/tests/probe-selection.test.mjs::WHAT[CONTEXT-COMPRESSION-010] CTX_011_no_completed_turn_yet_means_no_candidate` |
-| CONTEXT-COMPRESSION-011 | `requirements/context-compression/tests/blog-projection.test.mjs::WHAT[CONTEXT-COMPRESSION-011] CTX_012_squash_replaces_the_oldest_frames_and_leaves_the_covered_range_alone` |
-| CONTEXT-COMPRESSION-012 | `requirements/context-compression/tests/blogger-delta.test.mjs::WHAT[CONTEXT-COMPRESSION-012] CTX_013_a_small_transcript_becomes_one_chunk` |
-| CONTEXT-COMPRESSION-013 | `requirements/context-compression/tests/ctx014.test.mjs::WHAT[CONTEXT-COMPRESSION-013] CTX_014_diagnostic_emit_is_structured_and_redacted` |
-| CONTEXT-COMPRESSION-014 | `requirements/context-compression/tests/blog-projection.test.mjs::WHAT[CONTEXT-COMPRESSION-014] COMPANION_006_squash_rewrites_first_half_of_frames_permanently` |
-| CONTEXT-COMPRESSION-015 | `requirements/context-compression/tests/blog-projection.test.mjs::WHAT[CONTEXT-COMPRESSION-015] COMPANION_008_entry_appends_frame_and_advances_coverage_together` |
-| CONTEXT-COMPRESSION-016 | `requirements/context-compression/tests/probe-selection.test.mjs::WHAT[CONTEXT-COMPRESSION-016] CTX_011_the_candidate_never_swallows_the_message_being_answered` |
-| CONTEXT-COMPRESSION-017 | `requirements/context-compression/tests/ctx-opening-floor.test.mjs::WHAT[CONTEXT-COMPRESSION-017] CTX_016_t1_does_not_change_the_compression_floor` |
-| CONTEXT-COMPRESSION-018 | `requirements/context-compression/tests/companion-ordinary-material-surface.test.mjs::WHAT[CONTEXT-COMPRESSION-018] CompanionTransform owns ordinary-material entry and consumes Host suppression as a capability` |
-| CONTEXT-COMPRESSION-019 | `requirements/context-compression/tests/injected-context-reanchor.test.mjs::WHAT[CONTEXT-COMPRESSION-019] CTX_019_prefix_rebase_is_the_same_auxiliary_cold_boundary_as_host_reanchor` |
-| CONTEXT-COMPRESSION-020 | `requirements/context-compression/tests/ctx-opening-floor.test.mjs::WHAT[CONTEXT-COMPRESSION-020] todowrite call and matching result are retained across a Y cutoff` |
-| CONTEXT-COMPRESSION-021 | `requirements/context-compression/tests/companion-retry-policy.test.mjs::WHAT[CONTEXT-COMPRESSION-021] CTX_021_failed_blogger_main_with_material_dispatches_squash` |
-| CONTEXT-COMPRESSION-022 | `requirements/context-compression/tests/companion-retry-policy.test.mjs::WHAT[CONTEXT-COMPRESSION-022] CTX_022_durable_projection_keeps_newest_failure_count`；`requirements/context-compression/tests/companion-retry-policy.test.mjs::WHAT[CONTEXT-COMPRESSION-022] CTX_022_retry_sequence_returns_to_main_through_one_formula` |
-| CONTEXT-COMPRESSION-023 | `requirements/context-compression/tests/parked-transform.test.mjs::WHAT[CONTEXT-COMPRESSION-023] CTX_023_park_has_no_clock_or_timeout_dependency` |
-| CONTEXT-COMPRESSION-024 | `requirements/context-compression/tests/parked-transform.test.mjs::WHAT[CONTEXT-COMPRESSION-024] CTX_024_materialization_admission_is_cross_instance_single_flight`；`requirements/context-compression/tests/companion-retry-policy.test.mjs::WHAT[CONTEXT-COMPRESSION-024] CTX_024_request_scoped_repair_continues_only_for_the_current_request`；`requirements/context-compression/tests/enforcer-cycle-convergence.test.mjs::WHAT[CONTEXT-COMPRESSION-024] stale_terminal_cannot_reclaim_a_new_Blogger_request` |
-| CONTEXT-COMPRESSION-025 | `requirements/context-compression/tests/m6-fatal-boundary.test.mjs::WHAT[CONTEXT-COMPRESSION-025] Blogger fatal binds exact request settlement and one injected fuse` |
-| CONTEXT-COMPRESSION-027 | `requirements/context-compression/tests/request-context-invariants.property.test.mjs::WHAT[CONTEXT-COMPRESSION-027] every successful Main construction satisfies the §4.2 invariants`；`requirements/context-compression/tests/request-context-invariants.property.test.mjs::WHAT[CONTEXT-COMPRESSION-027] every successful Squash construction binds count and digests`；`requirements/context-compression/tests/request-context-invariants.property.test.mjs::WHAT[CONTEXT-COMPRESSION-027] non-advancing coverage is rejected, never constructed`；`requirements/context-compression/tests/request-context-invariants.property.test.mjs::WHAT[CONTEXT-COMPRESSION-027] different content yields different digests; same content is stable`；`requirements/context-compression/tests/request-context-invariants.property.test.mjs::WHAT[CONTEXT-COMPRESSION-027] squash count/digest disagreement is rejected, never constructed`；`requirements/context-compression/tests/request-context-invariants.property.test.mjs::WHAT[CONTEXT-COMPRESSION-027] recovery rejection cases are distinct and labeled`；`requirements/context-compression/tests/request-context-invariants.property.test.mjs::WHAT[CONTEXT-COMPRESSION-027] old-epoch staged requests keep their frozen epoch and never claim current authority` |
-
 ## GAP
 
 - CONTEXT-COMPRESSION-017/020：`ctx-opening-floor.test.mjs` 证明 pre/post-T1 floor 等价与 todo round retention 纯判定；`provider-projection/tests/projection.test.mjs` 证明真实 Y prefix write-back 越过 `todowrite` 时 call/result 仍以原始 X Host 消息存在。CLOSED。

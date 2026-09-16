@@ -13,7 +13,7 @@
 
 `ToolRuntimeScope.OrchestratorHostFor` 在既有 composition 层静态构造 `OrchestratorHostDeps` 与 `OrchestratorHost`，由 Fable 保留 `ContinueManagerLoop` 等高阶参数的调用约定；`CaptureWorktreeSnapshot` 全链保持 `WorkspaceSnapshotId`。不能用 `createObj + box` 和动态加载替代这条声明依赖：该旧路径曾使双参数回调返回函数而非 Promise，首次 publication 因 `computation.then is not a function` 失败。会话取消和 scope 卸载分别直调 `CancelAndDrain`、`DetachAndDrain`，不以缺模块时的默认成功绕过资源结算。恢复引用后的 scope shard 真实 focused Fable 编译通过，闭包为 942 个 source；这不替代真实 Host Long Stroke 验收。
 
-2026-09-09，旧动态装配在唯一 Long Stroke 的首次 publication 触发上述异常，后续 join 耗尽内存 verdict 后持续为空；恢复 typed 装配并重建后，同一 `requirements/verification-system/tests/e2e/entry.test.mjs` 完成 `Continue → IncumbencyOpened → Accepted → ConflictDetected → RebasedCandidate → Published`，journal 为 454/699、SSE 为 2193/3351。剧本、事件上限和 outstanding 判定均未改变，临时诊断探针已删除。
+2026-09-09，旧动态装配在唯一 Long Stroke 的首次 publication 触发上述异常，后续 join 耗尽内存 verdict 后持续为空；恢复 typed 装配并重建后，同一 `requirements/verification-system/tests/e2e/014.test.mjs` 完成 `Continue → IncumbencyOpened → Accepted → ConflictDetected → RebasedCandidate → Published`，journal 为 454/699、SSE 为 2193/3351。剧本、事件上限和 outstanding 判定均未改变，临时诊断探针已删除。
 
 ### RuntimePath 摘要依赖
 
@@ -25,22 +25,3 @@
 
 - **IntegrationGate 互斥**：基于文件锁实现的轻量互斥机制，仅覆盖目标分支指针更新窗口，不侵占 Relay assessment、Manager work、rebase 或冲突处理。
 - **WorktreeResource 生命周期**：为每个任务分配由 `ManagerJobId` 绑定的独立工作树，完成任务后原子清理，崩溃恢复时按持久化事实精准收拢或复用。projection 不 fold 成唯一「最新 case」，SW-003 vs SW-009 消歧保证恢复重入直接由事实与当前外部 head 判定。
-
-## 验证与测试落点
-
-| 命题 | 落点测试 |
-|---|---|
-| CHGINT-001 | `requirements/change-integration/tests/job.test.mjs::WHAT[CHGINT-001] ORCH_003_a_created_job_persists_the_manager_agent_and_the_worktree_identity` |
-| CHGINT-002 | `requirements/change-integration/tests/git-operations.test.mjs::WHAT[CHGINT-002] GIT_is_dirty_true_only_on_nonempty_porcelain` |
-| CHGINT-003 | `requirements/change-integration/tests/job.test.mjs::WHAT[CHGINT-003] ORCH_007_each_durable_fact_has_one_projection_slot` |
-| CHGINT-004 | `requirements/change-integration/tests/integration-gate.test.mjs::WHAT[CHGINT-004] GATE_acquire_and_release_round_trips` |
-| CHGINT-005 | `requirements/change-integration/tests/gate-scope.test.mjs::WHAT[CHGINT-005] rebase conflict records machine fact and continues the loop outside the gate`；`requirements/change-integration/tests/gate-scope.test.mjs::WHAT[CHGINT-005] artifact conflict continues the loop outside the gate` |
-| CHGINT-006 | `requirements/change-integration/tests/job.test.mjs::WHAT[CHGINT-006] ORCH_007_projection_keeps_independent_facts_instead_of_latest_stage` |
-| CHGINT-007 | `requirements/change-integration/tests/job.test.mjs::WHAT[CHGINT-007] ORCH_007_the_three_publish_claim_branches_are_evaluated_in_the_clause_order` |
-| CHGINT-008 | `requirements/change-integration/tests/git-operations.test.mjs::WHAT[CHGINT-008] GIT_ff_merge_happy_path_advances_to_candidate` |
-| CHGINT-009 | `requirements/change-integration/tests/host.test.mjs::WHAT[CHGINT-009] manager loop keeps the durable job worktree`；`requirements/change-integration/tests/job.test.mjs::WHAT[CHGINT-009] ORCH_006_the_worktree_is_located_by_identity_and_the_path_is_only_diagnostic` |
-| CHGINT-010 | `requirements/change-integration/tests/gate-scope.test.mjs::WHAT[CHGINT-010] rebase work holds the gate only for the ff mutation`；`requirements/change-integration/tests/gate-scope.test.mjs::WHAT[CHGINT-010] conflict resolution never acquires the publish gate`；`requirements/change-integration/tests/gate-scope.test.mjs::WHAT[CHGINT-010] 10,000 Continue signals complete the real manager loop with exact effects and balanced resources` |
-| CHGINT-011 | `requirements/change-integration/tests/host.test.mjs::WHAT[CHGINT-011] HOST_JoinPublishedAvailable_engine_init_failure_is_an_error_result` |
-| CHGINT-012 | `requirements/change-integration/tests/runtime.test.mjs::WHAT[CHGINT-012] nonterminal durable evidence preserves the Road worktree across recovery` |
-| CHGINT-013 | `requirements/change-integration/tests/gate-scope.test.mjs::WHAT[CHGINT-013] CAS miss invalidates certificate rebases and continues the loop after releasing the gate`；`requirements/change-integration/tests/orchestrator-conflict-confluence.test.mjs::WHAT[CHGINT-013] THEOREM_stale_target_invalidates_the_rebased_binding` |
-| CHGINT-014 | `requirements/change-integration/tests/gate-scope.test.mjs::WHAT[CHGINT-014] stale certificate never reaches publish gate`；`requirements/change-integration/tests/gate-scope.test.mjs::WHAT[CHGINT-014] Git conflict facts override model-perfect publication` |

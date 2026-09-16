@@ -87,3 +87,8 @@ repository-generated JavaScript、codec、resource 与其他构建产物必须�
 M6 中 semantic-owner/locality/slice/exposure/canonical-adjudication 作为 release authorization 模型的路线终止。已有 `.fsi`、fsproj、ProjectReference、impact compile、compiler canary 与已完成的真实 contract/adapter 拆分继续作为普通编译资产保留；旧 manifest、owner ACL、locality classification、worksheet、formal snapshot 与相关 adjudication 只能保留为历史资料或迁移兼容输入，不得参与当前 release verdict。
 
 切换后 `scripts/checks/subsystems.mjs` 是 source→subsystem→compile-shard 结构事实的唯一 release gate；旧 `semantic-owners.mjs`、`owner-contracts.mjs`、`owner-projects.mjs` 不得与其并行形成双重权威。迁移不得通过给新 shard 补旧 ACL、复制 old manifest claim 或新增 facade 来取得绿灯。任何旧 gate 与新 subsystem 模型冲突时，修正或退休旧 gate，而不是恢复已放弃的治理层级。
+
+## STRUCTURED-WORKFLOW-017: 插件转换管道与静态门禁退役约束
+
+插件转换管道（PluginTransforms）与业务装饰器必须直接由宿主契约与生命周期拓扑保证其调用顺序与单一职责；废弃的静态源码扫描门禁（如 scanPluginTransforms 等）必须彻底退役，严禁自建第二套源码扫描真相，其实际行为由宿主边界契约测试（host-boundary ordered-transform 等）提供行为证明。
+

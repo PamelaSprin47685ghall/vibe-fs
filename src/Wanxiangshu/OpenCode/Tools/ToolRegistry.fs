@@ -354,11 +354,7 @@ module ToolRegistry =
             let executeAfterBoundary args (ctx: HostToolContext) =
                 task {
                     if AblationGate.toolDenied spec.Name then
-                        return
-                            denied
-                                ctx
-                                Path.DeniedAblation
-                                (Map [ "tool", spec.Name ])
+                        return denied ctx Path.DeniedAblation (Map [ "tool", spec.Name ])
                     elif isStrengthReplica ctx then
                         // STRENGTH-004: Host-native read/glob/grep are the entire replica surface.
                         return denied ctx Path.DeniedStrength Map.empty

@@ -1,36 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import {
-import { generate } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs'
-import { randomUUID } from 'node:crypto'
-import { parse as parseToml } from 'smol-toml'
-import { create as createEventStore, dispose as disposeEventStore } from '../../../dist/Persistence/EventStore/Surface.js'
-import { pending } from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
-
-// Edit capability's progressive surface: easy exact edits use edit(), while
-// rewrite() remains the unbounded whole-file escape hatch. Every edit call is
-// planned against one immutable snapshot and stages at most one mutation.
-
-
-  caseName,
-  failureCode,
-  failureReason,
-  rewritten,
-  run,
-  runObserved,
-} from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
-  api as runtimeApi,
-  createApi as createRuntimeApi,
-  readPaths as runtimeReadPaths,
-  run as runRuntime,
-  stagedCount,
-  stagedKinds,
-} from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
+import { commitPlan } from '../../../dist/Repository/Programming/Js/FilesystemSurface.js'
+import { validateFreshness, preflight } from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
+import { runObserved, caseName, failureCode } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-edit-'))
@@ -44,89 +19,11 @@ ${body}
   }
 }`
 
-const execute = (dir, body, language = 'en') =>
-  run(dir, 'Coder', language, program(body), 2000, Date.now() + 60_000, 1 << 20, null)
-
-// tests/unit/js-tools/js-tools-fs.test.mjs — G5 Phase B-4: filesystem adapter
-// (JS-005/006/007/013/015).
-//
-// Strict UTF-8 reads, ordered anchor matching, full glob, all-or-nothing
-// commit with rollback. Pure Node fs against per-test temp directories.
-
-
-  readUtf8,
-  glob,
-  findAnchor,
-  requireUnique,
-  grep,
-  commitPlan,
-  rollbackPlan,
-} from '../../../dist/Repository/Programming/Js/FilesystemSurface.js'
-
-const exact = (text) => ({ kind: 'exact', text })
-const regex = (text) => ({ kind: 'regex', text })
-
-const sandbox = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-jstools-'))
-  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
-}
-const ok = (result) => result.ok
-const codeOf = (result) => result.code
-const unwrap = (result) => {
-  assert.equal(result.ok, true, `expected Ok, got ${JSON.stringify(result.error)}`)
-  return result.value
-}
-
-// JS-012/015: transaction decisions consume plain mutation facts; durable
-// effects stay behind the EventStore-backed owner surfaces.
-
-
-  validateSingleIntent,
-  validateTargets,
-  validateFreshness,
-  preflight,
-  commitPlan,
-  rollbackPlan,
-} from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
-
 const ok = (result) => result.ok
 const codeOf = (result) => result.code
 const rewrite = (path, originalText, newText) => ({ kind: 'rewrite', path, originalText, newText })
 const create = (path, text) => ({ kind: 'create', path, text })
-
 const current = { 'a.txt': 'current' }
-
-// JS-085: sandbox → staging → preflight → commit is one owner-managed
-// workflow. Result validation precedes commit and success is coupled to commit.
-
-
-  run,
-  runObserved,
-  caseName,
-  rewritten,
-  created,
-  failureCode,
-  render,
-} from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
-
-const sandbox = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-workflow-'))
-  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
-}
-
-const localStore = () => {
-  const owned = mkdtempSync(join(tmpdir(), 'wxs-workflow-events-'))
-  const commonDir = join(owned, '.git')
-  mkdirSync(commonDir, { recursive: true })
-  const handle = createEventStore(commonDir, randomUUID().replaceAll('-', ''))
-  return { handle, close: () => { disposeEventStore(handle); rmSync(owned, { recursive: true, force: true }) } }
-}
-
-const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')
-const runWorkflow = async (dir, program, { deadlineMs = 2000, store = null } = {}) => ({
-  outcome: await run(dir, 'Coder', 'en', program, deadlineMs, Date.now() + 60_000, 1 << 20, store),
-  surface: coderSurface(),
-})
 
 test('WHAT[REPOSITORY-PROGRAMMING-014] JS_EDIT_target_read_is_observed_and_external_change_wins', async () => {
   const { dir, cleanup } = sandbox()

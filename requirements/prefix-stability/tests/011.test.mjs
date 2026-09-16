@@ -1,0 +1,146 @@
+// PREFIX-STABILITY-001 / PREFIX-STABILITY-013 — the append-only provider prefix
+// law. ProviderProjection is the sole authority: tools/system/identity and the
+// complete message prefix all participate in the cache identity.
+
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import fc from 'fast-check'
+
+import * as prefix from '../../../dist/Context/Prefix/Surface.js'
+import * as providerProjection from '../../../dist/Participant/Provider/Projection/Surface.js'
+
+const wire = (
+  messages,
+  {
+    tools = ['read', 'write'],
+    system = ['sys'],
+    providerId = 'openai',
+    modelId = 'gpt-4o',
+    variant = 'deep',
+  } = {},
+) => ({
+  modelId,
+  messages,
+  providerId,
+  system,
+  tools,
+  variant,
+})
+
+const msg = (id, role, text) => ({
+  parts: [{ kind: 'text', text }],
+  role,
+  id,
+})
+
+const textPart = fc.record({ kind: fc.constant('text'), text: fc.string({ maxLength: 48 }) })
+const reasoningPart = fc.record({ kind: fc.constant('reasoning'), text: fc.string({ maxLength: 48 }) })
+const toolCallPart = fc.record({
+  kind: fc.constant('tool-call'),
+  callId: fc.string({ maxLength: 24 }),
+  name: fc.string({ maxLength: 24 }),
+  args: fc.string({ maxLength: 48 }),
+})
+const toolResultPart = fc.record({
+  kind: fc.constant('tool-result'),
+  callId: fc.string({ maxLength: 24 }),
+  result: fc.string({ maxLength: 48 }),
+})
+const mediaPart = fc.record({
+  kind: fc.constant('media'),
+  mediaType: fc.option(fc.string({ maxLength: 24 }), { nil: null }),
+  contentDigest: fc.string({ maxLength: 48 }),
+})
+const wirePart = fc.oneof(textPart, reasoningPart, toolCallPart, toolResultPart, mediaPart)
+const message = fc.record({
+  role: fc.constantFrom('user', 'assistant'),
+  parts: fc.array(wirePart, { minLength: 1, maxLength: 6 }),
+})
+const mutationTarget = fc
+  .tuple(
+    fc.constantFrom('user', 'assistant'),
+    textPart,
+    reasoningPart,
+    toolCallPart,
+    toolResultPart,
+    mediaPart,
+  )
+  .map(([role, ...parts]) => ({ role, parts }))
+const metadata = fc.record({
+  tools: fc.array(fc.string({ maxLength: 16 }), { maxLength: 8 }),
+  system: fc.array(fc.string({ maxLength: 32 }), { maxLength: 4 }),
+  providerId: fc.string({ minLength: 1, maxLength: 16 }),
+  modelId: fc.string({ minLength: 1, maxLength: 16 }),
+  variant: fc.string({ maxLength: 16 }),
+})
+
+const W1 = wire([msg('m1', 'user', 'first')])
+const W2 = wire([msg('m1', 'user', 'first'), msg('m2', 'assistant', 'second')])
+const W3 = wire([
+  msg('m1', 'user', 'first'),
+  msg('m2', 'assistant', 'second'),
+  msg('m3', 'user', 'third'),
+])
+
+const changed = (value) => `${value}\u0000changed`
+
+const replacePart = (messageValue, index, replacement) => ({
+  ...messageValue,
+  parts: messageValue.parts.map((part, partIndex) => (partIndex === index ? replacement : part)),
+})
+
+const historicalMutations = (target) => {
+  const mutations = [{ name: 'role', message: { ...target, role: changed(target.role) } }]
+
+  target.parts.forEach((part, index) => {
+    const add = (name, replacement) => mutations.push({ name, message: replacePart(target, index, replacement) })
+    if (part.kind === 'text' || part.kind === 'reasoning') {
+      add(`${part.kind}.text`, { ...part, text: changed(part.text) })
+    } else if (part.kind === 'tool-call') {
+      add('tool-call.callId', { ...part, callId: changed(part.callId) })
+      add('tool-call.name', { ...part, name: changed(part.name) })
+      add('tool-call.args', { ...part, args: changed(part.args) })
+    } else if (part.kind === 'tool-result') {
+      add('tool-result.callId', { ...part, callId: changed(part.callId) })
+      add('tool-result.result', { ...part, result: changed(part.result) })
+    } else {
+      add('media.mediaType', {
+        ...part,
+        mediaType: part.mediaType === null ? 'changed' : changed(part.mediaType),
+      })
+      add('media.contentDigest', { ...part, contentDigest: changed(part.contentDigest) })
+    }
+  })
+
+  return mutations
+}
+
+test('WHAT[PREFIX-STABILITY-011] PREFIX_STABILITY_epoch_switches_are_fact_driven_not_estimate_driven', () => {
+  const drift = wire([msg('m1', 'user', 'FIRST CHANGED')])
+  assert.equal(providerProjection.isAppendOnlyPrefix(drift, W2), false, 'drift is real and byte-level')
+
+  // PrefixSurface exposes only fact-driven epoch transitions. There is no
+  // estimate/limit/token/elapsed/repair channel to use as a masking switch.
+  for (const forbidden of ['estimate', 'limit', 'token', 'elapsed', 'repair', 'mask', 'drift']) {
+    assert.equal(typeof prefix[forbidden], 'undefined', `${forbidden} must not be an epoch API`)
+  }
+
+  const committed = prefix.applyRebase(
+    {
+      previousEpoch: 0,
+      nextEpoch: 1,
+      candidate: prefix.snapshot({
+        ref: 'blob-frozen-4',
+        frozenDigest: 'frozen-4',
+        cutoff: 4,
+        prefixDigest: 'prefix-4',
+        sealRoot: 'seal-4',
+        syntheticId: 'synthetic-seal-4',
+      }),
+    },
+    prefix.empty,
+  )
+  assert.equal(committed.ok, true, committed.ok ? '' : committed.error)
+  assert.equal(prefix.epochOf(committed.value), 1n)
+  assert.ok(committed.value.snapshot)
+})

@@ -32,4 +32,8 @@ module SessionRecoveryHostSurface =
 
     val signalCancelled: handle: RecoveryHostHandle -> sessionId: string -> physicalUserMessageId: string -> Task<obj>
 
+    /// PAR-023：宿主 session idle。扫描只考虑该 session 中 `Accepted` 且无
+    /// `ProviderStarted` 的执行；返回值是完整可观察效果（port 调用 + manual）。
+    val signalSessionQuiesced: handle: RecoveryHostHandle -> sessionId: string -> Task<obj>
+
     val disposeRecoveryHost: handle: RecoveryHostHandle -> unit

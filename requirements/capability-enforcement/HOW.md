@@ -42,28 +42,3 @@ Roles.permissions (Kernel 层单一真相源)
 
 文件变换工具的 `mv`/`rm` 规范与 JS 生成式工具规范分别归属 `interaction.opencode-tools-filemutationtools` 与 `repository-programming.repository-programming-js-toolbindings` 两个 compile shard（原先由同一 shard 混合编译两个子系统的源码）。`ToolRegistry` 与 `FileMutationSurface` 各自按真实符号分别引用这两半。
 
-## 验证与测试落点
-
-ENF-015、ENF-016 原来的门禁测试仅提供手写 compiler evidence，已随被禁路径删除。替代的真实 owner 行为证明现由 `authority-subject-binding.test.mjs` 与 `authority-stale-admission.test.mjs` 承接：它们驱动注册的 ChatExecution surface，实际执行 `ManagedChatAcceptance` 与 `ManagedChatProviderLifecycle` 的准入（dist 构建产物，非重写的 oracle）。覆盖边界（不得外推）：这两条测试证明的是 chat-execution acceptance/lifecycle 这一个消费边界——精确 subject（`ChatExecutionKey` = SessionId + PhysicalUserMessageId）与版本（evidence 的 logical run / authority root / identity seed）绑定、外来主体及旧版本尝试在消费点 fail closed 且零效果、状态推进后旧准入不再驱动新效果、当前事实再次满足时从当前读取产生 fresh admission。其余已登记行（`RecoveryReceipt`、`RecoveryPermit`、`OwnerIdentityWitness`、`AppendReceipt`、`ChatAdmissionBindingReceipt` 等）的 subject/版本/digest 与 multiplicity 字段仍只由 `scripts/checks/authority-contracts.json` 的正向登记声明，其各自运行时的消费点 scre…
-ENF-013/ENF-014/ENF-017 原来所依赖的静态契约清单（`authority-contracts.json` 及 `authority-boundary.mjs` 扫描器）已退役。权威的分类、范围、新鲜度与多样性由真实端口、编译器类型与运行时准入（如 `authority-subject-binding.test.mjs`、`authority-stale-admission.test.mjs`、`process-capability-lifecycle.test.mjs`）直接保障。
-
-| 命题 | 落点测试 |
-|---|---|
-| ENF-001 | `requirements/capability-enforcement/tests/attempt-plan-authority.test.mjs::WHAT[ENF-001] PROMPT_008_the_profile_derives_role_prompt_and_tools_from_the_authority` |
-| ENF-002 | `requirements/capability-enforcement/tests/agent-permission-gate.test.mjs::WHAT[ENF-002] AGENT_006_role_tool_matrix_reaches_the_host_schema`；`requirements/capability-enforcement/tests/tool-spec-contracts.test.mjs::WHAT[ENF-002] TOOLSPEC_delegation_tools_have_owner_defined_admission` |
-| ENF-003 | `requirements/capability-enforcement/tests/attempt-plan-authority.test.mjs::WHAT[ENF-003] PROMPT_008_the_request_kind_is_carried_not_inferred` |
-| ENF-004 | `requirements/capability-enforcement/tests/agent-permission-gate.test.mjs::WHAT[ENF-004] AGENT_010_canonical_agents_carry_stable_allow_sets` |
-| ENF-005 | `requirements/capability-enforcement/tests/strength-replica-tool-map.test.mjs::WHAT[ENF-005] STRENGTH_004_replica_host_tool_map_denies_everything_then_allows_exact_readonly` |
-| ENF-006 | `requirements/capability-enforcement/tests/agent-permission-gate.test.mjs::WHAT[ENF-006] HOST_skill_remains_allowed_for_every_managed_role`；`requirements/capability-enforcement/tests/internal-leaf-tool-authority.test.mjs::WHAT[ENF-006] internal_leaf_tool_declares_attachment_authority_not_a_public_office` |
-| ENF-007 | `requirements/capability-enforcement/tests/stealth-browser-mcp-wildcard.test.mjs::WHAT[ENF-007] AGENT_026_wildcard_matrix_mechanism` |
-| ENF-008 | `requirements/capability-enforcement/tests/tool-referential-integrity.test.mjs::WHAT[ENF-008] registered_js_tools_match_js_tool_generator_output` |
-| ENF-009 | `requirements/capability-enforcement/tests/tool-referential-integrity.test.mjs::WHAT[ENF-009] gate_a_repo_scan_is_green` |
-| ENF-010 | `requirements/capability-enforcement/tests/agent-permission-gate.test.mjs::WHAT[ENF-010] AGENT_002_gate_accepts_distinct_models_and_writes_owned_fields` |
-| ENF-011 | `requirements/capability-enforcement/tests/managed-agent-config.test.mjs::WHAT[ENF-011] MACFG_applyOwnedFields_writes_owned_keys_and_never_touches_model` |
-| ENF-012 | `requirements/capability-enforcement/tests/tool-referential-integrity.test.mjs::WHAT[ENF-012] registered_js_tools_reject_cross_role_execution` |
-| ENF-015 | `requirements/capability-enforcement/tests/authority-subject-binding.test.mjs::WHAT[ENF-015] AUTHORITY_001_witness_declares_exact_subject_and_version_and_admits_fresh_at_consumption` |
-| ENF-016 | `requirements/capability-enforcement/tests/authority-stale-admission.test.mjs::WHAT[ENF-016] AUTHORITY_002_stale_admission_is_rejected_and_fresh_admission_reads_current_facts` |
-| ENF-018 | `requirements/capability-enforcement/tests/process-capability-lifecycle.test.mjs::WHAT[ENF-018] process capability consumes once and reports duplicate consumption without effect` |
-| ENF-019 | `requirements/capability-enforcement/tests/process-capability-lifecycle.test.mjs::WHAT[ENF-019] provider-attempt composition requires fresh current-process admission without codec or event recovery` |
-| ENF-020 | `requirements/capability-enforcement/tests/m6-fatal-boundary.test.mjs::WHAT[ENF-020] invalid configuration reaches one injected fatal adapter only through composition` |
-| ENF-021 | `requirements/capability-enforcement/tests/blogger-repair-trace.test.mjs::WHAT[ENF-021] repeat_terminal_idle_is_idempotent_no_duplicate_nudge`；`requirements/capability-enforcement/tests/blogger-repair-trace.test.mjs::WHAT[ENF-021] idle_without_quiescence_permit_spends_no_budget`；`requirements/capability-enforcement/tests/blogger-repair-trace.test.mjs::WHAT[ENF-021] next_terminal_sends_at_most_one_aabb_then_abandons`；`requirements/capability-enforcement/tests/blogger-repair-trace.test.mjs::WHAT[ENF-021] transform_and_idle_interleave_resolves_to_single_owner`；`requirements/capability-enforcement/tests/blogger-repair-trace.test.mjs::WHAT[ENF-021] transform_on_aabb_claimed_terminal_waits_without_double_spend`；`requirements/capability-enforcement/tests/blogger-repair-trace.test.mjs::WHAT[ENF-021] repair_without_journal_abandons_without_physical_sends`；`requirements/capability-enforcement/tests/blogger-repair-trace.test.mjs::WHAT[ENF-021] shutdown_rejects_new_repair_episode_before_drain` |

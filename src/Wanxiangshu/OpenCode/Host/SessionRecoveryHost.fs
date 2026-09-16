@@ -42,9 +42,21 @@ type SessionRecoveryHost
     let statesFor (event: ChatExecutionRecoveryLifecycleEvent) =
         let projection = (AgentJournal.snapshot journal).AgentProjections.ChatExecutions
 
-        eventKey event
-        |> Option.map (fun key -> ChatExecutionProjection.byKey key projection |> Option.toList)
-        |> Option.defaultWith (fun () -> ChatExecutionProjection.current projection)
+        match event with
+        | ChatExecutionRecoveryLifecycleEvent.SessionQuiesced sessionId ->
+            // PAR-023: the obligation is exactly `Accepted ∧ ¬ProviderStarted` for
+            // that session. Executions that already reached the provider belong to
+            // the provider recovery owner (or their own terminal projection), and an
+            // idle observation must never re-judge them.
+            ChatExecutionProjection.current projection
+            |> List.filter (fun state ->
+                state.Key.SessionId = sessionId
+                && state.Lifecycle = ChatExecutionLifecycle.Accepted
+                && state.ProviderStarted.IsNone)
+        | _ ->
+            eventKey event
+            |> Option.map (fun key -> ChatExecutionProjection.byKey key projection |> Option.toList)
+            |> Option.defaultWith (fun () -> ChatExecutionProjection.current projection)
 
     let classifyProviderSnapshot (state: ChatExecutionState) (messages: SessionMessage list) =
         let matches =

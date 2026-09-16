@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
 import { run } from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -17,8 +16,7 @@ import { pending } from '../../../dist/Repository/Programming/Js/TransactionSurf
 // JS-019: stable codes, frozen once shipped. AnchorRules owns the pure
 // declaration refusals (empty anchor, non-positive occurrence); the other
 // refusal classes live in the sandbox matcher / transaction layer.
-
-
+import {
   failureCatalog,
   validateAnchorDeclaration as validateDeclaration,
   validateAnchorOccurrence as validateOccurrence,
@@ -55,14 +53,12 @@ const PROGRAM = `class Js extends JsProgram {
 
 // JS-085: sandbox → staging → preflight → commit is one owner-managed
 // workflow. Result validation precedes commit and success is coupled to commit.
-
-
-  run,
+import {
+  run as workflowRun,
   runObserved,
   caseName,
   rewritten,
   created,
-  failureCode,
   render,
 } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
 
@@ -81,7 +77,7 @@ const localStore = () => {
 
 const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')
 const runWorkflow = async (dir, program, { deadlineMs = 2000, store = null } = {}) => ({
-  outcome: await run(dir, 'Coder', 'en', program, deadlineMs, Date.now() + 60_000, 1 << 20, store),
+  outcome: await workflowRun(dir, 'Coder', 'en', program, deadlineMs, Date.now() + 60_000, 1 << 20, store),
   surface: coderSurface(),
 })
 

@@ -16,6 +16,9 @@
 /resources/provider/tool/fork/**
 /resources/provider/tool/inspect/**
 /scripts/checks/language-parity-gate.mjs
-/requirements/capability-enforcement/tests/agent-permission-gate.test.mjs
-/requirements/capability-enforcement/tests/inquiry-permissions.test.mjs
-/requirements/capability-enforcement/tests/integration/plugin/manager-tool-contract.test.mjs
+/requirements/capability-enforcement/tests/001.test.mjs
+/requirements/capability-enforcement/tests/003.test.mjs
+/requirements/capability-enforcement/tests/006.test.mjs
+/requirements/capability-enforcement/tests/009.test.mjs
+/requirements/capability-enforcement/tests/010.test.mjs
+/requirements/capability-enforcement/tests/011.test.mjs

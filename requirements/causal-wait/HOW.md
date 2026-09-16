@@ -48,19 +48,3 @@
 - F# 注释与字符串中的符号由 `maskFSharpTrivia` 排除，作为 false-positive decoy；locator 字符串本身不是 decoy，因为它就是可读取诊断文件的协议地址。
 
 机械保证边界：该门禁证明受支持 F# source path 中不存在上述读取能力或 locator，不声称完成通用跨语言数据流证明。行为测试补足 capability 因果：observer 能写、reader 能读、二者不可互换；WHAT 与 oracle 的业务正确性仍由 owner review 负责。
-
----
-
-## 验证与测试落点
-
-| 命题 | 落点测试 |
-|---|---|
-| CAUSAL-001 | `requirements/causal-wait/tests/causal-wait.test.mjs::WHAT[CAUSAL-001] RED_8_application_observer_enter_only_snapshot_via_reader` |
-| CAUSAL-002 | `requirements/causal-wait/tests/causal-wait.test.mjs::WHAT[CAUSAL-002] RED_1_active_wait_visible_after_enter` |
-| CAUSAL-003 | `requirements/causal-wait/tests/boundary-observation.test.mjs::WHAT[CAUSAL-003] business observer cannot read the diagnostic snapshot`；`requirements/causal-wait/tests/boundary-observation.test.mjs::WHAT[CAUSAL-003] shared analyzer accepts the real production tree`；`requirements/causal-wait/tests/boundary-observation.test.mjs::WHAT[CAUSAL-003] analyzer rejects snapshot reads in an unlisted future decision path` |
-| CAUSAL-004 | `requirements/causal-wait/tests/wait-lifecycle.test.mjs::WHAT[CAUSAL-004] CAUSAL_004_observer_and_reader_capabilities_are_not_interchangeable` |
-| CAUSAL-005 | `requirements/causal-wait/tests/until-signal-or-deadline.test.mjs::WHAT[CAUSAL-005] THEOREM_untilSignalOrDeadline_signal_then_ready_cancels_deadline` |
-| CAUSAL-006 | `requirements/causal-wait/tests/causal-wait.test.mjs::WHAT[CAUSAL-006] RED_2_resolve_clears_active_and_records_resolved` |
-| CAUSAL-007 | `requirements/causal-wait/tests/causal-frontier.test.mjs::WHAT[CAUSAL-007] RED_5_nested_graph_walks_to_external_frontier` |
-| CAUSAL-008 | `requirements/causal-wait/tests/wait-lifecycle.test.mjs::WHAT[CAUSAL-008] CAUSAL_008_fresh_registry_starts_empty_no_durable_state` |
-| CAUSAL-009 | `requirements/causal-wait/tests/m6-slice-boundary.test.mjs::WHAT[CAUSAL-009] production inventory separates contract runtime adapter mailbox and proof surface`；`requirements/causal-wait/tests/m6-slice-boundary.test.mjs::WHAT[CAUSAL-009] causal wait contract excludes registry diagnostics mailbox and proof runtime`；`requirements/causal-wait/tests/causal-wait-bridge.test.mjs::WHAT[CAUSAL-009] CAUSAL_BRIDGE_first_binding_is_stable_and_refreshes_on_lifecycle` |

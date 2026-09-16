@@ -544,9 +544,19 @@ module ProviderRecoveryWorkflow =
             if not admitted then
                 settleFailedAttemptTarget durable input.Turn
 
-            match admitted, input.RequestKind with
-            | true, _ -> return RetryVerdict.Superseded
-            | false, (ProviderRequestKind.BloggerMain | ProviderRequestKind.BloggerSquash) ->
+            // PAR-022: a recovery continuation may only be sent after the Host
+            // stopped automatic retry for this exact provider run. A send inside
+            // the still-running failed turn is silently dropped by the Host
+            // (`SessionRunState.ensureRunning` joins the dying run instead of
+            // starting the new turn), so the fence — not this workflow — owns
+            // the dispatch occasion.
+            let! hostStopped =
+                ProviderAttemptStopFence.shared.AwaitStop(input.Turn.SessionId, input.Turn.ProviderRun)
+
+            match admitted, hostStopped, input.RequestKind with
+            | true, _, _ -> return RetryVerdict.Superseded
+            | false, false, _ -> return RetryVerdict.Superseded
+            | false, true, (ProviderRequestKind.BloggerMain | ProviderRequestKind.BloggerSquash) ->
                 return!
                     dispatchBloggerAfterFailure
                         sessionPort
@@ -557,7 +567,7 @@ module ProviderRecoveryWorkflow =
                         failureReason
                         authorization
                         input
-            | false, (ProviderRequestKind.WorkMain | ProviderRequestKind.InteractionRepair) ->
+            | false, true, (ProviderRequestKind.WorkMain | ProviderRequestKind.InteractionRepair) ->
                 return!
                     continueWorkMain
                         sessionPort
@@ -568,7 +578,7 @@ module ProviderRecoveryWorkflow =
                         authorization
                         continuationPrompt
                         failureReason
-            | false, ProviderRequestKind.StrengthReplica ->
+            | false, true, ProviderRequestKind.StrengthReplica ->
                 // The policy never licenses a replica recovery; fail closed.
                 return RetryVerdict.Superseded
         }

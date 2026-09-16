@@ -20,7 +20,7 @@
 
 ## VERIFICATION-SYSTEM-002: One World——恰一个 Long Stroke
 
-第 4 层物理验收严格保持全局恰好一个真实 E2E 入口（`tests/e2e/entry.test.mjs`）和全程单次物理环境生命周期。严禁并行启动多个 Canary 实例、工作池或为每个测试场景单独创建独立世界以冒充覆盖率。E2E 用例上限必须严格受限且只降不升。
+第 4 层物理验收严格保持全局恰好一个真实 E2E 入口（`tests/e2e/014.test.mjs`）和全程单次物理环境生命周期。严禁并行启动多个 Canary 实例、工作池或为每个测试场景单独创建独立世界以冒充覆盖率。E2E 用例上限必须严格受限且只降不升。
 
 ## VERIFICATION-SYSTEM-003: 晋级阶梯，禁止跨级
 
@@ -94,3 +94,29 @@ Release gate 变成「最多 N 轮」或「重跑直到通过」
 ## VERIFICATION-SYSTEM-013: JS 语义边界终态清零
 
 所有产品语义测试对实现内部的越界依赖必须终态清零：严禁深层导入内部 dist 模块、严禁混淆导出探测（mangled names）、严禁直接消费编译器底层表示、严禁使用过渡期的兼容 facade 或私有 contract 适配器。所有被语义测试调用的模块必须在正式的 Surface Manifest 中完成注册，明确其所有权、关联命题与源码映射，确保测试世界与实现内部彻底解耦。
+
+## VERIFICATION-SYSTEM-014: Long Stroke 真实物理验收环境
+
+第 4 层 Long Stroke 物理验收环境在单次 OpenCode 进程生命周期（spawn count 恰为 1）内执行完整端到端场景。真实宿主环境下依次验证：
+1. 嵌套 Replica 物理启动且不阻塞属主（Strength Canary）；
+2. 伴生 Inspector 会话的前缀律、批次合并、会话删除捕获与 Bookkeeper 结算（Inspector / Casebook G2/G6 Canary）；
+3. 直接 HumanRoot Manager 循环的多轮迭代、权威消息继承与状态收敛；
+4. 运行态 Join 屏障、无变更冷检索（Cold Fetch）与真实 Host 插件观测点（Canaries A/E/G/H）。
+整个生命周期保持单一物理服务端与单一日志写入器，严禁使用重试直至通过。
+
+## VERIFICATION-SYSTEM-015: 日志观察器因果消费与完整性
+
+日志观察器（Journal Observer）必须按严格行缓冲与因果消费语义监听事件日志流：
+1. 仅解析合法 `Fact` 结构，正文描述（prose）中偶然出现的关键字严禁识别为领域事实；
+2. 多字节 UTF-8 编码与未闭合行必须等待完整行结束符到达后方可提交位点，严禁截断或提前消费未完成片段；
+3. 遭遇非法 JSON 或 `event_id` 标识冲突时必须 fail-closed 并抛出异常；
+4. 底层文件标识替换或消费前缀被截断时必须 fail-closed；
+5. 多写入者文件交错时保持原子追加、单调位点前进、订阅派发与关闭后注销语义。
+
+## VERIFICATION-SYSTEM-016: 验证输入快照与运行时扰动拦截
+
+构建与验证调度器必须在执行前捕获完整验证输入快照，并在执行全过程中守卫输入确定性：
+1. 完整收集源码、脚本、规范、资源与工作流配置等输入集，准确比对文件集合变动与内容哈希；忽略 `.fable-build` 等合法构建输出；根目录缺失时 fail-closed；
+2. 运行期间检测到输入被改写、新增或删除时，调度器必须立即中断后续阶段并以非零状态失败退出（fail-closed），严禁产出虚假有效性报告；
+3. 支持隔离日志目录（logDirectory），在独立路径下管理运行日志与 `latest` 软链接，避免污染仓库根目录；
+4. 单元与集成测试执行环境必须剥离 `TESTS_MJS_FILES` 环境变量覆盖，防止子阶段被意外过滤导致测试范围静默缩水。

@@ -1,27 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import {
-import { generate } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { create as createEventStore, dispose as disposeEventStore } from '../../../dist/Persistence/EventStore/Surface.js'
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs'
-import { parse as parseToml } from 'smol-toml'
-import { pending } from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
-
-// JS runtime bindings and sandbox integration. The injected api is the only
-// model authority; reads/searches are JSON values and mutations only stage.
-
-
-  createApi,
-  api as apiOf,
-  stagedCount,
-  stagedKinds,
-  run,
-} from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
+import { generate } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
+import { createApi, api as apiOf, stagedCount } from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
+import { appendPrepared, appendCommitted, pending } from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
+import { run, caseName } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bindings-'))
@@ -29,20 +16,6 @@ const sandbox = () => {
 }
 
 const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')
-
-// JS-012/015: transaction modules never enumerate EventStore history.
-// A crash leaves Prepared as audit evidence; the next process never mutates files to hide the broken tool.
-
-
-  appendPrepared,
-  appendCommitted,
-  pending,
-} from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
-
-const sandbox = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-txstore-'))
-  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
-}
 
 const localStore = (commonDir) => {
   const owned = commonDir ?? mkdtempSync(join(tmpdir(), 'wxs-txstore-events-'))
@@ -69,33 +42,6 @@ const prepared = (id, root, mutations) => ({
   mutations,
 })
 
-// JS-085: sandbox → staging → preflight → commit is one owner-managed
-// workflow. Result validation precedes commit and success is coupled to commit.
-
-
-  run,
-  runObserved,
-  caseName,
-  rewritten,
-  created,
-  failureCode,
-  render,
-} from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
-
-const sandbox = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-workflow-'))
-  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
-}
-
-const localStore = () => {
-  const owned = mkdtempSync(join(tmpdir(), 'wxs-workflow-events-'))
-  const commonDir = join(owned, '.git')
-  mkdirSync(commonDir, { recursive: true })
-  const handle = createEventStore(commonDir, randomUUID().replaceAll('-', ''))
-  return { handle, close: () => { disposeEventStore(handle); rmSync(owned, { recursive: true, force: true }) } }
-}
-
-const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')
 const runWorkflow = async (dir, program, { deadlineMs = 2000, store = null } = {}) => ({
   outcome: await run(dir, 'Coder', 'en', program, deadlineMs, Date.now() + 60_000, 1 << 20, store),
   surface: coderSurface(),

@@ -27,22 +27,26 @@ module StealthBrowserMcpConfig =
         | _ -> false
 
     let launchFrom (read: string -> string option) : Launch =
-        if not (AblationRegistry.isActive (AblationNodeId.create "external-investigation") (AblationSettings.current ())) then
+        if
+            not (
+                AblationRegistry.isActive (AblationNodeId.create "external-investigation") (AblationSettings.current ())
+            )
+        then
             Launch.Disabled
         else
-        let disabled = envValue read "STEALTH_BROWSER_MCP_DISABLED"
-        let fixture = envValue read "STEALTH_BROWSER_MCP_FIXTURE"
-        let testMode = envValue read "WANXIANGSHU_TEST"
-        let gitRef = envValue read "STEALTH_BROWSER_MCP_REF"
+            let disabled = envValue read "STEALTH_BROWSER_MCP_DISABLED"
+            let fixture = envValue read "STEALTH_BROWSER_MCP_FIXTURE"
+            let testMode = envValue read "WANXIANGSHU_TEST"
+            let gitRef = envValue read "STEALTH_BROWSER_MCP_REF"
 
-        if isTruthy disabled then
-            Launch.Disabled
-        elif fixture <> "" then
-            Launch.Fixture fixture
-        elif isTruthy testMode then
-            Launch.Disabled
-        else
-            Launch.Uvx(if gitRef = "" then StealthBrowserMcp.defaultRef else gitRef)
+            if isTruthy disabled then
+                Launch.Disabled
+            elif fixture <> "" then
+                Launch.Fixture fixture
+            elif isTruthy testMode then
+                Launch.Disabled
+            else
+                Launch.Uvx(if gitRef = "" then StealthBrowserMcp.defaultRef else gitRef)
 
     let private nonBlankVarValue (value: obj) =
         let text = string value

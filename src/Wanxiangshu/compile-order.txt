@@ -40,6 +40,10 @@ OpenCode/Host/SessionContract.fsi
 OpenCode/Host/SessionContract.fs
 OpenCode/Host/SessionQuiescenceGate.fsi
 OpenCode/Host/SessionQuiescenceGate.fs
+OpenCode/Host/ProviderAttemptStopFence.fsi
+OpenCode/Host/ProviderAttemptStopFence.fs
+OpenCode/Host/ProviderAttemptStopFenceSurface.fsi
+OpenCode/Host/ProviderAttemptStopFenceSurface.fs
 Context/Trace/Cursor.fsi
 Context/Trace/Cursor.fs
 Foundation/Roles.fsi

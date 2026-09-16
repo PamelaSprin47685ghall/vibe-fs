@@ -12,9 +12,3 @@
 
 3. **Canary 契约验证**：
    - 通过 `browser-provenance-canary.test.mjs` 与 `facts-not-obligations.test.mjs`，确保在无真实浏览器运行的单元测试套件中，双语契约与实质性语义区分始终有效且不退化。
-
-## 验证与测试落点
-
-| 命题 | 落点测试 |
-|---|---|
-| EXTERNAL-INVESTIGATION-010 | `requirements/external-investigation/tests/stealth-browser-role-lock.test.mjs::WHAT[EXTERNAL-INVESTIGATION-010] browser_is_the_only_network_office` |

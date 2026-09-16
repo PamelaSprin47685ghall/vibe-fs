@@ -7,9 +7,7 @@ module AblationToolMap =
 
     let private load () =
         match AblationManifest.loadToolMap () with
-        | Ok document ->
-            document.Tools
-            |> Map.map (fun _ value -> AblationNodeId.create value)
+        | Ok document -> document.Tools |> Map.map (fun _ value -> AblationNodeId.create value)
         | Error _ -> Map.empty
 
     let private map () =
@@ -22,7 +20,6 @@ module AblationToolMap =
 
     let resetCache () = cached <- None
 
-    let tryNode (toolName: string) =
-        map () |> Map.tryFind toolName
+    let tryNode (toolName: string) = map () |> Map.tryFind toolName
 
     let allTools () = map () |> Map.toList

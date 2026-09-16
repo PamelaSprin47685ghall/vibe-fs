@@ -193,7 +193,7 @@ npm run format-build-test
 |----|------|------|
 | unit | `requirements/verification-system/tests/run.mjs` | 对 `dist/` 的契约；经 `requirements/verification-system/tests/support/` |
 | integration | `requirements/verification-system/tests/integration/run.mjs` | resources、plugin、persist、strength、package、harness（套件在 owner 包 `tests/integration/` 下） |
-| e2e | `requirements/verification-system/tests/e2e/entry.test.mjs` | `scenarios/long-stroke.toml` + `support/` oracles；单次连续生命周期 |
+| e2e | `requirements/verification-system/tests/e2e/014.test.mjs` | `scenarios/long-stroke.toml` + `support/` oracles；单次连续生命周期 |
 
 `dist/` 陈旧时 unit 拒绝运行。资源路径由包内 `dist/` 相对定位到 `resources/`，不依赖 `process.cwd()`。
 

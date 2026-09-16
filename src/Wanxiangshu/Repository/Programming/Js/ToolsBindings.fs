@@ -97,14 +97,20 @@ module JsToolsBindings =
                         ==> fun (pattern: string) ->
                             task {
                                 let! globRes = JsGlobFs.glob root pattern
+
                                 match globRes with
-                                | Ok listing -> return createObj [ "ok" ==> true; "paths" ==> (List.toArray listing.Paths) ]
+                                | Ok listing ->
+                                    return createObj [ "ok" ==> true; "paths" ==> (List.toArray listing.Paths) ]
                                 | Error failure -> return failureObj failure
                             }
                         "grep"
                         ==> fun (needle: obj) (pattern: string) ->
                             task {
-                                if isUndefined pattern || not (isString pattern) || System.String.IsNullOrEmpty pattern then
+                                if
+                                    isUndefined pattern
+                                    || not (isString pattern)
+                                    || System.String.IsNullOrEmpty pattern
+                                then
                                     return failureObj JsFailure.AnchorInvalidPattern
                                 else
                                     match anchorOf needle with
@@ -112,12 +118,14 @@ module JsToolsBindings =
                                     | Ok spec ->
                                         match requireNonEmptyExact spec with
                                         | Error failure -> return failureObj failure
-                                        | Ok () ->
+                                        | Ok() ->
                                             let! grepRes = JsAnchorFs.grep root spec pattern
+
                                             match grepRes with
                                             | Error failure -> return failureObj failure
                                             | Ok listing ->
                                                 listing.ReadSnapshots |> List.iter readSnapshots.Add
+
                                                 let matches =
                                                     listing.Matches
                                                     |> List.map (fun hit ->
@@ -126,6 +134,7 @@ module JsToolsBindings =
                                                               "line" ==> hit.Line
                                                               "column" ==> hit.Column
                                                               "text" ==> hit.Text ])
+
                                                 return createObj [ "ok" ==> true; "matches" ==> (List.toArray matches) ]
                             }
                         "edit"

@@ -36,17 +36,3 @@
 
 2026-09-12：`Enforcer/InstitutionalLearning/Fold.fs` 这个只把 `projection.InstitutionalLearning` 写回聚合的裸装配包装已删除，同批删除的还有 Fission、Concern、Attention 三个同类包装；装配现由 `Composition/Durable/ProjectionUpdate.applyInstitutionalLearning` 与 `applyAttentionLearning` 承担，调用顺序仍是「先写 `InstitutionalLearning`，再用同一事实 resurface attention」。本分片剩余文件 `InstitutionalLearningTools.fs` 仍真实读取聚合（`AgentProjection.pendingAttentionWorkPairs`、`snapshot.AgentProjections.*`），因此保留 `composition-durable-*` 引用，闭包仅从 158 收到 157 个 `.fs`；不要把它读成隔离成果。
 真实 `InstitutionalLearningTools` consumer 与 Enhancer 签名反向 consumer 的影响集合经 `compile-impact` 合并为一次编译，通过 1432 parsed sources／1394 items（fingerprint `f4c0e60d84d5`）。该集合仍含其他 consumer 真正需要的 Host 合同，不能把局部分片的闭包缩小推广到全部反向 consumer。
-
-## 验证与测试落点
-
-INSTITUTIONAL-LEARNING-007 原本由一条源码文本断言「覆盖」：它 match `Composition/Durable/Fold.fs` 与工具文件的字符串，其中「`ExperienceKind.Celebrate -> AttentionProjection.pending`」甚至由注释满足。该断言不是行为证明，也没有 JS 可驱动的替代路径（没有暴露「折叠一条 learning 事实」的 Surface），因此 2026-09-12 连同 fold 装配迁移一并删除，不把新实现文本重新钉成断言；该条款当前没有可执行落点，已由 `node scripts/check.mjs` 的 requirement-trace 如实报告为 proof gap。切片侧语义仍由 `attention-regulation` 的 `pending`/`resurface` 测试与本包 008 的冻结语义覆盖。
-
-| 命题 | 落点测试 |
-|---|---|
-| INSTITUTIONAL-LEARNING-001 | `requirements/institutional-learning/tests/institutional-learning.test.mjs::WHAT[INSTITUTIONAL-LEARNING-001] celebrate and regret accept one raw natural-language experience without a rule template` |
-| INSTITUTIONAL-LEARNING-002 | `requirements/institutional-learning/tests/institutional-learning.test.mjs::WHAT[INSTITUTIONAL-LEARNING-002] one enhancer evaluation yields exactly one ABSORB BIRTH or DISCARD disposition with no score state` |
-| INSTITUTIONAL-LEARNING-003 | `requirements/institutional-learning/tests/institutional-learning.test.mjs::WHAT[INSTITUTIONAL-LEARNING-003] enhancer is bounded to the supplied experience and live rulebook snapshot` |
-| INSTITUTIONAL-LEARNING-004 | `requirements/institutional-learning/tests/institutional-learning.test.mjs::WHAT[INSTITUTIONAL-LEARNING-004] unsafe raw experience cannot bypass behavior-rule admission by directly birthing a rule` |
-| INSTITUTIONAL-LEARNING-005 | `requirements/institutional-learning/tests/institutional-learning.test.mjs::WHAT[INSTITUTIONAL-LEARNING-005] no reusable trigger or nonduplicate mechanism degrades to DISCARD rather than attention-tax debt` |
-| INSTITUTIONAL-LEARNING-006 | `requirements/institutional-learning/tests/institutional-learning.test.mjs::WHAT[INSTITUTIONAL-LEARNING-006] positive and negative experiences use the same non-punitive bounded enhancer` |
-| INSTITUTIONAL-LEARNING-008 | `requirements/institutional-learning/tests/institutional-learning.test.mjs::WHAT[INSTITUTIONAL-LEARNING-008] occurrence replay keeps the first frozen result and does not create a second disposition` |

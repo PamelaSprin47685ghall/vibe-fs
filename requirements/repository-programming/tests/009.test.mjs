@@ -1,51 +1,16 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import {
-import { generate } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-
-// JS runtime bindings and sandbox integration. The injected api is the only
-// model authority; reads/searches are JSON values and mutations only stage.
-
-
-  createApi,
-  api as apiOf,
-  stagedCount,
-  stagedKinds,
-  run,
-} from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
-
-const sandbox = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-bindings-'))
-  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
-}
-
-const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')
-
-// tests/unit/js-tools/js-tools-fs.test.mjs — G5 Phase B-4: filesystem adapter
-// (JS-005/006/007/013/015).
-//
-// Strict UTF-8 reads, ordered anchor matching, full glob, all-or-nothing
-// commit with rollback. Pure Node fs against per-test temp directories.
-
-
-  readUtf8,
-  glob,
-  findAnchor,
-  requireUnique,
-  grep,
-  commitPlan,
-  rollbackPlan,
-} from '../../../dist/Repository/Programming/Js/FilesystemSurface.js'
+import { createApi, api as apiOf } from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
+import { grep } from '../../../dist/Repository/Programming/Js/FilesystemSurface.js'
 
 const exact = (text) => ({ kind: 'exact', text })
 const regex = (text) => ({ kind: 'regex', text })
 
 const sandbox = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-jstools-'))
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-bindings-'))
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 const ok = (result) => result.ok

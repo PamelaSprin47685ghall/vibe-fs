@@ -41,7 +41,8 @@ type ManifestDocument =
       Nodes: ManifestNode list
       Edges: ManifestEdge list }
 
-type ProfilesDocument = { Profiles: Map<string, Map<string, string>> }
+type ProfilesDocument =
+    { Profiles: Map<string, Map<string, string>> }
 
 type ToolMapDocument = { Tools: Map<string, string> }
 
@@ -82,11 +83,10 @@ module AblationMode =
 [<RequireQualifiedAccess>]
 module AblationRegistry =
     let modeFor (id: AblationNodeId) (registry: AblationRegistry) =
-        registry.Modes
-        |> Map.tryFind id
-        |> Option.defaultValue AblationMode.Active
+        registry.Modes |> Map.tryFind id |> Option.defaultValue AblationMode.Active
 
-    let isActive id registry = modeFor id registry = AblationMode.Active
+    let isActive id registry =
+        modeFor id registry = AblationMode.Active
 
     let isBorrowedOrActive id registry =
         match modeFor id registry with

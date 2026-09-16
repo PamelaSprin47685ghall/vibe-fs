@@ -25,17 +25,3 @@
    - `OpenCode/Tools/CoderTool.fs` 静态调用 `RepositoryWarmStart.prepareDocument`，由原 runtime 拥有上述 fail-open；adapter 不再动态加载模块、解码 Fable union 或吞掉所有异常。正常 `Ok` 文档直接传给 SyncDelegate；typed `Error` 为不变量失败，Task fault／取消继续传播，不另造成功结果。
 
 `ForkTool.prepareForkPromptWithRecord` 同样静态调用 `RepositoryWarmStart.appendToBaseDocument`：原始 relay document、关键词准入与无关键词零工作保持不变；查询级 fail-open 仍由 WarmStart 拥有，adapter 不再通过 null／默认原文掩盖 typed Error、Task fault 或取消。既有 WarmStart suite 证明 runtime 的查询失败与角色／路径边界，Fork suite 证明实际工具准入和派发；尚无直接注入 Fork adapter fault／取消的专门回归，不将前者冒充后者。
-
-## 验证与测试落点
-
-| 命题 | 落点测试 |
-|---|---|
-| REPOSITORY-INVESTIGATION-001 | `requirements/repository-investigation/tests/repository-warm-start.test.mjs::WHAT[REPOSITORY-INVESTIGATION-001] AGENT_032_renderer_keeps_charge_authoritative_and_hints_do_not_replace_evidence` |
-| REPOSITORY-INVESTIGATION-002 | `requirements/repository-investigation/tests/semble-mcp.test.mjs::WHAT[REPOSITORY-INVESTIGATION-002] AGENT_027_parse_text_and_tool_result`；`requirements/repository-investigation/tests/semble-mcp.test.mjs::WHAT[REPOSITORY-INVESTIGATION-002] AGENT_027_search_fixture_stdio_roundtrip` |
-| REPOSITORY-INVESTIGATION-003 | `requirements/repository-investigation/tests/investigation-resource-laws.test.mjs::WHAT[REPOSITORY-INVESTIGATION-003] INVESTIGATE_inspector_role_law_layers_reasoning_below_evidence_acquisition` |
-| REPOSITORY-INVESTIGATION-004 | `requirements/repository-investigation/tests/investigation-resource-laws.test.mjs::WHAT[REPOSITORY-INVESTIGATION-004] INVESTIGATE_inspector_role_law_has_evidence_funnel_and_stop_rule` |
-| REPOSITORY-INVESTIGATION-005 | `requirements/repository-investigation/tests/investigation-resource-laws.test.mjs::WHAT[REPOSITORY-INVESTIGATION-005] INVESTIGATE_inspect_law_pins_causal_readonly_witness_not_editor`；`requirements/repository-investigation/tests/investigation-resource-laws.test.mjs::WHAT[REPOSITORY-INVESTIGATION-005] INVESTIGATE_query_shell_law_is_observation_not_execution_and_inspector_only` |
-| REPOSITORY-INVESTIGATION-006 | `requirements/repository-investigation/tests/repository-warm-start.test.mjs::WHAT[REPOSITORY-INVESTIGATION-006] AGENT_032_renderer_keeps_hostile_hint_bytes_as_toml_data_and_dedupes_stably` |
-| REPOSITORY-INVESTIGATION-007 | `requirements/repository-investigation/tests/repository-warm-start.test.mjs::WHAT[REPOSITORY-INVESTIGATION-007] AGENT_032_keywords_normalize_stable_exact_dedupe_and_cap_at_eight`；`requirements/repository-investigation/tests/repository-warm-start.test.mjs::WHAT[REPOSITORY-INVESTIGATION-007] AGENT_032_zero_keywords_is_byte_exact_zero_work` |
-| REPOSITORY-INVESTIGATION-008 | `requirements/repository-investigation/tests/repository-warm-start.test.mjs::WHAT[REPOSITORY-INVESTIGATION-008] AGENT_032_nonconsumer_nonempty_keywords_fail_and_missing_workspace_skips` |
-| REPOSITORY-INVESTIGATION-009 | `requirements/repository-investigation/tests/repository-warm-start.test.mjs::WHAT[REPOSITORY-INVESTIGATION-009] AGENT_032_renderer_enforces_24_hint_and_64KiB_bounds_by_whole_entries`；`requirements/repository-investigation/tests/repository-warm-start.test.mjs::WHAT[REPOSITORY-INVESTIGATION-009] AGENT_032_searches_all_independent_keywords_in_one_parallel_wave_and_restores_ordinal_order` |

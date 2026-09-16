@@ -38,16 +38,3 @@ Release Proof (npm pack 真实打包、归档成员闭包与隔离外部消费�
 ### 4. 发布级闭包证明 (Release Proof & Packing Verification)
 
 - 在发布前执行全流程验证，调用真实 `npm pack` 产出 tarball，由 `verify-package.mjs` 流式校验成员闭包、防止路径逃逸与非普通文件、比对完整 digest，解压至隔离外部目录并在独立 consumer 中完成无仓库开发依赖的入口导入与资源读取验证。
-
-## 验证与测试落点
-
-| 命题 | 落点测试 |
-|---|---|
-| DISTRIBUTION-001 | `requirements/distribution/tests/pack-closure.test.mjs::WHAT[DISTRIBUTION-001] DISTRIBUTION_artifact_carries_compiled_code_and_runtime_resources_together` |
-| DISTRIBUTION-002 | `requirements/distribution/tests/cwd-independent-resources.test.mjs::WHAT[DISTRIBUTION-002] DISTRIBUTION_resource_reads_resolve_under_package_root_regardless_of_cwd`；`requirements/distribution/tests/cwd-independent-resources.test.mjs::WHAT[DISTRIBUTION-002] DISTRIBUTION_fresh_process_with_foreign_cwd_imports_entry_and_reads_resources` |
-| DISTRIBUTION-003 | `requirements/distribution/tests/pack-closure.test.mjs::WHAT[DISTRIBUTION-003] DISTRIBUTION_manifest_entry_matches_exports_and_shipped_path` |
-| DISTRIBUTION-004 | `requirements/distribution/tests/pack-closure.test.mjs::WHAT[DISTRIBUTION-004] DISTRIBUTION_files_whitelist_is_explicit_and_excludes_dev_test_legacy` |
-| DISTRIBUTION-005 | `requirements/distribution/tests/cwd-independent-resources.test.mjs::WHAT[DISTRIBUTION-005] DISTRIBUTION_lookup_is_single_fixed_relative_path_not_candidate_search` |
-| DISTRIBUTION-006 | `requirements/distribution/tests/cwd-independent-resources.test.mjs::WHAT[DISTRIBUTION-006] DISTRIBUTION_resource_missing_fails_fast_no_fallback` |
-| DISTRIBUTION-007 | `requirements/distribution/tests/pack-closure.test.mjs::WHAT[DISTRIBUTION-007] DISTRIBUTION_release_proof_covers_build_package_packing_and_artifact_checks` |
-| DISTRIBUTION-008 | `requirements/distribution/tests/pack-closure.test.mjs::WHAT[DISTRIBUTION-008] DISTRIBUTION_enforcer_rulebook_closure_is_complete`；`requirements/distribution/tests/pack-closure.test.mjs::WHAT[DISTRIBUTION-008] DISTRIBUTION_provider_resource_closure_is_language_complete` |

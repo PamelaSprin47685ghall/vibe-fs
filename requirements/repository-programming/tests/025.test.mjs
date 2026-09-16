@@ -6,34 +6,11 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { create as createEventStore, dispose as disposeEventStore } from '../../../dist/Persistence/EventStore/Surface.js'
 import {
-import { mkdtempSync, readdirSync, rmSync, readFileSync } from 'node:fs'
-
-// REPOSITORY-PROGRAMMING-025: the Committed cut boundary —
-// file effects may already exist, so recovery must distinguish
-// committed/unknown precisely; an Unknown read is never treated as not-written.
-//
-// This test drives the compiled production path (TransactionStore.appendPrepared/
-// appendCommitted + the real IEventStore append) on a real store with injected
-// interruption at both sides of the effect boundary:
-//   1. interrupt before Committed  -> pending still holds the Prepared fact
-//      (interrupted-tool evidence; reopen never auto-completes, never rolls back);
-//   2. interrupt after Committed   -> pending is released; the (Prepared, Committed)
-//      pair survives reopen as the commit receipt;
-//   3. cross-file write sets      -> the pending/committed observation covers the
-//      complete mutation list, not one file;
-//   4. unknown outcome            -> a reopened store that cannot find the Committed
-//      fact keeps the Prepared pending; the caller must re-verify, never assume
-//      not-written.
-//
-// REPOSITORY-PROGRAMMING-015 (crash leaves Prepared as audit evidence, next
-// process never mutates files) is covered by js-tools-transaction-store.test.mjs;
-// this file covers the fatal-sweep Committed-cut boundary itself.
-
-
   appendPrepared,
   appendCommitted,
   pending,
 } from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
+import { assertFatalBoundary } from '../../structured-workflow/tests/support/m6-boundary-proof.mjs'
 
 const makeDir = (prefix) => mkdtempSync(join(tmpdir(), prefix))
 
@@ -56,49 +33,6 @@ const unwrap = (result) => {
 }
 
 const pendingIds = (handle) => pending(handle).map((p) => p.transactionId).sort()
-
-// REPOSITORY-PROGRAMMING-025: the Prepared cut boundary —
-// before the Prepared fact has a trusted receipt, no file effect may occur.
-//
-// This test drives the compiled production path (TransactionStore.appendPrepared
-// + the real IEventStore append) on a real store with injected interruption:
-// preparing two distinct transactions must leave the Integrator-owned pending
-// projection holding exactly both facts, and must touch zero workspace bytes.
-// A second run proves the boundary from the other side: with a store whose
-// append is interrupted (storage gate held), the Prepared receipt is absent and
-// the in-memory projection cannot advance — local authoritative state never
-// leads the durable receipt.
-//
-// REPOSITORY-PROGRAMMING-012 (appendPrepared/pending round trip) and
-// REPOSITORY-PROGRAMMING-015 (Prepared-without-Committed is interrupted-tool
-// evidence, reopen never undoes) are covered by js-tools-transaction-store.test.mjs;
-// this file covers the fatal-sweep Prepared-cut boundary itself.
-
-
-  appendPrepared,
-  appendCommitted,
-  pending,
-} from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
-
-const makeDir = (prefix) => mkdtempSync(join(tmpdir(), prefix))
-
-const openStore = (commonDir) => {
-  const handle = createEventStore(commonDir, randomUUID().replaceAll('-', ''))
-  return { handle, close: () => disposeEventStore(handle) }
-}
-
-const prepared = (id, root, mutations) => ({
-  transactionId: id,
-  workspaceRoot: root,
-  mutations,
-})
-
-const mutation = (path, originalText, newText) => ({ path, originalText, newText })
-
-const unwrap = (result) => {
-  assert.equal(result.ok, true, `expected Ok, got ${JSON.stringify(result.error)}`)
-  return result
-}
 
 const workspaceFiles = (dir) => readdirSync(dir, { withFileTypes: true })
   .filter((entry) => entry.isFile())
@@ -376,3 +310,5 @@ test('WHAT[REPOSITORY-PROGRAMMING-025] production_store_has_no_optional_fatal_ha
   )
   assert.doesNotMatch(source, /fatalTripHandler|setFatalTripHandler/)
 })
+
+test('WHAT[REPOSITORY-PROGRAMMING-025] transaction fatal preserves rollback or cut settlement and one injected fuse', () => assertFatalBoundary('repository-programming'))

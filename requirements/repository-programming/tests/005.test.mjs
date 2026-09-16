@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
 import { permissions as rolePermissions } from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import {
 
 // tests/unit/js-tools/js-surface.test.mjs — G5 Phase A: capability algebra,
 // four-layer exactness, deterministic generation, generated-name gate.
@@ -74,8 +74,7 @@ const layersOf = (s) =>
 // Builtin coexistence plus the generated js-* registered Host tool. Primitive
 // filesystem tools remain normal fallbacks; intent-level preference is only in
 // the generated description.
-
-
+import {
   annotate,
   validateRecommendation,
   builtinTools,

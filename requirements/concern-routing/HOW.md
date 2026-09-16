@@ -18,15 +18,3 @@
 
 3. **Provider 呈现**：
    将已发现的订阅与接收到的邮箱消息紧凑呈现为自然语言文本块，屏蔽底层代次、ACK 序号与内部路由拓扑。
-
-## 验证与测试落点
-
-| 命题 | 落点测试 |
-|---|---|
-| CONCERN-ROUTING-001 | `requirements/concern-routing/tests/concern-routing.test.mjs::WHAT[CONCERN-ROUTING-001] subscribe is idempotent per live owner and keeps id-to-concern immutable` |
-| CONCERN-ROUTING-002 | `requirements/concern-routing/tests/concern-routing.test.mjs::WHAT[CONCERN-ROUTING-002] subscription announcement is sticky once per recipient Pair Hint coverage` |
-| CONCERN-ROUTING-003 | `requirements/concern-routing/tests/concern-routing.test.mjs::WHAT[CONCERN-ROUTING-003] publish fails closed for unknown and stale generations instead of retargeting` |
-| CONCERN-ROUTING-004 | `requirements/concern-routing/tests/concern-routing.test.mjs::WHAT[CONCERN-ROUTING-004] messages wait for the next Pair Hint and coverage commits only on placement` |
-| CONCERN-ROUTING-005 | `requirements/concern-routing/tests/concern-routing.test.mjs::WHAT[CONCERN-ROUTING-005] peer routing carries no authority or obligation vocabulary` |
-| CONCERN-ROUTING-006 | `requirements/concern-routing/tests/concern-routing.test.mjs::WHAT[CONCERN-ROUTING-006] retirement prevents old messages crossing into a same-concern replacement generation` |
-| CONCERN-ROUTING-007 | `requirements/concern-routing/tests/concern-routing.test.mjs::WHAT[CONCERN-ROUTING-007] routing state remains mailbox facts plus bounded delivery coverage, not an organization workflow` |

@@ -144,18 +144,25 @@ module JsAnchorFs =
 
     /// JS-020: Host grep over gitignore-selected UTF-8 files. Full result —
     /// no internal bound; the Host tool-result bound tail-keeps the tail.
-    let grep (root: string) (spec: AnchorSpec) (pattern: string) : System.Threading.Tasks.Task<Result<JsGrepListing, JsFailure>> =
+    let grep
+        (root: string)
+        (spec: AnchorSpec)
+        (pattern: string)
+        : System.Threading.Tasks.Task<Result<JsGrepListing, JsFailure>> =
         task {
             if System.String.IsNullOrEmpty pattern then
                 return Error JsFailure.AnchorInvalidPattern
             else
                 let! globRes = JsGlobFs.glob root pattern
+
                 match globRes with
                 | Error failure -> return Error failure
                 | Ok listing ->
                     let scanned = ResizeArray<JsReadSnapshot * JsGrepHit list>()
+
                     for path in listing.Paths do
                         do! yieldEventLoop ()
+
                         match grepPath root spec path with
                         | Some item -> scanned.Add item
                         | None -> ()

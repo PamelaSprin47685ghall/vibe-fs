@@ -22,14 +22,3 @@
 `Composition/Durable/AgentJournalPortAdapter.forAttention` 从同一个 journal 的单次 snapshot 取 Attention 切片，以原 stream／provider-run 追加 `AgentFact.Attention`。`ToolRegistry` 只选择并接入该适配器，不拥有 outer union 包装。预期追加失败仍渲染原 durable-unavailable 结果；物理异常继续传播，没有 catch-all、默认成功或第二套存储。其余领域消费者尚未迁移，不因这一工具解耦宣称全局 SCC 已消除。
 
 `OpenCode/Tools/AttentionToolSurface` 执行真实 `AttentionTools.specs` 的工具，以 JS 原生回调适配本域 port。001／002 的证明不再匹配源码函数名，而是实际执行 enough／abandon，确认接受／拒绝及零持久化调用。003／004 执行 defer，证明空输入、缺身份、缺 journal、预期失败、异常传播、身份传递、重复 occurrence 及已 resurface 条目不复活；投影使用现有 production Surface，不复制算法。这里的记录型 port 不证明物理 journal 重启或跨进程原子性，原有持久化与重放证明仍须保留。
-
-## 验证与测试落点
-
-| 命题 | 最低充分 proof |
-|---|---|
-| ATTENTION-REGULATION-001 | `requirements/attention-regulation/tests/attention-regulation.test.mjs::WHAT[ATTENTION-REGULATION-001] enough is a pure cognitive stop with no durable authority state` |
-| ATTENTION-REGULATION-002 | `requirements/attention-regulation/tests/attention-regulation.test.mjs::WHAT[ATTENTION-REGULATION-002] abandon releases only cognitive attention and never mutates obligations or authority` |
-| ATTENTION-REGULATION-003 | `requirements/attention-regulation/tests/attention-regulation.test.mjs::WHAT[ATTENTION-REGULATION-003] defer creates pending work without creating execution or obligation state` |
-| ATTENTION-REGULATION-004 | `requirements/attention-regulation/tests/attention-regulation.test.mjs::WHAT[ATTENTION-REGULATION-004] deferred work is occurrence-idempotent and participant-life isolated` |
-| ATTENTION-REGULATION-005 | `requirements/attention-regulation/tests/attention-regulation.test.mjs::WHAT[ATTENTION-REGULATION-005] resurfacing consumes deferred visibility once without activating work` |
-| ATTENTION-REGULATION-006 | `requirements/attention-regulation/tests/attention-regulation.test.mjs::WHAT[ATTENTION-REGULATION-006] attention state stays a minimal deferred-work projection, not a workflow engine` |

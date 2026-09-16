@@ -62,6 +62,7 @@ module JsFilesystemSurface =
     let glob (root: string) (pattern: string) : System.Threading.Tasks.Task<obj> =
         task {
             let! globRes = JsGlobFs.glob root pattern
+
             match globRes with
             | Ok listing ->
                 return
@@ -90,6 +91,7 @@ module JsFilesystemSurface =
     let grep (root: string) (declaration: obj) (pattern: string) : System.Threading.Tasks.Task<obj> =
         task {
             let! grepRes = JsAnchorFs.grep root (anchorOf declaration) pattern
+
             match grepRes with
             | Error failure -> return failureResult failure
             | Ok listing ->
@@ -102,6 +104,7 @@ module JsFilesystemSurface =
                                column = hit.Column
                                text = hit.Text |})
                     |> List.toArray
+
                 return
                     box
                         {| ok = true

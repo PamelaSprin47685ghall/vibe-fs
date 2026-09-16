@@ -11,9 +11,9 @@ orchestrator、Long Stroke e2e）归 `verification-system/tests/`。每个包目
 
 ```text
 WHY.md      不可替代的存在理由（保姆级）
-WHAT.md     唯一 normative 合同（编号命题，每条有测试落点）
-HOW.md      实现模型、约束与测试落点（非 normative；含「历史与弃权」）
-tests/      本包拥有的可执行 proof（*.test.mjs）
+WHAT.md     唯一 normative 合同（编号命题，对应同编号测试）
+HOW.md      实现模型与约束（非 normative；含「历史与弃权」）
+tests/      本包拥有的可执行 proof（NNN.test.mjs）
 APPLIES-TO  可选的包外正向代码覆盖声明；仓库根相对、gitignore wildmatch 语法，普通行=纳入，!行=排除例外
 ```
 
@@ -148,9 +148,9 @@ grounding 由 `requirement-grounding` package 拥有。
 
 ```text
 node requirements/verification-system/tests/run.mjs          # 单元套件（自动发现 requirements/<package>/tests/**/*.test.mjs）
-node --test requirements/<pkg>/tests/<file>.test.mjs   # 单包单文件
-node scripts/check.mjs           # 全 static gates
+node --test requirements/<pkg>/tests/NNN.test.mjs            # 单包单文件
+node scripts/check.mjs                                       # 全 static gates
 ```
 
-- 每条 WHAT 命题的测试落点见该包 HOW.md 与 tests/。
-- 迁移状态：旧 `docs/`、`changes/` 已于 2026-08-14 cutover 归档删除（git 可回溯）；`tests/` 已全部分包（见各包 HOW.md）。
+- 测试文件按 WHAT 条款编号统一命名为 `NNN.test.mjs`，与用例标题中的 `WHAT[PREFIX-NNN]` 强力绑定；顶层 `tests/`、`tests/integration/` 以及 `tests/e2e/NNN.test.mjs` 为唯一测试入口；HOW.md 不再维护独立的测试落点表，映射关系完全由测试用例标题锚权威定义。
+- 迁移状态：旧 `docs/`、`changes/` 已于 2026-08-14 cutover 归档删除（git 可回溯）；`tests/` 已全部分包并统一编号。

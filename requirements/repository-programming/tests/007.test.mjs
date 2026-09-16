@@ -1,121 +1,30 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { read, write, edit, toolName } from '../../../dist/OpenCode/Tools/FileToolsSurface.js'
-import {
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs'
-import { generate } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs'
-import { randomUUID } from 'node:crypto'
 import { parse as parseToml } from 'smol-toml'
-import { create as createEventStore, dispose as disposeEventStore } from '../../../dist/Persistence/EventStore/Surface.js'
-import { pending } from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
-
-// VERIFY-009 coverage: static read/write/edit tools through their registered
-// owner surface. Native Node fs is used only for fixture setup/observations.
-
+import { read, toolName } from '../../../dist/OpenCode/Tools/FileToolsSurface.js'
+import { generate } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
+import { readUtf8, findAnchor, requireUnique } from '../../../dist/Repository/Programming/Js/FilesystemSurface.js'
+import { createApi, api as apiOf } from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
+import { validateAnchorDeclaration as validateDeclaration, validateAnchorOccurrence as validateOccurrence } from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
+import { run, render } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-filetools-'))
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
-
-// tests/unit/js-tools/js-anchors.test.mjs — G5 Phase B: failure algebra +
-// ordered anchor declaration rules (JS-006/JS-019).
-//
-// JS-019: stable codes, frozen once shipped. AnchorRules owns the pure
-// declaration refusals (empty anchor, non-positive occurrence); the other
-// refusal classes live in the sandbox matcher / transaction layer.
-
-
-  failureCatalog,
-  validateAnchorDeclaration as validateDeclaration,
-  validateAnchorOccurrence as validateOccurrence,
-} from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
-
 const declaration = (spec, occurrence) => ({ ...spec, occurrence })
 const ok = (result) => result.ok
 const exact = (text) => ({ kind: 'exact', text })
 const regex = (text) => ({ kind: 'regex', text })
-
-// JS runtime bindings and sandbox integration. The injected api is the only
-// model authority; reads/searches are JSON values and mutations only stage.
-
-
-  createApi,
-  api as apiOf,
-  stagedCount,
-  stagedKinds,
-  run,
-} from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
-
-const sandbox = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-bindings-'))
-  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
-}
-
 const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')
-
-// tests/unit/js-tools/js-tools-fs.test.mjs — G5 Phase B-4: filesystem adapter
-// (JS-005/006/007/013/015).
-//
-// Strict UTF-8 reads, ordered anchor matching, full glob, all-or-nothing
-// commit with rollback. Pure Node fs against per-test temp directories.
-
-
-  readUtf8,
-  glob,
-  findAnchor,
-  requireUnique,
-  grep,
-  commitPlan,
-  rollbackPlan,
-} from '../../../dist/Repository/Programming/Js/FilesystemSurface.js'
-
-const exact = (text) => ({ kind: 'exact', text })
-const regex = (text) => ({ kind: 'regex', text })
-
-const sandbox = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-jstools-'))
-  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
-}
-const ok = (result) => result.ok
 const codeOf = (result) => result.code
 const unwrap = (result) => {
   assert.equal(result.ok, true, `expected Ok, got ${JSON.stringify(result.error)}`)
   return result.value
 }
-
-// JS-085: sandbox → staging → preflight → commit is one owner-managed
-// workflow. Result validation precedes commit and success is coupled to commit.
-
-
-  run,
-  runObserved,
-  caseName,
-  rewritten,
-  created,
-  failureCode,
-  render,
-} from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
-
-const sandbox = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-workflow-'))
-  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
-}
-
-const localStore = () => {
-  const owned = mkdtempSync(join(tmpdir(), 'wxs-workflow-events-'))
-  const commonDir = join(owned, '.git')
-  mkdirSync(commonDir, { recursive: true })
-  const handle = createEventStore(commonDir, randomUUID().replaceAll('-', ''))
-  return { handle, close: () => { disposeEventStore(handle); rmSync(owned, { recursive: true, force: true }) } }
-}
-
-const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')
 const runWorkflow = async (dir, program, { deadlineMs = 2000, store = null } = {}) => ({
   outcome: await run(dir, 'Coder', 'en', program, deadlineMs, Date.now() + 60_000, 1 << 20, store),
   surface: coderSurface(),

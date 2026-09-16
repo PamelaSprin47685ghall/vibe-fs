@@ -152,32 +152,33 @@ module StaticTools =
         if not (AblationSettings.allowsToolSchema name) then
             "deny"
         else
-        match name, role with
-        | "commission", Role.Manager -> "deny"
-        | "fork", Role.Orchestrator -> "deny"
-        | "resume", Role.Orchestrator -> "deny"
-        | "commission", Role.Orchestrator -> "allow"
-        | "open-terminal", Role.DevOps
-        | "send-terminal", Role.DevOps
-        | "read-terminal", Role.DevOps
-        | "signal-terminal", Role.DevOps -> "allow"
-        | "fork", Role.DevOps -> "deny"
-        | "query-shell", Role.Inspector -> "allow"
-        | "run", Role.Inspector -> "deny"
-        | "run", Role.DevOps -> "allow"
-        | "query-shell", Role.DevOps -> "deny"
-        | "write", Role.DevOps
-        | "edit", Role.DevOps -> "deny"
-        | "skill", _ -> "allow"
-        | "assume", Role.Blogger
-        | "assume", Role.Distiller -> "deny"
-        | "assume", _ -> "allow"
-        | ("enough" | "abandon" | "defer" | "subscribe" | "publish" | "celebrate" | "regret"), Role.Blogger
-        | ("enough" | "abandon" | "defer" | "subscribe" | "publish" | "celebrate" | "regret"), Role.Distiller -> "deny"
-        | ("enough" | "abandon" | "defer" | "subscribe" | "publish" | "celebrate" | "regret"), _ -> "allow"
-        | "js-bookkeeper", _ -> "deny"
-        | name, _ when name.StartsWith "js-" -> jsPermission role name
-        | _ -> defaultPermission allowed name
+            match name, role with
+            | "commission", Role.Manager -> "deny"
+            | "fork", Role.Orchestrator -> "deny"
+            | "resume", Role.Orchestrator -> "deny"
+            | "commission", Role.Orchestrator -> "allow"
+            | "open-terminal", Role.DevOps
+            | "send-terminal", Role.DevOps
+            | "read-terminal", Role.DevOps
+            | "signal-terminal", Role.DevOps -> "allow"
+            | "fork", Role.DevOps -> "deny"
+            | "query-shell", Role.Inspector -> "allow"
+            | "run", Role.Inspector -> "deny"
+            | "run", Role.DevOps -> "allow"
+            | "query-shell", Role.DevOps -> "deny"
+            | "write", Role.DevOps
+            | "edit", Role.DevOps -> "deny"
+            | "skill", _ -> "allow"
+            | "assume", Role.Blogger
+            | "assume", Role.Distiller -> "deny"
+            | "assume", _ -> "allow"
+            | ("enough" | "abandon" | "defer" | "subscribe" | "publish" | "celebrate" | "regret"), Role.Blogger
+            | ("enough" | "abandon" | "defer" | "subscribe" | "publish" | "celebrate" | "regret"), Role.Distiller ->
+                "deny"
+            | ("enough" | "abandon" | "defer" | "subscribe" | "publish" | "celebrate" | "regret"), _ -> "allow"
+            | "js-bookkeeper", _ -> "deny"
+            | name, _ when name.StartsWith "js-" -> jsPermission role name
+            | _ -> defaultPermission allowed name
 
     let permissionObj (role: Role) : obj =
         let allowed = OfficeCapability.permissions role |> namesForPermissions

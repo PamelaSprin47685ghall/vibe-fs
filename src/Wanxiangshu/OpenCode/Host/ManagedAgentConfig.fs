@@ -160,9 +160,9 @@ module ManagedAgentConfig =
             let entry = ensureAgentEntry agents name
             entry?hidden <- true
         else
-        match ownedConfigForName inventory name with
-        | None -> ()
-        | Some owned -> assignOwnedFields (ensureAgentEntry agents name) owned
+            match ownedConfigForName inventory name with
+            | None -> ()
+            | Some owned -> assignOwnedFields (ensureAgentEntry agents name) owned
 
     let private ensureExperimental (config: obj) : obj =
         if isNull config?experimental then

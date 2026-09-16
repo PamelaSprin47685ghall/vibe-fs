@@ -3,27 +3,10 @@ import test from 'node:test'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import {
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs'
-import { randomUUID } from 'node:crypto'
 import { parse as parseToml } from 'smol-toml'
 import { generate } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
-import { create as createEventStore, dispose as disposeEventStore } from '../../../dist/Persistence/EventStore/Surface.js'
-import { pending } from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
-
-// Builtin coexistence plus the generated js-* registered Host tool. Primitive
-// filesystem tools remain normal fallbacks; intent-level preference is only in
-// the generated description.
-
-
-  annotate,
-  validateRecommendation,
-  builtinTools,
-  createRegistered,
-  name,
-  description,
-  execute,
-} from '../../../dist/Repository/Programming/Js/OpenCode/ToolHostSurface.js'
+import { createRegistered, execute } from '../../../dist/Repository/Programming/Js/OpenCode/ToolHostSurface.js'
+import { run, render } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-host-'))
@@ -39,32 +22,6 @@ const toolModule = () => {
     }),
   }
   return { tool }
-}
-
-// JS-085: sandbox → staging → preflight → commit is one owner-managed
-// workflow. Result validation precedes commit and success is coupled to commit.
-
-
-  run,
-  runObserved,
-  caseName,
-  rewritten,
-  created,
-  failureCode,
-  render,
-} from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
-
-const sandbox = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-workflow-'))
-  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
-}
-
-const localStore = () => {
-  const owned = mkdtempSync(join(tmpdir(), 'wxs-workflow-events-'))
-  const commonDir = join(owned, '.git')
-  mkdirSync(commonDir, { recursive: true })
-  const handle = createEventStore(commonDir, randomUUID().replaceAll('-', ''))
-  return { handle, close: () => { disposeEventStore(handle); rmSync(owned, { recursive: true, force: true }) } }
 }
 
 const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')

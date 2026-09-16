@@ -3,9 +3,8 @@ import test from 'node:test'
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import {
 import { generate } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
-import { run } from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
+import {
 
 // JS runtime bindings and sandbox integration. The injected api is the only
 // model authority; reads/searches are JSON values and mutations only stage.

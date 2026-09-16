@@ -39,16 +39,16 @@ module StrengthSettings =
         if AblationSettings.strengthForcedOff () then
             StrengthRolloutMode.Off
         else
-        match
-            env "WANXIANGSHU_STRENGTH_MODE"
-            |> Option.map (fun value -> value.ToLowerInvariant())
-        with
-        | Some "off" -> StrengthRolloutMode.Off
-        | Some "dry-run" -> StrengthRolloutMode.DryRun
-        | Some "treatment" -> StrengthRolloutMode.Treatment
-        | Some "shadow"
-        | None -> StrengthRolloutMode.Shadow
-        | Some _ -> StrengthRolloutMode.Off
+            match
+                env "WANXIANGSHU_STRENGTH_MODE"
+                |> Option.map (fun value -> value.ToLowerInvariant())
+            with
+            | Some "off" -> StrengthRolloutMode.Off
+            | Some "dry-run" -> StrengthRolloutMode.DryRun
+            | Some "treatment" -> StrengthRolloutMode.Treatment
+            | Some "shadow"
+            | None -> StrengthRolloutMode.Shadow
+            | Some _ -> StrengthRolloutMode.Off
 
     let private buildCosts (values: float option list) =
         match values with

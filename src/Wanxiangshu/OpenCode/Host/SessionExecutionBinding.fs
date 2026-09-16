@@ -472,6 +472,12 @@ module SessionExecutionBinding =
                         |> Result.mapError ProviderStartObservationError.BloggerRequestKindUnsupported
                 | None, Some(ProviderRequestKind.BloggerMain | ProviderRequestKind.BloggerSquash as established) ->
                     return Some established
+                | None, None when
+                    (match execution.Lifecycle with
+                     | ChatExecutionLifecycle.Terminal _ -> true
+                     | _ -> false)
+                    ->
+                    return None
                 | None, _ ->
                     return! Error(ProviderStartObservationError.BloggerRequestMissing execution.Evidence.SessionId)
             }
@@ -659,8 +665,12 @@ module SessionExecutionBinding =
                 (ChatExecutionProjection.byKey key projection.AgentProjections.ChatExecutions)
                     .IsNone
             then
-                let agentOpt = baseAgent (SessionId.value sessionId)
-                do! admitUnestablishedKey durable key agentOpt projection
+                let isSatellite =
+                    SessionAssociationProjection.isSatellite sessionId projection.AgentProjections.Associations
+
+                if not isSatellite then
+                    let agentOpt = baseAgent (SessionId.value sessionId)
+                    do! admitUnestablishedKey durable key agentOpt projection
         }
 
     let private freezeExistingDurablePlan

@@ -7,7 +7,6 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { parse as parseToml } from 'smol-toml'
 import { generate } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
-import {
 import { create as createEventStore, dispose as disposeEventStore } from '../../../dist/Persistence/EventStore/Surface.js'
 import { pending } from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
 
@@ -37,14 +36,12 @@ const PROGRAM = `class Js extends JsProgram {
 
 // JS-085: sandbox → staging → preflight → commit is one owner-managed
 // workflow. Result validation precedes commit and success is coupled to commit.
-
-
-  run,
+import {
+  run as workflowRun,
   runObserved,
   caseName,
   rewritten,
   created,
-  failureCode,
   render,
 } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
 
@@ -63,7 +60,7 @@ const localStore = () => {
 
 const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')
 const runWorkflow = async (dir, program, { deadlineMs = 2000, store = null } = {}) => ({
-  outcome: await run(dir, 'Coder', 'en', program, deadlineMs, Date.now() + 60_000, 1 << 20, store),
+  outcome: await workflowRun(dir, 'Coder', 'en', program, deadlineMs, Date.now() + 60_000, 1 << 20, store),
   surface: coderSurface(),
 })
 

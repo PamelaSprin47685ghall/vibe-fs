@@ -75,14 +75,12 @@ module AblationSettings =
     let allowsTool (toolName: string) : bool =
         match AblationToolMap.tryNode toolName with
         | None -> true
-        | Some node ->
-            AblationMode.allowsToolExecution (AblationRegistry.modeFor node (current ()))
+        | Some node -> AblationMode.allowsToolExecution (AblationRegistry.modeFor node (current ()))
 
     let allowsToolSchema (toolName: string) : bool =
         match AblationToolMap.tryNode toolName with
         | None -> true
-        | Some node ->
-            AblationMode.allowsToolSchema (AblationRegistry.modeFor node (current ()))
+        | Some node -> AblationMode.allowsToolSchema (AblationRegistry.modeFor node (current ()))
 
     let allowsPrimaryAgent (agentName: string) : bool =
         let node =
@@ -103,5 +101,4 @@ module AblationSettings =
     let allowsFactTag (factTag: string) : bool =
         match AblationFactMap.tryNode factTag with
         | None -> true
-        | Some node ->
-            AblationRegistry.isBorrowedOrActive node (current ())
+        | Some node -> AblationRegistry.isBorrowedOrActive node (current ())

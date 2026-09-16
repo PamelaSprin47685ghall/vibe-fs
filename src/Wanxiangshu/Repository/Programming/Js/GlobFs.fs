@@ -248,34 +248,35 @@ module JsGlobFs =
 
         let rec walk (dir: string) (rel: string) : System.Threading.Tasks.Task<unit> =
             task {
-            let nested = loadIgnoreFile (pathJoin dir ".gitignore") rel
-            let mark = rules.Count
+                let nested = loadIgnoreFile (pathJoin dir ".gitignore") rel
+                let mark = rules.Count
 
-            let rootExcludes =
-                if rel = "" then
-                    loadIgnoreFile (pathJoin root ".git/info/exclude") ""
-                else
-                    []
+                let rootExcludes =
+                    if rel = "" then
+                        loadIgnoreFile (pathJoin root ".git/info/exclude") ""
+                    else
+                        []
 
-            for rule in rootExcludes do
-                rules.Add(rule)
+                for rule in rootExcludes do
+                    rules.Add(rule)
 
-            for rule in nested do
-                rules.Add(rule)
+                for rule in nested do
+                    rules.Add(rule)
 
-            do! yieldEventLoop ()
+                do! yieldEventLoop ()
 
-            try
-                let entries = tryListDirectory dir
-                for entry in entries do
-                    match classifyVisibleEntry rules rel dir entry with
-                    | SkipEntry -> ()
-                    | RecurseDirectory(full, childRel) -> do! walk full childRel
-                    | EmitFile childRel ->
-                        do! yieldEventLoop ()
-                        files.Add(childRel.Replace('\\', '/'))
-            finally
-                rules.RemoveRange(mark, rules.Count - mark)
+                try
+                    let entries = tryListDirectory dir
+
+                    for entry in entries do
+                        match classifyVisibleEntry rules rel dir entry with
+                        | SkipEntry -> ()
+                        | RecurseDirectory(full, childRel) -> do! walk full childRel
+                        | EmitFile childRel ->
+                            do! yieldEventLoop ()
+                            files.Add(childRel.Replace('\\', '/'))
+                finally
+                    rules.RemoveRange(mark, rules.Count - mark)
             }
 
         task {
@@ -289,13 +290,16 @@ module JsGlobFs =
     let glob (root: string) (pattern: string) : System.Threading.Tasks.Task<Result<JsGlobListing, JsFailure>> =
         task {
             let matchers = compileUserPatterns pattern
+
             match matchers with
             | Error failure -> return Error failure
             | Ok compiledMatchers ->
                 let! visible = collectVisibleFiles root
+
                 let paths =
                     visible
                     |> List.filter (fun rel -> Array.exists (fun re -> GlobMatch.testCompiled re rel) compiledMatchers)
                     |> List.sort
+
                 return Ok { Paths = paths }
         }

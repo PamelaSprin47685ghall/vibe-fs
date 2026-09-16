@@ -13,18 +13,3 @@
 
 3. **结构对称性与防退化门禁**：
    - `language-parity-gate` 检查资源文件成对存在、占位符集合一致、标识符不翻译以及语义锚点双语覆盖。
-
-## 验证与测试落点
-
-| 命题 | 落点测试 |
-|---|---|
-| PROVIDER-LANGUAGE-001 | `requirements/provider-language/tests/provider-language.test.mjs::WHAT[PROVIDER-LANGUAGE-001] ProviderLanguage parses en and zh-CN with locale mapping` |
-| PROVIDER-LANGUAGE-002 | `requirements/provider-language/tests/provider-language.test.mjs::WHAT[PROVIDER-LANGUAGE-002] bind once is immutable and conflicting rebind fails closed` |
-| PROVIDER-LANGUAGE-003 | `requirements/provider-language/tests/provider-language.test.mjs::WHAT[PROVIDER-LANGUAGE-003] child inherits owner language without re-reading global` |
-| PROVIDER-LANGUAGE-004 | `requirements/provider-language/tests/provider-prose-and-preference.test.mjs::WHAT[PROVIDER-LANGUAGE-004] preference change only affects future sessions` |
-| PROVIDER-LANGUAGE-005 | `requirements/provider-language/tests/provider-prose-and-preference.test.mjs::WHAT[PROVIDER-LANGUAGE-005] Class A prose loads through the resource layer, both locales` |
-| PROVIDER-LANGUAGE-006 | `requirements/provider-language/tests/provider-prose-and-preference.test.mjs::WHAT[PROVIDER-LANGUAGE-006] require language pair fails closed on missing semantic path` |
-| PROVIDER-LANGUAGE-007 | `requirements/provider-language/tests/provider-prose-and-preference.test.mjs::WHAT[PROVIDER-LANGUAGE-007] substitute replaces values and fails closed on missing or leftover` |
-| PROVIDER-LANGUAGE-008 | `requirements/provider-language/tests/provider-language.test.mjs::WHAT[PROVIDER-LANGUAGE-008] bound language loads its own locale leaf` |
-| PROVIDER-LANGUAGE-009 | `requirements/provider-language/tests/provider-prose-and-preference.test.mjs::WHAT[PROVIDER-LANGUAGE-009] render layer never translates or substitutes owning prose` |
-| PROVIDER-LANGUAGE-011 | `requirements/provider-language/tests/language-parity-gate.test.mjs::WHAT[PROVIDER-LANGUAGE-011] identifier parity mismatch reports semantic and diff` |

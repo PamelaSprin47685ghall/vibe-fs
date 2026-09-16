@@ -24,23 +24,3 @@ Host 层的物理展示树深度恒为 2，所有子节点物理上均直挂在 
 ### 4. 物理容器复用
 
 Session projection 只暴露 physical container classification 与 durable association，不存储 run-scoped identity 字段，也不生成 lifecycle terminal/closure。`interaction-authority` 只在 exact typed lifecycle source 已匹配 accepted root 后持久化 `AuthorityLogicalRunClosed`；participant identity 与 fresh root 再由新的原子 `AuthorityRootAccepted` payload 同时安装/接受。association removal、detach/attach、classification、wall clock、idle/timeout 与 Host tree 均不得替代 closure evidence。
-
-## 验证与测试落点
-
-| 命题 | 落点测试 |
-|---|---|
-| SESSION-ONTOLOGY-001 | `requirements/session-ontology/tests/session-ontology-classification.test.mjs::WHAT[SESSION-ONTOLOGY-001] HOST_008_execution_class_predicates_distinguish_work_and_leaf` |
-| SESSION-ONTOLOGY-002 | `requirements/session-ontology/tests/session-ontology-classification.test.mjs::WHAT[SESSION-ONTOLOGY-002] HOST_008_attached_carries_one_owner_and_one_kind` |
-| SESSION-ONTOLOGY-003 | `requirements/session-ontology/tests/sync-delegate.test.mjs::WHAT[SESSION-ONTOLOGY-003] HOST_008_delegate_role_maps_to_attachment` |
-| SESSION-ONTOLOGY-004 | `requirements/session-ontology/tests/session-ontology-classification.test.mjs::WHAT[SESSION-ONTOLOGY-004] HOST_008_companion_is_internal_leaf_attached` |
-| SESSION-ONTOLOGY-005 | `requirements/session-ontology/tests/session-association.test.mjs::WHAT[SESSION-ONTOLOGY-005] HOST_008_companion_cannot_serve_two_work_sessions` |
-| SESSION-ONTOLOGY-006 | `requirements/session-ontology/tests/session-flattening.test.mjs::WHAT[SESSION-ONTOLOGY-006] HOST_015_child_of_child_is_physically_parented_to_family_root` |
-| SESSION-ONTOLOGY-007 | `requirements/session-ontology/tests/session-ontology-classification.test.mjs::WHAT[SESSION-ONTOLOGY-007] HOST_008_durable_link_derives_work_and_leaf_cells` |
-| SESSION-ONTOLOGY-008 | `requirements/session-ontology/tests/session-association.test.mjs::WHAT[SESSION-ONTOLOGY-008] HOST_008_linking_records_both_directions` |
-| SESSION-ONTOLOGY-009 | `requirements/session-ontology/tests/session-association.test.mjs::WHAT[SESSION-ONTOLOGY-009] COMPANION_001_every_work_session_may_have_a_companion` |
-| SESSION-ONTOLOGY-010 | `requirements/session-ontology/tests/session-association.test.mjs::WHAT[SESSION-ONTOLOGY-010] COMPANION_001_unknown_session_is_not_a_companion` |
-| SESSION-ONTOLOGY-011 | `requirements/session-ontology/tests/session-ontology-classification.test.mjs::WHAT[SESSION-ONTOLOGY-011] HOST_008_strength_replica_is_not_a_satellite_kind` |
-| SESSION-ONTOLOGY-012 | `requirements/session-ontology/tests/sync-delegate.test.mjs::WHAT[SESSION-ONTOLOGY-012] HOST_008_root_and_attached_helpers_are_explicit` |
-| SESSION-ONTOLOGY-013 | `requirements/session-ontology/tests/terminal-policy.test.mjs::WHAT[SESSION-ONTOLOGY-013] TPOL_roleName_uses_catalog_labels_and_rejects_none` |
-| SESSION-ONTOLOGY-014 | `requirements/session-ontology/tests/satellite-kind.test.mjs::WHAT[SESSION-ONTOLOGY-014] HOST_014_satellite_kind_is_companion_only` |
-| SESSION-ONTOLOGY-015 | `requirements/session-ontology/tests/session-reuse-identity.test.mjs::WHAT[SESSION-ONTOLOGY-015] physical SessionId reuse requires durable logical-run closure` |

@@ -368,6 +368,8 @@ type CompanionHost
     /// C4: send failure / dead child must drop cached SessionId and Ensure task.
     /// Next material creates a fresh Blogger; never keep Parked after fail.
     member this.InvalidateBloggerCache() : unit =
+        let previousBloggerId = lock gate (fun () -> bloggerId)
+
         lock gate (fun () ->
             satelliteRuntime
             |> Option.iter (fun runtime -> runtime.Invalidate(primaryId, SatelliteKind.Companion))
@@ -376,6 +378,9 @@ type CompanionHost
             bloggerId <- None
             bloggerCreateFailed <- true
             companion.RecordBloggerClosed())
+
+        previousBloggerId
+        |> Option.iter (fun sid -> sessions.InterruptAttempt(sid) |> ignore)
 
     member _.Memory = companion.Memory
 

@@ -3,30 +3,18 @@ import test from 'node:test'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import {
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { create as createEventStore, dispose as disposeEventStore } from '../../../dist/Persistence/EventStore/Surface.js'
-import { pending } from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
+import { commitPlan, rollbackPlan as fsRollbackPlan } from '../../../dist/Repository/Programming/Js/FilesystemSurface.js'
+import { appendPrepared, pending, rollbackPlan as txRollbackPlan } from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
+import { run, caseName, rewritten, created, failureCode } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
 
-// tests/unit/js-tools/js-tools-fs.test.mjs — G5 Phase B-4: filesystem adapter
-// (JS-005/006/007/013/015).
-//
-// Strict UTF-8 reads, ordered anchor matching, full glob, all-or-nothing
-// commit with rollback. Pure Node fs against per-test temp directories.
-
-
-  readUtf8,
-  glob,
-  findAnchor,
-  requireUnique,
-  grep,
-  commitPlan,
-  rollbackPlan,
-} from '../../../dist/Repository/Programming/Js/FilesystemSurface.js'
-
-const exact = (text) => ({ kind: 'exact', text })
-const regex = (text) => ({ kind: 'regex', text })
+const rollbackPlan = (dirOrMutations, maybeRollback) => {
+  if (maybeRollback !== undefined) {
+    return fsRollbackPlan(dirOrMutations, maybeRollback)
+  }
+  return txRollbackPlan(dirOrMutations)
+}
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-jstools-'))
@@ -34,24 +22,6 @@ const sandbox = () => {
 }
 const ok = (result) => result.ok
 const codeOf = (result) => result.code
-const unwrap = (result) => {
-  assert.equal(result.ok, true, `expected Ok, got ${JSON.stringify(result.error)}`)
-  return result.value
-}
-
-// JS-012/015: transaction modules never enumerate EventStore history.
-// A crash leaves Prepared as audit evidence; the next process never mutates files to hide the broken tool.
-
-
-  appendPrepared,
-  appendCommitted,
-  pending,
-} from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
-
-const sandbox = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-txstore-'))
-  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
-}
 
 const localStore = (commonDir) => {
   const owned = commonDir ?? mkdtempSync(join(tmpdir(), 'wxs-txstore-events-'))
@@ -77,21 +47,6 @@ const prepared = (id, root, mutations) => ({
   workspaceRoot: root,
   mutations,
 })
-
-existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs'
-
-  run,
-  caseName,
-  rewritten,
-  created,
-  failureCode,
-} from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
 
 const makeDirectory = (prefix) => mkdtempSync(join(tmpdir(), prefix))
 
@@ -122,24 +77,8 @@ const mutationView = (mutation) => ({
   newText: mutation.newText,
 })
 
-// JS-012/015: transaction decisions consume plain mutation facts; durable
-// effects stay behind the EventStore-backed owner surfaces.
-
-
-  validateSingleIntent,
-  validateTargets,
-  validateFreshness,
-  preflight,
-  commitPlan,
-  rollbackPlan,
-} from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
-
-const ok = (result) => result.ok
-const codeOf = (result) => result.code
 const rewrite = (path, originalText, newText) => ({ kind: 'rewrite', path, originalText, newText })
 const create = (path, text) => ({ kind: 'create', path, text })
-
-const current = { 'a.txt': 'current' }
 
 test('WHAT[REPOSITORY-PROGRAMMING-015] JS015_rollbackPlan_is_CAS_and_preserves_third_party_changes', () => {
   const { dir, cleanup } = sandbox()

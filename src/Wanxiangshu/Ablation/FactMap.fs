@@ -7,9 +7,7 @@ module AblationFactMap =
 
     let private load () =
         match AblationManifest.loadFactMap () with
-        | Ok document ->
-            document.Facts
-            |> Map.map (fun _ value -> AblationNodeId.create value)
+        | Ok document -> document.Facts |> Map.map (fun _ value -> AblationNodeId.create value)
         | Error _ -> Map.empty
 
     let private map () =

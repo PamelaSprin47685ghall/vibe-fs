@@ -26,7 +26,7 @@ export const WATCHDOG_FEED_PATTERN = /\bwatchdog\??\.\s*advance\s*\(/
 // unreadable root, or a missing entry, is a fail-closed condition (never green
 // with zero files). cases/ may be absent or empty (not required, not walked).
 export const E2E_ROOT_REL = 'requirements/verification-system/tests/e2e'
-export const SOLE_ENTRY = 'entry.test.mjs'
+export const SOLE_ENTRY = '014.test.mjs'
 
 const norm = (p) => p.replace(/\\/g, '/')
 

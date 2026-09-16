@@ -66,6 +66,7 @@ module CasebookWorkflow =
     let private staleNeedsRefresh (case: Case) (root: string) : Task<bool> =
         task {
             let! replayed = CasebookReplay.replayAll root case.Observations
+
             match checkFreshness case replayed with
             | ReplayResult.Fresh -> return false
             | ReplayResult.Stale -> return true

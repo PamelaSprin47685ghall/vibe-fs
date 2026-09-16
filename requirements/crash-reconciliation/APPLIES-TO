@@ -10,4 +10,4 @@
 /src/Wanxiangshu/Execution/Session/RecoveryClosureProjection.fs
 /src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs
-/requirements/change-integration/tests/runtime.test.mjs
+/requirements/change-integration/tests/013.test.mjs

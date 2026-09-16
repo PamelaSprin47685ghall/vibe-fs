@@ -3,56 +3,19 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { read, write, edit, toolName } from '../../../dist/OpenCode/Tools/FileToolsSurface.js'
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs'
-import {
-import { generate } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
-
-// VERIFY-009 coverage: static read/write/edit tools through their registered
-// owner surface. Native Node fs is used only for fixture setup/observations.
-
+import { read, write, edit } from '../../../dist/OpenCode/Tools/FileToolsSurface.js'
+import { createApi, api as apiOf, stagedCount, stagedKinds } from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
+import { validateSingleIntent, validateTargets } from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-filetools-'))
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
-// JS runtime bindings and sandbox integration. The injected api is the only
-// model authority; reads/searches are JSON values and mutations only stage.
-
-
-  createApi,
-  api as apiOf,
-  stagedCount,
-  stagedKinds,
-  run,
-} from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
-
-const sandbox = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-bindings-'))
-  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
-}
-
-const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')
-
-// JS-012/015: transaction decisions consume plain mutation facts; durable
-// effects stay behind the EventStore-backed owner surfaces.
-
-
-  validateSingleIntent,
-  validateTargets,
-  validateFreshness,
-  preflight,
-  commitPlan,
-  rollbackPlan,
-} from '../../../dist/Repository/Programming/Js/TransactionSurface.js'
-
 const ok = (result) => result.ok
 const codeOf = (result) => result.code
 const rewrite = (path, originalText, newText) => ({ kind: 'rewrite', path, originalText, newText })
 const create = (path, text) => ({ kind: 'create', path, text })
-
-const current = { 'a.txt': 'current' }
 
 test('WHAT[REPOSITORY-PROGRAMMING-010] FILETOOLS_write_creates_file_and_reports_size', async () => {
   const { dir, cleanup } = sandbox()

@@ -31,7 +31,10 @@ module AblationSurface =
             | InvalidMode(node, raw) -> "InvalidMode", $"{node}={raw}"
             | DagViolation reason -> "DagViolation", reason
 
-        box {| ok = false; kind = kind; error = detail |}
+        box
+            {| ok = false
+               kind = kind
+               error = detail |}
 
     let load () =
         AblationSettings.resetCache ()
@@ -48,9 +51,11 @@ module AblationSurface =
 
     let allowsTool (toolName: string) : bool = AblationSettings.allowsTool toolName
 
-    let allowsToolSchema (toolName: string) : bool = AblationSettings.allowsToolSchema toolName
+    let allowsToolSchema (toolName: string) : bool =
+        AblationSettings.allowsToolSchema toolName
 
-    let allowsPrimaryAgent (agentName: string) : bool = AblationSettings.allowsPrimaryAgent agentName
+    let allowsPrimaryAgent (agentName: string) : bool =
+        AblationSettings.allowsPrimaryAgent agentName
 
     let strengthForcedOff () : bool = AblationSettings.strengthForcedOff ()
 

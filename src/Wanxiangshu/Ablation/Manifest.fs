@@ -55,7 +55,8 @@ module AblationManifest =
         let moduleDir = dirname (fileURLToPath (moduleUrl ()))
         pathJoin (pathJoin (moduleDir, ".."), "..")
 
-    let resourcesDir () = pathJoin (packageRoot (), "resources/ablation")
+    let resourcesDir () =
+        pathJoin (packageRoot (), "resources/ablation")
 
     let private readJson path decoder =
         if not (existsSync path) then
@@ -67,7 +68,8 @@ module AblationManifest =
             | Ok value -> Ok value
             | Error reason -> Error(InvalidManifest(sprintf "%s: %s" path reason))
 
-    let loadNodes () = readJson (pathJoin (resourcesDir (), "nodes.json")) decodeDocument
+    let loadNodes () =
+        readJson (pathJoin (resourcesDir (), "nodes.json")) decodeDocument
 
     let nodesFingerprint () =
         let path = pathJoin (resourcesDir (), "nodes.json")
@@ -85,23 +87,27 @@ module AblationManifest =
             let profiles = get.Required.Field "profiles" (Decode.dict decodeProfile)
             { Profiles = profiles })
 
-    let loadProfiles () = readJson (pathJoin (resourcesDir (), "profiles.json")) decodeProfiles
+    let loadProfiles () =
+        readJson (pathJoin (resourcesDir (), "profiles.json")) decodeProfiles
 
     let loadToolMap () =
-        readJson (pathJoin (resourcesDir (), "tool-map.json")) (
-            Decode.object (fun get ->
+        readJson
+            (pathJoin (resourcesDir (), "tool-map.json"))
+            (Decode.object (fun get ->
                 let tools = get.Required.Field "tools" (Decode.dict Decode.string)
-                { Tools = tools })
-        )
+                { Tools = tools }))
 
     let loadFactMap () =
-        readJson (pathJoin (resourcesDir (), "fact-map.json")) (
-            Decode.object (fun get ->
+        readJson
+            (pathJoin (resourcesDir (), "fact-map.json"))
+            (Decode.object (fun get ->
                 let facts = get.Required.Field "facts" (Decode.dict Decode.string)
-                { Facts = facts })
-        )
+                { Facts = facts }))
 
-    let validateDag (document: ManifestDocument) (modes: Map<AblationNodeId, AblationMode>) : Result<unit, AblationLoadError> =
+    let validateDag
+        (document: ManifestDocument)
+        (modes: Map<AblationNodeId, AblationMode>)
+        : Result<unit, AblationLoadError> =
         let modeOf (raw: string) =
             modes
             |> Map.tryFind (AblationNodeId.create raw)
@@ -119,7 +125,14 @@ module AblationManifest =
         |> List.tryPick (fun edge ->
             match edge.Kind with
             | "station-order" when atLeastActive edge.To && not (atLeastBorrowed edge.From) ->
-                Some(DagViolation(sprintf "station-order: %s requires %s at least borrowed before active downstream" edge.To edge.From))
+                Some(
+                    DagViolation(
+                        sprintf
+                            "station-order: %s requires %s at least borrowed before active downstream"
+                            edge.To
+                            edge.From
+                    )
+                )
             | "borrow" when atLeastBorrowed edge.To && not (atLeastBorrowed edge.From) ->
                 Some(DagViolation(sprintf "borrow: %s requires %s at least borrowed" edge.To edge.From))
             | "parent" when atLeastActive edge.To && not (atLeastBorrowed edge.From) ->
@@ -127,7 +140,7 @@ module AblationManifest =
             | _ -> None)
         |> function
             | Some error -> Error error
-            | None -> Ok ()
+            | None -> Ok()
 
     let nodeIds (document: ManifestDocument) =
         document.Nodes |> List.map (fun node -> AblationNodeId.create node.Id)
@@ -162,9 +175,7 @@ module AblationManifest =
         let fromProfile =
             match profileName with
             | None -> Ok baseModes
-            | Some name ->
-                loadProfiles ()
-                |> Result.bind (modesFromProfile document name)
+            | Some name -> loadProfiles () |> Result.bind (modesFromProfile document name)
 
         fromProfile
         |> Result.bind (fun profileModes ->

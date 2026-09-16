@@ -122,6 +122,12 @@ A continuation of the same Logical Run may be sent only after the Host has
 stopped automatic retry and the budget still allows it. Sending the
 continuation advances nothing and resets nothing.
 
+“Host has stopped automatic retry” has exactly one operational definition
+(PAR-022): the exact failed `ProviderRunIdentity`'s Host terminal projection
+has been observed. A coarse `session.error` only finalizes the failure; it
+never authorizes the physical send. PAR-023 owns the obligation for an
+accepted retry the Host never executed.
+
 ## PAR-015: StrengthReplica stays out of the owner budget
 
 A StrengthReplica attempt success or failure belongs to a speculative branch;
@@ -191,3 +197,37 @@ and the retry policy still decides the execution content.
 - 失败 attempt 是 LWR 重试时：其物理 provider 被永久 poison，后续重投由调度器轮换到其它候选目标；既不改变 participant identity，也不改变预算代数。
 - 权限只属于确切的失败与确切的 attempt：provider-run witness 单次消费，因此重复通知、旧回调、取消与提交未知都不能再取得该权限；未取得 typed `RetryFreshAttempt` licence 的失败同样不结算目标。
 - ordinary 恢复、sync delegate 装饰器与恢复重入共用同一规则：结算只发生在 `Retry.attempt` 授权且尚未 dispatch 的 redispatch 内，LWR 重试事实与失败目标绑定在同一处读取。
+
+
+## PAR-022: 恢复重投以宿主停止自动重试为发送前提
+
+PAR-014 的“Host has stopped automatic retry”只有一个操作定义：该确切
+`ProviderRunIdentity` 的宿主终态投影（finalized errored assistant message）已被观察。
+粗粒度的 `session.error`（coarse wake）只负责失败定局（PAR-003 的预算推进与
+HOST-BOUNDARY-005 的失败终结论），从不授权物理发送；`session.idle` 既会在 halt
+内发生（run 尚在），也会在 run 结束时发生，两者载荷相同，不能作为该前提的证据。
+
+- 发送前提是 process-local 的发送栅栏，精确 key = `(SessionId, ProviderRunIdentity)`：
+  同 session 的其它 run、迟到的 idle、更早或更晚的尝试都不能满足它；
+- 会话中止 / 替换 / 删除使该 session 上 pending 的恢复发送永久失效（安全侧失败）；
+- 栅栏不写 Journal、不参与 crash recovery。重启后没有观察 → 不自动发送；悬挂态
+  由 PAR-023 的义务扫描定夺；
+- 该前提不引入任何 timer/deadline/polling：它只等待宿主自己的终态投影事件。
+
+
+## PAR-023: 已接受但从未 ProviderStarted 的恢复重投是显式义务
+
+一个物理恢复重投可以被宿主接受（`ChatExecution` 的 `Accepted`）而永不执行：宿主的
+异步 prompt 在会话 run 仍在进行时只 join 该 run，而被 join 的 run 若以 error 结束就
+不会再读这条消息。这种状态不得悬空。
+
+- 义务的 durable 形状只有一种：该 `ChatExecutionKey` 处于 `Accepted` 且没有
+  `ProviderStarted`；
+- 触发只来自宿主证据：该 session 的 `session.idle` 到达时，对**该 session 中
+  恰好处于上述形状**的执行做一次恢复判定，其它生命周期的执行不属于本次义务，
+  不得被 idle 观察重新审判；
+- 定夺必须是终局的：要么用确切的已接受material恢复执行（仅当绑定了 typed
+  resume capability 时），要么把该执行结为终态并把该 turn 的失败报出——绝不静默悬挂；
+- 该义务不授权发送新文本、不生成替换 `PromptClaim`：PAR-003 的“一次失败最多一次
+  物理发送”不被本条款放宽；
+- 重启后的同一义务由 boot recovery sweep 承担（同样的窄化形状）。

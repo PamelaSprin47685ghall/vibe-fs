@@ -49,8 +49,7 @@
         "src/Wanxiangshu/Strength/Persistence/Store.fs"
       ],
       "proofs": [
-        "requirements/durable-events/tests/canonical-integrator.test.mjs",
-        "requirements/durable-events/tests/event-store-compile-boundary.test.mjs"
+        "requirements/durable-events/tests/001.test.mjs"
       ],
       "publishes": [
         "DurableEvents.Contract",
@@ -70,9 +69,7 @@
         "src/Wanxiangshu/Strength/Policy.fs"
       ],
       "proofs": [
-        "requirements/execution-model-routing/tests/model-routing-runtime.test.mjs",
-        "requirements/execution-model-routing/tests/model-capacity-exclusivity.test.mjs",
-        "requirements/execution-model-routing/tests/open-code-port-routing.test.mjs"
+        "requirements/execution-model-routing/tests/001.test.mjs"
       ],
       "publishes": [
         "ModelRouting.Contract",
@@ -91,7 +88,7 @@
         "src/Wanxiangshu/Execution/Session/Wait/Surface.fs"
       ],
       "proofs": [
-        "requirements/causal-wait/tests/causal-wait.test.mjs"
+        "requirements/causal-wait/tests/001.test.mjs"
       ],
       "publishes": [
         "Session.Quiescence",
@@ -105,7 +102,7 @@
         "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
       ],
       "proofs": [
-        "requirements/host-boundary/tests/ordered-transform.test.mjs"
+        "requirements/host-boundary/tests/001.test.mjs"
       ],
       "publishes": [
         "OpenCode.PluginTransforms"
@@ -127,7 +124,7 @@
         "src/Wanxiangshu/OpenCode/Host/SharedState.fs"
       ],
       "proofs": [
-        "requirements/host-boundary/tests/host010-run-id-equivalence.test.mjs"
+        "requirements/host-boundary/tests/001.test.mjs"
       ],
       "publishes": [
         "Host.ProviderRunBinding",
@@ -144,8 +141,7 @@
         "src/Wanxiangshu/Mission/Relay/Surface.fs"
       ],
       "proofs": [
-        "requirements/relay-incumbency/tests/loop.test.mjs",
-        "requirements/relay-incumbency/tests/continuation.test.mjs"
+        "requirements/relay-incumbency/tests/001.test.mjs"
       ],
       "publishes": [
         "Relay.Incumbency"
@@ -161,8 +157,8 @@
         "src/Wanxiangshu/Mission/Relay/OpenCode/WorkspaceSnapshot.fs"
       ],
       "proofs": [
-        "requirements/relay-assessment/tests/certificate.test.mjs",
-        "requirements/relay-incumbency/tests/continuation.test.mjs"
+        "requirements/relay-assessment/tests/001.test.mjs",
+        "requirements/relay-incumbency/tests/001.test.mjs"
       ],
       "publishes": [
         "Relay.Assessment",
@@ -180,8 +176,8 @@
         "src/Wanxiangshu/Mission/Relay/Retirement/Surface.fs"
       ],
       "proofs": [
-        "requirements/interaction-authority/tests/join-guard.test.mjs",
-        "requirements/change-integration/tests/gate-scope.test.mjs",
+        "requirements/interaction-authority/tests/001.test.mjs",
+        "requirements/change-integration/tests/001.test.mjs",
         "requirements/verification-system/tests/e2e/scenarios/long-stroke.toml",
         "requirements/verification-system/tests/e2e/support/long-stroke-oracles.mjs"
       ],
@@ -199,7 +195,7 @@
         "src/Wanxiangshu/Mission/Relay/ProjectionSurface.fs"
       ],
       "proofs": [
-        "requirements/relay-context-projection/tests/loop-projection.test.mjs"
+        "requirements/relay-context-projection/tests/001.test.mjs"
       ],
       "publishes": [
         "Relay.ContextProjection"
@@ -224,7 +220,7 @@
         "src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs"
       ],
       "proofs": [
-        "requirements/managed-session-lifecycle/tests/session-recovery.test.mjs"
+        "requirements/managed-session-lifecycle/tests/001.test.mjs"
       ],
       "publishes": [
         "Session.Lifecycle",
@@ -248,7 +244,7 @@
         "src/Wanxiangshu/OpenCode/Tools/ToolSurface.fs"
       ],
       "proofs": [
-        "requirements/capability-enforcement/tests/tool-spec-contracts.test.mjs"
+        "requirements/capability-enforcement/tests/001.test.mjs"
       ],
       "publishes": [
         "ToolOwner.ToolSpec"
@@ -261,7 +257,7 @@
         "src/Wanxiangshu/OpenCode/Tools/NodeFs.fs"
       ],
       "proofs": [
-        "requirements/structured-workflow/tests/owner-project-boundaries.test.mjs"
+        "requirements/structured-workflow/tests/001.test.mjs"
       ],
       "publishes": [
         "ToolOwner.NodeFsPort"
@@ -274,7 +270,7 @@
         "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
       ],
       "proofs": [
-        "requirements/host-boundary/tests/host-signal-bootstrap-composition.test.mjs"
+        "requirements/host-boundary/tests/001.test.mjs"
       ],
       "publishes": [
         "OpenCode.HostSignalBootstrap"
@@ -290,8 +286,7 @@
         "src/Wanxiangshu/Mission/Obligation/Todo/Model.fs"
       ],
       "proofs": [
-        "requirements/obligation-ledger/tests/magic-todo.test.mjs",
-        "requirements/obligation-ledger/tests/obligation-ledger-workflow-contract.test.mjs"
+        "requirements/obligation-ledger/tests/001.test.mjs"
       ],
       "publishes": [
         "Mission.Authority",
@@ -308,7 +303,7 @@
         "src/Wanxiangshu/Composition/Turn/Program.fs"
       ],
       "proofs": [
-        "requirements/managed-session-lifecycle/tests/attached-session-runtime.test.mjs"
+        "requirements/managed-session-lifecycle/tests/001.test.mjs"
       ],
       "publishes": [
         "Composition.Turn"
@@ -324,7 +319,7 @@
         "src/Wanxiangshu/Execution/Delegation/Join.fs"
       ],
       "proofs": [
-        "requirements/delegation/tests/join-completion.test.mjs"
+        "requirements/delegation/tests/001.test.mjs"
       ],
       "publishes": [
         "Delegation.ChildOutcome",
@@ -340,7 +335,7 @@
         "src/Wanxiangshu/Context/Companion/Transform.fs"
       ],
       "proofs": [
-        "requirements/context-compression/tests/companion-projection.test.mjs"
+        "requirements/context-compression/tests/001.test.mjs"
       ],
       "publishes": [
         "Context.CompanionContract",
@@ -367,18 +362,8 @@
         "src/Wanxiangshu/Context/Companion/RuntimeSurface.fs"
       ],
       "proofs": [
-        "requirements/context-compression/tests/attempt-plan-probe-eligibility.test.mjs",
-        "requirements/context-compression/tests/companion-projection.test.mjs",
-        "requirements/context-compression/tests/ctx-capacity-observation-forbidden.test.mjs",
-        "requirements/context-compression/tests/ctx-opening-floor.test.mjs",
-        "requirements/context-compression/tests/ctx014.test.mjs",
-        "requirements/context-compression/tests/host-compaction-policy.test.mjs",
-        "requirements/context-compression/tests/injected-context-reanchor.test.mjs",
-        "requirements/context-compression/tests/probe-selection.test.mjs",
-        "requirements/context-compression/tests/projection-algebra-blogframes.test.mjs",
-        "requirements/context-compression/tests/retry-policy.test.mjs",
-        "requirements/context-compression/tests/terminal-validity.test.mjs",
-        "requirements/durable-events/tests/fold-context-recovery.test.mjs"
+        "requirements/context-compression/tests/001.test.mjs",
+        "requirements/durable-events/tests/001.test.mjs"
       ],
       "publishes": [
         "Context.CompanionContract"
@@ -397,14 +382,7 @@
         "src/Wanxiangshu/Context/Trace/SemanticTraceSurface.fs"
       ],
       "proofs": [
-        "requirements/semantic-trace/tests/x-trace.test.mjs",
-        "requirements/semantic-trace/tests/x-trace-capture.test.mjs",
-        "requirements/semantic-trace/tests/x-trace-capture-boundary.test.mjs",
-        "requirements/semantic-trace/tests/x-trace-capture-hardening.test.mjs",
-        "requirements/semantic-trace/tests/x-trace-compaction-survival.test.mjs",
-        "requirements/semantic-trace/tests/x-trace-fold.test.mjs",
-        "requirements/semantic-trace/tests/x-trace-locality.test.mjs",
-        "requirements/semantic-trace/tests/x-trace-provider-run-provenance.test.mjs"
+        "requirements/semantic-trace/tests/001.test.mjs"
       ],
       "publishes": [
         "SemanticTrace.Contract"
@@ -423,16 +401,7 @@
         "src/Wanxiangshu/Context/Prefix/XWireSurface.fs"
       ],
       "proofs": [
-        "requirements/prefix-stability/tests/attempt-plan-prefix.test.mjs",
-        "requirements/prefix-stability/tests/g2-inspector-provider-wire-prefix.test.mjs",
-        "requirements/prefix-stability/tests/pair-thought-anchored.test.mjs",
-        "requirements/prefix-stability/tests/pair-thought-transform.test.mjs",
-        "requirements/prefix-stability/tests/prefix-append-only-law.test.mjs",
-        "requirements/prefix-stability/tests/prefix-epoch-todo-checkpoint.test.mjs",
-        "requirements/prefix-stability/tests/prefix-epoch.test.mjs",
-        "requirements/prefix-stability/tests/projection-algebra-step5-digest.test.mjs",
-        "requirements/prefix-stability/tests/system-prompt-stability.test.mjs",
-        "requirements/prefix-stability/tests/xwire-transform-surface.test.mjs"
+        "requirements/prefix-stability/tests/001.test.mjs"
       ],
       "publishes": [
         "PrefixStability.Contract",
@@ -450,8 +419,8 @@
         "src/Wanxiangshu/Strength/Replica/Transform.fs"
       ],
       "proofs": [
-        "requirements/durable-events/tests/event-store-compile-boundary.test.mjs",
-        "requirements/speculative-investigation/tests/replica-transform.test.mjs"
+        "requirements/durable-events/tests/001.test.mjs",
+        "requirements/speculative-investigation/tests/001.test.mjs"
       ],
       "publishes": [
         "Strength.Contract"
@@ -467,7 +436,7 @@
         "src/Wanxiangshu/Enforcer/Rulebook.fs"
       ],
       "proofs": [
-        "requirements/behavior-diagnosis/tests/tip-v2-contract.test.mjs"
+        "requirements/behavior-diagnosis/tests/001.test.mjs"
       ],
       "publishes": [
         "Enforcer.ContinuationContract",
@@ -502,11 +471,7 @@
         "src/Wanxiangshu/Git/WorktreeResource.fs"
       ],
       "proofs": [
-        "requirements/change-integration/tests/job.test.mjs",
-        "requirements/change-integration/tests/git-operations.test.mjs",
-        "requirements/change-integration/tests/integration-gate.test.mjs",
-        "requirements/change-integration/tests/worktree-resource.test.mjs",
-        "requirements/change-integration/tests/runtime.test.mjs"
+        "requirements/change-integration/tests/001.test.mjs"
       ],
       "publishes": [
         "Change.Host.Surface",
@@ -528,10 +493,7 @@
         "src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs"
       ],
       "proofs": [
-        "requirements/durable-convergence/tests/event-store-merge.test.mjs",
-        "requirements/durable-convergence/tests/writer-stream-sync.test.mjs",
-        "requirements/durable-convergence/tests/replica-merge-laws.test.mjs",
-        "requirements/durable-convergence/tests/event-store-converge.test.mjs"
+        "requirements/durable-convergence/tests/001.test.mjs"
       ],
       "publishes": [
         "DurableConvergence.Contract",
@@ -560,9 +522,7 @@
         "src/Wanxiangshu/Mission/Obligation/Todo/Surface.fs"
       ],
       "proofs": [
-        "requirements/obligation-ledger/tests/magic-todo.test.mjs",
-        "requirements/obligation-ledger/tests/obligation-ledger-workflow-contract.test.mjs",
-        "requirements/obligation-ledger/tests/magic-todo-membrane.test.mjs"
+        "requirements/obligation-ledger/tests/001.test.mjs"
       ],
       "publishes": [
         "Obligation.LedgerContract",
@@ -579,8 +539,7 @@
         "src/Wanxiangshu/Mission/WorkRecord/Surface.fs"
       ],
       "proofs": [
-        "requirements/work-record/tests/lifecycle-work-record.test.mjs",
-        "requirements/work-record/tests/work-record-sections.test.mjs"
+        "requirements/work-record/tests/001.test.mjs"
       ],
       "publishes": [
         "WorkRecord.Surface",
@@ -595,9 +554,7 @@
         "src/Wanxiangshu/Participant/Persona/OfficeCapabilitySurface.fs"
       ],
       "proofs": [
-        "requirements/office-capability/tests/office-capability-integrity.test.mjs",
-        "requirements/office-capability/tests/office-capability-gate.test.mjs",
-        "requirements/office-capability/tests/office-capability-role-law-contract.test.mjs"
+        "requirements/office-capability/tests/001.test.mjs"
       ],
       "publishes": [
         "OfficeCapability.Contract",
@@ -612,7 +569,7 @@
         "src/Wanxiangshu/Verification/TemporalSurface.fs"
       ],
       "proofs": [
-        "requirements/verification-system/tests/proof-ladder.test.mjs"
+        "requirements/verification-system/tests/001.test.mjs"
       ],
       "publishes": [
         "VerificationSystem.TemporalSurface",
@@ -628,9 +585,7 @@
         "src/Wanxiangshu/OpenCode/Host/StealthBrowserMcpConfigSurface.fs"
       ],
       "proofs": [
-        "requirements/external-investigation/tests/browser-provenance-canary.test.mjs",
-        "requirements/external-investigation/tests/stealth-browser-role-lock.test.mjs",
-        "requirements/external-investigation/tests/facts-not-obligations.test.mjs"
+        "requirements/external-investigation/tests/010.test.mjs"
       ],
       "publishes": [
         "ExternalInvestigation.McpConfig",
@@ -647,7 +602,7 @@
         "src/Wanxiangshu/Interaction/Concern/Surface.fs"
       ],
       "proofs": [
-        "requirements/concern-routing/tests/concern-routing.test.mjs"
+        "requirements/concern-routing/tests/001.test.mjs"
       ],
       "publishes": [
         "ConcernRouting.Contract"
@@ -663,7 +618,7 @@
         "src/Wanxiangshu/Interaction/Attention/Surface.fs"
       ],
       "proofs": [
-        "requirements/attention-regulation/tests/attention-regulation.test.mjs"
+        "requirements/attention-regulation/tests/001.test.mjs"
       ],
       "publishes": [
         "AttentionRegulation.Contract"
@@ -697,32 +652,10 @@
         "src/Wanxiangshu/Participant/Provider/Attempt/TerminalValidity.fs"
       ],
       "proofs": [
-        "requirements/context-compression/tests/attempt-plan-probe-eligibility.test.mjs",
-        "requirements/context-compression/tests/blog-entry-committed.test.mjs",
-        "requirements/context-compression/tests/blog-projection.test.mjs",
-        "requirements/context-compression/tests/blogger-convergence-gaps.test.mjs",
-        "requirements/context-compression/tests/blogger-delta.test.mjs",
-        "requirements/context-compression/tests/blogger-runtime.test.mjs",
-        "requirements/context-compression/tests/blogger-seal-reactivate.test.mjs",
-        "requirements/context-compression/tests/companion-ordinary-material-surface.test.mjs",
-        "requirements/context-compression/tests/companion-projection.test.mjs",
-        "requirements/context-compression/tests/ctx-capacity-observation-forbidden.test.mjs",
-        "requirements/context-compression/tests/ctx-opening-floor.test.mjs",
-        "requirements/context-compression/tests/ctx014.test.mjs",
-        "requirements/context-compression/tests/enforcer-cycle-commit-convergence.test.mjs",
-        "requirements/context-compression/tests/enforcer-cycle-convergence.test.mjs",
-        "requirements/context-compression/tests/enforcer-frame-loader.test.mjs",
-        "requirements/context-compression/tests/enforcer-open-reload.test.mjs",
-        "requirements/context-compression/tests/host-compaction-policy.test.mjs",
-        "requirements/context-compression/tests/injected-context-reanchor.test.mjs",
-        "requirements/context-compression/tests/parked-transform.test.mjs",
-        "requirements/context-compression/tests/probe-selection.test.mjs",
-        "requirements/context-compression/tests/projection-algebra-blogframes.test.mjs",
-        "requirements/context-compression/tests/retry-policy.test.mjs",
-        "requirements/context-compression/tests/terminal-validity.test.mjs",
-        "requirements/capability-enforcement/tests/blogger-repair-trace.test.mjs",
-        "requirements/effect-accounting/tests/external-adapter-boundary.test.mjs",
-        "requirements/host-boundary/tests/host-capability-observation.test.mjs"
+        "requirements/context-compression/tests/001.test.mjs",
+        "requirements/capability-enforcement/tests/001.test.mjs",
+        "requirements/effect-accounting/tests/001.test.mjs",
+        "requirements/host-boundary/tests/001.test.mjs"
       ],
       "publishes": [
         "Context.CompanionContract",
@@ -747,11 +680,8 @@
         "src/Wanxiangshu/Participant/Provider/Attempt/RetryPolicy.fs"
       ],
       "proofs": [
-        "requirements/provider-attempt-recovery/tests/abort-residue.test.mjs",
-        "requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs",
-        "requirements/provider-attempt-recovery/tests/fallback-aabb-confluence.test.mjs",
-        "requirements/provider-attempt-recovery/tests/fallback-ledger.test.mjs",
-        "requirements/structured-workflow/tests/recovery-reentry.test.mjs"
+        "requirements/provider-attempt-recovery/tests/001.test.mjs",
+        "requirements/structured-workflow/tests/001.test.mjs"
       ],
       "publishes": [
         "Provider.AttemptRecovery"
@@ -770,8 +700,7 @@
         "src/Wanxiangshu/Resources/ProviderResourceBytes.fs"
       ],
       "proofs": [
-        "requirements/provider-language/tests/provider-language.test.mjs",
-        "requirements/provider-language/tests/provider-prose-and-preference.test.mjs"
+        "requirements/provider-language/tests/001.test.mjs"
       ],
       "publishes": [
         "Provider.Language",
@@ -796,10 +725,7 @@
         "src/Wanxiangshu/Foundation/SyntheticTomlSurface.fs"
       ],
       "proofs": [
-        "requirements/provider-projection/tests/message-intent-algebra.test.mjs",
-        "requirements/provider-projection/tests/projection-algebra.test.mjs",
-        "requirements/provider-projection/tests/projection.test.mjs",
-        "requirements/provider-projection/tests/provider-projection-boundary.test.mjs"
+        "requirements/provider-projection/tests/001.test.mjs"
       ],
       "publishes": [
         "Foundation.LlmFacing",
@@ -826,16 +752,7 @@
         "src/Wanxiangshu/Participant/Persona/Surface.fs"
       ],
       "proofs": [
-        "requirements/participant-identity/tests/catalog.test.mjs",
-        "requirements/participant-identity/tests/identity-boundary-gate.test.mjs",
-        "requirements/participant-identity/tests/identity-lineage.test.mjs",
-        "requirements/participant-identity/tests/identity-recovery.test.mjs",
-        "requirements/participant-identity/tests/identity-surface-smoke.test.mjs",
-        "requirements/participant-identity/tests/participant-identity-consumers.test.mjs",
-        "requirements/participant-identity/tests/participant-identity.test.mjs",
-        "requirements/participant-identity/tests/session-execution-binding.test.mjs",
-        "requirements/participant-identity/tests/session-reuse-composition.test.mjs",
-        "requirements/participant-identity/tests/session-reuse-identity.test.mjs"
+        "requirements/participant-identity/tests/001.test.mjs"
       ],
       "publishes": [
         "ParticipantIdentity.RoleVocabulary",
@@ -856,8 +773,7 @@
         "src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs"
       ],
       "proofs": [
-        "requirements/interaction-authority/tests/completed-turn-classifier.test.mjs",
-        "requirements/interaction-authority/tests/repair-lifecycle.test.mjs"
+        "requirements/interaction-authority/tests/001.test.mjs"
       ],
       "publishes": [
         "Interaction.Repair.Classification",
@@ -871,7 +787,7 @@
         "src/Wanxiangshu/OpenCode/Tools/AttentionTools.fs"
       ],
       "proofs": [
-        "requirements/attention-regulation/tests/attention-regulation.test.mjs"
+        "requirements/attention-regulation/tests/001.test.mjs"
       ],
       "publishes": [
         "ToolOwner.ToolSpec"
@@ -884,7 +800,7 @@
         "src/Wanxiangshu/OpenCode/Tools/ConcernTools.fs"
       ],
       "proofs": [
-        "requirements/concern-routing/tests/concern-routing.test.mjs"
+        "requirements/concern-routing/tests/001.test.mjs"
       ],
       "publishes": [
         "ToolOwner.ToolSpec"
@@ -900,7 +816,7 @@
         "src/Wanxiangshu/Interaction/Repair/Port.fs"
       ],
       "proofs": [
-        "requirements/dispatch-protocol/tests/send-format.test.mjs"
+        "requirements/dispatch-protocol/tests/001.test.mjs"
       ],
       "publishes": [
         "PromptDispatch.RuntimeNudge",
@@ -916,7 +832,7 @@
         "src/Wanxiangshu/Participant/Provider/Attempt/RequestKind.fs"
       ],
       "proofs": [
-        "requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs"
+        "requirements/provider-attempt-recovery/tests/001.test.mjs"
       ],
       "publishes": [
         "Provider.RequestKind"
@@ -931,7 +847,7 @@
         "src/Wanxiangshu/Host/Digest.fs"
       ],
       "proofs": [
-        "requirements/host-boundary/tests/sphinx-mcp-launch.test.mjs"
+        "requirements/host-boundary/tests/001.test.mjs"
       ],
       "publishes": [
         "Foundation.FatalProcess",
@@ -948,7 +864,7 @@
         "src/Wanxiangshu/Process/DeadlineSurface.fs"
       ],
       "proofs": [
-        "requirements/time-capability/tests/deadline-typed.test.mjs"
+        "requirements/time-capability/tests/001.test.mjs"
       ],
       "publishes": [
         "TimeCapability.Ports",
@@ -966,7 +882,7 @@
         "src/Wanxiangshu/Foundation/TaskResult.fs"
       ],
       "proofs": [
-        "requirements/intra-participant-parallelism/tests/foundation-utilities.test.mjs"
+        "requirements/intra-participant-parallelism/tests/001.test.mjs"
       ],
       "publishes": [
         "Foundation.AsyncSupport",
@@ -985,7 +901,7 @@
         "src/Wanxiangshu/Foundation/OutcomeSurface.fs"
       ],
       "proofs": [
-        "requirements/dispatch-protocol/tests/ingress-identity.test.mjs"
+        "requirements/dispatch-protocol/tests/001.test.mjs"
       ],
       "publishes": [
         "Foundation.Identity",
@@ -1001,7 +917,7 @@
         "src/Wanxiangshu/Resources/PromptSurface.fs"
       ],
       "proofs": [
-        "requirements/cognitive-environment/tests/blogger-chronicle-text.test.mjs"
+        "requirements/cognitive-environment/tests/001.test.mjs"
       ],
       "publishes": [
         "cognitive-environment.Contract"
@@ -1017,8 +933,7 @@
         "src/Wanxiangshu/Execution/Session/LoopDetectorSurface.fs"
       ],
       "proofs": [
-        "requirements/degeneration-guard/tests/loop-detector-memory.test.mjs",
-        "requirements/degeneration-guard/tests/m6-slice-boundary.test.mjs"
+        "requirements/degeneration-guard/tests/001.test.mjs"
       ],
       "publishes": [
         "degeneration-guard.Contract"
@@ -1034,7 +949,7 @@
         "src/Wanxiangshu/Execution/Session/OpenCode/HorizonTool.fs"
       ],
       "proofs": [
-        "requirements/participant-horizon/tests/admission-law.test.mjs"
+        "requirements/participant-horizon/tests/001.test.mjs"
       ],
       "publishes": [
         "participant-horizon.Contract"
@@ -1051,7 +966,7 @@
         "src/Wanxiangshu/OpenCode/Tools/ToolRegistrySurface.fs"
       ],
       "proofs": [
-        "requirements/capability-enforcement/tests/agent-permission-gate.test.mjs"
+        "requirements/capability-enforcement/tests/001.test.mjs"
       ],
       "publishes": [
         "capability-enforcement.Contract"
@@ -1068,7 +983,7 @@
         "src/Wanxiangshu/OpenCode/Host/ModelCapacity/Surface.fs"
       ],
       "proofs": [
-        "requirements/execution-model-routing/tests/admission-queue.test.mjs"
+        "requirements/execution-model-routing/tests/001.test.mjs"
       ],
       "publishes": [
         "execution-model-routing.Contract"
@@ -1085,7 +1000,7 @@
         "src/Wanxiangshu/Enforcer/Guidance/TipSurface.fs"
       ],
       "proofs": [
-        "requirements/guidance-delivery/tests/audience-separation.test.mjs"
+        "requirements/guidance-delivery/tests/001.test.mjs"
       ],
       "publishes": [
         "guidance-delivery.Contract"
@@ -1102,7 +1017,7 @@
         "src/Wanxiangshu/Participant/Provider/Attempt/FailureSurface.fs"
       ],
       "proofs": [
-        "requirements/execution-failure-policy/tests/cancel-retry-fallback-stream.property.test.mjs"
+        "requirements/execution-failure-policy/tests/001.test.mjs"
       ],
       "publishes": [
         "execution-failure-policy.Contract"
@@ -1121,8 +1036,7 @@
         "src/Wanxiangshu/Process/Surface.fs"
       ],
       "proofs": [
-        "requirements/time-capability/tests/ambient-time-forbidden.test.mjs",
-        "requirements/time-capability/tests/m6-slice-boundary.test.mjs"
+        "requirements/time-capability/tests/001.test.mjs"
       ],
       "publishes": [
         "time-capability.Contract"
@@ -1141,7 +1055,7 @@
         "src/Wanxiangshu/Execution/Session/Ownership.fs"
       ],
       "proofs": [
-        "requirements/session-ontology/tests/satellite-kind.test.mjs"
+        "requirements/session-ontology/tests/001.test.mjs"
       ],
       "publishes": [
         "session-ontology.Contract"
@@ -1159,7 +1073,7 @@
         "src/Wanxiangshu/Process/LargeGateSurface.fs"
       ],
       "proofs": [
-        "requirements/output-distillation/tests/distiller-fragment-humility.test.mjs"
+        "requirements/output-distillation/tests/001.test.mjs"
       ],
       "publishes": [
         "output-distillation.Contract"
@@ -1177,7 +1091,7 @@
         "src/Wanxiangshu/Enforcer/InstitutionalLearning/Surface.fs"
       ],
       "proofs": [
-        "requirements/institutional-learning/tests/institutional-learning.test.mjs"
+        "requirements/institutional-learning/tests/001.test.mjs"
       ],
       "publishes": [
         "institutional-learning.Contract"
@@ -1195,7 +1109,7 @@
         "src/Wanxiangshu/Resources/RuntimeResources.fs"
       ],
       "proofs": [
-        "requirements/distribution/tests/cwd-independent-resources.test.mjs"
+        "requirements/distribution/tests/001.test.mjs"
       ],
       "publishes": [
         "distribution.Contract"
@@ -1217,7 +1131,7 @@
         "src/Wanxiangshu/Repository/Investigation/WarmStartSurface.fs"
       ],
       "proofs": [
-        "requirements/repository-investigation/tests/investigation-resource-laws.test.mjs"
+        "requirements/repository-investigation/tests/001.test.mjs"
       ],
       "publishes": [
         "repository-investigation.Contract"
@@ -1239,7 +1153,7 @@
         "src/Wanxiangshu/Execution/Fission/Surface.fs"
       ],
       "proofs": [
-        "requirements/intra-participant-parallelism/tests/fission-domain.test.mjs"
+        "requirements/intra-participant-parallelism/tests/001.test.mjs"
       ],
       "publishes": [
         "intra-participant-parallelism.Contract"
@@ -1262,7 +1176,7 @@
         "src/Wanxiangshu/Requirement/Grounding/Surface.fs"
       ],
       "proofs": [
-        "requirements/requirement-grounding/tests/grounding-delivery.test.mjs"
+        "requirements/requirement-grounding/tests/001.test.mjs"
       ],
       "publishes": [
         "requirement-grounding.Contract"
@@ -1288,7 +1202,7 @@
         "src/Wanxiangshu/Interaction/Authority/Surface.fs"
       ],
       "proofs": [
-        "requirements/interaction-authority/tests/authority-acceptance-identity.test.mjs"
+        "requirements/interaction-authority/tests/001.test.mjs"
       ],
       "publishes": [
         "interaction-authority.Contract"
@@ -1314,7 +1228,7 @@
         "src/Wanxiangshu/Process/Spool.fs"
       ],
       "proofs": [
-        "requirements/process-execution/tests/executor-tool.test.mjs"
+        "requirements/process-execution/tests/001.test.mjs"
       ],
       "publishes": [
         "process-execution.Contract"
@@ -1339,7 +1253,7 @@
         "src/Wanxiangshu/Execution/Session/Recovery/Model.fs"
       ],
       "proofs": [
-        "requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs"
+        "requirements/dispatch-protocol/tests/001.test.mjs"
       ],
       "publishes": [
         "dispatch-protocol.Contract"
@@ -1367,7 +1281,7 @@
         "src/Wanxiangshu/Execution/Session/ChatExecution/Surface.fs"
       ],
       "proofs": [
-        "requirements/managed-chat-execution/tests/acceptance-idempotence.test.mjs"
+        "requirements/managed-chat-execution/tests/001.test.mjs"
       ],
       "publishes": [
         "managed-chat-execution.Contract"
@@ -1395,7 +1309,7 @@
         "src/Wanxiangshu/Enforcer/Surface.fs"
       ],
       "proofs": [
-        "requirements/behavior-diagnosis/tests/blog-entry-committed.test.mjs"
+        "requirements/behavior-diagnosis/tests/001.test.mjs"
       ],
       "publishes": [
         "behavior-diagnosis.Contract"
@@ -1424,7 +1338,7 @@
         "src/Wanxiangshu/Strength/TurnEvidence.fs"
       ],
       "proofs": [
-        "requirements/speculative-investigation/tests/authority-policy.test.mjs"
+        "requirements/speculative-investigation/tests/001.test.mjs"
       ],
       "publishes": [
         "speculative-investigation.Contract"
@@ -1456,7 +1370,7 @@
         "src/Wanxiangshu/Repository/Knowledge/Casebook/Workflow.fs"
       ],
       "proofs": [
-        "requirements/knowledge-reuse/tests/bookkeeper-mechanical.test.mjs"
+        "requirements/knowledge-reuse/tests/001.test.mjs"
       ],
       "publishes": [
         "knowledge-reuse.Contract"
@@ -1489,7 +1403,7 @@
         "src/Wanxiangshu/Sphinx/WireEncode.fs"
       ],
       "proofs": [
-        "requirements/epistemic-reasoning/tests/bayes.test.mjs"
+        "requirements/epistemic-reasoning/tests/001.test.mjs"
       ],
       "publishes": [
         "epistemic-reasoning.Contract"
@@ -1524,7 +1438,7 @@
         "src/Wanxiangshu/Repository/Programming/Js/WorkflowSurface.fs"
       ],
       "proofs": [
-        "requirements/repository-programming/tests/file-mutation-tools.test.mjs"
+        "requirements/repository-programming/tests/001.test.mjs"
       ],
       "publishes": [
         "repository-programming.Contract"
@@ -1595,9 +1509,7 @@
         "src/Wanxiangshu/OpenCode/Signals/HostSignalSubscribe.fs"
       ],
       "proofs": [
-        "requirements/host-boundary/tests/chat-hook-settlement.test.mjs",
-        "requirements/host-boundary/tests/host-session-contract-closure.test.mjs",
-        "requirements/host-boundary/tests/m6-slice-boundary.test.mjs"
+        "requirements/host-boundary/tests/001.test.mjs"
       ],
       "publishes": [
         "host-boundary.Contract"
@@ -1611,8 +1523,7 @@
         "src/Wanxiangshu/OpenCode/Host/RootWorkspaceRuntime.fs"
       ],
       "proofs": [
-        "requirements/host-boundary/tests/m6-slice-boundary.test.mjs",
-        "requirements/host-boundary/tests/shared-state.test.mjs"
+        "requirements/host-boundary/tests/001.test.mjs"
       ],
       "publishes": [
         "Host.RootWorkspace.Contract"
@@ -1685,8 +1596,7 @@
         "src/Wanxiangshu/Execution/Session/AgentCompletion.fs"
       ],
       "proofs": [
-        "requirements/delegation/tests/delegated-tool-estimate-facts.test.mjs",
-        "requirements/delegation/tests/delegation-compile-boundary.test.mjs"
+        "requirements/delegation/tests/001.test.mjs"
       ],
       "publishes": [
         "delegation.Contract"
@@ -1699,8 +1609,8 @@
         "src/Wanxiangshu/Execution/Delegation/Fork/RuntimeContract.fs"
       ],
       "proofs": [
-        "requirements/delegation/tests/reconcile-supervisor-await-agent.test.mjs",
-        "requirements/structured-workflow/tests/owner-project-boundaries.test.mjs"
+        "requirements/delegation/tests/001.test.mjs",
+        "requirements/structured-workflow/tests/001.test.mjs"
       ],
       "publishes": [
         "delegation.Contract"
@@ -1715,9 +1625,7 @@
         "src/Wanxiangshu/Sphinx/GenericIntegrator.fs"
       ],
       "proofs": [
-        "requirements/epistemic-reasoning/tests/durable-event-store.test.mjs",
-        "requirements/epistemic-reasoning/tests/research-export.test.mjs",
-        "requirements/epistemic-reasoning/tests/mcp-stdio.test.mjs"
+        "requirements/epistemic-reasoning/tests/001.test.mjs"
       ],
       "publishes": [
         "epistemic-reasoning.Contract"
