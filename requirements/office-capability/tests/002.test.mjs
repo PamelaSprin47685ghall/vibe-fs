@@ -31,7 +31,7 @@ test('WHAT[ENF-002] office_permission_surface_matches_the_canonical_roles_matrix
     ['manager', ['Finality', 'Fission', 'Fork', 'Horizon', 'Join', 'ReviewAssessment', 'TodoWrite']],
     ['orchestrator', ['Fork', 'Horizon', 'Join']],
     ['coder', ['BashHoneypot', 'Edit', 'Fetch', 'Fission', 'Glob', 'Grep', 'Inspect', 'Move', 'Read', 'Remove', 'Write']],
-    ['inspector', ['Exec', 'Fetch', 'Fission', 'Glob', 'Grep', 'Read']],
+    ['inspector', ['Fetch', 'Fission', 'Glob', 'Grep', 'Read']],
     ['browser', ['Fission', 'Glob', 'Grep', 'Network', 'Read']],
     ['inquiry', ['Fission', 'Inspect', 'Sphinx']],
     ['devops', ['Behavior', 'Exec', 'Glob', 'Grep', 'Horizon', 'Inspect', 'Join', 'Pty', 'Read']],

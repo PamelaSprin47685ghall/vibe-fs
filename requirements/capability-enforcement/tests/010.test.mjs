@@ -151,7 +151,7 @@ const ROLE_ALLOW = {
   Manager: ['fork', 'resume', 'join', 'horizon', 'todowrite', 'fission', 'suicide', 'review'],
   Orchestrator: ['commission', 'join', 'horizon'],
   Coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspect', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission'],
-  Inspector: ['read', 'glob', 'grep', 'query-shell', 'fetch', 'fission'],
+  Inspector: ['read', 'glob', 'grep', 'fetch', 'fission'],
   Browser: ['read', 'glob', 'grep', 'stealth-browser-mcp_*', 'fission'],
   Inquiry: ['inspect', 'sphinx_*', 'fission'],
   DevOps: [

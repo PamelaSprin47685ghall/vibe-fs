@@ -133,7 +133,7 @@ const ROLE_ALLOW = {
   Manager: ['fork', 'resume', 'join', 'horizon', 'todowrite', 'fission', 'suicide', 'review'],
   Orchestrator: ['commission', 'join', 'horizon'],
   Coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspect', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission'],
-  Inspector: ['read', 'glob', 'grep', 'query-shell', 'fetch', 'fission'],
+  Inspector: ['read', 'glob', 'grep', 'fetch', 'fission'],
   Browser: ['read', 'glob', 'grep', 'stealth-browser-mcp_*', 'fission'],
   Inquiry: ['inspect', 'sphinx_*', 'fission'],
   DevOps: [
@@ -317,7 +317,7 @@ test('WHAT[ENF-002] TOOLSPEC_coder_and_devops_tools_have_owner_defined_admission
 
   assert.equal(rolePredicate('run', 'devops'), true)
   assert.equal(rolePredicate('run', 'inspector'), false)
-  assert.equal(rolePredicate('query-shell', 'inspector'), true)
+  assert.equal(rolePredicate('query-shell', 'inspector'), false)
   assert.equal(rolePredicate('query-shell', 'devops'), false)
 
   assert.equal(rolePredicate('establish-behavior', 'devops'), true)

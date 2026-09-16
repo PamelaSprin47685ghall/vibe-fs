@@ -162,8 +162,8 @@ module StaticTools =
             | "read-terminal", Role.DevOps
             | "signal-terminal", Role.DevOps -> "allow"
             | "fork", Role.DevOps -> "deny"
-            | "query-shell", Role.Inspector -> "allow"
             | "run", Role.Inspector -> "deny"
+            | "query-shell", Role.Inspector -> "deny"
             | "run", Role.DevOps -> "allow"
             | "query-shell", Role.DevOps -> "deny"
             | "write", Role.DevOps

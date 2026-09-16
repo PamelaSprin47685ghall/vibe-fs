@@ -17,7 +17,7 @@ const ALLOWED = {
   orchestrator: ['commission', 'join', 'horizon', 'assume', ...COGNITIVE_TOOLS],
   manager: ['fork', 'resume', 'join', 'horizon', 'todowrite', 'fission', 'review', 'assume', ...COGNITIVE_TOOLS],
   coder: ['fission', 'read', 'write', 'edit', 'glob', 'grep', 'inspect', 'fetch', 'mv', 'rm', 'bash-honeypot', 'assume', ...COGNITIVE_TOOLS],
-  inspector: ['fission', 'read', 'glob', 'grep', 'query-shell', 'fetch', 'assume', ...COGNITIVE_TOOLS],
+  inspector: ['fission', 'read', 'glob', 'grep', 'fetch', 'assume', ...COGNITIVE_TOOLS],
   devops: ['join', 'horizon', 'read', 'glob', 'grep', 'inspect', 'run', 'establish-behavior', 'repair-behavior', 'assume', ...COGNITIVE_TOOLS],
   browser: ['fission', 'read', 'glob', 'grep', 'stealth-browser-mcp', 'assume', ...COGNITIVE_TOOLS],
   inquiry: ['fission', 'inspect', 'sphinx', 'assume', ...COGNITIVE_TOOLS],
