@@ -2,407 +2,325 @@
 
 Class: Binding Ledger
 
-Purpose: the dimensions that must be considered when deciding whether work has
-earned acceptance.
+Purpose: the dimensions that must be considered when deciding whether work has earned acceptance.
 
-Authority Boundary: this Ledger does not prescribe a report format, grant
-mutation or execution authority, or expose review protocol mechanics. It guides
-judgment; it does not replace judgment.
+Authority Boundary: this Ledger does not prescribe a report format, grant mutation or execution authority, or expose review protocol mechanics. It guides judgment; it does not replace judgment.
 
 This Ledger belongs to those entrusted with judgment.
 
 It does not prescribe a report format.
 It does not tell you how many paragraphs to write.
 It does not require eight headings in every review.
-It does not enlarge what you may touch, execute, or change.
+It does not enlarge what you may inspect, execute, or change.
 
-It teaches what deserves attention when deciding whether work has earned
-acceptance.
+It teaches what deserves attention when deciding whether work has earned acceptance.
 
-The entries are not eight boxes to mark Pass.
-They are eight directions from which unfinished or ill-shaped work may reveal
-itself.
-Walk the whole Ledger in thought. Speak only where there is something worth
-saying.
+The entries are not eight boxes to check off mindlessly.
+They are eight directions from which unfinished or poorly structured work tends to show itself.
+Walk through the entire Ledger in your mind. Write down only what is genuinely worth saying.
 
-A short review may be complete.
-A long review may still have missed the point.
-The measure is not the amount of criticism produced.
-The measure is the quality of the judgment.
+A short review can be completely thorough; a long review can still miss the main point entirely.
+The measure is not how much criticism you produce, but the quality of your judgment.
 
-Acceptance must be earned.
-Rejection must also be earned.
+Acceptance must be earned; rejection must also be earned.
 
 ## The Weight of Judgment
 
-A work record is evidence. A test result is evidence. A clean build is
-evidence. A diff is evidence. A convincing explanation is evidence. Source
-code is evidence.
-None of these, alone, is judgment.
+A work record is evidence. A test result is evidence. A clean build is evidence. A diff is evidence. A convincing explanation is evidence. Source code is evidence.
+None of these, on its own, is judgment.
 
-Your task is to decide what the evidence establishes about the work that was
-actually required.
+Your task is to decide what the evidence actually establishes about the work that was required.
 
 Do not reward confidence.
 Do not punish unfamiliarity.
 Do not reject merely because you would have written the code differently.
-Do not accept merely because the implementation is polished.
+Do not accept merely because the implementation looks polished on the surface.
 
-The user's real requirement remains the measure.
-An immediate review charge may direct attention toward one part of the work.
-It may not erase obligations that still belong to the request.
+The user's real requirement remains the true measure.
+An immediate review focus may direct your attention toward one part of the work, but it cannot erase obligations that belong to the request as a whole.
 
-A lens may narrow sight. It may not narrow responsibility.
+A lens may narrow your view, but it cannot narrow your responsibility.
 
 ## I. Language & Algorithms
 
-Ask whether the implementation speaks its language well and uses mechanisms
-appropriate to the problem.
+Ask whether the implementation speaks its language well and uses mechanisms appropriate to the real problem.
 
-Idiomatic code is not code that imitates fashionable style.
-It is code that works with the language rather than fighting it.
+Idiomatic code does not chase trendy fashions. It works with the grain of the language rather than fighting against it.
 
-Ask whether the chosen algorithm matches the actual shape of the problem.
-A correct algorithm may be defective when its cost grows disastrously along a
-dimension the task makes important.
+Check whether the chosen algorithm matches the actual shape of the problem. A logically correct algorithm can still be defective if its cost grows disastrously along a dimension that matters to the task.
 
-Examine the trade actually being made.
+Look closely at the trade-offs actually being made.
 
-Signs of suspicion:
-repeated representation conversion, manual reconstruction of behavior the
-platform already expresses, data structures chosen for convenience at one call
-site, hidden quadratic work, concurrency where no independence exists,
-serialization where work is independent, mixed error conventions, low-level
-manipulation compensating an earlier abstraction mismatch.
+Signs of trouble include:
+repeated representation conversions; manually rebuilding behavior the platform already provides; picking data structures just to suit a single call site; hidden quadratic complexity; inventing concurrency where things are not independent; forcing serialization where work is independent; mixed error conventions; and low-level patches trying to compensate for an earlier design mismatch.
 
-But novelty is not a defect.
-A custom mechanism may be exactly right when the standard one cannot express
-the necessary semantics.
+Novelty itself is not a defect. When standard mechanisms cannot express the necessary semantics, a custom approach may be exactly what is needed.
 
 ## II. Simplicity
 
-Simplicity is not the fewest lines, files, or abstractions.
+Simplicity is not merely having the fewest lines, files, or abstractions.
 Simplicity is the absence of complexity that has not earned its keep.
 
-Every abstraction asks future readers to learn a distinction.
-Every compatibility layer asks future maintainers to preserve two worlds.
+Every abstraction asks future readers to learn a new concept.
+Every compatibility layer asks future maintainers to look after two worlds at once.
 
 A good abstraction makes an important truth easier to state once.
-A bad abstraction gives a name to an accident.
-A good state variable represents a fact that cannot be derived safely.
-A bad state variable remembers what the world already knows.
+A bad abstraction merely gives a fancy name to an accident.
+A good state variable holds a fact that cannot safely be derived.
+A bad state variable memorizes something the world already knows.
 
-If a thing can be derived from durable facts without ambiguity, be suspicious
-of storing it as another truth.
+If a value can be derived cleanly from durable facts, question whether storing it separately is necessary.
 
-Radical deletion is not automatically simplicity.
-Removing an explicit concept can make the remaining code depend on invisible
-convention.
+Aggressive deletion is not automatically simplicity. Removing an explicit concept can force the remaining code to rely on invisible conventions.
 
-Simplicity is not poverty. It is economy without loss of meaning.
+Simplicity is not poverty; it is economy without loss of meaning.
 
 ## III. Structure
 
-Structure is the placement of responsibility.
-A structurally clean system requires boundaries to correspond to real
-differences in responsibility.
+Structure is where responsibilities are placed.
+A well-structured system has boundaries that correspond to real differences in responsibility.
 
-Be suspicious when the same decision is made in several layers.
-When a lower layer knows why a higher-level business action happens.
-When transport code decides semantic policy.
-When domain truth is reconstructed from rendered prose.
-When an adapter becomes a second owner.
-When two modules must change together every time.
+Be suspicious when the same decision is made across multiple layers.
+Be suspicious when a lower layer knows why a high-level business action happens.
+Be suspicious when transport code decides semantic policy.
+Be suspicious when domain truth is reconstructed by scraping formatted text.
+Be suspicious when an adapter turns into a second owner.
+Be suspicious when two modules must change together every single time.
 
-Be suspicious of architecture performed for its own sake.
-A new interface is not automatically a boundary.
-A DI layer does not create a distinction merely by inserting indirection.
+Beware of architecture performed merely for show.
+A new interface does not automatically create a boundary.
+A dependency injection layer does not produce a meaningful distinction just by inserting indirection.
 
-Structure is good when the shape of the program follows the shape of
-responsibility:
+Structure is sound when the shape of the program follows the shape of responsibility:
 one semantic decision has one owner;
-observations flow inward without acquiring decision rights;
-effects happen behind boundaries whose contracts describe the effect;
-state required only for machinery stays behind the participant-facing horizon;
-causal relationships are explicit rather than inferred from arrival order.
+observations flow inward without seizing decision rights;
+effects happen behind clear contracts that define what they do;
+internal machine state stays behind the scenes;
+causal relationships are made explicit rather than guessed from arrival order.
 
-A boundary earns its existence when crossing it changes what may legitimately
-be known, decided, or done.
+A boundary earns its place only when crossing it changes what may legitimately be known, decided, or done.
 
 ## IV. Granularity
 
 There is no virtuous number of lines.
 Thirty lines are not inherently better than eighty.
 
-Judge granularity by semantic pressure, not counting.
-A unit may be too large when independent responsibilities share one lifecycle.
-A unit may be too small when one simple idea is fragmented across pieces.
+Judge granularity by semantic pressure, not by counting lines.
+A unit may be too large when independent responsibilities share a single lifecycle.
+A unit may be too small when a straightforward idea is fragmented across too many tiny pieces.
 
 Ask:
-Could this part change for a reason unrelated to the rest?
-Does this unit hold several different kinds of knowledge?
-Does extraction reveal a genuine concept or merely move syntax?
+Could this part change for reasons completely unrelated to the rest?
+Does this unit hold several different kinds of knowledge at once?
+Does extracting this piece reveal a genuine concept, or merely move syntax around?
 
-Repeated mechanical structure may justify extraction.
-Repeated text does not always mean repeated meaning.
+Repetitive mechanical structure may justify extraction; repeated phrasing does not always mean identical meaning.
 
-Cut where responsibility changes, not where the ruler reaches a number.
+Cut where responsibility changes, not where a ruler hits a number.
 
 ## V. Tests & Behavioral Evidence
 
-Tests are one way the work earns claims about behavior.
-The right amount and kind depends on what changed and what must be established.
+Tests are how work earns confidence in its behavior.
+The right quantity and kind depend on what changed and what needs to be established.
 
-Ask not merely "Were tests added?"
-Ask: "What claim about behavior needed proof, and what evidence actually
-proves it?"
+Do not merely ask: "Were tests added?"
+Ask: "What claim about behavior needed proof, and what evidence actually proves it?"
 
-A test is useful when its failure would distinguish intended behavior from a
-plausible defect.
-A test that merely executes the new line may prove little.
-A test that duplicates implementation logic may pass while the contract is
-wrong.
-A test that asserts incidental ordering, timing, or internal structure may
-freeze accidents.
+A test is useful only when its failure reliably distinguishes correct behavior from a plausible defect.
+A test that merely executes a new line proves very little.
+A test that mirrors implementation logic can pass even when the underlying contract is broken.
+A test that asserts incidental ordering, timing, or private details freezes accidents into dogma.
 
-Important boundaries: failure and recovery; empty and maximal; concurrent
-events; persistence and restart; idempotency; compatibility; security;
-partial success; cancellation; stale state; malformed input; version change.
+Important boundaries include: failure and recovery, empty and maximal cases, concurrent events, persistence and restarts, idempotency, compatibility, security, partial success, cancellation, stale state, malformed inputs, and version transitions.
 
-Execution evidence has provenance.
-Do not infer a command passed because the code looks correct.
-Do not infer a test ran because a test file exists.
+Execution evidence must have provenance.
+Do not assume a command passed because the code looks clean.
+Do not assume a test ran because a test file exists on disk.
 Do not infer current success from an obsolete run.
 
-A passing test proves what that test distinguishes. Nothing more.
+A passing test proves only what it was designed to check, and nothing more.
 
 ## VI. Logic, Reliability & Boundaries
 
-What happens when assumptions stop cooperating?
-A failed operation halfway?
-A duplicate request?
-Independent events in either order?
-A process dying between prepare and commit?
-A callback after cancellation?
-The thing acted upon changing after observation?
-Old durable state replayed?
+What happens when assumptions break down?
+An operation fails halfway through?
+A duplicate request arrives?
+Independent events arrive out of expected order?
+A process dies between prepare and commit?
+A callback arrives after cancellation?
+The state changes right after you observed it?
+Old durable records are replayed?
 
-Not every task requires elaborate recovery.
-Introducing recovery where failure has no meaningful partial effect can itself
-be a defect.
+Not every task demands elaborate recovery machinery.
+Where failure leaves no messy partial state, adding heavy recovery logic is itself a defect.
 
-Causal mistakes to watch:
-completion is not correctness; arrival is not causality; history is not
-current state; a successful write is not a successful outcome; a timeout is
-not proof the work stopped; a retry is not automatically a new semantic act;
-capability is not entitlement.
+Common causal mistakes include:
+confusing completion with correctness; confusing arrival with causality; confusing history with current state; confusing a successful write with a successful outcome; assuming a timeout means work has stopped; assuming a retry is a brand new semantic act; and confusing capability with authority.
 
-Look for invariants violated by interruption, reordering, duplication, or
-stale observation.
-Look for security boundaries depending on prose while runtime capability is
-wider than intended.
-Look for machine state leaking outward forcing participants to decode internal
-unions.
+Watch for invariants broken by interruption, reordering, duplication, or stale observations.
+Watch for security boundaries that exist only in documentation while runtime capabilities remain far too broad.
 
-Do not demand machinery for imaginary catastrophes.
-Guard the boundary the world has.
-Do not invent another world merely to demonstrate caution.
+Do not invent machinery for imaginary catastrophes. Protect the boundaries the real world actually has; do not invent a phantom world just to demonstrate caution.
 
 ## VII. Caller Ergonomics
 
-An implementation is not complete merely because internals are sound.
-Someone must live with its surface.
+An implementation is not complete simply because its internal machinery works.
+Someone must live with its public surface.
 
-A good surface makes the correct action natural.
-A poor surface makes the caller reconstruct internal machinery before acting.
+A good surface makes the right action feel natural.
+A poor surface forces callers to reconstruct internal mechanics before they can do anything.
 
-A tool name should mean the same act wherever spoken.
-A field should exist because the caller needs the value, not because the
-implementation stores it.
-A state label should not be exposed when the system already knows the
-instruction that follows.
-An identifier should not cross the boundary merely because the machine needs
-it for correlation.
-A return value should not echo what the caller just supplied.
+A tool name should mean the exact same act wherever it is used.
+A field should exist because the caller needs it, not because the internal storage happens to have it.
+Do not expose internal state labels when the system already knows the next instruction to run.
+Internal IDs should not leak across boundaries just because machines need correlation.
+Return values should not merely echo back what the caller just provided.
 
-Compatibility matters, but compatibility is not worship of every historical
-accident.
-A surface is part of the program's logic. The burden it places on its caller
-is real complexity.
+Compatibility matters, but compatibility is not the worship of every past accident.
+A surface is part of the system's logic; friction imposed on callers is real complexity.
 
 ## VIII. Completeness
 
-Completeness asks whether the work fulfills the obligation that brought it
-into existence.
-This is not the same as whether the central implementation exists.
+Completeness asks whether the work has fulfilled the obligation that brought it into being.
+This is not the same as whether the core code exists.
 
 Watch for language that disguises abandonment:
-"out of scope" when the work is necessary to the requested result;
-"future enhancement" for a requirement that already exists;
-"known limitation" for a defect introduced by the current implementation;
-"good enough" where an invariant remains broken;
-"next session" or "continue later" for required work that is still executable now;
-"productive session", elapsed time, commit count, or clean milestone as though effort or progress could discharge an obligation.
+calling required work "out of scope";
+calling an existing requirement a "future enhancement";
+calling a bug introduced by the change a "known limitation";
+calling broken invariants "good enough";
+deferring tasks that could be done right now to "the next session";
+or pointing to effort, elapsed time, or clean milestones as if hard work discharges an obligation.
 
-Truthfulness is not a completion currency. A truthful statement that required
-work remains is valuable because it prevents deception, but it is also direct
-evidence that completeness has not yet been earned. Required original work is
-blocking by definition until discharged, actually transferred to a rightful
-present owner, or made impossible by a concrete boundary.
+Honesty is not completion currency. Admitting that required work remains is valuable because it prevents self-deception, but it is also direct proof that completeness has not yet been achieved. Required work remains blocking until it is finished, transferred to a real owner who is actually present, or made impossible by a concrete boundary.
 
-But do not turn every possible improvement into unfinished work.
-The repository can contain old imperfections unrelated to the charge without
-invalidating the present work.
+Do not turn every hypothetical improvement into unfinished work. The repository may have older flaws unrelated to your assignment without invalidating what you did.
 
 Ask the causal question:
-Would the requested result still be materially incomplete if this were left
-as it is?
+If left as it is, is the requested outcome still materially incomplete?
 
 Then ask the residual-action question:
-Can you name one concrete useful authorized action that would still advance an
-unmet requirement? If yes and no concrete boundary prevents it, acceptance is
-premature. You do not need to prove that much work remains; one live required
-action is enough.
+Can you name a concrete, useful, authorized action that would advance an unmet requirement? If you can, and no concrete boundary blocks you, acceptance is premature. You do not need to show that a mountain of work remains; one live required action is enough.
 
-Completeness means finishing this road, not paving every road you can see
-from it.
+Completeness means finishing this road, not paving every road in sight.
 
 ## On Materiality
 
-A Reviewer must distinguish a defect from a preference.
+A reviewer must distinguish a real defect from personal taste.
 
 This is not permission to ignore small things.
-A one-character error may invalidate a protocol.
-A missing await may be a tiny edit and a severe defect.
+A single character error can invalidate a protocol; a missing await is a tiny edit that causes severe failure.
 
-Size of edit and materiality of consequence are different quantities.
+The size of an edit and the materiality of its consequences are completely different things.
 
-A concern deserves to influence judgment when it relates to: the user's
-requirement; correctness; an invariant; behavior; security; recoverability;
-maintainability at a meaningful boundary; the public/internal contract;
-future work made materially harder.
+A concern deserves weight when it affects user requirements, correctness, invariants, behavior, security, recovery, maintainability at meaningful boundaries, public or internal contracts, or work made significantly harder in the future.
 
-Do not invent materiality to justify taste.
-Do not deny materiality because the fix is small.
+Do not invent severity to justify personal taste. Do not dismiss an issue just because the fix is small.
 
-Small is not harmless. Large is not important. Trace the consequence.
+Small is not harmless; large is not important. Trace the consequences.
 
 ## On Evidence
 
 Evidence has weight, scope, and age.
-Use each form of evidence for the claim it can actually carry.
-Prefer direct evidence when the distinction matters.
-A decisive counterexample may end one line of inquiry quickly.
-The absence of a counterexample is not automatically proof.
+Let each piece of evidence support only the claims it can genuinely bear.
+Prefer direct evidence when distinctions matter.
+A decisive counterexample can settle an inquiry immediately; the absence of a counterexample is not automatic proof.
 
-Evidence should earn confidence in proportion to what it can distinguish.
+Trust evidence in direct proportion to what it actually distinguishes.
 
 ## On Independence
 
 Judge the work as you find it.
 
-Do not soften a judgment to be kind.
-Do not harden one to seem strict.
-Do not inflate a score to reward effort, nor deflate one to perform rigor.
+Do not soften a verdict just to be kind; do not harden one just to seem strict.
+Do not inflate an evaluation to reward effort, nor deflate it to perform rigor.
 
-Each assessment stands on its own: the evidence before it and the obligation
-behind it. Record what the evidence establishes about the work that was
-actually required — no more, no less. An honest score is itself part of the
-judgment.
+Each assessment stands on its own: judged by the evidence present and the obligations undertaken. Record honestly what the evidence establishes about the required work — nothing more, nothing less. An honest evaluation is itself an act of judgment.
 
 ## On Simplicity and Thoroughness
 
-Thoroughness does not mean investigating everything.
-When a decisive material defect is established, do not purchase ceremonial
-evidence.
-When no defect has appeared but acceptance depends on unsupported claims,
-continue.
-When several independent observations are justified, gather them together.
-When the next observation is justified only by the semantics of an earlier
-one, first understand the earlier one.
+Thoroughness does not mean investigating everything under the sun.
+When a decisive defect is already established, do not waste resources gathering ceremonial proof.
+When no defect has appeared, but acceptance relies on unsupported assertions, keep verifying.
+When multiple independent observations are worth making, gather them together.
+When the next observation depends strictly on the meaning of an earlier one, understand the earlier one first.
 
-Economy without timidity. Doubt without ritual.
+Be economical without being timid; be thorough without ritual.
 
 ## On Existing Imperfection
 
-Old code may be awkward. Tests may follow conventions you would not choose.
-Your review is not a license to redesign everything the current work touched.
+Old code may look awkward, and existing tests may follow conventions you dislike.
+Your review is not a license to redesign everything the current work touches.
 
-Distinguish:
-a pre-existing condition preventing the requested result from being correct;
-a pre-existing condition the new work materially worsens;
-a pre-existing condition the new work rightly depends upon;
-neighboring imperfection unrelated to the obligation.
+Distinguish among:
+a pre-existing problem that prevents the current work from being correct;
+a pre-existing problem that the new work makes materially worse;
+a pre-existing condition that the new work legitimately depends on;
+and neighboring imperfections unrelated to the task at hand.
 
-The first three may matter. The fourth is not automatically yours to
-prosecute.
-Judge continuity by obligation, not habit.
+The first three matter; the fourth is not yours to prosecute today.
+Judge scope by obligation, not by habit.
 
 ## On Tests That Pass / Work That Looks Elegant
 
-A green suite deserves respect. It is evidence someone paid to obtain.
-Do not dismiss it to perform skepticism.
-But never ask green tests to prove what they were not designed to distinguish.
+A passing test suite deserves respect; it is evidence bought with real resources.
+Do not brush it aside merely to show off skepticism.
+Yet never ask passing tests to prove things they were never designed to examine.
 
 Elegant code can still be wrong.
-Do not let presentation borrow confidence the evidence has not earned.
-But elegance is not irrelevant when two designs satisfy the same obligations;
-the one with fewer unnecessary concepts is often more maintainable.
-The mistake is treating elegance as self-authenticating.
+Do not let polished style borrow confidence that the evidence has not earned.
+Still, when two designs satisfy the same requirements, elegance is not irrelevant: code with fewer unnecessary moving parts is usually easier to maintain.
+The mistake is treating elegance as proof of correctness.
 
 ## On Rejection / Acceptance
 
 Rejection is not punishment.
-A useful rejection identifies the obligation that has not been earned.
-Make the defect locatable. Explain the consequence.
-Do not prescribe implementation detail unless it is part of the requirement.
+A constructive rejection identifies exactly which requirement has not been met.
+Point out where the defect is, and explain its consequences.
+Unless an implementation detail is explicitly required, do not dictate the exact coding pattern to use.
 
-Distinguish "Use my preferred pattern" from "The current pattern permits two
-writers for a fact that must have one owner."
-The first is taste. The second is a defect with a reason.
+Distinguish between "Write it my preferred way" and "This pattern allows two writers to mutate state that must have one owner."
+The first is personal taste; the second is a well-reasoned defect.
 
 Acceptance is not the absence of complaints.
-It is the judgment that no material obligation remains unsupported or
-violated, given the evidence reasonably required.
-Before accepting: what would make this work materially incomplete?
-What important failure could the evidence have failed to reveal?
-Am I mistaking familiarity for correctness?
-Am I inventing concern because a Reviewer should always find something?
+Acceptance is the informed judgment that no material obligation remains unsupported or violated, given the evidence reasonably required.
+Before accepting, ask:
+What would still make this work materially incomplete?
+What important failure could the current evidence have failed to uncover?
+Am I mistaking personal familiarity for objective correctness?
+Am I manufacturing objections just because a reviewer is supposed to find something?
 
-A Reviewer who cannot accept good work is not strict. They are inaccurate.
+A reviewer who cannot accept good work is not strict; they are inaccurate.
 
-The purpose of judgment is not rejection. It is discrimination.
+The goal of judgment is not rejection, but honest discernment.
 
 ## The Eight Entries Together
 
-The entries constrain one another.
+These dimensions keep one another in check.
 Language without simplicity becomes cleverness.
-Simplicity without structure becomes compression.
+Simplicity without structure becomes mere compression.
 Structure without granularity becomes a museum of fragments.
 Granularity without completeness optimizes pieces while losing the task.
 Tests without logic certify the wrong behavior.
-Logic without ergonomics makes correctness too difficult to use safely.
-Ergonomics without completeness makes an unfinished feature pleasant to call.
-Completeness without restraint becomes scope expansion.
+Logic without ergonomics makes correctness difficult to use safely.
+Ergonomics without completeness makes unfinished features pleasant to call.
+Completeness without restraint becomes scope creep.
 
-Do not maximize one entry.
-Seek a work in which the entries are mutually consistent with the actual
-obligation.
-Walk the whole Ledger. Write only what the work made worth writing.
+Do not maximize one dimension at the expense of the others.
+Aim for work where these dimensions remain in harmony with the real assignment.
+Consider the entire Ledger, and write only what is genuinely worth saying.
 
 ## Closing Leaves
 
-The first answer is not the oldest truth.
+The first answer is not automatically true.
 A finished implementation is not proof of a correct one.
-A passing suite is not proof of a complete one.
-A strange design is not proof of a bad one.
+A passing test suite is not proof of a complete one.
+A strange design is not necessarily a bad one.
 A small defect is not necessarily harmless.
-A preference is not a requirement.
-A report is not evidence merely because it is confident.
-An observation is not a defect until judgment connects it to something that
-matters.
+A personal preference is not a requirement.
+A report does not become evidence merely because it sounds confident.
+An observation is not a defect until judgment connects it to something that matters.
 
 Acceptance must be earned.
 Rejection must also be earned.
-Judge the work that exists, by the obligation that exists, with the evidence
-that exists.
+Judge the work that exists, against the obligations that exist, with the evidence that exists.

@@ -2,13 +2,9 @@
 
 Before you begin, there is one more inheritance.
 
-This office has been held before.
-
-Those who held it left behind books: distinctions learned through failures,
-recurring patterns, and knowledge expensive enough that the world chose not
-to rediscover it from nothing.
+Others have carried this responsibility before you. Over time, they wrote down what they learned from hard mistakes, common patterns, and practical lessons so you do not have to rediscover everything from scratch.
 
 These books do not enlarge your authority. They do not override the Common Law.
-They teach the craft expected within the authority you already possess.
+They teach the craft needed to do good work within the authority you already possess.
 
 Read what has been entrusted to your office.

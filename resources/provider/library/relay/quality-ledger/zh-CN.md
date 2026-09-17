@@ -1,343 +1,325 @@
 # Quality Ledger
 
-Class：Binding Ledger
+Class：评判账册 (Binding Ledger)
 
 Purpose：规定在判断一项工作是否赢得 acceptance 时，必须认真考虑的方向。
 
-Authority Boundary：这本 Ledger 不规定 report format，不授予 mutation 或 execution authority，也不暴露 review protocol mechanics。它引导 judgment，但不会取代 judgment。
+Authority Boundary：本账册不规定死板的报告格式，不授予修改或执行权限，也不涉及内部评审机制。它引导 judgment，但不会取代 judgment。
 
-这本 Ledger 属于被托付进行 judgment 的人。
+这本账册属于被托付进行判断的人。
 
-它不规定 report format。
-它不告诉你必须写多少段。
-它不要求每次 review 都机械写出八个 heading。
-它也不会扩大你可以 touch、execute 或 change 的范围。
+它不规定死板的报告格式。
+它不限制你必须写多少段。
+它不要求每次评审都机械写出八个小标题。
+它也不会扩大你可以查看、执行或修改的范围。
 
-它教你：在决定工作是否赢得 acceptance 时，哪些方面值得注意。
+它告诉你：在决定工作是否赢得验收时，哪些方面值得格外注意。
 
-这些 entries 不是八个需要逐一勾选 Pass 的方框。
-它们是八个方向，unfinished 或结构失当的工作可能从这些方向暴露出来。
-在思考中走完整本 Ledger。只有真正值得说的内容才写出来。
+这些项目不是八个需要逐一打勾的答题卡。
+它们是八个方向——没有做完或结构走样的工作，往往会从这些方向暴露出来。
+在脑子里通盘过一遍这本账册。只有真正值得说的东西，才落笔写出来。
 
-短 review 可以完整。
-长 review 也可能仍然错过重点。
-衡量标准不是产生了多少批评。
-衡量标准是 judgment 的质量。
+短小的评审可以很完整；洋洋洒洒的万言书也可能完全抓不住要害。
+衡量的尺度不是挑了多少毛病，而是判断的成色。
 
-Acceptance 必须被赢得。
-Rejection 同样必须被赢得。
+验收的资格必须靠工作本身去赢得；驳回的理由同样必须站得住脚。
 
-## Judgment 的重量
+## 审视与判断的分量
 
-WorkRecord 是 evidence。Test result 是 evidence。Clean build 是 evidence。Diff 是 evidence。有说服力的 explanation 是 evidence。Source code 也是 evidence。
-这些东西单独都不是 judgment。
+工作记录是证据，测试跑通是证据，编译干净是证据，代码差异是证据，条理分明的解释是证据，源码本身也是证据。
+但这些材料单独拿出来，都不是最终的判断。
 
-你的任务，是判断这些 evidence 对“真正被要求完成的工作”究竟建立了什么。
+你的任务，是看这些证据对“真正被要求做好的工作”到底证明了什么。
 
-不要奖励 confidence。
-不要惩罚 unfamiliarity。
-不要仅仅因为你自己会用另一种方式写代码，就拒绝。
-也不要仅仅因为 implementation 很精致，就接受。
+不要因为对方讲话底气足就盲目认可。
+不要因为写法自己不熟悉就轻易挑刺。
+不要仅仅因为换成自己会用另一种写法，就予以拒绝。
+也不要单单因为表面功夫做得精致，就草率点头。
 
-用户真实的 requirement 始终是尺度。
-当前 review charge 可以让你把注意力更多放在某一部分。
-它不能抹掉仍属于整个 request 的 obligations。
+用户真实的需要，始终是衡量的尺度。
+当前的评审指引可以让你把注意力集中在某一部分，但它绝不能一笔勾销属于整个委托的根本责任。
 
-Lens 可以缩窄视野。
-它不能缩窄 responsibility。
+聚光灯可以缩窄视线，但不能缩窄责任。
 
 ## I. Language & Algorithms
 
-检查 implementation 是否善用它所处的 language，并使用与真实问题相匹配的 mechanisms。
+看看代码是否善用了它所处的编程语言，使用的手段是否与眼前的实际问题相衬。
 
-Idiomatic code 不是模仿流行风格的代码。
-而是与语言合作、而不是和语言对抗的代码。
+地道的代码不是盲目模仿流行的时髦写法，而是顺应语言的脾性，而不是跟语言对着干。
 
-检查所选 algorithm 是否匹配问题真实的 shape。
-一个逻辑上正确的 algorithm，如果沿着 task 重要的维度产生灾难性成本增长，也可能构成 defect。
+检查所选的算法是否切合问题的真实模样。一个在逻辑上挑不出毛病的算法，如果在任务看重的关键维度上开销暴涨，同样是严重的缺陷。
 
-检查真正发生的 trade-off。
+仔细看清楚实际做出的取舍。
 
-值得怀疑的迹象包括：
-反复转换 representation；手工重建 platform 已经能够表达的 behavior；为了某个单一 call site 的方便而选择 data structure；隐藏的 quadratic work；在不存在 independence 的地方制造 concurrency；在工作独立时强制 serialization；混杂的 error conventions；用低层 manipulation 补偿更早的 abstraction mismatch。
+值得警惕的迹象包括：
+来回倒腾数据格式；手工去拼装平台本来就能表达的行为；为了某一个调用处图省事而别扭地选择数据结构；暗藏的平方级开销；在没有独立性的地方硬造并发；在彼此独立的事情上强行串行；五花八门的错误处理约定；用底层的缝缝补补去掩盖更早前的抽象失当。
 
-但 novelty 本身不是 defect。
-当标准 mechanism 无法表达必要 semantics 时，一个 custom mechanism 可能正是正确选择。
+但新颖本身不是缺陷。当常规手段无法表达必要的语义时，量身定制一个做法可能正是最稳妥的选择。
 
 ## II. Simplicity
 
-Simplicity 不是最少的 lines、files 或 abstractions。
-Simplicity 是删除那些没有赢得存在理由的 complexity。
+简单不是代码行数最少、文件最少，或者抽象概念最少。
+简单是拿掉那些没有充分理由存在的复杂多余之物。
 
-每一个 abstraction 都要求未来 reader 学会一个 distinction。
-每一个 compatibility layer 都要求未来 maintainer 同时维护两个 worlds。
+每一个抽象，都在逼着后来的读者多学一套新概念。
+每一个兼容层，都在逼着以后的维护者同时照看两个世界。
 
-好的 abstraction 让一个重要 truth 更容易只陈述一次。
-坏的 abstraction 只是给 accident 起了名字。
-好的 state variable 表示一个无法安全推导的 fact。
-坏的 state variable 记住世界本来已经知道的东西。
+好的抽象，让一个重要事实更容易只说一遍。
+坏的抽象，只是给一次偶然的巧合起了个大名字。
+好的状态变量，记录的是无法安全推导出来的实在事实。
+坏的状态变量，记的是外部本来就知道、算一算就能出来的多余备忘。
 
-如果某件事能够从 durable facts 无歧义地导出，就应当怀疑是否有必要把它存成另一个 truth。
+如果一件事可以从已有的持久化事实中清清楚楚地推导出来，就要怀疑有没有必要把它当成第二份真相存下来。
 
-Radical deletion 并不自动等于 simplicity。
-删除一个明确 concept，可能反而让剩余代码依赖 invisible convention。
+大刀阔斧的删除并不自动等于简单。如果删掉了一个明确的概念，反而让剩下的代码依赖心照不宣的隐式约定，那只会更糟糕。
 
-Simplicity 不是贫乏，而是在不丢失 meaning 的前提下保持 economy。
+简单不是贫乏，而是在不丢掉原意的前提下把多余开销减到最少。
 
 ## III. Structure
 
-Structure 是 responsibility 的放置方式。
-结构干净的系统，需要 boundary 对应真实的 responsibility distinction。
+结构就是职责该放在哪里的规矩。
+结构清爽的系统，它的每一道边界都对应着现实里真实的职责划分。
 
-当同一个 decision 在多个 layers 被重复作出时，保持警惕。
-当 lower layer 知道 higher-level business action 为什么发生时，保持警惕。
-当 transport code 决定 semantic policy 时，保持警惕。
-当 domain truth 从 rendered prose 反推时，保持警惕。
-当 adapter 变成第二个 owner 时，保持警惕。
-当两个 modules 每次都必须一起修改时，保持警惕。
+如果同一个决定在好几层代码里被反复做，就要提高警惕。
+当下层代码反过来揣测高层业务意图时，要提高警惕。
+当负责网络传输的代码插手决定业务规矩时，要提高警惕。
+当核心事实要从格式化好的展示文本里反推时，要提高警惕。
+当适配器变成了第二个说了算的主人时，要提高警惕。
+当两个模块每次都必须拴在一起同时改动时，要提高警惕。
 
-也要警惕为了 architecture 本身而表演 architecture。
-新 interface 不会自动成为 boundary。
-DI layer 仅仅插入 indirection，并不会凭空创造 distinction。
+更要警惕为了摆弄架构而故弄玄虚。
+随手定义一个新接口，并不代表真正立起了边界。
+加一层依赖注入，除了平白多倒一道手，并不会凭空生出真正的业务区分。
 
-当 program 的 shape 跟随 responsibility 的 shape 时，structure 才是好的：
-一个 semantic decision 只有一个 owner；
-observations 可以向内流动，但不会因此取得 decision rights；
-effects 发生在由 contract 描述其 effect 的 boundary 之后；
-只有 machinery 需要的 state 保留在 participant-facing horizon 之后；
-causal relationships 被明确表达，而不是从 arrival order 推断。
+只有当代码的骨架顺应职责的分工时，结构才是健康的：
+一个业务决定只有一个管事的主人；
+各处的观察可以往里送，但不会因此夺走做决定的权力；
+外部操作只发生在契约清楚的边界后面；
+只有底层机器运转需要的数据，留在外部视界之外；
+因果联系清清楚楚写明，不从谁先到谁后到去瞎猜。
 
-当跨过一个 boundary 会改变“什么可以正当地被知道、决定或执行”时，这个 boundary 才真正赢得了存在理由。
+只有当跨过一道边界真正改变了“什么事合规可知、可定、可做”时，这道边界才真正立得住脚。
 
 ## IV. Granularity
 
-不存在一个天然有德性的行数。
-30 行并不会天然优于 80 行。
+没有什么行数天生就是绝对正确的。
+三十行代码绝不天然比八十行更优秀。
 
-根据 semantic pressure 判断 granularity，而不是计数。
-当彼此独立的 responsibilities 被迫共享一个 lifecycle 时，一个 unit 可能太大。
-当一个简单 idea 被碎裂到很多 pieces 中时，一个 unit 也可能太小。
+要根据实际的业务压力来推敲粒度，而不是数行数。
+当好几个互不相干的责任被迫挤在同一个生命周期里时，这个模块可能太大了。
+当一个明明白白的小想法被扯碎成无数零敲碎打的零碎碎片时，这个模块可能又太小了。
 
-问：
-这一部分是否可能因为与其余部分无关的原因而变化？
-这个 unit 是否同时持有若干种不同类型的 knowledge？
-Extraction 是否揭示了一个真实 concept，还是只是移动 syntax？
+问问自己：
+这部分代码会不会因为与其余部分毫无关联的原因而发生变化？
+这个单元是不是同时塞进了好几种不同层面的知识？
+拆出来的这块代码是不是揭示了一个真正独立的实在概念，还是只是换了个地方摆放语法？
 
-重复的 mechanical structure 可能值得 extraction。
-重复文字并不总是意味着重复 meaning。
+重复出现的机械结构，或许值得抽出来；但表面文字的重复，绝不等于背后含义的重复。
 
-在 responsibility 改变的地方切分，而不是在尺子到达某个数字时切分。
+在责任发生变化的地方下刀切分，而不是尺子量到某个行数就盲目下刀。
 
 ## V. Tests & Behavioral Evidence
 
-Tests 是工作赢得 behavior claims 的一种方式。
-正确的数量与种类，取决于什么发生了变化，以及什么必须被建立。
+测试是工作赢得行为凭信的重要方式。
+测试需要多少、该写哪种，完全看改动了什么，以及必须把什么事实证明清楚。
 
-不要只问：“有没有新增 tests？”
-要问：“哪个 behavior claim 需要 proof，而什么 evidence 真正证明了它？”
+不要单问：“有没有补测试？”
+要问：“哪项行为主张需要真凭实据，手头的证据到底能不能证明它？”
 
-当一个 test 的 failure 能够区分 intended behavior 与一个 plausible defect 时，它才有价值。
-只执行到新代码行的 test 可能几乎什么都没证明。
-复制 implementation logic 的 test 可能在 contract 错误时仍通过。
-断言 incidental ordering、timing 或 internal structure 的 test 可能冻结 accidents。
+只有当一个测试在系统真的出错时能够坚决亮红，它才算有价值。
+仅仅把新写的几行代码顺次执行一趟，几乎说明不了任何问题。
+直接把实现代码抄一遍的测试，就算规矩全错了依然能绿。
+去断言偶然的排布顺序、执行耗时或内部私有结构的测试，只会把偶然的表象当成铁律冻结下来。
 
-重要 boundaries 包括：failure 与 recovery；empty 与 maximal；concurrent events；persistence 与 restart；idempotency；compatibility；security；partial success；cancellation；stale state；malformed input；version change。
+关键的边界包括：失败与恢复、空输入与满载、并发事件、持久化与重启、幂等性、兼容性、安全性、部分成功、取消中断、陈旧数据、畸形输入，以及格式版本升级。
 
-Execution evidence 有 provenance。
-不要因为代码看起来正确，就推断 command 已通过。
-不要因为 test file 存在，就推断 test 已运行。
-不要从 obsolete run 推断当前 success。
+运行证据讲究出处与底细。
+不要因为代码看上去很顺眼，就断定命令一定能跑通。
+不要因为测试文件立在那里，就断定测试真的跑过了。
+不要拿过去陈旧的运行结果，来证明当下的成功。
 
-Passing test 只证明该 test 能够区分的内容，不会更多。
+跑通的测试，只能证明它真正检验过的那点内容，多一分也证明不了。
 
 ## VI. Logic, Reliability & Boundaries
 
-当 assumptions 不再合作时会发生什么？
-Operation 进行到一半失败？
-Duplicate request？
-Independent events 以任意顺序抵达？
-Process 在 prepare 与 commit 之间死亡？
-Cancellation 之后 callback 仍然抵达？
-被操作的对象在 observation 后又改变？
-旧 durable state 被 replay？
+当假设不再成立时，系统会发生什么？
+操作跑到一半突然失败了呢？
+同一个请求重复发过来了呢？
+两件独立的事情按意料之外的顺序到达了呢？
+进程在准备好与正式提交之间崩掉了呢？
+已经取消的任务随后又收到了回调呢？
+刚观察完的对象转眼又被别处篡改了呢？
+旧版本的落盘数据重新拿出来重放呢？
 
-并非每个 task 都需要复杂 recovery。
-当 failure 没有 meaningful partial effect 时，强行引入 recovery 本身也可能是 defect。
+并不是所有任务都需要弄一套复杂的恢复机制。
+如果一次失败根本不会留下什么需要收拾的烂摊子，硬塞一套复杂的恢复机制本身就是累赘。
 
-需要警惕的 causal mistakes：
-completion 不等于 correctness；arrival 不等于 causality；history 不等于 current state；successful write 不等于 successful outcome；timeout 不能证明 work 已停止；retry 不会自动成为新的 semantic act；capability 不等于 entitlement。
+容易犯的因果糊涂账包括：
+以为走完全程就是结果正确；以为消息先到就是有因果关系；以为历史记录就是当前局面；以为写入成功就是业务达标；以为超时了就等于事情已经停了；以为重新试一次就是全新的动作；以为手里有能力就等于享有对应的职权。
 
-寻找会被 interruption、reordering、duplication 或 stale observation 破坏的 invariants。
-寻找只靠 prose 约束 security boundary、但 runtime capability 实际更宽的地方。
-寻找 machine state 泄漏到外部，迫使 participants 解码 internal unions 的地方。
+留心那些会被打断、乱序、重复或陈旧观察所破坏的不变规矩。
+留心那些表面上用自然语言强调安全、但实际运行权限给得过宽的地方。
 
-不要为了 imaginary catastrophes 要求额外 machinery。
-守住真实世界拥有的 boundary。
-不要仅仅为了表现谨慎，就发明另一个世界。
+不要为凭空臆想出来的大灾难去拼凑额外的机械装置。守住现实世界真实存在的边界，不要为了显得谨慎而瞎造假想敌。
 
 ## VII. Caller Ergonomics
 
-Internals 正确，并不自动意味着 implementation 完整。
-总有人要长期生活在它的 surface 上。
+内部实现挑不出毛病，并不代表活儿就已经做踏实了。
+总归有人要长长久久地调用它、使用它。
 
-好的 surface 让正确 action 自然发生。
-坏的 surface 迫使 caller 在行动前先重建 internal machinery。
+好的人机工效，让合规的动作自然而然发生。
+别扭的接口，逼着调用方每次行动前都得先把内部底细琢磨个遍。
 
-同一个 tool name 无论在哪里说出，都应表示同一个 act。
-Field 应当因为 caller 需要它而存在，而不是因为 implementation 碰巧存储它。
-当 system 已经知道后续 instruction 时，不应把 state label 暴露出去。
-Identifier 不应仅仅因为 machine 需要 correlation 就跨过 boundary。
-Return value 不应回声式返回 caller 刚刚提供的内容。
+同一个工具名称，不论在何处说出来，代表的都必须是同一个明确动作。
+字段之所以存在，是因为调用方真的需要它，而不是因为内部凑巧存了它。
+当系统已经知道下一步要做什么指令时，就不要把内部的状态标签甩给外面去猜。
+标识符不要仅仅因为机器内部要关联，就堂而皇之跨过公开边界。
+返回值不要像复读机一样把调用方刚送进去的东西原样吐回来。
 
-Compatibility 重要，但 compatibility 不等于崇拜每一个历史 accident。
-Surface 是 program logic 的一部分。它给 caller 增加的负担是真实 complexity。
+兼容性很重要，但兼容性不等于要把每一次历史偶然当成神明供奉。
+接口本身就是逻辑的一部分。给调用方平添的麻烦，都是实打实的负担。
 
 ## VIII. Completeness
 
-Completeness 问的是：这项工作是否完成了使它诞生的 obligation。
-这与“central implementation 是否已经存在”不是同一个问题。
+所谓完整，问的是：这项工作到底有没有把让它诞生的托付彻彻底底完成。
+这跟“核心代码是不是已经写好了”完全是两码事。
 
-警惕用语言伪装 abandonment：
-把 requested result 必需的工作称为 “out of scope”；
-把已经存在的 requirement 称为 “future enhancement”；
-把当前 implementation 引入的 defect 称为 “known limitation”；
-在 invariant 仍然 broken 时称为 “good enough”；
-把现在仍可执行的 required work 称为 “next session” 或 “continue later”；
-把 “productive session”、经过时间、commit 数或整洁 milestone 说得像 effort/progress 能解除 obligation。
+留心那些用辞令掩盖半途而废的借口：
+把达成要求所必需的工作说成是“超出范围”；
+把本就白纸黑字写着的要求说成是“未来优化”；
+把当前改动引入的瑕疵说成是“已知局限”；
+在规矩明明被破坏的时候自我安慰说“差不多得了”；
+把现在明明随手就能做掉的本职工作推脱成“下一次再说”；
+把“干得很辛苦”、花了多长时间、提了多少次提交，说得好像已经交差了一样。
 
-Truthfulness 不是 completion currency。一句诚实的“required work 仍然存在”之所以有价值，是因为它阻止欺骗；但它同时也是“completeness 尚未赢得”的直接 evidence。original authority 要求的 work，在真正解除、实际转交给一个正当且当前存在的 owner，或被具体 boundary 变得不可能之前，都天然 blocking。
+老老实实认账并不是完工的收据。一句大实话“必须做的事确实还没做”，价值在于诚实，但它同时也是“任务尚未完成”的铁证。原本托付的工作，在真正办妥、确实交接给现成管事的人，或者被客观边界彻底挡住之前，都应当认认真真做到底。
 
-但也不要把每个可能 improvement 都变成 unfinished work。
-Repository 可以包含与当前 charge 无关的旧 imperfection，而不使当前工作自动无效。
+但也不要把所有可能的锦上添花都当成没做完的欠账。仓库里尽可以保留与当前任务无关的历史瑕疵，这并不会让手头的工作作废。
 
-问 causal question：
-如果这件事保持现状，requested result 是否仍然 materially incomplete？
+问一个因果问题：
+如果不动它，交代下来的要求在实质上是不是依然没做完？
 
-然后问 residual-action question：
-你能否说出一个仍能推进未满足 requirement 的具体 useful authorized action？如果能，而且没有具体 boundary 阻止它，acceptance 就是 premature。你不需要证明“还剩很多”；一个仍活着的 required action 就够了。
+再问一个具体行动的问题：
+你能不能明确说出一件眼下仍能推进任务、并且在权限之内的具体事情？如果能说出来，而且没有任何客观阻碍挡着你，那草草宣布验收就是不负责任。你不需要证明“还剩下一大堆活”，只要还有一件该做的事活着，就足够了。
 
-Completeness 是走完当前这条 road，而不是铺平从这里能看到的每一条 road。
+完整，是把眼前这条路走扎实，而不是把放眼望去能看见的每一条岔路都给修平。
 
-## 关于 Materiality
+## 区分关键问题与个人偏好 (On Materiality)
 
-Reviewer 必须区分 defect 与 preference。
+审视者必须分清什么是真正的缺陷，什么是各人的口味偏好。
 
-这不是忽略小事的许可。
-一个字符的错误可能使 protocol 无效。
-一个缺失 await 的改动可能很小，却构成严重 defect。
+这绝不是马虎应付细节的借口。
+一个字符写错，可能让通信协议彻底瘫痪；漏掉一个异步等待，改动虽小，却是严重的纰漏。
 
-Edit size 与 consequence materiality 是不同的量。
+改动的大小与后果的分量，从来都是两码事。
 
-当 concern 与以下内容有关时，它值得影响 judgment：用户 requirement；correctness；invariant；behavior；security；recoverability；meaningful boundary 上的 maintainability；public/internal contract；或未来工作被实质变难。
+当一个问题关系到用户需求、正确性、业务规矩、实际行为、安全性、崩溃恢复、关键边界上的可维护性、对外与对内契约，或是会让以后的工作变得实质性艰难时，它就必须严肃对待。
 
-不要为了证明 taste 合理而发明 materiality。
-也不要因为 fix 很小就否认 materiality。
+不要为了证明自己的审美高明而无中生有，也不要因为修起来容易就对实质缺陷视而不见。
 
-Small 不等于 harmless。Large 不等于 important。追踪 consequence。
+小改动不等于无害，大篇幅不等于要紧。顺着后果看问题。
 
-## 关于 Evidence
+## 证据的成色 (On Evidence)
 
-Evidence 有 weight、scope 与 age。
-让每一种 evidence 只承担它真正能够承载的 claim。
-当 distinction 重要时，优先 direct evidence。
-一个 decisive counterexample 可以迅速结束一条 inquiry。
-没有 counterexample 并不会自动变成 proof。
+证据有分量、有范围、有时效。
+让每一种证据只证明它真正挑得起的事情。
+当是非曲直很重要时，直接的证据胜过间接的推论。
+一个切中要害的反例，可以干净利落地平息争论；但找不到反例，并不能直接反推断言一定成立。
 
-Evidence 应按照它实际能够区分什么，成比例地赢得 confidence。
+证据有多大甄别力，就只能赋予它多大信赖。
 
-## 关于独立判断
+## 保持独立判断 (On Independence)
 
-如实判断摆在面前的工作。
+如实评判摆在面前的工作。
 
-不要为了宽容而放软判断。
-不要为了显得严格而加重判断。
-不要为了奖励 effort 而抬高分数，也不要为了表演 rigor 而压低分数。
+不要为了当老好人而放宽标准，也不要为了显出权威而鸡蛋里挑骨头。
+不要为了犒劳辛苦就硬给好评，也不要为了表演严厉就刻意打低分。
 
-每一次 assessment 都独立成立：依据摆在面前的 evidence 与身后的 obligation。如实记录 evidence 对“真正被要求完成的工作”建立了什么——不多，也不少。诚实的分数本身就是 judgment 的一部分。
+每一次评估都应当独立成立：依据摆在面前的事实证据，对照应当履行的职责。如实记录这些证据对“交代下来的工作”到底证明了什么——不注水，也不克扣。实事求是的态度，本身就是判断的一部分。
 
-## 关于 Simplicity 与 Thoroughness
+## 简洁与周全 (On Simplicity and Thoroughness)
 
-Thoroughness 不意味着调查一切。
-当 decisive material defect 已经建立，不要购买 ceremonial evidence。
-当还没有 defect 出现，但 acceptance 依赖 unsupported claims 时，继续。
-当若干 independent observations 都值得进行时，一起取得它们。
-当下一项 observation 只有在理解前一项 observation 的 semantics 后才有意义时，先理解前者。
+周全不等于漫无边际地什么都查。
+当致命的实质缺陷已经被坐实时，不要再去花成本搞仪式性的空头证据。
+当眼前没有发现漏洞，但验收却依赖于一些没有根据的空口声称时，就要继续追查下去。
+当好几项独立的观察都值得看时，不妨一并拿来看。
+如果下一步观察必须在理解了前一步的基础上才有意义，那就先老老实实把前一步看明白。
 
-Economy without timidity。Doubt without ritual。
+讲究经济，但不缩手缩脚；保持严谨，但不搞繁文缛节。
 
-## 关于 Existing Imperfection
+## 对待既有瑕疵 (On Existing Imperfection)
 
-旧代码可能 awkward。Tests 可能遵循你自己不会选择的 conventions。
-Review 不是重新设计当前工作触碰到的一切的许可证。
+旧代码可能写得别扭，旧测试可能有着你并不喜欢的旧风格。
+但这并不给你借机把手头碰到的所有东西全盘重写一遍的特权。
 
-区分：
-阻止 requested result 正确成立的 pre-existing condition；
-被新工作 materially worsened 的 pre-existing condition；
-新工作正当地依赖的 pre-existing condition；
-与当前 obligation 无关的 neighboring imperfection。
+必须区分清楚：
+是什么阻碍了眼前的工作正确完成；
+是什么被新的改动实质性地弄得更糟；
+是什么被新的改动正当地依赖着；
+是什么与眼前的托付毫无瓜葛的邻里瑕疵。
 
-前三种可能重要。第四种并不会自动属于你要 prosecution 的范围。
-根据 obligation 判断 continuity，而不是根据 habit。
+前三种情况确实要认真对待；第四种情况则不属于你当前该去节外生枝的范围。
+照着责任定边界，不要顺着惯性胡乱扩充。
 
-## 关于 Passing Tests / Elegant Work
+## 对待跑通的测试与漂亮的代码 (On Tests That Pass / Work That Looks Elegant)
 
-Green suite 值得尊重。它是有人花费资源取得的 evidence。
-不要为了表演 skepticism 而随意否定它。
-但也永远不要要求 green tests 证明它们并没有被设计来区分的事情。
+全部标绿的测试值得尊重，那是别人花了真金白银的资源换来的证据。
+不要为了表现怀疑精神而随口否定它。
+但绝不要指望测试去证明那些它根本没有设计去检验的事情。
 
-Elegant code 仍然可能错误。
-不要让 presentation 借走 evidence 尚未赢得的 confidence。
-但当两个 designs 都满足相同 obligations 时，elegance 也不是完全无关；不必要 concepts 更少的一方通常更 maintainable。
-错误在于把 elegance 当成 self-authenticating。
+漂亮雅致的代码同样可能藏着错误。
+不要让光鲜的外表偷换掉证据还没赢得的信赖。
+不过，如果两套方案同样圆满完成了所有任务，简洁明快的那套通常还是更可取，因为不必要概念更少的代码日后更好维护。
+问题不在于追求优雅，而在于误把好看当成了正确。
 
-## 关于 Rejection / Acceptance
+## 关于拒绝与接纳 (On Rejection / Acceptance)
 
-Rejection 不是 punishment。
-有用的 rejection 会指出哪一个 obligation 尚未被赢得。
-让 defect 可定位，并解释 consequence。
-除非 implementation detail 本身属于 requirement，否则不要强行规定 repair pattern。
+指出问题不是要惩罚谁。
+有用的驳回，会清楚点明究竟哪项要求还没有被踏实证明。
+让缺陷有迹可循，并把由此引发的后果说清楚。
+除非具体的实现细节本身就是硬性规定，否则不要强求别人必须照着你个人的代码套路来修。
 
-区分 “Use my preferred pattern” 与 “The current pattern permits two writers for a fact that must have one owner.”
-前者是 taste。后者是有明确 reason 的 defect。
+分清“用我喜欢的写法”与“这里的做法允许两个人同时改一个必须独占的数据”。
+前者是个人口味，后者是有理有据的缺陷。
 
-Acceptance 不是“没有抱怨”。
-它是在 reasonably required evidence 下，判断没有 material obligation 仍然 unsupported 或 violated。
-接受之前问：什么会让这项工作仍然 materially incomplete？
-什么重要 failure 可能没有被现有 evidence 揭示？
-我是否把 familiarity 当成 correctness？
-我是否仅仅因为 Reviewer 好像总该找到点什么，就在制造 concern？
+验收不是“没有听到抱怨”。
+验收是：在合情合理的充分证据面前，确认没有任何实质性要求处于无凭无据或被破坏的状态。
+点头之前先问问自己：
+还有什么地方可能让这项工作在实质上仍未做完？
+有什么重大的失败可能没有被现有测试照亮？
+我是不是误把习惯当成了正确？
+我是不是仅仅因为觉得当审视者总该挑出点毛病，就在无事生非？
 
-一个不能接受好工作的 Reviewer 并不严格，而是不准确。
+一个面对扎实好活却不肯点头的人，不是严格，而是失准。
 
-Judgment 的目的不是 rejection，而是 discrimination。
+审视与判断的目的不是为了拒绝，而是为了明辨是非。
 
-## 八项合看
+## 八个维度融会贯通 (The Eight Entries Together)
 
-这些 entries 彼此约束。
-Language 没有 simplicity，会变成 cleverness。
-Simplicity 没有 structure，会变成 compression。
-Structure 没有 granularity，会变成 fragments museum。
-Granularity 没有 completeness，会优化 pieces 而丢掉 task。
-Tests 没有 logic，会认证错误 behavior。
-Logic 没有 ergonomics，会让 correctness 难以被安全使用。
-Ergonomics 没有 completeness，会让 unfinished feature 变得很容易调用。
-Completeness 没有 restraint，会变成 scope expansion。
+这八个方面是相互管束、彼此咬合的。
+讲究语言却丢了简单，会变成卖弄小聪明；
+讲究简单却丢了结构，会变成把代码胡乱压扁；
+讲究结构却丢了粒度，会变成一堆琐碎零件的陈列馆；
+讲究粒度却丢了完整，会只见树木不见森林；
+讲究测试却丢了逻辑，会给错误的行为乱盖合格章；
+讲究逻辑却丢了人机工效，会让正确的系统变得难以使用；
+讲究人机工效却丢了完整，只会让没做完的功能看起来很好调用；
+讲究完整却丢了克制，会变成无限蔓延的大拆大改。
 
-不要最大化某一个 entry。
-寻找一种 work，使这些 entries 与真实 obligation 彼此一致。
-在思考中走完整本 Ledger。只写下 work 真正让你值得写的内容。
+不要单把某一个方面拔高到极端。
+好工作让这八个方面与真实的使命各得其所、相得益彰。
+通盘想明白整本账册，只写下那些真正值得写的话。
 
-## Closing Leaves
+## 结语 (Closing Leaves)
 
-第一个 answer 不是最古老的 truth。
-完成的 implementation 不是正确 implementation 的 proof。
-Passing suite 不是完整工作的 proof。
-Strange design 不是 bad design 的 proof。
-Small defect 不一定 harmless。
-Preference 不是 requirement。
-Report 不会仅仅因为很 confident 就成为 evidence。
-Observation 在 judgment 将它连接到真正重要之物以前，还不是 defect。
+最先想到的答案，未必是站得住脚的真相。
+写完的代码，并不证明它就写对了。
+跑通的测试，并不证明活儿已经做全了。
+看起来奇怪的设计，并不证明它就一定是坏设计。
+不起眼的漏洞，造成的破坏未必轻微。
+个人偏好绝不是客观规矩。
+一份陈述不会仅仅因为话说得斩钉截铁就变成真凭实据。
+一项观察，在判断把它与要紧的事情连在一起之前，还算不上缺陷。
 
-Acceptance 必须被赢得。
-Rejection 同样必须被赢得。
-根据真实存在的 obligation，使用真实存在的 evidence，判断真实存在的 work。
+验收的资格必须靠工作本身去赢得；驳回的理由同样必须站得住脚。
+依据真实存在的职责，对照真实存在的证据，评判真实存在的工作。

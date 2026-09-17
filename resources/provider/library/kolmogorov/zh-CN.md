@@ -1,156 +1,119 @@
 # Kolmogorov 之书
 
-Class：Handbook
+Class：手册 (Handbook)
 
-Purpose：积累关于 representation、boundary、change、evidence 与 verification 的工程判断。
+Purpose：积累关于数据表示、系统边界、变更演进、证据与验证的工程常识。
 
-Authority Boundary：本书只教授如何在已经托付给你的 authority 内把事情做得更好。它不会扩大 scope，不会授予 execution 权，也不会把设计偏好变成 product requirement。
+Authority Boundary：本书只讲解在已经托付给你的职权内如何把手艺做精。它不扩大你的工作范围，不授予额外的执行权，也不把个人的设计偏好当成产品规定。
 
 ## 选择最简单且足够的表示
 
-复杂度不能用文件数、行数、类型数或函数数直接衡量。
-这些都是观察，不是 verdict。
+代码的复杂度不能单靠数行数、数文件或数函数来判定。那些只是表象，不是结论。
 
-真正要问的是：这个 representation 必须承载多少不可约的意义？
-好的设计会让每个重要区别都有一个清楚的归属，并让无效组合难以被表达。
+真正要看的是：这套代码承载了多少不可减少的实际业务含义。好设计让每一个重要的概念都有一个清楚的归属，并且让不合规的组合在系统里很难表达出来。
 
-不要仅仅为了减少结构，就把不同含义压进同一个 primitive。
-也不要仅仅因为几段代码看起来相似，就创造 framework。
-只有当 abstraction 能保护 semantic boundary，或删除反复出现的 reasoning 时，它才真正赢得了存在理由；仅仅缩短文字不够。
+不要为了把表面结构压扁，就把两种截然不同的含义硬塞进同一个基础数据结构里。也不要仅仅因为几段代码长得像，就急匆匆造出一套大而无当的框架。只有当抽象能够守住清晰的业务边界，或者实实在在消除重复思考时，它才值得存在；仅仅为了少敲几个字符而抽象，通常得不偿失。
 
-行数与函数大小可以作为有用的建议性信号，但永远不是“这个模块一定错误”的硬证据。
-一个很大的 coherent owner，可能比若干把同一 invariant 打散的小文件更好；一个很小的文件，也可能正是干净的 legal seam。
-用 size 去提出 ownership 问题，而不是用它制造 refactor。
+行数和函数长短是提醒你注意的信号，但绝不是“这个模块一定写错了”的硬证据。一个职责紧凑连贯的大模块，往往胜过若干把同一条业务规矩割得支离破碎的小文件；一段很短的代码，也完全可能是一个干干净净的边界。用长短去推敲职责归属，不要单凭长短盲目重构。
 
 ## 区分本质复杂度与偶然复杂度
 
-Essential complexity 来自问题本身：真正独立的 states、真实 failure modes、authority boundaries、causal relationships，以及 restart 后仍必须存在的信息。
+本质复杂度来自问题本身：独立的业务状态、真实的失败情况、职责边界、因果联系，以及系统重启后依然必须保留的那些信息。
 
-Accidental complexity 来自选择的 representation：重复 state、没有 semantic work 的 translation layers、根据已经存在的事实重新拼装出来的 lifecycle flags、任何 supported world 都不需要的 compatibility branches，以及跨多个 owner 扩散的 control flow。
+偶然复杂度则来自我们自己选择的做法：到处重复的数据、没有任何业务实质的胶水转换层、根据已有事实又在别处拼凑出的生命周期标记、实际根本用不上的兼容分支，以及分散在各处的凌乱控制流程。
 
-不要以“简单”为名删除本质区别。
-也不要仅仅因为偶然复杂度已经存在，就替它辩护。
+不要借着“简单”的名义把本质上的必要区分给抹掉了。但也不要因为某种多余的偶然做法已经存在，就为它辩护。
 
-## 在 abstraction 之前先画 semantic boundary
+## 抽象之前先划清语义边界
 
-在选择 class、module、service 或 helper 之前，先问：谁拥有这个 fact？谁可以改变它？谁可以观察它？crash 之后什么必须留下？
+在动手建类、建模块、建服务之前，先想清楚：这个事实究竟归谁管？谁有权改变它？谁能看到它？系统出了故障之后，什么东西必须留下来？
 
-没有 semantic responsibility 的 boundary 多半只是仪式。
-能够保护 authority、provenance、persistence 或 stable contract 的 boundary，即使实现很小也有价值。
+一个没有明确职责划分的边界，通常只是形式主义的摆设。一个能守住职责、保证数据来源、确保可靠持久化与稳定契约的边界，哪怕实现起来只有短短几行代码，也是很有价值的。
 
-让核心 vocabulary 靠近 domain。
-只在真实边界做 translation。
-不要让 transport 或 framework shape 变成问题本身的模型。
+让核心词汇贴近实际业务领域。只在真正的系统交界处做数据转换，不要让底层的传输格式或框架结构反客为主，变成业务本身的模型。
 
-## 用类型系统排除虚假的世界
+## 用类型系统排除非法状态
 
-优先选择让 illegal state 根本无法出现的 representation，而不是依赖晚期 convention 去检查它。
+优先选择那些让非法状态从一开始就表达不出来的设计，而不是等运行起来后再用各种约定去到处检查。
 
-当 states 真正互斥时，使用 algebraic alternatives。
-当混淆 identifiers 会跨越 ownership 或 causal boundary 时，让它们保持不同类型。
-当 absence 本身有意义时，把 absence 明确表达出来。
+当几种状态真正互斥时，就用明确的联合类型或代数结构来表达。当把两种标识符混淆会引发混乱时（例如用户编号和订单编号），就分别给它们独立的类型名。当某种“缺失”本身有明确含义时，就把这种缺失清楚地写在类型里。
 
-不要用一组 booleans 暗中编码 state machine。
-不要仅仅为了读取方便，就把 derived fact 和它的 source 同时存储。
-如果一个 value 可以从 durable truth deterministic 地推导出来，优先推导；只有 measurement 证明另一种 representation 真有必要时才改变。
+不要用一堆布尔开关在背地里拼凑状态机。不要仅仅为了读起来顺手，就把能推导出来的派生数据和原始事实存放在一起。如果一个数值可以从已有的持久化事实中确定无疑地算出来，就老老实实去算，除非实际测量证明另外存一份确有必要。
 
-## 把纯决策与 effect 分开
+## 把纯逻辑决策与外部副作用分开
 
-有用的 architecture 往往拥有一个决定“应该发生什么”的 pure center，以及一个真正执行 I/O、time、process、network 或 persistence 的 effectful shell。
+一个结实可靠的系统，往往有一个负责决断“该做什么”的纯逻辑核心，以及一个负责真正执行输入输出、时钟、进程、网络或存储操作的薄外壳。
 
-目标不是追求仪式性的 purity。
-目标是：无需复现整个世界就能测试 decision，并让 effects 明确归属于真正拥有它们的 boundary。
+这不是为了讲究理论上的洁癖，而是为了不用把外部整套环境搬出来，就能直接、干净地测清楚核心逻辑；同时也让所有的外部操作都能明确归属于具体负责的边界。
 
-当 time、randomness、process launch 与 external observations 能改变行为时，把它们作为输入注入。
-不要让 ambient state 悄悄决定 domain truth。
+把时间、随机数、外部进程和网络观察作为参数传入，不要让随处飘浮的外部环境状态悄悄左右了业务判断。
 
-## 优先表达 declarative truth，而不是依靠 procedural reconstruction
+## 优先使用声明式事实，不靠过程式推测
 
-如果系统可以直接陈述一个 durable fact，就不要要求未来代码通过一串偶然 events 去猜出它。
+如果系统能直接记录下某件确定发生的事实，就不要让后来的代码顺着一连串偶然的零碎事件去瞎猜。
 
-Command 请求 action。
-Event 记录什么已经成为事实。
-不要混淆二者。
+命令是“请求执行某个动作”，它可能会因为不符合规矩而被拒绝。事件是“已经发生的事实”，发生了就不能否认。
 
-Command 可能在预期 event 发生前失败。
-Event 也可能在 command caller 已经消失之后才抵达。
-Persistent memory 应记录 recovery 真正需要的 facts，而不是把每个 implementation gesture 都当成 domain meaning 来 replay。
+命令可能在预期的事件发生前就失败了，事件也可能在最初发出命令的人离开之后才送到。持久化存储应当老老实实记录恢复局面所真正需要的事实，而不是把当时的一举一动当成业务本身的永恒意义去重演。
 
-## 围绕 ownership 与 causality 建模 concurrency
+## 围绕所有权与因果关系处理并发
 
-当独立工作拥有独立 ownership，而共享 mutation 明确可见时，concurrency 最安全。
+当彼此独立的事情各由独立的主体负责、对共享状态的改动清清楚楚时，并发才是最稳妥的。
 
-不要为了避免思考 interleavings 就串行化一切。
-也不要并行化那些 correctness 依赖 hidden order 的工作。
+不要为了图省事不想理顺交织流程，就一律改成串行；也不要把那些结果依赖隐式顺序的事情硬拆成并行。
 
-当顺序重要时，表示真正的原因：dependency、compare-and-swap witness、barrier、ownership transfer，或其他明确 relation。
-Scheduler order 不能替代 causality。
+如果一件事情必须在另一件事情之后做，就要把真实的原因表达出来：比如显式的前后依赖、版本见证、栅栏屏障、所有权移交，或是明确的关系约束。随意的调度先后绝不等于因果关系。
 
-设计 replay 与 reconciliation，使独立 histories 根据 facts 收敛，而不是根据哪个 callback 恰好先到。
+让重放和状态对齐按客观事实收敛，而不是看哪个回调函数碰巧先跑完。
 
-## 让 persistence 与 replay 讲同一个故事
+## 让持久化与重放讲同一个故事
 
-Durable state 必须足以恢复真正重要的 semantic state。
-Restart 不能发明 success、抹掉 material failure，或依赖已经不存在的 process-local flag。
+写入磁盘的数据，必须足够完整，能够把真正重要的业务局面如实还原出来。系统重启不能凭空编造成功，不能抹杀真实的失败，也不能指望已经随进程消失的内存标记。
 
-为 durable facts 使用 stable identities。
-在可能 replay 的 boundary 明确建模 idempotence。
-当 recovery 有歧义时，fail closed，而不是猜测。
+给持久化的事实起稳定长久的标识名字。在可能重试或重放的边界上，把幂等处理落实到位。遇到含糊不清的恢复数据，宁可停下来报错，也绝不胡乱猜测。
 
-当一个 representation 通过 clean break 被替换时，删除旧 provider surface，而不是迫使未来每一层同时理解两套 ontology。
-只有 recovery 真正需要时，historical decode 才可以保留在内部。
+如果某套旧做法已经彻底被新做法取代，就痛痛快快把旧接口清理干净，不要逼着以后的每一层代码都去兼容两套体系。只有在历史恢复确实不可或缺时，才在内部保留旧数据的解析能力。
 
-## 调查原因，而不只处理症状
+## 追查根因，而不只是应付表面症状
 
-失败的 test、exception、timeout、race 或意外 output 都是 evidence。
-它们还不是 root cause。
+失败的测试、报错信息、超时和诡异的输出，都是线索，还不是根因本身。
 
-沿着 ownership 与 data path 追踪，直到“改变你提出的原因”确实能够解释已经观察到的 effect。
-优先修复被破坏的 invariant，而不是只压住可见 symptom。
+顺着职责分配和数据流通的路径一路查下去，直到你能证明：只要改变你指出的那个原因，就能顺理成章地解释并消除眼前所有的异常现象。
 
-当修复改变了 protocol boundary 时，在真正失败的 boundary 增加 permanent regression test。
-不要把一次性 probe 当成 closure 的证明。
+修复必须恢复被破坏的规矩本身，而不是在表面加几行判断把报警遮掩过去。
 
-## 保存耐久知识，但不要创造第二个真源
+一旦修改涉及对外协议或模块边界，就必须在真正出错的边界上补上一道长久的自动化回归测试，不把随手跑一次临时脚本当成问题解决的凭据。
 
-记录那些昂贵、并且会跨 assignments 反复出现的区别。
-不要把 operational state 写进 doctrine。
-已有 canonical technical specification 时，从真正的 owner 组合它，而不是在 handbook 里复制出另一个竞争真源。
+## 沉淀耐用知识，但不制造第二个真源
 
-好书让未来 judgment 更便宜。
-它不会让未来每个问题都被强迫长得像这本书。
+把那些花了大代价才想明白、而且在往后工作中会反复碰到的经验记录下来。但切记：不要把日常运行的临时状态写进规范与守则。
 
-## 让名字成为 semantic documentation
+如果仓库里已经有正式的技术规范和代码权威，就直接引用它、遵循它，不要在别的手册里抄出一份看似相同、日后却难免脱节的“第二套真相”。
 
-名称应当揭示程序真正依赖的区别。
-当含义已经改变时，不要继续使用只记录旧 implementation accident 的名字。
-避免 generic buckets——它们唯一的承诺只是“互不相关的东西都能塞进去”。
+好手册是让以后的判断少走弯路，而不是逼着以后的每一个实际问题都硬长成手册里的死模样。
 
-当旧名字教授错误 ontology 时，rename 不是 cosmetic。
-反过来，如果 ownership 仍然错误，换一个新名字也修不好设计。
+## 让名字成为代码最直白的说明
 
-## 用测试保护行为与边界
+名字应该直接点明代码所依赖的真实概念。
 
-围绕必须保持成立的 algebra 编写 deterministic tests。
-当 adapter 与 framework behavior 本身属于 contract 时，使用 integration tests。
-只有少数必须由真实 Host 才能证明的 causal paths，才需要 end-to-end tests。
+当现实情况已经发生变化时，不要继续使用只反映当年偶然做法的旧名字。避免起一些像大杂烩一样的名字——它们唯一的特点就是什么八竿子打不着的东西都能往里装。
 
-一个 failing test 的价值，在于它能区分缺失的 behavior。
-一个 passing test 的价值，只等于它对自己声称要阻止的 regression 实际具有多强的失败能力。
+如果旧名字会让读者理解错业务，那么改名就是严肃的正经事；反过来，如果代码本身的职责划分一团糟，单单换个好听的新名字也拯救不了坏设计。
 
-不要削弱 tests 来让 implementation 通过。
-不要抬高 timeout 来隐藏 broken causal wait。
-不要把 flaky test 重复到 probability 看起来像 evidence。
+## 用测试守护行为与边界
 
-Verification 应形成 ladder：pure invariants、component contracts、integration boundaries，然后是能够证明剩余 uncertainty 的最小 real-host path。
+围绕必须始终成立的核心规矩编写确定性的测试。当适配器和框架交互本身就是对外契约的一部分时，编写集成测试。只有少数必须在真实宿主环境下才能证明的因果路径，才采用端到端测试。
 
-## 保持 scope discipline
+一个会失败的测试之所以宝贵，是因为它真能把错误从正确中甄别出来。一个通过的测试之所以有分量，完全取决于如果系统真的退化了，它到底能不能敏锐地亮起红灯。
 
-连贯地完成 entrusted change。
-不要把附近的 defect 当成重设计无关 subsystem 的许可。
-也不要仅仅因为修正一个已知 defect 会跨越多个文件，就把它保留下来。
+绝不要为了让测试变绿而弱化断言，不要盲目调大超时时间去掩盖因果等待漏洞，也不要把不稳定测试反复重跑直到碰巧通过当成证据。
 
-正确的 scope 由 obligation，以及让该 obligation 成真的必要 invariants 决定，而不是由 diff size 决定。
+验证应当是一步一步扎实的阶梯：先测纯逻辑不变量，再测组件契约，接着测集成边界，最后才走最小的真实环境路径去确认剩下的疑问。
 
-最简单且足够的设计，并不是最小的 artifact。
-它是 accidental machinery 最少、同时仍能讲完整真相的 representation。
+## 保持范围克制
+
+把托付给你的改动清清楚楚地做完整。不要把附近的陈旧瑕疵当成大改无关系统的借口，但也不要把自己改动范围内暴露出的已知缺陷视而不见地留下来。
+
+合理的工作范围取决于你承担的职责以及让这一职责成真所必需的规矩，而不是看文件差异的长短。
+
+最简单且足够的设计，绝不是代码字数最少的东西。它是没有多余摆设、同时还能讲出完整实话的明白表述。
