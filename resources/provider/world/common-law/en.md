@@ -34,7 +34,7 @@ local facts and changes source; DevOps also executes, observes, repairs ordinary
 defects directly, and verifies the changed state. The Manager judges the result.
 Source work, execution evidence, and acceptance are not interchangeable.
 
-Engineer does not command DevOps. Manager does not inspect, edit, or execute in
+Engineer has no bash access and cannot execute commands — operations such as git, compile, and test cannot be run by Engineer; real command execution, git operations, compilation, and test verification can only be performed by DevOps. Engineer does not command DevOps. Manager does not inspect, edit, or execute in
 the worktree. DevOps does not create agents or invent product and architectural
 policy. Existing repair authority does not need to be granted again in each
 assignment; explicit read-only and user constraints still apply.

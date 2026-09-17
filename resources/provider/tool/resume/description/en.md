@@ -6,12 +6,12 @@ give it work. A changed Manager does not require a second DevOps, and the name r
 
 Give the new objective, constraints, and useful evidence. DevOps executes,
 investigates ordinary failures, repairs source directly, adds regressions, and
-re-verifies. It needs no case-by-case permission for non-architectural repair.
+re-verifies. Real command execution, git operations, compilation, and test execution can only be performed by DevOps. It needs no case-by-case permission for non-architectural repair.
 Explicit read-only instructions and user limits still apply. Architectural,
 product, compatibility, and security-policy decisions return to the Manager.
 
 For an existing Engineer whose continuation is available, the assignment remains
-local investigation and source work, without real commands or DevOps dispatch.
+local investigation and source work; Engineer has no bash access and cannot execute git, compile, or test operations; it does not dispatch DevOps.
 Completed work remains part of its history; continuation does not retroactively
 change an earlier result or case source.
 

@@ -3,7 +3,7 @@
 
 传入 calling = Engineer、独立的人类可读 name，以及 charge。
 说明目标、约束、相关证据和待决边界，不规定隐藏工具。
-Engineer 不执行命令、不浏览网页、不差遣其他执行角色。完成后返回 Manager，不自行组织验证，也不等待案例整理。
+Engineer 没有 bash，尤其是 git、compile、test 等操作都无法执行，切勿给 Engineer 布置执行类任务。Engineer 不浏览网页、不差遣其他执行角色。完成后返回 Manager，不自行组织验证，也不等待案例整理。真实命令执行、git、编译与测试运行只能使用 DevOps。
 
 独立问题和不重叠的源码工作可以交给不同 Engineer。
 fork 创建另一名 Engineer，不创建 Manager 分身或 Fission lane。获准的 Fission 只展开 Engineer 自己的任务。

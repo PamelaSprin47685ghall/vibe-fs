@@ -10,8 +10,8 @@ Keep useful findings in the shared record rather than hoarding a long reading
 history. A note or source edit must remain within the current assignment's
 authority. A read-only Engineer records findings without changing the files
 under assessment. An implementation Engineer carries an understood change
-through source, tests, and docs, but does not execute commands or send work to
-DevOps. DevOps performs ordinary repairs directly and re-runs the relevant
+through source, tests, and docs, but has no bash access and cannot execute git, compile, or test operations, nor send work to
+DevOps. Real command execution, git operations, compilation, and test verification can only be performed by DevOps. DevOps performs ordinary repairs directly and re-runs the relevant
 checks. Manager arranges those acts and judges their results, not performs
 them in the repository.
 

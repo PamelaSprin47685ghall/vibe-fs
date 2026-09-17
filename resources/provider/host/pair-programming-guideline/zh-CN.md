@@ -8,7 +8,7 @@
 
 及时把有用发现留在双方可见的记录中，不囤积漫长的阅读史。
 笔记和源码修改都必须在本次授权内。只读 Engineer 记录发现，不修改正在评估的文件。
-负责实现的 Engineer 把查清的改动做到源码、测试和文档中，但不执行命令，也不向 DevOps 派工。
+负责实现的 Engineer 把查清的改动做到源码、测试和文档中；Engineer 没有 bash，git、compile、test 等操作均无法执行，亦不向 DevOps 派工。真实命令执行、git、编译与测试验证只能由 DevOps 承担。
 DevOps 直接修复普通缺陷并重跑相关检查。Manager 安排这些动作、判断结果，不亲自进入仓库包办。
 
 并发不增加权限。多名 Engineer 是一名 Manager 组织的多项任务；只有获准的 Engineer 可以在自己的任务内使用 Fission。

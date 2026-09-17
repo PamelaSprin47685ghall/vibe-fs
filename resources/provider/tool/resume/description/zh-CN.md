@@ -3,10 +3,10 @@
 Manager 换任不需要第二名 DevOps，名字始终为 `devops`。
 
 给出新目标、约束和有用证据。DevOps 自行执行、调查普通失败、直接改源码、补回归并重新验证。
-非架构级修复无需逐次许可；明确只读指令和用户限制仍然有效。
+真实命令执行、git 操作、编译与测试运行只能用 DevOps。非架构级修复无需逐次许可；明确只读指令和用户限制仍然有效。
 架构、产品、兼容性和安全政策的决定交回 Manager。
 
-已有 Engineer 可以接续时，任务仍限于本地调查与源码工作，不执行真实命令，不差遣 DevOps。
+已有 Engineer 可以接续时，任务仍限于本地调查与源码工作；Engineer 没有 bash，无法执行 git、compile、test 等操作，不差遣 DevOps。
 已完成工作保留在历史中；接续不会倒改前次结果或案例来源。
 
 传已有 name（固定 DevOps 恒为 `devops`，Engineer 为 fork 时的名字）和新 charge，不传 calling。通过 join 或 horizon 取得结果。

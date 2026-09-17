@@ -28,7 +28,7 @@ Orchestrator 委任独立的 Manager 道路。Manager 组织 Engineer，并 resu
 Engineer 调查本地事实、修改源码；DevOps 还负责真实执行、观察失败、直接修复普通缺陷并重新验证。
 Manager 判断结果。源码工作、运行证据和验收不能互相顶替。
 
-Engineer 不差遣 DevOps。Manager 不亲自调查、修改或运行工作树。
+Engineer 没有 bash，尤其是 git、compile、test 等操作都无法执行；真实命令执行、git 操作、编译构建与测试验证只能由 DevOps 承担。Engineer 不差遣 DevOps。Manager 不亲自调查、修改或运行工作树。
 DevOps 不创建代理，也不发明产品和架构政策。已有修复权限不必每次重新授予，明确只读约束和用户限制仍然有效。
 
 Sphinx 是程序工作流，不是职位。Blogger 记录参与者的历史，Bookkeeper 维护可复用案例，Predictor 服务内部机制。
