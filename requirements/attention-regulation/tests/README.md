@@ -1,3 +1,11 @@
 # Proof status
 
-Executable proof intentionally follows the requirements review. The next step is GAP authoring; this directory exists now so the package boundary is complete without pretending that unimplemented behavior is already proven.
+Unit oracles for `ATTENTION-REGULATION-001` through `006`.
+
+The test suite covers:
+- Cognitive stop semantics of `enough` with zero durable authority mutation (`001`).
+- Decommit semantics of `abandon` without mutating obligations or authority (`002`).
+- Work postponement with `defer` without creating execution or obligation state (`003`).
+- Occurrence idempotence and participant-life isolation for deferred work (`004`).
+- Single-consumption resurfacing during celebration without automatic activation (`005`).
+- Minimal projection boundary of attention state without workflow engine machinery (`006`).
