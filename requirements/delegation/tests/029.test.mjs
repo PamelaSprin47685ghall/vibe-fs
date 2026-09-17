@@ -138,3 +138,56 @@ test('WHAT[DELEG-029] delegation runtime consumes only the delegation-owned jour
   }
   assert.ok(consumesPort, 'delegation-recovery-runtime implementation must consume AgentJournalPort')
 })
+
+test('WHAT[DELEG-029] PTY adapter consumes only narrow PTY capability and does not access forbidden runtime internals', () => {
+  const compileInventory = readCompileShardInventory({ repositoryRoot: ROOT })
+  const subsystemInventory = buildSubsystemInventory({ compileInventory })
+  assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))
+
+  const ptyAdapter = [...subsystemInventory.projects.values()].find(
+    (project) => project.shard === 'delegation-pty-adapter',
+  )
+  assert.ok(ptyAdapter, 'shard delegation-pty-adapter must exist')
+
+  // 1. 验证编译引用：不得引用 delegation-host-adapter 与 execution-delegation-fork-runtime
+  const forbiddenShards = new Set([
+    'delegation-host-adapter',
+    'execution-delegation-fork-runtime',
+  ])
+  for (const reference of ptyAdapter.references) {
+    const provider = subsystemInventory.projects.get(reference)
+    assert.ok(
+      !forbiddenShards.has(provider.shard),
+      `delegation-pty-adapter must not reference forbidden shard: ${provider.shard} (DELEG-029)`,
+    )
+  }
+
+  // 2. 源码文本静态约束：严禁 type HostForkRuntime with，严禁直接读取 Gate, Dictionary, TCS 等
+  const ptySources = [...ptyAdapter.implementationFiles, ...ptyAdapter.signatureFiles]
+  for (const sourcePath of ptySources) {
+    const text = readFileSync(sourcePath, 'utf8')
+    assert.doesNotMatch(text, /type\s+HostForkRuntime\s+with/, `${sourcePath} must not extend HostForkRuntime`)
+    assert.doesNotMatch(text, /\bHostForkRuntime\b/, `${sourcePath} must not reference HostForkRuntime`)
+    assert.doesNotMatch(text, /\bForkRuntime\b/, `${sourcePath} must not reference ForkRuntime`)
+    assert.doesNotMatch(text, /\bTaskCompletionSource\b/, `${sourcePath} must not reference TaskCompletionSource`)
+    assert.doesNotMatch(text, /\bDictionary\b/, `${sourcePath} must not reference Dictionary`)
+  }
+
+  // 3. 验证 delegation-owned 窄 capability 类型存在性
+  let declaringProject = null
+  for (const project of subsystemInventory.projects.values()) {
+    const allFiles = [...project.implementationFiles, ...project.signatureFiles]
+    for (const file of allFiles) {
+      const text = readFileSync(file, 'utf8')
+      if (/\btype\s+DelegationPtyCapability\b/.test(text)) {
+        declaringProject = project
+        break
+      }
+    }
+    if (declaringProject) break
+  }
+  assert.ok(declaringProject, "a source file must declare 'type DelegationPtyCapability'")
+  assert.equal(declaringProject.subsystem, 'delegation', 'DelegationPtyCapability must belong to delegation subsystem')
+  assert.equal(declaringProject.legacyKind, 'contract', 'DelegationPtyCapability declaring project must be a contract shard')
+})
+

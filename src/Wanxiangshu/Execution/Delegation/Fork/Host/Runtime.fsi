@@ -126,3 +126,16 @@ type HostForkRuntime =
     member PendingRunCount: int
     member PendingCompletionCount: int
     member IsCancelled: bool
+
+    member TrackPtyRun: id: PtyId -> unit
+    member RegisterPtySnapshot: id: PtyId -> command: string -> unit
+    member UntrackPtyRun: id: string -> unit
+    member OwnsPty: id: PtyId -> bool
+    member IsPtyCompletion: runId: string -> bool
+    member TryBindTerminalName: name: string * id: PtyId -> Result<unit, string>
+    member TryPtyByName: name: string -> PtyId option
+    member ForkPty: command: string * agent: ManagedAgent * ?cwd: string -> Task<Result<PtyId, string>>
+    member TryPty: id: string -> PtyId option
+    member SendPty: id: PtyId * prompt: string * signal: PtySignal option -> Task<Result<PtyRead, string>>
+    member TryTerminalNameByPtyId: ptyId: string -> string option
+    member PtyCapability: DelegationPtyCapability

@@ -1,6 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
-open Wanxiangshu.Execution.Delegation.Fork.Host
+open Wanxiangshu.Execution.Delegation
 
 /// DevOps terminal verbs — open / send / read / signal (AGENT-006).
 module PtyTool =
@@ -75,7 +75,7 @@ module PtyTool =
     type PtyRuntimeContext =
         { IsDevOps: HostToolContext -> bool
           ManagedAgentFor: HostToolContext -> ManagedAgent option
-          RuntimeFor: HostToolContext -> Result<HostForkRuntime, string>
+          PtyCapabilityFor: HostToolContext -> Result<DelegationPtyCapability, string>
           DirectoryFor: string -> string option
           WorkspaceDirectory: string option }
 

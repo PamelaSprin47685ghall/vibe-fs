@@ -8,10 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-managedagent.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-host-adapter.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-fork-runtime.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
-    
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-pty-port.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.process-execution.process-processrequest.fsproj"/>
     <Compile Include="Execution/Delegation/Fork/Host/Pty.fsi"/>
     <Compile Include="Execution/Delegation/Fork/Host/Pty.fs"/>

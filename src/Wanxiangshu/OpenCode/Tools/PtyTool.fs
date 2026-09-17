@@ -3,7 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Threading.Tasks
 open FsToolkit.ErrorHandling
-open Wanxiangshu.Execution.Delegation.Fork.Host
+open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Process
@@ -81,7 +81,7 @@ module PtyTool =
     type PtyRuntimeContext =
         { IsDevOps: HostToolContext -> bool
           ManagedAgentFor: HostToolContext -> ManagedAgent option
-          RuntimeFor: HostToolContext -> Result<HostForkRuntime, string>
+          PtyCapabilityFor: HostToolContext -> Result<DelegationPtyCapability, string>
           DirectoryFor: string -> string option
           WorkspaceDirectory: string option }
 
@@ -137,26 +137,31 @@ module PtyTool =
         |> Result.requireSome (prose language Path.OpenTerminal.AuthorityRequired)
 
     /// Evidence → Decision: terminal name must be free before ForkPty.
-    let private requirePtyNameAvailable (language: ProviderLanguage) (runtime: HostForkRuntime) (name: string) =
-        runtime.TryPtyByName name
+    let private requirePtyNameAvailable (language: ProviderLanguage) (pty: DelegationPtyCapability) (name: string) =
+        pty.TryPtyByName name
         |> Result.requireNone (namedProse language Path.OpenTerminal.AlreadyInUse (name.Trim()))
 
     /// Evidence → Decision: bind name or untrack the freshly forked PTY.
-    let private bindOpenedTerminal (language: ProviderLanguage) (runtime: HostForkRuntime) (name: string) (id: PtyId) =
-        match runtime.TryBindTerminalName(name, id) with
+    let private bindOpenedTerminal
+        (language: ProviderLanguage)
+        (pty: DelegationPtyCapability)
+        (name: string)
+        (id: PtyId)
+        =
+        match pty.TryBindTerminalName(name, id) with
         | Ok() -> Ok(instruction (namedProse language Path.OpenTerminal.IsOpen (name.Trim())))
         | Error bindError ->
-            runtime.UntrackPtyRun id.Value
+            pty.UntrackPtyRun id.Value
             Error bindError
 
     /// Evidence → Decision: named PTY must already exist for send/read/signal.
     let private requirePtyByName
         (language: ProviderLanguage)
         (unknownPath: string)
-        (runtime: HostForkRuntime)
+        (pty: DelegationPtyCapability)
         (name: string)
         =
-        runtime.TryPtyByName name
+        pty.TryPtyByName name
         |> Result.requireSome (namedProse language unknownPath (name.Trim()))
 
     /// Evidence → Decision: empty read output vs payload.
@@ -174,16 +179,16 @@ module PtyTool =
         taskResult {
             let! language = requireDevOps runtimeCtx context Path.OpenTerminal.DevOpsOnly
             let! name, command = requireOpenArgs language args
-            let! runtime = runtimeCtx.RuntimeFor context
+            let! pty = runtimeCtx.PtyCapabilityFor context
             let! agent = requireManagedAgent language runtimeCtx context
-            do! requirePtyNameAvailable language runtime name
+            do! requirePtyNameAvailable language pty name
 
             let directory =
                 runtimeCtx.DirectoryFor context.SessionId
                 |> Option.orElse runtimeCtx.WorkspaceDirectory
 
-            let! id = runtime.ForkPty(command, agent, ?cwd = directory)
-            return! bindOpenedTerminal language runtime name id
+            let! id = pty.ForkPty(command, agent, directory)
+            return! bindOpenedTerminal language pty name id
         }
 
     let private sendTerminalOutcome
@@ -195,9 +200,9 @@ module PtyTool =
             let! language = requireDevOps runtimeCtx context Path.SendTerminal.DevOpsOnly
             let name = args.Text "name"
             let input = args.Text "input"
-            let! runtime = runtimeCtx.RuntimeFor context
-            let! ptyId = requirePtyByName language Path.SendTerminal.UnknownTerminal runtime name
-            let! _ = runtime.SendPty(ptyId, input, None)
+            let! pty = runtimeCtx.PtyCapabilityFor context
+            let! ptyId = requirePtyByName language Path.SendTerminal.UnknownTerminal pty name
+            let! _ = pty.SendPty(ptyId, input, None)
             return instruction (prose language Path.SendTerminal.InputSent)
         }
 
@@ -209,9 +214,9 @@ module PtyTool =
         taskResult {
             let! language = requireDevOps runtimeCtx context Path.ReadTerminal.DevOpsOnly
             let name = args.Text "name"
-            let! runtime = runtimeCtx.RuntimeFor context
-            let! ptyId = requirePtyByName language Path.ReadTerminal.UnknownTerminal runtime name
-            let! read = runtime.SendPty(ptyId, "", None)
+            let! pty = runtimeCtx.PtyCapabilityFor context
+            let! ptyId = requirePtyByName language Path.ReadTerminal.UnknownTerminal pty name
+            let! read = pty.SendPty(ptyId, "", None)
             return readTerminalBody language name read
         }
 
@@ -225,9 +230,9 @@ module PtyTool =
             let name = args.Text "name"
             let signalRaw = args.Text "signal"
             let! signalValue = PtySignal.tryParse signalRaw
-            let! runtime = runtimeCtx.RuntimeFor context
-            let! ptyId = requirePtyByName language Path.SignalTerminal.UnknownTerminal runtime name
-            let! _ = runtime.SendPty(ptyId, "", Some signalValue)
+            let! pty = runtimeCtx.PtyCapabilityFor context
+            let! ptyId = requirePtyByName language Path.SignalTerminal.UnknownTerminal pty name
+            let! _ = pty.SendPty(ptyId, "", Some signalValue)
 
             return
                 instruction (

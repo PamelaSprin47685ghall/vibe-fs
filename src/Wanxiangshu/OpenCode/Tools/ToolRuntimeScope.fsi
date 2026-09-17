@@ -6,6 +6,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
@@ -107,6 +108,7 @@ type ToolRuntimeScope =
     member RequireCurrentProcessJoin: root: SessionId -> Task<FamilyRecovery>
 
     member RuntimeFor: ctx: HostToolContext -> Result<HostForkRuntime, string>
+    member PtyCapabilityFor: ctx: HostToolContext -> Result<DelegationPtyCapability, string>
 
     member EnsureRoadDevOpsBound: parentSessionId: SessionId -> Task<unit>
 

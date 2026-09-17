@@ -37,6 +37,52 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Persistence.Journal
 
+
+[<RequireQualifiedAccess>]
+module private PtyHostHelpers =
+    let bindTerminalName (gate: obj) (terminalByName: Dictionary<string, string>) (name: string) (id: PtyId) =
+        lock gate (fun () ->
+            match terminalByName.TryGetValue(name.Trim()) with
+            | true, existing when existing <> id.Value ->
+                Error(sprintf "Terminal name '%s' is already in use" (name.Trim()))
+            | _ ->
+                terminalByName.[name.Trim()] <- id.Value
+                Ok())
+
+    let ptyByName
+        (gate: obj)
+        (terminalByName: Dictionary<string, string>)
+        (ptyRuns: HashSet<string>)
+        (known: PtyId -> bool)
+        (name: string)
+        =
+        lock gate (fun () ->
+            match terminalByName.TryGetValue(name.Trim()) with
+            | true, id when ptyRuns.Contains id && known (PtyId.Create id) -> Some(PtyId.Create id)
+            | _ -> None)
+
+    let ensureLf (prompt: string) =
+        if
+            prompt.EndsWith("\n", StringComparison.Ordinal)
+            || prompt.EndsWith("\r", StringComparison.Ordinal)
+        then
+            prompt
+        else
+            prompt + "\n"
+
+    let emptyRead (id: PtyId) : PtyRead =
+        { Id = id; Output = ""; Closed = false }
+
+    let mapRead (id: PtyId) (output: string, closed: bool) : PtyRead =
+        { Id = id
+          Output = output
+          Closed = closed }
+
+    let tryTerminalNameByPtyId (gate: obj) (terminalByName: Dictionary<string, string>) (ptyId: string) =
+        lock gate (fun () ->
+            terminalByName
+            |> Seq.tryPick (fun (KeyValue(name, id)) -> if id = ptyId then Some name else None))
+
 /// Bridges real child sessions to the existing completion mailbox.
 /// Fork / Reuse / Pty operations live in extension files (semantic split).
 type HostForkRuntime
@@ -635,6 +681,113 @@ type HostForkRuntime
     member _.PendingRunCount = lock gate (fun () -> pendingRuns.Count)
     member _.PendingCompletionCount = runtime.PendingCompletionCount
     member _.IsCancelled = runtime.IsCancelled
+
+    member this.TrackPtyRun(id: PtyId) =
+        lock gate (fun () -> ptyRuns.Add id.Value |> ignore)
+
+    member this.RegisterPtySnapshot (id: PtyId) (command: string) =
+        runtime.RegisterPty
+            { PtyId = id.Value
+              AgentId = id.Value
+              Command = command
+              StartedAt = this.Now() }
+
+    member this.UntrackPtyRun(id: string) =
+        lock gate (fun () ->
+            ptyRuns.Remove id |> ignore
+
+            let stale =
+                terminalByName
+                |> Seq.filter (fun kv -> kv.Value = id)
+                |> Seq.map (fun kv -> kv.Key)
+                |> Seq.toList
+
+            for name in stale do
+                terminalByName.Remove name |> ignore)
+
+        runtime.UnregisterPty id
+
+    member this.OwnsPty(id: PtyId) =
+        lock gate (fun () -> ptyRuns.Contains id.Value)
+
+    member this.IsPtyCompletion(runId: string) =
+        lock gate (fun () -> ptyRuns.Contains runId)
+
+    member this.TryBindTerminalName(name: string, id: PtyId) : Result<unit, string> =
+        if String.IsNullOrWhiteSpace name then
+            Error "Terminal name is required"
+        else
+            PtyHostHelpers.bindTerminalName gate terminalByName name id
+
+    member this.TryPtyByName(name: string) : PtyId option =
+        if String.IsNullOrWhiteSpace name then
+            None
+        else
+            PtyHostHelpers.ptyByName gate terminalByName ptyRuns ptyPortInstance.Known name
+
+    member this.ForkPty(command: string, agent: ManagedAgent, ?cwd: string) : Task<Result<PtyId, string>> =
+        taskResult {
+            do!
+                if String.IsNullOrWhiteSpace command then
+                    Error "PTY command is required"
+                else
+                    Ok()
+
+            let id = Pty.newId ()
+            this.TrackPtyRun id
+            this.RegisterPtySnapshot id command
+
+            try
+                ptyPortInstance.Fork(command, agent.Name, ptyId = id, ?cwd = cwd) |> ignore
+                return id
+            with ex ->
+                this.UntrackPtyRun id.Value
+                return! Error ex.Message
+        }
+
+    member this.TryPty(id: string) =
+        if String.IsNullOrWhiteSpace id then
+            None
+        elif this.OwnsPty(PtyId.Create id) && ptyPortInstance.Known(PtyId.Create id) then
+            Some(PtyId.Create id)
+        else
+            None
+
+    member this.SendPty(id: PtyId, prompt: string, signal: PtySignal option) : Task<Result<PtyRead, string>> =
+        taskResult {
+            do!
+                if not (this.OwnsPty id) then
+                    Error(sprintf "Unknown PTY id: %s" id.Value)
+                elif not (ptyPortInstance.Exists id) then
+                    Error(sprintf "Unknown PTY id: %s" id.Value)
+                else
+                    Ok()
+
+            match signal with
+            | Some value ->
+                do! ptyPortInstance.Send(id, PtyCommand.Signal value)
+                return PtyHostHelpers.emptyRead id
+            | None when String.IsNullOrEmpty prompt ->
+                let! output, closed = ptyPortInstance.Read id
+                return PtyHostHelpers.mapRead id (output, closed)
+            | None ->
+                do! ptyPortInstance.Send(id, PtyCommand.Write(Pty.bytes (PtyHostHelpers.ensureLf prompt)))
+                return PtyHostHelpers.emptyRead id
+        }
+
+    member this.TryTerminalNameByPtyId(ptyId: string) : string option =
+        PtyHostHelpers.tryTerminalNameByPtyId gate terminalByName ptyId
+
+    member this.PtyCapability: DelegationPtyCapability =
+        { TryPtyByName = this.TryPtyByName
+          ForkPty = fun (cmd, agent, cwd) -> this.ForkPty(cmd, agent, ?cwd = cwd)
+          TryBindTerminalName = fun (name, id) -> this.TryBindTerminalName(name, id)
+          UntrackPtyRun = this.UntrackPtyRun
+          SendPty = fun (id, prompt, sigOpt) -> this.SendPty(id, prompt, sigOpt)
+          OwnsPty = this.OwnsPty
+          TryPty = this.TryPty
+          TryTerminalNameByPtyId = this.TryTerminalNameByPtyId }
+
 
     member _.EnqueueBufferedJoinItems(items: JoinItem seq) =
         lock gate (fun () ->

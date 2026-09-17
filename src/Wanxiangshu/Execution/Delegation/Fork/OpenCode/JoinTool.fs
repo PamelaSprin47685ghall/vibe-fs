@@ -138,10 +138,7 @@ module JoinTool =
         | None -> liveAgentName runtime agentId
 
     let private terminalNameFromMap (runtime: HostForkRuntime) (ptyId: string) =
-        lock runtime.Gate (fun () ->
-            runtime.TerminalByName
-            |> Seq.tryPick (fun (KeyValue(name, id)) -> if id = ptyId then Some name else None))
-        |> Option.defaultValue ""
+        runtime.TryTerminalNameByPtyId ptyId |> Option.defaultValue ""
 
     let private resolveTerminalLabel (runtime: HostForkRuntime) (ptyId: string) =
         let _, ptys = runtime.List()

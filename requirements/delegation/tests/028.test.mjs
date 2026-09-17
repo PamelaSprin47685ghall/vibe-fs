@@ -95,8 +95,8 @@ const SOURCE_BUDGETS = new Map([
 ])
 
 const ADAPTER_RATCHET = new Map([
-  // 304/305 on 2026-09-16 — dispatch recovery workflow carries ProviderAttemptStopFence and durability Activation.
-  ['delegation-host-adapter', 304],
+  // 305/305 on 2026-09-18 — delegation-host-adapter consumes DelegationPtyCapability from delegation-pty-port.
+  ['delegation-host-adapter', 305],
   ['delegation-pty-adapter', 305],
   // 47 on 2026-09-14 — this batch hoisted Runtime.fs settleCompletedFromParts
   // into a module-internal SyncDelegateInternals module (namespace-scoped files

@@ -209,7 +209,7 @@ module ToolRegistry =
               let ptyContext: PtyTool.PtyRuntimeContext =
                   { IsDevOps = fun ctx -> runtime.IsRole(ctx, Role.DevOps)
                     ManagedAgentFor = runtime.ManagedAgentFor
-                    RuntimeFor = runtime.RuntimeFor
+                    PtyCapabilityFor = runtime.PtyCapabilityFor
                     DirectoryFor = runtime.DirectoryFor
                     WorkspaceDirectory = runtime.WorkspaceDirectory }
 

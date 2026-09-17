@@ -7,6 +7,7 @@ open Wanxiangshu.Change.Host
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Fission
@@ -811,6 +812,9 @@ type ToolRuntimeScope
             |> logicalOwnerFor
             |> SessionId.value
             |> getOrCreateRuntime
+
+    member this.PtyCapabilityFor(ctx: HostToolContext) : Result<DelegationPtyCapability, string> =
+        this.RuntimeFor ctx |> Result.map (fun r -> r.PtyCapability)
 
     /// CRASH-018: process-local adoption for explicit /continue. The durable
     /// handle stays byte-for-byte as it was at the crash boundary; a later LLM

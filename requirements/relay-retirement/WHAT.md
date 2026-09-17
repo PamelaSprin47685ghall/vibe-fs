@@ -4,9 +4,9 @@
 
 正常 assistant stop 不产生 retirement。模型正常离场只有 accepted `suicide`；authority revocation、session deletion、fatal fuse 与 provider capacity exhaustion 属于独立 exceptional terminal，不伪造 suicide。
 
-## RETIRE-002: 评分不可跳过；进度、测试、义务与 Git 状态不阻塞 retirement
+## RETIRE-002: 评级不可跳过；进度、测试、义务与 Git 状态不阻塞 retirement
 
-Manager 严禁跳过八维质量评分直接 suicide。若未提交 review assessment 试图 suicide，工具直接在返回值中提示必须先调用 review 完成质量评分。一旦质量评分已提交，则不论分数高低、测试成败、open obligations 多少、worktree 是否 dirty/unmerged，均不得成为 suicide 阻塞项。
+Manager 严禁跳过八维质量评级（PERFECT/REVISE/N/A）直接 suicide。若未提交 review assessment 试图 suicide，工具直接在返回值中提示必须先调用 review 完成质量评级。一旦质量评级已提交，则不论评级结果如何（是否含 REVISE）、测试成败、open obligations 多少、worktree 是否 dirty/unmerged，均不得成为 suicide 阻塞项。
 
 ## RETIRE-003: 递归 live resources 是唯一业务 blocker
 

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>delegation</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>delegation-pty-port</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>delegation</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>delegation-pty-port</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-managedagent.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.process-execution.process-processrequest.fsproj"/>
+    <Compile Include="Execution/Delegation/PtyPort.fsi"/>
+    <Compile Include="Execution/Delegation/PtyPort.fs"/>
+  </ItemGroup>
+</Project>

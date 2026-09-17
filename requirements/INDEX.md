@@ -1,6 +1,6 @@
 # Package index
 
-当前设计得到 **57 张 boundary card**。57 不是目标，也不是稳定 API；它只是当前按独立 WHY、failure meaning 与 independent-change test 得出的结果。后续全仓反向覆盖若发现 ORPHAN / OVERLAP / GARBAGE，应继续拆并。
+当前设计得到 **56 张 boundary card**。56 不是目标，也不是稳定 API；它只是当前按独立 WHY、failure meaning 与 independent-change test 得出的结果。后续全仓反向覆盖若发现 ORPHAN / OVERLAP / GARBAGE，应继续拆并。
 
 ## 1. Requirement system
 
@@ -90,7 +90,7 @@
 |---|---|
 | `obligation-ledger` | 长期 mission 必须持续维护当前仍欠世界什么，而不是用 phase/status 伪装工作进度。 |
 | `relay-incumbency` | 每一轮都在共享工作区上从权威用户消息重新开始并独立评估；同一 Road 至多一个 active 迭代，退休永不恢复；固定 DevOps 跨任期连续。 |
-| `relay-assessment` | 每任至多一次八维整数评审；独立评估由只读 Engineer 支持，低分原位接责，DevOps 自修使旧快照证书失效并由后任独立重评。 |
+| `relay-assessment` | 每任至多一次八维质量评级（PERFECT/REVISE/N/A 三态）；独立评估由只读 Engineer 支持，低分原位接责，DevOps 自修使旧快照证书失效并由后任独立重评。 |
 | `relay-retirement` | 退出是唯一正常出口；只有递归 live 资源能阻塞退休，固定 DevOps 跨任期连续且在退休中受明确收束边界保护。 |
 | `relay-context-projection` | 审计保留全量历史，provider 消息上下文只含权威消息与本轮消息，并在共享工作区上执行；固定 DevOps 执行事实通过客观记录感知、前任私有上下文隔离。 |
 

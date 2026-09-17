@@ -772,6 +772,8 @@ Context/Prefix/Surface.fsi
 Context/Prefix/Surface.fs
 Mission/Obligation/Todo/MagicTodoSemanticSurface.fsi
 Mission/Obligation/Todo/MagicTodoSemanticSurface.fs
+Execution/Delegation/PtyPort.fsi
+Execution/Delegation/PtyPort.fs
 Execution/Delegation/Fork/Surface.fsi
 Execution/Delegation/Fork/Surface.fs
 Execution/Delegation/HandoffSurface.fsi

@@ -4,9 +4,9 @@
 
 一项委托必须同时明确四项要素：交接的 charge（语义任务）、允许被委托方产生的 office 后果、工作的逻辑 owner、以及返回给调用方的 bounded 后果。委托的识别依据是被委托方的权能后果，而非 persona 名字或特定工具白名单。
 
-## DELEG-002: 同一 Office 的 calling 名只差 persona/depth，不差 authority
+## DELEG-002: 同一 Office 的 authority 不变，calling 别名不具有独立路由权威
 
-属于同一 Office 的不同 calling 别名（如 fast 与 deep 档位，仅作为向后兼容参数保留，不具有独立路由权威）仅在 persona 风格与推理深度上存在差异，不改变该 Office 的权能与权限。
+属于同一 Office 的不同 calling 别名（如历史 fast 与 deep 别名，仅作为向后兼容参数保留，不具有独立路由权威与额外权限）不改变该 Office 的权能与权限；每个 Role 对应单一确定 Persona，不以 calling 别名扩权或形成多重档位。
 
 ## DELEG-003: 独立 road 与 same-road continuation 硬区分，各占独立工具
 
@@ -36,9 +36,9 @@
 
 同步委托的串行化作用域为直接调用方的 ReuseScope。同一 key 下同时至多存在一个活跃批次；在前一批次完成前到达的新请求直接拒绝。不同层级的嵌套委托各占本层 scope，互不阻塞。
 
-## DELEG-010: owner effective tier 决定 delegate tier
+## DELEG-010: delegate 模型绑定由系统调度与有效配置决定，禁止自选 target
 
-委派绑定的档位由调用方有效 tier 映射（fast/deep 作为向下兼容参数，不赋予额外权限与模型选择权），模型不可自选目标 target。复用既有 child 时严格沿用其已绑定 managed agent。
+委派绑定的模型与执行配置由系统调度统一映射（历史 tier 及 fast/deep 仅作为向下兼容参数，不赋予额外权限与模型选择权），模型不可自选目标 target。复用既有 child 时严格沿用其已绑定 managed agent。
 
 ## DELEG-011: 无 return 通道；ordinary completion 结束 batch
 
