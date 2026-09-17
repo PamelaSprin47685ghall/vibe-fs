@@ -456,7 +456,7 @@ module ForkTool =
         (context: HostToolContext)
         (request: Request)
         language
-        (record: AgentRecord)
+        (role: Role)
         agentId
         attachment
         =
@@ -464,7 +464,7 @@ module ForkTool =
             let! placement =
                 taskResult {
                     do! recordFissionAffinity scope context agentId
-                    let! result = runManagerReuse scope runtime record.Role request language attachment agentId
+                    let! result = runManagerReuse scope runtime role request language attachment agentId
                     announceChild runtime context agentId
 
                     return
@@ -486,32 +486,34 @@ module ForkTool =
         (request: Request)
         language
         handles
-        (record: AgentRecord)
+        (role: Role)
         agentId
         =
         task {
             match! resolveAttachment scope handles request with
             | Error path -> return consequence (prose language path)
-            | Ok attachment -> return! commitIdleReuse scope runtime context request language record agentId attachment
+            | Ok attachment -> return! commitIdleReuse scope runtime context request language role agentId attachment
         }
 
-    let private reuseFoundAgent
+    let private validateWarmStart (request: Request) (role: Role) language =
+        if hasKeywords request && not (warmStartAllowed role) then
+            Error(consequence (prose language Path.Fork.WarmStartUnavailable))
+        else
+            Ok()
+
+    let private reuseWhileAllowed
         (scope: ToolRuntimeScope)
         (runtime: HostForkRuntime)
         (context: HostToolContext)
         (request: Request)
         language
         handles
-        (record: AgentRecord)
+        (role: Role)
         agentId
         =
-        let activeRun =
-            lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey agentId)
-
-        if activeRun then
-            reuseWhileActive language
-        else
-            reuseWhileIdle scope runtime context request language handles record agentId
+        match validateWarmStart request role language with
+        | Error err -> Task.FromResult err
+        | Ok () -> reuseWhileIdle scope runtime context request language handles role agentId
 
     let private reuseResolvedAgent
         (scope: ToolRuntimeScope)
@@ -520,13 +522,17 @@ module ForkTool =
         (request: Request)
         language
         handles
+        (handle: HandleRecord)
         agentId
         =
-        match runtime.TryFindAgent agentId with
-        | None -> Task.FromResult(consequence (prose language Path.Fork.PersonUnavailable))
-        | Some record when hasKeywords request && not (warmStartAllowed record.Role) ->
-            Task.FromResult(consequence (prose language Path.Fork.WarmStartUnavailable))
-        | Some record -> reuseFoundAgent scope runtime context request language handles record agentId
+        let activeRun =
+            lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey agentId)
+
+        match activeRun, runtime.TryFindAgent agentId, handle.CanonicalRole with
+        | true, _, _ -> reuseWhileActive language
+        | false, Some record, _ -> reuseWhileAllowed scope runtime context request language handles record.Role agentId
+        | false, None, Role.DevOps -> reuseWhileAllowed scope runtime context request language handles Role.DevOps agentId
+        | false, None, _ -> Task.FromResult(consequence (prose language Path.Fork.PersonUnavailable))
 
     let private executeManagerReusePerson
         (scope: ToolRuntimeScope)
@@ -540,7 +546,7 @@ module ForkTool =
         match HandleId.tryAgent handle.Handle with
         | None -> Task.FromResult(consequence (prose language Path.Fork.PersonUnknown))
         | Some handleId ->
-            reuseResolvedAgent scope runtime context request language handles (AgentHandleId.value handleId)
+            reuseResolvedAgent scope runtime context request language handles handle (AgentHandleId.value handleId)
 
     let private executeManagerNewCalling
         (scope: ToolRuntimeScope)
@@ -591,15 +597,26 @@ module ForkTool =
         (context: HostToolContext)
         language
         =
-        match scope.RuntimeFor context with
-        | Error _ -> Task.FromResult(consequence (prose language Path.Fork.ChargeContextUnavailable))
-        | Ok runtime ->
-            let handles = agentHandles scope context
+        task {
+            let parentSessionId =
+                if String.IsNullOrWhiteSpace context.SessionId then
+                    SessionId.create ""
+                else
+                    scope.LogicalOwnerFor(SessionId.create context.SessionId)
 
-            let existingByname =
-                handles |> Option.bind (HandleProjection.tryFindByByname request.Name)
+            if String.Equals(request.Name.Trim(), "devops", StringComparison.OrdinalIgnoreCase) then
+                do! scope.EnsureRoadDevOpsBound parentSessionId
 
-            executeManagerExistingPerson scope runtime context request language handles existingByname
+            match scope.RuntimeFor context with
+            | Error _ -> return consequence (prose language Path.Fork.ChargeContextUnavailable)
+            | Ok runtime ->
+                let handles = agentHandles scope context
+
+                let existingByname =
+                    handles |> Option.bind (HandleProjection.tryFindByByname request.Name)
+
+                return! executeManagerExistingPerson scope runtime context request language handles existingByname
+        }
 
     let private executeManagerResume (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
         task {

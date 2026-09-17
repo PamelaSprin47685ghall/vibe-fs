@@ -220,7 +220,8 @@ module ToolRegistry =
               let horizonContext: HorizonTool.HorizonRuntimeContext =
                   { RuntimeFor = runtime.RuntimeFor
                     LogicalOwnerFor = runtime.LogicalOwnerFor
-                    Journal = runtime.Journal }
+                    Journal = runtime.Journal
+                    EnsureRoadDevOpsBound = runtime.EnsureRoadDevOpsBound }
 
               yield HorizonTool.spec horizonContext
               yield FissionTool.spec factory runtime

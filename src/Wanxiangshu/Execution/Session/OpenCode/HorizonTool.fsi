@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Execution.Session.OpenCode
 
+open System.Threading.Tasks
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Execution.Delegation.Fork.Host
@@ -52,7 +53,8 @@ module HorizonTool =
     type HorizonRuntimeContext =
         { RuntimeFor: HostToolContext -> Result<HostForkRuntime, string>
           LogicalOwnerFor: SessionId -> SessionId
-          Journal: AgentJournal option }
+          Journal: AgentJournal option
+          EnsureRoadDevOpsBound: SessionId -> Task<unit> }
 
     val admission: ToolAdmission
     val spec: runtimeCtx: HorizonRuntimeContext -> ToolSpec

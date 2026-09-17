@@ -458,6 +458,70 @@ module HostForkAgent =
                         enriched
         }
 
+    let private interpretDevOpsFirstSent
+        (runtime: HostForkRuntime)
+        agentId
+        childId
+        role
+        agentName
+        preparedHandoff
+        sent
+        =
+        match sent with
+        | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted(_, authorityRoot) ->
+            let run =
+                runtime.InstallRun(
+                    agentId,
+                    childId,
+                    role,
+                    authorityRoot,
+                    ?preparedHandoff = preparedHandoff
+                )
+
+            let result =
+                runtime.Runtime.Fork(agentId, role, agentName, runWork = (fun () -> run.Source.Task))
+
+            Ok result
+        | HostForkRunLifecycle.AgentOwnerDispatchOutcome.AcceptanceUncertain _ ->
+            Ok(ForkResult.DispatchUncertain agentId)
+        | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Rejected err -> Error err
+
+    let private sendDevOpsFirstPrompt
+        (runtime: HostForkRuntime)
+        agentId
+        childId
+        prompt
+        renderedPrompt
+        expectedToolCalls
+        preparedHandoff
+        =
+        task {
+            do! maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
+            let agentName = "devops"
+            let role = Role.DevOps
+
+            match HostForkRunLifecycle.issueCurrentOwnerIdentitySeed runtime.Journal runtime.ParentId agentName with
+            | Error err -> return Error err
+            | Ok identitySeed ->
+                let! _ =
+                    XTraceCapture.captureOpeningWithReceipt runtime.Journal childId prompt []
+                    |> TaskResult.mapError (fun error -> sprintf "devops opening trace capture failed: %A" error)
+
+                let enrichedPrompt = defaultArg renderedPrompt prompt
+
+                let! sent =
+                    HostForkAgentOwner.sendFirstPromptObserved
+                        runtime.Sessions
+                        runtime.Journal
+                        childId
+                        identitySeed
+                        (runtime.DirectoryOf agentId)
+                        enrichedPrompt
+                        (fun _ -> ())
+
+                return interpretDevOpsFirstSent runtime agentId childId role agentName preparedHandoff sent
+        }
+
     let private reuseLiveChild
         (runtime: HostForkRuntime)
         (agentId: string)
@@ -477,8 +541,16 @@ module HostForkAgent =
             let boundAgent = HostForkBinding.managedAgent runtime.Journal childId
 
             match recordOpt, boundAgent with
-            | None, _ -> return Error(sprintf "Unknown agent id: %s" agentId)
-            | _, None -> return Error(sprintf "Agent handle '%s' has no active managed agent identity" agentId)
+            | _, None when agentId = "devops" ->
+                return!
+                    sendDevOpsFirstPrompt
+                        runtime
+                        agentId
+                        childId
+                        prompt
+                        renderedPrompt
+                        expectedToolCalls
+                        preparedHandoff
             | Some record, Some agentName ->
                 do! maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
 
@@ -493,6 +565,8 @@ module HostForkAgent =
                         renderedPrompt
                         wasDormant
                         preparedHandoff
+            | None, _ -> return Error(sprintf "Unknown agent id: %s" agentId)
+            | _, None -> return Error(sprintf "Agent handle '%s' has no active managed agent identity" agentId)
         }
 
     type HostForkRuntime with

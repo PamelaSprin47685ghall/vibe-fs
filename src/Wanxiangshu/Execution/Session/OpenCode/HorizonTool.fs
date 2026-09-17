@@ -61,7 +61,8 @@ module HorizonTool =
     type HorizonRuntimeContext =
         { RuntimeFor: HostToolContext -> Result<HostForkRuntime, string>
           LogicalOwnerFor: SessionId -> SessionId
-          Journal: AgentJournal option }
+          Journal: AgentJournal option
+          EnsureRoadDevOpsBound: SessionId -> Task<unit> }
 
     let private lang (ctx: HostToolContext) =
         ProviderLanguageBinding.forSessionText ctx.SessionId
@@ -160,14 +161,16 @@ module HorizonTool =
 
     let private executeWithJournal language (runtimeCtx: HorizonRuntimeContext) context (journal: AgentJournal) =
         task {
+            let parentSessionId =
+                SessionId.create context.SessionId |> runtimeCtx.LogicalOwnerFor
+
+            do! runtimeCtx.EnsureRoadDevOpsBound parentSessionId
+
             match runtimeCtx.RuntimeFor context with
             | Error _ -> return unavailable language Path.CannotBeSeen
             | Ok runtime ->
                 let agents, ptys = runtime.List()
                 let snapshot = AgentJournal.snapshot journal
-
-                let parentSessionId =
-                    SessionId.create context.SessionId |> runtimeCtx.LogicalOwnerFor
 
                 let durableHandles =
                     AgentProjection.tryFind parentSessionId snapshot.AgentProjections

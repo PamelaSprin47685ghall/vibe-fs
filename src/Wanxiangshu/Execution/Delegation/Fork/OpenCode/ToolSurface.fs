@@ -622,7 +622,8 @@ module ForkToolSurface =
         let horizonContext: HorizonTool.HorizonRuntimeContext =
             { RuntimeFor = harness.Scope.RuntimeFor
               LogicalOwnerFor = harness.Scope.LogicalOwnerFor
-              Journal = harness.Scope.Journal }
+              Journal = harness.Scope.Journal
+              EnsureRoadDevOpsBound = harness.Scope.EnsureRoadDevOpsBound }
 
         let spec = HorizonTool.spec horizonContext
         spec.Execute (HostToolArguments(box {| |})) (managerContext harness owner)
@@ -644,21 +645,31 @@ module ForkToolSurface =
                 | Some root ->
                     do! captureTraceText harness.Journal childId providerRun answer
 
-                    harness.Sessions.Notify(
-                        childId,
-                        TerminalOutcome.Completed
-                            { SessionId = childId
-                              AuthorityRootUserMessageId = AuthorityRootUserMessageId.create root
-                              ProviderRun = ProviderRunIdentity.create providerRun
-                              Role = Role.Coder
-                              Directory = None
-                              TerminalText = answer
-                              TurnFormalText = answer }
-                    )
-
                     match harness.Scope.RuntimeFor(managerContext harness owner) with
                     | Error _ -> return false
                     | Ok runtime ->
+                        let agentRole =
+                            match runtime.List() |> fst |> List.tryFind (fun a ->
+                                match runtime.TryChildSession a.AgentId with
+                                | Some sid -> sid = childId
+                                | None -> false) with
+                            | Some a -> a.Role
+                            | None ->
+                                if (SessionId.value childId).Contains("devops") then Role.DevOps
+                                else Role.Engineer
+
+                        harness.Sessions.Notify(
+                            childId,
+                            TerminalOutcome.Completed
+                                { SessionId = childId
+                                  AuthorityRootUserMessageId = AuthorityRootUserMessageId.create root
+                                  ProviderRun = ProviderRunIdentity.create providerRun
+                                  Role = agentRole
+                                  Directory = None
+                                  TerminalText = answer
+                                  TurnFormalText = answer }
+                        )
+
                         match runtime.List() |> fst |> List.tryHead with
                         | None -> return false
                         | Some agent ->

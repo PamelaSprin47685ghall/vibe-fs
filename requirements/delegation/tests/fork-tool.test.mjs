@@ -329,3 +329,47 @@ test('WHAT[MANAGED-SESSION-018] FORK_TOOL_process_detach_preserves_durable_activ
     forkTool.disposeRuntime(runtime)
   }
 })
+
+test('WHAT[PARTICIPANT-HORIZON-010] FORK_TOOL_manager_horizon_presents_bound_fixed_devops_initially', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-mgr-devops-horizon-'))
+  const owner = 'manager-devops-horizon'
+  const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
+
+  try {
+    const roster = await forkTool.executeHorizon(runtime, owner)
+    assert.match(roster, /devops/, 'initial manager horizon must present bound fixed devops')
+    assert.doesNotMatch(roster, /nothing needs your attention|没有事物需要你的注意|empty/i)
+  } finally {
+    forkTool.disposeRuntime(runtime)
+  }
+})
+
+test('WHAT[DELEG-003] FORK_TOOL_manager_resume_dispatches_to_bound_fixed_devops_directly', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-mgr-devops-resume-'))
+  const owner = 'manager-devops-resume'
+  const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
+
+  try {
+    setTimeout(() => {
+      forkTool.acceptPrompt(runtime, 0)
+    }, 50)
+
+    const resumed = forkTool.executeManagerResume(
+      runtime,
+      toolModule,
+      owner,
+      '',
+      'devops',
+      'DEVOPS-FIRST-CHARGE',
+    )
+    const result = await resumed
+    assert.match(result, /devops/)
+    assert.match(result, /carries this charge now|现已接下这项托付/i)
+
+    assert.equal(await forkTool.settle(runtime, owner, 'DEVOPS-FIRST-ANSWER', 'devops-run-1'), true)
+    const joined = await forkTool.executeJoin(runtime, owner)
+    assert.match(joined, /DEVOPS-FIRST-ANSWER/)
+  } finally {
+    forkTool.disposeRuntime(runtime)
+  }
+})

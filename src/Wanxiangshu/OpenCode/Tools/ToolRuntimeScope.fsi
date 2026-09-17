@@ -108,6 +108,8 @@ type ToolRuntimeScope =
 
     member RuntimeFor: ctx: HostToolContext -> Result<HostForkRuntime, string>
 
+    member EnsureRoadDevOpsBound: parentSessionId: SessionId -> Task<unit>
+
     /// CRASH-018: process-local adoption for explicit /continue. The durable
     /// handle stays byte-for-byte as it was at the crash boundary; a later LLM
     /// fork reuse is the first action allowed to reopen it durably.

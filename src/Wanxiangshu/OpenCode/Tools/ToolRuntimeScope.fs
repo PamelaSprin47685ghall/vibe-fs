@@ -418,6 +418,167 @@ type ToolRuntimeScope
                 Some facts)
         |> Option.defaultValue emptyManagerFacts
 
+    let devopsBindingTasks = Dictionary<string, Task<unit>>()
+
+    let isManagerProfile (sessionId: SessionId) =
+        match activeProfileFor sessionId with
+        | Some profile -> profile.CanonicalRole = Role.Manager
+        | None -> false
+
+    let isManagerRoadSession (sessionId: SessionId) =
+        let sidStr = SessionId.value sessionId
+        match String.IsNullOrWhiteSpace sidStr with
+        | true -> false
+        | false -> Option.isSome (roadViewOfSession sidStr) || isManagerProfile sessionId
+
+    let adoptIfNotOwned (runtime: HostForkRuntime) (childSessionId: SessionId) (handleId: AgentHandleId) =
+        let agentId = AgentHandleId.value handleId
+        match runtime.OwnsAgent agentId with
+        | false -> runtime.AdoptChild(agentId, childSessionId)
+        | true -> ()
+
+    let syncAdoptDevOps (runtime: HostForkRuntime) (existingHandle: HandleRecord) =
+        match HandleId.tryAgent existingHandle.Handle with
+        | Some handleId -> adoptIfNotOwned runtime existingHandle.ChildSessionId handleId
+        | None -> ()
+
+    let registerDevOpsChild
+        (runtime: HostForkRuntime)
+        (devopsAgentId: string)
+        (role: Role)
+        (childSessionId: SessionId)
+        (linkageResult: Result<unit, string>)
+        =
+        match linkageResult with
+        | Error err -> Error err
+        | Ok () ->
+            runtime.AdoptChild(devopsAgentId, childSessionId)
+            runtime.ChildCreated devopsAgentId role childSessionId
+            runtime.ChildCreatedDir devopsAgentId childSessionId (runtime.DirectoryOf devopsAgentId)
+            Ok ()
+
+    let linkDevOpsChild
+        (durable: AgentJournal)
+        (runtime: HostForkRuntime)
+        (parentSessionId: SessionId)
+        (devopsAgentId: string)
+        (devopsName: string)
+        (role: Role)
+        (childSessionId: SessionId)
+        =
+        task {
+            let journalPort = AgentJournalPortAdapter.fromAgentJournal durable
+            let! linkageResult =
+                HandleController.linkNamed
+                    (Some journalPort)
+                    parentSessionId
+                    devopsAgentId
+                    childSessionId
+                    devopsName
+                    "devops"
+                    role
+                    HandleOwnership.DurableParentHandle
+
+            return registerDevOpsChild runtime devopsAgentId role childSessionId linkageResult
+        }
+
+    let createAndLinkDevOps
+        (sessions: ISessionHostPort)
+        (durable: AgentJournal)
+        (runtime: HostForkRuntime)
+        (parentSessionId: SessionId)
+        key
+        =
+        task {
+            let devopsAgentId = "devops"
+            let devopsName = "devops"
+            let role = Role.DevOps
+
+            let! childResult =
+                sessions.CreateChildSession(
+                    parentSessionId,
+                    { Title = Some "devops"
+                      Agent = Some devopsName
+                      Directory = directoryFor key }
+                )
+
+            match childResult with
+            | Error _ -> return Error "create child failed"
+            | Ok childSessionId ->
+                return! linkDevOpsChild durable runtime parentSessionId devopsAgentId devopsName role childSessionId
+        }
+
+    let handleDevOpsCreationResult key (created: Result<unit, string>) =
+        match created with
+        | Error _ -> lock gate (fun () -> devopsBindingTasks.Remove key |> ignore)
+        | Ok () -> ()
+
+    let ensureDevOpsInRuntime
+        (sessions: ISessionHostPort)
+        (durable: AgentJournal)
+        (runtime: HostForkRuntime)
+        (parentSessionId: SessionId)
+        key
+        (devopsHandleOpt: HandleRecord option)
+        =
+        task {
+            match devopsHandleOpt with
+            | Some existingHandle ->
+                syncAdoptDevOps runtime existingHandle
+            | None ->
+                let! created = createAndLinkDevOps sessions durable runtime parentSessionId key
+                handleDevOpsCreationResult key created
+        }
+
+    let performEnsureWithRuntime
+        (sessions: ISessionHostPort)
+        (durable: AgentJournal)
+        (parentSessionId: SessionId)
+        key
+        (runtimeResult: Result<HostForkRuntime, string>)
+        (devopsHandleOpt: HandleRecord option)
+        =
+        task {
+            match runtimeResult with
+            | Error _ -> return ()
+            | Ok runtime -> return! ensureDevOpsInRuntime sessions durable runtime parentSessionId key devopsHandleOpt
+        }
+
+    let performEnsureWithJournal (parentSessionId: SessionId) key (durable: AgentJournal) =
+        task {
+            let snapshot = AgentJournal.snapshot durable
+            let handlesOpt =
+                AgentProjection.tryFind parentSessionId snapshot.AgentProjections
+                |> Option.bind (fun s -> s.Handles)
+
+            let devopsHandleOpt =
+                handlesOpt |> Option.bind (HandleProjection.tryFindByByname "devops")
+
+            let runtimeResult = getOrCreateRuntime key
+            return! performEnsureWithRuntime sessions durable parentSessionId key runtimeResult devopsHandleOpt
+        }
+
+    let performEnsureDevOpsBound (parentSessionId: SessionId) key =
+        task {
+            match journal with
+            | None -> return ()
+            | Some durable -> return! performEnsureWithJournal parentSessionId key durable
+        }
+
+    let getOrCreateDevOpsTask (parentSessionId: SessionId) key =
+        lock gate (fun () ->
+            match devopsBindingTasks.TryGetValue key with
+            | true, t -> t
+            | false, _ ->
+                let t = performEnsureDevOpsBound parentSessionId key
+                devopsBindingTasks.[key] <- t
+                t)
+
+    let ensureRoadDevOpsBound (parentSessionId: SessionId) : Task<unit> =
+        match isManagerRoadSession parentSessionId with
+        | false -> Task.FromResult ()
+        | true -> getOrCreateDevOpsTask parentSessionId (SessionId.value parentSessionId)
+
     member _.Sessions = sessions
     member _.WaitObserver = waitObserver
     member _.RootWorkspace = rootWorkspace
@@ -459,6 +620,7 @@ type ToolRuntimeScope
 
     member _.RoleFor(ctx: HostToolContext) = roleFor ctx
     member _.EnsureRoleFor(ctx: HostToolContext) = ensureRoleFor ctx
+    member _.EnsureRoadDevOpsBound(parentSessionId: SessionId) = ensureRoadDevOpsBound parentSessionId
 
     /// Manager authorization facts for the capability gate, derived purely
     /// from the objective RoadView. The certificate counts as valid only when
