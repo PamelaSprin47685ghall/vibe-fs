@@ -34,11 +34,12 @@ module PromptJournalAdapter =
                         |> Option.bind (fun s -> s.PromptAuthority)
 
                 let inheritedRun =
-                    ownerAuthority
-                    |> Option.bind (fun ownerAuth -> ownerAuth.ActiveLogicalRun)
+                    ownerAuthority |> Option.bind (fun ownerAuth -> ownerAuth.ActiveLogicalRun)
 
                 match authority.ActiveLogicalRun, inheritedRun with
-                | None, Some run -> { authority with ActiveLogicalRun = Some run }
+                | None, Some run ->
+                    { authority with
+                        ActiveLogicalRun = Some run }
                 | _ -> authority
 
             member _.Append sessionId providerRun fact =

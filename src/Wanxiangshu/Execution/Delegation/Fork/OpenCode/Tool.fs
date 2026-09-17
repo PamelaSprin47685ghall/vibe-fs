@@ -513,7 +513,7 @@ module ForkTool =
         =
         match validateWarmStart request role language with
         | Error err -> Task.FromResult err
-        | Ok () -> reuseWhileIdle scope runtime context request language handles role agentId
+        | Ok() -> reuseWhileIdle scope runtime context request language handles role agentId
 
     let private reuseResolvedAgent
         (scope: ToolRuntimeScope)
@@ -531,7 +531,8 @@ module ForkTool =
         match activeRun, runtime.TryFindAgent agentId, handle.CanonicalRole with
         | true, _, _ -> reuseWhileActive language
         | false, Some record, _ -> reuseWhileAllowed scope runtime context request language handles record.Role agentId
-        | false, None, Role.DevOps -> reuseWhileAllowed scope runtime context request language handles Role.DevOps agentId
+        | false, None, Role.DevOps ->
+            reuseWhileAllowed scope runtime context request language handles Role.DevOps agentId
         | false, None, _ -> Task.FromResult(consequence (prose language Path.Fork.PersonUnavailable))
 
     let private executeManagerReusePerson

@@ -470,13 +470,7 @@ module HostForkAgent =
         match sent with
         | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted(_, authorityRoot) ->
             let run =
-                runtime.InstallRun(
-                    agentId,
-                    childId,
-                    role,
-                    authorityRoot,
-                    ?preparedHandoff = preparedHandoff
-                )
+                runtime.InstallRun(agentId, childId, role, authorityRoot, ?preparedHandoff = preparedHandoff)
 
             let result =
                 runtime.Runtime.Fork(agentId, role, agentName, runWork = (fun () -> run.Source.Task))

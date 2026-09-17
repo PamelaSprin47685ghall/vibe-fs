@@ -649,14 +649,20 @@ module ForkToolSurface =
                     | Error _ -> return false
                     | Ok runtime ->
                         let agentRole =
-                            match runtime.List() |> fst |> List.tryFind (fun a ->
-                                match runtime.TryChildSession a.AgentId with
-                                | Some sid -> sid = childId
-                                | None -> false) with
+                            match
+                                runtime.List()
+                                |> fst
+                                |> List.tryFind (fun a ->
+                                    match runtime.TryChildSession a.AgentId with
+                                    | Some sid -> sid = childId
+                                    | None -> false)
+                            with
                             | Some a -> a.Role
                             | None ->
-                                if (SessionId.value childId).Contains("devops") then Role.DevOps
-                                else Role.Engineer
+                                if (SessionId.value childId).Contains("devops") then
+                                    Role.DevOps
+                                else
+                                    Role.Engineer
 
                         harness.Sessions.Notify(
                             childId,

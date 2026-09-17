@@ -427,12 +427,14 @@ type ToolRuntimeScope
 
     let isManagerRoadSession (sessionId: SessionId) =
         let sidStr = SessionId.value sessionId
+
         match String.IsNullOrWhiteSpace sidStr with
         | true -> false
         | false -> Option.isSome (roadViewOfSession sidStr) || isManagerProfile sessionId
 
     let adoptIfNotOwned (runtime: HostForkRuntime) (childSessionId: SessionId) (handleId: AgentHandleId) =
         let agentId = AgentHandleId.value handleId
+
         match runtime.OwnsAgent agentId with
         | false -> runtime.AdoptChild(agentId, childSessionId)
         | true -> ()
@@ -451,11 +453,11 @@ type ToolRuntimeScope
         =
         match linkageResult with
         | Error err -> Error err
-        | Ok () ->
+        | Ok() ->
             runtime.AdoptChild(devopsAgentId, childSessionId)
             runtime.ChildCreated devopsAgentId role childSessionId
             runtime.ChildCreatedDir devopsAgentId childSessionId (runtime.DirectoryOf devopsAgentId)
-            Ok ()
+            Ok()
 
     let linkDevOpsChild
         (durable: AgentJournal)
@@ -468,6 +470,7 @@ type ToolRuntimeScope
         =
         task {
             let journalPort = AgentJournalPortAdapter.fromAgentJournal durable
+
             let! linkageResult =
                 HandleController.linkNamed
                     (Some journalPort)
@@ -511,7 +514,7 @@ type ToolRuntimeScope
     let handleDevOpsCreationResult key (created: Result<unit, string>) =
         match created with
         | Error _ -> lock gate (fun () -> devopsBindingTasks.Remove key |> ignore)
-        | Ok () -> ()
+        | Ok() -> ()
 
     let ensureDevOpsInRuntime
         (sessions: ISessionHostPort)
@@ -523,8 +526,7 @@ type ToolRuntimeScope
         =
         task {
             match devopsHandleOpt with
-            | Some existingHandle ->
-                syncAdoptDevOps runtime existingHandle
+            | Some existingHandle -> syncAdoptDevOps runtime existingHandle
             | None ->
                 let! created = createAndLinkDevOps sessions durable runtime parentSessionId key
                 handleDevOpsCreationResult key created
@@ -547,6 +549,7 @@ type ToolRuntimeScope
     let performEnsureWithJournal (parentSessionId: SessionId) key (durable: AgentJournal) =
         task {
             let snapshot = AgentJournal.snapshot durable
+
             let handlesOpt =
                 AgentProjection.tryFind parentSessionId snapshot.AgentProjections
                 |> Option.bind (fun s -> s.Handles)
@@ -576,7 +579,7 @@ type ToolRuntimeScope
 
     let ensureRoadDevOpsBound (parentSessionId: SessionId) : Task<unit> =
         match isManagerRoadSession parentSessionId with
-        | false -> Task.FromResult ()
+        | false -> Task.FromResult()
         | true -> getOrCreateDevOpsTask parentSessionId (SessionId.value parentSessionId)
 
     member _.Sessions = sessions
