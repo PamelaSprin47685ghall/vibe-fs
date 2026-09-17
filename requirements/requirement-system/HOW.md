@@ -6,7 +6,7 @@
 
 ### 1. 结构与所有权验证器（`meta-verifier`）
 
-`tests/meta-verifier.test.mjs` 是全树结构契约的机器执行入口，执行五项封闭性断言：
+`tests/017.test.mjs` 是全树结构契约的机器执行入口，执行五项封闭性断言：
 - **三文档与测试齐备**：索引中的每个包必须包含 `WHY.md`、`WHAT.md`、`HOW.md` 及 `tests/` 目录。
 - **缺口与错误分离**：没有 active test 或 HOW 证明边的命题记入 GAP，不作为测试失败；已声明证明仍必须完整有效。
 - **测试文件物理存在**：落点表格中引用的测试文件必须在文件系统中真实存在；存在性只提供候选，不授予证明权威。
@@ -27,6 +27,7 @@
 
 ## GAP
 
+- `REQUIREMENT-SYSTEM-017`（CLOSED）：meta-verifier 机器执行已落地，对 requirements 全树执行文档齐备性、证明落点完整性、测试文件物理存在性、包目录封闭性与依赖声明合法性全树扫描，落点 `tests/017.test.mjs`。
 - `REQUIREMENT-SYSTEM-018`（CLOSED）：可执行证明双向可追溯性与真实行为断言已闭合，落点 `tests/018.test.mjs`。
 
 

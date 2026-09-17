@@ -108,12 +108,18 @@ const docFailures = (pkg) => {
   for (const doc of REQUIRED_DOCS) {
     if (!existsSync(join(REQUIREMENTS, pkg, doc))) failures.push(`${pkg}: missing ${doc}`)
   }
+  const testsDir = join(REQUIREMENTS, pkg, 'tests')
+  if (!existsSync(testsDir) || !statSync(testsDir).isDirectory()) {
+    failures.push(`${pkg}: missing tests/ directory`)
+  }
   return failures
 }
 
 const proofFailures = (pkg) => {
   const failures = []
-  const howText = read(join(REQUIREMENTS, pkg, 'HOW.md'))
+  const howPath = join(REQUIREMENTS, pkg, 'HOW.md')
+  if (!existsSync(howPath)) return failures
+  const howText = read(howPath)
   for (const line of howText.split('\n')) {
     if (!line.startsWith('|')) continue
     for (const token of landingFileTokens(line)) {
@@ -141,8 +147,34 @@ const depFailures = (pkg, allNames, skeleton) => {
 }
 
 test('WHAT[REQUIREMENT-SYSTEM-017] meta-verifier executes as the machine proof', () => {
-  assert.ok(
-    (existsSync(join(REQUIREMENTS, 'requirement-system/tests/017.test.mjs')) || existsSync(join(REQUIREMENTS, 'requirement-system/tests/meta-verifier.test.mjs'))),
-    'meta-verifier.test.mjs must exist and run as the REQUIREMENT-SYSTEM-017 machine proof',
-  )
+  const fromIndex = packageNamesFromIndexTables()
+  const skeleton = dependencySkeleton()
+
+  // 1. 包目录封闭性：requirements/ 规范树仅包含 INDEX.md 所列目录
+  const dirs = readdirSync(REQUIREMENTS)
+    .filter((entry) => statSync(join(REQUIREMENTS, entry)).isDirectory())
+    .sort()
+  const unknownDirs = dirs.filter((dir) => !fromIndex.includes(dir))
+  assert.deepEqual(unknownDirs, [], `requirements/ must not contain INDEX-external package dirs: ${unknownDirs.join(', ')}`)
+
+  // 2. 文档齐备性：所有包完整包含 WHY/WHAT/HOW 与 tests/ 目录
+  const docErrors = []
+  for (const pkg of fromIndex) {
+    docErrors.push(...docFailures(pkg))
+  }
+  assert.deepEqual(docErrors, [], 'all packages must carry complete documentation and tests/ directory:\n' + docErrors.join('\n'))
+
+  // 3. 依赖声明合法性：DEPENDS ON 集合必须是 INDEX 依赖骨架的子集
+  const depErrors = []
+  for (const pkg of fromIndex) {
+    depErrors.push(...depFailures(pkg, fromIndex, skeleton))
+  }
+  assert.deepEqual(depErrors, [], 'declared dependencies must be a subset of the INDEX skeleton:\n' + depErrors.join('\n'))
+
+  // 4. 已声明证明落点引用完整性与测试文件物理存在性
+  const proofErrors = []
+  for (const pkg of fromIndex) {
+    proofErrors.push(...proofFailures(pkg))
+  }
+  assert.deepEqual(proofErrors, [], 'declared proof landing files must physically exist:\n' + proofErrors.join('\n'))
 })
