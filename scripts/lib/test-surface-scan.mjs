@@ -30,6 +30,13 @@ export const REQUIREMENTS_ROOT = join(
 
 /** Compiler/build verification: subject is the emitted artifact, not semantics. */
 export const BUILD_VERIFICATION_FILES = new Set([
+  'requirements/verification-system/tests/008.test.mjs',
+  'requirements/verification-system/tests/011.test.mjs',
+  'requirements/distribution/tests/001.test.mjs',
+  'requirements/distribution/tests/002.test.mjs',
+  'requirements/distribution/tests/005.test.mjs',
+  'requirements/distribution/tests/006.test.mjs',
+  'requirements/distribution/tests/007.test.mjs',
   'requirements/verification-system/tests/guide-contract.test.mjs',
   // Its subject is the coverage/build runner itself, including the literal
   // fable_modules exclusion that keeps the coverage denominator honest.
@@ -50,6 +57,11 @@ export const BUILD_VERIFICATION_FILES = new Set([
  *  exact raw shape. Routing these through a semantic surface would hide
  *  precisely what the canary exists to prove. */
 export const HOST_PHYSICAL_CANARY_FILES = new Set([
+  'requirements/host-boundary/tests/006.test.mjs',
+  'requirements/host-boundary/tests/009.test.mjs',
+  'requirements/host-boundary/tests/010.test.mjs',
+  'requirements/host-boundary/tests/011.test.mjs',
+  'requirements/host-boundary/tests/012.test.mjs',
   'requirements/host-boundary/tests/host-message-projection.test.mjs',
   'requirements/host-boundary/tests/host-session-context.test.mjs',
   'requirements/host-boundary/tests/host010-run-id-equivalence.test.mjs',

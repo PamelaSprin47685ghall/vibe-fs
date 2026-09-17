@@ -585,7 +585,7 @@
         "src/Wanxiangshu/OpenCode/Host/StealthBrowserMcpConfigSurface.fs"
       ],
       "proofs": [
-        "requirements/external-investigation/tests/010.test.mjs"
+        "requirements/external-investigation/tests/012.test.mjs"
       ],
       "publishes": [
         "ExternalInvestigation.McpConfig",
@@ -1073,7 +1073,7 @@
         "src/Wanxiangshu/Process/LargeGateSurface.fs"
       ],
       "proofs": [
-        "requirements/output-distillation/tests/001.test.mjs"
+        "requirements/output-distillation/tests/014.test.mjs"
       ],
       "publishes": [
         "output-distillation.Contract"

@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import * as calibration from '../../../dist/OpenCode/Host/PairProgrammingCalibrationSurface.js'
+
+const { compose, renderToolEstimate } = calibration
+
+const english = 'English'
+
+const simplifiedChinese = 'SimplifiedChinese'
+
+test('WHAT[COGNITIVE-ENVIRONMENT-014] CE_014_tool_estimate_is_explicitly_advisory_in_both_provider_languages', () => {
+  const en = renderToolEstimate(english, 4)
+  assert.match(en, /4/)
+  assert.match(en, /delegator|commissioner/i)
+  assert.match(en, /not .*limit|not .*cap|advisory/i)
+  assert.match(en, /scope|parallel|delegate|split/i)
+
+  const zh = renderToolEstimate(simplifiedChinese, 4)
+  assert.match(zh, /4/)
+  assert.match(zh, /委任|委托|估算/)
+  assert.match(zh, /不是.*上限|并非.*上限|不.*限制/)
+  assert.match(zh, /范围|并行|委派|分裂/)
+})

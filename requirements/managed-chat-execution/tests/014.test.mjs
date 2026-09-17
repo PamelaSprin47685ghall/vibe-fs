@@ -1,0 +1,235 @@
+import test from 'node:test'
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: fs } = await import("node:fs");
+const { default: test } = await import("node:test");
+const { canonicalize, fold } = await import("../../../dist/Execution/Session/ChatExecution/Surface.js");
+const { queryFacts } = await import("../../../dist/Execution/Session/ChatExecution/StatusSurface.js");
+const { projectRecord } = await import("../../../dist/OpenCode/Host/ReliabilityDiagnosticsSurface.js");
+const { reconcileCapacityEvidence } = await import("../../../dist/OpenCode/Host/ModelRoutingSurface.js");
+const { recoverScenarios } = await import("../../../dist/Execution/Session/ChatExecution/RecoveryRuntimeSurface.js");
+const { captureEvidence, serializeEvidence } = await import("./support/incident-evidence.mjs");
+
+const fact = fs.readFileSync(new URL('./fixtures/chat-execution-v1.json', import.meta.url), 'utf8')
+const hostContract = JSON.parse(fs.readFileSync(
+  new URL('../../host-boundary/fixtures/opencode-chat-admission-1.18.29.json', import.meta.url),
+  'utf8',
+))
+const capacitySnapshot = {
+  ledgerEntries: [], tokens: [], custodies: [], executions: [], waiters: [], owners: [], lineage: [],
+  tokenStateCounts: { idle: 0, inFlight: 0, retiring: 0 },
+  activeCount: 0,
+  counters: { duplicate: 0, stale: 0, conflict: 0 },
+}
+const causalRecord = {
+  operation: 'AcceptedPersisted',
+  logicalRunId: 'run-chat-fixture',
+  sessionId: 'ses-chat-fixture',
+  authorityRootUserMessageId: 'msg-chat-root',
+  physicalUserMessageId: 'msg-chat-fixture',
+  promptKey: null,
+  providerRunIdentity: null,
+  participant: 'Bearer operator-secret at /home/operator/private/key',
+  role: 'engineer',
+  providerRequestKind: 'work-main',
+  transition: { from: null, to: 'Accepted' },
+  failureClass: 'PersistenceFailure',
+  resolution: 'PreserveCurrentFact',
+  capacityState: 'Released',
+  capacityFence: null,
+  hook: 'chat.message',
+  policyClass: 'Workflow',
+  recoveryDecision: 'ResumeAdmission',
+  persistenceCommitment: 'Committed',
+}
+const surfaces = { canonicalize, fold, queryFacts, projectRecord, reconcileCapacityEvidence, recoverScenarios }
+const captureInput = () => ({
+  facts: [fact],
+  key: { sessionId: 'ses-chat-fixture', physicalUserMessageId: 'msg-chat-fixture' },
+  capacitySnapshot,
+  diagnostics: [causalRecord],
+  hostContract,
+  recovery: {
+    scenario: 'CrashAfterAcceptance',
+    providerObservation: 'ProviderAbsent',
+    resourceObservation: 'ResourceAbsent',
+    persistenceCommitment: 'NotCommitted',
+    failurePolicy: 'NoFailureDecision',
+  },
+})
+
+test('WHAT[CHATEXEC-014] capture canonicalizes facts and preserves only immutable owner evidence', async () => {
+  const evidence = await captureEvidence(captureInput(), surfaces)
+  const projection = fold(evidence.execution.facts)
+  const status = queryFacts(evidence.execution.facts, evidence.execution.key.sessionId, evidence.execution.key.physicalUserMessageId)
+
+  assert.equal(projection.ok, true)
+  assert.deepEqual(evidence.execution.projection, projection.value)
+  assert.deepEqual(evidence.execution.status, status.status)
+  assert.deepEqual(evidence.capacity.reconciliation, { kind: 'NoOp' })
+  assert.equal(Object.isFrozen(evidence), true)
+  assert.deepEqual(JSON.parse(serializeEvidence(evidence)), evidence)
+})
+test('WHAT[CHATEXEC-014] capture redacts known failures and rejects payload or stack fields', async () => {
+  const evidence = await captureEvidence(captureInput(), surfaces)
+  const serialized = serializeEvidence(evidence)
+  assert.doesNotMatch(serialized, /operator-secret|\/home\/operator|stack trace/i)
+  assert.match(evidence.diagnostics[0].participant, /\[REDACTED\]/)
+  assert.equal('effectiveAgent' in evidence.diagnostics[0], false, 'diagnostic view carries no EffectiveAgent')
+
+  await assert.rejects(
+    captureEvidence({ ...captureInput(), prompt: 'raw user message' }, surfaces),
+    /unknown incident capture field 'prompt'/,
+  )
+  await assert.rejects(
+    captureEvidence({ ...captureInput(), diagnostics: [{ ...causalRecord, stack: 'stack trace' }] }, surfaces),
+    /unknown causal diagnostic field 'stack'/,
+  )
+})
+}
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: fs } = await import("node:fs");
+const { default: test } = await import("node:test");
+const { canonicalize, fold } = await import("../../../dist/Execution/Session/ChatExecution/Surface.js");
+const { queryFacts } = await import("../../../dist/Execution/Session/ChatExecution/StatusSurface.js");
+const { projectRecord } = await import("../../../dist/OpenCode/Host/ReliabilityDiagnosticsSurface.js");
+const { reconcileCapacityEvidence } = await import("../../../dist/OpenCode/Host/ModelRoutingSurface.js");
+const { recoverScenarios } = await import("../../../dist/Execution/Session/ChatExecution/RecoveryRuntimeSurface.js");
+const { captureEvidence, replayEvidence, serializeEvidence } = await import("./support/incident-evidence.mjs");
+
+const fact = fs.readFileSync(new URL('./fixtures/chat-execution-v1.json', import.meta.url), 'utf8')
+const hostContract = JSON.parse(fs.readFileSync(
+  new URL('../../host-boundary/fixtures/opencode-chat-admission-1.18.29.json', import.meta.url),
+  'utf8',
+))
+const agent028 = JSON.parse(fs.readFileSync(
+  new URL('../fixtures/incidents/agent-028.json', import.meta.url),
+  'utf8',
+))
+const surfaces = { canonicalize, fold, queryFacts, projectRecord, reconcileCapacityEvidence, recoverScenarios }
+const input = {
+  facts: [fact],
+  key: { sessionId: 'ses-chat-fixture', physicalUserMessageId: 'msg-chat-fixture' },
+  capacitySnapshot: {
+    ledgerEntries: [], tokens: [], custodies: [], executions: [], waiters: [], owners: [], lineage: [],
+    tokenStateCounts: { idle: 0, inFlight: 0, retiring: 0 }, activeCount: 0,
+    counters: { duplicate: 0, stale: 0, conflict: 0 },
+  },
+  diagnostics: [{
+    operation: 'AcceptedPersisted', logicalRunId: 'run-chat-fixture', sessionId: 'ses-chat-fixture',
+    authorityRootUserMessageId: 'msg-chat-root', physicalUserMessageId: 'msg-chat-fixture', promptKey: null,
+    providerRunIdentity: null, participant: 'engineer', role: 'engineer', providerRequestKind: 'work-main',
+    transition: { from: null, to: 'Accepted' }, failureClass: null, resolution: null,
+    capacityState: 'Released', capacityFence: null, hook: 'chat.message',
+    policyClass: 'Workflow', recoveryDecision: 'ResumeAdmission', persistenceCommitment: 'Committed',
+  }],
+  hostContract,
+  recovery: {
+    scenario: 'CrashAfterAcceptance', providerObservation: 'ProviderAbsent',
+    resourceObservation: 'ResourceAbsent', persistenceCommitment: 'NotCommitted',
+    failurePolicy: 'NoFailureDecision',
+  },
+}
+
+test('WHAT[CHATEXEC-014] replay reconstructs the canonical projection and emits only owner effect requests', async () => {
+  const captured = await captureEvidence(input, surfaces)
+  const replayed = await replayEvidence(serializeEvidence(captured), surfaces)
+
+  assert.equal(replayed.ok, true)
+  assert.deepEqual(replayed.execution, captured.execution)
+  assert.deepEqual(replayed.capacity, captured.capacity)
+  assert.deepEqual(replayed.recovery, captured.recovery)
+  assert.deepEqual(replayed.operatorActions, [{
+    owner: 'managed-chat-execution',
+    action: 'ResumePreProvider',
+    authority: 'EffectRequestOnly',
+  }])
+  assert.deepEqual(replayed.mutations, [])
+})
+test('WHAT[CHATEXEC-014] agent-028 session-only binding is hostile; current owners fold exact keys with fixed participant', async () => {
+  assert.equal(agent028.historicalModel.first.bindingKey, agent028.historicalModel.second.bindingKey)
+  assert.notEqual(
+    agent028.historicalModel.first.physicalUserMessageId,
+    agent028.historicalModel.second.physicalUserMessageId,
+  )
+  assert.equal(agent028.historicalModel.observedOutcome, 'IdentityConflict')
+
+  const projected = fold(agent028.currentModel.facts)
+  assert.equal(projected.ok, true)
+  assert.deepEqual(
+    projected.value.map(({ sessionId, physicalUserMessageId, phase }) => ({ sessionId, physicalUserMessageId, phase })),
+    [
+      { sessionId: 'session-agent-028', physicalUserMessageId: 'message-agent-028-a', phase: 'Accepted' },
+      { sessionId: 'session-agent-028', physicalUserMessageId: 'message-agent-028-b', phase: 'Accepted' },
+    ],
+  )
+  for (const entry of projected.value) {
+    assert.equal(entry.identity.participant, 'engineer')
+    assert.equal(entry.identity.role, 'engineer')
+    assert.equal('effectiveAgent' in entry.identity, false, 'projection carries no EffectiveAgent')
+  }
+  const recovery = await recoverScenarios([agent028.currentModel.recoveryScenario])
+  assert.deepEqual(recovery.decisions, [agent028.currentModel.expectedDecision])
+})
+test('WHAT[CHATEXEC-014] agent-028 legacy agent fields are hostile: dropped on re-encoding and inert on replay', () => {
+  const hostileFact = (physicalUserMessageId, legacyAgent) => {
+    const parsed = JSON.parse(agent028.currentModel.facts[0])
+    const payload = parsed[1][1][1]
+    payload.Evidence.PhysicalUserMessageId = ['PhysicalUserMessageId', physicalUserMessageId]
+    payload.Evidence.EffectiveAgent = legacyAgent
+    payload.Evidence.IdentitySeed[1].PeerAgent = legacyAgent
+    payload.Key.PhysicalUserMessageId = ['PhysicalUserMessageId', physicalUserMessageId]
+    return JSON.stringify(parsed)
+  }
+  const canonicalOf = (wire) => {
+    const result = canonicalize(wire)
+    assert.equal(result.ok, true, result.ok ? '' : result.error)
+    return result.value
+  }
+
+  const coderLegacy = canonicalOf(hostileFact('message-agent-028-a', 'engineer'))
+  const reviewerLegacy = canonicalOf(hostileFact('message-agent-028-a', 'reviewer'))
+  assert.equal(coderLegacy, reviewerLegacy, 'legacy-only agent difference must vanish on re-encoding')
+  assert.doesNotMatch(coderLegacy, /PeerAgent|EffectiveAgent/, 'current encoding drops legacy agent fields')
+
+  const folded = fold([coderLegacy, reviewerLegacy])
+  assert.equal(folded.ok, true, folded.ok ? '' : folded.error)
+  assert.equal(folded.value.length, 1)
+  assert.equal(folded.value[0].phase, 'Accepted')
+  assert.equal(folded.value[0].identity.participant, 'engineer', 'conflicting legacy fields cannot alter canonical participant')
+  assert.equal(folded.value[0].identity.role, 'engineer')
+})
+test('WHAT[CHATEXEC-014] duplicate replay is idempotent and does not accumulate authority', async () => {
+  const captured = await captureEvidence(input, surfaces)
+  const serialized = serializeEvidence(captured)
+  assert.deepEqual(await replayEvidence(serialized, surfaces), await replayEvidence(serialized, surfaces))
+})
+test('WHAT[CHATEXEC-014] replay fails closed on tamper, version, unknown, or missing evidence', async () => {
+  const captured = await captureEvidence(input, surfaces)
+  const tampered = structuredClone(captured)
+  tampered.execution.status.terminal = true
+  await assert.rejects(replayEvidence(JSON.stringify(tampered), surfaces), /incident evidence integrity mismatch/)
+
+  const version = structuredClone(captured)
+  version.schemaVersion = 2
+  await assert.rejects(replayEvidence(JSON.stringify(version), surfaces), /unsupported incident evidence schema version '2'/)
+
+  const unknown = structuredClone(captured)
+  unknown.untrusted = true
+  await assert.rejects(replayEvidence(JSON.stringify(unknown), surfaces), /unknown incident evidence field 'untrusted'/)
+
+  const missing = structuredClone(captured)
+  delete missing.capacity
+  await assert.rejects(replayEvidence(JSON.stringify(missing), surfaces), /missing incident evidence field 'capacity'/)
+})
+test('WHAT[CHATEXEC-014] replay rejects unsupported Host evidence and unknown recovery observations', async () => {
+  const unsupported = { ...input, hostContract: { ...hostContract, supportedVersionRange: null, observedResult: 'unsupported' } }
+  await assert.rejects(captureEvidence(unsupported, surfaces), /Host contract is not in an exact supported version/)
+
+  const unknown = { ...input, recovery: { ...input.recovery, providerObservation: 'MaybeAlive' } }
+  await assert.rejects(captureEvidence(unknown, surfaces), /recovery observation does not match scenario 'CrashAfterAcceptance'/)
+})
+}
