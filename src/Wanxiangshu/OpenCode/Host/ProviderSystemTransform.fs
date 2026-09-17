@@ -56,25 +56,69 @@ module ProviderSystemTransform =
         else
             None
 
+    let private activeRoles =
+        [ Role.Manager
+          Role.Orchestrator
+          Role.Engineer
+          Role.DevOps
+          Role.Blogger ]
+
+    let private roleMatchesSystem (r: Role) (system: string array) : bool =
+        let canonical (text: string) = if isNull text then "" else text.Trim()
+        let expectedEn = canonical (PromptResources.systemForRole ProviderLanguage.English r)
+        let expectedZh = canonical (PromptResources.systemForRole ProviderLanguage.SimplifiedChinese r)
+        system
+        |> Array.exists (fun text ->
+            let c = canonical text
+            c = expectedEn || c = expectedZh)
+
+    let private tryDeduceRole (role: SessionId -> Role option) (sid: SessionId) (system: string array) : Role option =
+        match role sid with
+        | Some r -> Some r
+        | None -> activeRoles |> List.tryFind (fun r -> roleMatchesSystem r system)
+
     let private replaceBookkeeperSystem lang sessionText output system =
-        if BookkeeperRuntime.isAttached sessionText then
-            let oldPrompt = PromptResources.loadBookkeeperSystemFor ProviderLanguage.English
+        let oldPromptEn = PromptResources.loadBookkeeperSystemFor ProviderLanguage.English
+        let oldPromptZh = PromptResources.loadBookkeeperSystemFor ProviderLanguage.SimplifiedChinese
+        let canonical (text: string) = if isNull text then "" else text.Trim()
+        let expectedEn = canonical oldPromptEn
+        let expectedZh = canonical oldPromptZh
+        let matchesBookkeeper =
+            system
+            |> Array.exists (fun text ->
+                let c = canonical text
+                c = expectedEn || c = expectedZh)
+
+        if BookkeeperRuntime.isAttached sessionText || matchesBookkeeper then
             let nextPrompt = PromptResources.loadBookkeeperSystemFor lang
-            output?system <- replaceOwnedSegment oldPrompt nextPrompt system
+            output?system <-
+                system
+                |> Array.map (fun text ->
+                    let c = canonical text
+                    if c = expectedEn || c = expectedZh then nextPrompt else text)
             true
         else
             false
 
     let private replaceRoleSystem (role: SessionId -> Role option) sid lang output system =
-        let refresh =
-            role sid
-            |> Option.bind (fun r ->
-                catalogPrompt (RuntimeResources.current().Prompts) r
-                |> Option.map (fun oldPrompt -> oldPrompt, localizedRolePrompt lang r))
-
-        match refresh with
+        match tryDeduceRole role sid system with
         | None -> ()
-        | Some(oldPrompt, nextPrompt) -> output?system <- replaceOwnedSegment oldPrompt nextPrompt system
+        | Some r ->
+            let oldPromptEn = PromptResources.systemForRole ProviderLanguage.English r
+            let oldPromptZh = PromptResources.systemForRole ProviderLanguage.SimplifiedChinese r
+            let currentPrompt =
+                catalogPrompt (RuntimeResources.current().Prompts) r
+                |> Option.defaultValue oldPromptEn
+            let nextPrompt = localizedRolePrompt lang r
+            let canonical (text: string) = if isNull text then "" else text.Trim()
+            let expectedEn = canonical oldPromptEn
+            let expectedZh = canonical oldPromptZh
+            let expectedCur = canonical currentPrompt
+            output?system <-
+                system
+                |> Array.map (fun text ->
+                    let c = canonical text
+                    if c = expectedEn || c = expectedZh || c = expectedCur then nextPrompt else text)
 
     let private transformSystem (role: SessionId -> Role option) sessionText output system =
         let sid = SessionId.create sessionText
