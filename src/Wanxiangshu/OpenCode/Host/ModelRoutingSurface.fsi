@@ -66,6 +66,7 @@ module ModelRoutingSurface =
     val boundDevopsTarget: runtime: obj -> sessionId: string -> obj
 
     val releasePhysicalExecution: runtime: obj -> sessionId: string -> physicalUserMessageId: string -> obj
+    val releaseExecution: runtime: obj -> sessionId: string -> obj
     val cancelPendingExecution: runtime: obj -> sessionId: string -> obj
 
     val enterProviderStep:

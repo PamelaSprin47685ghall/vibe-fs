@@ -60,3 +60,10 @@ ModelRoutingRuntime (进程单例，管理 Lease multiset 与 Capacity Token)
 按 production inventory 的声明递归闭包，端口从 7 项目／28 输入降至 5／22，policy 从 55／338 降至 54／334；policy 仍经 Grounding 等真实依赖编入摘要原语，未宣称完全无摘要。端口与 policy 独立 Fable 编译分别通过 60、372 parsed sources；OpencodeTypes、OpenCodeContract、ModelRouting 签名反向消费者的 flat 并集通过 1426 parsed sources／1388 items，包含实际 admission、binding、bootstrap 和插件装配路径。
 
 既有 `host-boundary/tests/host-session-contract-closure.test.mjs` 的 HOST-BOUNDARY-026 闭包证明分别拒绝端口与 policy 恢复宽 Host 引用，窄引用下通过；不设项目数或源码数新预算。新消费者产物上的 `ModelRoutingSurface.createSdkClientPort/sendPrompt` smoke 观察真实 adapter 交付的 SDK payload：显式模型保留 provider/model，reasoning 投影为顶层 variant；未指定模型时不从 agent 恢复模型。该注入 SDK client 的 smoke 不是真实 Host canary，也不证明全部 capacity 时序；既有正式行为证明入口保持如下。
+
+## 正式行为证明入口
+
+- EMR-001..016: `requirements/execution-model-routing/tests/*.test.mjs`
+- EMR-017: `requirements/execution-model-routing/tests/017.test.mjs` 与 `requirements/provider-attempt-recovery/tests/021.test.mjs`
+- EMR-018: `requirements/execution-model-routing/tests/018.test.mjs`
+- EMR-019: `requirements/execution-model-routing/tests/019.test.mjs`

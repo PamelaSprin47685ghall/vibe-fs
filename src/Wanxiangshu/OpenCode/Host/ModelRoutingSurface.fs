@@ -687,6 +687,9 @@ module ModelRoutingSurface =
         (runtimeOf runtime).ReleasePhysicalExecution(sessionId, physicalUserMessageId)
         |> transitionOutcomeObject
 
+    let releaseExecution (runtime: obj) (sessionId: string) : obj =
+        (runtimeOf runtime).ReleaseExecution(sessionId) |> transitionOutcomeObject
+
     let cancelPendingExecution (runtime: obj) (sessionId: string) : obj =
         (runtimeOf runtime).CancelPendingExecution(sessionId) |> transitionOutcomeObject
 
