@@ -165,6 +165,32 @@ module JoinTool =
     let private releasePtyTracks (runtime: HostForkRuntime) (batch: NonEmptyBatch<JoinItem>) =
         NonEmptyBatch.toList batch |> List.iter (untrackJoinItem runtime)
 
+    let private bufferRemainingItems (runtime: HostForkRuntime) (remaining: JoinItem list) =
+        match List.isEmpty remaining with
+        | true -> ()
+        | false -> runtime.EnqueueBufferedJoinItems remaining
+
+    let private renderResultsAvailable
+        language
+        (runtime: HostForkRuntime)
+        (resolveName: string -> string)
+        (resolveLabel: string -> string)
+        (batch: NonEmptyBatch<JoinItem>)
+        : string =
+        let rendered, remaining =
+            JoinResultRenderer.renderJoinItemBatchWithWindow language resolveName batch resolveLabel
+
+        let deliveredCount = NonEmptyBatch.length batch - List.length remaining
+
+        let deliveredItems =
+            NonEmptyBatch.toList batch
+            |> List.take deliveredCount
+            |> NonEmptyBatch.tryOfList
+
+        deliveredItems |> Option.iter (releasePtyTracks runtime)
+        bufferRemainingItems runtime remaining
+        rendered
+
     let private renderJoined
         language
         (runtime: HostForkRuntime)
@@ -174,14 +200,7 @@ module JoinTool =
         =
         match joined with
         | Ok(Interrupted reason) -> renderInterruptedReason language reason
-        | Ok(ResultsAvailable batch) ->
-            // Render before releasing names: this Join result is the moment the
-            // old terminal ending becomes heard.
-            let rendered =
-                JoinResultRenderer.renderJoinItemBatch language resolveName batch resolveLabel
-
-            releasePtyTracks runtime batch
-            rendered
+        | Ok(ResultsAvailable batch) -> renderResultsAvailable language runtime resolveName resolveLabel batch
         | Error joinError -> JoinResultRenderer.renderForkError language joinError resolveName
 
     let private executeAgentWithRuntime

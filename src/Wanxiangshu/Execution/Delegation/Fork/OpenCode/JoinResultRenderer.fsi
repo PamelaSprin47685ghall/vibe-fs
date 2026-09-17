@@ -74,6 +74,9 @@ module JoinResultRenderer =
         [<Literal>]
         val ForkMaterializationFailed: string = "tool/join/fork-materialization-failed"
 
+        [<Literal>]
+        val RemainingCompletions: string = "tool/join/remaining-completions"
+
     /// EXEC-017: interrupt consequences are natural language, not error DTO.
     val renderInterrupted: lang: ProviderLanguage -> reason: JoinInterruptReason -> string
 
@@ -84,6 +87,14 @@ module JoinResultRenderer =
         batch: NonEmptyBatch<JoinItem> ->
         resolveTerminalLabel: (string -> string) ->
             string
+
+    /// FIFO window-bounded render. Returns rendered text and un-rendered remaining items.
+    val renderJoinItemBatchWithWindow:
+        lang: ProviderLanguage ->
+        resolveAgentName: (string -> string) ->
+        batch: NonEmptyBatch<JoinItem> ->
+        resolveTerminalLabel: (string -> string) ->
+            string * JoinItem list
 
     /// EXEC-019: orchestrator verdict batch (FIFO; caller already capped at MaxJoinBatch).
     val renderOrchestratorBatch: lang: ProviderLanguage -> verdicts: NonEmptyBatch<OrchestratorVerdict> -> string

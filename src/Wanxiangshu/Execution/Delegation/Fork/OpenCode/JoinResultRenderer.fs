@@ -6,6 +6,7 @@ open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
+open Wanxiangshu.Host.Contract
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 
@@ -76,6 +77,9 @@ module JoinResultRenderer =
 
         [<Literal>]
         let ForkMaterializationFailed = "tool/join/fork-materialization-failed"
+
+        [<Literal>]
+        let RemainingCompletions = "tool/join/remaining-completions"
 
     let private prose lang path subs = ProviderProse.render lang path subs
 
@@ -278,6 +282,94 @@ module JoinResultRenderer =
         | AgentItem agentItem -> renderAgentItem lang resolveAgentName agentItem
         | PtyItem ptyItem -> renderPtyJoinItem lang resolveTerminalLabel ptyItem
 
+    let private renderJoinItemDocs
+        (lang: ProviderLanguage)
+        (resolveAgentName: string -> string)
+        (resolveTerminalLabel: string -> string)
+        (items: JoinItem list)
+        : LlmFacing.Document list =
+        items |> List.map (renderJoinItem lang resolveAgentName resolveTerminalLabel)
+
+    let private promptDoc (lang: ProviderLanguage) : LlmFacing.Document =
+        entry [ prose lang Path.RemainingCompletions Map.empty ] []
+
+    let private renderDocs (docs: LlmFacing.Document list) : string =
+        LlmFacing.combine docs |> LlmFacing.render
+
+    let private evaluateCandidateWindow (candidateText: string) : string option =
+        match ToolResultBound.fitsInWindow candidateText with
+        | true -> Some candidateText
+        | false -> None
+
+    let private tryStepWindowPrefix
+        (itemDocs: LlmFacing.Document list)
+        (prompt: LlmFacing.Document)
+        (total: int)
+        (k: int)
+        : string option =
+        match k >= total - 1 with
+        | true -> None
+        | false ->
+            let nextCand = renderDocs ((itemDocs |> List.take (k + 1)) @ [ prompt ])
+            evaluateCandidateWindow nextCand
+
+    let private searchMaxWindowPrefix
+        (itemDocs: LlmFacing.Document list)
+        (prompt: LlmFacing.Document)
+        (total: int)
+        (firstCand: string)
+        : int * string =
+        let rec search k lastValid =
+            match tryStepWindowPrefix itemDocs prompt total k with
+            | Some nextCand -> search (k + 1) nextCand
+            | None -> k, lastValid
+
+        match ToolResultBound.fitsInWindow firstCand with
+        | true -> search 1 firstCand
+        | false -> 1, firstCand
+
+    let private renderSingleItem
+        (lang: ProviderLanguage)
+        (resolveAgentName: string -> string)
+        (resolveTerminalLabel: string -> string)
+        (item: JoinItem)
+        : string * JoinItem list =
+        let doc = renderJoinItem lang resolveAgentName resolveTerminalLabel item
+        LlmFacing.render doc, []
+
+    let private renderMultiItems
+        (lang: ProviderLanguage)
+        (resolveAgentName: string -> string)
+        (resolveTerminalLabel: string -> string)
+        (items: JoinItem list)
+        : string * JoinItem list =
+        let total = List.length items
+        let itemDocs = renderJoinItemDocs lang resolveAgentName resolveTerminalLabel items
+        let allRendered = renderDocs itemDocs
+
+        if ToolResultBound.fitsInWindow allRendered then
+            allRendered, []
+        else
+            let prompt = promptDoc lang
+            let firstCand = renderDocs [ itemDocs.[0]; prompt ]
+
+            let deliveredCount, renderedWithPrompt =
+                searchMaxWindowPrefix itemDocs prompt total firstCand
+
+            let remaining = items |> List.skip deliveredCount
+            renderedWithPrompt, remaining
+
+    /// FIFO window-bounded render. Returns rendered text and un-rendered remaining items.
+    let renderJoinItemBatchWithWindow
+        (lang: ProviderLanguage)
+        (resolveAgentName: string -> string)
+        (batch: NonEmptyBatch<JoinItem>)
+        (resolveTerminalLabel: string -> string)
+        : string * JoinItem list =
+        match NonEmptyBatch.toList batch with
+        | [ single ] -> renderSingleItem lang resolveAgentName resolveTerminalLabel single
+        | items -> renderMultiItems lang resolveAgentName resolveTerminalLabel items
+
     /// EXEC-004 / EXEC-018 / EXEC-020: JoinItem batch (production JoinTool path).
     let renderJoinItemBatch
         (lang: ProviderLanguage)
@@ -285,10 +377,10 @@ module JoinResultRenderer =
         (batch: NonEmptyBatch<JoinItem>)
         (resolveTerminalLabel: string -> string)
         : string =
-        NonEmptyBatch.toList batch
-        |> List.map (renderJoinItem lang resolveAgentName resolveTerminalLabel)
-        |> LlmFacing.combine
-        |> LlmFacing.render
+        let rendered, _ =
+            renderJoinItemBatchWithWindow lang resolveAgentName batch resolveTerminalLabel
+
+        rendered
 
     let private orchestratorLine (lang: ProviderLanguage) (verdict: OrchestratorVerdict) : string =
         let path =

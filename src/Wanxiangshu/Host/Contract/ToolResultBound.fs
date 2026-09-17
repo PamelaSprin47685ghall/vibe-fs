@@ -154,20 +154,16 @@ module ToolResultBound =
 
         n
 
-    let private boundNonEmpty (text: string) : string =
-        let totalBytes = LlmFacing.byteCount text
-        // split('\n').length == newline count + 1 (trailing empty counts).
-        let totalLines = countLines text
-
-        if totalLines <= HostMaxLines && totalBytes <= HostMaxBytes then
-            text
+    /// Check whether text fits in the host tool result window without truncation.
+    let fitsInWindow (text: string) : bool =
+        if isNull text || text = "" then
+            true
         else
-            Marker + takeTail text
+            let totalBytes = LlmFacing.byteCount text
+            let totalLines = countLines text
+            totalLines <= HostMaxLines && totalBytes <= HostMaxBytes
 
     /// Bound a custom tool result. Under Host limits → identity.
     /// Over → `Marker + tail`, sized so Host does not re-truncate.
     let bound (text: string) : string =
-        if isNull text || text = "" then
-            text
-        else
-            boundNonEmpty text
+        if fitsInWindow text then text else Marker + takeTail text

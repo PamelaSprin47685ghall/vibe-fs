@@ -106,6 +106,9 @@ type HostForkRuntime =
     member FailRun: run: PendingHostRun * error: string -> Task
     member MarkReady: run: PendingHostRun -> unit
     member internal AwaitCurrentWorkRecord: agentId: string -> Task<Result<string, string>>
+    member internal EnqueueBufferedJoinItems: items: JoinItem seq -> unit
+    member internal DrainBufferedJoinItems: maxCount: int -> JoinItem list
+    member internal HasBufferedJoinItems: bool
     member CancelAndDrain: unit -> Task
     member DetachAndDrain: unit -> Task
     member Cancel: unit -> unit

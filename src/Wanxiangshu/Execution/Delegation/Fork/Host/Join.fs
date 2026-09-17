@@ -131,6 +131,9 @@ module HostForkJoin =
 
         if cap <= 0 then
             Task.FromResult None
+        elif runtime.HasBufferedJoinItems then
+            let buffered = runtime.DrainBufferedJoinItems cap
+            Task.FromResult(tryResultsAvailable buffered)
         else
             tryDrainAvailableBody runtime cap
 
@@ -249,7 +252,8 @@ module HostForkJoin =
             |> Map.exists (fun _ record -> handleIsActiveJoinTarget runtime record)
 
     let private parentHasJoinWork (runtime: HostForkRuntime) =
-        runtime.Runtime.ActiveRunCount > 0
+        runtime.HasBufferedJoinItems
+        || runtime.Runtime.ActiveRunCount > 0
         || runtime.Runtime.PendingCompletionCount > 0
         || lock runtime.Gate (fun () -> runtime.PendingRuns.Count > 0 || runtime.PtyRuns.Count > 0)
         || match runtime.Journal with
@@ -474,9 +478,13 @@ module HostForkJoin =
         (interrupt: Task<JoinInterruptReason>)
         =
         let tryDrain () =
-            tryDrainFissionLane runtime durable groupId laneIndex cap
+            if runtime.HasBufferedJoinItems then
+                let buffered = runtime.DrainBufferedJoinItems cap
+                Task.FromResult(tryResultsAvailable buffered)
+            else
+                tryDrainFissionLane runtime durable groupId laneIndex cap
 
-        let rec loop () =
+        let rec loop () : Task<Result<JoinWaitOutcome<JoinItem>, ForkError>> =
             task {
                 let! drained = tryDrain ()
                 return! afterOptionalDrain drained waitOrFail
@@ -506,6 +514,19 @@ module HostForkJoin =
 
         loop ()
 
+    let private joinFissionLaneAvailable
+        (runtime: HostForkRuntime)
+        (durable: AgentJournal option)
+        (groupId: string)
+        (laneIndex: int)
+        (cap: int)
+        (interrupt: Task<JoinInterruptReason>)
+        : Task<Result<JoinWaitOutcome<JoinItem>, ForkError>> =
+        match durable with
+        | None -> Task.FromResult(Error(ForkError.NotFound "Fission lane join requires durable journal"))
+        | Some _ when cap <= 0 -> Task.FromResult(Error ForkError.Empty)
+        | Some durable -> joinFissionLaneLoop runtime durable groupId laneIndex cap interrupt
+
     /// Fission lane join. The lane shares the logical owner's HostForkRuntime,
     /// but its completion drain is affinity-filtered and waits on durable journal
     /// change rather than the owner's shared wake token. That permits sibling
@@ -520,10 +541,14 @@ module HostForkJoin =
         : Task<Result<JoinWaitOutcome<JoinItem>, ForkError>> =
         let cap = min (max 0 maxCount) JoinBatch.Max
 
-        match runtime.Journal with
-        | None -> Task.FromResult(Error(ForkError.NotFound "Fission lane join requires durable journal"))
-        | Some durable when cap <= 0 -> Task.FromResult(Error ForkError.Empty)
-        | Some durable -> joinFissionLaneLoop runtime durable groupId laneIndex cap interrupt
+        let buffered =
+            match runtime.HasBufferedJoinItems with
+            | true -> runtime.DrainBufferedJoinItems cap
+            | false -> []
+
+        match tryResultsAvailable buffered with
+        | Some res -> Task.FromResult res
+        | None -> joinFissionLaneAvailable runtime runtime.Journal groupId laneIndex cap interrupt
 
     /// EXEC-018 batch join under FamilyRecoveryPermit.
     /// GREEN-4: validate permit then drain; does not start RestoreHandles.

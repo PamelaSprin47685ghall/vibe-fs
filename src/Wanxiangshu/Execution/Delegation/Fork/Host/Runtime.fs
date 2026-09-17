@@ -78,6 +78,7 @@ type HostForkRuntime
     // DSL-MUTABLE: resource — terminal name to PtyId map
     let terminalByName = Dictionary<string, string>()
     let ptyCompletionObservers = ResizeArray<PtyJoinItem -> unit>()
+    let bufferedJoinItems = Queue<JoinItem>()
     let gate = obj ()
     let cancelGate = obj ()
     let ownedWorkGate = obj ()
@@ -634,3 +635,15 @@ type HostForkRuntime
     member _.PendingRunCount = lock gate (fun () -> pendingRuns.Count)
     member _.PendingCompletionCount = runtime.PendingCompletionCount
     member _.IsCancelled = runtime.IsCancelled
+
+    member _.EnqueueBufferedJoinItems(items: JoinItem seq) =
+        lock gate (fun () ->
+            for item in items do
+                bufferedJoinItems.Enqueue item)
+
+    member _.DrainBufferedJoinItems(maxCount: int) : JoinItem list =
+        lock gate (fun () ->
+            let count = min maxCount bufferedJoinItems.Count
+            [ for _ in 1..count -> bufferedJoinItems.Dequeue() ])
+
+    member _.HasBufferedJoinItems = lock gate (fun () -> bufferedJoinItems.Count > 0)

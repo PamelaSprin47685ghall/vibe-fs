@@ -7,4 +7,5 @@ module ToolResultBound =
     val MarkerBytes: int
     val ContentMaxLines: int
     val ContentMaxBytes: int
+    val fitsInWindow: text: string -> bool
     val bound: text: string -> string
