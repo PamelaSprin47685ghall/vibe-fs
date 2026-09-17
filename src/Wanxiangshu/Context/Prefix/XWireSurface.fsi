@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Context.Prefix
 
+open System.Threading.Tasks
 open Wanxiangshu.Participant.Provider.Attempt
 
 [<RequireQualifiedAccess>]
@@ -41,5 +42,7 @@ module XWireSurface =
     val suppressHostMessagesByIds: rawMessages: obj array -> hostMessageIds: string array -> obj array
 
     val transform: input: obj -> obj
+
+    val candidateFromJournal: input: obj -> Task<obj>
 
     val reconcile: input: obj -> obj

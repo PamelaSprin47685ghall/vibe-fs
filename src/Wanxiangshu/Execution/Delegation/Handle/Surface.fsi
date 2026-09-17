@@ -30,6 +30,8 @@ module HandleSurface =
     /// The empty projection. JS starts every scenario from this.
     val empty: unit -> HandleProjectionState
 
+    val emptyState: unit -> HandleProjectionState
+
     /// Apply one lifecycle command to a projection state.
     ///
     /// Commands:

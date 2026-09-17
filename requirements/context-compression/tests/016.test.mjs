@@ -291,4 +291,106 @@ test('WHAT[CONTEXT-COMPRESSION-016] COMPANION_011_the_proof_hashes_exactly_the_c
   assert.deepEqual(asked, [4], 'the proof must hash the clamped cutoff exactly once')
   assert.equal(result.ok, true, result.ok ? '' : result.message)
 })
+
+test('WHAT[CONTEXT-COMPRESSION-016] journal_to_blob_materialization_and_probe_pipeline', async () => {
+  const xwire = await import('../../../dist/Context/Prefix/XWireSurface.js')
+  const { createHash } = await import('node:crypto')
+  const sha256Hex = (text) => createHash('sha256').update(text, 'utf8').digest('hex')
+
+  const blobStore = new Map()
+  const frame1 = 'Completed discovery on module Alpha\nEstablished baseline.'
+  const frame2 = 'Implemented fix in module Beta\nAdded test case.'
+  const ref1 = 'blobs/frame-1'
+  const ref2 = 'blobs/frame-2'
+  const digest1 = sha256Hex(frame1)
+  const digest2 = sha256Hex(frame2)
+  blobStore.set(ref1, frame1)
+  blobStore.set(ref2, frame2)
+
+  const readRefs = []
+  const writtenBlobs = new Map()
+  const port = {
+    readBlob: async (ref) => {
+      readRefs.push(ref)
+      if (!blobStore.has(ref)) return { ok: false, error: `missing blob ${ref}` }
+      return { ok: true, value: blobStore.get(ref) }
+    },
+    writeBlob: async (content) => {
+      const digest = sha256Hex(content)
+      const ref = 'blobs/frozen-prefix-1'
+      writtenBlobs.set(ref, { content, digest })
+      return { ok: true, value: { blobRef: ref, blobDigest: digest } }
+    },
+  }
+
+  const frames = [
+    { kind: 'Entry', ref: ref1, digest: digest1, coveredFrom: 0, coveredThrough: 1 },
+    { kind: 'Entry', ref: ref2, digest: digest2, coveredFrom: 1, coveredThrough: 2 },
+  ]
+  const opening = {
+    assignmentText: '# Common Law\nOriginal user assignment charter',
+    modelName: 'test-model',
+    timestampIso: '2026-09-17T00:00:00Z',
+  }
+
+  const res = await xwire.candidateFromJournal({
+    port,
+    sessionId: 'test-compress-ses',
+    opening,
+    frames,
+    coverableCutoff: 2,
+    coveredDigest: 'digest-prefix-cov',
+    requestCutoff: 2,
+  })
+
+  assert.equal(res.ok, true, res.error)
+  assert.deepEqual(readRefs, [ref1, ref2], 'ReadBlob must read both frame blobs in order')
+  assert.equal(writtenBlobs.size, 1, 'Exactly one frozen record prefix blob must be written')
+
+  const written = writtenBlobs.get('blobs/frozen-prefix-1')
+  assert.ok(written.content.includes(frame1), 'materialized text must contain frame 1 body')
+  assert.ok(written.content.includes(frame2), 'materialized text must contain frame 2 body')
+  assert.ok(
+    !written.content.includes('Original user assignment charter'),
+    'same-session frozen prefix must NOT contain Opening charter text'
+  )
+  assert.equal(written.digest, sha256Hex(written.content), 'BlobDigest must equal sha256 of materialized text')
+
+  assert.ok(res.probe, 'PrefixProbe must be returned')
+  assert.equal(res.probe.candidate.ref, 'blobs/frozen-prefix-1', 'PrefixProbe must carry written blob ref')
+  assert.equal(res.probe.candidate.frozenDigest, written.digest, 'PrefixProbe must carry written blob digest')
+  assert.equal(res.probe.candidate.cutoff, 2, 'PrefixProbe must carry correct cutoff')
+})
+
+test('WHAT[CONTEXT-COMPRESSION-016] journal_materialization_fails_closed_on_corrupted_blob_ref', async () => {
+  const xwire = await import('../../../dist/Context/Prefix/XWireSurface.js')
+
+  const writtenBlobs = new Map()
+  const port = {
+    readBlob: async (ref) => {
+      return { ok: false, error: `corrupted blob reference: ${ref}` }
+    },
+    writeBlob: async (content) => {
+      writtenBlobs.set('garbage', content)
+      return { ok: true, value: { blobRef: 'garbage-ref', blobDigest: 'garbage-digest' } }
+    },
+  }
+
+  const frames = [
+    { kind: 'Entry', ref: 'blobs/corrupted-frame', digest: 'bad-digest', coveredFrom: 0, coveredThrough: 1 },
+  ]
+
+  const res = await xwire.candidateFromJournal({
+    port,
+    sessionId: 'test-corrupt-ses',
+    frames,
+    coverableCutoff: 1,
+    coveredDigest: 'cov-bad',
+    requestCutoff: 1,
+  })
+
+  assert.equal(res.ok, false, 'must fail-closed on corrupt blob read')
+  assert.match(res.error, /corrupt/i, 'error reason must propagate')
+  assert.equal(writtenBlobs.size, 0, 'zero garbage writes must occur when frame read fails')
+})
 }

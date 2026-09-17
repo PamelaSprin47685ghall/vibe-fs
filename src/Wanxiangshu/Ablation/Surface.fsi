@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Ablation
 
 module AblationSurface =
+    val resetCache: unit -> unit
     val load: unit -> obj
     val modeFor: nodeId: string -> string
     val allowsTool: toolName: string -> bool

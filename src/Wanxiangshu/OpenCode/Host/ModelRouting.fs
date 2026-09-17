@@ -227,9 +227,27 @@ module ModelRouting =
         completion.SetException(error)
         completion.Task
 
+    let private isDeprecatedRole (role: Role) =
+        match role with
+        | Role.Coder
+        | Role.Inspector
+        | Role.Browser
+        | Role.Inquiry
+        | Role.Distiller -> true
+        | _ -> false
+
     let private normalizeReservationInput sessionId (role: Role) =
         if String.IsNullOrWhiteSpace sessionId then
             Error(ArgumentException("sessionId must be non-empty") :> exn)
+        elif isDeprecatedRole role then
+            Error(
+                InvalidOperationException(
+                    sprintf
+                        "execution-model-routing: deprecated role %s cannot acquire model lease"
+                        (Roles.roleLabel role)
+                )
+                :> exn
+            )
         else
             Ok(sessionId.Trim(), role)
 
@@ -272,6 +290,8 @@ module ModelRouting =
         // single-consumption binding written when a confirmed provider failure
         // keeps its target (PAR-021). Consumed by the next fresh admission.
         let recoveryRetryTargetBySession = Dictionary<string, ModelRoutingTarget>()
+        // DSL-MUTABLE: resource — bound ModelTarget per DevOps session (EMR-019 / MSL-024 / IA-022)
+        let boundDevopsTargetBySession = Dictionary<string, ModelRoutingTarget>()
         let admissionQueue = ExecutionAdmissionQueue(gate, transitionCounters)
         let admissionOwner = ExecutionCapacityOwner(transitionCounters)
         // DSL-MUTABLE: resource — process-local scheduler poison
@@ -413,7 +433,32 @@ module ModelRouting =
                   RoutingRole = demand.Role
                   Target = target }
 
+        let enforceImmutableDevopsBinding (sessionId: string) (role: Role) (target: ModelRoutingTarget) =
+            match role = Role.DevOps, boundDevopsTargetBySession.TryGetValue sessionId with
+            | true, (true, bound) when bound <> target ->
+                invalidOp (
+                    sprintf
+                        "execution-model-routing: DevOps model binding is immutable (%s/%s vs %s/%s)"
+                        bound.Model
+                        bound.Reasoning
+                        target.Model
+                        target.Reasoning
+                )
+            | true, (false, _) -> boundDevopsTargetBySession.[sessionId] <- target
+            | _ -> ()
+
+        let tryGetBoundDevopsTarget (sessionId: string) (role: Role) =
+            match role = Role.DevOps, boundDevopsTargetBySession.TryGetValue sessionId with
+            | true, (true, t) -> Some t
+            | _ -> None
+
+        let resolvePreviousTarget sessionId role =
+            match activePhysicalTarget sessionId with
+            | Some t -> Some t
+            | None -> tryGetBoundDevopsTarget sessionId role
+
         let commit (demand: ExecutionAdmissionDemand) (target: ModelRoutingTarget) =
+            enforceImmutableDevopsBinding demand.SessionId demand.Role target
             rememberExecution demand target
 
             let identity: ExecutionAdmissionExactIdentity =
@@ -676,11 +721,16 @@ module ModelRouting =
                 failedTask<ExecutionAdmissionAcquisition> ex
 
         let tryReserveFresh sessionId (role: Role) (lenderSessionId: string option) =
-            let previous = activePhysicalTarget sessionId
+            let previous =
+                match activePhysicalTarget sessionId with
+                | Some t -> Some t
+                | None -> tryGetBoundDevopsTarget sessionId role
 
             match reserveFreshOrPoison sessionId role lenderSessionId previous with
             | None -> None
             | Some target ->
+                enforceImmutableDevopsBinding sessionId role target
+
                 activeBySession.[sessionId] <-
                     { PhysicalUserMessageId = None
                       Participant = None
@@ -690,6 +740,13 @@ module ModelRouting =
                 drainDemands ()
                 Some target
 
+        let reserveFreshAndEnforce sessionId role lenderSessionId =
+            match tryReserveFresh sessionId role lenderSessionId with
+            | None -> None
+            | Some target ->
+                enforceImmutableDevopsBinding sessionId role target
+                Some target
+
         let tryReserveLocked sessionId (role: Role) (lenderSessionId: string option) =
             ensureHealthy ()
 
@@ -697,7 +754,7 @@ module ModelRouting =
             | (true, lease), _ when lease.PhysicalUserMessageId.IsNone && lease.RoutingRole = role -> Some lease.Target
             | (true, _), _ -> None
             | (false, _), true -> None
-            | (false, _), false -> tryReserveFresh sessionId role lenderSessionId
+            | (false, _), false -> reserveFreshAndEnforce sessionId role lenderSessionId
 
         let adoptExistingReservation
             sessionId
@@ -768,8 +825,15 @@ module ModelRouting =
             if admissionQueue.ContainsSession sessionId then
                 None
             else
-                let previous = activePhysicalTarget sessionId
+                let previous = resolvePreviousTarget sessionId role
                 routeFreshOrNone sessionId physicalUserMessageId role participant lenderSessionId previous
+
+        let acquireFreshLeaseAndEnforce sessionId physicalUserMessageId role participant lenderSessionId =
+            match tryAcquireFreshLease sessionId physicalUserMessageId role participant lenderSessionId with
+            | None -> None
+            | Some target ->
+                enforceImmutableDevopsBinding sessionId role target
+                Some target
 
         let tryLeaseLocked
             sessionId
@@ -792,7 +856,7 @@ module ModelRouting =
                 ->
                 adoptExistingReservation sessionId physicalUserMessageId role participant lease
             | true, _ -> None
-            | false, _ -> tryAcquireFreshLease sessionId physicalUserMessageId role participant lenderSessionId
+            | false, _ -> acquireFreshLeaseAndEnforce sessionId physicalUserMessageId role participant lenderSessionId
 
         let exactTargetAvailable (role: Role) target running =
             match scheduleOrPoison running role (Some target) with
@@ -991,6 +1055,26 @@ module ModelRouting =
 
                 lock gate (fun () ->
                     tryLeaseLocked normSessionId normPhysicalUserMessageId normRole normParticipant normLender)
+
+        member _.BindDevopsTarget(sessionId: string, target: ModelRoutingTarget) =
+            lock gate (fun () ->
+                match boundDevopsTargetBySession.TryGetValue sessionId with
+                | true, bound when bound <> target ->
+                    invalidOp (
+                        sprintf
+                            "execution-model-routing: DevOps model binding is immutable (%s/%s vs %s/%s)"
+                            bound.Model
+                            bound.Reasoning
+                            target.Model
+                            target.Reasoning
+                    )
+                | _ -> boundDevopsTargetBySession.[sessionId] <- target)
+
+        member _.BoundDevopsTarget(sessionId: string) : ModelRoutingTarget option =
+            lock gate (fun () ->
+                match boundDevopsTargetBySession.TryGetValue sessionId with
+                | true, target -> Some target
+                | false, _ -> None)
 
         /// Physical end signals are cleanup evidence, not the sole correctness
         /// mechanism. A newer chat.message also supersedes this lease atomically.

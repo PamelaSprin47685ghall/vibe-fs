@@ -51,6 +51,9 @@ module SessionBindingSurface =
                    value = null
                    error = message |}
 
+    let bind (parentId: string) (childId: string) (agent: string) : unit =
+        SessionExecutionBinding.bind (SessionId.create parentId) (SessionId.create childId) (optionalText agent)
+
     let bindChild (parentId: string) (childId: string) (agent: string) : obj =
         try
             SessionExecutionBinding.bind (SessionId.create parentId) (SessionId.create childId) (optionalText agent)
@@ -58,6 +61,21 @@ module SessionBindingSurface =
             box {| ok = true; error = "" |}
         with ex ->
             box {| ok = false; error = ex.Message |}
+
+    let bindDevOpsModel (sessionId: string) (model: obj) : unit =
+        match modelOf model with
+        | Some selected -> SessionExecutionBinding.bindDevOpsModel (SessionId.create sessionId) selected
+        | None -> invalidArg "model" "PROMPT-006 requires a provider model"
+
+    let verifyDevOpsModel (sessionId: string) (model: obj) : unit =
+        match modelOf model with
+        | Some selected -> SessionExecutionBinding.verifyDevOpsModel (SessionId.create sessionId) selected
+        | None -> invalidArg "model" "PROMPT-006 requires a provider model"
+
+    let tryParent (sessionId: string) : string =
+        SessionExecutionBinding.tryParent (SessionId.create sessionId)
+        |> Option.map SessionId.value
+        |> Option.defaultValue ""
 
     let observeUserFacingAgent (sessionId: string) (agent: string) : unit =
         SessionExecutionBinding.observeUserFacingAgent (SessionId.create sessionId) agent

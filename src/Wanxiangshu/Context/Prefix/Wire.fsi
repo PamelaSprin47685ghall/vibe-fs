@@ -25,6 +25,15 @@ type AttemptPlanCapability =
 
 module XWire =
 
+    val internal candidate:
+        port: WireJournalPort ->
+        sessionId: SessionId ->
+        snapshot: Wanxiangshu.Participant.Provider.Projection.ProjectionSnapshot ->
+        committed: PrefixSnapshot option ->
+        state: WireSessionState ->
+        requestCutoff: int ->
+            Task<Result<PrefixProbe, NoCandidateReason>>
+
     val mayProbe: budget: ProviderFailureBudget.FailureBudget -> bool
 
     val presentationHorizonForProbe: hasProbe: bool -> PrefixPresentationHorizon

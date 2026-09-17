@@ -134,6 +134,11 @@ type ToolRuntimeScope =
     /// workflow continuation state.
     member TerminateSession: sessionId: string * reason: string -> Task<Result<unit, string>>
 
+    /// MANAGED-SESSION-024: Replace crashed DevOps physical session under single logical authority
+    member ReplacePhysicalSession:
+        parentSessionId: SessionId * devopsAgentId: string * oldChildSessionId: SessionId ->
+            Task<Result<SessionId, string>>
+
     member DisposeSession: sessionId: string -> Task
 
     member DisposeAsync: unit -> Task

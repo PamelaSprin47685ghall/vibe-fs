@@ -146,18 +146,17 @@ module ParticipantIdentity =
         |> Result.map (fun (name, kind) ->
             create name kind (personaV1 kind) currentVersion PersonaOrigin.ResolvedAtRoot)
 
+    let private parseInheritedName canonicalManagedName =
+        match parseCanonicalName canonicalManagedName with
+        | Ok p -> Ok p
+        | Error(ParticipantIdentityError.LegacyParticipantName name) -> Ok(PersonaName name, ManagedRole Role.Engineer)
+        | Error err -> Error err
+
     let inheritFromOwner
         (canonicalManagedName: string)
         (owner: ParticipantIdentityEvidence)
         : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
-        let parsed =
-            match parseCanonicalName canonicalManagedName with
-            | Ok p -> Ok p
-            | Error(ParticipantIdentityError.LegacyParticipantName name) ->
-                Ok(PersonaName name, ManagedRole Role.Engineer)
-            | Error err -> Error err
-
-        parsed
+        parseInheritedName canonicalManagedName
         |> Result.map (fun (name, kind) ->
             create name kind (persona owner) (identity owner).PersonaCatalogVersion PersonaOrigin.InheritedFromOwner)
 
@@ -219,34 +218,25 @@ module ParticipantIdentity =
         | None, PersonaOrigin.ResolvedAtRoot -> rehydrateRoot input parsed
         | Some owner, PersonaOrigin.InheritedFromOwner -> rehydrateInherited owner input parsed
 
+    let private parseCandidate (input: ParticipantIdentityInput) =
+        match parseCanonicalName input.SelectedAgent with
+        | Ok p -> Ok p
+        | Error(ParticipantIdentityError.LegacyParticipantName name) when
+            input.Origin = PersonaOrigin.InheritedFromOwner
+            ->
+            Ok(PersonaName name, ManagedRole(input.Role |> Option.defaultValue Role.Engineer))
+        | Error err -> Error err
+
     let rehydrate
         (ownerOption: ParticipantIdentityEvidence option)
         (input: ParticipantIdentityInput)
         : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
-        let parsed =
-            match parseCanonicalName input.SelectedAgent with
-            | Ok p -> Ok p
-            | Error(ParticipantIdentityError.LegacyParticipantName name) when
-                input.Origin = PersonaOrigin.InheritedFromOwner
-                ->
-                Ok(PersonaName name, ManagedRole(input.Role |> Option.defaultValue Role.Engineer))
-            | Error err -> Error err
-
-        parsed
+        parseCandidate input
         |> Result.bind (validateRehydrationShape input)
         |> Result.bind (rehydrateByOrigin ownerOption input)
 
     let fromInput (input: ParticipantIdentityInput) : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
-        let parsed =
-            match parseCanonicalName input.SelectedAgent with
-            | Ok p -> Ok p
-            | Error(ParticipantIdentityError.LegacyParticipantName name) when
-                input.Origin = PersonaOrigin.InheritedFromOwner
-                ->
-                Ok(PersonaName name, ManagedRole(input.Role |> Option.defaultValue Role.Engineer))
-            | Error err -> Error err
-
-        parsed
+        parseCandidate input
         |> Result.bind (validateRehydrationShape input)
         |> Result.bind (fun ((name, kind) as parsed) ->
             match input.Origin with

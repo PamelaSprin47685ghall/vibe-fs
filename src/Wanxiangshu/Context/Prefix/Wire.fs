@@ -203,7 +203,7 @@ module XWire =
             return LifecycleWorkRecord.materialize opening frameBodies "" false
         }
 
-    let private candidate
+    let internal candidate
         (port: WireJournalPort)
         (sessionId: SessionId)
         (snapshot: ProjectionSnapshot)

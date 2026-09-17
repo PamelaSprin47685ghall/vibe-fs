@@ -48,6 +48,8 @@ module Roles =
         | "distiller" -> Some Role.Distiller
         | _ -> None
 
+    let tryParseHistoricalRole (value: string) : Role option = tryParseRole value
+
     /// AGENT-008 / ENF-006: Distiller and Blogger are private runtimes, not
     /// public fork / horizon vocabulary.
     let isInternal (role: Role) : bool =

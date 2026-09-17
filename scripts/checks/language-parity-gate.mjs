@@ -271,6 +271,142 @@ export const scanProviderLanguageBinding = (text) => {
  * @param {{ tipIdentities?: Iterable<string>, toolNames?: Iterable<string> }} [catalogOverrides]
  * @returns {{ ok: boolean, violations: Violation[], semanticDirs: string[] }}
  */
+
+/**
+ * PROVIDER-LANGUAGE-012: Bilingual prompt semantic parity for core roles.
+ */
+export const ROLE_PARITY_SPECS = [
+  {
+    role: 'engineer',
+    enPatterns: [
+      /only role permitted to use Fission/i,
+      /Sphinx invocation[\s\S]*?read-only[\s\S]*?Do not mutate, execute, use Fission/i,
+    ],
+    zhPatterns: [
+      /唯一允许使用 Fission/,
+      /Sphinx 内部调用另受只读任务约束[\s\S]*?不修改、不执行、不 Fission/,
+    ],
+  },
+  {
+    role: 'devops',
+    enPatterns: [
+      /cannot Fission/i,
+      /do not create or dispatch other engineering agents/i,
+      /direct (?:engineering and autonomous local )?repair/i,
+    ],
+    zhPatterns: [
+      /不能 Fission/,
+      /不创建或差遣其他工程代理/,
+      /直接(?:工程与自主局部)?修复/,
+    ],
+  },
+  {
+    role: 'manager',
+    enPatterns: [
+      /cannot use Fission/i,
+      /do not create (?:copies of yourself|management clones)/i,
+    ],
+    zhPatterns: [
+      /不能使用 Fission/,
+      /不创建自己的副本|不创建管理分身/,
+    ],
+  },
+]
+
+export const FORBIDDEN_PROMPT_PATTERNS = [
+  {
+    pattern: /Manager\s*(?:(?:可以|能够|允许|可|支持)\s*(?:使用\s*)?Fission|可分身|能够分身|进行分身)/i,
+    name: 'manager-fission-grant',
+  },
+  {
+    pattern: /DevOps\s*(?:(?:可以|能够|允许|可|支持)\s*(?:使用\s*)?Fission|可分身|能够分身|进行分身)/i,
+    name: 'devops-fission-grant',
+  },
+  {
+    pattern: /Manager\s*(?:can|may|is permitted to|is allowed to)\s*(?:use\s*)?Fission/i,
+    name: 'manager-fission-grant-en',
+  },
+  {
+    pattern: /DevOps\s*(?:can|may|is permitted to|is allowed to)\s*(?:use\s*)?Fission/i,
+    name: 'devops-fission-grant-en',
+  },
+]
+
+/**
+ * Scan core role prompts for bilingual semantic parity (PROVIDER-LANGUAGE-012).
+ * @param {string} providerAbs
+ * @returns {Violation[]}
+ */
+export const scanRolePromptParity = (providerAbs) => {
+  /** @type {Violation[]} */
+  const violations = []
+  const roleRoot = join(providerAbs, 'role')
+
+  for (const spec of ROLE_PARITY_SPECS) {
+    const enPath = join(roleRoot, spec.role, 'en.md')
+    const zhPath = join(roleRoot, spec.role, 'zh-CN.md')
+    if (!existsSync(enPath) || !existsSync(zhPath)) continue
+
+    const enText = readFileSync(enPath, 'utf8')
+    const zhText = readFileSync(zhPath, 'utf8')
+
+    for (const pat of spec.enPatterns) {
+      if (!pat.test(enText)) {
+        violations.push({
+          code: 'role-prompt-parity',
+          path: norm(join(PROVIDER_ROOT, 'role', spec.role, 'en.md')),
+          detail: `core role prompt missing required parity anchor: ${pat}`,
+        })
+      }
+    }
+
+    for (const pat of spec.zhPatterns) {
+      if (!pat.test(zhText)) {
+        violations.push({
+          code: 'role-prompt-parity',
+          path: norm(join(PROVIDER_ROOT, 'role', spec.role, 'zh-CN.md')),
+          detail: `core role prompt missing required parity anchor: ${pat}`,
+        })
+      }
+    }
+  }
+
+  return violations
+}
+
+/**
+ * Scan provider markdown files for affirmative invalid fission claims (PROVIDER-LANGUAGE-012).
+ * Strictly distinguishes affirmative grants from legitimate negative guards.
+ * @param {string} providerAbs
+ * @returns {Violation[]}
+ */
+export const scanForbiddenPromptPhrases = (providerAbs) => {
+  /** @type {Violation[]} */
+  const violations = []
+  if (!existsSync(providerAbs)) return violations
+
+  for (const abs of walk(providerAbs)) {
+    if (!abs.endsWith('.md')) continue
+    const text = readFileSync(abs, 'utf8')
+    const lines = text.split('\n')
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
+      for (const fp of FORBIDDEN_PROMPT_PATTERNS) {
+        if (fp.pattern.test(line)) {
+          violations.push({
+            code: 'forbidden-fission-claim',
+            path: norm(relative(resolve(providerAbs, '..', '..'), abs)),
+            detail: `line ${i + 1} matches forbidden affirmative fission claim ${fp.name}: ${line.trim()}`,
+          })
+        }
+      }
+    }
+  }
+
+  return violations
+}
+
 export const scanRepo = (repoRoot = process.cwd(), catalogOverrides) => {
   /** @type {Violation[]} */
   const violations = []
@@ -304,6 +440,8 @@ export const scanRepo = (repoRoot = process.cwd(), catalogOverrides) => {
   if (semanticDirs.length > 0) {
     violations.push(...scanIdentifierParity(semanticDirs, providerAbs, { tipIdentities, toolNames }))
     violations.push(...scanPlaceholderParity(semanticDirs, providerAbs))
+    violations.push(...scanRolePromptParity(providerAbs))
+    violations.push(...scanForbiddenPromptPhrases(providerAbs))
   }
 
   const bindingAbs = resolve(repoRoot, PROVIDER_LANGUAGE_BINDING_REL)

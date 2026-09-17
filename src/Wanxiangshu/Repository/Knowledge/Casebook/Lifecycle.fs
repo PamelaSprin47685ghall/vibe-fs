@@ -82,7 +82,46 @@ module CasebookLifecycle =
                 return! refreshIndexThenSettle store delegateSessionId
         }
 
+    let private finalizeOkCase
+        (workspaceRoot: string)
+        (delegateSessionId: string)
+        (q': string)
+        (a': string)
+        (observations: Observation list)
+        (store: IEventStore)
+        : Task<CaseFinalizeSettlement> =
+        task {
+            let related =
+                observations
+                |> List.choose (function
+                    | Observation.FileRead(p, _) -> Some p
+                    | _ -> None)
+                |> List.distinct
+                |> List.sort
+
+            let! freezeResult = CasebookCapture.freezeCompletionState store workspaceRoot related
+
+            match freezeResult with
+            | Error reason ->
+                return
+                    CaseFinalizeSettlement.notCommitted delegateSessionId (sprintf "freeze baseline failed: %s" reason)
+            | Ok baselineStr ->
+                let case: Case =
+                    { Identity = delegateSessionId
+                      SourceTrace = delegateSessionId
+                      Q = q'
+                      A = a'
+                      RelatedPaths = related
+                      CompletionFileState = baselineStr
+                      MaintenanceFileState = baselineStr
+                      AccessOrder = 0L
+                      Observations = observations }
+
+                return! archiveCase store delegateSessionId case
+        }
+
     let private spawnFinalize
+        (workspaceRoot: string)
         (delegateSessionId: string)
         (lastQ: string)
         (a: string)
@@ -102,31 +141,12 @@ module CasebookLifecycle =
 
             match spawned with
             | Error reason -> return CaseFinalizeSettlement.notCommitted delegateSessionId reason
-            | Ok(q', a') ->
-                let related =
-                    observations
-                    |> List.choose (function
-                        | Observation.FileRead(p, _) -> Some p
-                        | _ -> None)
-                    |> List.distinct
-                    |> List.sort
-
-                let case: Case =
-                    { Identity = delegateSessionId
-                      SourceTrace = delegateSessionId
-                      Q = q'
-                      A = a'
-                      RelatedPaths = related
-                      CompletionFileState = "state-initial"
-                      MaintenanceFileState = "state-initial"
-                      AccessOrder = 0L
-                      Observations = observations }
-
-                return! archiveCase store delegateSessionId case
+            | Ok(q', a') -> return! finalizeOkCase workspaceRoot delegateSessionId q' a' observations store
         }
 
     let private continueFinalizeDecision
         (store: IEventStore)
+        (workspaceRoot: string)
         (delegateSessionId: string)
         (draft: CasebookDraft)
         (a: string)
@@ -146,19 +166,19 @@ module CasebookLifecycle =
 
             match dispositionOfExistingScope delegateSessionId existing with
             | Some settled -> return settled
-            | None -> return! spawnFinalize delegateSessionId lastQ a observations (Some transcript) store
+            | None -> return! spawnFinalize workspaceRoot delegateSessionId lastQ a observations (Some transcript) store
         }
 
     let private dispatchFinalize
         (store: IEventStore)
-        (_workspaceRoot: string)
+        (workspaceRoot: string)
         (delegateSessionId: string)
         (draft: CasebookDraft)
         (a: string)
         : Task<CaseFinalizeSettlement> =
         task {
             try
-                let! result = continueFinalizeDecision store delegateSessionId draft a
+                let! result = continueFinalizeDecision store workspaceRoot delegateSessionId draft a
                 return result
             with ex ->
                 collector.Drain delegateSessionId |> ignore

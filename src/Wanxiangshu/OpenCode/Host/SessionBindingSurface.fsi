@@ -1,7 +1,11 @@
 namespace Wanxiangshu.OpenCode
 
 module SessionBindingSurface =
+    val bind: parentId: string -> childId: string -> agent: string -> unit
     val bindChild: parentId: string -> childId: string -> agent: string -> obj
+    val bindDevOpsModel: sessionId: string -> model: obj -> unit
+    val verifyDevOpsModel: sessionId: string -> model: obj -> unit
+    val tryParent: sessionId: string -> string
     val observeUserFacingAgent: sessionId: string -> agent: string -> unit
     val observeHostAuxiliaryChild: sessionId: string -> unit
     val isUnboundHostAuxiliaryChild: sessionId: string -> bool

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Context.Prefix
 
 open System
+open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
@@ -10,6 +11,8 @@ open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Context.Companion
+open Wanxiangshu.Context.Companion.Blogger
+open Wanxiangshu.Context.Trace
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 open Wanxiangshu.Participant.Provider.Attempt
@@ -680,3 +683,268 @@ module XWireSurface =
         box
             {| view = boundPlanView bound
                handle = wrapBoundPlan bound |}
+
+    /// Materialize candidate probe through the full production pipeline from a journal port.
+    /// Drives: readFrameBodies -> materializeFrozenRecordPrefix -> port.WriteBlob -> PrefixProbeSelection.select
+    let candidateFromJournal (input: obj) : Task<obj> =
+        task {
+            try
+                let jsPort = input?port
+
+                if isNullish jsPort then
+                    return
+                        box
+                            {| ok = false
+                               error = "missing port"
+                               probe = null |}
+                else
+                    let readBlobFn (blobRef: BlobRef) : Task<Result<string, string>> =
+                        task {
+                            try
+                                let refStr = BlobRef.value blobRef
+
+                                let! res =
+                                    if not (isNullish jsPort?readBlob) then
+                                        jsPort?readBlob (refStr)
+                                    elif not (isNullish jsPort?ReadBlob) then
+                                        jsPort?ReadBlob (refStr)
+                                    else
+                                        failwith "port missing readBlob"
+
+                                if isNullish res then
+                                    return Error(sprintf "blob %s not found" refStr)
+                                elif emitJsExpr res "$0 && typeof $0 === 'object' && 'ok' in $0" then
+                                    if unbox<bool> res?ok then
+                                        return Ok(string res?value)
+                                    else
+                                        return Error(string res?error)
+                                else
+                                    return Ok(string res)
+                            with ex ->
+                                return Error ex.Message
+                        }
+
+                    let writeBlobFn (content: string) : Task<Result<WireBlobRecord, string>> =
+                        task {
+                            try
+                                let! res =
+                                    if not (isNullish jsPort?writeBlob) then
+                                        jsPort?writeBlob (content)
+                                    elif not (isNullish jsPort?WriteBlob) then
+                                        jsPort?WriteBlob (content)
+                                    else
+                                        failwith "port missing writeBlob"
+
+                                if isNullish res then
+                                    return Error "writeBlob returned null"
+                                elif emitJsExpr res "$0 && typeof $0 === 'object' && 'ok' in $0 && !$0.ok" then
+                                    return Error(string res?error)
+                                else
+                                    let payload =
+                                        if emitJsExpr res "$0 && typeof $0 === 'object' && 'value' in $0" then
+                                            res?value
+                                        else
+                                            res
+
+                                    let bRef =
+                                        string (
+                                            if isNullish payload?blobRef then
+                                                payload?ref
+                                            else
+                                                payload?blobRef
+                                        )
+
+                                    let bDigest =
+                                        string (
+                                            if isNullish payload?blobDigest then
+                                                payload?digest
+                                            else
+                                                payload?blobDigest
+                                        )
+
+                                    return
+                                        Ok
+                                            { BlobRef = BlobRef.create bRef
+                                              BlobDigest = BlobDigest.create bDigest }
+                            with ex ->
+                                return Error ex.Message
+                        }
+
+                    let port: WireJournalPort =
+                        { ReadView = fun _ -> failwith "not used in candidate"
+                          ReadBlob = readBlobFn
+                          WriteBlob = writeBlobFn
+                          CurrentProjection = fun _ -> failwith "not used in candidate"
+                          RecordConfirmedSuccess = fun _ _ -> failwith "not used in candidate"
+                          CommitPrefixRebase = fun _ _ _ -> failwith "not used in candidate" }
+
+                    let sessionId =
+                        SessionId.create (
+                            if isNullish input?sessionId then
+                                "test-session"
+                            else
+                                string input?sessionId
+                        )
+
+                    let xTraceOpening =
+                        if not (isNullish input?opening) then
+                            let op = input?opening
+
+                            Some
+                                { AssignmentText =
+                                    if isNullish op?assignmentText then
+                                        ""
+                                    else
+                                        string op?assignmentText
+                                  AuthoritativeRequirements = []
+                                  ConstitutiveBody = "" }
+                        else
+                            None
+
+                    let frames =
+                        if not (isNullish input?frames) then
+                            let rawFrames =
+                                if emitJsExpr input?frames "Array.isArray($0)" then
+                                    unbox<obj array> input?frames
+                                else
+                                    [||]
+
+                            rawFrames
+                            |> Array.map (fun f ->
+                                { Kind =
+                                    if string f?kind = "Squash" then
+                                        BlogFrameKind.Squash
+                                    else
+                                        BlogFrameKind.Entry
+                                  Digest = BlobDigest.create (if isNullish f?digest then "" else string f?digest)
+                                  TextRef = BlobRef.create (if isNullish f?ref then "" else string f?ref)
+                                  CoveredFromSequence = if isNullish f?coveredFrom then 0L else int64 f?coveredFrom
+                                  CoveredThroughSequence =
+                                    if isNullish f?coveredThrough then
+                                        0L
+                                    else
+                                        int64 f?coveredThrough })
+                            |> Array.toList
+                        else
+                            []
+
+                    let blogState: BlogProjectionState =
+                        { FrameEpochId =
+                            FrameEpochId.create (
+                                if isNullish input?frameEpoch then
+                                    0L
+                                else
+                                    int64 input?frameEpoch
+                            )
+                          Frames = frames
+                          Coverage =
+                            { IngestedThroughSequence =
+                                if isNullish input?ingestedThrough then
+                                    0L
+                                else
+                                    int64 input?ingestedThrough
+                              CoverableTurnCutoffExclusive =
+                                if isNullish input?coverableCutoff then
+                                    2
+                                else
+                                    unbox<int> input?coverableCutoff
+                              CoveredPrefixDigest =
+                                if isNullish input?coveredDigest then
+                                    ""
+                                else
+                                    string input?coveredDigest
+                              CoverableFrameCount = frames.Length } }
+
+                    let wireState: WireSessionState =
+                        { XTrace =
+                            xTraceOpening
+                            |> Option.bind (fun op ->
+                                match XTraceProjection.applyOpening op.AssignmentText [] XTraceProjection.empty with
+                                | Ok st -> Some st
+                                | Error _ -> None)
+                          Blog = Some blogState
+                          PrefixEpoch =
+                            if isNullish input?prefixEpoch then
+                                None
+                            else
+                                Some
+                                    { EpochId = PrefixEpochId.create (int64 input?prefixEpoch)
+                                      Snapshot = None
+                                      ReanchoredRuns = Set.empty } }
+
+                    let currentProjection =
+                        if isNullish input?currentProjection then
+                            { ProviderId = None
+                              ModelId = None
+                              Variant = None
+                              Tools = []
+                              System = []
+                              Messages = [] }
+                        else
+                            semanticProjectionOfJs input?currentProjection
+
+                    let snapshot: ProjectionSnapshot = { CurrentProjection = currentProjection }
+
+                    let requestCutoff =
+                        if isNullish input?requestCutoff then
+                            2
+                        else
+                            unbox<int> input?requestCutoff
+
+                    let committedSnapshot =
+                        if isNullish input?committedSnapshot then
+                            None
+                        else
+                            Some(snapshotOfJs input?committedSnapshot)
+
+                    let! candidateResult =
+                        XWire.candidate port sessionId snapshot committedSnapshot wireState requestCutoff
+
+                    match candidateResult with
+                    | Ok probe ->
+                        let candidate = probe.Candidate
+
+                        let probeJs =
+                            box
+                                {| probeId = probe.ProbeId
+                                   basedOnEpoch = string (PrefixEpochId.value probe.BasedOnEpochId)
+                                   candidate =
+                                    box
+                                        {| ref = BlobRef.value candidate.FrozenRecordPrefixRef
+                                           frozenDigest = BlobDigest.value candidate.FrozenRecordPrefixDigest
+                                           cutoff = candidate.CutoffExclusive
+                                           prefixDigest = candidate.CoveredPrefixDigest
+                                           sealRoot = candidate.SealRoot
+                                           syntheticId = candidate.SyntheticMessageId |}
+                                   cutoff = candidate.CutoffExclusive
+                                   sealRoot = candidate.SealRoot
+                                   syntheticId = candidate.SyntheticMessageId |}
+
+                        return
+                            box
+                                {| ok = true
+                                   error = null
+                                   probe = probeJs |}
+                    | Error reason ->
+                        let desc =
+                            match reason with
+                            | NoCandidateReason.NoCoverage -> "no coverage"
+                            | NoCandidateReason.CoverageNotAheadOfRequest -> "coverage not ahead of request"
+                            | NoCandidateReason.WouldRetreat(committed, proposed) ->
+                                sprintf "cutoff %d behind %d" proposed committed
+                            | NoCandidateReason.NotNewerThanCommitted -> "not newer than committed"
+                            | NoCandidateReason.CutoffProofFailed(expected, recomputed) ->
+                                sprintf "cutoff proof failed: expected %s, recomputed %s" expected recomputed
+
+                        return
+                            box
+                                {| ok = false
+                                   error = desc
+                                   probe = null |}
+            with ex ->
+                return
+                    box
+                        {| ok = false
+                           error = ex.Message
+                           probe = null |}
+        }

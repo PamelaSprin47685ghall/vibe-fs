@@ -28,6 +28,8 @@ module SessionExecutionBinding =
 
     val bind: parentId: SessionId -> childId: SessionId -> agent: string option -> unit
     val restore: parentId: SessionId -> childId: SessionId -> agent: string option -> unit
+    val bindDevOpsModel: sessionId: SessionId -> model: OpencodeModel -> unit
+    val verifyDevOpsModel: sessionId: SessionId -> model: OpencodeModel -> unit
     val bindInternalRoot: sessionId: SessionId -> agent: string option -> unit
     val isInternalRoot: sessionId: SessionId -> bool
     val tryParent: sessionId: SessionId -> SessionId option

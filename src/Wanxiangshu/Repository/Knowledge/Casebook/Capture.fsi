@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
 open System.Threading.Tasks
+open Wanxiangshu.Persistence.EventStore
 
 /// Access tracker for substantive file access collection.
 type AccessTracker =
@@ -59,7 +60,10 @@ module CasebookCapture =
     val truncateDiffForBudget: diff: string -> budget: int -> obj
 
     /// KR-004: Freeze completion file state baseline.
-    val freezeCompletionState: workspaceRoot: string -> paths: string list -> Task<obj>
+    val freezeCompletionState:
+        store: IEventStore -> workspaceRoot: string -> paths: string list -> Task<Result<string, string>>
+
+    val captureBaselineFileStateMap: workspaceRoot: string -> paths: string list -> obj
 
     /// KR-004 / KR-005: Compute diff between baseline and current workspace.
     val computeMaintenanceDiff: workspaceRoot: string -> baseline: obj -> Task<obj>

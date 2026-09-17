@@ -29,6 +29,8 @@ module ForkToolSurface =
 
     type private ForkSessionPort() =
         let children = ResizeArray<OpenCodeChildInfo>()
+        let mutable latestPromptedSession: SessionId option = None
+        let mutable preAcceptedPrompts = 0
         let listeners = Dictionary<string, ResizeArray<TerminalCompletionListener>>()
         let prompts = Dictionary<string, ResizeArray<string>>()
 
@@ -96,10 +98,16 @@ module ForkToolSurface =
                 ready
                 |> List.iter (fun (_, waiter) -> AsyncSupport.trySetResult waiter () |> ignore)
 
+        let latestChild () =
+            children
+            |> Seq.tryLast
+            |> Option.map (fun child -> child.SessionId)
+            |> Option.orElse latestPromptedSession
+
         let releaseEmittedWaiters () =
             let admitted =
-                match children |> Seq.tryLast with
-                | Some child -> promptCountForKey (SessionId.value child.SessionId)
+                match latestChild () with
+                | Some childId -> promptCountForKey (SessionId.value childId)
                 | None -> 0
 
             let ready =
@@ -130,8 +138,7 @@ module ForkToolSurface =
             { new IDisposable with
                 member _.Dispose() = registrations.Remove listener |> ignore }
 
-        member _.LatestChild =
-            children |> Seq.tryLast |> Option.map (fun child -> child.SessionId)
+        member _.LatestChild = latestChild ()
 
         member _.ChildCount = children.Count
 
@@ -152,8 +159,8 @@ module ForkToolSurface =
 
         member _.WaitForEmittedPromptCount(count: int) : Task =
             let admitted =
-                match children |> Seq.tryLast with
-                | Some child -> promptCountForKey (SessionId.value child.SessionId)
+                match latestChild () with
+                | Some childId -> promptCountForKey (SessionId.value childId)
                 | None -> 0
 
             if admitted >= count then
@@ -182,7 +189,23 @@ module ForkToolSurface =
                     true
                 else
                     false
-            | _ -> false
+            | true, values when values.Count > 0 ->
+                let lastIndex = values.Count - 1
+                physicalSequence.Value <- physicalSequence.Value + 1
+                let physical = sprintf "fork-physical-%d" physicalSequence.Value
+
+                if
+                    AsyncSupport.trySetResult
+                        values[lastIndex]
+                        (SendOutcome.AdmittedWithPhysicalMessage(PhysicalUserMessageId.create physical))
+                then
+                    historyOf physicalRoots key |> fun roots -> roots.Add physical
+                    true
+                else
+                    false
+            | _ ->
+                preAcceptedPrompts <- preAcceptedPrompts + 1
+                true
 
         member _.Prompt(sessionId: SessionId, index: int) =
             match prompts.TryGetValue(SessionId.value sessionId) with
@@ -209,6 +232,7 @@ module ForkToolSurface =
             member _.SubscribeFutureTerminal(sessionId, listener) = subscribe sessionId listener
 
             member _.SendPrompt(sessionId, text, _) =
+                latestPromptedSession <- Some sessionId
                 let key = SessionId.value sessionId
                 historyOf prompts key |> fun values -> values.Add text
                 releasePromptWaiters key
@@ -218,6 +242,12 @@ module ForkToolSurface =
                 | Some outcome ->
                     nextSendOutcome <- None
                     Task.FromResult outcome
+                | None when preAcceptedPrompts > 0 ->
+                    preAcceptedPrompts <- preAcceptedPrompts - 1
+                    physicalSequence.Value <- physicalSequence.Value + 1
+                    let physical = sprintf "fork-physical-%d" physicalSequence.Value
+                    historyOf physicalRoots key |> fun roots -> roots.Add physical
+                    Task.FromResult(SendOutcome.AdmittedWithPhysicalMessage(PhysicalUserMessageId.create physical))
                 | None ->
                     let acceptance =
                         TaskCompletionSource<SendOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
@@ -576,7 +606,7 @@ module ForkToolSurface =
 
         match harness.Sessions.LatestChild with
         | Some childId -> harness.Sessions.AcceptPrompt(childId, index)
-        | None -> false
+        | None -> harness.Sessions.AcceptPrompt(SessionId.create "", index)
 
     let prompt (value: obj) (index: int) : obj =
         let harness = unbox<ForkHarness> value

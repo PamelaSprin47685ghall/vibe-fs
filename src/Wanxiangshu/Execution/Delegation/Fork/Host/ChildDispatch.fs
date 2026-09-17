@@ -88,13 +88,33 @@ module HostForkChildDispatch =
         for run in pending do
             settleAbandoned run
 
+    let private isFixedDevOps (agentId: string) =
+        String.Equals(agentId.Trim(), "devops", StringComparison.OrdinalIgnoreCase)
+
+    let private isFixedDevOpsHandle (handles: AgentLinkageProjection option) (agentId: string) =
+        match handles with
+        | Some h ->
+            match HandleProjection.tryFind (HandleController.agentHandle agentId) h with
+            | Some r -> r.CanonicalRole = Role.DevOps || r.Byname = "devops"
+            | None -> isFixedDevOps agentId
+        | None -> isFixedDevOps agentId
+
     let private clearChildrenAndRuns
         (gate: obj)
         (children: Dictionary<string, SessionId>)
         (pendingRuns: Dictionary<string, PendingHostRun>)
         =
         lock gate (fun () ->
+            let devopsChildOpt =
+                match children.TryGetValue "devops" with
+                | true, cid -> Some cid
+                | false, _ -> None
+
             children.Clear()
+            match devopsChildOpt with
+            | Some cid -> children.["devops"] <- cid
+            | None -> ()
+
             pendingRuns.Clear())
 
     let private nudgeBusyChild
@@ -374,8 +394,13 @@ module HostForkChildDispatch =
             | None -> processOwned
             | Some handles -> processOwned |> List.filter (isProcessOwnedActiveHandle handles)
 
-        let childIds = owned |> List.map snd |> List.distinct
-        cancelSignals (parentId :: childIds)
+        // MANAGED-SESSION-024 / Common Law: fixed road companion DevOps must never be abandoned or torn down on parent cancellation
+        let ownedToCancel =
+            owned
+            |> List.filter (fun (agentId, _) -> not (isFixedDevOpsHandle durableHandles agentId))
+
+        let childIdsToCancel = ownedToCancel |> List.map snd |> List.distinct
+        cancelSignals (parentId :: childIdsToCancel)
 
         // EXEC-009: durable abandon before aborting. A crash mid-Cancel must not
         // leave a session aborted but still Active/joinable. A leaked abort is
@@ -383,7 +408,7 @@ module HostForkChildDispatch =
         task {
             let journalPort = journal |> Option.map AgentJournalPortAdapter.fromAgentJournal
 
-            let! cancelResult = HandleController.cancelChildren journalPort parentId (owned |> List.map fst) abandonedAt
+            let! cancelResult = HandleController.cancelChildren journalPort parentId (ownedToCancel |> List.map fst) abandonedAt
 
             requireOk "Parent handle abandon failed" cancelResult
 
@@ -392,7 +417,7 @@ module HostForkChildDispatch =
             settlePendingAbandoned gate pendingRuns settleAbandoned
             do! awaitRecovery ()
 
-            let! teardown = teardownChildren sessions (childIds |> List.distinct)
+            let! teardown = teardownChildren sessions (childIdsToCancel |> List.distinct)
             requireOk "Parent teardown failed" teardown
             clearChildrenAndRuns gate children pendingRuns
         }

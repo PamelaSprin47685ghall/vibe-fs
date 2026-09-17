@@ -3,6 +3,7 @@ namespace Wanxiangshu.Ablation
 [<RequireQualifiedAccess>]
 module AblationFactMap =
 
+    // DSL-MUTABLE: resource — memoized ablation fact map
     let mutable private cached: Map<string, AblationNodeId> option = None
 
     let private load () =

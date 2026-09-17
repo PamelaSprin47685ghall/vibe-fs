@@ -142,61 +142,20 @@ module HostForkAgent =
                 return Error err
             }
         | Ok() ->
-            task {
-                lock runtime.Gate (fun () -> runtime.Children.[agentId] <- childId)
-
-                runtime.ChildCreated agentId role childId
-                runtime.ChildCreatedDir agentId childId (runtime.DirectoryOf agentId)
-
-                if isFirstPrompt then
-                    let! _ =
-                        XTraceCapture.captureOpeningWithReceipt runtime.Journal childId prompt requirements
-                        |> TaskResult.mapError (fun error -> sprintf "fork opening trace capture failed: %A" error)
-
-                    ()
-
-                do!
-                    maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
-                    |> TaskResultCE.ofTask
-                    |> TaskValue.map ignore
-
-                if deferSend && isFirstPrompt then
-                    runtime.DeferredFirstPrompts.[agentId] <-
-                        {| ChildId = childId
-                           IdentitySeed = identitySeed
-                           Prompt = enrichedPrompt |}
-
-                    return Ok(ForkResult.Created agentId)
-                else
-                    let! sent =
-                        HostForkAgentOwner.sendFirstPromptObserved
-                            runtime.Sessions
-                            runtime.Journal
-                            childId
-                            identitySeed
-                            (runtime.DirectoryOf agentId)
-                            enrichedPrompt
-                            (fun _ -> ())
-
-                    match sent with
-                    | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted(_, authorityRoot) ->
-                        let run =
-                            runtime.InstallRun(
-                                agentId,
-                                childId,
-                                role,
-                                authorityRoot,
-                                ?preparedHandoff = preparedHandoff
-                            )
-
-                        let result =
-                            runtime.Runtime.Fork(agentId, role, agentName, runWork = (fun () -> run.Source.Task))
-
-                        return Ok result
-                    | HostForkRunLifecycle.AgentOwnerDispatchOutcome.AcceptanceUncertain _ ->
-                        return Ok(ForkResult.DispatchUncertain agentId)
-                    | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Rejected err -> return Error err
-            }
+            continueNewChildFork
+                runtime
+                agentId
+                role
+                agentName
+                identitySeed
+                prompt
+                requirements
+                enrichedPrompt
+                isFirstPrompt
+                deferSend
+                expectedToolCalls
+                preparedHandoff
+                childId
 
     let private forkNewChild
         (runtime: HostForkRuntime)
@@ -534,8 +493,31 @@ module HostForkAgent =
 
             let boundAgent = HostForkBinding.managedAgent runtime.Journal childId
 
-            match recordOpt, boundAgent with
-            | _, None when agentId = "devops" ->
+            let isDevOpsHandle =
+                match runtime.Journal with
+                | Some durable ->
+                    let projection = AgentJournal.handleProjection durable runtime.ParentId
+                    let handle = HandleController.agentHandle agentId
+                    match HandleProjection.tryFind handle projection with
+                    | Some r -> r.CanonicalRole = Role.DevOps || r.Byname = "devops"
+                    | None -> agentId = "devops"
+                | None -> agentId = "devops"
+
+            let roleOpt =
+                recordOpt
+                |> Option.map (fun r -> r.Role)
+                |> Option.orElseWith (fun () ->
+                    match runtime.Journal with
+                    | Some durable ->
+                        let projection = AgentJournal.handleProjection durable runtime.ParentId
+                        let handle = HandleController.agentHandle agentId
+                        HandleProjection.tryFind handle projection
+                        |> Option.map (fun h -> h.CanonicalRole)
+                    | None -> None)
+                |> Option.orElseWith (fun () -> if isDevOpsHandle then Some Role.DevOps else None)
+
+            match roleOpt, boundAgent with
+            | _, None when isDevOpsHandle ->
                 return!
                     sendDevOpsFirstPrompt
                         runtime
@@ -545,7 +527,7 @@ module HostForkAgent =
                         renderedPrompt
                         expectedToolCalls
                         preparedHandoff
-            | Some record, Some agentName ->
+            | Some role, Some agentName ->
                 do! maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
 
                 return!
@@ -553,7 +535,7 @@ module HostForkAgent =
                         runtime
                         agentId
                         childId
-                        record.Role
+                        role
                         agentName
                         prompt
                         renderedPrompt

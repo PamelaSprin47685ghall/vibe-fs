@@ -52,6 +52,7 @@ module AblationSettings =
                   ManifestFingerprint = "000000000000"
                   NodeCount = 0 } }
 
+    // DSL-MUTABLE: resource — memoized ablation registry
     let mutable private cached: AblationRegistry option = None
 
     let current () : AblationRegistry =

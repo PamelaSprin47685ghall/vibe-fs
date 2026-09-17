@@ -22,7 +22,7 @@ const cutResult = () => projection.applyCut(cutMessages, 'old-run', 'suicide-cal
 
 const ids = (result) => result.provider.map((message) => message.id ?? message.info?.id)
 
-test('WHAT[RETIRE-008] wire cut drops the retired tail and the internal loop wake until the next real user turn', () => {
+test('WHAT[PROJ-008] wire cut drops the retired tail and the internal loop wake until the next real user turn', () => {
   const providerIds = ids(cutResult())
   assert.equal(providerIds.includes('a-late'), false)
   assert.equal(providerIds.includes('wake-1'), false)

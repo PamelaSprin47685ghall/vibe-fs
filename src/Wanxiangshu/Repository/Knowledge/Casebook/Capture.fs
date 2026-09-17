@@ -7,6 +7,10 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Host
 open Wanxiangshu.Repository.Programming.Js
+open Thoth.Json
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Persistence.EventStore
+open Wanxiangshu.Git
 
 /// Access tracker for substantive file access collection.
 type AccessTracker() =
@@ -319,15 +323,106 @@ module CasebookCapture =
         else
             box {| kind = "Missing" |}
 
-    let freezeCompletionState (workspaceRoot: string) (paths: string list) : Task<obj> =
+    let private readClassifiedEntry fullPath =
+        match JsUtf8Fs.readUtf8Classified fullPath with
+        | Ok text ->
+            box
+                {| kind = "Present"
+                   contentHash = contentHash text
+                   content = text |}
+        | Error _ -> box {| kind = "Missing" |}
+
+    let private captureFileStateEntry (workspaceRoot: string) (relPath: string) : obj =
+        let fullPath = JsMutationFs.resolveToolPath workspaceRoot relPath
+
+        match JsMutationFs.existsPath fullPath with
+        | false -> box {| kind = "Missing" |}
+        | true -> readClassifiedEntry fullPath
+
+    let captureBaselineFileStateMap (workspaceRoot: string) (paths: string list) : obj =
+        let resultMap = newJsMap ()
+
+        for relPath in paths do
+            jsMapSet resultMap (box relPath) (captureFileStateEntry workspaceRoot relPath)
+
+        resultMap
+
+    let private writePayloadEntry
+        (store: IEventStore)
+        (relPath: string)
+        (text: string)
+        : Task<Result<string * JsonValue, string>> =
         task {
-            let resultMap = newJsMap ()
+            let sha = contentHash text
+            let bytes = System.Text.Encoding.UTF8.GetBytes text
 
-            for relPath in paths do
-                jsMapSet resultMap (box relPath) (completionEntryAt workspaceRoot relPath)
+            match! store.WritePayload bytes with
+            | Error err -> return Error(sprintf "failed to write payload for %s: %s" relPath err)
+            | Ok payloadRef ->
+                let entryObj =
+                    Encode.object
+                        [ "kind", Encode.string "Present"
+                          "payloadRef", Encode.string (PayloadRef.value payloadRef)
+                          "payload_ref", Encode.string (PayloadRef.value payloadRef)
+                          "sha256", Encode.string sha
+                          "contentHash", Encode.string sha ]
 
-            return resultMap
+                return Ok(relPath, entryObj)
         }
+
+    let private readAndWritePayload
+        (store: IEventStore)
+        (relPath: string)
+        (fullPath: string)
+        : Task<Result<string * JsonValue, string>> =
+        match JsUtf8Fs.readUtf8Classified fullPath with
+        | Error err -> Task.FromResult(Error(sprintf "failed to read file %s: %A" relPath err))
+        | Ok text -> writePayloadEntry store relPath text
+
+    let private freezeSinglePath
+        (store: IEventStore)
+        (workspaceRoot: string)
+        (relPath: string)
+        : Task<Result<string * JsonValue, string>> =
+        let fullPath = JsMutationFs.resolveToolPath workspaceRoot relPath
+
+        match JsMutationFs.existsPath fullPath with
+        | false -> Task.FromResult(Ok(relPath, Encode.object [ "kind", Encode.string "Missing" ]))
+        | true -> readAndWritePayload store relPath fullPath
+
+    let rec private continueFreezeLoop store workspaceRoot rest (entries: ResizeArray<string * JsonValue>) =
+        function
+        | Error err -> Task.FromResult(Error err)
+        | Ok entry ->
+            entries.Add entry
+            freezePathsLoop store workspaceRoot rest entries
+
+    and private freezePathsLoop
+        (store: IEventStore)
+        (workspaceRoot: string)
+        (paths: string list)
+        (entries: ResizeArray<string * JsonValue>)
+        : Task<Result<string, string>> =
+        match paths with
+        | [] ->
+            let canonicalJson =
+                entries |> Seq.sortBy fst |> Seq.toList |> Encode.object |> Encode.toString 0
+
+            Task.FromResult(Ok canonicalJson)
+        | relPath :: rest ->
+            task {
+                let! step = freezeSinglePath store workspaceRoot relPath
+                return! continueFreezeLoop store workspaceRoot rest entries step
+            }
+
+    let freezeCompletionState
+        (store: IEventStore)
+        (workspaceRoot: string)
+        (paths: string list)
+        : Task<Result<string, string>> =
+        let distinctPaths = paths |> List.distinct |> List.sort
+        let entries = ResizeArray<string * JsonValue>()
+        freezePathsLoop store workspaceRoot distinctPaths entries
 
     let private kindOfEntry (entry: obj) : string =
         if isNull entry || isNull (entry?kind) then
@@ -356,44 +451,129 @@ module CasebookCapture =
     let private deletedFileDiff (relPath: string) (baseContent: string) : string =
         sprintf "diff --git a/%s b/%s\ndeleted file\n--- a/%s\n+++ /dev/null\n-%s" relPath relPath relPath baseContent
 
+    let private parseFallbackHash (valObj: JsonValue) =
+        match Decode.fromValue "$" (Decode.field "contentHash" Decode.string) valObj with
+        | Ok h2 -> h2
+        | Error _ -> ""
+
+    let private parseEntryHash (valObj: JsonValue) =
+        match Decode.fromValue "$" (Decode.field "sha256" Decode.string) valObj with
+        | Ok h -> h
+        | Error _ -> parseFallbackHash valObj
+
+    let private parseEntryKind (valObj: JsonValue) =
+        match Decode.fromValue "$" (Decode.field "kind" Decode.string) valObj with
+        | Ok k -> k
+        | Error _ -> "Missing"
+
+    let private decodeBaselinePairs (str: string) =
+        match Decode.fromString (Decode.keyValuePairs Decode.value) str with
+        | Ok pairs ->
+            pairs
+            |> List.map (fun (path, valObj) -> path, parseEntryKind valObj, parseEntryHash valObj)
+        | Error _ -> []
+
+    let private parseJsonBaselineEntries (str: string) =
+        if String.IsNullOrWhiteSpace str || str = "state-initial" then
+            []
+        else
+            decodeBaselinePairs str
+
+    let private diffFileEntry
+        (workspaceRoot: string)
+        (relPath: string)
+        (baseKind: string)
+        (baseHash: string)
+        (baseContent: string)
+        =
+        let fullPath = JsMutationFs.resolveToolPath workspaceRoot relPath
+
+        let current =
+            if JsMutationFs.existsPath fullPath then
+                JsUtf8Fs.readUtf8Classified fullPath |> Result.toOption
+            else
+                None
+
+        match current, baseKind with
+        | Some curText, "Missing" -> Some(addedFileDiff relPath curText)
+        | Some curText, "Present" when baseHash <> "" && baseHash <> contentHash curText ->
+            Some(
+                changedFileDiff
+                    relPath
+                    (if String.IsNullOrEmpty baseContent then
+                         baseHash
+                     else
+                         baseContent)
+                    curText
+            )
+        | Some curText, _ when baseHash <> "" && baseHash <> contentHash curText ->
+            Some(changedFileDiff relPath baseContent curText)
+        | None, "Present" ->
+            Some(
+                deletedFileDiff
+                    relPath
+                    (if String.IsNullOrEmpty baseContent then
+                         baseHash
+                     else
+                         baseContent)
+            )
+        | _ -> None
+
+    let private diffJsMapEntry (workspaceRoot: string) (baseline: obj) (relPath: string) =
+        let baseEntry = jsMapGet baseline (box relPath)
+        let baseKind = kindOfEntry baseEntry
+        let baseHash = hashOfEntry baseEntry
+        let baseContent = contentOfEntry baseEntry
+        diffFileEntry workspaceRoot relPath baseKind baseHash baseContent
+
+    let private recordJsMapDiffs workspaceRoot (baseline: obj) record =
+        let keys = jsArrayFrom (jsMapKeys baseline) |> Array.map string |> Array.toList
+
+        for relPath in keys do
+            diffJsMapEntry workspaceRoot baseline relPath |> Option.iter record
+
+    let private parseBaselineEntries (baseline: obj) : (string * string * string) list =
+        if isNull baseline then
+            []
+        elif isJsMap baseline then
+            jsArrayFrom (jsMapKeys baseline)
+            |> Array.map (fun k ->
+                let path = string k
+                let entry = jsMapGet baseline k
+                let kind = kindOfEntry entry
+                let hash = hashOfEntry entry
+                path, kind, hash)
+            |> Array.toList
+        elif emitJsExpr baseline "typeof $0 === 'string'" then
+            parseJsonBaselineEntries (unbox<string> baseline)
+        else
+            []
+
     let computeMaintenanceDiff (workspaceRoot: string) (baseline: obj) : Task<obj> =
         task {
             let mutable hasDiff = false
             let diffLines = ResizeArray<string>()
 
-            let keys =
-                if isJsMap baseline then
-                    jsArrayFrom (jsMapKeys baseline) |> Array.map string |> Array.toList
-                else
-                    []
-
             let record (line: string) =
                 hasDiff <- true
                 diffLines.Add line
 
-            let diffForPath (relPath: string) : string option =
-                let baseEntry = jsMapGet baseline (box relPath)
-                let baseKind = kindOfEntry baseEntry
-                let baseHash = hashOfEntry baseEntry
-                let baseContent = contentOfEntry baseEntry
-                let fullPath = JsMutationFs.resolveToolPath workspaceRoot relPath
+            let gitDiff =
+                try
+                    GitSubject.diffHeadBinary workspaceRoot
+                with _ ->
+                    ""
 
-                let current =
-                    if JsMutationFs.existsPath fullPath then
-                        JsUtf8Fs.readUtf8Classified fullPath |> Result.toOption
-                    else
-                        None
+            if not (String.IsNullOrWhiteSpace gitDiff) then
+                record gitDiff
 
-                match current, baseKind with
-                | Some curText, "Missing" -> Some(addedFileDiff relPath curText)
-                | Some curText, _ when baseHash <> contentHash curText ->
-                    Some(changedFileDiff relPath baseContent curText)
-                | Some _, _ -> None
-                | None, "Present" -> Some(deletedFileDiff relPath baseContent)
-                | None, _ -> None
+            let entries = parseBaselineEntries baseline
 
-            for relPath in keys do
-                diffForPath relPath |> Option.iter record
+            for (relPath, baseKind, baseHash) in entries do
+                diffFileEntry workspaceRoot relPath baseKind baseHash "" |> Option.iter record
+
+            if isJsMap baseline then
+                recordJsMapDiffs workspaceRoot baseline record
 
             let diffSummary = String.concat "\n" diffLines
 

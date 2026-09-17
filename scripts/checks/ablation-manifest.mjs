@@ -55,6 +55,10 @@ export function check(context) {
   const knownTools = knownMatch
     ? [...knownMatch[1].matchAll(/"([^"]+)"/g)].map((match) => match[1])
     : []
+  // SphinxMcp.permissionKey is "sphinx_*"
+  if (staticTools.includes('SphinxMcp.permissionKey')) {
+    knownTools.push('sphinx_*')
+  }
 
   for (const tool of knownTools) {
     if (!toolMap.tools[tool]) {
@@ -83,6 +87,18 @@ export function check(context) {
 
   if (!profiles.profiles.production) {
     issues.push({ code: 'profile-production', message: 'profiles.json missing production profile' })
+  }
+
+  // Verify revoked package nodes lifecycle status
+  const REVOKED_PACKAGES = ['external-investigation', 'output-distillation']
+  for (const revoked of REVOKED_PACKAGES) {
+    const node = nodes.nodes.find((n) => n.id === revoked)
+    if (node && node.status !== 'revoked') {
+      issues.push({
+        code: 'node-revoked-status-missing',
+        message: `revoked package node ${revoked} must be marked status: "revoked" in nodes.json`,
+      })
+    }
   }
 
   for (const [profileId, profile] of Object.entries(profiles.profiles)) {

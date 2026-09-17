@@ -13,6 +13,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.persistence-eventstore-canonicalintegrator.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.persistence-eventstore-processeventlog.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-composition.composition-durable-contextfact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.eventstore-authoritative-vocabulary.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>

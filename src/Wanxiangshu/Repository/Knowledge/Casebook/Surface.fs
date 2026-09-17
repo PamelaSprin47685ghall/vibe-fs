@@ -471,16 +471,40 @@ module CasebookSurface =
     let isSubstantiveTool (toolName: string) : bool =
         CasebookCapture.isSubstantiveTool toolName
 
-    let freezeCompletionState (workspaceRoot: string) (paths: obj) : Task<obj> =
-        let pathList =
-            if isNull paths then
-                []
-            elif emitJsExpr paths "Array.isArray($0)" then
-                stringsOf paths |> Array.toList
-            else
-                []
+    let freezeCompletionState (workspaceRootOrStore: obj) (pathsOrWorkspaceRoot: obj) : Task<obj> =
+        task {
+            let argCount = emitJsExpr () "arguments.length" |> unbox<int>
 
-        CasebookCapture.freezeCompletionState workspaceRoot pathList
+            if argCount >= 3 then
+                let store = emitJsExpr () "arguments[0]" |> storeOf
+                let workspaceRoot = emitJsExpr () "arguments[1]" |> string
+                let pathsRaw = emitJsExpr () "arguments[2]"
+
+                let pathList =
+                    if isNull pathsRaw then
+                        []
+                    elif emitJsExpr pathsRaw "Array.isArray($0)" then
+                        stringsOf pathsRaw |> Array.toList
+                    else
+                        []
+
+                match! CasebookCapture.freezeCompletionState store workspaceRoot pathList with
+                | Ok json -> return box json
+                | Error err -> return box {| ok = false; error = err |}
+            else
+                let workspaceRoot = string workspaceRootOrStore
+                let pathsRaw = pathsOrWorkspaceRoot
+
+                let pathList =
+                    if isNull pathsRaw then
+                        []
+                    elif emitJsExpr pathsRaw "Array.isArray($0)" then
+                        stringsOf pathsRaw |> Array.toList
+                    else
+                        []
+
+                return CasebookCapture.captureBaselineFileStateMap workspaceRoot pathList
+        }
 
     let computeMaintenanceDiff (workspaceRoot: string) (baseline: obj) : Task<obj> =
         CasebookCapture.computeMaintenanceDiff workspaceRoot baseline

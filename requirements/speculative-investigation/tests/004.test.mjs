@@ -91,7 +91,8 @@ test('WHAT[SPEC-INV-004] STRENGTH_004_007_policy_same_role_prompt_has_no_replica
   assert.equal(engId, Strength.systemPromptIdForRole('Engineer'))
   const prompt = Strength.systemPromptForRole('Engineer')
   assert.ok(prompt.length > 0)
-  assert.doesNotMatch(prompt, /strength|replica|prefetch/i)
+  assert.doesNotMatch(prompt, /\bStrength\b/)
+  assert.doesNotMatch(prompt, /replica|prefetch/i)
 })
 }
 

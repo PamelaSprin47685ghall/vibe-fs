@@ -78,8 +78,6 @@
     <Compile Include="Execution/Delegation/Fork/OpenCode/JoinSurface.fs"/>
     <Compile Include="Execution/Delegation/Fork/CleanBreakSurface.fsi"/>
     <Compile Include="Execution/Delegation/Fork/CleanBreakSurface.fs"/>
-    <Compile Include="Execution/Delegation/Handle/OpenCode/OneShotTool.fsi"/>
-    <Compile Include="Execution/Delegation/Handle/OpenCode/OneShotTool.fs"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/ToolSurface.fsi"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/ToolSurface.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Surface.fsi"/>

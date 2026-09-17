@@ -36,10 +36,13 @@ module AblationSurface =
                kind = kind
                error = detail |}
 
-    let load () =
+    let resetCache () : unit =
         AblationSettings.resetCache ()
         AblationToolMap.resetCache ()
         AblationFactMap.resetCache ()
+
+    let load () =
+        resetCache ()
 
         match AblationSettings.load () with
         | Ok registry -> registryToJs registry

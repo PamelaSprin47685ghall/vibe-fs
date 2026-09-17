@@ -102,7 +102,18 @@ module FetchTool =
             let identity = case.Identity
 
             let baseline =
-                CasebookCapture.baselineFromObservations case.Observations case.RelatedPaths
+                if
+                    not (String.IsNullOrWhiteSpace case.MaintenanceFileState)
+                    && case.MaintenanceFileState <> "state-initial"
+                then
+                    box case.MaintenanceFileState
+                elif
+                    not (String.IsNullOrWhiteSpace case.CompletionFileState)
+                    && case.CompletionFileState <> "state-initial"
+                then
+                    box case.CompletionFileState
+                else
+                    CasebookCapture.baselineFromObservations case.Observations case.RelatedPaths
 
             let! diffObj = CasebookCapture.computeMaintenanceDiff workspaceRoot baseline
             let hasDiff = unbox<bool> (diffObj?hasDiff)

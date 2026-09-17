@@ -125,7 +125,8 @@
       "id": "output-distillation",
       "package": "output-distillation",
       "station": 20,
-      "kind": "package"
+      "kind": "package",
+      "status": "revoked"
     },
     {
       "id": "causal-wait",
@@ -362,7 +363,8 @@
       "id": "external-investigation",
       "package": "external-investigation",
       "station": 46,
-      "kind": "package"
+      "kind": "package",
+      "status": "revoked"
     }
   ],
   "edges": [

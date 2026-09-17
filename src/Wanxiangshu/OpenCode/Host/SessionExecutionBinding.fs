@@ -73,6 +73,42 @@ module SessionExecutionBinding =
     // boundary; never session authority.
     // DSL-MUTABLE: resource — provider attempt binding map.
     let private providerAttemptBindings = Dictionary<string, ExpectedBinding>()
+    // DSL-MUTABLE: resource — session persistent model binding for fixed roles (DevOps)
+    let private persistentDevOpsModels = Dictionary<string, OpencodeModel>()
+
+    let private sameModel (left: OpencodeModel) (right: OpencodeModel) =
+        left.providerID = right.providerID
+        && left.modelID = right.modelID
+        && left.variant = right.variant
+
+    let private modelText (model: OpencodeModel) =
+        sprintf "%s/%s[%s]" model.providerID model.modelID (model.variant |> Option.defaultValue "<missing>")
+
+    let private roleOfParticipant (participant: string) : Role option =
+        match ManagedAgent.tryParse participant with
+        | Some managed -> Some managed.Role
+        | None -> Roles.tryParseRole (participant.Trim())
+
+    let private verifyDevOpsModelLocked (sessionKey: string) (model: OpencodeModel) : unit =
+        match persistentDevOpsModels.TryGetValue sessionKey with
+        | true, expected when not (sameModel expected model) ->
+            invalidOp (
+                sprintf
+                    "CRASH-020: DevOps model drift prohibited during resume/recovery (%s -> %s)"
+                    (modelText expected)
+                    (modelText model)
+            )
+        | _ -> ()
+
+    let private bindDevOpsModelLocked (sessionKey: string) (model: OpencodeModel) : unit =
+        verifyDevOpsModelLocked sessionKey model
+        persistentDevOpsModels.[sessionKey] <- model
+
+    let bindDevOpsModel (sessionId: SessionId) (model: OpencodeModel) : unit =
+        lock gate (fun () -> bindDevOpsModelLocked (SessionId.value sessionId) model)
+
+    let verifyDevOpsModel (sessionId: SessionId) (model: OpencodeModel) : unit =
+        lock gate (fun () -> verifyDevOpsModelLocked (SessionId.value sessionId) model)
 
     let private nonEmpty (value: string) =
         if String.IsNullOrWhiteSpace value then
@@ -140,14 +176,6 @@ module SessionExecutionBinding =
                 sprintf "PROMPT-006: parented session '%s' agent changed (%s -> %s)" sessionKey existing proposed
             )
         | _ -> agents.[sessionKey] <- proposed
-
-    let private sameModel (left: OpencodeModel) (right: OpencodeModel) =
-        left.providerID = right.providerID
-        && left.modelID = right.modelID
-        && left.variant = right.variant
-
-    let private modelText (model: OpencodeModel) =
-        sprintf "%s/%s[%s]" model.providerID model.modelID (model.variant |> Option.defaultValue "<missing>")
 
     let bind (parentId: SessionId) (childId: SessionId) (agent: string option) =
         let privateHostChild =
@@ -225,6 +253,21 @@ module SessionExecutionBinding =
           Agent = agent
           Model = model }
 
+    let private rememberAndBindExternalExecution
+        (sessionId: SessionId)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        (agent: string)
+        (model: OpencodeModel)
+        =
+        lock gate (fun () ->
+            let sessionKey = SessionId.value sessionId
+            rememberAgent sessionKey agent
+
+            if roleOfParticipant agent = Some Role.DevOps then
+                bindDevOpsModelLocked sessionKey model
+
+            providerAttemptBindings.[sessionKey] <- exactBinding physicalUserMessageId agent model)
+
     let acceptExternalExecution
         (sessionId: SessionId)
         (physicalUserMessageId: PhysicalUserMessageId)
@@ -233,11 +276,7 @@ module SessionExecutionBinding =
         : unit =
         match nonEmpty participant with
         | None -> invalidOp "PROMPT-006: accepted external execution has no participant"
-        | Some agent ->
-            lock gate (fun () ->
-                let sessionKey = SessionId.value sessionId
-                rememberAgent sessionKey agent
-                providerAttemptBindings.[sessionKey] <- exactBinding physicalUserMessageId agent model)
+        | Some agent -> rememberAndBindExternalExecution sessionId physicalUserMessageId agent model
 
     let acceptPromptExecution
         (sessionId: SessionId)
@@ -310,11 +349,6 @@ module SessionExecutionBinding =
             | true, agent -> Some agent
             | false, _ -> None)
 
-    let private roleOfParticipant (participant: string) : Role option =
-        match ManagedAgent.tryParse participant with
-        | Some managed -> Some managed.Role
-        | None -> Roles.tryParseRole (participant.Trim())
-
     let private rememberExternalAttempt sessionId physical agent target =
         let sessionKey = SessionId.value sessionId
 
@@ -325,6 +359,14 @@ module SessionExecutionBinding =
                   Model = ModelRouting.toOpenCodeModel target })
 
         Ok()
+
+    let private rememberLeaseTarget sessionId physical agent roleOpt target =
+        let model = ModelRouting.toOpenCodeModel target
+
+        if roleOpt = Some Role.DevOps then
+            verifyDevOpsModel sessionId model
+
+        rememberExternalAttempt sessionId physical agent target
 
     let private bindExternalExecutionLease sessionId physical agent =
         let roleOpt = roleOfParticipant agent
@@ -341,7 +383,7 @@ module SessionExecutionBinding =
                     "PROMPT-006: physical provider attempt %s has no model-routing execution lease"
                     (PhysicalUserMessageId.value physical)
             )
-        | Some target -> rememberExternalAttempt sessionId physical agent target
+        | Some target -> rememberLeaseTarget sessionId physical agent roleOpt target
 
     let private beginExternalProviderAttempt sessionId physicalUserMessageId =
         let sessionKey = SessionId.value sessionId
@@ -759,6 +801,7 @@ module SessionExecutionBinding =
             hostAuxiliaryChildren.Remove key |> ignore
             agents.Remove key |> ignore
             providerAttemptBindings.Remove key |> ignore
+            persistentDevOpsModels.Remove key |> ignore
 
             clearAcceptedPromptBindingsForSession key)
 
@@ -830,6 +873,12 @@ module SessionExecutionBinding =
             | (false, _), true -> ProviderExpectation.ManagedWithoutAttempt
             | _ -> ProviderExpectation.Unbound)
 
+    let private validateNonDriftAttempt sessionId expected observedAgent model =
+        if roleOfParticipant observedAgent = Some Role.DevOps then
+            verifyDevOpsModel sessionId model
+
+        validateLease sessionId expected.PhysicalUserMessageId observedAgent model
+
     let private validateExactAttempt
         (sessionId: SessionId)
         (expected: ExpectedBinding)
@@ -846,7 +895,7 @@ module SessionExecutionBinding =
                     (modelText model)
             )
         else
-            validateLease sessionId expected.PhysicalUserMessageId observedAgent model
+            validateNonDriftAttempt sessionId expected observedAgent model
 
     let validateObservedProvider (sessionId: SessionId) (agent: string) (model: OpencodeModel) : Result<bool, string> =
         let observedAgent = if isNull agent then "" else agent.Trim()

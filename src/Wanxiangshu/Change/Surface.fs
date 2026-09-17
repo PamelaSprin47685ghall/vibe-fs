@@ -1409,16 +1409,19 @@ module ChangeSurface =
             let ffGateHeld = ResizeArray<bool>()
             let ffExpectedHeads = ResizeArray<string>()
             let ffPinnedCandidates = ResizeArray<string>()
+            // DSL-MUTABLE: resource — simulated worktree ref states
             let worktreeHead = ref scenario.InitialHead
             let targetHead = ref scenario.InitialTarget
             let gateHeld = ref false
+            // DSL-MUTABLE: resource — simulated gate counters
             let gateAcquireCount = ref 0
             let gateReleaseCount = ref 0
             let signalIndex = ref 0
-
+            // DSL-MUTABLE: resource — simulated loop counters
             let signalCount = ref 0
             let continuationCount = ref 0
             let factCount = ref 0
+            // DSL-MUTABLE: resource — simulated git counter
             let gitCallCount = ref 0
             let burstIncumbency = IncumbencyId.create "burst-loop"
 

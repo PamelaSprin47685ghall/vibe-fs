@@ -36,6 +36,7 @@ module SyncDelegateSurface =
     /// (DELEG-023) before only the terminal verdict failed the call.
     type private RetryScript() =
         let queue = Queue<Result<unit, string>>()
+        // DSL-MUTABLE: resource — test retry call counter
         let mutable calls = 0
 
         member _.Push(verdict: Result<unit, string>) = queue.Enqueue verdict
@@ -55,6 +56,7 @@ module SyncDelegateSurface =
             Dictionary<string, ResizeArray<int * TaskCompletionSource<unit>>>()
 
         let prompts = Dictionary<string, ResizeArray<string>>()
+        // DSL-MUTABLE: algorithm-scratch — prompt readiness revision counter
         let revision = ref 0
         /// DSL-cross-callback-proof: physical waiter — wakes lookup after a prompt emission registers its child.
         let revisionWaiters = ResizeArray<int * TaskCompletionSource<int>>()

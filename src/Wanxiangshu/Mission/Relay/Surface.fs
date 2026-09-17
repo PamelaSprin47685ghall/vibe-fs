@@ -1,7 +1,27 @@
 namespace Wanxiangshu.Mission.Relay
 
+open Fable.Core.JsInterop
+
 module Surface =
     let empty () = Fold.empty
+
+    let openRoad road authority message incumbent snapshot =
+        let roadId = RoadId.create road
+        let authorityRevision = AuthorityRevision.create authority
+        let authorityMessageId = PhysicalUserMessageId.create message
+        let incumbentId = IncumbencyId.create incumbent
+        let snapshotId = WorkspaceSnapshotId.create snapshot
+
+        match
+            RelayTransaction.create
+                [ RelayEvent.RoadOpened(roadId, authorityRevision, authorityMessageId)
+                  RelayEvent.IncumbencyOpened(incumbentId, snapshotId) ]
+        with
+        | Error error -> failwith error
+        | Ok transaction ->
+            match Fold.apply Fold.empty roadId transaction with
+            | Ok state -> state
+            | Error error -> failwith error
 
     let private result value =
         match value with
@@ -242,7 +262,16 @@ module Surface =
 
             box
                 {| devopsId = devopsId
-                   incumbentId = incumbentId |}
+                   incumbentId = incumbentId
+                   modelTarget = roadView.BoundDevOpsModelTarget |> nullableString |}
 
-    let bindRoadDevOps state road devopsId =
-        Decision.bindRoadDevOps state (RoadId.create road) devopsId |> result
+    let bindRoadDevOps state road devopsId (modelTarget: obj) =
+        let target =
+            if isNull modelTarget then
+                None
+            elif emitJsExpr modelTarget "typeof $0 === 'string' && $0.trim().length > 0" then
+                Some(string modelTarget)
+            else
+                None
+
+        Decision.bindRoadDevOps state (RoadId.create road) devopsId target |> result

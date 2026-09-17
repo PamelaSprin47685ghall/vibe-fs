@@ -13,6 +13,12 @@ module PersonaSurface =
     let private roleOf (label: string) : Role option =
         if isNull label then None else Roles.tryParseRole label
 
+    let private historicalRoleOf (label: string) : Role option =
+        if isNull label then
+            None
+        else
+            Roles.tryParseHistoricalRole label
+
     let allRoleLabels: string array =
         ManagedAgentCatalog.allRoles |> List.map Roles.roleLabel |> List.toArray
 
@@ -57,10 +63,12 @@ module PersonaSurface =
         && ManagedAgentCatalog.isLegacyAgentName (name.ToLowerInvariant())
 
     let roleName (roleLabel: string) : string =
-        roleOf roleLabel |> Option.map Roles.roleLabel |> Option.defaultValue ""
+        historicalRoleOf roleLabel
+        |> Option.map Roles.roleLabel
+        |> Option.defaultValue ""
 
     let persona (roleLabel: string) (_tierLabel: string) : string =
-        match roleOf roleLabel with
+        match historicalRoleOf roleLabel with
         | Some role -> PersonaCatalog.persona role |> Persona.render
         | None -> ""
 
@@ -147,7 +155,7 @@ module PersonaSurface =
             if roleLabel = "bookkeeper" then
                 Some None
             else
-                roleOf roleLabel |> Option.map Some
+                historicalRoleOf roleLabel |> Option.map Some
 
         let parsedOrigin =
             match origin with

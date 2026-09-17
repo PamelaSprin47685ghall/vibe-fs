@@ -13,7 +13,7 @@ const mainRequest = () => ctx.main({ requestId: 'request-main', toml: 'work' })
 const mainRequest2 = () => ctx.main({ requestId: 'request-more', toml: 'more' })
 const KEY = 'ses-blog'
 
-test('WHAT[PAR-017] Blogger retry replaces exact physical ownership before the next binding', () => {
+test('WHAT[CONTEXT-COMPRESSION-024] CTX_024_blogger_runtime_surface_claim_and_release_replaces_request_ownership', () => {
   const scope = parkedTransform.scope()
   const failed = ctx.main({ requestId: 'request-failed', toml: 'failed' })
   const replacement = ctx.main({ requestId: 'request-replacement', toml: 'replacement' })

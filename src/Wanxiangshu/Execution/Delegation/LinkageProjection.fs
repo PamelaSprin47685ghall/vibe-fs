@@ -108,6 +108,19 @@ module HandleProjection =
         && existing.CanonicalRole = role
         && existing.Ownership = ownership
 
+    let private sameLogicalDevOpsBinding
+        (targetAgent: string)
+        (byname: string)
+        (role: Role)
+        (ownership: HandleOwnership)
+        (existing: HandleRecord)
+        =
+        existing.CanonicalRole = Role.DevOps
+        && role = Role.DevOps
+        && existing.TargetAgent = targetAgent
+        && existing.Byname = byname
+        && existing.Ownership = ownership
+
     let private replayExistingLink
         (childSessionId: SessionId)
         (targetAgent: string)
@@ -117,15 +130,33 @@ module HandleProjection =
         (current: AgentLinkageProjection)
         (existing: HandleRecord)
         : Result<AgentLinkageProjection, HandleTransitionRejection> =
-        match sameBinding childSessionId targetAgent byname role ownership existing, existing.Lifecycle with
-        | false, _ -> Error HandleIdentityConflict
-        | true, Active -> Ok current
-        | true, Abandoned _ -> Error AlreadyAbandoned
-        | true, CompletedAwaitingJoin _
-        | true, Retired ->
+        let isSameBinding = sameBinding childSessionId targetAgent byname role ownership existing
+        let isDevOpsPhysicalReplacement =
+            existing.Lifecycle = Retired
+            && sameLogicalDevOpsBinding targetAgent byname role ownership existing
+
+        if isDevOpsPhysicalReplacement then
+            // MANAGED-SESSION-024: Replacement physical session atomically takes over devops authority
             Ok
                 { current with
-                    Handles = Map.add existing.Handle { existing with Lifecycle = Active } current.Handles }
+                    Handles =
+                        Map.add
+                            existing.Handle
+                            { existing with
+                                ChildSessionId = childSessionId
+                                Lifecycle = Active
+                                LastCompletion = None }
+                            current.Handles }
+        else
+            match isSameBinding, existing.Lifecycle with
+            | false, _ -> Error HandleIdentityConflict
+            | true, Active -> Ok current
+            | true, Abandoned _ -> Error AlreadyAbandoned
+            | true, CompletedAwaitingJoin _
+            | true, Retired ->
+                Ok
+                    { current with
+                        Handles = Map.add existing.Handle { existing with Lifecycle = Active } current.Handles }
 
     let linkNamed
         (handle: HandleId)

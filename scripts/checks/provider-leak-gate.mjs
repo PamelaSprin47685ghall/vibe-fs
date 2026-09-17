@@ -30,7 +30,6 @@ export const PROVIDER_SCAN_ROOTS = Object.freeze([
   'src/Wanxiangshu/OpenCode/Tools/BashHoneypotTool.fs',
   'src/Wanxiangshu/OpenCode/Tools/FileMutationTools.fs',
   'src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs',
-  'src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs',
   'src/Wanxiangshu/Repository/Knowledge/Casebook/OpenCode/Tools.fs',
 ])
 

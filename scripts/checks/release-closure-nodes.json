@@ -1575,7 +1575,6 @@
         "src/Wanxiangshu/Execution/Delegation/Handle/FoldSurface.fs",
         "src/Wanxiangshu/Execution/Delegation/Handle/JoinInterruptRegistry.fs",
         "src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/JoinWake.fs",
-        "src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs",
         "src/Wanxiangshu/Execution/Delegation/Handle/Surface.fs",
         "src/Wanxiangshu/Execution/Delegation/Handoff.fs",
         "src/Wanxiangshu/Execution/Delegation/HandoffIdentity.fs",

@@ -59,6 +59,9 @@ module ModelRouting =
             lenderSessionId: string option ->
                 ModelRoutingTarget option
 
+        member BindDevopsTarget: sessionId: string * target: ModelRoutingTarget -> unit
+        member BoundDevopsTarget: sessionId: string -> ModelRoutingTarget option
+
         member internal ReleaseExecution: sessionId: string -> CapacityTransitionOutcome
 
         member internal ReleasePhysicalExecution:

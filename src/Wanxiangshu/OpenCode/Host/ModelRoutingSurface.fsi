@@ -62,6 +62,9 @@ module ModelRoutingSurface =
         lenderSessionId: string ->
             obj
 
+    val bindDevopsTarget: runtime: obj -> sessionId: string -> target: obj -> unit
+    val boundDevopsTarget: runtime: obj -> sessionId: string -> obj
+
     val releasePhysicalExecution: runtime: obj -> sessionId: string -> physicalUserMessageId: string -> obj
     val cancelPendingExecution: runtime: obj -> sessionId: string -> obj
 

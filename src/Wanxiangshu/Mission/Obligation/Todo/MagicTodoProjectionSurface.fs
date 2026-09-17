@@ -111,10 +111,7 @@ module MagicTodoProjectionSurface =
     let internal rejectionView rejection : obj =
         MagicTodoProjectionEncoding.rejectionView rejection
 
-    let internal incumbencyView
-        (state: MagicTodoProjection.MagicTodoProjectionState)
-        (incumbencyId: IncumbencyId)
-        : obj =
+    let incumbencyView (state: MagicTodoProjection.MagicTodoProjectionState) (incumbencyId: IncumbencyId) : obj =
         match MagicTodoProjection.tryIncumbency incumbencyId state with
         | None -> null
         | Some incumbency ->

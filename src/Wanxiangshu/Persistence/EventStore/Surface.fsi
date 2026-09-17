@@ -25,5 +25,7 @@ module Surface =
     /// Read the unique structural head, or `null` when the stream is forked/empty.
     val head: handle: EventStoreHandle * streamId: string -> obj
 
+    val readPayload: handle: EventStoreHandle * payloadRef: string -> Task<obj>
+
     /// The canonical remote store ref owned by persistence infrastructure.
     val canonicalStoreRef: string

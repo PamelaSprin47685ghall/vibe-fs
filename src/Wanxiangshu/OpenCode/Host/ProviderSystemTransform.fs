@@ -57,16 +57,33 @@ module ProviderSystemTransform =
             None
 
     let private activeRoles =
-        [ Role.Manager
-          Role.Orchestrator
-          Role.Engineer
-          Role.DevOps
-          Role.Blogger ]
+        [ Role.Manager; Role.Orchestrator; Role.Engineer; Role.DevOps; Role.Blogger ]
+
+    let private canonical (text: string) = if isNull text then "" else text.Trim()
+
+    let private chooseBookkeeperPrompt expectedEn expectedZh nextPrompt (text: string) =
+        let c = canonical text
+
+        if c = expectedEn || c = expectedZh then
+            nextPrompt
+        else
+            text
+
+    let private chooseRolePrompt expectedEn expectedZh expectedCur nextPrompt (text: string) =
+        let c = canonical text
+
+        if c = expectedEn || c = expectedZh || c = expectedCur then
+            nextPrompt
+        else
+            text
 
     let private roleMatchesSystem (r: Role) (system: string array) : bool =
-        let canonical (text: string) = if isNull text then "" else text.Trim()
-        let expectedEn = canonical (PromptResources.systemForRole ProviderLanguage.English r)
-        let expectedZh = canonical (PromptResources.systemForRole ProviderLanguage.SimplifiedChinese r)
+        let expectedEn =
+            canonical (PromptResources.systemForRole ProviderLanguage.English r)
+
+        let expectedZh =
+            canonical (PromptResources.systemForRole ProviderLanguage.SimplifiedChinese r)
+
         system
         |> Array.exists (fun text ->
             let c = canonical text
@@ -79,10 +96,13 @@ module ProviderSystemTransform =
 
     let private replaceBookkeeperSystem lang sessionText output system =
         let oldPromptEn = PromptResources.loadBookkeeperSystemFor ProviderLanguage.English
-        let oldPromptZh = PromptResources.loadBookkeeperSystemFor ProviderLanguage.SimplifiedChinese
-        let canonical (text: string) = if isNull text then "" else text.Trim()
+
+        let oldPromptZh =
+            PromptResources.loadBookkeeperSystemFor ProviderLanguage.SimplifiedChinese
+
         let expectedEn = canonical oldPromptEn
         let expectedZh = canonical oldPromptZh
+
         let matchesBookkeeper =
             system
             |> Array.exists (fun text ->
@@ -91,11 +111,7 @@ module ProviderSystemTransform =
 
         if BookkeeperRuntime.isAttached sessionText || matchesBookkeeper then
             let nextPrompt = PromptResources.loadBookkeeperSystemFor lang
-            output?system <-
-                system
-                |> Array.map (fun text ->
-                    let c = canonical text
-                    if c = expectedEn || c = expectedZh then nextPrompt else text)
+            output?system <- system |> Array.map (chooseBookkeeperPrompt expectedEn expectedZh nextPrompt)
             true
         else
             false
@@ -106,19 +122,19 @@ module ProviderSystemTransform =
         | Some r ->
             let oldPromptEn = PromptResources.systemForRole ProviderLanguage.English r
             let oldPromptZh = PromptResources.systemForRole ProviderLanguage.SimplifiedChinese r
+
             let currentPrompt =
                 catalogPrompt (RuntimeResources.current().Prompts) r
                 |> Option.defaultValue oldPromptEn
+
             let nextPrompt = localizedRolePrompt lang r
-            let canonical (text: string) = if isNull text then "" else text.Trim()
             let expectedEn = canonical oldPromptEn
             let expectedZh = canonical oldPromptZh
             let expectedCur = canonical currentPrompt
+
             output?system <-
                 system
-                |> Array.map (fun text ->
-                    let c = canonical text
-                    if c = expectedEn || c = expectedZh || c = expectedCur then nextPrompt else text)
+                |> Array.map (chooseRolePrompt expectedEn expectedZh expectedCur nextPrompt)
 
     let private transformSystem (role: SessionId -> Role option) sessionText output system =
         let sid = SessionId.create sessionText

@@ -222,7 +222,7 @@ type SyncDelegateRuntime
             let! prepared = handoff.Prepare call.Owner route |> TaskResultCE.ofTask
 
             // EXEC-031: capture the Opening from the raw Charge (not the
-            // provider envelope), matching OneShotAgentTool. PromptIngress omits
+            // provider envelope). PromptIngress omits
             // Opening for AgentOwnerRoot, so the LWR projector would otherwise
             // return None and the bounded record would be undefined. Idempotent:
             // a reused child keeps its first invocation's Opening (PERSIST-010).

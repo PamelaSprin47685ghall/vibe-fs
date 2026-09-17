@@ -58,12 +58,12 @@ module OfficeCapabilitySurface =
 
     let private officeName role =
         match role with
-        | Role.Engineer -> "Engineer"
-        | Role.Coder -> "Coder"
-        | Role.Inspector -> "Inspector"
-        | Role.DevOps -> "DevOps"
-        | Role.Browser -> "Browser"
-        | Role.Inquiry -> "Inquiry"
+        | Role.Engineer -> "engineer"
+        | Role.Coder -> "coder"
+        | Role.Inspector -> "inspector"
+        | Role.DevOps -> "devops"
+        | Role.Browser -> "browser"
+        | Role.Inquiry -> "inquiry"
         | _ -> failwith "OfficeCapabilitySurface: catalog contains a non-forkable role"
 
     /// OFF-007 / ARCH-017: the canonical manager fork office consequence set.

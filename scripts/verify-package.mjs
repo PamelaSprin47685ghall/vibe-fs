@@ -637,6 +637,9 @@ export async function verifyPackage({
       strict: true,
     })
 
+    // DISTRIBUTION-010: assert active registrations and surface consistency in extracted artifact
+    assertActiveRegistrations({ extractedPackageDir, root: resolvedRoot })
+
     if (!skipConsumer) {
       await runExternalConsumer({
         root: resolvedRoot,

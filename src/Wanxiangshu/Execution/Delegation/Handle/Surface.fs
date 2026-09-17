@@ -307,6 +307,8 @@ module HandleSurface =
     let empty () : HandleProjectionState =
         HandleProjectionState HandleProjection.empty
 
+    let emptyState () : HandleProjectionState = empty ()
+
     /// Apply one lifecycle command to a projection state.
     ///
     /// Commands:

@@ -140,6 +140,7 @@ module StaticTools =
     let private permissionFor allowed role name =
         match AblationSettings.allowsToolSchema name, name, role with
         | false, _, _ -> "deny"
+        | true, "fission", Role.Manager -> "deny"
         | true, "commission", Role.Manager -> "deny"
         | true, "fork", Role.Orchestrator -> "deny"
         | true, "resume", Role.Orchestrator -> "deny"

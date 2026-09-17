@@ -47,7 +47,7 @@ module CasebookBookkeeper =
         (store: IEventStore)
         (sessionId: string)
         (paths: string list)
-        (targetState: obj)
+        (targetState: string)
         (diffSummary: string)
         (case: Case)
         : Task<Result<bool, string>> =
@@ -61,18 +61,15 @@ module CasebookBookkeeper =
                     case.Observations
                     (Some diffSummary)
 
-            let updatedObservations =
-                case.Observations |> List.choose (rehashReadObservation targetState)
+            let updatedObservations = case.Observations
 
-            do!
-                CasebookWorkflow.refreshCase
-                    store
-                    case.Identity
-                    q'
-                    a'
-                    (storedStateRef case diffSummary)
-                    paths
-                    updatedObservations
+            let newMaintenanceState =
+                if not (String.IsNullOrWhiteSpace targetState) then
+                    targetState
+                else
+                    storedStateRef case diffSummary
+
+            do! CasebookWorkflow.refreshCase store case.Identity q' a' newMaintenanceState paths updatedObservations
 
             CasebookIndex.invalidate ()
             let! _ = CasebookIndex.refresh store 256 |> TaskResultCE.ofTask
@@ -89,10 +86,21 @@ module CasebookBookkeeper =
             let paths = extractPaths case
 
             let baseline =
-                CasebookCapture.baselineFromObservations case.Observations case.RelatedPaths
+                if
+                    not (String.IsNullOrWhiteSpace case.MaintenanceFileState)
+                    && case.MaintenanceFileState <> "state-initial"
+                then
+                    box case.MaintenanceFileState
+                elif
+                    not (String.IsNullOrWhiteSpace case.CompletionFileState)
+                    && case.CompletionFileState <> "state-initial"
+                then
+                    box case.CompletionFileState
+                else
+                    CasebookCapture.baselineFromObservations case.Observations case.RelatedPaths
 
             let! diffObj = CasebookCapture.computeMaintenanceDiff root baseline |> TaskResultCE.ofTask
-            let! targetState = CasebookCapture.freezeCompletionState root paths |> TaskResultCE.ofTask
+            let! targetState = CasebookCapture.freezeCompletionState store root paths
             let hasDiff = unbox<bool> (diffObj?hasDiff)
             let diffSummary = unbox<string> (diffObj?diffSummary)
 

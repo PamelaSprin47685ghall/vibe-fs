@@ -3,6 +3,9 @@ namespace Wanxiangshu.Mission.Relay
 module Surface =
     val empty: unit -> RelayState
 
+    val openRoad:
+        road: string -> authority: string -> message: string -> incumbent: string -> snapshot: string -> RelayState
+
     val openIncumbency:
         state: RelayState -> road: string -> incumbent: string -> snapshot: string -> authority: string -> obj
 
@@ -63,4 +66,4 @@ module Surface =
     val certificate: state: RelayState -> road: string -> obj
     val retirement: state: RelayState -> road: string -> obj
     val roadDevOps: state: RelayState -> road: string -> obj
-    val bindRoadDevOps: state: RelayState -> road: string -> devopsId: string -> obj
+    val bindRoadDevOps: state: RelayState -> road: string -> devopsId: string -> modelTarget: obj -> obj

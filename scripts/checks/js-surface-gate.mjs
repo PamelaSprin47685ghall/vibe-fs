@@ -24,9 +24,25 @@ export const HANDWRITTEN_ROLE_TOOL_TOKENS = [
   'js-coder',
   'js-inspector',
   'js-reviewer',
-  'js-devops',
   'js-browser',
   'js-inquiry',
+]
+
+export const DEPRECATED_ROLE_TOOL_TOKENS = [
+  'js-coder',
+  'js-inspector',
+  'js-browser',
+  'js-inquiry',
+  'js-reviewer',
+]
+
+export const REQUIRED_ACTIVE_JS_TOOLS = [
+  'js-engineer',
+  'js-devops',
+  'js-bookkeeper',
+  'js-manager',
+  'js-orchestrator',
+  'js-blogger',
 ]
 
 /** Files where the static enumeration is legitimate (permission matrix only). */
@@ -39,12 +55,24 @@ const norm = (path) => path.replace(/\\/g, '/')
 
 export const scanEntries = (entries) => {
   const violations = []
+  let staticToolsText = null
+
   for (const { file, text } of entries) {
+    const normalized = norm(file)
+    if (PERMISSION_MATRIX_FILES.includes(normalized)) {
+      staticToolsText = text
+    }
     const lines = text.split('\n')
     const check = (i, token, kind) =>
       violations.push({ file, line: i + 1, token, kind, text: lines[i].trim() })
-    const skipHandwritten = PERMISSION_MATRIX_FILES.includes(norm(file))
+    const skipHandwritten = PERMISSION_MATRIX_FILES.includes(normalized)
+
     for (let i = 0; i < lines.length; i++) {
+      // 1. 废弃角色工具绝对拦截：即使在权限矩阵文件中，也严禁出现废弃角色工具
+      for (const token of DEPRECATED_ROLE_TOOL_TOKENS) {
+        if (lines[i].includes(token)) check(i, token, 'deprecated-role-tool')
+      }
+      // 2. 手写角色工具拦截（非权限矩阵文件）
       if (!skipHandwritten) {
         for (const token of HANDWRITTEN_ROLE_TOOL_TOKENS) {
           if (lines[i].includes(token)) check(i, token, 'handwritten-role-tool')
@@ -52,6 +80,24 @@ export const scanEntries = (entries) => {
       }
     }
   }
+
+  // 3. 新工具 surface 完备性正向验证：StaticTools.fs 中必须完整枚举所有活跃角色的 js-* 工具
+  if (staticToolsText) {
+    const knownMatch = staticToolsText.match(/let knownToolNames =\s*\[([\s\S]*?)\]/)
+    const knownBlock = knownMatch ? knownMatch[1] : ''
+    for (const tool of REQUIRED_ACTIVE_JS_TOOLS) {
+      if (!knownBlock.includes(`"${tool}"`)) {
+        violations.push({
+          file: 'src/Wanxiangshu/OpenCode/Tools/StaticTools.fs',
+          line: 1,
+          token: tool,
+          kind: 'missing-active-js-tool',
+          text: `knownToolNames must contain ${tool}`,
+        })
+      }
+    }
+  }
+
   return violations
 }
 

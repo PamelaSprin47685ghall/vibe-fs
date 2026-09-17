@@ -209,7 +209,7 @@ type ToolRuntimeScope
         lock gate (fun () ->
             match disposed, runtimes.TryGetValue ownerKey with
             | true, _ -> Error "Tool runtime scope is disposed"
-            | false, (true, runtime) -> Ok runtime
+            | false, (true, runtime) when not runtime.IsCancelled -> Ok runtime
             | false, _ ->
                 let runtime = createRuntime ownerKey
                 runtimes.[ownerKey] <- runtime
@@ -423,7 +423,16 @@ type ToolRuntimeScope
     let isManagerProfile (sessionId: SessionId) =
         match activeProfileFor sessionId with
         | Some profile -> profile.CanonicalRole = Role.Manager
-        | None -> false
+        | None ->
+            match journal with
+            | Some durable ->
+                let snapshot = AgentJournal.snapshot durable
+                PromptAuthorityProjectionQueries.activeProfile sessionId snapshot.AgentProjections
+                |> Option.orElseWith (fun () ->
+                    PromptAuthorityProjectionQueries.lastAuthorityProfile sessionId snapshot.AgentProjections)
+                |> Option.map (fun p -> p.CanonicalRole = Role.Manager)
+                |> Option.defaultValue false
+            | None -> false
 
     let isManagerRoadSession (sessionId: SessionId) =
         let sidStr = SessionId.value sessionId
@@ -439,9 +448,18 @@ type ToolRuntimeScope
         | false -> runtime.AdoptChild(agentId, childSessionId)
         | true -> ()
 
-    let syncAdoptDevOps (runtime: HostForkRuntime) (existingHandle: HandleRecord) =
+    let syncAdoptDevOps (runtime: HostForkRuntime) (parentKey: string) (existingHandle: HandleRecord) =
         match HandleId.tryAgent existingHandle.Handle with
-        | Some handleId -> adoptIfNotOwned runtime existingHandle.ChildSessionId handleId
+        | Some handleId ->
+            let agentId = AgentHandleId.value handleId
+            match runtime.OwnsAgent agentId with
+            | false ->
+                runtime.AdoptChild(agentId, existingHandle.ChildSessionId)
+                runtime.AdoptExisting(agentId, existingHandle.ChildSessionId, existingHandle.CanonicalRole, "devops")
+                runtime.ChildCreated agentId existingHandle.CanonicalRole existingHandle.ChildSessionId
+                runtime.ChildCreatedDir agentId existingHandle.ChildSessionId (runtime.DirectoryOf agentId)
+                registerChild parentKey existingHandle.CanonicalRole existingHandle.ChildSessionId
+            | true -> ()
         | None -> ()
 
     let registerDevOpsChild
@@ -526,7 +544,16 @@ type ToolRuntimeScope
         =
         task {
             match devopsHandleOpt with
-            | Some existingHandle -> syncAdoptDevOps runtime existingHandle
+            | Some existingHandle ->
+                match existingHandle.Lifecycle with
+                | HandleLifecycle.Retired
+                | HandleLifecycle.Abandoned _ ->
+                    // MANAGED-SESSION-024: if prior physical session was retired/abandoned, create and link replacement physical session
+                    let! created = createAndLinkDevOps sessions durable runtime parentSessionId key
+
+                    handleDevOpsCreationResult key created
+                | _ ->
+                    syncAdoptDevOps runtime key existingHandle
             | None ->
                 let! created = createAndLinkDevOps sessions durable runtime parentSessionId key
                 handleDevOpsCreationResult key created
@@ -557,6 +584,7 @@ type ToolRuntimeScope
             let devopsHandleOpt =
                 handlesOpt |> Option.bind (HandleProjection.tryFindByByname "devops")
 
+
             let runtimeResult = getOrCreateRuntime key
             return! performEnsureWithRuntime sessions durable parentSessionId key runtimeResult devopsHandleOpt
         }
@@ -580,7 +608,15 @@ type ToolRuntimeScope
     let ensureRoadDevOpsBound (parentSessionId: SessionId) : Task<unit> =
         match isManagerRoadSession parentSessionId with
         | false -> Task.FromResult()
-        | true -> getOrCreateDevOpsTask parentSessionId (SessionId.value parentSessionId)
+        | true ->
+            let key = SessionId.value parentSessionId
+            lock gate (fun () ->
+                match getOrCreateRuntime key with
+                | Ok runtime when not (runtime.OwnsAgent "devops") ->
+                    devopsBindingTasks.Remove key |> ignore
+                    getOrCreateDevOpsTask parentSessionId key
+                | _ ->
+                    getOrCreateDevOpsTask parentSessionId key)
 
     member _.Sessions = sessions
     member _.WaitObserver = waitObserver
@@ -952,6 +988,132 @@ type ToolRuntimeScope
             | None -> ()
         }
         :> Task
+
+    /// MANAGED-SESSION-024: Replace crashed DevOps physical session under single logical authority
+    member private this.FinishReplaceChildSession
+        durable
+        runtime
+        parentSessionId
+        devopsAgentId
+        devopsName
+        role
+        newChildSessionId
+        =
+        task {
+            let! linkResult =
+                linkDevOpsChild durable runtime parentSessionId devopsAgentId devopsName role newChildSessionId
+
+            match linkResult with
+            | Error err -> return Error err
+            | Ok() -> return Ok newChildSessionId
+        }
+
+    member private this.ContinueWithRuntime
+        durable
+        parentSessionId
+        devopsAgentId
+        devopsName
+        role
+        newChildSessionId
+        runtimeResult
+        =
+        match runtimeResult with
+        | Error err -> Task.FromResult(Error err)
+        | Ok runtime ->
+            this.FinishReplaceChildSession
+                durable
+                runtime
+                parentSessionId
+                devopsAgentId
+                devopsName
+                role
+                newChildSessionId
+
+    member private this.ContinueReplacePhysicalSession durable parentSessionId devopsAgentId devopsName role key =
+        function
+        | Error err -> Task.FromResult(Error(sprintf "create replacement child failed: %s" err))
+        | Ok newChildSessionId ->
+            this.ContinueWithRuntime
+                durable
+                parentSessionId
+                devopsAgentId
+                devopsName
+                role
+                newChildSessionId
+                (getOrCreateRuntime key)
+
+    member private this.ContinueAfterRetire
+        durable
+        parentSessionId
+        devopsAgentId
+        oldChildSessionId
+        devopsName
+        role
+        key
+        =
+        task {
+            do! this.DisposeSession(SessionId.value oldChildSessionId)
+
+            let! childResult =
+                sessions.CreateChildSession(
+                    parentSessionId,
+                    { Title = Some "devops"
+                      Agent = Some devopsName
+                      Directory = directoryFor key }
+                )
+
+            return!
+                this.ContinueReplacePhysicalSession
+                    durable
+                    parentSessionId
+                    devopsAgentId
+                    devopsName
+                    role
+                    key
+                    childResult
+        }
+
+    member private this.ProceedReplacePhysicalSession durable parentSessionId devopsAgentId oldChildSessionId =
+        task {
+            let journalPort = AgentJournalPortAdapter.fromAgentJournal durable
+            let handle = HandleController.agentHandle devopsAgentId
+            let projection = journalPort.HandleProjection parentSessionId
+
+            // MANAGED-SESSION-024 / 024.test.mjs: if active at crash, record terminal completion before retirement
+            let! prepareResult =
+                match HandleProjection.tryFind handle projection with
+                | Some { Lifecycle = HandleLifecycle.Active } ->
+                    journalPort.AppendExecutionFact
+                        parentSessionId
+                        (ExecutionFactCases.HandleCompleted
+                            {| ParentSessionId = parentSessionId
+                               Handle = handle
+                               Kind = HandleCompletionKind.Terminal
+                               CompletionRef = None
+                               CompletionDigest = None |})
+                | _ -> Task.FromResult(Ok())
+
+            match prepareResult with
+            | Error err -> return Error(sprintf "prepare old handle failed: %s" err)
+            | Ok() ->
+                let! retireResult = HandleController.retire (Some journalPort) parentSessionId devopsAgentId
+                let devopsName = "devops"
+                let role = Role.DevOps
+                let key = SessionId.value parentSessionId
+
+                match retireResult with
+                | Error err -> return Error(sprintf "retire old handle failed: %s" err)
+                | Ok() ->
+                    return!
+                        this.ContinueAfterRetire durable parentSessionId devopsAgentId oldChildSessionId devopsName role key
+        }
+
+    member this.ReplacePhysicalSession
+        (parentSessionId: SessionId, devopsAgentId: string, oldChildSessionId: SessionId)
+        : Task<Result<SessionId, string>> =
+        match journal with
+        | None -> Task.FromResult(Error "journal unavailable")
+        | Some durable -> this.ProceedReplacePhysicalSession durable parentSessionId devopsAgentId oldChildSessionId
 
     member _.DisposeAsync() : Task =
         let forkRuntimes, orchestrators =

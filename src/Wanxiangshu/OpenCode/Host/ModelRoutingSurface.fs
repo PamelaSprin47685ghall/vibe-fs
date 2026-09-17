@@ -675,6 +675,14 @@ module ModelRoutingSurface =
         |> Option.map targetObject
         |> Option.defaultValue null
 
+    let bindDevopsTarget (runtime: obj) (sessionId: string) (target: obj) : unit =
+        (runtimeOf runtime).BindDevopsTarget(sessionId, targetOf target)
+
+    let boundDevopsTarget (runtime: obj) (sessionId: string) : obj =
+        (runtimeOf runtime).BoundDevopsTarget(sessionId)
+        |> Option.map targetObject
+        |> Option.defaultValue null
+
     let releasePhysicalExecution (runtime: obj) (sessionId: string) (physicalUserMessageId: string) : obj =
         (runtimeOf runtime).ReleasePhysicalExecution(sessionId, physicalUserMessageId)
         |> transitionOutcomeObject

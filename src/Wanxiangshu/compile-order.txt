@@ -1240,8 +1240,6 @@ Mission/Relay/OpenCode/NarrativeTransform.fsi
 Mission/Relay/OpenCode/NarrativeTransform.fs
 OpenCode/Host/ExplicitResumeSurface.fsi
 OpenCode/Host/ExplicitResumeSurface.fs
-Execution/Delegation/Handle/OpenCode/OneShotTool.fsi
-Execution/Delegation/Handle/OpenCode/OneShotTool.fs
 Execution/Delegation/Fork/OpenCode/Tool.fsi
 Execution/Delegation/Fork/OpenCode/Tool.fs
 OpenCode/Tools/PtyTool.fsi

@@ -164,5 +164,14 @@ module Surface =
         | None -> null
         | Some eventId -> box (EventId.value eventId)
 
+    let readPayload (handle: EventStoreHandle, payloadRef: string) : Task<obj> =
+        task {
+            let! result = handle.ReadPayload payloadRef
+
+            match result with
+            | None -> return null
+            | Some bytes -> return box bytes
+        }
+
     /// The canonical remote store ref owned by persistence infrastructure.
     let canonicalStoreRef = StoreRef.canonical

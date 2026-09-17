@@ -8,7 +8,7 @@ type MagicTodoProjectionHandle
 
 [<RequireQualifiedAccess>]
 module MagicTodoProjectionSurface =
-    val internal incumbencyView: state: MagicTodoProjectionState -> incumbencyId: IncumbencyId -> obj
+    val incumbencyView: state: MagicTodoProjectionState -> incumbencyId: IncumbencyId -> obj
     val create: unit -> MagicTodoProjectionHandle
     val fold: handle: MagicTodoProjectionHandle -> eventId: string -> factJson: string -> obj
     val view: handle: MagicTodoProjectionHandle -> incumbencyId: string -> obj

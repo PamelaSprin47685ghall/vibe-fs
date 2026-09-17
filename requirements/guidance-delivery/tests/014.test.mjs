@@ -8,7 +8,7 @@ const english = 'English'
 
 const simplifiedChinese = 'SimplifiedChinese'
 
-test('WHAT[COGNITIVE-ENVIRONMENT-014] CE_014_tool_estimate_is_explicitly_advisory_in_both_provider_languages', () => {
+test('WHAT[GD-012] GD_012_tool_estimate_calibration_rendered_for_guideline_instruction', () => {
   const en = renderToolEstimate(english, 4)
   assert.match(en, /4/)
   assert.match(en, /delegator|commissioner/i)

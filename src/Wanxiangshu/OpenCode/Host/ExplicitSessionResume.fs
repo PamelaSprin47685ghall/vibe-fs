@@ -8,6 +8,7 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch.OpenCode
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// CRASH-018: explicit, user-visible session resume. Nothing in this module is
@@ -100,6 +101,21 @@ module ExplicitSessionResume =
     let private candidateRecords (journal: SessionResumeJournalPort) (parentId: SessionId) =
         journal.CandidateRecords parentId
 
+    let private validateSingleDevOps (records: HandleRecord list) : Result<HandleRecord list, string> =
+        let activeDevOps =
+            records
+            |> List.filter (fun r ->
+                r.CanonicalRole = Role.DevOps
+                && match r.Lifecycle with
+                   | HandleLifecycle.Active
+                   | HandleLifecycle.CompletedAwaitingJoin _ -> true
+                   | _ -> false)
+
+        if activeDevOps.Length > 1 then
+            Error "CRASH-020: multiple active physical DevOps sessions detected; single authority violated"
+        else
+            Ok records
+
     let private renderLine (prefix: string) (record: HandleRecord) (detail: string) =
         sprintf
             "- %s byname=%s session_id=%s role=%s agent=%s prior_handle_state=%s%s"
@@ -142,10 +158,19 @@ module ExplicitSessionResume =
     let private unavailable prefix reason record =
         Unavailable(renderLine prefix record (" reason=" + sanitizeReason reason))
 
-    let private adoptObservation parentId adopt record =
-        match adopt parentId record with
+    let private adoptObservationResult record =
+        function
         | Ok() -> Surviving(renderLine "surviving" record "")
         | Error error -> unavailable "not-adopted" error record
+
+    let private adoptObservation parentId adopt record =
+        if
+            record.CanonicalRole = Role.DevOps
+            && not (String.Equals(record.Byname, "devops", StringComparison.OrdinalIgnoreCase))
+        then
+            unavailable "not-adopted" "CRASH-020: DevOps byname must be 'devops'" record
+        else
+            adoptObservationResult record (adopt parentId record)
 
     let private probePhysical
         (parentId: SessionId)
@@ -188,17 +213,26 @@ module ExplicitSessionResume =
         |> List.map (unavailable "unverified" "snapshot-port-unavailable")
         |> List.toArray
 
+    let private probeValidRecords parentId snapshot adopt validRecords =
+        match snapshot with
+        | None -> validRecords |> unverifiedObservations |> Task.FromResult
+        | Some snapshotPort -> inspectAll parentId snapshotPort adopt validRecords
+
+    let private probeDurableRecords parentId snapshot adopt durable =
+        match validateSingleDevOps (candidateRecords durable parentId) with
+        | Error err -> Task.FromResult([| Unavailable(sprintf "- %s" err) |])
+        | Ok validRecords -> probeValidRecords parentId snapshot adopt validRecords
+
     let private observations
         (journal: SessionResumeJournalPort option)
         (snapshot: ISessionSnapshotPort option)
         (adopt: AdoptExistingChild)
         (parentId: SessionId)
         : Task<ResumeObservation array> =
-        match journal, snapshot with
-        | None, _ ->
+        match journal with
+        | None ->
             Task.FromResult([| Unavailable("- durable journal unavailable; no child sessions were re-enlisted") |])
-        | Some durable, None -> candidateRecords durable parentId |> unverifiedObservations |> Task.FromResult
-        | Some durable, Some snapshotPort -> candidateRecords durable parentId |> inspectAll parentId snapshotPort adopt
+        | Some durable -> probeDurableRecords parentId snapshot adopt durable
 
     let private survivingLine =
         function
@@ -233,6 +267,7 @@ module ExplicitSessionResume =
             [ "[wanxiangshu restart briefing]"
               "The user explicitly invoked /continue. OpenCode/Wanxiangshu has just restarted."
               "The tool invocation that was in progress before the restart remains interrupted/failed in visible history. Do not infer that it completed, do not hide it, and do not manufacture a terminal result for it."
+              "All pending physical commands (run, PTY input) from before the crash are treated as interrupted; no commands are automatically replayed."
               "Surviving sub sessions re-enlisted process-locally for OPTIONAL reuse:"
               survivingText
               "Durable children that were not re-enlisted:"
