@@ -278,6 +278,8 @@ module ReviewTool =
                 |> requireSome BindingUnavailable
                 |> Result.bind (fun road ->
                     road.ActiveIncumbency
+                    |> Option.filter (fun _ -> road.ActivePhase = Some IncumbencyPhase.AuditPending)
+                    |> Option.filter (fun _ -> road.AcceptedAssessmentTransport.IsNone)
                     |> requireSome BindingUnavailable
                     |> Result.map (fun incumbencyId -> road, incumbencyId))
 

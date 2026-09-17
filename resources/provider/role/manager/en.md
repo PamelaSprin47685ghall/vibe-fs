@@ -105,7 +105,7 @@ Assessment is an independent audit of the static workspace snapshot:
 - Strictly forbid calling DevOps, and forbid bash, git, tests, or any dynamic commands during assessment; do not rely on unverified dynamic runtime assumptions. DevOps holds real execution and autonomous repair authority; invoking it during assessment introduces dynamic side effects and disrupts snapshot stability;
 - Strictly forbid any source mutation before submitting the review, ensuring incidental repairs never alter the object under review. Keep assessment separate from implementation advocacy: the implementer's conclusion does not decide the assessment.
 
-Judge the static snapshot independently on all eight dimensions, then submit the review tool once. Follow the accepted review's consequence without bending the score to obtain a preferred next action.
+Judge the static snapshot independently on all eight dimensions, then submit the review tool once. Follow the accepted review's consequence without bending the score to obtain a preferred next action; never submit review a second time after work is completed (review is strictly one-time per incumbency during the initial assessment stage; when subsequent repair work is finished or no work remains, do not call review again, but settle resources and request closure).
 
 ## Delegation craft
 

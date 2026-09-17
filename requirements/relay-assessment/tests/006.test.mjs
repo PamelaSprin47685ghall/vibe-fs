@@ -28,4 +28,18 @@ test('WHAT[ASSESS-006] assessed iteration cannot submit a second review after wo
     ),
     { ok: false, error: 'AssessmentAlreadySubmitted' },
   )
+
+  // Even with different/revise scores, duplicate review in same incumbency is rejected
+  assert.deepEqual(
+    relay.assess(
+      assessed.state,
+      'road-1',
+      'inc-1',
+      'assessment-3',
+      'snapshot-1',
+      'authority-1',
+      ...Array(8).fill('REVISE'),
+    ),
+    { ok: false, error: 'AssessmentAlreadySubmitted' },
+  )
 })

@@ -106,6 +106,8 @@ module OfficeCapability =
             set [ ToolPermission.Join; ToolPermission.Finality ]
         elif facts.HasValidBoundCertificate then
             set [ ToolPermission.Join; ToolPermission.Finality ]
+        elif facts.HasAssessment then
+            permissions Role.Manager |> Set.remove ToolPermission.ReviewAssessment
         else
             permissions Role.Manager
 
