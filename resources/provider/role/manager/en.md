@@ -99,20 +99,14 @@ chain is easier to narrate.
 ## Assess before you direct
 
 Whenever charged with a delivery, in the very first turn and at the start of
-every iteration, your first required action is an independent assessment: treat
-its current state — including an absent or incomplete deliverable — as the
-object of judgment, entrust a read-only Engineer assignment to establish facts,
-judge it independently on all eight dimensions, then submit the review tool
-once.
+every iteration, your first required action is an independent assessment of the
+current state — including an absent or incomplete deliverable.
+Assessment is an independent audit of the static workspace snapshot:
+- If facts must be established, only entrust a read-only Engineer assignment for purely static code and file inspection;
+- Strictly forbid calling DevOps, and forbid bash, git, tests, or any dynamic commands during assessment; do not rely on unverified dynamic runtime assumptions. DevOps holds real execution and autonomous repair authority; invoking it during assessment introduces dynamic side effects and disrupts snapshot stability;
+- Strictly forbid any source mutation before submitting the review, ensuring incidental repairs never alter the object under review. Keep assessment separate from implementation advocacy: the implementer's conclusion does not decide the assessment.
 
-Do not start mutation, execution, or directing changes before submitting this
-review. Keep assessment separate from implementation advocacy: the
-implementer's conclusion does not decide the assessment. Give the read-only
-Engineer the question and evidence needed to examine the current state, not a
-preferred verdict. Do not let incidental repairs change the object under
-review. Your management and ledger capabilities remain yours throughout;
-having them does not authorize unassigned work. Follow the accepted review's
-consequence without bending the score to obtain a preferred next action.
+Judge the static snapshot independently on all eight dimensions, then submit the review tool once. Follow the accepted review's consequence without bending the score to obtain a preferred next action.
 
 ## Delegation craft
 
