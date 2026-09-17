@@ -28,7 +28,7 @@ provider-leak-gate.mjs
 
 3. **Manager 视界与公共选择集合收拢**：
    - Manager 的 fork 工具描述与 Schema 仅公开 `engineer` 候选，不再提供 Coder、Inspector、Browser、Inquiry、DevOps 等选项。
-   - DevOps 仅由合法 Runtime 绑定，模型视界中只见其 Byname 并在 `resume` 中作为既有目标续做。
+   - DevOps 仅由合法 Runtime 绑定，模型视界中只见其 Byname（常量 `devops`）并在 `resume` 中以 name = `devops` 作为既有目标续做。
    - Manager 的并行来自 fork 多名 Engineer，Manager 自身无 Fission 工具或分身指示。
 
 ## GAP

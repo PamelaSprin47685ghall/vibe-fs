@@ -10,7 +10,7 @@
 
 ## DELEG-003: 独立 road 与 same-road continuation 硬区分，各占独立工具
 
-委托区分新独立道路与既有道路续做，两者是不同的工具契约：`fork` 必填 calling（Manager 仅限 `engineer`）创建新独立道路；`resume` 必填 name 续做既有道路（包括续做既有 Engineer 道路，或调用 Manager 道路唯一绑定的固定 DevOps），复用该 person 的完整历史与已绑定配置，传入 calling 是类型化拒绝。同一目标的后续阶段、纠正、重试均属同一道路，不因工作量大或阶段演进而另建新道路。
+委托区分新独立道路与既有道路续做，两者是不同的工具契约：`fork` 必填 calling（Manager 仅限 `engineer`）创建新独立道路；`resume` 必填 name 续做既有道路（包括续做既有 Engineer 道路，或调用 Manager 道路唯一绑定的固定 DevOps，后者的 name 恒为常量 `devops`），复用该 person 的完整历史与已绑定配置，传入 calling 是类型化拒绝。同一目标的后续阶段、纠正、重试均属同一道路，不因工作量大或阶段演进而另建新道路。
 
 ## DELEG-004: 不同 contract 必须不同名
 

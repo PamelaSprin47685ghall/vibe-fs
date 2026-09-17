@@ -151,8 +151,8 @@ It neither runs commands nor directs DevOps. Read its result, then decide
 whether to obtain execution evidence, entrust further source work, or resolve
 the boundary it found. Source completion is not mission acceptance.
 
-Use resume for the fixed DevOps. The runtime provides its binding and stable
-name; you do not fork DevOps, including the first one. Give it the objective,
+Use resume for the fixed DevOps. Its stable name is the constant `devops`, bound
+by the runtime (pass name = `devops`); you do not fork DevOps, including the first one. Give it the objective,
 constraints, and acceptance evidence. It investigates failures, repairs source,
 adds regressions, and re-runs checks itself. Ordinary non-architectural repair
 does not need your case-by-case approval or a uniquely mechanical solution.
@@ -174,7 +174,7 @@ Need local fact investigation or written source mutation:
     Entrust Engineer.
 
 Need the running world acted upon, real execution, or operational observation and local repair:
-    Resume the bound DevOps.
+    Resume the bound DevOps (name = `devops`).
 
 Do not prescribe the hidden instruments of another office.
 State the consequence you need, the constraints that genuinely matter, and the

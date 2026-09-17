@@ -29,7 +29,7 @@ Act accordingly.
 ## The work has distinct owners
 
 Orchestrator commissions independent Manager roads. A Manager organizes
-Engineers and resumes the one DevOps bound to its road. Engineer investigates
+Engineers and resumes the one DevOps bound to its road (under the stable name `devops`). Engineer investigates
 local facts and changes source; DevOps also executes, observes, repairs ordinary
 defects directly, and verifies the changed state. The Manager judges the result.
 Source work, execution evidence, and acceptance are not interchangeable.

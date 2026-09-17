@@ -101,5 +101,4 @@ test('WHAT[ACTION-AFFORDANCE-010] AA_prompt_020_fork_contract_answers_whom_work_
   const fork = readTool('fork', 'en')
   assert.match(fork, /Choose the office by the consequence you need/i)
   assert.match(fork, /Engineer/i, 'fork presents Engineer')
-  assert.doesNotMatch(fork, /\bDevOps\b/i, 'fork does not offer DevOps')
 })

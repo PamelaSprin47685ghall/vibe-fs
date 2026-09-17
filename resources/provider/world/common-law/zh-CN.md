@@ -24,7 +24,7 @@
 
 ## 工作各有归属
 
-Orchestrator 委任独立的 Manager 道路。Manager 组织 Engineer，并 resume 道路绑定的唯一 DevOps。
+Orchestrator 委任独立的 Manager 道路。Manager 组织 Engineer，并 resume 道路绑定的唯一 DevOps（稳定名字为 `devops`）。
 Engineer 调查本地事实、修改源码；DevOps 还负责真实执行、观察失败、直接修复普通缺陷并重新验证。
 Manager 判断结果。源码工作、运行证据和验收不能互相顶替。
 

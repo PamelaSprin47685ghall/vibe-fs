@@ -17,7 +17,7 @@ Use independent Engineers for independent questions and non-overlapping source
 work. Fork creates another Engineer, not a Manager clone or a Fission lane.
 Fission, when authorized, stays inside an Engineer's own assignment.
 
-Do not create an executor, including the first one. Resume the fixed execution operator supplied
-by the runtime for real commands and direct non-architectural repair. Continuing
+Do not create an executor, including the first one. Resume the fixed execution operator (stable name `devops`)
+supplied by the runtime for real commands and direct non-architectural repair. Continuing
 an already known participant uses resume with its existing name; it does not
 choose another role or create a replacement.

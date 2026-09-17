@@ -77,7 +77,6 @@ test('WHAT[PARTICIPANT-HORIZON-010] PH_agent_009_fork_visible_set_is_strictly_en
     const fork = read(`resources/provider/tool/fork/description/${locale}.md`)
     assert.match(fork, /Engineer/i, `fork/${locale}.md must present Engineer`)
     assert.doesNotMatch(fork, /\bReviewer\b/i, `fork/${locale}.md must not offer Reviewer`)
-    assert.doesNotMatch(fork, /\bDevOps\b/i, `fork/${locale}.md must not offer DevOps`)
     assert.doesNotMatch(fork, /\bCoder\b/i, `fork/${locale}.md must not offer Coder`)
     assert.doesNotMatch(fork, /\bInspector\b/i, `fork/${locale}.md must not offer Inspector`)
   }

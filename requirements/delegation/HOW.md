@@ -10,7 +10,7 @@ DELEG-020 约束：委托语义不依赖当前工具名字面值（`fork`、`com
 
 1. **异步见证与续做委托（`fork` / `resume`）**：由 Manager 在使命内部调用。
    - `fork`：必填 calling（仅限 `engineer`），创建具有独立 Byname 的新 Engineer 子执行者；
-   - `resume`：按 Byname 续做既有子执行者（包含 Engineer 既有道路以及 Manager 道路唯一绑定的固定 DevOps），复用其历史与环境，传入 calling 被类型化拒绝。
+   - `resume`：按 Byname 续做既有子执行者（包含 Engineer 既有道路以及 Manager 道路唯一绑定的固定 DevOps，后者的 Byname 恒为常量 `devops`），复用其历史与环境，传入 calling 被类型化拒绝。
    - 两者均支持附加历史背景（attachment）与建议性工具调用估算。
 2. **独立道路委托（`commission`）**：由 Orchestrator 调用，负责开启或续做独立集成道路，支持多道路并行推进。
 3. **Sphinx 程序内部同步调研（`SyncDelegate`）**：由 Sphinx 程序在需要语义事实时同步调用只读 Engineer 调研。调用方等待本次结果，只读 Engineer 仅调研现有本地事实并返回程序调用点，不具备写权限、命令执行、DevOps 差遣、Fission 或递归探究权限。

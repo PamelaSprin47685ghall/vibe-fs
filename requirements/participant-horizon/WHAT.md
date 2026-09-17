@@ -47,7 +47,7 @@ assessment 结论只以原子物化的质量义务与工作权形式进入账本
 
 - Manager `fork` 仅可见：`engineer`（单一本名版本）；Manager 严禁通过 `fork` 启动 DevOps、旧角色或内部身份。
 - Orchestrator `commission` 仅可见：`manager`。
-- 固定 DevOps 由合法 Runtime 绑定创建，在模型视界中仅以稳定 Byname 呈现，仅通过 `resume` 续做调用，严禁出现在 `fork` 的候选名单中。
+- 固定 DevOps 由合法 Runtime 绑定创建，在模型视界中仅以稳定 Byname（常量 `devops`）呈现，仅通过 `resume` 续做调用（传入 name = `devops`），严禁出现在 `fork` 的候选名单中。
 - `horizon()` 仅返回在场名册的 Byname 或 TerminalName，不暴露底层 id。
 - Blogger、Bookkeeper、Predictor 等内部角色以及已退出的旧角色（coder、inspector、browser、inquiry、distiller）严禁出现在可 fork 集合中。
 
