@@ -22,7 +22,7 @@ Host 侧展示给模型的工具 Schema 与运行时执行拦截 Gate 必须双�
 
 ## ENF-006: internal-only participants/actions 不进无资格 participant 的工具面
 
-内部专用工具（如 Blogger 的 `chronicle`、Bookkeeper 的 `js-bookkeeper`）仅向对应内部角色开放，普通角色不可见亦不可执行。认知与交互效用工具（如 `assume` 等）不属于领域业务权限，不进入 `Roles.permissions`，亦不得借此扩大角色的领域权能。
+内部专用工具（如 Blogger 的 `chronicle`、Bookkeeper 的 `js-bookkeeper`）仅向对应内部角色开放，普通角色不可见亦不可执行。认知与交互效用工具（如 `assume` 等）及 Host 工具（如 `skill`）不属于领域业务权限，不进入 `Roles.permissions`，亦不得借此扩大角色的领域权能；内部伴随角色（Blogger）禁止获得 `skill` 与 `assume` 等效用工具。
 
 ## ENF-007: Host-native/MCP/plugin 等不同技术来源的 actions 服从同一 semantic capability policy
 

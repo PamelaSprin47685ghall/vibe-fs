@@ -148,6 +148,7 @@ module StaticTools =
         | true, "fork", Role.DevOps -> "deny"
         | true, "resume", Role.DevOps -> "deny"
         | true, "run", Role.DevOps -> "allow"
+        | true, "skill", Role.Blogger -> "deny"
         | true, "skill", _ -> "allow"
         | true, "assume", Role.Blogger -> "deny"
         | true, "assume", _ -> "allow"

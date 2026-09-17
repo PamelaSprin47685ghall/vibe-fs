@@ -20,7 +20,7 @@ test('WHAT[ENF-010] AGENT_023_engineer_receives_hard_denial_and_no_shell', async
 
     assert.match(result, /DENIED/)
     assert.match(result, /unauthorized privilege-escalation|提权/)
-    assert.match(result, /No command ran|没有运行任何命令/)
+    assert.match(result, /No command ran|未运行任何命令|没有运行任何命令/)
   })
 })
 
