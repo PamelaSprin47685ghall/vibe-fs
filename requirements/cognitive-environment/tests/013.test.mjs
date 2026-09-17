@@ -72,6 +72,7 @@ test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_requires_explaining_urgent_pr
     assert.match(text, /为什么|why/i)
     assert.match(text, /怎样解决|how to solve/i)
     assert.match(text, /并行.*工具|parallel.*tool|tool.*parallel/i)
+    assert.doesNotMatch(text, /1\.\s*.*2\.\s*/, `${locale} pair hint must use continuous prose without numbered list markers`)
   }
 })
 test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_encourages_filling_concurrency_slots', () => {
