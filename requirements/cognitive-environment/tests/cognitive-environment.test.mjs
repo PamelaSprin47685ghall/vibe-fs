@@ -171,6 +171,7 @@ test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_encourages_filling_concurrenc
     assert.match(text, /十个|ten/i)
     assert.match(text, /空着|empty/i)
     assert.match(text, /ready/i)
+    assert.match(text, /并发.*工具|concurrent tool|RTT/i, `${locale} must mandate concurrent tool calls to reduce RTT`)
   }
 })
 
