@@ -40,7 +40,7 @@ const LANGUAGE = 'English'
 test('WHAT[COGNITIVE-ENVIRONMENT-003] CE_prompt_015_canonical_composition_common_law_role_law_office_library', () => {
   const catalog = promptResources.loadForLanguage(LANGUAGE)
   const coder = catalog.EngineerSystemPrompt
-  assert.match(coder, /You awaken in a world already in motion/, 'Common Law must lead')
+  assert.match(coder, /You awaken in a world (?:already in motion|that is already up and running)/, 'Common Law must lead')
   assert.match(coder, /local facts investigation|local investigation and source work/i, 'the unified engineering Role Law must follow')
   assert.match(coder, /one more inheritance/, 'Office Library ingress must be present for book-owning offices')
   assert.match(coder, /The Kolmogorov Book/, 'inherited volume must be composed')

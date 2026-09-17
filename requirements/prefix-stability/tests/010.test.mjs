@@ -380,7 +380,15 @@ test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_single_user_message_does_not_inje
   const out = await inject('ses_1', raw)
   assert.ok(out)
   assert.equal(out.length, 1)
-  assert.deepEqual(out[0], raw[0], 'single user message stays intact without preceding tool call')
+  assert.equal(pairMessages(out).length, 0)
+  assert.equal(out[0].parts[0].text, `hello\0\uFEFF<skill_content>\n${text.trim()}\n</skill_content>`)
+  assert.doesNotMatch(out[0].parts[0].text, /name=/)
+  const replay = await inject('ses_1', out)
+  assert.deepEqual(replay, out)
+
+  const subsequent = await inject('ses_1', [out[0], assistantText('a1'), userMsg('u2', 'steer')])
+  assert.equal(subsequent.length, 3)
+  assert.equal(subsequent[2].parts[0].text, 'steer', 'subsequent user message does not inject without prior tool call')
 })
 test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_places_pair_before_trailing_user_with_prior_assistant', async () => {
   const raw = [userMsg('u1'), assistantText('a1'), userMsg('u2', 'steer')]
@@ -500,10 +508,11 @@ test('WHAT[PREFIX-STABILITY-010] C_PH_ordinary_cursor_ordinary_suppresses_then_r
   assert.equal(pairMessages(ordinary).length, 0)
   assert.deepEqual(ordinary, initial)
 
-  const cursorReal = [{
-    info: { id: 'u1', role: 'user', model: { providerID: 'cursor', modelID: 'composer' } },
-    parts: [{ type: 'text', text: 'hello' }],
-  }]
+  const cursorReal = [
+    { info: { id: 'u1', role: 'user', model: { providerID: 'cursor', modelID: 'composer' } }, parts: [{ type: 'text', text: 'hello' }] },
+    assistantText('a1'),
+    userMsg('u2'),
+  ]
   const cursor = await inject(session, cursorReal)
   assert.equal(pairMessages(cursor).length, 0)
   assert.deepEqual(cursor, cursorReal)

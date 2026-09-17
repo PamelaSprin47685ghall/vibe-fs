@@ -25,5 +25,5 @@
 
 2. **Horizon 组装与 Transform**：
    - 动态装配器组合最新 tip guidance、耗时统计、动态工具调用期望与 `concern-routing` 待交付消息；
-   - 最终组装的 pair body 封装为 `<skill_content name="">…</skill_content>`，通过合成的 `skill` 工具调用注入 transcript；
+   - 最终组装的 pair body 封装为 `<skill_content>…</skill_content>`（不含 `name=""`），通过合成的 `skill` 工具调用注入 transcript；
    - 注入成功后 MarkerText 立即持久化冻结，重放路径直接返回已存文本，不再重复触发动态渲染。

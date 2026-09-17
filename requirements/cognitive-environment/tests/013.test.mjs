@@ -68,11 +68,11 @@ test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_requires_explaining_urgent_pr
     const text = read(`resources/provider/host/pair-programming-guideline/${locale}.md`)
     assert.match(text, /同伴|partner/i)
     assert.match(text, /解释|explain/i)
-    assert.match(text, /当务之急|urgent problem/i)
-    assert.match(text, /为什么|why/i)
-    assert.match(text, /怎样解决|how to solve/i)
-    assert.match(text, /并行.*工具|parallel.*tool|tool.*parallel/i)
-    assert.doesNotMatch(text, /1\.\s*.*2\.\s*/, `${locale} pair hint must use continuous prose without numbered list markers`)
+    assert.match(text, /原始需求|original (?:requirement|need|prompt)/i)
+    assert.match(text, /当务之急|urgent/i)
+    assert.match(text, /冗余|低效|redundant|inefficient/i)
+    assert.match(text, /并发.*工具|concurrent.*tool|parallel.*tool|tool.*parallel/i)
+    assert.match(text, /1\.\s*.*2\.\s*.*3\.\s*/s, `${locale} pair hint must list three numbered thinking requirements`)
   }
 })
 test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_encourages_filling_concurrency_slots', () => {

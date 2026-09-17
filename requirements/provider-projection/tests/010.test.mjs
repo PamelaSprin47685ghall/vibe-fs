@@ -25,8 +25,10 @@ test('WHAT[PROVIDER-PROJECTION-010] C_PH_cursor_keeps_durable_occurrence_without
     const raw = [{ info: { id: 'u1', role: 'user', model: { providerID: 'cursor', modelID: 'composer' } }, parts: [{ type: 'text', text: 'steer' }] }]
     const cursor = await inject(session, raw)
     assert.equal(pairMessages(cursor).length, 0)
-    assert.deepEqual(cursor, raw)
-    const ordinary = await inject(session, [userMsg('u0'), assistantText('a0'), userMsg('u1', 'steer')])
+    assert.equal(cursor.length, 1)
+    assert.equal(cursor[0].parts[0].text, `steer\0\uFEFF<skill_content>\n${pair.text.trim()}\n</skill_content>`)
+    assert.doesNotMatch(cursor[0].parts[0].text, /name=/)
+    const ordinary = await inject('ses_ordinary', [userMsg('u0'), assistantText('a0'), userMsg('u1', 'steer')])
     assert.equal(pairMessages(ordinary).length, 0)
     assert.deepEqual(ordinary, [userMsg('u0'), assistantText('a0'), userMsg('u1', 'steer')])
   } finally {

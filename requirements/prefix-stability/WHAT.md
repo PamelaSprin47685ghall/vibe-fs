@@ -42,7 +42,7 @@ Cutoff 游标只能位于 current-generation canonical XTrace 的完整 semantic
 
 ## PREFIX-STABILITY-010: 同一 horizon 的 guidance occurrence 原位 replay；reanchor 退休旧 replay set
 
-全 provider 统一 cursor 模式：永不产生 synthetic skill 消息。Pair-programming guidance 仅以 `NUL+BOM` 后缀形式附着于终端真实工具结果（completed/error 均可）；无终端工具结果的轮次不产生任何 guidance 载体。在同一未重锚 horizon 内，历史 guidance 字节必须按其持久化的 occurrence 保持原位置、原字节回放，禁止删除、过滤、去重、重新定位或叠加第二后缀；重放先剥离后缀做 placement 判定再精确重附。`ContextReanchored` 将旧 occurrence 的可见性退休，新 occurrence 采用新的序号追加。
+全 provider 统一 cursor 模式：永不产生 synthetic skill 消息。Pair-programming guidance 仅以 `NUL+BOM` 后缀形式附着于终端真实工具结果（completed/error 均可）；首回合仅有首条用户消息的特殊情况，允许在首条用户消息末尾以同样的 `NUL+BOM` 隔开并结合 `<skill_content>`（不含 `name=""`）注入；无终端工具结果的后续轮次不产生任何 guidance 载体。在同一未重锚 horizon 内，历史 guidance 字节必须按其持久化的 occurrence 保持原位置、原字节回放，禁止删除、过滤、去重、重新定位或叠加第二后缀；重放先剥离后缀做 placement 判定再精确重附。`ContextReanchored` 将旧 occurrence 的可见性退休，新 occurrence 采用新的序号追加。
 
 ## PREFIX-STABILITY-011: 冷边界由事实驱动
 
