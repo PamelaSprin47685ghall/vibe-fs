@@ -63,6 +63,17 @@ test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_teaches_continuous_ready_fron
     assert.doesNotMatch(text, /最多\s*\d+|max(?:imum)?\s+\d+/i)
   }
 })
+test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_requires_explaining_urgent_problem_and_parallel_tools_to_partner_before_acting', () => {
+  for (const locale of ['en', 'zh-CN']) {
+    const text = read(`resources/provider/host/pair-programming-guideline/${locale}.md`)
+    assert.match(text, /同伴|partner/i)
+    assert.match(text, /解释|explain/i)
+    assert.match(text, /当务之急|urgent problem/i)
+    assert.match(text, /为什么|why/i)
+    assert.match(text, /怎样解决|how to solve/i)
+    assert.match(text, /并行.*工具|parallel.*tool|tool.*parallel/i)
+  }
+})
 test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_encourages_filling_concurrency_slots', () => {
   for (const locale of ['en', 'zh-CN']) {
     const text = read(`resources/provider/host/pair-programming-guideline/${locale}.md`)
