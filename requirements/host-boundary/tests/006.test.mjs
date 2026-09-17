@@ -58,37 +58,37 @@ const modelFromLease = async (sessionId, physicalUserMessageId, role, participan
 
 test('WHAT[HOST-BOUNDARY-006] HOST-006_user_facing_agent_is_not_session_authority', () => {
   binding.drop('ses_binding_1')
-  binding.observeUserFacingAgent('ses_binding_1', 'coder')
-  const prepared = binding.prepareUserFacing('ses_binding_1', 'coder', false, model)
+  binding.observeUserFacingAgent('ses_binding_1', 'engineer')
+  const prepared = binding.prepareUserFacing('ses_binding_1', 'engineer', false, model)
   assert.equal(prepared.ok, true)
-  assert.equal(prepared.value.agent, 'coder')
-  assert.equal(binding.tryAgent('ses_binding_1'), 'coder')
+  assert.equal(prepared.value.agent, 'engineer')
+  assert.equal(binding.tryAgent('ses_binding_1'), 'engineer')
 })
 test('WHAT[HOST-BOUNDARY-006] HOST-006_accept_prompt_execution_binds_physical_prompt_and_provider_model', async () => {
   binding.drop('ses_binding_2')
-  const leasedModel = await modelFromLease('ses_binding_2', 'physical-1', 'coder', 'coder', undefined)
-  binding.acceptPromptExecution('ses_binding_2', 'prompt-1', 'physical-1', 'coder', leasedModel)
+  const leasedModel = await modelFromLease('ses_binding_2', 'physical-1', 'engineer', 'engineer', undefined)
+  binding.acceptPromptExecution('ses_binding_2', 'prompt-1', 'physical-1', 'engineer', leasedModel)
   const began = binding.beginProviderAttempt('ses_binding_2', 'physical-1', 'prompt-1')
   assert.equal(began.ok, true)
-  const allowed = binding.validateObservedProvider('ses_binding_2', 'coder', leasedModel)
+  const allowed = binding.validateObservedProvider('ses_binding_2', 'engineer', leasedModel)
   assert.equal(allowed.ok, true)
   assert.equal(allowed.value, true)
 })
 test('WHAT[HOST-BOUNDARY-006] HOST-006_external_acceptance_immediately_binds_participant', async () => {
   const session = 'ses_binding_external_acceptance'
   binding.drop(session)
-  const leasedModel = await modelFromLease(session, 'physical-external', 'coder', 'coder', undefined)
+  const leasedModel = await modelFromLease(session, 'physical-external', 'engineer', 'engineer', undefined)
 
-  binding.acceptExternalExecution(session, 'physical-external', 'coder', leasedModel)
+  binding.acceptExternalExecution(session, 'physical-external', 'engineer', leasedModel)
 
-  assert.equal(binding.tryAgent(session), 'coder')
-  const allowed = binding.validateObservedProvider(session, 'coder', leasedModel)
+  assert.equal(binding.tryAgent(session), 'engineer')
+  const allowed = binding.validateObservedProvider(session, 'engineer', leasedModel)
   assert.equal(allowed.ok, true, allowed.error)
   assert.equal(allowed.value, true)
 })
 test('WHAT[HOST-BOUNDARY-006] HOST-006_provider_drift_is_rejected_after_prompt_binding', () => {
   binding.drop('ses_binding_3')
-  binding.acceptPromptExecution('ses_binding_3', 'prompt-1', 'physical-1', 'coder', model)
+  binding.acceptPromptExecution('ses_binding_3', 'prompt-1', 'physical-1', 'engineer', model)
   binding.beginProviderAttempt('ses_binding_3', 'physical-1', 'prompt-1')
   const stale = binding.validateObservedProvider('ses_binding_3', 'inspector', model)
   assert.equal(stale.ok, false)
@@ -98,13 +98,13 @@ test('WHAT[HOST-BOUNDARY-006] HOST-006_stale_physical_terminal_cannot_strip_the_
   const session = 'ses_binding_stale_terminal'
   binding.drop(session)
 
-  await modelFromLease(session, 'physical-old', 'coder', 'coder', undefined)
-  const currentModel = await modelFromLease(session, 'physical-current', 'coder', 'coder', undefined)
+  await modelFromLease(session, 'physical-old', 'engineer', 'engineer', undefined)
+  const currentModel = await modelFromLease(session, 'physical-current', 'engineer', 'engineer', undefined)
 
   routing.releasePhysical(session, 'physical-old')
-  binding.acceptPromptExecution(session, 'prompt-current', 'physical-current', 'coder', currentModel)
+  binding.acceptPromptExecution(session, 'prompt-current', 'physical-current', 'engineer', currentModel)
 
-  const observed = binding.validateObservedProvider(session, 'coder', currentModel)
+  const observed = binding.validateObservedProvider(session, 'engineer', currentModel)
   assert.equal(observed.ok, true, observed.error)
   assert.equal(observed.value, true)
 
@@ -112,18 +112,18 @@ test('WHAT[HOST-BOUNDARY-006] HOST-006_stale_physical_terminal_cannot_strip_the_
 })
 test('WHAT[HOST-BOUNDARY-006] HOST-006_managed_prompt_preserves_agent_but_does_not_acquire_model', () => {
   binding.drop('ses_binding_4')
-  binding.bindChild('ses_parent_4', 'ses_binding_4', 'coder')
-  const prepared = binding.prepareManaged('ses_binding_4', 'coder', false, model)
+  binding.bindChild('ses_parent_4', 'ses_binding_4', 'engineer')
+  const prepared = binding.prepareManaged('ses_binding_4', 'engineer', false, model)
   assert.equal(prepared.ok, true)
-  assert.equal(prepared.value.agent, 'coder')
+  assert.equal(prepared.value.agent, 'engineer')
   assert.equal(prepared.value.modelProvided, false)
 })
 test('WHAT[HOST-BOUNDARY-006] HOST-006_child_enqueue_uses_binding_agent_and_model_free_options', () => {
-  const created = binding.bindChild('ses_parent', 'ses_child', 'coder')
+  const created = binding.bindChild('ses_parent', 'ses_child', 'engineer')
   assert.equal(created.ok, true)
-  const prepared = binding.prepareManaged('ses_child', 'coder', false, null)
+  const prepared = binding.prepareManaged('ses_child', 'engineer', false, null)
   assert.equal(prepared.ok, true)
-  assert.equal(prepared.value.agent, 'coder')
+  assert.equal(prepared.value.agent, 'engineer')
   assert.equal(prepared.value.modelProvided, false)
 })
 test('WHAT[HOST-BOUNDARY-006] HOST-006_private_bookkeeper_child_stays_outside_managed_execution_binding', () => {

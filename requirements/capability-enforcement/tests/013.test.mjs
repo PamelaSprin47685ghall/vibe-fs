@@ -35,5 +35,5 @@ test('WHAT[ENF-013] authority values strictly classify causal categories and voc
 
   const validConsume = quiescence.tryConsume(gate, validPermit)
   assert.equal(validConsume.accepted, true)
-  assert.equal(validConsume.failure, undefined)
+  assert.ok(validConsume.failure == null)
 })

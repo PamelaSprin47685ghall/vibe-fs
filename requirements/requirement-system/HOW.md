@@ -25,4 +25,9 @@
 
 `tests/change-lifecycle.test.mjs` 机械化验证变更文档边界，确保小型修复豁免规则、blocker 处理流程与历史已完成记录的只读性得到严格执行。
 
+## GAP
+
+- `REQUIREMENT-SYSTEM-018`（CLOSED）：可执行证明双向可追溯性与真实行为断言已闭合，落点 `tests/018.test.mjs`。
+
+
 ---

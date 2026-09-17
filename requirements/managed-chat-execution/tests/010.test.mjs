@@ -100,7 +100,7 @@ test('WHAT[CHATEXEC-010] cancel and delete settle every exact projected executio
     const messageIds = [`msg-${lifecycle}-a`, `msg-${lifecycle}-b`]
     const identities = [
       { role: 'engineer', participant: 'engineer' },
-      { role: 'inspector', participant: 'inspector' },
+      { role: 'devops', participant: 'devops' },
     ]
     const runtimes = new Map()
     const facts = []

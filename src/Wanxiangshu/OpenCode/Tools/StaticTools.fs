@@ -93,7 +93,7 @@ module StaticTools =
           "rm"
           "bash-honeypot"
           "run"
-          SphinxMcp.permissionKey
+          "sphinx_*"
           "review"
           "chronicle"
           "fetch"

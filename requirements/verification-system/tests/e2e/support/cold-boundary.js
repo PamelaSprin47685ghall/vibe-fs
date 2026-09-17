@@ -141,10 +141,23 @@ const probeKeepsFixedParts = (previousWire, nextWire) => isDeepStrictEqual(previ
 
 const sameProviderPlan = (previousWire, nextWire) => isDeepStrictEqual(previousWire.tools, nextWire.tools);
 
+const withoutGuidancePart = (part) => {
+  if (part?.kind === 'text' && typeof part.text === 'string') {
+    const idx = part.text.indexOf('\0\uFEFF<skill_content>');
+    return idx >= 0 ? { ...part, text: part.text.slice(0, idx) } : part;
+  }
+  return part;
+};
+
+const withoutGuidanceMessage = (message) => ({
+  ...message,
+  parts: (message.parts ?? []).map(withoutGuidancePart),
+});
+
 const managerLoopKeepsAuthority = (previousWire, nextWire) => {
   if (!sameProviderPlan(previousWire, nextWire)) return false;
   const systemOf = (wire) => (wire.messages ?? []).filter((message) => message?.role === 'system');
-  const usersOf = (wire) => (wire.messages ?? []).filter((message) => message?.role === 'user');
+  const usersOf = (wire) => (wire.messages ?? []).filter((message) => message?.role === 'user').map(withoutGuidanceMessage);
   if (!isDeepStrictEqual(systemOf(withoutHostModelBanner(previousWire)), systemOf(withoutHostModelBanner(nextWire)))) {
     return false;
   }

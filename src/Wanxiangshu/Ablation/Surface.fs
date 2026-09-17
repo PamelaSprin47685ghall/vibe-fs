@@ -45,7 +45,10 @@ module AblationSurface =
         resetCache ()
 
         match AblationSettings.load () with
-        | Ok registry -> registryToJs registry
+        | Ok registry ->
+            AblationSettings.setCache registry
+            registryToJs registry
+        | Error(InvalidMode(node, raw)) -> invalidOp $"InvalidMode: {node}={raw}"
         | Error error -> errorToJs error
 
     let modeFor (nodeId: string) : string =

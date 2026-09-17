@@ -4,6 +4,7 @@ namespace Wanxiangshu.Ablation
 module AblationSettings =
     val load: unit -> Result<AblationRegistry, AblationLoadError>
     val current: unit -> AblationRegistry
+    val setCache: registry: AblationRegistry -> unit
     val resetCache: unit -> unit
     val speculativeInvestigationMode: unit -> AblationMode
     val strengthForcedOff: unit -> bool

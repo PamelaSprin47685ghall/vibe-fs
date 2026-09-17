@@ -192,9 +192,9 @@ const providerLimited = (limits, routes) => (role, running, previous) => {
 test('WHAT[EMR-003] EMR_003_each_active_physical_execution_contributes_one_running_occurrence', async () => {
   const runtime = createRuntime(() => target())
 
-  const first = await acquireTarget(runtime, 'session-a', 'msg-a', 'coder', 'alice')
-  const same = await acquireTarget(runtime, 'session-a', 'msg-a', 'coder', 'alice')
-  const otherExecution = await acquireTarget(runtime, 'session-b', 'msg-b', 'coder', 'bob')
+  const first = await acquireTarget(runtime, 'session-a', 'msg-a', 'engineer', 'alice')
+  const same = await acquireTarget(runtime, 'session-a', 'msg-a', 'engineer', 'alice')
+  const otherExecution = await acquireTarget(runtime, 'session-b', 'msg-b', 'devops', 'bob')
 
   assert.equal(key(first), 'provider/shared|none')
   assert.equal(key(same), 'provider/shared|none')

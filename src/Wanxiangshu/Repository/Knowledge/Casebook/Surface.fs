@@ -393,8 +393,18 @@ module CasebookSurface =
         (updates: obj)
         : Task<obj> =
         let internalStore = storeOf store
-        let q = if isNull (updates?q) then "" else string updates?q
-        let a = if isNull (updates?a) then "" else string updates?a
+        let argCount = emitJsExpr () "arguments.length" |> unbox<int>
+
+        let q, a =
+            if argCount >= 6 then
+                let qVal = emitJsExpr () "arguments[4]" |> string
+                let aVal = emitJsExpr () "arguments[5]" |> string
+                qVal, aVal
+            else
+                let qVal = if isNull (updates?q) then "" else string updates?q
+                let aVal = if isNull (updates?a) then "" else string updates?a
+                qVal, aVal
+
         runUnitResult (CasebookWorkflow.refreshWithDiff internalStore identity diff newStateRef q a)
 
     let needsRefresh (store: obj) (capacity: int) (sessionId: string) (root: string) : Task<obj> =
@@ -430,6 +440,46 @@ module CasebookSurface =
         runStoreWorkflow CasebookWorkflow.archiveCase internalStore case
 
     let archiveCase (store: obj) (case: obj) : Task<obj> = archive store case
+
+    let finalizeEngineerCase
+        (store: obj)
+        (identity: string)
+        (trace: string)
+        (question: string)
+        (answer: string)
+        (relatedPathsRaw: obj)
+        (baselineJson: string)
+        : Task<obj> =
+        task {
+            let internalStore = storeOf store
+            let paths = stringsOf relatedPathsRaw |> Array.toList
+
+            let case: Case =
+                { Identity = identity
+                  SourceTrace = trace
+                  Q = question
+                  A = answer
+                  RelatedPaths = paths
+                  CompletionFileState = baselineJson
+                  MaintenanceFileState = baselineJson
+                  AccessOrder = 0L
+                  Observations = [] }
+
+            match! CasebookWorkflow.archiveCase internalStore case with
+            | Ok() ->
+                try
+                    let! _ = CasebookIndex.refresh internalStore 256
+                    ()
+                with _ ->
+                    ()
+
+                return box {| kind = "finalized" |}
+            | Error reason ->
+                return
+                    box
+                        {| kind = "notCommitted"
+                           error = reason |}
+        }
 
     // ── KR-003, KR-004, KR-010, KR-014, KR-015 Exports ──────────────────────
 

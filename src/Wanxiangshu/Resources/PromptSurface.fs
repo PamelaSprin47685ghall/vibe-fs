@@ -83,5 +83,28 @@ module PromptSurface =
     let runtimeInstallFromPackage () : unit =
         RuntimeResources.install (RuntimeResourceAssembly.load ())
 
+    let private roleSemanticPath role =
+        match role with
+        | Role.Manager -> "role/manager"
+        | Role.Orchestrator -> "role/orchestrator"
+        | Role.Engineer -> "role/engineer"
+        | Role.DevOps -> "role/devops"
+        | Role.Blogger -> "role/blogger"
+        | _ -> "role/engineer"
+
+    let instructionTextsForRole (roleLabel: string) : obj =
+        match Roles.tryParseRole roleLabel with
+        | None -> null
+        | Some role ->
+            let lang = ProviderLanguage.English
+            let common = ProviderResources.readText lang "world/common-law"
+            let law = ProviderResources.readText lang (roleSemanticPath role)
+            box {| roleLaw = law; commonLaw = common |}
+
+    let systemForRole (roleLabel: string) : string =
+        match Roles.tryParseRole roleLabel with
+        | None -> ""
+        | Some role -> PromptResources.systemForRole ProviderLanguage.English role
+
     let runtimeCurrent () : obj =
         RuntimeResources.current () |> runtimeToJs

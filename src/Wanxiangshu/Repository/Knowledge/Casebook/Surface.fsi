@@ -43,6 +43,16 @@ module CasebookSurface =
 
     val archiveCase: store: obj -> case: obj -> Task<obj>
 
+    val finalizeEngineerCase:
+        store: obj ->
+        identity: string ->
+        trace: string ->
+        question: string ->
+        answer: string ->
+        relatedPathsRaw: obj ->
+        baselineJson: string ->
+            Task<obj>
+
     val recordSubstantiveAccess: tracker: obj -> toolName: string -> args: obj -> committed: bool -> unit
 
     val createAccessTracker: unit -> obj

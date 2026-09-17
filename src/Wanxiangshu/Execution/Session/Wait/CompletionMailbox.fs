@@ -38,6 +38,7 @@ type CompletionMailbox(gate: obj) =
 
     let drainQueue (q: Queue<'T>) maxCount =
         [ // DSL-MUTABLE: algorithm-scratch — queue drain counter
+          // DSL-MUTABLE: algorithm-scratch — counter for draining items
           let mutable n = 0
 
           while n < maxCount && q.Count > 0 do

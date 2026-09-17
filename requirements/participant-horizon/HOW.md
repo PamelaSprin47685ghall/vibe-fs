@@ -33,5 +33,5 @@ provider-leak-gate.mjs
 
 ## GAP
 
-- `PARTICIPANT-HORIZON-015`（OPEN）：Manager 并行来自多名 Engineer 且视界中禁止 Manager Fission 与虚假分身拓扑，待 P1/P2 提示词与工具 Schema 完全收拢后闭合。
+- `PARTICIPANT-HORIZON-015`（CLOSED）：Manager 并行来自多名 Engineer 且视界中禁止 Manager Fission 与虚假分身拓扑已闭合，落点 `tests/015.test.mjs` 与 `StaticTools` 显式 deny。
 - `GAP-028`（CLOSED）：Horizon 已改用独立 `HandleProjection.horizonVisible`，父级可见 `Abandoned` 在 Join 消费并 `Retired` 前持续留在 roster；fork 首 prompt 的 `AcceptanceUnknown` 由 durable PromptAuthority `Pending` claim 接管恢复，保留 terminal observer 与单次物理发送，不再合成 `HandleCompleted` 或返回“未放置”。`horizon-surface.test.mjs`、`host-fork-restart-lifecycle.test.mjs` 与真实 `fork-tool.test.mjs` 回归均已绿；核心实现落于 `2953a0978`。

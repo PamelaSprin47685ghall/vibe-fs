@@ -8,6 +8,7 @@ test('WHAT[EXECFAIL-011] unclassified hook failure preserves own evidence and is
   const argsWithIdentity = {
     sessionID: 'ses-hook-011',
     messageID: 'msg-hook-011',
+    messages: [{ id: 'msg-hook-011', role: 'user' }],
   }
   const context = {}
   const unknownError = new Error('unexpected hook crash')

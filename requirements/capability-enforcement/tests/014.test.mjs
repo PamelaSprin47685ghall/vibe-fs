@@ -23,5 +23,5 @@ test('WHAT[ENF-014] owner single issuance and manifest anchors fail closed on mi
   // 3. The owning gate accepts its own valid permit
   const ownerConsume = quiescence.tryConsume(gateOwner, permit)
   assert.equal(ownerConsume.accepted, true)
-  assert.equal(ownerConsume.failure, undefined)
+  assert.ok(ownerConsume.failure == null)
 })

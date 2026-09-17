@@ -647,19 +647,19 @@ after(async () => {
 
 test('WHAT[PID-008] root_requires_external_participant_proof_then_model_is_scheduler_owned', async () => {
   const root = 'ses_binding_root'
-  const model = modelFor('coder')
+  const model = modelFor('engineer')
 
-  const unproven = binding.prepareUserFacing(root, 'coder', false, model)
+  const unproven = binding.prepareUserFacing(root, 'engineer', false, model)
   assert.equal(unproven.ok, false)
   assert.match(unproven.error, /no observed user binding/i)
 
-  binding.observeUserFacingAgent(root, 'coder')
-  assertPrepared(binding.prepareUserFacing(root, 'coder', false, model), 'coder')
-  const first = await admitPhysicalExecution(root, 'coder', 'coder')
+  binding.observeUserFacingAgent(root, 'engineer')
+  assertPrepared(binding.prepareUserFacing(root, 'engineer', false, model), 'engineer')
+  const first = await admitPhysicalExecution(root, 'engineer', 'engineer')
 
-  const temporary = binding.prepareUserFacing(root, 'coder', true, modelFor('coder'))
-  assertPrepared(temporary, 'coder')
-  const second = await admitPhysicalExecution(`${root}-override`, 'coder', 'coder')
+  const temporary = binding.prepareUserFacing(root, 'engineer', true, modelFor('engineer'))
+  assertPrepared(temporary, 'engineer')
+  const second = await admitPhysicalExecution(`${root}-override`, 'engineer', 'engineer')
 
   // Fresh physical retries keep the same fixed participant+Role even as the
   // scheduler hands out a new routing target admission.
@@ -668,33 +668,33 @@ test('WHAT[PID-008] root_requires_external_participant_proof_then_model_is_sched
   assert.deepEqual(second.target, first.target)
 
   // A preserve request cannot use a foreign override as a new base.
-  assertPrepared(binding.prepareUserFacing(root, 'coder', false, model), 'coder')
-  await admitPhysicalExecution(`${root}-restored`, 'coder', 'coder')
+  assertPrepared(binding.prepareUserFacing(root, 'engineer', false, model), 'engineer')
+  await admitPhysicalExecution(`${root}-restored`, 'engineer', 'engineer')
 
-  const foreign = binding.prepareUserFacing(root, 'inspector', true, modelFor('inspector'))
+  const foreign = binding.prepareManaged(root, 'devops', true, modelFor('devops'))
   assert.equal(foreign.ok, false)
   assert.match(foreign.error, /must equal authority participant/i)
 
-  binding.observeUserFacingAgent(root, 'inspector')
-  assertPrepared(binding.prepareUserFacing(root, 'inspector', false, modelFor('inspector')), 'inspector')
-  await admitPhysicalExecution(`${root}-switched`, 'inspector', 'inspector')
+  binding.observeUserFacingAgent(root, 'devops')
+  assertPrepared(binding.prepareUserFacing(root, 'devops', false, modelFor('devops')), 'devops')
+  await admitPhysicalExecution(`${root}-switched`, 'devops', 'devops')
 
   binding.drop(root)
 })
 test('WHAT[PID-008] parented_session_uses_stable_participant_lease_and_authorized_peer_only', async () => {
   const parent = 'ses_parent'
   const child = 'ses_child'
-  const created = binding.bindChild(parent, child, 'distiller')
+  const created = binding.bindChild(parent, child, 'blogger')
   assert.equal(created.ok, true, created.error)
 
-  assertPrepared(binding.prepareManaged(child, 'distiller', false, modelFor('distiller')), 'distiller')
-  await admitPhysicalExecution(child, 'distiller', 'distiller')
+  assertPrepared(binding.prepareManaged(child, 'blogger', false, modelFor('blogger')), 'blogger')
+  await admitPhysicalExecution(child, 'blogger', 'blogger')
 
-  const peer = binding.prepareManaged(child, 'distiller', true, modelFor('distiller'))
-  assertPrepared(peer, 'distiller')
-  await admitPhysicalExecution(`${child}-peer`, 'distiller', 'distiller')
+  const peer = binding.prepareManaged(child, 'blogger', true, modelFor('blogger'))
+  assertPrepared(peer, 'blogger')
+  await admitPhysicalExecution(`${child}-peer`, 'blogger', 'blogger')
 
-  const foreign = binding.prepareManaged(child, 'coder', true, modelFor('coder'))
+  const foreign = binding.prepareManaged(child, 'engineer', true, modelFor('engineer'))
   assert.equal(foreign.ok, false)
   assert.match(foreign.error, /must equal authority participant/i)
 
@@ -703,23 +703,23 @@ test('WHAT[PID-008] parented_session_uses_stable_participant_lease_and_authorize
 test('WHAT[PID-008] provider_reasoning_variant_must_match_the_exact_lease', async () => {
   const parent = 'ses_variant_parent'
   const child = 'ses_variant_exact'
-  assert.equal(binding.bindChild(parent, child, 'distiller').ok, true)
+  assert.equal(binding.bindChild(parent, child, 'devops').ok, true)
 
   const physicalId = 'msg-variant-exact'
-  const expected = modelFor('distiller')
-  const admission = await acquireLease(child, physicalId, 'distiller', 'distiller')
+  const expected = modelFor('devops')
+  const admission = await acquireLease(child, physicalId, 'devops', 'devops')
   const target = admission.exact.target
   assert.deepEqual(target, { model: 'test/deep', reasoning: 'high' })
   assert.deepEqual(routing.commitSharedExecutionAdmission(admission.lease, admission.exact), { kind: 'Applied' })
 
-  binding.acceptPromptExecution(child, 'prompt-variant-exact', physicalId, 'distiller', expected)
+  binding.acceptPromptExecution(child, 'prompt-variant-exact', physicalId, 'devops', expected)
   assert.equal(binding.beginProviderAttempt(child, physicalId, 'prompt-variant-exact').ok, true)
 
-  const valid = binding.validateObservedProvider(child, 'distiller', expected)
+  const valid = binding.validateObservedProvider(child, 'devops', expected)
   assert.equal(valid.ok, true)
   assert.equal(valid.value, true)
 
-  const drift = binding.validateObservedProvider(child, 'distiller', { ...expected, variant: 'default' })
+  const drift = binding.validateObservedProvider(child, 'devops', { ...expected, variant: 'default' })
   assert.equal(drift.ok, false)
   assert.match(drift.error, /model\/reasoning drift/i)
   assert.match(drift.error, /test\/deep\[high\] -> test\/deep\[default\]/)

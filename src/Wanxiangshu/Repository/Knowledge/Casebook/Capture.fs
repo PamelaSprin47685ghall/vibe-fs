@@ -551,6 +551,7 @@ module CasebookCapture =
 
     let computeMaintenanceDiff (workspaceRoot: string) (baseline: obj) : Task<obj> =
         task {
+            // DSL-MUTABLE: algorithm-scratch — maintenance diff presence accumulator
             let mutable hasDiff = false
             let diffLines = ResizeArray<string>()
 

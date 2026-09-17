@@ -61,3 +61,8 @@ Already terminal:
 ```
 
 `PreserveCurrentFact` 与 `AwaitAcceptanceReconciliation` 不伪造 terminal。`execution-model-routing` 仅在 pre-provider terminal receipt 为 `Committed` 后消费 exact fence；`managed-chat-execution` 穷尽校验 exact key、durable phase 与 typed disposition；provider recovery owner 独占解释 provider-started retry authorization；`host-boundary` 在该 phase 的全部前置动作完成后才执行 fatal。definitive `NotCommitted` 停在被拒绝步骤之前；`Unknown` 保持 uncertainty，且两者都不得以 finally/cleanup 释放 pre-provider fence 或重复物理 effect。
+
+## GAP
+
+- `EXECFAIL-009` / `EXECFAIL-011` / `EXECFAIL-012` / `EXECFAIL-013`（CLOSED）：Host 错误边界不做失败分类、未分类 Hook 失败携带证据、StopPhysicalRun 先落 admission barrier 与 unhandled fatal 分支生命周期分解已闭合，落点 `tests/009.test.mjs`、`tests/011.test.mjs`、`tests/012.test.mjs` 与 `tests/013.test.mjs`。
+

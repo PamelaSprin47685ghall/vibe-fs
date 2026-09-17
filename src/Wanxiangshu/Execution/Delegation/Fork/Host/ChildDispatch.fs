@@ -92,11 +92,12 @@ module HostForkChildDispatch =
         String.Equals(agentId.Trim(), "devops", StringComparison.OrdinalIgnoreCase)
 
     let private isFixedDevOpsHandle (handles: AgentLinkageProjection option) (agentId: string) =
-        match handles with
-        | Some h ->
-            match HandleProjection.tryFind (HandleController.agentHandle agentId) h with
-            | Some r -> r.CanonicalRole = Role.DevOps || r.Byname = "devops"
-            | None -> isFixedDevOps agentId
+        let handleRecordOpt =
+            handles
+            |> Option.bind (fun h -> HandleProjection.tryFind (HandleController.agentHandle agentId) h)
+
+        match handleRecordOpt with
+        | Some r -> r.CanonicalRole = Role.DevOps || r.Byname = "devops"
         | None -> isFixedDevOps agentId
 
     let private clearChildrenAndRuns
@@ -111,6 +112,7 @@ module HostForkChildDispatch =
                 | false, _ -> None
 
             children.Clear()
+
             match devopsChildOpt with
             | Some cid -> children.["devops"] <- cid
             | None -> ()
@@ -408,7 +410,8 @@ module HostForkChildDispatch =
         task {
             let journalPort = journal |> Option.map AgentJournalPortAdapter.fromAgentJournal
 
-            let! cancelResult = HandleController.cancelChildren journalPort parentId (ownedToCancel |> List.map fst) abandonedAt
+            let! cancelResult =
+                HandleController.cancelChildren journalPort parentId (ownedToCancel |> List.map fst) abandonedAt
 
             requireOk "Parent handle abandon failed" cancelResult
 

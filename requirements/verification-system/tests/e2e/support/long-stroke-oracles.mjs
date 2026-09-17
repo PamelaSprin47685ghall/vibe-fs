@@ -775,10 +775,15 @@ const incumbencyIdsIn = (payloads) => {
   return [...ids];
 };
 
+const stripGuidance = (text) => {
+  const idx = text.indexOf('\0\uFEFF<skill_content>');
+  return idx >= 0 ? text.slice(0, idx) : text;
+};
+
 const messageTextsByRole = (request, role) =>
   (request?.messages ?? [])
     .filter((message) => message?.role === role)
-    .map((message) => contentText(message?.content));
+    .map((message) => stripGuidance(contentText(message?.content)));
 
 const hasAssistantOrToolMessages = (request) =>
   (request?.messages ?? []).some((message) =>

@@ -125,10 +125,15 @@ module AttachmentSurface =
             let owner = SessionId.create "owner"
             let agent = "inspector"
             let existing = SessionId.create "host-child-existing"
+            // DSL-MUTABLE: algorithm-scratch — reconciliation counters in the test harness
             let createdCount = ref 0
+            // DSL-MUTABLE: algorithm-scratch — reconciliation counters in the test harness
             let observedCount = ref 0
+            // DSL-MUTABLE: algorithm-scratch — reconciliation counters in the test harness
             let registeredCount = ref 0
+            // DSL-MUTABLE: algorithm-scratch — reconciliation counters in the test harness
             let boundCount = ref 0
+            // DSL-MUTABLE: algorithm-scratch — reconciliation counters in the test harness
             let readyCount = ref 0
 
             let runtime =

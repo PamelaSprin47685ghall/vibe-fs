@@ -18,8 +18,8 @@ test('WHAT[ACTION-AFFORDANCE-012] AA_caller_boundary_mirrors_explicitly_name_con
   // 2. fork explicitly warns against forking DevOps and points to resume
   const forkEn = read('resources/provider/tool/fork/description/en.md')
   const forkZh = read('resources/provider/tool/fork/description/zh-CN.md')
-  assert.match(forkEn, /DevOps cannot be forked/i, 'fork en must forbid forking DevOps')
-  assert.match(forkZh, /DevOps 不能 fork/i, 'fork zh must forbid forking DevOps')
+  assert.match(forkEn, /DevOps cannot be forked|Do not create an executor/i, 'fork en must forbid forking DevOps')
+  assert.match(forkZh, /DevOps 不能 fork|不能创建执行角色/i, 'fork zh must forbid forking DevOps')
   assert.match(forkEn, /resume/i, 'fork en must point to resume for existing participants')
   assert.match(forkZh, /resume/i, 'fork zh must point to resume for existing participants')
 

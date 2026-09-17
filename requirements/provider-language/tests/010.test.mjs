@@ -47,8 +47,8 @@ test('WHAT[PROVIDER-LANGUAGE-010] PL_010_role_law_semantic_anchors_match_across_
 
   const mgrEn = read('resources/provider/role/manager/en.md')
   const mgrZh = read('resources/provider/role/manager/zh-CN.md')
-  assert.match(mgrEn, /does not inspect.*edit|does not touch/i)
-  assert.match(mgrZh, /不亲自修改/i)
+  assert.match(mgrEn, /do not investigate[\s\S]*?edit|does not inspect[\s\S]*?edit|does not touch/i)
+  assert.match(mgrZh, /不亲自.*修改|不亲自修改/i)
 
   // Mutation test: missing counterpart anchor must fail
   assert.throws(() => {

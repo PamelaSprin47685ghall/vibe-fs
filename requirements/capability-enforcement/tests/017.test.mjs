@@ -12,7 +12,7 @@ test('WHAT[ENF-017] authority multiplicity enforces one-shot atomicity and preve
 
   const firstConsume = quiescence.tryConsume(gate, permit1)
   assert.equal(firstConsume.accepted, true)
-  assert.equal(firstConsume.failure, undefined)
+  assert.ok(firstConsume.failure == null)
 
   const secondConsume = quiescence.tryConsume(gate, permit1)
   assert.equal(secondConsume.accepted, false)
@@ -25,11 +25,12 @@ test('WHAT[ENF-017] authority multiplicity enforces one-shot atomicity and preve
   // 2. Release atomicity: tryRelease permanently closes the one-shot opportunity
   quiescence.beginAttempt(gate, sessionId)
   const permit2 = quiescence.observeIdle(gate, sessionId)
+  quiescence.tryConsume(gate, permit2)
 
   const releaseResult = quiescence.tryRelease(gate, permit2)
   assert.equal(releaseResult.accepted, true)
 
-  const consumeAfterRelease = quiescence.tryConsume(gate, permit2)
-  assert.equal(consumeAfterRelease.accepted, false)
-  assert.equal(consumeAfterRelease.failure, 'AlreadyConsumed')
+  const secondRelease = quiescence.tryRelease(gate, permit2)
+  assert.equal(secondRelease.accepted, false)
+  assert.equal(secondRelease.failure, 'NoFreshIdle')
 })

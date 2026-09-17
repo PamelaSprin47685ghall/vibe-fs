@@ -148,15 +148,22 @@ module HorizonTool =
         else
             lines
 
+    let private isAbandonedHandle (handle: HandleRecord) =
+        match handle.Lifecycle with
+        | HandleLifecycle.Abandoned _ -> true
+        | _ -> false
+
+    let private shouldIncludeHandleInRoster runtime handle =
+        HostForkJoin.currentProcessHandle runtime handle || isAbandonedHandle handle
+
     let private appendHandleLinesForRoster language journal snapshot runtimeByAgentId runtime agentLines handles =
         task {
-            for handle in HandleProjection.horizonVisible handles do
-                // HOST-BOUNDARY-021: the roster answers only for the current
-                // process. Durable handles from a dead process stay inert until
-                // explicit reuse reopens the line; Join refuses them, so the
-                // horizon must not present them either.
-                if HostForkJoin.currentProcessHandle runtime handle then
-                    do! appendHandleLines language journal snapshot runtimeByAgentId agentLines handle
+            let eligibleHandles =
+                HandleProjection.horizonVisible handles
+                |> List.filter (shouldIncludeHandleInRoster runtime)
+
+            for handle in eligibleHandles do
+                do! appendHandleLines language journal snapshot runtimeByAgentId agentLines handle
         }
 
     let private executeWithJournal language (runtimeCtx: HorizonRuntimeContext) context (journal: AgentJournal) =

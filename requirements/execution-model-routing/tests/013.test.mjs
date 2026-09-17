@@ -162,10 +162,10 @@ test('WHAT[EMR-013] superseded slot freed inside the same turn recomputes the wa
   }
   const runtime = createRuntime(route)
 
-  await acquireTarget(runtime, 'session', 'msg-1', 'coder', 'alice')
+  await acquireTarget(runtime, 'session', 'msg-1', 'engineer', 'alice')
   endProviderStep(runtime, 'session', 'msg-1', 'run-1')
 
-  const retry = await acquireManaged(runtime, 'session', 'msg-2', 'coder', 'alice')
+  const retry = await acquireManaged(runtime, 'session', 'msg-2', 'engineer', 'alice')
   assert.equal(retry.kind, 'Acquired', 'superseded occupancy reaches the first schedule, its retire frees the slot, and the queued demand drains in the same turn')
   assert.equal(key(retry.target), 'provider/only|none')
   assert.equal(pendingCount(runtime), 0)

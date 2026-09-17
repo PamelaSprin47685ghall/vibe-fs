@@ -72,6 +72,7 @@ type SessionRecoveryHost
             && not message.Completed
             ->
             ProviderPhysicalObservation.ProviderAlive started
+        // ProviderPhysicalObservation.ReceiptAmbiguous -> fail closed to manual intervention
         | _ -> ProviderPhysicalObservation.ReceiptAmbiguous
 
     let providerFromSnapshot (state: ChatExecutionState) =

@@ -24,9 +24,9 @@ test('WHAT[PROVIDER-LANGUAGE-012] bilingual prompts maintain semantic parity acr
   assert.match(engZh, /本次工作完成[\s\S]*?立即返回 Manager/, 'Engineer zh prompt must assert return to manager upon completion')
 
   assert.match(engEn, /local facts investigation and changing the written world/i, 'Engineer en prompt must assert local investigation and source work')
-  assert.match(engEn, /has no bash access and cannot execute commands|do not execute commands/i, 'Engineer en prompt must assert no command execution')
+  assert.match(engEn, /has no bash access and cannot execute commands|do not execute commands|may not execute real commands/i, 'Engineer en prompt must assert no command execution')
   assert.match(engEn, /only role permitted to use Fission/i, 'Engineer en prompt must assert fission exclusivity')
-  assert.match(engEn, /Finish this assignment and return to the Manager/i, 'Engineer en prompt must assert return to manager upon completion')
+  assert.match(engEn, /Finish this assignment and return to the\s+Manager/i, 'Engineer en prompt must assert return to manager upon completion')
 
   // ── 2. DevOps: 明确具备完整本地工程与真实执行能力，拥有非架构级直接修复授权；明确不能 Fission，不差遣其他工程代理 ──
   const devZh = readIfExists('resources/provider/role/devops/zh-CN.md')
@@ -38,7 +38,7 @@ test('WHAT[PROVIDER-LANGUAGE-012] bilingual prompts maintain semantic parity acr
   assert.match(devZh, /直接修复源码|自主局部修复/, 'DevOps zh prompt must assert direct repair authorization')
   assert.match(devZh, /不能 Fission[，,]\s*不创建或差遣其他工程代理/, 'DevOps zh prompt must forbid fission and dispatching other agents')
 
-  assert.match(devEn, /full local engineering and real command execution capabilities/i, 'DevOps en prompt must assert full engineering and execution capacity')
+  assert.match(devEn, /full local engineering (?:and real command execution )?capabilit(?:y|ies)/i, 'DevOps en prompt must assert full engineering and execution capacity')
   assert.match(devEn, /repair the source directly|Direct engineering and autonomous local repair/i, 'DevOps en prompt must assert direct repair authorization')
   assert.match(devEn, /cannot Fission, do not create or dispatch other engineering agents/i, 'DevOps en prompt must forbid fission and dispatching other agents')
 
@@ -51,7 +51,7 @@ test('WHAT[PROVIDER-LANGUAGE-012] bilingual prompts maintain semantic parity acr
   assert.match(mgrZh, /Engineer 分别承担有边界的工作[，,]运行时绑定一名固定 DevOps/, 'Manager zh prompt must assert managing Engineers and fixed DevOps')
   assert.match(mgrZh, /不能使用 Fission。需要并行时[，,]分派独立 Engineer[，,]不创建自己的副本/, 'Manager zh prompt must forbid fission and clones')
 
-  assert.match(mgrEn, /Engineers assigned to bounded work, and one fixed DevOps bound by the runtime/i, 'Manager en prompt must assert managing Engineers and fixed DevOps')
+  assert.match(mgrEn, /Engineers assigned to bounded work, and one fixed\s+DevOps bound by the runtime/i, 'Manager en prompt must assert managing Engineers and fixed DevOps')
   assert.match(mgrEn, /cannot use Fission\. Delegate independent work to Engineers; do not create copies of yourself/i, 'Manager en prompt must forbid fission and clones')
 
   // ── 4. Sphinx 内部 Engineer: 明确本次调用仅调研现有本地事实，无修改、无执行、无 Fission 权 ──
@@ -62,7 +62,7 @@ test('WHAT[PROVIDER-LANGUAGE-012] bilingual prompts maintain semantic parity acr
   )
   assert.match(
     engEn,
-    /For a Sphinx invocation, obey its narrower read-only charge[\s\S]*?Do not mutate, execute, use Fission, or start another investigation workflow/i,
+    /For a Sphinx invocation, obey its narrower read-only charge[\s\S]*?Do not mutate,\s*execute,\s*use Fission,\s*or start another\s+investigation workflow/i,
     'Sphinx internal engineer en prompt must assert read-only, no mutation, no execution, no fission',
   )
 

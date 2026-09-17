@@ -5,7 +5,7 @@ open Wanxiangshu.Participant.Provider
 
 module PromptResources =
 
-    let private roleSemanticPath =
+    let internal roleSemanticPath =
         function
         | Role.Manager -> "role/manager"
         | Role.Orchestrator -> "role/orchestrator"

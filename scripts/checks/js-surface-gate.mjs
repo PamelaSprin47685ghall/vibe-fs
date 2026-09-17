@@ -69,11 +69,12 @@ export const scanEntries = (entries) => {
 
     for (let i = 0; i < lines.length; i++) {
       // 1. 废弃角色工具绝对拦截：即使在权限矩阵文件中，也严禁出现废弃角色工具
-      for (const token of DEPRECATED_ROLE_TOOL_TOKENS) {
-        if (lines[i].includes(token)) check(i, token, 'deprecated-role-tool')
-      }
-      // 2. 手写角色工具拦截（非权限矩阵文件）
-      if (!skipHandwritten) {
+      if (skipHandwritten) {
+        for (const token of DEPRECATED_ROLE_TOOL_TOKENS) {
+          if (lines[i].includes(token)) check(i, token, 'deprecated-role-tool')
+        }
+      } else {
+        // 2. 手写角色工具拦截（非权限矩阵文件）
         for (const token of HANDWRITTEN_ROLE_TOOL_TOKENS) {
           if (lines[i].includes(token)) check(i, token, 'handwritten-role-tool')
         }

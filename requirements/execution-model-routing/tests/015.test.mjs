@@ -5,7 +5,7 @@ import { createCounters, queryReliability, snapshot } from '../../../dist/OpenCo
 
 const target = { model: 'provider/shared', reasoning: 'none' }
 
-const identity = { sessionId: 'session-a', physicalUserMessageId: 'message-a', role: 'coder', participant: 'alice' }
+const identity = { sessionId: 'session-a', physicalUserMessageId: 'message-a', role: 'engineer', participant: 'alice' }
 
 test('WHAT[EMR-015] diagnostic query reuses capacity snapshot queue and fence counters without duplicate formula', async () => {
   const runtime = routing.createRuntime(() => target)

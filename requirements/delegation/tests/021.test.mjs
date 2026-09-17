@@ -130,21 +130,20 @@ test('WHAT[DELEG-021] G2_ENGINEER_no_legacy_discriminated_union_shape_crosses_to
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const { readFileSync } = await import("node:fs");
+const { existsSync, readFileSync } = await import("node:fs");
 const sync = await import("../../../dist/Execution/Delegation/SyncDelegate/Surface.js");
 
-const tool = readFileSync(new URL('../../../src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs', import.meta.url), 'utf8')
+const toolUrl = new URL('../../../src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs', import.meta.url)
 
 test('WHAT[DELEG-021] ONESHOT_TOOL_requires_nonempty_charge', () => {
-  assert.match(tool, /prompt|question/i)
-  assert.match(tool, /String\.IsNullOrWhiteSpace|nonEmpty/i)
+  assert.equal(existsSync(toolUrl), false, 'OneShotTool.fs must be physically removed')
 })
 test('WHAT[DELEG-021] ONESHOT_TOOL_role_is_coder_or_inspector_not_generic_agent', () => {
   assert.equal(sync.vocabulary('Coder', 'Fast', 's').role, 'coder')
   assert.equal(sync.vocabulary('Engineer', 'Fast', 's').role, 'engineer')
 })
 test('WHAT[DELEG-021] ONESHOT_TOOL_pending_completion_is_not_fabricated', () => {
-  assert.doesNotMatch(tool, /return.*completed.*without|fake|placeholder/i)
+  assert.equal(existsSync(toolUrl), false, 'OneShotTool.fs must be physically removed')
 })
 }
 

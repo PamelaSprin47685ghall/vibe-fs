@@ -3,7 +3,7 @@ import test from 'node:test'
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const { readFileSync } = await import("node:fs");
+const { existsSync, readFileSync } = await import("node:fs");
 const { join } = await import("node:path");
 const { fileURLToPath } = await import("node:url");
 const { interruptAttemptAdapterProbe, interruptRejectedAdapterProbe, interruptTerminatedAdapterProbe } = await import("../../../dist/OpenCode/Host/SessionsSurface.js");
@@ -36,7 +36,7 @@ test('WHAT[MANAGED-SESSION-018] TurnAborted has no logical child-cancel authorit
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const { readFileSync } = await import("node:fs");
+const { existsSync, readFileSync } = await import("node:fs");
 const { join } = await import("node:path");
 const { fileURLToPath } = await import("node:url");
 
@@ -79,7 +79,7 @@ test('WHAT[MANAGED-SESSION-018] shutdown detaches session runtimes before journa
 test('WHAT[MANAGED-SESSION-018] fork terminal callbacks drain before either detach or authorized parent cancel', () => {
   const runtime = read('src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs')
   const lifecycle = read('src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs')
-  const oneShot = read('src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs')
+  assert.equal(existsSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs')), false, 'OneShotTool.fs must be physically removed')
 
   assert.match(runtime, /let startOwnedWork \(work: unit -> Task\) : Task/)
   assert.match(runtime, /let stopOwnedWorkAndDrain \(\) : Task/)
@@ -94,9 +94,6 @@ test('WHAT[MANAGED-SESSION-018] fork terminal callbacks drain before either deta
   assert.match(lifecycle, /trackOwnedWork: \(unit -> Task\) -> unit/)
   assert.match(lifecycle, /fun _ outcome ->\s*trackOwnedWork \(fun \(\) ->/)
   assert.doesNotMatch(lifecycle, /fun _ outcome ->[\s\S]{0,240}\|> ignore/)
-
-  assert.match(oneShot, /scope\.RunOwnedWork\(fun \(\) ->/)
-  assert.doesNotMatch(oneShot, /settleCompletedTerminal scope childId terminal succeed latch completion\s*\|> ignore/)
 })
 test('WHAT[MANAGED-SESSION-018] TurnAborted publishes attempt terminal without child cascade', () => {
   const ordinary = read('src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs')

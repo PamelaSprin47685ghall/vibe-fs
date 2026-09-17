@@ -30,3 +30,8 @@ DEPENDS ON: durable-events, effect-accounting, semantic-trace
 - 原始语义追踪与 XTrace cursor → `semantic-trace`
 - 物理执行结果分类与记账 → `effect-accounting`
 - 提示词文本本地化 → `provider-language`
+
+## GAP
+
+- `OBLIGATION-LEDGER-020`（CLOSED）：实现质量判断归于独立 assessment，落点 `tests/020.test.mjs`。
+

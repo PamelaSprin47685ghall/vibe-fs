@@ -65,8 +65,8 @@ const providerLimited = (limits, routes) => (role, running, previous) => {
 
 test('WHAT[EMR-007] EMR_007_execution_release_is_idempotent_and_wakes_waiters_once', async () => {
   const runtime = createRuntime((_role, running) => running.length === 0 ? target('provider/one') : null)
-  await acquireTarget(runtime, 'holder', 'msg-holder', 'coder', 'alice')
-  const waiting = acquireTarget(runtime, 'waiter', 'msg-waiter', 'inspector', 'bob')
+  await acquireTarget(runtime, 'holder', 'msg-holder', 'engineer', 'alice')
+  const waiting = acquireTarget(runtime, 'waiter', 'msg-waiter', 'devops', 'bob')
 
   releasePhysicalExecution(runtime, 'holder', 'msg-holder')
   const acquired = await waiting
@@ -79,13 +79,13 @@ test('WHAT[EMR-007] EMR_007_execution_release_is_idempotent_and_wakes_waiters_on
 test('WHAT[EMR-007] EMR_007_late_terminal_for_superseded_physical_execution_cannot_release_current_lease', async () => {
   const runtime = createRuntime((role) => target(`provider/${role}`))
 
-  await acquireTarget(runtime, 'reused-session', 'msg-old', 'coder', 'alice')
-  await acquireTarget(runtime, 'reused-session', 'msg-current', 'inspector', 'alice')
+  await acquireTarget(runtime, 'reused-session', 'msg-old', 'engineer', 'alice')
+  await acquireTarget(runtime, 'reused-session', 'msg-current', 'devops', 'alice')
 
   releasePhysicalExecution(runtime, 'reused-session', 'msg-old')
   assert.equal(
-    key(tryLease(runtime, 'reused-session', 'msg-current', 'inspector', 'alice', null)),
-    'provider/inspector|none',
+    key(tryLease(runtime, 'reused-session', 'msg-current', 'devops', 'alice', null)),
+    'provider/devops|none',
     'late exact terminal evidence for the old physical material must not touch the current lease',
   )
   assert.equal(snapshotOccupied(runtime).length, 1)

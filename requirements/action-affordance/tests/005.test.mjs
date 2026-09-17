@@ -29,13 +29,13 @@ test('WHAT[ACTION-AFFORDANCE-005] AA_establish_behavior_is_legacy_forbidden_and_
   )
   assert.match(
     commonLawZh,
-    /源码落地、执行证据与最终验收不可相互替代/i,
+    /源码落地、执行证据与最终验收不可相互替代|修改源码、运行凭据与把关验收[，,]这三件事绝不能混为一谈[，,]更不能互相顶替/i,
     'common law zh must forbid treating source work and execution evidence as interchangeable',
   )
 
   assert.match(
     honeypotEn,
-    /Engineer works throughs+local file capabilities; required execution returns to the Manager for DevOps/i,
+    /Engineer works through\s+local file capabilities; required execution returns to the Manager for DevOps/i,
     'bash-honeypot en must mirror the separation of execution from file work',
   )
   assert.match(

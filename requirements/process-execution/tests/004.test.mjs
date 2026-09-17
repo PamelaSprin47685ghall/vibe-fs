@@ -38,7 +38,7 @@ test('WHAT[PROC-004] Process_deadline_is_independent_of_ambient_timezone', () =>
 
 {
 const { default: assert } = await import("node:assert/strict");
-const { readFileSync } = await import("node:fs");
+const { existsSync, readFileSync } = await import("node:fs");
 const { dirname, join } = await import("node:path");
 const { default: test } = await import("node:test");
 const { fileURLToPath } = await import("node:url");
@@ -52,20 +52,8 @@ const {
 
 test('WHAT[PROC-004] EXEC_oneshot_completion_wait_is_bounded_by_management_deadline', () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
-  const oneshot = readFileSync(
-    join(root, 'src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs'),
-    'utf8',
-  )
-
-  assert.match(oneshot, /CompletionTimeoutMs\s*=\s*600_000/, 'named completion deadline')
-  assert.match(oneshot, /NodeTiming\.raceExit/, 'completion races a timer, not bare Task')
-  assert.doesNotMatch(
-    oneshot,
-    /let! output = completion\.Task\s*$/m,
-    'must not bare-await completion.Task without race',
-  )
-  assert.match(oneshot, /AbortSession childId/, 'timeout path aborts the child session')
-  assert.match(oneshot, /timed out after/, 'timeout returns Error with timeout message, not hang')
+  const oneshotPath = join(root, 'src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs')
+  assert.equal(existsSync(oneshotPath), false, 'OneShotTool.fs must be physically removed')
 })
 }
 

@@ -70,44 +70,44 @@ test('WHAT[EMR-006] EMR_006_same_physical_message_retry_reuses_target_without_sc
     return target()
   })
 
-  await acquireTarget(runtime, 'session-a', 'msg-1', 'coder', 'alice')
-  await acquireTarget(runtime, 'session-a', 'msg-1', 'coder', 'alice')
-  await acquireTarget(runtime, 'session-a', 'msg-2', 'coder', 'alice')
+  await acquireTarget(runtime, 'session-a', 'msg-1', 'engineer', 'alice')
+  await acquireTarget(runtime, 'session-a', 'msg-1', 'engineer', 'alice')
+  await acquireTarget(runtime, 'session-a', 'msg-2', 'engineer', 'alice')
 
   assert.deepEqual(seen, [[], ['provider/shared|none']], 'same physical material reuses without a scheduler rerun; the superseding fresh schedule observes the replaced occupancy')
 })
 test('WHAT[EMR-006] EMR_006_new_physical_message_supersedes_old_A_B_occupancy_without_idle', async () => {
   const runtime = createRuntime((role) => target(`provider/${role}`))
 
-  const a = await acquireTarget(runtime, 'session', 'msg-a', 'coder', 'alice')
-  assert.equal(a.model, 'provider/coder')
+  const a = await acquireTarget(runtime, 'session', 'msg-a', 'engineer', 'alice')
+  assert.equal(a.model, 'provider/engineer')
   assert.equal(snapshotOccupied(runtime).length, 1)
 
-  const b = await acquireTarget(runtime, 'session', 'msg-b', 'inspector', 'alice')
-  assert.equal(b.model, 'provider/inspector')
+  const b = await acquireTarget(runtime, 'session', 'msg-b', 'devops', 'alice')
+  assert.equal(b.model, 'provider/devops')
   assert.equal(snapshotOccupied(runtime).length, 1, 'one reusable session can own only one current physical execution slot')
-  assert.equal(tryLease(runtime, 'session', 'msg-a', 'coder', 'alice', null), null, 'superseded physical material no longer owns a lease')
-  assert.equal(key(tryLease(runtime, 'session', 'msg-b', 'inspector', 'alice', null)), 'provider/inspector|none')
+  assert.equal(tryLease(runtime, 'session', 'msg-a', 'engineer', 'alice', null), null, 'superseded physical material no longer owns a lease')
+  assert.equal(key(tryLease(runtime, 'session', 'msg-b', 'devops', 'alice', null)), 'provider/devops|none')
 })
 test('WHAT[EMR-006] EMR_006_supersede_replaces_the_exact_capacity_owner', async () => {
   const runtime = createRuntime((role) => target(`provider/${role}`))
 
-  await acquireTarget(runtime, 'session', 'msg-a', 'coder', 'alice')
-  await acquireTarget(runtime, 'session', 'msg-b', 'inspector', 'alice')
+  await acquireTarget(runtime, 'session', 'msg-a', 'engineer', 'alice')
+  await acquireTarget(runtime, 'session', 'msg-b', 'devops', 'alice')
 
   const snapshot = capacitySnapshot(runtime)
   assert.equal(snapshot.tokens.length, 1)
   assert.deepEqual(snapshot.tokens[0].owner, {
     sessionId: 'session',
     physicalUserMessageId: 'msg-b',
-    role: 'inspector',
+    role: 'devops',
     participant: 'alice',
   })
   assert.deepEqual(snapshot.executions, [
     {
       sessionId: 'session',
       physicalUserMessageId: 'msg-b',
-      role: 'inspector',
+      role: 'devops',
       participant: 'alice',
     },
   ])
@@ -129,20 +129,20 @@ test('WHAT[EMR-006] EMR_006_only_the_current_run_witness_resolves_a_target', asy
 })
 test('WHAT[EMR-006] EMR_006_same_physical_message_cannot_change_role', async () => {
   const runtime = createRuntime(() => target())
-  await acquireTarget(runtime, 'session', 'msg-1', 'coder', 'alice')
+  await acquireTarget(runtime, 'session', 'msg-1', 'engineer', 'alice')
 
   await assert.rejects(
-    acquireTarget(runtime, 'session', 'msg-1', 'inspector', 'alice'),
+    acquireTarget(runtime, 'session', 'msg-1', 'devops', 'alice'),
     /physical execution .* changed role/i,
   )
   assert.equal(snapshotOccupied(runtime).length, 1)
 })
 test('WHAT[EMR-006] EMR_006_same_physical_message_cannot_change_participant', async () => {
   const runtime = createRuntime(() => target())
-  await acquireTarget(runtime, 'session', 'msg-1', 'coder', 'alice')
+  await acquireTarget(runtime, 'session', 'msg-1', 'engineer', 'alice')
 
   await assert.rejects(
-    acquireTarget(runtime, 'session', 'msg-1', 'coder', 'bob'),
+    acquireTarget(runtime, 'session', 'msg-1', 'engineer', 'bob'),
     /physical execution .* changed participant/i,
   )
   assert.equal(snapshotOccupied(runtime).length, 1)
@@ -151,14 +151,14 @@ test('WHAT[EMR-006] EMR_006_lease_is_stable_only_for_one_physical_user_material'
   let calls = 0
   const runtime = createRuntime(() => target(`provider/model-${++calls}`, 'low'))
 
-  const first = await acquireTarget(runtime, 'session', 'msg-1', 'coder', 'alice')
-  const retry = await acquireTarget(runtime, 'session', 'msg-1', 'coder', 'alice')
+  const first = await acquireTarget(runtime, 'session', 'msg-1', 'engineer', 'alice')
+  const retry = await acquireTarget(runtime, 'session', 'msg-1', 'engineer', 'alice')
 
   assert.equal(first.model, 'provider/model-1')
   assert.equal(retry.model, 'provider/model-1')
   assert.equal(calls, 1)
 
-  const nextMaterial = await acquireTarget(runtime, 'session', 'msg-2', 'coder', 'alice')
+  const nextMaterial = await acquireTarget(runtime, 'session', 'msg-2', 'engineer', 'alice')
   assert.equal(nextMaterial.model, 'provider/model-2', 'new physical material gets a fresh lease even without idle')
   assert.equal(calls, 2)
 })
@@ -170,10 +170,10 @@ test('WHAT[EMR-006] EMR_006_fresh_physical_receives_the_replaced_target_as_previ
     return previous ?? target(`provider/model-${++next}`, 'low')
   })
 
-  const first = await acquireTarget(runtime, 'continued', 'msg-1', 'coder', 'alice')
+  const first = await acquireTarget(runtime, 'continued', 'msg-1', 'engineer', 'alice')
   assert.equal(first.model, 'provider/model-1')
 
-  const continued = await acquireTarget(runtime, 'continued', 'msg-2', 'coder', 'alice')
+  const continued = await acquireTarget(runtime, 'continued', 'msg-2', 'engineer', 'alice')
   assert.deepEqual(continued, first, 'the atomically replaced active physical supplies the previous target')
   assert.deepEqual(seenPrevious, [null, first])
 })
@@ -185,10 +185,10 @@ test('WHAT[EMR-006] EMR_006_released_session_supplies_no_previous_target', async
     return previous ?? target(`provider/model-${++next}`, 'low')
   })
 
-  await acquireTarget(runtime, 'continued', 'msg-1', 'coder', 'alice')
+  await acquireTarget(runtime, 'continued', 'msg-1', 'engineer', 'alice')
   releasePhysicalExecution(runtime, 'continued', 'msg-1')
 
-  const rebuilt = await acquireTarget(runtime, 'continued', 'msg-2', 'coder', 'alice')
+  const rebuilt = await acquireTarget(runtime, 'continued', 'msg-2', 'engineer', 'alice')
   assert.equal(rebuilt.model, 'provider/model-2', 'no session-history cache survives an exact terminal release')
   assert.deepEqual(seenPrevious, [null, null])
 })
@@ -200,10 +200,10 @@ test('WHAT[EMR-006] EMR_006_unrelated_session_supplies_no_previous_target', asyn
     return previous ?? target(`provider/model-${++next}`, 'low')
   })
 
-  const first = await acquireTarget(runtime, 'session-a', 'msg-1', 'coder', 'alice')
+  const first = await acquireTarget(runtime, 'session-a', 'msg-1', 'engineer', 'alice')
   assert.equal(first.model, 'provider/model-1')
 
-  const fresh = await acquireTarget(runtime, 'session-b', 'msg-1', 'coder', 'bob')
+  const fresh = await acquireTarget(runtime, 'session-b', 'msg-1', 'engineer', 'bob')
   assert.equal(fresh.model, 'provider/model-2', 'another session never inherits a previous target')
   assert.deepEqual(seenPrevious, [null, null])
 })

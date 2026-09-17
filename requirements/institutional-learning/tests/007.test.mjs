@@ -8,7 +8,7 @@ test('WHAT[INSTITUTIONAL-LEARNING-007] celebrate surfaces deferred work at tail 
   const toolsSource = readFileSync('src/Wanxiangshu/OpenCode/Tools/InstitutionalLearningTools.fs', 'utf8')
 
   // pendingFor must query pendingAttentionWorkPairs ONLY for Celebrate and return [] for Regret
-  const pendingForMatch = toolsSource.match(/let private pendingFor kind durable sessionId =\s*([\s\S]*?)let private commitLearning/)
+  const pendingForMatch = toolsSource.match(/let private pendingFor kind\s+(?:\(durable[^)]*\)|durable)\s+sessionId\s*=\s*([\s\S]*?)let private commitLearning/)
   assert.ok(pendingForMatch, 'pendingFor function must exist')
   assert.match(pendingForMatch[1], /ExperienceKind\.Celebrate ->/, 'Celebrate queries attention-regulation pending work')
   assert.match(pendingForMatch[1], /ExperienceKind\.Regret -> \[\]/, 'Regret returns empty list for pending work')

@@ -234,7 +234,9 @@ module JsTransactionSurface =
         let readSnapshots = System.Collections.Generic.HashSet<string>()
         let explicitReads = System.Collections.Generic.HashSet<string>()
         let stagedWrites = System.Collections.Generic.Dictionary<string, string>()
+        // DSL-MUTABLE: cancellation — transaction aborted flag
         let mutable isAborted = false
+        // DSL-MUTABLE: single-flight — transaction committed flag
         let mutable isCommitted = false
 
         box

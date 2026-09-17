@@ -65,18 +65,18 @@ const providerLimited = (limits, routes) => (role, running, previous) => {
 
 test('WHAT[EMR-002] EMR_002_scheduler_program_error_poisons_pending_and_future_demands', async () => {
   const runtime = createRuntime((role) => {
-    if (role === 'inspector') return null
+    if (role === 'devops') return null
     throw new Error('bad scheduler program')
   })
 
-  const waiting = acquireTarget(runtime, 'waiter', 'msg-waiting', 'inspector', 'alice')
+  const waiting = acquireTarget(runtime, 'waiter', 'msg-waiting', 'devops', 'alice')
   const waitingRejected = assert.rejects(waiting, /bad scheduler program/)
   await Promise.resolve()
   assert.equal(pendingCount(runtime), 1)
 
   await assert.rejects(acquireTarget(runtime, 'boom', 'msg-boom', 'manager', 'bob'), /bad scheduler program/)
   await waitingRejected
-  await assert.rejects(acquireTarget(runtime, 'later', 'msg-later', 'inspector', 'carol'), /bad scheduler program/)
+  await assert.rejects(acquireTarget(runtime, 'later', 'msg-later', 'devops', 'carol'), /bad scheduler program/)
   assert.equal(pendingCount(runtime), 0)
 })
 }

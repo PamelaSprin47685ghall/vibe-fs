@@ -15,6 +15,14 @@ test('WHAT[CONTEXT-COMPRESSION-026] repair episode abandon failure causes rendez
   const authorityRoot = 'msg-auth-cc026'
   const mainSession = 'ses-main-cc026'
 
+  const request = runtime.main({
+    requestId,
+    mainSession,
+    bloggerSession: key,
+    toml: 'content-cc026',
+  })
+  runtime.claimCurrentRequest(scope, key, request)
+
   // 1. Initial claim on fresh slot succeeds
   const firstClaim = runtime.claimRepairEpisode(scope, requestId, authorityRoot, mainSession, key)
   assert.equal(firstClaim, 'Claimed', 'first claim on a clean slot must succeed')

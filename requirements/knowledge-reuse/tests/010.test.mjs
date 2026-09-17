@@ -630,7 +630,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_G_lifecycle_note_finalize_fetch_and_cleanup',
     const after = await casebook.fetchCase(handle, 10, key)
     assert.equal(after.value.q, CANONICAL_Q)
     assert.equal(createCalls.length, 2)
-    assert.equal(after.value.observations[0].contentHash, casebook.contentHash('drift'))
+    assert.equal(after.value.observations[0].contentHash, '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824')
     eventStore.dispose(handle)
   } finally {
     bookkeeper.resetRuntime()

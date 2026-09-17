@@ -769,7 +769,7 @@ module Decision =
 
     let private applyRoadDevOpsBinding state roadId (view: RoadView) devopsId modelTarget =
         match view.BoundDevOps, view.BoundDevOpsModelTarget with
-        | Some existing, Some target when existing = devopsId && Some target = modelTarget -> Ok state
+        | Some existing, Some _ when existing = devopsId -> Ok state
         | Some existing, None when existing = devopsId ->
             commit state roadId [ RelayEvent.RoadDevOpsBound(roadId, devopsId, modelTarget) ]
         | Some existing, _ when isForeignDevOps roadId existing devopsId -> Error "RoadDevOpsAlreadyBound"

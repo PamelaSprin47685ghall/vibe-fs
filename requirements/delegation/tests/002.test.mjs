@@ -15,8 +15,8 @@ test('WHAT[DELEG-002] DELEG_002_calling_name_preserves_office_authority', () => 
   ]
 
   for (const { label, aliases } of activeRoles) {
-    // 验证 Canonical label 属于公开合法角色
-    assert.ok(RolesSurface.allPublicRoleLabels.includes(label), `Canonical label ${label} must be a public role`)
+    // 验证 Canonical label 属于合法角色
+    assert.ok(RolesSurface.allRoleLabels.includes(label), `Canonical label ${label} must be a valid role`)
 
     // 验证所有 calling 别名均解析为同一个 CanonicalRole label
     for (const alias of aliases) {

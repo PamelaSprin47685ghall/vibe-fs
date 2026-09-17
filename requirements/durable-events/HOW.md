@@ -32,3 +32,8 @@
      与 context fold 共用同一份判定，不再各自复制文本。`ContextProjectionBridge` 是第四个桥。同批删掉三条已无调用方的写入辅助
      （`updateCompanion`／`updateAuthority`／`tryUpdateBlog`）。`m6-slice-boundary.test.mjs` 的域 fold 断言集合加入 `Context/Companion/Blogger/ContextFactFold.fs`，并把 `retireAuxiliaryInjectionVisibility` 列入「`Composition/` 之外不得调用」的写入辅助。
 - `event-store-compile-boundary.test.mjs` 直接消费既有 compile-shard 与 subsystem inventory，按显式分片与 subsystem 验证闭包排除及预算，不再自建 XML/legacy kind 正则解析；`scripts/compile-owner.mjs` 对每个目标分片生成 aggregate-order、零 ProjectReference 的 flat project，并以一次 Fable invocation 编译。
+
+## GAP
+
+- `DURABLE-EVENTS-011` / `DURABLE-EVENTS-025`（CLOSED）：Git blob 仅在 remote sync 边界存在（单文件对应单 blob）与 persistence cut stores 禁 optional fatal hook（唯一 fatal 归 composition）已闭合，落点 `tests/011.test.mjs` 与 `tests/025.test.mjs`。
+

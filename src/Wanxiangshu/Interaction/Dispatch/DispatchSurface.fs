@@ -23,7 +23,7 @@ module DispatchSurface =
     type private PlainSessionPort(raw: obj) =
         let typed = unbox<Wanxiangshu.OpenCode.ISessionHostPort> raw
         let sendPrompt = raw?``SendPrompt``
-        // DSL-MUTABLE: buffer — latest physical send observation for the JS result
+        // DSL-MUTABLE: resource — latest physical send observation for the JS result
         let mutable lastObservation: obj = null
 
         member _.LastObservation = lastObservation

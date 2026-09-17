@@ -28,7 +28,7 @@ test('WHAT[EMR-008] EMR_008_sdk_prompt_never_recovers_a_model_from_agent_or_host
   }
   const port = createSdkClientPort(client)
 
-  await sendPrompt(port, 'session-2', 'hello', promptOptions({ agent: 'coder' }))
+  await sendPrompt(port, 'session-2', 'hello', promptOptions({ agent: 'engineer' }))
 
   assert.equal(payload.model, undefined)
   assert.equal(payload.variant, undefined)

@@ -11,8 +11,8 @@ const queueWidth = 32
 const lineageCycles = 64
 const capacity = 4
 const admissionRetainedBound = 84
-const ELIGIBLE = 'coder'
-const BLOCKED = 'inspector'
+const ELIGIBLE = 'engineer'
+const BLOCKED = 'devops'
 const lineageRetainedComposition = Object.freeze({
   ledgerEntries: 1,
   token: 1,
@@ -138,7 +138,7 @@ test('WHAT[EMR-010] seeded lender soak shares one physical credit without retain
     const parent = {
       sessionId: `parent-${cycle}`,
       physicalUserMessageId: `parent-physical-${cycle}`,
-      role: 'coder',
+      role: 'engineer',
       participant: `parent-owner-${cycle}`,
     }
     const child = {
@@ -485,14 +485,14 @@ const providerLimited = (limits, routes) => (role, running, previous) => {
 
 test('WHAT[EMR-010] EMR_010_explicit_lender_credit_is_free_only_to_borrowers_not_global_waiters', async () => {
   const only = target('provider/only')
-  const runtime = createRuntime(providerLimited({ provider: 1 }, { coder: [only], manager: [only], inspector: [only] }))
+  const runtime = createRuntime(providerLimited({ provider: 1 }, { engineer: [only], manager: [only], devops: [only] }))
 
-  await acquireTarget(runtime, 'parent', 'msg-parent', 'coder', 'alice')
+  await acquireTarget(runtime, 'parent', 'msg-parent', 'engineer', 'alice')
   assert.equal(key(await acquireTarget(runtime, 'child', 'msg-child', 'manager', 'bob', 'parent')), key(only))
   assert.equal(snapshotOccupied(runtime).length, 1, 'borrowing never creates a second provider token')
 
   let settled = false
-  const stranger = acquireManaged(runtime, 'stranger', 'msg-stranger', 'inspector', 'carol').then((value) => {
+  const stranger = acquireManaged(runtime, 'stranger', 'msg-stranger', 'devops', 'carol').then((value) => {
     settled = true
     return value
   })
@@ -503,9 +503,9 @@ test('WHAT[EMR-010] EMR_010_explicit_lender_credit_is_free_only_to_borrowers_not
 })
 test('WHAT[EMR-010] EMR_010_absent_lender_queues_without_borrowing', async () => {
   const only = target('provider/only')
-  const runtime = createRuntime(providerLimited({ provider: 1 }, { coder: [only], manager: [only] }))
+  const runtime = createRuntime(providerLimited({ provider: 1 }, { engineer: [only], manager: [only] }))
 
-  await acquireTarget(runtime, 'parent', 'msg-parent', 'coder', 'alice')
+  await acquireTarget(runtime, 'parent', 'msg-parent', 'engineer', 'alice')
   const ghost = await beginExecutionAdmission(runtime, 'child', 'msg-child', 'manager', 'bob', 'ghost')
   assert.equal(ghost.kind, 'Queued', 'a lender with no credit authorizes nothing')
 
@@ -515,9 +515,9 @@ test('WHAT[EMR-010] EMR_010_absent_lender_queues_without_borrowing', async () =>
 })
 test('WHAT[EMR-010] EMR_010_borrowed_step_handoff_reuses_the_same_credit', async () => {
   const only = target('provider/only')
-  const runtime = createRuntime(providerLimited({ provider: 1 }, { coder: [only], manager: [only] }))
+  const runtime = createRuntime(providerLimited({ provider: 1 }, { engineer: [only], manager: [only] }))
 
-  await acquireTarget(runtime, 'parent', 'msg-parent', 'coder', 'alice')
+  await acquireTarget(runtime, 'parent', 'msg-parent', 'engineer', 'alice')
   await acquireTarget(runtime, 'child', 'msg-child', 'manager', 'bob', 'parent')
   await enterProviderStep(runtime, 'child', 'msg-child', [])
 
@@ -529,9 +529,9 @@ test('WHAT[EMR-010] EMR_010_borrowed_step_handoff_reuses_the_same_credit', async
 })
 test('WHAT[EMR-010] EMR_010_owner_transform_entry_reclaims_foreign_inflight_borrow', async () => {
   const only = target('provider/only')
-  const runtime = createRuntime(providerLimited({ provider: 1 }, { coder: [only], manager: [only] }))
+  const runtime = createRuntime(providerLimited({ provider: 1 }, { engineer: [only], manager: [only] }))
 
-  await acquireTarget(runtime, 'parent', 'msg-parent', 'coder', 'alice')
+  await acquireTarget(runtime, 'parent', 'msg-parent', 'engineer', 'alice')
   await acquireTarget(runtime, 'child', 'msg-child', 'manager', 'bob', 'parent')
 
   await enterProviderStep(runtime, 'parent', 'msg-parent', [])
@@ -560,9 +560,9 @@ test('WHAT[EMR-010] EMR_010_owner_transform_entry_reclaims_foreign_inflight_borr
 })
 test('WHAT[EMR-010] EMR_010_older_borrowed_step_precedes_later_owned_step', async () => {
   const only = target('provider/only')
-  const runtime = createRuntime(providerLimited({ provider: 1 }, { coder: [only], manager: [only] }))
+  const runtime = createRuntime(providerLimited({ provider: 1 }, { engineer: [only], manager: [only] }))
 
-  await acquireTarget(runtime, 'parent', 'msg-parent', 'coder', 'alice')
+  await acquireTarget(runtime, 'parent', 'msg-parent', 'engineer', 'alice')
   await acquireTarget(runtime, 'child', 'msg-child', 'manager', 'bob', 'parent')
   await enterProviderStep(runtime, 'parent', 'msg-parent', [])
 
@@ -577,24 +577,29 @@ test('WHAT[EMR-010] EMR_010_older_borrowed_step_precedes_later_owned_step', asyn
   assert.deepEqual(
     capacitySnapshot(runtime).waiters.map((waiter) => waiter.sessionId),
     ['parent'],
-    'owned identity selects its exact token but grants no priority over an older eligible borrower',
+    'borrowed waiter precedes later owned waiter for the same credit',
   )
-
   await childStep
   suppressProviderStep(runtime, 'child', 'msg-child')
+
+  assert.deepEqual(
+    capacitySnapshot(runtime).waiters.map((waiter) => waiter.sessionId),
+    [],
+  )
   await parentNextStep
   suppressProviderStep(runtime, 'parent', 'msg-parent')
   assert.deepEqual(capacitySnapshot(runtime).tokenStateCounts, { idle: 1, inFlight: 0, retiring: 0 })
+  assert.equal(snapshotOccupied(runtime).length, 1)
 })
 test('WHAT[EMR-010] EMR_010_credit_never_crosses_provider_boundary', async () => {
   const a = target('provider-a/model')
   const b = target('provider-b/model')
   const runtime = createRuntime(providerLimited(
     { 'provider-a': 1, 'provider-b': 1 },
-    { coder: [a], manager: [b] },
+    { engineer: [a], manager: [b] },
   ))
 
-  await acquireTarget(runtime, 'parent', 'msg-parent', 'coder', 'alice')
+  await acquireTarget(runtime, 'parent', 'msg-parent', 'engineer', 'alice')
   const child = await beginExecutionAdmission(runtime, 'child', 'msg-child', 'manager', 'bob', 'parent')
   assert.equal(child.kind, 'Acquired', 'a borrower needing another provider takes ordinary capacity')
   assert.equal(key(executionAdmissionTarget(runtime, child.lease)), 'provider-b/model|none')
@@ -605,8 +610,8 @@ test('WHAT[EMR-010] EMR_010_credit_never_crosses_provider_boundary', async () =>
 test('WHAT[EMR-010] EMR_010_reservation_borrowing_shares_one_token', async () => {
   const runtime = createRuntime(() => target('provider/shared'))
 
-  const first = tryReserveManaged(runtime, 'parent', 'coder', null)
-  const second = tryReserveManaged(runtime, 'child', 'coder', 'parent')
+  const first = tryReserveManaged(runtime, 'parent', 'engineer', null)
+  const second = tryReserveManaged(runtime, 'child', 'engineer', 'parent')
   assert.equal(key(first), 'provider/shared|none')
   assert.equal(key(second), 'provider/shared|none')
   assert.equal(capacitySnapshot(runtime).ledgerEntries.length, 1, 'an explicit lender reservation duplicates no capacity')

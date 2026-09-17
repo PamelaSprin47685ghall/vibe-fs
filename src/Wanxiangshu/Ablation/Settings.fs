@@ -18,17 +18,31 @@ module AblationSettings =
         $"WANXIANGSHU_ABLATION_{normalized}"
 
     let private explicitOverrides (nodeIds: AblationNodeId list) =
-        nodeIds
-        |> List.choose (fun id ->
-            env (envNodeKey id)
-            |> Option.bind AblationMode.parse
-            |> Option.map (fun mode -> id, mode))
+        // DSL-MUTABLE: algorithm-scratch — temporary error holding for overrides parsing
+        let mutable err = None
+
+        let pairs =
+            nodeIds
+            |> List.choose (fun id ->
+                let rawOpt = env (envNodeKey id)
+
+                match rawOpt, Option.bind AblationMode.parse rawOpt with
+                | None, _ -> None
+                | Some _, Some mode -> Some(id, mode)
+                | Some raw, None ->
+                    err <- Some(InvalidMode(AblationNodeId.value id, raw))
+                    None)
+
+        match err with
+        | Some e -> Error e
+        | None -> Ok pairs
 
     let load () : Result<AblationRegistry, AblationLoadError> =
         AblationManifest.loadNodes ()
         |> Result.bind (fun document ->
-            let overrides = explicitOverrides (AblationManifest.nodeIds document) |> Map.ofList
-            AblationManifest.buildRegistry document (profile ()) overrides)
+            explicitOverrides (AblationManifest.nodeIds document)
+            |> Result.bind (fun overrides ->
+                AblationManifest.buildRegistry document (profile ()) (Map.ofList overrides)))
 
     let private productionFallback () =
         match AblationManifest.loadNodes () with
@@ -62,6 +76,8 @@ module AblationSettings =
             cached <- Some reg
             reg)
 
+    let setCache (registry: AblationRegistry) = cached <- Some registry
+
     let resetCache () = cached <- None
 
     let speculativeInvestigationMode () =
@@ -71,12 +87,24 @@ module AblationSettings =
         speculativeInvestigationMode () = AblationMode.Ablated
 
     let allowsTool (toolName: string) : bool =
-        match AblationToolMap.tryNode toolName with
+        let targetNode =
+            if toolName = "speculate" then
+                Some(AblationNodeId.create "speculative-investigation")
+            else
+                AblationToolMap.tryNode toolName
+
+        match targetNode with
         | None -> true
         | Some node -> AblationMode.allowsToolExecution (AblationRegistry.modeFor node (current ()))
 
     let allowsToolSchema (toolName: string) : bool =
-        match AblationToolMap.tryNode toolName with
+        let targetNode =
+            if toolName = "speculate" then
+                Some(AblationNodeId.create "speculative-investigation")
+            else
+                AblationToolMap.tryNode toolName
+
+        match targetNode with
         | None -> true
         | Some node -> AblationMode.allowsToolSchema (AblationRegistry.modeFor node (current ()))
 

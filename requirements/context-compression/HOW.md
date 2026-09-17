@@ -31,7 +31,7 @@
 
 2026-09-12：`ContextFactFold` 交出聚合写入后，它对 `EnforcementProjection` 的调用形态没变（仍是纯投影 `applyFromEntry`／`applySquash`，值由 `Composition/Durable/DomainFamilyBridge.ContextProjectionBridge` 注入的窄查询提供），但 fold 不再持有 `AgentProjectionSet`：它只认识 `BloggerCycleProjectionState`／`EnforcementProjectionState`／`BlogProjectionState`／`ActivePrefixEpoch` 四个切片，按 `ContextProjectionChange` 列表表达六种事实要写的切片，拒绝文本与 fact 名放进闭合 `ContextFoldRejection`。前缀观测的吸收判定改由 `PrefixEpochProjection.describe` 提供，与 `ProjectionUpdate.prefixOutcome` 共用一份策略。
 
-`XWire.materializeFrozenRecordPrefix` 在读取并校验 coverable frame blobs 后，直接调用纯 `LifecycleWorkRecord.materialize opening frameBodies "" false`。同 session 不重复渲染 Opening，也不纳入 live RawGap；删除动态模块查找及手写 Chronicle fallback，frame 读取失败仍沿原 taskResult 传播。`lifecycle-work-record.test.mjs` 证明 canonical renderer，`prefix-stability/tests/prefix-writeback.test.mjs` 证明真实写回保留 raw Opening 对象与顺序；原 `ctx-opening-floor` 中只匹配源码／注释的 same-session 用例已删除。这些分别成立的证明尚不覆盖 journal → coverable frames → frozen blob 的完整物化路径，不宣称该集成缺口关闭。
+`XWire.materializeFrozenRecordPrefix` 在读取并校验 coverable frame blobs 后，直接调用纯 `LifecycleWorkRecord.materialize opening frameBodies "" false`。同 session 不重复渲染 Opening，也不纳入 live RawGap；删除动态模块查找及手写 Chronicle fallback，frame 读取失败仍沿原 taskResult 传播。`lifecycle-work-record.test.mjs` 证明 canonical renderer，`prefix-stability/tests/prefix-writeback.test.mjs` 证明真实写回保留 raw Opening 对象与顺序；原 `ctx-opening-floor` 中只匹配源码／注释的 same-session 用例已删除。journal → coverable frames → frozen blob 的完整物化路径由 `tests/016.test.mjs` 端到端物化用例与 `XWireSurface.candidateFromJournal` 证明闭合。
 
 ## 依赖关系
 

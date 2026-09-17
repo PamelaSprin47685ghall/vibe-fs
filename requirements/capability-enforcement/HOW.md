@@ -42,3 +42,8 @@ Roles.permissions (Kernel 层单一真相源)
    - 确定性发布与集成门禁由 `CHGINT-001` ~ `CHGINT-006` 对有效 quality candidate 的 typed admission 发行；durable `PublicationCommitted` 是结果，不另造第二套审查权威。
 
 `ToolRegistry` 直接消费 Fetch、Bookkeeper、Engineer、DevOps、文件变换与生成式 JS 工具的 typed admission／spec，删除模块查找、缺失模块时的备用权限表和静默漏注册路径。注册层只装配既有 provider 合同；`tool-spec-contracts.test.mjs` 与 `internal-leaf-tool-authority.test.mjs` 继续验证公开角色权限和无 attached transaction 时的内部工具拒绝，不以 source token 或生成 JavaScript 布局证明权限正确。
+
+## GAP
+
+- `ENF-013` / `ENF-014` / `ENF-017`（CLOSED）：权威值分类、单点发行与一次性能力不可复制消费证明已闭合，落点 `tests/013.test.mjs`、`tests/014.test.mjs` 与 `tests/017.test.mjs`。
+

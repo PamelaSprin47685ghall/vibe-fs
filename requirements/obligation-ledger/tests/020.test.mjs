@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
@@ -20,10 +20,15 @@ test('WHAT[OBLIGATION-LEDGER-020] OBL_020_ledger_does_not_adjudicate_quality', (
   assert.doesNotMatch(wire, /"quality"|"score"|"verdict"|"pass"|"acceptance"|"grade"/i)
 
   // 2. 生产源码结构断言：义务账本持久事实与投影模型中无质量终局裁决字段
+  assert.equal(
+    existsSync(join(ROOT, 'src/Wanxiangshu/Composition/Durable/MagicTodoIdentity.fs')),
+    false,
+    'MagicTodoIdentity.fs in Composition/Durable must be physically removed',
+  )
   const targetSources = [
     'src/Wanxiangshu/Composition/Durable/MagicTodoFacts.fs',
     'src/Wanxiangshu/Composition/Durable/MagicTodoProjection.fs',
-    'src/Wanxiangshu/Composition/Durable/MagicTodoIdentity.fs',
+    'src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoIdentity.fs',
   ]
 
   const forbiddenQualityTerms = [
@@ -49,7 +54,7 @@ test('WHAT[OBLIGATION-LEDGER-020] OBL_020_ledger_does_not_adjudicate_quality', (
 
   // 3. 架构依赖断言：obligation-ledger 领域分片严禁反向依赖 relay-assessment
   const todoFsproj = readFileSync(
-    join(ROOT, 'src/Wanxiangshu/Work/Mission/Obligation/Todo/Wanxiangshu.Owner.obligation-ledger.mission-obligation-todo-model.fsproj'),
+    join(ROOT, 'src/Wanxiangshu/Wanxiangshu.Owner.obligation-ledger.mission-obligation-todo-model.fsproj'),
     'utf8',
   )
   assert.doesNotMatch(

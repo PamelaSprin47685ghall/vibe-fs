@@ -13,10 +13,10 @@ test('WHAT[ACTION-AFFORDANCE-011] AA_critical_role_boundaries_are_mirrored_on_ca
   const forkEn = read('resources/provider/tool/fork/description/en.md')
   const forkZh = read('resources/provider/tool/fork/description/zh-CN.md')
 
-  assert.match(forkEn, /Engineer[sS]*investigates local facts and changes source code/i)
-  assert.match(forkZh, /Engineer[sS]*调查本地事实并修改源码/i)
-  assert.match(forkEn, /DevOps cannot be forked/i)
-  assert.match(forkZh, /DevOps 不能 fork/i)
+  assert.match(forkEn, /Fork Engineer to establish local facts and change repository source|Engineer.*local facts.*source/is)
+  assert.match(forkZh, /Engineer (?:托付本地事实调查与仓库源码工作|调查本地事实并修改源码)/i)
+  assert.match(forkEn, /DevOps cannot be forked|Do not create an executor/i)
+  assert.match(forkZh, /DevOps 不能 fork|不能创建执行角色/i)
 
   // 2. Resume description mirrors fixed DevOps road boundary and forbidden calling
   const resumeEn = read('resources/provider/tool/resume/description/en.md')

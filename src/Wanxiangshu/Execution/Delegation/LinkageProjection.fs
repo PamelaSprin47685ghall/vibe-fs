@@ -130,10 +130,23 @@ module HandleProjection =
         (current: AgentLinkageProjection)
         (existing: HandleRecord)
         : Result<AgentLinkageProjection, HandleTransitionRejection> =
-        let isSameBinding = sameBinding childSessionId targetAgent byname role ownership existing
+        let isSameBinding =
+            sameBinding childSessionId targetAgent byname role ownership existing
+
         let isDevOpsPhysicalReplacement =
             existing.Lifecycle = Retired
             && sameLogicalDevOpsBinding targetAgent byname role ownership existing
+
+        let linkExistingHandle () =
+            match isSameBinding, existing.Lifecycle with
+            | false, _ -> Error HandleIdentityConflict
+            | true, Active -> Ok current
+            | true, Abandoned _ -> Error AlreadyAbandoned
+            | true, CompletedAwaitingJoin _
+            | true, Retired ->
+                Ok
+                    { current with
+                        Handles = Map.add existing.Handle { existing with Lifecycle = Active } current.Handles }
 
         if isDevOpsPhysicalReplacement then
             // MANAGED-SESSION-024: Replacement physical session atomically takes over devops authority
@@ -148,15 +161,7 @@ module HandleProjection =
                                 LastCompletion = None }
                             current.Handles }
         else
-            match isSameBinding, existing.Lifecycle with
-            | false, _ -> Error HandleIdentityConflict
-            | true, Active -> Ok current
-            | true, Abandoned _ -> Error AlreadyAbandoned
-            | true, CompletedAwaitingJoin _
-            | true, Retired ->
-                Ok
-                    { current with
-                        Handles = Map.add existing.Handle { existing with Lifecycle = Active } current.Handles }
+            linkExistingHandle ()
 
     let linkNamed
         (handle: HandleId)

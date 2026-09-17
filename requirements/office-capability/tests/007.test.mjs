@@ -25,7 +25,7 @@ const ACTIVE_OFFICES = [
 ]
 
 test('WHAT[OFF-007] OFF_007_manager_forkable_offices_is_strictly_engineer', () => {
-  assert.deepEqual(managerForkableOffices(), ['Engineer'])
+  assert.deepEqual(managerForkableOffices(), ['engineer'])
 })
 }
 

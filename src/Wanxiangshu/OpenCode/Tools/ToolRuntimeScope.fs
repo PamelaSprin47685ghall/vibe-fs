@@ -420,19 +420,22 @@ type ToolRuntimeScope
 
     let devopsBindingTasks = Dictionary<string, Task<unit>>()
 
+    let isManagerInJournal (journal: AgentJournal option) (sessionId: SessionId) =
+        match journal with
+        | Some durable ->
+            let snapshot = AgentJournal.snapshot durable
+
+            PromptAuthorityProjectionQueries.activeProfile sessionId snapshot.AgentProjections
+            |> Option.orElseWith (fun () ->
+                PromptAuthorityProjectionQueries.lastAuthorityProfile sessionId snapshot.AgentProjections)
+            |> Option.map (fun p -> p.CanonicalRole = Role.Manager)
+            |> Option.defaultValue false
+        | None -> false
+
     let isManagerProfile (sessionId: SessionId) =
         match activeProfileFor sessionId with
         | Some profile -> profile.CanonicalRole = Role.Manager
-        | None ->
-            match journal with
-            | Some durable ->
-                let snapshot = AgentJournal.snapshot durable
-                PromptAuthorityProjectionQueries.activeProfile sessionId snapshot.AgentProjections
-                |> Option.orElseWith (fun () ->
-                    PromptAuthorityProjectionQueries.lastAuthorityProfile sessionId snapshot.AgentProjections)
-                |> Option.map (fun p -> p.CanonicalRole = Role.Manager)
-                |> Option.defaultValue false
-            | None -> false
+        | None -> isManagerInJournal journal sessionId
 
     let isManagerRoadSession (sessionId: SessionId) =
         let sidStr = SessionId.value sessionId
@@ -448,18 +451,26 @@ type ToolRuntimeScope
         | false -> runtime.AdoptChild(agentId, childSessionId)
         | true -> ()
 
+    let adoptDevOpsIfUnowned
+        (runtime: HostForkRuntime)
+        (parentKey: string)
+        (existingHandle: HandleRecord)
+        (agentId: string)
+        =
+        match runtime.OwnsAgent agentId with
+        | false ->
+            runtime.AdoptChild(agentId, existingHandle.ChildSessionId)
+            runtime.AdoptExisting(agentId, existingHandle.ChildSessionId, existingHandle.CanonicalRole, "devops")
+            runtime.ChildCreated agentId existingHandle.CanonicalRole existingHandle.ChildSessionId
+            runtime.ChildCreatedDir agentId existingHandle.ChildSessionId (runtime.DirectoryOf agentId)
+            registerChild parentKey existingHandle.CanonicalRole existingHandle.ChildSessionId
+        | true -> ()
+
     let syncAdoptDevOps (runtime: HostForkRuntime) (parentKey: string) (existingHandle: HandleRecord) =
         match HandleId.tryAgent existingHandle.Handle with
         | Some handleId ->
             let agentId = AgentHandleId.value handleId
-            match runtime.OwnsAgent agentId with
-            | false ->
-                runtime.AdoptChild(agentId, existingHandle.ChildSessionId)
-                runtime.AdoptExisting(agentId, existingHandle.ChildSessionId, existingHandle.CanonicalRole, "devops")
-                runtime.ChildCreated agentId existingHandle.CanonicalRole existingHandle.ChildSessionId
-                runtime.ChildCreatedDir agentId existingHandle.ChildSessionId (runtime.DirectoryOf agentId)
-                registerChild parentKey existingHandle.CanonicalRole existingHandle.ChildSessionId
-            | true -> ()
+            adoptDevOpsIfUnowned runtime parentKey existingHandle agentId
         | None -> ()
 
     let registerDevOpsChild
@@ -534,6 +545,15 @@ type ToolRuntimeScope
         | Error _ -> lock gate (fun () -> devopsBindingTasks.Remove key |> ignore)
         | Ok() -> ()
 
+    let needsReplacementDevOps (devopsHandleOpt: HandleRecord option) =
+        let lifecycleOpt = devopsHandleOpt |> Option.map (fun h -> h.Lifecycle)
+
+        match lifecycleOpt with
+        | None
+        | Some HandleLifecycle.Retired
+        | Some(HandleLifecycle.Abandoned _) -> true
+        | Some _ -> false
+
     let ensureDevOpsInRuntime
         (sessions: ISessionHostPort)
         (durable: AgentJournal)
@@ -543,20 +563,12 @@ type ToolRuntimeScope
         (devopsHandleOpt: HandleRecord option)
         =
         task {
-            match devopsHandleOpt with
-            | Some existingHandle ->
-                match existingHandle.Lifecycle with
-                | HandleLifecycle.Retired
-                | HandleLifecycle.Abandoned _ ->
-                    // MANAGED-SESSION-024: if prior physical session was retired/abandoned, create and link replacement physical session
-                    let! created = createAndLinkDevOps sessions durable runtime parentSessionId key
-
-                    handleDevOpsCreationResult key created
-                | _ ->
-                    syncAdoptDevOps runtime key existingHandle
-            | None ->
+            match needsReplacementDevOps devopsHandleOpt, devopsHandleOpt with
+            | true, _ ->
                 let! created = createAndLinkDevOps sessions durable runtime parentSessionId key
                 handleDevOpsCreationResult key created
+            | false, Some existingHandle -> syncAdoptDevOps runtime key existingHandle
+            | false, None -> ()
         }
 
     let performEnsureWithRuntime
@@ -605,18 +617,20 @@ type ToolRuntimeScope
                 devopsBindingTasks.[key] <- t
                 t)
 
+    let obtainRoadDevOpsTask (parentSessionId: SessionId) (key: string) =
+        lock gate (fun () ->
+            match getOrCreateRuntime key with
+            | Ok runtime when not (runtime.OwnsAgent "devops") ->
+                devopsBindingTasks.Remove key |> ignore
+                getOrCreateDevOpsTask parentSessionId key
+            | _ -> getOrCreateDevOpsTask parentSessionId key)
+
     let ensureRoadDevOpsBound (parentSessionId: SessionId) : Task<unit> =
         match isManagerRoadSession parentSessionId with
         | false -> Task.FromResult()
         | true ->
             let key = SessionId.value parentSessionId
-            lock gate (fun () ->
-                match getOrCreateRuntime key with
-                | Ok runtime when not (runtime.OwnsAgent "devops") ->
-                    devopsBindingTasks.Remove key |> ignore
-                    getOrCreateDevOpsTask parentSessionId key
-                | _ ->
-                    getOrCreateDevOpsTask parentSessionId key)
+            obtainRoadDevOpsTask parentSessionId key
 
     member _.Sessions = sessions
     member _.WaitObserver = waitObserver
@@ -1096,16 +1110,33 @@ type ToolRuntimeScope
             match prepareResult with
             | Error err -> return Error(sprintf "prepare old handle failed: %s" err)
             | Ok() ->
-                let! retireResult = HandleController.retire (Some journalPort) parentSessionId devopsAgentId
-                let devopsName = "devops"
-                let role = Role.DevOps
-                let key = SessionId.value parentSessionId
+                return!
+                    this.RetireAndContinuePhysicalSession
+                        journalPort
+                        parentSessionId
+                        devopsAgentId
+                        oldChildSessionId
+                        durable
+        }
 
-                match retireResult with
-                | Error err -> return Error(sprintf "retire old handle failed: %s" err)
-                | Ok() ->
-                    return!
-                        this.ContinueAfterRetire durable parentSessionId devopsAgentId oldChildSessionId devopsName role key
+    member private this.RetireAndContinuePhysicalSession
+        (journalPort: AgentJournalPort)
+        (parentSessionId: SessionId)
+        (devopsAgentId: string)
+        (oldChildSessionId: SessionId)
+        (durable: AgentJournal)
+        =
+        task {
+            let! retireResult = HandleController.retire (Some journalPort) parentSessionId devopsAgentId
+            let devopsName = "devops"
+            let role = Role.DevOps
+            let key = SessionId.value parentSessionId
+
+            match retireResult with
+            | Error err -> return Error(sprintf "retire old handle failed: %s" err)
+            | Ok() ->
+                return!
+                    this.ContinueAfterRetire durable parentSessionId devopsAgentId oldChildSessionId devopsName role key
         }
 
     member this.ReplacePhysicalSession

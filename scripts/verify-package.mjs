@@ -553,6 +553,33 @@ export async function runExternalConsumer({
   return true
 }
 
+export function assertActiveRegistrations({ extractedPackageDir, root }) {
+  const roleDir = path.join(extractedPackageDir, 'resources/provider/role')
+  if (!fs.existsSync(roleDir)) {
+    throw new Error(`extracted package missing resources/provider/role: ${roleDir}`)
+  }
+  const actualRoles = fs
+    .readdirSync(roleDir, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name)
+    .sort()
+
+  const expectedActiveRoles = [
+    'blogger',
+    'bookkeeper',
+    'devops',
+    'engineer',
+    'manager',
+    'orchestrator',
+  ].sort()
+
+  if (JSON.stringify(actualRoles) !== JSON.stringify(expectedActiveRoles)) {
+    throw new Error(
+      `resources/provider/role in package must strictly equal active roles: expected ${expectedActiveRoles.join(',')}, got ${actualRoles.join(',')}`,
+    )
+  }
+}
+
 /**
  * Verifies package closure and integrity end-to-end.
  *

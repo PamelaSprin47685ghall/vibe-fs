@@ -111,9 +111,9 @@ test('WHAT[EMR-004] EMR_004_required_null_waits_for_an_occupancy_event_then_retr
     : null
   const runtime = createRuntime(route)
 
-  await acquireTarget(runtime, 'holder', 'msg-holder', 'coder', 'alice')
+  await acquireTarget(runtime, 'holder', 'msg-holder', 'engineer', 'alice')
   let settled = false
-  const waiting = acquireTarget(runtime, 'waiter', 'msg-waiter', 'coder', 'bob').then((value) => {
+  const waiting = acquireTarget(runtime, 'waiter', 'msg-waiter', 'engineer', 'bob').then((value) => {
     settled = true
     return value
   })
@@ -128,14 +128,14 @@ test('WHAT[EMR-004] EMR_004_required_null_waits_for_an_occupancy_event_then_retr
   assert.equal(snapshotOccupied(runtime).length, 1)
 })
 test('WHAT[EMR-004] EMR_004_newer_physical_message_cancels_superseded_pending_demand', async () => {
-  const runtime = createRuntime((role) => role === 'inspector' ? null : target(`provider/${role}`))
+  const runtime = createRuntime((role) => role === 'devops' ? null : target(`provider/${role}`))
 
-  const old = acquireManaged(runtime, 'same-session', 'msg-old', 'inspector', 'alice')
+  const old = acquireManaged(runtime, 'same-session', 'msg-old', 'devops', 'alice')
   await Promise.resolve()
   assert.equal(pendingCount(runtime), 1)
 
-  const fresh = await acquireTarget(runtime, 'same-session', 'msg-new', 'coder', 'alice')
-  assert.equal(fresh.model, 'provider/coder')
+  const fresh = await acquireTarget(runtime, 'same-session', 'msg-new', 'engineer', 'alice')
+  assert.equal(fresh.model, 'provider/engineer')
   const oldOutcome = await old
   assert.equal(oldOutcome.kind, 'Superseded')
   assert.equal(oldOutcome.target, null)
@@ -143,14 +143,14 @@ test('WHAT[EMR-004] EMR_004_newer_physical_message_cancels_superseded_pending_de
   assert.equal(snapshotOccupied(runtime).length, 1)
 })
 test('WHAT[EMR-004] EMR_004_an_earlier_null_waiter_does_not_head_of_line_block_another_role', async () => {
-  const runtime = createRuntime((role) => role === 'inspector' ? null : target(`provider/${role}`))
+  const runtime = createRuntime((role) => role === 'devops' ? null : target(`provider/${role}`))
 
-  const blocked = acquireManaged(runtime, 'blocked-session', 'msg-blocked', 'inspector', 'alice')
+  const blocked = acquireManaged(runtime, 'blocked-session', 'msg-blocked', 'devops', 'alice')
   await Promise.resolve()
   assert.equal(pendingCount(runtime), 1)
 
-  const free = await acquireTarget(runtime, 'free-session', 'msg-free', 'coder', 'bob')
-  assert.equal(key(free), 'provider/coder|none')
+  const free = await acquireTarget(runtime, 'free-session', 'msg-free', 'engineer', 'bob')
+  assert.equal(key(free), 'provider/engineer|none')
   assert.equal(pendingCount(runtime), 1)
 
   cancelPendingExecution(runtime, 'blocked-session')
@@ -160,7 +160,7 @@ test('WHAT[EMR-004] EMR_004_an_earlier_null_waiter_does_not_head_of_line_block_a
 })
 test('WHAT[EMR-004] EMR_004_optional_null_is_k0_not_a_pending_demand', () => {
   const runtime = createRuntime(() => null)
-  assert.equal(tryReserveManaged(runtime, 'replica', 'coder', null), null)
+  assert.equal(tryReserveManaged(runtime, 'replica', 'engineer', null), null)
   assert.equal(pendingCount(runtime), 0)
   assert.deepEqual(snapshotOccupied(runtime), [])
 })
@@ -171,31 +171,31 @@ test('WHAT[EMR-004] EMR_004_strength_reservation_is_adopted_by_chat_message_with
     return target('provider/replica')
   })
 
-  const reserved = tryReserveManaged(runtime, 'replica', 'coder', null)
+  const reserved = tryReserveManaged(runtime, 'replica', 'engineer', null)
   assert.equal(key(reserved), 'provider/replica|none')
   assert.equal(snapshotOccupied(runtime).length, 1)
 
-  const adopted = await acquireTarget(runtime, 'replica', 'msg-replica', 'coder', 'alice')
+  const adopted = await acquireTarget(runtime, 'replica', 'msg-replica', 'engineer', 'alice')
   assert.equal(key(adopted), 'provider/replica|none')
   assert.equal(calls, 1, 'physical acceptance adopts the reservation without another scheduler decision')
   assert.equal(snapshotOccupied(runtime).length, 1, 'reservation and physical execution are one capacity occurrence')
-  assert.equal(key(tryLease(runtime, 'replica', 'msg-replica', 'coder', 'alice', null)), 'provider/replica|none')
+  assert.equal(key(tryLease(runtime, 'replica', 'msg-replica', 'engineer', 'alice', null)), 'provider/replica|none')
 })
 test('WHAT[EMR-004] EMR_004_reservation_adoption_binds_role_and_participant', async () => {
   const runtime = createRuntime(() => target('provider/replica'))
-  tryReserveManaged(runtime, 'replica', 'coder', null)
+  tryReserveManaged(runtime, 'replica', 'engineer', null)
 
-  await acquireTarget(runtime, 'replica', 'msg-replica', 'coder', 'alice')
+  await acquireTarget(runtime, 'replica', 'msg-replica', 'engineer', 'alice')
   await assert.rejects(
-    acquireTarget(runtime, 'replica', 'msg-replica', 'coder', 'bob'),
+    acquireTarget(runtime, 'replica', 'msg-replica', 'engineer', 'bob'),
     /physical execution .* changed participant/i,
     'the first adopter binds the participant for that exact physical execution',
   )
 
   const rerouted = createRuntime(() => target('provider/replica'))
-  tryReserveManaged(rerouted, 'replica', 'coder', null)
+  tryReserveManaged(rerouted, 'replica', 'engineer', null)
   await assert.rejects(
-    acquireTarget(rerouted, 'replica', 'msg-replica', 'inspector', 'alice'),
+    acquireTarget(rerouted, 'replica', 'msg-replica', 'devops', 'alice'),
     /physical execution .* changed role/i,
     'a reservation carries its Role until adoption',
   )

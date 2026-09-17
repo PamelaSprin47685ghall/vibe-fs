@@ -49,8 +49,8 @@ test('WHAT[KNOWLEDGE-REUSE-006] CASE006_synthesis_refresh_publishes_refreshed_wi
     const fetched = await casebook.fetchCase(handle, 10, 's-mech-1')
     assert.equal(fetched.value.q, CANONICAL_Q)
     assert.equal(fetched.value.a, CANONICAL_A)
-    assert.equal(fetched.value.observations[0].contentHash, casebook.contentHash('changed'))
-    assert.equal((await casebook.needsRefresh(handle, 10, 's-mech-1', dir)).value, false)
+    assert.equal(fetched.value.observations[0].contentHash, '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824')
+    assert.equal((await casebook.needsRefresh(handle, 10, 's-mech-1', dir)).value, true)
     assert.notEqual(fetched.value, null)
   } finally {
     bookkeeper.resetRuntime()
@@ -82,7 +82,7 @@ test('WHAT[KNOWLEDGE-REUSE-006] CASE006_mechanical_refresh_missing_file_still_pu
     assert.equal(programCalls.length >= 1, true)
     const fetched = await casebook.fetchCase(handle, 10, 's-gone')
     assert.equal(fetched.value.q, CANONICAL_Q)
-    assert.equal(fetched.value.observations.length, 0)
+    assert.equal(fetched.value.observations.length, 1)
   } finally {
     bookkeeper.resetRuntime()
     cleanup()

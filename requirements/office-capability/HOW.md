@@ -37,3 +37,8 @@ Office Consequence Model (语义唯一事实源)
 资源和运行接点共同修改：Bookkeeper 两阶段加载同语言的共同法、角色法和阶段提示；JS 示例按 Engineer 的读写能力和 DevOps 的直接修复职责选择；原始输出只进数据字段，截断说明从双语资源加载。案例 freshness 仅说明关联文件与维护状态，不声称已经重新验证正确性。
 
 `tests/005.test.mjs` 全量扫描分发资源并检查双语职责投影。实际装配由 `provider-language/tests/012.test.mjs` 检查；案例、命令输出和生成示例另由其 owning package 的正式测试证明。字符串断言不代表模型行为 canary、运行时权限或完整迁移已经通过。
+
+## GAP
+
+- `OFF-003` / `OFF-018`（CLOSED）：同一 Office authority 不变性与 Sphinx 程控探究流程约束已闭合，落点 `tests/003.test.mjs` 与 `tests/018.test.mjs`。
+

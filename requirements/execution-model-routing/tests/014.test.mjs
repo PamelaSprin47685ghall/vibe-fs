@@ -115,8 +115,8 @@ const queueWidth = 32
 const lineageCycles = 64
 const capacity = 4
 const admissionRetainedBound = 84
-const ELIGIBLE = 'coder'
-const BLOCKED = 'inspector'
+const ELIGIBLE = 'engineer'
+const BLOCKED = 'devops'
 const lineageRetainedComposition = Object.freeze({
   ledgerEntries: 1,
   token: 1,

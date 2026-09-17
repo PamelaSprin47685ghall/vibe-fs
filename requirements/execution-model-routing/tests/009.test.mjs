@@ -29,7 +29,7 @@ test('WHAT[EMR-009] EMR_009_sdk_prompt_projects_model_without_nested_variant_and
   const port = createSdkClientPort(client)
 
   await sendPrompt(port, 'session-1', 'hello', promptOptions({
-    agent: 'coder',
+    agent: 'engineer',
     model: { providerID: 'provider', modelID: 'model', variant: 'high' },
   }))
 

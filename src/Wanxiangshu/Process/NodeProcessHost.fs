@@ -284,9 +284,9 @@ module NodeProcessHost =
 
     let private drainAllChunks (fd: int) (chunkSize: int) (consume: byte[] -> unit) =
         let buffer = Array.zeroCreate<byte> chunkSize
-        // DSL-MUTABLE: buffer — read loop file offset
+        // DSL-MUTABLE: algorithm-scratch — read loop file offset
         let mutable position = 0
-        // DSL-MUTABLE: buffer — read loop done flag
+        // DSL-MUTABLE: algorithm-scratch — read loop done flag
         let mutable done' = false
 
         while not done' do

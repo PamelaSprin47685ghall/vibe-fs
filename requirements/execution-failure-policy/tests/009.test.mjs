@@ -20,7 +20,7 @@ test('WHAT[EXECFAIL-009] host error boundary normalizes raw untyped errors to pr
   for (const err of rawErrors) {
     const decoded = signals.tryDecode(sessionError(err))
     assert.ok(decoded != null)
-    assert.equal(decoded.kind, 'AttemptAborted')
+    assert.equal(decoded.kind, 'ProviderFailure')
     assert.equal(decoded.failure, 'ProviderTransient')
     assert.equal(decoded.diagnostic, err.message)
   }

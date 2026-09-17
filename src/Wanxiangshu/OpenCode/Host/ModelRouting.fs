@@ -292,6 +292,8 @@ module ModelRouting =
         let recoveryRetryTargetBySession = Dictionary<string, ModelRoutingTarget>()
         // DSL-MUTABLE: resource — bound ModelTarget per DevOps session (EMR-019 / MSL-024 / IA-022)
         let boundDevopsTargetBySession = Dictionary<string, ModelRoutingTarget>()
+        // DSL-MUTABLE: resource — superseded physical user message identities per session
+        let supersededPhysical = HashSet<string * string>()
         let admissionQueue = ExecutionAdmissionQueue(gate, transitionCounters)
         let admissionOwner = ExecutionCapacityOwner(transitionCounters)
         // DSL-MUTABLE: resource — process-local scheduler poison
@@ -679,6 +681,10 @@ module ModelRouting =
             | Some current -> current
             | None ->
                 let oldPhysicalUserMessageId = currentPhysicalUserMessageId sessionId
+
+                oldPhysicalUserMessageId
+                |> Option.iter (fun oldId -> supersededPhysical.Add(sessionId, oldId) |> ignore)
+
                 let previous = recoveryPreviousTarget sessionId
                 activeBySession.Remove sessionId |> ignore
                 supersedeCurrentDemand sessionId
@@ -835,6 +841,44 @@ module ModelRouting =
                 enforceImmutableDevopsBinding sessionId role target
                 Some target
 
+        let replaceActiveLeaseAndEnforce
+            sessionId
+            physicalUserMessageId
+            role
+            participant
+            lenderSessionId
+            (oldLease: ExecutionLease)
+            =
+            let previous = Some oldLease.Target
+            let oldPhysicalUserMessageId = oldLease.PhysicalUserMessageId
+
+            oldPhysicalUserMessageId
+            |> Option.iter (fun oldId -> supersededPhysical.Add(sessionId, oldId) |> ignore)
+
+            activeBySession.Remove sessionId |> ignore
+
+            let targetOpt =
+                routeFreshOrPoison
+                    sessionId
+                    oldPhysicalUserMessageId
+                    physicalUserMessageId
+                    role
+                    lenderSessionId
+                    previous
+
+            match targetOpt with
+            | Some target ->
+                activeBySession.[sessionId] <-
+                    { PhysicalUserMessageId = Some physicalUserMessageId
+                      Participant = Some participant
+                      RoutingRole = role
+                      Target = target }
+
+                drainDemands ()
+                enforceImmutableDevopsBinding sessionId role target
+                Some target
+            | None -> None
+
         let tryLeaseLocked
             sessionId
             physicalUserMessageId
@@ -842,21 +886,27 @@ module ModelRouting =
             (participant: string)
             (lenderSessionId: string option)
             =
-            match activeBySession.TryGetValue sessionId with
-            | true, lease when
+            match
+                supersededPhysical.Contains(sessionId, physicalUserMessageId), activeBySession.TryGetValue sessionId
+            with
+            | true, _ -> None
+            | false, (true, lease) when
                 lease.PhysicalUserMessageId = Some physicalUserMessageId
                 && lease.RoutingRole = role
                 && (lease.Participant = Some participant || lease.Participant.IsNone)
                 ->
                 Some lease.Target
-            | true, lease when
+            | false, (true, lease) when
                 lease.PhysicalUserMessageId.IsNone
                 && lease.RoutingRole = role
                 && (lease.Participant = Some participant || lease.Participant.IsNone)
                 ->
                 adoptExistingReservation sessionId physicalUserMessageId role participant lease
-            | true, _ -> None
-            | false, _ -> acquireFreshLeaseAndEnforce sessionId physicalUserMessageId role participant lenderSessionId
+            | false, (true, lease) when lease.PhysicalUserMessageId <> Some physicalUserMessageId ->
+                replaceActiveLeaseAndEnforce sessionId physicalUserMessageId role participant lenderSessionId lease
+            | false, (true, _) -> None
+            | false, (false, _) ->
+                acquireFreshLeaseAndEnforce sessionId physicalUserMessageId role participant lenderSessionId
 
         let exactTargetAvailable (role: Role) target running =
             match scheduleOrPoison running role (Some target) with
@@ -1013,6 +1063,7 @@ module ModelRouting =
         member _.ExecutionAdmissionTarget(lease: ExecutionAdmissionLease) = admissionOwner.Target lease
 
         member _.CommitExecutionAdmission(lease: ExecutionAdmissionLease, observed: ExecutionAdmissionExactIdentity) =
+            lock gate (fun () -> enforceImmutableDevopsBinding observed.SessionId observed.Role observed.Target)
             admissionOwner.Commit(lease, observed)
 
         member _.ReleaseExecutionAdmissionBeforeProvider

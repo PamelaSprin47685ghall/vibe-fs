@@ -163,20 +163,26 @@ module PersonaSurface =
             | "InheritedFromOwner" -> Some PersonaOrigin.InheritedFromOwner
             | _ -> None
 
-        match parsedRole, parsedOrigin with
-        | None, _ -> boundaryFailure "InvalidRoleLabel"
-        | _, None -> boundaryFailure "InvalidOriginLabel"
-        | Some role, Some personaOrigin ->
-            let input =
-                { SelectedAgent = canonicalManagedName
-                  Role = role
-                  Persona = personaName
-                  PersonaCatalogVersion = catalogVersion
-                  Origin = personaOrigin }
+        if
+            ManagedAgentCatalog.isLegacyAgentName (canonicalManagedName.ToLowerInvariant())
+            && roleLabel = "engineer"
+        then
+            boundaryFailure "LegacyParticipantCannotUpgradeToEngineer"
+        else
+            match parsedRole, parsedOrigin with
+            | None, _ -> boundaryFailure "InvalidRoleLabel"
+            | _, None -> boundaryFailure "InvalidOriginLabel"
+            | Some role, Some personaOrigin ->
+                let input =
+                    { SelectedAgent = canonicalManagedName
+                      Role = role
+                      Persona = personaName
+                      PersonaCatalogVersion = catalogVersion
+                      Origin = personaOrigin }
 
-            if String.IsNullOrWhiteSpace ownerCanonicalManagedName then
-                ParticipantIdentity.rehydrate None input |> identityResult
-            else
-                ParticipantIdentity.resolveAtRoot ownerCanonicalManagedName
-                |> Result.bind (fun owner -> ParticipantIdentity.rehydrate (Some owner) input)
-                |> identityResult
+                if String.IsNullOrWhiteSpace ownerCanonicalManagedName then
+                    ParticipantIdentity.rehydrate None input |> identityResult
+                else
+                    ParticipantIdentity.resolveAtRoot ownerCanonicalManagedName
+                    |> Result.bind (fun owner -> ParticipantIdentity.rehydrate (Some owner) input)
+                    |> identityResult

@@ -44,4 +44,4 @@ ExecutionBinding { target: ModelTarget; fence: CapacityFence; lease }
 
 ## GAP
 
-- `PID-010`（OPEN）：活跃身份解析已收敛为 Engineer/DevOps/Manager/Orchestrator/Blogger，Coder/Inspector/Browser/Inquiry/Distiller 退出活跃路径，历史身份解码隔离待 P1 角色迁移与解码器实现完成闭合。
+- `PID-010`（CLOSED）：活跃身份解析已收敛为 Engineer/DevOps/Manager/Orchestrator/Blogger，Coder/Inspector/Browser/Inquiry/Distiller 退出活跃路径，历史身份解码隔离已闭合，落点 `Identity.fs` 升权修复、`Roles` 分流及 `tests/010.test.mjs`。

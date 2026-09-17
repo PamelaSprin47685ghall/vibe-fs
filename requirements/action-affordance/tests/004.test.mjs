@@ -29,18 +29,18 @@ test('WHAT[ACTION-AFFORDANCE-004] AA_repair_behavior_is_legacy_forbidden_and_mec
   )
   assert.match(
     managerZh,
-    /并不以「只有唯一机械操作」或逐次批准为前提/i,
+    /并不以「只有唯一机械操作」或逐次批准为前提|不需要你逐次批准[，,]也不要求只有一种机械修法/i,
     'manager zh must recognize devops non-mechanical repairs within requirements',
   )
 
   assert.match(
     devopsEn,
-    /Inherent authority to directly repair ordinary defects/i,
+    /Inherent authority to directly repair ordinary defects|Direct engineering and autonomous local repair|inherent repair authority/i,
     'devops en must declare inherent repair authority',
   )
   assert.match(
     devopsZh,
-    /角色固有的普通缺陷直接修复授权/i,
+    /角色固有的普通缺陷直接修复授权|角色固有权限[，,]无需 Manager 逐次批准/i,
     'devops zh must declare inherent repair authority',
   )
 

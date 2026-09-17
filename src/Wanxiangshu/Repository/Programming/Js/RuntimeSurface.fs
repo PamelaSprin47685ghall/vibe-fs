@@ -16,7 +16,7 @@ module JsRuntimeSurface =
         member _.ReadSnapshots = readSnapshots
 
     let createApi (root: string) : obj =
-        // DSL-MUTABLE: buffer — JS mutation staging buffer handed off in handle
+        // DSL-MUTABLE: resource — JS mutation staging buffer handed off in handle
         let staging = ResizeArray<JsStagedMutation>()
         let readSnapshots = ResizeArray<JsReadSnapshot>()
         let api = JsToolsBindings.createApi root staging readSnapshots

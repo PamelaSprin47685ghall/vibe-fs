@@ -63,7 +63,7 @@ test('WHAT[ABL-010] primary agents and Sphinx MCP are correctly gated by ablatio
   // 3. epistemic-reasoning 为 ablated 时，Sphinx MCP 必须处于 Disabled
   withEnv(
     [
-      ['WANXIANGSHU_ABLATION_PROFILE', 'production'],
+      ['WANXIANGSHU_ABLATION_PROFILE', 'station-41'],
       ['WANXIANGSHU_ABLATION_epistemic_reasoning', 'ablated'],
     ],
     () => {

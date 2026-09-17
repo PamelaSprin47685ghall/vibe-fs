@@ -77,6 +77,7 @@ module Spool =
     /// UTF-8 continuation bytes have the 0b10xxxxxx shape; a truncated tail may
     /// begin inside a multi-byte character and must start at its first byte.
     let private continuationPrefixLength (bytes: byte[]) : int =
+        // DSL-MUTABLE: algorithm-scratch — UTF-8 continuation scan offset
         let mutable start = 0
 
         while start < bytes.Length && (bytes.[start] &&& 0xC0uy) = 0x80uy do
@@ -108,7 +109,9 @@ module Spool =
 
     let readLatestTail (limitBytes: int) (path: string) : Task<TailInput> =
         task {
+            // DSL-MUTABLE: algorithm-scratch — chunk accumulation buffer
             let mutable latest = [||]
+            // DSL-MUTABLE: algorithm-scratch — total byte counter for observed chunks
             let mutable observedBytes = 0L
 
             do!

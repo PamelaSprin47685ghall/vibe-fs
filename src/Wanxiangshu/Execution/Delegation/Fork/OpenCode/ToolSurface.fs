@@ -29,7 +29,9 @@ module ForkToolSurface =
 
     type private ForkSessionPort() =
         let children = ResizeArray<OpenCodeChildInfo>()
+        // DSL-MUTABLE: algorithm-scratch — latest prompted session in the harness
         let mutable latestPromptedSession: SessionId option = None
+        // DSL-MUTABLE: algorithm-scratch — pre-accepted prompt count in the harness
         let mutable preAcceptedPrompts = 0
         let listeners = Dictionary<string, ResizeArray<TerminalCompletionListener>>()
         let prompts = Dictionary<string, ResizeArray<string>>()

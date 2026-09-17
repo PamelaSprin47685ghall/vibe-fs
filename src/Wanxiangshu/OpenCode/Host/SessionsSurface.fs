@@ -50,6 +50,7 @@ module SessionsSurface =
         let rejection =
             TaskCompletionSource<Result<unit, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
 
+        // DSL-MUTABLE: resource — virtual clock for controlled OpenCode port
         let virtualTime = ref 0
 
         member _.Aborts = aborts.ToArray()

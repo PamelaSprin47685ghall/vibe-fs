@@ -2,6 +2,10 @@
 
 `WHAT.md` 是唯一 normative 合同。本文只记录当前实现入口与迁移方法。
 
+## GAP
+
+- `STRUCTURED-WORKFLOW-005`（CLOSED）：可变存储仅承载物理资源、投影缓存或算法草稿已闭合，落点 `tests/005.test.mjs`。
+
 ## 1. 当前结构入口
 
 - `scripts/checks/subsystems.json`：迁移期唯一 legacy-owner → subsystem 映射。它只帮助尚未显式迁移的 shard 解析 subsystem，不定义 consumer ACL、exposure 或业务 law。

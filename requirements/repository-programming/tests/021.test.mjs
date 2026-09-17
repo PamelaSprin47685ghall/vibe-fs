@@ -26,8 +26,8 @@ test('WHAT[REPOSITORY-PROGRAMMING-021] JS_SURFACE_GATE_rejects_handwritten_js_co
 test('WHAT[REPOSITORY-PROGRAMMING-021] JS_SURFACE_GATE_allows_permission_matrix_enumeration', () => {
   const hits = scanEntries([
     {
-      file: 'src/Wanxiangshu/Tools/StaticTools.fs',
-      text: 'let known = ["js-inquiry"; "js-coder"]\n',
+      file: 'src/Wanxiangshu/OpenCode/Tools/StaticTools.fs',
+      text: 'let knownToolNames = ["js-engineer"; "js-devops"; "js-bookkeeper"; "js-manager"; "js-orchestrator"; "js-blogger"]\n',
     },
   ])
   assert.deepEqual(hits, [])

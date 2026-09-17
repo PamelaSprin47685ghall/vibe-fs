@@ -18,12 +18,12 @@ test('WHAT[INTERACTION-AUTHORITY-021] historical inspector records are isolated 
   assert.equal(CapabilitySurface.isAllowed('Coder', 'Fission'), false, 'Legacy Coder must not have Fission permission')
 
   // 2. Active identity resolution fail-closed: legacy role names return LegacyParticipantName error and NEVER upgrade to Engineer
-  const legacyInspectorResolve = PersonaSurface.resolveAtRoot('inspector')
+  const legacyInspectorResolve = PersonaSurface.resolveParticipantIdentityAtRoot('inspector')
   assert.equal(legacyInspectorResolve.ok, false)
   assert.equal(legacyInspectorResolve.error, 'LegacyParticipantName', 'Resolving legacy inspector at root must fail-closed with LegacyParticipantName')
   assert.equal(legacyInspectorResolve.identity, null)
 
-  const legacyCoderResolve = PersonaSurface.resolveAtRoot('coder')
+  const legacyCoderResolve = PersonaSurface.resolveParticipantIdentityAtRoot('coder')
   assert.equal(legacyCoderResolve.ok, false)
   assert.equal(legacyCoderResolve.error, 'LegacyParticipantName', 'Resolving legacy coder at root must fail-closed with LegacyParticipantName')
   assert.equal(legacyCoderResolve.identity, null)

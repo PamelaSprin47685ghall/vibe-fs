@@ -29,7 +29,7 @@ test('WHAT[ACTION-AFFORDANCE-003] AA_inspect_is_legacy_forbidden_and_causal_read
   )
   assert.match(
     commonLawZh,
-    /Engineer 调查本地事实并修改源码；DevOps 承担真实执行/i,
+    /Engineer (?:负责)?调查本地事实并修改源码；DevOps (?:承担真实执行|则负责真刀真枪跑执行)/i,
     'common law zh must distinguish investigation from execution',
   )
 
@@ -40,7 +40,7 @@ test('WHAT[ACTION-AFFORDANCE-003] AA_inspect_is_legacy_forbidden_and_causal_read
   )
   assert.match(
     engineerZh,
-    /只读任务以发现收束，不顺手改进现场/i,
+    /只读任务以发现收束，不顺手改进现场|只读任务交付的是事实，不是被你改善后的现场/i,
     'engineer zh must enforce read-only assignment restriction',
   )
 

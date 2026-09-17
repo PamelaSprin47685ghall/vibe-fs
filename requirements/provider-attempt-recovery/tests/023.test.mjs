@@ -24,7 +24,7 @@ test('WHAT[PAR-023] session idle sweep selectively targets only Accepted without
   await recoveryHost.seedAccepted(handle, sessionIdA, 'msg-accepted-1')
 
   // Execution 2: ses-a, Accepted + ProviderStarted (already reached provider, not target)
-  await recoveryHost.seedStarted(handle, sessionIdA, 'msg-started-2')
+  await recoveryHost.seedProviderStarted(handle, sessionIdA, 'msg-started-2', 'run-started-2')
 
   // Execution 3: ses-b, Accepted, NO ProviderStarted (different session)
   await recoveryHost.seedAccepted(handle, sessionIdB, 'msg-accepted-3')

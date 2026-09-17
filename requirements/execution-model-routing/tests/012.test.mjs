@@ -82,7 +82,7 @@ const target = (model = 'provider/shared', reasoning = 'none') => ({ model, reas
 const identity = (overrides = {}) => ({
   sessionId: 'session-a',
   physicalUserMessageId: 'message-a',
-  role: 'coder',
+  role: 'engineer',
   participant: 'alice',
   target: target(),
   ...overrides,
@@ -133,7 +133,7 @@ test('WHAT[EMR-012] rejects commit with the wrong role', async () => {
   const runtime = routing.createRuntime(() => target())
   const lease = await acquire(runtime)
 
-  conflict(routing.commitExecutionAdmission(runtime, lease, identity({ role: 'inspector' })))
+  conflict(routing.commitExecutionAdmission(runtime, lease, identity({ role: 'devops' })))
   assert.equal(routing.snapshotOccupied(runtime).length, 1, 'wrong role cannot settle capacity')
   assert.deepEqual(routing.commitExecutionAdmission(runtime, lease, identity()), { kind: 'Applied' })
 })
@@ -152,7 +152,7 @@ test('WHAT[EMR-012] rejects release from another physical message and every wron
   for (const change of [
     { sessionId: 'other-session' },
     { physicalUserMessageId: 'other-message' },
-    { role: 'inspector' },
+    { role: 'devops' },
     { participant: 'bob' },
     { target: { model: 'provider/other', reasoning: 'none' } },
   ]) {

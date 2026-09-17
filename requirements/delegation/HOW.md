@@ -33,6 +33,6 @@ DELEG-020 约束：委托语义不依赖当前工具名字面值（`fork`、`com
 
 ## GAP
 
-- `DELEG-032`（OPEN）：Engineer 完成即返回 Manager、禁止 Engineer→DevOps 差遣与 DevOps 差遣其他子代理，待 P1/P2/P3 角色权限与工具链收拢后闭合。
+- `DELEG-032`（CLOSED）：Engineer 完成即返回 Manager、禁止 Engineer→DevOps 差遣与 DevOps 差遣其他子代理已闭合，落点 `tests/032.test.mjs`（权限矩阵断言）。
 - `sync-stream-seal`（CLOSED）：流式环境中多个 Inspector 并发调用时，单个工具调用无法在执行时刻预知本轮是否还有后续 sibling 工具调用到达。现由 `InspectorTool` 在流式步骤中以瞬时接受占位方式返回（解除流式死锁与 premature batch 冲突），并将待检任务登记到 `SyncDelegateBatching` 延期队列中；在宿主进入下一轮请求前，由 `PluginTransforms`（`experimental.chat.messages.transform` 管道）一次性收拢本轮积攒的所有 Inspector charges，以单一聚合 Prompt 触发一次性 Inspector 子会话调度，取得权威 `WorkRecord` 与 sibling 引用并存入持久化替换字典；在每次 Transform 执行时扫描 `messages` 就地替换历史 tool 结果，保证上下文与真实子会话执行完全满足 DELEG-008/012，全量单元测试与 56 步 Long Stroke G2 E2E 真实 Host 验证全绿。
 - `GAP-027`（CLOSED）：旧 reusable handoff 以 physical child `SessionId` 持有 cursor，并在 prompt 已 dispatch 后追加可失败 bookkeeping；旧 sticky terminal 还能跨 invocation 重放，fork idle reuse 又会立即返回旧/全生命周期结果，active new charge 还会混入 `BusyAgentNudge`。现已收口为 direct F# CE：logical-route frontier 只由 completed-handoff fact 推导；same-road fork/SyncDelegate 都执行 `prepare delta → dispatch → await own causal completion → bounded callee LWR → checkpoint`；fresh-only terminal observation 与 Authority Root 共同阻断上一轮 Completed/Failed；active assignment 明确拒绝；HostForkRuntime 的 bounded WorkRecord projector 为必需 capability，不能再构造“可完成但无 invocation delta”的 runtime。真实 fork tool 与 inspector/coder reuse 回归均已覆盖，authoritative runner 3405/3405 green。

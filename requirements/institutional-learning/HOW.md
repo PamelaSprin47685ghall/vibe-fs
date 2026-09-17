@@ -36,3 +36,8 @@
 
 2026-09-12：`Enforcer/InstitutionalLearning/Fold.fs` 这个只把 `projection.InstitutionalLearning` 写回聚合的裸装配包装已删除，同批删除的还有 Fission、Concern、Attention 三个同类包装；装配现由 `Composition/Durable/ProjectionUpdate.applyInstitutionalLearning` 与 `applyAttentionLearning` 承担，调用顺序仍是「先写 `InstitutionalLearning`，再用同一事实 resurface attention」。本分片剩余文件 `InstitutionalLearningTools.fs` 仍真实读取聚合（`AgentProjection.pendingAttentionWorkPairs`、`snapshot.AgentProjections.*`），因此保留 `composition-durable-*` 引用，闭包仅从 158 收到 157 个 `.fs`；不要把它读成隔离成果。
 真实 `InstitutionalLearningTools` consumer 与 Enhancer 签名反向 consumer 的影响集合经 `compile-impact` 合并为一次编译，通过 1432 parsed sources／1394 items（fingerprint `f4c0e60d84d5`）。该集合仍含其他 consumer 真正需要的 Host 合同，不能把局部分片的闭包缩小推广到全部反向 consumer。
+
+## GAP
+
+- `INSTITUTIONAL-LEARNING-007`（CLOSED）：`celebrate` 在学习闭合后尾部弹出 Deferred Work 已闭合，落点 `tests/007.test.mjs`。
+

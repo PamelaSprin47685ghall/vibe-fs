@@ -84,4 +84,4 @@
 
 ## GAP
 
-- `GAP-KR-001`（OPEN）：Case 数据模型双基线字段（`completionFileState`/`maintenanceFileState`）与 Lifecycle 结束边界自动冻结管道待在 P4 施工中落地接通（底层已具备 `EventStoreBlobWriter.WritePayload/ReadPayload` 与 `GitSubject.diffHeadBinary`）。
+- `GAP-KR-001`（CLOSED）：Case 数据模型双基线字段（`completionFileState`/`maintenanceFileState`）与 Lifecycle 结束边界自动冻结管道已完成接通落地（底层复用 `EventStoreBlobWriter.WritePayload/ReadPayload` 与 `GitSubject.diffHeadBinary`），Capture/Lifecycle/Bookkeeper 冻结管道接线闭合，落点 `tests/015.test.mjs` 端到端物化验证。

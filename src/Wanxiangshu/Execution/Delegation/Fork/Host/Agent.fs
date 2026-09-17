@@ -119,6 +119,94 @@ module HostForkAgent =
             DelegatedToolEstimateLedger.replace port childId expected
         | _ -> Task.FromResult(())
 
+    let private sendFirstPromptAndInstallRun
+        (runtime: HostForkRuntime)
+        (agentId: string)
+        (role: Role)
+        (agentName: string)
+        (identitySeed: PromptAuthority.IdentitySeed)
+        (enrichedPrompt: string)
+        (preparedHandoff: PreparedDelegationHandoff option)
+        (childId: SessionId)
+        : Task<Result<ForkResult, string>> =
+        task {
+            let! sent =
+                HostForkAgentOwner.sendFirstPromptObserved
+                    runtime.Sessions
+                    runtime.Journal
+                    childId
+                    identitySeed
+                    (runtime.DirectoryOf agentId)
+                    enrichedPrompt
+                    (fun _ -> ())
+
+            match sent with
+            | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted(_, authorityRoot) ->
+                let run =
+                    runtime.InstallRun(agentId, childId, role, authorityRoot, ?preparedHandoff = preparedHandoff)
+
+                let result =
+                    runtime.Runtime.Fork(agentId, role, agentName, runWork = (fun () -> run.Source.Task))
+
+                return Ok result
+            | HostForkRunLifecycle.AgentOwnerDispatchOutcome.AcceptanceUncertain _ ->
+                return Ok(ForkResult.DispatchUncertain agentId)
+            | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Rejected err -> return Error err
+        }
+
+    let private continueNewChildFork
+        (runtime: HostForkRuntime)
+        (agentId: string)
+        (role: Role)
+        (agentName: string)
+        (identitySeed: PromptAuthority.IdentitySeed)
+        (prompt: string)
+        (requirements: string list)
+        (enrichedPrompt: string)
+        (isFirstPrompt: bool)
+        (deferSend: bool)
+        (expectedToolCalls: int option)
+        (preparedHandoff: PreparedDelegationHandoff option)
+        (childId: SessionId)
+        : Task<Result<ForkResult, string>> =
+        task {
+            lock runtime.Gate (fun () -> runtime.Children.[agentId] <- childId)
+
+            runtime.ChildCreated agentId role childId
+            runtime.ChildCreatedDir agentId childId (runtime.DirectoryOf agentId)
+
+            if isFirstPrompt then
+                let! _ =
+                    XTraceCapture.captureOpeningWithReceipt runtime.Journal childId prompt requirements
+                    |> TaskResult.mapError (fun error -> sprintf "fork opening trace capture failed: %A" error)
+
+                ()
+
+            do!
+                maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
+                |> TaskResultCE.ofTask
+                |> TaskValue.map ignore
+
+            if deferSend && isFirstPrompt then
+                runtime.DeferredFirstPrompts.[agentId] <-
+                    {| ChildId = childId
+                       IdentitySeed = identitySeed
+                       Prompt = enrichedPrompt |}
+
+                return Ok(ForkResult.Created agentId)
+            else
+                return!
+                    sendFirstPromptAndInstallRun
+                        runtime
+                        agentId
+                        role
+                        agentName
+                        identitySeed
+                        enrichedPrompt
+                        preparedHandoff
+                        childId
+        }
+
     let private afterLinkage
         (runtime: HostForkRuntime)
         (agentId: string)
@@ -493,27 +581,22 @@ module HostForkAgent =
 
             let boundAgent = HostForkBinding.managedAgent runtime.Journal childId
 
-            let isDevOpsHandle =
-                match runtime.Journal with
-                | Some durable ->
+            let durableHandleOpt =
+                runtime.Journal
+                |> Option.bind (fun durable ->
                     let projection = AgentJournal.handleProjection durable runtime.ParentId
                     let handle = HandleController.agentHandle agentId
-                    match HandleProjection.tryFind handle projection with
-                    | Some r -> r.CanonicalRole = Role.DevOps || r.Byname = "devops"
-                    | None -> agentId = "devops"
+                    HandleProjection.tryFind handle projection)
+
+            let isDevOpsHandle =
+                match durableHandleOpt with
+                | Some r -> r.CanonicalRole = Role.DevOps || r.Byname = "devops"
                 | None -> agentId = "devops"
 
             let roleOpt =
                 recordOpt
                 |> Option.map (fun r -> r.Role)
-                |> Option.orElseWith (fun () ->
-                    match runtime.Journal with
-                    | Some durable ->
-                        let projection = AgentJournal.handleProjection durable runtime.ParentId
-                        let handle = HandleController.agentHandle agentId
-                        HandleProjection.tryFind handle projection
-                        |> Option.map (fun h -> h.CanonicalRole)
-                    | None -> None)
+                |> Option.orElseWith (fun () -> durableHandleOpt |> Option.map (fun h -> h.CanonicalRole))
                 |> Option.orElseWith (fun () -> if isDevOpsHandle then Some Role.DevOps else None)
 
             match roleOpt, boundAgent with
