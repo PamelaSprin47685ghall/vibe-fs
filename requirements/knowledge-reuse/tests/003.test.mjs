@@ -131,3 +131,60 @@ test('WHAT[KNOWLEDGE-REUSE-003] CASE003_normalize_dedupes_and_orders_observation
   assert.equal(casebook.normalize(obs).length, 2)
 })
 }
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const casebook = await import("../../../dist/Repository/Knowledge/Casebook/Surface.js");
+
+test('WHAT[KNOWLEDGE-REUSE-003] T17_substantive_access_collects_read_create_edit_delete_move_and_ignores_grep_glob', async () => {
+  // Substantive access collects:
+  // - successful read: entire file associated (path recorded)
+  // - successful create: new path
+  // - successful edit: target path
+  // - successful delete: original path, ending as Missing
+  // - successful move: both old and new paths
+  // - grep/glob/ls/mentions: NOT collected
+  assert.equal(typeof casebook.recordSubstantiveAccess, 'function', 'casebook must export recordSubstantiveAccess')
+  const access = casebook.createAccessTracker()
+  access.recordRead('src/lib.fs', 'hash1')
+  access.recordCreate('src/new.fs')
+  access.recordEdit('src/edit.fs')
+  access.recordDelete('src/deleted.fs')
+  access.recordMove('src/old.fs', 'src/renamed.fs')
+  // grep & glob should be ignored
+  access.recordGrep('TODO', 'src/lib.fs')
+  access.recordGlob('src/**/*.fs')
+
+  const paths = access.getRelatedPaths()
+  assert.deepEqual(paths.sort(), [
+    'src/deleted.fs',
+    'src/edit.fs',
+    'src/lib.fs',
+    'src/new.fs',
+    'src/old.fs',
+    'src/renamed.fs',
+  ].sort())
+})
+
+test('WHAT[KNOWLEDGE-REUSE-003] T18_grep_glob_ls_and_prose_mentions_do_not_enter_case_related_paths', () => {
+  assert.equal(typeof casebook.isSubstantiveTool, 'function', 'casebook must export isSubstantiveTool predicate')
+  assert.equal(casebook.isSubstantiveTool('read'), true)
+  assert.equal(casebook.isSubstantiveTool('write'), true)
+  assert.equal(casebook.isSubstantiveTool('edit'), true)
+  assert.equal(casebook.isSubstantiveTool('mv'), true)
+  assert.equal(casebook.isSubstantiveTool('rm'), true)
+  assert.equal(casebook.isSubstantiveTool('grep'), false)
+  assert.equal(casebook.isSubstantiveTool('glob'), false)
+  assert.equal(casebook.isSubstantiveTool('ls'), false)
+})
+
+test('WHAT[KNOWLEDGE-REUSE-003] T19_failed_or_uncommitted_mutations_do_not_record_modification_access', () => {
+  assert.equal(typeof casebook.createAccessTracker, 'function')
+  const tracker = casebook.createAccessTracker()
+  tracker.recordRead('src/a.fs', 'h1')
+  tracker.recordAttemptedMutation('src/b.fs', false) // uncommitted/failed
+  const paths = tracker.getRelatedPaths()
+  assert.deepEqual(paths, ['src/a.fs'])
+})
+}

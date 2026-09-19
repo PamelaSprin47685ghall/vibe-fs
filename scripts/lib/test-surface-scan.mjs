@@ -485,8 +485,8 @@ export const SURFACE_MANIFEST = [
   },
   {
     module: 'Process/LargeGateSurface.js',
-    owner: 'output-distillation',
-    laws: ['DISTILL-011'],
+    owner: 'process-execution',
+    laws: ['PROC-016'],
     source: 'src/Wanxiangshu/Process/LargeGateSurface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
@@ -1826,7 +1826,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Mission/Relay/Retirement/Surface.js',
     owner: 'relay-retirement',
-    laws: ['RETIRE-002', 'RETIRE-003', 'RETIRE-004', 'RETIRE-006', 'RETIRE-009'],
+    laws: ['RETIRE-002', 'RETIRE-003', 'RETIRE-004', 'RETIRE-009'],
     source: 'src/Wanxiangshu/Mission/Relay/Retirement/Surface.fs',
     representation: 'json',
     kind: 'pure',

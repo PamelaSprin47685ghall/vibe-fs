@@ -24,10 +24,6 @@ IncumbencyRetired 一旦 committed，任何 replay、provider recovery、rebase�
 
 每次成功 retirement 在同一 durable transaction 中提交闭合的 `RetirementSummary = { Id; IncumbencyId; SnapshotId; AuthorityRevision; ProjectionCut = { ProviderRunId; ToolCallId }; Outcome }`，其中快照与 authority 修订是 load-bearing retirement binding，`Outcome = Continue | Accepted of QualityCertificateId`。`Continue` 表示工作尚未完成：承载 Road 的 ActiveLogicalRun 保持开放，projection 在下一次 active 迭代就位后只保留 typed authority 消息与当前迭代消息；`Accepted` 表示质量证书已被接受：当前迭代关闭，证书有效期间不得开启新的迭代。后续显式 `QualityCertificateInvalidated`（snapshot、rebase 或 CAS admission 驱动）使该证书失效后，允许以普通 opening 开启下一个 AuditPending 迭代；该新迭代同样以上一次 LatestRetirement cut 为 projection 下界，携带的快照即退休时当前快照。只有自动中断/激活是 Continue 专属，失效后重开走 Change ContinueLoop 普通派发。Continue 退休的快照允许与 assessment 时不同，Accepted 退休的快照必须等于 assessment 快照，两者 authority 都必须等于当前。ManagerLoopSignal 由对 Outcome 的匹配派生（Accepted 证书→Candidate，Continue→Continue），不得在 Outcome 之外另立请求或接受布尔。物理 SessionId 可以复用，但逻辑 IncumbencyId 与 provider context 必须重开。跨包约束：退休与续发循环属于领域事实流转，composition root（如 `PluginTransforms`）严禁拥有或内联循环决策与提示词派发，自动评审/工作/收尾时序由 Manager owner CE 自主驱动。
 
-## RELAY-007: 已删除——normal-stop nudge 归属 interaction-authority
-
-此编号永久空缺。manager guard gate、terminal occasion 与飞行态只由 INTERACTION-AUTHORITY-019 定义，Relay 不再复制 nudge 状态机。
-
 ## RELAY-008: authority 或证书绑定域变化显式失效证书
 
 AuthorityRevision、WorkspaceSnapshotId、requirement digest、target/base horizon 任一变化都使旧 QualityCertificate 显式失效。失效不会恢复 assessor，只会驱动普通下一迭代。

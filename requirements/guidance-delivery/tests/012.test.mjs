@@ -35,3 +35,17 @@ test('WHAT[GD-012] GD_012_dynamic_fragment_is_between_tip_and_guideline_in_instr
   assert.ok(marker.indexOf(`# ${estimate}`) < marker.indexOf('# canonical pair guideline'))
   assert.equal(marker.split('\n').filter(Boolean).every((line) => line.startsWith('# ')), true)
 })
+
+test('WHAT[GD-012] GD_012_tool_estimate_calibration_rendered_for_guideline_instruction', () => {
+  const en = renderToolEstimate(english, 4)
+  assert.match(en, /4/)
+  assert.match(en, /delegator|commissioner/i)
+  assert.match(en, /not .*limit|not .*cap|advisory/i)
+  assert.match(en, /scope|parallel|delegate|split/i)
+
+  const zh = renderToolEstimate(simplifiedChinese, 4)
+  assert.match(zh, /4/)
+  assert.match(zh, /委任|委托|估算/)
+  assert.match(zh, /不是.*上限|并非.*上限|不.*限制/)
+  assert.match(zh, /范围|并行|委派|分裂/)
+})

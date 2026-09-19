@@ -784,3 +784,29 @@ test('WHAT[CONTEXT-COMPRESSION-024] CTX_024_materialization_admission_is_cross_i
   runtime.releaseMaterialization(secondLease)
 })
 }
+
+{
+const { default: test } = await import("node:test");
+const { default: assert } = await import("node:assert/strict");
+const owner = await import("../../../dist/Context/Companion/RuntimeSurface.js");
+
+const ctx = owner
+const parkedTransform = owner
+const main = () => ctx.main({ toml: 'work' })
+const main2 = () => ctx.main({ toml: 'more' })
+const mainRequest = () => ctx.main({ requestId: 'request-main', toml: 'work' })
+const mainRequest2 = () => ctx.main({ requestId: 'request-more', toml: 'more' })
+const KEY = 'ses-blog'
+
+test('WHAT[CONTEXT-COMPRESSION-024] CTX_024_blogger_runtime_surface_claim_and_release_replaces_request_ownership', () => {
+  const scope = parkedTransform.scope()
+  const failed = ctx.main({ requestId: 'request-failed', toml: 'failed' })
+  const replacement = ctx.main({ requestId: 'request-replacement', toml: 'replacement' })
+
+  assert.equal(parkedTransform.claimCurrentRequest(scope, KEY, failed), 'Claimed')
+  assert.equal(parkedTransform.releaseCurrentRequest(scope, KEY, 'request-failed'), 'Released')
+  assert.equal(parkedTransform.claimCurrentRequest(scope, KEY, replacement), 'Claimed')
+  assert.equal(parkedTransform.releaseCurrentRequest(scope, KEY, 'request-failed'), 'Conflict:request-replacement')
+  assert.equal(parkedTransform.peekCurrentRequest(scope, KEY)?.toml, 'replacement')
+})
+}

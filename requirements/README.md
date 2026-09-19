@@ -18,7 +18,7 @@ APPLIES-TO  可选的包外正向代码覆盖声明；仓库根相对、gitignor
 ```
 
 `requirements/<package>/` 下的全部内容天然属于该 package 的覆盖范围，包括文档、tests 与
-`APPLIES-TO` 本身；禁止为了覆盖包自身而把这些路径重复写进 `APPLIES-TO`。
+`APPLIES-TO` 本身；包自身路径的覆盖规则见 `requirement-grounding`。
 
 `APPLIES-TO` 不改变 package 的语义所有权，也不是新的 normative 文档。它只补充声明“这个
 package 还覆盖哪些包外仓库路径”。同一个源码文件可以同时命中多个 package；未提供该文件的

@@ -14,7 +14,7 @@ const TREE_ENTRY = join(REQUIREMENTS, 'README.md')
 
 const read = (path) => readFileSync(path, 'utf8')
 
-const REQUIRED_DOCS = ['WHY.md', 'WHAT.md', 'HOW.md']
+const REQUIRED_DOCS = ['WHY.md', 'WHAT.md']
 
 const packageNamesFromTreeEntry = () => {
   const text = read(TREE_ENTRY)
@@ -115,6 +115,45 @@ const docFailures = (pkg) => {
   return failures
 }
 
+const liveClauseNumbers = (pkg) => {
+  const whatPath = join(REQUIREMENTS, pkg, 'WHAT.md')
+  if (!existsSync(whatPath)) return new Set()
+  const text = read(whatPath)
+  const numbers = new Set()
+  for (const line of text.split('\n')) {
+    const mBracket = /^##\s+\[(\d{3})\]/.exec(line)
+    if (mBracket) {
+      if (!/已删除|已废止/.test(line)) numbers.add(mBracket[1])
+      continue
+    }
+    const mPrefix = /^##\s+[A-Z0-9-]+-(\d{3})\b/.exec(line)
+    if (mPrefix) {
+      if (!/已删除|已废止/.test(line)) numbers.add(mPrefix[1])
+    }
+  }
+  return numbers
+}
+
+const danglingTestFailures = (pkg) => {
+  const failures = []
+  const testsDir = join(REQUIREMENTS, pkg, 'tests')
+  if (!existsSync(testsDir) || !statSync(testsDir).isDirectory()) return failures
+  const live = liveClauseNumbers(pkg)
+  const files = readdirSync(testsDir).filter((name) => name.endsWith('.test.mjs'))
+  for (const file of files) {
+    const match = /^(\d{3})\.test\.mjs$/.exec(file)
+    if (match) {
+      const num = match[1]
+      if (!live.has(num)) {
+        failures.push(
+          `${pkg}/tests/${file}: 测试编号 [${num}] 在同包 WHAT.md 存活条款中不存在。如果某条款已删除，对应的测试需要提示用户进行相应处理。`,
+        )
+      }
+    }
+  }
+  return failures
+}
+
 const proofFailures = (pkg) => {
   const failures = []
   const howPath = join(REQUIREMENTS, pkg, 'HOW.md')
@@ -134,7 +173,7 @@ const proofFailures = (pkg) => {
 
 const depFailures = (pkg, allNames, skeleton) => {
   const failures = []
-  for (const doc of ['WHY.md', 'WHAT.md', 'HOW.md']) {
+  for (const doc of ['WHY.md', 'WHAT.md']) {
     const declared = declaredDependencies(pkg, doc, allNames)
     const allowed = skeleton.get(pkg) ?? new Set()
     for (const dep of declared) {
@@ -157,7 +196,7 @@ test('WHAT[REQUIREMENT-SYSTEM-017] meta-verifier executes as the machine proof',
   const unknownDirs = dirs.filter((dir) => !fromIndex.includes(dir))
   assert.deepEqual(unknownDirs, [], `requirements/ must not contain INDEX-external package dirs: ${unknownDirs.join(', ')}`)
 
-  // 2. 文档齐备性：所有包完整包含 WHY/WHAT/HOW 与 tests/ 目录
+  // 2. 文档齐备性：所有包完整包含 WHY/WHAT 与 tests/ 目录（对齐 [006]）
   const docErrors = []
   for (const pkg of fromIndex) {
     docErrors.push(...docFailures(pkg))
@@ -177,4 +216,15 @@ test('WHAT[REQUIREMENT-SYSTEM-017] meta-verifier executes as the machine proof',
     proofErrors.push(...proofFailures(pkg))
   }
   assert.deepEqual(proofErrors, [], 'declared proof landing files must physically exist:\n' + proofErrors.join('\n'))
+
+  // 5. 存活条款与测试对应性：每个 tests/ 下 NNN.test.mjs 的编号必须在同包 WHAT.md 存活条款中存在
+  const danglingErrors = []
+  for (const pkg of fromIndex) {
+    danglingErrors.push(...danglingTestFailures(pkg))
+  }
+  assert.deepEqual(
+    danglingErrors,
+    [],
+    'all tests must correspond to live clauses in WHAT.md:\n' + danglingErrors.join('\n'),
+  )
 })

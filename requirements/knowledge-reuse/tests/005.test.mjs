@@ -142,3 +142,50 @@ test('WHAT[KNOWLEDGE-REUSE-005] CASE004_005_freshness_check_is_hint_not_proof_re
   }
 })
 }
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const { mkdtempSync, rmSync, writeFileSync } = await import("node:fs");
+const { tmpdir } = await import("node:os");
+const { join } = await import("node:path");
+const eventStore = await import("../../../dist/Persistence/EventStore/Surface.js");
+const casebook = await import("../../../dist/Repository/Knowledge/Casebook/Surface.js");
+
+test('WHAT[KNOWLEDGE-REUSE-005] T23_T24_fetch_uses_diff_and_advances_maintenance_baseline_without_replay_loops', async () => {
+  assert.equal(typeof casebook.refreshWithDiff, 'function', 'casebook must export refreshWithDiff')
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-kr-t23-'))
+  const store = eventStore.create(dir, 'kr-t23-writer')
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'version-B', 'utf8')
+    const initialCase = {
+      identity: 'eng-invocation-1',
+      sourceTrace: 'trace-1',
+      q: 'Task Q',
+      a: 'Answer A',
+      relatedPaths: ['a.txt'],
+      completionFileState: 'state-ref-B',
+      maintenanceFileState: 'state-ref-B',
+      accessOrder: 0,
+    }
+    await casebook.archiveCase(store, initialCase)
+
+    // External change B -> C
+    writeFileSync(join(dir, 'a.txt'), 'version-C', 'utf8')
+    const diff = 'diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n-version-B\n+version-C\n'
+    const refreshResult = await casebook.refreshWithDiff(store, 'eng-invocation-1', diff, 'state-ref-C', {
+      q: 'Task Q',
+      a: 'Updated Answer A for C',
+    })
+
+    assert.equal(refreshResult.ok, true)
+    const fetched = await casebook.fetchCaseByIdentity(store, 'eng-invocation-1')
+    assert.equal(fetched.a, 'Updated Answer A for C')
+    assert.equal(fetched.completionFileState, 'state-ref-B', 'completionFileState must NEVER be rewritten')
+    assert.equal(fetched.maintenanceFileState, 'state-ref-C', 'maintenanceFileState advances to C')
+  } finally {
+    eventStore.dispose(store)
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+}

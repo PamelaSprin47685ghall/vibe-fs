@@ -455,3 +455,27 @@ test('WHAT[KNOWLEDGE-REUSE-006] js_bookkeeper_unbound_session_cannot_change_a_ca
   assert.match(String(result), /no Bookkeeper transaction|没有 Bookkeeper transaction/i)
 })
 }
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const bookkeeper = await import("../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js");
+
+test('WHAT[KNOWLEDGE-REUSE-006] T23_bookkeeper_refresh_receives_diff_only_and_has_no_repo_investigation_rights', async () => {
+  // Bookkeeper CaseRefresh receives: old case + diff. No repo read/glob/grep.
+  assert.equal(typeof bookkeeper.createRefreshPrompt, 'function', 'bookkeeper must format refresh prompt with diff only')
+  const prompt = bookkeeper.createRefreshPrompt({
+    q: 'Old Q',
+    a: 'Old A',
+    relatedPaths: ['a.txt'],
+    diff: '-B\n+C',
+  })
+  assert.match(prompt, /CaseRefresh/)
+  assert.match(prompt, /Old Q/)
+  assert.match(prompt, /Old A/)
+  assert.match(prompt, /diff/)
+  assert.match(prompt, /Do not read the repository/)
+  assert.doesNotMatch(prompt, /\[(?:transcript|file_contents|observations)\]/i,
+    'maintenance must not receive a replay trace or full file payloads')
+})
+}

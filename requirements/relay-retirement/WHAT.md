@@ -16,14 +16,6 @@ suicide 只检查当前 IncumbencyId 直接或递归拥有的 live child、backg
 
 admission 先冻结，再读取 exact recursive ownership projection。冻结前已 accepted 的资源必须阻塞；冻结后的创建因 stale fence 被拒绝。freeze fence 绑定精确 `IncumbencyId`，不得只绑定可复用的物理 `SessionId`；前任退休后下一迭代即使复用同一 SessionId，也不得继承前任 fence。若有 blocker，只恢复当前迭代 cleanup capability，不恢复新工作 admission。
 
-## RETIRE-005: 已删除——normal-stop nudge 归属 interaction-authority
-
-此编号永久空缺。manager guard 的 admission、飞行态与 fresh-terminal re-arm 只由 INTERACTION-AUTHORITY-019 定义。
-
-## RETIRE-006: 已删除——provider failure 归属 execution-failure-policy
-
-此编号永久空缺。provider/network failure、capacity settlement 与 fresh-attempt authorization 只由 execution-failure-policy 和 managed-chat-execution 定义。
-
 ## RETIRE-007: retirement 提交闭合 outcome 与 cut
 
 成功 retirement 在同一 durable transaction 中记录 `IncumbencyRetired` 与 `RetirementCommitted({ Id; IncumbencyId; SnapshotId; AuthorityRevision; ProjectionCut = { ProviderRunId; ToolCallId }; Outcome })`，其中快照与 authority 修订是 load-bearing retirement binding。`Outcome = Continue` 表示工作待续：同一 LogicalRun 保持开放，下一迭代就位后继续；Continue 的 retirement 快照取退休时当前快照，允许与 assessment 时快照不同并前向携带给下一迭代。`Outcome = Accepted certificateId` 要求快照等于 assessment/证书快照：证书须有效且属于当前迭代并绑定该快照，不同快照的 Accepted 一律拒绝。两者 authority 都必须等于当前。CleanupBlocked 的 perfect 迭代在 blockers 清除后可重试 Accepted。证书有效期间不激活任何新迭代，后续显式 `QualityCertificateInvalidated` 使该证书失效后允许普通新迭代。崩溃恢复不得看到永久的“已退休但无 outcome/cut”状态；ManagerLoopSignal 由匹配 Outcome 派生（Accepted 证书→Candidate，Continue→Continue）。

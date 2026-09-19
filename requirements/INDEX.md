@@ -126,24 +126,6 @@
 |---|---|
 | `distribution` | 可安装 artifact 必须携带运行所需代码与 semantic resources，同时排除不属于交付面的源码/开发资产；打包资源与活动注册严格同步。 |
 
-# 关键拆分裁决
-
-本轮相对旧 36 工作集作出这些结构变化：
-
-- `participant-guidance` → `cognitive-environment` + `action-affordance`：长期自我/知识环境与调用时 action contract 可独立重大变化。
-- 新增 `provider-language`：语言绑定不是 identity、horizon 或 renderer 的附属字段。
-- `durable-events` 中抽出 `effect-accounting`：事件 substrate 与外部 effect 的 Requested/Accepted/Unknown 语义有不同 failure meaning。
-- `process-execution` 中抽出 `output-distillation`：控制真实进程与压缩过大观察是两个 WHY。
-- `recovery` → `provider-attempt-recovery` + `crash-reconciliation`：业务 attempt 失败与进程丢失临时状态不是同一故障。
-- `review-protocol` → `review-judgement` + `review-assurance`：判断标准可以整体重写而不改变 witness/seal 协议，反之亦然。
-- `sphinx` → `epistemic-reasoning`：组件名与 A*/MCTS 等当前算法降为 HOW/proof；package 只保留不可替代的认识论合同。
-- 新增 `capability-enforcement`：office consequence 与 schema/runtime gate 同构是两个不同 WHY。
-- 新增 `external-investigation`：Browser 角色与专属集成已全链撤销，无替代代理且外部调查职责不转移。
-- 废止 `output-distillation`：模型蒸馏与 Distiller 角色彻底撤销，大输出确定性留尾截断与 Large Gate 迁入 `process-execution`。
-- 新增 `work-record`：canonical bounded work statement 被 delegation、process review、Finality 共用，不能继续藏在 Companion/Review 下。
-- 新增 `requirement-grounding`：路径命中的规范与测试需要自动、去重、可重放地进入开发上下文，弱介入不阻断 mutation。
-- 新增 `attention-regulation` / `concern-routing` / `institutional-learning`：最终微原语不是一个“大认知工具包”。`enough/abandon/defer`、`subscribe/publish`、`celebrate/regret → Enhancer` 分属注意力、通信、制度学习三个独立 failure domain；既有 `assume` 保持在 `cognitive-environment`，不重复设计。
-
 # 规范条款索引
 
 本节汇总全仓 **57 个规范包当前全部活跃条款**（以各包 `WHAT.md` 实际文本为准）：

@@ -26,3 +26,28 @@ test('WHAT[REQUIREMENT-SYSTEM-005] formalClauseDefinitionHeadings surfaces claus
     [{ id: 'ARCH-002', line: 2 }],
   )
 })
+
+test('WHAT[REQUIREMENT-SYSTEM-005] formalClauseDefinitionHeadings still recognizes a product clause defined in a Change file', () => {
+  // Change 文件不得承担正式定义职责；formalClauseDefinitionHeadings 必须仍能识别
+  // Change 文件里的产品条款定义（ARCH-001），由 scripts/lib/spec-rules.mjs 的 duplicateClauseDefinitions
+  //「正式定义只在 WHAT.md」gate 拒绝它。
+  assert.deepEqual(
+    formalClauseDefinitionHeadings([
+      '# CHG-002: some lifecycle identity',
+      '## ARCH-001: a product clause smuggled into a Change file',
+    ].join('\n'), PREFIXES),
+    [{ id: 'ARCH-001', line: 2 }],
+  )
+})
+
+test('WHAT[REQUIREMENT-SYSTEM-005] formalClauseDefinitionHeadings separates CHG-001 from product clauses', () => {
+  assert.deepEqual(
+    formalClauseDefinitionHeadings([
+      '# CHG-001: lifecycle identity',
+      '## ARCH-001: forbidden shadow definition',
+      '### FUTURE-001: non-product candidate',
+    ].join('\n'), PREFIXES),
+    [{ id: 'ARCH-001', line: 2 }],
+  )
+})
+
