@@ -2,7 +2,7 @@
 
 ## [001] `ParticipantIdentity` 是 logical participant run 的唯一私有身份 owner
 
-每个 durable logical participant run 恰有一个私有强类型 `ParticipantIdentity`。它原子包含 `Role`、稳定 `Persona` 与 Persona provenance/version；字段不得被其它包分拆拥有或独立改写。该 identity 在 exact run 内不可变，不以 `SessionId` 生命周期为作用域。Role 是本名词汇（Manager/Orchestrator/Engineer/DevOps/Blogger），每个 Role 在运行时恰对应一个 Persona（如 Engineer 为 Engineer，Manager 为 Lead，Orchestrator 为 Director，DevOps 为 Operator，Blogger 为 Chronicler）。Engineer 是独立真身份，拥有本地事实调查与源码读写实现权能，绝非 Coder 的别名或 Persona 包装。Coder、Inspector、Browser、Inquiry、Distiller 退出活跃身份集合与调度路径。Predictor、Bookkeeper 沿用内部身份边界，仅为内部机制专用角色（如 Predictor 用于 Strength 降级，Bookkeeper 用于案例维护），不参与普通调度、工具门禁与公开 fork 候选。
+每个 durable logical participant run 恰有一个私有强类型 `ParticipantIdentity`。它原子包含 `Role`、稳定 `Persona` 与 Persona provenance/version；字段不得被其它包分拆拥有或独立改写。该 identity 在 exact run 内不可变，不以 `SessionId` 生命周期为作用域。Role 是本名词汇（Manager/Orchestrator/Engineer/DevOps/Blogger），每个 Role 在运行时恰对应一个 Persona（如 Engineer 为 Engineer，Manager 为 Lead，Orchestrator 为 Director，DevOps 为 Operator，Blogger 为 Chronicler）。Engineer 是独立真身份，拥有本地事实调查与源码读写实现权能，绝非其他角色的别名或 Persona 包装。活跃身份集合与调度路径仅包含当前合法活跃角色。Predictor、Bookkeeper 沿用内部身份边界，仅为内部机制专用角色（如 Predictor 用于 Strength 降级，Bookkeeper 用于案例维护），不参与普通调度、工具门禁与公开 fork 候选。
 
 ## [002] ParticipantIdentity ≠ ExecutionBinding
 
@@ -38,4 +38,4 @@ child、attached 与 InternalLeaf 的 root 必须携带 identity owner 为 exact
 
 ## [010] 活跃身份解析与历史身份隔离解码
 
-活跃身份解析（如通过名字解析或新建 root）只接受当前合法活跃身份（`engineer`、`manager`、`orchestrator`、`devops`、`blogger`）；已被废止的旧角色（`coder`、`inspector`、`browser`、`inquiry`、`distiller`）一律在活跃调度路径中拒绝。历史事件、日志与归档中的旧身份必须隔离在历史解码边界，严禁在读取或恢复时将历史身份（如旧 `inspector`）静默自动升级为具备源码写入权限的新 `engineer`，亦严禁将旧 `devops` 误解析为具备 Fission 权能的 `engineer`。
+活跃身份解析（如通过名字解析或新建 root）严格限定于当前合法活跃身份集合（`engineer`、`manager`、`orchestrator`、`devops`、`blogger`）；任何非此集合的身份在活跃调度路径中均被严格拒绝。历史事件、日志与归档中的身份必须隔离在历史解码边界，严禁在读取或恢复时将只读历史身份静默自动升级为具备源码写入权限的 `engineer`，亦严禁将 `devops` 误解析为具备 Fission 权能的 `engineer`。

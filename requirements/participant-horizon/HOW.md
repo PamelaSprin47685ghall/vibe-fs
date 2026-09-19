@@ -24,10 +24,10 @@ provider-leak-gate.mjs
 
 2. **Gate B 反向防泄露门禁**：
    - 静态检查器 `provider-leak-gate.mjs` 扫描所有面向模型组装提示词与工具描述的代码，禁止 `SessionId`、`AgentId`、`ManagerJobId`、`PtyId`、`status`、`code` 等标记出现在输出流中。
-   - 对隐藏角色（如 Blogger、Bookkeeper、Predictor 以及已退役旧角色）的调用在解析层统一按通用不存在处理�避免错误信息泄露内部拓扑。
+   - 对非公开角色（如 Blogger、Bookkeeper、Predictor 等内部角色）的调用在解析层统一按通用不存在处理，避免错误信息泄露内部拓扑。
 
 3. **Manager 视界与公共选择集合收拢**：
-   - Manager 的 fork 工具描述与 Schema 仅公开 `engineer` 候选，不再提供 Coder、Inspector、Browser、Inquiry、DevOps 等选项。
+   - Manager 的 fork 工具描述与 Schema 仅公开 `engineer` 候选，严格排他。
    - DevOps 仅由合法 Runtime 绑定，模型视界中只见其 Byname（常量 `devops`）并在 `resume` 中以 name = `devops` 作为既有目标续做。
    - Manager 的并行来自 fork 多名 Engineer，Manager 自身无 Fission 工具或分身指示。
 

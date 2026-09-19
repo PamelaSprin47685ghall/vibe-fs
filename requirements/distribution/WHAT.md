@@ -14,7 +14,7 @@
 
 ## [004] Package 内容由显式 Whitelist 决定
 
-打包产物的内容必须且仅能由 `package.json` 的 `files` 白名单显式指定（`["dist/", "resources/"]`）。不属于运行时所需的源码文件（`src/`、`.fs`、`.fsproj`）、测试文件（`tests/`）、内部工具（`scripts/`）、规范文档（`requirements/`）或已废止资产严禁打包进入交付物。
+打包产物的内容必须且仅能由 `package.json` 的 `files` 白名单显式指定（`["dist/", "resources/"]`）。不属于运行时所需的源码文件（`src/`、`.fs`、`.fsproj`）、测试文件（`tests/`）、内部工具（`scripts/`）、规范文档（`requirements/`）或非运行时开发资产严禁打包进入交付物。
 
 ## [005] 编译、测试与发布消费同一份 Production Bytes
 
@@ -39,5 +39,5 @@
 ## [010] 打包资源与活动注册同步
 
 安装产物（npm tarball）中的运行时资源（`resources/**`）与编译产物（`dist/**`）必须与当前合法活跃角色集合（Engineer、DevOps、Manager、Orchestrator、Blogger 等）严格保持一致。
-严禁在发布产物中包含已废止角色（Coder、Inspector、Browser、Inquiry、Distiller）的活跃注册代码、死资源文件或陈旧工具映射。
+严禁在发布产物中包含非活跃角色（如 Coder、Inspector、Browser、Inquiry、Distiller 等）的注册代码、死资源文件或陈旧工具映射。
 `js-engineer`、`js-devops` 与 `js-bookkeeper` 等新工具 surface 必须在编译代码、surface manifest 与资源清单中完整且一致地导出，不存在未同步的孤立注册。

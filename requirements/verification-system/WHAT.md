@@ -14,7 +14,7 @@
 4. **Long Stroke**：恰好一个真实完整的端到端（E2E）物理验收环境。
 5. **Release**：一次确定性的全量构建、打包与交付物验证。
 
-证据层序由统一调度器保证：`scripts/verify.mjs` 导出 `verificationSteps` 作为唯一固定执行阶段列表（format:check → check → build → unit → integration，release 模式追加 e2e 与 package），`package.json` 仅声明调度入口，执行层序由真实固定调度器强力保证，不再要求同一编排代码书写顺序外部的写法锁定，层序颠倒或错置直接判为违约。日常开发入口 `format-build-test`（→ `node scripts/verify.mjs`）按序调度固定阶段；发布入口 `verify:release`（→ `node scripts/verify.mjs --release`）在此基础上额外调度 clean build（--clean）、Long Stroke 与真实 package 校验。两项入口对每个 step 均保持单次运行，每个 leaf step 必须恰有一个父级 owner，禁止顶层与子 orchestrator 重复执行；distribution package child 与一次 physical warmup 只由 integration orchestrator 调度。层级登记表机制已废止，证明由实际测试行为与可执行断言独立成立。
+证据层序由统一调度器保证：`scripts/verify.mjs` 导出 `verificationSteps` 作为唯一固定执行阶段列表（format:check → check → build → unit → integration，release 模式追加 e2e 与 package），`package.json` 仅声明调度入口，执行层序由真实固定调度器强力保证，不再要求同一编排代码书写顺序外部的写法锁定，层序颠倒或错置直接判为违约。日常开发入口 `format-build-test`（→ `node scripts/verify.mjs`）按序调度固定阶段；发布入口 `verify:release`（→ `node scripts/verify.mjs --release`）在此基础上额外调度 clean build（--clean）、Long Stroke 与真实 package 校验。两项入口对每个 step 均保持单次运行，每个 leaf step 必须恰有一个父级 owner，禁止顶层与子 orchestrator 重复执行；distribution package child 与一次 physical warmup 只由 integration orchestrator 调度。证明由实际测试行为与可执行断言独立成立。
 
 全仓禁止自建 FCS（`FSharp.Compiler.Service`）扫描：不得直接或经 wrapper、反射、`.fsx` 提取 F# typed AST、symbol/application use、推断类型或源码依赖图。全量、局部、owner/locality、fixture、report-only、CLI、CI、pre-build 与缓存/snapshot/delta/外部 evidence 复用均无豁免，不得作为门禁、报告或验收入口。正常 Fable 编译内部使用 compiler service 不在禁令范围内，但禁止为扫描取证额外启动或插桩编译器。纯源码文本与 JavaScript 静态检查仍是合法第 0 层证据。F# 编译器边界由 structured-workflow-011 定义；不得用旧扫描结果或空 evidence 冒充当前证明。
 

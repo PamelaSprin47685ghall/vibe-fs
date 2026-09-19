@@ -39,9 +39,9 @@ ExecutionBinding { target: ModelTarget; fence: CapacityFence; lease }
    - `Roles.fs` 不含 `ToolPermission`、权限矩阵或 capability 判断；这些事实只在 `Foundation/OfficeCapability.fs`。
 
 6. **活跃身份与历史身份解析隔离**：
-   - 活跃名字解析（`resolveParticipantIdentityAtRoot` 等）只接受当前规范角色（`engineer`、`manager`、`orchestrator`、`devops`、`blogger`），拒绝废弃角色（`coder`、`inspector`、`browser`、`inquiry`、`distiller`）。
-   - 历史回放与解码仅在专用解码边界识别旧身份，不进行静默权限提升（旧 `inspector` 保持只读身份，不升级为可写 `engineer`；旧 `devops` 不获得 `engineer` 的 Fission 权能）。
+   - 活跃名字解析（`resolveParticipantIdentityAtRoot` 等）仅接受当前规范角色（`engineer`、`manager`、`orchestrator`、`devops`、`blogger`），严格拒绝非合法集合的名字。
+   - 历史回放与解码仅在专用解码边界识别旧身份，不进行静默权限提升（只读历史身份保持只读，不升级为可写 `engineer`；`devops` 不获得 `engineer` 的 Fission 权能）。
 
 ## GAP
 
-- `participant-identity-010`（CLOSED）：活跃身份解析已收敛为 Engineer/DevOps/Manager/Orchestrator/Blogger，Coder/Inspector/Browser/Inquiry/Distiller 退出活跃路径，历史身份解码隔离已闭合，落点 `Identity.fs` 升权修复、`Roles` 分流及 `tests/010.test.mjs`。
+- 活跃身份解析与历史身份解码隔离由 `Identity.fs` 升权校验、`Roles` 分流及 `tests/010.test.mjs` 实施保证。

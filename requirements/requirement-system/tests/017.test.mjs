@@ -256,4 +256,59 @@ test('WHAT[requirement-system-017] meta-verifier executes as the machine proof',
     [],
     'all .test.mjs files under requirements/**/tests/ must match NNN.test.mjs:\n' + testNamingErrors.join('\n'),
   )
+
+  // 7. 测试用例标题锚点规范性：每个 NNN.test.mjs 内出现的测试用例标题锚点 WHAT[前缀-编号] 必须与 所在包名-文件编号 一致
+  const extractTestAnchors = (content) => {
+    const anchors = []
+    const lines = content.split('\n')
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
+      const m = /^\s*(?:test|it)\s*\(\s*(['"`])([\s\S]*?)\1/.exec(line)
+      if (m) {
+        const title = m[2]
+        const mAnchor = /WHAT\[([^\]]+)\]/.exec(title)
+        if (mAnchor) {
+          anchors.push({ line: i + 1, raw: mAnchor[0], content: mAnchor[1], title })
+        }
+      } else {
+        const mMulti = /^\s*(?:test|it)\s*\(\s*`([\s\S]*?)`/.exec(line)
+        if (mMulti) {
+          const title = mMulti[1]
+          const mAnchor = /WHAT\[([^\]]+)\]/.exec(title)
+          if (mAnchor) {
+            anchors.push({ line: i + 1, raw: mAnchor[0], content: mAnchor[1], title })
+          }
+        }
+      }
+    }
+    return anchors
+  }
+
+  const testAnchorErrors = []
+  for (const pkg of fromIndex) {
+    const testsDir = join(REQUIREMENTS, pkg, 'tests')
+    for (const file of findTestFiles(testsDir)) {
+      const base = basename(file)
+      const mFile = /^(\d{3})\.test\.mjs$/.exec(base)
+      if (!mFile) continue
+
+      const expectedNum = mFile[1]
+      const expectedAnchor = `WHAT[${pkg}-${expectedNum}]`
+      const content = read(file)
+      const anchors = extractTestAnchors(content)
+
+      for (const a of anchors) {
+        if (a.raw !== expectedAnchor) {
+          testAnchorErrors.push(
+            `${relative(ROOT, file)}:${a.line}: 测试用例标题锚点 "${a.raw}" 与所在包名-文件编号 "${pkg}-${expectedNum}" 不一致 (用例标题: "${a.title.trim()}")`,
+          )
+        }
+      }
+    }
+  }
+  assert.deepEqual(
+    testAnchorErrors,
+    [],
+    'all test case title anchors in NNN.test.mjs must match package-fileNum:\n' + testAnchorErrors.join('\n'),
+  )
 })

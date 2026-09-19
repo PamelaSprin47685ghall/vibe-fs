@@ -61,7 +61,7 @@
   - `Sphinx.Host.Adapter`（`sphinx-host-adapter`，kind: `adapter`）：包含 `SphinxMcpConfig` 启动配置与环境适配。
 - **单向依赖与闭包纯洁性**：应用与领域契约按真实知识消费窄合同、纯数据/decision 或 capability port，严禁传递包含 Runtime 与 Adapter 实现。compile shard 可以调整，不因旧 locality 标签或源码数量取得架构权威；结构治理以 structured-workflow-011 至 016 为准。
 
-2026-09-10，用户在本次规范冲突裁决中批准同步 host-boundary-026：纠正已拆出的摘要、消息、SDK 类型与工具适配器仍被写入旧宽合同的描述，解除仅允许两个旧合同名称的限制，但保留物理能力隔离、唯一实现、失败与结算语义。源码、签名、工程和测试未改；既有 host-boundary-026/027 的终端、SDK、消息、工具闭包反例及 host-boundary-029 的 fatal 注入证明继续承接对应性质，没有用文档一致性冒充新增编译或行为证明。
+关于 host-boundary-026 的架构约束：已拆出的摘要、消息、SDK 类型与工具适配器独立声明窄合同，解除仅允许两个旧合同名称的限制，同时严格保持物理能力隔离、唯一实现、失败与结算语义。既有 host-boundary-026/027 的终端、SDK、消息、工具闭包反例及 host-boundary-029 的 fatal 注入证明承接对应性质。
 
 **旧验证迁移已落地**：在 `a0a710fb2` 上，`host-session-contract-closure.test.mjs` 改用既有 `readCompileShardInventory` 与 `buildSubsystemInventory`，删除自建 XML/legacy locality/kind 解析、100/185 数量预算及 legacy owner 文件集合比较。全仓唯一生产来源、sibling 签名与 aggregate union 仍由原库存检查承接；Host 代表性源码归属显式覆盖消息、SDK 与工具新分片，摘要要求归属 runtime-platform。已有真实 provider、闭包排除和 composition 引用保护保留，并明确排除会话合同取得工具注册、物理订阅和事件总线。`SessionSnapshot.Model` 需要的 `OpencodeModel` 是数据合同，不误禁为物理 SDK 投影。
 
@@ -88,6 +88,6 @@ signal adapter 首次独立编译暴露既有 `ExecutionFailure`、`ChatExecutio
 
 ### 8. Shared-state 分片的真实编译依赖
 
-在 `e5794c8f4` 上删除无生产或测试调用方的 `OpenCode/Host/GitTree.fs/.fsi` 与 `GitTreePort`，同步去掉 aggregate、分片、APPLIES-TO 及 session-contract 排除表中的退役入口；EventStore 同名模块和 Relay snapshot 不变。shared-state 分片不再直接引用仅该适配器使用的 GitSubject 与宽 Host digest。历史 impact corpus／release-closure 快照不是当前 source authority，未重写其历史输入。
+`OpenCode/Host` 下不存在未使用的 GitTree 模块；EventStore 模块和 Relay snapshot 保持独立。shared-state 分片不直接引用 GitSubject 与宽 Host digest。
 
 首次独立 Fable 编译暴露 `PluginSessionScope` 的 `IJoinAttemptRegistry`／构造器漏报依赖及失效 namespace 引入。现直接引用窄 `delegation/join-attempt-registry`，删除失效引入，不通过整个 recovery runtime 补齐类型。修复后独立编译通过 578 parsed sources（`cf8198d664c9`）；新隔离 `SharedStateSurface` smoke 覆盖父子查询、空白候选拒绝、first-bind 和 continuation directory fallback。该 smoke 不证明 join 全部时序；消费者编译并集及未缩小的闭包口径见 structured-workflow/HOW 的 GAP-033 记录。

@@ -34,7 +34,7 @@
 
 3. **一次目标捕获，无 Replay 循环**：
    - `fetch` 执行时对当前工作区执行一次目标捕获 T，计算 B → T：无 diff 直接返回旧案；有 diff 且维护成功后原子更新；
-   - 废除 `replay-before / replay-after` 稳定性重放。
+   - 采用基于真实 diff 的单次维护，不包含 `replay-before / replay-after` 稳定性重放。
 
 ### 4. 持久化与索引投影
 

@@ -72,3 +72,35 @@ test('WHAT[interaction-authority-007] IA_007_unknown_origin_changes_no_projectio
   assert.deepEqual(intent.resolve({ sessionId: 'ses_a', physicalUserMessageId: 'msg_never_proven', explicitAgent: null, promptKey: null, hostCompaction: false, hostSynthetic: false }, { available: true, activeAgent: 'engineer', activeKind: 'HumanRoot', claims: [], acceptedContinuations: [] }), { case: 'Reject', reason: 'UnknownOriginWhileActive' })
   assert.equal(JSON.stringify(state), before)
 })
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const intent = await import("../../../dist/OpenCode/Host/ChatAdmission/IntentSurface.js");
+
+const message = (overrides = {}) => ({
+  sessionId: 'ses-chat',
+  physicalUserMessageId: 'msg-chat',
+  explicitAgent: null,
+  promptKey: null,
+  hostCompaction: false,
+  hostSynthetic: false,
+  ...overrides,
+})
+const snapshot = (overrides = {}) => ({
+  available: true,
+  activeParticipant: null,
+  activeKind: null,
+  claims: [],
+  acceptedContinuations: [],
+  ...overrides,
+})
+const decide = (decoded, durable = snapshot()) => intent.resolve(decoded, durable)
+
+test('WHAT[interaction-authority-007] unknown origin is rejected while active', () => {
+  assert.deepEqual(
+    decide(message(), snapshot({ activeParticipant: 'engineer', activeKind: 'HumanRoot' })),
+    { case: 'Reject', reason: 'UnknownOriginWhileActive' },
+  )
+})
+}

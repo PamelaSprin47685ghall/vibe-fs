@@ -11,7 +11,7 @@
    - `Published(messageOccurrence, generation, id, senderParticipant, message)`：挂靠到具体代次的消息事实。
    - `SubscriptionAnnounced(generation, recipientParticipant, pairOccurrence)`：公告覆盖跟踪。
    - `MessageDelivered(messageOccurrence, generation, ownerParticipant, pairOccurrence)`：交付覆盖跟踪。
-   - `MailboxRetired(generation, id, ownerParticipant)`：显式退役记录。
+   - `MailboxRetired(generation, id, ownerParticipant)`：显式注销与生命周期终结记录。
 
 2. **Pair Hint 聚合**：
    `prepareFragments(participant, pairOccurrence)` 计算当前批次应展示的地址公告与未读消息碎片，暂存待提交的 coverage facts。上层 guideline 模块完成 MarkerText 冻结后，将 Pair Hint 事实与 coverage facts 原子提交，保证不会因为上下文组装失败而丢失消息。

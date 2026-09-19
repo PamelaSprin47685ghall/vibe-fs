@@ -3,29 +3,6 @@ import test from 'node:test'
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const turns = await import("../../../dist/Interaction/Repair/CompletedTurnSurface.js");
-
-const text = (value) => ({ type: 'text', text: value })
-const reasoning = (value) => ({ type: 'reasoning', text: value })
-const toolCall = (callID, tool, args) => ({ type: 'tool-call', callID, tool, args })
-const toolResult = (callID, result) => ({ type: 'tool-result', callID, result })
-const activity = (kind) => ({ type: kind })
-const classify = (completed, finish, errorName, parts = []) => turns.classifyOutcome(completed, finish, errorName, parts)
-
-test('WHAT[provider-attempt-recovery-008] RECON_formal_content_gate_is_shared_with_terminal_validity', () => {
-  assert.equal(turns.formalContentUnusable(null), true)
-  assert.equal(turns.formalContentUnusable([]), true)
-  assert.equal(turns.formalContentUnusable([reasoning('only thoughts')]), true)
-  assert.equal(turns.formalContentUnusable([text('   ')]), true)
-  assert.equal(turns.formalContentUnusable([text('<tool_call>read</tool_call>')]), true)
-  assert.equal(turns.formalContentUnusable([text('a real answer')]), false)
-  assert.equal(turns.formalContentUnusable([text('a real answer'), reasoning('and thinking')]), false)
-})
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
 const intent = await import("../../../dist/OpenCode/Host/ChatAdmission/IntentSurface.js");
 const authority = await import("../../../dist/Interaction/Authority/RuntimeSurface.js");
 
@@ -120,5 +97,80 @@ test('WHAT[interaction-authority-008] IA_008_accepted_continuation_outranks_comp
   )
   state = authority.acceptClaim('pk_both', 'msg_both', state)
   assert.equal(authority.resolveKnownOrigin('msg_both', '', true, state), 'Continuation')
+})
+}
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const intent = await import("../../../dist/OpenCode/Host/ChatAdmission/IntentSurface.js");
+
+const message = (overrides = {}) => ({
+  sessionId: 'ses-chat',
+  physicalUserMessageId: 'msg-chat',
+  explicitAgent: null,
+  promptKey: null,
+  hostCompaction: false,
+  hostSynthetic: false,
+  ...overrides,
+})
+const snapshot = (overrides = {}) => ({
+  available: true,
+  activeParticipant: null,
+  activeKind: null,
+  claims: [],
+  acceptedContinuations: [],
+  ...overrides,
+})
+const decide = (decoded, durable = snapshot()) => intent.resolve(decoded, durable)
+
+test('WHAT[interaction-authority-008] accepted Host identity outranks claim and compaction', () => {
+  const durable = snapshot({
+    claims: [
+      {
+        promptKey: 'prompt-1',
+        sessionId: 'ses-chat',
+        origin: 'InteractionRepair',
+        participant: 'engineer',
+      },
+    ],
+    acceptedContinuations: [{ physicalUserMessageId: 'msg-chat', origin: 'JoinGuard' }],
+  })
+
+  assert.deepEqual(
+    decide(message({ promptKey: 'prompt-1', hostCompaction: true }), durable),
+    { case: 'NoManagedExecution', reason: 'AlreadyAcceptedHostMessage', origin: 'JoinGuard' },
+  )
+})
+test('WHAT[interaction-authority-008] registered AgentOwnerRoot outranks external root inference', () => {
+  assert.deepEqual(
+    decide(
+      message({ promptKey: 'unclaimed-owner-root', explicitAgent: 'reviewer' }),
+      snapshot({ activeParticipant: 'engineer', activeKind: 'AgentOwnerRoot' }),
+    ),
+    { case: 'Reject', reason: 'AgentOwnerRootPromptNotClaimed' },
+  )
+})
+test('WHAT[interaction-authority-008] plugin claim is frozen even if the later projection changes', () => {
+  const durable = snapshot({
+    claims: [
+      {
+        promptKey: 'prompt-1',
+        sessionId: 'ses-chat',
+        origin: 'InteractionRepair',
+        participant: 'engineer',
+      },
+    ],
+  })
+
+  const resolved = decide(message({ promptKey: 'prompt-1' }), durable)
+  durable.claims[0].participant = 'reviewer'
+  durable.claims.length = 0
+
+  assert.equal(resolved.case, 'PendingPromptIntent')
+  assert.equal(resolved.promptKey, 'prompt-1')
+  assert.equal(resolved.participant, 'engineer')
+  assert.equal('effectiveAgent' in resolved, false, 'intent carries no EffectiveAgent')
+  assert.equal('selectedAgent' in resolved, false, 'intent carries no SelectedAgent')
 })
 }

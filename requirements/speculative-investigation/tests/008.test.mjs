@@ -171,49 +171,6 @@ const attach = (replica, budget, purpose = 'Treatment', owner = 'owner') => {
 const turn = (sessionId, outcome, providerRun = 'run-t') => ({ sessionId, providerRun, outcome, parts: [] })
 const oneBatch = (replica) => ({ messages: [user('u1', replica, [hostText('Continue.')]), assistant('a1', replica, [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')])] })
 
-test('WHAT[participant-identity-008] Strength replica inherits the owner Persona and exact authority lineage', () => {
-  const owner = ownerProfile('engineer')
-  const issued = authority.issueInheritedIdentitySeed('engineer', owner)
-  assert.equal(issued.ok, true, issued.ok ? '' : issued.error)
-
-  assert.deepEqual(
-    {
-      ownerSession: issued.value.ownerSession,
-      ownerLogicalRun: issued.value.ownerLogicalRun,
-      ownerAuthorityRoot: issued.value.ownerAuthorityRoot,
-      persona: issued.value.participantIdentity.persona,
-      personaCatalogVersion: issued.value.participantIdentity.personaCatalogVersion,
-    },
-    {
-      ownerSession: owner.session,
-      ownerLogicalRun: owner.logicalRun,
-      ownerAuthorityRoot: owner.authorityRoot,
-      persona: owner.participantIdentity.persona,
-      personaCatalogVersion: owner.participantIdentity.personaCatalogVersion,
-    },
-  )
-})
-test('WHAT[participant-identity-008] Fission lane carries owner-issued identity lineage', () => {
-  const owner = ownerProfile('engineer')
-  const issued = authority.issueInheritedIdentitySeed('engineer', owner)
-  assert.equal(issued.ok, true, issued.ok ? '' : issued.error)
-
-  assert.deepEqual(authority.validateInheritedIdentitySeed(owner, issued.value), {
-    ok: true,
-    value: issued.value.participantIdentity,
-    error: null,
-  })
-})
-test('WHAT[participant-identity-008] Fission lane identity never infers lineage from a physical parent', () => {
-  const lane = Fission.startedLane(1, 'ses_physical_parent', 'investigate independently')
-  assert.deepEqual(lane, {
-    index: 1,
-    prompt: 'investigate independently',
-    hasAgentId: false,
-    hasHandle: false,
-    hasParent: false,
-  })
-})
 }
 
 {

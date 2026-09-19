@@ -2,56 +2,6 @@ import test from 'node:test'
 
 {
 const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const intent = await import("../../../dist/OpenCode/Host/ChatAdmission/IntentSurface.js");
-
-const message = (overrides = {}) => ({
-  sessionId: 'ses-chat',
-  physicalUserMessageId: 'msg-chat',
-  explicitAgent: null,
-  promptKey: null,
-  hostCompaction: false,
-  hostSynthetic: false,
-  ...overrides,
-})
-const snapshot = (overrides = {}) => ({
-  available: true,
-  activeParticipant: null,
-  activeKind: null,
-  claims: [],
-  acceptedContinuations: [],
-  ...overrides,
-})
-const decide = (decoded, durable = snapshot()) => intent.resolve(decoded, durable)
-
-test('WHAT[interaction-authority-009] explicit agent cannot infer HumanRoot while active', () => {
-  assert.deepEqual(
-    decide(
-      message({ explicitAgent: 'manager' }),
-      snapshot({ activeParticipant: 'engineer', activeKind: 'HumanRoot' }),
-    ),
-    { case: 'Reject', reason: 'UnknownOriginWhileActive' },
-  )
-})
-test('WHAT[interaction-authority-009] matching user agent continues the exact active root', () => {
-  assert.deepEqual(
-    decide(
-      message({ explicitAgent: 'engineer' }),
-      snapshot({ activeParticipant: 'engineer', activeKind: 'HumanRoot' }),
-    ),
-    {
-      case: 'ActiveHumanContinuationIntent',
-      sessionId: 'ses-chat',
-      physicalUserMessageId: 'msg-chat',
-      participant: 'engineer',
-      origin: 'HumanMessage',
-    },
-  )
-})
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
 const { readFileSync } = await import("node:fs");
 const { default: test } = await import("node:test");
 const chatExecution = await import("../../../dist/Execution/Session/ChatExecution/Surface.js");

@@ -68,7 +68,7 @@ const hanRatio = (text) => {
   return han / Math.max(1, latinWords)
 }
 
-test('WHAT[provider-language-006] PROMPT_017_world_role_library_all_have_en_zh_parity', () => {
+test('WHAT[cognitive-environment-006] PROMPT_017_world_role_library_all_have_en_zh_parity', () => {
   for (const semantic of [...ROLE_PATHS, ...SHARED_PATHS]) {
     providerLanguage.requireLanguagePair(semantic)
     assert.ok(providerLanguage.exists(english, semantic), `${semantic}: en`)
@@ -76,7 +76,7 @@ test('WHAT[provider-language-006] PROMPT_017_world_role_library_all_have_en_zh_p
   }
 })
 
-test('WHAT[provider-language-006] PROMPT_017_zh_cn_is_authored_chinese_not_an_english_copy', () => {
+test('WHAT[cognitive-environment-006] PROMPT_017_zh_cn_is_authored_chinese_not_an_english_copy', () => {
   const en = promptResources.loadForLanguage(english)
   const zh = promptResources.loadForLanguage(simplifiedChinese)
   assertActiveNonEmpty(zh, 'zh-CN')

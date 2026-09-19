@@ -10,7 +10,7 @@
 4. **分派与提交**：按 RequestKind 分派后继；Probe 成功原子提升 ActivePrefixEpoch，Squash 成功则压缩前半段 frames 并递增 FrameEpoch；只有 WorkMain/BloggerMain 的有效成功清零失败计数。
 5. **成功后的 retry transport row 不再授权 probe**：`settleVisibleToolContinuations` 先完成 prefix 提交、成功记账及 plan 消费。随后 `XWire.mayProbe` 读取已提交的连续失败计数；零失败只使用 committed prefix，不再物化 canonical X、读取候选 frames 或写入候选 blob。已有 frozen plan 仍原样复用；只有后续真实失败重新记账后才能选择新候选。`attempt-plan-probe-eligibility` 的回归通过 production budget 与 XWire decision Surface 重放 failure → tool success → coverage growth → new failure，证明成功后输出不变、再次失败恢复候选资格。
 
-该回归来自保留世界 `/tmp/oc-e2e-CEqj6W` 的 `seal-undeclared`：已提交 blob `f6067d123fb8…` 经 production memoryBlock 渲染的 wire digest 为 `28e287c40f4e`，新增 frame 的 blob `eb76afd20daa…` 渲染为 `a9cc2a3038ea`，分别精确匹配失败前后的 prefix。提交代码原样提升 candidate；缺陷是成功消费 plan 后，以仍存在的 failure projection 和 retry row 重新选出候选，而不是中断消息插入或提交时重算。旧实现确定性回归返回 cutoff 2 的新 probe（预期 `null`），修复后保持 committed output；此纯决策证明不替代真实 Host 的物理验收。
+该回归场景覆盖以下不变量：已提交 blob 与新增 frame blob 分别精确匹配失败前后的 prefix。成功消费 plan 后必须以零失败计数保持 committed output，严禁在消费 plan 后重新选出候选 probe（预期返回 `null`）；此纯决策证明不替代真实 Host 的物理验收。
 
 ### Blogger 压缩与连续追平
 
@@ -29,9 +29,9 @@
 
 `ContextFactFold` 在同一次 fact fold 内直接调用纯 `EnforcementProjection.applyFromEntry`／`applySquash`，使用具名 `EnforcementCycleRecord` 保留类型检查；不存在动态模块查找、手写 union tag 或模块缺失时的默认状态。该依赖指向 `enforcer-projection` 的纯投影分片，不指向 Enforcer runtime。Blogger Coordinator 所需 Nudge 工作流由独立 `dispatch/session-nudge` 分片提供，repair decision 与 Blogger evidence reader 由 `enforcer/repair` 提供，避免经 ingress 或 enforcer-codec 大分片形成编译环。
 
-2026-09-12：`ContextFactFold` 交出聚合写入后，它对 `EnforcementProjection` 的调用形态没变（仍是纯投影 `applyFromEntry`／`applySquash`，值由 `Composition/Durable/DomainFamilyBridge.ContextProjectionBridge` 注入的窄查询提供），但 fold 不再持有 `AgentProjectionSet`：它只认识 `BloggerCycleProjectionState`／`EnforcementProjectionState`／`BlogProjectionState`／`ActivePrefixEpoch` 四个切片，按 `ContextProjectionChange` 列表表达六种事实要写的切片，拒绝文本与 fact 名放进闭合 `ContextFoldRejection`。前缀观测的吸收判定改由 `PrefixEpochProjection.describe` 提供，与 `ProjectionUpdate.prefixOutcome` 共用一份策略。
+`ContextFactFold` 对 `EnforcementProjection` 的调用形态为纯投影 `applyFromEntry`／`applySquash`（值由 `Composition/Durable/DomainFamilyBridge.ContextProjectionBridge` 注入的窄查询提供），fold 严禁持有 `AgentProjectionSet`：它只认识 `BloggerCycleProjectionState`／`EnforcementProjectionState`／`BlogProjectionState`／`ActivePrefixEpoch` 四个切片，按 `ContextProjectionChange` 列表表达六种事实要写的切片，拒绝文本与 fact 名放进闭合 `ContextFoldRejection`。前缀观测的吸收判定由 `PrefixEpochProjection.describe` 统一提供，与 `ProjectionUpdate.prefixOutcome` 共用一份策略。
 
-`XWire.materializeFrozenRecordPrefix` 在读取并校验 coverable frame blobs 后，直接调用纯 `LifecycleWorkRecord.materialize opening frameBodies "" false`。同 session 不重复渲染 Opening，也不纳入 live RawGap；删除动态模块查找及手写 Chronicle fallback，frame 读取失败仍沿原 taskResult 传播。`lifecycle-work-record.test.mjs` 证明 canonical renderer，`prefix-stability/tests/prefix-writeback.test.mjs` 证明真实写回保留 raw Opening 对象与顺序；原 `ctx-opening-floor` 中只匹配源码／注释的 same-session 用例已删除。journal → coverable frames → frozen blob 的完整物化路径由 `tests/016.test.mjs` 端到端物化用例与 `XWireSurface.candidateFromJournal` 证明闭合。
+`XWire.materializeFrozenRecordPrefix` 在读取并校验 coverable frame blobs 后，直接调用纯 `LifecycleWorkRecord.materialize opening frameBodies "" false`。同 session 不重复渲染 Opening，也不纳入 live RawGap；禁止动态模块查找及手写 Chronicle fallback，frame 读取失败仍沿原 taskResult 传播。`lifecycle-work-record.test.mjs` 证明 canonical renderer，`prefix-stability/tests/prefix-writeback.test.mjs` 证明真实写回保留 raw Opening 对象与顺序。journal → coverable frames → frozen blob 的完整物化路径由 `tests/016.test.mjs` 端到端物化用例与 `XWireSurface.candidateFromJournal` 证明闭合。
 
 ## 依赖关系
 

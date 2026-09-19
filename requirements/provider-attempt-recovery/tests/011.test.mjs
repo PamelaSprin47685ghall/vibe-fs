@@ -442,3 +442,63 @@ test('WHAT[provider-attempt-recovery-011] retry_decision_is_material_based_and_p
   assert.match(compression.nextBloggerRequest('blogger-main', true), /blogger-squash/)
 })
 }
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const XWireSurface = await import("../../../dist/Context/Prefix/XWireSurface.js");
+
+const baseProjection = {
+  messages: [
+    { role: 'user', parts: [{ kind: 'text', text: 'hello' }] },
+    { role: 'assistant', parts: [{ kind: 'text', text: 'answer' }] },
+  ],
+}
+const acceptedRetryInput = (overrides = {}) => ({
+  journal: true,
+  sessionId: 'ses_x',
+  acceptedRetry: true,
+  failures: 1,
+  prefixEpoch: 0,
+  physicalUser: 'user-1',
+  acceptedPhysicalUser: 'user-1',
+  snapshotPort: true,
+  currentProjection: baseProjection,
+  committedSnapshot: null,
+  coverableCutoff: 2,
+  coveredDigest: XWireSurface.coveredPrefixDigest(baseProjection, 1),
+  requestStartCutoff: 1,
+  frozenRecordPrefixRef: 'blob/ref/frozen-1',
+  frozenRecordPrefixDigest: 'sha256:frozen-1',
+  frozenRecordPrefixBody: 'frozen record prefix body text',
+  memoryPreamble: 'companion memory preamble',
+  outcome: null,
+  ...overrides,
+})
+
+test('WHAT[provider-attempt-recovery-011] XWIRE_accepted_retry_cannot_be_consumed_by_other_physical_material_in_the_same_session', () => {
+  const result = XWireSurface.transform(acceptedRetryInput({
+    acceptedPhysicalUser: 'retry-user-1',
+    physicalUser: 'ordinary-user-2',
+  }))
+
+  assert.equal(result.ok, true)
+  assert.equal(result.noop, true)
+  assert.equal(result.changed, false)
+  assert.equal(result.consumed, false)
+})
+test('WHAT[provider-attempt-recovery-011] XWIRE_missing_current_physical_user_cannot_consume_the_accepted_retry', () => {
+  const result = XWireSurface.transform(acceptedRetryInput({ physicalUser: '' }))
+  assert.equal(result.ok, true)
+  assert.equal(result.noop, true)
+  assert.equal(result.consumed, false)
+})
+test('WHAT[provider-attempt-recovery-011] XWIRE_mutation_sensitive_unrelated_physical_user_must_not_consume_accepted_retry', () => {
+  const result = XWireSurface.transform(acceptedRetryInput({
+    acceptedPhysicalUser: 'retry-user-1',
+    physicalUser: 'unrelated-user-9',
+  }))
+  assert.equal(result.consumed, false,
+    'mutation guard: session presence alone must never consume an accepted physical retry')
+})
+}

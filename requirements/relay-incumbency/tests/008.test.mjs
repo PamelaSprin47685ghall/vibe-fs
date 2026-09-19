@@ -31,3 +31,20 @@ test('WHAT[relay-incumbency-008] authority update invalidates a perfect certific
   assert.equal(relay.certificate(revised.state, 'road-1').valid, false)
   assert.equal(relay.view(revised.state, 'road-1').phase, 'PerfectAwaitingRetirement')
 })
+
+test('WHAT[relay-incumbency-008] certificate invalidation is explicit and never reactivates its assessor', () => {
+  const opened = open(relay.empty())
+  const assessed = relay.assess(
+    opened.state,
+    'road-1',
+    'inc-1',
+    'assessment-1',
+    'snapshot-1',
+    'authority-1',
+    ...Array(8).fill('PERFECT'),
+  )
+  const invalidated = relay.invalidateCertificate(assessed.state, 'road-1', 'WorkspaceChanged')
+  assert.equal(invalidated.ok, true)
+  assert.equal(relay.certificate(invalidated.state, 'road-1').valid, false)
+  assert.equal(relay.view(invalidated.state, 'road-1').activeIncumbency, 'inc-1')
+})

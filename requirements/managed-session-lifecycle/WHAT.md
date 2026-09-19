@@ -90,8 +90,8 @@ session delete、turn observation或strength semantic-cut incident必须先完�
 
 ## [023] 身份替换后旧活跃会话显式收束与新任务仅接纳新身份
 
-新任务与新建子会话仅接受合法新身份集合（Engineer、DevOps、Manager、Orchestrator、Blogger 等），严禁为已废止旧角色（Coder、Inspector、Browser、Inquiry、Distiller）创建新会话。
-历史 EventStore 事件原样保留，历史中记录的旧身份事实解码严格隔离在历史边界；系统严禁在活跃生命周期中将旧 Inspector/Coder 自动升权或解析为具备写入/Fission 权限的 Engineer。
+新任务与新建子会话仅接受合法活跃身份集合（Engineer、DevOps、Manager、Orchestrator、Blogger 等），新建会话严格限定在此活跃角色集合内，拒绝任何非活跃集合的身份。
+历史 EventStore 事件原样保留，历史事实解码严格隔离在历史边界；系统严禁在活跃生命周期中将只读历史身份自动升权或解析为具备写入/Fission 权能的 Engineer。
 当系统在运行或重启中观察到残留的旧角色活跃会话时，生命周期管理器必须按既有中断/退休规则（`CancelAndDrain` 或显式 retirement）对其执行显式收束，写入终态并排空资源，严禁将其自动恢复为合法活跃运行链。
 
 ## [024] 固定 DevOps 崩溃恢复的单一逻辑执行权威与进程收束

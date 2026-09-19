@@ -20,7 +20,7 @@ Office 能力是纯粹的后果模型，权限矩阵仅是其在执行层的投�
 
 Engineer 的调查不包含任何真实命令执行，即使命令只读；只读调研是本次任务约束，不是另一个角色。DevOps 的普通修复允许既定需求内的工程判断，不以「只有唯一机械操作」或逐次批准为前提。Manager 必须区分 Engineer 完成、DevOps 运行和自修后的重新验证、自己作出的验收判断。
 
-已撤销角色、同步委托和模型蒸馏不得继续以可加载提示词、工具建议、旧别名或模型池留在 resources/。普通浏览器测试与一般探究用语不属于旧角色，不作关键词式误删。资源回归须覆盖实际分发资源及其调用接点，而非只检查角色目录。
+非当前合法活跃角色的可加载提示词、工具建议、别名或模型池不得留在 resources/。普通浏览器测试与一般探究用语不属于此类，不作关键词式误删。资源回归须覆盖实际分发资源及其调用接点，而非只检查角色目录。
 
 ## [006] offices 不可互换：禁止把 office 当可互换通用 agent
 
@@ -61,4 +61,4 @@ DevOps 拥有完整的运维执行与直接工程修复权能：
 
 Sphinx 是完全由程序控制的探究流程（epistemic workflow）：
 - **Entitled consequence**：程序驱动探究步骤推进、工作项决策、预算控制、续行与收束；在需要语义调研时，由程序同步调用只读 Engineer 获取本地事实证据。
-- **Non-consequence**：Sphinx 不是 Role、Persona 或普通 subagent；不拥有独立 Fission 身份；内部 Engineer 调研调用不具备修改、真实执行、DevOps 调度、Fission 或递归探究权限；彻底废止 Inquiry 模型驾驶层。
+- **Non-consequence**：Sphinx 不是 Role、Persona 或普通 subagent；不拥有独立 Fission 身份；内部 Engineer 调研调用不具备修改、真实执行、DevOps 调度、Fission 或递归探究权限；不设立任何中间模型驾驶层。

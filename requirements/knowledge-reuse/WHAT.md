@@ -88,6 +88,6 @@ Casebook semantic conflict必须先写入对应durable failure/cut-tail并取得
 
 大轨迹与大 diff 必须遵守预算限制，执行截头取尾处理，并保留明确的截断声明与变更路径信息。Bookkeeper 严禁将仅见尾部声称已审阅全部变更；无法做出有效更新时保留旧案与旧基线，严禁通过反复重试、模型蒸馏或读取全仓文件绕过预算。
 
-## [015] 废止严格 Replay 与稳定性校验循环
+## [015] 基于真实 Diff 的单次维护与非 Replay 语义
 
 系统不采用基于 `FileRead/GlobResult/GrepResult` 集合相等性判定的严格 replay 机制，不执行刷新前后的 `replay-before / replay-after` 稳定性循环。案例的新鲜度维护完全基于真实文件 diff 进行单次迁移。

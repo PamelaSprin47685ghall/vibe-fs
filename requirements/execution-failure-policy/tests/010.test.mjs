@@ -112,7 +112,7 @@ test('WHAT[execution-failure-policy-010] gate fails when FixedWithRegression nam
       sourceSymbol: 'S.fs :: s',
       operation: 's-op',
       status: 'FixedWithRegression',
-      formalTestId: 'requirements/ghost/tests/missing.test.mjs::WHAT[X] ghost',
+      formalTestId: 'requirements/ghost/tests/missing.test.mjs::WHAT[execution-failure-policy-010] ghost',
     }),
   ]
   const violations = scanFatalInventory(files, entries, () => false)
@@ -129,7 +129,7 @@ test('WHAT[execution-failure-policy-010] gate passes FixedWithRegression when th
       sourceSymbol: 'S.fs :: s',
       operation: 's-op',
       status: 'FixedWithRegression',
-      formalTestId: 'requirements/real/tests/there.test.mjs::WHAT[X] there',
+      formalTestId: 'requirements/real/tests/there.test.mjs::WHAT[execution-failure-policy-010] there',
     }),
   ]
   const violations = scanFatalInventory(files, entries, (rel) => rel === 'requirements/real/tests/there.test.mjs')
@@ -152,7 +152,7 @@ test('WHAT[execution-failure-policy-010] retired-fuse migration anchored on its 
       sourceSymbol: 'Cut.fs :: c',
       operation: 'dynamic (retired fuse; absence guarded by regression test)',
       status: 'FixedWithRegression',
-      formalTestId: 'requirements/real/tests/there.test.mjs::WHAT[X] no optional fuse remains',
+      formalTestId: 'requirements/real/tests/there.test.mjs::WHAT[execution-failure-policy-010] no optional fuse remains',
     }),
   ]
   const violations = scanFatalInventory(files, entries, (rel) => rel === 'requirements/real/tests/there.test.mjs')
@@ -167,7 +167,7 @@ test('WHAT[execution-failure-policy-010] retired-fuse migration without its regr
       sourceSymbol: 'Cut.fs :: c',
       operation: 'dynamic (retired fuse; absence guarded by regression test)',
       status: 'FixedWithRegression',
-      formalTestId: 'requirements/ghost/tests/missing.test.mjs::WHAT[X] ghost',
+      formalTestId: 'requirements/ghost/tests/missing.test.mjs::WHAT[execution-failure-policy-010] ghost',
     }),
   ]
   const violations = scanFatalInventory(files, entries, () => false)

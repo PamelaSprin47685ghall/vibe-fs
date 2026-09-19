@@ -42,4 +42,4 @@ AuthorityRevision、WorkspaceSnapshotId、requirement digest、target/base horiz
 
 ## [012] 固定 DevOps 初始绑定与恢复的唯一性及幂等性
 
-固定 DevOps 绑定的初始化、晚到创建结果、接收状态不明与崩溃恢复必须满足唯一性与幂等性：同一道路在运行时初次绑定一个逻辑 DevOps 并持久化，之后仅允许 resume，禁止通过 fork 创建第二名 DevOps；接收结果不明时保留原 PromptKey 与恢复权，不盲目重发亦不新建操作员；不再支持或测试 Manager 分身并发共享 DevOps 的前提。
+固定 DevOps 绑定的初始化、晚到创建结果、接收状态不明与崩溃恢复必须满足唯一性与幂等性：同一道路在运行时初次绑定一个逻辑 DevOps 并持久化，之后仅允许 resume，禁止通过 fork 创建第二名 DevOps；接收结果不明时保留原 PromptKey 与恢复权，不盲目重发亦不新建操作员；系统基于单一 Manager 拓扑设计，不支持并发共享 DevOps。

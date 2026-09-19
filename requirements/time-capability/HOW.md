@@ -36,7 +36,7 @@
 
 ### 6. 业务层全局时间禁令门禁（`ambient-time-forbidden`）
 
-`scripts/lib/raw-time-scan.mjs` 先遍历完整 `src/Wanxiangshu/`，再按精确文件路径排除已审查的物理时钟、timer、Host 与持久化适配器。例外不接受目录前缀；新 sibling 默认进入扫描（纯源码文本token扫描，非FCS）。生产根或声明的 scan root 不存在时 collector 直接失败；它不再是常驻门禁，time-capability-004 的证明由单元测试直接驱动同一 scanner。
+`scripts/lib/raw-time-scan.mjs` 先遍历完整 `src/Wanxiangshu/`，再按精确文件路径排除已审查的物理时钟、timer、Host 与持久化适配器。例外不接受目录前缀；新 sibling 默认进入扫描（纯源码文本token扫描，非FCS）。生产根或声明的 scan root 不存在时 collector 直接失败；time-capability-004 的证明由单元测试直接驱动同一 scanner。
 `scripts/checks/g4r-ce-vocabulary.mjs` 先遍历完整 `src/Wanxiangshu/`，再按精确文件路径排除已审查的物理时钟、timer、Host 与持久化适配器。例外不接受目录前缀；新 sibling 默认进入扫描（纯源码文本token扫描，非FCS）。生产根或声明的 scan root 不存在时 collector 直接失败，CLI 永久 hard-fail，不存在 soft phase。
 
 `tests/ambient-time-forbidden.test.mjs` 调用与 CLI 相同的 analyzer，分别固定 clean production、全树 collector、单 token mutation + allowlist sibling decoy、missing-root fail-closed。time-capability-004 是 source absence/architecture law，不登记到 `Process/Surface.js`；Surface Manifest 只约束 runtime semantic boundary，不能证明全生产树不存在 ambient-time token。

@@ -69,7 +69,7 @@ Protocol-boundary exemption（遵循 structured-workflow-017）：`nextTool` 与
 
 ## [014] MCP Server 身份、版本与能力协商
 
-MCP initialize 的 `serverInfo.name` 固定为 `sphinx`，`serverInfo.version` 严格等于 package manifest version，并通过 module path 定位包根而非 cwd。`2024-11-05` 客户端必须继续使用 structuredContent/Legacy tools；更新协议可发现 generic tools。Tasks 只有双方协商能力后才可启用，direct-provider 不依赖已弃用的 MCP Sampling。
+MCP initialize 的 `serverInfo.name` 固定为 `sphinx`，`serverInfo.version` 严格等于 package manifest version，并通过 module path 定位包根而非 cwd。`2024-11-05` 客户端必须继续使用 structuredContent/Legacy tools；更新协议可发现 generic tools。Tasks 只有双方协商能力后才可启用，direct-provider 不依赖 MCP Sampling。
 
 ## [015] Core 认识论零硬编码
 

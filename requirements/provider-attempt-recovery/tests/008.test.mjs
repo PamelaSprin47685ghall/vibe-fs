@@ -81,3 +81,26 @@ test('WHAT[provider-attempt-recovery-008] only_a_probe_attempt_with_a_usable_ter
   assert.equal(planner.promotableProbeId(withProbe, 'Failed'), null)
   assert.equal(planner.promotableProbeId(withProbe, 'Aborted'), null)
 })
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const turns = await import("../../../dist/Interaction/Repair/CompletedTurnSurface.js");
+
+const text = (value) => ({ type: 'text', text: value })
+const reasoning = (value) => ({ type: 'reasoning', text: value })
+const toolCall = (callID, tool, args) => ({ type: 'tool-call', callID, tool, args })
+const toolResult = (callID, result) => ({ type: 'tool-result', callID, result })
+const activity = (kind) => ({ type: kind })
+const classify = (completed, finish, errorName, parts = []) => turns.classifyOutcome(completed, finish, errorName, parts)
+
+test('WHAT[provider-attempt-recovery-008] RECON_formal_content_gate_is_shared_with_terminal_validity', () => {
+  assert.equal(turns.formalContentUnusable(null), true)
+  assert.equal(turns.formalContentUnusable([]), true)
+  assert.equal(turns.formalContentUnusable([reasoning('only thoughts')]), true)
+  assert.equal(turns.formalContentUnusable([text('   ')]), true)
+  assert.equal(turns.formalContentUnusable([text('<tool_call>read</tool_call>')]), true)
+  assert.equal(turns.formalContentUnusable([text('a real answer')]), false)
+  assert.equal(turns.formalContentUnusable([text('a real answer'), reasoning('and thinking')]), false)
+})
+}

@@ -17,15 +17,15 @@
 
 ### Host 装配与异步调用边界
 
-`ToolRuntimeScope.OrchestratorHostFor` 在既有 composition 层静态构造 `OrchestratorHostDeps` 与 `OrchestratorHost`，由 Fable 保留 `ContinueManagerLoop` 等高阶参数的调用约定；`CaptureWorktreeSnapshot` 全链保持 `WorkspaceSnapshotId`。不能用 `createObj + box` 和动态加载替代这条声明依赖：该旧路径曾使双参数回调返回函数而非 Promise，首次 publication 因 `computation.then is not a function` 失败。会话取消和 scope 卸载分别直调 `CancelAndDrain`、`DetachAndDrain`，不以缺模块时的默认成功绕过资源结算。恢复引用后的 scope shard 真实 focused Fable 编译通过，闭包为 942 个 source；这不替代真实 Host Long Stroke 验收。
+`ToolRuntimeScope.OrchestratorHostFor` 在既有 composition 层静态构造 `OrchestratorHostDeps` 与 `OrchestratorHost`，由 Fable 保留 `ContinueManagerLoop` 等高阶参数的调用约定；`CaptureWorktreeSnapshot` 全链保持 `WorkspaceSnapshotId`。系统严禁使用 `createObj + box` 和动态加载替代声明依赖，以保证双参数回调始终遵循 Promise 调用约定，防止 publication 过程因计算未决而失败。会话取消和 scope 卸载分别直调 `CancelAndDrain`、`DetachAndDrain`，不以缺模块时的默认成功绕过资源结算。包含 typed 装配的 scope shard 必须通过真实 focused Fable 编译（闭包 942 个 source）以及 Host 验收。
 
-2026-09-09，旧动态装配在唯一 Long Stroke 的首次 publication 触发上述异常，后续 join 耗尽内存 verdict 后持续为空；恢复 typed 装配并重建后，同一 `requirements/verification-system/tests/e2e/014.test.mjs` 完成 `Continue → IncumbencyOpened → Accepted → ConflictDetected → RebasedCandidate → Published`，journal 为 454/699、SSE 为 2193/3351。剧本、事件上限和 outstanding 判定均未改变，临时诊断探针已删除。
+端到端验证由 `requirements/verification-system/tests/e2e/014.test.mjs` 承载，完整覆盖 `Continue → IncumbencyOpened → Accepted → ConflictDetected → RebasedCandidate → Published` 链路，事件与 outstanding 判定严格按规范执行。
 
 ### RuntimePath 摘要依赖
 
 `change-fact` 分片中的 `RuntimePath` 仅通过 `HostDigest.sha256Hex` 为非 Git 工作区计算状态目录，直接引用既有零领域依赖的 `runtime-platform/digest`；GitSubject、Identity、Change facts 与 durable fact 引用保留。源码和签名不变，Git common-dir 优先、失败后的 XDG／home 路径选择及缓存语义均未修改。
 
-在 `bd99d71e7` 上，该分片声明递归闭包从 29 项目／158 个 `.fs/.fsi` 输入降至 27／148；独立 Fable 编译通过 186 parsed sources（`7711a827c1d3`）。以三个既有签名为输入保守选择反向消费者，单次 focused Fable 并集通过 1432 parsed sources／1394 items（`6f04afa1af0a`），并非签名发生了修改。新隔离产物 smoke 在临时目录中验证 Unicode 工作区的独立 Node SHA-256、已配置／未配置 XDG 的 fallback 与真实 Git common-dir 路径，临时目录已清理；该 smoke 不证明锁竞争、journal 恢复或 linked worktree 全分支。
+在 `bd99d71e7` 上，该分片声明递归闭包从 29 项目／158 个 `.fs/.fsi` 输入降至 27／148；独立 Fable 编译通过 186 parsed sources（`7711a827c1d3`）。以三个既有签名为输入保守选择反向消费者，单次 focused Fable 并集通过 1432 parsed sources／1394 items（`6f04afa1af0a`），并非签名发生了修改。新隔离产物 smoke 验证 Unicode 工作区的独立 Node SHA-256、已配置／未配置 XDG 的 fallback 与真实 Git common-dir 路径；该 smoke 专注于路径与摘要推导，不证明锁竞争、journal 恢复或 linked worktree 全分支。
 
 ### 门禁与工作树资源管理
 

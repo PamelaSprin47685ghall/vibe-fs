@@ -14,7 +14,7 @@
 
 ### 2. 静态边界门禁（`js-boundary-gate`）
 
-`scripts/checks/js-boundary-gate.mjs` 实施全测试空间的静态门禁扫描，确保零历史债务并在发现违规时立即判红：
+`scripts/checks/js-boundary-gate.mjs` 实施全测试空间的静态门禁扫描，确保严格符合规范边界并在发现违规时立即判红：
 - 阻断测试代码对内部 `dist/<module>.js` 的直接导入。
 - 阻断对对象属性进行混淆名模式匹配（如 `startsWith('Foo__')`）的反射探测。
 - 阻断对 `.tag`、`.fields`、`.cases()` 等编译器私有特性的感知。
@@ -24,7 +24,7 @@
 `scripts/lib/test-surface-scan.mjs` 中的 `SURFACE_MANIFEST` 严格定义了系统中所有合法暴露的 Semantic Surface：
 - 每个注册项必须明确声明其所属 `owner` 包、所证明的 `laws` 规范命题、源码路径 `source`、编译输出 `module` 以及表示形式 `representation`。
 - `scripts/checks/js-surface-manifest.mjs` 校验 surface 必须存在于 manifest 注册、law 必须在声明 owner 的 WHAT.md 存在、源码必须在 `Wanxiangshu.fsproj` 编译、dist 产物必须真实已发射，且至少一个 `.test.mjs` 静态 import 该 surface。
-- 退役 proof-authority 静态分析链：取消 callback 可达执行闭包分析、consumer 授权检查及 `SURFACE_CONSUMERS` 元数据。系统行为权限由真实生产 Capability/Authority 守卫。
+- 系统行为权限严格由真实生产 Capability/Authority 守卫，不依赖额外的 proof-authority 静态分析链或 `SURFACE_CONSUMERS` 元数据。
 
 ### 4. 原生数据校验器（`js-contract`）
 

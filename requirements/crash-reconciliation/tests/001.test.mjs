@@ -69,7 +69,7 @@ async function scenario(mode) {
   }
 }
 
-test('WHAT[managed-session-lifecycle-001] managed_child_effect_reconciliation_classifies_missing_matching_and_conflicting_evidence', () => {
+test('WHAT[crash-reconciliation-001] managed_child_effect_reconciliation_classifies_missing_matching_and_conflicting_evidence', () => {
   assert.deepEqual(AttachmentSurface.classifyObservation('missing'), {
     observation: 'missing',
     decision: 'Create',
@@ -86,7 +86,7 @@ test('WHAT[managed-session-lifecycle-001] managed_child_effect_reconciliation_cl
     children: ['host-child-existing', 'host-child-conflict'],
   })
 })
-test('WHAT[managed-session-lifecycle-001] SyncDelegate adapter reconciles managed child effects through the Host boundary', async () => {
+test('WHAT[crash-reconciliation-001] SyncDelegate adapter reconciles managed child effects through the Host boundary', async () => {
   const adopted = await scenario('matching')
   assert.deepEqual(adopted.listedFamilies, ['host-family-root'])
   assert.equal(adopted.createCount, 0)
@@ -122,7 +122,7 @@ test('WHAT[managed-session-lifecycle-001] SyncDelegate adapter reconciles manage
     'sync delegate child observation failed for host-family-root: controlled ListChildren rejection',
   )
 })
-test('WHAT[managed-session-lifecycle-001] same-family delegates are adopted only for the exact reuse scope', async () => {
+test('WHAT[crash-reconciliation-001] same-family delegates are adopted only for the exact reuse scope', async () => {
   const result = await scenario('other-scope')
 
   assert.deepEqual(result.listedFamilies, ['host-family-root'])
@@ -134,7 +134,7 @@ test('WHAT[managed-session-lifecycle-001] same-family delegates are adopted only
   assert.equal(result.child, 'host-child-created-exact-scope')
   assert.equal(result.error, '')
 })
-test('WHAT[managed-session-lifecycle-001] concurrent GetOrCreate serializes reconciliation and shares one child', async () => {
+test('WHAT[crash-reconciliation-001] concurrent GetOrCreate serializes reconciliation and shares one child', async () => {
   const result = await SyncDelegateSurface.concurrentAttachedGetOrCreateScenario()
 
   assert.equal(result.observeCount, 1)

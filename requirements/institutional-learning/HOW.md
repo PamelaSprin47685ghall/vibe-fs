@@ -34,7 +34,7 @@
 
 在 `686f3a9c4` 上替换这一条引用后，正式 planner 的 forward closure 从 7 个项目／38 个 `.fs/.fsi` 输入收窄到 4 个项目／16 个输入。该分片真实 focused Fable 编译通过（54 parsed sources，fingerprint `a731717f814a`）；其新产物的公开 Surface revision smoke 覆盖空规则、单规则与 Unicode／CRLF 多规则输入。这里的闭包数量不包括编译器隐式输入，不是编译耗时改善的证据。
 
-2026-09-12：`Enforcer/InstitutionalLearning/Fold.fs` 这个只把 `projection.InstitutionalLearning` 写回聚合的裸装配包装已删除，同批删除的还有 Fission、Concern、Attention 三个同类包装；装配现由 `Composition/Durable/ProjectionUpdate.applyInstitutionalLearning` 与 `applyAttentionLearning` 承担，调用顺序仍是「先写 `InstitutionalLearning`，再用同一事实 resurface attention」。本分片剩余文件 `InstitutionalLearningTools.fs` 仍真实读取聚合（`AgentProjection.pendingAttentionWorkPairs`、`snapshot.AgentProjections.*`），因此保留 `composition-durable-*` 引用，闭包仅从 158 收到 157 个 `.fs`；不要把它读成隔离成果。
+装配由 `Composition/Durable/ProjectionUpdate.applyInstitutionalLearning` 与 `applyAttentionLearning` 统一承担，调用顺序为「先写 `InstitutionalLearning`，再用同一事实 resurface attention」，不存在多余的裸装配包装。本分片文件 `InstitutionalLearningTools.fs` 真实读取聚合（`AgentProjection.pendingAttentionWorkPairs`、`snapshot.AgentProjections.*`），保留 `composition-durable-*` 引用。
 真实 `InstitutionalLearningTools` consumer 与 Enhancer 签名反向 consumer 的影响集合经 `compile-impact` 合并为一次编译，通过 1432 parsed sources／1394 items（fingerprint `f4c0e60d84d5`）。该集合仍含其他 consumer 真正需要的 Host 合同，不能把局部分片的闭包缩小推广到全部反向 consumer。
 
 ## GAP

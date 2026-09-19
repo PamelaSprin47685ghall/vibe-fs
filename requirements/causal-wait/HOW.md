@@ -43,7 +43,7 @@
 
 - collector 必须找到 `src/Wanxiangshu`，读取全部 production `.fs`；根缺失、目录不可读或文件读取失败直接抛错，不返回空集合。
 - 任意 `Journal` 路径及所有 `Fact.fs` / `Facts.fs` carrier 的 executable F# 禁止完整 causal-wait vocabulary。
-- `Execution/Session/Wait` owner 外禁止 `IWaitSnapshotReader`、`DiagnosticWaitSnapshot`、registry、semantic Surface与已删除的`CausalWaitHub`；唯一bridge出口是`PluginHostWiring`调用`CausalWaitBridge.target`构造注入sink。业务writer只能消费composition注入的`IWaitObserver`。
+- `Execution/Session/Wait` owner 外禁止 `IWaitSnapshotReader`、`DiagnosticWaitSnapshot`、registry、semantic Surface 与任何集中式等待集线器；唯一 bridge 出口是 `PluginHostWiring` 调用 `CausalWaitBridge.target` 构造注入 sink。业务 writer 只能消费 composition 注入的 `IWaitObserver`。
 - `.wanxiangshu/diagnostics/causal-waits.json` 是 owner-owned locator；production owner 外出现即失败，防止绕过 typed reader 直接读取桥接文件。
 - F# 注释与字符串中的符号由 `maskFSharpTrivia` 排除，作为 false-positive decoy；locator 字符串本身不是 decoy，因为它就是可读取诊断文件的协议地址。
 

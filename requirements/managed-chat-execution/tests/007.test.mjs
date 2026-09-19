@@ -78,38 +78,6 @@ test('WHAT[managed-chat-execution-007] release boundary failure is typed without
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const intent = await import("../../../dist/OpenCode/Host/ChatAdmission/IntentSurface.js");
-
-const message = (overrides = {}) => ({
-  sessionId: 'ses-chat',
-  physicalUserMessageId: 'msg-chat',
-  explicitAgent: null,
-  promptKey: null,
-  hostCompaction: false,
-  hostSynthetic: false,
-  ...overrides,
-})
-const snapshot = (overrides = {}) => ({
-  available: true,
-  activeParticipant: null,
-  activeKind: null,
-  claims: [],
-  acceptedContinuations: [],
-  ...overrides,
-})
-const decide = (decoded, durable = snapshot()) => intent.resolve(decoded, durable)
-
-test('WHAT[interaction-authority-007] unknown origin is rejected while active', () => {
-  assert.deepEqual(
-    decide(message(), snapshot({ activeParticipant: 'engineer', activeKind: 'HumanRoot' })),
-    { case: 'Reject', reason: 'UnknownOriginWhileActive' },
-  )
-})
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
 const chatExecution = await import("../../../dist/Execution/Session/ChatExecution/Surface.js");
 const recovery = await import("../../../dist/Execution/Session/ChatExecution/RecoveryRuntimeSurface.js");
 const status = await import("../../../dist/Execution/Session/ChatExecution/StatusSurface.js");

@@ -17,7 +17,7 @@
 - InternalLeaf 节点禁止持有 Companion、禁止递归附挂子叶，亦不得成为其他 Attached 节点的 owner。
 - 物理 Host parent 统一指向 family root，逻辑归属仅由 journal 关联事实定义。
 - SessionId 仅命名可复用物理容器；logical-run identity 由 `participant-identity` 的版本化 evidence 命名。
-- 领域内彻底消除旧式的 Student / Teacher 概念与拓扑。
+- 领域模型保持严格正交与单一职责的平坦拓扑。
 
 ## 违反边界的后果（RED）
 

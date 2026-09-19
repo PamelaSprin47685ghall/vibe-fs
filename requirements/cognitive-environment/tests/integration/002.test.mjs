@@ -68,7 +68,7 @@ const hanRatio = (text) => {
   return han / Math.max(1, latinWords)
 }
 
-test('WHAT[distribution-002] PROMPT_resources_load_from_package_independent_of_cwd', () => {
+test('WHAT[cognitive-environment-002] PROMPT_resources_load_from_package_independent_of_cwd', () => {
   const previous = process.cwd()
   try {
     process.chdir('/')

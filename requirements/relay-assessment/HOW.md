@@ -13,9 +13,9 @@
 
 `mission-relay-workspace-snapshot` 直接引用 `runtime-platform/digest`，保留 GitSubject 与 Relay core 的真实依赖，不再因字符串摘要引入 OpenCode 消息／事件合同。`WorkspaceSnapshot.canonical` 的 HEAD tree、status、index、binary diff、untracked blob hash 及分隔符不变，`capture` 和公开签名不变。
 
-## 角色与生命周期演进
+## 角色与生命周期实现
 
-1. **独立评估实例**：独立评估不依赖历史专职 Inspector 角色，由 Manager 派出只读 Engineer 实例建立事实；实现者的自评结论不得作为评审裁决。
+1. **独立评估实例**：独立评估由 Manager 派出只读 Engineer 实例建立事实；实现者的自评结论不得作为评审裁决。
 2. **DevOps 自修与证书失效**：DevOps 拥有固有非架构级修复权，自修修改工作树后快照发生推进；旧快照上签发的 `QualityCertificate` 随快照失效，新改动必须由下一任独立迭代重新评估。
 
 ## 依赖关系

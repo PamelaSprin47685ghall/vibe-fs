@@ -33,7 +33,7 @@ const evidence = {
 const run = (failurePoint = 'None', state = 'None') =>
   transaction.transactionScenario(evidence, failurePoint, state)
 
-test('WHAT[execution-model-routing-013] queue full and cancellation cross no bind Host or provider boundary', async () => {
+test('WHAT[managed-chat-execution-013] queue full and cancellation cross no bind Host or provider boundary', async () => {
   for (const [failurePoint, outcome] of [
     ['AcquireQueueFull', 'CapacityQueueFull'],
     ['AcquireCancelled', 'Cancelled'],

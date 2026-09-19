@@ -281,3 +281,120 @@ test('WHAT[interaction-authority-005] IA_005_every_continuation_kind_is_parseabl
   assert.equal(authority.tryParseContinuationKind('HumanRoot'), null)
 })
 }
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const intent = await import("../../../dist/OpenCode/Host/ChatAdmission/IntentSurface.js");
+
+const message = (overrides = {}) => ({
+  sessionId: 'ses-chat',
+  physicalUserMessageId: 'msg-chat',
+  explicitAgent: null,
+  promptKey: null,
+  hostCompaction: false,
+  hostSynthetic: false,
+  ...overrides,
+})
+const snapshot = (overrides = {}) => ({
+  available: true,
+  activeParticipant: null,
+  activeKind: null,
+  claims: [],
+  acceptedContinuations: [],
+  ...overrides,
+})
+const decide = (decoded, durable = snapshot()) => intent.resolve(decoded, durable)
+
+test('WHAT[interaction-authority-005] exhaustive chat admission intent table', () => {
+  const claim = {
+    promptKey: 'prompt-1',
+    sessionId: 'ses-chat',
+    origin: 'InteractionRepair',
+    participant: 'engineer',
+  }
+
+  const cases = [
+    {
+      label: 'unmanaged fresh host message',
+      decoded: message(),
+      expected: { case: 'NoManagedExecution', reason: 'UnmanagedMessage' },
+    },
+    {
+      label: 'fresh external managed root',
+      decoded: message({ explicitAgent: 'engineer' }),
+      expected: {
+        case: 'ExternalRootIntent',
+        sessionId: 'ses-chat',
+        physicalUserMessageId: 'msg-chat',
+        explicitAgent: 'engineer',
+        participant: 'engineer',
+        origin: 'HumanRoot',
+        identitySeed: 'RootSelection',
+      },
+    },
+    {
+      label: 'exact claimed plugin prompt',
+      decoded: message({ promptKey: 'prompt-1' }),
+      durable: snapshot({ claims: [claim] }),
+      expected: {
+        case: 'PendingPromptIntent',
+        sessionId: 'ses-chat',
+        physicalUserMessageId: 'msg-chat',
+        promptKey: 'prompt-1',
+        participant: 'engineer',
+        origin: 'InteractionRepair',
+        identitySeed: 'RootSelection',
+      },
+    },
+    {
+      label: 'host compaction',
+      decoded: message({ hostCompaction: true }),
+      expected: { case: 'HostInternal', origin: 'HostInternal' },
+    },
+    {
+      label: 'host synthetic',
+      decoded: message({ hostSynthetic: true }),
+      expected: { case: 'HostInternal', origin: 'HostInternal' },
+    },
+  ]
+
+  for (const row of cases) {
+    assert.deepEqual(intent.resolve(row.decoded, row.durable ?? snapshot()), row.expected, row.label)
+  }
+})
+test('WHAT[interaction-authority-005] rejects managed intent without physical message identity', () => {
+  assert.deepEqual(decide(message({ physicalUserMessageId: null, explicitAgent: 'engineer' })), {
+    case: 'Reject',
+    reason: 'ManagedIntentMissingPhysicalUserMessageId',
+  })
+
+  assert.deepEqual(
+    decide(
+      message({ physicalUserMessageId: null, promptKey: 'prompt-1' }),
+      snapshot({
+        claims: [
+          {
+            promptKey: 'prompt-1',
+            sessionId: 'ses-chat',
+            origin: 'InteractionRepair',
+            participant: 'engineer',
+          },
+        ],
+      }),
+    ),
+    { case: 'Reject', reason: 'ManagedIntentMissingPhysicalUserMessageId' },
+  )
+})
+test('WHAT[interaction-authority-005] rejects insufficient exact identity evidence', () => {
+  const rows = [
+    [message({ sessionId: null, explicitAgent: 'engineer' }), 'ManagedIntentMissingSessionId'],
+    [message({ explicitAgent: 'legacy-coder' }), 'InvalidExplicitAgent'],
+    [message({ promptKey: 'missing' }), 'PromptKeyNotClaimed'],
+  ]
+
+  for (const [decoded, reason] of rows) {
+    assert.deepEqual(decide(decoded), { case: 'Reject', reason })
+  }
+})
+}

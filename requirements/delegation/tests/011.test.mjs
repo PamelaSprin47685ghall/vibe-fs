@@ -2,60 +2,6 @@ import test from 'node:test'
 
 {
 const { default: assert } = await import("node:assert/strict");
-const { mkdtempSync } = await import("node:fs");
-const { tmpdir } = await import("node:os");
-const { join } = await import("node:path");
-const { default: test } = await import("node:test");
-const fork = await import("../../../dist/Execution/Delegation/Fork/Surface.js");
-const forkTool = await import("../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js");
-
-const schemaNode = (kind, extra = {}) => ({
-  kind,
-  ...extra,
-  describe: () => schemaNode(`${kind}-described`, extra),
-  optional: () => schemaNode(`${kind}-optional`, extra),
-  int: () => schemaNode(`${kind}-int`, extra),
-  nonnegative: () => schemaNode(`${kind}-nonnegative`, extra),
-})
-const toolModule = {
-  tool: {
-    schema: {
-      string: () => schemaNode('string'),
-      number: () => schemaNode('number'),
-      enum: (values) => schemaNode('enum', { values }),
-      array: (inner) => schemaNode('array', { inner }),
-    },
-  },
-}
-const waitForPromptCount = (runtime, count) => forkTool.awaitPromptCount(runtime, count)
-const ownerDescriptor = (sessionId) => [{ sessionId, agent: 'manager' }]
-
-test('WHAT[participant-horizon-011] FORK_TOOL_abandoned_child_does_not_vanish_from_horizon_before_join', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-abandoned-horizon-'))
-  const owner = 'manager-abandoned-horizon'
-  const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
-
-  try {
-    const placed = forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', 'Ada', 'VISIBLE-CHARGE')
-    await waitForPromptCount(runtime, 1)
-    assert.equal(forkTool.acceptPrompt(runtime, 0), true)
-    assert.match(await placed, /Ada/)
-
-    await forkTool.cancelOwnerChildren(runtime, owner)
-
-    const roster = await forkTool.executeHorizon(runtime, owner)
-    assert.match(roster, /Ada/, 'durable abandoned child must not become indistinguishable from never-created')
-    assert.match(roster, /did not return|未从此项任务归来/i)
-    assert.doesNotMatch(roster, /no one is currently away|当前没有.*在外/i)
-    assert.equal(forkTool.abortCount(runtime), 1, 'authorized logical cancel still physically tears down the child')
-  } finally {
-    forkTool.disposeRuntime(runtime)
-  }
-})
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const { mkdtemp } = await import("node:fs/promises");
 const { tmpdir } = await import("node:os");

@@ -52,9 +52,9 @@ Bookkeeper attachment 必须显式携带目标 transactionId，专用于临时�
 
 持久化事实中的角色标签必须由规范的 role catalog 唯一确定，不得随内部类型枚举或代码重命名而漂移。
 
-## [014] Student 与 Teacher 角色及拓扑彻底消除
+## [014] 单一平坦拓扑与合法角色边界
 
-系统内不存在 Student / Teacher 角色及对应绑定机制；任何解析、映射及运行时均严格拒绝旧式 Teacher 拓扑与未预期 kind。
+系统运行拓扑严格限定于当前合法角色集合及其正交的执行类；任何解析、映射及运行时均严格保证拓扑平坦与单一职责，拒绝任何未预期的分层或复合拓扑。
 
 ## [015] SessionId 是可复用物理容器，不是 identity scope
 

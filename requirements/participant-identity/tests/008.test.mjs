@@ -727,3 +727,149 @@ test('WHAT[participant-identity-008] provider_reasoning_variant_must_match_the_e
   binding.drop(child)
 })
 }
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const assoc = await import("../../../dist/Execution/Session/AssociationSurface.js");
+const roles = await import("../../../dist/Foundation/RolesSurface.js");
+const persona = await import("../../../dist/Participant/Persona/Surface.js");
+const authority = await import("../../../dist/Interaction/Authority/RuntimeSurface.js");
+
+const H = (value) => `H(${value})`
+const rootSelection = (agent) => {
+  const resolved = persona.resolveParticipantIdentityAtRoot(agent)
+  assert.equal(resolved.ok, true, resolved.ok ? '' : resolved.error)
+  return {
+    kind: 'RootSelection',
+    ownerSession: null,
+    ownerLogicalRun: null,
+    ownerAuthorityRoot: null,
+    participantIdentity: {
+      participant: resolved.identity.name,
+      role: resolved.identity.role,
+      persona: resolved.identity.persona,
+      personaCatalogVersion: resolved.identity.catalogVersion,
+      origin: resolved.identity.origin,
+    },
+  }
+}
+const syncDelegateRoles = ['Inspector', 'Coder']
+assert.deepEqual(syncDelegateRoles, ['Inspector', 'Coder'])
+
+test('WHAT[participant-identity-008] SyncDelegate identity inherits its exact owner Persona and version', () => {
+  const created = authority.createAuthorityRoot(
+    H,
+    'runtime-sync-lineage',
+    'ses_sync_owner',
+    'HumanRoot',
+    'msg_sync_owner',
+    rootSelection('manager'),
+  )
+  assert.equal(created.ok, true, created.ok ? '' : created.error)
+  const owner = created.value
+  const issued = authority.issueInheritedIdentitySeed('engineer', owner)
+  assert.equal(issued.ok, true, issued.ok ? '' : issued.error)
+
+  assert.deepEqual(
+    {
+      participant: issued.value.participantIdentity.participant,
+      role: issued.value.participantIdentity.role,
+      persona: issued.value.participantIdentity.persona,
+      personaCatalogVersion: issued.value.participantIdentity.personaCatalogVersion,
+      ownerSession: issued.value.ownerSession,
+      ownerLogicalRun: issued.value.ownerLogicalRun,
+      ownerAuthorityRoot: issued.value.ownerAuthorityRoot,
+    },
+    {
+      participant: 'engineer',
+      role: 'engineer',
+      persona: owner.participantIdentity.persona,
+      personaCatalogVersion: owner.participantIdentity.personaCatalogVersion,
+      ownerSession: owner.session,
+      ownerLogicalRun: owner.logicalRun,
+      ownerAuthorityRoot: owner.authorityRoot,
+    },
+  )
+})
+}
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const authority = await import("../../../dist/Interaction/Authority/RuntimeSurface.js");
+const Fission = await import("../../../dist/Execution/Fission/Surface.js");
+const persona = await import("../../../dist/Participant/Persona/Surface.js");
+
+const H = (value) => `H(${value})`
+const ownerProfile = (agent = 'engineer') => {
+  const resolved = persona.resolveParticipantIdentityAtRoot(agent)
+  assert.equal(resolved.ok, true, resolved.ok ? '' : resolved.error)
+  const root = authority.createAuthorityRoot(
+    H,
+    `runtime-${agent}-profile`,
+    `ses_${agent}`,
+    'HumanRoot',
+    `msg_${agent}`,
+    {
+      kind: 'RootSelection',
+      ownerSession: null,
+      ownerLogicalRun: null,
+      ownerAuthorityRoot: null,
+      participantIdentity: {
+        participant: resolved.identity.name,
+        role: resolved.identity.role,
+        persona: resolved.identity.persona,
+        personaCatalogVersion: resolved.identity.catalogVersion,
+        origin: resolved.identity.origin,
+      },
+    },
+  )
+  assert.equal(root.ok, true, root.ok ? '' : root.error)
+  return root.value
+}
+
+test('WHAT[participant-identity-008] Strength replica inherits the owner Persona and exact authority lineage', () => {
+  const owner = ownerProfile('engineer')
+  const issued = authority.issueInheritedIdentitySeed('engineer', owner)
+  assert.equal(issued.ok, true, issued.ok ? '' : issued.error)
+
+  assert.deepEqual(
+    {
+      ownerSession: issued.value.ownerSession,
+      ownerLogicalRun: issued.value.ownerLogicalRun,
+      ownerAuthorityRoot: issued.value.ownerAuthorityRoot,
+      persona: issued.value.participantIdentity.persona,
+      personaCatalogVersion: issued.value.participantIdentity.personaCatalogVersion,
+    },
+    {
+      ownerSession: owner.session,
+      ownerLogicalRun: owner.logicalRun,
+      ownerAuthorityRoot: owner.authorityRoot,
+      persona: owner.participantIdentity.persona,
+      personaCatalogVersion: owner.participantIdentity.personaCatalogVersion,
+    },
+  )
+})
+test('WHAT[participant-identity-008] Fission lane carries owner-issued identity lineage', () => {
+  const owner = ownerProfile('engineer')
+  const issued = authority.issueInheritedIdentitySeed('engineer', owner)
+  assert.equal(issued.ok, true, issued.ok ? '' : issued.error)
+
+  assert.deepEqual(authority.validateInheritedIdentitySeed(owner, issued.value), {
+    ok: true,
+    value: issued.value.participantIdentity,
+    error: null,
+  })
+})
+test('WHAT[participant-identity-008] Fission lane identity never infers lineage from a physical parent', () => {
+  const lane = Fission.startedLane(1, 'ses_physical_parent', 'investigate independently')
+  assert.deepEqual(lane, {
+    index: 1,
+    prompt: 'investigate independently',
+    hasAgentId: false,
+    hasHandle: false,
+    hasParent: false,
+  })
+})
+}

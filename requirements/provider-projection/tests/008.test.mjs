@@ -408,7 +408,7 @@ const {
   digest,
 } = codec
 
-test('WHAT[verification-system-008] tool schema surface preserves native validation and optionality', () => {
+test('WHAT[provider-projection-008] tool schema surface preserves native validation and optionality', () => {
   const schema = toolModule.tool.schema.object({
     source: schemaString(toolModule),
     described: schemaStringDescribed(toolModule, 'program source'),
@@ -440,7 +440,7 @@ test('WHAT[verification-system-008] tool schema surface preserves native validat
     assert.equal(schema.safeParse({ ...complete, ...mutation }).success, false, JSON.stringify(mutation))
   }
 })
-test('WHAT[verification-system-008] tool schema surface does not unwrap native literal values', () => {
+test('WHAT[provider-projection-008] tool schema surface does not unwrap native literal values', () => {
   const constrainedHost = { tool: { schema: { string: () => toolModule.tool.schema.literal('allowed') } } }
   const schema = schemaString(constrainedHost)
   assert.equal(schema.parse('allowed'), 'allowed')

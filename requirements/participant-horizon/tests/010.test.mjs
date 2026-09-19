@@ -36,3 +36,48 @@ test('WHAT[participant-horizon-010] PH_agent_009_fork_visible_set_is_strictly_en
     assert.doesNotMatch(fork, /\bInspector\b/i, `fork/${locale}.md must not offer Inspector`)
   }
 })
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { mkdtempSync } = await import("node:fs");
+const { tmpdir } = await import("node:os");
+const { join } = await import("node:path");
+const { default: test } = await import("node:test");
+const fork = await import("../../../dist/Execution/Delegation/Fork/Surface.js");
+const forkTool = await import("../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js");
+
+const schemaNode = (kind, extra = {}) => ({
+  kind,
+  ...extra,
+  describe: () => schemaNode(`${kind}-described`, extra),
+  optional: () => schemaNode(`${kind}-optional`, extra),
+  int: () => schemaNode(`${kind}-int`, extra),
+  nonnegative: () => schemaNode(`${kind}-nonnegative`, extra),
+})
+const toolModule = {
+  tool: {
+    schema: {
+      string: () => schemaNode('string'),
+      number: () => schemaNode('number'),
+      enum: (values) => schemaNode('enum', { values }),
+      array: (inner) => schemaNode('array', { inner }),
+    },
+  },
+}
+const waitForPromptCount = (runtime, count) => forkTool.awaitPromptCount(runtime, count)
+const ownerDescriptor = (sessionId) => [{ sessionId, agent: 'manager' }]
+
+test('WHAT[participant-horizon-010] FORK_TOOL_manager_horizon_presents_bound_fixed_devops_initially', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-mgr-devops-horizon-'))
+  const owner = 'manager-devops-horizon'
+  const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
+
+  try {
+    const roster = await forkTool.executeHorizon(runtime, owner)
+    assert.match(roster, /devops/, 'initial manager horizon must present bound fixed devops')
+    assert.doesNotMatch(roster, /nothing needs your attention|没有事物需要你的注意|empty/i)
+  } finally {
+    forkTool.disposeRuntime(runtime)
+  }
+})
+}

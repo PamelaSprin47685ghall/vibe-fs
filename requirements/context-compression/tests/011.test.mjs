@@ -409,3 +409,22 @@ test('WHAT[context-compression-011] CTX_012_the_built_candidate_is_exactly_what_
   assert.equal(promoted.value.snapshot.sealRoot, result.sealRoot)
 })
 }
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const XWireSurface = await import("../../../dist/Context/Prefix/XWireSurface.js");
+
+test('WHAT[context-compression-011] XWIRE_tool_call_provider_success_promotes_and_clears_before_host_turn_finishes', () => {
+  const result = XWireSurface.reconcile({
+    hasPlan: true,
+    outcome: 'tool-calls',
+    hasProbe: true,
+    currentEpoch: 0,
+    probeEpoch: 0,
+  })
+  assert.equal(result.promoted, true)
+  assert.equal(result.cleared, true)
+  assert.equal(result.keptPlan, false)
+})
+}

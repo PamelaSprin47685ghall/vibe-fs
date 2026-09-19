@@ -329,7 +329,7 @@ const committedAt = (cutoff, { digest = `prefix-${cutoff}`, frozen = `frozen-${c
     syntheticId: `synthetic-${seal}`,
   })
 
-test('WHAT[prefix-stability-002] PREFIX_STABILITY_prefix_behavior_is_exported_only_by_PrefixSurface', () => {
+test('WHAT[context-compression-002] PREFIX_STABILITY_prefix_behavior_is_exported_only_by_PrefixSurface', () => {
   for (const removed of ['select', 'snapshot', 'empty', 'prefixEmpty', 'prefixSnapshot', 'prefixProbe', 'applyRebase', 'retainTodoWriteRounds', 'requestKind', 'requestKindLabels', 'requestKindLabel', 'requestKindMayCarryProbe']) {
     assert.equal(typeof compression[removed], 'undefined', `${removed} must not remain on CompressionSurface`)
   }

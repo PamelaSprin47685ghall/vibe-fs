@@ -82,13 +82,13 @@ subsystem dependency graph 的目标形状是单向、可解释、可替换。�
 
 repository-generated JavaScript、codec、resource 与其他构建产物必须可追溯到产生它的 subsystem 与确定输入；构建可验证 digest、lineage 与确定性，但这些记录只是生成正确性的证据，不是新的 owner/slice/locality 授权体系。生成物若携带 filesystem/process/network 等 authority，必须按真实 capability 边界处理，不能因为 deterministic 或 generated 而视为 pure。禁止为了证明 subsystem 边界再建立一套与源码竞争的 canonical world、worksheet、adjudication snapshot 或 symbol ACL。
 
-## [016] 旧 M6 locality/slice 治理退役，禁止双重权威
+## [016] subsystem 结构事实与单一权威门禁
 
-semantic-owner/locality/slice/exposure/canonical-adjudication 不作为 release authorization 模型。已有 `.fsi`、fsproj、ProjectReference、impact compile、compiler canary 与已完成的真实 contract/adapter 拆分继续作为普通编译资产保留；旧 manifest、owner ACL、locality classification、worksheet、formal snapshot 与相关 adjudication 不得参与当前 release verdict。
+release authorization 模型严格以当前 subsystem 架构事实为准。已有 `.fsi`、fsproj、ProjectReference、impact compile、compiler canary 与真实 contract/adapter 拆分作为标准编译资产生效；任何额外或并行的 ownership 清单与分类元数据均不得参与当前 release verdict。
 
-`scripts/checks/subsystems.mjs` 是 source→subsystem→compile-shard 结构事实的唯一 release gate；旧 `semantic-owners.mjs`、`owner-contracts.mjs`、`owner-projects.mjs` 不与其并行形成双重权威。任何旧 gate 与新 subsystem 模型冲突时，修正或退休旧 gate，不恢复已放弃的治理层级。
+`scripts/checks/subsystems.mjs` 是 source→subsystem→compile-shard 结构事实的唯一 release gate，全仓禁止设立任何并行的结构审查门禁或维持双重权威。
 
-## [017] 插件转换管道与静态门禁退役约束
+## [017] 插件转换管道的唯一宿主边界契约证明
 
-插件转换管道（PluginTransforms）与业务装饰器必须直接由宿主契约与生命周期拓扑保证其调用顺序与单一职责；废弃的静态源码扫描门禁（如 scanPluginTransforms 等）必须彻底退役，严禁自建第二套源码扫描真相，其实际行为由宿主边界契约测试（host-boundary ordered-transform 等）提供行为证明。
+插件转换管道（PluginTransforms）与业务装饰器直接由宿主契约与生命周期拓扑保证其调用顺序与单一职责；严禁自建静态源码扫描作为第二套真相，其实际行为必须且仅能由宿主边界契约测试（host-boundary ordered-transform 等）提供行为证明。
 

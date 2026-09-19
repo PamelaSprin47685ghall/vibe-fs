@@ -91,44 +91,6 @@ test('WHAT[host-boundary-025] diagnostic adapter failure is transparent to calle
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const EventsSurface = await import("../../../dist/OpenCode/Host/EventsSurface.js");
-
-const notify = (port, sessionId, outcome) => EventsSurface.notify(port, sessionId, outcome.kind, outcome.providerRun ?? '', outcome.error ?? outcome.value ?? '')
-const completed = (providerRun = '') => ({ kind: 'Completed', providerRun })
-const failed = (error) => ({ kind: 'Failed', error })
-const aborted = (reason) => ({ kind: 'Aborted', error: reason })
-
-test('WHAT[delegation-025] EVT_future_subscriber_does_not_replay_sticky_terminal', () => {
-  const port = EventsSurface.create()
-  EventsSurface.notify(port, 'ses-reused', 'Completed', 'run-old', 'old result')
-
-  const seen = []
-  const subscription = EventsSurface.subscribeFuture(port, (sessionId, outcome) => seen.push({ sessionId, outcome }))
-  assert.deepEqual(seen, [], 'fresh work unit must not inherit the previous terminal')
-
-  EventsSurface.notify(port, 'ses-reused', 'Completed', 'run-new', 'new result')
-  assert.equal(seen.length, 1)
-  assert.equal(seen[0].sessionId, 'ses-reused')
-  assert.equal(seen[0].outcome.providerRun, 'run-new')
-  EventsSurface.dispose(subscription)
-})
-test('WHAT[delegation-025] EVT_run_scoped_failure_preserves_authority_root_across_host_event_port', () => {
-  const port = EventsSurface.create()
-  const seen = []
-  EventsSurface.subscribeFuture(port, (_, outcome) => seen.push(outcome))
-
-  EventsSurface.notifyForAuthority(port, 'ses-causal-failure', 'Failed', 'root-2', 'provider exhausted')
-
-  assert.equal(seen.length, 1)
-  assert.equal(seen[0].kind, 'Failed')
-  assert.equal(seen[0].text, 'provider exhausted')
-  assert.equal(seen[0].authorityRoot, 'root-2')
-})
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
 const { spawnSync } = await import("node:child_process");
 
 const moduleUrl = new URL('../../../dist/OpenCode/Host/ReliabilityDiagnosticsSurface.js', import.meta.url).href
