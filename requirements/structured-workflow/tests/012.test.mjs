@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -1573,6 +1574,399 @@ test('WHAT[structured-workflow-012] failure lifecycle prevents false-green warm 
       existsSync(markerFile),
       false,
       'injected warm failure must remove success marker',
+    )
+  } finally {
+    rmSync(scratchRoot, { recursive: true, force: true })
+  }
+})
+}
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { spawn, spawnSync } = await import("node:child_process");
+const { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } = await import("node:fs");
+const { tmpdir } = await import("node:os");
+const { join, resolve } = await import("node:path");
+const { hasEmittedJsFiles, compileOwnerProject } = await import("../../../scripts/lib/owner-compile.mjs");
+
+const ROOT = resolve(import.meta.dirname, '../../..')
+const FIXTURE_CLI = join(ROOT, 'requirements/structured-workflow/tests/fixtures/impact-cli')
+const CLI = join(ROOT, 'requirements/structured-workflow/tests/fixtures/impact-cli-wrapper.mjs')
+const FIXTURE_BOUNDARY = join(ROOT, 'requirements/structured-workflow/tests/fixtures/owner-project-boundary')
+
+const findImpactProject = (root) => {
+  const pending = [join(ROOT, 'src/Wanxiangshu/.fable-build/output-compile')]
+  let newest = null
+  let newestMtime = 0
+  while (pending.length > 0) {
+    const current = pending.pop()
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const path = join(current, entry.name)
+      if (entry.isDirectory()) {
+        pending.push(path)
+        continue
+      }
+      if (entry.name === 'Wanxiangshu.Impact.fsproj') {
+        const stat = statSync(path)
+        if (stat.mtimeMs > newestMtime) {
+          newest = path
+          newestMtime = stat.mtimeMs
+        }
+      }
+    }
+  }
+  return newest
+}
+
+const copyFixture = () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wanxiangshu-impact-fixture-'))
+  cpSync(FIXTURE_CLI, dir, { recursive: true })
+  writeFileSync(
+    join(dir, 'Directory.Build.props'),
+    `<Project>
+  <PropertyGroup>
+    <ImpactFixtureMark>1</ImpactFixtureMark>
+  </PropertyGroup>
+  <Import Project="${join(ROOT, 'Directory.Build.props')}" />
+</Project>
+`,
+    'utf8',
+  )
+  return dir
+}
+
+const runCli = (args) => spawnSync(
+  process.execPath,
+  [CLI, ...args],
+  { cwd: ROOT, encoding: 'utf8', timeout: 55_000 },
+)
+
+const findEmittedJs = (outputDir, expectedBasename) => {
+  const pending = [outputDir]
+  while (pending.length > 0) {
+    const current = pending.pop()
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const path = join(current, entry.name)
+      if (entry.isDirectory()) {
+        if (entry.name === 'fable' + '_modules') continue
+        pending.push(path)
+        continue
+      }
+      if (entry.name === expectedBasename) return path
+    }
+  }
+  return null
+}
+
+const baseArgs = (dir) => {
+  const scratchRoot = join(dir, 'scratch')
+  const outputDir = join(dir, 'out')
+  return {
+    scratchRoot,
+    outputDir,
+    flags: [
+      '--projects', dir,
+      '--props', join(dir, 'Directory.Build.props'),
+      '--scratch', scratchRoot,
+      '-o', outputDir,
+    ],
+  }
+}
+
+function compileFableDirect(project) {
+  const outDir = mkdtempSync(join(tmpdir(), 'wanxiangshu-owner-boundary-'))
+  return new Promise((resolveResult, reject) => {
+    const child = spawn(
+      'dotnet',
+      ['tool', 'run', 'fable', '--', join(FIXTURE_BOUNDARY, project), '-o', outDir, '--noGitignore'],
+      { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] },
+    )
+    let stdout = ''
+    let stderr = ''
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stdout.on('data', (chunk) => { stdout += chunk })
+    child.stderr.on('data', (chunk) => { stderr += chunk })
+    child.once('error', reject)
+    child.once('close', (status, signal) => {
+      rmSync(outDir, { recursive: true, force: true })
+      resolveResult({ status, signal, stdout, stderr })
+    })
+  })
+}
+
+integrationTest('WHAT[structured-workflow-012] compile-impact CLI compiles a focused production implementation change', { timeout: 120_000 }, () => {
+  const dir = copyFixture()
+  try {
+    const { flags, outputDir } = baseArgs(dir)
+    const alphaFs = join(dir, 'Alpha', 'Alpha.fs')
+
+    const focused = runCli([alphaFs, ...flags])
+    assert.equal(focused.status, 0, focused.stderr || focused.stdout)
+    assert.match(focused.stdout, /\[owner-compile\] OK: Wanxiangshu\.Impact\.fsproj/)
+    assert.match(focused.stdout, /compiled focused impact \(4 items\)/)
+
+    const projectPath = findImpactProject(dir)
+    assert.ok(projectPath, 'CLI must materialize Wanxiangshu.Impact.fsproj for the fixture')
+    const xml = readFileSync(projectPath, 'utf8')
+    assert.ok(!xml.includes('<ProjectReference'), 'impact CLI must not hand the owner ProjectReference graph to Fable')
+    assert.match(xml, /Alpha\/Alpha\.fs/)
+    assert.ok(!xml.includes('Beta/BetaOne.fs'), 'focused compile must exclude the unimpacted Beta sources')
+    assert.ok(hasEmittedJsFiles(outputDir), 'focused impact compile must emit JavaScript')
+    assert.ok(findEmittedJs(outputDir, 'Alpha.js'), 'focused emit must contain the changed Alpha module')
+    assert.ok(findEmittedJs(outputDir, 'Core.js'), 'focused emit must contain the Alpha forward closure')
+    assert.ok(!findEmittedJs(outputDir, 'BetaOne.js'), 'focused emit must not contain unimpacted Beta bytes')
+
+    const propsPath = join(dir, 'Directory.Build.props')
+    writeFileSync(propsPath, `${readFileSync(propsPath, 'utf8')}<!-- impact-cli full-fallback probe -->\n`, 'utf8')
+    const fallback = runCli([propsPath, ...flags])
+    assert.equal(fallback.status, 0, fallback.stderr || fallback.stdout)
+    assert.match(fallback.stdout, /compiled full impact \(8 items\)/)
+    assert.ok(
+      findEmittedJs(outputDir, 'BetaTwo.js'),
+      'full fallback must emit the whole fixture closure',
+    )
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+integrationTest('WHAT[structured-workflow-012] compile-impact CLI emits fresh output into a scratch output dir and never writes a success manifest', { timeout: 120_000 }, () => {
+  const dir = copyFixture()
+  try {
+    const { flags, scratchRoot, outputDir } = baseArgs(dir)
+    const alphaFs = join(dir, 'Alpha', 'Alpha.fs')
+
+    const result1 = runCli([alphaFs, ...flags])
+    assert.equal(result1.status, 0, result1.stderr || result1.stdout)
+    assert.match(result1.stdout, /\[owner-compile\] OK: Wanxiangshu\.Impact\.fsproj/)
+
+    assert.ok(hasEmittedJsFiles(outputDir), 'focused impact compile must emit JavaScript to output directory')
+    const beforePath = findEmittedJs(outputDir, 'Alpha.js')
+    assert.ok(beforePath, 'baseline flat compile must emit Alpha.js')
+    const before = readFileSync(beforePath, 'utf8')
+    assert.ok(before.includes('baseValue + 10'), 'baseline emit must carry the committed fixture value')
+
+    const manifestPath = join(scratchRoot, 'impact-manifest.json')
+    assert.ok(!existsSync(manifestPath), 'compileIncremental must not write an authoritative manifest')
+
+    writeFileSync(
+      alphaFs,
+      'namespace ImpactFixture\n\nmodule Alpha =\n    let value = Core.baseValue + 999\n',
+      'utf8',
+    )
+    const result2 = runCli(flags)
+    assert.equal(result2.status, 0, result2.stderr || result2.stdout)
+    assert.match(result2.stdout, /compiled .* impact/)
+    assert.ok(!result2.stdout.includes('up-to-date (cached)'), 'auto-detect must recompile, not report a cache hit')
+    const afterPath = findEmittedJs(outputDir, 'Alpha.js')
+    assert.ok(afterPath, 'emitted Alpha.js still exists after second run')
+    const after = readFileSync(afterPath, 'utf8')
+    assert.notEqual(after, before, 'auto-detected fixture change must produce an emergent emit delta')
+    assert.ok(after.includes('baseValue + 999'), 'recompiled emit must carry the mutated fixture value')
+    assert.ok(!existsSync(manifestPath), 'still no manifest written by a compile-only caller')
+    assert.ok(
+      !existsSync(join(outputDir, 'Foundation', 'FatalProcess.js')),
+      'auto-detect emit stays fixture-scoped, never production sources',
+    )
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+integrationTest('WHAT[structured-workflow-012] compile-impact CLI re-emits reverse consumers for inline body changes', { timeout: 120_000 }, () => {
+  const dir = copyFixture()
+  try {
+    const { flags, outputDir } = baseArgs(dir)
+    const coreFs = join(dir, 'Core', 'Core.fs')
+    const alphaFs = join(dir, 'Alpha', 'Alpha.fs')
+
+    writeFileSync(
+      coreFs,
+      'namespace ImpactFixture\n\nmodule Core =\n    let baseValue = 1\n\n    [<Literal>]\n    let tag = "core-tag"\n\n    let inline seeded (x: string) =\n        x + "original"\n',
+      'utf8',
+    )
+    writeFileSync(
+      coreFs.replace(/\.fs$/, '.fsi'),
+      'namespace ImpactFixture\n\nmodule Core =\n    val baseValue: int\n\n    [<Literal>]\n    val tag: string = "core-tag"\n\n    val inline seeded: string -> string\n',
+      'utf8',
+    )
+    writeFileSync(
+      alphaFs,
+      'namespace ImpactFixture\n\nmodule Alpha =\n    let value = Core.seeded (string Core.baseValue)\n',
+      'utf8',
+    )
+    writeFileSync(
+      alphaFs.replace(/\.fs$/, '.fsi'),
+      'namespace ImpactFixture\n\nmodule Alpha =\n    val value: string\n',
+      'utf8',
+    )
+
+    const props = join(dir, 'Directory.Build.props')
+    writeFileSync(props, `${readFileSync(props, 'utf8')}<!-- baseline -->\n`, 'utf8')
+    const baseline = runCli([props, ...flags])
+    assert.equal(baseline.status, 0, baseline.stderr || baseline.stdout)
+    const baselineAlphaPath = findEmittedJs(outputDir, 'Alpha.js')
+    assert.ok(baselineAlphaPath, 'baseline must emit Alpha.js')
+    const baselineAlpha = readFileSync(baselineAlphaPath, 'utf8')
+    assert.ok(baselineAlpha.includes('original'), 'baseline must embed the original inline body')
+
+    writeFileSync(
+      coreFs,
+      'namespace ImpactFixture\n\nmodule Core =\n    let baseValue = 1\n\n    [<Literal>]\n    let tag = "core-tag"\n\n    let inline seeded (x: string) =\n        x + "mutated"\n',
+      'utf8',
+    )
+    const focused = runCli([coreFs, ...flags])
+    assert.equal(focused.status, 0, focused.stderr || focused.stdout)
+    const mutatedAlphaPath = findEmittedJs(outputDir, 'Alpha.js')
+    assert.ok(mutatedAlphaPath, 'post-inline change still emits Alpha.js')
+    const mutatedAlpha = readFileSync(mutatedAlphaPath, 'utf8')
+    assert.ok(mutatedAlpha.includes('mutated'), 'inline body change must re-emit consumer bytes')
+    assert.notEqual(mutatedAlpha, baselineAlpha, 'Alpha emit must differ after the inline body change')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+integrationTest('WHAT[structured-workflow-012] deleting a source purges its stale JS from dist', { timeout: 120_000 }, () => {
+  const dir = copyFixture()
+  try {
+    const { flags, outputDir } = baseArgs(dir)
+
+    const alphaFs = join(dir, 'Alpha', 'Alpha.fs')
+    const baseline = runCli([alphaFs, ...flags])
+    assert.equal(baseline.status, 0, baseline.stderr || baseline.stdout)
+    assert.ok(findEmittedJs(outputDir, 'Alpha.js'), 'baseline must emit Alpha.js')
+
+    rmSync(alphaFs)
+    rmSync(join(dir, 'Wanxiangshu.Owner.fixture.alpha.fsproj'))
+    const afterDelete = runCli([alphaFs, ...flags])
+    assert.equal(afterDelete.status, 0, afterDelete.stderr || afterDelete.stdout)
+    assert.match(afterDelete.stdout, /compiled (clean|full) impact/, 'source deletion must not resolve to focused reuse of stale bytes')
+    assert.ok(
+      !findEmittedJs(outputDir, 'Alpha.js'),
+      'deleted source must not leave old JS in the emitted set',
+    )
+    assert.ok(
+      findEmittedJs(outputDir, 'BetaOne.js') || findEmittedJs(outputDir, 'Core.js'),
+      'post-deletion compile must still emit remaining modules',
+    )
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+integrationTest('WHAT[structured-workflow-012] independent Fable checks enforce compile-shard input boundaries', async () => {
+  const [
+    green,
+    red,
+    merged,
+    transitiveLeak,
+    privateModuleLeak,
+    privateBinding,
+    signedGreen,
+    signedRed,
+    signatureOnly,
+  ] = await Promise.all([
+    'GreenConsumer.fsproj',
+    'RedConsumer.fsproj',
+    'MergedConsumer.fsproj',
+    'LeakyConsumer.fsproj',
+    'PrivateConsumer.fsproj',
+    'PrivateBindingConsumer.fsproj',
+    'SignedGreenConsumer.fsproj',
+    'SignedRedConsumer.fsproj',
+    'SignatureOnlyGreenConsumer.fsproj',
+  ].map(compileFableDirect))
+  assert.equal(green.status, 0, `public contract must compile\n${green.stdout}\n${green.stderr}`)
+
+  assert.notEqual(red.status, 0, 'runtime symbol without a ProjectReference must be a compiler error')
+  assert.match(`${red.stdout}\n${red.stderr}`, /Runtime|secretValue|not defined/i)
+
+  assert.equal(
+    merged.status,
+    0,
+    `Fable ProjectReference source-merging canary: internal is not an assembly firewall\n${merged.stdout}\n${merged.stderr}`,
+  )
+
+  assert.equal(
+    transitiveLeak.status,
+    0,
+    `Fable transitively source-merges ProjectReference closure even when DisableTransitiveProjectReferences=true\n${transitiveLeak.stdout}\n${transitiveLeak.stderr}`,
+  )
+
+  assert.equal(
+    privateModuleLeak.status,
+    0,
+    `Fable source-merging canary: top-level private module is not a foreign-owner firewall\n${privateModuleLeak.stdout}\n${privateModuleLeak.stderr}`,
+  )
+
+  assert.notEqual(privateBinding.status, 0, 'module-local private binding must stay inaccessible after Fable source merge')
+  assert.match(`${privateBinding.stdout}\n${privateBinding.stderr}`, /privateValue|not accessible|not defined|private/i)
+
+  assert.equal(signedGreen.status, 0, `F# signature must expose declared contract\n${signedGreen.stdout}\n${signedGreen.stderr}`)
+
+  assert.notEqual(signedRed.status, 0, 'F# signature must hide implementation symbols from source-merged consumers')
+  assert.match(`${signedRed.stdout}\n${signedRed.stderr}`, /hiddenValue|not defined|not accessible/i)
+
+  assert.notEqual(signatureOnly.status, 0, 'Fable does not materialize a consumable module from a signature-only project')
+  assert.match(`${signatureOnly.stdout}\n${signatureOnly.stderr}`, /SignedProvider|not defined/i)
+})
+
+integrationTest('WHAT[structured-workflow-012] flat closure compilation compiles transitive closure green and keeps unreferenced sources red', async () => {
+  const emitterPath = join(FIXTURE_BOUNDARY, 'Emitter.fsproj')
+  const scratchRoot = mkdtempSync(join(tmpdir(), 'wanxiangshu-owner-flat-compile-'))
+  const rootPropsPath = join(ROOT, 'Directory.Build.props')
+
+  try {
+    const greenResult = await compileOwnerProject({
+      projectPath: join(FIXTURE_BOUNDARY, 'LeakyConsumer.fsproj'),
+      aggregatePath: emitterPath,
+      scratchRoot,
+      rootPropsPath,
+      stdio: 'pipe',
+    })
+    assert.equal(greenResult.ok, true, `LeakyConsumer flat closure must compile GREEN\n${greenResult.stdout}\n${greenResult.stderr}`)
+    assert.equal(greenResult.code, 0)
+
+    const redResult = await compileOwnerProject({
+      projectPath: join(FIXTURE_BOUNDARY, 'RedConsumer.fsproj'),
+      aggregatePath: emitterPath,
+      scratchRoot,
+      rootPropsPath,
+      stdio: 'pipe',
+    })
+    assert.equal(redResult.ok, false, 'RedConsumer without ProjectReference to Runtime must fail compile')
+    assert.notEqual(redResult.code, 0)
+    assert.match(`${redResult.stdout}\n${redResult.stderr}`, /Runtime|secretValue|not defined/i)
+
+    const staleFsprojPath = join(scratchRoot, 'StaleConsumer.fsproj')
+    writeFileSync(
+      staleFsprojPath,
+      `<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="NonExistentProvider.fsproj"/>
+    <Compile Include="${join(FIXTURE_BOUNDARY, 'RedConsumer.fs')}"/>
+  </ItemGroup>
+</Project>`,
+      'utf8',
+    )
+
+    await assert.rejects(
+      async () => {
+        await compileOwnerProject({
+          projectPath: staleFsprojPath,
+          aggregatePath: emitterPath,
+          scratchRoot,
+          rootPropsPath,
+          stdio: 'pipe',
+        })
+      },
+      /Missing ProjectReference.*NonExistentProvider\.fsproj/i,
+      'stale ProjectReference must fail before Fable compilation',
     )
   } finally {
     rmSync(scratchRoot, { recursive: true, force: true })

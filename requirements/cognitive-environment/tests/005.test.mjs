@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import * as promptResources from '../../../dist/Resources/PromptSurface.js'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '../../..')
 
@@ -57,3 +58,21 @@ test('WHAT[cognitive-environment-005] CE_role_law_is_enduring_self_model_without
     }
   }
 })
+
+{
+const PROMPT_FIELDS = [
+  'ManagerSystemPrompt',
+  'EngineerSystemPrompt',
+  'DevopsSystemPrompt',
+  'OrchestratorSystemPrompt',
+  'BloggerSystemPrompt',
+]
+
+const promptEntries = (catalog) => PROMPT_FIELDS.map((field) => [field, catalog[field]])
+
+integrationTest('WHAT[cognitive-environment-005] PROMPT_no_legacy_provider_ontology_in_composed_prompts', () => {
+  for (const [field, text] of promptEntries(promptResources.load())) {
+    assert.doesNotMatch(text, /\bfork-manager\b|\bfork-pty\b|\bedit-qa\b|\bmeditator\b|\bfast-executor\b|\bdeep-executor\b/i, field)
+  }
+})
+}

@@ -1,24 +1,59 @@
-const CLAUSE_LIKE_RE = /\b([A-Z][A-Z0-9]*-\d{3}(?:[A-Z]|-[A-Z0-9-]+)?)\b/g
-const NON_CLAUSE_IDENTIFIERS = new Set(['SHA-256'])
-const CLAUSE_HEADING_RE = /^#{1,6}\s+([A-Z][A-Z0-9]*-\d{3}(?:[A-Z]|-[A-Z0-9-]+)?)\b/gm
+const CLAUSE_LIKE_RE = /\b([a-z][a-z0-9]*(?:-[a-z0-9]+)*)-(\d{3}(?:-[A-Za-z0-9-]+|[a-zA-Z0-9-]+)?)\b/g
+const LEGACY_CLAUSE_LIKE_RE = /\b([A-Z][A-Z0-9]*-\d{3}(?:[A-Z]|-[A-Z0-9-]+)?)\b/g
+const NON_CLAUSE_IDENTIFIERS = new Set(['SHA-256', 'sha-256', 'utf-8', 'node:test'])
+const CLAUSE_HEADING_RE = /^#{1,6}\s+(?:\[(\d{3})\]|([A-Za-z][A-Za-z0-9]*-\d{3}(?:[A-Za-z]|-[A-Za-z0-9-]+)?)\b)/gm
 
 const escapedAlternation = (prefixes) =>
   prefixes.map((prefix) => prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
 
+/** Return whether a path should be ignored as a proposals directory (WHAT[011]). */
+export const isProposalPath = (path) => /(?:^|[\\/])proposals(?:[\\/]|$)/.test(path)
+
 /** Return unknown/suffixed clause-looking tokens with 1-based lines. */
-export const unknownClauseReferences = (text, prefixes) => {
-  const known = new Set(prefixes)
+export const unknownClauseReferences = (text, validClauses = [], prefixes = []) => {
+  const isSet = validClauses instanceof Set
+  const validSet = isSet ? validClauses : new Set(validClauses)
+  const knownPrefixes = new Set(prefixes)
   const findings = []
   const lines = text.split('\n')
 
   lines.forEach((content, index) => {
+    // Check lowercase pkg-NNN tokens
     for (const match of content.matchAll(CLAUSE_LIKE_RE)) {
+      const token = match[1] + '-' + match[2]
+      if (NON_CLAUSE_IDENTIFIERS.has(token)) continue
+
+      const exact = /^([a-z][a-z0-9-]*)-(\d{3})$/.exec(token)
+      if (!exact) {
+        // Suffixed token
+        findings.push({ token, line: index + 1 })
+      } else {
+        const pkg = exact[1]
+        if (validSet.size > 0) {
+          if (!validSet.has(token)) {
+            findings.push({ token, line: index + 1 })
+          }
+        } else if (knownPrefixes.size > 0 && !knownPrefixes.has(pkg)) {
+          findings.push({ token, line: index + 1 })
+        }
+      }
+    }
+
+    // Check legacy uppercase tokens if applicable
+    for (const match of content.matchAll(LEGACY_CLAUSE_LIKE_RE)) {
       const token = match[1]
       if (NON_CLAUSE_IDENTIFIERS.has(token)) continue
 
       const exact = /^([A-Z][A-Z0-9]*)-(\d{3})$/.exec(token)
-      if (!exact || !known.has(exact[1])) {
+      if (!exact) {
         findings.push({ token, line: index + 1 })
+      } else {
+        const prefix = exact[1]
+        if (validSet.size > 0) {
+          if (!validSet.has(token)) findings.push({ token, line: index + 1 })
+        } else if (knownPrefixes.size > 0 && !knownPrefixes.has(prefix)) {
+          findings.push({ token, line: index + 1 })
+        }
       }
     }
   })
@@ -26,50 +61,75 @@ export const unknownClauseReferences = (text, prefixes) => {
   return findings
 }
 
-/** Return every Clause-shaped Markdown heading, independent of known prefixes. */
+/** Return every Clause-shaped Markdown heading (## [NNN] or legacy ## PREFIX-NNN). */
 export const clauseDefinitionHeadings = (text) => {
   const findings = []
   for (const match of text.matchAll(CLAUSE_HEADING_RE)) {
-    findings.push({ id: match[1], line: text.slice(0, match.index).split('\n').length })
+    const id = match[1] ?? match[2]
+    findings.push({ id, line: text.slice(0, match.index).split('\n').length })
   }
   return findings
 }
 
-/** Return formal Clause headings while allowing non-product Change IDs such as CHG-NNN. */
-export const formalClauseDefinitionHeadings = (text, prefixes) => {
+/** Return formal Clause headings while allowing filtering by known prefixes/packages. */
+export const formalClauseDefinitionHeadings = (text, prefixes = []) => {
   const known = new Set(prefixes)
-  return clauseDefinitionHeadings(text).filter(({ id }) => known.has(id.split('-')[0]))
+  return clauseDefinitionHeadings(text).filter(({ id }) => {
+    if (/^\d{3}$/.test(id)) return true
+    return known.size === 0 || known.has(id.split('-')[0])
+  })
 }
 
 /**
  * Fail-closed duplicate clause check extracted from the retired spec gate.
  *
  * Pure: takes WHAT.md entries `{ file, pkg, text }`, returns violation objects
- * `{ file, line, msg }`. Reports every repeated clause ID and every prefix
- * owned by more than one package; the first definition wins, all later ones
- * are violations. Callers decide what to feed (live tree or temp fixture).
+ * `{ file, line, msg }`.
+ * - WHAT[001]: reports every repeated clause ID; first definition wins.
+ * - WHAT[005]: reports any clause definition in a non-WHAT.md file.
+ * - WHAT[011]: ignores entries under `proposals/`.
  */
 export const duplicateClauseDefinitions = (entries) => {
-  const definitions = new Map() // id -> { file, line }
-  const prefixOwner = new Map() // PREFIX -> pkg
+  const definitions = new Map() // id -> { file, line, pkg }
+  const prefixOwner = new Map() // prefix -> pkg
   const findings = []
+
   for (const { file, pkg, text } of entries) {
+    if (isProposalPath(file)) continue
+
+    const isWhat = /(?:^|[\\/])WHAT\.md$/.test(file)
+
     for (const { id, line } of clauseDefinitionHeadings(text)) {
-      const previous = definitions.get(id)
+      if (!isWhat) {
+        findings.push({
+          file,
+          line,
+          msg: `非 WHAT 文件严禁定义正式条款：${id}（位于 ${file}:${line}）`,
+        })
+        continue
+      }
+
+      const fullId = /^\d{3}$/.test(id) ? `${pkg}-${id}` : id
+      const previous = definitions.get(fullId)
       if (previous) {
         findings.push({
           file,
           line,
-          msg: `条款 ID 重复定义：${id}（已在 ${previous.file}:${previous.line} 定义）`,
+          msg: `条款 ID 重复定义：${fullId}（已在 ${previous.file}:${previous.line} 定义）`,
         })
         continue
       }
-      definitions.set(id, { file, line })
-      const prefix = id.split('-')[0]
-      const owner = prefixOwner.get(prefix)
-      if (owner && owner !== pkg)
-        findings.push({ file, line, msg: `前缀 ${prefix}- 被多包定义：${owner} 与 ${pkg}` })
-      else prefixOwner.set(prefix, pkg)
+      definitions.set(fullId, { file, line, pkg })
+
+      if (id.includes('-')) {
+        const prefix = id.split('-')[0]
+        const owner = prefixOwner.get(prefix)
+        if (owner && owner !== pkg) {
+          findings.push({ file, line, msg: `前缀 ${prefix}- 被多包定义：${owner} 与 ${pkg}` })
+        } else {
+          prefixOwner.set(prefix, pkg)
+        }
+      }
     }
   }
   return findings
@@ -140,11 +200,13 @@ export const markdownLocalLinks = (text) => {
 
 /**
  * Return known-prefix clause references, expanding compact spellings:
- * `PROMPT-003/005/006` checks all three; `HOST-009..012` and `CTX-006…012`
+ * `pkg-003/005/006` checks all three; `pkg-009..012` and `pkg-006…012`
  * check both endpoints. Ranges do not imply that every intermediate number exists.
  */
-export const clauseReferences = (text, prefixes) => {
-  const alternation = escapedAlternation(prefixes)
+export const clauseReferences = (text, prefixes = []) => {
+  const alternation = prefixes.length > 0
+    ? escapedAlternation(prefixes)
+    : '[a-z][a-z0-9-]*|[A-Z][A-Z0-9]*'
   const exact = new RegExp(`\\b(${alternation})-(\\d{3})\\b`, 'g')
   const slashTail = new RegExp(`\\b(${alternation})-\\d{3}((?:/\\d{3})+)\\b`, 'g')
   const rangeEnd = new RegExp(`\\b(${alternation})-\\d{3}(?:\\.\\.|…)(\\d{3})\\b`, 'g')

@@ -1,15 +1,12 @@
 // requirements/verification-system/tests/integration/run.mjs — sole integration child/warmup orchestrator.
 
 import { spawnSync } from 'node:child_process'
+import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { WATCHDOG_TIMEOUT_MS } from '../e2e/support/time-budget.js'
+import { WATCHDOG_TIMEOUT_MS, PROJECT_CHECK_TIMEOUT_MS } from '../e2e/support/time-budget.js'
 import { superviseNodeTest } from '../e2e/support/supervise-node-test.mjs'
-import { assessIntegrationEntryCoverage } from '../support/integration-entry-coverage.mjs'
-import { discoverSuiteTests } from '../support/discover-suite-tests.mjs'
-import { integrationNodeTestSteps, selectIntegrationSteps } from '../support/integration-node-test-steps.mjs'
-import { walk } from '../../../../scripts/lib/walk.mjs'
 
 process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
 
@@ -54,8 +51,6 @@ const INTEGRATION_PER_TEST_TIMEOUT_MS = Math.max(
   15_000,
 )
 
-const nodeTestSteps = process.env.WXS_RELEASE === '1' ? integrationNodeTestSteps(root) : selectIntegrationSteps(root)
-
 const childSteps = [
   {
     label: 'package/run.mjs (distribution)',
@@ -67,57 +62,61 @@ const childSteps = [
   },
 ]
 
-const packageIntegrationDir = path.join(root, 'requirements/distribution/tests/integration/package')
-const normalize = (file) => path.relative(root, file).split(path.sep).join('/')
-const childOwnedIntegrationTests = discoverSuiteTests(packageIntegrationDir).map((name) =>
-  normalize(path.join(packageIntegrationDir, name)),
-)
-const discoveredIntegrationTests = walk(path.join(root, 'requirements'), ['.test.mjs'])
-  .map(normalize)
-  .filter((file) => file.includes('/tests/integration/'))
-const wiredIntegrationTests = integrationNodeTestSteps(root).flatMap((step) => step.files.map(normalize))
-const entryCoverage = assessIntegrationEntryCoverage({
-  discoveredTests: discoveredIntegrationTests,
-  wiredTests: wiredIntegrationTests,
-  childOwnedTests: childOwnedIntegrationTests,
-})
-
-if (!entryCoverage.ok) {
-  console.error('integration: entry coverage mismatch')
-  for (const file of entryCoverage.missingFromEntry) console.error(`  unwired integration test: ${file}`)
-  for (const file of entryCoverage.staleEntry) console.error(`  wired path is not a discovered integration test: ${file}`)
-  for (const file of entryCoverage.duplicateWiring) console.error(`  integration test is wired more than once: ${file}`)
-  process.exit(1)
-}
+// Suites are discovered dynamically across all requirement packages' top-level tests/*.test.mjs.
+// Distribution is excluded here because it runs via its own child step package/run.mjs.
+const requirementsDir = path.join(root, 'requirements')
+const suites = readdirSync(requirementsDir, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory() && entry.name !== 'distribution')
+  .sort((a, b) => a.name.localeCompare(b.name))
+  .flatMap((entry) => {
+    const testsDir = path.join(requirementsDir, entry.name, 'tests')
+    try {
+      return readdirSync(testsDir)
+        .filter((name) => name.endsWith('.test.mjs'))
+        .sort()
+        .map((name) => path.join(testsDir, name))
+        .filter((file) => {
+          const text = readFileSync(file, 'utf8')
+          return text.includes('integrationTest') || text.includes('WXS_TIER_INTEGRATION')
+        })
+    } catch {
+      return []
+    }
+  })
 
 const isDryRun = process.argv.includes('--dry-run') || process.argv.includes('--print')
 if (isDryRun) {
   console.log('integration: dry run')
-  for (const step of nodeTestSteps) console.log(`  step: ${step.label} (${step.files.length} files)`)
+  console.log(`  discovered suites: ${suites.length} files`)
+  for (const file of suites) {
+    console.log(`    ${path.relative(root, file).split(path.sep).join('/')}`)
+  }
   for (const step of childSteps) console.log(`  child: ${step.label}`)
   process.exit(0)
 }
 
-for (const step of nodeTestSteps) {
+if (suites.length > 0) {
   const stepStart = Date.now()
-  const perTestTimeoutMs = step.perTestTimeoutMs ?? INTEGRATION_PER_TEST_TIMEOUT_MS
+  const hasCompilerTests = suites.some((f) => f.includes('structured-workflow'))
+  const perTestTimeoutMs = hasCompilerTests ? PROJECT_CHECK_TIMEOUT_MS : INTEGRATION_PER_TEST_TIMEOUT_MS
   try {
     await superviseNodeTest({
-      files: step.files,
-      label: `tests/integration/${step.label}`,
+      files: suites,
+      label: 'tests/integration/suites',
       silenceMs: Math.max(WATCHDOG_TIMEOUT_MS, perTestTimeoutMs + 5_000),
-      logPrefix: `integration:${step.label}`,
+      logPrefix: 'integration:suites',
       env: {
         ...process.env,
+        WXS_TIER_INTEGRATION: '1',
         PER_TEST_TIMEOUT_MS: String(perTestTimeoutMs),
       },
       throwOnFailure: true,
     })
     okGroups++
-    console.log(`✓ ${step.label} (${fmtSecs(Date.now() - stepStart)})`)
+    console.log(`✓ suites (${suites.length} files, ${fmtSecs(Date.now() - stepStart)})`)
   } catch (err) {
-    failedGroups.push({ label: step.label, err })
-    console.error(`✗ ${step.label} (${fmtSecs(Date.now() - stepStart)}): ${err.message}`)
+    failedGroups.push({ label: 'suites', err })
+    console.error(`✗ suites (${fmtSecs(Date.now() - stepStart)}): ${err.message}`)
   }
 }
 

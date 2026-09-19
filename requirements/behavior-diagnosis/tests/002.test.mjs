@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as enforcer from '../../../dist/Enforcer/Surface.js'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 const catalogRules = enforcer.rules()
 
@@ -45,3 +46,28 @@ test('WHAT[behavior-diagnosis-002] ENFORCER_170_catalog_is_stable_and_not_corrup
   assert.equal(fields[0], 'abbreviation-anxiety')
   assert.equal(fields[119], 'wrong-rule-composition')
 })
+
+{
+const fs = await import("node:fs");
+const path = await import("node:path");
+const { fileURLToPath } = await import("node:url");
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../')
+const enforcerRoot = path.join(repoRoot, 'resources', 'enforcer')
+
+integrationTest('WHAT[behavior-diagnosis-002] ENFORCER_resource_catalog_json_is_not_runtime_ssot', () => {
+  assert.equal(fs.existsSync(path.join(enforcerRoot, 'catalog.json')), false)
+})
+
+integrationTest('WHAT[behavior-diagnosis-002] ENFORCER_resource_rulebook_load_is_independent_of_process_cwd', () => {
+  const previous = process.cwd()
+  try {
+    process.chdir('/')
+    const rules = enforcer.rules()
+    assert.equal(rules.length, 120)
+    assert.deepEqual(rules.map((r) => r.lexicalOrder), Array.from({ length: rules.length }, (_, i) => i + 1))
+  } finally {
+    process.chdir(previous)
+  }
+})
+}

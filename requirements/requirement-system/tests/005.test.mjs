@@ -1,53 +1,49 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  archivePathReferences,
-  changeDependencyReferences,
   clauseDefinitionHeadings,
-  clauseReferences,
-  formalClauseDefinitionHeadings,
-  legacyWorkflowPathReferences,
-  markdownLocalLinks,
-  navigationProblems,
-  unknownClauseReferences,
+  duplicateClauseDefinitions,
 } from '../../../scripts/lib/spec-rules.mjs'
 
-const PREFIXES = ['ARCH', 'GOV', 'HOST']
+test('WHAT[requirement-system-005] formal clause definitions can only live in package WHAT.md', () => {
+  // README/AGENTS/CHANGELOG 等非 WHAT.md 路由与系统文件严禁定义正式条款
+  const entries = [
+    {
+      file: 'requirements/README.md',
+      pkg: 'requirement-system',
+      text: '# README\n\n## [002] illegal clause in navigation file\n',
+    },
+    {
+      file: 'AGENTS.md',
+      pkg: 'requirement-system',
+      text: '# AGENTS\n\n## [003] illegal clause in root doc\n',
+    },
+    {
+      file: 'CHANGELOG.md',
+      pkg: 'requirement-system',
+      text: '# CHANGELOG\n\n## [004] illegal clause in changelog\n',
+    },
+    {
+      file: 'requirements/requirement-system/WHAT.md',
+      pkg: 'requirement-system',
+      text: '# requirement-system — WHAT\n\n## [001] legal clause\n',
+    },
+  ]
 
-test('WHAT[requirement-system-005] formalClauseDefinitionHeadings surfaces clause definitions from routing files', () => {
-  // README/AGENTS/CHANGELOG 不是规范正文（无裸规范权威）；识别器必须仍能发现
-  // 路由文件里的产品条款定义，使 scripts/lib/spec-rules.mjs 的 duplicateClauseDefinitions「正式条款只能定义在
-  // package WHAT.md」gate 可以拒绝它。
+  const findings = duplicateClauseDefinitions(entries)
+  assert.equal(findings.length, 3, 'must flag all 3 non-WHAT definitions')
+  assert.ok(findings.some((f) => f.file.includes('README.md') && f.msg.includes('非 WHAT 文件严禁定义正式条款')))
+  assert.ok(findings.some((f) => f.file.includes('AGENTS.md') && f.msg.includes('非 WHAT 文件严禁定义正式条款')))
+  assert.ok(findings.some((f) => f.file.includes('CHANGELOG.md') && f.msg.includes('非 WHAT 文件严禁定义正式条款')))
+})
+
+test('WHAT[requirement-system-005] clauseDefinitionHeadings surfaces ## [NNN] definitions from any file for detection', () => {
   assert.deepEqual(
-    formalClauseDefinitionHeadings([
+    clauseDefinitionHeadings([
       '# README',
-      '## ARCH-002: a clause defined in a navigation file',
-    ].join('\n'), PREFIXES),
-    [{ id: 'ARCH-002', line: 2 }],
-  )
-})
-
-test('WHAT[requirement-system-005] formalClauseDefinitionHeadings still recognizes a product clause defined in a Change file', () => {
-  // Change 文件不得承担正式定义职责；formalClauseDefinitionHeadings 必须仍能识别
-  // Change 文件里的产品条款定义（ARCH-001），由 scripts/lib/spec-rules.mjs 的 duplicateClauseDefinitions
-  //「正式定义只在 WHAT.md」gate 拒绝它。
-  assert.deepEqual(
-    formalClauseDefinitionHeadings([
-      '# CHG-002: some lifecycle identity',
-      '## ARCH-001: a product clause smuggled into a Change file',
-    ].join('\n'), PREFIXES),
-    [{ id: 'ARCH-001', line: 2 }],
-  )
-})
-
-test('WHAT[requirement-system-005] formalClauseDefinitionHeadings separates CHG-001 from product clauses', () => {
-  assert.deepEqual(
-    formalClauseDefinitionHeadings([
-      '# CHG-001: lifecycle identity',
-      '## ARCH-001: forbidden shadow definition',
-      '### FUTURE-001: non-product candidate',
-    ].join('\n'), PREFIXES),
-    [{ id: 'ARCH-001', line: 2 }],
+      '## [002] a clause defined in a navigation file',
+    ].join('\n')),
+    [{ id: '002', line: 2 }],
   )
 })
 

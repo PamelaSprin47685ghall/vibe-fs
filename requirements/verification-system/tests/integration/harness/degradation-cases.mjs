@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { assertEq, assertTrue } from './lib.mjs';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
-const SOLE_ENTRY = 'requirements/verification-system/tests/e2e/014.test.mjs';
+const SOLE_ENTRY = 'requirements/verification-system/tests/014.test.mjs';
 
 const readSource = (relative) => readFileSync(`${REPO_ROOT}${relative}`, 'utf8');
 
@@ -48,13 +48,13 @@ export const degradationCases = [
 
       const verifySource = readSource('scripts/verify.mjs');
       const integrationAt = verifySource.indexOf('tests/integration/run.mjs');
-      const e2eAt = verifySource.indexOf('tests/e2e/014.test.mjs');
+      const e2eAt = verifySource.indexOf('tests/014.test.mjs');
       assertTrue(
         integrationAt >= 0 && e2eAt >= 0 && integrationAt < e2eAt,
         'verify.mjs must run integration before Long Stroke e2e',
       );
       assertTrue(
-        verifySource.includes('tests/e2e/014.test.mjs') && !verifySource.includes('tests/e2e/run.mjs'),
+        verifySource.includes('tests/014.test.mjs') && !verifySource.includes('tests/e2e/run.mjs'),
         'the sole e2e step must remain entry.test.mjs, not the retired multi-canary launcher',
       );
       const packageAt = verifySource.indexOf('verify-package.mjs');
@@ -75,7 +75,7 @@ export const degradationCases = [
         'integration orchestrator must own exactly one distribution package child',
       );
       assertTrue(
-        integration.indexOf('scripts/warmup-opencode.mjs') < integration.indexOf('for (const step of nodeTestSteps)'),
+        integration.indexOf('scripts/warmup-opencode.mjs') < integration.indexOf('await superviseNodeTest'),
         'integration orchestrator must warm opencode before any integration child',
       );
 

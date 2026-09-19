@@ -59,9 +59,9 @@ export function verificationSteps({ root = ROOT, release = false, verbose = fals
       {
         label: 'e2e',
         cmd: process.execPath,
-        argv: [path.join(root, 'requirements/verification-system/tests/e2e/014.test.mjs')],
+        argv: [path.join(root, 'requirements/verification-system/tests/014.test.mjs')],
         timeoutMs: 1_500_000,
-        env: getTestEnv({ verbose, hostEnv }),
+        env: getTestEnv({ verbose, hostEnv, extra: { WXS_TIER_RELEASE: '1' } }),
       },
       {
         label: 'package',

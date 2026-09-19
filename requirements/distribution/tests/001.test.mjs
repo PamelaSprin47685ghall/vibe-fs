@@ -11,6 +11,7 @@ import {
   validateArchiveEntries,
   validateArtifact,
 } from '../../../scripts/verify-package.mjs'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 const root = REPO_ROOT
 
@@ -54,4 +55,11 @@ test('WHAT[distribution-001] DISTRIBUTION_artifact_carries_compiled_code_and_run
       pkg.files.some((f) => normalize(f) === 'resources'),
     'one artifact must ship compiled code and runtime resources together (files whitelist)',
   )
+})
+
+integrationTest('WHAT[distribution-001] PACKAGE_contents_tarball_includes_manifest_dist_resources', () => {
+  const pkgData = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
+  assert.ok(Array.isArray(pkgData.files))
+  assert.ok(pkgData.files.some((f) => f === 'dist' || f === 'dist/' || f.startsWith('dist')))
+  assert.ok(pkgData.files.some((f) => f === 'resources' || f === 'resources/' || f.startsWith('resources')))
 })

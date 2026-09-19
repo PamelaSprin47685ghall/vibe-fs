@@ -25,7 +25,7 @@ export const WATCHDOG_FEED_PATTERN = /\bwatchdog\??\.\s*advance\s*\(/
 // The e2e root must exist and contain this sole top-level entry; a missing or
 // unreadable root, or a missing entry, is a fail-closed condition (never green
 // with zero files). cases/ may be absent or empty (not required, not walked).
-export const E2E_ROOT_REL = 'requirements/verification-system/tests/e2e'
+export const E2E_ROOT_REL = 'requirements/verification-system/tests'
 export const SOLE_ENTRY = '014.test.mjs'
 
 const norm = (p) => p.replace(/\\/g, '/')
@@ -102,5 +102,5 @@ export const e2eTestCaseFiles = (root = ROOT) => {
     )
   }
 
-  return files
+  return [entryPath]
 }

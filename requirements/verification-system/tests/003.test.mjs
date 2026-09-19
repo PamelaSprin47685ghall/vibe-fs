@@ -213,7 +213,7 @@ test('WHAT[verification-system-003] missing or empty cases/ is allowed (no throw
     const files = e2eTestCaseFiles(root)
     assert.equal(files.length, 1, 'only the sole top-level entry is in scope')
     assert.ok(
-      files[0].endsWith('/tests/e2e/' + SOLE_ENTRY),
+      files[0].endsWith('/tests/' + SOLE_ENTRY) || files[0].endsWith(SOLE_ENTRY),
       `expected sole entry path, got ${files[0]}`,
     )
   } finally {
@@ -225,7 +225,7 @@ test('WHAT[verification-system-003] missing or empty cases/ is allowed (no throw
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import("node:fs");
+const { mkdtempSync, mkdirSync, writeFileSync, rmSync, readdirSync, readFileSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
 const { default: path } = await import("node:path");
 const { fileURLToPath } = await import("node:url");
@@ -250,15 +250,28 @@ test('WHAT[verification-system-003] integration grouping set partition invariant
   const dailySteps = selectIntegrationSteps(root, { releaseOnly: false })
   const releaseSteps = selectIntegrationSteps(root, { releaseOnly: true })
 
-  const discoveredIntegrationTests = walk(path.join(root, 'requirements'), ['.test.mjs'])
-    .map(normalize)
-    .filter((file) => file.includes('/tests/integration/'))
-  const childOwnedIntegrationTests = new Set(
-    discoverSuiteTests(packageIntegrationDir).map((name) =>
-      normalize(path.join(packageIntegrationDir, name)),
-    ),
-  )
-  const nonChildDiscovered = discoveredIntegrationTests.filter((f) => !childOwnedIntegrationTests.has(f)).sort()
+  const requirementsDir = path.join(root, 'requirements')
+  const discoveredIntegrationTests = readdirSync(requirementsDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name !== 'distribution')
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .flatMap((entry) => {
+      const testsDir = path.join(requirementsDir, entry.name, 'tests')
+      try {
+        return readdirSync(testsDir)
+          .filter((name) => name.endsWith('.test.mjs'))
+          .sort()
+          .map((name) => normalize(path.join(testsDir, name)))
+          .filter((file) => {
+            const text = readFileSync(path.join(root, file), 'utf8')
+            return /\bintegrationTest\s*\(/.test(text)
+          })
+      } catch {
+        return []
+      }
+    })
+    .sort()
+
+  const nonChildDiscovered = discoveredIntegrationTests
 
   // Invariant 1: 每 integration 文件恰在一个组
   const seenFiles = new Set()
@@ -308,7 +321,7 @@ const { fileURLToPath } = await import("node:url");
 const { default: test } = await import("node:test");
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
-const ENTRY = join(ROOT, 'requirements/verification-system/tests/e2e/014.test.mjs')
+const ENTRY = join(ROOT, 'requirements/verification-system/tests/014.test.mjs')
 const LONG_STROKE = join(ROOT, 'requirements/verification-system/tests/e2e/scenarios/long-stroke.toml')
 const MARKER = 'PHYSICAL CONTRACTS (VERIFICATION-SYSTEM-003)'
 const REQUIRED = [

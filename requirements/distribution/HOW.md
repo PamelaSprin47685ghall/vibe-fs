@@ -42,4 +42,4 @@ Release Proof (npm pack 真实打包、归档成员闭包与隔离外部消费�
 ### 5. 活跃注册与资源同步门禁 (Active Registration & Surface Gate)
 
 - `scripts/checks/js-surface-gate.mjs` 与打包发布检查确保所有活跃角色（如 Engineer、DevOps）的工具 surface（`js-engineer`、`js-devops`）已生成并导出，且 `resources/provider/role/` 下仅包含合法活跃角色的双语资源。
-- 任何被废弃的工具或角色在打包白名单中必须被彻底清除，杜绝死资源混入发布包。
+- 打包白名单与分发产物严格限定为合法活跃角色及工具，确保发布包仅包含生效的运行时资产。

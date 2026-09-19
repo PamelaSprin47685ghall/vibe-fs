@@ -25,12 +25,12 @@ const cleanup = (root) => rmSync(root, { recursive: true, force: true })
 
 test('WHAT[verification-system-002] sole top-level e2e entry is 014.test.mjs', () => {
   // One World：第 4 层恰好一个真实 E2E 入口。顶层文件清单必须包含
-  // tests/e2e/014.test.mjs（唯一 Long Stroke）。
+  // 014.test.mjs（唯一 Long Stroke）。
   const files = e2eTestCaseFiles()
 
   assert.ok(
-    files.some((file) => file.endsWith('/tests/e2e/014.test.mjs') || file.endsWith('tests/e2e/014.test.mjs')),
-    'expected top-level sole entry e2e/014.test.mjs (verification-system package) in scope',
+    files.some((file) => file.endsWith('/tests/014.test.mjs') || file.endsWith('tests/014.test.mjs')),
+    'expected top-level sole entry 014.test.mjs (verification-system package) in scope',
   )
 })
 test('WHAT[verification-system-002] missing sole 014.test.mjs fails closed', () => {

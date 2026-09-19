@@ -18,7 +18,7 @@ Gate 有、Schema 无   ──► 产生安全隐患：模型虽不可见但可�
 - **Fission 仅 Engineer 准入**：唯一可赋予 Fission 的角色是 Engineer；Manager、Orchestrator、DevOps、Blogger、Bookkeeper、Predictor 及任何未决或内部身份调用 Fission 时，必须在运行时入口与执行 Gate 直接拒绝并 fail-closed，绝不仅从 schema 隐藏。
 - **Fork 与 Resume 权能分离**：Manager 的 `fork` 仅准入 Engineer 以派发独立新任务；固定 DevOps 仅允许经 `resume` 续做既有道路，严禁 fork DevOps 或由自身 fork 新代理。
 - **DevOps 固有直接工程能力与执行权**：DevOps 拥有直接文件读写改删与真实命令/进程执行权能，具备角色固有的非架构级自修授权，严禁设立任何 `allowRepair` 式逐次授权开关。
-- **无 Browser/网络调查权限**：彻底废止 Network 权限与 `stealth-browser-mcp_*` 集成，任何角色均无外部网络浏览工具。
+- **无 Browser/网络调查权限**：权限体系严格保持本地封闭，任何角色均无外部网络浏览工具。
 - **内部工具隔离**：运行时合成的内部角色工具（如 Blogger 的 `chronicle`、Bookkeeper 的 `js-bookkeeper`）绝不进入未受托角色的工具面；内部伴随角色（Blogger）禁止获得 `skill` 与 `assume` 等效用工具。
 - **四层同构**：面向编程的 `js-*` 工具（如 `js-engineer`、`js-devops`）在类型方法、描述文案、示例代码与运行时门禁四层保持严格同构。
 - **双层 Fail-Closed**：角色未决时拒绝一切执行；Host 配置异常时优先落地 deny 默认并安全终止进程。

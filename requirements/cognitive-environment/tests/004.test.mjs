@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import * as promptResources from '../../../dist/Resources/PromptSurface.js'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '../../..')
 
@@ -43,3 +44,32 @@ test('WHAT[cognitive-environment-004] CE_prompt_015_system_prompt_does_not_enume
     assert.doesNotMatch(prompt, /auto-injected|ToolPermission/, 'runtime tool-surface machinery must not enter Role Law')
   }
 })
+
+{
+const providerLanguage = await import("../../../dist/Participant/Provider/LanguageSurface.js");
+
+const english = 'English'
+const simplifiedChinese = 'SimplifiedChinese'
+
+const ROLE_PATHS = [
+  'role/manager', 'role/engineer', 'role/devops', 'role/orchestrator', 'role/blogger', 'role/bookkeeper',
+]
+
+const RETIRED_ROLE_PATHS = [
+  'role/coder', 'role/inspector', 'role/browser', 'role/inquiry', 'role/distiller',
+]
+
+const forbiddenRoleToolInventory = /\b(?:todowrite|open-terminal|send-terminal|read-terminal|signal-terminal|query-shell|sphinx_start|sphinx_resume|js-[a-z-]+)\b/i
+
+integrationTest('WHAT[cognitive-environment-004] PROMPT_role_laws_are_identity_not_tool_inventory', () => {
+  for (const path of ROLE_PATHS) {
+    const law = providerLanguage.readText(english, path)
+    assert.doesNotMatch(law, forbiddenRoleToolInventory, path)
+  }
+
+  for (const path of RETIRED_ROLE_PATHS) {
+    assert.equal(providerLanguage.exists(english, path), false, `${path} must not ship a Role Law`)
+    assert.equal(providerLanguage.exists(simplifiedChinese, path), false, `${path} must not ship a Role Law`)
+  }
+})
+}

@@ -2,17 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   archivePathReferences,
-  changeDependencyReferences,
-  clauseDefinitionHeadings,
-  clauseReferences,
-  formalClauseDefinitionHeadings,
   legacyWorkflowPathReferences,
-  markdownLocalLinks,
-  navigationProblems,
-  unknownClauseReferences,
 } from '../../../scripts/lib/spec-rules.mjs'
-
-const PREFIXES = ['ARCH', 'GOV', 'HOST']
 
 test('WHAT[requirement-system-010] spec gate detects retired workflow paths', () => {
   assert.deepEqual(

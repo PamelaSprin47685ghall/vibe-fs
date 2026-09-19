@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -261,5 +262,59 @@ test('WHAT[capability-enforcement-011] MACFG_configureFromHostConfig_projects_mi
   assert.equal(cfg.agent.blogger.hidden, true)
   assert.equal(cfg.agent.bookkeeper.hidden, true)
   assert.equal(cfg.compaction.auto, false)
+})
+}
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { withPlugin } = await import("../../verification-system/tests/support/plugin-fixture.mjs");
+
+const TOOL_NAMES = [
+  'fork', 'resume', 'commission', 'join', 'horizon', 'todowrite', 'fission',
+  'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm',
+  'bash-honeypot', 'assume',
+  'enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret',
+  'run', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
+  'review', 'chronicle', 'fetch', 'suicide',
+]
+
+const ROLE_NAMES = ['orchestrator', 'manager', 'engineer', 'devops', 'blogger']
+
+const COGNITIVE_TOOLS = ['enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret']
+
+const ALLOWED = {
+  orchestrator: ['commission', 'join', 'horizon', 'assume', ...COGNITIVE_TOOLS],
+  manager: ['fork', 'resume', 'join', 'horizon', 'todowrite', 'review', 'suicide', 'assume', ...COGNITIVE_TOOLS],
+  engineer: ['fission', 'read', 'write', 'edit', 'glob', 'grep', 'fetch', 'mv', 'rm', 'bash-honeypot', 'assume', ...COGNITIVE_TOOLS],
+  devops: [
+    'join', 'horizon', 'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'run',
+    'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
+    'assume', ...COGNITIVE_TOOLS,
+  ],
+  blogger: ['chronicle'],
+}
+
+const fullConfig = () => ({
+  agent: Object.fromEntries(
+    ROLE_NAMES.map((role) => [role, {}]),
+  ),
+})
+
+integrationTest('WHAT[capability-enforcement-011] MANAGER_config_projects_owned_permissions_with_default_deny', async () => {
+  await withPlugin(async (hooks) => {
+    const config = fullConfig()
+    hooks.config(config)
+    assert.equal(config.compaction.auto, false)
+    for (const role of ROLE_NAMES) {
+      const permission = config.agent[role].permission
+      for (const toolName of TOOL_NAMES) {
+        const expected = ALLOWED[role].includes(toolName) ? 'allow' : 'deny'
+        const key = toolName
+        assert.equal(permission[key], expected, `${role}.${key}`)
+      }
+      assert.equal(permission.external_directory, 'allow', `${role}.external_directory`)
+      assert.equal(config.agent[role].model, undefined)
+    }
+  })
 })
 }

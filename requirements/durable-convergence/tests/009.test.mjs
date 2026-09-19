@@ -125,3 +125,124 @@ test('WHAT[durable-convergence-009] Adapter: writer sync with absent remote crea
   }
 })
 }
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { spawnSync } = await import("node:child_process");
+const { existsSync, readFileSync } = await import("node:fs");
+const { fileURLToPath } = await import("node:url");
+const { join } = await import("node:path");
+const { createBareWorkspace, readRemoteStoreOid, remoteHasObject } = await import("../../verification-system/tests/support/dumb-remote.mjs");
+const eventStore = await import("../../../dist/Persistence/EventStore/Surface.js");
+const { integrationTest } = await import("../../verification-system/tests/support/tier-gate.mjs");
+
+const runner = fileURLToPath(new URL('../../../resources/git/wanxiang-hook.mjs', import.meta.url));
+
+const event = (id, writer) => ({
+  id,
+  stream: 'dumb/remote',
+  type: 'JobRequested',
+  parents: [],
+  payload: { writer },
+  payloadRefs: [],
+});
+
+const open = (repo, writerId) => eventStore.create(join(repo, '.git'), writerId);
+
+const append = async (handle, value) => {
+  const result = await eventStore.append(handle, [value]);
+  assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error));
+};
+
+const hook = (repo, kind = 'pre-push', arg = 'origin', input = '') => spawnSync(
+  process.execPath,
+  [runner, kind, arg],
+  { cwd: repo, input, encoding: 'utf8', env: { ...process.env, WANXIANG_GIT_SYNC_ACTIVE: '' } },
+);
+
+const assertHookOk = (result) => {
+  assert.equal(result.status, 0, "hook failed: " + (result.stderr || result.stdout));
+};
+
+integrationTest('WHAT[durable-convergence-009] dumb_remote_helper_has_no_Wanxiang_domain_or_projection_logic', () => {
+  const source = readFileSync(new URL('../../verification-system/tests/support/dumb-remote.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /dist\/Domain|CanonicalIntegrator|Projection|WriterStreamSync|HookSync/);
+  assert.match(source, /git/);
+});
+
+integrationTest('WHAT[durable-convergence-009] pre_push_hook_process_uploads_one_local_writer_file_to_bare_remote_store_ref', async () => {
+  const ws = createBareWorkspace(['a']);
+  try {
+    const repo = ws.client('a');
+    const local = open(repo, 'writer-a');
+    try {
+      await append(local, event('a'.repeat(40), 'a'));
+    } finally {
+      eventStore.dispose(local);
+    }
+    assertHookOk(hook(repo));
+    const oid = readRemoteStoreOid(ws.bare);
+    assert.match(oid, /^[0-9a-f]{40}$/);
+    assert.equal(remoteHasObject(ws.bare, oid), true);
+  } finally {
+    ws.cleanup();
+  }
+});
+
+integrationTest('WHAT[durable-convergence-009] second_machine_hook_imports_remote_writer_truth_without_any_running_Wanxiang_process', async () => {
+  const ws = createBareWorkspace(['a', 'b']);
+  try {
+    const a = ws.client('a');
+    const b = ws.client('b');
+    const localA = open(a, 'writer-a');
+    try {
+      await append(localA, event('a'.repeat(40), 'a'));
+    } finally {
+      eventStore.dispose(localA);
+    }
+    assertHookOk(hook(a));
+
+    assertHookOk(hook(b));
+    assert.equal(existsSync(join(b, '.git', 'wanxiang', 'events', 'writer-a.ndjson')), true);
+    const reopenedB = open(b, 'writer-b-after-sync');
+    try {
+      assert.deepEqual(eventStore.read(reopenedB, 'a'.repeat(40)), event('a'.repeat(40), 'a'));
+    } finally {
+      eventStore.dispose(reopenedB);
+    }
+  } finally {
+    ws.cleanup();
+  }
+});
+
+integrationTest('WHAT[durable-convergence-009] two_offline_clients_converge_by_whole_writer_files_and_repeat_is_idempotent', async () => {
+  const ws = createBareWorkspace(['a', 'b']);
+  try {
+    const a = ws.client('a');
+    const b = ws.client('b');
+    const localA = open(a, 'writer-a');
+    const localB = open(b, 'writer-b');
+    try {
+      await append(localA, event('a'.repeat(40), 'a'));
+      await append(localB, event('b'.repeat(40), 'b'));
+    } finally {
+      eventStore.dispose(localA);
+      eventStore.dispose(localB);
+    }
+
+    assertHookOk(hook(a));
+    assertHookOk(hook(b));
+    assertHookOk(hook(a));
+    const firstTip = readRemoteStoreOid(ws.bare);
+    assertHookOk(hook(a));
+    assert.equal(readRemoteStoreOid(ws.bare), firstTip, 'same complete writer bytes materialize the same Git root');
+
+    for (const repo of [a, b]) {
+      assert.equal(existsSync(join(repo, '.git', 'wanxiang', 'events', 'writer-a.ndjson')), true);
+      assert.equal(existsSync(join(repo, '.git', 'wanxiang', 'events', 'writer-b.ndjson')), true);
+    }
+  } finally {
+    ws.cleanup();
+  }
+});
+}

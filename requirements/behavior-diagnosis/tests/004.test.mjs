@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as enforcer from '../../../dist/Enforcer/Surface.js'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 const BASE = 'base blogger system prompt'
 
@@ -28,4 +29,15 @@ test('WHAT[behavior-diagnosis-004] BEHAVIOR_DIAGNOSIS_SYSTEM_004_english_load_ma
   const en = enforcer.rules()
   assert.equal(en.length, enforcer.ruleCount())
   assert.equal(en.length, 120)
+})
+
+integrationTest('WHAT[behavior-diagnosis-004] ENFORCER_resource_effective_blogger_prompt_includes_all_enforcer_texts', () => {
+  const rules = enforcer.rules()
+  const composed = enforcer.composeBloggerSystemPrompt('base', 'en')
+  assert.match(composed, /# Enforcer Rulebook/)
+  for (const rule of rules) {
+    assert.match(composed, new RegExp(`# ${rule.name}`))
+    const commented = rule.enforcerText.trim().split('\n').map((line) => line === '' ? '#' : `# ${line}`).join('\n')
+    assert.ok(composed.includes(commented))
+  }
 })

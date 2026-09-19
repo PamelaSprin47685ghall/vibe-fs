@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -44,5 +45,38 @@ test('WHAT[behavior-diagnosis-001] ENFORCER_172_field_names_match_the_rfc_spelli
   ]) {
     assert.ok(fields.has(expected), `catalog missing field ${expected}`)
   }
+})
+}
+
+{
+const { default: assert } = await import("node:assert/strict");
+const fs = await import("node:fs");
+const path = await import("node:path");
+const { fileURLToPath } = await import("node:url");
+const enforcer = await import("../../../dist/Enforcer/Surface.js");
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../')
+const enforcerRoot = path.join(repoRoot, 'resources', 'enforcer')
+
+integrationTest('WHAT[behavior-diagnosis-001] ENFORCER_resource_folder_rulebook_loads_with_contiguous_ordinals', () => {
+  const rules = enforcer.rules()
+  assert.ok(Array.isArray(rules))
+  assert.equal(rules.length, 120)
+  assert.deepEqual(rules.map((r) => r.lexicalOrder), Array.from({ length: rules.length }, (_, i) => i + 1))
+  assert.equal(enforcer.validate(1, rules).ok, true)
+  assert.equal(new Set(rules.map((r) => r.name)).size, rules.length)
+  for (const rule of rules) {
+    assert.equal(rule.name, rule.ruleId)
+    assert.equal(rule.name, rule.fieldName)
+    assert.ok(rule.enforcerText.trim().length > 0)
+    assert.ok(rule.mainText.trim().length > 0)
+    assert.equal(rule.scoreWhen, undefined)
+    assert.equal(rule.nudge, undefined)
+    assert.equal(rule.family, undefined)
+    assert.equal(rule.catalogOrdinal, undefined)
+  }
+
+  const dirs = fs.readdirSync(enforcerRoot, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort()
+  assert.deepEqual(rules.map((r) => r.name), dirs)
 })
 }

@@ -8,7 +8,7 @@
 
 ## 核心张力
 
-- **角色与能力目录同步**：消融节点与工具映射必须同步新角色体系，废止 Browser/Distiller/Inquiry 等旧角色，同时保证 Sphinx 等保留能力拥有完全独立的消融开关，不受其他能力撤销的连带影响。
+- **角色与能力目录同步**：消融节点与工具映射必须严格同步当前合法活跃角色体系（Engineer、DevOps、Manager、Orchestrator、Blogger 等），同时保证 Sphinx 等保留能力拥有完全独立的消融开关，不受其他能力撤销的连带影响。
 - **编号迁移不静默错位**：消融 DAG 与 Profile 编号迁移必须保持拓扑单调与显式对应，严禁静默错位。
 
 - **零影响**：Ablated 状态下 owner 路径必须与从未装载该机制时一致（对齐 speculative-investigation 的零影响基线精神）。

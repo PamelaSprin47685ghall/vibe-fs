@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -115,5 +116,69 @@ const valueOf = async (promise) => {
 test('WHAT[change-integration-002] WORKTREE_CMD_is_dirty_reads_porcelain', async () => {
   assert.equal(await change.gitIsDirty(fakeGit([['status --porcelain', [0, ' M x.fs\n', '']]]).git, PATH), true)
   assert.equal(await change.gitIsDirty(fakeGit([['status --porcelain', [0, '\n', '']]]).git, PATH), false)
+})
+}
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { execFileSync, spawnSync } = await import("node:child_process");
+const { mkdtempSync, rmSync, writeFileSync } = await import("node:fs");
+const { tmpdir } = await import("node:os");
+const { join } = await import("node:path");
+const change = await import('../../../dist/Change/Surface.js');
+
+const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
+
+const commit = (repo, file, contents, message) => {
+  writeFileSync(join(repo, file), contents)
+  git(repo, 'add', file)
+  git(repo, 'commit', '--quiet', '-m', message)
+  return git(repo, 'rev-parse', 'HEAD')
+}
+
+const realRunner = (command) => {
+  const result = spawnSync(command.fileName, command.args, {
+    cwd: command.workingDirectory,
+    encoding: 'utf8',
+  })
+  return Promise.resolve([result.status ?? 1, result.stdout ?? '', result.stderr ?? ''])
+}
+
+const fixture = () => {
+  const root = mkdtempSync(join(tmpdir(), 'wxs-ff-merge-real-'))
+  const repo = join(root, 'repo')
+  const candidate = join(root, 'candidate')
+
+  execFileSync('git', ['init', '--quiet', repo])
+  git(repo, 'config', 'user.email', 'test@example.com')
+  git(repo, 'config', 'user.name', 'test')
+  git(repo, 'checkout', '--quiet', '-b', 'main')
+  const expectedHead = commit(repo, 'shared.txt', 'base\n', 'base')
+  git(repo, 'worktree', 'add', '--quiet', '-b', 'candidate', candidate, 'main')
+  const candidateHead = commit(candidate, 'candidate.txt', 'candidate\n', 'candidate')
+
+  return {
+    candidate,
+    candidateHead,
+    expectedHead,
+    gitAdapter: change.createGit(repo, realRunner),
+    repo,
+    remove: () => rmSync(root, { recursive: true, force: true }),
+  }
+}
+
+integrationTest('WHAT[change-integration-002] Adapter_ffMerge_dirty_target_fails_closed_without_advancing_head', async () => {
+  const fx = fixture()
+
+  try {
+    writeFileSync(join(fx.repo, 'shared.txt'), 'dirty\n')
+    const result = await change.gitFfMerge(fx.gitAdapter, fx.candidate, 'main', fx.expectedHead, fx.candidateHead)
+
+    assert.deepEqual(result, { ok: false, error: 'target worktree is dirty; refusing ff-only merge' })
+    assert.equal(git(fx.repo, 'rev-parse', 'refs/heads/main'), fx.expectedHead)
+    assert.equal(git(fx.candidate, 'rev-parse', 'HEAD'), fx.candidateHead)
+  } finally {
+    fx.remove()
+  }
 })
 }

@@ -130,7 +130,7 @@
 
 | 序号 | 规范包 (`Package`) | 活跃条款数 | 活跃条款清单与演进导航 |
 |---|---|---|---|
-| 1 | `requirement-system` | 18 | requirement-system-001 ~ 018 |
+| 1 | `requirement-system` | 13 | requirement-system-001 ~ 008、010 ~ 011、015、017 ~ 018 |
 | 2 | `verification-system` | 16 | verification-system-001 ~ 006、007 ~ 016 |
 | 3 | `feature-ablation` | 12 | feature-ablation-001 ~ 009、feature-ablation-010（Primary agent 与 MCP 消融隔离）、feature-ablation-011、feature-ablation-012（角色/能力目录同步与独立开关保证） |
 | 4 | `js-semantic-surface` | 6 | js-semantic-surface-001 ~ 006 |
@@ -142,7 +142,7 @@
 | 10 | `host-boundary` | 31 | host-boundary-001 ~ 031 |
 | 11 | `participant-identity` | 10 | participant-identity-001 ~ 009、participant-identity-010（活跃身份解析与历史身份隔离解码） |
 | 12 | `execution-model-routing` | 19 | execution-model-routing-001 ~ 017、execution-model-routing-018（新角色集合模型路由解耦）、execution-model-routing-019（固定 DevOps 模型绑定持久性与禁止借 resume 换模型） |
-| 13 | `office-capability` | 12 | office-capability-001/003/004/005/006/007/011/012/015、office-capability-016（Engineer 职责与独享 Fission）、office-capability-017（DevOps 执行与固有非架构级自修授权）、office-capability-018（Sphinx 程控探究与内部只读 Engineer 调研）；office-capability-002/008/009/010/013/014 已正式撤销归档 |
+| 13 | `office-capability` | 12 | office-capability-001、003 ~ 007、011 ~ 012、015、office-capability-016（Engineer 职责与独享 Fission）、office-capability-017（DevOps 执行与固有非架构级自修授权）、office-capability-018（Sphinx 程控探究与内部只读 Engineer 调研） |
 | 14 | `capability-enforcement` | 24 | capability-enforcement-001 ~ 021、capability-enforcement-022（Fission 仅 Engineer 准入 fail-closed）、capability-enforcement-023（DevOps 固有自修授权禁 allowRepair 逐次开关）、capability-enforcement-024（Fork 与 Resume 权能分离） |
 | 15 | `participant-horizon` | 15 | participant-horizon-001 ~ 014、participant-horizon-015（Manager 并行来自派出多名 Engineer 而非自身分身） |
 | 16 | `cognitive-environment` | 16 | cognitive-environment-001 ~ 016 |
@@ -153,7 +153,7 @@
 | 21 | `concern-routing` | 7 | concern-routing-001 ~ 007 |
 | 22 | `interaction-authority` | 22 | interaction-authority-001 ~ 020、interaction-authority-021（历史事件不可变与旧身份不升权）、interaction-authority-022（DevOps 恢复与续行锁定固定模型与执行权威） |
 | 23 | `managed-chat-execution` | 14 | managed-chat-execution-001 ~ 014 |
-| 24 | `dispatch-protocol` | 0 | 注：派发协议条款统一收敛于各交互子系统 |
+| 24 | `dispatch-protocol` | 15 | dispatch-protocol-001 ~ 015 |
 | 25 | `durable-events` | 25 | durable-events-001 ~ 025 |
 | 26 | `effect-accounting` | 12 | effect-accounting-001 ~ 012 |
 | 27 | `durable-convergence` | 11 | durable-convergence-001 ~ 011 |
@@ -171,9 +171,9 @@
 | 39 | `crash-reconciliation` | 20 | crash-reconciliation-001 ~ 019、crash-reconciliation-020（固定 DevOps 崩溃恢复单一逻辑权威与命令去重） |
 | 40 | `degeneration-guard` | 13 | degeneration-guard-001 ~ 013 |
 | 41 | `obligation-ledger` | 28 | obligation-ledger-001 ~ 028 |
-| 42 | `relay-incumbency` | 11 | relay-incumbency-001 ~ 006、008 ~ 009、relay-incumbency-010（道路唯一逻辑 DevOps 与控制权交接）、relay-incumbency-011（任期连续性与归属明确）、relay-incumbency-012（固定 DevOps 初始绑定与恢复唯一性）；relay-incumbency-007 已删除 |
+| 42 | `relay-incumbency` | 11 | relay-incumbency-001 ~ 006、008 ~ 009、relay-incumbency-010（道路唯一逻辑 DevOps 与控制权交接）、relay-incumbency-011（任期连续性与归属明确）、relay-incumbency-012（固定 DevOps 初始绑定与恢复唯一性） |
 | 43 | `relay-assessment` | 10 | relay-assessment-001 ~ 008、relay-assessment-009（独立评估由只读 Engineer 支持且实现者不自定答案）、relay-assessment-010（DevOps 自修改变快照使旧评估与证书失效且不可冒充新改动验证） |
-| 44 | `relay-retirement` | 7 | relay-retirement-001 ~ 004、007 ~ 008、relay-retirement-009（固定 DevOps 与跨任期资源在退休中的交接与收束边界）；relay-retirement-005/006 已删除 |
+| 44 | `relay-retirement` | 7 | relay-retirement-001 ~ 004、007 ~ 008、relay-retirement-009（固定 DevOps 与跨任期资源在退休中的交接与收束边界） |
 | 45 | `relay-context-projection` | 9 | relay-context-projection-001 ~ 008、relay-context-projection-009（固定 DevOps 执行事实与前任上下文隔离） |
 | 46 | `behavior-diagnosis` | 19 | behavior-diagnosis-001 ~ 019 |
 | 47 | `guidance-delivery` | 12 | guidance-delivery-001 ~ 012 |
@@ -188,7 +188,7 @@
 
 # 依赖骨架
 
-这不是权威优先级，只表示定义所需 guarantee。精确 hard edge 以各 boundary card 的 `DEPENDS ON` 为准；本表是当前完整邻接清单（141 edges，按本 code block 逐项机器计数）。
+这不是权威优先级，只表示定义所需 guarantee。精确 hard edge 以各 boundary card 的 `DEPENDS ON` 为准；本表是当前完整邻接清单（157 edges，按本 code block 逐项机器计数）。
 
 ```text
 requirement-system       → 无
@@ -257,4 +257,4 @@ guidance-delivery    → provider-projection 删（渲染是下游机制）
 finality             → participant-horizon 删（包已退役为 relay-*；隐藏 Reviewer 机制随之删除）
 ```
 
-当前 144 edges 均为 semantic prerequisite（A 的 WHAT 定义需要 B 已提供的 guarantee），无 implementation/presentation/proof coupling。`epistemic-reasoning` 的 durable inquiry、受管 blind branch 与 capacity-safe OpenCode dispatch 分别直接依赖 `durable-events`、`delegation` 与 `execution-model-routing` 的 guarantee；这些不是存储、Host 或 proof 的偶然耦合。
+当前 157 edges 均为 semantic prerequisite（A 的 WHAT 定义需要 B 已提供的 guarantee），无 implementation/presentation/proof coupling。`epistemic-reasoning` 的 durable inquiry、受管 blind branch 与 capacity-safe OpenCode dispatch 分别直接依赖 `durable-events`、`delegation` 与 `execution-model-routing` 的 guarantee；这些不是存储、Host 或 proof 的偶然耦合。

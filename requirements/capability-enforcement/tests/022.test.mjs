@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -148,5 +149,28 @@ test('WHAT[capability-enforcement-022] TOOLSPEC_fission_is_exclusive_to_engineer
   assert.equal(rolePredicate('fission', 'orchestrator'), false, 'Orchestrator must be denied Fission')
   assert.equal(rolePredicate('fission', 'devops'), false, 'DevOps must be denied Fission')
   assert.equal(rolePredicate('fission', 'blogger'), false, 'Blogger must be denied Fission')
+})
+}
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { acceptAuthorityRoot, withExecutablePlugin } = await import("../../verification-system/tests/support/plugin-fixture.mjs");
+
+integrationTest('WHAT[capability-enforcement-022] MANAGER_fission_is_denied_for_manager_and_devops', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    await acceptAuthorityRoot(runtime, 'ses-mgr-fission', 'manager')
+    const resMgr = await hooks.tool.fission.execute(
+      { prompts: ['lane 1', 'lane 2'] },
+      { sessionID: 'ses-mgr-fission', agent: 'manager' },
+    )
+    assert.match(resMgr, /only available to Engineer|仅 Engineer 允许|denied/i)
+
+    await acceptAuthorityRoot(runtime, 'ses-devops-fission', 'devops')
+    const resDevOps = await hooks.tool.fission.execute(
+      { prompts: ['lane 1', 'lane 2'] },
+      { sessionID: 'ses-devops-fission', agent: 'devops' },
+    )
+    assert.match(resDevOps, /only available to Engineer|仅 Engineer 允许|denied/i)
+  })
 })
 }

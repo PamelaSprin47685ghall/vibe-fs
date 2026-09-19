@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as promptResources from '../../../dist/Resources/PromptSurface.js'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 test('WHAT[cognitive-environment-002] CE_002_layer_attribution_and_no_impersonation', () => {
   // 1. PromptSurface 导出存在且能装载规范提示词
@@ -35,3 +36,45 @@ test('WHAT[cognitive-environment-002] CE_002_layer_attribution_and_no_impersonat
   const impersonatingRoleLaw = '# Common Law\n\nYou awaken in a world that is already up and running.'
   assert.match(impersonatingRoleLaw, /^# Common Law/m, 'Impersonating content must match impersonation detection pattern')
 })
+
+{
+const PROMPT_FIELDS = [
+  'ManagerSystemPrompt',
+  'EngineerSystemPrompt',
+  'DevopsSystemPrompt',
+  'OrchestratorSystemPrompt',
+  'BloggerSystemPrompt',
+]
+
+const RETIRED_PROMPT_FIELDS = [
+  'CoderSystemPrompt',
+  'InspectorSystemPrompt',
+  'BrowserSystemPrompt',
+  'InquirySystemPrompt',
+  'DistillerSystemPrompt',
+]
+
+const assertActiveNonEmpty = (catalog, label) => {
+  for (const field of PROMPT_FIELDS) {
+    assert.equal(typeof catalog[field], 'string', `${label}: ${field}`)
+    assert.ok(catalog[field].trim().length > 0, `${label}: ${field} non-empty`)
+  }
+  for (const field of RETIRED_PROMPT_FIELDS) {
+    assert.equal(catalog[field], undefined, `${label}: retired ${field} must not exist`)
+  }
+  assert.equal(catalog.ReviewerSystemPrompt, undefined)
+  assert.equal(catalog.StudentSystemPrompt, undefined)
+  assert.equal(catalog.TeacherSystemPrompt, undefined)
+}
+
+integrationTest('WHAT[cognitive-environment-002] PROMPT_resources_load_from_package_independent_of_cwd', () => {
+  const previous = process.cwd()
+  try {
+    process.chdir('/')
+    assertActiveNonEmpty(promptResources.load(), 'PromptResources')
+    assertActiveNonEmpty(promptResources.runtimeLoad().Prompts, 'RuntimeResources')
+  } finally {
+    process.chdir(previous)
+  }
+})
+}

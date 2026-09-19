@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -384,5 +385,71 @@ test('WHAT[change-integration-005] WORKTREE_CMD_remove_force_flag_and_no_cwd', a
   assert.equal(result.ok, true)
   assert.deepEqual(fake.calls[0].args, ['worktree', 'remove', '--force', PATH])
   assert.equal(fake.calls[0].cwd, undefined)
+})
+}
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { execFileSync, spawnSync } = await import("node:child_process");
+const { chmodSync, mkdtempSync, rmSync, writeFileSync } = await import("node:fs");
+const { tmpdir } = await import("node:os");
+const { join } = await import("node:path");
+const change = await import('../../../dist/Change/Surface.js');
+
+const seedRepo = (repo) => {
+  execFileSync('git', ['init', '--quiet', repo])
+  execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: repo })
+  execFileSync('git', ['config', 'user.name', 'test'], { cwd: repo })
+  writeFileSync(join(repo, 'seed.txt'), 'seed\n')
+  execFileSync('git', ['add', 'seed.txt'], { cwd: repo })
+  execFileSync('git', ['commit', '--quiet', '-m', 'seed'], { cwd: repo })
+}
+
+const realRunner = (command) => {
+  const result = spawnSync(command.fileName, command.args, {
+    cwd: command.workingDirectory,
+    encoding: 'utf8',
+  })
+  return Promise.resolve([result.status ?? 1, result.stdout ?? '', result.stderr ?? ''])
+}
+
+const createRealWorktree = async (repo, child, job) => {
+  const git = change.createGit(repo, realRunner)
+  return change.gitCreateWorktree(git, job, child)
+}
+
+integrationTest('WHAT[change-integration-005] CHGINT_worktree_create_argv_is_accepted_by_real_git', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'wxs-worktree-real-'))
+  const repo = join(root, 'repo')
+  const child = join(root, 'manager-job-real')
+
+  try {
+    seedRepo(repo)
+    const created = await createRealWorktree(repo, child, 'job-real')
+    assert.equal(created.ok, true, created.ok ? '' : created.error)
+    assert.equal(created.value, 'manager/job-real')
+    assert.equal(execFileSync('git', ['-C', child, 'branch', '--show-current'], { encoding: 'utf8' }).trim(), 'manager/job-real')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+integrationTest('WHAT[change-integration-005] CHGINT_worktree_create_survives_installed_wanxiang_reference_transaction_hook', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'wxs-worktree-hooked-'))
+  const repo = join(root, 'repo')
+  const child = join(root, 'manager-job-hooked')
+
+  try {
+    seedRepo(repo)
+    const hook = join(repo, '.git', 'hooks', 'reference-transaction')
+    writeFileSync(hook, '#!/bin/sh\nexit 0\n')
+    chmodSync(hook, 0o755)
+
+    const created = await createRealWorktree(repo, child, 'job-hooked')
+    assert.equal(created.ok, true, created.ok ? '' : created.error)
+    assert.equal(execFileSync('git', ['-C', child, 'branch', '--show-current'], { encoding: 'utf8' }).trim(), 'manager/job-hooked')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 }

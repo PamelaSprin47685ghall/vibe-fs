@@ -96,3 +96,49 @@ test('WHAT[durable-convergence-008] activation only ensures hooks and user Git p
   assert.doesNotMatch(persistSources, /Converge\(|Fetch\(|Pull\(|Push\(/, 'ordinary local append/replay must not trigger remote sync')
 })
 }
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { spawnSync } = await import("node:child_process");
+const { existsSync, readFileSync } = await import("node:fs");
+const { fileURLToPath } = await import("node:url");
+const { join } = await import("node:path");
+const { createBareWorkspace, readRemoteStoreOid, remoteHasObject } = await import("../../verification-system/tests/support/dumb-remote.mjs");
+const eventStore = await import("../../../dist/Persistence/EventStore/Surface.js");
+const { integrationTest } = await import("../../verification-system/tests/support/tier-gate.mjs");
+
+const runner = fileURLToPath(new URL('../../../resources/git/wanxiang-hook.mjs', import.meta.url));
+
+const event = (id, writer) => ({
+  id,
+  stream: 'dumb/remote',
+  type: 'JobRequested',
+  parents: [],
+  payload: { writer },
+  payloadRefs: [],
+});
+
+const open = (repo, writerId) => eventStore.create(join(repo, '.git'), writerId);
+
+const append = async (handle, value) => {
+  const result = await eventStore.append(handle, [value]);
+  assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error));
+};
+
+const hook = (repo, kind = 'pre-push', arg = 'origin', input = '') => spawnSync(
+  process.execPath,
+  [runner, kind, arg],
+  { cwd: repo, input, encoding: 'utf8', env: { ...process.env, WANXIANG_GIT_SYNC_ACTIVE: '' } },
+);
+
+const assertHookOk = (result) => {
+  assert.equal(result.status, 0, "hook failed: " + (result.stderr || result.stdout));
+};
+
+integrationTest('WHAT[durable-convergence-008] reference_transaction_is_also_full_bidirectional_convergence', async () => {
+  const source = readFileSync(new URL('../../../src/Wanxiangshu/Git/Hook/Sync.fs', import.meta.url), 'utf8');
+  assert.match(source, /runReferenceTransaction/);
+  assert.match(source, /converge remote observed/);
+  assert.doesNotMatch(source, /downloadOnly|importOnly|ConvergeObserved/);
+});
+}

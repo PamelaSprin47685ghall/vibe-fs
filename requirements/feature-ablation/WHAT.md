@@ -57,5 +57,5 @@ manager、orchestrator primary agent 配置在 `relay-incumbency` 与 `change-in
 ## [012] 角色/能力目录同步与独立开关保证
 
 消融节点注册表、工具映射（`tool-map.json`）与事实映射（`fact-map.json`）必须与当前合法角色体系（Engineer、DevOps、Manager、Orchestrator、Blogger 等）严格同步。
-已被废止的角色与工具（Browser、Distiller、Inquiry 等）必须从活跃消融节点及映射中彻底撤销。
+活跃消融节点及映射表必须完整且仅由当前合法活跃角色与工具组成。
 Sphinx（`epistemic-reasoning`）等保留能力保持完全独立的消融开关与 Profile 控制；消融节点清单与 DAG 拓扑迁移必须保持显式对齐，严禁产生编号或配置的静默错位。

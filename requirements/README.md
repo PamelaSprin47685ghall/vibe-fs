@@ -27,7 +27,7 @@ grounding 由 `requirement-grounding` package 拥有。
 
 已知 proof gap 聚合台账见 [GAP.md](GAP.md)；包清单与依赖骨架见 [INDEX.md](INDEX.md)。
 
-## 57 包索引
+## 55 包索引
 
 ### 1. Requirement system
 | Package | 一句话 WHY |
@@ -140,7 +140,7 @@ grounding 由 `requirement-grounding` package 拥有。
 
 ## 依赖骨架
 
-权威依赖清单见各包 HOW.md 的 DEPENDS ON 节，与 `requirements/INDEX.md` 的 146-edge 骨架一致。
+权威依赖清单见各包 HOW.md 的 DEPENDS ON 节，与 `requirements/INDEX.md` 的 157-edge 骨架一致。
 
 ## 运行与验证
 
@@ -150,5 +150,5 @@ node --test requirements/<pkg>/tests/NNN.test.mjs            # 单包单文件
 node scripts/check.mjs                                       # 全 static gates
 ```
 
-- 测试文件按 WHAT 条款编号统一命名为 `NNN.test.mjs`，与用例标题中的 `WHAT[<包目录名小写>-NNN]` 强力绑定；顶层 `tests/`、`tests/integration/` 以及 `tests/e2e/NNN.test.mjs` 为唯一测试入口；HOW.md 不再维护独立的测试落点表，映射关系完全由测试用例标题锚权威定义。
+- 每个条款恰一个顶级 `tests/NNN.test.mjs`，与用例标题中的 `WHAT[<包目录名小写>-NNN]` 强力绑定；integration/release 档用例经文件内 tier-gate 门控（环境变量 WXS_TIER_INTEGRATION / WXS_TIER_RELEASE），分别由集成调度器与 --release 执行；HOW.md 不再维护独立的测试落点表，映射关系完全由测试用例标题锚权威定义。
 - 迁移状态：旧 `docs/`、`changes/` 已于 2026-08-14 cutover 归档删除（git 可回溯）；`tests/` 已全部分包并统一编号。

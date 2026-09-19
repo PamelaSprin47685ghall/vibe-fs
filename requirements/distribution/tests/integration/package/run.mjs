@@ -6,31 +6,42 @@
 // Silence = WATCHDOG_TIMEOUT_MS, same dog as e2e canary.
 // Workspace layout and distribution checks: merged into a single supervision call.
 
+import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { WATCHDOG_TIMEOUT_MS } from '../../../../verification-system/tests/e2e/support/time-budget.js'
+import { HARNESS_CASE_SILENCE_MS } from '../../../../verification-system/tests/e2e/support/time-budget.js'
 import { superviseNodeTest } from '../../../../verification-system/tests/e2e/support/supervise-node-test.mjs'
-import { discoverSuiteTests } from '../../../../verification-system/tests/support/discover-suite-tests.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
+const testsDir = path.resolve(here, '../..')
 
-// VERIFICATION-requirement-system-009: suites are discovered, not hardcoded, so an added or
-// renamed *.test.mjs is supervised automatically and the parent entry (which
-// reads the same discovery) cannot drift away from what this runner executes.
-const suites = discoverSuiteTests(here)
+// Suites are discovered, not hardcoded, so an added or renamed *.test.mjs
+// with integration tests is supervised automatically and cannot drift.
+const suites = readdirSync(testsDir)
+  .filter((name) => name.endsWith('.test.mjs'))
+  .sort()
+  .map((name) => path.join(testsDir, name))
+  .filter((file) => {
+    const text = readFileSync(file, 'utf8')
+    return text.includes('integrationTest') || text.includes('WXS_TIER_INTEGRATION')
+  })
+
 if (suites.length === 0) {
-  console.error(`package integration: no *.test.mjs suites discovered in ${here}`)
+  console.error(`package integration: no integration suites discovered in ${testsDir}`)
   process.exit(1)
 }
 
-const files = suites.map((name) => path.join(here, name))
-console.log(`\n=== package integration (${files.length} suites) ===`)
+console.log(`\n=== package integration (${suites.length} suites) ===`)
 await superviseNodeTest({
-  files,
+  files: suites,
   label: 'requirements/distribution/tests/integration/package',
-  silenceMs: WATCHDOG_TIMEOUT_MS,
+  silenceMs: 60000,
   logPrefix: 'package',
+  env: {
+    ...process.env,
+    WXS_TIER_INTEGRATION: '1',
+  },
 })
 
 console.log('\npackage integration: all suites passed')

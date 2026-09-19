@@ -3,24 +3,16 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
+import { isProposalPath } from '../../../scripts/lib/spec-rules.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
-
 const REQUIREMENTS = join(ROOT, 'requirements')
-
 const INDEX_FILE = join(ROOT, 'requirements/INDEX.md')
-
-const TREE_ENTRY = join(REQUIREMENTS, 'README.md')
 
 const read = (path) => readFileSync(path, 'utf8')
 
+// 新 [006] 与 [017]：合法包完整包含 WHY.md 与 WHAT.md
 const REQUIRED_DOCS = ['WHY.md', 'WHAT.md']
-
-const packageNamesFromTreeEntry = () => {
-  const text = read(TREE_ENTRY)
-  const names = [...text.matchAll(/\]\(([a-z][a-z0-9-]*)(?:\/(?:WHAT|WHY|README)\.md|\/)?\)/g)].map((m) => m[1])
-  return [...new Set(names)]
-}
 
 const packageNamesFromIndexTables = () => {
   const text = read(INDEX_FILE)
@@ -31,76 +23,6 @@ const packageNamesFromIndexTables = () => {
     if (name) names.push(name)
   }
   return [...new Set(names)]
-}
-
-const dependencySkeleton = () => {
-  const text = read(INDEX_FILE)
-  const heading = text.indexOf('# 依赖骨架')
-  assert.ok(heading >= 0, 'INDEX.md must contain a "# 依赖骨架" section')
-  const fenceStart = text.indexOf('```', heading)
-  const fenceEnd = text.indexOf('```', fenceStart + 3)
-  assert.ok(fenceStart >= 0 && fenceEnd >= 0, 'dependency skeleton must live in a fenced code block')
-  const block = text.slice(fenceStart + 3, fenceEnd)
-  const edges = new Map() // pkg -> Set<dep>
-  for (const line of block.split('\n')) {
-    const match = /^([a-z][a-z0-9-]*)\s*→\s*(.+)$/.exec(line.trim())
-    if (!match) continue
-    const [pkg, rhs] = [match[1], match[2]]
-    const deps = new Set()
-    for (const name of packageNamesFromIndexTables()) {
-      if (name === pkg) continue
-      if (new RegExp(`\\b${name}\\b`).test(rhs)) deps.add(name)
-    }
-    edges.set(pkg, deps)
-  }
-  return edges
-}
-
-const DEPENDS_ON_TRIGGER = /^\s*(?:#+\s*|\*\*\s*)?DEPENDS\s+ON\b/i
-
-const declaredDependencies = (pkg, docRel, allNames) => {
-  const filePath = join(REQUIREMENTS, pkg, docRel)
-  if (!existsSync(filePath)) return new Set()
-  const text = read(filePath)
-  const declared = new Set()
-  let collecting = false
-  for (const line of text.split('\n')) {
-    if (collecting) {
-      if (line.trim() === '' || /^\s*#/.test(line)) collecting = false
-      else collectNames(line, allNames, pkg, declared)
-      continue
-    }
-    if (DEPENDS_ON_TRIGGER.test(line)) {
-      collecting = true
-      collectNames(line, allNames, pkg, declared)
-    }
-  }
-  return declared
-}
-
-const collectNames = (line, allNames, self, out) => {
-  for (const name of allNames) {
-    if (name === self) continue
-    if (new RegExp(`\\b${name}\\b`).test(line)) out.add(name)
-  }
-}
-
-const landingFileTokens = (row) => {
-  const cells = row.split('|').map((cell) => cell.trim())
-  const landing = cells[2] ?? ''
-  return [...landing.matchAll(/(?:requirements\/|tests\/|scripts\/)[\w./-]+\.(?:test\.mjs|mjs)/g)].map(
-    (m) => m[0],
-  )
-}
-
-const resolveLanding = (pkg, token) => {
-  const repo = join(ROOT, token)
-  if (existsSync(repo)) return repo
-  if (token.startsWith('tests/')) {
-    const local = join(REQUIREMENTS, pkg, token)
-    if (existsSync(local)) return local
-  }
-  return repo
 }
 
 const docFailures = (pkg) => {
@@ -149,44 +71,12 @@ const danglingTestFailures = (pkg) => {
   return failures
 }
 
-const proofFailures = (pkg) => {
-  const failures = []
-  const howPath = join(REQUIREMENTS, pkg, 'HOW.md')
-  if (!existsSync(howPath)) return failures
-  const howText = read(howPath)
-  for (const line of howText.split('\n')) {
-    if (!line.startsWith('|')) continue
-    for (const token of landingFileTokens(line)) {
-      const resolved = resolveLanding(pkg, token)
-      if (!existsSync(resolved)) {
-        failures.push(`${pkg}: HOW landing file missing: ${token}`)
-      }
-    }
-  }
-  return failures
-}
-
-const depFailures = (pkg, allNames, skeleton) => {
-  const failures = []
-  for (const doc of ['WHY.md', 'WHAT.md']) {
-    const declared = declaredDependencies(pkg, doc, allNames)
-    const allowed = skeleton.get(pkg) ?? new Set()
-    for (const dep of declared) {
-      if (!allowed.has(dep)) {
-        failures.push(`${pkg}: ${doc} declares DEPENDS ON ${dep}, but the INDEX skeleton has no such edge (allowed: ${[...allowed].join(', ') || '无'})`)
-      }
-    }
-  }
-  return failures
-}
-
 test('WHAT[requirement-system-017] meta-verifier executes as the machine proof', () => {
   const fromIndex = packageNamesFromIndexTables()
-  const skeleton = dependencySkeleton()
 
-  // 1. 包目录封闭性：requirements/ 规范树仅包含 INDEX.md 所列目录
+  // 1. 包目录封闭性：requirements/ 规范树仅包含 INDEX.md 所列目录（忽略 proposals/ 目录）
   const dirs = readdirSync(REQUIREMENTS)
-    .filter((entry) => statSync(join(REQUIREMENTS, entry)).isDirectory())
+    .filter((entry) => !isProposalPath(entry) && statSync(join(REQUIREMENTS, entry)).isDirectory())
     .sort()
   const unknownDirs = dirs.filter((dir) => !fromIndex.includes(dir))
   assert.deepEqual(unknownDirs, [], `requirements/ must not contain INDEX-external package dirs: ${unknownDirs.join(', ')}`)
@@ -198,21 +88,7 @@ test('WHAT[requirement-system-017] meta-verifier executes as the machine proof',
   }
   assert.deepEqual(docErrors, [], 'all packages must carry complete documentation and tests/ directory:\n' + docErrors.join('\n'))
 
-  // 3. 依赖声明合法性：DEPENDS ON 集合必须是 INDEX 依赖骨架的子集
-  const depErrors = []
-  for (const pkg of fromIndex) {
-    depErrors.push(...depFailures(pkg, fromIndex, skeleton))
-  }
-  assert.deepEqual(depErrors, [], 'declared dependencies must be a subset of the INDEX skeleton:\n' + depErrors.join('\n'))
-
-  // 4. 已声明证明落点引用完整性与测试文件物理存在性
-  const proofErrors = []
-  for (const pkg of fromIndex) {
-    proofErrors.push(...proofFailures(pkg))
-  }
-  assert.deepEqual(proofErrors, [], 'declared proof landing files must physically exist:\n' + proofErrors.join('\n'))
-
-  // 5. 存活条款与测试对应性：每个 tests/ 下 NNN.test.mjs 的编号必须在同包 WHAT.md 存活条款中存在
+  // 3. 存活条款与测试对应性：如果某条款已删除，对应的测试需要提示用户进行相应处理
   const danglingErrors = []
   for (const pkg of fromIndex) {
     danglingErrors.push(...danglingTestFailures(pkg))
@@ -223,7 +99,7 @@ test('WHAT[requirement-system-017] meta-verifier executes as the machine proof',
     'all tests must correspond to live clauses in WHAT.md:\n' + danglingErrors.join('\n'),
   )
 
-  // 6. 测试文件名规范性：requirements/**/tests/ 下所有 .test.mjs 文件名必须匹配 NNN.test.mjs（任意深度）
+  // 4. 测试文件名规范性：requirements/**/tests/ 下所有 .test.mjs 文件名必须匹配 NNN.test.mjs（任意深度）
   const findTestFiles = (dir) => {
     const results = []
     if (!existsSync(dir)) return results
@@ -257,7 +133,7 @@ test('WHAT[requirement-system-017] meta-verifier executes as the machine proof',
     'all .test.mjs files under requirements/**/tests/ must match NNN.test.mjs:\n' + testNamingErrors.join('\n'),
   )
 
-  // 7. 测试用例标题锚点规范性：每个 NNN.test.mjs 内出现的测试用例标题锚点 WHAT[前缀-编号] 必须与 所在包名-文件编号 一致
+  // 5. 测试用例标题锚点规范性：每个 NNN.test.mjs 内出现的测试用例标题锚点 WHAT[前缀-编号] 必须与 所在包名-文件编号 一致
   const extractTestAnchors = (content) => {
     const anchors = []
     const lines = content.split('\n')

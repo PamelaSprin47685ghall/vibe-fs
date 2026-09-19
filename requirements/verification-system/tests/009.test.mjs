@@ -54,7 +54,7 @@ test('WHAT[verification-system-009] non-directory e2e root fails closed', () => 
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import("node:fs");
+const { mkdtempSync, mkdirSync, writeFileSync, rmSync, readdirSync, readFileSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
 const { default: path } = await import("node:path");
 const { fileURLToPath } = await import("node:url");
@@ -93,7 +93,8 @@ test('WHAT[verification-system-009] integration entry coverage delegates the exa
   )
 })
 test('WHAT[verification-system-009] discoverSuiteTests lists every package *.test.mjs and excludes the runner', () => {
-  const discovered = discoverSuiteTests(packageIntegrationDir)
+  const packageTestsDir = path.join(root, 'requirements/distribution/tests')
+  const discovered = discoverSuiteTests(packageTestsDir)
   // The four real package suites are all picked up.
   assert.ok(discovered.includes('001.test.mjs'))
   assert.ok(discovered.includes('003.test.mjs'))
@@ -128,39 +129,54 @@ test('WHAT[verification-system-009] parent delegation set equals the child-execu
   // Both the parent entry and the child runner consume discoverSuiteTests on
   // the same directory, so the delegated set must be exactly the set the child
   // runs. If these ever diverge, an added package test is silently omitted.
-  const childExecuted = discoverSuiteTests(packageIntegrationDir)
-  const parentDelegated = discoverSuiteTests(packageIntegrationDir)
+  const packageTestsDir = path.join(root, 'requirements/distribution/tests')
+  const childExecuted = discoverSuiteTests(packageTestsDir)
+  const parentDelegated = discoverSuiteTests(packageTestsDir)
   assert.deepEqual(childExecuted, parentDelegated)
   assert.ok(childExecuted.length > 0, 'package integration dir must own at least one suite')
 })
 test('WHAT[verification-system-009] the real integration entry covers every discovered integration test', () => {
-  // Behavior proof against the real repository state: walk requirements for
-  // *.test.mjs under tests/integration, delegate the exact discovered package
-  // set, and assert the entry coverage is green using the SAME wired set the
-  // parent run.mjs executes (single source of truth in
-  // integration-node-test-steps.mjs). An added package test is delegated
-  // automatically; an added non-package test that is not wired into the shared
-  // steps makes this go red.
-  const discoveredIntegrationTests = walk(path.join(root, 'requirements'), ['.test.mjs'])
-    .map(normalize)
-    .filter((file) => file.includes('/tests/integration/'))
-  const childOwnedIntegrationTests = discoverSuiteTests(packageIntegrationDir).map((name) =>
-    normalize(path.join(packageIntegrationDir, name)),
-  )
+  const packageTestsDir = path.join(root, 'requirements/distribution/tests')
+  const requirementsDir = path.join(root, 'requirements')
+  const discoveredIntegrationTests = readdirSync(requirementsDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name !== 'distribution')
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .flatMap((entry) => {
+      const testsDir = path.join(requirementsDir, entry.name, 'tests')
+      try {
+        return readdirSync(testsDir)
+          .filter((name) => name.endsWith('.test.mjs'))
+          .sort()
+          .map((name) => normalize(path.join(testsDir, name)))
+          .filter((file) => {
+            const text = readFileSync(path.join(root, file), 'utf8')
+            return /\bintegrationTest\s*\(/.test(text)
+          })
+      } catch {
+        return []
+      }
+    })
+    .sort()
+  const childOwnedIntegrationTests = discoverSuiteTests(packageTestsDir)
+    .filter((name) => {
+      const text = readFileSync(path.join(packageTestsDir, name), 'utf8')
+      return /\bintegrationTest\s*\(/.test(text)
+    })
+    .map((name) => normalize(path.join(packageTestsDir, name)))
   const wiredIntegrationTests = integrationNodeTestSteps(root).flatMap((step) =>
     step.files.map(normalize),
   )
   const result = assessIntegrationEntryCoverage({
-    discoveredTests: discoveredIntegrationTests,
+    discoveredTests: [...discoveredIntegrationTests, ...childOwnedIntegrationTests].sort(),
     wiredTests: wiredIntegrationTests,
     childOwnedTests: childOwnedIntegrationTests,
   })
   assert.equal(result.ok, true, JSON.stringify(result, null, 2))
   assert.deepEqual(childOwnedIntegrationTests.sort(), [
-    'requirements/distribution/tests/integration/package/001.test.mjs',
-    'requirements/distribution/tests/integration/package/003.test.mjs',
-    'requirements/distribution/tests/integration/package/004.test.mjs',
-    'requirements/distribution/tests/integration/package/008.test.mjs',
+    'requirements/distribution/tests/001.test.mjs',
+    'requirements/distribution/tests/003.test.mjs',
+    'requirements/distribution/tests/004.test.mjs',
+    'requirements/distribution/tests/008.test.mjs',
   ])
 })
 }
@@ -235,7 +251,7 @@ test('WHAT[verification-system-009] every ladder step target exists as a real fi
     'requirements/verification-system/tests/integration/run.mjs',
     'requirements/distribution/tests/integration/package/run.mjs',
     'scripts/warmup-opencode.mjs',
-    'requirements/verification-system/tests/e2e/014.test.mjs',
+    'requirements/verification-system/tests/014.test.mjs',
   ]
   for (const rel of required) {
     assert.ok(existsSync(join(ROOT, rel)), `ladder step target missing: ${rel}`)
@@ -397,6 +413,11 @@ test('WHAT[verification-system-009] repository closure gates reject an unassigne
     copyFileSync(
       join(repositoryRoot, 'requirements/distribution/tests/004.test.mjs'),
       join(fixture, 'requirements/distribution/tests/004.test.mjs'),
+    )
+    mkdirSync(join(fixture, 'requirements/verification-system/tests/support'), { recursive: true })
+    copyFileSync(
+      join(repositoryRoot, 'requirements/verification-system/tests/support/tier-gate.mjs'),
+      join(fixture, 'requirements/verification-system/tests/support/tier-gate.mjs'),
     )
     write(fixture, 'package.json', JSON.stringify({
       main: './dist/OpenCode/Plugin/Plugin.js',

@@ -41,6 +41,6 @@ Office Consequence Model (语义唯一事实源)
 ## GAP
 
 - `office-capability-003` / `office-capability-018`（CLOSED）：同一 Office authority 不变性与 Sphinx 程控探究流程约束已闭合，落点 `tests/003.test.mjs` 与 `tests/018.test.mjs`。
-- `office-capability-005` / `office-capability-007` / `office-capability-016` / `office-capability-017`（CLOSED）：DevOps 重复接收幂等、固定 DevOps 接力、Engineer 独享 Fission 与 DevOps 进程收束集成证明已闭合，落点 `tests/integration/005.test.mjs`、`tests/integration/007.test.mjs`、`tests/integration/016.test.mjs` 与 `tests/integration/017.test.mjs`。
-- `office-capability-006`（CLOSED）：Office 不可互换边界独立评测已闭合，落点 `tests/eval/provider-office-boundary/006.test.mjs`。
+- `office-capability-005` / `office-capability-007` / `office-capability-016` / `office-capability-017`（CLOSED）：DevOps 重复接收幂等、固定 DevOps 接力、Engineer 独享 Fission 与 DevOps 进程收束集成证明已闭合，落点 `tests/005.test.mjs`、`tests/007.test.mjs`、`tests/016.test.mjs` 与 `tests/017.test.mjs`（通过 `integrationTest` 门控）。
+- `office-capability-006`（CLOSED）：Office 不可互换边界独立评测已闭合，落点 `tests/006.test.mjs`（保持 unit 执行面，支撑用例仍位于 `tests/eval/provider-office-boundary/`）。
 

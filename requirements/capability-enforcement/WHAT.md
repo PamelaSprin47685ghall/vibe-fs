@@ -26,11 +26,11 @@ Host 侧展示给模型的工具 Schema 与运行时执行拦截 Gate 必须双�
 
 ## [007] Host-native/MCP/plugin 等不同技术来源的 actions 服从同一 semantic capability policy
 
-无论工具来源于 Host 原生、MCP 外部集成还是插件内部注册，其权限控制均由唯一的领域能力令牌统管。彻底废止 Network 权限与 `stealth-browser-mcp_*`；Sphinx MCP 经程控工作流调用，严禁为不同技术来源维护独立的权限映射表。
+无论工具来源于 Host 原生、MCP 外部集成还是插件内部注册，其权限控制均由唯一的领域能力令牌统管。权限控制仅覆盖本地离线能力，任何角色均无外部网络浏览工具；Sphinx MCP 经程控工作流调用，严禁为不同技术来源维护独立的权限映射表。
 
 ## [008] js-* 编程面四层同构：capability → base-class member → description → example → runtime gate
 
-针对 JS 文件系统能力：若角色缺少对应 capability，则代码生成器生成的基类中不包含对应方法、工具描述中不提及该方法、示例代码中不展示该方法，且底层运行时 Gate 同样拦截对该方法的调用。面向活跃角色的编程工具生成 `js-engineer` 与 `js-devops`，删除 `js-coder`、`js-inspector` 与 `js-browser`。
+针对 JS 文件系统能力：若角色缺少对应 capability，则代码生成器生成的基类中不包含对应方法、工具描述中不提及该方法、示例代码中不展示该方法，且底层运行时 Gate 同样拦截对该方法的调用。面向活跃角色的编程工具仅生成 `js-engineer` 与 `js-devops`。
 
 ## [009] 工具名引用完整性：same tool name → 唯一 schema owner + 唯一 semantic contract
 

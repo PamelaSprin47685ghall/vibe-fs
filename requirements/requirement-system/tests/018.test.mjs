@@ -1,55 +1,102 @@
 import assert from 'node:assert/strict'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { basename, dirname, join, relative, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
-import {
-  clauseDefinitionHeadings,
-  duplicateClauseDefinitions,
-  formalClauseDefinitionHeadings,
-  unknownClauseReferences,
-} from '../../../scripts/lib/spec-rules.mjs'
+import { isProposalPath } from '../../../scripts/lib/spec-rules.mjs'
 
-test('WHAT[requirement-system-018] RS_018_executable_proof_bidirectional_traceability_rules', () => {
-  // 1. 验证证明有效性校验函数：条款定义抽取与格式约束
-  const sampleMarkdown = `
-# Sample Package
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
+const REQUIREMENTS = join(ROOT, 'requirements')
+const INDEX_FILE = join(ROOT, 'requirements/INDEX.md')
 
-## REQ-001: First Clause
-Valid clause body.
+const read = (path) => readFileSync(path, 'utf8')
 
-## REQ-002: Second Clause
-Reference to REQ-001 is valid.
-Reference to UNKNOWN-999 is invalid.
-`
+const packageNamesFromIndexTables = () => {
+  const text = read(INDEX_FILE)
+  const names = []
+  for (const line of text.split('\n')) {
+    if (!line.startsWith('| ')) continue
+    const name = /`([a-z][a-z0-9-]*)`/.exec(line)?.[1]
+    if (name) names.push(name)
+  }
+  return [...new Set(names)]
+}
 
-  const headings = clauseDefinitionHeadings(sampleMarkdown)
-  assert.equal(headings.length, 2)
-  assert.equal(headings[0].id, 'REQ-001')
-  assert.equal(headings[1].id, 'REQ-002')
+const liveClauseNumbers = (pkg) => {
+  const whatPath = join(REQUIREMENTS, pkg, 'WHAT.md')
+  if (!existsSync(whatPath)) return new Set()
+  const text = read(whatPath)
+  const numbers = new Set()
+  for (const line of text.split('\n')) {
+    const mBracket = /^##\s+\[(\d{3})\]/.exec(line)
+    if (mBracket && !/已删除|已废止/.test(line)) {
+      numbers.add(mBracket[1])
+    }
+  }
+  return numbers
+}
 
-  // 2. 变异防御：未知命题引用拦截
-  const unknownRefs = unknownClauseReferences(sampleMarkdown, ['REQ'])
-  assert.equal(unknownRefs.length, 1)
-  assert.equal(unknownRefs[0].token, 'UNKNOWN-999')
+const findTestFiles = (dir) => {
+  const results = []
+  if (!existsSync(dir)) return results
+  const entries = readdirSync(dir, { withFileTypes: true })
+  for (const entry of entries) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) {
+      results.push(...findTestFiles(full))
+    } else if (entry.name.endsWith('.test.mjs')) {
+      results.push(full)
+    }
+  }
+  return results
+}
 
-  // 3. 变异防御：重复条款定义检测（禁止跨包或同一包重复声明权威）
-  const duplicateEntries = [
-    { file: 'pkg-a/WHAT.md', pkg: 'pkg-a', text: '## REQ-001: First Clause\nContent' },
-    { file: 'pkg-b/WHAT.md', pkg: 'pkg-b', text: '## REQ-001: Stolen Clause\nContent' },
-  ]
-  const dupFindings = duplicateClauseDefinitions(duplicateEntries)
-  assert.ok(dupFindings.length > 0, 'Duplicate clause definition across packages must be flagged as violation')
-  assert.match(dupFindings[0].msg, /条款 ID 重复定义：REQ-001/)
+test('WHAT[requirement-system-018] test filename must match clause exactly and tests for same clause live in one file', () => {
+  // [018]：每个有效可执行测试用例，文件名必须恰好对应到条款。同一命题可以拥有多个测试，都放在同一文件。
+  const packages = packageNamesFromIndexTables()
+  const violations = []
 
-  // 4. 变异防御：前缀所有权单义性（同一前缀严禁多包定义）
-  const multiPrefixEntries = [
-    { file: 'pkg-a/WHAT.md', pkg: 'pkg-a', text: '## REQ-001: Clause\nContent' },
-    { file: 'pkg-b/WHAT.md', pkg: 'pkg-b', text: '## REQ-002: Clause\nContent' },
-  ]
-  const prefixFindings = duplicateClauseDefinitions(multiPrefixEntries)
-  assert.ok(prefixFindings.length > 0, 'Multiple packages declaring the same prefix must be flagged as violation')
-  assert.match(prefixFindings[0].msg, /前缀 REQ- 被多包定义/)
+  for (const pkg of packages) {
+    const testsDir = join(REQUIREMENTS, pkg, 'tests')
+    if (!existsSync(testsDir)) continue
 
-  // 5. 正例验证：合法命题前缀被完整接纳
-  const formal = formalClauseDefinitionHeadings(sampleMarkdown, ['REQ'])
-  assert.equal(formal.length, 2)
-  assert.deepEqual(formal.map((f) => f.id), ['REQ-001', 'REQ-002'])
+    const liveClauses = liveClauseNumbers(pkg)
+    const testFiles = findTestFiles(testsDir)
+    const seenClausesInPkg = new Map() // clauseNum -> filePath
+
+    for (const filePath of testFiles) {
+      const fileName = basename(filePath)
+      const m = /^(\d{3})\.test\.mjs$/.exec(fileName)
+      if (!m) {
+        violations.push(
+          `${relative(ROOT, filePath)}: 文件名 "${fileName}" 不符合 NNN.test.mjs 格式，无法恰好对应到条款`,
+        )
+        continue
+      }
+
+      const clauseNum = m[1]
+      // 1. 文件名恰对条款：测试编号必须在同包 WHAT.md 的存活条款中
+      if (!liveClauses.has(clauseNum)) {
+        violations.push(
+          `${relative(ROOT, filePath)}: 测试文件名条款编号 [${clauseNum}] 在 ${pkg}/WHAT.md 存活条款中不存在`,
+        )
+      }
+
+      // 2. 同一命题同文件：同包下该条款只能有这唯一一个测试文件
+      if (seenClausesInPkg.has(clauseNum)) {
+        const prev = seenClausesInPkg.get(clauseNum)
+        violations.push(
+          `${relative(ROOT, filePath)}: 条款 [${clauseNum}] 存在重复测试文件（已有 ${relative(ROOT, prev)}），违背「同一命题测试都在同一文件」约束`,
+        )
+      } else {
+        seenClausesInPkg.set(clauseNum, filePath)
+      }
+    }
+  }
+
+  assert.deepEqual(
+    violations,
+    [],
+    'all tests must strictly match clauses and live in single files per clause:\n' + violations.join('\n'),
+  )
 })
