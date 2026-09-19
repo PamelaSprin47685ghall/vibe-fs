@@ -4,7 +4,7 @@
 
 ## 为什么只保留 subsystem
 
-过去同时维护 semantic owner、locality、fsproj、slice、exposure、audience、manifest 与 adjudication。每层单看都有理由，叠加后却产生第二套产品：维护者必须先理解治理模型，才能修改业务代码；而大量细项目仍没有换来稳定的 change locality。
+若同时维护 semantic owner、locality、fsproj、slice、exposure、audience、manifest 与 adjudication 八层，每层单看都有理由，叠加后却产生第二套产品：维护者必须先理解治理模型，才能修改业务代码；而大量细项目仍没有换来稳定的 change locality。
 
 Subsystem 回答唯一值得人工治理的问题：**哪一组知识、决策、不变量、失败语义与外部合同可以整体理解、整体替换？** 重构、重写、删除、任务分工与验收只以 subsystem 为单位。一个 subsystem 内部可以有很多 compile shard，但 shard 不拥有新的业务身份。
 

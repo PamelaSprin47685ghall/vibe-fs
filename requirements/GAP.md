@@ -59,6 +59,7 @@
 | GAP-048 | `participant-identity` | participant-identity-010 | 活跃身份解析与历史身份隔离解码 | CLOSED | `requirements/participant-identity/tests/010.test.mjs` + Identity.fs 升权修复与 Roles 分流 | 已落地独立 unit oracle | participant-identity |
 | GAP-049 | `context-compression` | context-compression-016 | journal → coverable frames → frozen blob 完整物化路径 | CLOSED | `requirements/context-compression/tests/016.test.mjs` + XWireSurface.candidateFromJournal | 已落地独立集成 oracle | context-compression |
 | GAP-050 | `requirement-system` | requirement-system-003（全部包同时为真/公理语义） | 公理地位与无裁决覆盖属语义解释原则，无忠实机械 oracle | OPEN | `requirements/requirement-system/tests/003.test.mjs`（诚实最小断言） | 维持公理地位，以诚实最小断言守卫基本性质 | requirement-system |
+| GAP-051 | `execution-failure-policy` | execution-failure-policy-014 | 无绑定本命题的独立 unit oracle（无 014.test.mjs） | PARTIAL | `requirements/execution-failure-policy/tests/010.test.mjs`（fatal-inventory-gate 对 fatal-inventory.json 的检查逻辑）+ `scripts/checks/fatal-inventory-gate.mjs`（check.mjs 门禁阶段执行） | 落地绑定 execution-failure-policy-014 的独立可红 oracle | execution-failure-policy |
 
 ## 纪律
 

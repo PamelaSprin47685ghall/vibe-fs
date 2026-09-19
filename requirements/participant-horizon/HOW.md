@@ -30,8 +30,3 @@ provider-leak-gate.mjs
    - Manager 的 fork 工具描述与 Schema 仅公开 `engineer` 候选，严格排他。
    - DevOps 仅由合法 Runtime 绑定，模型视界中只见其 Byname（常量 `devops`）并在 `resume` 中以 name = `devops` 作为既有目标续做。
    - Manager 的并行来自 fork 多名 Engineer，Manager 自身无 Fission 工具或分身指示。
-
-## GAP
-
-- `PARTICIPANT-HORIZON-015`（CLOSED）：Manager 并行来自多名 Engineer 且视界中禁止 Manager Fission 与虚假分身拓扑已闭合，落点 `tests/015.test.mjs` 与 `StaticTools` 显式 deny。
-- `GAP-028`（CLOSED）：Horizon 已改用独立 `HandleProjection.horizonVisible`，父级可见 `Abandoned` 在 Join 消费并 `Retired` 前持续留在 roster；fork 首 prompt 的 `AcceptanceUnknown` 由 durable PromptAuthority `Pending` claim 接管恢复，保留 terminal observer 与单次物理发送，不再合成 `HandleCompleted` 或返回“未放置”。`horizon-surface.test.mjs`、`host-fork-restart-lifecycle.test.mjs` 与真实 `fork-tool.test.mjs` 回归均已绿；核心实现落于 `2953a0978`。

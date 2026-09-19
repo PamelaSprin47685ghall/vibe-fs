@@ -203,7 +203,3 @@ DEPENDS ON:
 - `context-compression`
 - `prefix-stability`
 
-## GAP
-
-- `provider-attempt-recovery-017` / `provider-attempt-recovery-023`（CLOSED）：Blogger 重试替换确切物理绑定与已接受但未 ProviderStarted 执行的显式义务已闭合，落点 `tests/017.test.mjs` 与 `tests/023.test.mjs`。
-

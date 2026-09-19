@@ -38,9 +38,3 @@ Office Consequence Model (语义唯一事实源)
 
 `tests/005.test.mjs` 全量扫描分发资源并检查双语职责投影。实际装配由 `provider-language-012`（`provider-language/tests/012.test.mjs`）检查；案例、命令输出和生成示例另由其 owning package 的正式测试证明。字符串断言不代表模型行为 canary、运行时权限或完整迁移已经通过。
 
-## GAP
-
-- `office-capability-003` / `office-capability-018`（CLOSED）：同一 Office authority 不变性与 Sphinx 程控探究流程约束已闭合，落点 `tests/003.test.mjs` 与 `tests/018.test.mjs`。
-- `office-capability-005` / `office-capability-007` / `office-capability-016` / `office-capability-017`（CLOSED）：DevOps 重复接收幂等、固定 DevOps 接力、Engineer 独享 Fission 与 DevOps 进程收束集成证明已闭合，落点 `tests/005.test.mjs`、`tests/007.test.mjs`、`tests/016.test.mjs` 与 `tests/017.test.mjs`（通过 `integrationTest` 门控）。
-- `office-capability-006`（CLOSED）：Office 不可互换边界独立评测已闭合，落点 `tests/006.test.mjs`（保持 unit 执行面，支撑用例仍位于 `tests/eval/provider-office-boundary/`）。
-

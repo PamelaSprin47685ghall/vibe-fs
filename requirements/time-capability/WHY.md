@@ -28,6 +28,6 @@
 6. pure clock/timer capability type与Node clock/timer implementation处于同一slice，使普通consumer传递获得ambient time、timer或mutable runtime authority。
 7. pure `Deadline` 或 `SessionStartedAtProjection` 与Node/virtual timing实现共处同一project，导致只需确定性表示或投影的consumer被迫获得物理timer与可变verification runtime的完整编译闭包。
 
-## M6 Temporal locality 裁决
+## Temporal locality 裁决
 
-六类知识具有不同 consumer cohort（该切分由声明式 project/closure 边界与编译边界证明固定，不做 fresh compiler census、不执行任何自定义 FCS 扫描）：clock/timer capability type、pure `Deadline`、bind-once `SessionStartedAtProjection`、Node timing adapter、virtual timing implementation、production-bound representation Surface。它们不得继续借同一个project互相扩张可见面。前三者各自形成bounded contract；Node adapter与virtual implementation分居独立locality；原`foundation-temporal`只保留representation Surface。consumer 按已声明 ProjectReference 与精确编译闭包引用最窄 slice，同一 consumer 确实使用多个知识时显式引用多个 project。
+六类知识具有不同 consumer cohort（该切分由声明式 project/closure 边界与编译边界证明固定，不做 fresh compiler census、不执行任何自定义 FCS 扫描）：clock/timer capability type、pure `Deadline`、bind-once `SessionStartedAtProjection`、Node timing adapter、virtual timing implementation、production-bound representation Surface。它们不得借同一个project互相扩张可见面。前三者各自形成bounded contract；Node adapter与virtual implementation分居独立locality；representation Surface 独占独立 project。consumer 按已声明 ProjectReference 与精确编译闭包引用最窄 slice，同一 consumer 确实使用多个知识时显式引用多个 project。

@@ -55,7 +55,3 @@
 - **DryRun 模式**：启动真实物理子会话执行只读请求以供宿主观测，但完全解耦主路径等待与因果提交逻辑。
 - **时间无关 lifecycle**：`StrengthReplicaRuntime` 不注入 timer，也没有 latency/deadline race。Treatment 显式开启后等待 Replica 的 `Completion` 因果终态；DryRun 启动后立即返回，后台只观察 `Completion`。DryRun 若未先由 K gate/Replica terminal 收口，则 `HostTurnObserver` 在 exact Owner `TargetProviderRun` terminal 上调用 `CloseDryRunAtTargetTerminal` 收口。Owner cancel/delete 仍沿现有级联取消路径生效。
 
-## GAP
-
-- `speculative-investigation-014`（CLOSED）：消融状态优先于 rollout env 配置已闭合，落点 `tests/014.test.mjs`。
-

@@ -14,7 +14,7 @@ logical participant run 建立时，identity owner 以 `Role × persona provenan
 
 ## [004] 换执行者 ≠ 换人
 
-物理执行重试（Retry）、Strength 副本运行与援助升级仅改变物理目标与租约 binding（通过 MJS scheduler 为固定 Role 重新分配 model target/lease）；PeerAgent 与 side/cursor 轮换已彻底拔除。执行期间暴露的 Role、Persona、SelectedAgent 与 provenance/version 必须逐字段等于该 run durable 的 `ParticipantIdentityEvidence`；它们不得被分配的 provider/model 目标或租约覆盖。
+物理执行重试（Retry）、Strength 副本运行与援助升级仅改变物理目标与租约 binding（通过 MJS scheduler 为固定 Role 重新分配 model target/lease）；严禁 PeerAgent 与 side/cursor 轮换。执行期间暴露的 Role、Persona、SelectedAgent 与 provenance/version 必须逐字段等于该 run durable 的 `ParticipantIdentityEvidence`；它们不得被分配的 provider/model 目标或租约覆盖。
 
 ## [005] system prompt identity 只消费 ParticipantIdentity
 
@@ -22,7 +22,7 @@ system prompt 的身份标识由 `ParticipantIdentity.Role` 与其稳定 Persona
 
 ## [006] 稳定 Role identity 与可变机器 binding 严格分界
 
-`Role`、`Persona` 与 `SelectedAgent` 是稳定的 canonical identity evidence，由 `IdentitySeed` 派生且不可变，不是当前机器 binding。物理执行分配的 model target、fence 与租约标识仅属于 `ExecutionBinding`，不得覆盖 Role/Persona/SelectedAgent evidence。系统中彻底拔除 cursor-selected EffectiveAgent 及 PeerAgent 语义。
+`Role`、`Persona` 与 `SelectedAgent` 是稳定的 canonical identity evidence，由 `IdentitySeed` 派生且不可变，不是当前机器 binding。物理执行分配的 model target、fence 与租约标识仅属于 `ExecutionBinding`，不得覆盖 Role/Persona/SelectedAgent evidence。系统中不存在 cursor-selected EffectiveAgent 及 PeerAgent 语义。
 
 ## [007] 内部身份仍受同一原子模型约束
 

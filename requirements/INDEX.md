@@ -68,7 +68,7 @@
 | Package | 一句话 WHY |
 |---|---|
 | `semantic-trace` | participant life 中不可丢失的原始语义历史必须有 append-only、可定位的事实表示；Fission 多 present 确定性 keyed 汇聚，独立 invocation 范围与 resume 边界隔离。 |
-| `work-record` | 跨 participant/review/finality 传递的一段 work 必须有 bounded canonical statement（LWR）；Fission 汇聚生成单次 Invocation 唯一 Canonical Record。 |
+| `work-record` | 跨 participant/relay-assessment/relay-retirement 传递的一段 work 必须有 bounded canonical statement（LWR）；Fission 汇聚生成单次 Invocation 唯一 Canonical Record。 |
 | `context-compression` | 当历史过长时，只能以受控、证据边界明确的 semantic memory 替代可压缩部分。 |
 | `prefix-stability` | 同一 semantic epoch 内已呈现给 provider 的前缀必须保持稳定；冷边界只能由事实驱动。 |
 
@@ -92,7 +92,7 @@
 | `relay-retirement` | 退出是唯一正常出口；只有递归 live 资源能阻塞退休，固定 DevOps 跨任期连续且在退休中受明确收束边界保护。 |
 | `relay-context-projection` | 审计保留全量历史，provider 消息上下文只含权威消息与本轮消息，并在共享工作区上执行；固定 DevOps 执行事实通过客观记录感知、前任私有上下文隔离。 |
 
-旧 `review-judgement` / `review-assurance` / `finality` 已按 Manager 循环语义 clean break：评审并入 `relay-assessment`，终结并入 `relay-retirement`，上下文切段并入 `relay-context-projection`。
+评审归 `relay-assessment`，终结归 `relay-retirement`，上下文切段归 `relay-context-projection`。
 
 ## 10. Feedback
 
@@ -165,7 +165,7 @@
 | 33 | `work-record` | 17 | work-record-001 ~ 016、work-record-017（Fission 汇聚生成单次 Invocation Canonical Record） |
 | 34 | `context-compression` | 27 | context-compression-001 ~ 027 |
 | 35 | `prefix-stability` | 15 | prefix-stability-001 ~ 015 |
-| 36 | `execution-failure-policy` | 14 | execution-failure-policy-001 ~ 010、010b、011 ~ 013 |
+| 36 | `execution-failure-policy` | 14 | execution-failure-policy-001 ~ 014 |
 | 37 | `provider-attempt-recovery` | 23 | provider-attempt-recovery-001 ~ 023 |
 | 38 | `host-provider-failure-ownership` | 7 | host-provider-failure-ownership-001 ~ 007 |
 | 39 | `crash-reconciliation` | 20 | crash-reconciliation-001 ~ 019、crash-reconciliation-020（固定 DevOps 崩溃恢复单一逻辑权威与命令去重） |
@@ -254,7 +254,6 @@ Phase E 审计结论：3 条 coupling edge 已删（见 `AUDIT.md` Phase E）：
 structured-workflow  → causal-wait         删（CE builder 是实现耦合，非定义前提）
 time-capability      → causal-wait         删（deadline 是可选 escape，条件依赖非 hard）
 guidance-delivery    → provider-projection 删（渲染是下游机制）
-finality             → participant-horizon 删（包已退役为 relay-*；隐藏 Reviewer 机制随之删除）
 ```
 
 当前 157 edges 均为 semantic prerequisite（A 的 WHAT 定义需要 B 已提供的 guarantee），无 implementation/presentation/proof coupling。`epistemic-reasoning` 的 durable inquiry、受管 blind branch 与 capacity-safe OpenCode dispatch 分别直接依赖 `durable-events`、`delegation` 与 `execution-model-routing` 的 guarantee；这些不是存储、Host 或 proof 的偶然耦合。

@@ -41,7 +41,3 @@ ExecutionBinding { target: ModelTarget; fence: CapacityFence; lease }
 6. **活跃身份与历史身份解析隔离**：
    - 活跃名字解析（`resolveParticipantIdentityAtRoot` 等）仅接受当前规范角色（`engineer`、`manager`、`orchestrator`、`devops`、`blogger`），严格拒绝非合法集合的名字。
    - 历史回放与解码仅在专用解码边界识别旧身份，不进行静默权限提升（只读历史身份保持只读，不升级为可写 `engineer`；`devops` 不获得 `engineer` 的 Fission 权能）。
-
-## GAP
-
-- 活跃身份解析与历史身份解码隔离由 `Identity.fs` 升权校验、`Roles` 分流及 `tests/010.test.mjs` 实施保证。

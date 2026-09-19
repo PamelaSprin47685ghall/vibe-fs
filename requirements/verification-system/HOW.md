@@ -63,9 +63,3 @@
 
 文件名 `*.property.test.mjs` 不授予 property proof 权威。未调用 fast-check 的测试不得宣称随机 comprehensive。测试内 `violations()` 一类镜像公式及其 self-mutation 必须删除，或改为对 production Surface 的固定 counterexample；只有 production output 能使断言变红。
 
-## GAP
-
-- `verification-system-012` / `verification-system-014`（CLOSED）：行数非门禁原则与 Long Stroke 真实物理验收环境约束已闭合，落点 `tests/012.test.mjs` 与 `tests/014.test.mjs`。
-
-
-

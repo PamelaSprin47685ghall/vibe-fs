@@ -62,9 +62,9 @@ effectivePlanComplete(k) = OR(planComplete of Accepted T1..Tk)
 
 ## [013] 无过程评审阻塞与保留 todo lag-1 折叠
 
-移除过程性评审，$T_k$ 的 Accepted 立即生效，不派生过程评审义务，亦不阻塞后续 $T_{k+1}$ 的提交与执行。同时严格保留基于 committed Accepted 链的 desired lag-1 cutoff 与 prefix rebase 折叠行为。
+$T_k$ 的 Accepted 立即生效，无过程评审门禁，不派生过程评审义务，亦不阻塞后续 $T_{k+1}$ 的提交与执行。同时严格保留基于 committed Accepted 链的 desired lag-1 cutoff 与 prefix rebase 折叠行为。
 
-## [014] 移除中间过程评审，质量判断归于独立 assessment
+## [014] 质量判断归于独立 assessment，无过程评审门禁
 
 各 checkpoint 之间无过程性评审门禁，Manager 可无缝推进工作。实现质量不设终局评审，由独立 assessment 按公开准则与事实证据判断（relay-assessment relay-assessment-006）；本账本只记录义务，不做质量裁决。
 

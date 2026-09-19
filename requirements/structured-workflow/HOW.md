@@ -2,10 +2,6 @@
 
 `WHAT.md` 是唯一 normative 合同。本文仅说明架构治理、分片机制、数据流转与端口实现的当前实现决策。
 
-## GAP
-
-- `structured-workflow-005`（CLOSED）：可变存储仅承载物理资源、投影缓存或算法草稿已闭合，落点 `tests/005.test.mjs`。
-
 ## 1. 架构模型与治理入口
 
 - `scripts/checks/subsystems.json`：定义 legacy-owner → subsystem 映射。它帮助尚未显式声明的 compile shard 解析 subsystem，不定义 consumer ACL、exposure 或业务 law。

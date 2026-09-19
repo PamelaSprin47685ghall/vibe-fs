@@ -133,7 +133,7 @@ Stop plugin 可基于 decision-equivalence posterior、tested framing family 内
 
 ## [030] Legacy Adapter 黄金轨迹保持可观察兼容
 
-默认 Legacy profile 必须经 `旧 MCP → Legacy Adapter → Sphinx Core events → Legacy renderer` 重放冻结的 programming-quality transcript，并保持 request/nextTool 顺序、每次 accepted observation 的 revision、最终 epistemic basis、answer 与 `stop-dominates`。唯一明确翻转的旧行为是 process restart：handle 现在恢复为同一 durable inquiry；旧 `restart invalidates handles` 不再是合法特征。
+默认 Legacy profile 必须经 `旧 MCP → Legacy Adapter → Sphinx Core events → Legacy renderer` 重放冻结的 programming-quality transcript，并保持 request/nextTool 顺序、每次 accepted observation 的 revision、最终 epistemic basis、answer 与 `stop-dominates`。在 process restart 后，handle 恢复为同一 durable inquiry。
 
 ## [031] Sphinx 探究流程全程序控制，无 Inquiry 角色与模型驾驶层
 

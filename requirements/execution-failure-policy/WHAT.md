@@ -91,7 +91,7 @@ operator abort → `UserCancelled`，supersede → `Superseded`（crash-reconcil
 
 协议修复耗尽、过期回调、确定未发送和运行环境拒绝不得仅因“开发时没预料”成为 LocalInvariant。可达失败必须由所属请求或资源明确收敛；不释放其他请求的所有权，不重发 outcome unknown 的 effect，不在 fatal 后安排结算。保留的不变量熔断仍须满足 execution-failure-policy-006。
 
-## [010b] fatal 清单是机器可检查的入口索引
+## [014] fatal 清单是机器可检查的入口索引
 
 `requirements/execution-failure-policy/fatal-inventory.json` 是 execution-failure-policy-010 的机器可检查索引，不是第二套策略：每条记录以稳定 ID（附录 A 的 F 系列、附录 B 的 T 系列、附录 C 的 C/X 系列，见 AGENTS.md 提案）登记 owner requirement、source symbol、触发分支、输入来源、exact identity、phase、被断言的不变量、提交/资源处置、影响范围、证据类型、正式测试 ID 与状态（`Open|Proved|PropertyChecked|FixedWithRegression|RetainedFuse|ExcludedWithEvidence`）。定位一律按 source symbol + operation 字符串，禁用行号。`scripts/checks/fatal-inventory-gate.mjs`（已接入 `scripts/check.mjs`）在三种情形下失败：扫描到无清单行的 fatal/trip 调用（含 `TripFatal` 点自由绑定与 `ReportFatalDiagnostic` 转接的一跳别名）；清单行的 operation 字符串离开其 source 文件（证据过期）；`FixedWithRegression` 行点名的测试文件不存在。附录 C 的受管子进程 kill、signal-0 存活探测、`TextDecoder fatal:true`、`SendOutcome.Fatal` 联合分支按 `ExcludedWithEvidence` 登记，不进入 fatal 账。
 

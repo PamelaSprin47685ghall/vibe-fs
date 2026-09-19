@@ -1,5 +1,5 @@
 /**
- * Unified-store architecture gate (changes/active/storage.md §35–§37).
+ * Unified-store architecture gate.
  *
  * Scanners:
  *   1. feature-ref — refs/wanxiang/ outside Persist/Git ownership (only store may appear there)

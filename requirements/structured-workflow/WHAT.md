@@ -52,7 +52,7 @@ passed operation 恰好 once-through 且保持 business outcome、multiplicity �
 
 每个 production `.fs` 必须恰属于一个 subsystem，并恰由一个 compile shard 编译。**Subsystem 是唯一需要人工命名、裁决、分工、重构/重写/删除和验收的架构单位。** 一个 subsystem 拥有其 vocabulary、invariant、failure algebra、decision、public contract 与行为证明；它必须能够在只依赖公开 contract 与 proof 的前提下被整体替换。
 
-compile shard、`.fsproj`、`.fsi`、ProjectReference 与构建 closure 只是 subsystem 以下的编译实现。它们可以为增量编译、签名隔离和物理适配而自由拆分/合并，不取得独立 semantic owner、授权 audience、exposure class、slice adjudication 或 lifecycle。旧 `WanxiangshuSemanticOwner`、`WanxiangshuOwnerLocality`、locality kind、published-contract owner ACL 等字段在迁移期只允许作为兼容读取数据，禁止成为 release verdict 的权威输入。新 shard 应显式声明 `WanxiangshuSubsystem` 与 `WanxiangshuCompileShard`；未迁 shard 可暂由唯一 legacy-owner→subsystem 映射解析，不得因此恢复 owner 治理。
+compile shard、`.fsproj`、`.fsi`、ProjectReference 与构建 closure 只是 subsystem 以下的编译实现。它们可以为增量编译、签名隔离和物理适配而自由拆分/合并，不取得独立 semantic owner、授权 audience、exposure class、slice adjudication 或 lifecycle。所有 compile shard 应显式声明 `WanxiangshuSubsystem` 与 `WanxiangshuCompileShard`，禁止以任何 owner ACL 或 locality 字段作为 release verdict 的权威输入。
 
 compile-shard ProjectReference 图必须是 DAG；每个 production source 唯一归属，且 `.fs` 与 sibling `.fsi` 同 shard。`Wanxiangshu.fsproj` 是无语义 flattened emitter，其 `.fs/.fsi` compile set 必须与全部 compile shard 的 source 并集精确相等且不得 ProjectReference shard。release gate 只检查这些可由构建事实直接兑现的约束，不建立 per-symbol/per-owner ACL，也不得自建 FCS 扫描器来制造第二套源码依赖真相。
 
@@ -64,7 +64,7 @@ compile-shard ProjectReference 图必须是 DAG；每个 production source 唯�
 
 同一条规则对内联体和编译期常量同样适用：`.fs` 体中的 `let inline`、`member inline`、`inline fun` 或 `[<Literal>]` 字段在调用处落地，因此一个仍匹配原 `.fsi` 的 body 改动在形式上仍是 signature change，必须纳入全部真实 reverse consumer。只有被检出签名风险或缺少 sibling `.fsi` 才升级到这一级：不得把这些 `.fs` 直接当成 body-only 放行，也不得把其它 body-only `.fs` 无条件上升为 full。删除/移动/新增 source（含旧路径失效、新路径未归属）必须显式起效；未归属的 production 源发现后报错，不得用全量编译代替登记。文档、资源与测试变化不必调 Fable，只需按其真实输入关系更新派生产物并重跑检查。
 
-所有选中 source 必须按 canonical shard order（见 `compile-order.txt`，若缺乏则由 DAG 拓扑派生）合并成一次零 ProjectReference 的 flat Fable invocation；多个 shard 的影响集合先求并集，禁止逐 shard 重复启动 Fable。full release 的完整编译输入由分片 inventory 加上 canonical order manifest 共同产生，不再依赖任何 wrapper 工程文件存在。compile shard 的数量、名称和内部边界属于可调整的构建优化参数，不得迫使 subsystem 数量随之变化，也不得为了减少项目数把不相关知识重新塞进 shared foundation。
+所有选中 source 必须按 canonical shard order（见 `compile-order.txt`，若缺乏则由 DAG 拓扑派生）合并成一次零 ProjectReference 的 flat Fable invocation；多个 shard 的影响集合先求并集，禁止逐 shard 重复启动 Fable。full release 的完整编译输入由分片 inventory 加上 canonical order manifest 共同产生，严禁依赖任何 wrapper 工程文件存在。compile shard 的数量、名称和内部边界属于可调整的构建优化参数，不得迫使 subsystem 数量随之变化，也不得为了减少项目数把不相关知识重新塞进 shared foundation。
 
 ## [013] subsystem 边界必须遵守依赖倒置
 

@@ -30,7 +30,7 @@
 
 ---
 
-万象术以 OpenCode 插件形式落地。它不替换 Host 的对话模型，而是在其上叠加一层结构化编排：Orchestrator 统筹全局，Manager 分解任务并管理子会话，Coder 修改源码，Inspector 只读调查，DevOps 管控进程与环境，Reviewer 裁决质量。每个角色有自己的工具面与权限边界，Companion 在会话级提供认知上下文，Fallback 与 Review 各有明确写入口。智能体不必彼此信任，只需遵守同一套事实与边界。
+万象术以 OpenCode 插件形式落地。它不替换 Host 的对话模型，而是在其上叠加一层结构化编排：Orchestrator 统筹全局，Manager 分解任务并管理子会话，Engineer 调查事实与修改源码（独占 Fission），DevOps 管控进程与执行并拥有固有局部自修授权。每个角色有自己的工具面与权限边界，Companion 在会话级提供认知上下文，Fallback 与 Review 各有明确写入口。智能体不必彼此信任，只需遵守同一套事实与边界。
 
 Wanxiangshu is proprietary commercial software.
 Use, copying, modification, and distribution are governed by LICENSE.
@@ -96,29 +96,23 @@ npm install ./wanxiangshu-0.9.0.tgz
 ```text
 Orchestrator
   └── Manager
-        ├── Coder
-        ├── Inspector
-        ├── DevOps
-        └── Browser / Inquiry
+        ├── Engineer
+        └── DevOps
 ```
 
-Distiller、Blogger 等由编排路径调用，不作为单独“安装角色”配置。
+Blogger、Bookkeeper、Predictor 等内部角色由编排路径调用，不作为单独“安装角色”配置。
 
 ### 智能体角色
 
-九个 public Role，与 `requirements/participant-identity`、`requirements/cognitive-environment` 一致。工具面由 `Roles.permissions` 定义（`requirements/capability-enforcement` 四层同构）：
+核心活跃角色与 `requirements/office-capability`、`requirements/capability-enforcement` 一致。工具面由 `Roles.permissions` 定义：
 
 | 角色 | 典型工具面 | 说明 |
 |------|------------|------|
-| Orchestrator | `fork`, `join`, `horizon` | 顶层编排 |
-| Manager | `fork`, `join`, `horizon`, `todowrite`, `review`, `suicide`, `fission` | 独立评估、任务分解与责任推进；单次可见任务为评估、按指派修复、退出，循环 Continue/Accepted 裁决由系统执行 |
-| Coder | `read`, `write`, `edit`, `glob`, `grep`, `inspect`, `fetch`, `fission` | 源码修改 |
-| Inspector | `read`, `glob`, `grep`, `query-shell`, `fetch`, `fission` | 只读调查 |
-| DevOps | `open-terminal`, `run`, `inspect`, `behavior` 等 | 进程与环境 |
-| Browser | `read`, `glob`, `grep`, `stealth-browser-mcp`, `fission` | 浏览类任务 |
-| Inquiry | `inspect`, `sphinx`, `fission` | 语义调查与分析 |
-| Distiller | 无工具 | 输出蒸馏/摘要 |
-| Blogger | `chronicle` | Companion 叶子，写认知上下文 |
+| Orchestrator | `commission`, `join`, `horizon` | 顶层战役战略统筹与独立道路委任 |
+| Manager | `fork`, `resume`, `join`, `horizon`, `todowrite`, `review`, `suicide` | 独立评估、任务分解与推进未尽账本；通过 fork 派发 Engineer，通过 resume 续做固定 DevOps（无 Fission） |
+| Engineer | `read`, `write`, `edit`, `glob`, `grep`, `mv`, `rm`, `fetch`, `fission` | 本地事实调查与源码读写实现（不执行真实命令，不差遣 DevOps）；独占 Fission 权能 |
+| DevOps | `read`, `write`, `edit`, `glob`, `grep`, `mv`, `rm`, `exec`, `pty`, `join`, `horizon` | 真实命令执行、终端与进程管理；具备角色固有的非架构级自修授权（无 Fission） |
+| Blogger | `chronicle` | Companion 叶子，记录工作历史与认知上下文 |
 
 Bookkeeper 是内部叶子角色（有独立 Role Law，不进 public Role DU）。每个 managed work session 配套叶子 Companion（Blogger）。精确权限见 `requirements/participant-identity` 与 `requirements/capability-enforcement`。
 

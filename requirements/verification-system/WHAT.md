@@ -14,7 +14,7 @@
 4. **Long Stroke**：恰好一个真实完整的端到端（E2E）物理验收环境。
 5. **Release**：一次确定性的全量构建、打包与交付物验证。
 
-证据层序由统一调度器保证：`scripts/verify.mjs` 导出 `verificationSteps` 作为唯一固定执行阶段列表（format:check → check → build → unit → integration，release 模式追加 e2e 与 package），`package.json` 仅声明调度入口，执行层序由真实固定调度器强力保证，不再要求同一编排代码书写顺序外部的写法锁定，层序颠倒或错置直接判为违约。日常开发入口 `format-build-test`（→ `node scripts/verify.mjs`）按序调度固定阶段；发布入口 `verify:release`（→ `node scripts/verify.mjs --release`）在此基础上额外调度 clean build（--clean）、Long Stroke 与真实 package 校验。两项入口对每个 step 均保持单次运行，每个 leaf step 必须恰有一个父级 owner，禁止顶层与子 orchestrator 重复执行；distribution package child 与一次 physical warmup 只由 integration orchestrator 调度。证明由实际测试行为与可执行断言独立成立。
+证据层序由统一调度器保证：`scripts/verify.mjs` 导出 `verificationSteps` 作为唯一固定执行阶段列表（format:check → check → build → unit → integration，release 模式追加 e2e 与 package），`package.json` 仅声明调度入口，执行层序由真实固定调度器强力保证，无需同一编排代码书写顺序外部的写法锁定，层序颠倒或错置直接判为违约。日常开发入口 `format-build-test`（→ `node scripts/verify.mjs`）按序调度固定阶段；发布入口 `verify:release`（→ `node scripts/verify.mjs --release`）在此基础上额外调度 clean build（--clean）、Long Stroke 与真实 package 校验。两项入口对每个 step 均保持单次运行，每个 leaf step 必须恰有一个父级 owner，禁止顶层与子 orchestrator 重复执行；distribution package child 与一次 physical warmup 只由 integration orchestrator 调度。证明由实际测试行为与可执行断言独立成立。
 
 全仓禁止自建 FCS（`FSharp.Compiler.Service`）扫描：不得直接或经 wrapper、反射、`.fsx` 提取 F# typed AST、symbol/application use、推断类型或源码依赖图。全量、局部、owner/locality、fixture、report-only、CLI、CI、pre-build 与缓存/snapshot/delta/外部 evidence 复用均无豁免，不得作为门禁、报告或验收入口。正常 Fable 编译内部使用 compiler service 不在禁令范围内，但禁止为扫描取证额外启动或插桩编译器。纯源码文本与 JavaScript 静态检查仍是合法第 0 层证据。F# 编译器边界由 structured-workflow-011 定义；不得用旧扫描结果或空 evidence 冒充当前证明。
 
@@ -44,7 +44,7 @@ process-isolated test runner 必须区分叶子测试与承载整份文件的 ch
 
 ### 禁止退化清单
 
-禁止退化清单作为架构演进与时序监督的不变导向保留，不再要求条目文本与测试用例表建立 1:1 机器解析与用例存在性绑定；其防退化语义由因果监督机制、看门狗断言与实际时序测试成立。
+禁止退化清单作为架构演进与时序监督的不变导向保留，条目文本无需与测试用例表建立 1:1 机器解析与用例存在性绑定；其防退化语义由因果监督机制、看门狗断言与实际时序测试成立。
 
 ```text
 把 wall-clock 总超时当作唯一挂死判据
@@ -89,7 +89,7 @@ Release gate 变成「最多 N 轮」或「重跑直到通过」
 
 ## [012] 行数不是门禁，不做机械行数检查
 
-门禁系统只针对明确的语义违规、架构越界与规范不变量进行拦截，严禁设立机械的文件行数硬门禁或 advisory 警告，亦不再为证明政策存在而设立机械扫描器门禁。行数是代码演进的伴生表象而非缺陷根因，机械的行数限制会导致代码被不合理地碎片化拆分为无意义的辅助文件。系统通过明确的架构命名约束与语义边界守卫代码质量，而不依赖行数指标。
+门禁系统只针对明确的语义违规、架构越界与规范不变量进行拦截，严禁设立机械的文件行数硬门禁或 advisory 警告，严禁仅为证明政策存在而设立机械扫描器门禁。行数是代码演进的伴生表象而非缺陷根因，机械的行数限制会导致代码被不合理地碎片化拆分为无意义的辅助文件。系统通过明确的架构命名约束与语义边界守卫代码质量，而不依赖行数指标。
 
 ## [013] JS 语义边界终态清零
 

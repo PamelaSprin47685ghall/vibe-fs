@@ -63,7 +63,7 @@
 
 关于 host-boundary-026 的架构约束：已拆出的摘要、消息、SDK 类型与工具适配器独立声明窄合同，解除仅允许两个旧合同名称的限制，同时严格保持物理能力隔离、唯一实现、失败与结算语义。既有 host-boundary-026/027 的终端、SDK、消息、工具闭包反例及 host-boundary-029 的 fatal 注入证明承接对应性质。
 
-**旧验证迁移已落地**：在 `a0a710fb2` 上，`host-session-contract-closure.test.mjs` 改用既有 `readCompileShardInventory` 与 `buildSubsystemInventory`，删除自建 XML/legacy locality/kind 解析、100/185 数量预算及 legacy owner 文件集合比较。全仓唯一生产来源、sibling 签名与 aggregate union 仍由原库存检查承接；Host 代表性源码归属显式覆盖消息、SDK 与工具新分片，摘要要求归属 runtime-platform。已有真实 provider、闭包排除和 composition 引用保护保留，并明确排除会话合同取得工具注册、物理订阅和事件总线。`SessionSnapshot.Model` 需要的 `OpencodeModel` 是数据合同，不误禁为物理 SDK 投影。
+**验证实现**：`host-session-contract-closure.test.mjs` 使用既有 `readCompileShardInventory` 与 `buildSubsystemInventory`。全仓唯一生产来源、sibling 签名与 aggregate union 由库存检查承接；Host 代表性源码归属显式覆盖消息、SDK 与工具新分片，摘要要求归属 runtime-platform。已有真实 provider、闭包排除和 composition 引用保护保留，并明确排除会话合同取得工具注册、物理订阅和事件总线。`SessionSnapshot.Model` 需要的 `OpencodeModel` 是数据合同，不误禁为物理 SDK 投影。
 
 临时真实 fsproj 对照证明：会话分片改为显式 subsystem/shard 且移除旧 kind 后通过；误引工具适配器、会话源码移出 Host、显式工具分片移出 Host 均退出 1，并命中对应闭包／归属断言。每次对照后恢复原字节，生产工程未变。这些静态证明不代替独立 Fable 编译或行为证明，也不关闭 GAP-033 的其余知识隔离缺口。
 

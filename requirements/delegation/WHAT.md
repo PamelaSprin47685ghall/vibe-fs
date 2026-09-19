@@ -26,7 +26,7 @@
 
 ## [007] SyncDelegate DAG 有环即错，收敛为 Sphinx 程序内部同步 Engineer 调研
 
-同步委托依赖关系必须构成严格有向无环图（DAG）。撤销活跃业务角色间的任意同步委托（如旧 Inquiry/Coder/DevOps 到 Inspector，DevOps 到 Coder 等）；保留并收敛为 Sphinx 程序工作流内部在需要语义事实时同步调用只读 Engineer 调研。被调用的只读 Engineer 仅调研现有本地事实，完成本次调研即返回程序调用点，不具备文件写入、真实执行、DevOps 差遣、Fission 或递归调用权限。
+同步委托依赖关系必须构成严格有向无环图（DAG）。同步委托仅允许 Sphinx 程序工作流内部在需要语义事实时调用只读 Engineer 调研。被调用的只读 Engineer 仅调研现有本地事实，完成本次调研即返回程序调用点，不具备文件写入、真实执行、DevOps 差遣、Fission 或递归调用权限。
 
 ## [008] sync batch 成员与顺序由 Host tool-call 集合决定
 
