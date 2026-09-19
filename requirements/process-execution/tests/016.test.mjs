@@ -6,7 +6,7 @@ const { default: test } = await import("node:test");
 
 const { getCount, release, runLargeEstimate } = await import('../../../dist/Process/LargeGateSurface.js')
 
-test('WHAT[PROC-016] large_estimate_acquires_and_releases_the_gate', async () => {
+test('WHAT[process-execution-016] large_estimate_acquires_and_releases_the_gate', async () => {
   while (getCount() === 0) release()
 
   let gateCountDuringRun = undefined
@@ -39,13 +39,13 @@ const drain = () => {
 }
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0))
 
-test('WHAT[PROC-016] large_gate_first_acquire_succeeds_immediately', async () => {
+test('WHAT[process-execution-016] large_gate_first_acquire_succeeds_immediately', async () => {
   assert.equal(getCount(), 1, 'gate must start unheld')
   await acquire(live())
   assert.equal(getCount(), 0, 'holder makes the gate busy')
   drain()
 })
-test('WHAT[PROC-016] large_gate_second_acquire_waits_until_release', async () => {
+test('WHAT[process-execution-016] large_gate_second_acquire_waits_until_release', async () => {
   await acquire(live())
   let secondResolved = false
   const second = acquire(live()).then(() => {
@@ -59,11 +59,11 @@ test('WHAT[PROC-016] large_gate_second_acquire_waits_until_release', async () =>
   assert.equal(secondResolved, true)
   drain()
 })
-test('WHAT[PROC-016] large_gate_release_without_holder_is_noop', async () => {
+test('WHAT[process-execution-016] large_gate_release_without_holder_is_noop', async () => {
   release()
   assert.equal(getCount(), 1)
 })
-test('WHAT[PROC-016] large_gate_waiters_are_served_fifo', async () => {
+test('WHAT[process-execution-016] large_gate_waiters_are_served_fifo', async () => {
   await acquire(live())
   let first = false
   let second = false
@@ -87,7 +87,7 @@ test('WHAT[PROC-016] large_gate_waiters_are_served_fifo', async () => {
   assert.equal(second, true)
   drain()
 })
-test('WHAT[PROC-016] large_gate_cancelled_waiter_is_skipped', async () => {
+test('WHAT[process-execution-016] large_gate_cancelled_waiter_is_skipped', async () => {
   await acquire(live())
   const token = live()
   const waiter = acquire(token)
@@ -98,17 +98,17 @@ test('WHAT[PROC-016] large_gate_cancelled_waiter_is_skipped', async () => {
   assert.equal(getCount(), 1, 'cancelled waiter must not consume the permit')
   drain()
 })
-test('WHAT[PROC-016] large_gate_precancelled_token_is_rejected_immediately', async () => {
+test('WHAT[process-execution-016] large_gate_precancelled_token_is_rejected_immediately', async () => {
   await assert.rejects(acquire(cancelled()))
   assert.equal(getCount(), 1, 'a refused acquire must not hold the gate')
 })
-test('WHAT[PROC-016] large_gate_cancellation_observed_by_gate', async () => {
+test('WHAT[process-execution-016] large_gate_cancellation_observed_by_gate', async () => {
   const token = live()
   assert.equal(isCancellationRequested(token), false)
   cancelToken(token)
   assert.equal(isCancellationRequested(token), true)
 })
-test('WHAT[PROC-016] large_gate_acquire_after_release_reenters_cleanly', async () => {
+test('WHAT[process-execution-016] large_gate_acquire_after_release_reenters_cleanly', async () => {
   await acquire(live())
   release()
   assert.equal(getCount(), 1)

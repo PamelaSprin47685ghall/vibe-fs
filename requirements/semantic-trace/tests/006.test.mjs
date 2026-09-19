@@ -31,7 +31,7 @@ const fixture = () => {
   return projection
 }
 
-test('WHAT[SEMANTIC-TRACE-006] Host message set resolves only to its exact contiguous range', () => {
+test('WHAT[semantic-trace-006] Host message set resolves only to its exact contiguous range', () => {
   const projection = fixture()
   assert.deepEqual(trace.tryContiguousHostRange(['message-a'], projection), {
     start: { sequence: 1 },
@@ -39,7 +39,7 @@ test('WHAT[SEMANTIC-TRACE-006] Host message set resolves only to its exact conti
   })
   assert.equal(trace.tryContiguousHostRange(['message-a', 'missing'], projection), undefined)
 })
-test('WHAT[SEMANTIC-TRACE-006] range and frontier queries preserve half-open boundaries', () => {
+test('WHAT[semantic-trace-006] range and frontier queries preserve half-open boundaries', () => {
   const projection = fixture()
   const range = trace.tryContiguousHostRange(['message-a'], projection)
   assert.deepEqual(trace.slice(range, projection).map((part) => part.cursor.sequence), [1, 2])
@@ -57,7 +57,7 @@ const { default: test } = await import("node:test");
 const trace = await import("../../../dist/Context/Trace/SemanticTraceSurface.js");
 
 
-test('WHAT[SEMANTIC-TRACE-006] range vocabulary is half-open', () => {
+test('WHAT[semantic-trace-006] range vocabulary is half-open', () => {
   const range = trace.createRange(trace.cursor(1), trace.cursor(3))
   assert.equal(trace.rangeContains(trace.cursor(0), range), false)
   assert.equal(trace.rangeContains(trace.cursor(1), range), true)

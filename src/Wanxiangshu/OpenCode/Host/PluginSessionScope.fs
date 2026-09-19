@@ -50,7 +50,7 @@ type PluginSessionScope() =
     member val SessionDirectories = SharedState.SessionDirectories
     // DSL-MUTABLE: resource — per-instance owned session set.
     member val OwnedSessions = HashSet<string>()
-    /// EMR-004: per-plugin-instance routing demands, including a root chat.message
+    /// execution-model-routing-004: per-plugin-instance routing demands, including a root chat.message
     /// that may block before PromptIngress has had a chance to register ownership.
     /// This is cleanup bookkeeping only, never business/session authority.
     // DSL-MUTABLE: resource — per-instance routing session set.

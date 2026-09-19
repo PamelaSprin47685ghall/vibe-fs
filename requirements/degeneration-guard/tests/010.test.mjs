@@ -59,7 +59,7 @@ const rawDeltaWithoutMessage = (session, field, text) => ({
   },
 })
 
-test('WHAT[DG-010] LOOP_007_unowned_session_never_interrupts', async () => {
+test('WHAT[degeneration-guard-010] LOOP_007_unowned_session_never_interrupts', async () => {
   const aborts = []
   const sensor = createSensor({
     owned: ['ses_owned'],

@@ -38,7 +38,7 @@ module ToolRegistry =
         | _ -> fun _ -> false
 `
 
-test('WHAT[ENF-012] registered_js_tools_reject_cross_role_execution', () => {
+test('WHAT[capability-enforcement-012] registered_js_tools_reject_cross_role_execution', () => {
   for (const caller of allRoleLabels) {
     for (const target of allRoleLabels) {
       if (caller === target) continue

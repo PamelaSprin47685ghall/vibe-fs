@@ -17,7 +17,7 @@ const runChild = (mode, workspace, marker) =>
 
 const readMarker = (path) => JSON.parse(readFileSync(path, 'utf8'))
 
-test('WHAT[CRASH-020] DevOps crash recovery maintains single logical authority, locks model, and avoids command auto-replay', () => {
+test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logical authority, locks model, and avoids command auto-replay', () => {
   const workspace = mkdtempSync(join(tmpdir(), 'wxs-devops-crash-'))
   const beforeMarker = join(workspace, 'before-crash.json')
   const afterMarker = join(workspace, 'after-reopen.json')

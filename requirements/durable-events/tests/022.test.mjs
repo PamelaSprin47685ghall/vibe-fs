@@ -69,7 +69,7 @@ const ALLOWED_CONTRACT_CLOSURE_SHARDS = new Set([
   'foundation-roles',
 ])
 
-test('WHAT[DURABLE-EVENTS-022] EventStore contracts exclude physical and Strength runtime closure', () => {
+test('WHAT[durable-events-022] EventStore contracts exclude physical and Strength runtime closure', () => {
   for (const shard of CONTRACT_SHARDS) {
     const { project, plan } = planShard(shard)
     assert.ok(
@@ -149,7 +149,7 @@ test('WHAT[DURABLE-EVENTS-022] EventStore contracts exclude physical and Strengt
   assert.ok(!assemblySources.includes('Strength/Runtime.fs'))
 })
 
-test('WHAT[DURABLE-EVENTS-022] EventStore focused localities stay within compile budgets', () => {
+test('WHAT[durable-events-022] EventStore focused localities stay within compile budgets', () => {
   for (const shard of CONTRACT_SHARDS) {
     const { plan } = planShard(shard)
     assert.ok(

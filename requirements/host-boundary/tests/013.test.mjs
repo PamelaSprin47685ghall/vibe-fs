@@ -5,7 +5,7 @@ import { textDelta } from '../../../dist/OpenCode/Host/LoopSensorSurface.js'
 
 
 
-test('WHAT[HOST-BOUNDARY-013] bootstrap interrupts owned physical children but exempts roots and foreign sessions', async () => {
+test('WHAT[host-boundary-013] bootstrap interrupts owned physical children but exempts roots and foreign sessions', async () => {
   let observe
   await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
     const root = 'ses-loop-root'

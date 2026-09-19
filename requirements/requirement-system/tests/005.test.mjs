@@ -14,7 +14,7 @@ import {
 
 const PREFIXES = ['ARCH', 'GOV', 'HOST']
 
-test('WHAT[REQUIREMENT-SYSTEM-005] formalClauseDefinitionHeadings surfaces clause definitions from routing files', () => {
+test('WHAT[requirement-system-005] formalClauseDefinitionHeadings surfaces clause definitions from routing files', () => {
   // README/AGENTS/CHANGELOG 不是规范正文（无裸规范权威）；识别器必须仍能发现
   // 路由文件里的产品条款定义，使 scripts/lib/spec-rules.mjs 的 duplicateClauseDefinitions「正式条款只能定义在
   // package WHAT.md」gate 可以拒绝它。
@@ -27,7 +27,7 @@ test('WHAT[REQUIREMENT-SYSTEM-005] formalClauseDefinitionHeadings surfaces claus
   )
 })
 
-test('WHAT[REQUIREMENT-SYSTEM-005] formalClauseDefinitionHeadings still recognizes a product clause defined in a Change file', () => {
+test('WHAT[requirement-system-005] formalClauseDefinitionHeadings still recognizes a product clause defined in a Change file', () => {
   // Change 文件不得承担正式定义职责；formalClauseDefinitionHeadings 必须仍能识别
   // Change 文件里的产品条款定义（ARCH-001），由 scripts/lib/spec-rules.mjs 的 duplicateClauseDefinitions
   //「正式定义只在 WHAT.md」gate 拒绝它。
@@ -40,7 +40,7 @@ test('WHAT[REQUIREMENT-SYSTEM-005] formalClauseDefinitionHeadings still recogniz
   )
 })
 
-test('WHAT[REQUIREMENT-SYSTEM-005] formalClauseDefinitionHeadings separates CHG-001 from product clauses', () => {
+test('WHAT[requirement-system-005] formalClauseDefinitionHeadings separates CHG-001 from product clauses', () => {
   assert.deepEqual(
     formalClauseDefinitionHeadings([
       '# CHG-001: lifecycle identity',

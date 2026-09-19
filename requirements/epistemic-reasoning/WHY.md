@@ -8,7 +8,7 @@ Sphinx 的识别目标必须诚实。若两个外部世界在所有允许协议�
 
 ## 程序化工作流与角色收敛
 
-Sphinx 探究流程完全由程序控制（Programmatic Workflow）：预算分配、工作项调度、认识状态推进、方法激活与终止收束完全归程序控制，外部调用者（如 Manager/Orchestrator）不再通过 Inquiry 角色或 yield/nextTool 逐轮手动驾驶。Inquiry 角色及其模型槽位彻底移除。
+Sphinx 探究流程完全由程序控制（Programmatic Workflow）：预算分配、工作项调度、认识状态推进、方法激活与终止收束完全归程序控制，外部调用者（如 Manager/Orchestrator）不通过逐轮手动驾驶循环介入。系统不设立 Inquiry 角色及其模型槽位。
 
 在程序推进过程中需要建立代码或语义事实时，Sphinx 同步调用内部只读 Engineer 工作实例。该实例仅限只读调查，受预算与取消约束，完成即返回程序调用点，不具备修改工作区、真实执行、差遣 DevOps、递归探究或 Fission 权能。
 

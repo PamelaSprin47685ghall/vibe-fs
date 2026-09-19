@@ -12,24 +12,24 @@ const companion = (main, session) => ({ kind: 'companion', main, companion: sess
 const blogger = (main, session) => ({ kind: 'blogger', main, blogger: session })
 const managerJob = (job, manager) => ({ kind: 'managerJob', job, manager })
 
-test('WHAT[CRASH-014] CRASH_CLOSURE_validate_accepts_unique_sessions_and_keeps_order', () => {
+test('WHAT[crash-reconciliation-014] CRASH_CLOSURE_validate_accepts_unique_sessions_and_keeps_order', () => {
   const result = recovery.validateClosure(root, [child('p', 'c', 'h1'), companion('m', 'c2'), work('w1')])
   assert.equal(result.ok, true)
   assert.deepEqual([...result.members].sort(), ['A:p>c:h1', 'C:m>c2', 'W:w1'])
 })
-test('WHAT[CRASH-014] CRASH_CLOSURE_duplicate_session_is_a_cycle_block', () => {
+test('WHAT[crash-reconciliation-014] CRASH_CLOSURE_duplicate_session_is_a_cycle_block', () => {
   const result = recovery.validateClosure(root, [work('w1'), work('w1')])
   assert.equal(result.ok, false)
   assert.equal(result.error, 'RecoveryCycle')
 })
-test('WHAT[CRASH-014] CRASH_CLOSURE_member_tokens_are_stable_identities', () => {
+test('WHAT[crash-reconciliation-014] CRASH_CLOSURE_member_tokens_are_stable_identities', () => {
   assert.equal(recovery.token(work('w')), 'W:w')
   assert.equal(recovery.token(child('p', 'c', 'h1')), 'A:p>c:h1')
   assert.equal(recovery.token(companion('m', 'c2')), 'C:m>c2')
   assert.equal(recovery.token(blogger('m', 'b3')), 'B:m>b3')
   assert.equal(recovery.token(managerJob('j1', 'm4')), 'M:j1:m4')
 })
-test('WHAT[CRASH-014] CRASH_CLOSURE_members_set_matches_tokens', () => {
+test('WHAT[crash-reconciliation-014] CRASH_CLOSURE_members_set_matches_tokens', () => {
   const result = recovery.validateClosure(root, [work('w1'), child('p', 'c', 'h1')])
   assert.deepEqual([...result.members].sort(), ['A:p>c:h1', 'W:w1'])
 })
@@ -41,7 +41,7 @@ const { default: test } = await import("node:test");
 const recovery = await import("../../../dist/Execution/Session/Recovery/Surface.js");
 
 
-test('WHAT[CRASH-014] MISC_recovery_validate_closure_pure', () => {
+test('WHAT[crash-reconciliation-014] MISC_recovery_validate_closure_pure', () => {
   const valid = recovery.validateClosure('a1', [
     { kind: 'work', session: 'a1' },
     { kind: 'child', parent: 'a1', child: 'a2', handle: 'h1' },

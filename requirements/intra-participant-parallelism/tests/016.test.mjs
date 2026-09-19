@@ -4,7 +4,7 @@ import { TaskResultListSurface_traverseM as traverseM } from '../../../dist/Foun
 
 
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-016] TASK_RESULT_LIST_traverseM_calls_mapper_once_per_input_in_order_stops_at_first_Error_and_skips_empty', async () => {
+test('WHAT[intra-participant-parallelism-016] TASK_RESULT_LIST_traverseM_calls_mapper_once_per_input_in_order_stops_at_first_Error_and_skips_empty', async () => {
   const completedCalls = []
   const completed = await traverseM(async (item) => {
     completedCalls.push(item)

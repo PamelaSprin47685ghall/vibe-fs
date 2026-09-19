@@ -18,7 +18,7 @@
 3. **独立道路与续做严格区分**：
    - `fork`：必填 calling（Manager 仅限 `engineer`）创建新独立道路；
    - `resume`：必填 name 续做既有道路（包括续做既有 Engineer 道路，或调用 Manager 道路唯一绑定的固定 DevOps），复用该 participant 的历史与已绑定环境；
-   - 保持 DELEG-024、026、027 的契约：resume 同步等待 exact assignment 接收确认（AcceptedAssignment）后返回承接后果，异步执行工作，结果由 join/horizon 独立消费；同一道路同时至多一个 active work unit，忙碌时明确拒绝新任务，严禁将新任务伪装成 BusyAgentNudge。
+   - 保持 delegation-024、delegation-026、delegation-027 的契约：resume 同步等待 exact assignment 接收确认（AcceptedAssignment）后返回承接后果，异步执行工作，结果由 join/horizon 独立消费；同一道路同时至多一个 active work unit，忙碌时明确拒绝新任务，严禁将新任务伪装成 BusyAgentNudge。
 4. **拓扑隔离**：机器身份与会话拓扑严禁穿透 horizon 污染业务协议面。
 5. **返回是证据而非权力转移**：委托返回的 WorkRecord 仅更新调用方的认知状态，绝不自动赋予调用方额外权能或解除其既定义务。
 6. **单向载荷与信封隔离**：父向子传递背景必须作为只读数据字段，子向父交付结果必须作为 entry-local 证据，严禁逆向污染。

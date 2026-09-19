@@ -7,7 +7,7 @@ const enforcer = await import("../../../dist/Enforcer/Surface.js");
 const blog = await import("../../../dist/Enforcer/BlogSurface.js");
 
 
-test('WHAT[BD-009] CHRONICLE_valid_entry_with_identity_returns_fixed_ok', () => {
+test('WHAT[behavior-diagnosis-009] CHRONICLE_valid_entry_with_identity_returns_fixed_ok', () => {
   const result = blog.execute({
     hasFlight: true,
     sessionId: 'ses-blog',
@@ -19,7 +19,7 @@ test('WHAT[BD-009] CHRONICLE_valid_entry_with_identity_returns_fixed_ok', () => 
   assert.equal(result.ok, true)
   assert.equal(result.text, 'remembered')
 })
-test('WHAT[BD-009] CHRONICLE_valid_entry_without_tool_identity_still_returns_ok', () => {
+test('WHAT[behavior-diagnosis-009] CHRONICLE_valid_entry_without_tool_identity_still_returns_ok', () => {
   const result = blog.execute({ hasFlight: true, sessionId: 'ses-blog', entry: 'entry', tip: 'primitive-obsession' })
   assert.equal(result.ok, true)
   assert.equal(result.text, 'remembered')
@@ -38,10 +38,10 @@ const call = (text, evidence) => ({
   ...(evidence === undefined ? {} : { evidence }),
 })
 
-test('WHAT[BD-009] ENFORCER_042_domain_has_no_multi_call_merge_surface', () => {
+test('WHAT[behavior-diagnosis-009] ENFORCER_042_domain_has_no_multi_call_merge_surface', () => {
   assert.equal(enforcer.mergeCalls, undefined)
 })
-test('WHAT[BD-009] ENFORCER_025_single_call_preserves_canonical_tip_text_and_evidence', () => {
+test('WHAT[behavior-diagnosis-009] ENFORCER_025_single_call_preserves_canonical_tip_text_and_evidence', () => {
   const field = tip()
   const rule = enforcer.tryFindByField(field)
   const cycle = enforcer.canonicalCycle({ text: 'observation', tipField: field, evidence: 'evidence' })
@@ -70,12 +70,12 @@ const valid = (messageId, overrides = {}) => ({
 const prose = (messageId) => ({ messageId, parts: [{ type: 'text', text: 'plain response' }] })
 const invalid = (messageId) => ({ messageId, parts: [{ tool: 'chronicle', state: { status: 'completed', input: { text: 'no tip' } } }] })
 
-test('WHAT[BD-009] ENFORCER_061_exactly_one_valid_call_stops_physical_run', () => {
+test('WHAT[behavior-diagnosis-009] ENFORCER_061_exactly_one_valid_call_stops_physical_run', () => {
   const out = blog.protocol(valid('asst-valid'))
   assert.equal(out.state, 'StopPhysicalRun')
   assert.equal(out.fatal, null)
 })
-test('WHAT[BD-009] ENFORCER_064_two_valid_calls_require_protocol_repair', () => {
+test('WHAT[behavior-diagnosis-009] ENFORCER_064_two_valid_calls_require_protocol_repair', () => {
   const out = blog.protocol({
     messageId: 'asst-two',
     parts: [valid('asst-two').parts[0], valid('asst-two').parts[0]],
@@ -105,7 +105,7 @@ const cycleRecord = (n, field) => ({
   observedPrefixEpoch: 0,
 })
 
-test('WHAT[BD-009] ENFORCER_TIP_15_assistant_step_classification_protocol', () => {
+test('WHAT[behavior-diagnosis-009] ENFORCER_TIP_15_assistant_step_classification_protocol', () => {
   const single = enforcer.classifyAssistantStep({
     messageId: 'msg-1',
     parts: [{ tool: 'chronicle', state: { status: 'completed', input: { tip: 'primitive-obsession', text: 'work' } } }],

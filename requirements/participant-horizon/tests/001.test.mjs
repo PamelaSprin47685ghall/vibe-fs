@@ -24,7 +24,7 @@ const MANAGER_VISIBLE_SURFACES = [
   'lifecycle/magic-todo/manager-guideline',
 ]
 
-test('WHAT[PARTICIPANT-HORIZON-001] PH_exec_005_horizon_description_declares_pull_only_and_hides_machinery', () => {
+test('WHAT[participant-horizon-001] PH_exec_005_horizon_description_declares_pull_only_and_hides_machinery', () => {
   for (const locale of LOCALES) {
     const text = read(`resources/provider/tool/horizon/description/${locale}.md`)
     assert.match(text, /pull-only|只在调用时主动读取一次|不?轮询|do not poll/i)
@@ -57,7 +57,7 @@ module JoinResultRenderer =
         SessionId.value sid
 `
 
-test('WHAT[PARTICIPANT-HORIZON-001] gate_b_clean_horizon_fixture_is_green', () => {
+test('WHAT[participant-horizon-001] gate_b_clean_horizon_fixture_is_green', () => {
   assert.equal(scanText('HorizonTool.fs', CLEAN_HORIZON).length, 0)
 })
 }

@@ -23,7 +23,7 @@ const withJournal = async (fn) => {
 }
 const projection = (messages) => ({ messages })
 
-test('WHAT[SEMANTIC-TRACE-010] opening capture reports idempotent evidence', async () => {
+test('WHAT[semantic-trace-010] opening capture reports idempotent evidence', async () => {
   await withJournal(async (handle) => {
     const first = await trace.captureOpening(handle, SESSION, 'Review the tree.', ['Ship it.', 'Add tests.'])
     const second = await trace.captureOpening(handle, SESSION, 'Review the tree.', ['Ship it.', 'Add tests.'])
@@ -56,7 +56,7 @@ const part = (sequence, overrides = {}) => ({
   ...overrides,
 })
 
-test('WHAT[SEMANTIC-TRACE-010] conflicting opening is rejected', () => {
+test('WHAT[semantic-trace-010] conflicting opening is rejected', () => {
   const projection = unwrap(trace.appendOpening(trace.emptyProjection(), 'first task', []))
   const rejected = trace.appendOpening(projection, 'second task', [])
   assert.equal(rejected.ok, false)

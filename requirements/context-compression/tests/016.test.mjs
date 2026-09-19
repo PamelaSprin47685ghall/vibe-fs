@@ -44,7 +44,7 @@ function threeEntries() {
   return state
 }
 
-test('WHAT[CONTEXT-COMPRESSION-016] CTX_011_sequence_advances_within_one_turn', () => {
+test('WHAT[context-compression-016] CTX_011_sequence_advances_within_one_turn', () => {
   // A large message spans several 200 KiB chunks, so a chunk boundary can fall
   // inside a turn. Those chunks advance the record sequence and must be accepted
   // while the turn cutoff stays put.
@@ -116,13 +116,13 @@ const drainAll = (limit, messages, guard = 50) => {
   assert.fail(`chunking did not terminate within ${guard} chunks — a cursor is not advancing`)
 }
 
-test('WHAT[CONTEXT-COMPRESSION-016] CTX_011_a_fully_consumed_transcript_yields_no_chunk', () => {
+test('WHAT[context-compression-016] CTX_011_a_fully_consumed_transcript_yields_no_chunk', () => {
   const messages = delta.messages([{ role: 'user', parts: [delta.text('one')] }])
 
   assert.equal(delta.nextChunk({ limit: 1024, cursor: delta.cursor(1, 0), messages }), undefined)
   assert.equal(delta.nextChunk({ limit: 1024, cursor: origin, messages: delta.messages([]) }), undefined)
 })
-test('WHAT[CONTEXT-COMPRESSION-016] CTX_011_the_cursor_resumes_exactly_where_the_previous_chunk_stopped', () => {
+test('WHAT[context-compression-016] CTX_011_the_cursor_resumes_exactly_where_the_previous_chunk_stopped', () => {
   // Each turn here renders to roughly 1 KiB, so a small limit forces several
   // chunks. What matters is that draining loses nothing and repeats nothing.
   const body = 'x'.repeat(900)
@@ -152,7 +152,7 @@ test('WHAT[CONTEXT-COMPRESSION-016] CTX_011_the_cursor_resumes_exactly_where_the
     assert.equal(occurrences, 1, `turn ${n} must appear in exactly one chunk`)
   }
 })
-test('WHAT[CONTEXT-COMPRESSION-016] CTX_011_a_multi_part_turn_splits_at_part_boundaries_and_holds_the_cutoff', () => {
+test('WHAT[context-compression-016] CTX_011_a_multi_part_turn_splits_at_part_boundaries_and_holds_the_cutoff', () => {
   const body = 'y'.repeat(900)
   const messages = delta.messages([
     {
@@ -180,7 +180,7 @@ test('WHAT[CONTEXT-COMPRESSION-016] CTX_011_a_multi_part_turn_splits_at_part_bou
   assert.deepEqual(chunks[2].nextCursor, { turn: 2, part: 0 })
   assert.equal(chunks[2].nextCutoff, 2)
 })
-test('WHAT[CONTEXT-COMPRESSION-016] CTX_011_a_chunk_ending_on_a_non_final_part_never_advances_the_cutoff', () => {
+test('WHAT[context-compression-016] CTX_011_a_chunk_ending_on_a_non_final_part_never_advances_the_cutoff', () => {
   // The rule in isolation, with no following turn to pack in: three oversized parts
   // in one turn, so every chunk but the last stops mid-turn.
   const body = 'w'.repeat(1000)
@@ -204,7 +204,7 @@ test('WHAT[CONTEXT-COMPRESSION-016] CTX_011_a_chunk_ending_on_a_non_final_part_n
     ],
   )
 })
-test('WHAT[CONTEXT-COMPRESSION-016] CTX_011_the_cutoff_never_decreases_across_chunks', () => {
+test('WHAT[context-compression-016] CTX_011_the_cutoff_never_decreases_across_chunks', () => {
   const body = 'z'.repeat(700)
   const messages = delta.messages([
     { role: 'user', parts: [delta.text('short')] },
@@ -239,7 +239,7 @@ const committedAt = (cutoff, { digest = `prefix-${cutoff}`, frozen = `frozen-${c
     syntheticId: `synthetic-${seal}`,
   })
 
-test('WHAT[CONTEXT-COMPRESSION-016] CTX_011_coverage_inside_the_live_tail_means_no_candidate', () => {
+test('WHAT[context-compression-016] CTX_011_coverage_inside_the_live_tail_means_no_candidate', () => {
   // `requestStartCutoff = 0` is the first request of a session: there are no turns
   // before the message being answered, so any candidate would have to swallow it.
   const result = selection.select({
@@ -254,7 +254,7 @@ test('WHAT[CONTEXT-COMPRESSION-016] CTX_011_coverage_inside_the_live_tail_means_
   assert.equal(result.ok, false)
   assert.equal(result.error, 'CoverageNotAheadOfRequest')
 })
-test('WHAT[CONTEXT-COMPRESSION-016] CTX_011_the_candidate_never_swallows_the_message_being_answered', () => {
+test('WHAT[context-compression-016] CTX_011_the_candidate_never_swallows_the_message_being_answered', () => {
   // Companion is ahead of the request boundary — it consumed turns this request has
   // not sent yet. The candidate must clamp to the request's own start, or the probe
   // would replace the user message the model is supposed to answer.
@@ -270,7 +270,7 @@ test('WHAT[CONTEXT-COMPRESSION-016] CTX_011_the_candidate_never_swallows_the_mes
   assert.equal(result.ok, true, result.ok ? '' : result.message)
   assert.equal(result.cutoff, 4, 'clamped to the request start, not the Companion coverage')
 })
-test('WHAT[CONTEXT-COMPRESSION-016] COMPANION_011_the_proof_hashes_exactly_the_clamped_cutoff', () => {
+test('WHAT[context-compression-016] COMPANION_011_the_proof_hashes_exactly_the_clamped_cutoff', () => {
   // Step 1 clamps before step 5 hashes. Hashing the Companion's unclamped cutoff would
   // prove a prefix the candidate does not actually use — the check would pass while
   // describing a different range.
@@ -292,7 +292,7 @@ test('WHAT[CONTEXT-COMPRESSION-016] COMPANION_011_the_proof_hashes_exactly_the_c
   assert.equal(result.ok, true, result.ok ? '' : result.message)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-016] journal_to_blob_materialization_and_probe_pipeline', async () => {
+test('WHAT[context-compression-016] journal_to_blob_materialization_and_probe_pipeline', async () => {
   const xwire = await import('../../../dist/Context/Prefix/XWireSurface.js')
   const { createHash } = await import('node:crypto')
   const sha256Hex = (text) => createHash('sha256').update(text, 'utf8').digest('hex')
@@ -363,7 +363,7 @@ test('WHAT[CONTEXT-COMPRESSION-016] journal_to_blob_materialization_and_probe_pi
   assert.equal(res.probe.candidate.cutoff, 2, 'PrefixProbe must carry correct cutoff')
 })
 
-test('WHAT[CONTEXT-COMPRESSION-016] journal_materialization_fails_closed_on_corrupted_blob_ref', async () => {
+test('WHAT[context-compression-016] journal_materialization_fails_closed_on_corrupted_blob_ref', async () => {
   const xwire = await import('../../../dist/Context/Prefix/XWireSurface.js')
 
   const writtenBlobs = new Map()

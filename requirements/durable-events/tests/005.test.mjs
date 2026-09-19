@@ -23,7 +23,7 @@ const withTemp = (fn) => {
   return fn(base)
 }
 
-test('WHAT[DURABLE-EVENTS-005] one_writer_is_one_file_regardless_of_history_size', async () => {
+test('WHAT[durable-events-005] one_writer_is_one_file_regardless_of_history_size', async () => {
   const dir = withTemp((base) => base)
   const store = eventStore.create(dir, 'one-file-law')
   try {
@@ -62,7 +62,7 @@ const event = (id, n, parents = []) => ({
 const commonDir = async () => path.join(await mkdtemp(path.join(tmpdir(), 'wanxiang-local-log-')), '.git')
 const remove = async (dir) => rm(dir, { recursive: true, force: true })
 
-test('WHAT[DURABLE-EVENTS-005] DURABLE_EVENTS_005_one_process_is_one_unbounded_writer_file_with_no_segments', async () => {
+test('WHAT[durable-events-005] DURABLE_EVENTS_005_one_process_is_one_unbounded_writer_file_with_no_segments', async () => {
   const gitCommonDir = await commonDir()
   const store = eventStore.create(gitCommonDir, 'writer-proof-a')
   try {
@@ -86,7 +86,7 @@ test('WHAT[DURABLE-EVENTS-005] DURABLE_EVENTS_005_one_process_is_one_unbounded_w
     await remove(path.dirname(gitCommonDir))
   }
 })
-test('WHAT[DURABLE-EVENTS-005] DURABLE_EVENTS_005_each_process_writer_id_names_a_distinct_file_without_machine_identity', async () => {
+test('WHAT[durable-events-005] DURABLE_EVENTS_005_each_process_writer_id_names_a_distinct_file_without_machine_identity', async () => {
   const gitCommonDir = await commonDir()
   const a = eventStore.create(gitCommonDir, 'writer-a')
   const b = eventStore.create(gitCommonDir, 'writer-b')

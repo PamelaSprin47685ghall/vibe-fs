@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../..')
 
-test('WHAT[DISTRIBUTION-004] PACKAGE_contents_tarball_excludes_source_tests_docs_scripts', () => {
+test('WHAT[distribution-004] PACKAGE_contents_tarball_excludes_source_tests_docs_scripts', () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'))
   const files = pkg.files.map((f) => String(f).replace(/\\/g, '/'))
   const banned = ['src', 'src/', 'tests', 'tests/', 'scripts', 'scripts/', 'spec', 'spec/', 'docs', 'docs/', 'requirements', 'requirements/']

@@ -24,7 +24,7 @@ const probeFor = ({ cutoff = 5, id = 'probe-1' } = {}) => ({
   candidate: snapshotAt(cutoff),
 })
 
-test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_a_probe_denied_policy_never_asks_for_a_probe', () => {
+test('WHAT[context-compression-008] CTX_010_a_probe_denied_policy_never_asks_for_a_probe', () => {
   // `selectProbe` throws if called. A denied policy must not pay for a
   // digest recomputation or a blob read to discover it has nothing to do.
   const plan = planner.attemptPlan({ kind: requestKind.workMain, mayRecover: false })
@@ -33,7 +33,7 @@ test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_a_probe_denied_policy_never_asks_for
   assert.equal(plan.probeId, null)
   assert.equal(plan.noProbeReason, null, 'not asking is not a refusal')
 })
-test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_a_companion_request_never_asks_for_a_probe_even_when_allowed', () => {
+test('WHAT[context-compression-008] CTX_010_a_companion_request_never_asks_for_a_probe_even_when_allowed', () => {
   // Enforced in the planner, not left to the caller. A Companion request has no prefix
   // to probe — its history is the frame sequence — and a repair reuses whatever the
   // attempt it repairs already sent.
@@ -49,7 +49,7 @@ test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_a_companion_request_never_asks_for_a
     assert.equal(plan.probeId, null)
   }
 })
-test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_an_allowed_work_main_carries_the_probe_it_selected', () => {
+test('WHAT[context-compression-008] CTX_010_an_allowed_work_main_carries_the_probe_it_selected', () => {
   const plan = planner.attemptPlan({
     kind: requestKind.workMain,
     mayRecover: true,
@@ -60,7 +60,7 @@ test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_an_allowed_work_main_carries_the_pro
   assert.equal(plan.probeId, 'probe-abc')
   assert.equal(plan.noProbeReason, null)
 })
-test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_invalid_role_and_kind_fail_closed', () => {
+test('WHAT[context-compression-008] CTX_010_invalid_role_and_kind_fail_closed', () => {
   // CompressionSurface.attemptPlanCore validates only role+kind; tier was dropped
   // from the surface (participantIdentityToJs pins selectedTier:"deep"), so a
   // stray tier field is ignored rather than rejected.
@@ -84,7 +84,7 @@ const failureOwner = await import("../../../dist/Participant/Provider/Attempt/Fa
 const requestKind = prefix.requestKind
 const budget = failureOwner.budget
 
-test('WHAT[CONTEXT-COMPRESSION-008] only work_main requests may carry prefix probe', () => {
+test('WHAT[context-compression-008] only work_main requests may carry prefix probe', () => {
   assert.equal(requestKind.mayCarryProbe(requestKind.workMain), true)
   assert.equal(requestKind.mayCarryProbe(requestKind.bloggerMain), false)
   assert.equal(requestKind.mayCarryProbe(requestKind.bloggerSquash), false)

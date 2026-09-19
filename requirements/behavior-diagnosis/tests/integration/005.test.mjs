@@ -9,7 +9,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
 
 const enforcerRoot = path.join(repoRoot, 'resources', 'enforcer')
 
-test('WHAT[BD-005] ENFORCER_PROMPT_017_rulebook_loads_authored_zh_cn_without_fallback', () => {
+test('WHAT[behavior-diagnosis-005] ENFORCER_PROMPT_017_rulebook_loads_authored_zh_cn_without_fallback', () => {
   const en = enforcer.rules()
   const zh = enforcer.loadFor('zh-CN')
   assert.equal(en.length, 120)

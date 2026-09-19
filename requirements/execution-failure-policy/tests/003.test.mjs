@@ -68,7 +68,7 @@ const isRecoveryResolution = (resolution) =>
 const isTerminalResolution = (resolution) =>
   resolution === 'TerminalizeAcceptedPreProvider' || resolution === 'TerminalizeProviderStarted'
 
-test('WHAT[EXECFAIL-003] finite provider budget matrix fixes policy and recovery outcomes', async () => {
+test('WHAT[execution-failure-policy-003] finite provider budget matrix fixes policy and recovery outcomes', async () => {
   // Dense model property: temporal invariants over arbitrary failure, phase, budget, breaker, capacity
   fc.assert(
     fc.property(arbitraryExecutionFailureInput, (input) => {
@@ -335,7 +335,7 @@ const providerCases = [
   },
 ]
 
-test('WHAT[EXECFAIL-003] rejects illegal retry and breaker policy mutations', () => {
+test('WHAT[execution-failure-policy-003] rejects illegal retry and breaker policy mutations', () => {
   for (const failure of nonProviderFailures) {
     const decision = decide({ failure })
     assert.notEqual(decision.resolution, 'RetryFreshAttempt')

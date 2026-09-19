@@ -53,7 +53,7 @@ const legacySucceeded = JSON.stringify({
   }]]],
 })
 
-test('WHAT[PAR-002] legacy_fallback_bytes_decode_one_way_and_never_re_encode_offsets', () => {
+test('WHAT[provider-attempt-recovery-002] legacy_fallback_bytes_decode_one_way_and_never_re_encode_offsets', () => {
   const advance = codec.deserialize(legacyAdvance)
   assert.equal(advance.ok, true, advance.ok ? '' : advance.error)
   assert.match(advance.value.line, /FailureRecorded/)
@@ -132,7 +132,7 @@ const foldFacts = (facts) =>
   foldFactsThroughOwner(facts.map((value, index) => ownerEnvelope({ seq: index + 1, session: SESSION, fact: value })))
 const budgetOf = (projection) => providerFailureProjection.read(projection)
 
-test('WHAT[PAR-002] a_fresh_budget_starts_at_zero_with_no_budget_spent', () => {
+test('WHAT[provider-attempt-recovery-002] a_fresh_budget_starts_at_zero_with_no_budget_spent', () => {
   assert.deepEqual(budget.read(budget.initial), { failures: 0 })
 
   assert.deepEqual(
@@ -146,7 +146,7 @@ test('WHAT[PAR-002] a_fresh_budget_starts_at_zero_with_no_budget_spent', () => {
     },
   )
 })
-test('WHAT[PAR-002] fixed_participant_holds_across_failures', () => {
+test('WHAT[provider-attempt-recovery-002] fixed_participant_holds_across_failures', () => {
   // The budget carries no participant at all: identity is fixed elsewhere and
   // the retry-policy suite proves it immutable. The budget answers only the
   // count, so there is nothing here that could switch a participant.

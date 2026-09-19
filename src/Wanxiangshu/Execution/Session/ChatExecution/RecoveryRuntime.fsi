@@ -15,7 +15,7 @@ type ChatExecutionRecoveryLifecycleEvent =
     | SessionCancelled of ChatExecutionKey
     | CapacityProjectionReplayed
 
-    /// PAR-023：宿主发布 session idle 后，本 session 的 `Accepted` 且无
+    /// provider-attempt-recovery-023：宿主发布 session idle 后，本 session 的 `Accepted` 且无
     /// `ProviderStarted` 的执行是确切义务集：宿主已停止执行它们，恢复必须
     /// 逐一定夺（resume 或终态），不得留成悬空态。
     | SessionQuiesced of SessionId

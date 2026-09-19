@@ -29,7 +29,7 @@ export const forestCases = [
   // ── the one unimplemented obligation ──────────────────────────────────────
 
   {
-    name: 'VERIFY-003 the same request sequence produces the same content sequence, forest-wide',
+    name: 'verification-system-003 the same request sequence produces the same content sequence, forest-wide',
     fn: () => {
       // 纯函数性 is the only one of K10's four items with no existing gate, and the only one
       // that cannot be stated per fixture: a single scenario can look deterministic while the
@@ -56,7 +56,7 @@ export const forestCases = [
       // `forest.length === 15`, and package W2's single-source gate rejected it on the spot:
       //
       //   gate-forest-cases.mjs:103 FOREST_SIZE = 15 restates the size of a collection;
-      //   derive it from the collection (VERIFY-004 禁止退化清单 11)
+      //   derive it from the collection (verification-system-004 禁止退化清单 11)
       //
       // The gate was right, and about my own code. `loadForest` walks the directory precisely
       // so a scenario added later joins this property automatically; a pinned count would
@@ -99,7 +99,7 @@ export const forestCases = [
   },
 
   {
-    name: 'VERIFY-003 every declared step of every scenario is reached by its derived sequence',
+    name: 'verification-system-003 every declared step of every scenario is reached by its derived sequence',
     fn: () => {
       // The other half of the determinism claim, and why the case above cannot stand alone:
       // two runs that both reach nothing agree perfectly. `unanswered()` is the runtime's own
@@ -124,7 +124,7 @@ export const forestCases = [
   },
 
   {
-    name: 'VERIFY-003 a second session on the same lane does not change what content is selected',
+    name: 'verification-system-003 a second session on the same lane does not change what content is selected',
     fn: () => {
       // Not in K10's charter; added because `lanesOf` binds an alias to a SET of sessions
       // (measured in K9: `reviewer` legitimately holds two forks), which makes "does the

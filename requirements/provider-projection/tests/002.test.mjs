@@ -22,7 +22,7 @@ const before = (index) => ({ kind: 'BeforeMessageIndex', index })
 
 const append = { kind: 'Append' }
 
-test('WHAT[PROVIDER-PROJECTION-002] snapshot contains only the current semantic projection', () => {
+test('WHAT[provider-projection-002] snapshot contains only the current semantic projection', () => {
   const currentProjection = Projection.semanticProjection([message('user', 'current')])
   const value = Projection.projectionSnapshot(currentProjection)
 

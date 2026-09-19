@@ -7,16 +7,16 @@ const join = await import("../../../dist/Execution/Delegation/Fork/OpenCode/Join
 const handles = await import("../../../dist/Execution/Delegation/Handle/Surface.js");
 
 
-test('WHAT[DELEG-015] JOIN_COMPLETION_failed_is_rendered_as_agent_failed', () => {
+test('WHAT[delegation-015] JOIN_COMPLETION_failed_is_rendered_as_agent_failed', () => {
   const wire = join.renderBatch('english', [{ kind: 'failed', agentId: 'a1', agentName: 'Ada', role: 'Coder', runId: 'run-a1', code: 'E', message: 'no' }])
   assert.match(wire, /could not complete/)
   assert.doesNotMatch(wire, /has returned/)
 })
-test('WHAT[DELEG-015] JOIN_COMPLETION_terminal_projection_is_joinable_until_retired', () => {
+test('WHAT[delegation-015] JOIN_COMPLETION_terminal_projection_is_joinable_until_retired', () => {
   assert.equal(handles.crashScenario('completed').joinable, 1)
   assert.equal(handles.crashScenario('retired').joinable, 0)
 })
-test('WHAT[DELEG-015] JOIN_COMPLETION_interrupted_is_not_fork_error', () => {
+test('WHAT[delegation-015] JOIN_COMPLETION_interrupted_is_not_fork_error', () => {
   const wireUser = join.renderInterrupted('english', 'UserMessageArrived')
   assert.match(wireUser, /Something nearer has arrived/)
   assert.doesNotMatch(wireUser, /error|failed/i)
@@ -37,7 +37,7 @@ const join = await import("../../../dist/Execution/Delegation/Fork/OpenCode/Join
 const handles = await import("../../../dist/Execution/Delegation/Handle/Surface.js");
 
 
-test('WHAT[DELEG-015] JOIN_V2_abandoned_order_is_stable_after_completed_items', () => {
+test('WHAT[delegation-015] JOIN_V2_abandoned_order_is_stable_after_completed_items', () => {
   const wire = join.renderBatch('english', [
     { kind: 'completed', agentId: 'a1', agentName: 'first', role: 'Coder', runId: 'run-a1', workRecord: 'one' },
     { kind: 'abandoned', agentId: 'a2', agentName: 'second', reason: 'gone' },
@@ -45,10 +45,10 @@ test('WHAT[DELEG-015] JOIN_V2_abandoned_order_is_stable_after_completed_items', 
   assert.ok(wire.indexOf('first') < wire.indexOf('second'))
   assert.doesNotMatch(wire, /second has returned/)
 })
-test('WHAT[DELEG-015] JOIN_V2_duplicate_completed_is_absorbed_by_handle_projection', () => {
+test('WHAT[delegation-015] JOIN_V2_duplicate_completed_is_absorbed_by_handle_projection', () => {
   assert.deepEqual(handles.crashScenario('replayed-completed'), handles.crashScenario('completed'))
 })
-test('WHAT[DELEG-015] JOIN_V2_abandoned_is_not_joinable', () => {
+test('WHAT[delegation-015] JOIN_V2_abandoned_is_not_joinable', () => {
   const wire = join.renderBatch('english', [{ kind: 'abandoned', agentId: 'a1', agentName: 'Ada', reason: 'gone' }])
   assert.doesNotMatch(wire, /has returned/)
 })
@@ -63,7 +63,7 @@ const join = await import("../../../dist/Execution/Delegation/Fork/OpenCode/Join
 const LEGACY_DTO = /\b(status|count|ordinal|kind|agent|code|message)\s*=|\[\[result\]\]|\[error\]|work_record\s*=/
 const completed = (id, name, record = '') => ({ kind: 'completed', agentId: id, agentName: name, role: 'Coder', runId: `run-${id}`, workRecord: record })
 
-test('WHAT[DELEG-015] JOIN_V2_interrupted_reason_is_natural_language', () => {
+test('WHAT[delegation-015] JOIN_V2_interrupted_reason_is_natural_language', () => {
   const wire = join.renderInterrupted('english', 'UserMessageArrived')
   assert.match(wire, /Something nearer has arrived/)
   assert.ok(!LEGACY_DTO.test(wire))
@@ -90,7 +90,7 @@ const quiescentMailbox = (probe) => {
   return counts
 }
 
-test('WHAT[DELEG-015] JOIN_WAKE_spurious_wake_burst_still_delivers_exact_completion', async () => {
+test('WHAT[delegation-015] JOIN_WAKE_spurious_wake_burst_still_delivers_exact_completion', async () => {
   const probe = join.createJoinProbe()
   const ptyId = await forkOne(probe)
   const interrupt = join.createJoinInterrupt()
@@ -115,7 +115,7 @@ test('WHAT[DELEG-015] JOIN_WAKE_spurious_wake_burst_still_delivers_exact_complet
   assert.equal(after.kind, 'Error')
   assert.equal(after.error, 'NothingToJoin')
 })
-test('WHAT[DELEG-015] JOIN_WAKE_batch_is_capped_at_maxjoinbatch_with_exact_remainder', async () => {
+test('WHAT[delegation-015] JOIN_WAKE_batch_is_capped_at_maxjoinbatch_with_exact_remainder', async () => {
   const cap = join.joinMaxBatch()
   assert.ok(Number.isInteger(cap) && cap > 0, 'cap must come from the compiled JoinBatch')
   const probe = join.createJoinProbe()
@@ -148,7 +148,7 @@ test('WHAT[DELEG-015] JOIN_WAKE_batch_is_capped_at_maxjoinbatch_with_exact_remai
   )
   quiescentMailbox(probe)
 })
-test('WHAT[DELEG-015] JOIN_WAKE_interrupt_stays_distinct_from_failure_and_releases_lock', async () => {
+test('WHAT[delegation-015] JOIN_WAKE_interrupt_stays_distinct_from_failure_and_releases_lock', async () => {
   const probe = join.createJoinProbe()
   const ptyId = await forkOne(probe)
   const interrupt = join.createJoinInterrupt()
@@ -177,7 +177,7 @@ test('WHAT[DELEG-015] JOIN_WAKE_interrupt_stays_distinct_from_failure_and_releas
   assert.equal(drained.count, 1)
   quiescentMailbox(probe)
 })
-test('WHAT[DELEG-015] JOIN_WAKE_cancel_and_error_paths_release_lock_for_next_join', async () => {
+test('WHAT[delegation-015] JOIN_WAKE_cancel_and_error_paths_release_lock_for_next_join', async () => {
   const emptyProbe = join.createJoinProbe()
   const empty = await join.joinAvailable(emptyProbe, 0, join.createJoinInterrupt())
   assert.equal(empty.kind, 'Error')
@@ -225,7 +225,7 @@ test('WHAT[DELEG-015] JOIN_WAKE_cancel_and_error_paths_release_lock_for_next_joi
   assert.equal(released.kind, 'Error')
   assert.equal(released.error, 'NothingToJoin')
 })
-test('WHAT[DELEG-015] JOIN_WAKE_permit_gate_fails_closed_and_keeps_runtime_usable', async () => {
+test('WHAT[delegation-015] JOIN_WAKE_permit_gate_fails_closed_and_keeps_runtime_usable', async () => {
   const probe = join.createJoinProbe()
   const refused = await join.joinAvailableWithPermit(probe, 0, 4, join.createJoinInterrupt())
   assert.equal(refused.kind, 'Error')

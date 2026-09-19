@@ -7,7 +7,7 @@ import { checks } from '../../../scripts/check.mjs'
 
 const ROOT = join(fileURLToPath(new URL('../../..', import.meta.url)))
 
-test('WHAT[VERIFICATION-SYSTEM-012] VS_012_no_mechanical_line_count_gate_or_advisory', () => {
+test('WHAT[verification-system-012] VS_012_no_mechanical_line_count_gate_or_advisory', () => {
   // 1. 扫描 scripts/check.mjs 注册的全部门禁脚本
   assert.ok(checks.length >= 10, 'Gate list in check.mjs must contain active gates')
 

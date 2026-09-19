@@ -65,7 +65,7 @@ const profileOf = () => {
   return built.value
 }
 
-test('WHAT[DISPATCH-PROTOCOL-003] DP_003_receipt_shape_distinguishes_admission_from_physical_identity', () => {
+test('WHAT[dispatch-protocol-003] DP_003_receipt_shape_distinguishes_admission_from_physical_identity', () => {
   const admission = 'accepted-1a2b'
   const physical = 'msg_real'
   assert.equal(admission, 'accepted-1a2b')

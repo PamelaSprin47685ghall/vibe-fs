@@ -85,7 +85,7 @@ const seedTwoInvocations = async (handle) => {
   return { s1, s2, inv1Through, inv2Through }
 }
 
-test('WHAT[WORK-RECORD-011] bounded terminal-only completion still yields Recent work after Chronicle covered every durable part', async () => {
+test('WHAT[work-record-011] bounded terminal-only completion still yields Recent work after Chronicle covered every durable part', async () => {
   await withJournal(async (handle) => {
     await workRecord.captureOpening(handle, SEM, 'terminal race charge', [])
     const captured = await workRecord.captureProjection(handle, SEM, {
@@ -140,7 +140,7 @@ const materialize = (
 }
 const OPENING_END = { Sequence: 1 }
 
-test('WHAT[WORK-RECORD-011] LWR_last_assistant_text_is_in_recent_work_not_a_closing_report', () => {
+test('WHAT[work-record-011] LWR_last_assistant_text_is_in_recent_work_not_a_closing_report', () => {
   const trace = [
     xTrace.item({ sequence: 0, role: 'user', part: xTrace.text('task') }),
     xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.text('Final summary with detail') }),
@@ -153,7 +153,7 @@ test('WHAT[WORK-RECORD-011] LWR_last_assistant_text_is_in_recent_work_not_a_clos
   assert.equal(rendered.includes('Final output'), false)
   assert.equal(rendered.includes('final_text'), false)
 })
-test('WHAT[WORK-RECORD-011] LWR_empty_sections_are_omitted', () => {
+test('WHAT[work-record-011] LWR_empty_sections_are_omitted', () => {
   const trace = [xTrace.item({ sequence: 0, role: 'user', part: xTrace.text('task') })]
 
   const rendered = materialize(opening('task'), [], trace, { Sequence: 1 }, OPENING_END)
@@ -197,7 +197,7 @@ const trace = [
   xTrace.item({ sequence: 3, role: 'assistant', part: xTrace.text('Implemented and verified the fix.') }),
 ]
 
-test('WHAT[WORK-RECORD-011] LWR_statement_is_the_last_assistant_text_in_recent_work', () => {
+test('WHAT[work-record-011] LWR_statement_is_the_last_assistant_text_in_recent_work', () => {
   const rendered = materialize(
     opening('Rewrite the fallback controller.'),
     [],
@@ -227,7 +227,7 @@ const { default: test } = await import("node:test");
 const workRecord = await import("../../../dist/Mission/WorkRecord/OpeningSemanticSurface.js");
 
 
-test('WHAT[WORK-RECORD-011] WORK_RECORD_SECTIONS_lifecycle_source_declares_three_canonical_headings', () => {
+test('WHAT[work-record-011] WORK_RECORD_SECTIONS_lifecycle_source_declares_three_canonical_headings', () => {
   const opening = workRecord.opening('Fix the bug', ['Must be tested', 'Must be performant'], 'Plan for the mission')
   const frames = ['Frame 1 chronicle entry', 'Frame 2 chronicle entry']
   const gap = 'Recent edits performed in this round'

@@ -64,7 +64,7 @@ const profile = (value) => ({
 
 const register = (root) => authority.registerAuthority(root, authority.empty)
 
-test('WHAT[INTERACTION-AUTHORITY-007] IA_007_unknown_origin_changes_no_projection_state', () => {
+test('WHAT[interaction-authority-007] IA_007_unknown_origin_changes_no_projection_state', () => {
   const root = rootFor()
   const state = register(root)
   const before = JSON.stringify(state)

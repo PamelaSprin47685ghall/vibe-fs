@@ -58,7 +58,7 @@ type OrchestratorFactCases =
            WorktreePath: WorktreePath |}
 
 /// Fold refusals owned by the Change family: composition renders them into the
-/// durable fail-closed report, the family keeps the decision (DURABLE-EVENTS-023).
+/// durable fail-closed report, the family keeps the decision (durable-events-023).
 [<RequireQualifiedAccess>]
 type OrchestratorFoldRejection =
     | PublishClaimedWithoutRebasedCandidate

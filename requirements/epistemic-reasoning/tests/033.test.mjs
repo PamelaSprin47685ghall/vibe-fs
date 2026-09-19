@@ -4,7 +4,7 @@ import { gecSurface } from '../../../dist/Sphinx/GecSurface.js'
 
 
 
-test('WHAT[EPI-033] result acceptance is idempotent by work identity preventing late acceptance and duplicate purchases', () => {
+test('WHAT[epistemic-reasoning-033] result acceptance is idempotent by work identity preventing late acceptance and duplicate purchases', () => {
   // Accepted events bind workId and attempt identity. Replay folds them deterministically.
   const genesis = {
     id: 'ev0',

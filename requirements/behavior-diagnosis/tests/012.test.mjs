@@ -43,7 +43,7 @@ const apply = (state, value, n = 1) => {
   return { enforcement: enforcement.value, blog: committed.value }
 }
 
-test('WHAT[BD-012] ENFORCER_045_cycle_commit_appends_frame_and_advances_coverage', () => {
+test('WHAT[behavior-diagnosis-012] ENFORCER_045_cycle_commit_appends_frame_and_advances_coverage', () => {
   const state = apply({ enforcement: observation.emptyEnforcement, blog: observation.emptyBlog }, {
     toolCalls: ['call-1'], tipRuleId: 'enforcement-a01', fieldNameAtCommit: 'primitive-obsession', evidenceRef: 'blob-evidence',
   })
@@ -51,7 +51,7 @@ test('WHAT[BD-012] ENFORCER_045_cycle_commit_appends_frame_and_advances_coverage
   assert.equal(observation.coverage(state.blog).ingestedThroughSequence, 1)
   assert.equal(observation.coverage(state.blog).coverableTurnCutoffExclusive, 1)
 })
-test('WHAT[BD-012] ENFORCER_045_enforcement_half_queryable_by_provider_run', () => {
+test('WHAT[behavior-diagnosis-012] ENFORCER_045_enforcement_half_queryable_by_provider_run', () => {
   const state = apply({ enforcement: observation.emptyEnforcement, blog: observation.emptyBlog }, {
     run: 'msg-run1', toolCalls: ['call-a', 'call-b'], tipRuleId: 'enforcement-a01', fieldNameAtCommit: 'primitive-obsession', evidenceRef: 'blob-ev1',
   })
@@ -60,7 +60,7 @@ test('WHAT[BD-012] ENFORCER_045_enforcement_half_queryable_by_provider_run', () 
   assert.equal(tip.ruleId, 'enforcement-a01')
   assert.equal(tip.fieldName, 'primitive-obsession')
 })
-test('WHAT[BD-012] ENFORCER_045_no_enforcement_cycle_committed_fact_exists', () => {
+test('WHAT[behavior-diagnosis-012] ENFORCER_045_no_enforcement_cycle_committed_fact_exists', () => {
   assert.throws(() => blog.serializeFact({ case: 'EnforcementCycleCommitted' }), /unknown fact/)
 })
 }
@@ -74,7 +74,7 @@ const { join } = await import("node:path");
 const ROOT = new URL('../../../', import.meta.url).pathname
 const prodText = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
-test('WHAT[BD-012] C0_no_EnforcementCycleCommitted_fact', () => {
+test('WHAT[behavior-diagnosis-012] C0_no_EnforcementCycleCommitted_fact', () => {
   const fact = prodText('src/Wanxiangshu/Composition/Durable/Fact.fs')
   assert.equal(
     /\| EnforcementCycleCommitted\b/.test(fact),
@@ -125,7 +125,7 @@ const envelope = (fact) => ({
   fact,
 })
 
-test('WHAT[BD-012] PERSIST_005_envelope_rejects_pre_cutover_observation_tags', () => {
+test('WHAT[behavior-diagnosis-012] PERSIST_005_envelope_rejects_pre_cutover_observation_tags', () => {
   const line = blog.serializeEnvelope(envelope(observationFact()))
   assert.equal(line.includes('BlogObservationCommitted'), true)
   assert.equal(line.includes('BlogEntryCommitted'), false)
@@ -175,7 +175,7 @@ const squashed = () => ({
   run: 'run-squash',
 })
 
-test('WHAT[BD-012] PERSIST_005_observation_encode_writes_new_tags_only', () => {
+test('WHAT[behavior-diagnosis-012] PERSIST_005_observation_encode_writes_new_tags_only', () => {
   const committed = blog.serializeFact(observation())
   assert.equal(committed.includes('BlogObservationCommitted'), true)
   assert.equal(committed.includes('BlogEntryCommitted'), false)
@@ -184,7 +184,7 @@ test('WHAT[BD-012] PERSIST_005_observation_encode_writes_new_tags_only', () => {
   assert.equal(encodedSquash.includes('BlogObservationsSquashed'), true)
   assert.equal(encodedSquash.includes('BlogSquashCommitted'), false)
 })
-test('WHAT[BD-012] PERSIST_005_fact_codec_rejects_pre_cutover_observation_tags', () => {
+test('WHAT[behavior-diagnosis-012] PERSIST_005_fact_codec_rejects_pre_cutover_observation_tags', () => {
   const committed = blog.serializeFact(observation())
   const preCutoverCommitted = committed.replaceAll('BlogObservationCommitted', 'BlogEntryCommitted')
   assert.equal(preCutoverCommitted.includes('BlogEntryCommitted'), true)
@@ -246,7 +246,7 @@ const readObs = (enforcement, blog) => observation.observationsOf(enforcement, b
   frameDigest: o.frameDigest,
 }))
 
-test('WHAT[BD-012] OBS_PROJ_002_zip_recent_tips_with_blog_frame_digests', () => {
+test('WHAT[behavior-diagnosis-012] OBS_PROJ_002_zip_recent_tips_with_blog_frame_digests', () => {
   let blog = observation.emptyBlog
   let enforcement = observation.emptyEnforcement
 

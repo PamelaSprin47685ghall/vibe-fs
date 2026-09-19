@@ -23,7 +23,7 @@ const withTemp = (fn) => {
   return fn(base)
 }
 
-test('WHAT[DURABLE-EVENTS-001] append_only_prior_writer_bytes_are_a_strict_prefix_after_new_fact', async () => {
+test('WHAT[durable-events-001] append_only_prior_writer_bytes_are_a_strict_prefix_after_new_fact', async () => {
   const dir = withTemp((base) => base)
   const store = eventStore.create(dir, 'append-law')
   try {
@@ -74,7 +74,7 @@ const event = (n, parents = [], type = 'JobRequested', payload = { n }) => ({
   payloadRefs: [],
 })
 
-test('WHAT[DURABLE-EVENTS-001] append_commits_complete_canonical_line_then_updates_Current', async () => {
+test('WHAT[durable-events-001] append_commits_complete_canonical_line_then_updates_Current', async () => {
   const dir = withTemp((base) => base)
   const store = eventStore.create(dir, 'append-proof')
   try {

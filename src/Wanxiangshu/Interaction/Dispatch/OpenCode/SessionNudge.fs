@@ -334,7 +334,7 @@ module HostSessionNudge =
                 None
             |> TaskValue.map interactionRepairOutcomeOfResult
 
-    /// PAR-008: an empty / XML-only terminal earns at most one repair.
+    /// provider-attempt-recovery-008: an empty / XML-only terminal earns at most one repair.
     ///
     /// `requestId + terminalProviderRun` names the exact Blogger repair occasion.
     /// Neither the long-lived session nor LogicalRun alone may spend another

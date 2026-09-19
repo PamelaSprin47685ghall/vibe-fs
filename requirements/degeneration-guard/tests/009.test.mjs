@@ -59,7 +59,7 @@ const rawDeltaWithoutMessage = (session, field, text) => ({
   },
 })
 
-test('WHAT[DG-009] LOOP_017_new_attempt_waits_for_active_continuation_drain', async () => {
+test('WHAT[degeneration-guard-009] LOOP_017_new_attempt_waits_for_active_continuation_drain', async () => {
   const aborts = []
   const continuations = []
   let releaseContinue = () => {}
@@ -111,7 +111,7 @@ test('WHAT[DG-009] LOOP_017_new_attempt_waits_for_active_continuation_drain', as
   ])
 })
 
-test('WHAT[DG-009] LOOP_014_active_interrupt_tracked_in_owned_work_lifecycle', async () => {
+test('WHAT[degeneration-guard-009] LOOP_014_active_interrupt_tracked_in_owned_work_lifecycle', async () => {
   let workExecuted = 0
   const sensor = loopSensor.create({
     owned: ['ses_work'],
@@ -146,7 +146,7 @@ test('WHAT[DG-009] LOOP_014_active_interrupt_tracked_in_owned_work_lifecycle', a
   assert.equal(loopSensor.activeTask(sensor, 'ses_work', 'msg_work_1'), null)
 })
 
-test('WHAT[DG-009] LOOP_018_diagnostics_name_kind_not_side', async () => {
+test('WHAT[degeneration-guard-009] LOOP_018_diagnostics_name_kind_not_side', async () => {
   const diagnostics = []
   const sensor = createSensor({
     owned: ['ses_diag'],
@@ -176,7 +176,7 @@ test('WHAT[DG-009] LOOP_018_diagnostics_name_kind_not_side', async () => {
   )
 })
 
-test('WHAT[DG-009] LOOP_008_guard_has_no_fallback_or_nudge_recovery_path', () => {
+test('WHAT[degeneration-guard-009] LOOP_008_guard_has_no_fallback_or_nudge_recovery_path', () => {
   const sensorSource = readFileSync(join(root, 'src/Wanxiangshu/OpenCode/Host/LoopSensor.fs'), 'utf8')
   const ordinarySource = readFileSync(
     join(root, 'src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs'),

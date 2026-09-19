@@ -1,6 +1,6 @@
 /**
  * The Long Stroke — sole top-level E2E entry
- * WHAT[VERIFICATION-SYSTEM-014] Long Stroke 真实物理验收环境 (G4R-3 / changes/active/test.md).
+ * WHAT[verification-system-014] Long Stroke 真实物理验收环境 (G4R-3 / changes/active/test.md).
  *
  * Scenario: scenarios/long-stroke.toml
  * Oracles:  support/long-stroke-oracles.mjs

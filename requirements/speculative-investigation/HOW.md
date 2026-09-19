@@ -57,5 +57,5 @@
 
 ## GAP
 
-- `SPEC-INV-014`（CLOSED）：消融状态优先于 rollout env 配置已闭合，落点 `tests/014.test.mjs`。
+- `speculative-investigation-014`（CLOSED）：消融状态优先于 rollout env 配置已闭合，落点 `tests/014.test.mjs`。
 

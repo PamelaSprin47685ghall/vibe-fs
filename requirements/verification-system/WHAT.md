@@ -4,7 +4,7 @@
 
 ---
 
-## VERIFICATION-SYSTEM-001: 五层证据金字塔
+## [001] 五层证据金字塔
 
 所有规范命题的验收必须遵循严格固定的五层证据金字塔阶梯，层序由构建与测试配置强力锁定：
 0. **Static architecture/proof gates**：纯文本与文件系统静态检查，不依赖编译产物，随时可运行。
@@ -16,27 +16,27 @@
 
 证据层序由统一调度器保证：`scripts/verify.mjs` 导出 `verificationSteps` 作为唯一固定执行阶段列表（format:check → check → build → unit → integration，release 模式追加 e2e 与 package），`package.json` 仅声明调度入口，执行层序由真实固定调度器强力保证，不再要求同一编排代码书写顺序外部的写法锁定，层序颠倒或错置直接判为违约。日常开发入口 `format-build-test`（→ `node scripts/verify.mjs`）按序调度固定阶段；发布入口 `verify:release`（→ `node scripts/verify.mjs --release`）在此基础上额外调度 clean build（--clean）、Long Stroke 与真实 package 校验。两项入口对每个 step 均保持单次运行，每个 leaf step 必须恰有一个父级 owner，禁止顶层与子 orchestrator 重复执行；distribution package child 与一次 physical warmup 只由 integration orchestrator 调度。层级登记表机制已废止，证明由实际测试行为与可执行断言独立成立。
 
-全仓禁止自建 FCS（`FSharp.Compiler.Service`）扫描：不得直接或经 wrapper、反射、`.fsx` 提取 F# typed AST、symbol/application use、推断类型或源码依赖图。全量、局部、owner/locality、fixture、report-only、CLI、CI、pre-build 与缓存/snapshot/delta/外部 evidence 复用均无豁免，不得作为门禁、报告或验收入口。正常 Fable 编译内部使用 compiler service 不在禁令范围内，但禁止为扫描取证额外启动或插桩编译器。纯源码文本与 JavaScript 静态检查仍是合法第 0 层证据。F# 编译器边界由 STRUCTURED-WORKFLOW-011 定义；不得用旧扫描结果或空 evidence 冒充当前证明。
+全仓禁止自建 FCS（`FSharp.Compiler.Service`）扫描：不得直接或经 wrapper、反射、`.fsx` 提取 F# typed AST、symbol/application use、推断类型或源码依赖图。全量、局部、owner/locality、fixture、report-only、CLI、CI、pre-build 与缓存/snapshot/delta/外部 evidence 复用均无豁免，不得作为门禁、报告或验收入口。正常 Fable 编译内部使用 compiler service 不在禁令范围内，但禁止为扫描取证额外启动或插桩编译器。纯源码文本与 JavaScript 静态检查仍是合法第 0 层证据。F# 编译器边界由 structured-workflow-011 定义；不得用旧扫描结果或空 evidence 冒充当前证明。
 
-## VERIFICATION-SYSTEM-002: One World——恰一个 Long Stroke
+## [002] One World——恰一个 Long Stroke
 
 第 4 层物理验收严格保持全局恰好一个真实 E2E 入口（`tests/e2e/014.test.mjs`）和全程单次物理环境生命周期。严禁并行启动多个 Canary 实例、工作池或为每个测试场景单独创建独立世界以冒充覆盖率。E2E 用例上限必须严格受限且只降不升。
 
-## VERIFICATION-SYSTEM-003: 晋级阶梯，禁止跨级
+## [003] 晋级阶梯，禁止跨级
 
 语义命题必须按 Pure → Temporal → Adapter → Long Stroke 逐级进行证明，严禁跨级跳跃。严禁将普通的语义分支在无充分理由的情况下直接升级为昂贵的 E2E 物理测试；严禁使用重试直至通过（repeat-until-pass）掩盖不确定性。若某项验证声称必须在物理 Long Stroke 中进行，必须明确声明其所依赖的不可模拟的底层物理契约，无法声明者必须降级至底层证据层进行证明。
 
 provider recovery 的 Pure/Temporal 层必须用 fast-check 对 production Fable Surface 证明互斥 resolution、terminal 吸收、stale evidence 无效与 duplicate effect 幂等。唯一 Long Stroke 再证明不可模拟的真实 Host 边界：同一 logical run 上 `provider failure → recovery provider failure → success`，两个 failed ProviderRun 各有一个不同 durable recovery claim、各最多一次 physical acceptance，第二个 recovery 成功前无 exhaustion/重复 return，最终 join 只返回一次。
 
-## VERIFICATION-SYSTEM-004: verifier 必须可红
+## [004] verifier 必须可红
 
 所有门禁（gate）、验证器（verifier）及测试断言必须具备真实有效的失败能力（可红性）。每个静态门禁必须拥有配套的回归测试，通过受控的反例输入证明门禁能够准确识别违约并退出非零状态。verifier 自测必须运行实际 verifier 并通过真实输入变异或受控的 spy `runStep` 注入证明失败能力，严禁在测试内复制决策逻辑或以静态表面矩阵冒充回归。严禁为了通过测试而主动弱化或削弱断言条件。
 
-## VERIFICATION-SYSTEM-005: fail-closed
+## [005] fail-closed
 
 所有门禁、运行器与基础设施在遭遇数据损坏、协议失配、不可解析的边界状态或未知异常时，必须安全失败并向上传播非零退出码，严禁吞没异常假装通过。`scripts/check.mjs` 必须确保单个门禁的失败状态能够可靠传播至顶层入口；调度器与子进程执行器在 step 失败或异常崩溃时一律中断后续未执行阶段并向上传播非零退出状态，严禁以局部忽略或假绿通过。
 
-## VERIFICATION-SYSTEM-006: 因果推进门禁
+## [006] 因果推进门禁
 
 测试与运行期的挂死判据必须基于距离上一次**因果进展**的静默时长，严禁以整个测试套件的绝对墙钟运行时间作为唯一判据。看门狗只能由明确的业务因果事件进行续期（如被消费的剧本步骤、显式断言检查点或事实增长）；底层的原始传输流量、重连心跳或生命周期噪声严禁作为因果进展。背景非阻塞车道的进展只记录不续期。超时发生时必须先完整转储因果诊断状态，随后以非零状态安全退出。
 
@@ -63,39 +63,39 @@ Release gate 变成「最多 N 轮」或「重跑直到通过」
 把叶子测试 timeout 作为 process-isolated 文件 wrapper 的总预算
 ```
 
-## VERIFICATION-SYSTEM-007: 时间确定性
+## [007] 时间确定性
 
 语义与逻辑证明严禁依赖物理环境墙钟的随机性。Temporal 层测试必须基于虚拟时钟与可注入的时间端口进行，所有时间推进必须是离散且可确切枚举的。严禁使用真实等待（sleep）断言语义成立，严禁依赖物理调度器的执行顺序碰巧证明并发竞态。
 
 测试调度器可以用 prerequisite graph 筛选合法排列，但该筛选器对非法排列的拒绝只定义测试输入域，不证明 production 拒绝任何行为。非法世界必须交给拥有该边界的 production decision 或 typed port 判定；未到达 production Surface 的 helper rejection 不得列入 executable proof。
 
-## VERIFICATION-SYSTEM-008: 契约面语言边界
+## [008] 契约面语言边界
 
 生产代码与测试代码之间存在严格的契约面语言边界：生产代码以 `.fs` 编写，语义测试以 `.mjs` 编写并直接消费编译产物（dist）。编译器输出的内部符号、中间结构与内部映射关系不属于对外契约，语义测试只能通过正式注册的 Owner 契约面（公开纯函数、序列化契约、公开端口）访问系统。测试断言必须针对完整数据结构或规范序列化文本，严禁进行仅断言真值的脆弱验证。当测试消费的编译产物落后于源码时，运行器必须拒绝执行并 fail-closed；陈旧性判定由 `scripts/lib/build-state.mjs#assertBuildFresh` 内容摘要（content digests）强力裁决，严禁使用脆弱的文件修改时间（mtime）比较。删除冗余、失效证明或无独立失败价值的纯文案断言并不等同于降低 retained contract：系统对所有已确立并保留的业务规范不变量（retained contract）的守护与锁定机制持续有效，任何实质性削弱保留契约的行为仍被绝对禁止。
 
 属性测试的 generator 只能描述合法输入域、边界输入或精确非法 mutation，不得实现 expected decision。property 必须以 WHAT 独立声明的代数、变形关系或 typed rejection 判断注册 production Surface 的结果；严禁在测试内重建状态机、formula、decoder 或 detector 作为平行 oracle。无限或组合爆炸输入域必须固定 seed 与有限 run budget，失败必须输出并可重放 shrink path；有限小域优先穷举。无法说明 oracle 独立性的命题不得用随机生成伪装 comprehensive proof。
 
-## VERIFICATION-SYSTEM-009: 静态门禁命中真实路径
+## [009] 静态门禁命中真实路径
 
 所有静态门禁中配置的文件扫描路径、目录匹配规则以及检查入口，必须与仓库中实际存在的物理结构保持绝对一致。指向不存在路径的门禁因无法命中违规而被视为伪门禁，等同于门禁缺失。验证阶梯中声明的所有脚本、工具与测试入口必须物理存在且可正常调度。
 
-## VERIFICATION-SYSTEM-010: 验收判据不可放宽
+## [010] 验收判据不可放宽
 
 已设立并冻结的验收判据（包括用例数量天花板、超时时间预算、单调递减门禁基线、构建 manifest 摘要与内容证据的 fail-closed 契约及断言严苛度）只能收紧，严禁单方面放宽。manifest digests 与内容证据构成不可放宽的 fail-closed 验收红线。删除冗余或失效治理断言不属于放宽验收红线，但严禁以精简为由削弱 retained contract 的有效保护。覆盖率是显式诊断工具，报告必须由 build receipt+dedicated run 生成；无 80% 全局阈值。显式入口总是产出报告；覆盖率数据缺失、损坏或推后运行间被改则非零退出。执行者严禁自行宣布将阻塞项或未达标项降级为不影响通过的非阻塞项；任何对验收范围的正式调整必须通过正规的规范修订程序。
 
-## VERIFICATION-SYSTEM-011: 覆盖率门禁分母完整
+## [011] 覆盖率门禁分母完整
 
 测试覆盖率门禁的计算分母必须涵盖仓库中**全部生产模块**。dist 分母由 `--all` 语义与显式源清单核对保证：分母为当前 dist 中全部项目生产 `.js` 文件，排除 Fable runtime（`fable_modules`）与外部依赖，不包含 tests 及 scripts。未被任何测试加载的模块必须以 0% 覆盖率计入总分母，无需且严禁使用全量预导入污染运行时。严禁通过排除未加载模块人为虚增覆盖率，严禁设立非法的覆盖率豁免旁路。
 
-## VERIFICATION-SYSTEM-012: 行数不是门禁，不做机械行数检查
+## [012] 行数不是门禁，不做机械行数检查
 
 门禁系统只针对明确的语义违规、架构越界与规范不变量进行拦截，严禁设立机械的文件行数硬门禁或 advisory 警告，亦不再为证明政策存在而设立机械扫描器门禁。行数是代码演进的伴生表象而非缺陷根因，机械的行数限制会导致代码被不合理地碎片化拆分为无意义的辅助文件。系统通过明确的架构命名约束与语义边界守卫代码质量，而不依赖行数指标。
 
-## VERIFICATION-SYSTEM-013: JS 语义边界终态清零
+## [013] JS 语义边界终态清零
 
 所有产品语义测试对实现内部的越界依赖必须终态清零：严禁深层导入内部 dist 模块、严禁混淆导出探测（mangled names）、严禁直接消费编译器底层表示、严禁使用过渡期的兼容 facade 或私有 contract 适配器。所有被语义测试调用的模块必须在正式的 Surface Manifest 中完成注册，明确其所有权、关联命题与源码映射，确保测试世界与实现内部彻底解耦。
 
-## VERIFICATION-SYSTEM-014: Long Stroke 真实物理验收环境
+## [014] Long Stroke 真实物理验收环境
 
 第 4 层 Long Stroke 物理验收环境在单次 OpenCode 进程生命周期（spawn count 恰为 1）内执行完整端到端场景。真实宿主环境下依次验证：
 1. 嵌套 Replica 物理启动且不阻塞属主（Strength Canary）；
@@ -104,7 +104,7 @@ Release gate 变成「最多 N 轮」或「重跑直到通过」
 4. 运行态 Join 屏障、无变更冷检索（Cold Fetch）与真实 Host 插件观测点（Canaries A/E/G/H）。
 整个生命周期保持单一物理服务端与单一日志写入器，严禁使用重试直至通过。
 
-## VERIFICATION-SYSTEM-015: 日志观察器因果消费与完整性
+## [015] 日志观察器因果消费与完整性
 
 日志观察器（Journal Observer）必须按严格行缓冲与因果消费语义监听事件日志流：
 1. 仅解析合法 `Fact` 结构，正文描述（prose）中偶然出现的关键字严禁识别为领域事实；
@@ -113,7 +113,7 @@ Release gate 变成「最多 N 轮」或「重跑直到通过」
 4. 底层文件标识替换或消费前缀被截断时必须 fail-closed；
 5. 多写入者文件交错时保持原子追加、单调位点前进、订阅派发与关闭后注销语义。
 
-## VERIFICATION-SYSTEM-016: 验证输入快照与运行时扰动拦截
+## [016] 验证输入快照与运行时扰动拦截
 
 构建与验证调度器必须在执行前捕获完整验证输入快照，并在执行全过程中守卫输入确定性：
 1. 完整收集源码、脚本、规范、资源与工作流配置等输入集，准确比对文件集合变动与内容哈希；忽略 `.fable-build` 等合法构建输出；根目录缺失时 fail-closed；

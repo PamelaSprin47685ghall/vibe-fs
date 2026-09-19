@@ -25,7 +25,7 @@ const rowKeys = metadataRows.map((match) => match[2])
 
 const registeredNames = registrations.map((match) => match[1])
 
-test('WHAT[HOST-BOUNDARY-024] registered Hook keys and closed policy rows have exact one-to-one closure', () => {
+test('WHAT[host-boundary-024] registered Hook keys and closed policy rows have exact one-to-one closure', () => {
   assert.deepEqual(registeredNames.slice().sort(), rowNames.slice().sort())
   assert.equal(new Set(rowNames).size, rowNames.length)
   assert.equal(new Set(rowKeys).size, rowKeys.length)
@@ -33,21 +33,21 @@ test('WHAT[HOST-BOUNDARY-024] registered Hook keys and closed policy rows have e
   assert.equal(rowKeys.includes('tool'), false, 'the tool collection is not a Host Hook')
 })
 
-test('WHAT[HOST-BOUNDARY-024] registration is explicit static composition through the policy score', () => {
+test('WHAT[host-boundary-024] registration is explicit static composition through the policy score', () => {
   assert.doesNotMatch(hooksSource, /hooks\?[^\s]+\s*<-/)
   assert.doesNotMatch(hooksSource, /\bpolicyAwareHook\b/)
   assert.doesNotMatch(hooksSource, /List\.(?:map|fold|iter).*registeredHook/)
   assert.equal(registrations.length, metadataRows.length)
 })
 
-test('WHAT[HOST-BOUNDARY-024] rejects degradable security or workflow hook', () => {
+test('WHAT[host-boundary-024] rejects degradable security or workflow hook', () => {
   assert.equal(HookPolicySurface.acceptsPolicy('Security', 'BestEffortDiagnostic'), false)
   assert.equal(HookPolicySurface.acceptsPolicy('Workflow', 'BestEffortDiagnostic'), false)
   assert.equal(HookPolicySurface.acceptsPolicy('Invariant', 'BestEffortDiagnostic'), false)
   assert.equal(HookPolicySurface.acceptsPolicy('AuditOnly', 'BestEffortDiagnostic'), true)
 })
 
-test('WHAT[HOST-BOUNDARY-024] Hook authority cannot express identity mutation or admission bypass', () => {
+test('WHAT[host-boundary-024] Hook authority cannot express identity mutation or admission bypass', () => {
   assert.doesNotMatch(policySource, /MutateIdentity|BypassAdmission/)
   for (const row of HookPolicySurface.rows()) {
     assert.ok(['NoIdentityAccess', 'ObserveIdentity'].includes(row.identity))
@@ -55,7 +55,7 @@ test('WHAT[HOST-BOUNDARY-024] Hook authority cannot express identity mutation or
   }
 })
 
-test('WHAT[HOST-BOUNDARY-024] optional Casebook failure preserves the critical result and emits the existing diagnostic', () => {
+test('WHAT[host-boundary-024] optional Casebook failure preserves the critical result and emits the existing diagnostic', () => {
   assert.match(
     policySurfaceSource,
     /HookPolicy\.observeOptional Diagnostic\.emit OptionalHookEffect\.CasebookObservation effect/,

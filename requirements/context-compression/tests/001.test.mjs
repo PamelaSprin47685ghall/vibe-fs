@@ -20,7 +20,7 @@ const isCombinedNormalDelta = (text) =>
   text.startsWith('# Write the dense work-log continuation now') && text.includes('[[new_work_to_record]]')
 const isPreviousTip = (text) => text.includes('previous_enforcer_tip')
 
-test('WHAT[CONTEXT-COMPRESSION-001] CTX_001_no_prompt_carries_a_token_count_or_output_budget', () => {
+test('WHAT[context-compression-001] CTX_001_no_prompt_carries_a_token_count_or_output_budget', () => {
   const all = [
     prompt.normalInstruction,
     prompt.squashInstruction,
@@ -55,7 +55,7 @@ const files = [...subsystemInventory.projects.values()]
   .flatMap((project) => project.implementationFiles)
   .sort()
 
-test('WHAT[CONTEXT-COMPRESSION-001] CTX_001_context_compression_owner_never_observes_forbidden_capacity_synonyms', () => {
+test('WHAT[context-compression-001] CTX_001_context_compression_owner_never_observes_forbidden_capacity_synonyms', () => {
   // CTX-001's exact forbidden vocabulary, with one allowed exception: the
   // BloggerDeltaLimitBytes input contract (CTX-003) is a byte LIMIT on one
   // delta, not a window estimate — it is tested elsewhere and must stay.
@@ -82,7 +82,7 @@ test('WHAT[CONTEXT-COMPRESSION-001] CTX_001_context_compression_owner_never_obse
     }
   }
 })
-test('WHAT[CONTEXT-COMPRESSION-001] CTX_001_the_only_allowed_byte_metric_is_the_delta_input_contract', () => {
+test('WHAT[context-compression-001] CTX_001_the_only_allowed_byte_metric_is_the_delta_input_contract', () => {
   // The one legal byte quantity: BloggerDeltaLimitBytes = 200 KiB measured on
   // rendered TOML (CTX-003). It must exist and be a constant, not a query of
   // the provider window.

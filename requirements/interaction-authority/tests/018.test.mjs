@@ -51,7 +51,7 @@ const register = (root) => authority.registerAuthority(root, authority.empty)
 const continuation = (key, root, kind = 'ManagerGuard', payload = 'payload') =>
   authority.claimContinuation(key, 'ses_a', kind, root, payload)
 
-test('WHAT[INTERACTION-AUTHORITY-018] IA_018_exact_closure_releases_run_scoped_authority_before_root_reuse', () => {
+test('WHAT[interaction-authority-018] IA_018_exact_closure_releases_run_scoped_authority_before_root_reuse', () => {
   const first = rootFor()
   let state = register(first)
   const claim = continuation('pk_1', first)

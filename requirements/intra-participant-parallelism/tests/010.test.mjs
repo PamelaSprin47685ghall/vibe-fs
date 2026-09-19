@@ -15,7 +15,7 @@ const fissionProduction = () => [
   'src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs',
 ].map(read).join('\n')
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-010] V1 Fission has no OpenCode session-fork path and owns durable replay anchors', () => {
+test('WHAT[intra-participant-parallelism-010] V1 Fission has no OpenCode session-fork path and owns durable replay anchors', () => {
   const code = fissionProduction()
   assert.doesNotMatch(code, /session\s*\.\s*fork|\/session\/[^"']*\/fork|CreateForkedSession|ForkSession/i)
 

@@ -57,7 +57,7 @@ const fold = (envelopes) => {
   return state
 }
 
-test('WHAT[EPI-019] append_before_current_only_advances_after_durable_append_and_rejects_stale_expected_revision', async (t) => {
+test('WHAT[epistemic-reasoning-019] append_before_current_only_advances_after_durable_append_and_rejects_stale_expected_revision', async (t) => {
   await withRepo(t, async (commonDir) => {
     const inquiryId = `iq_${randomUUID()}`
     const stream = `sphinx/${inquiryId}`
@@ -104,7 +104,7 @@ test('WHAT[EPI-019] append_before_current_only_advances_after_durable_append_and
     }
   })
 })
-test('WHAT[EPI-019] restart_recovery_and_cache_loss_replay_the_same_canonical_hash', async (t) => {
+test('WHAT[epistemic-reasoning-019] restart_recovery_and_cache_loss_replay_the_same_canonical_hash', async (t) => {
   await withRepo(t, async (commonDir) => {
     const inquiryId = `iq_${randomUUID()}`
     const stream = `sphinx/${inquiryId}`
@@ -164,7 +164,7 @@ test('WHAT[EPI-019] restart_recovery_and_cache_loss_replay_the_same_canonical_ha
     }
   })
 })
-test('WHAT[EPI-019] same_work_attempt_replay_is_idempotent_but_conflicting_payload_is_rejected', async (t) => {
+test('WHAT[epistemic-reasoning-019] same_work_attempt_replay_is_idempotent_but_conflicting_payload_is_rejected', async (t) => {
   await withRepo(t, async (commonDir) => {
     const inquiryId = `iq_${randomUUID()}`
     const stream = `sphinx/${inquiryId}`
@@ -407,7 +407,7 @@ async function driveToAnswered(s) {
   return handle
 }
 
-test('WHAT[EPI-019] generic_restart_recovers_revision_results_and_conflict', { timeout: 30000 }, async () => {
+test('WHAT[epistemic-reasoning-019] generic_restart_recovers_revision_results_and_conflict', { timeout: 30000 }, async () => {
   // Generic sphinx_inquiry_* transitions are durable facts: killing the
   // first process must not lose the revision, the accepted results, or the
   // expectedRevision gate. The second server resumes at the same revision.
@@ -545,7 +545,7 @@ const waveEvents = (wave, assignment) => {
   ]
 }
 
-test('WHAT[EPI-019] soak_pure_spine_gates_conflicts_and_refold_recovers_without_io', async () => {
+test('WHAT[epistemic-reasoning-019] soak_pure_spine_gates_conflicts_and_refold_recovers_without_io', async () => {
   for (let wave = 0; wave < WAVES; wave += 1) {
     const tag = String(wave).padStart(4, '0')
     const inquiryId = `iq_soakpure${tag}`

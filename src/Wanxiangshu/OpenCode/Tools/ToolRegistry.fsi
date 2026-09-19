@@ -34,12 +34,12 @@ module ToolRegistry =
         [<Literal>]
         val DeniedTaskState: string = "tool/registry/denied-task-state"
 
-    /// ENF-006: the authority the execute gate resolves for a tool, so a
+    /// capability-enforcement-006: the authority the execute gate resolves for a tool, so a
     /// consumer can tell an office tool from an internal leaf without guessing
     /// from the tool name.
     val tryAdmission: specName: string -> bloggerHost: IBloggerRuntimeHost option -> ToolAdmission option
 
-    /// ENF-006: the internal-leaf decision for a session that holds no public
+    /// capability-enforcement-006: the internal-leaf decision for a session that holds no public
     /// office profile at all. An office tool is never admitted this way.
     val privateAttachmentAdmits:
         specName: string -> bloggerHost: IBloggerRuntimeHost option -> sessionId: string -> bool

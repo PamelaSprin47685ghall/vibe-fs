@@ -15,7 +15,7 @@ const PROVIDER_ROLES = [
   'bookkeeper',
 ]
 
-test('WHAT[DISTRIBUTION-008] PACKAGE_resources_provider_role_laws_and_rulebook_present_after_install', () => {
+test('WHAT[distribution-008] PACKAGE_resources_provider_role_laws_and_rulebook_present_after_install', () => {
   const providerDir = path.join(repoRoot, 'resources', 'provider')
   const enforcerDir = path.join(repoRoot, 'resources', 'enforcer')
 

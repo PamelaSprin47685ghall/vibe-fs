@@ -36,7 +36,7 @@ const buildPlan = (over) => {
   return built
 }
 
-test('WHAT[PAR-011] same-key same-plan replays the admitted plan', () => {
+test('WHAT[provider-attempt-recovery-011] same-key same-plan replays the admitted plan', () => {
   const scope = RecoveryScope.createRecoveryScope()
   const plan = buildPlan({})
 
@@ -55,7 +55,7 @@ test('WHAT[PAR-011] same-key same-plan replays the admitted plan', () => {
     RecoveryScope.recordAttemptPlan(scope, 'ses-1', 'phys-1', plan.handle)
   })
 })
-test('WHAT[PAR-011] same-key different authority fails closed', () => {
+test('WHAT[provider-attempt-recovery-011] same-key different authority fails closed', () => {
   const scope = RecoveryScope.createRecoveryScope()
   const original = buildPlan({})
   assert.equal(RecoveryScope.freezeAttemptPlan(scope, 'ses-1', 'phys-1', original.handle).outcome, 'Admitted')
@@ -71,7 +71,7 @@ test('WHAT[PAR-011] same-key different authority fails closed', () => {
     /HOST-BOUNDARY-008/,
   )
 })
-test('WHAT[PAR-011] same-key different probe fails closed', () => {
+test('WHAT[provider-attempt-recovery-011] same-key different probe fails closed', () => {
   const scope = RecoveryScope.createRecoveryScope()
   const committed = buildPlan({})
   assert.equal(RecoveryScope.freezeAttemptPlan(scope, 'ses-1', 'phys-1', committed.handle).outcome, 'Admitted')
@@ -83,7 +83,7 @@ test('WHAT[PAR-011] same-key different probe fails closed', () => {
   assert.equal(conflict.attempted.choice, 'UsePrefixProbe')
   assert.equal(conflict.attempted.probe.probeId, 'probe-99')
 })
-test('WHAT[PAR-011] same-key different request kind fails closed', () => {
+test('WHAT[provider-attempt-recovery-011] same-key different request kind fails closed', () => {
   const scope = RecoveryScope.createRecoveryScope()
   const work = buildPlan({ probe: probeInput() })
   assert.equal(work.view.choice, 'UsePrefixProbe')
@@ -96,7 +96,7 @@ test('WHAT[PAR-011] same-key different request kind fails closed', () => {
   assert.equal(conflict.existing.choice, 'UsePrefixProbe')
   assert.equal(conflict.attempted.choice, 'UseCommittedEpoch')
 })
-test('WHAT[PAR-011] same admitted plan drives binding and the frozen candidate is retained', () => {
+test('WHAT[provider-attempt-recovery-011] same admitted plan drives binding and the frozen candidate is retained', () => {
   const scope = RecoveryScope.createRecoveryScope()
   const frozen = buildPlan({
     session: 'ses-frozen',
@@ -130,7 +130,7 @@ test('WHAT[PAR-011] same admitted plan drives binding and the frozen candidate i
   assert.equal(retained.view.probe.probeId, 'probe-1')
   assert.equal(retained.view.probe.cutoff, 2)
 })
-test('WHAT[PAR-011] bind to the wrong parent or run is refused', () => {
+test('WHAT[provider-attempt-recovery-011] bind to the wrong parent or run is refused', () => {
   const scope = RecoveryScope.createRecoveryScope()
   const plan = buildPlan({ session: 'ses-bind', physical: 'phys-parent-1' })
   assert.equal(RecoveryScope.freezeAttemptPlan(scope, 'ses-bind', 'phys-parent-1', plan.handle).outcome, 'Admitted')
@@ -151,7 +151,7 @@ test('WHAT[PAR-011] bind to the wrong parent or run is refused', () => {
     /HOST-BOUNDARY-008/,
   )
 })
-test('WHAT[PAR-011] terminal consumption is single-shot and never re-promotes', () => {
+test('WHAT[provider-attempt-recovery-011] terminal consumption is single-shot and never re-promotes', () => {
   const scope = RecoveryScope.createRecoveryScope()
   const plan = buildPlan({
     session: 'ses-term',
@@ -175,7 +175,7 @@ test('WHAT[PAR-011] terminal consumption is single-shot and never re-promotes', 
     view: null,
   })
 })
-test('WHAT[PAR-011] freeze under the wrong session key is an identity mismatch', () => {
+test('WHAT[provider-attempt-recovery-011] freeze under the wrong session key is an identity mismatch', () => {
   const scope = RecoveryScope.createRecoveryScope()
   const plan = buildPlan({})
   assert.equal(plan.view.session, 'ses-1')
@@ -199,7 +199,7 @@ test('WHAT[PAR-011] freeze under the wrong session key is an identity mismatch',
   assert.equal(admitted.view.session, 'ses-1')
   assert.equal(admitted.view.physical, 'phys-1')
 })
-test('WHAT[PAR-011] freeze under the wrong physical key is an identity mismatch', () => {
+test('WHAT[provider-attempt-recovery-011] freeze under the wrong physical key is an identity mismatch', () => {
   const scope = RecoveryScope.createRecoveryScope()
   const plan = buildPlan({ session: 'ses-phys', physical: 'phys-exact' })
 
@@ -216,7 +216,7 @@ test('WHAT[PAR-011] freeze under the wrong physical key is an identity mismatch'
 
   assert.equal(RecoveryScope.freezeAttemptPlan(scope, 'ses-phys', 'phys-exact', plan.handle).outcome, 'Admitted')
 })
-test('WHAT[PAR-011] same physical replay after binding returns the admitted plan', () => {
+test('WHAT[provider-attempt-recovery-011] same physical replay after binding returns the admitted plan', () => {
   const scope = RecoveryScope.createRecoveryScope()
   const plan = buildPlan({
     session: 'ses-replay',
@@ -246,7 +246,7 @@ test('WHAT[PAR-011] same physical replay after binding returns the admitted plan
   assert.equal(rebound.bound, true)
   assert.deepEqual(rebound.view, bound.view)
 })
-test('WHAT[PAR-011] same run and root with a different participant conflicts', () => {
+test('WHAT[provider-attempt-recovery-011] same run and root with a different participant conflicts', () => {
   const scope = RecoveryScope.createRecoveryScope()
   const coderPlan = buildPlan({
     session: 'ses-who',
@@ -287,7 +287,7 @@ test('WHAT[PAR-011] same run and root with a different participant conflicts', (
   assert.equal(bound.bound, true)
   assert.equal(bound.view.agent, 'engineer')
 })
-test('WHAT[PAR-011] same run and root with a different role conflicts', () => {
+test('WHAT[provider-attempt-recovery-011] same run and root with a different role conflicts', () => {
   const scope = RecoveryScope.createRecoveryScope()
   const coderPlan = buildPlan({
     session: 'ses-role',
@@ -310,7 +310,7 @@ test('WHAT[PAR-011] same run and root with a different role conflicts', () => {
   assert.equal(conflict.existing.role, 'engineer')
   assert.equal(conflict.attempted.role, 'devops')
 })
-test('WHAT[PAR-011] recordBound rejects a conflicting session, run, or physical parent', () => {
+test('WHAT[provider-attempt-recovery-011] recordBound rejects a conflicting session, run, or physical parent', () => {
   const scope = RecoveryScope.createRecoveryScope()
   const plan = buildPlan({ session: 'ses-rec', physical: 'phys-rec' })
   assert.equal(RecoveryScope.freezeAttemptPlan(scope, 'ses-rec', 'phys-rec', plan.handle).outcome, 'Admitted')
@@ -331,7 +331,7 @@ test('WHAT[PAR-011] recordBound rejects a conflicting session, run, or physical 
   assert.equal(peeked.found, true)
   assert.equal(peeked.view.physical, 'phys-rec')
 })
-test('WHAT[PAR-011] same candidate probe id with a different digest conflicts', () => {
+test('WHAT[provider-attempt-recovery-011] same candidate probe id with a different digest conflicts', () => {
   const scope = RecoveryScope.createRecoveryScope()
   const first = buildPlan({
     session: 'ses-digest',
@@ -350,7 +350,7 @@ test('WHAT[PAR-011] same candidate probe id with a different digest conflicts', 
   assert.equal(conflict.existing.probe.frozenDigest, 'sha256:aaa')
   assert.equal(conflict.attempted.probe.frozenDigest, 'sha256:bbb')
 })
-test('WHAT[PAR-011] terminal consume clears both registries so a fresh physical plan may freeze', () => {
+test('WHAT[provider-attempt-recovery-011] terminal consume clears both registries so a fresh physical plan may freeze', () => {
   const scope = RecoveryScope.createRecoveryScope()
   const first = buildPlan({
     session: 'ses-clear',
@@ -404,7 +404,7 @@ const TOOL_CAPABILITIES = [
   'Write',
 ]
 
-test('WHAT[PAR-011] plans_carry_no_budget_snapshot', () => {
+test('WHAT[provider-attempt-recovery-011] plans_carry_no_budget_snapshot', () => {
   const planned = planner.plan({ role: 'engineer', kind: 'work-main' })
 
   for (const key of ['failures', 'budget', 'consecutiveFailureCount', 'count', 'exhausted']) {
@@ -425,11 +425,11 @@ test('WHAT[PAR-011] plans_carry_no_budget_snapshot', () => {
     'toolCapabilities',
   ])
 })
-test('WHAT[PAR-011] an_attempt_without_a_probe_cannot_promote_even_on_success', () => {
+test('WHAT[provider-attempt-recovery-011] an_attempt_without_a_probe_cannot_promote_even_on_success', () => {
   const withoutProbe = planner.plan({ role: 'engineer', kind: 'work-main', policyAllowsProbe: false })
   assert.equal(planner.promotableProbeId(withoutProbe, 'Completed'), null)
 })
-test('WHAT[PAR-011] retry_decision_is_material_based_and_physically_bound', () => {
+test('WHAT[provider-attempt-recovery-011] retry_decision_is_material_based_and_physically_bound', () => {
   // Same failed kind, only the material flag flips the decision: no transient
   // channel participates — the two calls are pure functions of their inputs.
   assert.notEqual(

@@ -22,7 +22,7 @@ const before = (index) => ({ kind: 'BeforeMessageIndex', index })
 
 const append = { kind: 'Append' }
 
-test('WHAT[PROVIDER-PROJECTION-001] online and replay projection share one canonical generic renderer', () => {
+test('WHAT[provider-projection-001] online and replay projection share one canonical generic renderer', () => {
   const current = [message('user', 'base')]
   const intent = insert('replayable', append, [row('assistant', 'projected', 'projected-id')])
   const online = Projection.renderMessagesWithHostIds(snapshot(), current, [intent])

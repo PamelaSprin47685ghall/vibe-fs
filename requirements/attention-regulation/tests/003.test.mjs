@@ -24,7 +24,7 @@ const recordingPort = () => {
   return fixture
 }
 
-test('WHAT[ATTENTION-REGULATION-003] defer creates pending work without creating execution or obligation state', async () => {
+test('WHAT[attention-regulation-003] defer creates pending work without creating execution or obligation state', async () => {
   const fixture = recordingPort()
   const accepted = await tools.execute(fixture.tools, 'defer', { new_work: '  investigate later  ' }, context())
   assert.ok(accepted.includes('investigate later'))

@@ -16,7 +16,7 @@ const job = (id, path = `/tmp/${id}`) => ({
   targetBranchFrozen: 'refs/heads/main',
 })
 
-test('WHAT[CHGINT-009] manager loop keeps the durable job worktree', () => {
+test('WHAT[change-integration-009] manager loop keeps the durable job worktree', () => {
   let projection = change.createJob(change.empty(), job('hostfw8', '/tmp/wt-hostfw8'))
   projection = change.recordFact(projection, 'hostfw8', change.fact('CandidateReady', {
     candidateCommit: 'c1',
@@ -115,12 +115,12 @@ const foldProjection = (events) => {
 const worktreeRequested = { kind: 'WorktreeCreateRequested', payload: { jobId: JOB, worktreeIdentity: 'manager/job_1', worktreePath: '/tmp/wt1' } }
 const worktreeCreated = { kind: 'WorktreeCreated', payload: { jobId: JOB, worktreeIdentity: 'manager/job_1', worktreePath: '/tmp/wt1' } }
 
-test('WHAT[CHGINT-009] ORCH_006_the_worktree_is_located_by_identity_and_the_path_is_only_diagnostic', () => {
+test('WHAT[change-integration-009] ORCH_006_the_worktree_is_located_by_identity_and_the_path_is_only_diagnostic', () => {
   const job = change.find(created(), JOB)
   assert.notEqual(job.worktreeIdentity, job.worktreePath)
   assert.equal(job.worktreeIdentity, 'wt_1')
 })
-test('WHAT[CHGINT-009] ORCH_003_durable_facts_do_not_change_job_identity', () => {
+test('WHAT[change-integration-009] ORCH_003_durable_facts_do_not_change_job_identity', () => {
   const before = change.find(created(), JOB)
   const after = jobAt(fact.candidateReady())
   const identity = (job) => ({
@@ -135,13 +135,13 @@ test('WHAT[CHGINT-009] ORCH_003_durable_facts_do_not_change_job_identity', () =>
   assert.deepEqual(identity(after.job), identity(before))
   assert.deepEqual(after.job.facts, ['CandidateReady'])
 })
-test('WHAT[CHGINT-009] ORCH_003_a_manager_session_resolves_to_its_one_job', () => {
+test('WHAT[change-integration-009] ORCH_003_a_manager_session_resolves_to_its_one_job', () => {
   const first = created()
   const second = change.createJob(first, payload({ jobId: 'job_2', managerSessionId: 'ses_m2', worktreeIdentity: 'wt_2' }))
   assert.equal(change.find(second, 'job_2').managerSessionId, 'ses_m2')
   assert.equal(change.find(second, 'ses_zz'), null)
 })
-test('WHAT[CHGINT-009] ORCH_003_a_second_create_for_one_job_id_cannot_change_its_manager_or_worktree', () => {
+test('WHAT[change-integration-009] ORCH_003_a_second_create_for_one_job_id_cannot_change_its_manager_or_worktree', () => {
   const again = change.createJob(created(), payload({ managerAgent: 'coder', worktreeIdentity: 'wt_other', worktreePath: '/tmp/wt_other' }))
   assert.deepEqual(
     { agent: change.find(again, JOB).managerAgent, worktree: change.find(again, JOB).worktreeIdentity },
@@ -180,7 +180,7 @@ const valueOf = async (promise) => {
   return result.value
 }
 
-test('WHAT[CHGINT-009] WORKTREE_CMD_identity_of_is_manager_slash_job', () => {
+test('WHAT[change-integration-009] WORKTREE_CMD_identity_of_is_manager_slash_job', () => {
   assert.equal(change.worktreeIdentityOf('job-7'), 'manager/job-7')
 })
 }

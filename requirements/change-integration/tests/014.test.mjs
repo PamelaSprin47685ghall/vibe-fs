@@ -6,7 +6,7 @@ const { default: test } = await import("node:test");
 
 const change = await import('../../../dist/Change/Surface.js')
 
-test('WHAT[CHGINT-014] stale certificate never reaches publish gate', async () => {
+test('WHAT[change-integration-014] stale certificate never reaches publish gate', async () => {
   const observation = await change.observeRelayProgram('stale-certificate')
 
   assert.deepEqual(observation.invalidations, ['WorkspaceChangedAfterAssessment'])
@@ -15,7 +15,7 @@ test('WHAT[CHGINT-014] stale certificate never reaches publish gate', async () =
   assert.equal(observation.gateAcquireCount, 0)
   assert.deepEqual(observation.facts, [])
 })
-test('WHAT[CHGINT-014] Git conflict facts override model-perfect publication', async () => {
+test('WHAT[change-integration-014] Git conflict facts override model-perfect publication', async () => {
   const observation = await change.observeRelayProgram('artifact-conflict')
 
   assert.deepEqual(observation.facts, ['ConflictDetected'])
@@ -31,14 +31,14 @@ const { default: test } = await import("node:test");
 
 const change = await import('../../../dist/Change/Surface.js')
 
-test('WHAT[CHGINT-014] stale certificate fails closed and never enters publish gate', async () => {
+test('WHAT[change-integration-014] stale certificate fails closed and never enters publish gate', async () => {
   const observation = await change.observeRelayProgram('stale-certificate')
 
   assert.deepEqual(observation.invalidations, ['WorkspaceChangedAfterAssessment'])
   assert.equal(observation.gateAcquireCount, 0)
   assert.equal(observation.facts.includes('Published'), false)
 })
-test('WHAT[CHGINT-014] reentry with wrong original-vs-rebased snapshot sends zero FF', async () => {
+test('WHAT[change-integration-014] reentry with wrong original-vs-rebased snapshot sends zero FF', async () => {
   const observation = await change.observeRelayProgram('reentry-wrong-snapshot')
 
   assert.equal(observation.ffCalls, 0)
@@ -54,7 +54,7 @@ const change = await import("../../../dist/Change/Surface.js");
 
 const published = (jobId, head) => ({ kind: 'Published', jobId, head })
 
-test('WHAT[DELEG-014] VERDICT_MAILBOX_ready_or_racing_verdict_beats_interrupt', async () => {
+test('WHAT[change-integration-014] VERDICT_MAILBOX_ready_or_racing_verdict_beats_interrupt', async () => {
   for (const order of ['queued-before-join', 'publish-then-interrupt', 'interrupt-then-publish']) {
     const mailbox = change.createVerdictMailbox()
     change.verdictMailboxStartJob(mailbox)
@@ -82,7 +82,7 @@ test('WHAT[DELEG-014] VERDICT_MAILBOX_ready_or_racing_verdict_beats_interrupt', 
     assert.equal(change.verdictMailboxPendingCount(mailbox), 0, `${order}: winning batch must drain exactly once`)
   }
 })
-test('WHAT[DELEG-014] VERDICT_MAILBOX_idle_empty_returns_empty_sentinel', async () => {
+test('WHAT[change-integration-014] VERDICT_MAILBOX_idle_empty_returns_empty_sentinel', async () => {
   const mailbox = change.createVerdictMailbox()
   const out = await change.verdictMailboxJoinAvailable(mailbox, 8, change.createVerdictInterrupt())
   assert.equal(out.kind, 'ResultsAvailable')
@@ -90,7 +90,7 @@ test('WHAT[DELEG-014] VERDICT_MAILBOX_idle_empty_returns_empty_sentinel', async 
   assert.equal(out.verdicts[0].kind, 'Empty')
   assert.equal(change.verdictMailboxPendingCount(mailbox), 0)
 })
-test('WHAT[DELEG-014] VERDICT_MAILBOX_batch_is_capped_at_maxjoinbatch_fifo_with_exact_remainder', async () => {
+test('WHAT[change-integration-014] VERDICT_MAILBOX_batch_is_capped_at_maxjoinbatch_fifo_with_exact_remainder', async () => {
   const cap = change.verdictMaxBatch()
   assert.ok(Number.isInteger(cap) && cap > 0, 'cap must come from the compiled JoinBatch')
   const mailbox = change.createVerdictMailbox()

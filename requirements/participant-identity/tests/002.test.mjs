@@ -35,7 +35,7 @@ const EXPECTED_PERSONAS = {
 }
 const personaLabel = (role) => identity.persona(role, '')
 
-test('WHAT[PID-002] persona_catalog_maps_roles_to_single_persona', () => {
+test('WHAT[participant-identity-002] persona_catalog_maps_roles_to_single_persona', () => {
   for (const [role, expected] of Object.entries(EXPECTED_PERSONAS)) {
     assert.equal(personaLabel(role), expected)
   }
@@ -43,7 +43,7 @@ test('WHAT[PID-002] persona_catalog_maps_roles_to_single_persona', () => {
   assert.equal(identity.resolveParticipantIdentityAtRoot('bookkeeper').identity.persona, 'Curator')
   assert.equal(identity.resolveParticipantIdentityAtRoot('predictor').identity.persona, 'Engineer')
 })
-test('WHAT[PID-002] all_legacy_bare_names_are_rejected', () => {
+test('WHAT[participant-identity-002] all_legacy_bare_names_are_rejected', () => {
   assert.deepEqual(new Set(identity.legacyNames), new Set(EXPECTED_LEGACY))
   for (const bare of EXPECTED_LEGACY) {
     assert.equal(identity.isLegacyName(bare), true, `'${bare}' must be legacy`)
@@ -55,7 +55,7 @@ test('WHAT[PID-002] all_legacy_bare_names_are_rejected', () => {
   assert.equal(identity.isManagedName('reviewer-fast'), false)
   for (const name of identity.requiredNames) assert.equal(identity.isLegacyName(name), false)
 })
-test('WHAT[PID-002] rejection_prose_is_version_agnostic', () => {
+test('WHAT[participant-identity-002] rejection_prose_is_version_agnostic', () => {
   const supported = identity.formatLegacyNameNotSupported('student')
   const inConfig = identity.formatLegacyNameInConfig('student')
   for (const text of [supported, inConfig]) {
@@ -99,13 +99,13 @@ const authorityModel = [
   '    member this.ParticipantIdentity = PromptIdentitySeed.participantIdentity this.StoredIdentitySeed',
 ].join('\n')
 
-test('WHAT[PID-002] the identity boundary entries are accepted for clean authority shape', () => {
+test('WHAT[participant-identity-002] the identity boundary entries are accepted for clean authority shape', () => {
   assert.deepEqual(scanEntries([
     { file: AUTHORITY_FACTS, text: authorityFacts },
     { file: AUTHORITY_MODEL, text: authorityModel },
   ]), [])
 })
-test('WHAT[PID-002] AuthorityRootAcceptedPayload must store the IdentitySeed', () => {
+test('WHAT[participant-identity-002] AuthorityRootAcceptedPayload must store the IdentitySeed', () => {
   const seedless = authorityFacts.replace('      IdentitySeed: PromptIdentitySeed }', '      AcceptedAt: int }')
   assert.deepEqual(
     scanEntries([{ file: AUTHORITY_FACTS, text: seedless }]),
@@ -119,7 +119,7 @@ test('WHAT[PID-002] AuthorityRootAcceptedPayload must store the IdentitySeed', (
     ],
   )
 })
-test('WHAT[PID-002] AuthorityRootAcceptedPayload cannot flatten IdentitySeed fields', () => {
+test('WHAT[participant-identity-002] AuthorityRootAcceptedPayload cannot flatten IdentitySeed fields', () => {
   const duplicated = authorityFacts.replace(
     '      IdentitySeed: PromptIdentitySeed }',
     '      IdentitySeed: PromptIdentitySeed\n      SelectedAgent: AgentId }',
@@ -136,7 +136,7 @@ test('WHAT[PID-002] AuthorityRootAcceptedPayload cannot flatten IdentitySeed fie
     ],
   )
 })
-test('WHAT[PID-002] AuthorityExecutionProfile must derive identity from its seed', () => {
+test('WHAT[participant-identity-002] AuthorityExecutionProfile must derive identity from its seed', () => {
   const undivided = authorityModel.replace(
     '    member this.ParticipantIdentity = PromptIdentitySeed.participantIdentity this.StoredIdentitySeed',
     '    member this.SchemaVersion = 1',
@@ -153,7 +153,7 @@ test('WHAT[PID-002] AuthorityExecutionProfile must derive identity from its seed
     ],
   )
 })
-test('WHAT[PID-002] a SessionId-keyed identity collection is forbidden', () => {
+test('WHAT[participant-identity-002] a SessionId-keyed identity collection is forbidden', () => {
   const file = 'src/Wanxiangshu/Interaction/Dispatch/Cache.fs'
   const source = [
     'namespace Wanxiangshu.Interaction.Dispatch',
@@ -172,7 +172,7 @@ test('WHAT[PID-002] a SessionId-keyed identity collection is forbidden', () => {
     ],
   )
 })
-test('WHAT[PID-002] a SessionId-keyed identity registry is forbidden', () => {
+test('WHAT[participant-identity-002] a SessionId-keyed identity registry is forbidden', () => {
   const file = 'src/Wanxiangshu/Interaction/Dispatch/Registry.fs'
   const source = [
     'namespace Wanxiangshu.Interaction.Dispatch',
@@ -190,7 +190,7 @@ test('WHAT[PID-002] a SessionId-keyed identity registry is forbidden', () => {
     ],
   )
 })
-test('WHAT[PID-002] a second identity fact owner is forbidden', () => {
+test('WHAT[participant-identity-002] a second identity fact owner is forbidden', () => {
   const file = 'src/Wanxiangshu/Interaction/Authority/Second.fs'
   const source = [
     'namespace Wanxiangshu.Interaction.Authority',
@@ -208,7 +208,7 @@ test('WHAT[PID-002] a second identity fact owner is forbidden', () => {
     ],
   )
 })
-test('WHAT[PID-002] the production participant identity boundary is clean', () => {
+test('WHAT[participant-identity-002] the production participant identity boundary is clean', () => {
   assert.deepEqual(scanRepo(ROOT), [])
 })
 }
@@ -281,7 +281,7 @@ const assertNoLegacyIdentityFields = (value, label) => {
   }
 }
 
-test('WHAT[PID-002] ProviderAttempt carries its ParticipantIdentity as one nested value', () => {
+test('WHAT[participant-identity-002] ProviderAttempt carries its ParticipantIdentity as one nested value', () => {
   const attempt = attemptPlan('engineer', 'work-main')
   const expected = canonicalIdentityOf('engineer')
 
@@ -339,7 +339,7 @@ const assertError = (result, error) => {
   assert.equal(result.error, error)
 }
 
-test('WHAT[PID-002] the retired peer slot is ignored and never affects identity', () => {
+test('WHAT[participant-identity-002] the retired peer slot is ignored and never affects identity', () => {
   const canonical = expectedView('engineer')
   const withLegacyPeer = identity.rehydrateParticipantIdentity(
     '',

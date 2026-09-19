@@ -1,11 +1,11 @@
 # execution-model-routing — WHAT
 
-## EMR-001: 唯一模型调度 authority = `~/.config/opencode/wanxiangshu.mjs`；缺失时原子创建推荐模板
+## [001] 唯一模型调度 authority = `~/.config/opencode/wanxiangshu.mjs`；缺失时原子创建推荐模板
 
 Wanxiangshu 的 managed 模型调度由 `~/.config/opencode/wanxiangshu.mjs` 的 default export 唯一决定。其余来源（`opencode.json`、环境变量、Host-final agent inventory、内建表）一律不得覆盖或替代该权威。
 若文件不存在，系统在加载时确保目录存在并原子创建推荐策略模板，随后加载该文件。已有文件严禁自动覆盖。文件缺失、加载失败或导出非法时直接 fail closed。
 
-## EMR-002: scheduler ABI 只有 `role + running + previous → target | null`
+## [002] scheduler ABI 只有 `role + running + previous → target | null`
 
 调度函数的唯一签名合同为：
 ```js
@@ -17,44 +17,44 @@ export default function route(role, running, previous) { ... }
 - 返回值：必须包含非空 `provider/model` 与 `reasoning`，或返回 `null`。
 - 抛出异常、返回 Promise 或非法结构均视为配置错误，直接 fail closed。
 
-## EMR-003: `running` 是真实 provider capacity token multiset；不是 live-session / active-execution 计数
+## [003] `running` 是真实 provider capacity token multiset；不是 live-session / active-execution 计数
 
 `running` 准确反映系统内部实际持有的 provider capacity token 集合。基础 token 总数即为 `running.length`。同一进程内所有 plugin 实例与 worktree 共享该 module-level multiset 真相。显式 lender 的 token 被借用方使用时只计数一次，不得重复计数。
 
-## EMR-004: required execution demand 只在 `chat.message` 物理执行准入产生；`null` = 等待，不是失败
+## [004] required execution demand 只在 `chat.message` 物理执行准入产生；`null` = 等待，不是失败
 
 发送或排队阶段严禁抢占 model slot，`SendPrompt` 必须保持 `Model=None`。唯一合法的需求准入点是 Host 接收物理 user message 后的 `chat.message` 边界。
 若调度器返回 `null`，不调用 provider、不消耗失败预算，demand 进入 pending 队列并在 occupancy 变更时由事件驱动重算。新到达的物理 user message 或会话销毁将取消并取代被 supersede 的旧 pending demand。
 
-## EMR-005: 模型选择策略全部属于 MJS；runtime 不再拥有 lane、容量表或候选算法
+## [005] 模型选择策略全部属于 MJS；runtime 不再拥有 lane、容量表或候选算法
 
 Runtime 仅负责加载 scheduler、校验 ABI、维护进程共享的 token ledger 与借贷仲裁，不拥有任何模型分类、优先级表、容量上限或调度策略。一切关于模型选取与并发限制的逻辑均属于 MJS 策略。
 
-## EMR-006: managed lease 只在一个物理 execution 内稳定；session continuation 重新调度但可偏好上一 target
+## [006] managed lease 只在一个物理 execution 内稳定；session continuation 重新调度但可偏好上一 target
 
 物理执行租约与 `(SessionId, PhysicalUserMessageId)` 绑定。同一 PhysicalUserMessageId 的执行与重试严格复用已有 target 与 capacity fence，不重新触发调度器，亦严禁在同一 physical 内改变 Role、participant 或切换 agent；同一 SessionId 出现新 PhysicalUserMessageId（fresh physical execution）时原子替代旧租约，并将该 run 不可变的 canonical Role 重新经 MJS 调度器路由至 target（可选择新 target；仅当旧执行仍是当前活跃执行时才将其 target 作为 `previous` 传入供优先续用），但绝不改变 participant identity 或 Role。provider step 结束时必须把实际 lease target 与 exact `ProviderRunIdentity` 绑定；failure settlement 只可原子消费该 witness，禁止从 mutable session-last target 猜测失败 provider。每个 session 最多保留 latest run witness，新 run 自动废除旧 witness。租约不以 SessionId 为单位跨物理执行永久绑定；exact terminal 释放后不存在 session 级 previous 缓存。
 
-## EMR-007: physical execution identity / end evidence 释放 occupancy；session/业务 lifecycle 不拥有槽
+## [007] physical execution identity / end evidence 释放 occupancy；session/业务 lifecycle 不拥有槽
 
 租约释放必须依赖确切的物理执行终结证据（无 error、completed assistant、`finish` 明确属于 `stop | length | content-filter`，且其 parentID 匹配 PhysicalUserMessageId）。
 `finish="tool-calls"` 仅终结单步并归还 step token，不解除 physical execution binding；assistant error，以及 Host 将流错误归一化后的 `finish="unknown" | "error"`，都只作为单步终结证据，不直接删除 execution binding，以便 Host 继续同 material retry。业务层的 handle 完成、join 或 finality 不直接操作租约。
 
-## EMR-008: `opencode.json` model 不再具有 authority；不校验不同角色 model 互异
+## [008] `opencode.json` model 不再具有 authority；不校验不同角色 model 互异
 
 Host 的 `opencode.json` 不作为 managed model 的真相源。系统不要求不同 canonical 角色使用互异的物理模型字符串；两者解析至相同 target 属于合法状态 (历史 `fast-`/`deep-` 档亦然)。
 
-## EMR-009: `chat.message` 是唯一 managed model admission；dispatch message 保持 model-free
+## [009] `chat.message` 是唯一 managed model admission；dispatch message 保持 model-free
 
 所有内部 synthetic prompt 分派均保持 `Model=None`。Host 接收物理 user message 后的 `chat.message` hook 负责获取租约，并将 `{providerID, modelID, variant}` 投影至 mutable message。后续 `chat.params` 仅验证当前物理执行已记录的确切绑定。
 
-## EMR-010: provider capacity 独立成可抢占 token；只凭显式 lender 借用
+## [010] provider capacity 独立成可抢占 token；只凭显式 lender 借用
 
 ModelTarget 物理绑定与 provider capacity token 严格解耦。在 provider 请求发出前，`experimental.chat.messages.transform` 负责获取对应 provider 的 capacity token。
 借用只能使用 acquire 输入中 `lenderSessionId` 显式指定的 lender 的 credit；无 lender 输入的 demand 只走普通容量，绝不因派生关系、 ambient 拓扑或同名 session 而获得信用。token 仅在 provider-step 边界转移。显式召回（release/retire）须等待借用方 step 结束；但当 lender 自己的 `experimental.chat.messages.transform` 为同一 owned credit 再次进入后续 provider step 时，容量所有者必须在仲裁前回收该 credit 上任何外来 InFlight/Retiring step（transform 入口抢占召回）：回合内后代借用可阻塞属主，属主 transform 一旦触发即回收。等待中的 borrower 仍按单调序号优先于较晚的 lender owned step，不得被该回收饿死。
 同一 token 同时面对多个可执行 provider-step demand 时，必须按 demand 的单调序号选择最早者；owned、borrowed、ordinary 只决定该 demand 可使用哪枚 token，不构成调度优先级。较晚到达的 lender owned step 不得越过已等待且可借用该 token 的 child step。
 Host 开始执行某个 managed tool 时，tool context 的 exact `ProviderRunIdentity` 构成 provider→tool 的因果 step 边界：在任何 capability/role gate 与 tool body 运行前，必须用当前冻结的 `PhysicalUserMessageId` 结束该 provider step，使 token 进入可借用的 idle 状态。工具体可以同步等待 descendant provider work，因此严禁把 provider capacity 持有到 tool body 返回、严禁以 wall-clock timeout 猜测何时释放，也严禁通过允许借用真实仍在执行的 token 伪造并发容量。
 
-## EMR-011: 物理 admission 顺序固定为 accept → acquire → bind → project
+## [011] 物理 admission 顺序固定为 accept → acquire → bind → project
 
 Managed chat execution 必须先为 exact `(SessionId, PhysicalUserMessageId)` durable 写入 `Accepted`（携带 IdentitySeed 确立的不可变 canonical participant 证据），路由器随后才可排队或获取容量。
 一次物理执行的顺序严格为：
@@ -65,44 +65,44 @@ Managed chat execution 必须先为 exact `(SessionId, PhysicalUserMessageId)` d
 5. Host projection：将 target 投影至 Host 消息。
 任一步失败只能交给 `execution-failure-policy` 结算已拥有的事实与资源；严禁 acquire-before-accept、先改 Host message 后补 binding，或让未接受的发送意图预占容量。
 
-## EMR-012: Capacity 是 exact opaque fenced capability
+## [012] Capacity 是 exact opaque fenced capability
 
 每次成功 acquire 返回不可伪造、单次结算的 capacity fence。
 Capacity exact identity 严格为 `(SessionId, PhysicalUserMessageId, Role, Participant, ModelTarget, CapacityFence)`，严格区分本地 participant（Role/Persona/SelectedAgent 证据）与远端模型目标（ModelTarget）。
 同一 physical execution 的重试严格复用已有 target 与 fence；fresh physical execution 则获取对应新 execution 的 fresh fence。
 capacity fence 至少因果绑定 exact session、physical message、fixed Role + Participant、target、owner lineage 与 fence epoch。borrow/recall 只转移同一 fence 的合法 custody，不复制 token。release、retain 与 transfer 必须携带 exact fence 并验证包含 fixed Role+Participant 与 exact target 的完整 capacity identity 及当前 custody；旧 epoch、重复 settlement、错误 physical id 或按计数/session 猜测释放均 fail closed。capacity settlement 的选择由 `execution-failure-policy` 输出，路由器只验证并原子执行。
 
-## EMR-013: Pending demand 是 bounded typed queue
+## [013] Pending demand 是 bounded typed queue
 
 `null` 或暂不可 acquire 的已接受 demand 只能进入有明确上限的 typed queue；entry 必须携带 exact `(SessionId, PhysicalUserMessageId)`、resolved target、role/participant/lender 输入与 supersession identity。队列满返回 typed `CapacityQueueFull` 并交给 failure policy，绝不得丢弃、无限扩容、解析错误文本后重试，或借 wall-clock timeout 清退。capacity release、exact supersede、session deletion 与 shutdown 是队列重算/移除事件；队列 correctness 不依赖 polling、sleep 或 elapsed time。
 
-## EMR-014: Capacity snapshot 与 reconciliation 只观察、绝不修复
+## [014] Capacity snapshot 与 reconciliation 只观察、绝不修复
 
 Capacity owner 必须发布不可变 snapshot：ledger entry、token state、exact execution owner、pending waiter、role/participant 身份与单调 duplicate/stale/conflict transition counter。始终满足 `0 <= active <= ledger entries`，且每个 token、waiter 与 map owner 均可追溯到 snapshot 内同一 exact identity。纯 `Evidence -> Decision` reconciliation 对合法 evidence 返回 `NoOp`；任何 map/ledger divergence、无 owner token/waiter 或不可能计数返回 typed `FailClosed`，不得自动补删 ledger/map、清零 counter/config 或借时间推断。release、commit、cancel 仅返回封闭 outcome `Applied | AlreadyApplied | StaleFence | Conflict`；duplicate 不得二次递减，旧 fence 不得触碰新 execution。
 
-## EMR-015: Reliability query 复用 capacity owner snapshot
+## [015] Reliability query 复用 capacity owner snapshot
 
-Reliability query 的 queue depth、active lease 与 duplicate/stale/conflict fence 数必须逐字段投影 EMR-014 immutable snapshot；diagnostic 模块严禁维护第二份 capacity/release counter、重算不同公式、reset/repair owner state 或把 query result 反馈给 routing。`CapacityQueueFull` observation 是缺失的 process-local monotonic diagnostic counter，只用于观测，不授权重试。
+Reliability query 的 queue depth、active lease 与 duplicate/stale/conflict fence 数必须逐字段投影 execution-model-routing-014 immutable snapshot；diagnostic 模块严禁维护第二份 capacity/release counter、重算不同公式、reset/repair owner state 或把 query result 反馈给 routing。`CapacityQueueFull` observation 是缺失的 process-local monotonic diagnostic counter，只用于观测，不授权重试。
 
-## EMR-016: routing fatal绑定exact fence settlement并经注入fuse执行
+## [016] routing fatal绑定exact fence settlement并经注入fuse执行
 
 fatal incident必须携带exact execution key、capacity fence及`Committed | Unknown` settlement evidence；未settle、stale fence与coarse session identity无权fatal。routing/Host port只接受composition注入的mandatory fatal capability，不得直接引用physical adapter。同一incident只允许一次report与kill，fatal不得修复、清零或释放capacity state。
 
-## EMR-017: provider 恢复重投的原目标绑定与失败驱逐
+## [017] provider 恢复重投的原目标绑定与失败驱逐
 
-provider 恢复的一次已确认失败由 `ModelRouting` 结算失败 attempt 的 exact witness（EMR-006），且只有两种结局：
+provider 恢复的一次已确认失败由 `ModelRouting` 结算失败 attempt 的 exact witness（execution-model-routing-006），且只有两种结局：
 
 - 保留目标：为同一 `SessionId` 写入一次单次消费的 recovery retry 绑定；该 session 的下一次 fresh admission 以该 target 作为调度偏好（优先于被原子取代执行提供的 `previous`），绑定随之被消费，无论该 admission 成功、排队还是被更新物理消息取代。
 - 驱逐目标：其 provider 在进程生命周期内被 poison，后续 fresh admission 回到普通调度。
 
 两种结局都只属于该 exact witness：witness 单次消费，重复或过期证据不产生第二结局；无 witness（例如进程重启后）不产生任何结局。recovery retry 绑定不是 session 级 previous 缓存：它只由失败结算从 exact witness 显式写入、只服务该 session 的下一次 fresh admission，并在 force cleanup（`ReleaseExecution`）时清除。
 
-## EMR-018: 新角色集合模型路由与旧角色槽位解耦
+## [018] 新角色集合模型路由与旧角色槽位解耦
 
 Wanxiangshu 的模型调度权威以当前合法角色集合（Engineer、DevOps、Manager、Orchestrator、Blogger 等）为唯一合法输入。
-推荐策略模板与 MJS 调度器不再要求或依赖 Coder、Inspector、Browser、Inquiry、Distiller 等旧角色模型槽位；若调度输入为已废除角色，系统必须 fail closed，严禁为其分配模型租约或发起 provider 物理准入。
+推荐策略模板与 MJS 调度器仅要求当前合法角色模型槽位；若调度输入为已废除角色，系统必须 fail closed，严禁为其分配模型租约或发起 provider 物理准入。
 
-## EMR-019: 固定 DevOps 模型绑定持久性与禁止通过 resume 换模型
+## [019] 固定 DevOps 模型绑定持久性与禁止通过 resume 换模型
 
 同一道路内固定绑定的 DevOps 的 ModelTarget 由道路初始化阶段确定并持久化记录。
 后续该道路内所有针对 DevOps 的 resume、续行或崩溃恢复，必须严格继承并复用该既有 ModelTarget，严禁通过 resume 参数或运行时策略重新分配、篡改或覆盖 DevOps 的物理模型。

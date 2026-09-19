@@ -292,7 +292,7 @@ module SessionRecoveryHostSurface =
     /// Release the journal capability. The caller removes the directory.
     let disposeRecoveryHost (handle: RecoveryHostHandle) : unit = JournalSurface.dispose handle.Journal
 
-    /// PAR-023: the Host published session idle. The sweep considers only the
+    /// provider-attempt-recovery-023: the Host published session idle. The sweep considers only the
     /// session's `Accepted ∧ ¬ProviderStarted` executions; the returned view is the
     /// whole observable effect (port invocations + manual interventions).
     let signalSessionQuiesced (handle: RecoveryHostHandle) (sessionId: string) : Task<obj> =

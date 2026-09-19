@@ -87,7 +87,7 @@ const mustFold = (wires) => {
 const phaseOf = (projection, physicalUserMessageId) =>
   projection.find((entry) => entry.physicalUserMessageId === physicalUserMessageId)
 
-test('WHAT[CHATEXEC-002] online prefix integration equals replay from the same canonical facts', () => {
+test('WHAT[managed-chat-execution-002] online prefix integration equals replay from the same canonical facts', () => {
   const history = [
     acceptedWire('msg-online-a'),
     startedWire('msg-online-a'),
@@ -145,7 +145,7 @@ const canonicalize = (wire) => {
 }
 const acceptedPayload = (wire) => wire[1][1][1]
 
-test('WHAT[CHATEXEC-002] schema v1 Accepted ProviderStarted and Terminal round-trip canonically', () => {
+test('WHAT[managed-chat-execution-002] schema v1 Accepted ProviderStarted and Terminal round-trip canonically', () => {
   const acceptedCanonical = canonicalize(fixture)
   assert.doesNotMatch(acceptedCanonical, /PeerAgent|EffectiveAgent/, 'canonical encoding drops raw v1 legacy agent fields')
   assert.equal(canonicalize(acceptedCanonical), acceptedCanonical, 'canonical bytes are a fixed point')
@@ -188,7 +188,7 @@ test('WHAT[CHATEXEC-002] schema v1 Accepted ProviderStarted and Terminal round-t
     },
   ])
 })
-test('WHAT[CHATEXEC-002] unknown schema version fails closed during production fold', () => {
+test('WHAT[managed-chat-execution-002] unknown schema version fails closed during production fold', () => {
   const unknown = JSON.parse(fixture)
   acceptedPayload(unknown).SchemaVersion = 2
   const result = chatExecution.fold([JSON.stringify(unknown)])
@@ -247,7 +247,7 @@ const terminal = (disposition, attempt = evidence(), appendOutcome = 'Committed'
 })
 const run = (...actions) => chatExecution.providerLifecycleScenario(actions)
 
-test('WHAT[CHATEXEC-002] writes ProviderStarted before provider work', async () => {
+test('WHAT[managed-chat-execution-002] writes ProviderStarted before provider work', async () => {
   const result = await run(accept(), start(), { kind: 'ProviderWork' })
 
   assert.equal(result.ok, true, JSON.stringify(result.error))
@@ -261,7 +261,7 @@ test('WHAT[CHATEXEC-002] writes ProviderStarted before provider work', async () 
   assert.equal(result.providerWorkCount, 1)
   assert.equal(result.projection.phase, 'ProviderStarted')
 })
-test('WHAT[CHATEXEC-002] each uncertain ProviderStarted append leaves projection accepted', async () => {
+test('WHAT[managed-chat-execution-002] each uncertain ProviderStarted append leaves projection accepted', async () => {
   for (const outcome of ['NotAttempted', 'CommitUnknown']) {
     const result = await run(accept(), start(evidence(), outcome))
     assert.equal(result.ok, false)

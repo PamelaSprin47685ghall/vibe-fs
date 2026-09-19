@@ -92,7 +92,7 @@ const mulberry32 = (seed) => {
   }
 }
 
-test('WHAT[PREFIX-STABILITY-014] PREFIX_STABILITY_pair_body_stays_out_of_the_trace_projections', () => {
+test('WHAT[prefix-stability-014] PREFIX_STABILITY_pair_body_stays_out_of_the_trace_projections', () => {
   const session = 'h13-014'
   const markerBody = 'SECRET synthetic marker body'
   const result = pair.foldAnchoredPair({
@@ -165,7 +165,7 @@ const pairMessages = (messages) => messages.filter((m) => isPairProgrammingThoug
 const guidanceSuffix = (markerText) => `\0\uFEFF${markerText}`
 const terminalOutputOf = (messages, id) => messages.find((m) => m.info.id === id).parts[0].state.output
 
-test('WHAT[PREFIX-STABILITY-014] PPT_source_is_the_frozen_side_channel_identity', () => {
+test('WHAT[prefix-stability-014] PPT_source_is_the_frozen_side_channel_identity', () => {
   assert.equal(source, 'pair-programming-auto-injected')
   assert.ok(text.length > 0, 'frozen thought text must be non-empty')
   assert.equal(isPairProgrammingThought(null), false)
@@ -174,7 +174,7 @@ test('WHAT[PREFIX-STABILITY-014] PPT_source_is_the_frozen_side_channel_identity'
   assert.equal(isPairProgrammingThought({ info: { source } }), true)
   assert.equal(isPairProgrammingThought({ parts: [] }), false, 'no info.source means not a marker')
 })
-test('WHAT[PREFIX-STABILITY-014] PPT_tryInject_user_quoting_the_thought_text_is_not_a_marker', async () => {
+test('WHAT[prefix-stability-014] PPT_tryInject_user_quoting_the_thought_text_is_not_a_marker', async () => {
   const raw = [userMsg('u1'), assistantText('a1'), userMsg('msg_1', text)]
   const out = await inject('ses_quote', raw)
   assert.equal(isPairProgrammingThought(out[2]), false, 'matching text alone must not classify as marker')

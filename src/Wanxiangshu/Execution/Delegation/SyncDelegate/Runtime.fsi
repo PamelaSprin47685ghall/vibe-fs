@@ -17,7 +17,7 @@ open Wanxiangshu.Persistence.Journal
 module internal SyncDelegatePhysicalIdentity =
     val title: scope: ReuseScopeId -> role: SyncDelegateRole -> agentName: string -> string
 
-/// Retry-decorator plug for dedicated delegate children (DELEG-023): the caller
+/// Retry-decorator plug for dedicated delegate children (delegation-023): the caller
 /// observes only the decorator's verdict, never a single transient attempt
 /// failure. `Ok unit` keeps the invocation pending (a fresh attempt was admitted
 /// or the episode was superseded); `Error reason` folds it as terminal.
@@ -93,7 +93,7 @@ type SyncDelegateRuntime =
     member HasOpeningCursor: sessionId: SessionId -> bool
     member AwaitAssignmentReady: sessionId: SessionId -> Task<bool>
     member TryAcceptedAuthorityRoot: sessionId: SessionId -> string option
-    /// DELEG-031: settle a completed turn from its own parts when the terminal
+    /// delegation-031: settle a completed turn from its own parts when the terminal
     /// trace capture reports NotCommitted/Unknown. True iff a live call
     /// consumed the turn.
     member SettleCompletedFromTurn: turn: ReconciledTurn -> bool

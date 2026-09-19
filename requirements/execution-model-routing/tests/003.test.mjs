@@ -88,7 +88,7 @@ const runProcess = (home, cycle) =>
     }),
   )
 
-test('WHAT[EMR-003] process restart drops process-local capacity and rebuilds only from explicit physical observations', (context) => {
+test('WHAT[execution-model-routing-003] process restart drops process-local capacity and rebuilds only from explicit physical observations', (context) => {
   const home = mkdtempSync(join(tmpdir(), 'wanxiangshu-capacity-restart-'))
   const config = join(home, '.config', 'opencode', 'wanxiangshu.mjs')
   mkdirSync(dirname(config), { recursive: true })
@@ -189,7 +189,7 @@ const providerLimited = (limits, routes) => (role, running, previous) => {
   return candidates.find(available) ?? null
 }
 
-test('WHAT[EMR-003] EMR_003_each_active_physical_execution_contributes_one_running_occurrence', async () => {
+test('WHAT[execution-model-routing-003] EMR_003_each_active_physical_execution_contributes_one_running_occurrence', async () => {
   const runtime = createRuntime(() => target())
 
   const first = await acquireTarget(runtime, 'session-a', 'msg-a', 'engineer', 'alice')
@@ -210,7 +210,7 @@ const { default: plugin } = await import("../../../dist/OpenCode/Plugin/Plugin.j
 const { createEnvironment, managedConfig, routeMessage } = await import("./support/process-shared-routing.mjs");
 
 
-test('WHAT[EMR-003] EMR_003_two_plugin_instances_share_one_process_running_multiset', async () => {
+test('WHAT[execution-model-routing-003] EMR_003_two_plugin_instances_share_one_process_running_multiset', async () => {
   const environment = createEnvironment(plugin.server)
   const previousHome = process.env.HOME
   process.env.HOME = environment.home

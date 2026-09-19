@@ -23,7 +23,7 @@ const withTemp = (fn) => {
   return fn(base)
 }
 
-test('WHAT[DURABLE-EVENTS-006] duplicate_same_identity_is_idempotent_but_collision_is_rejected', async () => {
+test('WHAT[durable-events-006] duplicate_same_identity_is_idempotent_but_collision_is_rejected', async () => {
   const dir = withTemp((base) => base)
   const store = eventStore.create(dir, 'collision-law')
   try {
@@ -65,7 +65,7 @@ const withRepo = (writerId, fn) => {
     .finally(() => rmSync(repo, { recursive: true, force: true }))
 }
 
-test('WHAT[DURABLE-EVENTS-006] append_adds_one_local_line_and_Current_is_already_integrated', async () => {
+test('WHAT[durable-events-006] append_adds_one_local_line_and_Current_is_already_integrated', async () => {
   await withRepo('journal-append-proof', async (commonDir) => {
     const booted = mustOk(await journal.JournalSurface_bootWithWriterId(commonDir, 'journal-append-proof', 'rt_es_append', 4242, '2026-04-01T00:00:00Z'), 'boot')
     const file = join(commonDir, 'wanxiang', 'events', 'journal-append-proof.ndjson')

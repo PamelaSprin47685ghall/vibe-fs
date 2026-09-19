@@ -35,7 +35,7 @@ const items = [
   obligation('verification', 'Verify the behavior with evidence.', 'far'),
 ]
 
-test('WHAT[OBLIGATION-LEDGER-006] rejects blank and duplicate obligation names as call syntax', () => {
+test('WHAT[obligation-ledger-006] rejects blank and duplicate obligation names as call syntax', () => {
   assert.equal(rejected(todo.validateObligations([obligation('   ', 'work')])).code, 'EmptyObligationName')
   assert.equal(
     rejected(todo.validateObligations([obligation('same', 'first'), obligation('same', 'second')])).code,

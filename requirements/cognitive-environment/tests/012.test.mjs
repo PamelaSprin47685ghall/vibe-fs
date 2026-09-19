@@ -37,7 +37,7 @@ const MIRRORED_BY_OFFICE_CAPABILITY = new Set(['entrust-by-consequence', 'choose
 
 const LANGUAGE = 'English'
 
-test('WHAT[COGNITIVE-ENVIRONMENT-012] CE_012_relay_assessment_prompt_carries_ledger_without_process_mechanics', () => {
+test('WHAT[cognitive-environment-012] CE_012_relay_assessment_prompt_carries_ledger_without_process_mechanics', () => {
   for (const locale of ['en', 'zh-CN']) {
     const text = read(`resources/provider/library/relay/quality-ledger/${locale}.md`)
     assert.match(text, /Ledger|judgment|acceptance/i, 'Relay assessment prompt carries Ledger guidance')

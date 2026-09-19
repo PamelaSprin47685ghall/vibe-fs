@@ -21,7 +21,7 @@ const unwrap = (result) => {
   return result.value
 }
 
-test('WHAT[REPOSITORY-PROGRAMMING-015] JS015_rollbackPlan_is_CAS_and_preserves_third_party_changes', () => {
+test('WHAT[repository-programming-015] JS015_rollbackPlan_is_CAS_and_preserves_third_party_changes', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'oldA', 'utf8')
@@ -88,7 +88,7 @@ const prepared = (id, root, mutations) => ({
   mutations,
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-015] JS015_prepared_without_committed_is_interrupted_tool_evidence', async () => {
+test('WHAT[repository-programming-015] JS015_prepared_without_committed_is_interrupted_tool_evidence', async () => {
   const local = localStore()
   try {
     const p = prepared('tx-2', '/ws', [mutation('a.txt', 'old', 'new'), mutation('b.txt', null, 'fresh')])
@@ -101,7 +101,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-015] JS015_prepared_without_committed_is_inter
     local.close()
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-015] JS015_reopening_store_never_undoes_an_interrupted_tool', async () => {
+test('WHAT[repository-programming-015] JS015_reopening_store_never_undoes_an_interrupted_tool', async () => {
   const { dir, cleanup } = sandbox()
   const common = mkdtempSync(join(tmpdir(), 'wxs-txstore-events-'))
   try {
@@ -125,7 +125,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-015] JS015_reopening_store_never_undoes_an_int
     cleanup()
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-015] JS015_store_source_has_no_manual_history_reader', async () => {
+test('WHAT[repository-programming-015] JS015_store_source_has_no_manual_history_reader', async () => {
   const source = readFileSync(new URL('../../../src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs', import.meta.url), 'utf8')
   assert.doesNotMatch(source, /loadEvents|scanUncommitted|OpenSnapshot|readStreams/)
   assert.doesNotMatch(source, /recoverCurrent|undoIfMatches/)
@@ -169,7 +169,7 @@ const mutationView = (mutation) => ({
   newText: mutation.newText,
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-015] Adapter JS015_MutationFs_commits_atomically_and_reopen_never_blind_retries_an_ambiguous_partial_commit', async () => {
+test('WHAT[repository-programming-015] Adapter JS015_MutationFs_commits_atomically_and_reopen_never_blind_retries_an_ambiguous_partial_commit', async () => {
   const workspace = makeDirectory('wxs-js-mutation-adapter-')
   const committedEvents = makeDirectory('wxs-js-mutation-committed-')
   const interruptedEvents = makeDirectory('wxs-js-mutation-interrupted-')
@@ -265,7 +265,7 @@ const rewrite = (path, originalText, newText) => ({ kind: 'rewrite', path, origi
 const create = (path, text) => ({ kind: 'create', path, text })
 const current = { 'a.txt': 'current' }
 
-test('WHAT[REPOSITORY-PROGRAMMING-015] JS015_rollback_plan_is_exact', () => {
+test('WHAT[repository-programming-015] JS015_rollback_plan_is_exact', () => {
   const mutations = [create('b.txt', 'newB'), rewrite('a.txt', 'oldA', 'newA')]
   // rollback restores rewrites and marks creates for removal, reversed order
   assert.deepEqual(rollbackPlan(mutations), [

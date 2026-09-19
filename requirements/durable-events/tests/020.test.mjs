@@ -26,7 +26,7 @@ const withRepo = (fn) => {
     .finally(() => rmSync(repo, { recursive: true, force: true }))
 }
 
-test('WHAT[DURABLE-EVENTS-020] empty_boot_is_read_only_and_keeps_RuntimeStarted_in_memory_until_activation', async () => {
+test('WHAT[durable-events-020] empty_boot_is_read_only_and_keeps_RuntimeStarted_in_memory_until_activation', async () => {
   await withRepo(async (commonDir) => {
     const booted = mustOk(await journal.JournalSurface_bootWithWriterId(commonDir, 'boot-empty', 'rt_empty', 6001, '2026-05-01T00:00:00Z'), 'empty boot')
     assert.equal(Number(booted.localSeq), 1)
@@ -34,14 +34,14 @@ test('WHAT[DURABLE-EVENTS-020] empty_boot_is_read_only_and_keeps_RuntimeStarted_
     journal.JournalSurface_dispose(booted.journal)
   })
 })
-test('WHAT[DURABLE-EVENTS-020] plugin host does not pre-scan canonical history before EventStore activation', async () => {
+test('WHAT[durable-events-020] plugin host does not pre-scan canonical history before EventStore activation', async () => {
   const { readFile } = await import('node:fs/promises')
   const pluginHost = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/PluginHost.fs', import.meta.url), 'utf8')
 
   assert.doesNotMatch(pluginHost, /ProcessEventLog\.readStreams/,
     'PluginHost must not add a second full history scan before CanonicalIntegrator owns replay')
 })
-test('WHAT[DURABLE-EVENTS-020] plugin load defers EventStore replay and durable-session seeding until activation', async () => {
+test('WHAT[durable-events-020] plugin load defers EventStore replay and durable-session seeding until activation', async () => {
   const { readFile } = await import('node:fs/promises')
   const workspaceStore = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/WorkspaceEventStore.fs', import.meta.url), 'utf8')
   const writer = await readFile(new URL('../../../src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs', import.meta.url), 'utf8')
@@ -56,7 +56,7 @@ test('WHAT[DURABLE-EVENTS-020] plugin load defers EventStore replay and durable-
   assert.match(signals, /ActivateDurability\(\)/,
     'the first durable Host admission must activate deferred projection state')
 })
-test('WHAT[DURABLE-EVENTS-020] parsed Journal payload replay does not stringify every envelope for legacy detection', async () => {
+test('WHAT[durable-events-020] parsed Journal payload replay does not stringify every envelope for legacy detection', async () => {
   const { readFile } = await import('node:fs/promises')
   const envelope = await readFile(new URL('../../../src/Wanxiangshu/Persistence/Journal/Envelope.fs', import.meta.url), 'utf8')
   const factCodec = await readFile(new URL('../../../src/Wanxiangshu/Persistence/Journal/FactCodec.fs', import.meta.url), 'utf8')
@@ -75,7 +75,7 @@ test('WHAT[DURABLE-EVENTS-020] parsed Journal payload replay does not stringify 
   assert.match(integrator, /Error error when FactCodec\.isIgnoredLegacyDecodeError error -> Ok current/,
     'legacy classification runs only after decode failure, never for modern events')
 })
-test('WHAT[DURABLE-EVENTS-020] replay ignores a legacy Journal fact instead of cutting the stream', async () => {
+test('WHAT[durable-events-020] replay ignores a legacy Journal fact instead of cutting the stream', async () => {
   await withRepo(async (commonDir) => {
     const eventId = 'e'.repeat(40)
     const legacy = {
@@ -104,7 +104,7 @@ test('WHAT[DURABLE-EVENTS-020] replay ignores a legacy Journal fact instead of c
     journal.JournalSurface_dispose(booted.journal)
   })
 })
-test('WHAT[DURABLE-EVENTS-020] Journal replay precompiles outer fact-family dispatch instead of reflecting nested unions per event', async () => {
+test('WHAT[durable-events-020] Journal replay precompiles outer fact-family dispatch instead of reflecting nested unions per event', async () => {
   const { readFile } = await import('node:fs/promises')
   const envelope = await readFile(new URL('../../../src/Wanxiangshu/Persistence/Journal/Envelope.fs', import.meta.url), 'utf8')
 
@@ -116,7 +116,7 @@ test('WHAT[DURABLE-EVENTS-020] Journal replay precompiles outer fact-family disp
   assert.doesNotMatch(envelope, /generateDecoderCached<Envelope>\s*\(\s*extra\s*=\s*extra\s*\)/,
     'Envelope Auto decoding may preserve the wire representation, but Fact must use the precompiled custom decoder')
 })
-test('WHAT[DURABLE-EVENTS-020] dominant XTracePartAppended history case has a direct decoder with compatibility fallback', async () => {
+test('WHAT[durable-events-020] dominant XTracePartAppended history case has a direct decoder with compatibility fallback', async () => {
   const { readFile } = await import('node:fs/promises')
   const envelope = await readFile(new URL('../../../src/Wanxiangshu/Persistence/Journal/Envelope.fs', import.meta.url), 'utf8')
 
@@ -154,7 +154,7 @@ const withRepo = (writerId, fn) => {
     .finally(() => rmSync(repo, { recursive: true, force: true }))
 }
 
-test('WHAT[DURABLE-EVENTS-020] create_is_read_only_until_the_first_business_append', async () => {
+test('WHAT[durable-events-020] create_is_read_only_until_the_first_business_append', async () => {
   await withRepo('journal-writer-proof', async (commonDir) => {
     const booted = mustOk(await journal.JournalSurface_boot(commonDir, 'rt_es', 4242, '2026-04-01T00:00:00Z'), 'boot')
     const file = join(commonDir, 'wanxiang', 'events', 'journal-writer-proof.ndjson')

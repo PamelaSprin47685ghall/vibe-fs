@@ -59,7 +59,7 @@ const foldFacts = (facts) =>
   foldFactsThroughOwner(facts.map((value, index) => ownerEnvelope({ seq: index + 1, session: SESSION, fact: value })))
 const budgetOf = (projection) => providerFailureProjection.read(projection)
 
-test('WHAT[PAR-003] the_same_attempt_observed_twice_advances_once', () => {
+test('WHAT[provider-attempt-recovery-003] the_same_attempt_observed_twice_advances_once', () => {
   let current = providerFailureProjection.forAuthority(RUN, ROOT)
   const first = providerFailureProjection.applyFailure(identityFor('run_1'), 1, current)
   assert.equal(first.ok, true)
@@ -74,7 +74,7 @@ test('WHAT[PAR-003] the_same_attempt_observed_twice_advances_once', () => {
   assert.equal(second.ok, true)
   assert.equal(providerFailureProjection.read(second.value).failures, 2)
 })
-test('WHAT[PAR-003] the_dedupe_window_is_bounded', () => {
+test('WHAT[provider-attempt-recovery-003] the_dedupe_window_is_bounded', () => {
   let current = providerFailureProjection.forAuthority(RUN, ROOT)
 
   for (let attempt = 1; attempt <= 60; attempt += 1) {
@@ -87,7 +87,7 @@ test('WHAT[PAR-003] the_dedupe_window_is_bounded', () => {
   assert.equal(state.failures, 60)
   assert.equal(state.dedupeKeys, 32)
 })
-test('WHAT[PAR-003] a_duplicate_line_is_absorbed_because_replay_produces_it', () => {
+test('WHAT[provider-attempt-recovery-003] a_duplicate_line_is_absorbed_because_replay_produces_it', () => {
   const folded = foldFacts([
     rootFact(),
     failureFact({ run: 'run_1', count: 1 }),
@@ -130,7 +130,7 @@ async function admit(journal, providerRunName) {
   }
 }
 
-test('WHAT[PAR-003] same_failure_observed_twice_advances_once', async () => {
+test('WHAT[provider-attempt-recovery-003] same_failure_observed_twice_advances_once', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-ledger-dedupe-'))
   const created = await bootWithWriterId(directory, 'writer-ledger-dedupe', 'rt_ledger_dedupe', 1, '2026-01-01T00:00:00Z')
   assert.equal(created.ok, true, created.ok ? '' : created.error)
@@ -169,7 +169,7 @@ test('WHAT[PAR-003] same_failure_observed_twice_advances_once', async () => {
     rmSync(directory, { recursive: true, force: true })
   }
 })
-test('WHAT[PAR-003] an_older_failed_run_is_absorbed_after_its_successor_advances', async () => {
+test('WHAT[provider-attempt-recovery-003] an_older_failed_run_is_absorbed_after_its_successor_advances', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-ledger-superseded-'))
   const created = await bootWithWriterId(directory, 'writer-ledger-superseded', 'rt_ledger_superseded', 1, '2026-01-01T00:00:00Z')
   assert.equal(created.ok, true, created.ok ? '' : created.error)
@@ -210,7 +210,7 @@ const { budget: providerFailureBudget, providerFailureProjection } = await impor
 
 const SESSION = 'ses_meta'
 
-test('WHAT[PAR-003] ProviderFailure_owner_exposes_budget_and_dedupe_state', () => {
+test('WHAT[provider-attempt-recovery-003] ProviderFailure_owner_exposes_budget_and_dedupe_state', () => {
   const initial = providerFailureProjection.forAuthority('run_L', 'msg_u1')
   const ownerIdentity = providerFailureBudget.attemptIdentity(SESSION, 'run_L', 'msg_u1', 'run_owner')
   const secondIdentity = providerFailureBudget.attemptIdentity(SESSION, 'run_L', 'msg_u1', 'run_second')
@@ -271,7 +271,7 @@ const TOOL_CAPABILITIES = [
   'Write',
 ]
 
-test('WHAT[PAR-003] each_retry_binds_a_fresh_physical_identity', () => {
+test('WHAT[provider-attempt-recovery-003] each_retry_binds_a_fresh_physical_identity', () => {
   // Fresh physical identity is a ledger requirement: two distinct ProviderRun
   // identities both advance; observing one twice never advances twice.
   const first = budget.attemptIdentity('ses_a', 'run_L', 'msg_u1', 'provider-1')

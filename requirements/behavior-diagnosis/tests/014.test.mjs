@@ -43,7 +43,7 @@ const apply = (state, value, n = 1) => {
   return { enforcement: enforcement.value, blog: committed.value }
 }
 
-test('WHAT[BD-014] ENFORCER_045_duplicate_provider_run_rejected_by_fold', () => {
+test('WHAT[behavior-diagnosis-014] ENFORCER_045_duplicate_provider_run_rejected_by_fold', () => {
   const first = observation.applyEnforcementCycle(observation.emptyEnforcement, cycle({ run: 'msg-dup' }))
   assert.equal(first.ok, true)
   const duplicate = observation.applyEnforcementCycle(first.value, cycle({ run: 'msg-dup' }))
@@ -72,18 +72,18 @@ const cycleRecord = (n, field) => ({
   observedPrefixEpoch: 0,
 })
 
-test('WHAT[BD-014] ENFORCER_TIP_08_each_committed_cycle_records_exactly_one_tip', () => {
+test('WHAT[behavior-diagnosis-014] ENFORCER_TIP_08_each_committed_cycle_records_exactly_one_tip', () => {
   const applied = observation.applyEnforcementCycle(observation.emptyEnforcement, cycleRecord(1, fields[0]))
   assert.equal(applied.ok, true, applied.ok ? '' : applied.error)
   assert.deepEqual(observation.recentTips(applied.value), [{ ruleId: fields[0], fieldName: fields[0], cycleId: 'msg_tip_1' }])
 })
-test('WHAT[BD-014] ENFORCER_TIP_09_replay_preserves_tip', () => {
+test('WHAT[behavior-diagnosis-014] ENFORCER_TIP_09_replay_preserves_tip', () => {
   const state = observation.applyEnforcementCycle(observation.emptyEnforcement, cycleRecord(1, fields[2])).value
   const duplicate = observation.applyEnforcementCycle(state, cycleRecord(1, fields[2]))
   assert.equal(duplicate.ok, false)
   assert.equal(observation.recentTips(state)[0].cycleId, 'msg_tip_1')
 })
-test('WHAT[BD-014] ENFORCER_TIP_10_recent_tips_cap_at_8', () => {
+test('WHAT[behavior-diagnosis-014] ENFORCER_TIP_10_recent_tips_cap_at_8', () => {
   let state = observation.emptyEnforcement
   for (let n = 1; n <= 12; n += 1) {
     const applied = observation.applyEnforcementCycle(state, cycleRecord(n, fields[n % fields.length]))
@@ -95,7 +95,7 @@ test('WHAT[BD-014] ENFORCER_TIP_10_recent_tips_cap_at_8', () => {
   assert.equal(tips[0].cycleId, 'msg_tip_5')
   assert.equal(tips[7].cycleId, 'msg_tip_12')
 })
-test('WHAT[BD-014] ENFORCER_TIP_11_recent_tips_order_oldest_to_newest', () => {
+test('WHAT[behavior-diagnosis-014] ENFORCER_TIP_11_recent_tips_order_oldest_to_newest', () => {
   let state = observation.emptyEnforcement
   for (let n = 1; n <= 3; n += 1) {
     const applied = observation.applyEnforcementCycle(state, cycleRecord(n, fields[n]))

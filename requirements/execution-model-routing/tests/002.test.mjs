@@ -63,7 +63,7 @@ const providerLimited = (limits, routes) => (role, running, previous) => {
   return candidates.find(available) ?? null
 }
 
-test('WHAT[EMR-002] EMR_002_scheduler_program_error_poisons_pending_and_future_demands', async () => {
+test('WHAT[execution-model-routing-002] EMR_002_scheduler_program_error_poisons_pending_and_future_demands', async () => {
   const runtime = createRuntime((role) => {
     if (role === 'devops') return null
     throw new Error('bad scheduler program')
@@ -105,7 +105,7 @@ const withTemp = async (run) => {
   }
 }
 
-test('WHAT[EMR-002] EMR_002_scheduler_preserves_running_duplicates_null_and_previous', async () => {
+test('WHAT[execution-model-routing-002] EMR_002_scheduler_preserves_running_duplicates_null_and_previous', async () => {
   await withTemp(async (path) => {
     const body = `export default function route(role, running, previous) {
       if (running.length !== 2) throw new Error('duplicates lost')
@@ -128,7 +128,7 @@ test('WHAT[EMR-002] EMR_002_scheduler_preserves_running_duplicates_null_and_prev
     )
   })
 })
-test('WHAT[EMR-002] EMR_002_scheduler_program_errors_fail_closed', async () => {
+test('WHAT[execution-model-routing-002] EMR_002_scheduler_program_errors_fail_closed', async () => {
   await withTemp(async (path) => {
     const invalidDefault = `export default 42\n`
     await assert.rejects(() => bootstrapAndLoadAt(path, invalidDefault), /default export.*function/i)

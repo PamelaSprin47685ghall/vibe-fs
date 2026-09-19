@@ -20,14 +20,14 @@ const acquire = (runtime, physicalUserMessageId) =>
     null,
   )
 
-test('WHAT[EXECFAIL-004] wrong exact capacity fence identity returns closed conflict', async () => {
+test('WHAT[execution-failure-policy-004] wrong exact capacity fence identity returns closed conflict', async () => {
   const runtime = routing.createRuntime(() => target)
   const acquired = await acquire(runtime, 'physical-1')
   assert.equal(acquired.kind, 'Acquired')
   const wrong = routing.commitExecutionAdmission(runtime, acquired.lease, identity('physical-other'))
   assert.deepEqual(wrong, { kind: 'Conflict' })
 })
-test('WHAT[EXECFAIL-004] stale exact capacity fence is closed without exposing handle', async () => {
+test('WHAT[execution-failure-policy-004] stale exact capacity fence is closed without exposing handle', async () => {
   const runtime = routing.createRuntime(() => target)
   const acquired = await acquire(runtime, 'physical-2')
   const successor = await acquire(runtime, 'physical-3')
@@ -142,7 +142,7 @@ const providerCases = [
   },
 ]
 
-test('WHAT[EXECFAIL-004] capacity settlement preserves the exact opaque fence reference', () => {
+test('WHAT[execution-failure-policy-004] capacity settlement preserves the exact opaque fence reference', () => {
   const release = decide({ failure: 'ProtocolRejection' }).capacitySettlement
   assert.deepEqual(release, { kind: 'ReleaseExactFence', fenceReference: capacityFence.reference })
 

@@ -63,7 +63,7 @@ const providerLimited = (limits, routes) => (role, running, previous) => {
   return candidates.find(available) ?? null
 }
 
-test('WHAT[EMR-007] EMR_007_execution_release_is_idempotent_and_wakes_waiters_once', async () => {
+test('WHAT[execution-model-routing-007] EMR_007_execution_release_is_idempotent_and_wakes_waiters_once', async () => {
   const runtime = createRuntime((_role, running) => running.length === 0 ? target('provider/one') : null)
   await acquireTarget(runtime, 'holder', 'msg-holder', 'engineer', 'alice')
   const waiting = acquireTarget(runtime, 'waiter', 'msg-waiter', 'devops', 'bob')
@@ -76,7 +76,7 @@ test('WHAT[EMR-007] EMR_007_execution_release_is_idempotent_and_wakes_waiters_on
   releasePhysicalExecution(runtime, 'holder', 'msg-holder')
   assert.equal(snapshotOccupied(runtime).length, 1, 'second release cannot remove somebody else\'s execution')
 })
-test('WHAT[EMR-007] EMR_007_late_terminal_for_superseded_physical_execution_cannot_release_current_lease', async () => {
+test('WHAT[execution-model-routing-007] EMR_007_late_terminal_for_superseded_physical_execution_cannot_release_current_lease', async () => {
   const runtime = createRuntime((role) => target(`provider/${role}`))
 
   await acquireTarget(runtime, 'reused-session', 'msg-old', 'engineer', 'alice')
@@ -102,7 +102,7 @@ const { default: test } = await import("node:test");
 
 const source = async (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 
-test('WHAT[EMR-007] EMR_007_exact_terminal_identity_releases_capacity_not_coarse_idle_or_business_completion', async () => {
+test('WHAT[execution-model-routing-007] EMR_007_exact_terminal_identity_releases_capacity_not_coarse_idle_or_business_completion', async () => {
   const recovery = await source('src/Wanxiangshu/OpenCode/Host/SessionRecoveryHost.fs')
   const codec = await source('src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs')
   const ordinary = await source('src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs')
@@ -117,7 +117,7 @@ test('WHAT[EMR-007] EMR_007_exact_terminal_identity_releases_capacity_not_coarse
   assert.doesNotMatch(ordinary, /ModelRouting\.(releaseExecution|releaseSession)/,
     'application completion/finality must not own physical capacity release')
 })
-test('WHAT[EMR-007] EMR_007_chat_message_closes_the_old_idle_window_before_model_admission', async () => {
+test('WHAT[execution-model-routing-007] EMR_007_chat_message_closes_the_old_idle_window_before_model_admission', async () => {
   const host = await source('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
   const chatHook = host.slice(host.indexOf('let chatMessageHook ='), host.indexOf('let cancelSignals'))
   const barrier = host.slice(host.indexOf('let observePhysicalAdmission'), host.indexOf('let chatMessageHook ='))

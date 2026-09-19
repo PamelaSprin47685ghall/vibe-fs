@@ -1,4 +1,4 @@
-// WHAT[EPI-009]: Bayes exact refiner admits only qualified factors and normalizes in log space.
+// WHAT[epistemic-reasoning-009]: Bayes exact refiner admits only qualified factors and normalizes in log space.
 
 namespace Wanxiangshu.Sphinx.Plugins.Bayes
 

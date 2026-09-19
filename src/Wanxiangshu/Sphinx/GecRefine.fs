@@ -1,4 +1,4 @@
-// WHAT[EPI-010,EPI-016,EPI-024]: Gec composition over certificate slots, exact/astar/mcts refiners and ordinal inference.
+// WHAT[epistemic-reasoning-010,epistemic-reasoning-016,epistemic-reasoning-024]: Gec composition over certificate slots, exact/astar/mcts refiners and ordinal inference.
 namespace Wanxiangshu.Sphinx
 
 open System

@@ -23,5 +23,5 @@ PromptResources.systemForRole (语言 lang, 角色 role)
 
 ## GAP
 
-- `COGNITIVE-ENVIRONMENT-002` / `COGNITIVE-ENVIRONMENT-014`（CLOSED）：认知层级语义所有权裁决与 delegated tool estimate 作为校准提示已闭合，落点 `tests/002.test.mjs` 与 `tests/014.test.mjs`。
+- `cognitive-environment-002` / `cognitive-environment-014`（CLOSED）：认知层级语义所有权裁决与 delegated tool estimate 作为校准提示已闭合，落点 `tests/002.test.mjs` 与 `tests/014.test.mjs`。
 

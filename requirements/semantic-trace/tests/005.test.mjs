@@ -4,7 +4,7 @@ import * as trace from '../../../dist/Context/Trace/SemanticTraceSurface.js'
 
 
 
-test('WHAT[SEMANTIC-TRACE-005] canonical render is deterministic and omits provenance', () => {
+test('WHAT[semantic-trace-005] canonical render is deterministic and omits provenance', () => {
   const items = [
     { cursor: trace.cursor(0), role: 'user', provenance: 'run-secret/msg-secret', part: trace.semanticText('Fix it.') },
     { cursor: trace.cursor(1), role: 'assistant', provenance: 'run-secret/msg-secret', part: trace.semanticReasoning('considered') },

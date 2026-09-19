@@ -4,7 +4,7 @@ import * as enforcer from '../../../dist/Enforcer/Surface.js'
 
 const BASE = 'base blogger system prompt'
 
-test('WHAT[BD-005] BEHAVIOR_DIAGNOSIS_SYSTEM_003_zh_cn_leaf_load_is_complete_and_nonempty', () => {
+test('WHAT[behavior-diagnosis-005] BEHAVIOR_DIAGNOSIS_SYSTEM_003_zh_cn_leaf_load_is_complete_and_nonempty', () => {
   const zh = enforcer.loadFor('zh-CN')
   assert.equal(zh.length, 120, 'zh-CN rulebook must have 120 rules')
   const names = new Set(zh.map((r) => r.name))

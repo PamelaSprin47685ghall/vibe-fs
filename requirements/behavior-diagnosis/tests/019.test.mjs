@@ -3,4 +3,4 @@ import { assertFatalBoundary } from '../../structured-workflow/tests/support/m6-
 
 
 
-test('WHAT[BD-019] Enforcer fatal requires typed settlement and one injected fuse', () => assertFatalBoundary('behavior-diagnosis'))
+test('WHAT[behavior-diagnosis-019] Enforcer fatal requires typed settlement and one injected fuse', () => assertFatalBoundary('behavior-diagnosis'))

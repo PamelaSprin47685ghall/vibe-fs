@@ -151,7 +151,7 @@ const captureFatal = async (work) => {
   }
 }
 
-test('WHAT[ENF-021] repeat_terminal_idle_is_idempotent_no_duplicate_nudge', async (t) => {
+test('WHAT[capability-enforcement-021] repeat_terminal_idle_is_idempotent_no_duplicate_nudge', async (t) => {
   const { ids, durable, scope, request, ports, calls } = await setupOwner(t)
 
   const first = await blog.observeIdleRepair(
@@ -176,7 +176,7 @@ test('WHAT[ENF-021] repeat_terminal_idle_is_idempotent_no_duplicate_nudge', asyn
   assert.equal(calls.sendPrompt.length, 1)
 })
 
-test('WHAT[ENF-021] idle_without_quiescence_permit_spends_no_budget', async (t) => {
+test('WHAT[capability-enforcement-021] idle_without_quiescence_permit_spends_no_budget', async (t) => {
   const { ids, durable, scope, request, ports, calls } = await setupOwner(t)
 
   const res = await blog.observeIdleRepair(
@@ -190,7 +190,7 @@ test('WHAT[ENF-021] idle_without_quiescence_permit_spends_no_budget', async (t) 
   assert.equal(blog.repairClaimedForKind(durable, ids.blogger, ids.request, 'run-1', NUDGE_KIND), false)
 })
 
-test('WHAT[ENF-021] next_terminal_sends_at_most_one_aabb_then_abandons', async (t) => {
+test('WHAT[capability-enforcement-021] next_terminal_sends_at_most_one_aabb_then_abandons', async (t) => {
   const { ids, durable, scope, request, ports, calls } = await setupOwner(t)
 
   const nudge = await blog.observeIdleRepair(
@@ -236,7 +236,7 @@ test('WHAT[ENF-021] next_terminal_sends_at_most_one_aabb_then_abandons', async (
   assert.equal(runtime.tryGetFlight(scope, ids.blogger), null)
 })
 
-test('WHAT[ENF-021] exhausted repair stops its real continuation without a process fatal', async (t) => {
+test('WHAT[capability-enforcement-021] exhausted repair stops its real continuation without a process fatal', async (t) => {
   const { ids, durable, scope, request, ports, calls } = await setupOwner(t)
   await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-1'))
   await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-2'))
@@ -254,7 +254,7 @@ test('WHAT[ENF-021] exhausted repair stops its real continuation without a proce
   assert.equal(runtime.tryGetFlight(scope, ids.blogger), null)
 })
 
-test('WHAT[ENF-021] terminal without provider identity stops only the exact request', async (t) => {
+test('WHAT[capability-enforcement-021] terminal without provider identity stops only the exact request', async (t) => {
   const { durable, scope, request, ids } = await setupOwner(t)
   const messages = [{ info: { role: 'assistant', time: { completed: 1 } }, parts: [] }]
   const { value, records } = await captureFatal(() =>
@@ -265,7 +265,7 @@ test('WHAT[ENF-021] terminal without provider identity stops only the exact requ
   assert.equal(runtime.tryGetFlight(scope, ids.blogger), null)
 })
 
-test('WHAT[ENF-021] failed durable abandon retains its flight and never reports settlement', async (t) => {
+test('WHAT[capability-enforcement-021] failed durable abandon retains its flight and never reports settlement', async (t) => {
   const { durable, handle, scope, request, ids } = await setupOwner(t)
   journal.JournalSurface_dispose(handle)
   const { records } = await captureFatal(async () => {
@@ -275,7 +275,7 @@ test('WHAT[ENF-021] failed durable abandon retains its flight and never reports 
   assert.equal(runtime.tryGetFlight(scope, ids.blogger).requestId, ids.request)
 })
 
-test('WHAT[ENF-021] repair settlement failure rejects every waiting observer without fatal or release', async (t) => {
+test('WHAT[capability-enforcement-021] repair settlement failure rejects every waiting observer without fatal or release', async (t) => {
   const { durable, handle, scope, request, ids, ports, calls } = await setupOwner(t)
   await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-1'))
   await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-2'))
@@ -291,7 +291,7 @@ test('WHAT[ENF-021] repair settlement failure rejects every waiting observer wit
   assert.equal(runtime.tryGetFlight(scope, ids.blogger).requestId, ids.request)
 })
 
-test('WHAT[ENF-021] unknown abandon commit still rejects every observer without release', async (t) => {
+test('WHAT[capability-enforcement-021] unknown abandon commit still rejects every observer without release', async (t) => {
   const { durable, scope, request, ids, ports, calls, writerFile } = await setupOwner(t)
   await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-1'))
   await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-2'))
@@ -310,7 +310,7 @@ test('WHAT[ENF-021] unknown abandon commit still rejects every observer without 
   assert.equal(runtime.tryGetFlight(scope, ids.blogger).requestId, ids.request)
 })
 
-test('WHAT[ENF-021] late observers after settlement failure get the same failure and no new budget', async (t) => {
+test('WHAT[capability-enforcement-021] late observers after settlement failure get the same failure and no new budget', async (t) => {
   const { durable, handle, scope, request, ids, ports, calls } = await setupOwner(t)
   await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-1'))
   await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-2'))
@@ -338,7 +338,7 @@ test('WHAT[ENF-021] late observers after settlement failure get the same failure
   assert.equal(runtime.tryGetFlight(scope, ids.blogger).requestId, ids.request)
 })
 
-test('WHAT[ENF-021] generated duplicate and interleaved repair observations preserve bounded effects', async () => {
+test('WHAT[capability-enforcement-021] generated duplicate and interleaved repair observations preserve bounded effects', async () => {
   await fc.assert(fc.asyncProperty(
     fc.array(fc.record({ idle: fc.boolean(), duplicate: fc.boolean(), quiescent: fc.boolean() }), { maxLength: 20 }),
     async (trace) => {
@@ -371,7 +371,7 @@ test('WHAT[ENF-021] generated duplicate and interleaved repair observations pres
   ), { seed: 20260914, numRuns: 60 })
 })
 
-test('WHAT[ENF-021] transform_and_idle_interleave_resolves_to_single_owner', async (t) => {
+test('WHAT[capability-enforcement-021] transform_and_idle_interleave_resolves_to_single_owner', async (t) => {
   const { ids, durable, scope, request, ports, calls } = await setupOwner(t)
 
   const before = await blog.observeTransformRepair(scope, durable, request, 'run-1', [])
@@ -411,7 +411,7 @@ test('WHAT[ENF-021] transform_and_idle_interleave_resolves_to_single_owner', asy
   assert.equal(calls.eventNotify.length, 1)
 })
 
-test('WHAT[ENF-021] transform_on_aabb_claimed_terminal_waits_without_double_spend', async (t) => {
+test('WHAT[capability-enforcement-021] transform_on_aabb_claimed_terminal_waits_without_double_spend', async (t) => {
   const { ids, durable, scope, request, ports, calls } = await setupOwner(t)
 
   const nudge = await blog.observeIdleRepair(
@@ -435,7 +435,7 @@ test('WHAT[ENF-021] transform_on_aabb_claimed_terminal_waits_without_double_spen
   assert.equal(calls.sendPrompt.length, 1)
 })
 
-test('WHAT[ENF-021] repair_without_journal_abandons_without_physical_sends', async (t) => {
+test('WHAT[capability-enforcement-021] repair_without_journal_abandons_without_physical_sends', async (t) => {
   const { ids, scope, request, ports, calls } = await setupOwner(t)
 
   const idle = await blog.observeIdleRepair(
@@ -452,7 +452,7 @@ test('WHAT[ENF-021] repair_without_journal_abandons_without_physical_sends', asy
   assert.equal(calls.sendPrompt.length, 0)
 })
 
-test('WHAT[ENF-021] shutdown_rejects_new_repair_episode_before_drain', async (t) => {
+test('WHAT[capability-enforcement-021] shutdown_rejects_new_repair_episode_before_drain', async (t) => {
   const { ids, scope } = await setupOwner(t)
 
   runtime.beginBloggerShutdown(scope)

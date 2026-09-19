@@ -36,7 +36,7 @@ const writeManifest = (dir, sources) => {
   writeFileSync(join(dir, 'src/Wanxiangshu/compile-order.txt'), sources.flatMap((s) => [`${s}.fsi`, `${s}.fs`]).join('\n') + '\n')
 }
 
-test('WHAT[STRUCTURED-WORKFLOW-011] RETIRED-GATE: aggregate deleted → check stays green on minimal fixture', () => {
+test('WHAT[structured-workflow-011] RETIRED-GATE: aggregate deleted → check stays green on minimal fixture', () => {
   const dir = fixtureRoot()
   try {
     writeShimShard(dir)
@@ -49,7 +49,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] RETIRED-GATE: aggregate deleted → check st
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-011] RETIRED-GATE: resurrecting wrapper fsproj → red', () => {
+test('WHAT[structured-workflow-011] RETIRED-GATE: resurrecting wrapper fsproj → red', () => {
   const dir = fixtureRoot()
   try {
     writeFileSync(join(dir, 'src/Wanxiangshu/Wanxiangshu.fsproj'), '<Project/>\n')
@@ -63,7 +63,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] RETIRED-GATE: resurrecting wrapper fsproj �
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-011] RETIRED-GATE: a script that hard-codes the aggregate path → red', () => {
+test('WHAT[structured-workflow-011] RETIRED-GATE: a script that hard-codes the aggregate path → red', () => {
   const dir = fixtureRoot()
   try {
     writeFileSync(
@@ -87,7 +87,7 @@ if (existsSync(DEPRECATED)) process.exit(2)
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-011] RETIRED-GATE: compile-order manifest missing or drifting → red', () => {
+test('WHAT[structured-workflow-011] RETIRED-GATE: compile-order manifest missing or drifting → red', () => {
   const dir = fixtureRoot()
   try {
     writeFileSync(join(dir, 'scripts/noop.mjs'), '// nothing\n')
@@ -103,7 +103,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] RETIRED-GATE: compile-order manifest missing
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-011] RETIRED-GATE: unconditional resetOutputDirectory in build.mjs → red', () => {
+test('WHAT[structured-workflow-011] RETIRED-GATE: unconditional resetOutputDirectory in build.mjs → red', () => {
   const dir = fixtureRoot()
   try {
     writeShimShard(dir)
@@ -128,7 +128,7 @@ console.log('build done')
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-011] RETIRED-GATE: build.mjs that accepts unknown argv → red', () => {
+test('WHAT[structured-workflow-011] RETIRED-GATE: build.mjs that accepts unknown argv → red', () => {
   const dir = fixtureRoot()
   try {
     writeShimShard(dir)
@@ -179,7 +179,7 @@ function references(projectName) {
   return productionProject(projectName).references.map((path) => relative(SRC, path))
 }
 
-test('WHAT[STRUCTURED-WORKFLOW-011] flattened Fable emitter mirrors compile-shard source coverage', () => {
+test('WHAT[structured-workflow-011] flattened Fable emitter mirrors compile-shard source coverage', () => {
   // W5 cutover: the wrapper aggregate is gone. The canonical compile-order
   // manifest is the final answer to "what does one real Fable call compile";
   // the compile-shard inventory already enforces coverage + DAG shape.
@@ -196,7 +196,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] flattened Fable emitter mirrors compile-shar
   const props = readFileSync(join(SRC, 'Directory.Build.props'), 'utf8')
   assert.match(props, /<DisableTransitiveProjectReferences>true<\/DisableTransitiveProjectReferences>/)
 })
-test('WHAT[STRUCTURED-WORKFLOW-011] subsystem ownership and compile-shard graph are complete and acyclic', () => {
+test('WHAT[structured-workflow-011] subsystem ownership and compile-shard graph are complete and acyclic', () => {
   const result = inventory
   assert.equal(result.ok, true, result.violations.join('\n'))
   assert.ok(result.sourceCount > 0, 'compile-shard graph must cover production sources')
@@ -289,7 +289,7 @@ const withShardRepo = (t, shards) => {
   return dir
 }
 
-test('WHAT[STRUCTURED-WORKFLOW-011] subsystem is the only semantic governance identity', (t) => {
+test('WHAT[structured-workflow-011] subsystem is the only semantic governance identity', (t) => {
   const inventory = buildSubsystemInventory()
   assert.equal(inventory.ok, true, inventory.violations.join('\n'))
 
@@ -424,7 +424,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] subsystem is the only semantic governance id
   assert.equal(clash.ok, false, 'a duplicated subsystem/shard identity must go red')
   assert.match(clash.violations.join('\n'), /duplicate compile shard/)
 })
-test('WHAT[STRUCTURED-WORKFLOW-011] shared gravity wells are split by knowledge instead of copied ACLs', () => {
+test('WHAT[structured-workflow-011] shared gravity wells are split by knowledge instead of copied ACLs', () => {
   const inventory = buildSubsystemInventory()
   const identity = project(inventory, 'Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj')
   const outcome = project(inventory, 'Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj')

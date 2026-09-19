@@ -96,7 +96,7 @@ const foldViews = (folded) => {
   return views(handles)
 }
 
-test('WHAT[MANAGED-SESSION-015] EXEC_009_only_an_agent_handle_answers_the_agent_question', () => {
+test('WHAT[managed-session-lifecycle-015] EXEC_009_only_an_agent_handle_answers_the_agent_question', () => {
   // `tryAgent` exists so a caller that needs an AgentHandleId cannot silently
   // accept a PTY handle by string coercion.
   assert.equal(isSome(handleId.tryAgent(handleId.agent('h1'))), true)
@@ -109,7 +109,7 @@ test('WHAT[MANAGED-SESSION-015] EXEC_009_only_an_agent_handle_answers_the_agent_
     ['agent:x', 'pty:x', 'manager-job:x'],
   )
 })
-test('WHAT[MANAGED-SESSION-015] EXEC_009_a_linked_handle_records_the_child_session_it_drives', () => {
+test('WHAT[managed-session-lifecycle-015] EXEC_009_a_linked_handle_records_the_child_session_it_drives', () => {
   // The field this pins was missing until package F: `HandleLinked` carried no
   // child SessionId, so eight consumers could not get from a handle to its child
   // and every read side of EXEC-009 was dangling.
@@ -128,14 +128,14 @@ test('WHAT[MANAGED-SESSION-015] EXEC_009_a_linked_handle_records_the_child_sessi
     abandonReason: undefined,
   })
 })
-test('WHAT[MANAGED-SESSION-015] EXEC_009_replaying_the_exact_live_link_is_idempotent', () => {
+test('WHAT[managed-session-lifecycle-015] EXEC_009_replaying_the_exact_live_link_is_idempotent', () => {
   const state = linkOn(HandleSurface.empty())
   const relinked = linkOn(state)
 
   assert.equal(HandleSurface.linkedChildren(relinked).length, 1)
   assert.deepEqual(stateOf(relinked), stateOf(state))
 })
-test('WHAT[MANAGED-SESSION-015] EXEC_009_one_durable_handle_cannot_be_rebound_to_another_child', () => {
+test('WHAT[managed-session-lifecycle-015] EXEC_009_one_durable_handle_cannot_be_rebound_to_another_child', () => {
   const state = linkOn(HandleSurface.empty())
 
   assert.deepEqual(
@@ -150,7 +150,7 @@ test('WHAT[MANAGED-SESSION-015] EXEC_009_one_durable_handle_cannot_be_rebound_to
   )
   assert.equal(stateOf(state).child, 'ses_c')
 })
-test('WHAT[MANAGED-SESSION-015] EXEC_009_a_completion_for_a_handle_that_was_never_linked_stops_the_replay', () => {
+test('WHAT[managed-session-lifecycle-015] EXEC_009_a_completion_for_a_handle_that_was_never_linked_stops_the_replay', () => {
   // No correct writer produces this: the link is what creates the handle. The
   // journal is incomplete, so booting from it would build state on absent facts.
   const folded = foldFacts([handleFact.completed])
@@ -174,7 +174,7 @@ const link = (projection, agentId, child, targetAgent = 'coder') => {
   return result.state
 }
 
-test('WHAT[MANAGED-SESSION-015] EXEC_018_creation_order_follows_HandleLinked_fold_sequence', () => {
+test('WHAT[managed-session-lifecycle-015] EXEC_018_creation_order_follows_HandleLinked_fold_sequence', () => {
   const projection = link(link(link(HandleSurface.empty(), 'later-id-zzz', 'ses_z', 'zebra-agent'), 'earlier-id-aaa', 'ses_a', 'alpha-agent'), 'mid-id-mmm', 'ses_m', 'mid-agent')
   const children = HandleSurface.linkedChildren(projection)
   assert.equal(children.find((item) => item.handle === 'agent:later-id-zzz').creationOrder, 0)
@@ -190,7 +190,7 @@ const HandleSurface = await import("../../../dist/Execution/Delegation/Handle/Su
 const TerminalPolicySurface = await import("../../../dist/OpenCode/Host/TerminalPolicySurface.js");
 
 
-test('WHAT[MANAGED-SESSION-015] TPOL_linked_child_keeps_exact_handle_and_target', () => {
+test('WHAT[managed-session-lifecycle-015] TPOL_linked_child_keeps_exact_handle_and_target', () => {
   const linked = HandleSurface.apply(HandleSurface.empty(), {
     op: 'link', handle: 'agent:h1', child: 'ses_child', agent: 'coder', role: 'Coder',
   })

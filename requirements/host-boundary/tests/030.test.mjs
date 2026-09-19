@@ -8,7 +8,7 @@ const toolHost = await import("../../../dist/OpenCode/Codec/ToolHostSurface.js")
 
 const malformedString = fc.anything({ withBoxedValues: true }).filter(value => typeof value !== 'string')
 
-test('WHAT[HOST-BOUNDARY-030] malformed Host values never gain authority or throw', () => {
+test('WHAT[host-boundary-030] malformed Host values never gain authority or throw', () => {
   fc.assert(fc.property(malformedString, value => {
     assert.doesNotThrow(() => toolHost.contextDecode({ sessionID: value, agent: value, callID: value, messageID: value }))
     assert.deepEqual(toolHost.contextView(toolHost.contextDecode({ sessionID: value, agent: value })), {
@@ -31,7 +31,7 @@ const { default: test } = await import("node:test");
 const toolHost = await import("../../../dist/OpenCode/Codec/ToolHostSurface.js");
 
 
-test('WHAT[HOST-BOUNDARY-030] raw Host booleans arrays identities and agents reject coercion', () => {
+test('WHAT[host-boundary-030] raw Host booleans arrays identities and agents reject coercion', () => {
   const malformed = toolHost.contextView(toolHost.contextDecode({
     sessionID: 7,
     agent: { toString: () => 'agent' },
@@ -48,7 +48,7 @@ test('WHAT[HOST-BOUNDARY-030] raw Host booleans arrays identities and agents rej
     promptText: null,
   })
 })
-test('WHAT[HOST-BOUNDARY-030] optional Host arguments distinguish absence from malformed values', () => {
+test('WHAT[host-boundary-030] optional Host arguments distinguish absence from malformed values', () => {
   for (const value of [null, undefined]) {
     const argumentsHandle = toolHost.makeArguments({ expected_tool_calls: value })
     assert.deepEqual(toolHost.argumentOptionalNonNegativeInteger(argumentsHandle, 'expected_tool_calls'), { ok: true, value: null })
@@ -59,7 +59,7 @@ test('WHAT[HOST-BOUNDARY-030] optional Host arguments distinguish absence from m
     assert.deepEqual(toolHost.argumentOptionalNonNegativeInteger(argumentsHandle, 'expected_tool_calls'), { ok: false })
   }
 })
-test('WHAT[HOST-BOUNDARY-030] Host session observations and session.get agents reject coercion', () => {
+test('WHAT[host-boundary-030] Host session observations and session.get agents reject coercion', () => {
   assert.deepEqual(
     toolHost.sessionObservation({ type: 'session.created', properties: { sessionID: 's1', info: { parentID: 'p1', agent: 'agent-a' } } }),
     { sessionId: 's1', hasParent: true, agent: 'agent-a' },
@@ -108,7 +108,7 @@ const closureSources = (root, projects) => {
   return new Set([...closure].flatMap(relSources))
 }
 
-test('WHAT[HOST-BOUNDARY-030] Host envelope rejects adjacent malformed event and session carriers without throwing', () => {
+test('WHAT[host-boundary-030] Host envelope rejects adjacent malformed event and session carriers without throwing', () => {
   for (const value of ['', ' ', 7, true, {}, [], new String('session-1')]) {
     const raw = { type: value, properties: { sessionID: value, sessionId: value, info: { sessionID: value } }, sessionID: value, sessionId: value }
     assert.doesNotThrow(() => HostSignalSurface.envelopeEventType(raw))
@@ -134,7 +134,7 @@ const { default: test } = await import("node:test");
 const { contextAttachAbort, contextDecode } = await import("../../../dist/OpenCode/Codec/ToolHostSurface.js");
 
 
-test('WHAT[HOST-BOUNDARY-030] abort marker accepts primitive boolean true only', () => {
+test('WHAT[host-boundary-030] abort marker accepts primitive boolean true only', () => {
   for (const aborted of [1, 'true', {}, [], new Boolean(true)]) {
     let calls = 0
     contextAttachAbort(contextDecode({

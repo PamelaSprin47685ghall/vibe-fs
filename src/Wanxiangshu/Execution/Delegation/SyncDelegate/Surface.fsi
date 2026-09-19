@@ -11,11 +11,11 @@ module SyncDelegateSurface =
     /// Every owner must first be admitted as an explicit durable HumanRoot.
     val create: directory: string -> owners: obj -> Task<obj>
 
-    /// MANAGED-SESSION-001: drive SyncDelegateRuntime's production child
+    /// managed-session-lifecycle-001: drive SyncDelegateRuntime's production child
     /// observation into AttachedSessionRuntime against controlled Host callbacks.
     val managedChildReconciliationScenario: directory: string -> mode: string -> Task<obj>
 
-    /// MANAGED-SESSION-001: two simultaneous callers for one exact key share
+    /// managed-session-lifecycle-001: two simultaneous callers for one exact key share
     /// the complete physical reconciliation transaction and its result.
     val concurrentAttachedGetOrCreateScenario: unit -> Task<obj>
 
@@ -91,15 +91,15 @@ module SyncDelegateSurface =
     val dispatchRetryAttempt: value: obj -> owner: string -> role: string -> bool
     val dispose: value: obj -> unit
 
-    /// DELEG-031 probe: close the journal writer so later appends are known
+    /// delegation-031 probe: close the journal writer so later appends are known
     /// NotAttempted; the next invocation must still deliver its WorkRecord.
     val closeJournalWriter: value: obj -> unit
 
-    /// DELEG-031 probe: run the production checkpoint for one prepared handoff
+    /// delegation-031 probe: run the production checkpoint for one prepared handoff
     /// and return the boxed settlement it reports.
     val checkpointForHarness: value: obj -> owner: string -> role: string -> parentEndExclusive: int -> Task<obj>
 
-    /// DELEG-031 probe: abandon the pending call for this delegate (parent
+    /// delegation-031 probe: abandon the pending call for this delegate (parent
     /// supersede guard) so a stale completion afterwards cannot claim it.
     val abandonPendingCall: value: obj -> owner: string -> role: string -> bool
 

@@ -66,7 +66,7 @@ const foldFacts = (facts) =>
 
 const budgetOf = (projection) => providerFailureProjection.read(projection)
 
-test('WHAT[PAR-007] a_valid_record_moves_the_durable_budget', () => {
+test('WHAT[provider-attempt-recovery-007] a_valid_record_moves_the_durable_budget', () => {
   const before = providerFailureProjection.forAuthority(RUN, ROOT)
   const applied = providerFailureProjection.applyFailure(identityFor('run_1'), 1, before)
 
@@ -80,7 +80,7 @@ test('WHAT[PAR-007] a_valid_record_moves_the_durable_budget', () => {
   })
 })
 
-test('WHAT[PAR-007] the_count_must_advance_by_exactly_one_from_the_folded_state', () => {
+test('WHAT[provider-attempt-recovery-007] the_count_must_advance_by_exactly_one_from_the_folded_state', () => {
   assert.equal(budget.isValidRecord(0, 1), true)
   assert.equal(budget.isValidRecord(4, 5), true)
   assert.equal(budget.isValidRecord(2, 3), true)
@@ -90,7 +90,7 @@ test('WHAT[PAR-007] the_count_must_advance_by_exactly_one_from_the_folded_state'
   }
 })
 
-test('WHAT[PAR-007] each_rejection_names_a_different_cause', () => {
+test('WHAT[provider-attempt-recovery-007] each_rejection_names_a_different_cause', () => {
   const base = providerFailureProjection.applyFailure(
     identityFor('run_1'),
     1,
@@ -119,7 +119,7 @@ test('WHAT[PAR-007] each_rejection_names_a_different_cause', () => {
   )
 })
 
-test('WHAT[PAR-007] a_replayed_journal_reaches_the_same_budget', () => {
+test('WHAT[provider-attempt-recovery-007] a_replayed_journal_reaches_the_same_budget', () => {
   const folded = foldFacts([
     rootFact(),
     failureFact({ run: 'run_1', count: 1 }),
@@ -131,7 +131,7 @@ test('WHAT[PAR-007] a_replayed_journal_reaches_the_same_budget', () => {
   assert.deepEqual({ failures: budgetOf(folded.value).failures }, { failures: 3 })
 })
 
-test('WHAT[PAR-007] a_replayed_journal_with_intervening_success_restart_reaches_the_same_budget', () => {
+test('WHAT[provider-attempt-recovery-007] a_replayed_journal_with_intervening_success_restart_reaches_the_same_budget', () => {
   const succeeded = providerSuccessRecorded({
     session: SESSION,
     logicalRun: RUN,
@@ -150,7 +150,7 @@ test('WHAT[PAR-007] a_replayed_journal_with_intervening_success_restart_reaches_
   assert.deepEqual({ failures: budgetOf(folded.value).failures }, { failures: 1 })
 })
 
-test('WHAT[PAR-007] an_advance_naming_another_run_is_absorbed_not_applied', () => {
+test('WHAT[provider-attempt-recovery-007] an_advance_naming_another_run_is_absorbed_not_applied', () => {
   const folded = foldFacts([
     rootFact(),
     failureFact({ run: 'run_1', count: 1, logical: 'run_M', root: 'msg_u2' }),

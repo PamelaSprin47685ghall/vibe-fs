@@ -17,7 +17,7 @@ const pkg = (root, name, applies = null) => {
   if (applies !== null) writeFileSync(join(dir, 'APPLIES-TO'), applies, 'utf8')
 }
 
-test('WHAT[REQUIREMENT-GROUNDING-004] returns every overlapping package in deterministic package-name order', () => {
+test('WHAT[requirement-grounding-004] returns every overlapping package in deterministic package-name order', () => {
   const { dir, cleanup } = sandbox()
   try {
     pkg(dir, 'zeta', '/src/shared/**\n')

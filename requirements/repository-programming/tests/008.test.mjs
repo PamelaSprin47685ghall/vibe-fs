@@ -15,7 +15,7 @@ const sandbox = () => {
 }
 const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')
 
-test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_bindings_path_boundary_denies_escape', () => {
+test('WHAT[repository-programming-008] JS007_bindings_path_boundary_denies_escape', () => {
   const { dir, cleanup } = sandbox()
   try {
     const binding = createApi(dir)
@@ -29,7 +29,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_bindings_path_boundary_denies_escap
     cleanup()
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_bindings_glob_lists_matching_paths', async () => {
+test('WHAT[repository-programming-008] JS007_bindings_glob_lists_matching_paths', async () => {
   const { dir, cleanup } = sandbox()
   try {
     mkdirSync(join(dir, 'src'))
@@ -66,7 +66,7 @@ const unwrap = (result) => {
   return result.value
 }
 
-test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_glob_deterministic_enumeration', async () => {
+test('WHAT[repository-programming-008] JS007_glob_deterministic_enumeration', async () => {
   const { dir, cleanup } = sandbox()
   try {
     mkdirSync(join(dir, 'src'))
@@ -89,7 +89,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_glob_deterministic_enumeration', as
     cleanup()
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_glob_gitignore_skips_git_and_ignored', async () => {
+test('WHAT[repository-programming-008] JS007_glob_gitignore_skips_git_and_ignored', async () => {
   const { dir, cleanup } = sandbox()
   try {
     mkdirSync(join(dir, '.git', 'objects'), { recursive: true })

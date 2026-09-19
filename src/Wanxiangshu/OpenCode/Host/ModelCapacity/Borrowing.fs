@@ -295,7 +295,7 @@ type internal BorrowingCapacity<'target>
         // for this execution, reclaim the owned credit from any foreign InFlight/
         // Retiring step (descendant borrow). Within a turn the owner may stay blocked
         // by that borrow; once the owner's transform fires, the credit returns.
-        // Waiting borrowers keep sequence priority via drain (EMR-010).
+        // Waiting borrowers keep sequence priority via drain (execution-model-routing-010).
         executionKey sessionId (Some physicalUserMessageId)
         |> tryDictionaryValue ownedTokenByExecution
         |> Option.bind (tryDictionaryValue tokens)

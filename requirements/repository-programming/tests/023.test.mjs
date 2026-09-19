@@ -36,7 +36,7 @@ ${body}
 const execute = (dir, body, language = 'en') =>
   run(dir, 'Coder', language, program(body), 2000, Date.now() + 60_000, 1 << 20, null)
 
-test('WHAT[REPOSITORY-PROGRAMMING-023] JS_EDIT_exact_batch_replaces_inserts_and_deletes_with_one_rewrite', async () => {
+test('WHAT[repository-programming-023] JS_EDIT_exact_batch_replaces_inserts_and_deletes_with_one_rewrite', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.js'), 'const alpha = 1;\nconst beta = 2;\nconst obsolete = true;\n', 'utf8')
@@ -57,7 +57,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-023] JS_EDIT_exact_batch_replaces_inserts_and_
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-023] JS_EDIT_only_surface_has_private_snapshot_read_without_public_file_member', async () => {
+test('WHAT[repository-programming-023] JS_EDIT_only_surface_has_private_snapshot_read_without_public_file_member', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'alpha\n', 'utf8')
@@ -86,7 +86,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-023] JS_EDIT_only_surface_has_private_snapshot
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-023] JS_EDIT_accepts_single_object_and_unambiguous_common_aliases', async () => {
+test('WHAT[repository-programming-023] JS_EDIT_accepts_single_object_and_unambiguous_common_aliases', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'before\n', 'utf8')
@@ -102,7 +102,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-023] JS_EDIT_accepts_single_object_and_unambig
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-023] JS_EDIT_all_applies_every_non_overlapping_string_or_regexp_match', async () => {
+test('WHAT[repository-programming-023] JS_EDIT_all_applies_every_non_overlapping_string_or_regexp_match', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.js'), 'oldApi();\noldApi();\nconst oldApiValue = 1;\n', 'utf8')
@@ -119,7 +119,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-023] JS_EDIT_all_applies_every_non_overlapping
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-023] JS_EDIT_preserves_sticky_regexp_as_write_authority', async () => {
+test('WHAT[repository-programming-023] JS_EDIT_preserves_sticky_regexp_as_write_authority', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'prefix target\n', 'utf8')
@@ -136,7 +136,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-023] JS_EDIT_preserves_sticky_regexp_as_write_
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-023] JS_EDIT_preserves_a_consistent_CRLF_file_when_callers_author_LF', async () => {
+test('WHAT[repository-programming-023] JS_EDIT_preserves_a_consistent_CRLF_file_when_callers_author_LF', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'alpha\r\nbeta\r\n', 'utf8')
@@ -152,7 +152,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-023] JS_EDIT_preserves_a_consistent_CRLF_file_
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-023] JS_EDIT_every_change_addresses_the_original_snapshot_and_failure_is_atomic', async () => {
+test('WHAT[repository-programming-023] JS_EDIT_every_change_addresses_the_original_snapshot_and_failure_is_atomic', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'alpha\n', 'utf8')
@@ -171,7 +171,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-023] JS_EDIT_every_change_addresses_the_origin
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-023] JS_EDIT_noop_succeeds_without_a_rewrite_intent', async () => {
+test('WHAT[repository-programming-023] JS_EDIT_noop_succeeds_without_a_rewrite_intent', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'alpha\n', 'utf8')
@@ -189,7 +189,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-023] JS_EDIT_noop_succeeds_without_a_rewrite_i
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-023] JS_EDIT_later_file_failure_discards_earlier_file_staging', async () => {
+test('WHAT[repository-programming-023] JS_EDIT_later_file_failure_discards_earlier_file_staging', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'alpha\n', 'utf8')

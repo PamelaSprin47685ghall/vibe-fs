@@ -7,29 +7,29 @@ const HandleSurface = await import("../../../dist/Execution/Delegation/Handle/Su
 
 const observed = (action) => HandleSurface.scenario(action)
 
-test('WHAT[MANAGED-SESSION-013] HFR_restart_abandoned_handle_recovered_abandoned', () => {
+test('WHAT[managed-session-lifecycle-013] HFR_restart_abandoned_handle_recovered_abandoned', () => {
   const result = observed('abandon')
   assert.equal(result.ok, true)
   assert.equal(result.record.lifecycle, 'Abandoned')
   assert.equal(result.horizonVisible, 1, 'unconsumed abandonment remains visible to the parent horizon')
 })
-test('WHAT[MANAGED-SESSION-013] HFR_restart_retired_handle_recovered_retired', () => {
+test('WHAT[managed-session-lifecycle-013] HFR_restart_retired_handle_recovered_retired', () => {
   const result = observed('retire')
   assert.equal(result.ok, true)
   assert.equal(result.record.lifecycle, 'Retired')
   assert.equal(result.horizonVisible, 0, 'join-retired handle may finally leave the parent horizon')
 })
-test('WHAT[MANAGED-SESSION-013] HFR_restart_host_owned_hidden_handle_is_filtered_out', () => {
+test('WHAT[managed-session-lifecycle-013] HFR_restart_host_owned_hidden_handle_is_filtered_out', () => {
   const result = { listable: 0, ownership: 'HostOwnedHidden' }
   assert.equal(result.listable, 0)
   assert.equal(result.ownership, 'HostOwnedHidden')
 })
-test('WHAT[MANAGED-SESSION-013] HFR_restart_active_handle_recovers_active', () => {
+test('WHAT[managed-session-lifecycle-013] HFR_restart_active_handle_recovers_active', () => {
   const result = observed('active')
   assert.equal(result.record.lifecycle, 'Active')
   assert.equal(result.record.child, 'ses_child')
 })
-test('WHAT[MANAGED-SESSION-013] HFR_restart_recovery_commit_failure_blocks', () => {
+test('WHAT[managed-session-lifecycle-013] HFR_restart_recovery_commit_failure_blocks', () => {
   const result = { ok: false, error: 'Writer is poisoned or disposed' }
   assert.equal(result.ok, false)
   assert.match(result.error, /poisoned|disposed/)
@@ -46,7 +46,7 @@ const SatelliteSurface = await import("../../../dist/OpenCode/Host/SatelliteSurf
 const HandleSurface = await import("../../../dist/Execution/Delegation/Handle/Surface.js");
 
 
-test('WHAT[MANAGED-SESSION-013] session_recovery_contract_reenlist_filters_hidden_handles', () => {
+test('WHAT[managed-session-lifecycle-013] session_recovery_contract_reenlist_filters_hidden_handles', () => {
   let state = HandleSurface.empty()
   const parent = 'ses_parent'
   
@@ -63,7 +63,7 @@ test('WHAT[MANAGED-SESSION-013] session_recovery_contract_reenlist_filters_hidde
   assert.equal(listable[0], 'agent:engineer')
   assert.equal(HandleSurface.read(state, listable[0]).child, 'ses_child_1')
 })
-test('WHAT[MANAGED-SESSION-013] session_recovery_contract_authorizes_family_without_physical_handle_leaks', () => {
+test('WHAT[managed-session-lifecycle-013] session_recovery_contract_authorizes_family_without_physical_handle_leaks', () => {
   const root = 'ses_root'
   const nodes = [
     { kind: 'child', parent: root, child: 'ses_child', handle: 'agent:h1' },

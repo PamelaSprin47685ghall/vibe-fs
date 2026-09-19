@@ -22,7 +22,7 @@ const TOOL_CAPABILITIES = [
   'Write',
 ]
 
-test('WHAT[PAR-010] blogger_retry_dispatch_selects_squash_when_material_exists_and_main_otherwise', () => {
+test('WHAT[provider-attempt-recovery-010] blogger_retry_dispatch_selects_squash_when_material_exists_and_main_otherwise', () => {
   assert.equal(compression.nextBloggerRequest('blogger-main', true), 'blogger-squash')
   assert.equal(compression.nextBloggerRequest('blogger-main', false), 'blogger-main')
   assert.equal(compression.nextBloggerRequest('blogger-squash', true), 'blogger-main')

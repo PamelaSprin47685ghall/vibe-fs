@@ -30,7 +30,7 @@ const waitForPromptCount = (runtime, count) => forkTool.awaitPromptCount(runtime
 
 const ownerDescriptor = (sessionId) => [{ sessionId, agent: 'manager' }]
 
-test('WHAT[DELEG-006] FORK_continuation_reuses_bound_managed_agent_and_does_not_rebind_tier', () => {
+test('WHAT[delegation-006] FORK_continuation_reuses_bound_managed_agent_and_does_not_rebind_tier', () => {
   const result = fork.reuseBinding('Ada', 'inspector', 'coder', 'deep', 'continue the charge')
   assert.equal(result.ok, true)
   assert.equal(result.byname, 'Ada')

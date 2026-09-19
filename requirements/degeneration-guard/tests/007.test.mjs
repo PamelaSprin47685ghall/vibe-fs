@@ -59,7 +59,7 @@ const rawDeltaWithoutMessage = (session, field, text) => ({
   },
 })
 
-test('WHAT[DG-007] LOOP_006_low_side_interrupts_once_but_does_not_continue_before_reconcile', async () => {
+test('WHAT[degeneration-guard-007] LOOP_006_low_side_interrupts_once_but_does_not_continue_before_reconcile', async () => {
   const aborts = []
   const continuations = []
   const sensor = createSensor({
@@ -88,7 +88,7 @@ test('WHAT[DG-007] LOOP_006_low_side_interrupts_once_but_does_not_continue_befor
   assert.deepEqual(continuations, [['ses_low', 'TooRepetitive']], 'cause and continuation are one-shot')
 })
 
-test('WHAT[DG-007] LOOP_006_abort_failure_rolls_back_guard_ownership', async () => {
+test('WHAT[degeneration-guard-007] LOOP_006_abort_failure_rolls_back_guard_ownership', async () => {
   const aborts = []
   const continuations = []
   const sensor = createSensor({
@@ -114,7 +114,7 @@ test('WHAT[DG-007] LOOP_006_abort_failure_rolls_back_guard_ownership', async () 
   assert.deepEqual(continuations, [])
 })
 
-test('WHAT[DG-007] LOOP_006_abort_throw_is_observed_without_recovery', async () => {
+test('WHAT[degeneration-guard-007] LOOP_006_abort_throw_is_observed_without_recovery', async () => {
   const aborts = []
   const continuations = []
   const sensor = createSensor({

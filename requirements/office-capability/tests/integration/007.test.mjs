@@ -3,7 +3,7 @@ import test from 'node:test'
 import * as office from '../../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 import * as bindingSurface from '../../../../dist/OpenCode/Host/SessionBindingSurface.js'
 
-test('WHAT[OFF-007] Manager road resumes fixed DevOps across relay incumbency iterations without creating substitute DevOps', async () => {
+test('WHAT[office-capability-007] Manager road resumes fixed DevOps across relay incumbency iterations without creating substitute DevOps', async () => {
   // 1. Manager consequence: has resume for existing devops, but no Fission
   const managerPerms = office.permissions('manager')
   assert.ok(managerPerms.includes('Resume'), 'Manager must have Resume permission')

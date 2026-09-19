@@ -66,7 +66,7 @@ const fullConfig = () => ({
   ),
 })
 
-test('WHAT[ENF-011] MANAGER_config_projects_owned_permissions_with_default_deny', async () => {
+test('WHAT[capability-enforcement-011] MANAGER_config_projects_owned_permissions_with_default_deny', async () => {
   await withPlugin(async (hooks) => {
     const config = fullConfig()
     hooks.config(config)

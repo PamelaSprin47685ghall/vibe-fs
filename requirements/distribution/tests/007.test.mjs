@@ -31,7 +31,7 @@ const walkFs = (dir) => {
   return out
 }
 
-test('WHAT[DISTRIBUTION-007] DISTRIBUTION_release_proof_covers_build_package_packing_and_artifact_checks', async () => {
+test('WHAT[distribution-007] DISTRIBUTION_release_proof_covers_build_package_packing_and_artifact_checks', async () => {
   const pipeline = pkg.scripts['verify:release']
   assert.equal(typeof pipeline, 'string', 'verify:release must exist')
   assert.match(pipeline, /node scripts\/verify\.mjs/, 'release proof must dispatch to verify.mjs')
@@ -79,7 +79,7 @@ test('WHAT[DISTRIBUTION-007] DISTRIBUTION_release_proof_covers_build_package_pac
   }
 })
 
-test('WHAT[DISTRIBUTION-007] P1-P4: validateArchiveEntries rejects missing, extra, digest-mismatch, and link entries', async () => {
+test('WHAT[distribution-007] P1-P4: validateArchiveEntries rejects missing, extra, digest-mismatch, and link entries', async () => {
   const tar = await import('tar')
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wx-negative-archive-test-'))
   const src = path.join(tmp, 'src')

@@ -37,7 +37,7 @@ const MIRRORED_BY_OFFICE_CAPABILITY = new Set(['entrust-by-consequence', 'choose
 
 const LANGUAGE = 'English'
 
-test('WHAT[COGNITIVE-ENVIRONMENT-007] CE_prompt_016_library_ingress_teaches_craft_within_existing_authority', () => {
+test('WHAT[cognitive-environment-007] CE_prompt_016_library_ingress_teaches_craft_within_existing_authority', () => {
   for (const locale of ['en', 'zh-CN']) {
     const text = read(`resources/provider/library/ingress/${locale}.md`)
     assert.match(text, /teach the craft|craft|技艺|手艺/i)

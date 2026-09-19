@@ -66,12 +66,12 @@ const foldFacts = (facts) =>
 
 const budgetOf = (projection) => providerFailureProjection.read(projection)
 
-test('WHAT[PAR-004] failure_adds_one_to_the_consecutive_count', () => {
+test('WHAT[provider-attempt-recovery-004] failure_adds_one_to_the_consecutive_count', () => {
   assert.deepEqual(budget.read(budget.recordFailure({ failures: 0 })), { failures: 1 })
   assert.deepEqual(budget.read(budget.recordFailure({ failures: 7 })), { failures: 8 })
 })
 
-test('WHAT[PAR-004] success_resets_the_budget', () => {
+test('WHAT[provider-attempt-recovery-004] success_resets_the_budget', () => {
   const afterFailure = budget.recordFailure(budget.initial)
   const afterSuccess = budget.recordSuccess(afterFailure)
 
@@ -79,7 +79,7 @@ test('WHAT[PAR-004] success_resets_the_budget', () => {
   assert.deepEqual(budget.read(budget.recordFailure(afterSuccess)), { failures: 1 })
 })
 
-test('WHAT[PAR-004] success_is_a_durable_fact_that_zeroes_the_count', () => {
+test('WHAT[provider-attempt-recovery-004] success_is_a_durable_fact_that_zeroes_the_count', () => {
   assert.deepEqual(
     providerFailureFactCaseNames.slice().sort(),
     ['FailureRecorded', 'RetryExhausted', 'SuccessRecorded'],
@@ -128,7 +128,7 @@ test('WHAT[PAR-004] success_is_a_durable_fact_that_zeroes_the_count', () => {
   )
 })
 
-test('WHAT[PAR-004] recording_success_clears_the_dedupe_window_too', () => {
+test('WHAT[provider-attempt-recovery-004] recording_success_clears_the_dedupe_window_too', () => {
   const advanced = providerFailureProjection.applyFailure(
     identityFor('run_1'),
     1,

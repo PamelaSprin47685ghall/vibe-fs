@@ -23,7 +23,7 @@ ${body}
 const execute = (dir, body, language = 'en') =>
   run(dir, 'Coder', language, program(body), 2000, Date.now() + 60_000, 1 << 20, null)
 
-test('WHAT[REPOSITORY-PROGRAMMING-014] JS_EDIT_target_read_is_observed_and_external_change_wins', async () => {
+test('WHAT[repository-programming-014] JS_EDIT_target_read_is_observed_and_external_change_wins', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'alpha\n', 'utf8')
@@ -73,7 +73,7 @@ const unwrap = (result) => {
   return result.value
 }
 
-test('WHAT[REPOSITORY-PROGRAMMING-014] JS014_commitPlan_rejects_a_create_race_without_overwriting', () => {
+test('WHAT[repository-programming-014] JS014_commitPlan_rejects_a_create_race_without_overwriting', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'new.txt'), 'external', 'utf8')
@@ -84,7 +84,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-014] JS014_commitPlan_rejects_a_create_race_wi
     cleanup()
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-014] JS014_commitPlan_rejects_a_stale_rewrite_without_overwriting', () => {
+test('WHAT[repository-programming-014] JS014_commitPlan_rejects_a_stale_rewrite_without_overwriting', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'external', 'utf8')
@@ -110,7 +110,7 @@ const rewrite = (path, originalText, newText) => ({ kind: 'rewrite', path, origi
 const create = (path, text) => ({ kind: 'create', path, text })
 const current = { 'a.txt': 'current' }
 
-test('WHAT[REPOSITORY-PROGRAMMING-014] JS014_stale_rewrite_is_a_conflict_with_no_retry', () => {
+test('WHAT[repository-programming-014] JS014_stale_rewrite_is_a_conflict_with_no_retry', () => {
   const fresh = [rewrite('a.txt', 'current', 'new')]
   const stale = [rewrite('a.txt', 'old', 'new')]
   assert.equal(ok(validateFreshness(current, fresh)), true)
@@ -118,7 +118,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-014] JS014_stale_rewrite_is_a_conflict_with_no
   // create targets are not freshness-checked
   assert.equal(ok(validateFreshness(current, [create('b.txt', 'n')])), true)
 })
-test('WHAT[REPOSITORY-PROGRAMMING-014] JS014_preflight_covers_read_only_snapshots_and_create_absence', () => {
+test('WHAT[repository-programming-014] JS014_preflight_covers_read_only_snapshots_and_create_absence', () => {
   const changedRead = preflight(
     ['dependency.txt'],
     { 'dependency.txt': 'external' },
@@ -160,7 +160,7 @@ const runWorkflow = async (dir, program, { deadlineMs = 2000, store = null } = {
   surface: coderSurface(),
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-014] JS014_workflow_rejects_a_changed_read_only_dependency', async () => {
+test('WHAT[repository-programming-014] JS014_workflow_rejects_a_changed_read_only_dependency', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'dependency.txt'), 'snapshot', 'utf8')
@@ -198,7 +198,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-014] JS014_workflow_rejects_a_changed_read_onl
     cleanup()
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-014] JS014_workflow_rejects_a_create_target_added_after_staging', async () => {
+test('WHAT[repository-programming-014] JS014_workflow_rejects_a_create_target_added_after_staging', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const program = `class Js extends JsProgram {
@@ -226,7 +226,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-014] JS014_workflow_rejects_a_create_target_ad
     cleanup()
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-014] JS014_workflow_tracks_every_file_scanned_by_grep', async () => {
+test('WHAT[repository-programming-014] JS014_workflow_tracks_every_file_scanned_by_grep', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'source.txt'), 'needle', 'utf8')

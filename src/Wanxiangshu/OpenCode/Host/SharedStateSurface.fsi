@@ -1,7 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
-/// JS-native boundary for HOST-BOUNDARY-010 shared cross-instance state and
-/// HOST-BOUNDARY-031 root workspace first-binding.
+/// JS-native boundary for host-boundary-010 shared cross-instance state and
+/// host-boundary-031 root workspace first-binding.
 module SharedStateSurface =
 
     /// SessionParents: cross-instance parent registry.

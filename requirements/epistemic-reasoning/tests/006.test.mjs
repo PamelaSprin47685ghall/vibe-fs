@@ -20,7 +20,7 @@ const preparePolarInvestigation = (store) => {
   return { handle: started.handle, actionKey: candidate.request.action.id }
 }
 
-test('WHAT[EPI-006] same_semantic_evidence_from_independent_dependency_groups_is_preserved_twice', () => {
+test('WHAT[epistemic-reasoning-006] same_semantic_evidence_from_independent_dependency_groups_is_preserved_twice', () => {
   const store = createStore()
   const { handle, actionKey } = preparePolarInvestigation(store)
 
@@ -58,7 +58,7 @@ test('WHAT[EPI-006] same_semantic_evidence_from_independent_dependency_groups_is
   assert.ok(Math.abs(posterior.down - 1 / 13) < 1e-12)
 })
 
-test('WHAT[EPI-006] same_dependency_group_is_not_counted_as_independent_evidence_twice', () => {
+test('WHAT[epistemic-reasoning-006] same_dependency_group_is_not_counted_as_independent_evidence_twice', () => {
   const store = createStore()
   const { handle, actionKey } = preparePolarInvestigation(store)
 

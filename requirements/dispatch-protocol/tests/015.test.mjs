@@ -9,7 +9,7 @@ const { decodeIngress } = await import("../../../dist/Interaction/Dispatch/Dispa
 const malformedString = fc.anything({ withBoxedValues: true }).filter(value => typeof value !== 'string')
 const nonblankString = fc.string().filter(value => value.trim().length > 0)
 
-test('WHAT[DISPATCH-PROTOCOL-015] ingress identity property rejects every malformed or ambiguous carrier world', () => {
+test('WHAT[dispatch-protocol-015] ingress identity property rejects every malformed or ambiguous carrier world', () => {
   fc.assert(fc.property(malformedString, nonblankString, (malformed, valid) => {
     assert.doesNotThrow(() => decodeIngress({ sessionID: malformed }, {}))
     assert.equal(decodeIngress({ sessionID: malformed }, {}).sessionId, null)
@@ -26,7 +26,7 @@ test('WHAT[DISPATCH-PROTOCOL-015] ingress identity property rejects every malfor
     assert.equal(decodeIngress({ sessionID: left }, { info: { sessionID: right } }).sessionId, null)
   }), { seed: 25015, numRuns: 120 })
 })
-test('WHAT[DISPATCH-PROTOCOL-015] generated non-arrays and non-booleans remain inert without exceptions', () => {
+test('WHAT[dispatch-protocol-015] generated non-arrays and non-booleans remain inert without exceptions', () => {
   fc.assert(fc.property(fc.anything({ withBoxedValues: true }), value => {
     if (!Array.isArray(value)) {
       assert.doesNotThrow(() => decodeIngress({}, { parts: value }))
@@ -46,7 +46,7 @@ const { default: test } = await import("node:test");
 const { decodeIngress } = await import("../../../dist/Interaction/Dispatch/DispatchSurface.js");
 
 
-test('WHAT[DISPATCH-PROTOCOL-015] ingress identity carrier algebra is exact conflict closed and byte preserving', () => {
+test('WHAT[dispatch-protocol-015] ingress identity carrier algebra is exact conflict closed and byte preserving', () => {
   const value = '  session opaque  '
   const decoded = decodeIngress(
     { sessionID: value, session: { id: value }, agent: 'agent-a', metadata: { wanxiangshu_prompt_key: 'prompt-a' } },
@@ -70,7 +70,7 @@ test('WHAT[DISPATCH-PROTOCOL-015] ingress identity carrier algebra is exact conf
     text: 'hello',
   })
 })
-test('WHAT[DISPATCH-PROTOCOL-015] ingress rejects conflicting or explicitly invalid SessionId carriers', () => {
+test('WHAT[dispatch-protocol-015] ingress rejects conflicting or explicitly invalid SessionId carriers', () => {
   const conflicts = [
     [{ sessionID: 'a', sessionId: 'b' }, {}],
     [{ sessionID: 'a', session: { id: 'b' } }, {}],
@@ -84,7 +84,7 @@ test('WHAT[DISPATCH-PROTOCOL-015] ingress rejects conflicting or explicitly inva
 
   for (const [input, output] of conflicts) assert.equal(decodeIngress(input, output).sessionId, null)
 })
-test('WHAT[DISPATCH-PROTOCOL-015] ingress accepts plain own data fields only and never invokes accessors', () => {
+test('WHAT[dispatch-protocol-015] ingress accepts plain own data fields only and never invokes accessors', () => {
   const inherited = Object.create({ id: 'inherited' })
   const nullPrototype = Object.create(null)
   nullPrototype.id = 'plain-null-prototype'
@@ -98,7 +98,7 @@ test('WHAT[DISPATCH-PROTOCOL-015] ingress accepts plain own data fields only and
   assert.equal(decodeIngress({ session: nullPrototype }, {}).sessionId, 'plain-null-prototype')
   assert.equal(decodeIngress({ session: new String('boxed') }, {}).sessionId, null)
 })
-test('WHAT[DISPATCH-PROTOCOL-015] agent and PromptKey require one exact primitive string', () => {
+test('WHAT[dispatch-protocol-015] agent and PromptKey require one exact primitive string', () => {
   assert.equal(decodeIngress({ agent: 'a' }, { message: { agent: 'b' } }).explicitAgent, null)
   assert.equal(decodeIngress({ agent: 'a' }, { info: { agent: 7 } }).explicitAgent, null)
   assert.equal(
@@ -110,7 +110,7 @@ test('WHAT[DISPATCH-PROTOCOL-015] agent and PromptKey require one exact primitiv
     null,
   )
 })
-test('WHAT[DISPATCH-PROTOCOL-015] explicit malformed carrier containers cannot collapse into Missing', () => {
+test('WHAT[dispatch-protocol-015] explicit malformed carrier containers cannot collapse into Missing', () => {
   let metadataGetterCalls = 0
   const metadataAccessor = {}
   Object.defineProperty(metadataAccessor, 'metadata', {
@@ -149,7 +149,7 @@ test('WHAT[DISPATCH-PROTOCOL-015] explicit malformed carrier containers cannot c
     'the valid scalar session grammar is not an agent container error',
   )
 })
-test('WHAT[DISPATCH-PROTOCOL-015] malformed parts and boolean lookalikes are absent and never throw', () => {
+test('WHAT[dispatch-protocol-015] malformed parts and boolean lookalikes are absent and never throw', () => {
   for (const parts of [7, 'text', {}, true, new String('boxed')]) {
     assert.doesNotThrow(() => decodeIngress({}, { parts }))
     assert.deepEqual(decodeIngress({}, { parts }), {

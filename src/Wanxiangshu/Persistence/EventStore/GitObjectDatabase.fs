@@ -379,7 +379,7 @@ module GitObjectDatabase =
                 return None
         }
 
-    /// DURABLE-EVENTS-004/006：CAS 未见证 newOid 不得假装提交。
+    /// durable-events-004/006：CAS 未见证 newOid 不得假装提交。
     let private confirmInstalledOid (lockPath: string) (refPath: string) (newOid: string) : Task<bool> =
         task {
             let! current = readRefTextQuietly refPath

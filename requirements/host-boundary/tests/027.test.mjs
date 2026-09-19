@@ -33,12 +33,12 @@ const closureSources = (root, projects) => {
   return new Set([...closure].flatMap(relSources))
 }
 
-test('WHAT[HOST-BOUNDARY-027] Host message loop and envelope slices reject the old wide signal closure', () => {
+test('WHAT[host-boundary-027] Host message loop and envelope slices reject the old wide signal closure', () => {
   assertPureContract()
   assertEffectIsInjected('host')
 })
 
-test('WHAT[HOST-BOUNDARY-027] production inventory closes Host codec audiences without the wide signal adapter', () => {
+test('WHAT[host-boundary-027] production inventory closes Host codec audiences without the wide signal adapter', () => {
   const shardInventory = readCompileShardInventory({ repositoryRoot: ROOT })
   const subsystemInventory = buildSubsystemInventory({ compileInventory: shardInventory })
   assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))
@@ -91,7 +91,7 @@ test('WHAT[HOST-BOUNDARY-027] production inventory closes Host codec audiences w
   assert.ok(refShards(requireShard(projects, 'execution-delegation-hostturnobservedsurface'), projects).includes('host-event-envelope'))
 })
 
-test('WHAT[HOST-BOUNDARY-027] Host envelope projection is shared and never mutates the raw payload', () => {
+test('WHAT[host-boundary-027] Host envelope projection is shared and never mutates the raw payload', () => {
   const payload = { type: 'message.updated', properties: { sessionID: 'session-1', info: { sessionID: 'session-2' } } }
   const input = { directory: '/must-not-cross', payload }
 

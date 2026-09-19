@@ -17,7 +17,7 @@ import {
 
 
 
-test('WHAT[DISTRIBUTION-009] normalizeMemberPath strips leading package/ and resolves slashes', () => {
+test('WHAT[distribution-009] normalizeMemberPath strips leading package/ and resolves slashes', () => {
   assert.equal(normalizeMemberPath('package/dist/index.js'), 'dist/index.js')
   assert.equal(normalizeMemberPath('package\\dist\\index.js'), 'dist/index.js')
   assert.equal(normalizeMemberPath('./package/dist/index.js'), 'dist/index.js')
@@ -26,7 +26,7 @@ test('WHAT[DISTRIBUTION-009] normalizeMemberPath strips leading package/ and res
   assert.equal(normalizeMemberPath('package'), '')
 })
 
-test('WHAT[DISTRIBUTION-009] checkPathTraversal rejects directory traversal and absolute paths', () => {
+test('WHAT[distribution-009] checkPathTraversal rejects directory traversal and absolute paths', () => {
   assert.doesNotThrow(() => checkPathTraversal('dist/index.js'))
   assert.doesNotThrow(() => checkPathTraversal('package/resources/file.md'))
 
@@ -48,7 +48,7 @@ test('WHAT[DISTRIBUTION-009] checkPathTraversal rejects directory traversal and 
   )
 })
 
-test('WHAT[DISTRIBUTION-009] isBannedMember flags dev, test, scripts, source and build artifacts', () => {
+test('WHAT[distribution-009] isBannedMember flags dev, test, scripts, source and build artifacts', () => {
   assert.equal(isBannedMember('src/Wanxiangshu/Main.fs'), true)
   assert.equal(isBannedMember('package/src/Wanxiangshu/Main.fs'), true)
   assert.equal(isBannedMember('tests/something.test.mjs'), true)
@@ -65,7 +65,7 @@ test('WHAT[DISTRIBUTION-009] isBannedMember flags dev, test, scripts, source and
   assert.equal(isBannedMember('package.json'), false)
 })
 
-test('WHAT[DISTRIBUTION-009] parsePackResult accepts single valid npm pack json output', () => {
+test('WHAT[distribution-009] parsePackResult accepts single valid npm pack json output', () => {
   const validOutput = JSON.stringify([
     {
       id: 'wanxiangshu@0.9.0',
@@ -80,7 +80,7 @@ test('WHAT[DISTRIBUTION-009] parsePackResult accepts single valid npm pack json 
   assert.equal(parsed.filename, 'wanxiangshu-0.9.0.tgz')
 })
 
-test('WHAT[DISTRIBUTION-009] parsePackResult accepts the npm >=12 name-keyed pack json shape', () => {
+test('WHAT[distribution-009] parsePackResult accepts the npm >=12 name-keyed pack json shape', () => {
   const validOutput = JSON.stringify({
     wanxiangshu: {
       id: 'wanxiangshu@0.9.0',
@@ -99,7 +99,7 @@ test('WHAT[DISTRIBUTION-009] parsePackResult accepts the npm >=12 name-keyed pac
   )
 })
 
-test('WHAT[DISTRIBUTION-009] parsePackResult rejects malformed json, wrong count, and mismatched package name', () => {
+test('WHAT[distribution-009] parsePackResult rejects malformed json, wrong count, and mismatched package name', () => {
   assert.throws(
     () => parsePackResult('not-json'),
     (err) => err.code === 'pack-json-invalid',
@@ -120,7 +120,7 @@ test('WHAT[DISTRIBUTION-009] parsePackResult rejects malformed json, wrong count
   )
 })
 
-test('WHAT[DISTRIBUTION-009] validateArtifact rejects non-regular entry (symbolic link) in archive stream', async () => {
+test('WHAT[distribution-009] validateArtifact rejects non-regular entry (symbolic link) in archive stream', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wx-symlink-test-'))
   const src = path.join(tmp, 'src')
   fs.mkdirSync(path.join(src, 'package'), { recursive: true })
@@ -137,7 +137,7 @@ test('WHAT[DISTRIBUTION-009] validateArtifact rejects non-regular entry (symboli
   fs.rmSync(tmp, { recursive: true, force: true })
 })
 
-test('WHAT[DISTRIBUTION-009] validateArtifact rejects path traversal in archive stream', async () => {
+test('WHAT[distribution-009] validateArtifact rejects path traversal in archive stream', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wx-traversal-test-'))
   const src = path.join(tmp, 'src')
   fs.mkdirSync(path.join(src, 'package'), { recursive: true })

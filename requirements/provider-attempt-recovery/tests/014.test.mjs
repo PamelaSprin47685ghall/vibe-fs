@@ -34,7 +34,7 @@ async function admit(journal, providerRunName) {
   }
 }
 
-test('WHAT[PAR-014] a_continuation_has_a_unique_accounted_and_budgeted_occasion', async () => {
+test('WHAT[provider-attempt-recovery-014] a_continuation_has_a_unique_accounted_and_budgeted_occasion', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-ledger-continuation-'))
   const created = await bootWithWriterId(directory, 'writer-ledger-continuation', 'rt_ledger_continuation', 1, '2026-01-01T00:00:00Z')
   assert.equal(created.ok, true, created.ok ? '' : created.error)

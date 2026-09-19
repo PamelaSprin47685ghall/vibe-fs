@@ -23,7 +23,7 @@ const RESOURCE_SAMPLES = [
   'enforcer/primitive-obsession/main.md',
 ]
 
-test('WHAT[DISTRIBUTION-002] DISTRIBUTION_resource_reads_resolve_under_package_root_regardless_of_cwd', async () => {
+test('WHAT[distribution-002] DISTRIBUTION_resource_reads_resolve_under_package_root_regardless_of_cwd', async () => {
   const previous = process.cwd()
   try {
     process.chdir('/')
@@ -40,7 +40,7 @@ test('WHAT[DISTRIBUTION-002] DISTRIBUTION_resource_reads_resolve_under_package_r
   }
 })
 
-test('WHAT[DISTRIBUTION-002] DISTRIBUTION_fresh_process_with_foreign_cwd_imports_entry_and_reads_resources', () => {
+test('WHAT[distribution-002] DISTRIBUTION_fresh_process_with_foreign_cwd_imports_entry_and_reads_resources', () => {
   // 干净子进程 + cwd=/：既不能靠 cwd 找到 resources，也不能靠源码树。唯一能成功
   // 的路径是包内 fixed-relative lookup（import.meta.url → ../../../resources）。
   const script = `

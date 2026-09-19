@@ -31,7 +31,7 @@ const trace = [
   xTrace.item({ sequence: 3, role: 'assistant', part: xTrace.text('Implemented and verified the fix.') }),
 ]
 
-test('WHAT[WORK-RECORD-012] LWR_prose_claim_never_renders_fixed_report_headings', () => {
+test('WHAT[work-record-012] LWR_prose_claim_never_renders_fixed_report_headings', () => {
   const rendered = materialize(
     opening('Rewrite the fallback controller.'),
     [],

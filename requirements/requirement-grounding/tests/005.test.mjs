@@ -25,7 +25,7 @@ const terminalRead = (path) => [{
   parts: [{ type: 'tool', tool: 'read', callID: 'source-read', state: { status: 'completed', input: { filePath: path }, output: 'source\n', time: { start: 0, end: 0 } } }],
 }]
 
-test('WHAT[REQUIREMENT-GROUNDING-005] APPLIES-TO external grounding injects only direct Markdown and excludes tests plus the manifest', async () => {
+test('WHAT[requirement-grounding-005] APPLIES-TO external grounding injects only direct Markdown and excludes tests plus the manifest', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'requirements', 'alpha', 'PROOF.md'), 'proof\n', 'utf8')

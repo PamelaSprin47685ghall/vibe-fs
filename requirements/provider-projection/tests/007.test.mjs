@@ -21,7 +21,7 @@ const expectedViolation = (rule, line, text) => ({
   text,
 })
 
-test('WHAT[PROVIDER-PROJECTION-007] generic decode projection and writeback remain allowed', () => {
+test('WHAT[provider-projection-007] generic decode projection and writeback remain allowed', () => {
   const source = `namespace Wanxiangshu.Participant.Provider.Projection
 
 open Wanxiangshu.Foundation
@@ -53,14 +53,14 @@ module GenericProjection =
   assert.deepEqual(violationFor(source), [])
 })
 
-test('WHAT[PROVIDER-PROJECTION-007] Strength namespace imports are rejected precisely', () => {
+test('WHAT[provider-projection-007] Strength namespace imports are rejected precisely', () => {
   assert.deepEqual(
     violationFor('namespace Fixture\nopen Wanxiangshu.Strength.Prediction\n'),
     [expectedViolation('strength-import', 2, 'open Wanxiangshu.Strength.Prediction')],
   )
 })
 
-test('WHAT[PROVIDER-PROJECTION-007] each foreign owner reference is rejected precisely', () => {
+test('WHAT[provider-projection-007] each foreign owner reference is rejected precisely', () => {
   for (const [source, reference] of [
     ['open Wanxiangshu.Context.Prefix', 'Wanxiangshu.Context.Prefix'],
     ['open Wanxiangshu.Enforcer', 'Wanxiangshu.Enforcer'],
@@ -75,7 +75,7 @@ test('WHAT[PROVIDER-PROJECTION-007] each foreign owner reference is rejected pre
   }
 })
 
-test('WHAT[PROVIDER-PROJECTION-007] each foreign materialization is rejected precisely', () => {
+test('WHAT[provider-projection-007] each foreign materialization is rejected precisely', () => {
   for (const name of [
     'ActivatePrefixEpoch',
     'InsertBlogFrames',
@@ -93,14 +93,14 @@ test('WHAT[PROVIDER-PROJECTION-007] each foreign materialization is rejected pre
   }
 })
 
-test('WHAT[PROVIDER-PROJECTION-007] Strength writeback API names are rejected precisely', () => {
+test('WHAT[provider-projection-007] Strength writeback API names are rejected precisely', () => {
   assert.deepEqual(
     violationFor('module Fixture\nlet tryApplyStrengthRenderedMessages value = value\n'),
     [expectedViolation('strength-api', 2, 'tryApplyStrengthRenderedMessages')],
   )
 })
 
-test('WHAT[PROVIDER-PROJECTION-007] production provider projection owners are policy-free', () => {
+test('WHAT[provider-projection-007] production provider projection owners are policy-free', () => {
   assert.deepEqual(
     scanProviderProjectionRepo(ROOT),
     [],

@@ -9,7 +9,7 @@ const { default: test } = await import("node:test");
 const { COVERAGE_EXCLUDE_GLOBS, selectProductionModules, verifyCoverageDenominator } = await import("./support/coverage-policy.mjs");
 
 
-test('WHAT[VERIFICATION-SYSTEM-011] selectProductionModules excludes fable_modules so untested modules count at 0%', () => {
+test('WHAT[verification-system-011] selectProductionModules excludes fable_modules so untested modules count at 0%', () => {
   const files = [
     'dist/foo.js',
     'dist/fable_modules/bar.js',
@@ -18,7 +18,7 @@ test('WHAT[VERIFICATION-SYSTEM-011] selectProductionModules excludes fable_modul
   ]
   assert.deepEqual(selectProductionModules(files), ['dist/foo.js', 'dist/qux.js'])
 })
-test('WHAT[VERIFICATION-SYSTEM-011] verifyCoverageDenominator catches missing and extra files', () => {
+test('WHAT[verification-system-011] verifyCoverageDenominator catches missing and extra files', () => {
   const expected = ['dist/a.js', 'dist/b.js']
   const reported1 = ['dist/a.js', 'dist/b.js']
   assert.equal(verifyCoverageDenominator(reported1, expected).ok, true)
@@ -33,7 +33,7 @@ test('WHAT[VERIFICATION-SYSTEM-011] verifyCoverageDenominator catches missing an
   assert.equal(check3.ok, false)
   assert.deepEqual(check3.extra, ['dist/extra.js'])
 })
-test('WHAT[VERIFICATION-SYSTEM-011] coverage exclude globs are fixed: node_modules, fable_modules, tests, scripts', () => {
+test('WHAT[verification-system-011] coverage exclude globs are fixed: node_modules, fable_modules, tests, scripts', () => {
   assert.deepEqual(COVERAGE_EXCLUDE_GLOBS, [
     '**/node_modules/**',
     '**/fable_modules/**',
@@ -185,7 +185,7 @@ assert.equal(foo(1), 'positive')
   return { distDir, testScript, assertBuildFreshFn, collectInputsFn }
 }
 
-test('WHAT[VERIFICATION-SYSTEM-011] 1. 一份被测文件、一份未导入文件: 两者都在分母，未导入文件为零', async () => {
+test('WHAT[verification-system-011] 1. 一份被测文件、一份未导入文件: 两者都在分母，未导入文件为零', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'cov-test-1-'))
   try {
     const { testScript, assertBuildFreshFn, collectInputsFn } = createMiniFixture(dir)
@@ -222,7 +222,7 @@ test('WHAT[VERIFICATION-SYSTEM-011] 1. 一份被测文件、一份未导入文�
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[VERIFICATION-SYSTEM-011] 2. 未导入文件顶层抛错: 不执行该顶层代码，仍作为未覆盖文件出现', async () => {
+test('WHAT[verification-system-011] 2. 未导入文件顶层抛错: 不执行该顶层代码，仍作为未覆盖文件出现', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'cov-test-2-'))
   try {
     const { testScript, assertBuildFreshFn, collectInputsFn } = createMiniFixture(dir, { bThrows: true })
@@ -250,7 +250,7 @@ test('WHAT[VERIFICATION-SYSTEM-011] 2. 未导入文件顶层抛错: 不执行该
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[VERIFICATION-SYSTEM-011] 3. 同名文件分处两个目录: 报表两条独立记录', async () => {
+test('WHAT[verification-system-011] 3. 同名文件分处两个目录: 报表两条独立记录', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'cov-test-3-'))
   try {
     const { testScript, assertBuildFreshFn, collectInputsFn } = createMiniFixture(dir, { duplicateName: true })
@@ -278,7 +278,7 @@ test('WHAT[VERIFICATION-SYSTEM-011] 3. 同名文件分处两个目录: 报表两
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[VERIFICATION-SYSTEM-011] 4. 主测试与一个正常完成的子进程覆盖不同分支: 合并后的同一文件包含两条实际路径', async () => {
+test('WHAT[verification-system-011] 4. 主测试与一个正常完成的子进程覆盖不同分支: 合并后的同一文件包含两条实际路径', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'cov-test-4-'))
   try {
     // Parent exercises foo(1) ('positive'), child exercises foo(-1) ('negative')
@@ -333,7 +333,7 @@ assert.equal(child.status, 0)
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[VERIFICATION-SYSTEM-011] 5. 测试断言失败: 命令失败，即使已写出报告', async () => {
+test('WHAT[verification-system-011] 5. 测试断言失败: 命令失败，即使已写出报告', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'cov-test-5-'))
   try {
     const failingScript = `import assert from 'node:assert/strict'
@@ -356,7 +356,7 @@ assert.equal(foo(1), 'wrong-expectation')
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[VERIFICATION-SYSTEM-011] 6. 内层 runner 在测试启动前崩溃: 明确 infrastructure error，不接受全零报告当成功', async () => {
+test('WHAT[verification-system-011] 6. 内层 runner 在测试启动前崩溃: 明确 infrastructure error，不接受全零报告当成功', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'cov-test-6-'))
   try {
     const nonExistentScript = path.join(dir, 'does-not-exist.js')
@@ -379,7 +379,7 @@ test('WHAT[VERIFICATION-SYSTEM-011] 6. 内层 runner 在测试启动前崩溃: �
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[VERIFICATION-SYSTEM-011] 7. raw 数据为空、JSON 损坏或错误 run-id: 命令失败，不读取历史数据兜底', async () => {
+test('WHAT[verification-system-011] 7. raw 数据为空、JSON 损坏或错误 run-id: 命令失败，不读取历史数据兜底', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'cov-test-7-'))
   try {
     // Runner that exits immediately without touching V8 coverage
@@ -409,7 +409,7 @@ test('WHAT[VERIFICATION-SYSTEM-011] 7. raw 数据为空、JSON 损坏或错误 r
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[VERIFICATION-SYSTEM-011] 8. 分母与 build receipt 对等 (source map / dist mismatch)', async () => {
+test('WHAT[verification-system-011] 8. 分母与 build receipt 对等 (source map / dist mismatch)', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'cov-test-8-'))
   try {
     const { testScript, distDir, assertBuildFreshFn, collectInputsFn } = createMiniFixture(dir)
@@ -435,7 +435,7 @@ test('WHAT[VERIFICATION-SYSTEM-011] 8. 分母与 build receipt 对等 (source ma
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[VERIFICATION-SYSTEM-011] 9. 测试运行期间生产文件被改写: INPUT_CHANGED，不授予本次报告当前性', async () => {
+test('WHAT[verification-system-011] 9. 测试运行期间生产文件被改写: INPUT_CHANGED，不授予本次报告当前性', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'cov-test-9-'))
   try {
     // Script modifies a production file during its test execution

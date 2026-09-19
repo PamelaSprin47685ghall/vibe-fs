@@ -24,7 +24,7 @@ const recordingPort = () => {
   return fixture
 }
 
-test('WHAT[ATTENTION-REGULATION-006] attention state stays a minimal deferred-work projection, not a workflow engine', () => {
+test('WHAT[attention-regulation-006] attention state stays a minimal deferred-work projection, not a workflow engine', () => {
   assert.deepEqual(attention.pending('ses-a', attention.empty()), [])
   const source = [
     read('src/Wanxiangshu/Interaction/Attention/Facts.fs'),

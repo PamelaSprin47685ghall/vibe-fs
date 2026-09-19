@@ -27,7 +27,7 @@ const MANAGER_VISIBLE_SURFACES = [
   'lifecycle/magic-todo/manager-guideline',
 ]
 
-test('WHAT[PARTICIPANT-HORIZON-006] PH_exec_030_internal_machine_state_renders_as_consequence_not_dto', () => {
+test('WHAT[participant-horizon-006] PH_exec_030_internal_machine_state_renders_as_consequence_not_dto', () => {
   const machineStateVocabulary = /\b(lane|offset|spool|job\s*id)\b/i
   for (const tool of ['join', 'horizon']) {
     for (const locale of LOCALES) {

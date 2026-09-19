@@ -61,7 +61,7 @@ const assertSingleRecovery = (decision, expected) => {
   assert.ok(decision.authorization)
 }
 
-test('WHAT[EXECFAIL-002] cancel/retry/stream matrix is interpreted by registered owners', async () => {
+test('WHAT[execution-failure-policy-002] cancel/retry/stream matrix is interpreted by registered owners', async () => {
   const cancelled = decide('UserCancelled')
   assertNoRecovery(cancelled)
   assert.equal(cancelled.resolution, 'TerminalizeProviderStarted')
@@ -357,7 +357,7 @@ const providerCases = [
   },
 ]
 
-test('WHAT[EXECFAIL-002] every phase and failure yields exactly one resolution and orthogonal dimensions', () => {
+test('WHAT[execution-failure-policy-002] every phase and failure yields exactly one resolution and orthogonal dimensions', () => {
   const dimensions = [
     'authorization',
     'breaker',

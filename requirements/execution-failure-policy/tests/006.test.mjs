@@ -110,7 +110,7 @@ const providerCases = [
   },
 ]
 
-test('WHAT[EXECFAIL-006] LocalInvariant requests fatality only after typed settlement commands', () => {
+test('WHAT[execution-failure-policy-006] LocalInvariant requests fatality only after typed settlement commands', () => {
   const decision = decide({ failure: 'LocalInvariant', phase: 'AcceptedBeforeProvider' })
   assert.equal(decision.resolution, 'TerminalizeAcceptedPreProvider')
   assert.equal(decision.breaker.kind, 'NoBreakerTransition')

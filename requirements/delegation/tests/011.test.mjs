@@ -30,7 +30,7 @@ const toolModule = {
 const waitForPromptCount = (runtime, count) => forkTool.awaitPromptCount(runtime, count)
 const ownerDescriptor = (sessionId) => [{ sessionId, agent: 'manager' }]
 
-test('WHAT[PARTICIPANT-HORIZON-011] FORK_TOOL_abandoned_child_does_not_vanish_from_horizon_before_join', async () => {
+test('WHAT[participant-horizon-011] FORK_TOOL_abandoned_child_does_not_vanish_from_horizon_before_join', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-abandoned-horizon-'))
   const owner = 'manager-abandoned-horizon'
   const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
@@ -125,7 +125,7 @@ const verifyReusableHandoff = async (role) => {
   } finally { sync.dispose(h) }
 }
 
-test('WHAT[DELEG-011] SYNC_RUNTIME_ordinary_completion_settles_batch_without_return_channel', async () => {
+test('WHAT[delegation-011] SYNC_RUNTIME_ordinary_completion_settles_batch_without_return_channel', async () => {
   const h = await live('owner-ordinary')
   try {
     const pending = sync.invoke(h, 'owner-ordinary', 'Engineer', 'ordinary charge')

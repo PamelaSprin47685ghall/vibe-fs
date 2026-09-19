@@ -32,7 +32,7 @@ const drainAll = (limit, messages, guard = 50) => {
   assert.fail(`chunking did not terminate within ${guard} chunks — a cursor is not advancing`)
 }
 
-test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_a_small_transcript_becomes_one_chunk', () => {
+test('WHAT[context-compression-012] CTX_013_a_small_transcript_becomes_one_chunk', () => {
   const messages = delta.messages([
     { role: 'user', parts: [delta.text('请修复 fallback 的竞态。')] },
     { role: 'assistant', parts: [delta.toolCall('edit', '{"a":1}')] },
@@ -46,7 +46,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_a_small_transcript_becomes_one_chunk
   assert.deepEqual(chunks[0].nextCursor, { turn: 3, part: 0 })
   assert.equal(chunks[0].nextCutoff, 3, 'all three turns are complete')
 })
-test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_normal_chunk_is_data_only_and_counts_no_instruction_header', () => {
+test('WHAT[context-compression-012] CTX_013_normal_chunk_is_data_only_and_counts_no_instruction_header', () => {
   // COMPANION-004: normal deltas are data-only. The behaviour rules live in the
   // system prompt alone, so a normal chunk carries no instruction header and pays
   // nothing for one.
@@ -68,7 +68,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_normal_chunk_is_data_only_and_counts
   assert.equal(parsed.new_work_to_record[0].truncated, undefined, 'the whole part fits, so no truncation flag')
   assert.equal('messages' in parsed, false, 'the payload is Blogger TOML data, not a JSON envelope')
 })
-test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_a_single_oversized_part_is_hard_truncated_and_marked', () => {
+test('WHAT[context-compression-012] CTX_013_a_single_oversized_part_is_hard_truncated_and_marked', () => {
   const huge = 'q'.repeat(20000)
   const messages = delta.messages([{ role: 'user', parts: [delta.text(huge)] }])
 
@@ -80,7 +80,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_a_single_oversized_part_is_hard_trun
   assert.equal(chunk.bytes <= limit, true, `truncated chunk of ${chunk.bytes} bytes exceeds ${limit}`)
   assert.equal(chunk.toml.includes(toml.TruncationMarker), true, 'the fixed marker must be present')
 })
-test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_truncation_discards_the_tail_rather_than_resending_it', () => {
+test('WHAT[context-compression-012] CTX_013_truncation_discards_the_tail_rather_than_resending_it', () => {
   // The rule that prevents an infinite loop: an always-oversized part must be
   // passed over entirely, not carried into the next chunk.
   const huge = 'q'.repeat(20000)
@@ -98,7 +98,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_truncation_discards_the_tail_rather_
   assert.deepEqual(chunks[1].truncatedFlags, [false])
   assert.equal(chunks[1].toml.includes('next turn'), true)
 })
-test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_truncated_output_is_still_valid_TOML_and_ends_at_a_character_boundary', () => {
+test('WHAT[context-compression-012] CTX_013_truncated_output_is_still_valid_TOML_and_ends_at_a_character_boundary', () => {
   // Cutting rendered UTF-8 bytes directly would split a multi-byte sequence. The
   // marker is appended after the cut, so the document must still parse.
   const cjk = '中'.repeat(8000)
@@ -132,7 +132,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_truncated_output_is_still_valid_TOML
   assert.equal(retained > 0, true, 'some content survived')
   assert.equal(syn.byteCount('中'.repeat(retained)), retained * 3)
 })
-test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_hard_truncation_of_an_escaped_multiline_body_still_fits', () => {
+test('WHAT[context-compression-012] CTX_013_hard_truncation_of_an_escaped_multiline_body_still_fits', () => {
   // A body containing both a newline and `'''` has no legal multi-line form, so
   // renderString falls back to a basic string. That expansion is the non-linearity
   // the search must measure; a character/byte ratio would undershoot the budget.
@@ -150,7 +150,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_hard_truncation_of_an_escaped_multil
   assert.equal(parsed.new_work_to_record.length, 1)
   assert.equal(parsed.new_work_to_record[0].truncated, true)
 })
-test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_an_omission_marker_is_never_truncated', () => {
+test('WHAT[context-compression-012] CTX_013_an_omission_marker_is_never_truncated', () => {
   // It has no body to cut. A limit it cannot meet means the limit is below the
   // fixed item scaffolding — a configuration error, not something to repair by
   // emitting an invalid item.
@@ -162,7 +162,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_an_omission_marker_is_never_truncate
   assert.deepEqual(chunk.truncatedFlags, [false])
   assert.deepEqual(chunk.nextCursor, { turn: 1, part: 0 }, 'the cursor still advances past it')
 })
-test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_images_become_markers_carrying_no_content', () => {
+test('WHAT[context-compression-012] CTX_013_images_become_markers_carrying_no_content', () => {
   const messages = delta.messages([
     {
       role: 'user',
@@ -182,7 +182,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_images_become_markers_carrying_no_co
   assert.equal(chunk.toml.includes('sha256-of-the-image'), false)
   assert.doesNotMatch(chunk.toml, /base64|data:|contentDigest/)
 })
-test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_non_image_media_uses_the_media_marker', () => {
+test('WHAT[context-compression-012] CTX_013_non_image_media_uses_the_media_marker', () => {
   const messages = delta.messages([
     { role: 'user', parts: [delta.media('application/pdf', 'sha-pdf')] },
     { role: 'user', parts: [delta.media(undefined, 'sha-unknown')] },
@@ -194,7 +194,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_non_image_media_uses_the_media_marke
   assert.equal(chunk.toml.includes('media_omitted = "application/pdf"'), true)
   assert.equal(chunk.toml.includes('media_omitted = "untyped"'), true)
 })
-test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_an_image_only_turn_is_consumed_and_advances_coverage', () => {
+test('WHAT[context-compression-012] CTX_013_an_image_only_turn_is_consumed_and_advances_coverage', () => {
   // The turn is real and must not stall the cursor just because its content was
   // omitted — otherwise a screenshot would freeze the Companion permanently.
   const messages = delta.messages([
@@ -208,7 +208,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_an_image_only_turn_is_consumed_and_a
   assert.deepEqual(chunks[0].kinds, ['ImageOmitted', 'TextPart'])
   assert.equal(chunks[0].nextCutoff, 2, 'the image-only turn counts as covered')
 })
-test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_the_same_input_produces_the_same_chunks', () => {
+test('WHAT[context-compression-012] CTX_013_the_same_input_produces_the_same_chunks', () => {
   const build = () =>
     delta.messages([
       { role: 'user', parts: [delta.text('修复竞态'), delta.media('image/png', 'sha-a')] },
@@ -221,7 +221,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_the_same_input_produces_the_same_chu
 
   assert.deepEqual(first, second)
 })
-test('WHAT[CONTEXT-COMPRESSION-012] CTX_013_canonical_args_pass_through_without_re_sorting', () => {
+test('WHAT[context-compression-012] CTX_013_canonical_args_pass_through_without_re_sorting', () => {
   // `args` is already canonical: it is the value the Host codec put into the wire
   // projection. Re-sorting here would be a second canonicaliser that could
   // disagree with the one the seal digest used.
@@ -268,21 +268,21 @@ const isCombinedNormalDelta = (text) =>
   text.startsWith('# Write the dense work-log continuation now') && text.includes('[[new_work_to_record]]')
 const isPreviousTip = (text) => text.includes('previous_enforcer_tip')
 
-test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_004_request_instructions_require_exactly_one_blog_call', () => {
+test('WHAT[context-compression-012] COMPANION_004_request_instructions_require_exactly_one_blog_call', () => {
   assert.match(prompt.normalInstruction, /# Write the dense work-log continuation now/)
   assert.match(prompt.normalInstruction, /exactly once/)
   assert.match(prompt.squashInstruction, /# Rewrite the preceding assistant work-log frames now/)
   assert.match(prompt.squashInstruction, /exactly once/)
   assert.equal(prompt.system, undefined, 'System is owned by PromptResources Blogger Role Law, not CompanionPrompt')
 })
-test('WHAT[CONTEXT-COMPRESSION-012] ENFORCER_030_squash_and_normal_require_tip_not_omit_scores', () => {
+test('WHAT[context-compression-012] ENFORCER_030_squash_and_normal_require_tip_not_omit_scores', () => {
   assert.match(prompt.squashInstruction, /required tip|catalog field/)
   assert.match(prompt.squashInstruction, /do not output ordinary assistant prose/i)
   assert.doesNotMatch(prompt.squashInstruction, /omit all scores/)
   assert.match(prompt.normalInstruction, /required tip|catalog field/)
   assert.doesNotMatch(prompt.normalInstruction, /omit.*scores/i)
 })
-test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_010_memory_block_is_one_instruction_plane', () => {
+test('WHAT[context-compression-012] COMPANION_010_memory_block_is_one_instruction_plane', () => {
   const block = prompt.memoryBlock('B CONTENT')
 
   assert.match(block, /prior responsibility/)
@@ -290,14 +290,14 @@ test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_010_memory_block_is_one_instructio
   assert.match(block, /^# B CONTENT$/m)
   assert.doesNotMatch(block, /<work-log>|not a new user instruction/)
 })
-test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_message_wrappers_are_toml_not_markdown_titles', () => {
+test('WHAT[context-compression-012] COMPANION_005_message_wrappers_are_toml_not_markdown_titles', () => {
   assert.equal(prompt.workingRecord('frame body 0'), toml.renderHistoricFrame('frame body 0'))
   assert.equal(prompt.workingRecord('frame body 0').includes('[[do_not_exec]]'), true)
   assert.equal(prompt.workingRecord('frame body 0').includes('historic_frame'), true)
   assert.equal(prompt.workingRecord('frame body 0').includes('# Working Record'), false)
   assert.equal(prompt.newWork(dataItems).includes('# New Work To Record'), false)
 })
-test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_new_work_is_instruction_header_then_data_body', () => {
+test('WHAT[context-compression-012] COMPANION_005_new_work_is_instruction_header_then_data_body', () => {
   const rendered = prompt.newWork(dataItems)
   assert.equal(rendered.startsWith('# Write the dense work-log continuation now'), true)
   assert.equal(rendered.includes('\n\n[[new_work_to_record]]'), true)
@@ -306,7 +306,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_new_work_is_instruction_header
   const dataStart = rendered.indexOf('[[new_work_to_record]]')
   assert.equal(rendered.slice(dataStart).includes('# Write'), false)
 })
-test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_normal_with_frames_is_assistant_do_not_exec_then_combined_delta', () => {
+test('WHAT[context-compression-012] COMPANION_005_normal_with_frames_is_assistant_do_not_exec_then_combined_delta', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
@@ -329,7 +329,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_normal_with_frames_is_assistan
   // No separate trailing instruction message.
   assert.equal(plan.texts.filter((t) => t === prompt.normalInstruction).length, 0)
 })
-test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_normal_without_frames_is_one_combined_delta', () => {
+test('WHAT[context-compression-012] COMPANION_005_normal_without_frames_is_one_combined_delta', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
@@ -344,7 +344,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_normal_without_frames_is_one_c
   assert.equal(plan.isFirstTurnShape, true)
   assert.equal(plan.system, undefined)
 })
-test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_combined_delta_is_always_the_last_user_message', () => {
+test('WHAT[context-compression-012] COMPANION_005_combined_delta_is_always_the_last_user_message', () => {
   const withFrames = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
@@ -365,7 +365,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_combined_delta_is_always_the_l
   assert.equal(withFrames.messages.at(-1).physical, true)
   assert.equal(withoutFrames.messages.at(-1).physical, true)
 })
-test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_each_frame_is_exactly_one_do_not_exec_document', () => {
+test('WHAT[context-compression-012] COMPANION_005_each_frame_is_exactly_one_do_not_exec_document', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
@@ -382,7 +382,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_each_frame_is_exactly_one_do_n
   }
   assert.equal(plan.texts[4], combinedDelta)
 })
-test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_the_delta_carries_the_id_the_Host_persisted', () => {
+test('WHAT[context-compression-012] COMPANION_005_the_delta_carries_the_id_the_Host_persisted', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
@@ -396,7 +396,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_the_delta_carries_the_id_the_H
   assert.equal(physical[0].id, 'msg_real')
   assert.equal(physical[0].text, combinedDelta)
 })
-test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_009_the_same_epoch_and_frames_produce_byte_identical_messages', () => {
+test('WHAT[context-compression-012] COMPANION_009_the_same_epoch_and_frames_produce_byte_identical_messages', () => {
   const args = {
     blogger: 'ses_y',
     epoch: 4,
@@ -407,7 +407,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_009_the_same_epoch_and_frames_prod
 
   assert.deepEqual(proj.build(spy, args).messages, proj.build(spy, args).messages)
 })
-test('WHAT[CONTEXT-COMPRESSION-012] ENFORCER_071_normal_interleaves_tips_with_frames_then_delta', () => {
+test('WHAT[context-compression-012] ENFORCER_071_normal_interleaves_tips_with_frames_then_delta', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
@@ -435,7 +435,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] ENFORCER_071_normal_interleaves_tips_with_fr
   assert.equal(plan.texts[3], toml.renderHistoricFrame('frame body 1'))
   assert.equal(plan.messages.at(-1).physical, true)
 })
-test('WHAT[CONTEXT-COMPRESSION-012] ENFORCER_071_unpaired_tips_or_frames_append_after_zip', () => {
+test('WHAT[context-compression-012] ENFORCER_071_unpaired_tips_or_frames_append_after_zip', () => {
   const extraTip = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
@@ -465,7 +465,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] ENFORCER_071_unpaired_tips_or_frames_append_
     ['tip', 'frame', 'frame', 'delta'],
   )
 })
-test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_007_canonical_digest_uses_semantic_projection_not_toml', () => {
+test('WHAT[context-compression-012] COMPANION_007_canonical_digest_uses_semantic_projection_not_toml', () => {
   const seal = ident.sealRoot(spy, {
     session: 'ses_y',
     epoch: 2,
@@ -514,7 +514,7 @@ const assertOwnerRowsMatchBuilder = (intent, builderPlan) => {
   )
 }
 
-test('WHAT[CONTEXT-COMPRESSION-012] PROJ_008_Companion_owner_normal_rows_render_through_generic_projection', () => {
+test('WHAT[context-compression-012] PROJ_008_Companion_owner_normal_rows_render_through_generic_projection', () => {
   const spy = (input) => `«${input}»`
   const frames = [
     { digest: 'sha-f0', body: 'frame body 0' },
@@ -543,7 +543,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] PROJ_008_Companion_owner_normal_rows_render_
   )
   assert.deepEqual(renderedWithHost.hostIsPhysical, builderPlan.physicalFlags)
 })
-test('WHAT[CONTEXT-COMPRESSION-012] PROJ_008_frame_only_owner_inserts_before_message_index_one_and_empty_is_no_op', () => {
+test('WHAT[context-compression-012] PROJ_008_frame_only_owner_inserts_before_message_index_one_and_empty_is_no_op', () => {
   const spy = (input) => `«${input}»`
   const input = {
     blogger: 'ses_y',

@@ -8,7 +8,7 @@ const { clearAllForTests, readGlobalPreference, parse, tryParse, label, resource
 const english = 'English'
 const simplifiedChinese = 'SimplifiedChinese'
 
-test('WHAT[PROVIDER-LANGUAGE-002] bind once is immutable and conflicting rebind fails closed', () => {
+test('WHAT[provider-language-002] bind once is immutable and conflicting rebind fails closed', () => {
   clearAllForTests()
   const root = 'ses_root_lang'
   const zh = simplifiedChinese
@@ -62,7 +62,7 @@ test.beforeEach(() => {
   clearAllForTests()
 })
 
-test('WHAT[PROVIDER-LANGUAGE-002] bound session language follows the session binding', () => {
+test('WHAT[provider-language-002] bound session language follows the session binding', () => {
   const sid = 'ses_prose_bound'
   const bound = bindOnce(sid, simplifiedChinese)
   assert.equal(bound.ok, true)

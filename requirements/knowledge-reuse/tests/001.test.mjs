@@ -42,7 +42,7 @@ const findCase = async (store, sessionId) => {
   return result.value
 }
 
-test('WHAT[KNOWLEDGE-REUSE-001] CASE001_casebook_is_best_effort_semantic_cache_with_readonly_observation_replay', async () => {
+test('WHAT[knowledge-reuse-001] CASE001_casebook_is_best_effort_semantic_cache_with_readonly_observation_replay', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-cb001-'))
   const local = createCasebookEventStore()
   try {

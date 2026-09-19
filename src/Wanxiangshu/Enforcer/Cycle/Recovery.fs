@@ -216,7 +216,7 @@ module EnforcerFrameRecovery =
                     |> Option.bind (fun value -> renderPlannedHostMessages snapshot [ value ])
         }
 
-    /// ENFORCER-051 / PROJ-008 step 3b: rebuild via Projection Algebra.
+    /// ENFORCER-051 / relay-context-projection-008 step 3b: rebuild via Projection Algebra.
     /// Companion-owned rows → Planner → generic renderer → Host messages.
     /// Missing association / frame load → None so the caller keeps rawMessages.
     /// Never return an empty list: that blanks the Host transcript (mock lastUser=null).

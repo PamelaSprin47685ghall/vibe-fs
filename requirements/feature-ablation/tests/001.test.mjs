@@ -25,8 +25,8 @@ const packageDirs = () =>
       }
     })
 
-test('WHAT[ABL-001] ABL_001_primary_nodes_cover_index_packages', () => {
-  const primary = nodesDoc.nodes.filter((node) => node.kind === 'package').map((node) => node.id)
+test('WHAT[feature-ablation-001] ABL_001_primary_nodes_cover_index_packages', () => {
+  const primary = nodesDoc.nodes.filter((node) => node.kind === 'package' && node.status !== 'revoked').map((node) => node.id)
   const packages = packageDirs()
   assert.deepEqual(new Set(primary), new Set(packages))
 })

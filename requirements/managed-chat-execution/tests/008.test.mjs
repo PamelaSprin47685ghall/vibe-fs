@@ -24,7 +24,7 @@ const snapshot = (overrides = {}) => ({
 })
 const decide = (decoded, durable = snapshot()) => intent.resolve(decoded, durable)
 
-test('WHAT[INTERACTION-AUTHORITY-008] accepted Host identity outranks claim and compaction', () => {
+test('WHAT[interaction-authority-008] accepted Host identity outranks claim and compaction', () => {
   const durable = snapshot({
     claims: [
       {
@@ -42,7 +42,7 @@ test('WHAT[INTERACTION-AUTHORITY-008] accepted Host identity outranks claim and 
     { case: 'NoManagedExecution', reason: 'AlreadyAcceptedHostMessage', origin: 'JoinGuard' },
   )
 })
-test('WHAT[INTERACTION-AUTHORITY-008] registered AgentOwnerRoot outranks external root inference', () => {
+test('WHAT[interaction-authority-008] registered AgentOwnerRoot outranks external root inference', () => {
   assert.deepEqual(
     decide(
       message({ promptKey: 'unclaimed-owner-root', explicitAgent: 'reviewer' }),
@@ -51,7 +51,7 @@ test('WHAT[INTERACTION-AUTHORITY-008] registered AgentOwnerRoot outranks externa
     { case: 'Reject', reason: 'AgentOwnerRootPromptNotClaimed' },
   )
 })
-test('WHAT[INTERACTION-AUTHORITY-008] plugin claim is frozen even if the later projection changes', () => {
+test('WHAT[interaction-authority-008] plugin claim is frozen even if the later projection changes', () => {
   const durable = snapshot({
     claims: [
       {
@@ -166,7 +166,7 @@ const acceptedWire = (evidence) =>
     ],
   ])
 
-test('WHAT[CHATEXEC-008] recovery begins from durable activation and re-enters only on causal events', async () => {
+test('WHAT[managed-chat-execution-008] recovery begins from durable activation and re-enters only on causal events', async () => {
   const [beforeDurability, afterDurability] = (await Runtime.admissionCrashPointScenarios(
     ['A', 'B'],
     'ProcessRestart',

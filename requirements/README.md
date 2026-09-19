@@ -12,9 +12,9 @@ orchestrator、Long Stroke e2e）归 `verification-system/tests/`。每个包目
 ```text
 WHY.md      不可替代的存在理由（保姆级）
 WHAT.md     唯一 normative 合同（编号命题，对应同编号测试）
-HOW.md      实现模型与约束（非 normative；含「历史与弃权」）
+HOW.md      可选说明：实现模型与约束（非 normative；含「历史与弃权」）
 tests/      本包拥有的可执行 proof（NNN.test.mjs）
-APPLIES-TO  可选的包外正向代码覆盖声明；仓库根相对、gitignore wildmatch 语法，普通行=纳入，!行=排除例外
+APPLIES-TO  可选的包外正向代码覆盖声明；仓库根相对、gitignore wildmatch 语法，普通行=纳入，!行=��除例外
 ```
 
 `requirements/<package>/` 下的全部内容天然属于该 package 的覆盖范围，包括文档、tests 与
@@ -64,7 +64,6 @@ grounding 由 `requirement-grounding` package 拥有。
 | [action-affordance](action-affordance/WHAT.md) | 决策点必须知道 act 的正负边界、成功后果与参数意义。 |
 | [provider-language](provider-language/WHAT.md) | 一个 life 一个稳定 natural-language world；protocol identifiers 不翻译。 |
 | [provider-projection](provider-projection/WHAT.md) | typed semantic intent 经唯一确定性投影成为 provider representation，表示不反向创造 authority。 |
-| [external-investigation](external-investigation/WHAT.md) | 外部 facts 以 provenance、source quality、disagreement-aware observation 建立。 |
 
 ### 5. Interaction / effect / durability
 | Package | 一句话 WHY |
@@ -83,7 +82,6 @@ grounding 由 `requirement-grounding` package 拥有。
 | [delegation](delegation/WHAT.md) | 语义工作转交时 authority、charge、owner 与返回后果明确。 |
 | [intra-participant-parallelism](intra-participant-parallelism/WHAT.md) | 同一 participant 可展开多个 coequal execution presents，而 identity/authority/responsibility 与最终 completion 仍保持一个。 |
 | [process-execution](process-execution/WHAT.md) | 真实进程/PTY 有 bounded、可终止、物理完成可信的 execution semantics。 |
-| [output-distillation](output-distillation/WHAT.md) | 大输出有损但诚实地压缩；fragment 不能冒充整体成功或发明因果。 |
 | [change-integration](change-integration/WHAT.md) | 独立 Git road 只在短原子门内发布，长 review/repair 不全局串行化。 |
 
 ### 7. Context continuity
@@ -152,5 +150,5 @@ node --test requirements/<pkg>/tests/NNN.test.mjs            # 单包单文件
 node scripts/check.mjs                                       # 全 static gates
 ```
 
-- 测试文件按 WHAT 条款编号统一命名为 `NNN.test.mjs`，与用例标题中的 `WHAT[PREFIX-NNN]` 强力绑定；顶层 `tests/`、`tests/integration/` 以及 `tests/e2e/NNN.test.mjs` 为唯一测试入口；HOW.md 不再维护独立的测试落点表，映射关系完全由测试用例标题锚权威定义。
+- 测试文件按 WHAT 条款编号统一命名为 `NNN.test.mjs`，与用例标题中的 `WHAT[<包目录名小写>-NNN]` 强力绑定；顶层 `tests/`、`tests/integration/` 以及 `tests/e2e/NNN.test.mjs` 为唯一测试入口；HOW.md 不再维护独立的测试落点表，映射关系完全由测试用例标题锚权威定义。
 - 迁移状态：旧 `docs/`、`changes/` 已于 2026-08-14 cutover 归档删除（git 可回溯）；`tests/` 已全部分包并统一编号。

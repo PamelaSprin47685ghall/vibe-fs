@@ -11,7 +11,7 @@ const { close, createStore, start, resume, state, assessWhy, relativeServerEntry
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '../../..')
 
-test('WHAT[EPI-002] fsharp_kernel_has_no_agent_host_domain_dependency_and_sdk_stays_at_mcp_edge', () => {
+test('WHAT[epistemic-reasoning-002] fsharp_kernel_has_no_agent_host_domain_dependency_and_sdk_stays_at_mcp_edge', () => {
   const sourceDir = join(root, 'src/Wanxiangshu/Sphinx')
   const files = readdirSync(sourceDir).filter((name) => name.endsWith('.fs')).sort()
   assert.ok(files.length >= 10)
@@ -98,7 +98,7 @@ async function driveToAnswered(tools, handle) {
   return tools.synthesize.handler(synthesisArgs(handle))
 }
 
-test('WHAT[EPI-002] terminal_answered_rejects_further_observations', async () => {
+test('WHAT[epistemic-reasoning-002] terminal_answered_rejects_further_observations', async () => {
   const tools = mcpServer(createStore())._registeredTools
 
   const started = await tools.start.handler({ question: ROOT_QUESTION })
@@ -122,7 +122,7 @@ test('WHAT[EPI-002] terminal_answered_rejects_further_observations', async () =>
   assert.equal(statusResult.structuredContent.nextTool, null)
   assert.ok(statusResult.structuredContent.answer.question)
 })
-test('WHAT[EPI-002] cancel_releases_handle_and_makes_it_unknown', async () => {
+test('WHAT[epistemic-reasoning-002] cancel_releases_handle_and_makes_it_unknown', async () => {
   const tools = mcpServer(createStore())._registeredTools
 
   const started = await tools.start.handler({ question: ROOT_QUESTION })
@@ -151,7 +151,7 @@ const { mcpServer } = await import("../../../dist/Sphinx/Surface.js");
 const { createStore, start, resume, assessWhy } = await import("./support.mjs");
 
 
-test('WHAT[EPI-002] handle_is_opaque_process_local_session_key', () => {
+test('WHAT[epistemic-reasoning-002] handle_is_opaque_process_local_session_key', () => {
   const store = createStore()
   const started = start(store, '花儿为什么这样红？')
   assert.equal(typeof started.handle, 'string')
@@ -166,7 +166,7 @@ test('WHAT[EPI-002] handle_is_opaque_process_local_session_key', () => {
     'unknown handle',
   )
 })
-test('WHAT[EPI-002] full_co_yield_path_preserves_kernel_continuation', () => {
+test('WHAT[epistemic-reasoning-002] full_co_yield_path_preserves_kernel_continuation', () => {
   const store = createStore()
   const started = start(store, '花儿为什么这样红？')
   const handle = started.handle
@@ -416,7 +416,7 @@ async function driveToAnswered(s) {
   return handle
 }
 
-test('WHAT[EPI-002] interleaved_inquiries_stay_independent', { timeout: 30000 }, async () => {
+test('WHAT[epistemic-reasoning-002] interleaved_inquiries_stay_independent', { timeout: 30000 }, async () => {
   const s = spawnSphinx()
   try {
     await s.initialize()
@@ -486,7 +486,7 @@ test('WHAT[EPI-002] interleaved_inquiries_stay_independent', { timeout: 30000 },
     s.close()
   }
 })
-test('WHAT[EPI-002] cancel_over_wire_then_status_unknown', { timeout: 30000 }, async () => {
+test('WHAT[epistemic-reasoning-002] cancel_over_wire_then_status_unknown', { timeout: 30000 }, async () => {
   const s = spawnSphinx()
   try {
     await s.initialize()
@@ -512,7 +512,7 @@ const { default: assert } = await import("node:assert/strict");
 const { createStore, start, resume, state, mcpServer } = await import("../../../dist/Sphinx/Surface.js");
 
 
-test('WHAT[EPI-002] answered_returns_structured_answer_and_null_next_tool', async () => {
+test('WHAT[epistemic-reasoning-002] answered_returns_structured_answer_and_null_next_tool', async () => {
   const server = mcpServer(createStore())
   const tools = server._registeredTools
 

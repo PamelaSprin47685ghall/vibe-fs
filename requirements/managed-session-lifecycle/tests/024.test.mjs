@@ -4,7 +4,7 @@ import * as RolesSurface from '../../../dist/Foundation/RolesSurface.js'
 import * as HandleSurface from '../../../dist/Execution/Delegation/Handle/Surface.js'
 import * as RelaySurface from '../../../dist/Mission/Relay/Surface.js'
 
-test('WHAT[MANAGED-SESSION-024] fixed DevOps crash recovery maintains single logical authority and locks bound model', () => {
+test('WHAT[managed-session-lifecycle-024] fixed DevOps crash recovery maintains single logical authority and locks bound model', () => {
   const all = RolesSurface.allRoleLabels
   assert.ok(all.includes('engineer'), 'Role labels must contain engineer')
   assert.ok(all.includes('devops'), 'Role labels must contain devops')

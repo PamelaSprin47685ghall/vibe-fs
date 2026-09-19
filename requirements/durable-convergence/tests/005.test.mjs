@@ -41,7 +41,7 @@ const withStore = async (writerId, fn) => {
   }
 }
 
-test('WHAT[DURABLE-CONVERGENCE-005] resolution with all competing heads collapses structural frontier', async () => {
+test('WHAT[durable-convergence-005] resolution with all competing heads collapses structural frontier', async () => {
   await withStore('writer-resolution', async (store) => {
     const a = make(A, [], 'replica/resolution')
     const b = make(B, [], 'replica/resolution')

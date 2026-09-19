@@ -1,6 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
-/// JS-native owner surface for PAR-011 / PAR-020 admitted-plan semantics.
+/// JS-native owner surface for provider-attempt-recovery-011 / provider-attempt-recovery-020 admitted-plan semantics.
 ///
 /// The scope stays an opaque handle: JS obtains it from `createRecoveryScope`,
 /// passes it back, and never inspects it. Pending/bound plans cross as the

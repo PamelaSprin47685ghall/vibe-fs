@@ -54,7 +54,7 @@ const mutate = (relativePath, addition) => {
   return mutated
 }
 
-test('WHAT[CAUSAL-003] business observer cannot read the diagnostic snapshot', () => {
+test('WHAT[causal-wait-003] business observer cannot read the diagnostic snapshot', () => {
   const registry = causal.createRegistry()
   const observer = causal.observerCapability(registry)
   const reader = causal.snapshotReaderCapability(registry)
@@ -68,17 +68,17 @@ test('WHAT[CAUSAL-003] business observer cannot read the diagnostic snapshot', (
   causal.dispose(lease)
 })
 
-test('WHAT[CAUSAL-003] shared analyzer accepts the real production tree', () => {
+test('WHAT[causal-wait-003] shared analyzer accepts the real production tree', () => {
   const files = boundaryGate.collectCausalWaitBoundaryFiles(ROOT)
   assert.ok(files.length > 0, 'production scan must contain F# files')
   assert.deepEqual(boundaryGate.analyzeObservationBoundary(files), [])
 })
 
-test('WHAT[CAUSAL-003] analyzer accepts comments and string literals as lexical decoys', () => {
+test('WHAT[causal-wait-003] analyzer accepts comments and string literals as lexical decoys', () => {
   assert.deepEqual(boundaryGate.analyzeObservationBoundary(CLEAN_FILES), [])
 })
 
-test('WHAT[CAUSAL-003] analyzer rejects causal-wait vocabulary in any Journal codec', () => {
+test('WHAT[causal-wait-003] analyzer rejects causal-wait vocabulary in any Journal codec', () => {
   const violations = boundaryGate.analyzeObservationBoundary(
     mutate('Persistence/Journal/EventStoreJournalCodec.fs', 'let reader: IWaitSnapshotReader = source\n'),
   )
@@ -87,7 +87,7 @@ test('WHAT[CAUSAL-003] analyzer rejects causal-wait vocabulary in any Journal co
   ])
 })
 
-test('WHAT[CAUSAL-003] analyzer rejects causal-wait vocabulary in every Fact carrier', () => {
+test('WHAT[causal-wait-003] analyzer rejects causal-wait vocabulary in every Fact carrier', () => {
   const violations = boundaryGate.analyzeObservationBoundary(
     mutate('Change/Fact.fs', 'let wait: DiagnosticWait = source\n'),
   )
@@ -96,7 +96,7 @@ test('WHAT[CAUSAL-003] analyzer rejects causal-wait vocabulary in every Fact car
   ])
 })
 
-test('WHAT[CAUSAL-003] analyzer rejects snapshot reads in an unlisted future decision path', () => {
+test('WHAT[causal-wait-003] analyzer rejects snapshot reads in an unlisted future decision path', () => {
   const violations = boundaryGate.analyzeObservationBoundary(
     mutate('Interaction/Dispatch/NewDecision.fs', 'let reader: IWaitSnapshotReader = source\n'),
   )
@@ -105,7 +105,7 @@ test('WHAT[CAUSAL-003] analyzer rejects snapshot reads in an unlisted future dec
   ])
 })
 
-test('WHAT[CAUSAL-003] analyzer rejects the diagnostic bridge locator outside its owner', () => {
+test('WHAT[causal-wait-003] analyzer rejects the diagnostic bridge locator outside its owner', () => {
   const violations = boundaryGate.analyzeObservationBoundary(
     mutate(
       'Interaction/Dispatch/NewDecision.fs',
@@ -117,7 +117,7 @@ test('WHAT[CAUSAL-003] analyzer rejects the diagnostic bridge locator outside it
   ])
 })
 
-test('WHAT[CAUSAL-003] collector fails closed when the production scan root is missing', () => {
+test('WHAT[causal-wait-003] collector fails closed when the production scan root is missing', () => {
   const root = mkdtempSync(join(tmpdir(), 'causal-wait-boundary-'))
   try {
     assert.throws(

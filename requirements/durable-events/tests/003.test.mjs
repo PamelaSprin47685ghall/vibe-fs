@@ -36,12 +36,12 @@ const mustOk = (result, label = 'result') => {
   return result.value
 }
 
-test('WHAT[DURABLE-EVENTS-003] PERSIST_001_serialization_is_deterministic_for_one_envelope', () => {
+test('WHAT[durable-events-003] PERSIST_001_serialization_is_deterministic_for_one_envelope', () => {
   const value = env({ seq: 3, observedAt: '2026-02-03T04:05:06Z' })
   assert.equal(journalCodec.serialize(value), journalCodec.serialize(value))
   assert.equal(journalCodec.serialize(value), journalCodec.serialize(env({ seq: 3, observedAt: '2026-02-03T04:05:06Z' })))
 })
-test('WHAT[DURABLE-EVENTS-003] PERSIST_001_an_absent_provider_run_is_omitted_rather_than_written_null', () => {
+test('WHAT[durable-events-003] PERSIST_001_an_absent_provider_run_is_omitted_rather_than_written_null', () => {
   const withoutRun = journalCodec.serialize(env({ seq: 1 }))
   assert.equal(withoutRun.includes('ProviderRun'), false)
 
@@ -49,7 +49,7 @@ test('WHAT[DURABLE-EVENTS-003] PERSIST_001_an_absent_provider_run_is_omitted_rat
   assert.equal(withRun.includes('ProviderRun'), true)
   assert.equal(withRun.includes('run_9'), true)
 })
-test('WHAT[DURABLE-EVENTS-003] PERSIST_001_an_envelope_survives_a_round_trip_unchanged', () => {
+test('WHAT[durable-events-003] PERSIST_001_an_envelope_survives_a_round_trip_unchanged', () => {
   const original = env({ seq: 4, observedAt: '2026-03-04T05:06:07Z', providerRun: 'run_1' })
   const line = journalCodec.serialize(original)
   const decoded = journalCodec.deserialize(line)
@@ -58,7 +58,7 @@ test('WHAT[DURABLE-EVENTS-003] PERSIST_001_an_envelope_survives_a_round_trip_unc
   assert.deepEqual(readEnvelope(decoded.value), readEnvelope(original))
   assert.equal(journalCodec.serialize(decoded.value), line)
 })
-test('WHAT[DURABLE-EVENTS-003] PERSIST_001_serialized_bytes_do_not_depend_on_the_writers_utc_offset', () => {
+test('WHAT[durable-events-003] PERSIST_001_serialized_bytes_do_not_depend_on_the_writers_utc_offset', () => {
   const instant = '2026-03-04T05:06:07Z'
   const atUtc = env({ seq: 1, observedAt: instant })
   const shanghai = env({ seq: 1, observedAt: '2026-03-04T13:06:07+08:00' })
@@ -72,7 +72,7 @@ test('WHAT[DURABLE-EVENTS-003] PERSIST_001_serialized_bytes_do_not_depend_on_the
   assert.equal(journalCodec.serialize(newYork), line)
   assert.equal(JSON.parse(line).ObservedAt, '2026-03-04T05:06:07.000+00:00')
 })
-test('WHAT[DURABLE-EVENTS-003] PERSIST_001_parents_and_payload_refs_are_canonicalized_at_the_codec_boundary', () => {
+test('WHAT[durable-events-003] PERSIST_001_parents_and_payload_refs_are_canonicalized_at_the_codec_boundary', () => {
   const encoded = journalCodec.encode(
     ['b'.repeat(32), 'a'.repeat(32), 'b'.repeat(32)],
     ['ref-z', 'ref-a', 'ref-z'],
@@ -106,7 +106,7 @@ const envelope = ({
   payloadRefs,
 })
 
-test('WHAT[DURABLE-EVENTS-003] same_EventId_different_canonical_bytes_fail_closed', () => {
+test('WHAT[durable-events-003] same_EventId_different_canonical_bytes_fail_closed', () => {
   const left = envelope({ payload: { status: 'open' } })
   const right = envelope({ payload: { status: 'closed' } })
 
@@ -119,7 +119,7 @@ test('WHAT[DURABLE-EVENTS-003] same_EventId_different_canonical_bytes_fail_close
   assert.equal(merged.ok, false)
   assert.equal(merged.error.code, 'IdentityCollision')
 })
-test('WHAT[DURABLE-EVENTS-003] same_EventId_same_canonical_bytes_dedupe_ok', () => {
+test('WHAT[durable-events-003] same_EventId_same_canonical_bytes_dedupe_ok', () => {
   const a = envelope({
     parents: [
       'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
@@ -144,7 +144,7 @@ test('WHAT[DURABLE-EVENTS-003] same_EventId_same_canonical_bytes_dedupe_ok', () 
   assert.equal(merged.ok, true)
   assert.equal(merged.events.length, 1)
 })
-test('WHAT[DURABLE-EVENTS-003] canonical_bytes_are_utf8_json_plus_single_LF_with_sorted_keys', () => {
+test('WHAT[durable-events-003] canonical_bytes_are_utf8_json_plus_single_LF_with_sorted_keys', () => {
   const value = envelope({
     parents: [
       'ffffffffffffffffffffffffffffffffffffffff',
@@ -181,14 +181,14 @@ test('WHAT[DURABLE-EVENTS-003] canonical_bytes_are_utf8_json_plus_single_LF_with
 
   assert.equal(eventCodec.encode(value), eventCodec.encode(value))
 })
-test('WHAT[DURABLE-EVENTS-003] event payload keys follow Unicode code-point order without integer-key reordering', () => {
+test('WHAT[durable-events-003] event payload keys follow Unicode code-point order without integer-key reordering', () => {
   const text = eventCodec.encode(envelope({
     payload: { 2: 'two', 10: 'ten', '\u{10000}': 'supplementary', '\uE000': 'bmp' },
   }))
 
   assert.match(text, /"payload":\{"10":"ten","2":"two","":"bmp","𐀀":"supplementary"\}/u)
 })
-test('WHAT[DURABLE-EVENTS-003] distinct_EventIds_are_both_retained', () => {
+test('WHAT[durable-events-003] distinct_EventIds_are_both_retained', () => {
   const a = envelope({ id: '1111111111111111111111111111111111111111' })
   const b = envelope({
     id: '2222222222222222222222222222222222222222',
@@ -246,17 +246,17 @@ const mustOk = (result, label = 'result') => {
   return result.value
 }
 
-test('WHAT[DURABLE-EVENTS-003] parents_are_accepted_and_canonicalized', () => {
+test('WHAT[durable-events-003] parents_are_accepted_and_canonicalized', () => {
   const parentA = 'b'.repeat(40)
   const parentB = 'a'.repeat(40)
   const encoded = journalCodec.encode([parentA, parentB, parentA], [], env())
   assert.deepEqual(encoded.parents, [parentB, parentA])
 })
-test('WHAT[DURABLE-EVENTS-003] payloadRefs_are_accepted_and_canonicalized_without_RuntimePath_IO', () => {
+test('WHAT[durable-events-003] payloadRefs_are_accepted_and_canonicalized_without_RuntimePath_IO', () => {
   const encoded = journalCodec.encode([], ['ref-z', 'ref-a', 'ref-z'], env())
   assert.deepEqual(encoded.payloadRefs, ['ref-a', 'ref-z'])
 })
-test('WHAT[DURABLE-EVENTS-003] canonical_identity_bytes_stable_under_section_5_0', () => {
+test('WHAT[durable-events-003] canonical_identity_bytes_stable_under_section_5_0', () => {
   const original = env({ seq: 3, observedAt: '2026-01-02T03:04:05Z', providerRun: 'run_stable' })
   const parents = ['c'.repeat(40), 'b'.repeat(40)]
   const refs = ['oid-2', 'oid-1']
@@ -288,7 +288,7 @@ const envelope = (id, parents = [], stream = 'proof/merge', payload = {}) => ({
   payloadRefs: [],
 })
 
-test('WHAT[DURABLE-EVENTS-003] DURABLE_EVENTS_003_same_EventId_same_bytes_dedupes', () => {
+test('WHAT[durable-events-003] DURABLE_EVENTS_003_same_EventId_same_bytes_dedupes', () => {
   const id = '0'.repeat(39) + '1'
   const sameA = envelope(id, [], 'proof/a', { x: 1 })
   const sameB = envelope(id, [], 'proof/a', { x: 1 })
@@ -301,7 +301,7 @@ test('WHAT[DURABLE-EVENTS-003] DURABLE_EVENTS_003_same_EventId_same_bytes_dedupe
   assert.equal(merged.events.length, 1)
   assert.deepEqual(merged.events[0].payload, { x: 1 }, 'merge returns the event payload, not the canonical envelope')
 })
-test('WHAT[DURABLE-EVENTS-003] DURABLE_EVENTS_003_same_EventId_different_bytes_fail_closed', () => {
+test('WHAT[durable-events-003] DURABLE_EVENTS_003_same_EventId_different_bytes_fail_closed', () => {
   const id = '0'.repeat(39) + '2'
   const a = envelope(id, [], 'proof/a', { x: 1 })
   const b = envelope(id, [], 'proof/a', { x: 2 })
@@ -339,14 +339,14 @@ const invalidUtf8Event = () => {
   return bytes
 }
 
-test('WHAT[DURABLE-EVENTS-003] invalid UTF-8 bytes fail closed before canonical JSON decoding', () => {
+test('WHAT[durable-events-003] invalid UTF-8 bytes fail closed before canonical JSON decoding', () => {
   const decoded = eventCodec.decodeUtf8(invalidUtf8Event())
 
   assert.equal(decoded.ok, false)
   assert.equal(decoded.error.code, 'NonCanonical')
   assert.match(decoded.error.reason, /not valid UTF-8/)
 })
-test('WHAT[DURABLE-EVENTS-003] UTF-8 BOM bytes are rejected rather than stripped by the decoder', () => {
+test('WHAT[durable-events-003] UTF-8 BOM bytes are rejected rather than stripped by the decoder', () => {
   const decoded = eventCodec.decodeUtf8(Buffer.concat([
     Buffer.from([0xef, 0xbb, 0xbf]),
     Buffer.from(eventCodec.encode(event)),
@@ -405,7 +405,7 @@ const handleLinked = (overrides = {}) => ({
   },
 })
 
-test('WHAT[DURABLE-EVENTS-003] PERSIST_001_runtime_started_pins_offset_on_serialize_and_deserialize', () => {
+test('WHAT[durable-events-003] PERSIST_001_runtime_started_pins_offset_on_serialize_and_deserialize', () => {
   const line = factCodec.encode(runtimeStarted())
   assert.match(line, /StartedAt[^Z]*Z|StartedAt.*\+00:00/, `offset must be pinned to UTC: ${line}`)
 
@@ -414,7 +414,7 @@ test('WHAT[DURABLE-EVENTS-003] PERSIST_001_runtime_started_pins_offset_on_serial
   assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
   assert.equal(decoded.line, line)
 })
-test('WHAT[DURABLE-EVENTS-003] PERSIST_001_handle_abandoned_pins_abandoned_at_offset', () => {
+test('WHAT[durable-events-003] PERSIST_001_handle_abandoned_pins_abandoned_at_offset', () => {
   const line = factCodec.encode(handleAbandoned('2026-01-01T08:00:00+08:00'))
   const decoded = factCodec.decode(line)
   assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
@@ -452,7 +452,7 @@ const readEnvelope = (value) => ({
   fact: value.fact,
 })
 
-test('WHAT[DURABLE-EVENTS-003] Journal_codec_serializes_one_envelope_to_one_UTC_line', () => {
+test('WHAT[durable-events-003] Journal_codec_serializes_one_envelope_to_one_UTC_line', () => {
   const line = journalCodec.serialize(envelope())
   assert.equal(line.includes('\n'), false)
   assert.equal(line.includes('\r'), false)
@@ -469,30 +469,30 @@ const { default: test } = await import("node:test");
 const canonical = await import("../../../dist/OpenCode/Codec/CanonicalJsonSurface.js");
 
 
-test('WHAT[DURABLE-EVENTS-003] MISC_canonical_json_sorts_keys_recursively', () => {
+test('WHAT[durable-events-003] MISC_canonical_json_sorts_keys_recursively', () => {
   assert.equal(canonical.canonicalJson({ b: 1, a: { d: 4, c: 3 } }), '{"a":{"c":3,"d":4},"b":1}')
   assert.equal(canonical.canonicalJson({ a: 1, b: 2 }), canonical.canonicalJson({ b: 2, a: 1 }))
   assert.equal(canonical.canonicalJson([3, { x: 1, y: 2 }]), '[3,{"x":1,"y":2}]')
   assert.equal(canonical.canonicalJson('s'), '"s"')
   assert.equal(canonical.canonicalJson(null), 'null')
 })
-test('WHAT[DURABLE-EVENTS-003] canonical JSON orders numeric-looking and non-BMP keys by Unicode code point', () => {
+test('WHAT[durable-events-003] canonical JSON orders numeric-looking and non-BMP keys by Unicode code point', () => {
   assert.equal(canonical.canonicalJson({ 2: 'two', 10: 'ten' }), '{"10":"ten","2":"two"}')
   assert.equal(
     canonical.canonicalJson({ '\u{10000}': 'supplementary', '\uE000': 'bmp' }),
     '{"":"bmp","𐀀":"supplementary"}',
   )
 })
-test('WHAT[DURABLE-EVENTS-003] canonical JSON preserves JSON sparse-array null semantics', () => {
+test('WHAT[durable-events-003] canonical JSON preserves JSON sparse-array null semantics', () => {
   assert.equal(canonical.canonicalJson(new Array(2)), '[null,null]')
 })
-test('WHAT[DURABLE-EVENTS-003] MISC_canonical_json_equal_ignores_key_order', () => {
+test('WHAT[durable-events-003] MISC_canonical_json_equal_ignores_key_order', () => {
   assert.equal(canonical.equal({ a: 1, b: 2 }, { b: 2, a: 1 }), true)
   assert.equal(canonical.equal({ a: 1 }, { a: 2 }), false)
   assert.equal(canonical.equal({ a: 1 }, { a: 1, b: 2 }), false)
   assert.equal(canonical.equal(null, undefined), false)
 })
-test('WHAT[DURABLE-EVENTS-003] MISC_without_keys_drops_named_fields_only', () => {
+test('WHAT[durable-events-003] MISC_without_keys_drops_named_fields_only', () => {
   assert.deepEqual(canonical.withoutKeys(['id', 'secret'], { id: 'x', secret: 'y', keep: 1 }), { keep: 1 })
   assert.equal(canonical.withoutKeys(['a'], 'plain'), 'plain')
   assert.equal(canonical.withoutKeys(['a'], null), null)

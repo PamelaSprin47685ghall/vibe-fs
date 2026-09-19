@@ -23,7 +23,7 @@ const RESOURCE_SAMPLES = [
   'enforcer/primitive-obsession/main.md',
 ]
 
-test('WHAT[DISTRIBUTION-006] DISTRIBUTION_resource_missing_fails_fast_no_fallback', async () => {
+test('WHAT[distribution-006] DISTRIBUTION_resource_missing_fails_fast_no_fallback', async () => {
   // 资源缺失必须抛错终止（package resource missing: <full>），不得 fallback、不得静默降级；
   // rulebook 元数据不以 catalog.json 为第二真源（目录即清单）。
   const { readText } = await import(packageResourcesUrl)
@@ -70,7 +70,7 @@ const walkFs = (dir) => {
   return out
 }
 
-test('WHAT[DISTRIBUTION-006] DISTRIBUTION_resource_io_lives_only_under_infrastructure_resources', () => {
+test('WHAT[distribution-006] DISTRIBUTION_resource_io_lives_only_under_infrastructure_resources', () => {
   const resourcesDir = path.join(root, 'src', 'Wanxiangshu', 'Resources')
   const productionFiles = walkFs(path.join(root, 'src', 'Wanxiangshu'))
   const offenders = productionFiles.filter(

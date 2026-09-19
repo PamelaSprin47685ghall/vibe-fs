@@ -47,12 +47,12 @@ const makeProviderFixture = () => {
   }
 }
 
-test('WHAT[PROVIDER-LANGUAGE-011] code span extraction skips fenced blocks', () => {
+test('WHAT[provider-language-011] code span extraction skips fenced blocks', () => {
   const text = 'Use `exit_code`.\n\n```\ntranslated_should_ignore\n```\nAlso `deadline_seconds`.'
   assert.deepEqual([...extractCodeSpans(text)].sort(), ['deadline_seconds', 'exit_code'])
 })
 
-test('WHAT[PROVIDER-LANGUAGE-011] identifier parity passes when both locales keep the same spans', () => {
+test('WHAT[provider-language-011] identifier parity passes when both locales keep the same spans', () => {
   const fx = makeProviderFixture()
   try {
     fx.writePair(
@@ -67,7 +67,7 @@ test('WHAT[PROVIDER-LANGUAGE-011] identifier parity passes when both locales kee
   }
 })
 
-test('WHAT[PROVIDER-LANGUAGE-011] identifier parity mismatch reports semantic and diff', () => {
+test('WHAT[provider-language-011] identifier parity mismatch reports semantic and diff', () => {
   const fx = makeProviderFixture()
   try {
     fx.writePair(
@@ -86,7 +86,7 @@ test('WHAT[PROVIDER-LANGUAGE-011] identifier parity mismatch reports semantic an
   }
 })
 
-test('WHAT[PROVIDER-LANGUAGE-011] tip and tool catalog hits must match across locales', () => {
+test('WHAT[provider-language-011] tip and tool catalog hits must match across locales', () => {
   const fx = makeProviderFixture()
   try {
     fx.writePair(
@@ -115,7 +115,7 @@ test('WHAT[PROVIDER-LANGUAGE-011] tip and tool catalog hits must match across lo
   }
 })
 
-test('WHAT[PROVIDER-LANGUAGE-011] protocol identifier extraction unions sources', () => {
+test('WHAT[provider-language-011] protocol identifier extraction unions sources', () => {
   const ids = extractProtocolIdentifiers('See `exit_code` then blind-edit via open-terminal.', {
     tipIdentities: ['blind-edit'],
     toolNames: ['open-terminal'],

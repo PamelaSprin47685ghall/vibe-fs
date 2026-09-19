@@ -28,7 +28,7 @@ const acquire = async (runtime, exact = identity()) => {
 
 const conflict = (outcome) => assert.deepEqual(outcome, { kind: 'Conflict' })
 
-test('WHAT[EMR-011] rejects release with the wrong physical fence', async () => {
+test('WHAT[execution-model-routing-011] rejects release with the wrong physical fence', async () => {
   const owner = routing.createRuntime(() => target)
   const wrongOwner = routing.createRuntime(() => target)
   const lease = await acquire(owner)

@@ -345,7 +345,7 @@ module JoinDrain =
                 return Ok()
             }
         | LegacyFalseAbort _, true ->
-            // EFFECT-ACCOUNTING-007: retired handle with legacy false-abort tombstone.
+            // effect-accounting-007: retired handle with legacy false-abort tombstone.
             // Fail-closed refuse — do not mint a replacement. The bad-data set is
             // observably empty (48-journal census: zero fired); the writer is dead
             // (codec-encode-finality-aborted gate). Action: archive or remove the

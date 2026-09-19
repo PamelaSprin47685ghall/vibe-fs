@@ -21,7 +21,7 @@ const reqCtx = (reqId, toml = 'test') => runtime.main({
   observedEpoch: 0,
 })
 
-test('WHAT[CONTEXT-COMPRESSION-024] CTX_024_flight_claim_conflict_keeps_foreign_owner_and_rejects_stale_release', () => {
+test('WHAT[context-compression-024] CTX_024_flight_claim_conflict_keeps_foreign_owner_and_rejects_stale_release', () => {
   const scope = runtime.scope()
   const ctx1 = reqCtx('req-owner-1', 'content-1')
   const ctx2 = reqCtx('req-owner-2', 'content-2')
@@ -82,7 +82,7 @@ const withOwner = async (work) => {
   }
 }
 
-test('WHAT[CONTEXT-COMPRESSION-024] every valid flight interleave keeps B unaffected by late A', async () => {
+test('WHAT[context-compression-024] every valid flight interleave keeps B unaffected by late A', async () => {
   assert.deepEqual(operations, [
     'A claims flight',
     'A repair in flight',
@@ -111,7 +111,7 @@ test('WHAT[CONTEXT-COMPRESSION-024] every valid flight interleave keeps B unaffe
     ),
   )
 })
-test('WHAT[CONTEXT-COMPRESSION-024] superseded A callbacks are idempotent, never a second fatal', async (t) => {
+test('WHAT[context-compression-024] superseded A callbacks are idempotent, never a second fatal', async (t) => {
   const { durable, opened, dir } = await (async () => {
     const inner = mkdtempSync(join(tmpdir(), 'wxs-blogger-flight-'))
     const stamp = `${Date.now()}-${Math.floor(Math.random() * 1e9)}`
@@ -213,7 +213,7 @@ test('WHAT[CONTEXT-COMPRESSION-024] superseded A callbacks are idempotent, never
   }
   assert.deepEqual(fatalRecords, [])
 })
-test('WHAT[CONTEXT-COMPRESSION-024] stale release of A never releases B; new B producer never joins A slot', async (t) => {
+test('WHAT[context-compression-024] stale release of A never releases B; new B producer never joins A slot', async (t) => {
   const inner = mkdtempSync(join(tmpdir(), 'wxs-blogger-flight-'))
   const stamp = `${Date.now()}-${Math.floor(Math.random() * 1e9)}`
   const boot = await journal.JournalSurface_bootWithWriterId(
@@ -307,7 +307,7 @@ test('WHAT[CONTEXT-COMPRESSION-024] stale release of A never releases B; new B p
   assert.equal(runtime.releaseCurrentRequest(scope, key, 'req-a'), 'Conflict:req-b')
   assert.equal(runtime.tryGetFlight(scope, key)?.requestId, 'req-b')
 })
-test('WHAT[CONTEXT-COMPRESSION-024] same-request epoch refresh keeps ownership; B still cannot intrude', async (t) => {
+test('WHAT[context-compression-024] same-request epoch refresh keeps ownership; B still cannot intrude', async (t) => {
   const inner = mkdtempSync(join(tmpdir(), 'wxs-blogger-flight-'))
   const stamp = `${Date.now()}-${Math.floor(Math.random() * 1e9)}`
   const boot = await journal.JournalSurface_bootWithWriterId(
@@ -396,7 +396,7 @@ test('WHAT[CONTEXT-COMPRESSION-024] same-request epoch refresh keeps ownership; 
   assert.equal(runtime.releaseCurrentRequest(scope, key, 'req-b'), 'Conflict:req')
   assert.equal(runtime.tryGetFlight(scope, key)?.requestId, 'req')
 })
-test('WHAT[CONTEXT-COMPRESSION-024] B repair after supersede waits for the dead episode drain, flight still exact', async (t) => {
+test('WHAT[context-compression-024] B repair after supersede waits for the dead episode drain, flight still exact', async (t) => {
   // Gap report (production defect, surface kept read-only per slice rules):
   // ReleaseCurrentRequest cancels A's repair episode but the rendezvous is
   // removed from the registry only when its CE unwinds (onCompleted). Until
@@ -499,7 +499,7 @@ test('WHAT[CONTEXT-COMPRESSION-024] B repair after supersede waits for the dead 
   assert.equal((await blog.observeIdleRepair(scope, durable, requestB, idle('run-b2'))).outcome, 'NudgeSent')
   assert.equal(runtime.tryGetFlight(scope, key)?.requestId, 'req-b')
 })
-test('WHAT[CONTEXT-COMPRESSION-024] scheduled promise order cannot move B terminal or capacity', async () => {
+test('WHAT[context-compression-024] scheduled promise order cannot move B terminal or capacity', async () => {
   await fc.assert(
     fc.asyncProperty(
       fc.array(fc.constantFrom('release', 'idle', 'transform', 'terminal'), { minLength: 4, maxLength: 8 }),
@@ -613,7 +613,7 @@ const failureOwner = await import("../../../dist/Participant/Provider/Attempt/Fa
 const budget = failureOwner.budget
 const projection = failureOwner.providerFailureProjection
 
-test('WHAT[CONTEXT-COMPRESSION-024] CTX_024_request_scoped_repair_continues_only_for_the_current_request', () => {
+test('WHAT[context-compression-024] CTX_024_request_scoped_repair_continues_only_for_the_current_request', () => {
   const base = {
     requestId: 'req-new',
     openRequestId: 'req-new',
@@ -678,7 +678,7 @@ const commit = (state, value) => {
   return result.value
 }
 
-test('WHAT[CONTEXT-COMPRESSION-024] stale_terminal_cannot_reclaim_a_new_Blogger_request', () => {
+test('WHAT[context-compression-024] stale_terminal_cannot_reclaim_a_new_Blogger_request', () => {
   const base = {
     requestId: 'req-new',
     openRequestId: 'req-new',
@@ -736,7 +736,7 @@ const runtime = await import("../../../dist/Context/Companion/RuntimeSurface.js"
 const ROOT = new URL('../../../', import.meta.url).pathname
 const main = (toml = 'delta-1') => runtime.main({ toml })
 
-test('WHAT[CONTEXT-COMPRESSION-024] CTX_024_flight_claim_never_overwrites_another_request', () => {
+test('WHAT[context-compression-024] CTX_024_flight_claim_never_overwrites_another_request', () => {
   const scope = runtime.scope()
   const key = 'ses-blogger'
 
@@ -750,7 +750,7 @@ test('WHAT[CONTEXT-COMPRESSION-024] CTX_024_flight_claim_never_overwrites_anothe
   )
   assert.equal(runtime.currentRequest(scope, key).toml, 'first')
 })
-test('WHAT[CONTEXT-COMPRESSION-024] CTX_024_stale_release_cannot_clear_a_newer_owner', () => {
+test('WHAT[context-compression-024] CTX_024_stale_release_cannot_clear_a_newer_owner', () => {
   const scope = runtime.scope()
   const key = 'ses-blogger'
 
@@ -763,7 +763,7 @@ test('WHAT[CONTEXT-COMPRESSION-024] CTX_024_stale_release_cannot_clear_a_newer_o
   assert.equal(runtime.releaseCurrentRequest(scope, key, 'req-a'), 'Released')
   assert.equal(runtime.currentRequest(scope, key), null)
 })
-test('WHAT[CONTEXT-COMPRESSION-024] CTX_024_materialization_admission_is_cross_instance_single_flight', async () => {
+test('WHAT[context-compression-024] CTX_024_materialization_admission_is_cross_instance_single_flight', async () => {
   const firstScope = runtime.scope()
   const secondScope = runtime.scope()
   const key = 'ses-blogger'
@@ -798,7 +798,7 @@ const mainRequest = () => ctx.main({ requestId: 'request-main', toml: 'work' })
 const mainRequest2 = () => ctx.main({ requestId: 'request-more', toml: 'more' })
 const KEY = 'ses-blog'
 
-test('WHAT[CONTEXT-COMPRESSION-024] CTX_024_blogger_runtime_surface_claim_and_release_replaces_request_ownership', () => {
+test('WHAT[context-compression-024] CTX_024_blogger_runtime_surface_claim_and_release_replaces_request_ownership', () => {
   const scope = parkedTransform.scope()
   const failed = ctx.main({ requestId: 'request-failed', toml: 'failed' })
   const replacement = ctx.main({ requestId: 'request-replacement', toml: 'replacement' })

@@ -12,7 +12,7 @@ open Wanxiangshu.Composition.Durable
 /// OpenCode loads the plugin once for the root workspace and again for each
 /// manager worktree. ReviewGuard, ProviderFailure and Authority facts must remain ONE
 /// projection per git common-dir runtime path — two projections over the same
-/// facts is the split-brain that PAR-003 and REVIEW-003 both depend on not
+/// facts is the split-brain that provider-attempt-recovery-003 and REVIEW-003 both depend on not
 /// happening.
 module SharedAgentJournal =
 

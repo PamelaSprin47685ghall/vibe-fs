@@ -99,7 +99,7 @@ const acceptedState = () => {
   return handle
 }
 
-test('WHAT[OBLIGATION-LEDGER-019] rejects a legacy seed after the first Magic provider request', () => {
+test('WHAT[obligation-ledger-019] rejects a legacy seed after the first Magic provider request', () => {
   const handle = projection.MagicTodoProjectionSurface_create()
   ok(foldMagic(handle, prepared, 'prepared-fact-ref'))
   const legacySeed = fact('LegacyTodoSeedAdopted', {

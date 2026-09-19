@@ -58,7 +58,7 @@ const fold = (events) => {
   return change.unwrapFold(result)
 }
 
-test('WHAT[EFFECT-ACCOUNTING-009] publish_claimed_recovery_three_branch_order_is_fixed', () => {
+test('WHAT[effect-accounting-009] publish_claimed_recovery_three_branch_order_is_fixed', () => {
   const projection = fold([
     managerCreated,
     rebased,

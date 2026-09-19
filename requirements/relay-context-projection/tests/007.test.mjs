@@ -22,7 +22,7 @@ const cutResult = () => projection.applyCut(cutMessages, 'old-run', 'suicide-cal
 
 const ids = (result) => result.provider.map((message) => message.id ?? message.info?.id)
 
-test('WHAT[PROJ-007] Accepted retirement reopened after invalidation cuts to authority plus current tail', () => {
+test('WHAT[relay-context-projection-007] Accepted retirement reopened after invalidation cuts to authority plus current tail', () => {
   const messages = [
     { id: 'root', run: '', role: 'user', text: 'root request' },
     { id: 'old-audit', run: 'old-run', role: 'assistant', text: 'perfect assessment narrative' },

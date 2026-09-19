@@ -14,7 +14,7 @@ const MANAGED = [
   'blogger',
 ]
 
-test('WHAT[EMR-005] EMR_005_recommended_resource_is_only_a_policy_template', async () => {
+test('WHAT[execution-model-routing-005] EMR_005_recommended_resource_is_only_a_policy_template', async () => {
   const { default: scheduler } = await import(`${templateUrl.href}?policy=${Date.now()}`)
   const { invokeScheduler } = await import('../../../dist/OpenCode/Host/ModelRoutingSurface.js')
   const route = (role, running, previous = null) => invokeScheduler(scheduler, role, running, previous)
@@ -24,7 +24,7 @@ test('WHAT[EMR-005] EMR_005_recommended_resource_is_only_a_policy_template', asy
 
   assert.notDeepEqual(next, first, 'the template itself, not runtime, owns capacity policy')
 })
-test('WHAT[EMR-005] EMR_005_recommended_template_counts_capacity_by_provider_across_models', async () => {
+test('WHAT[execution-model-routing-005] EMR_005_recommended_template_counts_capacity_by_provider_across_models', async () => {
   const { default: scheduler } = await import(`${templateUrl.href}?provider=${Date.now()}`)
   const { invokeScheduler } = await import('../../../dist/OpenCode/Host/ModelRoutingSurface.js')
   const route = (role, running, previous = null) => invokeScheduler(scheduler, role, running, previous)
@@ -63,7 +63,7 @@ const { default: test } = await import("node:test");
 
 const source = async (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 
-test('WHAT[EMR-005] EMR_005_runtime_contains_no_product_lane_or_max_sessions_policy', async () => {
+test('WHAT[execution-model-routing-005] EMR_005_runtime_contains_no_product_lane_or_max_sessions_policy', async () => {
   const routing = await source('src/Wanxiangshu/OpenCode/Host/ModelRouting.fs')
   assert.doesNotMatch(routing, /ExecutionLane|ModelLaneConfig|max_sessions|firstFree|first-free/)
 })

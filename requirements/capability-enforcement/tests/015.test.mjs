@@ -41,7 +41,7 @@ const start = (attempt, appendOutcome = 'Committed') => ({
   appendOutcome,
 })
 
-test('WHAT[ENF-015] AUTHORITY_001_witness_declares_exact_subject_and_version_and_admits_fresh_at_consumption', async () => {
+test('WHAT[capability-enforcement-015] AUTHORITY_001_witness_declares_exact_subject_and_version_and_admits_fresh_at_consumption', async () => {
   // (1) The issued witness carries the exact subject (SessionId + PhysicalUserMessageId) and the
   // version attributes of the established attempt, rather than an anonymous boolean.
   const attempt = evidence()

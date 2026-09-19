@@ -29,7 +29,7 @@ const materialize = (
 
 const OPENING_END = { Sequence: 1 }
 
-test('WHAT[WORK-RECORD-001] LWR_same_record_projected_two_ways_shares_work_facts', () => {
+test('WHAT[work-record-001] LWR_same_record_projected_two_ways_shares_work_facts', () => {
   // COMPANION-015 ①：record 属于一段 work，不属于 receiver。同一 canonical record
   // 以 includeOpening=true / false 两种投影物化，work facts（Chronicle / Recent work）
   // 不变，只有 Opening 渲染段不同——投影选择不改变事实。

@@ -24,7 +24,7 @@ const snapshot = (overrides = {}) => ({
 })
 const decide = (decoded, durable = snapshot()) => intent.resolve(decoded, durable)
 
-test('WHAT[INTERACTION-AUTHORITY-009] explicit agent cannot infer HumanRoot while active', () => {
+test('WHAT[interaction-authority-009] explicit agent cannot infer HumanRoot while active', () => {
   assert.deepEqual(
     decide(
       message({ explicitAgent: 'manager' }),
@@ -33,7 +33,7 @@ test('WHAT[INTERACTION-AUTHORITY-009] explicit agent cannot infer HumanRoot whil
     { case: 'Reject', reason: 'UnknownOriginWhileActive' },
   )
 })
-test('WHAT[INTERACTION-AUTHORITY-009] matching user agent continues the exact active root', () => {
+test('WHAT[interaction-authority-009] matching user agent continues the exact active root', () => {
   assert.deepEqual(
     decide(
       message({ explicitAgent: 'engineer' }),
@@ -90,7 +90,7 @@ const canonicalize = (wire) => {
 }
 const acceptedPayload = (wire) => wire[1][1][1]
 
-test('WHAT[CHATEXEC-009] durable execution fact round-trip excludes process-local artifacts', () => {
+test('WHAT[managed-chat-execution-009] durable execution fact round-trip excludes process-local artifacts', () => {
   const history = [canonicalize(fixture), canonicalize(started), canonicalize(terminal)]
 
   for (const line of history) {

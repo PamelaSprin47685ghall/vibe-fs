@@ -19,5 +19,5 @@
 
 ## GAP
 
-- `PROVIDER-LANGUAGE-010`（CLOSED）：Role Law 语义锚点跨语言成对命中已闭合，落点 `tests/010.test.mjs`。
+- `provider-language-010`（CLOSED）：Role Law 语义锚点跨语言成对命中已闭合，落点 `tests/010.test.mjs`。
 

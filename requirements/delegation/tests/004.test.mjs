@@ -22,7 +22,7 @@ const syncModel = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/
 
 const forkTool = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs'), 'utf8')
 
-test('WHAT[DELEG-004] commission_and_fork_are_distinct_contracts_not_witness', () => {
+test('WHAT[delegation-004] commission_and_fork_are_distinct_contracts_not_witness', () => {
   const pair = readProviderPair('tool/fork/description')
   assert.match(forkTool, /managerSpec/)
   assert.match(forkTool, /orchestratorSpec/)

@@ -21,7 +21,7 @@ const PROGRAM = `class Js extends JsProgram {
   }
 }`
 
-test('WHAT[REPOSITORY-PROGRAMMING-011] JS010_circular_return_is_invalid_return_value', async () => {
+test('WHAT[repository-programming-011] JS010_circular_return_is_invalid_return_value', async () => {
   const circular = `class Js extends JsProgram {
   async run() { const a = {}; a.self = a; return a; }
 }`
@@ -61,7 +61,7 @@ const runWorkflow = async (dir, program, { deadlineMs = 2000, store = null } = {
   surface: coderSurface(),
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-011] JS010_array_null_is_invalid_return_value', async () => {
+test('WHAT[repository-programming-011] JS010_array_null_is_invalid_return_value', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'old', 'utf8')
@@ -78,7 +78,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-011] JS010_array_null_is_invalid_return_value'
     cleanup()
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-011] JS010_mixed_object_array_is_invalid', async () => {
+test('WHAT[repository-programming-011] JS010_mixed_object_array_is_invalid', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const { outcome } = await runWorkflow(dir, `class Js extends JsProgram {

@@ -30,13 +30,13 @@ const wholeSemanticFiles = new Set(semanticTestFiles(join(ROOT, 'requirements'))
 
 const wholeSemanticImportEdges = semanticImportEdges(join(ROOT, 'requirements'))
 
-test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_law_owner_surface_registry', () => {
+test('WHAT[js-semantic-surface-003] JS_SURFACE_003_law_owner_surface_registry', () => {
   assert.ok(SURFACE_MANIFEST.length > 0)
   const failures = validateSurfaceManifest(SURFACE_MANIFEST, ROOT)
   assert.deepEqual(failures, [], failures.join('\n'))
 })
 
-test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_manifest_rejects_unemitted_or_invalid_evidence', () => {
+test('WHAT[js-semantic-surface-003] JS_SURFACE_003_manifest_rejects_unemitted_or_invalid_evidence', () => {
   const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-surface-manifest-'))
   const ownerWhat = join(temporaryRoot, 'requirements', 'owner', 'WHAT.md')
     const source = join(temporaryRoot, 'src', 'Wanxiangshu', 'Owner', 'Surface.fs')

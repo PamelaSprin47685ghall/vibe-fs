@@ -57,7 +57,7 @@ module HostForkJoin =
         | Done of Result<JoinWaitOutcome<JoinItem>, ForkError>
         | Retry
 
-    /// HOST-BOUNDARY-021 / EXEC-009: a durable handle is actionable only while
+    /// host-boundary-021 / EXEC-009: a durable handle is actionable only while
     /// THIS process owns its agent. After a restart the journal still carries the
     /// previous process's handles; join must not consume them and the horizon
     /// roster must not present them. Join admission and HorizonTool share this

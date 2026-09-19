@@ -94,7 +94,7 @@ const mustFold = (wires) => {
 const phaseOf = (projection, physicalUserMessageId) =>
   projection.find((entry) => entry.physicalUserMessageId === physicalUserMessageId)
 
-test('WHAT[CHATEXEC-001] exact key indexes two physical messages within one session', () => {
+test('WHAT[managed-chat-execution-001] exact key indexes two physical messages within one session', () => {
   const projection = mustFold([
     acceptedWire('msg-a'),
     startedWire('msg-a'),

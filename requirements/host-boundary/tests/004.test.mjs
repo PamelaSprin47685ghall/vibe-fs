@@ -4,7 +4,7 @@ import * as ReconcileSurface from '../../../dist/Composition/Turn/ReconcileSurfa
 
 
 
-test('WHAT[HOST-BOUNDARY-004] TurnUnknown is not a TurnOutcome case', () => {
+test('WHAT[host-boundary-004] TurnUnknown is not a TurnOutcome case', () => {
   // ReconcileSurface.tryOutcome rejects TurnUnknown — it is not accepted as a
   // publishable TurnOutcome. The production classifier throws, tryOutcome
   // catches and returns { accepted: false }.
@@ -12,30 +12,30 @@ test('WHAT[HOST-BOUNDARY-004] TurnUnknown is not a TurnOutcome case', () => {
   assert.equal(result.accepted, false)
 })
 
-test('WHAT[HOST-BOUNDARY-004] TurnUnknown lives only in SnapshotObservation', () => {
+test('WHAT[host-boundary-004] TurnUnknown lives only in SnapshotObservation', () => {
   assert.equal(ReconcileSurface.isSnapshotObservation('TurnUnknown'), true)
   assert.equal(ReconcileSurface.isSnapshotObservation('TurnCompleted'), false)
   assert.equal(ReconcileSurface.isSnapshotObservation('TurnInProgress'), false)
 })
 
-test('WHAT[HOST-BOUNDARY-004] outcomeOf refuses TurnUnknown instead of minting a TurnOutcome', () => {
+test('WHAT[host-boundary-004] outcomeOf refuses TurnUnknown instead of minting a TurnOutcome', () => {
   const result = ReconcileSurface.tryOutcome('TurnUnknown')
   assert.equal(result.accepted, false)
   assert.match(result.error, /SnapshotObservation, not a TurnOutcome/)
 })
 
-test('WHAT[HOST-BOUNDARY-004] TurnUnknown is not publishable', () => {
+test('WHAT[host-boundary-004] TurnUnknown is not publishable', () => {
   assert.equal(ReconcileSurface.isPublishableOutcome('TurnUnknown'), false)
   assert.equal(ReconcileSurface.isPublishableOutcome('TurnCompleted'), true)
 })
 
-test('WHAT[HOST-BOUNDARY-004] classifyTurn rejects TurnUnknown as terminal or provisional', () => {
+test('WHAT[host-boundary-004] classifyTurn rejects TurnUnknown as terminal or provisional', () => {
   // The production classifier must throw on TurnUnknown — it is neither
   // terminal nor provisional, it is a private snapshot observation.
   assert.throws(() => ReconcileSurface.classifyTurn('TurnUnknown'), /SnapshotObservation, not a TurnOutcome/)
 })
 
-test('WHAT[HOST-BOUNDARY-004] mutation_canary_TurnUnknown_must_not_be_accepted_as_outcome', () => {
+test('WHAT[host-boundary-004] mutation_canary_TurnUnknown_must_not_be_accepted_as_outcome', () => {
   const result = ReconcileSurface.tryOutcome('TurnUnknown')
   assert.equal(result.accepted, false,
     'mutation guard: TurnUnknown must be rejected by tryOutcome, not silently accepted')

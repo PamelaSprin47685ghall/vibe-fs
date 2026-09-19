@@ -14,7 +14,7 @@ const firstCheckpointSurfaces = [
   ['todowrite-description/zh-CN', 'resources/provider/lifecycle/magic-todo/todowrite-description/zh-CN.md'],
 ]
 
-test('WHAT[OBLIGATION-LEDGER-023] manager guideline freezes ledger discipline as Manager-only content', () => {
+test('WHAT[obligation-ledger-023] manager guideline freezes ledger discipline as Manager-only content', () => {
   for (const path of [
     'resources/provider/lifecycle/magic-todo/manager-guideline/en.md',
     'resources/provider/lifecycle/magic-todo/manager-guideline/zh-CN.md',

@@ -22,7 +22,7 @@ const lastTransition = (registry) => {
   return history.at(-1)
 }
 
-test('WHAT[CAUSAL-004] CAUSAL_004_observer_and_reader_capabilities_are_not_interchangeable', () => {
+test('WHAT[causal-wait-004] CAUSAL_004_observer_and_reader_capabilities_are_not_interchangeable', () => {
   const registry = causal.createRegistry()
   const observer = causal.observerCapability(registry)
   const reader = causal.snapshotReaderCapability(registry)

@@ -17,7 +17,7 @@ const runChild = (mode, workspace, marker) =>
 
 const readMarker = (path) => JSON.parse(readFileSync(path, 'utf8'))
 
-test('WHAT[CHATEXEC-009] abrupt process exit retains exact Accepted and empties local admission capacity', () => {
+test('WHAT[managed-chat-execution-009] abrupt process exit retains exact Accepted and empties local admission capacity', () => {
   const workspace = mkdtempSync(join(tmpdir(), 'wxs-chat-crash-'))
   const beforeMarker = join(workspace, 'before-crash.json')
   const afterMarker = join(workspace, 'after-reopen.json')

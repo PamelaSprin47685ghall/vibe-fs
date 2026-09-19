@@ -8,7 +8,7 @@ open Wanxiangshu.Participant.Provider
 /// JS-native owner boundary for the canonical provider prompt catalog and the
 /// package runtime-resource bundle. Prompt composition remains owned by
 /// PromptResources; this module only translates its records and localized
-/// language values into plain JavaScript data (JS-SEMANTIC-SURFACE-003/005).
+/// language values into plain JavaScript data (js-semantic-surface-003/005).
 [<RequireQualifiedAccess>]
 module PromptSurface =
 

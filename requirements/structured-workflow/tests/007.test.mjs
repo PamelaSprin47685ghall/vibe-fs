@@ -17,7 +17,7 @@ const VOCABULARY_SURFACES = {
 
 const REJECTED_PREFIX = /^(execute|process|handle|do|retry|run|perform|with)[A-Z]/
 
-test('WHAT[STRUCTURED-WORKFLOW-007] SW_011_named_vocabulary_surface_exists_in_Application', () => {
+test('WHAT[structured-workflow-007] SW_011_named_vocabulary_surface_exists_in_Application', () => {
   for (const [modulePath, names] of Object.entries(VOCABULARY_SURFACES)) {
     const source = readSrc(`src/Wanxiangshu/${modulePath}.fs`)
     for (const name of names) {
@@ -30,7 +30,7 @@ test('WHAT[STRUCTURED-WORKFLOW-007] SW_011_named_vocabulary_surface_exists_in_Ap
   }
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-007] SW_011_vocabulary_names_declare_business_promises_not_implementation_actions', () => {
+test('WHAT[structured-workflow-007] SW_011_vocabulary_names_declare_business_promises_not_implementation_actions', () => {
   const bad = []
   for (const [modulePath, names] of Object.entries(VOCABULARY_SURFACES)) {
     for (const name of names) {
@@ -40,7 +40,7 @@ test('WHAT[STRUCTURED-WORKFLOW-007] SW_011_vocabulary_names_declare_business_pro
   assert.deepEqual(bad, [], 'vocabulary names must not be implementation-action labels')
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-007] every vocabulary binds owner_law_relation_and_executable_proof', () => {
+test('WHAT[structured-workflow-007] every vocabulary binds owner_law_relation_and_executable_proof', () => {
   const OBLIGATIONS = [
     ['ManagerWorkflow.observe', 'Mission/Manager/Workflow.fs', 'Mission.Manager'],
     ['ManagerWorkflow.observeIdle', 'Mission/Manager/Workflow.fs', 'Mission.Manager'],
@@ -68,7 +68,7 @@ test('WHAT[STRUCTURED-WORKFLOW-007] every vocabulary binds owner_law_relation_an
     assert.ok(columns[1].includes(owner) && columns[1].includes(file), `${vocab} must name exact owner and source`)
 
     const whatId = columns[2].replaceAll('`', '')
-    assert.ok(['STRUCTURED-WORKFLOW-007', 'STRUCTURED-WORKFLOW-008'].includes(whatId), `${vocab} must bind its primary workflow law`)
+    assert.ok(['STRUCTURED-WORKFLOW-007', 'STRUCTURED-WORKFLOW-008', 'structured-workflow-007', 'structured-workflow-008'].includes(whatId), `${vocab} must bind its primary workflow law`)
     assert.ok(columns[3].length > 12, `${vocab} must declare a non-empty trace relation`)
 
     const short = vocab.split('.').pop()

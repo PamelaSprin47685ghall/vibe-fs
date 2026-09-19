@@ -38,7 +38,7 @@ module ToolRegistry =
         | _ -> fun _ -> false
 `
 
-test('WHAT[ENF-008] registered_js_tools_match_js_tool_generator_output', () => {
+test('WHAT[capability-enforcement-008] registered_js_tools_match_js_tool_generator_output', () => {
   for (const role of allRoleLabels) {
     const generated = generateRole(role, 'en')
     const toolName = `js-${role}`

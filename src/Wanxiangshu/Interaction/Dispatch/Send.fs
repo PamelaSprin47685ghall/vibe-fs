@@ -479,7 +479,7 @@ module PromptDispatcherSend =
         /// Inherits the run and root from the profile, so its key derivation has both.
         ///
         /// `payloadDigest` is a parameter rather than `sha256 text` computed here,
-        /// because PAR-008 needs one continuation kind to digest something
+        /// because provider-attempt-recovery-008 needs one continuation kind to digest something
         /// other than its text. See `SendInteractionRepair`.
         member private this.SendClaimedContinuation
             (port: IDispatchSessionPort)
@@ -727,7 +727,7 @@ module PromptDispatcherSend =
                 onAccepted
                 (Some tools)
 
-        /// PAR-008: the one Blogger-request + terminal-scoped interaction repair an unusable terminal earns.
+        /// provider-attempt-recovery-008: the one Blogger-request + terminal-scoped interaction repair an unusable terminal earns.
         ///
         /// Its payload digest names the occasion (BloggerRequestId + terminal
         /// provider run + repair kind), not the prompt text. Request identity

@@ -14,15 +14,15 @@ import {
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 
-test('WHAT[VERIFICATION-SYSTEM-013] product_semantic_debt_is_zero', () => {
+test('WHAT[verification-system-013] product_semantic_debt_is_zero', () => {
   assert.deepEqual(scanAll(), {}, 'no product semantic test may carry A-D debt')
 })
 
-test('WHAT[VERIFICATION-SYSTEM-013] boundary_gate_passes_at_terminal_state', () => {
+test('WHAT[verification-system-013] boundary_gate_passes_at_terminal_state', () => {
   assert.equal(runBoundaryGate({ root: ROOT }), 0)
 })
 
-test('WHAT[VERIFICATION-SYSTEM-013] exemptions_are_only_compiler_distribution_or_host_canary', () => {
+test('WHAT[verification-system-013] exemptions_are_only_compiler_distribution_or_host_canary', () => {
   for (const file of [...BUILD_VERIFICATION_FILES, ...HOST_PHYSICAL_CANARY_FILES]) {
     if (!existsSync(join(ROOT, file))) continue
     const ok = file.startsWith('requirements/verification-system/')
@@ -32,7 +32,7 @@ test('WHAT[VERIFICATION-SYSTEM-013] exemptions_are_only_compiler_distribution_or
   }
 })
 
-test('WHAT[VERIFICATION-SYSTEM-013] no_interop_or_domain_facade_imports', () => {
+test('WHAT[verification-system-013] no_interop_or_domain_facade_imports', () => {
   const facade = /(?:from\s*|import\s*\(\s*)['"][^'"]*(?:interop|domain)\.mjs['"]/
   const violators = semanticTestFiles()
     .filter((f) => facade.test(readFileSync(f, 'utf8')))
@@ -40,6 +40,6 @@ test('WHAT[VERIFICATION-SYSTEM-013] no_interop_or_domain_facade_imports', () => 
   assert.deepEqual(violators, [], 'no interop.mjs/domain.mjs facade imports may remain')
 })
 
-test('WHAT[VERIFICATION-SYSTEM-013] surface_manifest_is_nonempty_and_closed', () => {
+test('WHAT[verification-system-013] surface_manifest_is_nonempty_and_closed', () => {
   assert.ok(SURFACE_MANIFEST.length > 0, 'the surface registry must not be empty')
 })

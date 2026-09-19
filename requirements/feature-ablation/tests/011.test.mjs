@@ -21,7 +21,7 @@ const withEnv = (entries, run) => {
   }
 }
 
-test('WHAT[ABL-011] ABL_011_station_05_denies_ablated_durable_fact_tags', () => {
+test('WHAT[feature-ablation-011] ABL_011_station_05_denies_ablated_durable_fact_tags', () => {
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-05']], () => {
     Ablation.load()
     assert.equal(Ablation.allowsFact('AgentFact.Delegation'), false)
@@ -30,7 +30,7 @@ test('WHAT[ABL-011] ABL_011_station_05_denies_ablated_durable_fact_tags', () => 
     assert.equal(Ablation.allowsFact('AgentFact.UnmappedFamily'), true)
   })
 })
-test('WHAT[ABL-011] ABL_011_station_15_borrows_delegation_facts', () => {
+test('WHAT[feature-ablation-011] ABL_011_station_15_borrows_delegation_facts', () => {
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-15']], () => {
     Ablation.load()
     assert.equal(Ablation.allowsFact('AgentFact.Delegation'), true)
@@ -51,7 +51,7 @@ const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 const factMap = JSON.parse(read('resources/ablation/fact-map.json'))
 const nodes = JSON.parse(read('resources/ablation/nodes.json'))
 
-test('WHAT[ABL-011] ABL_011_every_mapped_fact_targets_manifest_node', () => {
+test('WHAT[feature-ablation-011] ABL_011_every_mapped_fact_targets_manifest_node', () => {
   for (const [tag, node] of Object.entries(factMap.facts)) {
     assert.ok(nodes.nodes.some((entry) => entry.id === node), `${tag} -> unknown node ${node}`)
   }

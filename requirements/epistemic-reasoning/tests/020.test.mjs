@@ -64,7 +64,7 @@ function inquiryEvents(lock) {
   ];
 }
 
-test('WHAT[EPI-020] missing_dependency_duplicate_release_or_abi_mismatch_fails_closed_or_drifted_plugin_runs', async () => {
+test('WHAT[epistemic-reasoning-020] missing_dependency_duplicate_release_or_abi_mismatch_fails_closed_or_drifted_plugin_runs', async () => {
   const surface = gecSurface;
   const clean = await surface.bindPlugins({ manifests: [manifest(), manifest({ id: 'helper', release: '2.1.0', abiHash: 'abi-helper-001', dependencies: ['canon'] })] });
   assert.equal(clean.ok, true, 'a satisfied dependency chain must bind');
@@ -105,7 +105,7 @@ test('WHAT[EPI-020] missing_dependency_duplicate_release_or_abi_mismatch_fails_c
   assert.equal(relocked.error.code, 'abi-mismatch');
 });
 
-test('WHAT[EPI-020] schema_hash_mismatch_rejects_observation_or_content_drift_passes_silently', async () => {
+test('WHAT[epistemic-reasoning-020] schema_hash_mismatch_rejects_observation_or_content_drift_passes_silently', async () => {
   const surface = gecSurface;
   const lock = [manifest()];
   const events = inquiryEvents(lock);
@@ -125,7 +125,7 @@ test('WHAT[EPI-020] schema_hash_mismatch_rejects_observation_or_content_drift_pa
   assert.equal(renamedResult.error.code, 'schema-mismatch');
 });
 
-test('WHAT[EPI-020] mid_run_plugin_swap_is_rejected_or_lock_is_advisory', async () => {
+test('WHAT[epistemic-reasoning-020] mid_run_plugin_swap_is_rejected_or_lock_is_advisory', async () => {
   const surface = gecSurface;
   const lock = [manifest()];
   const events = inquiryEvents(lock);

@@ -37,14 +37,14 @@ const MIRRORED_BY_OFFICE_CAPABILITY = new Set(['entrust-by-consequence', 'choose
 
 const LANGUAGE = 'English'
 
-test('WHAT[COGNITIVE-ENVIRONMENT-005] CE_prompt_015_no_tier_split_duplicates', () => {
+test('WHAT[cognitive-environment-005] CE_prompt_015_no_tier_split_duplicates', () => {
   const prompts = promptResources.allForLanguage(LANGUAGE)
   const unique = new Set(prompts)
   // Catalog contains the active canonical roles
   assert.ok(unique.size >= 5, 'canonical roles have unique prompts')
 })
 
-test('WHAT[COGNITIVE-ENVIRONMENT-005] CE_role_law_is_enduring_self_model_without_tier_split_or_hidden_orchestration', () => {
+test('WHAT[cognitive-environment-005] CE_role_law_is_enduring_self_model_without_tier_split_or_hidden_orchestration', () => {
   for (const role of ['engineer', 'manager', 'devops', 'orchestrator', 'blogger', 'bookkeeper']) {
     for (const locale of ['en', 'zh-CN']) {
       const text = read(`resources/provider/role/${role}/${locale}.md`)

@@ -60,7 +60,7 @@ const profileOf = () => {
   return built.value
 }
 
-test('WHAT[DISPATCH-PROTOCOL-007] DP_007_runtime_start_stamp_is_audit_only_not_restart_recovery_authority', () => {
+test('WHAT[dispatch-protocol-007] DP_007_runtime_start_stamp_is_audit_only_not_restart_recovery_authority', () => {
   const root = profileOf()
   const key = 'pk_r'
   const projection = authority.registerClaim(
@@ -189,7 +189,7 @@ const sendDetachedRoot = async (port, handle, session, text, seed) => {
   return sent
 }
 
-test('WHAT[DISPATCH-PROTOCOL-007] PROMPT_007_detached_refused_abandons_send_failed_without_resend', async () => {
+test('WHAT[dispatch-protocol-007] PROMPT_007_detached_refused_abandons_send_failed_without_resend', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-prompt-007-refused-'))
   const writerId = 'writer-007-refused'
   const opened = await openGitJournal(base, writerId, 'rt-007-refused')
@@ -217,7 +217,7 @@ test('WHAT[DISPATCH-PROTOCOL-007] PROMPT_007_detached_refused_abandons_send_fail
     rmSync(base, { recursive: true, force: true })
   }
 })
-test('WHAT[DISPATCH-PROTOCOL-007] PROMPT_007_detached_outcome_unknown_keeps_claim_pending_never_resends', async () => {
+test('WHAT[dispatch-protocol-007] PROMPT_007_detached_outcome_unknown_keeps_claim_pending_never_resends', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-prompt-007-unknown-'))
   const writerId = 'writer-007-unknown'
   const opened = await openGitJournal(base, writerId, 'rt-007-unknown')
@@ -297,7 +297,7 @@ const capturingPort = (captured, behaviour = {}) => ({
   },
 })
 
-test('WHAT[DISPATCH-PROTOCOL-007] JNGD_nudge_releases_the_key_when_send_fails_and_retries', async () => {
+test('WHAT[dispatch-protocol-007] JNGD_nudge_releases_the_key_when_send_fails_and_retries', async () => {
   const sid = 'ses_jg2'
   const dir = mkdtempSync(join(tmpdir(), 'wxs-jngd-'))
   const opened = await journal.JournalSurface_bootWithWriterId(dir, 'writer-jg2', 'rt-jg2', 4242, '2026-01-01T00:00:00Z')
@@ -320,7 +320,7 @@ test('WHAT[DISPATCH-PROTOCOL-007] JNGD_nudge_releases_the_key_when_send_fails_an
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[DISPATCH-PROTOCOL-007] JNGD_join_gate_dedupes_same_terminal_but_rearms_for_fresh_terminal', async () => {
+test('WHAT[dispatch-protocol-007] JNGD_join_gate_dedupes_same_terminal_but_rearms_for_fresh_terminal', async () => {
   const sid = 'ses_jg_repeat'
   const dir = mkdtempSync(join(tmpdir(), 'wxs-jngd-repeat-'))
   const opened = await journal.JournalSurface_bootWithWriterId(dir, 'writer-jg-repeat', 'rt-jg-repeat', 4242, '2026-01-01T00:00:00Z')
@@ -402,7 +402,7 @@ const userMessageWithKey = (id, keyValue) => ({
   metadata: { wanxiangshu_prompt_key: keyValue },
 })
 
-test('WHAT[DISPATCH-PROTOCOL-007] DP_007_restarts_never_auto_abandon_an_unresolved_broken_tool', async () => {
+test('WHAT[dispatch-protocol-007] DP_007_restarts_never_auto_abandon_an_unresolved_broken_tool', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-dp011b-'))
   try {
     const first = await journal.JournalSurface_bootWithWriterId(base, 'writer-dp011b-1', 'rt_1', 4242, '2020-01-01T00:00:00Z')

@@ -54,14 +54,14 @@ module internal SyncDelegatePhysicalIdentity =
             (Uri.EscapeDataString(SyncDelegate.roleLabel role))
             (Uri.EscapeDataString agentName)
 
-/// Retry-decorator plug for dedicated delegate children (DELEG-023): the caller
+/// Retry-decorator plug for dedicated delegate children (delegation-023): the caller
 /// observes only the decorator's verdict, never a single transient attempt
 /// failure. `Ok unit` keeps the invocation pending (a fresh attempt was admitted
 /// or the episode was superseded); `Error reason` folds it as terminal.
 type SyncDelegateRetryPort =
     { Retry: ReconciledTurn -> Wanxiangshu.Execution.Failure.ExecutionFailure -> string -> Task<Result<unit, string>> }
 
-/// Job-owned helpers for the DELEG-031 settle path. Module scope keeps the
+/// Job-owned helpers for the delegation-031 settle path. Module scope keeps the
 /// member body flat while still seeing store/race primitives.
 module internal SyncDelegateInternals =
     let settleCompletedFromParts
@@ -376,7 +376,7 @@ type SyncDelegateRuntime
             store.FailCall(call, "EXEC-031: Completed without bounded WorkRecord")
             true
 
-    /// DELEG-031: the completion the child physically produced, independent of
+    /// delegation-031: the completion the child physically produced, independent of
     /// whether its terminal trace durably committed. Used only when the
     /// terminal capture itself reports the write was NotCommitted/Unknown: the
     /// earned completion is delivered from the turn's own parts, never dropped
@@ -397,7 +397,7 @@ type SyncDelegateRuntime
             // does not use Terminal to build the inspect payload;
             // the bounded WorkRecord is the invocation's parts range.
             match! XTraceCapture.captureTerminalWithReceipt (Some journal) turn with
-            // DELEG-031: the terminal trace write is settlement evidence, not
+            // delegation-031: the terminal trace write is settlement evidence, not
             // the completion itself. WriterUnavailable/WriteUnknown means the
             // child physically finished but the evidence did not commit:
             // deliver the earned completion from the turn's own parts (neither
@@ -413,7 +413,7 @@ type SyncDelegateRuntime
                 return finishCompletedCall turn.SessionId call workRecord
         }
 
-    /// DELEG-025 causal identity: a turn belongs to this invocation iff its
+    /// delegation-025 causal identity: a turn belongs to this invocation iff its
     /// physical is the exact accepted prompt of this call, or it is a
     /// ProviderRetryAttempt continuation of the same accepted authority root
     /// (the retry attempts the decorator dispatched for this call).
@@ -485,7 +485,7 @@ type SyncDelegateRuntime
         }
 
     /// One confirmed provider failure for a pending call. The injected retry
-    /// decorator owns policy, budget admission and physical re-entry (DELEG-023):
+    /// decorator owns policy, budget admission and physical re-entry (delegation-023):
     /// a single transient failure never fails the call; only a terminal verdict
     /// does. Turns outside this invocation's accepted attempts stay ordinary.
     let rec handleFailedAttemptTurn (turn: ReconciledTurn) (failure: ExecutionFailure option) error =
@@ -629,7 +629,7 @@ type SyncDelegateRuntime
                |> List.forall (fun invocation -> invocation.StartCursor.IsSome)
         | None -> false
 
-    /// DELEG-031 probe seam: the exact authority root this delegate's live call
+    /// delegation-031 probe seam: the exact authority root this delegate's live call
     /// accepted, without consulting the durable projection (which freezes once
     /// the journal writer is released).
     member _.TryAcceptedAuthorityRoot(sessionId: SessionId) : string option =
@@ -637,7 +637,7 @@ type SyncDelegateRuntime
         | Some call -> Option.map (AuthorityRootUserMessageId.value) call.AcceptedAuthorityRoot
         | None -> None
 
-    /// DELEG-031: settle a completed turn from its own parts when the terminal
+    /// delegation-031: settle a completed turn from its own parts when the terminal
     /// trace capture reports NotCommitted/Unknown. True iff a live call
     /// consumed the turn. The checkpoint stays pending-evidence; the earned
     /// completion is delivered from the turn, never dropped, never re-executed.

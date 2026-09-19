@@ -39,7 +39,7 @@ const parseTomlFields = (text) =>
 
 const isDirectory = (path) => existsSync(path) && statSync(path).isDirectory()
 
-test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_specs_carry_names_descriptions_and_arguments', () => {
+test('WHAT[repository-programming-020] FILEMUT_specs_carry_names_descriptions_and_arguments', () => {
   const mv = createMv(toolModule())
   const rm = createRm(toolModule())
   assert.equal(name(mv), 'mv')
@@ -50,7 +50,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_specs_carry_names_descriptions_an
   assert.deepEqual(argumentNames(rm), ['path'])
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_mv_moves_a_file', async () => {
+test('WHAT[repository-programming-020] FILEMUT_mv_moves_a_file', async () => {
   const { dir, cleanup } = sandbox()
   const source = join(dir, 'alpha.txt')
   const destination = join(dir, 'beta.txt')
@@ -63,7 +63,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_mv_moves_a_file', async () => {
   cleanup()
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_mv_renames_a_directory_with_contents', async () => {
+test('WHAT[repository-programming-020] FILEMUT_mv_renames_a_directory_with_contents', async () => {
   const { dir, cleanup } = sandbox()
   const source = join(dir, 'old-dir')
   const destination = join(dir, 'new-dir')
@@ -77,7 +77,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_mv_renames_a_directory_with_conte
   cleanup()
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_mv_missing_source_returns_error', async () => {
+test('WHAT[repository-programming-020] FILEMUT_mv_missing_source_returns_error', async () => {
   const { dir, cleanup } = sandbox()
   const result = await execute(
     createMv(toolModule()),
@@ -89,7 +89,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_mv_missing_source_returns_error',
   cleanup()
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_mv_requires_source_and_destination', async () => {
+test('WHAT[repository-programming-020] FILEMUT_mv_requires_source_and_destination', async () => {
   const { dir, cleanup } = sandbox()
   const mv = createMv(toolModule())
   const missingBoth = await execute(mv, {}, context('ses-mv-req'))
@@ -99,7 +99,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_mv_requires_source_and_destinatio
   cleanup()
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_rm_removes_a_file', async () => {
+test('WHAT[repository-programming-020] FILEMUT_rm_removes_a_file', async () => {
   const { dir, cleanup } = sandbox()
   const path = join(dir, 'trash.txt')
   writeFileSync(path, 'payload')
@@ -109,7 +109,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_rm_removes_a_file', async () => {
   cleanup()
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_rm_removes_an_empty_directory', async () => {
+test('WHAT[repository-programming-020] FILEMUT_rm_removes_an_empty_directory', async () => {
   const { dir, cleanup } = sandbox()
   const path = join(dir, 'empty-dir')
   mkdirSync(path)
@@ -119,7 +119,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_rm_removes_an_empty_directory', a
   cleanup()
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_rm_refuses_a_non_empty_directory', async () => {
+test('WHAT[repository-programming-020] FILEMUT_rm_refuses_a_non_empty_directory', async () => {
   const { dir, cleanup } = sandbox()
   const path = join(dir, 'non-empty-dir')
   mkdirSync(path)
@@ -132,21 +132,21 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_rm_refuses_a_non_empty_directory'
   cleanup()
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_rm_missing_path_returns_error', async () => {
+test('WHAT[repository-programming-020] FILEMUT_rm_missing_path_returns_error', async () => {
   const { dir, cleanup } = sandbox()
   const result = await execute(createRm(toolModule()), { path: join(dir, 'nope.txt') }, context('ses-rm-missing'))
   assert.match(result, /No such file or directory|没有那个文件或目录/)
   cleanup()
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_rm_requires_a_path', async () => {
+test('WHAT[repository-programming-020] FILEMUT_rm_requires_a_path', async () => {
   const { dir, cleanup } = sandbox()
   const result = await execute(createRm(toolModule()), {}, context('ses-rm-req'))
   assert.match(result, /path is required|必须提供 path/)
   cleanup()
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_mv_rename_failure_surfaces_os_message', async () => {
+test('WHAT[repository-programming-020] FILEMUT_mv_rename_failure_surfaces_os_message', async () => {
   const { dir, cleanup } = sandbox()
   const source = join(dir, 'a.txt')
   writeFileSync(source, 'payload')

@@ -26,7 +26,7 @@ const invokeAndSettle = async (runtime, charge, answer, promptCount, runId) => {
   return result
 }
 
-test('WHAT[MANAGED-SESSION-014] G6_deleted_delegate_child_retires_live_binding_but_survives_for_owner_scope_close', async () => {
+test('WHAT[managed-session-lifecycle-014] G6_deleted_delegate_child_retires_live_binding_but_survives_for_owner_scope_close', async () => {
   const runtime = await create()
   try {
     await invokeAndSettle(runtime, 'first', 'first answer', 1, 'run-first')

@@ -10,7 +10,7 @@ const mustOk = (result) => {
   return result
 }
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-008] keyed work bundle is idempotent and rejects conflicting records for one lane', () => {
+test('WHAT[intra-participant-parallelism-008] keyed work bundle is idempotent and rejects conflicting records for one lane', () => {
   const empty = fission.workBundleEmpty
   assertJsData(empty, 'workBundleEmpty')
   assert.deepEqual(empty, { entries: [] })

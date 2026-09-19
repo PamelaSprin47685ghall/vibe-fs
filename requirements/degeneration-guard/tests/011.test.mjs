@@ -59,7 +59,7 @@ const rawDeltaWithoutMessage = (session, field, text) => ({
   },
 })
 
-test('WHAT[DG-011] LOOP_006_anomaly_resources_preserve_distinct_recovery_meanings', () => {
+test('WHAT[degeneration-guard-011] LOOP_006_anomaly_resources_preserve_distinct_recovery_meanings', () => {
   assert.equal(
     providerLanguage.readText('SimplifiedChinese', 'runtime/degeneration-too-repetitive').trim(),
     '你的输出重复字符太多，建议更换表述方式。',

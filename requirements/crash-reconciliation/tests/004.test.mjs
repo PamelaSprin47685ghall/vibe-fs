@@ -26,7 +26,7 @@ const continueSessionOf = (suffix) => `ses-continue-${suffix}`
 
 const continuePhysicalOf = (suffix) => `msg-continue-${suffix}`
 
-test('WHAT[CRASH-004] RECOVERY_FAMILY_dsl_module_and_private_permit_exist', () => {
+test('WHAT[crash-reconciliation-004] RECOVERY_FAMILY_dsl_module_and_private_permit_exist', () => {
   const src = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Model.fs'), 'utf8')
   assert.match(src, /module SessionRecovery/)
   assert.match(src, /type FamilyRecoveryPermit\s*=\s*\n\s*private/)

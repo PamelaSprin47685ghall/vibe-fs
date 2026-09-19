@@ -8,7 +8,7 @@ const { clearAllForTests, readGlobalPreference, parse, tryParse, label, resource
 const english = 'English'
 const simplifiedChinese = 'SimplifiedChinese'
 
-test('WHAT[PROVIDER-LANGUAGE-001] ProviderLanguage parses en and zh-CN with locale mapping', () => {
+test('WHAT[provider-language-001] ProviderLanguage parses en and zh-CN with locale mapping', () => {
   assert.equal(parse('en'), english)
   assert.equal(parse('english'), english)
   assert.equal(parse('zh-CN'), simplifiedChinese)
@@ -17,7 +17,7 @@ test('WHAT[PROVIDER-LANGUAGE-001] ProviderLanguage parses en and zh-CN with loca
   assert.equal(label(english), 'en')
   assert.equal(resourceDirectory(simplifiedChinese), 'zh-CN')
 })
-test('WHAT[PROVIDER-LANGUAGE-001] provider resource language roots map en.md and zh-CN.md', () => {
+test('WHAT[provider-language-001] provider resource language roots map en.md and zh-CN.md', () => {
   assert.equal(languageRootsPresent(), true)
   assert.equal(
     relativePath(english, 'role/manager'),
@@ -40,7 +40,7 @@ const SID = 'provider-system-i18n-bookkeeper'
 test.beforeEach(() => clearAllForTests())
 test.afterEach(() => clearAllForTests())
 
-test('WHAT[PROVIDER-LANGUAGE-001] system transform is stable for an English session', async () => {
+test('WHAT[provider-language-001] system transform is stable for an English session', async () => {
   bookkeeper.bindSession(SID, 'provider-language-surface', 'provider-language-surface')
   try {
     assert.equal(bindOnce(SID, 'English').ok, true)

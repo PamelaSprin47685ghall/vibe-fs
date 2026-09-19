@@ -2,10 +2,10 @@ namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
 
-/// PAR-022 fence: opaque handle surface.
+/// provider-attempt-recovery-022 fence: opaque handle surface.
 ///
 /// `fence` is an opaque handle: a JS test obtains it, passes it back, and never
-/// inspects it (JS-SEMANTIC-SURFACE-005). Session ids and provider runs cross as
+/// inspects it (js-semantic-surface-005). Session ids and provider runs cross as
 /// plain strings; the fence itself stays a class with private maps.
 module ProviderAttemptStopFenceSurface =
     val create: unit -> ProviderAttemptStopFence

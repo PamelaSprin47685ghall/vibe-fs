@@ -21,24 +21,26 @@ Office Consequence Model (语义唯一事实源)
      - **DevOps**：拥有 Read, Write, Edit, Glob, Grep, Move, Remove, Exec, Pty, Join, Horizon；具备角色固有非架构级自修授权，无 Fission；
      - **Manager**：拥有 Fork (仅 Engineer), Resume (已有 Engineer 续做或固定 DevOps), Join, Horizon, TodoWrite, ReviewAssessment, Finality；无 Fission；
      - **Orchestrator**：拥有 Fork/Commission (仅 Manager 道路), Join, Horizon；无 Fission。
-   - 同一后果事实通过 `office-capability-integrity.test.mjs` 与 Role Law 契约测试，确保 Manager、fork/resume 工具描述及各角色 Role Law 中双语表达完全一致。
+   - 同一后果事实通过 `tests/005.test.mjs` 与 Role Law 契约测试，确保 Manager、fork/resume 工具描述及各角色 Role Law 中双语表达完全一致。
 
 2. **不可互换性防护**：
    - 提示词与工具描述中明确携带各 Office 的负边界（negatives）。
    - 跨 Office 的越权调用在决策面被边界镜像（caller-facing boundary mirrors）拦截，在执行面被 ToolRegistry 门禁阻断。
    - Fission 准入仅放行已证明为 Engineer 的执行上下文，Manager、DevOps 及其他角色调用在入口即被 fail-closed 拦截。
 
-## 2026-09-16：角色合并后的资源工作链
+## 资源工作链
 
-本次重写覆盖共同法、六份角色说明、派工与 resume、Fission、Manager 阶段提示、结对指引、案例整理与读取、运行输出及完成纪律，中英文同步。Engineer 调查与实现不再交接给另一个职位；DevOps 可作普通工程判断并直接修复；Manager 分清源码完成、最后改动后的运行证据和验收。
+系统资源覆盖共同法、六份角色说明、派工与 resume、Fission、Manager 阶段提示、结对指引、案例整理与读取、运行输出及完成纪律，中英文同步。Engineer 调查与实现不交接给另一个职位；DevOps 可作普通工程判断并直接修复；Manager 分清源码完成、最后改动后的运行证据和验收。
 
-`PromptResources` 不再把已撤销角色映射到 Engineer。公开 `PromptSurface` 只返回五个活跃角色；尚存于内部旧 record 的字段为空，不作为公开提示词槽位。DevOps 同时继承源码工程与资源调度手艺。
+`PromptResources` 不将已撤销角色映射到 Engineer。公开 `PromptSurface` 只返回五个活跃角色；尚存于内部旧 record 的字段为空，不作为公开提示词槽位。DevOps 同时具备源码工程与资源调度能力。
 
-资源和运行接点共同修改：Bookkeeper 两阶段加载同语言的共同法、角色法和阶段提示；JS 示例按 Engineer 的读写能力和 DevOps 的直接修复职责选择；原始输出只进数据字段，截断说明从双语资源加载。案例 freshness 仅说明关联文件与维护状态，不声称已经重新验证正确性。
+资源和运行接点规范：Bookkeeper 两阶段加载同语言的共同法、角色法和阶段提示；JS 示例按 Engineer 的读写能力和 DevOps 的直接修复职责选择；原始输出只进数据字段，截断说明从双语资源加载。案例 freshness 仅说明关联文件与维护状态，不声称已经重新验证正确性。
 
-`tests/005.test.mjs` 全量扫描分发资源并检查双语职责投影。实际装配由 `provider-language/tests/012.test.mjs` 检查；案例、命令输出和生成示例另由其 owning package 的正式测试证明。字符串断言不代表模型行为 canary、运行时权限或完整迁移已经通过。
+`tests/005.test.mjs` 全量扫描分发资源并检查双语职责投影。实际装配由 `provider-language-012`（`provider-language/tests/012.test.mjs`）检查；案例、命令输出和生成示例另由其 owning package 的正式测试证明。字符串断言不代表模型行为 canary、运行时权限或完整迁移已经通过。
 
 ## GAP
 
-- `OFF-003` / `OFF-018`（CLOSED）：同一 Office authority 不变性与 Sphinx 程控探究流程约束已闭合，落点 `tests/003.test.mjs` 与 `tests/018.test.mjs`。
+- `office-capability-003` / `office-capability-018`（CLOSED）：同一 Office authority 不变性与 Sphinx 程控探究流程约束已闭合，落点 `tests/003.test.mjs` 与 `tests/018.test.mjs`。
+- `office-capability-005` / `office-capability-007` / `office-capability-016` / `office-capability-017`（CLOSED）：DevOps 重复接收幂等、固定 DevOps 接力、Engineer 独享 Fission 与 DevOps 进程收束集成证明已闭合，落点 `tests/integration/005.test.mjs`、`tests/integration/007.test.mjs`、`tests/integration/016.test.mjs` 与 `tests/integration/017.test.mjs`。
+- `office-capability-006`（CLOSED）：Office 不可互换边界独立评测已闭合，落点 `tests/eval/provider-office-boundary/006.test.mjs`。
 

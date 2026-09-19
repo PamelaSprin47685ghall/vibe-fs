@@ -21,7 +21,7 @@ const unwrap = (result) => {
   return result.value
 }
 
-test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_commitPlan_all_or_nothing', () => {
+test('WHAT[repository-programming-013] JS013_commitPlan_all_or_nothing', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'oldA', 'utf8')
@@ -37,7 +37,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_commitPlan_all_or_nothing', () => {
     cleanup()
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_commitPlan_aborts_before_write_when_snapshot_fails', () => {
+test('WHAT[repository-programming-013] JS013_commitPlan_aborts_before_write_when_snapshot_fails', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'oldA', 'utf8')
@@ -53,7 +53,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_commitPlan_aborts_before_write_when
     cleanup()
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_commitPlan_rolls_back_written_files_on_write_failure', () => {
+test('WHAT[repository-programming-013] JS013_commitPlan_rolls_back_written_files_on_write_failure', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'oldA', 'utf8')
@@ -82,7 +82,7 @@ const rewrite = (path, originalText, newText) => ({ kind: 'rewrite', path, origi
 const create = (path, text) => ({ kind: 'create', path, text })
 const current = { 'a.txt': 'current' }
 
-test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_preflight_orders_rules_and_short_circuits', () => {
+test('WHAT[repository-programming-013] JS013_preflight_orders_rules_and_short_circuits', () => {
   // duplicate intent wins over everything
   assert.equal(
     codeOf(preflight(['a.txt'], current, [], [rewrite('a.txt', 'current', 'x'), create('a.txt', 'y')])),
@@ -93,7 +93,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_preflight_orders_rules_and_short_ci
   // all good
   assert.equal(ok(preflight(['a.txt'], current, [], [rewrite('a.txt', 'current', 'x'), create('b.txt', 'y')])), true)
 })
-test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_commit_plan_is_exact', () => {
+test('WHAT[repository-programming-013] JS013_commit_plan_is_exact', () => {
   const mutations = [create('b.txt', 'newB'), rewrite('a.txt', 'oldA', 'newA')]
   assert.deepEqual(commitPlan(mutations), [
     { kind: 'rewrite', path: 'a.txt', expectedCurrent: 'oldA', newText: 'newA' },
@@ -132,7 +132,7 @@ const runWorkflow = async (dir, program, { deadlineMs = 2000, store = null } = {
   surface: coderSurface(),
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-013] JS085_workflow_reads_and_commits_rewrite', async () => {
+test('WHAT[repository-programming-013] JS085_workflow_reads_and_commits_rewrite', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
@@ -152,7 +152,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-013] JS085_workflow_reads_and_commits_rewrite'
     cleanup()
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-013] JS085_workflow_commits_create_and_reports', async () => {
+test('WHAT[repository-programming-013] JS085_workflow_commits_create_and_reports', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const program = `class Js extends JsProgram {

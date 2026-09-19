@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as hooks from '../../../dist/OpenCode/Host/PluginHooksSurface.js'
 
-test('WHAT[EXECFAIL-011] unclassified hook failure preserves own evidence and issues settlement incomplete for proven execution', () => {
+test('WHAT[execution-failure-policy-011] unclassified hook failure preserves own evidence and issues settlement incomplete for proven execution', () => {
   // 1. When hook arguments prove execution identity (sessionID + messageID),
   // boundary issues SettlementIncomplete and preserves execution key
   const argsWithIdentity = {

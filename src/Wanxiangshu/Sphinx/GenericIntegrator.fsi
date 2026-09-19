@@ -1,6 +1,6 @@
 namespace Wanxiangshu.Sphinx
 
-/// WHAT[EPI-019]: pure Current fold for generic Sphinx inquiries. No IO, no
+/// WHAT[epistemic-reasoning-019]: pure Current fold for generic Sphinx inquiries. No IO, no
 /// clock, no codec: the spine decodes durable envelopes into
 /// GenericEnvelopeInput and this module only folds them into per-inquiry
 /// cursors with an unbroken revision chain.

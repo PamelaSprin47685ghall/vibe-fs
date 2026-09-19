@@ -22,6 +22,6 @@ const cutResult = () => projection.applyCut(cutMessages, 'old-run', 'suicide-cal
 
 const ids = (result) => result.provider.map((message) => message.id ?? message.info?.id)
 
-test('WHAT[PROJ-002] projection cut covers the suicide request and result parts', () => {
+test('WHAT[relay-context-projection-002] projection cut covers the suicide request and result parts', () => {
   assert.deepEqual(ids(cutResult()), ['u1', 'a2'])
 })

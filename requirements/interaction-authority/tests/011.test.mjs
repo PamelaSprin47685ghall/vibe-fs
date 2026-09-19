@@ -48,7 +48,7 @@ const register = (root) => authority.registerAuthority(root, authority.empty)
 const continuation = (key, root, kind = 'ManagerGuard', payload = 'payload') =>
   authority.claimContinuation(key, 'ses_a', kind, root, payload)
 
-test('WHAT[INTERACTION-AUTHORITY-011] PROMPT_011_logical_run_id_is_stable_and_input_sensitive', () => {
+test('WHAT[interaction-authority-011] PROMPT_011_logical_run_id_is_stable_and_input_sensitive', () => {
   const id = (runtime, session, physical) => authority.stableLogicalRunId(hash, runtime, session, physical)
   const base = id('rt_1', 'ses_a', 'msg_u1')
   assert.equal(base, 'H(rt_1\nses_a\nmsg_u1)')
@@ -66,7 +66,7 @@ const binding = await import("../../../dist/OpenCode/Host/SessionBindingSurface.
 const chatParams = await import("../../../dist/OpenCode/Host/ChatParamsSurface.js");
 
 
-test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_parented_session_requires_provider_model_binding', () => {
+test('WHAT[interaction-authority-011] CHAT_PARAMS_parented_session_requires_provider_model_binding', () => {
   binding.bindChild('ses_chat_params_root', 'ses_chat_params_child', 'coder')
   const output = { model: { providerID: 'anthropic', modelID: 'fast-haiku' } }
   const rejected = chatParams.apply(
@@ -77,7 +77,7 @@ test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_parented_session_requires_prov
   assert.match(rejected.error, /no observable provider\/model binding|no exact physical execution binding/)
   assert.equal(output.model.modelID, 'fast-haiku')
 })
-test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_unbound_Host_auxiliary_child_does_not_claim_managed_execution', () => {
+test('WHAT[interaction-authority-011] CHAT_PARAMS_unbound_Host_auxiliary_child_does_not_claim_managed_execution', () => {
   binding.observeHostAuxiliaryChild('ses_chat_params_title')
   const output = { model: { providerID: 'anthropic', modelID: 'fast-haiku' } }
   const observed = chatParams.apply(
@@ -89,7 +89,7 @@ test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_unbound_Host_auxiliary_child_d
   assert.equal(observed.temperature, undefined)
   assert.equal(output.model.modelID, 'fast-haiku')
 })
-test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_acceptance_establishes_binding_without_rewriting_host_model', () => {
+test('WHAT[interaction-authority-011] CHAT_PARAMS_acceptance_establishes_binding_without_rewriting_host_model', () => {
   binding.bindChild('ses_chat_params_root_2', 'ses_chat_params_child_2', 'coder')
   binding.acceptPromptExecution(
     'ses_chat_params_child_2',
@@ -108,7 +108,7 @@ test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_acceptance_establishes_binding
   assert.equal(observed.temperature, 1)
   assert.equal(output.model.modelID, 'deep-opus')
 })
-test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_uses_the_resolved_provider_model_id_not_the_mutated_user_message_model', () => {
+test('WHAT[interaction-authority-011] CHAT_PARAMS_uses_the_resolved_provider_model_id_not_the_mutated_user_message_model', () => {
   binding.bindChild('ses_chat_params_root_3', 'ses_chat_params_child_3', 'coder')
   binding.acceptPromptExecution(
     'ses_chat_params_child_3',
@@ -134,7 +134,7 @@ test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_uses_the_resolved_provider_mod
   assert.equal(observed.ok, false)
   assert.match(observed.error, /model\/reasoning drift/i)
 })
-test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_accepts_the_real_provider_model_shape_with_message_variant', () => {
+test('WHAT[interaction-authority-011] CHAT_PARAMS_accepts_the_real_provider_model_shape_with_message_variant', () => {
   binding.bindChild('ses_chat_params_root_4', 'ses_chat_params_child_4', 'coder')
   binding.acceptPromptExecution(
     'ses_chat_params_child_4',
@@ -174,7 +174,7 @@ test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_accepts_the_real_provider_mode
   assert.equal(inputModel.variants.low.temperature, 1)
   assert.equal(inputModel.options.temperature, 1)
 })
-test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_leaves_temperature_untouched_when_model_capability_disables_it', () => {
+test('WHAT[interaction-authority-011] CHAT_PARAMS_leaves_temperature_untouched_when_model_capability_disables_it', () => {
   binding.bindChild('ses_chat_params_root_5', 'ses_chat_params_child_5', 'coder')
   binding.acceptPromptExecution(
     'ses_chat_params_child_5',
@@ -209,7 +209,7 @@ test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_leaves_temperature_untouched_w
   assert.equal(output.options.temperature, undefined)
   assert.equal(inputModel.variants.high.temperature, undefined)
 })
-test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_agentless_root_does_not_invent_binding', () => {
+test('WHAT[interaction-authority-011] CHAT_PARAMS_agentless_root_does_not_invent_binding', () => {
   const output = { model: { providerID: 'anthropic', modelID: 'fast-haiku' } }
   const observed = chatParams.apply({ sessionID: 'ses_unbound_root' }, output)
   assert.equal(observed.ok, true)

@@ -2,7 +2,7 @@ namespace Wanxiangshu.Sphinx.Plugins.AStar
 
 open Wanxiangshu.Sphinx.Core
 
-/// WHAT[EPI-010]: optimal path search over a finite deterministic graph with global bounds.
+/// WHAT[epistemic-reasoning-010]: optimal path search over a finite deterministic graph with global bounds.
 module Refiner =
     /// One directed edge with a nonnegative finite traversal cost.
     type Edge =

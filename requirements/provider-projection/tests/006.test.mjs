@@ -13,7 +13,7 @@ const row = (role, text, hostMessageId) => ({
   hostIsPhysical: false,
 })
 
-test('WHAT[PROVIDER-PROJECTION-006] different generic message bases conflict', () => {
+test('WHAT[provider-projection-006] different generic message bases conflict', () => {
   const first = Projection.replaceMessageBase({
     key: 'owner-base-a',
     rows: [row('user', 'first', 'first-id')],
@@ -28,7 +28,7 @@ test('WHAT[PROVIDER-PROJECTION-006] different generic message bases conflict', (
     conflict: 'ConflictingMessageBase',
   })
 })
-test('WHAT[PROVIDER-PROJECTION-006] generic row insertion is registration-order independent', () => {
+test('WHAT[provider-projection-006] generic row insertion is registration-order independent', () => {
   const base = [
     textMessage('user', 'u1'),
     textMessage('assistant', 'a1'),
@@ -72,7 +72,7 @@ const insert = (key, anchor, rows) => Projection.insertMessageRows({ key, anchor
 const before = (index) => ({ kind: 'BeforeMessageIndex', index })
 const append = { kind: 'Append' }
 
-test('WHAT[PROVIDER-PROJECTION-006] identical message bases dedupe deterministically', () => {
+test('WHAT[provider-projection-006] identical message bases dedupe deterministically', () => {
   const intent = base('base-1', [row('user', 'replacement', 'host-base', true)])
 
   assert.deepEqual(Projection.plan([intent, intent]), {
@@ -80,7 +80,7 @@ test('WHAT[PROVIDER-PROJECTION-006] identical message bases dedupe deterministic
     intents: ['ReplaceMessageBase'],
   })
 })
-test('WHAT[PROVIDER-PROJECTION-006] different message bases conflict regardless of registration order', () => {
+test('WHAT[provider-projection-006] different message bases conflict regardless of registration order', () => {
   const left = base('base-left', [row('user', 'left')])
   const right = base('base-right', [row('user', 'right')])
 
@@ -93,7 +93,7 @@ test('WHAT[PROVIDER-PROJECTION-006] different message bases conflict regardless 
     conflict: 'ConflictingMessageBase',
   })
 })
-test('WHAT[PROVIDER-PROJECTION-006] identical same-key row insertions dedupe', () => {
+test('WHAT[provider-projection-006] identical same-key row insertions dedupe', () => {
   const intent = insert('rows-1', before(0), [row('assistant', 'inserted', 'host-insert')])
 
   assert.deepEqual(Projection.plan([intent, intent]), {
@@ -101,7 +101,7 @@ test('WHAT[PROVIDER-PROJECTION-006] identical same-key row insertions dedupe', (
     intents: ['InsertMessageRows'],
   })
 })
-test('WHAT[PROVIDER-PROJECTION-006] differing same-key row insertions conflict with the key', () => {
+test('WHAT[provider-projection-006] differing same-key row insertions conflict with the key', () => {
   const left = insert('same-key', before(0), [row('assistant', 'left')])
   const right = insert('same-key', append, [row('assistant', 'right')])
 
@@ -111,7 +111,7 @@ test('WHAT[PROVIDER-PROJECTION-006] differing same-key row insertions conflict w
     key: 'same-key',
   })
 })
-test('WHAT[PROVIDER-PROJECTION-006] base and row intents have canonical permutation-invariant order', () => {
+test('WHAT[provider-projection-006] base and row intents have canonical permutation-invariant order', () => {
   const intents = [
     insert('z-append', append, [row('assistant', 'append-z', 'z')]),
     insert('b-before', before(1), [row('assistant', 'before-b', 'b')]),

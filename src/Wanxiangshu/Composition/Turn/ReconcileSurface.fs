@@ -271,7 +271,7 @@ module ReconcileSurface =
         | "StreamInterruptedAfterFirstToken" -> ExecutionFailure.StreamInterruptedAfterFirstToken
         | other -> invalidArg "failure" (sprintf "unknown failure label: %s" other)
 
-    /// PAR-008: a failure witness mints a provider-failure terminal only for a
+    /// provider-attempt-recovery-008: a failure witness mints a provider-failure terminal only for a
     /// confirmed provider class, or when the attempt's formal content is usable.
     let failureWitnessMintsTerminal (failure: string) (contentUsable: bool) : bool =
         ReconcileProgram.failureWitnessMintsTerminal (failureOfLabel failure) contentUsable

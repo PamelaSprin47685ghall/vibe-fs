@@ -19,7 +19,7 @@ const fill = async (runtime, count, prefix = 'waiting') => {
   return queued
 }
 
-test('WHAT[EMR-013] queue bound is enforced without drops', async () => {
+test('WHAT[execution-model-routing-013] queue bound is enforced without drops', async () => {
   const runtime = routing.createRuntime(() => null)
   const bound = routing.pendingBound(runtime)
 
@@ -42,7 +42,7 @@ test('WHAT[EMR-013] queue bound is enforced without drops', async () => {
   }
   assert.equal(routing.pendingCount(runtime), 0)
 })
-test('WHAT[EMR-013] FIFO admits the oldest scheduler-eligible demand on capacity release', async () => {
+test('WHAT[execution-model-routing-013] FIFO admits the oldest scheduler-eligible demand on capacity release', async () => {
   const admitted = []
   const runtime = routing.createRuntime((role, running) => {
     if (running.some((item) => item.model === 'provider/one')) return null
@@ -66,7 +66,7 @@ test('WHAT[EMR-013] FIFO admits the oldest scheduler-eligible demand on capacity
   assert.equal((await awaitQueued(second)).kind, 'Acquired')
   assert.deepEqual(admitted, ['engineer', 'manager', 'devops'])
 })
-test('WHAT[EMR-013] exact cancel and supersede are typed and idempotent', async () => {
+test('WHAT[execution-model-routing-013] exact cancel and supersede are typed and idempotent', async () => {
   const runtime = routing.createRuntime(() => null)
   const cancelled = await begin(runtime, 'cancelled', 'physical-cancelled', 'engineer', 'cancelled-owner')
   routing.cancelPendingExecution(runtime, 'cancelled')
@@ -153,7 +153,7 @@ const providerLimited = (limits, routes) => (role, running, previous) => {
   return candidates.find(available) ?? null
 }
 
-test('WHAT[EMR-013] superseded slot freed inside the same turn recomputes the waiting queue', { timeout: 5000 }, async () => {
+test('WHAT[execution-model-routing-013] superseded slot freed inside the same turn recomputes the waiting queue', { timeout: 5000 }, async () => {
   const only = target('provider/only')
   const runningCounts = []
   const route = (_role, running) => {

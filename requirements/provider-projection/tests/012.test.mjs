@@ -20,7 +20,7 @@ const item = (partValue, { role = 'user', truncated = false } = {}) => ({
   Truncated: truncated,
 })
 
-test('WHAT[PROVIDER-PROJECTION-012] CTX_013_identical_input_renders_byte_identical_output', () => {
+test('WHAT[provider-projection-012] CTX_013_identical_input_renders_byte_identical_output', () => {
   const build = () => [
     item(part.text('请修复 fallback 的竞态。'), { role: 'user' }),
     item(part.toolCall('edit', '{"a":1,"b":2}'), { role: 'assistant' }),
@@ -29,17 +29,17 @@ test('WHAT[PROVIDER-PROJECTION-012] CTX_013_identical_input_renders_byte_identic
 
   assert.equal(bt.render(build()), bt.render(build()))
 })
-test('WHAT[PROVIDER-PROJECTION-012] CTX_013_document_ends_with_exactly_one_LF', () => {
+test('WHAT[provider-projection-012] CTX_013_document_ends_with_exactly_one_LF', () => {
   const rendered = bt.render([item(part.text('a')), item(part.text('b'))])
 
   assert.equal(rendered.endsWith('\n'), true)
   assert.equal(rendered.endsWith('\n\n'), false)
 })
-test('WHAT[PROVIDER-PROJECTION-012] CTX_013_an_empty_document_is_empty_not_a_bare_newline', () => {
+test('WHAT[provider-projection-012] CTX_013_an_empty_document_is_empty_not_a_bare_newline', () => {
   assert.equal(bt.render([]), '')
   assert.equal(syn.byteCount(bt.render([])), 0)
 })
-test('WHAT[PROVIDER-PROJECTION-012] CTX_013_no_timestamps_or_host_ids_are_emitted', () => {
+test('WHAT[provider-projection-012] CTX_013_no_timestamps_or_host_ids_are_emitted', () => {
   const rendered = bt.render([
     item(part.text('work')),
     item(part.toolResult('contents')),
@@ -60,7 +60,7 @@ const { assertJsData } = await import("../../verification-system/tests/support/j
 const toml = await import('../../../dist/Foundation/SyntheticTomlSurface.js')
 const valueOf = (rendered) => parseToml(`x = ${rendered}`).x
 
-test('WHAT[PROVIDER-PROJECTION-012] P6_TOML_SURFACE_byte_count_measures_utf8_not_characters', () => {
+test('WHAT[provider-projection-012] P6_TOML_SURFACE_byte_count_measures_utf8_not_characters', () => {
   assert.equal(toml.byteCount('abc'), 3)
   assert.equal(toml.byteCount('é'), 2)
   assert.equal(toml.byteCount('中'), 3)
@@ -95,7 +95,7 @@ const syntaxLines = (document) => {
   return lines
 }
 
-test('WHAT[PROVIDER-PROJECTION-012] ARCH_010_CRLF_and_lone_CR_normalise_to_LF', () => {
+test('WHAT[provider-projection-012] ARCH_010_CRLF_and_lone_CR_normalise_to_LF', () => {
   // Without this, identical logical content renders as different bytes depending on which platform
   // produced it, and 「同一 semantic input 必须产生相同 bytes」 fails for a reason nobody can see.
   assert.equal(toml.normalizeNewlines('a\r\nb\rc\nd'), 'a\nb\nc\nd')
@@ -103,7 +103,7 @@ test('WHAT[PROVIDER-PROJECTION-012] ARCH_010_CRLF_and_lone_CR_normalise_to_LF', 
 
   assert.equal(toml.renderString('line one\r\nline two'), toml.renderString('line one\nline two'))
 })
-test('WHAT[PROVIDER-PROJECTION-012] ARCH_010_identical_input_renders_byte_identical_output', () => {
+test('WHAT[provider-projection-012] ARCH_010_identical_input_renders_byte_identical_output', () => {
   const build = () =>
     toml.renderDocument(['Use the result below as evidence.'], [
       toml.field('tool', toml.renderString('shell')),
@@ -112,7 +112,7 @@ test('WHAT[PROVIDER-PROJECTION-012] ARCH_010_identical_input_renders_byte_identi
 
   assert.equal(build(), build())
 })
-test('WHAT[PROVIDER-PROJECTION-012] ARCH_010_byteCount_measures_UTF8_not_characters', () => {
+test('WHAT[provider-projection-012] ARCH_010_byteCount_measures_UTF8_not_characters', () => {
   assert.equal(toml.byteCount('abc'), 3)
   assert.equal(toml.byteCount('é'), 2, 'U+00E9 is two bytes')
   assert.equal(toml.byteCount('中'), 3, 'CJK is three bytes')
@@ -126,7 +126,7 @@ test('WHAT[PROVIDER-PROJECTION-012] ARCH_010_byteCount_measures_UTF8_not_charact
   assert.equal(cjk.length, 100)
   assert.equal(toml.byteCount(cjk), 300)
 })
-test('WHAT[PROVIDER-PROJECTION-012] ARCH_010_byteCount_agrees_with_the_platform_encoder', () => {
+test('WHAT[provider-projection-012] ARCH_010_byteCount_agrees_with_the_platform_encoder', () => {
   // The hand-rolled counter exists because Fable has no GetByteCount. It must agree with Node's
   // encoder on every shape, or a limit means one thing in tests and another in production.
   const encoder = new TextEncoder()

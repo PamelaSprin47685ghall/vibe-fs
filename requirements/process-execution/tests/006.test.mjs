@@ -14,7 +14,7 @@ const {
   estimateView,
 } = await import('../../../dist/Process/Surface.js')
 
-test('WHAT[PROC-006] EXEC_011_kill_ack_grace_is_finite_not_MaxTimerWaitMs', () => {
+test('WHAT[process-execution-006] EXEC_011_kill_ack_grace_is_finite_not_MaxTimerWaitMs', () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
   const waitSrc = readFileSync(join(root, 'src/Wanxiangshu/Process/NodeProcessWait.fs'), 'utf8')
 
@@ -58,7 +58,7 @@ const okLauncher = (exitCode = 0, out = 'hello', err = '') => async (_command, _
   new TextEncoder().encode(err),
 ]
 
-test('WHAT[PROC-006] EXEC_011_throwing_host_under_cancellation_maps_to_process_cancelled', async () => {
+test('WHAT[process-execution-006] EXEC_011_throwing_host_under_cancellation_maps_to_process_cancelled', async () => {
   const explodingHost = async () => {
     throw new Error('host exploded')
   }
@@ -96,7 +96,7 @@ const within = (promise, ms, label) =>
 const expired = () => createDeadline('2000-01-01T00:00:00Z', 1)
 const killCount = (child) => childView(child).killCount
 
-test('WHAT[PROC-006] EXEC_011_D_mid_wait_cancellation_kills_once_and_rejects_without_hanging_on_exit', async () => {
+test('WHAT[process-execution-006] EXEC_011_D_mid_wait_cancellation_kills_once_and_rejects_without_hanging_on_exit', async () => {
   const child = childCreate(undefined)
   const deadline = createDeadline(nowIso(), 60_000)
   const token = createCancellationToken(false)
@@ -121,7 +121,7 @@ const {
   abortParent,
 } = await import('../../../dist/Process/Surface.js')
 
-test('WHAT[PROC-006] PTY_API_abort_parent_invokes_every_registered_callback', () => {
+test('WHAT[process-execution-006] PTY_API_abort_parent_invokes_every_registered_callback', () => {
   const parent = 'parent-all'
   const calls = []
   registerParentAbort(parent, () => calls.push('a'))
@@ -133,10 +133,10 @@ test('WHAT[PROC-006] PTY_API_abort_parent_invokes_every_registered_callback', ()
   abortParent(parent)
   assert.equal(calls.length, 4)
 })
-test('WHAT[PROC-006] PTY_API_abort_parent_with_unknown_id_is_a_noop', () => {
+test('WHAT[process-execution-006] PTY_API_abort_parent_with_unknown_id_is_a_noop', () => {
   abortParent('parent-never-registered')
 })
-test('WHAT[PROC-006] PTY_API_unregister_removes_only_the_matching_token', () => {
+test('WHAT[process-execution-006] PTY_API_unregister_removes_only_the_matching_token', () => {
   const parent = 'parent-partial'
   const calls = []
   const tokenA = registerParentAbort(parent, () => calls.push('a'))
@@ -146,7 +146,7 @@ test('WHAT[PROC-006] PTY_API_unregister_removes_only_the_matching_token', () => 
   abortParent(parent)
   assert.deepEqual(calls, ['b'])
 })
-test('WHAT[PROC-006] PTY_API_unregister_last_callback_drops_the_parent_entry', () => {
+test('WHAT[process-execution-006] PTY_API_unregister_last_callback_drops_the_parent_entry', () => {
   const parent = 'parent-dropped'
   const calls = []
   const token = registerParentAbort(parent, () => calls.push('a'))
@@ -155,19 +155,19 @@ test('WHAT[PROC-006] PTY_API_unregister_last_callback_drops_the_parent_entry', (
   abortParent(parent)
   assert.deepEqual(calls, [])
 })
-test('WHAT[PROC-006] PTY_API_unregister_with_unknown_parent_or_token_is_a_noop', () => {
+test('WHAT[process-execution-006] PTY_API_unregister_with_unknown_parent_or_token_is_a_noop', () => {
   unregisterParentAbort('parent-nope', 1)
   const parent = 'parent-mismatch'
   registerParentAbort(parent, () => {})
   unregisterParentAbort(parent, 99999)
   abortParent(parent)
 })
-test('WHAT[PROC-006] PTY_API_tokens_are_monotonic_across_parents', () => {
+test('WHAT[process-execution-006] PTY_API_tokens_are_monotonic_across_parents', () => {
   const t1 = registerParentAbort('parent-tok-1', () => {})
   const t2 = registerParentAbort('parent-tok-2', () => {})
   assert.ok(t2 > t1, `${t2} > ${t1}`)
 })
-test('WHAT[PROC-006] PTY_API_throwing_abort_callback_does_not_block_the_rest', () => {
+test('WHAT[process-execution-006] PTY_API_throwing_abort_callback_does_not_block_the_rest', () => {
   const parent = 'parent-throw'
   const calls = []
   registerParentAbort(parent, () => {
@@ -259,7 +259,7 @@ const portWith = (value) => {
   return p
 }
 
-test('WHAT[PROC-006] SUPERVISOR_attach_without_port_entry_kills_the_term', async () => {
+test('WHAT[process-execution-006] SUPERVISOR_attach_without_port_entry_kills_the_term', async () => {
   const process = child()
   try {
     const supervisor = supervisorCreate()
@@ -268,7 +268,7 @@ test('WHAT[PROC-006] SUPERVISOR_attach_without_port_entry_kills_the_term', async
     assert.ok(died(process), 'unregistered attach SIGKILLs the process tree')
   } finally { killChild(process) }
 })
-test('WHAT[PROC-006] SUPERVISOR_cancelAll_kills_live_sessions_and_skips_closed_or_null_backends', async () => {
+test('WHAT[process-execution-006] SUPERVISOR_cancelAll_kills_live_sessions_and_skips_closed_or_null_backends', async () => {
   const process = child()
   try {
     const supervisor = supervisorCreate()

@@ -4,7 +4,7 @@ namespace Wanxiangshu.Foundation
 /// (ARCH-010, P6 wave). Every function takes and returns JS-native data:
 /// strings, numbers, string arrays. F# list parameters become JS arrays;
 /// translation happens here at the owner boundary, the writer itself stays
-/// untouched (JS-SEMANTIC-SURFACE-003/005).
+/// untouched (js-semantic-surface-003/005).
 module SyntheticTomlSurface =
 
     let normalizeNewlines (text: string) : string = SyntheticToml.normalizeNewlines text

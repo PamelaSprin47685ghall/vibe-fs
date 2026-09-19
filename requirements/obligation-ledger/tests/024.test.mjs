@@ -8,7 +8,7 @@ const { applyToolDefinitionHook, createMagicTodoContractHooks, decodeV1TodoWrite
 const SESSION = 'ses_magic_todo_canary'
 const CALL = 'call_magic_todo_1'
 
-test('WHAT[OBLIGATION-LEDGER-024] definition replaces description, parameters, and jsonSchema while the original decoder stays the execute-path decoder', async () => {
+test('WHAT[obligation-ledger-024] definition replaces description, parameters, and jsonSchema while the original decoder stays the execute-path decoder', async () => {
   const hooks = createMagicTodoContractHooks()
   const seed = v1TodoWriteToolSeed()
   const advertised = sampleObligationTodoWriteAdvertisement()
@@ -50,7 +50,7 @@ test('WHAT[OBLIGATION-LEDGER-024] definition replaces description, parameters, a
   assert.equal(decoded.ok, true, 'B: original V1 decoder still accepts V1 rows after definition update')
   assert.deepEqual(decoded.value.todos[0], v1Row.todos[0])
 })
-test('WHAT[OBLIGATION-LEDGER-024] jsonSchema ternary: both parameters and jsonSchema are replaced together', async () => {
+test('WHAT[obligation-ledger-024] jsonSchema ternary: both parameters and jsonSchema are replaced together', async () => {
   // registry.ts ternary:
   //   output.parameters === tool.parameters || output.jsonSchema !== tool.jsonSchema
   //     ? output.jsonSchema : undefined
@@ -84,7 +84,7 @@ const { default: test } = await import("node:test");
 const host = await import("../../../dist/Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.js");
 
 
-test('WHAT[OBLIGATION-LEDGER-024] advertises planComplete in description, parameters, and jsonSchema', () => {
+test('WHAT[obligation-ledger-024] advertises planComplete in description, parameters, and jsonSchema', () => {
   const output = { description: '', parameters: {}, jsonSchema: {} }
   host.applyDefinition(output)
 

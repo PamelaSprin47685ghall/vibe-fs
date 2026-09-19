@@ -15,7 +15,7 @@ const ok = (...actions) => {
   return result.state
 }
 
-test('WHAT[EFFECT-ACCOUNTING-008] C5_materialize_opens_request_queryable_by_blogger', () => {
+test('WHAT[effect-accounting-008] C5_materialize_opens_request_queryable_by_blogger', () => {
   const result = cycle.scenario([materialize({ requestId: 'req-open' })])
   assert.equal(result.ok, true, result.error ?? '')
   assert.deepEqual(result.state, {
@@ -25,7 +25,7 @@ test('WHAT[EFFECT-ACCOUNTING-008] C5_materialize_opens_request_queryable_by_blog
     requestBindings: 0,
   })
 })
-test('WHAT[EFFECT-ACCOUNTING-008] C5_entry_commit_records_receipt_and_clears_open_request', () => {
+test('WHAT[effect-accounting-008] C5_entry_commit_records_receipt_and_clears_open_request', () => {
   assert.deepEqual(ok(materialize(), entry()), {
     openRequests: 0,
     openBloggers: 0,
@@ -33,12 +33,12 @@ test('WHAT[EFFECT-ACCOUNTING-008] C5_entry_commit_records_receipt_and_clears_ope
     requestBindings: 1,
   })
 })
-test('WHAT[EFFECT-ACCOUNTING-008] C5_same_provider_run_cannot_be_both_entry_and_squash', () => {
+test('WHAT[effect-accounting-008] C5_same_provider_run_cannot_be_both_entry_and_squash', () => {
   const result = state(entry({ run: 'msg-same' }), squash({ run: 'msg-same' }))
   assert.equal(result.ok, false)
   assert.match(result.error, /already has/i)
 })
-test('WHAT[EFFECT-ACCOUNTING-008] C5_materialize_prompt_key_fill_in_after_send', () => {
+test('WHAT[effect-accounting-008] C5_materialize_prompt_key_fill_in_after_send', () => {
   assert.deepEqual(ok(materialize({ requestId: 'req-key' }), materialize({ requestId: 'req-key', promptKey: 'pk-blog-1' })), {
     openRequests: 1,
     openBloggers: 1,
@@ -46,7 +46,7 @@ test('WHAT[EFFECT-ACCOUNTING-008] C5_materialize_prompt_key_fill_in_after_send',
     requestBindings: 0,
   })
 })
-test('WHAT[EFFECT-ACCOUNTING-008] C5_materialize_prompt_key_cannot_rebind', () => {
+test('WHAT[effect-accounting-008] C5_materialize_prompt_key_cannot_rebind', () => {
   const result = state(
     materialize({ requestId: 'req-rebind', promptKey: 'pk-a' }),
     materialize({ requestId: 'req-rebind', promptKey: 'pk-b' }),
@@ -54,12 +54,12 @@ test('WHAT[EFFECT-ACCOUNTING-008] C5_materialize_prompt_key_cannot_rebind', () =
   assert.equal(result.ok, false)
   assert.match(result.error, /different PromptKey/i)
 })
-test('WHAT[EFFECT-ACCOUNTING-008] C5_duplicate_request_materialize_different_context_rejected', () => {
+test('WHAT[effect-accounting-008] C5_duplicate_request_materialize_different_context_rejected', () => {
   const result = state(materialize({ requestId: 'req-dup', digest: 'ctx-1' }), materialize({ requestId: 'req-dup', digest: 'ctx-2' }))
   assert.equal(result.ok, false)
   assert.match(result.error, /different context/i)
 })
-test('WHAT[EFFECT-ACCOUNTING-008] C5_abandon_clears_open_request', () => {
+test('WHAT[effect-accounting-008] C5_abandon_clears_open_request', () => {
   assert.deepEqual(ok(materialize({ requestId: 'req-ab' }), { kind: 'abandon', requestId: 'req-ab', blogger: 'ses-blogger' }), {
     openRequests: 0,
     openBloggers: 0,
@@ -67,7 +67,7 @@ test('WHAT[EFFECT-ACCOUNTING-008] C5_abandon_clears_open_request', () => {
     requestBindings: 0,
   })
 })
-test('WHAT[EFFECT-ACCOUNTING-008] C5_request_id_cannot_rebind_to_different_provider_run', () => {
+test('WHAT[effect-accounting-008] C5_request_id_cannot_rebind_to_different_provider_run', () => {
   const result = state(entry({ requestId: 'req-bind', run: 'msg-a' }), entry({ requestId: 'req-bind', run: 'msg-b' }))
   assert.equal(result.ok, false)
   assert.match(result.error, /RequestId.*rebind/i)
@@ -128,7 +128,7 @@ const withJournal = async (prefix, writer, runtime, body) => {
   }
 }
 
-test('WHAT[EFFECT-ACCOUNTING-008] Adapter Blogger Coordinator submits one receipt and recovers exact physical acceptance without resend', async () => {
+test('WHAT[effect-accounting-008] Adapter Blogger Coordinator submits one receipt and recovers exact physical acceptance without resend', async () => {
   await withJournal('wxs-blogger-coordinator-', 'writer-blogger-coordinator', 'rt-blogger-coordinator', async (handle) => {
     const mainSession = 'ses-main-effect-008'
     const bloggerSession = 'ses-blogger-effect-008'

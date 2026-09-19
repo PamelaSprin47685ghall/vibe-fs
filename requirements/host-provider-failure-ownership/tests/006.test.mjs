@@ -28,7 +28,7 @@ const input = (failure, change = {}) => ({
 const classify = (failure, episodeId, change) =>
   presentation.classifyPolicyInput(input(failure, change), episodeId)
 
-test('WHAT[HOSTFAIL-006] exhaustion uses one typed final Wanxiangshu presentation', () => {
+test('WHAT[host-provider-failure-ownership-006] exhaustion uses one typed final Wanxiangshu presentation', () => {
   assert.deepEqual(
     classify('ProviderPermanent', 'episode-final', {
       provider: { ...input('ProviderPermanent').provider, retryBudget: 'Exhausted' },
@@ -42,7 +42,7 @@ test('WHAT[HOSTFAIL-006] exhaustion uses one typed final Wanxiangshu presentatio
   )
 })
 
-test('WHAT[HOSTFAIL-006] terminal resolution is never retrying', () => {
+test('WHAT[host-provider-failure-ownership-006] terminal resolution is never retrying', () => {
   const decision = classify('ProviderPermanent', 'episode-final', {
     provider: { ...input('ProviderPermanent').provider, retryBudget: 'Exhausted' },
   })

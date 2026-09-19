@@ -7,7 +7,7 @@ const { default: test } = await import("node:test");
 
 const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 
-test('WHAT[DURABLE-CONVERGENCE-008] reference-transaction and pre-push both call the same full bidirectional converge', async () => {
+test('WHAT[durable-convergence-008] reference-transaction and pre-push both call the same full bidirectional converge', async () => {
   const sync = await read('src/Wanxiangshu/Git/Hook/Sync.fs')
   assert.match(sync, /let runPrePush/)
   assert.match(sync, /converge remote None/)
@@ -15,7 +15,7 @@ test('WHAT[DURABLE-CONVERGENCE-008] reference-transaction and pre-push both call
   assert.match(sync, /converge remote observed/)
   assert.doesNotMatch(sync, /ConvergeObserved|downloadOnly|uploadOnly/i)
 })
-test('WHAT[DURABLE-CONVERGENCE-008] reference-transaction observed root changes discovery only not sync direction', async () => {
+test('WHAT[durable-convergence-008] reference-transaction observed root changes discovery only not sync direction', async () => {
   const gateway = await read('src/Wanxiangshu/Git/Gateway.fs')
   assert.match(gateway, /let converge/)
   assert.match(gateway, /match observedRemote with/)
@@ -24,14 +24,14 @@ test('WHAT[DURABLE-CONVERGENCE-008] reference-transaction observed root changes 
   assert.match(gateway, /discoverRemote/)
   assert.doesNotMatch(gateway, /IEventStore|CanonicalIntegrator|WorkspaceEventStore/)
 })
-test('WHAT[DURABLE-CONVERGENCE-008] lease race refetches and repeats the same k-way sync boundedly', async () => {
+test('WHAT[durable-convergence-008] lease race refetches and repeats the same k-way sync boundedly', async () => {
   const gateway = await read('src/Wanxiangshu/Git/Gateway.fs')
   assert.match(gateway, /--force-with-lease/)
   assert.match(gateway, /retriesLeft/)
   assert.match(gateway, /discoverRemote run remote/)
   assert.match(gateway, /ConvergeRetryExhausted/)
 })
-test('WHAT[DURABLE-CONVERGENCE-008] product process has no fetch pull push remote API', async () => {
+test('WHAT[durable-convergence-008] product process has no fetch pull push remote API', async () => {
   const gateway = await read('src/Wanxiangshu/Git/Gateway.fs')
   const boot = await read('src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs')
   const activation = await read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
@@ -40,7 +40,7 @@ test('WHAT[DURABLE-CONVERGENCE-008] product process has no fetch pull push remot
   assert.match(activation, /lazy[\s\S]*HookDispatcher\.ensure/)
   assert.doesNotMatch(activation, /GitGateway\.converge|\.(Fetch|Pull|Push)\(/i)
 })
-test('WHAT[DURABLE-CONVERGENCE-008] hook-internal Git commands are recursion guarded and pre-push is not reentered', async () => {
+test('WHAT[durable-convergence-008] hook-internal Git commands are recursion guarded and pre-push is not reentered', async () => {
   const runner = await read('resources/git/wanxiang-hook.mjs')
   const gateway = await read('src/Wanxiangshu/Git/Gateway.fs')
   assert.match(runner, /WANXIANG_GIT_SYNC_ACTIVE/)
@@ -63,7 +63,7 @@ const retention = await import("../../../dist/Persistence/EventStore/RetentionSu
 const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 const make = (id, stream, parents = []) => ({ id, stream, type: 'JobRequested', parents, payload: {}, payloadRefs: [] })
 
-test('WHAT[DURABLE-CONVERGENCE-008] activation only ensures hooks and user Git process runs full sync', async () => {
+test('WHAT[durable-convergence-008] activation only ensures hooks and user Git process runs full sync', async () => {
   const boot = await read('src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs')
   const activation = await read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
   const hook = await read('src/Wanxiangshu/Git/Hook/Dispatcher.fs')

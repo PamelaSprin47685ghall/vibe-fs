@@ -1,4 +1,4 @@
-// WHAT[EPI-010]: A* refiner expands minimum g+h, reopens on improved g, and bounds the optimum globally.
+// WHAT[epistemic-reasoning-010]: A* refiner expands minimum g+h, reopens on improved g, and bounds the optimum globally.
 
 namespace Wanxiangshu.Sphinx.Plugins.AStar
 

@@ -27,7 +27,7 @@ const lifecycle = (caseName) => ({
       },
 })
 
-test('WHAT[OBLIGATION-LEDGER-017] WorkActivated is an inert legacy fact: it fixes ProtectedPrefixEnd once but never re-decides work eligibility', () => {
+test('WHAT[obligation-ledger-017] WorkActivated is an inert legacy fact: it fixes ProtectedPrefixEnd once but never re-decides work eligibility', () => {
   const once = envelope.foldLifecycleSequence(SESSION, [lifecycle('LifeOpened'), lifecycle('WorkActivated')])
   assert.equal(once.ok, true, JSON.stringify(once.error))
   assert.equal(once.protectedPrefixEnd, 42)
@@ -118,7 +118,7 @@ const acceptT1Checkpoint = async (handle, session, callText) => {
   return { t1, accepted }
 }
 
-test('WHAT[OBLIGATION-LEDGER-017] zero-work planComplete=true with empty obligations is a valid T1 commitment', async () => {
+test('WHAT[obligation-ledger-017] zero-work planComplete=true with empty obligations is a valid T1 commitment', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-magic-todo-zero-work'
     const life = 'life-magic-todo-zero-work'
@@ -146,7 +146,7 @@ const traceOwner = await import("../../../dist/Context/Trace/SemanticTraceSurfac
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const item = (sequence, role, part) => traceOwner.item({ sequence, role, part })
 
-test('WHAT[OBLIGATION-LEDGER-017] Pre-T1 BlindPlan does not enlarge the structural Opening floor', () => {
+test('WHAT[obligation-ledger-017] Pre-T1 BlindPlan does not enlarge the structural Opening floor', () => {
   const floor = todo.effectiveOpeningFloor(true, false, 1, null, null, 7, [
     { sequence: 1, kind: 'text', text: 'opening' },
     { sequence: 7, kind: 'text', text: 'head' },
@@ -154,10 +154,10 @@ test('WHAT[OBLIGATION-LEDGER-017] Pre-T1 BlindPlan does not enlarge the structur
   assert.equal(floor, 2)
   assert.equal(todo.bloggerEffectiveStart(3, floor), 3)
 })
-test('WHAT[OBLIGATION-LEDGER-017] Pre-T1: no CurrentLife → no floor', () => {
+test('WHAT[obligation-ledger-017] Pre-T1: no CurrentLife → no floor', () => {
   assert.equal(todo.effectiveOpeningFloor(false, false, 1, null, null, 4, []), null)
 })
-test('WHAT[OBLIGATION-LEDGER-017] static: BloggerCoordinator + CompanionTransform zero ProtectedPrefixEnd refs', () => {
+test('WHAT[obligation-ledger-017] static: BloggerCoordinator + CompanionTransform zero ProtectedPrefixEnd refs', () => {
   for (const rel of [
     'src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs',
     'src/Wanxiangshu/Context/Companion/Transform.fs',

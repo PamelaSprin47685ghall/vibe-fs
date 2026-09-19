@@ -4,7 +4,7 @@ import * as recovery from '../../../dist/Execution/Session/ChatExecution/Recover
 
 
 
-test('WHAT[MANAGED-SESSION-019] cancel and delete lifecycle signals settle exact terminal resources through the execution owner', async () => {
+test('WHAT[managed-session-lifecycle-019] cancel and delete lifecycle signals settle exact terminal resources through the execution owner', async () => {
   const signals = recovery.lifecycleSignals()
   assert.ok(signals.includes('SessionDeleted'))
   assert.ok(signals.includes('SessionCancelled'))

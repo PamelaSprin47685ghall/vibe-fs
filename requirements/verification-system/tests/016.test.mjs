@@ -30,7 +30,7 @@ function setupFixtureRepo() {
   return dir
 }
 
-test('WHAT[VERIFICATION-SYSTEM-016] collectVerificationInputs collects expected relative paths and diff detects mutations', () => {
+test('WHAT[verification-system-016] collectVerificationInputs collects expected relative paths and diff detects mutations', () => {
   const fixture = setupFixtureRepo()
   try {
     const initial = collectVerificationInputs(fixture)
@@ -108,7 +108,7 @@ test('WHAT[VERIFICATION-SYSTEM-016] collectVerificationInputs collects expected 
   }
 })
 
-test('WHAT[VERIFICATION-SYSTEM-016] verify detects mid-flight inputs change via runStep perturbation and halts with fail', async () => {
+test('WHAT[verification-system-016] verify detects mid-flight inputs change via runStep perturbation and halts with fail', async () => {
   const fixture = setupFixtureRepo()
   const tmpLogs = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-step-logs-'))
   let buf = ''
@@ -162,7 +162,7 @@ test('WHAT[VERIFICATION-SYSTEM-016] verify detects mid-flight inputs change via 
   }
 })
 
-test('WHAT[VERIFICATION-SYSTEM-016] verify with isolated logDirectory creates run dir and latest link without touching repo root', async () => {
+test('WHAT[verification-system-016] verify with isolated logDirectory creates run dir and latest link without touching repo root', async () => {
   const fixture = setupFixtureRepo()
   const isolatedLogs = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-isolated-logs-'))
   let buf = ''
@@ -193,7 +193,7 @@ test('WHAT[VERIFICATION-SYSTEM-016] verify with isolated logDirectory creates ru
   }
 })
 
-test('WHAT[VERIFICATION-SYSTEM-016] verificationSteps excludes TESTS_MJS_FILES from unit and integration step environments', () => {
+test('WHAT[verification-system-016] verificationSteps excludes TESTS_MJS_FILES from unit and integration step environments', () => {
   const hostEnvWithOverride = {
     PATH: process.env.PATH || '',
     TESTS_MJS_FILES: 'some-test-override.test.mjs',

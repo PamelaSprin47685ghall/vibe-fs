@@ -7,7 +7,7 @@ open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation.Identity
 
-/// DURABLE-EVENTS-004/005/010/017.
+/// durable-events-004/005/010/017.
 /// Runtime truth is deliberately boring: one process owns one append-only NDJSON
 /// file under the repository's git common-dir. Git object plumbing is not a
 /// dependency of this module and therefore cannot leak into the local append path.

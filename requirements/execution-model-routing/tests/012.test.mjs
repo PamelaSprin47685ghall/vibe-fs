@@ -28,7 +28,7 @@ const acquire = async (runtime, exact = identity()) => {
 }
 const conflict = (outcome) => assert.deepEqual(outcome, { kind: 'Conflict' })
 
-test('WHAT[EMR-012] capacity lifecycle admits every legal fenced transition', async () => {
+test('WHAT[execution-model-routing-012] capacity lifecycle admits every legal fenced transition', async () => {
   const beforeProvider = routing.createRuntime(() => target)
   const beforeProviderLease = await acquire(beforeProvider)
   assert.equal(routing.executionAdmissionLifecycle(beforeProvider, beforeProviderLease), 'Pending')
@@ -45,7 +45,7 @@ test('WHAT[EMR-012] capacity lifecycle admits every legal fenced transition', as
   routing.releasePhysicalExecution(provider, identity().sessionId, identity().physicalUserMessageId)
   assert.equal(routing.executionAdmissionLifecycle(provider, providerLease), 'Released')
 })
-test('WHAT[EMR-012] capacity lifecycle rejects every illegal edge and opposite terminal', async () => {
+test('WHAT[execution-model-routing-012] capacity lifecycle rejects every illegal edge and opposite terminal', async () => {
   const committedRuntime = routing.createRuntime(() => target)
   const committed = await acquire(committedRuntime)
   routing.commitExecutionAdmission(committedRuntime, committed, identity())
@@ -60,7 +60,7 @@ test('WHAT[EMR-012] capacity lifecycle rejects every illegal edge and opposite t
     { kind: 'AlreadyApplied' },
   )
 })
-test('WHAT[EMR-012] same physical retry preserves the capability and a newer generation stales it', async () => {
+test('WHAT[execution-model-routing-012] same physical retry preserves the capability and a newer generation stales it', async () => {
   const runtime = routing.createRuntime(() => target)
   const first = await acquire(runtime)
   assert.equal(await acquire(runtime), first)
@@ -101,7 +101,7 @@ const acquire = async (runtime, exact = identity()) => {
 }
 const conflict = (outcome) => assert.deepEqual(outcome, { kind: 'Conflict' })
 
-test('WHAT[EMR-012] admission lease is opaque and projects only its frozen target', async () => {
+test('WHAT[execution-model-routing-012] admission lease is opaque and projects only its frozen target', async () => {
   const runtime = routing.createRuntime(() => target())
   const lease = await acquire(runtime)
 
@@ -109,7 +109,7 @@ test('WHAT[EMR-012] admission lease is opaque and projects only its frozen targe
   assert.equal(JSON.stringify(lease), '{}', 'the process capability has no serializable identity or capacity fields')
   assert.deepEqual(routing.commitExecutionAdmission(runtime, {}, identity()), { kind: 'StaleFence' })
 })
-test('WHAT[EMR-012] admission lease permits one terminal transition and idempotent duplicate', async () => {
+test('WHAT[execution-model-routing-012] admission lease permits one terminal transition and idempotent duplicate', async () => {
   const runtime = routing.createRuntime(() => target())
   const committed = await acquire(runtime)
 
@@ -129,7 +129,7 @@ test('WHAT[EMR-012] admission lease permits one terminal transition and idempote
   )
   conflict(routing.commitExecutionAdmission(runtime, released, releasedIdentity))
 })
-test('WHAT[EMR-012] rejects commit with the wrong role', async () => {
+test('WHAT[execution-model-routing-012] rejects commit with the wrong role', async () => {
   const runtime = routing.createRuntime(() => target())
   const lease = await acquire(runtime)
 
@@ -137,7 +137,7 @@ test('WHAT[EMR-012] rejects commit with the wrong role', async () => {
   assert.equal(routing.snapshotOccupied(runtime).length, 1, 'wrong role cannot settle capacity')
   assert.deepEqual(routing.commitExecutionAdmission(runtime, lease, identity()), { kind: 'Applied' })
 })
-test('WHAT[EMR-012] rejects commit with the wrong participant', async () => {
+test('WHAT[execution-model-routing-012] rejects commit with the wrong participant', async () => {
   const runtime = routing.createRuntime(() => target())
   const lease = await acquire(runtime)
 
@@ -145,7 +145,7 @@ test('WHAT[EMR-012] rejects commit with the wrong participant', async () => {
   assert.equal(routing.snapshotOccupied(runtime).length, 1, 'wrong participant cannot settle capacity')
   assert.deepEqual(routing.commitExecutionAdmission(runtime, lease, identity()), { kind: 'Applied' })
 })
-test('WHAT[EMR-012] rejects release from another physical message and every wrong exact identity field', async () => {
+test('WHAT[execution-model-routing-012] rejects release from another physical message and every wrong exact identity field', async () => {
   const runtime = routing.createRuntime(() => target())
   const lease = await acquire(runtime)
 
@@ -161,7 +161,7 @@ test('WHAT[EMR-012] rejects release from another physical message and every wron
 
   assert.equal(routing.snapshotOccupied(runtime).length, 1, 'wrong identity cannot release capacity')
 })
-test('WHAT[EMR-012] same physical retry reuses capability while newer material stales it', async () => {
+test('WHAT[execution-model-routing-012] same physical retry reuses capability while newer material stales it', async () => {
   const runtime = routing.createRuntime(() => target())
   const first = await acquire(runtime)
   const retry = await acquire(runtime)
@@ -176,7 +176,7 @@ test('WHAT[EMR-012] same physical retry reuses capability while newer material s
   })
   assert.deepEqual(routing.commitExecutionAdmission(runtime, newer, newerIdentity), { kind: 'Applied' })
 })
-test('WHAT[EMR-012] a lease from another runtime is rejected as the wrong capacity fence', async () => {
+test('WHAT[execution-model-routing-012] a lease from another runtime is rejected as the wrong capacity fence', async () => {
   const firstRuntime = routing.createRuntime(() => target())
   const secondRuntime = routing.createRuntime(() => target())
   const lease = await acquire(firstRuntime)

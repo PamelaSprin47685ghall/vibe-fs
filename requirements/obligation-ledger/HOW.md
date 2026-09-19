@@ -33,5 +33,5 @@ DEPENDS ON: durable-events, effect-accounting, semantic-trace
 
 ## GAP
 
-- `OBLIGATION-LEDGER-020`（CLOSED）：实现质量判断归于独立 assessment，落点 `tests/020.test.mjs`。
+- `obligation-ledger-020`（CLOSED）：实现质量判断归于独立 assessment，落点 `tests/020.test.mjs`。
 

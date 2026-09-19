@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as quiescence from '../../../dist/OpenCode/Host/QuiescenceSurface.js'
 
-test('WHAT[ENF-014] owner single issuance and manifest anchors fail closed on mismatch', () => {
+test('WHAT[capability-enforcement-014] owner single issuance and manifest anchors fail closed on mismatch', () => {
   const gateOwner = quiescence.create()
   const gateStranger = quiescence.create()
 

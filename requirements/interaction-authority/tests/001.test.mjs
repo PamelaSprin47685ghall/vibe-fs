@@ -51,7 +51,7 @@ const register = (root) => authority.registerAuthority(root, authority.empty)
 const continuation = (key, root, kind = 'ManagerGuard', payload = 'payload') =>
   authority.claimContinuation(key, 'ses_a', kind, root, payload)
 
-test('WHAT[INTERACTION-AUTHORITY-001] IA_001_physical_message_promotes_to_authority_root', () => {
+test('WHAT[interaction-authority-001] IA_001_physical_message_promotes_to_authority_root', () => {
   assert.equal(authority.promotePhysical('msg_u1'), 'msg_u1')
   assert.equal(rootFor().authorityRoot, 'msg_u1')
 })

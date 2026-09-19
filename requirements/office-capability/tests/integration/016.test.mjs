@@ -3,7 +3,7 @@ import test from 'node:test'
 import * as office from '../../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 import * as fissionSurface from '../../../../dist/Execution/Fission/Surface.js'
 
-test('WHAT[OFF-016] Engineer exclusively holds Fission authority and historical Manager Fission state never resurrects active lanes', async () => {
+test('WHAT[office-capability-016] Engineer exclusively holds Fission authority and historical Manager Fission state never resurrects active lanes', async () => {
   // 1. Office consequence model: Engineer exclusively holds Fission
   assert.ok(office.isAllowed('engineer', 'Fission'), 'Engineer must hold Fission')
   assert.equal(office.isAllowed('manager', 'Fission'), false, 'Manager must NOT hold Fission')

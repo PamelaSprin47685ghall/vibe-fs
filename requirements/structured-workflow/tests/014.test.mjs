@@ -28,7 +28,7 @@ const observation = (ordinal) => ({
   },
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-014] one capability or traversal mutation yields its exact violation', () => {
+test('WHAT[structured-workflow-014] one capability or traversal mutation yields its exact violation', () => {
   fc.assert(fc.property(fc.integer({ min: 1, max: 40 }), fc.integer({ min: 0, max: 39 }), (count, rawIndex) => {
     const observations = Array.from({ length: count }, (_, index) => observation(index))
     const legal = extractObservedCapabilityFactsV1(observations)
@@ -153,7 +153,7 @@ const generated = (artifactId, javascriptObservation, ordinal = 0) => ({
   },
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-014] capability observations and JavaScript traversal fail closed with exact codes', () => {
+test('WHAT[structured-workflow-014] capability observations and JavaScript traversal fail closed with exact codes', () => {
   assert.deepEqual(codes(validateCapabilityPartitionV1({ observations: [{ case: 'future-node' }] })), ['capability-extraction-incomplete'])
   for (const retired of [
     { case: 'fsharp-node', payload: { node_kind: 'application', semantic_identity: 'Fixture.value', site: site(90) } },
@@ -278,7 +278,7 @@ test('WHAT[STRUCTURED-WORKFLOW-014] capability observations and JavaScript trave
   ]).facts
   assert.deepEqual(codes(validateJavaScriptTraversalV1({ source_kind: 'generated-artifact', source_id: 'generated-artifact/v1:fixture', observation_site: site(), ast, binding_provenance_for_node: fixtureBindingProvenance, visits, capability_facts: mismatchedFacts })), ['javascript-traversal-source-mismatch'])
 })
-test('WHAT[STRUCTURED-WORKFLOW-014] JavaScript visitor closes dynamic computed CommonJS and parameterless Date capabilities', () => {
+test('WHAT[structured-workflow-014] JavaScript visitor closes dynamic computed CommonJS and parameterless Date capabilities', () => {
   const sourceId = 'generated-artifact/v1:dangerous'
   const ast = {
     type: 'Program',
@@ -350,7 +350,7 @@ test('WHAT[STRUCTURED-WORKFLOW-014] JavaScript visitor closes dynamic computed C
   assert.ok(facts.some(({ disposition }) => disposition.payload?.authorities?.includes('environment')))
   assert.ok(facts.some(({ disposition }) => disposition.payload?.authorities?.includes('file-system')))
 })
-test('WHAT[STRUCTURED-WORKFLOW-014] JavaScript visitor uses resolved binding provenance and never guesses from a root name', () => {
+test('WHAT[structured-workflow-014] JavaScript visitor uses resolved binding provenance and never guesses from a root name', () => {
   const sourceId = 'generated-artifact/v1:provenance'
   const shadowedProcessAst = {
     type: 'Program',
@@ -394,7 +394,7 @@ test('WHAT[STRUCTURED-WORKFLOW-014] JavaScript visitor uses resolved binding pro
     generated(sourceId, missingProvenanceCall.result.payload.observations[0]),
   ]).facts[0].disposition.case, 'unknown')
 })
-test('WHAT[STRUCTURED-WORKFLOW-014] JavaScript traversal rejects empty AST and every open visit-result shape', () => {
+test('WHAT[structured-workflow-014] JavaScript traversal rejects empty AST and every open visit-result shape', () => {
   const sourceId = 'generated-artifact/v1:closed-results'
   assert.deepEqual(codes(validateJavaScriptTraversalV1({ source_kind: 'generated-artifact', source_id: sourceId, observation_site: site(), ast: {}, binding_provenance_for_node: () => 'local', visits: [], capability_facts: [] })), ['capability-extraction-incomplete'])
 
@@ -414,7 +414,7 @@ test('WHAT[STRUCTURED-WORKFLOW-014] JavaScript traversal rejects empty AST and e
     assert.deepEqual(codes(validateJavaScriptTraversalV1({ source_kind: 'generated-artifact', source_id: sourceId, observation_site: site(), ast, binding_provenance_for_node: () => 'local', visits: malformed, capability_facts: [] })), ['capability-extraction-incomplete'])
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-014] traversal derives the complete node universe from AST and every array boundary is total', () => {
+test('WHAT[structured-workflow-014] traversal derives the complete node universe from AST and every array boundary is total', () => {
   const sourceId = 'generated-artifact/v1:atomic-universe'
   const ast = { type: 'Program', body: [{ type: 'ExpressionStatement', expression: { type: 'Literal', value: 1 } }] }
   const resolver = () => 'local'
@@ -479,7 +479,7 @@ function references(projectName) {
   return productionProject(projectName).references.map((path) => relative(SRC, path))
 }
 
-test('WHAT[STRUCTURED-WORKFLOW-014] NodeFs physical port and tool contracts have isolated compiler boundaries', () => {
+test('WHAT[structured-workflow-014] NodeFs physical port and tool contracts have isolated compiler boundaries', () => {
   const managedProject = 'Wanxiangshu.Owner.action-affordance.opencode-tools-managedagent.fsproj'
   const staticProject = 'Wanxiangshu.Owner.action-affordance.opencode-tools-statictools.fsproj'
   const nodeFsProject = 'Wanxiangshu.Owner.action-affordance.opencode-tools-nodefs.fsproj'

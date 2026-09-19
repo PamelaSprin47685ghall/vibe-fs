@@ -37,7 +37,7 @@ const MIRRORED_BY_OFFICE_CAPABILITY = new Set(['entrust-by-consequence', 'choose
 
 const LANGUAGE = 'English'
 
-test('WHAT[COGNITIVE-ENVIRONMENT-009] CE_prompt_016_office_library_closing_work_not_forced_to_resemble_book', () => {
+test('WHAT[cognitive-environment-009] CE_prompt_016_office_library_closing_work_not_forced_to_resemble_book', () => {
   for (const locale of ['en', 'zh-CN']) {
     const text = read(`resources/provider/library/closing/${locale}.md`)
     assert.match(text, /do not force the work|不?要强|不要.*模仿|Don't force/i)

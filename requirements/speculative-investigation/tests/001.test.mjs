@@ -33,7 +33,7 @@ const skipReason = (decision) => {
   return decision.reason
 }
 
-test('WHAT[SPEC-INV-001] STRENGTH_002_011_policy_k0_default_when_host_canary_or_cost_is_unproven', () => {
+test('WHAT[speculative-investigation-001] STRENGTH_002_011_policy_k0_default_when_host_canary_or_cost_is_unproven', () => {
   const unhealthy = decide({ ...eligibleOpportunity, hostCanaryHealthy: false })
   assert.equal(skipReason(unhealthy), 'host-canary-unhealthy')
   assert.equal(unhealthy.budget, 'K0')
@@ -47,7 +47,7 @@ test('WHAT[SPEC-INV-001] STRENGTH_002_011_policy_k0_default_when_host_canary_or_
   assert.equal(skipReason(shadow), 'shadow-k0')
   assert.equal(shadow.budget, 'K0')
 })
-test('WHAT[SPEC-INV-001] STRENGTH_001_014_policy_nested_replica_cannot_speculate', () => {
+test('WHAT[speculative-investigation-001] STRENGTH_001_014_policy_nested_replica_cannot_speculate', () => {
   const nested = decide({ ...eligibleOpportunity, isRootWork: false, isAttachedOrInternalLeaf: true, requestKind: 'strength-replica' })
   assert.equal(nested.budget, 'K0')
 })
@@ -73,7 +73,7 @@ const withEnv = (name, value, run) => {
 }
 const withCanary = (value, run) => withEnv('WANXIANGSHU_STRENGTH_HOST_CANARY', value, run)
 
-test('WHAT[SPEC-INV-001] STRENGTH_011_default_settings_are_shadow_k0_with_economic_holdout_and_no_k2_enablement', () => {
+test('WHAT[speculative-investigation-001] STRENGTH_011_default_settings_are_shadow_k0_with_economic_holdout_and_no_k2_enablement', () => {
   withEnv('WANXIANGSHU_STRENGTH_MODE', undefined, () => {
     withCanary(undefined, () => {
       const settings = Strength.settingsLoad()

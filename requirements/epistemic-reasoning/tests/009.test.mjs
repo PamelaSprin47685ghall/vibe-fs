@@ -20,7 +20,7 @@ const preparePolarInvestigation = (store) => {
   return { handle: started.handle, actionKey: candidate.request.action.id }
 }
 
-test('WHAT[EPI-009] bayesian_posterior_requires_explicit_numeric_qualification', () => {
+test('WHAT[epistemic-reasoning-009] bayesian_posterior_requires_explicit_numeric_qualification', () => {
   const store = createStore()
   const { handle, actionKey } = preparePolarInvestigation(store)
 
@@ -46,7 +46,7 @@ test('WHAT[EPI-009] bayesian_posterior_requires_explicit_numeric_qualification',
   assert.equal(state(store, handle).bayesian, null)
 })
 
-test('WHAT[EPI-009] qualified_independent_evidence_updates_posterior', () => {
+test('WHAT[epistemic-reasoning-009] qualified_independent_evidence_updates_posterior', () => {
   const store = createStore()
   const { handle, actionKey } = preparePolarInvestigation(store)
 
@@ -83,7 +83,7 @@ test('WHAT[EPI-009] qualified_independent_evidence_updates_posterior', () => {
   assert.ok(Math.abs(posterior.down - 0.3) < 1e-12)
 })
 
-test('WHAT[EPI-009] unqualified_item_cannot_mask_qualified_evidence_from_same_dependency_group', () => {
+test('WHAT[epistemic-reasoning-009] unqualified_item_cannot_mask_qualified_evidence_from_same_dependency_group', () => {
   const store = createStore()
   const { handle, actionKey } = preparePolarInvestigation(store)
 

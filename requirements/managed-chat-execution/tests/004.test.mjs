@@ -77,7 +77,7 @@ const hostPort = (sendPrompt) => ({
   SendPrompt: sendPrompt,
 })
 
-test('WHAT[CHATEXEC-004] durable acceptance is projected before its witness exists', async () => {
+test('WHAT[managed-chat-execution-004] durable acceptance is projected before its witness exists', async () => {
   const result = await accepted()
 
   assert.equal(result.ok, true, JSON.stringify(result.error))
@@ -97,7 +97,7 @@ test('WHAT[CHATEXEC-004] durable acceptance is projected before its witness exis
   assert.equal(result.capacityEffectCount, 0)
   assert.equal(result.hostEffectCount, 0)
 })
-test('WHAT[CHATEXEC-004] exact duplicate reconstructs an equivalent witness without another append', async () => {
+test('WHAT[managed-chat-execution-004] exact duplicate reconstructs an equivalent witness without another append', async () => {
   const result = await chatExecution.acceptanceDuplicateScenario(evidence())
 
   assert.equal(result.ok, true, JSON.stringify(result.error))
@@ -105,7 +105,7 @@ test('WHAT[CHATEXEC-004] exact duplicate reconstructs an equivalent witness with
   assert.equal(result.acceptanceAppendCount, 1)
   assert.deepEqual(result.secondTrace, ['Read', 'Witness'])
 })
-test('WHAT[CHATEXEC-004] established evidence conflict is typed and appends nothing', async () => {
+test('WHAT[managed-chat-execution-004] established evidence conflict is typed and appends nothing', async () => {
   const result = await chatExecution.acceptanceConflictScenario(
     evidence(),
     evidence({ logicalRunId: 'run-other' }),
@@ -116,7 +116,7 @@ test('WHAT[CHATEXEC-004] established evidence conflict is typed and appends noth
   assert.equal(result.acceptanceAppendCount, 1)
   assert.equal(result.witness, null)
 })
-test('WHAT[CHATEXEC-004] each uncertain persistence outcome acquires no capacity', async () => {
+test('WHAT[managed-chat-execution-004] each uncertain persistence outcome acquires no capacity', async () => {
   for (const outcome of ['NotAttempted', 'CommitUnknown']) {
     const result = await accepted(evidence(), outcome)
 
@@ -311,7 +311,7 @@ const cases = [
   })),
 ]
 
-test('WHAT[CHATEXEC-004] fixed admission counterworlds distinguish every intent and rejection', () => {
+test('WHAT[managed-chat-execution-004] fixed admission counterworlds distinguish every intent and rejection', () => {
 
   const observedIntents = new Set()
   const observedErrors = new Set()
@@ -408,7 +408,7 @@ const evidence = {
 const run = (failurePoint = 'None', state = 'None') =>
   transaction.transactionScenario(evidence, failurePoint, state)
 
-test('WHAT[CHATEXEC-004] accepted replay reuses acceptance without another append', async () => {
+test('WHAT[managed-chat-execution-004] accepted replay reuses acceptance without another append', async () => {
   const result = await run('None', 'Accepted')
 
   assert.equal(result.ok, true, JSON.stringify(result.error))
@@ -507,7 +507,7 @@ const mustFold = (wires) => {
 const phaseOf = (projection, physicalUserMessageId) =>
   projection.find((entry) => entry.physicalUserMessageId === physicalUserMessageId)
 
-test('WHAT[CHATEXEC-004] identical Accepted replay is idempotent and conflicting evidence fails closed', () => {
+test('WHAT[managed-chat-execution-004] identical Accepted replay is idempotent and conflicting evidence fails closed', () => {
   const accepted = acceptedWire('msg-replay')
   assert.deepEqual(mustFold([accepted, accepted]), mustFold([accepted]))
   assert.deepEqual(
@@ -624,7 +624,7 @@ const acceptedWire = (evidence) =>
     ],
   ])
 
-test('WHAT[CHATEXEC-004] same admitted plan binds the same admission twice', () => {
+test('WHAT[managed-chat-execution-004] same admitted plan binds the same admission twice', () => {
   const evidence = plainEvidence('ses-r02-same', 'msg-r02-same')
   const facts = [acceptedWire(evidence)]
   const message = {
@@ -641,7 +641,7 @@ test('WHAT[CHATEXEC-004] same admitted plan binds the same admission twice', () 
   assert.equal(first.intent?.kind, 'ResumeAccepted')
   assert.deepEqual(first.intent?.evidence, second.intent?.evidence)
 })
-test('WHAT[CHATEXEC-004] conflicting plan against the same key fails closed', () => {
+test('WHAT[managed-chat-execution-004] conflicting plan against the same key fails closed', () => {
   const evidence = plainEvidence('ses-r02-conflict', 'msg-r02-conflict')
   const facts = [acceptedWire(evidence)]
   const message = {

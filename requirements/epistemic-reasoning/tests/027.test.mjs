@@ -16,7 +16,7 @@ const dispatchInput = {
   siblings,
 }
 
-test('WHAT[EPI-027] blind_dispatch_forks_common_root_child_with_depth_one_and_new_child_per_retry', async () => {
+test('WHAT[epistemic-reasoning-027] blind_dispatch_forks_common_root_child_with_depth_one_and_new_child_per_retry', async () => {
   const first = await gecSurface.planOpenCodeDispatch(dispatchInput)
   assert.equal(first.error, undefined)
   // Child isolation: common root snapshot, parent is the managed session,
@@ -47,7 +47,7 @@ test('WHAT[EPI-027] blind_dispatch_forks_common_root_child_with_depth_one_and_ne
   assert.notEqual(retry.child.childSessionId, first.child.childSessionId)
 })
 
-test('WHAT[EPI-027] abort_and_drain_terminate_dispatched_work_and_workers_cannot_recurse', async () => {
+test('WHAT[epistemic-reasoning-027] abort_and_drain_terminate_dispatched_work_and_workers_cannot_recurse', async () => {
   const first = await gecSurface.planOpenCodeDispatch(dispatchInput)
   assert.equal(first.error, undefined)
 

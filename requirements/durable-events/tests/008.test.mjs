@@ -35,7 +35,7 @@ const withTemp = (fn) => {
   return fn(base)
 }
 
-test('WHAT[DURABLE-EVENTS-008] DURABLE_EVENTS_008_concurrent_heads_remain_distinct_in_structural_Current', async () => {
+test('WHAT[durable-events-008] DURABLE_EVENTS_008_concurrent_heads_remain_distinct_in_structural_Current', async () => {
   const dir = withTemp((base) => base)
   const store = eventStore.create(dir, 'conflict-proof')
   try {
@@ -50,7 +50,7 @@ test('WHAT[DURABLE-EVENTS-008] DURABLE_EVENTS_008_concurrent_heads_remain_distin
   }
 })
 
-test('WHAT[DURABLE-EVENTS-008] DURABLE_EVENTS_008_resolution_naming_all_heads_collapses_structural_Current', async () => {
+test('WHAT[durable-events-008] DURABLE_EVENTS_008_resolution_naming_all_heads_collapses_structural_Current', async () => {
   const dir = withTemp((base) => base)
   const store = eventStore.create(dir, 'resolution-proof')
   try {

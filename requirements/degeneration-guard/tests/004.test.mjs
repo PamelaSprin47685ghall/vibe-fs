@@ -44,7 +44,7 @@ const referenceScore = (text) => {
   return { weightedDistinctTokens, step }
 }
 
-test('WHAT[DG-004] LOOP_004_repository_corpus_contains_normal_source_documents_only', () => {
+test('WHAT[degeneration-guard-004] LOOP_004_repository_corpus_contains_normal_source_documents_only', () => {
   const files = loopDetectorRepositoryInputFiles().map((file) => file.replaceAll('\\', '/'))
 
   assert.ok(files.every(path.isAbsolute), 'selector must return filesystem paths')
@@ -55,7 +55,7 @@ test('WHAT[DG-004] LOOP_004_repository_corpus_contains_normal_source_documents_o
   assert.ok(!files.some((file) => file.endsWith('/docs/index.html')))
 })
 
-test('WHAT[DG-004] LOOP_004_repository_corpus_excludes_tracked_paths_deleted_from_the_worktree', () => {
+test('WHAT[degeneration-guard-004] LOOP_004_repository_corpus_excludes_tracked_paths_deleted_from_the_worktree', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'wanxiangshu-loop-selector-'))
 
   try {
@@ -74,7 +74,7 @@ test('WHAT[DG-004] LOOP_004_repository_corpus_excludes_tracked_paths_deleted_fro
   }
 })
 
-test('WHAT[DG-004] LOOP_004_runtime_envelope_reads_every_selected_repository_input_through_the_tracking_reader', async () => {
+test('WHAT[degeneration-guard-004] LOOP_004_runtime_envelope_reads_every_selected_repository_input_through_the_tracking_reader', async () => {
   const reads = []
   const bytes = new Map([
     ['a.md', Buffer.from('first source\n')],

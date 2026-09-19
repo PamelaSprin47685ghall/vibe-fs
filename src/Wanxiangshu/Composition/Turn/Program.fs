@@ -140,7 +140,7 @@ module ReconcileProgram =
     let tryFailureWitnessReason wake turn =
         tryFailureWitness wake turn |> Option.map snd
 
-    /// PAR-008: only a confirmed provider failure may mint a provider-failure
+    /// provider-attempt-recovery-008: only a confirmed provider failure may mint a provider-failure
     /// terminal. An errored attempt whose formal content is unusable (empty /
     /// XML-only) belongs to bounded Interaction Repair instead.
     let failureWitnessMintsTerminal (failure: ExecutionFailure) (contentUsable: bool) : bool =
@@ -188,7 +188,7 @@ module ReconcileProgram =
         | _ -> false
 
     /// Reconcile decision for one snapshot observation. Production Scheduler
-    /// supplies a single read per causal edge (HOST-BOUNDARY-005).
+    /// supplies a single read per causal edge (host-boundary-005).
     ///
     /// 不变量（GLORY-070 / HOST-004 rev.3 / rabbit §7）：SessionIdle 被消费后只允许
     /// 产生一个稳定观测交接或明确 fail closed；带 idle evidence 的稳定 `Unknown`

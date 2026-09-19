@@ -6,7 +6,7 @@ const { default: test } = await import("node:test");
 const host = await import("../../../dist/Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.js");
 
 
-test('WHAT[OBLIGATION-LEDGER-002] decodes required planComplete, workingOn, and obligations', () => {
+test('WHAT[obligation-ledger-002] decodes required planComplete, workingOn, and obligations', () => {
   const decoded = host.decodeInput({
     planComplete: false,
     workingOn: 'bridge',
@@ -130,7 +130,7 @@ test('WHAT[OBLIGATION-LEDGER-002] decodes required planComplete, workingOn, and 
   assert.equal(misspelledFarFocus.ok, true, misspelledFarFocus.ok ? '' : misspelledFarFocus.error)
   assert.equal(misspelledFarFocus.value.workingOn, 'ship')
 })
-test('WHAT[OBLIGATION-LEDGER-002] malformed provider wire is a typed provider rejection', () => {
+test('WHAT[obligation-ledger-002] malformed provider wire is a typed provider rejection', () => {
   let caught = null
   try {
     host.decodeInputOrReject({ workingOn: '', obligations: [] })
@@ -220,7 +220,7 @@ const acceptT1Checkpoint = async (handle, session, callText) => {
   return { t1, accepted }
 }
 
-test('WHAT[OBLIGATION-LEDGER-002] non-matching workingOn does not fail the membrane — all obligations are projected', async () => {
+test('WHAT[obligation-ledger-002] non-matching workingOn does not fail the membrane — all obligations are projected', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-workingon-repair'
     const life = 'life-workingon-repair'
@@ -275,7 +275,7 @@ const items = [
   obligation('verification', 'Verify the behavior with evidence.', 'far'),
 ]
 
-test('WHAT[OBLIGATION-LEDGER-002] canonical obligation wire is exactly name/horizon/work with stable digest input', () => {
+test('WHAT[obligation-ledger-002] canonical obligation wire is exactly name/horizon/work with stable digest input', () => {
   const wire = todo.canonicalObligationListWire(items)
   assert.equal(
     wire,

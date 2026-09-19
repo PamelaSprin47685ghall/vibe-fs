@@ -2,7 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
 
-/// JS-native semantic surface for the provider execution verb (PROC-011 /
+/// JS-native semantic surface for the provider execution verb (process-execution-011 /
 /// DISTILL-010). The name is a string constant; distillation is invoked
 /// inside `run` and is never a separate provider tool. A JS test never
 /// constructs `runSpec`, a ToolHostCodec factory, ToolRuntimeScope or a

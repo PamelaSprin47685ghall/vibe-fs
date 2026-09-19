@@ -37,7 +37,7 @@ const MIRRORED_BY_OFFICE_CAPABILITY = new Set(['entrust-by-consequence', 'choose
 
 const LANGUAGE = 'English'
 
-test('WHAT[COGNITIVE-ENVIRONMENT-016] CE_016_pair_hint_retains_brief_trigger_without_repeating_full_psychological_contract', () => {
+test('WHAT[cognitive-environment-016] CE_016_pair_hint_retains_brief_trigger_without_repeating_full_psychological_contract', () => {
   for (const locale of ['en', 'zh-CN']) {
     const hint = read(`resources/provider/host/pair-programming-guideline/${locale}.md`)
     const assumeDesc = read(`resources/provider/tool/assume/description/${locale}.md`)

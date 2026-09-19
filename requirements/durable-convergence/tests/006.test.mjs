@@ -41,7 +41,7 @@ const withStore = async (writerId, fn) => {
   }
 }
 
-test('WHAT[DURABLE-CONVERGENCE-006] convergence is a function of event truth not arrival wall clock', () => {
+test('WHAT[durable-convergence-006] convergence is a function of event truth not arrival wall clock', () => {
   const streams1 = [
     ['writer-a', [make(A), make(C, [A])]],
     ['writer-b', [make(B)]],

@@ -140,7 +140,7 @@ const depFailures = (pkg, allNames, skeleton) => {
   return failures
 }
 
-test('WHAT[REQUIREMENT-SYSTEM-001] every product truth has exactly one owner package', () => {
+test('WHAT[requirement-system-001] every product truth has exactly one owner package', () => {
   const fromIndex = packageNamesFromIndexTables()
   const dirs = readdirSync(REQUIREMENTS)
     .filter((entry) => statSync(join(REQUIREMENTS, entry)).isDirectory())

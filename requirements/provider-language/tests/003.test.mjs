@@ -8,7 +8,7 @@ const { clearAllForTests, readGlobalPreference, parse, tryParse, label, resource
 const english = 'English'
 const simplifiedChinese = 'SimplifiedChinese'
 
-test('WHAT[PROVIDER-LANGUAGE-003] child inherits owner language without re-reading global', () => {
+test('WHAT[provider-language-003] child inherits owner language without re-reading global', () => {
   clearAllForTests()
   const child = 'ses_child_lang'
   const zh = simplifiedChinese
@@ -57,7 +57,7 @@ test.beforeEach(() => {
   clearAllForTests()
 })
 
-test('WHAT[PROVIDER-LANGUAGE-003] child inherits owner language without reading the global preference', async () => {
+test('WHAT[provider-language-003] child inherits owner language without reading the global preference', async () => {
   const existing = 'ses_pref_existing'
 
   await withPreference('zh-CN', async () => {

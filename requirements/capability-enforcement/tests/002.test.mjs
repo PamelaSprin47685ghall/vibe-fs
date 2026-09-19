@@ -125,7 +125,7 @@ const ROLE_ALLOW = {
   Blogger: ['chronicle'],
 }
 
-test('WHAT[ENF-002] AGENT_006_role_tool_matrix_reaches_the_host_schema', () => {
+test('WHAT[capability-enforcement-002] AGENT_006_role_tool_matrix_reaches_the_host_schema', () => {
   const config = buildConfig()
   const outcome = configureManagedAgents(config)
   assert.equal(outcome.ok, true, outcome.error)
@@ -140,7 +140,7 @@ test('WHAT[ENF-002] AGENT_006_role_tool_matrix_reaches_the_host_schema', () => {
     )
   }
 })
-test('WHAT[ENF-002] office_capability_permissions_agree_with_the_host_schema_matrix', () => {
+test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_the_host_schema_matrix', () => {
   const permissionOf = (toolName) =>
     ({
       fork: 'Fork',
@@ -188,7 +188,7 @@ const { allRoleLabels, allPublicRoleLabels, allInternalRoleLabels } =
   await import('../../../dist/Foundation/RolesSurface.js')
 const { nameOf: managedAgentName } = await import('../../../dist/Participant/Persona/Surface.js')
 
-test('WHAT[ENF-002] P7_SURFACE_role_labels_are_js_native_strings', () => {
+test('WHAT[capability-enforcement-002] P7_SURFACE_role_labels_are_js_native_strings', () => {
   assertJsData(allRoleLabels, 'allRoleLabels')
   assert.equal(allRoleLabels.length, 5, 'exactly five canonical roles')
   assert.deepEqual(
@@ -197,7 +197,7 @@ test('WHAT[ENF-002] P7_SURFACE_role_labels_are_js_native_strings', () => {
       .sort(),
   )
 })
-test('WHAT[ENF-002] P7_SURFACE_public_internal_partition_and_managed_agent_name_are_js_native', () => {
+test('WHAT[capability-enforcement-002] P7_SURFACE_public_internal_partition_and_managed_agent_name_are_js_native', () => {
   assertJsData(allPublicRoleLabels, 'allPublicRoleLabels')
   assertJsData(allInternalRoleLabels, 'allInternalRoleLabels')
   assert.deepEqual(allPublicRoleLabels, ['devops', 'engineer', 'manager', 'orchestrator'])
@@ -216,7 +216,7 @@ const { default: test } = await import("node:test");
 const { rolePredicate } = await import("../../../dist/OpenCode/Tools/ToolRegistrySurface.js");
 
 
-test('WHAT[ENF-002] TOOLSPEC_delegation_tools_have_owner_defined_admission', () => {
+test('WHAT[capability-enforcement-002] TOOLSPEC_delegation_tools_have_owner_defined_admission', () => {
   // fork & resume: Manager only
   assert.equal(rolePredicate('fork', 'manager'), true)
   assert.equal(rolePredicate('fork', 'engineer'), false)
@@ -243,7 +243,7 @@ test('WHAT[ENF-002] TOOLSPEC_delegation_tools_have_owner_defined_admission', () 
   assert.equal(rolePredicate('horizon', 'devops'), true)
   assert.equal(rolePredicate('horizon', 'engineer'), false)
 })
-test('WHAT[ENF-002] TOOLSPEC_engineer_and_devops_tools_have_owner_defined_admission', () => {
+test('WHAT[capability-enforcement-002] TOOLSPEC_engineer_and_devops_tools_have_owner_defined_admission', () => {
   // bash-honeypot: Engineer only
   assert.equal(rolePredicate('bash-honeypot', 'engineer'), true)
   assert.equal(rolePredicate('bash-honeypot', 'devops'), false)
@@ -269,7 +269,7 @@ test('WHAT[ENF-002] TOOLSPEC_engineer_and_devops_tools_have_owner_defined_admiss
   assert.equal(rolePredicate('run', 'engineer'), false)
   assert.equal(rolePredicate('run', 'manager'), false)
 })
-test('WHAT[ENF-002] TOOLSPEC_cognitive_utility_tools_admission', () => {
+test('WHAT[capability-enforcement-002] TOOLSPEC_cognitive_utility_tools_admission', () => {
   for (const tool of ['assume', 'enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret']) {
     assert.equal(rolePredicate(tool, 'engineer'), true, `${tool} should be allowed for engineer`)
     assert.equal(rolePredicate(tool, 'devops'), true, `${tool} should be allowed for devops`)

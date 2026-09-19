@@ -7,7 +7,7 @@ const relay = await import("../../../dist/Mission/Relay/Surface.js");
 
 const open = (state) => relay.openIncumbency(state, 'road-1', 'inc-1', 'snapshot-1', 'authority-1')
 
-test('WHAT[RELAY-008] certificate invalidation is explicit and never reactivates its assessor', () => {
+test('WHAT[relay-incumbency-008] certificate invalidation is explicit and never reactivates its assessor', () => {
   const opened = open(relay.empty())
   const assessed = relay.assess(
     opened.state,
@@ -31,7 +31,7 @@ const { default: test } = await import("node:test");
 const relay = await import("../../../dist/Mission/Relay/Surface.js");
 
 
-test('WHAT[ASSESS-008] iteration phase separates assess work and finish before and after review', () => {
+test('WHAT[relay-assessment-008] iteration phase separates assess work and finish before and after review', () => {
   const opened = relay.openIncumbency(relay.empty(), 'road-1', 'inc-1', 'snapshot-1', 'authority-1')
   assert.equal(opened.ok, true)
   assert.equal(relay.view(opened.state, 'road-1').phase, 'AuditPending')

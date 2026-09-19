@@ -65,7 +65,7 @@ const profileOf = () => {
   return built.value
 }
 
-test('WHAT[DISPATCH-PROTOCOL-006] DP_006_abandon_keeps_the_claim_sequence_consumed', () => {
+test('WHAT[dispatch-protocol-006] DP_006_abandon_keeps_the_claim_sequence_consumed', () => {
   const root = profileOf()
   const key = 'pk_x'
   let projection = authority.registerAuthority(root, authority.empty)
@@ -79,7 +79,7 @@ test('WHAT[DISPATCH-PROTOCOL-006] DP_006_abandon_keeps_the_claim_sequence_consum
   assert.equal(after.claimSequences.length, 1)
 })
 
-test('WHAT[DISPATCH-PROTOCOL-006] DP_006_claim_sequence_advances_on_registration_not_on_resolution', () => {
+test('WHAT[dispatch-protocol-006] DP_006_claim_sequence_advances_on_registration_not_on_resolution', () => {
   const root = profileOf()
   const scope = authority.claimScopeDigest(
     SESSION,

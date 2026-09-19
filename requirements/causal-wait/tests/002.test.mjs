@@ -40,7 +40,7 @@ const lastExit = (registry) => {
 }
 const activeCount = (registry) => causal.snapshot(registry).active.length
 
-test('WHAT[CAUSAL-002] RED_1_active_wait_visible_after_enter', () => {
+test('WHAT[causal-wait-002] RED_1_active_wait_visible_after_enter', () => {
   const registry = causal.createRegistry()
   const descriptor = waitFor('A', 'X')
   const lease = causal.enter(registry, descriptor)
@@ -80,7 +80,7 @@ const lastTransition = (registry) => {
   return history.at(-1)
 }
 
-test('WHAT[CAUSAL-002] CAUSAL_002_descriptor_carries_typed_owner_producer_subject', () => {
+test('WHAT[causal-wait-002] CAUSAL_002_descriptor_carries_typed_owner_producer_subject', () => {
   const wait = descriptor('A')
   assert.equal(causal.ownerKey(wait.owner), 'flow:id=A')
   assert.equal(causal.producerKey(wait.producer), 'external:capability:id=A')

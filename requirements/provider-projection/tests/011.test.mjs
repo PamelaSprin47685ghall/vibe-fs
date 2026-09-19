@@ -22,7 +22,7 @@ const before = (index) => ({ kind: 'BeforeMessageIndex', index })
 
 const append = { kind: 'Append' }
 
-test('WHAT[PROVIDER-PROJECTION-011] PROJ_003_semantic_equality_ignores_wire_ids_but_wire_bytes_differ', () => {
+test('WHAT[provider-projection-011] PROJ_003_semantic_equality_ignores_wire_ids_but_wire_bytes_differ', () => {
   const projection = (callId) => ({
     providerId: null,
     modelId: null,

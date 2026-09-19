@@ -7,7 +7,7 @@ const resume = await import("../../../dist/OpenCode/Host/ExplicitResumeSurface.j
 const { acceptAuthorityRoot, withExecutablePlugin } = await import("../../verification-system/tests/support/plugin-fixture.mjs");
 
 
-test('WHAT[CRASH-018] CRASH_018_continue_registers_a_visible_command', () => {
+test('WHAT[crash-reconciliation-018] CRASH_018_continue_registers_a_visible_command', () => {
   const config = {}
   resume.registerCommand(config)
   assert.equal(typeof config.command.continue.template, 'string')
@@ -16,11 +16,11 @@ test('WHAT[CRASH-018] CRASH_018_continue_registers_a_visible_command', () => {
   assert.doesNotMatch(config.command.continue.template, /briefing attached to this command/i)
   assert.match(config.command.continue.description, /resume this session/i)
 })
-test('WHAT[CRASH-018] CRASH_018_non_continue_command_is_a_noop', async () => {
+test('WHAT[crash-reconciliation-018] CRASH_018_non_continue_command_is_a_noop', async () => {
   const actual = await resume.run('status', 'session-1', '')
   assert.deepEqual(actual.parts, [])
 })
-test('WHAT[CRASH-018] CRASH_018_continue_discloses_restart_without_minting_completion', async () => {
+test('WHAT[crash-reconciliation-018] CRASH_018_continue_discloses_restart_without_minting_completion', async () => {
   const output = await resume.run('/continue', 'session-1', 'reuse child')
   assert.equal(output.parts.length, 1)
   assert.equal(output.parts[0].type, 'text')
@@ -29,19 +29,19 @@ test('WHAT[CRASH-018] CRASH_018_continue_discloses_restart_without_minting_compl
   assert.match(output.parts[0].text, /User \/continue arguments: reuse child/)
   assert.match(output.parts[0].text, /Do not infer that it completed|do not manufacture a terminal result/i)
 })
-test('WHAT[CRASH-018] CRASH_018_missing_session_is_visible_and_does_not_resume', async () => {
+test('WHAT[crash-reconciliation-018] CRASH_018_missing_session_is_visible_and_does_not_resume', async () => {
   const output = await resume.run('continue', '', '')
   assert.equal(output.parts.length, 1)
   assert.match(output.parts[0].text, /no session id was supplied/i)
   assert.match(output.parts[0].text, /previous interrupted tool remains failed/i)
 })
-test('WHAT[CRASH-018] CRASH_018_resume_briefing_keeps_unverified_children_visible', async () => {
+test('WHAT[crash-reconciliation-018] CRASH_018_resume_briefing_keeps_unverified_children_visible', async () => {
   const output = await resume.run('continue', 'session-1', '')
   assert.match(output.parts[0].text, /Surviving sub sessions re-enlisted process-locally/i)
   assert.match(output.parts[0].text, /Durable children that were not re-enlisted/i)
   assert.match(output.parts[0].text, /- none/)
 })
-test('WHAT[CRASH-018] CRASH_018_real_command_material_materializes_briefing_and_stays_disclosure_only', async () => {
+test('WHAT[crash-reconciliation-018] CRASH_018_real_command_material_materializes_briefing_and_stays_disclosure_only', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'ses_continue_exact_material'
     const oldRootID = `root-${sessionID}`
@@ -136,7 +136,7 @@ test('WHAT[CRASH-018] CRASH_018_real_command_material_materializes_briefing_and_
     )
   })
 })
-test('WHAT[CRASH-018] CRASH_018_transform_uses_exact_physical_binding_when_host_drops_part_metadata', async () => {
+test('WHAT[crash-reconciliation-018] CRASH_018_transform_uses_exact_physical_binding_when_host_drops_part_metadata', async () => {
   await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
     const sessionID = 'ses_continue_exact_binding'
     const continueID = 'msg-continue-exact-binding'
@@ -195,7 +195,7 @@ test('WHAT[CRASH-018] CRASH_018_transform_uses_exact_physical_binding_when_host_
     assert.equal(providerOutput.messages[0].info.id, continueID)
   })
 })
-test('WHAT[CRASH-018] CRASH_018_chat_params_respects_exact_disclosure_classification', async () => {
+test('WHAT[crash-reconciliation-018] CRASH_018_chat_params_respects_exact_disclosure_classification', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'ses_continue_chat_params'
     const continueID = 'msg-continue-chat-params'
@@ -250,7 +250,7 @@ test('WHAT[CRASH-018] CRASH_018_chat_params_respects_exact_disclosure_classifica
     assert.equal(paramsOutput.options.temperature, undefined)
   })
 })
-test('WHAT[CRASH-018] CRASH_018_abandoned_command_handoff_cannot_mark_a_later_ordinary_material', async () => {
+test('WHAT[crash-reconciliation-018] CRASH_018_abandoned_command_handoff_cannot_mark_a_later_ordinary_material', async () => {
   await withExecutablePlugin(async (hooks) => {
     const sessionID = 'ses_continue_handoff_superseded'
     const commandOutput = { parts: [] }
@@ -279,7 +279,7 @@ test('WHAT[CRASH-018] CRASH_018_abandoned_command_handoff_cannot_mark_a_later_or
     )
   })
 })
-test('WHAT[CRASH-018] CRASH_018_resumed_session_user_message_without_explicit_agent_admits_and_transforms', async () => {
+test('WHAT[crash-reconciliation-018] CRASH_018_resumed_session_user_message_without_explicit_agent_admits_and_transforms', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'ses_resumed_user_continue'
     const userMessageID = 'msg-user-continue-1'
@@ -319,7 +319,7 @@ test('WHAT[CRASH-018] CRASH_018_resumed_session_user_message_without_explicit_ag
     assert.ok(transformOutput.messages.length > 0, 'transform must succeed without error')
   })
 })
-test('WHAT[CRASH-018] CRASH_018_chat_params_with_toplevel_messageID_recognizes_disclosure_only', async () => {
+test('WHAT[crash-reconciliation-018] CRASH_018_chat_params_with_toplevel_messageID_recognizes_disclosure_only', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'ses_continue_toplevel_messageid'
     const continueID = 'msg-continue-toplevel-id'
@@ -397,7 +397,7 @@ const withContinueHost = async (label, portOutcome, action) => {
 const continueSessionOf = (suffix) => `ses-continue-${suffix}`
 const continuePhysicalOf = (suffix) => `msg-continue-${suffix}`
 
-test('WHAT[CRASH-018] CRASH_018_absent_port_blocks_with_one_manual_and_no_background_command', async () => {
+test('WHAT[crash-reconciliation-018] CRASH_018_absent_port_blocks_with_one_manual_and_no_background_command', async () => {
   await withContinueHost('absent', 'absent', async (host) => {
     const result = await recoveryHost.resumeAccepted(
       host,
@@ -411,7 +411,7 @@ test('WHAT[CRASH-018] CRASH_018_absent_port_blocks_with_one_manual_and_no_backgr
     assert.equal(result.manuals[0].observation, 'ProviderAbsent')
   })
 })
-test('WHAT[CRASH-018] CRASH_018_duplicate_continue_keeps_a_single_manual', async () => {
+test('WHAT[crash-reconciliation-018] CRASH_018_duplicate_continue_keeps_a_single_manual', async () => {
   await withContinueHost('duplicate', 'absent', async (host) => {
     await recoveryHost.resumeAccepted(host, continueSessionOf('duplicate'), continuePhysicalOf('duplicate'))
     const result = await recoveryHost.resumeAccepted(
@@ -425,7 +425,7 @@ test('WHAT[CRASH-018] CRASH_018_duplicate_continue_keeps_a_single_manual', async
     assert.equal(result.manuals[0].observation, 'ProviderAbsent')
   })
 })
-test('WHAT[CRASH-018] CRASH_018_accepted_continue_emits_no_manual_block', async () => {
+test('WHAT[crash-reconciliation-018] CRASH_018_accepted_continue_emits_no_manual_block', async () => {
   await withContinueHost('accept', 'accept', async (host) => {
     const result = await recoveryHost.resumeAccepted(
       host,

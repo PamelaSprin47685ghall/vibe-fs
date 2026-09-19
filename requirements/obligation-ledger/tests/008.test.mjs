@@ -87,13 +87,13 @@ const acceptedState = () => {
   return handle
 }
 
-test('WHAT[OBLIGATION-LEDGER-008] rejects Accepted when it names another Prepared envelope', () => {
+test('WHAT[obligation-ledger-008] rejects Accepted when it names another Prepared envelope', () => {
   const handle = projection.MagicTodoProjectionSurface_create()
   ok(foldMagic(handle, prepared, 'prepared-fact-ref'))
   const mismatched = acceptedFact({ preparedFactRef: 'different-prepared-fact-ref' })
   assert.equal(error(foldMagic(handle, mismatched)).code, 'IdentityCorruption')
 })
-test('WHAT[OBLIGATION-LEDGER-008] rejects a replay whose frozen prepared identity differs', () => {
+test('WHAT[obligation-ledger-008] rejects a replay whose frozen prepared identity differs', () => {
   const handle = projection.MagicTodoProjectionSurface_create()
   ok(foldMagic(handle, prepared, 'prepared-fact-ref'))
   const collision = preparedFact({ providerInputDigest: 'different-provider-input-digest' })
@@ -131,7 +131,7 @@ const items = [
   obligation('verification', 'Verify the behavior with evidence.', 'far'),
 ]
 
-test('WHAT[OBLIGATION-LEDGER-008] pure replay identity checker detects corruption for the Host fatal boundary', () => {
+test('WHAT[obligation-ledger-008] pure replay identity checker detects corruption for the Host fatal boundary', () => {
   const expected = {
     managerLifeId: life,
     providerInputDigest: 'provider-a',

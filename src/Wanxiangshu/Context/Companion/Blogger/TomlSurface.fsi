@@ -4,7 +4,7 @@ namespace Wanxiangshu.Context.Companion.Blogger
 /// P6 wave). Delta parts cross as JSON-shaped discriminated values
 /// ({ kind: 'text', text } / { kind: 'toolCall', tool, args } / ...);
 /// translation to the F# BloggerDeltaPart union happens here at the owner
-/// boundary. The renderer core stays untouched (JS-SEMANTIC-SURFACE-003/005).
+/// boundary. The renderer core stays untouched (js-semantic-surface-003/005).
 module BloggerTomlSurface =
 
     val TruncationMarker: string

@@ -7,7 +7,7 @@ const { default: test } = await import("node:test");
 
 const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 
-test('WHAT[DURABLE-CONVERGENCE-009] dumb remote fixture has no Wanxiang domain or server-side logic', async () => {
+test('WHAT[durable-convergence-009] dumb remote fixture has no Wanxiang domain or server-side logic', async () => {
   const remote = await read('requirements/verification-system/tests/support/dumb-remote.mjs')
   assert.doesNotMatch(remote, /dist\/Domain|CanonicalIntegrator|Projection|WriterStreamSync|HookSync/,
     'remote fixture must stay a dumb Git remote: no Event/Projection/Wanxiang domain')
@@ -43,7 +43,7 @@ const canonicalLine = (id, stream) => JSON.stringify({
 const operations = (protocol) => protocol.map((call) => call.split(' ', 1)[0])
 const writtenRoot = (protocol) => protocol.findLast((call) => call.startsWith('WriteTree ')).slice('WriteTree '.length)
 
-test('WHAT[DURABLE-CONVERGENCE-009] Adapter: writer sync preserves exact identities and fails closed at the Git gateway', async () => {
+test('WHAT[durable-convergence-009] Adapter: writer sync preserves exact identities and fails closed at the Git gateway', async () => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-writer-sync-adapter-'))
   const commonDir = join(root, '.git')
   const localWriterId = 'writer-local'
@@ -96,7 +96,7 @@ test('WHAT[DURABLE-CONVERGENCE-009] Adapter: writer sync preserves exact identit
     rmSync(root, { recursive: true, force: true })
   }
 })
-test('WHAT[DURABLE-CONVERGENCE-009] Adapter: writer sync with absent remote creates the local-only snapshot without error', async () => {
+test('WHAT[durable-convergence-009] Adapter: writer sync with absent remote creates the local-only snapshot without error', async () => {
   const repo = mkdtempSync(join(tmpdir(), 'wxs-writer-sync-remote-absent-'))
   execFileSync('git', ['init', '-q', repo])
   const commonDir = join(repo, '.git')

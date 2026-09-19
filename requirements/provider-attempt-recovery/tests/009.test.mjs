@@ -66,7 +66,7 @@ const foldFacts = (facts) =>
 
 const budgetOf = (projection) => providerFailureProjection.read(projection)
 
-test('WHAT[PAR-009] the_domain_count_is_reachable_only_through_a_confirmed_failure', () => {
+test('WHAT[provider-attempt-recovery-009] the_domain_count_is_reachable_only_through_a_confirmed_failure', () => {
   assert.equal(budget.recordFailure.length, 1)
   assert.equal(budget.recordSuccess.length, 1)
 
@@ -79,7 +79,7 @@ test('WHAT[PAR-009] the_domain_count_is_reachable_only_through_a_confirmed_failu
   })
 })
 
-test('WHAT[PAR-009] the_dedupe_identity_names_the_run_the_root_and_the_attempt', () => {
+test('WHAT[provider-attempt-recovery-009] the_dedupe_identity_names_the_run_the_root_and_the_attempt', () => {
   const identity = identityFor('run_1')
 
   assert.deepEqual(identity, { session: 'ses_a', run: 'run_L', root: 'msg_u1', attempt: 'run_1' })

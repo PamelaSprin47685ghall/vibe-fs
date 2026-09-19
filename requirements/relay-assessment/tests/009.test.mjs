@@ -7,7 +7,7 @@ const perfectScores = Array(8).fill('PERFECT')
 const open = (state, snapshot = 'snapshot-1') =>
   relay.openIncumbency(state, 'road-1', 'inc-1', snapshot, 'authority-1')
 
-test('WHAT[ASSESS-009] independent assessment uses read-only engineer and rejects implementer self-verdict', () => {
+test('WHAT[relay-assessment-009] independent assessment uses read-only engineer and rejects implementer self-verdict', () => {
   const opened = open(relay.empty(), 'snapshot-1')
   assert.equal(opened.ok, true)
 

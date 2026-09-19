@@ -17,7 +17,7 @@ const VOCABULARY_SURFACES = {
 
 const REJECTED_PREFIX = /^(execute|process|handle|do|retry|run|perform|with)[A-Z]/
 
-test('WHAT[STRUCTURED-WORKFLOW-008] SW_015_no_anonymous_middleware_framework_in_workflow_vocabulary', () => {
+test('WHAT[structured-workflow-008] SW_015_no_anonymous_middleware_framework_in_workflow_vocabulary', () => {
   // DSL-015: semantic decorators must be named Vocabulary or a named call
   // site. A global DecoratorBase / MiddlewarePipeline / IWorkflowDecorator
   // framework is banned. Assert the production vocabulary modules define no

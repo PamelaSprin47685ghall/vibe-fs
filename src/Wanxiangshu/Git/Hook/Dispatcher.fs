@@ -7,7 +7,7 @@ open Wanxiangshu.Git
 open Wanxiangshu.Host
 open Wanxiangshu.Persistence.EventStore
 
-/// DURABLE-CONVERGENCE-008. Product startup only ENSURES the Git hook membrane.
+/// durable-convergence-008. Product startup only ENSURES the Git hook membrane.
 /// Actual full bidirectional convergence runs later in an independent Git-hook
 /// process through resources/git/wanxiang-hook.mjs + HookSync.
 [<RequireQualifiedAccess>]

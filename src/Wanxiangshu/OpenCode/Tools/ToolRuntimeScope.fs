@@ -816,7 +816,7 @@ type ToolRuntimeScope
     member this.PtyCapabilityFor(ctx: HostToolContext) : Result<DelegationPtyCapability, string> =
         this.RuntimeFor ctx |> Result.map (fun r -> r.PtyCapability)
 
-    /// CRASH-018: process-local adoption for explicit /continue. The durable
+    /// crash-reconciliation-018: process-local adoption for explicit /continue. The durable
     /// handle stays byte-for-byte as it was at the crash boundary; a later LLM
     /// fork reuse is the first action allowed to reopen it durably.
     member _.AdoptExistingChild(parentSessionId: SessionId, record: HandleRecord) : Result<unit, string> =
@@ -946,7 +946,7 @@ type ToolRuntimeScope
         }
         :> Task
 
-    /// MANAGED-SESSION-017: an internal stop is a synchronous
+    /// managed-session-lifecycle-017: an internal stop is a synchronous
     /// logical termination CE. Failed delivery is what completes the durable
     /// fork handle and wakes the parent; no future TurnAborted callback carries
     /// workflow continuation state.
@@ -1007,7 +1007,7 @@ type ToolRuntimeScope
         }
         :> Task
 
-    /// MANAGED-SESSION-024: Replace crashed DevOps physical session under single logical authority
+    /// managed-session-lifecycle-024: Replace crashed DevOps physical session under single logical authority
     member private this.FinishReplaceChildSession
         durable
         runtime
@@ -1097,7 +1097,7 @@ type ToolRuntimeScope
             let handle = HandleController.agentHandle devopsAgentId
             let projection = journalPort.HandleProjection parentSessionId
 
-            // MANAGED-SESSION-024 / 024.test.mjs: if active at crash, record terminal completion before retirement
+            // managed-session-lifecycle-024 / 024.test.mjs: if active at crash, record terminal completion before retirement
             let! prepareResult =
                 match HandleProjection.tryFind handle projection with
                 | Some { Lifecycle = HandleLifecycle.Active } ->

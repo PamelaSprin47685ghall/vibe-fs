@@ -96,7 +96,7 @@ const foldViews = (folded) => {
   return views(handles)
 }
 
-test('WHAT[MANAGED-SESSION-006] EXEC_009_agent_pty_and_manager_job_handles_are_separate_identities', () => {
+test('WHAT[managed-session-lifecycle-006] EXEC_009_agent_pty_and_manager_job_handles_are_separate_identities', () => {
   // The same string in three handle kinds must be three map keys. Collapsing them
   // to the raw string would let retiring an agent handle retire the PTY that
   // happens to share its id.
@@ -123,7 +123,7 @@ test('WHAT[MANAGED-SESSION-006] EXEC_009_agent_pty_and_manager_job_handles_are_s
   assert.equal(HandleSurface.isRetired(retired, handleId.pty('x')), false)
   assert.equal(stateOf(retired, handleId.pty('x')).lifecycle, 'Active')
 })
-test('WHAT[MANAGED-SESSION-006] EXEC_005_the_views_partition_the_lifecycle_and_never_show_retired', () => {
+test('WHAT[managed-session-lifecycle-006] EXEC_005_the_views_partition_the_lifecycle_and_never_show_retired', () => {
   const active = linkOn(HandleSurface.empty())
   const completed = completeOn(active)
   const retired = retireOn(completed)
@@ -139,7 +139,7 @@ test('WHAT[MANAGED-SESSION-006] EXEC_005_the_views_partition_the_lifecycle_and_n
   // cannot be joined or cancelled.
   assert.deepEqual(views(retired), { listable: [], joinable: [], active: [] })
 })
-test('WHAT[MANAGED-SESSION-006] EXEC_009_a_retired_handle_answers_retired_forever', () => {
+test('WHAT[managed-session-lifecycle-006] EXEC_009_a_retired_handle_answers_retired_forever', () => {
   const retired = retireOn(completeOn(linkOn(HandleSurface.empty())))
 
   assert.equal(HandleSurface.isRetired(retired, HANDLE), true)
@@ -165,7 +165,7 @@ test('WHAT[MANAGED-SESSION-006] EXEC_009_a_retired_handle_answers_retired_foreve
   assert.equal(HandleSurface.isRetired(reopened.ok ? reopened.state : retired, HANDLE), false)
   assert.equal(stateOf(reopened.ok ? reopened.state : retired).lifecycle, 'Active')
 })
-test('WHAT[MANAGED-SESSION-006] EXEC_009_a_retired_id_is_distinguishable_from_one_that_never_existed', () => {
+test('WHAT[managed-session-lifecycle-006] EXEC_009_a_retired_id_is_distinguishable_from_one_that_never_existed', () => {
   // The exact confusion the tombstone prevents. If the record were deleted on
   // retire, these two lookups would be identical and `fork` would treat a spent
   // handle id as an agent name.
@@ -182,7 +182,7 @@ test('WHAT[MANAGED-SESSION-006] EXEC_009_a_retired_id_is_distinguishable_from_on
     { retiredId: true, unknownId: false },
   )
 })
-test('WHAT[MANAGED-SESSION-006] EXEC_009_a_retired_child_session_is_still_recognised_as_a_child', () => {
+test('WHAT[managed-session-lifecycle-006] EXEC_009_a_retired_child_session_is_still_recognised_as_a_child', () => {
   // "Is this session one of mine" must answer yes for a child that already
   // finished — otherwise a late event from it looks like it came from a stranger.
   const retired = retireOn(completeOn(linkOn(HandleSurface.empty())))
@@ -192,7 +192,7 @@ test('WHAT[MANAGED-SESSION-006] EXEC_009_a_retired_child_session_is_still_recogn
   assert.equal(HandleSurface.read(retired, HANDLE).lifecycle, 'Retired')
   assert.equal(isSome(HandleSurface.tryFindByChildSession(retired, sessionId('ses_other'))), false)
 })
-test('WHAT[MANAGED-SESSION-006] EXEC_009_linked_children_lists_every_child_ever_linked', () => {
+test('WHAT[managed-session-lifecycle-006] EXEC_009_linked_children_lists_every_child_ever_linked', () => {
   // Replaces the old live-only `LinkedChildren` map, which forced restart
   // recovery and the retired-handle check to use two different structures.
   let state = linkOn(HandleSurface.empty(), { handle: handleId.agent('z'), child: sessionId('ses_1') })
@@ -209,7 +209,7 @@ test('WHAT[MANAGED-SESSION-006] EXEC_009_linked_children_lists_every_child_ever_
     [0, 1],
   )
 })
-test('WHAT[MANAGED-SESSION-006] EXEC_009_the_three_facts_replay_into_the_terminal_state', () => {
+test('WHAT[managed-session-lifecycle-006] EXEC_009_the_three_facts_replay_into_the_terminal_state', () => {
   const folded = foldFacts([handleFact.linked, handleFact.completed, handleFact.retired])
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
 
@@ -227,7 +227,7 @@ test('WHAT[MANAGED-SESSION-006] EXEC_009_the_three_facts_replay_into_the_termina
   })
   assert.deepEqual(foldViews(folded), { listable: [], joinable: [], active: [] })
 })
-test('WHAT[MANAGED-SESSION-006] EXEC_001_fork_creates_a_child_run', () => {
+test('WHAT[managed-session-lifecycle-006] EXEC_001_fork_creates_a_child_run', () => {
   const active = linkOn(HandleSurface.empty())
 
   assert.deepEqual(views(active), { listable: ['agent:h1'], joinable: [], active: ['agent:h1'] })
@@ -251,7 +251,7 @@ test('WHAT[MANAGED-SESSION-006] EXEC_001_fork_creates_a_child_run', () => {
   assert.deepEqual(views(joined), { listable: [], joinable: [], active: [] })
   assert.equal(HandleSurface.isRetired(joined, HANDLE), true)
 })
-test('WHAT[MANAGED-SESSION-006] EXEC_007_nudge_is_fire_and_forget', () => {
+test('WHAT[managed-session-lifecycle-006] EXEC_007_nudge_is_fire_and_forget', () => {
   const active = linkOn(HandleSurface.empty())
   const nudged = linkOn(active, { child: CHILD, agent: 'coder', role: 'Coder' })
 
@@ -261,7 +261,7 @@ test('WHAT[MANAGED-SESSION-006] EXEC_007_nudge_is_fire_and_forget', () => {
   assert.equal(HandleSurface.linkedChildren(nudged).length, 1)
   assert.deepEqual(stateOf(nudged).child, 'ses_c')
 })
-test('WHAT[MANAGED-SESSION-006] surface_refuses_unknown_role', () => {
+test('WHAT[managed-session-lifecycle-006] surface_refuses_unknown_role', () => {
   const result = HandleSurface.apply(HandleSurface.empty(), {
     op: 'link',
     handle: HANDLE,
@@ -273,21 +273,21 @@ test('WHAT[MANAGED-SESSION-006] surface_refuses_unknown_role', () => {
   assert.equal(result.error.kind, 'UnknownRole')
   assert.equal(result.error.value, 'Plumber')
 })
-test('WHAT[MANAGED-SESSION-006] surface_refuses_unknown_completion_kind', () => {
+test('WHAT[managed-session-lifecycle-006] surface_refuses_unknown_completion_kind', () => {
   const state = linkOn(HandleSurface.empty())
   const result = HandleSurface.apply(state, { op: 'complete', handle: HANDLE, kind: 'Exploded' })
   assert.equal(result.ok, false)
   assert.equal(result.error.kind, 'UnknownCompletionKind')
   assert.equal(result.error.value, 'Exploded')
 })
-test('WHAT[MANAGED-SESSION-006] surface_refuses_unknown_abandon_reason', () => {
+test('WHAT[managed-session-lifecycle-006] surface_refuses_unknown_abandon_reason', () => {
   const state = linkOn(HandleSurface.empty())
   const result = HandleSurface.apply(state, { op: 'abandon', handle: HANDLE, reason: 'Boredom' })
   assert.equal(result.ok, false)
   assert.equal(result.error.kind, 'UnknownAbandonReason')
   assert.equal(result.error.value, 'Boredom')
 })
-test('WHAT[MANAGED-SESSION-006] surface_refuses_unknown_ownership', () => {
+test('WHAT[managed-session-lifecycle-006] surface_refuses_unknown_ownership', () => {
   const result = HandleSurface.apply(HandleSurface.empty(), {
     op: 'link',
     handle: HANDLE,
@@ -300,7 +300,7 @@ test('WHAT[MANAGED-SESSION-006] surface_refuses_unknown_ownership', () => {
   assert.equal(result.error.kind, 'UnknownOwnership')
   assert.equal(result.error.value, 'AlienOwned')
 })
-test('WHAT[MANAGED-SESSION-006] surface_refuses_unknown_command_op', () => {
+test('WHAT[managed-session-lifecycle-006] surface_refuses_unknown_command_op', () => {
   const result = HandleSurface.apply(HandleSurface.empty(), { op: 'frobnicate', handle: HANDLE })
   assert.equal(result.ok, false)
   assert.equal(result.error.kind, 'UnknownCommand')
@@ -321,7 +321,7 @@ const linkedProjection = () => {
   return linked.state
 }
 
-test('WHAT[MANAGED-SESSION-006] EXEC_016_listable_handles_are_outstanding_for_manager', () => {
+test('WHAT[managed-session-lifecycle-006] EXEC_016_listable_handles_are_outstanding_for_manager', () => {
   const projection = linkedProjection()
   assert.deepEqual(HandleSurface.views(projection), { listable: ['agent:child-1'], joinable: [], active: ['agent:child-1'] })
 })
@@ -343,15 +343,15 @@ const makeActive = () => {
 const complete = (state) => HandleSurface.apply(state, { op: 'complete', handle: 'agent:c1', kind: 'Terminal' })
 const retire = (state) => HandleSurface.apply(state, { op: 'retire', handle: 'agent:c1' })
 
-test('WHAT[MANAGED-SESSION-006] THEOREM_join_blocked_while_handle_active', () => {
+test('WHAT[managed-session-lifecycle-006] THEOREM_join_blocked_while_handle_active', () => {
   const projection = makeActive()
   assert.deepEqual(HandleSurface.views(projection), { listable: ['agent:c1'], joinable: [], active: ['agent:c1'] })
 })
-test('WHAT[MANAGED-SESSION-006] THEOREM_WorkActivated_and_HandleLinked_interleavings_stay_blocked', () => {
+test('WHAT[managed-session-lifecycle-006] THEOREM_WorkActivated_and_HandleLinked_interleavings_stay_blocked', () => {
   const active = makeActive()
   assert.deepEqual(HandleSurface.views(active), { listable: ['agent:c1'], joinable: [], active: ['agent:c1'] })
 })
-test('WHAT[MANAGED-SESSION-006] THEOREM_projection_steps_enumerate_blocked_then_awakened_then_clear', () => {
+test('WHAT[managed-session-lifecycle-006] THEOREM_projection_steps_enumerate_blocked_then_awakened_then_clear', () => {
   const active = makeActive()
   const completed = complete(active)
   const retired = retire(completed.state)
@@ -370,10 +370,10 @@ const HandleSurface = await import("../../../dist/Execution/Delegation/Handle/Su
 const TerminalPolicySurface = await import("../../../dist/OpenCode/Host/TerminalPolicySurface.js");
 
 
-test('WHAT[MANAGED-SESSION-006] TPOL_sessionDead_false_without_journal', () => {
+test('WHAT[managed-session-lifecycle-006] TPOL_sessionDead_false_without_journal', () => {
   assert.equal(TerminalPolicySurface.sessionDeadWithoutJournal('ses_main'), false)
 })
-test('WHAT[MANAGED-SESSION-006] TPOL_outstanding_without_durable_work_is_role_closed', () => {
+test('WHAT[managed-session-lifecycle-006] TPOL_outstanding_without_durable_work_is_role_closed', () => {
   assert.equal(TerminalPolicySurface.outstandingWithoutJournal('Manager', false, 'ses_main'), false)
   assert.equal(TerminalPolicySurface.outstandingWithoutJournal('DevOps', true, 'ses_devops'), true)
   assert.equal(TerminalPolicySurface.outstandingWithoutJournal('Orchestrator', false, 'ses_orchestrator'), false)

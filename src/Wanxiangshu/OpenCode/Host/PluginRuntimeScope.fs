@@ -73,7 +73,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     // DSL-MUTABLE: single-flight — HOST-006 startup probe one-shot latch
     let mutable startupProbeDone = false
 
-    /// DG-008: process-local armed anomaly lives inside the sensor.
+    /// degeneration-guard-008: process-local armed anomaly lives inside the sensor.
     /// Optional until HostSignalBootstrap wires abort + ownership.
     // DSL-MUTABLE: resource — loop sensor attachment slot
     let mutable loopSensor: ILoopSensor option = None
@@ -471,7 +471,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             let! repairDrainFailure = captureTaskFailure (blogger.DrainRepairEpisodes())
             remember repairDrainFailure
 
-            // MANAGED-SESSION-018: the shared durable substrate is the last owner
+            // managed-session-lifecycle-018: the shared durable substrate is the last owner
             // released, after scheduler/background/process-local detach drains.
             let! journalFailure = captureTaskFailure (SharedAgentJournal.releaseAsync journal)
             remember journalFailure

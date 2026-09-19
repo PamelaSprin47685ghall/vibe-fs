@@ -73,7 +73,7 @@ const assertNoLegacyIdentityFields = (value, label) => {
   }
 }
 
-test('WHAT[PID-005] provider planning selects the system prompt and tool set from profile Role', () => {
+test('WHAT[participant-identity-005] provider planning selects the system prompt and tool set from profile Role', () => {
   const coderMain = attemptPlan('engineer', 'work-main')
   const coderAgain = attemptPlan('engineer', 'work-main')
   const devops = attemptPlan('devops', 'work-main')

@@ -1,4 +1,4 @@
-// WHAT[EPI-030]: durable codec for legacy Sphinx observations.
+// WHAT[epistemic-reasoning-030]: durable codec for legacy Sphinx observations.
 // Accepted legacy observations become canonical envelopes on one stream per
 // handle; the runner appends them after a successful Resume and replays the
 // decoded raws through a fresh store to recover the same handle at restart.

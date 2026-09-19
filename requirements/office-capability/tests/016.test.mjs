@@ -24,7 +24,7 @@ const ACTIVE_OFFICES = [
   },
 ]
 
-test('WHAT[OFF-016] OFF_016_engineer_is_the_only_office_entitled_to_fission', () => {
+test('WHAT[office-capability-016] OFF_016_engineer_is_the_only_office_entitled_to_fission', () => {
   assert.equal(isAllowed('engineer', 'Fission'), true)
   assert.equal(isAllowed('manager', 'Fission'), false)
   assert.equal(isAllowed('orchestrator', 'Fission'), false)
@@ -43,7 +43,7 @@ const { default: test } = await import("node:test");
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const readRole = (role, locale) => readFileSync(join(ROOT, 'resources/provider/role', role, locale), 'utf8')
 
-test('WHAT[OFF-016] engineer_role_law_carries_investigation_mutation_and_exclusive_fission', () => {
+test('WHAT[office-capability-016] engineer_role_law_carries_investigation_mutation_and_exclusive_fission', () => {
   const en = readRole('engineer', 'en.md')
   const zh = readRole('engineer', 'zh-CN.md')
   assert.match(en, /local facts|read, create, modify, move, delete/i)

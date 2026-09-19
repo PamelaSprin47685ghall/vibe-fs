@@ -1,6 +1,6 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
-/// CASE-003 / DELEG-031 (F35): the case finalize outcome is a closed
+/// CASE-003 / delegation-031 (F35): the case finalize outcome is a closed
 /// settlement, never a bare Result&lt;unit, string&gt;. `Finalized` and
 /// `NothingToFinalize` both release the identity; `NotCommitted` and
 /// `Unknown` RETAIN it so a later recovery can resume the exact finalize;

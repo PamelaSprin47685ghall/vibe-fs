@@ -20,5 +20,5 @@ DEPENDS ON:
 
 ## GAP
 
-- `RETIRE-008`（CLOSED）：退休工具返回与下一迭代派发之间建立物理中断边界已闭合，落点 `tests/008.test.mjs`。
+- `relay-retirement-008`（CLOSED）：退休工具返回与下一迭代派发之间建立物理中断边界已闭合，落点 `tests/008.test.mjs`。
 

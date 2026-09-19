@@ -31,7 +31,7 @@ const walkFs = (dir) => {
   return out
 }
 
-test('WHAT[DISTRIBUTION-008] DISTRIBUTION_enforcer_rulebook_closure_is_complete', () => {
+test('WHAT[distribution-008] DISTRIBUTION_enforcer_rulebook_closure_is_complete', () => {
   const enforcerRoot = path.join(root, 'resources', 'enforcer')
   const tipDirs = fs
     .readdirSync(enforcerRoot, { withFileTypes: true })
@@ -44,7 +44,7 @@ test('WHAT[DISTRIBUTION-008] DISTRIBUTION_enforcer_rulebook_closure_is_complete'
   }
 })
 
-test('WHAT[DISTRIBUTION-008] DISTRIBUTION_provider_resource_closure_is_language_complete', () => {
+test('WHAT[distribution-008] DISTRIBUTION_provider_resource_closure_is_language_complete', () => {
   const roleRoot = path.join(root, 'resources', 'provider', 'role')
   const roles = fs
     .readdirSync(roleRoot, { withFileTypes: true })

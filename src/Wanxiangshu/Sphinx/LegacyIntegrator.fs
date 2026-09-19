@@ -1,6 +1,6 @@
 namespace Wanxiangshu.Sphinx
 
-// WHAT[EPI-030]: pure Current fold for legacy Sphinx inquiries. No IO, no
+// WHAT[epistemic-reasoning-030]: pure Current fold for legacy Sphinx inquiries. No IO, no
 // clock, no codec: the spine decodes durable envelopes into LegacyEnvelopeInput
 // and this module only folds them into per-handle cursors.
 [<RequireQualifiedAccess>]

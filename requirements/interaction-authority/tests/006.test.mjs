@@ -84,7 +84,7 @@ const completeManagerLife = async (handle, session) => {
   assert.equal(completed.ok, true, completed.ok ? '' : completed.error)
 }
 
-test('WHAT[INTERACTION-AUTHORITY-006] HumanRoot missing identity seed is rejected without authority', async () => {
+test('WHAT[interaction-authority-006] HumanRoot missing identity seed is rejected without authority', async () => {
   await withJournal('human-missing', async (handle) => {
     const result = await dispatch.acceptHumanRootSelection(handle, 'ses-human-missing', 'msg-human-missing', null)
 
@@ -144,7 +144,7 @@ const register = (root) => authority.registerAuthority(root, authority.empty)
 const continuation = (key, root, kind = 'ManagerGuard', payload = 'payload') =>
   authority.claimContinuation(key, 'ses_a', kind, root, payload)
 
-test('WHAT[INTERACTION-AUTHORITY-006] IA_006_canonical_names_resolve_and_legacy_or_malformed_are_refused', () => {
+test('WHAT[interaction-authority-006] IA_006_canonical_names_resolve_and_legacy_or_malformed_are_refused', () => {
   for (const name of ['engineer', 'manager', 'devops']) {
     const result = authority.createAuthorityRoot(hash, 'rt_1', 'ses_a', 'HumanRoot', 'msg_u1', rootSelection(name))
     assert.equal(result.ok, true, result.error)
@@ -160,7 +160,7 @@ test('WHAT[INTERACTION-AUTHORITY-006] IA_006_canonical_names_resolve_and_legacy_
   assert.equal(authority.parseAgentName('fast-engineer').error.kind, 'Malformed')
   assert.equal(authority.parseAgentName('Engineer').error.kind, 'Malformed')
 })
-test('WHAT[INTERACTION-AUTHORITY-006] IA_006_agent_owner_root_claim_rejects_legacy_name', () => {
+test('WHAT[interaction-authority-006] IA_006_agent_owner_root_claim_rejects_legacy_name', () => {
   const inherited = authority.issueInheritedIdentitySeed('nonsense', rootFor('manager'))
   assert.match(inherited.error, /invalid|legacy|managed|malformed/i)
   assert.equal(inherited.ok, false)

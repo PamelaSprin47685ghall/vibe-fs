@@ -597,7 +597,7 @@ type HostForkRuntime
                 teardownTask <- Some drain
                 drain)
 
-    /// MANAGED-SESSION-018: plugin/process lifetime ending is not a logical
+    /// managed-session-lifecycle-018: plugin/process lifetime ending is not a logical
     /// parent cancellation. Stop this process's observers and local runtime
     /// resources without writing HandleAbandoned and without aborting live Host
     /// child sessions. Durable Active handles remain the restart authority.
@@ -637,7 +637,7 @@ type HostForkRuntime
     member internal _.OwnsAgent(agentId: string) =
         lock gate (fun () -> processOwnedAgents.Contains agentId)
 
-    /// CRASH-018: explicit /continue may discover a physically surviving child.
+    /// crash-reconciliation-018: explicit /continue may discover a physically surviving child.
     /// It stays dormant: addressable by a later explicit reuse, but excluded from
     /// this process's cancellation/teardown ownership until that reuse begins.
     member _.AdoptExisting(agentId: string, childId: SessionId, role: Role, agent: string) : unit =

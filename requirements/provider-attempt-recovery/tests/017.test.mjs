@@ -6,7 +6,7 @@ const ctx = owner
 const parkedTransform = owner
 const KEY = 'ses-blog-par-017'
 
-test('WHAT[PAR-017] PAR_017_blogger_retry_replaces_exact_physical_binding_before_redispatch', () => {
+test('WHAT[provider-attempt-recovery-017] PAR_017_blogger_retry_replaces_exact_physical_binding_before_redispatch', () => {
   const scope = parkedTransform.scope()
   const failed = ctx.main({ requestId: 'request-failed', toml: 'failed' })
   const replacement = ctx.main({ requestId: 'request-replacement', toml: 'replacement' })

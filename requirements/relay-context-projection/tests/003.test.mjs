@@ -22,7 +22,7 @@ const cutResult = () => projection.applyCut(cutMessages, 'old-run', 'suicide-cal
 
 const ids = (result) => result.provider.map((message) => message.id ?? message.info?.id)
 
-test('WHAT[PROJ-003] next iteration context contains exact authority and existing current messages', () => {
+test('WHAT[relay-context-projection-003] next iteration context contains exact authority and existing current messages', () => {
   const result = cutResult()
   assert.deepEqual(
     result.provider.filter((message) => ['u1'].includes(message.id)).map((message) => message.id),

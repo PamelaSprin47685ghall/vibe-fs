@@ -1,7 +1,7 @@
 /**
  * gate-scenario-runtime-cases.mjs — the composition, and its first real caller.
  *
- * VERIFY-003. K2-K5 each produced a pure piece and each had ZERO callers on the provider
+ * verification-system-003. K2-K5 each produced a pure piece and each had ZERO callers on the provider
  * path (measured at the start of K9). Every gate case before this one exercised a piece in
  * isolation, which proves the piece and says nothing about the forest.
  *
@@ -80,7 +80,7 @@ export const scenarioRuntimeCases = [
   // ── content is a pure function of the request ──────────────────────────────
 
   {
-    name: 'VERIFY-003 the same request twice selects the same content',
+    name: 'verification-system-003 the same request twice selects the same content',
     fn: () => {
       // The property the whole design rests on, and the one `pathCursor` broke: the old
       // matcher advanced a cursor on every match, so asking twice could answer twice
@@ -98,7 +98,7 @@ export const scenarioRuntimeCases = [
   },
 
   {
-    name: 'VERIFY-003 step comes from the request, not from arrival order',
+    name: 'verification-system-003 step comes from the request, not from arrival order',
     fn: () => {
       // Step 1 resolves on a runtime that has never seen step 0. A cursor-based matcher
       // cannot do this: its answer depends on how many requests already arrived, so the
@@ -123,7 +123,7 @@ export const scenarioRuntimeCases = [
   // ── fail closed ───────────────────────────────────────────────────────────
 
   {
-    name: 'VERIFY-003 an undeclared request is unmatched, never a default reply',
+    name: 'verification-system-003 an undeclared request is unmatched, never a default reply',
     fn: () => {
       const runtime = runtimeOf(TWO_STEPS);
       const body = request([user('Something nobody declared.')]);
@@ -136,7 +136,7 @@ export const scenarioRuntimeCases = [
   },
 
   {
-    name: 'VERIFY-003 an unbound session is unmatched rather than guessed',
+    name: 'verification-system-003 an unbound session is unmatched rather than guessed',
     fn: () => {
       // HOST-008 makes the alias→session association durable and the harness is TOLD it.
       // A mock that guessed would answer a question it cannot know.
@@ -152,7 +152,7 @@ export const scenarioRuntimeCases = [
   // ── faults are orthogonal to content ──────────────────────────────────────
 
   {
-    name: 'VERIFY-003 a retry re-selects the SAME content edge',
+    name: 'verification-system-003 a retry re-selects the SAME content edge',
     fn: () => {
       // The reason `delivery-plan.js` exists. The old form put the fault inside the content
       // edge, so a failing attempt and its retry were DIFFERENT edges with two ids whose
@@ -180,7 +180,7 @@ export const scenarioRuntimeCases = [
   },
 
   {
-    name: 'VERIFY-003 a faulted delivery still seals, so the retry is not a break',
+    name: 'verification-system-003 a faulted delivery still seals, so the retry is not a break',
     fn: () => {
       // The old `consumeExpectation` DELETED its cache entry for an error, because caching
       // seal→error would trap every retry on the failure forever. That made the content
@@ -391,7 +391,7 @@ user = "Ship the parser fix."
   // ── coverage reporting ────────────────────────────────────────────────────
 
   {
-    name: 'VERIFY-003 unanswered steps are reported, and internal turns are exempt',
+    name: 'verification-system-003 unanswered steps are reported, and internal turns are exempt',
     fn: () => {
       // `internal` turns exist only if production decides to compose them — a re-anchor
       // frame needs a restart, a guard nudge needs an unreviewed completion. Their absence
@@ -425,7 +425,7 @@ user = "# Review is required before completion."
   },
 
   {
-    name: 'VERIFY-003 must names a turn or a step and is checked by arrival',
+    name: 'verification-system-003 must names a turn or a step and is checked by arrival',
     fn: () => {
       const runtime = runtimeOf(`scenario = "p"
 must = ["guard"]
@@ -468,7 +468,7 @@ user = "# Review is required before completion."
   // ── a real compiled conversation (inline; no retired canary basename) ─────
 
   {
-    name: 'VERIFY-003 a real scenario drives its whole declared conversation',
+    name: 'verification-system-003 a real scenario drives its whole declared conversation',
     fn: () => {
       // Long Stroke is too large for this deliver()-style unit proof, so an INLINE fixture
       // carries the same shape the old smallest converted scenario used: one chat turn with

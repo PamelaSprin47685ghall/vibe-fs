@@ -2,7 +2,7 @@ namespace Wanxiangshu.Sphinx.Plugins.Bayes
 
 open Wanxiangshu.Sphinx.Core
 
-/// WHAT[EPI-009]: exact posterior over finite discrete hypotheses from qualified factors.
+/// WHAT[epistemic-reasoning-009]: exact posterior over finite discrete hypotheses from qualified factors.
 module Exact =
     /// One discrete hypothesis with a nonnegative prior weight.
     type Hypothesis = { Key: string; Prior: float }

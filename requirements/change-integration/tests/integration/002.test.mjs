@@ -47,7 +47,7 @@ const fixture = () => {
   }
 }
 
-test('WHAT[CHGINT-002] Adapter_ffMerge_dirty_target_fails_closed_without_advancing_head', async () => {
+test('WHAT[change-integration-002] Adapter_ffMerge_dirty_target_fails_closed_without_advancing_head', async () => {
   const fx = fixture()
 
   try {

@@ -4,7 +4,7 @@ import * as retirement from '../../../dist/Mission/Relay/Retirement/Surface.js'
 
 
 
-test('WHAT[RETIRE-002] dirty work quality state and conflicts never block suicide', () => {
+test('WHAT[relay-retirement-002] dirty work quality state and conflicts never block suicide', () => {
   assert.deepEqual(
     retirement.decide([], {
       assessed: false,

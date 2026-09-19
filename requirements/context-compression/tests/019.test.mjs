@@ -25,7 +25,7 @@ const contextReanchor = (overrides = {}) => ({
   ...overrides,
 })
 
-test('WHAT[CONTEXT-COMPRESSION-019] Context_fold_accepts_plain_envelopes_and_replays_the_line_codec', () => {
+test('WHAT[context-compression-019] Context_fold_accepts_plain_envelopes_and_replays_the_line_codec', () => {
   const folded = contextFold.fold([contextReanchor()])
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
   assert.equal(Number(folded.value.sessions.ses_context.PrefixEpoch.EpochId), 1)
@@ -34,7 +34,7 @@ test('WHAT[CONTEXT-COMPRESSION-019] Context_fold_accepts_plain_envelopes_and_rep
   assert.equal(replayed.ok, true, replayed.ok ? '' : JSON.stringify(replayed.error))
   assert.deepEqual(replayed.value.sessions, folded.value.sessions)
 })
-test('WHAT[CONTEXT-COMPRESSION-019] Context_fold_rejects_unknown_fact_cases_loudly', () => {
+test('WHAT[context-compression-019] Context_fold_rejects_unknown_fact_cases_loudly', () => {
   assert.throws(
     () => contextFold.fold([
       contextReanchor({
@@ -78,7 +78,7 @@ const sandbox = () => {
   return { dir, source: join(dir, 'src', 'main.fs'), cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
-test('WHAT[CONTEXT-COMPRESSION-019] CTX_019_reanchor_retires_old_pair_wire_but_keeps_history_and_allows_a_fresh_pair', async () => {
+test('WHAT[context-compression-019] CTX_019_reanchor_retires_old_pair_wire_but_keeps_history_and_allows_a_fresh_pair', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wanxiang-pair-reanchor-'))
   const opened = await pair.createJournal(dir)
   assert.equal(opened.ok, true)
@@ -111,7 +111,7 @@ test('WHAT[CONTEXT-COMPRESSION-019] CTX_019_reanchor_retires_old_pair_wire_but_k
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[CONTEXT-COMPRESSION-019] CTX_019_prefix_rebase_is_the_same_auxiliary_cold_boundary_as_host_reanchor', async () => {
+test('WHAT[context-compression-019] CTX_019_prefix_rebase_is_the_same_auxiliary_cold_boundary_as_host_reanchor', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wanxiang-pair-prefix-rebase-'))
   const opened = await pair.createJournal(dir)
   assert.equal(opened.ok, true)
@@ -139,7 +139,7 @@ test('WHAT[CONTEXT-COMPRESSION-019] CTX_019_prefix_rebase_is_the_same_auxiliary_
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[CONTEXT-COMPRESSION-019] CTX_019_reanchor_retires_old_requirement_reads_then_same_digest_regrounds_on_the_next_real_trigger', async () => {
+test('WHAT[context-compression-019] CTX_019_reanchor_retires_old_requirement_reads_then_same_digest_regrounds_on_the_next_real_trigger', async () => {
   const { dir, source, cleanup } = sandbox()
   const opened = await grounding.createJournal(dir)
   assert.equal(opened.ok, true)
@@ -173,7 +173,7 @@ test('WHAT[CONTEXT-COMPRESSION-019] CTX_019_reanchor_retires_old_requirement_rea
     cleanup()
   }
 })
-test('WHAT[CONTEXT-COMPRESSION-019] CTX_019_cursor_reanchor_strips_old_pair_suffix_before_adding_the_new_horizon_pair', async () => {
+test('WHAT[context-compression-019] CTX_019_cursor_reanchor_strips_old_pair_suffix_before_adding_the_new_horizon_pair', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wanxiang-cursor-pair-reanchor-'))
   const opened = await pair.createJournal(dir)
   assert.equal(opened.ok, true)
@@ -202,7 +202,7 @@ test('WHAT[CONTEXT-COMPRESSION-019] CTX_019_cursor_reanchor_strips_old_pair_suff
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[CONTEXT-COMPRESSION-019] CTX_019_cursor_reanchor_strips_old_requirement_suffixes_until_a_real_path_trigger_regrounds', async () => {
+test('WHAT[context-compression-019] CTX_019_cursor_reanchor_strips_old_requirement_suffixes_until_a_real_path_trigger_regrounds', async () => {
   const { dir, source, cleanup } = sandbox()
   const opened = await grounding.createJournal(dir)
   assert.equal(opened.ok, true)

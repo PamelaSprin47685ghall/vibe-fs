@@ -7,7 +7,7 @@ const change = await import("../../../dist/Change/Surface.js");
 
 const published = (jobId, head) => ({ kind: 'Published', jobId, head })
 
-test('WHAT[DELEG-015] VERDICT_MAILBOX_pending_interrupt_stays_interrupted_then_next_publish_delivers_exactly_once', async () => {
+test('WHAT[change-integration-015] VERDICT_MAILBOX_pending_interrupt_stays_interrupted_then_next_publish_delivers_exactly_once', async () => {
   const mailbox = change.createVerdictMailbox()
   change.verdictMailboxStartJob(mailbox)
   const interrupt = change.createVerdictInterrupt()
@@ -50,7 +50,7 @@ const payload = (overrides = {}) => ({
   ...overrides,
 })
 
-test('WHAT[CHGINT-015] worktree mutation during repair invalidates previous certificate and forces re-verification', () => {
+test('WHAT[change-integration-015] worktree mutation during repair invalidates previous certificate and forces re-verification', () => {
   const initial = change.createJobResult(change.empty(), payload())
   assert.equal(initial.ok, true)
 

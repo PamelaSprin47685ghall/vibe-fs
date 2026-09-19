@@ -42,7 +42,7 @@ const rejectsField = (field, fragment) => {
 
 export const sourceCases = [
   {
-    name: 'VERIFY-003 predicate-bag matching is retired',
+    name: 'verification-system-003 predicate-bag matching is retired',
     fn: () => {
       rejectsField('match = { user = "go" }', 'keyed by (lane, turn, step)');
       rejectsField('userRegex = "Fix.*"', 'cannot be prefix-ordered');
@@ -53,7 +53,7 @@ export const sourceCases = [
   },
 
   {
-    name: 'VERIFY-003 scoring is retired because a longest prefix is unique',
+    name: 'verification-system-003 scoring is retired because a longest prefix is unique',
     fn: () => {
       rejectsField('specificity = 9', 'nothing left to score');
     },
@@ -68,14 +68,14 @@ export const sourceCases = [
   },
 
   {
-    name: 'VERIFY-003 harness bookkeeping may not participate in matching',
+    name: 'verification-system-003 harness bookkeeping may not participate in matching',
     fn: () => {
       rejectsField('__testkitHeaders = { "x-session-id" = "s" }', 'one-way');
     },
   },
 
   {
-    name: 'VERIFY-003 the four matching flags are retired',
+    name: 'verification-system-003 the four matching flags are retired',
     fn: () => {
       rejectsField('reusable = true', 'inherently reusable');
       rejectsField('pathless = true', 'no cursor to be exempt from');
@@ -87,7 +87,7 @@ export const sourceCases = [
   },
 
   {
-    name: 'VERIFY-003 tool-set predicates are retired but declared tools are live assertions',
+    name: 'verification-system-003 tool-set predicates are retired but declared tools are live assertions',
     fn: () => {
       rejectsField('requiredTools = ["fork"]', 'the runtime asserts every declared tool is present on the wire request');
       assertTrue(compile(withField('forbiddenTools = ["executor"]')).ok, 'forbiddenTools is a live wire assertion and must load');
@@ -96,7 +96,7 @@ export const sourceCases = [
   },
 
   {
-    name: 'VERIFY-003 dynamic loading is retired at any nesting depth',
+    name: 'verification-system-003 dynamic loading is retired at any nesting depth',
     fn: () => {
       const result = compile(`scenario = "p"
 flow = [ { loadScripts = "after.toml" } ]
@@ -135,7 +135,7 @@ delivery = "provider-error"
   },
 
   {
-    name: 'VERIFY-003 every scenario in the forest compiles',
+    name: 'verification-system-003 every scenario in the forest compiles',
     fn: () => {
       const files = walk(SCENARIO_ROOT, ['.toml']);
       assertTrue(files.length > 0, `no scenarios found under ${SCENARIO_ROOT}`);
@@ -153,7 +153,7 @@ delivery = "provider-error"
   },
 
   {
-    name: 'VERIFY-003 no internal turn declares a lane',
+    name: 'verification-system-003 no internal turn declares a lane',
     fn: () => {
       const offenders = walk(SCENARIO_ROOT, ['.toml']).flatMap((file) => {
         const source = readFileSync(file, 'utf8');

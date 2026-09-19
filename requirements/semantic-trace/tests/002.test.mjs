@@ -25,7 +25,7 @@ const partDescriptor = {
   hostToolPartId: 'part-1',
 }
 
-test('WHAT[SEMANTIC-TRACE-002] copied semantic evidence excludes transport metadata', () => {
+test('WHAT[semantic-trace-002] copied semantic evidence excludes transport metadata', () => {
   const projection = unwrap(trace.appendPart(trace.emptyProjection(), partDescriptor))
   const evidence = trace.orderedSemanticParts(projection)[0]
   assert.equal(evidence.providerRun, 'provider-run-1')
@@ -59,7 +59,7 @@ const withJournal = async (fn) => {
 }
 const projection = (messages) => ({ messages })
 
-test('WHAT[SEMANTIC-TRACE-002] ProviderRetryAttempt_is_transport_control_not_durable_X_semantics', () => {
+test('WHAT[semantic-trace-002] ProviderRetryAttempt_is_transport_control_not_durable_X_semantics', () => {
   const source = readFileSync(
     resolve(import.meta.dirname, '../../../src/Wanxiangshu/Context/Trace/Capture.fs'),
     'utf8',
@@ -76,7 +76,7 @@ test('WHAT[SEMANTIC-TRACE-002] ProviderRetryAttempt_is_transport_control_not_dur
     'semantic capture must strip retry transport material before durable append',
   )
 })
-test('WHAT[SEMANTIC-TRACE-002] typed retry observation retains stable identity but appends no semantics', async () => {
+test('WHAT[semantic-trace-002] typed retry observation retains stable identity but appends no semantics', async () => {
   await withJournal(async (handle) => {
     const captured = await trace.captureObservedMessages(handle, SESSION, [
       {
@@ -110,11 +110,11 @@ const { default: test } = await import("node:test");
 const trace = await import("../../../dist/Context/Trace/SemanticTraceSurface.js");
 
 
-test('WHAT[SEMANTIC-TRACE-002] capture mapper copies text and reasoning semantics', () => {
+test('WHAT[semantic-trace-002] capture mapper copies text and reasoning semantics', () => {
   assert.deepEqual(trace.mapPart(trace.textPart('hello')), { kind: 'text', text: 'hello' })
   assert.deepEqual(trace.mapPart(trace.reasoningPart('considering')), { kind: 'reasoning', text: 'considering' })
 })
-test('WHAT[SEMANTIC-TRACE-002] capture mapper drops transport call identities', () => {
+test('WHAT[semantic-trace-002] capture mapper drops transport call identities', () => {
   assert.deepEqual(trace.mapPart(trace.toolCallPart('call-1', 'read', '{}')), {
     kind: 'tool-call',
     name: 'read',
@@ -125,7 +125,7 @@ test('WHAT[SEMANTIC-TRACE-002] capture mapper drops transport call identities', 
     result: 'output',
   })
 })
-test('WHAT[SEMANTIC-TRACE-002] activity bookkeeping has no semantic part', () => {
+test('WHAT[semantic-trace-002] activity bookkeeping has no semantic part', () => {
   assert.equal(trace.mapPart(trace.activityPart('step-start')), undefined)
 })
 }
@@ -161,12 +161,12 @@ const fixture = () => {
   return projection
 }
 
-test('WHAT[SEMANTIC-TRACE-002] provider-run query returns copied semantic evidence', () => {
+test('WHAT[semantic-trace-002] provider-run query returns copied semantic evidence', () => {
   const parts = trace.providerRunParts('provider-run-a', fixture())
   assert.deepEqual(parts.map((part) => part.cursor.sequence), [1, 2])
   assert.deepEqual(parts.map((part) => part.providerRun), ['provider-run-a', 'provider-run-a'])
 })
-test('WHAT[SEMANTIC-TRACE-002] exact provider tool and Host identities are queryable', () => {
+test('WHAT[semantic-trace-002] exact provider tool and Host identities are queryable', () => {
   const projection = fixture()
   assert.deepEqual(trace.toolResultParts('provider-run-a', 'call-a', projection).map((part) => part.cursor.sequence), [2])
   assert.deepEqual(

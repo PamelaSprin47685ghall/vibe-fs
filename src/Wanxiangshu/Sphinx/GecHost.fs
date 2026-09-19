@@ -6,13 +6,13 @@ open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Sphinx.Core
 
-/// WHAT[EPI-027]: OpenCode dispatch planning over the existing managed-session
+/// WHAT[epistemic-reasoning-027]: OpenCode dispatch planning over the existing managed-session
 /// owner (delegation/fission, capacity, failure policy). Sphinx only describes
 /// which blind child to fork: common root snapshot, no sibling payload, a new
 /// child per retry without failure output, abort/drain intents, depth exactly
 /// one. Sphinx keeps no private pool of its own.
 ///
-/// WHAT[EPI-018]: host-equivalence fold over the canonical accepted-event list.
+/// WHAT[epistemic-reasoning-018]: host-equivalence fold over the canonical accepted-event list.
 /// Host-private session ids, transport receipts and arrival timing ride in the
 /// outer arguments and never enter the semantic hash.
 module GecHost =

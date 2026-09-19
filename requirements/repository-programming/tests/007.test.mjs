@@ -13,7 +13,7 @@ const sandbox = () => {
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
-test('WHAT[REPOSITORY-PROGRAMMING-007] FILETOOLS_read_returns_content_for_existing_file', async () => {
+test('WHAT[repository-programming-007] FILETOOLS_read_returns_content_for_existing_file', async () => {
   const { dir, cleanup } = sandbox()
   const path = join(dir, 'note.txt')
   writeFileSync(path, 'hello world')
@@ -24,14 +24,14 @@ test('WHAT[REPOSITORY-PROGRAMMING-007] FILETOOLS_read_returns_content_for_existi
   assert.equal(toolName('read'), 'read')
   cleanup()
 })
-test('WHAT[REPOSITORY-PROGRAMMING-007] FILETOOLS_read_reports_missing_file', async () => {
+test('WHAT[repository-programming-007] FILETOOLS_read_reports_missing_file', async () => {
   const { dir, cleanup } = sandbox()
   const path = join(dir, 'nope.txt')
   const output = await read(dir, JSON.stringify({ filePath: path }))
   assert.equal(output.result, `File not found: ${path}`)
   cleanup()
 })
-test('WHAT[REPOSITORY-PROGRAMMING-007] FILETOOLS_read_accepts_a_bare_string_payload', async () => {
+test('WHAT[repository-programming-007] FILETOOLS_read_accepts_a_bare_string_payload', async () => {
   const { dir, cleanup } = sandbox()
   const path = join(dir, 'bare.txt')
   writeFileSync(path, 'bare payload')
@@ -39,7 +39,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-007] FILETOOLS_read_accepts_a_bare_string_payl
   assert.equal(output.result, 'bare payload')
   cleanup()
 })
-test('WHAT[REPOSITORY-PROGRAMMING-007] FILETOOLS_read_falls_back_to_raw_payload_when_not_json', async () => {
+test('WHAT[repository-programming-007] FILETOOLS_read_falls_back_to_raw_payload_when_not_json', async () => {
   const { dir, cleanup } = sandbox()
   const path = join(dir, 'raw.txt')
   writeFileSync(path, 'raw content')
@@ -59,13 +59,13 @@ const ok = (result) => result.ok
 const exact = (text) => ({ kind: 'exact', text })
 const regex = (text) => ({ kind: 'regex', text })
 
-test('WHAT[REPOSITORY-PROGRAMMING-007] JS006_empty_anchor_declaration_is_refused', () => {
+test('WHAT[repository-programming-007] JS006_empty_anchor_declaration_is_refused', () => {
   assert.equal(ok(validateDeclaration(declaration(exact(''), undefined))), false)
   assert.equal(ok(validateDeclaration(declaration(regex(''), undefined))), false)
   assert.equal(ok(validateDeclaration(declaration(exact('hello'), undefined))), true)
   assert.equal(ok(validateDeclaration(declaration(regex('^\\s*$'), undefined))), true)
 })
-test('WHAT[REPOSITORY-PROGRAMMING-007] JS006_non_positive_occurrence_is_refused', () => {
+test('WHAT[repository-programming-007] JS006_non_positive_occurrence_is_refused', () => {
   assert.equal(ok(validateOccurrence(declaration(exact('x'), 0))), false)
   assert.equal(ok(validateOccurrence(declaration(exact('x'), -1))), false)
   assert.equal(ok(validateOccurrence(declaration(exact('x'), 1))), true)
@@ -88,7 +88,7 @@ const sandbox = () => {
 }
 const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')
 
-test('WHAT[REPOSITORY-PROGRAMMING-007] JS005_bindings_file_reads_utf8', () => {
+test('WHAT[repository-programming-007] JS005_bindings_file_reads_utf8', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
@@ -127,7 +127,7 @@ const unwrap = (result) => {
   return result.value
 }
 
-test('WHAT[REPOSITORY-PROGRAMMING-007] JS005_readUtf8_reads_and_classifies', () => {
+test('WHAT[repository-programming-007] JS005_readUtf8_reads_and_classifies', () => {
   const { dir, cleanup } = sandbox()
   try {
     const file = join(dir, 'a.txt')
@@ -141,7 +141,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-007] JS005_readUtf8_reads_and_classifies', () 
     cleanup()
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-007] JS006_findAnchor_ordered_string_and_regex', () => {
+test('WHAT[repository-programming-007] JS006_findAnchor_ordered_string_and_regex', () => {
   const text = 'a b a b a'
   // exact, occurrence 1/2/3
   assert.deepEqual(unwrap(findAnchor(text, exact('a'), 1)), [0, 1])
@@ -155,7 +155,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-007] JS006_findAnchor_ordered_string_and_regex
   assert.deepEqual(unwrap(findAnchor(text, regex('^'), 1)), [0, 0])
   assert.equal(codeOf(findAnchor(text, regex('('), 1)), 'INVALID_ANCHOR_PATTERN')
 })
-test('WHAT[REPOSITORY-PROGRAMMING-007] JS006_requireUnique_refuses_ambiguous_anchors', () => {
+test('WHAT[repository-programming-007] JS006_requireUnique_refuses_ambiguous_anchors', () => {
   const text = 'x y x'
   assert.deepEqual(unwrap(requireUnique(text, exact('y'))), [2, 3])
   assert.equal(codeOf(requireUnique(text, exact('x'))), 'ANCHOR_NOT_UNIQUE')
@@ -193,7 +193,7 @@ const runWorkflow = async (dir, program, { deadlineMs = 2000, store = null } = {
   surface: coderSurface(),
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-007] JS006_missing_anchor_reason_names_declaration_path_and_pattern', async () => {
+test('WHAT[repository-programming-007] JS006_missing_anchor_reason_names_declaration_path_and_pattern', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
@@ -212,7 +212,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-007] JS006_missing_anchor_reason_names_declara
     cleanup()
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-007] JS005_offset_anchor_clips_to_closed_file_range', async () => {
+test('WHAT[repository-programming-007] JS005_offset_anchor_clips_to_closed_file_range', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
@@ -239,7 +239,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-007] JS005_offset_anchor_clips_to_closed_file_
     cleanup()
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-007] JS005_offset_N_is_string_index_not_line_number', async () => {
+test('WHAT[repository-programming-007] JS005_offset_N_is_string_index_not_line_number', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'ab\ncd\nef', 'utf8')

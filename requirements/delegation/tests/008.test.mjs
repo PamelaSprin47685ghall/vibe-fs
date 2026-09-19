@@ -71,7 +71,7 @@ const verifyReusableHandoff = async (role) => {
   } finally { sync.dispose(h) }
 }
 
-test('WHAT[DELEG-008] SYNC_RUNTIME_provider_tool_call_collection_preserves_role_order', () => {
+test('WHAT[delegation-008] SYNC_RUNTIME_provider_tool_call_collection_preserves_role_order', () => {
   const batch = sync.batchOrder('Engineer', ['engineer', 'establish-behavior', 'engineer'], 'engineer')
   assert.deepEqual(batch.order, ['engineer', 'engineer'])
   assert.equal(batch.currentPresent, true)
@@ -89,7 +89,7 @@ const sync = await import("../../../dist/Execution/Delegation/SyncDelegate/Surfa
 
 const surface = readFileSync(new URL('../../../src/Wanxiangshu/Execution/Delegation/SyncDelegate/Surface.fs', import.meta.url), 'utf8')
 
-test('WHAT[DELEG-008] DEFERRED_ENGINEER_stage_and_replace_tool_results_in_messages', () => {
+test('WHAT[delegation-008] DEFERRED_ENGINEER_stage_and_replace_tool_results_in_messages', () => {
   const placeholder = sync.stageDeferredInspection('session-test-deferred', 'call-deferred-1', 'check auth integrity', 'auth', 1)
   assert.match(placeholder, /Engineer charge accepted and deferred for batch execution/)
   assert.match(placeholder, /check auth integrity/)

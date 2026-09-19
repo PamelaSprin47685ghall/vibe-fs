@@ -40,13 +40,13 @@ const parseToml = (text) =>
 const SPOOL_COMMAND = "printf 'abcdefghijklmnopqrstuvwxyz0123456789'"
 const SPOOL_BUDGET = { command: SPOOL_COMMAND, output_budget_bytes: 4 }
 
-test('WHAT[PROC-005] RUN_non_positive_deadline_is_rejected', async () => {
+test('WHAT[process-execution-005] RUN_non_positive_deadline_is_rejected', async () => {
   for (const value of [0, -5, Number.NaN, Number.POSITIVE_INFINITY]) {
     const result = await run({ command: 'true', deadline_seconds: value })
     assert.match(result, /(?:deadline_seconds must be a finite positive number|deadline_seconds 必须是有限正数)/, `value=${value}`)
   }
 })
-test('WHAT[PROC-005] RUN_invalid_output_budget_is_rejected', async () => {
+test('WHAT[process-execution-005] RUN_invalid_output_budget_is_rejected', async () => {
   const negative = await run({ command: 'true', output_budget_bytes: -1 })
   assert.match(negative, /(?:output_budget_bytes must be a finite non-negative integer|output_budget_bytes 必须是有限非负整数)/)
 
@@ -72,7 +72,7 @@ const {
   estimateView,
 } = await import('../../../dist/Process/Surface.js')
 
-test('WHAT[PROC-005] EXEC_010_process_request_carries_all_fields', () => {
+test('WHAT[process-execution-005] EXEC_010_process_request_carries_all_fields', () => {
   const cmd = command('sh', ['-lc', 'echo hi'], '/tmp/wx', 'input')
   const cmdView = commandView(cmd)
   const estView = estimateView(estimate(42, 65536, 'large'))

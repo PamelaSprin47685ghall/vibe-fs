@@ -304,7 +304,7 @@ module StrengthSpeculate =
 
                 return ()
             | Ok started ->
-                // SPEC-INV-013: DryRun is a real, visible OpenCode child,
+                // speculative-investigation-013: DryRun is a real, visible OpenCode child,
                 // but terminal observation is not on the owner's transform
                 // critical path. "Dry" means zero promotion while the shadow still executes for real.
                 observeDryRunCompletion surface.StrengthScope surface.Owner started |> ignore

@@ -14,7 +14,7 @@ const firstCheckpointSurfaces = [
   ['todowrite-description/zh-CN', 'resources/provider/lifecycle/magic-todo/todowrite-description/zh-CN.md'],
 ]
 
-test('WHAT[OBLIGATION-LEDGER-003] clean break removes the legacy todo ontology from the production graph', () => {
+test('WHAT[obligation-ledger-003] clean break removes the legacy todo ontology from the production graph', () => {
   const algebra = read('src/Wanxiangshu/Mission/Obligation/Todo/Model.fs')
   // W5: the wrapper aggregate is gone; the compile-order manifest lists what
   // production actually ships.

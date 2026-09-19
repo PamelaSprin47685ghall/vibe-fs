@@ -66,7 +66,7 @@ const expectedEffects = (decision) => ({
   ],
 })[decision]
 
-test('WHAT[CHATEXEC-012] A–I production transaction and lifecycle prefixes drive recovery decisions', async () => {
+test('WHAT[managed-chat-execution-012] A–I production transaction and lifecycle prefixes drive recovery decisions', async () => {
   const transactionResults = new Map()
   for (const cut of ['A', 'B', 'C', 'D', 'E']) {
     transactionResults.set(cut, await transaction.transactionScenario(evidence(cut), `Crash${cut}`, 'None'))
@@ -169,7 +169,7 @@ const evidence = {
 }
 const action = (kind, extra = {}) => ({ kind, evidence, appendOutcome: 'Committed', ...extra })
 
-test('WHAT[CHATEXEC-012] duplicate crash-cut requests and input permutations preserve canonical production recovery', async () => {
+test('WHAT[managed-chat-execution-012] duplicate crash-cut requests and input permutations preserve canonical production recovery', async () => {
   const baseline = canonical((await recovery.admissionCrashPointScenarios(CUTS, 'PluginReload', 'NotCommitted', 'Applied')).scenarios)
 
   for (const order of generatedOrders(CUTS)) {
@@ -291,7 +291,7 @@ const evidenceSeed = (sessionId, physicalId) => ({
 })
 const action = (evidence, kind, extra = {}) => ({ kind, evidence, appendOutcome: 'Committed', ...extra })
 
-test('WHAT[CHATEXEC-012] duplicate terminal and stale recovery evidence are semantically inert', async () => {
+test('WHAT[managed-chat-execution-012] duplicate terminal and stale recovery evidence are semantically inert', async () => {
   // Invariant 1: Durable semantic idempotence across duplicate and reordered lifecycle actions
   await fc.assert(
     fc.asyncProperty(
@@ -487,7 +487,7 @@ const acceptedWire = (evidence) =>
     ],
   ])
 
-test('WHAT[CHATEXEC-012] lifecycle recovery interprets every typed decision through its owner port', async () => {
+test('WHAT[managed-chat-execution-012] lifecycle recovery interprets every typed decision through its owner port', async () => {
   const cases = [
     ['ProviderAlive', 'Ignore', []],
     ['AcceptedProviderAlive', 'ReconcilePhysical', ['ReconcilePhysical:PersistProviderStarted']],
@@ -503,7 +503,7 @@ test('WHAT[CHATEXEC-012] lifecycle recovery interprets every typed decision thro
     assert.deepEqual(result.effects, expected, scenario)
   }
 })
-test('WHAT[CHATEXEC-012] only causal lifecycle signals enter the shared recovery runtime', () => {
+test('WHAT[managed-chat-execution-012] only causal lifecycle signals enter the shared recovery runtime', () => {
   assert.deepEqual(Runtime.lifecycleSignals(), [
     'DurabilityActivated',
     'PluginRuntimeReloaded',
@@ -515,7 +515,7 @@ test('WHAT[CHATEXEC-012] only causal lifecycle signals enter the shared recovery
     'CapacityProjectionReplayed',
   ])
 })
-test('WHAT[CHATEXEC-012] absent recovery port publishes exactly one manual disposition and no resume', async () => {
+test('WHAT[managed-chat-execution-012] absent recovery port publishes exactly one manual disposition and no resume', async () => {
   await withRecoveryHost('absent', 'absent', async (host) => {
     const result = await recoveryHost.resumeAccepted(host, sessionOf('absent'), physicalOf('absent'))
 
@@ -524,7 +524,7 @@ test('WHAT[CHATEXEC-012] absent recovery port publishes exactly one manual dispo
     assertManualDisposition(result.manuals[0], 'ses-recovery-absent', 'msg-recovery-absent')
   })
 })
-test('WHAT[CHATEXEC-012] rejecting port is awaited and publishes the same single manual', async () => {
+test('WHAT[managed-chat-execution-012] rejecting port is awaited and publishes the same single manual', async () => {
   await withRecoveryHost('reject', 'reject', async (host) => {
     const result = await recoveryHost.resumeAccepted(host, sessionOf('reject'), physicalOf('reject'))
 
@@ -533,7 +533,7 @@ test('WHAT[CHATEXEC-012] rejecting port is awaited and publishes the same single
     assertManualDisposition(result.manuals[0], 'ses-recovery-reject', 'msg-recovery-reject')
   })
 })
-test('WHAT[CHATEXEC-012] accepting port awaits ordinary admission and emits no manual block', async () => {
+test('WHAT[managed-chat-execution-012] accepting port awaits ordinary admission and emits no manual block', async () => {
   await withRecoveryHost('accept', 'accept', async (host) => {
     const result = await recoveryHost.resumeAccepted(host, sessionOf('accept'), physicalOf('accept'))
 
@@ -541,7 +541,7 @@ test('WHAT[CHATEXEC-012] accepting port awaits ordinary admission and emits no m
     assert.deepEqual(result.manuals, [])
   })
 })
-test('WHAT[CHATEXEC-012] duplicate resume signals keep exactly one manual', async () => {
+test('WHAT[managed-chat-execution-012] duplicate resume signals keep exactly one manual', async () => {
   await withRecoveryHost('duplicate', 'absent', async (host) => {
     await recoveryHost.resumeAccepted(host, sessionOf('duplicate'), physicalOf('duplicate'))
     const result = await recoveryHost.resumeAccepted(host, sessionOf('duplicate'), physicalOf('duplicate'))
@@ -587,7 +587,7 @@ const terminal = ({
   },
 })
 
-test('WHAT[CHATEXEC-012] superseded exact capacity release is an idempotent recovery no-op', () => {
+test('WHAT[managed-chat-execution-012] superseded exact capacity release is an idempotent recovery no-op', () => {
   const release = recoveryHostSource.match(/let release \(key: ChatExecutionKey\) =([\s\S]*?)\n\s*let requirePersistence/)
   assert.ok(release, 'recovery capacity release boundary must remain explicit')
   assert.match(release[1], /CapacityTransitionOutcome\.Applied\s*\n\s*\| CapacityTransitionOutcome\.AlreadyApplied\s*\n\s*\| CapacityTransitionOutcome\.StaleFence ->\s*Task\.FromResult\(\(\)\)/)
@@ -625,12 +625,12 @@ const matrix = [
   ['ProviderAbsentWithoutPolicy', 'MarkManualIntervention', 'NoAuthorizedProviderDisposition', null],
 ]
 
-test('WHAT[CHATEXEC-012] durable facts plus explicit physical evidence exhaustively determine recovery', () => {
+test('WHAT[managed-chat-execution-012] durable facts plus explicit physical evidence exhaustively determine recovery', () => {
   for (const [scenario, kind, request, disposition] of matrix) {
     assert.deepEqual(recovery.decideScenario(scenario), { kind, request, disposition }, scenario)
   }
 })
-test('WHAT[CHATEXEC-012] duplicate evaluation is deterministic and effect-free', () => {
+test('WHAT[managed-chat-execution-012] duplicate evaluation is deterministic and effect-free', () => {
   for (const [scenario] of matrix) {
     const first = recovery.decideScenario(scenario)
     const second = recovery.decideScenario(scenario)

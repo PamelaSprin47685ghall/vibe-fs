@@ -1,6 +1,6 @@
 namespace Wanxiangshu.Sphinx
 
-// WHAT[EPI-030]: durable restart fold vocabulary. The canonical spine owns the
+// WHAT[epistemic-reasoning-030]: durable restart fold vocabulary. The canonical spine owns the
 // EventEnvelope; this contract only judges decoded sphinx observations, so the
 // fold stays free of storage, codec and host dependencies.
 [<RequireQualifiedAccess>]
@@ -12,7 +12,7 @@ module LegacyIntegrator =
           Question: string
           Raws: obj list }
 
-    /// WHAT[EPI-030]: durable Sphinx Current shared with the canonical spine.
+    /// WHAT[epistemic-reasoning-030]: durable Sphinx Current shared with the canonical spine.
     /// Keyed by durable handle; read back only through TryCurrent "Sphinx".
     type SphinxLegacyCurrent = Map<string, LegacyInquiryCursor>
 
@@ -26,7 +26,7 @@ module LegacyIntegrator =
           Revision: int
           Question: string }
 
-    /// WHAT[EPI-030]: envelope carrier across the owner boundary. The spine
+    /// WHAT[epistemic-reasoning-030]: envelope carrier across the owner boundary. The spine
     /// maps every accepted sphinx event to this carrier; unknown sphinx kinds
     /// ride as OtherSphinxEvent and never fail the fold.
     type LegacyEnvelopeInput =

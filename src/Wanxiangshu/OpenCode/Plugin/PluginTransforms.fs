@@ -611,7 +611,7 @@ module PluginTransforms =
 
                 match determineTransformMode branches projectionSessionIdOpt outObj with
                 | ExplicitResumeDisclosure ->
-                    // CRASH-018: the exact /continue material stays disclosure-only
+                    // crash-reconciliation-018: the exact /continue material stays disclosure-only
                     // for every provider step, including steps after tool results.
                     // The trailing marker is the direct path; the exact physical
                     // registry is the authoritative fallback when Host projection

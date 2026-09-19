@@ -17,7 +17,7 @@ const pkg = (root, name, applies = null) => {
   if (applies !== null) writeFileSync(join(dir, 'APPLIES-TO'), applies, 'utf8')
 }
 
-test('WHAT[REQUIREMENT-GROUNDING-002] treats a package own requirements subtree as implicit coverage that APPLIES-TO cannot cancel', () => {
+test('WHAT[requirement-grounding-002] treats a package own requirements subtree as implicit coverage that APPLIES-TO cannot cancel', () => {
   const { dir, cleanup } = sandbox()
   try {
     pkg(dir, 'alpha')
@@ -28,7 +28,7 @@ test('WHAT[REQUIREMENT-GROUNDING-002] treats a package own requirements subtree 
   } finally { cleanup() }
 })
 
-test('WHAT[REQUIREMENT-GROUNDING-002] resolves nonexistent paths through a symlinked workspace without allowing symlink escape', () => {
+test('WHAT[requirement-grounding-002] resolves nonexistent paths through a symlinked workspace without allowing symlink escape', () => {
   const { dir, cleanup } = sandbox()
   try {
     const real = join(dir, 'real')

@@ -17,7 +17,7 @@ type PreparedDelegationHandoff =
       ParentRecord: string option
       ParentEndExclusive: XTraceCursor }
 
-/// DELEG-031: the checkpoint that closes one reusable completion settles to a
+/// delegation-031: the checkpoint that closes one reusable completion settles to a
 /// closed outcome, never a bare Result<unit, string>. "Child finished" (the
 /// caller's invocation already resolved its WorkRecord or proven completion)
 /// and "completion evidence durably written" (this frontier fact committed)

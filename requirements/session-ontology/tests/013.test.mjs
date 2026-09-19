@@ -10,7 +10,7 @@ const linked = assoc.link({ main: 'ses_main', blogger: 'ses_blogger' }, assoc.em
 assert.equal(linked.ok, true, linked.message)
 const state = linked.value
 
-test('WHAT[SESSION-ONTOLOGY-013] HOST_008_canonical_role_label_is_catalog_stable', () => {
+test('WHAT[session-ontology-013] HOST_008_canonical_role_label_is_catalog_stable', () => {
   for (const role of ['Manager', 'Coder', 'Orchestrator']) {
     assert.equal(persona.roleName(role), role.toLowerCase())
   }
@@ -24,7 +24,7 @@ const { default: test } = await import("node:test");
 const persona = await import("../../../dist/Participant/Persona/Surface.js");
 
 
-test('WHAT[SESSION-ONTOLOGY-013] TPOL_roleName_uses_catalog_labels_and_rejects_none', () => {
+test('WHAT[session-ontology-013] TPOL_roleName_uses_catalog_labels_and_rejects_none', () => {
   assert.equal(persona.roleName('Manager'), 'manager')
   assert.equal(persona.roleName('Coder'), 'coder')
   assert.equal(persona.roleName('Orchestrator'), 'orchestrator')

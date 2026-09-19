@@ -7,7 +7,7 @@ const { mcpServer } = await import("../../../dist/Sphinx/Surface.js");
 const { createStore, start, resume, assessWhy } = await import("./support.mjs");
 
 
-test('WHAT[EPI-003] full_co_yield_path_preserves_grounded_epistemic_basis', () => {
+test('WHAT[epistemic-reasoning-003] full_co_yield_path_preserves_grounded_epistemic_basis', () => {
   const store = createStore()
   const started = start(store, '花儿为什么这样红？')
   const handle = started.handle
@@ -77,7 +77,7 @@ const { default: test } = await import("node:test");
 const { createStore, start, resume, state, assessWhy } = await import("./support.mjs");
 
 
-test('WHAT[EPI-003] ungrounded_model_finding_is_retained_as_claim_but_never_promoted_to_evidence', () => {
+test('WHAT[epistemic-reasoning-003] ungrounded_model_finding_is_retained_as_claim_but_never_promoted_to_evidence', () => {
   const store = createStore()
   const started = start(store, '花儿为什么这样红？')
   assessWhy(store, started.handle)

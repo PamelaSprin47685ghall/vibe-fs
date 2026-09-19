@@ -68,7 +68,7 @@ module CompletedTurnSurface =
     let isAbortErrorName (name: string) : bool =
         CompletedTurnClassifier.isAbortErrorName (optionalText name)
 
-    /// PAR-008: formal content that cannot be a terminal (empty / XML-only).
+    /// provider-attempt-recovery-008: formal content that cannot be a terminal (empty / XML-only).
     let formalContentUnusable (parts: obj) : bool =
         CompletedTurnClassifier.formalContentUnusable (partsOf parts)
 

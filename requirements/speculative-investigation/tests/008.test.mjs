@@ -17,7 +17,7 @@ const apply = (state, event) => {
 const turn = (providerRun, parts, outcome = 'completed') => ({ sessionId: 'owner', physicalUserMessageId: 'user-1', authorityRootUserMessageId: 'user-1', providerRun, parts, outcome })
 const call = (callId, name, args) => ({ kind: 'tool-call', callId, name, args })
 
-test('WHAT[SPEC-INV-008] STRENGTH_006_008_replay_excludes_Prepared_and_rebuilds_only_Promoted_at_exact_target_anchor', async () => {
+test('WHAT[speculative-investigation-008] STRENGTH_006_008_replay_excludes_Prepared_and_rebuilds_only_Promoted_at_exact_target_anchor', async () => {
   const value = frame()
   let projection = apply(Strength.projectionEmpty(), prepared(value))
   const messages = [{ id: 'user-1' }, { id: 'run-1' }, { id: 'user-2' }]
@@ -40,7 +40,7 @@ test('WHAT[SPEC-INV-008] STRENGTH_006_008_replay_excludes_Prepared_and_rebuilds_
   assert.equal(missing.ok, false)
   assert.match(missing.error, /target anchor is absent/i)
 })
-test('WHAT[SPEC-INV-008] STRENGTH_008_replay_loads_each_selected_plan_once_in_decision_order_and_stops_on_load_failure', async () => {
+test('WHAT[speculative-investigation-008] STRENGTH_008_replay_loads_each_selected_plan_once_in_decision_order_and_stops_on_load_failure', async () => {
   const value = frame()
   let projection = Strength.projectionEmpty()
 
@@ -87,7 +87,7 @@ test('WHAT[SPEC-INV-008] STRENGTH_008_replay_loads_each_selected_plan_once_in_de
   assert.deepEqual(noneSelected.value, [])
   assert.deepEqual(noneSelected.loadedDecisionIds, [])
 })
-test('WHAT[SPEC-INV-008] STRENGTH_008_compaction_does_not_retire_raw_replay_without_xtrace_coverage', async () => {
+test('WHAT[speculative-investigation-008] STRENGTH_008_compaction_does_not_retire_raw_replay_without_xtrace_coverage', async () => {
   const value = frame()
   let projection = apply(Strength.projectionEmpty(), prepared(value))
   projection = apply(projection, promoted(value))
@@ -96,7 +96,7 @@ test('WHAT[SPEC-INV-008] STRENGTH_008_compaction_does_not_retire_raw_replay_with
   assert.equal(Strength.lifecycleNeedsRawReplay(null, plan), true)
   assert.equal(Strength.lifecycleNeedsRawReplay(42n, plan), true)
 })
-test('WHAT[SPEC-INV-008] STRENGTH_008_trace_recovery_requires_one_exact_contiguous_canonical_match', () => {
+test('WHAT[speculative-investigation-008] STRENGTH_008_trace_recovery_requires_one_exact_contiguous_canonical_match', () => {
   const value = frame()
   const expected = Strength.traceExpectedParts(value)
   assert.equal(expected.length, 4)
@@ -171,7 +171,7 @@ const attach = (replica, budget, purpose = 'Treatment', owner = 'owner') => {
 const turn = (sessionId, outcome, providerRun = 'run-t') => ({ sessionId, providerRun, outcome, parts: [] })
 const oneBatch = (replica) => ({ messages: [user('u1', replica, [hostText('Continue.')]), assistant('a1', replica, [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')])] })
 
-test('WHAT[PID-008] Strength replica inherits the owner Persona and exact authority lineage', () => {
+test('WHAT[participant-identity-008] Strength replica inherits the owner Persona and exact authority lineage', () => {
   const owner = ownerProfile('engineer')
   const issued = authority.issueInheritedIdentitySeed('engineer', owner)
   assert.equal(issued.ok, true, issued.ok ? '' : issued.error)
@@ -193,7 +193,7 @@ test('WHAT[PID-008] Strength replica inherits the owner Persona and exact author
     },
   )
 })
-test('WHAT[PID-008] Fission lane carries owner-issued identity lineage', () => {
+test('WHAT[participant-identity-008] Fission lane carries owner-issued identity lineage', () => {
   const owner = ownerProfile('engineer')
   const issued = authority.issueInheritedIdentitySeed('engineer', owner)
   assert.equal(issued.ok, true, issued.ok ? '' : issued.error)
@@ -204,7 +204,7 @@ test('WHAT[PID-008] Fission lane carries owner-issued identity lineage', () => {
     error: null,
   })
 })
-test('WHAT[PID-008] Fission lane identity never infers lineage from a physical parent', () => {
+test('WHAT[participant-identity-008] Fission lane identity never infers lineage from a physical parent', () => {
   const lane = Fission.startedLane(1, 'ses_physical_parent', 'investigate independently')
   assert.deepEqual(lane, {
     index: 1,
@@ -232,7 +232,7 @@ const writePayload = async (store, text) => {
   return result.value
 }
 
-test('WHAT[SPEC-INV-008] STRENGTH_008_integrator_Current_reflects_Traced_range_without_history_scan', async () => {
+test('WHAT[speculative-investigation-008] STRENGTH_008_integrator_Current_reflects_Traced_range_without_history_scan', async () => {
   const local = createLocalEventStore()
   try {
     const ref = await writePayload(local.store, 'frame-material')
@@ -255,7 +255,7 @@ const { default: test } = await import("node:test");
 const root = resolve(import.meta.dirname, '../../..')
 const read = (path) => readFileSync(resolve(root, path), 'utf8')
 
-test('WHAT[SPEC-INV-008] StrengthReplay owns applyBeforeXTrace entry point for replay before xtrace', () => {
+test('WHAT[speculative-investigation-008] StrengthReplay owns applyBeforeXTrace entry point for replay before xtrace', () => {
   const replay = read('src/Wanxiangshu/Strength/OpenCode/Replay.fs')
   const pt = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
 

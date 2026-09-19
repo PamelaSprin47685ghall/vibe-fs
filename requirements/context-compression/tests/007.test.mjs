@@ -7,8 +7,8 @@ const budget = failureOwner.budget
 
 const projection = failureOwner.providerFailureProjection
 
-test('WHAT[CONTEXT-COMPRESSION-007] same_failed_kind_with_same_material_always_selects_the_same_next_request', () => {
-  // (Also WHAT[PAR-018]: the retry continuation decides immediately from durable
+test('WHAT[context-compression-007] same_failed_kind_with_same_material_always_selects_the_same_next_request', () => {
+  // (Also WHAT[provider-attempt-recovery-018]: the retry continuation decides immediately from durable
   // material — it never parks on a waiter for future production.)
   // Same failed kind + same material presence always selects the same next
   // request: the decision carries no cross-attempt waiter state.

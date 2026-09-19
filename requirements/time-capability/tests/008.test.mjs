@@ -32,7 +32,7 @@ const consumersOf = (projects, shardId) => [...projects.values()]
   .map((candidate) => candidate.shard)
   .sort()
 
-test('WHAT[TIME-008] production inventory separates contracts adapter verification and representation', () => {
+test('WHAT[time-capability-008] production inventory separates contracts adapter verification and representation', () => {
   const shardInventory = readCompileShardInventory({ repositoryRoot: ROOT })
   const subsystemInventory = buildSubsystemInventory({ compileInventory: shardInventory })
   assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))
@@ -126,7 +126,7 @@ test('WHAT[TIME-008] production inventory separates contracts adapter verificati
   assert.deepEqual(consumersOf(projects, 'foundation-temporal'), [])
 })
 
-test('WHAT[TIME-008] clock and timer capabilities are opaque instance-bound values', async () => {
+test('WHAT[time-capability-008] clock and timer capabilities are opaque instance-bound values', async () => {
   const firstClock = temporal.createVirtualClock()
   const secondClock = temporal.createVirtualClock()
   const firstTimer = temporal.createVirtualTimer()
@@ -160,7 +160,7 @@ test('WHAT[TIME-008] clock and timer capabilities are opaque instance-bound valu
   temporal.timerDispose(secondTimer)
 })
 
-test('WHAT[TIME-008] Deadline is immutable and decided only by explicit clock input', () => {
+test('WHAT[time-capability-008] Deadline is immutable and decided only by explicit clock input', () => {
   const value = deadline.create('2026-01-01T00:00:00Z', 5000)
   assertOpaque(value, 'deadline')
 
@@ -170,7 +170,7 @@ test('WHAT[TIME-008] Deadline is immutable and decided only by explicit clock in
   assert.equal(deadline.isExpired('2026-01-01T00:00:04Z', value), false)
 })
 
-test('WHAT[TIME-008] Node capability construction cannot mutate virtual time', async () => {
+test('WHAT[time-capability-008] Node capability construction cannot mutate virtual time', async () => {
   const virtualClock = temporal.createVirtualClock()
   const virtualTimer = temporal.createVirtualTimer()
   const virtualHandle = temporal.timerDelay(virtualTimer, 0)
@@ -195,7 +195,7 @@ test('WHAT[TIME-008] Node capability construction cannot mutate virtual time', a
   temporal.timerDispose(virtualTimer)
 })
 
-test('WHAT[TIME-008] temporal contracts exclude Node adapters mutable timers and SessionStartedAt projection', () => {
+test('WHAT[time-capability-008] temporal contracts exclude Node adapters mutable timers and SessionStartedAt projection', () => {
   assertPureContract()
   assertEffectIsInjected('timer')
 })

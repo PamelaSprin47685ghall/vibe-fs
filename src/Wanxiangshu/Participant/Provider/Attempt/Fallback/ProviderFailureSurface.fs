@@ -546,7 +546,7 @@ module ProviderFailureSurface =
                 | Error error -> box {| ok = false; error = error |}
         }
 
-    /// PAR-021 test seam: establish the exact durable `Accepted` +
+    /// provider-attempt-recovery-021 test seam: establish the exact durable `Accepted` +
     /// `ProviderStarted` facts for one physical request and provider run.
     let establishProviderRun
         (handle: Wanxiangshu.Persistence.Journal.JournalHandle)
@@ -591,7 +591,7 @@ module ProviderFailureSurface =
                 return box {| ok = Result.isOk started |}
         }
 
-    /// PAR-021: the durable dispatch fact behind one confirmed failure's target
+    /// provider-attempt-recovery-021: the durable dispatch fact behind one confirmed failure's target
     /// settlement — true only when that exact physical request was accepted as
     /// a `ProviderRetryAttempt` continuation AND the failed provider run is the
     /// exact run that established the request's durable `ProviderStarted`.

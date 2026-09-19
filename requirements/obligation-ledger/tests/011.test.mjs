@@ -76,7 +76,7 @@ const acceptT1Checkpoint = async (handle, session, callText) => {
   return { t1, accepted }
 }
 
-test('WHAT[OBLIGATION-LEDGER-011] next checkpoint updates Current without rollback', async () => {
+test('WHAT[obligation-ledger-011] next checkpoint updates Current without rollback', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-magic-todo-rewrite-feedback'
     const life = 'life-magic-todo-rewrite-feedback'
@@ -115,7 +115,7 @@ const firstCheckpointSurfaces = [
   ['todowrite-description/zh-CN', 'resources/provider/lifecycle/magic-todo/todowrite-description/zh-CN.md'],
 ]
 
-test('WHAT[OBLIGATION-LEDGER-011] production checkpoint path has no reviewer settlement owner', () => {
+test('WHAT[obligation-ledger-011] production checkpoint path has no reviewer settlement owner', () => {
   for (const path of [
     'src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs',
     'src/Wanxiangshu/Composition/Durable/MagicTodoProjection.fs',

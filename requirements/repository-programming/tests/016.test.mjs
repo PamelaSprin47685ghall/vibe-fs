@@ -23,7 +23,7 @@ const toolModule = () => {
   return { tool }
 }
 
-test('WHAT[REPOSITORY-PROGRAMMING-016] JS073_spec_executes_program_and_renders_result', async () => {
+test('WHAT[repository-programming-016] JS073_spec_executes_program_and_renders_result', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
@@ -82,7 +82,7 @@ const runWorkflow = async (dir, program, { deadlineMs = 2000, store = null } = {
   surface: coderSurface(),
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-016] JS016_result_renders_stable_toml_shapes', async () => {
+test('WHAT[repository-programming-016] JS016_result_renders_stable_toml_shapes', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
@@ -119,7 +119,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-016] JS016_result_renders_stable_toml_shapes',
     cleanup()
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-016] JS010_016_query_object_has_data_and_no_fs', async () => {
+test('WHAT[repository-programming-016] JS010_016_query_object_has_data_and_no_fs', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const program = `class Js extends JsProgram {
@@ -136,7 +136,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-016] JS010_016_query_object_has_data_and_no_fs
     cleanup()
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-016] JS010_016_primitive_return_uses_data_field', async () => {
+test('WHAT[repository-programming-016] JS010_016_primitive_return_uses_data_field', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const { outcome } = await runWorkflow(dir, `class Js extends JsProgram {

@@ -24,7 +24,7 @@ const packageDirs = () =>
       }
     })
 
-test('WHAT[ABL-004] ABL_004_profiles_cover_all_primary_nodes', () => {
+test('WHAT[feature-ablation-004] ABL_004_profiles_cover_all_primary_nodes', () => {
   const primary = nodesDoc.nodes.filter((node) => node.kind === 'package').map((node) => node.id)
   for (const [profileId, profile] of Object.entries(profilesDoc.profiles)) {
     for (const node of primary) {
@@ -32,7 +32,7 @@ test('WHAT[ABL-004] ABL_004_profiles_cover_all_primary_nodes', () => {
     }
   }
 })
-test('WHAT[ABL-004] ABL_004_station_profiles_track_segment_unablation', () => {
+test('WHAT[feature-ablation-004] ABL_004_station_profiles_track_segment_unablation', () => {
   const primary = nodesDoc.nodes.filter((node) => node.kind === 'package')
   const segmentEnd = (profileStation) => {
     if (profileStation <= 4) return 4
@@ -89,7 +89,7 @@ const withEnv = (entries, run) => {
   }
 }
 
-test('WHAT[ABL-004] ABL_004_production_default_is_all_active', () => {
+test('WHAT[feature-ablation-004] ABL_004_production_default_is_all_active', () => {
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', undefined]], () => {
     const result = Ablation.load()
     assert.equal(result.ok, true)
@@ -98,7 +98,7 @@ test('WHAT[ABL-004] ABL_004_production_default_is_all_active', () => {
     assert.equal(result.modes['speculative-investigation'], 'active')
   })
 })
-test('WHAT[ABL-004] ABL_004_station_05_ablates_downstream_packages', () => {
+test('WHAT[feature-ablation-004] ABL_004_station_05_ablates_downstream_packages', () => {
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-05']], () => {
     const result = Ablation.load()
     assert.equal(result.ok, true)
@@ -109,7 +109,7 @@ test('WHAT[ABL-004] ABL_004_station_05_ablates_downstream_packages', () => {
     assert.equal(result.modes['host-boundary'], 'active')
   })
 })
-test('WHAT[ABL-004] ABL_004_explicit_env_overrides_profile', () => {
+test('WHAT[feature-ablation-004] ABL_004_explicit_env_overrides_profile', () => {
   withEnv(
     [
       ['WANXIANGSHU_ABLATION_PROFILE', 'station-05'],
@@ -145,7 +145,7 @@ const withEnv = (entries, run) => {
   }
 }
 
-test('WHAT[ABL-004] ABL_004_station_15_borrows_sync_delegate_slice', () => {
+test('WHAT[feature-ablation-004] ABL_004_station_15_borrows_sync_delegate_slice', () => {
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-15']], () => {
     const result = Ablation.load()
     assert.equal(result.ok, true)
@@ -156,7 +156,7 @@ test('WHAT[ABL-004] ABL_004_station_15_borrows_sync_delegate_slice', () => {
     assert.equal(Ablation.allowsTool('inspect'), true)
   })
 })
-test('WHAT[ABL-004] ABL_004_station_42_activates_delegation', () => {
+test('WHAT[feature-ablation-004] ABL_004_station_42_activates_delegation', () => {
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-42']], () => {
     const result = Ablation.load()
     assert.equal(result.ok, true)
@@ -165,7 +165,7 @@ test('WHAT[ABL-004] ABL_004_station_42_activates_delegation', () => {
     assert.equal(Ablation.allowsTool('fork'), true)
   })
 })
-test('WHAT[ABL-004] ABL_004_station_56_is_full_production_surface', () => {
+test('WHAT[feature-ablation-004] ABL_004_station_56_is_full_production_surface', () => {
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-56']], () => {
     const result = Ablation.load()
     assert.equal(result.ok, true)

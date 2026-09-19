@@ -11,7 +11,7 @@ const { close, createStore, start, resume, state, assessWhy, relativeServerEntry
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '../../..')
 
-test('WHAT[EPI-001] start_yields_semantic_assessment_request', () => {
+test('WHAT[epistemic-reasoning-001] start_yields_semantic_assessment_request', () => {
   const store = createStore()
   const started = start(store, '花儿为什么这样红？')
   assert.equal(started.status, 'yield')
@@ -25,7 +25,7 @@ const { default: assert } = await import("node:assert/strict");
 const { createStore, start, resume, state, mcpServer } = await import("../../../dist/Sphinx/Surface.js");
 
 
-test('WHAT[EPI-001] start_yield_returns_structured_content_with_next_tool', async () => {
+test('WHAT[epistemic-reasoning-001] start_yield_returns_structured_content_with_next_tool', async () => {
   const server = mcpServer(createStore())
   const result = await server._registeredTools.start.handler({ question: '花青素合成是否解释红色？' })
 

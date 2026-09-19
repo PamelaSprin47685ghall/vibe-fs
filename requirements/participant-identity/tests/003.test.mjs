@@ -49,7 +49,7 @@ const assertError = (result, error) => {
   assert.equal(result.error, error)
 }
 
-test('WHAT[PID-003] rejects blank Persona and unsupported catalog version', () => {
+test('WHAT[participant-identity-003] rejects blank Persona and unsupported catalog version', () => {
   assertError(rehydrate({ ...expectedView('engineer'), persona: '  ' }), 'BlankPersona')
   assertError(
     rehydrate({ ...expectedView('engineer'), catalogVersion: 2 }),

@@ -24,7 +24,7 @@ const MANAGER_VISIBLE_SURFACES = [
   'lifecycle/magic-todo/manager-guideline',
 ]
 
-test('WHAT[PARTICIPANT-HORIZON-002] PH_agent_008_machine_binding_names_absent_from_provider_visible_surfaces', () => {
+test('WHAT[participant-horizon-002] PH_agent_008_machine_binding_names_absent_from_provider_visible_surfaces', () => {
   for (const surface of MANAGER_VISIBLE_SURFACES) {
     for (const locale of LOCALES) {
       const text = read(`resources/provider/${surface}/${locale}.md`)
@@ -40,7 +40,7 @@ const { default: test } = await import("node:test");
 const { FORBIDDEN_TOKENS } = await import("../../../scripts/checks/provider-leak-gate.mjs");
 
 
-test('WHAT[PARTICIPANT-HORIZON-002] PROVIDER_IDENTITY_LEAK_gate_b_forbids_agent_and_session_ids', () => {
+test('WHAT[participant-horizon-002] PROVIDER_IDENTITY_LEAK_gate_b_forbids_agent_and_session_ids', () => {
   for (const token of ['AgentId', 'SessionId', 'ManagerJobId', 'PtyId', 'agent_id', 'session_id', 'pty_id']) {
     assert.ok(FORBIDDEN_TOKENS.includes(token), `missing forbidden token: ${token}`)
   }
@@ -71,22 +71,22 @@ module JoinResultRenderer =
         SessionId.value sid
 `
 
-test('WHAT[PARTICIPANT-HORIZON-002] gate_b_documents_forbidden_machine_tokens', () => {
+test('WHAT[participant-horizon-002] gate_b_documents_forbidden_machine_tokens', () => {
   assert.ok(FORBIDDEN_TOKENS.includes('SessionId'))
   assert.ok(FORBIDDEN_TOKENS.includes('pty_id'))
 })
-test('WHAT[PARTICIPANT-HORIZON-002] gate_b_leaky_renderer_fixture_is_red_for_machine_tokens', () => {
+test('WHAT[participant-horizon-002] gate_b_leaky_renderer_fixture_is_red_for_machine_tokens', () => {
   const hits = scanText('JoinResultRenderer.fs', LEAKY_JOIN)
   assert.ok(hits.some((h) => h.id.startsWith('token:SessionId') || h.id === 'token:pty_id'))
 })
-test('WHAT[PARTICIPANT-HORIZON-002] gate_b_scan_entries_aggregates', () => {
+test('WHAT[participant-horizon-002] gate_b_scan_entries_aggregates', () => {
   const hits = scanEntries([
     { file: 'HorizonTool.fs', text: CLEAN_HORIZON },
     { file: 'JoinResultRenderer.fs', text: LEAKY_JOIN },
   ])
   assert.ok(hits.length >= 2)
 })
-test('WHAT[PARTICIPANT-HORIZON-002] gate_b_repo_scan_without_baseline_is_zero', () => {
+test('WHAT[participant-horizon-002] gate_b_repo_scan_without_baseline_is_zero', () => {
   const result = scanRepo(process.cwd())
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
   assert.deepEqual(result.counts, {})

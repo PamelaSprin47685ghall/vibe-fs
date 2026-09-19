@@ -48,7 +48,7 @@ const completedItem = (port, pid, outcome) => {
   return got[0]
 }
 
-test('WHAT[PROC-002] PORT_send_term_kill_int_marks_abort_for_the_next_completion', async () => {
+test('WHAT[process-execution-002] PORT_send_term_kill_int_marks_abort_for_the_next_completion', async () => {
   for (const signal of ['TERM', 'KILL', 'INT']) {
     const port = createPtyPort({})
     const got = []
@@ -140,7 +140,7 @@ const portWith = (value) => {
   return p
 }
 
-test('WHAT[PROC-002] SUPERVISOR_applyLive_signal_kills_the_real_process_group_or_process', async () => {
+test('WHAT[process-execution-002] SUPERVISOR_applyLive_signal_kills_the_real_process_group_or_process', async () => {
   const process = child()
   try {
     const supervisor = supervisorCreate()
@@ -150,7 +150,7 @@ test('WHAT[PROC-002] SUPERVISOR_applyLive_signal_kills_the_real_process_group_or
     assert.ok(died(process), 'child was killed')
   } finally { killChild(process) }
 })
-test('WHAT[PROC-002] SUPERVISOR_applyLive_signal_unknown_pid_becomes_error', async () => {
+test('WHAT[process-execution-002] SUPERVISOR_applyLive_signal_unknown_pid_becomes_error', async () => {
   const supervisor = supervisorCreate()
   supervisorAdd(supervisor, id('pty-ku'), sessionCreate('pty-ku', { pid: 2_147_483_647 }))
   const result = await supervisorApplyLive(supervisor, port(), id('pty-ku'), ptyCommandSignal('TERM'))

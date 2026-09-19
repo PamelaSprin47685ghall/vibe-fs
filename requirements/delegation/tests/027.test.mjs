@@ -4,7 +4,7 @@ import test from 'node:test'
 
 
 
-test('WHAT[DELEG-027] active fork assignment never becomes BusyAgentNudge', () => {
+test('WHAT[delegation-027] active fork assignment never becomes BusyAgentNudge', () => {
   const forkTool = readFileSync(
     new URL('../../../src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs', import.meta.url),
     'utf8',

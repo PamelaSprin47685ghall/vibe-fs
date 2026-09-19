@@ -8,7 +8,7 @@ const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '../../..')
 
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
-test('WHAT[ACTION-AFFORDANCE-011] AA_critical_role_boundaries_are_mirrored_on_caller_facing_tool_descriptions', () => {
+test('WHAT[action-affordance-011] AA_critical_role_boundaries_are_mirrored_on_caller_facing_tool_descriptions', () => {
   // 1. Fork description mirrors that Engineer is for investigation/source, and DevOps cannot be forked
   const forkEn = read('resources/provider/tool/fork/description/en.md')
   const forkZh = read('resources/provider/tool/fork/description/zh-CN.md')

@@ -23,7 +23,7 @@ const withJournal = async (fn) => {
 }
 const projection = (messages) => ({ messages })
 
-test('WHAT[SEMANTIC-TRACE-001] terminal capture returns explicit completion evidence', async () => {
+test('WHAT[semantic-trace-001] terminal capture returns explicit completion evidence', async () => {
   await withJournal(async (handle) => {
     const first = await trace.captureTerminalText(handle, SESSION, 'completed', 'terminal-run')
     const second = await trace.captureTerminalText(handle, SESSION, 'completed', 'terminal-run')
@@ -56,7 +56,7 @@ const part = (sequence, overrides = {}) => ({
   ...overrides,
 })
 
-test('WHAT[SEMANTIC-TRACE-001] opening evidence is copied verbatim and idempotent', () => {
+test('WHAT[semantic-trace-001] opening evidence is copied verbatim and idempotent', () => {
   const first = unwrap(trace.appendOpening(trace.emptyProjection(), 'first task', ['r1', 'r2']))
   const second = unwrap(trace.appendOpening(first, 'first task', ['r1', 'r2']))
   assert.deepEqual(trace.openingEvidence(second), {
@@ -66,7 +66,7 @@ test('WHAT[SEMANTIC-TRACE-001] opening evidence is copied verbatim and idempoten
   })
   assert.equal(trace.hasOpening(second), true)
 })
-test('WHAT[SEMANTIC-TRACE-001] semantic parts append in strict cursor order', () => {
+test('WHAT[semantic-trace-001] semantic parts append in strict cursor order', () => {
   let projection = trace.emptyProjection()
   projection = unwrap(trace.appendPart(projection, part(1)))
   projection = unwrap(trace.appendPart(projection, part(2, { kind: 'reasoning' })))
@@ -75,7 +75,7 @@ test('WHAT[SEMANTIC-TRACE-001] semantic parts append in strict cursor order', ()
   assert.deepEqual(trace.partKinds(projection), ['text', 'reasoning', 'tool_call'])
   assert.equal(trace.headCursor(projection).sequence, 4)
 })
-test('WHAT[SEMANTIC-TRACE-001] terminal evidence is idempotent per provider run', () => {
+test('WHAT[semantic-trace-001] terminal evidence is idempotent per provider run', () => {
   const terminal = { textRef: 'blob-terminal', textDigest: 'digest-terminal', providerRun: 'run-terminal' }
   const first = unwrap(trace.appendTerminal(trace.emptyProjection(), terminal))
   const second = unwrap(trace.appendTerminal(first, terminal))
@@ -85,7 +85,7 @@ test('WHAT[SEMANTIC-TRACE-001] terminal evidence is idempotent per provider run'
   })
   assert.deepEqual(trace.terminalEvidenceForProviderRun('run-terminal', second), trace.latestTerminalEvidence(second))
 })
-test('WHAT[SEMANTIC-TRACE-001] distinct provider runs retain distinct terminal evidence', () => {
+test('WHAT[semantic-trace-001] distinct provider runs retain distinct terminal evidence', () => {
   let projection = unwrap(trace.appendTerminal(trace.emptyProjection(), {
     textRef: 'blob-one', textDigest: 'digest-one', providerRun: 'run-one',
   }))
@@ -95,7 +95,7 @@ test('WHAT[SEMANTIC-TRACE-001] distinct provider runs retain distinct terminal e
   assert.equal(trace.terminalEvidenceForProviderRun('run-one', projection).textRef, 'blob-one')
   assert.equal(trace.latestTerminalEvidence(projection).providerRun, 'run-two')
 })
-test('WHAT[SEMANTIC-TRACE-001] one provider run cannot publish conflicting terminal evidence', () => {
+test('WHAT[semantic-trace-001] one provider run cannot publish conflicting terminal evidence', () => {
   const projection = unwrap(trace.appendTerminal(trace.emptyProjection(), {
     textRef: 'blob-one', textDigest: 'digest-one', providerRun: 'same-run',
   }))

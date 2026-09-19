@@ -76,7 +76,7 @@ const acceptT1Checkpoint = async (handle, session, callText) => {
   return { t1, accepted }
 }
 
-test('WHAT[OBLIGATION-LEDGER-009] duplicate obligation name is the provider-red class', async () => {
+test('WHAT[obligation-ledger-009] duplicate obligation name is the provider-red class', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-syntax-red'
     const life = 'life-syntax-red'
@@ -89,7 +89,7 @@ test('WHAT[OBLIGATION-LEDGER-009] duplicate obligation name is the provider-red 
     assert.equal(result.result.error.code, 'DuplicateObligationName')
   })
 })
-test('WHAT[OBLIGATION-LEDGER-009] prepare and accept succeed directly without review runtime', async () => {
+test('WHAT[obligation-ledger-009] prepare and accept succeed directly without review runtime', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-runtime-fatal'
     const life = 'life-runtime-fatal'
@@ -119,7 +119,7 @@ const firstCheckpointSurfaces = [
   ['todowrite-description/zh-CN', 'resources/provider/lifecycle/magic-todo/todowrite-description/zh-CN.md'],
 ]
 
-test('WHAT[OBLIGATION-LEDGER-009] failure triage keeps red for syntax and kills OpenCode on infrastructure faults', () => {
+test('WHAT[obligation-ledger-009] failure triage keeps red for syntax and kills OpenCode on infrastructure faults', () => {
   const membrane = read('src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs')
   const hostCodec = read('src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/HostCodec.fs')
 

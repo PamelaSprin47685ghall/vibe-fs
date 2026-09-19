@@ -6,7 +6,7 @@ const { default: test } = await import("node:test");
 const Strength = await import("../../../dist/Strength/Surface.js");
 
 
-test('WHAT[SPEC-INV-006] STRENGTH_006_prepared_commit_unknown_is_resolved_without_guessing', () => {
+test('WHAT[speculative-investigation-006] STRENGTH_006_prepared_commit_unknown_is_resolved_without_guessing', () => {
   assert.equal(Strength.commitResolvePrepared('Committed', 'Unknown'), 'Proceed')
   assert.equal(Strength.commitResolvePrepared('Rejected', 'Unknown'), 'FallBackK0')
   assert.equal(Strength.commitResolvePrepared('CommitUnknown', 'Matches'), 'Proceed')
@@ -27,7 +27,7 @@ const H = (text) => createHash('sha256').update(text).digest('hex')
 const frame = (toolName = 'read', args = '{"filePath":"a"}', result = 'alpha') => Strength.frameTryBuild(H, 10000, [{ requestOrdinal: 1, exchanges: [{ toolName, canonicalArguments: args, canonicalResult: result }] }]).value
 const publishRequest = (bundle, replica = 'replica-1') => ({ ownerSessionId: 'owner', decisionId: 'd1', targetProviderRun: 'run-1', replicaSessionId: replica, budget: 'K1', anchorDigest: 'anchor-a', bundle })
 
-test('WHAT[SPEC-INV-006] STRENGTH_006_008_durability_port_publishes_payload_closure_and_reloads_the_same_bundle', async () => {
+test('WHAT[speculative-investigation-006] STRENGTH_006_008_durability_port_publishes_payload_closure_and_reloads_the_same_bundle', async () => {
   const local = createLocalEventStore()
   try {
     const durability = Strength.durabilityCreate(local.store)
@@ -48,7 +48,7 @@ test('WHAT[SPEC-INV-006] STRENGTH_006_008_durability_port_publishes_payload_clos
     assert.deepEqual(Strength.projectionTraceRange('d1', projection), { startInclusive: 5n, endExclusive: 7n })
   } finally { local.close() }
 })
-test('WHAT[SPEC-INV-006] STRENGTH_006_durability_port_rejects_conflicting_Prepared_identity', async () => {
+test('WHAT[speculative-investigation-006] STRENGTH_006_durability_port_rejects_conflicting_Prepared_identity', async () => {
   const local = createLocalEventStore()
   try {
     const durability = Strength.durabilityCreate(local.store)
@@ -78,7 +78,7 @@ const apply = (state, event) => {
 const turn = (providerRun, parts, outcome = 'completed') => ({ sessionId: 'owner', physicalUserMessageId: 'user-1', authorityRootUserMessageId: 'user-1', providerRun, parts, outcome })
 const call = (callId, name, args) => ({ kind: 'tool-call', callId, name, args })
 
-test('WHAT[SPEC-INV-006] STRENGTH_006_008_prepared_candidate_cannot_be_traced_or_raw_replayed', async () => {
+test('WHAT[speculative-investigation-006] STRENGTH_006_008_prepared_candidate_cannot_be_traced_or_raw_replayed', async () => {
   const value = frame()
   const projection = apply(Strength.projectionEmpty(), prepared(value))
   assert.equal(Strength.projectionIsPromoted('d1', projection), false)
@@ -114,7 +114,7 @@ const publishRequest = (bundle, decision = 'cut-d1', replica = 'replica-1') => (
   bundle,
 })
 
-test('WHAT[SPEC-INV-006] prepared_cut_legal_command_is_accepted_by_the_fold', async () => {
+test('WHAT[speculative-investigation-006] prepared_cut_legal_command_is_accepted_by_the_fold', async () => {
   const local = createLocalEventStore()
   try {
     const durability = Strength.durabilityCreate(local.store)
@@ -134,7 +134,7 @@ test('WHAT[SPEC-INV-006] prepared_cut_legal_command_is_accepted_by_the_fold', as
     assert.equal(loaded.value.byteLength, bundle.byteLength)
   } finally { local.close() }
 })
-test('WHAT[SPEC-INV-006] prepared_cut_payload_closure_is_complete_before_the_receipt', async () => {
+test('WHAT[speculative-investigation-006] prepared_cut_payload_closure_is_complete_before_the_receipt', async () => {
   const local = createLocalEventStore()
   try {
     const durability = Strength.durabilityCreate(local.store)
@@ -151,7 +151,7 @@ test('WHAT[SPEC-INV-006] prepared_cut_payload_closure_is_complete_before_the_rec
     )
   } finally { local.close() }
 })
-test('WHAT[SPEC-INV-006] prepared_cut_reopen_observes_only_durable_receipts', async () => {
+test('WHAT[speculative-investigation-006] prepared_cut_reopen_observes_only_durable_receipts', async () => {
   const base = makeDir('wxs-strength-cut-reopen-')
   const commonDir = join(base, '.git')
   const local = createLocalEventStore({ commonDir })
@@ -176,7 +176,7 @@ test('WHAT[SPEC-INV-006] prepared_cut_reopen_observes_only_durable_receipts', as
     rmSync(base, { recursive: true, force: true })
   }
 })
-test('WHAT[SPEC-INV-006] prepared_cut_has_no_optional_fatal_handler_path', async () => {
+test('WHAT[speculative-investigation-006] prepared_cut_has_no_optional_fatal_handler_path', async () => {
   const { readFileSync } = await import('node:fs')
   const source = readFileSync(
     new URL('../../../src/Wanxiangshu/Strength/Persistence/Durability.fs', import.meta.url),
@@ -202,7 +202,7 @@ const writePayload = async (store, text) => {
   return result.value
 }
 
-test('WHAT[SPEC-INV-006] STRENGTH_006_017_strength_event_types_are_authoritative_store_vocabulary', () => {
+test('WHAT[speculative-investigation-006] STRENGTH_006_017_strength_event_types_are_authoritative_store_vocabulary', () => {
   assert.deepEqual([
     Strength.eventType(prepared()),
     Strength.eventType(promoted()),
@@ -210,7 +210,7 @@ test('WHAT[SPEC-INV-006] STRENGTH_006_017_strength_event_types_are_authoritative
     Strength.eventType(Strength.eventAbandoned('d1', 'run-1')),
   ], ['StrengthCandidatePrepared', 'StrengthCandidatePromoted', 'StrengthFramesTraced', 'StrengthCandidateAbandoned'])
 })
-test('WHAT[SPEC-INV-006] STRENGTH_006_store_envelope_puts_large_material_only_in_payload_refs', () => {
+test('WHAT[speculative-investigation-006] STRENGTH_006_store_envelope_puts_large_material_only_in_payload_refs', () => {
   const first = Strength.envelopeView(Strength.storeToEnvelope(H, prepared()))
   const conflicting = Strength.envelopeView(Strength.storeToEnvelope(H, prepared({ refs: ['payload-b'], digest: 'frame-b' })))
   assert.equal(first.eventType, 'StrengthCandidatePrepared')
@@ -221,7 +221,7 @@ test('WHAT[SPEC-INV-006] STRENGTH_006_store_envelope_puts_large_material_only_in
   assert.equal(decoded.value.kind, 'Prepared')
   assert.equal(decoded.value.frameDigest, 'frame-a')
 })
-test('WHAT[SPEC-INV-006] STRENGTH_006_same_decision_different_prepared_material_is_identity_collision', async () => {
+test('WHAT[speculative-investigation-006] STRENGTH_006_same_decision_different_prepared_material_is_identity_collision', async () => {
   const local = createLocalEventStore()
   try {
     const firstRef = await writePayload(local.store, 'first')
@@ -234,7 +234,7 @@ test('WHAT[SPEC-INV-006] STRENGTH_006_same_decision_different_prepared_material_
     assert.equal(rejected.error, 'IdentityCollision')
   } finally { local.close() }
 })
-test('WHAT[SPEC-INV-006] STRENGTH_006_payload_bytes_are_local_content_addressed_payloads', async () => {
+test('WHAT[speculative-investigation-006] STRENGTH_006_payload_bytes_are_local_content_addressed_payloads', async () => {
   const local = createLocalEventStore()
   try {
     const bytes = new Uint8Array([1, 2, 3, 4])
@@ -245,7 +245,7 @@ test('WHAT[SPEC-INV-006] STRENGTH_006_payload_bytes_are_local_content_addressed_
     assert.deepEqual([...loaded.value], [...bytes])
   } finally { local.close() }
 })
-test('WHAT[SPEC-INV-006] STRENGTH_006_integrator_Current_reflects_Prepared_binding_without_history_scan', async () => {
+test('WHAT[speculative-investigation-006] STRENGTH_006_integrator_Current_reflects_Prepared_binding_without_history_scan', async () => {
   const local = createLocalEventStore()
   try {
     const ref = await writePayload(local.store, 'frame-material')
@@ -255,7 +255,7 @@ test('WHAT[SPEC-INV-006] STRENGTH_006_integrator_Current_reflects_Prepared_bindi
     assert.equal(Strength.projectionIsPromoted('d1', projection), false)
   } finally { local.close() }
 })
-test('WHAT[SPEC-INV-006] STRENGTH_006_prepared_event_persists_nominal_budget_without_duplicate_derived_value_estimates', () => {
+test('WHAT[speculative-investigation-006] STRENGTH_006_prepared_event_persists_nominal_budget_without_duplicate_derived_value_estimates', () => {
   const envelope = Strength.storeToEnvelope(H, prepared({ digest: 'frame-exact' }))
   const decoded = Strength.storeTryDecodeEnvelope(envelope)
   assert.equal(decoded.ok, true)

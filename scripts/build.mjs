@@ -130,7 +130,7 @@ export class CrossProcessMutex {
 // ── Resource & Artifact Verification ─────────────────────────────────────────
 
 async function verifyArtifacts(targetRoot = root) {
-  // DG-004: repository is the SSOT. Derive the current envelope on every build;
+  // degeneration-guard-004: repository is the SSOT. Derive the current envelope on every build;
   // materialize it only as an ephemeral runtime import.
   try {
     await writeLoopDetectorEnvelopeArtifact(targetRoot)
@@ -183,7 +183,7 @@ async function verifyArtifacts(targetRoot = root) {
     }
   }
 
-  // JS-SEMANTIC-SURFACE-003/005: dist surface manifest validation (post-compile).
+  // js-semantic-surface-003/005: dist surface manifest validation (post-compile).
   if (runSurfaceManifest({ root: targetRoot }) !== 0) {
     throw new Error('js-surface-manifest: dist surface manifest validation failed')
   }

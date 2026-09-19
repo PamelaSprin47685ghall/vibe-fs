@@ -31,23 +31,23 @@
 
 | 条款编号 | 规范主题 | 核心断言 | 测试文件 |
 | --- | --- | --- | --- |
-| PROC-001 | 终端四动词四 Contract | 独立动词、UTF-8 编码、唯一 ID | `pty-api.test.mjs`, `pty-types.test.mjs`, `pty-backend.test.mjs` |
-| PROC-002 | Command 与 Signal 为物理 Act | 命令发送与增量观察分离 | `pty-backend.test.mjs` |
-| PROC-003 | 物理完成仅由 Backend Exit 确立 | Kill 不等于 Exit，等待退出事件 | `process-wait.test.mjs`, `pty-backend.test.mjs` |
-| PROC-004 | 有界执行之 Hard Limit 与超时 | 超时判定与确定性失败 | `deadline-surface.test.mjs`, `process-runner.test.mjs` |
-| PROC-005 | Process Request 类型化与预算拒绝 | 非法时限与负预算前置拒绝 | `executor-tool.test.mjs`, `handle-process.test.mjs` |
-| PROC-006 | Cancellation 彻底收束进程组 | 进程组信号发送与非阻塞返回 | `handle-process.test.mjs`, `pty-api.test.mjs`, `process-runner.test.mjs` |
-| PROC-007 | 持续终端与一次性执行严格分型 | PTY 与 run 互斥形态及 exit race | `pty-timing.test.mjs` |
-| PROC-008 | 完成事实双通道 | Agent Pulse 与 PTY completion 隔离 | `join-v2-mailbox-drain.test.mjs` |
-| PROC-009 | 物理输出捕获有界与 Spool 机制 | 缓冲预算切换 spool 流式转储 | `process-output.test.mjs`, `pty-session.test.mjs` |
-| PROC-010 | Terminal 与 Run 完成投影 | 真实退出码与输出投影 | `join-v2-wire-pty.test.mjs`, `process-runner.test.mjs`, `executor-tool.test.mjs` |
-| PROC-011 | Run/Query-Shell 参数能力与非蒸馏 | 参数对等校验与无蒸馏 | `executor-tool.test.mjs` |
-| PROC-012 | process 与 PTY contract 窄能力 | 纯词汇与适配器隔离 | `m6-slice-boundary.test.mjs` |
-| PROC-013 | 大输出零 Distiller 与原始留尾 | 任意输出零 Distiller、尾部原始 | `output-truncation-contract.test.mjs` |
-| PROC-014 | 真实程序事实与显式截断声明 | 事实不从日志推断、截断说明明确 | `output-truncation-contract.test.mjs` |
-| PROC-015 | 显式字节预算与 UTF-8 边界安全 | 字节预算计量、UTF-8 边界对齐 | `output-truncation-contract.test.mjs` |
-| PROC-016 | Large Gate 单持有者互斥门禁 | FIFO 排队、取消、互斥释放 | `large-gate.test.mjs`, `large-gate-runner.test.mjs` |
-| PROC-017 | 自定义工具留尾截断 | 留尾截断、标记注入、行边界完整 | `tool-result-bound.test.mjs` |
+| process-execution-001 | 终端四动词四 Contract | 独立动词、UTF-8 编码、唯一 ID | `pty-api.test.mjs`, `pty-types.test.mjs`, `pty-backend.test.mjs` |
+| process-execution-002 | Command 与 Signal 为物理 Act | 命令发送与增量观察分离 | `pty-backend.test.mjs` |
+| process-execution-003 | 物理完成仅由 Backend Exit 确立 | Kill 不等于 Exit，等待退出事件 | `process-wait.test.mjs`, `pty-backend.test.mjs` |
+| process-execution-004 | 有界执行之 Hard Limit 与超时 | 超时判定与确定性失败 | `deadline-surface.test.mjs`, `process-runner.test.mjs` |
+| process-execution-005 | Process Request 类型化与预算拒绝 | 非法时限与负预算前置拒绝 | `executor-tool.test.mjs`, `handle-process.test.mjs` |
+| process-execution-006 | Cancellation 彻底收束进程组 | 进程组信号发送与非阻塞返回 | `handle-process.test.mjs`, `pty-api.test.mjs`, `process-runner.test.mjs` |
+| process-execution-007 | 持续终端与一次性执行严格分型 | PTY 与 run 互斥形态及 exit race | `pty-timing.test.mjs` |
+| process-execution-008 | 完成事实双通道 | Agent Pulse 与 PTY completion 隔离 | `join-v2-mailbox-drain.test.mjs` |
+| process-execution-009 | 物理输出捕获有界与 Spool 机制 | 缓冲预算切换 spool 流式转储 | `process-output.test.mjs`, `pty-session.test.mjs` |
+| process-execution-010 | Terminal 与 Run 完成投影 | 真实退出码与输出投影 | `join-v2-wire-pty.test.mjs`, `process-runner.test.mjs`, `executor-tool.test.mjs` |
+| process-execution-011 | Run/Query-Shell 参数能力与非蒸馏 | 参数对等校验与无蒸馏 | `executor-tool.test.mjs` |
+| process-execution-012 | process 与 PTY contract 窄能力 | 纯词汇与适配器隔离 | `m6-slice-boundary.test.mjs` |
+| process-execution-013 | 大输出零 Distiller 与原始留尾 | 任意输出零 Distiller、尾部原始 | `output-truncation-contract.test.mjs` |
+| process-execution-014 | 真实程序事实与显式截断声明 | 事实不从日志推断、截断说明明确 | `output-truncation-contract.test.mjs` |
+| process-execution-015 | 显式字节预算与 UTF-8 边界安全 | 字节预算计量、UTF-8 边界对齐 | `output-truncation-contract.test.mjs` |
+| process-execution-016 | Large Gate 单持有者互斥门禁 | FIFO 排队、取消、互斥释放 | `large-gate.test.mjs`, `large-gate-runner.test.mjs` |
+| process-execution-017 | 自定义工具留尾截断 | 留尾截断、标记注入、行边界完整 | `tool-result-bound.test.mjs` |
 
 ## DEPENDS ON
 

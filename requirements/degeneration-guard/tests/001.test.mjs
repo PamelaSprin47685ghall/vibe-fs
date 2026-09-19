@@ -36,7 +36,7 @@ const referenceScore = (text) => {
   return { weightedDistinctTokens, step }
 }
 
-test('WHAT[DG-001] LOOP_003_single_token_repetition_becomes_too_repetitive', () => {
+test('WHAT[degeneration-guard-001] LOOP_003_single_token_repetition_becomes_too_repetitive', () => {
   const unit = ' retry'
   assert.equal(encode(unit).length, 1, 'fixture must be one o200k token')
 
@@ -45,7 +45,7 @@ test('WHAT[DG-001] LOOP_003_single_token_repetition_becomes_too_repetitive', () 
   assert.equal(result.state, 'TooRepetitive')
   assert.ok(result.weightedDistinctTokens < loopDetector.minimumWeightedDistinctCount)
 })
-test('WHAT[DG-001] LOOP_003_repository_like_programmatic_text_stays_normal', () => {
+test('WHAT[degeneration-guard-001] LOOP_003_repository_like_programmatic_text_stays_normal', () => {
   const body = `
 export class OrderProcessor {
   constructor(private readonly repository: OrderRepository, private readonly paymentGateway: PaymentGateway) {}
@@ -121,7 +121,7 @@ const rawDeltaWithoutMessage = (session, field, text) => ({
   },
 })
 
-test('WHAT[DG-001] LOOP_003_high_side_is_too_random_and_owns_its_continuation', async () => {
+test('WHAT[degeneration-guard-001] LOOP_003_high_side_is_too_random_and_owns_its_continuation', async () => {
   const text = chaoticText()
   const evaluation = loopDetector.pushText(loopDetector.create(), text)
   assert.equal(evaluation.state, 'TooRandom', `weightedDistinct=${evaluation.weightedDistinctTokens}`)

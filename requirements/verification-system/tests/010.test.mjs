@@ -24,7 +24,7 @@ function createMemorySink() {
   }
 
 for (const failingLabel of ['format:check', 'check', 'build']) {
-  test(`WHAT[VERIFICATION-SYSTEM-001] verify halts and marks subsequent steps not-run when ${failingLabel} fails`, async () => {
+  test(`WHAT[verification-system-001] verify halts and marks subsequent steps not-run when ${failingLabel} fails`, async () => {
     const tmpLogDir = mkdtempSync(join(tmpdir(), 'proof-ladder-fail-'))
     const sink = createMemorySink()
   const spawned = []
@@ -60,7 +60,7 @@ for (const failingLabel of ['format:check', 'check', 'build']) {
 })
   }
 
-test('WHAT[VERIFICATION-SYSTEM-010] acceptance criteria only tighten — a failing gate propagates failure', async () => {
+test('WHAT[verification-system-010] acceptance criteria only tighten — a failing gate propagates failure', async () => {
   // 行为面：导入 check.mjs 的 main/runChecks，以失败 gate 测试，必须返回非零退出码。
   const dir = mkdtempSync(join(tmpdir(), 'proof-ladder-fail-'))
   try {
@@ -75,7 +75,7 @@ test('WHAT[VERIFICATION-SYSTEM-010] acceptance criteria only tighten — a faili
   }
 })
 
-test('WHAT[VERIFICATION-SYSTEM-010] acceptance criteria only tighten — an unreadable gate is failure', async () => {
+test('WHAT[verification-system-010] acceptance criteria only tighten — an unreadable gate is failure', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'proof-ladder-missing-'))
   try {
     const { main } = await import('../../../scripts/check.mjs')

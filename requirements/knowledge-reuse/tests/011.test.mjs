@@ -40,7 +40,7 @@ const assertUnavailable = (text) => assert.match(text, /could not be read from t
 
 const assertNoMachineFreshness = (text) => assert.doesNotMatch(text, /\b(session_id|status|freshness|refresh)\s*=/)
 
-test('WHAT[KNOWLEDGE-REUSE-011] CASE011_fetch_single_flight_serializes_same_shelfmark', async () => {
+test('WHAT[knowledge-reuse-011] CASE011_fetch_single_flight_serializes_same_shelfmark', async () => {
   const { dir, handle, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')

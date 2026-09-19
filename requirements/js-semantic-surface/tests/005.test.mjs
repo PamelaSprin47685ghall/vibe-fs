@@ -30,7 +30,7 @@ const wholeSemanticFiles = new Set(semanticTestFiles(join(ROOT, 'requirements'))
 
 const wholeSemanticImportEdges = semanticImportEdges(join(ROOT, 'requirements'))
 
-test('WHAT[JS-SEMANTIC-SURFACE-005] JS_SURFACE_005_js_native_representation_rules', () => {
+test('WHAT[js-semantic-surface-005] JS_SURFACE_005_js_native_representation_rules', () => {
   assert.equal(isJsData(null), true)
   assert.equal(isJsData('s'), true)
   assert.equal(isJsData(42), true)

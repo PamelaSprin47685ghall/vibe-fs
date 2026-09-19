@@ -15,10 +15,10 @@ const failureOwner = await import("../../../dist/Participant/Provider/Attempt/Fa
 const { JournalSurface_bootWithWriterId: bootWithWriterId, JournalSurface_dispose: dispose } = await import("../../../dist/Persistence/Journal/Surface.js");
 
 
-test('WHAT[CRASH-012] VERIFY_008_child_recovery_workflow_commits_terminal_then_pulses_once_single_owner', () => {
+test('WHAT[crash-reconciliation-012] VERIFY_008_child_recovery_workflow_commits_terminal_then_pulses_once_single_owner', () => {
   assert.equal(child.resolve('active', 'terminal', [], 'done').result, 'RecoveredTerminal')
 })
-test('WHAT[CRASH-012] VERIFY_008_child_recovery_workflow_terminal_commit_single_owner_no_raw_publish_completion', () => {
+test('WHAT[crash-reconciliation-012] VERIFY_008_child_recovery_workflow_terminal_commit_single_owner_no_raw_publish_completion', () => {
   // Gap test 1: Terminal resolution commits a proven terminal proof and emits pulse
   // The production ChildRecoveryWorkflow single-owner path never publishes bare PublishCompletion
   const committed = child.resolve('active', 'terminal', [], 'done')
@@ -39,13 +39,13 @@ const handles = await import("../../../dist/Execution/Delegation/Handle/Surface.
 
 const active = () => handles.crashScenario('active')
 
-test('WHAT[CRASH-012] P0_RECOVERY_JOIN_001_crash_after_retired_is_idempotent', () => {
+test('WHAT[crash-reconciliation-012] P0_RECOVERY_JOIN_001_crash_after_retired_is_idempotent', () => {
   const state = handles.crashScenario('retired')
   assert.equal(state.lifecycle, 'Retired')
   assert.equal(state.joinable, 0)
   assert.equal(state.retired, true)
 })
-test('WHAT[CRASH-012] P0_RECOVERY_JOIN_001_duplicate_retire_and_late_complete_are_absorbed', () => {
+test('WHAT[crash-reconciliation-012] P0_RECOVERY_JOIN_001_duplicate_retire_and_late_complete_are_absorbed', () => {
   const state = handles.crashScenario('replayed-retired')
   assert.equal(state.lifecycle, 'Retired')
   assert.equal(state.retired, true)

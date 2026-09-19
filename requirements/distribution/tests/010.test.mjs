@@ -5,7 +5,7 @@ import test from 'node:test'
 
 const ROOT = new URL('../../..', import.meta.url).pathname
 
-test('WHAT[DISTRIBUTION-010] distribution artifact contains active registrations and surface consistency', async () => {
+test('WHAT[distribution-010] distribution artifact contains active registrations and surface consistency', async () => {
   // 1. 资源目录完全闭包深比较 (deepEqual)
   const roleDir = join(ROOT, 'resources/provider/role')
   assert.ok(existsSync(roleDir), 'resources/provider/role directory must exist')

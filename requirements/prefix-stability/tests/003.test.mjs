@@ -22,7 +22,7 @@ const probeFor = ({ cutoff = 5, id = 'probe-1' } = {}) => ({
   candidate: snapshotAt(cutoff),
 })
 
-test('WHAT[PREFIX-STABILITY-003] CTX_010_a_discarded_probe_leaves_the_committed_epoch_in_place', () => {
+test('WHAT[prefix-stability-003] CTX_010_a_discarded_probe_leaves_the_committed_epoch_in_place', () => {
   // The absence of a rollback, seen from the planner: a failed probe attempt produces
   // no promotable probe, and the next slot's plan reads the same committed snapshot.
   const committed = snapshotAt(4)
@@ -44,7 +44,7 @@ test('WHAT[PREFIX-STABILITY-003] CTX_010_a_discarded_probe_leaves_the_committed_
   const next = prefix.forChoice({ kind: 'committed' }, committed, companion.memoryPreamble, 'B BODY')
   assert.equal(next.dropLeading, 4)
 })
-test('WHAT[PREFIX-STABILITY-003] CTX_010_a_probe_plan_and_a_committed_plan_are_built_the_same_way', () => {
+test('WHAT[prefix-stability-003] CTX_010_a_probe_plan_and_a_committed_plan_are_built_the_same_way', () => {
   // A probe is not a different kind of request — it is the same request with a
   // candidate prefix. Separate code paths would let the two drift, and CTX-012 requires
   // a promoted probe to be byte-identical to what the successful attempt sent.
@@ -55,7 +55,7 @@ test('WHAT[PREFIX-STABILITY-003] CTX_010_a_probe_plan_and_a_committed_plan_are_b
 
   assert.deepEqual(asProbe, asCommitted)
 })
-test('WHAT[PREFIX-STABILITY-003] CTX_010_the_required_blob_follows_the_choice_not_the_committed_state', () => {
+test('WHAT[prefix-stability-003] CTX_010_the_required_blob_follows_the_choice_not_the_committed_state', () => {
   // The failure this prevents: reading the COMMITTED snapshot's blob for a probe
   // attempt injects the old FrozenRecordPrefix under the candidate's synthetic id. The provider
   // sees a changed prefix, and no fold can detect it — both halves are individually
@@ -99,7 +99,7 @@ const rebase = (state, { previousEpoch, nextEpoch, cutoff, digest, seal, prefixD
 const reanchor = (state, { previousEpoch, nextEpoch, observedRun = 'msg_compaction' }) =>
   prefix.applyReanchor({ previousEpoch, nextEpoch, observedRun }, state)
 
-test('WHAT[PREFIX-STABILITY-003] CTX_010_a_failed_probe_leaves_no_trace_to_undo', () => {
+test('WHAT[prefix-stability-003] CTX_010_a_failed_probe_leaves_no_trace_to_undo', () => {
   // There is no rollback operation to test, and that absence IS the clause: a
   // discarded candidate never became a fact. The projection a failed probe leaves
   // behind is byte-identical to the one before it.

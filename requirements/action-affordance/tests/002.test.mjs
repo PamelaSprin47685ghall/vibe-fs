@@ -22,7 +22,7 @@ const HIGH_RISK_TOOLS = Object.freeze([
   'bash-honeypot',
 ])
 
-test('WHAT[ACTION-AFFORDANCE-002] AA_high_risk_verbs_maintain_complete_contracts_and_bilingual_cognitive_anchors', () => {
+test('WHAT[action-affordance-002] AA_high_risk_verbs_maintain_complete_contracts_and_bilingual_cognitive_anchors', () => {
   for (const tool of HIGH_RISK_TOOLS) {
     for (const locale of LOCALES) {
       const path = `resources/provider/tool/${tool}/description/${locale}.md`

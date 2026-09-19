@@ -10,7 +10,7 @@ const ok = (result) => result.ok
 const exact = (text) => ({ kind: 'exact', text })
 const regex = (text) => ({ kind: 'regex', text })
 
-test('WHAT[REPOSITORY-PROGRAMMING-018] JS019_failure_codes_are_stable_and_unique', () => {
+test('WHAT[repository-programming-018] JS019_failure_codes_are_stable_and_unique', () => {
   const expectedCodes = [
     'INVALID_PROGRAM',
     'PROGRAM_FAILED',
@@ -69,13 +69,13 @@ const PROGRAM = `class Js extends JsProgram {
   }
 }`
 
-test('WHAT[REPOSITORY-PROGRAMMING-018] JS019_invalid_javascript_is_invalid_program', async () => {
+test('WHAT[repository-programming-018] JS019_invalid_javascript_is_invalid_program', async () => {
   const bad = `class Js extends JsProgram { async run() { return { broken: } } }`
   const result = await runWrapped(bad, { js: {} })
   assert.equal(result.ok, false)
   assert.equal(failureCode(result), 'INVALID_PROGRAM')
 })
-test('WHAT[REPOSITORY-PROGRAMMING-018] JS019_program_throw_is_program_failed', async () => {
+test('WHAT[repository-programming-018] JS019_program_throw_is_program_failed', async () => {
   const throwing = `class Js extends JsProgram {
   async run() { throw new Error('boom'); }
 }`
@@ -115,7 +115,7 @@ const runWorkflow = async (dir, program, { deadlineMs = 2000, store = null } = {
   surface: coderSurface(),
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-018] JS085_workflow_file_missing_fails_the_program', async () => {
+test('WHAT[repository-programming-018] JS085_workflow_file_missing_fails_the_program', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const program = `class Js extends JsProgram {
@@ -133,7 +133,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-018] JS085_workflow_file_missing_fails_the_pro
     cleanup()
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-018] JS019_missing_anchor_uses_stable_code', async () => {
+test('WHAT[repository-programming-018] JS019_missing_anchor_uses_stable_code', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')

@@ -59,7 +59,7 @@ const rawDeltaWithoutMessage = (session, field, text) => ({
   },
 })
 
-test('WHAT[DG-012] LOOP_012_degeneration_guard_is_the_single_closed_recovery_owner', async () => {
+test('WHAT[degeneration-guard-012] LOOP_012_degeneration_guard_is_the_single_closed_recovery_owner', async () => {
   const continuations = []
   const sensor = createSensor({
     owned: ['ses_closed'],

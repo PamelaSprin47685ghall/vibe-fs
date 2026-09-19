@@ -30,7 +30,7 @@ const wholeSemanticFiles = new Set(semanticTestFiles(join(ROOT, 'requirements'))
 
 const wholeSemanticImportEdges = semanticImportEdges(join(ROOT, 'requirements'))
 
-test('WHAT[JS-SEMANTIC-SURFACE-001] JS_SURFACE_001_all_semantic_tests_are_mjs', () => {
+test('WHAT[js-semantic-surface-001] JS_SURFACE_001_all_semantic_tests_are_mjs', () => {
   const testFiles = walk(join(ROOT, 'requirements'), ['.test.mjs', '.test.js', '.test.fs', '.test.ts', '.test.fsx'])
   assert.deepEqual(
     testFiles.filter((file) => !file.endsWith('.test.mjs')).map(relativePath),

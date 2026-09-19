@@ -24,7 +24,7 @@ const snapshot = (overrides = {}) => ({
 })
 const decide = (decoded, durable = snapshot()) => intent.resolve(decoded, durable)
 
-test('WHAT[INTERACTION-AUTHORITY-005] exhaustive chat admission intent table', () => {
+test('WHAT[interaction-authority-005] exhaustive chat admission intent table', () => {
   const claim = {
     promptKey: 'prompt-1',
     sessionId: 'ses-chat',
@@ -81,7 +81,7 @@ test('WHAT[INTERACTION-AUTHORITY-005] exhaustive chat admission intent table', (
     assert.deepEqual(intent.resolve(row.decoded, row.durable ?? snapshot()), row.expected, row.label)
   }
 })
-test('WHAT[INTERACTION-AUTHORITY-005] rejects managed intent without physical message identity', () => {
+test('WHAT[interaction-authority-005] rejects managed intent without physical message identity', () => {
   assert.deepEqual(decide(message({ physicalUserMessageId: null, explicitAgent: 'engineer' })), {
     case: 'Reject',
     reason: 'ManagedIntentMissingPhysicalUserMessageId',
@@ -104,7 +104,7 @@ test('WHAT[INTERACTION-AUTHORITY-005] rejects managed intent without physical me
     { case: 'Reject', reason: 'ManagedIntentMissingPhysicalUserMessageId' },
   )
 })
-test('WHAT[INTERACTION-AUTHORITY-005] rejects insufficient exact identity evidence', () => {
+test('WHAT[interaction-authority-005] rejects insufficient exact identity evidence', () => {
   const rows = [
     [message({ sessionId: null, explicitAgent: 'engineer' }), 'ManagedIntentMissingSessionId'],
     [message({ explicitAgent: 'legacy-coder' }), 'InvalidExplicitAgent'],
@@ -204,7 +204,7 @@ const mustFold = (wires) => {
 const phaseOf = (projection, physicalUserMessageId) =>
   projection.find((entry) => entry.physicalUserMessageId === physicalUserMessageId)
 
-test('WHAT[CHATEXEC-005] ProviderStarted enforces acceptance provider run and terminal fences', () => {
+test('WHAT[managed-chat-execution-005] ProviderStarted enforces acceptance provider run and terminal fences', () => {
   const beforeAccepted = fold([startedWire('msg-start')])
   assert.equal(beforeAccepted.ok, false)
 
@@ -278,7 +278,7 @@ const terminal = (disposition, attempt = evidence(), appendOutcome = 'Committed'
 })
 const run = (...actions) => chatExecution.providerLifecycleScenario(actions)
 
-test('WHAT[CHATEXEC-005] equal start and terminal duplicates are semantic no-ops', async () => {
+test('WHAT[managed-chat-execution-005] equal start and terminal duplicates are semantic no-ops', async () => {
   const result = await run(
     accept(),
     start(),
@@ -291,7 +291,7 @@ test('WHAT[CHATEXEC-005] equal start and terminal duplicates are semantic no-ops
   assert.deepEqual(result.appendCounts, { accepted: 1, providerStarted: 1, terminal: 1 })
   assert.equal(result.semanticTransitionCount, 3)
 })
-test('WHAT[CHATEXEC-005] ProviderStarted before Accepted rejects', async () => {
+test('WHAT[managed-chat-execution-005] ProviderStarted before Accepted rejects', async () => {
   const result = await run(start())
   assert.equal(result.ok, false)
   assert.equal(result.error.kind, 'MissingAccepted')
@@ -333,7 +333,7 @@ const terminal = ({
   },
 })
 
-test('WHAT[CHATEXEC-005] exact public assistant observation alone establishes provider start', () => {
+test('WHAT[managed-chat-execution-005] exact public assistant observation alone establishes provider start', () => {
   const started = terminal({ completed: undefined })
   delete started.properties.info.time.completed
   assert.deepEqual(hostSignals.tryDecodeExactProviderStart(started), {

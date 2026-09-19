@@ -21,8 +21,8 @@ const wake = {
 const name = (observation, signal = wake.retry()) =>
   reconcileSurface.decisionName(reconcileSurface.decideStep(signal, observation))
 
-test('WHAT[STRUCTURED-WORKFLOW-009] operator abort is a control-plane wake, never a business outcome', () => {
-  // EXEC-020 / STRUCTURED-WORKFLOW-009: cancellation/interruption are control
+test('WHAT[structured-workflow-009] operator abort is a control-plane wake, never a business outcome', () => {
+  // EXEC-020 / structured-workflow-009: cancellation/interruption are control
   // events, not business result data. The abort signal lives in ReconcileWake
   // (a typed control-plane channel) and must never be minted as a TurnOutcome.
   const wakes = [wake.idle('ses-a', 1), wake.retry(), wake.failure(), wake.abort()]

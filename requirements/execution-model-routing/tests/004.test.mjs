@@ -19,7 +19,7 @@ const fill = async (runtime, count, prefix = 'waiting') => {
   return queued
 }
 
-test('WHAT[EMR-004] an ineligible head does not block a later eligible demand', async () => {
+test('WHAT[execution-model-routing-004] an ineligible head does not block a later eligible demand', async () => {
   let freeEnabled = false
   const runtime = routing.createRuntime((role) => {
     if (role === 'devops') return target('provider/trigger')
@@ -105,7 +105,7 @@ const providerLimited = (limits, routes) => (role, running, previous) => {
   return candidates.find(available) ?? null
 }
 
-test('WHAT[EMR-004] EMR_004_required_null_waits_for_an_occupancy_event_then_retries', async () => {
+test('WHAT[execution-model-routing-004] EMR_004_required_null_waits_for_an_occupancy_event_then_retries', async () => {
   const route = (_role, running) => running.filter((item) => item.model === 'provider/only').length < 1
     ? target('provider/only')
     : null
@@ -127,7 +127,7 @@ test('WHAT[EMR-004] EMR_004_required_null_waits_for_an_occupancy_event_then_retr
   assert.equal(pendingCount(runtime), 0)
   assert.equal(snapshotOccupied(runtime).length, 1)
 })
-test('WHAT[EMR-004] EMR_004_newer_physical_message_cancels_superseded_pending_demand', async () => {
+test('WHAT[execution-model-routing-004] EMR_004_newer_physical_message_cancels_superseded_pending_demand', async () => {
   const runtime = createRuntime((role) => role === 'devops' ? null : target(`provider/${role}`))
 
   const old = acquireManaged(runtime, 'same-session', 'msg-old', 'devops', 'alice')
@@ -142,7 +142,7 @@ test('WHAT[EMR-004] EMR_004_newer_physical_message_cancels_superseded_pending_de
   assert.equal(pendingCount(runtime), 0)
   assert.equal(snapshotOccupied(runtime).length, 1)
 })
-test('WHAT[EMR-004] EMR_004_an_earlier_null_waiter_does_not_head_of_line_block_another_role', async () => {
+test('WHAT[execution-model-routing-004] EMR_004_an_earlier_null_waiter_does_not_head_of_line_block_another_role', async () => {
   const runtime = createRuntime((role) => role === 'devops' ? null : target(`provider/${role}`))
 
   const blocked = acquireManaged(runtime, 'blocked-session', 'msg-blocked', 'devops', 'alice')
@@ -158,13 +158,13 @@ test('WHAT[EMR-004] EMR_004_an_earlier_null_waiter_does_not_head_of_line_block_a
   assert.equal(blockedOutcome.kind, 'Cancelled')
   assert.equal(blockedOutcome.target, null)
 })
-test('WHAT[EMR-004] EMR_004_optional_null_is_k0_not_a_pending_demand', () => {
+test('WHAT[execution-model-routing-004] EMR_004_optional_null_is_k0_not_a_pending_demand', () => {
   const runtime = createRuntime(() => null)
   assert.equal(tryReserveManaged(runtime, 'replica', 'engineer', null), null)
   assert.equal(pendingCount(runtime), 0)
   assert.deepEqual(snapshotOccupied(runtime), [])
 })
-test('WHAT[EMR-004] EMR_004_strength_reservation_is_adopted_by_chat_message_without_double_counting', async () => {
+test('WHAT[execution-model-routing-004] EMR_004_strength_reservation_is_adopted_by_chat_message_without_double_counting', async () => {
   let calls = 0
   const runtime = createRuntime(() => {
     calls += 1
@@ -181,7 +181,7 @@ test('WHAT[EMR-004] EMR_004_strength_reservation_is_adopted_by_chat_message_with
   assert.equal(snapshotOccupied(runtime).length, 1, 'reservation and physical execution are one capacity occurrence')
   assert.equal(key(tryLease(runtime, 'replica', 'msg-replica', 'engineer', 'alice', null)), 'provider/replica|none')
 })
-test('WHAT[EMR-004] EMR_004_reservation_adoption_binds_role_and_participant', async () => {
+test('WHAT[execution-model-routing-004] EMR_004_reservation_adoption_binds_role_and_participant', async () => {
   const runtime = createRuntime(() => target('provider/replica'))
   tryReserveManaged(runtime, 'replica', 'engineer', null)
 
@@ -218,7 +218,7 @@ const promptOptions = (overrides = {}) => ({
   ...overrides,
 })
 
-test('WHAT[EMR-004] EMR_004_sdk_prompt_async_awaits_host_enqueue_and_surfaces_enqueue_rejection', async () => {
+test('WHAT[execution-model-routing-004] EMR_004_sdk_prompt_async_awaits_host_enqueue_and_surfaces_enqueue_rejection', async () => {
   let releaseHost
   let rejectHost
   let invoked = false

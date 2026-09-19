@@ -39,7 +39,7 @@ const banned = [
   /SemanticAssessment|GenerateCandidates|InvestigateRequest|SynthesizeRequest|RootContract|CognitiveAction/,
 ];
 
-test('WHAT[EPI-015] core_sources_exclude_epistemic_vocabulary_or_naive_core_reintroduces_legacy_ontology', () => {
+test('WHAT[epistemic-reasoning-015] core_sources_exclude_epistemic_vocabulary_or_naive_core_reintroduces_legacy_ontology', () => {
   const files = coreFiles().filter((file) => {
     const base = file.split('/').pop();
     return base !== 'McpServer.fs' && base !== 'McpServer.fsi';
@@ -54,7 +54,7 @@ test('WHAT[EPI-015] core_sources_exclude_epistemic_vocabulary_or_naive_core_rein
   void source;
 });
 
-test('WHAT[EPI-015] ids_are_kind_specific_opaque_or_stringly_typed_core_accepts_any_string', async () => {
+test('WHAT[epistemic-reasoning-015] ids_are_kind_specific_opaque_or_stringly_typed_core_accepts_any_string', async () => {
   const surface = gecSurface;
   const valid = [
     { kind: 'InquiryId', value: 'iq_01h455vb4pex5vsknk084sn02x' },
@@ -102,7 +102,7 @@ test('WHAT[EPI-015] ids_are_kind_specific_opaque_or_stringly_typed_core_accepts_
   }
 });
 
-test('WHAT[EPI-015] envelopes_compare_by_schema_identity_not_payload_semantics_or_core_interprets_payload', async () => {
+test('WHAT[epistemic-reasoning-015] envelopes_compare_by_schema_identity_not_payload_semantics_or_core_interprets_payload', async () => {
   const surface = gecSurface;
   const basePayload = { text: 'same bytes', n: 3 };
   const eventWith = (schemaId, kind) => ({

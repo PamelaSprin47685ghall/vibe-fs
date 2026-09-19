@@ -1,3 +1,0 @@
-# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
-# requirements/external-investigation/** is covered implicitly and must not be listed here.
-# Package is retracted; no active external paths.

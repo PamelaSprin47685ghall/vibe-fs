@@ -61,7 +61,7 @@ const observation = (result) => {
   return result.observation
 }
 
-test('WHAT[DISPATCH-PROTOCOL-011] PROMPT_006_send_payload_carries_prompt_key_metadata', async () => {
+test('WHAT[dispatch-protocol-011] PROMPT_006_send_payload_carries_prompt_key_metadata', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-send-meta-'))
   try {
     const opened = await journal.JournalSurface_bootWithWriterId(base, 'writer-send-meta', 'rt-send-meta', 4242, '2026-01-01T00:00:00Z')

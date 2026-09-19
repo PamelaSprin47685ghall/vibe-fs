@@ -28,7 +28,7 @@ const program = `class Js extends JsProgram {
   }
 }`
 
-test('WHAT[REQUIREMENT-GROUNDING-010] js-* read is a real read: covered code triggers grounding and already-read Markdown is deduplicated', async () => {
+test('WHAT[requirement-grounding-010] js-* read is a real read: covered code triggers grounding and already-read Markdown is deduplicated', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const readProgram = `class Js extends JsProgram {

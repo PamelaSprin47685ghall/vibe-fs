@@ -87,7 +87,7 @@ const assertSetAndCausalOrder = (events, expectedEvents) => {
 const hasReverseLexicalCausalEdge = (events) =>
   events.some((event) => event.parents.some((parent) => parent > event.id))
 
-test('WHAT[DURABLE-CONVERGENCE-002] cross-writer dependency is ordered before its child', () => {
+test('WHAT[durable-convergence-002] cross-writer dependency is ordered before its child', () => {
   const parent = {
     id: 'ffffffffffffffffffffffffffffffffffffffff',
     stream: 'property/k-way',
@@ -113,7 +113,7 @@ test('WHAT[DURABLE-CONVERGENCE-002] cross-writer dependency is ordered before it
     [parent.id, child.id],
   )
 })
-test('WHAT[DURABLE-CONVERGENCE-002] generated k-way merge preserves union across writer permutations and exact duplicates', () => {
+test('WHAT[durable-convergence-002] generated k-way merge preserves union across writer permutations and exact duplicates', () => {
   fc.assert(
     fc.property(scenario, (generated) => {
       const events = generated.nodes.map((_, index) =>
@@ -136,7 +136,7 @@ test('WHAT[DURABLE-CONVERGENCE-002] generated k-way merge preserves union across
     { seed: 0x4b574d47, numRuns: 500 },
   )
 })
-test('WHAT[DURABLE-CONVERGENCE-002] generated independent streams compose associatively', () => {
+test('WHAT[durable-convergence-002] generated independent streams compose associatively', () => {
   fc.assert(
     fc.property(independentScenario, ({ nodes, eventIds }) => {
       const streams = Array.from({ length: 3 }, (_, writer) => [
@@ -179,12 +179,12 @@ const A = 'a'.repeat(40)
 const B = 'b'.repeat(40)
 const C = 'c'.repeat(40)
 
-test('WHAT[DURABLE-CONVERGENCE-002] writer enumeration is commutative', () => {
+test('WHAT[durable-convergence-002] writer enumeration is commutative', () => {
   const a = ['writer-a', [make(A), make(C, [A])]]
   const b = ['writer-b', [make(B)]]
   assert.deepEqual(ids(merge.merge([a, b])), ids(merge.merge([b, a])))
 })
-test('WHAT[DURABLE-CONVERGENCE-002] duplicate stream input is idempotent by EventId', () => {
+test('WHAT[durable-convergence-002] duplicate stream input is idempotent by EventId', () => {
   const event = make(A, [], 'merge/main', { x: 1 })
   const result = merge.merge([
     ['writer-a', [event]],
@@ -232,7 +232,7 @@ const withStore = async (writerId, fn) => {
   }
 }
 
-test('WHAT[DURABLE-CONVERGENCE-002] merge is commutative associative idempotent at writer stream level', () => {
+test('WHAT[durable-convergence-002] merge is commutative associative idempotent at writer stream level', () => {
   const sa = ['writer-a', [make(A)]]
   const sb = ['writer-b', [make(B)]]
   const sc = ['writer-c', [make(C)]]
@@ -257,7 +257,7 @@ const retention = await import("../../../dist/Persistence/EventStore/RetentionSu
 const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 const make = (id, stream, parents = []) => ({ id, stream, type: 'JobRequested', parents, payload: {}, payloadRefs: [] })
 
-test('WHAT[DURABLE-CONVERGENCE-002] one k-way primitive is shared by integrator and sync', async () => {
+test('WHAT[durable-convergence-002] one k-way primitive is shared by integrator and sync', async () => {
   const primitive = await read('src/Wanxiangshu/Persistence/EventStore/EventKWayMerge.fs')
   const integrator = await read('src/Wanxiangshu/Persistence/EventStore/IntegratorEngine.fs')
   const sync = await read('src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs')
@@ -269,7 +269,7 @@ test('WHAT[DURABLE-CONVERGENCE-002] one k-way primitive is shared by integrator 
   assert.doesNotMatch(integrator, /sortBy.*EventId.*writerId/is, 'Integrator must not own a second k-way implementation')
   assert.doesNotMatch(sync, /observed_at.*runtime_id.*local_seq/is, 'sync must not invent a second event-ordering algorithm')
 })
-test('WHAT[DURABLE-CONVERGENCE-002] k-way cursor readiness is one finite state not parallel mutable axes', async () => {
+test('WHAT[durable-convergence-002] k-way cursor readiness is one finite state not parallel mutable axes', async () => {
   const primitive = await read('src/Wanxiangshu/Persistence/EventStore/EventKWayMerge.fs')
 
   assert.match(primitive, /type private CursorReadiness\s*=\s*[\s\S]*Waiting[\s\S]*Queued[\s\S]*Exhausted/)

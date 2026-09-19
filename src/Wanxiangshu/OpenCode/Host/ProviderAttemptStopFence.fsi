@@ -3,7 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 
-/// PAR-022：宿主「已停止自动重试」的 process-local 发送栅栏。
+/// provider-attempt-recovery-022：宿主「已停止自动重试」的 process-local 发送栅栏。
 ///
 /// 只回答一个问题：这个确切 provider attempt 的宿主终态投影（finalized
 /// errored assistant message）是否已被观察？不写 Journal、不参与 crash

@@ -9,7 +9,7 @@ assert.equal(linked.ok, true, linked.message)
 
 const state = linked.value
 
-test('WHAT[SESSION-ONTOLOGY-007] HOST_008_durable_link_derives_work_and_leaf_cells', () => {
+test('WHAT[session-ontology-007] HOST_008_durable_link_derives_work_and_leaf_cells', () => {
   assert.deepEqual(assoc.classify('ses_main', state), {
     executionClass: 'Work',
     ownership: { kind: 'Root', owner: null, attachment: null, transactionId: null },

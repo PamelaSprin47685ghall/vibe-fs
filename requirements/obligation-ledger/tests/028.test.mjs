@@ -5,7 +5,7 @@ const { default: test } = await import("node:test");
 const { assertFatalBoundary } = await import("../../structured-workflow/tests/support/m6-boundary-proof.mjs");
 
 
-test('WHAT[OBLIGATION-LEDGER-028] ledger fatal follows exact checkpoint settlement and one injected fuse', () => assertFatalBoundary('obligation-ledger'))
+test('WHAT[obligation-ledger-028] ledger fatal follows exact checkpoint settlement and one injected fuse', () => assertFatalBoundary('obligation-ledger'))
 }
 
 {
@@ -44,7 +44,7 @@ const argsWithObligations = (obligations = [{ name: 'task-1', horizon: 'near', w
   },
 })
 
-test('WHAT[OBLIGATION-LEDGER-028] before refuses when the durable journal is absent', async () => {
+test('WHAT[obligation-ledger-028] before refuses when the durable journal is absent', async () => {
   const result = await membrane.MagicTodoMembraneSurface_runHooksBefore(
     null, // no AgentJournal — the capability is legitimately absent
     null,
@@ -54,7 +54,7 @@ test('WHAT[OBLIGATION-LEDGER-028] before refuses when the durable journal is abs
   assert.equal(result.kind, 'provider_input_rejected')
   assert.match(result.reason, /durable AgentJournal|durable/i)
 })
-test('WHAT[OBLIGATION-LEDGER-028] before refuses when sessionID or callID is missing or blank', async () => {
+test('WHAT[obligation-ledger-028] before refuses when sessionID or callID is missing or blank', async () => {
   const opened = await openJournal()
   try {
     const { journal: durable } = opened
@@ -78,7 +78,7 @@ test('WHAT[OBLIGATION-LEDGER-028] before refuses when sessionID or callID is mis
     opened.close()
   }
 })
-test('WHAT[OBLIGATION-LEDGER-028] before refuses when the snapshot port is absent', async () => {
+test('WHAT[obligation-ledger-028] before refuses when the snapshot port is absent', async () => {
   const opened = await openJournal()
   try {
     const { journal: durable } = opened

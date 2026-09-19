@@ -30,7 +30,7 @@ const toolModule = {
 const waitForPromptCount = (runtime, count) => forkTool.awaitPromptCount(runtime, count)
 const ownerDescriptor = (sessionId) => [{ sessionId, agent: 'manager' }]
 
-test('WHAT[DELEG-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_and_leaves_completion_to_join', async () => {
+test('WHAT[delegation-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_and_leaves_completion_to_join', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-reuse-'))
   const owner = 'manager-reuse'
   const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
@@ -108,7 +108,7 @@ const { default: test } = await import("node:test");
 const handoff = await import("../../../dist/Execution/Delegation/HandoffSurface.js");
 
 
-test('WHAT[DELEG-024] reusable handoff advances one durable parent delta window at a time', () => {
+test('WHAT[delegation-024] reusable handoff advances one durable parent delta window at a time', () => {
   const first = handoff.handoffWindow(null, 10)
   assert.deepEqual(first, { start: 0, end: 10, isInitial: true })
 
@@ -117,13 +117,13 @@ test('WHAT[DELEG-024] reusable handoff advances one durable parent delta window 
 
   assert.deepEqual(handoff.handoffWindow(17, 17), { start: 17, end: 17, isInitial: false })
 })
-test('WHAT[DELEG-024] reusable prompt carries the new charge and parent delta as data', () => {
+test('WHAT[delegation-024] reusable prompt carries the new charge and parent delta as data', () => {
   const prompt = handoff.render('fix the second defect', 'parent delta only')
   assert.match(prompt, /# fix the second defect/)
   assert.match(prompt, /parent_delta_work_record\s*=/)
   assert.match(prompt, /parent delta only/)
 })
-test('WHAT[DELEG-024] bounded child result never widens to an earlier invocation', () => {
+test('WHAT[delegation-024] bounded child result never widens to an earlier invocation', () => {
   assert.deepEqual(handoff.childRange(31, 44), { start: 31, end: 44 })
 })
 }
@@ -199,10 +199,10 @@ const verifyReusableHandoff = async (role) => {
   } finally { sync.dispose(h) }
 }
 
-test('WHAT[DELEG-024] SYNC_RUNTIME_inspector_reuse_sends_parent_delta_waits_for_own_root_and_returns_own_child_delta', async () => {
+test('WHAT[delegation-024] SYNC_RUNTIME_inspector_reuse_sends_parent_delta_waits_for_own_root_and_returns_own_child_delta', async () => {
   await verifyReusableHandoff('Engineer')
 })
-test('WHAT[DELEG-024] SYNC_RUNTIME_coder_reuse_sends_parent_delta_waits_for_own_root_and_returns_own_child_delta', async () => {
+test('WHAT[delegation-024] SYNC_RUNTIME_coder_reuse_sends_parent_delta_waits_for_own_root_and_returns_own_child_delta', async () => {
   await verifyReusableHandoff('Coder')
 })
 }

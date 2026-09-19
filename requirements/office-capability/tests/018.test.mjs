@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as office from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 
-test('WHAT[OFF-018] sphinx is programmatic workflow with synchronous read-only engineer survey and without role persona or fission', () => {
+test('WHAT[office-capability-018] sphinx is programmatic workflow with synchronous read-only engineer survey and without role persona or fission', () => {
   // 1. Non-consequence: Sphinx is not a forkable office/persona
   const forkable = office.managerForkableOffices()
   assert.equal(forkable.includes('sphinx'), false)

@@ -16,19 +16,19 @@ const legacyResult = ({ callID = 'legacy', output = 'legacy' } = {}) => ({
   state: { status: 'completed', output },
 })
 
-test('WHAT[HOST-BOUNDARY-020] HOST_012_tool_part_shape_decodes_to_wire_tool_result', () => {
+test('WHAT[host-boundary-020] HOST_012_tool_part_shape_decodes_to_wire_tool_result', () => {
   const view = projection.decodeWireParts([assistantTool()])
   assert.equal(view[0].kind, 'ToolResult')
   assert.equal(view[0].callId, 'call_1')
   assert.equal(view[0].result, 'result')
 })
-test('WHAT[HOST-BOUNDARY-020] HOST_012_legacy_tool_result_shape_still_decodes', () => {
+test('WHAT[host-boundary-020] HOST_012_legacy_tool_result_shape_still_decodes', () => {
   const view = projection.decodeWireParts([legacyResult()])
   assert.equal(view[0].kind, 'ToolResult')
   assert.equal(view[0].callId, 'legacy')
   assert.equal(view[0].result, 'legacy')
 })
-test('WHAT[HOST-BOUNDARY-020] HOST_012_tool_error_part_enters_digest', () => {
+test('WHAT[host-boundary-020] HOST_012_tool_error_part_enters_digest', () => {
   const view = projection.decodeWireParts([assistantTool({ status: 'error', output: 'failed' })])
   assert.equal(view[0].kind, 'ToolResult')
   assert.equal(view[0].result, 'failed')
@@ -48,7 +48,7 @@ const assistantToolMessage = ({ messageID = 'asst_run', partID = 'part_todo', ca
   parts: [{ type: 'tool', id: partID, callID, tool: 'auto-injected', state: { status } }],
 })
 
-test('WHAT[HOST-BOUNDARY-020] snapshot location accepts exactly one target and fails closed for missing or ambiguous evidence', () => {
+test('WHAT[host-boundary-020] snapshot location accepts exactly one target and fails closed for missing or ambiguous evidence', () => {
   const exact = SessionSnapshotSurface.projectMessages([
     assistantToolMessage({ messageID: 'asst_target', partID: 'part_target' }),
     assistantToolMessage({ messageID: 'asst_decoy', partID: 'part_decoy', callID: 'call_other' }),
@@ -119,7 +119,7 @@ const acceptedRetryInput = (overrides = {}) => ({
   ...overrides,
 })
 
-test('WHAT[HOST-BOUNDARY-020] XWIRE_missing_prefix_epoch_fail_closed', () => {
+test('WHAT[host-boundary-020] XWIRE_missing_prefix_epoch_fail_closed', () => {
   const withoutEpoch = acceptedRetryInput()
   delete withoutEpoch.prefixEpoch
   const result = XWireSurface.transform(withoutEpoch)
@@ -127,19 +127,19 @@ test('WHAT[HOST-BOUNDARY-020] XWIRE_missing_prefix_epoch_fail_closed', () => {
   assert.equal(result.noop, false)
   assert.match(result.error, /prefix epoch/)
 })
-test('WHAT[HOST-BOUNDARY-020] XWIRE_malformed_prefix_epoch_fail_closed', () => {
+test('WHAT[host-boundary-020] XWIRE_malformed_prefix_epoch_fail_closed', () => {
   const result = XWireSurface.transform(acceptedRetryInput({ prefixEpoch: 'not-an-epoch' }))
   assert.equal(result.ok, false)
   assert.equal(result.noop, false)
   assert.match(result.error, /prefix epoch/)
 })
-test('WHAT[HOST-BOUNDARY-020] XWIRE_missing_frozen_prefix_body_fail_closed', () => {
+test('WHAT[host-boundary-020] XWIRE_missing_frozen_prefix_body_fail_closed', () => {
   const result = XWireSurface.transform(acceptedRetryInput({ frozenRecordPrefixBody: undefined }))
   assert.equal(result.ok, false)
   assert.equal(result.noop, false)
   assert.match(result.error, /frozen record prefix body/)
 })
-test('WHAT[HOST-BOUNDARY-020] XWIRE_covered_digest_mismatch_refuses_the_probe_fail_closed', () => {
+test('WHAT[host-boundary-020] XWIRE_covered_digest_mismatch_refuses_the_probe_fail_closed', () => {
   const result = XWireSurface.transform(acceptedRetryInput({ coveredDigest: 'not-the-current-prefix-digest' }))
   assert.equal(result.ok, true)
   assert.equal(result.consumed, true)

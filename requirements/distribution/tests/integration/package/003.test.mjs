@@ -11,7 +11,7 @@ const tar = await import("tar");
 const { REPO_ROOT, runExternalConsumer } = await import("../../../scripts/verify-package.mjs");
 
 
-test('WHAT[DISTRIBUTION-003] PACKAGE_external_consumer_imports_default_export_and_reads_resources', async () => {
+test('WHAT[distribution-003] PACKAGE_external_consumer_imports_default_export_and_reads_resources', async () => {
   // If dist/OpenCode/Plugin/Plugin.js is not present yet, skip or run
   const pluginEntry = path.join(REPO_ROOT, 'dist/OpenCode/Plugin/Plugin.js')
   if (!fs.existsSync(pluginEntry)) {
@@ -52,7 +52,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
 const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'))
 const main = path.join(repoRoot, pkg.main)
 
-test('WHAT[DISTRIBUTION-003] PACKAGE_import_wanxiangshu_main_exits_zero', async () => {
+test('WHAT[distribution-003] PACKAGE_import_wanxiangshu_main_exits_zero', async () => {
   const mod = await import(pathToFileURL(main).href)
   assert.equal(typeof mod, 'object')
   assert.ok(mod !== null)
@@ -69,7 +69,7 @@ const { fileURLToPath } = await import("node:url");
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../..')
 const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'))
 
-test('WHAT[DISTRIBUTION-003] PACKAGE_layout_matches_manifest_and_main', () => {
+test('WHAT[distribution-003] PACKAGE_layout_matches_manifest_and_main', () => {
   assert.equal(pkg.name, 'wanxiangshu')
   assert.ok(Array.isArray(pkg.files), 'package.json files whitelist must exist')
   assert.ok(pkg.files.includes('dist/') || pkg.files.includes('dist'), 'files must include dist/')

@@ -151,7 +151,7 @@ module HostTurnObserver =
                         context
         }
 
-    /// SPEC-INV-013 / STRENGTH-010: the primary-turn observation port is
+    /// speculative-investigation-013 / STRENGTH-010: the primary-turn observation port is
     /// optional; an absent port means no observation, never a skipped turn.
     let private observePrimaryTurnIfPresent
         (observePrimaryTurn: (ReconciledTurn -> Task<unit>) option)
@@ -203,7 +203,7 @@ module HostTurnObserver =
                 do! XWire.reconcileAttempt wirePort attempts turn
                 return ()
             else
-                // SPEC-INV-013 / STRENGTH-010 / STRENGTH-007: primary turn observation
+                // speculative-investigation-013 / STRENGTH-010 / STRENGTH-007: primary turn observation
                 // (closing dry run, primary symbol evidence collection, durable append)
                 // executes before observeCurrentTurn.
                 do! observePrimaryTurnIfPresent observePrimaryTurn turn
@@ -238,7 +238,7 @@ module HostTurnObserver =
         let turn = context.Turn
 
         if ExplicitResumeSuppression.isPhysicalMaterial turn.SessionId turn.PhysicalUserMessageId then
-            // CRASH-018: the /continue provider turn is disclosure-only. Reconcile
+            // crash-reconciliation-018: the /continue provider turn is disclosure-only. Reconcile
             // may observe it for transport bookkeeping, but Wanxiangshu must not
             // derive Strength, recovery, fallback, Companion, review, manager-idle
             // or interaction-repair effects from this physical material.

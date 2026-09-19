@@ -14,7 +14,7 @@ const kernelAction = ({ id, gain, gateway = 0, cost, value, provenance = [] }) =
   provenance,
 })
 
-test('WHAT[EPI-011] wire_equivalence_hint_cannot_force_kernel_merge', () => {
+test('WHAT[epistemic-reasoning-011] wire_equivalence_hint_cannot_force_kernel_merge', () => {
   const store = createStore()
   const started = start(store, '为什么会这样？')
   assessWhy(store, started.handle)
@@ -46,7 +46,7 @@ test('WHAT[EPI-011] wire_equivalence_hint_cannot_force_kernel_merge', () => {
   assert.ok(actions.every((action) => action.equivalenceKey === null))
 })
 
-test('WHAT[EPI-011] same_kernel_identity_merges_candidate_provenance_instead_of_erasing_it', () => {
+test('WHAT[epistemic-reasoning-011] same_kernel_identity_merges_candidate_provenance_instead_of_erasing_it', () => {
   const store = createStore()
   const started = start(store, '为什么会这样？')
   assessWhy(store, started.handle)
@@ -80,7 +80,7 @@ test('WHAT[EPI-011] same_kernel_identity_merges_candidate_provenance_instead_of_
   assert.deepEqual(actions[0].provenance.sort(), ['generator:abduction', 'generator:counterexample'])
 })
 
-test('WHAT[EPI-011] same_question_from_independent_dependency_groups_is_not_false_deduplicated', () => {
+test('WHAT[epistemic-reasoning-011] same_question_from_independent_dependency_groups_is_not_false_deduplicated', () => {
   const store = createStore()
   const started = start(store, '为什么会这样？')
   assessWhy(store, started.handle)
@@ -110,7 +110,7 @@ test('WHAT[EPI-011] same_question_from_independent_dependency_groups_is_not_fals
   assert.equal(state(store, started.handle).actions.length, 2)
 })
 
-test('WHAT[EPI-011] kernel_owned_equivalence_class_removes_only_truly_dominated_representation', () => {
+test('WHAT[epistemic-reasoning-011] kernel_owned_equivalence_class_removes_only_truly_dominated_representation', () => {
   const frontier = paretoFrontier([
     kernelAction({ id: 'expensive', gain: 0.9, cost: 0.4, value: 0.5 }),
     kernelAction({ id: 'cheap', gain: 0.9, cost: 0.2, value: 0.7 }),
@@ -119,7 +119,7 @@ test('WHAT[EPI-011] kernel_owned_equivalence_class_removes_only_truly_dominated_
   assert.deepEqual(frontier.map((action) => action.id), ['cheap'])
 })
 
-test('WHAT[EPI-011] pareto_incomparable_equivalent_representations_both_survive', () => {
+test('WHAT[epistemic-reasoning-011] pareto_incomparable_equivalent_representations_both_survive', () => {
   const frontier = paretoFrontier([
     kernelAction({ id: 'high', gain: 1, cost: 0.4, value: 0.6 }),
     kernelAction({ id: 'low', gain: 0.7, cost: 0.1, value: 0.6 }),

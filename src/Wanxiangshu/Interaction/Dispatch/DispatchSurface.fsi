@@ -62,7 +62,7 @@ module DispatchSurface =
         profile: obj ->
             Task<obj>
 
-    /// HOST-004 / DISPATCH-PROTOCOL-002: exercise the dispatch-owned final
+    /// HOST-004 / dispatch-protocol-002: exercise the dispatch-owned final
     /// physical-send admission without exposing Quiescence internals to this
     /// package's JS tests. Crash-reconciliation proves when the admission turns
     /// stale; this surface proves that stale evidence closes the durable claim

@@ -8,17 +8,17 @@ The published owner vocabulary is:
 
 | Operation family | Laws | Published evidence |
 |---|---|---|
-| `XTraceProjection.openingEvidence/hasOpening`, `latestTerminalEvidence/terminalEvidenceForProviderRun` | SEMANTIC-TRACE-001/010 | copied opening and terminal evidence |
-| `XTraceCapture.semanticPart`, `captureObservedMessagesWithReceipt` | SEMANTIC-TRACE-002/007/008 | copied semantic parts and typed capture receipts |
-| `XTraceCursor.*`, `XTraceRange.*` | SEMANTIC-TRACE-003/006/012 | opaque monotonic cursors and half-open ranges |
-| `orderedSemanticParts/currentGenerationSemanticParts/providerRunParts` | SEMANTIC-TRACE-003/004/009 | ordered, run-bound, generation-aware evidence |
-| `toolResultParts/toolPartsForHostIdentity`, Host-message and range queries | SEMANTIC-TRACE-002/004/006 | exact provider, Host, and range evidence |
-| `XTrace.render`, `XTraceMaterialization.renderRange` | SEMANTIC-TRACE-005/006/007 | canonical semantic rendering |
-| `XTrace.flatten`, `currentProjection/currentProjectionBetween` | SEMANTIC-TRACE-007 | one semantic projection formula |
-| `XTraceConvergence.mergeKeyedParts` | SEMANTIC-TRACE-011 | deterministic keyed Fission convergence |
-| Typed capture receipts and exact `SemanticTrace.Contract` symbols | SEMANTIC-TRACE-008 | owner-issued receipts and declared contracts |
+| `XTraceProjection.openingEvidence/hasOpening`, `latestTerminalEvidence/terminalEvidenceForProviderRun` | semantic-trace-001/010 | copied opening and terminal evidence |
+| `XTraceCapture.semanticPart`, `captureObservedMessagesWithReceipt` | semantic-trace-002/007/008 | copied semantic parts and typed capture receipts |
+| `XTraceCursor.*`, `XTraceRange.*` | semantic-trace-003/006/012 | opaque monotonic cursors and half-open ranges |
+| `orderedSemanticParts/currentGenerationSemanticParts/providerRunParts` | semantic-trace-003/004/009 | ordered, run-bound, generation-aware evidence |
+| `toolResultParts/toolPartsForHostIdentity`, Host-message and range queries | semantic-trace-002/004/006 | exact provider, Host, and range evidence |
+| `XTrace.render`, `XTraceMaterialization.renderRange` | semantic-trace-005/006/007 | canonical semantic rendering |
+| `XTrace.flatten`, `currentProjection/currentProjectionBetween` | semantic-trace-007 | one semantic projection formula |
+| `XTraceConvergence.mergeKeyedParts` | semantic-trace-011 | deterministic keyed Fission convergence |
+| Typed capture receipts and exact `SemanticTrace.Contract` symbols | semantic-trace-008 | owner-issued receipts and declared contracts |
 
-`Cursor.fs` is registered as the exact `semantic-evidence` contract kind: its durable cursor operations cross the execution-position guard only under `WHAT[SEMANTIC-TRACE-003]`; symbol roots and representation fields are not authorized.
+`Cursor.fs` is registered as the exact `semantic-evidence` contract kind: its durable cursor operations cross the execution-position guard only under `WHAT[semantic-trace-003]`; symbol roots and representation fields are not authorized.
 
 ## Capture and provenance
 

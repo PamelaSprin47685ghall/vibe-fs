@@ -9,7 +9,7 @@ const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '../../..')
 
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
-test('WHAT[ACTION-AFFORDANCE-003] AA_inspect_is_legacy_forbidden_and_causal_read_only_boundary_forbids_implementation', () => {
+test('WHAT[action-affordance-003] AA_inspect_is_legacy_forbidden_and_causal_read_only_boundary_forbids_implementation', () => {
   // 1. inspect must be explicitly forbidden from owning a ToolSpec
   assert.ok(
     LEGACY_FORBIDDEN_NAMES.includes('inspect'),

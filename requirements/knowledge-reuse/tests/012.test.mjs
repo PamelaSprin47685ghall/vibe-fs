@@ -23,7 +23,7 @@ const openStore = () => {
   return { dir, handle, close: () => { eventStore.dispose(handle); rmSync(dir, { recursive: true, force: true }) } }
 }
 
-test('WHAT[KNOWLEDGE-REUSE-012] CASEBOOK_index_exposes_shelfmark_and_canonical_question_only', async () => {
+test('WHAT[knowledge-reuse-012] CASEBOOK_index_exposes_shelfmark_and_canonical_question_only', async () => {
   const local = openStore()
   try {
     const question = 'Persistence after restart'
@@ -48,7 +48,7 @@ test('WHAT[KNOWLEDGE-REUSE-012] CASEBOOK_index_exposes_shelfmark_and_canonical_q
   }
 })
 
-test('WHAT[KNOWLEDGE-REUSE-012] CASEBOOK_shelfmark_is_stable_and_not_the_session_identity', () => {
+test('WHAT[knowledge-reuse-012] CASEBOOK_shelfmark_is_stable_and_not_the_session_identity', () => {
   const first = index.shelfmarkFor('private-session-a', '## Restart behavior\nfull canonical question')
   const again = index.shelfmarkFor('private-session-a', '## Restart behavior\nfull canonical question')
   const other = index.shelfmarkFor('private-session-b', '## Restart behavior\nfull canonical question')
@@ -58,7 +58,7 @@ test('WHAT[KNOWLEDGE-REUSE-012] CASEBOOK_shelfmark_is_stable_and_not_the_session
   assert.equal(first.includes('private-session-a'), false)
 })
 
-test('WHAT[KNOWLEDGE-REUSE-012] CASEBOOK_invalidate_then_refresh_advances_epoch', async () => {
+test('WHAT[knowledge-reuse-012] CASEBOOK_invalidate_then_refresh_advances_epoch', async () => {
   const local = openStore()
   try {
     assert.equal((await casebook.archive(local.handle, caseRec('idx-s2', 'Q', 'A'))).ok, true)
@@ -73,7 +73,7 @@ test('WHAT[KNOWLEDGE-REUSE-012] CASEBOOK_invalidate_then_refresh_advances_epoch'
   }
 })
 
-test('WHAT[KNOWLEDGE-REUSE-012] CASEBOOK_visible_set_change_advances_epoch', async () => {
+test('WHAT[knowledge-reuse-012] CASEBOOK_visible_set_change_advances_epoch', async () => {
   const local = openStore()
   try {
     const empty = await index.refresh(local.handle, 10)

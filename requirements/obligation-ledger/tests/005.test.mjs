@@ -14,7 +14,7 @@ const firstCheckpointSurfaces = [
   ['todowrite-description/zh-CN', 'resources/provider/lifecycle/magic-todo/todowrite-description/zh-CN.md'],
 ]
 
-test('WHAT[OBLIGATION-LEDGER-005] empty placeholders remain invalid while concrete planning work is legal before commitment', () => {
+test('WHAT[obligation-ledger-005] empty placeholders remain invalid while concrete planning work is legal before commitment', () => {
   const surfaces = [
     ...firstCheckpointSurfaces,
     ['obligation-name/en', 'resources/provider/lifecycle/magic-todo/obligation-name-description/en.md'],

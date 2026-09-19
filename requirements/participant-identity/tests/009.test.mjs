@@ -10,7 +10,7 @@ const scenario = fileURLToPath(
   new URL('./support/session-reuse-plugin-scenario.mjs', import.meta.url),
 )
 
-test('WHAT[PID-009] production plugin replaces identity only after exact durable Manager closure', () => {
+test('WHAT[participant-identity-009] production plugin replaces identity only after exact durable Manager closure', () => {
   const child = spawnSync(process.execPath, [scenario], {
     cwd: process.cwd(),
     encoding: 'utf8',
@@ -117,7 +117,7 @@ const acceptedFact = (profile) => ({
 })
 const current = (projection) => projection.sessions[session].activeLogicalRun
 
-test('WHAT[PID-009] reuses SessionId with a fresh closed-run identity', () => {
+test('WHAT[participant-identity-009] reuses SessionId with a fresh closed-run identity', () => {
   const first = createRoot('msg-run-a', managerSeed)
   const firstSnapshot = structuredClone(first)
   const second = createRoot('msg-run-b', coderSeed)

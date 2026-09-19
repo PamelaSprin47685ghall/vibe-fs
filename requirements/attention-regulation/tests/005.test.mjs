@@ -24,7 +24,7 @@ const recordingPort = () => {
   return fixture
 }
 
-test('WHAT[ATTENTION-REGULATION-005] resurfacing consumes deferred visibility once without activating work', () => {
+test('WHAT[attention-regulation-005] resurfacing consumes deferred visibility once without activating work', () => {
   let state = attention.empty()
   state = attention.record('ses-a', 'call-1', 'one', state)
   state = attention.record('ses-a', 'call-2', 'two', state)

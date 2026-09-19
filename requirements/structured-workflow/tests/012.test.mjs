@@ -228,7 +228,7 @@ const writeDiskFixture = () => {
   return { aggregate, projects, root, sourceDirectory }
 }
 
-test('WHAT[STRUCTURED-WORKFLOW-012] generated impact DAGs preserve change union signature monotonicity and canonical flat inputs', () => {
+test('WHAT[structured-workflow-012] generated impact DAGs preserve change union signature monotonicity and canonical flat inputs', () => {
   for (const [index, topology] of TOPOLOGIES.entries()) {
     fc.assert(fc.property(graphCase(topology), verifyGraph), {
       seed: SEED + index,
@@ -236,7 +236,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] generated impact DAGs preserve change union 
     })
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-012] disk inventory plans identically through the split stages', () => {
+test('WHAT[structured-workflow-012] disk inventory plans identically through the split stages', () => {
   const fixture = writeDiskFixture()
   try {
     for (const changedPaths of [
@@ -326,7 +326,7 @@ ${sources.flatMap((source) => [
 }
 const sourceNames = (plan) => plan.compileItems.map((path) => path.split('/').at(-1))
 
-test('WHAT[STRUCTURED-WORKFLOW-012] implementation changes reach reverse consumers', () => {
+test('WHAT[structured-workflow-012] implementation changes reach reverse consumers', () => {
   const fixture = createFixture()
   try {
     const plan = planImpactCompile({
@@ -350,7 +350,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] implementation changes reach reverse consume
     rmSync(fixture.root, { recursive: true, force: true })
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-012] signature-risky implementation changes still reach reverse consumers', () => {
+test('WHAT[structured-workflow-012] signature-risky implementation changes still reach reverse consumers', () => {
   const fixture = createFixture()
   try {
     // `let inline` / [<Literal>] bodies are emitted at the call site: a body
@@ -374,7 +374,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] signature-risky implementation changes still
     rmSync(fixture.root, { recursive: true, force: true })
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-012] incremental compile executes focused flat compile and records cache', async () => {
+test('WHAT[structured-workflow-012] incremental compile executes focused flat compile and records cache', async () => {
   const fixture = createFixture()
   try {
     const calls = []
@@ -415,7 +415,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] incremental compile executes focused flat co
     rmSync(fixture.root, { recursive: true, force: true })
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-012] signature changes include every reverse consumer and exact forward union', () => {
+test('WHAT[structured-workflow-012] signature changes include every reverse consumer and exact forward union', () => {
   const fixture = createFixture()
   try {
     const plan = planImpactCompile({
@@ -441,7 +441,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] signature changes include every reverse cons
     rmSync(fixture.root, { recursive: true, force: true })
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-012] toolchain changes and oversized impact select one full flat build', () => {
+test('WHAT[structured-workflow-012] toolchain changes and oversized impact select one full flat build', () => {
   const fixture = createFixture()
   try {
     const oversized = planImpactCompile({
@@ -463,7 +463,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] toolchain changes and oversized impact selec
     rmSync(fixture.root, { recursive: true, force: true })
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-012] materialized impact project has exact canonical inputs and zero ProjectReference', () => {
+test('WHAT[structured-workflow-012] materialized impact project has exact canonical inputs and zero ProjectReference', () => {
   const fixture = createFixture()
   try {
     const plan = planImpactCompile({
@@ -486,7 +486,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] materialized impact project has exact canoni
     rmSync(fixture.root, { recursive: true, force: true })
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-012] multi-change union compiles each closure once', () => {
+test('WHAT[structured-workflow-012] multi-change union compiles each closure once', () => {
   const fixture = createFixture()
   try {
     const plan = planImpactCompile({
@@ -510,7 +510,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] multi-change union compiles each closure onc
     rmSync(fixture.root, { recursive: true, force: true })
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-012] project file changes select one full flat build', () => {
+test('WHAT[structured-workflow-012] project file changes select one full flat build', () => {
   const fixture = createFixture()
   try {
     const plan = planImpactCompile({
@@ -525,7 +525,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] project file changes select one full flat bu
     rmSync(fixture.root, { recursive: true, force: true })
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-012] production impact-set ladder classifies fs fsi project and toolchain', () => {
+test('WHAT[structured-workflow-012] production impact-set ladder classifies fs fsi project and toolchain', () => {
   const impl = planImpactCompile({
     changedPaths: [join(SOURCE_ROOT, 'Foundation/FatalProcess.fs')],
     projectDirectory: SOURCE_ROOT,
@@ -571,7 +571,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] production impact-set ladder classifies fs f
   assert.equal(toolchain.mode, 'full')
   assert.equal(toolchain.reason, 'toolchain-or-project-change')
 })
-test('WHAT[STRUCTURED-WORKFLOW-012] compile-impact CLI plan-only smoke matches the planner', () => {
+test('WHAT[structured-workflow-012] compile-impact CLI plan-only smoke matches the planner', () => {
   const changed = join(SOURCE_ROOT, 'Foundation/FatalProcess.fs')
   // W4 cutover: `compile-impact.mjs` was deleted; `build.mjs --plan` is the
   // remaining read-only preview and reports the same planner-shaped payload.
@@ -592,7 +592,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] compile-impact CLI plan-only smoke matches t
   assert.equal(plan.reason, 'focused-impact')
   assert.ok(plan.compileItems.includes(join(SOURCE_ROOT, 'Foundation/FatalProcess.fs')))
 })
-test('WHAT[STRUCTURED-WORKFLOW-012] obsolete recursive-graph compile probes stay deleted', () => {
+test('WHAT[structured-workflow-012] obsolete recursive-graph compile probes stay deleted', () => {
   assert.equal(existsSync(join(ROOT, 'scripts/analyze-closures.mjs')), false)
   assert.equal(existsSync(join(SOURCE_ROOT, 'FableBarrier.fs')), false)
 
@@ -668,7 +668,7 @@ const timing = (milliseconds) => OWNER_IMPACT_TIMING_IDS.map((id) => ({
   median_milliseconds: milliseconds,
 }))
 
-test('WHAT[STRUCTURED-WORKFLOW-012] fixed owner impact corpus drives the production planner without becoming a verdict', () => {
+test('WHAT[structured-workflow-012] fixed owner impact corpus drives the production planner without becoming a verdict', () => {
   const fixture = mkdtempSync(join(tmpdir(), 'owner-impact-corpus-'))
   try {
     mkdirSync(join(fixture, 'src/Wanxiangshu'), { recursive: true })
@@ -719,7 +719,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] fixed owner impact corpus drives the product
     rmSync(fixture, { recursive: true, force: true })
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-012] owner impact corpus rejects stable-case deletion and baseline drift', () => {
+test('WHAT[structured-workflow-012] owner impact corpus rejects stable-case deletion and baseline drift', () => {
   const missingStableCase = corpus()
   missingStableCase.stable_cases.pop()
   assert.throws(() => validateOwnerImpactCorpusV1(missingStableCase), /closed report-only schema/)
@@ -742,7 +742,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] owner impact corpus rejects stable-case dele
   changedCommand.timing_commands[0].command = ['npm', 'run', 'format-build-test', '--extra-flag']
   assert.throws(() => validateOwnerImpactCorpusV1(changedCommand), /closed report-only schema/)
 })
-test('WHAT[STRUCTURED-WORKFLOW-012] baseline writer binds one clean exact commit and refuses overwrite', () => {
+test('WHAT[structured-workflow-012] baseline writer binds one clean exact commit and refuses overwrite', () => {
   const fixture = mkdtempSync(join(tmpdir(), 'owner-impact-baseline-'))
   try {
     const corpusPath = join(fixture, 'corpus.json')
@@ -812,7 +812,7 @@ const writeChainFixture = () => {
   return { aggregate, root, sourceDirectory }
 }
 
-test('WHAT[STRUCTURED-WORKFLOW-012] disk inventory matches the legacy plan and flags unmapped added sources as full', () => {
+test('WHAT[structured-workflow-012] disk inventory matches the legacy plan and flags unmapped added sources as full', () => {
   const fixture = writeChainFixture()
   try {
     const inventory = readImpactInventory({
@@ -846,7 +846,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] disk inventory matches the legacy plan and f
     rmSync(fixture.root, { recursive: true, force: true })
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-012] inventory rejects bad topology inputs and planning rejects bad change inputs', () => {
+test('WHAT[structured-workflow-012] inventory rejects bad topology inputs and planning rejects bad change inputs', () => {
   const fixture = writeChainFixture()
   try {
     // Duplicate Compile item across owner projects.
@@ -949,7 +949,7 @@ function references(projectName) {
   return productionProject(projectName).references.map((path) => relative(SRC, path))
 }
 
-test('WHAT[STRUCTURED-WORKFLOW-012] flat Fable projection planner produces exact closure and canonical aggregate order', () => {
+test('WHAT[structured-workflow-012] flat Fable projection planner produces exact closure and canonical aggregate order', () => {
   const aggregatePath = join(FIXTURE, 'Emitter.fsproj')
   const leakyConsumerPath = join(FIXTURE, 'LeakyConsumer.fsproj')
   const leakyContractPath = join(FIXTURE, 'LeakyContract.fsproj')
@@ -987,7 +987,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] flat Fable projection planner produces exact
     join(FIXTURE, 'SignedProvider.fs'),
   ])
 })
-test('WHAT[STRUCTURED-WORKFLOW-012] flat Fable projection materializes zero ProjectReference and isolated scratch props', () => {
+test('WHAT[structured-workflow-012] flat Fable projection materializes zero ProjectReference and isolated scratch props', () => {
   const scratchRoot = mkdtempSync(join(tmpdir(), 'wanxiangshu-materialize-test-'))
   const rootPropsPath = join(ROOT, 'Directory.Build.props')
   try {
@@ -1040,7 +1040,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] flat Fable projection materializes zero Proj
     rmSync(scratchRoot, { recursive: true, force: true })
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-012] flat projection rejects missing or stale ProjectReference before compiler invocation', () => {
+test('WHAT[structured-workflow-012] flat projection rejects missing or stale ProjectReference before compiler invocation', () => {
   const scratchRoot = mkdtempSync(join(tmpdir(), 'wanxiangshu-reject-test-'))
   try {
     const aggregatePath = join(FIXTURE, 'Emitter.fsproj')
@@ -1100,7 +1100,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] flat projection rejects missing or stale Pro
     rmSync(scratchRoot, { recursive: true, force: true })
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-012] flat Fable projection materialization escapes XML metacharacters, strips emitter identity, and binds source bytes into isolated fingerprints', () => {
+test('WHAT[structured-workflow-012] flat Fable projection materialization escapes XML metacharacters, strips emitter identity, and binds source bytes into isolated fingerprints', () => {
   const scratchRoot = mkdtempSync(join(tmpdir(), 'wanxiangshu-xml-metachar-proof-'))
   try {
     const signatureFile = join(scratchRoot, 'Special&Signature.fsi')
@@ -1360,7 +1360,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] flat Fable projection materialization escape
     rmSync(scratchRoot, { recursive: true, force: true })
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-012] failure lifecycle prevents false-green warm cache and enforces success marker contract', async () => {
+test('WHAT[structured-workflow-012] failure lifecycle prevents false-green warm cache and enforces success marker contract', async () => {
   const scratchRoot = mkdtempSync(join(tmpdir(), 'wanxiangshu-sw011-failure-proof-'))
   try {
     const aggregatePath = join(FIXTURE, 'Emitter.fsproj')

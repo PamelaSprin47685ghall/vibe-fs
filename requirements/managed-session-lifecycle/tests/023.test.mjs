@@ -3,7 +3,7 @@ import test from 'node:test'
 import * as RolesSurface from '../../../dist/Foundation/RolesSurface.js'
 import * as HandleSurface from '../../../dist/Execution/Delegation/Handle/Surface.js'
 
-test('WHAT[MANAGED-SESSION-023] new tasks reject legacy roles and legacy active sessions are explicitly retired', () => {
+test('WHAT[managed-session-lifecycle-023] new tasks reject legacy roles and legacy active sessions are explicitly retired', () => {
   const publicLabels = RolesSurface.allPublicRoleLabels
 
   // Active public roles must include Engineer and DevOps

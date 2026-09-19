@@ -36,7 +36,7 @@ const mustOk = (result, label = 'result') => {
   return result.value
 }
 
-test('WHAT[DURABLE-EVENTS-002] PERSIST_001_an_envelope_serializes_to_exactly_one_line', () => {
+test('WHAT[durable-events-002] PERSIST_001_an_envelope_serializes_to_exactly_one_line', () => {
   const line = journalCodec.serialize(env({ seq: 7 }))
   assert.equal(line.includes('\n'), false)
   assert.equal(line.includes('\r'), false)
@@ -96,18 +96,18 @@ const mustOk = (result, label = 'result') => {
   return result.value
 }
 
-test('WHAT[DURABLE-EVENTS-002] EventType_is_exactly_JournalEnvelope', () => {
+test('WHAT[durable-events-002] EventType_is_exactly_JournalEnvelope', () => {
   const encoded = journalCodec.encode([], [], env())
   assert.equal(encoded.eventType, 'JournalEnvelope')
   assert.equal(journalCodec.JournalEnvelopeEventType, 'JournalEnvelope')
   assert.equal(encoded.eventType, journalCodec.JournalEnvelopeEventType)
 })
-test('WHAT[DURABLE-EVENTS-002] encode_preserves_EventId', () => {
+test('WHAT[durable-events-002] encode_preserves_EventId', () => {
   const original = env({ seq: 7 })
   const encoded = journalCodec.encode([], [], original)
   assert.equal(encoded.eventId, original.id)
 })
-test('WHAT[DURABLE-EVENTS-002] encodeStreamId_scheme_is_stable_and_deterministic', () => {
+test('WHAT[durable-events-002] encodeStreamId_scheme_is_stable_and_deterministic', () => {
   assert.equal(journalCodec.encodeStreamId({ kind: 'Workspace' }), 'journal/workspace')
   assert.equal(journalCodec.encodeStreamId({ kind: 'Session', id: SESSION }), 'journal/session/ses_a')
   assert.equal(journalCodec.encodeStreamId({ kind: 'Child', id: 'child_1' }), 'journal/child/child_1')
@@ -123,7 +123,7 @@ test('WHAT[DURABLE-EVENTS-002] encodeStreamId_scheme_is_stable_and_deterministic
     assert.deepEqual(decoded, stream)
   }
 })
-test('WHAT[DURABLE-EVENTS-002] round_trip_preserves_fold_relevant_fields', () => {
+test('WHAT[durable-events-002] round_trip_preserves_fold_relevant_fields', () => {
   const original = env({ seq: 4, observedAt: '2026-03-04T05:06:07Z', providerRun: 'run_1' })
   const encoded = journalCodec.encode([], [], original)
   const decoded = mustOk(journalCodec.decode(encoded), 'decode')
@@ -139,7 +139,7 @@ test('WHAT[DURABLE-EVENTS-002] round_trip_preserves_fold_relevant_fields', () =>
   })
   assert.equal(journalCodec.serialize(decoded), journalCodec.serialize(original))
 })
-test('WHAT[DURABLE-EVENTS-002] round_trip_fold_equates_with_journal_fold', () => {
+test('WHAT[durable-events-002] round_trip_fold_equates_with_journal_fold', () => {
   const original = env({ seq: 2, observedAt: '2026-02-03T04:05:06Z', providerRun: 'run_x' })
   const encoded = journalCodec.encode([], [], original)
   const decoded = mustOk(journalCodec.decode(encoded), 'decode')
@@ -148,13 +148,13 @@ test('WHAT[DURABLE-EVENTS-002] round_trip_fold_equates_with_journal_fold', () =>
     line: journalCodec.serialize(original),
   })
 })
-test('WHAT[DURABLE-EVENTS-002] tryDecode_rejects_wrong_EventType', () => {
+test('WHAT[durable-events-002] tryDecode_rejects_wrong_EventType', () => {
   const encoded = journalCodec.encode([], [], env({ seq: 1 }))
   const result = journalCodec.decode({ ...encoded, eventType: 'JobRequested' })
   assert.equal(result.ok, false)
   assert.match(result.error, /JournalEnvelope/)
 })
-test('WHAT[DURABLE-EVENTS-002] workspace_child_process_streams_round_trip', () => {
+test('WHAT[durable-events-002] workspace_child_process_streams_round_trip', () => {
   const cases = [
     { stream: { kind: 'Workspace' }, seq: 1 },
     { stream: { kind: 'Child', id: 'ch_9' }, seq: 2 },
@@ -218,7 +218,7 @@ const handleLinked = (overrides = {}) => ({
   },
 })
 
-test('WHAT[DURABLE-EVENTS-002] handle_completed_with_completion_fields_round_trips_canonically', () => {
+test('WHAT[durable-events-002] handle_completed_with_completion_fields_round_trips_canonically', () => {
   const line = factCodec.encode(handleCompleted({
     ParentSessionId: 'ses_hc2',
     Handle: 'h-hc2',
@@ -231,7 +231,7 @@ test('WHAT[DURABLE-EVENTS-002] handle_completed_with_completion_fields_round_tri
   assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
   assert.equal(decoded.line, line)
 })
-test('WHAT[DURABLE-EVENTS-002] handle_completed_missing_completion_fields_is_rejected_without_decode_migration', () => {
+test('WHAT[durable-events-002] handle_completed_missing_completion_fields_is_rejected_without_decode_migration', () => {
   const line = factCodec.encode(handleCompleted())
   const missing = line
     .replace(/,"CompletionRef":null/g, '')
@@ -242,7 +242,7 @@ test('WHAT[DURABLE-EVENTS-002] handle_completed_missing_completion_fields_is_rej
   assert.equal(missing.includes('CompletionDigest'), false)
   assert.equal(factCodec.decode(missing).ok, false)
 })
-test('WHAT[DURABLE-EVENTS-002] malformed_completion_and_ownership_labels_fail_closed', () => {
+test('WHAT[durable-events-002] malformed_completion_and_ownership_labels_fail_closed', () => {
   assert.throws(
     () => factCodec.encode(handleCompleted({ Kind: 'forged-kind' })),
     /unknown completion kind/i,
@@ -283,7 +283,7 @@ const observed = (overrides = {}) => ({
   ...overrides,
 })
 
-test('WHAT[DURABLE-EVENTS-002] EXEC_HostTurnObserved_serializes_round_trip_with_provider_run', () => {
+test('WHAT[durable-events-002] EXEC_HostTurnObserved_serializes_round_trip_with_provider_run', () => {
   const line = hostTurn.serialize(observed())
   assert.equal(line.includes('HostTurnObserved'), true)
   assert.equal(line.includes('run_abc'), true)
@@ -295,7 +295,7 @@ test('WHAT[DURABLE-EVENTS-002] EXEC_HostTurnObserved_serializes_round_trip_with_
   assert.equal(decoded.providerRun, 'run_abc')
   assert.equal(decoded.line, line)
 })
-test('WHAT[DURABLE-EVENTS-002] EXEC_HostTurnObserved_serializes_round_trip_without_provider_run', () => {
+test('WHAT[durable-events-002] EXEC_HostTurnObserved_serializes_round_trip_without_provider_run', () => {
   const value = observed({ ProviderRun: null })
   const line = hostTurn.serialize(value)
   const decoded = hostTurn.deserialize(line)
@@ -304,12 +304,12 @@ test('WHAT[DURABLE-EVENTS-002] EXEC_HostTurnObserved_serializes_round_trip_witho
   assert.equal(decoded.providerRun == null, true)
   assert.equal(decoded.line, line)
 })
-test('WHAT[DURABLE-EVENTS-002] EXEC_HostTurnObserved_fold_is_noop_on_agent_projection', () => {
+test('WHAT[durable-events-002] EXEC_HostTurnObserved_fold_is_noop_on_agent_projection', () => {
   const folded = hostTurn.foldNoop(observed({ ProviderRun: 'run_1' }))
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
   assert.equal(folded.hasSession, false)
 })
-test('WHAT[DURABLE-EVENTS-002] EXEC_HostTurnObserved_identity_key_is_session_plus_provider_run', () => {
+test('WHAT[durable-events-002] EXEC_HostTurnObserved_identity_key_is_session_plus_provider_run', () => {
   const withRun = observed({ SessionId: 'ses_a', ProviderRun: 'run_x' })
   const sameKeyLater = observed({ SessionId: 'ses_a', ProviderRun: 'run_x', ObservedAt: '2026-04-01T08:00:01Z' })
   const differentRun = observed({ SessionId: 'ses_a', ProviderRun: 'run_y' })
@@ -351,7 +351,7 @@ const readEnvelope = (value) => ({
   fact: value.fact,
 })
 
-test('WHAT[DURABLE-EVENTS-002] Journal_codec_round_trip_preserves_fold_relevant_fields', () => {
+test('WHAT[durable-events-002] Journal_codec_round_trip_preserves_fold_relevant_fields', () => {
   const original = envelope({ seq: 7, providerRun: 'run_meta' })
   const encoded = journalCodec.encode([], [], original)
   const decoded = journalCodec.decode(encoded)
@@ -361,7 +361,7 @@ test('WHAT[DURABLE-EVENTS-002] Journal_codec_round_trip_preserves_fold_relevant_
   assert.equal(journalCodec.serialize(decoded.value), journalCodec.serialize(original))
   assert.equal(encoded.eventType, journalCodec.JournalEnvelopeEventType)
 })
-test('WHAT[DURABLE-EVENTS-002] Journal_stream_owner_round_trips_all_public_stream_kinds', () => {
+test('WHAT[durable-events-002] Journal_stream_owner_round_trips_all_public_stream_kinds', () => {
   for (const stream of [
     { kind: 'Workspace' },
     { kind: 'Session', id: SESSION },
@@ -385,7 +385,7 @@ const { CANONICAL_EVENT_READER_OWNER_PATHS, DUAL_WRITE_ALLOWLIST, GIT_BYPASS_ALL
 const readFixture = (name) =>
   readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8')
 
-test('WHAT[DURABLE-EVENTS-002] fixture unified-store-schema-version.fs is RED for schema-version-in-store-context', () => {
+test('WHAT[durable-events-002] fixture unified-store-schema-version.fs is RED for schema-version-in-store-context', () => {
   const source = readFixture('unified-store-schema-version.fs')
   const hits = scanSchemaVersionInStoreContext(source, 'Domain/EventStore.fs')
   assert.ok(hits.length >= 1, 'expected schema-version-in-store-context violation')
@@ -394,7 +394,7 @@ test('WHAT[DURABLE-EVENTS-002] fixture unified-store-schema-version.fs is RED fo
   assert.equal(scanFeatureRef(source, 'Domain/EventStore.fs').length, 0)
   assert.equal(scanGitBypass(source, 'Domain/EventStore.fs').length, 0)
 })
-test('WHAT[DURABLE-EVENTS-002] schemaVersion without store context is not flagged (host/authored allow)', () => {
+test('WHAT[durable-events-002] schemaVersion without store context is not flagged (host/authored allow)', () => {
   const host = [
     'module HandleCompletionCodec',
     'let encode () =',
@@ -410,13 +410,13 @@ test('WHAT[DURABLE-EVENTS-002] schemaVersion without store context is not flagge
   ].join('\n')
   assert.equal(scanSchemaVersionInStoreContext(enforcer, 'Domain/EnforcerCatalog.fs').length, 0)
 })
-test('WHAT[DURABLE-EVENTS-002] always-forbidden store version tokens are RED without extra context', () => {
+test('WHAT[durable-events-002] always-forbidden store version tokens are RED without extra context', () => {
   for (const token of ['storageVersion', 'journalVersion', 'formatVersion']) {
     const hits = scanSchemaVersionInStoreContext(`let x = ${token}`, 'Domain/Bad.fs')
     assert.ok(hits.some((h) => h.text.includes(token)), `expected hit for ${token}`)
   }
 })
-test('WHAT[DURABLE-EVENTS-002] production scan keeps store context free of version tokens', () => {
+test('WHAT[durable-events-002] production scan keeps store context free of version tokens', () => {
   const entries = collectProductionEntries()
   const violations = scanFiles(entries)
   const own = violations.filter((v) => v.id === 'schema-version-in-store-context')
@@ -426,7 +426,7 @@ test('WHAT[DURABLE-EVENTS-002] production scan keeps store context free of versi
     own.map((v) => `[${v.id}] ${v.file}:${v.line} ${v.label}`).join('\n'),
   )
 })
-test('WHAT[DURABLE-EVENTS-002] documented non-store schemaVersion sites remain unflagged in production text', () => {
+test('WHAT[durable-events-002] documented non-store schemaVersion sites remain unflagged in production text', () => {
   // Informational contract: these files may mention schemaVersion but must not trip the gate.
   assert.ok(NON_STORE_SCHEMA_VERSION_SITES.length >= 1)
   const entries = collectProductionEntries().filter((e) =>

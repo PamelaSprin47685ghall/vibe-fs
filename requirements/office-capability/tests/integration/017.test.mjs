@@ -3,7 +3,7 @@ import test from 'node:test'
 import * as office from '../../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 import * as ptySurface from '../../../../dist/Process/Surface.js'
 
-test('WHAT[OFF-017] DevOps executes real commands and PTY sessions are cascade closed on road teardown', async () => {
+test('WHAT[office-capability-017] DevOps executes real commands and PTY sessions are cascade closed on road teardown', async () => {
   // 1. DevOps consequence model: full engineering mutation + real command execution + PTY
   const devopsPerms = office.permissions('devops')
   assert.ok(devopsPerms.includes('Read'), 'DevOps has Read')

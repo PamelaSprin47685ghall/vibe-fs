@@ -203,7 +203,7 @@ module FissionConvergence =
 [<RequireQualifiedAccess>]
 module FissionRequestProjection =
 
-    /// INTRA-PARTICIPANT-PARALLELISM-013: physical origin may only narrow the
+    /// intra-participant-parallelism-013: physical origin may only narrow the
     /// office entitlement. `true` means the provider request must carry
     /// `fission=false`.
     let apply (hasPhysicalParent: bool) : bool = not hasPhysicalParent

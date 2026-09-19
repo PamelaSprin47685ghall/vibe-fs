@@ -5,7 +5,7 @@ import * as relay from '../../../dist/Mission/Relay/Surface.js'
 const open = (state, road = 'road-1', incumbent = 'inc-1') =>
   relay.openIncumbency(state, road, incumbent, 'snapshot-1', 'authority-1')
 
-test('WHAT[RELAY-004] low-score assessor takes work ownership in place without a new iteration', () => {
+test('WHAT[relay-incumbency-004] low-score assessor takes work ownership in place without a new iteration', () => {
   const first = open(relay.empty())
   const assessed = relay.assess(
     first.state,

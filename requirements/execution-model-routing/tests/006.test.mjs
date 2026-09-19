@@ -63,7 +63,7 @@ const providerLimited = (limits, routes) => (role, running, previous) => {
   return candidates.find(available) ?? null
 }
 
-test('WHAT[EMR-006] EMR_006_same_physical_message_retry_reuses_target_without_scheduler_rerun', async () => {
+test('WHAT[execution-model-routing-006] EMR_006_same_physical_message_retry_reuses_target_without_scheduler_rerun', async () => {
   const seen = []
   const runtime = createRuntime((_role, running) => {
     seen.push(running.map((item) => `${item.model}|${item.reasoning}`))
@@ -76,7 +76,7 @@ test('WHAT[EMR-006] EMR_006_same_physical_message_retry_reuses_target_without_sc
 
   assert.deepEqual(seen, [[], ['provider/shared|none']], 'same physical material reuses without a scheduler rerun; the superseding fresh schedule observes the replaced occupancy')
 })
-test('WHAT[EMR-006] EMR_006_new_physical_message_supersedes_old_A_B_occupancy_without_idle', async () => {
+test('WHAT[execution-model-routing-006] EMR_006_new_physical_message_supersedes_old_A_B_occupancy_without_idle', async () => {
   const runtime = createRuntime((role) => target(`provider/${role}`))
 
   const a = await acquireTarget(runtime, 'session', 'msg-a', 'engineer', 'alice')
@@ -89,7 +89,7 @@ test('WHAT[EMR-006] EMR_006_new_physical_message_supersedes_old_A_B_occupancy_wi
   assert.equal(tryLease(runtime, 'session', 'msg-a', 'engineer', 'alice', null), null, 'superseded physical material no longer owns a lease')
   assert.equal(key(tryLease(runtime, 'session', 'msg-b', 'devops', 'alice', null)), 'provider/devops|none')
 })
-test('WHAT[EMR-006] EMR_006_supersede_replaces_the_exact_capacity_owner', async () => {
+test('WHAT[execution-model-routing-006] EMR_006_supersede_replaces_the_exact_capacity_owner', async () => {
   const runtime = createRuntime((role) => target(`provider/${role}`))
 
   await acquireTarget(runtime, 'session', 'msg-a', 'engineer', 'alice')
@@ -112,7 +112,7 @@ test('WHAT[EMR-006] EMR_006_supersede_replaces_the_exact_capacity_owner', async 
     },
   ])
 })
-test('WHAT[EMR-006] EMR_006_only_the_current_run_witness_resolves_a_target', async () => {
+test('WHAT[execution-model-routing-006] EMR_006_only_the_current_run_witness_resolves_a_target', async () => {
   let scheduled = 0
   const runtime = createRuntime(() => target(`provider-${++scheduled}/model`))
 
@@ -127,7 +127,7 @@ test('WHAT[EMR-006] EMR_006_only_the_current_run_witness_resolves_a_target', asy
   assert.equal(takeProviderRunTarget(runtime, 'run-b'), null, 'the exact witness is single-consumption')
   assert.equal(takeProviderRunTarget(runtime, 'no-such-run'), null, 'an unknown run resolves nothing')
 })
-test('WHAT[EMR-006] EMR_006_same_physical_message_cannot_change_role', async () => {
+test('WHAT[execution-model-routing-006] EMR_006_same_physical_message_cannot_change_role', async () => {
   const runtime = createRuntime(() => target())
   await acquireTarget(runtime, 'session', 'msg-1', 'engineer', 'alice')
 
@@ -137,7 +137,7 @@ test('WHAT[EMR-006] EMR_006_same_physical_message_cannot_change_role', async () 
   )
   assert.equal(snapshotOccupied(runtime).length, 1)
 })
-test('WHAT[EMR-006] EMR_006_same_physical_message_cannot_change_participant', async () => {
+test('WHAT[execution-model-routing-006] EMR_006_same_physical_message_cannot_change_participant', async () => {
   const runtime = createRuntime(() => target())
   await acquireTarget(runtime, 'session', 'msg-1', 'engineer', 'alice')
 
@@ -147,7 +147,7 @@ test('WHAT[EMR-006] EMR_006_same_physical_message_cannot_change_participant', as
   )
   assert.equal(snapshotOccupied(runtime).length, 1)
 })
-test('WHAT[EMR-006] EMR_006_lease_is_stable_only_for_one_physical_user_material', async () => {
+test('WHAT[execution-model-routing-006] EMR_006_lease_is_stable_only_for_one_physical_user_material', async () => {
   let calls = 0
   const runtime = createRuntime(() => target(`provider/model-${++calls}`, 'low'))
 
@@ -162,7 +162,7 @@ test('WHAT[EMR-006] EMR_006_lease_is_stable_only_for_one_physical_user_material'
   assert.equal(nextMaterial.model, 'provider/model-2', 'new physical material gets a fresh lease even without idle')
   assert.equal(calls, 2)
 })
-test('WHAT[EMR-006] EMR_006_fresh_physical_receives_the_replaced_target_as_previous', async () => {
+test('WHAT[execution-model-routing-006] EMR_006_fresh_physical_receives_the_replaced_target_as_previous', async () => {
   const seenPrevious = []
   let next = 0
   const runtime = createRuntime((_role, _running, previous) => {
@@ -177,7 +177,7 @@ test('WHAT[EMR-006] EMR_006_fresh_physical_receives_the_replaced_target_as_previ
   assert.deepEqual(continued, first, 'the atomically replaced active physical supplies the previous target')
   assert.deepEqual(seenPrevious, [null, first])
 })
-test('WHAT[EMR-006] EMR_006_released_session_supplies_no_previous_target', async () => {
+test('WHAT[execution-model-routing-006] EMR_006_released_session_supplies_no_previous_target', async () => {
   const seenPrevious = []
   let next = 0
   const runtime = createRuntime((_role, _running, previous) => {
@@ -192,7 +192,7 @@ test('WHAT[EMR-006] EMR_006_released_session_supplies_no_previous_target', async
   assert.equal(rebuilt.model, 'provider/model-2', 'no session-history cache survives an exact terminal release')
   assert.deepEqual(seenPrevious, [null, null])
 })
-test('WHAT[EMR-006] EMR_006_unrelated_session_supplies_no_previous_target', async () => {
+test('WHAT[execution-model-routing-006] EMR_006_unrelated_session_supplies_no_previous_target', async () => {
   const seenPrevious = []
   let next = 0
   const runtime = createRuntime((_role, _running, previous) => {
@@ -223,7 +223,7 @@ const MANAGED = [
   'blogger',
 ]
 
-test('WHAT[EMR-006] EMR_006_recommended_template_prefers_previous_candidate_when_provider_has_capacity', async () => {
+test('WHAT[execution-model-routing-006] EMR_006_recommended_template_prefers_previous_candidate_when_provider_has_capacity', async () => {
   const { default: scheduler } = await import(`${templateUrl.href}?previous=${Date.now()}`)
   const { invokeScheduler } = await import('../../../dist/OpenCode/Host/ModelRoutingSurface.js')
   const route = (role, running, previous = null) => invokeScheduler(scheduler, role, running, previous)

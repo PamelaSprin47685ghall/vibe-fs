@@ -4,7 +4,7 @@ import * as retirement from '../../../dist/Mission/Relay/Retirement/Surface.js'
 
 
 
-test('WHAT[RETIRE-003] live recursive resources are the only business blockers', () => {
+test('WHAT[relay-retirement-003] live recursive resources are the only business blockers', () => {
   assert.deepEqual(
     retirement.decide(
       [

@@ -22,7 +22,7 @@ const TOOL_CAPABILITIES = [
   'Write',
 ]
 
-test('WHAT[PAR-015] independent_sessions_keep_independent_budgets', () => {
+test('WHAT[provider-attempt-recovery-015] independent_sessions_keep_independent_budgets', () => {
   const a0 = providerFailureProjection.forAuthority('run_L', 'msg_u1')
   const b0 = providerFailureProjection.forAuthority('run_M', 'msg_u2')
 

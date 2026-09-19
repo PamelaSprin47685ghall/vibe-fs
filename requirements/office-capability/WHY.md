@@ -16,7 +16,7 @@
 
 `office-capability` 的核心不变量：
 - **后果定义职位**：Office 仅由其有权产生的后果（Entitled Consequence）及其明确禁止的非后果（Non-consequence）定义。
-- **五分法撤销与新角色体系**：废除旧 Coder/Inspector/DevOps/Browser/Inquiry 五分法；确立正交清晰的权能分工：
+- **角色体系**：确立正交清晰的权能分工：
   - **Engineer**：负责本地事实调查与源码工作（读、写、改、移、删文件，实现、重构、编写测试源码）；不执行真实命令，不差遣 DevOps，不承担外部网络浏览职责；是**唯一具备 Fission 角色能力**的 Office。
   - **DevOps**：具备 Engineer 的全部本地工程能力，加真实命令执行、终端和进程管理；拥有**角色固有的非架构级修复授权**（执行中发现局部问题自行调查、直接修改源码、补充回归测试并重新验证，禁止任何 `allowRepair` 式逐次批准开关）；自身不 fork、不 Fission，不擅自作架构或产品决策。
   - **Manager**：负责独立评估、任务分解、派工、推进未尽账本、组织接力；不亲自调查或修改工作树，不 Fission；通过 `fork` Engineer 获得并行，通过 `resume` 固定 DevOps 获得执行与局部修复。
@@ -27,7 +27,7 @@
   - **Predictor**：内部机制专用角色，仅为 Strength 降级指定廉价 provider/model，不参与普通调度与工具门禁，无工程、执行或 Fission 权限。
 - **单一语义所有权、多处投影**：同一后果事实在 Manager Role Law、fork/resume 描述、各 Office 自我模型中保持严格一致，不得漂移。
 - **不可互换性**：各 Office 之间严禁作为通用代理相互替代。
-- **Role 是本名**：Orchestrator/Manager/Engineer/DevOps/Blogger/Bookkeeper/Predictor 是本名 Role，每个活跃 Role 恰对应一个 Persona 且权能完全相同，不存在 fast/deep 档位差异或组合名解析。活跃路径彻底删除 Coder、Inspector、Browser、Inquiry、Distiller。
+- **Role 是本名**：Orchestrator/Manager/Engineer/DevOps/Blogger/Bookkeeper/Predictor 是本名 Role，每个活跃 Role 恰对应一个 Persona 且权能完全相同，不存在 fast/deep 档位差异或组合名解析。活跃路径不含 Coder、Inspector、Browser、Inquiry、Distiller。
 
 ## 破裂后果
 

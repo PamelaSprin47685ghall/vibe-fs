@@ -4,7 +4,7 @@ open System
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
 
-/// PROMPT-006 / EMR-009: chat.params is an observation barrier, not a routing
+/// PROMPT-006 / execution-model-routing-009: chat.params is an observation barrier, not a routing
 /// authority. chat.message / internal SendPrompt must already have established the
 /// lease and projected model+variant before the provider reaches this hook.
 module ChatParamsHook =

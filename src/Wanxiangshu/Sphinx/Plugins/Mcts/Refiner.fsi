@@ -2,7 +2,7 @@ namespace Wanxiangshu.Sphinx.Plugins.Mcts
 
 open Wanxiangshu.Sphinx.Core
 
-/// WHAT[EPI-010]: seeded fixed-budget search over a finite generative model with sample statistics.
+/// WHAT[epistemic-reasoning-010]: seeded fixed-budget search over a finite generative model with sample statistics.
 module Refiner =
     /// One stochastic branch of a state-action kernel entry.
     type Outcome =

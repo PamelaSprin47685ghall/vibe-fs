@@ -38,7 +38,7 @@ const runWorkflow = async (dir, program, { deadlineMs = 2000, store = null } = {
   surface: coderSurface(),
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-019] JS085_workflow_preflight_blocks_stale_rewrite_without_touching_disk', async () => {
+test('WHAT[repository-programming-019] JS085_workflow_preflight_blocks_stale_rewrite_without_touching_disk', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'current text', 'utf8')
@@ -56,7 +56,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-019] JS085_workflow_preflight_blocks_stale_rew
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-019] JS085_workflow_program_error_fails_without_commit', async () => {
+test('WHAT[repository-programming-019] JS085_workflow_program_error_fails_without_commit', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'old', 'utf8')
@@ -72,7 +72,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-019] JS085_workflow_program_error_fails_withou
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-019] JS019_invalid_return_value_commits_nothing', async () => {
+test('WHAT[repository-programming-019] JS019_invalid_return_value_commits_nothing', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'old', 'utf8')

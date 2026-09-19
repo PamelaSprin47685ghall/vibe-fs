@@ -8,7 +8,7 @@ const { applyToolDefinitionHook, createMagicTodoContractHooks, decodeV1TodoWrite
 const SESSION = 'ses_magic_todo_canary'
 const CALL = 'call_magic_todo_1'
 
-test('WHAT[OBLIGATION-LEDGER-015] obligations project to the original V1 decoder shape', async () => {
+test('WHAT[obligation-ledger-015] obligations project to the original V1 decoder shape', async () => {
   const hooks = createMagicTodoContractHooks()
   const raw = sampleObligationTodoWriteArgs()
 
@@ -37,7 +37,7 @@ test('WHAT[OBLIGATION-LEDGER-015] obligations project to the original V1 decoder
     raw.obligations.map((t) => `${t.name}: ${t.work}`),
   )
 })
-test('WHAT[OBLIGATION-LEDGER-015] projection helper mutates original args in place', () => {
+test('WHAT[obligation-ledger-015] projection helper mutates original args in place', () => {
   const args = sampleObligationTodoWriteArgs()
   const originalArgs = args
   const originalObligations = args.obligations
@@ -58,7 +58,7 @@ const { default: test } = await import("node:test");
 const host = await import("../../../dist/Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.js");
 
 
-test('WHAT[OBLIGATION-LEDGER-015] workingOn projects to in_progress and every other obligation to pending', () => {
+test('WHAT[obligation-ledger-015] workingOn projects to in_progress and every other obligation to pending', () => {
   assert.deepEqual(
     host.projectCompatibilityRows('proof', [
       { name: 'bridge', horizon: 'near', work: 'Review bridge' },
@@ -72,7 +72,7 @@ test('WHAT[OBLIGATION-LEDGER-015] workingOn projects to in_progress and every ot
     ],
   )
 })
-test('WHAT[OBLIGATION-LEDGER-015] projects obligations into a non-enumerable V1 compatibility view', () => {
+test('WHAT[obligation-ledger-015] projects obligations into a non-enumerable V1 compatibility view', () => {
   const args = { planComplete: false, workingOn: 'provider-only', obligations: [{ name: 'provider-only', horizon: 'near', work: 'must remain durable provider input' }] }
   const output = { args }
   host.replaceCompatibilityArgs(output, [

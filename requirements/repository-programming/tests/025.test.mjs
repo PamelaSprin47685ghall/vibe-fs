@@ -27,7 +27,7 @@ const unwrap = (result) => {
 }
 const pendingIds = (handle) => pending(handle).map((p) => p.transactionId).sort()
 
-test('WHAT[REPOSITORY-PROGRAMMING-025] committed_cut_interrupt_before_commit_keeps_prepared_pending', async () => {
+test('WHAT[repository-programming-025] committed_cut_interrupt_before_commit_keeps_prepared_pending', async () => {
   const workspace = makeDir('wxs-committed-cut-before-')
   const common = makeDir('wxs-committed-cut-before-events-')
   const local = openStore(common)
@@ -53,7 +53,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-025] committed_cut_interrupt_before_commit_kee
     rmSync(common, { recursive: true, force: true })
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-025] committed_cut_interrupt_after_commit_keeps_pair_as_receipt', async () => {
+test('WHAT[repository-programming-025] committed_cut_interrupt_after_commit_keeps_pair_as_receipt', async () => {
   const workspace = makeDir('wxs-committed-cut-after-')
   const common = makeDir('wxs-committed-cut-after-events-')
   const local = openStore(common)
@@ -76,7 +76,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-025] committed_cut_interrupt_after_commit_keep
     rmSync(common, { recursive: true, force: true })
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-025] committed_cut_unknown_is_never_treated_as_not_written', async () => {
+test('WHAT[repository-programming-025] committed_cut_unknown_is_never_treated_as_not_written', async () => {
   const workspace = makeDir('wxs-committed-cut-unknown-')
   const common = makeDir('wxs-committed-cut-unknown-events-')
   const local = openStore(common)
@@ -110,14 +110,14 @@ test('WHAT[REPOSITORY-PROGRAMMING-025] committed_cut_unknown_is_never_treated_as
     rmSync(common, { recursive: true, force: true })
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-025] committed_cut_foreign_commit_never_releases_local_pending', async () => {
+test('WHAT[repository-programming-025] committed_cut_foreign_commit_never_releases_local_pending', async () => {
   const workspace = makeDir('wxs-committed-cut-foreign-')
   const common = makeDir('wxs-committed-cut-foreign-events-')
   const local = openStore(common)
   try {
     unwrap(await appendPrepared(local.handle, prepared('tx-local', workspace, [mutation('l.txt', null, 'l')])))
     // A stale/foreign Committed for a different transaction id has no release
-    // authority over this pending entry (EXECFAIL-006: stale/foreign callbacks
+    // authority over this pending entry (execution-failure-policy-006: stale/foreign callbacks
     // have no release authority).
     unwrap(await appendCommitted(local.handle, 'tx-foreign'))
     assert.deepEqual(
@@ -131,7 +131,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-025] committed_cut_foreign_commit_never_releas
     rmSync(common, { recursive: true, force: true })
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-025] committed_cut_file_effects_are_owned_by_workflow_not_the_fact', async () => {
+test('WHAT[repository-programming-025] committed_cut_file_effects_are_owned_by_workflow_not_the_fact', async () => {
   // The fact layer never touches the filesystem: even a fully committed pair
   // leaves the workspace byte-identical. File effects belong to the workflow
   // adapter (JsMutationFs.commitPlan), observed here by asserting the store
@@ -187,7 +187,7 @@ const workspaceFiles = (dir) => readdirSync(dir, { withFileTypes: true })
   .map((entry) => entry.name)
   .sort()
 
-test('WHAT[REPOSITORY-PROGRAMMING-025] prepared_cut_appends_facts_without_any_file_effect', async () => {
+test('WHAT[repository-programming-025] prepared_cut_appends_facts_without_any_file_effect', async () => {
   const workspace = makeDir('wxs-prepared-cut-ws-')
   const common = makeDir('wxs-prepared-cut-events-')
   const local = openStore(common)
@@ -210,7 +210,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-025] prepared_cut_appends_facts_without_any_fi
     rmSync(common, { recursive: true, force: true })
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-025] prepared_cut_pending_matches_the_complete_write_set_across_files', async () => {
+test('WHAT[repository-programming-025] prepared_cut_pending_matches_the_complete_write_set_across_files', async () => {
   const workspace = makeDir('wxs-prepared-cut-cross-')
   const common = makeDir('wxs-prepared-cut-cross-events-')
   const local = openStore(common)
@@ -245,7 +245,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-025] prepared_cut_pending_matches_the_complete
     rmSync(common, { recursive: true, force: true })
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-025] prepared_cut_codec_round_trip_is_fold_accepted_for_full_unicode_paths', async () => {
+test('WHAT[repository-programming-025] prepared_cut_codec_round_trip_is_fold_accepted_for_full_unicode_paths', async () => {
   const workspace = makeDir('wxs-prepared-cut-unicode-')
   const common = makeDir('wxs-prepared-cut-unicode-events-')
   const local = openStore(common)
@@ -266,7 +266,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-025] prepared_cut_codec_round_trip_is_fold_acc
     rmSync(common, { recursive: true, force: true })
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-025] prepared_cut_interrupted_append_leaves_no_local_pending_ahead_of_receipt', async () => {
+test('WHAT[repository-programming-025] prepared_cut_interrupted_append_leaves_no_local_pending_ahead_of_receipt', async () => {
   const workspace = makeDir('wxs-prepared-cut-interrupt-')
   const common = makeDir('wxs-prepared-cut-interrupt-events-')
   const local = openStore(common)
@@ -298,7 +298,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-025] prepared_cut_interrupted_append_leaves_no
     rmSync(common, { recursive: true, force: true })
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-025] prepared_cut_committed_match_releases_pending_after_both_receipts', async () => {
+test('WHAT[repository-programming-025] prepared_cut_committed_match_releases_pending_after_both_receipts', async () => {
   const workspace = makeDir('wxs-prepared-cut-commit-')
   const common = makeDir('wxs-prepared-cut-commit-events-')
   const local = openStore(common)
@@ -313,7 +313,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-025] prepared_cut_committed_match_releases_pen
     rmSync(common, { recursive: true, force: true })
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-025] production_store_has_no_optional_fatal_handler_path', async () => {
+test('WHAT[repository-programming-025] production_store_has_no_optional_fatal_handler_path', async () => {
   const source = readFileSync(
     new URL('../../../src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs', import.meta.url),
     'utf8',
@@ -327,5 +327,5 @@ const { default: test } = await import("node:test");
 const { assertFatalBoundary } = await import("../../structured-workflow/tests/support/m6-boundary-proof.mjs");
 
 
-test('WHAT[REPOSITORY-PROGRAMMING-025] transaction fatal preserves rollback or cut settlement and one injected fuse', () => assertFatalBoundary('repository-programming'))
+test('WHAT[repository-programming-025] transaction fatal preserves rollback or cut settlement and one injected fuse', () => assertFatalBoundary('repository-programming'))
 }

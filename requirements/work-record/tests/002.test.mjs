@@ -87,7 +87,7 @@ const seedTwoInvocations = async (handle) => {
   return { s1, s2, inv1Through, inv2Through }
 }
 
-test('WHAT[WORK-RECORD-002] COMPANION_015_bounded_chronicle_excludes_prior_invocation_y_frames', async (context) => {
+test('WHAT[work-record-002] COMPANION_015_bounded_chronicle_excludes_prior_invocation_y_frames', async (context) => {
   const opened = await openJournal()
   context.after(opened.close)
   const { s1, s2, inv1Through, inv2Through } = await seedTwoInvocations(opened.handle)

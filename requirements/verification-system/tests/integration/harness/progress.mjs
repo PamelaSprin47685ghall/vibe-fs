@@ -1,5 +1,5 @@
 /**
- * Mid-case feed for the harness suite dog (VERIFY-004).
+ * Mid-case feed for the harness suite dog (verification-system-004).
  *
  * Case-complete is the default renewal. A case that legitimately runs longer than
  * WATCHDOG_TIMEOUT_MS must call harnessProgress on its own causal steps — same rule

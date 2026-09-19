@@ -24,13 +24,13 @@ const prediction = { P1: 0.9, P2: 0.8, evidenceCount: 100 }
 const values = { V0: 0, V1: 5, V2: 8 }
 const config = { K1Margin: 1, K2Margin: 2, K2MinimumEvidence: 20 }
 
-test('WHAT[SPEC-INV-010] STRENGTH_010_value_equations_charge_fast_bytes_delay_and_risk', () => {
+test('WHAT[speculative-investigation-010] STRENGTH_010_value_equations_charge_fast_bytes_delay_and_risk', () => {
   const estimate = Strength.costEstimate(0.8, 0.5, 10, 8, 2, 1, 0.5, 0.9, 0.25, 0.4, 0.75, 1.1)
   assert.equal(estimate.V0, 0)
   assert.equal(estimate.V1, 0.8 * 10 - 2 - 0.5 - 0.25 - 0.75)
   assert.equal(estimate.V2, 0.8 * 10 + 0.8 * 0.5 * 8 - 2 - 0.8 * 1 - 0.9 - 0.4 - 1.1)
 })
-test('WHAT[SPEC-INV-010] STRENGTH_010_prediction_budget_derivation_is_monotonic_under_single_policy_formula', () => {
+test('WHAT[speculative-investigation-010] STRENGTH_010_prediction_budget_derivation_is_monotonic_under_single_policy_formula', () => {
   // Single formula owner StrengthPolicy.decideFromFacts
   // 1. Non-positive value estimate -> budget K0 (Skip)
   const lowV1 = { V0: 0, V1: 0.5, V2: 1.0 }
@@ -91,14 +91,14 @@ const skipReason = (decision) => {
   return decision.reason
 }
 
-test('WHAT[SPEC-INV-010] STRENGTH_010_economic_holdout_is_not_skipped_and_ineligible_never_counts_as_holdout', () => {
+test('WHAT[speculative-investigation-010] STRENGTH_010_economic_holdout_is_not_skipped_and_ineligible_never_counts_as_holdout', () => {
   assert.equal(decide(eligibleOpportunity, true, false).kind, 'ControlHoldout')
   assert.equal(decide(eligibleOpportunity, true, false).budget, 'K0')
   const ineligibleHoldout = decide({ ...eligibleOpportunity, hostCanaryHealthy: false }, true, false)
   assert.equal(skipReason(ineligibleHoldout), 'host-canary-unhealthy')
   assert.notEqual(ineligibleHoldout.kind, 'ControlHoldout')
 })
-test('WHAT[SPEC-INV-010] STRENGTH_010_k2_is_gated_and_not_enabled_by_this_proof', () => {
+test('WHAT[speculative-investigation-010] STRENGTH_010_k2_is_gated_and_not_enabled_by_this_proof', () => {
   const belowFloor = decide(eligibleOpportunity, false, false, { ...prediction, evidenceCount: 19 })
   assert.equal(belowFloor.kind, 'Speculate')
   assert.equal(belowFloor.budget, 'K1')
@@ -115,7 +115,7 @@ const Strength = await import("../../../dist/Strength/Surface.js");
 
 const H = (text) => `H(${text})`
 
-test('WHAT[SPEC-INV-010] STRENGTH_010_feature_key_has_no_replica_or_score_provenance', () => {
+test('WHAT[speculative-investigation-010] STRENGTH_010_feature_key_has_no_replica_or_score_provenance', () => {
   const feature = Strength.predictorFeature('Inspector', ['ReadonlyBatch'], 100)
   assert.equal('replicaSessionId' in feature, false)
   assert.equal('decisionId' in feature, false)
@@ -123,7 +123,7 @@ test('WHAT[SPEC-INV-010] STRENGTH_010_feature_key_has_no_replica_or_score_proven
   assert.equal('predictorScore' in feature, false)
   assert.deepEqual(feature, { canonicalRole: 'inspector', recentPrimary: ['ReadonlyBatch'], visibleByteBucket: 1 })
 })
-test('WHAT[SPEC-INV-010] STRENGTH_010_predictor_learns_only_explicit_primary_labels_and_keeps_a_bounded_feature_key', () => {
+test('WHAT[speculative-investigation-010] STRENGTH_010_predictor_learns_only_explicit_primary_labels_and_keeps_a_bounded_feature_key', () => {
   const feature = Strength.predictorFeature('Coder', ['ReadonlyBatch', 'TextOnly', 'MutatingOrExecuting', 'Other'], 5000)
   assert.equal(feature.visibleByteBucket, 2)
   assert.equal(feature.recentPrimary.length, 3)
@@ -141,7 +141,7 @@ test('WHAT[SPEC-INV-010] STRENGTH_010_predictor_learns_only_explicit_primary_lab
   assert.equal(bucketAfter.opportunities, 2)
   assert.equal(bucketAfter.secondObservations, 1)
 })
-test('WHAT[SPEC-INV-010] STRENGTH_010_counterfactual_requires_distinct_exact_runs_and_counts_neither_twice', () => {
+test('WHAT[speculative-investigation-010] STRENGTH_010_counterfactual_requires_distinct_exact_runs_and_counts_neither_twice', () => {
   const scope = Strength.scopeCreate()
   const feature = Strength.scopeFeature(scope, 'ses-a', 'Coder', 1000)
   assert.equal(Strength.scopeArm(scope, 'ses-a', 'run-1', feature).ok, true)
@@ -159,7 +159,7 @@ test('WHAT[SPEC-INV-010] STRENGTH_010_counterfactual_requires_distinct_exact_run
   assert.equal(Strength.scopeObserve(scope, 'ses-a', 'run-3', 'ReadonlyBatch'), null)
   Strength.scopeDispose(scope)
 })
-test('WHAT[SPEC-INV-010] STRENGTH_010_counterfactual_episodes_are_isolated_by_session_and_feature', () => {
+test('WHAT[speculative-investigation-010] STRENGTH_010_counterfactual_episodes_are_isolated_by_session_and_feature', () => {
   const scope = Strength.scopeCreate()
   const featureC = Strength.scopeFeature(scope, 'ses-a', 'Coder', 1000)
   const featureI = Strength.scopeFeature(scope, 'ses-a', 'Inspector', 1000)
@@ -179,7 +179,7 @@ test('WHAT[SPEC-INV-010] STRENGTH_010_counterfactual_episodes_are_isolated_by_se
   assert.deepEqual(Strength.scopeBucket(scope, featureI), { opportunities: 0, readonlyFirst: 0, secondObservations: 0, readonlySecond: 0 })
   Strength.scopeDispose(scope)
 })
-test('WHAT[SPEC-INV-010] STRENGTH_010_new_root_clear_starts_a_fresh_counterfactual_episode', () => {
+test('WHAT[speculative-investigation-010] STRENGTH_010_new_root_clear_starts_a_fresh_counterfactual_episode', () => {
   const scope = Strength.scopeCreate()
   const feature = Strength.scopeFeature(scope, 'ses-a', 'Coder', 1000)
   Strength.scopeArm(scope, 'ses-a', 'run-old', feature)
@@ -195,7 +195,7 @@ test('WHAT[SPEC-INV-010] STRENGTH_010_new_root_clear_starts_a_fresh_counterfactu
   assert.deepEqual(pair.secondSymbol, 'TextOnly')
   Strength.scopeDispose(scope)
 })
-test('WHAT[SPEC-INV-010] STRENGTH_010_unrelated_runs_before_target_never_start_a_pair', () => {
+test('WHAT[speculative-investigation-010] STRENGTH_010_unrelated_runs_before_target_never_start_a_pair', () => {
   const scope = Strength.scopeCreate()
   const feature = Strength.scopeFeature(scope, 'ses-a', 'Coder', 1000)
   Strength.scopeArm(scope, 'ses-a', 'run-target', feature)
@@ -208,7 +208,7 @@ test('WHAT[SPEC-INV-010] STRENGTH_010_unrelated_runs_before_target_never_start_a
   assert.deepEqual(pair, { feature, firstSymbol: 'ReadonlyBatch', secondSymbol: 'TextOnly' })
   Strength.scopeDispose(scope)
 })
-test('WHAT[SPEC-INV-010] STRENGTH_010_target_late_after_unarmed_observations_still_creates_first', () => {
+test('WHAT[speculative-investigation-010] STRENGTH_010_target_late_after_unarmed_observations_still_creates_first', () => {
   const scope = Strength.scopeCreate()
   const feature = Strength.scopeFeature(scope, 'ses-a', 'Coder', 1000)
   assert.equal(Strength.scopeObserve(scope, 'ses-a', 'run-early', 'TextOnly'), null)
@@ -220,7 +220,7 @@ test('WHAT[SPEC-INV-010] STRENGTH_010_target_late_after_unarmed_observations_sti
   assert.deepEqual(Strength.scopeBucket(scope, feature), { opportunities: 1, readonlyFirst: 1, secondObservations: 1, readonlySecond: 1 })
   Strength.scopeDispose(scope)
 })
-test('WHAT[SPEC-INV-010] STRENGTH_010_re_arm_while_armed_is_ignored', () => {
+test('WHAT[speculative-investigation-010] STRENGTH_010_re_arm_while_armed_is_ignored', () => {
   const scope = Strength.scopeCreate()
   const feature = Strength.scopeFeature(scope, 'ses-a', 'Coder', 1000)
   const otherFeature = Strength.scopeFeature(scope, 'ses-a', 'Inspector', 1000)
@@ -234,7 +234,7 @@ test('WHAT[SPEC-INV-010] STRENGTH_010_re_arm_while_armed_is_ignored', () => {
   assert.deepEqual(pair, { feature, firstSymbol: 'ReadonlyBatch', secondSymbol: 'TextOnly' })
   Strength.scopeDispose(scope)
 })
-test('WHAT[SPEC-INV-010] STRENGTH_010_repeated_exact_observations_are_idempotent', () => {
+test('WHAT[speculative-investigation-010] STRENGTH_010_repeated_exact_observations_are_idempotent', () => {
   const scope = Strength.scopeCreate()
   const feature = Strength.scopeFeature(scope, 'ses-a', 'Coder', 1000)
   Strength.scopeArm(scope, 'ses-a', 'run-1', feature)
@@ -251,7 +251,7 @@ test('WHAT[SPEC-INV-010] STRENGTH_010_repeated_exact_observations_are_idempotent
   assert.deepEqual(Strength.scopePredict(scope, feature), { P1: 1, P2: 0, evidenceCount: 1 })
   Strength.scopeDispose(scope)
 })
-test('WHAT[SPEC-INV-010] STRENGTH_010_clear_mid_episode_drops_the_buffered_first', () => {
+test('WHAT[speculative-investigation-010] STRENGTH_010_clear_mid_episode_drops_the_buffered_first', () => {
   const scope = Strength.scopeCreate()
   const feature = Strength.scopeFeature(scope, 'ses-a', 'Coder', 1000)
   Strength.scopeArm(scope, 'ses-a', 'run-1', feature)
@@ -267,7 +267,7 @@ test('WHAT[SPEC-INV-010] STRENGTH_010_clear_mid_episode_drops_the_buffered_first
   assert.deepEqual(pair, { feature, firstSymbol: 'TextOnly', secondSymbol: 'MutatingOrExecuting' })
   Strength.scopeDispose(scope)
 })
-test('WHAT[SPEC-INV-010] STRENGTH_010_interleaved_sessions_serialize_deterministically', () => {
+test('WHAT[speculative-investigation-010] STRENGTH_010_interleaved_sessions_serialize_deterministically', () => {
   const scope = Strength.scopeCreate()
   const featureA = Strength.scopeFeature(scope, 'ses-a', 'Coder', 1000)
   const featureB = Strength.scopeFeature(scope, 'ses-b', 'Inspector', 1000)
@@ -289,14 +289,14 @@ test('WHAT[SPEC-INV-010] STRENGTH_010_interleaved_sessions_serialize_determinist
   assert.deepEqual(Strength.scopeBucket(scope, featureB), settledB)
   Strength.scopeDispose(scope)
 })
-test('WHAT[SPEC-INV-010] STRENGTH_010_control_assignment_is_restart_stable_and_has_no_predictor_score_input', () => {
+test('WHAT[speculative-investigation-010] STRENGTH_010_control_assignment_is_restart_stable_and_has_no_predictor_score_input', () => {
   const first = Strength.policyControlBucket(H, 'policy-v1', 'root-1', 'run-1')
   assert.equal(first, Strength.policyControlBucket(H, 'policy-v1', 'root-1', 'run-1'))
   assert.notEqual(first, Strength.policyControlBucket(H, 'policy-v1', 'root-1', 'run-2'))
   assert.equal(Strength.policyIsControlHoldout(10000, first), true)
   assert.equal(Strength.policyIsControlHoldout(0, first), false)
 })
-test('WHAT[SPEC-INV-010] STRENGTH_010_rollout_uses_explicit_costs_and_shadow_never_means_treatment', () => {
+test('WHAT[speculative-investigation-010] STRENGTH_010_rollout_uses_explicit_costs_and_shadow_never_means_treatment', () => {
   const value = Strength.rolloutEstimate(
     { P1: 0.75, P2: 0.5, evidenceCount: 100 },
     { SavedDeep1: 10, SavedDeep2: 8, Fast1: 2, Fast2: 1, Byte1: 0.5, Byte2: 0.75, Delay1: 0.25, Delay2: 0.5, Risk1: 0.5, Risk2: 1 },

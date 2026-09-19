@@ -216,7 +216,7 @@ module AgentJournalPortAdapter =
                         |> Result.mapError JournalAppendFailure.describe
                 } }
 
-    /// DELEG-029: durable composition is the only place that wraps delegation fact
+    /// delegation-029: durable composition is the only place that wraps delegation fact
     /// cases into the outer routing union and adapts the journal handle.
     let fromAgentJournal (journal: AgentJournal) : AgentJournalPort =
         DelegationJournalAdapter.fromAgentJournal journal

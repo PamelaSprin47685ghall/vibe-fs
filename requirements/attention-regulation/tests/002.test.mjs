@@ -24,7 +24,7 @@ const recordingPort = () => {
   return fixture
 }
 
-test('WHAT[ATTENTION-REGULATION-002] abandon releases only cognitive attention and never mutates obligations or authority', async () => {
+test('WHAT[attention-regulation-002] abandon releases only cognitive attention and never mutates obligations or authority', async () => {
   const fixture = recordingPort()
   const accepted = await tools.execute(fixture.tools, 'abandon', { commitment: 'drop the speculative branch' }, context())
   const rejected = await tools.execute(fixture.tools, 'abandon', { commitment: '' }, context())

@@ -19,7 +19,7 @@ const payload = (overrides = {}) => ({
   ...overrides,
 })
 
-test('WHAT[CHGINT-016] parallel engineer and devops mutations require task boundary and forbid hash-equality bypass', () => {
+test('WHAT[change-integration-016] parallel engineer and devops mutations require task boundary and forbid hash-equality bypass', () => {
   const initial = change.createJobResult(change.empty(), payload())
   assert.equal(initial.ok, true)
 

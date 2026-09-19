@@ -29,6 +29,6 @@ module AgentJournalPortAdapter =
     val forTerminalPolicy: journal: AgentJournal -> TerminalPolicyPort
     val forHostJoinGuard: journal: AgentJournal -> HostJoinGuardJournalPort
 
-    /// DELEG-029: durable composition is the only place that wraps delegation fact
+    /// delegation-029: durable composition is the only place that wraps delegation fact
     /// cases into the outer routing union and adapts the journal handle.
     val fromAgentJournal: journal: AgentJournal -> AgentJournalPort

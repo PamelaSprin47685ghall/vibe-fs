@@ -21,7 +21,7 @@ ModelRoutingRuntime (进程单例，管理 Lease multiset 与 Capacity Token)
 2. **物理准入与租约管理**：
    - 调度请求仅在 Host `chat.message` 阶段触发，以 IdentitySeed 确立的 fixed canonical Role 作为 MJS 调度输入，将 `(SessionId, PhysicalUserMessageId)` 绑定至解析出的 ModelTarget 并修改 Host message。acquire 输入同时携带显式 participant 与可选的 `lenderSessionId`（后者由 accepted IdentitySeed 的 owner 派生）。
    - 同一 physical execution 重试严格复用已有 target 与 capacity fence，不重新执行调度器，亦严禁在同一 physical 内切换 Role、participant 或 agent；新物理消息到达（fresh physical execution）时原子取代并取消旧 pending demand，并以固定的 canonical Role 重新调度至新 target（仅当旧执行仍是当前活跃执行时，才将其 target 作为 `previous` 供偏好提示），但绝不改变 participant identity。`null` 返回值进入等待队列并在租约归还时事件驱动重试。
-   - provider 恢复的失败结算（EMR-017）另以 exact witness 写入一次单次消费的 recovery retry 绑定：该 session 的下一次 fresh admission 优先使用该目标（即使旧执行已释放），随后绑定被消费；poison 后的 provider 不再提供容量。
+   - provider 恢复的失败结算（execution-model-routing-017）另以 exact witness 写入一次单次消费的 recovery retry 绑定：该 session 的下一次 fresh admission 优先使用该目标（即使旧执行已释放），随后绑定被消费；poison 后的 provider 不再提供容量。
 
 3. **显式 lender 信用借用与召回**：
    - 真实 Token Ledger 记录全局占用；借用只承认 acquire/reserve 输入中 `lenderSessionId` 显式指定的 lender credit，不存在 ambient 派生树或隐式信用。
@@ -59,11 +59,11 @@ ModelRoutingRuntime (进程单例，管理 Lease multiset 与 Capacity Token)
 
 按 production inventory 的声明递归闭包，端口从 7 项目／28 输入降至 5／22，policy 从 55／338 降至 54／334；policy 仍经 Grounding 等真实依赖编入摘要原语，未宣称完全无摘要。端口与 policy 独立 Fable 编译分别通过 60、372 parsed sources；OpencodeTypes、OpenCodeContract、ModelRouting 签名反向消费者的 flat 并集通过 1426 parsed sources／1388 items，包含实际 admission、binding、bootstrap 和插件装配路径。
 
-既有 `host-boundary/tests/host-session-contract-closure.test.mjs` 的 HOST-BOUNDARY-026 闭包证明分别拒绝端口与 policy 恢复宽 Host 引用，窄引用下通过；不设项目数或源码数新预算。新消费者产物上的 `ModelRoutingSurface.createSdkClientPort/sendPrompt` smoke 观察真实 adapter 交付的 SDK payload：显式模型保留 provider/model，reasoning 投影为顶层 variant；未指定模型时不从 agent 恢复模型。该注入 SDK client 的 smoke 不是真实 Host canary，也不证明全部 capacity 时序；既有正式行为证明入口保持如下。
+既有 `host-boundary/tests/host-session-contract-closure.test.mjs` 的 host-boundary-026 闭包证明分别拒绝端口与 policy 恢复宽 Host 引用，窄引用下通过；不设项目数或源码数新预算。新消费者产物上的 `ModelRoutingSurface.createSdkClientPort/sendPrompt` smoke 观察真实 adapter 交付的 SDK payload：显式模型保留 provider/model，reasoning 投影为顶层 variant；未指定模型时不从 agent 恢复模型。该注入 SDK client 的 smoke 不是真实 Host canary，也不证明全部 capacity 时序；既有正式行为证明入口保持如下。
 
 ## 正式行为证明入口
 
-- EMR-001..016: `requirements/execution-model-routing/tests/*.test.mjs`
-- EMR-017: `requirements/execution-model-routing/tests/017.test.mjs` 与 `requirements/provider-attempt-recovery/tests/021.test.mjs`
-- EMR-018: `requirements/execution-model-routing/tests/018.test.mjs`
-- EMR-019: `requirements/execution-model-routing/tests/019.test.mjs`
+- execution-model-routing-001..016: `requirements/execution-model-routing/tests/*.test.mjs`
+- execution-model-routing-017: `requirements/execution-model-routing/tests/017.test.mjs` 与 `requirements/provider-attempt-recovery/tests/021.test.mjs`
+- execution-model-routing-018: `requirements/execution-model-routing/tests/018.test.mjs`
+- execution-model-routing-019: `requirements/execution-model-routing/tests/019.test.mjs`

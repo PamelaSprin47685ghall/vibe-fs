@@ -12,7 +12,7 @@ const mustOk = (result) => {
   return result
 }
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-014] control-plane successors run before lane settlement and final takeover', () => {
+test('WHAT[intra-participant-parallelism-014] control-plane successors run before lane settlement and final takeover', () => {
   for (const phase of ['lane', 'takeover']) {
     for (const observation of ['running', 'needs-continuation', 'provider-failed', 'degeneration-interrupted']) {
       assert.equal(
@@ -46,7 +46,7 @@ const fissionProduction = () => [
   'src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs',
 ].map(read).join('\n')
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-014] Degeneration guard remains control-plane owner before Fission settlement', () => {
+test('WHAT[intra-participant-parallelism-014] Degeneration guard remains control-plane owner before Fission settlement', () => {
   const observer = read('src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs')
   const host = read('src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs')
 

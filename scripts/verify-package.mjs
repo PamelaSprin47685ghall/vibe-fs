@@ -1,5 +1,5 @@
 // scripts/verify-package.mjs
-// DISTRIBUTION-007 real pack+extract+consume proof.
+// distribution-007 real pack+extract+consume proof.
 //
 // Performs real `npm pack --json --ignore-scripts --pack-destination <runDir>`,
 // streams members via `tar`, strictly validates normalized archive paths,
@@ -664,7 +664,7 @@ export async function verifyPackage({
       strict: true,
     })
 
-    // DISTRIBUTION-010: assert active registrations and surface consistency in extracted artifact
+    // distribution-010: assert active registrations and surface consistency in extracted artifact
     assertActiveRegistrations({ extractedPackageDir, root: resolvedRoot })
 
     if (!skipConsumer) {

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Focused architecture checks for VERIFY-005 layer 0.
+// Focused architecture checks for verification-system-005 layer 0.
 // Usage: node scripts/checks/architecture.mjs
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'

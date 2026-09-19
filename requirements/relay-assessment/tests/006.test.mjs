@@ -4,7 +4,7 @@ import * as relay from '../../../dist/Mission/Relay/Surface.js'
 
 const open = (state) => relay.openIncumbency(state, 'road-1', 'inc-1', 'snapshot-1', 'authority-1')
 
-test('WHAT[ASSESS-006] assessed iteration cannot submit a second review after work begins', () => {
+test('WHAT[relay-assessment-006] assessed iteration cannot submit a second review after work begins', () => {
   const opened = open(relay.empty())
   const assessed = relay.assess(
     opened.state,

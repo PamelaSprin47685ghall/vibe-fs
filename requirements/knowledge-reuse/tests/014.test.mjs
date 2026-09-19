@@ -1,13 +1,13 @@
 // requirements/knowledge-reuse/tests/014.test.mjs
 //
-// Laws: KNOWLEDGE-REUSE-014
+// Laws: knowledge-reuse-014
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import * as casebook from '../../../dist/Repository/Knowledge/Casebook/Surface.js'
 
-test('WHAT[KNOWLEDGE-REUSE-014] T26_large_traces_and_diffs_truncate_with_explicit_truncation_notice', () => {
+test('WHAT[knowledge-reuse-014] T26_large_traces_and_diffs_truncate_with_explicit_truncation_notice', () => {
   assert.equal(typeof casebook.truncateDiffForBudget, 'function', 'casebook must export truncateDiffForBudget')
   const largeDiff = 'x'.repeat(20000)
   const truncated = casebook.truncateDiffForBudget(largeDiff, 1000)

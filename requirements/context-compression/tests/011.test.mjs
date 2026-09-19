@@ -41,7 +41,7 @@ const foldErr = (requests) => {
   assert.fail('expected fold rejection')
 }
 
-test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_squash_does_not_advance_coverage', () => {
+test('WHAT[context-compression-011] CTX_012_squash_does_not_advance_coverage', () => {
   const squash = {
     previousEpoch: 0,
     nextEpoch: 1,
@@ -112,7 +112,7 @@ function threeEntries() {
   return state
 }
 
-test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_squash_replaces_the_oldest_frames_and_leaves_the_covered_range_alone', () => {
+test('WHAT[context-compression-011] CTX_012_squash_replaces_the_oldest_frames_and_leaves_the_covered_range_alone', () => {
   let state = blog.empty
   for (let i = 1; i <= 4; i += 1) {
     state = commitEntry(state, { from: i - 1, to: i, cutoffFrom: i - 1, cutoffTo: i, n: i }).value
@@ -148,7 +148,7 @@ test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_squash_replaces_the_oldest_frames_an
   assert.equal(merged.coveredFrom, 0)
   assert.equal(merged.coveredThrough, 2, 'squash unions the replaced frames\' coverage interval')
 })
-test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_a_squash_that_consumes_the_whole_covered_range_leaves_one_coverable_frame', () => {
+test('WHAT[context-compression-011] CTX_012_a_squash_that_consumes_the_whole_covered_range_leaves_one_coverable_frame', () => {
   // The boundary case the arithmetic has to get right. Squashing every covered frame
   // into one means the covered range is now that single frame — not zero, which would
   // silently disable probes, and not the old count, which would overrun the list.
@@ -165,7 +165,7 @@ test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_a_squash_that_consumes_the_whole_cov
   assert.equal(blog.coverage(collapsed.value).cutoff, 3, 'the covered X range is unchanged')
   assert.deepEqual(blog.coverableFrameKinds(collapsed.value), ['Squash'])
 })
-test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_squash_width_is_ceil_half_and_does_not_skip_a_single_frame', () => {
+test('WHAT[context-compression-011] CTX_012_squash_width_is_ceil_half_and_does_not_skip_a_single_frame', () => {
   const widthAfter = (count) => {
     let state = blog.empty
     for (let i = 1; i <= count; i += 1) {
@@ -179,7 +179,7 @@ test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_squash_width_is_ceil_half_and_does_n
   // a rewrite shortens it materially.
   assert.deepEqual([1, 2, 3, 4, 5, 6].map(widthAfter), [1, 1, 2, 2, 3, 3])
 })
-test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_single_frame_squash_may_replace_text_with_a_new_digest', () => {
+test('WHAT[context-compression-011] CTX_012_single_frame_squash_may_replace_text_with_a_new_digest', () => {
   const state = commitEntry(blog.empty, { from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }).value
   const rewritten = blog.frame({
     kind: 'Squash',
@@ -193,7 +193,7 @@ test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_single_frame_squash_may_replace_text
   assert.equal(squashed.ok, true, squashed.ok ? '' : squashed.error)
   assert.equal(blog.frames(squashed.value)[0].digest, 'sha-squash-rewritten')
 })
-test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_squash_frames_are_interchangeable_with_entries_so_cascade_works', () => {
+test('WHAT[context-compression-011] CTX_012_squash_frames_are_interchangeable_with_entries_so_cascade_works', () => {
   let state = threeEntries()
   // [Entry, Entry, Entry] → squash 2 → [Squash, Entry]
   const first = blog.applySquash({ previousEpoch: 0, nextEpoch: 1, count: 2, frame: squashFrame(1) }, state).value
@@ -205,7 +205,7 @@ test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_squash_frames_are_interchangeable_wi
   assert.deepEqual(blog.frameKinds(second.value), ['Squash'])
   assert.equal(Number(blog.frameEpochOf(second.value)), 2)
 })
-test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_squash_count_outside_available_range_is_refused', () => {
+test('WHAT[context-compression-011] CTX_012_squash_count_outside_available_range_is_refused', () => {
   let state = blog.empty
   for (let i = 1; i <= 2; i += 1) {
     state = commitEntry(state, { from: i - 1, to: i, cutoffFrom: i - 1, cutoffTo: i, n: i }).value
@@ -224,7 +224,7 @@ test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_squash_count_outside_available_range
   assert.equal(all.ok, true, all.ok ? '' : all.error)
   assert.deepEqual(blog.frameKinds(all.value), ['Squash'])
 })
-test('WHAT[CONTEXT-COMPRESSION-011] PERSIST_010_squash_epoch_must_be_the_successor', () => {
+test('WHAT[context-compression-011] PERSIST_010_squash_epoch_must_be_the_successor', () => {
   const state = commitEntry(blog.empty, { from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1 }).value
 
   for (const nextEpoch of [0, 2, 7]) {
@@ -235,7 +235,7 @@ test('WHAT[CONTEXT-COMPRESSION-011] PERSIST_010_squash_epoch_must_be_the_success
     )
   }
 })
-test('WHAT[CONTEXT-COMPRESSION-011] PERSIST_010_squash_written_against_a_stale_epoch_is_refused', () => {
+test('WHAT[context-compression-011] PERSIST_010_squash_written_against_a_stale_epoch_is_refused', () => {
   const state = commitEntry(blog.empty, { from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1 }).value
   const once = blog.applySquash({ previousEpoch: 0, nextEpoch: 1, count: 1, frame: squashFrame(1) }, state).value
 
@@ -265,7 +265,7 @@ const isCombinedNormalDelta = (text) =>
   text.startsWith('# Write the dense work-log continuation now') && text.includes('[[new_work_to_record]]')
 const isPreviousTip = (text) => text.includes('previous_enforcer_tip')
 
-test('WHAT[CONTEXT-COMPRESSION-011] COMPANION_013_seal_root_is_derived_from_exactly_the_candidate_identity', () => {
+test('WHAT[context-compression-011] COMPANION_013_seal_root_is_derived_from_exactly_the_candidate_identity', () => {
   const seal = ident.sealRoot(spy, {
     session: 'ses_x',
     epoch: 3,
@@ -276,7 +276,7 @@ test('WHAT[CONTEXT-COMPRESSION-011] COMPANION_013_seal_root_is_derived_from_exac
 
   assert.equal(seal, '«ses_x|3|7|prefix-7|frozen-7»')
 })
-test('WHAT[CONTEXT-COMPRESSION-011] COMPANION_013_seal_root_changes_when_any_identity_field_changes', () => {
+test('WHAT[context-compression-011] COMPANION_013_seal_root_changes_when_any_identity_field_changes', () => {
   const base = { session: 'ses_x', epoch: 1, cutoff: 4, prefixDigest: 'p', frozenDigest: 'f' }
   const seal = (over) => ident.sealRoot(spy, { ...base, ...over })
 
@@ -291,11 +291,11 @@ test('WHAT[CONTEXT-COMPRESSION-011] COMPANION_013_seal_root_changes_when_any_ide
 
   assert.equal(new Set(variants).size, variants.length, 'every field must affect the seal')
 })
-test('WHAT[CONTEXT-COMPRESSION-011] COMPANION_013_seal_root_is_stable_across_calls', () => {
+test('WHAT[context-compression-011] COMPANION_013_seal_root_is_stable_across_calls', () => {
   const args = { session: 'ses_x', epoch: 2, cutoff: 9, prefixDigest: 'p', frozenDigest: 'f' }
   assert.equal(ident.sealRoot(spy, args), ident.sealRoot(spy, args))
 })
-test('WHAT[CONTEXT-COMPRESSION-011] COMPANION_013_companion_memory_id_is_a_function_of_the_seal_alone', () => {
+test('WHAT[context-compression-011] COMPANION_013_companion_memory_id_is_a_function_of_the_seal_alone', () => {
   assert.equal(ident.companionMemoryMessageId(spy, 'SEAL'), '«SEAL|companion-memory»')
   assert.equal(
     ident.companionMemoryMessageId(spy, 'SEAL'),
@@ -303,7 +303,7 @@ test('WHAT[CONTEXT-COMPRESSION-011] COMPANION_013_companion_memory_id_is_a_funct
   )
   assert.notEqual(ident.companionMemoryMessageId(spy, 'SEAL'), ident.companionMemoryMessageId(spy, 'OTHER'))
 })
-test('WHAT[CONTEXT-COMPRESSION-011] COMPANION_013_frame_id_needs_both_the_ordinal_and_the_frame_epoch', () => {
+test('WHAT[context-compression-011] COMPANION_013_frame_id_needs_both_the_ordinal_and_the_frame_epoch', () => {
   const id = (over) =>
     ident.frameMessageId(spy, { blogger: 'ses_y', epoch: 0, ordinal: 0, digest: 'sha-a', ...over })
 
@@ -311,14 +311,14 @@ test('WHAT[CONTEXT-COMPRESSION-011] COMPANION_013_frame_id_needs_both_the_ordina
   assert.notEqual(id({}), id({ epoch: 1 }))
   assert.equal(id({}), '«ses_y|0|0|sha-a|blog-frame»')
 })
-test('WHAT[CONTEXT-COMPRESSION-011] COMPANION_013_instruction_id_distinguishes_normal_from_squash', () => {
+test('WHAT[context-compression-011] COMPANION_013_instruction_id_distinguishes_normal_from_squash', () => {
   const normal = ident.instructionMessageId(spy, { blogger: 'ses_y', epoch: 0, kind: 'normal' })
   const squash = ident.instructionMessageId(spy, { blogger: 'ses_y', epoch: 0, kind: 'squash' })
 
   assert.notEqual(normal, squash)
   assert.equal(normal, '«ses_y|0|normal|instruction»')
 })
-test('WHAT[CONTEXT-COMPRESSION-011] COMPANION_013_frame_ids_are_positional_within_the_current_sequence', () => {
+test('WHAT[context-compression-011] COMPANION_013_frame_ids_are_positional_within_the_current_sequence', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 2,
@@ -354,7 +354,7 @@ const committedAt = (cutoff, { digest = `prefix-${cutoff}`, frozen = `frozen-${c
     syntheticId: `synthetic-${seal}`,
   })
 
-test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_the_probe_carries_the_seal_the_promotion_will_reuse', () => {
+test('WHAT[context-compression-011] CTX_012_the_probe_carries_the_seal_the_promotion_will_reuse', () => {
   // COMPANION-013: the seal is derived from the candidate's identity plus the epoch it
   // was built from. That is what lets CTX-012 promote the snapshot verbatim — the seal
   // the successful request used is already the one the committed epoch needs, so
@@ -387,7 +387,7 @@ test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_the_probe_carries_the_seal_the_promo
   // identifies the attempt, and CTX-012's fold matches on the ProbeId alone.
   assert.notEqual(result.syntheticId, result.probeId)
 })
-test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_the_built_candidate_is_exactly_what_the_projection_will_promote', () => {
+test('WHAT[context-compression-011] CTX_012_the_built_candidate_is_exactly_what_the_projection_will_promote', () => {
   // End to end across the two modules: the snapshot the selector produced is accepted
   // by the fold unchanged. If either side reconstructed a field, this would be where
   // the drift showed.

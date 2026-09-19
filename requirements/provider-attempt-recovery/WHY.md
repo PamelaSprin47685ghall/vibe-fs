@@ -42,7 +42,7 @@ remain, and when to stop completely.**
   sends a new physical request.
 - **Provider health vs failure budget**: `ModelRouting` poisons a physical
   provider only when that provider's LWR-context retry is itself confirmed
-  failed (PAR-021); a first failure keeps the provider and binds the retry to
+  failed (provider-attempt-recovery-021); a first failure keeps the provider and binds the retry to
   the failed target, so provider health is never decided by a failure ordinal.
   The failure budget only counts consecutive failures and the budget. The two
   are orthogonal: the budget never revives a failed provider, and the provider

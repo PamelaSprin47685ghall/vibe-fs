@@ -14,7 +14,7 @@ const branch = (source, start, end) => {
   return source.slice(from, to)
 }
 
-test('WHAT[SPEC-INV-011] SPEC_INV_011_Strength_replica_lifecycle_has_no_wall_clock_terminal_arbitration', async () => {
+test('WHAT[speculative-investigation-011] SPEC_INV_011_Strength_replica_lifecycle_has_no_wall_clock_terminal_arbitration', async () => {
   const runtime = await read('src/Wanxiangshu/Strength/Replica/Runtime.fs')
   assert.doesNotMatch(runtime, /ITimerPort|timer\.Delay|completionWins|settleCompletionRace|maxLatencyMs|TimedOut/)
   assert.doesNotMatch(runtime, /\.IsCompleted|get_IsCompleted/)
@@ -47,16 +47,16 @@ const withEnv = (name, value, run) => {
 }
 const withCanary = (value, run) => withEnv('WANXIANGSHU_STRENGTH_HOST_CANARY', value, run)
 
-test('WHAT[SPEC-INV-011] STRENGTH_011_dry_run_is_an_explicit_non_default_host_canary_mode', () => {
+test('WHAT[speculative-investigation-011] STRENGTH_011_dry_run_is_an_explicit_non_default_host_canary_mode', () => {
   withEnv('WANXIANGSHU_STRENGTH_MODE', undefined, () => assert.equal(Strength.settingsLoad().mode, 'Shadow'))
   withEnv('WANXIANGSHU_STRENGTH_MODE', 'dry-run', () => assert.equal(Strength.settingsLoad().mode, 'DryRun'))
 })
-test('WHAT[SPEC-INV-011] STRENGTH_011_dry_run_budget_defaults_to_k1_and_requires_explicit_k2_canary_opt_in', () => {
+test('WHAT[speculative-investigation-011] STRENGTH_011_dry_run_budget_defaults_to_k1_and_requires_explicit_k2_canary_opt_in', () => {
   withEnv('WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET', undefined, () => assert.equal(Strength.settingsDryRunBudget(), 'K1'))
   withEnv('WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET', 'K2', () => assert.equal(Strength.settingsDryRunBudget(), 'K2'))
   withEnv('WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET', 'garbage', () => assert.equal(Strength.settingsDryRunBudget(), 'K1'))
 })
-test('WHAT[SPEC-INV-011] STRENGTH_011_host_canary_is_bound_to_the_pinned_OpenCode_and_plugin_contract', () => {
+test('WHAT[speculative-investigation-011] STRENGTH_011_host_canary_is_bound_to_the_pinned_OpenCode_and_plugin_contract', () => {
   const expected = `opencode-ai@${packageJson.devDependencies['opencode-ai']}|@opencode-ai/plugin@${packageJson.peerDependencies['@opencode-ai/plugin']}|strength-host-canary-v1`
   assert.equal(Strength.settingsHostCanaryFingerprint, expected)
   withCanary(undefined, () => assert.equal(Strength.settingsHostCanaryHealthy(), false))
@@ -64,7 +64,7 @@ test('WHAT[SPEC-INV-011] STRENGTH_011_host_canary_is_bound_to_the_pinned_OpenCod
   withCanary('pass', () => assert.equal(Strength.settingsHostCanaryHealthy(), false))
   withCanary(Strength.settingsHostCanaryFingerprint, () => assert.equal(Strength.settingsHostCanaryHealthy(), true))
 })
-test('WHAT[SPEC-INV-011] STRENGTH_011_process_fuse_is_first-failure-latched_and_cannot_be_cleared_by_a_session_cleanup', () => {
+test('WHAT[speculative-investigation-011] STRENGTH_011_process_fuse_is_first-failure-latched_and_cannot_be_cleared_by_a_session_cleanup', () => {
   const scope = Strength.scopeCreate()
   assert.equal(Strength.scopeFuseReason(scope), null)
   Strength.scopeTripFuse(scope, 'projection-conflict')
@@ -84,7 +84,7 @@ const Strength = await import("../../../dist/Strength/Surface.js");
 
 const H = (text) => `H(${text})`
 
-test('WHAT[SPEC-INV-011] STRENGTH_011_scope_fuse_keeps_first_reason_across_clear_and_dispose', () => {
+test('WHAT[speculative-investigation-011] STRENGTH_011_scope_fuse_keeps_first_reason_across_clear_and_dispose', () => {
   const scope = Strength.scopeCreate()
   assert.equal(Strength.scopeFuseReason(scope), null)
   Strength.scopeTripFuse(scope, 'first-failure')
@@ -95,7 +95,7 @@ test('WHAT[SPEC-INV-011] STRENGTH_011_scope_fuse_keeps_first_reason_across_clear
   Strength.scopeDispose(scope)
   assert.equal(Strength.scopeFuseReason(scope), 'first-failure')
 })
-test('WHAT[SPEC-INV-011] STRENGTH_011_scope_dispose_drops_process_local_caches_but_never_untrips_the_fuse', () => {
+test('WHAT[speculative-investigation-011] STRENGTH_011_scope_dispose_drops_process_local_caches_but_never_untrips_the_fuse', () => {
   const scope = Strength.scopeCreate()
   const feature = Strength.scopeFeature(scope, 'ses-a', 'Coder', 1000)
   Strength.scopeArm(scope, 'ses-a', 'run-1', feature)
@@ -172,7 +172,7 @@ const attach = (replica, budget, purpose = 'Treatment', owner = 'owner') => {
 const turn = (sessionId, outcome, providerRun = 'run-t') => ({ sessionId, providerRun, outcome, parts: [] })
 const oneBatch = (replica) => ({ messages: [user('u1', replica, [hostText('Continue.')]), assistant('a1', replica, [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')])] })
 
-test('WHAT[SPEC-INV-011] STRENGTH_015_replica_semantic_vs_physical_tail_lifecycle_split', () => {
+test('WHAT[speculative-investigation-011] STRENGTH_015_replica_semantic_vs_physical_tail_lifecycle_split', () => {
   const runtime = Strength.runtimeCreate()
   const b = binding('owner-life', 'replica-life', 'd-life')
   assert.equal(Strength.runtimeRegister(runtime, b).ok, true)
@@ -187,7 +187,7 @@ test('WHAT[SPEC-INV-011] STRENGTH_015_replica_semantic_vs_physical_tail_lifecycl
   // Once retired, presence is gone and business cannot restart from registry presence
   assert.equal(Strength.runtimeFindByReplica(runtime, 'replica-life'), null)
 })
-test('WHAT[SPEC-INV-011] STRENGTH_015_replica_semantic_terminal_is_first_wins_and_physical_tail_cannot_restart_business', async () => {
+test('WHAT[speculative-investigation-011] STRENGTH_015_replica_semantic_terminal_is_first_wins_and_physical_tail_cannot_restart_business', async () => {
   const { handle, completion } = attach('replica-sem', 'K1')
   // The K gate retires semantic admission but the physical identity lives on.
   assert.equal(await Strength.replicaHandleTransform(handle, oneBatch('replica-sem')), true)
@@ -207,7 +207,7 @@ test('WHAT[SPEC-INV-011] STRENGTH_015_replica_semantic_terminal_is_first_wins_an
   assert.equal(Strength.replicaHandleTurn(handle, turn('replica-sem', 'completed')), false)
   assert.deepEqual(Strength.replicaReleased(handle), ['replica-sem'])
 })
-test('WHAT[SPEC-INV-011] STRENGTH_015_session_delete_retires_live_and_orphan_bindings_with_one_lease_release', () => {
+test('WHAT[speculative-investigation-011] STRENGTH_015_session_delete_retires_live_and_orphan_bindings_with_one_lease_release', () => {
   // Live decision state: delete retires peek, binding and lease exactly once.
   const live = attach('replica-del', 'K1', 'Treatment', 'owner-del')
   Strength.replicaSessionDeleted(live.handle, 'replica-del')
@@ -230,7 +230,7 @@ test('WHAT[SPEC-INV-011] STRENGTH_015_session_delete_retires_live_and_orphan_bin
   assert.equal(Strength.replicaLiveFind(owned.handle, 'replica-owned'), null)
   assert.deepEqual(Strength.replicaReleased(owned.handle), ['replica-owned'])
 })
-test('WHAT[SPEC-INV-011] STRENGTH_015_replica_dispose_keeps_first_terminal_and_clears_all_live_resources', async () => {
+test('WHAT[speculative-investigation-011] STRENGTH_015_replica_dispose_keeps_first_terminal_and_clears_all_live_resources', async () => {
   // Dispose before any terminal completes the open decision as Cancelled.
   const open = attach('replica-open', 'K1')
   Strength.replicaDispose(open.handle)

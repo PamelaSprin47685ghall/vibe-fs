@@ -716,14 +716,14 @@ module ModelRoutingSurface =
         |> Option.map targetObject
         |> Option.defaultValue null
 
-    /// PAR-021: the failed attempt itself was the LWR retry, so its exact
+    /// provider-attempt-recovery-021: the failed attempt itself was the LWR retry, so its exact
     /// witness target condemns the provider of that target.
     let condemnFailedTarget (runtime: obj) (providerRun: string) : obj =
         (runtimeOf runtime).CondemnFailedTarget(providerRun)
         |> Option.map targetObject
         |> Option.defaultValue null
 
-    /// PAR-021: the failed attempt carried the original context, so the next
+    /// provider-attempt-recovery-021: the failed attempt carried the original context, so the next
     /// fresh admission of this session is bound to the failed target.
     let retainFailedTargetForRetry (runtime: obj) (sessionId: string) (providerRun: string) : obj =
         (runtimeOf runtime).RetainFailedTargetForRetry(sessionId, providerRun)

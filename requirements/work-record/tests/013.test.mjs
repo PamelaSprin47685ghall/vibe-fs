@@ -29,7 +29,7 @@ const materialize = (
 
 const OPENING_END = { Sequence: 1 }
 
-test('WHAT[WORK-RECORD-013] LWR_gap_excludes_raw_tool_call_and_result_but_keeps_text_and_reasoning', () => {
+test('WHAT[work-record-013] LWR_gap_excludes_raw_tool_call_and_result_but_keeps_text_and_reasoning', () => {
   // COMPANION-003: tool in/out 可作 Y 压缩源，但禁止 raw 进入 LWR。
   const hugeResult = 'FILE_CONTENTS_' + 'x'.repeat(200)
   const trace = [
@@ -51,7 +51,7 @@ test('WHAT[WORK-RECORD-013] LWR_gap_excludes_raw_tool_call_and_result_but_keeps_
   assert.equal(rendered.includes('FILE_CONTENTS_'), false)
 })
 
-test('WHAT[WORK-RECORD-013] LWR_recent_work_excludes_raw_tool_parts_and_keeps_last_assistant_text', () => {
+test('WHAT[work-record-013] LWR_recent_work_excludes_raw_tool_parts_and_keeps_last_assistant_text', () => {
   const trace = [
     xTrace.item({ sequence: 0, role: 'user', part: xTrace.text('task') }),
     xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.toolCall('bash', '{"command":"cat huge.log"}') }),

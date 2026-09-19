@@ -14,7 +14,7 @@ const job = (id, path = `/tmp/${id}`) => ({
   targetBranchFrozen: 'refs/heads/main',
 })
 
-test('WHAT[CHGINT-011] HOST_JoinPublishedAvailable_engine_init_failure_is_an_error_result', async () => {
+test('WHAT[change-integration-011] HOST_JoinPublishedAvailable_engine_init_failure_is_an_error_result', async () => {
   const result = await change.gitFreezeTargetBranch(change.createGit('/repo', () => Promise.resolve([128, '', 'bad repo'])))
   assert.equal(result.ok, false)
   assert.match(result.error, /bad repo/)

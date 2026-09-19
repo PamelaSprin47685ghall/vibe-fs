@@ -32,7 +32,7 @@ const drainAll = (limit, messages, guard = 50) => {
   assert.fail(`chunking did not terminate within ${guard} chunks — a cursor is not advancing`)
 }
 
-test('WHAT[CONTEXT-COMPRESSION-003] CTX_003_delta_limit_is_200_KiB', () => {
+test('WHAT[context-compression-003] CTX_003_delta_limit_is_200_KiB', () => {
   // An input contract, not an estimate: never compared to a model window, never
   // scaled by provider. Exported as a plain value so this test can read it.
   assert.equal(delta.limitBytes, 200 * 1024)
@@ -55,7 +55,7 @@ test('WHAT[CONTEXT-COMPRESSION-003] CTX_003_delta_limit_is_200_KiB', () => {
   assert.deepEqual(overLimitChunk.truncatedFlags, [true])
 })
 
-test('WHAT[CONTEXT-COMPRESSION-003] CTX_003_no_chunk_exceeds_the_limit', () => {
+test('WHAT[context-compression-003] CTX_003_no_chunk_exceeds_the_limit', () => {
   const messages = delta.messages(
     [0, 1, 2, 3, 4, 5].map((n) => ({
       role: n % 2 === 0 ? 'user' : 'assistant',

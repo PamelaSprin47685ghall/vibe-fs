@@ -52,7 +52,7 @@ const createdRoot = authority.createAuthorityRoot(
 assert.equal(createdRoot.ok, true, createdRoot.error)
 const root = createdRoot.value
 
-test('WHAT[INTERACTION-AUTHORITY-019] gate_nudge_is_exact_terminal_idempotent_and_unbounded_across_fresh_terminals', () => {
+test('WHAT[interaction-authority-019] gate_nudge_is_exact_terminal_idempotent_and_unbounded_across_fresh_terminals', () => {
   let state = authority.registerAuthority(root, authority.empty)
   const digest1 = authority.gateNudgePayloadDigest('missing-final-report', 'run-1')
   assert.equal(authority.gateNudgeAlreadyAdmitted('ses_jg', root.logicalRun, 'InteractionRepair', 'missing-final-report', 'run-1', state), false)
@@ -96,17 +96,17 @@ const { join } = await import("node:path");
 
 const text = (value) => [{ type: 'text', text: value }]
 
-test('WHAT[INTERACTION-AUTHORITY-019] repair claim does not turn an in-flight repair into exhaustion', () => {
+test('WHAT[interaction-authority-019] repair claim does not turn an in-flight repair into exhaustion', () => {
   assert.equal(turns.repairDefectDecision(false, false, null, []), 'RequestRepair')
   assert.equal(turns.repairDefectDecision(true, false, null, []), 'AwaitRepairTerminal')
   assert.equal(turns.repairDefectDecision(true, false, 'tool-calls', []), 'AwaitRepairTerminal')
 })
-test('WHAT[INTERACTION-AUTHORITY-019] fresh invalid repair terminals re-open the gate reminder', () => {
+test('WHAT[interaction-authority-019] fresh invalid repair terminals re-open the gate reminder', () => {
   assert.equal(turns.repairDefectDecision(true, true, 'stop', []), 'RequestRepair')
   assert.equal(turns.repairDefectDecision(true, true, 'length', text('partial')), 'RequestRepair')
   assert.equal(turns.repairDefectDecision(true, true, 'stop', text('done')), 'NoRepair')
 })
-test('WHAT[INTERACTION-AUTHORITY-019] a currently-repairing attempt never completes as exhausted or failed repair', () => {
+test('WHAT[interaction-authority-019] a currently-repairing attempt never completes as exhausted or failed repair', () => {
   // Translate the raw DU cases through the registered completed-turn surface:
   // currentAttemptIsRepair + unfinished → AwaitRepairTerminal, terminal+stop+empty
   // → NoRepair, terminal+length → RequestRepair. A repair never lands in an
@@ -115,7 +115,7 @@ test('WHAT[INTERACTION-AUTHORITY-019] a currently-repairing attempt never comple
   assert.equal(turns.repairDefectDecision(true, true, 'stop', text('ok')), 'NoRepair')
   assert.equal(turns.repairDefectDecision(true, true, 'length', []), 'RequestRepair')
 })
-test('WHAT[INTERACTION-AUTHORITY-019] duplicate gate-nudge claim is AlreadyAdmitted — single physical send', async () => {
+test('WHAT[interaction-authority-019] duplicate gate-nudge claim is AlreadyAdmitted — single physical send', async () => {
   // Claim admission is the durable fact: a first claim opens the occasion,
   // a second concurrent attempt on the same digest returns AlreadyAdmitted at
   // the durable-authority level, so the port records exactly one send.

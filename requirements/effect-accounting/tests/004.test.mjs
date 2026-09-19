@@ -15,7 +15,7 @@ const ok = (...actions) => {
   return result.state
 }
 
-test('WHAT[EFFECT-ACCOUNTING-004] C5_same_request_materialize_is_idempotent', () => {
+test('WHAT[effect-accounting-004] C5_same_request_materialize_is_idempotent', () => {
   assert.deepEqual(ok(materialize({ requestId: 'req-idem' }), materialize({ requestId: 'req-idem' })), {
     openRequests: 1,
     openBloggers: 1,
@@ -69,7 +69,7 @@ const linkedHandle = () => {
 }
 const applyHandle = (state, command) => handles.apply(state, { handle: 'agent:h1', ...command })
 
-test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_owner_failure_blogger_interrupt_interleavings_at_most_once', () => {
+test('WHAT[effect-accounting-004] THEOREM_owner_failure_blogger_interrupt_interleavings_at_most_once', () => {
   for (const observations of interleavings) {
     const state = observations.reduce(applyObservedOwnerDecision, initialFailures())
     assert.deepEqual(
@@ -78,12 +78,12 @@ test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_owner_failure_blogger_interrupt_interl
     )
   }
 })
-test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_owner_failure_alone_still_exactly_once_under_duplicate_observation', () => {
+test('WHAT[effect-accounting-004] THEOREM_owner_failure_alone_still_exactly_once_under_duplicate_observation', () => {
   const first = observeOwnerFailure(initialFailures())
   const afterDuplicate = observeDuplicateOwnerFailure(first)
   assert.deepEqual(failureState(afterDuplicate), failureState(first))
 })
-test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_counterfactual_blogger_advance_on_owner_would_double_count', () => {
+test('WHAT[effect-accounting-004] THEOREM_counterfactual_blogger_advance_on_owner_would_double_count', () => {
   const ownerAdvanced = observeOwnerFailure(initialFailures())
   const doubleCounted = advance(ownerAdvanced, BLOGGER, failureState(ownerAdvanced).failures + 1)
   assert.deepEqual(
@@ -91,7 +91,7 @@ test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_counterfactual_blogger_advance_on_owne
     { failures: 2, dedupeKeys: 2 },
   )
 })
-test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_join_guard_handle_complete_retire_exactly_once_projection', () => {
+test('WHAT[effect-accounting-004] THEOREM_join_guard_handle_complete_retire_exactly_once_projection', () => {
   const completed = applyHandle(linkedHandle(), { op: 'complete', kind: 'Terminal' })
   assert.equal(completed.ok, true, completed.ok ? '' : JSON.stringify(completed.error))
   assert.equal(handles.read(completed.state, 'agent:h1').lifecycle, 'CompletedAwaitingJoin')
@@ -102,7 +102,7 @@ test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_join_guard_handle_complete_retire_exac
   assert.equal(handles.read(retired.state, 'agent:h1').lifecycle, 'Retired')
   assert.equal(handles.views(retired.state).joinable.length, 0)
 })
-test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_join_guard_fold_absorbs_duplicate_complete_and_retire', () => {
+test('WHAT[effect-accounting-004] THEOREM_join_guard_fold_absorbs_duplicate_complete_and_retire', () => {
   const completed = applyHandle(linkedHandle(), { op: 'complete', kind: 'Terminal' })
   assert.equal(completed.ok, true, completed.ok ? '' : JSON.stringify(completed.error))
 
@@ -116,7 +116,7 @@ test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_join_guard_fold_absorbs_duplicate_comp
   assert.deepEqual(duplicateRetirement.error, { kind: 'TransitionRejected', reason: 'HandleIsRetired' })
   assert.equal(handles.read(retired.state, 'agent:h1').lifecycle, 'Retired')
 })
-test('WHAT[EFFECT-ACCOUNTING-004] THEOREM_single_retry_budget_twelfth_consecutive_failure_is_terminal', () => {
+test('WHAT[effect-accounting-004] THEOREM_single_retry_budget_twelfth_consecutive_failure_is_terminal', () => {
   assert.equal(budget.defaultBudget, 12)
   let failures = budget.initial
   for (let attempt = 1; attempt <= 11; attempt += 1) {

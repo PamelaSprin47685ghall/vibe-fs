@@ -8,7 +8,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 
 const readRole = (role, locale) => readFileSync(join(ROOT, 'resources/provider/role', role, locale), 'utf8')
 
-test('WHAT[OFF-011] manager_audit_pending_consequence_is_readonly_assessment_not_mutation', () => {
+test('WHAT[office-capability-011] manager_audit_pending_consequence_is_readonly_assessment_not_mutation', () => {
   const en = readRole('manager', 'en.md')
   const zh = readRole('manager', 'zh-CN.md')
   assert.match(en, /do not establish repository facts with your own hands/i)

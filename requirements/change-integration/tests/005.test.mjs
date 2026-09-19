@@ -6,14 +6,14 @@ const { default: test } = await import("node:test");
 
 const change = await import('../../../dist/Change/Surface.js')
 
-test('WHAT[CHGINT-005] rebase conflict records machine fact and continues the loop outside the gate', async () => {
+test('WHAT[change-integration-005] rebase conflict records machine fact and continues the loop outside the gate', async () => {
   const observation = await change.observeRelayProgram('rebase-conflict')
 
   assert.deepEqual(observation.facts, ['CandidateReady', 'ConflictDetected'])
   assert.deepEqual(observation.invalidations, ['InitialRebaseRequired'])
   assert.deepEqual(observation.continuations, ['surface-loop-1'])
 })
-test('WHAT[CHGINT-005] artifact conflict continues the loop outside the gate', async () => {
+test('WHAT[change-integration-005] artifact conflict continues the loop outside the gate', async () => {
   const observation = await change.observeRelayProgram('artifact-conflict')
 
   assert.deepEqual(observation.facts, ['ConflictDetected'])
@@ -63,11 +63,11 @@ const ffAnswers = ({ candidate = 'cafe01', targetHead = 'beef02', branch = 'main
 ]
 const ff = (answers) => change.gitFfMerge(git(fakeRunner(answers).runner), WORKTREE, 'main', 'beef02', 'cafe01')
 
-test('WHAT[CHGINT-005] GIT_conflicted_files_parses_lines', async () => {
+test('WHAT[change-integration-005] GIT_conflicted_files_parses_lines', async () => {
   const result = await change.gitConflictedFiles(git(fakeRunner([['diff --name-only --diff-filter=U', [0, 'a.fs\nb.fs\n', '']]]).runner), WORKTREE)
   assert.deepEqual(ok(result), ['a.fs', 'b.fs'])
 })
-test('WHAT[CHGINT-005] GIT_conflicted_files_error_propagates', async () => {
+test('WHAT[change-integration-005] GIT_conflicted_files_error_propagates', async () => {
   const result = await change.gitConflictedFiles(git(fakeRunner([['diff --name-only --diff-filter=U', [1, '', 'not a repo']]]).runner), WORKTREE)
   assert.equal(result.ok, false)
   assert.equal(result.error, 'not a repo')
@@ -160,7 +160,7 @@ const foldProjection = (events) => {
 const worktreeRequested = { kind: 'WorktreeCreateRequested', payload: { jobId: JOB, worktreeIdentity: 'manager/job_1', worktreePath: '/tmp/wt1' } }
 const worktreeCreated = { kind: 'WorktreeCreated', payload: { jobId: JOB, worktreeIdentity: 'manager/job_1', worktreePath: '/tmp/wt1' } }
 
-test('WHAT[CHGINT-005] ConflictDetected_preserves_machine_conflict_evidence_on_the_same_Road_worktree', () => {
+test('WHAT[change-integration-005] ConflictDetected_preserves_machine_conflict_evidence_on_the_same_Road_worktree', () => {
   const { job } = jobAt(fact.conflictDetected(['src/a.fs', 'src/b.fs']))
   assert.deepEqual(job.facts, ['ConflictDetected'])
   const conflict = change.fact('ConflictDetected', {
@@ -248,7 +248,7 @@ const classifyRebased = (head, rebasedCommit = 'r1', snapshot = 'h1') =>
 const classifyClaim = (head, rebasedCommit = 'r1', expectedHead = 'h1') =>
   change.classifyPublishClaim(head ?? null, rebasedCommit, expectedHead)
 
-test('WHAT[CHGINT-005] THEOREM_conflict_detected_remains_independent_durable_evidence', () => {
+test('WHAT[change-integration-005] THEOREM_conflict_detected_remains_independent_durable_evidence', () => {
   const folded = foldEvents([
     createEvent(JOB_A, 'ses_orch_a'),
     candidateEvent(JOB_A),
@@ -256,7 +256,7 @@ test('WHAT[CHGINT-005] THEOREM_conflict_detected_remains_independent_durable_evi
   ])
   assert.deepEqual(factsOf(folded, JOB_A), ['CandidateReady', 'ConflictDetected'])
 })
-test('WHAT[CHGINT-005] THEOREM_drop_ephemeral_preserves_conflict_evidence', () => {
+test('WHAT[change-integration-005] THEOREM_drop_ephemeral_preserves_conflict_evidence', () => {
   const durable = [createEvent(JOB_A, 'ses_orch_a'), conflictEvent(JOB_A)]
   const before = foldEvents(durable)
   assert.deepEqual(factsOf(before, JOB_A), ['ConflictDetected'])
@@ -272,7 +272,7 @@ const { default: test } = await import("node:test");
 
 const change = await import('../../../dist/Change/Surface.js')
 
-test('WHAT[CHGINT-005] cleanup failure after landed FF preserves published fact as PublishedPendingCleanup', async () => {
+test('WHAT[change-integration-005] cleanup failure after landed FF preserves published fact as PublishedPendingCleanup', async () => {
   const observation = await change.observeRelayProgram('cleanup-failed')
 
   // In R12/R13, cleanup failure after FF succeeds must NEVER masquerade as IntegrationFailed
@@ -284,7 +284,7 @@ test('WHAT[CHGINT-005] cleanup failure after landed FF preserves published fact 
   assert.ok(observation.facts.includes('Published'))
   assert.ok(!observation.facts.includes('JobFailed'))
 })
-test('WHAT[CHGINT-005] reentry cleanup failure preserves PublishedPendingCleanup', async () => {
+test('WHAT[change-integration-005] reentry cleanup failure preserves PublishedPendingCleanup', async () => {
   const observation = await change.observeRelayProgram('reentry-cleanup-failed')
 
   assert.equal(observation.verdict.kind, 'PublishedPendingCleanup')
@@ -327,7 +327,7 @@ const valueOf = async (promise) => {
   return result.value
 }
 
-test('WHAT[CHGINT-005] WORKTREE_create_returns_owned_resource_and_marks_path_identity', async () => {
+test('WHAT[change-integration-005] WORKTREE_create_returns_owned_resource_and_marks_path_identity', async () => {
   const { git, calls } = fakeGit()
   const resource = await valueOf(change.worktreeCreate(git, 'job-9', PATH))
 
@@ -336,7 +336,7 @@ test('WHAT[CHGINT-005] WORKTREE_create_returns_owned_resource_and_marks_path_ide
   assert.equal(change.worktreeIdentity(resource), 'manager/job-9')
   assert.deepEqual(calls, [{ args: ['worktree', 'add', PATH, '-b', 'manager/job-9'], cwd: '/repo' }])
 })
-test('WHAT[CHGINT-005] WORKTREE_release_removes_worktree_and_branch_once', async () => {
+test('WHAT[change-integration-005] WORKTREE_release_removes_worktree_and_branch_once', async () => {
   const { git, calls } = fakeGit()
   const resource = await valueOf(change.worktreeCreate(git, 'job-9', PATH))
 
@@ -350,7 +350,7 @@ test('WHAT[CHGINT-005] WORKTREE_release_removes_worktree_and_branch_once', async
     [{ args: ['branch', '-D', 'manager/job-9'], cwd: '/repo' }],
   )
 })
-test('WHAT[CHGINT-005] WORKTREE_release_aggregates_both_failures', async () => {
+test('WHAT[change-integration-005] WORKTREE_release_aggregates_both_failures', async () => {
   const { git } = fakeGit([
     ['worktree remove', [1, '', 'rm failed']],
     ['branch -D', [1, '', 'branch failed']],
@@ -360,7 +360,7 @@ test('WHAT[CHGINT-005] WORKTREE_release_aggregates_both_failures', async () => {
   assert.equal(result.ok, false)
   assert.equal(result.error, 'worktree=rm failed; branch=branch failed')
 })
-test('WHAT[CHGINT-005] WORKTREE_release_reports_single_failure_side', async () => {
+test('WHAT[change-integration-005] WORKTREE_release_reports_single_failure_side', async () => {
   const first = fakeGit([['worktree remove', [1, '', 'rm failed']]])
   const resource = await valueOf(change.worktreeCreate(first.git, 'job-9', PATH))
   const result = await change.worktreeRelease(resource)
@@ -371,13 +371,13 @@ test('WHAT[CHGINT-005] WORKTREE_release_reports_single_failure_side', async () =
   const result2 = await change.worktreeRelease(adopted)
   assert.equal(result2.error, 'branch=branch failed')
 })
-test('WHAT[CHGINT-005] WORKTREE_unreleased_resource_disposes_by_releasing', async () => {
+test('WHAT[change-integration-005] WORKTREE_unreleased_resource_disposes_by_releasing', async () => {
   const { git, calls } = fakeGit()
   const resource = await valueOf(change.worktreeCreate(git, 'job-9', PATH))
   await change.worktreeDispose(resource)
   assert.equal(calls.filter(({ args }) => args[1] === 'remove').length, 1)
 })
-test('WHAT[CHGINT-005] WORKTREE_CMD_remove_force_flag_and_no_cwd', async () => {
+test('WHAT[change-integration-005] WORKTREE_CMD_remove_force_flag_and_no_cwd', async () => {
   const fake = fakeRunner([])
   const git = change.createGit('/repo', fake.runner)
   const result = await change.gitRemoveWorktree(git, PATH)

@@ -3,7 +3,7 @@ namespace Wanxiangshu.OpenCode
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
 
-/// JS-native boundary for HOST-BOUNDARY-009/012/020 snapshot laws.
+/// JS-native boundary for host-boundary-009/012/020 snapshot laws.
 ///
 /// `SessionSnapshotPort.projectMessages` / `locateToolCall` return Fable
 /// records and unions (`SessionMessage`, `ToolCallLocation`,
@@ -51,7 +51,7 @@ module SessionSnapshotSurface =
 
         ProjectedMessages(messages)
 
-    /// HOST-BOUNDARY-012: resolve one tool callback through the Host's
+    /// host-boundary-012: resolve one tool callback through the Host's
     /// persisted assistant message + ToolPart. Delegates to
     /// `SessionSnapshot.locateToolCall` and translates the
     /// `Result<ToolCallLocation, ToolCallLocationError>` into a plain object.
@@ -86,7 +86,7 @@ module SessionSnapshotSurface =
                        error = "Ambiguous"
                        toolCallId = ToolCallId.value id |}
 
-    /// HOST-BOUNDARY-006: classify one persisted ToolPart's state as a plain
+    /// host-boundary-006: classify one persisted ToolPart's state as a plain
     /// string. Delegates to the already-projected `SessionMessage.ToolParts`
     /// array — no re-parsing.
     ///

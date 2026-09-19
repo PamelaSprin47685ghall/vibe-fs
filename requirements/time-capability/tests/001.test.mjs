@@ -7,7 +7,7 @@ const deadline = await import('../../../dist/Process/DeadlineSurface.js')
 
 const START_MS = Date.parse('2000-01-01T00:00:00Z')
 
-test('WHAT[TIME-001] TIME_001_virtual_clocks_are_independent_not_ambient', () => {
+test('WHAT[time-capability-001] TIME_001_virtual_clocks_are_independent_not_ambient', () => {
   const first = process.createVirtualClock()
   const second = process.createVirtualClock()
 

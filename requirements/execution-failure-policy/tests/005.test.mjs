@@ -110,7 +110,7 @@ const providerCases = [
   },
 ]
 
-test('WHAT[EXECFAIL-005] terminal resolution carries the exact execution key and typed disposition', () => {
+test('WHAT[execution-failure-policy-005] terminal resolution carries the exact execution key and typed disposition', () => {
   const expected = [
     ['NoAcceptedFact', 'PreserveCurrentFact'],
     ['AcceptedBeforeProvider', 'TerminalizeAcceptedPreProvider'],

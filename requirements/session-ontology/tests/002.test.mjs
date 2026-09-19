@@ -10,13 +10,13 @@ const linked = assoc.link({ main: 'ses_main', blogger: 'ses_blogger' }, assoc.em
 assert.equal(linked.ok, true, linked.message)
 const state = linked.value
 
-test('WHAT[SESSION-ONTOLOGY-002] HOST_008_attached_carries_one_owner_and_one_kind', () => {
+test('WHAT[session-ontology-002] HOST_008_attached_carries_one_owner_and_one_kind', () => {
   const view = assoc.classify('ses_blogger', state)
   assert.equal(view.ownership.kind, 'Attached')
   assert.equal(typeof view.ownership.owner, 'string')
   assert.equal(view.ownership.attachment, 'Companion')
 })
-test('WHAT[SESSION-ONTOLOGY-002] HOST_008_root_and_attached_helpers_are_plain_views', () => {
+test('WHAT[session-ontology-002] HOST_008_root_and_attached_helpers_are_plain_views', () => {
   assert.deepEqual(assoc.ownershipRoot, {
     kind: 'Root', owner: null, attachment: null, transactionId: null,
   })
@@ -55,7 +55,7 @@ const rootSelection = (agent) => {
 const syncDelegateRoles = ['Inspector', 'Coder']
 assert.deepEqual(syncDelegateRoles, ['Inspector', 'Coder'])
 
-test('WHAT[SESSION-ONTOLOGY-002] HOST_008_attached_ownership_carries_owner_and_kind', () => {
+test('WHAT[session-ontology-002] HOST_008_attached_ownership_carries_owner_and_kind', () => {
   assert.deepEqual(assoc.ownershipAttached('ses_owner', 'SyncInspector'), {
     kind: 'Attached', owner: 'ses_owner', attachment: 'SyncInspector', transactionId: null,
   })

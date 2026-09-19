@@ -6,7 +6,7 @@ open Wanxiangshu.Foundation.Identity
 /// HOST-004 quiescence gate: opaque capability surface (P4 pilot).
 ///
 /// `gate` and `permit` are opaque handles: a JS test obtains them, passes them
-/// back, and never inspects them (JS-SEMANTIC-SURFACE-005). Session ids cross
+/// back, and never inspects them (js-semantic-surface-005). Session ids cross
 /// as plain strings; the gate itself stays a class with private maps.
 module QuiescenceSurface =
 

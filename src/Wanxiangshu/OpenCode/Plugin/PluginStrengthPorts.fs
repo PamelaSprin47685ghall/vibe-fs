@@ -62,7 +62,7 @@ module PluginStrengthPorts =
             match appendResult with
             | StrengthDurableAppend.Applied -> ()
             | StrengthDurableAppend.SemanticRejected error ->
-                // DURABLE-EVENTS-021: process is no longer trustworthy
+                // durable-events-021: process is no longer trustworthy
                 Diagnostic.fatal "strength-semantic-cut" [ "result", error ]
             | StrengthDurableAppend.StorageFailed reason ->
                 tripFuse ("Strength promotion commit storage failure: " + reason)
@@ -83,7 +83,7 @@ module PluginStrengthPorts =
                 | Ok projection -> return! commitReconciledEvent durability projection turn
             }
 
-        /// SPEC-INV-013 / STRENGTH-010 / STRENGTH-007: dry-run close, primary
+        /// speculative-investigation-013 / STRENGTH-010 / STRENGTH-007: dry-run close, primary
         /// observation and the durable append all run before ordinary turn
         /// observation.
         let observePrimaryTurnBody (turn: ReconciledTurn) : Task<unit> =

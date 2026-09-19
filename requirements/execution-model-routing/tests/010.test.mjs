@@ -130,7 +130,7 @@ const observedIdentity = (runtime, lease, record) => ({
   target: routing.executionAdmissionTarget(runtime, lease),
 })
 
-test('WHAT[EMR-010] seeded lender soak shares one physical credit without retained settlement nodes', async (context) => {
+test('WHAT[execution-model-routing-010] seeded lender soak shares one physical credit without retained settlement nodes', async (context) => {
   const runtime = routing.createRuntime((_role, running) => (running.length === 0 ? target : null))
   const auditor = createAuditor(runtime, lineageRetainedBound)
 
@@ -303,7 +303,7 @@ const PERMITTED_CONSUMER_FILES = Object.freeze([
   'src/Wanxiangshu/OpenCode/Host/ModelRouting.fs',
 ])
 
-test('WHAT[EMR-010] EMR_010_model_capacity_owner_defines_all_private_borrowing_knowledge', async () => {
+test('WHAT[execution-model-routing-010] EMR_010_model_capacity_owner_defines_all_private_borrowing_knowledge', async () => {
   const ownerContent = (
     await Promise.all(OWNER_FILES.map((file) => readFile(join(repoRoot, file), 'utf8')))
   ).join('\n')
@@ -326,7 +326,7 @@ test('WHAT[EMR-010] EMR_010_model_capacity_owner_defines_all_private_borrowing_k
     )
   }
 })
-test('WHAT[EMR-010] EMR_010_model_capacity_private_knowledge_is_exclusive_to_owner', async () => {
+test('WHAT[execution-model-routing-010] EMR_010_model_capacity_private_knowledge_is_exclusive_to_owner', async () => {
   const allFsFiles = await getAllProductionFsFiles(srcRoot)
   assert.ok(allFsFiles.length >= 600, `Expected at least 600 production files, got ${allFsFiles.length}`)
 
@@ -356,7 +356,7 @@ test('WHAT[EMR-010] EMR_010_model_capacity_private_knowledge_is_exclusive_to_own
     `Private ModelCapacity borrowing/lineage knowledge leaked outside owner modules (${OWNER_FILES.join(', ')}). Violations: ${JSON.stringify(violations, null, 2)}`
   )
 })
-test('WHAT[EMR-010] EMR_010_capacity_ledger_and_borrowing_capacity_types_are_restricted_to_permitted_zones', async () => {
+test('WHAT[execution-model-routing-010] EMR_010_capacity_ledger_and_borrowing_capacity_types_are_restricted_to_permitted_zones', async () => {
   const allFsFiles = await getAllProductionFsFiles(srcRoot)
   const violations = []
 
@@ -384,7 +384,7 @@ test('WHAT[EMR-010] EMR_010_capacity_ledger_and_borrowing_capacity_types_are_res
     `Controlled ModelCapacity types appeared outside permitted zones (${PERMITTED_CONSUMER_FILES.join(', ')}). Violations: ${JSON.stringify(violations, null, 2)}`
   )
 })
-test('WHAT[EMR-010] EMR_010_exclusivity_test_is_refutable_and_fails_closed_on_violation', () => {
+test('WHAT[execution-model-routing-010] EMR_010_exclusivity_test_is_refutable_and_fails_closed_on_violation', () => {
   // Test refutability: simulate a leaked knowledge identifier in non-owner content
   const simulatedLeakedContent = `
     namespace Wanxiangshu.SomeModule
@@ -483,7 +483,7 @@ const providerLimited = (limits, routes) => (role, running, previous) => {
   return candidates.find(available) ?? null
 }
 
-test('WHAT[EMR-010] EMR_010_explicit_lender_credit_is_free_only_to_borrowers_not_global_waiters', async () => {
+test('WHAT[execution-model-routing-010] EMR_010_explicit_lender_credit_is_free_only_to_borrowers_not_global_waiters', async () => {
   const only = target('provider/only')
   const runtime = createRuntime(providerLimited({ provider: 1 }, { engineer: [only], manager: [only], devops: [only] }))
 
@@ -501,7 +501,7 @@ test('WHAT[EMR-010] EMR_010_explicit_lender_credit_is_free_only_to_borrowers_not
   cancelPendingExecution(runtime, 'stranger')
   assert.equal((await stranger).kind, 'Cancelled')
 })
-test('WHAT[EMR-010] EMR_010_absent_lender_queues_without_borrowing', async () => {
+test('WHAT[execution-model-routing-010] EMR_010_absent_lender_queues_without_borrowing', async () => {
   const only = target('provider/only')
   const runtime = createRuntime(providerLimited({ provider: 1 }, { engineer: [only], manager: [only] }))
 
@@ -513,7 +513,7 @@ test('WHAT[EMR-010] EMR_010_absent_lender_queues_without_borrowing', async () =>
   assert.equal((await awaitQueuedExecutionAdmission(ghost.queue)).kind, 'Cancelled')
   assert.equal(snapshotOccupied(runtime).length, 1)
 })
-test('WHAT[EMR-010] EMR_010_borrowed_step_handoff_reuses_the_same_credit', async () => {
+test('WHAT[execution-model-routing-010] EMR_010_borrowed_step_handoff_reuses_the_same_credit', async () => {
   const only = target('provider/only')
   const runtime = createRuntime(providerLimited({ provider: 1 }, { engineer: [only], manager: [only] }))
 
@@ -527,7 +527,7 @@ test('WHAT[EMR-010] EMR_010_borrowed_step_handoff_reuses_the_same_credit', async
   assert.deepEqual(capacitySnapshot(runtime).tokenStateCounts, { idle: 1, inFlight: 0, retiring: 0 })
   assert.equal(snapshotOccupied(runtime).length, 1)
 })
-test('WHAT[EMR-010] EMR_010_owner_transform_entry_reclaims_foreign_inflight_borrow', async () => {
+test('WHAT[execution-model-routing-010] EMR_010_owner_transform_entry_reclaims_foreign_inflight_borrow', async () => {
   const only = target('provider/only')
   const runtime = createRuntime(providerLimited({ provider: 1 }, { engineer: [only], manager: [only] }))
 
@@ -558,7 +558,7 @@ test('WHAT[EMR-010] EMR_010_owner_transform_entry_reclaims_foreign_inflight_borr
   suppressProviderStep(runtime, 'parent', 'msg-parent')
   assert.deepEqual(capacitySnapshot(runtime).tokenStateCounts, { idle: 1, inFlight: 0, retiring: 0 })
 })
-test('WHAT[EMR-010] EMR_010_older_borrowed_step_precedes_later_owned_step', async () => {
+test('WHAT[execution-model-routing-010] EMR_010_older_borrowed_step_precedes_later_owned_step', async () => {
   const only = target('provider/only')
   const runtime = createRuntime(providerLimited({ provider: 1 }, { engineer: [only], manager: [only] }))
 
@@ -591,7 +591,7 @@ test('WHAT[EMR-010] EMR_010_older_borrowed_step_precedes_later_owned_step', asyn
   assert.deepEqual(capacitySnapshot(runtime).tokenStateCounts, { idle: 1, inFlight: 0, retiring: 0 })
   assert.equal(snapshotOccupied(runtime).length, 1)
 })
-test('WHAT[EMR-010] EMR_010_credit_never_crosses_provider_boundary', async () => {
+test('WHAT[execution-model-routing-010] EMR_010_credit_never_crosses_provider_boundary', async () => {
   const a = target('provider-a/model')
   const b = target('provider-b/model')
   const runtime = createRuntime(providerLimited(
@@ -607,7 +607,7 @@ test('WHAT[EMR-010] EMR_010_credit_never_crosses_provider_boundary', async () =>
 
   cancelPendingExecution(runtime, 'child')
 })
-test('WHAT[EMR-010] EMR_010_reservation_borrowing_shares_one_token', async () => {
+test('WHAT[execution-model-routing-010] EMR_010_reservation_borrowing_shares_one_token', async () => {
   const runtime = createRuntime(() => target('provider/shared'))
 
   const first = tryReserveManaged(runtime, 'parent', 'engineer', null)
@@ -626,7 +626,7 @@ const { default: test } = await import("node:test");
 
 const source = async (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 
-test('WHAT[EMR-010] EMR_010_borrowing_complexity_is_owned_only_by_the_capacity_decorator', async () => {
+test('WHAT[execution-model-routing-010] EMR_010_borrowing_complexity_is_owned_only_by_the_capacity_decorator', async () => {
   const capacity = (
     await Promise.all([
       source('src/Wanxiangshu/OpenCode/Host/ModelCapacity/Model.fs'),
@@ -665,7 +665,7 @@ const { default: test } = await import("node:test");
 const root = new URL('../../../', import.meta.url)
 const source = (path) => readFile(new URL(path, root), 'utf8')
 
-test('WHAT[EMR-010] EMR_010_managed_tool_execution_ends_the_current_provider_step_before_tool_body', async () => {
+test('WHAT[execution-model-routing-010] EMR_010_managed_tool_execution_ends_the_current_provider_step_before_tool_body', async () => {
   const [binding, registry] = await Promise.all([
     source('src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs'),
     source('src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs'),

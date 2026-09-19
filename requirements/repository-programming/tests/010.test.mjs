@@ -13,7 +13,7 @@ const sandbox = () => {
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
-test('WHAT[REPOSITORY-PROGRAMMING-010] FILETOOLS_write_creates_file_and_reports_size', async () => {
+test('WHAT[repository-programming-010] FILETOOLS_write_creates_file_and_reports_size', async () => {
   const { dir, cleanup } = sandbox()
   const path = join(dir, 'out.txt')
   const output = await write(dir, JSON.stringify({ filePath: path, content: 'written by test' }))
@@ -22,13 +22,13 @@ test('WHAT[REPOSITORY-PROGRAMMING-010] FILETOOLS_write_creates_file_and_reports_
   assert.equal(output.truncated, false)
   cleanup()
 })
-test('WHAT[REPOSITORY-PROGRAMMING-010] FILETOOLS_write_refuses_unparseable_payload', async () => {
+test('WHAT[repository-programming-010] FILETOOLS_write_refuses_unparseable_payload', async () => {
   const { dir, cleanup } = sandbox()
   const output = await write(dir, 'not json at all')
   assert.match(output.result, /^Failed to parse JSON payload for write tool: /)
   cleanup()
 })
-test('WHAT[REPOSITORY-PROGRAMMING-010] FILETOOLS_edit_replaces_exact_match', async () => {
+test('WHAT[repository-programming-010] FILETOOLS_edit_replaces_exact_match', async () => {
   const { dir, cleanup } = sandbox()
   const path = join(dir, 'edit.txt')
   writeFileSync(path, 'alpha beta gamma')
@@ -37,14 +37,14 @@ test('WHAT[REPOSITORY-PROGRAMMING-010] FILETOOLS_edit_replaces_exact_match', asy
   assert.equal(readFileSync(path, 'utf8'), 'alpha BETA gamma')
   cleanup()
 })
-test('WHAT[REPOSITORY-PROGRAMMING-010] FILETOOLS_edit_reports_missing_file', async () => {
+test('WHAT[repository-programming-010] FILETOOLS_edit_reports_missing_file', async () => {
   const { dir, cleanup } = sandbox()
   const path = join(dir, 'missing.txt')
   const output = await edit(dir, JSON.stringify({ filePath: path, oldString: 'x', newString: 'y' }))
   assert.equal(output.result, `File not found: ${path}`)
   cleanup()
 })
-test('WHAT[REPOSITORY-PROGRAMMING-010] FILETOOLS_edit_reports_absent_old_string', async () => {
+test('WHAT[repository-programming-010] FILETOOLS_edit_reports_absent_old_string', async () => {
   const { dir, cleanup } = sandbox()
   const path = join(dir, 'no-match.txt')
   writeFileSync(path, 'nothing to replace')
@@ -53,7 +53,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-010] FILETOOLS_edit_reports_absent_old_string'
   assert.equal(readFileSync(path, 'utf8'), 'nothing to replace')
   cleanup()
 })
-test('WHAT[REPOSITORY-PROGRAMMING-010] FILETOOLS_edit_refuses_unparseable_payload', async () => {
+test('WHAT[repository-programming-010] FILETOOLS_edit_refuses_unparseable_payload', async () => {
   const { dir, cleanup } = sandbox()
   const output = await edit(dir, '{broken')
   assert.match(output.result, /^Invalid edit payload: /)
@@ -76,7 +76,7 @@ const sandbox = () => {
 }
 const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')
 
-test('WHAT[REPOSITORY-PROGRAMMING-010] JS008_012_bindings_rewrite_requires_existing_target', () => {
+test('WHAT[repository-programming-010] JS008_012_bindings_rewrite_requires_existing_target', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'old text', 'utf8')
@@ -90,7 +90,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-010] JS008_012_bindings_rewrite_requires_exist
     cleanup()
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-010] JS009_012_bindings_write_stages_create', () => {
+test('WHAT[repository-programming-010] JS009_012_bindings_write_stages_create', () => {
   const { dir, cleanup } = sandbox()
   try {
     const binding = createApi(dir)
@@ -102,7 +102,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-010] JS009_012_bindings_write_stages_create', 
     cleanup()
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-010] JS009_bindings_write_rejects_an_existing_target_before_staging', () => {
+test('WHAT[repository-programming-010] JS009_bindings_write_rejects_an_existing_target_before_staging', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'existing.txt'), 'external', 'utf8')
@@ -128,7 +128,7 @@ const rewrite = (path, originalText, newText) => ({ kind: 'rewrite', path, origi
 const create = (path, text) => ({ kind: 'create', path, text })
 const current = { 'a.txt': 'current' }
 
-test('WHAT[REPOSITORY-PROGRAMMING-010] JS026_same_path_once_rejects_duplicate_mutation_targets', () => {
+test('WHAT[repository-programming-010] JS026_same_path_once_rejects_duplicate_mutation_targets', () => {
   const dup = [rewrite('a.txt', 'x', 'y'), create('a.txt', 'z')]
   const result = validateSingleIntent(dup)
   assert.equal(ok(result), false)
@@ -137,7 +137,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-010] JS026_same_path_once_rejects_duplicate_mu
   const distinct = [rewrite('a.txt', 'x', 'y'), create('b.txt', 'z')]
   assert.equal(ok(validateSingleIntent(distinct)), true)
 })
-test('WHAT[REPOSITORY-PROGRAMMING-010] JS008_009_rewrite_requires_existing_target_create_requires_missing', () => {
+test('WHAT[repository-programming-010] JS008_009_rewrite_requires_existing_target_create_requires_missing', () => {
   const existing = ['a.txt']
   assert.equal(ok(validateTargets(existing, [rewrite('a.txt', 'x', 'y')])), true)
   assert.equal(codeOf(validateTargets(existing, [rewrite('missing.txt', 'x', 'y')])), 'FILE_NOT_FOUND')

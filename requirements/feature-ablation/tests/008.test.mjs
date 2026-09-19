@@ -18,7 +18,7 @@ const withEnv = (entries, run) => {
   }
 }
 
-test('WHAT[ABL-008] ABL_008_strength_forced_off_when_speculation_ablated', () => {
+test('WHAT[feature-ablation-008] ABL_008_strength_forced_off_when_speculation_ablated', () => {
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-05']], () => {
     Ablation.load()
     assert.equal(Ablation.strengthForcedOff(), true)

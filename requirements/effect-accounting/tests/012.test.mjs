@@ -58,7 +58,7 @@ const fold = (events) => {
   return change.unwrapFold(result)
 }
 
-test('WHAT[EFFECT-ACCOUNTING-012] publish_claim_without_durable_rebase_witness_is_rejected', () => {
+test('WHAT[effect-accounting-012] publish_claim_without_durable_rebase_witness_is_rejected', () => {
   const result = change.fold([managerCreated, claimed])
   assert.equal(result.ok, false)
   assert.match(result.error, /publish claimed for a job with no rebased candidate/i)

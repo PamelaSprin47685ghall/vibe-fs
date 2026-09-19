@@ -29,7 +29,7 @@ const materialize = (
 }
 const OPENING_END = { Sequence: 1 }
 
-test('WHAT[WORK-RECORD-005] LWR_gap_starts_at_record_coverage_not_prefix_cutoff', () => {
+test('WHAT[work-record-005] LWR_gap_starts_at_record_coverage_not_prefix_cutoff', () => {
   const trace = [
     xTrace.item({ sequence: 0, role: 'user', part: xTrace.text('task') }),
     xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.text('work a') }),
@@ -73,7 +73,7 @@ const trace = [
   xTrace.item({ sequence: 2, role: 'assistant', part: xTrace.text('delivered') }),
 ]
 
-test('WHAT[WORK-RECORD-005] LWR_gap_from_origin_is_full_history_including_partial_turn', () => {
+test('WHAT[work-record-005] LWR_gap_from_origin_is_full_history_including_partial_turn', () => {
   // With coverage at origin, the gap is the whole trace after the opening end —
   // still NOT turn-bounded: a partial turn is a valid uncovered suffix.
   const rendered = materialize(
@@ -85,7 +85,7 @@ test('WHAT[WORK-RECORD-005] LWR_gap_from_origin_is_full_history_including_partia
     true,
   )
 
-  // WORK-RECORD-005：Recent work = bounded invocation 内 Y 未覆盖的 X-derived suffix，
+  // work-record-005：Recent work = bounded invocation 内 Y 未覆盖的 X-derived suffix，
   // 不是「最近发生的事」。coverage 在 origin 时 suffix 就是全部历史——包括 partial turn。
   assert.ok(rendered.includes('thinking'))
   assert.ok(rendered.includes('delivered'))

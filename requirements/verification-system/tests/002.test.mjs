@@ -23,7 +23,7 @@ const makeTempRoot = (layout) => {
 }
 const cleanup = (root) => rmSync(root, { recursive: true, force: true })
 
-test('WHAT[VERIFICATION-SYSTEM-002] sole top-level e2e entry is 014.test.mjs', () => {
+test('WHAT[verification-system-002] sole top-level e2e entry is 014.test.mjs', () => {
   // One World：第 4 层恰好一个真实 E2E 入口。顶层文件清单必须包含
   // tests/e2e/014.test.mjs（唯一 Long Stroke）。
   const files = e2eTestCaseFiles()
@@ -33,7 +33,7 @@ test('WHAT[VERIFICATION-SYSTEM-002] sole top-level e2e entry is 014.test.mjs', (
     'expected top-level sole entry e2e/014.test.mjs (verification-system package) in scope',
   )
 })
-test('WHAT[VERIFICATION-SYSTEM-002] missing sole 014.test.mjs fails closed', () => {
+test('WHAT[verification-system-002] missing sole 014.test.mjs fails closed', () => {
   // One World：第 4 层恰好一个真实 E2E 入口。e2e dir exists but the sole
   // entry is absent → must throw, not report green with the other files.
   const root = makeTempRoot({ files: ['other.test.mjs'] })
@@ -73,7 +73,7 @@ function createMemorySink() {
   }
   }
 for (const failingLabel of ['format:check', 'check', 'build']) {
-  test(`WHAT[VERIFICATION-SYSTEM-001] verify halts and marks subsequent steps not-run when ${failingLabel} fails`, async () => {
+  test(`WHAT[verification-system-001] verify halts and marks subsequent steps not-run when ${failingLabel} fails`, async () => {
     const tmpLogDir = mkdtempSync(join(tmpdir(), 'proof-ladder-fail-'))
     const sink = createMemorySink()
   const spawned = []
@@ -109,7 +109,7 @@ for (const failingLabel of ['format:check', 'check', 'build']) {
 })
   }
 
-test('WHAT[VERIFICATION-SYSTEM-002] release ladder includes clean build, exactly one e2e and one package step', async () => {
+test('WHAT[verification-system-002] release ladder includes clean build, exactly one e2e and one package step', async () => {
   const tmpLogDir = mkdtempSync(join(tmpdir(), 'proof-ladder-release-'))
   const sink = createMemorySink()
   const spawned = []

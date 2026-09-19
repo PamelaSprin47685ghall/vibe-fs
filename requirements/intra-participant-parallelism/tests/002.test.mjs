@@ -12,7 +12,7 @@ const mustOk = (result) => {
   return result
 }
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-002] canonical lane array preserves each prompt including embedded newlines', () => {
+test('WHAT[intra-participant-parallelism-002] canonical lane array preserves each prompt including embedded newlines', () => {
   const parsed = mustOk(fission.parsePrompt(['  A  \r\nstill A', 'B\r\n']))
   assert.deepEqual(
     parsed.lanes.map((lane) => [lane.index, lane.prompt]),
@@ -50,7 +50,7 @@ const fissionProduction = () => [
   'src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs',
 ].map(read).join('\n')
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-002] fission tool exposes prompts as a string array without newline splitting', () => {
+test('WHAT[intra-participant-parallelism-002] fission tool exposes prompts as a string array without newline splitting', () => {
   const model = read('src/Wanxiangshu/Execution/Fission/Model.fs')
   const tool = read('src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs')
 

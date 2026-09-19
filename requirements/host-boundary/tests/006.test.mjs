@@ -56,7 +56,7 @@ const modelFromLease = async (sessionId, physicalUserMessageId, role, participan
   return { providerID, modelID: modelParts.join('/'), variant: target.reasoning }
 }
 
-test('WHAT[HOST-BOUNDARY-006] HOST-006_user_facing_agent_is_not_session_authority', () => {
+test('WHAT[host-boundary-006] HOST-006_user_facing_agent_is_not_session_authority', () => {
   binding.drop('ses_binding_1')
   binding.observeUserFacingAgent('ses_binding_1', 'engineer')
   const prepared = binding.prepareUserFacing('ses_binding_1', 'engineer', false, model)
@@ -64,7 +64,7 @@ test('WHAT[HOST-BOUNDARY-006] HOST-006_user_facing_agent_is_not_session_authorit
   assert.equal(prepared.value.agent, 'engineer')
   assert.equal(binding.tryAgent('ses_binding_1'), 'engineer')
 })
-test('WHAT[HOST-BOUNDARY-006] HOST-006_accept_prompt_execution_binds_physical_prompt_and_provider_model', async () => {
+test('WHAT[host-boundary-006] HOST-006_accept_prompt_execution_binds_physical_prompt_and_provider_model', async () => {
   binding.drop('ses_binding_2')
   const leasedModel = await modelFromLease('ses_binding_2', 'physical-1', 'engineer', 'engineer', undefined)
   binding.acceptPromptExecution('ses_binding_2', 'prompt-1', 'physical-1', 'engineer', leasedModel)
@@ -74,7 +74,7 @@ test('WHAT[HOST-BOUNDARY-006] HOST-006_accept_prompt_execution_binds_physical_pr
   assert.equal(allowed.ok, true)
   assert.equal(allowed.value, true)
 })
-test('WHAT[HOST-BOUNDARY-006] HOST-006_external_acceptance_immediately_binds_participant', async () => {
+test('WHAT[host-boundary-006] HOST-006_external_acceptance_immediately_binds_participant', async () => {
   const session = 'ses_binding_external_acceptance'
   binding.drop(session)
   const leasedModel = await modelFromLease(session, 'physical-external', 'engineer', 'engineer', undefined)
@@ -86,7 +86,7 @@ test('WHAT[HOST-BOUNDARY-006] HOST-006_external_acceptance_immediately_binds_par
   assert.equal(allowed.ok, true, allowed.error)
   assert.equal(allowed.value, true)
 })
-test('WHAT[HOST-BOUNDARY-006] HOST-006_provider_drift_is_rejected_after_prompt_binding', () => {
+test('WHAT[host-boundary-006] HOST-006_provider_drift_is_rejected_after_prompt_binding', () => {
   binding.drop('ses_binding_3')
   binding.acceptPromptExecution('ses_binding_3', 'prompt-1', 'physical-1', 'engineer', model)
   binding.beginProviderAttempt('ses_binding_3', 'physical-1', 'prompt-1')
@@ -94,7 +94,7 @@ test('WHAT[HOST-BOUNDARY-006] HOST-006_provider_drift_is_rejected_after_prompt_b
   assert.equal(stale.ok, false)
   assert.match(stale.error, /provider agent drift/)
 })
-test('WHAT[HOST-BOUNDARY-006] HOST-006_stale_physical_terminal_cannot_strip_the_lease_before_chat_params_validation', async () => {
+test('WHAT[host-boundary-006] HOST-006_stale_physical_terminal_cannot_strip_the_lease_before_chat_params_validation', async () => {
   const session = 'ses_binding_stale_terminal'
   binding.drop(session)
 
@@ -110,7 +110,7 @@ test('WHAT[HOST-BOUNDARY-006] HOST-006_stale_physical_terminal_cannot_strip_the_
 
   binding.drop(session)
 })
-test('WHAT[HOST-BOUNDARY-006] HOST-006_managed_prompt_preserves_agent_but_does_not_acquire_model', () => {
+test('WHAT[host-boundary-006] HOST-006_managed_prompt_preserves_agent_but_does_not_acquire_model', () => {
   binding.drop('ses_binding_4')
   binding.bindChild('ses_parent_4', 'ses_binding_4', 'engineer')
   const prepared = binding.prepareManaged('ses_binding_4', 'engineer', false, model)
@@ -118,7 +118,7 @@ test('WHAT[HOST-BOUNDARY-006] HOST-006_managed_prompt_preserves_agent_but_does_n
   assert.equal(prepared.value.agent, 'engineer')
   assert.equal(prepared.value.modelProvided, false)
 })
-test('WHAT[HOST-BOUNDARY-006] HOST-006_child_enqueue_uses_binding_agent_and_model_free_options', () => {
+test('WHAT[host-boundary-006] HOST-006_child_enqueue_uses_binding_agent_and_model_free_options', () => {
   const created = binding.bindChild('ses_parent', 'ses_child', 'engineer')
   assert.equal(created.ok, true)
   const prepared = binding.prepareManaged('ses_child', 'engineer', false, null)
@@ -126,7 +126,7 @@ test('WHAT[HOST-BOUNDARY-006] HOST-006_child_enqueue_uses_binding_agent_and_mode
   assert.equal(prepared.value.agent, 'engineer')
   assert.equal(prepared.value.modelProvided, false)
 })
-test('WHAT[HOST-BOUNDARY-006] HOST-006_private_bookkeeper_child_stays_outside_managed_execution_binding', () => {
+test('WHAT[host-boundary-006] HOST-006_private_bookkeeper_child_stays_outside_managed_execution_binding', () => {
   const child = 'ses_binding_bookkeeper_child'
   binding.drop(child)
 
@@ -135,7 +135,7 @@ test('WHAT[HOST-BOUNDARY-006] HOST-006_private_bookkeeper_child_stays_outside_ma
   assert.equal(binding.tryAgent(child), '')
   assert.equal(binding.isUnboundHostAuxiliaryChild(child), true)
 })
-test('WHAT[HOST-BOUNDARY-006] HOST-006_terminal_listener_refcounts_do_not_share_disposal', () => {
+test('WHAT[host-boundary-006] HOST-006_terminal_listener_refcounts_do_not_share_disposal', () => {
   const observed = runListenerRefcountScenario()
   assert.equal(observed.afterOneDisposeFatal, true)
   assert.equal(observed.afterAllDisposeFatal, false)
@@ -156,7 +156,7 @@ const assistantToolMessage = ({ messageID = 'asst_run', partID = 'part_todo', ca
   parts: [{ type: 'tool', id: partID, callID, tool: 'auto-injected', state: { status } }],
 })
 
-test('WHAT[HOST-BOUNDARY-006] HOST-004 keeps failed session tool state consistent across Parts and ToolParts', () => {
+test('WHAT[host-boundary-006] HOST-004 keeps failed session tool state consistent across Parts and ToolParts', () => {
   const messages = projectMessages([assistantToolMessage({ status: 'error' })])
   const part = toolPartStateAt(messages, 0, 0)
   assert.equal(part.ok, true)

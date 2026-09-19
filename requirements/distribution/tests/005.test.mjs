@@ -23,7 +23,7 @@ const RESOURCE_SAMPLES = [
   'enforcer/primitive-obsession/main.md',
 ]
 
-test('WHAT[DISTRIBUTION-005] DISTRIBUTION_lookup_is_single_fixed_relative_path_not_candidate_search', () => {
+test('WHAT[distribution-005] DISTRIBUTION_lookup_is_single_fixed_relative_path_not_candidate_search', () => {
   // PackageResources 的 ../../../resources 必须恰好是仓库/安装根的 resources/。
   // 这是「单份发布、无 dist 双副本、无 fallback」的实现证据（docs/why/enforcer.md）。
   const moduleDir = path.dirname(fileURLToPath(packageResourcesUrl))
@@ -37,7 +37,7 @@ test('WHAT[DISTRIBUTION-005] DISTRIBUTION_lookup_is_single_fixed_relative_path_n
     assert.ok(readFileSync(full, 'utf8').trim().length > 0, `expected fixed path non-empty: ${full}`)
   }
 
-  // DISTRIBUTION-005：资源单份发布——resources/ 只存在于包根，不得复制进 dist/ 形成双副本。
+  // distribution-005：资源单份发布——resources/ 只存在于包根，不得复制进 dist/ 形成双副本。
   assert.equal(
     readdirSync(path.join(root, 'dist')).includes('resources'),
     false,

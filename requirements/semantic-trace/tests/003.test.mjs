@@ -23,7 +23,7 @@ const withJournal = async (fn) => {
 }
 const projection = (messages) => ({ messages })
 
-test('WHAT[SEMANTIC-TRACE-003] concurrent same-session captures serialize before allocating durable cursors', async () => {
+test('WHAT[semantic-trace-003] concurrent same-session captures serialize before allocating durable cursors', async () => {
   await withJournal(async (handle) => {
     const capture = (hostMessageId, text) => trace.captureObservedMessages(handle, SESSION, [
       {
@@ -74,7 +74,7 @@ const part = (sequence, overrides = {}) => ({
   ...overrides,
 })
 
-test('WHAT[SEMANTIC-TRACE-003] duplicate and retreating cursors are rejected', () => {
+test('WHAT[semantic-trace-003] duplicate and retreating cursors are rejected', () => {
   const projection = unwrap(trace.appendPart(trace.emptyProjection(), part(5)))
   assert.equal(trace.appendPart(projection, part(5)).ok, false)
   assert.equal(trace.appendPart(projection, part(3)).ok, false)
@@ -87,7 +87,7 @@ const { default: test } = await import("node:test");
 const trace = await import("../../../dist/Context/Trace/SemanticTraceSurface.js");
 
 
-test('WHAT[SEMANTIC-TRACE-003] cursor vocabulary is monotonic and opaque', () => {
+test('WHAT[semantic-trace-003] cursor vocabulary is monotonic and opaque', () => {
   const origin = trace.originCursor
   const second = trace.next(origin)
   const third = trace.next(second)

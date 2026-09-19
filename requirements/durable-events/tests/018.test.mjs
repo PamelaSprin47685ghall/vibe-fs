@@ -15,7 +15,7 @@ const sandboxHooks = () => {
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
-test('WHAT[DURABLE-EVENTS-018] HOOK_activation_ensure_installs_both_hooks_and_remote_fetch_refspec_without_running_sync', async () => {
+test('WHAT[durable-events-018] HOOK_activation_ensure_installs_both_hooks_and_remote_fetch_refspec_without_running_sync', async () => {
   const { execFileSync } = await import('node:child_process')
   const repo = mkdtempSync(join(tmpdir(), 'wxs-hook-ensure-'))
   try {
@@ -39,7 +39,7 @@ test('WHAT[DURABLE-EVENTS-018] HOOK_activation_ensure_installs_both_hooks_and_re
   }
 })
 
-test('WHAT[DURABLE-EVENTS-018] HOOK_shim_resolves_node_from_environment_not_installer_host_execPath', async () => {
+test('WHAT[durable-events-018] HOOK_shim_resolves_node_from_environment_not_installer_host_execPath', async () => {
   const { execFileSync } = await import('node:child_process')
   const repo = mkdtempSync(join(tmpdir(), 'wxs-hook-shim-'))
   try {
@@ -60,7 +60,7 @@ test('WHAT[DURABLE-EVENTS-018] HOOK_shim_resolves_node_from_environment_not_inst
   }
 })
 
-test('WHAT[DURABLE-EVENTS-018] HOOK_reference_transaction_and_pre_push_launch_the_same_independent_full_converge_runtime', async () => {
+test('WHAT[durable-events-018] HOOK_reference_transaction_and_pre_push_launch_the_same_independent_full_converge_runtime', async () => {
   const { spawnSync } = await import('node:child_process')
   const runner = join(process.cwd(), 'resources/git/wanxiang-hook.mjs')
 
@@ -98,13 +98,13 @@ test('WHAT[DURABLE-EVENTS-018] HOOK_reference_transaction_and_pre_push_launch_th
 
 })
 
-test('WHAT[DURABLE-EVENTS-018] HOOK_classification_preserves_foreign_hooks', () => {
+test('WHAT[durable-events-018] HOOK_classification_preserves_foreign_hooks', () => {
   assert.equal(Hook.classifyExistingHook(null), 'Installed')
   assert.equal(Hook.classifyExistingHook(`# ${MARKER}\n`), 'AlreadyOwned')
   assert.equal(Hook.classifyExistingHook('#!/bin/sh\necho foreign\n'), 'ForeignHook')
 })
 
-test('WHAT[DURABLE-EVENTS-018] HOOK_install_refreshes_owned_hook_but_never_overwrites_foreign_hook', () => {
+test('WHAT[durable-events-018] HOOK_install_refreshes_owned_hook_but_never_overwrites_foreign_hook', () => {
   const { dir, cleanup } = sandboxHooks()
   try {
     const owned = `#!/bin/sh\n# ${MARKER}\nexit 0\n`

@@ -6,7 +6,7 @@ const { default: test } = await import("node:test");
 const deadline = await import("../../../dist/Process/DeadlineSurface.js");
 
 
-test('WHAT[PROC-004] Process_deadline_uses_explicit_offset_semantics', () => {
+test('WHAT[process-execution-004] Process_deadline_uses_explicit_offset_semantics', () => {
   const value = deadline.create('2026-01-01T00:00:00Z', 5000)
 
   assert.equal(deadline.remainingMs('2026-01-01T00:00:02Z', value), 3000)
@@ -19,7 +19,7 @@ test('WHAT[PROC-004] Process_deadline_uses_explicit_offset_semantics', () => {
   assert.equal(deadline.remainingMs('2026-01-01T08:00:02+08:00', value), 3000)
   assert.equal(deadline.isExpired('2026-01-01T08:00:02+08:00', value), false)
 })
-test('WHAT[PROC-004] Process_deadline_is_independent_of_ambient_timezone', () => {
+test('WHAT[process-execution-004] Process_deadline_is_independent_of_ambient_timezone', () => {
   const original = process.env.TZ
   const value = deadline.create('2026-01-01T00:00:00Z', 5000)
 
@@ -50,7 +50,7 @@ const {
   estimateView,
 } = await import('../../../dist/Process/Surface.js')
 
-test('WHAT[PROC-004] EXEC_oneshot_completion_wait_is_bounded_by_management_deadline', () => {
+test('WHAT[process-execution-004] EXEC_oneshot_completion_wait_is_bounded_by_management_deadline', () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
   const oneshotPath = join(root, 'src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs')
   assert.equal(existsSync(oneshotPath), false, 'OneShotTool.fs must be physically removed')
@@ -81,7 +81,7 @@ const okLauncher = (exitCode = 0, out = 'hello', err = '') => async (_command, _
   new TextEncoder().encode(err),
 ]
 
-test('WHAT[PROC-004] EXEC_011_slow_process_is_killed_and_reports_timeout', async () => {
+test('WHAT[process-execution-004] EXEC_011_slow_process_is_killed_and_reports_timeout', async () => {
   const hangingLauncher = (_command, token) =>
     new Promise((resolve) => {
       token.register(() => resolve([-1, new Uint8Array(0), new Uint8Array(0)]))
@@ -99,7 +99,7 @@ test('WHAT[PROC-004] EXEC_011_slow_process_is_killed_and_reports_timeout', async
   assert.equal(result.ok, false)
   assert.equal(result.error.kind, 'TimeoutExceeded')
 })
-test('WHAT[PROC-004] EXEC_011_spawn_failure_maps_to_spawn_failed', async () => {
+test('WHAT[process-execution-004] EXEC_011_spawn_failure_maps_to_spawn_failed', async () => {
   const failingHost = async () => ({ ok: false, error: 'ENOENT: no such binary' })
   const result = await runWithHostLauncher(failingHost, cmd, makeEstimate(), CTX, live())
 
@@ -107,7 +107,7 @@ test('WHAT[PROC-004] EXEC_011_spawn_failure_maps_to_spawn_failed', async () => {
   assert.equal(result.error.kind, 'SpawnFailed')
   assert.match(result.error.reason, /ENOENT/)
 })
-test('WHAT[PROC-004] EXEC_011_throwing_host_maps_to_execution_failed', async () => {
+test('WHAT[process-execution-004] EXEC_011_throwing_host_maps_to_execution_failed', async () => {
   const explodingHost = async () => {
     throw new Error('host exploded')
   }
@@ -146,7 +146,7 @@ const within = (promise, ms, label) =>
 const expired = () => createDeadline('2000-01-01T00:00:00Z', 1)
 const killCount = (child) => childView(child).killCount
 
-test('WHAT[PROC-004] EXEC_011_B_deadline_kills_once_then_real_exit_is_timed_out', async () => {
+test('WHAT[process-execution-004] EXEC_011_B_deadline_kills_once_then_real_exit_is_timed_out', async () => {
   let child
   child = childCreate(() => {
     setTimeout(() => childExit(child, 137), 15)
@@ -158,7 +158,7 @@ test('WHAT[PROC-004] EXEC_011_B_deadline_kills_once_then_real_exit_is_timed_out'
   assert.equal(killCount(child), 1, 'deadline path Kill exactly once')
 })
 test(
-  'WHAT[PROC-004] EXEC_011_C_kill_never_acked_ends_with_minus_one_timed_out',
+  'WHAT[process-execution-004] EXEC_011_C_kill_never_acked_ends_with_minus_one_timed_out',
   { timeout: 15_000 },
   async () => {
     assert.equal(killAckGraceMs, 1_000)

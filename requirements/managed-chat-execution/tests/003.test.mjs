@@ -33,7 +33,7 @@ const evidence = {
 const run = (failurePoint = 'None', state = 'None') =>
   transaction.transactionScenario(evidence, failurePoint, state)
 
-test('WHAT[CHATEXEC-003] managed admission has one fixed success order', async () => {
+test('WHAT[managed-chat-execution-003] managed admission has one fixed success order', async () => {
   const result = await run()
 
   assert.equal(result.ok, true, JSON.stringify(result.error))
@@ -58,7 +58,7 @@ test('WHAT[CHATEXEC-003] managed admission has one fixed success order', async (
   assert.equal(result.releaseCount, 0)
   assert.equal(result.providerCount, 0)
 })
-test('WHAT[CHATEXEC-003] append failure performs zero downstream effects', async () => {
+test('WHAT[managed-chat-execution-003] append failure performs zero downstream effects', async () => {
   for (const failurePoint of ['AcceptNotAttempted', 'AcceptCommitUnknown']) {
     const result = await run(failurePoint)
 
@@ -73,7 +73,7 @@ test('WHAT[CHATEXEC-003] append failure performs zero downstream effects', async
     assert.equal(result.providerCount, 0)
   }
 })
-test('WHAT[CHATEXEC-003] acquisition failure crosses no later boundary', async () => {
+test('WHAT[managed-chat-execution-003] acquisition failure crosses no later boundary', async () => {
   const result = await run('AcquireLease')
 
   assert.equal(result.ok, false)
@@ -91,7 +91,7 @@ test('WHAT[CHATEXEC-003] acquisition failure crosses no later boundary', async (
   assert.equal(result.releaseCount, 0)
   assert.equal(result.providerCount, 0)
 })
-test('WHAT[CHATEXEC-003] superseded demand is a typed nonfatal short-circuit', async () => {
+test('WHAT[managed-chat-execution-003] superseded demand is a typed nonfatal short-circuit', async () => {
   const result = await run('AcquireSuperseded')
 
   assert.equal(result.ok, true, JSON.stringify(result.error))
@@ -109,7 +109,7 @@ test('WHAT[CHATEXEC-003] superseded demand is a typed nonfatal short-circuit', a
   assert.equal(result.releaseCount, 0)
   assert.equal(result.providerCount, 0)
 })
-test('WHAT[CHATEXEC-003] already-started replay performs no duplicate admission effect', async () => {
+test('WHAT[managed-chat-execution-003] already-started replay performs no duplicate admission effect', async () => {
   const result = await run('None', 'ProviderStarted')
 
   assert.equal(result.ok, true, JSON.stringify(result.error))
@@ -134,7 +134,7 @@ const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
 const bootstrap = readFileSync(join(ROOT, 'src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs'), 'utf8')
 const occurrences = (pattern) => bootstrap.match(pattern)?.length ?? 0
 
-test('WHAT[CHATEXEC-003] managed path calls one admission transaction', () => {
+test('WHAT[managed-chat-execution-003] managed path calls one admission transaction', () => {
   assert.equal(occurrences(/ChatAdmissionTransaction\.production/g), 1)
   assert.equal(occurrences(/ChatAdmissionTransaction\.execute/g), 1)
   assert.match(
@@ -150,7 +150,7 @@ test('WHAT[CHATEXEC-003] managed path calls one admission transaction', () => {
   const hook = bootstrap.indexOf('let chatMessageHook')
   assert.ok(construction >= 0 && construction < hook, 'the transaction factory must be composed before the callback')
 })
-test('WHAT[CHATEXEC-003] only Settled crosses the managed provider boundary', () => {
+test('WHAT[managed-chat-execution-003] only Settled crosses the managed provider boundary', () => {
   assert.equal(occurrences(/continueManagedChatMessage/g), 2, 'one declaration and one invocation')
   const admission = bootstrap.slice(
     bootstrap.indexOf('let admitManagedChatMessage'),
@@ -162,7 +162,7 @@ test('WHAT[CHATEXEC-003] only Settled crosses the managed provider boundary', ()
   assert.doesNotMatch(admission, /ChatAdmissionTransactionOutcome\.Superseded _\) -> \(\)/)
   assert.equal(occurrences(/TransactionStopped outcome/g), 1)
 })
-test('WHAT[CHATEXEC-003] acceptance uncertainty, acquire, bind, and Host projection failures stop before provider', () => {
+test('WHAT[managed-chat-execution-003] acceptance uncertainty, acquire, bind, and Host projection failures stop before provider', () => {
   const continuation = bootstrap.slice(
     bootstrap.indexOf('let continueManagedChatMessage'),
     bootstrap.indexOf('let currentExecution'),
@@ -179,19 +179,19 @@ test('WHAT[CHATEXEC-003] acceptance uncertainty, acquire, bind, and Host project
   assert.doesNotMatch(continuation, /ChatAdmissionTransaction|TransactionFailed|Error error/)
   assert.doesNotMatch(admission, /Error error[\s\S]*continueManagedChatMessage/)
 })
-test('WHAT[CHATEXEC-003] unmanaged and HostInternal preserve the physical continuation without admission', () => {
+test('WHAT[managed-chat-execution-003] unmanaged and HostInternal preserve the physical continuation without admission', () => {
   assert.match(
     bootstrap,
     /Decision\.NoManagedExecution _[\s\S]*?Decision\.HostInternal _[\s\S]*?continueUnmanagedChatMessage intent/,
   )
 })
-test('WHAT[CHATEXEC-003] Reject remains typed at the Host hook boundary', () => {
+test('WHAT[managed-chat-execution-003] Reject remains typed at the Host hook boundary', () => {
   assert.match(
     bootstrap,
     /Decision\.Reject rejection, _, _ ->\s*rejectedChatMessage \(IntentRejected rejection\)/,
   )
 })
-test('WHAT[CHATEXEC-003] bootstrap contains no fragmented admission owner', () => {
+test('WHAT[managed-chat-execution-003] bootstrap contains no fragmented admission owner', () => {
   for (const forbidden of [
     /PromptIngress\.createDecisionHook/,
     /PromptIngress\.createHook/,

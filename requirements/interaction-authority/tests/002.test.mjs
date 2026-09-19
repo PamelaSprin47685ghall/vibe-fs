@@ -51,7 +51,7 @@ const register = (root) => authority.registerAuthority(root, authority.empty)
 const continuation = (key, root, kind = 'ManagerGuard', payload = 'payload') =>
   authority.claimContinuation(key, 'ses_a', kind, root, payload)
 
-test('WHAT[INTERACTION-AUTHORITY-002] IA_002_transport_receipt_shape_is_not_authority_evidence', () => {
+test('WHAT[interaction-authority-002] IA_002_transport_receipt_shape_is_not_authority_evidence', () => {
   assert.equal(authority.transportReceiptShape('accepted-1a2b'), true)
   assert.equal(authority.transportReceiptShape('msg_real'), false)
 })

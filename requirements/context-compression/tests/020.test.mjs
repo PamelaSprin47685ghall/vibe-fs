@@ -6,7 +6,7 @@ import * as magicTodo from '../../../dist/Mission/Obligation/Todo/MagicTodoSeman
 const floor = ({ hasOpenLife = true, planCommitted = false, xTraceHeadSequence = 0, legacyProtectedPrefixEnd, parts = [] } = {}) =>
   magicTodo.effectiveOpeningFloor(hasOpenLife, planCommitted, 1, null, null, xTraceHeadSequence, parts)
 
-test('WHAT[CONTEXT-COMPRESSION-020] todowrite_material_does_not_redefine_the_owned_opening_floor', () => {
+test('WHAT[context-compression-020] todowrite_material_does_not_redefine_the_owned_opening_floor', () => {
   const parts = [
     { sequence: 8, kind: 'tool_call', toolCallId: 'todo-call-1' },
     { sequence: 9, kind: 'tool_result', toolCallId: 'todo-call-1' },
@@ -15,7 +15,7 @@ test('WHAT[CONTEXT-COMPRESSION-020] todowrite_material_does_not_redefine_the_own
   assert.equal(Number(floor({ xTraceHeadSequence: 20, parts })), 2)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-020] todowrite call and matching result are retained across a Y cutoff', () => {
+test('WHAT[context-compression-020] todowrite call and matching result are retained across a Y cutoff', () => {
   assert.deepEqual(
     prefix.retainTodoWriteRounds([
       { containsTodoWrite: false, callIds: [] },

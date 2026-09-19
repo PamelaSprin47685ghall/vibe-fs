@@ -258,7 +258,7 @@ module HostForkRunLifecycle =
             let root = run.AuthorityRoot
             TerminalStop.belongsTo root stop
 
-    /// DELEG-031: the handoff port travels with the prepared handoff as one slot
+    /// delegation-031: the handoff port travels with the prepared handoff as one slot
     /// (`Some slot` proves the capability was present at PrepareHandoff time).
     /// A run whose `Handoff` slot is `None` has no completion checkpoint to
     /// write — capability absence is therefore decided here structurally, not by
@@ -314,7 +314,7 @@ module HostForkRunLifecycle =
         | None -> Task.FromResult(()) :> Task
         | Some(port, handoff) ->
             task {
-                // DELEG-031: the checkpoint returns its own settlement — a pending
+                // delegation-031: the checkpoint returns its own settlement — a pending
                 // completion is delivered whatever the commitment says. The child
                 // already finished; NotCommitted/Unknown preserve pending-evidence
                 // for the next invocation's durable re-read and never re-execute
@@ -463,7 +463,7 @@ module HostForkRunLifecycle =
             // Observation only. Keep pending run Active for a later proven terminal.
             Task.FromResult(())
         | Completed result when not result.IsValid ->
-            // PAR-008 / P0-RECOVERY-JOIN-001: an empty / XML-only terminal is
+            // provider-attempt-recovery-008 / P0-RECOVERY-JOIN-001: an empty / XML-only terminal is
             // not a proven failure. The subagent auto-retries and continues — its
             // reconcile loop performs the bounded missing-final-report repair.
             // Concluding MISSING_FINAL_REPORT
@@ -472,7 +472,7 @@ module HostForkRunLifecycle =
         | Completed result when not (completionBelongsToRun run result) -> Task.FromResult(())
         | Completed result ->
             task {
-                // DELEG-031: settlement is attempted before delivery, but the
+                // delegation-031: settlement is attempted before delivery, but the
                 // proven completion is delivered whatever the commitment says —
                 // neither announced early (this await precedes the SetResult
                 // below) nor forgotten. Only PhaseConflict escalates, after
@@ -508,7 +508,7 @@ module HostForkRunLifecycle =
             stop.Reason = "MISSING_FINAL_REPORT"
             || stop.Reason.Contains("MISSING_FINAL_REPORT")
             ->
-            // PAR-008 / P0-RECOVERY-JOIN-001: a missing final report is not a
+            // provider-attempt-recovery-008 / P0-RECOVERY-JOIN-001: a missing final report is not a
             // proven terminal failure. The subagent auto-retries and continues (its
             // reconcile loop keeps repairing the empty terminal); delivering a
             // proven MISSING_FINAL_REPORT failure here concludes the run before the

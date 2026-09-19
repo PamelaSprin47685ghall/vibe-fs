@@ -4,7 +4,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
-/// JS-native boundary for MessageVisibilityHub (HOST-BOUNDARY-008): tests drive
+/// JS-native boundary for MessageVisibilityHub (host-boundary-008): tests drive
 /// a duck-typed ITimerPort and observe wake / deadline-backstop / waiter-leak
 /// semantics. The hub and the F# waiter registry never cross this edge.
 module MessageVisibilitySurface =

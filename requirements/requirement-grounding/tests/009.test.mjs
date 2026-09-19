@@ -28,7 +28,7 @@ const program = `class Js extends JsProgram {
   }
 }`
 
-test('WHAT[REQUIREMENT-GROUNDING-009] js-* mutations commit normally while grounding observes the full effect set without admission', async () => {
+test('WHAT[requirement-grounding-009] js-* mutations commit normally while grounding observes the full effect set without admission', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const result = await surface.runWithObservationFailure(dir, 'js-union', program)

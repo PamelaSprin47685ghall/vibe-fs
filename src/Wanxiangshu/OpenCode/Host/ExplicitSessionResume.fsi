@@ -6,14 +6,14 @@ open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 
-/// CRASH-018: explicit, user-visible session resume. Nothing in this module is
+/// crash-reconciliation-018: explicit, user-visible session resume. Nothing in this module is
 /// reachable from plugin load or ordinary turns. `/continue` only discovers and
 /// process-locally re-enlists surviving child sessions; it never repairs the old
 /// tool call, appends recovery facts, or sends a prompt on the user's behalf.
 [<RequireQualifiedAccess>]
 module ExplicitSessionResume =
 
-    /// CRASH-018 process-local reenlistment of the explicit-resume provider turn.
+    /// crash-reconciliation-018 process-local reenlistment of the explicit-resume provider turn.
     /// The runtime scope supplies only its managed-session observation; durable
     /// authority/profile interpretation stays here.
     val observeChatMessage:

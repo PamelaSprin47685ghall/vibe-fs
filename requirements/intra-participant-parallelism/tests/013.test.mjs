@@ -42,7 +42,7 @@ const harness = ({ failCreateAt, failStartAt, failInterrupt = false, parent = 'o
   return { events, runtime }
 }
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] user-facing root caller is rejected before fission reserves or creates anything', async () => {
+test('WHAT[intra-participant-parallelism-013] user-facing root caller is rejected before fission reserves or creates anything', async () => {
   const { events, runtime } = harness({ parent: null })
   const owner = 'root-caller'
   const result = await fission.admit(runtime, owner, parsed())
@@ -52,7 +52,7 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] user-facing root caller is rejecte
   assert.deepEqual(events, [['parent', 'root-caller']])
   assert.equal(fission.isActive(runtime, owner), false)
 })
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] root provider request suppresses fission while a subsession inherits office entitlement', () => {
+test('WHAT[intra-participant-parallelism-013] root provider request suppresses fission while a subsession inherits office entitlement', () => {
   assert.deepEqual(
     fissionHost.projectFissionToolVisibility(false, { fork: true, fission: true }),
     { fork: true, fission: false },
@@ -94,7 +94,7 @@ const withRoutingHome = async (body) => {
   }
 }
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] real root chat message carries a request-local fission deny', async () => {
+test('WHAT[intra-participant-parallelism-013] real root chat message carries a request-local fission deny', async () => {
   await withRoutingHome(async () => {
     await withExecutablePlugin(async (hooks) => {
       const sessionID = 'fission-root-provider-surface'
@@ -120,7 +120,7 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] real root chat message carries a r
     })
   })
 })
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] a bound child retains fission when the physical parent cache is empty', async () => {
+test('WHAT[intra-participant-parallelism-013] a bound child retains fission when the physical parent cache is empty', async () => {
   await withExecutablePlugin(async (hooks) => {
     const sessionID = 'fission-bound-child-provider-surface'
     bindManagedChild('fission-binding-parent', sessionID, 'engineer')
@@ -145,7 +145,7 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] a bound child retains fission when
     }
   })
 })
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] forced root fission rejects origin before parsing prompts', async () => {
+test('WHAT[intra-participant-parallelism-013] forced root fission rejects origin before parsing prompts', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'fission-root-origin'
     await acceptAuthorityRoot(runtime, sessionID, 'engineer')

@@ -3,7 +3,7 @@
  *
  * Domain / Application / Session code must never read a wall clock directly;
  * the only legal ambient-time owners are the exact physical adapter files in
- * RAW_TIME_ALLOWLIST. TIME-004's ward is the unit test at
+ * RAW_TIME_ALLOWLIST. time-capability-004's ward is the unit test at
  * requirements/time-capability/tests/ambient-time-forbidden.test.mjs — this is
  * a library, not a gate: fail-closed behavior lives in the tests and in
  * collectRawTimeScanEntries' missing-root throw.

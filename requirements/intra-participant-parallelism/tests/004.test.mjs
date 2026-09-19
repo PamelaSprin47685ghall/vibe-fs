@@ -42,7 +42,7 @@ const harness = ({ failCreateAt, failStartAt, failInterrupt = false, parent = 'o
   return { events, runtime }
 }
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-004] partial create or start failure rolls back every created lane and never interrupts old caller', async () => {
+test('WHAT[intra-participant-parallelism-004] partial create or start failure rolls back every created lane and never interrupts old caller', async () => {
   for (const options of [{ failCreateAt: 1 }, { failStartAt: 1 }]) {
     const { events, runtime } = harness(options)
     const owner = `owner-${JSON.stringify(options)}`

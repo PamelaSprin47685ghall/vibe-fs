@@ -87,7 +87,7 @@ const seedTwoInvocations = async (handle) => {
   return { s1, s2, inv1Through, inv2Through }
 }
 
-test('WHAT[WORK-RECORD-016] COMPANION_015_bounded_review_consumes_request_range_not_session_head', async () => {
+test('WHAT[work-record-016] COMPANION_015_bounded_review_consumes_request_range_not_session_head', async () => {
   await withJournal(async (journal) => {
     const { s1, s2, inv1Through } = await seedTwoInvocations(journal)
     await commitY(journal, { from: inv1Through, to: s1, body: 'CURRENT_Y_INV2', n: 2 })

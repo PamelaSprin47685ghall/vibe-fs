@@ -12,7 +12,7 @@ const toolResult = (callID, result) => ({ type: 'tool-result', callID, result })
 const activity = (kind) => ({ type: kind })
 const classify = (completed, finish, errorName, parts = []) => turns.classifyOutcome(completed, finish, errorName, parts)
 
-test('WHAT[PAR-008] RECON_formal_content_gate_is_shared_with_terminal_validity', () => {
+test('WHAT[provider-attempt-recovery-008] RECON_formal_content_gate_is_shared_with_terminal_validity', () => {
   assert.equal(turns.formalContentUnusable(null), true)
   assert.equal(turns.formalContentUnusable([]), true)
   assert.equal(turns.formalContentUnusable([reasoning('only thoughts')]), true)
@@ -84,7 +84,7 @@ const profile = (value) => ({
 })
 const register = (root) => authority.registerAuthority(root, authority.empty)
 
-test('WHAT[INTERACTION-AUTHORITY-008] IA_008_resolution_order_is_accepted_then_claimed_then_compaction_then_root', () => {
+test('WHAT[interaction-authority-008] IA_008_resolution_order_is_accepted_then_claimed_then_compaction_then_root', () => {
   const root = rootFor('engineer', 'msg_u1', 'AgentOwnerRoot')
   let state = register(root)
 
@@ -111,7 +111,7 @@ test('WHAT[INTERACTION-AUTHORITY-008] IA_008_resolution_order_is_accepted_then_c
     },
   )
 })
-test('WHAT[INTERACTION-AUTHORITY-008] IA_008_accepted_continuation_outranks_compaction', () => {
+test('WHAT[interaction-authority-008] IA_008_accepted_continuation_outranks_compaction', () => {
   const root = rootFor()
   let state = register(root)
   state = authority.registerClaim(

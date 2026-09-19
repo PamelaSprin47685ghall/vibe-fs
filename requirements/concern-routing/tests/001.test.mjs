@@ -5,7 +5,7 @@ import * as concern from '../../../dist/Interaction/Concern/Surface.js'
 
 const read = (path) => readFileSync(path, 'utf8')
 
-test('WHAT[CONCERN-ROUTING-001] subscribe is idempotent per live owner and keeps id-to-concern immutable', () => {
+test('WHAT[concern-routing-001] subscribe is idempotent per live owner and keeps id-to-concern immutable', () => {
   let state = concern.empty()
   const first = concern.subscribe('owner-a', 'gen-1', 'build', 'build health', state)
   assert.equal(first.ok, true)
@@ -19,7 +19,7 @@ test('WHAT[CONCERN-ROUTING-001] subscribe is idempotent per live owner and keeps
   assert.equal(concern.subscribe('owner-a', 'gen-2', 'build', 'different meaning', state).ok, false)
 })
 
-test('WHAT[CONCERN-ROUTING-001] subscribe rejects blank address fields without creating a mailbox', () => {
+test('WHAT[concern-routing-001] subscribe rejects blank address fields without creating a mailbox', () => {
   for (const fixture of [
     { id: '', semanticAddress: 'build health', error: 'concern id must be non-empty' },
     { id: ' \t', semanticAddress: 'build health', error: 'concern id must be non-empty' },

@@ -46,7 +46,7 @@ async function checkInventoryAvailability(warehouseId, skuList) {
 }
 `
 
-test('WHAT[DG-005] LOOP_005_detector_memory_is_bounded_by_tokenizer_vocabulary_not_stream_length', () => {
+test('WHAT[degeneration-guard-005] LOOP_005_detector_memory_is_bounded_by_tokenizer_vocabulary_not_stream_length', () => {
   const detector = loopDetector.create()
   const text = diverse()
   const distinct = new Set(encode(text)).size
@@ -100,7 +100,7 @@ const referenceScore = (text) => {
   return { weightedDistinctTokens, step }
 }
 
-test('WHAT[DG-005] LOOP_005_empty_push_is_noop', () => {
+test('WHAT[degeneration-guard-005] LOOP_005_empty_push_is_noop', () => {
   const detector = loopDetector.create()
   const before = loopDetector.evaluate(detector)
   const after = loopDetector.pushText(detector, '')

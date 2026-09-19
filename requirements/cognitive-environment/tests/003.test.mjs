@@ -37,7 +37,7 @@ const MIRRORED_BY_OFFICE_CAPABILITY = new Set(['entrust-by-consequence', 'choose
 
 const LANGUAGE = 'English'
 
-test('WHAT[COGNITIVE-ENVIRONMENT-003] CE_prompt_015_canonical_composition_common_law_role_law_office_library', () => {
+test('WHAT[cognitive-environment-003] CE_prompt_015_canonical_composition_common_law_role_law_office_library', () => {
   const catalog = promptResources.loadForLanguage(LANGUAGE)
   const coder = catalog.EngineerSystemPrompt
   assert.match(coder, /You awaken in a world (?:already in motion|that is already up and running)/, 'Common Law must lead')

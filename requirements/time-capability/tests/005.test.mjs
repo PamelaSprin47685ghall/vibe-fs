@@ -8,7 +8,7 @@ const process = await import('../../../dist/Process/Surface.js')
 const deadline = await import('../../../dist/Process/DeadlineSurface.js')
 const START_MS = Date.parse('2000-01-01T00:00:00Z')
 
-test('WHAT[TIME-005] TIME_005_deadline_verdict_uses_injected_clock_view', () => {
+test('WHAT[time-capability-005] TIME_005_deadline_verdict_uses_injected_clock_view', () => {
   const clock = process.createVirtualClock()
   process.clockSet(clock, '2026-01-01T00:00:00Z')
   const value = deadline.create('2026-01-01T00:00:00Z', 5000)
@@ -28,7 +28,7 @@ const { assertOpaque } = await import("../../verification-system/tests/support/j
 const deadline = await import('../../../dist/Process/DeadlineSurface.js')
 const ISO_START = '2026-01-01T00:00:00Z'
 
-test('WHAT[TIME-005] TIME_005_verdict_follows_injected_clock_not_value', () => {
+test('WHAT[time-capability-005] TIME_005_verdict_follows_injected_clock_not_value', () => {
   const dl = deadline.create(ISO_START, 5000)
   assert.equal(deadline.isExpired('2026-01-01T00:00:04Z', dl), false)
   assert.equal(deadline.isExpired('2026-01-01T00:00:06Z', dl), true)
@@ -47,7 +47,7 @@ const { default: test } = await import("node:test");
 const process = await import('../../../dist/Process/Surface.js')
 const settle = () => new Promise((resolve) => setImmediate(resolve))
 
-test('WHAT[TIME-005] TEMPORAL_virtual_clock_time_is_input_not_authority', async () => {
+test('WHAT[time-capability-005] TEMPORAL_virtual_clock_time_is_input_not_authority', async () => {
   const timer = process.createVirtualTimer()
   let fired = 0
   const handle = process.timerDelay(timer, 100)
@@ -63,7 +63,7 @@ test('WHAT[TIME-005] TEMPORAL_virtual_clock_time_is_input_not_authority', async 
   assert.equal(fired, 1, 'advance past deadline fires exactly once')
   process.timerDispose(timer)
 })
-test('WHAT[TIME-005] TEMPORAL_virtual_clock_cancel_and_dispose_yield_zero_callbacks', async () => {
+test('WHAT[time-capability-005] TEMPORAL_virtual_clock_cancel_and_dispose_yield_zero_callbacks', async () => {
   const timer = process.createVirtualTimer()
   let fired = 0
   const first = process.timerDelay(timer, 10)

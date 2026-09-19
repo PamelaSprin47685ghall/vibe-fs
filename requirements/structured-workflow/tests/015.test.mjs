@@ -159,7 +159,7 @@ const legalFixture = () => {
 
 const codes = (fixture) => validateGeneratedModuleRelationV1(fixture).map(({ code }) => code)
 
-test('WHAT[STRUCTURED-WORKFLOW-015] generated artifact binds tracked inputs bytes lineage traversal and import', () => {
+test('WHAT[structured-workflow-015] generated artifact binds tracked inputs bytes lineage traversal and import', () => {
   const legal = legalFixture()
   assert.deepEqual(codes(legal), [])
   assert.equal(

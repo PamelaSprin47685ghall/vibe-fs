@@ -24,7 +24,7 @@ function createMemorySink() {
   }
 
 for (const failingLabel of ['format:check', 'check', 'build']) {
-  test(`WHAT[VERIFICATION-SYSTEM-001] verify halts and marks subsequent steps not-run when ${failingLabel} fails`, async () => {
+  test(`WHAT[verification-system-001] verify halts and marks subsequent steps not-run when ${failingLabel} fails`, async () => {
     const tmpLogDir = mkdtempSync(join(tmpdir(), 'proof-ladder-fail-'))
     const sink = createMemorySink()
   const spawned = []
@@ -60,7 +60,7 @@ for (const failingLabel of ['format:check', 'check', 'build']) {
 })
   }
 
-test('WHAT[VERIFICATION-SYSTEM-001] format-build-test ladder pins the stage order', async () => {
+test('WHAT[verification-system-001] format-build-test ladder pins the stage order', async () => {
   const { scripts } = JSON.parse(read('package.json'))
   const command = scripts['format-build-test']
   assert.equal(typeof command, 'string', 'package.json scripts.format-build-test must exist')
@@ -115,7 +115,7 @@ test('WHAT[VERIFICATION-SYSTEM-001] format-build-test ladder pins the stage orde
   }
 })
 
-test('WHAT[VERIFICATION-SYSTEM-001] verify step env strips TESTS_MJS_FILES and propagates verbose flag', () => {
+test('WHAT[verification-system-001] verify step env strips TESTS_MJS_FILES and propagates verbose flag', () => {
   const hostEnvWithOverride = {
     ...process.env,
     TESTS_MJS_FILES: 'requirements/verification-system/tests/fake.test.mjs',
@@ -161,7 +161,7 @@ test('WHAT[VERIFICATION-SYSTEM-001] verify step env strips TESTS_MJS_FILES and p
   assert.equal('TESTS_MJS_FILES' in pkg.env, false, 'package step env must not contain TESTS_MJS_FILES')
 })
 
-test('WHAT[VERIFICATION-SYSTEM-001] verify --profile emits stage timings and returns profile array', async () => {
+test('WHAT[verification-system-001] verify --profile emits stage timings and returns profile array', async () => {
   const tmpLogDir = mkdtempSync(join(tmpdir(), 'proof-ladder-profile-'))
   const sink = createMemorySink()
   const fakeRunStep = async ({ label }) => ({

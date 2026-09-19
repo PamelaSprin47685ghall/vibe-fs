@@ -16,7 +16,7 @@ const promptOptions = (overrides = {}) => ({
   ...overrides,
 })
 
-test('WHAT[EMR-009] EMR_009_sdk_prompt_projects_model_without_nested_variant_and_reasoning_as_top_level_variant', async () => {
+test('WHAT[execution-model-routing-009] EMR_009_sdk_prompt_projects_model_without_nested_variant_and_reasoning_as_top_level_variant', async () => {
   let payload
   const client = {
     session: {
@@ -48,7 +48,7 @@ const { default: plugin } = await import("../../../dist/OpenCode/Plugin/Plugin.j
 const { createEnvironment, managedConfig } = await import("./support/process-shared-routing.mjs");
 
 
-test('WHAT[EMR-009] EMR_009_chat_message_routes_when_session_id_is_carried_on_output_message', async () => {
+test('WHAT[execution-model-routing-009] EMR_009_chat_message_routes_when_session_id_is_carried_on_output_message', async () => {
   const environment = createEnvironment(plugin.server)
   const previousHome = process.env.HOME
   process.env.HOME = environment.home
@@ -90,7 +90,7 @@ const { default: test } = await import("node:test");
 
 const source = async (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 
-test('WHAT[EMR-009] EMR_009_chat_message_is_the_single_managed_execution_admission_owner', async () => {
+test('WHAT[execution-model-routing-009] EMR_009_chat_message_is_the_single_managed_execution_admission_owner', async () => {
   const host = await source('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
   const admission = await source('src/Wanxiangshu/OpenCode/Host/ChatAdmission/Transaction.fs')
   const routing = await source('src/Wanxiangshu/OpenCode/Host/ModelRouting.fs')

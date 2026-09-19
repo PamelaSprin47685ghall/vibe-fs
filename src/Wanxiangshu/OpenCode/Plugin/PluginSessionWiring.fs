@@ -44,7 +44,7 @@ module PluginSessionWiring =
 
         /// The retry decorator's real plug for dedicated delegate children: the
         /// provider-owned engine decides, admits and re-dispatches; the delegate
-        /// observes only continue-vs-terminal (DELEG-023).
+        /// observes only continue-vs-terminal (delegation-023).
         let delegateRetryPort (durable: AgentJournal) : SyncDelegateRetryPort =
             { Retry =
                 fun turn failure error ->
@@ -80,7 +80,7 @@ module PluginSessionWiring =
 
         match journal with
         | Some durable ->
-            // DURABLE-EVENTS-020: history-derived process bindings are semantic
+            // durable-events-020: history-derived process bindings are semantic
             // state, so seeding them belongs to the first durable admission, not
             // plugin construction. This callback also forces the deferred
             // WorkspaceEventStore Current exactly at that activation boundary.

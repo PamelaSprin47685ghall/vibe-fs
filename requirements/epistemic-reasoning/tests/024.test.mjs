@@ -4,7 +4,7 @@ import { gecSurface } from '../../../dist/Sphinx/GecSurface.js'
 
 const strict2 = (order) => order.map((label) => [label])
 
-test('WHAT[EPI-024] candidate-label-equivariance-permuted-labels-permute-scores-identically', async () => {
+test('WHAT[epistemic-reasoning-024] candidate-label-equivariance-permuted-labels-permute-scores-identically', async () => {
   const ballots = [strict2(['a', 'b', 'c']), strict2(['a', 'b', 'c'])]
   const original = await gecSurface.borda({ candidates: ['a', 'b', 'c'], ballots })
   assert.equal(original.ok, true)
@@ -21,7 +21,7 @@ test('WHAT[EPI-024] candidate-label-equivariance-permuted-labels-permute-scores-
   assert.ok(Math.abs(permuted.scores.a - original.scores.c) < 1e-12)
 })
 
-test('WHAT[EPI-024] fractional-tie-extension-shares-average-borda-points', async () => {
+test('WHAT[epistemic-reasoning-024] fractional-tie-extension-shares-average-borda-points', async () => {
   const result = await gecSurface.borda({
     candidates: ['a', 'b', 'c'],
     ballots: [[['a', 'b'], ['c']]],
@@ -33,7 +33,7 @@ test('WHAT[EPI-024] fractional-tie-extension-shares-average-borda-points', async
   assert.ok(String(result.extension).includes('fractional'))
 })
 
-test('WHAT[EPI-024] appearance-normalized-extension-divides-by-ballot-appearance-not-raw-sum', async () => {
+test('WHAT[epistemic-reasoning-024] appearance-normalized-extension-divides-by-ballot-appearance-not-raw-sum', async () => {
   const result = await gecSurface.borda({
     candidates: ['a', 'b', 'c'],
     ballots: [
@@ -52,7 +52,7 @@ test('WHAT[EPI-024] appearance-normalized-extension-divides-by-ballot-appearance
   assert.ok(result.meanScores.b > result.meanScores.a)
 })
 
-test('WHAT[EPI-024] borda-guarantees-claim-only-ballot-order-invariance-and-label-equivariance', async () => {
+test('WHAT[epistemic-reasoning-024] borda-guarantees-claim-only-ballot-order-invariance-and-label-equivariance', async () => {
   const input = {
     candidates: ['a', 'b', 'c'],
     ballots: [strict2(['a', 'b', 'c']), strict2(['c', 'a', 'b'])],
@@ -70,7 +70,7 @@ test('WHAT[EPI-024] borda-guarantees-claim-only-ballot-order-invariance-and-labe
   assert.ok(Math.abs(reversed.scores.c - first.scores.c) < 1e-12)
 })
 
-test('WHAT[EPI-024] zero-sum-gauge-fixes-location-with-strengths-summing-to-zero', async () => {
+test('WHAT[epistemic-reasoning-024] zero-sum-gauge-fixes-location-with-strengths-summing-to-zero', async () => {
   const result = await gecSurface.bradleyTerry({
     candidates: ['a', 'b', 'c'],
     comparisons: [
@@ -90,7 +90,7 @@ test('WHAT[EPI-024] zero-sum-gauge-fixes-location-with-strengths-summing-to-zero
   assert.ok(result.strengths.b > result.strengths.c)
 })
 
-test('WHAT[EPI-024] disconnected-comparison-graph-returns-typed-unidentifiable-error', async () => {
+test('WHAT[epistemic-reasoning-024] disconnected-comparison-graph-returns-typed-unidentifiable-error', async () => {
   const result = await gecSurface.bradleyTerry({
     candidates: ['a', 'b', 'c', 'd'],
     comparisons: [
@@ -105,7 +105,7 @@ test('WHAT[EPI-024] disconnected-comparison-graph-returns-typed-unidentifiable-e
   assert.ok(!('strengths' in result) || result.strengths == null)
 })
 
-test('WHAT[EPI-024] separation-with-regularization-stays-finite-and-reports-diagnostics', async () => {
+test('WHAT[epistemic-reasoning-024] separation-with-regularization-stays-finite-and-reports-diagnostics', async () => {
   const result = await gecSurface.bradleyTerry({
     candidates: ['a', 'b'],
     comparisons: [{ a: 'a', b: 'b', winsA: 10, winsB: 0 }],

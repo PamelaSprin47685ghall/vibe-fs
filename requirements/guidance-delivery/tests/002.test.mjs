@@ -77,7 +77,7 @@ const presentationOf = (value) => value?.presentation
 
 const textOf = (value) => value?.text
 
-test('WHAT[GD-002] ENFORCER_TIP_DELIVERY_001_first_resolve_is_full_main_md', async () => {
+test('WHAT[guidance-delivery-002] ENFORCER_TIP_DELIVERY_001_first_resolve_is_full_main_md', async () => {
   await withJournal(async (journal) => {
     await seedOwnerWithTip(journal)
     const guidance = await resolveTipGuidance(journal, main)
@@ -93,7 +93,7 @@ test('WHAT[GD-002] ENFORCER_TIP_DELIVERY_001_first_resolve_is_full_main_md', asy
   })
 })
 
-test('WHAT[GD-002] ENFORCER_PROMPT_017_full_tip_guidance_uses_owner_session_zh_cn_rulebook', async () => {
+test('WHAT[guidance-delivery-002] ENFORCER_PROMPT_017_full_tip_guidance_uses_owner_session_zh_cn_rulebook', async () => {
   language.clearAllForTests()
   try {
     const bound = language.bindOnce(main, 'SimplifiedChinese')

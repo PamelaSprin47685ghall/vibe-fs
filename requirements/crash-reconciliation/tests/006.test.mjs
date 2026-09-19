@@ -15,7 +15,7 @@ const failureOwner = await import("../../../dist/Participant/Provider/Attempt/Fa
 const { JournalSurface_bootWithWriterId: bootWithWriterId, JournalSurface_dispose: dispose } = await import("../../../dist/Persistence/Journal/Surface.js");
 
 
-test('WHAT[CRASH-006] VERIFY_008_provider_failure_admission_ordered_sequence', async () => {
+test('WHAT[crash-reconciliation-006] VERIFY_008_provider_failure_admission_ordered_sequence', async () => {
   // Gap test 5: drive ProviderFailureLedger with 4 admissions in sequence:
   // NoActiveRun -> RetryAuthorized -> duplicate replay -> EpisodeSuperseded -> RetryExhausted
   const directory = mkdtempSync(join(tmpdir(), 'wxs-failure-order-test-'))
@@ -59,7 +59,7 @@ test('WHAT[CRASH-006] VERIFY_008_provider_failure_admission_ordered_sequence', a
     rmSync(directory, { recursive: true, force: true })
   }
 })
-test('WHAT[CRASH-006] VERIFY_008_workflow_main_session_failure_owner_proven_routing', async () => {
+test('WHAT[crash-reconciliation-006] VERIFY_008_workflow_main_session_failure_owner_proven_routing', async () => {
   // Gap test 6: Blogger-kind failure appends to resolved main session; WorkMain failure stays on failed session.
   const directory = mkdtempSync(join(tmpdir(), 'wxs-failure-owner-test-'))
   const created = await bootWithWriterId(directory, 'writer-gap-6', 'rt-gap-6', 1, '2026-01-01T00:00:00Z')
@@ -104,7 +104,7 @@ test('WHAT[CRASH-006] VERIFY_008_workflow_main_session_failure_owner_proven_rout
     rmSync(directory, { recursive: true, force: true })
   }
 })
-test('WHAT[CRASH-006] VERIFY_008_interaction_repair_no_direct_ledger_path_documented', () => {
+test('WHAT[crash-reconciliation-006] VERIFY_008_interaction_repair_no_direct_ledger_path_documented', () => {
   // Gap test 7: InteractionRepair has no direct recordAuthorizedFailure/recordConfirmedSuccess call
   // in its typed API surface; interaction repair emits idle nudges/reconcile decisions only.
   // The production InteractionRepair module exports repairBloggerProtocol, repairMissingFinalReport,
@@ -123,7 +123,7 @@ const S = 'ses-q'
 const accepted = { accepted: true, failure: null }
 const rejected = (failure) => ({ accepted: false, failure })
 
-test('WHAT[CRASH-006] Q01_normal_stable_idle_yields_one_consumable_permit', () => {
+test('WHAT[crash-reconciliation-006] Q01_normal_stable_idle_yields_one_consumable_permit', () => {
   const gate = quiescence.create()
   assertOpaque(gate, 'gate')
   quiescence.beginAttempt(gate, S)
@@ -133,7 +133,7 @@ test('WHAT[CRASH-006] Q01_normal_stable_idle_yields_one_consumable_permit', () =
   assert.deepEqual(quiescence.tryConsume(gate, permit), accepted, 'fresh idle permit must consume once')
   assert.deepEqual(quiescence.tryConsume(gate, permit), rejected('AlreadyConsumed'), 'a consumed permit must never send again')
 })
-test('WHAT[CRASH-006] Q02_new_provider_attempt_invalidates_the_old_permit', () => {
+test('WHAT[crash-reconciliation-006] Q02_new_provider_attempt_invalidates_the_old_permit', () => {
   const gate = quiescence.create()
   quiescence.beginAttempt(gate, S)
   const permit = quiescence.observeIdle(gate, S)
@@ -144,7 +144,7 @@ test('WHAT[CRASH-006] Q02_new_provider_attempt_invalidates_the_old_permit', () =
 
   assert.deepEqual(quiescence.tryConsume(gate, permit), rejected('Superseded'), 'stale permit must be rejected')
 })
-test('WHAT[CRASH-006] Q03_repeated_idle_does_not_repeat_send', () => {
+test('WHAT[crash-reconciliation-006] Q03_repeated_idle_does_not_repeat_send', () => {
   const gate = quiescence.create()
   quiescence.beginAttempt(gate, S)
   const first = quiescence.observeIdle(gate, S)
@@ -153,7 +153,7 @@ test('WHAT[CRASH-006] Q03_repeated_idle_does_not_repeat_send', () => {
   assert.deepEqual(quiescence.tryConsume(gate, first), accepted)
   assert.deepEqual(quiescence.tryConsume(gate, second), rejected('AlreadyConsumed'), 'the same idle occasion admits at most one send')
 })
-test('WHAT[CRASH-006] Q04_new_attempt_own_idle_can_send_again', () => {
+test('WHAT[crash-reconciliation-006] Q04_new_attempt_own_idle_can_send_again', () => {
   const gate = quiescence.create()
   quiescence.beginAttempt(gate, S)
   const aPermit = quiescence.observeIdle(gate, S)
@@ -165,7 +165,7 @@ test('WHAT[CRASH-006] Q04_new_attempt_own_idle_can_send_again', () => {
   const bPermit = quiescence.observeIdle(gate, S)
   assert.deepEqual(quiescence.tryConsume(gate, bPermit), accepted, 'B must be able to send on its own idle')
 })
-test('WHAT[CRASH-006] Q04b_transport_idle_waits_for_all_active_tool_bodies', () => {
+test('WHAT[crash-reconciliation-006] Q04b_transport_idle_waits_for_all_active_tool_bodies', () => {
   const gate = quiescence.create()
   quiescence.beginAttempt(gate, S)
   quiescence.beginTool(gate, S)
@@ -188,7 +188,7 @@ test('WHAT[CRASH-006] Q04b_transport_idle_waits_for_all_active_tool_bodies', () 
     'the same exact idle evidence becomes consumable when the final tool body ends',
   )
 })
-test('WHAT[CRASH-006] Q05_new_physical_user_material_revokes_the_previous_idle_before_transform', () => {
+test('WHAT[crash-reconciliation-006] Q05_new_physical_user_material_revokes_the_previous_idle_before_transform', () => {
   const gate = quiescence.create()
   quiescence.beginAttempt(gate, S)
   const oldPermit = quiescence.observeIdle(gate, S)
@@ -209,7 +209,7 @@ test('WHAT[CRASH-006] Q05_new_physical_user_material_revokes_the_previous_idle_b
   quiescence.observePhysicalMessage(gate, S, 'msg-new')
   assert.deepEqual(quiescence.tryConsume(gate, newPermit), accepted, 'same physical message replay must be a no-op')
 })
-test('WHAT[CRASH-006] Q05b_delayed_older_physical_replay_is_inert_after_newer_material', () => {
+test('WHAT[crash-reconciliation-006] Q05b_delayed_older_physical_replay_is_inert_after_newer_material', () => {
   const gate = quiescence.create()
 
   quiescence.observePhysicalMessage(gate, S, 'msg-a')
@@ -223,7 +223,7 @@ test('WHAT[CRASH-006] Q05b_delayed_older_physical_replay_is_inert_after_newer_ma
   quiescence.observePhysicalMessage(gate, S, 'msg-a')
   assert.deepEqual(quiescence.tryConsume(gate, currentPermit), accepted, 'delayed replay of A must not revoke B\'s live attempt')
 })
-test('WHAT[CRASH-006] Q06_definitive_pre_acceptance_rejection_can_return_the_same_idle_permit', () => {
+test('WHAT[crash-reconciliation-006] Q06_definitive_pre_acceptance_rejection_can_return_the_same_idle_permit', () => {
   const gate = quiescence.create()
   quiescence.beginAttempt(gate, S)
   const permit = quiescence.observeIdle(gate, S)
@@ -239,7 +239,7 @@ test('WHAT[CRASH-006] Q06_definitive_pre_acceptance_rejection_can_return_the_sam
     'a fresher provider attempt prevents an old consumed permit from being resurrected',
   )
 })
-test('WHAT[CRASH-006] Q10_session_deleted_drops_every_permit', () => {
+test('WHAT[crash-reconciliation-006] Q10_session_deleted_drops_every_permit', () => {
   const gate = quiescence.create()
   quiescence.beginAttempt(gate, S)
   const permit = quiescence.observeIdle(gate, S)
@@ -247,7 +247,7 @@ test('WHAT[CRASH-006] Q10_session_deleted_drops_every_permit', () => {
   quiescence.dropSession(gate, S)
   assert.deepEqual(quiescence.tryConsume(gate, permit), rejected('NoFreshIdle'), 'a dropped session never sends on an old permit')
 })
-test('WHAT[CRASH-006] P4_SURFACE_exports_exact_capability_names', () => {
+test('WHAT[crash-reconciliation-006] P4_SURFACE_exports_exact_capability_names', () => {
   assert.deepEqual(Object.getOwnPropertyNames(quiescence).sort(), [
     'beginAttempt',
     'beginTool',
@@ -290,7 +290,7 @@ const withContinueHost = async (label, portOutcome, action) => {
 const continueSessionOf = (suffix) => `ses-continue-${suffix}`
 const continuePhysicalOf = (suffix) => `msg-continue-${suffix}`
 
-test('WHAT[CRASH-006] RECOVERY_FAMILY_constructor_does_not_start_fork_restore', () => {
+test('WHAT[crash-reconciliation-006] RECOVERY_FAMILY_constructor_does_not_start_fork_restore', () => {
   const src = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs'), 'utf8')
   const code = src.split('\n').filter((line) => !/^\s*\/\//.test(line) && !/^\s*\*/.test(line)).join('\n')
   assert.doesNotMatch(code, /do recoveryTask <- restoreChildren/)
@@ -300,12 +300,12 @@ test('WHAT[CRASH-006] RECOVERY_FAMILY_constructor_does_not_start_fork_restore', 
   assert.doesNotMatch(code, /member this\.RestoreLinkedHandles/)
   assert.doesNotMatch(code, /do!\s*this\.AwaitRecovery/)
 })
-test('WHAT[CRASH-006] RECOVERY_FAMILY_authorize_ready_issues_private_permit', () => {
+test('WHAT[crash-reconciliation-006] RECOVERY_FAMILY_authorize_ready_issues_private_permit', () => {
   const result = recovery.authorize('parent', 7, [])
   assert.equal(result.state, 'FamilyReady')
   assert.equal(result.root, 'parent')
 })
-test('WHAT[CRASH-006] RECOVERY_FAMILY_ready_before_business_is_type_enforced', () => {
+test('WHAT[crash-reconciliation-006] RECOVERY_FAMILY_ready_before_business_is_type_enforced', () => {
   assert.equal(recovery.authorize('p', 7, []).state, 'FamilyReady')
 })
 }
@@ -327,7 +327,7 @@ const requested = (entries) => ({
   entries,
 })
 
-test('WHAT[CHGINT-006] PERSIST_009_worktree_requested_created_reentry_is_finite_and_fail_closed', () => {
+test('WHAT[change-integration-006] PERSIST_009_worktree_requested_created_reentry_is_finite_and_fail_closed', () => {
   // Fresh entry records intent before the ordinary fork CE creates anything.
   assert.deepEqual(decide({ kind: 'NoDurableEffect' }), { kind: 'RequestThenCreate' })
 

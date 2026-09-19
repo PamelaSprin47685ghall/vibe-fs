@@ -6,7 +6,7 @@ import test from 'node:test'
 const ROOT = new URL('../../..', import.meta.url).pathname
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
-test('WHAT[ABL-012] ablation tool map syncs with active roles and excludes deprecated browser/distiller tools', () => {
+test('WHAT[feature-ablation-012] ablation tool map syncs with active roles and excludes deprecated browser/distiller tools', () => {
   const toolMap = JSON.parse(read('resources/ablation/tool-map.json'))
   const tools = toolMap.tools || {}
 

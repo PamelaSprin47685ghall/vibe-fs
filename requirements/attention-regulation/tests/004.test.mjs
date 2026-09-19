@@ -24,7 +24,7 @@ const recordingPort = () => {
   return fixture
 }
 
-test('WHAT[ATTENTION-REGULATION-004] deferred work is occurrence-idempotent and participant-life isolated', async () => {
+test('WHAT[attention-regulation-004] deferred work is occurrence-idempotent and participant-life isolated', async () => {
   const fixture = recordingPort()
   await tools.execute(fixture.tools, 'defer', { new_work: 'one' }, context())
   await tools.execute(fixture.tools, 'defer', { new_work: 'do not replace one' }, context())

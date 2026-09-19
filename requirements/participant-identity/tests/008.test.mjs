@@ -47,7 +47,7 @@ const inheritedSeed = (child, owner) => {
   return result.value
 }
 
-test('WHAT[PID-008] inherited identity records the exact durable owner witness', () => {
+test('WHAT[participant-identity-008] inherited identity records the exact durable owner witness', () => {
   const owner = rootProfile()
   const seed = inheritedSeed('engineer', owner)
 
@@ -82,7 +82,7 @@ test('WHAT[PID-008] inherited identity records the exact durable owner witness',
     },
   )
 })
-test('WHAT[PID-008] rejects stale owner identity evidence', () => {
+test('WHAT[participant-identity-008] rejects stale owner identity evidence', () => {
   const seed = inheritedSeed('devops', rootProfile())
   const currentOwnerRun = rootProfile('ses_owner', 'msg_fresh_owner_root')
 
@@ -95,7 +95,7 @@ test('WHAT[PID-008] rejects stale owner identity evidence', () => {
     actual: seed.ownerLogicalRun,
   })
 })
-test('WHAT[PID-008] closed owner run rejects its inherited identity evidence', () => {
+test('WHAT[participant-identity-008] closed owner run rejects its inherited identity evidence', () => {
   const owner = rootProfile()
   const seed = inheritedSeed('inspector', owner)
 
@@ -108,7 +108,7 @@ test('WHAT[PID-008] closed owner run rejects its inherited identity evidence', (
     actual: '',
   })
 })
-test('WHAT[PID-008] derived identity rejects root-selection evidence', () => {
+test('WHAT[participant-identity-008] derived identity rejects root-selection evidence', () => {
   const owner = rootProfile()
 
   const validation = authority.validateInheritedIdentitySeed(owner, owner.identitySeed)
@@ -120,7 +120,7 @@ test('WHAT[PID-008] derived identity rejects root-selection evidence', () => {
     actual: 'RootSelection',
   })
 })
-test('WHAT[PID-008] inherited identity rejects a different owner session', () => {
+test('WHAT[participant-identity-008] inherited identity rejects a different owner session', () => {
   const owner = rootProfile()
   const seed = inheritedSeed('inspector', owner)
   const wrongOwner = { ...owner, session: 'ses_different_owner' }
@@ -134,7 +134,7 @@ test('WHAT[PID-008] inherited identity rejects a different owner session', () =>
     actual: owner.session,
   })
 })
-test('WHAT[PID-008] inherited identity rejects a different authority root', () => {
+test('WHAT[participant-identity-008] inherited identity rejects a different authority root', () => {
   const owner = rootProfile()
   const seed = inheritedSeed('inspector', owner)
   const wrongRoot = { ...owner, authorityRoot: 'msg_different_root' }
@@ -148,7 +148,7 @@ test('WHAT[PID-008] inherited identity rejects a different authority root', () =
     actual: owner.authorityRoot,
   })
 })
-test('WHAT[PID-008] durable inherited seed round-trips without re-resolution', () => {
+test('WHAT[participant-identity-008] durable inherited seed round-trips without re-resolution', () => {
   const owner = rootProfile()
   const seed = inheritedSeed('inspector', owner)
   const claimed = authority.claimAgentOwnerRoot('pk_child', 'ses_child', 'digest-child', seed)
@@ -171,7 +171,7 @@ test('WHAT[PID-008] durable inherited seed round-trips without re-resolution', (
     error: null,
   })
 })
-test('WHAT[PID-008] raw legacy PeerAgent fields are ignored and never re-encoded', () => {
+test('WHAT[participant-identity-008] raw legacy PeerAgent fields are ignored and never re-encoded', () => {
   const canonical = canonicalIdentityOf('engineer')
   const legacySeed = {
     kind: 'RootSelection',
@@ -316,7 +316,7 @@ const inheritedProfile = () => {
   return createRoot('AgentOwnerRoot', issued.value, 'ses-recovery-child', 'msg-recovery-child')
 }
 
-test('WHAT[PID-008] current v2 durable identity recovers exact participant and owner provenance', () => {
+test('WHAT[participant-identity-008] current v2 durable identity recovers exact participant and owner provenance', () => {
   const profile = inheritedProfile()
   const payload = journalRoundTripPayload(authorityFact(profile))
   assert.deepEqual(payload, {
@@ -337,7 +337,7 @@ test('WHAT[PID-008] current v2 durable identity recovers exact participant and o
     error: '',
   })
 })
-test('WHAT[PID-008] supported legacy HumanRoot deterministically recovers its upgraded identity', () => {
+test('WHAT[participant-identity-008] supported legacy HumanRoot deterministically recovers its upgraded identity', () => {
   const profile = createRoot()
   const legacy = legacyHumanRootLine(profile)
   assert.match(legacy, /PeerAgent/)
@@ -365,7 +365,7 @@ test('WHAT[PID-008] supported legacy HumanRoot deterministically recovers its up
     error: '',
   })
 })
-test('WHAT[PID-008] missing active authority rejects even when LastAuthorityProfile is present', () => {
+test('WHAT[participant-identity-008] missing active authority rejects even when LastAuthorityProfile is present', () => {
   const projection = register(createRoot())
   const historicalOnly = { ...projection, activeLogicalRun: null }
 
@@ -375,7 +375,7 @@ test('WHAT[PID-008] missing active authority rejects even when LastAuthorityProf
     error: 'MissingActiveAuthority',
   })
 })
-test('WHAT[PID-008] rejects corrupt identity provenance', () => {
+test('WHAT[participant-identity-008] rejects corrupt identity provenance', () => {
   const rootProjection = register(createRoot())
   const inheritedProjection = register(inheritedProfile())
   const corruptions = [
@@ -396,7 +396,7 @@ test('WHAT[PID-008] rejects corrupt identity provenance', () => {
     assert.notEqual(recovered.error, '')
   }
 })
-test('WHAT[PID-008] closed exact run cannot be recovered as current', () => {
+test('WHAT[participant-identity-008] closed exact run cannot be recovered as current', () => {
   const profile = createRoot()
   const closed = authority.closeAuthority(
     profile.logicalRun,
@@ -483,7 +483,7 @@ const assertNoLegacyIdentityFields = (value, label) => {
   }
 }
 
-test('WHAT[PID-008] child identity inherits the parent Persona and version across roles', () => {
+test('WHAT[participant-identity-008] child identity inherits the parent Persona and version across roles', () => {
   const parent = rootProfile('engineer', 'ses_identity_parent')
   const child = inheritedSeed('manager', parent)
 
@@ -543,7 +543,7 @@ const assertError = (result, error) => {
   assert.equal(result.error, error)
 }
 
-test('WHAT[PID-008] inherited identity requires the exact current owner Persona and version', () => {
+test('WHAT[participant-identity-008] inherited identity requires the exact current owner Persona and version', () => {
   const inherited = identity.inheritParticipantIdentityFromOwner('engineer', 'manager')
   assertJsData(inherited, 'inherited identity')
   assert.equal(inherited.ok, true)
@@ -645,7 +645,7 @@ after(async () => {
   await rm(home, { recursive: true, force: true })
 })
 
-test('WHAT[PID-008] root_requires_external_participant_proof_then_model_is_scheduler_owned', async () => {
+test('WHAT[participant-identity-008] root_requires_external_participant_proof_then_model_is_scheduler_owned', async () => {
   const root = 'ses_binding_root'
   const model = modelFor('engineer')
 
@@ -681,7 +681,7 @@ test('WHAT[PID-008] root_requires_external_participant_proof_then_model_is_sched
 
   binding.drop(root)
 })
-test('WHAT[PID-008] parented_session_uses_stable_participant_lease_and_authorized_peer_only', async () => {
+test('WHAT[participant-identity-008] parented_session_uses_stable_participant_lease_and_authorized_peer_only', async () => {
   const parent = 'ses_parent'
   const child = 'ses_child'
   const created = binding.bindChild(parent, child, 'blogger')
@@ -700,7 +700,7 @@ test('WHAT[PID-008] parented_session_uses_stable_participant_lease_and_authorize
 
   binding.drop(child)
 })
-test('WHAT[PID-008] provider_reasoning_variant_must_match_the_exact_lease', async () => {
+test('WHAT[participant-identity-008] provider_reasoning_variant_must_match_the_exact_lease', async () => {
   const parent = 'ses_variant_parent'
   const child = 'ses_variant_exact'
   assert.equal(binding.bindChild(parent, child, 'devops').ok, true)

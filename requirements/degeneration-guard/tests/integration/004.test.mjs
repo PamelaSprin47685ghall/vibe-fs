@@ -47,7 +47,7 @@ const referenceEnvelope = (tokens, lambda, initialValue) => {
   }
 }
 
-test('WHAT[DG-004] LOOP_004_runtime_envelope_is_freshly_derived_from_the_current_repository_without_numeric_snapshots', async () => {
+test('WHAT[degeneration-guard-004] LOOP_004_runtime_envelope_is_freshly_derived_from_the_current_repository_without_numeric_snapshots', async () => {
   let generatedBytes = null
   const derived = await writeLoopDetectorEnvelopeArtifact(undefined, {
     writeArtifact: (_target, bytes) => { generatedBytes = bytes },

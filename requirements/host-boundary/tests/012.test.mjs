@@ -13,7 +13,7 @@ const assistantToolMessage = ({ messageID = 'asst_run', partID = 'part_todo', ca
   parts: [{ type: 'tool', id: partID, callID, tool: 'auto-injected', state: { status } }],
 })
 
-test('WHAT[HOST-BOUNDARY-012] TODO-004 resolves a tool callback through its persisted assistant run and Host ToolPart', () => {
+test('WHAT[host-boundary-012] TODO-004 resolves a tool callback through its persisted assistant run and Host ToolPart', () => {
   const messages = projectMessages([assistantToolMessage({ status: 'completed' })])
   const located = locateToolCall('call_todo', messages)
   assert.equal(located.ok, true)

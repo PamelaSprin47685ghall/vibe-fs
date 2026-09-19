@@ -34,7 +34,7 @@ const withJournal = async (body, runtime = 'rt_magic_todo_after') => {
   }
 }
 
-test('WHAT[OBLIGATION-LEDGER-026] after hook accepts checkpoint durably and enriches T1 revelation', async () => {
+test('WHAT[obligation-ledger-026] after hook accepts checkpoint durably and enriches T1 revelation', async () => {
   await withJournal(async (handle) => {
     const sessionId = 'ses-after-test'
     const incumbencyId = 'life-after-test'
@@ -78,7 +78,7 @@ const { applyToolDefinitionHook, createMagicTodoContractHooks, decodeV1TodoWrite
 const SESSION = 'ses_magic_todo_canary'
 const CALL = 'call_magic_todo_1'
 
-test('WHAT[OBLIGATION-LEDGER-026] after does not run when executor throws', async () => {
+test('WHAT[obligation-ledger-026] after does not run when executor throws', async () => {
   const hooks = createMagicTodoContractHooks()
   let afterCalls = 0
   const after = async () => {
@@ -104,7 +104,7 @@ test('WHAT[OBLIGATION-LEDGER-026] after does not run when executor throws', asyn
   assert.equal(observation.afterRan, false, 'F: FREEZE — after does not run when executor throws')
   assert.equal(afterCalls, 0, 'F: after hook body never invoked on throw')
 })
-test('WHAT[OBLIGATION-LEDGER-026] after runs when executor succeeds', async () => {
+test('WHAT[obligation-ledger-026] after runs when executor succeeds', async () => {
   // Control: same path with success must invoke after (proves the freeze is path-sensitive).
   const hooks = createMagicTodoContractHooks()
   let afterCalls = 0
@@ -212,7 +212,7 @@ const acceptT1Checkpoint = async (handle, session, callText) => {
   return { t1, accepted }
 }
 
-test('WHAT[OBLIGATION-LEDGER-026] accepted planComplete=false carries no T1 entrustment revelation (revelation is reserved for the first accepted true)', async () => {
+test('WHAT[obligation-ledger-026] accepted planComplete=false carries no T1 entrustment revelation (revelation is reserved for the first accepted true)', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-magic-todo-planning-false'
     const life = 'life-magic-todo-planning-false'
@@ -221,7 +221,7 @@ test('WHAT[OBLIGATION-LEDGER-026] accepted planComplete=false carries no T1 entr
     assert.doesNotMatch(accepted.value.enrichedResult, /Manager who will carry it is you|The road is yours/i)
   })
 })
-test('WHAT[OBLIGATION-LEDGER-026] first accepted planComplete=true reveals entrustment in the enriched result', async () => {
+test('WHAT[obligation-ledger-026] first accepted planComplete=true reveals entrustment in the enriched result', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-magic-todo-t1-t2-lag1'
     const life = 'life-magic-todo-t1-t2-lag1'
@@ -230,7 +230,7 @@ test('WHAT[OBLIGATION-LEDGER-026] first accepted planComplete=true reveals entru
     assert.match(accepted.value.enrichedResult, /Manager who will carry it is you|The road is yours/i)
   })
 })
-test('WHAT[OBLIGATION-LEDGER-026] enriched result for normal checkpoints contains epilogue instructions', async () => {
+test('WHAT[obligation-ledger-026] enriched result for normal checkpoints contains epilogue instructions', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-magic-todo-t1-t2-resolve'
     const life = 'life-magic-todo-t1-t2-resolve'
@@ -247,7 +247,7 @@ test('WHAT[OBLIGATION-LEDGER-026] enriched result for normal checkpoints contain
     assert.doesNotMatch(t2Accepted.value.enrichedResult, /Manager who will carry it is you|The road is yours/i, 'T1 entrustment revelation happens exactly once')
   })
 })
-test('WHAT[OBLIGATION-LEDGER-026] prepare without open life is a structured rejection, never a provider red path', async () => {
+test('WHAT[obligation-ledger-026] prepare without open life is a structured rejection, never a provider red path', async () => {
   await withJournal(async (handle) => {
     // prepare without openLife → NoOpenManagerLife (infrastructure-level, not provider red)
     const obligations = [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }]
@@ -259,7 +259,7 @@ test('WHAT[OBLIGATION-LEDGER-026] prepare without open life is a structured reje
     assert.ok(result.error.code === 'NoActiveIncumbency' || result.error.code === 'NoOpenManagerLife')
   })
 })
-test('WHAT[OBLIGATION-LEDGER-026] host before/after hook rejects without active incumbency as typed tool rejection, not infrastructure fatal', async () => {
+test('WHAT[obligation-ledger-026] host before/after hook rejects without active incumbency as typed tool rejection, not infrastructure fatal', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-fresh-manager-todowrite'
     const call = 'call-fresh-manager-todowrite'

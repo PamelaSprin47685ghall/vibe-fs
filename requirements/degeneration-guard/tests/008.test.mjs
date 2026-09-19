@@ -59,7 +59,7 @@ const rawDeltaWithoutMessage = (session, field, text) => ({
   },
 })
 
-test('WHAT[DG-008] LOOP_001_armed_anomaly_is_process_local', async () => {
+test('WHAT[degeneration-guard-008] LOOP_001_armed_anomaly_is_process_local', async () => {
   const first = createSensor({ owned: ['ses_a'], abort: () => {}, continue: () => {} })
   const second = createSensor({ owned: ['ses_a'], abort: () => {}, continue: () => {} })
 
@@ -73,7 +73,7 @@ test('WHAT[DG-008] LOOP_001_armed_anomaly_is_process_local', async () => {
   assert.deepEqual(loopSensor.consumeAbortCause(second, 'ses_a', 'msg_a'), { cause: 'External' })
 })
 
-test('WHAT[DG-008] LOOP_013_wrong_run_never_consumes_or_clears_newer_anomaly', async () => {
+test('WHAT[degeneration-guard-008] LOOP_013_wrong_run_never_consumes_or_clears_newer_anomaly', async () => {
   const aborts = []
   const continuations = []
   const sensor = createSensor({
@@ -105,7 +105,7 @@ test('WHAT[DG-008] LOOP_013_wrong_run_never_consumes_or_clears_newer_anomaly', a
   assert.deepEqual(continuations, [['ses_scoped', 'TooRepetitive']])
 })
 
-test('WHAT[DG-008] LOOP_016_delta_without_message_id_is_observed_only', async () => {
+test('WHAT[degeneration-guard-008] LOOP_016_delta_without_message_id_is_observed_only', async () => {
   const aborts = []
   const sensor = createSensor({
     owned: ['ses_norun'],

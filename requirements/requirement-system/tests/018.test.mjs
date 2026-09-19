@@ -7,7 +7,7 @@ import {
   unknownClauseReferences,
 } from '../../../scripts/lib/spec-rules.mjs'
 
-test('WHAT[REQUIREMENT-SYSTEM-018] RS_018_executable_proof_bidirectional_traceability_rules', () => {
+test('WHAT[requirement-system-018] RS_018_executable_proof_bidirectional_traceability_rules', () => {
   // 1. 验证证明有效性校验函数：条款定义抽取与格式约束
   const sampleMarkdown = `
 # Sample Package

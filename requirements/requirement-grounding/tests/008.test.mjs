@@ -25,7 +25,7 @@ const toolBatch = (providerID, path) => [
   { info: { id: 'r1', role: 'assistant', providerID }, parts: [{ type: 'tool', tool: 'read', callID: 'source', state: { status: 'completed', input: { filePath: path }, output: 'before\n', time: { start: 0, end: 0 } } }] },
 ]
 
-test('WHAT[REQUIREMENT-GROUNDING-008] mutation grounding is weak observation and never becomes tool admission', async () => {
+test('WHAT[requirement-grounding-008] mutation grounding is weak observation and never becomes tool admission', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const sourcePath = join(dir, 'src', 'main.fs')

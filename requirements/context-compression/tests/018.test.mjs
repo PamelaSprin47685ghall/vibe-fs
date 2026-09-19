@@ -21,7 +21,7 @@ const reqCtx = (reqId, toml = 'test') => runtime.main({
   observedEpoch: 0,
 })
 
-test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_sealed_stays_sealed_cancel_wakes_waiter_and_release_clears_flight', async () => {
+test('WHAT[context-compression-018] BLOGGER_RUNTIME_sealed_stays_sealed_cancel_wakes_waiter_and_release_clears_flight', async () => {
   const scope = runtime.scope()
   const ctxA = reqCtx('req-1', 'initial')
 
@@ -39,7 +39,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_sealed_stays_sealed_cancel_w
   assert.equal(runtime.releaseCurrentRequest(scope, KEY, 'req-1'), 'Released')
   assert.equal(runtime.currentRequest(scope, KEY), null)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_material_mailbox_waiter_first_delivers_directly', async () => {
+test('WHAT[context-compression-018] BLOGGER_RUNTIME_material_mailbox_waiter_first_delivers_directly', async () => {
   const scope = runtime.scope()
   const ctx = reqCtx('req-waiter-first', 'waiter-content')
 
@@ -49,7 +49,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_material_mailbox_waiter_firs
   assert.equal(wake.kind, 'MaterialAvailable')
   assert.equal(wake.context.toml, 'waiter-content')
 })
-test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_material_mailbox_material_first_stages_for_next_park', async () => {
+test('WHAT[context-compression-018] BLOGGER_RUNTIME_material_mailbox_material_first_stages_for_next_park', async () => {
   const scope = runtime.scope()
   const ctx = reqCtx('req-mat-first', 'staged-content')
 
@@ -58,7 +58,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_material_mailbox_material_fi
   assert.equal(wake.kind, 'MaterialAvailable')
   assert.equal(wake.context.toml, 'staged-content')
 })
-test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_material_mailbox_newest_covers_supersedes_older_offer', async () => {
+test('WHAT[context-compression-018] BLOGGER_RUNTIME_material_mailbox_newest_covers_supersedes_older_offer', async () => {
   const scope = runtime.scope()
   const ctx1 = reqCtx('req-1', 'older-material')
   const ctx2 = reqCtx('req-2', 'newest-material')
@@ -71,7 +71,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_material_mailbox_newest_cove
   assert.equal(wake.kind, 'MaterialAvailable')
   assert.equal(wake.context.toml, 'newest-material')
 })
-test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_flight_lease_dispose_clears_exact_flight', () => {
+test('WHAT[context-compression-018] BLOGGER_RUNTIME_flight_lease_dispose_clears_exact_flight', () => {
   const scope = runtime.scope()
   const ctx1 = reqCtx('req-lease-1', 'content-lease')
 
@@ -115,7 +115,7 @@ const filesContaining = (pattern) =>
   })
 const rel = (abs) => abs.slice(ROOT.length)
 
-test('WHAT[CONTEXT-COMPRESSION-018] C0_blogger_lifecycle_authority_is_physical_ownership', () => {
+test('WHAT[context-compression-018] C0_blogger_lifecycle_authority_is_physical_ownership', () => {
   // Blogger/Runtime/State.fs is deleted: the pure router decideMaterial and the
   // DrainWindow/openDrain/blocksNewRequest helpers have zero production consumers.
   // The lifecycle authority is physical flight ownership held by the coordinator
@@ -173,7 +173,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] C0_blogger_lifecycle_authority_is_physical_o
     'dead router State.fsi must stay deleted',
   )
 })
-test('WHAT[CONTEXT-COMPRESSION-018] C0_exact_flight_lease_is_the_only_busy_definition', () => {
+test('WHAT[context-compression-018] C0_exact_flight_lease_is_the_only_busy_definition', () => {
   // Companion send Task must not decide busy. Production busy is exact shared flight ownership only.
   // PR7 D6: BloggerRuntimeState/Cell deleted — zero residual shadow ownership.
   const companion = prodText('src/Wanxiangshu/Context/Companion/Runtime.fs')
@@ -196,7 +196,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] C0_exact_flight_lease_is_the_only_busy_defin
   const scope = prodText('src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs')
   assert.doesNotMatch(scope, /GetBloggerRuntime|SetBloggerRuntime/, 'scope must not expose cell Get/Set')
 })
-test('WHAT[CONTEXT-COMPRESSION-018] C0_material_mailbox_and_flight_lease_are_separate_resources', () => {
+test('WHAT[context-compression-018] C0_material_mailbox_and_flight_lease_are_separate_resources', () => {
   // Separate physical resources: pending material mailbox + exact flight registry.
   // Forbidden: a second `currentRequest` dict or InFlight shadow fallback.
   // Blogger mailbox and flight ownership live in PluginBloggerScope.
@@ -221,7 +221,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] C0_material_mailbox_and_flight_lease_are_sep
     'TryPeekCurrentRequest / TryGetFlight must read SharedState.BloggerFlights only',
   )
 })
-test('WHAT[CONTEXT-COMPRESSION-018] C0_commit_uses_live_InFlight_only_not_open_heal', () => {
+test('WHAT[context-compression-018] C0_commit_uses_live_InFlight_only_not_open_heal', () => {
   // Host transform msgs end on the historical last assistant (new outbound shell
   // is not in the list). Commit must peek InFlight only — healing open here
   // rebinds a new RequestId onto an old provider run (stale-cycle race).
@@ -244,7 +244,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] C0_commit_uses_live_InFlight_only_not_open_h
     'resolveCycleContext must not heal InFlight via SetCurrentRequest',
   )
 })
-test('WHAT[CONTEXT-COMPRESSION-018] C0_single_main_material_coordinator_entry', () => {
+test('WHAT[context-compression-018] C0_single_main_material_coordinator_entry', () => {
   const hasCoordinator = filesContaining(/BloggerCoordinator\.onMainContext\b/).map(rel)
   assert.deepEqual(
     hasCoordinator,
@@ -269,7 +269,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] C0_single_main_material_coordinator_entry', 
     `parallel offerToBlogger sites remain: ${offerSites.join(', ')}`,
   )
 })
-test('WHAT[CONTEXT-COMPRESSION-018] C0_no_BloggerNeedsReset_full_X_replay', () => {
+test('WHAT[context-compression-018] C0_no_BloggerNeedsReset_full_X_replay', () => {
   const hits = filesContaining(/BloggerNeedsReset/).map(rel)
   assert.equal(
     hits.length,
@@ -277,7 +277,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] C0_no_BloggerNeedsReset_full_X_replay', () =
     `BloggerNeedsReset still present: ${hits.join(', ')} — restart must reuse durable frames + X gap`,
   )
 })
-test('WHAT[CONTEXT-COMPRESSION-018] C0_first_request_does_not_extract_raw_user_toml', () => {
+test('WHAT[context-compression-018] C0_first_request_does_not_extract_raw_user_toml', () => {
   const host = prodText('src/Wanxiangshu/Enforcer/Continuation.fs')
   const extractsRawToml =
     /Extract the TOML from the raw messages/.test(host) ||
@@ -289,7 +289,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] C0_first_request_does_not_extract_raw_user_t
     'first request still extracts TOML from raw user messages; must project from typed context only',
   )
 })
-test('WHAT[CONTEXT-COMPRESSION-018] C0_squash_path_does_not_SubscribeTerminal', () => {
+test('WHAT[context-compression-018] C0_squash_path_does_not_SubscribeTerminal', () => {
   const blogger = prodText('src/Wanxiangshu/Context/Companion/HostBlogger.fs')
   assert.equal(
     /SubscribeTerminal/.test(blogger),
@@ -297,7 +297,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] C0_squash_path_does_not_SubscribeTerminal', 
     'Squash still waits on SubscribeTerminal; must share blog-tool continuation with Normal',
   )
 })
-test('WHAT[CONTEXT-COMPRESSION-018] C0_squash_constructs_typed_BloggerRequestContext_Squash_in_production', () => {
+test('WHAT[context-compression-018] C0_squash_constructs_typed_BloggerRequestContext_Squash_in_production', () => {
   // Domain type + match arms exist; production must CONSTRUCT Squash context for send/commit.
   // W6 cutover: the constructor is `BloggerRequestMaterial.createSquash` piped
   // into `BloggerRequestContext.Squash` — the squash payload is validated inline,
@@ -316,7 +316,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] C0_squash_constructs_typed_BloggerRequestCon
     'no production construction of BloggerRequestContext.Squash via createSquash — typed squash context is domain-only',
   )
 })
-test('WHAT[CONTEXT-COMPRESSION-018] C0_park_only_after_KnownCommitted', () => {
+test('WHAT[context-compression-018] C0_park_only_after_KnownCommitted', () => {
   const host = prodText('src/Wanxiangshu/Enforcer/Continuation.fs')
   assert.match(host, /ParkTransform/,
     'probe: ParkTransform must exist to assert the KnownCommitted gate')
@@ -369,7 +369,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] C0_park_only_after_KnownCommitted', () => {
   assert.match(host, /return project |return stop |return resumeCatchUp/,
     'not-committed paths must still return ContinuationOutcome')
 })
-test('WHAT[CONTEXT-COMPRESSION-018] C0_commit_refreshes_durable_coverage_before_park', () => {
+test('WHAT[context-compression-018] C0_commit_refreshes_durable_coverage_before_park', () => {
   // One external wake may need many ≤200 KiB cycles. After BlogObservationCommitted the
   // continuation must re-chunk from durable coverage (tryRefresh) and continue
   // without waiting for a new main-session wake. Stale pending material is not enough.
@@ -390,7 +390,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] C0_commit_refreshes_durable_coverage_before_
   )
   assert.doesNotMatch(host, /TryTakePendingOffer/, 'parent code cannot peek and interpret mailbox state')
 })
-test('WHAT[CONTEXT-COMPRESSION-018] C0_caught_up_is_parked_not_completed_and_wake_rechecks_live_Current', () => {
+test('WHAT[context-compression-018] C0_caught_up_is_parked_not_completed_and_wake_rechecks_live_Current', () => {
   const host = prodText('src/Wanxiangshu/Enforcer/Continuation.fs')
   const quiet = host.indexOf('| None, None -> return! finishCaughtUpAfterCommit')
   const parkFn = host.indexOf('let private parkAfterCatchUpClear')
@@ -409,7 +409,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] C0_caught_up_is_parked_not_completed_and_wak
     'caught-up itself must not be treated as completion before the parked wait',
   )
 })
-test('WHAT[CONTEXT-COMPRESSION-018] C0_adopted_blogger_motion_is_not_active_PENDING', () => {
+test('WHAT[context-compression-018] C0_adopted_blogger_motion_is_not_active_PENDING', () => {
   // Adopted motion is git history only; no active PENDING/ parking file.
   assert.equal(
     existsSync(join(ROOT, 'PENDING/blogger-prompt-shape-and-parking.md')),
@@ -432,13 +432,13 @@ const mainRequest = () => ctx.main({ requestId: 'request-main', toml: 'work' })
 const mainRequest2 = () => ctx.main({ requestId: 'request-more', toml: 'more' })
 const KEY = 'ses-blog'
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_idle_plus_material_starts', () => {
+test('WHAT[context-compression-018] ENFORCER_047_idle_plus_material_starts', () => {
   const scope = parkedTransform.scope()
   assert.equal(parkedTransform.claimCurrentRequest(scope, KEY, main()), 'Claimed')
   assert.equal(parkedTransform.tryGetFlight(scope, KEY)?.toml, 'work')
   parkedTransform.dispose(scope)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_inflight_plus_material_skips_without_queue', () => {
+test('WHAT[context-compression-018] ENFORCER_047_inflight_plus_material_skips_without_queue', () => {
   // hasFlight true → Skip; original flight ownership is not replaced by routing.
   const scope = parkedTransform.scope()
   assert.equal(parkedTransform.claimCurrentRequest(scope, KEY, ctx.main({ requestId: 'req-first', toml: 'work' })), 'Claimed')
@@ -446,13 +446,13 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_inflight_plus_material_skips_wi
   assert.equal(parkedTransform.tryGetFlight(scope, KEY)?.toml, 'work')
   parkedTransform.dispose(scope)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_open_producer_between_steps_stages_material', () => {
+test('WHAT[context-compression-018] ENFORCER_047_open_producer_between_steps_stages_material', () => {
   const scope = parkedTransform.scope()
   assert.equal(parkedTransform.offerParked(scope, KEY, main2()), 'Staged')
   assert.equal(parkedTransform.tryGetFlight(scope, KEY), null)
   parkedTransform.dispose(scope)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_cycle_commit_clears_flight', () => {
+test('WHAT[context-compression-018] ENFORCER_047_cycle_commit_clears_flight', () => {
   const scope = parkedTransform.scope()
   const requested = mainRequest()
   parkedTransform.claimCurrentRequest(scope, KEY, requested)
@@ -463,7 +463,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_cycle_commit_clears_flight', ()
   assert.equal(parkedTransform.tryGetFlight(scope, KEY), null)
   assert.equal(parkedTransform.peekCurrentRequest(scope, KEY), null)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_idle_plus_parked_waiter_offers', async () => {
+test('WHAT[context-compression-018] ENFORCER_047_idle_plus_parked_waiter_offers', async () => {
   const scope = parkedTransform.scope()
   const waiter = parkedTransform.park(scope, KEY)
   assert.equal(parkedTransform.offerParked(scope, KEY, main2()), 'Delivered')
@@ -472,7 +472,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_idle_plus_parked_waiter_offers'
   assert.equal(wake.context.toml, 'more')
   parkedTransform.dispose(scope)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_clear_flight_is_idempotent', () => {
+test('WHAT[context-compression-018] ENFORCER_047_clear_flight_is_idempotent', () => {
   // Physical clear: second clear on empty ownership is a no-op (no NotInFlight cell error).
   const scope = parkedTransform.scope()
   const requested = mainRequest()
@@ -482,13 +482,13 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_clear_flight_is_idempotent', ()
   parkedTransform.releaseCurrentRequest(scope, KEY, 'request-main')
   assert.equal(parkedTransform.tryGetFlight(scope, KEY), null)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_clear_without_flight_is_idempotent', () => {
+test('WHAT[context-compression-018] ENFORCER_047_clear_without_flight_is_idempotent', () => {
   const scope = parkedTransform.scope()
   assert.equal(parkedTransform.tryGetFlight(scope, KEY), null)
   parkedTransform.releaseCurrentRequest(scope, KEY, 'request-main')
   assert.equal(parkedTransform.tryGetFlight(scope, KEY), null)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_squash_commit_clears_flight', () => {
+test('WHAT[context-compression-018] ENFORCER_047_squash_commit_clears_flight', () => {
   // Squash commit path uses the same physical clear as cycle commit.
   const scope = parkedTransform.scope()
   const requested = mainRequest()
@@ -498,7 +498,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_squash_commit_clears_flight', (
   assert.equal(parkedTransform.tryGetFlight(scope, KEY), null)
   assert.equal(parkedTransform.peekCurrentRequest(scope, KEY), null)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_session_delete_is_registry_removal_not_a_cell_state', () => {
+test('WHAT[context-compression-018] ENFORCER_047_session_delete_is_registry_removal_not_a_cell_state', () => {
   // DSL-003: owner lifetime is the physical registry — session delete removes
   // flight ownership. There is no Disposed state tag.
   const scope = parkedTransform.scope()
@@ -508,7 +508,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_session_delete_is_registry_remo
   parkedTransform.releaseCurrentRequest(scope, KEY, 'request-main')
   assert.equal(parkedTransform.tryGetFlight(scope, KEY), null)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_two_inflight_contexts_cannot_coexist', () => {
+test('WHAT[context-compression-018] ENFORCER_047_two_inflight_contexts_cannot_coexist', () => {
   // hasFlight already true → Skip; production keeps the registered flight.
   const scope = parkedTransform.scope()
   const claimed = mainRequest()
@@ -520,7 +520,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_two_inflight_contexts_cannot_co
   assert.equal(parkedTransform.tryGetFlight(scope, KEY)?.toml, 'work')
   assert.notEqual(parkedTransform.tryGetFlight(scope, KEY)?.toml, 'more')
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_waiter_offer_does_not_register_flight', () => {
+test('WHAT[context-compression-018] ENFORCER_047_waiter_offer_does_not_register_flight', () => {
   // DSL-003: Offer is routing only — parked host dictionary stages the context
   // (ENFORCER-050); a staged offer must not imply SetCurrentRequest.
   const scope = parkedTransform.scope()
@@ -553,7 +553,7 @@ const ctx = () => bloggerRuntime.main({
   observedEpoch: 0,
 })
 
-test('WHAT[CONTEXT-COMPRESSION-018] HANDLE_lifecycle_CompletedAwaitingJoin_and_Retired_seal_blogger', () => {
+test('WHAT[context-compression-018] HANDLE_lifecycle_CompletedAwaitingJoin_and_Retired_seal_blogger', () => {
   const completed = handle.scenario('complete')
   assert.equal(completed.ok, true)
   assert.equal(completed.record.lifecycle, 'CompletedAwaitingJoin')
@@ -562,12 +562,12 @@ test('WHAT[CONTEXT-COMPRESSION-018] HANDLE_lifecycle_CompletedAwaitingJoin_and_R
   assert.equal(retired.ok, true)
   assert.equal(retired.record.lifecycle, 'Retired')
 })
-test('WHAT[CONTEXT-COMPRESSION-018] HANDLE_lifecycle_Abandoned_seals_blogger', () => {
+test('WHAT[context-compression-018] HANDLE_lifecycle_Abandoned_seals_blogger', () => {
   const abandoned = handle.scenario('abandon')
   assert.equal(abandoned.ok, true)
   assert.equal(abandoned.record.lifecycle, 'Abandoned')
 })
-test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_cell_has_no_sealed_mirror_durable_is_truth', async () => {
+test('WHAT[context-compression-018] BLOGGER_RUNTIME_cell_has_no_sealed_mirror_durable_is_truth', async () => {
   // R05: DrainWindow deleted; sealed stays sealed, new root starts fresh owner scope.
   const scope = parkedTransform.scope()
   parkedTransform.claimCurrentRequest(scope, KEY, ctx())
@@ -575,7 +575,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_cell_has_no_sealed_mirror_du
   parkedTransform.releaseCurrentRequest(scope, KEY, 'request-main')
   assert.equal(parkedTransform.tryGetFlight(scope, KEY), null)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_park_and_offer_material_mailbox', async () => {
+test('WHAT[context-compression-018] BLOGGER_RUNTIME_park_and_offer_material_mailbox', async () => {
   // Mailbox delivery: park awaits material, offer resumes waiter
   const scope = parkedTransform.scope()
   const waiter = parkedTransform.park(scope, KEY)
@@ -583,14 +583,14 @@ test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_park_and_offer_material_mail
   const wake = await waiter
   assert.equal(wake.kind, 'MaterialAvailable')
 })
-test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_staged_offer_delivers_to_next_park', async () => {
+test('WHAT[context-compression-018] BLOGGER_RUNTIME_staged_offer_delivers_to_next_park', async () => {
   // Offer first stages, then park consumes immediately
   const scope = parkedTransform.scope()
   assert.equal(parkedTransform.offerMaterial(scope, KEY, ctx()), 'Staged')
   const wake = await parkedTransform.park(scope, KEY)
   assert.equal(wake.kind, 'MaterialAvailable')
 })
-test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_flight_lease_claim_and_release', () => {
+test('WHAT[context-compression-018] BLOGGER_RUNTIME_flight_lease_claim_and_release', () => {
   const scope = parkedTransform.scope()
   assert.equal(parkedTransform.claimCurrentRequest(scope, KEY, ctx()), 'Claimed')
   assert.notEqual(parkedTransform.tryGetFlight(scope, KEY), null)
@@ -610,7 +610,7 @@ const { acceptAuthorityRoot, withExecutablePlugin } = await import("../../verifi
 const root = resolve(import.meta.dirname, '../../..')
 const read = (path) => readFileSync(resolve(root, path), 'utf8')
 
-test('WHAT[CONTEXT-COMPRESSION-018] CompanionTransform owns ordinary-material entry and consumes Host suppression as a capability', () => {
+test('WHAT[context-compression-018] CompanionTransform owns ordinary-material entry and consumes Host suppression as a capability', () => {
   const companion = read('src/Wanxiangshu/Context/Companion/Transform.fs')
   const pt = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
 
@@ -633,7 +633,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] CompanionTransform owns ordinary-material en
   assert.match(pt, /match\s+determineTransformMode/)
   assert.doesNotMatch(pt, /let\s+private\s+isExplicitResumeProviderMaterial/)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] explicit-resume nudge path with marked suppression prevents companion double-send', async () => {
+test('WHAT[context-compression-018] explicit-resume nudge path with marked suppression prevents companion double-send', async () => {
   await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
     const sessionID = 'ses_explicit_resume_nudge_suppression'
     const continueID = 'msg-continue-nudge-1'
@@ -676,7 +676,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] explicit-resume nudge path with marked suppr
     assert.equal(runtime.prompts.length, 0, 'suppression path must not double-send prompts')
   })
 })
-test('WHAT[CONTEXT-COMPRESSION-018] fresh binding without suppression history admits ordinary material', async () => {
+test('WHAT[context-compression-018] fresh binding without suppression history admits ordinary material', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'ses_fresh_ordinary_binding'
     const userMessageID = 'msg-user-fresh-1'
@@ -733,7 +733,7 @@ const isCombinedNormalDelta = (text) =>
   text.startsWith('# Write the dense work-log continuation now') && text.includes('[[new_work_to_record]]')
 const isPreviousTip = (text) => text.includes('previous_enforcer_tip')
 
-test('WHAT[CONTEXT-COMPRESSION-018] COMPANION_018_first_turn_shape_is_false_when_historic_frames_or_tips_present', () => {
+test('WHAT[context-compression-018] COMPANION_018_first_turn_shape_is_false_when_historic_frames_or_tips_present', () => {
   const withFrame = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
@@ -781,18 +781,18 @@ const stopReason = (reason) => {
   return reason
 }
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_same_run_after_squash_rejected_as_known_not_committed', () => {
+test('WHAT[context-compression-018] ENFORCER_same_run_after_squash_rejected_as_known_not_committed', () => {
   const committedRuns = new Set(['run-squash'])
   assert.equal(committedRuns.has('run-squash'), true)
   assert.equal(stopReason('idempotent-receipt-catch-up-complete'), 'idempotent-receipt-catch-up-complete')
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_open_without_promptkey_binding_is_unexpected_end', () => {
+test('WHAT[context-compression-018] ENFORCER_open_without_promptkey_binding_is_unexpected_end', () => {
   const scope = runtime.scope()
   assert.equal(runtime.claimCurrentRequest(scope, 'ses-blog', runtime.main({ toml: 'open' })), 'Claimed')
   assert.equal(runtime.currentRequest(scope, 'ses-blog').toml, 'open')
   runtime.dispose(scope)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_open_bound_promptkey_commits_and_clears_open', () => {
+test('WHAT[context-compression-018] ENFORCER_open_bound_promptkey_commits_and_clears_open', () => {
   const scope = runtime.scope()
   runtime.claimCurrentRequest(scope, 'ses-blog', runtime.main({ requestId: 'req-open', toml: 'bound' }))
   assert.notEqual(runtime.currentRequest(scope, 'ses-blog'), null)
@@ -801,7 +801,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_open_bound_promptkey_commits_and_cl
   assert.equal(runtime.currentRequest(scope, 'ses-blog'), null)
   runtime.dispose(scope)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_catchup_drains_next_window_after_idempotent_receipt', () => {
+test('WHAT[context-compression-018] ENFORCER_catchup_drains_next_window_after_idempotent_receipt', () => {
   let state = frames.empty
   state = apply(state, entry({ run: 'run-1' }))
   state = apply(state, entry({ epoch: 0, previous: 1, next: 2, previousCutoff: 1, nextCutoff: 2, run: 'run-2' }))
@@ -809,14 +809,14 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_catchup_drains_next_window_after_id
   assert.equal(frames.coverage(state).cutoff, 2)
   assert.equal(frames.frameCount(state), 2)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_park_cancel_is_the_only_non_material_wake', async () => {
+test('WHAT[context-compression-018] ENFORCER_park_cancel_is_the_only_non_material_wake', async () => {
   const scope = runtime.scope()
   const parked = runtime.park(scope, 'ses-blog')
   runtime.cancelParked(scope, 'ses-blog')
   assert.deepEqual(await parked, { kind: 'Cancelled', context: null })
   runtime.dispose(scope)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_caught_up_park_absorbs_future_material_beyond_previous_head_without_frozen_frontier', async () => {
+test('WHAT[context-compression-018] ENFORCER_caught_up_park_absorbs_future_material_beyond_previous_head_without_frozen_frontier', async () => {
   const scope = runtime.scope()
   const parked = runtime.park(scope, 'ses-blog')
   assert.equal(runtime.offerParked(scope, 'ses-blog', runtime.main({ toml: 'future' })), 'Delivered')
@@ -825,7 +825,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_caught_up_park_absorbs_future_mater
   assert.equal(wake.context.toml, 'future')
   runtime.dispose(scope)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_park_resumed_with_flight_projects_directly', () => {
+test('WHAT[context-compression-018] ENFORCER_park_resumed_with_flight_projects_directly', () => {
   const scope = runtime.scope()
   assert.equal(runtime.claimCurrentRequest(scope, 'ses-blog', runtime.main({ requestId: 'req-live', toml: 'restartable' })), 'Claimed')
   assert.notEqual(runtime.currentRequest(scope, 'ses-blog'), null)
@@ -833,18 +833,18 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_park_resumed_with_flight_projects_d
   assert.equal(runtime.currentRequest(scope, 'ses-blog').toml, 'restartable')
   runtime.dispose(scope)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_no_journal_projects_raw_messages', () => {
+test('WHAT[context-compression-018] ENFORCER_no_journal_projects_raw_messages', () => {
   const scope = runtime.scope()
   assert.equal(runtime.claimCurrentRequest(scope, 'ses-blog', runtime.main({ toml: 'raw' })), 'Claimed')
   assert.equal(runtime.currentRequest(scope, 'ses-blog').toml, 'raw')
   runtime.dispose(scope)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_no_journal_empty_messages_is_empty_projection_fatal', () => {
+test('WHAT[context-compression-018] ENFORCER_no_journal_empty_messages_is_empty_projection_fatal', () => {
   assert.equal(frames.frameCount(frames.empty), 0)
   const valid = compression.terminalValidity('')
   assert.equal(valid.valid, false)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_first_request_rebuilds_from_typed_context', () => {
+test('WHAT[context-compression-018] ENFORCER_first_request_rebuilds_from_typed_context', () => {
   const context = runtime.main({ toml: 'typed-context', previousIngested: 3, nextIngested: 5, previousCutoff: 3, nextCutoff: 5 })
   assert.equal(runtime.toml(context), 'typed-context')
   assert.equal(context.previousIngested, 3)
@@ -886,46 +886,46 @@ const commit = (state, value) => {
   return result.value
 }
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_blog_tool_without_CurrentRequest_rejects_not_ok', () => {
+test('WHAT[context-compression-018] ENFORCER_blog_tool_without_CurrentRequest_rejects_not_ok', () => {
   const scope = runtime.scope()
   assert.equal(runtime.currentRequest(scope, 'ses-blog'), null)
   runtime.dispose(scope)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_live_blog_without_CurrentRequest_and_without_open_is_fatal', () => {
+test('WHAT[context-compression-018] ENFORCER_live_blog_without_CurrentRequest_and_without_open_is_fatal', () => {
   const scope = runtime.scope()
   assert.equal(runtime.currentRequest(scope, 'ses-blog'), null)
   runtime.dispose(scope)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_empty_delta_terminal_is_fatal', () => {
+test('WHAT[context-compression-018] ENFORCER_empty_delta_terminal_is_fatal', () => {
   const invalid = compression.terminalValidity('')
   assert.equal(invalid.valid, false)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_host_completed_blog_with_live_request_commits_and_advances_coverage', () => {
+test('WHAT[context-compression-018] ENFORCER_host_completed_blog_with_live_request_commits_and_advances_coverage', () => {
   const requestState = request()
   assert.equal(runtime.toml(requestState), 'work')
   const result = frames.applyEntry(entry(0, 0, 1, 'run-1'), frames.empty)
   assert.equal(result.ok, true)
   assert.equal(frames.coverage(result.value).ingestedThroughSequence, 1)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_host_completed_blog_without_live_request_is_noop_not_commit', () => {
+test('WHAT[context-compression-018] ENFORCER_host_completed_blog_without_live_request_is_noop_not_commit', () => {
   const scope = runtime.scope()
   assert.equal(runtime.currentRequest(scope, 'ses-blog'), null)
   assert.equal(frames.frameCount(frames.empty), 0)
   runtime.dispose(scope)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_host_completed_blog_second_pass_same_run_is_idempotent', () => {
+test('WHAT[context-compression-018] ENFORCER_host_completed_blog_second_pass_same_run_is_idempotent', () => {
   const receipts = new Set()
   receipts.add('run-idem')
   receipts.add('run-idem')
   assert.equal(receipts.size, 1)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_host_completed_blog_second_window_advances_coverage_not_resend', () => {
+test('WHAT[context-compression-018] ENFORCER_host_completed_blog_second_window_advances_coverage_not_resend', () => {
   let state = commit(frames.empty, entry(0, 0, 1, 'run-1'))
   state = commit(state, entry(0, 1, 2, 'run-2'))
   assert.equal(frames.coverage(state).ingestedThroughSequence, 2)
   assert.equal(frames.coverage(state).cutoff, 2)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_resolveCycleContext_prefers_live_inflight_request', () => {
+test('WHAT[context-compression-018] ENFORCER_resolveCycleContext_prefers_live_inflight_request', () => {
   const scope = runtime.scope()
   runtime.claimCurrentRequest(scope, 'ses-blog', request('live'))
   const live = runtime.currentRequest(scope, 'ses-blog')
@@ -957,14 +957,14 @@ const commit = (state, request) => {
   return result.value
 }
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_load_effective_frames_missing_association', () => {
+test('WHAT[context-compression-018] ENFORCER_load_effective_frames_missing_association', () => {
   assert.equal(frames.frameCount(frames.empty), 0)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_load_effective_frames_empty_ok', () => {
+test('WHAT[context-compression-018] ENFORCER_load_effective_frames_empty_ok', () => {
   assert.deepEqual(frames.frames(frames.empty), [])
   assert.equal(frames.hasCoverage(frames.empty), false)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_load_effective_frames_resolves_committed_frame', () => {
+test('WHAT[context-compression-018] ENFORCER_load_effective_frames_resolves_committed_frame', () => {
   const state = commit(frames.empty, entry())
   const [frame] = frames.frames(state)
   assert.equal(frame.kind, 'Entry')
@@ -972,7 +972,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_load_effective_frames_resolves_comm
   assert.equal(frame.digest, 'sha-frame')
   assert.equal(frames.coverage(state).ingestedThroughSequence, 1)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_load_effective_frames_missing_blob_fails_closed', () => {
+test('WHAT[context-compression-018] ENFORCER_load_effective_frames_missing_blob_fails_closed', () => {
   // A persisted frame has an opaque blob reference; an absent body is never
   // replaced with fabricated text.
   const state = commit(frames.empty, entry({ frame: frames.frame({ kind: 'Entry', digest: 'missing', ref: 'gone' }) }))
@@ -980,7 +980,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_load_effective_frames_missing_blob_
   assert.equal(frame.ref, 'gone')
   assert.equal(frame.body, undefined)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_load_effective_frames_digest_mismatch_fails_closed', () => {
+test('WHAT[context-compression-018] ENFORCER_load_effective_frames_digest_mismatch_fails_closed', () => {
   const rejected = frames.applyEntry(entry({ digest: 'wrong' }), frames.empty)
   assert.equal(rejected.ok, true, 'commit stores the declared digest; body validation is a separate fail-closed step')
   const probe = prefix.select({
@@ -995,14 +995,14 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_load_effective_frames_digest_mismat
   })
   assert.equal(probe.ok, false)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_rebuild_falls_back_to_raw_when_frame_blob_lost', () => {
+test('WHAT[context-compression-018] ENFORCER_rebuild_falls_back_to_raw_when_frame_blob_lost', () => {
   const state = commit(frames.empty, entry())
   const [frame] = frames.frames(state)
   assert.equal(typeof frame.ref, 'string')
   assert.equal(frame.body, undefined, 'raw fallback does not invent a frame body')
   assert.equal(frames.frameCount(state), 1)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_contribution_preserves_raw_identity', () => {
+test('WHAT[context-compression-018] ENFORCER_contribution_preserves_raw_identity', () => {
   const frame = frames.frame({ kind: 'Entry', digest: 'sha-raw', ref: 'blob-raw' })
   assert.equal(frame.digest, 'sha-raw')
   assert.equal(frame.ref, 'blob-raw')
@@ -1055,7 +1055,7 @@ const oneFrame = () => {
   return result.value
 }
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_reload_main_context_from_open_materialization', () => {
+test('WHAT[context-compression-018] ENFORCER_reload_main_context_from_open_materialization', () => {
   const m = runtime.main(mainJson())
   assert.equal(m.toml, 'work')
   assert.equal(m.previousIngested, 0)
@@ -1063,31 +1063,31 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_reload_main_context_from_open_mater
   assert.equal(m.previousCutoff, 0)
   assert.equal(m.nextCutoff, 1)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_reload_squash_context_from_open_materialization', () => {
+test('WHAT[context-compression-018] ENFORCER_reload_squash_context_from_open_materialization', () => {
   const s = runtime.squash(squashJson())
   assert.equal(s.kind, 'Squash')
   assert.equal(s.coveredFrameCount, 2)
   assert.deepEqual(s.digests, ['sha-a', 'sha-b'])
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_reload_defaults_when_blob_is_sparse', () => {
+test('WHAT[context-compression-018] ENFORCER_reload_defaults_when_blob_is_sparse', () => {
   const m = runtime.main({ kind: 'Main' })
   assert.equal(m.toml, '')
   assert.equal(m.previousIngested, 0)
   assert.equal(m.nextIngested, 1)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_reload_parses_string_numbers_and_derives_delta_digest', () => {
+test('WHAT[context-compression-018] ENFORCER_reload_parses_string_numbers_and_derives_delta_digest', () => {
   const m = runtime.main(mainJson({ previousIngested: '4', nextIngested: '7', previousCutoff: '3', nextCutoff: '7' }))
   assert.equal(m.previousIngested, 4)
   assert.equal(m.nextIngested, 7)
   assert.equal(m.previousCutoff, 3)
   assert.equal(m.nextCutoff, 7)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_reload_derives_delta_digest_from_context_digest_when_toml_empty', () => {
+test('WHAT[context-compression-018] ENFORCER_reload_derives_delta_digest_from_context_digest_when_toml_empty', () => {
   const m = runtime.main(mainJson({ toml: '', deltaDigest: 'context-digest' }))
   assert.equal(runtime.toml(m), '')
   assert.equal(m.deltaDigest, 'context-digest')
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_resolve_cycle_prefers_live_request_over_open', () => {
+test('WHAT[context-compression-018] ENFORCER_resolve_cycle_prefers_live_request_over_open', () => {
   const scope = runtime.scope()
   runtime.claimCurrentRequest(scope, 'ses-blog', runtime.main(mainJson({ toml: 'live-toml' })))
   const live = runtime.currentRequest(scope, 'ses-blog')
@@ -1095,15 +1095,15 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_resolve_cycle_prefers_live_request_
   assert.notEqual(runtime.currentRequest(scope, 'ses-blog'), null)
   runtime.dispose(scope)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_squash_frame_count_beyond_existing_frames_abandons', () => {
+test('WHAT[context-compression-018] ENFORCER_squash_frame_count_beyond_existing_frames_abandons', () => {
   const result = frames.applySquash({ previousEpoch: 0, nextEpoch: 1, count: 2, frame: frames.frame({ kind: 'Squash', digest: 'sha-s', ref: 'blob-s' }) }, oneFrame())
   assert.equal(result.ok, false)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_squash_frame_epoch_mismatch_abandons', () => {
+test('WHAT[context-compression-018] ENFORCER_squash_frame_epoch_mismatch_abandons', () => {
   const result = frames.applySquash({ previousEpoch: 2, nextEpoch: 3, count: 1, frame: frames.frame({ kind: 'Squash', digest: 'sha-s', ref: 'blob-s' }) }, oneFrame())
   assert.equal(result.ok, false)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_squash_frame_digests_mismatch_abandons', () => {
+test('WHAT[context-compression-018] ENFORCER_squash_frame_digests_mismatch_abandons', () => {
   const source = readFileSync(
     resolve(import.meta.dirname, '../../../src/Wanxiangshu/Enforcer/Cycle/Commit.fs'),
     'utf8',
@@ -1120,7 +1120,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_squash_frame_digests_mismatch_aband
     'digest-list mismatch must reject before the squash is admitted',
   )
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_squash_other_blogger_session_abandons', () => {
+test('WHAT[context-compression-018] ENFORCER_squash_other_blogger_session_abandons', () => {
   const scope = runtime.scope()
   runtime.claimCurrentRequest(scope, 'ses-other-blog', runtime.squash(squashJson({ bloggerSession: 'ses-other-blog' })))
   assert.notEqual(runtime.currentRequest(scope, 'ses-other-blog'), null)
@@ -1138,7 +1138,7 @@ const runtime = await import("../../../dist/Context/Companion/RuntimeSurface.js"
 const ROOT = new URL('../../../', import.meta.url).pathname
 const main = (toml = 'delta-1') => runtime.main({ toml })
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_160_material_event_resumes_park_with_typed_context', async () => {
+test('WHAT[context-compression-018] ENFORCER_160_material_event_resumes_park_with_typed_context', async () => {
   const scope = runtime.scope()
   const waiter = runtime.park(scope, 'ses-blogger')
   assert.equal(runtime.offerParked(scope, 'ses-blogger', main('delta-1')), 'Delivered')
@@ -1148,7 +1148,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_160_material_event_resumes_park_wit
   assert.equal(wake.context.kind, 'Main')
   assert.equal(wake.context.toml, 'delta-1')
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_162_cancel_is_an_explicit_event', async () => {
+test('WHAT[context-compression-018] ENFORCER_162_cancel_is_an_explicit_event', async () => {
   const scope = runtime.scope()
   const waiter = runtime.park(scope, 'ses-blogger')
 
@@ -1156,7 +1156,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_162_cancel_is_an_explicit_event', a
 
   assert.deepEqual(await waiter, { kind: 'Cancelled', context: null })
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_050_offer_first_is_delivered_by_the_next_await', async () => {
+test('WHAT[context-compression-018] ENFORCER_050_offer_first_is_delivered_by_the_next_await', async () => {
   const scope = runtime.scope()
 
   assert.equal(runtime.offerParked(scope, 'ses-blogger', main('staged')), 'Staged')
@@ -1164,7 +1164,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_050_offer_first_is_delivered_by_the
   assert.equal(wake.kind, 'MaterialAvailable')
   assert.equal(wake.context.toml, 'staged')
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_160_two_awaits_share_one_material_event', async () => {
+test('WHAT[context-compression-018] ENFORCER_160_two_awaits_share_one_material_event', async () => {
   const scope = runtime.scope()
   const first = runtime.park(scope, 'ses-blogger')
   const second = runtime.park(scope, 'ses-blogger')
@@ -1176,7 +1176,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_160_two_awaits_share_one_material_e
   assert.equal(a.context.toml, 'one-event')
   assert.deepEqual(b, a)
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_162_dispose_cancels_every_material_wait', async () => {
+test('WHAT[context-compression-018] ENFORCER_162_dispose_cancels_every_material_wait', async () => {
   const scope = runtime.scope()
   const a = runtime.park(scope, 'ses-a')
   const b = runtime.park(scope, 'ses-b')
@@ -1186,7 +1186,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_162_dispose_cancels_every_material_
   assert.equal((await a).kind, 'Cancelled')
   assert.equal((await b).kind, 'Cancelled')
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_162_cancel_drops_staged_material_without_touching_flight', async () => {
+test('WHAT[context-compression-018] ENFORCER_162_cancel_drops_staged_material_without_touching_flight', async () => {
   const scope = runtime.scope()
   const key = 'ses-blogger'
 
@@ -1197,7 +1197,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_162_cancel_drops_staged_material_wi
   assert.equal(runtime.peekCurrentRequest(scope, key)?.toml, 'already-flying')
   runtime.releaseCurrentRequest(scope, key, 'request-main')
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_seal_cancels_wait_without_revoking_existing_flight', async () => {
+test('WHAT[context-compression-018] ENFORCER_seal_cancels_wait_without_revoking_existing_flight', async () => {
   const scope = runtime.scope()
   const key = 'ses-blogger'
   const waiter = runtime.park(scope, key)
@@ -1209,7 +1209,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_seal_cancels_wait_without_revoking_
   assert.equal(runtime.peekCurrentRequest(scope, key)?.toml, 'seal-in-flight')
   runtime.releaseCurrentRequest(scope, key, 'request-main')
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_161_sessions_are_independent', async () => {
+test('WHAT[context-compression-018] ENFORCER_161_sessions_are_independent', async () => {
   const scope = runtime.scope()
   const a = runtime.park(scope, 'ses-a')
   const b = runtime.park(scope, 'ses-b')
@@ -1219,7 +1219,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_161_sessions_are_independent', asyn
   runtime.cancelParked(scope, 'ses-a')
   assert.equal((await a).kind, 'Cancelled')
 })
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_CurrentRequest_is_physical_flight_ownership', () => {
+test('WHAT[context-compression-018] ENFORCER_047_CurrentRequest_is_physical_flight_ownership', () => {
   const scope = runtime.scope()
   const key = 'ses-blogger'
 

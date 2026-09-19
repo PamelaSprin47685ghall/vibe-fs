@@ -76,7 +76,7 @@ const acceptT1Checkpoint = async (handle, session, callText) => {
   return { t1, accepted }
 }
 
-test('WHAT[OBLIGATION-LEDGER-010] T1 accept makes the proposed account Current immediately, before any review', async () => {
+test('WHAT[obligation-ledger-010] T1 accept makes the proposed account Current immediately, before any review', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-magic-todo-t1-t2-lag1'
     const life = 'life-magic-todo-t1-t2-lag1'
@@ -87,7 +87,7 @@ test('WHAT[OBLIGATION-LEDGER-010] T1 accept makes the proposed account Current i
     assert.equal(snapshot.currentObligations.digest, t1.result.value.prepared.proposedTodoDigest)
   })
 })
-test('WHAT[OBLIGATION-LEDGER-010] T2 accepted account supersedes CurrentObligations', async () => {
+test('WHAT[obligation-ledger-010] T2 accepted account supersedes CurrentObligations', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-magic-todo-t1-t2-resolve'
     const life = 'life-magic-todo-t1-t2-resolve'
@@ -192,7 +192,7 @@ const acceptedState = () => {
   return handle
 }
 
-test('WHAT[OBLIGATION-LEDGER-010] Accepted supersedes Current immediately', () => {
+test('WHAT[obligation-ledger-010] Accepted supersedes Current immediately', () => {
   const lifeState = projection.MagicTodoProjectionSurface_view(acceptedState(), life)
   assert.equal(lifeState.currentObligations.reference, 'proposal-list')
   assert.equal(lifeState.currentObligations.digest, 'proposal-digest')
@@ -219,7 +219,7 @@ const firstCheckpointSurfaces = [
   ['todowrite-description/zh-CN', 'resources/provider/lifecycle/magic-todo/todowrite-description/zh-CN.md'],
 ]
 
-test('WHAT[OBLIGATION-LEDGER-010] provider wording says Accepted becomes Current without reviewer settlement', () => {
+test('WHAT[obligation-ledger-010] provider wording says Accepted becomes Current without reviewer settlement', () => {
   for (const path of [
     'resources/provider/lifecycle/magic-todo/todowrite-description/en.md',
     'resources/provider/lifecycle/magic-todo/todowrite-description/zh-CN.md',
@@ -262,7 +262,7 @@ const items = [
   obligation('verification', 'Verify the behavior with evidence.', 'far'),
 ]
 
-test('WHAT[OBLIGATION-LEDGER-010] fresh admission freezes Base and Submitted without a merge preview', () => {
+test('WHAT[obligation-ledger-010] fresh admission freezes Base and Submitted without a merge preview', () => {
   const current = [obligation('implementation', 'Implement the requested behavior.')]
   const submitted = [...current, obligation('verification', 'Verify the behavior with evidence.')]
 

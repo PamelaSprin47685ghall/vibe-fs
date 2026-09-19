@@ -10,7 +10,7 @@ const completed = (providerRun = '') => ({ kind: 'Completed', providerRun })
 const failed = (error) => ({ kind: 'Failed', error })
 const aborted = (reason) => ({ kind: 'Aborted', error: reason })
 
-test('WHAT[HOST-BOUNDARY-016] EVT_duplicate_completed_for_the_same_provider_run_is_absorbed', () => {
+test('WHAT[host-boundary-016] EVT_duplicate_completed_for_the_same_provider_run_is_absorbed', () => {
   const port = EventsSurface.create()
   const received = []
   EventsSurface.subscribe(port, (sessionId, outcome) => received.push({ sessionId, outcome }))
@@ -18,7 +18,7 @@ test('WHAT[HOST-BOUNDARY-016] EVT_duplicate_completed_for_the_same_provider_run_
   assert.equal(notify(port, 'ses_dup', completed('run-1')), false)
   assert.equal(received.length, 1)
 })
-test('WHAT[HOST-BOUNDARY-016] EVT_completed_without_provider_run_is_never_a_duplicate', () => {
+test('WHAT[host-boundary-016] EVT_completed_without_provider_run_is_never_a_duplicate', () => {
   const port = EventsSurface.create()
   const received = []
   EventsSurface.subscribe(port, () => received.push(true))
@@ -26,7 +26,7 @@ test('WHAT[HOST-BOUNDARY-016] EVT_completed_without_provider_run_is_never_a_dupl
   notify(port, 'ses_norun', completed())
   assert.equal(received.length, 2)
 })
-test('WHAT[HOST-BOUNDARY-016] EVT_failed_and_aborted_outcomes_are_not_deduped', () => {
+test('WHAT[host-boundary-016] EVT_failed_and_aborted_outcomes_are_not_deduped', () => {
   const port = EventsSurface.create()
   const received = []
   EventsSurface.subscribe(port, (_, outcome) => received.push(outcome.kind))
@@ -36,7 +36,7 @@ test('WHAT[HOST-BOUNDARY-016] EVT_failed_and_aborted_outcomes_are_not_deduped', 
   notify(port, 'ses_abort', aborted('cancelled'))
   assert.deepEqual(received, ['Failed', 'Failed', 'Aborted', 'Aborted'])
 })
-test('WHAT[HOST-BOUNDARY-016] EVT_terminal_notification_fans_out_once_to_each_live_physical_listener', () => {
+test('WHAT[host-boundary-016] EVT_terminal_notification_fans_out_once_to_each_live_physical_listener', () => {
   const port = EventsSurface.create()
   const first = []
   const second = []
@@ -48,7 +48,7 @@ test('WHAT[HOST-BOUNDARY-016] EVT_terminal_notification_fans_out_once_to_each_li
   assert.deepEqual(first, [['ses_fanout', 'Failed']])
   assert.deepEqual(second, [['ses_fanout', 'Failed']])
 })
-test('WHAT[HOST-BOUNDARY-016] EVT_late_subscriber_replays_the_last_sticky_outcome_per_session', () => {
+test('WHAT[host-boundary-016] EVT_late_subscriber_replays_the_last_sticky_outcome_per_session', () => {
   const port = EventsSurface.create()
   notify(port, 'ses_replay_a', completed('run-a'))
   notify(port, 'ses_replay_b', failed('error-b'))
@@ -56,7 +56,7 @@ test('WHAT[HOST-BOUNDARY-016] EVT_late_subscriber_replays_the_last_sticky_outcom
   EventsSurface.subscribe(port, (sessionId, outcome) => replayed.push([sessionId, outcome.kind]))
   assert.deepEqual(replayed.sort(), [['ses_replay_a', 'Completed'], ['ses_replay_b', 'Failed']])
 })
-test('WHAT[HOST-BOUNDARY-016] EVT_disposed_listener_stops_delivery_and_listener_count_reporting', () => {
+test('WHAT[host-boundary-016] EVT_disposed_listener_stops_delivery_and_listener_count_reporting', () => {
   const port = EventsSurface.create()
   const received = []
   const subscription = EventsSurface.subscribe(port, (_, outcome) => received.push(outcome.kind))
@@ -74,7 +74,7 @@ const EventsSurface = await import("../../../dist/OpenCode/Host/EventsSurface.js
 
 const notify = (port, sessionId, outcome) => EventsSurface.notify(port, sessionId, outcome.kind, outcome.providerRun ?? '', outcome.value ?? outcome.error ?? '')
 
-test('WHAT[HOST-BOUNDARY-016] EXEC_join_NotifyTerminal_then_late_SubscribeTerminal_replays_sticky', () => {
+test('WHAT[host-boundary-016] EXEC_join_NotifyTerminal_then_late_SubscribeTerminal_replays_sticky', () => {
   const port = EventsSurface.create()
   notify(port, 'ses_sticky_child', { kind: 'Completed', providerRun: 'run-1', value: 'done' })
   const seen = []
@@ -83,7 +83,7 @@ test('WHAT[HOST-BOUNDARY-016] EXEC_join_NotifyTerminal_then_late_SubscribeTermin
   assert.equal(seen[0].sessionId, 'ses_sticky_child')
   assert.equal(seen[0].outcome.text, 'done')
 })
-test('WHAT[HOST-BOUNDARY-016] EXEC_join_Failed_outcomes_are_not_provider_run_deduped', () => {
+test('WHAT[host-boundary-016] EXEC_join_Failed_outcomes_are_not_provider_run_deduped', () => {
   const port = EventsSurface.create()
   let count = 0
   EventsSurface.subscribe(port, () => { count += 1 })
@@ -106,7 +106,7 @@ const completed = (providerRun = '') => ({ kind: 'Completed', providerRun })
 const failed = (error) => ({ kind: 'Failed', error })
 const idleWake = ReconcileSurface.idleWake('s1', 1n)
 
-test('WHAT[HOST-BOUNDARY-016] EXEC_events_sticky_terminal_bounded', () => {
+test('WHAT[host-boundary-016] EXEC_events_sticky_terminal_bounded', () => {
   const port = EventsSurface.create()
   // The production HostEventPort has a stickyCap of 256. Notify 300 sessions
   // and verify the port still functions (sticky eviction is internal).
@@ -119,7 +119,7 @@ test('WHAT[HOST-BOUNDARY-016] EXEC_events_sticky_terminal_bounded', () => {
   assert.ok(replayed.length <= 256, `sticky replay must be bounded: got ${replayed.length}`)
   assert.ok(replayed.length > 0, 'sticky replay must not be empty')
 })
-test('WHAT[HOST-BOUNDARY-016] mutation_canary_duplicate_completed_is_absorbed', () => {
+test('WHAT[host-boundary-016] mutation_canary_duplicate_completed_is_absorbed', () => {
   // The production EventsSurface must absorb duplicate Completed for the
   // same provider run. If dedup is removed, this canary fails.
   const port = EventsSurface.create()

@@ -5,7 +5,7 @@ import { assertOptionalObservationNoninterference } from '../../structured-workf
 
 
 
-test('WHAT[DG-013] diagnostic failure cannot alter loop guard arm interrupt consume or continuation', async () => {
+test('WHAT[degeneration-guard-013] diagnostic failure cannot alter loop guard arm interrupt consume or continuation', async () => {
   assert.throws(
     () => loopSensor.create({ owned: ['session-1'], abort: () => {}, continue: () => {} }),
     /requires a diagnostic callback/,

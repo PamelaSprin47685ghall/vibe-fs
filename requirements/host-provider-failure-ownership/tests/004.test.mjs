@@ -28,7 +28,7 @@ const input = (failure, change = {}) => ({
 const classify = (failure, episodeId, change) =>
   presentation.classifyPolicyInput(input(failure, change), episodeId)
 
-test('WHAT[HOSTFAIL-004] non-terminal resolution leaves presentation to the Host', () => {
+test('WHAT[host-provider-failure-ownership-004] non-terminal resolution leaves presentation to the Host', () => {
   assert.deepEqual(
     classify('ProviderPermanent', 'episode-settled', { phase: 'Terminal' }),
     { mode: 'Ignore', hasFinalPresentation: false },

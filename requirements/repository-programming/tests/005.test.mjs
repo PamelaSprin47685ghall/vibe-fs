@@ -52,7 +52,7 @@ const layersOf = (s) =>
     ]),
   )
 
-test('WHAT[REPOSITORY-PROGRAMMING-005] JS002_description_embeds_spec_base_class_rules_and_one_ultra_example', () => {
+test('WHAT[repository-programming-005] JS002_description_embeds_spec_base_class_rules_and_one_ultra_example', () => {
   const coder = surface('Engineer', ['Read', 'Write', 'Edit', 'Glob', 'Grep'])
   for (const token of [
     'class JsProgram',
@@ -77,7 +77,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-005] JS002_description_embeds_spec_base_class_
   assert.equal(coder.description.includes('_api'), false)
   assert.equal(coder.description.includes('js.read'), false)
 })
-test('WHAT[REPOSITORY-PROGRAMMING-005] JS010_description_never_dilutes_the_ultra_example', () => {
+test('WHAT[repository-programming-005] JS010_description_never_dilutes_the_ultra_example', () => {
   for (const role of ['Engineer', 'DevOps']) {
     const result = surface(role, rolePermissions(role.toLowerCase()))
     const classes = result.description.match(/class Js extends JsProgram/g) ?? []
@@ -85,7 +85,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-005] JS010_description_never_dilutes_the_ultra
     assert.match(result.description, /Semantic branches belong between programs/)
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-005] JS_description_retains_no_unsubstituted_placeholders', () => {
+test('WHAT[repository-programming-005] JS_description_retains_no_unsubstituted_placeholders', () => {
   const result = generate('Coder', caps(ToolPermission.Read, ToolPermission.Edit, ToolPermission.Write), 'en')
   assert.equal(result.description.includes('{{'), false)
 })
@@ -114,7 +114,7 @@ const toolModule = () => {
   return { tool }
 }
 
-test('WHAT[REPOSITORY-PROGRAMMING-005] JS003_builtin_fallback_descriptions_are_left_untouched', () => {
+test('WHAT[repository-programming-005] JS003_builtin_fallback_descriptions_are_left_untouched', () => {
   assert.deepEqual([...builtinTools()].sort(), ['edit', 'glob', 'grep', 'patch', 'read', 'write'])
   for (const builtinName of builtinTools()) {
     const original = `${builtinName} primitive fallback`
@@ -124,13 +124,13 @@ test('WHAT[REPOSITORY-PROGRAMMING-005] JS003_builtin_fallback_descriptions_are_l
   }
   assert.equal(annotate('join', 'Join a session', 'js-coder'), 'Join a session')
 })
-test('WHAT[REPOSITORY-PROGRAMMING-005] JS003_hook_must_not_recommend_invisible_tools', () => {
+test('WHAT[repository-programming-005] JS003_hook_must_not_recommend_invisible_tools', () => {
   assert.equal(validateRecommendation('js-coder', ['js-coder', 'read']).ok, true)
   const denied = validateRecommendation('js-coder', ['read'])
   assert.equal(denied.ok, false)
   assert.equal(denied.error.includes('not provider-visible') || denied.error.includes('不可见'), true)
 })
-test('WHAT[REPOSITORY-PROGRAMMING-005] JS073_spec_carries_generated_name_and_honest_description', () => {
+test('WHAT[repository-programming-005] JS073_spec_carries_generated_name_and_honest_description', () => {
   const { dir, cleanup } = sandbox()
   try {
     const registered = createRegistered(toolModule(), 'Coder', 'en', dir, null)

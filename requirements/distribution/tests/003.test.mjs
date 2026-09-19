@@ -11,7 +11,7 @@ const exists = (relative) => fs.existsSync(path.join(root, relative))
 
 const normalize = (entry) => String(entry).replace(/\\/g, '/').replace(/\/+$/, '')
 
-test('WHAT[DISTRIBUTION-003] DISTRIBUTION_manifest_entry_matches_exports_and_shipped_path', () => {
+test('WHAT[distribution-003] DISTRIBUTION_manifest_entry_matches_exports_and_shipped_path', () => {
   assert.equal(typeof pkg.main, 'string', 'main must be declared')
   assert.equal(pkg.exports['.'], pkg.main, 'exports["."] must equal main')
   assert.match(pkg.main, /^\.?\/?dist\//, 'main must live under dist/')

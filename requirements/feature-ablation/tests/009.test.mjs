@@ -17,7 +17,7 @@ const knownMatch = staticTools.match(/let knownToolNames =\s*\[([\s\S]*?)\]/)
 
 const knownTools = knownMatch ? [...knownMatch[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]) : []
 
-test('WHAT[ABL-009] ABL_009_every_known_tool_maps_to_a_manifest_node', () => {
+test('WHAT[feature-ablation-009] ABL_009_every_known_tool_maps_to_a_manifest_node', () => {
   for (const tool of knownTools) {
     assert.ok(toolMap.tools[tool], `missing tool-map entry for ${tool}`)
     const node = toolMap.tools[tool]
@@ -25,7 +25,7 @@ test('WHAT[ABL-009] ABL_009_every_known_tool_maps_to_a_manifest_node', () => {
   }
 })
 
-test('WHAT[ABL-009] ABL_009_tool_map_has_no_stale_entries', () => {
+test('WHAT[feature-ablation-009] ABL_009_tool_map_has_no_stale_entries', () => {
   for (const tool of Object.keys(toolMap.tools)) {
     assert.ok(knownTools.includes(tool), `stale tool-map entry ${tool}`)
   }

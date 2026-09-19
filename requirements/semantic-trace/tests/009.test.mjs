@@ -19,7 +19,7 @@ const append = (projection, sequence, generation, turn) => unwrap(trace.appendPa
   providerRun: `run-${sequence}`,
 }))
 
-test('WHAT[SEMANTIC-TRACE-009] a new Host generation does not erase opening or semantic parts', () => {
+test('WHAT[semantic-trace-009] a new Host generation does not erase opening or semantic parts', () => {
   let projection = unwrap(trace.appendOpening(trace.emptyProjection(), 'first task', ['r1']))
   projection = append(projection, 1, 0, 0)
   projection = append(projection, 2, 0, 1)
@@ -30,7 +30,7 @@ test('WHAT[SEMANTIC-TRACE-009] a new Host generation does not erase opening or s
   assert.deepEqual(trace.openingEvidence(projection).authoritativeRequirements, ['r1'])
 })
 
-test('WHAT[SEMANTIC-TRACE-009] cursor sequence remains global across Host generations', () => {
+test('WHAT[semantic-trace-009] cursor sequence remains global across Host generations', () => {
   let projection = trace.emptyProjection()
   projection = append(projection, 1, 0, 0)
   projection = append(projection, 2, 0, 1)

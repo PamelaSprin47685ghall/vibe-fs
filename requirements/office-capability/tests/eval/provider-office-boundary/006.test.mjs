@@ -27,7 +27,7 @@ const assertCaseShape = (c) => {
   assert.equal(fail.ok, false, `${c.id} fail_example must be rejected`)
 }
 
-test('WHAT[OFF-006] office_boundary_eval_corpus_has_id_setup_oracles_and_synthetic_traces', () => {
+test('WHAT[office-capability-006] office_boundary_eval_corpus_has_id_setup_oracles_and_synthetic_traces', () => {
   assert.equal(CASES.length, 4)
   assert.deepEqual(
     CASES.map((c) => c.id).sort(),
@@ -40,27 +40,27 @@ test('WHAT[OFF-006] office_boundary_eval_corpus_has_id_setup_oracles_and_synthet
   )
 })
 
-test('WHAT[OFF-016] office_boundary_eval_engineer_local_investigation_case_is_red_and_green', () => {
+test('WHAT[office-capability-006] office_boundary_eval_engineer_local_investigation_case_is_red_and_green', () => {
   const c = CASES.find((x) => x.id === 'engineer-local-investigation-and-mutation')
   assertCaseShape(c)
 })
 
-test('WHAT[OFF-017] office_boundary_eval_devops_inherent_repair_case_is_red_and_green', () => {
+test('WHAT[office-capability-006] office_boundary_eval_devops_inherent_repair_case_is_red_and_green', () => {
   const c = CASES.find((x) => x.id === 'devops-inherent-repair')
   assertCaseShape(c)
 })
 
-test('WHAT[OFF-017] office_boundary_eval_devops_does_not_choose_case_is_red_and_green', () => {
+test('WHAT[office-capability-006] office_boundary_eval_devops_does_not_choose_case_is_red_and_green', () => {
   const c = CASES.find((x) => x.id === 'devops-does-not-choose-among-valid-behaviors')
   assertCaseShape(c)
 })
 
-test('WHAT[OFF-006] office_boundary_eval_manager_mixed_mission_case_is_red_and_green', () => {
+test('WHAT[office-capability-006] office_boundary_eval_manager_mixed_mission_case_is_red_and_green', () => {
   const c = CASES.find((x) => x.id === 'manager-mixed-mission')
   assertCaseShape(c)
 })
 
-test('WHAT[OFF-006] office_boundary_eval_oracles_are_not_wired_into_production_tools', () => {
+test('WHAT[office-capability-006] office_boundary_eval_oracles_are_not_wired_into_production_tools', () => {
   const sources = [
     readFileSync(join(HERE, 'oracles.mjs'), 'utf8'),
     readFileSync(join(HERE, 'corpus.mjs'), 'utf8'),

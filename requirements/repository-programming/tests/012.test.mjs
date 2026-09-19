@@ -15,7 +15,7 @@ const sandbox = () => {
 }
 const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')
 
-test('WHAT[REPOSITORY-PROGRAMMING-012] JS008_012_bindings_rewrite_stages_without_touching_disk', () => {
+test('WHAT[repository-programming-012] JS008_012_bindings_rewrite_stages_without_touching_disk', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'old text', 'utf8')
@@ -29,7 +29,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-012] JS008_012_bindings_rewrite_stages_without
     cleanup()
   }
 })
-test('WHAT[REPOSITORY-PROGRAMMING-012] JS009_012_bindings_write_leaves_disk_untouched', () => {
+test('WHAT[repository-programming-012] JS009_012_bindings_write_leaves_disk_untouched', () => {
   const { dir, cleanup } = sandbox()
   try {
     const binding = createApi(dir)
@@ -79,7 +79,7 @@ const prepared = (id, root, mutations) => ({
   mutations,
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-012] JS012_prepare_then_commit_updates_only_integrator_Current', async () => {
+test('WHAT[repository-programming-012] JS012_prepare_then_commit_updates_only_integrator_Current', async () => {
   const local = localStore()
   try {
     const p = prepared('tx-1', '/ws', [mutation('a.txt', 'old', 'new')])
@@ -124,7 +124,7 @@ const runWorkflow = async (dir, program, { deadlineMs = 2000, store = null } = {
   surface: coderSurface(),
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-012] JS012_workflow_with_store_persists_prepare_and_commit', async () => {
+test('WHAT[repository-programming-012] JS012_workflow_with_store_persists_prepare_and_commit', async () => {
   const { dir, cleanup } = sandbox()
   const local = localStore()
   try {

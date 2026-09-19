@@ -3,7 +3,7 @@ namespace Wanxiangshu.OpenCode
 open Fable.Core.JsInterop
 open Wanxiangshu.Sphinx
 
-/// JS-native boundary for HOST-BOUNDARY-017 Sphinx MCP launch contract tests.
+/// JS-native boundary for host-boundary-017 Sphinx MCP launch contract tests.
 /// Translates env vars → plain JS `{ kind, path, enabled, reason }` and applies
 /// the launch decision to a Host config object.  No F# DU cases cross the edge.
 module SphinxMcpConfigSurface =

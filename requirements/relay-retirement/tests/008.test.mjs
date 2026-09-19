@@ -23,7 +23,7 @@ const cutResult = () =>
 
 const ids = (result) => result.provider.map((message) => message.id ?? message.info?.id)
 
-test('WHAT[RETIRE-008] RETIRE_008_physical_interruption_boundary_drops_retired_tail_and_loop_wake', () => {
+test('WHAT[relay-retirement-008] RETIRE_008_physical_interruption_boundary_drops_retired_tail_and_loop_wake', () => {
   const providerIds = ids(cutResult())
   assert.equal(providerIds.includes('a-late'), false, 'late retired part must be dropped')
   assert.equal(providerIds.includes('wake-1'), false, 'internal loop wake must be dropped')

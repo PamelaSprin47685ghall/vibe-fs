@@ -10,7 +10,7 @@ const decode = (raw) => HostSignalSurface.tryDecode(raw) ?? undefined
 const decodeExecutionEnd = (raw) => HostSignalSurface.tryDecodePhysicalExecutionEnd(raw) ?? undefined
 const decodeStepEnd = (raw) => HostSignalSurface.tryDecodeProviderStepEnd(raw) ?? undefined
 
-test('WHAT[HOST-BOUNDARY-001] HOST_001_fragment_events_die_at_earliest_boundary', () => {
+test('WHAT[host-boundary-001] HOST_001_fragment_events_die_at_earliest_boundary', () => {
   const fragments = [
     { type: 'message.updated', properties: { sessionID: SESSION } },
     { type: 'part.delta', properties: { sessionID: SESSION } },
@@ -19,7 +19,7 @@ test('WHAT[HOST-BOUNDARY-001] HOST_001_fragment_events_die_at_earliest_boundary'
   ]
   assert.deepEqual(fragments.map(decode), [undefined, undefined, undefined, undefined])
 })
-test('WHAT[HOST-BOUNDARY-001] HOST_001_terminal_message_identity_is_physical_capacity_evidence_not_a_business_signal', () => {
+test('WHAT[host-boundary-001] HOST_001_terminal_message_identity_is_physical_capacity_evidence_not_a_business_signal', () => {
   const running = {
     type: 'message.updated',
     properties: {
@@ -135,7 +135,7 @@ const admit = async (runtime, sessionId, physicalUserMessageId, role, participan
   assert.ok(['Applied', 'AlreadyApplied'].includes(settlement.kind))
 }
 
-test('WHAT[HOST-BOUNDARY-001] HOST_001_failed_provider_step_keeps_same_physical_execution_binding_for_host_retry', async () => {
+test('WHAT[host-boundary-001] HOST_001_failed_provider_step_keeps_same_physical_execution_binding_for_host_retry', async () => {
   const runtime = routing.createRuntime(() => target)
   const sessionId = 'session-retry'
   const physicalUserMessageId = 'msg-retry'
@@ -176,7 +176,7 @@ test('WHAT[HOST-BOUNDARY-001] HOST_001_failed_provider_step_keeps_same_physical_
   await routing.enterProviderStep(runtime, sessionId, physicalUserMessageId, ['run-failed'])
   assert.deepEqual(routing.tryLease(runtime, sessionId, physicalUserMessageId, role, participant, undefined), target)
 })
-test('WHAT[HOST-BOUNDARY-001] HOST_001_ambiguous_finish_keeps_same_physical_execution_binding_for_host_retry', async () => {
+test('WHAT[host-boundary-001] HOST_001_ambiguous_finish_keeps_same_physical_execution_binding_for_host_retry', async () => {
   for (const finish of ['unknown', 'error']) {
     const runtime = routing.createRuntime(() => target)
     const sessionId = `session-retry-${finish}`
@@ -236,7 +236,7 @@ const deletedRaw = (sessionId, parentID) => ({ type: 'session.deleted', sessionI
 const errorRaw = (sessionId, name = 'TimeoutError') => ({ type: 'session.error', sessionID: sessionId, properties: { error: { name } } })
 const trySubscribe = async (input = {}) => HostSignalSubscribeSurface.trySubscribe(input, () => {})
 
-test('WHAT[HOST-BOUNDARY-001] MISC_signals_router_loop_delta_bypasses_adapt', () => {
+test('WHAT[host-boundary-001] MISC_signals_router_loop_delta_bypasses_adapt', () => {
   // Loop text deltas are not coarse session lifecycle signals — the codec
   // drops them before adaptation. tryAdapt returns null.
   assert.equal(HostSignalSurface.tryAdapt(['x'], { type: 'message.part.delta', properties: { sessionID: 'x' } }), null)

@@ -12,7 +12,7 @@ const readLaw = (semanticPath, locale) => readFileSync(join(providerRoot, semant
 
 const LOCALES = ['en', 'zh-CN']
 
-test('WHAT[REPOSITORY-INVESTIGATION-003] INVESTIGATE_inspector_role_law_layers_reasoning_below_evidence_acquisition', () => {
+test('WHAT[repository-investigation-003] INVESTIGATE_inspector_role_law_layers_reasoning_below_evidence_acquisition', () => {
   for (const locale of LOCALES) {
     const law = readLaw('role/engineer', locale)
     // Reasoning/evidence layering: a mechanical trail of searches is not a

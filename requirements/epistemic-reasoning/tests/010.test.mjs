@@ -10,7 +10,7 @@ const tinyFactors = Array.from({ length: 40 }, (_, index) => ({
   likelihoods: { a: 1e-10, b: 2e-10 },
 }))
 
-test('WHAT[EPI-010] log-space-bayes-survives-likelihood-product-underflow', async () => {
+test('WHAT[epistemic-reasoning-010] log-space-bayes-survives-likelihood-product-underflow', async () => {
   const result = await gecSurface.refineCertificate(
     { hypotheses: ['a', 'b'], priors: { a: 0.5, b: 0.5 } },
     { kind: 'bayes-exact', factors: tinyFactors },
@@ -25,7 +25,7 @@ test('WHAT[EPI-010] log-space-bayes-survives-likelihood-product-underflow', asyn
   const actualLogOdds = Math.log(result.posterior.a / result.posterior.b)
   assert.ok(Math.abs(actualLogOdds - expectedLogOdds) < 1e-9)
 })
-test('WHAT[EPI-010] exact-bayes-matches-brute-force-normalized-product-when-representable', async () => {
+test('WHAT[epistemic-reasoning-010] exact-bayes-matches-brute-force-normalized-product-when-representable', async () => {
   const result = await gecSurface.refineCertificate(
     { hypotheses: ['up', 'down'], priors: { up: 0.3, down: 0.7 } },
     {
@@ -40,7 +40,7 @@ test('WHAT[EPI-010] exact-bayes-matches-brute-force-normalized-product-when-repr
   assert.ok(Math.abs(result.posterior.up - 0.72) < 1e-12)
   assert.ok(Math.abs(result.posterior.down - 0.28) < 1e-12)
 })
-test('WHAT[EPI-010] astar-reports-global-frontier-bound-incumbent-and-reopens-better-g', async () => {
+test('WHAT[epistemic-reasoning-010] astar-reports-global-frontier-bound-incumbent-and-reopens-better-g', async () => {
   const result = await gecSurface.refineCertificate(
     {},
     {
@@ -68,7 +68,7 @@ test('WHAT[EPI-010] astar-reports-global-frontier-bound-incumbent-and-reopens-be
   assert.ok(Math.abs(result.lowerBound - 5) < 1e-12)
   assert.ok(Math.abs(result.upperBound - 5) < 1e-12)
 })
-test('WHAT[EPI-010] astar-rejects-nonzero-goal-heuristic-and-exposes-admissibility-assumption', async () => {
+test('WHAT[epistemic-reasoning-010] astar-rejects-nonzero-goal-heuristic-and-exposes-admissibility-assumption', async () => {
   const rejected = await gecSurface.refineCertificate(
     {},
     {
@@ -96,7 +96,7 @@ test('WHAT[EPI-010] astar-rejects-nonzero-goal-heuristic-and-exposes-admissibili
   assert.deepEqual(admitted.path, ['S', 'G'])
   assert.ok(admitted.assumptions.includes('admissible-heuristic-assumed-unverified'))
 })
-test('WHAT[EPI-010] exact-bayes-reports-canonical-factors-and-ignores-invalid-shadows', async () => {
+test('WHAT[epistemic-reasoning-010] exact-bayes-reports-canonical-factors-and-ignores-invalid-shadows', async () => {
   const result = await gecSurface.refineCertificate(
     { hypotheses: ['up', 'down'], priors: { up: 0.3, down: 0.7 } },
     {
@@ -126,7 +126,7 @@ test('WHAT[EPI-010] exact-bayes-reports-canonical-factors-and-ignores-invalid-sh
   assert.deepEqual(shadowed.usedFactors, ['dep-one'])
   assert.ok(Math.abs(shadowed.posterior.up - (0.8 * 0.3) / (0.8 * 0.3 + 0.2 * 0.7)) < 1e-12)
 })
-test('WHAT[EPI-010] seeded-mcts-returns-descriptive-sample-summary-not-deterministic-truth', async () => {
+test('WHAT[epistemic-reasoning-010] seeded-mcts-returns-descriptive-sample-summary-not-deterministic-truth', async () => {
   const patch = {
     kind: 'mcts-sample',
     root: 'root',
@@ -159,7 +159,7 @@ test('WHAT[EPI-010] seeded-mcts-returns-descriptive-sample-summary-not-determini
   assert.ok(!/singleton/i.test(guaranteeText))
   assert.ok(!/probabilistic-coverage/i.test(guaranteeText))
 })
-test('WHAT[EPI-010] mcts-sample-accepts-negative-rewards-and-ignores-legacy-prior', async () => {
+test('WHAT[epistemic-reasoning-010] mcts-sample-accepts-negative-rewards-and-ignores-legacy-prior', async () => {
   const patch = {
     kind: 'mcts-sample',
     root: 'root',
@@ -196,7 +196,7 @@ const { mapOfEntries, run, uct } = await import("./support.mjs");
 const map = (entries) => mapOfEntries(entries)
 const model = (root, children, terminalReward, prior) => ({ root, children, terminalReward, prior })
 
-test('WHAT[EPI-010] mcts_selection_expansion_rollout_backup_prefers_high_value_branch', () => {
+test('WHAT[epistemic-reasoning-010] mcts_selection_expansion_rollout_backup_prefers_high_value_branch', () => {
   const result = run(
     40,
     model(
@@ -220,7 +220,7 @@ test('WHAT[EPI-010] mcts_selection_expansion_rollout_backup_prefers_high_value_b
   assert.equal(result.bestAction, 'strong')
   assert.equal(result.iterations, 40)
 })
-test('WHAT[EPI-010] graph_mcts_shares_transposition_statistics_by_semantic_node_key', () => {
+test('WHAT[epistemic-reasoning-010] graph_mcts_shares_transposition_statistics_by_semantic_node_key', () => {
   const result = run(
     20,
     model(
@@ -243,7 +243,7 @@ test('WHAT[EPI-010] graph_mcts_shares_transposition_statistics_by_semantic_node_
   assert.ok(shared.visits > 1)
   assert.ok(result.nodes.length <= 4)
 })
-test('WHAT[EPI-010] uct_for_unvisited_node_is_infinite', () => {
+test('WHAT[epistemic-reasoning-010] uct_for_unvisited_node_is_infinite', () => {
   const node = { semanticKey: 'new', visits: 0, valueSum: 0, prior: 0.5 }
   assert.equal(uct(10, Math.SQRT2, node), Number.POSITIVE_INFINITY)
 })
@@ -258,7 +258,7 @@ const map = (entries) => mapOfEntries(entries)
 const edges = (rows) => rows.map(([from, to, cost]) => ({ from, to, cost }))
 const problem = (start, goal, graphEdges, heuristic) => ({ start, goal, edges: graphEdges, heuristic })
 
-test('WHAT[EPI-010] graph_astar_degenerates_to_standard_g_plus_h_shortest_path', () => {
+test('WHAT[epistemic-reasoning-010] graph_astar_degenerates_to_standard_g_plus_h_shortest_path', () => {
   const solved = solveGraph(
     problem(
       'S',
@@ -282,7 +282,7 @@ test('WHAT[EPI-010] graph_astar_degenerates_to_standard_g_plus_h_shortest_path',
   assert.equal(solved.cost, 3)
   assert.deepEqual(solved.path, ['S', 'A', 'C', 'G'])
 })
-test('WHAT[EPI-010] graph_astar_reopens_closed_node_when_better_g_is_discovered', () => {
+test('WHAT[epistemic-reasoning-010] graph_astar_reopens_closed_node_when_better_g_is_discovered', () => {
   const solved = solveGraph(
     problem(
       'S',
@@ -308,7 +308,7 @@ test('WHAT[EPI-010] graph_astar_reopens_closed_node_when_better_g_is_discovered'
   assert.deepEqual(solved.path, ['S', 'B', 'C', 'G'])
   assert.ok(solved.expanded.filter((node) => node === 'C').length >= 2)
 })
-test('WHAT[EPI-010] graph_astar_rejects_negative_cost_graph', () => {
+test('WHAT[epistemic-reasoning-010] graph_astar_rejects_negative_cost_graph', () => {
   const solved = solveGraph(problem('S', 'G', edges([['S', 'G', -1]]), map([['S', 0], ['G', 0]])))
   assert.equal(solved, null)
 })
@@ -398,7 +398,7 @@ const waveEvents = (wave, assignment) => {
   ]
 }
 
-test('WHAT[EPI-010] soak_seeded_bayes_and_astar_entries_stay_deterministic_across_waves', async () => {
+test('WHAT[epistemic-reasoning-010] soak_seeded_bayes_and_astar_entries_stay_deterministic_across_waves', async () => {
   const posteriors = new Set()
   const astarPatch = {
     kind: 'astar',

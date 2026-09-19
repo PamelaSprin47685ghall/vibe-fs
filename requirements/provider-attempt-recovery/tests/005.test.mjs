@@ -59,10 +59,10 @@ const foldFacts = (facts) =>
   foldFactsThroughOwner(facts.map((value, index) => ownerEnvelope({ seq: index + 1, session: SESSION, fact: value })))
 const budgetOf = (projection) => providerFailureProjection.read(projection)
 
-test('WHAT[PAR-005] the_default_automatic_retry_budget_is_twelve', () => {
+test('WHAT[provider-attempt-recovery-005] the_default_automatic_retry_budget_is_twelve', () => {
   assert.equal(budget.defaultBudget, 12)
 })
-test('WHAT[PAR-005] verdict_boundaries_zero_one_eleven_twelve', () => {
+test('WHAT[provider-attempt-recovery-005] verdict_boundaries_zero_one_eleven_twelve', () => {
   const at = (count) => ({ failures: count })
   // 0: fresh run may retry.
   assert.equal(budget.verdict(12, at(0)), 'MayRetry')
@@ -83,7 +83,7 @@ test('WHAT[PAR-005] verdict_boundaries_zero_one_eleven_twelve', () => {
   assert.deepEqual(verdicts.slice(0, 11), Array(11).fill('MayRetry'))
   assert.equal(verdicts[11], 'Exhausted')
 })
-test('WHAT[PAR-005] a_configured_budget_is_honoured_and_never_infinite', () => {
+test('WHAT[provider-attempt-recovery-005] a_configured_budget_is_honoured_and_never_infinite', () => {
   const at = (count) => ({ failures: count })
   assert.deepEqual(
     [1, 2, 3].map((limit) => budget.verdict(limit, at(2))),
@@ -91,7 +91,7 @@ test('WHAT[PAR-005] a_configured_budget_is_honoured_and_never_infinite', () => {
   )
   assert.equal(budget.verdict(0, budget.initial), 'Exhausted')
 })
-test('WHAT[PAR-005] exhaustion_is_stored_rather_than_re_derived_from_the_count', () => {
+test('WHAT[provider-attempt-recovery-005] exhaustion_is_stored_rather_than_re_derived_from_the_count', () => {
   const advanced = providerFailureProjection.applyFailure(
     identityFor('run_1'),
     1,
@@ -105,7 +105,7 @@ test('WHAT[PAR-005] exhaustion_is_stored_rather_than_re_derived_from_the_count',
   assert.equal(providerFailureProjection.mayRetry(12, exhausted), false)
   assert.equal(providerFailureProjection.mayRetry(9999, exhausted), false)
 })
-test('WHAT[PAR-005] may_retry_answers_the_projection_level_question', () => {
+test('WHAT[provider-attempt-recovery-005] may_retry_answers_the_projection_level_question', () => {
   let current = providerFailureProjection.forAuthority(RUN, ROOT)
   assert.equal(providerFailureProjection.mayRetry(3, current), true)
 
@@ -117,7 +117,7 @@ test('WHAT[PAR-005] may_retry_answers_the_projection_level_question', () => {
   assert.equal(providerFailureProjection.mayRetry(3, current), false)
   assert.equal(providerFailureProjection.mayRetry(4, current), true)
 })
-test('WHAT[PAR-005] an_advance_after_exhaustion_is_absorbed_not_applied', () => {
+test('WHAT[provider-attempt-recovery-005] an_advance_after_exhaustion_is_absorbed_not_applied', () => {
   const folded = foldFacts([
     rootFact(),
     failureFact({ run: 'run_1', count: 1 }),
@@ -165,7 +165,7 @@ async function admit(journal, providerRunName) {
   }
 }
 
-test('WHAT[PAR-005] twelfth_failure_admission_is_retry_exhausted', async () => {
+test('WHAT[provider-attempt-recovery-005] twelfth_failure_admission_is_retry_exhausted', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-ledger-admission-'))
   const created = await bootWithWriterId(directory, 'writer-ledger-admission', 'rt_ledger_admission', 1, '2026-01-01T00:00:00Z')
   assert.equal(created.ok, true, created.ok ? '' : created.error)
@@ -210,7 +210,7 @@ test('WHAT[PAR-005] twelfth_failure_admission_is_retry_exhausted', async () => {
     rmSync(directory, { recursive: true, force: true })
   }
 })
-test('WHAT[PAR-005] admission_continues_while_budget_remains', async () => {
+test('WHAT[provider-attempt-recovery-005] admission_continues_while_budget_remains', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-ledger-continue-'))
   const created = await bootWithWriterId(directory, 'writer-ledger-continue', 'rt_ledger_continue', 1, '2026-01-01T00:00:00Z')
   assert.equal(created.ok, true, created.ok ? '' : created.error)

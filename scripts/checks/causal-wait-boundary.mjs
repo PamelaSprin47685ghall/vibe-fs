@@ -2,7 +2,7 @@
 /**
  * Causal-wait architecture gate.
  *
- * CAUSAL-003/004:
+ * causal-wait-003/004:
  *   - Fact and Journal carriers contain no executable causal-wait vocabulary.
  *   - Snapshot readers, registry implementation, diagnostic bridges and their
  *     file locator stay inside Execution/Session/Wait.

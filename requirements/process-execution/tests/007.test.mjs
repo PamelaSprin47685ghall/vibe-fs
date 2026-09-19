@@ -48,7 +48,7 @@ const completedItem = (port, pid, outcome) => {
   return got[0]
 }
 
-test('WHAT[PROC-007] PORT_close_requests_terminate_but_keeps_the_session_live', async () => {
+test('WHAT[process-execution-007] PORT_close_requests_terminate_but_keeps_the_session_live', async () => {
   const seen = []
   const port = createPtyPort({ handler: async (_pid, command) => { if (command.kind !== 'Spawn') seen.push(command.signal); return success } })
   const pid = forkDefault(port, 'pty-cs')
@@ -56,10 +56,10 @@ test('WHAT[PROC-007] PORT_close_requests_terminate_but_keeps_the_session_live', 
   assert.deepEqual(seen, ['SIGTERM'])
   assert.equal(portExists(port, pid), true)
 })
-test('WHAT[PROC-007] PORT_close_all_with_no_sessions_resolves', async () => {
+test('WHAT[process-execution-007] PORT_close_all_with_no_sessions_resolves', async () => {
   await portCloseAll(createPtyPort({}), 0)
 })
-test('WHAT[PROC-007] PORT_close_all_awaits_exit_task_when_it_resolves_in_grace', async () => {
+test('WHAT[process-execution-007] PORT_close_all_awaits_exit_task_when_it_resolves_in_grace', async () => {
   const seen = []
   const exit = exitSignal()
   const port = createPtyPort({ handler: async (_pid, command) => { if (command.kind !== 'Spawn') seen.push(command.kind); return success } })
@@ -70,7 +70,7 @@ test('WHAT[PROC-007] PORT_close_all_awaits_exit_task_when_it_resolves_in_grace',
   await closing
   assert.deepEqual(seen, ['Signal'])
 })
-test('WHAT[PROC-007] PORT_close_all_escalates_to_kill_after_grace', async () => {
+test('WHAT[process-execution-007] PORT_close_all_escalates_to_kill_after_grace', async () => {
   const seen = []
   const exit = exitSignal()
   const port = createPtyPort({ handler: async (_pid, command) => {
@@ -83,7 +83,7 @@ test('WHAT[PROC-007] PORT_close_all_escalates_to_kill_after_grace', async () => 
   await portCloseAll(port, 0)
   assert.deepEqual(seen, ['SIGTERM', 'SIGKILL'])
 })
-test('WHAT[PROC-007] PORT_close_all_kill_failure_propagates', async () => {
+test('WHAT[process-execution-007] PORT_close_all_kill_failure_propagates', async () => {
   const exit = exitSignal()
   const port = createPtyPort({ handler: async (_pid, command) => {
     if (command.kind === 'Signal' && command.signal === 'SIGKILL') return failure('no such process')
@@ -93,14 +93,14 @@ test('WHAT[PROC-007] PORT_close_all_kill_failure_propagates', async () => {
   portRegisterExitTask(port, pid, exit.promise)
   await assert.rejects(portCloseAll(port, 0), /PTY kill failed for pty-cf: no such process/)
 })
-test('WHAT[PROC-007] PORT_close_all_skips_ids_without_exit_task', async () => {
+test('WHAT[process-execution-007] PORT_close_all_skips_ids_without_exit_task', async () => {
   const seen = []
   const port = createPtyPort({ handler: async (_pid, command) => { if (command.kind !== 'Spawn') seen.push(command.kind); return success } })
   forkDefault(port, 'pty-cn')
   await portCloseAll(port, 0)
   assert.deepEqual(seen, ['Signal'])
 })
-test('WHAT[PROC-007] PORT_list_reports_active_handles', () => {
+test('WHAT[process-execution-007] PORT_list_reports_active_handles', () => {
   const port = createPtyPort({})
   const pid = forkDefault(port, 'pty-ls', 'tail -f')
   const listed = portList(port)
@@ -113,7 +113,7 @@ test('WHAT[PROC-007] PORT_list_reports_active_handles', () => {
   portComplete(port, pid, { ok: true, value: 'done' })
   assert.equal(portList(port).ptys.length, 0)
 })
-test('WHAT[PROC-007] PORT_list_without_provider_returns_empty_agents', () => {
+test('WHAT[process-execution-007] PORT_list_without_provider_returns_empty_agents', () => {
   const port = createPtyPort({})
   forkDefault(port, 'pty-le')
   assert.equal(portList(port).agents.length, 0)
@@ -199,25 +199,25 @@ const portWith = (value) => {
   return p
 }
 
-test('WHAT[PROC-007] SUPERVISOR_add_tryGet_get_roundtrip', () => {
+test('WHAT[process-execution-007] SUPERVISOR_add_tryGet_get_roundtrip', () => {
   const supervisor = supervisorCreate()
   const session = sessionCreate('pty-a', null)
   supervisorAdd(supervisor, id('pty-a'), session)
   assert.notEqual(supervisorTryGet(supervisor, id('pty-a')), null)
   assert.equal(sessionView(supervisorGet(supervisor, id('pty-a'))).ptyId, 'pty-a')
 })
-test('WHAT[PROC-007] SUPERVISOR_tryGet_missing_returns_none_and_get_throws', () => {
+test('WHAT[process-execution-007] SUPERVISOR_tryGet_missing_returns_none_and_get_throws', () => {
   const supervisor = supervisorCreate()
   assert.equal(supervisorTryGet(supervisor, id('pty-missing')), null)
   assert.throws(() => supervisorGet(supervisor, id('pty-missing')), /Unknown PTY id: pty-missing/)
 })
-test('WHAT[PROC-007] SUPERVISOR_remove_drops_the_session', () => {
+test('WHAT[process-execution-007] SUPERVISOR_remove_drops_the_session', () => {
   const supervisor = supervisorCreate()
   supervisorAdd(supervisor, id('pty-r'), sessionCreate('pty-r', null))
   supervisorRemove(supervisor, id('pty-r'))
   assert.equal(supervisorTryGet(supervisor, id('pty-r')), null)
 })
-test('WHAT[PROC-007] SUPERVISOR_list_returns_added_ids_only', () => {
+test('WHAT[process-execution-007] SUPERVISOR_list_returns_added_ids_only', () => {
   const supervisor = supervisorCreate()
   supervisorAdd(supervisor, id('pty-1'), sessionCreate('pty-1', null))
   supervisorAdd(supervisor, id('pty-2'), sessionCreate('pty-2', null))
@@ -225,7 +225,7 @@ test('WHAT[PROC-007] SUPERVISOR_list_returns_added_ids_only', () => {
   supervisorRemove(supervisor, id('pty-1'))
   assert.deepEqual(supervisorList(supervisor), ['pty-2'])
 })
-test('WHAT[PROC-007] SUPERVISOR_takePending_returns_and_clears_the_queue', () => {
+test('WHAT[process-execution-007] SUPERVISOR_takePending_returns_and_clears_the_queue', () => {
   const supervisor = supervisorCreate()
   const session = sessionCreate('pty-q', null)
   sessionPushPending(session, ptyCommandWrite('first'))
@@ -237,11 +237,11 @@ test('WHAT[PROC-007] SUPERVISOR_takePending_returns_and_clears_the_queue', () =>
   assert.equal(sessionView(session).pendingCount, 0)
   assert.deepEqual(supervisorPendingEntries(supervisorTakePending(supervisor, id('pty-q'))), [])
 })
-test('WHAT[PROC-007] SUPERVISOR_takePending_unknown_id_is_empty', () => {
+test('WHAT[process-execution-007] SUPERVISOR_takePending_unknown_id_is_empty', () => {
   const supervisor = supervisorCreate()
   assert.deepEqual(supervisorPendingEntries(supervisorTakePending(supervisor, id('pty-nope'))), [])
 })
-test('WHAT[PROC-007] SUPERVISOR_drop_removes_session_and_returns_pending', () => {
+test('WHAT[process-execution-007] SUPERVISOR_drop_removes_session_and_returns_pending', () => {
   const supervisor = supervisorCreate()
   const session = sessionCreate('pty-d', null)
   sessionPushPending(session, ptyCommandWrite('queued'))
@@ -252,7 +252,7 @@ test('WHAT[PROC-007] SUPERVISOR_drop_removes_session_and_returns_pending', () =>
   assert.equal(supervisorTryGet(supervisor, id('pty-d')), null)
   assert.deepEqual(supervisorPendingEntries(supervisorDropPending(supervisor, id('pty-d'))), [])
 })
-test('WHAT[PROC-007] SUPERVISOR_attach_registers_live_session_and_forwards_onData_to_buffer', () => {
+test('WHAT[process-execution-007] SUPERVISOR_attach_registers_live_session_and_forwards_onData_to_buffer', () => {
   const supervisor = supervisorCreate()
   const term = fakeTerm(9999)
   supervisorAttach(supervisor, portWith('pty-at'), id('pty-at'), term)
@@ -263,7 +263,7 @@ test('WHAT[PROC-007] SUPERVISOR_attach_registers_live_session_and_forwards_onDat
   term.dataCb('world')
   assert.equal(sessionView(session).output, 'hello world')
 })
-test('WHAT[PROC-007] SUPERVISOR_attach_onData_ignored_after_session_closed', () => {
+test('WHAT[process-execution-007] SUPERVISOR_attach_onData_ignored_after_session_closed', () => {
   const supervisor = supervisorCreate()
   const term = fakeTerm(9999)
   supervisorAttach(supervisor, portWith('pty-ic'), id('pty-ic'), term)
@@ -272,7 +272,7 @@ test('WHAT[PROC-007] SUPERVISOR_attach_onData_ignored_after_session_closed', () 
   term.dataCb('late data')
   assert.equal(sessionView(session).output, '')
 })
-test('WHAT[PROC-007] SUPERVISOR_attach_replays_pending_writes_onto_the_live_backend', async () => {
+test('WHAT[process-execution-007] SUPERVISOR_attach_replays_pending_writes_onto_the_live_backend', async () => {
   const supervisor = supervisorCreate()
   const session = sessionCreate('pty-rp', null)
   supervisorAdd(supervisor, id('pty-rp'), session)
@@ -290,7 +290,7 @@ const { spawnSync } = await import("node:child_process");
 const { default: test } = await import("node:test");
 
 
-test('WHAT[PROC-007] short PTY exit race owns enough physical lifetime to settle', () => {
+test('WHAT[process-execution-007] short PTY exit race owns enough physical lifetime to settle', () => {
   const surfaceUrl = new URL('../../../dist/Process/Surface.js', import.meta.url).href
   const program = `
     const { ptyRaceExit } = await import(${JSON.stringify(surfaceUrl)});

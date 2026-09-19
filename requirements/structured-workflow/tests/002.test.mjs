@@ -7,7 +7,7 @@ const { default: test } = await import("node:test");
 const { walk } = await import("../../../scripts/lib/walk.mjs");
 
 
-test('WHAT[STRUCTURED-WORKFLOW-002] ORCHESTRATOR_PROGRAM_004: no Command/Reply/Step AST tokens in Orchestration workflow source', () => {
+test('WHAT[structured-workflow-002] ORCHESTRATOR_PROGRAM_004: no Command/Reply/Step AST tokens in Orchestration workflow source', () => {
   // Fail closed if a second-runtime protocol sneaks back into the vertical slice.
   const files = walk('src/Wanxiangshu/Change', ['.fs'])
   assert.ok(files.length > 0, 'expected Change/*.fs')
@@ -23,12 +23,12 @@ test('WHAT[STRUCTURED-WORKFLOW-002] ORCHESTRATOR_PROGRAM_004: no Command/Reply/S
   }
   assert.deepEqual(hits, [])
 })
-test('WHAT[STRUCTURED-WORKFLOW-002] ORCHESTRATOR_PROGRAM_002: Domain OrchestratorProgram AST module is gone', () => {
+test('WHAT[structured-workflow-002] ORCHESTRATOR_PROGRAM_002: Domain OrchestratorProgram AST module is gone', () => {
   const files = walk('src/Wanxiangshu', ['.fs'])
   const ast = files.filter((file) => /OrchestratorProgram\.fs$/.test(file))
   assert.deepEqual(ast, [], 'Domain OrchestratorProgram AST module must be deleted after PR3 direct-CE cutover')
 })
-test('WHAT[STRUCTURED-WORKFLOW-002] ORCHESTRATOR_PROGRAM_003: OrchestratorInterpreter is gone', () => {
+test('WHAT[structured-workflow-002] ORCHESTRATOR_PROGRAM_003: OrchestratorInterpreter is gone', () => {
   const files = walk('src/Wanxiangshu', ['.fs'])
   const interpreter = files.filter((file) => /OrchestratorInterpreter\.fs$/.test(file))
   assert.deepEqual(interpreter, [], 'OrchestratorInterpreter must be deleted after PR3')
@@ -41,7 +41,7 @@ const { default: test } = await import("node:test");
 const { RAW_TIME_ALLOWLIST, RAW_TIME_SCAN_ROOTS, RAW_TIME_TOKENS, isRawTimeAllowlisted, scanRawTimeEntries } = await import("../../../scripts/lib/raw-time-scan.mjs");
 
 
-test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_documents_raw_time_tokens_and_scan_root', () => {
+test('WHAT[structured-workflow-002] G4R_CE_documents_raw_time_tokens_and_scan_root', () => {
   for (const token of [
     'DateTimeOffset.UtcNow',
     'DateTime.Now',
@@ -54,7 +54,7 @@ test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_documents_raw_time_tokens_and_scan_ro
   }
   assert.deepEqual([...RAW_TIME_SCAN_ROOTS], ['.'])
 })
-test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_raw_time_scanner_RED_on_synthetic_tokens', () => {
+test('WHAT[structured-workflow-002] G4R_CE_S0_raw_time_scanner_RED_on_synthetic_tokens', () => {
   const dirty = scanRawTimeEntries([
     {
       file: 'Application/Reconciliation/Evil.fs',
@@ -77,7 +77,7 @@ test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_raw_time_scanner_RED_on_synthetic_
     )
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_raw_time_scanner_ignores_comment_only_mentions', () => {
+test('WHAT[structured-workflow-002] G4R_CE_S0_raw_time_scanner_ignores_comment_only_mentions', () => {
   const clean = scanRawTimeEntries([
     {
       file: 'Domain/Doc.fs',
@@ -86,7 +86,7 @@ test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_raw_time_scanner_ignores_comment_o
   ])
   assert.equal(clean.length, 0)
 })
-test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_raw_time_allowlist_is_exact_file_only', () => {
+test('WHAT[structured-workflow-002] G4R_CE_raw_time_allowlist_is_exact_file_only', () => {
   const file = 'Session/PhysicalClockAdapter.fs'
   assert.equal(isRawTimeAllowlisted(file, []), false)
   assert.equal(isRawTimeAllowlisted(file, ['Session/PhysicalClockAdapter.fs']), true)
@@ -128,7 +128,7 @@ const wake = {
 const name = (observation, signal = wake.retry()) =>
   reconcileSurface.decisionName(reconcileSurface.decideStep(signal, observation))
 
-test('WHAT[STRUCTURED-WORKFLOW-002] RECONCILE_PROGRAM_006: Domain surface has no Command/Reply/Trace AST exports', () => {
+test('WHAT[structured-workflow-002] RECONCILE_PROGRAM_006: Domain surface has no Command/Reply/Trace AST exports', () => {
   // The semantic owner exposes named observations and opaque publish maps, not
   // a second-runtime AST. Presence of the owner operations is the contract;
   // emitted export enumeration is deliberately not part of this test.

@@ -8,7 +8,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 
 const readRole = (role, locale) => readFileSync(join(ROOT, 'resources/provider/role', role, locale), 'utf8')
 
-test('WHAT[OFF-012] orchestrator_commissions_manager_roads_not_phases', () => {
+test('WHAT[office-capability-012] orchestrator_commissions_manager_roads_not_phases', () => {
   const en = readRole('orchestrator', 'en.md')
   const zh = readRole('orchestrator', 'zh-CN.md')
   assert.match(en, /You commission independent destinations, not technical phases/i)

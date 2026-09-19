@@ -4,7 +4,7 @@ import * as enforcer from '../../../dist/Enforcer/Surface.js'
 
 const BASE = 'base blogger system prompt'
 
-test('WHAT[BD-018] BEHAVIOR_DIAGNOSIS_SYSTEM_005_rulebook_revision_freezes_system_prompt_and_tool_definitions', () => {
+test('WHAT[behavior-diagnosis-018] BEHAVIOR_DIAGNOSIS_SYSTEM_005_rulebook_revision_freezes_system_prompt_and_tool_definitions', () => {
   const base = 'blogger base prompt'
   const promptA = enforcer.composeBloggerSystemPrompt(base, 'en')
   const rulesA = enforcer.rules()

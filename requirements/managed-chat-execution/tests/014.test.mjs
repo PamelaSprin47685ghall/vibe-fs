@@ -59,7 +59,7 @@ const captureInput = () => ({
   },
 })
 
-test('WHAT[CHATEXEC-014] capture canonicalizes facts and preserves only immutable owner evidence', async () => {
+test('WHAT[managed-chat-execution-014] capture canonicalizes facts and preserves only immutable owner evidence', async () => {
   const evidence = await captureEvidence(captureInput(), surfaces)
   const projection = fold(evidence.execution.facts)
   const status = queryFacts(evidence.execution.facts, evidence.execution.key.sessionId, evidence.execution.key.physicalUserMessageId)
@@ -71,7 +71,7 @@ test('WHAT[CHATEXEC-014] capture canonicalizes facts and preserves only immutabl
   assert.equal(Object.isFrozen(evidence), true)
   assert.deepEqual(JSON.parse(serializeEvidence(evidence)), evidence)
 })
-test('WHAT[CHATEXEC-014] capture redacts known failures and rejects payload or stack fields', async () => {
+test('WHAT[managed-chat-execution-014] capture redacts known failures and rejects payload or stack fields', async () => {
   const evidence = await captureEvidence(captureInput(), surfaces)
   const serialized = serializeEvidence(evidence)
   assert.doesNotMatch(serialized, /operator-secret|\/home\/operator|stack trace/i)
@@ -134,7 +134,7 @@ const input = {
   },
 }
 
-test('WHAT[CHATEXEC-014] replay reconstructs the canonical projection and emits only owner effect requests', async () => {
+test('WHAT[managed-chat-execution-014] replay reconstructs the canonical projection and emits only owner effect requests', async () => {
   const captured = await captureEvidence(input, surfaces)
   const replayed = await replayEvidence(serializeEvidence(captured), surfaces)
 
@@ -149,7 +149,7 @@ test('WHAT[CHATEXEC-014] replay reconstructs the canonical projection and emits 
   }])
   assert.deepEqual(replayed.mutations, [])
 })
-test('WHAT[CHATEXEC-014] agent-028 session-only binding is hostile; current owners fold exact keys with fixed participant', async () => {
+test('WHAT[managed-chat-execution-014] agent-028 session-only binding is hostile; current owners fold exact keys with fixed participant', async () => {
   assert.equal(agent028.historicalModel.first.bindingKey, agent028.historicalModel.second.bindingKey)
   assert.notEqual(
     agent028.historicalModel.first.physicalUserMessageId,
@@ -174,7 +174,7 @@ test('WHAT[CHATEXEC-014] agent-028 session-only binding is hostile; current owne
   const recovery = await recoverScenarios([agent028.currentModel.recoveryScenario])
   assert.deepEqual(recovery.decisions, [agent028.currentModel.expectedDecision])
 })
-test('WHAT[CHATEXEC-014] agent-028 legacy agent fields are hostile: dropped on re-encoding and inert on replay', () => {
+test('WHAT[managed-chat-execution-014] agent-028 legacy agent fields are hostile: dropped on re-encoding and inert on replay', () => {
   const hostileFact = (physicalUserMessageId, legacyAgent) => {
     const parsed = JSON.parse(agent028.currentModel.facts[0])
     const payload = parsed[1][1][1]
@@ -202,12 +202,12 @@ test('WHAT[CHATEXEC-014] agent-028 legacy agent fields are hostile: dropped on r
   assert.equal(folded.value[0].identity.participant, 'engineer', 'conflicting legacy fields cannot alter canonical participant')
   assert.equal(folded.value[0].identity.role, 'engineer')
 })
-test('WHAT[CHATEXEC-014] duplicate replay is idempotent and does not accumulate authority', async () => {
+test('WHAT[managed-chat-execution-014] duplicate replay is idempotent and does not accumulate authority', async () => {
   const captured = await captureEvidence(input, surfaces)
   const serialized = serializeEvidence(captured)
   assert.deepEqual(await replayEvidence(serialized, surfaces), await replayEvidence(serialized, surfaces))
 })
-test('WHAT[CHATEXEC-014] replay fails closed on tamper, version, unknown, or missing evidence', async () => {
+test('WHAT[managed-chat-execution-014] replay fails closed on tamper, version, unknown, or missing evidence', async () => {
   const captured = await captureEvidence(input, surfaces)
   const tampered = structuredClone(captured)
   tampered.execution.status.terminal = true
@@ -225,7 +225,7 @@ test('WHAT[CHATEXEC-014] replay fails closed on tamper, version, unknown, or mis
   delete missing.capacity
   await assert.rejects(replayEvidence(JSON.stringify(missing), surfaces), /missing incident evidence field 'capacity'/)
 })
-test('WHAT[CHATEXEC-014] replay rejects unsupported Host evidence and unknown recovery observations', async () => {
+test('WHAT[managed-chat-execution-014] replay rejects unsupported Host evidence and unknown recovery observations', async () => {
   const unsupported = { ...input, hostContract: { ...hostContract, supportedVersionRange: null, observedResult: 'unsupported' } }
   await assert.rejects(captureEvidence(unsupported, surfaces), /Host contract is not in an exact supported version/)
 

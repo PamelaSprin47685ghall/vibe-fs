@@ -36,7 +36,7 @@ const mustOk = (result, label = 'result') => {
   return result.value
 }
 
-test('WHAT[DURABLE-EVENTS-016] durable fact vocabulary has no OpenCode infrastructure dependency', () => {
+test('WHAT[durable-events-016] durable fact vocabulary has no OpenCode infrastructure dependency', () => {
   const readSource = (path) => readFileSync(new URL(`../../../${path}`, import.meta.url), 'utf8')
   const envelope = readSource('src/Wanxiangshu/Persistence/Journal/Envelope.fs')
   const fact = readSource('src/Wanxiangshu/Composition/Durable/Fact.fs')
@@ -72,7 +72,7 @@ const envelope = ({
   payloadRefs,
 })
 
-test('WHAT[DURABLE-EVENTS-016] Git_contract_exposes_canonical_store_ref', () => {
+test('WHAT[durable-events-016] Git_contract_exposes_canonical_store_ref', () => {
   assert.equal(eventStore.canonicalStoreRef, 'refs/wanxiang/store')
 })
 }
@@ -86,7 +86,7 @@ const { CANONICAL_EVENT_READER_OWNER_PATHS, DUAL_WRITE_ALLOWLIST, GIT_BYPASS_ALL
 const readFixture = (name) =>
   readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8')
 
-test('WHAT[DURABLE-EVENTS-016] scanner ids cover unified-store clean-break and history ownership rules', () => {
+test('WHAT[durable-events-016] scanner ids cover unified-store clean-break and history ownership rules', () => {
   assert.deepEqual([...SCANNER_IDS], [
     'feature-ref',
     'schema-version-in-store-context',
@@ -97,7 +97,7 @@ test('WHAT[DURABLE-EVENTS-016] scanner ids cover unified-store clean-break and h
     'canonical-shared-program',
   ])
 })
-test('WHAT[DURABLE-EVENTS-016] fixture unified-store-feature-ref.fs is RED for feature-ref', () => {
+test('WHAT[durable-events-016] fixture unified-store-feature-ref.fs is RED for feature-ref', () => {
   const source = readFixture('unified-store-feature-ref.fs')
   const hits = scanFeatureRef(source, 'Domain/CasebookStore.fs')
   assert.ok(hits.length >= 1, 'expected feature-ref violation')
@@ -106,7 +106,7 @@ test('WHAT[DURABLE-EVENTS-016] fixture unified-store-feature-ref.fs is RED for f
   assert.equal(scanSchemaVersionInStoreContext(source).length, 0)
   assert.equal(scanGitBypass(source, 'Domain/CasebookStore.fs').length, 0)
 })
-test('WHAT[DURABLE-EVENTS-016] fixture unified-store-git-bypass.fs is RED for git-bypass', () => {
+test('WHAT[durable-events-016] fixture unified-store-git-bypass.fs is RED for git-bypass', () => {
   const source = readFixture('unified-store-git-bypass.fs')
   const hits = scanGitBypass(source, 'Domain/FeatureGit.fs')
   assert.ok(hits.length >= 1, 'expected git-bypass violation')
@@ -115,7 +115,7 @@ test('WHAT[DURABLE-EVENTS-016] fixture unified-store-git-bypass.fs is RED for gi
   assert.equal(scanFeatureRef(source, 'Domain/FeatureGit.fs').length, 0)
   assert.equal(scanSchemaVersionInStoreContext(source).length, 0)
 })
-test('WHAT[DURABLE-EVENTS-016] canonical refs/wanxiang/store is allowed only under Persist/Git ownership', () => {
+test('WHAT[durable-events-016] canonical refs/wanxiang/store is allowed only under Persist/Git ownership', () => {
   const source = 'let storeRef = "refs/wanxiang/store"'
   assert.equal(
     scanFeatureRef(source, 'Infrastructure/Persist/GitRawStore.fs').length,
@@ -125,7 +125,7 @@ test('WHAT[DURABLE-EVENTS-016] canonical refs/wanxiang/store is allowed only und
   const red = scanFeatureRef(source, 'Domain/Casebook.fs')
   assert.ok(red.length >= 1)
 })
-test('WHAT[DURABLE-EVENTS-016] owner remote-tracking store ref is allowed; other feature refs stay RED', () => {
+test('WHAT[durable-events-016] owner remote-tracking store ref is allowed; other feature refs stay RED', () => {
   const remote = 'let r = "refs/wanxiang/remotes/origin/store"'
   assert.equal(
     scanFeatureRef(remote, 'Infrastructure/Persist/StoreTypes.fs').length,
@@ -141,7 +141,7 @@ test('WHAT[DURABLE-EVENTS-016] owner remote-tracking store ref is allowed; other
   )
   assert.ok(scanFeatureRef(feature, 'Domain/Casebook.fs').length >= 1)
 })
-test('WHAT[DURABLE-EVENTS-016] git-bypass allowlist is empty; only Persist/Git ownership may invoke git', () => {
+test('WHAT[durable-events-016] git-bypass allowlist is empty; only Persist/Git ownership may invoke git', () => {
   assert.deepEqual([...GIT_BYPASS_ALLOWLIST], [])
   const source = 'let c = { FileName = "git"; Arguments = [] }'
   assert.equal(scanGitBypass(source, 'src/Wanxiangshu/Git/Subject.fs').length, 0)
@@ -149,7 +149,7 @@ test('WHAT[DURABLE-EVENTS-016] git-bypass allowlist is empty; only Persist/Git o
   assert.ok(scanGitBypass(source, 'src/Wanxiangshu/Domain/Sneaky.fs').length >= 1)
   assert.ok(scanGitBypass(source, 'src/Wanxiangshu/Journal/RuntimePath.fs').length >= 1)
 })
-test('WHAT[DURABLE-EVENTS-016] production scan is GREEN under gate rules (empty git-bypass allowlist)', () => {
+test('WHAT[durable-events-016] production scan is GREEN under gate rules (empty git-bypass allowlist)', () => {
   const entries = collectProductionEntries()
   assert.ok(entries.length > 0, 'expected production .fs files')
   const violations = scanFiles(entries)

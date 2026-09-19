@@ -15,7 +15,7 @@ module WorkRecordSurface =
     /// COMPANION-012: capture a plain semantic projection and return its inclusive last cursor.
     val captureProjection: handle: JournalHandle -> sessionId: string -> projection: obj -> Task<obj>
 
-    /// WORK-RECORD-011 fixture seam: capture the private completion evidence
+    /// work-record-011 fixture seam: capture the private completion evidence
     /// through the canonical XTrace owner without exposing that owner to this
     /// package's JS tests.
     val captureTerminalText:

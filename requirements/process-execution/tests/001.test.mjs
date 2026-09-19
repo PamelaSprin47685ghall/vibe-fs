@@ -13,16 +13,16 @@ const {
   abortParent,
 } = await import('../../../dist/Process/Surface.js')
 
-test('WHAT[PROC-001] PTY_API_bytes_encodes_utf8', () => {
+test('WHAT[process-execution-001] PTY_API_bytes_encodes_utf8', () => {
   assert.deepEqual(bytes('abc'), [97, 98, 99])
   assert.deepEqual(bytes('é'), [0xc3, 0xa9])
   assert.deepEqual(bytes('雪'), [0xe9, 0x9b, 0xaa])
   assert.deepEqual(bytes(''), [])
 })
-test('WHAT[PROC-001] PTY_API_new_id_has_pty_prefix_and_eight_hex_chars', () => {
+test('WHAT[process-execution-001] PTY_API_new_id_has_pty_prefix_and_eight_hex_chars', () => {
   assert.match(ptyIdView(newId()), /^pty-[0-9a-f]{8}$/)
 })
-test('WHAT[PROC-001] PTY_API_new_id_is_unique_per_call', () => {
+test('WHAT[process-execution-001] PTY_API_new_id_is_unique_per_call', () => {
   const seen = new Set(Array.from({ length: 64 }, () => ptyIdView(newId())))
   assert.equal(seen.size, 64)
 })
@@ -57,12 +57,12 @@ const takeCompletions = (port, count = 1) => new Promise((resolve) => {
   })
 })
 
-test('WHAT[PROC-001] BACKEND_createPort_returns_a_working_port', () => {
+test('WHAT[process-execution-001] BACKEND_createPort_returns_a_working_port', () => {
   const port = backendCreatePort()
   assert.ok(port, 'port exists')
   assert.equal(portExists(port, ptyId('pty-b')), false)
 })
-test('WHAT[PROC-001] BACKEND_failed_fork_leaves_unknown_active_but_known_closed', async () => {
+test('WHAT[process-execution-001] BACKEND_failed_fork_leaves_unknown_active_but_known_closed', async () => {
   const port = backendCreatePort()
   const completion = takeCompletions(port)
   const pid = portFork(port, 'echo hi', 'devops', ptyId('pty-fa'), undefined)
@@ -70,7 +70,7 @@ test('WHAT[PROC-001] BACKEND_failed_fork_leaves_unknown_active_but_known_closed'
   assert.equal(portExists(port, pid), false)
   assert.equal(portKnown(port, pid), true)
 })
-test('WHAT[PROC-001] BACKEND_generated_id_also_fails_cleanly', async () => {
+test('WHAT[process-execution-001] BACKEND_generated_id_also_fails_cleanly', async () => {
   const port = backendCreatePort()
   const completion = takeCompletions(port)
   const pid = portFork(port, 'echo hi', 'devops', undefined, undefined)
@@ -78,32 +78,32 @@ test('WHAT[PROC-001] BACKEND_generated_id_also_fails_cleanly', async () => {
   assert.match(ptyIdView(pid), /^pty-[0-9a-f]{8}$/)
   assert.equal(item.ptyId, ptyIdView(pid))
 })
-test('WHAT[PROC-001] BACKEND_send_after_failed_fork_reports_closed', async () => {
+test('WHAT[process-execution-001] BACKEND_send_after_failed_fork_reports_closed', async () => {
   const port = backendCreatePort()
   const completion = takeCompletions(port)
   const pid = portFork(port, 'echo hi', 'devops', ptyId('pty-wc'), undefined)
   await completion
   assert.deepEqual(await portSend(port, pid, write), failure('PTY closed'))
 })
-test('WHAT[PROC-001] BACKEND_send_on_never_forked_id_is_unknown', async () => {
+test('WHAT[process-execution-001] BACKEND_send_on_never_forked_id_is_unknown', async () => {
   const port = backendCreatePort()
   assert.deepEqual(await portSend(port, ptyId('pty-uk'), write), failure('Unknown PTY id: pty-uk'))
 })
-test('WHAT[PROC-001] BACKEND_read_after_failed_fork_returns_empty_closed', async () => {
+test('WHAT[process-execution-001] BACKEND_read_after_failed_fork_returns_empty_closed', async () => {
   const port = backendCreatePort()
   const completion = takeCompletions(port)
   const pid = portFork(port, 'echo hi', 'devops', ptyId('pty-rf'), undefined)
   await completion
   assert.deepEqual(await portRead(port, pid), { ok: true, value: { output: '', closed: true } })
 })
-test('WHAT[PROC-001] BACKEND_read_never_forked_is_an_error', async () => {
+test('WHAT[process-execution-001] BACKEND_read_never_forked_is_an_error', async () => {
   const port = backendCreatePort()
   assert.deepEqual(await portRead(port, ptyId('pty-rn')), failure('Unknown PTY id: pty-rn'))
 })
-test('WHAT[PROC-001] BACKEND_close_all_with_nothing_active_resolves', async () => {
+test('WHAT[process-execution-001] BACKEND_close_all_with_nothing_active_resolves', async () => {
   await portCloseAll(backendCreatePort(), 0)
 })
-test('WHAT[PROC-001] BACKEND_ports_are_isolated_from_each_other', async () => {
+test('WHAT[process-execution-001] BACKEND_ports_are_isolated_from_each_other', async () => {
   const a = backendCreatePort()
   const b = backendCreatePort()
   const completion = takeCompletions(a)
@@ -113,7 +113,7 @@ test('WHAT[PROC-001] BACKEND_ports_are_isolated_from_each_other', async () => {
   assert.equal(portKnown(b, pid), false)
   assert.deepEqual(await portSend(b, pid, write), failure('Unknown PTY id: pty-iso'))
 })
-test('WHAT[PROC-001] BACKEND_signal_on_failed_id_is_rejected_as_closed', async () => {
+test('WHAT[process-execution-001] BACKEND_signal_on_failed_id_is_rejected_as_closed', async () => {
   const port = backendCreatePort()
   const completion = takeCompletions(port)
   const pid = portFork(port, 'echo hi', 'devops', ptyId('pty-sg'), undefined)
@@ -170,13 +170,13 @@ const completedItem = (port, pid, outcome) => {
   return got[0]
 }
 
-test('WHAT[PROC-001] PORT_ctor_defaults_are_safe_and_functional', async () => {
+test('WHAT[process-execution-001] PORT_ctor_defaults_are_safe_and_functional', async () => {
   const port = createPtyPort({})
   const pid = forkDefault(port, 'pty-x')
   assert.equal(portExists(port, pid), true)
   assert.deepEqual(await portSend(port, pid, write), success)
 })
-test('WHAT[PROC-001] PORT_ctor_keeps_supplied_sender_and_handler', async () => {
+test('WHAT[process-execution-001] PORT_ctor_keeps_supplied_sender_and_handler', async () => {
   const seen = []
   const receivedEvents = []
   const sender = (item) => receivedEvents.push(item)
@@ -198,7 +198,7 @@ test('WHAT[PROC-001] PORT_ctor_keeps_supplied_sender_and_handler', async () => {
   assert.equal(receivedEvents[0].outcome, 'done')
   assert.equal(receivedEvents[0].closed, true)
 })
-test('WHAT[PROC-001] PORT_fork_generates_pty_id_and_dispatches_spawn', async () => {
+test('WHAT[process-execution-001] PORT_fork_generates_pty_id_and_dispatches_spawn', async () => {
   const seen = []
   const port = createPtyPort({
     handler: async (pid, command) => {
@@ -212,7 +212,7 @@ test('WHAT[PROC-001] PORT_fork_generates_pty_id_and_dispatches_spawn', async () 
   assert.deepEqual(seen, [[value, 'Spawn', 'sleep 1', '']])
   assert.equal(portExists(port, pid), true)
 })
-test('WHAT[PROC-001] PORT_fork_honors_explicit_id_and_cwd', async () => {
+test('WHAT[process-execution-001] PORT_fork_honors_explicit_id_and_cwd', async () => {
   const seen = []
   const port = createPtyPort({
     handler: async (pid, command) => {
@@ -224,14 +224,14 @@ test('WHAT[PROC-001] PORT_fork_honors_explicit_id_and_cwd', async () => {
   assert.equal(ptyIdView(pid), 'pty-custom')
   assert.deepEqual(seen, [['pty-custom', 'ls -la', '/srv']])
 })
-test('WHAT[PROC-001] PORT_fork_twice_on_same_id_replaces_the_handle', () => {
+test('WHAT[process-execution-001] PORT_fork_twice_on_same_id_replaces_the_handle', () => {
   const port = createPtyPort({})
   forkDefault(port, 'pty-rf', 'first')
   forkDefault(port, 'pty-rf', 'second')
   assert.equal(portList(port).ptys.length, 1)
   assert.equal(portList(port).ptys[0].command, 'second')
 })
-test('WHAT[PROC-001] PORT_exists_and_known_track_active_and_closed', () => {
+test('WHAT[process-execution-001] PORT_exists_and_known_track_active_and_closed', () => {
   const port = createPtyPort({})
   const unknown = id('pty-ne')
   assert.equal(portExists(port, unknown), false)
@@ -245,7 +245,7 @@ test('WHAT[PROC-001] PORT_exists_and_known_track_active_and_closed', () => {
   assert.equal(portExists(port, pid), false)
   assert.equal(portKnown(port, pid), true)
 })
-test('WHAT[PROC-001] PORT_send_unknown_and_closed_ids_fail_with_distinct_reasons', async () => {
+test('WHAT[process-execution-001] PORT_send_unknown_and_closed_ids_fail_with_distinct_reasons', async () => {
   const port = createPtyPort({})
   assert.deepEqual(await portSend(port, id('pty-un'), write), failure('Unknown PTY id: pty-un'))
 
@@ -253,7 +253,7 @@ test('WHAT[PROC-001] PORT_send_unknown_and_closed_ids_fail_with_distinct_reasons
   portComplete(port, pid, { ok: true, value: 'done' })
   assert.deepEqual(await portSend(port, pid, write), failure('PTY closed'))
 })
-test('WHAT[PROC-001] PORT_send_forwards_command_and_propagates_handler_outcomes', async () => {
+test('WHAT[process-execution-001] PORT_send_forwards_command_and_propagates_handler_outcomes', async () => {
   const seen = []
   const port = createPtyPort({
     handler: async (_pid, command) => {
@@ -270,10 +270,10 @@ test('WHAT[PROC-001] PORT_send_forwards_command_and_propagates_handler_outcomes'
   assert.deepEqual(await portSend(port, pid, signalOf('HUP')), failure('signal exploded'))
   assert.deepEqual(seen, ['Resize', 'Write', 'Signal'])
 })
-test('WHAT[PROC-001] PORT_read_unknown_id_is_an_error', async () => {
+test('WHAT[process-execution-001] PORT_read_unknown_id_is_an_error', async () => {
   assert.deepEqual(await portRead(createPtyPort({}), id('pty-ru')), failure('Unknown PTY id: pty-ru'))
 })
-test('WHAT[PROC-001] PORT_read_after_close_returns_empty_closed_without_handling', async () => {
+test('WHAT[process-execution-001] PORT_read_after_close_returns_empty_closed_without_handling', async () => {
   const seen = []
   const port = createPtyPort({ handler: async (_pid, command) => { if (command.kind !== 'Spawn') seen.push(command.kind); return success } })
   const pid = forkDefault(port, 'pty-rc')
@@ -281,7 +281,7 @@ test('WHAT[PROC-001] PORT_read_after_close_returns_empty_closed_without_handling
   assert.deepEqual(await portRead(port, pid), { ok: true, value: { output: '', closed: true } })
   assert.deepEqual(seen, [])
 })
-test('WHAT[PROC-001] PORT_read_parks_waiter_and_read_result_resolves_it', async () => {
+test('WHAT[process-execution-001] PORT_read_parks_waiter_and_read_result_resolves_it', async () => {
   const seen = []
   const port = createPtyPort({ handler: async (_pid, command) => { if (command.kind !== 'Spawn') seen.push(command.kind); return success } })
   const pid = forkDefault(port, 'pty-pr')
@@ -290,7 +290,7 @@ test('WHAT[PROC-001] PORT_read_parks_waiter_and_read_result_resolves_it', async 
   portReadResult(port, pid, 'buffered', false)
   assert.deepEqual(await read, { ok: true, value: { output: 'buffered', closed: false } })
 })
-test('WHAT[PROC-001] PORT_read_result_can_report_closed_and_reparks_after_resolution', async () => {
+test('WHAT[process-execution-001] PORT_read_result_can_report_closed_and_reparks_after_resolution', async () => {
   const port = createPtyPort({})
   const pid = forkDefault(port, 'pty-pr2')
   const first = portRead(port, pid)
@@ -301,7 +301,7 @@ test('WHAT[PROC-001] PORT_read_result_can_report_closed_and_reparks_after_resolu
   portReadResult(port, pid, 'again', false)
   assert.deepEqual(await second, { ok: true, value: { output: 'again', closed: false } })
 })
-test('WHAT[PROC-001] PORT_concurrent_read_fails_fast_without_unparking', async () => {
+test('WHAT[process-execution-001] PORT_concurrent_read_fails_fast_without_unparking', async () => {
   const port = createPtyPort({})
   const pid = forkDefault(port, 'pty-cc')
   const first = portRead(port, pid)
@@ -309,14 +309,14 @@ test('WHAT[PROC-001] PORT_concurrent_read_fails_fast_without_unparking', async (
   portReadResult(port, pid, 'kept', false)
   assert.deepEqual(await first, { ok: true, value: { output: 'kept', closed: false } })
 })
-test('WHAT[PROC-001] PORT_fail_read_resolves_parked_reader_with_error', async () => {
+test('WHAT[process-execution-001] PORT_fail_read_resolves_parked_reader_with_error', async () => {
   const port = createPtyPort({})
   const pid = forkDefault(port, 'pty-fr')
   const read = portRead(port, pid)
   portFailRead(port, pid, 'backend died')
   assert.deepEqual(await read, failure('backend died'))
 })
-test('WHAT[PROC-001] PORT_read_result_and_fail_read_without_waiter_are_noops', () => {
+test('WHAT[process-execution-001] PORT_read_result_and_fail_read_without_waiter_are_noops', () => {
   const port = createPtyPort({})
   const pid = forkDefault(port, 'pty-nw')
   portReadResult(port, pid, 'orphan', false)
@@ -403,13 +403,13 @@ const portWith = (value) => {
   return p
 }
 
-test('WHAT[PROC-001] SUPERVISOR_signalName_maps_every_signal_to_a_kill_name', () => {
+test('WHAT[process-execution-001] SUPERVISOR_signalName_maps_every_signal_to_a_kill_name', () => {
   for (const [wire, expected] of [
     ['TERM', 'SIGTERM'], ['KILL', 'SIGKILL'], ['INT', 'SIGINT'], ['HUP', 'SIGHUP'],
     ['QUIT', 'SIGQUIT'], ['USR1', 'SIGUSR1'], ['USR2', 'SIGUSR2'],
   ]) assert.equal(supervisorSignalName(wire), expected)
 })
-test('WHAT[PROC-001] SUPERVISOR_ensureSpawn_reuses_one_loader_and_faults_without_bun_pty', async () => {
+test('WHAT[process-execution-001] SUPERVISOR_ensureSpawn_reuses_one_loader_and_faults_without_bun_pty', async () => {
   const supervisor = supervisorCreate()
   const first = supervisorEnsureSpawn(supervisor)
   const second = supervisorEnsureSpawn(supervisor)
@@ -417,10 +417,10 @@ test('WHAT[PROC-001] SUPERVISOR_ensureSpawn_reuses_one_loader_and_faults_without
   await assert.rejects(first)
   assert.throws(() => supervisorSpawnSync(supervisor, 'echo hi', ''), /bun-pty is not loaded/)
 })
-test('WHAT[PROC-001] SUPERVISOR_spawnSync_fails_fast_when_loader_never_ran', () => {
+test('WHAT[process-execution-001] SUPERVISOR_spawnSync_fails_fast_when_loader_never_ran', () => {
   assert.throws(() => supervisorSpawnSync(supervisorCreate(), 'echo hi', ''), /bun-pty is not loaded/)
 })
-test('WHAT[PROC-001] SUPERVISOR_spawnSync_invokes_sh_lc_with_fixed_options', () => {
+test('WHAT[process-execution-001] SUPERVISOR_spawnSync_invokes_sh_lc_with_fixed_options', () => {
   const supervisor = supervisorCreate()
   let seen
   supervisorSetSpawn(supervisor, (shell, args, options) => {
@@ -436,7 +436,7 @@ test('WHAT[PROC-001] SUPERVISOR_spawnSync_invokes_sh_lc_with_fixed_options', () 
   assert.equal(seen[2].rows, 24)
   assert.equal(seen[2].cwd, '/tmp/work')
 })
-test('WHAT[PROC-001] SUPERVISOR_spawnSync_defaults_cwd_to_process_cwd', () => {
+test('WHAT[process-execution-001] SUPERVISOR_spawnSync_defaults_cwd_to_process_cwd', () => {
   const supervisor = supervisorCreate()
   let seenCwd
   supervisorSetSpawn(supervisor, (_shell, _args, options) => {
@@ -446,14 +446,14 @@ test('WHAT[PROC-001] SUPERVISOR_spawnSync_defaults_cwd_to_process_cwd', () => {
   supervisorSpawnSync(supervisor, 'ls', '')
   assert.equal(seenCwd, process.cwd())
 })
-test('WHAT[PROC-001] SUPERVISOR_applyLive_closed_session_short_circuits_ok', async () => {
+test('WHAT[process-execution-001] SUPERVISOR_applyLive_closed_session_short_circuits_ok', async () => {
   const supervisor = supervisorCreate()
   const session = sessionCreate('pty-c', null)
   sessionSetClosed(session, true)
   supervisorAdd(supervisor, id('pty-c'), session)
   assert.deepEqual(await supervisorApplyLive(supervisor, port(), id('pty-c'), ptyCommandRead()), resultOk)
 })
-test('WHAT[PROC-001] SUPERVISOR_applyLive_write_forwards_utf8_to_backend', async () => {
+test('WHAT[process-execution-001] SUPERVISOR_applyLive_write_forwards_utf8_to_backend', async () => {
   const supervisor = supervisorCreate()
   const writes = []
   const backend = { write: (text) => writes.push(text) }
@@ -462,13 +462,13 @@ test('WHAT[PROC-001] SUPERVISOR_applyLive_write_forwards_utf8_to_backend', async
   assert.deepEqual(result, resultOk)
   assert.deepEqual(writes, ['héllo'])
 })
-test('WHAT[PROC-001] SUPERVISOR_applyLive_write_backend_error_becomes_error_result', async () => {
+test('WHAT[process-execution-001] SUPERVISOR_applyLive_write_backend_error_becomes_error_result', async () => {
   const supervisor = supervisorCreate()
   const backend = { write: () => { throw new Error('EPIPE') } }
   supervisorAdd(supervisor, id('pty-we'), sessionCreate('pty-we', backend))
   assert.deepEqual(await supervisorApplyLive(supervisor, port(), id('pty-we'), ptyCommandWrite(new Uint8Array(0))), resultError('EPIPE'))
 })
-test('WHAT[PROC-001] SUPERVISOR_applyLive_read_drains_buffer_into_port', async () => {
+test('WHAT[process-execution-001] SUPERVISOR_applyLive_read_drains_buffer_into_port', async () => {
   const supervisor = supervisorCreate()
   const p = portWith('pty-re')
   const session = sessionCreate('pty-re', {})
@@ -481,7 +481,7 @@ test('WHAT[PROC-001] SUPERVISOR_applyLive_read_drains_buffer_into_port', async (
   portReadResult(p, id('pty-re'), 'after', false)
   assert.deepEqual(await read, { ok: true, value: { output: 'after', closed: false } })
 })
-test('WHAT[PROC-001] SUPERVISOR_applyLive_resize_swallows_backend_errors', async () => {
+test('WHAT[process-execution-001] SUPERVISOR_applyLive_resize_swallows_backend_errors', async () => {
   const supervisor = supervisorCreate()
   const resizes = []
   const backend = { resize: (width, height) => { resizes.push([width, height]); throw new Error('nope') } }
@@ -489,12 +489,12 @@ test('WHAT[PROC-001] SUPERVISOR_applyLive_resize_swallows_backend_errors', async
   assert.deepEqual(await supervisorApplyLive(supervisor, port(), id('pty-z'), ptyCommandResize(120, 40)), resultOk)
   assert.deepEqual(resizes, [[120, 40]])
 })
-test('WHAT[PROC-001] SUPERVISOR_applyLive_spawn_on_live_backend_is_a_noop', async () => {
+test('WHAT[process-execution-001] SUPERVISOR_applyLive_spawn_on_live_backend_is_a_noop', async () => {
   const supervisor = supervisorCreate()
   supervisorAdd(supervisor, id('pty-sp'), sessionCreate('pty-sp', {}))
   assert.deepEqual(await supervisorApplyLive(supervisor, port(), id('pty-sp'), ptyCommandSpawn('x', '')), resultOk)
 })
-test('WHAT[PROC-001] SUPERVISOR_applyLive_write_without_backend_parks_until_resolved', async () => {
+test('WHAT[process-execution-001] SUPERVISOR_applyLive_write_without_backend_parks_until_resolved', async () => {
   const supervisor = supervisorCreate()
   const session = sessionCreate('pty-p', null)
   supervisorAdd(supervisor, id('pty-p'), session)
@@ -504,7 +504,7 @@ test('WHAT[PROC-001] SUPERVISOR_applyLive_write_without_backend_parks_until_reso
   pendingResolve(entries, 0, resultOk)
   assert.deepEqual(await pending, resultOk)
 })
-test('WHAT[PROC-001] SUPERVISOR_applyLive_parked_write_resolves_with_error', async () => {
+test('WHAT[process-execution-001] SUPERVISOR_applyLive_parked_write_resolves_with_error', async () => {
   const supervisor = supervisorCreate()
   const session = sessionCreate('pty-pe', null)
   supervisorAdd(supervisor, id('pty-pe'), session)
@@ -513,7 +513,7 @@ test('WHAT[PROC-001] SUPERVISOR_applyLive_parked_write_resolves_with_error', asy
   pendingResolve(entries, 0, resultError('backend vanished'))
   assert.deepEqual(await pending, resultError('backend vanished'))
 })
-test('WHAT[PROC-001] SUPERVISOR_applyLive_non_write_commands_without_backend_return_ok_immediately', async () => {
+test('WHAT[process-execution-001] SUPERVISOR_applyLive_non_write_commands_without_backend_return_ok_immediately', async () => {
   const supervisor = supervisorCreate()
   const session = sessionCreate('pty-nb', null)
   supervisorAdd(supervisor, id('pty-nb'), session)
@@ -547,7 +547,7 @@ const {
   portList,
 } = await import('../../../dist/Process/Surface.js')
 
-test('WHAT[PROC-001] PTY_TYPES_tryParse_accepts_every_supported_signal_name', () => {
+test('WHAT[process-execution-001] PTY_TYPES_tryParse_accepts_every_supported_signal_name', () => {
   const expected = [
     ['TERM', 'SIGTERM'],
     ['KILL', 'SIGKILL'],
@@ -562,7 +562,7 @@ test('WHAT[PROC-001] PTY_TYPES_tryParse_accepts_every_supported_signal_name', ()
     assert.equal(ptySignalView(wire), name)
   }
 })
-test('WHAT[PROC-001] PTY_TYPES_tryParse_rejects_unknown_and_prefixed_names', () => {
+test('WHAT[process-execution-001] PTY_TYPES_tryParse_rejects_unknown_and_prefixed_names', () => {
   for (const bad of ['SIGTERM', 'term', '', 'SIGKILL', 'STOP']) {
     const parsed = signalParse(bad)
     assert.equal(parsed.ok, false, bad)
@@ -570,7 +570,7 @@ test('WHAT[PROC-001] PTY_TYPES_tryParse_rejects_unknown_and_prefixed_names', () 
     if (bad !== '') assert.ok(String(parsed.error).includes(bad), `${bad} echoed in error`)
   }
 })
-test('WHAT[PROC-001] PTY_TYPES_command_views_carry_their_fields', () => {
+test('WHAT[process-execution-001] PTY_TYPES_command_views_carry_their_fields', () => {
   assert.deepEqual(ptyCommandView(ptyCommandSpawn('sh -c ls', '/tmp')), {
     kind: 'Spawn',
     command: 'sh -c ls',
@@ -588,10 +588,10 @@ test('WHAT[PROC-001] PTY_TYPES_command_views_carry_their_fields', () => {
     height: 40,
   })
 })
-test('WHAT[PROC-001] PTY_TYPES_pty_id_roundtrips_its_value', () => {
+test('WHAT[process-execution-001] PTY_TYPES_pty_id_roundtrips_its_value', () => {
   assert.equal(ptyIdView(ptyId('pty-deadbeef')), 'pty-deadbeef')
 })
-test('WHAT[PROC-001] PTY_TYPES_pty_handle_view_exposes_identity_and_command', () => {
+test('WHAT[process-execution-001] PTY_TYPES_pty_handle_view_exposes_identity_and_command', () => {
   const port = createPtyPort({})
   const id = portFork(port, 'sleep 1', 'devops', ptyId('pty-1'), undefined)
   const listed = portList(port).ptys
@@ -602,7 +602,7 @@ test('WHAT[PROC-001] PTY_TYPES_pty_handle_view_exposes_identity_and_command', ()
   assert.ok(typeof listed[0].startedAt === 'string')
   assert.equal(ptyIdView(id), 'pty-1')
 })
-test('WHAT[PROC-001] PTY_TYPES_pty_read_view_reports_output_and_closed', async () => {
+test('WHAT[process-execution-001] PTY_TYPES_pty_read_view_reports_output_and_closed', async () => {
   const port = createPtyPort({})
   const id = portFork(port, 'echo hi', 'devops', ptyId('pty-read'), undefined)
   const pending = portRead(port, id)
@@ -610,7 +610,7 @@ test('WHAT[PROC-001] PTY_TYPES_pty_read_view_reports_output_and_closed', async (
   assert.deepEqual(await pending, { ok: true, value: { output: 'partial output', closed: true } })
   portComplete(port, id, undefined)
 })
-test('WHAT[PROC-001] PTY_TYPES_read_plans_cover_unknown_in_progress_closed_and_park', async () => {
+test('WHAT[process-execution-001] PTY_TYPES_read_plans_cover_unknown_in_progress_closed_and_park', async () => {
   const port = createPtyPort({})
   const unknown = await portRead(port, ptyId('pty-unknown'))
   assert.deepEqual(unknown, { ok: false, error: 'Unknown PTY id: pty-unknown' })

@@ -16,7 +16,7 @@ function shuffledCopies(list) {
   return [list.slice(), list.slice().reverse(), [list[1], list[0], list[2], list[3]].filter(Boolean)];
 }
 
-test('WHAT[EPI-022] batch_respects_dependencies_conflicts_and_budget_or_naive_scheduler_overcommits', async () => {
+test('WHAT[epistemic-reasoning-022] batch_respects_dependencies_conflicts_and_budget_or_naive_scheduler_overcommits', async () => {
   const surface = gecSurface;
   const targets = [
     target({ id: 't-root', cost: { compute: 1, budget: 1 } }),
@@ -49,7 +49,7 @@ test('WHAT[EPI-022] batch_respects_dependencies_conflicts_and_budget_or_naive_sc
   assert.ok(total <= 5, 'batched cost must stay within budget');
 });
 
-test('WHAT[EPI-022] incomparable_losses_keep_pareto_frontier_or_scalar_sum_hides_tradeoff', async () => {
+test('WHAT[epistemic-reasoning-022] incomparable_losses_keep_pareto_frontier_or_scalar_sum_hides_tradeoff', async () => {
   const surface = gecSurface;
   const targets = [
     target({ id: 't-alpha', loss: { currency: 'alpha-loss', value: 0.1 } }),
@@ -71,7 +71,7 @@ test('WHAT[EPI-022] incomparable_losses_keep_pareto_frontier_or_scalar_sum_hides
   assert.ok(summed.batch.includes('t-one'), 'with a declared common currency the better loss must be preferred');
 });
 
-test('WHAT[EPI-022] unconverted-loss-currencies-stay-incomparable-despite-shared-common-currency', async () => {
+test('WHAT[epistemic-reasoning-022] unconverted-loss-currencies-stay-incomparable-despite-shared-common-currency', async () => {
   const surface = gecSurface;
   const targets = [
     target({ id: 't-one', loss: { currency: 'alpha-loss', value: 0.2 }, commonCurrency: 'shared' }),
@@ -83,7 +83,7 @@ test('WHAT[EPI-022] unconverted-loss-currencies-stay-incomparable-despite-shared
   assert.ok(result.pareto.includes('t-two'), 'the numerically larger unconverted loss must stay on the frontier');
 });
 
-test('WHAT[EPI-022] batch_composes_by_canonical_order_not_input_sum_or_delta_addition_reorders_semantics', async () => {
+test('WHAT[epistemic-reasoning-022] batch_composes_by_canonical_order_not_input_sum_or_delta_addition_reorders_semantics', async () => {
   const surface = gecSurface;
   const targets = [
     target({ id: 't-zeta', loss: { currency: 'shared', value: 0.3 }, commonCurrency: 'shared' }),

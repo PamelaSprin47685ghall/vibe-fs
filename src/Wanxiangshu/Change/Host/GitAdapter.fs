@@ -75,9 +75,9 @@ module OrchestratorGit =
         }
 
     // semantic-decorator-owner: change-integration
-    // semantic-decorator-WHAT: CHGINT-003
+    // semantic-decorator-WHAT: change-integration-003
     // semantic-decorator-trace-relation: delete stale REBASE_HEAD exactly once before the single candidate commit attempt
-    // semantic-decorator-proof: requirements/change-integration/tests/git-operations.test.mjs::WHAT[CHGINT-003] GIT_candidate_commit_deletes_stale_rebase_head_before_commit_and_surfaces_failure
+    // semantic-decorator-proof: requirements/change-integration/tests/git-operations.test.mjs::WHAT[change-integration-003] GIT_candidate_commit_deletes_stale_rebase_head_before_commit_and_surfaces_failure
     // semantic-decorator-failure-policy: ignore stale-ref deletion outcome; surface commit stderr unless git reports nothing to commit
     // semantic-decorator-cancel-policy: cancellation is owned by the injected command runner and stops before the next command
     // semantic-decorator-deadline-policy: each command uses the runner deadline; no sequence-level deadline extension

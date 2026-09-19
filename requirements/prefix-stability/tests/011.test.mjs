@@ -120,7 +120,7 @@ const historicalMutations = (target) => {
   return mutations
 }
 
-test('WHAT[PREFIX-STABILITY-011] PREFIX_STABILITY_epoch_switches_are_fact_driven_not_estimate_driven', () => {
+test('WHAT[prefix-stability-011] PREFIX_STABILITY_epoch_switches_are_fact_driven_not_estimate_driven', () => {
   const drift = wire([msg('m1', 'user', 'FIRST CHANGED')])
   assert.equal(providerProjection.isAppendOnlyPrefix(drift, W2), false, 'drift is real and byte-level')
 

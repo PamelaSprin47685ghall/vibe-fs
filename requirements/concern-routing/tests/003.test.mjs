@@ -5,7 +5,7 @@ import * as concern from '../../../dist/Interaction/Concern/Surface.js'
 
 const read = (path) => readFileSync(path, 'utf8')
 
-test('WHAT[CONCERN-ROUTING-003] publish fails closed for unknown and stale generations instead of retargeting', () => {
+test('WHAT[concern-routing-003] publish fails closed for unknown and stale generations instead of retargeting', () => {
   assert.equal(concern.publish('sender', 'msg-0', 'missing', 'x', concern.empty()).ok, false)
 
   let state = concern.subscribe('owner-a', 'gen-1', 'build', 'build health', concern.empty()).state

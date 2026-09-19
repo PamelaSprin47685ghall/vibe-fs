@@ -117,7 +117,7 @@ module CompletedTurnClassifier =
                 )
             )
 
-    /// PAR-008: unusable formal content (empty / XML-only) is content damage, not
+    /// provider-attempt-recovery-008: unusable formal content (empty / XML-only) is content damage, not
     /// a provider request failure. Such a turn earns at most one bounded
     /// Interaction Repair and never advances the failure budget.
     let formalContentUnusable (parts: MessagePart array) : bool =

@@ -5,7 +5,7 @@ import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 
 const templateUrl = new URL('../../../resources/wanxiangshu.mjs', import.meta.url)
 
-test('WHAT[EMR-018] routing supports new role collection (Engineer, DevOps) and decouples legacy slots', async () => {
+test('WHAT[execution-model-routing-018] routing supports new role collection (Engineer, DevOps) and decouples legacy slots', async () => {
   const source = await readFile(templateUrl, 'utf8')
   assert.match(source, /export default function route/)
   const { default: route } = await import(`${templateUrl.href}?test=${Date.now()}`)

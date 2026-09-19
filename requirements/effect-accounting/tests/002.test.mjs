@@ -23,19 +23,19 @@ const remainsPending = async (run, message) => {
   assert.equal(resolved, false, `${message} must not resolve the run completion cell`)
 }
 
-test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_MissingFinalReport_Failed_keeps_run_pending_not_failed', async () => {
+test('WHAT[effect-accounting-002] EXEC_join_MissingFinalReport_Failed_keeps_run_pending_not_failed', async () => {
   const run = lifecycleModule.HostForkRunLifecycleSurface_create({ agentId: 'agent-mfr', childId: 'ses_mfr_child', parentId: 'ses_mfr_parent' })
   await lifecycleModule.HostForkRunLifecycleSurface_complete(run, { kind: 'Failed', message: 'MISSING_FINAL_REPORT' })
   await remainsPending(run, 'MISSING_FINAL_REPORT')
 })
 
-test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_empty_Completed_keeps_run_pending_not_failed', async () => {
+test('WHAT[effect-accounting-002] EXEC_join_empty_Completed_keeps_run_pending_not_failed', async () => {
   const run = makeRun('agent-empty', 'ses_empty_child', 'ses_empty_parent')
   await lifecycle.complete(run, { kind: 'Completed', terminalText: '' })
   await remainsPending(run, 'empty Completed')
 })
 
-test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_interaction_repair_exhausted_settles_the_run', async () => {
+test('WHAT[effect-accounting-002] EXEC_join_interaction_repair_exhausted_settles_the_run', async () => {
   const run = makeRun('agent-repair-exhausted', 'ses_repair_exhausted_child', 'ses_repair_exhausted_parent')
   await lifecycle.complete(run, { kind: 'Failed', message: 'INTERACTION_REPAIR_EXHAUSTED' })
 
@@ -50,7 +50,7 @@ test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_interaction_repair_exhausted_settles
   })
 })
 
-test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_real_Failed_still_claims_run', async () => {
+test('WHAT[effect-accounting-002] EXEC_join_real_Failed_still_claims_run', async () => {
   const run = makeRun('agent-real', 'ses_real_child', 'ses_real_parent')
   await lifecycle.complete(run, { kind: 'Failed', message: 'provider timeout' })
 
@@ -65,7 +65,7 @@ test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_real_Failed_still_claims_run', async
   })
 })
 
-test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_first_proven_terminal_is_single_assignment', async () => {
+test('WHAT[effect-accounting-002] EXEC_join_first_proven_terminal_is_single_assignment', async () => {
   const failedFirst = makeRun('agent-failed-first', 'ses_failed_first_child', 'ses_failed_first_parent')
   await lifecycle.complete(failedFirst, { kind: 'Failed', message: 'providers exhausted' })
   await lifecycle.complete(failedFirst, { kind: 'Completed', terminalText: 'late success' })

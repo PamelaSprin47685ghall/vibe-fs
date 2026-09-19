@@ -35,13 +35,13 @@ const assertHookOk = (result) => {
   assert.equal(result.status, 0, `hook failed: ${result.stderr || result.stdout}`)
 }
 
-test('WHAT[DURABLE-CONVERGENCE-009] dumb_remote_helper_has_no_Wanxiang_domain_or_projection_logic', () => {
+test('WHAT[durable-convergence-009] dumb_remote_helper_has_no_Wanxiang_domain_or_projection_logic', () => {
   const source = readFileSync(new URL('../../../verification-system/tests/support/dumb-remote.mjs', import.meta.url), 'utf8')
   assert.doesNotMatch(source, /dist\/Domain|CanonicalIntegrator|Projection|WriterStreamSync|HookSync/)
   assert.match(source, /git/)
 })
 
-test('WHAT[DURABLE-CONVERGENCE-009] pre_push_hook_process_uploads_one_local_writer_file_to_bare_remote_store_ref', async () => {
+test('WHAT[durable-convergence-009] pre_push_hook_process_uploads_one_local_writer_file_to_bare_remote_store_ref', async () => {
   const ws = createBareWorkspace(['a'])
   try {
     const repo = ws.client('a')
@@ -60,7 +60,7 @@ test('WHAT[DURABLE-CONVERGENCE-009] pre_push_hook_process_uploads_one_local_writ
   }
 })
 
-test('WHAT[DURABLE-CONVERGENCE-009] second_machine_hook_imports_remote_writer_truth_without_any_running_Wanxiang_process', async () => {
+test('WHAT[durable-convergence-009] second_machine_hook_imports_remote_writer_truth_without_any_running_Wanxiang_process', async () => {
   const ws = createBareWorkspace(['a', 'b'])
   try {
     const a = ws.client('a')
@@ -88,7 +88,7 @@ test('WHAT[DURABLE-CONVERGENCE-009] second_machine_hook_imports_remote_writer_tr
   }
 })
 
-test('WHAT[DURABLE-CONVERGENCE-009] two_offline_clients_converge_by_whole_writer_files_and_repeat_is_idempotent', async () => {
+test('WHAT[durable-convergence-009] two_offline_clients_converge_by_whole_writer_files_and_repeat_is_idempotent', async () => {
   const ws = createBareWorkspace(['a', 'b'])
   try {
     const a = ws.client('a')

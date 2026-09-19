@@ -13,7 +13,7 @@ import * as sharedStateSurface from '../../../dist/OpenCode/Host/SharedStateSurf
 
 
 
-test('WHAT[HOST-BOUNDARY-010] SHARED_dictionaries_are_live_singletons_shared_across_importers', async () => {
+test('WHAT[host-boundary-010] SHARED_dictionaries_are_live_singletons_shared_across_importers', async () => {
   // SessionParents: mutations made through one import must be visible through
   // a fresh dynamic import of the same surface. A per-instance Map (the
   // HOST-012 failure mode) would not retain the entry across imports.

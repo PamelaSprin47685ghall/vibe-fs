@@ -494,7 +494,7 @@ module PromptAuthority =
             && dispatch.PayloadDigest = payloadDigest)
         |> Option.map (fun dispatch -> dispatch.PhysicalUserMessageId)
 
-    /// PAR-008: has this Blogger request + terminal occasion already spent its one repair.
+    /// provider-attempt-recovery-008: has this Blogger request + terminal occasion already spent its one repair.
     /// Blogger protocol repair deliberately uses both axes: request identity
     /// prevents cross-request leakage on a long-lived run, while terminal identity
     /// distinguishes same-terminal re-entry from a new invalid terminal.

@@ -120,13 +120,13 @@ const historicalMutations = (target) => {
   return mutations
 }
 
-test('WHAT[PREFIX-STABILITY-013] PREFIX_STABILITY_tool_set_change_breaks_the_law_even_if_messages_prefix', () => {
+test('WHAT[prefix-stability-013] PREFIX_STABILITY_tool_set_change_breaks_the_law_even_if_messages_prefix', () => {
   const fewerTools = wire([msg('m1', 'user', 'first')], { tools: ['read'] })
   assert.equal(providerProjection.isAppendOnlyPrefix(fewerTools, W2), false, 'tools must be identical, not merely prefixed')
   assert.equal(providerProjection.isAppendOnlyPrefix(W1, fewerTools), false)
 })
 
-test('WHAT[PREFIX-STABILITY-013] PREFIX_STABILITY_identity_or_system_change_breaks_the_law', () => {
+test('WHAT[prefix-stability-013] PREFIX_STABILITY_identity_or_system_change_breaks_the_law', () => {
   const otherProvider = wire([msg('m1', 'user', 'first')], { providerId: 'anthropic' })
   const otherModel = wire([msg('m1', 'user', 'first')], { modelId: 'gpt-4o-mini' })
   const otherVariant = wire([msg('m1', 'user', 'first')], { variant: 'fast' })
@@ -142,7 +142,7 @@ test('WHAT[PREFIX-STABILITY-013] PREFIX_STABILITY_identity_or_system_change_brea
   }
 })
 
-test('WHAT[PREFIX-STABILITY-013] PREFIX_STABILITY_reverse_order_is_not_a_prefix', () => {
+test('WHAT[prefix-stability-013] PREFIX_STABILITY_reverse_order_is_not_a_prefix', () => {
   assert.equal(providerProjection.isAppendOnlyPrefix(W2, W1), false, 'a longer history is not a prefix of a shorter one')
   assert.equal(providerProjection.isAppendOnlyPrefix(W3, W1), false)
 })

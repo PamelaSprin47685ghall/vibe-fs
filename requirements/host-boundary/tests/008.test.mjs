@@ -15,7 +15,7 @@ const msg = ({ id, role, parentID, created = 1, completed = false, summary = fal
   summary,
 })
 
-test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 the bindable run is the unsealed assistant child of the physical user message', () => {
+test('WHAT[host-boundary-008] host-boundary-008 the bindable run is the unsealed assistant child of the physical user message', () => {
   const physical = 'msg_user_1'
   const messages = projectMessages([
     msg({ id: physical, role: 'user' }),
@@ -25,14 +25,14 @@ test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 the bindable run is the unsealed
   assert.equal(result.ok, true)
   assert.equal(result.id, 'asst_bindable')
 })
-test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 no bindable run means no ToolContext messageID to treat as the sealed run', () => {
+test('WHAT[host-boundary-008] host-boundary-008 no bindable run means no ToolContext messageID to treat as the sealed run', () => {
   const physical = 'msg_user_1'
   const messages = projectMessages([msg({ id: physical, role: 'user' })])
   const result = bindableRun(physical, messages)
   assert.equal(result.ok, false)
   assert.equal(result.error, 'NoBindableRun')
 })
-test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 duplicate bindable runs fail closed', () => {
+test('WHAT[host-boundary-008] host-boundary-008 duplicate bindable runs fail closed', () => {
   const physical = 'msg_user_1'
   const messages = projectMessages([
     msg({ id: 'asst_1', role: 'assistant', parentID: physical }),
@@ -43,7 +43,7 @@ test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 duplicate bindable runs fail clo
   assert.equal(result.error, 'AmbiguousRun')
   assert.equal(result.count, 2)
 })
-test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 projection lag may catch up to the unique bindable run', () => {
+test('WHAT[host-boundary-008] host-boundary-008 projection lag may catch up to the unique bindable run', () => {
   const physical = 'msg_user_1'
   const result = observeSequence(physical, [
     projectMessages([msg({ id: physical, role: 'user' })]),
@@ -59,7 +59,7 @@ test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 projection lag may catch up to t
     reads: 2,
   })
 })
-test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 ambiguity is not retried as projector lag', () => {
+test('WHAT[host-boundary-008] host-boundary-008 ambiguity is not retried as projector lag', () => {
   const physical = 'msg_user_1'
   const result = observeSequence(physical, [
     projectMessages([
@@ -79,7 +79,7 @@ test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 ambiguity is not retried as proj
     reads: 1,
   })
 })
-test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 not-latest rejection is not retried as projector lag', () => {
+test('WHAT[host-boundary-008] host-boundary-008 not-latest rejection is not retried as projector lag', () => {
   const physical = 'msg_user_1'
   const result = observeSequence(physical, [
     projectMessages([
@@ -98,7 +98,7 @@ test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 not-latest rejection is not retr
     reads: 1,
   })
 })
-test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 latest run follows Host creation time rather than lexical ID or list order', () => {
+test('WHAT[host-boundary-008] host-boundary-008 latest run follows Host creation time rather than lexical ID or list order', () => {
   const physical = 'msg_user_1'
   const olderCandidate = msg({ id: 'zzz-older', role: 'assistant', parentID: physical, created: 10 })
   const newerAssistant = msg({ id: 'aaa-newer', role: 'assistant', parentID: 'msg_other', created: 20 })
@@ -113,7 +113,7 @@ test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 latest run follows Host creation
     })
   }
 })
-test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 invalid Host creation sequence fails closed', () => {
+test('WHAT[host-boundary-008] host-boundary-008 invalid Host creation sequence fails closed', () => {
   const physical = 'msg_user_1'
 
   for (const created of [null, '20', Number.NaN, Number.POSITIVE_INFINITY]) {
@@ -125,7 +125,7 @@ test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 invalid Host creation sequence f
     )
   }
 })
-test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 compaction is not retried as projector lag', () => {
+test('WHAT[host-boundary-008] host-boundary-008 compaction is not retried as projector lag', () => {
   const physical = 'msg_user_1'
   const result = observeSequence(physical, [
     projectMessages([
@@ -143,7 +143,7 @@ test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 compaction is not retried as pro
     reads: 1,
   })
 })
-test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 projection catch-up is bounded by the production read budget', () => {
+test('WHAT[host-boundary-008] host-boundary-008 projection catch-up is bounded by the production read budget', () => {
   const physical = 'msg_user_1'
   const missing = projectMessages([msg({ id: physical, role: 'user' })])
   const result = observeSequence(physical, Array.from({ length: 8 }, () => missing))
@@ -180,7 +180,7 @@ const fakeTimer = () => {
   return { port, deadlines }
 }
 
-test('WHAT[HOST-BOUNDARY-008] message_visibility_signal_wakes_waiter_and_cancels_deadline', async () => {
+test('WHAT[host-boundary-008] message_visibility_signal_wakes_waiter_and_cancels_deadline', async () => {
   const timer = fakeTimer()
   const hub = surface.create(timer.port)
 
@@ -193,7 +193,7 @@ test('WHAT[HOST-BOUNDARY-008] message_visibility_signal_wakes_waiter_and_cancels
   assert.equal(timer.deadlines[0].cancelled, true, 'event fast path must cancel the deadline backstop')
   assert.equal(surface.pendingCount(hub, 'session-a'), 0, 'settled waiter must leave the registry')
 })
-test('WHAT[HOST-BOUNDARY-008] deadline_backstop_resolves_when_no_signal_arrives', async () => {
+test('WHAT[host-boundary-008] deadline_backstop_resolves_when_no_signal_arrives', async () => {
   const timer = fakeTimer()
   const hub = surface.create(timer.port)
 
@@ -203,7 +203,7 @@ test('WHAT[HOST-BOUNDARY-008] deadline_backstop_resolves_when_no_signal_arrives'
 
   assert.equal(surface.pendingCount(hub, 'session-b'), 0, 'deadline-settled waiter must leave the registry')
 })
-test('WHAT[HOST-BOUNDARY-008] foreign_session_signal_never_wakes_waiter', async () => {
+test('WHAT[host-boundary-008] foreign_session_signal_never_wakes_waiter', async () => {
   const timer = fakeTimer()
   const hub = surface.create(timer.port)
 
@@ -254,7 +254,7 @@ const acceptedRetryInput = (overrides = {}) => ({
   ...overrides,
 })
 
-test('WHAT[HOST-BOUNDARY-008] XWIRE_pre_inference_retry_does_not_require_a_public_session_snapshot', () => {
+test('WHAT[host-boundary-008] XWIRE_pre_inference_retry_does_not_require_a_public_session_snapshot', () => {
   const result = XWireSurface.transform(acceptedRetryInput({ snapshotPort: false }))
   assert.equal(result.ok, true)
   assert.equal(result.noop, false)

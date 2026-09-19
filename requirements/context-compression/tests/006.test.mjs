@@ -8,7 +8,7 @@ const requestKind = prefix.requestKind
 
 const budget = failureOwner.budget
 
-test('WHAT[CONTEXT-COMPRESSION-006] role is fixed across retry attempts and consecutive failures', () => {
+test('WHAT[context-compression-006] role is fixed across retry attempts and consecutive failures', () => {
   const planner = compression.attemptPlanner
 
   const plan0 = planner.plan({ kind: requestKind.workMain, role: 'engineer', policyAllowsProbe: false, noCandidateReason: 'NoCoverage' })
@@ -29,7 +29,7 @@ test('WHAT[CONTEXT-COMPRESSION-006] role is fixed across retry attempts and cons
   }
 })
 
-test('WHAT[CONTEXT-COMPRESSION-006] retry policy includes squash only when BloggerMain fails and frames exist', () => {
+test('WHAT[context-compression-006] retry policy includes squash only when BloggerMain fails and frames exist', () => {
   // BloggerMain failed with frames => next request is BloggerSquash
   assert.equal(compression.nextBloggerRequest('blogger-main', true), 'blogger-squash')
 
@@ -41,7 +41,7 @@ test('WHAT[CONTEXT-COMPRESSION-006] retry policy includes squash only when Blogg
   assert.equal(compression.nextBloggerRequest('blogger-squash', false), 'blogger-main')
 })
 
-test('WHAT[CONTEXT-COMPRESSION-006] prefix probe is selected when policy allows and candidate exists', () => {
+test('WHAT[context-compression-006] prefix probe is selected when policy allows and candidate exists', () => {
   const planner = compression.attemptPlanner
 
   const probe = {
@@ -74,7 +74,7 @@ test('WHAT[CONTEXT-COMPRESSION-006] prefix probe is selected when policy allows 
   assert.equal(disallowed.probeId, null)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-006] consecutive failures consume the failure budget and exhaustion halts auto-retry', () => {
+test('WHAT[context-compression-006] consecutive failures consume the failure budget and exhaustion halts auto-retry', () => {
   let b = budget.initial
   assert.deepEqual(b, { failures: 0 })
   assert.equal(budget.verdict(budget.defaultBudget, b), 'MayRetry')
@@ -96,7 +96,7 @@ test('WHAT[CONTEXT-COMPRESSION-006] consecutive failures consume the failure bud
   assert.equal(budget.verdict(budget.defaultBudget, cleared), 'MayRetry')
 })
 
-test('WHAT[CONTEXT-COMPRESSION-006] compression owner exposes the retry dispatch and planning surface', () => {
+test('WHAT[context-compression-006] compression owner exposes the retry dispatch and planning surface', () => {
   assert.equal(typeof compression.nextBloggerRequest, 'function')
   assert.equal(typeof compression.attemptPlanner.plan, 'function')
   assert.equal(typeof compression.attemptPlanner.promotableProbeId, 'function')

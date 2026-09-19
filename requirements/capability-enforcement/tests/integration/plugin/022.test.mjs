@@ -66,7 +66,7 @@ const fullConfig = () => ({
   ),
 })
 
-test('WHAT[ENF-022] MANAGER_fission_is_denied_for_manager_and_devops', async () => {
+test('WHAT[capability-enforcement-022] MANAGER_fission_is_denied_for_manager_and_devops', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'ses-mgr-fission', 'manager')
     const resMgr = await hooks.tool.fission.execute(

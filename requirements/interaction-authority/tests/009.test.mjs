@@ -64,7 +64,7 @@ const profile = (value) => ({
 
 const register = (root) => authority.registerAuthority(root, authority.empty)
 
-test('WHAT[INTERACTION-AUTHORITY-009] IA_009_pure_resolution_never_infers_human_root', () => {
+test('WHAT[interaction-authority-009] IA_009_pure_resolution_never_infers_human_root', () => {
   const root = rootFor('engineer', 'msg_u1', 'HumanRoot')
   const state = register(root)
   assert.equal(state.activeLogicalRun.authorityKind, 'HumanRoot')

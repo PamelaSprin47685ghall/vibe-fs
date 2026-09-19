@@ -32,7 +32,7 @@ function patchesInCanonicalOrder() {
   ];
 }
 
-test('WHAT[EPI-016] single_certificate_holds_exact_bound_sample_ordinal_latent_together_or_solver_mode_splits_state', async () => {
+test('WHAT[epistemic-reasoning-016] single_certificate_holds_exact_bound_sample_ordinal_latent_together_or_solver_mode_splits_state', async () => {
   const surface = gecSurface;
   let certificate = baseCertificate();
   for (const patch of patchesInCanonicalOrder()) {
@@ -64,7 +64,7 @@ test('WHAT[EPI-016] single_certificate_holds_exact_bound_sample_ordinal_latent_t
     'slot values must be order independent while witnesses accumulate',
   );
 });
-test('WHAT[EPI-016] sample_slot_requires_coverage_assumptions_or_point_estimate_masquerades_as_bound', async () => {
+test('WHAT[epistemic-reasoning-016] sample_slot_requires_coverage_assumptions_or_point_estimate_masquerades_as_bound', async () => {
   const surface = gecSurface;
   const invalidPatches = [
     {
@@ -114,7 +114,7 @@ test('WHAT[EPI-016] sample_slot_requires_coverage_assumptions_or_point_estimate_
   });
   assert.equal(validSample.ok, true, 'well-formed sample with coverage must be accepted');
 });
-test('WHAT[EPI-016] exact_bound_declare_inclusion_while_sample_declares_coverage_or_value_preorder_collapses', async () => {
+test('WHAT[epistemic-reasoning-016] exact_bound_declare_inclusion_while_sample_declares_coverage_or_value_preorder_collapses', async () => {
   const surface = gecSurface;
   const start = baseCertificate();
   const withExact = await surface.refineCertificate({
@@ -234,7 +234,7 @@ const waveEvents = (wave, assignment) => {
   ]
 }
 
-test('WHAT[EPI-016] soak_multi_plugin_waves_stay_deterministic_and_honestly_labeled', async () => {
+test('WHAT[epistemic-reasoning-016] soak_multi_plugin_waves_stay_deterministic_and_honestly_labeled', async () => {
   const recommendations = new Set()
   for (let wave = 0; wave < WAVES; wave += 1) {
     const input = waveInput(wave)
@@ -334,7 +334,7 @@ test('WHAT[EPI-016] soak_multi_plugin_waves_stay_deterministic_and_honestly_labe
     'evidence crossing the bonferroni threshold mid-soak must flip the verdict',
   )
 })
-test('WHAT[EPI-016] soak_honesty_labels_stay_pinned_across_seeded_refiner_waves', async () => {
+test('WHAT[epistemic-reasoning-016] soak_honesty_labels_stay_pinned_across_seeded_refiner_waves', async () => {
   const scopes = new Set()
   const codes = new Set()
   for (let wave = 0; wave < WAVES; wave += 1) {

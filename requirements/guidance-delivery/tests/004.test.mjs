@@ -78,7 +78,7 @@ const markerOutput = (messages) => {
   return idx >= 0 ? output.slice(idx + SEP.length) : undefined
 }
 
-test('WHAT[GD-004] ENFORCER_TIP_NUDGE_001_latest_tip_first_delivery_is_full_main_md', async () => {
+test('WHAT[guidance-delivery-004] ENFORCER_TIP_NUDGE_001_latest_tip_first_delivery_is_full_main_md', async () => {
   const fixture = await seed()
   try {
     const result = await latestTipNudge(fixture.journal, blogger)
@@ -102,7 +102,7 @@ const delivery = await import("../../../dist/Enforcer/Guidance/DeliverySurface.j
 const { empty, apply, applyReanchor, hasFullDelivered } = delivery
 const TipPresentation = Object.freeze({ Full: 'Full', IdentityOnly: 'IdentityOnly' })
 
-test('WHAT[GD-004] TDP_001_empty_state_has_nothing_delivered', () => {
+test('WHAT[guidance-delivery-004] TDP_001_empty_state_has_nothing_delivered', () => {
   assert.equal(hasFullDelivered('primitive-obsession', empty), false)
 })
 }
@@ -175,7 +175,7 @@ const withJournal = async (fn) => {
 const presentationOf = (value) => value?.presentation
 const textOf = (value) => value?.text
 
-test('WHAT[GD-004] ENFORCER_TIP_DELIVERY_003_latestTipGuidance_matches_resolve_text', async () => {
+test('WHAT[guidance-delivery-004] ENFORCER_TIP_DELIVERY_003_latestTipGuidance_matches_resolve_text', async () => {
   await withJournal(async (journal) => {
     await seedOwnerWithTip(journal)
     const viaResolve = textOf(await resolveTipGuidance(journal, main))

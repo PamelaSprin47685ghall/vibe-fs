@@ -31,7 +31,7 @@ const walkFs = (dir) => {
   return out
 }
 
-test('WHAT[DISTRIBUTION-001] DISTRIBUTION_artifact_carries_compiled_code_and_runtime_resources_together', () => {
+test('WHAT[distribution-001] DISTRIBUTION_artifact_carries_compiled_code_and_runtime_resources_together', () => {
   const required = [
     'dist/OpenCode/Plugin/Plugin.js',
     'resources/provider/role/manager/en.md',

@@ -27,7 +27,7 @@ const MANAGER_VISIBLE_SURFACES = [
   'lifecycle/magic-todo/manager-guideline',
 ]
 
-test('WHAT[PARTICIPANT-HORIZON-008] PH_glory_002_030_manager_surface_hides_review_orchestration', () => {
+test('WHAT[participant-horizon-008] PH_glory_002_030_manager_surface_hides_review_orchestration', () => {
   for (const surface of MANAGER_VISIBLE_SURFACES) {
     for (const locale of LOCALES) {
       const text = read(`resources/provider/${surface}/${locale}.md`)

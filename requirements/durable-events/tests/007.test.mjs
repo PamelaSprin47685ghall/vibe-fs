@@ -36,7 +36,7 @@ const mustOk = (result, label = 'result') => {
   return result.value
 }
 
-test('WHAT[DURABLE-EVENTS-007] PERSIST_005_malformed_json_is_an_error_value_not_an_exception', () => {
+test('WHAT[durable-events-007] PERSIST_005_malformed_json_is_an_error_value_not_an_exception', () => {
   for (const bad of ['', '{', '{"unclosed": ', 'null', '[]', 'not json at all']) {
     const decoded = journalCodec.deserialize(bad)
     assert.equal(decoded.ok, false, `${JSON.stringify(bad)} must not decode`)
@@ -78,7 +78,7 @@ const event = (n, parents = [], type = 'JobRequested', payload = { n }) => ({
   payloadRefs: [],
 })
 
-test('WHAT[DURABLE-EVENTS-007] append_rejects_missing_parent_without_writing_bytes', async () => {
+test('WHAT[durable-events-007] append_rejects_missing_parent_without_writing_bytes', async () => {
   const dir = withTemp((base) => base)
   const store = eventStore.create(dir, 'missing-parent-proof')
   try {
@@ -92,7 +92,7 @@ test('WHAT[DURABLE-EVENTS-007] append_rejects_missing_parent_without_writing_byt
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[DURABLE-EVENTS-007] append_rejects_cycle_in_one_batch_before_durability', async () => {
+test('WHAT[durable-events-007] append_rejects_cycle_in_one_batch_before_durability', async () => {
   const dir = withTemp((base) => base)
   const store = eventStore.create(dir, 'cycle-proof')
   try {
@@ -107,7 +107,7 @@ test('WHAT[DURABLE-EVENTS-007] append_rejects_cycle_in_one_batch_before_durabili
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[DURABLE-EVENTS-007] append_rejects_unknown_event_type_fail_closed', async () => {
+test('WHAT[durable-events-007] append_rejects_unknown_event_type_fail_closed', async () => {
   const dir = withTemp((base) => base)
   const store = eventStore.create(dir, 'unknown-type-proof')
   try {
@@ -153,21 +153,21 @@ const withTemp = (fn) => {
   return fn(base)
 }
 
-test('WHAT[DURABLE-EVENTS-007] DURABLE_EVENTS_014_k_way_merge_rejects_missing_parent_fail_closed', () => {
+test('WHAT[durable-events-007] DURABLE_EVENTS_014_k_way_merge_rejects_missing_parent_fail_closed', () => {
   const child = make({ id: B, parents: [A] })
   const result = eventMerge.merge([['writer', [child]]])
   assert.equal(result.ok, false)
   assert.equal(result.error.code, 'MissingParent')
   assert.equal(result.error.eventId, A)
 })
-test('WHAT[DURABLE-EVENTS-007] DURABLE_EVENTS_014_k_way_merge_rejects_backward_or_cyclic_writer_frontier', () => {
+test('WHAT[durable-events-007] DURABLE_EVENTS_014_k_way_merge_rejects_backward_or_cyclic_writer_frontier', () => {
   const a = make({ id: A, parents: [B] })
   const b = make({ id: B, parents: [A] })
   const result = eventMerge.merge([['writer', [a, b]]])
   assert.equal(result.ok, false)
   assert.equal(result.error.code, 'NonCanonical')
 })
-test('WHAT[DURABLE-EVENTS-007] DURABLE_EVENTS_007_unknown_authoritative_event_type_is_rejected_before_durability', async () => {
+test('WHAT[durable-events-007] DURABLE_EVENTS_007_unknown_authoritative_event_type_is_rejected_before_durability', async () => {
   const dir = withTemp((base) => base)
   const store = eventStore.create(dir, 'unknown-type-fold')
   try {
@@ -197,7 +197,7 @@ const envelope = (id, parents = [], stream = 'proof/merge', payload = {}) => ({
   payloadRefs: [],
 })
 
-test('WHAT[DURABLE-EVENTS-007] DURABLE_EVENTS_014_missing_parent_fails_closed', () => {
+test('WHAT[durable-events-007] DURABLE_EVENTS_014_missing_parent_fails_closed', () => {
   const child = envelope('0'.repeat(39) + '3', ['0'.repeat(39) + '9'])
   const result = eventMerge.merge([['a', [child]]])
   assert.equal(result.ok, false)
@@ -229,7 +229,7 @@ const invalidUtf8Event = () => {
   return bytes
 }
 
-test('WHAT[DURABLE-EVENTS-007] local writer boot rejects invalid UTF-8 without replacement decoding', () => {
+test('WHAT[durable-events-007] local writer boot rejects invalid UTF-8 without replacement decoding', () => {
   const root = mkdtempSync(join(tmpdir(), 'wanxiang-invalid-utf8-'))
   const commonDir = join(root, '.git')
   const eventsDir = join(commonDir, 'wanxiang', 'events')
@@ -291,16 +291,16 @@ const handleLinked = (overrides = {}) => ({
   },
 })
 
-test('WHAT[DURABLE-EVENTS-007] PERSIST_005_unparseable_json_is_a_decode_error_not_a_throw', () => {
+test('WHAT[durable-events-007] PERSIST_005_unparseable_json_is_a_decode_error_not_a_throw', () => {
   const decoded = factCodec.decode('{not json')
   assert.equal(decoded.ok, false)
   assert.equal(typeof decoded.error, 'string')
 })
-test('WHAT[DURABLE-EVENTS-007] PERSIST_005_unknown_case_is_a_decode_error', () => {
+test('WHAT[durable-events-007] PERSIST_005_unknown_case_is_a_decode_error', () => {
   const decoded = factCodec.decode('{"NoSuchFactCase":{"X":1}}')
   assert.equal(decoded.ok, false)
 })
-test('WHAT[DURABLE-EVENTS-007] Fact_codec_distinguishes_current_and_malformed_lines', () => {
+test('WHAT[durable-events-007] Fact_codec_distinguishes_current_and_malformed_lines', () => {
   const current = factCodec.decode(factCodec.encode(runtimeStarted()))
   assert.equal(current.ok, true, current.ok ? '' : current.error)
   assert.equal(current.case, 'RuntimeStarted')
@@ -341,7 +341,7 @@ const readEnvelope = (value) => ({
   fact: value.fact,
 })
 
-test('WHAT[DURABLE-EVENTS-007] Journal_codec_refuses_unknown_facts_and_streams', () => {
+test('WHAT[durable-events-007] Journal_codec_refuses_unknown_facts_and_streams', () => {
   assert.throws(
     () => journalCodec.serialize(envelope({ stream: { kind: 'Unknown' } })),
     /unknown stream/i,

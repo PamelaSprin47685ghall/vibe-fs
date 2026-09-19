@@ -46,7 +46,7 @@ const assertBoot = (result) => {
   return result.journal
 }
 
-test('WHAT[OBLIGATION-LEDGER-018] persists typed prepared identity through AgentJournal and EventStore boot', async () => {
+test('WHAT[obligation-ledger-018] persists typed prepared identity through AgentJournal and EventStore boot', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-obligation-event-store-'))
   const startedAt = '2026-08-11T00:00:00Z'
   try {
@@ -183,7 +183,7 @@ const acceptedState = () => {
   return handle
 }
 
-test('WHAT[OBLIGATION-LEDGER-018] checkpoint lifecycle is tagged Prepared and Accepted', () => {
+test('WHAT[obligation-ledger-018] checkpoint lifecycle is tagged Prepared and Accepted', () => {
   const handle = projection.MagicTodoProjectionSurface_create()
   ok(foldMagic(handle, prepared, 'prepared-fact-ref'))
   assert.deepEqual(projection.MagicTodoProjectionSurface_view(handle, life).checkpoints[0].lifecycle, { kind: 'Prepared' })
@@ -191,7 +191,7 @@ test('WHAT[OBLIGATION-LEDGER-018] checkpoint lifecycle is tagged Prepared and Ac
   ok(foldMagic(handle, accepted))
   assert.equal(projection.MagicTodoProjectionSurface_view(handle, life).checkpoints[0].lifecycle.kind, 'Accepted')
 })
-test('WHAT[OBLIGATION-LEDGER-018] stores typed Magic Todo bytes in the canonical Fact envelope', () => {
+test('WHAT[obligation-ledger-018] stores typed Magic Todo bytes in the canonical Fact envelope', () => {
   const typed = ok(codec.encode(accepted)).value
   const encoded = envelope.serializeMagicTodoEnvelope(typed)
   const decoded = envelope.deserializeMagicTodoEnvelope(encoded)
@@ -200,18 +200,18 @@ test('WHAT[OBLIGATION-LEDGER-018] stores typed Magic Todo bytes in the canonical
   assert.equal(decoded.case, 'MagicTodo')
   assert.equal(decoded.payload, typed)
 })
-test('WHAT[OBLIGATION-LEDGER-018] legacy Prepared without planComplete decodes as committed true', () => {
+test('WHAT[obligation-ledger-018] legacy Prepared without planComplete decodes as committed true', () => {
   const legacy = prepared.replace(/,"PlanCompleteDeclared":false/, '')
   const decoded = codec.decode(legacy)
   assert.equal(decoded.ok, true)
   assert.equal(decoded.planCompleteDeclared, true)
 })
-test('WHAT[OBLIGATION-LEDGER-018] rejects forward Magic Todo payloads without throwing through boot fold', () => {
+test('WHAT[obligation-ledger-018] rejects forward Magic Todo payloads without throwing through boot fold', () => {
   const forward = prepared.replace('TodoWritePrepared', 'FutureMagicTodoCase')
   assert.doesNotThrow(() => codec.decode(forward))
   assert.equal(codec.decode(forward).ok, false)
 })
-test('WHAT[OBLIGATION-LEDGER-018] folds a typed Magic Todo envelope into the one canonical projection', () => {
+test('WHAT[obligation-ledger-018] folds a typed Magic Todo envelope into the one canonical projection', () => {
   const typed = ok(codec.encode(prepared)).value
   const folded = envelope.foldMagicEnvelope(managerSession, 'manager-provider-run', typed)
   assert.equal(folded.ok, true, folded.ok ? '' : folded.error)
@@ -235,7 +235,7 @@ const projectionSurface = await import("../../../dist/Mission/Obligation/Todo/Ma
 
 const sha256Hex = (value) => createHash('sha256').update(value).digest('hex')
 
-test('WHAT[OBLIGATION-LEDGER-018] business sequencing prepares and accepts checkpoints through public membrane surface', async () => {
+test('WHAT[obligation-ledger-018] business sequencing prepares and accepts checkpoints through public membrane surface', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-ob-ledger-workflow-'))
   const boot = await journal.JournalSurface_boot(directory, 'rt_ob_workflow', 101, '2026-08-11T00:00:00Z')
   assert.equal(boot.ok, true)
@@ -267,7 +267,7 @@ test('WHAT[OBLIGATION-LEDGER-018] business sequencing prepares and accepts check
     rmSync(directory, { recursive: true, force: true })
   }
 })
-test('WHAT[OBLIGATION-LEDGER-018] hot-path queries use incremental projection facts on IncumbencyMagicTodoState', () => {
+test('WHAT[obligation-ledger-018] hot-path queries use incremental projection facts on IncumbencyMagicTodoState', () => {
   const fact = (caseName, payload) => JSON.stringify({ case: caseName, ...payload })
   const prepared = fact('TodoWritePrepared', {
     ManagerSessionId: 'ses-1',

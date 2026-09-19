@@ -96,7 +96,7 @@ const foldViews = (folded) => {
   return views(handles)
 }
 
-test('WHAT[MANAGED-SESSION-008] EXEC_004_join_may_only_retire_a_handle_that_actually_completed', () => {
+test('WHAT[managed-session-lifecycle-008] EXEC_004_join_may_only_retire_a_handle_that_actually_completed', () => {
   // `retire` IS join's write. Retiring an active handle would discard a child
   // that is still running and leave its completion with nowhere to land.
   const active = linkOn(HandleSurface.empty())
@@ -110,7 +110,7 @@ test('WHAT[MANAGED-SESSION-008] EXEC_004_join_may_only_retire_a_handle_that_actu
     { ok: false, error: { kind: 'TransitionRejected', reason: 'UnknownHandle' } },
   )
 })
-test('WHAT[MANAGED-SESSION-008] EXEC_009_a_replayed_completion_or_retirement_is_absorbed', () => {
+test('WHAT[managed-session-lifecycle-008] EXEC_009_a_replayed_completion_or_retirement_is_absorbed', () => {
   // The tombstone makes both idempotent, and a journal written across a restart
   // contains exactly these repeats. Rejecting them would refuse to boot.
   const folded = foldFacts([
@@ -124,7 +124,7 @@ test('WHAT[MANAGED-SESSION-008] EXEC_009_a_replayed_completion_or_retirement_is_
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
   assert.equal(foldStateOf(folded).lifecycle, 'Retired')
 })
-test('WHAT[MANAGED-SESSION-008] EXEC_004_a_retirement_without_a_completion_stops_the_replay', () => {
+test('WHAT[managed-session-lifecycle-008] EXEC_004_a_retirement_without_a_completion_stops_the_replay', () => {
   // `retire` is join's write, and join consumes a completion. A tombstone with no
   // completion means a handle was discarded while its child was still running.
   const folded = foldFacts([handleFact.linked, handleFact.retired])
@@ -137,7 +137,7 @@ test('WHAT[MANAGED-SESSION-008] EXEC_004_a_retirement_without_a_completion_stops
   // for a missing link, the other for a missing completion.
   assert.notEqual(folded.error.Reason, foldFacts([handleFact.completed]).error.Reason)
 })
-test('WHAT[MANAGED-SESSION-008] fold_refuses_unknown_fact_case', () => {
+test('WHAT[managed-session-lifecycle-008] fold_refuses_unknown_fact_case', () => {
   const folded = foldFacts([fact('HandleExploded', { ParentSessionId: PARENT, Handle: HANDLE })])
   assert.equal(folded.ok, false)
   assert.equal(folded.error.kind, 'UnknownFactCase')
@@ -161,7 +161,7 @@ const makeActive = () => {
 const complete = (state) => HandleSurface.apply(state, { op: 'complete', handle: 'agent:c1', kind: 'Terminal' })
 const retire = (state) => HandleSurface.apply(state, { op: 'retire', handle: 'agent:c1' })
 
-test('WHAT[MANAGED-SESSION-008] THEOREM_blocked_to_awakened_fold_trails_confluent_after_retire', () => {
+test('WHAT[managed-session-lifecycle-008] THEOREM_blocked_to_awakened_fold_trails_confluent_after_retire', () => {
   const active = makeActive()
   const completed = complete(active)
   const retired = retire(completed.state)
@@ -183,7 +183,7 @@ const link = (projection, agentId, child, targetAgent = 'coder') => {
   return result.state
 }
 
-test('WHAT[MANAGED-SESSION-008] EXEC_009_consume_abandoned_writes_HandleRetired_second_AlreadyRetired', () => {
+test('WHAT[managed-session-lifecycle-008] EXEC_009_consume_abandoned_writes_HandleRetired_second_AlreadyRetired', () => {
   let projection = link(HandleSurface.empty(), 'h1', 'ses_c')
   projection = HandleSurface.apply(projection, { op: 'abandon', handle: 'agent:h1', reason: 'ParentCancelled' }).state
   assert.equal(HandleSurface.reportableAbandonedCount(projection), 1)

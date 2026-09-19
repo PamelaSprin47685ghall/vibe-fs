@@ -5,7 +5,7 @@ import * as relay from '../../../dist/Mission/Relay/Surface.js'
 const open = (state, road = 'road-1', incumbent = 'inc-1') =>
   relay.openIncumbency(state, road, incumbent, 'snapshot-1', 'authority-1')
 
-test('WHAT[RELAY-002] every iteration opens on the same AuditPending algebra', () => {
+test('WHAT[relay-incumbency-002] every iteration opens on the same AuditPending algebra', () => {
   const first = open(relay.empty())
   assert.deepEqual(relay.view(first.state, 'road-1'), {
     activeIncumbency: 'inc-1',
@@ -43,7 +43,7 @@ test('WHAT[RELAY-002] every iteration opens on the same AuditPending algebra', (
   })
 })
 
-test('WHAT[RELAY-002] repeat-round has same meaning, assessment replay is idempotent, conflicting-snapshot assessment fails', () => {
+test('WHAT[relay-incumbency-002] repeat-round has same meaning, assessment replay is idempotent, conflicting-snapshot assessment fails', () => {
   const first = open(relay.empty())
   const assessed = relay.assess(
     first.state,

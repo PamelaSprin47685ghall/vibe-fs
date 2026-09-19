@@ -1,7 +1,7 @@
 /**
  * gate-cold-boundary-cases.mjs — every declared seal exception is explicit.
  *
- * ARCH-004 / VERIFY-003. The property is not "cold boundaries work" but "a break the
+ * ARCH-004 / verification-system-003. The property is not "cold boundaries work" but "a break the
  * scenario did not declare is fatal, and a declaration that never fires is fatal too".
  *
  * Package K1 measured what the alternative costs. The deleted `epochCold` exemption
@@ -362,7 +362,7 @@ export const coldBoundaryCases = [
   // ── a declaration that never fires is also fatal ─────────────────────────
 
   {
-    name: 'VERIFY-003 a declared boundary that did not break is fatal',
+    name: 'verification-system-003 a declared boundary that did not break is fatal',
     fn: () => {
       // Same reasoning as an empty `attempts` list: the author believes a cold
       // boundary is covered, and the scenario silently stopped exercising it. Treating
@@ -379,7 +379,7 @@ export const coldBoundaryCases = [
   },
 
   {
-    name: 'VERIFY-003 a boundary declared on the first request is unreachable',
+    name: 'verification-system-003 a boundary declared on the first request is unreachable',
     fn: () => {
       // Nothing is sealed yet, so no break can happen there. Accepting it silently
       // would make the declaration decorative.
@@ -390,7 +390,7 @@ export const coldBoundaryCases = [
   // ── declaration lookup is keyed, never inferred ──────────────────────────
 
   {
-    name: 'VERIFY-003 a boundary governs exactly the step it names',
+    name: 'verification-system-003 a boundary governs exactly the step it names',
     fn: () => {
       const boundaries = [compiledAt('epoch-switch')];
 
@@ -402,7 +402,7 @@ export const coldBoundaryCases = [
   },
 
   {
-    name: 'VERIFY-003 a boundary cannot spread to a declaration sharing its prefix',
+    name: 'verification-system-003 a boundary cannot spread to a declaration sharing its prefix',
     fn: () => {
       // A prefix-matched boundary would excuse every later turn that happens to start with
       // the same words — one declaration silently covering a whole conversation.
@@ -423,7 +423,7 @@ export const coldBoundaryCases = [
   },
 
   {
-    name: 'VERIFY-003 two boundaries for one key is an error, not a precedence question',
+    name: 'verification-system-003 two boundaries for one key is an error, not a precedence question',
     fn: () => {
       const boundaries = [compiledAt('epoch-switch'), compiledAt('fallback-side')];
 
@@ -460,7 +460,7 @@ export const coldBoundaryCases = [
   },
 
   {
-    name: 'VERIFY-003 a boundary must name a turn and a step',
+    name: 'verification-system-003 a boundary must name a turn and a step',
     fn: () => {
       assertTrue(validateBoundary({ kind: 'epoch-switch', step: 0 }).some((p) => p.includes('name the turn')));
       assertTrue(validateBoundary({ kind: 'epoch-switch', turn: '', step: 0 }).some((p) => p.includes('name the turn')));

@@ -22,10 +22,10 @@ const syncModel = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/
 
 const forkTool = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs'), 'utf8')
 
-test('WHAT[DELEG-020] delegation_semantics_do_not_depend_on_current_tool_names', () => {
+test('WHAT[delegation-020] delegation_semantics_do_not_depend_on_current_tool_names', () => {
   const how = readFileSync(new URL('../HOW.md', import.meta.url), 'utf8')
   assert.match(how, /工具名/)
-  assert.match(how, /DELEG-020/)
+  assert.match(how, /delegation-020/)
   assert.match(how, /改名不动 WHAT/)
   for (const name of ['fork', 'commission', 'inspect', 'establish-behavior', 'repair-behavior']) assert.ok(how.includes(name))
 })

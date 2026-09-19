@@ -17,7 +17,7 @@ const withSession = (messages, sessionID = 'engineer-auto-injected') =>
     },
   }))
 
-test('WHAT[ENF-006] HOST_013_skill_stays_host_owned_and_legacy_marker_is_not_plugin_registered', async () => {
+test('WHAT[capability-enforcement-006] HOST_013_skill_stays_host_owned_and_legacy_marker_is_not_plugin_registered', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'engineer-auto-injected', 'engineer')
     assert.equal(hooks.tool['auto-injected'], undefined, 'legacy auto-injected must not be in hooks.tool')
@@ -96,7 +96,7 @@ const fullConfig = () => ({
   ),
 })
 
-test('WHAT[ENF-006] MANAGER_pair_guidance_rides_cursor_suffix_without_synthetic_skill_row', async () => {
+test('WHAT[capability-enforcement-006] MANAGER_pair_guidance_rides_cursor_suffix_without_synthetic_skill_row', async () => {
   assert.equal(markerToolName, 'skill')
   assert.equal(typeof markerSource, 'string')
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {

@@ -36,7 +36,7 @@ const mustOk = (result, label = 'result') => {
   return result.value
 }
 
-test('WHAT[DURABLE-EVENTS-014] PERSIST_001_ordering_is_by_local_seq_inside_a_runtime_and_by_time_across', () => {
+test('WHAT[durable-events-014] PERSIST_001_ordering_is_by_local_seq_inside_a_runtime_and_by_time_across', () => {
   const a1 = env({ runtime: 'rt_a', seq: 1, observedAt: '2026-01-01T00:00:09Z' })
   const a2 = env({ runtime: 'rt_a', seq: 2, observedAt: '2026-01-01T00:00:00Z' })
   assert.equal(journalCodec.compareSortKey(a1, a2) < 0, true)
@@ -47,14 +47,14 @@ test('WHAT[DURABLE-EVENTS-014] PERSIST_001_ordering_is_by_local_seq_inside_a_run
   assert.equal(journalCodec.compareSortKey(a1, b1) > 0, true)
   assert.equal(journalCodec.compareSortKey(b1, a1) < 0, true)
 })
-test('WHAT[DURABLE-EVENTS-014] PERSIST_001_same_instant_across_runtimes_breaks_the_tie_by_runtime_id', () => {
+test('WHAT[durable-events-014] PERSIST_001_same_instant_across_runtimes_breaks_the_tie_by_runtime_id', () => {
   const at = '2026-01-01T00:00:00Z'
   const a = env({ runtime: 'rt_a', seq: 1, observedAt: at })
   const b = env({ runtime: 'rt_b', seq: 1, observedAt: at })
   assert.equal(journalCodec.compareSortKey(a, b) < 0, true)
   assert.equal(journalCodec.compareSortKey(b, a) > 0, true)
 })
-test('WHAT[DURABLE-EVENTS-014] PERSIST_001_k_way_merge_is_a_total_order_regardless_of_input_order', () => {
+test('WHAT[durable-events-014] PERSIST_001_k_way_merge_is_a_total_order_regardless_of_input_order', () => {
   const at = (s) => `2026-01-01T00:00:0${s}Z`
   const streamA = [
     env({ runtime: 'rt_a', seq: 1, observedAt: at(1) }),
@@ -106,7 +106,7 @@ const withTemp = (fn) => {
   return fn(base)
 }
 
-test('WHAT[DURABLE-EVENTS-014] DURABLE_EVENTS_014_k_way_merge_is_deterministic_with_EventId_tiebreak', () => {
+test('WHAT[durable-events-014] DURABLE_EVENTS_014_k_way_merge_is_deterministic_with_EventId_tiebreak', () => {
   const root = make({ id: A })
   const high = make({ id: C, parents: [A], eventType: 'JobAccepted' })
   const low = make({ id: B, parents: [A], eventType: 'JobRejected' })
@@ -142,7 +142,7 @@ const envelope = (id, parents = [], stream = 'proof/merge', payload = {}) => ({
   payloadRefs: [],
 })
 
-test('WHAT[DURABLE-EVENTS-014] DURABLE_EVENTS_014_k_way_merge_is_writer_enumeration_independent', () => {
+test('WHAT[durable-events-014] DURABLE_EVENTS_014_k_way_merge_is_writer_enumeration_independent', () => {
   const a = envelope('0'.repeat(39) + 'a')
   const b = envelope('0'.repeat(39) + 'b')
   const c = envelope('0'.repeat(39) + 'c', ['0'.repeat(39) + 'a'])
@@ -160,7 +160,7 @@ test('WHAT[DURABLE-EVENTS-014] DURABLE_EVENTS_014_k_way_merge_is_writer_enumerat
   assert.equal(right.ok, true)
   assert.deepEqual(left.events.map((e) => e.id), right.events.map((e) => e.id))
 })
-test('WHAT[DURABLE-EVENTS-014] k-way merge does not re-sort every writer head for every event', () => {
+test('WHAT[durable-events-014] k-way merge does not re-sort every writer head for every event', () => {
   const writers = 512
   const eventsPerWriter = 16
   let nextId = 0

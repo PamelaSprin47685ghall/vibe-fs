@@ -17,7 +17,7 @@ const closure = (inventory, root) => {
   return [...visited].flatMap((path) => inventory.projects.get(path).implementationFiles)
 }
 
-test('WHAT[STRUCTURED-WORKFLOW-013] attention tools consume their own port without durable aggregate or runtime containers', () => {
+test('WHAT[structured-workflow-013] attention tools consume their own port without durable aggregate or runtime containers', () => {
   const inventory = buildSubsystemInventory()
   assert.ok(inventory.ok, inventory.violations.join('\n'))
   const tools = [...inventory.projects.values()].find((project) =>
@@ -77,7 +77,7 @@ function references(projectName) {
   return productionProject(projectName).references.map((path) => relative(SRC, path))
 }
 
-test('WHAT[STRUCTURED-WORKFLOW-013] GitGateway exposes a narrow dependency-inverted compiler boundary', () => {
+test('WHAT[structured-workflow-013] GitGateway exposes a narrow dependency-inverted compiler boundary', () => {
   const providerName = 'Wanxiangshu.Owner.change-integration.git-gateway.fsproj'
   const provider = productionProject(providerName)
   assert.equal(provider.shard, 'git-gateway')
@@ -91,7 +91,7 @@ test('WHAT[STRUCTURED-WORKFLOW-013] GitGateway exposes a narrow dependency-inver
   const signature = readFileSync(join(SRC, 'Git/Gateway.fsi'), 'utf8')
   assert.doesNotMatch(signature, /SyncActiveEnv|discoverRemote/)
 })
-test('WHAT[STRUCTURED-WORKFLOW-013] request kind and fallback facts remain disjoint compile shards', () => {
+test('WHAT[structured-workflow-013] request kind and fallback facts remain disjoint compile shards', () => {
   const requestProject = 'Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj'
   const factsProject = 'Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-facts.fsproj'
 
@@ -208,7 +208,7 @@ const withShardRepo = (t, shards) => {
   return dir
 }
 
-test('WHAT[STRUCTURED-WORKFLOW-013] reusable platform shards depend on no domain subsystem', () => {
+test('WHAT[structured-workflow-013] reusable platform shards depend on no domain subsystem', () => {
   const inventory = buildSubsystemInventory()
   let checkedPlatformShards = 0
   for (const entry of inventory.projects.values()) {

@@ -20,7 +20,7 @@ const isCombinedNormalDelta = (text) =>
   text.startsWith('# Write the dense work-log continuation now') && text.includes('[[new_work_to_record]]')
 const isPreviousTip = (text) => text.includes('previous_enforcer_tip')
 
-test('WHAT[CONTEXT-COMPRESSION-017] COMPANION_010_same_session_lwr_returns_responsibility_without_delegation_fields', () => {
+test('WHAT[context-compression-017] COMPANION_010_same_session_lwr_returns_responsibility_without_delegation_fields', () => {
   const lwr = 'Opening\nhuman-root task\n\nChronicle\nself history'
   const block = prompt.memoryBlock(lwr)
 
@@ -41,25 +41,25 @@ const magicTodo = await import("../../../dist/Mission/Obligation/Todo/MagicTodoS
 const floor = ({ hasOpenLife = true, planCommitted = false, xTraceHeadSequence = 0, legacyProtectedPrefixEnd, parts = [] } = {}) =>
   magicTodo.effectiveOpeningFloor(hasOpenLife, planCommitted, 1, null, null, xTraceHeadSequence, parts)
 
-test('WHAT[CONTEXT-COMPRESSION-017] CTX_016_pre_t1_floor_stops_after_true_opening', () => {
+test('WHAT[context-compression-017] CTX_016_pre_t1_floor_stops_after_true_opening', () => {
   assert.equal(
     Number(floor({ planCommitted: false, xTraceHeadSequence: 17 })),
     2,
     'Pre-T1 planning material after the opening is ordinary compressible history',
   )
 })
-test('WHAT[CONTEXT-COMPRESSION-017] CTX_016_t1_does_not_change_the_compression_floor', () => {
+test('WHAT[context-compression-017] CTX_016_t1_does_not_change_the_compression_floor', () => {
   assert.equal(Number(floor({ planCommitted: false, xTraceHeadSequence: 17 })), 2)
   assert.equal(Number(floor({ planCommitted: true, xTraceHeadSequence: 17 })), 2)
 })
-test('WHAT[CONTEXT-COMPRESSION-017] CTX_016_work_activated_is_inert_and_does_not_move_the_floor', () => {
+test('WHAT[context-compression-017] CTX_016_work_activated_is_inert_and_does_not_move_the_floor', () => {
   const without = Number(floor({ xTraceHeadSequence: 2 }))
   const withLegacy = Number(floor({ xTraceHeadSequence: 2, legacyProtectedPrefixEnd: 42 }))
 
   assert.equal(withLegacy, without, 'WorkActivated (inert legacy) must not change the structural floor')
   assert.notEqual(withLegacy, 42, 'the legacy ProtectedPrefixEndSequence (42) must never be read')
 })
-test('WHAT[CONTEXT-COMPRESSION-017] CTX_016_blogger_effective_start_is_max_of_record_coverage_and_floor', () => {
+test('WHAT[context-compression-017] CTX_016_blogger_effective_start_is_max_of_record_coverage_and_floor', () => {
   assert.equal(
     Number(magicTodo.bloggerEffectiveStart(1, 3)),
     3,

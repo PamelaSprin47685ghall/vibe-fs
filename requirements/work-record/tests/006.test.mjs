@@ -29,7 +29,7 @@ const materialize = (
 
 const OPENING_END = { Sequence: 1 }
 
-test('WHAT[WORK-RECORD-006] LWR_child_opening_excludes_parent_work_record_envelope', () => {
+test('WHAT[work-record-006] LWR_child_opening_excludes_parent_work_record_envelope', () => {
   // 父 LWR 是继承 context，不复制进 child 的 Opening（EXEC-006）
   const assignment = 'child task'
   const parentEnvelope = '# commissioner_record ...'

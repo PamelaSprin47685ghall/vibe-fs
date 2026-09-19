@@ -12,7 +12,7 @@ const readLaw = (semanticPath, locale) => readFileSync(join(providerRoot, semant
 
 const LOCALES = ['en', 'zh-CN']
 
-test('WHAT[REPOSITORY-INVESTIGATION-005] INVESTIGATE_inspector_role_law_pins_observe_without_changing', () => {
+test('WHAT[repository-investigation-005] INVESTIGATE_inspector_role_law_pins_observe_without_changing', () => {
   for (const locale of LOCALES) {
     const law = readLaw('role/engineer', locale)
     assert.match(law, /observe without changing|只观察，不改变/, `${locale} observe without changing`)

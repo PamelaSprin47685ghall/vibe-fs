@@ -40,7 +40,7 @@ const parseToml = (text) =>
 const SPOOL_COMMAND = "printf 'abcdefghijklmnopqrstuvwxyz0123456789'"
 const SPOOL_BUDGET = { command: SPOOL_COMMAND, output_budget_bytes: 4 }
 
-test('WHAT[PROC-010] RUN_completed_command_reports_exit_code_and_streams', async () => {
+test('WHAT[process-execution-010] RUN_completed_command_reports_exit_code_and_streams', async () => {
   const result = parseToml(
     await run({ command: "printf 'hello-stdout'; printf 'hello-stderr' >&2" }),
   )
@@ -48,7 +48,7 @@ test('WHAT[PROC-010] RUN_completed_command_reports_exit_code_and_streams', async
   assert.equal(result.stdout, 'hello-stdout')
   assert.equal(result.stderr, 'hello-stderr')
 })
-test('WHAT[PROC-010] RUN_nonzero_exit_is_reported_not_thrown', async () => {
+test('WHAT[process-execution-010] RUN_nonzero_exit_is_reported_not_thrown', async () => {
   const result = parseToml(await run({ command: 'exit 3' }))
   assert.equal(result.exit_code, '3')
 })
@@ -60,7 +60,7 @@ const { default: test } = await import("node:test");
 
 const { renderPtyCompletion } = await import('../../../dist/Process/Surface.js')
 
-test('WHAT[PROC-010] EXEC_004_pty_completion_is_natural_language_plus_exit_code', () => {
+test('WHAT[process-execution-010] EXEC_004_pty_completion_is_natural_language_plus_exit_code', () => {
   const wire = renderPtyCompletion('shell', 'pty-9', 'ended', 0)
   assert.match(wire, /# shell has ended\./)
   assert.match(wire, /exit_code = 0/)
@@ -92,7 +92,7 @@ const okLauncher = (exitCode = 0, out = 'hello', err = '') => async (_command, _
   new TextEncoder().encode(err),
 ]
 
-test('WHAT[PROC-010] EXEC_011_successful_run_collects_stdout_and_exit_code', async () => {
+test('WHAT[process-execution-010] EXEC_011_successful_run_collects_stdout_and_exit_code', async () => {
   const result = await runWithLauncher(okLauncher(0, 'the output', ''), cmd, makeEstimate(), CTX, live())
   assert.equal(result.ok, true)
   assert.deepEqual(result.value, {
@@ -103,7 +103,7 @@ test('WHAT[PROC-010] EXEC_011_successful_run_collects_stdout_and_exit_code', asy
     spooled: false,
   })
 })
-test('WHAT[PROC-010] EXEC_011_nonzero_exit_is_still_an_ok_outcome', async () => {
+test('WHAT[process-execution-010] EXEC_011_nonzero_exit_is_still_an_ok_outcome', async () => {
   const result = await runWithLauncher(okLauncher(3, '', 'boom'), cmd, makeEstimate(), CTX, live())
   assert.equal(result.ok, true)
   assert.equal(result.value.kind, 'Completed')

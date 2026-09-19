@@ -4,7 +4,7 @@ import * as relay from '../../../dist/Mission/Relay/Surface.js'
 
 const open = (state) => relay.openIncumbency(state, 'road-1', 'inc-1', 'snapshot-1', 'authority-1')
 
-test('WHAT[RELAY-008] authority update invalidates a perfect certificate without restoring work ownership', () => {
+test('WHAT[relay-incumbency-008] authority update invalidates a perfect certificate without restoring work ownership', () => {
   const first = open(relay.empty())
   const perfect = relay.assess(
     first.state,

@@ -30,7 +30,7 @@ const waitForPromptCount = (runtime, count) => forkTool.awaitPromptCount(runtime
 
 const ownerDescriptor = (sessionId) => [{ sessionId, agent: 'manager' }]
 
-test('WHAT[DELEG-003] FORK_road_with_calling_is_independent_and_omitted_calling_continues_byname', () => {
+test('WHAT[delegation-003] FORK_road_with_calling_is_independent_and_omitted_calling_continues_byname', () => {
   const independent = fork.chooseRoad('Manager', 'Ada', 'inspect the retry path')
   assert.equal(independent.ok, true)
   assert.equal(independent.road, 'Independent')
@@ -45,7 +45,7 @@ test('WHAT[DELEG-003] FORK_road_with_calling_is_independent_and_omitted_calling_
   assert.equal(continuation.calling, null)
 })
 
-test('WHAT[DELEG-003] FORK_TOOL_requires_calling_and_resume_rejects_calling', async () => {
+test('WHAT[delegation-003] FORK_TOOL_requires_calling_and_resume_rejects_calling', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-split-'))
   const owner = 'manager-fork-split'
   const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
@@ -78,7 +78,7 @@ test('WHAT[DELEG-003] FORK_TOOL_requires_calling_and_resume_rejects_calling', as
   }
 })
 
-test('WHAT[DELEG-003] FORK_TOOL_manager_resume_dispatches_to_bound_fixed_devops_directly', async () => {
+test('WHAT[delegation-003] FORK_TOOL_manager_resume_dispatches_to_bound_fixed_devops_directly', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-mgr-devops-resume-'))
   const owner = 'manager-devops-resume'
   const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
@@ -108,7 +108,7 @@ test('WHAT[DELEG-003] FORK_TOOL_manager_resume_dispatches_to_bound_fixed_devops_
   }
 })
 
-test('WHAT[DELEG-003] manager resume preserves companion devops across restart and normalizes state for new charges', async () => {
+test('WHAT[delegation-003] manager resume preserves companion devops across restart and normalizes state for new charges', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-mgr-devops-restart-'))
   const owner = 'manager-devops-restart'
   const runtime1 = await forkTool.createRuntime(directory, ownerDescriptor(owner))
@@ -169,7 +169,7 @@ test('WHAT[DELEG-003] manager resume preserves companion devops across restart a
   }
 })
 
-test('WHAT[DELEG-003] companion devops is preserved and not abandoned when parent session cancels child work', async () => {
+test('WHAT[delegation-003] companion devops is preserved and not abandoned when parent session cancels child work', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-mgr-devops-cancel-'))
   const owner = 'manager-devops-cancel'
   const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))

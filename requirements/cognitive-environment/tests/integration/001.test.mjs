@@ -68,7 +68,7 @@ const hanRatio = (text) => {
   return han / Math.max(1, latinWords)
 }
 
-test('WHAT[COGNITIVE-ENVIRONMENT-001] PROMPT_common_law_discourages_ascii_art_in_both_languages', () => {
+test('WHAT[cognitive-environment-001] PROMPT_common_law_discourages_ascii_art_in_both_languages', () => {
   const en = promptResources.loadForLanguage(english)
   const zh = promptResources.loadForLanguage(simplifiedChinese)
 

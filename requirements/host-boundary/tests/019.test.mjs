@@ -30,14 +30,14 @@ const REGISTERED_HOOK_NAMES = [
   'command.execute.before',
 ]
 
-test('WHAT[HOST-BOUNDARY-019] STRENGTH_004_replica_transform_route_is_structurally_exclusive', () => {
+test('WHAT[host-boundary-019] STRENGTH_004_replica_transform_route_is_structurally_exclusive', () => {
   // The transform hook is registered exactly once under the experimental name.
   // There is no second 'chat.transform' alias — that was removed because the
   // Host Hooks type has only the experimental key.
   assert.match(hookPolicySource, /HostKey = "experimental\.chat\.messages\.transform"/)
   assert.doesNotMatch(hookPolicySource, /HostKey = "chat\.transform"/)
 })
-test('WHAT[HOST-BOUNDARY-019] CHAT_MESSAGE_routes_managed_model_then_CHAT_PARAMS_only_validates', () => {
+test('WHAT[host-boundary-019] CHAT_MESSAGE_routes_managed_model_then_CHAT_PARAMS_only_validates', () => {
   // chat.message is registered before chat.params in the hook object.
   const chatMessageIdx = pluginHooksSource.indexOf('registeredHook HookKey.ChatMessage')
   const chatParamsIdx = pluginHooksSource.indexOf('registeredHook HookKey.ChatParams')
@@ -50,7 +50,7 @@ test('WHAT[HOST-BOUNDARY-019] CHAT_MESSAGE_routes_managed_model_then_CHAT_PARAMS
   // chat.params does not rewrite the model id.
   assert.doesNotMatch(chatParamsHookSource, /output\?model.*<-\s*[^t]/)
 })
-test('WHAT[HOST-BOUNDARY-019] CHAT_MESSAGE_new_physical_material_supersedes_old_capacity_without_idle', () => {
+test('WHAT[host-boundary-019] CHAT_MESSAGE_new_physical_material_supersedes_old_capacity_without_idle', () => {
   // The physical user message identity is exact: a new material supersedes
   // the old one. This is a structural fact of the message identity model,
   // not an idle-derived continuation. The hook surface does not derive
@@ -60,7 +60,7 @@ test('WHAT[HOST-BOUNDARY-019] CHAT_MESSAGE_new_physical_material_supersedes_old_
   // the managed model admission owner — not an idle consumer.
   assert.match(pluginHooksSource, /wired\.ChatMessageHook/)
 })
-test('WHAT[HOST-BOUNDARY-019] PROMPT_004_human_root_survives_host_synthetic_file_parts', () => {
+test('WHAT[host-boundary-019] PROMPT_004_human_root_survives_host_synthetic_file_parts', () => {
   // The transform hook receives the full message array including host-synthetic
   // parts. The human root message identity (role=user, id=root) is preserved
   // through the transform — the lifecycle wrapper only admits/drains the same
@@ -75,7 +75,7 @@ test('WHAT[HOST-BOUNDARY-019] PROMPT_004_human_root_survives_host_synthetic_file
   const transformsSource = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
   assert.doesNotMatch(transformsSource, /source.*host.*business|host.*file.*fact/)
 })
-test('WHAT[HOST-BOUNDARY-019] AGENT_007_tool_gate_recovers_human_root_from_host_snapshot_on_resume', () => {
+test('WHAT[host-boundary-019] AGENT_007_tool_gate_recovers_human_root_from_host_snapshot_on_resume', () => {
   // The tool.execute.before hook decodes context from the tool input, not
   // from a host snapshot. The human root is recovered from the durable
   // snapshot via SessionSnapshotPort, not from the hook args.
@@ -98,7 +98,7 @@ const assistantToolMessage = ({ messageID = 'asst_run', partID = 'part_todo', ca
   parts: [{ type: 'tool', id: partID, callID, tool: 'auto-injected', state: { status } }],
 })
 
-test('WHAT[HOST-BOUNDARY-019] CANARY_H journal xtrace uniquely completes host carrier', () => {
+test('WHAT[host-boundary-019] CANARY_H journal xtrace uniquely completes host carrier', () => {
   const messages = projectMessages([assistantToolMessage({ status: 'completed' })])
   const located = locateToolCall('call_todo', messages)
   assert.equal(located.ok, true)
@@ -106,7 +106,7 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_H journal xtrace uniquely completes host ca
   assert.equal(located.hostToolPartId, 'part_todo')
   assert.equal(located.toolCallId, 'call_todo')
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_H journal mapping fails closed on host part mismatch', () => {
+test('WHAT[host-boundary-019] CANARY_H journal mapping fails closed on host part mismatch', () => {
   const messages = projectMessages([{ info: { id: 'ses_x' }, parts: [{ type: 'text', text: 'not a tool' }] }])
   const located = locateToolCall('call_missing', messages)
   assert.equal(located.ok, false)
@@ -168,7 +168,7 @@ const append = async (handle, session, caseName, payload) => {
   return result
 }
 
-test('WHAT[HOST-BOUNDARY-019] CANARY_A openLife and compatibility injection do not wait for snapshot IO', async () => {
+test('WHAT[host-boundary-019] CANARY_A openLife and compatibility injection do not wait for snapshot IO', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-canary-a-before'
     const life = 'life-canary-a-before'
@@ -186,7 +186,7 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_A openLife and compatibility injection do n
     assert.equal(output.args.todos[0].status, 'in_progress')
   })
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_A pending {} waits in deferred prepare, not accepted as evidence', async () => {
+test('WHAT[host-boundary-019] CANARY_A pending {} waits in deferred prepare, not accepted as evidence', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-canary-a-pending'
     await openLife(handle, session, 'life-canary-a-pending')
@@ -198,7 +198,7 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_A pending {} waits in deferred prepare, not
     assert.equal(result.error.code, 'SnapshotInputMismatch')
   })
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_A materialized input must match live args canonical', () => {
+test('WHAT[host-boundary-019] CANARY_A materialized input must match live args canonical', () => {
   const expected = host.canonicalInput({
     planComplete: false, workingOn: 'diagnose',
     obligations: [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }],
@@ -207,7 +207,7 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_A materialized input must match live args c
   assert.equal(result.ok, true)
   assert.equal(result.value.inputCanonical, expected)
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_A materialization fails closed when provider input differs', () => {
+test('WHAT[host-boundary-019] CANARY_A materialization fails closed when provider input differs', () => {
   const actual = host.canonicalInput({
     planComplete: false, workingOn: 'other',
     obligations: [{ name: 'other', work: 'Different provider input.' }],
@@ -220,7 +220,7 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_A materialization fails closed when provide
   assert.equal(result.ok, false)
   assert.equal(result.error.code, 'InputMismatch')
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_B definition replaces both parameters and jsonSchema with V2 schema', () => {
+test('WHAT[host-boundary-019] CANARY_B definition replaces both parameters and jsonSchema with V2 schema', () => {
   const output = { description: '', parameters: {}, jsonSchema: {} }
   host.applyDefinition(output)
   // B: both surfaces carry the V2 obligations schema
@@ -239,7 +239,7 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_B definition replaces both parameters and j
     output.jsonSchema.properties.planComplete.description,
   )
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_C todos is non-enumerable while obligations remains visible', () => {
+test('WHAT[host-boundary-019] CANARY_C todos is non-enumerable while obligations remains visible', () => {
   const args = {
     planComplete: false, workingOn: 'provider-only',
     obligations: [{ name: 'provider-only', work: 'must remain durable provider input' }],
@@ -263,12 +263,12 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_C todos is non-enumerable while obligations
   // C: args object identity preserved (in-place mutation, not replacement)
   assert.equal(output.args, args)
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_E replaceEnrichedResult rewrites the provider-visible output', () => {
+test('WHAT[host-boundary-019] CANARY_E replaceEnrichedResult rewrites the provider-visible output', () => {
   const output = { output: 'builtin executor succeeded' }
   host.replaceEnrichedResult(output, 'enriched: Manager who will carry it is you')
   assert.equal(output.output, 'enriched: Manager who will carry it is you')
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_E live accept enriches the result the provider sees', async () => {
+test('WHAT[host-boundary-019] CANARY_E live accept enriches the result the provider sees', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-canary-e'
     const life = 'life-canary-e'
@@ -283,14 +283,14 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_E live accept enriches the result the provi
     assert.match(accepted.value.enrichedResult, /Manager who will carry it is you|The road is yours/i)
   })
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_G accept rejects unknown physical success evidence', async () => {
+test('WHAT[host-boundary-019] CANARY_G accept rejects unknown physical success evidence', async () => {
   await withJournal(async (handle) => {
     const result = await membrane.MagicTodoMembraneSurface_accept(handle, null, 'UNKNOWN', 'input', 'output')
     assert.equal(result.ok, false)
     assert.equal(result.error.code, 'InvalidPhysicalEvidence')
   })
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_G live after success and recovered completed tool part are both admissible evidence', async () => {
+test('WHAT[host-boundary-019] CANARY_G live after success and recovered completed tool part are both admissible evidence', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-canary-g'
     const life = 'life-canary-g'
@@ -317,7 +317,7 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_G live after success and recovered complete
     assert.equal(recoveredAccepted.ok, true, 'RecoveredCompletedToolPart must be admissible')
   })
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_H prepare derives full durable identity from sessionId + callId only', async () => {
+test('WHAT[host-boundary-019] CANARY_H prepare derives full durable identity from sessionId + callId only', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-canary-h'
     const life = 'life-canary-h'
@@ -335,7 +335,7 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_H prepare derives full durable identity fro
     assert.ok(prepared.prepared.proposedTodoDigest, 'proposedTodoDigest must be derived')
   })
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_H duplicate callId produces idempotent replay, not a second checkpoint', async () => {
+test('WHAT[host-boundary-019] CANARY_H duplicate callId produces idempotent replay, not a second checkpoint', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-canary-h-replay'
     const life = 'life-canary-h-replay'
@@ -355,7 +355,7 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_H duplicate callId produces idempotent repl
     )
   })
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_J live accept creates TodoWriteAccepted with Prepared digests', async () => {
+test('WHAT[host-boundary-019] CANARY_J live accept creates TodoWriteAccepted with Prepared digests', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-canary-j'
     const life = 'life-canary-j'
@@ -372,7 +372,7 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_J live accept creates TodoWriteAccepted wit
     assert.equal(snapshot.checkpoints[0].accepted, true)
   })
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_J accept rejects mismatched input digest', async () => {
+test('WHAT[host-boundary-019] CANARY_J accept rejects mismatched input digest', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-canary-j-mismatch'
     const life = 'life-canary-j-mismatch'
@@ -386,7 +386,7 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_J accept rejects mismatched input digest', 
     assert.equal(accepted.error.code, 'InputDigestMismatch')
   })
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_K recovery accept via RecoveredCompletedToolPart creates accepted checkpoint', async () => {
+test('WHAT[host-boundary-019] CANARY_K recovery accept via RecoveredCompletedToolPart creates accepted checkpoint', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-canary-k'
     const life = 'life-canary-k'
@@ -407,7 +407,7 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_K recovery accept via RecoveredCompletedToo
     assert.equal(snapshot.checkpoints[0].accepted, true)
   })
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_L prepare without accept does not create an accepted checkpoint', async () => {
+test('WHAT[host-boundary-019] CANARY_L prepare without accept does not create an accepted checkpoint', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-canary-l'
     const life = 'life-canary-l'
@@ -424,7 +424,7 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_L prepare without accept does not create an
     assert.equal(snapshot.currentObligations, null)
   })
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_L sink optimistic Pk does not constitute checkpoint without accept', async () => {
+test('WHAT[host-boundary-019] CANARY_L sink optimistic Pk does not constitute checkpoint without accept', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-canary-l-sink'
     const life = 'life-canary-l-sink'
@@ -445,7 +445,7 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_L sink optimistic Pk does not constitute ch
     assert.equal(snapshot.checkpoints.filter((c) => c.accepted).length, 0)
   })
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_M next checkpoint advances CurrentObligations cleanly without rollback', async () => {
+test('WHAT[host-boundary-019] CANARY_M next checkpoint advances CurrentObligations cleanly without rollback', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-canary-m'
     const life = 'life-canary-m'
@@ -479,7 +479,7 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_M next checkpoint advances CurrentObligatio
     )
   })
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_P recovery accept reads from Journal, not from bridge', async () => {
+test('WHAT[host-boundary-019] CANARY_P recovery accept reads from Journal, not from bridge', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-canary-p'
     const life = 'life-canary-p'
@@ -507,7 +507,7 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_P recovery accept reads from Journal, not f
     assert.equal(snapshot.checkpoints[0].outputDigest, outputDigest)
   })
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_P idempotent replay accept uses Journal state, not bridge', async () => {
+test('WHAT[host-boundary-019] CANARY_P idempotent replay accept uses Journal state, not bridge', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-canary-p-idempotent'
     const life = 'life-canary-p-idempotent'
@@ -526,18 +526,18 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_P idempotent replay accept uses Journal sta
     assert.equal(replayAccepted.ok, true)
   })
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_R admitTodowriteBatch admits multiple todowrite calls in one message', () => {
+test('WHAT[host-boundary-019] CANARY_R admitTodowriteBatch admits multiple todowrite calls in one message', () => {
   const firstCall = 'call-r-first'
   const secondCall = 'call-r-second'
   // R: two different callIDs in one assistant message → admitted for sequential execution
   const admitted = todo.admitTodowriteBatch([firstCall, secondCall])
   assert.equal(admitted.ok, true)
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_R single todowrite call is admitted', () => {
+test('WHAT[host-boundary-019] CANARY_R single todowrite call is admitted', () => {
   const admitted = todo.admitTodowriteBatch(['call-r-single'])
   assert.equal(admitted.ok, true)
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_N zero bare SessionTodo.update outside the membrane (static)', () => {
+test('WHAT[host-boundary-019] CANARY_N zero bare SessionTodo.update outside the membrane (static)', () => {
   // W5: the wrapper aggregate is gone; the compile-order manifest is the
   // only source enumerating production .fs now. This pin no longer applies.
   // N: no V2 runner type exists — construction cannot bypass the membrane
@@ -558,7 +558,7 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_N zero bare SessionTodo.update outside the 
   assert.match(surfaceSource, /sink is optimistic UI state only/, 'TodoTable is explicitly sink-only')
   assert.doesNotMatch(surfaceSource, /SessionTodo\.update/, 'no bare SessionTodo.update in surface')
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_O no plugin todowrite tool overrides builtin (static)', () => {
+test('WHAT[host-boundary-019] CANARY_O no plugin todowrite tool overrides builtin (static)', () => {
   // O: the plugin registers hooks (definition/before/after), not a competing
   //    tool. Assert the exact typed HookPolicy composition names rather than
   //    searching for emitted Host-key strings that PluginHooks no longer owns.
@@ -574,7 +574,7 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_O no plugin todowrite tool overrides builti
   const props = read('src/Wanxiangshu/Directory.Build.props')
   assert.doesNotMatch(props, /<ProjectReference[^>]*[Oo]pen[Cc]ode/, 'no Host source project reference in shared props')
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_Q todowrite description contains tagged/lag/multi-sequential, not reviewer/session/barrier/witness/2N', () => {
+test('WHAT[host-boundary-019] CANARY_Q todowrite description contains tagged/lag/multi-sequential, not reviewer/session/barrier/witness/2N', () => {
   const description = read('resources/provider/lifecycle/magic-todo/todowrite-description/en.md')
   // Q: must contain planComplete tagging
   assert.match(description, /planComplete/i)
@@ -586,7 +586,7 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_Q todowrite description contains tagged/lag
   // Q: must NOT contain reviewer identity / session / barrier / witness / 2N mechanics
   assert.doesNotMatch(description, /reviewer session|barrier|witness|2N/i)
 })
-test('WHAT[HOST-BOUNDARY-019] CANARY_F execute throw is a physical integration boundary (not unit-testable)', () => {
+test('WHAT[host-boundary-019] CANARY_F execute throw is a physical integration boundary (not unit-testable)', () => {
   // F is proven at the real Host boundary, but the production membrane must
   // retain both evidence branches so recovery never assumes `after` ran.
   const source = read('src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs')
@@ -596,7 +596,7 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_F execute throw is a physical integration b
   assert.match(boundary, /RecoveredCompletedToolPart/, 'recovered completion evidence must remain explicit')
   assert.match(boundary, /physicalResult/, 'host input must fail closed at the physical evidence boundary')
 })
-test('WHAT[HOST-BOUNDARY-019] canary file integrity: all A–R canaries are present in this file', () => {
+test('WHAT[host-boundary-019] canary file integrity: all A–R canaries are present in this file', () => {
   const source = read(existsSync(join(ROOT, 'requirements/host-boundary/tests/019.test.mjs')) ? 'requirements/host-boundary/tests/019.test.mjs' : 'requirements/host-boundary/tests/magic-todo-membrane-canaries.test.mjs')
   const canaryIds = ['A', 'B', 'C', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R']
   for (const id of canaryIds) {
@@ -639,7 +639,7 @@ const runInstalledCanary = () => {
 }
 const first = (evidence, kind) => evidence.observations.find((observation) => observation.kind === kind)
 
-test('WHAT[HOST-BOUNDARY-019] fails closed on OpenCode chat contract drift', () => {
+test('WHAT[host-boundary-019] fails closed on OpenCode chat contract drift', () => {
   assert.throws(
     () => assertPassingVersionEvidence(driftFixture.versions),
     /outside the passing observed range/,
@@ -716,7 +716,7 @@ const makeRecordingCaps = (opts = {}) => {
   return { caps, trace }
 }
 
-test('WHAT[HOST-BOUNDARY-019] normalTransform executes exact 16-step canonical sequence on production createWithCaps', async () => {
+test('WHAT[host-boundary-019] normalTransform executes exact 16-step canonical sequence on production createWithCaps', async () => {
   const { caps, trace } = makeRecordingCaps({ horizon: PrefixPresentationHorizon.Current })
   const branches = new TransformBranchCapabilities(
     () => false,
@@ -732,7 +732,7 @@ test('WHAT[HOST-BOUNDARY-019] normalTransform executes exact 16-step canonical s
   assert.deepEqual(trace, EXPECTED_ORDER)
   assert.equal(trace.length, 18)
 })
-test('WHAT[HOST-BOUNDARY-019] counterexample: swapping two stub functions causes trace to differ', async () => {
+test('WHAT[host-boundary-019] counterexample: swapping two stub functions causes trace to differ', async () => {
   const normal = makeRecordingCaps({ horizon: PrefixPresentationHorizon.Current, swap3and4: false })
   const swapped = makeRecordingCaps({ horizon: PrefixPresentationHorizon.Current, swap3and4: true })
 
@@ -751,7 +751,7 @@ test('WHAT[HOST-BOUNDARY-019] counterexample: swapping two stub functions causes
   assert.notDeepEqual(swapped.trace, normal.trace)
   assert.notDeepEqual(swapped.trace, EXPECTED_ORDER)
 })
-test('WHAT[HOST-BOUNDARY-019] tentative prefix probe horizon suppresses historical auxiliary projection in the same physical request', async () => {
+test('WHAT[host-boundary-019] tentative prefix probe horizon suppresses historical auxiliary projection in the same physical request', async () => {
   const { caps, trace } = makeRecordingCaps({ horizon: PrefixPresentationHorizon.TentativeCold })
   const branches = new TransformBranchCapabilities(
     () => false,
@@ -773,7 +773,7 @@ test('WHAT[HOST-BOUNDARY-019] tentative prefix probe horizon suppresses historic
   assert.equal(trace.includes('SanitizeMessages'), true)
   assert.equal(trace.length, 15)
 })
-test('WHAT[HOST-BOUNDARY-019] branch probe: ReplicaRuntime runs only replica steps', async () => {
+test('WHAT[host-boundary-019] branch probe: ReplicaRuntime runs only replica steps', async () => {
   const replicaTrace = []
   const caps = new NormalTransformCapabilities(
     ...Array.from({ length: 16 }, () => () => { replicaTrace.push('unwantedNormalStep'); return Promise.resolve() }),
@@ -808,7 +808,7 @@ test('WHAT[HOST-BOUNDARY-019] branch probe: ReplicaRuntime runs only replica ste
   ])
   assert.equal(replicaTrace.includes('unwantedNormalStep'), false)
 })
-test('WHAT[HOST-BOUNDARY-019] branch probe: IsExplicitResume runs only ExplicitResumeSanitize and exits', async () => {
+test('WHAT[host-boundary-019] branch probe: IsExplicitResume runs only ExplicitResumeSanitize and exits', async () => {
   const resumeTrace = []
   const caps = new NormalTransformCapabilities(
     ...Array.from({ length: 16 }, () => () => { resumeTrace.push('unwantedNormalStep'); return Promise.resolve() }),

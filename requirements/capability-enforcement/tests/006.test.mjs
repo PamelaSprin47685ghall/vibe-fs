@@ -125,7 +125,7 @@ const ROLE_ALLOW = {
   Blogger: ['chronicle'],
 }
 
-test('WHAT[ENF-006] HOST_skill_is_a_host_utility_for_interactive_roles_only', () => {
+test('WHAT[capability-enforcement-006] HOST_skill_is_a_host_utility_for_interactive_roles_only', () => {
   const config = buildConfig()
   assert.equal(configureManagedAgents(config).ok, true)
   for (const role of ROLES) {
@@ -137,7 +137,7 @@ test('WHAT[ENF-006] HOST_skill_is_a_host_utility_for_interactive_roles_only', ()
     )
   }
 })
-test('WHAT[ENF-006] ASSUME_is_a_non_authority_utility_for_interactive_roles_only', () => {
+test('WHAT[capability-enforcement-006] ASSUME_is_a_non_authority_utility_for_interactive_roles_only', () => {
   const config = buildConfig()
   assert.equal(configureManagedAgents(config).ok, true)
   for (const role of ROLES) {
@@ -182,7 +182,7 @@ const admitManagedRoot = async (hooks, sessionID = 'ses-auto-injected') => {
   await hooks['chat.message']({ sessionID, agent: 'engineer' }, output)
 }
 
-test('WHAT[ENF-006] AUTOINJ_skill_wire_stays_host_owned_and_is_not_plugin_registered', async () => {
+test('WHAT[capability-enforcement-006] AUTOINJ_skill_wire_stays_host_owned_and_is_not_plugin_registered', async () => {
   assert.equal(markerToolName, 'skill')
   assert.equal(rolePredicate('skill', 'engineer'), false, 'Host-owned skill is not a plugin role tool')
   assert.equal(rolePredicate('skill', 'manager'), false)
@@ -193,7 +193,7 @@ test('WHAT[ENF-006] AUTOINJ_skill_wire_stays_host_owned_and_is_not_plugin_regist
     assert.equal(hooks.tool.skill, undefined, 'skill remains Host-owned rather than plugin-registered')
   })
 })
-test('WHAT[ENF-006] AUTOINJ_active_empty_skill_call_is_denied_without_touching_real_skill_names', async () => {
+test('WHAT[capability-enforcement-006] AUTOINJ_active_empty_skill_call_is_denied_without_touching_real_skill_names', async () => {
   await withExecutablePlugin(async (hooks) => {
     await admitManagedRoot(hooks)
     const transformed = {
@@ -240,7 +240,7 @@ test('WHAT[ENF-006] AUTOINJ_active_empty_skill_call_is_denied_without_touching_r
     assert.equal(real.parts[0].state.output, 'real skill output')
   })
 })
-test('WHAT[ENF-006] AUTOINJ_tryInject_rewrites_active_call_without_synthetic_injection', async () => {
+test('WHAT[capability-enforcement-006] AUTOINJ_tryInject_rewrites_active_call_without_synthetic_injection', async () => {
   await withExecutablePlugin(async (hooks) => {
     await admitManagedRoot(hooks)
     const transformed = {
@@ -287,7 +287,7 @@ const { chronicleContract } = await import("../../../dist/OpenCode/Tools/ToolSur
 
 installDefaultResources()
 
-test('WHAT[ENF-006] CHRONICLE_spec_exposes_identity_and_argument_surface', () => {
+test('WHAT[capability-enforcement-006] CHRONICLE_spec_exposes_identity_and_argument_surface', () => {
   const contract = chronicleContract()
   assert.equal(contract.name, 'chronicle')
   assert.deepEqual(contract.argumentNames, ['entry', 'tip'])
@@ -303,12 +303,12 @@ const { permissions: rolePermissions, isAllowed: surfaceIsAllowed } = await impo
 const { allRoleLabels } = await import("../../../dist/Foundation/RolesSurface.js");
 
 
-test('WHAT[ENF-006] inquiry_role_is_revoked_and_permissions_fail_closed', () => {
+test('WHAT[capability-enforcement-006] inquiry_role_is_revoked_and_permissions_fail_closed', () => {
   assert.equal(allRoleLabels.includes('inquiry'), false, 'Inquiry must not be in canonical active roles')
   const allowed = rolePermissions('inquiry')
   assert.deepEqual(allowed, [], 'inquiry permissions must fail closed to empty set')
 })
-test('WHAT[ENF-006] inquiry_isAllowed_denies_all_tools', () => {
+test('WHAT[capability-enforcement-006] inquiry_isAllowed_denies_all_tools', () => {
   assert.equal(surfaceIsAllowed('inquiry', 'Inspect'), false)
   assert.equal(surfaceIsAllowed('inquiry', 'Sphinx'), false)
   assert.equal(surfaceIsAllowed('inquiry', 'Fission'), false)
@@ -324,24 +324,24 @@ const { allRoleLabels } = await import("../../../dist/Foundation/RolesSurface.js
 
 const OFFICE_TOOLS = ['fetch', 'review', 'join', 'chronicle', 'run', 'fork', 'resume']
 
-test('WHAT[ENF-006] internal_leaf_tool_declares_attachment_authority_not_a_public_office', () => {
+test('WHAT[capability-enforcement-006] internal_leaf_tool_declares_attachment_authority_not_a_public_office', () => {
   assert.equal(admissionAuthority('js-bookkeeper'), 'private-attachment')
   for (const tool of OFFICE_TOOLS) {
     assert.equal(admissionAuthority(tool), 'office', `${tool} is an office tool`)
   }
   assert.equal(admissionAuthority('no-such-tool'), 'unknown')
 })
-test('WHAT[ENF-006] internal_leaf_tool_is_invisible_to_every_public_office_role', () => {
+test('WHAT[capability-enforcement-006] internal_leaf_tool_is_invisible_to_every_public_office_role', () => {
   assert.ok(allRoleLabels.length > 0)
   for (const role of allRoleLabels) {
     assert.equal(rolePredicate('js-bookkeeper', role), false, `js-bookkeeper must stay invisible to ${role}`)
   }
 })
-test('WHAT[ENF-006] attachment_authority_is_fail_closed_without_an_attached_transaction', () => {
+test('WHAT[capability-enforcement-006] attachment_authority_is_fail_closed_without_an_attached_transaction', () => {
   assert.equal(privateAttachmentAdmits('js-bookkeeper', 'ses-never-attached'), false)
   assert.equal(privateAttachmentAdmits('js-bookkeeper', ''), false)
 })
-test('WHAT[ENF-006] an_office_tool_can_never_be_admitted_through_the_attachment_path', () => {
+test('WHAT[capability-enforcement-006] an_office_tool_can_never_be_admitted_through_the_attachment_path', () => {
   for (const tool of OFFICE_TOOLS) {
     assert.equal(privateAttachmentAdmits(tool, 'ses-any'), false, `${tool} must not take the attachment path`)
   }

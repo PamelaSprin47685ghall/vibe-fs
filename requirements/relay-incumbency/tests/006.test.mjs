@@ -5,7 +5,7 @@ import * as relay from '../../../dist/Mission/Relay/Surface.js'
 const open = (state, road = 'road-1', incumbent = 'inc-1', snapshot = 'snapshot-1') =>
   relay.openIncumbency(state, road, incumbent, snapshot, 'authority-1')
 
-test('WHAT[RELAY-006] Continue keeps the road open for a next iteration', () => {
+test('WHAT[relay-incumbency-006] Continue keeps the road open for a next iteration', () => {
   const first = open(relay.empty())
   const assessed = relay.assess(
     first.state,
@@ -37,7 +37,7 @@ test('WHAT[RELAY-006] Continue keeps the road open for a next iteration', () => 
   assert.equal(relay.authority(next.state, 'road-1').activeSnapshot, 'snapshot-2')
 })
 
-test('WHAT[RELAY-006] Accepted blocks reopening while valid, invalidation reopens it', () => {
+test('WHAT[relay-incumbency-006] Accepted blocks reopening while valid, invalidation reopens it', () => {
   const first = open(relay.empty())
   const assessed = relay.assess(
     first.state,

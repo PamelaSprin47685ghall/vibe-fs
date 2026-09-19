@@ -22,6 +22,6 @@ const cutResult = () => projection.applyCut(cutMessages, 'old-run', 'suicide-cal
 
 const ids = (result) => result.provider.map((message) => message.id ?? message.info?.id)
 
-test('WHAT[PROJ-001] audit projection retains every physical message across the cut', () => {
+test('WHAT[relay-context-projection-001] audit projection retains every physical message across the cut', () => {
   assert.equal(cutResult().audit.length, cutMessages.length)
 })

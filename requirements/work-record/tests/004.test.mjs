@@ -87,7 +87,7 @@ const seedTwoInvocations = async (handle) => {
   return { s1, s2, inv1Through, inv2Through }
 }
 
-test('WHAT[WORK-RECORD-004] COMPANION_015_bounded_chronicle_heading_omitted_when_invocation_has_no_y', async () => {
+test('WHAT[work-record-004] COMPANION_015_bounded_chronicle_heading_omitted_when_invocation_has_no_y', async () => {
   await withJournal(async (journal) => {
     const { s1, s2 } = await seedTwoInvocations(journal)
 
@@ -103,7 +103,7 @@ test('WHAT[WORK-RECORD-004] COMPANION_015_bounded_chronicle_heading_omitted_when
   })
 })
 
-test('WHAT[WORK-RECORD-004] same terminal text in a reused child is a fresh occurrence when ProviderRun changes', async () => {
+test('WHAT[work-record-004] same terminal text in a reused child is a fresh occurrence when ProviderRun changes', async () => {
   await withJournal(async (handle) => {
     await workRecord.captureOpening(handle, SEM, 'reuse first', [])
     const first = await workRecord.captureProjection(handle, SEM, {
@@ -141,7 +141,7 @@ test('WHAT[WORK-RECORD-004] same terminal text in a reused child is a fresh occu
   })
 })
 
-test('WHAT[WORK-RECORD-004] rematerializing an older bounded range never substitutes a later terminal', async () => {
+test('WHAT[work-record-004] rematerializing an older bounded range never substitutes a later terminal', async () => {
   await withJournal(async (handle) => {
     await workRecord.captureOpening(handle, SEM, 'history first', [])
     await workRecord.captureProjection(handle, SEM, {

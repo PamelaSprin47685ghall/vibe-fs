@@ -66,7 +66,7 @@ const layersOf = (s) =>
     ]),
   )
 
-test('WHAT[REPOSITORY-PROGRAMMING-022] JS_description_is_action_first_then_teaches_paid_failure_memory', () => {
+test('WHAT[repository-programming-022] JS_description_is_action_first_then_teaches_paid_failure_memory', () => {
   const coder = surface('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'])
   const lessonText = coder.description.replace(/\s+/g, ' ')
 

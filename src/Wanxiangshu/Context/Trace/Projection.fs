@@ -451,7 +451,7 @@ module XTraceProjection =
 
     /// The first stable user message in the current Host generation is the raw
     /// session Opening. Same-session prefix replacement must never delete it;
-    /// WORK-RECORD-007 renders frozen-prefix records with includeOpening=false.
+    /// work-record-007 renders frozen-prefix records with includeOpening=false.
     let tryOpeningHostMessageId (state: XTraceProjectionState) : string option =
         state
         |> parts

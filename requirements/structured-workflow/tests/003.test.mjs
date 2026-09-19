@@ -7,7 +7,7 @@ const tr = await import("../../../dist/OpenCode/Tools/ToolRegistrySurface.js");
 const retirement = await import("../../../dist/Mission/Relay/Retirement/Surface.js");
 
 
-test('WHAT[STRUCTURED-WORKFLOW-003] Orchestrator retirement and decision state operates without resumable workflow continuation addresses', () => {
+test('WHAT[structured-workflow-003] Orchestrator retirement and decision state operates without resumable workflow continuation addresses', () => {
   const decision = retirement.decide([], {
     assessed: true,
     openObligations: 0,
@@ -26,7 +26,7 @@ const { TaskResultListSurface_traverseM } = await import("../../../dist/Foundati
 const outcomeSurface = await import("../../../dist/Foundation/OutcomeSurface.js");
 
 
-test('WHAT[STRUCTURED-WORKFLOW-003] OutcomeSurface defines public vocabulary for outcome classification', () => {
+test('WHAT[structured-workflow-003] OutcomeSurface defines public vocabulary for outcome classification', () => {
   assert.ok(outcomeSurface.sendOutcomeKinds().includes('AdmittedWithReceipt'))
   assert.ok(outcomeSurface.isValidAgentRunResult('terminal text'))
   assert.equal(outcomeSurface.isValidAgentRunResult('   '), false)
@@ -55,7 +55,7 @@ const wake = {
 const name = (observation, signal = wake.retry()) =>
   reconcileSurface.decisionName(reconcileSurface.decideStep(signal, observation))
 
-test('WHAT[STRUCTURED-WORKFLOW-003] RECONCILE_PROGRAM_005: TurnUnknown never crosses the stable business-turn boundary', () => {
+test('WHAT[structured-workflow-003] RECONCILE_PROGRAM_005: TurnUnknown never crosses the stable business-turn boundary', () => {
   // HOST-004 / rabbit §7: TurnUnknown is type-unreachable for publishDecision
   // (not a TurnOutcome). IdleWake + Unknown → Publish (observation
   // handoff only); business repair lives in TurnWorkflow / InteractionRepair.
@@ -69,7 +69,7 @@ test('WHAT[STRUCTURED-WORKFLOW-003] RECONCILE_PROGRAM_005: TurnUnknown never cro
   assert.equal(reconcileSurface.tryOutcome('TurnUnknown').accepted, false)
   assert.equal(reconcileSurface.tryOutcome('TurnUnknown').name, undefined)
 })
-test('WHAT[STRUCTURED-WORKFLOW-003] RECONCILE_PROGRAM_007: TurnUnknown is SnapshotObservation, not TurnOutcome', () => {
+test('WHAT[structured-workflow-003] RECONCILE_PROGRAM_007: TurnUnknown is SnapshotObservation, not TurnOutcome', () => {
   // The five accepted JS outcome names are checked through the owner’s stable
   // acceptance result, never through DU case metadata.
   for (const outcome of [
@@ -105,7 +105,7 @@ const { fileURLToPath } = await import("node:url");
 const ROOT = new URL('../../../', import.meta.url).pathname
 const readSrc = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
-test('WHAT[STRUCTURED-WORKFLOW-003] SW_009_reconcile_domain_is_observation_stabilization_not_a_program', () => {
+test('WHAT[structured-workflow-003] SW_009_reconcile_domain_is_observation_stabilization_not_a_program', () => {
   // The registered ReconcileSurface is the owner contract: callers observe
   // one causal observation decision, never emitted union metadata.
   for (const n of [
@@ -137,14 +137,14 @@ test('WHAT[STRUCTURED-WORKFLOW-003] SW_009_reconcile_domain_is_observation_stabi
     assert.equal(n in reconcile, false, `ReconcileSurface must not export ${n}`)
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-003] SW_009_recovery_surface_drives_ordinary_workflow_entrypoints', () => {
+test('WHAT[structured-workflow-003] SW_009_recovery_surface_drives_ordinary_workflow_entrypoints', () => {
   // Recovery is a permit-gated re-entry into the same named workflows the
   // live path uses (ARCH-005 / ce-temporal-ownership §15–17): the
   // SessionRecoveryWorkflow entry, the provider recovery vocabulary, and the
   // thin per-context TurnWorkflow router. None of them is a stored position.
   //
   // Source-tree proof: each workflow module defines its named entrypoint as a
-  // `let` — the direct-CE contract (STRUCTURED-WORKFLOW-001). Build-verification
+  // `let` — the direct-CE contract (structured-workflow-001). Build-verification
   // (guide-contract.test.mjs) proves the emitted modules load and the
   // entrypoints are callable.
   const entrypoints = [
@@ -163,7 +163,7 @@ test('WHAT[STRUCTURED-WORKFLOW-003] SW_009_recovery_surface_drives_ordinary_work
   }
   assert.deepEqual(missing, [], `recovery workflow entrypoints must exist in production source: ${missing.join('; ')}`)
 })
-test('WHAT[STRUCTURED-WORKFLOW-003] SW_009_change_seam_has_no_recovery_control_token_dispatcher', () => {
+test('WHAT[structured-workflow-003] SW_009_change_seam_has_no_recovery_control_token_dispatcher', () => {
   // OBL-002: the Change seam must not re-introduce a JobRecoveryAction
   // control-token type, a recoveryAction producer, a resumeFromDurableFacts
   // interpreter, or any equivalent NextAction dispatcher. Recovery re-enters
@@ -207,7 +207,7 @@ const outcomeSurface = await import("../../../dist/Foundation/OutcomeSurface.js"
 const ROOT = new URL('../../../', import.meta.url).pathname
 const readSrc = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
-test('WHAT[STRUCTURED-WORKFLOW-003] SW_002_workflow_modules_export_no_program_counter_shaped_names', () => {
+test('WHAT[structured-workflow-003] SW_002_workflow_modules_export_no_program_counter_shaped_names', () => {
   // DSL-002 / ARCH-008: the direct workflow owner exposes story entrypoints,
   // never a stored business stage. Source-tree proof: no Stage/Phase/NextAction
   // let bindings in the workflow modules.
@@ -223,7 +223,7 @@ test('WHAT[STRUCTURED-WORKFLOW-003] SW_002_workflow_modules_export_no_program_co
   }
   assert.deepEqual(bad, [], `workflow modules must not define program-counter-shaped names: ${bad.join('; ')}`)
 })
-test('WHAT[STRUCTURED-WORKFLOW-003] SW_003_domain_flow_and_outcome_types_are_domain_facts', () => {
+test('WHAT[structured-workflow-003] SW_003_domain_flow_and_outcome_types_are_domain_facts', () => {
   // Agent errors remain domain facts. Companion has no generic context/error
   // workflow vocabulary: direct durable and transform owners carry its operations.
   const agentErrors = readSrc('src/Wanxiangshu/Execution/Agent/Errors.fs')

@@ -35,7 +35,7 @@ const items = [
   obligation('verification', 'Verify the behavior with evidence.', 'far'),
 ]
 
-test('WHAT[OBLIGATION-LEDGER-022] blocks retirement suicide until plan commitment, not merely until any checkpoint', () => {
+test('WHAT[obligation-ledger-022] blocks retirement suicide until plan commitment, not merely until any checkpoint', () => {
   assert.equal(todo.requirePlanCommitmentBeforeFirstSuicide(false).error.code, 'FirstSuicideWithoutCheckpoint')
   assert.equal(ok(todo.requirePlanCommitmentBeforeFirstSuicide(true)), null)
 })

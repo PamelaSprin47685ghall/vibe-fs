@@ -3,4 +3,4 @@ import { assertFatalBoundary } from '../../structured-workflow/tests/support/m6-
 
 
 
-test('WHAT[INTERACTION-AUTHORITY-020] repair fatal preserves exact claim settlement and one injected fuse', () => assertFatalBoundary('interaction-authority'))
+test('WHAT[interaction-authority-020] repair fatal preserves exact claim settlement and one injected fuse', () => assertFatalBoundary('interaction-authority'))

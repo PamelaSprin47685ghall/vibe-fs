@@ -69,7 +69,7 @@ const installBookkeeperRuntime = (port, ownerSessionIds) => {
 const record = (sessionId, q, a, observations) => ({ sessionId, q, a, observations, lastAccessOrder: 0 })
 const openStore = (dir, writerId) => eventStore.create(join(dir, '.git'), writerId)
 
-test('WHAT[KNOWLEDGE-REUSE-010] CASE010_finalize_create_child_once_and_cleanup_never_runs_bookkeeper', async () => {
+test('WHAT[knowledge-reuse-010] CASE010_finalize_create_child_once_and_cleanup_never_runs_bookkeeper', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-session-fin-'))
   const { port, createCalls, programCalls, prompts } = scriptedBookkeeperPort()
   try {
@@ -139,7 +139,7 @@ const failingPort = () => {
 }
 const record = (sessionId, q, a, observations) => ({ sessionId, q, a, observations, lastAccessOrder: 0 })
 
-test('WHAT[KNOWLEDGE-REUSE-010] CASE010_finalize_uses_synthesizer_not_raw_noteAnswer', async () => {
+test('WHAT[knowledge-reuse-010] CASE010_finalize_uses_synthesizer_not_raw_noteAnswer', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-fin-'))
   const { port, createCalls, programCalls } = scriptedBookkeeperPort()
   try {
@@ -175,7 +175,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] CASE010_finalize_uses_synthesizer_not_raw_noteAn
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[KNOWLEDGE-REUSE-010] CASE010_cleanup_never_synthesizes', async () => {
+test('WHAT[knowledge-reuse-010] CASE010_cleanup_never_synthesizes', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-cleanup-'))
   const { port, createCalls, programCalls } = scriptedBookkeeperPort()
   try {
@@ -242,7 +242,7 @@ const findCase = async (store, sessionId) => {
   return result.value
 }
 
-test('WHAT[KNOWLEDGE-REUSE-010] CASE010_finalize_is_exactly_once_per_scope', async () => {
+test('WHAT[knowledge-reuse-010] CASE010_finalize_is_exactly_once_per_scope', async () => {
   const local = createCasebookEventStore()
   try {
     assert.equal((await casebook.finalize(local.store, caseRec('scope-1', 'Q', 'A', []))).ok, true)
@@ -292,7 +292,7 @@ const openStore = () => {
   }
 }
 
-test('WHAT[KNOWLEDGE-REUSE-010] CASE010_finalize_is_exactly_once_per_scope', async () => {
+test('WHAT[knowledge-reuse-010] CASE010_finalize_is_exactly_once_per_scope', async () => {
   const local = openStore()
   try {
     const first = await casebook.finalize(local.handle, caseRec('scope-1', 'Q', 'A', []))
@@ -329,7 +329,7 @@ const QUESTIONS = [
   ['When does CaseFinalize run?', 'ReuseScope close, once.'],
 ]
 
-test('WHAT[KNOWLEDGE-REUSE-010] G6_engineer_charge_sync_delegate_lifecycle_bookkeeper_fetch', async () => {
+test('WHAT[knowledge-reuse-010] G6_engineer_charge_sync_delegate_lifecycle_bookkeeper_fetch', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-g6-engineer-charge-'))
   execFileSync('git', ['init', '--quiet', dir])
   mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
@@ -423,7 +423,7 @@ const QUESTIONS = [
   ['When does CaseFinalize run?', 'ReuseScope close, once.'],
 ]
 
-test('WHAT[KNOWLEDGE-REUSE-010] G6_G_host_reusable_inspector_one_finalize_then_cold_fetch', async () => {
+test('WHAT[knowledge-reuse-010] G6_G_host_reusable_inspector_one_finalize_then_cold_fetch', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-g6-host-reuse-'))
   execFileSync('git', ['init', '--quiet', dir])
   mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
@@ -530,7 +530,7 @@ const sandbox = () => {
   }
 }
 
-test('WHAT[KNOWLEDGE-REUSE-010] lifecycle_cleanupInspector_never_publishes_case', async () => {
+test('WHAT[knowledge-reuse-010] lifecycle_cleanupInspector_never_publishes_case', async () => {
   const { dir, handle, cleanup } = sandbox()
   try {
     lifecycle.enable(dir)
@@ -549,7 +549,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] lifecycle_cleanupInspector_never_publishes_case'
     cleanup()
   }
 })
-test('WHAT[KNOWLEDGE-REUSE-010] lifecycle_missing_answer_is_noop_finalize', async () => {
+test('WHAT[knowledge-reuse-010] lifecycle_missing_answer_is_noop_finalize', async () => {
   const { dir, handle, cleanup } = sandbox()
   try {
     lifecycle.enable(dir)
@@ -581,7 +581,7 @@ const { CANONICAL_A, CANONICAL_Q, installBookkeeperRuntime, scriptedBookkeeperPo
 const fileRead = (path, contentHash) => ({ kind: 'file-read', path, contentHash })
 const record = (sessionId, q, a, observations) => ({ sessionId, q, a, observations, lastAccessOrder: 0 })
 
-test('WHAT[KNOWLEDGE-REUSE-010] G6_G_universal_loop_archive_finalize_fetch', async () => {
+test('WHAT[knowledge-reuse-010] G6_G_universal_loop_archive_finalize_fetch', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-universal-'))
   const handle = eventStore.create(dir, 'universal-archive')
   try {
@@ -595,7 +595,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_G_universal_loop_archive_finalize_fetch', asy
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[KNOWLEDGE-REUSE-010] G6_G_lifecycle_note_finalize_fetch_and_cleanup', async () => {
+test('WHAT[knowledge-reuse-010] G6_G_lifecycle_note_finalize_fetch_and_cleanup', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-universal-life-'))
   try {
     execFileSync('git', ['init', '--quiet', dir])
@@ -638,7 +638,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_G_lifecycle_note_finalize_fetch_and_cleanup',
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[KNOWLEDGE-REUSE-010] G6_G_cancel_session_cleanup_no_publication', async () => {
+test('WHAT[knowledge-reuse-010] G6_G_cancel_session_cleanup_no_publication', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-universal-cancel-'))
   try {
     execFileSync('git', ['init', '--quiet', dir])

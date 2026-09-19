@@ -12,7 +12,7 @@ const mustOk = (result) => {
   return result
 }
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] convergence requires all lane records and all completion deliveries', () => {
+test('WHAT[intra-participant-parallelism-009] convergence requires all lane records and all completion deliveries', () => {
   const bundle = [0, 1, 2].reduce(
     (state, lane) => mustOk(fission.workBundleAdd(lane, `ref-${lane}`, state)).bundle,
     fission.workBundleEmpty,
@@ -24,7 +24,7 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] convergence requires all lane reco
   const incomplete = mustOk(fission.workBundleAdd(0, 'ref-0', fission.workBundleEmpty)).bundle
   assert.equal(fission.convergenceReady(3, ['pre-child'], incomplete, delivery), false)
 })
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] ring successor wraps and forwards past already-closed lanes to the next live present', () => {
+test('WHAT[intra-participant-parallelism-009] ring successor wraps and forwards past already-closed lanes to the next live present', () => {
   assert.equal(fission.ringSuccessor(4, 0, [0, 1, 2, 3]), null, 'all lanes closed leaves the group finalizer holding the bundle')
   assert.equal(fission.ringSuccessor(4, 1, [0, 1, 3]), 2, 'lane 1 forwards directly to live successor lane 2')
   assert.equal(fission.ringSuccessor(4, 1, [0, 1, 2]), 3, 'closed successor lane 2 forwards mechanically to lane 3')
@@ -74,7 +74,7 @@ const harness = ({ failCreateAt, failStartAt, failInterrupt = false, parent = 'o
   return { events, runtime }
 }
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] observeLaneTurn and OrdinaryTurnWorkflow absorb Fission-replaced owner turns without sending continuations', async () => {
+test('WHAT[intra-participant-parallelism-009] observeLaneTurn and OrdinaryTurnWorkflow absorb Fission-replaced owner turns without sending continuations', async () => {
   const owner = 'retired-owner-workflow'
   fission.markSilentInterrupt(owner)
 
@@ -90,7 +90,7 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] observeLaneTurn and OrdinaryTurnWo
     fission.clearOwner(owner)
   }
 })
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] exact Fission terminal bridge reconciles a completed lane even when session idle is missing', async () => {
+test('WHAT[intra-participant-parallelism-009] exact Fission terminal bridge reconciles a completed lane even when session idle is missing', async () => {
   const observed = await fissionHost.missingIdleTerminalBridgeScenario()
   assertJsData(observed, 'Fission missing-idle terminal bridge observation')
   assert.equal(observed.outcome, 'TurnCompleted')
@@ -116,7 +116,7 @@ const fissionProduction = () => [
   'src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs',
 ].map(read).join('\n')
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] Host convergence performs ring takeover before reporting the old logical owner', () => {
+test('WHAT[intra-participant-parallelism-009] Host convergence performs ring takeover before reporting the old logical owner', () => {
   const host = read('src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs')
   const bootstrap = read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
   const facts = read('src/Wanxiangshu/Execution/Fission/Facts.fs')

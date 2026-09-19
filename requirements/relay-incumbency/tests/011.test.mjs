@@ -4,7 +4,7 @@ import * as relay from '../../../dist/Mission/Relay/Surface.js'
 
 
 
-test('WHAT[RELAY-011] accepted assignments and running processes preserve continuity across manager terms without record loss', () => {
+test('WHAT[relay-incumbency-011] accepted assignments and running processes preserve continuity across manager terms without record loss', () => {
   const first = relay.openIncumbency(relay.empty(), 'road-1', 'inc-1', 'snapshot-1', 'authority-1')
   assert.equal(first.ok, true)
 

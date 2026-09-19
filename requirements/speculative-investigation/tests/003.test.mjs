@@ -10,7 +10,7 @@ const result = (callId, resultText) => ({ kind: 'tool-result', callId, result: r
 const text = (textValue) => ({ kind: 'text', text: textValue })
 const msg = (role, parts) => ({ role, parts })
 
-test('WHAT[SPEC-INV-003] STRENGTH_003_005_collector_preserves_provider_request_batches_and_concurrent_order', () => {
+test('WHAT[speculative-investigation-003] STRENGTH_003_005_collector_preserves_provider_request_batches_and_concurrent_order', () => {
   const batches = Strength.collectCompleteBatches([
     msg('user', [text('root')]),
     msg('assistant', [call('c1', 'read', '{"a":1}'), call('c2', 'grep', '{"b":2}')]),
@@ -24,7 +24,7 @@ test('WHAT[SPEC-INV-003] STRENGTH_003_005_collector_preserves_provider_request_b
   assert.deepEqual(batches[0].exchanges.map((exchange) => exchange.canonicalResult), ['one', 'two'])
   assert.equal(batches[1].requestOrdinal, 2)
 })
-test('WHAT[SPEC-INV-003] STRENGTH_005_incomplete_batch_and_results_after_next_provider_message_are_not_collected', () => {
+test('WHAT[speculative-investigation-003] STRENGTH_005_incomplete_batch_and_results_after_next_provider_message_are_not_collected', () => {
   assert.deepEqual(Strength.collectCompleteBatches([
     msg('assistant', [call('c1', 'read', '{}'), call('c2', 'grep', '{}')]),
     msg('tool', [result('c1', 'one')]),
@@ -58,7 +58,7 @@ const registered = (replica, budget) => {
 }
 const apply = async (runtime, output) => Strength.transformApply(H, runtime, output)
 
-test('WHAT[SPEC-INV-003] STRENGTH_003_K1_aborts_before_provider_request_2_after_one_complete_batch', async () => {
+test('WHAT[speculative-investigation-003] STRENGTH_003_K1_aborts_before_provider_request_2_after_one_complete_batch', async () => {
   const runtime = registered('replica-k1', 'K1')
   const output = { messages: [user('u1', 'replica-k1', [hostText('Continue.')]), assistant('a1', 'replica-k1', [hostCall('c1', 'read', { filePath: 'a' })]), tool('t1', 'replica-k1', [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')])] }
   const outcome = await apply(runtime, output)
@@ -74,7 +74,7 @@ test('WHAT[SPEC-INV-003] STRENGTH_003_K1_aborts_before_provider_request_2_after_
   assert.notEqual(Strength.runtimeRetire(runtime, 'replica-k1'), null)
   assert.equal((await apply(runtime, output)).kind, 'NotReplica')
 })
-test('WHAT[SPEC-INV-003] STRENGTH_003_multiple_parallel_tool_calls_in_one_request_form_single_batch', async () => {
+test('WHAT[speculative-investigation-003] STRENGTH_003_multiple_parallel_tool_calls_in_one_request_form_single_batch', async () => {
   const runtime = registered('replica-multi-tool', 'K1')
   const output = {
     messages: [
@@ -94,7 +94,7 @@ test('WHAT[SPEC-INV-003] STRENGTH_003_multiple_parallel_tool_calls_in_one_reques
   assert.equal(outcome.batches[0].exchanges[1].toolName, 'grep')
   assert.deepEqual(outcome.aborted, ['replica-multi-tool'])
 })
-test('WHAT[SPEC-INV-003] STRENGTH_003_K1_counts_OpenCode_completed_tool_part_as_one_real_request', async () => {
+test('WHAT[speculative-investigation-003] STRENGTH_003_K1_counts_OpenCode_completed_tool_part_as_one_real_request', async () => {
   const runtime = registered('replica-host-k1', 'K1')
   const output = { messages: [user('u1', 'replica-host-k1', [hostText('Continue.')]), assistant('a1', 'replica-host-k1', [hostResult('c1', 'read', { filePath: 'README.md' }, 'alpha')]), assistant('a2', 'replica-host-k1', [])] }
   const outcome = await apply(runtime, output)
@@ -106,7 +106,7 @@ test('WHAT[SPEC-INV-003] STRENGTH_003_K1_counts_OpenCode_completed_tool_part_as_
   assert.equal(outcome.batches[0].exchanges[0].canonicalResult, 'alpha')
   assert.deepEqual(outcome.aborted, ['replica-host-k1'])
 })
-test('WHAT[SPEC-INV-003] STRENGTH_003_K2_allows_request_2_then_aborts_before_request_3', async () => {
+test('WHAT[speculative-investigation-003] STRENGTH_003_K2_allows_request_2_then_aborts_before_request_3', async () => {
   const runtime = registered('replica-k2', 'K2')
   const first = { messages: [user('u1', 'replica-k2', [hostText('Continue.')]), assistant('a1', 'replica-k2', [hostResult('c1', 'grep', { pattern: 'x' }, 'a:1:x')])] }
   assert.equal((await apply(runtime, first)).kind, 'Ready')
@@ -117,7 +117,7 @@ test('WHAT[SPEC-INV-003] STRENGTH_003_K2_allows_request_2_then_aborts_before_req
   assert.equal(retired.batches.length, 2)
   assert.deepEqual(retired.aborted, ['replica-k2'])
 })
-test('WHAT[SPEC-INV-003] STRENGTH_003_speculation_completion_is_aligned_to_provider_step_boundary_without_wall_clock_inference', async () => {
+test('WHAT[speculative-investigation-003] STRENGTH_003_speculation_completion_is_aligned_to_provider_step_boundary_without_wall_clock_inference', async () => {
   const runtime = registered('replica-step-bound', 'K1')
   const output = {
     messages: [
@@ -189,7 +189,7 @@ const attach = (replica, budget, purpose = 'Treatment', owner = 'owner') => {
 const turn = (sessionId, outcome, providerRun = 'run-t') => ({ sessionId, providerRun, outcome, parts: [] })
 const oneBatch = (replica) => ({ messages: [user('u1', replica, [hostText('Continue.')]), assistant('a1', replica, [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')])] })
 
-test('WHAT[SPEC-INV-003] STRENGTH_003_replica_request_counts_never_exceed_the_immutable_k_budget', async () => {
+test('WHAT[speculative-investigation-003] STRENGTH_003_replica_request_counts_never_exceed_the_immutable_k_budget', async () => {
   // K1 with a two-batch transcript still reports at most one request.
   const k1 = attach('replica-k1c', 'K1')
   const two = { messages: [user('u1', 'replica-k1c', [hostText('Continue.')]), assistant('a1', 'replica-k1c', [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')]), assistant('a2', 'replica-k1c', [hostResult('c2', 'grep', { pattern: 'x' }, 'hit')])] }

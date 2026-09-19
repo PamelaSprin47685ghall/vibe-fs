@@ -1,6 +1,6 @@
 # Proof status
 
-Unit oracles for `INSTITUTIONAL-LEARNING-001` through `008`.
+Unit oracles for `institutional-learning-001` through `008`.
 
 The test suite covers:
 - Raw natural-language experience input for `celebrate` and `regret` (`001`).

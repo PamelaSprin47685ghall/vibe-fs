@@ -47,7 +47,7 @@ const fixture = () => {
   }
 }
 
-test('WHAT[CHGINT-008] Adapter_ffMerge_clean_fast_forward_returns_exact_candidate_receipt', async () => {
+test('WHAT[change-integration-008] Adapter_ffMerge_clean_fast_forward_returns_exact_candidate_receipt', async () => {
   const fx = fixture()
 
   try {
@@ -61,7 +61,7 @@ test('WHAT[CHGINT-008] Adapter_ffMerge_clean_fast_forward_returns_exact_candidat
   }
 })
 
-test('WHAT[CHGINT-008] Adapter_ffMerge_moved_head_fails_closed_without_advancing_head', async () => {
+test('WHAT[change-integration-008] Adapter_ffMerge_moved_head_fails_closed_without_advancing_head', async () => {
   const fx = fixture()
 
   try {

@@ -5,7 +5,7 @@ import * as resume from '../../../dist/OpenCode/Host/ExplicitResumeSurface.js'
 
 
 
-test('WHAT[CRASH-020] DevOps crash recovery maintains single logical authority, locks model, and avoids command auto-replay', async () => {
+test('WHAT[crash-reconciliation-020] DevOps crash recovery maintains single logical authority, locks model, and avoids command auto-replay', async () => {
   // 1. RolesSurface must have consolidated DevOps and Engineer
   const all = RolesSurface.allRoleLabels
   assert.ok(all.includes('devops'), 'Role labels must have devops')

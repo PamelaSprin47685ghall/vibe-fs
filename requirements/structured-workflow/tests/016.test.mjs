@@ -83,7 +83,7 @@ const withShardRepo = (t, shards) => {
   return dir
 }
 
-test('WHAT[STRUCTURED-WORKFLOW-016] release architecture has one subsystem authority', () => {
+test('WHAT[structured-workflow-016] release architecture has one subsystem authority', () => {
   const check = readFileSync(resolve(ROOT, 'scripts/check.mjs'), 'utf8')
   assert.match(check, /checks\/subsystems\.mjs/)
   assert.doesNotMatch(check, /checks\/semantic-owners\.mjs/)

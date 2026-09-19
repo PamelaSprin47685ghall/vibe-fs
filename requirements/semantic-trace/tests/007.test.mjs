@@ -23,7 +23,7 @@ const withJournal = async (fn) => {
 }
 const projection = (messages) => ({ messages })
 
-test('WHAT[SEMANTIC-TRACE-007] projection capture is idempotent and reports owner receipts', async () => {
+test('WHAT[semantic-trace-007] projection capture is idempotent and reports owner receipts', async () => {
   await withJournal(async (handle) => {
     const value = projection([
       { role: 'user', parts: [trace.semanticText('task')] },
@@ -37,7 +37,7 @@ test('WHAT[SEMANTIC-TRACE-007] projection capture is idempotent and reports owne
     assert.equal(trace.orderedSemanticParts(trace.snapshot(handle, SESSION)).length, 3)
   })
 })
-test('WHAT[SEMANTIC-TRACE-007] materialization reads canonical durable semantics', async () => {
+test('WHAT[semantic-trace-007] materialization reads canonical durable semantics', async () => {
   await withJournal(async (handle) => {
     await trace.captureProjection(handle, SESSION, projection([
       { role: 'user', parts: [trace.semanticText('raw opening')] },
@@ -63,7 +63,7 @@ const { default: test } = await import("node:test");
 const trace = await import("../../../dist/Context/Trace/SemanticTraceSurface.js");
 
 
-test('WHAT[SEMANTIC-TRACE-007] flatten is the single semantic source', () => {
+test('WHAT[semantic-trace-007] flatten is the single semantic source', () => {
   const flat = trace.flatten([
     { role: 'user', parts: [trace.semanticText('task'), trace.semanticToolCall('read', '{}')] },
     { role: 'assistant', parts: [trace.semanticReasoning('considered'), trace.semanticText('done')] },

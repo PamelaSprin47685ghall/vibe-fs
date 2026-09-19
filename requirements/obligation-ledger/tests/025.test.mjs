@@ -84,7 +84,7 @@ const acceptT1Checkpoint = async (handle, session, callText) => {
   return { t1, accepted }
 }
 
-test('WHAT[OBLIGATION-LEDGER-025] accept rejects unknown physical success evidence', async () => {
+test('WHAT[obligation-ledger-025] accept rejects unknown physical success evidence', async () => {
   await withJournal(async (handle) => {
     const result = await membrane.MagicTodoMembraneSurface_accept(handle, null, 'UNKNOWN', 'input', 'output')
     assert.equal(result.ok, false)
@@ -92,7 +92,7 @@ test('WHAT[OBLIGATION-LEDGER-025] accept rejects unknown physical success eviden
   })
 })
 
-test('WHAT[OBLIGATION-LEDGER-025] openLife and compatibility injection do not wait for snapshot IO', async () => {
+test('WHAT[obligation-ledger-025] openLife and compatibility injection do not wait for snapshot IO', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-before-latency'
     const life = 'life-before-latency'
@@ -110,7 +110,7 @@ test('WHAT[OBLIGATION-LEDGER-025] openLife and compatibility injection do not wa
   })
 })
 
-test('WHAT[OBLIGATION-LEDGER-025] prepare rejects a pending ToolPart whose provider input is still empty', async () => {
+test('WHAT[obligation-ledger-025] prepare rejects a pending ToolPart whose provider input is still empty', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-magic-todo-pending-input'
     await openLife(handle, session, 'life-magic-todo-pending-input')
@@ -129,14 +129,14 @@ test('WHAT[OBLIGATION-LEDGER-025] prepare rejects a pending ToolPart whose provi
   })
 })
 
-test('WHAT[OBLIGATION-LEDGER-025] before materializes the exact provider input including planComplete and workingOn', () => {
+test('WHAT[obligation-ledger-025] before materializes the exact provider input including planComplete and workingOn', () => {
   const expected = host.canonicalInput({ planComplete: false, workingOn: 'diagnose', obligations: [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }] })
   const result = locality.materializeInput('call-magic-todo-await-input', '{}', 0, expected)
   assert.equal(result.ok, true)
   assert.equal(result.value.inputCanonical, expected)
 })
 
-test('WHAT[OBLIGATION-LEDGER-025] materialization fails closed when the provider input differs', () => {
+test('WHAT[obligation-ledger-025] materialization fails closed when the provider input differs', () => {
   const actual = host.canonicalInput({ planComplete: false, workingOn: 'other', obligations: [{ name: 'other', work: 'Different provider input.' }] })
   const expected = host.canonicalInput({ planComplete: false, workingOn: 'diagnose', obligations: [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }] })
   const result = locality.materializeInput('call-magic-todo-await-conflict', actual, 1, expected)
@@ -144,7 +144,7 @@ test('WHAT[OBLIGATION-LEDGER-025] materialization fails closed when the provider
   assert.equal(result.error.code, 'InputMismatch')
 })
 
-test('WHAT[OBLIGATION-LEDGER-025] materialized snapshot input must still match tool.execute.before args', async () => {
+test('WHAT[obligation-ledger-025] materialized snapshot input must still match tool.execute.before args', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-magic-todo-conflicting-input'
     await openLife(handle, session, 'life-magic-todo-conflicting-input')

@@ -18,7 +18,7 @@ const openAssessed = (scores) => {
   return assessed.state
 }
 
-test('WHAT[RETIRE-007] Continue retirement commits a closed Continue outcome with cut binding', () => {
+test('WHAT[relay-retirement-007] Continue retirement commits a closed Continue outcome with cut binding', () => {
   const fresh = relay.openIncumbency(relay.empty(), 'road-1', 'inc-1', 'snapshot-1', 'authority-1')
   assert.equal(fresh.ok, true)
   assert.deepEqual(
@@ -42,7 +42,7 @@ test('WHAT[RETIRE-007] Continue retirement commits a closed Continue outcome wit
   assert.equal(relay.view(retired.state, 'road-1').activeIncumbency, null)
 })
 
-test('WHAT[RETIRE-007] Accepted retirement commits a closed Accepted outcome with certificate binding', () => {
+test('WHAT[relay-retirement-007] Accepted retirement commits a closed Accepted outcome with certificate binding', () => {
   const state = openAssessed(Array(8).fill('PERFECT'))
   const retired = relay.retireAccepted(
     state,
@@ -68,7 +68,7 @@ test('WHAT[RETIRE-007] Accepted retirement commits a closed Accepted outcome wit
   assert.equal(relay.view(retired.state, 'road-1').activeIncumbency, null)
 })
 
-test('WHAT[RETIRE-007] Accepted with a stale different snapshot fails', () => {
+test('WHAT[relay-retirement-007] Accepted with a stale different snapshot fails', () => {
   const state = openAssessed(Array(8).fill('PERFECT'))
   const stale = relay.retireAccepted(
     state,
@@ -83,7 +83,7 @@ test('WHAT[RETIRE-007] Accepted with a stale different snapshot fails', () => {
   assert.deepEqual(stale, { ok: false, error: 'RetirementSnapshotStale' })
 })
 
-test('WHAT[RETIRE-007] blocked perfect iteration retries Accepted after blockers clear', () => {
+test('WHAT[relay-retirement-007] blocked perfect iteration retries Accepted after blockers clear', () => {
   const state = openAssessed(Array(8).fill('PERFECT'))
   const blocked = relay.blockCleanup(state, 'road-1', 'inc-1', 'blocker-digest-1')
   assert.equal(blocked.ok, true)

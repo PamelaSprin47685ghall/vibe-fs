@@ -14,7 +14,7 @@ const userMsg = (id, body = 'hello') => ({ info: { id, role: 'user' }, parts: [{
 const assistantText = (id, body = 'ack') => ({ info: { id, role: 'assistant' }, parts: [{ type: 'text', text: body }] })
 const pairMessages = (messages) => messages.filter((message) => pair.isPairProgrammingThought(message))
 
-test('WHAT[PROVIDER-PROJECTION-010] C_PH_cursor_keeps_durable_occurrence_without_synthetic_message', async () => {
+test('WHAT[provider-projection-010] C_PH_cursor_keeps_durable_occurrence_without_synthetic_message', async () => {
   const previous = process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
   try {
     delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
@@ -36,7 +36,7 @@ test('WHAT[PROVIDER-PROJECTION-010] C_PH_cursor_keeps_durable_occurrence_without
     else process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = previous
   }
 })
-test('WHAT[PROVIDER-PROJECTION-010] C_PH_cursor_appends_NUL_BOM_guidance_inside_real_completed_tool_result', async () => {
+test('WHAT[provider-projection-010] C_PH_cursor_appends_NUL_BOM_guidance_inside_real_completed_tool_result', async () => {
   const raw = [
     { info: { id: 'u1', role: 'user', model: { providerID: 'cursor', modelID: 'default' } }, parts: [{ type: 'text', text: 'read it' }] },
     { info: { id: 'c1', role: 'assistant' }, parts: [{ type: 'tool', tool: 'read', callID: 'call_read', state: { status: 'pending', input: {}, time: { start: 0 } } }] },
@@ -51,7 +51,7 @@ test('WHAT[PROVIDER-PROJECTION-010] C_PH_cursor_appends_NUL_BOM_guidance_inside_
   assert.equal(raw.at(-1).parts[0].state.output, 'success')
   assert.deepEqual(await inject('ses_cursor_completed_tool', raw), out)
 })
-test('WHAT[PROVIDER-PROJECTION-010] C_PH_cursor_appends_NUL_BOM_guidance_inside_real_error_tool_result', async () => {
+test('WHAT[provider-projection-010] C_PH_cursor_appends_NUL_BOM_guidance_inside_real_error_tool_result', async () => {
   const raw = [
     { info: { id: 'u1', role: 'user', model: { providerID: 'cursor', modelID: 'default' } }, parts: [{ type: 'text', text: 'read it' }] },
     { info: { id: 'c1', role: 'assistant' }, parts: [{ type: 'tool', tool: 'read', callID: 'call_read', state: { status: 'pending', input: {}, time: { start: 0 } } }] },
@@ -74,7 +74,7 @@ const { assertJsData } = await import("../../verification-system/tests/support/j
 const toml = await import('../../../dist/Foundation/SyntheticTomlSurface.js')
 const valueOf = (rendered) => parseToml(`x = ${rendered}`).x
 
-test('WHAT[PROVIDER-PROJECTION-010] P6_TOML_SURFACE_renderer_returns_data_only_values', () => {
+test('WHAT[provider-projection-010] P6_TOML_SURFACE_renderer_returns_data_only_values', () => {
   assert.equal(typeof toml.renderString, 'function')
   assert.equal(typeof toml.renderDocument, 'function')
   assert.equal(toml.renderDocument([], [toml.field('status', toml.renderString('ok'))]), 'status = "ok"\n')
@@ -107,7 +107,7 @@ const syntaxLines = (document) => {
   return lines
 }
 
-test('WHAT[PROVIDER-PROJECTION-010] ARCH_011_renderer_stays_data_only', () => {
+test('WHAT[provider-projection-010] ARCH_011_renderer_stays_data_only', () => {
   assert.equal(typeof toml.renderString, 'function')
   assert.equal(typeof toml.renderDocument, 'function')
   assert.equal(toml.renderDocument([], [toml.field('status', toml.renderString('ok'))]), 'status = "ok"\n')

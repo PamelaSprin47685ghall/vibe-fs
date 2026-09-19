@@ -7,7 +7,7 @@ import { withExecutablePlugin, acceptAuthorityRoot } from '../../../../verificat
 
 const isDirectory = (path) => existsSync(path) && statSync(path).isDirectory()
 
-test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_017_mv_moves_a_file', async () => {
+test('WHAT[repository-programming-020] AGENT_017_mv_moves_a_file', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'engineer-mv-file', 'engineer')
     const source = join(directory, 'alpha.txt')
@@ -25,7 +25,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_017_mv_moves_a_file', async () => {
   })
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_017_mv_renames_a_directory', async () => {
+test('WHAT[repository-programming-020] AGENT_017_mv_renames_a_directory', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'engineer-mv-dir', 'engineer')
     const source = join(directory, 'old-dir')
@@ -44,7 +44,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_017_mv_renames_a_directory', async 
   })
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_017_mv_missing_source_returns_error', async () => {
+test('WHAT[repository-programming-020] AGENT_017_mv_missing_source_returns_error', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'engineer-mv-missing', 'engineer')
     const text = await hooks.tool.mv.execute(
@@ -56,7 +56,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_017_mv_missing_source_returns_error
   })
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_018_rm_removes_a_file', async () => {
+test('WHAT[repository-programming-020] AGENT_018_rm_removes_a_file', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'engineer-rm-file', 'engineer')
     const path = join(directory, 'trash.txt')
@@ -71,7 +71,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_018_rm_removes_a_file', async () =>
   })
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_018_rm_removes_an_empty_directory', async () => {
+test('WHAT[repository-programming-020] AGENT_018_rm_removes_an_empty_directory', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'engineer-rm-empty-dir', 'engineer')
     const path = join(directory, 'empty-dir')
@@ -86,7 +86,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_018_rm_removes_an_empty_directory',
   })
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_018_rm_refuses_a_non_empty_directory', async () => {
+test('WHAT[repository-programming-020] AGENT_018_rm_refuses_a_non_empty_directory', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'engineer-rm-nonempty', 'engineer')
     const path = join(directory, 'non-empty-dir')
@@ -102,7 +102,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_018_rm_refuses_a_non_empty_director
   })
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_018_rm_missing_path_returns_error', async () => {
+test('WHAT[repository-programming-020] AGENT_018_rm_missing_path_returns_error', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'engineer-rm-missing', 'engineer')
     const text = await hooks.tool.rm.execute(
@@ -114,7 +114,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_018_rm_missing_path_returns_error',
   })
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_016_mv_and_rm_are_denied_for_non_coder_roles', async () => {
+test('WHAT[repository-programming-020] AGENT_016_mv_and_rm_are_denied_for_non_coder_roles', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     // Manager holds neither Move nor Remove (AGENT-006/016).
     await acceptAuthorityRoot(runtime, 'manager-mv-rm', 'manager')
@@ -133,7 +133,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_016_mv_and_rm_are_denied_for_non_co
   })
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-020] AGENT_016_mv_and_rm_are_denied_when_the_role_is_unresolved', async () => {
+test('WHAT[repository-programming-020] AGENT_016_mv_and_rm_are_denied_when_the_role_is_unresolved', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     // No Authority Root: AGENT-007 layer two fail-closed — the tool must not run.
     const context = { sessionID: 'unresolved-mv-rm', agent: 'manager' }

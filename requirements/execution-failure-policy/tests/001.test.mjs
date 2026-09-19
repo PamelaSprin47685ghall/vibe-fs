@@ -10,7 +10,7 @@ const sessionError = (error) => ({
   properties: { sessionID: 'session-1', error },
 })
 
-test('WHAT[EXECFAIL-001] Host adapter returns closed typed failures from structural evidence', () => {
+test('WHAT[execution-failure-policy-001] Host adapter returns closed typed failures from structural evidence', () => {
   assert.equal(signals.tryDecode(sessionError({ name: 'TimeoutError', message: 'fatal wording' })).failure, 'ProviderTransient')
   // The Host boundary classifies nothing: every reported error is a provider
   // error. Only typed control signals stay distinct.
@@ -126,7 +126,7 @@ const providerCases = [
   },
 ]
 
-test('WHAT[EXECFAIL-001] observes every closed failure and persistence commitment variant', () => {
+test('WHAT[execution-failure-policy-001] observes every closed failure and persistence commitment variant', () => {
   assert.equal(failures.length, 13)
 
   for (const failure of failures) {
@@ -146,14 +146,14 @@ const { default: test } = await import("node:test");
 const provider = await import("../../../dist/Participant/Provider/Attempt/FailureSurface.js");
 
 
-test('WHAT[EXECFAIL-001] adapter returns typed ProviderTransient', () => {
+test('WHAT[execution-failure-policy-001] adapter returns typed ProviderTransient', () => {
   assert.deepEqual(provider.classify({
     providerRun: 'run-17', requestKind: 'WorkMain', status: 'Transient', firstTokenObserved: false, diagnostic: 'never retry',
   }), {
     failure: 'ProviderTransient', providerRun: 'run-17', requestKind: 'work-main', firstTokenObserved: false, diagnostic: 'never retry',
   })
 })
-test('WHAT[EXECFAIL-001] provider adapter preserves permanent kind and exact attempt identity', () => {
+test('WHAT[execution-failure-policy-001] provider adapter preserves permanent kind and exact attempt identity', () => {
   const result = provider.classify({
     providerRun: 'run-18', requestKind: 'BloggerSquash', status: 'Permanent', firstTokenObserved: false, diagnostic: 'timeout',
   })
@@ -161,7 +161,7 @@ test('WHAT[EXECFAIL-001] provider adapter preserves permanent kind and exact att
   assert.equal(result.providerRun, 'run-18')
   assert.equal(result.requestKind, 'blogger-squash')
 })
-test('WHAT[EXECFAIL-001] first-token evidence maps interruption without transparent retry classification', () => {
+test('WHAT[execution-failure-policy-001] first-token evidence maps interruption without transparent retry classification', () => {
   const result = provider.classify({
     providerRun: 'run-19', requestKind: 'InteractionRepair', status: 'Transient', firstTokenObserved: true, diagnostic: 'retryable',
   })

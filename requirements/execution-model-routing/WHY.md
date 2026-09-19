@@ -25,7 +25,7 @@ MJS 表达策略        ──► (role, running, previous) -> { model, reasonin
 
 ## 核心不变量扩充
 
-- **新角色集合路由与旧槽位解耦**：调度权威以 Engineer、DevOps、Manager、Orchestrator、Blogger 等新集合为准；配置不再要求 Coder/Inspector/Browser/Inquiry/Distiller 等旧角色槽位。
+- **当前角色集合路由**：调度权威以 Engineer、DevOps、Manager、Orchestrator、Blogger 为准；当前配置仅要求活跃角色的模型槽位。
 - **DevOps 模型绑定持久性**：DevOps 模型在道路初始化时确立并持久化，后续 resume 与恢复必须严格沿用既有绑定，严禁借 resume 换模型。
 
 ## 破裂后果
@@ -43,7 +43,7 @@ MJS 表达策略        ──► (role, running, previous) -> { model, reasonin
 - `managed-session-lifecycle`：提供 managed session 生命周期边界与销毁信号。
 - `host-boundary`：提供 plugin 启动、物理 message/hook 拦截与 Host 消息改写边界。
 
-- 配置仍强依赖已废止角色的模型槽位，阻碍新角色集合的正常部署。
+- 配置未能正确提供活跃角色的模型槽位，阻碍正常部署。
 - DevOps 在 resume 过程中发生模型漂移，破坏固定执行权威的模型一致性。
 
 ## DEPENDS ON

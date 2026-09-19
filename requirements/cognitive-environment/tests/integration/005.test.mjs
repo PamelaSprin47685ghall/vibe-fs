@@ -68,7 +68,7 @@ const hanRatio = (text) => {
   return han / Math.max(1, latinWords)
 }
 
-test('WHAT[COGNITIVE-ENVIRONMENT-005] PROMPT_no_legacy_provider_ontology_in_composed_prompts', () => {
+test('WHAT[cognitive-environment-005] PROMPT_no_legacy_provider_ontology_in_composed_prompts', () => {
   for (const [field, text] of promptEntries(promptResources.load())) {
     assert.doesNotMatch(text, /\bfork-manager\b|\bfork-pty\b|\bedit-qa\b|\bmeditator\b|\bfast-executor\b|\bdeep-executor\b/i, field)
   }

@@ -25,7 +25,7 @@ type RetryPorts =
       Redispatch: ProviderRecoveryAuthorization -> RetryAttempt -> Task<RetryVerdict> }
 
 /// Single retry engine shared by the ordinary turn path, Blogger recovery and
-/// dedicated delegate children (DELEG-023 / EXECFAIL-003 / PAR-019).
+/// dedicated delegate children (delegation-023 / execution-failure-policy-003 / provider-attempt-recovery-019).
 module Retry =
 
     let private decision (input: RetryAttempt) =

@@ -12,7 +12,7 @@ const providerRoot = join(here, '../../../resources/provider')
 const readLaw = (semanticPath, locale) => readFileSync(join(providerRoot, semanticPath, `${locale}.md`), 'utf8')
 const LOCALES = ['en', 'zh-CN']
 
-test('WHAT[REPOSITORY-INVESTIGATION-001] INVESTIGATE_warm_start_law_marks_charge_authoritative', () => {
+test('WHAT[repository-investigation-001] INVESTIGATE_warm_start_law_marks_charge_authoritative', () => {
   for (const locale of LOCALES) {
     const envelope = readLaw('lifecycle/warm-start/charge-envelope', locale)
     assert.match(
@@ -71,7 +71,7 @@ const waitFor = async (predicate, message, ms = 1500) => {
   }
 }
 
-test('WHAT[REPOSITORY-INVESTIGATION-001] AGENT_032_renderer_keeps_charge_authoritative_and_hints_do_not_replace_evidence', () => {
+test('WHAT[repository-investigation-001] AGENT_032_renderer_keeps_charge_authoritative_and_hints_do_not_replace_evidence', () => {
   const rendered = renderCharge('authoritative charge', [search(1, 'first', [hint(1, 1, 'src/a.fs', 'orientation')])])
 
   assert.match(rendered, /Caller charge:/)
@@ -102,7 +102,7 @@ test.before(() => {
   managedAgentConfig.installDefaultResources()
 })
 
-test('WHAT[REPOSITORY-INVESTIGATION-001] AGENT_027_configure_does_not_inject_host_mcp_or_permission_keys', () => {
+test('WHAT[repository-investigation-001] AGENT_027_configure_does_not_inject_host_mcp_or_permission_keys', () => {
   const config = buildConfig()
   assert.equal(managedAgentConfig.configure(config).ok, true)
   assert.equal(config.mcp?.[semble.serverName], undefined)

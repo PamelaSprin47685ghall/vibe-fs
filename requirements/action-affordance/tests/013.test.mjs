@@ -23,7 +23,7 @@ const HIGH_RISK_TOOLS = Object.freeze([
 
 const readTool = (tool, locale) => read(`resources/provider/tool/${tool}/description/${locale}.md`)
 
-test('WHAT[ACTION-AFFORDANCE-013] AA_prompt_020_success_returns_establish_bounded_consequence', () => {
+test('WHAT[action-affordance-013] AA_prompt_020_success_returns_establish_bounded_consequence', () => {
   const commissionEn = readTool('commission', 'en')
   assert.match(commissionEn, /A successful return establishes that the named road has taken the charge\./)
   assert.match(commissionEn, /It does not establish that the destination has been reached\./)

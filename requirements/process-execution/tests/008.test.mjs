@@ -10,7 +10,7 @@ const {
   ptyExited,
 } = await import('../../../dist/Execution/Session/Wait/Surface.js')
 
-test('WHAT[PROC-008] EXEC_018_drain_available_returns_two_completions_in_publish_order', () => {
+test('WHAT[process-execution-008] EXEC_018_drain_available_returns_two_completions_in_publish_order', () => {
   const mailbox = completionMailboxCreate()
   completionMailboxPublishPty(mailbox, ptyExited('a', 'closed'))
   completionMailboxPublishPty(mailbox, ptyExited('b', 'closed'))

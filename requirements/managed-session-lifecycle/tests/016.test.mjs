@@ -13,7 +13,7 @@ const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
 
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 
-test('WHAT[MANAGED-SESSION-016] Sessions adapter rejects root attempt interrupt and physically aborts a managed child exactly once', async () => {
+test('WHAT[managed-session-lifecycle-016] Sessions adapter rejects root attempt interrupt and physically aborts a managed child exactly once', async () => {
   const observed = await interruptAttemptAdapterProbe()
 
   assert.equal(observed.created, true)
@@ -30,7 +30,7 @@ test('WHAT[MANAGED-SESSION-016] Sessions adapter rejects root attempt interrupt 
   assert.equal(observed.childStillManagedAfterInterrupt, true)
 })
 
-test('WHAT[MANAGED-SESSION-016] managed interrupt Host rejection is terminal after exactly one AbortSession attempt', async () => {
+test('WHAT[managed-session-lifecycle-016] managed interrupt Host rejection is terminal after exactly one AbortSession attempt', async () => {
   const observed = await interruptRejectedAdapterProbe()
 
   assert.equal(observed.outcome, 'Error')
@@ -46,7 +46,7 @@ test('WHAT[MANAGED-SESSION-016] managed interrupt Host rejection is terminal aft
   ])
 })
 
-test('WHAT[MANAGED-SESSION-016] Turn orchestration consumes typed outcome without cross-callback aborted registry PC', () => {
+test('WHAT[managed-session-lifecycle-016] Turn orchestration consumes typed outcome without cross-callback aborted registry PC', () => {
   const ordinary = read('src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs')
   const workflow = read('src/Wanxiangshu/Composition/Turn/Workflow.fs')
   const observer = read('src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs')
@@ -57,7 +57,7 @@ test('WHAT[MANAGED-SESSION-016] Turn orchestration consumes typed outcome withou
   assert.doesNotMatch(observer, /scope\.Sessions\.AbortedSessions/)
 })
 
-test('WHAT[MANAGED-SESSION-016] already-terminal attempt interrupt is Ok and issues transport abort for root session', async () => {
+test('WHAT[managed-session-lifecycle-016] already-terminal attempt interrupt is Ok and issues transport abort for root session', async () => {
   const observed = await interruptTerminatedAdapterProbe()
 
   assert.equal(observed.terminatedOutcome, 'Ok')

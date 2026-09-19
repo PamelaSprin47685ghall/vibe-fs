@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as blog from '../../../dist/Enforcer/BlogSurface.js'
 
-test('WHAT[EXECFAIL-012] stop physical run secures admission barrier before detached physical abort and preserves isolation', async () => {
+test('WHAT[execution-failure-policy-012] stop physical run secures admission barrier before detached physical abort and preserves isolation', async () => {
   let terminationCalled = false
   let terminateSessionId = null
   let terminateReason = null

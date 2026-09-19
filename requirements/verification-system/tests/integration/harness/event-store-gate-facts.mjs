@@ -1,5 +1,5 @@
 /**
- * Append named VERIFY-004 gate facts into the local process EventStore.
+ * Append named verification-system-004 gate facts into the local process EventStore.
  * Shock-cut model: `.git/wanxiang/events/<WriterId>.ndjson`; no Git ODB/ref append.
  */
 

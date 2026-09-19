@@ -9,7 +9,7 @@ const root = resolve(join(dirname(fileURLToPath(import.meta.url)), '../../..'))
 
 const read = (path) => readFileSync(join(root, path), 'utf8')
 
-test('WHAT[PROVIDER-PROJECTION-013] LLM_FACING_single_representation_owner_is_hard_gated', () => {
+test('WHAT[provider-projection-013] LLM_FACING_single_representation_owner_is_hard_gated', () => {
   const result = spawnSync(process.execPath, [join(root, 'scripts/checks/llm-facing-format-gate.mjs')], {
     cwd: root,
     encoding: 'utf8',

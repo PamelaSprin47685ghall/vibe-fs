@@ -15,7 +15,7 @@ const failureOwner = await import("../../../dist/Participant/Provider/Attempt/Fa
 const { JournalSurface_bootWithWriterId: bootWithWriterId, JournalSurface_dispose: dispose } = await import("../../../dist/Persistence/Journal/Surface.js");
 
 
-test('WHAT[CRASH-011] VERIFY_008_bare_runtime_join_refusal_and_permit_validation', async () => {
+test('WHAT[crash-reconciliation-011] VERIFY_008_bare_runtime_join_refusal_and_permit_validation', async () => {
   // Gap test 3: Join ops require valid FamilyRecoveryPermit.
   // Bare join on JoinSurface without permit or work fails closed as NothingToJoin.
   const probe = joinSurface.createJoinProbe()
@@ -51,30 +51,30 @@ const valid = (over = {}) => ({
   ...over,
 })
 
-test('WHAT[CRASH-011] HFRT_join_with_permit_root_mismatch_is_not_found', () => {
+test('WHAT[crash-reconciliation-011] HFRT_join_with_permit_root_mismatch_is_not_found', () => {
   const result = join.validatePermit('ses_other', 0, 'ses_hfrt', 0, [], [])
   assert.equal(result.ok, false)
   assert.match(result.error, /root mismatch: permit=ses_other runtime=ses_hfrt/)
 })
-test('WHAT[CRASH-011] HFRT_join_with_permit_stale_journal_sequence_is_not_found', () => {
+test('WHAT[crash-reconciliation-011] HFRT_join_with_permit_stale_journal_sequence_is_not_found', () => {
   const result = join.validatePermit('ses_hfrt', 1000, 'ses_hfrt', 0, [], [])
   assert.equal(result.ok, false)
   assert.match(result.error, /journalSequence stale: permit=1000/)
 })
-test('WHAT[CRASH-011] EXEC_023_permit_whose_recovered_member_is_gone_is_not_found', () => {
+test('WHAT[crash-reconciliation-011] EXEC_023_permit_whose_recovered_member_is_gone_is_not_found', () => {
   const result = join.validatePermit('ses_hfrt', 0, 'ses_hfrt', 0, ['W:ses_vanished'], [])
   assert.equal(result.ok, false)
   assert.match(result.error, /closure lost members: missing=W:ses_vanished/)
 })
-test('WHAT[CRASH-011] EXEC_023_permit_survives_family_growth_after_recovery_closed', () => {
+test('WHAT[crash-reconciliation-011] EXEC_023_permit_survives_family_growth_after_recovery_closed', () => {
   const result = join.validatePermit('ses_hfrt', 0, 'ses_hfrt', 0, ['W:ses_hfrt'], ['W:ses_hfrt', 'C:ses_child>ses_grandchild'])
   assert.equal(result.ok, true)
   assert.equal(result.error, 'NothingToJoin')
 })
-test('WHAT[CRASH-011] HFRT_join_with_valid_permit_passes_validation', () => {
+test('WHAT[crash-reconciliation-011] HFRT_join_with_valid_permit_passes_validation', () => {
   assert.deepEqual(join.validatePermit('ses_hfrt', 0, 'ses_hfrt', 0, [], []), { ok: true, error: 'NothingToJoin' })
 })
-test('WHAT[CRASH-011] HFRT_await_agent_with_permit_validation_error_maps_to_not_found', () => {
+test('WHAT[crash-reconciliation-011] HFRT_await_agent_with_permit_validation_error_maps_to_not_found', () => {
   const result = join.validatePermit('ses_other', 0, 'ses_hfrt', 0, [], [])
   assert.equal(result.ok, false)
   assert.match(result.error, /NotFound|root mismatch/)
@@ -93,7 +93,7 @@ const companion = (main, session) => ({ kind: 'companion', main, companion: sess
 const blogger = (main, session) => ({ kind: 'blogger', main, blogger: session })
 const managerJob = (job, manager) => ({ kind: 'managerJob', job, manager })
 
-test('WHAT[CRASH-011] CRASH_CLOSURE_permit_refuses_loss_and_admits_growth', () => {
+test('WHAT[crash-reconciliation-011] CRASH_CLOSURE_permit_refuses_loss_and_admits_growth', () => {
   const permit = ['W:w1', 'A:p>c:h1']
   assert.deepEqual(recovery.missingMembers(permit, ['W:w1']), ['A:p>c:h1'])
   assert.deepEqual(recovery.missingMembers(permit, ['W:w1', 'A:p>c:h1', 'C:m>c2']), [])

@@ -42,7 +42,7 @@ const harness = ({ failCreateAt, failStartAt, failInterrupt = false, parent = 'o
   return { events, runtime }
 }
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-003] admission creates fresh sibling sessions with old parent and starts from LWR + exact lane input', async () => {
+test('WHAT[intra-participant-parallelism-003] admission creates fresh sibling sessions with old parent and starts from LWR + exact lane input', async () => {
   const { events, runtime } = harness()
   assertOpaque(runtime, 'Fission admission runtime')
   const owner = 'old-caller'

@@ -24,7 +24,7 @@ const recordingPort = () => {
   return fixture
 }
 
-test('WHAT[ATTENTION-REGULATION-001] enough is a pure cognitive stop with no durable authority state', async () => {
+test('WHAT[attention-regulation-001] enough is a pure cognitive stop with no durable authority state', async () => {
   const fixture = recordingPort()
   const accepted = await tools.execute(fixture.tools, 'enough', { decision: '  use the existing result  ' }, context())
   const rejected = await tools.execute(fixture.tools, 'enough', { decision: ' \n ' }, context())

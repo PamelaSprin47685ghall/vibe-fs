@@ -41,7 +41,7 @@ const foldErr = (requests) => {
   assert.fail('expected fold rejection')
 }
 
-test('WHAT[CONTEXT-COMPRESSION-015] ENFORCER_045_coverage_strictly_advances_across_commits', () => {
+test('WHAT[context-compression-015] ENFORCER_045_coverage_strictly_advances_across_commits', () => {
   const s = foldOk([
     entryWithEnforcement({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1, run: 'msg_r1' }),
     entryWithEnforcement({ from: 1, to: 3, cutoffFrom: 1, cutoffTo: 2, n: 2, run: 'msg_r2' }),
@@ -51,7 +51,7 @@ test('WHAT[CONTEXT-COMPRESSION-015] ENFORCER_045_coverage_strictly_advances_acro
   assert.equal(blog.coverage(s.Blog).ingestedThroughSequence, 3)
   assert.equal(blog.coverage(s.Blog).cutoff, 2)
 })
-test('WHAT[CONTEXT-COMPRESSION-015] ENFORCER_045_zero_advance_rejected', () => {
+test('WHAT[context-compression-015] ENFORCER_045_zero_advance_rejected', () => {
   const error = foldErr([
     entryWithEnforcement({ from: 1, to: 1, cutoffFrom: 0, cutoffTo: 0, n: 1, run: 'msg_zero' }),
   ])
@@ -103,7 +103,7 @@ function threeEntries() {
   return state
 }
 
-test('WHAT[CONTEXT-COMPRESSION-015] PERSIST_010_empty_projection_covers_nothing', () => {
+test('WHAT[context-compression-015] PERSIST_010_empty_projection_covers_nothing', () => {
   assert.equal(blog.frameCount(blog.empty), 0)
   assert.equal(blog.hasCoverage(blog.empty), false)
   assert.deepEqual(blog.coverage(blog.empty), {
@@ -113,7 +113,7 @@ test('WHAT[CONTEXT-COMPRESSION-015] PERSIST_010_empty_projection_covers_nothing'
     coverableFrames: 0,
   })
 })
-test('WHAT[CONTEXT-COMPRESSION-015] COMPANION_008_entry_appends_frame_and_advances_coverage_together', () => {
+test('WHAT[context-compression-015] COMPANION_008_entry_appends_frame_and_advances_coverage_together', () => {
   const result = commitEntry(blog.empty, { from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, digest: 'd1' })
 
   assert.equal(result.ok, true, result.ok ? '' : result.error)
@@ -134,7 +134,7 @@ test('WHAT[CONTEXT-COMPRESSION-015] COMPANION_008_entry_appends_frame_and_advanc
   assert.equal(stamped.coveredFrom, 0)
   assert.equal(stamped.coveredThrough, 1)
 })
-test('WHAT[CONTEXT-COMPRESSION-015] CTX_011_entry_that_consumed_nothing_is_refused', () => {
+test('WHAT[context-compression-015] CTX_011_entry_that_consumed_nothing_is_refused', () => {
   // An entry whose ingest sequence did not move would let the same delta be
   // blogged forever: the next offer would compute the identical chunk.
   const same = commitEntry(blog.empty, { from: 0, to: 0, cutoffFrom: 0, cutoffTo: 0 })
@@ -145,7 +145,7 @@ test('WHAT[CONTEXT-COMPRESSION-015] CTX_011_entry_that_consumed_nothing_is_refus
   const back = commitEntry(first, { from: 2, to: 1, cutoffFrom: 2, cutoffTo: 2 })
   assert.deepEqual(back, { ok: false, error: 'IngestCursorNotAdvanced' })
 })
-test('WHAT[CONTEXT-COMPRESSION-015] PERSIST_010_entry_whose_previous_cursor_disagrees_is_refused', () => {
+test('WHAT[context-compression-015] PERSIST_010_entry_whose_previous_cursor_disagrees_is_refused', () => {
   // The writer's view of where the Companion was must match the projection's.
   // A mismatch means two writers, or a line replayed out of order.
   const first = commitEntry(blog.empty, { from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1 }).value
@@ -153,7 +153,7 @@ test('WHAT[CONTEXT-COMPRESSION-015] PERSIST_010_entry_whose_previous_cursor_disa
 
   assert.deepEqual(stale, { ok: false, error: 'IngestCursorMismatch' })
 })
-test('WHAT[CONTEXT-COMPRESSION-015] CTX_011_coverage_may_not_retreat', () => {
+test('WHAT[context-compression-015] CTX_011_coverage_may_not_retreat', () => {
   const first = commitEntry(blog.empty, { from: 0, to: 2, cutoffFrom: 0, cutoffTo: 2 }).value
 
   // Claiming an earlier previous-cutoff than the projection holds.
@@ -164,7 +164,7 @@ test('WHAT[CONTEXT-COMPRESSION-015] CTX_011_coverage_may_not_retreat', () => {
   const backwards = commitEntry(first, { from: 2, to: 3, cutoffFrom: 2, cutoffTo: 1 })
   assert.deepEqual(backwards, { ok: false, error: 'CoverageRetreated' })
 })
-test('WHAT[CONTEXT-COMPRESSION-015] PERSIST_010_entry_written_against_a_replaced_frame_epoch_is_refused', () => {
+test('WHAT[context-compression-015] PERSIST_010_entry_written_against_a_replaced_frame_epoch_is_refused', () => {
   // A squash replaced the frame sequence. An entry still carrying the old epoch
   // describes frames that no longer exist.
   const first = commitEntry(blog.empty, { from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1 }).value

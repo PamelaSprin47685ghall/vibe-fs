@@ -5,7 +5,7 @@ import * as learning from '../../../dist/Enforcer/InstitutionalLearning/Surface.
 
 const read = (path) => readFileSync(path, 'utf8')
 
-test('WHAT[INSTITUTIONAL-LEARNING-001] celebrate and regret accept one raw natural-language experience without a rule template', () => {
+test('WHAT[institutional-learning-001] celebrate and regret accept one raw natural-language experience without a rule template', () => {
   const tools = read('src/Wanxiangshu/OpenCode/Tools/InstitutionalLearningTools.fs')
   assert.match(tools, /Name = "celebrate"[\s\S]*?Arguments = \[ "experience", argument \]/)
   assert.match(tools, /Name = "regret"[\s\S]*?Arguments = \[ "experience", argument \]/)

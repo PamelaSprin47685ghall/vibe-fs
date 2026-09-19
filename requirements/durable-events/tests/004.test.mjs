@@ -33,7 +33,7 @@ const event = (n, parents = [], type = 'JobRequested', payload = { n }) => ({
   payloadRefs: [],
 })
 
-test('WHAT[DURABLE-EVENTS-004] append_task_does_not_return_until_the_cross_process_store_lock_is_released', async () => {
+test('WHAT[durable-events-004] append_task_does_not_return_until_the_cross_process_store_lock_is_released', async () => {
   const dir = withTemp((base) => base)
   const store = eventStore.create(dir, 'lock-release-proof')
   try {
@@ -94,7 +94,7 @@ const withWriter = (run) => {
   }
 }
 
-test('WHAT[DURABLE-EVENTS-004] every incomplete canonical writer tail fails closed', () => {
+test('WHAT[durable-events-004] every incomplete canonical writer tail fails closed', () => {
   withWriter(({ commonDir, writerPath }) => {
     fc.assert(
       fc.property(payloads, cutSeed, (values, seed) => {

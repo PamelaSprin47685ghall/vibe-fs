@@ -73,7 +73,7 @@ const assertNoLegacyIdentityFields = (value, label) => {
   }
 }
 
-test('WHAT[PID-007] Bookkeeper has private identity and no public Role', () => {
+test('WHAT[participant-identity-007] Bookkeeper has private identity and no public Role', () => {
   const bookkeeper = Persona.resolveParticipantIdentityAtRoot('bookkeeper')
 
   assert.equal(bookkeeper.ok, true, bookkeeper.ok ? '' : bookkeeper.error)

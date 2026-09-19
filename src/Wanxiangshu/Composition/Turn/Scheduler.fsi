@@ -31,7 +31,7 @@ module Reconciler =
 
         member SignalIdle: sessionId: SessionId * permit: QuiescencePermit -> unit
 
-        /// HOST-BOUNDARY-001/005: terminal assistant message.updated is an
+        /// host-boundary-001/005: terminal assistant message.updated is an
         /// infrastructure-only projection edge. It can only wake an already
         /// parked coarse-signal occasion for the exact current physical user;
         /// it never creates or changes business terminal semantics.

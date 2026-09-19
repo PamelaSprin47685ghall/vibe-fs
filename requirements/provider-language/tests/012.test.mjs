@@ -11,7 +11,7 @@ const readIfExists = (rel) => {
   return readFileSync(full, 'utf8')
 }
 
-test('WHAT[PROVIDER-LANGUAGE-012] bilingual prompts maintain semantic parity across core roles and forbid invalid fission claims', async () => {
+test('WHAT[provider-language-012] bilingual prompts maintain semantic parity across core roles and forbid invalid fission claims', async () => {
   // ── 1. Engineer: 明确负责本地事实调查与源码工作，无真实执行权，完成即返回；明确是唯一允许使用 Fission 的角色 ──
   const engZh = readIfExists('resources/provider/role/engineer/zh-CN.md')
   const engEn = readIfExists('resources/provider/role/engineer/en.md')

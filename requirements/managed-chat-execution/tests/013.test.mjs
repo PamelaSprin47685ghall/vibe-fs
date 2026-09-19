@@ -33,7 +33,7 @@ const evidence = {
 const run = (failurePoint = 'None', state = 'None') =>
   transaction.transactionScenario(evidence, failurePoint, state)
 
-test('WHAT[EMR-013] queue full and cancellation cross no bind Host or provider boundary', async () => {
+test('WHAT[execution-model-routing-013] queue full and cancellation cross no bind Host or provider boundary', async () => {
   for (const [failurePoint, outcome] of [
     ['AcquireQueueFull', 'CapacityQueueFull'],
     ['AcquireCancelled', 'Cancelled'],
@@ -67,7 +67,7 @@ const { createCounters, queryReliability } = await import("../../../dist/OpenCod
 
 const acceptedFact = fs.readFileSync(new URL('./fixtures/chat-execution-v1.json', import.meta.url), 'utf8')
 
-test('WHAT[CHATEXEC-013] diagnostic query derives nonterminal and physical-attempt counts from canonical projection', () => {
+test('WHAT[managed-chat-execution-013] diagnostic query derives nonterminal and physical-attempt counts from canonical projection', () => {
   const projected = fold([acceptedFact])
   assert.equal(projected.ok, true)
 
@@ -178,7 +178,7 @@ const acceptedWire = (evidence) =>
     ],
   ])
 
-test('WHAT[CHATEXEC-013] exact terminal settlement revokes the manual', async () => {
+test('WHAT[managed-chat-execution-013] exact terminal settlement revokes the manual', async () => {
   await withRecoveryHost('terminal', 'absent', async (host) => {
     const sessionId = sessionOf('terminal')
     const physicalId = physicalOf('terminal')
@@ -198,7 +198,7 @@ test('WHAT[CHATEXEC-013] exact terminal settlement revokes the manual', async ()
     assert.equal(settled.physicalUserMessageId, physicalId)
   })
 })
-test('WHAT[CHATEXEC-013] pre-provider cancellation settlement revokes the manual', async () => {
+test('WHAT[managed-chat-execution-013] pre-provider cancellation settlement revokes the manual', async () => {
   await withRecoveryHost('accepted-cancel', 'absent', async (host) => {
     const sessionId = sessionOf('accepted-cancel')
     const physicalId = physicalOf('accepted-cancel')

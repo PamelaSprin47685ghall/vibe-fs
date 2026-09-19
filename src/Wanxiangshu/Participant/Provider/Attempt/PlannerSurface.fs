@@ -7,7 +7,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Persona
 
-/// JS-native proof surface for PROMPT-008 / ENF-001 / ENF-003 / ENF-004.
+/// JS-native proof surface for PROMPT-008 / capability-enforcement-001 / capability-enforcement-003 / capability-enforcement-004.
 ///
 /// The caller supplies only the role and physical request kind. The
 /// AttemptPlanner remains the sole constructor of the profile; this boundary

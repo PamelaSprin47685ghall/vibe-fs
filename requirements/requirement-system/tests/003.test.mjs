@@ -140,7 +140,7 @@ const depFailures = (pkg, allNames, skeleton) => {
   return failures
 }
 
-test('WHAT[REQUIREMENT-SYSTEM-003] every INDEX package carries all three documents', () => {
+test('WHAT[requirement-system-003] every INDEX package carries all three documents', () => {
   const allNames = packageNamesFromIndexTables()
   const missing = []
   for (const pkg of allNames) {

@@ -140,7 +140,7 @@ const depFailures = (pkg, allNames, skeleton) => {
   return failures
 }
 
-test('WHAT[REQUIREMENT-SYSTEM-004] declared proof rows name live landing files', () => {
+test('WHAT[requirement-system-004] declared proof rows name live landing files', () => {
   const dirs = readdirSync(REQUIREMENTS)
     .filter((entry) => statSync(join(REQUIREMENTS, entry)).isDirectory())
     .sort()

@@ -26,7 +26,7 @@ const stopReason = (reason) => {
   return reason
 }
 
-test('WHAT[CONTEXT-COMPRESSION-023] ENFORCER_park_never_expires_without_an_event', async () => {
+test('WHAT[context-compression-023] ENFORCER_park_never_expires_without_an_event', async () => {
   const scope = runtime.scope()
   const parked = runtime.park(scope, 'ses-blog')
   assert.equal(runtime.offerParked(scope, 'ses-blog', runtime.main({ toml: 'fresh' })), 'Delivered')
@@ -46,7 +46,7 @@ const runtime = await import("../../../dist/Context/Companion/RuntimeSurface.js"
 const ROOT = new URL('../../../', import.meta.url).pathname
 const main = (toml = 'delta-1') => runtime.main({ toml })
 
-test('WHAT[CONTEXT-COMPRESSION-023] CTX_023_park_has_no_clock_or_timeout_dependency', () => {
+test('WHAT[context-compression-023] CTX_023_park_has_no_clock_or_timeout_dependency', () => {
   const parked = readFileSync(
     `${ROOT}src/Wanxiangshu/Context/Companion/Blogger/Runtime/ParkedTransform.fs`,
     'utf8',

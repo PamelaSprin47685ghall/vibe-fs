@@ -15,7 +15,7 @@ const firstCheckpointSurfaces = [
   ['todowrite-description/zh-CN', 'resources/provider/lifecycle/magic-todo/todowrite-description/zh-CN.md'],
 ]
 
-test('WHAT[OBLIGATION-LEDGER-027] provider prose freezes progressive elaboration around workingOn', () => {
+test('WHAT[obligation-ledger-027] provider prose freezes progressive elaboration around workingOn', () => {
   for (const path of [
     'resources/provider/lifecycle/magic-todo/todowrite-description/en.md',
     'resources/provider/lifecycle/magic-todo/todowrite-description/zh-CN.md',
@@ -75,7 +75,7 @@ const items = [
   obligation('verification', 'Verify the behavior with evidence.', 'far'),
 ]
 
-test('WHAT[OBLIGATION-LEDGER-027] horizon is planning resolution, not provider-visible lifecycle state', () => {
+test('WHAT[obligation-ledger-027] horizon is planning resolution, not provider-visible lifecycle state', () => {
   const wire = todo.canonicalObligationListWire([
     obligation('now', 'Close the directly actionable unit.', 'near'),
     obligation('next', 'Preserve the next meaningful outcome.', 'mid'),

@@ -96,7 +96,7 @@ const foldViews = (folded) => {
   return views(handles)
 }
 
-test('WHAT[MANAGED-SESSION-007] LOOP_optional_string_traversal_calls_extract_zero_for_None_once_for_Some_and_propagates_failure', () => {
+test('WHAT[managed-session-lifecycle-007] LOOP_optional_string_traversal_calls_extract_zero_for_None_once_for_Some_and_propagates_failure', () => {
   const calls = []
   const extract = (value) => {
     calls.push(value)
@@ -120,7 +120,7 @@ test('WHAT[MANAGED-SESSION-007] LOOP_optional_string_traversal_calls_extract_zer
   )
   assert.deepEqual(calls, ['present', 'failing'], 'extract failure propagates after exactly one invocation')
 })
-test('WHAT[MANAGED-SESSION-007] EXEC_004_the_first_completion_wins_and_later_ones_are_refused', () => {
+test('WHAT[managed-session-lifecycle-007] EXEC_004_the_first_completion_wins_and_later_ones_are_refused', () => {
   // Terminal, send-failure and cancel race for one cell. The loser must be
   // REFUSED rather than overwrite the winner, or a cancelled child could report
   // the terminal it never reached.
@@ -137,7 +137,7 @@ test('WHAT[MANAGED-SESSION-007] EXEC_004_the_first_completion_wins_and_later_one
 
   assert.equal(stateOf(completed).completion, 'Terminal', 'the winner is unchanged')
 })
-test('WHAT[MANAGED-SESSION-007] EXEC_004_each_completion_kind_survives_into_the_state', () => {
+test('WHAT[managed-session-lifecycle-007] EXEC_004_each_completion_kind_survives_into_the_state', () => {
   // EXEC-005 requires `list` to say WHICH completion landed, so the kind is part
   // of the lifecycle state rather than a boolean beside it.
   for (const kind of ['Terminal', 'SendFailure', 'Cancelled']) {
@@ -148,7 +148,7 @@ test('WHAT[MANAGED-SESSION-007] EXEC_004_each_completion_kind_survives_into_the_
     )
   }
 })
-test('WHAT[MANAGED-SESSION-007] EXEC_004_completing_an_unknown_handle_is_refused_by_name', () => {
+test('WHAT[managed-session-lifecycle-007] EXEC_004_completing_an_unknown_handle_is_refused_by_name', () => {
   const state = linkOn(HandleSurface.empty())
 
   assert.deepEqual(
@@ -156,7 +156,7 @@ test('WHAT[MANAGED-SESSION-007] EXEC_004_completing_an_unknown_handle_is_refused
     { ok: false, error: { kind: 'TransitionRejected', reason: 'UnknownHandle' } },
   )
 })
-test('WHAT[MANAGED-SESSION-007] EXEC_009_completed_awaiting_join_carries_blob_refs', () => {
+test('WHAT[managed-session-lifecycle-007] EXEC_009_completed_awaiting_join_carries_blob_refs', () => {
   const completed = completeOn(linkOn(HandleSurface.empty()), {
     kind: 'Terminal',
     ref: blobRef('blobs/completion-h1'),
@@ -177,7 +177,7 @@ test('WHAT[MANAGED-SESSION-007] EXEC_009_completed_awaiting_join_carries_blob_re
   })
   assert.deepEqual(views(completed).joinable, ['agent:h1'])
 })
-test('WHAT[MANAGED-SESSION-007] EXEC_009_cancelled_completion_has_no_blob', () => {
+test('WHAT[managed-session-lifecycle-007] EXEC_009_cancelled_completion_has_no_blob', () => {
   const cancelled = completeOn(linkOn(HandleSurface.empty()), { kind: 'Cancelled' })
   assert.deepEqual(
     {
@@ -194,7 +194,7 @@ test('WHAT[MANAGED-SESSION-007] EXEC_009_cancelled_completion_has_no_blob', () =
     },
   )
 })
-test('WHAT[MANAGED-SESSION-007] EXEC_009_fold_replays_completion_blob_refs', () => {
+test('WHAT[managed-session-lifecycle-007] EXEC_009_fold_replays_completion_blob_refs', () => {
   const folded = foldFacts([handleFact.linked, handleFact.completedWithBlob])
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
   assert.deepEqual(foldStateOf(folded), {
@@ -210,7 +210,7 @@ test('WHAT[MANAGED-SESSION-007] EXEC_009_fold_replays_completion_blob_refs', () 
     abandonReason: undefined,
   })
 })
-test('WHAT[MANAGED-SESSION-007] EXEC_009_codec_migrates_0_5_1_handle_completed_missing_blob_fields', () => {
+test('WHAT[managed-session-lifecycle-007] EXEC_009_codec_migrates_0_5_1_handle_completed_missing_blob_fields', () => {
   // 0.5.1 lines lack CompletionRef/CompletionDigest. Decode must inject None rather
   // than refuse the journal — forward-compat for in-flight 0.5.1 runtimes.
   const modern = fact('HandleCompleted', {
@@ -282,7 +282,7 @@ const assertLateCompletionRejected = (result) => {
   })
 }
 
-test('WHAT[MANAGED-SESSION-007] every completion race preserves the first production winner', () => {
+test('WHAT[managed-session-lifecycle-007] every completion race preserves the first production winner', () => {
   const empty = handles.empty()
 
   fc.assert(
@@ -343,12 +343,12 @@ const makeActive = () => {
 const complete = (state) => HandleSurface.apply(state, { op: 'complete', handle: 'agent:c1', kind: 'Terminal' })
 const retire = (state) => HandleSurface.apply(state, { op: 'retire', handle: 'agent:c1' })
 
-test('WHAT[MANAGED-SESSION-007] THEOREM_handle_completed_causally_awakens_joinable', () => {
+test('WHAT[managed-session-lifecycle-007] THEOREM_handle_completed_causally_awakens_joinable', () => {
   const completed = complete(makeActive())
   assert.equal(completed.ok, true)
   assert.deepEqual(HandleSurface.views(completed.state).joinable, ['agent:c1'])
 })
-test('WHAT[MANAGED-SESSION-007] THEOREM_join_wake_path_trace_WorkActivated_then_HandleCompleted', () => {
+test('WHAT[managed-session-lifecycle-007] THEOREM_join_wake_path_trace_WorkActivated_then_HandleCompleted', () => {
   const folded = HandleFoldSurface.foldApply(HandleFoldSurface.foldEmpty(), [
     { fact: { case: 'HandleLinked', payload: { ParentSessionId: 'ses_parent', ChildSessionId: 'ses_child', Handle: 'agent:c1', TargetAgent: 'coder', CanonicalRole: 'Coder', Ownership: 'DurableParentHandle' } } },
     { fact: { case: 'HandleCompleted', payload: { ParentSessionId: 'ses_parent', Handle: 'agent:c1', Kind: 'Terminal' } } },

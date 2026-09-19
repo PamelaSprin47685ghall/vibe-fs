@@ -35,7 +35,7 @@ const EXPECTED_PERSONAS = {
 }
 const personaLabel = (role) => identity.persona(role, '')
 
-test('WHAT[PID-001] catalog_has_canonical_roles', () => {
+test('WHAT[participant-identity-001] catalog_has_canonical_roles', () => {
   assertJsData(identity.allRoleLabels, 'allRoleLabels')
   assert.deepEqual([...identity.allRoleLabels].sort(), [...EXPECTED_ROLES].sort())
   assert.equal(identity.allRoleLabels.length, 5)
@@ -45,7 +45,7 @@ test('WHAT[PID-001] catalog_has_canonical_roles', () => {
     [...EXPECTED_ROLES].sort(),
   )
 })
-test('WHAT[PID-001] required_names_are_canonical_and_include_managed_agents', () => {
+test('WHAT[participant-identity-001] required_names_are_canonical_and_include_managed_agents', () => {
   assertJsData(identity.requiredNames, 'requiredNames')
   assert.equal(identity.requiredNames.length, 7)
   for (const role of EXPECTED_ROLES) {
@@ -114,7 +114,7 @@ const writePassingBoundary = (root) => {
   )
 }
 
-test('WHAT[PID-001] rejects SessionId keyed identity cache', () => {
+test('WHAT[participant-identity-001] rejects SessionId keyed identity cache', () => {
   const root = mkdtempSync(join(tmpdir(), 'participant-identity-boundary-'))
 
   try {
@@ -156,7 +156,7 @@ const journalCodec = await import("../../../dist/Persistence/Journal/CodecSurfac
 const factCodec = await import("../../../dist/Persistence/Journal/FactCodecSurface.js");
 
 
-test('WHAT[PID-001] registered identity surfaces load and expose their narrow contracts', async () => {
+test('WHAT[participant-identity-001] registered identity surfaces load and expose their narrow contracts', async () => {
   const engineer = identity.resolveParticipantIdentityAtRoot('engineer')
   assert.equal(engineer.ok, true)
   assert.equal(engineer.identity.name, 'engineer')
@@ -219,7 +219,7 @@ const assertError = (result, error) => {
   assert.equal(result.error, error)
 }
 
-test('WHAT[PID-001] resolves every canonical participant identity and persona', () => {
+test('WHAT[participant-identity-001] resolves every canonical participant identity and persona', () => {
   assert.deepEqual(new Set(identity.requiredNames), new Set(Object.keys(EXPECTED)))
 
   for (const name of identity.requiredNames) {
@@ -235,7 +235,7 @@ test('WHAT[PID-001] resolves every canonical participant identity and persona', 
     assertCanonicalIdentity(restored.identity, expectedView(name), `${name} rehydrated`)
   }
 })
-test('WHAT[PID-001] rejects legacy, malformed, blank, and unknown participant names', () => {
+test('WHAT[participant-identity-001] rejects legacy, malformed, blank, and unknown participant names', () => {
   for (const name of identity.legacyNames) {
     assertError(identity.resolveParticipantIdentityAtRoot(name), 'LegacyParticipantName')
   }
@@ -250,7 +250,7 @@ test('WHAT[PID-001] rejects legacy, malformed, blank, and unknown participant na
   }
   assertError(identity.resolveParticipantIdentityAtRoot('unknown'), 'UnknownParticipantName')
 })
-test('WHAT[PID-001] rejects independently supplied role, persona, and origin', () => {
+test('WHAT[participant-identity-001] rejects independently supplied role, persona, and origin', () => {
   const canonical = expectedView('engineer')
   const mismatches = [
     [{ ...canonical, role: 'devops' }, 'RoleMismatch'],

@@ -44,7 +44,7 @@ const lastExit = (registry) => {
 
 const activeCount = (registry) => causal.snapshot(registry).active.length
 
-test('WHAT[CAUSAL-001] RED_8_application_observer_enter_only_snapshot_via_reader', () => {
+test('WHAT[causal-wait-001] RED_8_application_observer_enter_only_snapshot_via_reader', () => {
   const registry = causal.createRegistry()
   const observer = causal.observerCapability(registry)
   const reader = causal.snapshotReaderCapability(registry)

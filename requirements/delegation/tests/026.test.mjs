@@ -30,7 +30,7 @@ const toolModule = {
 const waitForPromptCount = (runtime, count) => forkTool.awaitPromptCount(runtime, count)
 const ownerDescriptor = (sessionId) => [{ sessionId, agent: 'manager' }]
 
-test('WHAT[DELEG-026] RESUME_synchronous_admission_with_async_work_and_join_isolation', async () => {
+test('WHAT[delegation-026] RESUME_synchronous_admission_with_async_work_and_join_isolation', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-resume-sync-admit-'))
   const owner = 'manager-resume-sync-admit'
   const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
@@ -70,7 +70,7 @@ test('WHAT[DELEG-026] RESUME_synchronous_admission_with_async_work_and_join_isol
     forkTool.disposeRuntime(runtime)
   }
 })
-test('WHAT[DELEG-026] FORK_TOOL_acceptance_unknown_never_claims_charge_was_not_placed', async () => {
+test('WHAT[delegation-026] FORK_TOOL_acceptance_unknown_never_claims_charge_was_not_placed', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-unknown-'))
   const owner = 'manager-unknown'
   const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
@@ -97,7 +97,7 @@ test('WHAT[DELEG-026] FORK_TOOL_acceptance_unknown_never_claims_charge_was_not_p
     forkTool.disposeRuntime(runtime)
   }
 })
-test('WHAT[DELEG-026] FORK_TOOL_unconfirmed_dispatch_reports_uncertain_and_never_leaves_ghost_run_for_join', async () => {
+test('WHAT[delegation-026] FORK_TOOL_unconfirmed_dispatch_reports_uncertain_and_never_leaves_ghost_run_for_join', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-unconfirmed-'))
   const owner = 'manager-unconfirmed'
   const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
@@ -136,7 +136,7 @@ const { readFileSync } = await import("node:fs");
 const { default: test } = await import("node:test");
 
 
-test('WHAT[DELEG-026] reusable delegation has no durable program-counter/state-machine vocabulary', () => {
+test('WHAT[delegation-026] reusable delegation has no durable program-counter/state-machine vocabulary', () => {
   const handoff = readFileSync(new URL('../../../src/Wanxiangshu/Execution/Delegation/Handoff.fs', import.meta.url), 'utf8')
   const ledger = readFileSync(new URL('../../../src/Wanxiangshu/Execution/Delegation/HandoffLedger.fs', import.meta.url), 'utf8')
   const facts = readFileSync(new URL('../../../src/Wanxiangshu/Execution/Delegation/Facts.fs', import.meta.url), 'utf8')
@@ -147,7 +147,7 @@ test('WHAT[DELEG-026] reusable delegation has no durable program-counter/state-m
   assert.doesNotMatch(ledger, /advanceHandoff|DelegateSessionId/)
   assert.match(ledger, /DelegationHandoffCompleted/)
 })
-test('WHAT[DELEG-026] fork admission bookkeeping that can fail happens before dispatch', () => {
+test('WHAT[delegation-026] fork admission bookkeeping that can fail happens before dispatch', () => {
   const forkTool = readFileSync(
     new URL('../../../src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs', import.meta.url),
     'utf8',

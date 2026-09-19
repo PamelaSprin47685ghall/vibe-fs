@@ -23,7 +23,7 @@ const HIGH_RISK_TOOLS = Object.freeze([
 
 const readTool = (tool, locale) => read(`resources/provider/tool/${tool}/description/${locale}.md`)
 
-test('WHAT[ACTION-AFFORDANCE-010] AA_prompt_020_fork_contract_answers_whom_work_is_entrusted_to', () => {
+test('WHAT[action-affordance-010] AA_prompt_020_fork_contract_answers_whom_work_is_entrusted_to', () => {
   const fork = readTool('fork', 'en')
   assert.match(fork, /Choose the office by the consequence you need/i)
   assert.match(fork, /Engineer/i, 'fork presents Engineer')

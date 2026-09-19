@@ -38,7 +38,7 @@ const acquire = async (runtime, sessionId, physicalUserMessageId, role = 'engine
   return acquiredTarget
 }
 
-test('WHAT[EMR-017] retainFailedTargetForRetry binds target for next fresh admission and consumes once', async () => {
+test('WHAT[execution-model-routing-017] retainFailedTargetForRetry binds target for next fresh admission and consumes once', async () => {
   const seenPrevious = []
   let scheduled = 0
   const runtime = createRuntime((_role, _running, previous) => {
@@ -71,7 +71,7 @@ test('WHAT[EMR-017] retainFailedTargetForRetry binds target for next fresh admis
   releasePhysicalExecution(runtime, 'ses-1', 'msg-3')
 })
 
-test('WHAT[EMR-017] retainFailedTargetForRetry witness is single-consumption and rejects mismatched session', async () => {
+test('WHAT[execution-model-routing-017] retainFailedTargetForRetry witness is single-consumption and rejects mismatched session', async () => {
   const runtime = createRuntime(() => target('provider-test/model'))
 
   // Session ses-a executes run-a1
@@ -101,7 +101,7 @@ test('WHAT[EMR-017] retainFailedTargetForRetry witness is single-consumption and
   assert.equal(retainFailedTargetForRetry(runtime, 'ses-a', 'no-such-run'), null)
 })
 
-test('WHAT[EMR-017] condemnFailedTarget poisons the provider and rotates next admission', async () => {
+test('WHAT[execution-model-routing-017] condemnFailedTarget poisons the provider and rotates next admission', async () => {
   const poisoned = []
   const template = {
     default: (role, running) => {
@@ -134,7 +134,7 @@ test('WHAT[EMR-017] condemnFailedTarget poisons the provider and rotates next ad
   assert.equal(condemnFailedTarget(runtime, 'run-c1'), null, 'witness is single-consumption')
 })
 
-test('WHAT[EMR-017] force cleanup (releaseExecution) clears recovery retry target before consumption', async () => {
+test('WHAT[execution-model-routing-017] force cleanup (releaseExecution) clears recovery retry target before consumption', async () => {
   let count = 0
   const runtime = createRuntime((_role, _running, previous) => previous ?? target(`provider-${++count}/model`))
 

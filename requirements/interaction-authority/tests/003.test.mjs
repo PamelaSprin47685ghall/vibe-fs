@@ -84,7 +84,7 @@ const completeManagerLife = async (handle, session) => {
   assert.equal(completed.ok, true, completed.ok ? '' : completed.error)
 }
 
-test('WHAT[INTERACTION-AUTHORITY-003] HumanRoot persists identity before provider work and returns the exact profile', async () => {
+test('WHAT[interaction-authority-003] HumanRoot persists identity before provider work and returns the exact profile', async () => {
   await withJournal('human-explicit', async (handle) => {
     const result = await dispatch.acceptHumanRootSelection(handle, 'ses-human-explicit', 'msg-human-explicit', rootSelection)
     const projection = dispatch.projectionObservation(handle, 'ses-human-explicit')
@@ -101,7 +101,7 @@ test('WHAT[INTERACTION-AUTHORITY-003] HumanRoot persists identity before provide
     assert.deepEqual(projection.activeLogicalRun, result.profile)
   })
 })
-test('WHAT[INTERACTION-AUTHORITY-003] physical receipt installs exact AgentOwnerRoot authority after its claim', async () => {
+test('WHAT[interaction-authority-003] physical receipt installs exact AgentOwnerRoot authority after its claim', async () => {
   await withJournal('physical-acceptance', async (handle) => {
     const owner = await acceptOwner(handle)
     const seed = inheritedSeed(owner, 'coder')
@@ -139,7 +139,7 @@ test('WHAT[INTERACTION-AUTHORITY-003] physical receipt installs exact AgentOwner
     assert.deepEqual(afterReceipt.activeLogicalRun.identitySeed, seed)
   })
 })
-test('WHAT[INTERACTION-AUTHORITY-003] rejected or unknown physical send outcome leaves no authority', async () => {
+test('WHAT[interaction-authority-003] rejected or unknown physical send outcome leaves no authority', async () => {
   await withJournal('unaccepted-send', async (handle) => {
     const owner = await acceptOwner(handle)
     const rejectedSeed = inheritedSeed(owner, 'coder')
@@ -214,7 +214,7 @@ const createRoot = () => {
 }
 const identityOf = (profile) => profile.identitySeed.participantIdentity
 
-test('WHAT[INTERACTION-AUTHORITY-003] valid authority profiles carry one atomic participant identity', () => {
+test('WHAT[interaction-authority-003] valid authority profiles carry one atomic participant identity', () => {
   const profile = createRoot()
 
   assert.deepEqual(
@@ -239,7 +239,7 @@ test('WHAT[INTERACTION-AUTHORITY-003] valid authority profiles carry one atomic 
     assert.equal(Object.hasOwn(profile, field), false, `${field} was duplicated outside participantIdentity`)
   }
 })
-test('WHAT[INTERACTION-AUTHORITY-003] rejects hand-built mismatched profile', () => {
+test('WHAT[interaction-authority-003] rejects hand-built mismatched profile', () => {
   const valid = createRoot()
   const mismatches = {
     participant: 'reviewer',
@@ -261,7 +261,7 @@ test('WHAT[INTERACTION-AUTHORITY-003] rejects hand-built mismatched profile', ()
     assert.equal(result.ok, false, `${field} mismatch was accepted`)
   }
 })
-test('WHAT[INTERACTION-AUTHORITY-003] Bookkeeper cannot enter a public authority profile', () => {
+test('WHAT[interaction-authority-003] Bookkeeper cannot enter a public authority profile', () => {
   const result = authority.createAuthorityRoot(
     hash,
     'rt-profile',
@@ -397,7 +397,7 @@ const assertDecodeErrorAcrossReplayRoutes = (line, expected) => {
   assert.match(eventResult.error, expected)
 }
 
-test('WHAT[INTERACTION-AUTHORITY-003] current schema-v2 authority bytes round-trip canonically', () => {
+test('WHAT[interaction-authority-003] current schema-v2 authority bytes round-trip canonically', () => {
   const factLine = factCodec.encode(currentFact())
   const decodedFact = factCodec.decode(factLine)
   assert.equal(decodedFact.ok, true, decodedFact.ok ? '' : decodedFact.error)
@@ -422,13 +422,13 @@ test('WHAT[INTERACTION-AUTHORITY-003] current schema-v2 authority bytes round-tr
     assert.equal(legacyAgentBytes.test(line), false)
   }
 })
-test('WHAT[INTERACTION-AUTHORITY-003] current AgentOwnerRoot retains exact inherited owner provenance', () => {
+test('WHAT[interaction-authority-003] current AgentOwnerRoot retains exact inherited owner provenance', () => {
   const line = factCodec.encode(currentFact(inheritedPayload))
   const decoded = factCodec.decode(line)
   assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
   assert.deepEqual(decoded.payload.IdentitySeed, inheritedPayload.IdentitySeed)
 })
-test('WHAT[INTERACTION-AUTHORITY-003] repeated legacy HumanRoot replay upgrades to identical schema-v2 identity', () => {
+test('WHAT[interaction-authority-003] repeated legacy HumanRoot replay upgrades to identical schema-v2 identity', () => {
   const factFirst = factCodec.decode(legacyHumanRoot)
   const factSecond = factCodec.decode(legacyHumanRoot)
   assert.equal(factFirst.ok, true, factFirst.ok ? '' : factFirst.error)
@@ -453,7 +453,7 @@ test('WHAT[INTERACTION-AUTHORITY-003] repeated legacy HumanRoot replay upgrades 
   assert.deepEqual(eventFirst.value.fact.payload.IdentitySeed, factFirst.payload.IdentitySeed)
   assert.deepEqual(eventSecond.value.fact.payload.IdentitySeed, factFirst.payload.IdentitySeed)
 })
-test('WHAT[INTERACTION-AUTHORITY-003] unknown authority schema fails closed precisely', () => {
+test('WHAT[interaction-authority-003] unknown authority schema fails closed precisely', () => {
   assert.throws(
     () => factCodec.encode(currentFact({ ...currentPayload, SchemaVersion: 1 })),
     /AuthorityRootAccepted encoder requires SchemaVersion 2, got 1/,
@@ -464,13 +464,13 @@ test('WHAT[INTERACTION-AUTHORITY-003] unknown authority schema fails closed prec
   })
   assertDecodeErrorAcrossReplayRoutes(unknown, /AuthorityRootAccepted schema version is unsupported: 99/)
 })
-test('WHAT[INTERACTION-AUTHORITY-003] malformed legacy identity fails closed at the missing field', () => {
+test('WHAT[interaction-authority-003] malformed legacy identity fails closed at the missing field', () => {
   const malformed = replacePayload(legacyHumanRoot, (payload) => {
     delete payload.SelectedAgent
   })
   assertDecodeErrorAcrossReplayRoutes(malformed, /SelectedAgent/)
 })
-test('WHAT[INTERACTION-AUTHORITY-003] stale legacy peer fields normalize to canonical identity', () => {
+test('WHAT[interaction-authority-003] stale legacy peer fields normalize to canonical identity', () => {
   const stale = replacePayload(legacyHumanRoot, (payload) => {
     // Raw v1 compat field, spelled indirectly so only the explicit v1 fixture
     // carries the legacy field name; the decoder must drop it.
@@ -490,13 +490,13 @@ test('WHAT[INTERACTION-AUTHORITY-003] stale legacy peer fields normalize to cano
 })
   assert.equal(legacyAgentBytes.test(decoded.line), false)
 })
-test('WHAT[INTERACTION-AUTHORITY-003] malformed schema-v2 identity fails closed at the missing field', () => {
+test('WHAT[interaction-authority-003] malformed schema-v2 identity fails closed at the missing field', () => {
   const malformed = replacePayload(factCodec.encode(currentFact()), (payload) => {
     delete identityInSeed(payload.IdentitySeed).Persona
   })
   assertDecodeErrorAcrossReplayRoutes(malformed, /Persona/)
 })
-test('WHAT[INTERACTION-AUTHORITY-003] mismatched schema-v2 identity fails closed precisely', () => {
+test('WHAT[interaction-authority-003] mismatched schema-v2 identity fails closed precisely', () => {
   const mismatch = replacePayload(factCodec.encode(currentFact()), (payload) => {
     identityInSeed(payload.IdentitySeed).Persona = 'Auditor'
   })
@@ -505,7 +505,7 @@ test('WHAT[INTERACTION-AUTHORITY-003] mismatched schema-v2 identity fails closed
     /participant identity Persona mismatch: expected Engineer, got Auditor/,
   )
 })
-test('WHAT[INTERACTION-AUTHORITY-003] rejects unprovable historical identity', () => {
+test('WHAT[interaction-authority-003] rejects unprovable historical identity', () => {
   const agentOwner = replacePayload(legacyHumanRoot, (payload) => {
     payload.AuthorityKind = 'AgentOwnerRoot'
   })
@@ -514,7 +514,7 @@ test('WHAT[INTERACTION-AUTHORITY-003] rejects unprovable historical identity', (
     /legacy AuthorityRootAccepted v1 AgentOwnerRoot cannot prove participant identity/,
   )
 })
-test('WHAT[INTERACTION-AUTHORITY-003] participant identity is not a second live fact case', () => {
+test('WHAT[interaction-authority-003] participant identity is not a second live fact case', () => {
   const invented = JSON.parse(legacyHumanRoot)
   const taggedCase = authorityCase(invented)
   assert.notEqual(taggedCase, null)
@@ -571,7 +571,7 @@ const register = (root) => authority.registerAuthority(root, authority.empty)
 const continuation = (key, root, kind = 'ManagerGuard', payload = 'payload') =>
   authority.claimContinuation(key, 'ses_a', kind, root, payload)
 
-test('WHAT[INTERACTION-AUTHORITY-003] IA_003_malformed_profile_role_and_root_kind_fail_closed_tier_is_compat', () => {
+test('WHAT[interaction-authority-003] IA_003_malformed_profile_role_and_root_kind_fail_closed_tier_is_compat', () => {
   const root = rootFor()
   const identity = root.identitySeed.participantIdentity
   const malformed = [
@@ -589,7 +589,7 @@ test('WHAT[INTERACTION-AUTHORITY-003] IA_003_malformed_profile_role_and_root_kin
     assert.match(result.error, expected)
   }
 })
-test('WHAT[INTERACTION-AUTHORITY-003] IA_003_root_carries_resolved_participant_identity', () => {
+test('WHAT[interaction-authority-003] IA_003_root_carries_resolved_participant_identity', () => {
   assert.deepEqual(profile(rootFor('engineer')), {
     session: 'ses_a',
     logicalRun: 'H(rt_1\nses_a\nmsg_u1)',
@@ -607,7 +607,7 @@ test('WHAT[INTERACTION-AUTHORITY-003] IA_003_root_carries_resolved_participant_i
     role: 'manager',
   })
 })
-test('WHAT[INTERACTION-AUTHORITY-003] IA_003_root_remains_the_source_for_continuations', () => {
+test('WHAT[interaction-authority-003] IA_003_root_remains_the_source_for_continuations', () => {
   const root = rootFor()
   const state = authority.registerClaim(continuation('pk_c', root, 'BusyAgentNudge', 'pd-n'), register(root))
   assert.deepEqual(profile(state.activeLogicalRun), profile(root))
@@ -622,7 +622,7 @@ const tp = await import("../../../dist/OpenCode/Host/TerminalPolicySurface.js");
 const roles = await import("../../../dist/Foundation/RolesSurface.js");
 
 
-test('WHAT[INTERACTION-AUTHORITY-003] TPOL_top_level_manager_has_fail_closed_parent_rules_table_driven', () => {
+test('WHAT[interaction-authority-003] TPOL_top_level_manager_has_fail_closed_parent_rules_table_driven', () => {
   assert.equal(tp.sessionDeadWithoutJournal('ses-root-manager'), false)
   assert.ok(roles.allRoleLabels.includes('manager'))
   assert.ok(roles.allRoleLabels.includes('orchestrator'))

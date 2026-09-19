@@ -27,7 +27,7 @@ const sandbox = () => {
 }
 const record = (sessionId, q, a, observations) => ({ sessionId, q, a, observations, lastAccessOrder: 0 })
 
-test('WHAT[KNOWLEDGE-REUSE-006] CASE006_synthesis_refresh_publishes_refreshed_with_revised_a', async () => {
+test('WHAT[knowledge-reuse-006] CASE006_synthesis_refresh_publishes_refreshed_with_revised_a', async () => {
   const { dir, handle, cleanup } = sandbox()
   const { port, createCalls, programCalls } = scriptedBookkeeperPort()
   try {
@@ -57,7 +57,7 @@ test('WHAT[KNOWLEDGE-REUSE-006] CASE006_synthesis_refresh_publishes_refreshed_wi
     cleanup()
   }
 })
-test('WHAT[KNOWLEDGE-REUSE-006] CASE006_mechanical_refresh_no_case_is_noop', async () => {
+test('WHAT[knowledge-reuse-006] CASE006_mechanical_refresh_no_case_is_noop', async () => {
   const { dir, handle, cleanup } = sandbox()
   try {
     const result = await bookkeeperRefresh.refreshStale(handle, dir, 'missing')
@@ -67,7 +67,7 @@ test('WHAT[KNOWLEDGE-REUSE-006] CASE006_mechanical_refresh_no_case_is_noop', asy
     cleanup()
   }
 })
-test('WHAT[KNOWLEDGE-REUSE-006] CASE006_mechanical_refresh_missing_file_still_publishes', async () => {
+test('WHAT[knowledge-reuse-006] CASE006_mechanical_refresh_missing_file_still_publishes', async () => {
   const { dir, handle, cleanup } = sandbox()
   const { port, createCalls, programCalls } = scriptedBookkeeperPort()
   try {
@@ -159,7 +159,7 @@ const installBookkeeperRuntime = (port, ownerSessionIds) => {
 const record = (sessionId, q, a, observations) => ({ sessionId, q, a, observations, lastAccessOrder: 0 })
 const openStore = (dir, writerId) => eventStore.create(join(dir, '.git'), writerId)
 
-test('WHAT[KNOWLEDGE-REUSE-006] CASE006_create_child_once_per_refresh_via_js_bookkeeper', async () => {
+test('WHAT[knowledge-reuse-006] CASE006_create_child_once_per_refresh_via_js_bookkeeper', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-session-refresh-'))
   const handle = eventStore.create(dir, 'bookkeeper-session-refresh')
   const { port, createCalls, programCalls, prompts } = scriptedBookkeeperPort()
@@ -218,7 +218,7 @@ const failingPort = () => {
 }
 const record = (sessionId, q, a, observations) => ({ sessionId, q, a, observations, lastAccessOrder: 0 })
 
-test('WHAT[KNOWLEDGE-REUSE-006] CASE006_injected_synthesizer_error_keeps_old_case', async () => {
+test('WHAT[knowledge-reuse-006] CASE006_injected_synthesizer_error_keeps_old_case', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-err-'))
   const handle = eventStore.create(dir, 'bookkeeper-synthesis-error')
   const { port } = failingPort()
@@ -240,7 +240,7 @@ test('WHAT[KNOWLEDGE-REUSE-006] CASE006_injected_synthesizer_error_keeps_old_cas
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[KNOWLEDGE-REUSE-006] CASE006_synthesizer_runs_once_per_stale_refresh', async () => {
+test('WHAT[knowledge-reuse-006] CASE006_synthesizer_runs_once_per_stale_refresh', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-once-'))
   const handle = eventStore.create(dir, 'bookkeeper-synthesis-once')
   const { port, createCalls, programCalls } = scriptedBookkeeperPort()
@@ -279,7 +279,7 @@ const fakeSchema = {
 }
 const factory = { tool: { schema: fakeSchema } }
 
-test('WHAT[KNOWLEDGE-REUSE-006] CASE006_bookkeeper_provider_contract_is_one_program', () => {
+test('WHAT[knowledge-reuse-006] CASE006_bookkeeper_provider_contract_is_one_program', () => {
   const tool = bookkeeper.contract(factory)
   assert.equal(tool.name, 'js-bookkeeper')
   assert.deepEqual(tool.argumentNames, ['program'])
@@ -313,7 +313,7 @@ const current = (txId) => {
 }
 const currentCase = (question, answer) => [question, answer]
 
-test('WHAT[KNOWLEDGE-REUSE-006] js_bookkeeper_surface_is_program_only_and_has_case_sdk', () => {
+test('WHAT[knowledge-reuse-006] js_bookkeeper_surface_is_program_only_and_has_case_sdk', () => {
   const tool = bookkeeper.contract(factory)
   assert.equal(tool.name, 'js-bookkeeper')
   assert.deepEqual(tool.argumentNames, ['program'])
@@ -324,7 +324,7 @@ test('WHAT[KNOWLEDGE-REUSE-006] js_bookkeeper_surface_is_program_only_and_has_ca
   assert.match(tool.description, /not a line number|不是行号/)
   assert.doesNotMatch(tool.description, /Q\.md|A\.md|old_text|new_text|filesystem/i)
 })
-test('WHAT[KNOWLEDGE-REUSE-006] js_bookkeeper_program_reshapes_question_and_answer_atomically', async () => {
+test('WHAT[knowledge-reuse-006] js_bookkeeper_program_reshapes_question_and_answer_atomically', async () => {
   const tx = 'tx-js-bookkeeper-both'
   const session = 'bk-js-bookkeeper-both'
   bookkeeper.beginTransaction(tx, '## Goal\nkeep old goal\n## Constraints\nold constraint', '## Answer\nold answer\n## Evidence\nweak')
@@ -368,7 +368,7 @@ test('WHAT[KNOWLEDGE-REUSE-006] js_bookkeeper_program_reshapes_question_and_answ
     bookkeeper.resetRuntime()
   }
 })
-test('WHAT[KNOWLEDGE-REUSE-006] js_bookkeeper_zero_mutation_is_legal', async () => {
+test('WHAT[knowledge-reuse-006] js_bookkeeper_zero_mutation_is_legal', async () => {
   const tx = 'tx-js-bookkeeper-idle'
   const session = 'bk-js-bookkeeper-idle'
   bookkeeper.beginTransaction(tx, 'Q', 'A')
@@ -391,7 +391,7 @@ test('WHAT[KNOWLEDGE-REUSE-006] js_bookkeeper_zero_mutation_is_legal', async () 
     bookkeeper.resetRuntime()
   }
 })
-test('WHAT[KNOWLEDGE-REUSE-006] js_bookkeeper_duplicate_set_rolls_back_the_whole_program', async () => {
+test('WHAT[knowledge-reuse-006] js_bookkeeper_duplicate_set_rolls_back_the_whole_program', async () => {
   const tx = 'tx-js-bookkeeper-duplicate'
   const session = 'bk-js-bookkeeper-duplicate'
   bookkeeper.beginTransaction(tx, 'Q', 'A')
@@ -417,7 +417,7 @@ test('WHAT[KNOWLEDGE-REUSE-006] js_bookkeeper_duplicate_set_rolls_back_the_whole
     bookkeeper.resetRuntime()
   }
 })
-test('WHAT[KNOWLEDGE-REUSE-006] js_bookkeeper_program_failure_rolls_back_staged_mutation', async () => {
+test('WHAT[knowledge-reuse-006] js_bookkeeper_program_failure_rolls_back_staged_mutation', async () => {
   const tx = 'tx-js-bookkeeper-throw'
   const session = 'bk-js-bookkeeper-throw'
   bookkeeper.beginTransaction(tx, 'Q', 'A')
@@ -441,7 +441,7 @@ test('WHAT[KNOWLEDGE-REUSE-006] js_bookkeeper_program_failure_rolls_back_staged_
     bookkeeper.resetRuntime()
   }
 })
-test('WHAT[KNOWLEDGE-REUSE-006] js_bookkeeper_unbound_session_cannot_change_a_case', async () => {
+test('WHAT[knowledge-reuse-006] js_bookkeeper_unbound_session_cannot_change_a_case', async () => {
   const result = await run(
     'no-such-session',
     `class Js extends JsProgram {
@@ -461,7 +461,7 @@ const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const bookkeeper = await import("../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js");
 
-test('WHAT[KNOWLEDGE-REUSE-006] T23_bookkeeper_refresh_receives_diff_only_and_has_no_repo_investigation_rights', async () => {
+test('WHAT[knowledge-reuse-006] T23_bookkeeper_refresh_receives_diff_only_and_has_no_repo_investigation_rights', async () => {
   // Bookkeeper CaseRefresh receives: old case + diff. No repo read/glob/grep.
   assert.equal(typeof bookkeeper.createRefreshPrompt, 'function', 'bookkeeper must format refresh prompt with diff only')
   const prompt = bookkeeper.createRefreshPrompt({

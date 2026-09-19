@@ -22,7 +22,7 @@ const cutResult = () => projection.applyCut(cutMessages, 'old-run', 'suicide-cal
 
 const ids = (result) => result.provider.map((message) => message.id ?? message.info?.id)
 
-test('WHAT[PROJ-006] projection is deterministic and bounded', () => {
+test('WHAT[relay-context-projection-006] projection is deterministic and bounded', () => {
   const first = projection.applyCut(cutMessages, 'old-run', 'suicide-call', ['old-run'], ['u1'])
   const second = projection.applyCut(cutMessages, 'old-run', 'suicide-call', ['old-run'], ['u1'])
   assert.deepEqual(first.provider, second.provider)

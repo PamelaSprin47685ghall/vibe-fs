@@ -22,7 +22,7 @@ const probeFor = ({ cutoff = 5, id = 'probe-1' } = {}) => ({
   candidate: snapshotAt(cutoff),
 })
 
-test('WHAT[PREFIX-STABILITY-002] COMPANION_009_no_snapshot_means_send_raw_history', () => {
+test('WHAT[prefix-stability-002] COMPANION_009_no_snapshot_means_send_raw_history', () => {
   const plan = prefix.forSnapshot(null, companion.memoryPreamble, 'unused')
 
   assert.equal(plan.replacesPrefix, false)
@@ -53,11 +53,11 @@ const rebase = (state, { previousEpoch, nextEpoch, cutoff, digest, seal, prefixD
 const reanchor = (state, { previousEpoch, nextEpoch, observedRun = 'msg_compaction' }) =>
   prefix.applyReanchor({ previousEpoch, nextEpoch, observedRun }, state)
 
-test('WHAT[PREFIX-STABILITY-002] COMPANION_009_initial_epoch_has_no_snapshot', () => {
+test('WHAT[prefix-stability-002] COMPANION_009_initial_epoch_has_no_snapshot', () => {
   assert.equal(prefix.epochOf(prefix.empty), 0n)
   assert.equal(prefix.hasSnapshot(prefix.empty), false)
 })
-test('WHAT[PREFIX-STABILITY-002] CTX_012_successful_probe_promotes_its_candidate_verbatim', () => {
+test('WHAT[prefix-stability-002] CTX_012_successful_probe_promotes_its_candidate_verbatim', () => {
   const result = rebase(prefix.empty, { previousEpoch: 0, nextEpoch: 1, cutoff: 4, seal: 'seal-P1' })
 
   assert.equal(result.ok, true, result.ok ? '' : result.error)
@@ -70,7 +70,7 @@ test('WHAT[PREFIX-STABILITY-002] CTX_012_successful_probe_promotes_its_candidate
   // whole rather than field by field.
   assert.deepEqual(result.value.snapshot, candidate({ cutoff: 4, seal: 'seal-P1' }))
 })
-test('WHAT[PREFIX-STABILITY-002] CTX_012_probe_capability_returns_after_a_reanchor', () => {
+test('WHAT[prefix-stability-002] CTX_012_probe_capability_returns_after_a_reanchor', () => {
   // The reanchor is not a permanent shutdown. Once the Companion rebuilds
   // coverage in the new numbering, a probe promotes normally — from cutoff 1,
   // because the retired snapshot no longer imposes a floor.

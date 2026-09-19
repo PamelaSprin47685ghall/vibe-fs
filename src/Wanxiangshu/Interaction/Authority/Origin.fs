@@ -21,7 +21,7 @@ type PromptContinuationKind =
     /// It extends that delegate's exact active owner-root run without rebinding identity.
     | ManagedDelegationAssignment
     | ProviderRetryAttempt
-    /// DG-011: same-run continuation owned by degeneration-guard after its own interrupt.
+    /// degeneration-guard-011: same-run continuation owned by degeneration-guard after its own interrupt.
     | DegenerationGuard
     /// Same-run Fission delivery: predecessor work or a pre-Fission shared
     /// external completion enters a lane only at a safe provider boundary.

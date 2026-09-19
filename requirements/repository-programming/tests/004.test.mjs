@@ -66,7 +66,7 @@ const layersOf = (s) =>
     ]),
   )
 
-test('WHAT[REPOSITORY-PROGRAMMING-004] JS001_generated_name_gate_rejects_forged_names', () => {
+test('WHAT[repository-programming-004] JS001_generated_name_gate_rejects_forged_names', () => {
   const perms = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep)
   assert.equal(isGeneratedToolName('Engineer', perms, 'js-engineer'), true)
   assert.equal(isGeneratedToolName('Engineer', perms, 'js-devops'), false)

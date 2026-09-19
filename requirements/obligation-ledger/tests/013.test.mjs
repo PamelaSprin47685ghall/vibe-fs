@@ -76,7 +76,7 @@ const acceptT1Checkpoint = async (handle, session, callText) => {
   return { t1, accepted }
 }
 
-test('WHAT[OBLIGATION-LEDGER-013] T2 prepare after T1 succeeds immediately without process review wait', async () => {
+test('WHAT[obligation-ledger-013] T2 prepare after T1 succeeds immediately without process review wait', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-magic-todo-t1-t2-lag1'
     const life = 'life-magic-todo-t1-t2-lag1'
@@ -178,7 +178,7 @@ const acceptedState = () => {
   return handle
 }
 
-test('WHAT[OBLIGATION-LEDGER-013] successive checkpoints can be prepared and accepted without review blockage', () => {
+test('WHAT[obligation-ledger-013] successive checkpoints can be prepared and accepted without review blockage', () => {
   const nextWrite = todo.todoWriteId(sha256, life, 'todo-call-2')
   const handle = acceptedState()
   const nextPrepared = preparedFact({

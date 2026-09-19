@@ -9,7 +9,7 @@ const root = resolve(join(dirname(fileURLToPath(import.meta.url)), '../../..'))
 
 const read = (path) => readFileSync(join(root, path), 'utf8')
 
-test('WHAT[PROVIDER-PROJECTION-014] LLM_FACING_composition_stays_typed_until_the_final_render', () => {
+test('WHAT[provider-projection-014] LLM_FACING_composition_stays_typed_until_the_final_render', () => {
   const syncStore = read('src/Wanxiangshu/Execution/Delegation/SyncDelegate/Store.fs')
   const warmStart = read('src/Wanxiangshu/Repository/Investigation/WarmStart/Prompt.fs')
   const joinRenderer = read('src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs')

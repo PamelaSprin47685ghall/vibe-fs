@@ -10,7 +10,7 @@ const decode = (raw) => HostSignalSurface.tryDecode(raw) ?? undefined
 const decodeExecutionEnd = (raw) => HostSignalSurface.tryDecodePhysicalExecutionEnd(raw) ?? undefined
 const decodeStepEnd = (raw) => HostSignalSurface.tryDecodeProviderStepEnd(raw) ?? undefined
 
-test('WHAT[HOST-BOUNDARY-002] HOST_001_only_coarse_session_lifecycle_signals_cross_the_boundary', () => {
+test('WHAT[host-boundary-002] HOST_001_only_coarse_session_lifecycle_signals_cross_the_boundary', () => {
   const idle = decode({ type: 'session.status', properties: { sessionID: SESSION, status: { type: 'idle' } } })
   const dedicatedIdle = decode({ type: 'session.idle', properties: { sessionID: SESSION } })
   const retry = decode({ type: 'session.status', properties: { sessionID: SESSION, status: { type: 'retry', attempt: 2 } } })
@@ -39,7 +39,7 @@ const deletedRaw = (sessionId, parentID) => ({ type: 'session.deleted', sessionI
 const errorRaw = (sessionId, name = 'TimeoutError') => ({ type: 'session.error', sessionID: sessionId, properties: { error: { name } } })
 const trySubscribe = async (input = {}) => HostSignalSubscribeSurface.trySubscribe(input, () => {})
 
-test('WHAT[HOST-BOUNDARY-002] the host signal boundary exposes the exact typed coarse-signal set', () => {
+test('WHAT[host-boundary-002] the host signal boundary exposes the exact typed coarse-signal set', () => {
   assert.deepEqual(HostSignalSurface.tryDecode(idleRaw('s1')), {
     kind: 'SessionIdle',
     sessionId: 's1',
@@ -84,7 +84,7 @@ test('WHAT[HOST-BOUNDARY-002] the host signal boundary exposes the exact typed c
   assert.equal(HostSignalSurface.tryDecode({ type: 'chat.message', sessionID: 's1' }), null)
   assert.equal(HostSignalSurface.tryDecode({ type: 'session.status', sessionID: 's1', properties: { status: { type: 'busy' } } }), null)
 })
-test('WHAT[HOST-BOUNDARY-002] R3_abort_error_adapts_to_attempt_aborted_not_dropped', () => {
+test('WHAT[host-boundary-002] R3_abort_error_adapts_to_attempt_aborted_not_dropped', () => {
   assert.deepEqual(HostSignalSurface.tryDecode(errorRaw('s1', 'MessageAbortedError')), {
     kind: 'AttemptAborted',
     sessionId: 's1',
@@ -105,14 +105,14 @@ test('WHAT[HOST-BOUNDARY-002] R3_abort_error_adapts_to_attempt_aborted_not_dropp
     diagnostic: 'provider failure',
   })
 })
-test('WHAT[HOST-BOUNDARY-002] MISC_signals_try_adapt_ownership_gate', () => {
+test('WHAT[host-boundary-002] MISC_signals_try_adapt_ownership_gate', () => {
   // Production tryAdapt: unowned session signals are dropped except
   // ProviderFailure which always crosses (isOwned || signal is ProviderFailure).
   assert.equal(HostSignalSurface.tryAdapt([], idleRaw('s1')), null)
   assert.notEqual(HostSignalSurface.tryAdapt([], errorRaw('s1')), null)
   assert.notEqual(HostSignalSurface.tryAdapt(['s1'], idleRaw('s1')), null)
 })
-test('WHAT[HOST-BOUNDARY-002] MISC_signals_router_register_unregister', () => {
+test('WHAT[host-boundary-002] MISC_signals_router_register_unregister', () => {
   // Production tryAdapt uses the owned array as a set; register = add to
   // array, unregister = remove. The ownership gate is the production
   // adapter, not a test-side router.
@@ -120,7 +120,7 @@ test('WHAT[HOST-BOUNDARY-002] MISC_signals_router_register_unregister', () => {
   assert.notEqual(HostSignalSurface.tryAdapt(['s1'], retryRaw('s1')), null)
   assert.equal(HostSignalSurface.tryAdapt([], idleRaw('s1')), null)
 })
-test('WHAT[HOST-BOUNDARY-002] mutation_canary_ProviderFailure_crosses_without_ownership', () => {
+test('WHAT[host-boundary-002] mutation_canary_ProviderFailure_crosses_without_ownership', () => {
   // ProviderFailure must always cross the boundary even for unowned sessions.
   // If someone adds an ownership gate to ProviderFailure, this canary fails.
   assert.notEqual(HostSignalSurface.tryAdapt([], errorRaw('s1', 'OverloadedError')), null,

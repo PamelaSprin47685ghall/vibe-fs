@@ -4,7 +4,7 @@ import * as retirement from '../../../dist/Mission/Relay/Retirement/Surface.js'
 
 
 
-test('WHAT[RETIRE-009] fixed devops and road-level resources do not block Continue retirement and transfer cleanly', () => {
+test('WHAT[relay-retirement-009] fixed devops and road-level resources do not block Continue retirement and transfer cleanly', () => {
   if (typeof retirement.decideWithRoadResources === 'function') {
     const roadResources = [
       { id: 'fixed-devops-1', kind: 'FixedDevOps', roadId: 'road-1' },
@@ -21,7 +21,7 @@ test('WHAT[RETIRE-009] fixed devops and road-level resources do not block Contin
   }
 })
 
-test('WHAT[RETIRE-009] live incumbency-owned child tasks block retirement while devops processes persist across terms', () => {
+test('WHAT[relay-retirement-009] live incumbency-owned child tasks block retirement while devops processes persist across terms', () => {
   if (typeof retirement.decideWithRoadResources === 'function') {
     const incumbencyResources = [
       { id: 'engineer-child-1', kind: 'ChildAgent', owner: 'inc-1' },

@@ -2,7 +2,7 @@
  * gate-budget-cases.mjs — budget table relations retained after scripts/budget-gate.mjs removal.
  *
  * 0.5.3 retired the budget-gate scanner. Cases that only imported that scanner were removed.
- * Cases that assert time-budget.js relations (no script dependency) stay for VERIFY-004 coverage.
+ * Cases that assert time-budget.js relations (no script dependency) stay for verification-system-004 coverage.
  */
 
 import { assertEq, assertTrue } from './lib.mjs';
@@ -10,7 +10,7 @@ import * as budget from '../../e2e/support/time-budget.js';
 
 export const budgetCases = [
   {
-    name: 'VERIFY-004 every centralized budget holds its measured value',
+    name: 'verification-system-004 every centralized budget holds its measured value',
     fn: () => {
       const expected = {
         LITERAL_BUDGET_THRESHOLD_MS: 1000,
@@ -57,7 +57,7 @@ export const budgetCases = [
   },
 
   {
-    name: 'VERIFY-004 no budget is 兜底-only for a criterion that has a causal signal',
+    name: 'verification-system-004 no budget is 兜底-only for a criterion that has a causal signal',
     fn: () => {
       assertTrue(
         budget.WATCHDOG_TIMEOUT_MS < budget.CANARY_TIMEOUT_MS,
@@ -77,7 +77,7 @@ export const budgetCases = [
       );
       assertTrue(
         budget.UNIT_VERDICT_SILENCE_MS < budget.SUITE_BACKSTOP_MS,
-        'the silence window is the primary criterion; the suite ceiling is only 兜底 (VERIFY-004)',
+        'the silence window is the primary criterion; the suite ceiling is only 兜底 (verification-system-004)',
       );
       assertTrue(
         budget.UNIT_VERDICT_SILENCE_MS === budget.WATCHDOG_TIMEOUT_MS,
@@ -92,7 +92,7 @@ export const budgetCases = [
       );
       assertTrue(
         budget.READINESS_STAGE_MS < budget.CANARY_READY_MS,
-        'a stage budget at or above the total startup 兜底 makes the ladder decorative (VERIFY-004)',
+        'a stage budget at or above the total startup 兜底 makes the ladder decorative (verification-system-004)',
       );
       assertTrue(
         budget.PROJECT_CHECK_TIMEOUT_MS > budget.PER_TEST_TIMEOUT_MS

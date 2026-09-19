@@ -3,7 +3,7 @@ import test from 'node:test'
 
 const { registerBounded } = await import('../../../dist/OpenCode/Codec/ToolHostSurface.js')
 
-test('WHAT[PROC-017] custom_tool_output_undergoes_deterministic_tail_truncation', async () => {
+test('WHAT[process-execution-017] custom_tool_output_undergoes_deterministic_tail_truncation', async () => {
   const registrations = []
   const fakeTool = (definition) => {
     registrations.push(definition)

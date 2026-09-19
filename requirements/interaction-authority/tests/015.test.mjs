@@ -87,7 +87,7 @@ const completeManagerLife = async (handle, session) => {
   assert.equal(completed.ok, true, completed.ok ? '' : completed.error)
 }
 
-test('WHAT[INTERACTION-AUTHORITY-015] matching external user ingress continues without replacing the active authority run', async () => {
+test('WHAT[interaction-authority-015] matching external user ingress continues without replacing the active authority run', async () => {
   await withJournal('external-while-active', async (handle) => {
     const active = await acceptOwner(handle, 'ses-external-while-active')
     const before = dispatch.projectionObservation(handle, 'ses-external-while-active')

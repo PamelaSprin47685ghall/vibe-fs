@@ -22,7 +22,7 @@ const TOOL_CAPABILITIES = [
   'Write',
 ]
 
-test('WHAT[PAR-013] participant_identity_role_and_persona_remain_immutable_across_retries', () => {
+test('WHAT[provider-attempt-recovery-013] participant_identity_role_and_persona_remain_immutable_across_retries', () => {
   const first = planner.plan({ role: 'engineer', kind: 'work-main' })
   const second = planner.plan({ role: 'engineer', kind: 'work-main' })
 
@@ -44,7 +44,7 @@ test('WHAT[PAR-013] participant_identity_role_and_persona_remain_immutable_acros
   })
 })
 
-test('WHAT[PAR-013] plans_derive_system_prompt_and_tools_from_the_fixed_role', () => {
+test('WHAT[provider-attempt-recovery-013] plans_derive_system_prompt_and_tools_from_the_fixed_role', () => {
   const planned = attemptPurpose.plan({ role: 'engineer', kind: 'work-main' })
 
   assert.equal(planned.ok, true)

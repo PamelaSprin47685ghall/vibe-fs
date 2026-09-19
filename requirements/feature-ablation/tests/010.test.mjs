@@ -6,7 +6,7 @@ import test from 'node:test'
 const ROOT = new URL('../../..', import.meta.url).pathname
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
-test('WHAT[ABL-010] primary agents and Sphinx MCP are correctly gated by ablation state and decoupled from browser removal', async () => {
+test('WHAT[feature-ablation-010] primary agents and Sphinx MCP are correctly gated by ablation state and decoupled from browser removal', async () => {
   const Ablation = await import('../../../dist/Ablation/Surface.js')
   const SphinxMcpConfigSurface = await import('../../../dist/OpenCode/Host/SphinxMcpConfigSurface.js')
 

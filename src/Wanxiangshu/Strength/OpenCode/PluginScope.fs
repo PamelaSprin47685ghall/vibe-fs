@@ -125,7 +125,7 @@ type PluginStrengthScope() =
     // DSL-MUTABLE: resource — counterfactual collector (physical adapter, typed outcome)
     let collector = CounterfactualCollector()
 
-    /// SPEC-INV-011: Fuse is a process-wide monotonic Result error latch owned by PluginStrengthScope
+    /// speculative-investigation-011: Fuse is a process-wide monotonic Result error latch owned by PluginStrengthScope
     /// (single safety owner). Ok() = operational; Error reason = permanently tripped (K0 fail-closed).
     /// One-shot idempotent: once tripped, it can never be cleared by session cleanup, turn reconciliation,
     /// or caller reset. Losing predictor cache on restart conservatively reverts to K0; the fuse ensures

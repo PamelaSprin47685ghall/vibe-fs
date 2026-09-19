@@ -22,7 +22,7 @@ const freshPermit = (gate, session = SESSION) => {
   return permit
 }
 
-test('WHAT[ENF-018] process capability consumes once and reports duplicate consumption without effect', () => {
+test('WHAT[capability-enforcement-018] process capability consumes once and reports duplicate consumption without effect', () => {
   const gate = quiescence.create()
   const permit = freshPermit(gate)
 
@@ -31,7 +31,7 @@ test('WHAT[ENF-018] process capability consumes once and reports duplicate consu
   assertResult(quiescence.tryConsume(gate, permit), rejected('AlreadyConsumed'))
 })
 
-test('WHAT[ENF-018] process capability is owner-bound and a wrong-owner error leaves the issuing gate unchanged', () => {
+test('WHAT[capability-enforcement-018] process capability is owner-bound and a wrong-owner error leaves the issuing gate unchanged', () => {
   const owner = quiescence.create()
   const stranger = quiescence.create()
   const permit = freshPermit(owner)
@@ -41,7 +41,7 @@ test('WHAT[ENF-018] process capability is owner-bound and a wrong-owner error le
   assertResult(quiescence.tryConsume(owner, permit), accepted)
 })
 
-test('WHAT[ENF-018] a newer attempt supersedes only the stale permit', () => {
+test('WHAT[capability-enforcement-018] a newer attempt supersedes only the stale permit', () => {
   const gate = quiescence.create()
   const stale = freshPermit(gate)
   const current = freshPermit(gate)
@@ -51,7 +51,7 @@ test('WHAT[ENF-018] a newer attempt supersedes only the stale permit', () => {
   assertResult(quiescence.tryConsume(gate, current), accepted)
 })
 
-test('WHAT[ENF-018] revoke is permanent for that attempt and a real newer attempt restores eligibility', () => {
+test('WHAT[capability-enforcement-018] revoke is permanent for that attempt and a real newer attempt restores eligibility', () => {
   const gate = quiescence.create()
   const revoked = freshPermit(gate)
 
@@ -65,7 +65,7 @@ test('WHAT[ENF-018] revoke is permanent for that attempt and a real newer attemp
   assertResult(quiescence.tryConsume(gate, next), accepted)
 })
 
-test('WHAT[ENF-018] absent or dropped fresh-idle state fails closed without changing later admission', () => {
+test('WHAT[capability-enforcement-018] absent or dropped fresh-idle state fails closed without changing later admission', () => {
   const gate = quiescence.create()
   const historicalIdle = quiescence.observeIdle(gate, SESSION)
   assertOpaque(historicalIdle, 'historical idle permit')
@@ -80,7 +80,7 @@ test('WHAT[ENF-018] absent or dropped fresh-idle state fails closed without chan
   assertResult(quiescence.tryConsume(gate, current), accepted)
 })
 
-test('WHAT[ENF-018] release reopens only an exact consumed permit and every rejected release is inert', () => {
+test('WHAT[capability-enforcement-018] release reopens only an exact consumed permit and every rejected release is inert', () => {
   const gate = quiescence.create()
   const permit = freshPermit(gate)
 

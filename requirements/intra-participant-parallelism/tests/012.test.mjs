@@ -15,7 +15,7 @@ const fissionProduction = () => [
   'src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs',
 ].map(read).join('\n')
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-012] Fission role eligibility resolves OfficeRole admission across all roles', () => {
+test('WHAT[intra-participant-parallelism-012] Fission role eligibility resolves OfficeRole admission across all roles', () => {
   assert.equal(tr.rolePredicate('fission', 'Engineer'), true, 'Engineer must have fission permission')
   for (const role of [
     'Manager',

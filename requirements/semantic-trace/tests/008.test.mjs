@@ -23,7 +23,7 @@ const partDescriptor = {
   hostToolPartId: 'part-1',
 }
 
-test('WHAT[SEMANTIC-TRACE-008] semantic surface admits only the three append transitions', () => {
+test('WHAT[semantic-trace-008] semantic surface admits only the three append transitions', () => {
   let projection = trace.emptyProjection()
   projection = unwrap(trace.appendOpening(projection, 'task', []))
   projection = unwrap(trace.appendPart(projection, partDescriptor))
@@ -36,13 +36,13 @@ test('WHAT[SEMANTIC-TRACE-008] semantic surface admits only the three append tra
   assert.equal(trace.appendSpeculative, undefined)
 })
 
-test('WHAT[SEMANTIC-TRACE-008] no generic fact or full-history fold crosses the owner surface', () => {
+test('WHAT[semantic-trace-008] no generic fact or full-history fold crosses the owner surface', () => {
   for (const forbidden of ['fact', 'envelope', 'fold', 'replay', 'session', 'appendReanchor']) {
     assert.equal(trace[forbidden], undefined, `${forbidden} must not bypass semantic-trace owner vocabulary`)
   }
 })
 
-test('WHAT[SEMANTIC-TRACE-008] signed trace contracts expose operations while keeping projection state opaque', () => {
+test('WHAT[semantic-trace-008] signed trace contracts expose operations while keeping projection state opaque', () => {
   const projection = readFileSync(new URL('../../../src/Wanxiangshu/Context/Trace/Projection.fsi', import.meta.url), 'utf8')
   const cursor = readFileSync(new URL('../../../src/Wanxiangshu/Context/Trace/Cursor.fsi', import.meta.url), 'utf8')
   const capture = readFileSync(new URL('../../../src/Wanxiangshu/Context/Trace/Capture.fsi', import.meta.url), 'utf8')

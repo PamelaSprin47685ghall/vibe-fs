@@ -51,13 +51,13 @@ const waitFor = async (predicate, message, ms = 1500) => {
   }
 }
 
-test('WHAT[REPOSITORY-INVESTIGATION-007] AGENT_032_keywords_normalize_stable_exact_dedupe_and_cap_at_eight', () => {
+test('WHAT[repository-investigation-007] AGENT_032_keywords_normalize_stable_exact_dedupe_and_cap_at_eight', () => {
   const raw = ' alpha\r\n\r\nbeta\nalpha\nAlpha\n gamma \n d\n e\n f\n g\n h\n i\n'
   assert.equal(warmStart.maxKeywords, 8)
   assert.deepEqual(warmStart.normalizeKeywords(raw), ['alpha', 'beta', 'Alpha', 'gamma', 'd', 'e', 'f', 'g'])
 })
 
-test('WHAT[REPOSITORY-INVESTIGATION-007] AGENT_032_zero_keywords_is_byte_exact_zero_work', async () => {
+test('WHAT[repository-investigation-007] AGENT_032_zero_keywords_is_byte_exact_zero_work', async () => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-warm-start-role-'))
   let calls = 0
   const searchFn = async () => {

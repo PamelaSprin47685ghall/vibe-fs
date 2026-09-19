@@ -7,7 +7,7 @@ import * as PersonaSurface from '../../../dist/Participant/Persona/Surface.js'
 import * as CapabilitySurface from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 import * as EventStoreSurface from '../../../dist/Persistence/EventStore/Surface.js'
 
-test('WHAT[INTERACTION-AUTHORITY-021] historical inspector records are isolated and do not upgrade to engineer authority', async () => {
+test('WHAT[interaction-authority-021] historical inspector records are isolated and do not upgrade to engineer authority', async () => {
   // 1. Office permissions boundary: Engineer has Write and Fission; legacy Inspector/Coder have neither
   assert.equal(CapabilitySurface.isAllowed('Engineer', 'Write'), true, 'Engineer must have Write permission')
   assert.equal(CapabilitySurface.isAllowed('Engineer', 'Fission'), true, 'Engineer must have Fission permission')

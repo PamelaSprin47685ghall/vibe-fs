@@ -39,7 +39,7 @@ module Diagnostic =
               "persistence_commitment"
               "hook"
               "policy_class"
-              // SPEC-INV-013: visible DryRun child identity; observation-only.
+              // speculative-investigation-013: visible DryRun child identity; observation-only.
               "replica_session_id"
               "blogger_session_id"
               "operation"

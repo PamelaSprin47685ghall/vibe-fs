@@ -51,7 +51,7 @@ const register = (root) => authority.registerAuthority(root, authority.empty)
 const continuation = (key, root, kind = 'ManagerGuard', payload = 'payload') =>
   authority.claimContinuation(key, 'ses_a', kind, root, payload)
 
-test('WHAT[INTERACTION-AUTHORITY-010] IA_010_terminal_repair_identity_is_exactly_once', () => {
+test('WHAT[interaction-authority-010] IA_010_terminal_repair_identity_is_exactly_once', () => {
   const root = rootFor()
   let state = register(root)
   assert.equal(authority.repairAlreadyClaimed('ses_a', root.logicalRun, 'req-empty', 'run_term', 'empty', state), false)

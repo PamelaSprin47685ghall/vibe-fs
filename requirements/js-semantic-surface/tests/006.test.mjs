@@ -30,7 +30,7 @@ const wholeSemanticFiles = new Set(semanticTestFiles(join(ROOT, 'requirements'))
 
 const wholeSemanticImportEdges = semanticImportEdges(join(ROOT, 'requirements'))
 
-test('WHAT[JS-SEMANTIC-SURFACE-006] JS_SURFACE_006_fable_representation_not_contract', () => {
+test('WHAT[js-semantic-surface-006] JS_SURFACE_006_fable_representation_not_contract', () => {
   const existing = [...BUILD_VERIFICATION_FILES].filter((file) => existsSync(join(ROOT, file)))
   assert.ok(existing.length > 0, 'compiler/build quarantine must have at least one live entry')
 
@@ -49,7 +49,7 @@ test('WHAT[JS-SEMANTIC-SURFACE-006] JS_SURFACE_006_fable_representation_not_cont
   }
 })
 
-test('WHAT[JS-SEMANTIC-SURFACE-006] JS_SURFACE_006_emitted_relative_imports_are_package_closed_and_named_exports_link', () => {
+test('WHAT[js-semantic-surface-006] JS_SURFACE_006_emitted_relative_imports_are_package_closed_and_named_exports_link', () => {
   const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-module-linkage-'))
   const distRoot = join(temporaryRoot, 'dist')
   const sourceRoot = join(temporaryRoot, 'src')

@@ -27,7 +27,7 @@ const causalRecord = {
   persistenceCommitment: 'Committed',
 }
 
-test('WHAT[HOST-BOUNDARY-025] causal diagnostic schema preserves exact available correlation and explicit absence', () => {
+test('WHAT[host-boundary-025] causal diagnostic schema preserves exact available correlation and explicit absence', () => {
   const projected = projectRecord(causalRecord)
   assert.deepEqual(projected, causalRecord)
   assert.equal(Object.isFrozen(projected), true)
@@ -42,7 +42,7 @@ test('WHAT[HOST-BOUNDARY-025] causal diagnostic schema preserves exact available
   assert.equal(unavailable.providerRunIdentity, null)
   assert.equal(unavailable.failureClass, null)
 })
-test('WHAT[HOST-BOUNDARY-025] causal diagnostics reject payload fields and redact credential/path material', () => {
+test('WHAT[host-boundary-025] causal diagnostics reject payload fields and redact credential/path material', () => {
   assert.throws(
     () => projectRecord({ ...causalRecord, prompt: 'user text' }),
     /unknown causal diagnostic field 'prompt'/,
@@ -56,7 +56,7 @@ test('WHAT[HOST-BOUNDARY-025] causal diagnostics reject payload fields and redac
   assert.equal(projected.participant.includes('/home/alice'), false)
   assert.match(projected.participant, /\[REDACTED\]/)
 })
-test('WHAT[HOST-BOUNDARY-025] missing observation counters are process-local monotonic immutable snapshots', () => {
+test('WHAT[host-boundary-025] missing observation counters are process-local monotonic immutable snapshots', () => {
   const counters = createCounters()
   recordObservation(counters, 'IdentityConflict')
   recordObservation(counters, 'QueueFull')
@@ -80,7 +80,7 @@ test('WHAT[HOST-BOUNDARY-025] missing observation counters are process-local mon
   assert.equal(Object.isFrozen(snapshot(counters)), true)
   assert.equal('duplicateFences' in snapshot(counters), false, 'capacity owner counters must not be duplicated locally')
 })
-test('WHAT[HOST-BOUNDARY-025] diagnostic adapter failure is transparent to caller state', () => {
+test('WHAT[host-boundary-025] diagnostic adapter failure is transparent to caller state', () => {
   const business = { accepted: true }
   const emitted = tryEmit({ ...causalRecord, operation: 'invalid\noperation' })
   assert.equal(emitted, false)
@@ -98,7 +98,7 @@ const completed = (providerRun = '') => ({ kind: 'Completed', providerRun })
 const failed = (error) => ({ kind: 'Failed', error })
 const aborted = (reason) => ({ kind: 'Aborted', error: reason })
 
-test('WHAT[DELEG-025] EVT_future_subscriber_does_not_replay_sticky_terminal', () => {
+test('WHAT[delegation-025] EVT_future_subscriber_does_not_replay_sticky_terminal', () => {
   const port = EventsSurface.create()
   EventsSurface.notify(port, 'ses-reused', 'Completed', 'run-old', 'old result')
 
@@ -112,7 +112,7 @@ test('WHAT[DELEG-025] EVT_future_subscriber_does_not_replay_sticky_terminal', ()
   assert.equal(seen[0].outcome.providerRun, 'run-new')
   EventsSurface.dispose(subscription)
 })
-test('WHAT[DELEG-025] EVT_run_scoped_failure_preserves_authority_root_across_host_event_port', () => {
+test('WHAT[delegation-025] EVT_run_scoped_failure_preserves_authority_root_across_host_event_port', () => {
   const port = EventsSurface.create()
   const seen = []
   EventsSurface.subscribeFuture(port, (_, outcome) => seen.push(outcome))
@@ -133,7 +133,7 @@ const { spawnSync } = await import("node:child_process");
 
 const moduleUrl = new URL('../../../dist/OpenCode/Host/ReliabilityDiagnosticsSurface.js', import.meta.url).href
 
-test('WHAT[HOST-BOUNDARY-025] known typed failure emits one redacted JSON line without stack', () => {
+test('WHAT[host-boundary-025] known typed failure emits one redacted JSON line without stack', () => {
   const source = `
     import { emitKnownFailure } from ${JSON.stringify(moduleUrl)};
     emitKnownFailure({

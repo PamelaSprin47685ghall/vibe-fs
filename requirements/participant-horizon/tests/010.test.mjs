@@ -27,7 +27,7 @@ const MANAGER_VISIBLE_SURFACES = [
   'lifecycle/magic-todo/manager-guideline',
 ]
 
-test('WHAT[PARTICIPANT-HORIZON-010] PH_agent_009_fork_visible_set_is_strictly_engineer', () => {
+test('WHAT[participant-horizon-010] PH_agent_009_fork_visible_set_is_strictly_engineer', () => {
   for (const locale of LOCALES) {
     const fork = read(`resources/provider/tool/fork/description/${locale}.md`)
     assert.match(fork, /Engineer/i, `fork/${locale}.md must present Engineer`)

@@ -24,7 +24,7 @@ const ACTIVE_OFFICES = [
   },
 ]
 
-test('WHAT[OFF-017] OFF_017_devops_has_inherent_mutation_authority_without_allow_repair_toggle', () => {
+test('WHAT[office-capability-017] OFF_017_devops_has_inherent_mutation_authority_without_allow_repair_toggle', () => {
   assert.equal(isAllowed('devops', 'Write'), true)
   assert.equal(isAllowed('devops', 'Edit'), true)
   assert.equal(isAllowed('devops', 'Move'), true)
@@ -44,7 +44,7 @@ const { default: test } = await import("node:test");
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const readRole = (role, locale) => readFileSync(join(ROOT, 'resources/provider/role', role, locale), 'utf8')
 
-test('WHAT[OFF-017] devops_role_law_carries_execution_and_inherent_repair_without_allow_repair_toggle', () => {
+test('WHAT[office-capability-017] devops_role_law_carries_execution_and_inherent_repair_without_allow_repair_toggle', () => {
   const en = readRole('devops', 'en.md')
   const zh = readRole('devops', 'zh-CN.md')
   assert.match(en, /operational objective|execution/i)

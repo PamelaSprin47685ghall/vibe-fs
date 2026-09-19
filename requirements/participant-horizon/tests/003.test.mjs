@@ -24,7 +24,7 @@ const MANAGER_VISIBLE_SURFACES = [
   'lifecycle/magic-todo/manager-guideline',
 ]
 
-test('WHAT[PARTICIPANT-HORIZON-003] PH_exec_030_no_generic_state_dto_vocabulary_in_join_or_horizon_descriptions', () => {
+test('WHAT[participant-horizon-003] PH_exec_030_no_generic_state_dto_vocabulary_in_join_or_horizon_descriptions', () => {
   const dtoVocabulary = /\b(status|session_id|agent_id|pty_id|code|ordinal|kind|count)\b/i
   for (const tool of ['join', 'horizon']) {
     for (const locale of LOCALES) {
@@ -42,13 +42,13 @@ const { parse: parseToml } = await import("smol-toml");
 const join = await import("../../../dist/Execution/Delegation/Fork/OpenCode/JoinSurface.js");
 
 
-test('WHAT[PARTICIPANT-HORIZON-003] devops_join_deadline_renders_natural_language_not_timed_out_dto', () => {
+test('WHAT[participant-horizon-003] devops_join_deadline_renders_natural_language_not_timed_out_dto', () => {
   const wire = join.renderInterrupted('english', 'DeadlineExpired')
   assert.match(wire, /No return reached you before your waiting ended/)
   assert.equal(parseToml(wire).status, undefined)
   assert.equal(parseToml(wire).error, undefined)
 })
-test('WHAT[PARTICIPANT-HORIZON-003] devops_join_timed_out_fork_error_also_natural_language', () => {
+test('WHAT[participant-horizon-003] devops_join_timed_out_fork_error_also_natural_language', () => {
   const wire = join.renderForkError('english', 'TimedOut')
   assert.match(wire, /No return reached you before your waiting ended/)
   assert.equal(parseToml(wire).status, undefined)
@@ -67,13 +67,13 @@ const failed = (over = {}) => ({ kind: 'failed', agentId: 'a1', agentName: 'engi
 const pty = (kind, over = {}) => ({ kind, ptyId: 'pty-1', terminalLabel: 'npm test', outcome: 'exit 0', code: '', message: '', ...over, ...(kind ? { kind } : {}) })
 const assertClean = (wire, label) => assert.ok(!LEGACY_DTO.test(wire), `${label}: ${wire}`)
 
-test('WHAT[PARTICIPANT-HORIZON-003] MISC_join_render_batch_pty_aborted_natural_language', () => {
+test('WHAT[participant-horizon-003] MISC_join_render_batch_pty_aborted_natural_language', () => {
   const wire = join.renderBatch('english', [pty('pty-aborted', { ptyId: 'pty-3', outcome: 'interrupted', code: 'AB', message: 'esc' })])
   assert.match(wire, /# npm test was interrupted\./)
   assert.match(wire, /output = "esc"/)
   assert.ok(!wire.includes('pty_id'))
 })
-test('WHAT[PARTICIPANT-HORIZON-003] MISC_join_render_batch_multiple_items_stable_order', () => {
+test('WHAT[participant-horizon-003] MISC_join_render_batch_multiple_items_stable_order', () => {
   const wire = join.renderBatch('english', [
     failed({ message: 'boom' }),
     pty('pty-aborted', { ptyId: 'p', terminalLabel: 'Terminal', outcome: 'x', code: 'C', message: 'm' }),
@@ -84,7 +84,7 @@ test('WHAT[PARTICIPANT-HORIZON-003] MISC_join_render_batch_multiple_items_stable
   assert.equal([...wire.matchAll(/was interrupted\./g)].length, 1)
   assertClean(wire, 'multiple')
 })
-test('WHAT[PARTICIPANT-HORIZON-003] MISC_join_render_interrupted_natural_language', () => {
+test('WHAT[participant-horizon-003] MISC_join_render_interrupted_natural_language', () => {
   const operatorWire = join.renderInterrupted('english', 'OperatorAbort')
   assert.match(operatorWire, /# Your waiting was interrupted\./)
   assertClean(operatorWire, 'operator')
@@ -97,7 +97,7 @@ test('WHAT[PARTICIPANT-HORIZON-003] MISC_join_render_interrupted_natural_languag
   assert.match(deadlineWire, /# No return reached you before your waiting ended\./)
   assertClean(deadlineWire, 'deadline')
 })
-test('WHAT[PARTICIPANT-HORIZON-003] MISC_join_render_fork_error_natural_language', () => {
+test('WHAT[participant-horizon-003] MISC_join_render_fork_error_natural_language', () => {
   const cases = [
     ['Empty', /nothing away to receive/],
     ['NothingToJoin', /nothing away to receive/],
@@ -125,7 +125,7 @@ const join = await import("../../../dist/Execution/Delegation/Fork/OpenCode/Join
 const LEGACY_DTO = /\b(status|count|ordinal|kind|agent|code|message)\s*=|\[\[result\]\]|\[error\]|work_record\s*=/
 const assertClean = (wire, label) => assert.ok(!LEGACY_DTO.test(wire), `${label}: ${wire}`)
 
-test('WHAT[PARTICIPANT-HORIZON-003] JOIN_SURFACE_interrupt_and_fork_error_are_natural_language_only', () => {
+test('WHAT[participant-horizon-003] JOIN_SURFACE_interrupt_and_fork_error_are_natural_language_only', () => {
   assertClean(join.renderInterrupted('english', 'OperatorAbort'), 'operator abort')
   assertClean(join.renderForkError('english', 'NothingToJoin'), 'nothing to join')
   assertClean(join.renderForkError('english', 'TimedOut'), 'timed out')
@@ -156,10 +156,10 @@ module JoinResultRenderer =
         SessionId.value sid
 `
 
-test('WHAT[PARTICIPANT-HORIZON-003] gate_b_documents_forbidden_dto_patterns', () => {
+test('WHAT[participant-horizon-003] gate_b_documents_forbidden_dto_patterns', () => {
   assert.ok(FORBIDDEN_DTO_PATTERNS.some((p) => p.id === 'field-status'))
 })
-test('WHAT[PARTICIPANT-HORIZON-003] gate_b_leaky_renderer_fixture_is_red_for_dto_fields', () => {
+test('WHAT[participant-horizon-003] gate_b_leaky_renderer_fixture_is_red_for_dto_fields', () => {
   const hits = scanText('JoinResultRenderer.fs', LEAKY_JOIN)
   assert.ok(hits.some((h) => h.id === 'field-status'))
 })

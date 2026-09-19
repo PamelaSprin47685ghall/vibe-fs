@@ -84,7 +84,7 @@ const waveEvents = (wave, assignment) => {
   ]
 }
 
-test('WHAT[EPI-029] soak_evidence_threshold_flips_once_and_voc_vetoes_every_wave', async () => {
+test('WHAT[epistemic-reasoning-029] soak_evidence_threshold_flips_once_and_voc_vetoes_every_wave', async () => {
   const stopInput = (evidence) => ({
     testedFramings: ['wording-a', 'wording-b'],
     decisionPosterior: { approve: 0.68, reject: 0.32 },
@@ -148,7 +148,7 @@ const { gecSurface } = await import("../../../dist/Sphinx/GecSurface.js");
 
 const posterior = { approve: 0.68, reject: 0.32 }
 
-test('WHAT[EPI-029] certificate-bounds-guarantee-to-tested-framing-family-only', async () => {
+test('WHAT[epistemic-reasoning-029] certificate-bounds-guarantee-to-tested-framing-family-only', async () => {
   const result = await gecSurface.stopCertificate({
     testedFramings: ['neutral', 'reverse-wording'],
     decisionPosterior: { ...posterior },
@@ -163,7 +163,7 @@ test('WHAT[EPI-029] certificate-bounds-guarantee-to-tested-framing-family-only',
   assert.ok(!/all wording/i.test(scopeText))
   assert.ok(!result.certificate.testedFamily.includes('leading-question'))
 })
-test('WHAT[EPI-029] sequential-error-control-tightens-with-repeated-checks', async () => {
+test('WHAT[epistemic-reasoning-029] sequential-error-control-tightens-with-repeated-checks', async () => {
   const base = {
     testedFramings: ['neutral', 'reverse-wording'],
     decisionPosterior: { ...posterior },
@@ -178,7 +178,7 @@ test('WHAT[EPI-029] sequential-error-control-tightens-with-repeated-checks', asy
   assert.ok(late.certificate.sequentialError.cumulativeError <= 0.05 + 1e-12)
   assert.match(late.certificate.sequentialError.method, /bonferroni/i)
 })
-test('WHAT[EPI-029] stable-minority-mode-returns-decision-distribution-not-single-winner', async () => {
+test('WHAT[epistemic-reasoning-029] stable-minority-mode-returns-decision-distribution-not-single-winner', async () => {
   const result = await gecSurface.stopCertificate({
     testedFramings: ['neutral', 'reverse-wording'],
     decisionPosterior: { ...posterior },
@@ -196,7 +196,7 @@ test('WHAT[EPI-029] stable-minority-mode-returns-decision-distribution-not-singl
   assert.ok(Math.abs(minority.mass - 0.32) < 1e-12)
   assert.deepEqual(result.decision.minorityModes, [{ decision: 'reject', mass: 0.32 }])
 })
-test('WHAT[EPI-029] caller-supplied-coverage-and-minority-thresholds-bind', async () => {
+test('WHAT[epistemic-reasoning-029] caller-supplied-coverage-and-minority-thresholds-bind', async () => {
   const base = {
     testedFramings: ['neutral', 'reverse-wording'],
     decisionPosterior: { ...posterior },
@@ -213,7 +213,7 @@ test('WHAT[EPI-029] caller-supplied-coverage-and-minority-thresholds-bind', asyn
   assert.ok(Math.abs(fallback.certificate.requiredCoverage - 0.5) < 1e-12)
   assert.ok(Math.abs(fallback.certificate.minorityThreshold - 0.05) < 1e-12)
 })
-test('WHAT[EPI-029] caller-evidence-fires-stop-when-all-checks-pass', async () => {
+test('WHAT[epistemic-reasoning-029] caller-evidence-fires-stop-when-all-checks-pass', async () => {
   const result = await gecSurface.stopCertificate({
     testedFramings: ['neutral', 'reverse-wording'],
     decisionPosterior: { ...posterior },
@@ -233,7 +233,7 @@ test('WHAT[EPI-029] caller-evidence-fires-stop-when-all-checks-pass', async () =
   }
   assert.equal(result.recommendation, 'stop')
 })
-test('WHAT[EPI-029] conservative-upper-voc-blocks-stopping-on-point-estimate-alone', async () => {
+test('WHAT[epistemic-reasoning-029] conservative-upper-voc-blocks-stopping-on-point-estimate-alone', async () => {
   const result = await gecSurface.stopCertificate({
     testedFramings: ['neutral', 'reverse-wording'],
     decisionPosterior: { ...posterior },

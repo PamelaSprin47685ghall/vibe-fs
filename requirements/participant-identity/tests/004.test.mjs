@@ -73,7 +73,7 @@ const assertNoLegacyIdentityFields = (value, label) => {
   }
 }
 
-test('WHAT[PID-004] terminal dispatch preserves the exact IdentitySeed', () => {
+test('WHAT[participant-identity-004] terminal dispatch preserves the exact IdentitySeed', () => {
   const profile = rootProfile('devops')
   const promptKey = 'pk_identity_terminal_dispatch'
   const claim = Runtime.claimContinuation(
@@ -93,7 +93,7 @@ test('WHAT[PID-004] terminal dispatch preserves the exact IdentitySeed', () => {
   assert.deepEqual(projection.acceptedDispatches[0].identitySeed, profile.identitySeed)
 })
 
-test('WHAT[PID-004] Strength replica inherits owner Persona and version with the same participant', () => {
+test('WHAT[participant-identity-004] Strength replica inherits owner Persona and version with the same participant', () => {
   const owner = rootProfile('engineer', 'ses_identity_strength_owner')
   const replica = inheritedSeed('engineer', owner)
 
@@ -111,7 +111,7 @@ test('WHAT[PID-004] Strength replica inherits owner Persona and version with the
   )
 })
 
-test('WHAT[PID-004] Fission lane inherits owner Persona and version without physical-parent inference', () => {
+test('WHAT[participant-identity-004] Fission lane inherits owner Persona and version without physical-parent inference', () => {
   const owner = rootProfile('engineer', 'ses_identity_fission_owner')
   const laneIdentity = inheritedSeed('engineer', owner)
   const lane = Fission.startedLane(2, 'ses_unrelated_physical_parent', 'inspect lane')
@@ -129,7 +129,7 @@ test('WHAT[PID-004] Fission lane inherits owner Persona and version without phys
   })
 })
 
-test('WHAT[PID-004] raw legacy PeerAgent/EffectiveAgent/cursor fields are ignored and never re-encoded', () => {
+test('WHAT[participant-identity-004] raw legacy PeerAgent/EffectiveAgent/cursor fields are ignored and never re-encoded', () => {
   const canonical = canonicalIdentityOf('engineer')
   const legacySeed = {
     kind: 'RootSelection',

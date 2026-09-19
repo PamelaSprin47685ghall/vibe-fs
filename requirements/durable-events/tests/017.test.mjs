@@ -23,7 +23,7 @@ const withTemp = (fn) => {
   return fn(base)
 }
 
-test('WHAT[DURABLE-EVENTS-017] append_path_has_no_Git_object_or_ref_capability', async () => {
+test('WHAT[durable-events-017] append_path_has_no_Git_object_or_ref_capability', async () => {
   const source = await readFile(new URL('../../../src/Wanxiangshu/Persistence/EventStore/Store.fs', import.meta.url), 'utf8')
   const log = await readFile(new URL('../../../src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs', import.meta.url), 'utf8')
   for (const token of ['WriteBlob', 'WriteTree', 'ReadRef', 'CompareAndSwapRef', 'RootOid', 'ProcessGitRawStore']) {
@@ -53,7 +53,7 @@ const event = (id, n, parents = []) => ({
 const commonDir = async () => path.join(await mkdtemp(path.join(tmpdir(), 'wanxiang-local-log-')), '.git')
 const remove = async (dir) => rm(dir, { recursive: true, force: true })
 
-test('WHAT[DURABLE-EVENTS-017] DURABLE_EVENTS_004_017_local_append_has_zero_Git_object_tree_ref_dependencies', async () => {
+test('WHAT[durable-events-017] DURABLE_EVENTS_004_017_local_append_has_zero_Git_object_tree_ref_dependencies', async () => {
   const gitCommonDir = await commonDir()
   const store1 = eventStore.create(gitCommonDir, 'writer-bytes-1')
   try {

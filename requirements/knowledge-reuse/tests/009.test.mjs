@@ -40,7 +40,7 @@ const findCase = async (store, sessionId) => {
   return result.value
 }
 
-test('WHAT[KNOWLEDGE-REUSE-009] CASE009_marker_gates_the_surface', async () => {
+test('WHAT[knowledge-reuse-009] CASE009_marker_gates_the_surface', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-cbmarker-'))
   try {
     assert.equal(casebook.featureEnabled(dir), false)
@@ -81,7 +81,7 @@ const assertNoCase = (text) => assert.match(text, /The Casebook contains no entr
 const assertUnavailable = (text) => assert.match(text, /could not be read from this execution context|无法从当前执行环境读取|当前执行上下文无法读取/i)
 const assertNoMachineFreshness = (text) => assert.doesNotMatch(text, /\b(session_id|status|freshness|refresh)\s*=/)
 
-test('WHAT[KNOWLEDGE-REUSE-009] CASE009_fetch_execution_rejects_a_workspace_without_the_marker', async () => {
+test('WHAT[knowledge-reuse-009] CASE009_fetch_execution_rejects_a_workspace_without_the_marker', async () => {
   const { dir, handle, cleanup } = sandbox({ enabled: false })
   try {
     const tool = fetchSurface.contract(factory, dir, handle)
@@ -124,7 +124,7 @@ const sandbox = () => {
   }
 }
 
-test('WHAT[KNOWLEDGE-REUSE-009] lifecycle_disabled_marker_skips_publication', async () => {
+test('WHAT[knowledge-reuse-009] lifecycle_disabled_marker_skips_publication', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-lifecycle-off-'))
   execFileSync('git', ['init', '--quiet', dir])
   const handle = eventStore.create(join(dir, '.git'), 'lifecycle-off')

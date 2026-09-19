@@ -6,7 +6,7 @@ const { default: test } = await import("node:test");
 
 const change = await import('../../../dist/Change/Surface.js')
 
-test('WHAT[CHGINT-001] fresh quality candidate runs the full publish lifecycle to Published', async () => {
+test('WHAT[change-integration-001] fresh quality candidate runs the full publish lifecycle to Published', async () => {
   const observation = await change.observeRelayProgram('fresh')
 
   assert.deepEqual(observation.verdict, { kind: 'Published', detail: 'rebased-1' })
@@ -32,7 +32,7 @@ test('WHAT[CHGINT-001] fresh quality candidate runs the full publish lifecycle t
     'relay:terminate',
   ])
 })
-test('WHAT[CHGINT-001] retirement without a valid certificate continues the loop', async () => {
+test('WHAT[change-integration-001] retirement without a valid certificate continues the loop', async () => {
   const observation = await change.observeRelayProgram('retired')
 
   assert.deepEqual(observation.continuations, ['surface-loop-1'])
@@ -129,7 +129,7 @@ const foldProjection = (events) => {
 const worktreeRequested = { kind: 'WorktreeCreateRequested', payload: { jobId: JOB, worktreeIdentity: 'manager/job_1', worktreePath: '/tmp/wt1' } }
 const worktreeCreated = { kind: 'WorktreeCreated', payload: { jobId: JOB, worktreeIdentity: 'manager/job_1', worktreePath: '/tmp/wt1' } }
 
-test('WHAT[CHGINT-001] ORCH_003_a_created_job_persists_the_manager_agent_and_the_worktree_identity', () => {
+test('WHAT[change-integration-001] ORCH_003_a_created_job_persists_the_manager_agent_and_the_worktree_identity', () => {
   const job = change.find(created(), JOB)
   assert.deepEqual(job, {
     jobId: 'job_1',
@@ -151,7 +151,7 @@ const { default: test } = await import("node:test");
 
 const change = await import('../../../dist/Change/Surface.js')
 
-test('WHAT[CHGINT-001] fresh quality candidate runs to Published with verified publication evidence', async () => {
+test('WHAT[change-integration-001] fresh quality candidate runs to Published with verified publication evidence', async () => {
   const observation = await change.observeRelayProgram('fresh')
 
   assert.deepEqual(observation.verdict, { kind: 'Published', detail: 'rebased-1' })
@@ -163,7 +163,7 @@ test('WHAT[CHGINT-001] fresh quality candidate runs to Published with verified p
   assert.equal(observation.gateAcquireCount, 1)
   assert.equal(observation.gateReleaseCount, 1)
 })
-test('WHAT[CHGINT-001] pre-rebase C1/S1 certificate cannot authorize rebased S2 candidate and fails closed', async () => {
+test('WHAT[change-integration-001] pre-rebase C1/S1 certificate cannot authorize rebased S2 candidate and fails closed', async () => {
   const observation = await change.observeRelayProgram('rebase-reuse-old-cert')
 
   assert.equal(observation.verdict.kind, 'IntegrationFailed')
@@ -174,7 +174,7 @@ test('WHAT[CHGINT-001] pre-rebase C1/S1 certificate cannot authorize rebased S2 
   assert.equal(observation.gateAcquireCount, 0)
   assert.equal(observation.facts.includes('Published'), false)
 })
-test('WHAT[CHGINT-001] cancellation during manager loop returns Cancelled verdict and does not burn retry budget', async () => {
+test('WHAT[change-integration-001] cancellation during manager loop returns Cancelled verdict and does not burn retry budget', async () => {
   const observation = await change.observeRelayProgram('cancelled-program')
 
   assert.deepEqual(observation.verdict, { kind: 'Cancelled', detail: 'cancelled' })
@@ -188,7 +188,7 @@ test('WHAT[CHGINT-001] cancellation during manager loop returns Cancelled verdic
   assert.deepEqual(observation.invalidations, [])
   assert.deepEqual(observation.continuations, [])
 })
-test('WHAT[CHGINT-001] reentry gate cancellation returns Cancelled with zero FF', async () => {
+test('WHAT[change-integration-001] reentry gate cancellation returns Cancelled with zero FF', async () => {
   const observation = await change.observeRelayProgram('reentry-gate-cancelled')
 
   assert.deepEqual(observation.verdict, { kind: 'Cancelled', detail: 'cancelled' })
@@ -198,7 +198,7 @@ test('WHAT[CHGINT-001] reentry gate cancellation returns Cancelled with zero FF'
   assert.equal(observation.gateReleaseCount, 0)
   assert.equal(observation.facts.includes('Published'), false)
 })
-test('WHAT[CHGINT-001] old certificate still fails closed after the rebased record supersedes it', async () => {
+test('WHAT[change-integration-001] old certificate still fails closed after the rebased record supersedes it', async () => {
   const observation = await change.observeRelayProgram('rebase-reuse-old-cert')
 
   assert.deepEqual(observation.facts, ['CandidateReady', 'RebasedCandidateReady'])

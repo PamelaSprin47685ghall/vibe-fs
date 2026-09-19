@@ -3,7 +3,7 @@ namespace Wanxiangshu.Persistence.EventStore
 open System.Collections.Generic
 open Wanxiangshu.Foundation.Identity
 
-/// DURABLE-CONVERGENCE-001..003 / DURABLE-EVENTS-014.
+/// durable-convergence-001..003 / durable-events-014.
 /// Pure structural k-way merge over ordered writer streams. It owns no business
 /// projection and reads no files; callers provide already-decoded streams.
 [<RequireQualifiedAccess>]

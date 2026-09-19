@@ -68,7 +68,7 @@ const hanRatio = (text) => {
   return han / Math.max(1, latinWords)
 }
 
-test('WHAT[COGNITIVE-ENVIRONMENT-004] PROMPT_role_laws_are_identity_not_tool_inventory', () => {
+test('WHAT[cognitive-environment-004] PROMPT_role_laws_are_identity_not_tool_inventory', () => {
   for (const path of ROLE_PATHS) {
     const law = providerLanguage.readText(english, path)
     assert.doesNotMatch(law, forbiddenRoleToolInventory, path)

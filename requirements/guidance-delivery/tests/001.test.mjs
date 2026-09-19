@@ -6,8 +6,8 @@ const { empty, apply, applyReanchor, hasFullDelivered } = delivery
 
 const TipPresentation = Object.freeze({ Full: 'Full', IdentityOnly: 'IdentityOnly' })
 
-test('WHAT[GD-001] TDP_006_frontier_and_coverage_are_two_axes_not_one_bool', () => {
-  // GD-001 两轴分离：Frontier（哪些 occurrence 已交付，durable/monotonic）与
+test('WHAT[guidance-delivery-001] TDP_006_frontier_and_coverage_are_two_axes_not_one_bool', () => {
+  // guidance-delivery-001 两轴分离：Frontier（哪些 occurrence 已交付，durable/monotonic）与
   // Coverage（全文此刻是否可恢复，horizon-relative）不得压成单一 durable bool。
   // 前沿轴：Full 交付被记录（monotonic 前进）。
   const firstFull = apply('primitive-obsession', TipPresentation.Full, empty)

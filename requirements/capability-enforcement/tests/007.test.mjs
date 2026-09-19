@@ -23,7 +23,7 @@ const buildConfig = () => {
 }
 installDefaultResources()
 
-test('WHAT[ENF-007] sphinx_wildcard_is_not_exposed_to_ordinary_interactive_roles', () => {
+test('WHAT[capability-enforcement-007] sphinx_wildcard_is_not_exposed_to_ordinary_interactive_roles', () => {
   const config = buildConfig()
   assert.equal(configureManagedAgents(config).ok, true)
 
@@ -63,10 +63,10 @@ const buildConfig = () => {
 }
 installDefaultResources()
 
-test('WHAT[ENF-007] browser_role_is_revoked_from_canonical_active_roles', () => {
+test('WHAT[capability-enforcement-007] browser_role_is_revoked_from_canonical_active_roles', () => {
   assert.equal(allRoleLabels.includes('browser'), false, 'Browser role must be deleted from canonical active roles')
 })
-test('WHAT[ENF-007] network_and_stealth_browser_mcp_are_denied_for_all_roles', () => {
+test('WHAT[capability-enforcement-007] network_and_stealth_browser_mcp_are_denied_for_all_roles', () => {
   const config = buildConfig()
   assert.equal(configureManagedAgents(config).ok, true)
 

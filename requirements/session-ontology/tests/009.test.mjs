@@ -9,7 +9,7 @@ const linked = (pairs, start = assoc.empty) =>
     return result.value
   }, start)
 
-test('WHAT[SESSION-ONTOLOGY-009] COMPANION_001_every_work_session_may_have_a_companion', () => {
+test('WHAT[session-ontology-009] COMPANION_001_every_work_session_may_have_a_companion', () => {
   const roles = ['orchestrator', 'manager', 'coder', 'inspector', 'browser', 'inquiry', 'reviewer', 'devops', 'distiller']
   const state = linked(roles.map((role) => ({ main: `ses_${role}`, blogger: `ses_${role}_y` })))
   for (const role of roles) {
@@ -18,7 +18,7 @@ test('WHAT[SESSION-ONTOLOGY-009] COMPANION_001_every_work_session_may_have_a_com
   }
 })
 
-test('WHAT[SESSION-ONTOLOGY-009] COMPANION_003_unlinking_frees_work_session_for_fresh_companion', () => {
+test('WHAT[session-ontology-009] COMPANION_003_unlinking_frees_work_session_for_fresh_companion', () => {
   const state = linked([{ main: 'ses_x', blogger: 'ses_y1' }])
   const unlinked = assoc.unlink('ses_x', state)
   assert.equal(assoc.bloggerOf('ses_x', unlinked), null)
@@ -29,7 +29,7 @@ test('WHAT[SESSION-ONTOLOGY-009] COMPANION_003_unlinking_frees_work_session_for_
   assert.equal(assoc.bloggerOf('ses_x', linked([{ main: 'ses_x', blogger: 'ses_y2' }], unlinked)), 'ses_y2')
 })
 
-test('WHAT[SESSION-ONTOLOGY-009] COMPANION_003_unlinking_is_total_and_idempotent', () => {
+test('WHAT[session-ontology-009] COMPANION_003_unlinking_is_total_and_idempotent', () => {
   assert.deepEqual(assoc.ids(assoc.unlink('ses_never_seen', assoc.empty)), [])
   const once = assoc.unlink('ses_x', linked([{ main: 'ses_x', blogger: 'ses_y' }]))
   const twice = assoc.unlink('ses_x', once)

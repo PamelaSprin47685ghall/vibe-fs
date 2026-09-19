@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import * as learning from '../../../dist/Enforcer/InstitutionalLearning/Surface.js'
 
-test('WHAT[INSTITUTIONAL-LEARNING-007] celebrate surfaces deferred work at tail while regret surfaces zero and replay is idempotent', () => {
+test('WHAT[institutional-learning-007] celebrate surfaces deferred work at tail while regret surfaces zero and replay is idempotent', () => {
   // 1. Static ordering & scoping verification in InstitutionalLearningTools.fs
   const toolsSource = readFileSync('src/Wanxiangshu/OpenCode/Tools/InstitutionalLearningTools.fs', 'utf8')
 

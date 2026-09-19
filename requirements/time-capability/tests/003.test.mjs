@@ -8,11 +8,11 @@ const process = await import('../../../dist/Process/Surface.js')
 const deadline = await import('../../../dist/Process/DeadlineSurface.js')
 const START_MS = Date.parse('2000-01-01T00:00:00Z')
 
-test('WHAT[TIME-003] TIME_003_virtual_clock_starts_at_fixed_epoch', () => {
+test('WHAT[time-capability-003] TIME_003_virtual_clock_starts_at_fixed_epoch', () => {
   const clock = process.createVirtualClock()
   assert.equal(Number(process.clockNowMs(clock)), START_MS)
 })
-test('WHAT[TIME-003] TIME_003_virtual_clock_advance_and_set_are_deterministic', () => {
+test('WHAT[time-capability-003] TIME_003_virtual_clock_advance_and_set_are_deterministic', () => {
   const clock = process.createVirtualClock()
 
   process.clockAdvanceMs(clock, 5000)
@@ -34,7 +34,7 @@ const { assertOpaque } = await import("../../verification-system/tests/support/j
 const process = await import('../../../dist/Process/Surface.js')
 const settle = () => new Promise((resolve) => setImmediate(resolve))
 
-test('WHAT[TIME-003] VERIFY_004_virtual_timer_fires_exactly_when_advanced_past_deadline', async () => {
+test('WHAT[time-capability-003] VERIFY_004_virtual_timer_fires_exactly_when_advanced_past_deadline', async () => {
   const timer = process.createVirtualTimer()
   const handle = process.timerDelay(timer, 100)
   assertOpaque(timer, 'virtual timer')
@@ -55,7 +55,7 @@ test('WHAT[TIME-003] VERIFY_004_virtual_timer_fires_exactly_when_advanced_past_d
   assert.equal(process.timerNowMs(timer), 100)
   process.timerDispose(timer)
 })
-test('WHAT[TIME-003] VERIFY_004_virtual_timer_cancel_before_fire_yields_zero_callbacks', async () => {
+test('WHAT[time-capability-003] VERIFY_004_virtual_timer_cancel_before_fire_yields_zero_callbacks', async () => {
   const timer = process.createVirtualTimer()
   const handle = process.timerDelay(timer, 50)
   let fired = 0
@@ -69,7 +69,7 @@ test('WHAT[TIME-003] VERIFY_004_virtual_timer_cancel_before_fire_yields_zero_cal
   assert.equal(fired, 0, 'cancel must leave Delay pending forever')
   process.timerDispose(timer)
 })
-test('WHAT[TIME-003] VERIFY_004_virtual_timer_dispose_stops_all_pending_callbacks', async () => {
+test('WHAT[time-capability-003] VERIFY_004_virtual_timer_dispose_stops_all_pending_callbacks', async () => {
   const timer = process.createVirtualTimer()
   const first = process.timerDelay(timer, 10)
   const second = process.timerDelay(timer, 20)
@@ -86,7 +86,7 @@ test('WHAT[TIME-003] VERIFY_004_virtual_timer_dispose_stops_all_pending_callback
   await settle()
   assert.equal(fired, 0, 'dispose clears pending entries without firing')
 })
-test('WHAT[TIME-003] VERIFY_004_virtual_timer_multiple_handles_fire_independently', async () => {
+test('WHAT[time-capability-003] VERIFY_004_virtual_timer_multiple_handles_fire_independently', async () => {
   const timer = process.createVirtualTimer()
   const order = []
   const short = process.timerDelay(timer, 10)

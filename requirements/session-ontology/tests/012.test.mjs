@@ -10,7 +10,7 @@ const linked = assoc.link({ main: 'ses_main', blogger: 'ses_blogger' }, assoc.em
 assert.equal(linked.ok, true, linked.message)
 const state = linked.value
 
-test('WHAT[SESSION-ONTOLOGY-012] HOST_008_bookkeeper_attachment_carries_transaction_id', () => {
+test('WHAT[session-ontology-012] HOST_008_bookkeeper_attachment_carries_transaction_id', () => {
   assert.deepEqual(assoc.bookkeeperAttachment('tx-42'), { name: 'Bookkeeper', transactionId: 'tx-42' })
 })
 }
@@ -44,16 +44,16 @@ const rootSelection = (agent) => {
 const syncDelegateRoles = ['Inspector', 'Coder']
 assert.deepEqual(syncDelegateRoles, ['Inspector', 'Coder'])
 
-test('WHAT[SESSION-ONTOLOGY-012] HOST_008_root_and_attached_helpers_are_explicit', () => {
+test('WHAT[session-ontology-012] HOST_008_root_and_attached_helpers_are_explicit', () => {
   assert.deepEqual(assoc.ownershipRoot, {
     kind: 'Root', owner: null, attachment: null, transactionId: null,
   })
   assert.equal(assoc.ownershipAttached('ses_owner', 'SyncInspector').owner, 'ses_owner')
 })
-test('WHAT[SESSION-ONTOLOGY-012] HOST_008_bookkeeper_carries_transaction_id', () => {
+test('WHAT[session-ontology-012] HOST_008_bookkeeper_carries_transaction_id', () => {
   assert.deepEqual(assoc.bookkeeperAttachment('tx-42'), { name: 'Bookkeeper', transactionId: 'tx-42' })
 })
-test('WHAT[SESSION-ONTOLOGY-012] Bookkeeper is private identity, not a Foundation role', () => {
+test('WHAT[session-ontology-012] Bookkeeper is private identity, not a Foundation role', () => {
   assert.equal(persona.isManagedName('bookkeeper'), true)
   assert.equal(roles.allRoleLabels.includes('bookkeeper'), false)
   assert.equal(persona.nameOf('deep', 'bookkeeper'), '')

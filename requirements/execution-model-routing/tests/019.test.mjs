@@ -4,7 +4,7 @@ import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 
 const templateUrl = new URL('../../../resources/wanxiangshu.mjs', import.meta.url)
 
-test('WHAT[EMR-019] fixed DevOps model binding is immutable and cannot be changed via resume', async () => {
+test('WHAT[execution-model-routing-019] fixed DevOps model binding is immutable and cannot be changed via resume', async () => {
   const { default: route } = await import(`${templateUrl.href}?test=${Date.now()}`)
   const boundDevopsTarget = { model: 'provider/fixed-devops', reasoning: 'high' }
 

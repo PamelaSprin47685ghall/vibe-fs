@@ -13,7 +13,7 @@ const evidence = (suffix) => ({
   identitySeed: { participantIdentity: { selectedAgent: 'engineer' } },
 })
 
-test('WHAT[HOST-BOUNDARY-022] fatal diagnostic follows exact settlement', async () => {
+test('WHAT[host-boundary-022] fatal diagnostic follows exact settlement', async () => {
   const settled = await transaction.preProviderSettlementScenario(
     evidence('fatal-order'),
     'FatalMembraneInput',
@@ -43,7 +43,7 @@ test('WHAT[HOST-BOUNDARY-022] fatal diagnostic follows exact settlement', async 
   assert.deepEqual(settled.admission, { activeCapacity: 0, providerBinding: 0 })
 })
 
-test('WHAT[HOST-BOUNDARY-022] fatal-before-exact-settlement mutation is rejected', async () => {
+test('WHAT[host-boundary-022] fatal-before-exact-settlement mutation is rejected', async () => {
   const incomplete = await transaction.preProviderSettlementScenario(
     evidence('fatal-mutation'),
     'FatalMembraneInput',
@@ -57,14 +57,14 @@ test('WHAT[HOST-BOUNDARY-022] fatal-before-exact-settlement mutation is rejected
   )
 })
 
-test('WHAT[HOST-BOUNDARY-022] expected protocol and legal nonfatal admission outcomes emit no fatal policy', () => {
+test('WHAT[host-boundary-022] expected protocol and legal nonfatal admission outcomes emit no fatal policy', () => {
   for (const failure of ['ProtocolRejection', 'Superseded', 'UserCancelled', 'CapacityQueueFull']) {
     const settlement = failure === 'ProtocolRejection' ? 'NoOwnedExecution' : 'ExactSettlementComplete'
     assert.equal(hooks.hookFailurePolicy(failure, settlement), 'RethrowUnchanged', failure)
   }
 })
 
-test('WHAT[HOST-BOUNDARY-022] persistence commitment preserves fence and acceptance uncertainty', () => {
+test('WHAT[host-boundary-022] persistence commitment preserves fence and acceptance uncertainty', () => {
   assert.equal(
     hooks.hookFailurePolicy('PersistenceNotCommitted', 'SettlementIncomplete'),
     'RethrowUnchanged',

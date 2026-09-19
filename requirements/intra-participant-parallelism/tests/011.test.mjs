@@ -42,7 +42,7 @@ const harness = ({ failCreateAt, failStartAt, failInterrupt = false, parent = 'o
   return { events, runtime }
 }
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-011] second admission while active is rejected as AlreadyFissioned until release', async () => {
+test('WHAT[intra-participant-parallelism-011] second admission while active is rejected as AlreadyFissioned until release', async () => {
   const live = harness()
   const owner = 'single-flight-owner'
   assert.equal((await fission.admit(live.runtime, owner, parsed())).ok, true)

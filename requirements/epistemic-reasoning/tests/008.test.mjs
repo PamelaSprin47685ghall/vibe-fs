@@ -4,7 +4,7 @@ import { createStore, start, resume, state, assessWhy } from './support.mjs'
 
 
 
-test('WHAT[EPI-008] gateway_gain_can_make_low_immediate_gain_question_worth_asking', () => {
+test('WHAT[epistemic-reasoning-008] gateway_gain_can_make_low_immediate_gain_question_worth_asking', () => {
   const store = createStore()
   const started = start(store, '复杂问题为什么发生？')
   assessWhy(store, started.handle)
@@ -28,7 +28,7 @@ test('WHAT[EPI-008] gateway_gain_can_make_low_immediate_gain_question_worth_aski
   assert.equal(result.request.action.semanticKey, 'question:gateway')
 })
 
-test('WHAT[EPI-008] bare_candidate_without_explicit_gains_is_evaluated_by_kernel_and_investigated', () => {
+test('WHAT[epistemic-reasoning-008] bare_candidate_without_explicit_gains_is_evaluated_by_kernel_and_investigated', () => {
   const store = createStore()
   const started = start(store, '复杂系统为什么会崩溃？')
   assessWhy(store, started.handle)

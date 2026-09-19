@@ -1,8 +1,8 @@
 /**
  * gate-schema-cases.mjs — a scenario that half-loads is worse than one that fails.
  *
- * VERIFY-003. Every check here runs at load time with no Host and no build artifacts,
- * which is what puts it in VERIFY-001 layer 0 alongside `ssot-lint` and `shock-audit`.
+ * verification-system-003. Every check here runs at load time with no Host and no build artifacts,
+ * which is what puts it in verification-system-001 layer 0 alongside `ssot-lint` and `shock-audit`.
  *
  * The dead-edge check is the one that requires the static whole: a step no flow can
  * reach is a step the author believes is covered. It was unavailable while scenarios
@@ -91,7 +91,7 @@ export const schemaCases = [
   // ── compilation: source is a conversation, output is a lookup table ────────
 
   {
-    name: 'VERIFY-003 a step position compiles to the runtime step integer',
+    name: 'verification-system-003 a step position compiles to the runtime step integer',
     fn: () => {
       // §9's two layers. The author never writes a step number; the position within
       // the turn IS the number, which is what K2's `stepOf` counts off the request.
@@ -105,7 +105,7 @@ export const schemaCases = [
   },
 
   {
-    name: 'VERIFY-003 an explicit runtimeStep compiles a sparse measured cursor',
+    name: 'verification-system-003 an explicit runtimeStep compiles a sparse measured cursor',
     fn: () => {
       const scenario = accepts(`scenario = "p"
 flow = [ { prompt = { text = "go" } } ]
@@ -130,7 +130,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 runtimeStep rejects malformed and duplicate cursors',
+    name: 'verification-system-003 runtimeStep rejects malformed and duplicate cursors',
     fn: () => {
       rejects(minimal('\n  [[turn.step]]\n  runtimeStep = -1\n  respond = { type = "text", text = "bad" }\n'), 'runtimeStep must be a non-negative integer');
       rejects(minimal('\n  [[turn.step]]\n  runtimeStep = 0\n  respond = { type = "text", text = "duplicate" }\n'), 'runtimeStep 0 duplicates');
@@ -138,7 +138,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 a fault names a step and compiles to the integer key',
+    name: 'verification-system-003 a fault names a step and compiles to the integer key',
     fn: () => {
       // The deviation from §10 worth pinning: the document writes `step = "fork-agent"`
       // (a name), K2 made the runtime step an integer. The compiler resolves one into
@@ -158,7 +158,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 a cold boundary compiles the same way',
+    name: 'verification-system-003 a cold boundary compiles the same way',
     fn: () => {
       const scenario = accepts(HEALTHY);
 
@@ -169,7 +169,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 a child turn is reached through a tool call argument',
+    name: 'verification-system-003 a child turn is reached through a tool call argument',
     fn: () => {
       // `fork(agent, prompt)` is how the session that receives a child turn comes to
       // exist, so the prompt argument is a real edge in the reachability graph. Without
@@ -185,7 +185,7 @@ user = "go"
   // ── the TOML root-key trap ───────────────────────────────────────────────
 
   {
-    name: 'VERIFY-003 a root key after a table header is rejected',
+    name: 'verification-system-003 a root key after a table header is rejected',
     fn: () => {
       // Measured in §10: `flow = [...]` after `[[epoch]]` parses as `epoch[0].flow`
       // with no error. The parsed object cannot reveal this — it is indistinguishable
@@ -207,7 +207,7 @@ flow = []
   },
 
   {
-    name: 'VERIFY-003 every root key is guarded, and the line is reported',
+    name: 'verification-system-003 every root key is guarded, and the line is reported',
     fn: () => {
       for (const key of ['scenario', 'description', 'must', 'flow']) {
         const problems = rootKeyOrderProblems(`[[turn]]\nid = "a"\n${key} = "x"\n`);
@@ -218,7 +218,7 @@ flow = []
   },
 
   {
-    name: 'VERIFY-003 a key inside a table is not mistaken for a root key',
+    name: 'verification-system-003 a key inside a table is not mistaken for a root key',
     fn: () => {
       // `id`, `user`, `tools`, `respond` legitimately live under a header. Flagging
       // them would make the check unusable, so only the four root keys are guarded.
@@ -227,7 +227,7 @@ flow = []
   },
 
   {
-    name: 'VERIFY-003 commented-out root keys are ignored',
+    name: 'verification-system-003 commented-out root keys are ignored',
     fn: () => {
       // §10 makes comments load-bearing for clause references, so a commented example
       // must not fail the file.
@@ -238,7 +238,7 @@ flow = []
   // ── one point, one declaration ───────────────────────────────────────────
 
   {
-    name: 'VERIFY-003 two declarations for one key with different responses are rejected',
+    name: 'verification-system-003 two declarations for one key with different responses are rejected',
     fn: () => {
       rejects(
         `scenario = "p"
@@ -264,7 +264,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 two declarations for one key with the SAME response are also rejected',
+    name: 'verification-system-003 two declarations for one key with the SAME response are also rejected',
     fn: () => {
       // The documented deviation. §10 collapses identical templates, which was a
       // mitigation for predicate-conjunction matching where template reuse produced
@@ -294,7 +294,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 the same turn text at different steps is legitimate',
+    name: 'verification-system-003 the same turn text at different steps is legitimate',
     fn: () => {
       // A multi-step turn is the normal shape. If this were an ambiguity the old
       // matcher's `messageCount` predicate would still be needed.
@@ -318,7 +318,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 the same turn text in different lanes is legitimate',
+    name: 'verification-system-003 the same turn text in different lanes is legitimate',
     fn: () => {
       accepts(`scenario = "p"
 flow = [ { prompt = { text = "go" } } ]
@@ -345,7 +345,7 @@ user = "go"
   // ── dangling references ──────────────────────────────────────────────────
 
   {
-    name: 'VERIFY-003 a fault referencing an undeclared turn is rejected',
+    name: 'verification-system-003 a fault referencing an undeclared turn is rejected',
     fn: () => {
       rejects(
         minimal('\n[[fault]]\nturn = "nope"\nstep = 0\nattempts = [1]\ndelivery = "provider-error"\n'),
@@ -355,7 +355,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 a fault referencing an undeclared step is rejected',
+    name: 'verification-system-003 a fault referencing an undeclared step is rejected',
     fn: () => {
       // The narrower dangling case: the turn exists, the step does not. Silently
       // accepting it would make the fault inert — a step the author believes is
@@ -368,7 +368,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 a cold boundary referencing an undeclared step is rejected',
+    name: 'verification-system-003 a cold boundary referencing an undeclared step is rejected',
     fn: () => {
       rejects(minimal('\n[[epoch]]\nturn = "nope"\nstep = 0\nreason = "epoch-switch"\n'), "references turn 'nope'");
       rejects(minimal('\n[[epoch]]\nturn = "a"\nstep = 3\nreason = "epoch-switch"\n'), "references step '3'");
@@ -376,7 +376,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 must referencing an undeclared step is rejected',
+    name: 'verification-system-003 must referencing an undeclared step is rejected',
     fn: () => {
       rejects(
         `scenario = "p"
@@ -396,7 +396,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 a flow wait referencing an undeclared step is rejected',
+    name: 'verification-system-003 a flow wait referencing an undeclared step is rejected',
     fn: () => {
       // Not in §12's list, added here: a `wait` on a step that cannot arrive hangs the
       // scenario until the watchdog fires, and the diagnostic then points at a timeout
@@ -418,7 +418,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 waitAny accepts two exact declared alternatives',
+    name: 'verification-system-003 waitAny accepts two exact declared alternatives',
     fn: () => {
       accepts(`scenario = "p"
 flow = [ { prompt = { text = "go" } }, { waitAny = ["a.0", "a.1"] } ]
@@ -437,7 +437,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 waitAny rejects malformed and dangling alternatives',
+    name: 'verification-system-003 waitAny rejects malformed and dangling alternatives',
     fn: () => {
       rejects(minimal().replace('flow = [ { prompt = { text = "go" } } ]', 'flow = [ { prompt = { text = "go" } }, { waitAny = "a.0" } ]'), 'waitAny must be an array');
       rejects(minimal().replace('flow = [ { prompt = { text = "go" } } ]', 'flow = [ { prompt = { text = "go" } }, { waitAny = ["a.0"] } ]'), 'waitAny requires at least two');
@@ -447,7 +447,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 must and wait may name a turn or a step',
+    name: 'verification-system-003 must and wait may name a turn or a step',
     fn: () => {
       // Both granularities are useful: a turn id for "this exchange happened", a step
       // id for "this particular provider step happened".
@@ -467,7 +467,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 turn and step ids cannot share one wait signal',
+    name: 'verification-system-003 turn and step ids cannot share one wait signal',
     fn: () => {
       rejects(
         `scenario = "p"
@@ -501,7 +501,7 @@ user = "activate"
   // ── dead edges: the check only a static whole allows ─────────────────────
 
   {
-    name: 'VERIFY-003 a turn no flow can reach is rejected',
+    name: 'verification-system-003 a turn no flow can reach is rejected',
     fn: () => {
       rejects(
         `scenario = "p"
@@ -527,7 +527,7 @@ user = "nobody ever sends this"
   },
 
   {
-    name: 'VERIFY-003 a production-composed lane opts out with internal',
+    name: 'verification-system-003 a production-composed lane opts out with internal',
     fn: () => {
       // The Blogger and the Executor map child cannot be reached by any scenario text:
       // production composes their prompts itself
@@ -556,7 +556,7 @@ user = "You are the blogger of a coding agent session."
   },
 
   {
-    name: 'VERIFY-003 internal must be true when present',
+    name: 'verification-system-003 internal must be true when present',
     fn: () => {
       // `internal = false` would read as "checked and reachable", which is the opposite
       // of what the field means. Omitting it is the way to say that.
@@ -578,7 +578,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 a race step opts out of unanswered with optional',
+    name: 'verification-system-003 a race step opts out of unanswered with optional',
     fn: () => {
       // A race path (restart window, crash timing) may or may not be reached on a
       // given run. Declaring the step lets a request be answered when it fires;
@@ -601,7 +601,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 optional must be true when present',
+    name: 'verification-system-003 optional must be true when present',
     fn: () => {
       // `optional = false` would read as "checked and required", which is the opposite
       // of what the field means. Omitting it is the way to say that.
@@ -623,7 +623,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 a required step may not follow an optional race tail',
+    name: 'verification-system-003 a required step may not follow an optional race tail',
     fn: () => {
       // The race tail is terminal for the turn's requirement surface: a required
       // step after it would only be reachable when the race fired, silently
@@ -649,7 +649,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 a must requirement may not name an optional step',
+    name: 'verification-system-003 a must requirement may not name an optional step',
     fn: () => {
       // `must` means "this MUST be reached"; `optional` means absence is fine.
       // Naming one in the other is contradictory.
@@ -675,7 +675,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 parentSession is retired, not a reachability input',
+    name: 'verification-system-003 parentSession is retired, not a reachability input',
     fn: () => {
       // Measured dead twice over. Its only source was a retired legacy parent-session
       // header (`x-parent-session-id` under harness bookkeeping the provider never
@@ -700,7 +700,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 a title turn is reachable through the turn it titles',
+    name: 'verification-system-003 a title turn is reachable through the turn it titles',
     fn: () => {
       // No special case needed: a title request carries the conversation being titled,
       // so its declared text prefix-matches the real turn's. Special-casing `kind` here
@@ -729,7 +729,7 @@ user = "Ship the parser fix"
   },
 
   {
-    name: 'VERIFY-003 reachability is prefix-based in both directions',
+    name: 'verification-system-003 reachability is prefix-based in both directions',
     fn: () => {
       // A flow prompt may be longer than the declared fragment (the scenario declares
       // a distinctive prefix) or shorter (the flow sends a short instruction and the
@@ -751,7 +751,7 @@ user = "Ship the parser fix"
   // ── structural requirements ──────────────────────────────────────────────
 
   {
-    name: 'VERIFY-003 a malformed fault is rejected by the real compiler, not only the unit',
+    name: 'verification-system-003 a malformed fault is rejected by the real compiler, not only the unit',
     fn: () => {
       // `validateFault` had eight callers in this gate and none in the compiler, so a
       // real scenario could declare `attempts = []` — a fault that never fires — and
@@ -773,9 +773,9 @@ attempts = []
   },
 
   {
-    name: 'VERIFY-003 a provider-error must declare status and retryable',
+    name: 'verification-system-003 a provider-error must declare status and retryable',
     fn: () => {
-      // PAR-019. `retryable` decides WHO drives the retry: a retryable 500 means
+      // provider-attempt-recovery-019. `retryable` decides WHO drives the retry: a retryable 500 means
       // the Host does it and no continuation is ever sent; a non-retryable 400 means the
       // Host gives up and the plugin must carry the Logical Run forward. Both run
       // silently, proving different clauses — so neither may be defaulted.
@@ -816,7 +816,7 @@ attempts = [1]
   },
 
   {
-    name: 'VERIFY-003 two faults on one key are rejected at load, not at delivery',
+    name: 'verification-system-003 two faults on one key are rejected at load, not at delivery',
     fn: () => {
       // `faultFor` throws on this, which means the author finds out mid-run — after the
       // Host is up, in whichever scenario happened to reach that step first. The whole
@@ -835,7 +835,7 @@ attempts = [2]
   },
 
   {
-    name: 'VERIFY-003 assertModelTrajectory must name a declared lane and an exact sequence',
+    name: 'verification-system-003 assertModelTrajectory must name a declared lane and an exact sequence',
     fn: () => {
       // The effective model is a CONCLUSION of the run (PROMPT-008 makes
       // `AttemptExecutionProfile` its only source), so a scenario asserts it and never
@@ -866,7 +866,7 @@ user = "Ship the parser fix."
   },
 
   {
-    name: 'VERIFY-003 bindChild identifies the next child by exact Host agent only',
+    name: 'verification-system-003 bindChild identifies the next child by exact Host agent only',
     fn: () => {
       const binding = (value) => `scenario = "p"
 flow = [
@@ -892,7 +892,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 afterExpectation attempts is a one-based physical delivery count',
+    name: 'verification-system-003 afterExpectation attempts is a one-based physical delivery count',
     fn: () => {
       const withAttempts = (attempts) => minimal().replace(
         'flow = [ { prompt = { text = "go" } } ]',
@@ -908,7 +908,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 assertDeliveries is a load-time bounded delivery claim',
+    name: 'verification-system-003 assertDeliveries is a load-time bounded delivery claim',
     fn: () => {
       const withAssertion = (claim) => minimal().replace(
         'flow = [ { prompt = { text = "go" } } ]',
@@ -929,7 +929,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 waitFact renewOn is a unique non-empty fact list distinct from the target',
+    name: 'verification-system-003 waitFact renewOn is a unique non-empty fact list distinct from the target',
     fn: () => {
       const withWaitFact = (claim) => minimal().replace(
         'flow = [ { prompt = { text = "go" } } ]',
@@ -949,7 +949,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 a scenario needs a name, and a turn needs user text and a step',
+    name: 'verification-system-003 a scenario needs a name, and a turn needs user text and a step',
     fn: () => {
       rejects('[[turn]]\nid = "a"\nuser = "go"\n\n  [[turn.step]]\n  respond = { type = "text" }\n', 'scenario name');
       rejects('scenario = "p"\nflow = []\n\n[[turn]]\nid = "a"\n\n  [[turn.step]]\n  respond = {}\n', 'needs user text');
@@ -959,7 +959,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 a scenario with no turns is rejected',
+    name: 'verification-system-003 a scenario with no turns is rejected',
     fn: () => {
       // The shape `loadScripts` needed. `host-restart-after.json` was
       // `{ "scenario": "host-restart" }` plus three edges: a fragment that named a
@@ -971,7 +971,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 malformed TOML is reported as a parse failure, not a schema problem',
+    name: 'verification-system-003 malformed TOML is reported as a parse failure, not a schema problem',
     fn: () => {
       // The two are different author actions: fix the syntax, versus fix the meaning.
       rejects('scenario = "p"\n[[turn\nid = "a"\n', 'TOML parse failed');
@@ -979,7 +979,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 malformed top-level collections fail closed with prefixed schema diagnostics',
+    name: 'verification-system-003 malformed top-level collections fail closed with prefixed schema diagnostics',
     fn: () => {
       // TOML accepts a root table or scalar where the scenario grammar requires an
       // array. Reject before the compiler reaches flatMap, forEach, or map so every
@@ -1000,7 +1000,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 setup event ceilings are positive theoretical exact trigger counts',
+    name: 'verification-system-003 setup event ceilings are positive theoretical exact trigger counts',
     fn: () => {
       const withSetup = (setup) => `scenario = "p"
 setup = ${setup}
@@ -1024,7 +1024,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 a rejected scenario yields no partial result',
+    name: 'verification-system-003 a rejected scenario yields no partial result',
     fn: () => {
       // A scenario that half-loads is a scenario whose author believes something is
       // covered that is not — the same failure mode as a dangling fault, one level up.
@@ -1036,7 +1036,7 @@ user = "go"
   },
 
   {
-    name: 'VERIFY-003 every problem is prefixed with the file it came from',
+    name: 'verification-system-003 every problem is prefixed with the file it came from',
     fn: () => {
       // Nineteen scenarios load at once; a bare message would not say which file.
       const result = compile('scenario = "p"\nflow = []\n\n[[turn]]\nid = "a"\n\n  [[turn.step]]\n  respond = {}\n');

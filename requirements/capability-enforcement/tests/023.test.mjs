@@ -140,7 +140,7 @@ const ROLE_ALLOW = {
   Blogger: ['chronicle'],
 }
 
-test('WHAT[ENF-023] devops_host_schema_contains_direct_mutation_tools', () => {
+test('WHAT[capability-enforcement-023] devops_host_schema_contains_direct_mutation_tools', () => {
   const config = buildConfig()
   assert.equal(configureManagedAgents(config).ok, true)
   for (const tool of ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'run']) {

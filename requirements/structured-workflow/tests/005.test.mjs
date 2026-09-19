@@ -33,7 +33,7 @@ const FORBIDDEN_WORKFLOW_STATE_TERMS = [
   /\b(workflow_?stage|business_?phase|execution_?slot|workflow_?state)\b/i,
 ]
 
-test('WHAT[STRUCTURED-WORKFLOW-005] SW_005_mutable_storage_discipline_and_no_workflow_state', () => {
+test('WHAT[structured-workflow-005] SW_005_mutable_storage_discipline_and_no_workflow_state', () => {
   const prodFiles = collectFsFiles(join(ROOT, 'src/Wanxiangshu'))
   assert.ok(prodFiles.length > 50, 'Must scan production F# codebase')
 

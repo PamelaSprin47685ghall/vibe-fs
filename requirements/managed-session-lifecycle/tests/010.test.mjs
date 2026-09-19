@@ -4,7 +4,7 @@ import * as HandleSurface from '../../../dist/Execution/Delegation/Handle/Surfac
 
 
 
-test('WHAT[MANAGED-SESSION-010] EXEC_014_host_owned_hidden_child_is_parent_invisible', () => {
+test('WHAT[managed-session-lifecycle-010] EXEC_014_host_owned_hidden_child_is_parent_invisible', () => {
   const linked = HandleSurface.apply(HandleSurface.empty(), {
     op: 'link',
     handle: 'agent:executor',

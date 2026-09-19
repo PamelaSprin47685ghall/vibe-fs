@@ -31,7 +31,7 @@ const fixture = () => {
   return projection
 }
 
-test('WHAT[SEMANTIC-TRACE-004] stable Host message identity resolves at a durable cursor', () => {
+test('WHAT[semantic-trace-004] stable Host message identity resolves at a durable cursor', () => {
   const projection = fixture()
   assert.equal(trace.tryHostMessageIdAt(trace.cursor(2), projection), 'message-a')
   assert.deepEqual(trace.partsForHostMessageIds(['message-b'], projection).map((part) => part.cursor.sequence), [3])
@@ -60,14 +60,14 @@ const append = (projection, sequence, generation, run, turn = 0) => unwrap(trace
   providerRun: run,
 }))
 
-test('WHAT[SEMANTIC-TRACE-004] provider runs segment the ordered semantic projection', () => {
+test('WHAT[semantic-trace-004] provider runs segment the ordered semantic projection', () => {
   let projection = trace.emptyProjection()
   projection = append(projection, 1, 0, 'run-a')
   projection = append(projection, 2, 0, 'run-b', 1)
   assert.deepEqual(trace.providerRunParts('run-a', projection).map((part) => part.cursor.sequence), [1])
   assert.deepEqual(trace.providerRunParts('run-b', projection).map((part) => part.cursor.sequence), [2])
 })
-test('WHAT[SEMANTIC-TRACE-004] a new provenance generation changes only the current-generation query', () => {
+test('WHAT[semantic-trace-004] a new provenance generation changes only the current-generation query', () => {
   let projection = trace.emptyProjection()
   projection = append(projection, 1, 0, 'run-before')
   projection = append(projection, 2, 1, 'run-after')

@@ -2,7 +2,7 @@ namespace Wanxiangshu.Sphinx
 
 open Wanxiangshu.Persistence.EventStore
 
-/// WHAT[EPI-019]: durable codec for generic sphinx_inquiry_* inquiries.
+/// WHAT[epistemic-reasoning-019]: durable codec for generic sphinx_inquiry_* inquiries.
 /// Accepted generic transitions become canonical envelopes on one stream per
 /// iq_ id; boot materializes the rule-derived Current into a fresh Registry.
 module GenericDurability =

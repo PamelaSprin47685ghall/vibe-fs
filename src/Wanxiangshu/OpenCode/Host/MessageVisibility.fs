@@ -6,7 +6,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
-/// HOST-BOUNDARY-008 event-driven projection catch-up. The Host can publish the
+/// host-boundary-008 event-driven projection catch-up. The Host can publish the
 /// assistant message before its public session projection is readable; a
 /// `message.updated` signal is the causal hint that a re-read can now observe
 /// it. Waiters are per-session one-shot completions with an ITimerPort deadline

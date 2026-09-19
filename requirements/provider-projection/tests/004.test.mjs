@@ -22,7 +22,7 @@ const before = (index) => ({ kind: 'BeforeMessageIndex', index })
 
 const append = { kind: 'Append' }
 
-test('WHAT[PROVIDER-PROJECTION-004] base replacement preserves every Host metadata channel', () => {
+test('WHAT[provider-projection-004] base replacement preserves every Host metadata channel', () => {
   const rendered = Projection.renderMessagesWithHostIds(
     snapshot(),
     [message('user', 'ignored')],
@@ -38,7 +38,7 @@ test('WHAT[PROVIDER-PROJECTION-004] base replacement preserves every Host metada
   assert.deepEqual(rendered.hostIsPhysical, [true, false, false])
 })
 
-test('WHAT[PROVIDER-PROJECTION-004] BeforeMessageIndex and Append materialize aligned rows', () => {
+test('WHAT[provider-projection-004] BeforeMessageIndex and Append materialize aligned rows', () => {
   const original = [message('user', 'first'), message('user', 'second')]
   const intents = [
     insert('before', before(1), [row('assistant', 'middle', 'middle-id')]),
@@ -53,7 +53,7 @@ test('WHAT[PROVIDER-PROJECTION-004] BeforeMessageIndex and Append materialize al
   assert.deepEqual(Projection.renderMessages(snapshot(original), original, intents), rendered.messages)
 })
 
-test('WHAT[PROVIDER-PROJECTION-004] canonical wire rendering freezes the generic row shape', () => {
+test('WHAT[provider-projection-004] canonical wire rendering freezes the generic row shape', () => {
   const rendered = Projection.renderMessages(
     snapshot(),
     [],
@@ -66,7 +66,7 @@ test('WHAT[PROVIDER-PROJECTION-004] canonical wire rendering freezes the generic
   )
 })
 
-test('WHAT[PROVIDER-PROJECTION-004] cutoff digest hashes only the truncated current projection', () => {
+test('WHAT[provider-projection-004] cutoff digest hashes only the truncated current projection', () => {
   const current = snapshot([
     message('user', 'first'),
     message('assistant', 'second'),

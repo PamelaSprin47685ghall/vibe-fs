@@ -29,7 +29,7 @@ const materialize = (
 
 const OPENING_END = { Sequence: 1 }
 
-test('WHAT[WORK-RECORD-015] LWR_work_record_start_is_structural_floor_not_stage', () => {
+test('WHAT[work-record-015] LWR_work_record_start_is_structural_floor_not_stage', () => {
   // TODO-001 / GLORY-006：WorkRecordStart = OpeningBoundary = Opening exclusive end，
   // 由 XTrace Opening cursor 纯推导（结构性 floor），不是 Stage fact，不读 WorkActivated。
   // opening cursor 0 → floor 1（exclusive）。

@@ -10,7 +10,7 @@ const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
 const SMALL_FIX = /普通小型修复[、,].{0,40}不要求创建 Change/
 
-test('WHAT[REQUIREMENT-SYSTEM-015] AGENTS.md keeps the small-fix exemption', () => {
+test('WHAT[requirement-system-015] AGENTS.md keeps the small-fix exemption', () => {
   const agents = read('AGENTS.md')
   assert.match(agents, SMALL_FIX)
   const dropped = agents.replace(SMALL_FIX, '')

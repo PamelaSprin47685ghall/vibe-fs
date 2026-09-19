@@ -22,7 +22,7 @@ const syncModel = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/
 
 const forkTool = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs'), 'utf8')
 
-test('WHAT[DELEG-007] sync_delegate_edges_are_the_allowed_dag_only', () => {
+test('WHAT[delegation-007] sync_delegate_edges_are_the_allowed_dag_only', () => {
   const adjacency = new Map([
     ['Sphinx', ['Engineer']], ['Engineer', []],
   ])

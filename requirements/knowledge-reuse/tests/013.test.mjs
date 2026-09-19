@@ -23,7 +23,7 @@ const unwrap = async (operation) => {
   return result
 }
 
-test('WHAT[KNOWLEDGE-REUSE-013] cut_boundary_legal_commands_always_fold_per_fact_constructor', async () => {
+test('WHAT[knowledge-reuse-013] cut_boundary_legal_commands_always_fold_per_fact_constructor', async () => {
   const common = makeDir('wxs-casebook-cut-events-')
   const local = openStore(common)
   try {
@@ -47,7 +47,7 @@ test('WHAT[KNOWLEDGE-REUSE-013] cut_boundary_legal_commands_always_fold_per_fact
     rmSync(common, { recursive: true, force: true })
   }
 })
-test('WHAT[KNOWLEDGE-REUSE-013] cut_boundary_interrupted_archive_never_leads_the_receipt', async () => {
+test('WHAT[knowledge-reuse-013] cut_boundary_interrupted_archive_never_leads_the_receipt', async () => {
   const common = makeDir('wxs-casebook-cut-interrupt-')
   const local = openStore(common)
   try {
@@ -69,7 +69,7 @@ test('WHAT[KNOWLEDGE-REUSE-013] cut_boundary_interrupted_archive_never_leads_the
     rmSync(common, { recursive: true, force: true })
   }
 })
-test('WHAT[KNOWLEDGE-REUSE-013] cut_boundary_complete_observation_set_survives_refresh', async () => {
+test('WHAT[knowledge-reuse-013] cut_boundary_complete_observation_set_survives_refresh', async () => {
   const common = makeDir('wxs-casebook-cut-cross-')
   const local = openStore(common)
   try {
@@ -95,7 +95,7 @@ test('WHAT[KNOWLEDGE-REUSE-013] cut_boundary_complete_observation_set_survives_r
     rmSync(common, { recursive: true, force: true })
   }
 })
-test('WHAT[KNOWLEDGE-REUSE-013] production_store_has_no_optional_fatal_handler_path', async () => {
+test('WHAT[knowledge-reuse-013] production_store_has_no_optional_fatal_handler_path', async () => {
   const { readFileSync } = await import('node:fs')
   const source = readFileSync(
     new URL('../../../src/Wanxiangshu/Repository/Knowledge/Casebook/Store.fs', import.meta.url),
@@ -110,5 +110,5 @@ const { default: test } = await import("node:test");
 const { assertFatalBoundary } = await import("../../structured-workflow/tests/support/m6-boundary-proof.mjs");
 
 
-test('WHAT[KNOWLEDGE-REUSE-013] Casebook fatal follows durable cut settlement and one injected fuse', () => assertFatalBoundary('knowledge-reuse'))
+test('WHAT[knowledge-reuse-013] Casebook fatal follows durable cut settlement and one injected fuse', () => assertFatalBoundary('knowledge-reuse'))
 }

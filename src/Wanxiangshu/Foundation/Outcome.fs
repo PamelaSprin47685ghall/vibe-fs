@@ -68,7 +68,7 @@ module Outcome =
     type SessionError =
         | NoProgress of reason: string
         | SessionCancelled
-        /// PAR-005: the bounded automatic provider-recovery budget is spent.
+        /// provider-attempt-recovery-005: the bounded automatic provider-recovery budget is spent.
         | AutoRecoveryExhausted
         | ReviewExhausted
         /// A dispatched prompt whose physical acceptance could not be proven.

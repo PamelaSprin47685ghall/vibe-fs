@@ -96,7 +96,7 @@ const baseArgs = (dir) => {
   }
 }
 
-test('WHAT[STRUCTURED-WORKFLOW-012] compile-impact CLI compiles a focused production implementation change', { timeout: 120_000 }, () => {
+test('WHAT[structured-workflow-012] compile-impact CLI compiles a focused production implementation change', { timeout: 120_000 }, () => {
   const dir = copyFixture()
   try {
     const { flags, outputDir } = baseArgs(dir)
@@ -137,7 +137,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] compile-impact CLI compiles a focused produc
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-012] compile-impact CLI emits fresh output into a scratch output dir and never writes a success manifest', { timeout: 120_000 }, () => {
+test('WHAT[structured-workflow-012] compile-impact CLI emits fresh output into a scratch output dir and never writes a success manifest', { timeout: 120_000 }, () => {
   // Change of contract: compileIncremental plans and compiles — it NEVER commits to
   // an authoritative build manifest; the orchestrator (scripts/build.mjs) is the
   // only process that records "these bytes have been verified". A scratch run that
@@ -192,7 +192,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] compile-impact CLI emits fresh output into a
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-012] compile-impact CLI re-emits reverse consumers for inline body changes', { timeout: 120_000 }, () => {
+test('WHAT[structured-workflow-012] compile-impact CLI re-emits reverse consumers for inline body changes', { timeout: 120_000 }, () => {
   const dir = copyFixture()
   try {
     const { flags, outputDir } = baseArgs(dir)
@@ -254,7 +254,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] compile-impact CLI re-emits reverse consumer
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-012] deleting a source purges its stale JS from dist', { timeout: 120_000 }, () => {
+test('WHAT[structured-workflow-012] deleting a source purges its stale JS from dist', { timeout: 120_000 }, () => {
   const dir = copyFixture()
   try {
     const { flags, outputDir } = baseArgs(dir)
@@ -321,7 +321,7 @@ function compile(project) {
   })
 }
 
-test('WHAT[STRUCTURED-WORKFLOW-012] independent Fable checks enforce compile-shard input boundaries', async () => {
+test('WHAT[structured-workflow-012] independent Fable checks enforce compile-shard input boundaries', async () => {
   const [
     green,
     red,
@@ -377,7 +377,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] independent Fable checks enforce compile-sha
   assert.notEqual(signatureOnly.status, 0, 'Fable does not materialize a consumable module from a signature-only project')
   assert.match(`${signatureOnly.stdout}\n${signatureOnly.stderr}`, /SignedProvider|not defined/i)
 })
-test('WHAT[STRUCTURED-WORKFLOW-012] flat closure compilation compiles transitive closure green and keeps unreferenced sources red', async () => {
+test('WHAT[structured-workflow-012] flat closure compilation compiles transitive closure green and keeps unreferenced sources red', async () => {
   const emitterPath = join(FIXTURE, 'Emitter.fsproj')
   const scratchRoot = mkdtempSync(join(tmpdir(), 'wanxiangshu-owner-flat-compile-'))
   const rootPropsPath = join(ROOT, 'Directory.Build.props')

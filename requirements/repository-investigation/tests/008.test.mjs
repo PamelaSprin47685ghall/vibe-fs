@@ -51,7 +51,7 @@ const waitFor = async (predicate, message, ms = 1500) => {
   }
 }
 
-test('WHAT[REPOSITORY-INVESTIGATION-008] AGENT_032_nonconsumer_nonempty_keywords_fail_and_missing_workspace_skips', async () => {
+test('WHAT[repository-investigation-008] AGENT_032_nonconsumer_nonempty_keywords_fail_and_missing_workspace_skips', async () => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-warm-start-role-'))
   let calls = 0
   const searchFn = async () => {

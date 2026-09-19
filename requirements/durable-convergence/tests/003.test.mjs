@@ -21,7 +21,7 @@ const A = 'a'.repeat(40)
 const B = 'b'.repeat(40)
 const C = 'c'.repeat(40)
 
-test('WHAT[DURABLE-CONVERGENCE-003] identity collision is fail closed not LWW', () => {
+test('WHAT[durable-convergence-003] identity collision is fail closed not LWW', () => {
   const left = make(A, [], 'merge/main', { x: 1 })
   const right = make(A, [], 'merge/main', { x: 2 })
   const result = merge.merge([
@@ -47,7 +47,7 @@ const retention = await import("../../../dist/Persistence/EventStore/RetentionSu
 const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 const make = (id, stream, parents = []) => ({ id, stream, type: 'JobRequested', parents, payload: {}, payloadRefs: [] })
 
-test('WHAT[DURABLE-CONVERGENCE-003] sync blobifies each complete writer file once without segments or index', async () => {
+test('WHAT[durable-convergence-003] sync blobifies each complete writer file once without segments or index', async () => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-writer-blobify-'))
   const repoA = join(root, 'a')
   const repoB = join(root, 'b')
@@ -119,7 +119,7 @@ test('WHAT[DURABLE-CONVERGENCE-003] sync blobifies each complete writer file onc
     rmSync(root, { recursive: true, force: true })
   }
 })
-test('WHAT[DURABLE-CONVERGENCE-003] runtime append and external hook share one physical store gate', async () => {
+test('WHAT[durable-convergence-003] runtime append and external hook share one physical store gate', async () => {
   const log = await read('src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs')
   const store = await read('src/Wanxiangshu/Persistence/EventStore/Store.fs')
   const hook = await read('src/Wanxiangshu/Git/Hook/Sync.fs')
@@ -149,7 +149,7 @@ const invalidUtf8Line = (line) => {
   return bytes
 }
 
-test('WHAT[DURABLE-CONVERGENCE-003] remote writer bytes reject invalid UTF-8 before retained-union merge', async () => {
+test('WHAT[durable-convergence-003] remote writer bytes reject invalid UTF-8 before retained-union merge', async () => {
   const repo = mkdtempSync(join(tmpdir(), 'wxs-remote-invalid-utf8-'))
   git(repo, ['init', '-q'])
   const commonDir = join(repo, '.git')

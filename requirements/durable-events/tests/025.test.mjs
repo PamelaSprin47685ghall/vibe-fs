@@ -4,7 +4,7 @@ import test from 'node:test'
 import * as Strength from '../../../dist/Strength/Surface.js'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
 
-test('WHAT[DURABLE-EVENTS-025] persistence cut stores have no optional fatal hook and composition is sole fatal owner after cut settles', async () => {
+test('WHAT[durable-events-025] persistence cut stores have no optional fatal hook and composition is sole fatal owner after cut settles', async () => {
   // 1. Static boundary check: StrengthDurability and CasebookStore must not retain module-global fatalTripHandler
   const durabilitySource = readFileSync('src/Wanxiangshu/Strength/Persistence/Durability.fs', 'utf8')
   const casebookSource = readFileSync('src/Wanxiangshu/Repository/Knowledge/Casebook/Store.fs', 'utf8')

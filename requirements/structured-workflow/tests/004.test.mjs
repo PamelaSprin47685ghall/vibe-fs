@@ -7,7 +7,7 @@ const { TaskResultListSurface_traverseM } = await import("../../../dist/Foundati
 const outcomeSurface = await import("../../../dist/Foundation/OutcomeSurface.js");
 
 
-test('WHAT[STRUCTURED-WORKFLOW-004] Fable async Result plumbing provides sequential short-circuiting traversal', async () => {
+test('WHAT[structured-workflow-004] Fable async Result plumbing provides sequential short-circuiting traversal', async () => {
   const traversedOk = await TaskResultListSurface_traverseM((x) => Promise.resolve(x > 0), [1, 2, 3])
   assert.deepEqual(traversedOk, ['Ok', 1, 2, 3])
 
@@ -23,7 +23,7 @@ const { CONTROL_PYRAMID_GUIDE, evaluateBaseline, renderFailure, scanControlPyram
 
 const scan = (text) => scanControlPyramidEntries([{ file: 'Example.fs', text }])
 
-test('WHAT[STRUCTURED-WORKFLOW-004] CONTROL_PYRAMID_nested_match_is_RED_at_the_inner_decision', () => {
+test('WHAT[structured-workflow-004] CONTROL_PYRAMID_nested_match_is_RED_at_the_inner_decision', () => {
   const hits = scan(`
 module Example
 
@@ -42,7 +42,7 @@ let decode input =
   assert.equal(hits[0].line, 8)
   assert.deepEqual(hits[0].chain, ['match', 'match'])
 })
-test('WHAT[STRUCTURED-WORKFLOW-004] CONTROL_PYRAMID_mixed_match_if_try_is_aggressively_detected', () => {
+test('WHAT[structured-workflow-004] CONTROL_PYRAMID_mixed_match_if_try_is_aggressively_detected', () => {
   const hits = scan(`
 let run state =
     match state with
@@ -63,7 +63,7 @@ let run state =
     ],
   )
 })
-test('WHAT[STRUCTURED-WORKFLOW-004] CONTROL_PYRAMID_flat_sequential_decisions_are_GREEN', () => {
+test('WHAT[structured-workflow-004] CONTROL_PYRAMID_flat_sequential_decisions_are_GREEN', () => {
   const hits = scan(`
 let first =
     match a with
@@ -78,7 +78,7 @@ let second =
 
   assert.equal(hits.length, 0)
 })
-test('WHAT[STRUCTURED-WORKFLOW-004] CONTROL_PYRAMID_tuple_match_is_GREEN', () => {
+test('WHAT[structured-workflow-004] CONTROL_PYRAMID_tuple_match_is_GREEN', () => {
   const hits = scan(`
 let decide a b =
     match a, b with
@@ -89,7 +89,7 @@ let decide a b =
 
   assert.equal(hits.length, 0)
 })
-test('WHAT[STRUCTURED-WORKFLOW-004] CONTROL_PYRAMID_if_elif_chain_is_GREEN_because_it_is_one_decision_level', () => {
+test('WHAT[structured-workflow-004] CONTROL_PYRAMID_if_elif_chain_is_GREEN_because_it_is_one_decision_level', () => {
   const hits = scan(`
 let decide enabled accepted leased =
     if not enabled then
@@ -104,7 +104,7 @@ let decide enabled accepted leased =
 
   assert.equal(hits.length, 0)
 })
-test('WHAT[STRUCTURED-WORKFLOW-004] CONTROL_PYRAMID_comments_and_multiline_strings_do_not_create_fake_hits', () => {
+test('WHAT[structured-workflow-004] CONTROL_PYRAMID_comments_and_multiline_strings_do_not_create_fake_hits', () => {
   const hits = scan(`
 let sample = """
 match fake with
@@ -128,7 +128,7 @@ let real x =
 
   assert.equal(hits.length, 0)
 })
-test('WHAT[STRUCTURED-WORKFLOW-004] CONTROL_PYRAMID_ratchet_accepts_equal_or_lower_per_file_debt', () => {
+test('WHAT[structured-workflow-004] CONTROL_PYRAMID_ratchet_accepts_equal_or_lower_per_file_debt', () => {
   const baseline = {
     version: 1,
     files: { 'A.fs': 2, 'B.fs': 1 },
@@ -144,7 +144,7 @@ test('WHAT[STRUCTURED-WORKFLOW-004] CONTROL_PYRAMID_ratchet_accepts_equal_or_low
   assert.equal(result.currentTotal, 3)
   assert.equal(result.baselineTotal, 3)
 })
-test('WHAT[STRUCTURED-WORKFLOW-004] CONTROL_PYRAMID_ratchet_rejects_new_or_increased_file_debt', () => {
+test('WHAT[structured-workflow-004] CONTROL_PYRAMID_ratchet_rejects_new_or_increased_file_debt', () => {
   const baseline = {
     version: 1,
     files: { 'A.fs': 1 },
@@ -164,7 +164,7 @@ test('WHAT[STRUCTURED-WORKFLOW-004] CONTROL_PYRAMID_ratchet_rejects_new_or_incre
     ],
   )
 })
-test('WHAT[STRUCTURED-WORKFLOW-004] CONTROL_PYRAMID_many_hits_print_locations_but_the_long_tutorial_once', () => {
+test('WHAT[structured-workflow-004] CONTROL_PYRAMID_many_hits_print_locations_but_the_long_tutorial_once', () => {
   const output = renderFailure([
     {
       file: 'a.fs',
@@ -199,7 +199,7 @@ test('WHAT[STRUCTURED-WORKFLOW-004] CONTROL_PYRAMID_many_hits_print_locations_bu
   assert.match(output, /match → match!/)
   assert.match(output, /--explain/)
 })
-test('WHAT[STRUCTURED-WORKFLOW-004] CONTROL_PYRAMID_tutorial_prerequisites_are_repo_concrete_and_cannot_be_shrunk', () => {
+test('WHAT[structured-workflow-004] CONTROL_PYRAMID_tutorial_prerequisites_are_repo_concrete_and_cannot_be_shrunk', () => {
   assert.match(CONTROL_PYRAMID_GUIDE, /FsToolkit\.ErrorHandling/)
   assert.match(CONTROL_PYRAMID_GUIDE, /open FsToolkit\.ErrorHandling/)
   assert.match(CONTROL_PYRAMID_GUIDE, /open Wanxiangshu\.Foundation/)
@@ -246,7 +246,7 @@ const wake = {
 const name = (observation, signal = wake.retry()) =>
   reconcileSurface.decisionName(reconcileSurface.decideStep(signal, observation))
 
-test('WHAT[STRUCTURED-WORKFLOW-004] RECONCILE_PROGRAM_001: isTerminalOutcome classifies terminal vs provisional', () => {
+test('WHAT[structured-workflow-004] RECONCILE_PROGRAM_001: isTerminalOutcome classifies terminal vs provisional', () => {
   assert.equal(typeof reconcileSurface.isTerminalOutcome, 'function')
   assert.equal(typeof reconcileSurface.classifyTurn, 'function')
 
@@ -275,11 +275,11 @@ test('WHAT[STRUCTURED-WORKFLOW-004] RECONCILE_PROGRAM_001: isTerminalOutcome cla
   assert.equal(reconcileSurface.isPublishableOutcome('TurnUnknown'), false)
   assert.throws(() => reconcileSurface.isTerminalOutcome('TurnUnknown'), /TurnUnknown/)
 })
-test('WHAT[STRUCTURED-WORKFLOW-004] RECONCILE_PROGRAM_003: decideStep produces one decision per causal edge (HOST-BOUNDARY-005)', () => {
+test('WHAT[structured-workflow-004] RECONCILE_PROGRAM_003: decideStep produces one decision per causal edge (host-boundary-005)', () => {
   assert.equal(typeof reconcileSurface.decideStep, 'function')
   assert.equal(typeof reconcileSurface.decisionName, 'function')
 
-  // HOST-BOUNDARY-005: a later read needs a new coarse Host signal or exact
+  // host-boundary-005: a later read needs a new coarse Host signal or exact
   // projection-change edge. The decision API has no read-budget input.
   //
   // SnapshotError / NoTurn → StopPass (nothing to act on).
@@ -324,7 +324,7 @@ test('WHAT[STRUCTURED-WORKFLOW-004] RECONCILE_PROGRAM_003: decideStep produces o
 
   assert.deepEqual(reconcileSurface.decideStep(wake.retry(), evidence.unknown()), { name: 'StopPass' })
 })
-test('WHAT[STRUCTURED-WORKFLOW-004] RECONCILE_PROGRAM_004: publishDecision gates already-published terminal and provisional', () => {
+test('WHAT[structured-workflow-004] RECONCILE_PROGRAM_004: publishDecision gates already-published terminal and provisional', () => {
   assert.equal(typeof reconcileSurface.publishDecision, 'function')
   assert.equal(typeof reconcileSurface.consumeKey, 'function')
   assert.deepEqual(reconcileSurface.acceptedTurnFields(), ['session', 'physical', 'providerRun', 'outcome'])

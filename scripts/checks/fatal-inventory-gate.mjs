@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * fatal-inventory-gate.mjs — EXECFAIL-010 entry gate.
+ * fatal-inventory-gate.mjs — execution-failure-policy-010 entry gate.
  *
  * Compares the scanned production fatal-entry set against
  * requirements/execution-failure-policy/fatal-inventory.json (the entry index,

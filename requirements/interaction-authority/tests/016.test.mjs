@@ -48,7 +48,7 @@ const register = (root) => authority.registerAuthority(root, authority.empty)
 const continuation = (key, root, kind = 'ManagerGuard', payload = 'payload') =>
   authority.claimContinuation(key, 'ses_a', kind, root, payload)
 
-test('WHAT[INTERACTION-AUTHORITY-016] IA_016_agent_owner_root_has_no_run_before_physical_acceptance', () => {
+test('WHAT[interaction-authority-016] IA_016_agent_owner_root_has_no_run_before_physical_acceptance', () => {
   const owner = rootFor('manager')
   const inherited = authority.issueInheritedIdentitySeed('manager', owner)
   assert.equal(inherited.ok, true, inherited.error)
@@ -135,7 +135,7 @@ const profile = (value) => ({
 })
 const register = (root) => authority.registerAuthority(root, authority.empty)
 
-test('WHAT[INTERACTION-AUTHORITY-016] IA_016_accepted_root_claim_stays_out_of_continuation_map', () => {
+test('WHAT[interaction-authority-016] IA_016_accepted_root_claim_stays_out_of_continuation_map', () => {
   const claim = authority.claimAgentOwnerRoot(
     'pk_owner',
     'ses_a',

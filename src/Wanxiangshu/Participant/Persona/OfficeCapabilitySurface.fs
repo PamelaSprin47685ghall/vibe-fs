@@ -66,7 +66,7 @@ module OfficeCapabilitySurface =
         | Role.Inquiry -> "inquiry"
         | _ -> failwith "OfficeCapabilitySurface: catalog contains a non-forkable role"
 
-    /// OFF-007 / ARCH-017: the canonical manager fork office consequence set.
+    /// office-capability-007 / ARCH-017: the canonical manager fork office consequence set.
     let managerForkableOffices () : string array =
         ManagedAgentCatalog.managerForkableRoles |> List.map officeName |> List.toArray
 

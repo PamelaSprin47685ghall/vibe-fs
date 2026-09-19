@@ -88,7 +88,7 @@ type EventStoreBlobWriter private (store: IEventStore) =
     static member Create(store: IEventStore) : IBlobWriter =
         EventStoreBlobWriter(store) :> IBlobWriter
 
-/// Unified payload closure for one Journal fact (DURABLE-EVENTS-012): every
+/// Unified payload closure for one Journal fact (durable-events-012): every
 /// EventStore payload the fact references. This is the single mapping that makes
 /// `EventEnvelope.PayloadRefs` authoritative instead of always empty. Journal
 /// facts carry blob handles inline in the domain payload, so the closure is

@@ -24,17 +24,17 @@ const prediction = { P1: 0.9, P2: 0.8, evidenceCount: 100 }
 const values = { V0: 0, V1: 5, V2: 8 }
 const config = { K1Margin: 1, K2Margin: 2, K2MinimumEvidence: 20 }
 
-test('WHAT[SPEC-INV-004] STRENGTH_004_each_supported_replica_has_exact_readonly_capabilities', () => {
+test('WHAT[speculative-investigation-004] STRENGTH_004_each_supported_replica_has_exact_readonly_capabilities', () => {
   for (const role of ['Coder', 'Inspector', 'DevOps', 'Inquiry']) {
     assert.deepEqual(Strength.capabilities(role), exactReadonly)
   }
 })
-test('WHAT[SPEC-INV-004] STRENGTH_004_each_unsupported_replica_is_fail_closed', () => {
+test('WHAT[speculative-investigation-004] STRENGTH_004_each_unsupported_replica_is_fail_closed', () => {
   for (const role of ['Manager', 'Orchestrator', 'Browser', 'Reviewer', 'Distiller', 'Blogger']) {
     assert.deepEqual(Strength.capabilities(role), [])
   }
 })
-test('WHAT[SPEC-INV-004] STRENGTH_004_019_replica_never_clears_owner_failure_budget_or_carries_prefix_probe', () => {
+test('WHAT[speculative-investigation-004] STRENGTH_004_019_replica_never_clears_owner_failure_budget_or_carries_prefix_probe', () => {
   assert.equal(Strength.clearsFailureCountOnSuccess('strength-replica'), false)
   assert.equal(Strength.mayCarryProbe('strength-replica'), false)
   assert.equal(Strength.clearsFailureCountOnSuccess('work-main'), true)
@@ -75,7 +75,7 @@ const skipReason = (decision) => {
   return decision.reason
 }
 
-test('WHAT[SPEC-INV-004] STRENGTH_014_policy_strength_replica_is_internal_leaf_attached_not_satellite_kind', () => {
+test('WHAT[speculative-investigation-004] STRENGTH_014_policy_strength_replica_is_internal_leaf_attached_not_satellite_kind', () => {
   const facts = Strength.associationFacts('owner-work')
   assert.deepEqual(facts.satelliteCases, ['Companion'])
   assert.equal(facts.hasReplicaSatellite, false)
@@ -86,7 +86,7 @@ test('WHAT[SPEC-INV-004] STRENGTH_014_policy_strength_replica_is_internal_leaf_a
   assert.equal(facts.strengthReplicaAttachment, true)
   assert.equal(facts.companionAttachment, false)
 })
-test('WHAT[SPEC-INV-004] STRENGTH_004_007_policy_same_role_prompt_has_no_replica_identity', () => {
+test('WHAT[speculative-investigation-004] STRENGTH_004_007_policy_same_role_prompt_has_no_replica_identity', () => {
   const engId = Strength.systemPromptIdForRole('Engineer')
   assert.equal(engId, Strength.systemPromptIdForRole('Engineer'))
   const prompt = Strength.systemPromptForRole('Engineer')
@@ -117,7 +117,7 @@ const registered = (replica, budget) => {
 }
 const apply = async (runtime, output) => Strength.transformApply(H, runtime, output)
 
-test('WHAT[SPEC-INV-004] STRENGTH_004_non_replica_session_returns_not_replica', async () => {
+test('WHAT[speculative-investigation-004] STRENGTH_004_non_replica_session_returns_not_replica', async () => {
   const runtime = registered('replica-known', 'K1')
   const output = { messages: [user('u1', 'unknown-session', [hostText('Continue.')])] }
   const outcome = await apply(runtime, output)
@@ -183,7 +183,7 @@ const attach = (replica, budget, purpose = 'Treatment', owner = 'owner') => {
 const turn = (sessionId, outcome, providerRun = 'run-t') => ({ sessionId, providerRun, outcome, parts: [] })
 const oneBatch = (replica) => ({ messages: [user('u1', replica, [hostText('Continue.')]), assistant('a1', replica, [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')])] })
 
-test('WHAT[SPEC-INV-004] STRENGTH_014_runtime_is_owner_single_flight_and_decision_local', () => {
+test('WHAT[speculative-investigation-004] STRENGTH_014_runtime_is_owner_single_flight_and_decision_local', () => {
   const runtime = Strength.runtimeCreate()
   const first = binding('owner', 'replica-1', 'd1')
   const second = binding('owner', 'replica-2', 'd2')
@@ -196,7 +196,7 @@ test('WHAT[SPEC-INV-004] STRENGTH_014_runtime_is_owner_single_flight_and_decisio
   assert.equal(Strength.runtimeFindByReplica(runtime, 'replica-1'), null)
   assert.equal(Strength.runtimeRegister(runtime, second).ok, true)
 })
-test('WHAT[SPEC-INV-004] STRENGTH_004_runtime_rejects_unknown_role_and_budget', () => {
+test('WHAT[speculative-investigation-004] STRENGTH_004_runtime_rejects_unknown_role_and_budget', () => {
   const runtime = Strength.runtimeCreate()
   const unknownRole = Strength.runtimeRegister(runtime, binding('o1', 'r1', 'd1', 'Unknown', 'K1'))
   assert.equal(unknownRole.ok, false)
@@ -205,7 +205,7 @@ test('WHAT[SPEC-INV-004] STRENGTH_004_runtime_rejects_unknown_role_and_budget', 
   assert.equal(unknownBudget.ok, false)
   assert.match(unknownBudget.error, /unknown budget/)
 })
-test('WHAT[SPEC-INV-004] STRENGTH_004_runtime_rejects_K0_and_ineligible_replica_authority', () => {
+test('WHAT[speculative-investigation-004] STRENGTH_004_runtime_rejects_K0_and_ineligible_replica_authority', () => {
   const runtime = Strength.runtimeCreate()
   assert.equal(Strength.runtimeRegister(runtime, binding('o1', 'r1', 'd1', 'Coder', 'K0')).error, 'EmptyBudget')
   assert.equal(Strength.runtimeRegister(runtime, binding('o2', 'r2', 'd2', 'Manager', 'K1')).error, 'RoleIneligible')

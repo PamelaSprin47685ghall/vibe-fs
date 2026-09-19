@@ -28,7 +28,7 @@ module ServeEntry =
     [<Emit("process.exit(1)")>]
     let private exitFailure () : unit = jsNative
 
-    // WHAT[EPI-030]: SPHINX_COMMON_DIR selects the durable workspace. Missing
+    // WHAT[epistemic-reasoning-030]: SPHINX_COMMON_DIR selects the durable workspace. Missing
     // or blank keeps the legacy in-memory server with no store contact.
     let private sphinxCommonDirEnv = "SPHINX_COMMON_DIR"
 

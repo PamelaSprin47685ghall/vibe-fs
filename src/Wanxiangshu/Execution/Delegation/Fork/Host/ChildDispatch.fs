@@ -396,7 +396,7 @@ module HostForkChildDispatch =
             | None -> processOwned
             | Some handles -> processOwned |> List.filter (isProcessOwnedActiveHandle handles)
 
-        // MANAGED-SESSION-024 / Common Law: fixed road companion DevOps must never be abandoned or torn down on parent cancellation
+        // managed-session-lifecycle-024 / Common Law: fixed road companion DevOps must never be abandoned or torn down on parent cancellation
         let ownedToCancel =
             owned
             |> List.filter (fun (agentId, _) -> not (isFixedDevOpsHandle durableHandles agentId))

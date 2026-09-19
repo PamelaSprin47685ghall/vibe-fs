@@ -15,7 +15,7 @@ const tipNames = () =>
     .map((entry) => entry.name)
     .sort()
 
-test('WHAT[GD-010] AUDIENCE_004_corpus_distinctness_entrusted_to_review_without_runtime_similarity_gate', () => {
+test('WHAT[guidance-delivery-010] AUDIENCE_004_corpus_distinctness_entrusted_to_review_without_runtime_similarity_gate', () => {
   // Static check: delivery & catalog sources must not implement runtime text-similarity interceptors
   const catalogSource = readFileSync(join(ROOT, 'src/Wanxiangshu/Enforcer/Catalog.fs'), 'utf8')
   const deliverySource = readFileSync(join(ROOT, 'src/Wanxiangshu/Enforcer/Guidance/DeliveryProjection.fs'), 'utf8')

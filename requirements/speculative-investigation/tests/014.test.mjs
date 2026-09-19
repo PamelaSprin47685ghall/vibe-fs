@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import * as ablation from '../../../dist/Ablation/Surface.js'
 
-test('WHAT[SPEC-INV-014] strength is strictly forced Off when speculative-investigation is ablated prioritizing over rollout env', (t) => {
+test('WHAT[speculative-investigation-014] strength is strictly forced Off when speculative-investigation is ablated prioritizing over rollout env', (t) => {
   const prevEnv = process.env.WANXIANGSHU_STRENGTH_MODE
   t.after(() => {
     if (prevEnv === undefined) {

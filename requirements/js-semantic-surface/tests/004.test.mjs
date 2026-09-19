@@ -30,7 +30,7 @@ const wholeSemanticFiles = new Set(semanticTestFiles(join(ROOT, 'requirements'))
 
 const wholeSemanticImportEdges = semanticImportEdges(join(ROOT, 'requirements'))
 
-test('WHAT[JS-SEMANTIC-SURFACE-004] JS_SURFACE_004_helper_not_directly_tested', () => {
+test('WHAT[js-semantic-surface-004] JS_SURFACE_004_helper_not_directly_tested', () => {
   const violations = []
 
   for (const { importer, target } of wholeSemanticImportEdges) {
@@ -45,7 +45,7 @@ test('WHAT[JS-SEMANTIC-SURFACE-004] JS_SURFACE_004_helper_not_directly_tested', 
   assert.deepEqual(violations, [], violations.join('\n'))
 })
 
-test('WHAT[JS-SEMANTIC-SURFACE-004] JS_SURFACE_004b_support_to_support_transitive_edge_is_scanned', () => {
+test('WHAT[js-semantic-surface-004] JS_SURFACE_004b_support_to_support_transitive_edge_is_scanned', () => {
   const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-transitive-edge-'))
   const testPath = join(temporaryRoot, 'requirements', 'probe', 'tests', 'probe.test.mjs')
   const supportA = join(temporaryRoot, 'requirements', 'probe', 'tests', 'support', 'a.mjs')

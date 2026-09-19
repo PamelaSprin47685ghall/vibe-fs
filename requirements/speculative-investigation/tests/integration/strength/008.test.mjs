@@ -20,7 +20,7 @@ const append = async (durability, event) => {
   assert.equal(result.ok, true, result.error)
 }
 
-test('WHAT[SPEC-INV-008] STRENGTH_INTEGRATION_Prepared_candidate_consumption_Promoted_restart_replay_Traced', async () => {
+test('WHAT[speculative-investigation-008] STRENGTH_INTEGRATION_Prepared_candidate_consumption_Promoted_restart_replay_Traced', async () => {
   const local = createLocalEventStore()
   try {
     const durability = Strength.durabilityCreate(local.store)

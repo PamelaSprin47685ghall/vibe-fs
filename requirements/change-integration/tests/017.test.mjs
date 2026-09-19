@@ -19,7 +19,7 @@ const payload = (overrides = {}) => ({
   ...overrides,
 })
 
-test('WHAT[CHGINT-017] multi-road confluence requires post-integration verification and preserves certificate invalidation', () => {
+test('WHAT[change-integration-017] multi-road confluence requires post-integration verification and preserves certificate invalidation', () => {
   const jobA = 'job_a'
   const jobB = 'job_b'
   let state = change.empty()

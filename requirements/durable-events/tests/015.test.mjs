@@ -179,13 +179,13 @@ const coverageOf = (session) => ({
   digest: session.Blog.Coverage.CoveredPrefixDigest,
 })
 
-test('WHAT[DURABLE-EVENTS-015] PERSIST_010_companion_online_and_codec_replay_are_identical', () => {
+test('WHAT[durable-events-015] PERSIST_010_companion_online_and_codec_replay_are_identical', () => {
   const envelopes = [linkedFact(), openingFact(), partFact(), terminalFact(), closedFact()]
 
   assert.deepEqual(contextFold.replay(envelopes), contextFold.fold(envelopes))
 })
 
-test('WHAT[DURABLE-EVENTS-015] PERSIST_010_companion_facts_fold_into_the_owned_projection', () => {
+test('WHAT[durable-events-015] PERSIST_010_companion_facts_fold_into_the_owned_projection', () => {
   const session = foldOk([linkedFact(), openingFact(), partFact(), terminalFact()])
 
   assert.equal(session.Companion.BloggerSessionId, BLOGGER)
@@ -215,7 +215,7 @@ test('WHAT[DURABLE-EVENTS-015] PERSIST_010_companion_facts_fold_into_the_owned_p
   })
 })
 
-test('WHAT[DURABLE-EVENTS-015] HOST_008_duplicate_companion_link_to_a_different_child_fails_closed', () => {
+test('WHAT[durable-events-015] HOST_008_duplicate_companion_link_to_a_different_child_fails_closed', () => {
   const envelopes = [linkedFact(), linkedFact('ses_other_blogger')]
   const result = contextFold.fold(envelopes)
 
@@ -224,7 +224,7 @@ test('WHAT[DURABLE-EVENTS-015] HOST_008_duplicate_companion_link_to_a_different_
   assert.deepEqual(contextFold.replay(envelopes), result)
 })
 
-test('WHAT[DURABLE-EVENTS-015] PERSIST_010_entry_and_squash_fold_into_the_blog_projection', () => {
+test('WHAT[durable-events-015] PERSIST_010_entry_and_squash_fold_into_the_blog_projection', () => {
   const session = foldOk([
     entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
     entryFact({ from: 1, to: 2, cutoffFrom: 1, cutoffTo: 2, n: 2 }),
@@ -236,7 +236,7 @@ test('WHAT[DURABLE-EVENTS-015] PERSIST_010_entry_and_squash_fold_into_the_blog_p
   assert.equal(session.PrefixEpoch == null, true)
 })
 
-test('WHAT[DURABLE-EVENTS-015] PERSIST_010_single_frame_squash_accepts_the_new_terminal_blob_digest', () => {
+test('WHAT[durable-events-015] PERSIST_010_single_frame_squash_accepts_the_new_terminal_blob_digest', () => {
   const session = foldOk([
     entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
     squashFact({ previousEpoch: 0, nextEpoch: 1, count: 1, textDigest: 'sha-squash-rewritten' }),
@@ -246,7 +246,7 @@ test('WHAT[DURABLE-EVENTS-015] PERSIST_010_single_frame_squash_accepts_the_new_t
   assert.deepEqual(session.Blog.FrameKinds, ['Squash'])
 })
 
-test('WHAT[DURABLE-EVENTS-015] CTX_012_rebase_folds_into_the_prefix_projection_only', () => {
+test('WHAT[durable-events-015] CTX_012_rebase_folds_into_the_prefix_projection_only', () => {
   const session = foldOk([
     entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1 }),
     rebaseFact({ previousEpoch: 0, nextEpoch: 1, cutoff: 1 }),
@@ -258,7 +258,7 @@ test('WHAT[DURABLE-EVENTS-015] CTX_012_rebase_folds_into_the_prefix_projection_o
   assert.equal(Number(session.Blog.FrameEpochId), 0)
 })
 
-test('WHAT[DURABLE-EVENTS-015] PERSIST_010_a_stale_frame_epoch_fails_the_fold_closed', () => {
+test('WHAT[durable-events-015] PERSIST_010_a_stale_frame_epoch_fails_the_fold_closed', () => {
   const result = contextFold.fold([
     entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
     squashFact({ previousEpoch: 0, nextEpoch: 1, count: 1 }),
@@ -271,7 +271,7 @@ test('WHAT[DURABLE-EVENTS-015] PERSIST_010_a_stale_frame_epoch_fails_the_fold_cl
   assert.match(result.error.Reason, /PERSIST-010/)
 })
 
-test('WHAT[DURABLE-EVENTS-015] CTX_012_a_replayed_rebase_is_absorbed_so_crash_recovery_is_idempotent', () => {
+test('WHAT[durable-events-015] CTX_012_a_replayed_rebase_is_absorbed_so_crash_recovery_is_idempotent', () => {
   const session = foldOk([
     rebaseFact({ previousEpoch: 0, nextEpoch: 1, cutoff: 4, seal: 'seal-P1' }),
     rebaseFact({ previousEpoch: 0, nextEpoch: 1, cutoff: 4, seal: 'seal-P1' }),
@@ -281,7 +281,7 @@ test('WHAT[DURABLE-EVENTS-015] CTX_012_a_replayed_rebase_is_absorbed_so_crash_re
   assert.equal(session.PrefixEpoch.Snapshot.SealRoot, 'seal-P1')
 })
 
-test('WHAT[DURABLE-EVENTS-015] CTX_011_a_not_new_candidate_is_absorbed_by_the_fold', () => {
+test('WHAT[durable-events-015] CTX_011_a_not_new_candidate_is_absorbed_by_the_fold', () => {
   const session = foldOk([
     rebaseFact({ previousEpoch: 0, nextEpoch: 1, cutoff: 5 }),
     rebaseFact({ previousEpoch: 1, nextEpoch: 2, cutoff: 5 }),
@@ -290,14 +290,14 @@ test('WHAT[DURABLE-EVENTS-015] CTX_011_a_not_new_candidate_is_absorbed_by_the_fo
   assert.equal(Number(session.PrefixEpoch.EpochId), 1)
 })
 
-test('WHAT[DURABLE-EVENTS-015] PERSIST_010_a_non_sequential_prefix_epoch_fails_the_fold_closed', () => {
+test('WHAT[durable-events-015] PERSIST_010_a_non_sequential_prefix_epoch_fails_the_fold_closed', () => {
   const result = contextFold.fold([rebaseFact({ previousEpoch: 0, nextEpoch: 3, cutoff: 2 })])
   assert.equal(result.ok, false)
   assert.equal(result.error.Fact, 'PrefixRebaseCommitted')
   assert.match(result.error.Reason, /not the successor/)
 })
 
-test('WHAT[DURABLE-EVENTS-015] CTX_011_a_retreating_cutoff_fails_the_fold_closed', () => {
+test('WHAT[durable-events-015] CTX_011_a_retreating_cutoff_fails_the_fold_closed', () => {
   const result = contextFold.fold([
     rebaseFact({ previousEpoch: 0, nextEpoch: 1, cutoff: 8 }),
     rebaseFact({ previousEpoch: 1, nextEpoch: 2, cutoff: 3 }),
@@ -308,7 +308,7 @@ test('WHAT[DURABLE-EVENTS-015] CTX_011_a_retreating_cutoff_fails_the_fold_closed
   assert.match(result.error.Reason, /CTX-011/)
 })
 
-test('WHAT[DURABLE-EVENTS-015] HOST_006_reanchor_retires_the_prefix_and_zeroes_prefix_coverage_in_one_fact', () => {
+test('WHAT[durable-events-015] HOST_006_reanchor_retires_the_prefix_and_zeroes_prefix_coverage_in_one_fact', () => {
   const before = foldOk([
     entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
     entryFact({ from: 1, to: 2, cutoffFrom: 1, cutoffTo: 2, n: 2 }),
@@ -333,7 +333,7 @@ test('WHAT[DURABLE-EVENTS-015] HOST_006_reanchor_retires_the_prefix_and_zeroes_p
   assert.equal(Number(after.Blog.FrameEpochId), 0)
 })
 
-test('WHAT[DURABLE-EVENTS-015] HOST_006_a_replayed_reanchor_leaves_rebuilt_coverage_alone', () => {
+test('WHAT[durable-events-015] HOST_006_a_replayed_reanchor_leaves_rebuilt_coverage_alone', () => {
   const session = foldOk([
     entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
     reanchorFact({ previousEpoch: 0, nextEpoch: 1 }),
@@ -346,7 +346,7 @@ test('WHAT[DURABLE-EVENTS-015] HOST_006_a_replayed_reanchor_leaves_rebuilt_cover
   assert.deepEqual(coverageOf(session), { ingestedThroughSequence: 3, cutoff: 2, digest: 'rebuilt-2' })
 })
 
-test('WHAT[DURABLE-EVENTS-015] HOST_006_coverage_and_probes_both_recover_after_a_reanchor', () => {
+test('WHAT[durable-events-015] HOST_006_coverage_and_probes_both_recover_after_a_reanchor', () => {
   const session = foldOk([
     entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
     rebaseFact({ previousEpoch: 0, nextEpoch: 1, cutoff: 1 }),
@@ -360,7 +360,7 @@ test('WHAT[DURABLE-EVENTS-015] HOST_006_coverage_and_probes_both_recover_after_a
   assert.deepEqual(coverageOf(session), { ingestedThroughSequence: 2, cutoff: 1, digest: 'post' })
 })
 
-test('WHAT[DURABLE-EVENTS-015] PERSIST_010_context_recovery_facts_survive_NDJSON_and_still_fold', () => {
+test('WHAT[durable-events-015] PERSIST_010_context_recovery_facts_survive_NDJSON_and_still_fold', () => {
   const result = contextFold.replay([
     entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
     squashFact({ previousEpoch: 0, nextEpoch: 1, count: 1 }),

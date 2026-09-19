@@ -10,7 +10,7 @@ const textMessage = (id, role, text) => ({
   parts: [{ type: 'text', text }],
 })
 
-test('WHAT[PREFIX-STABILITY-009] prefix replacement removes covered history by stable Host identity', () => {
+test('WHAT[prefix-stability-009] prefix replacement removes covered history by stable Host identity', () => {
   const raw = [
     textMessage('covered-u', 'user', 'old user'),
     textMessage('request-local', 'assistant', 'request-local presentation only'),
@@ -30,7 +30,7 @@ test('WHAT[PREFIX-STABILITY-009] prefix replacement removes covered history by s
   assert.equal(projected[1], raw[1], 'request-local presentation must survive as the same Host object')
   assert.equal(projected[2], raw[3], 'live history must survive as the same Host object')
 })
-test('WHAT[PREFIX-STABILITY-009] stable identity replacement preserves survivor order and todowrite round objects', () => {
+test('WHAT[prefix-stability-009] stable identity replacement preserves survivor order and todowrite round objects', () => {
   const raw = [
     {
       info: { id: 'todo-call-msg', role: 'assistant' },
@@ -62,7 +62,7 @@ test('WHAT[PREFIX-STABILITY-009] stable identity replacement preserves survivor 
   assert.equal(projected[3], raw[2])
   assert.equal(projected[4], raw[4])
 })
-test('WHAT[PREFIX-STABILITY-009] transport suppression removes only exact stale Host ids', () => {
+test('WHAT[prefix-stability-009] transport suppression removes only exact stale Host ids', () => {
   const retryMessage = (id, text) => ({
     info: { id, role: 'user' },
     parts: [{ type: 'text', text, metadata: { wanxiangshu_origin: 'ProviderRetryAttempt' } }],
@@ -98,7 +98,7 @@ const stage2Snapshot = (raw, committed = null) => ({
   committedPrefix: committed,
 })
 
-test('WHAT[PREFIX-STABILITY-009] CTX_011_step5_cutoff_digest_truncates_exactly_at_the_cutoff', () => {
+test('WHAT[prefix-stability-009] CTX_011_step5_cutoff_digest_truncates_exactly_at_the_cutoff', () => {
   const snapshot = stage2Snapshot([
     { info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'first' }] },
     { info: { id: 'm2', role: 'assistant' }, parts: [{ type: 'text', text: 'second' }] },
@@ -133,7 +133,7 @@ test('WHAT[PREFIX-STABILITY-009] CTX_011_step5_cutoff_digest_truncates_exactly_a
     XWireSurface.coveredPrefixDigest(snapshot.currentProjection, snapshot.currentProjection.messages.length),
   )
 })
-test('WHAT[PREFIX-STABILITY-009] CTX_011_step5_the_proof_reads_the_SNAPSHOT_not_a_stale_closure', () => {
+test('WHAT[prefix-stability-009] CTX_011_step5_the_proof_reads_the_SNAPSHOT_not_a_stale_closure', () => {
   // The digest must be recomputed from X's CURRENT projection each attempt — a
   // closure captured once would re-prove yesterday's numbering.
   const before = stage2Snapshot([
@@ -152,7 +152,7 @@ test('WHAT[PREFIX-STABILITY-009] CTX_011_step5_the_proof_reads_the_SNAPSHOT_not_
     'the same cutoff over a grown projection must not produce the same proof',
   )
 })
-test('WHAT[PREFIX-STABILITY-009] prefix_proof_and_writeback_use_canonical_XTrace_not_request_local_message_positions', () => {
+test('WHAT[prefix-stability-009] prefix_proof_and_writeback_use_canonical_XTrace_not_request_local_message_positions', () => {
   const wireSource = readFileSync(
     resolve(import.meta.dirname, '../../../src/Wanxiangshu/Context/Prefix/Wire.fs'),
     'utf8',
@@ -175,7 +175,7 @@ test('WHAT[PREFIX-STABILITY-009] prefix_proof_and_writeback_use_canonical_XTrace
     'step-5 proof must not hash the mutable request presentation',
   )
 })
-test('WHAT[PREFIX-STABILITY-009] prefix lifecycle and rendering stay with the prefix owner', () => {
+test('WHAT[prefix-stability-009] prefix lifecycle and rendering stay with the prefix owner', () => {
   const ownerSource = readFileSync(
     resolve(import.meta.dirname, '../../../src/Wanxiangshu/Context/Prefix/Projection.fs'),
     'utf8',
@@ -196,7 +196,7 @@ test('WHAT[PREFIX-STABILITY-009] prefix lifecycle and rendering stay with the pr
   assert.doesNotMatch(providerIntentSource, /PrefixActivation|KeepPhysicalPrefix|ActivatePrefixEpoch|ReanchorAfterCompaction/)
   assert.doesNotMatch(providerRendererSource, /PrefixActivation|RenderedPrefix|renderPrefix/)
 })
-test('WHAT[PREFIX-STABILITY-009] retry_transport_rows_retire_only_at_a_real_cold_horizon', () => {
+test('WHAT[prefix-stability-009] retry_transport_rows_retire_only_at_a_real_cold_horizon', () => {
   const wireSource = readFileSync(
     resolve(import.meta.dirname, '../../../src/Wanxiangshu/Context/Prefix/Wire.fs'),
     'utf8',
@@ -222,7 +222,7 @@ test('WHAT[PREFIX-STABILITY-009] retry_transport_rows_retire_only_at_a_real_cold
   assert.doesNotMatch(wireSource, /ProjectionIntent\.(?:SuppressTransportOnly|ReanchorAfterCompaction)/)
   assert.doesNotMatch(wireSource, /Projection(?:Planner\.plan|Renderer\.renderPrefix)/)
 })
-test('WHAT[PREFIX-STABILITY-009] compiled retry retirement preserves Current and only removes stale retry rows at TentativeCold', () => {
+test('WHAT[prefix-stability-009] compiled retry retirement preserves Current and only removes stale retry rows at TentativeCold', () => {
   const retry = (id) => ({
     info: { id, role: 'user', metadata: { wanxiangshu_origin: 'ProviderRetryAttempt' } },
     parts: [{ type: 'text', text: id }],

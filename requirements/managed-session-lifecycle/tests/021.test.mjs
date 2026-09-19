@@ -23,7 +23,7 @@ const sandbox = () => {
   }
 }
 
-test('WHAT[MANAGED-SESSION-021] CASE_SETTLE_finalized_releases_identity_exactly_once', async () => {
+test('WHAT[managed-session-lifecycle-021] CASE_SETTLE_finalized_releases_identity_exactly_once', async () => {
   const { dir, cleanup } = sandbox()
   try {
     lifecycle.enable(dir)
@@ -71,7 +71,7 @@ test('WHAT[MANAGED-SESSION-021] CASE_SETTLE_finalized_releases_identity_exactly_
     cleanup()
   }
 })
-test('WHAT[MANAGED-SESSION-021] CASE_SETTLE_nothing_to_finalize_is_not_a_failure', async () => {
+test('WHAT[managed-session-lifecycle-021] CASE_SETTLE_nothing_to_finalize_is_not_a_failure', async () => {
   const { dir, cleanup } = sandbox()
   try {
     lifecycle.enable(dir)
@@ -90,7 +90,7 @@ test('WHAT[MANAGED-SESSION-021] CASE_SETTLE_nothing_to_finalize_is_not_a_failure
     cleanup()
   }
 })
-test('WHAT[MANAGED-SESSION-021] CASE_SETTLE_identity_retention_is_owner_driven_not_finally', async () => {
+test('WHAT[managed-session-lifecycle-021] CASE_SETTLE_identity_retention_is_owner_driven_not_finally', async () => {
   const { readFileSync } = await import('node:fs')
   const { fileURLToPath } = await import('node:url')
   const root = fileURLToPath(new URL('../../..', import.meta.url))
@@ -114,5 +114,5 @@ const { default: test } = await import("node:test");
 const { assertFatalBoundary } = await import("../../structured-workflow/tests/support/m6-boundary-proof.mjs");
 
 
-test('WHAT[MANAGED-SESSION-021] lifecycle fatal follows exact drain and one injected fuse', () => assertFatalBoundary('managed-session-lifecycle'))
+test('WHAT[managed-session-lifecycle-021] lifecycle fatal follows exact drain and one injected fuse', () => assertFatalBoundary('managed-session-lifecycle'))
 }

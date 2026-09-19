@@ -36,7 +36,7 @@ ${body}
 const execute = (dir, body, language = 'en') =>
   run(dir, 'Coder', language, program(body), 2000, Date.now() + 60_000, 1 << 20, null)
 
-test('WHAT[REPOSITORY-PROGRAMMING-024] JS_EDIT_near_match_is_copy_ready_diagnostic_but_never_write_authority', async () => {
+test('WHAT[repository-programming-024] JS_EDIT_near_match_is_copy_ready_diagnostic_but_never_write_authority', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.js'), 'const timeout = 1000;\nstart(timeout);\n', 'utf8')
@@ -59,7 +59,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-024] JS_EDIT_near_match_is_copy_ready_diagnost
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-024] JS_EDIT_ambiguous_match_returns_candidates_and_two_safe_next_moves', async () => {
+test('WHAT[repository-programming-024] JS_EDIT_ambiguous_match_returns_candidates_and_two_safe_next_moves', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'section A\nvalue = 1\nsection B\nvalue = 1\n', 'utf8')
@@ -82,7 +82,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-024] JS_EDIT_ambiguous_match_returns_candidate
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-024] JS_EDIT_overlap_and_invalid_shape_have_stable_codes_and_zero_commit', async () => {
+test('WHAT[repository-programming-024] JS_EDIT_overlap_and_invalid_shape_have_stable_codes_and_zero_commit', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'alpha beta gamma\n', 'utf8')
@@ -105,7 +105,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-024] JS_EDIT_overlap_and_invalid_shape_have_st
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-024] JS_EDIT_rejects_invalid_path_unknown_fields_and_exotic_change_objects', async () => {
+test('WHAT[repository-programming-024] JS_EDIT_rejects_invalid_path_unknown_fields_and_exotic_change_objects', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'alpha\n', 'utf8')
@@ -156,7 +156,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-024] JS_EDIT_rejects_invalid_path_unknown_fiel
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-024] JS_EDIT_diagnostics_are_bounded_and_echo_the_attempted_find', async () => {
+test('WHAT[repository-programming-024] JS_EDIT_diagnostics_are_bounded_and_echo_the_attempted_find', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const longLine = `${'x'.repeat(6000)} const timeout = 1000; ${'y'.repeat(6000)}`
@@ -189,7 +189,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-024] JS_EDIT_diagnostics_are_bounded_and_echo_
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-024] JS_EDIT_copy_ready_fix_uses_the_exact_candidate_subspan', async () => {
+test('WHAT[repository-programming-024] JS_EDIT_copy_ready_fix_uses_the_exact_candidate_subspan', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.js'), 'prefix const timeout = 1000; suffix\n', 'utf8')
@@ -209,7 +209,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-024] JS_EDIT_copy_ready_fix_uses_the_exact_can
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-024] JS_EDIT_failure_control_language_is_localized', async () => {
+test('WHAT[repository-programming-024] JS_EDIT_failure_control_language_is_localized', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'value = 1\nvalue = 1\n', 'utf8')

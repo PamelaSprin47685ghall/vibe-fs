@@ -74,7 +74,7 @@ const mutatedWire = (wire, mutation) => mutation({
   })),
 })
 
-test('WHAT[PREFIX-STABILITY-001] G2_engineer_Q1_Q2_Q3_provider_wire_append_only_prefix', async () => {
+test('WHAT[prefix-stability-001] G2_engineer_Q1_Q2_Q3_provider_wire_append_only_prefix', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-g2-engineer-wire-'))
   const harness = await delegation.create(directory, [{ sessionId: OWNER, agent: 'manager' }])
   try {
@@ -263,7 +263,7 @@ const mulberry32 = (seed) => {
   }
 }
 
-test('WHAT[PREFIX-STABILITY-001] H13_01_canonical_multi_tool_sequence_is_an_append_only_prefix', async () => {
+test('WHAT[prefix-stability-001] H13_01_canonical_multi_tool_sequence_is_an_append_only_prefix', async () => {
   const session = 'h13-01'
   const round1Real = [
     toolCall('c1', 'bash', 't1'),
@@ -300,7 +300,7 @@ test('WHAT[PREFIX-STABILITY-001] H13_01_canonical_multi_tool_sequence_is_an_appe
 
   assertPrefixLaw(round1Wire, round2Wire, 'H13-01 canonical sequence')
 })
-test('WHAT[PREFIX-STABILITY-001] H13_08_n_round_property_prefix_law_holds', async () => {  const rand = mulberry32(0x1357)
+test('WHAT[prefix-stability-001] H13_08_n_round_property_prefix_law_holds', async () => {  const rand = mulberry32(0x1357)
   const session = 'h13-08'
   const rounds = 8
 
@@ -451,7 +451,7 @@ const historicalMutations = (target) => {
   return mutations
 }
 
-test('WHAT[PREFIX-STABILITY-001] PREFIX_STABILITY_append_only_law_holds_within_one_epoch', () => {
+test('WHAT[prefix-stability-001] PREFIX_STABILITY_append_only_law_holds_within_one_epoch', () => {
   assert.equal(providerProjection.isAppendOnlyPrefix(W1, W2), true, 'W1 ⊏ W2')
   assert.equal(providerProjection.isAppendOnlyPrefix(W1, W3), true, 'W1 ⊏ W3')
   assert.equal(providerProjection.isAppendOnlyPrefix(W2, W3), true, 'W2 ⊏ W3')
@@ -472,7 +472,7 @@ test('WHAT[PREFIX-STABILITY-001] PREFIX_STABILITY_append_only_law_holds_within_o
     { seed: 0x50524658, numRuns: 1_000 },
   )
 })
-test('WHAT[PREFIX-STABILITY-001] PREFIX_STABILITY_modified_historical_bytes_break_the_law', () => {
+test('WHAT[prefix-stability-001] PREFIX_STABILITY_modified_historical_bytes_break_the_law', () => {
   const changedWire = wire([msg('m1', 'user', 'FIRST CHANGED')])
   assert.equal(providerProjection.isAppendOnlyPrefix(changedWire, W2), false, 'a changed first message is not a prefix')
   assert.equal(providerProjection.isAppendOnlyPrefix(W1, changedWire), false, 'nor is the old first message a prefix of the changed one')
@@ -513,11 +513,11 @@ const { default: test } = await import("node:test");
 const XWireSurface = await import("../../../dist/Context/Prefix/XWireSurface.js");
 
 
-test('WHAT[PREFIX-STABILITY-001] compiled XWireSurface exposes the production horizon decision', () => {
+test('WHAT[prefix-stability-001] compiled XWireSurface exposes the production horizon decision', () => {
   assert.equal(XWireSurface.presentationHorizon(false), 'Current')
   assert.equal(XWireSurface.presentationHorizon(true), 'TentativeCold')
 })
-test('WHAT[PREFIX-STABILITY-001] compiled XWireSurface reconciles completion and failure', () => {
+test('WHAT[prefix-stability-001] compiled XWireSurface reconciles completion and failure', () => {
   assert.deepEqual(
     XWireSurface.reconcile({
       hasPlan: true,

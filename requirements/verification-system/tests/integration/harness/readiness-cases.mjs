@@ -1,5 +1,5 @@
 /**
- * gate-readiness-cases.mjs — the startup ladder, under test (VERIFY-004, W5).
+ * gate-readiness-cases.mjs — the startup ladder, under test (verification-system-004, W5).
  *
  * The clause requires the startup window to have a causal criterion of its own:
  *
@@ -83,7 +83,7 @@ const allStageNames = READINESS_STAGES.map((stage) => stage.name);
 
 export const readinessCases = [
   {
-    name: 'VERIFY-004 the ladder stages are ordered the way production prints them',
+    name: 'verification-system-004 the ladder stages are ordered the way production prints them',
     fn: () => {
       // The load-bearing case, and the one the measured defect would have failed. Within one file
       // the print order IS the completion order, so the ladder's relative order must match it.
@@ -114,7 +114,7 @@ export const readinessCases = [
   },
 
   {
-    name: 'VERIFY-004 every stage marker is printed exactly once by the harness',
+    name: 'verification-system-004 every stage marker is printed exactly once by the harness',
     fn: () => {
       // Deliberately the guard that lets `readiness.js` NOT anchor to the exact log format. Matching
       // substrings means a reworded timing line still advances the ladder; it also means a DELETED
@@ -137,7 +137,7 @@ export const readinessCases = [
   },
 
   {
-    name: 'VERIFY-004 the host stages are nested where the ladder places them',
+    name: 'verification-system-004 the host stages are nested where the ladder places them',
     fn: () => {
       // The cross-file half of the order check. All Host stages are printed inside
       // `process-host.js`, so within-file monotonicity cannot see that they belong between
@@ -173,7 +173,7 @@ export const readinessCases = [
   },
 
   {
-    name: 'VERIFY-004 no stage marker is a substring of another',
+    name: 'verification-system-004 no stage marker is a substring of another',
     fn: () => {
       // Substring matching plus a marker contained in another marker means one line advances two
       // stages, which makes the climb depend on which stage is checked first. Cheap to forbid, and
@@ -192,7 +192,7 @@ export const readinessCases = [
   },
 
   {
-    name: 'VERIFY-004 one buffer carrying several stages drains all of them',
+    name: 'verification-system-004 one buffer carrying several stages drains all of them',
     fn: () => {
       // Output arrives in blocks, so advancing one step per call would leave the ladder permanently
       // behind a child that prints three stages into one pipe write — and 「behind」 here means the
@@ -210,7 +210,7 @@ export const readinessCases = [
   },
 
   {
-    name: 'VERIFY-004 a reprinted earlier stage does not reset the climb',
+    name: 'verification-system-004 a reprinted earlier stage does not reset the climb',
     fn: () => {
       // 「反复重连的 SSE 读者」 one layer earlier: a retried health check that reset the ladder would
       // renew the startup budget forever, and a host looping on a failing probe would look like a
@@ -229,7 +229,7 @@ export const readinessCases = [
   },
 
   {
-    name: 'VERIFY-004 a later marker arriving alone does not skip the stages before it',
+    name: 'verification-system-004 a later marker arriving alone does not skip the stages before it',
     fn: () => {
       // The converse, and the reason the launcher can feed the whole accumulated buffer safely: the
       // ladder is a sequence, not a set. A child that printed only its last line would otherwise be
@@ -244,7 +244,7 @@ export const readinessCases = [
   },
 
   {
-    name: 'VERIFY-004 the diagnostic names the stage reached and the stage awaited',
+    name: 'verification-system-004 the diagnostic names the stage reached and the stage awaited',
     fn: () => {
       // Two different facts, and the pair is what makes a startup failure actionable: 「reached
       // provider, awaiting port-bound」 points at the Host's listen call, 「reached nothing」 points
@@ -268,7 +268,7 @@ export const readinessCases = [
   },
 
   {
-    name: 'VERIFY-004 the stage budget is tighter than the total startup ceiling',
+    name: 'verification-system-004 the stage budget is tighter than the total startup ceiling',
     fn: () => {
       // Detection of the one degradation no static check can prevent: 「延长静默窗口以掩盖竞态」.
       // Stated as the relation rather than the value so raising the stage budget past the ceiling —

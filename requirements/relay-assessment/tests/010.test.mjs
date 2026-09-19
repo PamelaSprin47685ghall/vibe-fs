@@ -7,7 +7,7 @@ const perfectScores = Array(8).fill('PERFECT')
 const open = (state, snapshot = 'snapshot-1') =>
   relay.openIncumbency(state, 'road-1', 'inc-1', snapshot, 'authority-1')
 
-test('WHAT[ASSESS-010] devops self-repair snapshot mutation invalidates old assessment and certificate', () => {
+test('WHAT[relay-assessment-010] devops self-repair snapshot mutation invalidates old assessment and certificate', () => {
   const opened = open(relay.empty(), 'snapshot-1')
   const assessed = relay.assess(
     opened.state,

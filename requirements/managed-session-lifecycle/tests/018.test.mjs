@@ -11,7 +11,7 @@ const { interruptAttemptAdapterProbe, interruptRejectedAdapterProbe, interruptTe
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 
-test('WHAT[MANAGED-SESSION-018] TurnAborted has no logical child-cancel authority', () => {
+test('WHAT[managed-session-lifecycle-018] TurnAborted has no logical child-cancel authority', () => {
   const ordinary = read('src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs')
   const tools = read('src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs')
   const scope = read('src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs')
@@ -43,7 +43,7 @@ const { fileURLToPath } = await import("node:url");
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 
-test('WHAT[MANAGED-SESSION-018] shutdown detaches session runtimes before journal release without logical cancel', () => {
+test('WHAT[managed-session-lifecycle-018] shutdown detaches session runtimes before journal release without logical cancel', () => {
   const scope = read('src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs')
   const sessionOwner = read('src/Wanxiangshu/OpenCode/Host/SessionRuntimeOwner.fs')
   const tools = read('src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs')
@@ -76,7 +76,7 @@ test('WHAT[MANAGED-SESSION-018] shutdown detaches session runtimes before journa
   assert.match(scheduler, /if isDurableUnavailable \(\) then\s*closeAdmission \(\)/)
   assert.match(bootstrap, /durableUnavailable = Some\(fun \(\) -> journal \|> Option\.exists AgentJournal\.isPoisoned\)/)
 })
-test('WHAT[MANAGED-SESSION-018] fork terminal callbacks drain before either detach or authorized parent cancel', () => {
+test('WHAT[managed-session-lifecycle-018] fork terminal callbacks drain before either detach or authorized parent cancel', () => {
   const runtime = read('src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs')
   const lifecycle = read('src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs')
   assert.equal(existsSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs')), false, 'OneShotTool.fs must be physically removed')
@@ -95,7 +95,7 @@ test('WHAT[MANAGED-SESSION-018] fork terminal callbacks drain before either deta
   assert.match(lifecycle, /fun _ outcome ->\s*trackOwnedWork \(fun \(\) ->/)
   assert.doesNotMatch(lifecycle, /fun _ outcome ->[\s\S]{0,240}\|> ignore/)
 })
-test('WHAT[MANAGED-SESSION-018] TurnAborted publishes attempt terminal without child cascade', () => {
+test('WHAT[managed-session-lifecycle-018] TurnAborted publishes attempt terminal without child cascade', () => {
   const ordinary = read('src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs')
 
   const abortedBlock = ordinary.match(/let private handleAborted([\s\S]*?)let private applyJoinGuardNudge/)
@@ -138,7 +138,7 @@ const waitForPromptCount = (runtime, count) => forkTool.awaitPromptCount(runtime
 
 const ownerDescriptor = (sessionId) => [{ sessionId, agent: 'manager' }]
 
-test('WHAT[MANAGED-SESSION-018] FORK_TOOL_process_detach_preserves_durable_active_child_for_restart', async () => {
+test('WHAT[managed-session-lifecycle-018] FORK_TOOL_process_detach_preserves_durable_active_child_for_restart', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-process-detach-'))
   const owner = 'manager-process-detach'
   const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))

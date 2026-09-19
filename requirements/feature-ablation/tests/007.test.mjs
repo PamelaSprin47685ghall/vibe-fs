@@ -18,7 +18,7 @@ const withEnv = (entries, run) => {
   }
 }
 
-test('WHAT[ABL-007] ABL_007_load_exposes_manifest_fingerprint', () => {
+test('WHAT[feature-ablation-007] ABL_007_load_exposes_manifest_fingerprint', () => {
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', undefined]], () => {
     const result = Ablation.load()
     assert.equal(result.ok, true)

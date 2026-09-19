@@ -11,7 +11,7 @@ const exists = (relative) => fs.existsSync(path.join(root, relative))
 
 const normalize = (entry) => String(entry).replace(/\\/g, '/').replace(/\/+$/, '')
 
-test('WHAT[DISTRIBUTION-004] DISTRIBUTION_files_whitelist_is_explicit_and_excludes_dev_test_legacy', () => {
+test('WHAT[distribution-004] DISTRIBUTION_files_whitelist_is_explicit_and_excludes_dev_test_legacy', () => {
   assert.ok(Array.isArray(pkg.files), 'package.json files whitelist must exist')
   assert.ok(
     pkg.files.some((f) => normalize(f) === 'dist'),

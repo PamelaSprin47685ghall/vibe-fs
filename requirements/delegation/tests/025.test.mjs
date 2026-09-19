@@ -6,7 +6,7 @@ const { readFileSync } = await import("node:fs");
 const { default: test } = await import("node:test");
 
 
-test('WHAT[DELEG-025] reusable fork terminal failure is guarded by the accepted authority root', () => {
+test('WHAT[delegation-025] reusable fork terminal failure is guarded by the accepted authority root', () => {
   const lifecycle = readFileSync(
     new URL('../../../src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs', import.meta.url),
     'utf8',
@@ -88,7 +88,7 @@ const verifyReusableHandoff = async (role) => {
   } finally { sync.dispose(h) }
 }
 
-test('WHAT[DELEG-025] SYNC_RUNTIME_late_failure_from_previous_authority_root_cannot_fail_reused_call', async () => {
+test('WHAT[delegation-025] SYNC_RUNTIME_late_failure_from_previous_authority_root_cannot_fail_reused_call', async () => {
   const h = await live('owner-failure-causality')
   try {
     const first = sync.invoke(h, 'owner-failure-causality', 'Engineer', 'FIRST')

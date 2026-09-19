@@ -29,7 +29,7 @@ const materialize = (
 
 const OPENING_END = { Sequence: 1 }
 
-test('WHAT[WORK-RECORD-009] LWR_t1_commitment_call_result_is_constitutive_opening_material', () => {
+test('WHAT[work-record-009] LWR_t1_commitment_call_result_is_constitutive_opening_material', () => {
   // COMPANION-014 ⑨ / TODO-015：BlindPlan T1（第一次 accepted planComplete=true）的
   // todowrite call + canonical accepted result 是 constitutive Opening material，
   // 不得当 incidental tool 滤入 Recent work（XTrace.forOpening 保留 raw）。

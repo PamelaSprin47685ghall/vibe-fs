@@ -16,7 +16,7 @@ const tipNames = () =>
     .map((entry) => entry.name)
     .sort()
 
-test('WHAT[GD-008] AUDIENCE_001_main_md_sections_never_enter_blogger_system_prompt', () => {
+test('WHAT[guidance-delivery-008] AUDIENCE_001_main_md_sections_never_enter_blogger_system_prompt', () => {
   const composed = enforcer.composeBloggerSystemPrompt('base', 'en')
 
   // `## What To Do Now` is the main.md-only remediation section (0/120
@@ -25,7 +25,7 @@ test('WHAT[GD-008] AUDIENCE_001_main_md_sections_never_enter_blogger_system_prom
   // The `# Enforcer Tip` marker is the Main-only delivery header.
   assert.equal(composed.includes('# Enforcer Tip'), false)
 })
-test('WHAT[GD-008] AUDIENCE_002_corpus_level_detection_and_remediation_do_not_leak', () => {
+test('WHAT[guidance-delivery-008] AUDIENCE_002_corpus_level_detection_and_remediation_do_not_leak', () => {
   for (const name of tipNames()) {
     const enforcerText = readFileSync(join(RULEBOOK, name, 'enforcer.md'), 'utf8')
     const mainText = readFileSync(join(RULEBOOK, name, 'main.md'), 'utf8')
@@ -46,7 +46,7 @@ test('WHAT[GD-008] AUDIENCE_002_corpus_level_detection_and_remediation_do_not_le
     )
   }
 })
-test('WHAT[GD-008] AUDIENCE_003_previous_tip_history_is_not_main_authority', () => {
+test('WHAT[guidance-delivery-008] AUDIENCE_003_previous_tip_history_is_not_main_authority', () => {
   // ENFORCER-071 Y side: Blogger's own history is rendered as low-trust
   // previous_enforcer_tip ([[do_not_exec]], role=assistant) — it must not be
   // repurposed as Main instruction. The Main surface is TipGuidance only.
@@ -77,7 +77,7 @@ const proj = companion
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const bloggerRoleLawPath = join(ROOT, 'resources/provider/role/blogger/en.md')
 
-test('WHAT[GD-008] ENFORCER_TIP_13_work_record_contains_previous_enforcer_tip_blocks', () => {
+test('WHAT[guidance-delivery-008] ENFORCER_TIP_13_work_record_contains_previous_enforcer_tip_blocks', () => {
   const block = toml.renderPreviousEnforcerTip('primitive-obsession', 'msg_c1')
   assert.match(block, /\[\[do_not_exec\]\]/)
   assert.match(block, /kind = "previous_enforcer_tip"/)
@@ -111,7 +111,7 @@ test('WHAT[GD-008] ENFORCER_TIP_13_work_record_contains_previous_enforcer_tip_bl
   assert.equal(plan.texts[3].includes('historic_frame'), true)
   assert.equal(plan.messages.at(-1).physical, true)
 })
-test('WHAT[GD-008] ENFORCER_TIP_14_prompt_has_anti_repeat_and_severe_exception', () => {
+test('WHAT[guidance-delivery-008] ENFORCER_TIP_14_prompt_has_anti_repeat_and_severe_exception', () => {
   const roleLaw = readFileSync(bloggerRoleLawPath, 'utf8')
   assert.match(roleLaw, /One observation[\s\S]*One lesson[\s\S]*One listener/)
   assert.match(roleLaw, /Do not avoid a repeated lesson/)

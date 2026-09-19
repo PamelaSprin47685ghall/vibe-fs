@@ -44,7 +44,7 @@ function threeEntries() {
   return state
 }
 
-test('WHAT[CONTEXT-COMPRESSION-010] CTX_011_a_squash_cannot_make_an_uncovered_frame_coverable', () => {
+test('WHAT[context-compression-010] CTX_011_a_squash_cannot_make_an_uncovered_frame_coverable', () => {
   // Mid-turn chunks only: nothing is coverable. A squash rewrites those frames but
   // cannot create coverage the cutoff never claimed.
   const chunk1 = commitEntry(blog.empty, { from: 0, to: 1, cutoffFrom: 0, cutoffTo: 0, digest: '' }).value
@@ -79,7 +79,7 @@ const committedAt = (cutoff, { digest = `prefix-${cutoff}`, frozen = `frozen-${c
     syntheticId: `synthetic-${seal}`,
   })
 
-test('WHAT[CONTEXT-COMPRESSION-010] CTX_011_no_completed_turn_yet_means_no_candidate', () => {
+test('WHAT[context-compression-010] CTX_011_no_completed_turn_yet_means_no_candidate', () => {
   // The first-turn state, and the post-reanchor state — one reason, because they are
   // the same situation: no cutoff claims anything.
   const result = selection.select({
@@ -95,7 +95,7 @@ test('WHAT[CONTEXT-COMPRESSION-010] CTX_011_no_completed_turn_yet_means_no_candi
   assert.equal(result.error, 'NoCoverage')
   assert.match(result.message, /no completed turn/)
 })
-test('WHAT[CONTEXT-COMPRESSION-010] CTX_011_a_retreating_candidate_is_refused', () => {
+test('WHAT[context-compression-010] CTX_011_a_retreating_candidate_is_refused', () => {
   const result = selection.select({
     committedEpoch: 2,
     committedSnapshot: committedAt(8),
@@ -109,7 +109,7 @@ test('WHAT[CONTEXT-COMPRESSION-010] CTX_011_a_retreating_candidate_is_refused', 
   assert.equal(result.error, 'WouldRetreat')
   assert.match(result.message, /3 is behind the committed 8/)
 })
-test('WHAT[CONTEXT-COMPRESSION-010] CTX_011_an_identical_candidate_is_refused_before_an_epoch_is_spent', () => {
+test('WHAT[context-compression-010] CTX_011_an_identical_candidate_is_refused_before_an_epoch_is_spent', () => {
   // Same cutoff, same prefix digest, same FrozenRecordPrefix digest. Promoting it would spend an
   // epoch and a cold boundary on a prefix the model has already seen.
   const result = selection.select({
@@ -125,7 +125,7 @@ test('WHAT[CONTEXT-COMPRESSION-010] CTX_011_an_identical_candidate_is_refused_be
   assert.equal(result.ok, false)
   assert.equal(result.error, 'NotNewerThanCommitted')
 })
-test('WHAT[CONTEXT-COMPRESSION-010] CTX_011_the_same_cutoff_with_a_tighter_B_is_a_new_candidate', () => {
+test('WHAT[context-compression-010] CTX_011_the_same_cutoff_with_a_tighter_B_is_a_new_candidate', () => {
   // The case a "cutoff must increase" rule would wrongly reject. A Y squash makes B
   // more compact without covering more X turns, and that IS worth a new epoch: the
   // model sees the same history in fewer tokens.
@@ -142,7 +142,7 @@ test('WHAT[CONTEXT-COMPRESSION-010] CTX_011_the_same_cutoff_with_a_tighter_B_is_
   assert.equal(result.ok, true, result.ok ? '' : result.message)
   assert.equal(result.cutoff, 6)
 })
-test('WHAT[CONTEXT-COMPRESSION-010] COMPANION_011_a_digest_mismatch_fails_closed', () => {
+test('WHAT[context-compression-010] COMPANION_011_a_digest_mismatch_fails_closed', () => {
   // The Companion recorded a digest for cutoff 5, but X's prefix now hashes to
   // something else. The numbering moved — a Host compaction, a pruned message — and
   // building a FrozenRecordPrefix here would describe turns the prefix no longer has.
@@ -161,7 +161,7 @@ test('WHAT[CONTEXT-COMPRESSION-010] COMPANION_011_a_digest_mismatch_fails_closed
   assert.match(result.message, /what-the-prefix-hashes-to-now/)
   assert.match(result.message, /COMPANION-011/)
 })
-test('WHAT[CONTEXT-COMPRESSION-010] COMPANION_011_the_proof_runs_even_when_the_candidate_looks_identical', () => {
+test('WHAT[context-compression-010] COMPANION_011_the_proof_runs_even_when_the_candidate_looks_identical', () => {
   // An identity match computed from a stale numbering is not evidence of anything, so
   // the proof comes first. If this ordering flipped, a session whose prefix had been
   // renumbered would report `NotNewerThanCommitted` — a benign-sounding reason —
@@ -178,7 +178,7 @@ test('WHAT[CONTEXT-COMPRESSION-010] COMPANION_011_the_proof_runs_even_when_the_c
 
   assert.equal(result.error, 'CutoffProofFailed', 'the proof must precede the identity comparison')
 })
-test('WHAT[CONTEXT-COMPRESSION-010] CTX_011_a_candidate_the_selector_refuses_is_one_the_fold_would_also_refuse', () => {
+test('WHAT[context-compression-010] CTX_011_a_candidate_the_selector_refuses_is_one_the_fold_would_also_refuse', () => {
   // The two layers must agree on identity, since neither can import the other. An
   // identical candidate is refused here as `NotNewerThanCommitted` and there as
   // `CandidateNotNew`; if the field sets diverged, one side would build what the other

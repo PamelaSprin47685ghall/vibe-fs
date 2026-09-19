@@ -79,7 +79,7 @@ module ProviderRecoveryWorkflow =
         else
             RecoveryMaterialState.Ready
 
-    /// CTX-023 / PAR-018: durable event wait. The open materialization is the
+    /// CTX-023 / provider-attempt-recovery-018: durable event wait. The open materialization is the
     /// producer proof; commit/abandon facts close it and coverage facts may make
     /// a probe available. No process-local flight state and no clock participate.
     let rec private awaitLinkedProducer
@@ -482,7 +482,7 @@ module ProviderRecoveryWorkflow =
                 | HostSessionNudge.GateContinuationOutcome.Failed _ -> RetryVerdict.Terminal error
         }
 
-    /// PAR-021: the two durable facts the recovery target settlement consumes.
+    /// provider-attempt-recovery-021: the two durable facts the recovery target settlement consumes.
     /// The failed attempt was the LWR retry iff its exact physical request was
     /// accepted as a `ProviderRetryAttempt` continuation AND the failed provider
     /// run is the exact run that established that request's durable
@@ -511,7 +511,7 @@ module ProviderRecoveryWorkflow =
         kind = Some PromptAuthority.ContinuationKind.ProviderRetryAttempt
         && establishedRun = Some providerRun
 
-    /// PAR-021: the single target settlement for one confirmed provider failure,
+    /// provider-attempt-recovery-021: the single target settlement for one confirmed provider failure,
     /// shared by ordinary recovery, the SyncDelegate decorator and recovery
     /// re-entry. A failed LWR retry condemns its provider; every other failure
     /// keeps the provider and binds the next fresh admission of this session to
@@ -538,13 +538,13 @@ module ProviderRecoveryWorkflow =
         task {
             let admitted = recoveryAlreadyAdmitted durable input.Turn authorization
 
-            // PAR-021: only a licensed, not-yet-dispatched redispatch settles
+            // provider-attempt-recovery-021: only a licensed, not-yet-dispatched redispatch settles
             // the failed target; the witness and the durable prompt claim each
             // hold exactly one permission.
             if not admitted then
                 settleFailedAttemptTarget durable input.Turn
 
-            // PAR-022: a recovery continuation may only be sent after the Host
+            // provider-attempt-recovery-022: a recovery continuation may only be sent after the Host
             // stopped automatic retry for this exact provider run. A send inside
             // the still-running failed turn is silently dropped by the Host
             // (`SessionRunState.ensureRunning` joins the dying run instead of
@@ -747,7 +747,7 @@ module ProviderRecoveryWorkflow =
         }
         :> Task
 
-    /// Retry-decorator plug for one dedicated delegate child (DELEG-023).
+    /// Retry-decorator plug for one dedicated delegate child (delegation-023).
     ///
     /// The caller observes only the verdict: a single transient attempt failure
     /// never reaches it. Recovery reuses the same policy, ledger and WorkMain

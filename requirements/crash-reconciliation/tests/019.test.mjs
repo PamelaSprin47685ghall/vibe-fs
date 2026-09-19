@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import * as resume from '../../../dist/OpenCode/Host/ExplicitResumeSurface.js'
 
-test('WHAT[CRASH-019] external effects close 4 phase contract and ambiguous evidence fails closed without durable pc', async () => {
+test('WHAT[crash-reconciliation-019] external effects close 4 phase contract and ambiguous evidence fails closed without durable pc', async () => {
   // 1. Non-continue command is disclosure-only / no-op and never triggers automatic command replay
   const statusOutput = await resume.run('status', 'ses-crash019', '')
   assert.deepEqual(statusOutput.parts, [], 'non-continue command must not trigger automatic execution replay')

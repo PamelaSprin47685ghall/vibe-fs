@@ -21,7 +21,7 @@ const remainsPending = async (promise) =>
     new Promise((resolve) => setImmediate(() => resolve({ kind: 'pending' }))),
   ])
 
-test('WHAT[DELEG-031] DELEG_031_committed_checkpoint_advances_frontier_and_delivers_work_record', async () => {
+test('WHAT[delegation-031] DELEG_031_committed_checkpoint_advances_frontier_and_delivers_work_record', async () => {
   const owner = 'owner-deleg031-committed'
   const h = await live(owner)
   try {
@@ -43,7 +43,7 @@ test('WHAT[DELEG-031] DELEG_031_committed_checkpoint_advances_frontier_and_deliv
   }
 })
 
-test('WHAT[DELEG-031] DELEG_031_uncommitted_checkpoint_still_delivers_work_record_without_reexecution', async () => {
+test('WHAT[delegation-031] DELEG_031_uncommitted_checkpoint_still_delivers_work_record_without_reexecution', async () => {
   const owner = 'owner-deleg031-uncommitted'
   const h = await live(owner)
   try {
@@ -75,7 +75,7 @@ test('WHAT[DELEG-031] DELEG_031_uncommitted_checkpoint_still_delivers_work_recor
   }
 })
 
-test('WHAT[DELEG-031] DELEG_031_checkpoint_probe_reports_typed_settlement_with_exact_identity', async () => {
+test('WHAT[delegation-031] DELEG_031_checkpoint_probe_reports_typed_settlement_with_exact_identity', async () => {
   const owner = 'owner-deleg031-probe'
   const h = await live(owner)
   try {
@@ -101,7 +101,7 @@ test('WHAT[DELEG-031] DELEG_031_checkpoint_probe_reports_typed_settlement_with_e
   }
 })
 
-test('WHAT[DELEG-031] DELEG_031_duplicate_completion_is_idempotent_and_never_reexecutes', async () => {
+test('WHAT[delegation-031] DELEG_031_duplicate_completion_is_idempotent_and_never_reexecutes', async () => {
   const owner = 'owner-deleg031-duplicate'
   const h = await live(owner)
   try {
@@ -132,7 +132,7 @@ test('WHAT[DELEG-031] DELEG_031_duplicate_completion_is_idempotent_and_never_ree
   }
 })
 
-test('WHAT[DELEG-031] DELEG_031_stale_authority_completion_cannot_claim_a_new_call', async () => {
+test('WHAT[delegation-031] DELEG_031_stale_authority_completion_cannot_claim_a_new_call', async () => {
   const owner = 'owner-deleg031-stale'
   const h = await live(owner)
   try {
@@ -162,7 +162,7 @@ test('WHAT[DELEG-031] DELEG_031_stale_authority_completion_cannot_claim_a_new_ca
   }
 })
 
-test('WHAT[DELEG-031] DELEG_031_parent_supersede_leaves_no_orphan_completion_claim', async () => {
+test('WHAT[delegation-031] DELEG_031_parent_supersede_leaves_no_orphan_completion_claim', async () => {
   const owner = 'owner-deleg031-supersede'
   const h = await live(owner)
   try {
@@ -187,7 +187,7 @@ test('WHAT[DELEG-031] DELEG_031_parent_supersede_leaves_no_orphan_completion_cla
   }
 })
 
-test('WHAT[DELEG-031] DELEG_031_completed_and_delete_in_both_orders_settle_exactly_once', async () => {
+test('WHAT[delegation-031] DELEG_031_completed_and_delete_in_both_orders_settle_exactly_once', async () => {
   for (const order of ['complete-then-delete', 'delete-then-complete']) {
     const owner = `owner-deleg031-order-${order}`
     const h = await live(owner)

@@ -35,7 +35,7 @@ const assertHookOk = (result) => {
   assert.equal(result.status, 0, `hook failed: ${result.stderr || result.stdout}`)
 }
 
-test('WHAT[DURABLE-CONVERGENCE-008] reference_transaction_is_also_full_bidirectional_convergence', async () => {
+test('WHAT[durable-convergence-008] reference_transaction_is_also_full_bidirectional_convergence', async () => {
   const source = readFileSync(new URL('../../../../src/Wanxiangshu/Git/Hook/Sync.fs', import.meta.url), 'utf8')
   assert.match(source, /runReferenceTransaction/)
   assert.match(source, /converge remote observed/)

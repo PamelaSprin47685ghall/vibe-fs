@@ -73,7 +73,7 @@ const assertNoLegacyIdentityFields = (value, label) => {
   }
 }
 
-test('WHAT[PID-006] fresh physical retries preserve ParticipantIdentity while the failure budget advances', () => {
+test('WHAT[participant-identity-006] fresh physical retries preserve ParticipantIdentity while the failure budget advances', () => {
   const first = attemptPlan('engineer', 'work-main')
   const expected = canonicalIdentityOf('engineer')
 
@@ -106,7 +106,7 @@ test('WHAT[PID-006] fresh physical retries preserve ParticipantIdentity while th
   assertCanonicalIdentity(last.participantIdentity, expected, 'post-retry identity')
 })
 
-test('WHAT[PID-006] durable provider failure fold preserves the exact IdentitySeed', () => {
+test('WHAT[participant-identity-006] durable provider failure fold preserves the exact IdentitySeed', () => {
   const canonical = canonicalIdentityOf('engineer')
   const seed = {
     ...rootSelection('engineer'),

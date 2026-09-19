@@ -83,7 +83,7 @@ function reverseKeys(value) {
   return value;
 }
 
-test('WHAT[EPI-017] replay_is_key_order_invariant_or_stringify_hash_breaks_on_reordered_keys', async () => {
+test('WHAT[epistemic-reasoning-017] replay_is_key_order_invariant_or_stringify_hash_breaks_on_reordered_keys', async () => {
   const surface = gecSurface;
   const events = baseEvents();
   const first = await surface.semanticHash({ events });
@@ -106,7 +106,7 @@ test('WHAT[EPI-017] replay_is_key_order_invariant_or_stringify_hash_breaks_on_re
   const moved = await surface.semanticHash({ events: reorderedEvents });
   assert.notEqual(moved.hash, first.hash, 'event sequence order is semantic and must change the hash');
 });
-test('WHAT[EPI-017] replay_consumes_accepted_observations_without_provider_recall_or_replay_hits_network', async () => {
+test('WHAT[epistemic-reasoning-017] replay_consumes_accepted_observations_without_provider_recall_or_replay_hits_network', async () => {
   const surface = gecSurface;
   const events = baseEvents();
   const first = await surface.replay({ events });
@@ -123,7 +123,7 @@ test('WHAT[EPI-017] replay_consumes_accepted_observations_without_provider_recal
   assert.equal(diverged.ok, true);
   assert.notEqual(diverged.stateHash, first.stateHash, 'different accepted payloads must diverge even with the same seed');
 });
-test('WHAT[EPI-017] replay_rejects_observations_missing_protocol_bindings_or_partial_provenance_replays', async () => {
+test('WHAT[epistemic-reasoning-017] replay_rejects_observations_missing_protocol_bindings_or_partial_provenance_replays', async () => {
   const surface = gecSurface;
   const required = [
     'rootSnapshotHash',
@@ -239,7 +239,7 @@ const waveEvents = (wave, assignment) => {
   ]
 }
 
-test('WHAT[EPI-017] soak_replay_and_hash_stay_stable_across_repeated_waves', async () => {
+test('WHAT[epistemic-reasoning-017] soak_replay_and_hash_stay_stable_across_repeated_waves', async () => {
   const hashes = new Set()
   for (let wave = 0; wave < WAVES; wave += 1) {
     const events = waveEvents(wave, wave % 2 === 0 ? 'wording-a' : 'wording-b')

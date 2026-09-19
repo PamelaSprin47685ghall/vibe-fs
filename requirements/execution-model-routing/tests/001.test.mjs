@@ -14,7 +14,7 @@ const MANAGED = [
   'blogger',
 ]
 
-test('WHAT[EMR-001] EMR_001_recommended_resource_is_directly_executable_and_uses_full_model_selectors', async () => {
+test('WHAT[execution-model-routing-001] EMR_001_recommended_resource_is_directly_executable_and_uses_full_model_selectors', async () => {
   const source = await readFile(templateUrl, 'utf8')
   assert.match(source, /export default function route/)
   const { default: scheduler } = await import(`${templateUrl.href}?test=${Date.now()}`)
@@ -55,7 +55,7 @@ const withTemp = async (run) => {
   }
 }
 
-test('WHAT[EMR-001] EMR_001_missing_scheduler_is_created_once_then_loaded_from_disk', async () => {
+test('WHAT[execution-model-routing-001] EMR_001_missing_scheduler_is_created_once_then_loaded_from_disk', async () => {
   await withTemp(async (path) => {
     const scheduler = await bootstrapAndLoadAt(path, template)
     assert.equal(await readFile(path, 'utf8'), template)
@@ -64,7 +64,7 @@ test('WHAT[EMR-001] EMR_001_missing_scheduler_is_created_once_then_loaded_from_d
     assert.equal(selected.reasoning, 'none')
   })
 })
-test('WHAT[EMR-001] EMR_001_existing_scheduler_is_never_overwritten', async () => {
+test('WHAT[execution-model-routing-001] EMR_001_existing_scheduler_is_never_overwritten', async () => {
   await withTemp(async (path) => {
     const existing = `export default () => ({ model: 'provider/user-choice', reasoning: 'high' })\n`
     await import('node:fs/promises').then(({ mkdir }) => mkdir(join(path, '..'), { recursive: true }))
@@ -75,7 +75,7 @@ test('WHAT[EMR-001] EMR_001_existing_scheduler_is_never_overwritten', async () =
     assert.equal(invokeScheduler(scheduler, 'coder', []).model, 'provider/user-choice')
   })
 })
-test('WHAT[EMR-001] EMR_001_concurrent_bootstrap_keeps_one_atomic_winner_without_merge', async () => {
+test('WHAT[execution-model-routing-001] EMR_001_concurrent_bootstrap_keeps_one_atomic_winner_without_merge', async () => {
   await withTemp(async (path) => {
     const [left, right] = await Promise.all([
       bootstrapAndLoadAt(path, template),

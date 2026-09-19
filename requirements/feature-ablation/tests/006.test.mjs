@@ -18,7 +18,7 @@ const withEnv = (entries, run) => {
   }
 }
 
-test('WHAT[ABL-006] ABL_006_unknown_profile_fail_closed', () => {
+test('WHAT[feature-ablation-006] ABL_006_unknown_profile_fail_closed', () => {
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'does-not-exist']], () => {
     const result = Ablation.load()
     assert.equal(result.ok, false)

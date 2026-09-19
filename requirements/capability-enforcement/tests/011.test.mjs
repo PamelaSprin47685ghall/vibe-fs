@@ -125,7 +125,7 @@ const ROLE_ALLOW = {
   Blogger: ['chronicle'],
 }
 
-test('WHAT[ENF-011] AGENT_002_missing_agent_is_projected_on_configure', () => {
+test('WHAT[capability-enforcement-011] AGENT_002_missing_agent_is_projected_on_configure', () => {
   const config = buildConfig()
   delete config.agent.engineer
   const outcome = configureManagedAgents(config)
@@ -136,7 +136,7 @@ test('WHAT[ENF-011] AGENT_002_missing_agent_is_projected_on_configure', () => {
   assert.ok(typeof entry.prompt === 'string' && entry.prompt.length > 0)
   assert.equal('model' in entry, false)
 })
-test('WHAT[ENF-011] AGENT_002_owned_writes_never_touch_the_model_binding', () => {
+test('WHAT[capability-enforcement-011] AGENT_002_owned_writes_never_touch_the_model_binding', () => {
   const config = buildConfig()
   const before = {}
   for (const name in config.agent) before[name] = config.agent[name].model
@@ -146,7 +146,7 @@ test('WHAT[ENF-011] AGENT_002_owned_writes_never_touch_the_model_binding', () =>
     assert.equal(config.agent[name].model, before[name], `model binding of ${name} must be untouched`)
   }
 })
-test('WHAT[ENF-011] AGENT_019_external_directory_overrides_host_default_ask', () => {
+test('WHAT[capability-enforcement-011] AGENT_019_external_directory_overrides_host_default_ask', () => {
   const config = buildConfig()
   assert.equal(configureManagedAgents(config).ok, true)
 
@@ -187,14 +187,14 @@ function fullConfig() {
   return { agent: Object.fromEntries(NAMES.map((name) => [name, {}])) }
 }
 
-test('WHAT[ENF-011] MACFG_validate_accepts_empty_agent_map_and_projects_full_catalog', () => {
+test('WHAT[capability-enforcement-011] MACFG_validate_accepts_empty_agent_map_and_projects_full_catalog', () => {
   const empty = okOf(validate({}))
   assert.equal(empty.ok, true, empty.ok ? '' : empty.error)
   assert.equal(empty.bindingNames.length, 5)
   const blankMap = okOf(validate({ agent: {} }))
   assert.equal(blankMap.ok, true, blankMap.ok ? '' : blankMap.error)
 })
-test('WHAT[ENF-011] MACFG_validate_accepts_missing_equal_and_arbitrary_model_fields', () => {
+test('WHAT[capability-enforcement-011] MACFG_validate_accepts_missing_equal_and_arbitrary_model_fields', () => {
   const cfg = fullConfig()
   cfg.agent.manager.model = 'provider/shared'
   cfg.agent.engineer.model = ''
@@ -204,7 +204,7 @@ test('WHAT[ENF-011] MACFG_validate_accepts_missing_equal_and_arbitrary_model_fie
   assert.equal(result.ok, true, result.ok ? '' : result.error)
   assert.equal(result.bindingNames.length, 5, 'bookkeeper and predictor have no active Role binding')
 })
-test('WHAT[ENF-011] MACFG_applyOwnedFields_writes_owned_keys_and_never_touches_model', () => {
+test('WHAT[capability-enforcement-011] MACFG_applyOwnedFields_writes_owned_keys_and_never_touches_model', () => {
   const cfg = fullConfig()
   for (const name of NAMES) cfg.agent[name].model = `host/${name}`
   const result = configure(cfg)
@@ -219,7 +219,7 @@ test('WHAT[ENF-011] MACFG_applyOwnedFields_writes_owned_keys_and_never_touches_m
     assert.equal(entry.model, `host/${name}`, 'model stays untouched but is never routing truth')
   }
 })
-test('WHAT[ENF-011] MACFG_applyOwnedFields_skips_null_config_and_projects_missing_catalog_agents', () => {
+test('WHAT[capability-enforcement-011] MACFG_applyOwnedFields_skips_null_config_and_projects_missing_catalog_agents', () => {
   const rejected = configure(null)
   assert.equal(rejected.ok, false)
 
@@ -233,13 +233,13 @@ test('WHAT[ENF-011] MACFG_applyOwnedFields_skips_null_config_and_projects_missin
   assert.equal(projected.permission['*'], 'deny')
   assert.equal('model' in projected, false, 'projection never invents a model binding')
 })
-test('WHAT[ENF-011] MACFG_applyOwnedFields_honors_chat_max_retries_env', () => {
+test('WHAT[capability-enforcement-011] MACFG_applyOwnedFields_honors_chat_max_retries_env', () => {
   const cfg = fullConfig()
   const result = configure(cfg)
   assert.equal(result.ok, true, result.ok ? '' : result.error)
   assert.equal(cfg.experimental.chatMaxRetries, 0)
 })
-test('WHAT[ENF-011] MACFG_configureFromHostConfig_returns_role_inventory_without_model_authority', () => {
+test('WHAT[capability-enforcement-011] MACFG_configureFromHostConfig_returns_role_inventory_without_model_authority', () => {
   const cfg = fullConfig()
   cfg.agent.manager.model = 'provider/shared'
   const result = configure(cfg)
@@ -247,7 +247,7 @@ test('WHAT[ENF-011] MACFG_configureFromHostConfig_returns_role_inventory_without
   assert.equal(cfg.compaction.auto, false)
   assert.equal(cfg.agent.manager.model, 'provider/shared')
 })
-test('WHAT[ENF-011] MACFG_configureFromHostConfig_projects_missing_catalog_without_model_authority', () => {
+test('WHAT[capability-enforcement-011] MACFG_configureFromHostConfig_projects_missing_catalog_without_model_authority', () => {
   const cfg = {}
   const result = configure(cfg)
   assert.equal(result.ok, true, result.ok ? '' : result.error)

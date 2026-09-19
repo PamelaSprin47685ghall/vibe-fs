@@ -4,7 +4,7 @@ import * as relay from '../../../dist/Mission/Relay/Surface.js'
 
 
 
-test('WHAT[RELAY-012] fixed devops initial binding and recovery are idempotent and reject duplicate creation', () => {
+test('WHAT[relay-incumbency-012] fixed devops initial binding and recovery are idempotent and reject duplicate creation', () => {
   if (typeof relay.bindRoadDevOps === 'function') {
     const state = relay.empty()
     const bound1 = relay.bindRoadDevOps(state, 'road-1', 'devops-1')

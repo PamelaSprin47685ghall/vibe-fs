@@ -10,7 +10,7 @@ type ISessionRuntimeOwner =
     abstract CancelSessionChildren: string -> Task
     abstract DisposeSession: string -> Task
     abstract DisposeExecutorRuntime: string -> Task
-    /// MANAGED-SESSION-018: plugin shutdown drains process-local observers without
+    /// managed-session-lifecycle-018: plugin shutdown drains process-local observers without
     /// manufacturing logical parent cancellation. Durable Active handles survive
     /// for restart recovery before the shared Journal/EventStore is released.
     abstract DisposeAsync: unit -> Task

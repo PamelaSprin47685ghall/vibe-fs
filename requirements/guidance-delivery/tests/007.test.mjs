@@ -78,12 +78,12 @@ const markerOutput = (messages) => {
   return idx >= 0 ? output.slice(idx + SEP.length) : undefined
 }
 
-test('WHAT[GD-007] ENFORCER_TIP_NUDGE_001b_latestTipNudge_is_same_bytes_as_latestTipGuidance', async () => {
+test('WHAT[guidance-delivery-007] ENFORCER_TIP_NUDGE_001b_latestTipNudge_is_same_bytes_as_latestTipGuidance', async () => {
   const fixture = await seed()
   try {
     // 先交付一次 Full（推进 durable Frontier），之后 latest 稳定为 Identity 文本。
     await latestTipNudge(fixture.journal, blogger)
-    // GD-007: latestTipNudge 是 latestTipGuidance 的同字节别名（同一时刻
+    // guidance-delivery-007: latestTipNudge 是 latestTipGuidance 的同字节别名（同一时刻
     // 两者返回同一字节——Full/Identity 文本，不是旧 Nudge 字段）。
     const viaNudge = await latestTipNudge(fixture.journal, blogger)
     const viaGuidance = await latestTipGuidance(fixture.journal, blogger)
@@ -162,13 +162,13 @@ const withJournal = async (fn) => {
 const presentationOf = (value) => value?.presentation
 const textOf = (value) => value?.text
 
-test('WHAT[GD-007] ENFORCER_TIP_DELIVERY_003b_latestTipNudge_is_same_bytes_as_latestTipGuidance', async () => {
+test('WHAT[guidance-delivery-007] ENFORCER_TIP_DELIVERY_003b_latestTipNudge_is_same_bytes_as_latestTipGuidance', async () => {
   await withJournal(async (journal) => {
     await seedOwnerWithTip(journal)
     await resolveTipGuidance(journal, main) // record Full so latest is identity
     const viaLatest = await latestTipGuidance(journal, main)
     const viaAlias = await latestTipNudge(journal, main)
-    // latestTipNudge is the same-byte alias of latestTipGuidance (GD-007).
+    // latestTipNudge is the same-byte alias of latestTipGuidance (guidance-delivery-007).
     assert.equal(viaAlias, viaLatest)
   })
 })

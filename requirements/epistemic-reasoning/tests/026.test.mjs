@@ -27,7 +27,7 @@ const contractionCase = {
   expectFixedPoint: 2,
 };
 
-test('WHAT[EPI-026] declared_finite_dag_lattice_or_contraction_converges_or_closure_claims_without_domain', async () => {
+test('WHAT[epistemic-reasoning-026] declared_finite_dag_lattice_or_contraction_converges_or_closure_claims_without_domain', async () => {
   const surface = gecSurface;
   const dag = await surface.replay({ events: events(), closure: { domain: dagCase.domain, operator: dagCase.operator, maxIterations: 50 } });
   assert.equal(dag.ok, true);
@@ -47,7 +47,7 @@ test('WHAT[EPI-026] declared_finite_dag_lattice_or_contraction_converges_or_clos
   assert.equal(contraction.unique, true, 'only the contraction modulus may support a uniqueness claim');
 });
 
-test('WHAT[EPI-026] undeclared_domain_reports_bounded_residual_without_uniqueness_or_naive_fixed_point_overclaims', async () => {
+test('WHAT[epistemic-reasoning-026] undeclared_domain_reports_bounded_residual_without_uniqueness_or_naive_fixed_point_overclaims', async () => {
   const surface = gecSurface;
   const missing = [
     { name: 'absent domain', closure: { operator: latticeCase.operator, maxIterations: 8 } },
@@ -68,7 +68,7 @@ test('WHAT[EPI-026] undeclared_domain_reports_bounded_residual_without_uniquenes
   }
 });
 
-test('WHAT[EPI-026] async_convergence_stays_conjecture_without_gap_fairness_and_order_or_partial_evidence_claims_limit', async () => {
+test('WHAT[epistemic-reasoning-026] async_convergence_stays_conjecture_without_gap_fairness_and_order_or_partial_evidence_claims_limit', async () => {
   const surface = gecSurface;
   const partial = await surface.replay({
     events: events(),
@@ -85,7 +85,7 @@ test('WHAT[EPI-026] async_convergence_stays_conjecture_without_gap_fairness_and_
   assert.ok(partial.residual && Number.isFinite(partial.residual.bound), 'bounded residual must still be reported');
 });
 
-test('WHAT[EPI-026] declared_misspecification_downgrades_async_closure_even_when_other_flags_pass', async () => {
+test('WHAT[epistemic-reasoning-026] declared_misspecification_downgrades_async_closure_even_when_other_flags_pass', async () => {
   const surface = gecSurface;
   const misspecified = await surface.replay({
     events: events(),

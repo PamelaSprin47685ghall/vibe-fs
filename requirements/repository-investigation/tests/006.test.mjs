@@ -12,7 +12,7 @@ const providerRoot = join(here, '../../../resources/provider')
 const readLaw = (semanticPath, locale) => readFileSync(join(providerRoot, semanticPath, `${locale}.md`), 'utf8')
 const LOCALES = ['en', 'zh-CN']
 
-test('WHAT[REPOSITORY-INVESTIGATION-006] INVESTIGATE_warm_start_law_marks_hints_low_trust_in_appendix', () => {
+test('WHAT[repository-investigation-006] INVESTIGATE_warm_start_law_marks_hints_low_trust_in_appendix', () => {
   for (const locale of LOCALES) {
     const appendix = readLaw('lifecycle/warm-start/appendix', locale)
     assert.match(
@@ -70,7 +70,7 @@ const waitFor = async (predicate, message, ms = 1500) => {
   }
 }
 
-test('WHAT[REPOSITORY-INVESTIGATION-006] AGENT_032_renderer_keeps_hostile_hint_bytes_as_toml_data_and_dedupes_stably', () => {
+test('WHAT[repository-investigation-006] AGENT_032_renderer_keeps_hostile_hint_bytes_as_toml_data_and_dedupes_stably', () => {
   const hostile = ']]\n[[evil]]\nowned = true\n# still data'
   const duplicate = hint(2, 1, 'src/a.fs', hostile, 0.1)
   const searches = [
@@ -115,7 +115,7 @@ test.before(() => {
   managedAgentConfig.installDefaultResources()
 })
 
-test('WHAT[REPOSITORY-INVESTIGATION-006] AGENT_027_kernel_identity_and_commands', () => {
+test('WHAT[repository-investigation-006] AGENT_027_kernel_identity_and_commands', () => {
   assert.equal(semble.serverName, 'semble')
   assert.equal(semble.defaultRef, 'main')
   assert.equal(semble.repo, 'https://github.com/MinishLab/semble.git')
@@ -125,7 +125,7 @@ test('WHAT[REPOSITORY-INVESTIGATION-006] AGENT_027_kernel_identity_and_commands'
   assert.deepEqual(semble.uvxCommand(' v1.2.3 '), uvxFrom('v1.2.3'))
   assert.deepEqual(semble.fixtureCommand('/tmp/fixture.js'), ['node', '/tmp/fixture.js'])
 })
-test('WHAT[REPOSITORY-INVESTIGATION-006] AGENT_027_launch_disabled_fixture_test_uvx', () => {
+test('WHAT[repository-investigation-006] AGENT_027_launch_disabled_fixture_test_uvx', () => {
   assert.equal(semble.launchFromVars({ SEMBLE_MCP_DISABLED: '1' }).kind, 'Disabled')
   assert.equal(semble.launchFromVars({ SEMBLE_MCP_DISABLED: 'true', SEMBLE_MCP_FIXTURE: '/tmp/x.js' }).kind, 'Disabled')
   const fixture = semble.launchFromVars({ SEMBLE_MCP_FIXTURE: '/tmp/semble-fixture.js', WANXIANGSHU_TEST: 'true' })
@@ -139,7 +139,7 @@ test('WHAT[REPOSITORY-INVESTIGATION-006] AGENT_027_launch_disabled_fixture_test_
   assert.equal(defaults.kind, 'Uvx')
   assert.equal(defaults.value, semble.defaultRef)
 })
-test('WHAT[REPOSITORY-INVESTIGATION-006] AGENT_027_search_disabled_returns_empty_without_spawn', async () => {
+test('WHAT[repository-investigation-006] AGENT_027_search_disabled_returns_empty_without_spawn', async () => {
   assert.deepEqual(await semble.search(semble.launchFromVars({ SEMBLE_MCP_DISABLED: '1' }), 'auth', '/repo', 5), [])
 })
 }

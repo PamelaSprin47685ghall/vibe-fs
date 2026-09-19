@@ -18,7 +18,7 @@ const withEnv = (entries, run) => {
   }
 }
 
-test('WHAT[ABL-005] ABL_005_station_05_denies_downstream_tools', () => {
+test('WHAT[feature-ablation-005] ABL_005_station_05_denies_downstream_tools', () => {
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-05']], () => {
     Ablation.load()
     assert.equal(Ablation.allowsTool('fork'), false)
@@ -30,7 +30,7 @@ test('WHAT[ABL-005] ABL_005_station_05_denies_downstream_tools', () => {
   })
 })
 
-test('WHAT[ABL-005] ABL_005_station_14_keeps_coder_surface_and_ablates_manager_tools', () => {
+test('WHAT[feature-ablation-005] ABL_005_station_14_keeps_coder_surface_and_ablates_manager_tools', () => {
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-14']], () => {
     Ablation.load()
     assert.equal(Ablation.allowsTool('read'), true)

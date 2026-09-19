@@ -127,7 +127,7 @@ module HostSignalBootstrap =
             // recovery itself is causal and no longer uses a wall-clock deadline.
             let recoveryTimerPort = NodeTiming.nodeTimerPort ()
 
-            // HOST-BOUNDARY-008: projection catch-up wakes on the session's
+            // host-boundary-008: projection catch-up wakes on the session's
             // message.updated signal; recoveryTimerPort supplies the backstop.
             let messageVisibility = MessageVisibilityHub(recoveryTimerPort)
             scope.AttachMessageVisibility messageVisibility
@@ -178,7 +178,7 @@ module HostSignalBootstrap =
 
                 reconciler.Signal signal
 
-            /// PAR-003: no Host signal may name the failed ProviderRun.
+            /// provider-attempt-recovery-003: no Host signal may name the failed ProviderRun.
             ///
             /// `ProviderFailure` and `ProviderRetry` used to run their own writers here
             /// — a second and third writer of the durable failure budget, each deciding from
@@ -192,7 +192,7 @@ module HostSignalBootstrap =
                 | SessionIdle sessionId ->
                     // LOOP-005: idle ends the attempt → fresh detector for the next stream.
                     // Armed anomaly must survive until TurnAborted reconciliation consumes
-                    // guard ownership (ResetDetector deliberately does not clear it; DG-008).
+                    // guard ownership (ResetDetector deliberately does not clear it; degeneration-guard-008).
                     scope.LoopSensor.ResetDetector sessionId
 
                     // HOST-004: the idle observation mints the quiescence permit that
@@ -329,7 +329,7 @@ module HostSignalBootstrap =
             let settleExactTerminal (observation: ExactProviderTerminalObservation) =
                 match observation.Outcome, observation.Disposition, startedEvidenceForTerminal observation with
                 | HostProviderTerminalOutcome.ProviderFailure failure, None, Some _ ->
-                    // PAR-022: the Host's exact attempt-stop observation. A recovery
+                    // provider-attempt-recovery-022: the Host's exact attempt-stop observation. A recovery
                     // continuation for this run may only be sent after it.
                     ProviderAttemptStopFence.shared.Observe(observation.SessionId, observation.ProviderRun)
 
@@ -763,26 +763,26 @@ module HostSignalBootstrap =
                         | Some sessionId -> do! ensurePhysicalParentDiscovered sessionId
                         | None -> ()
 
-                        // INTRA-PARTICIPANT-PARALLELISM-013: request-local origin
+                        // intra-participant-parallelism-013: request-local origin
                         // narrowing is independent of business-root admission. In
-                        // particular, CRASH-018 explicit /continue still performs a
+                        // particular, crash-reconciliation-018 explicit /continue still performs a
                         // provider turn even though it deliberately skips managed admission.
                         FissionHostRequestProjection.projectExternalManaged hasPhysicalParent intent output
 
-                        // CRASH-018: command.execute.before has no physical message id.
+                        // crash-reconciliation-018: command.execute.before has no physical message id.
                         // Carry its dynamic restart disclosure across that one Host seam,
                         // then materialize it on the real chat.message before any owner
                         // policy can observe the turn. Hosts that already forwarded the
                         // marked part only consume the pending handoff here.
                         let explicitResume = ExplicitResumeSuppression.classifyChatMessage decoded output
 
-                        // CRASH-018: bind the disclosure marker to this exact
+                        // crash-reconciliation-018: bind the disclosure marker to this exact
                         // physical user material before any routing/reconcile wake
                         // can interpret the turn. A later unmarked physical user
                         // message on the same reusable SessionId clears it here.
                         match decoded.SessionId, decoded.PhysicalUserMessageId with
                         | Some sessionId, Some physicalId ->
-                            // HOST-004 / CRASH-006: physical admission itself closes
+                            // HOST-004 / crash-reconciliation-006: physical admission itself closes
                             // the previous terminal's idle-send window. Waiting until
                             // messages.transform leaves a race where an old idle repair
                             // can enqueue after this message is accepted and supersede

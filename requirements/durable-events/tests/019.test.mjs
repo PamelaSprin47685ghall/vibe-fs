@@ -27,7 +27,7 @@ const mustOk = (result, label) => {
   return result
 }
 
-test('WHAT[DURABLE-EVENTS-019] every registered business oracle changes its production Current', async () => {
+test('WHAT[durable-events-019] every registered business oracle changes its production Current', async () => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-integrator-registration-'))
   const commonDir = join(root, '.git')
   mkdirSync(commonDir, { recursive: true })
@@ -166,7 +166,7 @@ const { CANONICAL_EVENT_READER_OWNER_PATHS, DUAL_WRITE_ALLOWLIST, GIT_BYPASS_ALL
 const readFixture = (name) =>
   readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8')
 
-test('WHAT[DURABLE-EVENTS-019] feature history loops report exact path line and token', () => {
+test('WHAT[durable-events-019] feature history loops report exact path line and token', () => {
   const fixtures = [
     ['ProcessEventLog.readStreams commonDir', 'ProcessEventLog.readStreams'],
     ['let loadEvents raw = raw', 'loadEvents'],
@@ -208,7 +208,7 @@ test('WHAT[DURABLE-EVENTS-019] feature history loops report exact path line and 
     { line: 5, token: 'manual merge' },
   )
 })
-test('WHAT[DURABLE-EVENTS-019] feature-local NDJSON SQLite and private stores are forbidden', () => {
+test('WHAT[durable-events-019] feature-local NDJSON SQLite and private stores are forbidden', () => {
   const file = 'src/Wanxiangshu/Repository/Feature/PrivateStore.fs'
   const source = [
     'module FeatureStorage',
@@ -226,7 +226,7 @@ test('WHAT[DURABLE-EVENTS-019] feature-local NDJSON SQLite and private stores ar
     ],
   )
 })
-test('WHAT[DURABLE-EVENTS-019] durable file database and custom-store writer capabilities are owner-bound', () => {
+test('WHAT[durable-events-019] durable file database and custom-store writer capabilities are owner-bound', () => {
   const file = 'src/Wanxiangshu/Repository/Feature/CustomHistory.fs'
   const fixtures = [
     ['System.IO.File.AppendAllText("feature-history.log", payload)', 'System.IO.File.AppendAllText'],
@@ -248,7 +248,7 @@ test('WHAT[DURABLE-EVENTS-019] durable file database and custom-store writer cap
     'the exact physical owner may use durable writer capabilities',
   )
 })
-test('WHAT[DURABLE-EVENTS-019] canonical integrator and exact physical or proof readers are allowed', () => {
+test('WHAT[durable-events-019] canonical integrator and exact physical or proof readers are allowed', () => {
   const reader = [
     'let streams = ProcessEventLog.readStreams commonDir',
     'let event = (store: IEventStore).TryEvent eventId',
@@ -338,7 +338,7 @@ test('WHAT[DURABLE-EVENTS-019] canonical integrator and exact physical or proof 
     'verification observation is granted to exact probes, not the whole directory',
   )
 })
-test('WHAT[DURABLE-EVENTS-019] production tree has no feature history loop or private substrate', () => {
+test('WHAT[durable-events-019] production tree has no feature history loop or private substrate', () => {
   const entries = collectProductionEntries()
   const violations = scanFiles(entries).filter(
     (v) => v.id === 'feature-history-loop' || v.id === 'private-durable-substrate',

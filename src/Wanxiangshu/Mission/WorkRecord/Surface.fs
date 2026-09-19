@@ -130,7 +130,7 @@ module WorkRecordSurface =
                 | Error error -> raise (InvalidOperationException(captureError error))
         }
 
-    /// WORK-RECORD-011 fixture seam: capture the private completion evidence
+    /// work-record-011 fixture seam: capture the private completion evidence
     /// through the canonical XTrace owner without exposing that owner to this
     /// package's JS tests.
     let captureTerminalText

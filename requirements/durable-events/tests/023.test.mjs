@@ -33,7 +33,7 @@ function collectSourceFiles(directory) {
   return found
 }
 
-test('WHAT[DURABLE-EVENTS-023] canonical codec surface keeps encode decode UTF-8 identity and merge in one fail-closed protocol', () => {
+test('WHAT[durable-events-023] canonical codec surface keeps encode decode UTF-8 identity and merge in one fail-closed protocol', () => {
   const left = event()
   const same = event()
   const collision = event({ payload: { state: 'closed' } })
@@ -73,11 +73,11 @@ test('WHAT[DURABLE-EVENTS-023] canonical codec surface keeps encode decode UTF-8
   assert.deepEqual(eventCodec.decodeUtf8Text(invalidUtf8), invalidUtf8Error)
   assert.deepEqual(eventCodec.decodeUtf8(invalidUtf8), invalidUtf8Error)
 })
-test('WHAT[DURABLE-EVENTS-023] canonical codec and owner folds reject physical store and outer-union authority', () => {
+test('WHAT[durable-events-023] canonical codec and owner folds reject physical store and outer-union authority', () => {
   assertPureContract()
   assertEffectIsInjected('file-system')
 })
-test('WHAT[DURABLE-EVENTS-023] single-field family folds own their slice and declare no aggregate dependency', () => {
+test('WHAT[durable-events-023] single-field family folds own their slice and declare no aggregate dependency', () => {
   const shardInventory = readCompileShardInventory({ repositoryRoot: ROOT })
   const subsystemInventory = buildSubsystemInventory({ compileInventory: shardInventory })
   assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))
@@ -112,7 +112,7 @@ test('WHAT[DURABLE-EVENTS-023] single-field family folds own their slice and dec
     .join('\n')
   assert.doesNotMatch(changeFoldSources, /\bAgentProjectionSet\b|\bFoldRejection\b/)
 })
-test('WHAT[DURABLE-EVENTS-023] prompt provider companion and context folds decide on their own slices while composition owns the aggregate write', () => {
+test('WHAT[durable-events-023] prompt provider companion and context folds decide on their own slices while composition owns the aggregate write', () => {
   // These families span more than one slice, so the fold stays and returns a
   // change list over the slices it owns; the bridge writes it back.
   for (const source of [
@@ -166,7 +166,7 @@ const withJournalDir = async (tag, scenario) => {
   }
 }
 
-test('WHAT[DURABLE-EVENTS-023] EXEC_port_members_read_journal_at_call_time', () =>
+test('WHAT[durable-events-023] EXEC_port_members_read_journal_at_call_time', () =>
   withJournalDir('live-read', (commonDir, tag) =>
     surface.liveReadScenario(commonDir, tag).then((result) => {
       assert.equal(result.folded, true, 'the seeded fact must fold')
@@ -180,7 +180,7 @@ test('WHAT[DURABLE-EVENTS-023] EXEC_port_members_read_journal_at_call_time', () 
       assert.equal(result.stateAfter, true, 'ReadView must observe the XTrace slice the opening wrote')
     }),
   ))
-test('WHAT[DURABLE-EVENTS-023] EXEC_one_commit_moves_every_related_view_together', () =>
+test('WHAT[durable-events-023] EXEC_one_commit_moves_every_related_view_together', () =>
   withJournalDir('same-commit', (commonDir, tag) =>
     surface.sameCommitViewScenario(commonDir, tag).then((result) => {
       assert.equal(result.outcome, 'Ok', `commit must succeed, got ${result.outcome}`)
@@ -199,7 +199,7 @@ test('WHAT[DURABLE-EVENTS-023] EXEC_one_commit_moves_every_related_view_together
       assert.equal(result.postState, true, 'ReadView must carry the session state the commit created')
     }),
   ))
-test('WHAT[DURABLE-EVENTS-023] EXEC_revision_waiter_wakes_on_next_commit', () =>
+test('WHAT[durable-events-023] EXEC_revision_waiter_wakes_on_next_commit', () =>
   withJournalDir('wait', (commonDir, tag) =>
     Promise.race([
       surface.revisionWaitScenario(commonDir, tag),
@@ -212,7 +212,7 @@ test('WHAT[DURABLE-EVENTS-023] EXEC_revision_waiter_wakes_on_next_commit', () =>
       assert.equal(result.observedHandle, true, 'the member reads the committed state after the wake')
     }),
   ))
-test('WHAT[DURABLE-EVENTS-023] EXEC_cancelled_waiter_releases_without_stealing_a_commit', () =>
+test('WHAT[durable-events-023] EXEC_cancelled_waiter_releases_without_stealing_a_commit', () =>
   withJournalDir('cancel', (commonDir, tag) =>
     surface.cancelWaiterScenario(commonDir, tag).then((result) => {
       assert.equal(result.cancelledToNone, true, 'a cancelled waiter resolves to None')
@@ -220,7 +220,7 @@ test('WHAT[DURABLE-EVENTS-023] EXEC_cancelled_waiter_releases_without_stealing_a
       assert.equal(result.revisionAdvanced, true, 'the commit still lands and advances revision')
     }),
   ))
-test('WHAT[DURABLE-EVENTS-023] EXEC_unknown_append_poisons_and_is_never_confirmed', () =>
+test('WHAT[durable-events-023] EXEC_unknown_append_poisons_and_is_never_confirmed', () =>
   withJournalDir('poison', (commonDir, tag) =>
     surface.poisonedUnknownAppendScenario(commonDir, tag).then((result) => {
       assert.equal(result.seededOk, true)

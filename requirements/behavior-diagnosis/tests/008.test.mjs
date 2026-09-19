@@ -8,7 +8,7 @@ const enforcer = await import("../../../dist/Enforcer/Surface.js");
 const catalogRules = enforcer.rules()
 const catalogFields = enforcer.fieldNames()
 
-test('WHAT[BD-008] ENFORCER_170_no_bridge_fields_on_rule', () => {
+test('WHAT[behavior-diagnosis-008] ENFORCER_170_no_bridge_fields_on_rule', () => {
   for (const rule of catalogRules) {
     assert.equal(rule.scoreWhen, undefined, `rule ${rule.ruleId} still has ScoreWhen`)
     assert.equal(rule.nudge, undefined, `rule ${rule.ruleId} still has Nudge`)
@@ -26,7 +26,7 @@ const enforcer = await import("../../../dist/Enforcer/Surface.js");
 const firstField = () => enforcer.fieldNames()[0]
 const firstRule = () => enforcer.tryFindByField(firstField())
 
-test('WHAT[BD-008] ENFORCER_024_extra_numeric_properties_are_ignored', () => {
+test('WHAT[behavior-diagnosis-008] ENFORCER_024_extra_numeric_properties_are_ignored', () => {
   const field = firstField()
   const result = enforcer.decodeCall({
     text: 'entry',
@@ -75,7 +75,7 @@ const envelope = (fact) => ({
   fact,
 })
 
-test('WHAT[BD-008] ENFORCER_072_observation_commit_without_TipRuleId_is_refused_at_envelope_decode', () => {
+test('WHAT[behavior-diagnosis-008] ENFORCER_072_observation_commit_without_TipRuleId_is_refused_at_envelope_decode', () => {
   for (const tag of ['BlogEntryCommitted', 'BlogObservationCommitted']) {
     const legacy = JSON.stringify({
       RuntimeId: ['RuntimeId', 'rt1'],
@@ -102,7 +102,7 @@ test('WHAT[BD-008] ENFORCER_072_observation_commit_without_TipRuleId_is_refused_
     assert.equal(decoded.error, blog.tipV2CleanBreakMessage)
   }
 })
-test('WHAT[BD-008] ENFORCER_072_ScoreVectorRef_era_entry_is_refused_at_envelope_decode', () => {
+test('WHAT[behavior-diagnosis-008] ENFORCER_072_ScoreVectorRef_era_entry_is_refused_at_envelope_decode', () => {
   for (const tag of ['BlogEntryCommitted', 'BlogObservationCommitted']) {
     const legacy = JSON.stringify({
       RuntimeId: ['RuntimeId', 'rt1'],
@@ -169,7 +169,7 @@ const squashed = () => ({
   run: 'run-squash',
 })
 
-test('WHAT[BD-008] ENFORCER_072_score_vector_entry_refuses_with_tip_v2_message', () => {
+test('WHAT[behavior-diagnosis-008] ENFORCER_072_score_vector_entry_refuses_with_tip_v2_message', () => {
   for (const tag of ['BlogEntryCommitted', 'BlogObservationCommitted']) {
     const legacy = `{"${tag}":{"ScoreVectorRef":"sv-1","TipRuleId":"rule"}}`
     assert.equal(blog.containsLegacyScoreVectorEntry(legacy), true, tag)
@@ -179,13 +179,13 @@ test('WHAT[BD-008] ENFORCER_072_score_vector_entry_refuses_with_tip_v2_message',
     assert.equal(decoded.error, blog.tipV2CleanBreakMessage)
   }
 })
-test('WHAT[BD-008] ENFORCER_072_entry_without_tip_rule_id_is_legacy', () => {
+test('WHAT[behavior-diagnosis-008] ENFORCER_072_entry_without_tip_rule_id_is_legacy', () => {
   for (const tag of ['BlogEntryCommitted', 'BlogObservationCommitted']) {
     const noTipRule = `{"${tag}":{"Entry":"e"}}`
     assert.equal(blog.containsLegacyScoreVectorEntry(noTipRule), true, tag)
   }
 })
-test('WHAT[BD-008] ENFORCER_072_modern_tip_v2_entry_passes_the_marker_check', () => {
+test('WHAT[behavior-diagnosis-008] ENFORCER_072_modern_tip_v2_entry_passes_the_marker_check', () => {
   for (const tag of ['BlogEntryCommitted', 'BlogObservationCommitted']) {
     const modern = `{"${tag}":{"TipRuleId":"rule-x","Entry":"e"}}`
     assert.equal(blog.containsLegacyScoreVectorEntry(modern), false, tag)
@@ -215,7 +215,7 @@ const cycleRecord = (n, field) => ({
   observedPrefixEpoch: 0,
 })
 
-test('WHAT[BD-008] ENFORCER_TIP_03_04_facade_surface_has_tip_not_numeric_scores', () => {
+test('WHAT[behavior-diagnosis-008] ENFORCER_TIP_03_04_facade_surface_has_tip_not_numeric_scores', () => {
   const sample = enforcer.decodeCall({ text: 'x', tip: fields[0] })
   assert.equal(sample.ok, true)
   assert.equal(typeof sample.value.tip.ruleId, 'string')

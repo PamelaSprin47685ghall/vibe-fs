@@ -35,7 +35,7 @@ module ManagedSessionTermination =
         | Ok(), Error error -> Error("Host abort failed: " + error)
         | Ok(), Ok() -> Ok()
 
-    /// MANAGED-SESSION-017: fail-closed termination is one causal CE, not an
+    /// managed-session-lifecycle-017: fail-closed termination is one causal CE, not an
     /// attempt-only interrupt followed by a future callback guessing the cause.
     /// Descendant durable cancellation precedes physical teardown; Failed is
     /// published after teardown so the existing fork terminal listener commits

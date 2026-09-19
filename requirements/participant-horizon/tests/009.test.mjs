@@ -9,14 +9,14 @@ const assertDeniedGenerically = (orchestrator, calling) => {
   assert.ok(calling)
 }
 
-test('WHAT[PARTICIPANT-HORIZON-009] FORK_manager-unavailable_is_denied_generically', () => {
+test('WHAT[participant-horizon-009] FORK_manager-unavailable_is_denied_generically', () => {
   assertDeniedGenerically(false, 'examiner')
 })
 
-test('WHAT[PARTICIPANT-HORIZON-009] FORK_manager-unknown_is_denied_generically', () => {
+test('WHAT[participant-horizon-009] FORK_manager-unknown_is_denied_generically', () => {
   assertDeniedGenerically(false, 'wizard')
 })
 
-test('WHAT[PARTICIPANT-HORIZON-009] FORK_orchestrator-unknown_is_denied_generically', () => {
+test('WHAT[participant-horizon-009] FORK_orchestrator-unknown_is_denied_generically', () => {
   assertDeniedGenerically(true, 'coder')
 })

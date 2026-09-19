@@ -10,7 +10,7 @@ const { fileURLToPath } = await import("node:url");
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 
-test('WHAT[HOST-BOUNDARY-021] HostSignalBootstrap is strictly a wiring composition root with 0 foreign internal imports', () => {
+test('WHAT[host-boundary-021] HostSignalBootstrap is strictly a wiring composition root with 0 foreign internal imports', () => {
   const bootstrapSource = read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
 
   // Prohibit forbidden foreign internal domain opens (AGENTS.md Chapter 26)
@@ -53,7 +53,7 @@ test('WHAT[HOST-BOUNDARY-021] HostSignalBootstrap is strictly a wiring compositi
   assert.doesNotMatch(bootstrapSource, /\bNextStep\b/)
   assert.doesNotMatch(bootstrapSource, /\bResumeAt\b/)
 })
-test('WHAT[HOST-BOUNDARY-021] HostSignalBootstrap delegates policy to published owner contracts', () => {
+test('WHAT[host-boundary-021] HostSignalBootstrap delegates policy to published owner contracts', () => {
   const bootstrapSource = read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
 
   // Host observations are persisted through the exact execution-binding owner;
@@ -93,7 +93,7 @@ const { fileURLToPath } = await import("node:url");
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 
-test('WHAT[HOST-BOUNDARY-021] HOST_021_plugin_load_graph_has_no_semantic_recovery_or_workspace_mutation', () => {
+test('WHAT[host-boundary-021] HOST_021_plugin_load_graph_has_no_semantic_recovery_or_workspace_mutation', () => {
   const boot = read('src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs')
   const signal = read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
   const workspaceStore = read('src/Wanxiangshu/OpenCode/Host/WorkspaceEventStore.fs')
@@ -121,14 +121,14 @@ test('WHAT[HOST-BOUNDARY-021] HOST_021_plugin_load_graph_has_no_semantic_recover
   assert.equal([...recoveryWiring.matchAll(/AttachDurabilityActivation/g)].length, 1)
   assert.doesNotMatch(recoveryWiring, /restoreLinkedChildren|recoverFamilyDirect|defaultRecoverPromptClaims|defaultRecoverBlogger/)
 })
-test('WHAT[HOST-BOUNDARY-021] HOST_021_broken_tool_recovery_APIs_do_not_exist', () => {
+test('WHAT[host-boundary-021] HOST_021_broken_tool_recovery_APIs_do_not_exist', () => {
   const fission = read('src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs')
   const jsStore = read('src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs')
 
   assert.doesNotMatch(fission, /let\s+recoverGroups\b/)
   assert.doesNotMatch(jsStore, /let\s+recoverCurrent\b/)
 })
-test('WHAT[HOST-BOUNDARY-021] HOST_021_ordinary_join_does_not_reenlist_old_durable_tool_state', () => {
+test('WHAT[host-boundary-021] HOST_021_ordinary_join_does_not_reenlist_old_durable_tool_state', () => {
   const join = read('src/Wanxiangshu/Execution/Delegation/Fork/Host/Join.fs')
   const joinTool = read('src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinTool.fs')
 
@@ -136,7 +136,7 @@ test('WHAT[HOST-BOUNDARY-021] HOST_021_ordinary_join_does_not_reenlist_old_durab
   assert.match(join, /drainFromJournalWhere/)
   assert.doesNotMatch(joinTool, /tryMembershipOfLane/)
 })
-test('WHAT[HOST-BOUNDARY-021] HOST_021_plugin_load_does_not_append_RuntimeStarted', () => {
+test('WHAT[host-boundary-021] HOST_021_plugin_load_does_not_append_RuntimeStarted', () => {
   const boot = read('src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs')
   const journalWriter = read('src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs')
 
@@ -178,34 +178,34 @@ const acceptedRetryInput = (overrides = {}) => ({
   ...overrides,
 })
 
-test('WHAT[HOST-BOUNDARY-021] XWIRE_covered_prefix_digest_is_sha256', () => {
+test('WHAT[host-boundary-021] XWIRE_covered_prefix_digest_is_sha256', () => {
   assert.equal(
     XWireSurface.coveredPrefixDigest(baseProjection, 1),
     '823d6b40827ef755cd32aeef72b073a7883c01dcb29c5fdf3318c237a59f1129',
   )
 })
-test('WHAT[HOST-BOUNDARY-021] XWIRE_no_journal_is_a_noop', () => {
+test('WHAT[host-boundary-021] XWIRE_no_journal_is_a_noop', () => {
   const result = XWireSurface.transform(acceptedRetryInput({ journal: false }))
   assert.equal(result.ok, true)
   assert.equal(result.noop, true)
   assert.equal(result.changed, false)
   assert.equal(result.consumed, false)
 })
-test('WHAT[HOST-BOUNDARY-021] XWIRE_no_session_id_in_output_is_a_noop', () => {
+test('WHAT[host-boundary-021] XWIRE_no_session_id_in_output_is_a_noop', () => {
   const result = XWireSurface.transform(acceptedRetryInput({ sessionId: '' }))
   assert.equal(result.ok, true)
   assert.equal(result.noop, true)
   assert.equal(result.changed, false)
   assert.equal(result.consumed, false)
 })
-test('WHAT[HOST-BOUNDARY-021] XWIRE_unaccepted_retry_is_a_noop', () => {
+test('WHAT[host-boundary-021] XWIRE_unaccepted_retry_is_a_noop', () => {
   const result = XWireSurface.transform(acceptedRetryInput({ acceptedRetry: false }))
   assert.equal(result.ok, true)
   assert.equal(result.noop, true)
   assert.equal(result.changed, false)
   assert.equal(result.consumed, false)
 })
-test('WHAT[HOST-BOUNDARY-021] XWIRE_accepted_retry_with_material_renders_synthetic_prefix', () => {
+test('WHAT[host-boundary-021] XWIRE_accepted_retry_with_material_renders_synthetic_prefix', () => {
   const result = XWireSurface.transform(acceptedRetryInput({ coverableCutoff: 2 }))
   assert.equal(result.ok, true)
   assert.equal(result.noop, false)
@@ -218,7 +218,7 @@ test('WHAT[HOST-BOUNDARY-021] XWIRE_accepted_retry_with_material_renders_synthet
     assert.ok(result.output.messages, 'output must have messages')
   }
 })
-test('WHAT[HOST-BOUNDARY-021] XWIRE_accepted_retry_without_material_has_no_probe', () => {
+test('WHAT[host-boundary-021] XWIRE_accepted_retry_without_material_has_no_probe', () => {
   const result = XWireSurface.transform(acceptedRetryInput({ coverableCutoff: 0 }))
   assert.equal(result.ok, true)
   assert.equal(result.noop, false)
@@ -228,12 +228,12 @@ test('WHAT[HOST-BOUNDARY-021] XWIRE_accepted_retry_without_material_has_no_probe
   assert.equal(result.changed, false)
   assert.ok(result.noProbeReason, 'should have a no-probe reason')
 })
-test('WHAT[HOST-BOUNDARY-021] XWIRE_completed_attempt_with_probe_promotes_prefix_rebase', () => {
+test('WHAT[host-boundary-021] XWIRE_completed_attempt_with_probe_promotes_prefix_rebase', () => {
   const result = XWireSurface.transform(acceptedRetryInput({ outcome: 'completed', coverableCutoff: 2 }))
   assert.equal(result.ok, true)
   assert.equal(result.promoted, true)
 })
-test('WHAT[HOST-BOUNDARY-021] XWIRE_stale_probe_does_not_promote_after_prefix_rebase', () => {
+test('WHAT[host-boundary-021] XWIRE_stale_probe_does_not_promote_after_prefix_rebase', () => {
   const result = XWireSurface.reconcile({
     hasPlan: true,
     outcome: 'completed',
@@ -244,35 +244,35 @@ test('WHAT[HOST-BOUNDARY-021] XWIRE_stale_probe_does_not_promote_after_prefix_re
   assert.equal(result.promoted, false)
   assert.equal(result.cleared, true)
 })
-test('WHAT[HOST-BOUNDARY-021] XWIRE_failed_attempt_does_not_promote', () => {
+test('WHAT[host-boundary-021] XWIRE_failed_attempt_does_not_promote', () => {
   const result = XWireSurface.transform(acceptedRetryInput({ outcome: 'failed', coverableCutoff: 2 }))
   assert.equal(result.ok, true)
   assert.equal(result.promoted, false)
 })
-test('WHAT[HOST-BOUNDARY-021] XWIRE_reconcile_completed_with_probe_promotes_and_clears', () => {
+test('WHAT[host-boundary-021] XWIRE_reconcile_completed_with_probe_promotes_and_clears', () => {
   const result = XWireSurface.reconcile({ hasPlan: true, outcome: 'completed', hasProbe: true, currentEpoch: 0, probeEpoch: 0 })
   assert.equal(result.promoted, true)
   assert.equal(result.cleared, true)
   assert.equal(result.keptPlan, false)
 })
-test('WHAT[HOST-BOUNDARY-021] XWIRE_reconcile_completed_without_probe_clears_without_promoting', () => {
+test('WHAT[host-boundary-021] XWIRE_reconcile_completed_without_probe_clears_without_promoting', () => {
   const result = XWireSurface.reconcile({ hasPlan: true, outcome: 'completed', hasProbe: false })
   assert.equal(result.promoted, false)
   assert.equal(result.cleared, true)
 })
-test('WHAT[HOST-BOUNDARY-021] XWIRE_reconcile_failed_clears_plan_without_promoting', () => {
+test('WHAT[host-boundary-021] XWIRE_reconcile_failed_clears_plan_without_promoting', () => {
   const result = XWireSurface.reconcile({ hasPlan: true, outcome: 'failed', hasProbe: true })
   assert.equal(result.promoted, false)
   assert.equal(result.cleared, true)
   assert.equal(result.keptPlan, false)
 })
-test('WHAT[HOST-BOUNDARY-021] XWIRE_reconcile_unknown_reread_keeps_the_plan', () => {
+test('WHAT[host-boundary-021] XWIRE_reconcile_unknown_reread_keeps_the_plan', () => {
   const result = XWireSurface.reconcile({ hasPlan: true, outcome: 'in-progress', hasProbe: true })
   assert.equal(result.promoted, false)
   assert.equal(result.cleared, false)
   assert.equal(result.keptPlan, true)
 })
-test('WHAT[HOST-BOUNDARY-021] XWIRE_reconcile_no_plan_is_inert', () => {
+test('WHAT[host-boundary-021] XWIRE_reconcile_no_plan_is_inert', () => {
   const result = XWireSurface.reconcile({ hasPlan: false, outcome: 'completed', hasProbe: true })
   assert.equal(result.promoted, false)
   assert.equal(result.cleared, false)

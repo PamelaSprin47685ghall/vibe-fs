@@ -28,7 +28,7 @@ const ACTIVE_OFFICES = [
   },
 ]
 
-test('WHAT[OFF-006] OFF_006_offices_are_not_interchangeable_general_purpose_agents', () => {
+test('WHAT[office-capability-006] OFF_006_offices_are_not_interchangeable_general_purpose_agents', () => {
   const managerEn = read('role/manager/en.md')
   const managerZh = read('role/manager/zh-CN.md')
   assert.match(managerEn, /Do not treat these offices as interchangeable/i)

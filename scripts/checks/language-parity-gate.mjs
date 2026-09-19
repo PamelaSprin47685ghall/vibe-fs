@@ -273,7 +273,7 @@ export const scanProviderLanguageBinding = (text) => {
  */
 
 /**
- * PROVIDER-LANGUAGE-012: Bilingual prompt semantic parity for core roles.
+ * provider-language-012: Bilingual prompt semantic parity for core roles.
  */
 export const ROLE_PARITY_SPECS = [
   {
@@ -333,7 +333,7 @@ export const FORBIDDEN_PROMPT_PATTERNS = [
 ]
 
 /**
- * Scan core role prompts for bilingual semantic parity (PROVIDER-LANGUAGE-012).
+ * Scan core role prompts for bilingual semantic parity (provider-language-012).
  * @param {string} providerAbs
  * @returns {Violation[]}
  */
@@ -375,7 +375,7 @@ export const scanRolePromptParity = (providerAbs) => {
 }
 
 /**
- * Scan provider markdown files for affirmative invalid fission claims (PROVIDER-LANGUAGE-012).
+ * Scan provider markdown files for affirmative invalid fission claims (provider-language-012).
  * Strictly distinguishes affirmative grants from legitimate negative guards.
  * @param {string} providerAbs
  * @returns {Violation[]}

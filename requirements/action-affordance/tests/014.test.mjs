@@ -23,7 +23,7 @@ const HIGH_RISK_TOOLS = Object.freeze([
 
 const readTool = (tool, locale) => read(`resources/provider/tool/${tool}/description/${locale}.md`)
 
-test('WHAT[ACTION-AFFORDANCE-014] AA_assume_contract_is_update_then_query_over_one_free_form_canvas', () => {
+test('WHAT[action-affordance-014] AA_assume_contract_is_update_then_query_over_one_free_form_canvas', () => {
   for (const locale of LOCALES) {
     const description = readTool('assume', locale)
     const update = read(`resources/provider/tool/assume/arg-update/${locale}.md`)

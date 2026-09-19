@@ -26,7 +26,7 @@ const withRepo = (writerId, fn) => {
     .finally(() => rmSync(repo, { recursive: true, force: true }))
 }
 
-test('WHAT[DURABLE-EVENTS-012] BlobWriter_uses_local_content_addressed_payloads_not_workspace_blobs_or_Git_ODB', async () => {
+test('WHAT[durable-events-012] BlobWriter_uses_local_content_addressed_payloads_not_workspace_blobs_or_Git_ODB', async () => {
   await withRepo('journal-blob-proof', async (commonDir) => {
     const booted = mustOk(await journal.JournalSurface_boot(commonDir, 'rt_es_blob', 4242, '2026-04-01T00:00:00Z'), 'boot')
 
@@ -41,7 +41,7 @@ test('WHAT[DURABLE-EVENTS-012] BlobWriter_uses_local_content_addressed_payloads_
     journal.JournalSurface_dispose(booted.journal)
   })
 })
-test('WHAT[DURABLE-EVENTS-012] appended_fact_lifts_real_blob_digest_into_persisted_payload_refs', async () => {
+test('WHAT[durable-events-012] appended_fact_lifts_real_blob_digest_into_persisted_payload_refs', async () => {
   await withRepo('journal-closure-proof', async (commonDir) => {
     const booted = mustOk(await journal.JournalSurface_bootWithWriterId(commonDir, 'journal-closure-proof', 'rt_es_closure', 4242, '2026-04-01T00:00:00Z'), 'boot')
 
@@ -71,7 +71,7 @@ test('WHAT[DURABLE-EVENTS-012] appended_fact_lifts_real_blob_digest_into_persist
     journal.JournalSurface_dispose(booted.journal)
   })
 })
-test('WHAT[DURABLE-EVENTS-012] closure_fails_closed_when_a_real_content_address_is_missing', async () => {
+test('WHAT[durable-events-012] closure_fails_closed_when_a_real_content_address_is_missing', async () => {
   await withRepo('journal-closure-missing', async (commonDir) => {
     const booted = mustOk(await journal.JournalSurface_boot(commonDir, 'rt_es_missing', 4242, '2026-04-01T00:00:00Z'), 'boot')
     const missingDigest = 'f'.repeat(64)
@@ -143,7 +143,7 @@ const payloadRefsFromFile = (commonDir, writerId) => {
     .map((event) => event.payload_refs)
 }
 
-test('WHAT[DURABLE-EVENTS-012] closure_lifts_a_content_addressed_digest_into_payload_refs', async () => {
+test('WHAT[durable-events-012] closure_lifts_a_content_addressed_digest_into_payload_refs', async () => {
   await withJournal('closure-real', async (commonDir, handle) => {
     const receipt = await journal.JournalSurface_writePayload(handle, 'durable body\n')
     assert.equal(receipt.ok, true, JSON.stringify(receipt.error))
@@ -159,7 +159,7 @@ test('WHAT[DURABLE-EVENTS-012] closure_lifts_a_content_addressed_digest_into_pay
     assert.deepEqual(refs.at(-1), [receipt.blobRef.slice('blobs/'.length)])
   })
 })
-test('WHAT[DURABLE-EVENTS-012] closure_dedupes_a_matching_blob_ref_and_digest_pair', async () => {
+test('WHAT[durable-events-012] closure_dedupes_a_matching_blob_ref_and_digest_pair', async () => {
   await withJournal('closure-dedupe', async (commonDir, handle) => {
     const receipt = await journal.JournalSurface_writePayload(handle, 'dedupe body\n')
     assert.equal(receipt.ok, true, JSON.stringify(receipt.error))
@@ -177,7 +177,7 @@ test('WHAT[DURABLE-EVENTS-012] closure_dedupes_a_matching_blob_ref_and_digest_pa
     assert.equal(refs.at(-1)[0], receipt.blobRef.slice('blobs/'.length))
   })
 })
-test('WHAT[DURABLE-EVENTS-012] closure_ignores_non_content_addressed_placeholder_handles', async () => {
+test('WHAT[durable-events-012] closure_ignores_non_content_addressed_placeholder_handles', async () => {
   await withJournal('closure-placeholder', async (commonDir, handle) => {
     const appended = await journal.JournalSurface_appendManagerLifecycle(
       handle,
@@ -188,7 +188,7 @@ test('WHAT[DURABLE-EVENTS-012] closure_ignores_non_content_addressed_placeholder
     assert.deepEqual(payloadRefsFromFile(commonDir, 'closure-placeholder').at(-1), [])
   })
 })
-test('WHAT[DURABLE-EVENTS-012] closure_is_empty_for_a_fact_without_blob_fields', async () => {
+test('WHAT[durable-events-012] closure_is_empty_for_a_fact_without_blob_fields', async () => {
   await withJournal('closure-empty', async (commonDir, handle) => {
     const appended = await journal.JournalSurface_appendAgent(
       handle,

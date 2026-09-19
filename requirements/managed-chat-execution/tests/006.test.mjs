@@ -33,7 +33,7 @@ const evidence = {
 const run = (failurePoint = 'None', state = 'None') =>
   transaction.transactionScenario(evidence, failurePoint, state)
 
-test('WHAT[CHATEXEC-006] terminal replay performs no acceptance or capacity effect', async () => {
+test('WHAT[managed-chat-execution-006] terminal replay performs no acceptance or capacity effect', async () => {
   const result = await run('None', 'Terminal')
 
   assert.equal(result.ok, true, JSON.stringify(result.error))
@@ -134,7 +134,7 @@ const mustFold = (wires) => {
 const phaseOf = (projection, physicalUserMessageId) =>
   projection.find((entry) => entry.physicalUserMessageId === physicalUserMessageId)
 
-test('WHAT[CHATEXEC-006] same key terminal conflict', () => {
+test('WHAT[managed-chat-execution-006] same key terminal conflict', () => {
   const accepted = acceptedWire('msg-terminal')
   const started = startedWire('msg-terminal')
   const completed = terminalWire('msg-terminal', 'Completed')
@@ -147,7 +147,7 @@ test('WHAT[CHATEXEC-006] same key terminal conflict', () => {
   assert.equal(conflict.ok, false)
   assert.notEqual(conflict.error, '')
 })
-test('WHAT[CHATEXEC-006] Terminal directly after Accepted is rejected', () => {
+test('WHAT[managed-chat-execution-006] Terminal directly after Accepted is rejected', () => {
   const result = fold([
     acceptedWire('msg-pre-provider'),
     preProviderTerminalWire('msg-pre-provider', 'Completed'),
@@ -206,7 +206,7 @@ const terminal = (disposition, attempt = evidence(), appendOutcome = 'Committed'
 })
 const run = (...actions) => chatExecution.providerLifecycleScenario(actions)
 
-test('WHAT[CHATEXEC-006] each terminal disposition is durable after provider start', async () => {
+test('WHAT[managed-chat-execution-006] each terminal disposition is durable after provider start', async () => {
   for (const disposition of ['Completed', 'Cancelled', 'Rejected', 'Failed']) {
     const result = await run(accept(), start(), terminal(disposition))
 
@@ -220,12 +220,12 @@ test('WHAT[CHATEXEC-006] each terminal disposition is durable after provider sta
     assert.deepEqual(result.appendCounts, { accepted: 1, providerStarted: 1, terminal: 1 })
   }
 })
-test('WHAT[CHATEXEC-006] provider terminal before ProviderStarted rejects', async () => {
+test('WHAT[managed-chat-execution-006] provider terminal before ProviderStarted rejects', async () => {
   const result = await run(accept(), terminal('Completed'))
   assert.equal(result.ok, false)
   assert.equal(result.error.kind, 'ProviderNotStarted')
 })
-test('WHAT[CHATEXEC-006] conflicting terminal rejects without a second write', async () => {
+test('WHAT[managed-chat-execution-006] conflicting terminal rejects without a second write', async () => {
   const result = await run(
     accept(),
     start(),
@@ -238,7 +238,7 @@ test('WHAT[CHATEXEC-006] conflicting terminal rejects without a second write', a
   assert.deepEqual(result.appendCounts, { accepted: 1, providerStarted: 1, terminal: 1 })
   assert.equal(result.projection.disposition, 'Completed')
 })
-test('WHAT[CHATEXEC-006] each uncertain Terminal append leaves projection provider-started', async () => {
+test('WHAT[managed-chat-execution-006] each uncertain Terminal append leaves projection provider-started', async () => {
   for (const outcome of ['NotAttempted', 'CommitUnknown']) {
     const result = await run(accept(), start(), terminal('Completed', evidence(), outcome))
     assert.equal(result.ok, false)
@@ -283,7 +283,7 @@ const terminal = ({
   },
 })
 
-test('WHAT[CHATEXEC-006] production Host terminal owner persists before exact capacity settlement', () => {
+test('WHAT[managed-chat-execution-006] production Host terminal owner persists before exact capacity settlement', () => {
   assert.match(adapterSource, /onExactAssistantObservation[\s\S]*?tryDecodeExactProviderStart[\s\S]*?tryDecodeExactProviderTerminal/)
   assert.match(bootstrapSource, /let\s+startedEvidenceForTerminal[\s\S]*?exactStarted key/)
   assert.match(bootstrapSource, /let\s+applyObservedTerminal[\s\S]*?ExactAssistantTerminal[\s\S]*?NotifyProjectionChanged/)
@@ -297,7 +297,7 @@ test('WHAT[CHATEXEC-006] production Host terminal owner persists before exact ca
   assert.match(recoveryHostSource, /let release[\s\S]*?ModelRouting\.releasePhysicalExecution key\.SessionId key\.PhysicalUserMessageId/)
   assert.match(codecSource, /ProviderRunIdentity/)
 })
-test('WHAT[CHATEXEC-006] exact successful Host terminals retain typed finish outcomes', () => {
+test('WHAT[managed-chat-execution-006] exact successful Host terminals retain typed finish outcomes', () => {
   for (const [finish, outcome] of [
     ['stop', 'Stop'],
     ['length', 'Length'],
@@ -313,7 +313,7 @@ test('WHAT[CHATEXEC-006] exact successful Host terminals retain typed finish out
     })
   }
 })
-test('WHAT[CHATEXEC-006] exact cancel and interruption become closed typed terminal dispositions', () => {
+test('WHAT[managed-chat-execution-006] exact cancel and interruption become closed typed terminal dispositions', () => {
   assert.deepEqual(hostSignals.tryDecodeExactProviderTerminal(terminal({ error: { name: 'AbortError' } })), {
     sessionId: 'ses-terminal',
     physicalUserMessageId: 'msg-terminal',
@@ -332,7 +332,7 @@ test('WHAT[CHATEXEC-006] exact cancel and interruption become closed typed termi
     disposition: '',
   })
 })
-test('WHAT[CHATEXEC-006] exact provider failure remains typed but awaits retry-owner disposition', () => {
+test('WHAT[managed-chat-execution-006] exact provider failure remains typed but awaits retry-owner disposition', () => {
   assert.deepEqual(hostSignals.tryDecodeExactProviderTerminal(terminal({ error: { name: 'TimeoutError', message: 'AbortError' } })), {
     sessionId: 'ses-terminal',
     physicalUserMessageId: 'msg-terminal',
@@ -342,7 +342,7 @@ test('WHAT[CHATEXEC-006] exact provider failure remains typed but awaits retry-o
     disposition: '',
   })
 })
-test('WHAT[CHATEXEC-006] ambiguous and deleted evidence fail closed', () => {
+test('WHAT[managed-chat-execution-006] ambiguous and deleted evidence fail closed', () => {
   assert.equal(hostSignals.tryDecodeExactProviderTerminal(terminal({ providerRun: '' })), null)
   assert.equal(hostSignals.tryDecodeExactProviderTerminal({ type: 'session.deleted', properties: { sessionID: 'ses-terminal' } }), null)
   assert.match(bootstrapSource, /match observation\.Outcome, observation\.Disposition, startedEvidenceForTerminal observation with/)

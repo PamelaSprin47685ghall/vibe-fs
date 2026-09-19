@@ -79,7 +79,7 @@ module ForkChildPayload =
              | Some payload when not (System.String.IsNullOrWhiteSpace payload) ->
                  [ LlmFacing.Data.stringField "content" payload ]
              | _ -> [])
-            // Commissioner / attachment LWR as ARCH-010 data fields (DELEG-019/021).
+            // Commissioner / attachment LWR as ARCH-010 data fields (delegation-019/021).
             // Parent → child only: instruction header names the field; the record
             // itself is a TOML string value — never Split into `# Opening` /
             // `# Chronicle` comments, never dumped as bare prose outside a field.

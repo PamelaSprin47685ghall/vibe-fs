@@ -22,7 +22,7 @@ const TOOL_CAPABILITIES = [
   'Write',
 ]
 
-test('WHAT[PAR-008] an_invalid_terminal_earns_at_most_one_repair_and_never_advances', () => {
+test('WHAT[provider-attempt-recovery-008] an_invalid_terminal_earns_at_most_one_repair_and_never_advances', () => {
   // Empty and XML-only terminals are unusable content (production
   // TerminalValidity), not provider failures: the budget has no input for
   // terminal text, so recording nothing is structural.
@@ -36,7 +36,7 @@ test('WHAT[PAR-008] an_invalid_terminal_earns_at_most_one_repair_and_never_advan
   assert.equal(budget.recordFailure.length, 1, 'budget advance takes only the budget, never terminal text')
 })
 
-test('WHAT[PAR-008] an_errored_attempt_with_unusable_content_never_mints_a_provider_terminal', () => {
+test('WHAT[provider-attempt-recovery-008] an_errored_attempt_with_unusable_content_never_mints_a_provider_terminal', () => {
   // A confirmed provider class still terminalizes the attempt; the policy owns
   // whether that becomes a licensed retry or a terminal.
   assert.equal(reconcile.failureWitnessMintsTerminal('ProviderTransient', false), true)
@@ -57,7 +57,7 @@ test('WHAT[PAR-008] an_errored_attempt_with_unusable_content_never_mints_a_provi
   }
 })
 
-test('WHAT[PAR-008] only_a_probe_attempt_with_a_usable_terminal_may_promote', () => {
+test('WHAT[provider-attempt-recovery-008] only_a_probe_attempt_with_a_usable_terminal_may_promote', () => {
   const withProbe = planner.plan({
     role: 'engineer',
     kind: 'work-main',

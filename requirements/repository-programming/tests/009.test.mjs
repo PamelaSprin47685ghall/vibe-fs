@@ -15,7 +15,7 @@ const sandbox = () => {
 }
 const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')
 
-test('WHAT[REPOSITORY-PROGRAMMING-009] JS010_bindings_grep_returns_matches', async () => {
+test('WHAT[repository-programming-009] JS010_bindings_grep_returns_matches', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'one two one', 'utf8')
@@ -52,7 +52,7 @@ const unwrap = (result) => {
   return result.value
 }
 
-test('WHAT[REPOSITORY-PROGRAMMING-009] JS020_grep_returns_line_column_and_skips_ignored', async () => {
+test('WHAT[repository-programming-009] JS020_grep_returns_line_column_and_skips_ignored', async () => {
   const { dir, cleanup } = sandbox()
   try {
     mkdirSync(join(dir, 'src'))

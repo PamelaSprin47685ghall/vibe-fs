@@ -59,7 +59,7 @@ const foldFacts = (facts) =>
   foldFactsThroughOwner(facts.map((value, index) => ownerEnvelope({ seq: index + 1, session: SESSION, fact: value })))
 const budgetOf = (projection) => providerFailureProjection.read(projection)
 
-test('WHAT[PAR-001] an_accepted_authority_root_creates_the_budget', () => {
+test('WHAT[provider-attempt-recovery-001] an_accepted_authority_root_creates_the_budget', () => {
   const folded = foldFacts([rootFact()])
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
 
@@ -71,7 +71,7 @@ test('WHAT[PAR-001] an_accepted_authority_root_creates_the_budget', () => {
     exhausted: false,
   })
 })
-test('WHAT[PAR-001] a_record_with_no_accepted_root_stops_the_replay', () => {
+test('WHAT[provider-attempt-recovery-001] a_record_with_no_accepted_root_stops_the_replay', () => {
   const folded = foldFacts([failureFact({ run: 'run_1', count: 1 })])
 
   assert.equal(folded.ok, false)
@@ -81,7 +81,7 @@ test('WHAT[PAR-001] a_record_with_no_accepted_root_stops_the_replay', () => {
     'provider failure has no active budget: requires an accepted Authority Root',
   )
 })
-test('WHAT[PAR-001] an_active_authority_root_must_close_before_replacement', () => {
+test('WHAT[provider-attempt-recovery-001] an_active_authority_root_must_close_before_replacement', () => {
   const folded = foldFacts([
     rootFact(),
     failureFact({ run: 'run_1', count: 1 }),
@@ -130,7 +130,7 @@ async function admit(journal, providerRunName) {
   }
 }
 
-test('WHAT[PAR-001] no_active_run_records_nothing_and_writes_no_fact', async () => {
+test('WHAT[provider-attempt-recovery-001] no_active_run_records_nothing_and_writes_no_fact', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-ledger-norun-'))
   const created = await bootWithWriterId(directory, 'writer-ledger-norun', 'rt_ledger_norun', 1, '2026-01-01T00:00:00Z')
   assert.equal(created.ok, true, created.ok ? '' : created.error)

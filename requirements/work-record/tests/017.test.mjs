@@ -1,6 +1,6 @@
 // requirements/work-record/tests/017.test.mjs
 //
-// Law: WORK-RECORD-017
+// Law: work-record-017
 // Scenario T22: Fission convergence materializes a single canonical invocation work record.
 
 import assert from 'node:assert/strict'
@@ -8,7 +8,7 @@ import test from 'node:test'
 
 import * as workRecord from '../../../dist/Mission/WorkRecord/Surface.js'
 
-test('WHAT[WORK-RECORD-017] T22_fission_convergence_materializes_single_canonical_invocation_work_record', () => {
+test('WHAT[work-record-017] T22_fission_convergence_materializes_single_canonical_invocation_work_record', () => {
   assert.equal(typeof workRecord.materializeFissionInvocationRecord, 'function', 'must export materializeFissionInvocationRecord')
 
   const convergedTrace = {

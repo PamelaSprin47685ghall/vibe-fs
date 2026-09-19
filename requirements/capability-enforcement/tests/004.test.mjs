@@ -125,7 +125,7 @@ const ROLE_ALLOW = {
   Blogger: ['chronicle'],
 }
 
-test('WHAT[ENF-004] AGENT_010_canonical_agents_carry_stable_allow_sets', () => {
+test('WHAT[capability-enforcement-004] AGENT_010_canonical_agents_carry_stable_allow_sets', () => {
   const first = buildConfig()
   const second = buildConfig()
   assert.equal(configureManagedAgents(first).ok, true)
@@ -143,7 +143,7 @@ const { default: test } = await import("node:test");
 const { plan } = await import("../../../dist/Participant/Provider/Attempt/PlannerSurface.js");
 
 
-test('WHAT[ENF-004] AGENT_010_the_tier_does_not_reach_the_system_prompt_or_the_tool_set', () => {
+test('WHAT[capability-enforcement-004] AGENT_010_the_tier_does_not_reach_the_system_prompt_or_the_tool_set', () => {
   const fast = plan({ role: 'engineer', tier: 'fast', kind: 'work-main' })
   const deep = plan({ role: 'engineer', tier: 'deep', kind: 'work-main' })
 

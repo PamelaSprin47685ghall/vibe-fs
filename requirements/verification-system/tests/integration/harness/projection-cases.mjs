@@ -1,7 +1,7 @@
 /**
  * gate-projection-cases.mjs — the mock's projection must not be tautological.
  *
- * VERIFY-007 / ARCH-004. Every scenario edge match and every prefix-seal check
+ * verification-system-007 / ARCH-004. Every scenario edge match and every prefix-seal check
  * ultimately asks "are these two requests the same exchange". If that question
  * ever answers `true` too readily, the whole forest degrades into a device that
  * green-lights any implementation — `design-script-forest.md` §14 names this the
@@ -82,20 +82,20 @@ export const projectionCases = [
   // The measured failure, stated directly. If this ever passes as "equal", the
   // forest is matching on role sequence alone.
   differs(
-    'VERIFY-007 different user text is a different exchange',
+    'verification-system-007 different user text is a different exchange',
     body([SYSTEM, user('Do thing A.')]),
     body([SYSTEM, user('Do a completely different thing B.')]),
   ),
 
   agrees(
-    'VERIFY-007 identical bodies are the same exchange',
+    'verification-system-007 identical bodies are the same exchange',
     body([SYSTEM, user('Do thing A.')]),
     body([SYSTEM, user('Do thing A.')]),
   ),
 
   // A request is not identified by how many messages it has.
   differs(
-    'VERIFY-007 same length with different content differs',
+    'verification-system-007 same length with different content differs',
     body([SYSTEM, user('one'), assistantCall(), toolResult('ok')]),
     body([SYSTEM, user('two'), assistantCall(), toolResult('ok')]),
   ),
@@ -103,13 +103,13 @@ export const projectionCases = [
   // ── tool calls: name, arguments, and canonical form ──────────────────────
 
   differs(
-    'VERIFY-007 different tool arguments differ',
+    'verification-system-007 different tool arguments differ',
     body([SYSTEM, assistantCall({ args: '{"agent":"coder"}' })]),
     body([SYSTEM, assistantCall({ args: '{"agent":"reviewer"}' })]),
   ),
 
   differs(
-    'VERIFY-007 different tool name differs',
+    'verification-system-007 different tool name differs',
     body([SYSTEM, assistantCall({ name: 'fork' })]),
     body([SYSTEM, assistantCall({ name: 'join' })]),
   ),
@@ -118,7 +118,7 @@ export const projectionCases = [
   // canonicalisation a scenario edge would match or miss depending on how the
   // production JSON serialiser happened to order a record's fields.
   agrees(
-    'VERIFY-007 tool argument key order does not change the exchange',
+    'verification-system-007 tool argument key order does not change the exchange',
     body([SYSTEM, assistantCall({ args: '{"a":1,"b":2}' })]),
     body([SYSTEM, assistantCall({ args: '{"b":2,"a":1}' })]),
   ),
@@ -126,7 +126,7 @@ export const projectionCases = [
   // ── the two projections disagree on IDs, and that is the point ───────────
 
   {
-    name: 'VERIFY-007 semantic drops call ids, wire keeps them',
+    name: 'verification-system-007 semantic drops call ids, wire keeps them',
     fn: () => {
       const first = body([SYSTEM, assistantCall({ id: 'call_aaa' })]);
       const second = body([SYSTEM, assistantCall({ id: 'call_bbb' })]);
@@ -143,7 +143,7 @@ export const projectionCases = [
   // ── tool results ────────────────────────────────────────────────────────
 
   differs(
-    'VERIFY-007 different tool result differs',
+    'verification-system-007 different tool result differs',
     body([SYSTEM, assistantCall(), toolResult('ok')]),
     body([SYSTEM, assistantCall(), toolResult('failed: permission denied')]),
   ),
@@ -165,7 +165,7 @@ export const projectionCases = [
   // Text and reasoning are both one string. Positional union construction would
   // relabel one as the other and every rendered projection would still be valid.
   differs(
-    'VERIFY-007 reasoning is not text',
+    'verification-system-007 reasoning is not text',
     body([SYSTEM, chunk('text', 'identical words')]),
     body([SYSTEM, chunk('reasoning', 'identical words')]),
   ),
@@ -173,7 +173,7 @@ export const projectionCases = [
   // ── an unknown chunk must vanish, not become empty text ─────────────────
 
   {
-    name: 'VERIFY-007 an unrecognised content chunk is dropped, not emptied',
+    name: 'verification-system-007 an unrecognised content chunk is dropped, not emptied',
     fn: () => {
       const withUnknown = body([SYSTEM, { role: 'user', content: [{ type: 'video', src: 'x' }] }]);
       const withOther = body([SYSTEM, { role: 'user', content: [{ type: 'audio', src: 'y' }] }]);
@@ -245,7 +245,7 @@ export const projectionCases = [
   // ── the guard against re-introducing a second normaliser ────────────────
 
   {
-    name: 'VERIFY-007 harness asks production, it does not re-implement',
+    name: 'verification-system-007 harness asks production, it does not re-implement',
     fn: async () => {
       const production = await import('../../../../../dist/Participant/Provider/Projection/Surface.js');
       const adapter = await import('../../e2e/support/provider-wire.js');

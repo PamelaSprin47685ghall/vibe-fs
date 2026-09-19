@@ -69,7 +69,7 @@ const installBookkeeperRuntime = (port, ownerSessionIds) => {
 const record = (sessionId, q, a, observations) => ({ sessionId, q, a, observations, lastAccessOrder: 0 })
 const openStore = (dir, writerId) => eventStore.create(join(dir, '.git'), writerId)
 
-test('WHAT[KNOWLEDGE-REUSE-005] CASE006_missing_runtime_keeps_old_case', async () => {
+test('WHAT[knowledge-reuse-005] CASE006_missing_runtime_keeps_old_case', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-session-noport-'))
   const handle = eventStore.create(dir, 'bookkeeper-session-noport')
   try {
@@ -130,7 +130,7 @@ const findCase = async (store, sessionId) => {
   return result.value
 }
 
-test('WHAT[KNOWLEDGE-REUSE-005] CASE004_005_freshness_check_is_hint_not_proof_reads_Current_only', async () => {
+test('WHAT[knowledge-reuse-005] CASE004_005_freshness_check_is_hint_not_proof_reads_Current_only', async () => {
   const local = createCasebookEventStore()
   try {
     await unwrap(casebook.archive(local.store, caseRec('s1', 'Q1', 'A1', [fileRead('a.txt', 'h1')])))
@@ -152,7 +152,7 @@ const { join } = await import("node:path");
 const eventStore = await import("../../../dist/Persistence/EventStore/Surface.js");
 const casebook = await import("../../../dist/Repository/Knowledge/Casebook/Surface.js");
 
-test('WHAT[KNOWLEDGE-REUSE-005] T23_T24_fetch_uses_diff_and_advances_maintenance_baseline_without_replay_loops', async () => {
+test('WHAT[knowledge-reuse-005] T23_T24_fetch_uses_diff_and_advances_maintenance_baseline_without_replay_loops', async () => {
   assert.equal(typeof casebook.refreshWithDiff, 'function', 'casebook must export refreshWithDiff')
   const dir = mkdtempSync(join(tmpdir(), 'wxs-kr-t23-'))
   const store = eventStore.create(dir, 'kr-t23-writer')

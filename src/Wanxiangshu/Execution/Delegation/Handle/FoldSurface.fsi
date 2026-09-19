@@ -4,7 +4,7 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Foundation
 
 /// JS-native fold replay boundary for durable handle lifecycle
-/// (MANAGED-SESSION-006/008/015).
+/// (managed-session-lifecycle-006/008/015).
 ///
 /// This surface calls the production `ExecutionFactFold.fold` directly — no
 /// second interpreter. JS sends a list of fact envelopes; the surface

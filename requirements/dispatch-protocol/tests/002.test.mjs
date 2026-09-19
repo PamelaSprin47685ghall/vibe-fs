@@ -60,7 +60,7 @@ const profileOf = () => {
   return built.value
 }
 
-test('WHAT[DISPATCH-PROTOCOL-002] DP_002_submit_records_the_receipt_without_resolving_the_claim', () => {
+test('WHAT[dispatch-protocol-002] DP_002_submit_records_the_receipt_without_resolving_the_claim', () => {
   const root = profileOf()
   const key = 'pk_s'
   const claim = authority.claimContinuation(key, SESSION, 'ManagerGuard', root, 'pd-1')
@@ -81,7 +81,7 @@ test('WHAT[DISPATCH-PROTOCOL-002] DP_002_submit_records_the_receipt_without_reso
     'Submitted keeps claim pending: only real chat.message resolves it',
   )
 })
-test('WHAT[DISPATCH-PROTOCOL-002] DP_002_abandon_removes_the_claim_and_leaves_the_active_run_alone', () => {
+test('WHAT[dispatch-protocol-002] DP_002_abandon_removes_the_claim_and_leaves_the_active_run_alone', () => {
   const root = profileOf()
   const key = 'pk_x'
   let projection = authority.registerAuthority(root, authority.empty)
@@ -95,7 +95,7 @@ test('WHAT[DISPATCH-PROTOCOL-002] DP_002_abandon_removes_the_claim_and_leaves_th
   assert.equal(after.pendingClaims.length, 0)
   assert.equal(after.activeLogicalRun.logicalRun, root.logicalRun)
 })
-test('WHAT[DISPATCH-PROTOCOL-002] DP_002_claim_records_payload_digest_and_participant', () => {
+test('WHAT[dispatch-protocol-002] DP_002_claim_records_payload_digest_and_participant', () => {
   const claim = authority.claimAgentOwnerRoot(
     'pk_o',
     SESSION,
@@ -159,7 +159,7 @@ const claim = (session, key, seq) => ({
 const started = (seq, runtime) => ({ kind: 'runtime-start', seq, runtime })
 const findClaim = (claims, key) => claims.find((value) => value.promptKey === key)
 
-test('WHAT[DISPATCH-PROTOCOL-002] PROMPT_011_RuntimeStarted_advances_a_workspace_watermark_not_every_session', () => {
+test('WHAT[dispatch-protocol-002] PROMPT_011_RuntimeStarted_advances_a_workspace_watermark_not_every_session', () => {
   const folded = dispatch.foldRuntimeStartWatermark([
     claim('ses_a', 'pk_a', 1),
     claim('ses_b', 'pk_b', 2),
@@ -246,7 +246,7 @@ const observation = (result) => {
   return result.observation
 }
 
-test('WHAT[DISPATCH-PROTOCOL-002] HOST_004_stale_idle_repair_is_abandoned_at_the_final_physical_send_boundary', async () => {
+test('WHAT[dispatch-protocol-002] HOST_004_stale_idle_repair_is_abandoned_at_the_final_physical_send_boundary', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-idle-send-race-'))
   try {
     const opened = await journal.JournalSurface_bootWithWriterId(base, 'writer-idle-race', 'rt-idle-race', 4242, '2026-01-01T00:00:00Z')

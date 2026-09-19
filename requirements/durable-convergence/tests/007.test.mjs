@@ -35,7 +35,7 @@ const observe = async (store) => {
   }
 }
 
-test('WHAT[DURABLE-CONVERGENCE-007] retained rich history rebuilds the exact live production Current', async () => {
+test('WHAT[durable-convergence-007] retained rich history rebuilds the exact live production Current', async () => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-integrator-parity-'))
   const commonDir = join(root, '.git')
   mkdirSync(commonDir, { recursive: true })
@@ -125,7 +125,7 @@ const retention = await import("../../../dist/Persistence/EventStore/RetentionSu
 const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 const make = (id, stream, parents = []) => ({ id, stream, type: 'JobRequested', parents, payload: {}, payloadRefs: [] })
 
-test('WHAT[DURABLE-CONVERGENCE-007] sync does not integrate business history', async () => {
+test('WHAT[durable-convergence-007] sync does not integrate business history', async () => {
   const source = await read('src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs')
   assert.doesNotMatch(source, /StrengthProjection|CasebookProjection|AgentProjection|MagicTodo|JsTransactionPrepared/)
   assert.doesNotMatch(source, /Fold\.apply|StrengthProjection\.fold|CasebookProjection\.fold/)

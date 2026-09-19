@@ -8,7 +8,7 @@ const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '../../..')
 
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
-test('WHAT[ACTION-AFFORDANCE-009] AA_calling_choices_must_not_degrade_into_bare_enums', () => {
+test('WHAT[action-affordance-009] AA_calling_choices_must_not_degrade_into_bare_enums', () => {
   // 1. commission description defines calling options semantically
   const commEn = read('resources/provider/tool/commission/description/en.md')
   const commZh = read('resources/provider/tool/commission/description/zh-CN.md')

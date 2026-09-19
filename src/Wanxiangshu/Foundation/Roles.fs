@@ -50,7 +50,7 @@ module Roles =
 
     let tryParseHistoricalRole (value: string) : Role option = tryParseRole value
 
-    /// AGENT-008 / ENF-006: Distiller and Blogger are private runtimes, not
+    /// AGENT-008 / capability-enforcement-006: Distiller and Blogger are private runtimes, not
     /// public fork / horizon vocabulary.
     let isInternal (role: Role) : bool =
         match role with

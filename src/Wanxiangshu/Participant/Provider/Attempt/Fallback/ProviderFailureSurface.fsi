@@ -23,11 +23,11 @@ module ProviderFailureSurface =
     val recordConfirmedFailure:
         handle: JournalHandle -> budget: int -> session: string -> providerRun: string -> reason: string -> Task<obj>
 
-    /// PAR-021: the durable `ProviderRetryAttempt` dispatch fact of one failed
+    /// provider-attempt-recovery-021: the durable `ProviderRetryAttempt` dispatch fact of one failed
     /// physical attempt — the fact the recovery target settlement consumes.
     /// True only when the failed provider run is the exact run that established
     /// the request's durable `ProviderStarted`.
-    /// PAR-021 test seam: establish durable `Accepted` + `ProviderStarted`
+    /// provider-attempt-recovery-021 test seam: establish durable `Accepted` + `ProviderStarted`
     /// facts for one physical request and provider run.
     val establishProviderRun:
         handle: JournalHandle -> session: string -> physicalMessage: string -> providerRun: string -> Task<obj>

@@ -4,7 +4,7 @@ import * as relay from '../../../dist/Mission/Relay/Surface.js'
 
 const open = (state) => relay.openIncumbency(state, 'road-1', 'inc-1', 'snapshot-1', 'authority-1')
 
-test('WHAT[ASSESS-005] no-revise assessment creates an exact-bound certificate and downgrades the phase', () => {
+test('WHAT[relay-assessment-005] no-revise assessment creates an exact-bound certificate and downgrades the phase', () => {
   const opened = open(relay.empty())
   const assessed = relay.assess(
     opened.state,

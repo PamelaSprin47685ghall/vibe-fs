@@ -84,7 +84,7 @@ export const forestLibCases = [
   // ── withPatched: the mutation must actually be in force ────────────────────
 
   {
-    name: 'VERIFY-004 withPatched applies the mutation and restores it on normal return',
+    name: 'verification-system-004 withPatched applies the mutation and restores it on normal return',
     fn: () => {
       // The half that a restore-only test would miss. `select` is replaced on the PROTOTYPE
       // and then called through a real instance, so the assertion fails if the patch did not
@@ -111,7 +111,7 @@ export const forestLibCases = [
   },
 
   {
-    name: 'VERIFY-004 withPatched restores when the body throws',
+    name: 'verification-system-004 withPatched restores when the body throws',
     fn: () => {
       // A thrown assertion is the NORMAL exit for a mutation case, so this is the path that
       // decides whether the cases after it run against the shipped code.
@@ -131,7 +131,7 @@ export const forestLibCases = [
   },
 
   {
-    name: 'VERIFY-004 an ES module export cannot be patched, and withPatched says so',
+    name: 'verification-system-004 an ES module export cannot be patched, and withPatched says so',
     fn: () => {
       // The measurement the module header records, kept executable because it is the reason
       // K11 mutates INPUTS rather than modules. The descriptor is the trap: it claims
@@ -167,7 +167,7 @@ export const forestLibCases = [
   // ── rejectsSelect: a refusal is a returned value, not a throw ─────────────
 
   {
-    name: 'VERIFY-003 rejectsSelect fails when select succeeded',
+    name: 'verification-system-003 rejectsSelect fails when select succeeded',
     fn: () => {
       // Without this, every K11 case could pass by asserting a refusal against a request the
       // forest happily answers.
@@ -182,7 +182,7 @@ export const forestLibCases = [
   },
 
   {
-    name: 'VERIFY-003 rejectsSelect distinguishes the three refusals and returns the refusal',
+    name: 'verification-system-003 rejectsSelect distinguishes the three refusals and returns the refusal',
     fn: () => {
       // The discriminant is required because the three refusals mean different things. A
       // helper that accepted "any refusal" would pass a mutation that turned a real ambiguity
@@ -210,7 +210,7 @@ export const forestLibCases = [
   // ── the serialiser ────────────────────────────────────────────────────────
 
   {
-    name: 'VERIFY-003 two runs of one derived sequence serialise to identical text',
+    name: 'verification-system-003 two runs of one derived sequence serialise to identical text',
     fn: () => {
       // The forest-wide property K10 rests on (`design-script-forest.md:581`), proven here on
       // the sole One World scenario — K10 owns the all-on-disk case.
@@ -248,7 +248,7 @@ export const forestLibCases = [
   // ── the loader ────────────────────────────────────────────────────────────
 
   {
-    name: 'VERIFY-003 the forest loader fails closed and names the file that did not compile',
+    name: 'verification-system-003 the forest loader fails closed and names the file that did not compile',
     fn: () => {
       // Built inline: writing a broken file into `tests/e2e/scripts/` would break
       // `gate:toml` and every other gate that reads the directory, so the fail-closed path has
@@ -268,7 +268,7 @@ export const forestLibCases = [
   },
 
   {
-    name: 'VERIFY-003 every scenario on disk is compiled, none skipped',
+    name: 'verification-system-003 every scenario on disk is compiled, none skipped',
     fn: () => {
       // The count is compared against the directory rather than pinned to 15: a pinned number
       // and a walk-derived loader would drift, and the drift would show up as a scenario

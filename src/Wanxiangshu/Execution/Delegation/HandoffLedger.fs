@@ -50,7 +50,7 @@ module DelegationHandoffLedger =
                   ParentEndExclusive = XTraceRange.endExclusive handoff.Range }
         }
 
-    /// PERSIST-002 / DELEG-031 classification: the failure taxonomy IS the
+    /// PERSIST-002 / delegation-031 classification: the failure taxonomy IS the
     /// settlement. WriterUnavailable is known-not-committed; WriteUnknown
     /// stays pending-evidence; FactRejected is the frontier invariant cut —
     /// PhaseConflict for the owner, never collapsed to a bare string.
@@ -82,7 +82,7 @@ module DelegationHandoffLedger =
                            ParentEndExclusive = XTraceCursor.sequence handoff.ParentEndExclusive |})
                     journal
 
-            // PERSIST-002 / DELEG-031: the failure taxonomy is the settlement.
+            // PERSIST-002 / delegation-031: the failure taxonomy is the settlement.
             // WriterUnavailable is known-not-committed; WriteUnknown stays
             // pending-evidence (never auto-retried or re-emitted); FactRejected
             // is the frontier invariant cut (retreat/negative) and is reported

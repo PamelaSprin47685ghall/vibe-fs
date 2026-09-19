@@ -9,9 +9,9 @@ const ROOT = new URL('../../../', import.meta.url).pathname
 
 const readSrc = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
-test('WHAT[STRUCTURED-WORKFLOW-001] SW_001_workflow_entrypoints_are_the_exported_surface', () => {
+test('WHAT[structured-workflow-001] SW_001_workflow_entrypoints_are_the_exported_surface', () => {
   // Source-tree proof: each workflow module defines its named entrypoint as a
-  // `let` — the direct-CE contract (STRUCTURED-WORKFLOW-001). Build-verification
+  // `let` — the direct-CE contract (structured-workflow-001). Build-verification
   // (guide-contract.test.mjs) proves the emitted modules load and the
   // entrypoints are callable.
   const entrypoints = [

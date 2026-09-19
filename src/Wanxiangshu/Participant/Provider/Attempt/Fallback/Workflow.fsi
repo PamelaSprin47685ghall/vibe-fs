@@ -12,7 +12,7 @@ open Wanxiangshu.Persistence.Journal
 module ProviderRecoveryWorkflow =
     val awaitRecoveryMaterial: host: IBloggerRuntimeHost -> durable: AgentJournal -> mainSessionId: SessionId -> Task
 
-    /// PAR-021: the one durable fact the recovery target settlement consumes —
+    /// provider-attempt-recovery-021: the one durable fact the recovery target settlement consumes —
     /// the failed attempt itself was the LWR retry.
     val failedAttemptWasLwrRetry:
         durable: AgentJournal ->

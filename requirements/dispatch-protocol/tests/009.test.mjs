@@ -120,7 +120,7 @@ const sendDetachedRoot = async (port, handle, session, text, seed) => {
   return sent
 }
 
-test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_claims_and_persists_without_physical_accepted', async () => {
+test('WHAT[dispatch-protocol-009] PROMPT_007_detached_claims_and_persists_without_physical_accepted', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-prompt-007-'))
   try {
     const opened = await journal.JournalSurface_bootWithWriterId(base, 'writer-007', 'rt-007', 4242, '2026-01-01T00:00:00Z')
@@ -148,7 +148,7 @@ test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_claims_and_persists_withou
   }
 })
 
-test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_sdk_physical_id_does_not_race_chat_message_acceptance', async () => {
+test('WHAT[dispatch-protocol-009] PROMPT_007_detached_sdk_physical_id_does_not_race_chat_message_acceptance', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-prompt-007-physical-'))
   try {
     const opened = await journal.JournalSurface_bootWithWriterId(base, 'writer-007-physical', 'rt-007-physical', 4242, '2026-01-01T00:00:00Z')
@@ -179,7 +179,7 @@ test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_sdk_physical_id_does_not_r
   }
 })
 
-test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_returns_even_when_session_send_task_never_settles', async () => {
+test('WHAT[dispatch-protocol-009] PROMPT_007_detached_returns_even_when_session_send_task_never_settles', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-prompt-007-never-'))
   let release
   try {
@@ -223,7 +223,7 @@ test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_returns_even_when_session_
   }
 })
 
-test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_continuation_same_claim_path', async () => {
+test('WHAT[dispatch-protocol-009] PROMPT_007_detached_continuation_same_claim_path', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-prompt-007c-'))
   try {
     const opened = await journal.JournalSurface_bootWithWriterId(base, 'writer-007c', 'rt-007c', 4242, '2026-01-01T00:00:00Z')
@@ -262,11 +262,11 @@ test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_continuation_same_claim_pa
   }
 })
 
-test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_await_mode_constructors_exist', () => {
+test('WHAT[dispatch-protocol-009] PROMPT_007_await_mode_constructors_exist', () => {
   assert.deepEqual(dispatch.awaitModeObservation(), { await: 'Await', detached: 'Detached' })
 })
 
-test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_late_listener_verdict_routes_to_exact_owner', async () => {
+test('WHAT[dispatch-protocol-009] PROMPT_007_detached_late_listener_verdict_routes_to_exact_owner', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-prompt-007-late-'))
   const writerId = 'writer-007-late'
   const opened = await openGitJournal(base, writerId, 'rt-007-late')
@@ -297,7 +297,7 @@ test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_late_listener_verdict_rout
   }
 })
 
-test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_late_unknown_keeps_claim_then_refused_abandons', async () => {
+test('WHAT[dispatch-protocol-009] PROMPT_007_detached_late_unknown_keeps_claim_then_refused_abandons', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-prompt-007-dup-'))
   const writerId = 'writer-007-dup'
   const opened = await openGitJournal(base, writerId, 'rt-007-dup')
@@ -329,7 +329,7 @@ test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_late_unknown_keeps_claim_t
   }
 })
 
-test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_owned_settled_late_delivery_writes_no_fact', async () => {
+test('WHAT[dispatch-protocol-009] PROMPT_007_detached_owned_settled_late_delivery_writes_no_fact', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-prompt-007-owned-'))
   const writerId = 'writer-007-owned'
   const opened = await openGitJournal(base, writerId, 'rt-007-owned')

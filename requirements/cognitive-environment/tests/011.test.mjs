@@ -37,7 +37,7 @@ const MIRRORED_BY_OFFICE_CAPABILITY = new Set(['entrust-by-consequence', 'choose
 
 const LANGUAGE = 'English'
 
-test('WHAT[COGNITIVE-ENVIRONMENT-011] CE_011_transient_texts_do_not_rewrite_role_self_model', () => {
+test('WHAT[cognitive-environment-011] CE_011_transient_texts_do_not_rewrite_role_self_model', () => {
   const transientTexts = [...walkMarkdown('resources/provider/lifecycle'), ...walkMarkdown('resources/provider/runtime')]
   assert.ok(transientTexts.length > 0, 'lifecycle and runtime provider texts must exist')
   for (const text of transientTexts) {

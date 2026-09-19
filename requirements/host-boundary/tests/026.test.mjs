@@ -35,7 +35,7 @@ const productionSources = (plan) => plan.compileItems
   .filter((path) => path.endsWith('.fs'))
   .map((path) => path.slice(SOURCE_ROOT.length + 1).replaceAll('\\', '/'))
 
-test('WHAT[HOST-BOUNDARY-026] host session contract compiles independently without runtime or sphinx dependencies', () => {
+test('WHAT[host-boundary-026] host session contract compiles independently without runtime or sphinx dependencies', () => {
   const { plan } = planShard('host-session-contract')
   const sources = productionSources(plan)
 
@@ -114,7 +114,7 @@ test('WHAT[HOST-BOUNDARY-026] host session contract compiles independently witho
     assert.ok(!adapterSources.includes(unrelated), `signal adapter must not acquire ${unrelated}`)
   }
 })
-test('WHAT[HOST-BOUNDARY-026] Host source ownership follows subsystem inventory and physical boundaries', () => {
+test('WHAT[host-boundary-026] Host source ownership follows subsystem inventory and physical boundaries', () => {
   const hostSources = [
     // EventContract was retagged to runtime-platform next to Digest/Quiescence; physical
     // host boundary ownership only applies to protocol/codec/adapter sources.
@@ -264,7 +264,7 @@ const closureSources = (root, projects) => {
   return new Set([...closure].flatMap(relSources))
 }
 
-test('WHAT[HOST-BOUNDARY-026] tool registration compiles without signal routing or terminal bus implementations', () => {
+test('WHAT[host-boundary-026] tool registration compiles without signal routing or terminal bus implementations', () => {
   const shardInventory = readCompileShardInventory({ repositoryRoot: ROOT })
   const subsystemInventory = buildSubsystemInventory({ compileInventory: shardInventory })
   assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))

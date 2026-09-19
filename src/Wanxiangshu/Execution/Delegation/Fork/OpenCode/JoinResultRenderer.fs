@@ -13,7 +13,7 @@ open Wanxiangshu.Participant.Provider
 /// EXEC-004 / EXEC-017 / EXEC-030: LLM-facing join wire — natural language + WorkRecord only.
 /// No status / count / ordinal / kind / agent / code / message DTO plane.
 ///
-/// Directional LWR plane (DELEG-013 / DELEG-019 / PROVIDER-PROJECTION-009):
+/// Directional LWR plane (delegation-013 / delegation-019 / provider-projection-009):
 /// child → parent join MUST keep the WorkRecord in Instruction Plane. Do NOT
 /// wrap it in `work_record = …` or any other TOML data field. Parent → child fork payload is the opposite contract
 /// (`commissioner_record` / `attached_work_record` fields) — do not conflate.

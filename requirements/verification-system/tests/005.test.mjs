@@ -23,7 +23,7 @@ const makeTempRoot = (layout) => {
 }
 const cleanup = (root) => rmSync(root, { recursive: true, force: true })
 
-test('WHAT[VERIFICATION-SYSTEM-005] traversal errors are not masked (cause preserved)', () => {
+test('WHAT[verification-system-005] traversal errors are not masked (cause preserved)', () => {
   // fail-closed 义务（VERIFY-005）：遇数据损坏/边界失配时安全失败，不崩溃吞上下文。
   // The original fail-open path swallowed the traversal error into a green [].
   // Fail-closed means the underlying errno is preserved as `cause` so the
@@ -69,7 +69,7 @@ function createMemorySink() {
   }
   }
 for (const failingLabel of ['format:check', 'check', 'build']) {
-  test(`WHAT[VERIFICATION-SYSTEM-001] verify halts and marks subsequent steps not-run when ${failingLabel} fails`, async () => {
+  test(`WHAT[verification-system-001] verify halts and marks subsequent steps not-run when ${failingLabel} fails`, async () => {
     const tmpLogDir = mkdtempSync(join(tmpdir(), 'proof-ladder-fail-'))
     const sink = createMemorySink()
   const spawned = []
@@ -105,7 +105,7 @@ for (const failingLabel of ['format:check', 'check', 'build']) {
 })
   }
 
-test('WHAT[VERIFICATION-SYSTEM-005] check.mjs propagates nonzero fail-closed', () => {
+test('WHAT[verification-system-005] check.mjs propagates nonzero fail-closed', () => {
   const checkSource = read('scripts/check.mjs')
   assert.match(
     checkSource,
@@ -121,7 +121,7 @@ const { default: test } = await import("node:test");
 const { StrictMockSignals } = await import("./e2e/support/strict-mock-signals.js");
 
 
-test('WHAT[VERIFICATION-SYSTEM-005] waitAny fatal cancellation removes every registered waiter', async () => {
+test('WHAT[verification-system-005] waitAny fatal cancellation removes every registered waiter', async () => {
   const signals = new StrictMockSignals();
   const waiting = signals.waitForAnyExpectation(['original.1', 'guarded.0']);
 
@@ -130,7 +130,7 @@ test('WHAT[VERIFICATION-SYSTEM-005] waitAny fatal cancellation removes every reg
   await assert.rejects(waiting, /provider mismatch/);
   assert.equal(signals._expectationWaiters.size, 0);
 });
-test('WHAT[VERIFICATION-SYSTEM-005] waitAny rejects an open or malformed alternative set', async () => {
+test('WHAT[verification-system-005] waitAny rejects an open or malformed alternative set', async () => {
   const signals = new StrictMockSignals();
 
   await assert.rejects(signals.waitForAnyExpectation('original.1'), /array of at least two/);
@@ -147,7 +147,7 @@ const { default: test } = await import("node:test");
 const { walk } = await import("../../../scripts/lib/walk.mjs");
 
 
-test('WHAT[VERIFICATION-SYSTEM-005] walk throws on a missing root instead of returning an empty array', () => {
+test('WHAT[verification-system-005] walk throws on a missing root instead of returning an empty array', () => {
   const missing = join(tmpdir(), 'walk-fail-closed-missing-' + process.pid)
   rmSync(missing, { recursive: true, force: true })
   assert.throws(
@@ -156,7 +156,7 @@ test('WHAT[VERIFICATION-SYSTEM-005] walk throws on a missing root instead of ret
     'a missing root must throw so a gate cannot scan nothing and report OK',
   )
 })
-test('WHAT[VERIFICATION-SYSTEM-005] walk throws on a non-directory root instead of returning [root]', () => {
+test('WHAT[verification-system-005] walk throws on a non-directory root instead of returning [root]', () => {
   const dir = mkdtempSync(join(tmpdir(), 'walk-fail-closed-file-root-'))
   try {
     const file = join(dir, 'leaf.fs')
@@ -170,7 +170,7 @@ test('WHAT[VERIFICATION-SYSTEM-005] walk throws on a non-directory root instead 
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[VERIFICATION-SYSTEM-005] walk throws on a nested unreadable directory instead of silently skipping it', () => {
+test('WHAT[verification-system-005] walk throws on a nested unreadable directory instead of silently skipping it', () => {
   const dir = mkdtempSync(join(tmpdir(), 'walk-fail-closed-nested-'))
   try {
     const nested = join(dir, 'nested')
@@ -197,7 +197,7 @@ test('WHAT[VERIFICATION-SYSTEM-005] walk throws on a nested unreadable directory
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[VERIFICATION-SYSTEM-005] walk rejects a symlink entry instead of following or skipping it', () => {
+test('WHAT[verification-system-005] walk rejects a symlink entry instead of following or skipping it', () => {
   const dir = mkdtempSync(join(tmpdir(), 'walk-fail-closed-symlink-'))
   try {
     const target = join(dir, 'target.fs')
@@ -213,7 +213,7 @@ test('WHAT[VERIFICATION-SYSTEM-005] walk rejects a symlink entry instead of foll
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[VERIFICATION-SYSTEM-005] walk rejects a symlink root instead of following it', () => {
+test('WHAT[verification-system-005] walk rejects a symlink root instead of following it', () => {
   const dir = mkdtempSync(join(tmpdir(), 'walk-fail-closed-symlink-root-'))
   try {
     const realDir = join(dir, 'real')
@@ -230,7 +230,7 @@ test('WHAT[VERIFICATION-SYSTEM-005] walk rejects a symlink root instead of follo
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[VERIFICATION-SYSTEM-005] walk returns sorted matching paths on a normal tree', () => {
+test('WHAT[verification-system-005] walk returns sorted matching paths on a normal tree', () => {
   // Regression guard: the fail-closed hardening must not break the successful path.
   const dir = mkdtempSync(join(tmpdir(), 'walk-fail-closed-ok-'))
   try {
@@ -249,7 +249,7 @@ test('WHAT[VERIFICATION-SYSTEM-005] walk returns sorted matching paths on a norm
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[VERIFICATION-SYSTEM-005] walk preserves the SKIP directory set', () => {
+test('WHAT[verification-system-005] walk preserves the SKIP directory set', () => {
   const dir = mkdtempSync(join(tmpdir(), 'walk-fail-closed-skip-'))
   try {
     mkdirSync(join(dir, 'node_modules'))

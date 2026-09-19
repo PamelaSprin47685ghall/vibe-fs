@@ -22,7 +22,7 @@ const probeFor = ({ cutoff = 5, id = 'probe-1' } = {}) => ({
   candidate: snapshotAt(cutoff),
 })
 
-test('WHAT[PREFIX-STABILITY-006] HOST_006_a_retired_snapshot_and_a_never_promoted_one_produce_the_same_plan', () => {
+test('WHAT[prefix-stability-006] HOST_006_a_retired_snapshot_and_a_never_promoted_one_produce_the_same_plan', () => {
   // The two histories are different but the instruction is identical, which is why
   // `Snapshot = None` carries both.
   const rebased = prefix.applyRebase(
@@ -63,7 +63,7 @@ const rebase = (state, { previousEpoch, nextEpoch, cutoff, digest, seal, prefixD
 const reanchor = (state, { previousEpoch, nextEpoch, observedRun = 'msg_compaction' }) =>
   prefix.applyReanchor({ previousEpoch, nextEpoch, observedRun }, state)
 
-test('WHAT[PREFIX-STABILITY-006] HOST_006_reanchor_retires_the_snapshot_and_advances_the_epoch', () => {
+test('WHAT[prefix-stability-006] HOST_006_reanchor_retires_the_snapshot_and_advances_the_epoch', () => {
   const committed = rebase(prefix.empty, { previousEpoch: 0, nextEpoch: 1, cutoff: 7 }).value
 
   const result = reanchor(committed, { previousEpoch: 1, nextEpoch: 2 })
@@ -85,7 +85,7 @@ test('WHAT[PREFIX-STABILITY-006] HOST_006_reanchor_retires_the_snapshot_and_adva
   // twice.
   assert.deepEqual(prefix.reanchoredRuns(result.value), ['msg_compaction'])
 })
-test('WHAT[PREFIX-STABILITY-006] HOST_006_reanchoring_a_session_that_never_promoted_still_advances', () => {
+test('WHAT[prefix-stability-006] HOST_006_reanchoring_a_session_that_never_promoted_still_advances', () => {
   // A manual /compact on a session with no committed snapshot. Nothing to retire,
   // but the cold boundary is just as real, and the epoch is what the frame
   // projection's coverage reset is paired with under one fact.
@@ -95,7 +95,7 @@ test('WHAT[PREFIX-STABILITY-006] HOST_006_reanchoring_a_session_that_never_promo
   assert.equal(prefix.epochOf(result.value), 1n)
   assert.equal(prefix.hasSnapshot(result.value), false)
 })
-test('WHAT[PREFIX-STABILITY-006] PERSIST_010_reanchor_epoch_must_be_the_successor', () => {
+test('WHAT[prefix-stability-006] PERSIST_010_reanchor_epoch_must_be_the_successor', () => {
   for (const nextEpoch of [0, 3, 9]) {
     assert.deepEqual(
       reanchor(prefix.empty, { previousEpoch: 0, nextEpoch }),
@@ -104,7 +104,7 @@ test('WHAT[PREFIX-STABILITY-006] PERSIST_010_reanchor_epoch_must_be_the_successo
     )
   }
 })
-test('WHAT[PREFIX-STABILITY-006] HOST_006_the_same_compaction_is_never_reanchored_twice', () => {
+test('WHAT[prefix-stability-006] HOST_006_the_same_compaction_is_never_reanchored_twice', () => {
   // Two observations of one pseudo-run must produce one retirement.
   const once = reanchor(prefix.empty, { previousEpoch: 0, nextEpoch: 1 }).value
 
@@ -113,7 +113,7 @@ test('WHAT[PREFIX-STABILITY-006] HOST_006_the_same_compaction_is_never_reanchore
 
   assert.equal(prefix.epochOf(once), 1n, 'the epoch did not move twice')
 })
-test('WHAT[PREFIX-STABILITY-006] HOST_006_a_recorded_compaction_stays_refused_after_the_epoch_moves_on', () => {
+test('WHAT[prefix-stability-006] HOST_006_a_recorded_compaction_stays_refused_after_the_epoch_moves_on', () => {
   // The failure the recorded-run set exists for, and the reason the epoch check alone
   // is not enough.
   //
@@ -135,7 +135,7 @@ test('WHAT[PREFIX-STABILITY-006] HOST_006_a_recorded_compaction_stays_refused_af
   assert.equal(prefix.epochOf(promoted), 2n, 'the promoted prefix survives')
   assert.equal(prefix.hasSnapshot(promoted), true)
 })
-test('WHAT[PREFIX-STABILITY-006] HOST_006_a_genuinely_new_compaction_reanchors_again', () => {
+test('WHAT[prefix-stability-006] HOST_006_a_genuinely_new_compaction_reanchors_again', () => {
   // A second, different pseudo-run on an already-reanchored session. It must be
   // accepted, or a second manual /compact would leave the session pointing at a
   // numbering the transcript no longer has.
@@ -163,7 +163,7 @@ const textMessage = (id, role, text) => ({
   parts: [{ type: 'text', text }],
 })
 
-test('WHAT[PREFIX-STABILITY-006] same-session memory is inserted after the preserved raw Opening', () => {
+test('WHAT[prefix-stability-006] same-session memory is inserted after the preserved raw Opening', () => {
   const raw = [
     textMessage('opening-u', 'user', 'raw opening'),
     textMessage('covered-a', 'assistant', 'covered work'),

@@ -9,14 +9,14 @@ const process = await import('../../../dist/Process/Surface.js')
 const first = '2026-08-14T08:00:00.000Z'
 const later = '2026-08-14T08:05:00.000Z'
 
-test('WHAT[TIME-007] TIME_007_session_started_at_is_bind_once_to_first_prompt_sample', () => {
+test('WHAT[time-capability-007] TIME_007_session_started_at_is_bind_once_to_first_prompt_sample', () => {
   const initial = process.sessionStartBind(first, null)
   const rebound = process.sessionStartBind(later, initial)
 
   assert.equal(Date.parse(process.sessionStartAt(initial)), Date.parse(first))
   assert.equal(Date.parse(process.sessionStartAt(rebound)), Date.parse(first), 'later prompts cannot move SessionStartedAt')
 })
-test('WHAT[TIME-007] TIME_007_durable_session_start_fact_keeps_the_first_prompt_sample', () => {
+test('WHAT[time-capability-007] TIME_007_durable_session_start_fact_keeps_the_first_prompt_sample', () => {
   const ledger = process.createSessionStartLedger()
   process.appendSessionStart(ledger, 'ses_elapsed', first)
   process.appendSessionStart(ledger, 'ses_elapsed', later)
@@ -24,7 +24,7 @@ test('WHAT[TIME-007] TIME_007_durable_session_start_fact_keeps_the_first_prompt_
   const state = process.readSessionStart(ledger, 'ses_elapsed')
   assert.equal(Date.parse(process.sessionStartAt(state)), Date.parse(first))
 })
-test('WHAT[TIME-007] TIME_007_session_start_uses_bounded_projection_not_history_scan_or_mutable_counter', () => {
+test('WHAT[time-capability-007] TIME_007_session_start_uses_bounded_projection_not_history_scan_or_mutable_counter', () => {
   for (const relative of [
     '../../../src/Wanxiangshu/Execution/Session/SessionStartedAtProjection.fs',
     '../../../src/Wanxiangshu/Execution/Session/SessionStartedAtLedger.fs',
@@ -35,7 +35,7 @@ test('WHAT[TIME-007] TIME_007_session_start_uses_bounded_projection_not_history_
     }
   }
 })
-test('WHAT[TIME-007] TIME_007_elapsed_is_clamped_and_human_readable_in_both_languages', () => {
+test('WHAT[time-capability-007] TIME_007_elapsed_is_clamped_and_human_readable_in_both_languages', () => {
   const positive = 125000
   const negative = -5000
 
@@ -50,7 +50,7 @@ test('WHAT[TIME-007] TIME_007_elapsed_is_clamped_and_human_readable_in_both_lang
   assert.match(process.renderElapsed('en', negative), /0 minutes 0 seconds/i)
   assert.match(process.renderElapsed('zh', negative), /0 分钟 0 秒/)
 })
-test('WHAT[TIME-007] GD_012_elapsed_is_fresh_per_occurrence_but_old_marker_bytes_stay_frozen', () => {
+test('WHAT[time-capability-007] GD_012_elapsed_is_fresh_per_occurrence_but_old_marker_bytes_stay_frozen', () => {
   const guideline = 'canonical pair guideline'
   const oldElapsed = process.renderElapsed('en', 30000)
   const newElapsed = process.renderElapsed('en', 90000)
@@ -63,7 +63,7 @@ test('WHAT[TIME-007] GD_012_elapsed_is_fresh_per_occurrence_but_old_marker_bytes
   assert.notEqual(oldMarker, newMarker)
   assert.match(oldMarker, /30 seconds/i, 'historical MarkerText is an immutable occurrence value')
 })
-test('WHAT[TIME-007] GD_012_composition_order_is_tip_elapsed_estimate_guideline', () => {
+test('WHAT[time-capability-007] GD_012_composition_order_is_tip_elapsed_estimate_guideline', () => {
   const marker = process.composeWithElapsed('tip', 'elapsed', 'estimate', 'guideline')
   assert.equal(marker, 'tip\n\nelapsed\n\nestimate\n\nguideline')
 })
@@ -78,7 +78,7 @@ const { default: test } = await import("node:test");
 const root = resolve(import.meta.dirname, '../../..')
 const read = (path) => readFileSync(resolve(root, path), 'utf8')
 
-test('WHAT[TIME-007] SessionStartedAtLedger owns bindSessionStartedAt entry point for transform boundary', () => {
+test('WHAT[time-capability-007] SessionStartedAtLedger owns bindSessionStartedAt entry point for transform boundary', () => {
   const ledger = read('src/Wanxiangshu/Execution/Session/SessionStartedAtLedger.fs')
   const pt = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
 

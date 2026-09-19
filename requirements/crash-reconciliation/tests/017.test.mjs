@@ -26,7 +26,7 @@ const continueSessionOf = (suffix) => `ses-continue-${suffix}`
 
 const continuePhysicalOf = (suffix) => `msg-continue-${suffix}`
 
-test('WHAT[CRASH-017] RECOVERY_FAMILY_plugin_load_only_attaches_physical_recovery_wiring_and_join_uses_current_process_permit', () => {
+test('WHAT[crash-reconciliation-017] RECOVERY_FAMILY_plugin_load_only_attaches_physical_recovery_wiring_and_join_uses_current_process_permit', () => {
   const wiring = readFileSync(join(ROOT, 'src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs'), 'utf8')
   const spike = readFileSync(join(ROOT, 'src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs'), 'utf8')
   const scope = readFileSync(join(ROOT, 'src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs'), 'utf8')

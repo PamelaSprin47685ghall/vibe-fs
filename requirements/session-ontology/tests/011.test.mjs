@@ -9,7 +9,7 @@ assert.equal(linked.ok, true, linked.message)
 
 const state = linked.value
 
-test('WHAT[SESSION-ONTOLOGY-011] HOST_008_strength_replica_is_not_a_satellite_kind', () => {
+test('WHAT[session-ontology-011] HOST_008_strength_replica_is_not_a_satellite_kind', () => {
   assert.equal(assoc.isStrengthReplicaAttachment('StrengthReplica'), true)
   for (const kind of ['Companion', 'SyncInspector', 'SyncCoder', 'Bookkeeper']) {
     assert.equal(assoc.isStrengthReplicaAttachment(kind), false)

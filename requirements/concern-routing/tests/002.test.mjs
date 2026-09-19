@@ -5,7 +5,7 @@ import * as concern from '../../../dist/Interaction/Concern/Surface.js'
 
 const read = (path) => readFileSync(path, 'utf8')
 
-test('WHAT[CONCERN-ROUTING-002] subscription announcement is sticky once per recipient Pair Hint coverage', () => {
+test('WHAT[concern-routing-002] subscription announcement is sticky once per recipient Pair Hint coverage', () => {
   let state = concern.subscribe('owner-a', 'gen-1', 'build', 'build health', concern.empty()).state
   const first = concern.prepare('recipient-a', state)
   assert.deepEqual(first.announcements, [{ id: 'build', concern: 'build health' }])

@@ -29,7 +29,7 @@ module FissionHost =
     val routeAttemptAborted:
         sessionId: SessionId -> onSilentReplacement: (unit -> unit) -> onOrdinaryAbort: (unit -> unit) -> unit
 
-    /// INTRA-PARTICIPANT-PARALLELISM-009: an exact physical terminal is only
+    /// intra-participant-parallelism-009: an exact physical terminal is only
     /// a reconciliation occasion for the durable Fission lane that still owns
     /// that exact current physical material. The Host root supplies observation
     /// and wake capabilities; Fission owns the membership/currentness decision.

@@ -137,7 +137,7 @@ module HostEventCodec =
         // Wanxiangshu classifies nothing at this boundary — retry, budget and
         // context replacement are owned by the provider recovery path. Only two
         // typed control signals stay distinct: operator abort (HOST-002/004,
-        // CRASH-008) and supersede (a newer attempt already owns the fact).
+        // crash-reconciliation-008) and supersede (a newer attempt already owns the fact).
         // Semantic failures such as tool-call errors never reach here: OpenCode
         // resolves them inside its own loop and reports parts, not session errors.
         match errorNameOf error with
@@ -304,7 +304,7 @@ module HostEventCodec =
         | true, true, Some sessionId, Some physical, Some providerRun -> Some(sessionId, physical, providerRun)
         | _ -> None
 
-    /// EMR-007: physical capacity release needs exact execution identity. The
+    /// execution-model-routing-007: physical capacity release needs exact execution identity. The
     /// coarse SessionIdle signal has only SessionId and can arrive after a newer
     /// chat.message admission, so it cannot safely release model occupancy.
     /// A terminal assistant message carries parentID = the exact physical user

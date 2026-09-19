@@ -34,7 +34,7 @@ const plant = (commonDir) => {
   ]
 }
 
-test('WHAT[DURABLE-EVENTS-009] local_EventStore_never_reads_or_rewrites_any_legacy_layout', async () => {
+test('WHAT[durable-events-009] local_EventStore_never_reads_or_rewrites_any_legacy_layout', async () => {
   const repo = mkdtempSync(join(tmpdir(), 'wxs-leave-unread-'))
   try {
     execFileSync('git', ['init', '--quiet', repo])
@@ -63,7 +63,7 @@ test('WHAT[DURABLE-EVENTS-009] local_EventStore_never_reads_or_rewrites_any_lega
   }
 })
 
-test('WHAT[DURABLE-EVENTS-009] shock_cut_source_has_no_legacy_shape_detection_migration_or_reset', async () => {
+test('WHAT[durable-events-009] shock_cut_source_has_no_legacy_shape_detection_migration_or_reset', async () => {
   const { readFile } = await import('node:fs/promises')
   const eventStore = await readFile(
     new URL('../../../../src/Wanxiangshu/Persistence/EventStore/Store.fs', import.meta.url),

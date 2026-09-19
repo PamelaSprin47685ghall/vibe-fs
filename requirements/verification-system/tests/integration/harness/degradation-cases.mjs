@@ -17,7 +17,7 @@ const readSource = (relative) => readFileSync(`${REPO_ROOT}${relative}`, 'utf8')
 
 export const degradationCases = [
   {
-    name: 'VERIFY-004 One World sole entry has no multi-canary shuffle-repeat pool',
+    name: 'verification-system-004 One World sole entry has no multi-canary shuffle-repeat pool',
     fn: () => {
       // Covers the pool/launcher degradations that belonged to the retired multi-canary runner
       // (fixed-sleep bark stagger, ready-timeout-as-pass, release-gate --repeat 1..3). One World
@@ -100,7 +100,7 @@ export const degradationCases = [
   },
 
   {
-    name: 'VERIFY-004 internal expectations are background progress',
+    name: 'verification-system-004 internal expectations are background progress',
     fn: () => {
       const source = readSource('requirements/verification-system/tests/e2e/support/strict-mock-provider.js');
 
@@ -116,7 +116,7 @@ export const degradationCases = [
   },
 
   {
-    name: 'VERIFY-004 flow waits do not start a competing total timeout',
+    name: 'verification-system-004 flow waits do not start a competing total timeout',
     fn: () => {
       const source = readSource('requirements/verification-system/tests/e2e/support/scenario-driver.mjs');
 

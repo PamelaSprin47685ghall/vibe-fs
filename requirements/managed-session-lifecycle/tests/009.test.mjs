@@ -33,7 +33,7 @@ const completeOn = (projection, { handle = HANDLE, kind = 'Terminal' } = {}) => 
 const stateOf = (projection, handle = HANDLE) => HandleSurface.read(projection, handle)
 const views = (projection) => HandleSurface.views(projection)
 
-test('WHAT[MANAGED-SESSION-009] EXEC_009_HandleAbandoned_serializes_round_trip', () => {
+test('WHAT[managed-session-lifecycle-009] EXEC_009_HandleAbandoned_serializes_round_trip', () => {
   const value = fact('HandleAbandoned', {
     ParentSessionId: PARENT,
     Handle: HANDLE,
@@ -49,7 +49,7 @@ test('WHAT[MANAGED-SESSION-009] EXEC_009_HandleAbandoned_serializes_round_trip',
   assert.equal(decoded.case, 'HandleAbandoned')
   assert.equal(decoded.line, line)
 })
-test('WHAT[MANAGED-SESSION-009] EXEC_009_Active_to_Abandoned_fold_and_projection', () => {
+test('WHAT[managed-session-lifecycle-009] EXEC_009_Active_to_Abandoned_fold_and_projection', () => {
   const abandoned = abandonOn(linkOn(HandleSurface.empty()))
   assert.deepEqual(stateOf(abandoned), {
     handle: 'agent:h1',
@@ -69,14 +69,14 @@ test('WHAT[MANAGED-SESSION-009] EXEC_009_Active_to_Abandoned_fold_and_projection
   // EXEC-009: Abandoned is reportable once via join batch, not via joinable completion cell.
   assert.equal(HandleSurface.reportableAbandonedCount(abandoned), 1)
 })
-test('WHAT[MANAGED-SESSION-009] EXEC_009_CompletedAwaitingJoin_can_abandon', () => {
+test('WHAT[managed-session-lifecycle-009] EXEC_009_CompletedAwaitingJoin_can_abandon', () => {
   const abandoned = abandonOn(completeOn(linkOn(HandleSurface.empty())), { reason: 'DeadlineExceeded' })
   assert.equal(stateOf(abandoned).lifecycle, 'Abandoned')
   assert.equal(stateOf(abandoned).abandonReason, 'DeadlineExceeded')
   assert.deepEqual(views(abandoned).joinable, [])
   assert.equal(HandleSurface.reportableAbandonedCount(abandoned), 1)
 })
-test('WHAT[MANAGED-SESSION-009] EXEC_009_Abandoned_is_not_joinable_and_cannot_complete', () => {
+test('WHAT[managed-session-lifecycle-009] EXEC_009_Abandoned_is_not_joinable_and_cannot_complete', () => {
   const abandoned = abandonOn(linkOn(HandleSurface.empty()))
   assert.deepEqual(
     HandleSurface.apply(abandoned, { op: 'complete', handle: HANDLE, kind: 'Terminal' }).error,
@@ -97,7 +97,7 @@ test('WHAT[MANAGED-SESSION-009] EXEC_009_Abandoned_is_not_joinable_and_cannot_co
   assert.equal(reopened.ok, true, `Retired handle must be reopenable, got ${JSON.stringify(reopened)}`)
   assert.equal(stateOf(reopened.state).lifecycle, 'Active')
 })
-test('WHAT[MANAGED-SESSION-009] EXEC_009_recordAbandon_CAS_first_wins', async (context) => {
+test('WHAT[managed-session-lifecycle-009] EXEC_009_recordAbandon_CAS_first_wins', async (context) => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-abandon-direct-'))
   const created = await HandleJournalSurface.JournalSurface_openJournal(
     dir,
@@ -135,7 +135,7 @@ test('WHAT[MANAGED-SESSION-009] EXEC_009_recordAbandon_CAS_first_wins', async (c
     assert.equal(projection.record.abandonReason, 'ParentCancelled')
     assert.deepEqual(projection.views.joinable, [])
 })
-test('WHAT[MANAGED-SESSION-009] EXEC_009_fold_replays_HandleAbandoned_idempotent', () => {
+test('WHAT[managed-session-lifecycle-009] EXEC_009_fold_replays_HandleAbandoned_idempotent', () => {
   const linked = fact('HandleLinked', {
     ParentSessionId: PARENT,
     ChildSessionId: CHILD,
@@ -161,7 +161,7 @@ test('WHAT[MANAGED-SESSION-009] EXEC_009_fold_replays_HandleAbandoned_idempotent
   assert.equal(stateOf(handles).abandonReason, 'HostSessionGone')
   assert.deepEqual(views(handles), { listable: [], joinable: [], active: [] })
 })
-test('WHAT[MANAGED-SESSION-009] EXEC_009_retire_tombstone_unaffected_by_abandon_path', () => {
+test('WHAT[managed-session-lifecycle-009] EXEC_009_retire_tombstone_unaffected_by_abandon_path', () => {
   const retired = (() => {
     let p = linkOn(HandleSurface.empty())
     p = completeOn(p)
@@ -175,7 +175,7 @@ test('WHAT[MANAGED-SESSION-009] EXEC_009_retire_tombstone_unaffected_by_abandon_
     kind: 'TransitionRejected', reason: 'HandleIsRetired',
   })
 })
-test('WHAT[MANAGED-SESSION-009] EXEC_009_projection_CAS_duplicate_abandon_refused', () => {
+test('WHAT[managed-session-lifecycle-009] EXEC_009_projection_CAS_duplicate_abandon_refused', () => {
   const abandoned = abandonOn(linkOn(HandleSurface.empty()))
   assert.deepEqual(HandleSurface.apply(abandoned, { op: 'abandon', handle: HANDLE, reason: 'DeadlineExceeded' }).error, {
     kind: 'TransitionRejected', reason: 'AlreadyAbandoned',
@@ -280,7 +280,7 @@ const foldViews = (folded) => {
   return views(handles)
 }
 
-test('WHAT[MANAGED-SESSION-009] EXEC_009_parent_abort_needs_the_handles_themselves_not_a_count', () => {
+test('WHAT[managed-session-lifecycle-009] EXEC_009_parent_abort_needs_the_handles_themselves_not_a_count', () => {
   // "Cancel every owned physical resource individually" is only expressible if
   // the caller gets the ids. A count would force it to guess which ones.
   let state = linkOn(HandleSurface.empty(), { handle: handleId.agent('a'), child: sessionId('ses_1') })
@@ -307,7 +307,7 @@ const link = (projection, agentId, child, targetAgent = 'coder') => {
   return result.state
 }
 
-test('WHAT[MANAGED-SESSION-009] EXEC_009_abandoned_retire_clears_reportable_single_report', () => {
+test('WHAT[managed-session-lifecycle-009] EXEC_009_abandoned_retire_clears_reportable_single_report', () => {
   let projection = link(HandleSurface.empty(), 'h1', 'ses_c')
   projection = HandleSurface.apply(projection, { op: 'abandon', handle: 'agent:h1', reason: 'ParentCancelled' }).state
   assert.equal(HandleSurface.reportableAbandonedCount(projection), 1)
@@ -327,7 +327,7 @@ const { fileURLToPath } = await import("node:url");
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 
-test('WHAT[MANAGED-SESSION-009] provider transform is admitted into plugin shutdown ownership', () => {
+test('WHAT[managed-session-lifecycle-009] provider transform is admitted into plugin shutdown ownership', () => {
   const scope = read('src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs')
   const hooks = read('src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs')
   const interop = read('src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs')
@@ -377,7 +377,7 @@ const invokeAndSettle = async (runtime, charge, answer, promptCount, runId) => {
   return result
 }
 
-test('WHAT[MANAGED-SESSION-009] G2_delegate_cancel_owner_fails_pending_invoke_no_extra_child', async () => {
+test('WHAT[managed-session-lifecycle-009] G2_delegate_cancel_owner_fails_pending_invoke_no_extra_child', async () => {
   const runtime = await create()
   const pending = SyncDelegateSurface.invoke(runtime, owner, 'Engineer', 'pending')
   await admit(runtime, 1)

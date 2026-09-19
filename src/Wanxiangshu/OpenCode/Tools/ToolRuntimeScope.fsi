@@ -112,7 +112,7 @@ type ToolRuntimeScope =
 
     member EnsureRoadDevOpsBound: parentSessionId: SessionId -> Task<unit>
 
-    /// CRASH-018: process-local adoption for explicit /continue. The durable
+    /// crash-reconciliation-018: process-local adoption for explicit /continue. The durable
     /// handle stays byte-for-byte as it was at the crash boundary; a later LLM
     /// fork reuse is the first action allowed to reopen it durably.
     member AdoptExistingChild: parentSessionId: SessionId * record: HandleRecord -> Result<unit, string>
@@ -130,13 +130,13 @@ type ToolRuntimeScope =
 
     member CancelSessionChildren: sessionId: string -> Task
 
-    /// MANAGED-SESSION-017: an internal stop is a synchronous
+    /// managed-session-lifecycle-017: an internal stop is a synchronous
     /// logical termination CE. Failed delivery is what completes the durable
     /// fork handle and wakes the parent; no future TurnAborted callback carries
     /// workflow continuation state.
     member TerminateSession: sessionId: string * reason: string -> Task<Result<unit, string>>
 
-    /// MANAGED-SESSION-024: Replace crashed DevOps physical session under single logical authority
+    /// managed-session-lifecycle-024: Replace crashed DevOps physical session under single logical authority
     member ReplacePhysicalSession:
         parentSessionId: SessionId * devopsAgentId: string * oldChildSessionId: SessionId ->
             Task<Result<SessionId, string>>

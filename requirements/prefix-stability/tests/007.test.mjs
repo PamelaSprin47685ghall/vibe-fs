@@ -14,7 +14,7 @@ const roles = ['Manager', 'Orchestrator', 'Engineer', 'DevOps', 'Blogger']
 
 const profile = (role, tier = 'Fast', kind = 'WorkMain') => planner.plan({ role, tier, kind })
 
-test('WHAT[PREFIX-STABILITY-007] PROMPT_019_each_canonical_role_has_one_stable_prompt_identity', () => {
+test('WHAT[prefix-stability-007] PROMPT_019_each_canonical_role_has_one_stable_prompt_identity', () => {
   const ids = new Set()
   for (const role of roles) {
     const id = authority.systemPromptIdForRole(role)
@@ -36,7 +36,7 @@ test('WHAT[PREFIX-STABILITY-007] PROMPT_019_each_canonical_role_has_one_stable_p
   assert.equal(ids.size, roles.length, 'canonical roles must not alias prompt identities')
 })
 
-test('WHAT[PREFIX-STABILITY-007] PROMPT_019_participant_identity_preserved_across_tiers_not_prompt_identity', () => {
+test('WHAT[prefix-stability-007] PROMPT_019_participant_identity_preserved_across_tiers_not_prompt_identity', () => {
   const engineerFast = delegation.vocabulary('Engineer', 'Fast', OWNER)
   const engineerDeep = delegation.vocabulary('Engineer', 'Deep', OWNER)
 
@@ -52,7 +52,7 @@ test('WHAT[PREFIX-STABILITY-007] PROMPT_019_participant_identity_preserved_acros
   assert.equal(profile('DevOps', 'Fast').systemPromptId, profile('DevOps', 'Deep').systemPromptId)
 })
 
-test('WHAT[PREFIX-STABILITY-007] PROMPT_019_role_identity_does_not_inherit_attempt_cursor_or_replica_metadata', () => {
+test('WHAT[prefix-stability-007] PROMPT_019_role_identity_does_not_inherit_attempt_cursor_or_replica_metadata', () => {
   const manager = profile('Manager', 'Fast')
   const devops = profile('DevOps', 'Fast')
 
@@ -67,7 +67,7 @@ test('WHAT[PREFIX-STABILITY-007] PROMPT_019_role_identity_does_not_inherit_attem
   assert.match(devops.requestKind, /^work-?main$/i)
 })
 
-test('WHAT[PREFIX-STABILITY-007] PROMPT_019_role_and_tier_capabilities_remain_explicit', () => {
+test('WHAT[prefix-stability-007] PROMPT_019_role_and_tier_capabilities_remain_explicit', () => {
   const managerFast = profile('Manager', 'Fast')
   const managerDeep = profile('Manager', 'Deep')
   const engineerFast = profile('Engineer', 'Fast')

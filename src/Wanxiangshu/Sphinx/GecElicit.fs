@@ -1,4 +1,4 @@
-// WHAT[EPI-023,EPI-025,EPI-029]: Gec composition over split-ballot, self-prediction and stop certificates.
+// WHAT[epistemic-reasoning-023,epistemic-reasoning-025,epistemic-reasoning-029]: Gec composition over split-ballot, self-prediction and stop certificates.
 namespace Wanxiangshu.Sphinx
 
 open System

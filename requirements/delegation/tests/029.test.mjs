@@ -26,7 +26,7 @@ const assertRecoveryClosure = (inventory, root) => {
   visit(root.projectPath)
 }
 
-test('WHAT[DELEG-029] delegation runtime consumes only the delegation-owned journal port', () => {
+test('WHAT[delegation-029] delegation runtime consumes only the delegation-owned journal port', () => {
   const compileInventory = readCompileShardInventory({ repositoryRoot: ROOT })
   const subsystemInventory = buildSubsystemInventory({ compileInventory })
   assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))
@@ -139,7 +139,7 @@ test('WHAT[DELEG-029] delegation runtime consumes only the delegation-owned jour
   assert.ok(consumesPort, 'delegation-recovery-runtime implementation must consume AgentJournalPort')
 })
 
-test('WHAT[DELEG-029] PTY adapter consumes only narrow PTY capability and does not access forbidden runtime internals', () => {
+test('WHAT[delegation-029] PTY adapter consumes only narrow PTY capability and does not access forbidden runtime internals', () => {
   const compileInventory = readCompileShardInventory({ repositoryRoot: ROOT })
   const subsystemInventory = buildSubsystemInventory({ compileInventory })
   assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))

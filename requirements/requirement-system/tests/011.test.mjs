@@ -14,7 +14,7 @@ import {
 
 const PREFIXES = ['ARCH', 'GOV', 'HOST']
 
-test('WHAT[REQUIREMENT-SYSTEM-011] spec gate rejects proposed and specific completed dependencies but allows active scope', () => {
+test('WHAT[requirement-system-011] spec gate rejects proposed and specific completed dependencies but allows active scope', () => {
   assert.deepEqual(
     changeDependencyReferences([
       '// changes/proposed/future.md is not current',

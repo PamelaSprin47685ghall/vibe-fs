@@ -22,7 +22,7 @@ const TOOL_CAPABILITIES = [
   'Write',
 ]
 
-test('WHAT[PAR-018] recovery_retry_unlocks_only_on_durable_material_without_waiters', () => {
+test('WHAT[provider-attempt-recovery-018] recovery_retry_unlocks_only_on_durable_material_without_waiters', () => {
   // Material-driven: the same failed kind plus the same material presence
   // always decides the same next request — no transient waiter, timer or
   // clock state participates in the decision.

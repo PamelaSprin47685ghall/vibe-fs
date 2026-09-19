@@ -51,7 +51,7 @@ const register = (root) => authority.registerAuthority(root, authority.empty)
 const continuation = (key, root, kind = 'ManagerGuard', payload = 'payload') =>
   authority.claimContinuation(key, 'ses_a', kind, root, payload)
 
-test('WHAT[INTERACTION-AUTHORITY-012] IA_005_degeneration_guard_is_continuation', () => {
+test('WHAT[interaction-authority-012] IA_005_degeneration_guard_is_continuation', () => {
   for (const kind of ['DegenerationGuard', 'ManagerGuard']) {
     assert.deepEqual(authority.originForContinuation(kind), { kind: 'Continuation', label: kind })
   }

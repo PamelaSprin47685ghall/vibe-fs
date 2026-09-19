@@ -60,7 +60,7 @@ const foldVia = (surface, host, hostSessionId, extra = {}) =>
     resourceFacts,
   })
 
-test('WHAT[EPI-018] same_ordered_canonical_events_fold_to_same_semantic_hash_across_hosts', async () => {
+test('WHAT[epistemic-reasoning-018] same_ordered_canonical_events_fold_to_same_semantic_hash_across_hosts', async () => {
   const mcp = await foldVia(gecSurface, 'mcp', 'mcp-session-aaa', { arrivedAtMs: 1000 })
   const opencode = await foldVia(gecSurface, 'opencode', 'oc-session-bbb', { arrivedAtMs: 9281 })
 
@@ -85,7 +85,7 @@ test('WHAT[EPI-018] same_ordered_canonical_events_fold_to_same_semantic_hash_acr
   assert.equal(mcpLater.semanticHash, mcp.semanticHash)
 })
 
-test('WHAT[EPI-018] reordered_arrivals_do_not_fold_to_the_same_semantic_hash', async () => {
+test('WHAT[epistemic-reasoning-018] reordered_arrivals_do_not_fold_to_the_same_semantic_hash', async () => {
   const ordered = await foldVia(gecSurface, 'mcp', 'mcp-session-aaa')
   assert.equal(ordered.error, undefined)
 

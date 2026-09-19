@@ -22,7 +22,7 @@ const cutResult = () => projection.applyCut(cutMessages, 'old-run', 'suicide-cal
 
 const ids = (result) => result.provider.map((message) => message.id ?? message.info?.id)
 
-test('WHAT[PROJ-005] next iteration shows the current-iteration tail after a clean authority start', () => {
+test('WHAT[relay-context-projection-005] next iteration shows the current-iteration tail after a clean authority start', () => {
   const provider = ids(cutResult())
   assert.equal(provider[0], 'u1')
   assert.equal(provider[provider.length - 1], 'a2')

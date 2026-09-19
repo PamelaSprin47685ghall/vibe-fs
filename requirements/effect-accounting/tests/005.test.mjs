@@ -4,15 +4,15 @@ import * as child from '../../../dist/Execution/Delegation/Fork/ChildRecoverySur
 
 
 
-test('WHAT[EFFECT-ACCOUNTING-005] requested_only_without_physical_evidence_stays_pending_not_blind_retry', () => {
+test('WHAT[effect-accounting-005] requested_only_without_physical_evidence_stays_pending_not_blind_retry', () => {
   assert.equal(child.resolve('active', 'missing', [], '').result, 'RecoveryIncomplete')
 })
 
-test('WHAT[EFFECT-ACCOUNTING-005] outcome_unknown_without_physical_evidence_never_becomes_terminal', () => {
+test('WHAT[effect-accounting-005] outcome_unknown_without_physical_evidence_never_becomes_terminal', () => {
   assert.equal(child.resolve('active', 'missing', [], '').result, 'RecoveryIncomplete')
 })
 
-test('WHAT[EFFECT-ACCOUNTING-005] terminal_issued_only_after_proven_physical_evidence', () => {
+test('WHAT[effect-accounting-005] terminal_issued_only_after_proven_physical_evidence', () => {
   assert.equal(child.provenTerminal('{"status":"ok"}').ok, true)
   assert.equal(child.resolve('active', 'terminal', [], 'body').result, 'RecoveredTerminal')
 })

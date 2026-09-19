@@ -7,7 +7,7 @@ const join = await import("../../../dist/Execution/Delegation/Fork/OpenCode/Join
 const handles = await import("../../../dist/Execution/Delegation/Handle/Surface.js");
 
 
-test('WHAT[DELEG-013] JOIN_COMPLETION_completed_is_rendered_as_entry_local_work_record', () => {
+test('WHAT[delegation-013] JOIN_COMPLETION_completed_is_rendered_as_entry_local_work_record', () => {
   const wire = join.renderBatch('english', [
     {
       kind: 'completed',
@@ -21,7 +21,7 @@ test('WHAT[DELEG-013] JOIN_COMPLETION_completed_is_rendered_as_entry_local_work_
   assert.match(wire, /Task completed with verifiable evidence/)
   assert.match(wire, /has returned/)
 })
-test('WHAT[DELEG-013] JOIN_COMPLETION_abandoned_is_rendered_as_agent_did_not_return', () => {
+test('WHAT[delegation-013] JOIN_COMPLETION_abandoned_is_rendered_as_agent_did_not_return', () => {
   const wire = join.renderBatch('english', [
     {
       kind: 'abandoned',
@@ -44,13 +44,13 @@ const join = await import("../../../dist/Execution/Delegation/Fork/OpenCode/Join
 const LEGACY_DTO = /\b(status|count|ordinal|kind|agent|code|message)\s*=|\[\[result\]\]|\[error\]|work_record\s*=/
 const completed = (id, name, record = '') => ({ kind: 'completed', agentId: id, agentName: name, role: 'Coder', runId: `run-${id}`, workRecord: record })
 
-test('WHAT[DELEG-013] JOIN_V2_failed_agent_is_natural_language', () => {
+test('WHAT[delegation-013] JOIN_V2_failed_agent_is_natural_language', () => {
   const wire = join.renderBatch('english', [{ kind: 'failed', agentId: 'a2', agentName: 'engineer', role: 'Engineer', runId: 'run-a2', code: 'E', message: 'failed' }])
   assert.match(wire, /could not complete/)
   assert.ok(!LEGACY_DTO.test(wire))
 })
 
-test('WHAT[DELEG-013] JOIN_FIFO_window_bounds_batch_and_prompts_manager_to_continue', () => {
+test('WHAT[delegation-013] JOIN_FIFO_window_bounds_batch_and_prompts_manager_to_continue', () => {
   const item1 = completed('a1', 'agent1', Array.from({ length: 800 }, (_, i) => `line a1 ${i}`).join('\n'))
   const item2 = completed('a2', 'agent2', Array.from({ length: 800 }, (_, i) => `line a2 ${i}`).join('\n'))
   const item3 = completed('a3', 'agent3', Array.from({ length: 800 }, (_, i) => `line a3 ${i}`).join('\n'))
@@ -62,7 +62,7 @@ test('WHAT[DELEG-013] JOIN_FIFO_window_bounds_batch_and_prompts_manager_to_conti
   assert.match(wire, /Remaining completions are available\. Continue calling join to receive them\./)
 })
 
-test('WHAT[DELEG-013] JOIN_FIFO_all_fit_in_window_does_not_prompt_continue', () => {
+test('WHAT[delegation-013] JOIN_FIFO_all_fit_in_window_does_not_prompt_continue', () => {
   const item1 = completed('a1', 'agent1', 'work 1')
   const item2 = completed('a2', 'agent2', 'work 2')
 
@@ -72,7 +72,7 @@ test('WHAT[DELEG-013] JOIN_FIFO_all_fit_in_window_does_not_prompt_continue', () 
   assert.doesNotMatch(wire, /Remaining completions are available/)
 })
 
-test('WHAT[DELEG-013] JOIN_FIFO_single_large_item_exceeding_window_still_returned', () => {
+test('WHAT[delegation-013] JOIN_FIFO_single_large_item_exceeding_window_still_returned', () => {
   const largeItem = completed('a1', 'agent1', Array.from({ length: 2500 }, (_, i) => `line ${i}`).join('\n'))
 
   const wire = join.renderBatch('english', [largeItem])
@@ -80,7 +80,7 @@ test('WHAT[DELEG-013] JOIN_FIFO_single_large_item_exceeding_window_still_returne
   assert.doesNotMatch(wire, /Remaining completions are available/)
 })
 
-test('WHAT[DELEG-013] JOIN_FIFO_zh_CN_prompts_manager_to_continue_join', () => {
+test('WHAT[delegation-013] JOIN_FIFO_zh_CN_prompts_manager_to_continue_join', () => {
   const item1 = completed('a1', 'agent1', Array.from({ length: 1200 }, (_, i) => `line a1 ${i}`).join('\n'))
   const item2 = completed('a2', 'agent2', Array.from({ length: 1200 }, (_, i) => `line a2 ${i}`).join('\n'))
 
@@ -98,7 +98,7 @@ const { readFileSync } = await import("node:fs");
 
 const source = readFileSync(new URL('../../../src/Wanxiangshu/Execution/Delegation/Fork/Host/Join.fs', import.meta.url), 'utf8')
 
-test('WHAT[DELEG-013] EXEC_fork_runtime_await_agent_timeout', () => {
+test('WHAT[delegation-013] EXEC_fork_runtime_await_agent_timeout', () => {
   assert.match(source, /let awaitAgent/)
   assert.match(source, /timeoutMs/)
   assert.match(source, /AwaitAgent\(agentId/)

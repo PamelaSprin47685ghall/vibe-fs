@@ -32,7 +32,7 @@ const closureSources = (root, projects) => {
   return new Set([...closure].flatMap(relSources))
 }
 
-test('WHAT[HOST-BOUNDARY-031] RootWorkspace runtime is private and every observer consumes only the typed contract', () => {
+test('WHAT[host-boundary-031] RootWorkspace runtime is private and every observer consumes only the typed contract', () => {
   const shardInventory = readCompileShardInventory({ repositoryRoot: ROOT })
   const subsystemInventory = buildSubsystemInventory({ compileInventory: shardInventory })
   assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))
@@ -75,7 +75,7 @@ const { putSessionParent, getSessionParent, clearSessionParents, tryBindRootWork
 const sharedStateSurface = await import("../../../dist/OpenCode/Host/SharedStateSurface.js");
 
 
-test('WHAT[HOST-BOUNDARY-031] SHARED_root_workspace_is_first_bound_behind_typed_capabilities', async () => {
+test('WHAT[host-boundary-031] SHARED_root_workspace_is_first_bound_behind_typed_capabilities', async () => {
   assert.equal(tryGetRootWorkspace(), null)
   assert.equal(tryBindRootWorkspace(null), false, 'None must not occupy the first-bind slot')
   assert.equal(tryBindRootWorkspace(''), false, 'blank must not occupy the first-bind slot')

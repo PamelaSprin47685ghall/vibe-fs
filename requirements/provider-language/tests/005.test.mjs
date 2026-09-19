@@ -36,7 +36,7 @@ test.beforeEach(() => {
   clearAllForTests()
 })
 
-test('WHAT[PROVIDER-LANGUAGE-005] production feature code carries no inline bilingual literal branch', () => {
+test('WHAT[provider-language-005] production feature code carries no inline bilingual literal branch', () => {
   // Class A prose lives only under resources/provider; feature code may not
   // smuggle natural-language locale forks. Scan every production .fs for the
   // giveaway shape `match ... with | ... -> "en text" | ... -> "zh text"`.
@@ -50,7 +50,7 @@ test('WHAT[PROVIDER-LANGUAGE-005] production feature code carries no inline bili
   }
   assert.deepEqual(suspicious, [], 'business logic must not hardcode bilingual literal branches')
 })
-test('WHAT[PROVIDER-LANGUAGE-005] Class A prose loads through the resource layer, both locales', () => {
+test('WHAT[provider-language-005] Class A prose loads through the resource layer, both locales', () => {
   // Three-way ownership proof: semantic content is read via ProviderResources-
   // owned paths under resources/provider, which currently contains role/manager
   // en.md + zh-CN.md — not embedded in any .fs file.
@@ -71,7 +71,7 @@ const SID = 'provider-system-i18n-bookkeeper'
 test.beforeEach(() => clearAllForTests())
 test.afterEach(() => clearAllForTests())
 
-test('WHAT[PROVIDER-LANGUAGE-005] system transform localizes only the wanxiangshu-owned segment', async () => {
+test('WHAT[provider-language-005] system transform localizes only the wanxiangshu-owned segment', async () => {
   bookkeeper.bindSession(SID, 'provider-language-surface', 'provider-language-surface')
   try {
     assert.equal(bindOnce(SID, 'SimplifiedChinese').ok, true)

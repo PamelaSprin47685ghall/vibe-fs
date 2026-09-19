@@ -1,6 +1,6 @@
 # Proof status
 
-Unit oracles for `ATTENTION-REGULATION-001` through `006`.
+Unit oracles for `attention-regulation-001` through `006`.
 
 The test suite covers:
 - Cognitive stop semantics of `enough` with zero durable authority mutation (`001`).

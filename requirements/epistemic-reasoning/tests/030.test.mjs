@@ -42,7 +42,7 @@ async function loadTranscript() {
   return { file, calls, outcomes }
 }
 
-test('WHAT[EPI-030] frozen_transcript_sha_and_projection_match_before_replay', async () => {
+test('WHAT[epistemic-reasoning-030] frozen_transcript_sha_and_projection_match_before_replay', async () => {
   const { file, calls, outcomes } = await loadTranscript()
   const projection = await readJson(fixture('legacy', 'programming-quality.event-projection.json'))
   const summary = await readJson(fixture('legacy', 'programming-quality.expected-summary.json'))
@@ -67,7 +67,7 @@ test('WHAT[EPI-030] frozen_transcript_sha_and_projection_match_before_replay', a
   assert.match(outcomes.get(failed[0].id), /INVALID_OBSERVATION/)
   assert.equal(typeof failed[0].args.evidence[0].source, 'string')
 })
-test('WHAT[EPI-030] fifty_eight_accepted_calls_replay_to_identical_revision_tool_sequence_with_golden_anchors', async () => {
+test('WHAT[epistemic-reasoning-030] fifty_eight_accepted_calls_replay_to_identical_revision_tool_sequence_with_golden_anchors', async () => {
   const { calls, outcomes } = await loadTranscript()
   const projection = await readJson(fixture('legacy', 'programming-quality.event-projection.json'))
   const summary = await readJson(fixture('legacy', 'programming-quality.expected-summary.json'))
@@ -358,7 +358,7 @@ async function driveToAnswered(s) {
   return handle
 }
 
-test('WHAT[EPI-030] restart_recovers_same_durable_inquiry', { timeout: 30000 }, async () => {
+test('WHAT[epistemic-reasoning-030] restart_recovers_same_durable_inquiry', { timeout: 30000 }, async () => {
   // Both servers share one durable commonDir via SPHINX_COMMON_DIR. Killing
   // the first process must not invalidate the handle: the second server
   // recovers the same durable inquiry at the same revision.

@@ -21,5 +21,5 @@
 
 ## GAP
 
-- `ACTION-AFFORDANCE-002` ~ `005` / `009` / `011` / `012`（CLOSED）：高风险动词最低契约与认知锚点约束（002）、inspect 负边界（003）、repair-behavior mechanical 语义（004）、establish-behavior 源码与执行证据分离（005）、能力选择非裸枚举（009）、关键边界镜像（011）以及易混淆相邻动作镜像（012）均已闭合，落点分别为 `tests/002.test.mjs`、`tests/003.test.mjs`、`tests/004.test.mjs`、`tests/005.test.mjs`、`tests/009.test.mjs`、`tests/011.test.mjs` 与 `tests/012.test.mjs`。
+- `action-affordance-002` ~ `005` / `009` / `011` / `012`（CLOSED）：高风险动词最低契约与认知锚点约束（002）、inspect 负边界（003）、repair-behavior mechanical 语义（004）、establish-behavior 源码与执行证据分离（005）、能力选择非裸枚举（009）、关键边界镜像（011）以及易混淆相邻动作镜像（012）均已闭合，落点分别为 `tests/002.test.mjs`、`tests/003.test.mjs`、`tests/004.test.mjs`、`tests/005.test.mjs`、`tests/009.test.mjs`、`tests/011.test.mjs` 与 `tests/012.test.mjs`。
 

@@ -99,13 +99,13 @@ module ToolRegistry =
           PromptText = None
           AttachAbort = fun _ -> id }
 
-    /// ENF-006: the authority the execute gate resolves for a tool, so a
+    /// capability-enforcement-006: the authority the execute gate resolves for a tool, so a
     /// consumer can tell an office tool from an internal leaf without guessing
     /// from the tool name.
     let tryAdmission (specName: string) (bloggerHost: IBloggerRuntimeHost option) : ToolAdmission option =
         tryAdmissionFor specName bloggerHost
 
-    /// ENF-006: the internal-leaf decision for a session that holds no public
+    /// capability-enforcement-006: the internal-leaf decision for a session that holds no public
     /// office profile at all. An office tool is never admitted this way.
     let privateAttachmentAdmits
         (specName: string)
@@ -120,7 +120,7 @@ module ToolRegistry =
     /// AGENT-007 role gate, delegates to owner-defined tool admissions.
     /// sessionId is the tool call's Host session; bloggerHost is optional for tests.
     let rolePredicate (specName: string) (bloggerHost: IBloggerRuntimeHost option) (sessionId: string) : Role -> bool =
-        // ENF-006: an internal leaf tool is admitted by attachment, never by a
+        // capability-enforcement-006: an internal leaf tool is admitted by attachment, never by a
         // public office, so no public Role may ever see it on this surface.
         match tryAdmissionFor specName bloggerHost with
         | Some(ToolAdmission.OfficeRole predicate) -> predicate (probeContext sessionId)

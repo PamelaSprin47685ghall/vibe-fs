@@ -1,6 +1,6 @@
 # Proof status
 
-Unit oracles for `CONCERN-ROUTING-001` through `007`.
+Unit oracles for `concern-routing-001` through `007`.
 
 The test suite covers:
 - Idempotent address subscription and immutable id-to-concern mapping (`001`).

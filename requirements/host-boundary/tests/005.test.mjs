@@ -8,7 +8,7 @@ const ReconcileSurface = await import("../../../dist/Composition/Turn/ReconcileS
 
 const idleWake = ReconcileSurface.idleWake('s1', 1n)
 
-test('WHAT[HOST-BOUNDARY-005] exact failure wake survives same-physical idle admission', () => {
+test('WHAT[host-boundary-005] exact failure wake survives same-physical idle admission', () => {
   const failure = ReconcileSurface.failureWakeFor('msg-current')
 
   assert.equal(ReconcileSurface.mergeWakeKind('msg-current', failure, idleWake), 'FailureWake')
@@ -29,11 +29,11 @@ test('WHAT[HOST-BOUNDARY-005] exact failure wake survives same-physical idle adm
   )
   assert.equal(ReconcileSurface.mergeWakeKind('msg-current', failure, ReconcileSurface.abortWake()), 'AbortWake')
 })
-test('WHAT[HOST-BOUNDARY-005] coarse failure without physical binding cannot publish a terminal turn', async () => {
+test('WHAT[host-boundary-005] coarse failure without physical binding cannot publish a terminal turn', async () => {
   const result = await ReconcileSurface.unboundFailureScenario()
   assert.equal(result.snapshotReads, 0)
 })
-test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_projection_edge_drives_exactly_one_additional_idle_read', async () => {
+test('WHAT[host-boundary-005] EXEC_reconcile_projection_edge_drives_exactly_one_additional_idle_read', async () => {
   const result = await ReconcileSurface.idleProjectionEdgeScenario()
 
   assert.deepEqual(result, {
@@ -43,7 +43,7 @@ test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_projection_edge_drives_exactly_one_
     hasQuiescence: true,
   })
 })
-test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_without_projection_edge_reads_once_and_exposes_no_counter', async () => {
+test('WHAT[host-boundary-005] EXEC_reconcile_without_projection_edge_reads_once_and_exposes_no_counter', async () => {
   const result = await ReconcileSurface.idleProvisionalWithoutProjectionEdgeScenario()
   assert.deepEqual(result, {
     snapshotReads: 1,
@@ -57,7 +57,7 @@ test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_without_projection_edge_reads_once_
   )
   assert.deepEqual(decision, { name: 'StopPass' })
 })
-test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_projection_edge_delivers_the_next_failed_provider_run_to_AABB', async () => {
+test('WHAT[host-boundary-005] EXEC_reconcile_projection_edge_delivers_the_next_failed_provider_run_to_AABB', async () => {
   const result = await ReconcileSurface.failureProjectionEdgeScenario()
 
   assert.deepEqual(result, {
@@ -67,7 +67,7 @@ test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_projection_edge_delivers_the_next_f
     hasQuiescence: false,
   })
 })
-test('WHAT[HOST-BOUNDARY-005] EXEC_provider_failure_with_exact_current_assistant_does_not_wait_for_terminal_projection', async () => {
+test('WHAT[host-boundary-005] EXEC_provider_failure_with_exact_current_assistant_does_not_wait_for_terminal_projection', async () => {
   const result = await ReconcileSurface.failureWitnessCurrentAssistantScenario()
 
   assert.deepEqual(result, {
@@ -79,7 +79,7 @@ test('WHAT[HOST-BOUNDARY-005] EXEC_provider_failure_with_exact_current_assistant
     hasQuiescence: false,
   })
 })
-test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_snapshot_error_and_no_turn_stop_current_pass', () => {
+test('WHAT[host-boundary-005] EXEC_reconcile_snapshot_error_and_no_turn_stop_current_pass', () => {
   const error = ReconcileSurface.decideStep(
     idleWake,
     ReconcileSurface.evidenceSnapshotError('projection unavailable'),
@@ -92,7 +92,7 @@ test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_snapshot_error_and_no_turn_stop_cur
   )
   assert.equal(ReconcileSurface.decisionName(noTurn), 'StopPass')
 })
-test('WHAT[HOST-BOUNDARY-005] EXEC_only_idle_can_publish_a_nonterminal_current_assistant', () => {
+test('WHAT[host-boundary-005] EXEC_only_idle_can_publish_a_nonterminal_current_assistant', () => {
   const idle = ReconcileSurface.decideStep(
     idleWake,
     ReconcileSurface.evidenceProvisional('TurnInProgress'),
@@ -111,14 +111,14 @@ test('WHAT[HOST-BOUNDARY-005] EXEC_only_idle_can_publish_a_nonterminal_current_a
     assert.equal(ReconcileSurface.decisionName(decision), 'StopPass')
   }
 })
-test('WHAT[HOST-BOUNDARY-005] mutation_canary_terminal_evidence_still_publishes', () => {
+test('WHAT[host-boundary-005] mutation_canary_terminal_evidence_still_publishes', () => {
   const decision = ReconcileSurface.decideStep(
     ReconcileSurface.failureWake(),
     ReconcileSurface.evidenceTerminal('TurnCompleted'),
   )
   assert.equal(ReconcileSurface.decisionName(decision), 'Publish')
 })
-test('WHAT[HOST-BOUNDARY-005] terminal provider failure publishes only with matching typed physical witness', () => {
+test('WHAT[host-boundary-005] terminal provider failure publishes only with matching typed physical witness', () => {
   const terminal = ReconcileSurface.evidenceTerminalFor('failed-physical', 'TurnFailed')
 
   assert.equal(
@@ -143,7 +143,7 @@ test('WHAT[HOST-BOUNDARY-005] terminal provider failure publishes only with matc
     'idle observed before session.error must not publish a provider failure without its typed witness',
   )
 })
-test('WHAT[HOST-BOUNDARY-005] exact failure witness dominates every same-run coarse wake ordering', () => {
+test('WHAT[host-boundary-005] exact failure witness dominates every same-run coarse wake ordering', () => {
   const physical = 'msg-failure-property'
   const terminal = ReconcileSurface.evidenceTerminalFor(physical, 'TurnFailed')
   const coarseWake = fc.constantFrom(ReconcileSurface.retryWake(), ReconcileSurface.idleWake('ses-failure-property'))
@@ -180,14 +180,14 @@ const completed = (providerRun = '') => ({ kind: 'Completed', providerRun })
 const failed = (error) => ({ kind: 'Failed', error })
 const idleWake = ReconcileSurface.idleWake('s1', 1n)
 
-test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_error_never_self_polls', () => {
+test('WHAT[host-boundary-005] EXEC_reconcile_error_never_self_polls', () => {
   const decision = ReconcileSurface.decideStep(
     idleWake,
     ReconcileSurface.evidenceSnapshotError('provider unavailable'),
   )
   assert.equal(ReconcileSurface.decisionName(decision), 'StopPass')
 })
-test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_idle_is_the_only_nonterminal_publish_authority', () => {
+test('WHAT[host-boundary-005] EXEC_reconcile_idle_is_the_only_nonterminal_publish_authority', () => {
   const idle = ReconcileSurface.decideStep(idleWake, ReconcileSurface.evidenceProvisional('TurnInProgress'))
   assert.equal(ReconcileSurface.decisionName(idle), 'Publish')
 
@@ -197,11 +197,11 @@ test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_idle_is_the_only_nonterminal_publis
   )
   assert.equal(ReconcileSurface.decisionName(failure), 'StopPass')
 })
-test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_idle_provisional_publishes', () => {
+test('WHAT[host-boundary-005] EXEC_reconcile_idle_provisional_publishes', () => {
   const decision = ReconcileSurface.decideStep(idleWake, ReconcileSurface.evidenceProvisional('TurnInProgress'))
   assert.equal(ReconcileSurface.decisionName(decision), 'Publish')
 })
-test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_unknown_under_idle_wake_publishes', () => {
+test('WHAT[host-boundary-005] EXEC_reconcile_unknown_under_idle_wake_publishes', () => {
   // Unknown (finish=None) under IdleWake → Publish.
   // Under Retry/Failure/Abort wake → StopPass.
   const idleDecision = ReconcileSurface.decideStep(idleWake, ReconcileSurface.evidenceUnknown())
@@ -210,11 +210,11 @@ test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_unknown_under_idle_wake_publishes',
   const retryDecision = ReconcileSurface.decideStep(ReconcileSurface.retryWake(), ReconcileSurface.evidenceUnknown())
   assert.equal(ReconcileSurface.decisionName(retryDecision), 'StopPass')
 })
-test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_session_cleared_stops', () => {
+test('WHAT[host-boundary-005] EXEC_reconcile_session_cleared_stops', () => {
   const decision = ReconcileSurface.decideStep(idleWake, ReconcileSurface.evidenceSessionCleared())
   assert.equal(ReconcileSurface.decisionName(decision), 'StopPass')
 })
-test('WHAT[HOST-BOUNDARY-005] mutation_canary_snapshot_error_must_stop_pass', () => {
+test('WHAT[host-boundary-005] mutation_canary_snapshot_error_must_stop_pass', () => {
   // SnapshotError must never Publish or self-authorize another read.
   const decision = ReconcileSurface.decideStep(idleWake, ReconcileSurface.evidenceSnapshotError('e'))
   assert.equal(ReconcileSurface.decisionName(decision), 'StopPass',

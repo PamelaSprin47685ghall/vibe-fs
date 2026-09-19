@@ -37,7 +37,7 @@ const makeProviderFixture = () => {
   }
 }
 
-test('WHAT[PROVIDER-LANGUAGE-008] repo scan is green across every semantic surface', () => {
+test('WHAT[provider-language-008] repo scan is green across every semantic surface', () => {
   const result = scanRepo()
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
 })
@@ -51,7 +51,7 @@ const { clearAllForTests, readGlobalPreference, parse, tryParse, label, resource
 const english = 'English'
 const simplifiedChinese = 'SimplifiedChinese'
 
-test('WHAT[PROVIDER-LANGUAGE-008] bound language loads its own locale leaf', () => {
+test('WHAT[provider-language-008] bound language loads its own locale leaf', () => {
   assert.equal(exists(english, 'role/manager'), true)
   assert.equal(exists(simplifiedChinese, 'role/manager'), true)
 })

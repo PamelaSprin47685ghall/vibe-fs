@@ -35,7 +35,7 @@ const items = [
   obligation('verification', 'Verify the behavior with evidence.', 'far'),
 ]
 
-test('WHAT[OBLIGATION-LEDGER-001] canonical obligation wire carries no provider-visible cold state', () => {
+test('WHAT[obligation-ledger-001] canonical obligation wire carries no provider-visible cold state', () => {
   const wire = todo.canonicalObligationListWire(items)
   assert.doesNotMatch(wire, /"id"|"status"|"priority"/)
 })

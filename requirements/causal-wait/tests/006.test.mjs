@@ -40,7 +40,7 @@ const lastExit = (registry) => {
 }
 const activeCount = (registry) => causal.snapshot(registry).active.length
 
-test('WHAT[CAUSAL-006] RED_2_resolve_clears_active_and_records_resolved', async () => {
+test('WHAT[causal-wait-006] RED_2_resolve_clears_active_and_records_resolved', async () => {
   const registry = causal.createRegistry()
   const pending = deferred()
   const awaited = causal.awaitTask(registry, waitFor('A', 'X'), pending.promise)
@@ -51,7 +51,7 @@ test('WHAT[CAUSAL-006] RED_2_resolve_clears_active_and_records_resolved', async 
   assert.equal(activeCount(registry), 0)
   assert.equal(lastExit(registry), 'WaitResolved')
 })
-test('WHAT[CAUSAL-006] RED_3_fail_clears_active_and_records_failed', async () => {
+test('WHAT[causal-wait-006] RED_3_fail_clears_active_and_records_failed', async () => {
   const registry = causal.createRegistry()
   const pending = deferred()
   const awaited = causal.awaitTask(registry, waitFor('A', 'X'), pending.promise)
@@ -61,7 +61,7 @@ test('WHAT[CAUSAL-006] RED_3_fail_clears_active_and_records_failed', async () =>
   assert.equal(activeCount(registry), 0)
   assert.equal(lastExit(registry), 'WaitFailed')
 })
-test('WHAT[CAUSAL-006] RED_4_cancel_clears_active_and_records_cancelled', async () => {
+test('WHAT[causal-wait-006] RED_4_cancel_clears_active_and_records_cancelled', async () => {
   const registry = causal.createRegistry()
   const pending = deferred()
   const awaited = causal.awaitTask(registry, waitFor('A', 'X'), pending.promise)
@@ -71,7 +71,7 @@ test('WHAT[CAUSAL-006] RED_4_cancel_clears_active_and_records_cancelled', async 
   assert.equal(activeCount(registry), 0)
   assert.equal(lastExit(registry), 'WaitCancelled')
 })
-test('WHAT[CAUSAL-006] RED_4_cancel_message_also_classifies_as_cancelled', async () => {
+test('WHAT[causal-wait-006] RED_4_cancel_message_also_classifies_as_cancelled', async () => {
   const registry = causal.createRegistry()
   const pending = deferred()
   const awaited = causal.awaitTask(registry, waitFor('A', 'X'), pending.promise)
@@ -81,7 +81,7 @@ test('WHAT[CAUSAL-006] RED_4_cancel_message_also_classifies_as_cancelled', async
   assert.equal(lastExit(registry), 'WaitCancelled')
   assert.equal(activeCount(registry), 0)
 })
-test('WHAT[CAUSAL-006] history_capacity_bounds_ring_buffer', () => {
+test('WHAT[causal-wait-006] history_capacity_bounds_ring_buffer', () => {
   const registry = causal.createRegistry(2)
   for (let i = 0; i < 3; i += 1) {
     const lease = causal.enter(registry, waitFor('A', `X${i}`))
@@ -114,7 +114,7 @@ const write = (descriptor) => {
   return { workspace, lease, registry }
 }
 
-test('WHAT[CAUSAL-006] CAUSAL_006_wait_escape_has_five_typed_cases', () => {
+test('WHAT[causal-wait-006] CAUSAL_006_wait_escape_has_five_typed_cases', () => {
   const tags = [
     causal.escape('deadlineAt', '2026-01-01T00:00:00Z'),
     causal.escape('cancelledBy', owner('review-attempt')),
@@ -125,7 +125,7 @@ test('WHAT[CAUSAL-006] CAUSAL_006_wait_escape_has_five_typed_cases', () => {
 
   assert.deepEqual(tags, ['deadlineAt', 'cancelledBy', 'processLifetime', 'sessionLifetime', 'openEndedExternal'])
 })
-test('WHAT[CAUSAL-006] CAUSAL_006_escapes_render_distinctly_in_diagnostics', () => {
+test('WHAT[causal-wait-006] CAUSAL_006_escapes_render_distinctly_in_diagnostics', () => {
   const wait = causal.createWait({
     waitKind: 'escape-taxonomy',
     owner: owner('A'),
@@ -152,7 +152,7 @@ test('WHAT[CAUSAL-006] CAUSAL_006_escapes_render_distinctly_in_diagnostics', () 
     fs.rmSync(workspace, { recursive: true, force: true })
   }
 })
-test('WHAT[CAUSAL-006] CAUSAL_006_deadline_escape_carries_typed_instant', () => {
+test('WHAT[causal-wait-006] CAUSAL_006_deadline_escape_carries_typed_instant', () => {
   const wait = causal.createWait({
     waitKind: 'deadline-escape',
     owner: owner('A'),
@@ -196,7 +196,7 @@ const lastTransition = (registry) => {
   return history.at(-1)
 }
 
-test('WHAT[CAUSAL-006] CAUSAL_006_dispose_defaults_to_wait_disposed', () => {
+test('WHAT[causal-wait-006] CAUSAL_006_dispose_defaults_to_wait_disposed', () => {
   const registry = causal.createRegistry()
   const lease = causal.enter(registry, descriptor('A'))
   assertOpaque(lease, 'wait lease')
@@ -207,14 +207,14 @@ test('WHAT[CAUSAL-006] CAUSAL_006_dispose_defaults_to_wait_disposed', () => {
   assert.equal(transition.exit, 'WaitDisposed')
   assert.equal(causal.snapshot(registry).active.length, 0)
 })
-test('WHAT[CAUSAL-006] CAUSAL_006_mark_exit_then_dispose_preserves_exit', () => {
+test('WHAT[causal-wait-006] CAUSAL_006_mark_exit_then_dispose_preserves_exit', () => {
   const registry = causal.createRegistry()
   const lease = causal.enter(registry, descriptor('A'))
   causal.markExit(lease, 'WaitCancelled')
   causal.dispose(lease)
   assert.equal(lastTransition(registry).exit, 'WaitCancelled')
 })
-test('WHAT[CAUSAL-006] CAUSAL_006_repeated_mark_exit_last_one_wins', () => {
+test('WHAT[causal-wait-006] CAUSAL_006_repeated_mark_exit_last_one_wins', () => {
   const registry = causal.createRegistry()
   const lease = causal.enter(registry, descriptor('A'))
   causal.markExit(lease, 'WaitResolved')
@@ -222,7 +222,7 @@ test('WHAT[CAUSAL-006] CAUSAL_006_repeated_mark_exit_last_one_wins', () => {
   causal.dispose(lease)
   assert.equal(lastTransition(registry).exit, 'WaitFailed')
 })
-test('WHAT[CAUSAL-006] CAUSAL_006_dispose_is_idempotent_single_leave', () => {
+test('WHAT[causal-wait-006] CAUSAL_006_dispose_is_idempotent_single_leave', () => {
   const registry = causal.createRegistry()
   const lease = causal.enter(registry, descriptor('A'))
   causal.dispose(lease)
@@ -232,7 +232,7 @@ test('WHAT[CAUSAL-006] CAUSAL_006_dispose_is_idempotent_single_leave', () => {
   assert.equal(leaves.length, 1)
   assert.equal(causal.snapshot(registry).active.length, 0)
 })
-test('WHAT[CAUSAL-006] CAUSAL_006_reenter_is_fresh_observation_not_revival', () => {
+test('WHAT[causal-wait-006] CAUSAL_006_reenter_is_fresh_observation_not_revival', () => {
   const registry = causal.createRegistry()
   const first = causal.enter(registry, descriptor('A'))
   const sequenceAfterEnter = causal.snapshot(registry).sequence
@@ -246,7 +246,7 @@ test('WHAT[CAUSAL-006] CAUSAL_006_reenter_is_fresh_observation_not_revival', () 
   causal.dispose(second)
   assert.equal(causal.snapshot(registry).active.length, 0)
 })
-test('WHAT[CAUSAL-006] CAUSAL_006_history_default_capacity_is_256', () => {
+test('WHAT[causal-wait-006] CAUSAL_006_history_default_capacity_is_256', () => {
   assert.equal(causal.historyCapacity(causal.createRegistry()), 256)
 })
 }

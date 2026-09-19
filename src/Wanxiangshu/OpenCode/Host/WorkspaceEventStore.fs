@@ -61,7 +61,7 @@ module WorkspaceEventStore =
                 entry.RefCount <- entry.RefCount + 1
                 entry.Store
             | false, _ ->
-                // DURABLE-EVENTS-020: owning the workspace capability is not the
+                // durable-events-020: owning the workspace capability is not the
                 // same thing as consuming durable semantics. Canonical replay is
                 // deliberately behind the IEventStore methods so plugin load can
                 // finish without folding the entire workspace history.

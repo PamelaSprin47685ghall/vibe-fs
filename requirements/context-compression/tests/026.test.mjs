@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as runtime from '../../../dist/Context/Companion/RuntimeSurface.js'
 
-test('WHAT[CONTEXT-COMPRESSION-026] repair episode abandon failure causes rendezvous to fail terminally without fake success and prevents restart', async (t) => {
+test('WHAT[context-compression-026] repair episode abandon failure causes rendezvous to fail terminally without fake success and prevents restart', async (t) => {
   const scope = runtime.createScope()
   t.after(() => {
     try {

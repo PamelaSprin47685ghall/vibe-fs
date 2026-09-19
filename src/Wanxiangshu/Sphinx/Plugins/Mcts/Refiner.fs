@@ -1,4 +1,4 @@
-// WHAT[EPI-010]: MCTS refiner runs a seeded fixed-budget search over a finite generative model.
+// WHAT[epistemic-reasoning-010]: MCTS refiner runs a seeded fixed-budget search over a finite generative model.
 
 namespace Wanxiangshu.Sphinx.Plugins.Mcts
 

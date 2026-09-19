@@ -85,7 +85,7 @@ const seedTwoInvocations = async (handle) => {
   return { s1, s2, inv1Through, inv2Through }
 }
 
-test('WHAT[WORK-RECORD-007] child_to_parent_run_bounded_LWR_omits_caller_charge', async () => {
+test('WHAT[work-record-007] child_to_parent_run_bounded_LWR_omits_caller_charge', async () => {
   await withJournal(async (journal) => {
     await workRecord.captureOpening(journal, SEM, 'assigned task', [])
     const captured = await workRecord.captureProjection(journal, SEM, {
@@ -138,7 +138,7 @@ const materialize = (
 }
 const OPENING_END = { Sequence: 1 }
 
-test('WHAT[WORK-RECORD-007] LWR_parent_to_child_includes_opening', () => {
+test('WHAT[work-record-007] LWR_parent_to_child_includes_opening', () => {
   // EXEC-006: parent → child background keeps Opening (includeOpening default true).
   const rendered = materialize(
     opening('assigned task'),
@@ -154,7 +154,7 @@ test('WHAT[WORK-RECORD-007] LWR_parent_to_child_includes_opening', () => {
   assert.equal(rendered.includes('assigned task'), true)
   assert.match(rendered, /Chronicle\ndid work/)
 })
-test('WHAT[WORK-RECORD-007] LWR_child_to_parent_omits_opening', () => {
+test('WHAT[work-record-007] LWR_child_to_parent_omits_opening', () => {
   // EXEC-006: child → parent join omits Opening — assigner already knows the task.
   const rendered = materialize(
     opening('assigned task'),

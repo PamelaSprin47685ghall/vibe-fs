@@ -1,4 +1,4 @@
-// WHAT[EPI-019,EPI-028]: canonical-spine store codec over the durable EventStore.
+// WHAT[epistemic-reasoning-019,epistemic-reasoning-028]: canonical-spine store codec over the durable EventStore.
 namespace Wanxiangshu.Sphinx
 
 open System
@@ -6,7 +6,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Sphinx.Core
 
-/// WHAT[EPI-019]: pure codec, conflict gate, fold and export over the canonical
+/// WHAT[epistemic-reasoning-019]: pure codec, conflict gate, fold and export over the canonical
 /// durable spine. Every durable byte lives in the canonical EventStore (owned by
 /// Persistence); this module only translates caller JS events into envelopes,
 /// judges appends against a caller-held Current, folds caller-supplied envelope

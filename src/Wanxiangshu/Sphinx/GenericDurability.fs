@@ -1,4 +1,4 @@
-// WHAT[EPI-019]: durable codec for generic sphinx_inquiry_* inquiries.
+// WHAT[epistemic-reasoning-019]: durable codec for generic sphinx_inquiry_* inquiries.
 // One stream per iq_ id, deterministic envelope ids chained by causal
 // parents, payloads as canonical JSON. The canonical rule folds envelopes
 // into a per-inquiry cursor map; boot materializes that Current into a fresh

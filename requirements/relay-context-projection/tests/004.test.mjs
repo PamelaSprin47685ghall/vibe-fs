@@ -22,7 +22,7 @@ const cutResult = () => projection.applyCut(cutMessages, 'old-run', 'suicide-cal
 
 const ids = (result) => result.provider.map((message) => message.id ?? message.info?.id)
 
-test('WHAT[PROJ-004] retired finish and internal wake project to a clean authority start', () => {
+test('WHAT[relay-context-projection-004] retired finish and internal wake project to a clean authority start', () => {
   const initial = [{ id: 'root', run: '', role: 'user', text: 'root user request' }]
   const initialProvider = projection.applyCut(initial, '', '', [], ['root'])
   assert.deepEqual(ids(initialProvider), ['root'])

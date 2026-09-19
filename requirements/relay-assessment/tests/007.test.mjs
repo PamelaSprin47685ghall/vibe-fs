@@ -7,7 +7,7 @@ const scores = ['PERFECT', 'REVISE', 'PERFECT', 'REVISE', 'PERFECT', 'PERFECT', 
 const open = (state, snapshot = 'snapshot-1') =>
   relay.openIncumbency(state, 'road-1', 'inc-1', snapshot, 'authority-1')
 
-test('WHAT[ASSESS-007] assessment accepts latest workspace snapshot on submit', () => {
+test('WHAT[relay-assessment-007] assessment accepts latest workspace snapshot on submit', () => {
   const opened = open(relay.empty(), 'snapshot-2')
   const assessed = relay.assess(
     opened.state,

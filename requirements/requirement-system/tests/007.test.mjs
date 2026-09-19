@@ -14,7 +14,7 @@ import {
 
 const PREFIXES = ['ARCH', 'GOV', 'HOST']
 
-test('WHAT[REQUIREMENT-SYSTEM-007] spec gate requires exact README coverage of formal files', () => {
+test('WHAT[requirement-system-007] spec gate requires exact README coverage of formal files', () => {
   const navigation = [
     '[kept](what/kept.md)',
     '[stale](what/stale.md)',
@@ -29,7 +29,7 @@ test('WHAT[REQUIREMENT-SYSTEM-007] spec gate requires exact README coverage of f
   )
 })
 
-test('WHAT[REQUIREMENT-SYSTEM-007] spec gate covers links with spaces and hash characters exactly', () => {
+test('WHAT[requirement-system-007] spec gate covers links with spaces and hash characters exactly', () => {
   const navigation = [
     '[kept](why/kept.md)',
     '[research](<why/research # note.md>)',
@@ -49,7 +49,7 @@ test('WHAT[REQUIREMENT-SYSTEM-007] spec gate covers links with spaces and hash c
   )
 })
 
-test('WHAT[REQUIREMENT-SYSTEM-007] spec gate extracts local Markdown links without treating URLs or anchors as files', () => {
+test('WHAT[requirement-system-007] spec gate extracts local Markdown links without treating URLs or anchors as files', () => {
   assert.deepEqual(
     markdownLocalLinks([
       '[plain](what/agent.md)',

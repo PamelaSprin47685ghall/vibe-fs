@@ -13,7 +13,7 @@ const sandbox = () => {
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
-test('WHAT[CHGINT-004] GATE_lock_path_is_stable_per_repo_and_branch', () => {
+test('WHAT[change-integration-004] GATE_lock_path_is_stable_per_repo_and_branch', () => {
   const first = change.lockPath('/repo/a', 'main')
   const second = change.lockPath('/repo/a', 'main')
   const otherBranch = change.lockPath('/repo/a', 'dev')
@@ -24,7 +24,7 @@ test('WHAT[CHGINT-004] GATE_lock_path_is_stable_per_repo_and_branch', () => {
   assert.notEqual(first, otherRepo)
   assert.match(first, /wanxiangshu-publish-[0-9a-f]{64}$/)
 })
-test('WHAT[CHGINT-004] GATE_acquire_and_release_round_trips', async () => {
+test('WHAT[change-integration-004] GATE_acquire_and_release_round_trips', async () => {
   const { dir, cleanup } = sandbox()
   const lockTarget = join(dir, 'target.lock')
   writeFileSync(lockTarget, '')
@@ -37,7 +37,7 @@ test('WHAT[CHGINT-004] GATE_acquire_and_release_round_trips', async () => {
   await change.releaseGate(second)
   cleanup()
 })
-test('WHAT[CHGINT-004] GATE_dispose_releases_the_lock', async () => {
+test('WHAT[change-integration-004] GATE_dispose_releases_the_lock', async () => {
   const { dir, cleanup } = sandbox()
   const lockTarget = join(dir, 'target.lock')
   writeFileSync(lockTarget, '')
@@ -49,7 +49,7 @@ test('WHAT[CHGINT-004] GATE_dispose_releases_the_lock', async () => {
   await change.releaseGate(second)
   cleanup()
 })
-test('WHAT[CHGINT-004] GATE_second_acquire_on_held_lock_eventually_fails', async () => {
+test('WHAT[change-integration-004] GATE_second_acquire_on_held_lock_eventually_fails', async () => {
   const { dir, cleanup } = sandbox()
   const lockTarget = join(dir, 'target.lock')
   writeFileSync(lockTarget, '')
@@ -160,7 +160,7 @@ const foldProjection = (events) => {
 const worktreeRequested = { kind: 'WorktreeCreateRequested', payload: { jobId: JOB, worktreeIdentity: 'manager/job_1', worktreePath: '/tmp/wt1' } }
 const worktreeCreated = { kind: 'WorktreeCreated', payload: { jobId: JOB, worktreeIdentity: 'manager/job_1', worktreePath: '/tmp/wt1' } }
 
-test('WHAT[CHGINT-004] ORCH_004_multiple_jobs_are_active_at_once_and_terminal_ones_drop_out', () => {
+test('WHAT[change-integration-004] ORCH_004_multiple_jobs_are_active_at_once_and_terminal_ones_drop_out', () => {
   let projection = created()
   projection = change.createJob(projection, payload({ jobId: 'job_2', managerSessionId: 'ses_m2' }))
   projection = change.createJob(projection, payload({ jobId: 'job_3', managerSessionId: 'ses_m3' }))
@@ -245,7 +245,7 @@ const classifyRebased = (head, rebasedCommit = 'r1', snapshot = 'h1') =>
 const classifyClaim = (head, rebasedCommit = 'r1', expectedHead = 'h1') =>
   change.classifyPublishClaim(head ?? null, rebasedCommit, expectedHead)
 
-test('WHAT[CHGINT-004] THEOREM_orchestrator_independent_jobs_confluent_across_interleavings', () => {
+test('WHAT[change-integration-004] THEOREM_orchestrator_independent_jobs_confluent_across_interleavings', () => {
   const seqA = [createEvent(JOB_A, 'ses_orch_a'), candidateEvent(JOB_A, 'ca', 'snapshot-a', 'certificate-a')]
   const seqB = [createEvent(JOB_B, 'ses_orch_b'), candidateEvent(JOB_B, 'cb', 'snapshot-b', 'certificate-b')]
   const foldAB = foldEvents([...seqA, ...seqB])

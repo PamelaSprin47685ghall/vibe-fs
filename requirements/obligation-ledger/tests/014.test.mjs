@@ -84,7 +84,7 @@ const acceptT1Checkpoint = async (handle, session, callText) => {
   return { t1, accepted }
 }
 
-test('WHAT[OBLIGATION-LEDGER-014] successive checkpoints can be prepared and accepted seamlessly', async () => {
+test('WHAT[obligation-ledger-014] successive checkpoints can be prepared and accepted seamlessly', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-magic-todo-t1-t2-resolve'
     const life = 'life-magic-todo-t1-t2-resolve'

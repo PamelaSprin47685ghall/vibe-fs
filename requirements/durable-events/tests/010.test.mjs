@@ -39,7 +39,7 @@ const withRepo = async (name, fn) => {
   }
 }
 
-test('WHAT[DURABLE-EVENTS-010] SharedAgentJournal_boots_local_EventStore_and_leaves_retired_RuntimePath_ndjson_unread', async () => {
+test('WHAT[durable-events-010] SharedAgentJournal_boots_local_EventStore_and_leaves_retired_RuntimePath_ndjson_unread', async () => {
   await withRepo('boot', async (workspace, commonDir) => {
     const retiredDir = join(commonDir, 'wanxiangshu-next', 'runtimes')
     mkdirSync(retiredDir, { recursive: true })

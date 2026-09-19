@@ -73,7 +73,7 @@ const verifyReusableHandoff = async (role) => {
   } finally { sync.dispose(h) }
 }
 
-test('WHAT[DELEG-023] SYNC_RUNTIME_transient_turn_failure_stays_child_local_until_exhausted', async () => {
+test('WHAT[delegation-023] SYNC_RUNTIME_transient_turn_failure_stays_child_local_until_exhausted', async () => {
   const h = await live('owner-retry')
   try {
     const pending = sync.invoke(h, 'owner-retry', 'Engineer', 'retry charge')

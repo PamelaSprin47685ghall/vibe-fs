@@ -6,7 +6,7 @@ const { default: test } = await import("node:test");
 const journal = await import("../../../dist/Persistence/Journal/Surface.js");
 
 
-test('WHAT[EXECFAIL-007] journal writer outcomes preserve exact persistence commitment', () => {
+test('WHAT[execution-failure-policy-007] journal writer outcomes preserve exact persistence commitment', () => {
   assert.deepEqual(journal.JournalSurface_mapAppendFailure({ kind: 'WriterUnavailable', diagnostic: 'writer closing' }), {
     failure: 'PersistenceFailure', commitment: 'NotCommitted', diagnostic: 'writer closing',
   })
@@ -123,7 +123,7 @@ const providerCases = [
   },
 ]
 
-test('WHAT[EXECFAIL-007] persistence commitment remains explicit and uncertainty reconciles without repeated effect', () => {
+test('WHAT[execution-failure-policy-007] persistence commitment remains explicit and uncertainty reconciles without repeated effect', () => {
   const notCommitted = decide({
     failure: { kind: 'PersistenceFailure', commitment: 'NotCommitted' },
   })

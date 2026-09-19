@@ -5,7 +5,7 @@
 `dispatch-protocol` 规范逻辑提示穿过不可靠传输层时的物理调度模型：
 
 1. **Claim 注册与 PromptKey 派生**：
-   在向底层通道发送消息前，`PromptDispatcher` 首先根据 `(SessionId, LogicalRunId, AuthorityRootId, Origin, PayloadDigest, ClaimSequence)` 确定性计算 agent-free 的 `PromptKey`（不哈入任何 agent、peer 或 model；旧版含 agent 的 key 仅在回放历史时单向解码，新调度绝不双写），并持久化 `PluginPromptClaimed` 事实。
+   在向底层通道发送消息前，`PromptDispatcher` 首先根据 `(SessionId, LogicalRunId, AuthorityRootId, Origin, PayloadDigest, ClaimSequence)` 确定性计算 agent-free 的 `PromptKey`（不哈入任何 agent、peer 或 model；对包含 agent 的 key 仅在回放历史时提供单向解码，新调度绝不双写），并持久化 `PluginPromptClaimed` 事实。
    terminal-scoped gate nudge 先以不含 sequence 的 claim scope 进入 dispatcher-owned physical single-flight；同 scope 的并发观察等待同一 Task，只有唯一 writer 派生 sequence、写 claim 并调用 Host。完成后删除 flight；后续 retry 仍由 durable Pending/Accepted/Abandoned projection 决定。
 
 2. **传输交互与回执捕获**：
@@ -27,7 +27,7 @@
 
 5. **Host physical identity 解码**：
    `PromptIngressCodec` 只读取 Host 1.18.29 契约中的 `input.messageID` 与 `output.message.id`。空白 carrier 视为缺失；两个非空 carrier 必须保持原始字节完全一致。缺失、冲突、仅有非契约字段时均不生成 `PhysicalUserMessageId`。
-   `SessionId` carrier先逐字段解码为`Absent | Invalid | Valid opaque-string`，再跨四个正式source汇总：存在`Invalid`或多个不同`Valid`即拒绝，全部`Valid`原始字节相同才建立identity。嵌套`session`只接受plain JSON record的own data property；PromptKey 与旧版只读 agent carrier 复用相同汇总器，禁止字段优先级掩盖冲突。wire 上新生成的 PromptKey carrier 必须为 agent-free `PromptKey`；旧版含 agent 的 key 仅用于读取旧事实，不得双写。测试从注册的dispatch production Surface穿越Fable边界，并以source × alias × value-kind × multiplicity生成完整partition。
+   `SessionId` carrier先逐字段解码为`Absent | Invalid | Valid opaque-string`，再跨四个正式source汇总：存在`Invalid`或多个不同`Valid`即拒绝，全部`Valid`原始字节相同才建立identity。嵌套`session`只接受plain JSON record的own data property；PromptKey 与旧版只读 agent carrier 复用相同汇总器，禁止字段优先级掩盖冲突。wire 上新生成的 PromptKey carrier 必须为 agent-free `PromptKey`；含 agent 的 key 仅用于读取持久化载荷单向解码，不得双写。测试从注册的dispatch production Surface穿越Fable边界，并以source × alias × value-kind × multiplicity生成完整partition。
 
 ### Nudge 编译边界
 

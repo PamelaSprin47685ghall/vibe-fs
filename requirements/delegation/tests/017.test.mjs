@@ -73,7 +73,7 @@ const verifyReusableHandoff = async (role) => {
   } finally { sync.dispose(h) }
 }
 
-test('WHAT[DELEG-017] SYNC_RUNTIME_work_record_is_evidence_and_does_not_transfer_authority', () => {
+test('WHAT[delegation-017] SYNC_RUNTIME_work_record_is_evidence_and_does_not_transfer_authority', () => {
   const result = sync.evidenceBoundary('inspect this file', 'found one bounded fact')
   assert.equal(result.charge, 'inspect this file')
   assert.equal(result.workRecord, 'found one bounded fact')

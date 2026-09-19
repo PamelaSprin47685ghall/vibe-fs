@@ -16,7 +16,7 @@ const job = (id, path = `/tmp/${id}`) => ({
   targetBranchFrozen: 'refs/heads/main',
 })
 
-test('WHAT[CHGINT-006] HOST_awaitManager_stages_the_worktree_after_a_completed_manager_run', async () => {
+test('WHAT[change-integration-006] HOST_awaitManager_stages_the_worktree_after_a_completed_manager_run', async () => {
   const runner = (command) => command.args[0] === 'worktree' ? Promise.resolve([0, '', '']) : Promise.resolve([0, '', ''])
   const resource = await change.worktreeCreate(change.createGit('/repo', runner), 'hostfw10', '/tmp/hostfw10')
   assert.equal(resource.ok, true)
@@ -111,67 +111,67 @@ const foldProjection = (events) => {
 const worktreeRequested = { kind: 'WorktreeCreateRequested', payload: { jobId: JOB, worktreeIdentity: 'manager/job_1', worktreePath: '/tmp/wt1' } }
 const worktreeCreated = { kind: 'WorktreeCreated', payload: { jobId: JOB, worktreeIdentity: 'manager/job_1', worktreePath: '/tmp/wt1' } }
 
-test('WHAT[CHGINT-006] ORCH_003_fact_for_an_unknown_job_is_a_no_op_rather_than_a_new_entry', () => {
+test('WHAT[change-integration-006] ORCH_003_fact_for_an_unknown_job_is_a_no_op_rather_than_a_new_entry', () => {
   const projection = change.recordFact(created(), 'never', fact.candidateReady())
   assert.equal(change.activeJobs(projection).length, 1)
   assert.equal(change.find(projection, 'never'), null)
 })
-test('WHAT[CHGINT-006] ORCH_006_a_terminal_job_stays_in_the_map_so_a_replay_is_recognised', () => {
+test('WHAT[change-integration-006] ORCH_006_a_terminal_job_stays_in_the_map_so_a_replay_is_recognised', () => {
   const published = change.recordFact(created(), JOB, fact.published())
   assert.notEqual(change.find(published, JOB), null)
   assert.equal(change.activeJobs(published).length, 0)
   const replayed = change.recordFact(published, JOB, fact.published())
   assert.deepEqual(change.find(replayed, JOB).facts, ['Published'])
 })
-test('WHAT[CHGINT-006] ORCH_006_a_terminal_job_accepts_no_further_facts', () => {
+test('WHAT[change-integration-006] ORCH_006_a_terminal_job_accepts_no_further_facts', () => {
   const published = change.recordFact(created(), JOB, fact.published())
   for (const later of [fact.candidateReady('c9'), fact.rebased(), fact.failed('late')]) {
     const after = change.recordFact(published, JOB, later)
     assert.deepEqual(change.find(after, JOB).facts, ['Published'])
   }
 })
-test('WHAT[CHGINT-006] ORCH_006_all_three_terminal_cases_end_the_job', () => {
+test('WHAT[change-integration-006] ORCH_006_all_three_terminal_cases_end_the_job', () => {
   for (const terminal of [fact.published(), fact.failed(), fact.abandoned()]) {
     const projection = change.recordFact(created(), JOB, terminal)
     assert.equal(change.activeJobs(projection).length, 0)
   }
 })
-test('WHAT[CHGINT-006] ORCH_007_projection_keeps_independent_facts_instead_of_latest_stage', () => {
+test('WHAT[change-integration-006] ORCH_007_projection_keeps_independent_facts_instead_of_latest_stage', () => {
   const candidate = jobAt(fact.candidateReady())
   const conflicted = jobAt(fact.conflictDetected(), candidate.projection)
   assert.deepEqual(conflicted.job.facts, ['CandidateReady', 'ConflictDetected'])
 })
-test('WHAT[CHGINT-006] ORCH_006_the_journal_replays_independent_facts_and_terminal', () => {
+test('WHAT[change-integration-006] ORCH_006_the_journal_replays_independent_facts_and_terminal', () => {
   const projection = foldProjection([createdEvent, candidateEvent, publishedEvent])
   assert.deepEqual(change.find(projection, JOB).facts, ['CandidateReady', 'Published'])
   assert.equal(change.activeJobs(projection).length, 0)
 })
-test('WHAT[CHGINT-006] ORCH_006_a_fact_before_its_create_is_dropped_not_promoted', () => {
+test('WHAT[change-integration-006] ORCH_006_a_fact_before_its_create_is_dropped_not_promoted', () => {
   const projection = foldProjection([candidateEvent])
   assert.equal(change.find(projection, JOB), null)
 })
-test('WHAT[CHGINT-006] ORCH_006_a_replayed_create_does_not_reset_a_job_that_already_made_progress', () => {
+test('WHAT[change-integration-006] ORCH_006_a_replayed_create_does_not_reset_a_job_that_already_made_progress', () => {
   const projection = foldProjection([createdEvent, candidateEvent, publishedEvent, createdEvent])
   assert.deepEqual(change.find(projection, JOB).facts, ['CandidateReady', 'Published'])
   assert.equal(change.activeJobs(projection).length, 0)
 })
-test('WHAT[CHGINT-006] PERSIST_009_worktree_request_then_created_marks_identity_created', () => {
+test('WHAT[change-integration-006] PERSIST_009_worktree_request_then_created_marks_identity_created', () => {
   const projection = foldProjection([worktreeRequested, worktreeCreated])
   assert.equal(change.worktreeEffect(projection, 'manager/job_1'), 'Created')
 })
-test('WHAT[CHGINT-006] PERSIST_009_duplicate_request_after_created_does_not_regress_to_requested', () => {
+test('WHAT[change-integration-006] PERSIST_009_duplicate_request_after_created_does_not_regress_to_requested', () => {
   const projection = foldProjection([worktreeRequested, worktreeCreated, worktreeRequested])
   assert.equal(change.worktreeEffect(projection, 'manager/job_1'), 'Created')
 })
-test('WHAT[CHGINT-006] PERSIST_009_duplicate_created_is_idempotent', () => {
+test('WHAT[change-integration-006] PERSIST_009_duplicate_created_is_idempotent', () => {
   const projection = foldProjection([worktreeRequested, worktreeCreated, worktreeCreated])
   assert.equal(change.worktreeEffect(projection, 'manager/job_1'), 'Created')
 })
-test('WHAT[CHGINT-006] PERSIST_009_request_alone_is_not_created', () => {
+test('WHAT[change-integration-006] PERSIST_009_request_alone_is_not_created', () => {
   const projection = foldProjection([worktreeRequested])
   assert.equal(change.worktreeEffect(projection, 'manager/job_1'), 'Requested')
 })
-test('WHAT[CHGINT-006] PERSIST_009_direct_request_accept_helpers_match_fold', () => {
+test('WHAT[change-integration-006] PERSIST_009_direct_request_accept_helpers_match_fold', () => {
   let projection = change.empty()
   projection = change.requestWorktree(projection, 'manager/job_1', '/tmp/wt1', JOB)
   assert.equal(change.worktreeEffect(projection, 'manager/job_1'), 'Requested')
@@ -188,7 +188,7 @@ const { default: test } = await import("node:test");
 
 const change = await import('../../../dist/Change/Surface.js')
 
-test('WHAT[CHGINT-006] EXEC_016_active_manager_jobs_are_outstanding_for_orchestrator', () => {
+test('WHAT[change-integration-006] EXEC_016_active_manager_jobs_are_outstanding_for_orchestrator', () => {
   let jobs = change.createJob(change.empty(), {
     jobId: 'job_1',
     managerSessionId: 'ses_mgr',
@@ -284,7 +284,7 @@ const classifyRebased = (head, rebasedCommit = 'r1', snapshot = 'h1') =>
 const classifyClaim = (head, rebasedCommit = 'r1', expectedHead = 'h1') =>
   change.classifyPublishClaim(head ?? null, rebasedCommit, expectedHead)
 
-test('WHAT[CHGINT-006] THEOREM_independent_facts_survive_and_published_is_terminal', () => {
+test('WHAT[change-integration-006] THEOREM_independent_facts_survive_and_published_is_terminal', () => {
   const events = [
     createEvent(JOB_A, 'ses_orch_a'),
     candidateEvent(JOB_A),
@@ -339,7 +339,7 @@ const valueOf = async (promise) => {
   return result.value
 }
 
-test('WHAT[CHGINT-006] WORKTREE_adopt_never_releases_on_dispose', async () => {
+test('WHAT[change-integration-006] WORKTREE_adopt_never_releases_on_dispose', async () => {
   const { git, calls } = fakeGit()
   const resource = change.worktreeAdopt(git, 'manager/job-9', PATH)
 
@@ -351,7 +351,7 @@ test('WHAT[CHGINT-006] WORKTREE_adopt_never_releases_on_dispose', async () => {
     'an adopted resource must not clean up on dispose (recovery owns it)',
   )
 })
-test('WHAT[CHGINT-006] WORKTREE_mark_durable_disposes_without_release', async () => {
+test('WHAT[change-integration-006] WORKTREE_mark_durable_disposes_without_release', async () => {
   const { git, calls } = fakeGit()
   const resource = await valueOf(change.worktreeCreate(git, 'job-9', PATH))
   change.worktreeMarkDurable(resource)
@@ -362,7 +362,7 @@ test('WHAT[CHGINT-006] WORKTREE_mark_durable_disposes_without_release', async ()
     'a durable worktree (published) must survive dispose',
   )
 })
-test('WHAT[CHGINT-006] WORKTREE_CMD_list_parses_porcelain_blocks', async () => {
+test('WHAT[change-integration-006] WORKTREE_CMD_list_parses_porcelain_blocks', async () => {
   const porcelain = [
     'worktree /repo',
     'HEAD 0123456789abcdef',
@@ -386,23 +386,23 @@ test('WHAT[CHGINT-006] WORKTREE_CMD_list_parses_porcelain_blocks', async () => {
     { path: '/detached', identity: null },
   ])
 })
-test('WHAT[CHGINT-006] WORKTREE_CMD_list_error_propagates', async () => {
+test('WHAT[change-integration-006] WORKTREE_CMD_list_error_propagates', async () => {
   const result = await change.gitListWorktrees(fakeGit([['worktree list --porcelain', [128, '', 'not a git repository']]]).git)
   assert.equal(result.ok, false)
   assert.equal(result.error, 'not a git repository')
 })
-test('WHAT[CHGINT-006] WORKTREE_CMD_list_branches_strips_current_and_worktree_markers', async () => {
+test('WHAT[change-integration-006] WORKTREE_CMD_list_branches_strips_current_and_worktree_markers', async () => {
   const result = await change.gitListManagerBranches(fakeGit([['branch --list manager/*', [0, '* manager/active\n+ manager/checked-out-elsewhere\n  manager/plain\n\n', '']]]).git)
   assert.equal(result.ok, true)
   assert.deepEqual(result.value, ['manager/active', 'manager/checked-out-elsewhere', 'manager/plain'])
 })
-test('WHAT[CHGINT-006] WORKTREE_CMD_delete_branch_uses_force_delete', async () => {
+test('WHAT[change-integration-006] WORKTREE_CMD_delete_branch_uses_force_delete', async () => {
   const fake = fakeGit([])
   const result = await change.gitDeleteBranch(fake.git, 'manager/job-3')
   assert.equal(result.ok, true)
   assert.deepEqual(fake.calls[0].args, ['branch', '-D', 'manager/job-3'])
 })
-test('WHAT[CHGINT-006] WORKTREE_CMD_delete_branch_falls_back_to_stdout_when_stderr_blank', async () => {
+test('WHAT[change-integration-006] WORKTREE_CMD_delete_branch_falls_back_to_stdout_when_stderr_blank', async () => {
   const result = await change.gitDeleteBranch(fakeGit([['branch -D', [1, 'branch not found', '']]]).git, 'manager/job-3')
   assert.equal(result.error, 'branch not found')
 })

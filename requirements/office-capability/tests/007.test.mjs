@@ -24,7 +24,7 @@ const ACTIVE_OFFICES = [
   },
 ]
 
-test('WHAT[OFF-007] OFF_007_manager_forkable_offices_is_strictly_engineer', () => {
+test('WHAT[office-capability-007] OFF_007_manager_forkable_offices_is_strictly_engineer', () => {
   assert.deepEqual(managerForkableOffices(), ['engineer'])
 })
 }
@@ -39,7 +39,7 @@ const { default: test } = await import("node:test");
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const readRole = (role, locale) => readFileSync(join(ROOT, 'resources/provider/role', role, locale), 'utf8')
 
-test('WHAT[OFF-007] manager_has_no_personal_repository_witness_and_no_fission', () => {
+test('WHAT[office-capability-007] manager_has_no_personal_repository_witness_and_no_fission', () => {
   const en = readRole('manager', 'en.md')
   const zh = readRole('manager', 'zh-CN.md')
   assert.match(en, /do not establish repository facts with your own hands/i)

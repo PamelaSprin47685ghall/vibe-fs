@@ -69,7 +69,7 @@ module McpServer =
     [<Emit("(args) => $0(args)")>]
     let private unaryHandler (handler: obj -> obj) : obj = jsNative
 
-    // WHAT[EPI-030]: the MCP SDK awaits whatever a tool callback returns, so a
+    // WHAT[epistemic-reasoning-030]: the MCP SDK awaits whatever a tool callback returns, so a
     // Fable Task (a native promise) lets durable tools append after the session
     // accepted, without fire-and-forget. Rejections never escape: every durable
     // handler catches its failures into a typed isError result.
@@ -454,7 +454,7 @@ module McpServer =
         | AppendError.SemanticCut cut -> sprintf "durable semantic cut by rule %s: %s" cut.Rule cut.Reason
         | AppendError.AppendFailed reason -> reason
 
-    // WHAT[EPI-019]: generic durable-append failure. Memory is never advanced
+    // WHAT[epistemic-reasoning-019]: generic durable-append failure. Memory is never advanced
     // before the envelope lands, so the caller retries the identical call.
     let private genericAppendFailedView (tool: string) (inquiryId: string) (reason: string) : McpContract.ErrorView =
         { Code = "durable-append-failed"
@@ -680,10 +680,10 @@ module McpServer =
         | None -> GecInquiry.Registry()
         | Some current -> restoreGenericOrThrow current
 
-    // WHAT[EPI-030]: sanctioned Current slot written by the Sphinx rule.
+    // WHAT[epistemic-reasoning-030]: sanctioned Current slot written by the Sphinx rule.
     let private sphinxCurrentKey = "Sphinx"
 
-    // WHAT[EPI-030]: durable identity mirrors LegacyDurability: one stream per
+    // WHAT[epistemic-reasoning-030]: durable identity mirrors LegacyDurability: one stream per
     // handle, deterministic handle:revision ids chained by causal parents, and
     // the accepted args inlined as canonical JSON for replay.
     let private legacyEnvelopeOf
@@ -711,7 +711,7 @@ module McpServer =
                       "question", Encode.string question ]
               PayloadRefs = [] }
 
-    // WHAT[EPI-030]: durable-append failures are typed MCP errors, never
+    // WHAT[epistemic-reasoning-030]: durable-append failures are typed MCP errors, never
     // silent. The session already advanced in memory, so the revision can never
     // be appended again; only in-memory work continues.
     let private durableAppendFailedView (handle: string) (revision: int) (reason: string) : McpContract.ErrorView =
@@ -911,7 +911,7 @@ module McpServer =
             (asyncUnaryHandler handler)
         |> ignore
 
-    // WHAT[EPI-030]: one registration source for both servers. None keeps the
+    // WHAT[epistemic-reasoning-030]: one registration source for both servers. None keeps the
     // legacy sync handlers; Some store swaps the six mutating tools to
     // append-after-accept handlers with identical titles and schemas.
     let private buildServer (sessions: SessionStore) (durable: IEventStore option) : obj =
@@ -1161,7 +1161,7 @@ module McpServer =
             replayCursor serving handle cursor
             |> Result.bind (fun () -> replayCursors serving tail)
 
-    // WHAT[EPI-030]: cross-process recovery. Every durable cursor rebuilds into
+    // WHAT[epistemic-reasoning-030]: cross-process recovery. Every durable cursor rebuilds into
     // the serving store oldest-first before the transport connects, so server2
     // answers at the same revision server1 left behind. Any failure refuses to
     // serve rather than answering from an unrecovered store.

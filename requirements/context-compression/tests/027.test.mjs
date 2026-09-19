@@ -83,7 +83,7 @@ const arbitrarySquashPick = fc.record({
   digests: fc.array(fc.string({ minLength: 1, maxLength: 12 }), { minLength: 1, maxLength: 4 }),
 })
 
-test('WHAT[CONTEXT-COMPRESSION-027] every successful Main construction satisfies the §4.2 invariants', () => {
+test('WHAT[context-compression-027] every successful Main construction satisfies the §4.2 invariants', () => {
   fc.assert(
     fc.property(arbitraryMainPick, (pick) => {
       const descriptor = honestMain(pick)
@@ -113,7 +113,7 @@ test('WHAT[CONTEXT-COMPRESSION-027] every successful Main construction satisfies
   )
 })
 
-test('WHAT[CONTEXT-COMPRESSION-027] every successful Squash construction binds count and digests', () => {
+test('WHAT[context-compression-027] every successful Squash construction binds count and digests', () => {
   fc.assert(
     fc.property(arbitrarySquashPick, (pick) => {
       const descriptor = honestSquash(pick)
@@ -138,7 +138,7 @@ test('WHAT[CONTEXT-COMPRESSION-027] every successful Squash construction binds c
   )
 })
 
-test('WHAT[CONTEXT-COMPRESSION-027] non-advancing coverage is rejected, never constructed', () => {
+test('WHAT[context-compression-027] non-advancing coverage is rejected, never constructed', () => {
   fc.assert(
     fc.property(
       arbitraryMainPick,
@@ -165,7 +165,7 @@ test('WHAT[CONTEXT-COMPRESSION-027] non-advancing coverage is rejected, never co
   )
 })
 
-test('WHAT[CONTEXT-COMPRESSION-027] different content yields different digests; same content is stable', () => {
+test('WHAT[context-compression-027] different content yields different digests; same content is stable', () => {
   // The JS descriptor carries no trusted digest: it is production-derived
   // inside the owner boundary, so a saboteur cannot even express "honest
   // content, foreign digest" through `runtime.main`. Tamper-resistance is
@@ -229,7 +229,7 @@ test('WHAT[CONTEXT-COMPRESSION-027] different content yields different digests; 
   )
 })
 
-test('WHAT[CONTEXT-COMPRESSION-027] squash count/digest disagreement is rejected, never constructed', () => {
+test('WHAT[context-compression-027] squash count/digest disagreement is rejected, never constructed', () => {
   // Count-vs-carried disagreement: the production squash constructor rejects
   // before any flight state is touched. Proved through the claim boundary
   // (constructor failure throws out of `squash`, so no flight is claimed).
@@ -282,7 +282,7 @@ test('WHAT[CONTEXT-COMPRESSION-027] squash count/digest disagreement is rejected
   }
 })
 
-test('WHAT[CONTEXT-COMPRESSION-027] recovery rejection cases are distinct and labeled', () => {
+test('WHAT[context-compression-027] recovery rejection cases are distinct and labeled', () => {
   // The compiled production recovery exports one typed rejection union with
   // five distinct cases plus a label renderer. Each corruption class maps to
   // its own case: unreadable I/O (BlobUnreadable), unparseable bytes
@@ -311,7 +311,7 @@ test('WHAT[CONTEXT-COMPRESSION-027] recovery rejection cases are distinct and la
   assert.match(labelOf(3, ['items wire broken']), /undecodable/)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-027] old-epoch staged requests keep their frozen epoch and never claim current authority', () => {
+test('WHAT[context-compression-027] old-epoch staged requests keep their frozen epoch and never claim current authority', () => {
   fc.assert(
     fc.property(
       arbitraryMainPick,

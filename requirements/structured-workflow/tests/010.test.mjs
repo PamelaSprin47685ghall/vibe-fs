@@ -22,7 +22,7 @@ const withConcurrencyProbe = (action) => {
   return { probed, state }
 }
 
-test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_results_follow_input_order_not_completion_order', async () => {
+test('WHAT[structured-workflow-010] ARCH_009_results_follow_input_order_not_completion_order', async () => {
   // The property a caller depends on: `results[i]` is the result for `items[i]`.
   // Here the FIRST item is the SLOWEST, so a implementation that appended on
   // completion would return the exact reverse.
@@ -34,7 +34,7 @@ test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_results_follow_input_order_not_comp
 
   assert.deepEqual(await parallel.mapBounded(6, reverseDelays, items), [10, 20, 30, 40, 50, 60])
 })
-test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_order_holds_when_the_bound_forces_several_waves', async () => {
+test('WHAT[structured-workflow-010] ARCH_009_order_holds_when_the_bound_forces_several_waves', async () => {
   // With max=2 over 6 items the work runs in three waves, so ordering has to
   // survive being reassembled across them rather than within one batch.
   const items = [1, 2, 3, 4, 5, 6]
@@ -45,12 +45,12 @@ test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_order_holds_when_the_bound_forces_s
 
   assert.deepEqual(await parallel.mapBounded(2, jittered, items), ['r1', 'r2', 'r3', 'r4', 'r5', 'r6'])
 })
-test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_a_synchronous_action_still_yields_a_result_list', async () => {
+test('WHAT[structured-workflow-010] ARCH_009_a_synchronous_action_still_yields_a_result_list', async () => {
   // Not every action awaits. An implementation keying results off a resolved
   // promise's callback ordering would degrade here without failing loudly.
   assert.deepEqual(await parallel.mapBounded(3, async (item) => item + 1, [1, 2, 3]), [2, 3, 4])
 })
-test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_concurrency_never_exceeds_the_declared_maximum', async () => {
+test('WHAT[structured-workflow-010] ARCH_009_concurrency_never_exceeds_the_declared_maximum', async () => {
   const { probed, state } = withConcurrencyProbe(async (item) => {
     await sleep(15)
     return item
@@ -63,7 +63,7 @@ test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_concurrency_never_exceeds_the_decla
   assert.equal(state.peak, 3, 'the semaphore must admit exactly `maxConcurrency` at a time')
   assert.equal(state.inFlight, 0, 'every permit must be released')
 })
-test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_a_maximum_of_one_serialises_the_work', async () => {
+test('WHAT[structured-workflow-010] ARCH_009_a_maximum_of_one_serialises_the_work', async () => {
   // The degenerate bound is worth pinning separately: it is what a caller reaches
   // for when an action is not safe to run concurrently at all.
   const completions = []
@@ -78,7 +78,7 @@ test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_a_maximum_of_one_serialises_the_wor
   assert.equal(state.peak, 1)
   assert.deepEqual(completions, [1, 2, 3, 4], 'serialised work completes in submission order')
 })
-test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_a_bound_above_the_item_count_is_not_an_error', async () => {
+test('WHAT[structured-workflow-010] ARCH_009_a_bound_above_the_item_count_is_not_an_error', async () => {
   const { probed, state } = withConcurrencyProbe(async (item) => {
     await sleep(8)
     return item
@@ -87,7 +87,7 @@ test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_a_bound_above_the_item_count_is_not
   assert.deepEqual(await parallel.mapBounded(100, probed, [1, 2]), [1, 2])
   assert.equal(state.peak, 2, 'peak is bounded by the work available, not by the permit count')
 })
-test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_a_rejection_returns_early_while_siblings_keep_running', async () => {
+test('WHAT[structured-workflow-010] ARCH_009_a_rejection_returns_early_while_siblings_keep_running', async () => {
   // `Promise.all` semantics, pinned because it is easy to assume otherwise: the
   // call rejects as soon as ONE action throws, but the actions already admitted
   // are not cancelled — they run to completion in the background.
@@ -125,7 +125,7 @@ test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_a_rejection_returns_early_while_sib
   // The semaphore is per call, so a fresh call is unaffected by the failed one.
   assert.deepEqual(await parallel.mapBounded(2, async (item) => item, [1, 2, 3]), [1, 2, 3])
 })
-test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_a_non_positive_maximum_is_refused_rather_than_defaulted', async () => {
+test('WHAT[structured-workflow-010] ARCH_009_a_non_positive_maximum_is_refused_rather_than_defaulted', async () => {
   // Zero cannot mean "unbounded" and cannot mean "one". Both readings are a guess
   // at the caller's intent, and one of them silently removes the bound.
   for (const invalid of [0, -1, -100]) {
@@ -136,7 +136,7 @@ test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_a_non_positive_maximum_is_refused_r
     )
   }
 })
-test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_an_empty_input_short_circuits_before_the_bound_is_checked', async () => {
+test('WHAT[structured-workflow-010] ARCH_009_an_empty_input_short_circuits_before_the_bound_is_checked', async () => {
   // Empty input returns before any permit is taken. Worth pinning because it is
   // the one path where the action is never called at all.
   let calls = 0
@@ -148,10 +148,10 @@ test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_an_empty_input_short_circuits_befor
   assert.deepEqual(await parallel.mapBounded(2, counted, []), [])
   assert.equal(calls, 0)
 })
-test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_a_live_token_lets_the_work_run', async () => {
+test('WHAT[structured-workflow-010] ARCH_009_a_live_token_lets_the_work_run', async () => {
   assert.deepEqual(await parallel.mapBounded(2, async (item) => item * 3, [1, 2, 3], liveToken()), [3, 6, 9])
 })
-test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_an_already_cancelled_token_stops_the_work_before_it_starts', async () => {
+test('WHAT[structured-workflow-010] ARCH_009_an_already_cancelled_token_stops_the_work_before_it_starts', async () => {
   // `WaitAsync` throws on a cancelled token before the action is invoked. That
   // ordering is the point: cancellation must not depend on the action choosing to
   // check, because a long-running action would then ignore it entirely.
@@ -168,7 +168,7 @@ test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_an_already_cancelled_token_stops_th
   )
   assert.equal(calls, 0, 'no action may run under an already-cancelled token')
 })
-test('WHAT[STRUCTURED-WORKFLOW-010] ARCH_009_the_cancellation_token_reaches_the_action', async () => {
+test('WHAT[structured-workflow-010] ARCH_009_the_cancellation_token_reaches_the_action', async () => {
   // The action receives the token as its second argument, so a nested call can
   // propagate it. Losing it here is how an inner fan-out becomes uncancellable.
   const token = liveToken()
@@ -208,7 +208,7 @@ const wake = {
 const name = (observation, signal = wake.retry()) =>
   reconcileSurface.decisionName(reconcileSurface.decideStep(signal, observation))
 
-test('WHAT[STRUCTURED-WORKFLOW-010] RECONCILE_SCHEDULER_BOUND_001: same-session burst coalesces and stale work is invalidated', async () => {
+test('WHAT[structured-workflow-010] RECONCILE_SCHEDULER_BOUND_001: same-session burst coalesces and stale work is invalidated', async () => {
   const result = await reconcileSurface.schedulerBurstBoundScenario()
 
   assert.equal(result.kickCount, 3000)
@@ -221,7 +221,7 @@ test('WHAT[STRUCTURED-WORKFLOW-010] RECONCILE_SCHEDULER_BOUND_001: same-session 
   // the ClearSession generation bump before the gate releases.
   assert.equal(result.delivered, 0)
 })
-test('WHAT[STRUCTURED-WORKFLOW-010] RECONCILE_SCHEDULER_BOUND_002: stop waits for the live pass and drains to zero observable work', async () => {
+test('WHAT[structured-workflow-010] RECONCILE_SCHEDULER_BOUND_002: stop waits for the live pass and drains to zero observable work', async () => {
   const result = await reconcileSurface.schedulerBurstBoundScenario()
 
   // StopAndDrain was issued while the pass was blocked and completed only
@@ -229,7 +229,7 @@ test('WHAT[STRUCTURED-WORKFLOW-010] RECONCILE_SCHEDULER_BOUND_002: stop waits fo
   assert.equal(result.stopWaited, true)
   assert.equal(result.delivered, 0)
 })
-test('WHAT[STRUCTURED-WORKFLOW-010] RECONCILE_SCHEDULER_BOUND_003: kicks after stop do nothing', async () => {
+test('WHAT[structured-workflow-010] RECONCILE_SCHEDULER_BOUND_003: kicks after stop do nothing', async () => {
   const result = await reconcileSurface.schedulerBurstBoundScenario()
 
   assert.equal(result.postStopRejected, true)

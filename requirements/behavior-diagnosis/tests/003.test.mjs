@@ -11,7 +11,7 @@ const rule = (overrides = {}) => ({
   lexicalOrder: overrides.lexicalOrder ?? 1,
 })
 
-test('WHAT[BD-003] ENFORCER_170_validate_accepts_one_rule', () => {
+test('WHAT[behavior-diagnosis-003] ENFORCER_170_validate_accepts_one_rule', () => {
   const result = enforcer.validate(1, [
     rule({ name: 'f1', lexicalOrder: 1 }),
   ])
@@ -23,7 +23,7 @@ test('WHAT[BD-003] ENFORCER_170_validate_accepts_one_rule', () => {
   assert.equal(result.value[0].lexicalOrder, 1)
 })
 
-test('WHAT[BD-003] ENFORCER_170_validate_accepts_two_rules', () => {
+test('WHAT[behavior-diagnosis-003] ENFORCER_170_validate_accepts_two_rules', () => {
   const result = enforcer.validate(1, [
     rule({ name: 'f1', lexicalOrder: 1 }),
     rule({ name: 'f2', lexicalOrder: 2 }),
@@ -36,7 +36,7 @@ test('WHAT[BD-003] ENFORCER_170_validate_accepts_two_rules', () => {
   )
 })
 
-test('WHAT[BD-003] ENFORCER_170_validate_accepts_packaged_catalog_n_rules', () => {
+test('WHAT[behavior-diagnosis-003] ENFORCER_170_validate_accepts_packaged_catalog_n_rules', () => {
   // Real package rulebook (dynamic N; do not hardcode 120 in the validator).
   const packaged = enforcer.rules()
   assert.ok(packaged.length > 0, 'packaged catalog must load at least one rule')
@@ -50,13 +50,13 @@ test('WHAT[BD-003] ENFORCER_170_validate_accepts_packaged_catalog_n_rules', () =
   )
 })
 
-test('WHAT[BD-003] ENFORCER_170_validate_rejects_empty_catalog', () => {
+test('WHAT[behavior-diagnosis-003] ENFORCER_170_validate_rejects_empty_catalog', () => {
   const result = enforcer.validate(1, [])
   assert.equal(result.ok, false)
   assert.equal(result.error, 'enforcer catalog must contain at least one rule')
 })
 
-test('WHAT[BD-003] ENFORCER_170_validate_rejects_duplicate_rule_id', () => {
+test('WHAT[behavior-diagnosis-003] ENFORCER_170_validate_rejects_duplicate_rule_id', () => {
   const result = enforcer.validate(1, [
     rule({ name: 'dup', lexicalOrder: 1 }),
     rule({ name: 'dup', lexicalOrder: 2 }),
@@ -66,7 +66,7 @@ test('WHAT[BD-003] ENFORCER_170_validate_rejects_duplicate_rule_id', () => {
   assert.match(result.error, /dup/)
 })
 
-test('WHAT[BD-003] ENFORCER_170_validate_rejects_duplicate_field', () => {
+test('WHAT[behavior-diagnosis-003] ENFORCER_170_validate_rejects_duplicate_field', () => {
   // Same TipName twice is a duplicate field/name/id.
   const result = enforcer.validate(1, [
     rule({ name: 'same-field', lexicalOrder: 1 }),
@@ -77,7 +77,7 @@ test('WHAT[BD-003] ENFORCER_170_validate_rejects_duplicate_field', () => {
   assert.match(result.error, /same-field/)
 })
 
-test('WHAT[BD-003] ENFORCER_170_validate_rejects_ordinal_gap', () => {
+test('WHAT[behavior-diagnosis-003] ENFORCER_170_validate_rejects_ordinal_gap', () => {
   // Only [1, 3] — gap at 2.
   const result = enforcer.validate(1, [
     rule({ name: 'f1', lexicalOrder: 1 }),
@@ -87,7 +87,7 @@ test('WHAT[BD-003] ENFORCER_170_validate_rejects_ordinal_gap', () => {
   assert.match(result.error, /lexicalOrder must be contiguous 1\.\.2/)
 })
 
-test('WHAT[BD-003] ENFORCER_170_validate_rejects_unknown_schema_version', () => {
+test('WHAT[behavior-diagnosis-003] ENFORCER_170_validate_rejects_unknown_schema_version', () => {
   const result = enforcer.validate(2, [
     rule({ name: 'f1', lexicalOrder: 1 }),
   ])
@@ -95,7 +95,7 @@ test('WHAT[BD-003] ENFORCER_170_validate_rejects_unknown_schema_version', () => 
   assert.equal(result.error, 'enforcer catalog schemaVersion must be 1, got 2')
 })
 
-test('WHAT[BD-003] ENFORCER_170_validate_rejects_empty_main_text', () => {
+test('WHAT[behavior-diagnosis-003] ENFORCER_170_validate_rejects_empty_main_text', () => {
   const result = enforcer.validate(1, [
     rule({ name: 'f1', mainText: '   ', lexicalOrder: 1 }),
   ])
@@ -103,7 +103,7 @@ test('WHAT[BD-003] ENFORCER_170_validate_rejects_empty_main_text', () => {
   assert.match(result.error, /empty text or identity mismatch on rule ordinal 1/)
 })
 
-test('WHAT[BD-003] ENFORCER_170_validate_rejects_empty_enforcer_text', () => {
+test('WHAT[behavior-diagnosis-003] ENFORCER_170_validate_rejects_empty_enforcer_text', () => {
   const result = enforcer.validate(1, [
     rule({ name: 'f1', enforcerText: '', lexicalOrder: 1 }),
   ])
@@ -111,7 +111,7 @@ test('WHAT[BD-003] ENFORCER_170_validate_rejects_empty_enforcer_text', () => {
   assert.match(result.error, /empty text or identity mismatch on rule ordinal 1/)
 })
 
-test('WHAT[BD-003] ENFORCER_170_validate_rejects_identity_mismatch', () => {
+test('WHAT[behavior-diagnosis-003] ENFORCER_170_validate_rejects_identity_mismatch', () => {
   const result = enforcer.validate(1, [
     rule({ name: 'tip-a', ruleId: 'other-id', fieldName: 'tip-a', lexicalOrder: 1 }),
   ])

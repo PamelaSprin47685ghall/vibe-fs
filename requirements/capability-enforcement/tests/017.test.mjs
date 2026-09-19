@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as quiescence from '../../../dist/OpenCode/Host/QuiescenceSurface.js'
 
-test('WHAT[ENF-017] authority multiplicity enforces one-shot atomicity and prevents duplicated consumption', () => {
+test('WHAT[capability-enforcement-017] authority multiplicity enforces one-shot atomicity and prevents duplicated consumption', () => {
   const gate = quiescence.create()
   const sessionId = 'ses-enf-017'
 

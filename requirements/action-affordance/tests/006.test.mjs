@@ -23,7 +23,7 @@ const HIGH_RISK_TOOLS = Object.freeze([
 
 const readTool = (tool, locale) => read(`resources/provider/tool/${tool}/description/${locale}.md`)
 
-test('WHAT[ACTION-AFFORDANCE-006] AA_prompt_020_run_contract_grounds_command_as_act_with_bounded_consequence', () => {
+test('WHAT[action-affordance-006] AA_prompt_020_run_contract_grounds_command_as_act_with_bounded_consequence', () => {
   for (const locale of LOCALES) {
     const text = readTool('run', locale)
     assert.match(text, /command is an act|命令是一种行动|command 是一次行动|命令是一次行动/i)

@@ -77,7 +77,7 @@ const hostPort = (sendPrompt) => ({
   SendPrompt: sendPrompt,
 })
 
-test('WHAT[CHATEXEC-011] external and plugin roots share AcceptManagedChatIntent', async () => {
+test('WHAT[managed-chat-execution-011] external and plugin roots share AcceptManagedChatIntent', async () => {
   await withJournal('shared-owner', async (handle) => {
     const external = await dispatch.acceptManagedExternal(
       handle,
@@ -161,7 +161,7 @@ const canonicalize = (wire) => {
 }
 const acceptedPayload = (wire) => wire[1][1][1]
 
-test('WHAT[CHATEXEC-011] malformed exact identity seed is rejected by the production codec', () => {
+test('WHAT[managed-chat-execution-011] malformed exact identity seed is rejected by the production codec', () => {
   const malformed = JSON.parse(fixture)
   acceptedPayload(malformed).Evidence.IdentitySeed[0] = 'ForgedSeed'
   const result = chatExecution.canonicalize(JSON.stringify(malformed))
@@ -220,7 +220,7 @@ const terminal = (disposition, attempt = evidence(), appendOutcome = 'Committed'
 })
 const run = (...actions) => chatExecution.providerLifecycleScenario(actions)
 
-test('WHAT[CHATEXEC-011] exact physical provider run and evidence are frozen', async () => {
+test('WHAT[managed-chat-execution-011] exact physical provider run and evidence are frozen', async () => {
   for (const [attempt, expected] of [
     [evidence({ physicalUserMessageId: 'msg-wrong' }), 'AttemptKeyMismatch'],
     [evidence({ providerRun: 'provider-wrong' }), 'ProviderRunConflict'],

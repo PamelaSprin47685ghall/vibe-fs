@@ -12,7 +12,7 @@ const { formatDiagnostics } = await import("./e2e/support/diagnostics-format.js"
 const { formatCausalSection } = await import("./e2e/support/diagnostics-causal.js");
 
 
-test('WHAT[VERIFICATION-SYSTEM-006] gather reads causal waits file', async () => {
+test('WHAT[verification-system-006] gather reads causal waits file', async () => {
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'causal-gather-'))
   const dir = path.join(workDir, '.wanxiangshu', 'diagnostics')
   fs.mkdirSync(dir, { recursive: true })
@@ -55,7 +55,7 @@ test('WHAT[VERIFICATION-SYSTEM-006] gather reads causal waits file', async () =>
     fs.rmSync(workDir, { recursive: true, force: true })
   }
 })
-test('WHAT[VERIFICATION-SYSTEM-006] format puts frontier before e2e events', () => {
+test('WHAT[verification-system-006] format puts frontier before e2e events', () => {
   const text = formatDiagnostics({
     events: [{ seq: 1, time: '00:00:00.000', type: 'session.idle' }],
     causalFrontier: [{
@@ -75,7 +75,7 @@ test('WHAT[VERIFICATION-SYSTEM-006] format puts frontier before e2e events', () 
   assert.ok(frontierAt >= 0, 'missing CAUSAL FRONTIER banner')
   assert.ok(e2eAt > frontierAt, 'CAUSAL FRONTIER must precede E2E DIAGNOSTICS')
 })
-test('WHAT[VERIFICATION-SYSTEM-006] formatCausalSection banner is first line', () => {
+test('WHAT[verification-system-006] formatCausalSection banner is first line', () => {
   const lines = formatCausalSection({
     causalFrontier: [{
       kind: 'ExternalProducerFrontier',
@@ -89,7 +89,7 @@ test('WHAT[VERIFICATION-SYSTEM-006] formatCausalSection banner is first line', (
   assert.ok(lines.length > 0, 'formatCausalSection must emit lines')
   assert.equal(lines[0], '════════════ CAUSAL FRONTIER ════════════')
 })
-test('WHAT[VERIFICATION-SYSTEM-006] watchdog onTimeout prints frontier before event tail', () => {
+test('WHAT[verification-system-006] watchdog onTimeout prints frontier before event tail', () => {
   const source = fs.readFileSync(
     fileURLToPath(new URL('./e2e/support/scenario-parallel.js', import.meta.url)),
     'utf8',
@@ -129,7 +129,7 @@ const makeTempRoot = (layout) => {
 }
 const cleanup = (root) => rmSync(root, { recursive: true, force: true })
 
-test('WHAT[VERIFICATION-SYSTEM-006] top-level e2e tests never feed watchdog directly', () => {
+test('WHAT[verification-system-006] top-level e2e tests never feed watchdog directly', () => {
   // watchdog 只由 support/ 因果原语投喂；顶层测试直接调用 watchdog.advance( 即违规。
   const files = e2eTestCaseFiles()
 
@@ -153,7 +153,7 @@ const { default: test } = await import("node:test");
 const { StrictMockProvider } = await import("./e2e/support/strict-mock-provider.js");
 
 
-test('WHAT[VERIFICATION-SYSTEM-006] afterExpectation observation preserves physical session for early and late barriers', () => {
+test('WHAT[verification-system-006] afterExpectation observation preserves physical session for early and late barriers', () => {
   const provider = new StrictMockProvider()
   let early = null
   provider.afterExpectation('orch.2', (observation) => { early = observation })
@@ -186,7 +186,7 @@ const replayToolUrl = new URL('../../managed-chat-execution/tests/support/incide
 const runbook = fs.readFileSync(runbookUrl, 'utf8')
 const incident = fs.readFileSync(incidentUrl, 'utf8')
 
-test('WHAT[VERIFICATION-SYSTEM-006] incident fixture carries declared redaction and no secrets', () => {
+test('WHAT[verification-system-006] incident fixture carries declared redaction and no secrets', () => {
   assert.equal(fs.existsSync(schemaUrl), true)
   assert.equal(fs.existsSync(replayToolUrl), true)
   assert.equal(fs.existsSync(incidentUrl), true)
@@ -213,7 +213,7 @@ const fakeEvents = () => ({
   },
 })
 
-test('WHAT[VERIFICATION-SYSTEM-006] turn registry keeps physical cursor identity per session', async () => {
+test('WHAT[verification-system-006] turn registry keeps physical cursor identity per session', async () => {
   const events = fakeEvents()
   const turns = createScenarioTurn({ events })
 
@@ -232,7 +232,7 @@ test('WHAT[VERIFICATION-SYSTEM-006] turn registry keeps physical cursor identity
   await root.awaitTerminal({ requireAssistantTerminal: false })
   assert.equal(root.activitySeq, 1)
 })
-test('WHAT[VERIFICATION-SYSTEM-006] turn registry restart clear forgets all pre-restart cursors', () => {
+test('WHAT[verification-system-006] turn registry restart clear forgets all pre-restart cursors', () => {
   const turns = createScenarioTurn({ events: fakeEvents() })
   turns.start('root')
   turns.start('child')
@@ -249,7 +249,7 @@ const { default: test } = await import("node:test");
 const { StrictMockSignals } = await import("./e2e/support/strict-mock-signals.js");
 
 
-test('WHAT[VERIFICATION-SYSTEM-006] waitAny selects either exact branch and removes every sibling waiter', async () => {
+test('WHAT[verification-system-006] waitAny selects either exact branch and removes every sibling waiter', async () => {
   for (const winner of ['original.1', 'guarded.0']) {
     const signals = new StrictMockSignals();
     const waiting = signals.waitForAnyExpectation(['original.1', 'guarded.0']);
@@ -269,7 +269,7 @@ const { classifyVerdict } = await import("./support/verdict-feed.mjs");
 
 const event = (type, data = {}) => ({ type, data })
 
-test('WHAT[VERIFICATION-SYSTEM-006] a verdict renews the silence window', () => {
+test('WHAT[verification-system-006] a verdict renews the silence window', () => {
   // Whole objects, not truthiness. mjs has no compile-time rename protection, so `blocking` read as
   // `undefined` would be falsy and a truthiness assertion would report the opposite of the truth
   // while passing — the exact failure this repository measured four times in package K9.
@@ -291,7 +291,7 @@ test('WHAT[VERIFICATION-SYSTEM-006] a verdict renews the silence window', () => 
     lane: 'z.mjs',
   })
 })
-test('WHAT[VERIFICATION-SYSTEM-006] bytes moving is recorded and does not renew', () => {
+test('WHAT[verification-system-006] bytes moving is recorded and does not renew', () => {
   // 「不算进展：…任何『有字节在动』的证据」. `test:stdout` is the load-bearing member: a test that
   // hangs while printing is what turns a verdict feed back into a wall-clock timer, and
   // `hangs-with-handle-and-chatter.fixture.mjs` is built from exactly that shape.
@@ -303,7 +303,7 @@ test('WHAT[VERIFICATION-SYSTEM-006] bytes moving is recorded and does not renew'
     )
   }
 })
-test('WHAT[VERIFICATION-SYSTEM-006] scheduling noise is not fed at all', () => {
+test('WHAT[verification-system-006] scheduling noise is not fed at all', () => {
   // `null` rather than a background default. `test:enqueue` and `test:dequeue` fire per test before
   // anything has happened, so defaulting unknown events to background would fill the watchdog dump's
   // "last background progress" line with scheduling noise and point the reader at the wrong lane.
@@ -315,7 +315,7 @@ test('WHAT[VERIFICATION-SYSTEM-006] scheduling noise is not fed at all', () => {
   assert.equal(classifyVerdict({}), null)
   assert.equal(classifyVerdict({ type: 42 }), null)
 })
-test('WHAT[VERIFICATION-SYSTEM-006] a verdict without a name or file still carries attribution', () => {
+test('WHAT[verification-system-006] a verdict without a name or file still carries attribution', () => {
   // `Watchdog.advance` rejects an empty reason or lane by design — VERIFY-004 makes both part of the
   // timeout dump, and W6 records that a default of 'unattributed' would keep every canary green
   // while the dump lost the one thing the clause requires it to carry. So the classifier must never
@@ -356,7 +356,7 @@ function cleanEnv() {
   return env
 }
 
-test('WHAT[VERIFICATION-SYSTEM-006] P6-REPORTER-001: compact and verbose modes produce identical verdict counts matching exact expectation', async () => {
+test('WHAT[verification-system-006] P6-REPORTER-001: compact and verbose modes produce identical verdict counts matching exact expectation', async () => {
   const targetFile = path.join(
     root,
     'requirements/distribution/tests/integration/package/layout.test.mjs',
@@ -426,7 +426,7 @@ test('WHAT[VERIFICATION-SYSTEM-006] P6-REPORTER-001: compact and verbose modes p
   assert.match(verbose.stderrText, /test B/)
 })
 
-test('WHAT[VERIFICATION-SYSTEM-006] P6-REPORTER-002: single leaf completion does NOT remove file from outstanding set', async () => {
+test('WHAT[verification-system-006] P6-REPORTER-002: single leaf completion does NOT remove file from outstanding set', async () => {
   // (a) Truth table against isFileCompletionEvent
   const fileA = path.resolve('/tmp/a.test.mjs')
   const fileB = path.resolve('/tmp/nested/b.test.mjs')
@@ -533,7 +533,7 @@ test('WHAT[VERIFICATION-SYSTEM-006] P6-REPORTER-002: single leaf completion does
   assert.equal(outstanding.size, 0, 'file must be removed from outstanding after the final wrapper complete')
 })
 
-test('WHAT[VERIFICATION-SYSTEM-006] P6-REPORTER-003: drainTestStream contract and inner:drained event delivery', async () => {
+test('WHAT[verification-system-006] P6-REPORTER-003: drainTestStream contract and inner:drained event delivery', async () => {
   // 1. Error branch: PassThrough destroyed with error
   const sendMessages = []
   const errorStream = new PassThrough()
@@ -596,7 +596,7 @@ test('WHAT[VERIFICATION-SYSTEM-006] P6-REPORTER-003: drainTestStream contract an
   assert.equal(summaryData.failed, 0)
 })
 
-test('WHAT[VERIFICATION-SYSTEM-006] T6-STATE-001: TestRunState handles identical leaf names across different files without collision', () => {
+test('WHAT[verification-system-006] T6-STATE-001: TestRunState handles identical leaf names across different files without collision', () => {
   const state = createRunState()
   const file1 = path.resolve('/path/to/test-a.mjs')
   const file2 = path.resolve('/path/to/test-b.mjs')
@@ -619,7 +619,7 @@ test('WHAT[VERIFICATION-SYSTEM-006] T6-STATE-001: TestRunState handles identical
   assert.equal(sum.failures[0].file, file2)
 })
 
-test('WHAT[VERIFICATION-SYSTEM-006] T6-STATE-002: TestRunState differentiates nested subtests with same name under same file', () => {
+test('WHAT[verification-system-006] T6-STATE-002: TestRunState differentiates nested subtests with same name under same file', () => {
   const state = createRunState()
   const file = path.resolve('/path/to/nested.mjs')
 
@@ -640,7 +640,7 @@ test('WHAT[VERIFICATION-SYSTEM-006] T6-STATE-002: TestRunState differentiates ne
   assert.equal(sum.leafDurations.length, 2)
 })
 
-test('WHAT[VERIFICATION-SYSTEM-006] T6-STATE-003: container suite failures count into containerFailures and not failed count', () => {
+test('WHAT[verification-system-006] T6-STATE-003: container suite failures count into containerFailures and not failed count', () => {
   const state = createRunState()
   const file = path.resolve('/path/to/suite.mjs')
 
@@ -688,7 +688,7 @@ test('WHAT[VERIFICATION-SYSTEM-006] T6-STATE-003: container suite failures count
   assert.equal(sum.failures[0].name, 'leaf 2')
 })
 
-test('WHAT[VERIFICATION-SYSTEM-006] T6-STATE-004: createCompactReporter shares state with TestRunState instance', async () => {
+test('WHAT[verification-system-006] T6-STATE-004: createCompactReporter shares state with TestRunState instance', async () => {
   const injectedState = createRunState()
   const reporter = createCompactReporter({
     state: injectedState,
@@ -718,7 +718,7 @@ test('WHAT[VERIFICATION-SYSTEM-006] T6-STATE-004: createCompactReporter shares s
   assert.equal(sum.filesCompleted, 1)
 })
 
-test('WHAT[VERIFICATION-SYSTEM-006] T6-STATE-005: supervisor aborts when inner runner fails without summary or with runner:error', async () => {
+test('WHAT[verification-system-006] T6-STATE-005: supervisor aborts when inner runner fails without summary or with runner:error', async () => {
   const fakeInner = path.join(here, 'support/fixtures/all-pass.fixture.mjs')
 
   // Running an inner that is NOT run-inner.mjs means it will not send runner:summary

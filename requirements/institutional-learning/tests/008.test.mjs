@@ -5,7 +5,7 @@ import * as learning from '../../../dist/Enforcer/InstitutionalLearning/Surface.
 
 const read = (path) => readFileSync(path, 'utf8')
 
-test('WHAT[INSTITUTIONAL-LEARNING-008] occurrence replay keeps the first frozen result and does not create a second disposition', () => {
+test('WHAT[institutional-learning-008] occurrence replay keeps the first frozen result and does not create a second disposition', () => {
   let state = learning.empty()
   state = learning.commit('ses-a', 'learn-1', 'celebrate', 'raw', 'rev-1', 'DISCARD', 'frozen-first', ['defer-1'], state)
   state = learning.commit('ses-a', 'learn-1', 'celebrate', 'changed', 'rev-2', 'ABSORB', 'frozen-second', [], state)

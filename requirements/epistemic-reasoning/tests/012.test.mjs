@@ -9,7 +9,7 @@ const here = dirname(fileURLToPath(import.meta.url))
 
 const root = join(here, '../../..')
 
-test('WHAT[EPI-012] closure_is_idempotent_at_fixed_point', () => {
+test('WHAT[epistemic-reasoning-012] closure_is_idempotent_at_fixed_point', () => {
   const store = createStore()
   const started = start(store, '花儿为什么这样红？')
   assessWhy(store, started.handle)

@@ -24,7 +24,7 @@ const sandbox = () => {
   }
 }
 
-test('WHAT[MANAGED-SESSION-022] CASE_SETTLE_uncommitted_finalize_does_not_publish_a_case', async () => {
+test('WHAT[managed-session-lifecycle-022] CASE_SETTLE_uncommitted_finalize_does_not_publish_a_case', async () => {
   const { dir, cleanup } = sandbox()
   try {
     lifecycle.enable(dir)

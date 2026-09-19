@@ -14,7 +14,7 @@ import {
 
 const PREFIXES = ['ARCH', 'GOV', 'HOST']
 
-test('WHAT[REQUIREMENT-SYSTEM-010] spec gate detects retired workflow paths', () => {
+test('WHAT[requirement-system-010] spec gate detects retired workflow paths', () => {
   assert.deepEqual(
     legacyWorkflowPathReferences([
       'read docs/proposal/future.md',
@@ -28,7 +28,7 @@ test('WHAT[REQUIREMENT-SYSTEM-010] spec gate detects retired workflow paths', ()
   )
 })
 
-test('WHAT[REQUIREMENT-SYSTEM-010] spec gate detects references to the deleted archive tree', () => {
+test('WHAT[requirement-system-010] spec gate detects references to the deleted archive tree', () => {
   assert.deepEqual(
     archivePathReferences([
       '// archive/docs/proof/verify.md is gone',

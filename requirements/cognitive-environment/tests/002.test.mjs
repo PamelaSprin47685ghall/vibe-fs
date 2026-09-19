@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as promptResources from '../../../dist/Resources/PromptSurface.js'
 
-test('WHAT[COGNITIVE-ENVIRONMENT-002] CE_002_layer_attribution_and_no_impersonation', () => {
+test('WHAT[cognitive-environment-002] CE_002_layer_attribution_and_no_impersonation', () => {
   // 1. PromptSurface 导出存在且能装载规范提示词
   const catalog = promptResources.runtimeLoad()
   assert.ok(catalog, 'PromptCatalog must be loaded')

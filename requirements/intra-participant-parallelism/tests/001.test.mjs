@@ -12,7 +12,7 @@ const mustOk = (result) => {
   return result
 }
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-001] lanes carry no provider-visible identity or handle and keep the same logical participant', () => {
+test('WHAT[intra-participant-parallelism-001] lanes carry no provider-visible identity or handle and keep the same logical participant', () => {
   const lane = fission.startedLane(1, 'lane-session-1', 'lane input')
   assertJsData(lane, 'started lane')
   assert.equal(lane.index, 1)
@@ -35,7 +35,7 @@ const { default: test } = await import("node:test");
 
 const read = (path) => readFileSync(path, 'utf8')
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-001] TaskResult and Parallel helpers are pure utilities with no authority side effects', () => {
+test('WHAT[intra-participant-parallelism-001] TaskResult and Parallel helpers are pure utilities with no authority side effects', () => {
   const taskResult = read('src/Wanxiangshu/Foundation/TaskResult.fs')
   const parallel = read('src/Wanxiangshu/Foundation/Parallel.fs')
   assert.match(taskResult, /taskResult\b/)

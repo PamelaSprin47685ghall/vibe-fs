@@ -84,7 +84,7 @@ const completeManagerLife = async (handle, session) => {
   assert.equal(completed.ok, true, completed.ok ? '' : completed.error)
 }
 
-test('WHAT[INTERACTION-AUTHORITY-005] AgentOwnerRoot rejects RootSelection before Host send', async () => {
+test('WHAT[interaction-authority-005] AgentOwnerRoot rejects RootSelection before Host send', async () => {
   await withJournal('owner-root-selection', async (handle) => {
     let providerSends = 0
     const result = await dispatch.sendAgentOwnerRootAwait(
@@ -104,7 +104,7 @@ test('WHAT[INTERACTION-AUTHORITY-005] AgentOwnerRoot rejects RootSelection befor
     assert.equal(dispatch.projectionObservation(handle, 'ses-owner-root-selection').activeLogicalRun, null)
   })
 })
-test('WHAT[INTERACTION-AUTHORITY-005] inherited identity is durable in PluginPromptClaimed before Host send', async () => {
+test('WHAT[interaction-authority-005] inherited identity is durable in PluginPromptClaimed before Host send', async () => {
   await withJournal('claim-before-send', async (handle) => {
     const owner = await acceptOwner(handle)
     const seed = inheritedSeed(owner)
@@ -136,7 +136,7 @@ test('WHAT[INTERACTION-AUTHORITY-005] inherited identity is durable in PluginPro
     }])
   })
 })
-test('WHAT[INTERACTION-AUTHORITY-005] stale owner witness is rejected before Host send', async () => {
+test('WHAT[interaction-authority-005] stale owner witness is rejected before Host send', async () => {
   await withJournal('stale-owner', async (handle) => {
     const owner = await acceptOwner(handle)
     const seed = inheritedSeed(owner)
@@ -160,7 +160,7 @@ test('WHAT[INTERACTION-AUTHORITY-005] stale owner witness is rejected before Hos
     assert.equal(dispatch.projectionObservation(handle, 'ses-stale-child').activeLogicalRun, null)
   })
 })
-test('WHAT[INTERACTION-AUTHORITY-005] owner superseded after claim rejects physical acceptance without child authority', async () => {
+test('WHAT[interaction-authority-005] owner superseded after claim rejects physical acceptance without child authority', async () => {
   await withJournal('owner-race', async (handle) => {
     const owner = await acceptOwner(handle, 'ses-race-owner')
     const seed = inheritedSeed(owner)
@@ -261,7 +261,7 @@ const profile = (value) => ({
 })
 const register = (root) => authority.registerAuthority(root, authority.empty)
 
-test('WHAT[INTERACTION-AUTHORITY-005] IA_005_every_continuation_kind_is_parseable_and_not_root', () => {
+test('WHAT[interaction-authority-005] IA_005_every_continuation_kind_is_parseable_and_not_root', () => {
   const kinds = [
     'InteractionRepair',
     'JoinGuard',

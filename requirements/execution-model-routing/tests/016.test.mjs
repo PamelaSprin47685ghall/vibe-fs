@@ -3,4 +3,4 @@ import { assertFatalBoundary } from '../../structured-workflow/tests/support/m6-
 
 
 
-test('WHAT[EMR-016] routing fatal requires exact fence settlement and one injected fuse', () => assertFatalBoundary('execution-model-routing'))
+test('WHAT[execution-model-routing-016] routing fatal requires exact fence settlement and one injected fuse', () => assertFatalBoundary('execution-model-routing'))

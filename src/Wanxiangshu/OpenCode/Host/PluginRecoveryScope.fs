@@ -97,7 +97,7 @@ type TransformAttemptPlanBindingError =
 /// Owning recovery CE holds the permits internally; Host callbacks are only
 /// rendezvous/observation adapters that deliver typed observations. Physical
 /// identity (SessionId / ProviderRunIdentity) is the typed capability key;
-/// no stringly-typed TryGet/Clear drives business branching (SW-017, SW-009, PAR-011).
+/// no stringly-typed TryGet/Clear drives business branching (structured-workflow-017, structured-workflow-009, provider-attempt-recovery-011).
 type PluginRecoveryScope(journal: AgentJournal option) =
 
     // Owning CE internal single-flight channels — process-local, crash-zero.
@@ -117,7 +117,7 @@ type PluginRecoveryScope(journal: AgentJournal option) =
     /// DSL-cross-callback-proof: physical single-flight — opaque frozen attempt plan channel.
     /// Owning recovery CE (XWire.reconcileAttempt) consumes via ConsumeAttemptPlan on terminal;
     /// transform adapter records via RecordAttemptPlan; Strength peeks via TryAttemptPlan.
-    /// No stringly-typed TryGet/Clear drives business branching (SW-017②, SW-009, PAR-011).
+    /// No stringly-typed TryGet/Clear drives business branching (structured-workflow-017②, structured-workflow-009, provider-attempt-recovery-011).
     // DSL-MUTABLE: single-flight — per-provider-run attempt plan channel (frozen decision, typed handle)
     let attemptPlans = Dictionary<string, AttemptPlan>()
 

@@ -26,6 +26,6 @@ const assertRecoveryClosure = (inventory, root) => {
   visit(root.projectPath)
 }
 
-test('WHAT[DELEG-030] delegation invariant fatal preserves settlement and one injected fuse', () => {
+test('WHAT[delegation-030] delegation invariant fatal preserves settlement and one injected fuse', () => {
   assertFatalBoundary('delegation')
 })

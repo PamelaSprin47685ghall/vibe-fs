@@ -10,7 +10,7 @@ const sessionError = (error) => ({
   properties: { sessionID: 'session-1', error },
 })
 
-test('WHAT[EXECFAIL-008] Host classification ignores diagnostic wording', () => {
+test('WHAT[execution-failure-policy-008] Host classification ignores diagnostic wording', () => {
   const transient = signals.tryDecode(sessionError({ name: 'TimeoutError', message: 'permission denied forever' }))
   const rewritten = signals.tryDecode(sessionError({ name: 'TimeoutError', message: 'please retry' }))
   assert.equal(transient.failure, 'ProviderTransient')
@@ -25,7 +25,7 @@ const { default: test } = await import("node:test");
 const journal = await import("../../../dist/Persistence/Journal/Surface.js");
 
 
-test('WHAT[EXECFAIL-008] persistence diagnostics cannot change commitment', () => {
+test('WHAT[execution-failure-policy-008] persistence diagnostics cannot change commitment', () => {
   for (const diagnostic of ['definitely succeeded', 'definitely failed', 'retry me']) {
     assert.equal(journal.JournalSurface_mapAppendFailure({ kind: 'WriteUnknown', diagnostic }).commitment, 'Unknown')
   }
@@ -136,7 +136,7 @@ const providerCases = [
   },
 ]
 
-test('WHAT[EXECFAIL-008] policy is deterministic and ignores diagnostic or temporal decoration', () => {
+test('WHAT[execution-failure-policy-008] policy is deterministic and ignores diagnostic or temporal decoration', () => {
   const typed = decide({ failure: 'ProviderTransient' })
   const decorated = decide({
     failure: 'ProviderTransient',
@@ -156,7 +156,7 @@ const { default: test } = await import("node:test");
 const provider = await import("../../../dist/Participant/Provider/Attempt/FailureSurface.js");
 
 
-test('WHAT[EXECFAIL-008] provider diagnostic text never drives classification', () => {
+test('WHAT[execution-failure-policy-008] provider diagnostic text never drives classification', () => {
   for (const diagnostic of ['auth failure', 'rate limited', 'permanent fatal']) {
     assert.equal(provider.classify({
       providerRun: 'run-20', requestKind: 'StrengthReplica', status: 'Transient', firstTokenObserved: false, diagnostic,

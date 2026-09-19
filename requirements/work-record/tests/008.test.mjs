@@ -29,7 +29,7 @@ const materialize = (
 
 const OPENING_END = { Sequence: 1 }
 
-test('WHAT[WORK-RECORD-008] LWR_opening_prompt_is_byte_exact_and_appears_exactly_once', () => {
+test('WHAT[work-record-008] LWR_opening_prompt_is_byte_exact_and_appears_exactly_once', () => {
   const assignment = 'Rewrite the fallback controller.\nKeep it typed.'
   const trace = [xTrace.item({ sequence: 0, role: 'user', part: xTrace.text(assignment) })]
 
@@ -43,7 +43,7 @@ test('WHAT[WORK-RECORD-008] LWR_opening_prompt_is_byte_exact_and_appears_exactly
   assert.match(rendered, new RegExp(assignment.replace(/\n/g, '\\n')))
 })
 
-test('WHAT[WORK-RECORD-008] LWR_reviewer_opening_preserves_authoritative_requirement_order', () => {
+test('WHAT[work-record-008] LWR_reviewer_opening_preserves_authoritative_requirement_order', () => {
   const requirements = ['requirement one', 'requirement two', 'requirement three']
 
   const rendered = materialize(opening('review task', requirements), [], [], { Sequence: 0 }, OPENING_END)

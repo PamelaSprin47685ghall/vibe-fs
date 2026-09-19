@@ -4,7 +4,7 @@ import { plan } from '../../../dist/Participant/Provider/Attempt/PlannerSurface.
 
 
 
-test('WHAT[ENF-001] PROMPT_008_the_profile_derives_role_prompt_and_tools_from_the_authority', () => {
+test('WHAT[capability-enforcement-001] PROMPT_008_the_profile_derives_role_prompt_and_tools_from_the_authority', () => {
   const planned = plan({ role: 'engineer', tier: 'fast', kind: 'work-main' })
 
   assert.equal(planned.ok, true, planned.error)

@@ -25,7 +25,7 @@ const terminalRead = (path) => [{
   parts: [{ type: 'tool', tool: 'read', callID: 'source-read', state: { status: 'completed', input: { filePath: path }, output: 'source\n', time: { start: 0, end: 0 } } }],
 }]
 
-test('WHAT[REQUIREMENT-GROUNDING-011] ordinary read observations add knowledge without creating authority or expanding capability', async () => {
+test('WHAT[requirement-grounding-011] ordinary read observations add knowledge without creating authority or expanding capability', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const opened = await host.createJournal(dir)

@@ -3,7 +3,7 @@ namespace Wanxiangshu.Execution.Delegation
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 
-/// DELEG-029: The delegation subsystem declares this capability port while
+/// delegation-029: The delegation subsystem declares this capability port while
 /// durable composition implements it over the concrete journal. Host runtime,
 /// recovery, and fold consume only this port.
 type AgentJournalPort =

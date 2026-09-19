@@ -1,6 +1,6 @@
 // requirements/participant-identity/tests/010.test.mjs
 //
-// WHAT[PID-010] — Active participant identity resolution accepts only valid
+// WHAT[participant-identity-010] — Active participant identity resolution accepts only valid
 // canonical roles (engineer, devops, manager, orchestrator, blogger), while
 // retired roles (coder, inspector, browser, inquiry, distiller) are rejected
 // from active scheduling and kept strictly isolated in historical decoding.
@@ -11,7 +11,7 @@ import test from 'node:test'
 const identity = await import('../../../dist/Participant/Persona/Surface.js')
 const officeCap = await import('../../../dist/Participant/Persona/OfficeCapabilitySurface.js')
 
-test('WHAT[PID-010] active_identity_resolution_accepts_engineer_and_rejects_retired_roles', () => {
+test('WHAT[participant-identity-010] active_identity_resolution_accepts_engineer_and_rejects_retired_roles', () => {
   const engineer = identity.resolveParticipantIdentityAtRoot('engineer')
   assert.equal(engineer.ok, true, 'engineer must be accepted as canonical active identity')
   assert.equal(engineer.identity.name, 'engineer')
@@ -29,7 +29,7 @@ test('WHAT[PID-010] active_identity_resolution_accepts_engineer_and_rejects_reti
   }
 })
 
-test('WHAT[PID-010] historical_identity_decoding_does_not_silently_upgrade_inspector_or_devops_to_engineer', () => {
+test('WHAT[participant-identity-010] historical_identity_decoding_does_not_silently_upgrade_inspector_or_devops_to_engineer', () => {
   // 1. Retired roles are legacy names and cannot be managed names for active scheduling
   assert.equal(identity.isLegacyName('inspector'), true)
   assert.equal(identity.isLegacyName('coder'), true)

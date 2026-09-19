@@ -91,7 +91,7 @@ module ExecutorTool =
             let ArgWorldLock = "tool/query-shell/arg-world_lock"
 
     /// Provider-visible execution verb. Distillation is invoked inside this
-    /// tool and is never a separate provider verb (PROC-011 / DISTILL-010).
+    /// tool and is never a separate provider verb (process-execution-011 / DISTILL-010).
     [<Literal>]
     let RunToolName = "run"
 

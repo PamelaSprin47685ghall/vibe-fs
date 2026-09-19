@@ -6,7 +6,7 @@ const { default: test } = await import("node:test");
 
 const change = await import('../../../dist/Change/Surface.js')
 
-test('WHAT[CHGINT-013] target movement before publish invalidates the certificate and continues the loop without entering the gate', async () => {
+test('WHAT[change-integration-013] target movement before publish invalidates the certificate and continues the loop without entering the gate', async () => {
   const observation = await change.observeRelayProgram('target-moved')
 
   assert.deepEqual(observation.invalidations, ['TargetAdvanced'])
@@ -16,7 +16,7 @@ test('WHAT[CHGINT-013] target movement before publish invalidates the certificat
   assert.equal(observation.gateAcquireCount, 0)
   assert.equal(observation.facts.includes('Published'), false)
 })
-test('WHAT[CHGINT-013] CAS miss invalidates certificate rebases and continues the loop after releasing the gate', async () => {
+test('WHAT[change-integration-013] CAS miss invalidates certificate rebases and continues the loop after releasing the gate', async () => {
   const observation = await change.observeRelayProgram('cas-miss')
 
   assert.deepEqual(observation.ffGateHeld, [true])
@@ -34,7 +34,7 @@ test('WHAT[CHGINT-013] CAS miss invalidates certificate rebases and continues th
   const continuation = observation.timeline.indexOf('continue:surface-loop-1')
   assert.ok(release < invalidate && invalidate < rebase && rebase < continuation)
 })
-test('WHAT[CHGINT-013] CAS miss appends the complete claim then a superseding rebased record, continues once, publishes at most once', async () => {
+test('WHAT[change-integration-013] CAS miss appends the complete claim then a superseding rebased record, continues once, publishes at most once', async () => {
   const observation = await change.observeRelayProgram('cas-miss')
 
   assert.deepEqual(observation.facts, ['PublishClaimed', 'RebasedCandidateReady'])
@@ -45,7 +45,7 @@ test('WHAT[CHGINT-013] CAS miss appends the complete claim then a superseding re
   assert.equal(observation.gateAcquireCount, 1)
   assert.equal(observation.gateReleaseCount, 1)
 })
-test('WHAT[CHGINT-013] target movement appends a superseding rebased record and continues once without publishing', async () => {
+test('WHAT[change-integration-013] target movement appends a superseding rebased record and continues once without publishing', async () => {
   const observation = await change.observeRelayProgram('target-moved')
 
   assert.deepEqual(observation.facts, ['CandidateReady', 'RebasedCandidateReady'])
@@ -142,7 +142,7 @@ const foldProjection = (events) => {
 const worktreeRequested = { kind: 'WorktreeCreateRequested', payload: { jobId: JOB, worktreeIdentity: 'manager/job_1', worktreePath: '/tmp/wt1' } }
 const worktreeCreated = { kind: 'WorktreeCreated', payload: { jobId: JOB, worktreeIdentity: 'manager/job_1', worktreePath: '/tmp/wt1' } }
 
-test('WHAT[CHGINT-013] target_movement_makes_the_rebased_binding_stale', () => {
+test('WHAT[change-integration-013] target_movement_makes_the_rebased_binding_stale', () => {
   assert.equal(classifyRebased('h2').kind, 'NeedsRebase')
 })
 }
@@ -221,7 +221,7 @@ const classifyRebased = (head, rebasedCommit = 'r1', snapshot = 'h1') =>
 const classifyClaim = (head, rebasedCommit = 'r1', expectedHead = 'h1') =>
   change.classifyPublishClaim(head ?? null, rebasedCommit, expectedHead)
 
-test('WHAT[CHGINT-013] THEOREM_stale_target_invalidates_the_rebased_binding', () => {
+test('WHAT[change-integration-013] THEOREM_stale_target_invalidates_the_rebased_binding', () => {
   const folded = foldEvents([createEvent(JOB_A, 'ses_orch_a'), candidateEvent(JOB_A), rebasedEvent(JOB_A)])
   assert.deepEqual(factsOf(folded, JOB_A), ['CandidateReady', 'RebasedCandidateReady'])
   assert.equal(classifyRebased('h1').kind, 'PublishReady')
@@ -235,7 +235,7 @@ const { default: test } = await import("node:test");
 
 const change = await import('../../../dist/Change/Surface.js')
 
-test('WHAT[CHGINT-013] CAS miss releases gate and invalidates certificate without publishing', async () => {
+test('WHAT[change-integration-013] CAS miss releases gate and invalidates certificate without publishing', async () => {
   const observation = await change.observeRelayProgram('cas-miss')
 
   assert.deepEqual(observation.ffGateHeld, [true])
@@ -244,7 +244,7 @@ test('WHAT[CHGINT-013] CAS miss releases gate and invalidates certificate withou
   assert.deepEqual(observation.continuations, ['surface-loop-1'])
   assert.equal(observation.gateHeldAfterRun, false)
 })
-test('WHAT[CHGINT-013] superseding rebased evidence appends while the old claim cannot reenter after supersession', () => {
+test('WHAT[change-integration-013] superseding rebased evidence appends while the old claim cannot reenter after supersession', () => {
   const created = {
     kind: 'ManagerJobCreated',
     payload: {
@@ -296,7 +296,7 @@ test('WHAT[CHGINT-013] superseding rebased evidence appends while the old claim 
   ])
   assert.equal(retryClaim.ok, true)
 })
-test('WHAT[CHGINT-013] recordFact keeps the latest rebased record instead of the first write', () => {
+test('WHAT[change-integration-013] recordFact keeps the latest rebased record instead of the first write', () => {
   const job = 'job_1'
   let projection = change.empty()
   projection = change.createJob(projection, {
@@ -315,7 +315,7 @@ test('WHAT[CHGINT-013] recordFact keeps the latest rebased record instead of the
   projection = change.recordFact(projection, job, rebased('r2', 'h2', 'snapshot-rebased-2'))
   assert.deepEqual(change.find(projection, job).facts, ['RebasedCandidateReady'])
 })
-test('WHAT[CHGINT-013] stale claim superseded by newer rebased evidence re-enters the loop without FF', async () => {
+test('WHAT[change-integration-013] stale claim superseded by newer rebased evidence re-enters the loop without FF', async () => {
   const observation = await change.observeRelayProgram('reentry-stale-claim-superseded')
 
   // The CAS-missed R1 claim beside the superseding R2 record is expired: the

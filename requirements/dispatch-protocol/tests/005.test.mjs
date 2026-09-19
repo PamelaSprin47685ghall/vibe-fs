@@ -65,7 +65,7 @@ const profileOf = () => {
   return built.value
 }
 
-test('WHAT[DISPATCH-PROTOCOL-005] DP_005_prompt_key_is_deterministic_and_moves_with_every_component', () => {
+test('WHAT[dispatch-protocol-005] DP_005_prompt_key_is_deterministic_and_moves_with_every_component', () => {
   const root = profileOf()
   const base = {
     session: SESSION,
@@ -125,7 +125,7 @@ test('WHAT[DISPATCH-PROTOCOL-005] DP_005_prompt_key_is_deterministic_and_moves_w
   )
 })
 
-test('WHAT[DISPATCH-PROTOCOL-005] DP_005_claim_scope_names_exactly_session_run_origin_and_payload', () => {
+test('WHAT[dispatch-protocol-005] DP_005_claim_scope_names_exactly_session_run_origin_and_payload', () => {
   const root = profileOf()
   const scope = authority.claimScopeDigest(
     SESSION,
@@ -142,7 +142,7 @@ test('WHAT[DISPATCH-PROTOCOL-005] DP_005_claim_scope_names_exactly_session_run_o
   )
 })
 
-test('WHAT[DISPATCH-PROTOCOL-005] DP_005_legacy_identity_fields_are_dropped_never_reencoded', () => {
+test('WHAT[dispatch-protocol-005] DP_005_legacy_identity_fields_are_dropped_never_reencoded', () => {
   const legacyIdentity = {
     participant: 'engineer',
     selectedAgent: 'stale-selected',

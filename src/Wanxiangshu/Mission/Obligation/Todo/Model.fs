@@ -263,7 +263,7 @@ module MagicTodo =
 
     /// Compression protects only the true Life Opening. BlindPlan/T1 may extend
     /// the WorkRecord's constitutive Opening material, but it must never enlarge
-    /// the X→Y compression floor (CONTEXT-COMPRESSION-017).
+    /// the X→Y compression floor (context-compression-017).
     let effectiveOpeningFloor
         (hasOpenLife: bool)
         (_planCommitted: bool)

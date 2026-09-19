@@ -9,7 +9,7 @@ open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
 
-/// DURABLE-CONVERGENCE-002/003/007/008/011.
+/// durable-convergence-002/003/007/008/011.
 /// Sync is deliberately physical: complete WriterId NDJSON files and payload
 /// files in, Git blobs/tree out. It never interprets domain state.
 [<RequireQualifiedAccess>]

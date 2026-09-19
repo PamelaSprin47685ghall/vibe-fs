@@ -22,7 +22,7 @@ const TOOL_CAPABILITIES = [
   'Write',
 ]
 
-test('WHAT[PAR-006] retry_keeps_fixed_participant_with_decoupled_model_routing', () => {
+test('WHAT[provider-attempt-recovery-006] retry_keeps_fixed_participant_with_decoupled_model_routing', () => {
   // Fixed participant: the same role plans twice with an identical identity,
   // system prompt and tool set — no retry ever switches the participant.
   const first = planner.plan({ role: 'coder', kind: 'work-main' })

@@ -25,7 +25,7 @@ const terminalRead = (path) => [{
   parts: [{ type: 'tool', tool: 'read', callID: 'source-read', state: { status: 'completed', input: { filePath: path }, output: 'source\n', time: { start: 0, end: 0 } } }],
 }]
 
-test('WHAT[REQUIREMENT-GROUNDING-006] direct Markdown read counts as visible grounding material and only unread siblings are injected', async () => {
+test('WHAT[requirement-grounding-006] direct Markdown read counts as visible grounding material and only unread siblings are injected', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const snapshot = grounding.materializePackage(dir, 'alpha')
@@ -66,7 +66,7 @@ test('WHAT[REQUIREMENT-GROUNDING-006] direct Markdown read counts as visible gro
   } finally { cleanup() }
 })
 
-test('WHAT[REQUIREMENT-GROUNDING-006] deduplicates material content versions and re-grounds only the changed Markdown sibling', async () => {
+test('WHAT[requirement-grounding-006] deduplicates material content versions and re-grounds only the changed Markdown sibling', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const opened = await host.createJournal(dir)
@@ -93,7 +93,7 @@ test('WHAT[REQUIREMENT-GROUNDING-006] deduplicates material content versions and
   } finally { cleanup() }
 })
 
-test('WHAT[REQUIREMENT-GROUNDING-006] reanchor_resets_horizon_coverage_so_the_same_digest_must_ground_again', async () => {
+test('WHAT[requirement-grounding-006] reanchor_resets_horizon_coverage_so_the_same_digest_must_ground_again', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const opened = await host.createJournal(dir)

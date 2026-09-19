@@ -28,7 +28,7 @@ const input = (failure, change = {}) => ({
 const classify = (failure, episodeId, change) =>
   presentation.classifyPolicyInput(input(failure, change), episodeId)
 
-test('WHAT[HOSTFAIL-003] recovery resolution produces zero Wanxiangshu final presentation', () => {
+test('WHAT[host-provider-failure-ownership-003] recovery resolution produces zero Wanxiangshu final presentation', () => {
   for (const failure of ['ProviderTransient', 'ProviderPermanent']) {
     assert.deepEqual(classify(failure, 'episode-1'), {
       mode: 'Recovery',
@@ -39,7 +39,7 @@ test('WHAT[HOSTFAIL-003] recovery resolution produces zero Wanxiangshu final pre
   }
 })
 
-test('WHAT[HOSTFAIL-003] recovery resolution has no suppression facade', () => {
+test('WHAT[host-provider-failure-ownership-003] recovery resolution has no suppression facade', () => {
   const decision = classify('ProviderTransient', 'episode-1')
   assert.equal(decision.mode, 'Recovery')
   assert.equal(decision.hasFinalPresentation, false)

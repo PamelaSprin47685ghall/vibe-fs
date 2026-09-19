@@ -321,7 +321,7 @@ module JsBookkeeperTool =
             | Ok value -> return succeeded language value
         }
 
-    /// KNOWLEDGE-REUSE-006 / ENF-006: the Bookkeeper is an internal leaf whose
+    /// knowledge-reuse-006 / capability-enforcement-006: the Bookkeeper is an internal leaf whose
     /// prompt is HostInternal, so its session never holds a public office Role.
     /// Its authority is the owner-held transaction attachment itself.
     let admission: ToolAdmission =

@@ -35,7 +35,7 @@
 
 ### 5. Proof Surface（`execution-session-wait-proof-surface`）
 
-`Execution/Session/Wait/Surface.fs`只投影production contract/runtime/adapter/mailbox。owner inventory证明没有production locality引用该Surface；`PROC-008` mailbox proof也在此注册，删除`Process/Surface.fs`中的第二份mailbox镜像。
+`Execution/Session/Wait/Surface.fs`只投影production contract/runtime/adapter/mailbox。owner inventory证明没有production locality引用该Surface；`process-execution-008` mailbox proof也在此注册，删除`Process/Surface.fs`中的第二份mailbox镜像。
 
 ### 6. 静态边界防护门禁（`causal-wait-boundary`）
 

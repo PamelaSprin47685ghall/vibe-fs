@@ -4,7 +4,7 @@ import { gecSurface } from '../../../dist/Sphinx/GecSurface.js'
 
 
 
-test('WHAT[EPI-032] internal engineer investigation is read-only synchronous budgeted cancellable without fission or devops', () => {
+test('WHAT[epistemic-reasoning-032] internal engineer investigation is read-only synchronous budgeted cancellable without fission or devops', () => {
   // Dispatch planning describes blind child execution for semantic investigation:
   // depth is strictly 1 (no recursive subagents, no fission, no devops delegation).
   const plan = gecSurface.planOpenCodeDispatch({

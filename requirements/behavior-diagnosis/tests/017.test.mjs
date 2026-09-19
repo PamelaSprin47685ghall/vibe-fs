@@ -7,7 +7,7 @@ const enforcer = await import("../../../dist/Enforcer/Surface.js");
 const blog = await import("../../../dist/Enforcer/BlogSurface.js");
 
 
-test('WHAT[BD-017] CHRONICLE_empty_canonical_text_returns_public_consequence', () => {
+test('WHAT[behavior-diagnosis-017] CHRONICLE_empty_canonical_text_returns_public_consequence', () => {
   const result = blog.execute({ hasFlight: true, sessionId: 'ses-blog', entry: '   ', tip: 'primitive-obsession' })
   assert.equal(result.ok, true)
   assert.equal(result.text, 'nothing-to-remember')
@@ -48,7 +48,7 @@ const managerOwner = {
   },
 }
 
-test('WHAT[BD-017] repeated invalid turns re-open repair and stable terminals complete it', () => {
+test('WHAT[behavior-diagnosis-017] repeated invalid turns re-open repair and stable terminals complete it', () => {
   // decideRepairDefect is exercised only through the registered
   // CompletedTurnSurface name mapping: in-flight/currentRepair attempts await
   // terminal, fresh invalid terminals re-request, repairs never exhaust.
@@ -58,7 +58,7 @@ test('WHAT[BD-017] repeated invalid turns re-open repair and stable terminals co
   assert.equal(turns.repairDefectDecision(true, true, 'length', []), 'RequestRepair')
   assert.equal(turns.repairDefectDecision(true, true, 'stop', text('done')), 'NoRepair')
 })
-test('WHAT[BD-017] concurrent gate nudge deduplicates at the dispatch boundary', async () => {
+test('WHAT[behavior-diagnosis-017] concurrent gate nudge deduplicates at the dispatch boundary', async () => {
   // Two nudges on the same terminal occasion must collapse to exactly one
   // physical send; a second admission observes the first result. This is the
   // AlreadyAdmitted-not-Failed contract proven at the physical boundary.
@@ -103,7 +103,7 @@ test('WHAT[BD-017] concurrent gate nudge deduplicates at the dispatch boundary',
     rmSync(base, { recursive: true, force: true })
   }
 })
-test('WHAT[BD-017] authority gate-nudge admission is required before any physical send', async () => {
+test('WHAT[behavior-diagnosis-017] authority gate-nudge admission is required before any physical send', async () => {
   // Without an agent-owner profile the surface's profileOf resolves an error:
   // the nudge is refused before any physical SendPrompt reaches the port.
   const base = mkdtempSync(join(tmpdir(), 'wxs-enf153-gate-'))
@@ -154,12 +154,12 @@ const valid = (messageId, overrides = {}) => ({
 const prose = (messageId) => ({ messageId, parts: [{ type: 'text', text: 'plain response' }] })
 const invalid = (messageId) => ({ messageId, parts: [{ tool: 'chronicle', state: { status: 'completed', input: { text: 'no tip' } } }] })
 
-test('WHAT[BD-017] ENFORCER_061_empty_calls_rebuilds_without_fatal', () => {
+test('WHAT[behavior-diagnosis-017] ENFORCER_061_empty_calls_rebuilds_without_fatal', () => {
   const out = blog.protocol(prose('asst-prose'))
   assert.equal(out.state, 'ProjectMessages')
   assert.equal(out.fatal, null)
 })
-test('WHAT[BD-017] ENFORCER_061_invalid_tip_is_protocol_skip', () => {
+test('WHAT[behavior-diagnosis-017] ENFORCER_061_invalid_tip_is_protocol_skip', () => {
   const out = blog.protocol(invalid('asst-skip'))
   assert.equal(out.state, 'ProjectMessages')
   assert.equal(out.fatal, null)
@@ -175,7 +175,7 @@ const { default: test } = await import("node:test");
 const { fileURLToPath } = await import("node:url");
 
 
-test('WHAT[BD-017] ENFORCER_stopPhysicalRun_argument_order_is_messages_then_fallback', () => {
+test('WHAT[behavior-diagnosis-017] ENFORCER_stopPhysicalRun_argument_order_is_messages_then_fallback', () => {
   // Definition: stopPhysicalRun (messages) (reason) — the fallback lambda is
   // gone (ENFORCER-047: stop decision has no heal path today). Injection
   // site is the ctx.Stop lambda in mkCtx; call sites pass rawMessages + reason.
@@ -218,7 +218,7 @@ const blog = await import("../../../dist/Enforcer/BlogSurface.js");
 
 const classify = (messageId, parts) => enforcer.classifyAssistantStep({ messageId, parts })
 
-test('WHAT[BD-017] ENFORCER_last_assistant_step_ignores_malformed_messages', () => {
+test('WHAT[behavior-diagnosis-017] ENFORCER_last_assistant_step_ignores_malformed_messages', () => {
   assert.equal(classify('', [null]).providerRun, null)
   assert.equal(classify('', [{ info: { id: 'x', role: 'user' } }]).acceptedCalls, 0)
   assert.equal(classify('', [{ info: { id: 'x' } }]).acceptedCalls, 0)
@@ -232,12 +232,12 @@ test('WHAT[BD-017] ENFORCER_last_assistant_step_ignores_malformed_messages', () 
   assert.equal(full.providerRun, 'a-2')
   assert.equal(full.acceptedCalls, 1)
 })
-test('WHAT[BD-017] ENFORCER_bad_tip_decode_is_protocol_skip_and_rebuilds', () => {
+test('WHAT[behavior-diagnosis-017] ENFORCER_bad_tip_decode_is_protocol_skip_and_rebuilds', () => {
   const out = classify('asst-skip', [{ tool: 'chronicle', state: { status: 'completed', input: { text: 'no tip' } } }])
   assert.equal(out.protocol, 'ProjectMessages')
   assert.equal(out.acceptedCalls, 0)
 })
-test('WHAT[BD-017] ENFORCER_completed_blog_part_in_empty_arm_rebuilds', () => {
+test('WHAT[behavior-diagnosis-017] ENFORCER_completed_blog_part_in_empty_arm_rebuilds', () => {
   const out = classify('asst-completed-skip', [
     { tool: 'chronicle', state: { status: 'completed', input: {} } },
     { type: 'text', text: 'plain' },
@@ -245,37 +245,37 @@ test('WHAT[BD-017] ENFORCER_completed_blog_part_in_empty_arm_rebuilds', () => {
   assert.equal(out.hasBlogToolPart, true)
   assert.equal(out.acceptedCalls, 0)
 })
-test('WHAT[BD-017] ENFORCER_interrupted_statusless_blog_part_aabbs', () => {
+test('WHAT[behavior-diagnosis-017] ENFORCER_interrupted_statusless_blog_part_aabbs', () => {
   const out = blog.classifyPart({ tool: 'chronicle', state: { metadata: { interrupted: true } } })
   assert.equal(out.blogPartInterrupted, true)
   assert.equal(out.hasFailedBlogAttempt, true)
 })
-test('WHAT[BD-017] ENFORCER_uninterrupted_statusless_blog_part_rebuilds', () => {
+test('WHAT[behavior-diagnosis-017] ENFORCER_uninterrupted_statusless_blog_part_rebuilds', () => {
   const out = blog.classifyPart({ tool: 'chronicle', state: { metadata: { interrupted: false } } })
   assert.equal(out.blogPartInterrupted, false)
   assert.equal(out.hasFailedBlogAttempt, false)
 })
-test('WHAT[BD-017] ENFORCER_running_blog_part_projects_raw', () => {
+test('WHAT[behavior-diagnosis-017] ENFORCER_running_blog_part_projects_raw', () => {
   const out = blog.classifyPart({ tool: 'chronicle', state: { status: 'running' } })
   assert.equal(out.hasIncompleteBlogTool, true)
   assert.equal(out.hasFailedBlogAttempt, false)
 })
-test('WHAT[BD-017] ENFORCER_unknown_status_blog_part_is_not_a_failed_attempt', () => {
+test('WHAT[behavior-diagnosis-017] ENFORCER_unknown_status_blog_part_is_not_a_failed_attempt', () => {
   const out = blog.classifyPart({ tool: 'chronicle', state: { status: 'weird', metadata: { interrupted: false } } })
   assert.equal(out.hasIncompleteBlogTool, false)
   assert.equal(out.hasFailedBlogAttempt, false)
 })
-test('WHAT[BD-017] ENFORCER_stateless_blog_part_has_no_status', () => {
+test('WHAT[behavior-diagnosis-017] ENFORCER_stateless_blog_part_has_no_status', () => {
   const out = blog.classifyPart({ tool: 'chronicle' })
   assert.equal(out.status, null)
   assert.equal(out.hasFailedBlogAttempt, false)
 })
-test('WHAT[BD-017] ENFORCER_statusless_blog_part_is_not_incomplete', () => {
+test('WHAT[behavior-diagnosis-017] ENFORCER_statusless_blog_part_is_not_incomplete', () => {
   const out = blog.classifyPart({ tool: 'chronicle', state: {} })
   assert.equal(out.hasIncompleteBlogTool, false)
   assert.equal(out.hasFailedBlogAttempt, false)
 })
-test('WHAT[BD-017] ENFORCER_null_part_in_transcript_is_ignored', () => {
+test('WHAT[behavior-diagnosis-017] ENFORCER_null_part_in_transcript_is_ignored', () => {
   const out = classify('asst-nullpart', [null])
   assert.equal(out.acceptedCalls, 0)
   assert.equal(out.hasBlogToolPart, false)

@@ -6,7 +6,7 @@ const { default: test } = await import("node:test");
 
 const change = await import('../../../dist/Change/Surface.js')
 
-test('WHAT[CHGINT-010] rebase work holds the gate only for the ff mutation', async () => {
+test('WHAT[change-integration-010] rebase work holds the gate only for the ff mutation', async () => {
   const observation = await change.observeRelayProgram('fresh')
 
   assert.deepEqual(observation.rebaseGateHeld, [false])
@@ -16,7 +16,7 @@ test('WHAT[CHGINT-010] rebase work holds the gate only for the ff mutation', asy
   assert.equal(observation.gateReleaseCount, 1)
   assert.equal(observation.gateHeldAfterRun, false)
 })
-test('WHAT[CHGINT-010] conflict resolution never acquires the publish gate', async () => {
+test('WHAT[change-integration-010] conflict resolution never acquires the publish gate', async () => {
   const observation = await change.observeRelayProgram('rebase-conflict')
 
   assert.deepEqual(observation.rebaseGateHeld, [false])
@@ -24,7 +24,7 @@ test('WHAT[CHGINT-010] conflict resolution never acquires the publish gate', asy
   assert.equal(observation.gateAcquireCount, 0)
   assert.equal(observation.gateHeldAfterRun, false)
 })
-test('WHAT[CHGINT-010] 10,000 Continue signals complete the real manager loop with exact effects and balanced resources', async () => {
+test('WHAT[change-integration-010] 10,000 Continue signals complete the real manager loop with exact effects and balanced resources', async () => {
   const observation = await change.observeManagerLoopBurst(10000)
 
   assert.deepEqual(observation.verdict, { kind: 'IntegrationFailed', detail: 'burst-complete' })
@@ -126,7 +126,7 @@ const foldProjection = (events) => {
 const worktreeRequested = { kind: 'WorktreeCreateRequested', payload: { jobId: JOB, worktreeIdentity: 'manager/job_1', worktreePath: '/tmp/wt1' } }
 const worktreeCreated = { kind: 'WorktreeCreated', payload: { jobId: JOB, worktreeIdentity: 'manager/job_1', worktreePath: '/tmp/wt1' } }
 
-test('WHAT[CHGINT-010] ORCH_005_a_rebased_candidate_publishes_only_while_the_target_has_not_moved', () => {
+test('WHAT[change-integration-010] ORCH_005_a_rebased_candidate_publishes_only_while_the_target_has_not_moved', () => {
   assert.equal(classifyRebased('h1').kind, 'PublishReady')
   assert.equal(classifyRebased('h2').kind, 'NeedsRebase')
 })

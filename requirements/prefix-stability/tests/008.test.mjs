@@ -20,7 +20,7 @@ const probeFor = ({ cutoff = 5, id = 'probe-1' } = {}) => ({
   candidate: snapshotAt(cutoff),
 })
 
-test('WHAT[PREFIX-STABILITY-008] COMPANION_010_the_memory_returns_same_session_responsibility_as_instruction', () => {
+test('WHAT[prefix-stability-008] COMPANION_010_the_memory_returns_same_session_responsibility_as_instruction', () => {
   const plan = prefix.forSnapshot(snapshotAt(3), companion.memoryPreamble, 'THE WORK LOG')
 
   assert.equal(plan.replacesPrefix, true)

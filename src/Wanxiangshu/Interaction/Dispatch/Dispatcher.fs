@@ -683,7 +683,7 @@ module PromptDispatcher =
                 terminalProviderRun
                 (this.ProjectionFor profile.SessionId)
 
-        /// PAR-008: has this Blogger request + terminal occasion already spent its one interaction repair.
+        /// provider-attempt-recovery-008: has this Blogger request + terminal occasion already spent its one interaction repair.
         ///
         /// A read, not a claim. The previous `TryClaimInteractionRepair` mutated a
         /// `RepairClaims` set that no fact ever wrote, so the at-most-once guarantee

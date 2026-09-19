@@ -3,7 +3,7 @@ import test from 'node:test'
 
 const change = await import('../../../dist/Change/Surface.js')
 
-test('WHAT[CHGINT-012] nonterminal durable evidence preserves the Road worktree across recovery', () => {
+test('WHAT[change-integration-012] nonterminal durable evidence preserves the Road worktree across recovery', () => {
   let projection = change.createJob(change.empty(), {
     jobId: 'job-1',
     managerSessionId: 'ses-manager-1',

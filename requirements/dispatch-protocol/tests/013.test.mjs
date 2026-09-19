@@ -53,7 +53,7 @@ const userMessageWithKey = (id, keyValue) => ({
   metadata: { wanxiangshu_prompt_key: keyValue },
 })
 
-test('WHAT[DISPATCH-PROTOCOL-013] DP_013_construction_waits_for_durability_activation_before_explicit_recovery', async () => {
+test('WHAT[dispatch-protocol-013] DP_013_construction_waits_for_durability_activation_before_explicit_recovery', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-dispatch-activation-'))
   try {
     const first = await journal.JournalSurface_bootWithWriterId(

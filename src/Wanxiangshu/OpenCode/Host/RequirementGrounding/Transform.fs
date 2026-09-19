@@ -291,7 +291,7 @@ module RequirementGroundingTransform =
             return! anchorRequested journal sessionId realMessages providerId visibleHistory pending
         }
 
-    /// REQUIREMENT-GROUNDING-007/012: project requirement grounding or terminate on failure.
+    /// requirement-grounding-007/012: project requirement grounding or terminate on failure.
     /// Domain decision: projection failure terminates the session.
     let projectOrTerminate
         (journal: AgentJournal option)

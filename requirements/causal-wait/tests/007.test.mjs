@@ -25,7 +25,7 @@ const waitExternal = (ownerId, externalId) =>
     source: 'causal-frontier.test',
   })
 
-test('WHAT[CAUSAL-007] RED_5_nested_graph_walks_to_external_frontier', () => {
+test('WHAT[causal-wait-007] RED_5_nested_graph_walks_to_external_frontier', () => {
   const frontiers = causal.frontiers([waitWorkflow('A', 'B'), waitExternal('B', 'C')])
 
   assert.equal(frontiers.length, 1)
@@ -38,7 +38,7 @@ test('WHAT[CAUSAL-007] RED_5_nested_graph_walks_to_external_frontier', () => {
   assert.match(frontiers[0].detail, /FRONTIER: waiting for external producer/)
 })
 
-test('WHAT[CAUSAL-007] RED_6_missing_producer_reports_broken_causal_edge', () => {
+test('WHAT[causal-wait-007] RED_6_missing_producer_reports_broken_causal_edge', () => {
   const frontiers = causal.frontiers([waitWorkflow('A', 'B')])
 
   assert.equal(frontiers.length, 1)
@@ -50,7 +50,7 @@ test('WHAT[CAUSAL-007] RED_6_missing_producer_reports_broken_causal_edge', () =>
   assert.match(frontiers[0].detail, /BROKEN CAUSAL EDGE/)
 })
 
-test('WHAT[CAUSAL-007] RED_7_cycle_reports_without_hanging', () => {
+test('WHAT[causal-wait-007] RED_7_cycle_reports_without_hanging', () => {
   const frontiers = causal.frontiers([
     waitWorkflow('A', 'B'),
     waitWorkflow('B', 'C'),
@@ -67,7 +67,7 @@ test('WHAT[CAUSAL-007] RED_7_cycle_reports_without_hanging', () => {
   }
 })
 
-test('WHAT[CAUSAL-007] empty_snapshot_yields_empty_frontier', () => {
+test('WHAT[causal-wait-007] empty_snapshot_yields_empty_frontier', () => {
   const frontiers = causal.frontiers([])
   assert.equal(frontiers.length, 1)
   assert.equal(frontiers[0].kind, 'Empty')

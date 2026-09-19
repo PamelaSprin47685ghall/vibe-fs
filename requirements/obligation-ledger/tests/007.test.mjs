@@ -35,7 +35,7 @@ const items = [
   obligation('verification', 'Verify the behavior with evidence.', 'far'),
 ]
 
-test('WHAT[OBLIGATION-LEDGER-007] admits multiple todowrite calls in one assistant message with sequential execution semantics', () => {
+test('WHAT[obligation-ledger-007] admits multiple todowrite calls in one assistant message with sequential execution semantics', () => {
   assert.equal(ok(todo.admitTodowriteBatch([firstCall, secondCall])), null)
   assert.equal(ok(todo.admitTodowriteBatch([firstCall, firstCall])), null)
 })

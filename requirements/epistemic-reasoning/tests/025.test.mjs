@@ -6,7 +6,7 @@ const { default: assert } = await import("node:assert/strict");
 const { gecSurface } = await import("../../../dist/Sphinx/GecSurface.js");
 
 
-test('WHAT[EPI-025] epsilon-clipped-log-score-stays-finite-on-zero-probability', async () => {
+test('WHAT[epistemic-reasoning-025] epsilon-clipped-log-score-stays-finite-on-zero-probability', async () => {
   const clipped = await gecSurface.selfPrediction({
     workId: 'work_001',
     predicted: { a: 0, b: 1 },
@@ -31,7 +31,7 @@ test('WHAT[EPI-025] epsilon-clipped-log-score-stays-finite-on-zero-probability',
   assert.equal(exact.ok, true)
   assert.ok(Math.abs(exact.logScore - Math.log(0.7)) < 1e-12)
 })
-test('WHAT[EPI-025] brier-score-on-valid-simplex-computes-squared-error', async () => {
+test('WHAT[epistemic-reasoning-025] brier-score-on-valid-simplex-computes-squared-error', async () => {
   const result = await gecSurface.selfPrediction({
     workId: 'work_002',
     predicted: { a: 0.7, b: 0.2, c: 0.1 },
@@ -43,7 +43,7 @@ test('WHAT[EPI-025] brier-score-on-valid-simplex-computes-squared-error', async 
   assert.equal(result.ok, true)
   assert.ok(Math.abs(result.brierScore - 0.14) < 1e-12)
 })
-test('WHAT[EPI-025] brier-score-rejects-prediction-outside-the-simplex', async () => {
+test('WHAT[epistemic-reasoning-025] brier-score-rejects-prediction-outside-the-simplex', async () => {
   const negative = await gecSurface.selfPrediction({
     workId: 'work_003',
     predicted: { a: -0.2, b: 1.2 },
@@ -65,7 +65,7 @@ test('WHAT[EPI-025] brier-score-rejects-prediction-outside-the-simplex', async (
   assert.equal(unnormalized.ok, false)
   assert.match(unnormalized.error, /simplex/i)
 })
-test('WHAT[EPI-025] commit-before-reveal-rejects-unsealed-prediction-and-binds-work', async () => {
+test('WHAT[epistemic-reasoning-025] commit-before-reveal-rejects-unsealed-prediction-and-binds-work', async () => {
   const sealed = await gecSurface.selfPrediction({
     workId: 'work_004',
     predicted: { a: 0.6, b: 0.4 },
@@ -87,7 +87,7 @@ test('WHAT[EPI-025] commit-before-reveal-rejects-unsealed-prediction-and-binds-w
   assert.equal(unsealed.ok, false)
   assert.match(unsealed.error, /commit|reveal|seal/i)
 })
-test('WHAT[EPI-025] raw-score-keeps-calibration-sharpness-separate-and-held-out-gates-update', async () => {
+test('WHAT[epistemic-reasoning-025] raw-score-keeps-calibration-sharpness-separate-and-held-out-gates-update', async () => {
   const base = {
     workId: 'work_005',
     predicted: { a: 0.6, b: 0.4 },
@@ -192,7 +192,7 @@ const waveEvents = (wave, assignment) => {
   ]
 }
 
-test('WHAT[EPI-025] soak_scored_forecasts_keep_seal_and_simplex_gates_across_waves', async () => {
+test('WHAT[epistemic-reasoning-025] soak_scored_forecasts_keep_seal_and_simplex_gates_across_waves', async () => {
   for (let wave = 0; wave < WAVES; wave += 1) {
     const input = waveInput(wave)
     const next = xorshift((input.seed ^ 0x9e3779b9) >>> 0)

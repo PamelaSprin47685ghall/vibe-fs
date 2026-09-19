@@ -41,12 +41,12 @@ const ffAnswers = ({ candidate = 'cafe01', targetHead = 'beef02', branch = 'main
 ]
 const ff = (answers) => change.gitFfMerge(git(fakeRunner(answers).runner), WORKTREE, 'main', 'beef02', 'cafe01')
 
-test('WHAT[CHGINT-002] GIT_is_dirty_true_only_on_nonempty_porcelain', async () => {
+test('WHAT[change-integration-002] GIT_is_dirty_true_only_on_nonempty_porcelain', async () => {
   assert.equal(await change.gitIsDirty(git(fakeRunner([['status --porcelain', [0, ' M file.fs\n', '']]]).runner), WORKTREE), true)
   assert.equal(await change.gitIsDirty(git(fakeRunner([['status --porcelain', [0, '', '']]]).runner), WORKTREE), false)
   assert.equal(await change.gitIsDirty(git(fakeRunner([['status --porcelain', [1, '', 'boom']]]).runner), WORKTREE), false)
 })
-test('WHAT[CHGINT-002] GIT_ff_merge_refuses_dirty_target_worktree', async () => {
+test('WHAT[change-integration-002] GIT_ff_merge_refuses_dirty_target_worktree', async () => {
   const answers = ffAnswers().map(([prefix, response]) => prefix === 'status --porcelain' ? [prefix, [0, ' M dirty.fs\n', '']] : [prefix, response])
   const result = await ff(answers)
   assert.equal(result.ok, false)
@@ -70,13 +70,13 @@ const job = (id, path = `/tmp/${id}`) => ({
   targetBranchFrozen: 'refs/heads/main',
 })
 
-test('WHAT[CHGINT-002] HOST_sweep_failure_aborts_engine_initialization', async () => {
+test('WHAT[change-integration-002] HOST_sweep_failure_aborts_engine_initialization', async () => {
   const runner = (command) => command.args[0] === 'worktree' ? Promise.resolve([128, '', 'no .git']) : Promise.resolve([0, '', ''])
   const result = await change.gitListWorktrees(change.createGit('/repo', runner))
   assert.equal(result.ok, false)
   assert.match(result.error, /no \.git/)
 })
-test('WHAT[CHGINT-002] HOST_ForkManagerJob_surfaces_the_engine_verdict_error', async () => {
+test('WHAT[change-integration-002] HOST_ForkManagerJob_surfaces_the_engine_verdict_error', async () => {
   const runner = () => Promise.resolve([0, ' M dirty.fs\n', ''])
   assert.equal(await change.gitIsDirty(change.createGit('/repo', runner), '/tmp/hostfw5'), true)
 })
@@ -112,7 +112,7 @@ const valueOf = async (promise) => {
   return result.value
 }
 
-test('WHAT[CHGINT-002] WORKTREE_CMD_is_dirty_reads_porcelain', async () => {
+test('WHAT[change-integration-002] WORKTREE_CMD_is_dirty_reads_porcelain', async () => {
   assert.equal(await change.gitIsDirty(fakeGit([['status --porcelain', [0, ' M x.fs\n', '']]]).git, PATH), true)
   assert.equal(await change.gitIsDirty(fakeGit([['status --porcelain', [0, '\n', '']]]).git, PATH), false)
 })

@@ -4,7 +4,7 @@ import { gecSurface } from '../../../dist/Sphinx/GecSurface.js'
 
 
 
-test('WHAT[EPI-034] cancellation penetrates full chain across parent tool child engineer and result acceptance', () => {
+test('WHAT[epistemic-reasoning-034] cancellation penetrates full chain across parent tool child engineer and result acceptance', () => {
   // Cancelling an inquiry plan generates abort intents for active work children
   const plan = gecSurface.planOpenCodeDispatch({
     session: { port: 'test-port' },

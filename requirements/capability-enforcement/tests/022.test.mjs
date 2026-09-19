@@ -125,7 +125,7 @@ const ROLE_ALLOW = {
   Blogger: ['chronicle'],
 }
 
-test('WHAT[ENF-022] fission_is_strictly_denied_in_host_schema_for_non_engineer_roles', () => {
+test('WHAT[capability-enforcement-022] fission_is_strictly_denied_in_host_schema_for_non_engineer_roles', () => {
   const config = buildConfig()
   assert.equal(configureManagedAgents(config).ok, true)
   assert.equal(evaluate(mergedRules(config, 'engineer'), 'fission', '*').action, 'allow')
@@ -142,7 +142,7 @@ const { default: test } = await import("node:test");
 const { rolePredicate } = await import("../../../dist/OpenCode/Tools/ToolRegistrySurface.js");
 
 
-test('WHAT[ENF-022] TOOLSPEC_fission_is_exclusive_to_engineer', () => {
+test('WHAT[capability-enforcement-022] TOOLSPEC_fission_is_exclusive_to_engineer', () => {
   assert.equal(rolePredicate('fission', 'engineer'), true, 'Engineer is admitted for Fission')
   assert.equal(rolePredicate('fission', 'manager'), false, 'Manager must be denied Fission')
   assert.equal(rolePredicate('fission', 'orchestrator'), false, 'Orchestrator must be denied Fission')

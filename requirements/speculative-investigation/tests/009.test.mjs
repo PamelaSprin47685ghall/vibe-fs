@@ -11,7 +11,7 @@ const result = (callId, resultText) => ({ kind: 'tool-result', callId, result: r
 const exchange = (toolName, canonicalArguments, canonicalResult) => ({ toolName, canonicalArguments, canonicalResult })
 const batch = (requestOrdinal, exchanges) => ({ requestOrdinal, exchanges })
 
-test('WHAT[SPEC-INV-009] STRENGTH_009_replica_mirror_localizes_owner_call_ids_without_changing_semantics', () => {
+test('WHAT[speculative-investigation-009] STRENGTH_009_replica_mirror_localizes_owner_call_ids_without_changing_semantics', () => {
   const ownerMessages = [
     { role: 'assistant', parts: [call('owner-a', 'read', '{"filePath":"a"}'), call('owner-b', 'grep', '{"pattern":"x"}')] },
     { role: 'tool', parts: [result('owner-b', 'hit'), result('owner-a', 'alpha')] },
@@ -51,7 +51,7 @@ const media = (mediaType, contentDigest) => ({ kind: 'media', mediaType, content
 const msg = (role, parts) => ({ role, parts })
 const rendered = (messages) => ({ messages, hostMessageIds: messages.map(() => null), hostIsPhysical: messages.map(() => false) })
 
-test('WHAT[SPEC-INV-009] STRENGTH_009_rendered_message_adapter_roundtrips_wire_semantics_with_host_only_ids', () => {
+test('WHAT[speculative-investigation-009] STRENGTH_009_rendered_message_adapter_roundtrips_wire_semantics_with_host_only_ids', () => {
   const input = rendered([msg('user', [text('hello')]), msg('assistant', [text('world')])])
   const applied = Adapter.tryApplyRenderedMessages('replica-session', H, input)
   assert.equal(applied.ok, true)
@@ -61,7 +61,7 @@ test('WHAT[SPEC-INV-009] STRENGTH_009_rendered_message_adapter_roundtrips_wire_s
   const decoded = Adapter.decodeMessageView(applied.value)
   assert.equal(Projection.renderWire(decoded.messages), Projection.renderWire(input.messages))
 })
-test('WHAT[SPEC-INV-009] STRENGTH_009_host_adapter_encodes_strength_tool_pairs_as_native_completed_OpenCode_parts', () => {
+test('WHAT[speculative-investigation-009] STRENGTH_009_host_adapter_encodes_strength_tool_pairs_as_native_completed_OpenCode_parts', () => {
   const input = {
     messages: [msg('user', [text('owner mirror')]), msg('assistant', [call('c1', 'read', '{"filePath":"README.md"}'), call('c2', 'grep', '{"pattern":"Strength"}')]), msg('tool', [result('c1', 'alpha'), result('c2', 'beta')])],
     hostMessageIds: [null, 'synthetic-call-message', 'synthetic-result-message'],
@@ -92,7 +92,7 @@ const snapshot = (messages = []) => Projection.projectionSnapshot(Projection.sem
 const text = (textValue) => ({ kind: 'text', text: textValue })
 const message = (role, parts) => ({ role, parts })
 
-test('WHAT[SPEC-INV-009] STRENGTH_006_009_candidate_wrong_target_and_promoted_replica_reflection_conflict', () => {
+test('WHAT[speculative-investigation-009] STRENGTH_006_009_candidate_wrong_target_and_promoted_replica_reflection_conflict', () => {
   const wrongTarget = Strength.candidate(H, { ownerSessionId: 'owner', decisionId: 'd1', targetProviderRun: 'target-a', currentProviderRun: 'target-b', bundle })
   assert.equal(wrongTarget.ok, false)
   assert.equal(wrongTarget.error, 'StrengthCandidateWrongTarget')
@@ -106,14 +106,14 @@ test('WHAT[SPEC-INV-009] STRENGTH_006_009_candidate_wrong_target_and_promoted_re
   assert.equal(invalidAnchor.ok, false)
   assert.equal(invalidAnchor.error, 'InvalidStrengthAnchor')
 })
-test('WHAT[SPEC-INV-009] STRENGTH_009_012_policy_promoted_frames_leave_later_pair_anchor_messages_in_place', () => {
+test('WHAT[speculative-investigation-009] STRENGTH_009_012_policy_promoted_frames_leave_later_pair_anchor_messages_in_place', () => {
   const base = [message('user', [text('u1')]), message('assistant', [text('target-assistant')]), message('user', [text('pair-anchor-stand-in')])]
   const promoted = Strength.promoted(H, { ownerSessionId: 'owner', decisionId: 'd1', targetProviderRun: 'target-1', beforeIndex: 1, isReplicaRequest: false, bundle }).value
   const rendered = Projection.renderMessagesWithHostIds(snapshot(base), base, [promoted])
   assert.deepEqual(rendered.messages.map((item) => item.role), ['user', 'assistant', 'tool', 'assistant', 'user'])
   assert.equal(rendered.messages.at(-1).parts[0].text, 'pair-anchor-stand-in')
 })
-test('WHAT[SPEC-INV-009] STRENGTH_009_replica_mirror_replaces_base_then_local_batches_append', () => {
+test('WHAT[speculative-investigation-009] STRENGTH_009_replica_mirror_replaces_base_then_local_batches_append', () => {
   const mirrorMessages = [message('user', [text('mirror-base')])]
   const mirror = Strength.projectionMirror({ decisionId: 'd1', targetProviderRun: 'target', semanticDigest: 'sem-a', rows: [{ message: mirrorMessages[0], hostMessageId: 'mirror-host-id', hostIsPhysical: true }] }).value
   const local = Strength.replicaLocal(H, { ownerSessionId: 'owner', decisionId: 'd1', bundle }).value
@@ -149,7 +149,7 @@ const registered = (replica, budget) => {
 }
 const apply = async (runtime, output) => Strength.transformApply(H, runtime, output)
 
-test('WHAT[SPEC-INV-009] STRENGTH_003_004_replica_initial_transform_replaces_bootstrap_with_frozen_owner_mirror', async () => {
+test('WHAT[speculative-investigation-009] STRENGTH_003_004_replica_initial_transform_replaces_bootstrap_with_frozen_owner_mirror', async () => {
   const runtime = registered('replica-initial', 'K1')
   const output = { messages: [user('u1', 'replica-initial', [hostText('Continue.')])] }
   const outcome = await apply(runtime, output)

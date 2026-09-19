@@ -4,7 +4,7 @@ open System.Collections.Generic
 open Fable.Core
 open Fable.Core.JsInterop
 
-/// WHAT[EPI-013,EPI-019]: schema-only generic inquiry registry backing the five
+/// WHAT[epistemic-reasoning-013,epistemic-reasoning-019]: schema-only generic inquiry registry backing the five
 /// sphinx_inquiry_start / sphinx_work_submit / sphinx_inquiry_status /
 /// sphinx_inquiry_export / sphinx_inquiry_cancel MCP tools. Accepted
 /// transitions are durable facts: GenericDurability appends one envelope per

@@ -68,7 +68,7 @@ const hanRatio = (text) => {
   return han / Math.max(1, latinWords)
 }
 
-test('WHAT[COGNITIVE-ENVIRONMENT-003] PROMPT_composition_common_law_role_law_then_inherited_library', () => {
+test('WHAT[cognitive-environment-003] PROMPT_composition_common_law_role_law_then_inherited_library', () => {
   const prompts = promptResources.load()
   inOrder(prompts.ManagerSystemPrompt, ['# # Common Law', '# # Management', '# # Office Library', '# # The Kolmogorov Book', '# # The Book of Scarcity'])
   inOrder(prompts.EngineerSystemPrompt, ['# # Common Law', '# # Engineering', '# # Office Library', '# # The Kolmogorov Book'])
@@ -81,7 +81,7 @@ test('WHAT[COGNITIVE-ENVIRONMENT-003] PROMPT_composition_common_law_role_law_the
   }
 })
 
-test('WHAT[COGNITIVE-ENVIRONMENT-003] PROMPT_bookkeeper_inherits_common_law_and_casebook_role_law', () => {
+test('WHAT[cognitive-environment-003] PROMPT_bookkeeper_inherits_common_law_and_casebook_role_law', () => {
   const en = promptResources.loadBookkeeperSystemFor(english)
   const zh = promptResources.loadBookkeeperSystemFor(simplifiedChinese)
   inOrder(en, ['# # Common Law', '# # The Casebook'])

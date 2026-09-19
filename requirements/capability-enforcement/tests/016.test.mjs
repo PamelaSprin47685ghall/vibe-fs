@@ -48,7 +48,7 @@ const terminal = (disposition, attempt, appendOutcome = 'Committed') => ({
   appendOutcome,
 })
 
-test('WHAT[ENF-016] AUTHORITY_002_stale_admission_is_rejected_and_fresh_admission_reads_current_facts', async () => {
+test('WHAT[capability-enforcement-016] AUTHORITY_002_stale_admission_is_rejected_and_fresh_admission_reads_current_facts', async () => {
   // (1) Positive control: while the current facts admit the provider step, the very same admission
   // operation succeeds and derives its decision from a fresh read of the projection.
   const attempt = evidence()

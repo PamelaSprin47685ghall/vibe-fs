@@ -125,7 +125,7 @@ const ROLE_ALLOW = {
   Blogger: ['chronicle'],
 }
 
-test('WHAT[ENF-010] AGENT_002_gate_accepts_distinct_models_and_writes_owned_fields', () => {
+test('WHAT[capability-enforcement-010] AGENT_002_gate_accepts_distinct_models_and_writes_owned_fields', () => {
   const config = buildConfig()
   const outcome = configureManagedAgents(config)
   assert.equal(outcome.ok, true, `gate must accept distinct models: ${outcome.error}`)
@@ -138,7 +138,7 @@ test('WHAT[ENF-010] AGENT_002_gate_accepts_distinct_models_and_writes_owned_fiel
     assert.ok(typeof entry.prompt === 'string' && entry.prompt.length > 0, `${agentName(role)} must carry a prompt`)
   }
 })
-test('WHAT[ENF-010] AGENT_007_bash_stays_denied_even_when_the_gate_fails', () => {
+test('WHAT[capability-enforcement-010] AGENT_007_bash_stays_denied_even_when_the_gate_fails', () => {
   const config = buildConfig()
   config.agent.build = { model: 'some-model' }
   const outcome = configureManagedAgents(config)
@@ -158,14 +158,14 @@ test('WHAT[ENF-010] AGENT_007_bash_stays_denied_even_when_the_gate_fails', () =>
     assert.ok(!allowList(config, name).includes('bash'), `${name} must never allow bash`)
   }
 })
-test('WHAT[ENF-010] AGENT_007_validation_error_is_still_reported', () => {
+test('WHAT[capability-enforcement-010] AGENT_007_validation_error_is_still_reported', () => {
   const config = buildConfig()
   config.agent.build = { model: 'some-model' }
   const outcome = validateManagedAgents(config)
   assert.equal(outcome.ok, false)
   assert.match(outcome.error, /Legacy agent name 'build'/)
 })
-test('WHAT[ENF-010] AGENT_004_legacy_agent_name_fails_validation', () => {
+test('WHAT[capability-enforcement-010] AGENT_004_legacy_agent_name_fails_validation', () => {
   const config = buildConfig()
   config.agent.build = { model: 'some-model' }
   const outcome = validateManagedAgents(config)
@@ -181,13 +181,13 @@ const { bashHoneypotContract } = await import("../../../dist/OpenCode/Tools/Tool
 const { acceptAuthorityRoot, withExecutablePlugin } = await import("../../verification-system/tests/support/plugin-fixture.mjs");
 
 
-test('WHAT[ENF-010] BASHHONEY_spec_is_parameterless_and_named_bash_honeypot', () => {
+test('WHAT[capability-enforcement-010] BASHHONEY_spec_is_parameterless_and_named_bash_honeypot', () => {
   const contract = bashHoneypotContract()
   assert.equal(contract.name, 'bash-honeypot')
   assert.match(contract.description, /[Hh]oneypot/)
   assert.deepEqual(contract.argumentNames, [])
 })
-test('WHAT[ENF-010] BASHHONEY_execute_returns_hard_denial_and_runs_nothing', async () => {
+test('WHAT[capability-enforcement-010] BASHHONEY_execute_returns_hard_denial_and_runs_nothing', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'ses-honey', 'engineer')
     const result = await hooks.tool['bash-honeypot'].execute({}, { sessionID: 'ses-honey', agent: 'engineer' })
@@ -207,7 +207,7 @@ const { default: test } = await import("node:test");
 const { acceptAuthorityRoot, grantWorkOwned, withExecutablePlugin, withPlugin } = await import("../../verification-system/tests/support/plugin-fixture.mjs");
 
 
-test('WHAT[ENF-010] FORK_orchestrator_missing_authority_is_refused_without_session_identity', async () => {
+test('WHAT[capability-enforcement-010] FORK_orchestrator_missing_authority_is_refused_without_session_identity', async () => {
   await withExecutablePlugin(async (hooks) => {
     const result = await hooks.tool.commission.execute(
       { calling: 'lead', name: 'North Road', charge: 'x' },
@@ -227,7 +227,7 @@ const { permissions: rolePermissions, isAllowed: surfaceIsAllowed } = await impo
 const { allRoleLabels } = await import("../../../dist/Foundation/RolesSurface.js");
 
 
-test('WHAT[ENF-010] inquiry_rolePredicate_denies_all_tools', () => {
+test('WHAT[capability-enforcement-010] inquiry_rolePredicate_denies_all_tools', () => {
   assert.equal(rolePredicate('inspect', 'inquiry'), false)
   assert.equal(rolePredicate('fission', 'inquiry'), false)
 })
@@ -256,11 +256,11 @@ function fullConfig() {
   return { agent: Object.fromEntries(NAMES.map((name) => [name, {}])) }
 }
 
-test('WHAT[ENF-010] MACFG_validate_rejects_null_config_and_legacy_agent', () => {
+test('WHAT[capability-enforcement-010] MACFG_validate_rejects_null_config_and_legacy_agent', () => {
   assert.match(errOf(validate(null)), /Host config object/)
   assert.match(errOf(validate({ agent: { build: {} } })), /build/)
 })
-test('WHAT[ENF-010] MACFG_validate_rejects_legacy_agent_present', () => {
+test('WHAT[capability-enforcement-010] MACFG_validate_rejects_legacy_agent_present', () => {
   const cfg = fullConfig()
   cfg.agent.build = {}
   assert.match(errOf(validate(cfg)), /build/)
@@ -268,7 +268,7 @@ test('WHAT[ENF-010] MACFG_validate_rejects_legacy_agent_present', () => {
   cfg.agent.coder = {}
   assert.match(errOf(validate(cfg)), /coder/)
 })
-test('WHAT[ENF-010] MACFG_configureManager_legacy_agent_is_fatal_after_owned_fields_land', () => {
+test('WHAT[capability-enforcement-010] MACFG_configureManager_legacy_agent_is_fatal_after_owned_fields_land', () => {
   const cfg = fullConfig()
   cfg.agent.build = {}
 

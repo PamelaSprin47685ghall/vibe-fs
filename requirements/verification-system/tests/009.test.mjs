@@ -23,7 +23,7 @@ const makeTempRoot = (layout) => {
 }
 const cleanup = (root) => rmSync(root, { recursive: true, force: true })
 
-test('WHAT[VERIFICATION-SYSTEM-009] missing e2e root fails closed, not green with zero files', () => {
+test('WHAT[verification-system-009] missing e2e root fails closed, not green with zero files', () => {
   // A gate whose path criterion points at a non-existent directory is a fake
   // gate (always-passing). Missing root must throw, never return [].
   const root = mkdtempSync(join(tmpdir(), 'e2e-wdf-fc-'))
@@ -37,7 +37,7 @@ test('WHAT[VERIFICATION-SYSTEM-009] missing e2e root fails closed, not green wit
     cleanup(root)
   }
 })
-test('WHAT[VERIFICATION-SYSTEM-009] non-directory e2e root fails closed', () => {
+test('WHAT[verification-system-009] non-directory e2e root fails closed', () => {
   const root = makeTempRoot({ e2eIsFile: true })
   try {
     assert.throws(
@@ -70,7 +70,7 @@ const root = path.resolve(here, '../../..')
 const packageIntegrationDir = path.join(root, 'requirements/distribution/tests/integration/package')
 const normalize = (file) => path.relative(root, file).split(path.sep).join('/')
 
-test('WHAT[VERIFICATION-SYSTEM-009] integration entry coverage accepts an exact reachable set', () => {
+test('WHAT[verification-system-009] integration entry coverage accepts an exact reachable set', () => {
   assert.deepEqual(
     assess(
       ['requirements/a/tests/integration/a.test.mjs', 'requirements/b/tests/integration/b.test.mjs'],
@@ -79,7 +79,7 @@ test('WHAT[VERIFICATION-SYSTEM-009] integration entry coverage accepts an exact 
     { ok: true, missingFromEntry: [], staleEntry: [], duplicateWiring: [] },
   )
 })
-test('WHAT[VERIFICATION-SYSTEM-009] integration entry coverage delegates the exact declared child-owned set', () => {
+test('WHAT[verification-system-009] integration entry coverage delegates the exact declared child-owned set', () => {
   assert.deepEqual(
     assess(
       [
@@ -92,7 +92,7 @@ test('WHAT[VERIFICATION-SYSTEM-009] integration entry coverage delegates the exa
     { ok: true, missingFromEntry: [], staleEntry: [], duplicateWiring: [] },
   )
 })
-test('WHAT[VERIFICATION-SYSTEM-009] discoverSuiteTests lists every package *.test.mjs and excludes the runner', () => {
+test('WHAT[verification-system-009] discoverSuiteTests lists every package *.test.mjs and excludes the runner', () => {
   const discovered = discoverSuiteTests(packageIntegrationDir)
   // The four real package suites are all picked up.
   assert.ok(discovered.includes('001.test.mjs'))
@@ -104,7 +104,7 @@ test('WHAT[VERIFICATION-SYSTEM-009] discoverSuiteTests lists every package *.tes
   // Deterministic, sorted, deduplicated.
   assert.deepEqual(discovered, [...new Set(discovered)].sort())
 })
-test('WHAT[VERIFICATION-SYSTEM-009] discoverSuiteTests auto-includes an added test and excludes non-test files', () => {
+test('WHAT[verification-system-009] discoverSuiteTests auto-includes an added test and excludes non-test files', () => {
   const scratch = mkdtempSync(path.join(tmpdir(), 'pkg-suite-'))
   try {
     writeFileSync(path.join(scratch, 'alpha.test.mjs'), '// noop\n')
@@ -119,12 +119,12 @@ test('WHAT[VERIFICATION-SYSTEM-009] discoverSuiteTests auto-includes an added te
     rmSync(scratch, { recursive: true, force: true })
   }
 })
-test('WHAT[VERIFICATION-SYSTEM-009] discoverSuiteTests fail-closes on an unreadable directory', () => {
+test('WHAT[verification-system-009] discoverSuiteTests fail-closes on an unreadable directory', () => {
   // A non-existent directory yields an empty set rather than throwing; the
   // child runner turns an empty set into a non-zero exit.
   assert.deepEqual(discoverSuiteTests(path.join(tmpdir(), 'does-not-exist-suite-xyz')), [])
 })
-test('WHAT[VERIFICATION-SYSTEM-009] parent delegation set equals the child-executed set (no drift)', () => {
+test('WHAT[verification-system-009] parent delegation set equals the child-executed set (no drift)', () => {
   // Both the parent entry and the child runner consume discoverSuiteTests on
   // the same directory, so the delegated set must be exactly the set the child
   // runs. If these ever diverge, an added package test is silently omitted.
@@ -133,7 +133,7 @@ test('WHAT[VERIFICATION-SYSTEM-009] parent delegation set equals the child-execu
   assert.deepEqual(childExecuted, parentDelegated)
   assert.ok(childExecuted.length > 0, 'package integration dir must own at least one suite')
 })
-test('WHAT[VERIFICATION-SYSTEM-009] the real integration entry covers every discovered integration test', () => {
+test('WHAT[verification-system-009] the real integration entry covers every discovered integration test', () => {
   // Behavior proof against the real repository state: walk requirements for
   // *.test.mjs under tests/integration, delegate the exact discovered package
   // set, and assert the entry coverage is green using the SAME wired set the
@@ -189,7 +189,7 @@ function createMemorySink() {
   }
   }
 for (const failingLabel of ['format:check', 'check', 'build']) {
-  test(`WHAT[VERIFICATION-SYSTEM-001] verify halts and marks subsequent steps not-run when ${failingLabel} fails`, async () => {
+  test(`WHAT[verification-system-001] verify halts and marks subsequent steps not-run when ${failingLabel} fails`, async () => {
     const tmpLogDir = mkdtempSync(join(tmpdir(), 'proof-ladder-fail-'))
     const sink = createMemorySink()
   const spawned = []
@@ -225,7 +225,7 @@ for (const failingLabel of ['format:check', 'check', 'build']) {
 })
   }
 
-test('WHAT[VERIFICATION-SYSTEM-009] every ladder step target exists as a real file', () => {
+test('WHAT[verification-system-009] every ladder step target exists as a real file', () => {
   // 层序里的每个入口都必须是真实文件：指向不存在文件的命令恒为「没跑到」，
   // 层序 pin 就退化成文字装饰（VERIFY-004 静态门禁必须命中真实路径）。
   const required = [
@@ -241,7 +241,7 @@ test('WHAT[VERIFICATION-SYSTEM-009] every ladder step target exists as a real fi
     assert.ok(existsSync(join(ROOT, rel)), `ladder step target missing: ${rel}`)
   }
 })
-test('WHAT[VERIFICATION-SYSTEM-009] every wired gate path exists and checks set matches scripts/checks directory', () => {
+test('WHAT[verification-system-009] every wired gate path exists and checks set matches scripts/checks directory', () => {
   for (const gatePath of checks) {
     assert.ok(
       existsSync(gatePath),
@@ -274,7 +274,7 @@ test('WHAT[VERIFICATION-SYSTEM-009] every wired gate path exists and checks set 
     'checks registered in check.mjs must equal gate scripts in scripts/checks',
   )
 })
-test('WHAT[VERIFICATION-SYSTEM-009] no custom FCS executable remains after the full-repo ban', () => {
+test('WHAT[verification-system-009] no custom FCS executable remains after the full-repo ban', () => {
   // GAP-031 全仓自定义 FCS 禁令：扫描链是被删除，不是被禁用。任何自定义 FCS
   // 可执行物（驱动 FSharp.Compiler.Service 的 .fsx，或 shell 到 `dotnet fsi` /
   // 加载 Fable+FCS 程序集 / import 已删除扫描入口的 JS gate）都必须变红。
@@ -346,7 +346,7 @@ const runNode = (root, args) => {
   })
 }
 
-test('WHAT[VERIFICATION-SYSTEM-009] repository closure gates reject an unassigned production source and package member', () => {
+test('WHAT[verification-system-009] repository closure gates reject an unassigned production source and package member', () => {
   const fixture = mkdtempSync(join(tmpdir(), 'repository-closure-'))
 
   try {

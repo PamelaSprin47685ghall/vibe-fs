@@ -7,7 +7,7 @@ const target = { model: 'provider/shared', reasoning: 'none' }
 
 const identity = { sessionId: 'session-a', physicalUserMessageId: 'message-a', role: 'engineer', participant: 'alice' }
 
-test('WHAT[EMR-015] diagnostic query reuses capacity snapshot queue and fence counters without duplicate formula', async () => {
+test('WHAT[execution-model-routing-015] diagnostic query reuses capacity snapshot queue and fence counters without duplicate formula', async () => {
   const runtime = routing.createRuntime(() => target)
   const acquired = await routing.acquireExecutionAdmission(
     runtime,

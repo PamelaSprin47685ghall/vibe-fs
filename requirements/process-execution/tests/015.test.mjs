@@ -26,13 +26,13 @@ const parseToml = parseDocument
 
 const run = (args, context = { sessionID: 'ses-exec' }) => executeRun(toolModule, {}, args, context, 'ready')
 
-test('WHAT[PROC-015] output_truncation_enforces_byte_budget_and_utf8_char_boundary', async () => {
+test('WHAT[process-execution-015] output_truncation_enforces_byte_budget_and_utf8_char_boundary', async () => {
   // 包含 3 字节 UTF-8 中文字符与 4 字节 Emoji 的超长输出
   const command = 'python3 -c "print(\'万象术\' * 100 + \'🔥\' * 50 + \'FINAL_TAIL_UTF8\')"'
   const budgetBytes = 64
   const result = await run({ command, output_budget_bytes: budgetBytes })
 
-  // PROC-015: 截断必须对齐 UTF-8 字符边界，不得产生无效的 \uFFFD 乱码
+  // process-execution-015: 截断必须对齐 UTF-8 字符边界，不得产生无效的 \uFFFD 乱码
   assert.ok(!result.includes('\uFFFD'), 'truncation must not slice mid-UTF-8 multibyte character')
   assert.ok(result.includes('FINAL_TAIL_UTF8'), 'latest UTF-8 tail must be retained')
 })

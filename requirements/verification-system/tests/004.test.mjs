@@ -6,24 +6,24 @@ const { default: test } = await import("node:test");
 const { parseConcurrency, assertConcurrency } = await import("../../../scripts/lib/concurrency-cap.mjs");
 
 
-test('WHAT[VERIFICATION-SYSTEM-004] parseConcurrency accepts unset, empty, and boolean values', () => {
+test('WHAT[verification-system-004] parseConcurrency accepts unset, empty, and boolean values', () => {
   assert.equal(parseConcurrency(undefined), true)
   assert.equal(parseConcurrency(null), true)
   assert.equal(parseConcurrency(''), true)
   assert.equal(parseConcurrency(true), true)
   assert.equal(parseConcurrency('true'), true)
 })
-test('WHAT[VERIFICATION-SYSTEM-004] parseConcurrency treats false as 1 alias', () => {
+test('WHAT[verification-system-004] parseConcurrency treats false as 1 alias', () => {
   assert.equal(parseConcurrency(false), 1)
   assert.equal(parseConcurrency('false'), 1)
 })
-test('WHAT[VERIFICATION-SYSTEM-004] parseConcurrency accepts positive integers', () => {
+test('WHAT[verification-system-004] parseConcurrency accepts positive integers', () => {
   assert.equal(parseConcurrency(1), 1)
   assert.equal(parseConcurrency('1'), 1)
   assert.equal(parseConcurrency(4), 4)
   assert.equal(parseConcurrency('8'), 8)
 })
-test('WHAT[VERIFICATION-SYSTEM-004] parseConcurrency throws input error on non-positive, NaN, or non-integer', () => {
+test('WHAT[verification-system-004] parseConcurrency throws input error on non-positive, NaN, or non-integer', () => {
   assert.throws(() => parseConcurrency(0), /Invalid NODE_TEST_CONCURRENCY/)
   assert.throws(() => parseConcurrency('0'), /Invalid NODE_TEST_CONCURRENCY/)
   assert.throws(() => parseConcurrency(-1), /Invalid NODE_TEST_CONCURRENCY/)
@@ -35,7 +35,7 @@ test('WHAT[VERIFICATION-SYSTEM-004] parseConcurrency throws input error on non-p
   assert.throws(() => parseConcurrency(Infinity), /Invalid NODE_TEST_CONCURRENCY/)
   assert.throws(() => parseConcurrency('-Infinity'), /Invalid NODE_TEST_CONCURRENCY/)
 })
-test('WHAT[VERIFICATION-SYSTEM-004] assertConcurrency forwards to parseConcurrency', () => {
+test('WHAT[verification-system-004] assertConcurrency forwards to parseConcurrency', () => {
   assert.equal(assertConcurrency('4'), 4)
   assert.throws(() => assertConcurrency('bad'), /Invalid NODE_TEST_CONCURRENCY/)
 })
@@ -60,7 +60,7 @@ const root = path.resolve(here, '../../..')
 const packageIntegrationDir = path.join(root, 'requirements/distribution/tests/integration/package')
 const normalize = (file) => path.relative(root, file).split(path.sep).join('/')
 
-test('WHAT[VERIFICATION-SYSTEM-004] integration entry coverage goes red for an unwired integration test', () => {
+test('WHAT[verification-system-004] integration entry coverage goes red for an unwired integration test', () => {
   assert.deepEqual(
     assess(
       ['requirements/a/tests/integration/a.test.mjs', 'requirements/b/tests/integration/b.test.mjs'],
@@ -74,7 +74,7 @@ test('WHAT[VERIFICATION-SYSTEM-004] integration entry coverage goes red for an u
     },
   )
 })
-test('WHAT[VERIFICATION-SYSTEM-004] integration entry coverage goes red for stale or duplicate wiring', () => {
+test('WHAT[verification-system-004] integration entry coverage goes red for stale or duplicate wiring', () => {
   assert.deepEqual(
     assess(
       ['requirements/a/tests/integration/a.test.mjs'],
@@ -92,7 +92,7 @@ test('WHAT[VERIFICATION-SYSTEM-004] integration entry coverage goes red for stal
     },
   )
 })
-test('WHAT[VERIFICATION-SYSTEM-004] integration entry coverage goes red when a child-owned test is not declared', () => {
+test('WHAT[verification-system-004] integration entry coverage goes red when a child-owned test is not declared', () => {
   // A child test that exists on disk but is omitted from the declared
   // child-owned set must surface as missing-from-entry: the parent would
   // neither run it nor delegate it. This is the no-unwired-child-test gate.
@@ -125,7 +125,7 @@ const { default: test } = await import("node:test");
 const { duplicateClauseDefinitions } = await import("../../../scripts/lib/spec-rules.mjs");
 
 
-test('WHAT[VERIFICATION-SYSTEM-004] spec gate rejects duplicate CHATEXEC identifiers', () => {
+test('WHAT[verification-system-004] spec gate rejects duplicate CHATEXEC identifiers', () => {
   const fixture = mkdtempSync(join(tmpdir(), 'spec-duplicate-id-'))
 
   try {
@@ -247,7 +247,7 @@ function createHarness(opts = {}) {
   }
 }
 
-test('WHAT[VERIFICATION-SYSTEM-004] watchdog fires on silence after exact timeoutMs', async () => {
+test('WHAT[verification-system-004] watchdog fires on silence after exact timeoutMs', async () => {
   const h = createHarness({ timeoutMs: 500, label: 'dog-silence' })
 
   await h.advance(499)
@@ -259,7 +259,7 @@ test('WHAT[VERIFICATION-SYSTEM-004] watchdog fires on silence after exact timeou
   assert.equal(h.terminateCount, 1)
   assert.ok(h.diagnostics.some((d) => d.includes("WATCHDOG: 'dog-silence' silent for 500ms")))
 })
-test('WHAT[VERIFICATION-SYSTEM-004] blocking renew pushes timeout forward indefinitely', async () => {
+test('WHAT[verification-system-004] blocking renew pushes timeout forward indefinitely', async () => {
   const h = createHarness({ timeoutMs: 300, label: 'dog-renew' })
 
   await h.advance(200)
@@ -280,7 +280,7 @@ test('WHAT[VERIFICATION-SYSTEM-004] blocking renew pushes timeout forward indefi
   assert.ok(h.diagnostics.some((d) => d.includes('2 blocking progress update(s)')))
   assert.ok(h.diagnostics.some((d) => d.includes('last progress: step-2 lane=worker')))
 })
-test('WHAT[VERIFICATION-SYSTEM-004] background advance records info but does not renew timeout', async () => {
+test('WHAT[verification-system-004] background advance records info but does not renew timeout', async () => {
   const h = createHarness({ timeoutMs: 400, label: 'dog-background' })
 
   await h.advance(100)
@@ -297,7 +297,7 @@ test('WHAT[VERIFICATION-SYSTEM-004] background advance records info but does not
   assert.ok(h.diagnostics.some((d) => d.includes('0 blocking progress update(s)')))
   assert.ok(h.diagnostics.some((d) => d.includes('background progress 100ms ago: bg-step-2 lane=sidecar (2 background update(s), none of them renewals)')))
 })
-test('WHAT[VERIFICATION-SYSTEM-004] stop permanently disarms watchdog with no subsequent fire', async () => {
+test('WHAT[verification-system-004] stop permanently disarms watchdog with no subsequent fire', async () => {
   const h = createHarness({ timeoutMs: 200, label: 'dog-stopped' })
 
   await h.advance(100)
@@ -313,7 +313,7 @@ test('WHAT[VERIFICATION-SYSTEM-004] stop permanently disarms watchdog with no su
   await h.advance(500)
   assert.equal(h.terminated, false)
 })
-test('WHAT[VERIFICATION-SYSTEM-004] setWindow(null) restores centralized default WATCHDOG_TIMEOUT_MS', async () => {
+test('WHAT[verification-system-004] setWindow(null) restores centralized default WATCHDOG_TIMEOUT_MS', async () => {
   const h = createHarness({ timeoutMs: 500, label: 'dog-window' })
 
   // Widen to 2000ms
@@ -334,7 +334,7 @@ test('WHAT[VERIFICATION-SYSTEM-004] setWindow(null) restores centralized default
   assert.equal(h.terminated, true)
   assert.ok(h.diagnostics.some((d) => d.includes(`(limit ${WATCHDOG_TIMEOUT_MS}ms)`)))
 })
-test('WHAT[VERIFICATION-SYSTEM-004] timeout fires at most once even if clock continues to advance', async () => {
+test('WHAT[verification-system-004] timeout fires at most once even if clock continues to advance', async () => {
   const h = createHarness({ timeoutMs: 300, label: 'dog-once' })
 
   await h.advance(300)
@@ -343,7 +343,7 @@ test('WHAT[VERIFICATION-SYSTEM-004] timeout fires at most once even if clock con
   await h.advance(1000)
   assert.equal(h.terminateCount, 1, 'terminate must not be called repeatedly')
 })
-test('WHAT[VERIFICATION-SYSTEM-004] diagnostic is flushed before terminate and onTimeout is bounded', async () => {
+test('WHAT[verification-system-004] diagnostic is flushed before terminate and onTimeout is bounded', async () => {
   const executionOrder = []
   const clock = createVirtualClock()
   const timers = createVirtualTimers(clock)

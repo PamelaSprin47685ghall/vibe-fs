@@ -90,7 +90,7 @@ module SessionsSurface =
             member _.SubscribeFutureTerminalListener _ = subscription
             member _.NotifyTerminal _ _ = true
 
-    /// MANAGED-SESSION-016/017: exercise the production session adapter against
+    /// managed-session-lifecycle-016/017: exercise the production session adapter against
     /// a controlled physical Host boundary. The returned view contains values,
     /// never the adapter or its managed-child representation.
     let interruptAttemptAdapterProbe () : Task<obj> =
@@ -146,7 +146,7 @@ module SessionsSurface =
                           "childStillManagedAfterInterrupt", box (sessions.IsManagedChild managedChildId) ]
         }
 
-    /// MANAGED-SESSION-016: a Host rejection is a typed terminal result for the
+    /// managed-session-lifecycle-016: a Host rejection is a typed terminal result for the
     /// single production adapter attempt; the adapter never retries AbortSession.
     let interruptRejectedAdapterProbe () : Task<obj> =
         task {
@@ -202,7 +202,7 @@ module SessionsSurface =
                           "trace", box trace ]
         }
 
-    /// MANAGED-SESSION-016 already-terminal: a lifecycle-terminated attempt is
+    /// managed-session-lifecycle-016 already-terminal: a lifecycle-terminated attempt is
     /// permitted to abort on the Host transport, while a
     /// non-terminal non-managed attempt is still rejected with zero transport
     /// calls. The returned view contains values, never the adapter.

@@ -32,7 +32,7 @@ function workRef(workId, attempt = 1, extra = {}) {
   return { id: workId, branch, attempt, ...extra };
 }
 
-test('WHAT[EPI-021] ready_requires_satisfied_dependencies_or_dangling_work_runs_early', async () => {
+test('WHAT[epistemic-reasoning-021] ready_requires_satisfied_dependencies_or_dangling_work_runs_early', async () => {
   const surface = gecSurface;
   const blocked = [
     created(),
@@ -70,7 +70,7 @@ test('WHAT[EPI-021] ready_requires_satisfied_dependencies_or_dangling_work_runs_
   assert.equal(noFence.ok, false, 'leasing without fence evidence must be rejected');
   assert.equal(noFence.error.code, 'missing-fence');
 });
-test('WHAT[EPI-021] terminal_states_never_return_to_executing_and_attempt_accepts_single_observation_or_retry_forks_state', async () => {
+test('WHAT[epistemic-reasoning-021] terminal_states_never_return_to_executing_and_attempt_accepts_single_observation_or_retry_forks_state', async () => {
   const surface = gecSurface;
   const runToSuccess = (workId) => [
     ...prefix(workId, []),
@@ -113,7 +113,7 @@ test('WHAT[EPI-021] terminal_states_never_return_to_executing_and_attempt_accept
   const retried = await surface.replay({ events: retry });
   assert.equal(retried.ok, true, 'retry must re-enter Ready with a fresh attempt rather than resuming Executing');
 });
-test('WHAT[EPI-021] wall_clock_fields_are_rejected_or_timer_drives_lifecycle', async () => {
+test('WHAT[epistemic-reasoning-021] wall_clock_fields_are_rejected_or_timer_drives_lifecycle', async () => {
   const surface = gecSurface;
   const timed = [
     'leaseExpiresAt',
@@ -227,7 +227,7 @@ const waveEvents = (wave, assignment) => {
   ]
 }
 
-test('WHAT[EPI-021] soak_replay_rejects_lifecycle_violations_with_stable_codes_across_waves', async () => {
+test('WHAT[epistemic-reasoning-021] soak_replay_rejects_lifecycle_violations_with_stable_codes_across_waves', async () => {
   const lock = [{ id: 'canon', release: '1.0.0', abiHash: 'abi-canon' }]
   const fields = ['leaseExpiresAt', 'heartbeatTimeout', 'wallClock', 'expiresAt', 'timeoutMs']
   for (let wave = 0; wave < WAVES; wave += 1) {

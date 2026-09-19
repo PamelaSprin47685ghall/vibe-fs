@@ -17,7 +17,7 @@ const pkg = (root, name, applies = null) => {
   if (applies !== null) writeFileSync(join(dir, 'APPLIES-TO'), applies, 'utf8')
 }
 
-test('WHAT[REQUIREMENT-GROUNDING-001] discovers requirement packages from the current workspace without a Wanxiangshu package list', () => {
+test('WHAT[requirement-grounding-001] discovers requirement packages from the current workspace without a Wanxiangshu package list', () => {
   const { dir, cleanup } = sandbox()
   try {
     pkg(dir, 'zeta')

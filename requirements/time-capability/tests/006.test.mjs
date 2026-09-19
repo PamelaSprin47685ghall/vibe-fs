@@ -15,7 +15,7 @@ const descriptor = () =>
     source: 'until-signal-or-deadline.test',
   })
 
-test('WHAT[TIME-006] THEOREM_untilSignalOrDeadline_deadline_without_material_is_WaitTimedOut', async () => {
+test('WHAT[time-capability-006] THEOREM_untilSignalOrDeadline_deadline_without_material_is_WaitTimedOut', async () => {
   const registry = causal.createRegistry()
   const timer = process.createVirtualTimer()
   const handle = process.timerDelay(timer, 100)

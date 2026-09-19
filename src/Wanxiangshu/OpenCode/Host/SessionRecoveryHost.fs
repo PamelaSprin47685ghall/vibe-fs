@@ -44,7 +44,7 @@ type SessionRecoveryHost
 
         match event with
         | ChatExecutionRecoveryLifecycleEvent.SessionQuiesced sessionId ->
-            // PAR-023: the obligation is exactly `Accepted ∧ ¬ProviderStarted` for
+            // provider-attempt-recovery-023: the obligation is exactly `Accepted ∧ ¬ProviderStarted` for
             // that session. Executions that already reached the provider belong to
             // the provider recovery owner (or their own terminal projection), and an
             // idle observation must never re-judge them.

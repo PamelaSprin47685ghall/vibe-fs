@@ -1,6 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
-/// JS-native boundary for HOST-BOUNDARY-008: the causal read that binds a
+/// JS-native boundary for host-boundary-008: the causal read that binds a
 /// provider run identity to the unsealed assistant child of one physical user
 /// message.
 ///
@@ -15,7 +15,7 @@ namespace Wanxiangshu.OpenCode
 /// crosses the JS boundary.
 module ProviderRunBindingSurface =
 
-    /// HOST-BOUNDARY-008 causal read: bind the unsealed assistant child of one
+    /// host-boundary-008 causal read: bind the unsealed assistant child of one
     /// physical user message to a provider run identity.
     ///
     /// `messages` is the opaque `ProjectedMessages` handle from

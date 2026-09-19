@@ -140,7 +140,7 @@ const depFailures = (pkg, allNames, skeleton) => {
   return failures
 }
 
-test('WHAT[REQUIREMENT-SYSTEM-002] package identity is the name, not the physical layout', () => {
+test('WHAT[requirement-system-002] package identity is the name, not the physical layout', () => {
   assert.deepEqual(REQUIRED_DOCS, ['WHY.md', 'WHAT.md', 'HOW.md'])
   assert.ok(!existsSync(join(REQUIREMENTS, 'requirement-system/package.toml')), 'no manifest format may enter the tree contract')
 })

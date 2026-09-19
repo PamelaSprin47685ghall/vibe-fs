@@ -48,7 +48,7 @@ const fold = (events) => {
   return change.unwrapFold(result)
 }
 
-test('WHAT[EFFECT-ACCOUNTING-010] typed_effect_facts_replace_the_generic_durable_effect_union', () => {
+test('WHAT[effect-accounting-010] typed_effect_facts_replace_the_generic_durable_effect_union', () => {
   assert.match(FACT_TYPES_SOURCE, /WorktreeCreateRequested/)
   assert.match(FACT_TYPES_SOURCE, /WorktreeCreated/)
   assert.match(FACT_TYPES_SOURCE, /PublishClaimed/)
@@ -67,7 +67,7 @@ const { default: test } = await import("node:test");
 const codec = await import("../../../dist/Persistence/Journal/FactCodecSurface.js");
 
 
-test('WHAT[EFFECT-ACCOUNTING-010] PERSIST_005_pre050_marker_refuses_with_migration_message', () => {
+test('WHAT[effect-accounting-010] PERSIST_005_pre050_marker_refuses_with_migration_message', () => {
   const markers = [
     'FailuresOnCurrentSide',
     'IsDead',

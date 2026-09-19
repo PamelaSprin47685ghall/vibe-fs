@@ -410,7 +410,7 @@ module SessionExecutionBinding =
             | true, binding -> Some binding.Model
             | false, _ -> None)
 
-    /// EMR-010: a managed tool body is downstream of the provider step that
+    /// execution-model-routing-010: a managed tool body is downstream of the provider step that
     /// emitted its exact ProviderRunIdentity. Tool execution may synchronously
     /// wait for descendant provider work (for example output distillation), so
     /// carrying provider capacity across this boundary can deadlock the family.
@@ -470,7 +470,7 @@ module SessionExecutionBinding =
 
     /// HOST-004: Begin a physical provider attempt for the transform boundary.
     /// Combines quiescence begin, execution binding, and model routing step entry.
-    /// Domain decision: managed provider step must have physical user message id (EMR-010).
+    /// Domain decision: managed provider step must have physical user message id (execution-model-routing-010).
     let beginPhysicalProviderAttemptForTransform
         (beginQuiescence: SessionId -> unit)
         (projectionSessionIdOpt: string option)

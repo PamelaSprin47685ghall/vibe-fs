@@ -10,10 +10,10 @@ type ProviderAttemptStopFenceSnapshot =
       Waiting: int
       Denied: int }
 
-/// PAR-022：宿主「已停止自动重试」的 process-local 发送栅栏。
+/// provider-attempt-recovery-022：宿主「已停止自动重试」的 process-local 发送栅栏。
 ///
 /// 精确 key = (SessionId, ProviderRunIdentity)。恢复重投的许可只属于确切的失败
-/// attempt（PAR-021），所以栅栏的观察也只属于它：同 session 的其它 run、迟到的
+/// attempt（provider-attempt-recovery-021），所以栅栏的观察也只属于它：同 session 的其它 run、迟到的
 /// idle、粗粒度的 session.error 都不能满足它。
 ///
 /// 唯一状态转换：

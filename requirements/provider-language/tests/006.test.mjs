@@ -37,23 +37,23 @@ const makeProviderFixture = () => {
   }
 }
 
-test('WHAT[PROVIDER-LANGUAGE-006] locale leaves are en.md and zh-CN.md under the provider root', () => {
+test('WHAT[provider-language-006] locale leaves are en.md and zh-CN.md under the provider root', () => {
   assert.deepEqual(LOCALE_FILES, ['en.md', 'zh-CN.md'])
   assert.equal(PROVIDER_ROOT, 'resources/provider')
 })
-test('WHAT[PROVIDER-LANGUAGE-006] parity detects missing zh-CN leaf', () => {
+test('WHAT[provider-language-006] parity detects missing zh-CN leaf', () => {
   const providerAbs = '/tmp/provider'
   const violations = scanParity(['role/manager'], providerAbs)
   assert.ok(violations.some((v) => v.code === 'missing-en' || v.code === 'missing-zh-cn'))
 })
-test('WHAT[PROVIDER-LANGUAGE-006] parity detects missing en leaf in the real tree', () => {
+test('WHAT[provider-language-006] parity detects missing en leaf in the real tree', () => {
   const violations = scanParity(['role/manager'], resolve(process.cwd(), PROVIDER_ROOT))
   assert.equal(violations.length, 0)
 })
-test('WHAT[PROVIDER-LANGUAGE-006] Host binding only observes raw preference and delegates', () => {
+test('WHAT[provider-language-006] Host binding only observes raw preference and delegates', () => {
   assert.deepEqual(scanProviderLanguageBinding(THIN_HOST_BINDING), [])
 })
-test('WHAT[PROVIDER-LANGUAGE-006] Host English fallback and parser are owner-policy violations', () => {
+test('WHAT[provider-language-006] Host English fallback and parser are owner-policy violations', () => {
   const fallback = scanProviderLanguageBinding(
     `${THIN_HOST_BINDING}\nlet fallback = ProviderLanguage.English`,
   )
@@ -76,7 +76,7 @@ test('WHAT[PROVIDER-LANGUAGE-006] Host English fallback and parser are owner-pol
     },
   ])
 })
-test('WHAT[PROVIDER-LANGUAGE-006] Host preference branches and aliases are owner-policy violations', () => {
+test('WHAT[provider-language-006] Host preference branches and aliases are owner-policy violations', () => {
   const red = scanProviderLanguageBinding(`
 module ProviderLanguageBinding =
     let readGlobalPreference () =
@@ -140,7 +140,7 @@ test.beforeEach(() => {
   clearAllForTests()
 })
 
-test('WHAT[PROVIDER-LANGUAGE-006] require language pair fails closed on missing semantic path', () => {
+test('WHAT[provider-language-006] require language pair fails closed on missing semantic path', () => {
   // 缺 en.md 或 zh-CN.md → 抛错（bound session 缺 localization ≠ 许可换语言）。
   assert.throws(() => requireLanguagePair('role/office-that-does-not-exist'), /missing/)
   // 成对存在的真实资源 → 不抛。

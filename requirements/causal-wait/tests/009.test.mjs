@@ -52,7 +52,7 @@ const mutate = (relativePath, addition) => {
   return mutated
 }
 
-test('WHAT[CAUSAL-009] analyzer rejects a global observer hub in a business workflow', () => {
+test('WHAT[causal-wait-009] analyzer rejects a global observer hub in a business workflow', () => {
   const violations = boundaryGate.analyzeObservationBoundary(
     mutate('Interaction/Dispatch/NewDecision.fs', 'let observer = CausalWaitHub.observer\n'),
   )
@@ -60,7 +60,7 @@ test('WHAT[CAUSAL-009] analyzer rejects a global observer hub in a business work
     'Interaction/Dispatch/NewDecision.fs: diagnostics read capability "CausalWaitHub" is confined to Execution/Session/Wait',
   ])
 })
-test('WHAT[CAUSAL-009] analyzer rejects the Node diagnostic adapter outside composition', () => {
+test('WHAT[causal-wait-009] analyzer rejects the Node diagnostic adapter outside composition', () => {
   const violations = boundaryGate.analyzeObservationBoundary(
     mutate('Interaction/Dispatch/NewDecision.fs', 'let sink = CausalWaitBridge.target workspace\n'),
   )
@@ -91,7 +91,7 @@ const externalProducer = (kind, identity) => causal.externalProducer(kind, ident
 const readDiagnostic = (workspace) =>
   JSON.parse(fs.readFileSync(path.join(workspace, '.wanxiangshu', 'diagnostics', 'causal-waits.json'), 'utf8'))
 
-test('WHAT[CAUSAL-009] CAUSAL_BRIDGE_first_binding_is_stable_and_refreshes_on_lifecycle', () => {
+test('WHAT[causal-wait-009] CAUSAL_BRIDGE_first_binding_is_stable_and_refreshes_on_lifecycle', () => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'causal-runtime-'))
   const redirect = fs.mkdtempSync(path.join(os.tmpdir(), 'causal-redirect-'))
   const registry = causal.createRegistry()
@@ -136,7 +136,7 @@ const requireShard = (projects, shardId) => {
 const relSources = (project) => project.implementationFiles.map((p) => path.relative(ROOT, p)).sort()
 const refShards = (project, projects) => project.references.map((refPath) => projects.get(refPath).shard).sort()
 
-test('WHAT[CAUSAL-009] production inventory separates contract runtime adapter mailbox and proof surface', () => {
+test('WHAT[causal-wait-009] production inventory separates contract runtime adapter mailbox and proof surface', () => {
   const shardInventory = readCompileShardInventory({ repositoryRoot: ROOT })
   const subsystemInventory = buildSubsystemInventory({ compileInventory: shardInventory })
   assert.ok(subsystemInventory.ok, subsystemInventory.violations.join('\n'))
@@ -198,7 +198,7 @@ test('WHAT[CAUSAL-009] production inventory separates contract runtime adapter m
     'proof surface must not provide production capability',
   )
 })
-test('WHAT[CAUSAL-009] causal wait contract excludes registry diagnostics mailbox and proof runtime', () => {
+test('WHAT[causal-wait-009] causal wait contract excludes registry diagnostics mailbox and proof runtime', () => {
   assertPureContract()
   assertEffectIsInjected('console')
 })

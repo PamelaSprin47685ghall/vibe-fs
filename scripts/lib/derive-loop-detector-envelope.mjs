@@ -17,7 +17,7 @@ import {
 
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const halfLife = 256
-// DG-003: empirical quantile envelope. Low-side 97.5% confidence (lower quantile p=0.025)
+// degeneration-guard-003: empirical quantile envelope. Low-side 97.5% confidence (lower quantile p=0.025)
 // and high-side 100% (upper quantile p=1.0, maximum corpus value for random anomaly threshold).
 const lowerQuantileProbability = 0.025
 const upperQuantileProbability = 1.0

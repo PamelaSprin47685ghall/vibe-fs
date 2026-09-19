@@ -27,7 +27,7 @@ const acquire = async (runtime, exact) => {
 }
 const exactKey = ({ sessionId, physicalUserMessageId }) => `${sessionId}\u001f${physicalUserMessageId}`
 
-test('WHAT[EMR-014] valid immutable snapshot is a reconciliation no-op with traceable tokens and waiters', async () => {
+test('WHAT[execution-model-routing-014] valid immutable snapshot is a reconciliation no-op with traceable tokens and waiters', async () => {
   const runtime = routing.createRuntime((_role, running) => (running.length === 0 ? target : null))
   const holder = identity('holder', 'physical-holder')
   const holderLease = await acquire(runtime, holder)
@@ -55,7 +55,7 @@ test('WHAT[EMR-014] valid immutable snapshot is a reconciliation no-op with trac
   assert.throws(() => snapshot.tokens.push({}), TypeError)
   assert.deepEqual(routing.cancelPendingExecution(runtime, 'waiting'), { kind: 'Applied' })
 })
-test('WHAT[EMR-014] duplicate release never decrements twice', async () => {
+test('WHAT[execution-model-routing-014] duplicate release never decrements twice', async () => {
   const runtime = routing.createRuntime(() => target)
   const firstIdentity = identity('session', 'physical-1')
   await acquire(runtime, firstIdentity)
@@ -68,7 +68,7 @@ test('WHAT[EMR-014] duplicate release never decrements twice', async () => {
   assert.equal(duplicate.ledgerEntries.length, 0)
   assert.equal(duplicate.counters.duplicate, released.counters.duplicate + 1)
 })
-test('WHAT[EMR-014] stale fence cannot touch a newer execution', async () => {
+test('WHAT[execution-model-routing-014] stale fence cannot touch a newer execution', async () => {
   const runtime = routing.createRuntime(() => target)
   const firstIdentity = identity('session', 'physical-1')
   const first = await acquire(runtime, firstIdentity)
@@ -81,7 +81,7 @@ test('WHAT[EMR-014] stale fence cannot touch a newer execution', async () => {
   assert.ok(stale.executions.some((owner) => exactKey(owner) === exactKey(secondIdentity)))
   assert.deepEqual(routing.commitExecutionAdmission(runtime, second, secondIdentity), { kind: 'Applied' })
 })
-test('WHAT[EMR-014] opposite terminal transition is a monotonic conflict', async () => {
+test('WHAT[execution-model-routing-014] opposite terminal transition is a monotonic conflict', async () => {
   const runtime = routing.createRuntime(() => target)
   const exact = identity('session', 'physical')
   const lease = await acquire(runtime, exact)
@@ -91,7 +91,7 @@ test('WHAT[EMR-014] opposite terminal transition is a monotonic conflict', async
   const conflict = routing.capacitySnapshot(runtime)
   assert.equal(conflict.counters.conflict, before.counters.conflict + 1)
 })
-test('WHAT[EMR-014] reconciliation fails closed on map ledger divergence without repair', async () => {
+test('WHAT[execution-model-routing-014] reconciliation fails closed on map ledger divergence without repair', async () => {
   const runtime = routing.createRuntime(() => target)
   await acquire(runtime, identity('holder', 'physical-holder'))
   const valid = routing.capacitySnapshot(runtime)
@@ -234,7 +234,7 @@ const observedIdentity = (runtime, lease, record) => ({
   target: routing.executionAdmissionTarget(runtime, lease),
 })
 
-test('WHAT[EMR-014] seeded bounded admission soak preserves fairness and exact reconciliation after every operation', async (context) => {
+test('WHAT[execution-model-routing-014] seeded bounded admission soak preserves fairness and exact reconciliation after every operation', async (context) => {
   const next = seeded(seed)
   let blockedEligible = false
   const runtime = routing.createRuntime((role, running) => {

@@ -11,7 +11,7 @@
 
 dedicated delegate child 的插件是 `ProviderRecoveryWorkflow.continueDelegateCallAfterConfirmedFailure`；
 delegate 只消费 verdict（`Ok unit` 保持调用 pending，`Error reason` 才终结），因此单次瞬态尝试失败
-不再直接失败调用方（DELEG-023）。
+不再直接失败调用方（delegation-023）。
 
 ### Failure budget algebra and single writer
 
@@ -101,7 +101,7 @@ delegate 只消费 verdict（`Ok unit` 保持调用 pending，`Error reason` 才
    Squash/repair success writes no SuccessRecorded; only WorkMain/BloggerMain
    success clears the failure count.
 8. **Identity isolation and target settlement**: budget advance spends budget
-   and settles the failed physical target under PAR-021 — the first failure
+   and settles the failed physical target under provider-attempt-recovery-021 — the first failure
    keeps the provider and binds the session's next fresh admission to the
    failed target for the LWR-replaced retry; only a failed LWR retry poisons
    the provider and the following dispatch rotates. It never changes identity.
@@ -134,7 +134,7 @@ delegate 只消费 verdict（`Ok unit` 保持调用 pending，`Error reason` 才
     resource recovery never starts provider recovery and never publishes a
     lazy requeue.
 
-12. **PAR-008 routing — unusable content is repair, not a provider failure**:
+12. **provider-attempt-recovery-008 routing — unusable content is repair, not a provider failure**:
     an attempt that reports an error while its formal visible text is unusable
     (empty / XML-only, the shared `TerminalValidity` gate) is content damage.
     `Interaction/Repair/CompletedTurn.fs` (`classifyErroredContent`) keeps it on
@@ -150,7 +150,7 @@ delegate 只消费 verdict（`Ok unit` 保持调用 pending，`Error reason` 才
     still terminalizes with the policy owning retry vs terminal, so ordinary
     provider fallback is unchanged.
 
-13. **PAR-021 target settlement — one rule for every recovery entry**: the
+13. **provider-attempt-recovery-021 target settlement — one rule for every recovery entry**: the
     settlement runs inside `Retry.attempt`'s licensed redispatch (the single
     engine shared by the ordinary turn path, Blogger recovery and dedicated
     SyncDelegate children), after the durable prompt claim proved this
@@ -160,7 +160,7 @@ delegate 只消费 verdict（`Ok unit` 保持调用 pending，`Error reason` 才
     provider run is the exact run that established that request's durable
     `ProviderStarted` (one physical message drives several provider steps, so
     a later step of a successful retry episode is not the LWR retry itself) —
-    and settles the exact failed witness (EMR-006/EMR-017) once: an LWR
+    and settles the exact failed witness (execution-model-routing-006/execution-model-routing-017) once: an LWR
     retry's own failure condemns
     its provider (`ModelRouting.CondemnFailedTarget`), every other failure
     keeps the provider and binds the session's next fresh admission to the
@@ -189,7 +189,7 @@ value; `Fallback/ProviderFailureSurface.fs` folds real durable facts behind
 an opaque projection handle and projects only the logical run, authority
 root, failure count, dedupe cardinality and exhaustion. The surface exposes
 no continuation, next action, or physical send power.
-PAR-020's exact production-bound proof replays the same facts to the same
+provider-attempt-recovery-020's exact production-bound proof replays the same facts to the same
 restricted view; flow permission stays with `RetryPolicy` and the typed
 failure policy.
 
@@ -205,5 +205,5 @@ DEPENDS ON:
 
 ## GAP
 
-- `PAR-017` / `PAR-023`（CLOSED）：Blogger 重试替换确切物理绑定与已接受但未 ProviderStarted 执行的显式义务已闭合，落点 `tests/017.test.mjs` 与 `tests/023.test.mjs`。
+- `provider-attempt-recovery-017` / `provider-attempt-recovery-023`（CLOSED）：Blogger 重试替换确切物理绑定与已接受但未 ProviderStarted 执行的显式义务已闭合，落点 `tests/017.test.mjs` 与 `tests/023.test.mjs`。
 

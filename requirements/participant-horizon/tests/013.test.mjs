@@ -10,7 +10,7 @@ const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
 const LOCALES = ['en', 'zh-CN']
 
-test('WHAT[PARTICIPANT-HORIZON-013] warm_start_material_is_labelled_orientation_data_not_instruction', () => {
+test('WHAT[participant-horizon-013] warm_start_material_is_labelled_orientation_data_not_instruction', () => {
   for (const locale of LOCALES) {
     const envelope = read(`resources/provider/lifecycle/warm-start/charge-envelope/${locale}.md`)
     assert.match(

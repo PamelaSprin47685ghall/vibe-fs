@@ -4,7 +4,7 @@ import * as calibration from '../../../dist/OpenCode/Host/PairProgrammingCalibra
 
 const { renderToolEstimate } = calibration
 
-test('WHAT[COGNITIVE-ENVIRONMENT-014] CE_014_tool_estimate_is_explicitly_advisory_in_both_provider_languages', () => {
+test('WHAT[cognitive-environment-014] CE_014_tool_estimate_is_explicitly_advisory_in_both_provider_languages', () => {
   const en = renderToolEstimate('English', 4)
   assert.match(en, /4/)
   assert.match(en, /delegator|commissioner/i)

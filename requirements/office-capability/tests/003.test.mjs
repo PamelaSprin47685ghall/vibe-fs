@@ -3,7 +3,7 @@ import test from 'node:test'
 import * as office from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 import { assertJsData } from '../../verification-system/tests/support/js-contract.mjs'
 
-test('WHAT[OFF-003] office authority is immutable and invariant across persona tiers and composite names', () => {
+test('WHAT[office-capability-003] office authority is immutable and invariant across persona tiers and composite names', () => {
   // 1. Immutable authority per canonical role: Engineer permissions are exact and invariant
   const engineerPermissions = office.permissions('engineer')
   assert.deepEqual(
@@ -28,7 +28,7 @@ test('WHAT[OFF-003] office authority is immutable and invariant across persona t
   assert.equal(office.isAllowed('fast-devops', 'Exec'), false)
 })
 
-test('WHAT[OFF-003] office_permission_surface_matches_the_canonical_roles_matrix', () => {
+test('WHAT[office-capability-003] office_permission_surface_matches_the_canonical_roles_matrix', () => {
   const matrix = [
     ['manager', ['Finality', 'Fork', 'Horizon', 'Join', 'Resume', 'ReviewAssessment', 'TodoWrite']],
     ['orchestrator', ['Fork', 'Horizon', 'Join']],
@@ -50,7 +50,7 @@ test('WHAT[OFF-003] office_permission_surface_matches_the_canonical_roles_matrix
   assert.deepEqual(office.permissions('distiller'), [], 'retired role fails closed to empty set')
 })
 
-test('WHAT[OFF-003] office_permission_surface_denies_outside_the_matrix', () => {
+test('WHAT[office-capability-003] office_permission_surface_denies_outside_the_matrix', () => {
   // Engineer permissions
   assert.equal(office.isAllowed('engineer', 'Fission'), true, 'Engineer has Fission')
   assert.equal(office.isAllowed('engineer', 'Read'), true, 'Engineer has Read')

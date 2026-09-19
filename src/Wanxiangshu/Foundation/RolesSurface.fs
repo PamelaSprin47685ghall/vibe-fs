@@ -2,7 +2,7 @@ namespace Wanxiangshu.Foundation
 
 /// JS-native semantic surface for participant identity. Role
 /// crosses the boundary as canonical wire labels; JS callers never touch
-/// Fable representation (JS-SEMANTIC-SURFACE-003/005).
+/// Fable representation (js-semantic-surface-003/005).
 module RolesSurface =
 
     let private labelsOf (predicate: Role -> bool) : string array =

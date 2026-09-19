@@ -64,5 +64,5 @@ Already terminal:
 
 ## GAP
 
-- `EXECFAIL-009` / `EXECFAIL-011` / `EXECFAIL-012` / `EXECFAIL-013`（CLOSED）：Host 错误边界不做失败分类、未分类 Hook 失败携带证据、StopPhysicalRun 先落 admission barrier 与 unhandled fatal 分支生命周期分解已闭合，落点 `tests/009.test.mjs`、`tests/011.test.mjs`、`tests/012.test.mjs` 与 `tests/013.test.mjs`。
+- `execution-failure-policy-009` / `execution-failure-policy-011` / `execution-failure-policy-012` / `execution-failure-policy-013`（CLOSED）：Host 错误边界不做失败分类、未分类 Hook 失败携带证据、StopPhysicalRun 先落 admission barrier 与 unhandled fatal 分支生命周期分解已闭合，落点 `tests/009.test.mjs`、`tests/011.test.mjs`、`tests/012.test.mjs` 与 `tests/013.test.mjs`。
 

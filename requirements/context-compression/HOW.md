@@ -60,7 +60,7 @@ validity 证明共同落在同一个 closure 上。
 
 ## GAP
 
-- CONTEXT-COMPRESSION-017/020：`ctx-opening-floor.test.mjs` 证明 pre/post-T1 floor 等价与 todo round retention 纯判定；`provider-projection/tests/projection.test.mjs` 证明真实 Y prefix write-back 越过 `todowrite` 时 call/result 仍以原始 X Host 消息存在。CLOSED。
-- CONTEXT-COMPRESSION-021/022：失败本地 Y retry 与唯一 `BloggerMainContext` 已进入 production graph；`BloggerRetryPolicy` 纯材料分派与 `ProviderFailureProjection` newest-covers 去重已取代旧等待未来 X 的入口。CLOSED。
-- CONTEXT-COMPRESSION-023：park 与 recovery wait 均只由 typed/durable event 推动；correctness path 无 timer/deadline/timeout。CLOSED。
-- CONTEXT-COMPRESSION-024：同一 Blogger 的 materialize / bind / abandon 已由跨 plugin instance admission 串行；normal start 在 admission 内重检 exact shared flight ownership，retry 对 foreign flight fail-before-write；进程重启不重建本地 repair episode。flight claim / release 均 RequestId-aware，拒绝跨 owner 覆盖或删除。terminal→request owner fence 由 `BloggerRequestOwnership` 统一判定，并以 assistant `parentID → PhysicalUserMessageId → PromptAuthority accepted dispatch → durable open RequestId/PromptKey` 为证据；旧 terminal 已被新 RequestId 取代时为 `Superseded`，Enforcer continuation 与 reconciled-idle repair 均 no-op，不消费或改写新 owner。CLOSED。
+- context-compression-017/context-compression-020：`ctx-opening-floor.test.mjs` 证明 pre/post-T1 floor 等价与 todo round retention 纯判定；`provider-projection/tests/projection.test.mjs` 证明真实 Y prefix write-back 越过 `todowrite` 时 call/result 仍以原始 X Host 消息存在。CLOSED。
+- context-compression-021/context-compression-022：失败本地 Y retry 与唯一 `BloggerMainContext` 已进入 production graph；`BloggerRetryPolicy` 纯材料分派与 `ProviderFailureProjection` newest-covers 去重已取代旧等待未来 X 的入口。CLOSED。
+- context-compression-023：park 与 recovery wait 均只由 typed/durable event 推动；correctness path 无 timer/deadline/timeout。CLOSED。
+- context-compression-024：同一 Blogger 的 materialize / bind / abandon 已由跨 plugin instance admission 串行；normal start 在 admission 内重检 exact shared flight ownership，retry 对 foreign flight fail-before-write；进程重启不重建本地 repair episode。flight claim / release 均 RequestId-aware，拒绝跨 owner 覆盖或删除。terminal→request owner fence 由 `BloggerRequestOwnership` 统一判定，并以 assistant `parentID → PhysicalUserMessageId → PromptAuthority accepted dispatch → durable open RequestId/PromptKey` 为证据；旧 terminal 已被新 RequestId 取代时为 `Superseded`，Enforcer continuation 与 reconciled-idle repair 均 no-op，不消费或改写新 owner。CLOSED。

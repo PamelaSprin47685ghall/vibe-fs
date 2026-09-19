@@ -32,7 +32,7 @@ const families = parentAgents.flatMap((parentAgent) =>
   schedule: validPermutations[index % validPermutations.length],
 }))
 
-test('WHAT[VERIFICATION-SYSTEM-007] deterministic families preserve replay, restart, identity, and fence laws', async () => {
+test('WHAT[verification-system-007] deterministic families preserve replay, restart, identity, and fence laws', async () => {
   assert.equal(families.length, 32)
   assert.deepEqual(new Set(families.map(({ parentAgent }) => parentAgent)), new Set(parentAgents))
   assert.deepEqual(new Set(families.map(({ childAgent }) => childAgent)), new Set(childAgents))
@@ -68,7 +68,7 @@ const { default: test } = await import("node:test");
 const { defaultFamily, operations, permutations, prerequisites, runInterleaving, validPermutations } = await import("./support/identity-capacity-interleaving.mjs");
 
 
-test('WHAT[VERIFICATION-SYSTEM-007] executes every valid identity/admission/capacity causal interleaving', async () => {
+test('WHAT[verification-system-007] executes every valid identity/admission/capacity causal interleaving', async () => {
   assert.deepEqual(operations, [
     'parent accepted',
     'child dispatched',
@@ -122,7 +122,7 @@ const advanceAgentFact = (run, count) => ({
 })
 const providerFailureOf = (projection) => projection?.sessions?.[SESSION_A]?.providerFailures
 
-test('WHAT[VERIFICATION-SYSTEM-007] deterministic queue enumerates races explicitly', () => {
+test('WHAT[verification-system-007] deterministic queue enumerates races explicitly', () => {
   const a = ['A1', 'A2']
   const b = ['B1']
   const interleavings = DeterministicEventQueue.interleavings(a, b)
@@ -134,7 +134,7 @@ test('WHAT[VERIFICATION-SYSTEM-007] deterministic queue enumerates races explici
   assert.equal(permutations.length, 6)
   for (const permutation of permutations) assert.deepEqual([...permutation].sort(), ['A', 'B', 'C'])
 })
-test('WHAT[VERIFICATION-SYSTEM-007] completion source order is explicit', async () => {
+test('WHAT[verification-system-007] completion source order is explicit', async () => {
   const source = new DeterministicCompletionSource()
   const firstEntry = source.enqueue()
   const secondEntry = source.enqueue()
@@ -146,7 +146,7 @@ test('WHAT[VERIFICATION-SYSTEM-007] completion source order is explicit', async 
   assert.equal(second, 'second')
   assert.equal(source.pendingCount, 0)
 })
-test('WHAT[VERIFICATION-SYSTEM-007] runTrace advances clock and appends durably', async () => {
+test('WHAT[verification-system-007] runTrace advances clock and appends durably', async () => {
   const world = await createDurableWorld({ directory: 'temporal-runtrace', runtime: 'rt_trace', pid: 4242 })
 
   let fired = 0
@@ -171,7 +171,7 @@ test('WHAT[VERIFICATION-SYSTEM-007] runTrace advances clock and appends durably'
   assert.equal(providerFailure.failures, 1)
   world.dispose()
 })
-test('WHAT[VERIFICATION-SYSTEM-007] recorded provider port replays in enqueued order', async () => {
+test('WHAT[verification-system-007] recorded provider port replays in enqueued order', async () => {
   const port = createRecordedProviderPort()
   port.enqueue({ text: 'first' })
   port.enqueue({ text: 'second' })
@@ -182,7 +182,7 @@ test('WHAT[VERIFICATION-SYSTEM-007] recorded provider port replays in enqueued o
   assert.deepEqual(second, { text: 'second' })
   assert.equal(port.pendingCount, 0)
 })
-test('WHAT[VERIFICATION-SYSTEM-007] journal release drains accepted append prefix and rejects later admission', async () => {
+test('WHAT[verification-system-007] journal release drains accepted append prefix and rejects later admission', async () => {
   const result = await temporal.writerReleaseDrainScenario()
   assert.deepEqual(result, {
     acceptedPrefix: 'Committed',
@@ -192,7 +192,7 @@ test('WHAT[VERIFICATION-SYSTEM-007] journal release drains accepted append prefi
     duringClose: 'WriterClosing',
   })
 })
-test('WHAT[VERIFICATION-SYSTEM-007] journal poison preserves the first physical failure and stops storage traffic', async () => {
+test('WHAT[verification-system-007] journal poison preserves the first physical failure and stops storage traffic', async () => {
   const result = await temporal.writerPoisonPreservesFirstFailureScenario()
   assert.deepEqual(result, {
     appendCalls: 2,
@@ -200,7 +200,7 @@ test('WHAT[VERIFICATION-SYSTEM-007] journal poison preserves the first physical 
     second: 'WriterPoisoned:append failed: disk exploded',
   })
 })
-test('WHAT[VERIFICATION-SYSTEM-007] reconcile shutdown closes admission and waits for the running pass', async () => {
+test('WHAT[verification-system-007] reconcile shutdown closes admission and waits for the running pass', async () => {
   const result = await temporal.reconcileSchedulerStopDrainScenario()
   assert.deepEqual(result, {
     blockedOnRunningPass: true,
@@ -209,14 +209,14 @@ test('WHAT[VERIFICATION-SYSTEM-007] reconcile shutdown closes admission and wait
     snapshotReads: 1,
   })
 })
-test('WHAT[VERIFICATION-SYSTEM-007] poisoned durable substrate rejects new reconcile admission', async () => {
+test('WHAT[verification-system-007] poisoned durable substrate rejects new reconcile admission', async () => {
   const result = await temporal.reconcileSchedulerDurableUnavailableScenario()
   assert.deepEqual(result, {
     rejectedWhileFirstPassBlocked: true,
     snapshotReads: 1,
   })
 })
-test('WHAT[VERIFICATION-SYSTEM-007] plugin scope drains reconcile and admitted Host work before disposal', async () => {
+test('WHAT[verification-system-007] plugin scope drains reconcile and admitted Host work before disposal', async () => {
   const result = await temporal.pluginScopeStopDrainScenario()
   assert.deepEqual(result, {
     blockedBeforeRelease: true,
@@ -227,7 +227,7 @@ test('WHAT[VERIFICATION-SYSTEM-007] plugin scope drains reconcile and admitted H
     stillWaitingForOwnedWork: true,
   })
 })
-test('WHAT[VERIFICATION-SYSTEM-007] plugin scope preserves detached background failure instead of swallowing it', async () => {
+test('WHAT[verification-system-007] plugin scope preserves detached background failure instead of swallowing it', async () => {
   const result = await temporal.pluginScopeBackgroundFailureScenario()
   assert.deepEqual(result, {
     error: 'background exploded',

@@ -12,7 +12,7 @@ const readLaw = (semanticPath, locale) => readFileSync(join(providerRoot, semant
 
 const LOCALES = ['en', 'zh-CN']
 
-test('WHAT[REPOSITORY-INVESTIGATION-004] INVESTIGATE_inspector_role_law_has_evidence_funnel_and_stop_rule', () => {
+test('WHAT[repository-investigation-004] INVESTIGATE_inspector_role_law_has_evidence_funnel_and_stop_rule', () => {
   for (const locale of LOCALES) {
     const law = readLaw('role/engineer', locale)
     assert.match(law, /cheapest adequate observation|最便宜的充分观察/, `${locale} cheapest adequate observation`)

@@ -65,7 +65,7 @@ const profileOf = () => {
   return built.value
 }
 
-test('WHAT[DISPATCH-PROTOCOL-001] DP_001_every_send_member_lives_on_the_prompt_dispatcher_runtime', () => {
+test('WHAT[dispatch-protocol-001] DP_001_every_send_member_lives_on_the_prompt_dispatcher_runtime', () => {
   const surface = dispatch.sendMemberObservation()
   assert.ok(surface.members.length >= 6, `send surface must exist, got ${surface.members.length}`)
   for (const name of surface.members) {

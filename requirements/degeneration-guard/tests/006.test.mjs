@@ -46,7 +46,7 @@ async function checkInventoryAvailability(warehouseId, skuList) {
 }
 `
 
-test('WHAT[DG-006] LOOP_005_two_detectors_are_independent_attempts', () => {
+test('WHAT[degeneration-guard-006] LOOP_005_two_detectors_are_independent_attempts', () => {
   const a = loopDetector.create()
   const b = loopDetector.create()
 
@@ -114,7 +114,7 @@ const rawDeltaWithoutMessage = (session, field, text) => ({
   },
 })
 
-test('WHAT[DG-006] LOOP_006_attempt_reset_preserves_armed_cause_until_reconcile', async () => {
+test('WHAT[degeneration-guard-006] LOOP_006_attempt_reset_preserves_armed_cause_until_reconcile', async () => {
   const aborts = []
   const sensor = createSensor({
     owned: ['ses_idle'],
@@ -134,7 +134,7 @@ test('WHAT[DG-006] LOOP_006_attempt_reset_preserves_armed_cause_until_reconcile'
     anomaly: 'TooRepetitive',
   })
 })
-test('WHAT[DG-006] LOOP_015_drop_session_cleans_active_tasks_and_detectors', async () => {
+test('WHAT[degeneration-guard-006] LOOP_015_drop_session_cleans_active_tasks_and_detectors', async () => {
   const sensor = createSensor({
     owned: ['ses_drop'],
     abort: () => ({ ok: true }),

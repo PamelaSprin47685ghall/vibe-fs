@@ -7,6 +7,6 @@ const managedAgentConfig = readFileSync(
   'utf8',
 )
 
-test('WHAT[HOSTFAIL-002] Host retry zero is a literal ownership rule rather than a positive retry budget', () => {
+test('WHAT[host-provider-failure-ownership-002] Host retry zero is a literal ownership rule rather than a positive retry budget', () => {
   assert.doesNotMatch(managedAgentConfig, /chatMaxRetries[^\n]*(?:1|2|3|4|5|6|7|8|9)/)
 })

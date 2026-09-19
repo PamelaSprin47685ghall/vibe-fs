@@ -17,7 +17,7 @@ const ACTIVE_ROLES = Object.freeze([
   'bookkeeper',
 ])
 
-test('WHAT[PROVIDER-LANGUAGE-010] PL_010_role_law_semantic_anchors_match_across_languages', () => {
+test('WHAT[provider-language-010] PL_010_role_law_semantic_anchors_match_across_languages', () => {
   for (const role of ACTIVE_ROLES) {
     const enPath = `resources/provider/role/${role}/en.md`
     const zhPath = `resources/provider/role/${role}/zh-CN.md`

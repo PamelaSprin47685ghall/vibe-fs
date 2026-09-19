@@ -22,7 +22,7 @@ async function withTempRepo(fn) {
   }
 }
 
-test('WHAT[VERIFICATION-SYSTEM-015] E1: prose decoy does not register as domain fact case', async () => {
+test('WHAT[verification-system-015] E1: prose decoy does not register as domain fact case', async () => {
   await withTempRepo(async ({ eventsDir }) => {
     const observer = createJournalObserver({
       readFiles: () => {
@@ -70,7 +70,7 @@ test('WHAT[VERIFICATION-SYSTEM-015] E1: prose decoy does not register as domain 
   });
 });
 
-test('WHAT[VERIFICATION-SYSTEM-015] E2: UTF-8 and trailing line chunking waits for complete line before committing', async () => {
+test('WHAT[verification-system-015] E2: UTF-8 and trailing line chunking waits for complete line before committing', async () => {
   await withTempRepo(async ({ eventsDir }) => {
     const observer = createJournalObserver({
       readFiles: () => {
@@ -127,7 +127,7 @@ test('WHAT[VERIFICATION-SYSTEM-015] E2: UTF-8 and trailing line chunking waits f
   });
 });
 
-test('WHAT[VERIFICATION-SYSTEM-015] E3: complete line with invalid JSON or identity collision fails closed', async () => {
+test('WHAT[verification-system-015] E3: complete line with invalid JSON or identity collision fails closed', async () => {
   await withTempRepo(async ({ eventsDir }) => {
     const getObserver = () => createJournalObserver({
       readFiles: () => {
@@ -176,7 +176,7 @@ test('WHAT[VERIFICATION-SYSTEM-015] E3: complete line with invalid JSON or ident
   });
 });
 
-test('WHAT[VERIFICATION-SYSTEM-015] E4: file identity replacement and prefix truncation fail closed', async () => {
+test('WHAT[verification-system-015] E4: file identity replacement and prefix truncation fail closed', async () => {
   await withTempRepo(async ({ eventsDir }) => {
     const getObserver = () => createJournalObserver({
       readFiles: () => {
@@ -218,7 +218,7 @@ test('WHAT[VERIFICATION-SYSTEM-015] E4: file identity replacement and prefix tru
   });
 });
 
-test('WHAT[VERIFICATION-SYSTEM-015] multi-writer interleaving, subscription and close semantics', async () => {
+test('WHAT[verification-system-015] multi-writer interleaving, subscription and close semantics', async () => {
   await withTempRepo(async ({ eventsDir }) => {
     const observer = createJournalObserver({
       readFiles: () => {

@@ -7,33 +7,33 @@ const child = await import("../../../dist/Execution/Delegation/Fork/ChildRecover
 
 const event = (kind, extra = {}) => ({ kind, ...extra })
 
-test('WHAT[CRASH-001] CRASH_JOIN_abort_observation_never_becomes_completion', () => {
+test('WHAT[crash-reconciliation-001] CRASH_JOIN_abort_observation_never_becomes_completion', () => {
   const result = child.resolve('active', 'missing', ['aborted:transport'], '')
   assert.equal(result.result, 'RecoveryIncomplete')
   assert.notEqual(result.result, 'RecoveredTerminal')
   assert.notEqual(result.result, 'RecoveredAbandoned')
 })
-test('WHAT[CRASH-001] CRASH_JOIN_durable_abandoned_is_terminal_abandonment', () => {
+test('WHAT[crash-reconciliation-001] CRASH_JOIN_durable_abandoned_is_terminal_abandonment', () => {
   const result = child.resolve('abandoned', 'missing', [], '')
   assert.equal(result.result, 'RecoveredAbandoned')
 })
-test('WHAT[CRASH-001] CRASH_JOIN_parent_cancelled_abandons_missing_child', () => {
+test('WHAT[crash-reconciliation-001] CRASH_JOIN_parent_cancelled_abandons_missing_child', () => {
   assert.equal(child.resolve('active', 'missing', ['parent-cancelled'], '').result, 'RecoveredAbandoned')
 })
-test('WHAT[CRASH-001] CRASH_JOIN_active_child_is_recovered_active_not_incomplete', () => {
+test('WHAT[crash-reconciliation-001] CRASH_JOIN_active_child_is_recovered_active_not_incomplete', () => {
   assert.equal(child.resolve('active', 'active', ['active'], '').result, 'RecoveredActive')
 })
-test('WHAT[CRASH-001] CRASH_JOIN_restore_in_flight_remains_incomplete_without_permit', () => {
+test('WHAT[crash-reconciliation-001] CRASH_JOIN_restore_in_flight_remains_incomplete_without_permit', () => {
   assert.equal(child.resolve('active', 'missing', ['restore'], '').result, 'RecoveryIncomplete')
 })
-test('WHAT[CRASH-001] CRASH_JOIN_unreadable_snapshot_remains_incomplete', () => {
+test('WHAT[crash-reconciliation-001] CRASH_JOIN_unreadable_snapshot_remains_incomplete', () => {
   assert.equal(child.resolve('active', 'unreadable', [], '').result, 'RecoveryIncomplete')
 })
-test('WHAT[CRASH-001] CRASH_JOIN_terminal_proof_is_joinable_only_with_body', () => {
+test('WHAT[crash-reconciliation-001] CRASH_JOIN_terminal_proof_is_joinable_only_with_body', () => {
   assert.deepEqual(child.provenTerminal('body'), { ok: true, finality: 'Succeeded', body: 'body' })
   assert.equal(child.provenTerminal('').ok, false)
 })
-test('WHAT[CRASH-001] CRASH_JOIN_return_requires_proof_before_commit', () => {
+test('WHAT[crash-reconciliation-001] CRASH_JOIN_return_requires_proof_before_commit', () => {
   assert.equal(child.trace([
     event('TerminalProofIssued', { agent: 'a1' }),
     event('HandleCompletionCommitted', { agent: 'a1' }),
@@ -69,7 +69,7 @@ async function scenario(mode) {
   }
 }
 
-test('WHAT[MANAGED-SESSION-001] managed_child_effect_reconciliation_classifies_missing_matching_and_conflicting_evidence', () => {
+test('WHAT[managed-session-lifecycle-001] managed_child_effect_reconciliation_classifies_missing_matching_and_conflicting_evidence', () => {
   assert.deepEqual(AttachmentSurface.classifyObservation('missing'), {
     observation: 'missing',
     decision: 'Create',
@@ -86,7 +86,7 @@ test('WHAT[MANAGED-SESSION-001] managed_child_effect_reconciliation_classifies_m
     children: ['host-child-existing', 'host-child-conflict'],
   })
 })
-test('WHAT[MANAGED-SESSION-001] SyncDelegate adapter reconciles managed child effects through the Host boundary', async () => {
+test('WHAT[managed-session-lifecycle-001] SyncDelegate adapter reconciles managed child effects through the Host boundary', async () => {
   const adopted = await scenario('matching')
   assert.deepEqual(adopted.listedFamilies, ['host-family-root'])
   assert.equal(adopted.createCount, 0)
@@ -122,7 +122,7 @@ test('WHAT[MANAGED-SESSION-001] SyncDelegate adapter reconciles managed child ef
     'sync delegate child observation failed for host-family-root: controlled ListChildren rejection',
   )
 })
-test('WHAT[MANAGED-SESSION-001] same-family delegates are adopted only for the exact reuse scope', async () => {
+test('WHAT[managed-session-lifecycle-001] same-family delegates are adopted only for the exact reuse scope', async () => {
   const result = await scenario('other-scope')
 
   assert.deepEqual(result.listedFamilies, ['host-family-root'])
@@ -134,7 +134,7 @@ test('WHAT[MANAGED-SESSION-001] same-family delegates are adopted only for the e
   assert.equal(result.child, 'host-child-created-exact-scope')
   assert.equal(result.error, '')
 })
-test('WHAT[MANAGED-SESSION-001] concurrent GetOrCreate serializes reconciliation and shares one child', async () => {
+test('WHAT[managed-session-lifecycle-001] concurrent GetOrCreate serializes reconciliation and shares one child', async () => {
   const result = await SyncDelegateSurface.concurrentAttachedGetOrCreateScenario()
 
   assert.equal(result.observeCount, 1)
@@ -153,7 +153,7 @@ const S = 'ses-q'
 const accepted = { accepted: true, failure: null }
 const rejected = (failure) => ({ accepted: false, failure })
 
-test('WHAT[CRASH-001] Q07_restart_gate_holds_no_permit', () => {
+test('WHAT[crash-reconciliation-001] Q07_restart_gate_holds_no_permit', () => {
   const before = quiescence.create()
   quiescence.beginAttempt(before, S)
   const oldPermit = quiescence.observeIdle(before, S)
@@ -163,7 +163,7 @@ test('WHAT[CRASH-001] Q07_restart_gate_holds_no_permit', () => {
   const after = quiescence.create()
   assert.deepEqual(quiescence.tryConsume(after, oldPermit), rejected('WrongOwner'), 'restart must not inherit idle truth')
 })
-test('WHAT[CRASH-001] Q08_restart_or_unknown_idle_cannot_mint_new_send_authority', () => {
+test('WHAT[crash-reconciliation-001] Q08_restart_or_unknown_idle_cannot_mint_new_send_authority', () => {
   const restarted = quiescence.create()
   const historicalIdle = quiescence.observeIdle(restarted, S)
   assert.deepEqual(

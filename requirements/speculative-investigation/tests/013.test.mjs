@@ -14,7 +14,7 @@ const branch = (source, start, end) => {
   return source.slice(from, to)
 }
 
-test('WHAT[SPEC-INV-013] SPEC_INV_013_DryRun_owner_path_starts_shadow_and_does_not_await_replica_terminal', async () => {
+test('WHAT[speculative-investigation-013] SPEC_INV_013_DryRun_owner_path_starts_shadow_and_does_not_await_replica_terminal', async () => {
   const source = await read('src/Wanxiangshu/Strength/OpenCode/Speculate.fs')
   const dry = branch(source, '| StrengthRolloutMode.DryRun ->', '| StrengthRolloutMode.Off ->')
 
@@ -23,7 +23,7 @@ test('WHAT[SPEC-INV-013] SPEC_INV_013_DryRun_owner_path_starts_shadow_and_does_n
   assert.doesNotMatch(dry, /StrengthCandidatePrepared|PublishPrepared|renderCandidate/)
   assert.doesNotMatch(dry, /StrengthCandidatePromoted|Promoted/)
 })
-test('WHAT[SPEC-INV-013] SPEC_INV_013_DryRun_runtime_creates_a_real_visible_attached_child_then_observes_it_independently', async () => {
+test('WHAT[speculative-investigation-013] SPEC_INV_013_DryRun_runtime_creates_a_real_visible_attached_child_then_observes_it_independently', async () => {
   const source = await read('src/Wanxiangshu/Strength/Replica/Runtime.fs')
   const start = source.indexOf('member this.StartDryRun')
   assert.ok(start >= 0, 'runtime must expose a distinct StartDryRun capability')
@@ -49,7 +49,7 @@ test('WHAT[SPEC-INV-013] SPEC_INV_013_DryRun_runtime_creates_a_real_visible_atta
   assert.match(observe, /let!\s+_\s*=\s*state\.Completion\.Task/)
   assert.doesNotMatch(observe, /Delay|deadline|timeout|TimedOut/i)
 })
-test('WHAT[SPEC-INV-013] SPEC_INV_013_DryRun_terminal_only_ends_observation_and_owner_cancel_still_cascades', async () => {
+test('WHAT[speculative-investigation-013] SPEC_INV_013_DryRun_terminal_only_ends_observation_and_owner_cancel_still_cascades', async () => {
   const runtime = await read('src/Wanxiangshu/Strength/Replica/Runtime.fs')
   const observer = await read('src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs')
   const strengthPorts = await read('src/Wanxiangshu/OpenCode/Plugin/PluginStrengthPorts.fs')
@@ -57,7 +57,7 @@ test('WHAT[SPEC-INV-013] SPEC_INV_013_DryRun_terminal_only_ends_observation_and_
   assert.match(runtime, /AbortSession/)
   assert.match(runtime, /CloseDryRunAtTargetTerminal/)
   assert.match(runtime, /dryRunStateAtTargetTerminal[\s\S]*TargetProviderRun = turn\.ProviderRun[\s\S]*StrengthReplicaPurpose\.DryRun/)
-  // SPEC-INV-013: HostTurnObserver delegates pre-turn replica arbitration via handlePreTurn
+  // speculative-investigation-013: HostTurnObserver delegates pre-turn replica arbitration via handlePreTurn
   // before any other business observation is admitted.
   assert.match(
     observer,
@@ -71,7 +71,7 @@ test('WHAT[SPEC-INV-013] SPEC_INV_013_DryRun_terminal_only_ends_observation_and_
   assert.doesNotMatch(dry, /HostMessageProjection\.replaceMessagesInPlace/)
   assert.doesNotMatch(dry, /TripStrengthFuse\([^)]*TimedOut/i)
 })
-test('WHAT[SPEC-INV-013] SPEC_INV_013_DryRun_visibility_is_not_a_fake_diagnostic_only_path', async () => {
+test('WHAT[speculative-investigation-013] SPEC_INV_013_DryRun_visibility_is_not_a_fake_diagnostic_only_path', async () => {
   const runtime = await read('src/Wanxiangshu/Strength/Replica/Runtime.fs')
   const host = await read('src/Wanxiangshu/Strength/OpenCode/Speculate.fs')
 
@@ -139,7 +139,7 @@ const attach = (replica, budget, purpose = 'Treatment', owner = 'owner') => {
 const turn = (sessionId, outcome, providerRun = 'run-t') => ({ sessionId, providerRun, outcome, parts: [] })
 const oneBatch = (replica) => ({ messages: [user('u1', replica, [hostText('Continue.')]), assistant('a1', replica, [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')])] })
 
-test('WHAT[SPEC-INV-013] STRENGTH_013_dry_run_closes_only_at_the_exact_owner_target_run', async () => {
+test('WHAT[speculative-investigation-013] STRENGTH_013_dry_run_closes_only_at_the_exact_owner_target_run', async () => {
   const handle = Strength.replicaRuntimeCreate(65536)
   const attached = Strength.replicaAttach(handle, replicaBinding('owner-dry', 'replica-dry', 'dec-dry', 'K1'), 'DryRun')
   assert.equal(attached.ok, true, attached.error)

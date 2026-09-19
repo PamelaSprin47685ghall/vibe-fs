@@ -54,7 +54,7 @@ const withJournal = async (prefix, writer, runtime, body) => {
   }
 }
 
-test('WHAT[EFFECT-ACCOUNTING-011] Adapter Todo Host Before executor After commits exact checkpoint and recovery does not repeat mutation', async () => {
+test('WHAT[effect-accounting-011] Adapter Todo Host Before executor After commits exact checkpoint and recovery does not repeat mutation', async () => {
   await withJournal('wxs-todo-host-adapter-', 'writer-todo-host', 'rt-todo-host', async (handle) => {
     const session = 'ses-todo-effect-011'
     const life = 'life-todo-effect-011'
@@ -193,18 +193,18 @@ const accepted = (preparedRef = preparedFactRef) => fact('TodoWriteAccepted', {
   SemanticVersion: 'magic-v1',
 })
 
-test('WHAT[EFFECT-ACCOUNTING-011] accepted_without_any_prepared_is_rejected', () => {
+test('WHAT[effect-accounting-011] accepted_without_any_prepared_is_rejected', () => {
   // No TodoWritePrepared means Accept is rejected, never silently accepted.
   const handle = projection.MagicTodoProjectionSurface_create()
   assert.equal(foldError(foldMagic(handle, accepted())), 'PreparedMissingForAccept')
 })
-test('WHAT[EFFECT-ACCOUNTING-011] accepted_naming_another_prepared_envelope_is_identity_corruption', () => {
+test('WHAT[effect-accounting-011] accepted_naming_another_prepared_envelope_is_identity_corruption', () => {
   // A Prepared exists, but Accepted names another envelope: identity corruption.
   const handle = projection.MagicTodoProjectionSurface_create()
   ok(foldMagic(handle, prepared, preparedFactRef))
   assert.equal(foldError(foldMagic(handle, accepted('different-prepared-fact-ref-011'))), 'IdentityCorruption')
 })
-test('WHAT[EFFECT-ACCOUNTING-011] accepted_naming_exact_prepared_switches_current_immediately', () => {
+test('WHAT[effect-accounting-011] accepted_naming_exact_prepared_switches_current_immediately', () => {
   // Naming the exact Prepared envelope succeeds and immediately switches Current
   // to the proposal list; a later review conclusion cannot roll it back.
   const handle = projection.MagicTodoProjectionSurface_create()

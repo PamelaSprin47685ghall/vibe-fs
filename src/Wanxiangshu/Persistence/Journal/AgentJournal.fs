@@ -172,7 +172,7 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
 
     /// Append one fact and fold it.
     ///
-    /// Deduplication is deliberately absent here. PAR-003 names the
+    /// Deduplication is deliberately absent here. provider-attempt-recovery-003 names the
     /// ProviderFailureLedger as the single place that decides whether a failed
     /// attempt advances the failure budget, and REVIEW-004 gives review dedupe to the
     /// projection. A second dedupe at the append boundary would be the same

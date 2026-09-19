@@ -15,7 +15,7 @@ const failureOwner = await import("../../../dist/Participant/Provider/Attempt/Fa
 const { JournalSurface_bootWithWriterId: bootWithWriterId, JournalSurface_dispose: dispose } = await import("../../../dist/Persistence/Journal/Surface.js");
 
 
-test('WHAT[CRASH-002] VERIFY_008_child_recovery_workflow_commits_terminal_snapshot_then_pulses', () => {
+test('WHAT[crash-reconciliation-002] VERIFY_008_child_recovery_workflow_commits_terminal_snapshot_then_pulses', () => {
   assert.equal(child.resolve('active', 'terminal', [], 'done').result, 'RecoveredTerminal')
 })
 }
@@ -29,14 +29,14 @@ const handles = await import("../../../dist/Execution/Delegation/Handle/Surface.
 
 const ROOT = new URL('../../../', import.meta.url).pathname
 
-test('WHAT[CRASH-002] HFR_restart_empty_journal_yields_no_linked_handles', () => {
+test('WHAT[crash-reconciliation-002] HFR_restart_empty_journal_yields_no_linked_handles', () => {
   assert.equal(child.resolve('active', 'missing', [], '').result, 'RecoveryIncomplete')
 })
-test('WHAT[CRASH-002] HFR_restart_completed_terminal_re_enlists_child_into_runtime', () => {
+test('WHAT[crash-reconciliation-002] HFR_restart_completed_terminal_re_enlists_child_into_runtime', () => {
   assert.equal(child.resolve('completed', 'missing', [], 'work-record').result, 'RecoveredTerminal')
   assert.equal(handles.crashScenario('completed').lifecycle, 'CompletedAwaitingJoin')
 })
-test('WHAT[CRASH-002] HFR_restart_active_with_terminal_snapshot_recovered_terminal', () => {
+test('WHAT[crash-reconciliation-002] HFR_restart_active_with_terminal_snapshot_recovered_terminal', () => {
   assert.equal(child.resolve('active', 'terminal', [], 'work-record').result, 'RecoveredTerminal')
 })
 }
@@ -48,13 +48,13 @@ const handles = await import("../../../dist/Execution/Delegation/Handle/Surface.
 
 const active = () => handles.crashScenario('active')
 
-test('WHAT[CRASH-002] P0_RECOVERY_JOIN_001_crash_after_completed_before_consume_is_awaiting_join', () => {
+test('WHAT[crash-reconciliation-002] P0_RECOVERY_JOIN_001_crash_after_completed_before_consume_is_awaiting_join', () => {
   const state = handles.crashScenario('completed')
   assert.equal(state.lifecycle, 'CompletedAwaitingJoin')
   assert.deepEqual(state.completion, { kind: 'Terminal' })
   assert.equal(state.joinable, 1)
 })
-test('WHAT[CRASH-002] P0_RECOVERY_JOIN_001_duplicate_handle_completed_is_absorbed', () => {
+test('WHAT[crash-reconciliation-002] P0_RECOVERY_JOIN_001_duplicate_handle_completed_is_absorbed', () => {
   const state = handles.crashScenario('replayed-completed')
   assert.equal(state.lifecycle, 'CompletedAwaitingJoin')
   assert.deepEqual(state.completion, { kind: 'Terminal' })
@@ -68,7 +68,7 @@ const { default: test } = await import("node:test");
 const recovery = await import("../../../dist/Execution/Session/Recovery/Surface.js");
 
 
-test('WHAT[CRASH-002] MISC_recovery_receipt_accessors_and_nonempty_helpers', () => {
+test('WHAT[crash-reconciliation-002] MISC_recovery_receipt_accessors_and_nonempty_helpers', () => {
   assert.deepEqual(recovery.receiptView('s1', 42), {
     session: 's1',
     sequence: 42,

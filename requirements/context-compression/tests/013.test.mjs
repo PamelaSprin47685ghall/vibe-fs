@@ -26,13 +26,13 @@ const captureError = (fn) => {
   return lines
 }
 
-test('WHAT[CONTEXT-COMPRESSION-013] CTX_014_diagnostic_emit_is_structured_and_redacted', () => {
+test('WHAT[context-compression-013] CTX_014_diagnostic_emit_is_structured_and_redacted', () => {
   const lines = captureError(() => diag.emit('context_compression_test', fields))
   // `emit` is intentionally non-fatal and must not write an unstructured line.
   assert.equal(lines.length, 0)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-013] CTX_014_fatal_emits_structured_event_without_raw_payload', () => {
+test('WHAT[context-compression-013] CTX_014_fatal_emits_structured_event_without_raw_payload', () => {
   const previous = process.env.WANXIANGSHU_NO_FATAL_EXIT
   process.env.WANXIANGSHU_NO_FATAL_EXIT = '1'
   try {
@@ -49,7 +49,7 @@ test('WHAT[CONTEXT-COMPRESSION-013] CTX_014_fatal_emits_structured_event_without
   }
 })
 
-test('WHAT[CONTEXT-COMPRESSION-013] CTX_014_emit_drops_unbounded_fields_without_affecting_caller', () => {
+test('WHAT[context-compression-013] CTX_014_emit_drops_unbounded_fields_without_affecting_caller', () => {
   const state = { accepted: true }
   assert.doesNotThrow(() => diag.emit('context_compression_test', [['estimated_tokens_remaining', 'secret']]))
   assert.deepEqual(state, { accepted: true })

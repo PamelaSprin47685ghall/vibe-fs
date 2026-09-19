@@ -48,7 +48,7 @@ test.beforeEach(() => {
   clearAllForTests()
 })
 
-test('WHAT[PROVIDER-LANGUAGE-009] render layer never translates or substitutes owning prose', () => {
+test('WHAT[provider-language-009] render layer never translates or substitutes owning prose', () => {
   // Render/layout owns substitution only; semantic content passes through
   // verbatim — the layer never invents, translates, or corrects the prose it
   // renders. A zh value survives byte-identical; a wrong-locale value is not

@@ -7,11 +7,11 @@ const magicTodo = await import("../../../dist/Mission/Obligation/Todo/MagicTodoS
 
 const t = (id) => id
 
-test('WHAT[PREFIX-STABILITY-004] PREFIX_STABILITY_lag1_rebase_consumes_one_previous_committed_locator', () => {
+test('WHAT[prefix-stability-004] PREFIX_STABILITY_lag1_rebase_consumes_one_previous_committed_locator', () => {
   assert.equal(magicTodo.requiresLag1Rebase(undefined), false, 'T1 has no committed predecessor')
   assert.equal(magicTodo.requiresLag1Rebase(t('T1')), true, 'later committed checkpoints have one lag-1 predecessor')
 })
-test('WHAT[PREFIX-STABILITY-004] PREFIX_STABILITY_todo_checkpoint_commit_uses_the_existing_epoch_contract', () => {
+test('WHAT[prefix-stability-004] PREFIX_STABILITY_todo_checkpoint_commit_uses_the_existing_epoch_contract', () => {
   const commit = magicTodo.buildTodoCheckpointCommit({
     sessionId: 'ses_1',
     managerLifeId: 'life-1',
@@ -75,7 +75,7 @@ const rebase = (state, { previousEpoch, nextEpoch, cutoff, digest, seal, prefixD
 const reanchor = (state, { previousEpoch, nextEpoch, observedRun = 'msg_compaction' }) =>
   prefix.applyReanchor({ previousEpoch, nextEpoch, observedRun }, state)
 
-test('WHAT[PREFIX-STABILITY-004] CTX_011_promoted_cutoff_may_not_retreat', () => {
+test('WHAT[prefix-stability-004] CTX_011_promoted_cutoff_may_not_retreat', () => {
   const committed = rebase(prefix.empty, { previousEpoch: 0, nextEpoch: 1, cutoff: 6 }).value
 
   const backwards = rebase(committed, { previousEpoch: 1, nextEpoch: 2, cutoff: 3 })
@@ -84,7 +84,7 @@ test('WHAT[PREFIX-STABILITY-004] CTX_011_promoted_cutoff_may_not_retreat', () =>
   const forwards = rebase(committed, { previousEpoch: 1, nextEpoch: 2, cutoff: 9 })
   assert.equal(forwards.ok, true, forwards.ok ? '' : forwards.error)
 })
-test('WHAT[PREFIX-STABILITY-004] CTX_011_same_cutoff_with_a_tighter_B_is_a_new_candidate', () => {
+test('WHAT[prefix-stability-004] CTX_011_same_cutoff_with_a_tighter_B_is_a_new_candidate', () => {
   // A Y squash makes B more compact without covering more X turns. Equal cutoff
   // plus a different FrozenRecordPrefix digest is therefore a legitimate promotion — this is
   // the case a naive "cutoff must increase" rule would wrongly reject.
@@ -101,7 +101,7 @@ test('WHAT[PREFIX-STABILITY-004] CTX_011_same_cutoff_with_a_tighter_B_is_a_new_c
   assert.equal(tighter.ok, true, tighter.ok ? '' : tighter.error)
   assert.equal(prefix.epochOf(tighter.value), 2n)
 })
-test('WHAT[PREFIX-STABILITY-004] CTX_011_an_identical_candidate_is_reported_as_not_new', () => {
+test('WHAT[prefix-stability-004] CTX_011_an_identical_candidate_is_reported_as_not_new', () => {
   // Identity is (cutoff, prefix digest, FrozenRecordPrefix digest). CTX-011 already refuses
   // to BUILD such a probe, so a line carrying one is a replay. The projection
   // reports it rather than silently applying: promoting would spend an epoch and
@@ -117,7 +117,7 @@ test('WHAT[PREFIX-STABILITY-004] CTX_011_an_identical_candidate_is_reported_as_n
   // The projection is untouched by the refusal.
   assert.equal(prefix.epochOf(committed), 1n)
 })
-test('WHAT[PREFIX-STABILITY-004] PERSIST_010_rebase_epoch_must_be_the_successor', () => {
+test('WHAT[prefix-stability-004] PERSIST_010_rebase_epoch_must_be_the_successor', () => {
   for (const nextEpoch of [0, 2, 5]) {
     assert.deepEqual(
       rebase(prefix.empty, { previousEpoch: 0, nextEpoch, cutoff: 3 }),

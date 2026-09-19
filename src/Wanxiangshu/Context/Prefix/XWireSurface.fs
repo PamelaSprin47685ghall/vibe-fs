@@ -17,7 +17,7 @@ open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 open Wanxiangshu.Participant.Provider.Attempt
 
-/// HOST-BOUNDARY-020/021: X-wire transform decision surface.
+/// host-boundary-020/021: X-wire transform decision surface.
 ///
 /// The production `XWire.applyTransform` is async and coupled to `AgentJournal`,
 /// `PluginRuntimeScope`, and `ISessionSnapshotPort` — it orchestrates blob reads,
@@ -228,7 +228,7 @@ module XWireSurface =
                  Set.ofArray hostMessageIds)
         |> List.toArray
 
-    /// HOST-BOUNDARY-020/021: the X-wire transform decision.
+    /// host-boundary-020/021: the X-wire transform decision.
     ///
     /// Input fields (JS object):
     ///   journal:       truthy = a durable journal is available.
@@ -256,7 +256,7 @@ module XWireSurface =
     ///   durable promotion is committed only by `reconcile`, which rechecks
     ///   the probe epoch.
     let transform (input: obj) : obj =
-        // ── HOST-BOUNDARY-021: no journal → no-op ──
+        // ── host-boundary-021: no journal → no-op ──
         let journal = isTruthy input?journal
 
         if not journal then
@@ -271,7 +271,7 @@ module XWireSurface =
                    error = null
                    output = input?currentProjection |}
         else
-            // ── HOST-BOUNDARY-021: no session id → no-op ──
+            // ── host-boundary-021: no session id → no-op ──
             let sessionId = text input?sessionId
 
             if String.IsNullOrEmpty sessionId then
@@ -286,7 +286,7 @@ module XWireSurface =
                        error = null
                        output = input?currentProjection |}
             else
-                // ── PAR-011: only the exact Host-accepted physical retry may plan ──
+                // ── provider-attempt-recovery-011: only the exact Host-accepted physical retry may plan ──
                 let acceptedRetry =
                     not (isNullish input?acceptedRetry) && (input?acceptedRetry |> unbox<bool>)
 
@@ -457,7 +457,7 @@ module XWireSurface =
                                error = null
                                output = output |}
 
-    /// HOST-BOUNDARY-021: reconcile decision — does a completed attempt promote
+    /// host-boundary-021: reconcile decision — does a completed attempt promote
     /// a prefix rebase, and does a failed/aborted attempt clear the plan?
     ///
     /// Delegates to the pure decision used by `XWire.reconcileAttempt`. The

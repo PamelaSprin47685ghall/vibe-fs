@@ -146,7 +146,7 @@ module HandleSurface =
                    joinable = HandleProjection.joinable replayed |> List.length
                    retired = record.Lifecycle = HandleLifecycle.Retired |}
 
-    // ── JS-native handle lifecycle surface (MANAGED-SESSION-006/007/008/009/015) ─
+    // ── JS-native handle lifecycle surface (managed-session-lifecycle-006/007/008/009/015) ─
     //
     // The handle projection vertical slice. JS tests send a command and
     // receive plain-object snapshots; the typed HandleProjection (Map, DU,

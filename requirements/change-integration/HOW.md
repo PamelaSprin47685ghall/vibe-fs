@@ -30,4 +30,4 @@
 ### 门禁与工作树资源管理
 
 - **IntegrationGate 互斥**：基于文件锁实现的轻量互斥机制，仅覆盖目标分支指针更新窗口，不侵占 Relay assessment、Manager work、rebase 或冲突处理。
-- **WorktreeResource 生命周期**：为每个任务分配由 `ManagerJobId` 绑定的独立工作树，完成任务后原子清理，崩溃恢复时按持久化事实精准收拢或复用。projection 不 fold 成唯一「最新 case」，SW-003 vs SW-009 消歧保证恢复重入直接由事实与当前外部 head 判定。
+- **WorktreeResource 生命周期**：为每个任务分配由 `ManagerJobId` 绑定的独立工作树，完成任务后原子清理，崩溃恢复时按持久化事实精准收拢或复用。projection 不 fold 成唯一「最新 case」，structured-workflow-003 vs structured-workflow-009 消歧保证恢复重入直接由事实与当前外部 head 判定。

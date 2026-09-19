@@ -11,7 +11,7 @@ const { close, createStore, start, resume, state, assessWhy, relativeServerEntry
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '../../..')
 
-test('WHAT[EPI-007] contract_keeps_distribution_after_semantic_assessment', () => {
+test('WHAT[epistemic-reasoning-007] contract_keeps_distribution_after_semantic_assessment', () => {
   const store = createStore()
   const started = start(store, '花儿为什么这样红？')
 
@@ -31,7 +31,7 @@ const { default: test } = await import("node:test");
 const { library, phase0Names, createStore, start, resume } = await import("./support.mjs");
 
 
-test('WHAT[EPI-007] method_library_preserves_phase0_kernel_and_extends_without_pipeline_semantics', () => {
+test('WHAT[epistemic-reasoning-007] method_library_preserves_phase0_kernel_and_extends_without_pipeline_semantics', () => {
   const names = [...library]
   assert.deepEqual([...phase0Names].sort(), [
     'Abduction',
@@ -46,7 +46,7 @@ test('WHAT[EPI-007] method_library_preserves_phase0_kernel_and_extends_without_p
   assert.ok(names.includes('SourceTriangulation'))
   assert.ok(names.includes('OntologyRepair'))
 })
-test('WHAT[EPI-007] why_question_activates_multiple_generators_from_distribution_and_facets', () => {
+test('WHAT[epistemic-reasoning-007] why_question_activates_multiple_generators_from_distribution_and_facets', () => {
   const store = createStore()
   const started = start(store, '花儿为什么这样红？')
   const result = resume(store, started.handle, {
@@ -61,7 +61,7 @@ test('WHAT[EPI-007] why_question_activates_multiple_generators_from_distribution
   assert.ok(result.request.methods.includes('CausalMechanism'))
   assert.equal(result.request.methods.includes('Synthesis'), false)
 })
-test('WHAT[EPI-007] predictive_polar_question_activates_base_rate_and_falsification', () => {
+test('WHAT[epistemic-reasoning-007] predictive_polar_question_activates_base_rate_and_falsification', () => {
   const store = createStore()
   const started = start(store, '明天白银会涨吗？')
   const result = resume(store, started.handle, {
@@ -82,7 +82,7 @@ const { default: test } = await import("node:test");
 const { createStore, start, resume, state, assessWhy } = await import("./support.mjs");
 
 
-test('WHAT[EPI-007] later_semantic_assessment_updates_control_belief_without_creating_evidence', () => {
+test('WHAT[epistemic-reasoning-007] later_semantic_assessment_updates_control_belief_without_creating_evidence', () => {
   const store = createStore()
   const started = start(store, '为什么程序卡住？')
   assessWhy(store, started.handle)

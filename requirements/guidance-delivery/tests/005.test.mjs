@@ -8,7 +8,7 @@ const delivery = await import("../../../dist/Enforcer/Guidance/DeliverySurface.j
 const { empty, apply, applyReanchor, hasFullDelivered } = delivery
 const TipPresentation = Object.freeze({ Full: 'Full', IdentityOnly: 'IdentityOnly' })
 
-test('WHAT[GD-005] TDP_004_reanchor_voids_full_history_so_next_resolve_refulls', () => {
+test('WHAT[guidance-delivery-005] TDP_004_reanchor_voids_full_history_so_next_resolve_refulls', () => {
   let state = apply('primitive-obsession', TipPresentation.Full, empty)
   assert.equal(hasFullDelivered('primitive-obsession', state), true)
 
@@ -21,7 +21,7 @@ test('WHAT[GD-005] TDP_004_reanchor_voids_full_history_so_next_resolve_refulls',
   state = apply('primitive-obsession', TipPresentation.Full, state)
   assert.equal(hasFullDelivered('primitive-obsession', state), true)
 })
-test('WHAT[GD-005] TDP_005_reanchor_does_not_advance_occurrence_frontier', () => {
+test('WHAT[guidance-delivery-005] TDP_005_reanchor_does_not_advance_occurrence_frontier', () => {
   // applyReanchor only clears the horizon-relative Full history. The
   // occurrence-based frontier is a different axis (TipDeliveryProjection
   // tracks FullDeliveredTips per Main session; reanchor never mints a new
@@ -106,7 +106,7 @@ const withJournal = async (fn) => {
 const presentationOf = (value) => value?.presentation
 const textOf = (value) => value?.text
 
-test('WHAT[GD-005] ENFORCER_TIP_DELIVERY_006_context_reanchor_clears_full_so_next_is_full_again', async () => {
+test('WHAT[guidance-delivery-005] ENFORCER_TIP_DELIVERY_006_context_reanchor_clears_full_so_next_is_full_again', async () => {
   await withJournal(async (journal) => {
     await seedOwnerWithTip(journal)
     const first = await resolveTipGuidance(journal, main)

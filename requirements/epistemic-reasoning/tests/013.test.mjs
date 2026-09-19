@@ -63,7 +63,7 @@ async function driveToAnswered(tools, handle) {
   return tools.synthesize.handler(synthesisArgs(handle))
 }
 
-test('WHAT[EPI-013] full_next_tool_chain_via_phase_tools', async () => {
+test('WHAT[epistemic-reasoning-013] full_next_tool_chain_via_phase_tools', async () => {
   const tools = mcpServer(createStore())._registeredTools
 
   const started = await tools.start.handler({ question: ROOT_QUESTION })
@@ -120,7 +120,7 @@ test('WHAT[EPI-013] full_next_tool_chain_via_phase_tools', async () => {
     assert.ok(revisions[i] > revisions[i - 1], `revision step ${i} should increase`)
   }
 })
-test('WHAT[EPI-013] legacy_resume_advances_via_generic_decode_with_same_envelope', async () => {
+test('WHAT[epistemic-reasoning-013] legacy_resume_advances_via_generic_decode_with_same_envelope', async () => {
   const tools = mcpServer(createStore())._registeredTools
 
   const started = await tools.start.handler({ question: ROOT_QUESTION })
@@ -136,7 +136,7 @@ test('WHAT[EPI-013] legacy_resume_advances_via_generic_decode_with_same_envelope
   assert.equal(assessed.structuredContent.request.type, 'GenerateCandidatesRequest')
   assert.equal(assessed.structuredContent.revision, 1)
 })
-test('WHAT[EPI-013] invalid_observation_when_forms_missing', async () => {
+test('WHAT[epistemic-reasoning-013] invalid_observation_when_forms_missing', async () => {
   const tools = mcpServer(createStore())._registeredTools
 
   const started = await tools.start.handler({ question: ROOT_QUESTION })
@@ -152,7 +152,7 @@ test('WHAT[EPI-013] invalid_observation_when_forms_missing', async () => {
   assert.equal(result._meta.error.recoverable, true)
   assert.equal(result._meta.error.retryable, false)
 })
-test('WHAT[EPI-013] missing_handle_question_required_unknown_handle_codes', async () => {
+test('WHAT[epistemic-reasoning-013] missing_handle_question_required_unknown_handle_codes', async () => {
   const tools = mcpServer(createStore())._registeredTools
 
   // MISSING_HANDLE: blank handle on a phase tool whose observation decodes ok.
@@ -179,7 +179,7 @@ test('WHAT[EPI-013] missing_handle_question_required_unknown_handle_codes', asyn
   assert.equal(unknown._meta.error.recoverable, false)
   assert.equal(unknown._meta.error.retryable, false)
 })
-test('WHAT[EPI-013] surface_status_and_cancel_functions_match_handler_envelopes', () => {
+test('WHAT[epistemic-reasoning-013] surface_status_and_cancel_functions_match_handler_envelopes', () => {
   const store = createStore()
   const handle = start(store, ROOT_QUESTION).handle
 
@@ -227,7 +227,7 @@ test('WHAT[EPI-013] surface_status_and_cancel_functions_match_handler_envelopes'
   assert.equal(afterCancel.code, 'UNKNOWN_HANDLE')
   assert.equal(afterCancel.recoverable, false)
 })
-test('WHAT[EPI-013] kernel_rejected_error_content_is_human_readable', async () => {
+test('WHAT[epistemic-reasoning-013] kernel_rejected_error_content_is_human_readable', async () => {
   const tools = mcpServer(createStore())._registeredTools
 
   const started = await tools.start.handler({ question: ROOT_QUESTION })
@@ -240,7 +240,7 @@ test('WHAT[EPI-013] kernel_rejected_error_content_is_human_readable', async () =
   assert.match(result.content[0].text, /KERNEL_REJECTED/)
   assert.match(result.content[0].text, /Next action/)
 })
-test('WHAT[EPI-013] full_next_tool_chain_with_bare_candidate_proposals', async () => {
+test('WHAT[epistemic-reasoning-013] full_next_tool_chain_with_bare_candidate_proposals', async () => {
   const tools = mcpServer(createStore())._registeredTools
 
   const started = await tools.start.handler({ question: '如何写程序才能写好程序？' })
@@ -310,7 +310,7 @@ test('WHAT[EPI-013] full_next_tool_chain_with_bare_candidate_proposals', async (
   assert.equal(answered.structuredContent.answer.epistemicBasis.findings.length, 1)
   assert.equal(answered.structuredContent.answer.epistemicBasis.evidence.length, 1)
 })
-test('WHAT[EPI-013] generic_tools_registered_alongside_legacy_eight', () => {
+test('WHAT[epistemic-reasoning-013] generic_tools_registered_alongside_legacy_eight', () => {
   const tools = mcpServer(createStore())._registeredTools
 
   for (const name of ['start', 'assess', 'propose', 'investigate', 'synthesize', 'status', 'cancel', 'resume']) {
@@ -327,7 +327,7 @@ test('WHAT[EPI-013] generic_tools_registered_alongside_legacy_eight', () => {
     assert.equal(typeof tools[name].handler, 'function')
   }
 })
-test('WHAT[EPI-013] generic_start_status_cancel_envelope_with_iq_ids_and_stale_submit_conflict', async () => {
+test('WHAT[epistemic-reasoning-013] generic_start_status_cancel_envelope_with_iq_ids_and_stale_submit_conflict', async () => {
   const tools = mcpServer(createStore())._registeredTools
 
   const started = await tools.sphinx_inquiry_start.handler({
@@ -372,7 +372,7 @@ test('WHAT[EPI-013] generic_start_status_cancel_envelope_with_iq_ids_and_stale_s
   })
   assert.equal(gone.isError, true)
 })
-test('WHAT[EPI-013] text_outputs_carry_handle_and_inquiry_id_for_text_only_models', async () => {
+test('WHAT[epistemic-reasoning-013] text_outputs_carry_handle_and_inquiry_id_for_text_only_models', async () => {
   const tools = mcpServer(createStore())._registeredTools
 
   const started = await tools.start.handler({ question: ROOT_QUESTION })
@@ -392,7 +392,7 @@ test('WHAT[EPI-013] text_outputs_carry_handle_and_inquiry_id_for_text_only_model
   assert.match(unknown.content[0].text, /iq_nope/)
   assert.equal(unknown._meta.error.code, 'UNKNOWN_HANDLE')
 })
-test('WHAT[EPI-013] empty_forms_assessment_abstains_but_advances', async () => {
+test('WHAT[epistemic-reasoning-013] empty_forms_assessment_abstains_but_advances', async () => {
   const tools = mcpServer(createStore())._registeredTools
 
   const started = await tools.start.handler({ question: ROOT_QUESTION })
@@ -404,7 +404,7 @@ test('WHAT[EPI-013] empty_forms_assessment_abstains_but_advances', async () => {
   assert.equal(assessed.structuredContent.nextTool, 'propose')
   assert.equal(assessed.structuredContent.revision, 1)
 })
-test('WHAT[EPI-013] generic_cancel_reports_cancelled_code_and_blank_start_names_its_tool', async () => {
+test('WHAT[epistemic-reasoning-013] generic_cancel_reports_cancelled_code_and_blank_start_names_its_tool', async () => {
   const tools = mcpServer(createStore())._registeredTools
 
   const blank = await tools.sphinx_inquiry_start.handler({ question: '  ' })
@@ -426,14 +426,14 @@ test('WHAT[EPI-013] generic_cancel_reports_cancelled_code_and_blank_start_names_
   assert.equal(submitAfter.isError, true)
   assert.equal(submitAfter._meta.error.code, 'inquiry-cancelled')
 })
-test('WHAT[EPI-013] legacy_shaped_id_in_generic_tool_gets_iq_hint', async () => {
+test('WHAT[epistemic-reasoning-013] legacy_shaped_id_in_generic_tool_gets_iq_hint', async () => {
   const tools = mcpServer(createStore())._registeredTools
 
   const legacyShaped = await tools.sphinx_inquiry_status.handler({ inquiryId: '0702fb48-6517-4875-8fee-33ed6ad2cc38' })
   assert.equal(legacyShaped.isError, true)
   assert.match(legacyShaped.content[0].text, /iq_ ids from sphinx_inquiry_start/)
 })
-test('WHAT[EPI-013] generic_submit_with_results_advances_revision_and_status_follows', async () => {
+test('WHAT[epistemic-reasoning-013] generic_submit_with_results_advances_revision_and_status_follows', async () => {
   const tools = mcpServer(createStore())._registeredTools
 
   const started = await tools.sphinx_inquiry_start.handler({
@@ -486,7 +486,7 @@ const { mcpServer } = await import("../../../dist/Sphinx/Surface.js");
 const { createStore, start, resume, assessWhy } = await import("./support.mjs");
 
 
-test('WHAT[EPI-013] mcp_server_surface_exposes_phase_tools_and_legacy_resume', async () => {
+test('WHAT[epistemic-reasoning-013] mcp_server_surface_exposes_phase_tools_and_legacy_resume', async () => {
   const server = mcpServer(createStore())
   for (const name of ['start', 'assess', 'propose', 'investigate', 'synthesize', 'status', 'cancel']) {
     assert.ok(name in server._registeredTools, `missing tool ${name}`)
@@ -706,7 +706,7 @@ async function driveToAnswered(s) {
   return handle
 }
 
-test('WHAT[EPI-013] tools_list_returns_legacy_eight_plus_generic_five_with_schemas', { timeout: 30000 }, async () => {
+test('WHAT[epistemic-reasoning-013] tools_list_returns_legacy_eight_plus_generic_five_with_schemas', { timeout: 30000 }, async () => {
   const s = spawnSphinx()
   try {
     // Default blackbox client negotiates 2024-11-05: the legacy eight keep
@@ -765,7 +765,7 @@ test('WHAT[EPI-013] tools_list_returns_legacy_eight_plus_generic_five_with_schem
     s.close()
   }
 })
-test('WHAT[EPI-013] full_flow_to_answered_driven_by_next_tool', { timeout: 30000 }, async () => {
+test('WHAT[epistemic-reasoning-013] full_flow_to_answered_driven_by_next_tool', { timeout: 30000 }, async () => {
   const s = spawnSphinx()
   try {
     await s.initialize()
@@ -808,7 +808,7 @@ test('WHAT[EPI-013] full_flow_to_answered_driven_by_next_tool', { timeout: 30000
     s.close()
   }
 })
-test('WHAT[EPI-013] unknown_handle_and_malformed_payload_are_typed_errors', { timeout: 30000 }, async () => {
+test('WHAT[epistemic-reasoning-013] unknown_handle_and_malformed_payload_are_typed_errors', { timeout: 30000 }, async () => {
   const s = spawnSphinx()
   try {
     await s.initialize()
@@ -838,7 +838,7 @@ test('WHAT[EPI-013] unknown_handle_and_malformed_payload_are_typed_errors', { ti
     s.close()
   }
 })
-test('WHAT[EPI-013] answered_then_submit_returns_already_answered', { timeout: 30000 }, async () => {
+test('WHAT[epistemic-reasoning-013] answered_then_submit_returns_already_answered', { timeout: 30000 }, async () => {
   const s = spawnSphinx()
   try {
     await s.initialize()
@@ -852,7 +852,7 @@ test('WHAT[EPI-013] answered_then_submit_returns_already_answered', { timeout: 3
     s.close()
   }
 })
-test('WHAT[EPI-013] stdout_lines_are_pure_jsonrpc', { timeout: 30000 }, async () => {
+test('WHAT[epistemic-reasoning-013] stdout_lines_are_pure_jsonrpc', { timeout: 30000 }, async () => {
   const s = spawnSphinx()
   try {
     await s.initialize()

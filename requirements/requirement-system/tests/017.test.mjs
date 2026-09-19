@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
@@ -124,11 +124,6 @@ const liveClauseNumbers = (pkg) => {
     const mBracket = /^##\s+\[(\d{3})\]/.exec(line)
     if (mBracket) {
       if (!/已删除|已废止/.test(line)) numbers.add(mBracket[1])
-      continue
-    }
-    const mPrefix = /^##\s+[A-Z0-9-]+-(\d{3})\b/.exec(line)
-    if (mPrefix) {
-      if (!/已删除|已废止/.test(line)) numbers.add(mPrefix[1])
     }
   }
   return numbers
@@ -185,7 +180,7 @@ const depFailures = (pkg, allNames, skeleton) => {
   return failures
 }
 
-test('WHAT[REQUIREMENT-SYSTEM-017] meta-verifier executes as the machine proof', () => {
+test('WHAT[requirement-system-017] meta-verifier executes as the machine proof', () => {
   const fromIndex = packageNamesFromIndexTables()
   const skeleton = dependencySkeleton()
 
@@ -226,5 +221,39 @@ test('WHAT[REQUIREMENT-SYSTEM-017] meta-verifier executes as the machine proof',
     danglingErrors,
     [],
     'all tests must correspond to live clauses in WHAT.md:\n' + danglingErrors.join('\n'),
+  )
+
+  // 6. 测试文件名规范性：requirements/**/tests/ 下所有 .test.mjs 文件名必须匹配 NNN.test.mjs（任意深度）
+  const findTestFiles = (dir) => {
+    const results = []
+    if (!existsSync(dir)) return results
+    const entries = readdirSync(dir, { withFileTypes: true })
+    for (const entry of entries) {
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) {
+        results.push(...findTestFiles(full))
+      } else if (entry.name.endsWith('.test.mjs')) {
+        results.push(full)
+      }
+    }
+    return results
+  }
+
+  const testNamingErrors = []
+  for (const pkg of fromIndex) {
+    const testsDir = join(REQUIREMENTS, pkg, 'tests')
+    for (const file of findTestFiles(testsDir)) {
+      const base = basename(file)
+      if (!/^\d{3}\.test\.mjs$/.test(base)) {
+        testNamingErrors.push(
+          `${relative(ROOT, file)}: 测试文件名 "${base}" 不符合 NNN.test.mjs 命名规范`,
+        )
+      }
+    }
+  }
+  assert.deepEqual(
+    testNamingErrors,
+    [],
+    'all .test.mjs files under requirements/**/tests/ must match NNN.test.mjs:\n' + testNamingErrors.join('\n'),
   )
 })

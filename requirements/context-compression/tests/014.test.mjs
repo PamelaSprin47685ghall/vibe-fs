@@ -44,7 +44,7 @@ function threeEntries() {
   return state
 }
 
-test('WHAT[CONTEXT-COMPRESSION-014] COMPANION_006_squash_rewrites_first_half_of_frames_permanently', () => {
+test('WHAT[context-compression-014] COMPANION_006_squash_rewrites_first_half_of_frames_permanently', () => {
   let state = blog.empty
   for (let i = 1; i <= 4; i += 1) {
     const result = commitEntry(state, { from: i - 1, to: i, cutoffFrom: i - 1, cutoffTo: i, n: i })
@@ -82,7 +82,7 @@ const isCombinedNormalDelta = (text) =>
   text.startsWith('# Write the dense work-log continuation now') && text.includes('[[new_work_to_record]]')
 const isPreviousTip = (text) => text.includes('previous_enforcer_tip')
 
-test('WHAT[CONTEXT-COMPRESSION-014] CTX_012_squash_projects_only_oldest_historic_frames_then_instruction', () => {
+test('WHAT[context-compression-014] CTX_012_squash_projects_only_oldest_historic_frames_then_instruction', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 1,
@@ -102,7 +102,7 @@ test('WHAT[CONTEXT-COMPRESSION-014] CTX_012_squash_projects_only_oldest_historic
   assert.deepEqual(plan.roles, ['assistant', 'assistant', 'user'])
   assert.equal(plan.system, undefined)
 })
-test('WHAT[CONTEXT-COMPRESSION-014] CTX_012_squash_pairs_tips_with_covered_frames_then_instruction', () => {
+test('WHAT[context-compression-014] CTX_012_squash_pairs_tips_with_covered_frames_then_instruction', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 1,
@@ -130,7 +130,7 @@ test('WHAT[CONTEXT-COMPRESSION-014] CTX_012_squash_pairs_tips_with_covered_frame
     false,
   )
 })
-test('WHAT[CONTEXT-COMPRESSION-014] CTX_012_a_squash_ignores_a_delta_even_if_one_is_supplied', () => {
+test('WHAT[context-compression-014] CTX_012_a_squash_ignores_a_delta_even_if_one_is_supplied', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 1,
@@ -147,7 +147,7 @@ test('WHAT[CONTEXT-COMPRESSION-014] CTX_012_a_squash_ignores_a_delta_even_if_one
     'the delta must not reach a squash request',
   )
 })
-test('WHAT[CONTEXT-COMPRESSION-014] CTX_012_a_squash_never_shows_the_later_frames', () => {
+test('WHAT[context-compression-014] CTX_012_a_squash_never_shows_the_later_frames', () => {
   const plan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
@@ -164,7 +164,7 @@ test('WHAT[CONTEXT-COMPRESSION-014] CTX_012_a_squash_never_shows_the_later_frame
     )
   }
 })
-test('WHAT[CONTEXT-COMPRESSION-014] CTX_012_squash_and_normal_requests_use_different_last_message_ids', () => {
+test('WHAT[context-compression-014] CTX_012_squash_and_normal_requests_use_different_last_message_ids', () => {
   const shared = { blogger: 'ses_y', epoch: 0, frames: frames(1) }
 
   const normal = proj.build(spy, { ...shared, kind: proj.normal, delta: { messageId: 'm', items: dataItems } })
@@ -174,7 +174,7 @@ test('WHAT[CONTEXT-COMPRESSION-014] CTX_012_squash_and_normal_requests_use_diffe
   assert.equal(squash.messages.at(-1).id, '«ses_y|0|squash|instruction»')
   assert.notEqual(normal.messages.at(-1).id, squash.messages.at(-1).id)
 })
-test('WHAT[CONTEXT-COMPRESSION-014] CTX_012_squash_plan_has_zero_physical_messages_and_not_first_turn', () => {
+test('WHAT[context-compression-014] CTX_012_squash_plan_has_zero_physical_messages_and_not_first_turn', () => {
   const squashPlan = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 1,
@@ -227,7 +227,7 @@ const assertOwnerRowsMatchBuilder = (intent, builderPlan) => {
   )
 }
 
-test('WHAT[CONTEXT-COMPRESSION-014] PROJ_008_Companion_owner_squash_rows_render_through_generic_projection', () => {
+test('WHAT[context-compression-014] PROJ_008_Companion_owner_squash_rows_render_through_generic_projection', () => {
   const spy = (input) => `«${input}»`
   const frames = [
     { digest: 'sha-f0', body: 'frame body 0' },

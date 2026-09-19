@@ -17,7 +17,7 @@ const pkg = (root, name, applies = null) => {
   if (applies !== null) writeFileSync(join(dir, 'APPLIES-TO'), applies, 'utf8')
 }
 
-test('WHAT[REQUIREMENT-GROUNDING-003] evaluates APPLIES-TO as ordered positive wildmatch includes with bang exclusions', () => {
+test('WHAT[requirement-grounding-003] evaluates APPLIES-TO as ordered positive wildmatch includes with bang exclusions', () => {
   const { dir, cleanup } = sandbox()
   try {
     pkg(dir, 'alpha', '/src/**\n!/src/generated/**\n/src/generated/keep.fs\n')

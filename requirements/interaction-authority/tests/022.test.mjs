@@ -4,7 +4,7 @@ import * as CapabilitySurface from '../../../dist/Participant/Persona/OfficeCapa
 import * as HandleSurface from '../../../dist/Execution/Delegation/Handle/Surface.js'
 import * as RelaySurface from '../../../dist/Mission/Relay/Surface.js'
 
-test('WHAT[INTERACTION-AUTHORITY-022] DevOps resume and continuation strictly lock bound model target and have direct write permissions', () => {
+test('WHAT[interaction-authority-022] DevOps resume and continuation strictly lock bound model target and have direct write permissions', () => {
   // 1. Office capability truth: DevOps has direct Write/Edit/Exec permissions, but NOT Fission
   assert.equal(CapabilitySurface.isAllowed('DevOps', 'Write'), true, 'DevOps must have direct Write permission')
   assert.equal(CapabilitySurface.isAllowed('DevOps', 'Edit'), true, 'DevOps must have direct Edit permission')

@@ -4,7 +4,7 @@ import * as tr from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
 
 
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-017] Fission admission formula requires verified CanonicalRole=Engineer, subsession origin, explicit authorization, and no active group', () => {
+test('WHAT[intra-participant-parallelism-017] Fission admission formula requires verified CanonicalRole=Engineer, subsession origin, explicit authorization, and no active group', () => {
   assert.equal(tr.rolePredicate('fission', 'Engineer'), true, 'CanonicalRole Engineer must be eligible')
 
   const nonEngineerRoles = [
@@ -26,7 +26,7 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-017] Fission admission formula requires
   }
 })
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-017] aliases, tool parameters, self-claim, and attached work records do not grant Fission', () => {
+test('WHAT[intra-participant-parallelism-017] aliases, tool parameters, self-claim, and attached work records do not grant Fission', () => {
   const pseudoRoles = [
     'engineer-alias',
     'ManagerWithWorkRecord',

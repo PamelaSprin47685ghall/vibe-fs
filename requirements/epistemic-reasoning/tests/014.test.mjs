@@ -204,7 +204,7 @@ async function driveToAnswered(s) {
   return handle
 }
 
-test('WHAT[EPI-014] initialize_returns_server_identity_and_instructions', { timeout: 30000 }, async () => {
+test('WHAT[epistemic-reasoning-014] initialize_returns_server_identity_and_instructions', { timeout: 30000 }, async () => {
   const s = spawnSphinx()
   try {
     const res = await s.initialize()
@@ -217,7 +217,7 @@ test('WHAT[EPI-014] initialize_returns_server_identity_and_instructions', { time
   }
 })
 
-test('WHAT[EPI-014] newer_negotiated_capability_discovers_generic_tools_without_tasks_or_sampling', { timeout: 30000 }, async () => {
+test('WHAT[epistemic-reasoning-014] newer_negotiated_capability_discovers_generic_tools_without_tasks_or_sampling', { timeout: 30000 }, async () => {
   const s = spawnSphinx()
   try {
     const res = await s.call('initialize', {

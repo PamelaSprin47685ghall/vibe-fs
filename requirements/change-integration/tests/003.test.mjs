@@ -41,11 +41,11 @@ const ffAnswers = ({ candidate = 'cafe01', targetHead = 'beef02', branch = 'main
 ]
 const ff = (answers) => change.gitFfMerge(git(fakeRunner(answers).runner), WORKTREE, 'main', 'beef02', 'cafe01')
 
-test('WHAT[CHGINT-003] GIT_rebase_ok_on_zero_exit', async () => {
+test('WHAT[change-integration-003] GIT_rebase_ok_on_zero_exit', async () => {
   const result = await change.gitRebase(git(fakeRunner([['rebase main', [0, '', '']]]).runner), WORKTREE, 'main')
   assert.equal(result.ok, true)
 })
-test('WHAT[CHGINT-003] GIT_rebase_stale_rebase_head_is_cleared_before_fresh_rebase', async () => {
+test('WHAT[change-integration-003] GIT_rebase_stale_rebase_head_is_cleared_before_fresh_rebase', async () => {
   const fake = fakeRunner([])
   await change.gitRebase(git(fake.runner), WORKTREE, 'main')
   assert.deepEqual(fake.calls.map((call) => call.args.join(' ')), [
@@ -55,7 +55,7 @@ test('WHAT[CHGINT-003] GIT_rebase_stale_rebase_head_is_cleared_before_fresh_reba
     'rebase main',
   ])
 })
-test('WHAT[CHGINT-003] GIT_rebase_in_progress_stages_and_continues', async () => {
+test('WHAT[change-integration-003] GIT_rebase_in_progress_stages_and_continues', async () => {
   const { mkdtempSync, rmSync } = await import('node:fs')
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
@@ -71,7 +71,7 @@ test('WHAT[CHGINT-003] GIT_rebase_in_progress_stages_and_continues', async () =>
   ])
   rmSync(dir, { recursive: true, force: true })
 })
-test('WHAT[CHGINT-003] GIT_rebase_continue_failure_surfaces_stderr', async () => {
+test('WHAT[change-integration-003] GIT_rebase_continue_failure_surfaces_stderr', async () => {
   const { mkdtempSync, rmSync } = await import('node:fs')
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
@@ -85,7 +85,7 @@ test('WHAT[CHGINT-003] GIT_rebase_continue_failure_surfaces_stderr', async () =>
   assert.equal(result.error, 'conflict remains')
   rmSync(dir, { recursive: true, force: true })
 })
-test('WHAT[CHGINT-003] GIT_rebase_stage_failure_is_an_error', async () => {
+test('WHAT[change-integration-003] GIT_rebase_stage_failure_is_an_error', async () => {
   const { mkdtempSync, rmSync } = await import('node:fs')
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
@@ -99,12 +99,12 @@ test('WHAT[CHGINT-003] GIT_rebase_stage_failure_is_an_error', async () => {
   assert.equal(result.error, 'index locked')
   rmSync(dir, { recursive: true, force: true })
 })
-test('WHAT[CHGINT-003] GIT_rebase_surfaces_stderr_on_failure', async () => {
+test('WHAT[change-integration-003] GIT_rebase_surfaces_stderr_on_failure', async () => {
   const result = await change.gitRebase(git(fakeRunner([['rebase main', [1, 'stdout-noise', 'CONFLICT (content)']]]).runner), WORKTREE, 'main')
   assert.equal(result.ok, false)
   assert.equal(result.error, 'CONFLICT (content)')
 })
-test('WHAT[CHGINT-003] GIT_candidate_commit_deletes_stale_rebase_head_before_commit_and_surfaces_failure', async () => {
+test('WHAT[change-integration-003] GIT_candidate_commit_deletes_stale_rebase_head_before_commit_and_surfaces_failure', async () => {
   const fake = fakeRunner([['commit -m candidate: manager-1', [1, '', 'commit rejected']]])
   const result = await hostSurface.finalizeWorktree(fake.runner, 'manager-1', WORKTREE)
   assert.equal(result.ok, false)
@@ -114,7 +114,7 @@ test('WHAT[CHGINT-003] GIT_candidate_commit_deletes_stale_rebase_head_before_com
     'commit -m candidate: manager-1',
   ])
 })
-test('WHAT[CHGINT-003] GIT_has_rebase_head_true_only_when_git_path_dir_exists', async () => {
+test('WHAT[change-integration-003] GIT_has_rebase_head_true_only_when_git_path_dir_exists', async () => {
   const { mkdtempSync, rmSync } = await import('node:fs')
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
@@ -217,7 +217,7 @@ const foldProjection = (events) => {
 const worktreeRequested = { kind: 'WorktreeCreateRequested', payload: { jobId: JOB, worktreeIdentity: 'manager/job_1', worktreePath: '/tmp/wt1' } }
 const worktreeCreated = { kind: 'WorktreeCreated', payload: { jobId: JOB, worktreeIdentity: 'manager/job_1', worktreePath: '/tmp/wt1' } }
 
-test('WHAT[CHGINT-003] ORCH_007_each_durable_fact_has_one_projection_slot', () => {
+test('WHAT[change-integration-003] ORCH_007_each_durable_fact_has_one_projection_slot', () => {
   let projection = created()
   for (const value of [fact.candidateReady(), fact.conflictDetected(), fact.rebased(), fact.publishClaimed()]) {
     projection = change.recordFact(projection, JOB, value)
@@ -229,7 +229,7 @@ test('WHAT[CHGINT-003] ORCH_007_each_durable_fact_has_one_projection_slot', () =
     'PublishClaimed',
   ])
 })
-test('WHAT[CHGINT-003] ORCH_007_incomplete_publish_claimed_evidence_is_rejected', () => {
+test('WHAT[change-integration-003] ORCH_007_incomplete_publish_claimed_evidence_is_rejected', () => {
   const incomplete = change.fact('PublishClaimed', { rebasedCommit: 'r1', expectedHead: 'h1' })
   assert.throws(() => change.recordFact(created(), JOB, incomplete), /Incomplete PublishClaimed payload/)
 })
@@ -309,12 +309,12 @@ const classifyRebased = (head, rebasedCommit = 'r1', snapshot = 'h1') =>
 const classifyClaim = (head, rebasedCommit = 'r1', expectedHead = 'h1') =>
   change.classifyPublishClaim(head ?? null, rebasedCommit, expectedHead)
 
-test('WHAT[CHGINT-003] THEOREM_publish_claimed_without_rebased_candidate_is_rejected', () => {
+test('WHAT[change-integration-003] THEOREM_publish_claimed_without_rebased_candidate_is_rejected', () => {
   const result = change.fold([createEvent(JOB_A, 'ses_orch_a'), candidateEvent(JOB_A), publishClaimedEvent(JOB_A)])
   assert.equal(result.ok, false)
   assert.match(result.error, /no rebased candidate/)
 })
-test('WHAT[CHGINT-003] THEOREM_publish_claimed_with_incomplete_evidence_is_rejected', () => {
+test('WHAT[change-integration-003] THEOREM_publish_claimed_with_incomplete_evidence_is_rejected', () => {
   const incomplete = {
     kind: 'PublishClaimed',
     payload: { jobId: JOB_A, targetRef: 'refs/heads/main', rebasedCommit: 'r1', expectedHead: 'h1' },
@@ -336,7 +336,7 @@ const { default: test } = await import("node:test");
 
 const change = await import('../../../dist/Change/Surface.js')
 
-test('WHAT[CHGINT-003] reentry with valid complete claim reenters without CandidateReady and publishes on the pin', async () => {
+test('WHAT[change-integration-003] reentry with valid complete claim reenters without CandidateReady and publishes on the pin', async () => {
   const observation = await change.observeRelayProgram('reentry-valid')
 
   assert.deepEqual(observation.verdict, { kind: 'Published', detail: 'rebased-1' })
@@ -348,7 +348,7 @@ test('WHAT[CHGINT-003] reentry with valid complete claim reenters without Candid
   assert.equal(observation.ffGateHeld[0], true)
   assert.ok(observation.facts.includes('Published'))
 })
-test('WHAT[CHGINT-003] reentry missing RebasedCandidateReady evidence sends zero FF', async () => {
+test('WHAT[change-integration-003] reentry missing RebasedCandidateReady evidence sends zero FF', async () => {
   const observation = await change.observeRelayProgram('reentry-missing-rebased')
 
   assert.equal(observation.ffCalls, 0)
@@ -356,7 +356,7 @@ test('WHAT[CHGINT-003] reentry missing RebasedCandidateReady evidence sends zero
   assert.equal(observation.facts.includes('Published'), false)
   assert.equal(observation.verdict.kind, 'IntegrationFailed')
 })
-test('WHAT[CHGINT-003] reentry with conflicting claim snapshot sends zero FF', async () => {
+test('WHAT[change-integration-003] reentry with conflicting claim snapshot sends zero FF', async () => {
   const observation = await change.observeRelayProgram('reentry-claim-snapshot-mismatch')
 
   assert.equal(observation.ffCalls, 0)
@@ -366,7 +366,7 @@ test('WHAT[CHGINT-003] reentry with conflicting claim snapshot sends zero FF', a
   assert.deepEqual(observation.verdict, { kind: 'IntegrationFailed', detail: 'scenario-complete' })
   assert.equal(observation.signalCount, 1)
 })
-test('WHAT[CHGINT-003] reentry with conflicting claim target sends zero FF', async () => {
+test('WHAT[change-integration-003] reentry with conflicting claim target sends zero FF', async () => {
   const observation = await change.observeRelayProgram('reentry-claim-target-mismatch')
 
   assert.equal(observation.ffCalls, 0)
@@ -376,7 +376,7 @@ test('WHAT[CHGINT-003] reentry with conflicting claim target sends zero FF', asy
   // Hard target mismatch refuses publish recovery without entering the loop.
   assert.equal(observation.signalCount, 0)
 })
-test('WHAT[CHGINT-003] old incomplete claim decode fails closed in fold and recordFact', () => {
+test('WHAT[change-integration-003] old incomplete claim decode fails closed in fold and recordFact', () => {
   const incomplete = change.fact('PublishClaimed', { rebasedCommit: 'r1', expectedHead: 'h1' })
   assert.throws(() => change.recordFact(change.empty(), 'job_1', incomplete), /Incomplete PublishClaimed payload/)
 
@@ -411,7 +411,7 @@ test('WHAT[CHGINT-003] old incomplete claim decode fails closed in fold and reco
   assert.equal(foldResult.ok, false)
   assert.match(foldResult.error, /Incomplete PublishClaimed payload/)
 })
-test('WHAT[CHGINT-003] reentry FF-success with Published-append failure never masquerades as success', async () => {
+test('WHAT[change-integration-003] reentry FF-success with Published-append failure never masquerades as success', async () => {
   const observation = await change.observeRelayProgram('reentry-published-append-failed')
 
   assert.equal(observation.ffCalls, 1)
@@ -451,13 +451,13 @@ const valueOf = async (promise) => {
   return result.value
 }
 
-test('WHAT[CHGINT-003] WORKTREE_create_propagates_port_error', async () => {
+test('WHAT[change-integration-003] WORKTREE_create_propagates_port_error', async () => {
   const { git } = fakeGit([['worktree add', [1, '', 'worktree add exploded']]])
   const result = await change.worktreeCreate(git, 'job-9', PATH)
   assert.equal(result.ok, false)
   assert.equal(result.error, 'worktree add exploded')
 })
-test('WHAT[CHGINT-003] WORKTREE_CMD_create_returns_identity_on_success', async () => {
+test('WHAT[change-integration-003] WORKTREE_CMD_create_returns_identity_on_success', async () => {
   const { git, calls } = fakeGit()
   const result = await change.gitCreateWorktree(git, 'job-3', PATH)
   assert.equal(result.ok, true)
@@ -465,7 +465,7 @@ test('WHAT[CHGINT-003] WORKTREE_CMD_create_returns_identity_on_success', async (
   assert.deepEqual(calls[0].args, ['worktree', 'add', PATH, '-b', 'manager/job-3'])
   assert.equal(calls[0].cwd, '/repo')
 })
-test('WHAT[CHGINT-003] WORKTREE_CMD_create_surfaces_stderr_on_failure', async () => {
+test('WHAT[change-integration-003] WORKTREE_CMD_create_surfaces_stderr_on_failure', async () => {
   const { git } = fakeGit([['worktree add', [1, '', 'already exists']]])
   const result = await change.gitCreateWorktree(git, 'job-3', PATH)
   assert.equal(result.error, 'already exists')

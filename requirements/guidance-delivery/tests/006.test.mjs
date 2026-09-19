@@ -78,7 +78,7 @@ const markerOutput = (messages) => {
   return idx >= 0 ? output.slice(idx + SEP.length) : undefined
 }
 
-test('WHAT[GD-006] ENFORCER_TIP_NUDGE_002_missing_recent_tip_returns_none', async () => {
+test('WHAT[guidance-delivery-006] ENFORCER_TIP_NUDGE_002_missing_recent_tip_returns_none', async () => {
   const fixture = await seed({ withTip: false })
   try {
     assert.equal(await latestTipNudge(fixture.journal, blogger), null)
@@ -86,7 +86,7 @@ test('WHAT[GD-006] ENFORCER_TIP_NUDGE_002_missing_recent_tip_returns_none', asyn
     fixture.dispose()
   }
 })
-test('WHAT[GD-006] ENFORCER_TIP_NUDGE_003_missing_owner_returns_none', async () => {
+test('WHAT[guidance-delivery-006] ENFORCER_TIP_NUDGE_003_missing_owner_returns_none', async () => {
   const fixture = await seed({ withAssociation: false })
   try {
     assert.equal(await latestTipNudge(fixture.journal, blogger), null)
@@ -164,7 +164,7 @@ const withJournal = async (fn) => {
 const presentationOf = (value) => value?.presentation
 const textOf = (value) => value?.text
 
-test('WHAT[GD-006] ENFORCER_TIP_DELIVERY_004_blogger_session_id_resolves_owner_main', async () => {
+test('WHAT[guidance-delivery-006] ENFORCER_TIP_DELIVERY_004_blogger_session_id_resolves_owner_main', async () => {
   await withJournal(async (journal) => {
     await seedOwnerWithTip(journal)
     const viaBlogger = await resolveTipGuidance(journal, blogger)
@@ -173,7 +173,7 @@ test('WHAT[GD-006] ENFORCER_TIP_DELIVERY_004_blogger_session_id_resolves_owner_m
     assert.match(textOf(viaBlogger), /tip = "primitive-obsession"/)
   })
 })
-test('WHAT[GD-006] ENFORCER_TIP_DELIVERY_005_missing_tip_returns_none', async () => {
+test('WHAT[guidance-delivery-006] ENFORCER_TIP_DELIVERY_005_missing_tip_returns_none', async () => {
   await withJournal(async (journal) => {
     const linked = await guidance.appendCompanionLink(journal, {
       session: main,

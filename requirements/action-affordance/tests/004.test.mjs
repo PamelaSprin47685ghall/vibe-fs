@@ -9,7 +9,7 @@ const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '../../..')
 
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
-test('WHAT[ACTION-AFFORDANCE-004] AA_repair_behavior_is_legacy_forbidden_and_mechanical_means_semantic_meaning_decided', () => {
+test('WHAT[action-affordance-004] AA_repair_behavior_is_legacy_forbidden_and_mechanical_means_semantic_meaning_decided', () => {
   // 1. repair-behavior must not reappear as ToolSpec owner
   assert.ok(
     LEGACY_FORBIDDEN_NAMES.includes('repair-behavior'),

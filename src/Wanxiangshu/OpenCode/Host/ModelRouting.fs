@@ -288,9 +288,9 @@ module ModelRouting =
         let latestProviderRunBySession = Dictionary<string, string>()
         // DSL-MUTABLE: resource — one recovery retry target per session: the
         // single-consumption binding written when a confirmed provider failure
-        // keeps its target (PAR-021). Consumed by the next fresh admission.
+        // keeps its target (provider-attempt-recovery-021). Consumed by the next fresh admission.
         let recoveryRetryTargetBySession = Dictionary<string, ModelRoutingTarget>()
-        // DSL-MUTABLE: resource — bound ModelTarget per DevOps session (EMR-019 / MSL-024 / IA-022)
+        // DSL-MUTABLE: resource — bound ModelTarget per DevOps session (execution-model-routing-019 / managed-session-lifecycle-024 / interaction-authority-022)
         let boundDevopsTargetBySession = Dictionary<string, ModelRoutingTarget>()
         // DSL-MUTABLE: resource — superseded physical user message identities per session
         let supersededPhysical = HashSet<string * string>()
@@ -374,7 +374,7 @@ module ModelRouting =
             if not (isNull markFailedFn) && isFunction markFailedFn then
                 callScheduler markFailedFn (targetProvider target) [||] null |> ignore
 
-        // PAR-021: a confirmed provider failure that kept its target binds this
+        // provider-attempt-recovery-021: a confirmed provider failure that kept its target binds this
         // session's next fresh admission to that target; the binding is consumed
         // once, and only a still-active replaced execution can otherwise supply
         // the ordinary previous hint.
@@ -1205,7 +1205,7 @@ module ModelRouting =
         member _.TakeProviderRunTarget(providerRun: string) : ModelRoutingTarget option =
             lock gate (fun () -> takeProviderRunTarget providerRun)
 
-        /// PAR-021: the failed attempt itself carried the LWR-replaced context,
+        /// provider-attempt-recovery-021: the failed attempt itself carried the LWR-replaced context,
         /// so its confirmed failure condemns the provider of the exact witness
         /// target. The witness is single-consumption: duplicate observations,
         /// stale callbacks, cancellations and unknown submissions hold no
@@ -1218,7 +1218,7 @@ module ModelRouting =
                     Some target
                 | None -> None)
 
-        /// PAR-021: the failed attempt carried the original context, so its
+        /// provider-attempt-recovery-021: the failed attempt carried the original context, so its
         /// provider is kept and the next fresh admission of this session is
         /// bound to the exact failed target for the LWR retry. The witness
         /// must belong to this session and the binding is consumed once.
@@ -1420,7 +1420,7 @@ module ModelRouting =
 
         message
 
-    /// EMR-009 Host projection. Routing owns both which outcomes carry a model
+    /// execution-model-routing-009 Host projection. Routing owns both which outcomes carry a model
     /// and the exact mutable Host field that receives that model; composition
     /// roots only invoke this published projection.
     let projectHostModel (output: obj) (model: OpencodeModel) =

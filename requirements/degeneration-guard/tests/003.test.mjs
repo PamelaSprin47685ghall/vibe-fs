@@ -44,7 +44,7 @@ const referenceScore = (text) => {
   return { weightedDistinctTokens, step }
 }
 
-test('WHAT[DG-003] LOOP_003_fresh_detector_uses_repository_normal_prior', () => {
+test('WHAT[degeneration-guard-003] LOOP_003_fresh_detector_uses_repository_normal_prior', () => {
   const result = loopDetector.evaluate(loopDetector.create())
   assert.equal(result.state, 'Normal')
   assert.equal(result.isAnomalous, false)
@@ -52,7 +52,7 @@ test('WHAT[DG-003] LOOP_003_fresh_detector_uses_repository_normal_prior', () => 
   close(result.weightedDistinctTokens, loopDetector.normalWeightedDistinctCount)
 })
 
-test('WHAT[DG-003] LOOP_003_push_text_is_o200k_token_based', () => {
+test('WHAT[degeneration-guard-003] LOOP_003_push_text_is_o200k_token_based', () => {
   const text = 'const π = await repository.load("订单-42");\nreturn { ok: true, revision: 17 };'
   const expected = referenceScore(text)
   const result = loopDetector.pushText(loopDetector.create(), text)
@@ -62,7 +62,7 @@ test('WHAT[DG-003] LOOP_003_push_text_is_o200k_token_based', () => {
   close(result.weightedDistinctTokens, expected.weightedDistinctTokens)
 })
 
-test('WHAT[DG-003] LOOP_EQ_serial_parallel_token_identical', async () => {
+test('WHAT[degeneration-guard-003] LOOP_EQ_serial_parallel_token_identical', async () => {
   const fixture = [
     'export class OrderProcessor {',
     '  constructor(private readonly repository: OrderRepository) {}',
@@ -86,7 +86,7 @@ test('WHAT[DG-003] LOOP_EQ_serial_parallel_token_identical', async () => {
   assert.deepEqual(parallel4Tokens, serialTokens)
 })
 
-test('WHAT[DG-003] LOOP_BOUNDS_edge_cases', () => {
+test('WHAT[degeneration-guard-003] LOOP_BOUNDS_edge_cases', () => {
   // n = 1
   assert.deepEqual(envelopeBounds([42], 0.5), { minimum: 42, maximum: 42 })
   // all-equal
@@ -100,14 +100,14 @@ test('WHAT[DG-003] LOOP_BOUNDS_edge_cases', () => {
   assert.deepEqual(envelopeBounds(samples, 1.0), { minimum: 100, maximum: 100 })
 })
 
-test('WHAT[DG-003] LOOP_BOUNDS_empty_and_invalid', () => {
+test('WHAT[degeneration-guard-003] LOOP_BOUNDS_empty_and_invalid', () => {
   assert.throws(() => envelopeBounds([], 0.5), { message: 'Loop detector envelope has no samples' })
   assert.throws(() => envelopeBounds([1, 2, 3], 0), { message: 'Loop detector envelope has invalid probability' })
   assert.throws(() => envelopeBounds([1, 2, 3], -0.2), { message: 'Loop detector envelope has invalid probability' })
   assert.throws(() => envelopeBounds([1, 2, 3], 1.5), { message: 'Loop detector envelope has invalid probability' })
 })
 
-test('WHAT[DG-003] LOOP_WORKER_failure_terminates', async () => {
+test('WHAT[degeneration-guard-003] LOOP_WORKER_failure_terminates', async () => {
   const fixture = [
     'class Alpha {',
     '  run() { return 1; }',

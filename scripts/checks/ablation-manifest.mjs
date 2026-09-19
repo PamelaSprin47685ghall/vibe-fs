@@ -29,7 +29,7 @@ export function check(context) {
         }
       })
 
-  const primaryNodes = nodes.nodes.filter((node) => node.kind === 'package').map((node) => node.id)
+  const primaryNodes = nodes.nodes.filter((node) => node.kind === 'package' && node.status !== 'revoked').map((node) => node.id)
   const packages = packageDirs()
 
   for (const pkg of packages) {

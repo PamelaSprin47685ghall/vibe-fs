@@ -11,7 +11,7 @@ const nextReanchor = (observed, reanchored) => {
   return policy.nextReanchor(observed, (runId) => handled.has(runId))
 }
 
-test('WHAT[CONTEXT-COMPRESSION-005] CTX_005_containment_does_not_discriminate_by_source', () => {
+test('WHAT[context-compression-005] CTX_005_containment_does_not_discriminate_by_source', () => {
   // A user's /compact and an unexpected Host compaction get identical handling, so
   // there is no "which kind" parameter and no branch for it. This asserts the shape of
   // the signature: a single-argument predicate with no source input.
@@ -29,7 +29,7 @@ const failureOwner = await import("../../../dist/Participant/Provider/Attempt/Fa
 const requestKind = prefix.requestKind
 const budget = failureOwner.budget
 
-test('WHAT[CONTEXT-COMPRESSION-005] every recorded failure consumes exactly one budget unit', () => {
+test('WHAT[context-compression-005] every recorded failure consumes exactly one budget unit', () => {
   // The budget API takes no reason or error text: failures are never classified.
   assert.equal(budget.recordFailure(budget.initial).failures, 1)
   assert.equal(budget.isValidRecord(0, 1), true)
@@ -49,7 +49,7 @@ const terminalValidity = {
   describe: compression.terminalValidityDescription,
 }
 
-test('WHAT[CONTEXT-COMPRESSION-005] CTX_005_validity_does_not_depend_on_failure_cause', () => {
+test('WHAT[context-compression-005] CTX_005_validity_does_not_depend_on_failure_cause', () => {
   // The predicate must not treat provider error prose as a signal. A completed
   // response that happens to discuss an overflow is still a valid result, and a
   // failed attempt is not this function's business at all.

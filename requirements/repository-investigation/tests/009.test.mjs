@@ -51,7 +51,7 @@ const waitFor = async (predicate, message, ms = 1500) => {
   }
 }
 
-test('WHAT[REPOSITORY-INVESTIGATION-009] AGENT_032_renderer_enforces_24_hint_and_64KiB_bounds_by_whole_entries', () => {
+test('WHAT[repository-investigation-009] AGENT_032_renderer_enforces_24_hint_and_64KiB_bounds_by_whole_entries', () => {
   assert.equal(warmStart.maxHintsTotal, 24)
   assert.equal(warmStart.maxWarmStartBytes, 64 * 1024)
 
@@ -65,7 +65,7 @@ test('WHAT[REPOSITORY-INVESTIGATION-009] AGENT_032_renderer_enforces_24_hint_and
   assert.ok(parsed.repository_hint_omitted > 0)
 })
 
-test('WHAT[REPOSITORY-INVESTIGATION-009] AGENT_032_append_composes_authoritative_instruction_before_reference_hints', () => {
+test('WHAT[repository-investigation-009] AGENT_032_append_composes_authoritative_instruction_before_reference_hints', () => {
   const base = 'authoritative assignment'
   const rendered = appendAppendix(base, [search(1, 'q', [hint(1, 1, 'src/a.fs', 'orientation')])])
 
@@ -74,7 +74,7 @@ test('WHAT[REPOSITORY-INVESTIGATION-009] AGENT_032_append_composes_authoritative
   assert.equal(parsed.repository_hint[0].content, 'orientation')
 })
 
-test('WHAT[REPOSITORY-INVESTIGATION-009] AGENT_032_searches_all_independent_keywords_in_one_parallel_wave_and_restores_ordinal_order', async () => {
+test('WHAT[repository-investigation-009] AGENT_032_searches_all_independent_keywords_in_one_parallel_wave_and_restores_ordinal_order', async () => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-warm-start-'))
   let release
   const gate = new Promise((resolve) => { release = resolve })

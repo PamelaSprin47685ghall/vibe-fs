@@ -1,6 +1,6 @@
 // requirements/participant-horizon/tests/015.test.mjs
 //
-// WHAT[PARTICIPANT-HORIZON-015] — Manager achieves parallelism by forking multiple
+// WHAT[participant-horizon-015] — Manager achieves parallelism by forking multiple
 // independent Engineers, never by Manager fission. The horizon and tool surfaces
 // never present Manager fission or duplicate DevOps affordances, and each Engineer
 // sub-agent is independently visible by its stable Byname in horizon() roster.
@@ -16,7 +16,7 @@ import { permissions as officePermissions, isAllowed } from '../../../dist/Parti
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
-test('WHAT[PARTICIPANT-HORIZON-015] manager_fork_candidate_is_strictly_engineer_and_devops_is_not_forkable', () => {
+test('WHAT[participant-horizon-015] manager_fork_candidate_is_strictly_engineer_and_devops_is_not_forkable', () => {
   // Manager fork rejects devops, coder, inspector, browser, inquiry, reviewer, manager
   const deniedRoles = ['devops', 'coder', 'inspector', 'browser', 'inquiry', 'reviewer', 'manager']
   for (const role of deniedRoles) {
@@ -30,7 +30,7 @@ test('WHAT[PARTICIPANT-HORIZON-015] manager_fork_candidate_is_strictly_engineer_
   assert.equal(engineerRoad.calling, 'engineer')
 })
 
-test('WHAT[PARTICIPANT-HORIZON-015] manager_horizon_presents_multiple_engineers_by_distinct_byname', () => {
+test('WHAT[participant-horizon-015] manager_horizon_presents_multiple_engineers_by_distinct_byname', () => {
   // Horizon must present separate child handles for distinct Engineer instances
   const engineerA = fork.chooseRoad('engineer', 'EngineerA', 'Investigate part A')
   const engineerB = fork.chooseRoad('engineer', 'EngineerB', 'Implement part B')
@@ -42,7 +42,7 @@ test('WHAT[PARTICIPANT-HORIZON-015] manager_horizon_presents_multiple_engineers_
   assert.notEqual(engineerA.byname, engineerB.byname)
 })
 
-test('WHAT[PARTICIPANT-HORIZON-015] manager_fission_is_explicitly_denied_in_schema_permissions_and_bilingual_laws', () => {
+test('WHAT[participant-horizon-015] manager_fission_is_explicitly_denied_in_schema_permissions_and_bilingual_laws', () => {
   // 1. isAllowed('manager', 'Fission') === false
   assert.equal(isAllowed('manager', 'Fission'), false, 'Manager must not have Fission capability')
   assert.equal(officePermissions('manager').includes('Fission'), false, 'Manager permissions must explicitly exclude fission')

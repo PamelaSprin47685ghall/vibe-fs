@@ -1,7 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
-/// JS-native boundary for HOST-BOUNDARY-010 shared cross-instance state and
-/// HOST-BOUNDARY-031 root workspace first-binding. The physical Map/Set
+/// JS-native boundary for host-boundary-010 shared cross-instance state and
+/// host-boundary-031 root workspace first-binding. The physical Map/Set
 /// singletons and RootWorkspace runtime stay opaque. Every operation
 /// closes over the same module-level singleton, so a mutation made through
 /// one import is visible through another — the behavioral proof that

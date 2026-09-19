@@ -15,7 +15,7 @@ import { discoverSuiteTests } from '../../../../verification-system/tests/suppor
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
-// VERIFICATION-SYSTEM-009: suites are discovered, not hardcoded, so an added or
+// VERIFICATION-requirement-system-009: suites are discovered, not hardcoded, so an added or
 // renamed *.test.mjs is supervised automatically and the parent entry (which
 // reads the same discovery) cannot drift away from what this runner executes.
 const suites = discoverSuiteTests(here)

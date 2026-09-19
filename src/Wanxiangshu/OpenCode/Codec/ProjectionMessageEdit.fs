@@ -168,7 +168,7 @@ module ProjectionMessageEdit =
                       "parts", box (List.toArray parts) ]
         }
 
-    /// PROJ-004: write a fully rendered DSL message view back to
+    /// relay-context-projection-004: write a fully rendered DSL message view back to
     /// Host objects. This is intentionally an adapter, not business assembly.
     /// Missing Host ids are derived from wire bytes + ordinal and are Host-only;
     /// the generated identity never enters ProviderSemanticProjection.

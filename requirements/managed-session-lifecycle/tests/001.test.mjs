@@ -6,14 +6,14 @@ const { default: test } = await import("node:test");
 const AttachmentSurface = await import("../../../dist/Execution/Session/Attachment/AttachmentSurface.js");
 
 
-test('WHAT[MANAGED-SESSION-001] EXEC_026_get_or_create_creates_and_binds_a_work_child_once', async () => {
+test('WHAT[managed-session-lifecycle-001] EXEC_026_get_or_create_creates_and_binds_a_work_child_once', async () => {
   const observed = await AttachmentSurface.scenario('owner', 'Engineer', 'engineer', 'engineer', true)
   assert.equal(observed.created, 1)
   assert.equal(observed.firstChild, 'child-1')
   assert.equal(observed.secondChild, 'child-1')
   assert.equal(observed.firstAgent, 'engineer')
 })
-test('WHAT[MANAGED-SESSION-001] EXEC_026_remove_and_remove_by_delegate_session_are_the_only_unbind_paths', async () => {
+test('WHAT[managed-session-lifecycle-001] EXEC_026_remove_and_remove_by_delegate_session_are_the_only_unbind_paths', async () => {
   const observed = await AttachmentSurface.scenario('owner', 'Coder', 'coder', 'coder', true)
   assert.equal(observed.created, 1)
   assert.equal(observed.firstChild, observed.secondChild)
@@ -30,7 +30,7 @@ const SatelliteSurface = await import("../../../dist/OpenCode/Host/SatelliteSurf
 const HandleSurface = await import("../../../dist/Execution/Delegation/Handle/Surface.js");
 
 
-test('WHAT[MANAGED-SESSION-001] session_recovery_contract_attached_runtime_single_owner_pure_evidence', async () => {
+test('WHAT[managed-session-lifecycle-001] session_recovery_contract_attached_runtime_single_owner_pure_evidence', async () => {
   const result = await AttachmentSurface.scenario('owner_1', 'Engineer', 'engineer', 'engineer', true)
   assert.equal(result.created, 1)
   assert.equal(result.firstChild, 'child-1')

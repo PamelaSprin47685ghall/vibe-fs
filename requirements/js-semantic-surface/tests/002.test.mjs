@@ -30,11 +30,11 @@ const wholeSemanticFiles = new Set(semanticTestFiles(join(ROOT, 'requirements'))
 
 const wholeSemanticImportEdges = semanticImportEdges(join(ROOT, 'requirements'))
 
-test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002_forbidden_patterns_absent_from_semantic_tests', () => {
+test('WHAT[js-semantic-surface-002] JS_SURFACE_002_forbidden_patterns_absent_from_semantic_tests', () => {
   assert.deepEqual(wholeScan, {}, 'no semantic test may carry forbidden patterns')
 })
 
-test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002c_whole_semantic_test_zone_is_scanned', () => {
+test('WHAT[js-semantic-surface-002] JS_SURFACE_002c_whole_semantic_test_zone_is_scanned', () => {
   const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-semantic-zone-'))
   const fixturePaths = ['zone-probe.mjs', 'zone-probe.js'].map((name) =>
     join(temporaryRoot, 'requirements', 'probe', 'tests', 'support', name),
@@ -71,7 +71,7 @@ test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002c_whole_semantic_test_zone_is_
   }
 })
 
-test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002f_template_dist_import_is_detected', () => {
+test('WHAT[js-semantic-surface-002] JS_SURFACE_002f_template_dist_import_is_detected', () => {
   const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-template-import-'))
   const fixturePath = join(temporaryRoot, 'requirements', 'probe', 'tests', 'probe.test.mjs')
   mkdirSync(dirname(fixturePath), { recursive: true })

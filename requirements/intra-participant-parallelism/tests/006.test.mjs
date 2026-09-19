@@ -10,7 +10,7 @@ const mustOk = (result) => {
   return result
 }
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-006] pre-fission completion broadcasts to every lane exactly once with idempotent delivery', () => {
+test('WHAT[intra-participant-parallelism-006] pre-fission completion broadcasts to every lane exactly once with idempotent delivery', () => {
   const emptyDelivery = fission.deliveryEmpty(3)
   assertJsData(emptyDelivery, 'deliveryEmpty')
   assert.deepEqual(emptyDelivery, { laneCount: 3, deliveries: [] })

@@ -3,7 +3,7 @@ import { assertEffectIsInjected, assertPureContract } from '../../structured-wor
 
 
 
-test('WHAT[PROC-012] process and PTY contracts exclude Node adapters mutable handles and delegation runtime', () => {
+test('WHAT[process-execution-012] process and PTY contracts exclude Node adapters mutable handles and delegation runtime', () => {
   assertPureContract()
   assertEffectIsInjected('process-control')
 })

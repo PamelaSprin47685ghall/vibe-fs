@@ -40,7 +40,7 @@ const lastExit = (registry) => {
 }
 const activeCount = (registry) => causal.snapshot(registry).active.length
 
-test('WHAT[CAUSAL-005] THEOREM_untilSignalOrDeadline_returns_immediately_when_tryRead_ready', async () => {
+test('WHAT[causal-wait-005] THEOREM_untilSignalOrDeadline_returns_immediately_when_tryRead_ready', async () => {
   const registry = causal.createRegistry()
   const timer = process.createVirtualTimer()
   const handle = process.timerDelay(timer, 10_000)
@@ -56,7 +56,7 @@ test('WHAT[CAUSAL-005] THEOREM_untilSignalOrDeadline_returns_immediately_when_tr
   assert.equal(activeCount(registry), 0)
   process.timerDispose(timer)
 })
-test('WHAT[CAUSAL-005] THEOREM_untilSignalOrDeadline_signal_then_ready_cancels_deadline', async () => {
+test('WHAT[causal-wait-005] THEOREM_untilSignalOrDeadline_signal_then_ready_cancels_deadline', async () => {
   const registry = causal.createRegistry()
   const timer = process.createVirtualTimer()
   const handle = process.timerDelay(timer, 5_000)
@@ -79,7 +79,7 @@ test('WHAT[CAUSAL-005] THEOREM_untilSignalOrDeadline_signal_then_ready_cancels_d
   assert.equal(activeCount(registry), 0)
   process.timerDispose(timer)
 })
-test('WHAT[CAUSAL-005] THEOREM_untilSignalOrDeadline_stale_signal_loops_until_deadline', async () => {
+test('WHAT[causal-wait-005] THEOREM_untilSignalOrDeadline_stale_signal_loops_until_deadline', async () => {
   const registry = causal.createRegistry()
   const timer = process.createVirtualTimer()
   const handle = process.timerDelay(timer, 250)
@@ -132,7 +132,7 @@ const enteredLeft = (snapshot) => {
   return snapshot.history[1].exit
 }
 
-test('WHAT[CAUSAL-005] THEOREM_untilSignalOrDeadline_signal_then_ready_cancels_deadline', async () => {
+test('WHAT[causal-wait-005] THEOREM_untilSignalOrDeadline_signal_then_ready_cancels_deadline', async () => {
   const registry = causal.createRegistry()
   const timer = process.createVirtualTimer()
   const handle = process.timerDelay(timer, 60_000)
@@ -166,7 +166,7 @@ test('WHAT[CAUSAL-005] THEOREM_untilSignalOrDeadline_signal_then_ready_cancels_d
   assert.equal(handle.cancelCount, 1)
   process.timerDispose(timer)
 })
-test('WHAT[CAUSAL-005] THEOREM_untilSignalOrDeadline_stale_signal_loops_until_deadline', async () => {
+test('WHAT[causal-wait-005] THEOREM_untilSignalOrDeadline_stale_signal_loops_until_deadline', async () => {
   const registry = causal.createRegistry()
   const timer = process.createVirtualTimer()
   const handle = process.timerDelay(timer, 250)

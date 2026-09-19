@@ -37,7 +37,7 @@ export const PROVIDER_SCAN_ROOTS = Object.freeze([
 const PROVIDER_OUTPUT_LINE_RE =
   /Description\s*=|field\s+"|tomlObject|tomlObjectWithInstructions|\[\s*"error"|ToolHostCodec\.(?:TString|TTable)|\btString\s+\(|\bTString\s+"|instructions\s*=|hookSuffix|catalogDescription/
 
-/** VERIFY-005 Gate B leak vocabulary (substring tokens). */
+/** verification-system-005 Gate B leak vocabulary (substring tokens). */
 export const FORBIDDEN_TOKENS = Object.freeze([
   'SessionId',
   'AgentId',

@@ -8,7 +8,7 @@ const handles = await import("../../../dist/Execution/Delegation/Handle/Surface.
 const join = await import("../../../dist/Execution/Delegation/Fork/OpenCode/JoinSurface.js");
 
 
-test('WHAT[CRASH-009] P0_CLEAN_BREAK_delayed_recovery_before_ready_no_aborted_join_then_true_terminal', () => {
+test('WHAT[crash-reconciliation-009] P0_CLEAN_BREAK_delayed_recovery_before_ready_no_aborted_join_then_true_terminal', () => {
   const waiting = child.resolve('active', 'missing', ['aborted:interrupted tool', 'restore'], '')
   assert.equal(waiting.result, 'RecoveryIncomplete')
   assert.equal(handles.crashScenario('active').retired, false)
@@ -26,13 +26,13 @@ const handles = await import("../../../dist/Execution/Delegation/Handle/Surface.
 
 const active = () => handles.crashScenario('active')
 
-test('WHAT[CRASH-009] P0_RECOVERY_JOIN_001_crash_after_aborted_observed_stays_active', () => {
+test('WHAT[crash-reconciliation-009] P0_RECOVERY_JOIN_001_crash_after_aborted_observed_stays_active', () => {
   const state = active()
   assert.equal(state.lifecycle, 'Active')
   assert.equal(state.joinable, 0)
   assert.equal(state.retired, false)
 })
-test('WHAT[CRASH-009] P0_RECOVERY_JOIN_001_crash_matrix_no_aborted_durable_fact', () => {
+test('WHAT[crash-reconciliation-009] P0_RECOVERY_JOIN_001_crash_matrix_no_aborted_durable_fact', () => {
   const state = active()
   assert.equal(state.lifecycle, 'Active')
   assert.equal(state.completion, null)
@@ -56,10 +56,10 @@ const legal = [
   event('JoinReturned', { agent: AGENT }),
 ]
 
-test('WHAT[CRASH-009] P0_RECOVERY_JOIN_001_trace_legal_order_passes', () => {
+test('WHAT[crash-reconciliation-009] P0_RECOVERY_JOIN_001_trace_legal_order_passes', () => {
   assert.equal(childRecovery.trace(legal), true)
 })
-test('WHAT[CRASH-009] P0_RECOVERY_JOIN_001_trace_join_without_proof_fails', () => {
+test('WHAT[crash-reconciliation-009] P0_RECOVERY_JOIN_001_trace_join_without_proof_fails', () => {
   assert.equal(
     childRecovery.trace([
       event('ChildRecoveryStarted', { session: CHILD }),
@@ -69,7 +69,7 @@ test('WHAT[CRASH-009] P0_RECOVERY_JOIN_001_trace_join_without_proof_fails', () =
     false,
   )
 })
-test('WHAT[CRASH-009] P0_RECOVERY_JOIN_001_trace_join_without_commit_fails', () => {
+test('WHAT[crash-reconciliation-009] P0_RECOVERY_JOIN_001_trace_join_without_commit_fails', () => {
   assert.equal(
     childRecovery.trace([
       event('TerminalProofIssued', { agent: AGENT }),
@@ -78,7 +78,7 @@ test('WHAT[CRASH-009] P0_RECOVERY_JOIN_001_trace_join_without_commit_fails', () 
     false,
   )
 })
-test('WHAT[CRASH-009] P0_RECOVERY_JOIN_001_trace_proof_after_commit_fails', () => {
+test('WHAT[crash-reconciliation-009] P0_RECOVERY_JOIN_001_trace_proof_after_commit_fails', () => {
   assert.equal(
     childRecovery.trace([
       event('HandleCompletionCommitted', { agent: AGENT }),
@@ -88,7 +88,7 @@ test('WHAT[CRASH-009] P0_RECOVERY_JOIN_001_trace_proof_after_commit_fails', () =
     false,
   )
 })
-test('WHAT[CRASH-009] P0_RECOVERY_JOIN_001_trace_abort_adjacent_commit_fails', () => {
+test('WHAT[crash-reconciliation-009] P0_RECOVERY_JOIN_001_trace_abort_adjacent_commit_fails', () => {
   assert.equal(
     childRecovery.trace([
       event('RawAbortObserved', { session: CHILD }),
@@ -99,7 +99,7 @@ test('WHAT[CRASH-009] P0_RECOVERY_JOIN_001_trace_abort_adjacent_commit_fails', (
     false,
   )
 })
-test('WHAT[CRASH-009] P0_RECOVERY_JOIN_001_trace_abort_adjacent_join_returned_fails', () => {
+test('WHAT[crash-reconciliation-009] P0_RECOVERY_JOIN_001_trace_abort_adjacent_join_returned_fails', () => {
   assert.equal(
     childRecovery.trace([
       event('TerminalProofIssued', { agent: AGENT }),
@@ -110,11 +110,11 @@ test('WHAT[CRASH-009] P0_RECOVERY_JOIN_001_trace_abort_adjacent_join_returned_fa
     false,
   )
 })
-test('WHAT[CRASH-009] P0_RECOVERY_JOIN_001_trace_empty_and_abort_only_pass', () => {
+test('WHAT[crash-reconciliation-009] P0_RECOVERY_JOIN_001_trace_empty_and_abort_only_pass', () => {
   assert.equal(childRecovery.trace([]), true)
   assert.equal(childRecovery.trace([event('RawAbortObserved', { session: CHILD })]), true)
 })
-test('WHAT[CRASH-009] P0_RECOVERY_JOIN_001_trace_wrong_agent_proof_does_not_satisfy_join', () => {
+test('WHAT[crash-reconciliation-009] P0_RECOVERY_JOIN_001_trace_wrong_agent_proof_does_not_satisfy_join', () => {
   assert.equal(
     childRecovery.trace([
       event('TerminalProofIssued', { agent: 'other-agent' }),

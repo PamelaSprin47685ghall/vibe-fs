@@ -4,7 +4,7 @@ import * as projection from '../../../dist/Mission/Relay/ProjectionSurface.js'
 
 
 
-test('WHAT[PROJ-009] provider projection excludes predecessor manager private transcript and devops prompt history', () => {
+test('WHAT[relay-context-projection-009] provider projection excludes predecessor manager private transcript and devops prompt history', () => {
   const messages = [
     { id: 'root-auth', run: '', role: 'user', text: 'root requirement' },
     { id: 'm1-assess', run: 'run-m1', role: 'assistant', text: 'manager 1 private reasoning' },
@@ -37,7 +37,7 @@ test('WHAT[PROJ-009] provider projection excludes predecessor manager private tr
   assert.deepEqual(providerIds, ['root-auth', 'm2-assess'])
 })
 
-test('WHAT[PROJ-009] devops execution facts reach next incumbent via workspace snapshot rather than conversational replay', () => {
+test('WHAT[relay-context-projection-009] devops execution facts reach next incumbent via workspace snapshot rather than conversational replay', () => {
   if (typeof projection.projectDevOpsFacts === 'function') {
     const facts = projection.projectDevOpsFacts({
       workspaceSnapshotId: 'snap-post-devops',

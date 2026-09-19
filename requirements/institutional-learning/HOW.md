@@ -39,5 +39,5 @@
 
 ## GAP
 
-- `INSTITUTIONAL-LEARNING-007`（CLOSED）：`celebrate` 在学习闭合后尾部弹出 Deferred Work 已闭合，落点 `tests/007.test.mjs`。
+- `institutional-learning-007`（CLOSED）：`celebrate` 在学习闭合后尾部弹出 Deferred Work 已闭合，落点 `tests/007.test.mjs`。
 

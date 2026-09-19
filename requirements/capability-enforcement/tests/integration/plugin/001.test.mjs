@@ -66,7 +66,7 @@ const fullConfig = () => ({
   ),
 })
 
-test('WHAT[ENF-001] MANAGER_role_permission_matrix_is_owned_by_RolesSurface', () => {
+test('WHAT[capability-enforcement-001] MANAGER_role_permission_matrix_is_owned_by_RolesSurface', () => {
   for (const role of ROLE_NAMES) {
     const labels = permissions(role)
     assert.ok(Array.isArray(labels), role)

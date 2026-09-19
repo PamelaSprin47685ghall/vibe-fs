@@ -13,7 +13,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
 const PRODUCTION_ROOT = join(ROOT, 'src', 'Wanxiangshu')
 
-test('WHAT[TIME-004] domain_application_session_contain_no_raw_time_tokens', () => {
+test('WHAT[time-capability-004] domain_application_session_contain_no_raw_time_tokens', () => {
   const hits = scanRawTimeProduction(ROOT)
   assert.equal(
     hits.length,
@@ -24,14 +24,14 @@ test('WHAT[TIME-004] domain_application_session_contain_no_raw_time_tokens', () 
   )
 })
 
-test('WHAT[TIME-004] collector_reads_the_whole_production_tree_before_allowlisting_adapters', () => {
+test('WHAT[time-capability-004] collector_reads_the_whole_production_tree_before_allowlisting_adapters', () => {
   assert.deepEqual([...RAW_TIME_SCAN_ROOTS], ['.'])
   const entries = collectRawTimeScanEntries(PRODUCTION_ROOT, RAW_TIME_SCAN_ROOTS)
   assert.ok(entries.some((entry) => entry.file === 'Process/NodeTiming.fs'))
   assert.ok(entries.some((entry) => entry.file === 'Change/Program.fs'))
 })
 
-test('WHAT[TIME-004] exact_mutation_is_detected_without_a_directory_allowlist_escape', () => {
+test('WHAT[time-capability-004] exact_mutation_is_detected_without_a_directory_allowlist_escape', () => {
   const source = [
     'module Synthetic',
     'let a = DateTimeOffset.UtcNow',
@@ -63,7 +63,7 @@ test('WHAT[TIME-004] exact_mutation_is_detected_without_a_directory_allowlist_es
   assert.deepEqual(unlistedSibling.map((hit) => hit.token), ['DateTimeOffset.UtcNow'])
 })
 
-test('WHAT[TIME-004] missing_production_root_fails_closed', () => {
+test('WHAT[time-capability-004] missing_production_root_fails_closed', () => {
   const missing = join(PRODUCTION_ROOT, '__missing_time_gate_root__')
   assert.throws(
     () => collectRawTimeScanEntries(missing, RAW_TIME_SCAN_ROOTS),

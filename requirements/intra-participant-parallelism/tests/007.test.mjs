@@ -10,6 +10,6 @@ const mustOk = (result) => {
   return result
 }
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-007] post-fission completion has exactly one affinity target: the initiating lane', () => {
+test('WHAT[intra-participant-parallelism-007] post-fission completion has exactly one affinity target: the initiating lane', () => {
   assert.deepEqual(fission.completionTargets(4, { kind: 'lane', index: 2 }), [2])
 })

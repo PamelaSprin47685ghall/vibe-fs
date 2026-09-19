@@ -8,7 +8,7 @@ const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '../../..')
 
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
-test('WHAT[ACTION-AFFORDANCE-012] AA_caller_boundary_mirrors_explicitly_name_confusable_nearby_acts_and_forbidden_requests', () => {
+test('WHAT[action-affordance-012] AA_caller_boundary_mirrors_explicitly_name_confusable_nearby_acts_and_forbidden_requests', () => {
   // 1. commission explicitly names 'This is not fork'
   const commissionEn = read('resources/provider/tool/commission/description/en.md')
   const commissionZh = read('resources/provider/tool/commission/description/zh-CN.md')

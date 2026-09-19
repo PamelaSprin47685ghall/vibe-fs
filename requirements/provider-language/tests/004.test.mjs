@@ -8,7 +8,7 @@ const { clearAllForTests, readGlobalPreference, parse, tryParse, label, resource
 const english = 'English'
 const simplifiedChinese = 'SimplifiedChinese'
 
-test('WHAT[PROVIDER-LANGUAGE-004] global preference defaults to English when env unset', () => {
+test('WHAT[provider-language-004] global preference defaults to English when env unset', () => {
   const previous = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
   delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
   try {
@@ -56,11 +56,11 @@ test.beforeEach(() => {
   clearAllForTests()
 })
 
-test('WHAT[PROVIDER-LANGUAGE-004] unbound session language is English (first touch)', () => {
+test('WHAT[provider-language-004] unbound session language is English (first touch)', () => {
   const sid = 'ses_prose_unbound'
   assert.equal(nameOf(languageOfSession(sid)), english)
 })
-test('WHAT[PROVIDER-LANGUAGE-004] preference change only affects future sessions', async () => {
+test('WHAT[provider-language-004] preference change only affects future sessions', async () => {
   const existing = 'ses_pref_existing'
   const fresh = 'ses_pref_fresh'
 

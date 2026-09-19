@@ -4,7 +4,7 @@ open System.Threading.Tasks
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Process
 
-/// DELEG-029: Delegation-owned narrow PTY capability port.
+/// delegation-029: Delegation-owned narrow PTY capability port.
 /// Decouples PTY tool verbs from HostForkRuntime, Gate, and physical Process types.
 type DelegationPtyCapability =
     {

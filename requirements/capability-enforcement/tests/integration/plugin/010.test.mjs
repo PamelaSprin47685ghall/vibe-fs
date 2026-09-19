@@ -6,7 +6,7 @@ const { default: test } = await import("node:test");
 const { withExecutablePlugin, acceptAuthorityRoot } = await import("../../../../verification-system/tests/support/plugin-fixture.mjs");
 
 
-test('WHAT[ENF-010] AGENT_023_engineer_receives_hard_denial_and_no_shell', async () => {
+test('WHAT[capability-enforcement-010] AGENT_023_engineer_receives_hard_denial_and_no_shell', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'engineer-bash-honey', 'engineer')
     assert.ok(hooks.tool['bash-honeypot'], 'bash-honeypot must be registered')
@@ -21,7 +21,7 @@ test('WHAT[ENF-010] AGENT_023_engineer_receives_hard_denial_and_no_shell', async
     assert.match(result, /No command ran|未运行任何命令|没有运行任何命令/)
   })
 })
-test('WHAT[ENF-010] AGENT_023_bash_honeypot_is_denied_for_non_engineer_roles', async () => {
+test('WHAT[capability-enforcement-010] AGENT_023_bash_honeypot_is_denied_for_non_engineer_roles', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'manager-bash-honey', 'manager')
     const result = await hooks.tool['bash-honeypot'].execute(
@@ -31,7 +31,7 @@ test('WHAT[ENF-010] AGENT_023_bash_honeypot_is_denied_for_non_engineer_roles', a
     assert.match(result, /not available to Manager|对 Manager 不可用/)
   })
 })
-test('WHAT[ENF-010] AGENT_023_bash_honeypot_is_denied_when_the_role_is_unresolved', async () => {
+test('WHAT[capability-enforcement-010] AGENT_023_bash_honeypot_is_denied_when_the_role_is_unresolved', async () => {
   await withExecutablePlugin(async (hooks) => {
     const result = await hooks.tool['bash-honeypot'].execute(
       {},
@@ -96,7 +96,7 @@ const fullConfig = () => ({
   ),
 })
 
-test('WHAT[ENF-010] MANAGER_plugin_registers_only_plugin_owned_capability_tools', async () => {
+test('WHAT[capability-enforcement-010] MANAGER_plugin_registers_only_plugin_owned_capability_tools', async () => {
   await withPlugin(async (hooks) => {
     assert.deepEqual(Object.keys(hooks.tool).sort(), [...PLUGIN_TOOL_NAMES].sort())
     for (const toolName of PLUGIN_TOOL_NAMES) {
@@ -109,7 +109,7 @@ test('WHAT[ENF-010] MANAGER_plugin_registers_only_plugin_owned_capability_tools'
     for (const toolName of forbidden) assert.equal(hooks.tool[toolName], undefined, `${toolName} must not be an export`)
   })
 })
-test('WHAT[ENF-010] MANAGER_host_schemas_are_present_for_every_declared_argument', async () => {
+test('WHAT[capability-enforcement-010] MANAGER_host_schemas_are_present_for_every_declared_argument', async () => {
   await withPlugin(async (hooks) => {
     const expected = {
       fork: ['calling', 'name', 'charge', 'keywords', 'attach', 'expected_tool_calls'],
@@ -134,7 +134,7 @@ test('WHAT[ENF-010] MANAGER_host_schemas_are_present_for_every_declared_argument
     assert.equal(hooks.tool.commission.args.keywords, undefined)
   })
 })
-test('WHAT[ENF-010] ASSUME_updates_then_queries_one_persistent_jq_canvas_in_one_call', async () => {
+test('WHAT[capability-enforcement-010] ASSUME_updates_then_queries_one_persistent_jq_canvas_in_one_call', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'manager-assume', 'manager')
 
@@ -190,7 +190,7 @@ test('WHAT[ENF-010] ASSUME_updates_then_queries_one_persistent_jq_canvas_in_one_
     assert.equal(afterRejectedUpdate, 'true')
   })
 })
-test('WHAT[ENF-010] MANAGER_calling_enum_uses_personas_while_name_remains_a_free_byname', async () => {
+test('WHAT[capability-enforcement-010] MANAGER_calling_enum_uses_personas_while_name_remains_a_free_byname', async () => {
   await withPlugin(async (hooks) => {
     const managerPersonas = ['engineer']
     for (const calling of managerPersonas) {
@@ -207,7 +207,7 @@ test('WHAT[ENF-010] MANAGER_calling_enum_uses_personas_while_name_remains_a_free
     }
   })
 })
-test('WHAT[ENF-010] MANAGER_legacy_agent_configuration_is_rejected_after_owned_projection', async () => {
+test('WHAT[capability-enforcement-010] MANAGER_legacy_agent_configuration_is_rejected_after_owned_projection', async () => {
   await withPlugin(async (hooks) => {
     const config = fullConfig()
     config.agent.build = {}

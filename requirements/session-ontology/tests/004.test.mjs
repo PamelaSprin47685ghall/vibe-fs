@@ -9,7 +9,7 @@ assert.equal(linked.ok, true, linked.message)
 
 const state = linked.value
 
-test('WHAT[SESSION-ONTOLOGY-004] HOST_008_companion_is_internal_leaf_attached', () => {
+test('WHAT[session-ontology-004] HOST_008_companion_is_internal_leaf_attached', () => {
   const view = assoc.classify('ses_blogger', state)
   assert.equal(view.executionClass, 'InternalLeaf')
   assert.equal(view.ownership.kind, 'Attached')
@@ -17,7 +17,7 @@ test('WHAT[SESSION-ONTOLOGY-004] HOST_008_companion_is_internal_leaf_attached', 
   assert.equal(view.ownership.attachment, 'Companion')
 })
 
-test('WHAT[SESSION-ONTOLOGY-004] HOST_008_strength_replica_is_internal_leaf_attached', () => {
+test('WHAT[session-ontology-004] HOST_008_strength_replica_is_internal_leaf_attached', () => {
   assert.equal(assoc.strengthExecutionClass, 'InternalLeaf')
   assert.deepEqual(assoc.strengthOwnership('ses_owner'), {
     kind: 'Attached', owner: 'ses_owner', attachment: 'StrengthReplica', transactionId: null,

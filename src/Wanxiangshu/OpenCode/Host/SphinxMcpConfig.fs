@@ -106,7 +106,7 @@ module SphinxMcpConfig =
     let apply (config: obj) (launch: Launch) : unit =
         if isNull config then () else applyNonNull config launch
 
-    // ── JS-native boundary for HOST-BOUNDARY-017 contract tests ────────────
+    // ── JS-native boundary for host-boundary-017 contract tests ────────────
 
     /// The server identity this adapter owns.
     let serverIdentity () : string = SphinxMcp.serverName

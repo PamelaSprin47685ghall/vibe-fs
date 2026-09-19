@@ -23,7 +23,7 @@ type PrefixRendered =
 ///
 /// Pure and index-based. The Host message objects live at the adapter boundary; what
 /// is decided here is the intent: whether the companion memory replaces the physical
-/// prefix, and what that synthetic message contains (PROJ-001 — the caller declares
+/// prefix, and what that synthetic message contains (relay-context-projection-001 — the caller declares
 /// the intent, the renderer applies it).
 [<RequireQualifiedAccess>]
 module XPrefixProjection =
@@ -37,7 +37,7 @@ module XPrefixProjection =
         { ContainsTodoWrite: bool
           ToolCallIds: Set<ToolCallId> }
 
-    /// CONTEXT-COMPRESSION-020: Y may replace ordinary dropped history, but a
+    /// context-compression-020: Y may replace ordinary dropped history, but a
     /// todowrite round remains raw X. The call message establishes the protected
     /// call id; any dropped message carrying that id (notably the result) belongs
     /// to the same protected round. A malformed call without an id still protects

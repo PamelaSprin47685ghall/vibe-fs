@@ -28,7 +28,7 @@ const ACTIVE_OFFICES = [
   },
 ]
 
-test('WHAT[OFF-005] OFF_005_each_office_consequence_hits_manager_law_and_fork_description_in_both_locales', () => {
+test('WHAT[office-capability-005] OFF_005_each_office_consequence_hits_manager_law_and_fork_description_in_both_locales', () => {
   const surfaces = {
     managerEn: read('role/manager/en.md'),
     managerZh: read('role/manager/zh-CN.md'),

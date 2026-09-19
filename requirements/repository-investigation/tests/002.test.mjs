@@ -12,7 +12,7 @@ const providerRoot = join(here, '../../../resources/provider')
 const readLaw = (semanticPath, locale) => readFileSync(join(providerRoot, semanticPath, `${locale}.md`), 'utf8')
 const LOCALES = ['en', 'zh-CN']
 
-test('WHAT[REPOSITORY-INVESTIGATION-002] INVESTIGATE_inspector_role_law_makes_evidence_locatable_again', () => {
+test('WHAT[repository-investigation-002] INVESTIGATE_inspector_role_law_makes_evidence_locatable_again', () => {
   for (const locale of LOCALES) {
     const law = readLaw('role/engineer', locale)
     assert.match(law, /locatable|再次被定位/, `${locale} locatability`)
@@ -43,7 +43,7 @@ test.before(() => {
   managedAgentConfig.installDefaultResources()
 })
 
-test('WHAT[REPOSITORY-INVESTIGATION-002] AGENT_027_parse_text_and_tool_result', () => {
+test('WHAT[repository-investigation-002] AGENT_027_parse_text_and_tool_result', () => {
   const hits = semble.parseText(JSON.stringify({
     results: [
       { file_path: 'src/A.fs', start_line: 2, end_line: 8, content: 'let a = 1\nlet b = 2', score: 0.42, total_lines: 30 },
@@ -73,7 +73,7 @@ test('WHAT[REPOSITORY-INVESTIGATION-002] AGENT_027_parse_text_and_tool_result', 
   assert.equal(fromTool[0].startLine, 1)
   assert.equal(fromTool[0].totalLines, 1)
 })
-test('WHAT[REPOSITORY-INVESTIGATION-002] AGENT_027_search_fixture_stdio_roundtrip', async () => {
+test('WHAT[repository-investigation-002] AGENT_027_search_fixture_stdio_roundtrip', async () => {
   const hits = await semble.search(
     semble.launchFromVars({ SEMBLE_MCP_FIXTURE: fixturePath, WANXIANGSHU_TEST: 'true' }),
     'auth handler',

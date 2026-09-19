@@ -52,7 +52,7 @@ const userMessageWithKey = (id, keyValue) => ({
   metadata: { wanxiangshu_prompt_key: keyValue },
 })
 
-test('WHAT[DISPATCH-PROTOCOL-008] DP_008_unproven_outcome_stays_pending_never_resends', async () => {
+test('WHAT[dispatch-protocol-008] DP_008_unproven_outcome_stays_pending_never_resends', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-dp008-'))
   try {
     // 启动 1：发送 AgentOwnerRoot（Detached），Host 只回 receipt —— claim 挂起。
@@ -94,7 +94,7 @@ test('WHAT[DISPATCH-PROTOCOL-008] DP_008_unproven_outcome_stays_pending_never_re
     rmSync(base, { recursive: true, force: true })
   }
 })
-test('WHAT[DISPATCH-PROTOCOL-008] DP_008_snapshot_unreadable_is_no_proof_and_keeps_the_claim_pending', async () => {
+test('WHAT[dispatch-protocol-008] DP_008_snapshot_unreadable_is_no_proof_and_keeps_the_claim_pending', async () => {
   const unreadableBase = mkdtempSync(join(tmpdir(), 'wxs-dp008-unreadable-'))
   try {
     const unreadableFirst = await journal.JournalSurface_bootWithWriterId(unreadableBase, 'writer-dp008-unreadable-1', 'rt_1', 4242, '2026-01-01T00:00:00Z')
@@ -194,7 +194,7 @@ const observation = (result) => {
   return result.observation
 }
 
-test('WHAT[DISPATCH-PROTOCOL-008] DP_008_concurrent_exact_gate_nudges_share_one_claim_and_send', async () => {
+test('WHAT[dispatch-protocol-008] DP_008_concurrent_exact_gate_nudges_share_one_claim_and_send', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-gate-single-flight-'))
   try {
     const opened = await journal.JournalSurface_bootWithWriterId(

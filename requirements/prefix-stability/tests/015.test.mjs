@@ -22,7 +22,7 @@ const probeFor = ({ cutoff = 5, id = 'probe-1' } = {}) => ({
   candidate: snapshotAt(cutoff),
 })
 
-test('WHAT[PREFIX-STABILITY-015] COMPANION_013_the_plan_reuses_the_snapshot_s_own_synthetic_id', () => {
+test('WHAT[prefix-stability-015] COMPANION_013_the_plan_reuses_the_snapshot_s_own_synthetic_id', () => {
   // Not re-derived. That id was fixed when the candidate was built and is what the
   // provider has already seen for this epoch; a second derivation site would make any
   // drift a cold boundary on every later request.
@@ -80,12 +80,12 @@ const pairMessages = (messages) => messages.filter((m) => isPairProgrammingThoug
 const guidanceSuffix = (markerText) => `\0\uFEFF${markerText}`
 const terminalOutputOf = (messages, id) => messages.find((m) => m.info.id === id).parts[0].state.output
 
-test('WHAT[PREFIX-STABILITY-015] PPT_tryInject_call_id_is_stable_per_session_and_ordinal', () => {
+test('WHAT[prefix-stability-015] PPT_tryInject_call_id_is_stable_per_session_and_ordinal', () => {
   assert.equal(stableCallId('ses_1', 1n), stableCallId('ses_1', 1n))
   assert.notEqual(stableCallId('ses_1', 1n), stableCallId('ses_1', 2n))
   assert.notEqual(stableCallId('ses_1', 1n), stableCallId('ses_2', 1n))
 })
-test('WHAT[PREFIX-STABILITY-015] PPT_tryInject_without_session_id_still_appends_stable_pair', async () => {
+test('WHAT[prefix-stability-015] PPT_tryInject_without_session_id_still_appends_stable_pair', async () => {
   // Without a session id the guidance still lands deterministically on the
   // terminal real tool result; a session-less trailing-user turn passes through.
   const raw = [toolCall('c1', 'bash', 't1'), toolResult('r1', 'bash', 't1', 'out1')]

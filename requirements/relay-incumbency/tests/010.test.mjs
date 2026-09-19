@@ -4,7 +4,7 @@ import * as relay from '../../../dist/Mission/Relay/Surface.js'
 
 
 
-test('WHAT[RELAY-010] road owns unique logical devops and active incumbent holds exclusive invocation authority', () => {
+test('WHAT[relay-incumbency-010] road owns unique logical devops and active incumbent holds exclusive invocation authority', () => {
   const first = relay.openIncumbency(relay.empty(), 'road-1', 'inc-1', 'snapshot-1', 'authority-1')
   assert.equal(first.ok, true)
 

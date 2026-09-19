@@ -1,4 +1,4 @@
-// WHAT[EPI-030]: frozen-transcript replay over the public legacy adapter.
+// WHAT[epistemic-reasoning-030]: frozen-transcript replay over the public legacy adapter.
 // Keeps one SessionStore per replayed inquiry in a module table; start mints a
 // fresh inquiry id and ignores any frozen handle, later calls run through the
 // live store handle. Every verdict comes from SessionStore + McpContract views.

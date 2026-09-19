@@ -7,7 +7,7 @@ const sessionError = (error, properties = {}) => ({
   properties: { sessionID: 'ses-execfail-009', error, ...properties },
 })
 
-test('WHAT[EXECFAIL-009] host error boundary normalizes raw untyped errors to provider transient without guessing failure classes', () => {
+test('WHAT[execution-failure-policy-009] host error boundary normalizes raw untyped errors to provider transient without guessing failure classes', () => {
   // 1. Untyped upstream errors of varying prose or status codes decode strictly to ProviderTransient
   const rawErrors = [
     { name: 'Error', message: 'HTTP 429 Too Many Requests: rate limit exceeded' },

@@ -33,7 +33,7 @@ const evidence = {
 const run = (failurePoint = 'None', state = 'None') =>
   transaction.transactionScenario(evidence, failurePoint, state)
 
-test('WHAT[CHATEXEC-007] every acquired pre-commit failure releases exactly once', async () => {
+test('WHAT[managed-chat-execution-007] every acquired pre-commit failure releases exactly once', async () => {
   const expectations = new Map([
     ['LeaseTarget', 'LeaseTargetFailed'],
     ['BindExecution', 'BindingFailed'],
@@ -62,7 +62,7 @@ test('WHAT[CHATEXEC-007] every acquired pre-commit failure releases exactly once
     }
   }
 })
-test('WHAT[CHATEXEC-007] release boundary failure is typed without a second release', async () => {
+test('WHAT[managed-chat-execution-007] release boundary failure is typed without a second release', async () => {
   const result = await run('ReleaseBeforeProvider')
 
   assert.equal(result.ok, false)
@@ -99,7 +99,7 @@ const snapshot = (overrides = {}) => ({
 })
 const decide = (decoded, durable = snapshot()) => intent.resolve(decoded, durable)
 
-test('WHAT[INTERACTION-AUTHORITY-007] unknown origin is rejected while active', () => {
+test('WHAT[interaction-authority-007] unknown origin is rejected while active', () => {
   assert.deepEqual(
     decide(message(), snapshot({ activeParticipant: 'engineer', activeKind: 'HumanRoot' })),
     { case: 'Reject', reason: 'UnknownOriginWhileActive' },
@@ -194,7 +194,7 @@ const mustFold = (wires) => {
 const phaseOf = (projection, physicalUserMessageId) =>
   projection.find((entry) => entry.physicalUserMessageId === physicalUserMessageId)
 
-test('WHAT[CHATEXEC-007] pre-provider failure cancellation and rejection settle without a provider run', () => {
+test('WHAT[managed-chat-execution-007] pre-provider failure cancellation and rejection settle without a provider run', () => {
   for (const disposition of ['Cancelled', 'Rejected', 'Failed']) {
     const messageId = `msg-pre-provider-${disposition.toLowerCase()}`
     const projection = mustFold([
@@ -238,7 +238,7 @@ const cases = [
   ['PluginReplay', 'Rejected'],
 ]
 
-test('WHAT[CHATEXEC-007] each typed pre-provider failure settles the exact accepted execution', async () => {
+test('WHAT[managed-chat-execution-007] each typed pre-provider failure settles the exact accepted execution', async () => {
   for (const [failure, disposition] of cases) {
     const result = await transaction.preProviderSettlementScenario(evidence(failure), failure, 'Exact')
 
@@ -265,7 +265,7 @@ test('WHAT[CHATEXEC-007] each typed pre-provider failure settles the exact accep
     assert.ok(['Recoverable', 'Permanent'].includes(result.failure.classification))
   }
 })
-test('WHAT[CHATEXEC-007] rejects hostile legacy AGENT-028 membrane input before it can enter a legal managed flow', async () => {
+test('WHAT[managed-chat-execution-007] rejects hostile legacy AGENT-028 membrane input before it can enter a legal managed flow', async () => {
   // effectiveAgent is not a current builder field: it is injected here solely as
   // raw hostile legacy evidence and must fail closed with zero admission effects.
   const result = await transaction.preProviderSettlementScenario(
@@ -285,7 +285,7 @@ test('WHAT[CHATEXEC-007] rejects hostile legacy AGENT-028 membrane input before 
   assert.equal(result.admission.providerBinding, 0)
   assert.equal(result.providerEffectCount, 0)
 })
-test('WHAT[CHATEXEC-007] detects missing exact pre-provider release', async () => {
+test('WHAT[managed-chat-execution-007] detects missing exact pre-provider release', async () => {
   const settled = await transaction.preProviderSettlementScenario(
     evidence('release-control'),
     'ProjectionError',

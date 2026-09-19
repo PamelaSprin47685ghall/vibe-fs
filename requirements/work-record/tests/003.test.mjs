@@ -29,7 +29,7 @@ const materialize = (
 
 const OPENING_END = { Sequence: 1 }
 
-test('WHAT[WORK-RECORD-003] LWR_y_frames_cover_prefix_and_x_supplies_only_suffix', () => {
+test('WHAT[work-record-003] LWR_y_frames_cover_prefix_and_x_supplies_only_suffix', () => {
   const trace = [
     xTrace.item({ sequence: 0, role: 'user', part: xTrace.text('task') }),
     xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.text('work a') }),
@@ -49,7 +49,7 @@ test('WHAT[WORK-RECORD-003] LWR_y_frames_cover_prefix_and_x_supplies_only_suffix
   assert.equal(rendered.includes('work b'), false)
 })
 
-test('WHAT[WORK-RECORD-003] LWR_no_y_frames_means_opening_plus_raw_gap_not_alternate_A_path', () => {
+test('WHAT[work-record-003] LWR_no_y_frames_means_opening_plus_raw_gap_not_alternate_A_path', () => {
   const trace = [
     xTrace.item({ sequence: 0, role: 'user', part: xTrace.text('task') }),
     xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.text('work a') }),

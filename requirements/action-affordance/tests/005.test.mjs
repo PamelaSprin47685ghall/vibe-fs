@@ -9,7 +9,7 @@ const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '../../..')
 
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
-test('WHAT[ACTION-AFFORDANCE-005] AA_establish_behavior_is_legacy_forbidden_and_source_modification_is_separated_from_execution_evidence', () => {
+test('WHAT[action-affordance-005] AA_establish_behavior_is_legacy_forbidden_and_source_modification_is_separated_from_execution_evidence', () => {
   // 1. establish-behavior must not own a ToolSpec
   assert.ok(
     LEGACY_FORBIDDEN_NAMES.includes('establish-behavior'),

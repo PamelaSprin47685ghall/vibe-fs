@@ -86,7 +86,7 @@ const markerOutput = (messages) => {
   return idx >= 0 ? output.slice(idx + SEP.length) : undefined
 }
 
-test('WHAT[GD-009] CTX_002_GUIDELINE_001_marker_without_nudge_is_guideline_text', async () => {
+test('WHAT[guidance-delivery-009] CTX_002_GUIDELINE_001_marker_without_nudge_is_guideline_text', async () => {
   const marker = pair.text
   const result = await tryInject('ses-gd-001', marker, anchor)
   assert.equal(result.ok, true, result.error)
@@ -94,7 +94,7 @@ test('WHAT[GD-009] CTX_002_GUIDELINE_001_marker_without_nudge_is_guideline_text'
   assert.match(marker, /^# /)
 })
 
-test('WHAT[GD-009] CTX_002_GUIDELINE_002_marker_with_nudge_is_one_instruction_plane', async () => {
+test('WHAT[guidance-delivery-009] CTX_002_GUIDELINE_002_marker_with_nudge_is_one_instruction_plane', async () => {
   const nudge = 'A domain concept is crossing a boundary as a primitive. Introduce a distinct type so invalid substitutions become impossible.'
   const marker = `# ${nudge}\n${pair.text}`
   const result = await tryInject('ses-gd-002', marker, anchor)

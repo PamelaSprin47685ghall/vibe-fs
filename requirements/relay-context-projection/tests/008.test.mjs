@@ -22,7 +22,7 @@ const cutResult = () => projection.applyCut(cutMessages, 'old-run', 'suicide-cal
 
 const ids = (result) => result.provider.map((message) => message.id ?? message.info?.id)
 
-test('WHAT[PROJ-008] wire cut drops the retired tail and the internal loop wake until the next real user turn', () => {
+test('WHAT[relay-context-projection-008] wire cut drops the retired tail and the internal loop wake until the next real user turn', () => {
   const providerIds = ids(cutResult())
   assert.equal(providerIds.includes('a-late'), false)
   assert.equal(providerIds.includes('wake-1'), false)
@@ -30,7 +30,7 @@ test('WHAT[PROJ-008] wire cut drops the retired tail and the internal loop wake 
   assert.equal(providerIds.includes('r1'), false)
 })
 
-test('WHAT[PROJ-008] projection cut preserves only typed authority from the retired iteration', () => {
+test('WHAT[relay-context-projection-008] projection cut preserves only typed authority from the retired iteration', () => {
   const messages = [
     { id: 'root-authority', run: '', role: 'user', text: 'root request' },
     { id: 'old-audit', run: 'old-run', role: 'assistant', text: 'audit' },

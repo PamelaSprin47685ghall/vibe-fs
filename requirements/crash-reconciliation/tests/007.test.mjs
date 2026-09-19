@@ -5,7 +5,7 @@ import * as reconcile from '../../../dist/Composition/Turn/ReconcileSurface.js'
 const decisionName = (evidence, wake = reconcile.retryWake()) =>
   reconcile.decisionName(reconcile.decideStep(wake, evidence))
 
-test('WHAT[CRASH-007] turn_unknown_is_snapshot_observation_not_turn_outcome', () => {
+test('WHAT[crash-reconciliation-007] turn_unknown_is_snapshot_observation_not_turn_outcome', () => {
   const publishable = ['TurnInProgress', 'TurnNeedsContinuation', 'TurnCompleted', 'TurnAborted', 'TurnFailed']
   for (const name of publishable) {
     assert.equal(reconcile.tryOutcome(name).accepted, true, `${name} must be a publishable outcome`)
@@ -17,7 +17,7 @@ test('WHAT[CRASH-007] turn_unknown_is_snapshot_observation_not_turn_outcome', ()
   assert.equal(reconcile.isPublishableOutcome('TurnUnknown'), false)
 })
 
-test('WHAT[CRASH-007] publish_boundary_carries_turn_outcome_not_snapshot_observation', () => {
+test('WHAT[crash-reconciliation-007] publish_boundary_carries_turn_outcome_not_snapshot_observation', () => {
   // This is the owner-defined plain input contract, not Fable reflection.
   assert.deepEqual(reconcile.acceptedTurnFields(), ['session', 'physical', 'providerRun', 'outcome'])
 

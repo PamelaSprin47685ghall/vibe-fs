@@ -59,7 +59,7 @@ const foldFacts = (facts) =>
   foldFactsThroughOwner(facts.map((value, index) => ownerEnvelope({ seq: index + 1, session: SESSION, fact: value })))
 const budgetOf = (projection) => providerFailureProjection.read(projection)
 
-test('WHAT[PAR-020] budget_replay_exposes_domain_evidence_without_resume_authority', () => {
+test('WHAT[provider-attempt-recovery-020] budget_replay_exposes_domain_evidence_without_resume_authority', () => {
   const facts = [rootFact(), failureFact({ run: 'provider-1', count: 1 })]
   const first = budgetOf(foldFacts(facts).value)
   const replay = budgetOf(foldFacts(facts).value)
@@ -118,7 +118,7 @@ const buildPlan = (over) => {
   return built
 }
 
-test('WHAT[PAR-020] recovery holds manual-only ownership and publishes no background resume', () => {
+test('WHAT[provider-attempt-recovery-020] recovery holds manual-only ownership and publishes no background resume', () => {
   const scope = RecoveryScope.createRecoveryScope()
   assert.deepEqual(RecoveryScope.recoveryOwnership(scope), { manuals: 0 })
 

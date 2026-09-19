@@ -66,7 +66,7 @@ const layersOf = (s) =>
     ]),
   )
 
-test('WHAT[REPOSITORY-PROGRAMMING-003] JS002_generation_is_deterministic_and_names_js_role', () => {
+test('WHAT[repository-programming-003] JS002_generation_is_deterministic_and_names_js_role', () => {
   const perms = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep, ToolPermission.Edit, ToolPermission.Write)
   const a = generate('Engineer', perms, 'en')
   const b = generate('Engineer', perms, 'en')
@@ -78,7 +78,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-003] JS002_generation_is_deterministic_and_nam
   assert.equal(a.capabilities.length, 5)
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-003] JS002_same_capabilities_share_mechanics_but_role_shapes_the_ultra_example', () => {
+test('WHAT[repository-programming-003] JS002_same_capabilities_share_mechanics_but_role_shapes_the_ultra_example', () => {
   const shared = caps(ToolPermission.Read, ToolPermission.Edit, ToolPermission.Glob, ToolPermission.Grep)
   const engineer = generate('Engineer', shared, 'en')
   const devops = generate('DevOps', shared, 'en')
@@ -89,7 +89,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-003] JS002_same_capabilities_share_mechanics_b
   assert.match(devops.description, /candidateTests/)
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-003] JS004_fast_deep_profiles_generate_identical_surfaces', () => {
+test('WHAT[repository-programming-003] JS004_fast_deep_profiles_generate_identical_surfaces', () => {
   // Tier never reaches the generator: capability is role-only (AGENT-001).
   // The same capability set from a deep Coder yields byte-identical output.
   const fast = generate('Engineer', caps(ToolPermission.Read, ToolPermission.Glob), 'en')
@@ -98,7 +98,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-003] JS004_fast_deep_profiles_generate_identic
   assert.equal(fast.description, deep.description)
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-003] JS010_each_filesystem_role_gets_exactly_one_distinct_ultra_example', () => {
+test('WHAT[repository-programming-003] JS010_each_filesystem_role_gets_exactly_one_distinct_ultra_example', () => {
   const markers = {
     Engineer: /oldApi → newApi/,
     DevOps: /candidateTests/,

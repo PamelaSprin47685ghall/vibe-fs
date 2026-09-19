@@ -22,7 +22,7 @@ open Wanxiangshu.Ablation
 /// keeps Host capabilities private; callers cannot obtain emitted turn values.
 module FissionHostSurface =
 
-    /// INTRA-PARTICIPANT-PARALLELISM-013: expose the exact request-local
+    /// intra-participant-parallelism-013: expose the exact request-local
     /// provider tool projection without exposing Host session registries.
     let projectFissionToolVisibility (hasPhysicalParent: bool) (tools: obj) : obj =
         if not (AblationSettings.fissionVisible ()) then

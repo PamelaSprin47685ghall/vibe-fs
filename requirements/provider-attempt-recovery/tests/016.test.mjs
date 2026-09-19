@@ -22,7 +22,7 @@ const TOOL_CAPABILITIES = [
   'Write',
 ]
 
-test('WHAT[PAR-016] success_accounting_requires_proven_request_kind', () => {
+test('WHAT[provider-attempt-recovery-016] success_accounting_requires_proven_request_kind', () => {
   // Only WorkMain-family attempts may carry a probe; maintenance and repair
   // kinds never do — so their success can never promote and never clear the
   // budget through the probe path. The kind label itself decides.

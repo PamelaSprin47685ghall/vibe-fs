@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import * as recoveryHost from '../../../dist/OpenCode/Host/SessionRecoveryHostSurface.js'
 
-test('WHAT[PAR-023] session idle sweep selectively targets only Accepted without ProviderStarted executions of that session', async (t) => {
+test('WHAT[provider-attempt-recovery-023] session idle sweep selectively targets only Accepted without ProviderStarted executions of that session', async (t) => {
   const tempDir = mkdtempSync(join(tmpdir(), 'wxs-par023-'))
   t.after(() => {
     rmSync(tempDir, { recursive: true, force: true })

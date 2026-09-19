@@ -8,13 +8,13 @@ const english = 'English'
 
 const simplifiedChinese = 'SimplifiedChinese'
 
-test('WHAT[GD-012] GD_012_DELEG_022_no_estimate_means_no_dynamic_fragment', () => {
+test('WHAT[guidance-delivery-012] GD_012_DELEG_022_no_estimate_means_no_dynamic_fragment', () => {
   const guideline = 'canonical pair guideline'
   assert.equal(compose(undefined, undefined, guideline), '# canonical pair guideline\n')
   assert.equal(compose('tip guidance', undefined, guideline), '# tip guidance\n# canonical pair guideline\n')
 })
 
-test('WHAT[GD-012] GD_012_each_new_occurrence_can_render_a_new_remaining_without_rewriting_old_text', () => {
+test('WHAT[guidance-delivery-012] GD_012_each_new_occurrence_can_render_a_new_remaining_without_rewriting_old_text', () => {
   const guideline = 'canonical pair guideline'
   const oldMarker = compose(undefined, renderToolEstimate(english, 3), guideline)
   const newMarker = compose(undefined, renderToolEstimate(english, 0), guideline)
@@ -25,7 +25,7 @@ test('WHAT[GD-012] GD_012_each_new_occurrence_can_render_a_new_remaining_without
   assert.match(oldMarker, /3/, 'the previously materialized string remains unchanged')
 })
 
-test('WHAT[GD-012] GD_012_dynamic_fragment_is_between_tip_and_guideline_in_instruction_plane', () => {
+test('WHAT[guidance-delivery-012] GD_012_dynamic_fragment_is_between_tip_and_guideline_in_instruction_plane', () => {
   const tip = 'tip guidance'
   const estimate = renderToolEstimate(english, 2)
   const guideline = 'canonical pair guideline'
@@ -36,7 +36,7 @@ test('WHAT[GD-012] GD_012_dynamic_fragment_is_between_tip_and_guideline_in_instr
   assert.equal(marker.split('\n').filter(Boolean).every((line) => line.startsWith('# ')), true)
 })
 
-test('WHAT[GD-012] GD_012_tool_estimate_calibration_rendered_for_guideline_instruction', () => {
+test('WHAT[guidance-delivery-012] GD_012_tool_estimate_calibration_rendered_for_guideline_instruction', () => {
   const en = renderToolEstimate(english, 4)
   assert.match(en, /4/)
   assert.match(en, /delegator|commissioner/i)

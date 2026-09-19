@@ -29,7 +29,7 @@ const createRealWorktree = async (repo, child, job) => {
   return change.gitCreateWorktree(git, job, child)
 }
 
-test('WHAT[CHGINT-005] CHGINT_worktree_create_argv_is_accepted_by_real_git', async () => {
+test('WHAT[change-integration-005] CHGINT_worktree_create_argv_is_accepted_by_real_git', async () => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-worktree-real-'))
   const repo = join(root, 'repo')
   const child = join(root, 'manager-job-real')
@@ -45,7 +45,7 @@ test('WHAT[CHGINT-005] CHGINT_worktree_create_argv_is_accepted_by_real_git', asy
   }
 })
 
-test('WHAT[CHGINT-005] CHGINT_worktree_create_survives_installed_wanxiang_reference_transaction_hook', async () => {
+test('WHAT[change-integration-005] CHGINT_worktree_create_survives_installed_wanxiang_reference_transaction_hook', async () => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-worktree-hooked-'))
   const repo = join(root, 'repo')
   const child = join(root, 'manager-job-hooked')

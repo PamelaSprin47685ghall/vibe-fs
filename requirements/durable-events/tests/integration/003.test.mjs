@@ -12,7 +12,7 @@ const event = (overrides = {}) => ({
   ...overrides,
 })
 
-test('WHAT[DURABLE-EVENTS-003] canonical_event_bytes_are_stable_under_object_and_set_order', () => {
+test('WHAT[durable-events-003] canonical_event_bytes_are_stable_under_object_and_set_order', () => {
   const left = event({
     parents: ['c'.repeat(40), 'b'.repeat(40), 'c'.repeat(40)],
     payloadRefs: ['ref-z', 'ref-a', 'ref-z'],
@@ -30,14 +30,14 @@ test('WHAT[DURABLE-EVENTS-003] canonical_event_bytes_are_stable_under_object_and
   assert.equal(codec.checkIdentity(left, right).ok, true)
 })
 
-test('WHAT[DURABLE-EVENTS-003] same_event_id_different_canonical_bytes_is_identity_collision', () => {
+test('WHAT[durable-events-003] same_event_id_different_canonical_bytes_is_identity_collision', () => {
   const result = codec.checkIdentity(event(), event({ payload: { answer: 43 } }))
   assert.equal(result.ok, false)
   assert.equal(result.error.code, 'IdentityCollision')
   assert.equal(result.error.eventId, 'a'.repeat(40))
 })
 
-test('WHAT[DURABLE-EVENTS-003] canonical_event_bytes_decode_to_the_same_plain_event', () => {
+test('WHAT[durable-events-003] canonical_event_bytes_decode_to_the_same_plain_event', () => {
   const original = event({
     id: 'b'.repeat(40),
     parents: ['d'.repeat(40), 'c'.repeat(40)],
@@ -52,7 +52,7 @@ test('WHAT[DURABLE-EVENTS-003] canonical_event_bytes_decode_to_the_same_plain_ev
   })
 })
 
-test('WHAT[DURABLE-EVENTS-003] decode_rejects_noncanonical_key_and_set_order_without_reencoding_the_event', async () => {
+test('WHAT[durable-events-003] decode_rejects_noncanonical_key_and_set_order_without_reencoding_the_event', async () => {
   const base = {
     event_id: 'e'.repeat(40),
     event_type: 'JobRequested',
@@ -85,7 +85,7 @@ test('WHAT[DURABLE-EVENTS-003] decode_rejects_noncanonical_key_and_set_order_wit
   )
 })
 
-test('WHAT[DURABLE-EVENTS-003] merge_by_identity_dedupes_equal_bytes_and_rejects_collisions', () => {
+test('WHAT[durable-events-003] merge_by_identity_dedupes_equal_bytes_and_rejects_collisions', () => {
   const same = codec.mergeByIdentity([event(), event()])
   assert.equal(same.ok, true)
   assert.equal(same.events.length, 1)

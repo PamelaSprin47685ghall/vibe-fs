@@ -33,7 +33,7 @@ const REGISTERED_HOOK_NAMES = [
   'command.execute.before',
 ]
 
-test('WHAT[HOST-BOUNDARY-014] LocalInvariant crosses the typed membrane after fatal policy', () => {
+test('WHAT[host-boundary-014] LocalInvariant crosses the typed membrane after fatal policy', () => {
   let threw = null
   const wrapped = PluginHooksSurface.policyAwareHook('test-fatal-sync', () => { throw new Error('invariant-broken') })
   try {
@@ -45,7 +45,7 @@ test('WHAT[HOST-BOUNDARY-014] LocalInvariant crosses the typed membrane after fa
   assert.equal(threw.message, 'invariant-broken')
 })
 
-test('WHAT[HOST-BOUNDARY-014] typed membrane catches async LocalInvariant and rethrows', async () => {
+test('WHAT[host-boundary-014] typed membrane catches async LocalInvariant and rethrows', async () => {
   let caught = null
   const wrapped = PluginHooksSurface.policyAwareHook('test-fatal-async', () => Promise.reject(new Error('async-invariant-broken')))
   try {
@@ -57,7 +57,7 @@ test('WHAT[HOST-BOUNDARY-014] typed membrane catches async LocalInvariant and re
   assert.equal(caught.message, 'async-invariant-broken')
 })
 
-test('WHAT[HOST-BOUNDARY-014] unclassifiable hook failure rethrows with unproven settlement, no fuse until evidence lands', () => {
+test('WHAT[host-boundary-014] unclassifiable hook failure rethrows with unproven settlement, no fuse until evidence lands', () => {
   // An unrecognized exception can no longer claim NoAcceptedFact/NoOwnedExecution:
   // the policy must refuse to settle-as-fatal before the exact settlement is
   // proven. The error itself still crosses to the Host (fail-loud): rethrown.
@@ -82,7 +82,7 @@ test('WHAT[HOST-BOUNDARY-014] unclassifiable hook failure rethrows with unproven
   }
 })
 
-test('WHAT[HOST-BOUNDARY-014] hook arguments supply the owned execution key instead of a fabricated no-evidence default', () => {
+test('WHAT[host-boundary-014] hook arguments supply the owned execution key instead of a fabricated no-evidence default', () => {
   // A transform-class hook carries the physical execution in output.messages;
   // tool/event hooks carry sessionID directly. Unclassifiable failures inherit
   // that exact key — never the invented 'execution that owns nothing' shape.
@@ -105,7 +105,7 @@ test('WHAT[HOST-BOUNDARY-014] hook arguments supply the owned execution key inst
   assert.equal(toolOutcome.hasExecutionKey, false)
 })
 
-test('WHAT[HOST-BOUNDARY-014] typed ProtocolRejection rethrows unchanged without Diagnostic.fatal', async () => {
+test('WHAT[host-boundary-014] typed ProtocolRejection rethrows unchanged without Diagnostic.fatal', async () => {
   const originalWrite = process.stderr.write.bind(process.stderr)
   const captured = []
   process.stderr.write = (chunk) => { captured.push(String(chunk)); return true }
@@ -123,7 +123,7 @@ test('WHAT[HOST-BOUNDARY-014] typed ProtocolRejection rethrows unchanged without
   }
 })
 
-test('WHAT[HOST-BOUNDARY-014] unpublished rejection shape rethrows with unproven settlement, not a fabricated no-ownership claim', async () => {
+test('WHAT[host-boundary-014] unpublished rejection shape rethrows with unproven settlement, not a fabricated no-ownership claim', async () => {
   const originalWrite = process.stderr.write.bind(process.stderr)
   const captured = []
   process.stderr.write = (chunk) => { captured.push(String(chunk)); return true }
@@ -144,7 +144,7 @@ test('WHAT[HOST-BOUNDARY-014] unpublished rejection shape rethrows with unproven
   }
 })
 
-test('WHAT[HOST-BOUNDARY-014] every HookFailurePolicy branch is selected from typed policy and settlement evidence', () => {
+test('WHAT[host-boundary-014] every HookFailurePolicy branch is selected from typed policy and settlement evidence', () => {
   const cases = [
     ['ProtocolRejection', 'NoOwnedExecution', 'RethrowUnchanged'],
     ['Superseded', 'ExactSettlementComplete', 'RethrowUnchanged'],
@@ -161,7 +161,7 @@ test('WHAT[HOST-BOUNDARY-014] every HookFailurePolicy branch is selected from ty
   }
 })
 
-test('WHAT[HOST-BOUNDARY-014] HOST_009_inherited_NODE_TEST_CONTEXT_never_disables_production_fatal', () => {
+test('WHAT[host-boundary-014] HOST_009_inherited_NODE_TEST_CONTEXT_never_disables_production_fatal', () => {
   // The FatalProcess.kill Emit in src has exactly one gate: WANXIANGSHU_NO_FATAL_EXIT.
   // There is no NODE_TEST_CONTEXT gate. Production fatal fires regardless of test context.
   const fatalProcessSource = read('src/Wanxiangshu/Foundation/FatalProcess.fs')
@@ -171,13 +171,13 @@ test('WHAT[HOST-BOUNDARY-014] HOST_009_inherited_NODE_TEST_CONTEXT_never_disable
   assert.equal(process.env.WANXIANGSHU_NO_FATAL_EXIT, '1')
 })
 
-test('WHAT[HOST-BOUNDARY-014] HOST_009_every_registered_hook_has_a_fixture_here', () => {
+test('WHAT[host-boundary-014] HOST_009_every_registered_hook_has_a_fixture_here', () => {
   const policyKeys = [...hookPolicySource.matchAll(/\{ HostKey = "([^"]+)"/g)].map((match) => match[1])
   assert.deepEqual(policyKeys.slice().sort(), REGISTERED_HOOK_NAMES.slice().sort())
   assert.equal(new Set(policyKeys).size, policyKeys.length)
 })
 
-test('WHAT[HOST-BOUNDARY-014] HOST_009_every_hook_accepts_its_arguments_positionally', async () => {
+test('WHAT[host-boundary-014] HOST_009_every_hook_accepts_its_arguments_positionally', async () => {
   // The production policy membrane wraps a two-argument callable: (args, context).
   // curriedHook and pairedHook both emit (args, context) arrow functions. The
   // paired adapter must also complete the second stage when Fable boxes an
@@ -194,13 +194,13 @@ test('WHAT[HOST-BOUNDARY-014] HOST_009_every_hook_accepts_its_arguments_position
   assert.equal(result.context, 'ctx-val')
 })
 
-test('WHAT[HOST-BOUNDARY-014] tool.execute.before uses the common typed membrane after arity adaptation', () => {
+test('WHAT[host-boundary-014] tool.execute.before uses the common typed membrane after arity adaptation', () => {
   assert.match(pluginHooksSource, /registeredHook HookKey\.ToolBefore \(pairedHook \(box toolBefore\)\)/)
   assert.match(interopSource, /metadata\.HostKey, policyAwareHook metadata\.DiagnosticOperation adaptedHook/)
   assert.doesNotMatch(interopSource, /isExpected|classifiedRejectionHook|hostErrorText/)
 })
 
-test('WHAT[HOST-BOUNDARY-014] HOST_009_the_tool_registry_is_a_registry_not_a_triggered_hook', () => {
+test('WHAT[host-boundary-014] HOST_009_the_tool_registry_is_a_registry_not_a_triggered_hook', () => {
   // The tool registry is attached as hooks.tool — a property holding a Tools
   // collection, not a hook callable. It is never in the Host's Hooks type.
   assert.match(pluginHooksSource, /"tool", registration\.Tools/)

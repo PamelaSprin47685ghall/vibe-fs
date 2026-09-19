@@ -85,7 +85,7 @@ module Identity =
     ///
     /// One Host assistant message is one provider request is one attempt, so
     /// there is exactly one type for it. SSOT used to name the concept twice
-    /// (`ProviderAttemptIdentity` in PROMPT-008 and PAR-007); the wording is
+    /// (`ProviderAttemptIdentity` in PROMPT-008 and provider-attempt-recovery-007); the wording is
     /// now unified, because two types would make "are these two identities of the
     /// same attempt equal" an askable but meaningless question.
     type ProviderRunIdentity = private ProviderRunIdentity of string

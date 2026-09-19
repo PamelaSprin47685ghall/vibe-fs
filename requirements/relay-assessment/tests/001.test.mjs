@@ -13,7 +13,7 @@ const perfect = {
   completeness: 'PERFECT',
 }
 
-test('WHAT[ASSESS-001] review schema is eight required PERFECT/REVISE/N/A scores with optional note', () => {
+test('WHAT[relay-assessment-001] review schema is eight required PERFECT/REVISE/N/A scores with optional note', () => {
   const schema = JSON.parse(assessment.schemaJson)
   assert.equal(schema.type, 'object')
   assert.equal(schema.additionalProperties, false)
@@ -26,7 +26,7 @@ test('WHAT[ASSESS-001] review schema is eight required PERFECT/REVISE/N/A scores
   assert.deepEqual(schema.properties.note, { type: 'string' })
 })
 
-test('WHAT[ASSESS-001] malformed scores are rejected without coercion', () => {
+test('WHAT[relay-assessment-001] malformed scores are rejected without coercion', () => {
   for (const payload of [
     { ...perfect, simplicity: 10 },
     { ...perfect, simplicity: 9.5 },
@@ -42,7 +42,7 @@ test('WHAT[ASSESS-001] malformed scores are rejected without coercion', () => {
   }
 })
 
-test('WHAT[ASSESS-001] valid payload preserves exact ratings and rejects only on REVISE', () => {
+test('WHAT[relay-assessment-001] valid payload preserves exact ratings and rejects only on REVISE', () => {
   // Any dimension with REVISE causes overall rejection (allPerfect: false) and populates lowDimensions
   const withRevise = assessment.parse({ ...perfect, structure: 'REVISE', completeness: 'REVISE' })
   assert.deepEqual(withRevise, {

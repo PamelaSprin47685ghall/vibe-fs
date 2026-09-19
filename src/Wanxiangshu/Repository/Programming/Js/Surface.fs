@@ -97,7 +97,7 @@ module JsToolGenerator =
             |> List.tryFind (fun fragment -> fragment.MemberName = memberName)
             |> Option.map (fun fragment -> fragment.RuntimeBindingKey))
 
-/// Transaction context supporting separation of ReadSnapshots and SubstantiveAccess (RP-026 / T18 / T19).
+/// Transaction context supporting separation of ReadSnapshots and SubstantiveAccess (repository-programming-026 / T18 / T19).
 type JsTransactionContext() =
     let readSnapshots = System.Collections.Generic.HashSet<string>()
     let explicitReads = System.Collections.Generic.HashSet<string>()

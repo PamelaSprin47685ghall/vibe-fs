@@ -6,14 +6,14 @@ const { default: test } = await import("node:test");
 const Strength = await import("../../../dist/Strength/Surface.js");
 
 
-test('WHAT[SPEC-INV-007] STRENGTH_007_promotion_commit_unknown_never_allows_continuation_without_durable_fact', () => {
+test('WHAT[speculative-investigation-007] STRENGTH_007_promotion_commit_unknown_never_allows_continuation_without_durable_fact', () => {
   assert.equal(Strength.commitResolvePromotion('Committed', 'Unknown'), 'Proceed')
   assert.equal(Strength.commitResolvePromotion('Rejected', 'Unknown'), 'FailClosed')
   assert.equal(Strength.commitResolvePromotion('CommitUnknown', 'Matches'), 'Proceed')
   assert.equal(Strength.commitResolvePromotion('CommitUnknown', 'Absent'), 'RetryAppend')
   assert.equal(Strength.commitResolvePromotion('CommitUnknown', 'Unknown'), 'FailClosed')
 })
-test('WHAT[SPEC-INV-007] STRENGTH_007_promotion_requires_the_exact_target_run_and_real_provider_output', () => {
+test('WHAT[speculative-investigation-007] STRENGTH_007_promotion_requires_the_exact_target_run_and_real_provider_output', () => {
   assert.equal(Strength.promotionDecide('run-1', 'run-1', 'RealOutput'), 'Promote')
   assert.equal(Strength.promotionDecide('run-1', 'run-2', 'RealOutput'), 'IgnoreWrongRun')
   assert.equal(Strength.promotionDecide('run-1', 'run-1', 'NoOutput'), 'AwaitOrAbandon')
@@ -38,7 +38,7 @@ const apply = (state, event) => {
 const turn = (providerRun, parts, outcome = 'completed') => ({ sessionId: 'owner', physicalUserMessageId: 'user-1', authorityRootUserMessageId: 'user-1', providerRun, parts, outcome })
 const call = (callId, name, args) => ({ kind: 'tool-call', callId, name, args })
 
-test('WHAT[SPEC-INV-007] STRENGTH_007_lifecycle_promotes_only_exact_target_with_real_provider_output', () => {
+test('WHAT[speculative-investigation-007] STRENGTH_007_lifecycle_promotes_only_exact_target_with_real_provider_output', () => {
   const value = frame()
   let projection = apply(Strength.projectionEmpty(), prepared(value))
   const realTurn = turn('run-1', [call('c1', 'read', '{}')])
@@ -72,7 +72,7 @@ const writePayload = async (store, text) => {
   return result.value
 }
 
-test('WHAT[SPEC-INV-007] STRENGTH_007_promotion_without_prepared_is_missing_parent', async () => {
+test('WHAT[speculative-investigation-007] STRENGTH_007_promotion_without_prepared_is_missing_parent', async () => {
   const local = createLocalEventStore()
   try {
     const frameRef = await writePayload(local.store, 'frame')
@@ -81,7 +81,7 @@ test('WHAT[SPEC-INV-007] STRENGTH_007_promotion_without_prepared_is_missing_pare
     assert.equal(rejected.error, 'MissingParent')
   } finally { local.close() }
 })
-test('WHAT[SPEC-INV-007] STRENGTH_007_integrator_Current_reflects_Promoted_without_history_scan', async () => {
+test('WHAT[speculative-investigation-007] STRENGTH_007_integrator_Current_reflects_Promoted_without_history_scan', async () => {
   const local = createLocalEventStore()
   try {
     const ref = await writePayload(local.store, 'frame-material')
@@ -103,12 +103,12 @@ const call = (callId, name, args) => ({ kind: 'tool-call', callId, name, args })
 const result = (callId, value) => ({ kind: 'tool-result', callId, result: value })
 const activity = (kind) => ({ kind, text: '' })
 
-test('WHAT[SPEC-INV-007] STRENGTH_007_provider_output_evidence_rejects_unknown_part_kinds', () => {
+test('WHAT[speculative-investigation-007] STRENGTH_007_provider_output_evidence_rejects_unknown_part_kinds', () => {
   const result = Strength.turnEvidenceClassify([{ kind: 'unknown-part' }])
   assert.equal(result.ok, false)
   assert.match(result.error, /unknown message part kind/)
 })
-test('WHAT[SPEC-INV-007] STRENGTH_007_provider_output_evidence_is_not_host_bookkeeping', () => {
+test('WHAT[speculative-investigation-007] STRENGTH_007_provider_output_evidence_is_not_host_bookkeeping', () => {
   assert.equal(Strength.turnEvidenceClassify([]), 'NoOutput')
   assert.equal(Strength.turnEvidenceClassify([activity('step-start')]), 'TransportOnly')
   assert.equal(Strength.turnEvidenceClassify([result('c1', 'result')]), 'TransportOnly')

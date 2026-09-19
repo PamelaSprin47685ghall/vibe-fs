@@ -7,12 +7,12 @@ module ToolRegistrySurface =
     /// Unknown role and unknown tool both fail closed.
     val rolePredicate: toolName: string -> roleLabel: string -> bool
 
-    /// ENF-006: which authority the execute gate resolves for a tool. `office`
+    /// capability-enforcement-006: which authority the execute gate resolves for a tool. `office`
     /// needs the session's established public Role; `private-attachment` is an
     /// internal leaf admitted by owner-held evidence and never holds an office.
     val admissionAuthority: toolName: string -> string
 
-    /// ENF-006: the internal-leaf decision for a session holding no public
+    /// capability-enforcement-006: the internal-leaf decision for a session holding no public
     /// office profile. Office tools always answer false here.
     val privateAttachmentAdmits: toolName: string -> sessionId: string -> bool
 

@@ -27,7 +27,7 @@ module ProjectionUpdate =
     val retireAuxiliaryInjectionVisibility: session: SessionAgentProjection -> SessionAgentProjection
 
     // Single-field fact families: the domain fold owns the slice decision and
-    // composition only writes the slice back (DELEG-029 / DURABLE-EVENTS-023).
+    // composition only writes the slice back (delegation-029 / durable-events-023).
 
     val applyFission:
         projection: AgentProjectionSet -> fact: FissionFactCases -> Result<AgentProjectionSet, FoldRejection>

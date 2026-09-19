@@ -7,7 +7,7 @@ const scores = ['PERFECT', 'REVISE', 'PERFECT', 'REVISE', 'PERFECT', 'PERFECT', 
 const open = (state, snapshot = 'snapshot-1') =>
   relay.openIncumbency(state, 'road-1', 'inc-1', snapshot, 'authority-1')
 
-test('WHAT[ASSESS-002] second assessment in one iteration is rejected without overwriting the first', () => {
+test('WHAT[relay-assessment-002] second assessment in one iteration is rejected without overwriting the first', () => {
   const opened = open(relay.empty())
   const assessed = relay.assess(opened.state, 'road-1', 'inc-1', 'assessment-1', 'snapshot-1', 'authority-1', ...scores)
   assert.equal(assessed.ok, true)
@@ -46,7 +46,7 @@ test('WHAT[ASSESS-002] second assessment in one iteration is rejected without ov
   assert.deepEqual(second, { ok: false, error: 'AssessmentAlreadySubmitted' })
 })
 
-test('WHAT[ASSESS-002] cross-iteration replay of another iteration assessment is rejected', () => {
+test('WHAT[relay-assessment-002] cross-iteration replay of another iteration assessment is rejected', () => {
   const opened = open(relay.empty())
   const assessed = relay.assess(opened.state, 'road-1', 'inc-1', 'assessment-1', 'snapshot-1', 'authority-1', ...scores)
   assert.equal(assessed.ok, true)

@@ -11,7 +11,7 @@ const sync = await import("../../../dist/Execution/Delegation/SyncDelegate/Surfa
 const OWNER = 'owner-ce'
 const descriptor = [{ sessionId: OWNER, agent: 'manager' }]
 
-test('WHAT[DELEG-009] SYNC_SERIALIZATION_second_active_call_is_rejected', async () => {
+test('WHAT[delegation-009] SYNC_SERIALIZATION_second_active_call_is_rejected', async () => {
   const h = await sync.create(await mkdtemp(join(tmpdir(), 'wxs-sync-ce-')), descriptor)
   try {
     const first = sync.invoke(h, 'owner-ce', 'Engineer', 'first arrival')
@@ -100,7 +100,7 @@ const verifyReusableHandoff = async (role) => {
   } finally { sync.dispose(h) }
 }
 
-test('WHAT[DELEG-009] SYNC_RUNTIME_same_reuse_scope_serializes_distinct_provider_runs_but_distinct_scopes_are_independent', () => {
+test('WHAT[delegation-009] SYNC_RUNTIME_same_reuse_scope_serializes_distinct_provider_runs_but_distinct_scopes_are_independent', () => {
   const blocked = sync.serializationDecision('owner-a', 'owner-a', false)
   assert.equal(blocked.accepted, false)
   assert.match(blocked.reason, /same ReuseScope/)

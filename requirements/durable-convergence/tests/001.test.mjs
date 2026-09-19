@@ -21,7 +21,7 @@ const A = 'a'.repeat(40)
 const B = 'b'.repeat(40)
 const C = 'c'.repeat(40)
 
-test('WHAT[DURABLE-CONVERGENCE-001] set union never drops distinct events', () => {
+test('WHAT[durable-convergence-001] set union never drops distinct events', () => {
   const result = merge.merge([
     ['writer-a', [make(A)]],
     ['writer-b', [make(B)]],
@@ -68,7 +68,7 @@ const withStore = async (writerId, fn) => {
   }
 }
 
-test('WHAT[DURABLE-CONVERGENCE-001] set union never drops concurrent events', () => {
+test('WHAT[durable-convergence-001] set union never drops concurrent events', () => {
   const merged = merge.merge([
     ['writer-a', [make(A)]],
     ['writer-b', [make(B)]],

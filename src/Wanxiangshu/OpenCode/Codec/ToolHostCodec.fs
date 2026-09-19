@@ -275,7 +275,7 @@ type HostToolContext =
 type HostToolFactory = private HostToolFactory of obj
 type HostSchema = private HostSchema of obj
 
-/// The authority a tool call is admitted under. ENF-006 keeps the two sources
+/// The authority a tool call is admitted under. capability-enforcement-006 keeps the two sources
 /// apart in the type: an office tool is decided by the public Role the Authority
 /// Root established, while an internal leaf tool (Bookkeeper's `js-bookkeeper`)
 /// is decided by owner-held attachment evidence because its session is

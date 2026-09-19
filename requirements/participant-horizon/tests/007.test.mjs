@@ -27,7 +27,7 @@ const MANAGER_VISIBLE_SURFACES = [
   'lifecycle/magic-todo/manager-guideline',
 ]
 
-test('WHAT[PARTICIPANT-HORIZON-007] PH_agent_008_internal_participants_absent_from_provider_visible_surfaces', () => {
+test('WHAT[participant-horizon-007] PH_agent_008_internal_participants_absent_from_provider_visible_surfaces', () => {
   const surfaces = [
     'role/manager',
     'tool/fork/description',

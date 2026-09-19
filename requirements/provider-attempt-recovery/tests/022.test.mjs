@@ -4,7 +4,7 @@ import * as fence from '../../../dist/OpenCode/Host/ProviderAttemptStopFenceSurf
 
 const freshFence = () => fence.create()
 
-test('WHAT[PAR-022] await without the exact observation stays pending', async () => {
+test('WHAT[provider-attempt-recovery-022] await without the exact observation stays pending', async () => {
   const f = freshFence()
   const pending = fence.awaitStop(f, 'ses-a', 'msg-run-1')
 
@@ -16,7 +16,7 @@ test('WHAT[PAR-022] await without the exact observation stays pending', async ()
   assert.deepEqual(fence.snapshot(f), { stopped: 1, waiting: 0, denied: 0 })
 })
 
-test('WHAT[PAR-022] another run and another session never satisfy the exact attempt', async () => {
+test('WHAT[provider-attempt-recovery-022] another run and another session never satisfy the exact attempt', async () => {
   const f = freshFence()
   const pending = fence.awaitStop(f, 'ses-a', 'msg-run-1')
 
@@ -30,7 +30,7 @@ test('WHAT[PAR-022] another run and another session never satisfy the exact atte
   assert.equal(await pending, true)
 })
 
-test('WHAT[PAR-022] observation is idempotent and a late waiter resolves immediately', async () => {
+test('WHAT[provider-attempt-recovery-022] observation is idempotent and a late waiter resolves immediately', async () => {
   const f = freshFence()
 
   fence.observe(f, 'ses-a', 'msg-run-1')
@@ -40,7 +40,7 @@ test('WHAT[PAR-022] observation is idempotent and a late waiter resolves immedia
   assert.equal(await fence.awaitStop(f, 'ses-a', 'msg-run-1'), true)
 })
 
-test('WHAT[PAR-022] revocation denies the waiting attempt only', async () => {
+test('WHAT[provider-attempt-recovery-022] revocation denies the waiting attempt only', async () => {
   const f = freshFence()
   const pending = fence.awaitStop(f, 'ses-a', 'msg-run-1')
 

@@ -4,7 +4,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Foundation.Identity
 
-/// JS-native owner surface for PAR-011 / PAR-020 admitted-plan semantics.
+/// JS-native owner surface for provider-attempt-recovery-011 / provider-attempt-recovery-020 admitted-plan semantics.
 ///
 /// The scope stays an opaque handle: JS obtains it from `createRecoveryScope`,
 /// passes it back, and never inspects it. Pending/bound plans cross as the
@@ -66,7 +66,7 @@ module PluginRecoveryScopeSurface =
                    expected = null
                    handle = null |}
 
-    /// Invoke the real `RecordPendingAttemptPlan`; conflicts throw HOST-BOUNDARY-008.
+    /// Invoke the real `RecordPendingAttemptPlan`; conflicts throw host-boundary-008.
     let recordAttemptPlan (scope: obj) (sessionId: string) (physical: string) (pending: obj) : unit =
         let scope = unbox<PluginRecoveryScope> scope
         let plan = XWireSurface.unwrapPendingPlan pending
@@ -95,7 +95,7 @@ module PluginRecoveryScopeSurface =
                    handle = null |}
 
     /// Invoke the real `RecordAttemptPlan`; re-binding a run to another physical
-    /// parent throws HOST-BOUNDARY-008.
+    /// parent throws host-boundary-008.
     let recordBound (scope: obj) (sessionId: string) (providerRun: string) (bound: obj) : unit =
         let scope = unbox<PluginRecoveryScope> scope
         let plan = XWireSurface.unwrapBoundPlan bound

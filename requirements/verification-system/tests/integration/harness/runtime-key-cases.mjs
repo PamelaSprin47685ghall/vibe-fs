@@ -1,7 +1,7 @@
 /**
  * gate-runtime-key-cases.mjs — the scenario lookup key is a pure function.
  *
- * VERIFY-003. Three properties, each of which the old matcher broke:
+ * verification-system-003. Three properties, each of which the old matcher broke:
  *
  *   pure       the answer depends on the request, not on how many came before
  *   prefix     longest declared prefix wins, and ties are author errors
@@ -76,7 +76,7 @@ export const runtimeKeyCases = [
   // ── kind: the fourth component, and why turn alone cannot carry it ────────
 
   {
-    name: 'VERIFY-003 a title request and its chat turn share turn and step',
+    name: 'verification-system-003 a title request and its chat turn share turn and step',
     fn: () => {
       // The measurement that forced `kind` into the key. The Host prepends its title
       // marker at `messages[0]` and appends the whole conversation after it
@@ -96,7 +96,7 @@ export const runtimeKeyCases = [
   },
 
   {
-    name: 'VERIFY-003 kind is read from the preamble, not from position 0',
+    name: 'verification-system-003 kind is read from the preamble, not from position 0',
     fn: () => {
       // This case previously asserted the marker must be at `messages[0]` and cited
       // `prompt.ts:235` for it. Measured against a live Host in K9, a real title request is:
@@ -133,7 +133,7 @@ export const runtimeKeyCases = [
   },
 
   {
-    name: 'VERIFY-003 there is no synthetic kind',
+    name: 'verification-system-003 there is no synthetic kind',
     fn: () => {
       // The old classifier had one, decided by `NUDGE_MARKERS` — production prompt
       // sentences copied into the mock, which the extinction list condemns as a
@@ -151,7 +151,7 @@ export const runtimeKeyCases = [
   },
 
   {
-    name: 'VERIFY-003 kind partitions declarations, and defaults to chat',
+    name: 'verification-system-003 kind partitions declarations, and defaults to chat',
     fn: () => {
       const entries = [
         { id: 'chat', lane: 'manager', turn: 'Ship it.', step: 0 },
@@ -169,7 +169,7 @@ export const runtimeKeyCases = [
   // ── step is a property of the request ─────────────────────────────────────
 
   {
-    name: 'VERIFY-003 step counts assistant messages after the last user message',
+    name: 'verification-system-003 step counts assistant messages after the last user message',
     fn: () => {
       // The Host appends exactly one assistant message per provider step
       // (`../opencode/packages/opencode/src/session/prompt.ts:1186`), so this is
@@ -181,7 +181,7 @@ export const runtimeKeyCases = [
   },
 
   {
-    name: 'VERIFY-003 a new user message resets step',
+    name: 'verification-system-003 a new user message resets step',
     fn: () => {
       // Turn boundaries are where step restarts. A cursor would have kept counting.
       assertEq(stepOf(request([user('go'), assistant('r1'), user('again')])), 0);
@@ -190,7 +190,7 @@ export const runtimeKeyCases = [
   },
 
   {
-    name: 'VERIFY-003 step is zero when there is no user message at all',
+    name: 'verification-system-003 step is zero when there is no user message at all',
     fn: () => {
       assertEq(stepOf(request([assistant('r1')])), 0);
       assertEq(stepOf(request([])), 0);
@@ -199,7 +199,7 @@ export const runtimeKeyCases = [
   },
 
   {
-    name: 'VERIFY-003 tool results do not count as steps',
+    name: 'verification-system-003 tool results do not count as steps',
     fn: () => {
       // Only assistant messages are provider steps. Counting tool results would
       // double-count a single step that happened to call a tool.
@@ -315,7 +315,7 @@ export const runtimeKeyCases = [
   },
 
   {
-    name: 'VERIFY-003 reading the key twice gives the same answer',
+    name: 'verification-system-003 reading the key twice gives the same answer',
     fn: () => {
       // Purity, stated directly. The old `pathCursor` advanced on observation, so
       // asking twice moved the answer.
@@ -332,7 +332,7 @@ export const runtimeKeyCases = [
   // ── turn is prefix-comparable semantic text ──────────────────────────────
 
   {
-    name: 'VERIFY-003 a shorter utterance is a string prefix of a longer one',
+    name: 'verification-system-003 a shorter utterance is a string prefix of a longer one',
     fn: () => {
       // The property longest-prefix matching rests on. `renderSemantic` would fail
       // it: its closing `}]}]}` sits after the text, so no shorter utterance is ever
@@ -346,7 +346,7 @@ export const runtimeKeyCases = [
   },
 
   {
-    name: 'VERIFY-003 turn reads the LAST user message',
+    name: 'verification-system-003 turn reads the LAST user message',
     fn: () => {
       // A conversation carries many user messages; the one being answered is the
       // last. Matching on the first would pin every step of a session to turn one.
@@ -355,7 +355,7 @@ export const runtimeKeyCases = [
   },
 
   {
-    name: 'VERIFY-003 turn is null when no user message exists',
+    name: 'verification-system-003 turn is null when no user message exists',
     fn: () => {
       assertEq(turnOf(request([assistant('r1')])), null);
       assertEq(turnOf(request([])), null);
@@ -363,7 +363,7 @@ export const runtimeKeyCases = [
   },
 
   {
-    name: 'VERIFY-003 turn is not truncated',
+    name: 'verification-system-003 turn is not truncated',
     fn: () => {
       // `extractLastUserMsg` sliced at 2000 characters, so two long prompts became
       // identical whenever they differed only past the cut — and a prompt long
@@ -378,7 +378,7 @@ export const runtimeKeyCases = [
   },
 
   {
-    name: 'VERIFY-003 prose can never be confused with a tool call',
+    name: 'verification-system-003 prose can never be confused with a tool call',
     fn: () => {
       // Non-prose parts are tagged with `\u001f`, which prose cannot contain. Without
       // the tag, a scenario declaring the text `fork` would match a tool call to
@@ -641,7 +641,7 @@ export const runtimeKeyCases = [
   },
 
   {
-    name: 'VERIFY-003 the session id comes from explicit runtime context',
+    name: 'verification-system-003 the session id comes from explicit runtime context',
     fn: () => {
       // Session identity is routing context supplied by the provider adapter. It is not part
       // of semantic request content and must not be inferred from a request body.
@@ -656,7 +656,7 @@ export const runtimeKeyCases = [
   // ── longest prefix wins, and a tie is an author error ────────────────────
 
   {
-    name: 'VERIFY-003 the longest declared prefix wins',
+    name: 'verification-system-003 the longest declared prefix wins',
     fn: () => {
       const entries = [
         entry({ id: 'short', turn: 'Fix' }),
@@ -670,7 +670,7 @@ export const runtimeKeyCases = [
   },
 
   {
-    name: 'VERIFY-003 a shorter prefix still wins when the longer one does not match',
+    name: 'verification-system-003 a shorter prefix still wins when the longer one does not match',
     fn: () => {
       const entries = [entry({ id: 'short', turn: 'Fix' }), entry({ id: 'long', turn: 'Fix the bug' })];
 
@@ -680,7 +680,7 @@ export const runtimeKeyCases = [
   },
 
   {
-    name: 'VERIFY-003 two same-length prefixes are ambiguous, never scored',
+    name: 'verification-system-003 two same-length prefixes are ambiguous, never scored',
     fn: () => {
       // The replacement for `specificity`. Two declarations of equal length that both
       // match describe one point in the conversation with two different responses, so
@@ -703,7 +703,7 @@ export const runtimeKeyCases = [
   },
 
   {
-    name: 'VERIFY-003 step and lane partition the declarations before prefixing',
+    name: 'verification-system-003 step and lane partition the declarations before prefixing',
     fn: () => {
       // Same turn text at two steps is the normal shape of a multi-step turn, and it
       // must not be an ambiguity. The old matcher needed `messageCount` for this.
@@ -726,7 +726,7 @@ export const runtimeKeyCases = [
   },
 
   {
-    name: 'VERIFY-003 nothing declared fails closed with the key that missed',
+    name: 'verification-system-003 nothing declared fails closed with the key that missed',
     fn: () => {
       const entries = [entry({ id: 'only', turn: 'Ship it' })];
       const resolved = resolveEntry(request([user('Something else')]), entries, BINDINGS, { sessionId: SESSION });
@@ -803,7 +803,7 @@ export const runtimeKeyCases = [
   },
 
   {
-    name: 'VERIFY-003 a request with no user message matches nothing',
+    name: 'verification-system-003 a request with no user message matches nothing',
     fn: () => {
       // A bare continuation cannot begin with any declared user text. Admitting it
       // would make every scenario match every synthetic nudge.
@@ -815,7 +815,7 @@ export const runtimeKeyCases = [
   },
 
   {
-    name: 'VERIFY-003 a lane-less declaration matches any lane',
+    name: 'verification-system-003 a lane-less declaration matches any lane',
     fn: () => {
       // Single-lane scenarios should not have to name their only lane. `undefined`
       // means "any", which is different from `null` — the value an unbound session

@@ -66,7 +66,7 @@ const layersOf = (s) =>
     ]),
   )
 
-test('WHAT[REPOSITORY-PROGRAMMING-001] JS001_generate_none_when_no_filesystem_capability', () => {
+test('WHAT[repository-programming-001] JS001_generate_none_when_no_filesystem_capability', () => {
   for (const role of ['Orchestrator', 'Inquiry', 'Distiller', 'Blogger']) {
     const perms = caps(...permsOf(rolePermissions(role.toLowerCase())))
     assert.equal(isNone(surface(role, rolePermissions(role.toLowerCase()))), true, `${role} must get no js-* surface`)
@@ -74,7 +74,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-001] JS001_generate_none_when_no_filesystem_ca
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-001] JS001_role_projection_is_exactly_roles_permissions_intersection', () => {
+test('WHAT[repository-programming-001] JS001_role_projection_is_exactly_roles_permissions_intersection', () => {
   for (const role of ['Manager', 'Orchestrator', 'Coder', 'Inspector', 'Browser', 'Inquiry', 'DevOps', 'Distiller', 'Blogger']) {
     const fsPerms = fsPermissionsOf(role)
     const result = surface(role, rolePermissions(role.toLowerCase()))
@@ -90,7 +90,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-001] JS001_role_projection_is_exactly_roles_pe
   }
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-001] JS001_non_fs_permissions_never_produce_members', () => {
+test('WHAT[repository-programming-001] JS001_non_fs_permissions_never_produce_members', () => {
   for (const name of PERMISSION_NAMES.filter((n) => !['Read', 'Write', 'Edit', 'Glob', 'Grep'].includes(n))) {
     const result = generate('Engineer', caps(toolPermissionByName[name]), 'en')
     assert.equal(isNone(result), true, `${name} alone must not generate a surface`)

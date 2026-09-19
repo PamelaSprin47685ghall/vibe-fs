@@ -34,7 +34,7 @@ module SphinxIntegrationRules =
             |> Result.map (toFields >> LegacyIntegrator.LegacyEnvelopeInput.LegacyObservation)
             |> Result.mapError (fun error -> sprintf "Sphinx legacy observation decode failed: %s" error)
 
-    /// WHAT[EPI-030]: durable restart oracle for legacy Sphinx inquiries. It folds
+    /// WHAT[epistemic-reasoning-030]: durable restart oracle for legacy Sphinx inquiries. It folds
     /// accepted sphinx-legacy observations into per-handle cursors; every other
     /// sphinx kind is forward-compatible vocabulary and leaves Current unchanged.
     let sphinxRule: IntegrationRule =
@@ -101,7 +101,7 @@ module SphinxIntegrationRules =
         |> Result.mapError (fun error -> sprintf "Sphinx generic observation decode failed: %s" error)
         |> Result.bind toInput
 
-    /// WHAT[EPI-019]: durable restart oracle for generic Sphinx inquiries. It folds
+    /// WHAT[epistemic-reasoning-019]: durable restart oracle for generic Sphinx inquiries. It folds
     /// accepted sphinx-generic transitions into per-inquiry cursors; the legacy
     /// Sphinx rule ignores this kind and leaves its own Current unchanged.
     let sphinxGenericRule: IntegrationRule =

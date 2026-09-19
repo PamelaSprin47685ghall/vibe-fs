@@ -28,7 +28,7 @@ const input = (failure, change = {}) => ({
 const classify = (failure, episodeId, change) =>
   presentation.classifyPolicyInput(input(failure, change), episodeId)
 
-test('WHAT[HOSTFAIL-005] policy owner recovers with zero Host retry', () => {
+test('WHAT[host-provider-failure-ownership-005] policy owner recovers with zero Host retry', () => {
   assert.equal(classify('ProviderPermanent', 'episode-5').hasFinalPresentation, false)
   assert.deepEqual(scanRetryOwnership(ROOT), [])
 })

@@ -87,7 +87,7 @@ const mustFold = (wires) => {
 const phaseOf = (projection, physicalUserMessageId) =>
   projection.find((entry) => entry.physicalUserMessageId === physicalUserMessageId)
 
-test('WHAT[CHATEXEC-010] cancel and delete settle every exact projected execution before capacity is drained', async () => {
+test('WHAT[managed-chat-execution-010] cancel and delete settle every exact projected execution before capacity is drained', async () => {
   const targetFor = (role) => ({ model: `provider/${role}`, reasoning: 'none' })
   const signals = new Set(recovery.lifecycleSignals())
 
@@ -201,7 +201,7 @@ const terminal = ({
   },
 })
 
-test('WHAT[CHATEXEC-010] recovery drain completion uses the Fable-compatible completion owner', () => {
+test('WHAT[managed-chat-execution-010] recovery drain completion uses the Fable-compatible completion owner', () => {
   assert.match(recoveryHostSource, /AsyncSupport\.trySetResult completion \(\)/)
   assert.doesNotMatch(recoveryHostSource, /completion\.TrySetResult/)
 })

@@ -619,7 +619,7 @@ module SemanticTraceSurface =
             | Error error -> return raise (InvalidOperationException error)
         }
 
-    // ── SEMANTIC-TRACE-011 / 012 helpers ───────────────────────────────────────
+    // ── semantic-trace-011 / 012 helpers ───────────────────────────────────────
 
     let mergeKeyedLaneTraces (lanesObj: obj) : obj array =
         let lanes = arrayOf lanesObj

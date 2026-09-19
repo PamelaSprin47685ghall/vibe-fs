@@ -59,7 +59,7 @@ const acceptedFact = (profile) => ({
   },
 })
 
-test('WHAT[SESSION-ONTOLOGY-015] physical SessionId reuse requires durable logical-run closure', () => {
+test('WHAT[session-ontology-015] physical SessionId reuse requires durable logical-run closure', () => {
   const session = 'ses-reusable-container'
   const first = root(session, 'msg-container-a', 'manager')
   const second = root(session, 'msg-container-b', 'engineer')

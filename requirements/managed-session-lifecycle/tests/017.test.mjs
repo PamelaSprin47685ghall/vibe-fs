@@ -17,7 +17,7 @@ const walkFs = (dir) => {
   })
 }
 
-test('WHAT[MANAGED-SESSION-017] fail-closed interrupt becomes Failed terminal so fork completion wakes parent', () => {
+test('WHAT[managed-session-lifecycle-017] fail-closed interrupt becomes Failed terminal so fork completion wakes parent', () => {
   const sessions = read('src/Wanxiangshu/OpenCode/Host/Sessions.fs')
   const pluginTransforms = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
   const lifecycle = read('src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs')
@@ -56,7 +56,7 @@ test('WHAT[MANAGED-SESSION-017] fail-closed interrupt becomes Failed terminal so
   assert.doesNotMatch(sessions, /attemptTerminations|TryTakeAttemptTermination|TerminateAttempt/)
 })
 
-test('WHAT[MANAGED-SESSION-017] invariant and tool fail-closed paths cannot use orphan InterruptAttempt', () => {
+test('WHAT[managed-session-lifecycle-017] invariant and tool fail-closed paths cannot use orphan InterruptAttempt', () => {
   const fatalOwners = [
     'src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs',
     'src/Wanxiangshu/OpenCode/Tools/ChronicleTool.fs',
@@ -73,7 +73,7 @@ test('WHAT[MANAGED-SESSION-017] invariant and tool fail-closed paths cannot use 
   assert.match(read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs'), /ManagedSessionTermination\.terminate/)
 })
 
-test('WHAT[MANAGED-SESSION-017] raw InterruptAttempt callers are restricted to workflows with an explicit successor owner', () => {
+test('WHAT[managed-session-lifecycle-017] raw InterruptAttempt callers are restricted to workflows with an explicit successor owner', () => {
   // Relay clean break: Review/Finality owners are deleted, and retirement no
   // longer issues a session-scoped abort (RETIRE-008) — a late Host kill lands
   // in the successor's run on the reused session.
@@ -94,7 +94,7 @@ test('WHAT[MANAGED-SESSION-017] raw InterruptAttempt callers are restricted to w
   assert.deepEqual(new Set(callers), allowed)
 })
 
-test('WHAT[MANAGED-SESSION-017] fatal termination never stores cross-callback cause state', () => {
+test('WHAT[managed-session-lifecycle-017] fatal termination never stores cross-callback cause state', () => {
   const sources = walkFs('src/Wanxiangshu').map((path) => [path, read(path)])
   for (const [path, source] of sources) {
     assert.doesNotMatch(source, /attemptTerminations|TryTakeAttemptTermination|AbortCause\.InternalTermination/, path)

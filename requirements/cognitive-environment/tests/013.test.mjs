@@ -35,7 +35,7 @@ const ROLE_LAW_ROLES = Object.freeze([
 const MIRRORED_BY_OFFICE_CAPABILITY = new Set(['entrust-by-consequence', 'choose-by-return', 'no-omnipotent-charge'])
 const LANGUAGE = 'English'
 
-test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_requires_immediate_todowrite_refresh_when_the_account_becomes_stale', () => {
+test('WHAT[cognitive-environment-013] CE_pair_hint_requires_immediate_todowrite_refresh_when_the_account_becomes_stale', () => {
   for (const locale of ['en', 'zh-CN']) {
     const text = read(`resources/provider/host/pair-programming-guideline/${locale}.md`)
     assert.match(text, /todowrite/i)
@@ -48,7 +48,7 @@ test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_requires_immediate_todowrite_
     assert.match(text, /无变化|仍准确|still accurate|has not changed/i)
   }
 })
-test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_teaches_continuous_ready_frontier_without_batch_barriers', () => {
+test('WHAT[cognitive-environment-013] CE_pair_hint_teaches_continuous_ready_frontier_without_batch_barriers', () => {
   for (const locale of ['en', 'zh-CN']) {
     const text = read(`resources/provider/host/pair-programming-guideline/${locale}.md`)
     assert.match(text, /parallel|concurr|并行|并发/i)
@@ -63,7 +63,7 @@ test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_teaches_continuous_ready_fron
     assert.doesNotMatch(text, /最多\s*\d+|max(?:imum)?\s+\d+/i)
   }
 })
-test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_requires_explaining_urgent_problem_and_parallel_tools_to_partner_before_acting', () => {
+test('WHAT[cognitive-environment-013] CE_pair_hint_requires_explaining_urgent_problem_and_parallel_tools_to_partner_before_acting', () => {
   for (const locale of ['en', 'zh-CN']) {
     const text = read(`resources/provider/host/pair-programming-guideline/${locale}.md`)
     assert.match(text, /同伴|partner/i)
@@ -75,7 +75,7 @@ test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_requires_explaining_urgent_pr
     assert.match(text, /1\.\s*.*2\.\s*.*3\.\s*/s, `${locale} pair hint must list three numbered thinking requirements`)
   }
 })
-test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_encourages_filling_concurrency_slots', () => {
+test('WHAT[cognitive-environment-013] CE_pair_hint_encourages_filling_concurrency_slots', () => {
   for (const locale of ['en', 'zh-CN']) {
     const text = read(`resources/provider/host/pair-programming-guideline/${locale}.md`)
     assert.match(text, /并发槽|concurrency slot/i)
@@ -85,7 +85,7 @@ test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_encourages_filling_concurrenc
     assert.match(text, /并发.*工具|concurrent tool|RTT/i, `${locale} must mandate concurrent tool calls to reduce RTT`)
   }
 })
-test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_points_non_linear_work_to_assume_without_repeating_the_manual', () => {
+test('WHAT[cognitive-environment-013] CE_pair_hint_points_non_linear_work_to_assume_without_repeating_the_manual', () => {
   for (const locale of ['en', 'zh-CN']) {
     const hint = read(`resources/provider/host/pair-programming-guideline/${locale}.md`)
     const description = read(`resources/provider/tool/assume/description/${locale}.md`)
@@ -105,7 +105,7 @@ test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_points_non_linear_work_to_ass
     assert.match(description, /犹豫不产生新知识|hesitation produces no new knowledge/i)
   }
 })
-test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_rides_cursor_suffix_without_pseudo_skill_wire', () => {
+test('WHAT[cognitive-environment-013] CE_pair_hint_rides_cursor_suffix_without_pseudo_skill_wire', () => {
   for (const locale of ['en', 'zh-CN']) {
     const text = read(`resources/provider/host/pair-programming-guideline/${locale}.md`)
     assert.match(text, /附加于工具输出尾部|appended to tool output/i)
@@ -127,7 +127,7 @@ const text = readFileSync(
   'utf8',
 )
 
-test('WHAT[COGNITIVE-ENVIRONMENT-013] PAIR_HINT_canonical_text_encourages_continuous_ready_frontier_without_global_N', () => {
+test('WHAT[cognitive-environment-013] PAIR_HINT_canonical_text_encourages_continuous_ready_frontier_without_global_N', () => {
   assert.match(text, /parallel|concurr|并行|并发/i)
   assert.match(text, /ready frontier/i)
   assert.match(text, /A1/)
@@ -136,7 +136,7 @@ test('WHAT[COGNITIVE-ENVIRONMENT-013] PAIR_HINT_canonical_text_encourages_contin
   assert.match(text, /依赖|dependenc/i)
   assert.doesNotMatch(text, /最多\s*\d+|max(?:imum)?\s+\d+/i)
 })
-test('WHAT[COGNITIVE-ENVIRONMENT-013] PAIR_HINT_canonical_text_teaches_abstract_then_commit', () => {
+test('WHAT[cognitive-environment-013] PAIR_HINT_canonical_text_teaches_abstract_then_commit', () => {
   assert.match(text, /abstract|抽象/i)
   assert.match(text, /commit|笃定/i)
   assert.match(text, /`assume`/)

@@ -43,7 +43,7 @@ const apply = (state, value, n = 1) => {
   return { enforcement: enforcement.value, blog: committed.value }
 }
 
-test('WHAT[BD-013] ENFORCER_045_stale_previous_ingest_cursor_rejected', () => {
+test('WHAT[behavior-diagnosis-013] ENFORCER_045_stale_previous_ingest_cursor_rejected', () => {
   const first = observation.applyBlogEntry(
     { frameEpoch: 0, previousIngestedThroughSequence: 0, nextIngestedThroughSequence: 2, previousCoverableTurnCutoffExclusive: 0, nextCoverableTurnCutoffExclusive: 1, nextCoveredPrefixDigest: 'd1' },
     observation.blogFrame({ kind: 'Entry', digest: 'sha-a', ref: 'blob-a', coveredFrom: 0, coveredThrough: 2 }),
@@ -65,7 +65,7 @@ const { default: test } = await import("node:test");
 const blog = await import("../../../dist/Enforcer/BlogSurface.js");
 
 
-test('WHAT[BD-013] ENFORCER_045_mainContext_refuses_when_next_sequence_cannot_advance', () => {
+test('WHAT[behavior-diagnosis-013] ENFORCER_045_mainContext_refuses_when_next_sequence_cannot_advance', () => {
   const refused = blog.coverageBirth({
     previousIngestedThroughSequence: 2,
     nextIngestedThroughSequence: 2,
@@ -77,7 +77,7 @@ test('WHAT[BD-013] ENFORCER_045_mainContext_refuses_when_next_sequence_cannot_ad
   assert.equal(refused.ok, false)
   assert.match(refused.error, /non-advancing ingested sequence/)
 })
-test('WHAT[BD-013] ENFORCER_045_mainContext_refuses_unmapped_next_cursor', () => {
+test('WHAT[behavior-diagnosis-013] ENFORCER_045_mainContext_refuses_unmapped_next_cursor', () => {
   const unmapped = blog.coverageBirth({
     previousIngestedThroughSequence: 0,
     nextIngestedThroughSequence: 1,
@@ -89,7 +89,7 @@ test('WHAT[BD-013] ENFORCER_045_mainContext_refuses_unmapped_next_cursor', () =>
   assert.equal(unmapped.ok, false)
   assert.match(unmapped.error, /unmapped/)
 })
-test('WHAT[BD-013] ENFORCER_045_mainContext_accepts_strict_advance', () => {
+test('WHAT[behavior-diagnosis-013] ENFORCER_045_mainContext_accepts_strict_advance', () => {
   const context = blog.coverageBirth({
     previousIngestedThroughSequence: 0,
     nextIngestedThroughSequence: 1,
@@ -102,7 +102,7 @@ test('WHAT[BD-013] ENFORCER_045_mainContext_accepts_strict_advance', () => {
   assert.equal(context.ingestedThroughSequence, 1n)
   assert.equal(context.coverableTurnCutoffExclusive, 1)
 })
-test('WHAT[BD-013] ENFORCER_045_mid_turn_advance_preserves_covered_prefix', () => {
+test('WHAT[behavior-diagnosis-013] ENFORCER_045_mid_turn_advance_preserves_covered_prefix', () => {
   const context = blog.coverageBirth({
     previousIngestedThroughSequence: 3,
     nextIngestedThroughSequence: 4,
@@ -127,7 +127,7 @@ const enforcer = await import("../../../dist/Enforcer/Surface.js");
 const blog = await import("../../../dist/Enforcer/BlogSurface.js");
 
 
-test('WHAT[BD-013] ENFORCER_commit_classification_exposes_named_semantic_branches', () => {
+test('WHAT[behavior-diagnosis-013] ENFORCER_commit_classification_exposes_named_semantic_branches', () => {
   assert.equal(blog.classifyCommit({ callCount: 0, providerRun: 'run', tip: 'primitive-obsession' }).branch, 'ProtocolRepair')
   assert.equal(blog.classifyCommit({ callCount: 1, providerRun: '', tip: 'primitive-obsession' }).branch, 'Fatal')
   assert.equal(blog.classifyCommit({ callCount: 1, providerRun: 'run', tip: '' }).branch, 'ProtocolRepair')

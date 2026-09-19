@@ -94,7 +94,7 @@ type AgentProjectionSet =
         /// Canonical per-Life Magic Todo checkpoint projection.
         MagicTodo: MagicTodoProjection.MagicTodoProjectionState
 
-        /// DELEG-024: last parent XTrace cursor physically handed to each reusable
+        /// delegation-024: last parent XTrace cursor physically handed to each reusable
         /// delegate session. Keyed pair lookup; never inferred from prompt text.
         DelegationCompletedHandoffs: Map<string, int64>
 

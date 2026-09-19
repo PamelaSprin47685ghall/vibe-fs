@@ -22,7 +22,7 @@ const syncModel = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/
 
 const forkTool = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs'), 'utf8')
 
-test('WHAT[DELEG-001] manager_role_law_entrusts_by_consequence_not_persona', () => {
+test('WHAT[delegation-001] manager_role_law_entrusts_by_consequence_not_persona', () => {
   const pair = readProviderPair('role/manager')
   assert.match(pair.en, /entrust.*consequence/i)
   assert.match(pair.zh, /托付|consequence/i)

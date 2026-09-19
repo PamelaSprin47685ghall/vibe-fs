@@ -36,7 +36,7 @@ const referenceScore = (text) => {
   return { weightedDistinctTokens, step }
 }
 
-test('WHAT[DG-002] LOOP_009_text_and_reasoning_delta_decode_fail_closed', () => {
+test('WHAT[degeneration-guard-002] LOOP_009_text_and_reasoning_delta_decode_fail_closed', () => {
   assert.equal(loopDetector.tryDecodeTextDelta({ type: 'session.status' }), null)
 
   for (const field of ['text', 'reasoning', 'model_thought', 'thinking', 'reasoning_content']) {
@@ -129,7 +129,7 @@ const rawDeltaWithoutMessage = (session, field, text) => ({
   },
 })
 
-test('WHAT[DG-002] LOOP_002_sensor_observes_text_and_reasoning_only', async () => {
+test('WHAT[degeneration-guard-002] LOOP_002_sensor_observes_text_and_reasoning_only', async () => {
   const aborts = []
   const sensor = createSensor({
     owned: ['ses_text'],

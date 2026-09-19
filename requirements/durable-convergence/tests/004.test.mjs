@@ -41,7 +41,7 @@ const withStore = async (writerId, fn) => {
   }
 }
 
-test('WHAT[DURABLE-CONVERGENCE-004] concurrent heads are preserved as structural DomainConflict frontier', async () => {
+test('WHAT[durable-convergence-004] concurrent heads are preserved as structural DomainConflict frontier', async () => {
   await withStore('writer-conflict', async (store) => {
     const a = make(A, [], 'replica/conflict')
     const b = make(B, [], 'replica/conflict')

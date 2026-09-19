@@ -66,7 +66,7 @@ const layersOf = (s) =>
     ]),
   )
 
-test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_capability_exactness_plus_one_ultra_example_coder', () => {
+test('WHAT[repository-programming-002] JS004_capability_exactness_plus_one_ultra_example_coder', () => {
   const result = surface('Engineer', ['Read', 'Write', 'Edit', 'Glob', 'Grep'])
   assert.equal(isSome(result), true)
   const layers = layersOf(result)
@@ -87,7 +87,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_capability_exactness_plus_one_ultra
   assert.match(result.examples[0], /oldApi → newApi/)
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_absent_capability_is_absent_in_all_four_layers', () => {
+test('WHAT[repository-programming-002] JS004_absent_capability_is_absent_in_all_four_layers', () => {
   const result = surface('Engineer', ['Read', 'Glob', 'Grep']) // no Edit / Write
   assert.equal(isSome(result), true)
   assert.deepEqual(memberNames(result), ['file', 'glob', 'grep'])
@@ -99,7 +99,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_absent_capability_is_absent_in_all_
   assert.equal(result.examples.some((example) => example.includes('this.rewrite')), false)
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_edit_guidance_never_names_missing_read_or_write_members', () => {
+test('WHAT[repository-programming-002] JS004_edit_guidance_never_names_missing_read_or_write_members', () => {
   const editOnly = surface('Engineer', ['Edit'])
   assert.deepEqual(memberNames(editOnly), ['edit', 'rewrite'])
   for (const unavailable of [
@@ -125,7 +125,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_edit_guidance_never_names_missing_r
   assert.match(editWrite.description, /(^|[^A-Za-z0-9_])write\(path/m)
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_member_gate_binds_present_members_only', () => {
+test('WHAT[repository-programming-002] JS004_member_gate_binds_present_members_only', () => {
   const perms = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep)
   assert.equal(memberBinding('Engineer', perms, 'file'), 'js.read')
   assert.equal(memberBinding('Engineer', perms, 'glob'), 'js.glob')
@@ -136,7 +136,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_member_gate_binds_present_members_o
   assert.equal(memberBinding('Blogger', caps(ToolPermission.Chronicle), 'file'), undefined)
 })
 
-test('WHAT[REPOSITORY-PROGRAMMING-002] JS004_lying_generator_counterexample_is_rejected', () => {
+test('WHAT[repository-programming-002] JS004_lying_generator_counterexample_is_rejected', () => {
   // A "lying" surface advertises a member with no runtime binding — the exact
   // failure mode the four-layer invariant exists to make impossible. The gate
   // must refuse the member: memberBinding returns undefined for it, so a

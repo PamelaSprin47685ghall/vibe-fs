@@ -27,7 +27,7 @@ const lifecycle = (caseName) => ({
       },
 })
 
-test('WHAT[OBLIGATION-LEDGER-016] T1 revelation hook wraps the accepted result with entrustment', () => {
+test('WHAT[obligation-ledger-016] T1 revelation hook wraps the accepted result with entrustment', () => {
   const wrapped = todo.wrapT1AcceptedResult(SESSION, 'checkpoint body')
   assert.ok(wrapped.startsWith('# The account has been accepted.'))
   assert.ok(wrapped.includes('The Manager who will carry it is you.'))
@@ -111,7 +111,7 @@ const acceptT1Checkpoint = async (handle, session, callText) => {
   return { t1, accepted }
 }
 
-test('WHAT[OBLIGATION-LEDGER-016] first accepted planComplete=false stays at the Planning Table without commitment', async (context) => {
+test('WHAT[obligation-ledger-016] first accepted planComplete=false stays at the Planning Table without commitment', async (context) => {
   const opened = await openJournal()
   context.after(opened.close)
   const session = 'ses-magic-todo-planning-false'
@@ -209,7 +209,7 @@ const acceptedState = () => {
   return handle
 }
 
-test('WHAT[OBLIGATION-LEDGER-016] projection latches the first true commitment and never reopens it', () => {
+test('WHAT[obligation-ledger-016] projection latches the first true commitment and never reopens it', () => {
   const makeCheckpoint = (suffix, declared, baseName, proposalName, frontier) => {
     const cpCall = `todo-${suffix}`
     const cpWrite = todo.todoWriteId(sha256, life, cpCall)
@@ -285,7 +285,7 @@ const firstCheckpointSurfaces = [
   ['todowrite-description/zh-CN', 'resources/provider/lifecycle/magic-todo/todowrite-description/zh-CN.md'],
 ]
 
-test('WHAT[OBLIGATION-LEDGER-016] planning checkpoints are allowed until the first irreversible true commitment', () => {
+test('WHAT[obligation-ledger-016] planning checkpoints are allowed until the first irreversible true commitment', () => {
   for (const [label, path] of firstCheckpointSurfaces) {
     const text = read(path)
     assert.match(text, /planComplete/i, `${label}: must expose the explicit commitment declaration`)
@@ -310,7 +310,7 @@ const traceOwner = await import("../../../dist/Context/Trace/SemanticTraceSurfac
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const item = (sequence, role, part) => traceOwner.item({ sequence, role, part })
 
-test('WHAT[OBLIGATION-LEDGER-016] T1 constitutive boundary is independent from the compression floor', () => {
+test('WHAT[obligation-ledger-016] T1 constitutive boundary is independent from the compression floor', () => {
   const callId = 't1-call'
   const parts = [
     { sequence: 1, kind: 'text', text: 'opening' },
@@ -325,7 +325,7 @@ test('WHAT[OBLIGATION-LEDGER-016] T1 constitutive boundary is independent from t
   assert.equal(todo.bloggerEffectiveStart(7, floor), 7)
   assert.equal(todo.bloggerEffectiveStart(10, floor), 10)
 })
-test('WHAT[OBLIGATION-LEDGER-016] T1 constitutive body renders in Opening, not Recent', () => {
+test('WHAT[obligation-ledger-016] T1 constitutive body renders in Opening, not Recent', () => {
   const openingCharge = opening.opening('Ship the bridge.', [], '')
   const constitutive = [
     item(5, 'assistant', traceOwner.toolCallPart('t1', 'todowrite', '{"planComplete":true,"workingOn":"","obligations":[]}')),
@@ -350,7 +350,7 @@ test('WHAT[OBLIGATION-LEDGER-016] T1 constitutive body renders in Opening, not R
   assert.doesNotMatch(recentSection, /todowrite/)
   assert.doesNotMatch(recentSection, /The Manager who will carry it is you/)
 })
-test('WHAT[OBLIGATION-LEDGER-016] XTrace.forOpening keeps T1 tools; forWorkRecord drops them', () => {
+test('WHAT[obligation-ledger-016] XTrace.forOpening keeps T1 tools; forWorkRecord drops them', () => {
   const items = [
     item(5, 'assistant', traceOwner.toolCallPart('t1', 'todowrite', '{}')),
     item(6, 'tool', traceOwner.toolResultPart('t1', 'entrusted')),

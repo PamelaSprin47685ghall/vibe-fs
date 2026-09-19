@@ -60,7 +60,7 @@ const profileOf = () => {
   return built.value
 }
 
-test('WHAT[DISPATCH-PROTOCOL-010] DP_010_authority_root_profile_cannot_express_a_model', () => {
+test('WHAT[dispatch-protocol-010] DP_010_authority_root_profile_cannot_express_a_model', () => {
   const profile = profileOf()
   assert.deepEqual(
     { ...profile, model: profile.model },
@@ -135,7 +135,7 @@ const observation = (result) => {
   return result.observation
 }
 
-test('WHAT[DISPATCH-PROTOCOL-010] PROMPT_006_unknown_authority_kind_fails_closed', async () => {
+test('WHAT[dispatch-protocol-010] PROMPT_006_unknown_authority_kind_fails_closed', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-send-format-invalid-'))
   try {
     const opened = await journal.JournalSurface_bootWithWriterId(base, 'writer-invalid', 'rt-invalid', 4242, '2026-01-01T00:00:00Z')
@@ -159,7 +159,7 @@ test('WHAT[DISPATCH-PROTOCOL-010] PROMPT_006_unknown_authority_kind_fails_closed
     rmSync(base, { recursive: true, force: true })
   }
 })
-test('WHAT[DISPATCH-PROTOCOL-010] PROMPT_006_send_payload_carries_participant_and_no_model', async () => {
+test('WHAT[dispatch-protocol-010] PROMPT_006_send_payload_carries_participant_and_no_model', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-send-format-'))
   try {
     const opened = await journal.JournalSurface_bootWithWriterId(base, 'writer-send', 'rt-send', 4242, '2026-01-01T00:00:00Z')

@@ -25,7 +25,7 @@ const terminalRead = (path) => [{
   parts: [{ type: 'tool', tool: 'read', callID: 'source-read', state: { status: 'completed', input: { filePath: path }, output: 'source\n', time: { start: 0, end: 0 } } }],
 }]
 
-test('WHAT[REQUIREMENT-GROUNDING-012] freezes result-only terminal bytes across restart replay while changed digests append without rewriting the provider prefix', async () => {
+test('WHAT[requirement-grounding-012] freezes result-only terminal bytes across restart replay while changed digests append without rewriting the provider prefix', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const source = join(dir, 'src', 'main.fs')

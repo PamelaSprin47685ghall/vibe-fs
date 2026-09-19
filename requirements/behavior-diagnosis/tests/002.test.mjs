@@ -6,29 +6,29 @@ const catalogRules = enforcer.rules()
 
 const catalogFields = enforcer.fieldNames()
 
-test('WHAT[BD-002] ENFORCER_170_rule_ids_are_unique', () => {
+test('WHAT[behavior-diagnosis-002] ENFORCER_170_rule_ids_are_unique', () => {
   const ids = catalogRules.map((r) => r.ruleId)
   assert.equal(new Set(ids).size, 120)
 })
 
-test('WHAT[BD-002] ENFORCER_170_field_names_are_unique', () => {
+test('WHAT[behavior-diagnosis-002] ENFORCER_170_field_names_are_unique', () => {
   const fields = catalogRules.map((r) => r.fieldName)
   assert.equal(new Set(fields).size, 120)
 })
 
-test('WHAT[BD-002] ENFORCER_170_catalog_ordinals_are_contiguous_from_1', () => {
+test('WHAT[behavior-diagnosis-002] ENFORCER_170_catalog_ordinals_are_contiguous_from_1', () => {
   const orders = catalogRules.map((r) => r.lexicalOrder).sort((a, b) => a - b)
   assert.deepEqual(orders, Array.from({ length: 120 }, (_, i) => i + 1))
 })
 
-test('WHAT[BD-002] ENFORCER_170_all_main_and_enforcer_texts_are_nonempty', () => {
+test('WHAT[behavior-diagnosis-002] ENFORCER_170_all_main_and_enforcer_texts_are_nonempty', () => {
   for (const rule of catalogRules) {
     assert.ok(rule.enforcerText.trim().length > 0, `rule ${rule.ruleId} has empty enforcer.md`)
     assert.ok(rule.mainText.trim().length > 0, `rule ${rule.ruleId} has empty main.md`)
   }
 })
 
-test('WHAT[BD-002] ENFORCER_170_catalog_is_stable_and_not_corrupted', () => {
+test('WHAT[behavior-diagnosis-002] ENFORCER_170_catalog_is_stable_and_not_corrupted', () => {
   // Regression: last tip main guidance must stay short and domain-specific.
   const l10 = catalogRules.find((r) => r.fieldName === 'incidental-complexity-dominates')
   assert.ok(l10, 'incidental-complexity-dominates must exist')

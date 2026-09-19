@@ -92,7 +92,7 @@ const mulberry32 = (seed) => {
   }
 }
 
-test('WHAT[PREFIX-STABILITY-010] H13_02_historical_pair_never_relocates_to_current_batch', async () => {
+test('WHAT[prefix-stability-010] H13_02_historical_pair_never_relocates_to_current_batch', async () => {
   const session = 'h13-02'
 
   const round1 = [toolCall('c1', 'bash', 't1'), toolResult('r1', 'bash', 't1')]
@@ -116,7 +116,7 @@ test('WHAT[PREFIX-STABILITY-010] H13_02_historical_pair_never_relocates_to_curre
   assert.equal(wire2[3].parts[0].state.output, `ok\0\uFEFF${text}`)
   assertPrefixLaw(wire1, wire2, 'H13-02 no historical relocation')
 })
-test('WHAT[PREFIX-STABILITY-010] H13_02b_durable_history_replays_the_current_skill_wire_only', async () => {
+test('WHAT[prefix-stability-010] H13_02b_durable_history_replays_the_current_skill_wire_only', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-h1302b-'))
   const opened = await openJournal(dir)
   try {
@@ -151,7 +151,7 @@ test('WHAT[PREFIX-STABILITY-010] H13_02b_durable_history_replays_the_current_ski
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[PREFIX-STABILITY-010] H13_03_same_placement_reentry_appends_no_pair', async () => {
+test('WHAT[prefix-stability-010] H13_03_same_placement_reentry_appends_no_pair', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-h1303-'))
   const opened = await openJournal(dir)
   try {
@@ -174,7 +174,7 @@ test('WHAT[PREFIX-STABILITY-010] H13_03_same_placement_reentry_appends_no_pair',
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[PREFIX-STABILITY-010] H13_04_restart_replay_is_byte_identical', async () => {
+test('WHAT[prefix-stability-010] H13_04_restart_replay_is_byte_identical', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-h1304-'))
   const session = 'h13-04'
   const raw = [
@@ -205,7 +205,7 @@ test('WHAT[PREFIX-STABILITY-010] H13_04_restart_replay_is_byte_identical', async
 
   rmSync(dir, { recursive: true, force: true })
 })
-test('WHAT[PREFIX-STABILITY-010] H13_05_missing_anchor_pair_is_omitted_not_relocated', async () => {
+test('WHAT[prefix-stability-010] H13_05_missing_anchor_pair_is_omitted_not_relocated', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-h1305-'))
   const opened = await openJournal(dir)
   try {
@@ -252,7 +252,7 @@ test('WHAT[PREFIX-STABILITY-010] H13_05_missing_anchor_pair_is_omitted_not_reloc
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[PREFIX-STABILITY-010] H13_05b_xwire_drop_leading_continue_still_commits', async () => {
+test('WHAT[prefix-stability-010] H13_05b_xwire_drop_leading_continue_still_commits', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-h1305b-'))
   const opened = await openJournal(dir)
   try {
@@ -297,7 +297,7 @@ test('WHAT[PREFIX-STABILITY-010] H13_05b_xwire_drop_leading_continue_still_commi
     rmSync(dir, { recursive: true, force: true })
   }
 })
-test('WHAT[PREFIX-STABILITY-010] H13_06_prior_tip_only_affects_the_new_pair', async () => {
+test('WHAT[prefix-stability-010] H13_06_prior_tip_only_affects_the_new_pair', async () => {
   const session = 'h13-06'
 
   const wire1 = await inject(
@@ -371,11 +371,11 @@ const pairMessages = (messages) => messages.filter((m) => isPairProgrammingThoug
 const guidanceSuffix = (markerText) => `\0\uFEFF${markerText}`
 const terminalOutputOf = (messages, id) => messages.find((m) => m.info.id === id).parts[0].state.output
 
-test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_empty_history_does_not_inject_pair', async () => {
+test('WHAT[prefix-stability-010] PPT_tryInject_empty_history_does_not_inject_pair', async () => {
   const out = await inject('ses_empty', [])
   assert.equal(out.length, 0, 'empty history must not inject pair')
 })
-test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_single_user_message_does_not_inject_pair_to_prevent_tool_start', async () => {
+test('WHAT[prefix-stability-010] PPT_tryInject_single_user_message_does_not_inject_pair_to_prevent_tool_start', async () => {
   const raw = [userMsg('msg_1')]
   const out = await inject('ses_1', raw)
   assert.ok(out)
@@ -390,7 +390,7 @@ test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_single_user_message_does_not_inje
   assert.equal(subsequent.length, 3)
   assert.equal(subsequent[2].parts[0].text, 'steer', 'subsequent user message does not inject without prior tool call')
 })
-test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_places_pair_before_trailing_user_with_prior_assistant', async () => {
+test('WHAT[prefix-stability-010] PPT_tryInject_places_pair_before_trailing_user_with_prior_assistant', async () => {
   const raw = [userMsg('u1'), assistantText('a1'), userMsg('u2', 'steer')]
   const out = await inject('ses_assistant', raw)
   assert.ok(out)
@@ -401,7 +401,7 @@ test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_places_pair_before_trailing_user_
   assert.deepEqual(out, raw)
   assert.equal(pairMessages(out).length, 0)
 })
-test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_merges_into_tool_batches_before_user', async () => {
+test('WHAT[prefix-stability-010] PPT_tryInject_merges_into_tool_batches_before_user', async () => {
   const raw = [
     toolCall('c1', 'bash', 't1'),
     toolCall('c2', 'read', 't2'),
@@ -432,7 +432,7 @@ test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_merges_into_tool_batches_before_u
   assert.deepEqual(replay, out)
   assert.equal(terminalOutputOf(replay, 'r2'), `out2${guidanceSuffix(text)}`)
 })
-test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_second_pass_of_same_placement_replays_existing_pair', async () => {
+test('WHAT[prefix-stability-010] PPT_tryInject_second_pass_of_same_placement_replays_existing_pair', async () => {
   const initial = [userMsg('u1'), assistantText('a1'), userMsg('u2')]
   const once = await inject('ses_append', initial)
   assert.ok(once)
@@ -447,7 +447,7 @@ test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_second_pass_of_same_placement_rep
   assert.equal(pairMessages(twice).length, 0)
   assert.deepEqual(twice, once, 'replay must be byte-identical')
 })
-test('WHAT[PREFIX-STABILITY-010] PPT_skip_auto_injected_env_blocks_new_pair_but_replays_history', async () => {
+test('WHAT[prefix-stability-010] PPT_skip_auto_injected_env_blocks_new_pair_but_replays_history', async () => {
   const previous = process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
   try {
     delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
@@ -486,7 +486,7 @@ test('WHAT[PREFIX-STABILITY-010] PPT_skip_auto_injected_env_blocks_new_pair_but_
     else process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = previous
   }
 })
-test('WHAT[PREFIX-STABILITY-010] PPT_skip_auto_injected_env_keeps_empty_transcript_without_pair', async () => {
+test('WHAT[prefix-stability-010] PPT_skip_auto_injected_env_keeps_empty_transcript_without_pair', async () => {
   const previous = process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
   try {
     process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = '1'
@@ -498,7 +498,7 @@ test('WHAT[PREFIX-STABILITY-010] PPT_skip_auto_injected_env_keeps_empty_transcri
     else process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = previous
   }
 })
-test('WHAT[PREFIX-STABILITY-010] C_PH_ordinary_cursor_ordinary_suppresses_then_restores_same_occurrence', async () => {
+test('WHAT[prefix-stability-010] C_PH_ordinary_cursor_ordinary_suppresses_then_restores_same_occurrence', async () => {
   const session = 'ses_cursor_transition'
   const initial = [userMsg('u1'), assistantText('a1'), userMsg('u2')]
   const ordinary = await inject(session, initial)
@@ -521,7 +521,7 @@ test('WHAT[PREFIX-STABILITY-010] C_PH_ordinary_cursor_ordinary_suppresses_then_r
   assert.equal(pairMessages(back).length, 0)
   assert.deepEqual(back, ordinary, 'same occurrence restores the identical wire')
 })
-test('WHAT[PREFIX-STABILITY-010] PPT_distiller_and_blogger_never_inject_pair_hint', async () => {
+test('WHAT[prefix-stability-010] PPT_distiller_and_blogger_never_inject_pair_hint', async () => {
   const bloggerMsg = [
     userMsg('u1'),
     assistantText('a1'),

@@ -28,7 +28,7 @@ const ACTIVE_OFFICES = [
   },
 ]
 
-test('WHAT[OFF-015] predictor_is_internal_mechanism_role_not_forkable_or_scheduled', () => {
+test('WHAT[office-capability-015] predictor_is_internal_mechanism_role_not_forkable_or_scheduled', () => {
   const forkEn = read('tool/fork/description/en.md')
   const forkZh = read('tool/fork/description/zh-CN.md')
   assert.doesNotMatch(forkEn, /\bpredictor\b/i)

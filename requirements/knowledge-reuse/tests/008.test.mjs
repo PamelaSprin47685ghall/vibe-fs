@@ -27,7 +27,7 @@ const refreshed = (sessionId, q, a, observations) => ({
 const accessed = (sessionId) => ({ kind: 'case-accessed', sessionId })
 const evicted = (sessionId) => ({ kind: 'case-evicted', sessionId })
 
-test('WHAT[KNOWLEDGE-REUSE-008] CASE008_fold_accessed_and_evicted_derives_access_order', () => {
+test('WHAT[knowledge-reuse-008] CASE008_fold_accessed_and_evicted_derives_access_order', () => {
   const { cases } = project([
     captured('s1', 'Q1', 'A1', [read('a.txt', 'h1')]),
     captured('s2', 'Q2', 'A2', [read('b.txt', 'h2')]),
@@ -38,7 +38,7 @@ test('WHAT[KNOWLEDGE-REUSE-008] CASE008_fold_accessed_and_evicted_derives_access
   const { cases: combined } = project([captured('s2', 'Q2', 'A2', []), evicted('s2')])
   assert.equal(combined.length, 0)
 })
-test('WHAT[KNOWLEDGE-REUSE-008] CASE008_lru_evict_keeps_most_recently_accessed', () => {
+test('WHAT[knowledge-reuse-008] CASE008_lru_evict_keeps_most_recently_accessed', () => {
   const { cases } = project([
     captured('s1', 'Q1', 'A1', []),
     captured('s2', 'Q2', 'A2', []),
@@ -95,7 +95,7 @@ const openStore = () => {
   }
 }
 
-test('WHAT[KNOWLEDGE-REUSE-008] CASE008_fold_accessed_and_evicted_derives_access_order', () => {
+test('WHAT[knowledge-reuse-008] CASE008_fold_accessed_and_evicted_derives_access_order', () => {
   const folded = project([
     { kind: 'case-captured', case: caseRec('s1', 'Q1', 'A1', [read('a.txt', 'h1')]) },
     { kind: 'case-captured', case: caseRec('s2', 'Q2', 'A2', [read('b.txt', 'h2')]) },
@@ -109,7 +109,7 @@ test('WHAT[KNOWLEDGE-REUSE-008] CASE008_fold_accessed_and_evicted_derives_access
   ])
   assert.equal(combined.cases.length, 0)
 })
-test('WHAT[KNOWLEDGE-REUSE-008] CASE008_lru_evict_keeps_most_recently_accessed', () => {
+test('WHAT[knowledge-reuse-008] CASE008_lru_evict_keeps_most_recently_accessed', () => {
   const folded = project([
     { kind: 'case-captured', case: caseRec('s1', 'Q1', 'A1', []) },
     { kind: 'case-captured', case: caseRec('s2', 'Q2', 'A2', []) },
@@ -156,7 +156,7 @@ const sandbox = () => {
   }
 }
 
-test('WHAT[KNOWLEDGE-REUSE-008] lifecycle_touchAccess_and_touchCaseAccess_advance_integrated_access_order', async () => {
+test('WHAT[knowledge-reuse-008] lifecycle_touchAccess_and_touchCaseAccess_advance_integrated_access_order', async () => {
   const { dir, reopen, cleanup } = sandbox()
   try {
     lifecycle.enable(dir)

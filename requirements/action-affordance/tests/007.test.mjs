@@ -23,7 +23,7 @@ const HIGH_RISK_TOOLS = Object.freeze([
 
 const readTool = (tool, locale) => read(`resources/provider/tool/${tool}/description/${locale}.md`)
 
-test('WHAT[ACTION-AFFORDANCE-007] AA_arch_006_007_distinct_semantics_have_distinct_names', () => {
+test('WHAT[action-affordance-007] AA_arch_006_007_distinct_semantics_have_distinct_names', () => {
   const fork = readTool('fork', 'en')
   const commission = readTool('commission', 'en')
   assert.match(fork, /another office within this mission/i)

@@ -34,7 +34,7 @@ const event = (n, parents = [], type = 'JobRequested', payload = { n }) => ({
   payloadRefs: [],
 })
 
-test('WHAT[DURABLE-EVENTS-021] semantic_failure_writes_cut_tail_reset_and_the_same_feature_can_succeed_next', async () => {
+test('WHAT[durable-events-021] semantic_failure_writes_cut_tail_reset_and_the_same_feature_can_succeed_next', async () => {
   const dir = withTemp((base) => base)
   const store = eventStore.create(dir, 'semantic-cut-proof')
   try {
@@ -72,7 +72,7 @@ test('WHAT[DURABLE-EVENTS-021] semantic_failure_writes_cut_tail_reset_and_the_sa
   }
 })
 
-test('WHAT[DURABLE-EVENTS-021] an uncut historical Journal fault suppresses only its own journal stream', async () => {
+test('WHAT[durable-events-021] an uncut historical Journal fault suppresses only its own journal stream', async () => {
   const dir = withTemp((base) => base)
   const eventsDir = path.join(dir, 'wanxiang', 'events')
   mkdirSync(eventsDir, { recursive: true })

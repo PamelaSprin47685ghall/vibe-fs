@@ -8,7 +8,7 @@ import { scanRetryOwnership } from '../../../scripts/checks/retry-owner.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 
-test('WHAT[PAR-019] one policy owner licenses every provider recovery attempt', () => {
+test('WHAT[provider-attempt-recovery-019] one policy owner licenses every provider recovery attempt', () => {
   assert.deepEqual(scanRetryOwnership(ROOT), [])
 })
 
@@ -27,7 +27,7 @@ const fixture = (mutationPath, mutation) => {
   return { root, close: () => rmSync(root, { recursive: true, force: true }) }
 }
 
-test('WHAT[PAR-019] rejects nested physical retry owner', () => {
+test('WHAT[provider-attempt-recovery-019] rejects nested physical retry owner', () => {
   const fx = fixture(
     'Interaction/Dispatch/NestedRetry.fs',
     'let resend port =\n    for attempt in [ 1; 2 ] do\n        port.SendPrompt(sessionId, text, options)\n',
@@ -39,7 +39,7 @@ test('WHAT[PAR-019] rejects nested physical retry owner', () => {
   }
 })
 
-test('WHAT[PAR-019] rejects retry classification from diagnostic text', () => {
+test('WHAT[provider-attempt-recovery-019] rejects retry classification from diagnostic text', () => {
   const fx = fixture(
     'Interaction/Dispatch/StringRetry.fs',
     'let retry error =\n    if error.Contains("timeout") then fallback ()\n',

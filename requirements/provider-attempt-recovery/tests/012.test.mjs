@@ -52,7 +52,7 @@ const erroredBlog = (id, callId) =>
     { completed: true },
   )
 
-test('WHAT[PAR-012] PAR_012_an_interrupted_tool_call_is_not_a_confirmed_failure', () => {
+test('WHAT[provider-attempt-recovery-012] PAR_012_an_interrupted_tool_call_is_not_a_confirmed_failure', () => {
   // Host 标记(interrupted=true)是判据:该残留被识别为 abort 清理,不是工具失败。
   const evidence = repair.classifyBlogAttempt(interruptedBlog('asst-killed', 'blog-hang'))
   assert.equal(evidence.aborted, true)
@@ -61,7 +61,7 @@ test('WHAT[PAR-012] PAR_012_an_interrupted_tool_call_is_not_a_confirmed_failure'
   assert.equal(evidence.errored, false)
 })
 
-test('WHAT[PAR-012] PAR_012_a_tool_error_without_interrupted_is_the_confirmed_failure', () => {
+test('WHAT[provider-attempt-recovery-012] PAR_012_a_tool_error_without_interrupted_is_the_confirmed_failure', () => {
   // status=error 且无 interrupted → 工具本身失败,才计入已确认失败。
   const evidence = repair.classifyBlogAttempt(erroredBlog('asst-tool-error', 'blog-crash'))
   assert.equal(evidence.errored, true)

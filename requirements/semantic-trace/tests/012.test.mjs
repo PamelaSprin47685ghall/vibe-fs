@@ -1,6 +1,6 @@
 // requirements/semantic-trace/tests/012.test.mjs
 //
-// Law: SEMANTIC-TRACE-012
+// Law: semantic-trace-012
 // Scenario T21: Multiple resumes in the same session produce strictly isolated invocation ranges.
 
 import assert from 'node:assert/strict'
@@ -8,7 +8,7 @@ import test from 'node:test'
 
 import * as semanticTrace from '../../../dist/Context/Trace/SemanticTraceSurface.js'
 
-test('WHAT[SEMANTIC-TRACE-012] T21_multiple_session_resumes_produce_strictly_isolated_invocation_ranges', () => {
+test('WHAT[semantic-trace-012] T21_multiple_session_resumes_produce_strictly_isolated_invocation_ranges', () => {
   assert.equal(typeof semanticTrace.createInvocationBoundary, 'function', 'must export createInvocationBoundary')
 
   const trace = semanticTrace.emptyTrace()

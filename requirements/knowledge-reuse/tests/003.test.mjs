@@ -6,7 +6,7 @@ const { default: test } = await import("node:test");
 const casebook = await import("../../../dist/Repository/Knowledge/Casebook/Surface.js");
 
 
-test('WHAT[KNOWLEDGE-REUSE-003] CASE003_read_capture_is_typed_and_hashed', () => {
+test('WHAT[knowledge-reuse-003] CASE003_read_capture_is_typed_and_hashed', () => {
   const obs = casebook.capture('read', { path: 'src/a.fs' }, 'module A // 观察 🧭\r\n')
   assert.notEqual(obs, null)
   assert.equal(obs.kind, 'file-read')
@@ -17,23 +17,23 @@ test('WHAT[KNOWLEDGE-REUSE-003] CASE003_read_capture_is_typed_and_hashed', () =>
   // missing path → no observation
   assert.equal(casebook.capture('read', {}, 'text'), null)
 })
-test('WHAT[KNOWLEDGE-REUSE-003] CASE003_glob_capture_parses_rendered_paths', () => {
+test('WHAT[knowledge-reuse-003] CASE003_glob_capture_parses_rendered_paths', () => {
   const obs = casebook.capture('glob', { pattern: 'src/**/*.fs' }, 'src/a.fs\nsrc/b.fs\n')
   assert.equal(obs.kind, 'glob-result')
   assert.equal(obs.pattern, 'src/**/*.fs')
   assert.deepEqual(obs.paths, ['src/a.fs', 'src/b.fs'])
 })
-test('WHAT[KNOWLEDGE-REUSE-003] CASE003_grep_capture_keeps_match_lines', () => {
+test('WHAT[knowledge-reuse-003] CASE003_grep_capture_keeps_match_lines', () => {
   const obs = casebook.capture('grep', { pattern: 'TODO' }, 'src/a.fs:3:TODO fix\n')
   assert.equal(obs.kind, 'grep-result')
   assert.equal(obs.pattern, 'TODO')
   assert.equal(obs.matches.length, 1)
 })
-test('WHAT[KNOWLEDGE-REUSE-003] CASE003_unknown_tool_yields_nothing', () => {
+test('WHAT[knowledge-reuse-003] CASE003_unknown_tool_yields_nothing', () => {
   assert.equal(casebook.capture('executor', { command: 'ls' }, 'x'), null)
   assert.equal(casebook.capture('write', { path: 'a' }, 'x'), null)
 })
-test('WHAT[KNOWLEDGE-REUSE-003] S63_executor_reading_positives', () => {
+test('WHAT[knowledge-reuse-003] S63_executor_reading_positives', () => {
   const fileOf = (cmd) => {
     const obs = casebook.ofExecCommand(cmd)
     assert.notEqual(obs, null, `${cmd} must be recognized`)
@@ -48,7 +48,7 @@ test('WHAT[KNOWLEDGE-REUSE-003] S63_executor_reading_positives', () => {
   assert.equal(fileOf("sed -n '20,80p' src/a.fs"), 'src/a.fs')
   assert.equal(fileOf('cat src/a.fs | grep bar'), 'src/a.fs')
 })
-test('WHAT[KNOWLEDGE-REUSE-003] S63_executor_reading_negatives_skip_safely', () => {
+test('WHAT[knowledge-reuse-003] S63_executor_reading_negatives_skip_safely', () => {
   for (const cmd of ['cat "$(echo x)"', 'sh -c "cat a"', 'bash -c "cat a"', 'grep -r x .', 'ls -la']) {
     assert.equal(casebook.ofExecCommand(cmd), null, `${cmd} must be skipped`)
   }
@@ -82,7 +82,7 @@ const refreshed = (sessionId, q, a, observations) => ({
 const accessed = (sessionId) => ({ kind: 'case-accessed', sessionId })
 const evicted = (sessionId) => ({ kind: 'case-evicted', sessionId })
 
-test('WHAT[KNOWLEDGE-REUSE-003] CASE003_normalize_dedupes_and_orders_observations', () => {
+test('WHAT[knowledge-reuse-003] CASE003_normalize_dedupes_and_orders_observations', () => {
   const obs = [read('a.txt', 'h1'), read('a.txt', 'h1'), glob('**/*.fs', ['x', 'y']), glob('**/*.fs', ['y', 'x'])]
   // same identity → one entry; glob paths order-insensitive
   assert.equal(casebook.normalize(obs).length, 2)
@@ -125,7 +125,7 @@ const openStore = () => {
   }
 }
 
-test('WHAT[KNOWLEDGE-REUSE-003] CASE003_normalize_dedupes_and_orders_observations', () => {
+test('WHAT[knowledge-reuse-003] CASE003_normalize_dedupes_and_orders_observations', () => {
   const obs = [read('a.txt', 'h1'), read('a.txt', 'h1'), glob('**/*.fs', ['x', 'y']), glob('**/*.fs', ['y', 'x'])]
   // same identity → one entry; glob paths order-insensitive
   assert.equal(casebook.normalize(obs).length, 2)
@@ -137,7 +137,7 @@ const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const casebook = await import("../../../dist/Repository/Knowledge/Casebook/Surface.js");
 
-test('WHAT[KNOWLEDGE-REUSE-003] T17_substantive_access_collects_read_create_edit_delete_move_and_ignores_grep_glob', async () => {
+test('WHAT[knowledge-reuse-003] T17_substantive_access_collects_read_create_edit_delete_move_and_ignores_grep_glob', async () => {
   // Substantive access collects:
   // - successful read: entire file associated (path recorded)
   // - successful create: new path
@@ -167,7 +167,7 @@ test('WHAT[KNOWLEDGE-REUSE-003] T17_substantive_access_collects_read_create_edit
   ].sort())
 })
 
-test('WHAT[KNOWLEDGE-REUSE-003] T18_grep_glob_ls_and_prose_mentions_do_not_enter_case_related_paths', () => {
+test('WHAT[knowledge-reuse-003] T18_grep_glob_ls_and_prose_mentions_do_not_enter_case_related_paths', () => {
   assert.equal(typeof casebook.isSubstantiveTool, 'function', 'casebook must export isSubstantiveTool predicate')
   assert.equal(casebook.isSubstantiveTool('read'), true)
   assert.equal(casebook.isSubstantiveTool('write'), true)
@@ -179,7 +179,7 @@ test('WHAT[KNOWLEDGE-REUSE-003] T18_grep_glob_ls_and_prose_mentions_do_not_enter
   assert.equal(casebook.isSubstantiveTool('ls'), false)
 })
 
-test('WHAT[KNOWLEDGE-REUSE-003] T19_failed_or_uncommitted_mutations_do_not_record_modification_access', () => {
+test('WHAT[knowledge-reuse-003] T19_failed_or_uncommitted_mutations_do_not_record_modification_access', () => {
   assert.equal(typeof casebook.createAccessTracker, 'function')
   const tracker = casebook.createAccessTracker()
   tracker.recordRead('src/a.fs', 'h1')

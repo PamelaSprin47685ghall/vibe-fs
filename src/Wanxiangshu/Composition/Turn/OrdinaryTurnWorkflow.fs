@@ -117,7 +117,7 @@ module OrdinaryTurnWorkflow =
             AsyncSupport.completedTask ()
 
     /// Own the reconciled ordinary-turn outcome match.
-    /// `abortCause` is the Host boundary typed outcome consumed exactly once (SW-017 ①).
+    /// `abortCause` is the Host boundary typed outcome consumed exactly once (structured-workflow-017 ①).
     /// Guard armed state is not exposed; CE branches on the typed abort outcome.
     let private handleAborted
         (eventPort: IEventObservationPort)
@@ -125,13 +125,13 @@ module OrdinaryTurnWorkflow =
         (turn: ReconciledTurn)
         (reason: string)
         =
-        // DG-009: degeneration-guard already owns its successor. Application must
+        // degeneration-guard-009: degeneration-guard already owns its successor. Application must
         // not become a second recovery owner. External aborts retain normal cleanup.
         match abortCause with
         | AbortCause.DegenerationGuard _ -> AsyncSupport.completedTask ()
         | AbortCause.External ->
             task {
-                // MANAGED-SESSION-018: TurnAborted is an attempt observation, not
+                // managed-session-lifecycle-018: TurnAborted is an attempt observation, not
                 // proof that the logical parent/session ceased to exist. Do not
                 // escalate ambiguous AbortError into ParentCancelled and do not
                 // physically destroy background children. SessionDeleted or an

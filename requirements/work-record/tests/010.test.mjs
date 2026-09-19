@@ -29,7 +29,7 @@ const materialize = (
 
 const OPENING_END = { Sequence: 1 }
 
-test('WHAT[WORK-RECORD-010] LWR_materialization_is_deterministic', () => {
+test('WHAT[work-record-010] LWR_materialization_is_deterministic', () => {
   const trace = [
     xTrace.item({ sequence: 0, role: 'user', part: xTrace.text('task') }),
     xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.text('work') }),

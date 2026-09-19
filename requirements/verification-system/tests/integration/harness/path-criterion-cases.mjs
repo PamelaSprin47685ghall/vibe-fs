@@ -9,7 +9,7 @@ import { assertEq, assertTrue, tmpScenarioDir } from './lib.mjs';
 
 export const pathCriterionCases = [
   {
-    name: 'VERIFY-004 real harness entry fails closed when test root is missing',
+    name: 'verification-system-004 real harness entry fails closed when test root is missing',
     fn: () => {
       const emptyRoot = tmpScenarioDir();
       const runnerPath = fileURLToPath(new URL('../../../run.mjs', import.meta.url));

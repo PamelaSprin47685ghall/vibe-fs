@@ -21,7 +21,7 @@ const rebase = (state, { previousEpoch, nextEpoch, cutoff, digest, seal, prefixD
 const reanchor = (state, { previousEpoch, nextEpoch, observedRun = 'msg_compaction' }) =>
   prefix.applyReanchor({ previousEpoch, nextEpoch, observedRun }, state)
 
-test('WHAT[PREFIX-STABILITY-012] PREFIX_STABILITY_committed_reanchor_survives_subsequent_failure', () => {
+test('WHAT[prefix-stability-012] PREFIX_STABILITY_committed_reanchor_survives_subsequent_failure', () => {
   // CTX-015 / HOST-006：已提交的 reanchor（ContextReanchored）与 rebase
   // （PrefixRebaseCommitted）不因后续 provider failure 回滚。投影层没有
   // provider 结局输入；「失败后回滚」在类别上不存在（同 CTX-010 的

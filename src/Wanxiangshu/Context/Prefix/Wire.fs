@@ -195,10 +195,10 @@ module XWire =
                       AuthoritativeRequirements = []
                       ConstitutiveBody = "" }
 
-            // Same-session FrozenRecordPrefix omits Opening (WORK-RECORD-007):
+            // Same-session FrozenRecordPrefix omits Opening (work-record-007):
             // the true raw Opening remains physically present outside the Y
             // replacement. Gap/terminal are live X material and also stay out.
-            // Under WORK-RECORD-007, LifecycleWorkRecord.materialize with
+            // Under work-record-007, LifecycleWorkRecord.materialize with
             // includeOpening=false produces the headless Chronicle Y prefix.
             return LifecycleWorkRecord.materialize opening frameBodies "" false
         }

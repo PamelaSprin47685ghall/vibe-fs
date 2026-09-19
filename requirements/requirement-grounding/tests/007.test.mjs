@@ -25,7 +25,7 @@ const toolBatch = (providerID, path) => [
   { info: { id: 'r1', role: 'assistant', providerID }, parts: [{ type: 'tool', tool: 'read', callID: 'source', state: { status: 'completed', input: { filePath: path }, output: 'before\n', time: { start: 0, end: 0 } } }] },
 ]
 
-test('WHAT[REQUIREMENT-GROUNDING-007] ordinary providers replay anchored read call-result pairs while Cursor appends NUL-BOM result-only bytes after the pseudo-skill with stable source-path attributes', async () => {
+test('WHAT[requirement-grounding-007] ordinary providers replay anchored read call-result pairs while Cursor appends NUL-BOM result-only bytes after the pseudo-skill with stable source-path attributes', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const sourcePath = join(dir, 'src', 'main.fs')
@@ -62,7 +62,7 @@ test('WHAT[REQUIREMENT-GROUNDING-007] ordinary providers replay anchored read ca
   } finally { cleanup() }
 })
 
-test('WHAT[REQUIREMENT-GROUNDING-007] grep match files do not trigger APPLIES-TO before an explicit read', async () => {
+test('WHAT[requirement-grounding-007] grep match files do not trigger APPLIES-TO before an explicit read', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const sourcePath = join(dir, 'src', 'main.fs')

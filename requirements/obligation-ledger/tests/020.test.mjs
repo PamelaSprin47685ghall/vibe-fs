@@ -8,7 +8,7 @@ import { maskFSharpTrivia } from '../../../scripts/lib/fsharp-source.mjs'
 
 const ROOT = join(fileURLToPath(new URL('../../..', import.meta.url)))
 
-test('WHAT[OBLIGATION-LEDGER-020] OBL_020_ledger_does_not_adjudicate_quality', () => {
+test('WHAT[obligation-ledger-020] OBL_020_ledger_does_not_adjudicate_quality', () => {
   // 1. 行为面与参数契约断言：todowrite 工具线仅接收义务与规划完备性标志，不包含任何质量裁决参数
   const obligation = { name: 'task-1', horizon: 'near', work: 'implement feature' }
   const wire = todo.canonicalObligationListWire([obligation])

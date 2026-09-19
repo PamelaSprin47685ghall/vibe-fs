@@ -76,7 +76,7 @@ const acceptT1Checkpoint = async (handle, session, callText) => {
   return { t1, accepted }
 }
 
-test('WHAT[OBLIGATION-LEDGER-012] T1 accept creates the checkpoint (SSOT = TodoWriteAccepted)', async () => {
+test('WHAT[obligation-ledger-012] T1 accept creates the checkpoint (SSOT = TodoWriteAccepted)', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-magic-todo-t1-t2-lag1'
     const life = 'life-magic-todo-t1-t2-lag1'
@@ -105,7 +105,7 @@ const firstCheckpointSurfaces = [
   ['todowrite-description/zh-CN', 'resources/provider/lifecycle/magic-todo/todowrite-description/zh-CN.md'],
 ]
 
-test('WHAT[OBLIGATION-LEDGER-012] TodoWriteAccepted is the sole SSOT for checkpoints', () => {
+test('WHAT[obligation-ledger-012] TodoWriteAccepted is the sole SSOT for checkpoints', () => {
   const membrane = read('src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs')
   assert.match(membrane, /TodoWriteAccepted accepted/, 'membrane appends TodoWriteAccepted')
 })
@@ -141,7 +141,7 @@ const items = [
   obligation('verification', 'Verify the behavior with evidence.', 'far'),
 ]
 
-test('WHAT[OBLIGATION-LEDGER-012] replays an identical obligation checkpoint even while its review is outstanding (no new review from replay)', () => {
+test('WHAT[obligation-ledger-012] replays an identical obligation checkpoint even while its review is outstanding (no new review from replay)', () => {
   const current = [obligation('implementation', 'Implement the requested behavior.')]
   const write = todo.todoWriteId(sha256, life, firstCall)
   const existing = {

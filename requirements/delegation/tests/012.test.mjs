@@ -73,7 +73,7 @@ const verifyReusableHandoff = async (role) => {
   } finally { sync.dispose(h) }
 }
 
-test('WHAT[DELEG-012] SYNC_RUNTIME_first_provider_call_receives_canonical_record_and_sibling_receives_reference', async () => {
+test('WHAT[delegation-012] SYNC_RUNTIME_first_provider_call_receives_canonical_record_and_sibling_receives_reference', async () => {
   const h = await live('owner-canonical')
   try {
     const first = sync.invokeBatch(h, 'owner-canonical', 'Engineer', 'first charge', 'run-canonical', 'call-first', ['call-first', 'call-second'])

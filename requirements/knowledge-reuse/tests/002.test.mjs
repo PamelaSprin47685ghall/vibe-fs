@@ -27,7 +27,7 @@ const refreshed = (sessionId, q, a, observations) => ({
 const accessed = (sessionId) => ({ kind: 'case-accessed', sessionId })
 const evicted = (sessionId) => ({ kind: 'case-evicted', sessionId })
 
-test('WHAT[KNOWLEDGE-REUSE-002] CASE002_fold_captured_and_refreshed_keeps_qa_verbatim', () => {
+test('WHAT[knowledge-reuse-002] CASE002_fold_captured_and_refreshed_keeps_qa_verbatim', () => {
   const { cases } = project([
     captured('s1', 'Q1', 'A1', [read('a.txt', 'h1')]),
     captured('s2', 'Q2', 'A2', [read('b.txt', 'h2')]),
@@ -76,7 +76,7 @@ const openStore = () => {
   }
 }
 
-test('WHAT[KNOWLEDGE-REUSE-002] CASE002_fold_captured_and_refreshed_keeps_qa_verbatim', () => {
+test('WHAT[knowledge-reuse-002] CASE002_fold_captured_and_refreshed_keeps_qa_verbatim', () => {
   const folded = project([
     { kind: 'case-captured', case: caseRec('s1', 'Q1', 'A1', [read('a.txt', 'h1')]) },
     { kind: 'case-captured', case: caseRec('s2', 'Q2', 'A2', [read('b.txt', 'h2')]) },
@@ -118,7 +118,7 @@ const assertNoCase = (text) => assert.match(text, /The Casebook contains no entr
 const assertUnavailable = (text) => assert.match(text, /could not be read from this execution context|无法从当前执行环境读取|当前执行上下文无法读取/i)
 const assertNoMachineFreshness = (text) => assert.doesNotMatch(text, /\b(session_id|status|freshness|refresh)\s*=/)
 
-test('WHAT[KNOWLEDGE-REUSE-002] CASE004_fetch_returns_exact_canonical_a', async () => {
+test('WHAT[knowledge-reuse-002] CASE004_fetch_returns_exact_canonical_a', async () => {
   const { dir, handle, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
@@ -164,7 +164,7 @@ const sandbox = () => {
   }
 }
 
-test('WHAT[KNOWLEDGE-REUSE-002] lifecycle_notePrompt_noteAnswer_tryFinalize_creates_case_once', async () => {
+test('WHAT[knowledge-reuse-002] lifecycle_notePrompt_noteAnswer_tryFinalize_creates_case_once', async () => {
   const { dir, reopen, cleanup } = sandbox()
   try {
     lifecycle.enable(dir)

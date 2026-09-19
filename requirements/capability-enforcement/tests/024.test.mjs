@@ -4,7 +4,7 @@ import { acceptAuthorityRoot, grantWorkOwned, withExecutablePlugin, withPlugin }
 
 
 
-test('WHAT[ENF-024] FORK_manager_fork_rejects_devops_calling', async () => {
+test('WHAT[capability-enforcement-024] FORK_manager_fork_rejects_devops_calling', async () => {
   await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'ses-fork-devops', 'manager')
     await grantWorkOwned(runtime, 'ses-fork-devops')

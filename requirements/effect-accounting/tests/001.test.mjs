@@ -58,7 +58,7 @@ const fold = (events) => {
   return change.unwrapFold(result)
 }
 
-test('WHAT[EFFECT-ACCOUNTING-001] worktree_requested_created_are_distinct_typed_states_not_one_bool', () => {
+test('WHAT[effect-accounting-001] worktree_requested_created_are_distinct_typed_states_not_one_bool', () => {
   let projection = createJob()
   assert.equal(change.worktreeEffect(projection, WT), null)
   projection = change.requestWorktree(projection, WT, WT_PATH, JOB)

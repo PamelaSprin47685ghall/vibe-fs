@@ -64,7 +64,7 @@ const profile = (value) => ({
 
 const register = (root) => authority.registerAuthority(root, authority.empty)
 
-test('WHAT[INTERACTION-AUTHORITY-017] IA_017_claimed_key_without_active_run_stays_unknown', () => {
+test('WHAT[interaction-authority-017] IA_017_claimed_key_without_active_run_stays_unknown', () => {
   const root = rootFor()
   const state = authority.registerAuthority(root, authority.empty)
   const closed = { ...state, activeLogicalRun: null }

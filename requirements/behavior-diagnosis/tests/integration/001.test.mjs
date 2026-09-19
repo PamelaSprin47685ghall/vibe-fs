@@ -9,7 +9,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
 
 const enforcerRoot = path.join(repoRoot, 'resources', 'enforcer')
 
-test('WHAT[BD-001] ENFORCER_resource_folder_rulebook_loads_with_contiguous_ordinals', () => {
+test('WHAT[behavior-diagnosis-001] ENFORCER_resource_folder_rulebook_loads_with_contiguous_ordinals', () => {
   const rules = enforcer.rules()
   assert.ok(Array.isArray(rules))
   assert.equal(rules.length, 120)

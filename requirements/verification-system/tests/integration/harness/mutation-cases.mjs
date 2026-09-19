@@ -103,7 +103,7 @@ export const mutationCases = [
   // ── class 1: epochCold ────────────────────────────────────────────────────
 
   {
-    name: 'VERIFY-003 a prefix rewrite is refused even when tools and the system message are unchanged',
+    name: 'verification-system-003 a prefix rewrite is refused even when tools and the system message are unchanged',
     fn: () => {
       // 「epochCold  放过不该发生的 epoch 切换（tools+system 未变即通过）」
       //
@@ -146,7 +146,7 @@ export const mutationCases = [
   },
 
   {
-    name: 'VERIFY-003 a declared epoch boundary admits the rewrite, and only at the step it names',
+    name: 'verification-system-003 a declared epoch boundary admits the rewrite, and only at the step it names',
     fn: () => {
       // The other half, without which the case above could be satisfied by refusing
       // everything. A gate that never admits a legitimate rebase is as wrong as one that
@@ -179,7 +179,7 @@ reason = "epoch-switch"
   // ── class 2: specificity ──────────────────────────────────────────────────
 
   {
-    name: 'VERIFY-003 two declarations for one point are refused at load, never scored',
+    name: 'verification-system-003 two declarations for one point are refused at load, never scored',
     fn: () => {
       // 「specificity  两条边同时命中时静默选一条」
       //
@@ -222,7 +222,7 @@ user = "Ship the parser fix."
   },
 
   {
-    name: 'VERIFY-003 two equal-weight prefixes are reported as ambiguous, not resolved by score',
+    name: 'verification-system-003 two equal-weight prefixes are reported as ambiguous, not resolved by score',
     fn: () => {
       // The runtime half, and a distinction the charter's one-line summary elides: two
       // declarations with IDENTICAL text are a load-time refusal (the case above), while two
@@ -336,7 +336,7 @@ user = ["HEAD", "yz"]
   // ── class 4: loadScripts, re-anchored ─────────────────────────────────────
 
   {
-    name: 'VERIFY-003 a declared edge still resolves after a restart clears the seals',
+    name: 'verification-system-003 a declared edge still resolves after a restart clears the seals',
     fn: () => {
       // 「loadScripts  重启后匹配空间被换掉，原本该暴露的错命中消失」
       //
@@ -370,7 +370,7 @@ user = ["HEAD", "yz"]
   },
 
   {
-    name: 'VERIFY-003 a restart does not resurrect an edge the scenario never declared',
+    name: 'verification-system-003 a restart does not resurrect an edge the scenario never declared',
     fn: () => {
       // The complement, and why the case above is not enough alone: "still resolves" could be
       // satisfied by a matcher that became MORE permissive after a restart, which is the

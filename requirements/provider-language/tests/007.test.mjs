@@ -37,7 +37,7 @@ const makeProviderFixture = () => {
   }
 }
 
-test('WHAT[PROVIDER-LANGUAGE-007] placeholder parity passes on equal sets', () => {
+test('WHAT[provider-language-007] placeholder parity passes on equal sets', () => {
   const fx = makeProviderFixture()
   try {
     fx.writePair('tool/demo', '{{byname}} has returned.', '{{byname}} 已经回来了。')
@@ -46,7 +46,7 @@ test('WHAT[PROVIDER-LANGUAGE-007] placeholder parity passes on equal sets', () =
     fx.dispose()
   }
 })
-test('WHAT[PROVIDER-LANGUAGE-007] placeholder parity mismatch reports diff', () => {
+test('WHAT[provider-language-007] placeholder parity mismatch reports diff', () => {
   const fx = makeProviderFixture()
   try {
     fx.writePair('tool/demo', '{{byname}} carries {{charge}}.', '{{byname}} 承担托付。')
@@ -59,7 +59,7 @@ test('WHAT[PROVIDER-LANGUAGE-007] placeholder parity mismatch reports diff', () 
     fx.dispose()
   }
 })
-test('WHAT[PROVIDER-LANGUAGE-007] placeholder extraction dedupes and skips plain text', () => {
+test('WHAT[provider-language-007] placeholder extraction dedupes and skips plain text', () => {
   assert.deepEqual([...extractPlaceholders('{{byname}} / {{charge}} / {{byname}}')].sort(), [
     'byname',
     'charge',
@@ -104,7 +104,7 @@ test.beforeEach(() => {
   clearAllForTests()
 })
 
-test('WHAT[PROVIDER-LANGUAGE-007] substitute replaces values and fails closed on missing or leftover', () => {
+test('WHAT[provider-language-007] substitute replaces values and fails closed on missing or leftover', () => {
   assert.equal(substitute('Hello {{name}}.', { name: 'world' }), 'Hello world.')
   // 缺参：模板里的 {{name}} 没有对应值 → 必须抛错，不许留下未替换洞。
   assert.throws(() => substitute('Hello {{name}}.', {}), /missing substitution/)

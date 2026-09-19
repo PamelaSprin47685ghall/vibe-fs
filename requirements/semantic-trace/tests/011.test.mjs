@@ -1,6 +1,6 @@
 // requirements/semantic-trace/tests/011.test.mjs
 //
-// Law: SEMANTIC-TRACE-011
+// Law: semantic-trace-011
 // Scenario T22: Fission keyed convergence merging lane traces deterministically.
 
 import assert from 'node:assert/strict'
@@ -8,7 +8,7 @@ import test from 'node:test'
 
 import * as semanticTrace from '../../../dist/Context/Trace/SemanticTraceSurface.js'
 
-test('WHAT[SEMANTIC-TRACE-011] T22_fission_keyed_convergence_merges_lane_traces_deterministically', () => {
+test('WHAT[semantic-trace-011] T22_fission_keyed_convergence_merges_lane_traces_deterministically', () => {
   // Proves that when multiple Fission lanes execute, their traces are merged
   // by keyed provenance rather than accidental arrival order.
   assert.equal(typeof semanticTrace.mergeKeyedLaneTraces, 'function', 'must export mergeKeyedLaneTraces')

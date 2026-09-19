@@ -51,7 +51,7 @@ const register = (root) => authority.registerAuthority(root, authority.empty)
 const continuation = (key, root, kind = 'ManagerGuard', payload = 'payload') =>
   authority.claimContinuation(key, 'ses_a', kind, root, payload)
 
-test('WHAT[INTERACTION-AUTHORITY-013] continuation preserves logical run and root authority profile', () => {
+test('WHAT[interaction-authority-013] continuation preserves logical run and root authority profile', () => {
   const root = rootFor()
   const state = authority.registerClaim(continuation('pk_c', root, 'DegenerationGuard', 'pd-n'), register(root))
   assert.deepEqual(profile(state.activeLogicalRun), profile(root))

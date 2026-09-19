@@ -33,7 +33,7 @@ const event = (n, parents = [], type = 'JobRequested', payload = { n }) => ({
   payloadRefs: [],
 })
 
-test('WHAT[DURABLE-EVENTS-013] physical append failure leaves event and structural Current unchanged', async () => {
+test('WHAT[durable-events-013] physical append failure leaves event and structural Current unchanged', async () => {
   const dir = withTemp((base) => base)
   const store = eventStore.create(dir, 'append-failure-proof')
   try {
@@ -80,7 +80,7 @@ const withRepo = (fn) => {
     .finally(() => rmSync(repo, { recursive: true, force: true }))
 }
 
-test('WHAT[DURABLE-EVENTS-013] restart_replays_prior_writer_files_then_fresh_runtime_starts_LocalSeq_at_1', async () => {
+test('WHAT[durable-events-013] restart_replays_prior_writer_files_then_fresh_runtime_starts_LocalSeq_at_1', async () => {
   await withRepo(async (commonDir) => {
     const first = mustOk(await journal.JournalSurface_bootWithWriterId(commonDir, 'boot-writer-a', 'rt_before', 4242, '2026-04-01T00:00:00Z'), 'first boot')
 
@@ -98,7 +98,7 @@ test('WHAT[DURABLE-EVENTS-013] restart_replays_prior_writer_files_then_fresh_run
     journal.JournalSurface_dispose(restarted.journal)
   })
 })
-test('WHAT[DURABLE-EVENTS-013] boot_and_live_use_one_CanonicalIntegrator_program', async () => {
+test('WHAT[durable-events-013] boot_and_live_use_one_CanonicalIntegrator_program', async () => {
   const { readFile } = await import('node:fs/promises')
   const integrator = await readFile(new URL('../../../src/Wanxiangshu/Persistence/EventStore/IntegratorEngine.fs', import.meta.url), 'utf8')
   const writer = await readFile(new URL('../../../src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs', import.meta.url), 'utf8')
@@ -135,7 +135,7 @@ const withRepo = (writerId, fn) => {
     .finally(() => rmSync(repo, { recursive: true, force: true }))
 }
 
-test('WHAT[DURABLE-EVENTS-013] journal_surface_does_not_mint_terminal_proof_from_forged_strings', () => {
+test('WHAT[durable-events-013] journal_surface_does_not_mint_terminal_proof_from_forged_strings', () => {
   assert.equal(Object.hasOwn(journal, 'JournalSurface_recordTerminalCompletion'), false)
 })
 }
@@ -187,7 +187,7 @@ const appendLife = (handle, session) =>
   journal.JournalSurface_appendManagerLifecycle(handle, { kind: 'Session', session }, lifeOpened(session))
 const revisionOf = (handle) => Number(revisions.revision(handle))
 
-test('WHAT[DURABLE-EVENTS-013] EXEC_journal_revision_advances_only_on_successful_fold', async (context) => {
+test('WHAT[durable-events-013] EXEC_journal_revision_advances_only_on_successful_fold', async (context) => {
   const opened = await openJournal('revision-advance')
   context.after(opened.close)
   const before = Number(revisions.revision(opened.handle))
@@ -199,7 +199,7 @@ test('WHAT[DURABLE-EVENTS-013] EXEC_journal_revision_advances_only_on_successful
   const after = Number(revisions.revision(opened.handle))
   assert.equal(after, 2, 'first business append lazily writes RuntimeStarted#1 then publishes business#2')
 })
-test('WHAT[DURABLE-EVENTS-013] EXEC_AwaitChangeFrom_after_append_returns_promptly', async () => {
+test('WHAT[durable-events-013] EXEC_AwaitChangeFrom_after_append_returns_promptly', async () => {
   await withJournal('revision-prompt', async (handle) => {
     const from = revisionOf(handle)
     const linked = await appendLife(handle, 'ses_prompt')
@@ -214,7 +214,7 @@ test('WHAT[DURABLE-EVENTS-013] EXEC_AwaitChangeFrom_after_append_returns_promptl
     assert.equal(change.revision, revisionOf(handle))
   })
 })
-test('WHAT[DURABLE-EVENTS-013] EXEC_AwaitChangeFrom_before_append_waits_then_completes', async () => {
+test('WHAT[durable-events-013] EXEC_AwaitChangeFrom_before_append_waits_then_completes', async () => {
   await withJournal('revision-wait', async (handle) => {
     const from = revisionOf(handle)
     const pending = revisions.awaitChangeFrom(from, handle)
@@ -231,7 +231,7 @@ test('WHAT[DURABLE-EVENTS-013] EXEC_AwaitChangeFrom_before_append_waits_then_com
     assert.ok(change.envelope.length > 0)
   })
 })
-test('WHAT[DURABLE-EVENTS-013] EXEC_cancelled_revision_subscription_unregisters_without_a_fact', async () => {
+test('WHAT[durable-events-013] EXEC_cancelled_revision_subscription_unregisters_without_a_fact', async () => {
   await withJournal('revision-cancel', async (handle) => {
     const from = revisionOf(handle)
     assert.equal(await revisions.awaitCancelled(from, handle), true)
@@ -252,7 +252,7 @@ const linked = (pairs, start = assoc.empty) =>
     return result.value
   }, start)
 
-test('WHAT[DURABLE-EVENTS-013] PERSIST_008_both_directions_answer_from_one_map_without_a_scan', () => {
+test('WHAT[durable-events-013] PERSIST_008_both_directions_answer_from_one_map_without_a_scan', () => {
   // The reason both entries live in one map: `isCompanion` and `bloggerOf` are the
   // two questions the transform boundary asks on every request, and a reverse index
   // held separately could disagree with the forward one.
@@ -277,7 +277,7 @@ const { CANONICAL_EVENT_READER_OWNER_PATHS, DUAL_WRITE_ALLOWLIST, GIT_BYPASS_ALL
 const readFixture = (name) =>
   readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8')
 
-test('WHAT[DURABLE-EVENTS-013] canonical shape requires one-envelope rule and shared boot live program', () => {
+test('WHAT[durable-events-013] canonical shape requires one-envelope rule and shared boot live program', () => {
   const kernelFile = 'src/Wanxiangshu/Persistence/EventStore/IntegrationKernel.fs'
   const canonicalFile = 'src/Wanxiangshu/Persistence/EventStore/IntegratorEngine.fs'
   const kernel = [
@@ -356,7 +356,7 @@ test('WHAT[DURABLE-EVENTS-013] canonical shape requires one-envelope rule and sh
     'alternate reducers and unused integrateOne references must not satisfy any call-graph edge',
   )
 })
-test('WHAT[DURABLE-EVENTS-013] production CanonicalIntegrator has the shared one-envelope program shape', () => {
+test('WHAT[durable-events-013] production CanonicalIntegrator has the shared one-envelope program shape', () => {
   const entries = collectProductionEntries()
   const violations = scanCanonicalSharedProgram(entries)
   assert.deepEqual(

@@ -15,16 +15,16 @@ const failureOwner = await import("../../../dist/Participant/Provider/Attempt/Fa
 const { JournalSurface_bootWithWriterId: bootWithWriterId, JournalSurface_dispose: dispose } = await import("../../../dist/Persistence/Journal/Surface.js");
 
 
-test('WHAT[CRASH-005] VERIFY_008_child_recovery_workflow_waits_without_committing_when_snapshot_is_unreadable', () => {
+test('WHAT[crash-reconciliation-005] VERIFY_008_child_recovery_workflow_waits_without_committing_when_snapshot_is_unreadable', () => {
   assert.equal(child.resolve('active', 'unreadable', [], '').result, 'RecoveryIncomplete')
 })
-test('WHAT[CRASH-005] VERIFY_008_child_recovery_workflow_blocks_retired_handle', () => {
+test('WHAT[crash-reconciliation-005] VERIFY_008_child_recovery_workflow_blocks_retired_handle', () => {
   assert.equal(child.resolve('retired', 'missing', [], '').result, 'RecoveryBlocked')
 })
-test('WHAT[CRASH-005] VERIFY_008_child_recovery_workflow_incomplete_when_terminal_body_is_blank', () => {
+test('WHAT[crash-reconciliation-005] VERIFY_008_child_recovery_workflow_incomplete_when_terminal_body_is_blank', () => {
   assert.equal(child.resolve('active', 'terminal', [], '').result, 'RecoveryBlocked')
 })
-test('WHAT[CRASH-005] VERIFY_008_missing_ports_or_waiting_never_synthesizes_family_ready', () => {
+test('WHAT[crash-reconciliation-005] VERIFY_008_missing_ports_or_waiting_never_synthesizes_family_ready', () => {
   // Gap test 2: When child recovery is waiting or blocked, authorizeFamilyResume outcomes
   // are FamilyWaiting / FamilyBlocked, never FamilyReady or NoRecoveryRequired.
   const waiting = recovery.authorize('parent', 1, [{ session: 'child', state: 'Waiting' }])
@@ -44,7 +44,7 @@ test('WHAT[CRASH-005] VERIFY_008_missing_ports_or_waiting_never_synthesizes_fami
   assert.equal(jobWait.state, 'Waiting')
   assert.notEqual(jobWait.state, 'NoRecoveryRequired')
 })
-test('WHAT[CRASH-005] VERIFY_008_executor_tool_empty_or_whitespace_session_id_fails_closed', async () => {
+test('WHAT[crash-reconciliation-005] VERIFY_008_executor_tool_empty_or_whitespace_session_id_fails_closed', async () => {
   // Gap test 4: Empty/whitespace SessionId fails closed via production executor tool surface
   const fakeSchema = {
     string: () => ({ kind: 'string', describe: () => ({}), optional: () => ({}) }),
@@ -73,7 +73,7 @@ const handles = await import("../../../dist/Execution/Delegation/Handle/Surface.
 
 const ROOT = new URL('../../../', import.meta.url).pathname
 
-test('WHAT[CRASH-005] HFR_restart_active_with_unreadable_snapshot_waits_for_terminal_evidence', () => {
+test('WHAT[crash-reconciliation-005] HFR_restart_active_with_unreadable_snapshot_waits_for_terminal_evidence', () => {
   assert.equal(child.resolve('active', 'unreadable', [], '').result, 'RecoveryIncomplete')
 })
 }
@@ -85,7 +85,7 @@ const handles = await import("../../../dist/Execution/Delegation/Handle/Surface.
 
 const active = () => handles.crashScenario('active')
 
-test('WHAT[CRASH-005] P0_RECOVERY_JOIN_001_crash_before_handle_completed_append_has_no_completion', () => {
+test('WHAT[crash-reconciliation-005] P0_RECOVERY_JOIN_001_crash_before_handle_completed_append_has_no_completion', () => {
   const state = active()
   assert.equal(state.lifecycle, 'Active')
   assert.equal(state.completion, null)
@@ -119,16 +119,16 @@ const withContinueHost = async (label, portOutcome, action) => {
 const continueSessionOf = (suffix) => `ses-continue-${suffix}`
 const continuePhysicalOf = (suffix) => `msg-continue-${suffix}`
 
-test('WHAT[CRASH-005] RECOVERY_FAMILY_authorize_blocks_on_child_block', () => {
+test('WHAT[crash-reconciliation-005] RECOVERY_FAMILY_authorize_blocks_on_child_block', () => {
   assert.equal(recovery.authorize('parent', 1, [{ session: 'child', state: 'Blocked' }]).state, 'FamilyBlocked')
 })
-test('WHAT[CRASH-005] RECOVERY_FAMILY_authorize_waiting_is_family_waiting_not_blocked', () => {
+test('WHAT[crash-reconciliation-005] RECOVERY_FAMILY_authorize_waiting_is_family_waiting_not_blocked', () => {
   const result = recovery.authorize('parent', 1, [{ session: 'child', state: 'Waiting' }])
   assert.equal(result.state, 'FamilyWaiting')
   assert.notEqual(result.state, 'FamilyBlocked')
   assert.notEqual(result.state, 'FamilyReady')
 })
-test('WHAT[CRASH-005] RECOVERY_FAMILY_handle_family_waiting_maps_to_waiting_not_blocked', () => {
+test('WHAT[crash-reconciliation-005] RECOVERY_FAMILY_handle_family_waiting_maps_to_waiting_not_blocked', () => {
   const src = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Model.fs'), 'utf8')
   const waitingArm = src.match(/HandleFamilyRecovery\.HandlesWaiting[\s\S]*?(?=HandleFamilyRecovery\.HandlesBlocked)/)?.[0]
   assert.ok(waitingArm, 'HandleFamilyRecovery.HandlesWaiting arm body not found')

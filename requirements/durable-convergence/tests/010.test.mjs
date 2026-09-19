@@ -11,7 +11,7 @@ import { remotePayloadNeedsRead } from '../../../dist/Persistence/EventStore/Ret
 
 const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 
-test('WHAT[DURABLE-CONVERGENCE-010] no-op sync reuses stat-fingerprint materialization instead of rereading durable bytes', async () => {
+test('WHAT[durable-convergence-010] no-op sync reuses stat-fingerprint materialization instead of rereading durable bytes', async () => {
   const log = await read('src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs')
   const sync = await read('src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs')
 
@@ -22,7 +22,7 @@ test('WHAT[DURABLE-CONVERGENCE-010] no-op sync reuses stat-fingerprint materiali
   assert.match(sync, /materializationCache/i)
 })
 
-test('WHAT[DURABLE-CONVERGENCE-010] near-equal worst path reads and blobifies only changed files', async () => {
+test('WHAT[durable-convergence-010] near-equal worst path reads and blobifies only changed files', async () => {
   const log = await read('src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs')
   const sync = await read('src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs')
   const remoteTrees = sync.slice(sync.indexOf('let private readRemoteTrees'), sync.indexOf('let private readRemote\n'))
@@ -40,14 +40,14 @@ test('WHAT[DURABLE-CONVERGENCE-010] near-equal worst path reads and blobifies on
   assert.doesNotMatch(sync, /readRemoteTrees[\s\S]*readBlobList raw writerEntries[\s\S]*readBlobList raw payloadEntries/)
 })
 
-test('WHAT[DURABLE-CONVERGENCE-010] unchanged remote payload is not reread merely because payloads have no writer manifest', () => {
+test('WHAT[durable-convergence-010] unchanged remote payload is not reread merely because payloads have no writer manifest', () => {
   assert.equal(remotePayloadNeedsRead('stat-a', 'a'.repeat(40), 'stat-a', 'a'.repeat(40), true), false)
   assert.equal(remotePayloadNeedsRead('stat-a', 'a'.repeat(40), 'stat-b', 'a'.repeat(40), true), true)
   assert.equal(remotePayloadNeedsRead('stat-a', 'a'.repeat(40), 'stat-a', 'b'.repeat(40), true), true)
   assert.equal(remotePayloadNeedsRead('stat-a', 'a'.repeat(40), 'stat-a', 'a'.repeat(40), false), true)
 })
 
-test('WHAT[DURABLE-CONVERGENCE-010] pre-push starts from tracking ref and only discovers remote after lease rejection', async () => {
+test('WHAT[durable-convergence-010] pre-push starts from tracking ref and only discovers remote after lease rejection', async () => {
   const gateway = await read('src/Wanxiangshu/Git/Gateway.fs')
 
   assert.match(gateway, /readTrackedRemote|trackingRef/)
@@ -56,7 +56,7 @@ test('WHAT[DURABLE-CONVERGENCE-010] pre-push starts from tracking ref and only d
   assert.doesNotMatch(gateway, /\| None ->\s*let! snapshot, expected = discoverRemote run remote/)
 })
 
-test('WHAT[DURABLE-CONVERGENCE-010] clean tracked snapshot skips all Wanxiang transport', async () => {
+test('WHAT[durable-convergence-010] clean tracked snapshot skips all Wanxiang transport', async () => {
   const gateway = await read('src/Wanxiangshu/Git/Gateway.fs')
   const sync = await read('src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs')
 
@@ -65,7 +65,7 @@ test('WHAT[DURABLE-CONVERGENCE-010] clean tracked snapshot skips all Wanxiang tr
   assert.match(gateway, /readTrackedRemote/)
 })
 
-test('WHAT[DURABLE-CONVERGENCE-010] hook installer enables repo-local SSH multiplex without clobbering ssh identity options', () => {
+test('WHAT[durable-convergence-010] hook installer enables repo-local SSH multiplex without clobbering ssh identity options', () => {
   const repo = mkdtempSync(join(tmpdir(), 'wxs-hook-ssh-mux-'))
 
   try {
@@ -96,7 +96,7 @@ test('WHAT[DURABLE-CONVERGENCE-010] hook installer enables repo-local SSH multip
   }
 })
 
-test('WHAT[DURABLE-CONVERGENCE-010] hook installer migrates the obsolete long repo-local control socket path', () => {
+test('WHAT[durable-convergence-010] hook installer migrates the obsolete long repo-local control socket path', () => {
   const repo = mkdtempSync(join(tmpdir(), 'wxs-hook-ssh-migrate-'))
 
   try {
@@ -120,7 +120,7 @@ test('WHAT[DURABLE-CONVERGENCE-010] hook installer migrates the obsolete long re
   }
 })
 
-test('WHAT[DURABLE-CONVERGENCE-010] hook installer migrates the ephemeral tmp-directory path and recreates it at SSH invocation', () => {
+test('WHAT[durable-convergence-010] hook installer migrates the ephemeral tmp-directory path and recreates it at SSH invocation', () => {
   const repo = mkdtempSync(join(tmpdir(), 'wxs-hook-ssh-ephemeral-migrate-'))
 
   try {
@@ -157,7 +157,7 @@ test('WHAT[DURABLE-CONVERGENCE-010] hook installer migrates the ephemeral tmp-di
   }
 })
 
-test('WHAT[DURABLE-CONVERGENCE-010] hook installer respects user-owned SSH multiplex configuration', () => {
+test('WHAT[durable-convergence-010] hook installer respects user-owned SSH multiplex configuration', () => {
   const repo = mkdtempSync(join(tmpdir(), 'wxs-hook-ssh-user-owned-'))
 
   try {
@@ -172,7 +172,7 @@ test('WHAT[DURABLE-CONVERGENCE-010] hook installer respects user-owned SSH multi
   }
 })
 
-test('WHAT[DURABLE-CONVERGENCE-010] confirmed same-root convergence does not publish an empty snapshot', async () => {
+test('WHAT[durable-convergence-010] confirmed same-root convergence does not publish an empty snapshot', async () => {
   const gateway = await read('src/Wanxiangshu/Git/Gateway.fs')
 
   assert.match(gateway, /remoteKnownCurrent|confirmedRemote/i)
@@ -181,7 +181,7 @@ test('WHAT[DURABLE-CONVERGENCE-010] confirmed same-root convergence does not pub
   assert.match(gateway, /return Ok\(\)/)
 })
 
-test('WHAT[DURABLE-CONVERGENCE-010] irrelevant reference transactions exit before starting Node', () => {
+test('WHAT[durable-convergence-010] irrelevant reference transactions exit before starting Node', () => {
   const repo = mkdtempSync(join(tmpdir(), 'wxs-hook-fast-path-'))
 
   try {

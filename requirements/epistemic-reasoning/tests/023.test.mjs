@@ -84,7 +84,7 @@ const waveEvents = (wave, assignment) => {
   ]
 }
 
-test('WHAT[EPI-023] soak_seeded_waves_reproduce_identical_matrices_and_stable_signed_effects', async () => {
+test('WHAT[epistemic-reasoning-023] soak_seeded_waves_reproduce_identical_matrices_and_stable_signed_effects', async () => {
   const auditor = { operations: 0, matrices: new Set(), estimates: [] }
   for (let wave = 0; wave < WAVES; wave += 1) {
     const input = waveInput(wave)
@@ -142,7 +142,7 @@ const assignmentInput = (seed) => ({
   candidates: [...candidates3],
 })
 
-test('WHAT[EPI-023] deterministic-seed-reproduces-identical-balanced-assignment-matrix', async () => {
+test('WHAT[epistemic-reasoning-023] deterministic-seed-reproduces-identical-balanced-assignment-matrix', async () => {
   const first = await gecSurface.splitBallot(assignmentInput(1234))
   const second = await gecSurface.splitBallot(assignmentInput(1234))
   assert.equal(first.ok, true)
@@ -164,7 +164,7 @@ test('WHAT[EPI-023] deterministic-seed-reproduces-identical-balanced-assignment-
   assert.equal(counts['wording-b'], 4)
   assert.equal(tokens.size, 8)
 })
-test('WHAT[EPI-023] blind-branch-view-exposes-no-sibling-answer-ranking-or-aggregate', async () => {
+test('WHAT[epistemic-reasoning-023] blind-branch-view-exposes-no-sibling-answer-ranking-or-aggregate', async () => {
   const result = await gecSurface.splitBallot(assignmentInput(77))
   assert.equal(result.ok, true)
   for (const item of result.assignments) {
@@ -179,7 +179,7 @@ test('WHAT[EPI-023] blind-branch-view-exposes-no-sibling-answer-ranking-or-aggre
   const seen = result.assignments.map((item) => `${item.subject}:${item.blindToken}`)
   assert.equal(new Set(seen).size, result.assignments.length)
 })
-test('WHAT[EPI-023] wording-effect-reports-signed-difference-in-means-not-absolute-distance', async () => {
+test('WHAT[epistemic-reasoning-023] wording-effect-reports-signed-difference-in-means-not-absolute-distance', async () => {
   const base = {
     rootSnapshot: 'snap-split-b',
     seed: 9,
@@ -209,7 +209,7 @@ test('WHAT[EPI-023] wording-effect-reports-signed-difference-in-means-not-absolu
   assert.ok(Math.abs(estimated.effect.estimate - -2 / 3) < 1e-12)
   assert.ok(estimated.effect.estimate < 0)
 })
-test('WHAT[EPI-023] ate-interpretation-declares-causal-assumptions-and-permutation-uncertainty', async () => {
+test('WHAT[epistemic-reasoning-023] ate-interpretation-declares-causal-assumptions-and-permutation-uncertainty', async () => {
   const base = {
     rootSnapshot: 'snap-split-c',
     seed: 21,
@@ -245,7 +245,7 @@ test('WHAT[EPI-023] ate-interpretation-declares-causal-assumptions-and-permutati
   assert.ok(Number.isFinite(pValue))
   assert.ok(pValue >= 0 && pValue <= 1)
 })
-test('WHAT[EPI-023] treatment-details-configure-wording-polarity-and-order', async () => {
+test('WHAT[epistemic-reasoning-023] treatment-details-configure-wording-polarity-and-order', async () => {
   const result = await gecSurface.splitBallot({
     rootSnapshot: 'snap-split-d',
     seed: 31,
@@ -272,7 +272,7 @@ test('WHAT[EPI-023] treatment-details-configure-wording-polarity-and-order', asy
     assert.equal(item.openFirst, true)
   }
 })
-test('WHAT[EPI-023] invalid-treatment-polarity-fails-closed', async () => {
+test('WHAT[epistemic-reasoning-023] invalid-treatment-polarity-fails-closed', async () => {
   const result = await gecSurface.splitBallot({
     rootSnapshot: 'snap-split-e',
     seed: 33,
@@ -284,7 +284,7 @@ test('WHAT[EPI-023] invalid-treatment-polarity-fails-closed', async () => {
   assert.equal(result.ok, false)
   assert.match(result.error.code, /invalid-polarity/i)
 })
-test('WHAT[EPI-023] carryover-permutation-null-is-seeded-deterministic-and-capped', async () => {
+test('WHAT[epistemic-reasoning-023] carryover-permutation-null-is-seeded-deterministic-and-capped', async () => {
   const input = (seed, permutations) => ({
     responses: subjects8.map((subject, index) => ({ subject, response: index < 4 ? 4.0 : 1.0 })),
     priorExposure: Object.fromEntries(subjects8.map((subject, index) => [subject, index < 4 ? 'arm-a' : 'arm-b'])),
@@ -318,7 +318,7 @@ test('WHAT[EPI-023] carryover-permutation-null-is-seeded-deterministic-and-cappe
   assert.equal(capped.ok, true)
   assert.equal(capped.uncertainty.nullPermutations, 1024)
 })
-test('WHAT[EPI-023] missing-root-snapshot-fails-closed-before-randomization', async () => {
+test('WHAT[epistemic-reasoning-023] missing-root-snapshot-fails-closed-before-randomization', async () => {
   const result = await gecSurface.splitBallot({
     seed: 5,
     subjects: ['s1', 's2'],

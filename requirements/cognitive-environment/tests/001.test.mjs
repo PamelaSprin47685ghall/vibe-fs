@@ -37,7 +37,7 @@ const MIRRORED_BY_OFFICE_CAPABILITY = new Set(['entrust-by-consequence', 'choose
 
 const LANGUAGE = 'English'
 
-test('WHAT[COGNITIVE-ENVIRONMENT-001] CE_prompt_015_one_system_prompt_per_role', () => {
+test('WHAT[cognitive-environment-001] CE_prompt_015_one_system_prompt_per_role', () => {
   const prompts = promptResources.allForLanguage(LANGUAGE)
   assert.equal(prompts.length, 5, 'canonical system prompts in catalog')
 })

@@ -25,7 +25,7 @@ const packageDirs = () =>
       }
     })
 
-test('WHAT[ABL-003] ABL_003_station_order_edges_are_acyclic_by_construction', () => {
+test('WHAT[feature-ablation-003] ABL_003_station_order_edges_are_acyclic_by_construction', () => {
   const edges = nodesDoc.edges.filter((edge) => edge.kind === 'station-order')
   const graph = new Map()
   for (const edge of edges) {

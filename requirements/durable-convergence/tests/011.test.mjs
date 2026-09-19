@@ -54,7 +54,7 @@ const writeEvent = async (commonDir, writerId, event) => {
   return join(commonDir, 'wanxiang', 'events', `${writerId}.ndjson`)
 }
 
-test('WHAT[DURABLE-CONVERGENCE-011] reverse tail read is exact across block boundaries', () => {
+test('WHAT[durable-convergence-011] reverse tail read is exact across block boundaries', () => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-writer-tail-'))
   const path = join(root, 'writer.ndjson')
   try {
@@ -67,7 +67,7 @@ test('WHAT[DURABLE-CONVERGENCE-011] reverse tail read is exact across block boun
   }
 })
 
-test('WHAT[DURABLE-CONVERGENCE-011] durable Journal ObservedAt outranks refreshed writer mtime', () => {
+test('WHAT[durable-convergence-011] durable Journal ObservedAt outranks refreshed writer mtime', () => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-writer-observed-at-'))
   const commonDir = join(root, '.git')
   const now = Date.parse('2026-08-21T00:00:00Z')
@@ -115,7 +115,7 @@ test('WHAT[DURABLE-CONVERGENCE-011] durable Journal ObservedAt outranks refreshe
   }
 })
 
-test('WHAT[DURABLE-CONVERGENCE-011] 24h expiry removes local writer and remote materialization', async () => {
+test('WHAT[durable-convergence-011] 24h expiry removes local writer and remote materialization', async () => {
   await withRepo(async (repo, commonDir) => {
     // EventStore boot deliberately applies retention against its physical current
     // time. Keep this proof relative to the same captured instant instead of
@@ -150,7 +150,7 @@ test('WHAT[DURABLE-CONVERGENCE-011] 24h expiry removes local writer and remote m
   })
 })
 
-test('WHAT[DURABLE-CONVERGENCE-011] stale remote snapshot cannot revive writer after cache crosses expiry', async () => {
+test('WHAT[durable-convergence-011] stale remote snapshot cannot revive writer after cache crosses expiry', async () => {
   await withRepo(async (repo, commonDir) => {
     const born = Date.parse('2026-08-20T00:00:00Z')
     const writerPath = await writeEvent(commonDir, 'writer-aging', make(A, 'retention/aging'))
@@ -168,7 +168,7 @@ test('WHAT[DURABLE-CONVERGENCE-011] stale remote snapshot cannot revive writer a
   })
 })
 
-test('WHAT[DURABLE-CONVERGENCE-011] manifest-less legacy remote is ignored instead of refreshing writer activity', async () => {
+test('WHAT[durable-convergence-011] manifest-less legacy remote is ignored instead of refreshing writer activity', async () => {
   await withRepo(async (repo, commonDir) => {
     const born = Date.parse('2026-08-20T00:00:00Z')
     const writerPath = await writeEvent(commonDir, 'writer-legacy-remote', make(A, 'retention/legacy'))
@@ -194,7 +194,7 @@ test('WHAT[DURABLE-CONVERGENCE-011] manifest-less legacy remote is ignored inste
   })
 })
 
-test('WHAT[DURABLE-CONVERGENCE-011] v1 mtime manifest is legacy and cannot resurrect an expired writer', async () => {
+test('WHAT[durable-convergence-011] v1 mtime manifest is legacy and cannot resurrect an expired writer', async () => {
   await withRepo(async (repo, commonDir) => {
     const born = Date.parse('2026-08-20T00:00:00Z')
     const writerPath = await writeEvent(commonDir, 'writer-v1-remote', make(A, 'retention/v1'))
@@ -231,7 +231,7 @@ test('WHAT[DURABLE-CONVERGENCE-011] v1 mtime manifest is legacy and cannot resur
   })
 })
 
-test('WHAT[DURABLE-CONVERGENCE-011] declared manifest must cover every remote writer blob exactly', async () => {
+test('WHAT[durable-convergence-011] declared manifest must cover every remote writer blob exactly', async () => {
   await withRepo(async (repo, commonDir) => {
     const born = Date.parse('2026-08-20T00:00:00Z')
     const writerPath = await writeEvent(commonDir, 'writer-invalid-manifest', make(A, 'retention/invalid-manifest'))
@@ -262,7 +262,7 @@ test('WHAT[DURABLE-CONVERGENCE-011] declared manifest must cover every remote wr
   })
 })
 
-test('WHAT[DURABLE-CONVERGENCE-011] writer lifecycle observes active, expiry, and reactivation without mtime resurrection', async () => {
+test('WHAT[durable-convergence-011] writer lifecycle observes active, expiry, and reactivation without mtime resurrection', async () => {
   await withRepo(async (repo, commonDir) => {
     const HOUR = 60 * 60 * 1000
     const born = Date.parse('2026-08-20T00:00:00Z')

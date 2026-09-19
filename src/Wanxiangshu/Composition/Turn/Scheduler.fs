@@ -89,7 +89,7 @@ module Reconciler =
         /// DSL-cross-callback-proof: physical resource — last Host wake observation replayed to a drain
         // DSL-MUTABLE: resource — per-session last-dispatch wake.
         let wakes = Dictionary<string, ReconcileProgram.ReconcileWake>()
-        // HOST-BOUNDARY-005: exact terminal message.updated is a projection
+        // host-boundary-005: exact terminal message.updated is a projection
         // visibility edge, never a business HostSignal. Keep one monotonic edge
         // version per session/current physical user so a pass can park without
         // losing an edge that races the snapshot read.
@@ -463,7 +463,7 @@ module Reconciler =
         member _.SignalIdle(sessionId: SessionId, permit: QuiescencePermit) : unit =
             this.Kick(sessionId, ReconcileProgram.ReconcileWake.IdleWake permit)
 
-        /// HOST-BOUNDARY-001/005: terminal assistant message.updated is an
+        /// host-boundary-001/005: terminal assistant message.updated is an
         /// infrastructure-only projection edge. It can only wake an already
         /// parked coarse-signal occasion for the exact current physical user;
         /// it never creates or changes business terminal semantics.

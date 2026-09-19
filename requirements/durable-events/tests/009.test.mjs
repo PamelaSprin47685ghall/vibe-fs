@@ -36,7 +36,7 @@ const mustOk = (result, label = 'result') => {
   return result.value
 }
 
-test('WHAT[DURABLE-EVENTS-009] PERSIST_005_legacy_fallback_counters_and_model_ids_are_fatal', () => {
+test('WHAT[durable-events-009] PERSIST_005_legacy_fallback_counters_and_model_ids_are_fatal', () => {
   const markers = [
     'FailuresOnCurrentSide',
     'IsDead',
@@ -55,7 +55,7 @@ test('WHAT[DURABLE-EVENTS-009] PERSIST_005_legacy_fallback_counters_and_model_id
     assert.equal(decoded.error, factCodec.pre050MigrationMessage)
   }
 })
-test('WHAT[DURABLE-EVENTS-009] PERSIST_005_replaced_fact_names_produce_the_migration_message_not_a_codec_error', () => {
+test('WHAT[durable-events-009] PERSIST_005_replaced_fact_names_produce_the_migration_message_not_a_codec_error', () => {
   const retired = [
     'PluginPromptAccepted',
     'HumanPromptAccepted',
@@ -77,14 +77,14 @@ test('WHAT[DURABLE-EVENTS-009] PERSIST_005_replaced_fact_names_produce_the_migra
     assert.equal(factCodec.decode(line).error, factCodec.pre050MigrationMessage, `${name} must be diagnosed by name`)
   }
 })
-test('WHAT[DURABLE-EVENTS-009] PERSIST_005_the_migration_message_tells_the_operator_what_to_do', () => {
+test('WHAT[durable-events-009] PERSIST_005_the_migration_message_tells_the_operator_what_to_do', () => {
   assert.equal(
     factCodec.pre050MigrationMessage,
     'Wanxiangshu 0.5.0 does not support pre-0.5.0 runtime journals.\n' +
       'Archive or remove the old Wanxiangshu runtime journal before starting.',
   )
 })
-test('WHAT[DURABLE-EVENTS-009] PERSIST_005_a_current_fact_is_not_mistaken_for_a_legacy_one', () => {
+test('WHAT[durable-events-009] PERSIST_005_a_current_fact_is_not_mistaken_for_a_legacy_one', () => {
   const line = journalCodec.serialize(env({ seq: 1 }))
   assert.equal(factCodec.containsLegacyFallbackFields(line), false)
 
@@ -153,15 +153,15 @@ const handleLinked = (overrides = {}) => ({
   },
 })
 
-test('WHAT[DURABLE-EVENTS-009] PERSIST_005_modern_json_has_no_legacy_markers', () => {
+test('WHAT[durable-events-009] PERSIST_005_modern_json_has_no_legacy_markers', () => {
   assert.equal(factCodec.containsLegacyFallbackFields('{"RuntimeStarted":{"Runtime":"rt"}}'), false)
 })
-test('WHAT[DURABLE-EVENTS-009] historical_unanchored_guideline_is_refused_without_rewrite', () => {
+test('WHAT[durable-events-009] historical_unanchored_guideline_is_refused_without_rewrite', () => {
   const legacy = JSON.stringify({ PairProgrammingGuidelineAppended: { Ordinal: 1, MarkerText: 'legacy' } })
   const decoded = factCodec.decode(legacy)
   assert.equal(decoded.ok, false)
 })
-test('WHAT[DURABLE-EVENTS-009] Fact_codec_reports_migration_markers_as_data_errors', () => {
+test('WHAT[durable-events-009] Fact_codec_reports_migration_markers_as_data_errors', () => {
   const markers = [
     'FailuresOnCurrentSide',
     'IsDead',
@@ -191,13 +191,13 @@ const { CANONICAL_EVENT_READER_OWNER_PATHS, DUAL_WRITE_ALLOWLIST, GIT_BYPASS_ALL
 const readFixture = (name) =>
   readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8')
 
-test('WHAT[DURABLE-EVENTS-009] fixture unified-store-dual-write.fs is RED for dual-write', () => {
+test('WHAT[durable-events-009] fixture unified-store-dual-write.fs is RED for dual-write', () => {
   const source = readFixture('unified-store-dual-write.fs')
   const hits = scanDualWrite(source, 'src/Wanxiangshu/Application/DualWriteBridge.fs')
   assert.ok(hits.length >= 1, 'expected dual-write violation')
   assert.equal(hits[0].id, 'dual-write')
 })
-test('WHAT[DURABLE-EVENTS-009] Journal-only or EventStore-only modules are not dual-write', () => {
+test('WHAT[durable-events-009] Journal-only or EventStore-only modules are not dual-write', () => {
   const journalOnly = [
     'module RuntimePath',
     'let root = joinPath common "wanxiangshu-next"',
@@ -218,12 +218,12 @@ test('WHAT[DURABLE-EVENTS-009] Journal-only or EventStore-only modules are not d
     0,
   )
 })
-test('WHAT[DURABLE-EVENTS-009] dual-write allowlist is empty (no parked bridges)', () => {
+test('WHAT[durable-events-009] dual-write allowlist is empty (no parked bridges)', () => {
   assert.deepEqual([...DUAL_WRITE_ALLOWLIST], [
     'src/Wanxiangshu/Verification/JournalPortObservationSurface.fs',
   ])
 })
-test('WHAT[DURABLE-EVENTS-009] production scan has no dual-write residue', () => {
+test('WHAT[durable-events-009] production scan has no dual-write residue', () => {
   const entries = collectProductionEntries()
   const violations = scanFiles(entries)
   const own = violations.filter((v) => v.id === 'dual-write')
@@ -273,7 +273,7 @@ const withRepo = async (name, fn) => {
   }
 }
 
-test('WHAT[DURABLE-EVENTS-009] SharedAgentJournal_cache_hit_returns_same_instance_without_rereading_retired_path', async (context) => {
+test('WHAT[durable-events-009] SharedAgentJournal_cache_hit_returns_same_instance_without_rereading_retired_path', async (context) => {
   const opened = openRepo('cache')
   context.after(opened.close)
   const retiredDir = join(opened.commonDir, 'wanxiangshu-next', 'runtimes')

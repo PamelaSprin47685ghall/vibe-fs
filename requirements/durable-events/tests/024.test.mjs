@@ -33,6 +33,6 @@ function collectSourceFiles(directory) {
   return found
 }
 
-test('WHAT[DURABLE-EVENTS-024] semantic cut fatal requires settlement and one injected physical fuse', () => {
+test('WHAT[durable-events-024] semantic cut fatal requires settlement and one injected physical fuse', () => {
   assertFatalBoundary('durable-events')
 })

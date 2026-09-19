@@ -8,7 +8,7 @@ const delivery = await import("../../../dist/Enforcer/Guidance/DeliverySurface.j
 const { empty, apply, applyReanchor, hasFullDelivered } = delivery
 const TipPresentation = Object.freeze({ Full: 'Full', IdentityOnly: 'IdentityOnly' })
 
-test('WHAT[GD-003] TDP_002_full_marks_tip_delivered_identity_only_does_not', () => {
+test('WHAT[guidance-delivery-003] TDP_002_full_marks_tip_delivered_identity_only_does_not', () => {
   let state = apply('primitive-obsession', TipPresentation.Full, empty)
   assert.equal(hasFullDelivered('primitive-obsession', state), true)
 
@@ -17,7 +17,7 @@ test('WHAT[GD-003] TDP_002_full_marks_tip_delivered_identity_only_does_not', () 
   assert.equal(hasFullDelivered('ignored-tdd', state), false)
   assert.equal(hasFullDelivered('primitive-obsession', state), true)
 })
-test('WHAT[GD-003] TDP_003_blank_or_null_tip_name_is_ignored', () => {
+test('WHAT[guidance-delivery-003] TDP_003_blank_or_null_tip_name_is_ignored', () => {
   const afterBlank = apply('   ', TipPresentation.Full, empty)
   assert.equal(hasFullDelivered('   ', afterBlank), false)
   assert.deepEqual(afterBlank, empty)
@@ -94,7 +94,7 @@ const withJournal = async (fn) => {
 const presentationOf = (value) => value?.presentation
 const textOf = (value) => value?.text
 
-test('WHAT[GD-003] ENFORCER_TIP_DELIVERY_002_second_resolve_same_tip_is_identity_only', async () => {
+test('WHAT[guidance-delivery-003] ENFORCER_TIP_DELIVERY_002_second_resolve_same_tip_is_identity_only', async () => {
   await withJournal(async (journal) => {
     await seedOwnerWithTip(journal)
     const first = await resolveTipGuidance(journal, main)

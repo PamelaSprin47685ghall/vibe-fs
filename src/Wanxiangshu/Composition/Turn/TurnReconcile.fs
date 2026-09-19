@@ -70,7 +70,7 @@ module TurnReconcile =
         |> Option.bind List.tryLast
 
     let private resolveAssistant (messages: SessionMessage list) (physical: string) =
-        // HOST-BOUNDARY-005: once the current physical user is known, only an
+        // host-boundary-005: once the current physical user is known, only an
         // assistant after that exact user can reconcile this occasion. Falling
         // back to an assistant after the authority root turns projection lag
         // into a stale terminal from an older continuation; AABB then stops

@@ -33,7 +33,7 @@ const bindExecution = async (role) => {
   return ids
 }
 
-test('WHAT[CONTEXT-COMPRESSION-025] stop decision fences provider admission before the abort resolves', async (t) => {
+test('WHAT[context-compression-025] stop decision fences provider admission before the abort resolves', async (t) => {
   await routing.initialize()
   const ids = await bindExecution('blogger')
   const other = await bindExecution('engineer')
@@ -66,7 +66,7 @@ test('WHAT[CONTEXT-COMPRESSION-025] stop decision fences provider admission befo
     /no active execution binding/,
   )
 })
-test('WHAT[CONTEXT-COMPRESSION-025] abort rejection never reopens the stopped execution', async () => {
+test('WHAT[context-compression-025] abort rejection never reopens the stopped execution', async () => {
   await routing.initialize()
   const ids = await bindExecution('blogger')
 
@@ -91,5 +91,5 @@ const { default: test } = await import("node:test");
 const { assertFatalBoundary } = await import("../../structured-workflow/tests/support/m6-boundary-proof.mjs");
 
 
-test('WHAT[CONTEXT-COMPRESSION-025] Blogger fatal binds exact request settlement and one injected fuse', () => assertFatalBoundary('context-compression'))
+test('WHAT[context-compression-025] Blogger fatal binds exact request settlement and one injected fuse', () => assertFatalBoundary('context-compression'))
 }

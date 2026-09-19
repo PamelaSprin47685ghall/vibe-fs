@@ -5,7 +5,7 @@ import * as concern from '../../../dist/Interaction/Concern/Surface.js'
 
 const read = (path) => readFileSync(path, 'utf8')
 
-test('WHAT[CONCERN-ROUTING-006] retirement prevents old messages crossing into a same-concern replacement generation', () => {
+test('WHAT[concern-routing-006] retirement prevents old messages crossing into a same-concern replacement generation', () => {
   let state = concern.subscribe('owner-a', 'gen-1', 'build', 'build health', concern.empty()).state
   state = concern.publish('sender', 'msg-old', 'build', 'old message', state).state
   state = concern.retire('owner-a', 'build', 'gen-1', state).state

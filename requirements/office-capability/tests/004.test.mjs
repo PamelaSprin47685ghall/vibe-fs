@@ -8,7 +8,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 
 const readRole = (role, locale) => readFileSync(join(ROOT, 'resources/provider/role', role, locale), 'utf8')
 
-test('WHAT[OFF-004] capability_is_consequence_model_not_tool_whitelist_transcription', () => {
+test('WHAT[office-capability-004] capability_is_consequence_model_not_tool_whitelist_transcription', () => {
   const en = readRole('manager', 'en.md')
   const zh = readRole('manager', 'zh-CN.md')
   assert.match(en, /Know another office by its promises, not by its keys/i)

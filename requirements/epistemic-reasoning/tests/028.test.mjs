@@ -103,7 +103,7 @@ const buildSpineWithObservations = async (t, observations) => {
   }
 }
 
-test('WHAT[EPI-028] export_contains_every_required_field_and_replay_matches_semantic_and_answer_hashes', async (t) => {
+test('WHAT[epistemic-reasoning-028] export_contains_every_required_field_and_replay_matches_semantic_and_answer_hashes', async (t) => {
   const events = await buildSpineWithObservations(t, [
     { claim: 'Small changes fail less often.', source: { id: 'doc-sre-1', kind: 'document' } },
   ])
@@ -137,7 +137,7 @@ test('WHAT[EPI-028] export_contains_every_required_field_and_replay_matches_sema
   assert.equal(replayedAgain.semanticHash, bundle.semanticHash)
   assert.equal(replayedAgain.answerHash, bundle.answerHash)
 })
-test('WHAT[EPI-028] externally_grounded_claims_stay_empty_without_external_source', async (t) => {
+test('WHAT[epistemic-reasoning-028] externally_grounded_claims_stay_empty_without_external_source', async (t) => {
   const modelOnly = gecSurface.exportFromEvents({
     events: await buildSpineWithObservations(t, [
       { claim: 'The model believes small changes are safer.', source: null },
@@ -248,7 +248,7 @@ const waveEvents = (wave, assignment) => {
   ]
 }
 
-test('WHAT[EPI-028] soak_export_bundles_replay_to_identical_hashes_every_wave', async () => {
+test('WHAT[epistemic-reasoning-028] soak_export_bundles_replay_to_identical_hashes_every_wave', async () => {
   for (let wave = 0; wave < WAVES; wave += 1) {
     const events = waveEvents(wave, 'wording-a')
     const bundle = gecSurface.exportFromEvents({ events })

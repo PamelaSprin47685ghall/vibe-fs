@@ -117,7 +117,7 @@ module ChronicleTool =
         // with no live cycle is still a valid Blogger-originated invocation that
         // must reach executeChronicle so the Chronicle owner can produce the
         // typed NoLiveCycle result, terminate the stale session, and let only the
-        // outer Host adapter encode that result as an SDK exception (BD-006).
+        // outer Host adapter encode that result as an SDK exception (behavior-diagnosis-006).
         ToolAdmission.OfficeRole(fun _ role -> role = Role.Blogger)
 
     let spec

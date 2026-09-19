@@ -21,7 +21,7 @@ const externalProducer = (kind, identity) => causal.externalProducer(kind, ident
 const readDiagnostic = (workspace) =>
   JSON.parse(fs.readFileSync(path.join(workspace, '.wanxiangshu', 'diagnostics', 'causal-waits.json'), 'utf8'))
 
-test('WHAT[CAUSAL-008] CAUSAL_BRIDGE_writeSnapshot_overwrites_workspace_json', () => {
+test('WHAT[causal-wait-008] CAUSAL_BRIDGE_writeSnapshot_overwrites_workspace_json', () => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'causal-bridge-'))
   fs.mkdirSync(path.join(workspace, '.git', 'info'), { recursive: true })
   const registry = causal.createRegistry()
@@ -75,7 +75,7 @@ const lastTransition = (registry) => {
   return history.at(-1)
 }
 
-test('WHAT[CAUSAL-008] CAUSAL_008_fresh_registry_starts_empty_no_durable_state', () => {
+test('WHAT[causal-wait-008] CAUSAL_008_fresh_registry_starts_empty_no_durable_state', () => {
   const snapshot = causal.snapshot(causal.createRegistry())
   assert.equal(snapshot.active.length, 0)
   assert.equal(snapshot.history.length, 0)

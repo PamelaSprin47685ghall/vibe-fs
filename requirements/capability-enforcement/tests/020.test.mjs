@@ -3,4 +3,4 @@ import { assertFatalBoundary } from '../../structured-workflow/tests/support/m6-
 
 
 
-test('WHAT[ENF-020] invalid configuration reaches one injected fatal adapter only through composition', () => assertFatalBoundary('capability-enforcement', 'not-required'))
+test('WHAT[capability-enforcement-020] invalid configuration reaches one injected fatal adapter only through composition', () => assertFatalBoundary('capability-enforcement', 'not-required'))

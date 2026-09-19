@@ -14,7 +14,7 @@ const firstCheckpointSurfaces = [
   ['todowrite-description/zh-CN', 'resources/provider/lifecycle/magic-todo/todowrite-description/zh-CN.md'],
 ]
 
-test('WHAT[OBLIGATION-LEDGER-004] Manager Role Law distinguishes planning relation from entrusted mission without owning tool timing', () => {
+test('WHAT[obligation-ledger-004] Manager Role Law distinguishes planning relation from entrusted mission without owning tool timing', () => {
   for (const path of ['resources/provider/role/manager/en.md', 'resources/provider/role/manager/zh-CN.md']) {
     const text = read(path)
     assert.match(text, /Planning Table|规划桌/i)
@@ -26,7 +26,7 @@ test('WHAT[OBLIGATION-LEDGER-004] Manager Role Law distinguishes planning relati
   }
 })
 
-test('WHAT[OBLIGATION-LEDGER-004] committed mode rejects planning-only debt by consequence, not keywords', () => {
+test('WHAT[obligation-ledger-004] committed mode rejects planning-only debt by consequence, not keywords', () => {
   for (const [label, path] of firstCheckpointSurfaces) {
     const text = read(path)
     assert.match(text, /planComplete/i)

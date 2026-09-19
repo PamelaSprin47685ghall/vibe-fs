@@ -21,7 +21,7 @@ const rebase = (state, { previousEpoch, nextEpoch, cutoff, digest, seal, prefixD
 const reanchor = (state, { previousEpoch, nextEpoch, observedRun = 'msg_compaction' }) =>
   prefix.applyReanchor({ previousEpoch, nextEpoch, observedRun }, state)
 
-test('WHAT[PREFIX-STABILITY-005] CTX_012_a_replayed_rebase_is_reported_as_stale', () => {
+test('WHAT[prefix-stability-005] CTX_012_a_replayed_rebase_is_reported_as_stale', () => {
   // CTX-012's recovery path re-attempts the commit after a restart: it cannot
   // know whether the append landed before the crash. The second attempt carries
   // the epoch it expected, which the projection has left.

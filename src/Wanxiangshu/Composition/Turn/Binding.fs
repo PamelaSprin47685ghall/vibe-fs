@@ -124,7 +124,7 @@ module TurnBinding =
                           Role = None
                           Directory = None })
 
-        /// CRASH-018: the explicit-resume material and the first ordinary
+        /// crash-reconciliation-018: the explicit-resume material and the first ordinary
         /// material that replaces it must move reconciliation's physical cursor
         /// without minting authority or a continuation identity.
         member _.BindPhysicalUserMaterial(sessionId: SessionId, physical: PhysicalUserMessageId) =

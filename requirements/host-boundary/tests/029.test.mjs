@@ -41,20 +41,20 @@ const assertHardExit = (result, mode) => {
   assert.doesNotMatch(result.stdout, /after-fatal/, `${mode}: must never return past the fuse`)
 }
 
-test('WHAT[HOST-BOUNDARY-029] fatal child reports once then dies without returning', async () => {
+test('WHAT[host-boundary-029] fatal child reports once then dies without returning', async () => {
   const result = await runChild(['trip'])
   assertHardExit(result, 'trip')
   const report = JSON.parse(result.stderr.trim().split('\n').pop())
   assert.equal(report.operation, 'fixture-fatal')
   assert.equal(result.stderr.trim().split('\n').filter(Boolean).length, 1, 'exactly one incident report')
 })
-test('WHAT[HOST-BOUNDARY-029] diagnostic owner path reports once then dies without returning', async () => {
+test('WHAT[host-boundary-029] diagnostic owner path reports once then dies without returning', async () => {
   const result = await runChild(['diagnostic'])
   assertHardExit(result, 'diagnostic')
   const report = JSON.parse(result.stderr.trim().split('\n').pop())
   assert.equal(report.operation, 'fixture-fatal-diagnostic')
 })
-test('WHAT[HOST-BOUNDARY-029] committed facts survive the fatal exit and reopen cleanly', async () => {
+test('WHAT[host-boundary-029] committed facts survive the fatal exit and reopen cleanly', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-fatal-exit-'))
   try {
     const boot = await journal.JournalSurface_boot(directory, 'rt-fatal-exit', 4242, '2026-09-14T00:00:00Z')
@@ -79,20 +79,20 @@ test('WHAT[HOST-BOUNDARY-029] committed facts survive the fatal exit and reopen 
     rmSync(directory, { recursive: true, force: true })
   }
 })
-test('WHAT[HOST-BOUNDARY-029] failing console capture cannot bypass the fuse', async () => {
+test('WHAT[host-boundary-029] failing console capture cannot bypass the fuse', async () => {
   const result = await runChild(['console-throw'])
   assertHardExit(result, 'console-throw')
 })
-test('WHAT[HOST-BOUNDARY-029] closed stdio cannot bypass the fuse', async () => {
+test('WHAT[host-boundary-029] closed stdio cannot bypass the fuse', async () => {
   const result = await runChild(['pipe-close'])
   assertHardExit(result, 'pipe-close')
 })
-test('WHAT[HOST-BOUNDARY-029] repeated incident reports once then dies', async () => {
+test('WHAT[host-boundary-029] repeated incident reports once then dies', async () => {
   const result = await runChild(['double-trip'])
   assertHardExit(result, 'double-trip')
   assert.equal(result.stderr.trim().split('\n').filter(Boolean).length, 1, 'rebroadcast must stay idempotent')
 })
-test('WHAT[HOST-BOUNDARY-029] normal rejection, stale callback, and exhaustion never exit the process', async () => {
+test('WHAT[host-boundary-029] normal rejection, stale callback, and exhaustion never exit the process', async () => {
   for (const mode of ['reject', 'stale-callback', 'exhausted']) {
     const result = await runChild([mode])
     assert.equal(result.signal, null, `${mode}: must not die by signal`)
@@ -134,7 +134,7 @@ const closureSources = (root, projects) => {
   return new Set([...closure].flatMap(relSources))
 }
 
-test('WHAT[HOST-BOUNDARY-029] fatal vocabulary stays pure and physical execution is composition-only', () => {
+test('WHAT[host-boundary-029] fatal vocabulary stays pure and physical execution is composition-only', () => {
   assertPureContract()
   assertFatalBoundary('host-boundary')
 })

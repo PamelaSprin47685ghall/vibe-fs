@@ -6,22 +6,22 @@ const { default: test } = await import("node:test");
 const recovery = await import("../../../dist/Execution/Session/Recovery/Surface.js");
 
 
-test('WHAT[CRASH-013] RECOVERY_COMBINE_export_exists', () => {
+test('WHAT[crash-reconciliation-013] RECOVERY_COMBINE_export_exists', () => {
   assert.equal(typeof recovery.combine, 'function')
 })
-test('WHAT[CRASH-013] RECOVERY_COMBINE_blocked_dominates', () => {
+test('WHAT[crash-reconciliation-013] RECOVERY_COMBINE_blocked_dominates', () => {
   assert.equal(recovery.combine(['NoRecoveryRequired', 'Waiting', 'Blocked', 'Recovered']), 'Blocked')
 })
-test('WHAT[CRASH-013] RECOVERY_COMBINE_waiting_dominates_ready', () => {
+test('WHAT[crash-reconciliation-013] RECOVERY_COMBINE_waiting_dominates_ready', () => {
   assert.equal(recovery.combine(['NoRecoveryRequired', 'Recovered', 'Waiting']), 'Waiting')
 })
-test('WHAT[CRASH-013] RECOVERY_COMBINE_recovered_over_ready', () => {
+test('WHAT[crash-reconciliation-013] RECOVERY_COMBINE_recovered_over_ready', () => {
   assert.equal(recovery.combine(['NoRecoveryRequired', 'Recovered']), 'Recovered')
 })
-test('WHAT[CRASH-013] RECOVERY_COMBINE_empty_is_no_recovery_required', () => {
+test('WHAT[crash-reconciliation-013] RECOVERY_COMBINE_empty_is_no_recovery_required', () => {
   assert.equal(recovery.combine([]), 'NoRecoveryRequired')
 })
-test('WHAT[CRASH-013] RECOVERY_COMBINE_order_independent_for_tier', () => {
+test('WHAT[crash-reconciliation-013] RECOVERY_COMBINE_order_independent_for_tier', () => {
   assert.equal(recovery.combine(['Blocked', 'Waiting', 'Recovered']), 'Blocked')
   assert.equal(recovery.combine(['Recovered', 'Blocked', 'Waiting']), 'Blocked')
 })
@@ -33,7 +33,7 @@ const { default: test } = await import("node:test");
 const recovery = await import("../../../dist/Execution/Session/Recovery/Surface.js");
 
 
-test('WHAT[CRASH-013] MISC_recovery_authorize_aggregates_blocks_waits_ready', () => {
+test('WHAT[crash-reconciliation-013] MISC_recovery_authorize_aggregates_blocks_waits_ready', () => {
   assert.equal(recovery.authorize('root1', 9, [{ session: 'child1', state: 'Blocked' }]).state, 'FamilyBlocked')
   assert.equal(
     recovery.authorize('root1', 9, [
@@ -76,7 +76,7 @@ const withContinueHost = async (label, portOutcome, action) => {
 const continueSessionOf = (suffix) => `ses-continue-${suffix}`
 const continuePhysicalOf = (suffix) => `msg-continue-${suffix}`
 
-test('WHAT[CRASH-013] RECOVERY_FAMILY_combine_and_coordinator_ownership_moved', () => {
+test('WHAT[crash-reconciliation-013] RECOVERY_FAMILY_combine_and_coordinator_ownership_moved', () => {
   const domain = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Model.fs'), 'utf8')
   const coordinator = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Coordinator.fs'), 'utf8')
   // W5 cutover: ownership is declared on the owning shard, not the wrapper

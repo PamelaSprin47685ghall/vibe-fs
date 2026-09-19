@@ -29,14 +29,14 @@ const materialize = (
 }
 const OPENING_END = { Sequence: 1 }
 
-test('WHAT[WORK-RECORD-014] LWR_gap_never_uses_prefix_cutoff', () => {
+test('WHAT[work-record-014] LWR_gap_never_uses_prefix_cutoff', () => {
   const trace = [
     xTrace.item({ sequence: 0, role: 'user', part: xTrace.text('task') }),
     xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.text('work a') }),
     xTrace.item({ sequence: 2, role: 'assistant', part: xTrace.text('work b') }),
   ]
 
-  // WORK-RECORD-014：LWR gap 只消费 RecordCoverage（XTrace 游标，可落 turn 中间），
+  // work-record-014：LWR gap 只消费 RecordCoverage（XTrace 游标，可落 turn 中间），
   // 绝不取 PrefixCoverage（完整 Host turn 边界）定位。cursor 1 之后是完整 turn 边界，
   // 若误用 prefix 量纲 gap 会含 work a；实际 gap 从 cursor 2 起——RecordCoverage 独一量纲。
   const rendered = materialize(opening('task'), ['f1'], trace, { Sequence: 2 }, OPENING_END)
@@ -75,7 +75,7 @@ const trace = [
   xTrace.item({ sequence: 2, role: 'assistant', part: xTrace.text('delivered') }),
 ]
 
-test('WHAT[WORK-RECORD-014] LWR_recent_work_can_start_mid_turn_at_record_coverage', () => {
+test('WHAT[work-record-014] LWR_recent_work_can_start_mid_turn_at_record_coverage', () => {
   // RecordCoverage consumed through cursor 1 (the reasoning part) — mid-turn
   // relative to any complete-turn boundary. The gap must start at cursor 2.
   const rendered = materialize(

@@ -3,7 +3,7 @@ import test from 'node:test'
 import * as quiescence from '../../../dist/OpenCode/Host/QuiescenceSurface.js'
 import * as office from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 
-test('WHAT[ENF-013] authority values strictly classify causal categories and vocabulary rejects name-only guessing', () => {
+test('WHAT[capability-enforcement-013] authority values strictly classify causal categories and vocabulary rejects name-only guessing', () => {
   // 1. Vocabulary isolation: OfficeCapability permissions returns discrete domain vocabulary labels.
   // Vocabulary items are plain string labels and do not carry execution authority by themselves.
   const engineerPermissions = office.permissions('engineer')

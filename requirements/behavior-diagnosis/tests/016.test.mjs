@@ -50,7 +50,7 @@ const readObs = (enforcement, blog) => observation.observationsOf(enforcement, b
   frameDigest: o.frameDigest,
 }))
 
-test('WHAT[BD-016] OBS_PROJ_003_squash_co_moves_tips_and_frames_as_observation', () => {
+test('WHAT[behavior-diagnosis-016] OBS_PROJ_003_squash_co_moves_tips_and_frames_as_observation', () => {
   let blog = observation.emptyBlog
   let enforcement = observation.emptyEnforcement
 
@@ -174,7 +174,7 @@ const readObservations = ({ enforcement, blog: blogState }) =>
 const isPreviousTip = (text) => text.includes('previous_enforcer_tip')
 const isHistoricFrame = (text) => text.includes('historic_frame')
 
-test('WHAT[BD-016] A42_PAIRED_HISTORY_001_eval_loads_120_tip_catalog_from_owner_surface', () => {
+test('WHAT[behavior-diagnosis-016] A42_PAIRED_HISTORY_001_eval_loads_120_tip_catalog_from_owner_surface', () => {
   const rules = enforcer.rules()
   assert.equal(rules.length, 120)
   assert.equal(enforcer.ruleCount(), 120)
@@ -194,7 +194,7 @@ test('WHAT[BD-016] A42_PAIRED_HISTORY_001_eval_loads_120_tip_catalog_from_owner_
   assert.match(composed, new RegExp(TIP_X))
   assert.match(composed, new RegExp(TIP_Y))
 })
-test('WHAT[BD-016] A42_PAIRED_HISTORY_002_observations_a_and_b_carry_real_historical_tip_ids', () => {
+test('WHAT[behavior-diagnosis-016] A42_PAIRED_HISTORY_002_observations_a_and_b_carry_real_historical_tip_ids', () => {
   const projected = foldPairedHistory()
   assert.deepEqual(readObservations(projected), [
     { tipName: TIP_X, cycleId: 'run-obs-a', frameDigest: 'sha-obs-a' },
@@ -217,7 +217,7 @@ test('WHAT[BD-016] A42_PAIRED_HISTORY_002_observations_a_and_b_carry_real_histor
   assert.equal(decodedY.ok, true)
   assert.equal(decodedY.value.tip.fieldName, TIP_Y)
 })
-test('WHAT[BD-016] A42_PAIRED_HISTORY_003_selection_path_sees_tip_x_when_new_material_resembles_a', () => {
+test('WHAT[behavior-diagnosis-016] A42_PAIRED_HISTORY_003_selection_path_sees_tip_x_when_new_material_resembles_a', () => {
   const projected = foldPairedHistory()
   const observations = readObservations(projected)
   assert.equal(observations[0].tipName, TIP_X)
@@ -270,7 +270,7 @@ test('WHAT[BD-016] A42_PAIRED_HISTORY_003_selection_path_sees_tip_x_when_new_mat
   const stillSelectable = enforcer.decodeCall({ text: 'candidate continuation for similar material', tip: TIP_X })
   assert.equal(stillSelectable.ok, true, 'catalog must still admit tip X for a possible true repeat')
 })
-test('WHAT[BD-016] A42_PAIRED_HISTORY_004_history_visibility_is_proved_without_a_true_repeat_oracle', () => {
+test('WHAT[behavior-diagnosis-016] A42_PAIRED_HISTORY_004_history_visibility_is_proved_without_a_true_repeat_oracle', () => {
   const projected = foldPairedHistory()
   const observations = readObservations(projected)
   const tipXVisible = observations.some((o) => o.tipName === TIP_X && o.cycleId === 'run-obs-a')
@@ -307,7 +307,7 @@ const cycleRecord = (n, field) => ({
   observedPrefixEpoch: 0,
 })
 
-test('WHAT[BD-016] ENFORCER_TIP_12_squash_co_truncates_recent_tips', () => {
+test('WHAT[behavior-diagnosis-016] ENFORCER_TIP_12_squash_co_truncates_recent_tips', () => {
   let state = observation.emptyEnforcement
   for (let n = 1; n <= 2; n += 1) {
     const applied = observation.applyEnforcementCycle(state, cycleRecord(n, fields[n - 1]))

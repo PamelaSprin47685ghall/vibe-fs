@@ -159,7 +159,7 @@ module internal SyncDelegateWorkflow =
         (handoff: PreparedDelegationHandoff)
         : Task<Result<unit, string>> =
         task {
-            // DELEG-031: the checkpoint returns the settlement itself, not a nested
+            // delegation-031: the checkpoint returns the settlement itself, not a nested
             // Result to flatten. The completed child is already proven — the caller
             // below delivers the already-earned WorkRecord whatever the commitment
             // says. Only the PhaseConflict invariant cut escalates through the
@@ -205,7 +205,7 @@ module internal SyncDelegateWorkflow =
                     (deps.DescribeWait(DelegateCompletion(batchOwner, delegateSession, role)))
                     call.Answer.Task
 
-            // DELEG-031: settlement attempt precedes the caller's observation of
+            // delegation-031: settlement attempt precedes the caller's observation of
             // success, but its commitment never rewrites the proven completion.
             // NotCommitted/Unknown preserve pending-evidence; the earned
             // WorkRecord is delivered either way. Only PhaseConflict escalates.

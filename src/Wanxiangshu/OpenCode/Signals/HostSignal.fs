@@ -9,7 +9,7 @@ type HostFailureObservation =
       Failure: ExecutionFailure
       Diagnostic: string }
 
-/// PAR-009: `Attempt` is the Host's own retry counter. Diagnostics only —
+/// provider-attempt-recovery-009: `Attempt` is the Host's own retry counter. Diagnostics only —
 /// it may not reach ConsecutiveFailureCount, the budget test, or the
 /// decision to send a continuation.
 type RetrySignal =
@@ -18,7 +18,7 @@ type RetrySignal =
       Failure: ExecutionFailure
       Diagnostic: string }
 
-/// PAR-003: Host signals never carry provider-run identity.
+/// provider-attempt-recovery-003: Host signals never carry provider-run identity.
 ///
 /// No message id on any case. A retry event's `messageID` was previously read as
 /// the failed assistant message and written into the failure ledger, which is deriving a

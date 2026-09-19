@@ -15,7 +15,7 @@ const sandbox = () => {
 }
 const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')
 
-test('WHAT[REPOSITORY-PROGRAMMING-006] JS011_sandbox_program_uses_bindings_end_to_end', async () => {
+test('WHAT[repository-programming-006] JS011_sandbox_program_uses_bindings_end_to_end', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
@@ -61,13 +61,13 @@ const PROGRAM = `class Js extends JsProgram {
   }
 }`
 
-test('WHAT[REPOSITORY-PROGRAMMING-006] JS011_program_runs_and_returns_json', async () => {
+test('WHAT[repository-programming-006] JS011_program_runs_and_returns_json', async () => {
   const api = { js: { read: async (path) => ({ path, text: 'hello' }) } }
   const result = await runWrapped(PROGRAM, api)
   assert.equal(result.ok, true)
   assert.deepEqual(JSON.parse(result.value), { sum: 3, text: 'hello' })
 })
-test('WHAT[REPOSITORY-PROGRAMMING-006] JS011_api_is_the_only_authority_in_the_context', async () => {
+test('WHAT[repository-programming-006] JS011_api_is_the_only_authority_in_the_context', async () => {
   // process / require / fs / globalThis.process must be undefined inside the vm.
   const probe = `class Js extends JsProgram {
   async run() {
@@ -88,7 +88,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-006] JS011_api_is_the_only_authority_in_the_co
     globalProcess: 'undefined',
   })
 })
-test('WHAT[REPOSITORY-PROGRAMMING-006] JS054_1_sync_infinite_loop_is_killed_by_vm_timeout', async () => {
+test('WHAT[repository-programming-006] JS054_1_sync_infinite_loop_is_killed_by_vm_timeout', async () => {
   const loop = `class Js extends JsProgram {
   async run() { while (true) {} }
 }`
@@ -96,7 +96,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-006] JS054_1_sync_infinite_loop_is_killed_by_v
   assert.equal(result.ok, false)
   assert.equal(failureCode(result), 'PROGRAM_TIMEOUT')
 })
-test('WHAT[REPOSITORY-PROGRAMMING-006] JS054_1_async_deadline_proxy_aborts_api_calls_after_deadline', async () => {
+test('WHAT[repository-programming-006] JS054_1_async_deadline_proxy_aborts_api_calls_after_deadline', async () => {
   // deadline in the past → first api call throws __PROGRAM_TIMEOUT__ → wrapper
   // classifies it as a program failure carrying the timeout marker.
   const program = `class Js extends JsProgram {
@@ -107,7 +107,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-006] JS054_1_async_deadline_proxy_aborts_api_c
   assert.equal(result.ok, false)
   assert.equal(failureCode(result), 'PROGRAM_TIMEOUT')
 })
-test('WHAT[REPOSITORY-PROGRAMMING-006] JS054_2_output_bound_rejects_oversized_results', async () => {
+test('WHAT[repository-programming-006] JS054_2_output_bound_rejects_oversized_results', async () => {
   const big = `class Js extends JsProgram {
   async run() { return { data: 'x'.repeat(1000) }; }
 }`

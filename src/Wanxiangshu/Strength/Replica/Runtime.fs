@@ -79,7 +79,7 @@ type StrengthReplicaPeek =
       Batches: StrengthRequestBatch list
       SemanticTerminal: StrengthReplicaTerminal option }
 
-/// SPEC-INV-011 / R15: Partition between immutable business outcome vs physical-tail cleanup.
+/// speculative-investigation-011 / R15: Partition between immutable business outcome vs physical-tail cleanup.
 /// Business consumers await and observe only immutable outcome (RequestsAdmitted, Batches, Terminal),
 /// while the physical session capability (retention in byReplica & liveRegistry) is held exclusively
 /// for host cleanup (turn drain, aborting trailing frames, model release) until isReplicaPhysicalTerminal.
@@ -672,7 +672,7 @@ type StrengthReplicaRuntime
                         binding
         }
 
-    /// SPEC-INV-013: DryRun is observation-only. If its own K gate/terminal has
+    /// speculative-investigation-013: DryRun is observation-only. If its own K gate/terminal has
     /// not already closed it by the time the exact owner target run terminates,
     /// that causal owner terminal is the remaining reason to stop the leaf.
     /// No elapsed-time arbitration participates in this decision.

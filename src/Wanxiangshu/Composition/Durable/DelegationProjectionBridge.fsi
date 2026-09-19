@@ -3,7 +3,7 @@ namespace Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation
 
-/// DSL-003 / DELEG-029 / DURABLE-EVENTS-023: Durable composition bridge for
+/// DSL-003 / delegation-029 / durable-events-023: Durable composition bridge for
 /// delegation-owned folds.
 ///
 /// Pure fold decisions and state transitions are owned by the delegation domain

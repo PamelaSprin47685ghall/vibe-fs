@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as office from '../../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 
-test('WHAT[OFF-005] consequence is invariant across decision surfaces: DevOps assignment reception is single-active and duplicate reception is idempotent', async () => {
+test('WHAT[office-capability-005] consequence is invariant across decision surfaces: DevOps assignment reception is single-active and duplicate reception is idempotent', async () => {
   // 1. Single consequence truth: DevOps has Exec and Pty, but NO Fission
   assert.ok(office.isAllowed('devops', 'Exec'), 'DevOps has Exec')
   assert.ok(office.isAllowed('devops', 'Pty'), 'DevOps has Pty')

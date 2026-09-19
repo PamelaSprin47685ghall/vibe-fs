@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../..')
 
-test('WHAT[DISTRIBUTION-001] PACKAGE_contents_tarball_includes_manifest_dist_resources', () => {
+test('WHAT[distribution-001] PACKAGE_contents_tarball_includes_manifest_dist_resources', () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'))
   assert.ok(Array.isArray(pkg.files))
   assert.ok(pkg.files.some((f) => f === 'dist' || f === 'dist/' || f.startsWith('dist')))

@@ -1,6 +1,6 @@
 # Package index
 
-当前设计得到 **57 张 boundary card**。57 不是目标，也不是稳定 API；它只是当前按独立 WHY、failure meaning 与 independent-change test 得出的结果。后续全仓反向覆盖若发现 ORPHAN / OVERLAP / GARBAGE，应继续拆并。
+当前设计得到 **55 张 boundary card**。57 不是目标，也不是稳定 API；它只是当前按独立 WHY、failure meaning 与 independent-change test 得出的结果。后续全仓反向覆盖若发现 ORPHAN / OVERLAP / GARBAGE，应继续拆并。
 
 ## 1. Requirement system
 
@@ -41,7 +41,6 @@
 | `action-affordance` | participant 在采取一个 action 的决策点必须知道该 act 的正边界、负边界、成功后果与参数意义。 |
 | `provider-language` | 一个 participant life 必须生活在单一、稳定的自然语言世界中，而 protocol identity 保持语言不变；核心角色双语 Prompt 语义同源一致。 |
 | `provider-projection` | 已决定可见的 typed semantic intent 必须经唯一确定性投影变成 provider representation，表示不能反向创造 authority。 |
-| `external-investigation` | [已撤销] Browser 角色与专属集成全链撤销且无替代代理，外部调查职责不转移且禁止通过通用执行工具复活。 |
 
 ## 5. Interaction / effect / durability
 
@@ -62,7 +61,6 @@
 | `delegation` | 一项语义工作交给另一 participant 时，authority、charge、owner 与返回后果必须明确；Manager 派发 Engineer 与续做固定 DevOps，禁止跨角色向后差遣；Sphinx 程序内部同步只读 Engineer 调研。 |
 | `intra-participant-parallelism` | 同一个 participant（仅限 Engineer）可拥有多个 coequal execution presents，而 identity/authority/responsibility 与最终 completion 仍保持一个。 |
 | `process-execution` | participant 控制真实进程/PTY 时必须得到有界、可终止、物理完成可信的 execution semantics，承接大输出零 Distiller 留尾截断与 Large Gate 门禁。 |
-| `output-distillation` | [已撤销] 任意输出规模零 Distiller 模型会话与彻底去角色化，大输出留尾截断与程序事实迁入 process-execution。 |
 | `change-integration` | 独立 Git 工作道路进入共享 ref 时必须在短原子门内发布，长 review/repair 不应被全局串行化；DevOps 自修推进快照触发证书失效与独立重评。 |
 
 ## 7. Context continuity
@@ -128,71 +126,69 @@
 
 # 规范条款索引
 
-本节汇总全仓 **57 个规范包当前全部活跃条款**（以各包 `WHAT.md` 实际文本为准）：
+本节汇总全仓 **55 个规范包当前全部活跃条款**（以各包 `WHAT.md` 实际文本为准）：
 
 | 序号 | 规范包 (`Package`) | 活跃条款数 | 活跃条款清单与演进导航 |
 |---|---|---|---|
-| 1 | `requirement-system` | 18 | REQUIREMENT-SYSTEM-001 ~ 018 |
-| 2 | `verification-system` | 16 | VERIFICATION-SYSTEM-001 ~ 006、007 ~ 016 |
-| 3 | `feature-ablation` | 12 | ABL-001 ~ 009、ABL-010（Primary agent 与 MCP 消融隔离）、ABL-011、ABL-012（角色/能力目录同步与独立开关保证） |
-| 4 | `js-semantic-surface` | 6 | JS-SEMANTIC-SURFACE-001 ~ 006 |
-| 5 | `structured-workflow` | 17 | STRUCTURED-WORKFLOW-001 ~ 017 |
-| 6 | `time-capability` | 8 | TIME-001 ~ 008 |
-| 7 | `causal-wait` | 9 | CAUSAL-001 ~ 009 |
-| 8 | `session-ontology` | 15 | SESSION-ONTOLOGY-001 ~ 015 |
-| 9 | `managed-session-lifecycle` | 24 | MANAGED-SESSION-001 ~ 022、MS-023（身份替换后旧活跃会话显式收束）、MS-024（固定 DevOps 崩溃恢复单一权威与进程排空） |
-| 10 | `host-boundary` | 31 | HOST-BOUNDARY-001 ~ 031 |
-| 11 | `participant-identity` | 10 | PID-001 ~ 009、PID-010（活跃身份解析与历史身份隔离解码） |
-| 12 | `execution-model-routing` | 19 | EMR-001 ~ 017、EMR-018（新角色集合模型路由解耦）、EMR-019（固定 DevOps 模型绑定持久性与禁止借 resume 换模型） |
-| 13 | `office-capability` | 12 | OFF-001/003/004/005/006/007/011/012/015、OFF-016（Engineer 职责与独享 Fission）、OFF-017（DevOps 执行与固有非架构级自修授权）、OFF-018（Sphinx 程控探究与内部只读 Engineer 调研）；OFF-002/008/009/010/013/014 已正式撤销归档 |
-| 14 | `capability-enforcement` | 24 | ENF-001 ~ 021、ENF-022（Fission 仅 Engineer 准入 fail-closed）、ENF-023（DevOps 固有自修授权禁 allowRepair 逐次开关）、ENF-024（Fork 与 Resume 权能分离） |
-| 15 | `participant-horizon` | 15 | PARTICIPANT-HORIZON-001 ~ 014、PARTICIPANT-HORIZON-015（Manager 并行来自派出多名 Engineer 而非自身分身） |
-| 16 | `cognitive-environment` | 16 | COGNITIVE-ENVIRONMENT-001 ~ 016 |
-| 17 | `attention-regulation` | 6 | ATTENTION-REGULATION-001 ~ 006 |
-| 18 | `action-affordance` | 14 | ACTION-AFFORDANCE-001 ~ 014 |
-| 19 | `provider-language` | 12 | PROVIDER-LANGUAGE-001 ~ 011、PL-012（核心角色双语 Prompt 语义一致与同源认知） |
-| 20 | `provider-projection` | 14 | PROVIDER-PROJECTION-001 ~ 014 |
-| 21 | `external-investigation` | 2 | EI-012（Browser 角色与专属集成全链撤销且无替代代理）、EI-013（外部调查职责不转移且禁止通用工具复活）；001~011 已撤销 |
-| 22 | `concern-routing` | 7 | CONCERN-ROUTING-001 ~ 007 |
-| 23 | `interaction-authority` | 22 | INTERACTION-AUTHORITY-001 ~ 020、IA-021（历史事件不可变与旧身份不升权）、IA-022（DevOps 恢复与续行锁定固定模型与执行权威） |
-| 24 | `managed-chat-execution` | 14 | CHATEXEC-001 ~ 014 |
-| 25 | `dispatch-protocol` | 0 | 注：派发协议条款统一收敛于各交互子系统 |
-| 26 | `durable-events` | 25 | DURABLE-EVENTS-001 ~ 025 |
-| 27 | `effect-accounting` | 12 | EFFECT-ACCOUNTING-001 ~ 012 |
-| 28 | `durable-convergence` | 11 | DURABLE-CONVERGENCE-001 ~ 011 |
-| 29 | `delegation` | 31 | DELEG-001 ~ 017、019 ~ 030、DELEG-031（reusable completion checkpoint 闭合收口）、DELEG-032（Engineer 完成即返回，禁跨角色向后差遣） |
-| 30 | `intra-participant-parallelism` | 17 | IPP-001 ~ 011、IPP-012（订正：eligibility 单一 consequence source）、IPP-013 ~ 016、IPP-017（Fission 准入判定公式与主体边界） |
-| 31 | `process-execution` | 17 | PROC-001 ~ 012、PROC-013（大输出零 Distiller 与预算留尾截断）、PROC-014（程序事实不从日志推断与截断声明）、PROC-015（字节预算与 UTF-8 边界对齐）、PROC-016（Large Gate 互斥门禁）、PROC-017（ToolResultBound 留尾截断） |
-| 32 | `output-distillation` | 1 | DISTILL-014（任意输出规模零 Distiller 模型会话与彻底去角色化）；DISTILL-001~010/013 已撤销，011/012 迁入 PROC-016/017 |
-| 33 | `change-integration` | 17 | CHGINT-001 ~ 014、CHGINT-015（修复改变工作树后必须重新验证与证书失效）、CHGINT-016（并行协调隔离）、CHGINT-017（多道路汇聚后必须重新验证） |
-| 34 | `semantic-trace` | 12 | SEMANTIC-TRACE-001 ~ 010、ST-011（Fission keyed convergence 与多 Present 轨迹归并）、ST-012（独立 Invocation 范围与 Resume 边界） |
-| 35 | `work-record` | 17 | WORK-RECORD-001 ~ 016、WR-017（Fission 汇聚生成单次 Invocation Canonical Record） |
-| 36 | `context-compression` | 27 | CONTEXT-COMPRESSION-001 ~ 027 |
-| 37 | `prefix-stability` | 15 | PREFIX-STABILITY-001 ~ 015 |
-| 38 | `execution-failure-policy` | 14 | EXECFAIL-001 ~ 010、010b、011 ~ 013 |
-| 39 | `provider-attempt-recovery` | 23 | PAR-001 ~ 023 |
-| 40 | `host-provider-failure-ownership` | 7 | HOSTFAIL-001 ~ 007 |
-| 41 | `crash-reconciliation` | 20 | CRASH-001 ~ 019、CRASH-020（固定 DevOps 崩溃恢复单一逻辑权威与命令去重） |
-| 42 | `degeneration-guard` | 13 | DG-001 ~ 013 |
-| 43 | `obligation-ledger` | 28 | OBLIGATION-LEDGER-001 ~ 028 |
-| 44 | `relay-incumbency` | 11 | RELAY-001 ~ 006、008 ~ 009、RELAY-010（道路唯一逻辑 DevOps 与控制权交接）、RELAY-011（任期连续性与归属明确）、RELAY-012（固定 DevOps 初始绑定与恢复唯一性）；RELAY-007 已删除 |
-| 45 | `relay-assessment` | 10 | ASSESS-001 ~ 008、ASSESS-009（独立评估由只读 Engineer 支持且实现者不自定答案）、ASSESS-010（DevOps 自修改变快照使旧评估与证书失效且不可冒充新改动验证） |
-| 46 | `relay-retirement` | 7 | RETIRE-001 ~ 004、007 ~ 008、RETIRE-009（固定 DevOps 与跨任期资源在退休中的交接与收束边界）；RETIRE-005/006 已删除 |
-| 47 | `relay-context-projection` | 9 | PROJ-001 ~ 008、PROJ-009（固定 DevOps 执行事实与前任上下文隔离） |
-| 48 | `behavior-diagnosis` | 19 | BD-001 ~ 019 |
-| 49 | `guidance-delivery` | 12 | GD-001 ~ 012 |
-| 50 | `institutional-learning` | 8 | INSTITUTIONAL-LEARNING-001 ~ 008 |
-| 51 | `repository-investigation` | 9 | REPOSITORY-INVESTIGATION-001 ~ 009 |
-| 52 | `knowledge-reuse` | 15 | KNOWLEDGE-REUSE-001 ~ 013、KR-014（预算与截断诚实性）、KR-015（废止严格 Replay 与稳定性校验循环） |
-| 53 | `repository-programming` | 27 | REPOSITORY-PROGRAMMING-001 ~ 025、RP-026（事务 ReadSnapshots 与案例实质访问严格分离）、RP-027（Engineer 与 DevOps 统一文件工具与编程面生成） |
-| 54 | `requirement-grounding` | 12 | REQUIREMENT-GROUNDING-001 ~ 012 |
-| 55 | `speculative-investigation` | 14 | SPEC-INV-001 ~ 014 |
-| 56 | `epistemic-reasoning` | 34 | EPI-001 ~ 030、EPI-031（Sphinx 探究流程全程序控制，无 Inquiry 角色）、EPI-032（内部 Engineer 调研只读同步有预算可取消）、EPI-033（结果接纳幂等防重复购买）、EPI-034（取消全链贯穿父工具与子 Engineer） |
-| 57 | `distribution` | 10 | DISTRIBUTION-001 ~ 009、DIST-010（打包资源与活动注册同步） |
+| 1 | `requirement-system` | 18 | requirement-system-001 ~ 018 |
+| 2 | `verification-system` | 16 | verification-system-001 ~ 006、007 ~ 016 |
+| 3 | `feature-ablation` | 12 | feature-ablation-001 ~ 009、feature-ablation-010（Primary agent 与 MCP 消融隔离）、feature-ablation-011、feature-ablation-012（角色/能力目录同步与独立开关保证） |
+| 4 | `js-semantic-surface` | 6 | js-semantic-surface-001 ~ 006 |
+| 5 | `structured-workflow` | 17 | structured-workflow-001 ~ 017 |
+| 6 | `time-capability` | 8 | time-capability-001 ~ 008 |
+| 7 | `causal-wait` | 9 | causal-wait-001 ~ 009 |
+| 8 | `session-ontology` | 15 | session-ontology-001 ~ 015 |
+| 9 | `managed-session-lifecycle` | 24 | managed-session-lifecycle-001 ~ 022、managed-session-lifecycle-023（身份替换后旧活跃会话显式收束）、managed-session-lifecycle-024（固定 DevOps 崩溃恢复单一权威与进程排空） |
+| 10 | `host-boundary` | 31 | host-boundary-001 ~ 031 |
+| 11 | `participant-identity` | 10 | participant-identity-001 ~ 009、participant-identity-010（活跃身份解析与历史身份隔离解码） |
+| 12 | `execution-model-routing` | 19 | execution-model-routing-001 ~ 017、execution-model-routing-018（新角色集合模型路由解耦）、execution-model-routing-019（固定 DevOps 模型绑定持久性与禁止借 resume 换模型） |
+| 13 | `office-capability` | 12 | office-capability-001/003/004/005/006/007/011/012/015、office-capability-016（Engineer 职责与独享 Fission）、office-capability-017（DevOps 执行与固有非架构级自修授权）、office-capability-018（Sphinx 程控探究与内部只读 Engineer 调研）；office-capability-002/008/009/010/013/014 已正式撤销归档 |
+| 14 | `capability-enforcement` | 24 | capability-enforcement-001 ~ 021、capability-enforcement-022（Fission 仅 Engineer 准入 fail-closed）、capability-enforcement-023（DevOps 固有自修授权禁 allowRepair 逐次开关）、capability-enforcement-024（Fork 与 Resume 权能分离） |
+| 15 | `participant-horizon` | 15 | participant-horizon-001 ~ 014、participant-horizon-015（Manager 并行来自派出多名 Engineer 而非自身分身） |
+| 16 | `cognitive-environment` | 16 | cognitive-environment-001 ~ 016 |
+| 17 | `attention-regulation` | 6 | attention-regulation-001 ~ 006 |
+| 18 | `action-affordance` | 14 | action-affordance-001 ~ 014 |
+| 19 | `provider-language` | 12 | provider-language-001 ~ 011、provider-language-012（核心角色双语 Prompt 语义一致与同源认知） |
+| 20 | `provider-projection` | 14 | provider-projection-001 ~ 014 |
+| 21 | `concern-routing` | 7 | concern-routing-001 ~ 007 |
+| 22 | `interaction-authority` | 22 | interaction-authority-001 ~ 020、interaction-authority-021（历史事件不可变与旧身份不升权）、interaction-authority-022（DevOps 恢复与续行锁定固定模型与执行权威） |
+| 23 | `managed-chat-execution` | 14 | managed-chat-execution-001 ~ 014 |
+| 24 | `dispatch-protocol` | 0 | 注：派发协议条款统一收敛于各交互子系统 |
+| 25 | `durable-events` | 25 | durable-events-001 ~ 025 |
+| 26 | `effect-accounting` | 12 | effect-accounting-001 ~ 012 |
+| 27 | `durable-convergence` | 11 | durable-convergence-001 ~ 011 |
+| 28 | `delegation` | 31 | delegation-001 ~ 017、019 ~ 030、delegation-031（reusable completion checkpoint 闭合收口）、delegation-032（Engineer 完成即返回，禁跨角色向后差遣） |
+| 29 | `intra-participant-parallelism` | 17 | intra-participant-parallelism-001 ~ 011、intra-participant-parallelism-012（订正：eligibility 单一 consequence source）、intra-participant-parallelism-013 ~ 016、intra-participant-parallelism-017（Fission 准入判定公式与主体边界） |
+| 30 | `process-execution` | 17 | process-execution-001 ~ 012、process-execution-013（大输出零 Distiller 与预算留尾截断）、process-execution-014（程序事实不从日志推断与截断声明）、process-execution-015（字节预算与 UTF-8 边界对齐）、process-execution-016（Large Gate 互斥门禁）、process-execution-017（ToolResultBound 留尾截断） |
+| 31 | `change-integration` | 17 | change-integration-001 ~ 014、change-integration-015（修复改变工作树后必须重新验证与证书失效）、change-integration-016（并行协调隔离）、change-integration-017（多道路汇聚后必须重新验证） |
+| 32 | `semantic-trace` | 12 | semantic-trace-001 ~ 010、semantic-trace-011（Fission keyed convergence 与多 Present 轨迹归并）、semantic-trace-012（独立 Invocation 范围与 Resume 边界） |
+| 33 | `work-record` | 17 | work-record-001 ~ 016、work-record-017（Fission 汇聚生成单次 Invocation Canonical Record） |
+| 34 | `context-compression` | 27 | context-compression-001 ~ 027 |
+| 35 | `prefix-stability` | 15 | prefix-stability-001 ~ 015 |
+| 36 | `execution-failure-policy` | 14 | execution-failure-policy-001 ~ 010、010b、011 ~ 013 |
+| 37 | `provider-attempt-recovery` | 23 | provider-attempt-recovery-001 ~ 023 |
+| 38 | `host-provider-failure-ownership` | 7 | host-provider-failure-ownership-001 ~ 007 |
+| 39 | `crash-reconciliation` | 20 | crash-reconciliation-001 ~ 019、crash-reconciliation-020（固定 DevOps 崩溃恢复单一逻辑权威与命令去重） |
+| 40 | `degeneration-guard` | 13 | degeneration-guard-001 ~ 013 |
+| 41 | `obligation-ledger` | 28 | obligation-ledger-001 ~ 028 |
+| 42 | `relay-incumbency` | 11 | relay-incumbency-001 ~ 006、008 ~ 009、relay-incumbency-010（道路唯一逻辑 DevOps 与控制权交接）、relay-incumbency-011（任期连续性与归属明确）、relay-incumbency-012（固定 DevOps 初始绑定与恢复唯一性）；relay-incumbency-007 已删除 |
+| 43 | `relay-assessment` | 10 | relay-assessment-001 ~ 008、relay-assessment-009（独立评估由只读 Engineer 支持且实现者不自定答案）、relay-assessment-010（DevOps 自修改变快照使旧评估与证书失效且不可冒充新改动验证） |
+| 44 | `relay-retirement` | 7 | relay-retirement-001 ~ 004、007 ~ 008、relay-retirement-009（固定 DevOps 与跨任期资源在退休中的交接与收束边界）；relay-retirement-005/006 已删除 |
+| 45 | `relay-context-projection` | 9 | relay-context-projection-001 ~ 008、relay-context-projection-009（固定 DevOps 执行事实与前任上下文隔离） |
+| 46 | `behavior-diagnosis` | 19 | behavior-diagnosis-001 ~ 019 |
+| 47 | `guidance-delivery` | 12 | guidance-delivery-001 ~ 012 |
+| 48 | `institutional-learning` | 8 | institutional-learning-001 ~ 008 |
+| 49 | `repository-investigation` | 9 | repository-investigation-001 ~ 009 |
+| 50 | `knowledge-reuse` | 15 | knowledge-reuse-001 ~ 013、knowledge-reuse-014（预算与截断诚实性）、knowledge-reuse-015（废止严格 Replay 与稳定性校验循环） |
+| 51 | `repository-programming` | 27 | repository-programming-001 ~ 025、repository-programming-026（事务 ReadSnapshots 与案例实质访问严格分离）、repository-programming-027（Engineer 与 DevOps 统一文件工具与编程面生成） |
+| 52 | `requirement-grounding` | 12 | requirement-grounding-001 ~ 012 |
+| 53 | `speculative-investigation` | 14 | speculative-investigation-001 ~ 014 |
+| 54 | `epistemic-reasoning` | 34 | epistemic-reasoning-001 ~ 030、epistemic-reasoning-031（Sphinx 探究流程全程序控制，无 Inquiry 角色）、epistemic-reasoning-032（内部 Engineer 调研只读同步有预算可取消）、epistemic-reasoning-033（结果接纳幂等防重复购买）、epistemic-reasoning-034（取消全链贯穿父工具与子 Engineer） |
+| 55 | `distribution` | 10 | distribution-001 ~ 009、distribution-010（打包资源与活动注册同步） |
 
 # 依赖骨架
 
-这不是权威优先级，只表示定义所需 guarantee。精确 hard edge 以各 boundary card 的 `DEPENDS ON` 为准；本表是当前完整邻接清单（146 edges，按本 code block 逐项机器计数）。
+这不是权威优先级，只表示定义所需 guarantee。精确 hard edge 以各 boundary card 的 `DEPENDS ON` 为准；本表是当前完整邻接清单（141 edges，按本 code block 逐项机器计数）。
 
 ```text
 requirement-system       → 无
@@ -215,7 +211,6 @@ attention-regulation     → participant-identity, durable-events
 action-affordance        → office-capability, participant-horizon
 provider-language        → session-ontology
 provider-projection      → participant-horizon, provider-language
-external-investigation   → office-capability, participant-horizon, host-boundary
 concern-routing          → participant-identity, participant-horizon, durable-events
 interaction-authority    → participant-identity, session-ontology
 managed-chat-execution   → durable-events, interaction-authority, participant-identity, execution-model-routing, execution-failure-policy, host-boundary
@@ -226,7 +221,6 @@ durable-convergence      → durable-events
 delegation               → office-capability, session-ontology, managed-session-lifecycle, participant-horizon
 intra-participant-parallelism → participant-identity, session-ontology, managed-session-lifecycle, office-capability, capability-enforcement, participant-horizon, work-record, process-execution, durable-events, crash-reconciliation
 process-execution        → time-capability, host-boundary, participant-horizon
-output-distillation      → process-execution, participant-horizon
 change-integration       → effect-accounting, durable-events, crash-reconciliation
 semantic-trace           → durable-events
 work-record              → semantic-trace, context-compression, participant-horizon
@@ -263,4 +257,4 @@ guidance-delivery    → provider-projection 删（渲染是下游机制）
 finality             → participant-horizon 删（包已退役为 relay-*；隐藏 Reviewer 机制随之删除）
 ```
 
-当前 149 edges 均为 semantic prerequisite（A 的 WHAT 定义需要 B 已提供的 guarantee），无 implementation/presentation/proof coupling。`epistemic-reasoning` 的 durable inquiry、受管 blind branch 与 capacity-safe OpenCode dispatch 分别直接依赖 `durable-events`、`delegation` 与 `execution-model-routing` 的 guarantee；这些不是存储、Host 或 proof 的偶然耦合。
+当前 144 edges 均为 semantic prerequisite（A 的 WHAT 定义需要 B 已提供的 guarantee），无 implementation/presentation/proof coupling。`epistemic-reasoning` 的 durable inquiry、受管 blind branch 与 capacity-safe OpenCode dispatch 分别直接依赖 `durable-events`、`delegation` 与 `execution-model-routing` 的 guarantee；这些不是存储、Host 或 proof 的偶然耦合。

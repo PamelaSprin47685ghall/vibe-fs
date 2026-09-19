@@ -10,7 +10,7 @@ const linked = assoc.link({ main: 'ses_main', blogger: 'ses_blogger' }, assoc.em
 assert.equal(linked.ok, true, linked.message)
 const state = linked.value
 
-test('WHAT[SESSION-ONTOLOGY-001] HOST_008_execution_class_predicates_distinguish_work_and_leaf', () => {
+test('WHAT[session-ontology-001] HOST_008_execution_class_predicates_distinguish_work_and_leaf', () => {
   assert.deepEqual(assoc.executionClass('Work'), { name: 'Work', isWork: true, isInternalLeaf: false })
   assert.deepEqual(assoc.executionClass('InternalLeaf'), { name: 'InternalLeaf', isWork: false, isInternalLeaf: true })
 })
@@ -45,7 +45,7 @@ const rootSelection = (agent) => {
 const syncDelegateRoles = ['Inspector', 'Coder']
 assert.deepEqual(syncDelegateRoles, ['Inspector', 'Coder'])
 
-test('WHAT[SESSION-ONTOLOGY-001] HOST_008_execution_class_predicates_distinguish_work_and_leaf', () => {
+test('WHAT[session-ontology-001] HOST_008_execution_class_predicates_distinguish_work_and_leaf', () => {
   assert.equal(assoc.executionClass('Work').isWork, true)
   assert.equal(assoc.executionClass('Work').isInternalLeaf, false)
   assert.equal(assoc.executionClass('InternalLeaf').isWork, false)

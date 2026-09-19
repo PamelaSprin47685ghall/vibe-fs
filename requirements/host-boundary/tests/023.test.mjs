@@ -33,7 +33,7 @@ const runInstalledCanary = () => {
 
 const first = (evidence, kind) => evidence.observations.find((observation) => observation.kind === kind)
 
-test('WHAT[HOST-BOUNDARY-023] installed OpenCode chat admission public contract is observed and version-fenced', () => {
+test('WHAT[host-boundary-023] installed OpenCode chat admission public contract is observed and version-fenced', () => {
   const evidence = runInstalledCanary()
   assert.deepEqual(evidence.versions, fixture.observedVersions)
   assert.deepEqual(evidence.publicApis.hooks, fixture.publicHooks)

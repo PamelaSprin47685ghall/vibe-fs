@@ -11,13 +11,13 @@ const { fileURLToPath } = await import("node:url");
 const { default: path } = await import("node:path");
 
 
-test('WHAT[VERIFICATION-SYSTEM-003] isCountedSseEvent excludes server.heartbeat only', () => {
+test('WHAT[verification-system-003] isCountedSseEvent excludes server.heartbeat only', () => {
   assert.equal(isCountedSseEvent({ type: 'server.heartbeat' }), false);
   assert.equal(isCountedSseEvent({ type: 'message.updated' }), true);
   assert.equal(isCountedSseEvent({ type: '' }), false);
   assert.equal(isCountedSseEvent({}), false);
 });
-test('WHAT[VERIFICATION-SYSTEM-003] normalizeEventCeilings rejects non-positive integers', () => {
+test('WHAT[verification-system-003] normalizeEventCeilings rejects non-positive integers', () => {
   assert.deepEqual(normalizeEventCeilings({}), {});
   assert.deepEqual(normalizeEventCeilings({ maxJournalEvents: 12, maxSseEvents: 34 }), {
     maxJournalEvents: 12,
@@ -26,12 +26,12 @@ test('WHAT[VERIFICATION-SYSTEM-003] normalizeEventCeilings rejects non-positive 
   assert.throws(() => normalizeEventCeilings({ maxJournalEvents: 0 }), /positive integer/);
   assert.throws(() => normalizeEventCeilings({ maxSseEvents: 1.2 }), /positive integer/);
 });
-test('WHAT[VERIFICATION-SYSTEM-003] eventCeilingSetupProblems matches schema contract', () => {
+test('WHAT[verification-system-003] eventCeilingSetupProblems matches schema contract', () => {
   assert.deepEqual(eventCeilingSetupProblems(undefined), []);
   assert.ok(eventCeilingSetupProblems({ maxJournalEvents: 0 })[0].includes('maxJournalEvents'));
   assert.ok(eventCeilingSetupProblems({ maxSseEvents: -3 })[0].includes('maxSseEvents'));
 });
-test('WHAT[VERIFICATION-SYSTEM-003] attachEventCeilings breaches maxSseEvents without counting heartbeats', () => {
+test('WHAT[verification-system-003] attachEventCeilings breaches maxSseEvents without counting heartbeats', () => {
   const listeners = [];
   const scenario = {
     host: { workDir: '/tmp/does-not-need-to-exist-for-sse-only' },
@@ -74,7 +74,7 @@ test('WHAT[VERIFICATION-SYSTEM-003] attachEventCeilings breaches maxSseEvents wi
   // Heartbeat must not increment.
   assert.equal(breached.sseEvents, 3);
 });
-test('WHAT[VERIFICATION-SYSTEM-003] long-stroke.toml pins measured exact event ceilings', () => {
+test('WHAT[verification-system-003] long-stroke.toml pins measured exact event ceilings', () => {
   const dir = path.dirname(fileURLToPath(import.meta.url));
   const source = readFileSync(path.join(dir, 'e2e/scenarios/long-stroke.toml'), 'utf8');
   const result = compileScenario(source, { name: 'long-stroke.toml' });
@@ -84,7 +84,7 @@ test('WHAT[VERIFICATION-SYSTEM-003] long-stroke.toml pins measured exact event c
   assert.equal(result.scenario.setup.maxJournalEvents, 699);
   assert.equal(result.scenario.setup.maxSseEvents, 3351);
 });
-test('WHAT[VERIFICATION-SYSTEM-003] Long Stroke keeps one Manager loop and two exact consecutive failures', () => {
+test('WHAT[verification-system-003] Long Stroke keeps one Manager loop and two exact consecutive failures', () => {
   const dir = path.dirname(fileURLToPath(import.meta.url));
   const source = readFileSync(path.join(dir, 'e2e/scenarios/long-stroke.toml'), 'utf8');
   const result = compileScenario(source, { name: 'long-stroke.toml' });
@@ -194,7 +194,7 @@ const makeTempRoot = (layout) => {
 }
 const cleanup = (root) => rmSync(root, { recursive: true, force: true })
 
-test('WHAT[VERIFICATION-SYSTEM-003] e2e case ceiling is zero — no cases/ channel', () => {
+test('WHAT[verification-system-003] e2e case ceiling is zero — no cases/ channel', () => {
   // E2E_CASE_CEILING = 0：case 天花板只降不升。机器面 = 顶层清单不递归
   // cases/ 或 support/；缺失或空 cases/ 必须被容忍（不存在 = 零 case），
   // 不许 walk 或 require 该目录。
@@ -204,7 +204,7 @@ test('WHAT[VERIFICATION-SYSTEM-003] e2e case ceiling is zero — no cases/ chann
     assert.ok(existsSync(file), `e2e top-level test file missing: ${file}`)
   }
 })
-test('WHAT[VERIFICATION-SYSTEM-003] missing or empty cases/ is allowed (no throw)', () => {
+test('WHAT[verification-system-003] missing or empty cases/ is allowed (no throw)', () => {
   // cases/ is not required and not walked. A valid e2e root with the sole
   // entry and NO cases/ directory must return exactly the entry — proving the
   // fail-closed tightening did not regress the documented cases/ tolerance.
@@ -241,7 +241,7 @@ const root = path.resolve(here, '../../..')
 const packageIntegrationDir = path.join(root, 'requirements/distribution/tests/integration/package')
 const normalize = (file) => path.relative(root, file).split(path.sep).join('/')
 
-test('WHAT[VERIFICATION-SYSTEM-003] integration grouping set partition invariants', () => {
+test('WHAT[verification-system-003] integration grouping set partition invariants', () => {
   // 1. 每 integration 文件恰在一个组
   // 2. 合联集 = discovered set (excluding child owned)
   // 3. 日常集不含 releaseOnly 所含（特别是 compiler-canary）
@@ -317,7 +317,7 @@ const REQUIRED = [
   /repeat-until-pass/i,
 ]
 
-test('WHAT[VERIFICATION-SYSTEM-003] sole e2e entry declares unsimulatable physical contracts', () => {
+test('WHAT[verification-system-003] sole e2e entry declares unsimulatable physical contracts', () => {
   const text = readFileSync(ENTRY, 'utf8')
   assert.equal(text.includes(MARKER), true, 'e2e entry must name PHYSICAL CONTRACTS (VERIFICATION-SYSTEM-003)')
   for (const contract of REQUIRED) {
@@ -325,7 +325,7 @@ test('WHAT[VERIFICATION-SYSTEM-003] sole e2e entry declares unsimulatable physic
   }
   assert.equal(text.replace(MARKER, '').includes(MARKER), false)
 })
-test('WHAT[VERIFICATION-SYSTEM-003] active-join user-message injection waits for physical ToolPart running', () => {
+test('WHAT[verification-system-003] active-join user-message injection waits for physical ToolPart running', () => {
   const scenario = readFileSync(LONG_STROKE, 'utf8')
   const entry = readFileSync(ENTRY, 'utf8')
   const joinExpectation = scenario.indexOf('{ wait = "manager-loop.1"')
@@ -340,7 +340,7 @@ test('WHAT[VERIFICATION-SYSTEM-003] active-join user-message injection waits for
   assert.match(entry, /toolName\s*===\s*['"]join['"]/)
   assert.match(entry, /toolStatus\s*===\s*['"]running['"]/)
 })
-test('WHAT[VERIFICATION-SYSTEM-003] format-build-test does not repeat-until-pass', () => {
+test('WHAT[verification-system-003] format-build-test does not repeat-until-pass', () => {
   const { scripts } = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
   const command = scripts['format-build-test']
   assert.equal(typeof command, 'string')

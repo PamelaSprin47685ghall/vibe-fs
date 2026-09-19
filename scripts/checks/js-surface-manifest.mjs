@@ -24,12 +24,12 @@ const WHAT_TAG = /WHAT\[([A-Z][A-Z0-9-]*-\d{3}(?:[A-Z]|-[A-Z0-9]+)?)\]/g
 export const whatIds = (text) => {
   WHAT_ID.lastIndex = 0
   WHAT_TAG.lastIndex = 0
-  return [
-    ...new Set([
-      ...[...text.matchAll(WHAT_ID)].map((match) => match[1]),
-      ...[...text.matchAll(WHAT_TAG)].map((match) => match[1]),
-    ]),
+  const legacy = [
+    ...[...text.matchAll(WHAT_ID)].map((match) => match[1]),
+    ...[...text.matchAll(WHAT_TAG)].map((match) => match[1]),
   ]
+  const bracketNums = [...text.matchAll(/^#{1,6}\s+\[(\d{3}[a-z]?)\]/gm)].map((match) => match[1])
+  return [...new Set([...legacy, ...bracketNums])]
 }
 
 const sourceCompileStem = (source) => {
@@ -120,7 +120,9 @@ export const validateSurfaceManifest = (manifest = SURFACE_MANIFEST, root = proc
         continue
       }
       const lawIds = new Set(whatIds(read(root, lawWhatPath)))
-      if (!lawIds.has(law)) fail(`${label}: law ${law} is absent from ${lawWhatPath}`)
+      const numMatch = /-(\d{3}[a-z]?)$/.exec(law)
+      const lawNum = numMatch ? numMatch[1] : null
+      if (!lawIds.has(law) && !(lawNum && lawIds.has(lawNum))) fail(`${label}: law ${law} is absent from ${lawWhatPath}`)
     }
 
     if (typeof entry.source !== 'string' || !existsSync(join(root, entry.source))) {

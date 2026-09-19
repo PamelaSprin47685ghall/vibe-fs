@@ -10,7 +10,7 @@ const scenario = fileURLToPath(
   new URL('../../participant-identity/tests/support/session-reuse-plugin-scenario.mjs', import.meta.url),
 )
 
-test('WHAT[MANAGED-SESSION-020] fresh identity waits for exact durable prior-run closure on the public plugin canary', () => {
+test('WHAT[managed-session-lifecycle-020] fresh identity waits for exact durable prior-run closure on the public plugin canary', () => {
   const child = spawnSync(process.execPath, [scenario], {
     cwd: process.cwd(),
     encoding: 'utf8',
@@ -110,7 +110,7 @@ const runTurnArbitrary = fc.record({
   token: arbitraryToken,
 })
 
-test('WHAT[MANAGED-SESSION-020] subagent session reuse property verifies prior-run closure across arbitrary agent sequences', () => {
+test('WHAT[managed-session-lifecycle-020] subagent session reuse property verifies prior-run closure across arbitrary agent sequences', () => {
   fc.assert(
     fc.property(
       fc.array(runTurnArbitrary, { minLength: 2, maxLength: 8 }),
@@ -157,7 +157,7 @@ test('WHAT[MANAGED-SESSION-020] subagent session reuse property verifies prior-r
     propertyOptions,
   )
 })
-test('WHAT[MANAGED-SESSION-020] subagent authority closure cleans claims, continuations, and sequences while retaining history', () => {
+test('WHAT[managed-session-lifecycle-020] subagent authority closure cleans claims, continuations, and sequences while retaining history', () => {
   fc.assert(
     fc.property(
       runTurnArbitrary,
@@ -194,7 +194,7 @@ test('WHAT[MANAGED-SESSION-020] subagent authority closure cleans claims, contin
     propertyOptions,
   )
 })
-test('WHAT[MANAGED-SESSION-020] Manager AgentOwnerRoot remains active for owner-directed post-life recovery', () => {
+test('WHAT[managed-session-lifecycle-020] Manager AgentOwnerRoot remains active for owner-directed post-life recovery', () => {
   const profile = createSubagentRoot('msg-manager-child-work', 'manager')
   const active = authority.registerAuthority(profile, authority.empty)
   assert.notEqual(active.ok, false)
@@ -208,7 +208,7 @@ test('WHAT[MANAGED-SESSION-020] Manager AgentOwnerRoot remains active for owner-
   assert.match(refused.error, /non-Manager AgentOwnerRoot/)
   assert.equal(active.activeLogicalRun.logicalRun, profile.logicalRun)
 })
-test('WHAT[MANAGED-SESSION-020] mutant: omitting child-work closure causes fast-check to detect ActiveRunIdentityConflict', () => {
+test('WHAT[managed-session-lifecycle-020] mutant: omitting child-work closure causes fast-check to detect ActiveRunIdentityConflict', () => {
   const property = fc.property(
     runTurnArbitrary,
     runTurnArbitrary,

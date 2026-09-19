@@ -42,7 +42,7 @@ const findCase = async (store, sessionId) => {
   return result.value
 }
 
-test('WHAT[KNOWLEDGE-REUSE-007] CASE007_captured_refreshed_round_trip_through_integrator_Current', async () => {
+test('WHAT[knowledge-reuse-007] CASE007_captured_refreshed_round_trip_through_integrator_Current', async () => {
   const local = createCasebookEventStore()
   try {
     await unwrap(casebook.archive(local.store, caseRec('s1', 'Q1', 'A1', [fileRead('a.txt', 'h1')])))
@@ -55,7 +55,7 @@ test('WHAT[KNOWLEDGE-REUSE-007] CASE007_captured_refreshed_round_trip_through_in
   }
 })
 
-test('WHAT[KNOWLEDGE-REUSE-007] CASE007_accessed_and_evicted_are_integrated_without_feature_history_scan', async () => {
+test('WHAT[knowledge-reuse-007] CASE007_accessed_and_evicted_are_integrated_without_feature_history_scan', async () => {
   const local = createCasebookEventStore()
   try {
     await unwrap(casebook.archive(local.store, caseRec('s1', 'Q', 'A', [])))
@@ -69,7 +69,7 @@ test('WHAT[KNOWLEDGE-REUSE-007] CASE007_accessed_and_evicted_are_integrated_with
   }
 })
 
-test('WHAT[KNOWLEDGE-REUSE-007] CASE007_store_has_no_loadEvents_project_or_history_reader', async () => {
+test('WHAT[knowledge-reuse-007] CASE007_store_has_no_loadEvents_project_or_history_reader', async () => {
   const { readFileSync } = await import('node:fs')
   const source = readFileSync(new URL('../../../src/Wanxiangshu/Repository/Knowledge/Casebook/Store.fs', import.meta.url), 'utf8')
   assert.doesNotMatch(source, /loadEvents|loadEnvelopes|project\s*\(|OpenSnapshot|readStreams/)

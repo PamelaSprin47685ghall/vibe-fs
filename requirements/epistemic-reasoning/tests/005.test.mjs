@@ -11,7 +11,7 @@ const { close, createStore, start, resume, state, assessWhy, relativeServerEntry
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '../../..')
 
-test('WHAT[EPI-005] semantic_assessment_and_candidates_are_control_observations_not_world_evidence', () => {
+test('WHAT[epistemic-reasoning-005] semantic_assessment_and_candidates_are_control_observations_not_world_evidence', () => {
   const store = createStore()
   const started = start(store, '为什么天空是蓝色？')
   assessWhy(store, started.handle)
@@ -38,7 +38,7 @@ test('WHAT[EPI-005] semantic_assessment_and_candidates_are_control_observations_
   assert.equal(current.evidence.length, 0)
   assert.equal(current.findings.length, 0)
 })
-test('WHAT[EPI-005] candidate_question_must_be_investigated_before_it_can_affect_answer', () => {
+test('WHAT[epistemic-reasoning-005] candidate_question_must_be_investigated_before_it_can_affect_answer', () => {
   const store = createStore()
   const started = start(store, '花儿为什么这样红？')
   assessWhy(store, started.handle)
@@ -69,7 +69,7 @@ const { default: test } = await import("node:test");
 const { createStore, start, resume, state, assessWhy } = await import("./support.mjs");
 
 
-test('WHAT[EPI-005] synthesis_is_information_propagation_not_information_acquisition', () => {
+test('WHAT[epistemic-reasoning-005] synthesis_is_information_propagation_not_information_acquisition', () => {
   const store = createStore()
   const started = start(store, '花儿为什么这样红？')
   assessWhy(store, started.handle)

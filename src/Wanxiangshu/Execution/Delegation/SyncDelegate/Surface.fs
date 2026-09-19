@@ -33,7 +33,7 @@ open Wanxiangshu.Persistence.Journal
 module SyncDelegateSurface =
     /// Test-side plug of the retry decorator: the harness records each verdict
     /// request so a landing test can prove a transient failure stayed child-local
-    /// (DELEG-023) before only the terminal verdict failed the call.
+    /// (delegation-023) before only the terminal verdict failed the call.
     type private RetryScript() =
         let queue = Queue<Result<unit, string>>()
         // DSL-MUTABLE: resource — test retry call counter
@@ -645,7 +645,7 @@ module SyncDelegateSurface =
         | Ok admission -> createWithAdmissions directory observationMode [ admission ]
         | Error error -> raise (InvalidOperationException error)
 
-    /// MANAGED-SESSION-001: drive SyncDelegateRuntime's production child
+    /// managed-session-lifecycle-001: drive SyncDelegateRuntime's production child
     /// observation into AttachedSessionRuntime against controlled Host callbacks.
     let managedChildReconciliationScenario (directory: string) (mode: string) : Task<obj> =
         task {
@@ -696,7 +696,7 @@ module SyncDelegateSurface =
             return result
         }
 
-    /// MANAGED-SESSION-001: two simultaneous callers for one exact key share
+    /// managed-session-lifecycle-001: two simultaneous callers for one exact key share
     /// the complete physical reconciliation transaction and its result.
     let concurrentAttachedGetOrCreateScenario () : Task<obj> =
         task {
@@ -798,7 +798,7 @@ module SyncDelegateSurface =
         (turn: ReconciledTurn)
         =
         task {
-            // DELEG-031: the terminal capture inside HandleTurn writes through
+            // delegation-031: the terminal capture inside HandleTurn writes through
             // the production journal. A released writer surfaces as
             // XTraceCaptureError.StorageAppendFailed carrying the typed
             // JournalAppendFailure — not a crash. WriterUnavailable/WriteUnknown
@@ -829,7 +829,7 @@ module SyncDelegateSurface =
         PromptAuthorityProjectionQueries.activeProfile child (AgentJournal.snapshot harness.Journal).AgentProjections
         |> Option.map (fun profile -> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
 
-    /// DELEG-031: the causal root this call actually accepted, read from the
+    /// delegation-031: the causal root this call actually accepted, read from the
     /// live call — not from the durable projection. PromptAuthority facts are
     /// journal appends: after the writer is released the projection freezes and
     /// can no longer answer, but the in-memory call still knows the exact root
@@ -1290,7 +1290,7 @@ module SyncDelegateSurface =
     let dispose (value: obj) : unit =
         unbox<Harness> value |> fun harness -> harness.Dispose()
 
-    /// DELEG-031 probe: close the journal writer exactly once, so every later
+    /// delegation-031 probe: close the journal writer exactly once, so every later
     /// append is a known NotAttempted (WriterClosing/WriterDisposed). The next
     /// invocation must still deliver its earned WorkRecord — the uncommitted
     /// checkpoint is pending-evidence, never a re-executed child.
@@ -1315,7 +1315,7 @@ module SyncDelegateSurface =
                commitment = commitment
                reason = reason |}
 
-    /// DELEG-031 probe: run the PRODUCTION checkpoint (the same
+    /// delegation-031 probe: run the PRODUCTION checkpoint (the same
     /// DelegationHandoffLedger.checkpointCompleted the runtime port calls) for
     /// one prepared handoff and return the exact settlement it reports. No
     /// second implementation: the port below is the ledger, not a re-model.
@@ -1340,7 +1340,7 @@ module SyncDelegateSurface =
                 return boxSettlement settled
         }
 
-    /// DELEG-031 probe: the parent supersede guard — abandon the pending call
+    /// delegation-031 probe: the parent supersede guard — abandon the pending call
     /// for this delegate so a stale completion afterwards cannot claim it.
     let abandonPendingCall (value: obj) (owner: string) (role: string) : bool =
         let harness = unbox<Harness> value

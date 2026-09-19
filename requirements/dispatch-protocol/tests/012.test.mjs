@@ -30,7 +30,7 @@ const capturingPort = () => ({
   SendPrompt: async () => dispatch.admittedWithReceipt('accepted-binding'),
 })
 
-test('WHAT[DISPATCH-PROTOCOL-012] recovered turn binding restores durable participant and role when process-local role is absent', async () => {
+test('WHAT[dispatch-protocol-012] recovered turn binding restores durable participant and role when process-local role is absent', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-binding-recovery-'))
   try {
     const opened = await journal.JournalSurface_bootWithWriterId(base, 'writer-binding', 'rt-binding', 4242, '2026-01-01T00:00:00Z')
@@ -172,7 +172,7 @@ const observation = (result) => {
   return result.observation
 }
 
-test('WHAT[DISPATCH-PROTOCOL-012] DP_012_physical_acceptance_hands_exact_claim_identity_to_managed_execution', async () => {
+test('WHAT[dispatch-protocol-012] DP_012_physical_acceptance_hands_exact_claim_identity_to_managed_execution', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-dispatch-handoff-'))
   try {
     const opened = await journal.JournalSurface_bootWithWriterId(

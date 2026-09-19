@@ -8,7 +8,7 @@ const terminalValidity = {
   describe: compression.terminalValidityDescription,
 }
 
-test('WHAT[CONTEXT-COMPRESSION-004] CTX_004_empty_terminal_is_not_a_result', () => {
+test('WHAT[context-compression-004] CTX_004_empty_terminal_is_not_a_result', () => {
   // Whitespace-only counts as empty: a model that emitted nothing but a newline
   // did not answer, and treating it as valid would commit an empty frame.
   for (const text of ['', ' ', '\n', '\t\n  ']) {
@@ -20,7 +20,7 @@ test('WHAT[CONTEXT-COMPRESSION-004] CTX_004_empty_terminal_is_not_a_result', () 
   }
 })
 
-test('WHAT[CONTEXT-COMPRESSION-004] CTX_004_xml_only_terminal_is_not_a_result', () => {
+test('WHAT[context-compression-004] CTX_004_xml_only_terminal_is_not_a_result', () => {
   // Tool-call markup where prose was required. Containment, not well-formedness:
   // a truncated tag still means the model was trying to call a tool.
   const markups = [
@@ -40,7 +40,7 @@ test('WHAT[CONTEXT-COMPRESSION-004] CTX_004_xml_only_terminal_is_not_a_result', 
   }
 })
 
-test('WHAT[CONTEXT-COMPRESSION-004] CTX_004_prose_is_a_result', () => {
+test('WHAT[context-compression-004] CTX_004_prose_is_a_result', () => {
   const texts = [
     'Fixed the race in next/Fallback.fs by moving the cursor advance behind the gate.',
     '修复了 fallback 的竞态。',
@@ -57,7 +57,7 @@ test('WHAT[CONTEXT-COMPRESSION-004] CTX_004_prose_is_a_result', () => {
   }
 })
 
-test('WHAT[CONTEXT-COMPRESSION-004] CTX_004_isValid_agrees_with_check', () => {
+test('WHAT[context-compression-004] CTX_004_isValid_agrees_with_check', () => {
   // One predicate, two shapes. If these ever disagree, a caller reading the bool
   // and a caller reading the reason would commit different facts for one text.
   const samples = ['', '   ', '<tool_call/>', 'real answer', 'a < b']
@@ -71,7 +71,7 @@ test('WHAT[CONTEXT-COMPRESSION-004] CTX_004_isValid_agrees_with_check', () => {
   }
 })
 
-test('WHAT[CONTEXT-COMPRESSION-004] CTX_004_rejection_reasons_are_distinguishable_for_diagnostics', () => {
+test('WHAT[context-compression-004] CTX_004_rejection_reasons_are_distinguishable_for_diagnostics', () => {
   // HOST-007 lets diagnostics report which shape was refused. The two reasons
   // must render differently, or an operator cannot tell "the model said nothing"
   // from "the model tried to call a tool".

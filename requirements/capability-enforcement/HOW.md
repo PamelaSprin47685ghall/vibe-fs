@@ -38,12 +38,12 @@ Roles.permissions (Kernel 层单一真相源)
    - JS `QuiescenceSurface` 只暴露 typed result view。重启恢复 durable facts 后仍由普通 attempt composition 重新 `ObserveIdle`，不编码或复活旧 permit。
 
 6. **复用既有离任与集成证明**：
-   - 离任准入与资源闭包继续由 `RETIRE-001` ~ `RETIRE-008` 的 IncumbencyId、WorkspaceSnapshotId 与 recursive live resources closure 合同建立。
-   - 确定性发布与集成门禁由 `CHGINT-001` ~ `CHGINT-006` 对有效 quality candidate 的 typed admission 发行；durable `PublicationCommitted` 是结果，不另造第二套审查权威。
+   - 离任准入与资源闭包继续由 `relay-retirement-001` ~ `relay-retirement-008` 的 IncumbencyId、WorkspaceSnapshotId 与 recursive live resources closure 合同建立。
+   - 确定性发布与集成门禁由 `change-integration-001` ~ `change-integration-006` 对有效 quality candidate 的 typed admission 发行；durable `PublicationCommitted` 是结果，不另造第二套审查权威。
 
 `ToolRegistry` 直接消费 Fetch、Bookkeeper、Engineer、DevOps、文件变换与生成式 JS 工具的 typed admission／spec，删除模块查找、缺失模块时的备用权限表和静默漏注册路径。注册层只装配既有 provider 合同；`tool-spec-contracts.test.mjs` 与 `internal-leaf-tool-authority.test.mjs` 继续验证公开角色权限和无 attached transaction 时的内部工具拒绝，不以 source token 或生成 JavaScript 布局证明权限正确。
 
 ## GAP
 
-- `ENF-013` / `ENF-014` / `ENF-017`（CLOSED）：权威值分类、单点发行与一次性能力不可复制消费证明已闭合，落点 `tests/013.test.mjs`、`tests/014.test.mjs` 与 `tests/017.test.mjs`。
+- `capability-enforcement-013` / `capability-enforcement-014` / `capability-enforcement-017`（CLOSED）：权威值分类、单点发行与一次性能力不可复制消费证明已闭合，落点 `tests/013.test.mjs`、`tests/014.test.mjs` 与 `tests/017.test.mjs`。
 

@@ -103,7 +103,7 @@ const admittedWithPhysical = (physicalMessageId) => ({
   SendPrompt: async () => dispatch.admittedWithPhysicalMessage(physicalMessageId),
 })
 
-test('WHAT[PAR-021] first_failure_keeps_the_original_target_for_the_lwr_retry', async () => {
+test('WHAT[provider-attempt-recovery-021] first_failure_keeps_the_original_target_for_the_lwr_retry', async () => {
   const { template, runtime, failedTarget } = await firstFailureKeptTarget()
 
   try {
@@ -125,7 +125,7 @@ test('WHAT[PAR-021] first_failure_keeps_the_original_target_for_the_lwr_retry', 
   }
 })
 
-test('WHAT[PAR-021] a_successful_lwr_retry_switches_nothing', async () => {
+test('WHAT[provider-attempt-recovery-021] a_successful_lwr_retry_switches_nothing', async () => {
   const { template, runtime, failedTarget } = await firstFailureKeptTarget()
 
   try {
@@ -142,7 +142,7 @@ test('WHAT[PAR-021] a_successful_lwr_retry_switches_nothing', async () => {
   }
 })
 
-test('WHAT[PAR-021] only_the_failed_lwr_retry_condemns_the_provider_and_rotates', async () => {
+test('WHAT[provider-attempt-recovery-021] only_the_failed_lwr_retry_condemns_the_provider_and_rotates', async () => {
   const { template, runtime, failedTarget } = await firstFailureKeptTarget()
 
   try {
@@ -168,7 +168,7 @@ test('WHAT[PAR-021] only_the_failed_lwr_retry_condemns_the_provider_and_rotates'
   }
 })
 
-test('WHAT[PAR-021] the_settlement_fact_is_the_durable_provider_retry_attempt_acceptance', async () => {
+test('WHAT[provider-attempt-recovery-021] the_settlement_fact_is_the_durable_provider_retry_attempt_acceptance', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-lwr-fact-'))
 
   const created = await journal.JournalSurface_bootWithWriterId(
@@ -232,7 +232,7 @@ test('WHAT[PAR-021] the_settlement_fact_is_the_durable_provider_retry_attempt_ac
   }
 })
 
-test('WHAT[PAR-021] the_lwr_retry_payload_replaces_the_covered_prefix_with_the_work_record', () => {
+test('WHAT[provider-attempt-recovery-021] the_lwr_retry_payload_replaces_the_covered_prefix_with_the_work_record', () => {
   const projection = {
     messages: [
       { role: 'user', parts: [{ kind: 'text', text: 'opening request' }] },
@@ -285,7 +285,7 @@ test('WHAT[PAR-021] the_lwr_retry_payload_replaces_the_covered_prefix_with_the_w
   assert.equal(beforeAnyFailure.changed, false, 'no confirmed failure means no LWR replacement')
 })
 
-test('WHAT[PAR-021] ordinary_recovery_and_the_delegate_decorator_share_one_settlement', () => {
+test('WHAT[provider-attempt-recovery-021] ordinary_recovery_and_the_delegate_decorator_share_one_settlement', () => {
   const source = readFileSync(
     join(ROOT, 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs'),
     'utf8',

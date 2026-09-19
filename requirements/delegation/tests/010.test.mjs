@@ -30,7 +30,7 @@ const toolModule = {
 const waitForPromptCount = (runtime, count) => forkTool.awaitPromptCount(runtime, count)
 const ownerDescriptor = (sessionId) => [{ sessionId, agent: 'manager' }]
 
-test('WHAT[PARTICIPANT-HORIZON-010] FORK_TOOL_manager_horizon_presents_bound_fixed_devops_initially', async () => {
+test('WHAT[participant-horizon-010] FORK_TOOL_manager_horizon_presents_bound_fixed_devops_initially', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-mgr-devops-horizon-'))
   const owner = 'manager-devops-horizon'
   const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
@@ -56,7 +56,7 @@ const sync = await import("../../../dist/Execution/Delegation/SyncDelegate/Surfa
 const OWNER = 'owner-ce'
 const descriptor = [{ sessionId: OWNER, agent: 'manager' }]
 
-test('WHAT[DELEG-010] SYNC_SERIALIZATION_reuses_dedicated_child_after_completion', async () => {
+test('WHAT[delegation-010] SYNC_SERIALIZATION_reuses_dedicated_child_after_completion', async () => {
   const h = await sync.create(await mkdtemp(join(tmpdir(), 'wxs-sync-ce-ref-')), descriptor)
   try {
     const first = sync.invoke(h, 'owner-ce', 'Engineer', 'first')
@@ -154,7 +154,7 @@ const verifyReusableHandoff = async (role) => {
   } finally { sync.dispose(h) }
 }
 
-test('WHAT[DELEG-010] SYNC_RUNTIME_same_role_reuses_one_child_after_completion', async () => {
+test('WHAT[delegation-010] SYNC_RUNTIME_same_role_reuses_one_child_after_completion', async () => {
   const h = await live('owner-sync')
   try {
     const first = sync.invoke(h, 'owner-sync', 'Engineer', 'first')
@@ -191,24 +191,24 @@ const { default: test } = await import("node:test");
 const sync = await import("../../../dist/Execution/Delegation/SyncDelegate/Surface.js");
 
 
-test('WHAT[DELEG-010] EXEC_026_tier_is_an_ignored_compat_param', () => {
+test('WHAT[delegation-010] EXEC_026_tier_is_an_ignored_compat_param', () => {
   for (const tier of ['Fast', 'Deep']) {
     const value = sync.vocabulary('Engineer', tier, 'owner-reuse-scope')
     assert.equal(value.agent, 'engineer')
     assert.equal(value.role, 'engineer')
   }
 })
-test('WHAT[DELEG-010] EXEC_026_agentNameFor_returns_bare_inspector_coder', () => {
+test('WHAT[delegation-010] EXEC_026_agentNameFor_returns_bare_inspector_coder', () => {
   assert.equal(sync.vocabulary('Engineer', 'Fast', 's').agent, 'engineer')
   assert.equal(sync.vocabulary('Engineer', 'Deep', 's').agent, 'engineer')
   assert.equal(sync.vocabulary('Coder', 'Fast', 's').agent, 'coder')
   assert.equal(sync.vocabulary('Coder', 'Deep', 's').agent, 'coder')
 })
-test('WHAT[DELEG-010] EXEC_026_ReuseScopeId_create_value_and_equals', () => {
+test('WHAT[delegation-010] EXEC_026_ReuseScopeId_create_value_and_equals', () => {
   assert.equal(sync.vocabulary('Engineer', 'Fast', 'owner-reuse-scope').scope, 'owner-reuse-scope')
   assert.equal(sync.vocabulary('Engineer', 'Fast', 'other-scope').scope, 'other-scope')
 })
-test('WHAT[DELEG-010] EXEC_026_DedicatedDelegateKey_binds_scope_and_role', () => {
+test('WHAT[delegation-010] EXEC_026_DedicatedDelegateKey_binds_scope_and_role', () => {
   assert.equal(sync.vocabulary('Engineer', 'Fast', 'scope-1').role, 'engineer')
   assert.equal(sync.vocabulary('Coder', 'Fast', 'scope-1').role, 'coder')
 })

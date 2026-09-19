@@ -105,7 +105,7 @@ const ADAPTER_RATCHET = new Map([
   ['delegation-recovery-runtime', 47],
 ])
 
-test('WHAT[DELEG-028] Delegation contract excludes workflow Host PTY and recovery sources', () => {
+test('WHAT[delegation-028] Delegation contract excludes workflow Host PTY and recovery sources', () => {
   const { sources } = inspectShard('delegation-contract')
 
   const forbidden = [
@@ -123,7 +123,7 @@ test('WHAT[DELEG-028] Delegation contract excludes workflow Host PTY and recover
   }
 })
 
-test('WHAT[DELEG-028] Delegation focused localities stay within compile budgets', () => {
+test('WHAT[delegation-028] Delegation focused localities stay within compile budgets', () => {
   // W5 cutover: the aggregate fsproj is gone. Count total .fs from the
   // compile-order manifest — the canonical declaration of what the build
   // actually compiles.
@@ -144,7 +144,7 @@ test('WHAT[DELEG-028] Delegation focused localities stay within compile budgets'
     )
     assert.ok(
       inspected.sources.length <= ratchet,
-      `${locality} grew beyond its recorded ratchet ${ratchet} — revise WHAT[DELEG-028] or shrink the closure`,
+      `${locality} grew beyond its recorded ratchet ${ratchet} — revise WHAT[delegation-028] or shrink the closure`,
     )
   }
 
@@ -236,7 +236,7 @@ test('WHAT[DELEG-028] Delegation focused localities stay within compile budgets'
   )
 })
 
-test('WHAT[DELEG-028] DELEG-029 boundary ignores locality kind labels entirely', () => {
+test('WHAT[delegation-028] delegation-029 boundary ignores locality kind labels entirely', () => {
   // Positive: erasing every kind label keeps the boundary intact — it is decided by
   // transitive source membership alone.
   const kindless = new Map(projects.map((project) => [project.projectPath, { ...project, legacyKind: '' }]))

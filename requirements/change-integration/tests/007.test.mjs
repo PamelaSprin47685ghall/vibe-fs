@@ -86,12 +86,12 @@ const foldProjection = (events) => {
 const worktreeRequested = { kind: 'WorktreeCreateRequested', payload: { jobId: JOB, worktreeIdentity: 'manager/job_1', worktreePath: '/tmp/wt1' } }
 const worktreeCreated = { kind: 'WorktreeCreated', payload: { jobId: JOB, worktreeIdentity: 'manager/job_1', worktreePath: '/tmp/wt1' } }
 
-test('WHAT[CHGINT-007] ORCH_007_the_three_publish_claim_branches_are_evaluated_in_the_clause_order', () => {
+test('WHAT[change-integration-007] ORCH_007_the_three_publish_claim_branches_are_evaluated_in_the_clause_order', () => {
   assert.equal(classifyClaim('r1').kind, 'AlreadyFastForwarded')
   assert.equal(classifyClaim('h1').kind, 'PublishReady')
   assert.equal(classifyClaim('h9').kind, 'ClaimExpired')
 })
-test('WHAT[CHGINT-007] ORCH_008_an_unreadable_target_head_fails_closed_for_every_head_dependent_case', () => {
+test('WHAT[change-integration-007] ORCH_008_an_unreadable_target_head_fails_closed_for_every_head_dependent_case', () => {
   assert.equal(classifyRebased(undefined).kind, 'HeadUnreadable')
   assert.equal(classifyClaim(undefined).kind, 'HeadUnreadable')
 })
@@ -171,7 +171,7 @@ const classifyRebased = (head, rebasedCommit = 'r1', snapshot = 'h1') =>
 const classifyClaim = (head, rebasedCommit = 'r1', expectedHead = 'h1') =>
   change.classifyPublishClaim(head ?? null, rebasedCommit, expectedHead)
 
-test('WHAT[CHGINT-007] THEOREM_publish_claimed_three_branch_order_is_fixed', () => {
+test('WHAT[change-integration-007] THEOREM_publish_claimed_three_branch_order_is_fixed', () => {
   const folded = foldEvents([
     createEvent(JOB_A, 'ses_orch_a'),
     candidateEvent(JOB_A),
@@ -183,7 +183,7 @@ test('WHAT[CHGINT-007] THEOREM_publish_claimed_three_branch_order_is_fixed', () 
   assert.equal(classifyClaim('h1').kind, 'PublishReady')
   assert.equal(classifyClaim('h9').kind, 'ClaimExpired')
 })
-test('WHAT[CHGINT-007] THEOREM_drop_ephemeral_preserves_publish_claimed_branch_algebra', () => {
+test('WHAT[change-integration-007] THEOREM_drop_ephemeral_preserves_publish_claimed_branch_algebra', () => {
   const durable = [createEvent(JOB_A, 'ses_orch_a'), candidateEvent(JOB_A), rebasedEvent(JOB_A), publishClaimedEvent(JOB_A)]
   const before = foldEvents(durable)
   assert.deepEqual(factsOf(before, JOB_A), ['CandidateReady', 'RebasedCandidateReady', 'PublishClaimed'])
@@ -206,13 +206,13 @@ const { default: test } = await import("node:test");
 
 const change = await import('../../../dist/Change/Surface.js')
 
-test('WHAT[CHGINT-007] classifyPublishClaim three-way reality ordering', () => {
+test('WHAT[change-integration-007] classifyPublishClaim three-way reality ordering', () => {
   assert.equal(change.classifyPublishClaim('r1', 'r1', 'h1').kind, 'AlreadyFastForwarded')
   assert.equal(change.classifyPublishClaim('h1', 'r1', 'h1').kind, 'PublishReady')
   assert.equal(change.classifyPublishClaim('h9', 'r1', 'h1').kind, 'ClaimExpired')
   assert.equal(change.classifyPublishClaim(null, 'r1', 'h1').kind, 'HeadUnreadable')
 })
-test('WHAT[CHGINT-007] published-but-unsettled reentry never replays FF', async () => {
+test('WHAT[change-integration-007] published-but-unsettled reentry never replays FF', async () => {
   const observation = await change.observeRelayProgram('reentry-published-unsettled')
 
   assert.equal(observation.ffCalls, 0)

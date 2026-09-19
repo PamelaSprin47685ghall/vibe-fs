@@ -22,7 +22,7 @@ const freshPermit = (gate, session = SESSION) => {
   return permit
 }
 
-test('WHAT[ENF-019] provider-attempt composition requires fresh current-process admission without codec or event recovery', () => {
+test('WHAT[capability-enforcement-019] provider-attempt composition requires fresh current-process admission without codec or event recovery', () => {
   const priorProcess = quiescence.create()
   const priorPermit = freshPermit(priorProcess)
   const currentProcess = quiescence.create()
@@ -37,7 +37,7 @@ test('WHAT[ENF-019] provider-attempt composition requires fresh current-process 
   assertResult(quiescence.tryConsume(currentProcess, currentPermit), accepted)
 })
 
-test('WHAT[ENF-019] live opaque permit resources stay bounded to the current session attempt', () => {
+test('WHAT[capability-enforcement-019] live opaque permit resources stay bounded to the current session attempt', () => {
   const gate = quiescence.create()
   assert.equal(quiescence.livePermitCount(gate), 0)
 

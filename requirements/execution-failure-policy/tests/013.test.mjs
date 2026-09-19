@@ -23,7 +23,7 @@ const baseInput = {
 }
 const decide = (change = {}) => policy.decide({ ...baseInput, ...change })
 
-test('WHAT[EXECFAIL-013] fatal branches preserve distinct lifecycle semantics and reject coalescing across commitments', () => {
+test('WHAT[execution-failure-policy-013] fatal branches preserve distinct lifecycle semantics and reject coalescing across commitments', () => {
   // 1. AcceptedBeforeProvider vs ProviderStarted distinct terminal resolutions
   const preProviderDecision = decide({
     phase: 'AcceptedBeforeProvider',

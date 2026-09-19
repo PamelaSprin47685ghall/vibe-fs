@@ -6,7 +6,7 @@ const { default: assert } = await import("node:assert/strict");
 const { decode, decodeSemanticAssessmentObservation, decodeCandidatesObservation, decodeInvestigationObservation, decodeSynthesisObservation } = await import("../../../dist/Sphinx/Surface.js");
 
 
-test('WHAT[EPI-004] decode and decodeSemanticAssessmentObservation produce same result for SemanticAssessment raw', () => {
+test('WHAT[epistemic-reasoning-004] decode and decodeSemanticAssessmentObservation produce same result for SemanticAssessment raw', () => {
   const raw = { type: 'SemanticAssessment', forms: { Polar: 0.9, Other: 0.1 } }
   const generic = decode(raw)
   const specific = decodeSemanticAssessmentObservation(raw)
@@ -15,7 +15,7 @@ test('WHAT[EPI-004] decode and decodeSemanticAssessmentObservation produce same 
   assert.equal(generic.observationType, 'SemanticAssessment')
   assert.equal(specific.observationType, 'SemanticAssessment')
 })
-test('WHAT[EPI-004] decode and decodeCandidatesObservation produce same result for Candidates raw', () => {
+test('WHAT[epistemic-reasoning-004] decode and decodeCandidatesObservation produce same result for Candidates raw', () => {
   const raw = {
     type: 'Candidates',
     items: [{ method: 'why', question: 'why X?', semanticKey: 'k1' }],
@@ -27,7 +27,7 @@ test('WHAT[EPI-004] decode and decodeCandidatesObservation produce same result f
   assert.equal(generic.observationType, 'Candidates')
   assert.equal(specific.observationType, 'Candidates')
 })
-test('WHAT[EPI-004] decode and decodeInvestigationObservation produce same result for Investigation raw', () => {
+test('WHAT[epistemic-reasoning-004] decode and decodeInvestigationObservation produce same result for Investigation raw', () => {
   const raw = { type: 'Investigation', actionKey: 'action-1' }
   const generic = decode(raw)
   const specific = decodeInvestigationObservation(raw)
@@ -36,7 +36,7 @@ test('WHAT[EPI-004] decode and decodeInvestigationObservation produce same resul
   assert.equal(generic.observationType, 'Investigation')
   assert.equal(specific.observationType, 'Investigation')
 })
-test('WHAT[EPI-004] decode and decodeSynthesisObservation produce same result for Synthesis raw', () => {
+test('WHAT[epistemic-reasoning-004] decode and decodeSynthesisObservation produce same result for Synthesis raw', () => {
   const raw = { type: 'Synthesis', text: 'summary' }
   const generic = decode(raw)
   const specific = decodeSynthesisObservation(raw)
@@ -45,7 +45,7 @@ test('WHAT[EPI-004] decode and decodeSynthesisObservation produce same result fo
   assert.equal(generic.observationType, 'Synthesis')
   assert.equal(specific.observationType, 'Synthesis')
 })
-test('WHAT[EPI-004] decode rejects unknown observation type', () => {
+test('WHAT[epistemic-reasoning-004] decode rejects unknown observation type', () => {
   const raw = { type: 'Unknown' }
   const result = decode(raw)
   assert.equal(result.ok, false)
@@ -64,7 +64,7 @@ const { close, createStore, start, resume, state, assessWhy, relativeServerEntry
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '../../..')
 
-test('WHAT[EPI-004] resume_rejects_observation_that_does_not_match_pending_kernel_request', () => {
+test('WHAT[epistemic-reasoning-004] resume_rejects_observation_that_does_not_match_pending_kernel_request', () => {
   const store = createStore()
   const started = start(store, '为什么程序卡住？')
   const before = state(store, started.handle).Revision
@@ -143,7 +143,7 @@ async function driveToAnswered(tools, handle) {
   return tools.synthesize.handler(synthesisArgs(handle))
 }
 
-test('WHAT[EPI-004] wrong_phase_returns_kernel_rejected_without_advancing', async () => {
+test('WHAT[epistemic-reasoning-004] wrong_phase_returns_kernel_rejected_without_advancing', async () => {
   const tools = mcpServer(createStore())._registeredTools
 
   const started = await tools.start.handler({ question: ROOT_QUESTION })
@@ -167,7 +167,7 @@ test('WHAT[EPI-004] wrong_phase_returns_kernel_rejected_without_advancing', asyn
   assert.equal(statusResult.structuredContent.revision, 0)
   assert.equal(statusResult.structuredContent.nextTool, 'assess')
 })
-test('WHAT[EPI-004] wrong_action_key_returns_kernel_rejected_revision_unchanged', async () => {
+test('WHAT[epistemic-reasoning-004] wrong_action_key_returns_kernel_rejected_revision_unchanged', async () => {
   const tools = mcpServer(createStore())._registeredTools
 
   const started = await tools.start.handler({ question: ROOT_QUESTION })
@@ -391,7 +391,7 @@ async function driveToAnswered(s) {
   return handle
 }
 
-test('WHAT[EPI-004] wrong_phase_over_wire_returns_kernel_rejected', { timeout: 30000 }, async () => {
+test('WHAT[epistemic-reasoning-004] wrong_phase_over_wire_returns_kernel_rejected', { timeout: 30000 }, async () => {
   const s = spawnSphinx()
   try {
     await s.initialize()
@@ -414,7 +414,7 @@ const { default: assert } = await import("node:assert/strict");
 const { createStore, start, resume, state, mcpServer } = await import("../../../dist/Sphinx/Surface.js");
 
 
-test('WHAT[EPI-004] wrong_phase_returns_typed_error_without_structured_content', async () => {
+test('WHAT[epistemic-reasoning-004] wrong_phase_returns_typed_error_without_structured_content', async () => {
   const server = mcpServer(createStore())
   const started = await server._registeredTools.start.handler({ question: '花青素合成是否解释红色？' })
   const handle = started.structuredContent.handle
@@ -434,7 +434,7 @@ test('WHAT[EPI-004] wrong_phase_returns_typed_error_without_structured_content',
   assert.equal(result._meta.error.handle, handle)
   assert.match(result.content[0].text, /KERNEL_REJECTED/)
 })
-test('WHAT[EPI-004] kernel_reject_does_not_advance_revision', () => {
+test('WHAT[epistemic-reasoning-004] kernel_reject_does_not_advance_revision', () => {
   const store = createStore()
   const started = start(store, '花青素合成是否解释红色？')
   const handle = started.handle
@@ -457,7 +457,7 @@ const { default: test } = await import("node:test");
 const { serverName, permissionKey, relativeServerEntry, isTool, localCommand, fixtureCommand } = await import("../../../dist/Sphinx/Surface.js");
 
 
-test('WHAT[EPI-004] AGENT_030_kernel_identity_and_commands', () => {
+test('WHAT[epistemic-reasoning-004] AGENT_030_kernel_identity_and_commands', () => {
   assert.equal(serverName, 'sphinx')
   assert.equal(permissionKey, 'sphinx_*')
   assert.equal(relativeServerEntry, 'dist/Sphinx/ServeEntry.js')

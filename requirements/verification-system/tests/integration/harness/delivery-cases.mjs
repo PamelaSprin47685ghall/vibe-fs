@@ -1,7 +1,7 @@
 /**
  * gate-delivery-cases.mjs — transport faults stay orthogonal to content.
  *
- * VERIFY-003. The property under test is not "faults work" but "declaring a fault
+ * verification-system-003. The property under test is not "faults work" but "declaring a fault
  * changes nothing about which content edge is selected". That is what makes content
  * a pure function of the request rather than a function of the request AND how many
  * times it has failed so far.
@@ -97,7 +97,7 @@ export const deliveryCases = [
   // ── the orthogonality claim ───────────────────────────────────────────────
 
   {
-    name: 'VERIFY-003 a retry re-selects the same content edge',
+    name: 'verification-system-003 a retry re-selects the same content edge',
     fn: () => {
       // The whole reason faults are declared separately. Under the old form the
       // failing attempt and the succeeding one were two edges with two ids, and the
@@ -116,7 +116,7 @@ export const deliveryCases = [
   },
 
   {
-    name: 'VERIFY-003 the declared attempts fault and the next one delivers',
+    name: 'verification-system-003 the declared attempts fault and the next one delivers',
     fn: () => {
       const deliveries = emptyDeliveries();
       const faults = [fault({ attempts: [1, 2] })];
@@ -131,7 +131,7 @@ export const deliveryCases = [
   },
 
   {
-    name: 'VERIFY-003 no declared fault means every delivery goes through',
+    name: 'verification-system-003 no declared fault means every delivery goes through',
     fn: () => {
       const deliveries = emptyDeliveries();
 
@@ -142,7 +142,7 @@ export const deliveryCases = [
   },
 
   {
-    name: 'VERIFY-003 a fault at a later attempt lets the earlier ones through',
+    name: 'verification-system-003 a fault at a later attempt lets the earlier ones through',
     fn: () => {
       // Not every fault is a leading one. A provider that works twice and then
       // fails is what a mid-conversation outage looks like.
@@ -161,7 +161,7 @@ export const deliveryCases = [
   // ── the counter counts physical deliveries ───────────────────────────────
 
   {
-    name: 'VERIFY-003 every arrival is counted, faulted ones included',
+    name: 'verification-system-003 every arrival is counted, faulted ones included',
     fn: () => {
       // Counting only the successes would make `attempts = [1, 2]` unreachable: the
       // second arrival would still be attempt 1 and would fault forever.
@@ -176,7 +176,7 @@ export const deliveryCases = [
   },
 
   {
-    name: 'VERIFY-003 the counter is per key, not global',
+    name: 'verification-system-003 the counter is per key, not global',
     fn: () => {
       // Two different declarations each start at attempt 1. A global counter would make the
       // second turn's first delivery look like a retry of the first turn.
@@ -190,7 +190,7 @@ export const deliveryCases = [
   },
 
   {
-    name: 'VERIFY-003 counting is the only state, and it is observable',
+    name: 'verification-system-003 counting is the only state, and it is observable',
     fn: () => {
       // `deliveriesOf` reads without recording. A diagnostic that had to record in
       // order to report would change the thing it was reporting.
@@ -207,7 +207,7 @@ export const deliveryCases = [
   // ── fault selection is keyed, not scored ────────────────────────────────
 
   {
-    name: 'VERIFY-003 a fault governs exactly the step it names',
+    name: 'verification-system-003 a fault governs exactly the step it names',
     fn: () => {
       const faults = [fault()];
 
@@ -219,7 +219,7 @@ export const deliveryCases = [
   },
 
   {
-    name: 'VERIFY-003 a fault cannot spread to a declaration that shares its prefix',
+    name: 'verification-system-003 a fault cannot spread to a declaration that shares its prefix',
     fn: () => {
       // Content uses longest-prefix so a scenario can declare a short distinctive fragment.
       // A fault must not spread that way — one declaration would silently cover every later
@@ -251,7 +251,7 @@ export const deliveryCases = [
   },
 
   {
-    name: 'VERIFY-003 two faults for one key is an error, not a precedence question',
+    name: 'verification-system-003 two faults for one key is an error, not a precedence question',
     fn: () => {
       // Same shape as `ambiguousTurn`: two declarations for one point mean the
       // scenario does not say what the transport does. Picking one would answer a
@@ -271,7 +271,7 @@ export const deliveryCases = [
   },
 
   {
-    name: 'VERIFY-003 a lane-less fault applies to any lane',
+    name: 'verification-system-003 a lane-less fault applies to any lane',
     fn: () => {
       const faults = [{ turn: TURN, step: 0, attempts: [1], kind: 'provider-error' }];
 
@@ -283,7 +283,7 @@ export const deliveryCases = [
   // ── load-time validation ─────────────────────────────────────────────────
 
   {
-    name: 'VERIFY-003 an empty attempts list is rejected at load time',
+    name: 'verification-system-003 an empty attempts list is rejected at load time',
     fn: () => {
       // A fault that never fires is a step the author believes is covered and is
       // not. Silently accepting it is how a scenario stops testing what it claims.
@@ -295,7 +295,7 @@ export const deliveryCases = [
   },
 
   {
-    name: 'VERIFY-003 attempt numbers are one-based and distinct',
+    name: 'verification-system-003 attempt numbers are one-based and distinct',
     fn: () => {
       assertTrue(validateFault(sourceFault({ attempts: [0, 1] })).some((p) => p.includes('one-based')), 'zero rejected');
       assertTrue(validateFault(sourceFault({ attempts: [-1] })).some((p) => p.includes('one-based')), 'negative rejected');
@@ -305,7 +305,7 @@ export const deliveryCases = [
   },
 
   {
-    name: 'VERIFY-003 only the declared fault kinds exist',
+    name: 'verification-system-003 only the declared fault kinds exist',
     fn: () => {
       // A typo'd kind must not become a silently inert declaration. Fault kinds are
       // transport facts, independent from the content selected for the request.
@@ -321,7 +321,7 @@ export const deliveryCases = [
   },
 
   {
-    name: 'VERIFY-003 a fault must name a turn and a step',
+    name: 'verification-system-003 a fault must name a turn and a step',
     fn: () => {
       // Without both it is not a point in a conversation, and it would apply to
       // whatever happened to match — the "spreads by accident" failure again.
@@ -333,7 +333,7 @@ export const deliveryCases = [
   },
 
   {
-    name: 'VERIFY-003 no fault kind can express a content change',
+    name: 'verification-system-003 no fault kind can express a content change',
     fn: () => {
       // The boundary this file exists to hold. A transport fault says the delivery
       // failed; it never says the model said something different. A kind like
@@ -351,7 +351,7 @@ export const deliveryCases = [
   // ── rendering a fault the Host will actually classify ─────────────────────
 
   {
-    name: 'PAR-019 a retryable fault renders a body the Host retries',
+    name: 'provider-attempt-recovery-019 a retryable fault renders a body the Host retries',
     fn: () => {
       // `../opencode/packages/opencode/src/session/message-v2.ts:706` hands the body to
       // `ProviderError.parseStreamError`, which (`provider/error.ts:102`) returns undefined
@@ -365,7 +365,7 @@ export const deliveryCases = [
   },
 
   {
-    name: 'PAR-019 a non-retryable fault renders a body the Host gives up on',
+    name: 'provider-attempt-recovery-019 a non-retryable fault renders a body the Host gives up on',
     fn: () => {
       // `invalid_prompt` yields `isRetryable: false`, so the Host stops and the plugin must
       // continue the Logical Run itself (`src/Wanxiangshu/Application/Reconciliation/TurnCompletionProgram.fs:92`).
@@ -378,7 +378,7 @@ export const deliveryCases = [
   },
 
   {
-    name: 'PAR-019 the retired isRetryable body field was never read',
+    name: 'provider-attempt-recovery-019 the retired isRetryable body field was never read',
     fn: () => {
       // Measured in K9. Every JSON fault wrote its intent as `body.error.isRetryable`:
       //

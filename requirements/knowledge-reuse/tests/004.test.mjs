@@ -27,7 +27,7 @@ const refreshed = (sessionId, q, a, observations) => ({
 const accessed = (sessionId) => ({ kind: 'case-accessed', sessionId })
 const evicted = (sessionId) => ({ kind: 'case-evicted', sessionId })
 
-test('WHAT[KNOWLEDGE-REUSE-004] CASE004_classifyReplay_fresh_only_on_exact_normalized_equality', () => {
+test('WHAT[knowledge-reuse-004] CASE004_classifyReplay_fresh_only_on_exact_normalized_equality', () => {
   const stored = [read('a.txt', 'h1'), glob('**/*.fs', ['x', 'y'])]
   // exact replay (order-insensitive glob) → Fresh
   assert.equal(
@@ -83,7 +83,7 @@ const findCase = async (store, sessionId) => {
   return result.value
 }
 
-test('WHAT[KNOWLEDGE-REUSE-004] CASE004_005_workflow_archive_fetch_closed_loop_reads_Current_only', async () => {
+test('WHAT[knowledge-reuse-004] CASE004_005_workflow_archive_fetch_closed_loop_reads_Current_only', async () => {
   const local = createCasebookEventStore()
   try {
     await unwrap(casebook.archive(local.store, caseRec('s1', 'Q1', 'A1', [fileRead('a.txt', 'h1')])))
@@ -93,7 +93,7 @@ test('WHAT[KNOWLEDGE-REUSE-004] CASE004_005_workflow_archive_fetch_closed_loop_r
     local.close()
   }
 })
-test('WHAT[KNOWLEDGE-REUSE-004] CASE004_refresh_and_needsRefresh_replay_the_same_Current', async () => {
+test('WHAT[knowledge-reuse-004] CASE004_refresh_and_needsRefresh_replay_the_same_Current', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-cbrefresh-'))
   const local = createCasebookEventStore()
   try {
@@ -147,7 +147,7 @@ const openStore = () => {
   }
 }
 
-test('WHAT[KNOWLEDGE-REUSE-004] CASE004_classifyReplay_fresh_only_on_exact_normalized_equality', () => {
+test('WHAT[knowledge-reuse-004] CASE004_classifyReplay_fresh_only_on_exact_normalized_equality', () => {
   const stored = [read('a.txt', 'h1'), glob('**/*.fs', ['x', 'y'])]
   // exact replay (order-insensitive glob) → fresh
   assert.equal(casebook.classifyReplay(stored, [glob('**/*.fs', ['y', 'x']), read('a.txt', 'h1')]), 'fresh')
@@ -189,7 +189,7 @@ const assertNoCase = (text) => assert.match(text, /The Casebook contains no entr
 const assertUnavailable = (text) => assert.match(text, /could not be read from this execution context|无法从当前执行环境读取|当前执行上下文无法读取/i)
 const assertNoMachineFreshness = (text) => assert.doesNotMatch(text, /\b(session_id|status|freshness|refresh)\s*=/)
 
-test('WHAT[KNOWLEDGE-REUSE-004] CASE004_fetch_uses_shelfmark_and_replays_before_refreshing', async () => {
+test('WHAT[knowledge-reuse-004] CASE004_fetch_uses_shelfmark_and_replays_before_refreshing', async () => {
   const { dir, handle, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
@@ -224,7 +224,7 @@ test('WHAT[KNOWLEDGE-REUSE-004] CASE004_fetch_uses_shelfmark_and_replays_before_
     cleanup()
   }
 })
-test('WHAT[KNOWLEDGE-REUSE-004] CASE009_fetch_never_writes_the_subject', async () => {
+test('WHAT[knowledge-reuse-004] CASE009_fetch_never_writes_the_subject', async () => {
   const { dir, handle, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
@@ -246,7 +246,7 @@ const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
 const casebook = await import("../../../dist/Repository/Knowledge/Casebook/Surface.js");
 
-test('WHAT[KNOWLEDGE-REUSE-004] T20_completion_boundary_freezes_baseline_B_and_tracks_diff_B_to_C', async () => {
+test('WHAT[knowledge-reuse-004] T20_completion_boundary_freezes_baseline_B_and_tracks_diff_B_to_C', async () => {
   // Read A -> change to B -> end trajectory -> external changes to C
   // Initial completionFileState = B; maintenanceFileState = B; diff = B -> C
   assert.equal(typeof casebook.freezeCompletionState, 'function', 'casebook must export freezeCompletionState')
@@ -267,7 +267,7 @@ test('WHAT[KNOWLEDGE-REUSE-004] T20_completion_boundary_freezes_baseline_B_and_t
   }
 })
 
-test('WHAT[KNOWLEDGE-REUSE-004] T27_devops_self_repair_updates_related_case_maintenance_baseline_without_fake_engineer_source', async () => {
+test('WHAT[knowledge-reuse-004] T27_devops_self_repair_updates_related_case_maintenance_baseline_without_fake_engineer_source', async () => {
   // DevOps repair updates related cases from B -> C, but does NOT become an Engineer case source.
   assert.equal(typeof casebook.applyExternalChangeToCase, 'function', 'casebook must apply external change B->C to existing case')
   const updated = casebook.applyExternalChangeToCase({
@@ -292,7 +292,7 @@ const { join } = await import("node:path");
 const eventStore = await import("../../../dist/Persistence/EventStore/Surface.js");
 const casebook = await import("../../../dist/Repository/Knowledge/Casebook/Surface.js");
 
-test('WHAT[KNOWLEDGE-REUSE-004] dual_baselines_freeze_pipeline_and_refresh_maintenance_evolution', async () => {
+test('WHAT[knowledge-reuse-004] dual_baselines_freeze_pipeline_and_refresh_maintenance_evolution', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-kr-dual-baseline-'))
   const store = eventStore.create(dir, 'kr-dual-baseline-writer')
   try {
