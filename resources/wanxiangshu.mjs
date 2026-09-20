@@ -139,7 +139,9 @@ export const hasTheoreticalCapacity = (role) => {
 
 export default function route(role, running, previous) {
   if (role === 'devops' && previous) {
-    return previous
+    if (isAvailable(running, previous.model)) {
+      return previous
+    }
   }
   const candidates = pools.get(role)
   if (!candidates) return null

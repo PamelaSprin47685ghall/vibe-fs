@@ -86,3 +86,59 @@ test('WHAT[execution-model-routing-019] fixed DevOps model binding is immutable 
     'Committing with a conflicting target must fail closed',
   )
 })
+
+test('WHAT[execution-model-routing-019] DevOps model automatically rotates when bound model quota is exhausted', async () => {
+  const { default: route, markProviderFailed, clearFailedProviders } = await import(`${templateUrl.href}?test=${Date.now()}`)
+  clearFailedProviders()
+  const runtime = routing.createRuntime(route)
+  const sessionId = 'ses_devops_quota_test'
+
+  // 1. First execution acquires target from pool
+  const acq1 = await routing.acquireExecutionAdmission(
+    runtime,
+    sessionId,
+    'msg_q1',
+    'devops',
+    'devops',
+    null,
+  )
+  assert.equal(acq1.kind, 'Acquired')
+  const target1 = routing.executionAdmissionTarget(runtime, acq1.lease)
+  routing.commitExecutionAdmission(runtime, acq1.lease, {
+    sessionId,
+    physicalUserMessageId: 'msg_q1',
+    role: 'devops',
+    participant: 'devops',
+    target: target1,
+  })
+  routing.releasePhysicalExecution(runtime, sessionId, 'msg_q1')
+
+  // 2. Mark target1's provider as failed (simulating quota exhausted)
+  const provider1 = target1.model.slice(0, target1.model.indexOf('/'))
+  markProviderFailed(provider1)
+
+  // 3. Next execution should automatically acquire the next candidate from the pool rather than throwing
+  const acq2 = await routing.acquireExecutionAdmission(
+    runtime,
+    sessionId,
+    'msg_q2',
+    'devops',
+    'devops',
+    null,
+  )
+  assert.equal(acq2.kind, 'Acquired')
+  const target2 = routing.executionAdmissionTarget(runtime, acq2.lease)
+  assert.notEqual(target2.model, target1.model, 'DevOps must rotate away from exhausted provider')
+
+  // Committing target2 must succeed and update the bound target
+  const commit2 = routing.commitExecutionAdmission(runtime, acq2.lease, {
+    sessionId,
+    physicalUserMessageId: 'msg_q2',
+    role: 'devops',
+    participant: 'devops',
+    target: target2,
+  })
+  assert.ok(['Applied', 'AlreadyApplied'].includes(commit2.kind))
+  assert.deepEqual(routing.boundDevopsTarget(runtime, sessionId), target2, 'Bound target must update to target2')
+  clearFailedProviders()
+})

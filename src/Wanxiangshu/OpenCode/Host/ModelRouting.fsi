@@ -127,6 +127,7 @@ module ModelRouting =
         lenderSessionId: string option ->
             ModelRoutingTarget option
 
+    val internal boundDevopsModel: sessionId: SessionId -> OpencodeModel option
     val internal releaseExecution: sessionId: SessionId -> CapacityTransitionOutcome
 
     val internal releasePhysicalExecution:

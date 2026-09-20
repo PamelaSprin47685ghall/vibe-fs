@@ -397,6 +397,11 @@ module ModelRouting =
                 poison ex
                 raise ex
 
+        let exactTargetAvailable (role: Role) target running =
+            match scheduleOrPoison running role (Some target) with
+            | Some candidate -> candidate = target
+            | None -> false
+
         let routeFreshOrPoison
             sessionId
             oldPhysicalUserMessageId
@@ -437,7 +442,7 @@ module ModelRouting =
 
         let enforceImmutableDevopsBinding (sessionId: string) (role: Role) (target: ModelRoutingTarget) =
             match role = Role.DevOps, boundDevopsTargetBySession.TryGetValue sessionId with
-            | true, (true, bound) when bound <> target ->
+            | true, (true, bound) when bound <> target && exactTargetAvailable role bound (running ()) ->
                 invalidOp (
                     sprintf
                         "execution-model-routing: DevOps model binding is immutable (%s/%s vs %s/%s)"
@@ -446,7 +451,7 @@ module ModelRouting =
                         target.Model
                         target.Reasoning
                 )
-            | true, (false, _) -> boundDevopsTargetBySession.[sessionId] <- target
+            | true, _ -> boundDevopsTargetBySession.[sessionId] <- target
             | _ -> ()
 
         let tryGetBoundDevopsTarget (sessionId: string) (role: Role) =
@@ -908,11 +913,6 @@ module ModelRouting =
             | false, (false, _) ->
                 acquireFreshLeaseAndEnforce sessionId physicalUserMessageId role participant lenderSessionId
 
-        let exactTargetAvailable (role: Role) target running =
-            match scheduleOrPoison running role (Some target) with
-            | Some candidate -> candidate = target
-            | None -> false
-
         let enterProviderStepLocked sessionId physicalUserMessageId fence =
             ensureHealthy ()
 
@@ -1110,7 +1110,7 @@ module ModelRouting =
         member _.BindDevopsTarget(sessionId: string, target: ModelRoutingTarget) =
             lock gate (fun () ->
                 match boundDevopsTargetBySession.TryGetValue sessionId with
-                | true, bound when bound <> target ->
+                | true, bound when bound <> target && exactTargetAvailable Role.DevOps bound (running ()) ->
                     invalidOp (
                         sprintf
                             "execution-model-routing: DevOps model binding is immutable (%s/%s vs %s/%s)"
@@ -1332,6 +1332,13 @@ module ModelRouting =
                 participant,
                 lenderSessionId
             )
+        | None -> None
+
+    let internal boundDevopsModel (sessionId: SessionId) : OpencodeModel option =
+        match lock sharedGate (fun () -> sharedRuntime) with
+        | Some runtime ->
+            runtime.BoundDevopsTarget(SessionId.value sessionId)
+            |> Option.map toOpenCodeModel
         | None -> None
 
     let internal releaseExecution (sessionId: SessionId) =

@@ -90,8 +90,10 @@ module SessionExecutionBinding =
         | None -> Roles.tryParseRole (participant.Trim())
 
     let private verifyDevOpsModelLocked (sessionKey: string) (model: OpencodeModel) : unit =
-        match persistentDevOpsModels.TryGetValue sessionKey with
-        | true, expected when not (sameModel expected model) ->
+        match ModelRouting.boundDevopsModel (SessionId.create sessionKey), persistentDevOpsModels.TryGetValue sessionKey with
+        | Some routingTarget, _ when sameModel routingTarget model ->
+            persistentDevOpsModels.[sessionKey] <- model
+        | _, (true, expected) when not (sameModel expected model) ->
             invalidOp (
                 sprintf
                     "CRASH-020: DevOps model drift prohibited during resume/recovery (%s -> %s)"
