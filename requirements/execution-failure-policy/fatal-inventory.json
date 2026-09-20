@@ -830,7 +830,7 @@
       "assertedInvariant": "A true semantic cut must stop the process through exactly one owned fuse — not through an optionally-wired global,",
       "commitDisposition": "Cut-settled signal is the Rejected/SemanticRejected return itself (DURABLE-EVENTS-025: persistence cut stores hold no optional fatal hook; the sole fatal owner is composition). No in-adapter fuse by design.",
       "scopeOfEffect": "No process exit at this site; the cut is owner-observable evidence consumed composition-side (F17 fuse when the promotion is truly untrustworthy).",
-      "evidenceType": "PersistenceCuts (landed in worktree, not-yet-run pending Main integrated build): requirements/speculative-investigation/tests/006.test.mjs WHAT[SPEC-INV-006] (4 tests incl. prepared_cut_has_no_optional_fatal_handler_path) + DURABLE-EVENTS-025 clause (requirements/durable-events/WHAT.md + HOW.md proof row). Strength shard focused-compile GREEN.",
+      "evidenceType": "PersistenceCuts (landed in worktree, not-yet-run pending Main integrated build): requirements/speculative-investigation/tests/006.test.mjs WHAT[SPEC-INV-006] (4 tests incl. prepared_cut_has_no_optional_fatal_handler_path) + DURABLE-EVENTS-025 clause (requirements/durable-events/WHAT.md). Strength shard focused-compile GREEN.",
       "formalTestId": "requirements/speculative-investigation/tests/006.test.mjs::WHAT[SPEC-INV-006] prepared_cut_has_no_optional_fatal_handler_path",
       "status": "FixedWithRegression"
     },

@@ -90,9 +90,10 @@ module SessionExecutionBinding =
         | None -> Roles.tryParseRole (participant.Trim())
 
     let private verifyDevOpsModelLocked (sessionKey: string) (model: OpencodeModel) : unit =
-        match ModelRouting.boundDevopsModel (SessionId.create sessionKey), persistentDevOpsModels.TryGetValue sessionKey with
-        | Some routingTarget, _ when sameModel routingTarget model ->
-            persistentDevOpsModels.[sessionKey] <- model
+        match
+            ModelRouting.boundDevopsModel (SessionId.create sessionKey), persistentDevOpsModels.TryGetValue sessionKey
+        with
+        | Some routingTarget, _ when sameModel routingTarget model -> persistentDevOpsModels.[sessionKey] <- model
         | _, (true, expected) when not (sameModel expected model) ->
             invalidOp (
                 sprintf

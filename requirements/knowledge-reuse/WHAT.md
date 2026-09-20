@@ -91,3 +91,10 @@ Casebook semantic conflict必须先写入对应durable failure/cut-tail并取得
 ## [015] 基于真实 Diff 的单次维护与非 Replay 语义
 
 系统不采用基于 `FileRead/GlobResult/GrepResult` 集合相等性判定的严格 replay 机制，不执行刷新前后的 `replay-before / replay-after` 稳定性循环。案例的新鲜度维护完全基于真实文件 diff 进行单次迁移。
+
+## [016] 完整文件状态基线与存在性不变量
+
+逻辑工程工作结束边界所冻结的完整文件状态基线精确记录关联路径的物理事实，并严格保证不可变性与存在性分类：
+1. **Present 状态与内容寻址不可变性**：存在的文件在基线中记录为 `Present`，绑定其内容的 SHA-256 哈希指纹（`sha256` / `contentHash`）及持久化存储引用（`payloadRef`）。文件内容未变更时其指纹与存储引用保持绝对一致；底层存储按哈希去重复用既有 payload，严禁原地覆写已有 blob。若发生哈希碰撞（相同 digest 对应不同字节），系统直接抛错中断并 fail-closed；
+2. **Missing 状态明确表示文件不存在**：冻结时物理路径不存在的文件在基线中显式记录为 `Missing`。后续维护计算 diff 时，`Missing → 存在` 确定性识别为新增文件（new file），`Present → 不存在` 确定性识别为删除文件（deleted file）。`Missing` 属于合法的文件存在性观察事实，严禁将其与执行失败或异常中断混淆；
+3. **I/O 故障与读取异常严禁伪装为 Missing 或 Present**：在文件打开、分类读取或哈希写入期间若发生文件系统 I/O 故障（如路径为目录、权限拒绝、数据读取损坏等），冻结流水线必须立即中断并返回失败，外层归档流程结算为未提交（notCommitted）。严禁将 I/O 失败静默降级为 `Missing`，亦严禁伪造为 `Present`，确保基线数据绝无虚假事实。

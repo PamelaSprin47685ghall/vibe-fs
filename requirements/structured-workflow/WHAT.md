@@ -1,6 +1,6 @@
 # structured-workflow — WHAT
 
-本文件是 `structured-workflow` 的**唯一 normative 合同**。WHY 与 HOW 非 normative。
+本文件是 `structured-workflow` 的**唯一 normative 合同**。WHY 非 normative。
 
 ---
 
@@ -91,4 +91,12 @@ release authorization 模型严格以当前 subsystem 架构事实为准。已�
 ## [017] 插件转换管道的唯一宿主边界契约证明
 
 插件转换管道（PluginTransforms）与业务装饰器直接由宿主契约与生命周期拓扑保证其调用顺序与单一职责；严禁自建静态源码扫描作为第二套真相，其实际行为必须且仅能由宿主边界契约测试（host-boundary ordered-transform 等）提供行为证明。
+
+## [018] 关键业务流程因果 Trace 守恒与证明义务注册
+
+关键业务流程（Manager 观察与推进、Fallback 故障授权、Provider 恢复重入、Orchestrator 变基发布等）的因果 Trace 必须严格满足守恒律：
+1. 每次业务流程执行的因果 Trace 必须来自明确的一次准入（admission），并收敛至确定的一次结算（settlement）或有界的无效果终态，严禁对同一流程重复结算；
+2. 无法结算的 Trace 不得静默丢弃，必须保留未决或失败证据；
+3. 违反这些约束时（如发生重复结算、缺少结算或丢弃未结算 Trace），即使外部返回值或局部操作看似正常，其整体准入/结算状态也必须判定为失败；
+4. 关键业务词汇必须在注册表中完整绑定其所属 Subsystem、主导 WHAT law、允许的 Trace relation 与可执行行为证明（executable proof），确保因果 Trace 拓扑不变量在静态与运行时均受到闭环保护。
 

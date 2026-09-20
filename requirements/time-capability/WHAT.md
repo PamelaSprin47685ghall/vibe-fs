@@ -1,6 +1,6 @@
 # time-capability — WHAT
 
-本文件是 `time-capability` 的**唯一 normative 合同**。WHY 与 HOW 非 normative。
+本文件是 `time-capability` 的**唯一 normative 合同**。WHY 非 normative。
 
 ---
 

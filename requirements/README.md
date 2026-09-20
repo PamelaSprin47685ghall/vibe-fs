@@ -12,9 +12,8 @@ orchestrator、Long Stroke e2e）归 `verification-system/tests/`。每个包目
 ```text
 WHY.md      不可替代的存在理由（保姆级）
 WHAT.md     唯一 normative 合同（编号命题，对应同编号测试）
-HOW.md      可选说明：实现模型与约束（非 normative；含「历史与弃权」）
 tests/      本包拥有的可执行 proof（NNN.test.mjs）
-APPLIES-TO  可选的包外正向代码覆盖声明；仓库根相对、gitignore wildmatch 语法，普通行=纳入，!行=��除例外
+APPLIES-TO  可选的包外正向代码覆盖声明；仓库根相对、gitignore wildmatch 语法，普通行=纳入，!行=排除例外
 ```
 
 `requirements/<package>/` 下的全部内容天然属于该 package 的覆盖范围，包括文档、tests 与
@@ -140,7 +139,7 @@ grounding 由 `requirement-grounding` package 拥有。
 
 ## 依赖骨架
 
-权威依赖清单见各包 HOW.md 的 DEPENDS ON 节，与 `requirements/INDEX.md` 的 157-edge 骨架一致。
+权威依赖清单见各包 WHY.md 的 DEPENDS ON 节，与 `requirements/INDEX.md` 的 157-edge 骨架一致。
 
 ## 运行与验证
 
@@ -150,5 +149,5 @@ node --test requirements/<pkg>/tests/NNN.test.mjs            # 单包单文件
 node scripts/check.mjs                                       # 全 static gates
 ```
 
-- 每个条款恰一个顶级 `tests/NNN.test.mjs`，与用例标题中的 `WHAT[<包目录名小写>-NNN]` 强力绑定；integration/release 档用例经文件内 tier-gate 门控（环境变量 WXS_TIER_INTEGRATION / WXS_TIER_RELEASE），分别由集成调度器与 --release 执行；HOW.md 不再维护独立的测试落点表，映射关系完全由测试用例标题锚权威定义。
+- 每个条款恰一个顶级 `tests/NNN.test.mjs`，与用例标题中的 `WHAT[<包目录名小写>-NNN]` 强力绑定；integration/release 档用例经文件内 tier-gate 门控（环境变量 WXS_TIER_INTEGRATION / WXS_TIER_RELEASE），分别由集成调度器与 --release 执行；测试落点由测试用例标题锚 WHAT[包-NNN] 定义。
 - 迁移状态：旧 `docs/`、`changes/` 已于 2026-08-14 cutover 归档删除（git 可回溯）；`tests/` 已全部分包并统一编号。

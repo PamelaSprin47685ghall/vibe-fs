@@ -1,6 +1,6 @@
 # verification-system — WHAT
 
-本文件是 `verification-system` 的**唯一 normative 合同**。WHY 与 HOW 非 normative。
+本文件是 `verification-system` 的**唯一 normative 合同**。WHY 非 normative。
 
 ---
 

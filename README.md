@@ -141,7 +141,7 @@ Bookkeeper 是内部叶子角色（有独立 Role Law，不进 public Role DU）
 ```text
 src/           生产源码
 resources/     随包运行时资源
-requirements/  55 包 normative 语义树：每包必备 WHY.md、WHAT.md 与 tests/，HOW.md 记录实现决策说明
+requirements/  55 包 normative 语义树：每包必备 WHY.md、WHAT.md 与 tests/
 proposals/     deferred 未来材料（用户管理）
 scripts/       构建与少量仓库检查
 docs/          项目文档与在线阅览（docs/index.html）
@@ -195,7 +195,7 @@ npm run format-build-test
 
 规范是万象术的语义根：每条行为命题有稳定 ID、测试落点和 owner 包。规范不跟踪实现进度，只定义正确性。
 
-- **规范**：`requirements/<package>/`（55 包 normative 树；必备 WHY.md、WHAT.md 与 tests/，HOW.md 记录实现决策说明；WHAT 命题 ID 稳定寻址，条款与测试文件一一映射，覆盖缺口见 [requirements/GAP.md](requirements/GAP.md)）。
+- **规范**：`requirements/<package>/`（55 包 normative 树；必备 WHY.md、WHAT.md 与 tests/；WHAT 命题 ID 稳定寻址，条款与测试文件一一映射，覆盖缺口见 [requirements/GAP.md](requirements/GAP.md)）。
 - **历史 Clause 与变更记录**：2026-08-14 cutover 已归档（含 Kolmogorov 工程纪律与 completed change 考古；git 历史可回溯）。
 - 测试全部包自有（`requirements/<package>/tests/`），直接引用 WHAT 命题 ID。规范不跟踪实现进度。
 

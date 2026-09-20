@@ -1,6 +1,6 @@
 # feature-ablation — WHAT
 
-本文件是 `feature-ablation` 的**唯一 normative 合同**。WHY 与 HOW 非 normative。
+本文件是 `feature-ablation` 的**唯一 normative 合同**。WHY 非 normative。
 
 ---
 
@@ -13,7 +13,7 @@
 每个节点处于 `ablated | borrowed | active` 之一：
 
 - **ablated**：该切面不参与 owner 路径；不得改变 provider 可见工具、Host hook 行为或等价副作用。
-- **borrowed**：仅 HOW 与 manifest 明示的借用面可运行；不得触发完整包级下游语义。
+- **borrowed**：仅 resources/ablation/nodes.json 与 manifest 明示的借用面可运行；不得触发完整包级下游语义。
 - **active**：包级机制按各自 WHAT 正常运行。
 
 未配置时 production 默认全部为 `active`。
@@ -28,7 +28,7 @@
 
 ## [005] 零影响
 
-节点为 `ablated` 时：对应工具不得出现在 provider schema 允许集；execute gate 必须拒绝并返回 `tool/registry/denied-ablation`；Strength 等 Host hook 必须等价于 Off/无操作。Borrowed 面仅允许 manifest 与 HOW 映射表列出的行为；其余与 ablated 相同。
+节点为 `ablated` 时：对应工具不得出现在 provider schema 允许集；execute gate 必须拒绝并返回 `tool/registry/denied-ablation`；Strength 等 Host hook 必须等价于 Off/无操作。Borrowed 面仅允许 resources/ablation/nodes.json 与 manifest 映射表列出的行为；其余与 ablated 相同。
 
 ## [006] Fail-closed 加载
 

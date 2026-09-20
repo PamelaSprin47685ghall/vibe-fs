@@ -39,7 +39,7 @@ test('WHAT[feature-ablation-002] ABL_002_tri_state_semantics_distinction', () =>
     assert.equal(Ablation.allowsToolSchema('read'), true, 'active node tool schema must be allowed')
   })
 
-  // 3. borrowed 状态：仅 HOW 与 manifest 明示的借用面可运行；不得触发完整包级下游语义
+  // 3. borrowed 状态：仅 resources/ablation/nodes.json 与 manifest 明示的借用面可运行；不得触发完整包级下游语义
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-14']], () => {
     Ablation.load()
     // station-14 中 delegation 处于 borrowed/ablated 切面：允许读，但不允许完整 async fork/fission 语义
