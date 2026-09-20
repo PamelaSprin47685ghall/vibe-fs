@@ -89,19 +89,140 @@ export function check(context) {
     issues.push({ code: 'profile-production', message: 'profiles.json missing production profile' })
   }
 
-  // Verify revoked package nodes lifecycle status
+  // Verify revoked package nodes are completely removed
   const REVOKED_PACKAGES = ['external-investigation', 'output-distillation']
   for (const revoked of REVOKED_PACKAGES) {
     const node = nodes.nodes.find((n) => n.id === revoked)
-    if (node && node.status !== 'revoked') {
+    if (node) {
       issues.push({
-        code: 'node-revoked-status-missing',
-        message: `revoked package node ${revoked} must be marked status: "revoked" in nodes.json`,
+        code: 'node-revoked-not-deleted',
+        message: `revoked package node ${revoked} must be removed from nodes.json`,
       })
     }
   }
 
+  // Verify no node contains revoked status or attribute
+  for (const node of nodes.nodes) {
+    if (node.status === 'revoked' || node.revoked !== undefined) {
+      issues.push({
+        code: 'node-revoked-stale',
+        message: `node ${node.id} has revoked status or attribute; revoked nodes must be deleted`,
+      })
+    }
+  }
+
+  // Verify borrowed_surface exists and is string[] on every node
+  for (const node of nodes.nodes) {
+    if (!Array.isArray(node.borrowed_surface)) {
+      issues.push({
+        code: 'node-borrowed-surface-missing',
+        message: `node ${node.id} missing borrowed_surface array`,
+      })
+    } else {
+      for (const item of node.borrowed_surface) {
+        if (typeof item !== 'string') {
+          issues.push({
+            code: 'node-borrowed-surface-invalid',
+            message: `node ${node.id} borrowed_surface contains non-string item: ${item}`,
+          })
+        }
+      }
+    }
+  }
+
+  // Verify parent edges are completely removed
+  const parentEdges = (nodes.edges || []).filter((e) => e.kind === 'parent')
+  if (parentEdges.length > 0) {
+    issues.push({
+      code: 'edge-parent-stale',
+      message: `found ${parentEdges.length} parent edges; parent must be node attribute`,
+    })
+  }
+
+  // Verify edge kinds: only station-order and borrow allowed
+  for (const edge of nodes.edges || []) {
+    const kind = edge.kind ?? 'station-order'
+    if (kind !== 'station-order' && kind !== 'borrow') {
+      issues.push({
+        code: 'edge-kind-invalid',
+        message: `edge ${edge.from} -> ${edge.to} has invalid kind '${edge.kind}'; only station-order and borrow allowed`,
+      })
+    }
+  }
+
+  // Verify slice nodes declare valid parent
+  const nodeMap = new Map(nodes.nodes.map((n) => [n.id, n]))
+  for (const node of nodes.nodes.filter((n) => n.kind === 'slice')) {
+    if (!node.parent) {
+      issues.push({ code: 'slice-missing-parent', message: `slice node ${node.id} missing parent` })
+    } else {
+      const parentNode = nodeMap.get(node.parent)
+      if (!parentNode || parentNode.kind !== 'package' || parentNode.package !== node.package) {
+        issues.push({ code: 'slice-invalid-parent', message: `slice node ${node.id} has invalid parent ${node.parent}` })
+      }
+    }
+  }
+
+  // Static cycle detection across station-order and borrow edges
+  const dagEdges = (nodes.edges || []).filter(
+    (e) => (e.kind ?? 'station-order') === 'station-order' || e.kind === 'borrow'
+  )
+  const adj = new Map()
+  for (const edge of dagEdges) {
+    if (!adj.has(edge.from)) adj.set(edge.from, [])
+    adj.get(edge.from).push(edge.to)
+  }
+  const visitState = new Map()
+  for (const node of nodes.nodes) {
+    visitState.set(node.id, 0)
+  }
+  let cycleFound = null
+  const dfs = (nodeId) => {
+    visitState.set(nodeId, 1)
+    for (const next of adj.get(nodeId) || []) {
+      const state = visitState.get(next) ?? 0
+      if (state === 1) {
+        cycleFound = `Cycle detected involving edge ${nodeId} -> ${next}`
+        return true
+      }
+      if (state === 0) {
+        if (dfs(next)) return true
+      }
+    }
+    visitState.set(nodeId, 2)
+    return false
+  }
+  for (const node of nodes.nodes) {
+    if ((visitState.get(node.id) ?? 0) === 0) {
+      if (dfs(node.id)) break
+    }
+  }
+  if (cycleFound) {
+    issues.push({ code: 'dag-cycle', message: cycleFound })
+  }
+
+  // Verify profiles: no revoked keys or modes, and all primary nodes covered
   for (const [profileId, profile] of Object.entries(profiles.profiles)) {
+    if (profile.revoked !== undefined) {
+      issues.push({
+        code: 'profile-revoked-stale',
+        message: `profile ${profileId} must not contain revoked property`,
+      })
+    }
+    for (const [modeKey, modeVal] of Object.entries(profile.modes || {})) {
+      if (modeVal === 'revoked' || modeKey === 'revoked') {
+        issues.push({
+          code: 'profile-revoked-stale',
+          message: `profile ${profileId} must not contain revoked key or mode for ${modeKey}`,
+        })
+      }
+      if (REVOKED_PACKAGES.includes(modeKey)) {
+        issues.push({
+          code: 'profile-revoked-not-deleted',
+          message: `profile ${profileId} contains deleted revoked node ${modeKey}`,
+        })
+      }
+    }
     for (const node of primaryNodes) {
       if (!profile.modes?.[node]) {
         issues.push({ code: 'profile-incomplete', message: `profile ${profileId} missing node ${node}` })

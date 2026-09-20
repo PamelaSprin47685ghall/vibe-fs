@@ -1,28 +1,29 @@
+import assert from 'node:assert/strict'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import test from 'node:test'
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { readFileSync } = await import("node:fs");
-const { readdirSync } = await import("node:fs");
-const { join } = await import("node:path");
-const { default: test } = await import("node:test");
+import * as Ablation from '../../../dist/Ablation/Surface.js'
 
 const ROOT = new URL('../../..', import.meta.url).pathname
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 const nodesDoc = JSON.parse(read('resources/ablation/nodes.json'))
 const profilesDoc = JSON.parse(read('resources/ablation/profiles.json'))
-const packageDirs = () =>
-  readdirSync(join(ROOT, 'requirements'), { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .filter((name) => {
-      try {
-        read(`requirements/${name}/WHAT.md`)
-        return true
-      } catch {
-        return false
-      }
-    })
+
+const withEnv = (entries, run) => {
+  const previous = Object.fromEntries(entries.map(([name]) => [name, process.env[name]]))
+  try {
+    for (const [name, value] of entries) {
+      if (value === undefined) delete process.env[name]
+      else process.env[name] = value
+    }
+    run()
+  } finally {
+    for (const [name, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[name]
+      else process.env[name] = value
+    }
+  }
+}
 
 test('WHAT[feature-ablation-004] ABL_004_profiles_cover_all_primary_nodes', () => {
   const primary = nodesDoc.nodes.filter((node) => node.kind === 'package').map((node) => node.id)
@@ -32,6 +33,7 @@ test('WHAT[feature-ablation-004] ABL_004_profiles_cover_all_primary_nodes', () =
     }
   }
 })
+
 test('WHAT[feature-ablation-004] ABL_004_station_profiles_track_segment_unablation', () => {
   const primary = nodesDoc.nodes.filter((node) => node.kind === 'package')
   const segmentEnd = (profileStation) => {
@@ -66,28 +68,6 @@ test('WHAT[feature-ablation-004] ABL_004_station_profiles_track_segment_unablati
     }
   }
 })
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const Ablation = await import("../../../dist/Ablation/Surface.js");
-
-const withEnv = (entries, run) => {
-  const previous = Object.fromEntries(entries.map(([name]) => [name, process.env[name]]))
-  try {
-    for (const [name, value] of entries) {
-      if (value === undefined) delete process.env[name]
-      else process.env[name] = value
-    }
-    run()
-  } finally {
-    for (const [name, value] of Object.entries(previous)) {
-      if (value === undefined) delete process.env[name]
-      else process.env[name] = value
-    }
-  }
-}
 
 test('WHAT[feature-ablation-004] ABL_004_production_default_is_all_active', () => {
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', undefined]], () => {
@@ -98,6 +78,7 @@ test('WHAT[feature-ablation-004] ABL_004_production_default_is_all_active', () =
     assert.equal(result.modes['speculative-investigation'], 'active')
   })
 })
+
 test('WHAT[feature-ablation-004] ABL_004_station_05_ablates_downstream_packages', () => {
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-05']], () => {
     const result = Ablation.load()
@@ -109,6 +90,7 @@ test('WHAT[feature-ablation-004] ABL_004_station_05_ablates_downstream_packages'
     assert.equal(result.modes['host-boundary'], 'active')
   })
 })
+
 test('WHAT[feature-ablation-004] ABL_004_explicit_env_overrides_profile', () => {
   withEnv(
     [
@@ -122,28 +104,6 @@ test('WHAT[feature-ablation-004] ABL_004_explicit_env_overrides_profile', () => 
     },
   )
 })
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const Ablation = await import("../../../dist/Ablation/Surface.js");
-
-const withEnv = (entries, run) => {
-  const previous = Object.fromEntries(entries.map(([name]) => [name, process.env[name]]))
-  try {
-    for (const [name, value] of entries) {
-      if (value === undefined) delete process.env[name]
-      else process.env[name] = value
-    }
-    run()
-  } finally {
-    for (const [name, value] of Object.entries(previous)) {
-      if (value === undefined) delete process.env[name]
-      else process.env[name] = value
-    }
-  }
-}
 
 test('WHAT[feature-ablation-004] ABL_004_station_15_borrows_sync_delegate_slice', () => {
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-15']], () => {
@@ -156,6 +116,7 @@ test('WHAT[feature-ablation-004] ABL_004_station_15_borrows_sync_delegate_slice'
     assert.equal(Ablation.allowsTool('inspect'), true)
   })
 })
+
 test('WHAT[feature-ablation-004] ABL_004_station_42_activates_delegation', () => {
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-42']], () => {
     const result = Ablation.load()
@@ -165,6 +126,7 @@ test('WHAT[feature-ablation-004] ABL_004_station_42_activates_delegation', () =>
     assert.equal(Ablation.allowsTool('fork'), true)
   })
 })
+
 test('WHAT[feature-ablation-004] ABL_004_station_56_is_full_production_surface', () => {
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-56']], () => {
     const result = Ablation.load()
@@ -174,4 +136,19 @@ test('WHAT[feature-ablation-004] ABL_004_station_56_is_full_production_surface',
     assert.equal(Ablation.fissionVisible(), true)
   })
 })
-}
+
+test('WHAT[feature-ablation-004] ABL_004_unknown_profile_fail_closed', () => {
+  withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'does-not-exist']], () => {
+    const result = Ablation.load()
+    assert.equal(result.ok, false)
+    assert.equal(result.kind, 'UnknownProfile')
+  })
+})
+
+test('WHAT[feature-ablation-004] ABL_004_load_exposes_manifest_fingerprint', () => {
+  withEnv([['WANXIANGSHU_ABLATION_PROFILE', undefined]], () => {
+    const result = Ablation.load()
+    assert.equal(result.ok, true)
+    assert.match(result.manifestFingerprint, /^[0-9a-f]{12}$/)
+  })
+})

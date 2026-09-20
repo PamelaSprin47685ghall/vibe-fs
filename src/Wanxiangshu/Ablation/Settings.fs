@@ -52,19 +52,26 @@ module AblationSettings =
                 |> List.map (fun node -> AblationNodeId.create node.Id, AblationMode.Active)
                 |> Map.ofList
 
+            let nodeMap =
+                document.Nodes
+                |> List.map (fun node -> AblationNodeId.create node.Id, node)
+                |> Map.ofList
+
             { Modes = modes
               Audit =
                 { Profile = None
                   ManifestVersion = document.Version
                   ManifestFingerprint = AblationManifest.nodesFingerprint ()
-                  NodeCount = document.Nodes.Length } }
+                  NodeCount = document.Nodes.Length }
+              Nodes = nodeMap }
         | Error _ ->
             { Modes = Map.empty
               Audit =
                 { Profile = None
                   ManifestVersion = "ablation-v1"
                   ManifestFingerprint = "000000000000"
-                  NodeCount = 0 } }
+                  NodeCount = 0 }
+              Nodes = Map.empty }
 
     // DSL-MUTABLE: resource — memoized ablation registry
     let mutable private cached: AblationRegistry option = None
@@ -86,6 +93,34 @@ module AblationSettings =
     let strengthForcedOff () =
         speculativeInvestigationMode () = AblationMode.Ablated
 
+    let private isItemInBorrowedSurface (nodeId: AblationNodeId) (item: string) (reg: AblationRegistry) : bool =
+        let nodeOpt = AblationRegistry.tryFindNode nodeId reg
+        let parentNodeOpt =
+            nodeOpt
+            |> Option.bind (fun n -> n.Parent)
+            |> Option.bind (fun pId -> AblationRegistry.tryFindNode (AblationNodeId.create pId) reg)
+
+        let inSelf =
+            nodeOpt
+            |> Option.map (fun n -> n.BorrowedSurface |> List.contains item)
+            |> Option.defaultValue false
+
+        let inParent =
+            match nodeOpt, parentNodeOpt with
+            | Some node, Some parentNode ->
+                parentNode.BorrowedSurface |> List.contains node.Id
+                || parentNode.BorrowedSurface |> List.contains item
+            | _ -> false
+
+        inSelf || inParent
+
+    let private isNodeAllowed (node: AblationNodeId) (item: string) : bool =
+        let reg = current ()
+        match AblationRegistry.modeFor node reg with
+        | AblationMode.Active -> true
+        | AblationMode.Ablated -> false
+        | AblationMode.Borrowed -> isItemInBorrowedSurface node item reg
+
     let allowsTool (toolName: string) : bool =
         let targetNode =
             if toolName = "speculate" then
@@ -93,9 +128,9 @@ module AblationSettings =
             else
                 AblationToolMap.tryNode toolName
 
-        match targetNode with
-        | None -> true
-        | Some node -> AblationMode.allowsToolExecution (AblationRegistry.modeFor node (current ()))
+        targetNode
+        |> Option.map (fun node -> isNodeAllowed node toolName)
+        |> Option.defaultValue true
 
     let allowsToolSchema (toolName: string) : bool =
         let targetNode =
@@ -104,27 +139,23 @@ module AblationSettings =
             else
                 AblationToolMap.tryNode toolName
 
-        match targetNode with
-        | None -> true
-        | Some node -> AblationMode.allowsToolSchema (AblationRegistry.modeFor node (current ()))
+        targetNode
+        |> Option.map (fun node -> isNodeAllowed node toolName)
+        |> Option.defaultValue true
 
     let allowsPrimaryAgent (agentName: string) : bool =
-        let node =
-            match agentName.ToLowerInvariant() with
-            | "manager" -> Some(AblationNodeId.create "relay-incumbency")
-            | "orchestrator" -> Some(AblationNodeId.create "change-integration")
-            | "browser" -> Some(AblationNodeId.create "external-investigation")
-            | "inquiry" -> Some(AblationNodeId.create "epistemic-reasoning")
-            | _ -> None
-
-        match node with
-        | None -> true
-        | Some id -> AblationRegistry.isActive id (current ())
+        let reg = current ()
+        match agentName.ToLowerInvariant() with
+        | "manager" -> AblationRegistry.isActive (AblationNodeId.create "relay-incumbency") reg
+        | "orchestrator" -> AblationRegistry.isActive (AblationNodeId.create "change-integration") reg
+        | "inquiry" -> AblationRegistry.isActive (AblationNodeId.create "epistemic-reasoning") reg
+        | "browser" -> false
+        | _ -> true
 
     let fissionVisible () =
         AblationRegistry.isActive (AblationNodeId.create "intra-participant-parallelism") (current ())
 
     let allowsFactTag (factTag: string) : bool =
-        match AblationFactMap.tryNode factTag with
-        | None -> true
-        | Some node -> AblationRegistry.isBorrowedOrActive node (current ())
+        AblationFactMap.tryNode factTag
+        |> Option.map (fun node -> isNodeAllowed node factTag)
+        |> Option.defaultValue true

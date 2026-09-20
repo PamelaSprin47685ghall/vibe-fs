@@ -5,366 +5,414 @@
       "id": "feature-ablation",
       "package": "feature-ablation",
       "station": 0,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "requirement-system",
       "package": "requirement-system",
       "station": 1,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "verification-system",
       "package": "verification-system",
       "station": 2,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "js-semantic-surface",
       "package": "js-semantic-surface",
       "station": 3,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "structured-workflow",
       "package": "structured-workflow",
       "station": 4,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "host-boundary",
       "package": "host-boundary",
       "station": 5,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "session-ontology",
       "package": "session-ontology",
       "station": 6,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "participant-identity",
       "package": "participant-identity",
       "station": 7,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "provider-language",
       "package": "provider-language",
       "station": 8,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "office-capability",
       "package": "office-capability",
       "station": 9,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "capability-enforcement",
       "package": "capability-enforcement",
       "station": 10,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "cognitive-environment",
       "package": "cognitive-environment",
       "station": 11,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "action-affordance",
       "package": "action-affordance",
       "station": 12,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "participant-horizon",
       "package": "participant-horizon",
       "station": 13,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "provider-projection",
       "package": "provider-projection",
       "station": 14,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "repository-investigation",
       "package": "repository-investigation",
       "station": 15,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "requirement-grounding",
       "package": "requirement-grounding",
       "station": 16,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "repository-programming",
       "package": "repository-programming",
       "station": 17,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "time-capability",
       "package": "time-capability",
       "station": 18,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "process-execution",
       "package": "process-execution",
       "station": 19,
-      "kind": "package"
-    },
-    {
-      "id": "output-distillation",
-      "package": "output-distillation",
-      "station": 20,
       "kind": "package",
-      "status": "revoked"
+      "borrowed_surface": []
     },
     {
       "id": "causal-wait",
       "package": "causal-wait",
       "station": 21,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "durable-events",
       "package": "durable-events",
       "station": 22,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "effect-accounting",
       "package": "effect-accounting",
       "station": 23,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "semantic-trace",
       "package": "semantic-trace",
       "station": 24,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "context-compression",
       "package": "context-compression",
       "station": 25,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "prefix-stability",
       "package": "prefix-stability",
       "station": 26,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "work-record",
       "package": "work-record",
       "station": 27,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "behavior-diagnosis",
       "package": "behavior-diagnosis",
       "station": 28,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "guidance-delivery",
       "package": "guidance-delivery",
       "station": 29,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "attention-regulation",
       "package": "attention-regulation",
       "station": 30,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "execution-failure-policy",
       "package": "execution-failure-policy",
       "station": 31,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "interaction-authority",
       "package": "interaction-authority",
       "station": 32,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "managed-chat-execution",
       "package": "managed-chat-execution",
       "station": 33,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "execution-model-routing",
       "package": "execution-model-routing",
       "station": 34,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "managed-session-lifecycle",
       "package": "managed-session-lifecycle",
       "station": 35,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "dispatch-protocol",
       "package": "dispatch-protocol",
       "station": 36,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "provider-attempt-recovery",
       "package": "provider-attempt-recovery",
       "station": 37,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "host-provider-failure-ownership",
       "package": "host-provider-failure-ownership",
       "station": 38,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "degeneration-guard",
       "package": "degeneration-guard",
       "station": 39,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "crash-reconciliation",
       "package": "crash-reconciliation",
       "station": 40,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "durable-convergence",
       "package": "durable-convergence",
       "station": 41,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "delegation",
       "package": "delegation",
       "station": 42,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": [
+        "delegation.sync-delegate",
+        "AgentFact.Delegation",
+        "AgentFact.Execution"
+      ]
     },
     {
       "id": "concern-routing",
       "package": "concern-routing",
       "station": 43,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "intra-participant-parallelism",
       "package": "intra-participant-parallelism",
       "station": 44,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "knowledge-reuse",
       "package": "knowledge-reuse",
       "station": 45,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "epistemic-reasoning",
       "package": "epistemic-reasoning",
       "station": 47,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "speculative-investigation",
       "package": "speculative-investigation",
       "station": 48,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "institutional-learning",
       "package": "institutional-learning",
       "station": 49,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "obligation-ledger",
       "package": "obligation-ledger",
       "station": 50,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "relay-incumbency",
       "package": "relay-incumbency",
       "station": 51,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "relay-assessment",
       "package": "relay-assessment",
       "station": 52,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "relay-context-projection",
       "package": "relay-context-projection",
       "station": 53,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "relay-retirement",
       "package": "relay-retirement",
       "station": 54,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "change-integration",
       "package": "change-integration",
       "station": 55,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "distribution",
       "package": "distribution",
       "station": 56,
-      "kind": "package"
+      "kind": "package",
+      "borrowed_surface": []
     },
     {
       "id": "delegation.sync-delegate",
       "package": "delegation",
       "station": 42,
       "parent": "delegation",
-      "kind": "slice"
+      "kind": "slice",
+      "borrowed_surface": []
     },
     {
       "id": "delegation.async-fork",
       "package": "delegation",
       "station": 42,
       "parent": "delegation",
-      "kind": "slice"
+      "kind": "slice",
+      "borrowed_surface": []
     },
     {
       "id": "change-integration.orchestrator-tools",
       "package": "change-integration",
       "station": 55,
       "parent": "change-integration",
-      "kind": "slice"
-    },
-    {
-      "id": "external-investigation",
-      "package": "external-investigation",
-      "station": 46,
-      "kind": "package",
-      "status": "revoked"
+      "kind": "slice",
+      "borrowed_surface": []
     }
   ],
   "edges": [
@@ -460,11 +508,6 @@
     },
     {
       "from": "requirement-system",
-      "to": "output-distillation",
-      "kind": "station-order"
-    },
-    {
-      "from": "requirement-system",
       "to": "causal-wait",
       "kind": "station-order"
     },
@@ -725,11 +768,6 @@
     },
     {
       "from": "verification-system",
-      "to": "output-distillation",
-      "kind": "station-order"
-    },
-    {
-      "from": "verification-system",
       "to": "causal-wait",
       "kind": "station-order"
     },
@@ -985,11 +1023,6 @@
     },
     {
       "from": "js-semantic-surface",
-      "to": "output-distillation",
-      "kind": "station-order"
-    },
-    {
-      "from": "js-semantic-surface",
       "to": "causal-wait",
       "kind": "station-order"
     },
@@ -1240,11 +1273,6 @@
     },
     {
       "from": "structured-workflow",
-      "to": "output-distillation",
-      "kind": "station-order"
-    },
-    {
-      "from": "structured-workflow",
       "to": "causal-wait",
       "kind": "station-order"
     },
@@ -1490,11 +1518,6 @@
     },
     {
       "from": "host-boundary",
-      "to": "output-distillation",
-      "kind": "station-order"
-    },
-    {
-      "from": "host-boundary",
       "to": "causal-wait",
       "kind": "station-order"
     },
@@ -1735,11 +1758,6 @@
     },
     {
       "from": "session-ontology",
-      "to": "output-distillation",
-      "kind": "station-order"
-    },
-    {
-      "from": "session-ontology",
       "to": "causal-wait",
       "kind": "station-order"
     },
@@ -1975,11 +1993,6 @@
     },
     {
       "from": "participant-identity",
-      "to": "output-distillation",
-      "kind": "station-order"
-    },
-    {
-      "from": "participant-identity",
       "to": "causal-wait",
       "kind": "station-order"
     },
@@ -2210,11 +2223,6 @@
     },
     {
       "from": "provider-language",
-      "to": "output-distillation",
-      "kind": "station-order"
-    },
-    {
-      "from": "provider-language",
       "to": "causal-wait",
       "kind": "station-order"
     },
@@ -2440,11 +2448,6 @@
     },
     {
       "from": "office-capability",
-      "to": "output-distillation",
-      "kind": "station-order"
-    },
-    {
-      "from": "office-capability",
       "to": "causal-wait",
       "kind": "station-order"
     },
@@ -2665,11 +2668,6 @@
     },
     {
       "from": "capability-enforcement",
-      "to": "output-distillation",
-      "kind": "station-order"
-    },
-    {
-      "from": "capability-enforcement",
       "to": "causal-wait",
       "kind": "station-order"
     },
@@ -2885,11 +2883,6 @@
     },
     {
       "from": "cognitive-environment",
-      "to": "output-distillation",
-      "kind": "station-order"
-    },
-    {
-      "from": "cognitive-environment",
       "to": "causal-wait",
       "kind": "station-order"
     },
@@ -3100,11 +3093,6 @@
     },
     {
       "from": "action-affordance",
-      "to": "output-distillation",
-      "kind": "station-order"
-    },
-    {
-      "from": "action-affordance",
       "to": "causal-wait",
       "kind": "station-order"
     },
@@ -3310,11 +3298,6 @@
     },
     {
       "from": "participant-horizon",
-      "to": "output-distillation",
-      "kind": "station-order"
-    },
-    {
-      "from": "participant-horizon",
       "to": "causal-wait",
       "kind": "station-order"
     },
@@ -3515,11 +3498,6 @@
     },
     {
       "from": "provider-projection",
-      "to": "output-distillation",
-      "kind": "station-order"
-    },
-    {
-      "from": "provider-projection",
       "to": "causal-wait",
       "kind": "station-order"
     },
@@ -3715,11 +3693,6 @@
     },
     {
       "from": "repository-investigation",
-      "to": "output-distillation",
-      "kind": "station-order"
-    },
-    {
-      "from": "repository-investigation",
       "to": "causal-wait",
       "kind": "station-order"
     },
@@ -3910,11 +3883,6 @@
     },
     {
       "from": "requirement-grounding",
-      "to": "output-distillation",
-      "kind": "station-order"
-    },
-    {
-      "from": "requirement-grounding",
       "to": "causal-wait",
       "kind": "station-order"
     },
@@ -4100,11 +4068,6 @@
     },
     {
       "from": "repository-programming",
-      "to": "output-distillation",
-      "kind": "station-order"
-    },
-    {
-      "from": "repository-programming",
       "to": "causal-wait",
       "kind": "station-order"
     },
@@ -4285,11 +4248,6 @@
     },
     {
       "from": "time-capability",
-      "to": "output-distillation",
-      "kind": "station-order"
-    },
-    {
-      "from": "time-capability",
       "to": "causal-wait",
       "kind": "station-order"
     },
@@ -4465,11 +4423,6 @@
     },
     {
       "from": "process-execution",
-      "to": "output-distillation",
-      "kind": "station-order"
-    },
-    {
-      "from": "process-execution",
       "to": "causal-wait",
       "kind": "station-order"
     },
@@ -4640,181 +4593,6 @@
     },
     {
       "from": "process-execution",
-      "to": "distribution",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "causal-wait",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "durable-events",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "effect-accounting",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "semantic-trace",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "context-compression",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "prefix-stability",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "work-record",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "behavior-diagnosis",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "guidance-delivery",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "attention-regulation",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "execution-failure-policy",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "interaction-authority",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "managed-chat-execution",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "execution-model-routing",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "managed-session-lifecycle",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "dispatch-protocol",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "provider-attempt-recovery",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "host-provider-failure-ownership",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "degeneration-guard",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "crash-reconciliation",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "durable-convergence",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "delegation",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "concern-routing",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "intra-participant-parallelism",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "knowledge-reuse",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "epistemic-reasoning",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "speculative-investigation",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "institutional-learning",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "obligation-ledger",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "relay-incumbency",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "relay-assessment",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "relay-context-projection",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "relay-retirement",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
-      "to": "change-integration",
-      "kind": "station-order"
-    },
-    {
-      "from": "output-distillation",
       "to": "distribution",
       "kind": "station-order"
     },
@@ -7807,16 +7585,6 @@
       "from": "office-capability",
       "to": "delegation.sync-delegate",
       "kind": "borrow"
-    },
-    {
-      "from": "delegation",
-      "to": "delegation.async-fork",
-      "kind": "parent"
-    },
-    {
-      "from": "change-integration",
-      "to": "change-integration.orchestrator-tools",
-      "kind": "parent"
     }
   ]
 }

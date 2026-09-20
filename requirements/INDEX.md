@@ -8,7 +8,7 @@
 |---|---|
 | `requirement-system` | 当前接受的产品真理必须有唯一 package owner、显式依赖与唯一 proof ownership。 |
 | `verification-system` | requirement acceptance 必须由分层、可失败、可重放的证据体系定义，而不是测试类型或人工印象。 |
-| `feature-ablation` | 巡检与渐进验收需要正式消融开关与 DAG，使下游未审机制可零影响关停而不改源码；消融目录与新角色体系严格同步。 |
+| `feature-ablation` | 巡检与渐进验收需要节点注册表、三态语义、消融 DAG 与配置集，使下游未审机制可零影响关停而不改源码。 |
 | `js-semantic-surface` | 语义测试只能经正式、稳定、JS-native 的 semantic surface 进入；Fable runtime representation 不属于 semantic contract。 |
 
 ## 2. Programming / causality
@@ -132,7 +132,7 @@
 |---|---|---|---|
 | 1 | `requirement-system` | 13 | requirement-system-001 ~ 008、010 ~ 011、015、017 ~ 018 |
 | 2 | `verification-system` | 16 | verification-system-001 ~ 006、007 ~ 016 |
-| 3 | `feature-ablation` | 12 | feature-ablation-001 ~ 009、feature-ablation-010（Primary agent 与 MCP 消融隔离）、feature-ablation-011、feature-ablation-012（角色/能力目录同步与独立开关保证） |
+| 3 | `feature-ablation` | 4 | feature-ablation-001 ~ 004（节点注册表、三态语义、消融 DAG、配置集） |
 | 4 | `js-semantic-surface` | 6 | js-semantic-surface-001 ~ 006 |
 | 5 | `structured-workflow` | 17 | structured-workflow-001 ~ 017 |
 | 6 | `time-capability` | 8 | time-capability-001 ~ 008 |

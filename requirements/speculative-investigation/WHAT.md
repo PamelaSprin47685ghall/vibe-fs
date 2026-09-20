@@ -56,4 +56,4 @@ DryRun 自身不拥有 wall-clock deadline。它先由自己的 K gate 或真实
 
 ## [014] Ablation 优先于 rollout env
 
-当 `feature-ablation` 将 `speculative-investigation` 节点设为 ablated 时，Strength 必须强制等价 Off，优先于 `WANXIANGSHU_STRENGTH_MODE` 的非 off 值。节点 borrowed/active 时，Strength env 继续控制 Shadow/DryRun/Treatment（见 `feature-ablation` feature-ablation-008）。
+当 `feature-ablation` 将 `speculative-investigation` 节点设为 ablated 时，Strength 必须强制等价 Off，优先于 `WANXIANGSHU_STRENGTH_MODE` 的非 off 值。节点 borrowed/active 时，Strength env 继续控制 Shadow/DryRun/Treatment（见 `feature-ablation` feature-ablation-002）。

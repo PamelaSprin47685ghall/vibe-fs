@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as Ablation from '../../../dist/Ablation/Surface.js'
+import * as SphinxMcpConfigSurface from '../../../dist/OpenCode/Host/SphinxMcpConfigSurface.js'
 
 const withEnv = (entries, run) => {
   const previous = Object.fromEntries(entries.map(([name]) => [name, process.env[name]]))
@@ -53,5 +54,175 @@ test('WHAT[feature-ablation-002] ABL_002_tri_state_semantics_distinction', () =>
     assert.throws(() => {
       Ablation.load()
     }, /InvalidMode|fail-closed|ablation/i, 'Invalid ablation mode string must fail-closed')
+  })
+})
+
+test('WHAT[feature-ablation-002] ABL_002_borrowed_surface_enforcement', () => {
+  // active 全放行
+  withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'production']], () => {
+    Ablation.load()
+    assert.equal(Ablation.allowsFact('AgentFact.Delegation'), true)
+    assert.equal(Ablation.allowsFact('AgentFact.Execution'), true)
+    assert.equal(Ablation.allowsTool('fork'), true)
+  })
+
+  // ablated 全拒绝
+  withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-05']], () => {
+    Ablation.load()
+    assert.equal(Ablation.allowsFact('AgentFact.Delegation'), false)
+    assert.equal(Ablation.allowsFact('AgentFact.Execution'), false)
+    assert.equal(Ablation.allowsTool('fork'), false)
+  })
+
+  // borrowed 状态：仅命中本节点或父节点 borrowed_surface 清单的项放行，清单外拒绝
+  withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-15']], () => {
+    Ablation.load()
+    // delegation 节点在 nodes.json 中明示 borrowed_surface 包含 AgentFact.Delegation / AgentFact.Execution / delegation.sync-delegate
+    assert.equal(Ablation.allowsFact('AgentFact.Delegation'), true, 'fact in borrowed_surface must be allowed')
+    assert.equal(Ablation.allowsFact('AgentFact.Execution'), true, 'fact in borrowed_surface must be allowed')
+    // fork 属于 delegation.async-fork，不在 delegation 借用面中，必须被拒绝
+    assert.equal(Ablation.allowsTool('fork'), false, 'tool outside borrowed_surface must be denied')
+    // AgentFact.Relay 属于 relay-incumbency（在 station-15 为 ablated 且无借用），必须被拒绝
+    assert.equal(Ablation.allowsFact('AgentFact.Relay'), false, 'unborrowed fact must be denied')
+  })
+})
+
+test('WHAT[feature-ablation-002] ABL_002_station_05_denies_downstream_tools', () => {
+  withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-05']], () => {
+    Ablation.load()
+    assert.equal(Ablation.allowsTool('fork'), false)
+    assert.equal(Ablation.allowsToolSchema('fork'), false)
+    assert.equal(Ablation.allowsTool('fission'), false)
+    assert.equal(Ablation.allowsTool('review'), false)
+    assert.equal(Ablation.allowsTool('commission'), false)
+    assert.equal(Ablation.allowsTool('read'), true)
+  })
+})
+
+test('WHAT[feature-ablation-002] ABL_002_station_14_keeps_coder_surface_and_ablates_manager_tools', () => {
+  withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-14']], () => {
+    Ablation.load()
+    assert.equal(Ablation.allowsTool('read'), true)
+    assert.equal(Ablation.allowsTool('fork'), false)
+    assert.equal(Ablation.allowsPrimaryAgent('manager'), false)
+    assert.equal(Ablation.allowsPrimaryAgent('coder'), true)
+    assert.equal(Ablation.fissionVisible(), false)
+  })
+})
+
+test('WHAT[feature-ablation-002] ABL_002_strength_forced_off_when_speculation_ablated', () => {
+  withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-05']], () => {
+    Ablation.load()
+    assert.equal(Ablation.strengthForcedOff(), true)
+  })
+})
+
+test('WHAT[feature-ablation-002] ABL_002_primary_agents_and_sphinx_mcp_gated_by_ablation_state', () => {
+  // 1. station-05 下 relay-incumbency 与 change-integration 为 ablated:
+  // manager 与 orchestrator 必须被拒绝 (allowsPrimaryAgent === false)
+  // browser 恒 false (fail-closed)
+  withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-05']], () => {
+    Ablation.load()
+    assert.equal(
+      Ablation.allowsPrimaryAgent('manager'),
+      false,
+      'station-05 must reject manager when relay-incumbency is ablated',
+    )
+    assert.equal(
+      Ablation.allowsPrimaryAgent('orchestrator'),
+      false,
+      'station-05 must reject orchestrator when change-integration is ablated',
+    )
+    assert.equal(Ablation.allowsPrimaryAgent('browser'), false, 'browser agent must be fail-closed false')
+    assert.equal(Ablation.allowsPrimaryAgent('inquiry'), false, 'inquiry agent must be false when epistemic-reasoning is ablated')
+  })
+
+  // 2. production profile 下两者均为 active:
+  // manager 与 orchestrator 必须允许 (allowsPrimaryAgent === true)
+  // browser 即使在 production 下也恒 false
+  withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'production']], () => {
+    Ablation.load()
+    assert.equal(
+      Ablation.allowsPrimaryAgent('manager'),
+      true,
+      'production profile must allow manager primary agent',
+    )
+    assert.equal(
+      Ablation.allowsPrimaryAgent('orchestrator'),
+      true,
+      'production profile must allow orchestrator primary agent',
+    )
+    assert.equal(
+      Ablation.allowsPrimaryAgent('browser'),
+      false,
+      'browser must remain false even in production',
+    )
+  })
+
+  // 3. epistemic-reasoning 为 ablated 时，Sphinx MCP 必须处于 Disabled
+  withEnv(
+    [
+      ['WANXIANGSHU_ABLATION_PROFILE', 'station-41'],
+      ['WANXIANGSHU_ABLATION_epistemic_reasoning', 'ablated'],
+    ],
+    () => {
+      Ablation.load()
+      const envReader = (k) => (process.env[k] !== undefined ? process.env[k] : undefined)
+      const decision = SphinxMcpConfigSurface.launchDecision(envReader)
+      assert.equal(
+        decision.kind,
+        'disabled',
+        'Sphinx MCP must be Disabled when epistemic-reasoning is ablated',
+      )
+      assert.equal(
+        decision.enabled,
+        false,
+        'Sphinx MCP must be Disabled when epistemic-reasoning is ablated',
+      )
+    },
+  )
+
+  // 4. epistemic-reasoning 为 active 时，Sphinx 开关由其自身状态控制，正常启用
+  withEnv(
+    [
+      ['WANXIANGSHU_ABLATION_PROFILE', 'production'],
+      ['WANXIANGSHU_ABLATION_epistemic_reasoning', 'active'],
+      ['SPHINX_MCP_DISABLED', '0'],
+      ['WANXIANGSHU_TEST', '0'],
+    ],
+    () => {
+      Ablation.load()
+      const envReader = (k) => (process.env[k] !== undefined ? process.env[k] : undefined)
+      const decision = SphinxMcpConfigSurface.launchDecision(envReader)
+      assert.notEqual(
+        decision.kind,
+        'disabled',
+        'Sphinx MCP must remain active when epistemic-reasoning is active',
+      )
+      assert.equal(
+        decision.enabled,
+        true,
+        'Sphinx MCP must remain active when epistemic-reasoning is active',
+      )
+    },
+  )
+})
+
+test('WHAT[feature-ablation-002] ABL_002_station_05_denies_ablated_durable_fact_tags', () => {
+  withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-05']], () => {
+    Ablation.load()
+    assert.equal(Ablation.allowsFact('AgentFact.Delegation'), false)
+    assert.equal(Ablation.allowsFact('AgentFact.Relay'), false)
+    assert.equal(Ablation.allowsFact('MagicTodo'), false)
+    assert.equal(Ablation.allowsFact('AgentFact.UnmappedFamily'), true)
+  })
+})
+
+test('WHAT[feature-ablation-002] ABL_002_station_15_borrows_delegation_facts', () => {
+  withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-15']], () => {
+    Ablation.load()
+    assert.equal(Ablation.allowsFact('AgentFact.Delegation'), true)
+    assert.equal(Ablation.allowsFact('AgentFact.Execution'), true)
+    assert.equal(Ablation.allowsFact('AgentFact.Relay'), false)
   })
 })

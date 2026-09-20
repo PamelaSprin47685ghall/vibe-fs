@@ -13,23 +13,13 @@ type AblationAudit =
       ManifestFingerprint: string
       NodeCount: int }
 
-type AblationRegistry =
-    { Modes: Map<AblationNodeId, AblationMode>
-      Audit: AblationAudit }
-
-type AblationLoadError =
-    | MissingManifest of path: string
-    | InvalidManifest of reason: string
-    | UnknownProfile of name: string
-    | InvalidMode of node: string * raw: string
-    | DagViolation of reason: string
-
 type ManifestNode =
     { Id: string
       Package: string
       Station: int
       Kind: string
-      Parent: string option }
+      Parent: string option
+      BorrowedSurface: string list }
 
 type ManifestEdge =
     { From: string
@@ -40,6 +30,18 @@ type ManifestDocument =
     { Version: string
       Nodes: ManifestNode list
       Edges: ManifestEdge list }
+
+type AblationRegistry =
+    { Modes: Map<AblationNodeId, AblationMode>
+      Audit: AblationAudit
+      Nodes: Map<AblationNodeId, ManifestNode> }
+
+type AblationLoadError =
+    | MissingManifest of path: string
+    | InvalidManifest of reason: string
+    | UnknownProfile of name: string
+    | InvalidMode of node: string * raw: string
+    | DagViolation of reason: string
 
 type ProfilesDocument =
     { Profiles: Map<string, Map<string, string>> }
@@ -93,3 +95,6 @@ module AblationRegistry =
         | AblationMode.Active
         | AblationMode.Borrowed -> true
         | AblationMode.Ablated -> false
+
+    let tryFindNode (id: AblationNodeId) (registry: AblationRegistry) =
+        registry.Nodes |> Map.tryFind id

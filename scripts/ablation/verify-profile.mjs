@@ -27,7 +27,6 @@ process.env.WANXIANGSHU_ABLATION_PROFILE = profileId
 
 try {
   const Ablation = require(`${ROOT}/dist/Ablation/Surface.js`)
-  Ablation.load()
   const result = Ablation.load()
   if (!result.ok) {
     console.error(`verify-profile: FAILED profile=${profileId}`)
