@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import {
+  JournalSurface_bootWithWriterId as bootWithWriterId,
+  JournalSurface_dispose as dispose,
+} from '../../../dist/Persistence/Journal/Surface.js'
 import * as failureOwner from '../../../dist/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.js'
 
 const {
@@ -147,4 +154,34 @@ test('WHAT[provider-attempt-recovery-004] recording_success_clears_the_dedupe_wi
 
   const again = providerFailureProjection.applyFailure(identityFor('run_1'), 1, afterSuccess)
   assert.equal(again.ok, true)
+})
+
+test('WHAT[provider-attempt-recovery-004] an_accepted_execution_without_a_start_fact_still_names_its_ordinary_kind', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-par004-kind-'))
+  const created = await bootWithWriterId(directory, 'writer-par004-kind', 'rt_par004_kind', 1, '2026-01-01T00:00:00Z')
+  assert.equal(created.ok, true, created.ok ? '' : created.error)
+
+  try {
+    const journal = created.journal
+    const session = 'ses_par004_kind'
+    const physical = 'msg_par004_kind'
+
+    // No durable execution at all: the evidence refuses to name a kind.
+    assert.equal(failureOwner.requestKindFor(journal, session, physical), '')
+
+    // provider-attempt-recovery-023 shape: Accepted without ProviderStarted still
+    // names its ordinary kind through the accepted evidence origin, so a
+    // confirmed failure of such an attempt stays retryable.
+    const accepted = await failureOwner.establishAcceptedExecution(journal, session, physical)
+    assert.equal(accepted.ok, true)
+    assert.equal(failureOwner.requestKindFor(journal, session, physical), 'work-main')
+
+    // Once the exact start fact exists, the same request keeps its frozen kind.
+    const started = await failureOwner.establishProviderRun(journal, session, physical, 'run_par004_kind')
+    assert.equal(started.ok, true, started.ok ? '' : JSON.stringify(started))
+    assert.equal(failureOwner.requestKindFor(journal, session, physical), 'work-main')
+  } finally {
+    dispose(created.journal)
+    rmSync(directory, { recursive: true, force: true })
+  }
 })

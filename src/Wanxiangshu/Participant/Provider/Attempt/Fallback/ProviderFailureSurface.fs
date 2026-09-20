@@ -591,6 +591,51 @@ module ProviderFailureSurface =
                 return box {| ok = Result.isOk started |}
         }
 
+    /// provider-attempt-recovery-023 test seam: establish only the durable `Accepted` fact for
+    /// one physical request — the exact obligation shape clause 023 owns
+    /// (`Accepted` without `ProviderStarted`).
+    let establishAcceptedExecution
+        (handle: Wanxiangshu.Persistence.Journal.JournalHandle)
+        (session: string)
+        (physicalMessage: string)
+        : Task<obj> =
+        task {
+            let identity =
+                ParticipantIdentity.resolveAtRoot "engineer"
+                |> Result.defaultWith (fun error -> invalidArg "session" $"invalid identity: {error}")
+
+            let accepted: AcceptedChatExecutionEvidence =
+                { SessionId = SessionId.create session
+                  LogicalRunId = LogicalRunId.create $"run-{physicalMessage}"
+                  AuthorityRootUserMessageId = AuthorityRootUserMessageId.create physicalMessage
+                  AuthorityKind = PromptRootAuthorityKind.HumanRoot
+                  IdentitySeed = PromptIdentitySeed.RootSelection identity
+                  PhysicalUserMessageId = PhysicalUserMessageId.create physicalMessage
+                  Origin = PromptOrigin.AuthorityRoot PromptRootAuthorityKind.HumanRoot }
+
+            let key: ChatExecutionKey =
+                { SessionId = accepted.SessionId
+                  PhysicalUserMessageId = accepted.PhysicalUserMessageId }
+
+            let! acceptance = ManagedChatAcceptance.accept handle.Journal key accepted
+            return box {| ok = Result.isOk acceptance |}
+        }
+
+    /// provider-attempt-recovery-003 test seam: the request kind a confirmed failure of this
+    /// exact physical request continues with. Empty string when the durable
+    /// evidence refuses to name one.
+    let requestKindFor
+        (handle: Wanxiangshu.Persistence.Journal.JournalHandle)
+        (session: string)
+        (physicalMessage: string)
+        : string =
+        ProviderRecoveryWorkflow.requestKindFor
+            handle.Journal
+            (SessionId.create session)
+            (PhysicalUserMessageId.create physicalMessage)
+        |> Option.map ProviderRequestKind.label
+        |> Option.defaultValue ""
+
     /// provider-attempt-recovery-021: the durable dispatch fact behind one confirmed failure's target
     /// settlement — true only when that exact physical request was accepted as
     /// a `ProviderRetryAttempt` continuation AND the failed provider run is the

@@ -152,13 +152,33 @@ module ProviderRecoveryWorkflow =
         | ProviderRequestKind.InteractionRepair -> Some failedSessionId
         | ProviderRequestKind.StrengthReplica -> None
 
-    let private requestKindFor (durable: AgentJournal) (turn: ReconciledTurn) =
-        (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
+    /// provider-attempt-recovery-003 / provider-attempt-recovery-023: the request kind a confirmed
+    /// failure continues with.
+    ///
+    /// The durable `ProviderStarted` fact is the primary evidence. An execution
+    /// that is durably `Accepted` without it (the provider-attempt-recovery-023 shape) still
+    /// names its ordinary kind through the accepted evidence origin, so a
+    /// confirmed failure of such an attempt is retried instead of being reported
+    /// as an unretryable terminal. Satellite (Blogger) sessions keep requiring
+    /// the persisted start: their kind comes from the open typed request, and a
+    /// guess would cross the ownership line.
+    let requestKindFor
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        : ProviderRequestKind option =
+        let projection = AgentJournal.snapshot durable
+
+        projection.AgentProjections.ChatExecutions
         |> ChatExecutionProjection.byKey
-            { SessionId = turn.SessionId
-              PhysicalUserMessageId = turn.PhysicalUserMessageId }
-        |> Option.bind (fun execution -> execution.ProviderStarted)
-        |> Option.map (fun started -> started.RequestKind)
+            { SessionId = sessionId
+              PhysicalUserMessageId = physicalUserMessageId }
+        |> Option.bind (fun execution ->
+            match execution.ProviderStarted with
+            | Some started -> Some started.RequestKind
+            | None when SessionAssociationProjection.isSatellite sessionId projection.AgentProjections.Associations ->
+                None
+            | None -> Some(AttemptPlanner.ordinaryRequestKind execution.Evidence.Origin))
 
     let private recoverySquashContext (durable: AgentJournal) (mainSessionId: SessionId) (bloggerSessionId: SessionId) =
         let session =
@@ -645,7 +665,7 @@ module ProviderRecoveryWorkflow =
             let hasCapacity = roleName = "" || ModelRouting.hasTheoreticalCapacity roleName
 
             let recoveryContext =
-                requestKindFor durable turn
+                requestKindFor durable turn.SessionId turn.PhysicalUserMessageId
                 |> Option.bind (fun requestKind ->
                     recoveryOwnerSession projections turn.SessionId requestKind
                     |> Option.bind (fun ownerSessionId ->
@@ -772,7 +792,7 @@ module ProviderRecoveryWorkflow =
             let hasCapacity = roleName = "" || ModelRouting.hasTheoreticalCapacity roleName
 
             let recoveryContext =
-                requestKindFor durable turn
+                requestKindFor durable turn.SessionId turn.PhysicalUserMessageId
                 |> Option.bind (fun requestKind ->
                     recoveryOwnerSession projections turn.SessionId requestKind
                     |> Option.bind (fun ownerSessionId ->

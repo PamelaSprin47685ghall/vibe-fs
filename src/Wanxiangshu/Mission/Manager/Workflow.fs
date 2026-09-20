@@ -365,7 +365,10 @@ module ManagerWorkflow =
         with
         | true, _, _ -> Task.FromResult()
         | false, Some _, _ -> observeOrdinary context
-        | false, None, ReconcileProgram.TurnInProgress
-        | false, None, ReconcileProgram.TurnNeedsContinuation _ -> Task.FromResult()
+        | false, None, ReconcileProgram.TurnInProgress -> Task.FromResult()
+        // provider-attempt-recovery-008: an unfinished manager turn is content damage, not a
+        // reason to stop. It earns the same bounded Interaction Repair as every
+        // other repairable role instead of being silently dropped.
+        | false, None, ReconcileProgram.TurnNeedsContinuation _ -> observeOrdinary context
         | false, None, ReconcileProgram.TurnCompleted -> observeIdle sessionPort rootWorkspace journal context
         | false, None, _ -> observeOrdinary context

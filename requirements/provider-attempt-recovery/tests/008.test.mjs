@@ -85,6 +85,7 @@ test('WHAT[provider-attempt-recovery-008] only_a_probe_attempt_with_a_usable_ter
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
+const { readFile } = await import("node:fs/promises");
 const turns = await import("../../../dist/Interaction/Repair/CompletedTurnSurface.js");
 
 const text = (value) => ({ type: 'text', text: value })
@@ -102,5 +103,21 @@ test('WHAT[provider-attempt-recovery-008] RECON_formal_content_gate_is_shared_wi
   assert.equal(turns.formalContentUnusable([text('<tool_call>read</tool_call>')]), true)
   assert.equal(turns.formalContentUnusable([text('a real answer')]), false)
   assert.equal(turns.formalContentUnusable([text('a real answer'), reasoning('and thinking')]), false)
+})
+
+test('WHAT[provider-attempt-recovery-008] an_unfinished_manager_turn_reaches_bounded_interaction_repair', async () => {
+  const managerSource = await readFile(
+    new URL('../../../src/Wanxiangshu/Mission/Manager/Workflow.fs', import.meta.url),
+    'utf8',
+  )
+
+  // A TurnNeedsContinuation without a failure witness is exactly the bounded
+  // Interaction Repair this clause licenses — for the Manager role too. The
+  // in-progress turn stays with the Host loop, but the unfinished turn must
+  // never be dropped in silence.
+  assert.match(
+    managerSource,
+    /\|\s*false, None, ReconcileProgram\.TurnInProgress\s*->\s*Task\.FromResult\(\)[\s\S]{0,400}?\|\s*false, None, ReconcileProgram\.TurnNeedsContinuation _\s*->\s*observeOrdinary context/,
+  )
 })
 }

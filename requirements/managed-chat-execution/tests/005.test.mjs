@@ -239,7 +239,7 @@ test('WHAT[managed-chat-execution-005] exact public assistant observation alone 
 
   assert.match(bootstrapSource, /let\s+continueStartedLifecycle[\s\S]*?ModelRouting\.endProviderStep[\s\S]*?settleObservedTerminal/)
   assert.match(bootstrapSource, /let signalNewProviderStart started providerStarted =[\s\S]*?if providerStarted then[\s\S]*?signalProviderStarted started/)
-  assert.match(bootstrapSource, /let continueProviderStart[\s\S]*?match persistence with[\s\S]*?\| Error \w+ ->[\s\S]*?rejectProviderStart started[\s\S]*?\| Ok providerStarted ->[\s\S]*?BindPhysicalUserMaterial\(started\.SessionId, started\.PhysicalUserMessageId\)[\s\S]*?signalNewProviderStart started providerStarted[\s\S]*?continueStartedLifecycle/)
+  assert.match(bootstrapSource, /let continueProviderStart[\s\S]*?match persistence with[\s\S]*?\| Error \w+ ->[\s\S]*?rejectProviderStart started[\s\S]*?continueStartedLifecycle started providerStepEnded terminal[\s\S]*?\| Ok providerStarted ->[\s\S]*?BindPhysicalUserMaterial\(started\.SessionId, started\.PhysicalUserMessageId\)[\s\S]*?signalNewProviderStart started providerStarted[\s\S]*?continueStartedLifecycle/)
   assert.match(bootstrapSource, /persistProviderStartedFromObservation[\s\S]*?continueProviderStart started providerStepEnded terminal providerStarted/)
   assert.match(bindingSource, /persistObservedProviderStart[\s\S]*?ChatExecutionProjection\.byKey key/)
   assert.match(bindingSource, /match execution \|> Option\.map _\.Lifecycle, execution \|> Option\.bind _\.ProviderStarted with[\s\S]*?ChatExecutionLifecycle\.Terminal[\s\S]*?AcceptedExecutionAlreadyTerminal[\s\S]*?\| _, Some _ -> Task\.FromResult\(Ok false\)[\s\S]*?\| _, None ->[\s\S]*?bindAttemptPlan[\s\S]*?do! persistPreparedProviderStarted[\s\S]*?return true/)

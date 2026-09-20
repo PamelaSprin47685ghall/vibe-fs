@@ -32,6 +32,13 @@ module ProviderFailureSurface =
     val establishProviderRun:
         handle: JournalHandle -> session: string -> physicalMessage: string -> providerRun: string -> Task<obj>
 
+    /// provider-attempt-recovery-023 test seam: establish only the durable `Accepted` fact for one
+    /// physical request (the `Accepted ∧ ¬ProviderStarted` obligation shape).
+    val establishAcceptedExecution: handle: JournalHandle -> session: string -> physicalMessage: string -> Task<obj>
+
+    /// provider-attempt-recovery-003 test seam: the request kind a confirmed failure continues with.
+    val requestKindFor: handle: JournalHandle -> session: string -> physicalMessage: string -> string
+
     val wasLwrRetryAttempt:
         handle: JournalHandle -> session: string -> physicalMessage: string -> providerRun: string -> bool
 

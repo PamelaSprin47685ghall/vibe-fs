@@ -328,9 +328,11 @@ module HostSignalBootstrap =
 
             let settleExactTerminal (observation: ExactProviderTerminalObservation) =
                 match observation.Outcome, observation.Disposition, startedEvidenceForTerminal observation with
-                | HostProviderTerminalOutcome.ProviderFailure failure, None, Some _ ->
-                    // provider-attempt-recovery-022: the Host's exact attempt-stop observation. A recovery
-                    // continuation for this run may only be sent after it.
+                | HostProviderTerminalOutcome.ProviderFailure failure, None, _ ->
+                    // provider-attempt-recovery-022: the exact terminal projection IS the Host's
+                    // attempt-stop observation. A missing durable start fact must not
+                    // suppress the fence or the failure wake, or the recovery
+                    // dispatch would wait forever on a fence nothing observes.
                     ProviderAttemptStopFence.shared.Observe(observation.SessionId, observation.ProviderRun)
 
                     reconciler.Kick(
@@ -403,8 +405,12 @@ module HostSignalBootstrap =
                 =
                 match persistence with
                 | Error error ->
+                    // provider-attempt-recovery-022: the durable start fact only owns the plan
+                    // binding. Its rejection must not suppress the Host's exact
+                    // attempt-stop observation below, otherwise the recovery dispatch
+                    // waits forever on a fence nothing observes.
                     rejectProviderStart started error
-                    Task.FromResult() :> Task
+                    (continueStartedLifecycle started providerStepEnded terminal :> Task)
                 | Ok providerStarted ->
                     task {
                         reconciler.BindPhysicalUserMaterial(started.SessionId, started.PhysicalUserMessageId)

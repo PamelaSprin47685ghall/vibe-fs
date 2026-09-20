@@ -46,6 +46,13 @@ kind; only a proven `BloggerMain | BloggerSquash` may use the association to
 locate the owning main session. Manager, coder and other ordinary children
 keep their durable `WorkMain` even when an association exists.
 
+An execution that is durably `Accepted` without a persisted `ProviderStarted`
+(the provider-attempt-recovery-023 shape) names its ordinary kind through the accepted
+evidence origin, so a confirmed failure of such an attempt is still retried as
+its own `WorkMain`/`InteractionRepair`; a satellite (Blogger) session keeps
+requiring the persisted start. No prose, failure ordinal or session
+association may supply a missing kind.
+
 ## [005] Bounded automatic retry budget
 
 Automatic retry and recovery are strictly bounded (default consecutive
@@ -73,6 +80,9 @@ and stops the replay.
 An empty terminal or an XML-only terminal means the response content is
 unusable, not that the provider request failed: at most one bounded
 Interaction Repair follows; advancing the failure budget on it is forbidden.
+That bounded Interaction Repair is the path every repairable role — Manager
+included — must actually reach: silently dropping an unfinished turn is
+forbidden.
 
 ## [009] Host attempt number is not the domain count
 
@@ -209,6 +219,8 @@ host-boundary-005 的失败终结论），从不授权物理发送；`session.id
 
 - 发送前提是 process-local 的发送栅栏，精确 key = `(SessionId, ProviderRunIdentity)`：
   同 session 的其它 run、迟到的 idle、更早或更晚的尝试都不能满足它；
+- 满足栅栏的是该确切 run 的宿主终态投影本身：该 attempt 的 durable
+  `ProviderStarted` 事实缺失（provider-attempt-recovery-023 形状）不抑制栅栏观察与失败定局；
 - 会话中止 / 替换 / 删除使该 session 上 pending 的恢复发送永久失效（安全侧失败）；
 - 栅栏不写 Journal、不参与 crash recovery。重启后没有观察 → 不自动发送；悬挂态
   由 provider-attempt-recovery-023 的义务扫描定夺；

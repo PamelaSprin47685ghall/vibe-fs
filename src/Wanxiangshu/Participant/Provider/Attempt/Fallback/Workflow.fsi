@@ -21,6 +21,16 @@ module ProviderRecoveryWorkflow =
         providerRun: ProviderRunIdentity ->
             bool
 
+    /// provider-attempt-recovery-003 / provider-attempt-recovery-023: the request kind a confirmed
+    /// failure continues with — the persisted `ProviderStarted` kind, or the
+    /// accepted evidence's ordinary kind when the start fact was never persisted
+    /// (non-satellite sessions only).
+    val requestKindFor:
+        durable: AgentJournal ->
+        sessionId: SessionId ->
+        physicalUserMessageId: PhysicalUserMessageId ->
+            ProviderRequestKind option
+
     val continueAfterConfirmedFailure:
         sessionPort: ISessionHostPort ->
         rootWorkspace: IRootWorkspaceReader ->

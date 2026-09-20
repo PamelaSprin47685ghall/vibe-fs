@@ -287,7 +287,7 @@ test('WHAT[managed-chat-execution-006] production Host terminal owner persists b
   assert.match(adapterSource, /onExactAssistantObservation[\s\S]*?tryDecodeExactProviderStart[\s\S]*?tryDecodeExactProviderTerminal/)
   assert.match(bootstrapSource, /let\s+startedEvidenceForTerminal[\s\S]*?exactStarted key/)
   assert.match(bootstrapSource, /let\s+applyObservedTerminal[\s\S]*?ExactAssistantTerminal[\s\S]*?NotifyProjectionChanged/)
-  assert.match(bootstrapSource, /let\s+settleExactTerminal[\s\S]*?match observation\.Outcome, observation\.Disposition, startedEvidenceForTerminal observation with[\s\S]*?HostProviderTerminalOutcome\.ProviderFailure failure, None, Some _[\s\S]*?ReconcileWake\.FailureWake\([\s\S]*?Some observation\.PhysicalUserMessageId/)
+  assert.match(bootstrapSource, /let\s+settleExactTerminal[\s\S]*?match observation\.Outcome, observation\.Disposition, startedEvidenceForTerminal observation with[\s\S]*?HostProviderTerminalOutcome\.ProviderFailure failure, None, _[\s\S]*?ReconcileWake\.FailureWake\([\s\S]*?Some observation\.PhysicalUserMessageId/)
   assert.match(bootstrapSource, /onExactAssistantObservation\s*=\s*\(fun[\s\S]*?\(started: ExactProviderStartObservation\)[\s\S]*?\(terminal: ExactProviderTerminalObservation option\)[\s\S]*?persistProviderStartedFromObservation[\s\S]*?continueProviderStart started providerStepEnded terminal providerStarted/)
 
   assert.match(recoveryRuntimeSource, /let recover[\s\S]*?ChatExecutionRecovery\.decide evidence[\s\S]*?interpret ports decision/)
