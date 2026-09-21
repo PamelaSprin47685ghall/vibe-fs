@@ -20,7 +20,7 @@ const withEnv = (entries, run) => {
 }
 
 test('WHAT[feature-ablation-002] ABL_002_tri_state_semantics_distinction', () => {
-  // 1. ablated 状态：对应工具零副作用，既不得出现在 provider schema，也不得被 execution gate 放行
+  // 1. ablated 状态：该切面不启用；不得改变可见工具、行为或等价副作用——既不得出现在 provider schema，也不得被 execution gate 放行
   withEnv([
     ['WANXIANGSHU_ABLATION_PROFILE', 'station-41'],
     ['WANXIANGSHU_ABLATION_speculative_investigation', 'ablated'],
