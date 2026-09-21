@@ -2,17 +2,16 @@ import test from 'node:test'
 
 {
 const { default: assert } = await import("node:assert/strict");
-const { execFileSync } = await import("node:child_process");
-const { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } = await import("node:fs");
+const { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
-const { join } = await import("node:path");
+const { join, resolve } = await import("node:path");
 const { default: test } = await import("node:test");
-const { loopDetectorRepositoryInputFiles } = await import("../../../scripts/lib/loop-detector-repository-corpus.mjs");
-const { assertBuildFresh, collectCompilerInputs, collectGeneratedInputs, collectArtifactInputs, collectOutputs, computeDigest, readManifest, writeManifest, invalidateManifest, MANIFEST_SCHEMA } = await import("../../../scripts/lib/build-state.mjs");
+const { assertBuildFresh, collectOutputs, readManifest, writeManifest, MANIFEST_SCHEMA } = await import("../../../scripts/lib/build-state.mjs");
 const { planImpactCompile, resetOutputDirectory } = await import("../../../scripts/lib/owner-compile.mjs");
 const { runBuild } = await import("../../../scripts/build.mjs");
 const { assertProductionSourcesAssigned } = await import("../../../scripts/lib/compile-shards.mjs");
-
+const { validateModuleLinkage, validateModuleLoadability } = await import("../../../scripts/checks/js-module-linkage.mjs");
+const { walk } = await import("../../../scripts/lib/walk.mjs");
 
 test('WHAT[verification-system-008] assertBuildFresh succeeds on current repository build', () => {
   const freshness = assertBuildFresh({ root: process.cwd() })
@@ -21,6 +20,7 @@ test('WHAT[verification-system-008] assertBuildFresh succeeds on current reposit
   assert.ok(typeof freshness.generatedInputDigest === 'string')
   assert.ok(typeof freshness.artifactInputDigest === 'string')
 })
+
 test('WHAT[verification-system-008] no-op mode preserves manifest and generation', async () => {
   const root = process.cwd()
   const manifestBefore = readManifest({ root })
@@ -34,6 +34,7 @@ test('WHAT[verification-system-008] no-op mode preserves manifest and generation
   const manifestAfter = readManifest({ root })
   assert.equal(manifestAfter.generation, manifestBefore.generation)
 })
+
 test('WHAT[verification-system-008] manifest corruption causes assertBuildFresh to throw with code', () => {
   const root = mkdtempSync(join(tmpdir(), 'wanxiang-corrupt-manifest-'))
   try {
@@ -52,6 +53,7 @@ test('WHAT[verification-system-008] manifest corruption causes assertBuildFresh 
     rmSync(root, { recursive: true, force: true })
   }
 })
+
 test('WHAT[verification-system-008] missing or stale output entry causes assertBuildFresh to throw', () => {
   const root = mkdtempSync(join(tmpdir(), 'wanxiang-stale-output-'))
   try {
@@ -105,6 +107,7 @@ test('WHAT[verification-system-008] missing or stale output entry causes assertB
     rmSync(root, { recursive: true, force: true })
   }
 })
+
 test('WHAT[verification-system-008] changed .fs with unchanged .fsi triggers reverse-consumer recompile', () => {
   const root = mkdtempSync(join(tmpdir(), 'wanxiang-inline-fsi-'))
   try {
@@ -163,6 +166,7 @@ test('WHAT[verification-system-008] changed .fs with unchanged .fsi triggers rev
     rmSync(root, { recursive: true, force: true })
   }
 })
+
 test('WHAT[verification-system-008] untracked new production source fails compile-shard inventory', () => {
   const root = mkdtempSync(join(tmpdir(), 'wanxiang-untracked-source-'))
   try {
@@ -198,6 +202,7 @@ test('WHAT[verification-system-008] untracked new production source fails compil
     rmSync(root, { recursive: true, force: true })
   }
 })
+
 test('WHAT[verification-system-008] release output reset physically removes stale artifacts', () => {
   const root = mkdtempSync(join(tmpdir(), 'wanxiang-release-output-'))
   const output = join(root, 'dist')
@@ -214,190 +219,28 @@ test('WHAT[verification-system-008] release output reset physically removes stal
     rmSync(root, { recursive: true, force: true })
   }
 })
-}
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const { acceptHumanRoot, budget, providerFailureProjection, fold, recordConfirmedFailure, snapshot } = await import("../../../dist/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.js");
+test('WHAT[verification-system-008] emitted dist modules pass linkage and dynamic loadability gate', async () => {
+  const distRoot = resolve(process.cwd(), 'dist')
+  const linkageViolations = validateModuleLinkage(distRoot)
+  assert.deepEqual(linkageViolations, [], 'all emitted dist modules must satisfy relative ESM linkage')
 
-
-test('WHAT[verification-system-008] provider failure has one importable production surface', () => {
-  assert.equal(typeof budget, 'object')
-  assert.equal(typeof providerFailureProjection, 'object')
-  assert.equal(typeof fold, 'function')
-  assert.equal(typeof acceptHumanRoot, 'function')
-  assert.equal(typeof recordConfirmedFailure, 'function')
-  assert.equal(typeof snapshot, 'function')
+  const loadabilityViolations = await validateModuleLoadability(distRoot)
+  assert.deepEqual(loadabilityViolations, [], 'all emitted dist production modules must successfully load')
 })
-}
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const { readdirSync } = await import("node:fs");
-const { resolve, join } = await import("node:path");
-const { walk } = await import("../../../scripts/lib/walk.mjs");
+test('WHAT[verification-system-008] module loadability verifier is red when a dist module fails to load', async () => {
+  const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-module-load-red-'))
+  const distRoot = join(temporaryRoot, 'dist')
+  mkdirSync(distRoot, { recursive: true })
 
-const BUILD_ROOT = 'dist'
-const BUILD_ROOT_ABS = `${resolve(BUILD_ROOT)}/`
-const FABLE_LIBRARY_DIR = (() => {
-  const candidates = readdirSync(join(BUILD_ROOT_ABS, 'fable_modules')).filter((entry) =>
-    entry.startsWith('fable-library-js.'),
-  )
-  if (candidates.length !== 1) {
-    throw new Error(
-      `expected exactly one fable-library-js.* in ${BUILD_ROOT_ABS}/fable_modules, found: ${candidates.join(', ') || '(none)'}`,
-    )
+  try {
+    writeFileSync(join(distRoot, 'broken.js'), 'throw new Error("top-level explosion in broken emitted module")\n')
+    const failures = await validateModuleLoadability(distRoot)
+    assert.ok(failures.length > 0, 'validateModuleLoadability must fail for modules that throw on load')
+    assert.match(failures[0], /broken\.js: failed to load emitted module/)
+  } finally {
+    rmSync(temporaryRoot, { recursive: true, force: true })
   }
-  return join(BUILD_ROOT_ABS, 'fable_modules', candidates[0])
-})()
-const load = (modulePath) => import(new URL(`../../../dist/${modulePath}.js`, import.meta.url).pathname)
-const surfaceOf = (mod) => Object.keys(mod).filter((name) => !name.endsWith('_$reflection'))
-const assertCallable = (mod, modulePath, names) => {
-  for (const name of names) {
-    assert.equal(
-      typeof mod[name],
-      'function',
-      `${modulePath} must export '${name}' as a function; exports: ${surfaceOf(mod).join(', ')}`,
-    )
-  }
-}
-
-test('WHAT[verification-system-008] AgentProgram publishes its flow entrypoints', async () => {
-  const mod = await load('Execution/Agent/Program')
-
-  assertCallable(mod, 'Execution/Agent/Program', ['validateSession', 'runAgentFlow'])
-})
-test('WHAT[verification-system-008] Companion has no generic program facade and keeps its direct delta owner', async () => {
-  const delta = await load('Context/Companion/Blogger/Delta')
-  assertCallable(delta, 'Context/Companion/Blogger/Delta', ['BloggerDelta_nextChunk'])
-})
-test('WHAT[verification-system-008] OrchestratorProgram publishes exactly one entrypoint', async () => {
-  const mod = await load('Change/Program')
-
-  assertCallable(mod, 'Change/Program', ['run'])
-})
-test('WHAT[verification-system-008] Domain ReconcileProgram publishes pure decisions', async () => {
-  const mod = await load('Composition/Turn/Program')
-  const names = surfaceOf(mod)
-
-  assert.ok(
-    names.some((n) => n.includes('isTerminalOutcome')),
-    `Domain ReconcileProgram must publish isTerminalOutcome; exports: ${names.join(', ')}`,
-  )
-  assert.ok(
-    names.some((n) => n.includes('decideStep')),
-    `Domain ReconcileProgram must publish decideStep; exports: ${names.join(', ')}`,
-  )
-  assert.ok(
-    names.some((n) => n.includes('publishDecision')),
-    `Domain ReconcileProgram must publish publishDecision; exports: ${names.join(', ')}`,
-  )
-})
-test('WHAT[verification-system-008] ProcessRunner publishes its run entrypoints', async () => {
-  const mod = await load('Process/ProcessRunner')
-
-  assertCallable(mod, 'Process/ProcessRunner', ['run', 'runWithHost', 'runWithLauncher'])
-})
-test('WHAT[verification-system-008] the Parallel kernel publishes only bounded parallelism', async () => {
-  const mod = await load('Foundation/Parallel')
-
-  // docs/what/flow.md (Direct CE) superseded the Flow monad; its monadic surface
-  // (Flow_run / Flow_fail / Flow_attempt / Flow_create / Flow_lift and the
-  // FlowBuilder) is no longer a demanded contract. Bounded concurrency is still
-  // legal, so `Parallel.mapBounded` remains the only required export here.
-  assertCallable(mod, 'Foundation/Parallel', ['Parallel_mapBounded'])
-})
-test('WHAT[verification-system-008] the journal publishes boot append and snapshot', async () => {
-  const [journal, esWriter, envelope, codec, state] = await Promise.all([
-    load('Persistence/Journal/AgentJournal'),
-    load('Persistence/Journal/EventStoreJournalWriter'),
-    load('Persistence/Journal/Envelope'),
-    load('Persistence/Journal/FactCodec'),
-    load('Composition/Durable/ProjectionState'),
-  ])
-
-  // AgentJournal constructs from an already-folded projection + writer
-  // (createFromProjection). EventStore boot/resume belongs to
-  // EventStoreJournalWriter (create / resumeOrCreate) and the workspace Host.
-  // The retired EventStore-boot forwarding facade must not return.
-  assertCallable(journal, 'Persistence/Journal/AgentJournal', [
-    'AgentJournalModule_createFromProjection',
-    'AgentJournalModule_appendAgent',
-    'AgentJournalModule_appendMagicTodo',
-    'AgentJournalModule_snapshot',
-    'AgentJournalModule_revision',
-    'AgentJournalModule_snapshotWithRevision',
-    'AgentJournalModule_awaitChangeFrom',
-    'AgentJournalModule_isPoisoned',
-  ])
-
-  const hasCreate = Object.keys(esWriter).some((name) => name.startsWith('EventStoreJournalWriter_create'))
-  const hasResume = Object.keys(esWriter).some((name) =>
-    name.startsWith('EventStoreJournalWriter_resumeOrCreate'),
-  )
-  assert.equal(hasCreate, true, 'EventStoreJournalWriter.create must be published')
-  assert.equal(hasResume, true, 'EventStoreJournalWriter.resumeOrCreate must be published')
-
-  assertCallable(envelope, 'Persistence/Journal/Envelope', [
-    'EnvelopeModule_serialize',
-    'EnvelopeModule_deserialize',
-    'EnvelopeModule_compareSortKey',
-  ])
-  assertCallable(codec, 'Persistence/Journal/FactCodec', ['serializeFact', 'deserializeFact'])
-
-  // PERSIST-008's integrated state.
-  assert.equal(typeof state['ProjectionSet'], 'function', 'Journal/ProjectionState must publish ProjectionSet')
-})
-test('WHAT[verification-system-008] the outcome kernel publishes the two commit results', async () => {
-  const mod = await load('Foundation/Outcome')
-
-  // PERSIST-002 has exactly two append outcomes, so `CommitResult` is one generic
-  // union rather than a bool plus an error field.
-  assert.equal(typeof mod['Outcome_CommitResult$1'], 'function')
-  assertCallable(mod, 'Foundation/Outcome', ['AgentRunResult__get_IsValid'])
-})
-test('WHAT[verification-system-008] the published plugin entrypoint loads', async () => {
-  // `package.json` `main` / `exports["."]` resolve here. A build that emits every
-  // domain module but not this one produces an installable package that does
-  // nothing, and no other test would notice.
-  const mod = await load('OpenCode/Plugin/Plugin')
-
-  assert.ok(surfaceOf(mod).length > 0, 'OpenCode/Plugin/Plugin must publish at least one export')
-})
-test('WHAT[verification-system-008] every emitted module actually loads', async () => {
-  // The gap this closes: `dotnet build` type-checks the F#, and the layer 1 tests
-  // import only what `domain.mjs` binds — which is Kernel/Domain/Journal/Process.
-  // Nothing imported `OpenCode/*`, so a module could be emitted with a broken
-  // import and every gate stayed green.
-  //
-  // That is not hypothetical. `Task.CompletedTask` compiles under .NET and Fable
-  // emits `get_CompletedTask` for it, which `fable-library-js` does not export, so
-  // five modules — including the plugin entrypoint — failed at LOAD with
-  // "does not provide an export named". The package was installable and inert.
-  //
-  // An ES module's imports are resolved before its body runs, so importing each
-  // one is a real link check and executes no plugin logic.
-  const modules = walk(BUILD_ROOT, ['.js']).filter((file) => !file.includes('fable_modules'))
-
-  assert.ok(modules.length > 100, `expected a full build under ${BUILD_ROOT}, found ${modules.length} modules`)
-
-  const failures = []
-  for (const file of modules) {
-    try {
-      await import(new URL(`../../../${file}`, import.meta.url).pathname)
-    } catch (error) {
-      failures.push(`${file}: ${error.message.split('\n')[0]}`)
-    }
-  }
-
-  assert.deepEqual(failures, [], 'every emitted module must link against the fable-library it was built for')
-})
-test('WHAT[verification-system-008] the contract and the facade read the same build', () => {
-  // Both checks resolve `dist` independently. If they ever disagreed, this file
-  // would be asserting against artifacts no test actually uses.
-  assert.match(BUILD_ROOT_ABS, /\/dist\/$/)
-  assert.match(FABLE_LIBRARY_DIR, /fable-library-js\.\d+\.\d+\.\d+$/)
 })
 }

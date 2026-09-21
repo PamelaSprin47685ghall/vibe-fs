@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// JS-SEMANTIC-SURFACE-003/005 manifest gate.
+// WHAT[js-semantic-surface-003] / WHAT[verification-system-013] surface manifest gate.
 //
 // Registration grants no authority by itself. Every registered module must be
 // owned by a current requirement, governed by current WHAT laws,

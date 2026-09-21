@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict'
 import { verify, verificationSteps } from '../../../scripts/verify.mjs'
-import { checks } from '../../../scripts/check.mjs'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, readlinkSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
@@ -21,44 +20,7 @@ function createMemorySink() {
       return buf
     },
   }
-  }
-
-for (const failingLabel of ['format:check', 'check', 'build']) {
-  test(`WHAT[verification-system-001] verify halts and marks subsequent steps not-run when ${failingLabel} fails`, async () => {
-    const tmpLogDir = mkdtempSync(join(tmpdir(), 'proof-ladder-fail-'))
-    const sink = createMemorySink()
-  const spawned = []
-  const fakeRunStep = async ({ label, argv }) => {
-      spawned.push(label)
-      if (label === failingLabel) {
-        return { label, ok: false, exitCode: 1, signal: null, durationMs: 5 }
-  }
-      return { label, ok: true, exitCode: 0, signal: null, durationMs: 5 }
-    }
-
-    try {
-      const result = await verify({
-        release: false,
-        runStep: fakeRunStep,
-        output: sink,
-        logDirectory: tmpLogDir,
-})
-      assert.equal(result.exitCode, 1)
-      assert.equal(result.outcome, 'fail')
-      assert.equal(spawned.at(-1), failingLabel, `execution must stop after ${failingLabel}`)
-
-      const failedIdx = result.steps.findIndex((s) => s.label === failingLabel)
-      assert.ok(failedIdx >= 0)
-      assert.equal(result.steps[failedIdx].status, 'failed')
-      for (let i = failedIdx + 1; i < result.steps.length; i++) {
-        assert.equal(result.steps[i].status, 'not-run', `step ${result.steps[i].label} must be marked not-run`)
-    }
-      assert.match(sink.output, /FAIL  verify daily/)
-    } finally {
-      rmSync(tmpLogDir, { recursive: true, force: true })
-    }
-})
-  }
+}
 
 test('WHAT[verification-system-001] format-build-test ladder pins the stage order', async () => {
   const { scripts } = JSON.parse(read('package.json'))

@@ -30,20 +30,12 @@ export const REQUIREMENTS_ROOT = join(
 
 /** Compiler/build verification: subject is the emitted artifact, not semantics. */
 export const BUILD_VERIFICATION_FILES = new Set([
-  'requirements/verification-system/tests/008.test.mjs',
   'requirements/verification-system/tests/011.test.mjs',
   'requirements/distribution/tests/001.test.mjs',
   'requirements/distribution/tests/002.test.mjs',
   'requirements/distribution/tests/005.test.mjs',
   'requirements/distribution/tests/006.test.mjs',
   'requirements/distribution/tests/007.test.mjs',
-  'requirements/verification-system/tests/guide-contract.test.mjs',
-  // Its subject is the coverage/build runner itself, including the literal
-  // fable_modules exclusion that keeps the coverage denominator honest.
-  'requirements/verification-system/tests/coverage-gate.test.mjs',
-  'requirements/verification-system/tests/coverage-runner.test.mjs',
-  'requirements/distribution/tests/pack-closure.test.mjs',
-  'requirements/distribution/tests/cwd-independent-resources.test.mjs',
   // Representation validator: its subject is the JS-native boundary rules,
   // so it must be able to spell out the forbidden Fable shapes.
   'requirements/verification-system/tests/support/js-contract.mjs',

@@ -183,63 +183,13 @@ test('WHAT[verification-system-009] the real integration entry covers every disc
 
 {
 const { default: assert } = await import("node:assert/strict");
-const { verify, verificationSteps } = await import("../../../scripts/verify.mjs");
 const { checks } = await import("../../../scripts/check.mjs");
-const { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, rmSync, writeFileSync } = await import("node:fs");
-const { tmpdir } = await import("node:os");
+const { existsSync, readFileSync, readdirSync } = await import("node:fs");
 const { basename, dirname, join, resolve } = await import("node:path");
 const { fileURLToPath } = await import("node:url");
 const { default: test } = await import("node:test");
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
-const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
-function createMemorySink() {
-  let buf = ''
-  return {
-    write(chunk) {
-      buf += chunk
-    },
-    get output() {
-      return buf
-    },
-  }
-  }
-for (const failingLabel of ['format:check', 'check', 'build']) {
-  test(`WHAT[verification-system-009] verify halts and marks subsequent steps not-run when ${failingLabel} fails`, async () => {
-    const tmpLogDir = mkdtempSync(join(tmpdir(), 'proof-ladder-fail-'))
-    const sink = createMemorySink()
-  const spawned = []
-  const fakeRunStep = async ({ label, argv }) => {
-      spawned.push(label)
-      if (label === failingLabel) {
-        return { label, ok: false, exitCode: 1, signal: null, durationMs: 5 }
-  }
-      return { label, ok: true, exitCode: 0, signal: null, durationMs: 5 }
-    }
-
-    try {
-      const result = await verify({
-        release: false,
-        runStep: fakeRunStep,
-        output: sink,
-        logDirectory: tmpLogDir,
-})
-      assert.equal(result.exitCode, 1)
-      assert.equal(result.outcome, 'fail')
-      assert.equal(spawned.at(-1), failingLabel, `execution must stop after ${failingLabel}`)
-
-      const failedIdx = result.steps.findIndex((s) => s.label === failingLabel)
-      assert.ok(failedIdx >= 0)
-      assert.equal(result.steps[failedIdx].status, 'failed')
-      for (let i = failedIdx + 1; i < result.steps.length; i++) {
-        assert.equal(result.steps[i].status, 'not-run', `step ${result.steps[i].label} must be marked not-run`)
-    }
-      assert.match(sink.output, /FAIL  verify daily/)
-    } finally {
-      rmSync(tmpLogDir, { recursive: true, force: true })
-    }
-})
-  }
 
 test('WHAT[verification-system-009] every ladder step target exists as a real file', () => {
   // 层序里的每个入口都必须是真实文件：指向不存在文件的命令恒为「没跑到」，

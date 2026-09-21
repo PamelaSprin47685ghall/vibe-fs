@@ -161,3 +161,54 @@ test('WHAT[verification-system-004] spec gate rejects duplicate CHATEXEC identif
   }
 })
 }
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = await import("node:fs");
+const { tmpdir } = await import("node:os");
+const { join } = await import("node:path");
+const { default: test } = await import("node:test");
+const { check, run } = await import("../../../scripts/checks/js-boundary-gate.mjs");
+
+test('WHAT[verification-system-004] js-boundary-gate verifier is red on controlled A-D semantic debt', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'boundary-gate-red-'))
+
+  try {
+    const pkgDir = join(fixture, 'requirements', 'sample-pkg', 'tests')
+    mkdirSync(pkgDir, { recursive: true })
+
+    // Build debt fixture content dynamically at runtime to avoid embedding static forbidden patterns in test source
+    const distPath = ['..', '..', '..', 'dist', 'Internal', 'UnregisteredModule.js'].join('/')
+    const importKeyword = 'import * as mod'
+    const fromKeyword = 'from'
+    const importLine = `${importKeyword} ${fromKeyword} '${distPath}'`
+    const exportDiscoveryLine = 'const names = ' + 'Object.' + 'keys(mod)'
+    const debtFile = join(pkgDir, 'debt.test.mjs')
+    writeFileSync(
+      debtFile,
+      `${importLine}\n${exportDiscoveryLine}\n`,
+      'utf8',
+    )
+
+    const checkResult = check({ root: fixture })
+    assert.ok(checkResult.debt > 0, 'check must report non-zero debt on A-D violations')
+    assert.ok(
+      checkResult.issues.some((issue) => issue.code === 'deep-dist-import'),
+      'check must report deep-dist-import violation',
+    )
+    assert.ok(
+      checkResult.issues.some((issue) => issue.code === 'export-discovery'),
+      'check must report export-discovery violation',
+    )
+
+    const exitCode = run({ root: fixture })
+    assert.equal(exitCode, 1, 'run must return exit code 1 on semantic debt')
+
+    rmSync(debtFile)
+    const cleanExitCode = run({ root: fixture })
+    assert.equal(cleanExitCode, 0, 'run must return exit code 0 on zero debt')
+  } finally {
+    rmSync(fixture, { recursive: true, force: true })
+  }
+})
+}

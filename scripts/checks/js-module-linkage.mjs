@@ -2,7 +2,7 @@
 
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, extname, isAbsolute, relative, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { parseModule } from '../lib/js-syntax.mjs'
 import { walk } from '../lib/walk.mjs'
@@ -95,10 +95,30 @@ export function validateModuleLinkage(distRoot, files = walk(resolve(distRoot), 
   return violations.sort()
 }
 
-export function check(context) {
+export async function validateModuleLoadability(distRoot, files = walk(resolve(distRoot), ['.js'])) {
+  const root = resolve(distRoot)
+  const productionModules = files.filter((file) => !normalize(file).includes('fable_modules'))
+  const failures = []
+
+  for (const file of productionModules) {
+    try {
+      const fileUrl = pathToFileURL(file).href
+      await import(fileUrl)
+    } catch (error) {
+      const importer = normalize(relative(root, file))
+      const firstLine = (error?.message || String(error)).split('\n')[0]
+      failures.push(`${importer}: failed to load emitted module: ${firstLine}`)
+    }
+  }
+
+  return failures.sort()
+}
+export async function check(context) {
   const root = context?.root ?? process.cwd()
   const distRoot = resolve(root, 'dist')
-  const violations = validateModuleLinkage(distRoot)
+  const linkageViolations = validateModuleLinkage(distRoot)
+  const loadabilityViolations = await validateModuleLoadability(distRoot)
+  const violations = [...linkageViolations, ...loadabilityViolations].sort()
   return {
     issues: violations.map((v) => ({
       code: 'js-module-linkage',
@@ -107,11 +127,13 @@ export function check(context) {
   }
 }
 
-export function runCli(argv = process.argv.slice(2)) {
+export async function runCli(argv = process.argv.slice(2)) {
   const root = process.cwd()
   const distRoot = resolve(root, 'dist')
   const files = walk(distRoot, ['.js'])
-  const violations = validateModuleLinkage(distRoot, files)
+  const linkageViolations = validateModuleLinkage(distRoot, files)
+  const loadabilityViolations = await validateModuleLoadability(distRoot, files)
+  const violations = [...linkageViolations, ...loadabilityViolations].sort()
 
   if (violations.length > 0) {
     violations.sort()
@@ -119,14 +141,16 @@ export function runCli(argv = process.argv.slice(2)) {
     for (const violation of violations) console.error(`  ${violation}`)
     return 1
   }
-  console.log(`js-module-linkage: OK — ${files.length} emitted modules linked`)
+  console.log(`js-module-linkage: OK — ${files.length} emitted modules linked and loaded`)
   return 0
 }
 
-export function run({ root = process.cwd() } = {}) {
+export async function run({ root = process.cwd() } = {}) {
   const distRoot = resolve(root, 'dist')
   const files = walk(distRoot, ['.js'])
-  const violations = validateModuleLinkage(distRoot, files)
+  const linkageViolations = validateModuleLinkage(distRoot, files)
+  const loadabilityViolations = await validateModuleLoadability(distRoot, files)
+  const violations = [...linkageViolations, ...loadabilityViolations].sort()
 
   if (violations.length > 0) {
     violations.sort()
@@ -134,10 +158,10 @@ export function run({ root = process.cwd() } = {}) {
     for (const violation of violations) console.error(`  ${violation}`)
     return 1
   }
-  console.log(`js-module-linkage: OK — ${files.length} emitted modules linked`)
+  console.log(`js-module-linkage: OK — ${files.length} emitted modules linked and loaded`)
   return 0
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  process.exitCode = runCli()
+  runCli().then((code) => { process.exitCode = code })
 }

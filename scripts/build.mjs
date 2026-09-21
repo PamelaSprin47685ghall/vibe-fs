@@ -187,7 +187,7 @@ async function verifyArtifacts(targetRoot = root) {
   if (runSurfaceManifest({ root: targetRoot }) !== 0) {
     throw new Error('js-surface-manifest: dist surface manifest validation failed')
   }
-  if (runModuleLinkage({ root: targetRoot }) !== 0) {
+  if ((await runModuleLinkage({ root: targetRoot })) !== 0) {
     throw new Error('js-module-linkage: emitted ESM graph is not package-closed')
   }
 }
