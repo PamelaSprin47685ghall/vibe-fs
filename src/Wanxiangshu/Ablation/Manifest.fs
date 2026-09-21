@@ -100,52 +100,43 @@ module AblationManifest =
             )
         | Some _, Some _ -> None
 
+    let private validatePackageMainNodes (document: ManifestDocument) : AblationLoadError option =
+        let packages =
+            document.Nodes
+            |> List.map (fun n -> n.Package)
+            |> List.distinct
+
+        packages
+        |> List.tryPick (fun pkg ->
+            let nodesInPkg = document.Nodes |> List.filter (fun n -> n.Package = pkg)
+            let mainNodes =
+                nodesInPkg
+                |> List.filter (fun n -> n.Id = pkg && n.Kind = "package")
+            let pkgKindNodes =
+                nodesInPkg
+                |> List.filter (fun n -> n.Kind = "package")
+
+            if mainNodes.IsEmpty then
+                Some(InvalidManifest(sprintf "Package '%s' is missing a main node (expected id '%s' and kind 'package')" pkg pkg))
+            elif mainNodes.Length > 1 || pkgKindNodes.Length > 1 then
+                Some(InvalidManifest(sprintf "Package '%s' has multiple main nodes" pkg))
+            else
+                None)
+
     let validateNodes (document: ManifestDocument) : Result<unit, AblationLoadError> =
         let nodeMap = document.Nodes |> List.map (fun n -> n.Id, n) |> Map.ofList
 
-        document.Nodes
-        |> List.filter (fun node -> node.Kind = "slice")
-        |> List.tryPick (validateSliceNode nodeMap)
-        |> function
-            | Some err -> Error err
-            | None -> Ok()
+        let sliceError =
+            document.Nodes
+            |> List.filter (fun node -> node.Kind = "slice")
+            |> List.tryPick (validateSliceNode nodeMap)
 
-    let loadNodes () =
-        readJson (pathJoin (resourcesDir (), "nodes.json")) decodeDocument
-        |> Result.bind (fun doc -> validateNodes doc |> Result.map (fun () -> doc))
+        let mainNodeError = validatePackageMainNodes document
 
-    let nodesFingerprint () =
-        let path = pathJoin (resourcesDir (), "nodes.json")
-
-        if not (existsSync path) then
-            "000000000000"
-        else
-            fingerprintText (readFileSync (path, "utf8"))
-
-    let private decodeProfile =
-        Decode.object (fun get -> get.Required.Field "modes" (Decode.dict Decode.string))
-
-    let private decodeProfiles =
-        Decode.object (fun get ->
-            let profiles = get.Required.Field "profiles" (Decode.dict decodeProfile)
-            { Profiles = profiles })
-
-    let loadProfiles () =
-        readJson (pathJoin (resourcesDir (), "profiles.json")) decodeProfiles
-
-    let loadToolMap () =
-        readJson
-            (pathJoin (resourcesDir (), "tool-map.json"))
-            (Decode.object (fun get ->
-                let tools = get.Required.Field "tools" (Decode.dict Decode.string)
-                { Tools = tools }))
-
-    let loadFactMap () =
-        readJson
-            (pathJoin (resourcesDir (), "fact-map.json"))
-            (Decode.object (fun get ->
-                let facts = get.Required.Field "facts" (Decode.dict Decode.string)
-                { Facts = facts }))
+        match sliceError, mainNodeError with
+        | Some err, _ -> Error err
+        | None, Some err -> Error err
+        | None, None -> Ok()
 
     let private detectCycle (document: ManifestDocument) : string option =
         let edges =
@@ -181,6 +172,48 @@ module AblationManifest =
 
         allNodes
         |> List.tryPick (fun node -> if state.[node] = 0 then dfs node else None)
+
+    let loadNodes () =
+        readJson (pathJoin (resourcesDir (), "nodes.json")) decodeDocument
+        |> Result.bind (fun doc ->
+            validateNodes doc
+            |> Result.bind (fun () ->
+                match detectCycle doc with
+                | Some cycle -> Error(DagViolation cycle)
+                | None -> Ok doc))
+
+    let nodesFingerprint () =
+        let path = pathJoin (resourcesDir (), "nodes.json")
+
+        if not (existsSync path) then
+            "000000000000"
+        else
+            fingerprintText (readFileSync (path, "utf8"))
+
+    let private decodeProfile =
+        Decode.object (fun get -> get.Required.Field "modes" (Decode.dict Decode.string))
+
+    let private decodeProfiles =
+        Decode.object (fun get ->
+            let profiles = get.Required.Field "profiles" (Decode.dict decodeProfile)
+            { Profiles = profiles })
+
+    let loadProfiles () =
+        readJson (pathJoin (resourcesDir (), "profiles.json")) decodeProfiles
+
+    let loadToolMap () =
+        readJson
+            (pathJoin (resourcesDir (), "tool-map.json"))
+            (Decode.object (fun get ->
+                let tools = get.Required.Field "tools" (Decode.dict Decode.string)
+                { Tools = tools }))
+
+    let loadFactMap () =
+        readJson
+            (pathJoin (resourcesDir (), "fact-map.json"))
+            (Decode.object (fun get ->
+                let facts = get.Required.Field "facts" (Decode.dict Decode.string)
+                { Facts = facts }))
 
     let private validateEdge
         (modes: Map<AblationNodeId, AblationMode>)

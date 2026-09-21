@@ -99,13 +99,15 @@ test('WHAT[feature-ablation-002] ABL_002_station_05_denies_downstream_tools', ()
   })
 })
 
-test('WHAT[feature-ablation-002] ABL_002_station_14_keeps_coder_surface_and_ablates_manager_tools', () => {
+test('WHAT[feature-ablation-002] ABL_002_station_14_keeps_engineer_surface_and_ablates_manager_tools', () => {
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-14']], () => {
     Ablation.load()
     assert.equal(Ablation.allowsTool('read'), true)
+    assert.equal(Ablation.allowsTool('glob'), true)
+    assert.equal(Ablation.allowsTool('grep'), true)
     assert.equal(Ablation.allowsTool('fork'), false)
+    assert.equal(Ablation.allowsTool('js-manager'), false)
     assert.equal(Ablation.allowsPrimaryAgent('manager'), false)
-    assert.equal(Ablation.allowsPrimaryAgent('coder'), true)
     assert.equal(Ablation.fissionVisible(), false)
   })
 })

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
+import * as Ablation from '../../../dist/Ablation/Surface.js'
 
 const ROOT = new URL('../../..', import.meta.url).pathname
 
@@ -54,5 +55,29 @@ test('WHAT[feature-ablation-003] ABL_003_dag_station_order_and_borrow_edges_are_
       edge.kind === 'station-order' || edge.kind === 'borrow',
       `unexpected edge kind ${edge.kind}`,
     )
+  }
+})
+
+test('WHAT[feature-ablation-003] ABL_003_cyclic_graph_load_fails_closed', () => {
+  const nodesPath = join(ROOT, 'resources/ablation/nodes.json')
+  const original = readFileSync(nodesPath, 'utf8')
+  try {
+    const doc = JSON.parse(original)
+    // requirement-system -> verification-system 已存在，添加反向边形成环
+    doc.edges.push({
+      from: 'verification-system',
+      to: 'requirement-system',
+      kind: 'station-order',
+    })
+    writeFileSync(nodesPath, JSON.stringify(doc, null, 2), 'utf8')
+
+    const result = Ablation.load()
+    assert.equal(result.ok, false, 'manifest loading must fail when graph contains cycles')
+    assert.equal(result.kind, 'DagViolation')
+    assert.match(result.error, /cycle/i)
+    assert.deepEqual(Ablation.manifestNodeIds(), [])
+  } finally {
+    writeFileSync(nodesPath, original, 'utf8')
+    Ablation.load()
   }
 })

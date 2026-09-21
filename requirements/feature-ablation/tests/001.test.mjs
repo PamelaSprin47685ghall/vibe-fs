@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
-import { readFileSync, readdirSync } from 'node:fs'
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
+import * as Ablation from '../../../dist/Ablation/Surface.js'
 
 const ROOT = new URL('../../..', import.meta.url).pathname
 
@@ -130,4 +131,57 @@ test('WHAT[feature-ablation-001] ABL_001_tool_map_and_fact_map_sync_with_active_
       `fact ${factTag} maps to node ${nodeName} which must exist in nodes.json`,
     )
   }
+})
+
+test('WHAT[feature-ablation-001] ABL_001_primary_node_uniqueness_and_presence_fail_closed', () => {
+  const nodesPath = join(ROOT, 'resources/ablation/nodes.json')
+  const original = readFileSync(nodesPath, 'utf8')
+
+  const withNodesDoc = (modifier, run) => {
+    try {
+      const doc = JSON.parse(original)
+      modifier(doc)
+      writeFileSync(nodesPath, JSON.stringify(doc, null, 2), 'utf8')
+      run()
+    } finally {
+      writeFileSync(nodesPath, original, 'utf8')
+      Ablation.load()
+    }
+  }
+
+  // 1. 缺失主节点：当包缺失同名主节点时，load 必须 fail-closed 返回 InvalidManifest
+  withNodesDoc(
+    (doc) => {
+      const target = doc.nodes.find((n) => n.id === 'feature-ablation')
+      target.id = 'feature-ablation-custom'
+      target.kind = 'custom'
+    },
+    () => {
+      const result = Ablation.load()
+      assert.equal(result.ok, false, 'manifest loading must fail when primary node is missing')
+      assert.equal(result.kind, 'InvalidManifest')
+      assert.match(result.error, /missing a main node/i)
+      assert.deepEqual(Ablation.manifestNodeIds(), [])
+    },
+  )
+
+  // 2. 多个主节点：同一包出现多个主节点时，load 必须 fail-closed 返回 InvalidManifest
+  withNodesDoc(
+    (doc) => {
+      doc.nodes.push({
+        id: 'feature-ablation-extra',
+        package: 'feature-ablation',
+        station: 0,
+        kind: 'package',
+        borrowed_surface: [],
+      })
+    },
+    () => {
+      const result = Ablation.load()
+      assert.equal(result.ok, false, 'manifest loading must fail when duplicate primary nodes exist')
+      assert.equal(result.kind, 'InvalidManifest')
+      assert.match(result.error, /multiple main nodes/i)
+      assert.deepEqual(Ablation.manifestNodeIds(), [])
+    },
+  )
 })
