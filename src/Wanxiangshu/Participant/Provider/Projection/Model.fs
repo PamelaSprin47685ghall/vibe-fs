@@ -3,7 +3,7 @@ namespace Wanxiangshu.Participant.Provider.Projection
 open System
 open Wanxiangshu.Foundation.Identity
 
-/// The two provider projections (VERIFY-007).
+/// The two provider projections (provider-projection-003).
 ///
 /// They are separate types on purpose. One projection cannot serve both
 /// purposes: byte equality needs the IDs, cross-session equality must not have
@@ -75,7 +75,7 @@ module ProviderProjection =
         { Role: string
           Parts: SemanticPart list }
 
-    /// Used for canary fixture matching (VERIFY-003), Blogger delta
+    /// Used for canary fixture matching (provider-projection-003), Blogger delta
     /// (COMPANION-012) and behavioural comparison.
     ///
     /// Excludes message IDs, call IDs, timestamps, runtime metadata, directory,
@@ -106,8 +106,8 @@ module ProviderProjection =
         { Role = message.Role
           Parts = message.Parts |> List.map semanticPart }
 
-    /// Drop the identities. Named explicitly because VERIFY-007 permits exactly
-    /// one such function and forbids implicit conversion.
+    /// Drop the identities. Named explicitly because provider-projection-003
+    /// permits exactly one such function and forbids implicit conversion.
     let toSemantic (wire: ProviderWireProjection) : ProviderSemanticProjection =
         { ProviderId = wire.ProviderId
           ModelId = wire.ModelId

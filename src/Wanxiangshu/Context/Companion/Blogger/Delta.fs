@@ -69,7 +69,7 @@ module BloggerDelta =
         // A semantic tool result has no tool name: the wire projection drops the
         // call id and the name travels on the CALL part. Attributing one here would
         // require pairing results back to calls by position, which is exactly the
-        // positional guessing VERIFY-007 removed elsewhere.
+        // positional guessing provider-projection-003 removed elsewhere.
         | SemanticToolResult result -> BloggerDeltaPart.ToolResultPart result
         | SemanticMedia(mediaType, _digest) -> omissionFor mediaType
 

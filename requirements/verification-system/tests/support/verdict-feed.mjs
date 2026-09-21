@@ -1,4 +1,4 @@
-// tests/unit/verdict-feed.mjs — which node:test events prove the suite moved (VERIFY-004).
+// tests/unit/verdict-feed.mjs — which node:test events prove the suite moved (verification-system-006).
 //
 // The clause's discriminator: 「该事件是否证明被测因果链前进了一步」, and it disqualifies
 // 「任何『有字节在动』的证据」. Applied to the unit suite, that rules out the granularity W4 was

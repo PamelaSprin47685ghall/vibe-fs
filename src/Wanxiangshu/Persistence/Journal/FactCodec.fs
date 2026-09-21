@@ -42,7 +42,7 @@ module FactCodec =
     ///
     /// Fields — the old Fallback projection stored Dead/Failures counters and
     /// model ids. Guessing a modulo-4 cursor from them would be inventing
-    /// history, and VERIFY-006 lists a journal carrying model ids as a No-Go.
+    /// history, and durable-events-009 lists a journal carrying model ids as a No-Go.
     ///
     /// Case names — the facts replaced in this migration. Without them the
     /// decoder would fail with an opaque union error, so the operator would see

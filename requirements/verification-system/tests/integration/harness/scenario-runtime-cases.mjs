@@ -1,7 +1,7 @@
 /**
  * gate-scenario-runtime-cases.mjs — the composition, and its first real caller.
  *
- * verification-system-003. K2-K5 each produced a pure piece and each had ZERO callers on the provider
+ * K2-K5 each produced a pure piece and each had ZERO callers on the provider
  * path (measured at the start of K9). Every gate case before this one exercised a piece in
  * isolation, which proves the piece and says nothing about the forest.
  *

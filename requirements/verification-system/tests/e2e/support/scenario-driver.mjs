@@ -194,7 +194,7 @@ async function sendPrompt(scenario, sessionId, prompt) {
  * The previous loop called `advance({ blocking: true })` at the top of every iteration and then
  * waited on the event probe with a predicate that accepted EVERY host event, for 500ms. So the
  * silence budget was renewed every slice whether or not the fact moved, and the thing being
- * awaited was 「有字节在动」 rather than a step of the causal chain. VERIFY-004 names this exact
+ * awaited was 「有字节在动」 rather than a step of the causal chain. verification-system-006 names this exact
  * shape: 「一个反复重连的 SSE 读者能永久续期一个错误的 watchdog」. Measured with a fake event source
  * that answers every slice and a fact that never appears, the loop survived past two silence
  * windows and would have run to the full 120000ms fallback.
@@ -253,7 +253,7 @@ export async function awaitFactBarrier(scenario, step, ctx = null) {
     return readJournal(scenario.host.workDir, name, renewOn);
   };
 
-  // VERIFY-004: a waitFact with an explicit timeout is a bounded wait step —
+  // verification-system-006: a waitFact with an explicit timeout is a bounded wait step —
   // widen the silence window to that bound so a slow-but-progressing promote
   // is not killed by the default 5s silence watchdog mid-poll.
   scenario.watchdog?.setWindow(step.timeoutMs ?? null);
@@ -278,7 +278,7 @@ export async function awaitFactBarrier(scenario, step, ctx = null) {
         `waitFact ${name} overshot eq ${need} (got ${next.named}); use gte when the producer can race past the exact count`,
       );
     }
-    // VERIFY-004 / waitFact causal renewal: only the awaited count OR an explicitly
+    // verification-system-006 / waitFact causal renewal: only the awaited count OR an explicitly
     // declared renewOn fact is causal blocking progress. Any other journal growth is
     // background traffic — recorded for diagnosis, never renewing the silence window.
     if (next.named > observed.named) {
@@ -389,7 +389,7 @@ async function runFlow(scenario, doc, ctx) {
   /** One flow step. Nested so the verbs keep reading `scenario` / `doc` / `ctx` directly. */
   const runStep = async (step) => {
     if (step.wait) {
-      // VERIFY-004: an explicitly-bounded wait is a declared slow step — the
+      // verification-system-006: an explicitly-bounded wait is a declared slow step — the
       // watchdog silence window widens to its timeoutMs so a legitimate
       // recovery chain is not mistaken for a hang. Background traffic never
       // renews the window; only a blocking advance does.
@@ -693,7 +693,7 @@ async function runFlow(scenario, doc, ctx) {
       // StrictMockSignals, so it cannot barrier multi-delivery continues; this poll is the
       // barrier for the trailing success delivery. Renew watchdog only on observed progress
       // (length growth or matching-prefix growth). Overshoot or prefix divergence fails
-      // immediately — no slice/normalize (VERIFY-002). Stuck silence → existing watchdog.
+      // immediately — no slice/normalize (verification-system-004). Stuck silence → existing watchdog.
       const claim = step.assertModelTrajectory;
       const sessionId = scenario.provider.sessionFor(claim.lane);
       assert.ok(sessionId, `assertModelTrajectory lane '${claim.lane}' is not bound`);
@@ -729,9 +729,9 @@ async function runFlow(scenario, doc, ctx) {
         }
 
         if (models.length === expected.length) {
-          // Exact, and deliberately so. The old scenario carried a
-          // `rawModels.length === 5 → slice(1)` normalization to tolerate a duplicated first
-          // attempt — assertion weakening of the kind VERIFY-002 forbids. If the Host ever does
+      // Exact, and deliberately so. The old scenario carried a
+      // `rawModels.length === 5 → slice(1)` normalization to tolerate a duplicated first
+      // attempt — assertion weakening of the kind verification-system-004 forbids. If the Host ever does
           // deliver that duplicate, this must fail and be explained.
           assert.deepEqual(models, expected, `model trajectory for lane ${claim.lane}`);
           ctx.modelTrajectory = models;

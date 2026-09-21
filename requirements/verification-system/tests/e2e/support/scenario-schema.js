@@ -1,7 +1,7 @@
 /**
  * scenario-schema.js — TOML scenario source → the runtime structures K2-K4 consume.
  *
- * VERIFY-003. Two layers, deliberately not the same shape:
+ * verification-system-001. Two layers, deliberately not the same shape:
  *
  *   source     a conversation a human reads top to bottom
  *   compiled   (lane, turn, step) entries a machine looks up
@@ -262,7 +262,7 @@ const afterExpectationProblems = (flow) =>
 
 /**
  * `waitFact.renewOn` — the causal intermediate facts that renew the barrier
- * (VERIFY-004 / waitfact-causal-renewal). An empty or absent list is a simple
+ * (verification-system-006 / waitfact-causal-renewal). An empty or absent list is a simple
  * barrier that only follows the target. Rejected: non-array, non-string entries,
  * empty strings, duplicates, or an entry repeating the awaited `name` (a
  * fact that renews itself is the old any-append bug in a costume).

@@ -130,7 +130,7 @@ module ProjectionMessageEdit =
                       "result", canonicalValue resultCanonical ]
             )
         | WireMedia _ ->
-            // VERIFY-007: semantic/media digests are one-way. Reconstructing media
+            // provider-projection-010: semantic/media digests are one-way. Reconstructing media
             // bytes from a digest would invent provider-visible content.
             Error "wire media cannot be reconstructed from semantic digest"
 

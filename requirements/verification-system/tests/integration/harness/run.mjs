@@ -4,7 +4,7 @@
  * Proves environment isolation, strict FIFO, SSE reconnect/event waits,
  * and diagnostics/leak checks using extracted harness APIs; no fixed sleeps.
  *
- * Hang criterion: HARNESS_CASE_SILENCE_MS without a finished case (VERIFY-004).
+ * Hang criterion: HARNESS_CASE_SILENCE_MS without a finished case (verification-system-006).
  * Case completion is the only blocking advance — not case start, not console output.
  *
  * Run: node requirements/verification-system/tests/integration/harness/run.mjs

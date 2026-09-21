@@ -1,5 +1,5 @@
 /**
- * gate-timeout-cases.mjs — the silence criterion of verification-system-004, as regressions.
+ * gate-timeout-cases.mjs — the silence criterion of verification-system-006, as regressions.
  *
  * Four of the thirteen 禁止退化 items are watchdog semantics, and each has a case here:
  *
@@ -102,7 +102,7 @@ async function runWatchdogRejectsBackgroundNoise() {
 }
 
 async function runWatchdogWidenedWindowToleratesDeclaredSlowStep() {
-  // verification-system-004: a legitimately slow wait step is DECLARED (scenario timeoutMs),
+  // verification-system-006: a legitimately slow wait step is DECLARED (scenario timeoutMs),
   // never inferred. setWindow widens the silence window to that bound — slow
   // work inside the bound must not be mistaken for a hang.
   const script =
@@ -170,7 +170,7 @@ async function runConcurrentAwaitTimeouts() {
   await server.close();
 }
 
-// ── verification-system-004 watchdog properties, one case per 禁止退化 item ────────────────
+// ── verification-system-006 watchdog properties, one case per 禁止退化 item ────────────────
 
 /**
  * A lane in the shape `scenario-parallel.js` builds from a consumed expectation. Assembled from
@@ -210,7 +210,7 @@ function runNoWildcardEventAwait() {
     offenders.length,
     0,
     `an await whose predicate accepts any host event is transport motion, not causal progress ` +
-      `(verification-system-004 禁止退化清单 2): ${offenders.join(' | ')}`,
+      `(verification-system-006 禁止退化清单 2): ${offenders.join(' | ')}`,
   );
 }
 
@@ -457,9 +457,9 @@ export const timeoutCases = [
   { name: 'watchdog widened window tolerates declared slow step', fn: runWatchdogWidenedWindowToleratesDeclaredSlowStep },
   { name: 'watchdog restores default window', fn: runWatchdogRestoresDefaultWindow },
   { name: 'concurrent awaitEvent timeouts stay independent', fn: runConcurrentAwaitTimeouts },
-  { name: 'verification-system-004 no watchdog feed awaits an unspecified host event', fn: runNoWildcardEventAwait },
-  { name: 'verification-system-004 the timeout dump separates causal progress from background', fn: runDiagnosticDumpIsComplete },
-  { name: 'verification-system-004 a clean scenario is not held to the end of the silence window', fn: runTimerDoesNotHoldEventLoop },
-  { name: 'verification-system-004 waitFact renews only on an observation', fn: runWaitFactRenewsOnlyOnObservation },
-  { name: 'verification-system-004 waitFact renews on declared facts and preserves exact counts', fn: runWaitFactRenewsOnDeclaredFactAndCountsPrecisely },
+  { name: 'verification-system-006 no watchdog feed awaits an unspecified host event', fn: runNoWildcardEventAwait },
+  { name: 'verification-system-006 the timeout dump separates causal progress from background', fn: runDiagnosticDumpIsComplete },
+  { name: 'verification-system-006 a clean scenario is not held to the end of the silence window', fn: runTimerDoesNotHoldEventLoop },
+  { name: 'verification-system-006 waitFact renews only on an observation', fn: runWaitFactRenewsOnlyOnObservation },
+  { name: 'verification-system-006 waitFact renews on declared facts and preserves exact counts', fn: runWaitFactRenewsOnDeclaredFactAndCountsPrecisely },
 ];

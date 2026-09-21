@@ -328,7 +328,7 @@ const { default: test } = await import("node:test");
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const ENTRY = join(ROOT, 'requirements/verification-system/tests/014.test.mjs')
 const LONG_STROKE = join(ROOT, 'requirements/verification-system/tests/e2e/scenarios/long-stroke.toml')
-const MARKER = 'PHYSICAL CONTRACTS (VERIFICATION-SYSTEM-003)'
+const MARKER = 'PHYSICAL CONTRACTS (verification-system [002]/[014])'
 const REQUIRED = [
   /OpenCode process lifetime|spawn count === 1|spawn === 1/,
   /Host-assigned assistant messageID|HOST-010/,
@@ -337,7 +337,7 @@ const REQUIRED = [
 
 test('WHAT[verification-system-003] sole e2e entry declares unsimulatable physical contracts', () => {
   const text = readFileSync(ENTRY, 'utf8')
-  assert.equal(text.includes(MARKER), true, 'e2e entry must name PHYSICAL CONTRACTS (VERIFICATION-SYSTEM-003)')
+  assert.equal(text.includes(MARKER), true, 'e2e entry must name PHYSICAL CONTRACTS (verification-system [002]/[014])')
   for (const contract of REQUIRED) {
     assert.match(text, contract, `e2e entry must declare ${contract}`)
   }

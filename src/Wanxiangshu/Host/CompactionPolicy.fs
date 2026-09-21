@@ -36,7 +36,7 @@ type CompactionGateVerdict =
 ///
 /// Pure. The config object and the Host snapshot are read by the adapter; what is
 /// here is which keys are required and what an observation means, so both are
-/// testable without a Host (VERIFY-008).
+/// testable without a Host (verification-system-001 Pure laws).
 [<RequireQualifiedAccess>]
 module HostCompactionPolicy =
 

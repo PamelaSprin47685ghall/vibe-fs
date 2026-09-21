@@ -101,23 +101,23 @@ module AblationManifest =
         | Some _, Some _ -> None
 
     let private validatePackageMainNodes (document: ManifestDocument) : AblationLoadError option =
-        let packages =
-            document.Nodes
-            |> List.map (fun n -> n.Package)
-            |> List.distinct
+        let packages = document.Nodes |> List.map (fun n -> n.Package) |> List.distinct
 
         packages
         |> List.tryPick (fun pkg ->
             let nodesInPkg = document.Nodes |> List.filter (fun n -> n.Package = pkg)
+
             let mainNodes =
-                nodesInPkg
-                |> List.filter (fun n -> n.Id = pkg && n.Kind = "package")
-            let pkgKindNodes =
-                nodesInPkg
-                |> List.filter (fun n -> n.Kind = "package")
+                nodesInPkg |> List.filter (fun n -> n.Id = pkg && n.Kind = "package")
+
+            let pkgKindNodes = nodesInPkg |> List.filter (fun n -> n.Kind = "package")
 
             if mainNodes.IsEmpty then
-                Some(InvalidManifest(sprintf "Package '%s' is missing a main node (expected id '%s' and kind 'package')" pkg pkg))
+                Some(
+                    InvalidManifest(
+                        sprintf "Package '%s' is missing a main node (expected id '%s' and kind 'package')" pkg pkg
+                    )
+                )
             elif mainNodes.Length > 1 || pkgKindNodes.Length > 1 then
                 Some(InvalidManifest(sprintf "Package '%s' has multiple main nodes" pkg))
             else

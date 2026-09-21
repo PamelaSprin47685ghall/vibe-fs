@@ -5,7 +5,7 @@ open Wanxiangshu.Foundation.Identity
 /// COMPANION-013: every synthetic identity the Companion protocol puts on the wire.
 ///
 /// All four formulas are pure functions of durable facts, and `sha256` arrives as a
-/// parameter so this module has no Host dependency (VERIFY-008). No GUID, no
+/// parameter so this module has no Host dependency (verification-system-001 Pure laws). No GUID, no
 /// `Math.random`, no clock, no Host runtime id — a synthetic message must be
 /// byte-identical on every request within one epoch, and any of those would change
 /// it per call and break the prefix cache silently.

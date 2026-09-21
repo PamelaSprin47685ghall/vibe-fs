@@ -12,7 +12,7 @@ open Fable.Core.JsInterop
 ///
 /// Pure domains never call this. They take `sha256: string -> string` as a
 /// parameter, which is why `Domain/` has no `node:crypto` import and stays
-/// testable without a Host (VERIFY-008).
+/// testable without a Host (verification-system-001 Pure laws).
 module HostDigest =
 
     [<Import("createHash", "node:crypto")>]

@@ -1,7 +1,7 @@
 /**
  * gate-runtime-key-cases.mjs — the scenario lookup key is a pure function.
  *
- * verification-system-003. Three properties, each of which the old matcher broke:
+ * Three properties, each of which the old matcher broke:
  *
  *   pure       the answer depends on the request, not on how many came before
  *   prefix     longest declared prefix wins, and ties are author errors

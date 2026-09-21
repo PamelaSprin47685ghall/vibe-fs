@@ -24,7 +24,7 @@ const makeTempRoot = (layout) => {
 const cleanup = (root) => rmSync(root, { recursive: true, force: true })
 
 test('WHAT[verification-system-005] traversal errors are not masked (cause preserved)', () => {
-  // fail-closed 义务（VERIFY-005）：遇数据损坏/边界失配时安全失败，不崩溃吞上下文。
+  // fail-closed 义务（verification-system-005）：遇数据损坏/边界失配时安全失败，不崩溃吞上下文。
   // The original fail-open path swallowed the traversal error into a green [].
   // Fail-closed means the underlying errno is preserved as `cause` so the
   // failure is explainable, not a silent zero-file OK.

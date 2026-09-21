@@ -1,7 +1,7 @@
 /**
  * gate-schema-cases.mjs — a scenario that half-loads is worse than one that fails.
  *
- * verification-system-003. Every check here runs at load time with no Host and no build artifacts,
+ * Every check here runs at load time with no Host and no build artifacts,
  * which is what puts it in verification-system-001 layer 0 alongside `ssot-lint` and `shock-audit`.
  *
  * The dead-edge check is the one that requires the static whole: a step no flow can

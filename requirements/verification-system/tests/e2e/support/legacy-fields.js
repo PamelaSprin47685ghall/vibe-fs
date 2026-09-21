@@ -1,7 +1,7 @@
 /**
  * legacy-fields.js — fields a TOML scenario may not use, and what replaced each.
  *
- * VERIFY-003. Every name below existed in the JSON forest and now has a strictly
+ * verification-system-001. Every name below existed in the JSON forest and now has a strictly
  * better expression. Rejecting them is not tidiness: each one, if silently accepted,
  * would be ignored by the compiler while the author believed it was in force. A
  * scenario carrying `reusable = true` that the loader drops is a scenario whose author

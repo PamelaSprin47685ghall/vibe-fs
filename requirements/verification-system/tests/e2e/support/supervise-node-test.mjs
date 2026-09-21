@@ -1,5 +1,5 @@
 /**
- * Out-of-process supervisor for a node:test child (VERIFY-004 silence criterion).
+ * Out-of-process supervisor for a node:test child (verification-system-006 silence criterion).
  *
  * Shared by unit / integration / package runners. The silence window is fed only by
  * test verdicts; stdout/stderr/diagnostics are background and never renew.

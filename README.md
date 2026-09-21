@@ -178,16 +178,19 @@ npm run format-build-test
 
 | 命令 | 作用 |
 |------|------|
-| `npm run format-build-test` | Fantomas 写盘 → `scripts/check.mjs` → 编译 → unit → integration → package → warmup → Long Stroke e2e → `npm pack --dry-run` |
+| `npm run format-build-test` | 日常验证：Fantomas 写盘 → `scripts/check.mjs` → 编译 → unit → integration（warmup 与 distribution package 子步骤随 integration 调度） |
+| `npm run verify:release` | 发布验证：在日常阶梯基础上追加 clean build（`--clean`）、Long Stroke e2e（`tests/014.test.mjs`）与真实 package 校验 |
 | `node scripts/build.mjs --plan` | 只读计划报告：`mode`/`reason`/`changedInputs`/`selectedShards`/`compileItems`/`fableCompileInvocations`，不写 `dist/` |
 
 ### 测试分层
+
+语义命题按 Pure laws → Temporal → Adapter → Long Stroke 四层逐级证明（WHAT[verification-system-001]、[003]）。日常入口 format-build-test 调度编译与 unit/integration；Long Stroke 与真实 package 校验由发布入口 verify:release 额外调度。
 
 | 层 | 入口 | 范围 |
 |----|------|------|
 | unit | `requirements/verification-system/tests/run.mjs` | 对 `dist/` 的契约；经 `requirements/verification-system/tests/support/` |
 | integration | `requirements/verification-system/tests/integration/run.mjs` | resources、plugin、persist、strength、package、harness（用例经 tier-gate 门控并入各包顶级 `tests/NNN.test.mjs`） |
-| e2e | `requirements/verification-system/tests/e2e/014.test.mjs` | `scenarios/long-stroke.toml` + `support/` oracles；单次连续生命周期 |
+| e2e（Long Stroke） | `requirements/verification-system/tests/014.test.mjs` | `scenarios/long-stroke.toml` + `support/` oracles；单次连续生命周期 |
 
 `dist/` 陈旧时 unit 拒绝运行。资源路径由包内 `dist/` 相对定位到 `resources/`，不依赖 `process.cwd()`。
 
@@ -226,7 +229,7 @@ resources/wanxiangshu.mjs
 - **构建**：`scripts/build.mjs`（清空 `dist/` → Fable → 校验入口与资源）。不把 `resources/` 复制进 `dist/`。
 - **打包**：仓库根 `npm pack`（或 `--pack-destination artifacts/package`）。tarball = `dist/` + `resources/` + metadata（`package.json`、`README.md`、`LICENSE`）。不得含 `src/`、`requirements/`、`scripts/`、`artifacts/`。
 
-发布预检：`npm run format-build-test`（干净工作树；验证日志进 CI artifact）。
+发布预检：`npm run verify:release`（干净工作树；验证日志进 CI artifact）。
 
 ### 提交要求
 
@@ -240,7 +243,7 @@ resources/wanxiangshu.mjs
 ```bash
 npm ci
 dotnet tool restore
-npm run format-build-test
+npm run verify:release
 npm pack --pack-destination artifacts/package
 ```
 

@@ -1,7 +1,7 @@
 /**
  * delivery-plan.js — transport faults, declared separately from content.
  *
- * VERIFY-003. Content is a pure function of the request; a fault is not content.
+ * verification-system-001. Content is a pure function of the request; a fault is not content.
  * A provider that returns 500 twice and then succeeds sent ONE conversation over
  * THREE physical deliveries, and the delivery count is genuinely countable — so
  * this is the one place in the forest where counting is legitimate.

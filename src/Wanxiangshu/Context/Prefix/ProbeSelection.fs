@@ -28,7 +28,7 @@ type NoCandidateReason =
 
 /// CTX-011 candidate selection: build the probe for one armed slot, or say why not.
 ///
-/// Pure. `sha256` is a parameter (VERIFY-008), and the FrozenRecordPrefix body is already
+/// Pure. `sha256` is a parameter (verification-system-001 Pure laws), and the FrozenRecordPrefix body is already
 /// materialised by the caller — reading a blob is a Host concern (PERSIST-007), and
 /// this module must stay callable from a layer-1 test.
 [<RequireQualifiedAccess>]

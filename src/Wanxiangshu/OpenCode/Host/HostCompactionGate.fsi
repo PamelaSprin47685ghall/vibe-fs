@@ -10,7 +10,7 @@ open Wanxiangshu.Persistence.Journal
 ///
 /// The decisions live in `Domain.HostCompactionPolicy`; this module only reads and
 /// writes Host objects and the journal. `HostCompactionPolicy` is what a layer-1 test
-/// exercises, which is why the judgement is not inlined here (VERIFY-008).
+/// exercises, which is why the judgement is not inlined here (verification-system-001 Pure laws).
 module HostCompactionGate =
 
     /// HOST-006 prevention layer: force every required setting off.

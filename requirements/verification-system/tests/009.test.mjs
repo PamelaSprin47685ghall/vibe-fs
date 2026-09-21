@@ -243,7 +243,7 @@ for (const failingLabel of ['format:check', 'check', 'build']) {
 
 test('WHAT[verification-system-009] every ladder step target exists as a real file', () => {
   // 层序里的每个入口都必须是真实文件：指向不存在文件的命令恒为「没跑到」，
-  // 层序 pin 就退化成文字装饰（VERIFY-004 静态门禁必须命中真实路径）。
+  // 层序 pin 就退化成文字装饰（verification-system-009 静态门禁必须命中真实路径）。
   const required = [
     'scripts/check.mjs',
     'scripts/build.mjs',

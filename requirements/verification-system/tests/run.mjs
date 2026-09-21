@@ -17,7 +17,7 @@
 //   node requirements/verification-system/tests/run.mjs --skip-staleness-check   (build-tooling work only)
 //
 // Supervision lives in requirements/verification-system/tests/e2e/support/supervise-node-test.mjs
-// so integration/package share the same verdict-silence criterion (VERIFY-004).
+// so integration/package share the same verdict-silence criterion (verification-system-006).
 // UNIT_VERDICT_SILENCE_MS remains the unit budget.
 
 import { dirname, join } from 'node:path'

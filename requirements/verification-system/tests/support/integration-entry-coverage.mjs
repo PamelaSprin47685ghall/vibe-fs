@@ -11,7 +11,7 @@ const duplicatesOf = (values) => {
 }
 
 /**
- * VERIFY-004/009: every integration test must be reachable from the
+ * verification-system-004/009: every integration test must be reachable from the
  * authoritative integration entry exactly once, and every wired path must
  * resolve to a discovered integration test. Tests owned by a child entrypoint
  * are declared as an exact set (`childOwnedTests`) — not a broad prefix — so

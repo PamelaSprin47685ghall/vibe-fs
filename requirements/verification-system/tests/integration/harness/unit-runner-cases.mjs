@@ -91,7 +91,7 @@ const fixtureNames = () => readdirSync(`${REPO_ROOT}${FIXTURE_DIR}`);
 
 export const unitRunnerCases = [
   {
-    name: 'verification-system-004 a hung test that keeps printing is ended by the verdict-silence window',
+    name: 'verification-system-006 a hung test that keeps printing is ended by the verdict-silence window',
     fn: async () => {
       // The load-bearing case, covering two forbidden degradations at once:
       //
@@ -155,7 +155,7 @@ export const unitRunnerCases = [
   },
 
   {
-    name: 'verification-system-004 a clean run is not held to the end of the silence window',
+    name: 'verification-system-006 a clean run is not held to the end of the silence window',
     fn: async () => {
       // 「让 watchdog 计时器持有事件循环，使干净结束也要等满静默窗口」. The guard is `unref` inside
       // `Watchdog._arm`; W6 measured 2004ms of a 2000ms window with the call removed. Here the same
@@ -177,7 +177,7 @@ export const unitRunnerCases = [
   },
 
   {
-    name: 'verification-system-004 a green ledger with a leaked handle is a failure, not a pass',
+    name: 'verification-system-006 a green ledger with a leaked handle is a failure, not a pass',
     fn: async () => {
       // The failure mode the previous runner could not express. It awaited `stream.on('end')`, which
       // DOES arrive for this fixture — node:test finished its work — so it would have exited 0 while
@@ -203,7 +203,7 @@ export const unitRunnerCases = [
   },
 
   {
-    name: 'verification-system-004 verdicts actually renew the window, so legitimate slow work is not killed',
+    name: 'verification-system-006 verdicts actually renew the window, so legitimate slow work is not killed',
     fn: async () => {
       // The case that proves the feed is WIRED, and the reason it exists is a measured hole in this
       // file's first draft: with `classifyVerdict` returning null for every verdict — the feed fully
@@ -308,7 +308,7 @@ export const unitRunnerCases = [
   },
 
   {
-    name: 'verification-system-004 the silence window covers one whole test plus jitter',
+    name: 'verification-system-006 the silence window covers one whole test plus jitter',
     fn: () => {
       // Detection, not prevention, and the comment says so rather than overclaiming. Raising a budget
       // to hide a race is 「延长静默窗口或测试超时以掩盖竞态」, and no static check distinguishes a
@@ -324,7 +324,7 @@ export const unitRunnerCases = [
       assertTrue(
         UNIT_VERDICT_SILENCE_MS < SUITE_BACKSTOP_MS,
         'the window is the primary criterion and the backstop only 兜底; inverting them restores the ' +
-          'degradation verification-system-004 names first',
+          'degradation verification-system-006 names first',
       );
     },
   },

@@ -1,7 +1,7 @@
 /**
  * cold-boundary.js — explicit declared exceptions to the prefix seal.
  *
- * ARCH-004 keeps the provider-visible prefix byte-stable so KV-cache hits. VERIFY-003
+ * ARCH-004 keeps the provider-visible prefix byte-stable so KV-cache hits. verification-system-001
  * §"冷边界显式声明" names an explicit finite set of legitimate exceptions and requires
  * the scenario to say WHERE each happens:
  *

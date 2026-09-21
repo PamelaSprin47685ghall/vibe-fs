@@ -1,5 +1,5 @@
 /**
- * watchdog.js — the silence criterion of VERIFY-004, derived from the clause.
+ * watchdog.js — the silence criterion of verification-system-006, derived from the clause.
  *
  * 「没有进展就杀死，而不是等总超时」. The judgement is 「距上次因果进展的静默时长」, never the total
  * run time, and the four properties the clause spells out are:
@@ -156,7 +156,7 @@ export class Watchdog {
 
   /**
    * Temporarily widen the silence window for one explicitly-bounded wait step
-   * (VERIFY-004: a legitimately slow step must be declared, never inferred —
+   * (verification-system-006: a legitimately slow step must be declared, never inferred —
    * the scenario's `timeoutMs` is that declaration). `null` restores the
    * centralized default. Only blocking advances renew the widened window, so
    * background traffic still cannot extend it.
@@ -219,7 +219,7 @@ export class Watchdog {
 function requireText(value, field) {
   if (typeof value !== 'string' || value.length === 0) {
     throw new TypeError(
-      `Watchdog.advance requires a non-empty ${field}; VERIFY-004 makes it part of the ` +
+      `Watchdog.advance requires a non-empty ${field}; verification-system-006 makes it part of the ` +
       `timeout dump, and ${JSON.stringify(value)} would leave the dump unable to say what the ` +
       `last progress was`,
     );

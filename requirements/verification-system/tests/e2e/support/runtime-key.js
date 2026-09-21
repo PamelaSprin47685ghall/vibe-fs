@@ -1,7 +1,7 @@
 /**
  * runtime-key.js — the scenario lookup key, as semantic functions of body plus harness context.
  *
- * VERIFY-003. Every semantic component is derived from the request alone; lane routing reads
+ * verification-system-001. Every semantic component is derived from the request alone; lane routing reads
  * only explicit harness context; nothing here reads
  * or writes state. That is the whole point: the matcher this replaces kept a
  * `pathCursor` per path and a `claimCount` per edge, so the answer depended on how
@@ -200,7 +200,7 @@ const lastUserIndex = (messages) => {
  * The last user message, as prefix-comparable semantic text.
  *
  * Goes through the production semantic projection, so a scenario matches exactly
- * what VERIFY-007 says the exchange meant — ids and runtime metadata excluded,
+ * what verification-system-001 says the exchange meant — ids and runtime metadata excluded,
  * multimodal parts reduced to their digest.
  *
  * No truncation. The old `extractLastUserMsg` sliced at 2000 characters, which made

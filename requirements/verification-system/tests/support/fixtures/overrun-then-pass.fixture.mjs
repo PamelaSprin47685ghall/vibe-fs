@@ -1,4 +1,4 @@
-// VERIFY-004's 「禁止：让被遗弃的测试在稍后 reject，从而掩盖真正的失败」, under test.
+// verification-system-004's 「禁止：让被遗弃的测试在稍后 reject，从而掩盖真正的失败」, under test.
 //
 // A overruns its per-test bound; B is trivially correct and runs after it. The clause names this the
 // easiest mistake to make — a timeout that rejects a racing Promise without clearing the follow-on

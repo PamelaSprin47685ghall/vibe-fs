@@ -1,8 +1,7 @@
 /**
  * time-budget.js — every wall-clock bound the harness owns, named exactly once.
  *
- * VERIFY-004: 「wall-clock 上限可以作为兜底存在，但不得是唯一或首要的判据。兜底值必须集中定义，
- * 不得散落为字面量。」 Package W1 measured what 散落 had become: 23 timing literals across 13
+ * verification-system-006: 挂死判据必须是距上次因果进展的静默时长，wall-clock 总超时不得当作唯一判据（禁止退化清单）；墙钟兜底值在本文件集中定义，不散落为字面量。 Package W1 measured what 散落 had become: 23 timing literals across 13
  * files, none of them visible to any gate. Two were the same 3000ms diagnostic race written
  * independently in two files. One (10000) was spelled a third and fourth time inside
  * user-facing strings that would have kept saying "within 10s" after the budget moved. One
@@ -59,7 +58,7 @@ const budgetFromEnv = (name, fallback) => {
 
 /**
  * Silence budget of a scenario-local watchdog: how long without causal progress before the
- * canary is declared hung. Short on purpose — VERIFY-004 asks 「距上次因果进展过了多久」, and 3s
+ * canary is declared hung. Short on purpose — verification-system-006 asks 「距上次因果进展过了多久」, and 3s
  * means the diagnostic is taken at the causal scene instead of minutes downstream. Also the
  * default budget for a canary `wait` expectation (`strict-mock-provider.js:154`), so a single
  * fork→worktree bootstrap or join mailbox gate (~2.3-2.4s) fits inside it without a per-step
@@ -68,7 +67,7 @@ const budgetFromEnv = (name, fallback) => {
 export const WATCHDOG_TIMEOUT_MS = budgetFromEnv('WATCHDOG_TIMEOUT_MS', 5000);
 
 /**
- * Integration harness case-silence (VERIFY-004). Must exceed the longest
+ * Integration harness case-silence (verification-system-006). Must exceed the longest
  * single harness case wall time. Unit-runner renew probes intentionally last
  * longer than the e2e canary silence (WATCHDOG_TIMEOUT_MS); if the harness dog
  * reused that budget, the last open case would be killed mid-work.
@@ -106,8 +105,7 @@ export const CANARY_READY_MS = 10000;
 export const READINESS_STAGE_MS = 4000;
 
 /**
- * Provider-failure backstop ceiling for one Host process: the 兜底 VERIFY-004 permits so long as it is not the
- * primary criterion, which the watchdog is. Restart-heavy strokes need roughly 45s solo headroom;
+ * Provider-failure backstop ceiling for one Host process: [006] 禁止把 wall-clock 总超时当作唯一判据——watchdog 才是首要判据，本兜底因此成立。Restart-heavy strokes need roughly 45s solo headroom;
  * the bound stays generous as a backstop only. Still overridable through the CANARY_TIMEOUT_MS
  * environment variable; the env read stays at the call site so this module reads no process state.
  */
@@ -160,11 +158,11 @@ export const PER_TEST_TIMEOUT_MS = budgetFromEnv('PER_TEST_TIMEOUT_MS', 2500);
  * hang criterion.
  *
  * Before W4 this WAS the real criterion: a test that hangs while holding a handle prevents
- * node:test from emitting `end`, so nothing else terminated the run. VERIFY-004 forbids that
- * (「以套件总时长作为唯一挂死判据」) and W4 removed it — `UNIT_VERDICT_SILENCE_MS` below is the
+ * node:test from emitting `end`, so nothing else terminated the run. verification-system-006 forbids that
+ * (「把 wall-clock 总超时当作唯一挂死判据」) and W4 removed it — `UNIT_VERDICT_SILENCE_MS` below is the
  * primary criterion, and this survives only for a child that outlives its supervisor.
  *
- * The clause permits exactly this: 「wall-clock 上限可以作为兜底存在，但不得是唯一或首要的判据」.
+ * [006] 禁止把 wall-clock 总超时当作唯一判据；非首要的物理兜底因此成立。
  */
 export const SUITE_BACKSTOP_MS = budgetFromEnv('SUITE_BACKSTOP_MS', 300000);
 
@@ -204,7 +202,7 @@ export const PROJECT_CHECK_TIMEOUT_MS = budgetFromEnv('PROJECT_CHECK_TIMEOUT_MS'
 /**
  * Fixed probe lattice for `tests/integration/harness/unit-runner-cases.mjs`.
  * Independent of production PER_TEST/UNIT_VERDICT so raising production CI headroom
- * does not collapse fixture headroom (VERIFY-004 inequalities still hold).
+ * does not collapse fixture headroom (verification-system-006 inequalities still hold).
  */
 export const UNIT_RUNNER_PROBE_PER_TEST_MS = budgetFromEnv('UNIT_RUNNER_PROBE_PER_TEST_MS', 2000);
 export const UNIT_RUNNER_PROBE_SILENCE_MS = budgetFromEnv('UNIT_RUNNER_PROBE_SILENCE_MS', 7000);

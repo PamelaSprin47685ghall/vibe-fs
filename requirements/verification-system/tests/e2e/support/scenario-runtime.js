@@ -1,7 +1,7 @@
 /**
  * scenario-runtime.js — the compiled scenario, as the provider actually consults it.
  *
- * VERIFY-003. K2-K5 each produced a pure piece: `runtime-key` derives (lane, kind, turn,
+ * verification-system-001. K2-K5 each produced a pure piece: `runtime-key` derives (lane, kind, turn,
  * step) from a request, `delivery-plan` says whether THIS physical delivery is refused,
  * `cold-boundary` says whether a broken prefix seal was declared, `scenario-schema`
  * compiles the source. None of them knew about the others, and measured after K8:

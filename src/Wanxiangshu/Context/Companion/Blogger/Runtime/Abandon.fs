@@ -32,7 +32,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
-/// VERIFY-005 single writer for BloggerRequestAbandoned (protocol fail + send-fail + crash-A).
+/// context-compression-024 single writer for BloggerRequestAbandoned (protocol fail + send-fail + crash-A).
 /// Coordinator / EnforcerHost call here; they do not construct the fact.
 module BloggerAbandon =
 

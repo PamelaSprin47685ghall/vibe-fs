@@ -9,7 +9,7 @@ type IDeadlineHandle =
     abstract Delay: Task<unit>
     abstract Cancel: unit -> unit
 
-/// Central delay capability (VERIFY-004): production = Node timer, test = virtual clock.
+/// Central delay capability (verification-system-007 时间确定性): production = Node timer, test = virtual clock.
 /// Long budgets (≥1000ms) may unref in physical adapters so a clean process is not held open.
 type ITimerPort =
     abstract Delay: milliseconds: int -> IDeadlineHandle

@@ -1,4 +1,4 @@
-// tests/unit/Plugin/plugin-fixture.mjs — shared layer-2 plugin fixture (VERIFY-008).
+// tests/unit/Plugin/plugin-fixture.mjs — shared layer-2 plugin fixture (verification-system-008).
 //
 // Deliberately NOT named `*.test.mjs`. `tests/unit/runner.mjs:98` discovers tests with
 // `walk('tests/unit', ['.test.mjs'])`, so a helper carrying that suffix would be run as

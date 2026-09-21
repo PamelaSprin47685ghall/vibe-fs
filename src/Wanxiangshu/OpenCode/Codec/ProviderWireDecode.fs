@@ -10,7 +10,7 @@ open Wanxiangshu.Host
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
-/// Host raw object → `ProviderWireProjection` (VERIFY-005 adapter boundary).
+/// Host raw object → `ProviderWireProjection` (provider-projection-003).
 ///
 /// This module owns dynamic property access; `Domain.ProviderProjection` owns the
 /// types and the questions asked of them. It produces ONLY the wire projection —
@@ -19,7 +19,7 @@ open Wanxiangshu.Foundation.Identity
 ///
 /// The previous version defined its own `ProviderVisibleMessage` used for both
 /// byte equality and cross-session comparison, which is why the canary matcher
-/// grew a separate normaliser beside it (VERIFY-007).
+/// grew a separate normaliser beside it (provider-projection-003).
 ///
 /// Wave 3 split: this module is the raw decode boundary. `ProviderWireCapture`
 /// owns the capture variants that retain Host stable addresses; it depends on

@@ -10,7 +10,7 @@
  * (g4r-freeze gate retired 2026-08-14; the e2e-watchdog-feed gate keeps the
  * sole-entry scope).
  *
- * PHYSICAL CONTRACTS (VERIFICATION-SYSTEM-003): this file is the sole Long Stroke
+ * PHYSICAL CONTRACTS (verification-system [002]/[014]): this file is the sole Long Stroke
  * because it depends on Host facts Pure/Temporal/Adapter cannot simulate:
  *   1. OpenCode process lifetime — spawn count === 1, one serve, one journal writer
  *   2. Host-assigned assistant messageID persisted before transform, then

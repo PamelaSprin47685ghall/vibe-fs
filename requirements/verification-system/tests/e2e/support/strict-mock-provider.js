@@ -152,7 +152,7 @@ export class StrictMockProvider {
     return this._state.sessionBindings.get(alias) || null;
   }
 
-  // VERIFY-004: no competing absolute timeout on flow waits. When timeoutMs is
+  // verification-system-006: no competing absolute timeout on flow waits. When timeoutMs is
   // omitted, wait until the expectation matches; the scenario Watchdog owns
   // silence detection. Do not default to WATCHDOG_TIMEOUT_MS here — that turned
   // every unbounded `wait = "..."` into a 5s wall clock under parallel load.

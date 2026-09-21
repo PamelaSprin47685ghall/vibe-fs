@@ -1,5 +1,5 @@
 /**
- * readiness.js — the startup window, as a ladder of causal stages (VERIFY-004, W5).
+ * readiness.js — the startup window, as a ladder of causal stages (verification-system-006, W5).
  *
  * The clause requires seamless coverage:
  *

@@ -5,7 +5,7 @@
  * appending durable facts and SSE frames forever while never producing the awaited
  * causal fact — and a widened waitFact window (60s+) will sit through that storm.
  *
- * G4R / VERIFY-004: the primary hang criterion for runaway production is a declared
+ * G4R / verification-system-010: the primary hang criterion for runaway production is a declared
  * exact ceiling on how many events the scenario is theoretically allowed to trigger.
  *
  * Counting rules (authoritative):
