@@ -105,7 +105,7 @@ test('WHAT[feature-ablation-004] ABL_004_explicit_env_overrides_profile', () => 
   )
 })
 
-test('WHAT[feature-ablation-004] ABL_004_station_15_borrows_sync_delegate_slice', () => {
+test('WHAT[feature-ablation-004] ABL_004_station_15_borrows_sync_delegate_child_node', () => {
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-15']], () => {
     const result = Ablation.load()
     assert.equal(result.ok, true)

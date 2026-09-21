@@ -35,17 +35,17 @@ test('WHAT[feature-ablation-001] ABL_001_primary_nodes_cover_index_packages', ()
   assert.deepEqual(new Set(primary), new Set(packages))
 })
 
-test('WHAT[feature-ablation-001] ABL_001_slice_nodes_declare_valid_parent_package', () => {
+test('WHAT[feature-ablation-001] ABL_001_child_nodes_declare_valid_parent_package', () => {
   const nodeMap = new Map(nodesDoc.nodes.map((n) => [n.id, n]))
-  const slices = nodesDoc.nodes.filter((n) => n.kind === 'slice')
-  assert.ok(slices.length > 0, 'must have slice nodes')
+  const childNodes = nodesDoc.nodes.filter((n) => n.kind === 'slice')
+  assert.ok(childNodes.length > 0, 'must have child nodes')
 
-  for (const slice of slices) {
-    assert.ok(slice.parent, `slice ${slice.id} must declare parent`)
-    const parentNode = nodeMap.get(slice.parent)
-    assert.ok(parentNode, `slice ${slice.id} parent ${slice.parent} must exist`)
-    assert.equal(parentNode.kind, 'package', `slice ${slice.id} parent must be package`)
-    assert.equal(slice.package, parentNode.package, `slice ${slice.id} and parent must share package`)
+  for (const childNode of childNodes) {
+    assert.ok(childNode.parent, `child node ${childNode.id} must declare parent`)
+    const parentNode = nodeMap.get(childNode.parent)
+    assert.ok(parentNode, `child node ${childNode.id} parent ${childNode.parent} must exist`)
+    assert.equal(parentNode.kind, 'package', `child node ${childNode.id} parent must be package`)
+    assert.equal(childNode.package, parentNode.package, `child node ${childNode.id} and parent must share package`)
   }
 
   // Edge list must contain zero parent edges
