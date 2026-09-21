@@ -1,10 +1,10 @@
 # E2E — One World / The Long Stroke
 
-Sole entry: `node requirements/verification-system/tests/e2e/entry.test.mjs`（经 `npm run verify:release`）。
+Sole entry: `node requirements/verification-system/tests/014.test.mjs`（经 `npm run verify:release`）。
 
 | File | Role |
 |------|------|
-| `entry.test.mjs` | Only top-level E2E entry (G4R / One World) |
+| `014.test.mjs` | Only top-level E2E entry (G4R / One World) |
 | `scenarios/long-stroke.toml` | Provider turn script for the Long Stroke |
 | `support/long-stroke-oracles.mjs` | Sequencing / adversity oracles the TOML cannot express |
 

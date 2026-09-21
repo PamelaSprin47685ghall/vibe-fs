@@ -5,6 +5,8 @@
 /src/Wanxiangshu/Verification/**
 /scripts/check.mjs
 /scripts/build.mjs
+/scripts/verify.mjs
+/scripts/lib/build-state.mjs
 /scripts/checks/**
 /scripts/lib/test-surface-scan.mjs
 /scripts/lib/walk.mjs

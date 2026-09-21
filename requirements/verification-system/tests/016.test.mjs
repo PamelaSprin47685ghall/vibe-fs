@@ -135,6 +135,8 @@ test('WHAT[verification-system-016] verify detects mid-flight inputs change via 
     assert.ok(result.inputChanges, 'inputChanges must be present')
     assert.equal(result.inputChanges.equal, false)
     assert.ok(result.inputChanges.reason.includes('src/Foo.fs'))
+    const integrationStep = result.steps.find((s) => s.label === 'integration')
+    assert.equal(integrationStep?.status, 'not-run', 'subsequent integration step must not run after unit mutation')
 
     // Control group: clean run without mutations
     const cleanLogs = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-clean-logs-'))
@@ -208,4 +210,49 @@ test('WHAT[verification-system-016] verificationSteps excludes TESTS_MJS_FILES f
   assert.equal('TESTS_MJS_FILES' in integrationStep.env, false, 'integration step env must not contain TESTS_MJS_FILES')
   assert.equal(unitStep.env.NODE_TEST_VERBOSE, '1')
   assert.equal(unitStep.env.WXS_E2E_QUIET, '1')
+})
+
+test('WHAT[verification-system-016] verify immediately interrupts subsequent steps when input is perturbed mid-run', async () => {
+  const fixture = setupFixtureRepo()
+  const tmpLogs = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-step-interrupt-logs-'))
+  let buf = ''
+  const sink = { write(chunk) { buf += chunk } }
+  const executedSteps = []
+
+  try {
+    const mutatingRunStep = async ({ label }) => {
+      executedSteps.push(label)
+      if (label === 'check') {
+        fs.writeFileSync(path.join(fixture, 'src/Foo.fs'), 'module Foo\nlet x = 999\n')
+      }
+      return { label, ok: true, exitCode: 0, signal: null, durationMs: 2 }
+    }
+
+    const result = await verify({
+      root: fixture,
+      release: false,
+      runStep: mutatingRunStep,
+      output: sink,
+      logDirectory: tmpLogs,
+    })
+
+    assert.equal(result.exitCode, 1, 'must exit with non-zero status')
+    assert.equal(result.outcome, 'fail', 'outcome must be fail')
+    assert.ok(result.inputChanges, 'inputChanges must be recorded')
+    assert.equal(result.inputChanges.equal, false)
+
+    // Planned steps for daily: format:check, check, build, unit, integration
+    // When check mutates input, subsequent steps build, unit, integration must NOT be executed!
+    assert.deepEqual(executedSteps, ['format:check', 'check'], 'steps after check must not be executed')
+
+    const stepStatuses = Object.fromEntries(result.steps.map((s) => [s.label, s.status]))
+    assert.equal(stepStatuses['format:check'], 'ok')
+    assert.equal(stepStatuses['check'], 'ok')
+    assert.equal(stepStatuses['build'], 'not-run', 'subsequent step build must be not-run')
+    assert.equal(stepStatuses['unit'], 'not-run', 'subsequent step unit must be not-run')
+    assert.equal(stepStatuses['integration'], 'not-run', 'subsequent step integration must be not-run')
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true })
+    fs.rmSync(tmpLogs, { recursive: true, force: true })
+  }
 })

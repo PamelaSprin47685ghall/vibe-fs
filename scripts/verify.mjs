@@ -220,6 +220,7 @@ export async function verify({
   const stepResults = []
   let pipelineFailed = false
   let failureReason
+  let inputChanges
 
   for (let i = 0; i < plannedSteps.length; i++) {
     const stepPlan = plannedSteps[i]
@@ -258,6 +259,19 @@ export async function verify({
         wallMs: durationMs,
       })
       output.write(`  ${stepPlan.label.padEnd(14)} OK  ${(durationMs / 1000).toFixed(1)}s\n`)
+
+      try {
+        const currentInputs = collectVerificationInputs(resolvedRoot)
+        const diff = diffVerificationInputs(beforeInputs, currentInputs)
+        if (!diff.equal) {
+          pipelineFailed = true
+          inputChanges = diff
+          failureReason = `inputs-changed:${diff.reason}`
+        }
+      } catch (err) {
+        pipelineFailed = true
+        failureReason = `after-input-collection-failed: ${err.message}`
+      }
     } else {
       pipelineFailed = true
       failureReason = `step-failed:${stepPlan.label}`
@@ -276,21 +290,22 @@ export async function verify({
   }
 
   let afterInputs
-  let inputChanges
-  try {
-    afterInputs = collectVerificationInputs(resolvedRoot)
-    const diff = diffVerificationInputs(beforeInputs, afterInputs)
-    if (!diff.equal) {
-      inputChanges = diff
+  if (!inputChanges) {
+    try {
+      afterInputs = collectVerificationInputs(resolvedRoot)
+      const diff = diffVerificationInputs(beforeInputs, afterInputs)
+      if (!diff.equal) {
+        inputChanges = diff
+        if (!pipelineFailed) {
+          pipelineFailed = true
+          failureReason = `inputs-changed:${diff.reason}`
+        }
+      }
+    } catch (err) {
       if (!pipelineFailed) {
         pipelineFailed = true
-        failureReason = `inputs-changed:${diff.reason}`
+        failureReason = `after-input-collection-failed: ${err.message}`
       }
-    }
-  } catch (err) {
-    if (!pipelineFailed) {
-      pipelineFailed = true
-      failureReason = `after-input-collection-failed: ${err.message}`
     }
   }
 
