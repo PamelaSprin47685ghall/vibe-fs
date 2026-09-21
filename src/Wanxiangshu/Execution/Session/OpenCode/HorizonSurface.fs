@@ -40,7 +40,9 @@ module HorizonSurface =
         [ line language statusPath label; work ]
 
     let render (agents: obj array) (ptys: obj array) : string =
-        let language = ProviderLanguage.English
+        // provider-language-008: the roster is LLM-facing prose; bind it to the
+        // configured language instead of a hardcoded English default.
+        let language = ProviderLanguageBinding.readGlobalPreference ()
         let agentLines = agents |> Array.toList |> List.collect (agentLines language)
 
         let ptyLines =
@@ -62,13 +64,19 @@ module HorizonSurface =
 
     let unavailable () : string =
         ToolHostCodec.tomlObjectWithInstructions
-            [ ProviderProse.render ProviderLanguage.English HorizonTool.Path.UnavailableFromContext Map.empty ]
+            [ ProviderProse.render
+                  (ProviderLanguageBinding.readGlobalPreference ())
+                  HorizonTool.Path.UnavailableFromContext
+                  Map.empty ]
             []
 
     let cannotBeSeen () : string =
         ToolHostCodec.tomlObjectWithInstructions
-            [ ProviderProse.render ProviderLanguage.English HorizonTool.Path.CannotBeSeen Map.empty ]
+            [ ProviderProse.render
+                  (ProviderLanguageBinding.readGlobalPreference ())
+                  HorizonTool.Path.CannotBeSeen
+                  Map.empty ]
             []
 
     let description () : string =
-        ProviderProse.render ProviderLanguage.English HorizonTool.Path.Description Map.empty
+        ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) HorizonTool.Path.Description Map.empty

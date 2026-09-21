@@ -69,10 +69,13 @@ module ProviderSystemTransform =
         else
             text
 
-    let private chooseRolePrompt expectedEn expectedZh expectedCur nextPrompt (text: string) =
+    /// Wanxiangshu-owned role prompts may arrive as the canonical English or
+    /// Chinese Role Law, or as either language's installed-bundle view. All four
+    /// are the same semantic prompt, so all four repair to the bound language.
+    let private chooseRolePrompt expectedEn expectedZh expectedCur expectedInstalled nextPrompt (text: string) =
         let c = canonical text
 
-        if c = expectedEn || c = expectedZh || c = expectedCur then
+        if c = expectedEn || c = expectedZh || c = expectedCur || c = expectedInstalled then
             nextPrompt
         else
             text
@@ -127,14 +130,23 @@ module ProviderSystemTransform =
                 catalogPrompt (RuntimeResources.current().Prompts) r
                 |> Option.defaultValue oldPromptEn
 
+            // provider-language-008: the installed bundle's own view is also a
+            // legitimate seed, so a config written under either language still
+            // repairs. Byte comparison stays the only recognition rule — the
+            // transform never invents or translates prose (provider-language-009).
+            let installedPrompt =
+                catalogPrompt (RuntimeResources.promptsFor lang) r
+                |> Option.defaultValue oldPromptEn
+
             let nextPrompt = localizedRolePrompt lang r
             let expectedEn = canonical oldPromptEn
             let expectedZh = canonical oldPromptZh
             let expectedCur = canonical currentPrompt
+            let expectedInstalled = canonical installedPrompt
 
             output?system <-
                 system
-                |> Array.map (chooseRolePrompt expectedEn expectedZh expectedCur nextPrompt)
+                |> Array.map (chooseRolePrompt expectedEn expectedZh expectedCur expectedInstalled nextPrompt)
 
     let private transformSystem (role: SessionId -> Role option) sessionText output system =
         let sid = SessionId.create sessionText

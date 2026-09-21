@@ -19,6 +19,7 @@ test('WHAT[relay-incumbency-004] low-score assessor takes work ownership in plac
   assert.equal(assessed.ok, true)
   assert.deepEqual(relay.view(assessed.state, 'road-1'), {
     activeIncumbency: 'inc-1',
+    iterationOrdinal: 1,
     phase: 'WorkOwned',
     retired: [],
   })

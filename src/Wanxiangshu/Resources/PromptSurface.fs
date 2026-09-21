@@ -92,19 +92,22 @@ module PromptSurface =
         | Role.Blogger -> "role/blogger"
         | _ -> "role/engineer"
 
-    let instructionTextsForRole (roleLabel: string) : obj =
+    // provider-language-008: role law is Class A text the model reads. The
+    // language is supplied by the caller — the Host boundary owns preference
+    // observation and session binding, and this layer owns rendering only.
+    let instructionTextsForRole (language: string) (roleLabel: string) : obj =
         match Roles.tryParseRole roleLabel with
         | None -> null
         | Some role ->
-            let lang = ProviderLanguage.English
+            let lang = languageOf language
             let common = ProviderResources.readText lang "world/common-law"
             let law = ProviderResources.readText lang (roleSemanticPath role)
             box {| roleLaw = law; commonLaw = common |}
 
-    let systemForRole (roleLabel: string) : string =
+    let systemForRole (language: string) (roleLabel: string) : string =
         match Roles.tryParseRole roleLabel with
         | None -> ""
-        | Some role -> PromptResources.systemForRole ProviderLanguage.English role
+        | Some role -> PromptResources.systemForRole (languageOf language) role
 
     let runtimeCurrent () : obj =
         RuntimeResources.current () |> runtimeToJs

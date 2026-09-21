@@ -43,3 +43,7 @@ AuthorityRevision、WorkspaceSnapshotId、requirement digest、target/base horiz
 ## [012] 固定 DevOps 初始绑定与恢复的唯一性及幂等性
 
 固定 DevOps 绑定的初始化、晚到创建结果、接收状态不明与崩溃恢复必须满足唯一性与幂等性：同一道路在运行时初次绑定一个逻辑 DevOps 并持久化，之后仅允许 resume，禁止通过 fork 创建第二名 DevOps；接收结果不明时保留原 PromptKey 与恢复权，不盲目重发亦不新建操作员；系统基于单一 Manager 拓扑设计，不支持并发共享 DevOps。
+
+## [013] 每任 Manager 都知道自己是第几任
+
+每一条 open Road 必须能从 durable opening 事实确定当前迭代序号：首个 active 迭代为 1，之后每发生一次 `IncumbencyOpened` 加一。序号只由已 committed 的 opening 折叠得出，同一 opening 的重复提交幂等，不得因 provider 请求次数、nudge 次数或 crash 恢复而改变；无 active 迭代时不存在可读序号。`runtime/manager-assess` 评估请求文档必须把该序号 substitution 进去，中英双语的语义一致：明确告知这是接手此任务的第几任 Manager，前任可能已做了一些工作、也可能已完成，一切以本任对共享工作区的实际调查为准。序号只用于自我介绍，不得用于选择分支、恢复状态或替代任何 durable 事实。

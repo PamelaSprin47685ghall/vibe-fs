@@ -32,6 +32,8 @@ module RuntimeResourceAssembly =
           EnforcerRules = rules
           EnglishEnforcerRules = englishRules
           SimplifiedChineseEnforcerRules = simplifiedChineseRules
-          ProviderLanguageRootsReady = ProviderResources.languageRootsPresent () }
+          ProviderLanguageRootsReady = ProviderResources.languageRootsPresent ()
+          EnglishPrompts = PromptResources.loadForLanguage ProviderLanguage.English
+          SimplifiedChinesePrompts = PromptResources.loadForLanguage ProviderLanguage.SimplifiedChinese }
 
     let load () : RuntimeResources = loadFor ProviderLanguage.English

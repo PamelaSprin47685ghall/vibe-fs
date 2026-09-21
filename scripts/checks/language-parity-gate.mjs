@@ -22,6 +22,46 @@ export const PROVIDER_LANGUAGE_BINDING_REL =
   'src/Wanxiangshu/OpenCode/Host/ProviderLanguageBinding.fs'
 export const STATIC_TOOLS_REL = 'src/Wanxiangshu/OpenCode/Tools/StaticTools.fs'
 
+/**
+ * Production sources whose Class A text must follow the bound language. A
+ * hardcoded `ProviderLanguage.English` in these files ships English prose to a
+ * Chinese-bound session (provider-language-008).
+ */
+export const LLM_FACING_SOURCES = Object.freeze([
+  'src/Wanxiangshu/Resources/PromptSurface.fs',
+  'src/Wanxiangshu/Resources/PromptResources.fs',
+  'src/Wanxiangshu/OpenCode/Host/ManagedAgentConfig.fs',
+  'src/Wanxiangshu/Context/Companion/ProjectionSurface.fs',
+  'src/Wanxiangshu/Execution/Session/OpenCode/HorizonSurface.fs',
+  'src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.fs',
+])
+
+/// `ProviderLanguage.English` used as a rendering language, not as a match
+/// arm over a language parameter (which is legitimate: both cases must exist).
+const HARDCODED_ENGLISH = /ProviderProse\.(?:render|instructionLines)\s+ProviderLanguage\.English|ProviderResources\.readText\s+ProviderLanguage\.English|\(\s*ProviderLanguage\.English\s+output\s*\)|applyDefinition\s+ProviderLanguage\.English/
+
+/**
+ * provider-language-008: no LLM-facing module may hardcode the English
+ * rendering language. The session's bound language — or the global preference
+ * when no session is in scope — is the only lawful source.
+ * @param {string} text
+ * @param {string} path
+ * @returns {Violation[]}
+ */
+export const scanHardcodedEnglish = (text, path) => {
+  /** @type {Violation[]} */
+  const violations = []
+  text.split('\n').forEach((line, index) => {
+    if (!HARDCODED_ENGLISH.test(line)) return
+    violations.push({
+      code: 'hardcoded-english',
+      path,
+      detail: `line ${index + 1} renders Class A prose in a hardcoded English language: ${line.trim()}`,
+    })
+  })
+  return violations
+}
+
 const norm = (p) => p.replace(/\\/g, '/')
 
 const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

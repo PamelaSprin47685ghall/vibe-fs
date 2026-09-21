@@ -3,6 +3,7 @@ namespace Wanxiangshu.Participant.Provider
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation
 
 /// Provider-language owner boundary. Language values, session binding and
 /// localized resources cross as strings and plain objects; ProviderLanguage,
@@ -122,5 +123,23 @@ module ProviderLanguageSurface =
             let input = createObj [ "sessionID" ==> sessionId; "model" ==> createObj [] ]
             let output = createObj [ "system" ==> system ]
             let! _ = Wanxiangshu.OpenCode.ProviderSystemTransform.createWith (fun _ -> None) input output
+            return box {| system = unbox<string array> output?system |}
+        }
+
+    /// Same boundary for a public role. The label crosses as a string; the
+    /// transform itself still decides the role from durable authority first and
+    /// only falls back to the supplied label when no profile exists.
+    let transformRoleSystem (sessionId: string) (roleLabel: string) (system: string array) : Task<obj> =
+        task {
+            let sid = SessionId.create sessionId
+            Wanxiangshu.OpenCode.ProviderLanguageBinding.ensureRoot sid |> ignore
+
+            let role = Roles.tryParseRole roleLabel
+
+            let input = createObj [ "sessionID" ==> sessionId; "model" ==> createObj [] ]
+            let output = createObj [ "system" ==> system ]
+
+            let! _ = Wanxiangshu.OpenCode.ProviderSystemTransform.createWith (fun _ -> role) input output
+
             return box {| system = unbox<string array> output?system |}
         }

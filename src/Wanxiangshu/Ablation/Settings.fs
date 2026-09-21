@@ -95,6 +95,7 @@ module AblationSettings =
 
     let private isItemInBorrowedSurface (nodeId: AblationNodeId) (item: string) (reg: AblationRegistry) : bool =
         let nodeOpt = AblationRegistry.tryFindNode nodeId reg
+
         let parentNodeOpt =
             nodeOpt
             |> Option.bind (fun n -> n.Parent)
@@ -116,6 +117,7 @@ module AblationSettings =
 
     let private isNodeAllowed (node: AblationNodeId) (item: string) : bool =
         let reg = current ()
+
         match AblationRegistry.modeFor node reg with
         | AblationMode.Active -> true
         | AblationMode.Ablated -> false
@@ -145,6 +147,7 @@ module AblationSettings =
 
     let allowsPrimaryAgent (agentName: string) : bool =
         let reg = current ()
+
         match agentName.ToLowerInvariant() with
         | "manager" -> AblationRegistry.isActive (AblationNodeId.create "relay-incumbency") reg
         | "orchestrator" -> AblationRegistry.isActive (AblationNodeId.create "change-integration") reg

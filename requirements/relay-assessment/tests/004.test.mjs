@@ -13,6 +13,7 @@ test('WHAT[relay-assessment-004] revise assessment atomically records obligation
   assert.equal(assessed.ok, true)
   assert.deepEqual(relay.view(assessed.state, 'road-1'), {
     activeIncumbency: 'inc-1',
+    iterationOrdinal: 1,
     phase: 'WorkOwned',
     retired: [],
   })

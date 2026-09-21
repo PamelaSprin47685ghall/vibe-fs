@@ -766,6 +766,8 @@ Participant/Provider/ProviderResources.fsi
 Participant/Provider/ProviderResources.fs
 Participant/Provider/Prose.fsi
 Participant/Provider/Prose.fs
+OpenCode/Host/ProviderLanguageBinding.fsi
+OpenCode/Host/ProviderLanguageBinding.fs
 Context/Companion/ProjectionSurface.fsi
 Context/Companion/ProjectionSurface.fs
 Context/Prefix/Surface.fsi
@@ -940,8 +942,6 @@ OpenCode/Host/ModelRoutingSurface.fsi
 OpenCode/Host/ModelRoutingSurface.fs
 OpenCode/Host/SessionBindingSurface.fsi
 OpenCode/Host/SessionBindingSurface.fs
-OpenCode/Host/ProviderLanguageBinding.fsi
-OpenCode/Host/ProviderLanguageBinding.fs
 OpenCode/Host/SessionHostPort.fsi
 OpenCode/Host/SessionHostPort.fs
 OpenCode/Host/SessionRuntimeOwner.fsi

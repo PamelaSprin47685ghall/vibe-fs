@@ -187,6 +187,7 @@ module Surface =
         | Some roadView ->
             box
                 {| activeIncumbency = roadView.ActiveIncumbency |> Option.map IncumbencyId.value |> nullableString
+                   iterationOrdinal = roadView.IterationOrdinal
                    phase = roadView.ActivePhase |> Option.map phaseName |> nullableString
                    retired = roadView.RetiredIncumbencies |> List.map IncumbencyId.value |> List.toArray |}
 

@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Participant.Provider
+open Wanxiangshu.OpenCode
 
 /// JS-native owner for the Magic Todo Host boundary.
 /// Provider input and compatibility rows cross as plain objects; Host codec
@@ -96,4 +97,6 @@ module MagicTodoHostSurface =
         MagicTodoHostCodec.replaceEnrichedResult output text
 
     let applyDefinition (output: obj) : unit =
-        MagicTodoHostCodec.applyDefinition ProviderLanguage.English output
+        // provider-language-008: the todowrite schema is LLM-facing Class A text.
+        // Bind its descriptions to the configured language, never to English.
+        MagicTodoHostCodec.applyDefinition (ProviderLanguageBinding.readGlobalPreference ()) output

@@ -45,6 +45,23 @@ module ManagerWorkflow =
         relayState journal sessionId
         |> Option.bind (fun state -> Fold.view state (roadId sessionId))
 
+    let private currentViewOf (journal: AgentJournal option) (sessionId: SessionId) =
+        journal
+        |> Option.bind (fun durable ->
+            relayState durable sessionId
+            |> Option.bind (fun state -> Fold.view state (roadId sessionId)))
+
+    /// The iteration ordinal as the provider reads it: "1" for the first
+    /// Manager on this road, then one more per durable opening. A road with no
+    /// view yet (first opening not yet committed) is still the first.
+    let private iterationOrdinalText (journal: AgentJournal option) (sessionId: SessionId) =
+        let ordinal =
+            currentViewOf journal sessionId
+            |> Option.map (fun road -> max 1 road.IterationOrdinal)
+            |> Option.defaultValue 1
+
+        string ordinal
+
     let private isRetiredObservation
         (journal: AgentJournal option)
         (sessionId: SessionId)
@@ -83,11 +100,17 @@ module ManagerWorkflow =
         (turn: ReconciledTurn)
         (resourcePath: string)
         =
+        let substitutions =
+            if resourcePath = assessPath then
+                Map [ "ordinal", iterationOrdinalText (Some journal) turn.SessionId ]
+            else
+                Map.empty
+
         HostSessionNudge.trySendGateContinuation
             sessionPort
             rootWorkspace
             turn.SessionId
-            (ProviderProse.documentFor turn.SessionId resourcePath Map.empty)
+            (ProviderProse.documentFor turn.SessionId resourcePath substitutions)
             PromptAuthority.ContinuationKind.ManagerGuard
             turn.Directory
             (Some journal)
@@ -198,7 +221,10 @@ module ManagerWorkflow =
         =
         task {
             let loopPromptText =
-                ProviderProse.documentFor sessionId "runtime/manager-assess" Map.empty
+                ProviderProse.documentFor
+                    sessionId
+                    "runtime/manager-assess"
+                    (Map [ "ordinal", iterationOrdinalText (Some durable) sessionId ])
 
             let terminalRun = ProviderRunIdentity.create retirement.ProjectionCut.ProviderRunId
 

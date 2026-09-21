@@ -11,7 +11,7 @@ module PromptSurface =
     val runtimeLoadForLanguage: language: string -> obj
     val runtimeInstallFromPackage: unit -> unit
 
-    val instructionTextsForRole: roleLabel: string -> obj
+    val instructionTextsForRole: language: string -> roleLabel: string -> obj
 
-    val systemForRole: roleLabel: string -> string
+    val systemForRole: language: string -> roleLabel: string -> string
     val runtimeCurrent: unit -> obj

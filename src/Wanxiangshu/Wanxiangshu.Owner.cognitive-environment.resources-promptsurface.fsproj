@@ -11,6 +11,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-runtimeresources.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-promptcatalog.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.distribution.resources-enforcercatalogresource.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
     <Compile Include="Resources/PromptSurface.fsi"/>
     <Compile Include="Resources/PromptSurface.fs"/>
   </ItemGroup>

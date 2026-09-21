@@ -115,7 +115,11 @@ module ManagedAgentConfig =
     /// Only active roles receive a Host agent entry; retired identities are
     /// never projected into a live provider configuration.
     let private ownedConfigForRole (role: Role) : obj option =
-        let prompts = RuntimeResources.current().Prompts
+        // provider-language-008: the Host config prompt is LLM-facing Class A
+        // text. Project the language the sessions actually run in; a zh-CN
+        // preference must never seed an English prompt into the config.
+        let language = ProviderLanguageBinding.readGlobalPreference ()
+        let prompts = RuntimeResources.promptsFor language
 
         match role with
         | Role.Manager -> Some(StaticTools.managerAgentConfig (Some prompts.ManagerSystemPrompt))
@@ -138,7 +142,8 @@ module ManagedAgentConfig =
 
     let private ownedConfigForName (inventory: ManagedAgentInventory) (name: string) : obj option =
         if ManagedAgentCatalog.isBookkeeperName name then
-            Some(StaticTools.bookkeeperAgentConfig (PromptResources.loadBookkeeperSystem ()))
+            let language = ProviderLanguageBinding.readGlobalPreference ()
+            Some(StaticTools.bookkeeperAgentConfig (PromptResources.loadBookkeeperSystemFor language))
         else
             dynamicConfigForName inventory name
 

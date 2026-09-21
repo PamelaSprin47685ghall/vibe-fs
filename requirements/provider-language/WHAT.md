@@ -35,6 +35,15 @@
 
 参与者感知到的所有工具描述与调用契约，必须与其 `SessionProviderLanguage` 严格一致，严禁出现系统提示词与工具描述语言混杂的情况。
 
+## [013] 中文偏好下所有 Class A 文本必须抵达模型即为中文
+
+环境变量 `WANXIANGSHU_PROVIDER_LANGUAGE` 一经观测为中文，任何进入模型感知范围的 Class A 文本都必须是中文。以下路径严禁出现英文文案：
+1. **Host 配置投影**：写入 `config.agent.<role>.prompt` 与 bookkeeper prompt 的提示词，必须取自全局偏好所选语言，不得取自安装时固化的英文视图；
+2. **Host 系统段修复**：`ProviderSystemTransform` 必须把 Wanxiangshu 自有的角色提示词段改写为会话绑定语言，无论该段来自规范英文、规范中文还是安装视图；
+3. **JS 边界模块**：面向模型的指令平面（Companion 指令、horizon 名册、todowrite schema 描述）必须绑定语言，严禁硬编码 `ProviderLanguage.English`。
+
+凡语言未绑定或偏好未设置时才退居英文默认值；一旦偏好为中文，英文文案不得抵达模型。已绑定的会话即使偏好随后改为中文，也必须保持自身语言。
+
 ## [009] 散文文本三向所有权分离与集中装载
 
 语义内容归属于各领域的 Semantic Owner，语言归属于 Session 绑定，渲染布局归属于通用机制。严禁在业务代码中使用 `match lang` 分支硬编码自然语言字面量；所有 Class A 文本统一经由 `ProviderResources` 加载。

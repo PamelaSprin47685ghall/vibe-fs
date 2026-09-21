@@ -818,7 +818,9 @@ export function assertManagerLoopAuthorityPreserved(scenario, sessionId) {
   const baselinePlan = providerPlanOf(firsts[0]);
   const baselineUsers = messageTextsByRole(firsts[0], 'user');
   assert.ok(baselineUsers.length >= 1, 'manager-loop: initial iteration must carry typed authority user messages');
-  const assessmentResource = '# Establish read-only evidence about the current delivery through the entitled offices.';
+  // The ordinal sentence leads the resource; the digit is the successor number,
+  // so the anchor stops before it and never has to be re-pinned per iteration.
+  const assessmentResource = '# You are the ';
   for (const [index, request] of firsts.entries()) {
     assert.deepEqual(
       providerPlanOf(request),
@@ -836,6 +838,18 @@ export function assertManagerLoopAuthorityPreserved(scenario, sessionId) {
         || (users.length === baselineUsers.length + 1 && users.at(-1)?.startsWith(assessmentResource)),
       `manager-loop: iteration #${index + 1} may append only the exact assessment resource`,
     );
+
+    // The successor ordinal is bound into the appended resource, and it must
+    // equal this iteration's 1-based position among the observed iteration-firsts.
+    const appended = users.at(-1) ?? '';
+    if (users.length === baselineUsers.length + 1) {
+      const ordinal = /# You are the (\d+) Manager taking over this mission\./.exec(appended)?.[1];
+      assert.equal(
+        ordinal,
+        String(index + 1),
+        `manager-loop: iteration #${index + 1} must be told it is successor ${index + 1}, got ${ordinal}`,
+      );
+    }
   }
 }
 

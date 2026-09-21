@@ -96,5 +96,4 @@ module AblationRegistry =
         | AblationMode.Borrowed -> true
         | AblationMode.Ablated -> false
 
-    let tryFindNode (id: AblationNodeId) (registry: AblationRegistry) =
-        registry.Nodes |> Map.tryFind id
+    let tryFindNode (id: AblationNodeId) (registry: AblationRegistry) = registry.Nodes |> Map.tryFind id

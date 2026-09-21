@@ -82,6 +82,7 @@ test('WHAT[relay-incumbency-006] Accepted blocks reopening while valid, invalida
   assert.equal(next.ok, true)
   assert.deepEqual(relay.view(next.state, 'road-1'), {
     activeIncumbency: 'inc-2',
+    iterationOrdinal: 2,
     phase: 'AuditPending',
     retired: ['inc-1'],
   })

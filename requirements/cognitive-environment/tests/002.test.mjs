@@ -11,7 +11,7 @@ test('WHAT[cognitive-environment-002] CE_002_layer_attribution_and_no_impersonat
   const roles = ['manager', 'engineer', 'devops', 'orchestrator', 'blogger']
 
   for (const role of roles) {
-    const texts = promptResources.instructionTextsForRole(role)
+    const texts = promptResources.instructionTextsForRole('English', role)
     assert.ok(texts, `Instruction texts for ${role} must exist`)
 
     // 2. 认知层正交性：Role Law 只定义自我模型与职责边界，严禁包含具体任务（Mission）或可用工具列表（Tools）
@@ -27,7 +27,7 @@ test('WHAT[cognitive-environment-002] CE_002_layer_attribution_and_no_impersonat
     assert.doesNotMatch(commonLaw, /^#+\s*Role Law/m, 'Common Law must not impersonate Role Law')
 
     // 4. 组合顺序与分层结构独立性：验证组合顺序中各层语义边界清晰，不存在单一全序覆盖规则
-    const systemPrompt = promptResources.systemForRole(role)
+    const systemPrompt = promptResources.systemForRole('English', role)
     assert.ok(systemPrompt.length > 0, `System prompt for ${role} must be composed`)
     assert.ok(systemPrompt.includes('Common Law'), `System prompt for ${role} must preserve Common Law heading`)
   }

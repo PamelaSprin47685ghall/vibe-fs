@@ -121,7 +121,12 @@ test('WHAT[verification-system-003] Long Stroke keeps one Manager loop and two e
   );
 
   const assessUser =
-    '# Entrust read-only Engineer work to establish facts about the current deliverable, including absent or incomplete work.';
+    '# You are the 2 Manager taking over this mission. A predecessor may already have done\n' +
+    '# part of the work, or may already have finished it; investigate the actual workspace before you\n' +
+    '# act on either assumption. The shared workspace is the current execution state: check it directly\n' +
+    '# rather than trusting any inherited claim.\n' +
+    '#\n' +
+    '# Entrust read-only Engineer work to establish facts about the current deliverable';
   const loopRequest = (turn, step) => ({
     messages: [
       { role: 'user', content: turn },

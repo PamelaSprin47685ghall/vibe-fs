@@ -6,6 +6,7 @@ open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Projection
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Resources
 
 /// Context-compression projection owner. Prompt wrappers, synthetic identities
@@ -27,14 +28,19 @@ module CompanionProjectionSurface =
         else
             unbox<string -> string> value
 
+    // provider-language-008: the Companion instruction plane is Class A text
+    // the Blogger reads. Bind it to the configured language instead of a
+    // hardcoded English default.
+    let private language = ProviderLanguageBinding.readGlobalPreference ()
+
     let private normalLines =
-        ProviderProse.instructionLines ProviderLanguage.English CompanionPrompt.Normal Map.empty
+        ProviderProse.instructionLines language CompanionPrompt.Normal Map.empty
 
     let private squashLines =
-        ProviderProse.instructionLines ProviderLanguage.English CompanionPrompt.Squash Map.empty
+        ProviderProse.instructionLines language CompanionPrompt.Squash Map.empty
 
     let private memoryPreambleValue =
-        ProviderProse.render ProviderLanguage.English CompanionPrompt.MemoryPreamble Map.empty
+        ProviderProse.render language CompanionPrompt.MemoryPreamble Map.empty
 
     let normalInstructionLines: string array = normalLines |> List.toArray
     let squashInstructionLines: string array = squashLines |> List.toArray

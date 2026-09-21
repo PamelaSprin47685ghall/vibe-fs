@@ -9,6 +9,7 @@ test('WHAT[relay-incumbency-002] every iteration opens on the same AuditPending 
   const first = open(relay.empty())
   assert.deepEqual(relay.view(first.state, 'road-1'), {
     activeIncumbency: 'inc-1',
+    iterationOrdinal: 1,
     phase: 'AuditPending',
     retired: [],
   })
@@ -38,6 +39,7 @@ test('WHAT[relay-incumbency-002] every iteration opens on the same AuditPending 
   assert.equal(next.ok, true)
   assert.deepEqual(relay.view(next.state, 'road-1'), {
     activeIncumbency: 'inc-2',
+    iterationOrdinal: 2,
     phase: 'AuditPending',
     retired: ['inc-1'],
   })

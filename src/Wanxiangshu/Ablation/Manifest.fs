@@ -40,8 +40,8 @@ module AblationManifest =
               Kind = get.Optional.Field "kind" Decode.string |> Option.defaultValue "package"
               Parent = get.Optional.Field "parent" Decode.string
               BorrowedSurface =
-                  get.Optional.Field "borrowed_surface" (Decode.list Decode.string)
-                  |> Option.defaultValue [] })
+                get.Optional.Field "borrowed_surface" (Decode.list Decode.string)
+                |> Option.defaultValue [] })
 
     let private decodeEdge =
         Decode.object (fun get ->
@@ -72,28 +72,43 @@ module AblationManifest =
 
     let private validateSliceNode (nodeMap: Map<string, ManifestNode>) (node: ManifestNode) : AblationLoadError option =
         let parentNode =
-            node.Parent
-            |> Option.bind (fun parentId -> Map.tryFind parentId nodeMap)
+            node.Parent |> Option.bind (fun parentId -> Map.tryFind parentId nodeMap)
 
         match node.Parent, parentNode with
-        | None, _ ->
-            Some(InvalidManifest(sprintf "Slice node '%s' must declare parent" node.Id))
-        | Some parentId, None ->
-            Some(InvalidManifest(sprintf "Slice node '%s' parent '%s' not found" node.Id parentId))
+        | None, _ -> Some(InvalidManifest(sprintf "Slice node '%s' must declare parent" node.Id))
+        | Some parentId, None -> Some(InvalidManifest(sprintf "Slice node '%s' parent '%s' not found" node.Id parentId))
         | Some parentId, Some parent when parent.Kind <> "package" ->
-            Some(InvalidManifest(sprintf "Slice node '%s' parent '%s' must be kind 'package' but is '%s'" node.Id parentId parent.Kind))
+            Some(
+                InvalidManifest(
+                    sprintf
+                        "Slice node '%s' parent '%s' must be kind 'package' but is '%s'"
+                        node.Id
+                        parentId
+                        parent.Kind
+                )
+            )
         | Some parentId, Some parent when parent.Package <> node.Package ->
-            Some(InvalidManifest(sprintf "Slice node '%s' (package '%s') and parent '%s' (package '%s') must belong to same package" node.Id node.Package parentId parent.Package))
+            Some(
+                InvalidManifest(
+                    sprintf
+                        "Slice node '%s' (package '%s') and parent '%s' (package '%s') must belong to same package"
+                        node.Id
+                        node.Package
+                        parentId
+                        parent.Package
+                )
+            )
         | Some _, Some _ -> None
 
     let validateNodes (document: ManifestDocument) : Result<unit, AblationLoadError> =
         let nodeMap = document.Nodes |> List.map (fun n -> n.Id, n) |> Map.ofList
+
         document.Nodes
         |> List.filter (fun node -> node.Kind = "slice")
         |> List.tryPick (validateSliceNode nodeMap)
         |> function
             | Some err -> Error err
-            | None -> Ok ()
+            | None -> Ok()
 
     let loadNodes () =
         readJson (pathJoin (resourcesDir (), "nodes.json")) decodeDocument
@@ -145,12 +160,14 @@ module AblationManifest =
 
         let allNodes = document.Nodes |> List.map (fun n -> n.Id)
         let state = Dictionary<string, int>()
+
         for id in allNodes do
             state.[id] <- 0
 
         let rec dfs node =
             state.[node] <- 1
             let neighbors = adj |> Map.tryFind node |> Option.defaultValue []
+
             let cycleFound =
                 neighbors
                 |> List.tryPick (fun nextNode ->
@@ -158,14 +175,17 @@ module AblationManifest =
                     | true, 1 -> Some(sprintf "Cycle detected involving edge %s -> %s" node nextNode)
                     | true, 0 -> dfs nextNode
                     | _ -> None)
+
             state.[node] <- 2
             cycleFound
 
         allNodes
-        |> List.tryPick (fun node ->
-            if state.[node] = 0 then dfs node else None)
+        |> List.tryPick (fun node -> if state.[node] = 0 then dfs node else None)
 
-    let private validateEdge (modes: Map<AblationNodeId, AblationMode>) (edge: ManifestEdge) : AblationLoadError option =
+    let private validateEdge
+        (modes: Map<AblationNodeId, AblationMode>)
+        (edge: ManifestEdge)
+        : AblationLoadError option =
         let modeOf raw =
             modes
             |> Map.tryFind (AblationNodeId.create raw)
@@ -173,18 +193,20 @@ module AblationManifest =
 
         let fromMode = modeOf edge.From
         let toMode = modeOf edge.To
-        let fromAtLeastBorrowed = fromMode = AblationMode.Active || fromMode = AblationMode.Borrowed
+
+        let fromAtLeastBorrowed =
+            fromMode = AblationMode.Active || fromMode = AblationMode.Borrowed
+
         let toActive = toMode = AblationMode.Active
-        let toAtLeastBorrowed = toMode = AblationMode.Active || toMode = AblationMode.Borrowed
+
+        let toAtLeastBorrowed =
+            toMode = AblationMode.Active || toMode = AblationMode.Borrowed
 
         match edge.Kind with
         | "station-order" when toActive && not fromAtLeastBorrowed ->
             Some(
                 DagViolation(
-                    sprintf
-                        "station-order: %s requires %s at least borrowed before active downstream"
-                        edge.To
-                        edge.From
+                    sprintf "station-order: %s requires %s at least borrowed before active downstream" edge.To edge.From
                 )
             )
         | "borrow" when toAtLeastBorrowed && not fromAtLeastBorrowed ->
@@ -201,7 +223,7 @@ module AblationManifest =
         match cycleError, edgeError with
         | Some err, _ -> Error err
         | None, Some err -> Error err
-        | None, None -> Ok ()
+        | None, None -> Ok()
 
     let nodeIds (document: ManifestDocument) =
         document.Nodes |> List.map (fun node -> AblationNodeId.create node.Id)

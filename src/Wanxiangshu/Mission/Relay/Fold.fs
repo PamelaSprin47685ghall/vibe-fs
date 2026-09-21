@@ -33,21 +33,26 @@ type private RoadState =
 type RelayState = private RelayState of Map<string, RoadState>
 
 type RoadView =
-    { AuthorityRevision: AuthorityRevision
-      AuthorityRevisions: AuthorityRevision list
-      AuthorityMessageIds: PhysicalUserMessageId list
-      ActiveIncumbency: IncumbencyId option
-      ActivePhase: IncumbencyPhase option
-      ActiveSnapshotId: WorkspaceSnapshotId option
-      ActiveAuthorityRevision: AuthorityRevision option
-      ActiveCleanupBlockerDigest: string option
-      AcceptedAssessmentTransport: (string * string) option
-      RetiredIncumbencies: IncumbencyId list
-      RetiredProviderRunIds: Set<string>
-      Certificate: QualityCertificate option
-      LatestRetirement: RetirementSummary option
-      BoundDevOps: string option
-      BoundDevOpsModelTarget: string option }
+    {
+        AuthorityRevision: AuthorityRevision
+        AuthorityRevisions: AuthorityRevision list
+        AuthorityMessageIds: PhysicalUserMessageId list
+        /// How many iterations this road has opened, counting the active one.
+        /// Derived purely from durable openings; never an execution cursor.
+        IterationOrdinal: int
+        ActiveIncumbency: IncumbencyId option
+        ActivePhase: IncumbencyPhase option
+        ActiveSnapshotId: WorkspaceSnapshotId option
+        ActiveAuthorityRevision: AuthorityRevision option
+        ActiveCleanupBlockerDigest: string option
+        AcceptedAssessmentTransport: (string * string) option
+        RetiredIncumbencies: IncumbencyId list
+        RetiredProviderRunIds: Set<string>
+        Certificate: QualityCertificate option
+        LatestRetirement: RetirementSummary option
+        BoundDevOps: string option
+        BoundDevOpsModelTarget: string option
+    }
 
 module private Internal =
     let private key roadId = RoadId.value roadId
@@ -718,6 +723,9 @@ module Fold =
             { AuthorityRevision = road.AuthorityRevision
               AuthorityRevisions = road.AuthorityRevisions
               AuthorityMessageIds = road.AuthorityMessageIds
+              // An opening is a durable IncumbencyOpened event: the road's own
+              // history plus the active one, so the first iteration is 1.
+              IterationOrdinal = List.length road.Retired + (if road.Active.IsSome then 1 else 0)
               ActiveIncumbency = road.Active |> Option.map (fun active -> active.Id)
               ActivePhase = road.Active |> Option.map (fun active -> active.Phase)
               ActiveSnapshotId = road.Active |> Option.map (fun active -> active.SnapshotId)

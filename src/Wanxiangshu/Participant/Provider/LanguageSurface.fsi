@@ -34,3 +34,7 @@ module ProviderLanguageSurface =
     /// the Bookkeeper-owned system segment. The attachment fixture is private;
     /// host-owned system bytes remain caller data and are never rewritten.
     val transformBookkeeperSystem: sessionId: string -> system: string array -> Task<obj>
+
+    /// Exercise the real host transform for a public role's owned system
+    /// segment. Role is a stable label, not an F# union value.
+    val transformRoleSystem: sessionId: string -> roleLabel: string -> system: string array -> Task<obj>

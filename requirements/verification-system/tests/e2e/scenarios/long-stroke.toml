@@ -395,7 +395,9 @@ tools = ["fork", "resume", "join", "horizon", "review", "suicide"]
 [[turn]]
 id = "manager-reopened-loop"
 internal = true
-user = "# Entrust read-only Engineer work to establish facts about the current deliverable, including absent or incomplete work."
+# The ordinal sentence is the leader; the declared fragment stays the stable
+# tail so the successor number never has to be re-pinned per iteration.
+user = ["# You are the ", "Entrust read-only Engineer work to establish facts about the current deliverable"]
 tools = ["fork", "resume", "join", "horizon", "review", "suicide"]
 
   [[turn.step]]

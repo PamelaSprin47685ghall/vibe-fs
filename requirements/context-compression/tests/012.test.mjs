@@ -1,5 +1,9 @@
 import test from 'node:test'
 
+// Provider language is adopted at import time; these fixtures assert English
+// prose, so pin the preference before any production surface loads.
+process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");

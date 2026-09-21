@@ -3,21 +3,26 @@ namespace Wanxiangshu.Mission.Relay
 type RelayState
 
 type RoadView =
-    { AuthorityRevision: AuthorityRevision
-      AuthorityRevisions: AuthorityRevision list
-      AuthorityMessageIds: PhysicalUserMessageId list
-      ActiveIncumbency: IncumbencyId option
-      ActivePhase: IncumbencyPhase option
-      ActiveSnapshotId: WorkspaceSnapshotId option
-      ActiveAuthorityRevision: AuthorityRevision option
-      ActiveCleanupBlockerDigest: string option
-      AcceptedAssessmentTransport: (string * string) option
-      RetiredIncumbencies: IncumbencyId list
-      RetiredProviderRunIds: Set<string>
-      Certificate: QualityCertificate option
-      LatestRetirement: RetirementSummary option
-      BoundDevOps: string option
-      BoundDevOpsModelTarget: string option }
+    {
+        AuthorityRevision: AuthorityRevision
+        AuthorityRevisions: AuthorityRevision list
+        AuthorityMessageIds: PhysicalUserMessageId list
+        /// How many iterations this road has opened, counting the active one.
+        /// Derived purely from durable openings; never an execution cursor.
+        IterationOrdinal: int
+        ActiveIncumbency: IncumbencyId option
+        ActivePhase: IncumbencyPhase option
+        ActiveSnapshotId: WorkspaceSnapshotId option
+        ActiveAuthorityRevision: AuthorityRevision option
+        ActiveCleanupBlockerDigest: string option
+        AcceptedAssessmentTransport: (string * string) option
+        RetiredIncumbencies: IncumbencyId list
+        RetiredProviderRunIds: Set<string>
+        Certificate: QualityCertificate option
+        LatestRetirement: RetirementSummary option
+        BoundDevOps: string option
+        BoundDevOpsModelTarget: string option
+    }
 
 module Fold =
     val empty: RelayState
