@@ -56,6 +56,30 @@ test('WHAT[execution-model-routing-019] fixed DevOps model binding is immutable 
   const target2 = routing.executionAdmissionTarget(runtime, acq2.lease)
   assert.deepEqual(target2, targetA, 'Fresh DevOps admission on resume must strictly inherit and lock target A')
 
+  // Commit round 2 successfully with target2 (targetA)
+  const commitOutcome2 = routing.commitExecutionAdmission(runtime, acq2.lease, {
+    sessionId,
+    physicalUserMessageId: 'msg_devops_2',
+    role: 'devops',
+    participant: 'devops',
+    target: target2,
+  })
+  assert.ok(['Applied', 'AlreadyApplied'].includes(commitOutcome2.kind))
+  routing.releasePhysicalExecution(runtime, sessionId, 'msg_devops_2')
+
+  // Round 3: Subsequent fresh admission must also strictly inherit target A
+  const acq3 = await routing.acquireExecutionAdmission(
+    runtime,
+    sessionId,
+    'msg_devops_3',
+    'devops',
+    'devops',
+    null,
+  )
+  assert.equal(acq3.kind, 'Acquired')
+  const target3 = routing.executionAdmissionTarget(runtime, acq3.lease)
+  assert.deepEqual(target3, targetA, 'Subsequent DevOps admission must also strictly inherit target A')
+
   // Attempting to bind or commit a conflicting target must be rejected fail-closed
   const conflictTarget = { model: 'other/conflict-model', reasoning: 'none' }
   assert.throws(

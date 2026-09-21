@@ -690,7 +690,11 @@ module ModelRouting =
                 oldPhysicalUserMessageId
                 |> Option.iter (fun oldId -> supersededPhysical.Add(sessionId, oldId) |> ignore)
 
-                let previous = recoveryPreviousTarget sessionId
+                let previous =
+                    match recoveryPreviousTarget sessionId with
+                    | Some t -> Some t
+                    | None -> tryGetBoundDevopsTarget sessionId role
+
                 activeBySession.Remove sessionId |> ignore
                 supersedeCurrentDemand sessionId
 
