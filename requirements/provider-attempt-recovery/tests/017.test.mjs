@@ -35,4 +35,12 @@ test('WHAT[provider-attempt-recovery-017] PAR_017_blogger_retry_replaces_exact_p
     parkedTransform.claimCurrentRequest(scope, KEY, failed),
     'Conflict:request-replacement',
   )
+
+  // Rebind protection: same request re-materialization with replacement prompt key
+  // does not rebind across active flight
+  assert.equal(
+    parkedTransform.releaseCurrentRequest(scope, KEY, 'request-replacement'),
+    'Released',
+    'replacement can be cleanly released after retry',
+  )
 })

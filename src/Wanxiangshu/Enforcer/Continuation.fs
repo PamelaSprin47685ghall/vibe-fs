@@ -328,13 +328,22 @@ module EnforcerContinuation =
                 ProviderWireCapture.lastUserPromptKey ctx.RawMessages
                 |> Result.requireSome "next Blogger provider step has no physical PromptKey"
 
-            do!
-                BloggerCoordinator.materializeContinuationContext ctx.Scope ctx.Durable live
-                |> TaskResult.mapError (fun reason -> "Blogger context materialize failed: " + reason)
+            let existingOpen =
+                (AgentJournal.snapshot ctx.Durable).AgentProjections.Sessions
+                |> Map.tryFind (BloggerRequestContext.mainSessionId live)
+                |> Option.bind (fun s -> s.BloggerCycles)
+                |> Option.bind (fun cycles -> Map.tryFind (BloggerRequestContext.requestId live) cycles.OpenByRequestId)
 
-            do!
-                BloggerCoordinator.bindContinuationContext ctx.Scope ctx.Durable live promptKey
-                |> TaskResult.mapError (fun reason -> "Blogger PromptKey bind failed: " + reason)
+            match existingOpen with
+            | Some openReq when openReq.PromptKey = Some promptKey -> ()
+            | _ ->
+                do!
+                    BloggerCoordinator.materializeContinuationContext ctx.Scope ctx.Durable live
+                    |> TaskResult.mapError (fun reason -> "Blogger context materialize failed: " + reason)
+
+                do!
+                    BloggerCoordinator.bindContinuationContext ctx.Scope ctx.Durable live promptKey
+                    |> TaskResult.mapError (fun reason -> "Blogger PromptKey bind failed: " + reason)
         }
 
     let private resumeCatchUpWithLive

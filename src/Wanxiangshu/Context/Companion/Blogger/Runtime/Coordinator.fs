@@ -824,11 +824,25 @@ module BloggerCoordinator =
         (mainSessionId: SessionId)
         (bloggerSessionId: SessionId)
         (requestId: BloggerRequestId)
+        (promptKey: PromptKey option)
         (staleOpen: OpenBloggerRequest option)
         : Task<unit> =
         task {
             match staleOpen with
             | Some openReq when openReq.RequestId <> requestId ->
+                do!
+                    BloggerAbandon.byRequestId
+                        journal
+                        openReq.RequestId
+                        mainSessionId
+                        bloggerSessionId
+                        "superseded-by-new-materialize"
+            | Some openReq when
+                openReq.RequestId = requestId
+                && openReq.PromptKey.IsSome
+                && promptKey.IsSome
+                && openReq.PromptKey <> promptKey
+                ->
                 do!
                     BloggerAbandon.byRequestId
                         journal
@@ -902,10 +916,16 @@ module BloggerCoordinator =
                 |> Option.bind (fun cycles -> BloggerCycleProjection.tryOpenByBlogger bloggerSessionId cycles)
 
             do!
-                abandonStaleOpen journal mainSessionId bloggerSessionId requestId staleOpen
+                abandonStaleOpen journal mainSessionId bloggerSessionId requestId promptKey staleOpen
                 |> TaskResultCE.ofTask
 
-            let! contextRef, contextDigest = resolveContextBlob journal existingOpen promptKey contextPayload
+            let effectiveOpen =
+                (AgentJournal.snapshot journal).AgentProjections.Sessions
+                |> Map.tryFind mainSessionId
+                |> Option.bind (fun s -> s.BloggerCycles)
+                |> Option.bind (fun cycles -> Map.tryFind requestId cycles.OpenByRequestId)
+
+            let! contextRef, contextDigest = resolveContextBlob journal effectiveOpen promptKey contextPayload
 
             let fact =
                 ContextFact.BloggerRequestMaterialized
@@ -1018,7 +1038,19 @@ module BloggerCoordinator =
                         ctx
                 with
                 | Error reason -> return Error reason
-                | Ok() -> return! materializeRequest journal ctx (Some promptKey)
+                | Ok() ->
+                    let mainId = BloggerRequestContext.mainSessionId ctx
+                    let reqId = BloggerRequestContext.requestId ctx
+
+                    let existingOpen =
+                        (AgentJournal.snapshot journal).AgentProjections.Sessions
+                        |> Map.tryFind mainId
+                        |> Option.bind (fun s -> s.BloggerCycles)
+                        |> Option.bind (fun cycles -> Map.tryFind reqId cycles.OpenByRequestId)
+
+                    match existingOpen with
+                    | Some openReq when openReq.PromptKey = Some promptKey -> return Ok()
+                    | _ -> return! materializeRequest journal ctx (Some promptKey)
             })
 
     let abandonContinuationContext
