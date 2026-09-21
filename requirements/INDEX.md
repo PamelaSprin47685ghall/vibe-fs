@@ -131,7 +131,7 @@
 | 序号 | 规范包 (`Package`) | 活跃条款数 | 活跃条款清单与演进导航 |
 |---|---|---|---|
 | 1 | `requirement-system` | 13 | requirement-system-001 ~ 008、010 ~ 011、015、017 ~ 018 |
-| 2 | `verification-system` | 16 | verification-system-001 ~ 006、007 ~ 016 |
+| 2 | `verification-system` | 16 | verification-system-001 ~ 016 |
 | 3 | `feature-ablation` | 4 | feature-ablation-001 ~ 004（节点注册表、三态语义、消融 DAG、配置集） |
 | 4 | `js-semantic-surface` | 6 | js-semantic-surface-001 ~ 006 |
 | 5 | `structured-workflow` | 17 | structured-workflow-001 ~ 017 |
