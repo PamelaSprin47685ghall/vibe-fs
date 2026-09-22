@@ -600,6 +600,23 @@ module HostForkAgent =
                 |> Option.orElseWith (fun () -> if isDevOpsHandle then Some Role.DevOps else None)
 
             match roleOpt, boundAgent with
+            | _, Some agentName when isDevOpsHandle ->
+                // When devops already has an active or previous authority profile,
+                // reuse the child session via normal continuation/reuse rather than
+                // creating a duplicate AgentOwnerRoot which causes ActiveRunIdentityConflict.
+                do! maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
+
+                return!
+                    reuseWithManagedAgent
+                        runtime
+                        agentId
+                        childId
+                        Role.DevOps
+                        agentName
+                        prompt
+                        renderedPrompt
+                        wasDormant
+                        preparedHandoff
             | _, None when isDevOpsHandle ->
                 return!
                     sendDevOpsFirstPrompt

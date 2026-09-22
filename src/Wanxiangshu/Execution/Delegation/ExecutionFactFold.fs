@@ -114,13 +114,19 @@ module ExecutionFactFold =
         | ExecutionFactCases.HandleAbandoned payload ->
             let priorState = sessionState payload.ParentSessionId
 
+            let terminalChild =
+                priorState
+                |> Option.bind (fun s -> s.Handles)
+                |> Option.bind (HandleProjection.tryFind payload.Handle)
+                |> Option.map (fun record -> record.ChildSessionId)
+
             HandleProjection.abandon
                 payload.Handle
                 payload.Reason
                 (priorState
                  |> Option.bind (fun s -> s.Handles)
                  |> Option.defaultValue HandleProjection.empty)
-            |> handleOutcome "HandleAbandoned" payload.ParentSessionId payload.Handle priorState None
+            |> handleOutcome "HandleAbandoned" payload.ParentSessionId payload.Handle priorState terminalChild
 
         // Clean-break: false abort cell → Active only when ref/digest match.
 

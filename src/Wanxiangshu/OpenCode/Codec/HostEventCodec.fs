@@ -140,11 +140,18 @@ module HostEventCodec =
         // crash-reconciliation-008) and supersede (a newer attempt already owns the fact).
         // Semantic failures such as tool-call errors never reach here: OpenCode
         // resolves them inside its own loop and reports parts, not session errors.
-        match errorNameOf error with
-        | "MessageAbortedError"
-        | "AbortError" -> ExecutionFailure.UserCancelled
-        | "SupersededError" -> ExecutionFailure.Superseded
-        | _ -> ExecutionFailure.ProviderTransient
+        let errName = errorNameOf error
+        let reason = failureReasonOf error
+        let isUpstreamAbort = reason.ToLowerInvariant().Contains("upstream_error")
+
+        if isUpstreamAbort then
+            ExecutionFailure.ProviderTransient
+        else
+            match errName with
+            | "MessageAbortedError"
+            | "AbortError" -> ExecutionFailure.UserCancelled
+            | "SupersededError" -> ExecutionFailure.Superseded
+            | _ -> ExecutionFailure.ProviderTransient
 
     let private decodeSessionErrorFor (sessionId: SessionId) (raw: obj) : HostSignal option =
         let properties = raw?properties

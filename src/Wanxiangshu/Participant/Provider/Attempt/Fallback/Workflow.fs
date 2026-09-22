@@ -675,6 +675,20 @@ module ProviderRecoveryWorkflow =
 
                         ProviderFailureEvidence.currentState failureState
                         |> Option.map (fun current -> ownerSessionId, requestKind, current)))
+                |> Option.orElseWith (fun () ->
+                    // If the first turn/opening failed before ProviderStarted was durable,
+                    // fall back to default WorkMain under the active authority profile.
+                    activeProfileOpt
+                    |> Option.bind (fun _ ->
+                        let ownerSessionId = turn.SessionId
+                        let requestKind = ProviderRequestKind.WorkMain
+                        let failureState =
+                            AgentProjection.tryFind ownerSessionId projections.AgentProjections
+                            |> Option.bind _.ProviderFailures
+
+                        ProviderFailureEvidence.currentState failureState
+                        |> Option.map (fun current -> ownerSessionId, requestKind, current))
+                )
 
             match hasCapacity, recoveryContext with
             | false, _ -> notifyFailure eventPort turn "All candidate providers exhausted (zero capacity)"

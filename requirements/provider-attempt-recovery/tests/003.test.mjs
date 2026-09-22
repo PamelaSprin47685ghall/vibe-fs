@@ -268,6 +268,7 @@ const TOOL_CAPABILITIES = [
   'Move',
   'Read',
   'Remove',
+  'Sphinx',
   'Write',
 ]
 
