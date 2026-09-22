@@ -21,7 +21,7 @@
 
 ## [003] 阶梯
 
-语义命题必须按 Pure → Temporal → Adapter → Long Stroke 逐级进行证明，严禁跨级省略。
+语义命题必须按 Pure → Temporal → Adapter → Long Stroke 逐级证明，严禁跨级省略；经用户确认不适用的层级除外。
 
 ## [004] verifier 必须可红
 
