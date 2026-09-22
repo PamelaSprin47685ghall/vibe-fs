@@ -36,6 +36,7 @@ module HostSignalBootstrap =
           BindActiveRun: SessionId -> Role -> string option -> unit
           CurrentPhysicalUserMessage: string -> string option
           ChatMessageHook: obj
+          ResolveSessionAgent: SessionId -> Task<string option>
           ObserveEvent: obj -> Task<unit> }
 
     /// Neutral Strength ports built by plugin composition (`PluginStrengthPorts`)

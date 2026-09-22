@@ -364,6 +364,52 @@ type ToolRuntimeScope
             | None -> return! recoverHumanRootFromSnapshot ctx
         }
 
+    let commandRootPhysicalId (sessionId: SessionId) =
+        Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.create (
+            "wanxiangshu:command-root:" + SessionId.value sessionId
+        )
+
+    let acceptHumanRootFor
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (physicalMessageId: Wanxiangshu.Foundation.Identity.PhysicalUserMessageId)
+        (agent: string)
+        : Task<Role option> =
+        task {
+            let runtime = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
+
+            let! admission =
+                taskResult {
+                    let! seed = humanRootIdentitySeedAdmission durable sessionId agent
+
+                    let! attempt =
+                        runtime.AcceptHumanRoot sessionId physicalMessageId (Some seed)
+                        |> TaskResultCE.ofTask
+
+                    let! profile = attempt |> Result.mapError (fun _ -> ())
+                    return profile.CanonicalRole
+                }
+
+            return Result.toOption admission
+        }
+
+    let ensureCommandRoleFor (sessionId: SessionId) (resolveAgent: SessionId -> Task<string option>) =
+        task {
+            match journal with
+            | None -> return None
+            | Some durable ->
+                match
+                    PromptAuthorityProjectionQueries.activeProfile
+                        sessionId
+                        (AgentJournal.snapshot durable).AgentProjections
+                with
+                | Some profile -> return Some profile.CanonicalRole
+                | None ->
+                    match! resolveAgent sessionId with
+                    | None -> return None
+                    | Some agent -> return! acceptHumanRootFor durable sessionId (commandRootPhysicalId sessionId) agent
+        }
+
     /// The managed agent the Authority Root selected for this session.
     ///
     /// A PTY belongs to the Logical Run and uses the fixed participant identity
@@ -674,6 +720,10 @@ type ToolRuntimeScope
 
     member _.RoleFor(ctx: HostToolContext) = roleFor ctx
     member _.EnsureRoleFor(ctx: HostToolContext) = ensureRoleFor ctx
+
+    member _.EnsureCommandRoleFor(sessionId: SessionId, resolveAgent: SessionId -> Task<string option>) =
+        ensureCommandRoleFor sessionId resolveAgent
+
     member _.EnsureRoadDevOpsBound(parentSessionId: SessionId) = ensureRoadDevOpsBound parentSessionId
 
     /// Manager authorization facts for the capability gate, derived purely

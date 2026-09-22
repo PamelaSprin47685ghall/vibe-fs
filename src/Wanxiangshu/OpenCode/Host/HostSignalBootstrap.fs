@@ -61,6 +61,7 @@ module HostSignalBootstrap =
           BindActiveRun: SessionId -> Role -> string option -> unit
           CurrentPhysicalUserMessage: string -> string option
           ChatMessageHook: obj
+          ResolveSessionAgent: SessionId -> Task<string option>
           ObserveEvent: obj -> Task<unit> }
 
     let private observeSessionIdentity (sessionId: SessionId) (hasParent: bool) (agent: string option) =
@@ -827,6 +828,7 @@ module HostSignalBootstrap =
                         reconciler.TryPhysicalUserMessage(SessionId.create sessionId)
                         |> Option.map PhysicalUserMessageId.value)
                   ChatMessageHook = chatMessageHook
+                  ResolveSessionAgent = resolveAgentForSession
                   ObserveEvent =
                     (fun raw ->
                         task {
