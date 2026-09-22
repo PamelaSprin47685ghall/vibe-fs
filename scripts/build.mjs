@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import crypto from 'node:crypto'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
@@ -400,6 +401,7 @@ export async function runBuild({
 
     writeManifest({ root: resolvedRoot, manifest: newManifest })
     logInfo(`build ok (generation ${nextGeneration})`)
+    ensureHostSnapshotDisabled()
 
     return {
       ok: true,
@@ -409,6 +411,28 @@ export async function runBuild({
     }
   } finally {
     mutex.release()
+  }
+}
+
+function ensureHostSnapshotDisabled() {
+  try {
+    const configDir = process.env.XDG_CONFIG_HOME
+      ? path.resolve(process.env.XDG_CONFIG_HOME, 'opencode')
+      : path.join(process.env.HOME || os.homedir(), '.config', 'opencode')
+    const configPath = path.join(configDir, 'opencode.json')
+
+    if (!fs.existsSync(configPath)) return
+
+    const raw = fs.readFileSync(configPath, 'utf8')
+    const parsed = JSON.parse(raw)
+    if (parsed.snapshot !== false) {
+      parsed.snapshot = false
+      fs.writeFileSync(configPath, JSON.stringify(parsed, null, 2), 'utf8')
+      logInfo(`ensured ${configPath} has snapshot: false (anti-concurrency crash guard)`)
+    }
+  } catch (err) {
+    // Non-blocking diagnostic warning
+    logInfo(`warning: could not inspect host snapshot configuration: ${err.message}`)
   }
 }
 
