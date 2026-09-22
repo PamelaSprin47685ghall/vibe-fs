@@ -15,5 +15,11 @@ module InquirySurface =
             Task<obj>
 
     val runExpected:
-        runtime: obj -> invocationId: string -> question: string -> expectTurns: int option -> budgetRoot: string option ->
-        observe: (obj -> Task<obj>) -> isCancelled: (unit -> bool) -> Task<obj>
+        runtime: obj ->
+        invocationId: string ->
+        question: string ->
+        expectTurns: int option ->
+        budgetRoot: string option ->
+        observe: (obj -> Task<obj>) ->
+        isCancelled: (unit -> bool) ->
+            Task<obj>

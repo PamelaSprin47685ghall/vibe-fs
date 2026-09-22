@@ -19,12 +19,23 @@ module InquirySurface =
         (unbox<InquiryRuntime> runtime)
             .Run(invocationId, question, observeWork, isCancelled)
 
-    let runExpected (runtime: obj) invocationId question (expectTurns: int option) (budgetRoot: string option) (observe: obj -> Task<obj>) isCancelled =
+    let runExpected
+        (runtime: obj)
+        invocationId
+        question
+        (expectTurns: int option)
+        (budgetRoot: string option)
+        (observe: obj -> Task<obj>)
+        isCancelled
+        =
         let observeWork work =
             task {
                 try
                     let! observation = observe work
                     return Ok observation
-                with error -> return Error error.Message
+                with error ->
+                    return Error error.Message
             }
-        (unbox<InquiryRuntime> runtime).Run(invocationId, question, observeWork, isCancelled, ?expectTurns = expectTurns, ?budgetRoot = budgetRoot)
+
+        (unbox<InquiryRuntime> runtime)
+            .Run(invocationId, question, observeWork, isCancelled, ?expectTurns = expectTurns, ?budgetRoot = budgetRoot)

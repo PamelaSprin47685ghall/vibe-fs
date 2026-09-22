@@ -98,8 +98,9 @@ module Policy =
     let private exhaustedReason (state: EpistemicState) =
         let priceLimited =
             state.Budget.Expectation.IsSome
-            && (state.Actions |> Map.exists (fun _ action ->
-                action.Kind = ActionKind.Investigate && action.Status = ActionStatus.Open))
+            && (state.Actions
+                |> Map.exists (fun _ action ->
+                    action.Kind = ActionKind.Investigate && action.Status = ActionStatus.Open))
 
         if priceLimited then
             "turn-price"
@@ -130,8 +131,12 @@ module Policy =
         | _ -> state, InquiryResult.Answered(canonicalAnswer (exhaustedReason state) state)
 
     let private decideWithRoot (root: RootContract) (state: EpistemicState) =
-        if state.Budget.Expectation.IsSome && State.remainingYieldBudget state <= 1
-           && not (Map.isEmpty state.Findings) && state.Synthesis.IsNone then
+        if
+            state.Budget.Expectation.IsSome
+            && State.remainingYieldBudget state <= 1
+            && not (Map.isEmpty state.Findings)
+            && state.Synthesis.IsNone
+        then
             yieldRequest (SynthesizeRequest(state.Findings |> Map.toList |> List.map fst, root)) state
         elif state.NeedsGeneration then
             yieldRequest (GenerateCandidatesRequest(Methodology.generationMethods state, root)) state

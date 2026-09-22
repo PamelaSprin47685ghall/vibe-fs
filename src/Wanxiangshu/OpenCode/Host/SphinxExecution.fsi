@@ -6,15 +6,19 @@ open Wanxiangshu.Persistence.EventStore
 
 type ISphinxEngineerPort =
     abstract Invoke:
-        owner: SessionId * charge: string * admitted: (SessionId -> unit) * isCancelled: (unit -> bool) -> Task<Result<string, string>>
+        owner: SessionId * charge: string * admitted: (SessionId -> unit) * isCancelled: (unit -> bool) ->
+            Task<Result<string, string>>
+
     abstract Cancel: child: SessionId -> Task<unit>
     abstract LogicalOwnerOf: present: SessionId -> SessionId
 
 /// One plugin-owned inquiry executor; session ownership remains with SyncDelegate.
 type SphinxExecution =
     new: store: IEventStore * engineers: ISphinxEngineerPort -> SphinxExecution
+
     member Run:
         context: HostToolContext * invocationId: string * question: string * expectTurns: int option -> Task<obj>
+
     member CancelSession: sessionId: string -> unit
     member DisposeAsync: unit -> Task
 

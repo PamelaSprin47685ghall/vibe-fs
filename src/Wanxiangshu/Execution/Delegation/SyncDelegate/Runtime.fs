@@ -228,8 +228,10 @@ type SyncDelegateRuntime
         taskResult {
             let requireLiveCall () =
                 match store.TryPeekCallByDelegate call.Delegate with
-                | Some active when Object.ReferenceEquals(active, call)
-                                   && not (call.Invocations |> List.exists (fun invocation -> invocation.IsCancelled())) ->
+                | Some active when
+                    Object.ReferenceEquals(active, call)
+                    && not (call.Invocations |> List.exists (fun invocation -> invocation.IsCancelled()))
+                    ->
                     Ok()
                 | _ -> Error "sync delegate call was cancelled before prompt dispatch"
 

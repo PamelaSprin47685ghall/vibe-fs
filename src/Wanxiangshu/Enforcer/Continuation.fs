@@ -42,6 +42,7 @@ module EnforcerContinuation =
         | InjectRepair of BloggerRequestContext
         | CommitUnknown
         | AbandonThenCatchUp
+        | Stop of string
 
     /// Continuation transform result. Empty message lists are forbidden: Host
     /// forwards them as provider `messages` and rejects with 400.
@@ -148,13 +149,13 @@ module EnforcerContinuation =
                         ctx.RawMessages
                 with
                 | BloggerRepairOutcome.RepairInjected msgs -> return ctx.Project msgs
-                | BloggerRepairOutcome.PendingRepairWait -> return ctx.Project ctx.RawMessages
-                | BloggerRepairOutcome.SupersededIgnored -> return ctx.Project ctx.RawMessages
+                | BloggerRepairOutcome.PendingRepairWait -> return ctx.Stop "enforcer-cycle-nudge-deferred-to-idle"
+                | BloggerRepairOutcome.SupersededIgnored -> return ctx.Stop "blogger-repair-superseded-ignored"
                 | BloggerRepairOutcome.UnownedIdleIgnored ->
                     return ctx.Stop "unowned-interrupted-blog-without-CurrentRequest"
                 | BloggerRepairOutcome.AbandonedExhausted -> return ctx.Stop "blogger-protocol-repair-exhausted"
                 | BloggerRepairOutcome.NudgeSent _
-                | BloggerRepairOutcome.AabbSent _ -> return ctx.Project ctx.RawMessages
+                | BloggerRepairOutcome.AabbSent _ -> return ctx.Stop "blogger-repair-sent"
                 | BloggerRepairOutcome.Completed -> return ctx.Stop "blogger-protocol-repair-completed"
             }
         | None -> Task.FromResult(ctx.Stop "unowned-interrupted-blog-without-CurrentRequest")
@@ -186,13 +187,13 @@ module EnforcerContinuation =
                         "enforcer-cycle-nudge-deferred-to-idle"
                         [ "session_id", sessionKey; "result", reason ]
 
-                    return ctx.Project ctx.RawMessages
-                | BloggerRepairOutcome.SupersededIgnored -> return ctx.Project ctx.RawMessages
+                    return ctx.Stop "enforcer-cycle-nudge-deferred-to-idle"
+                | BloggerRepairOutcome.SupersededIgnored -> return ctx.Stop "blogger-repair-superseded-ignored"
                 | BloggerRepairOutcome.UnownedIdleIgnored ->
                     return ctx.Stop "unowned-invalid-blog-cycle-without-CurrentRequest"
                 | BloggerRepairOutcome.AbandonedExhausted -> return ctx.Stop "blogger-protocol-repair-exhausted"
                 | BloggerRepairOutcome.NudgeSent _
-                | BloggerRepairOutcome.AabbSent _ -> return ctx.Project ctx.RawMessages
+                | BloggerRepairOutcome.AabbSent _ -> return ctx.Stop "blogger-repair-sent"
                 | BloggerRepairOutcome.Completed -> return ctx.Stop "blogger-protocol-repair-completed"
             }
 
@@ -583,9 +584,12 @@ module EnforcerContinuation =
                         ctx.RawMessages
                 with
                 | BloggerRepairOutcome.RepairInjected _ -> return CycleDisposition.InjectRepair freshCtx
-                | BloggerRepairOutcome.PendingRepairWait -> return CycleDisposition.Working
-                | BloggerRepairOutcome.SupersededIgnored -> return CycleDisposition.Working
-                | BloggerRepairOutcome.UnownedIdleIgnored -> return CycleDisposition.Working
+                | BloggerRepairOutcome.PendingRepairWait ->
+                    return CycleDisposition.Stop "enforcer-empty-cycle-nudge-deferred-to-idle"
+                | BloggerRepairOutcome.SupersededIgnored ->
+                    return CycleDisposition.Stop "enforcer-empty-cycle-repair-superseded-ignored"
+                | BloggerRepairOutcome.UnownedIdleIgnored ->
+                    return CycleDisposition.Stop "enforcer-empty-cycle-unowned-idle-ignored"
                 | BloggerRepairOutcome.AbandonedExhausted ->
                     // The coordinator already settled this exact request:
                     // abandonment is durable and the flight was released inside
@@ -593,13 +597,13 @@ module EnforcerContinuation =
                     // the next material rather than fusing the process.
                     return CycleDisposition.AbandonThenCatchUp
                 | BloggerRepairOutcome.NudgeSent _
-                | BloggerRepairOutcome.AabbSent _
+                | BloggerRepairOutcome.AabbSent _ -> return CycleDisposition.Stop "enforcer-empty-cycle-repair-sent"
                 | BloggerRepairOutcome.Completed ->
                     // A transform observation can never yield a send-kind reply;
                     // a mismatched outcome violates the rendezvous contract.
                     Diagnostic.fatal "enforcer-repair-outcome-mismatch" [ "session_id", sessionKey; "result", reason ]
 
-                    return CycleDisposition.Working
+                    return CycleDisposition.Stop "enforcer-repair-outcome-mismatch"
         }
 
     let private abandonStaleDisposition
@@ -844,6 +848,7 @@ module EnforcerContinuation =
             resumeCatchUp ctx mainSessionId sessionKey "stale-cycle-catch-up-complete"
         | CycleDisposition.Working -> finishWorking ctx liveCtx
         | CycleDisposition.Committed afterSquashMain -> finishCommitted ctx mainSessionId sessionKey afterSquashMain
+        | CycleDisposition.Stop reason -> Task.FromResult(ctx.Stop reason)
 
     /// Branch 2 — ENFORCER-044: merge/commit on completed blog tool parts when
     /// this plugin owns the cycle (live CurrentRequest).
