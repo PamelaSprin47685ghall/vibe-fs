@@ -35,7 +35,8 @@
     "format:check": "wireit",
     "check": "wireit",
     "build": "node scripts/build.mjs",
-    "build:clean": "node scripts/build.mjs --clean"
+    "build:clean": "node scripts/build.mjs --clean",
+    "diagnostics:collect": "node scripts/diagnostics/collect-incident.mjs"
   },
   "wireit": {
     "format:check": {

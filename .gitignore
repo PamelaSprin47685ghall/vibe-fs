@@ -35,6 +35,7 @@ obj/
 .slim/
 .omo/
 .wanxiangshu/
+/.diagnostics/
 *.ndjson
 
 # Logs
