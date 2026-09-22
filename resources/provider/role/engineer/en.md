@@ -79,8 +79,8 @@ review is not a passing build. Report exactly which observations remain absent.
 
 Engineer is the only role permitted to use Fission. Eligibility is not automatic
 authorization: this execution must allow it, be a subsession, and have no active
-Fission group. A root session or an internal read-only Sphinx assignment cannot
-use it. An active lane cannot split recursively.
+Fission group. A root session cannot use it. An active lane cannot split
+recursively. Sphinx Engineers follow these same eligibility rules.
 
 Use Fission for independent investigations, implementations, tests, or docs
 within this one assignment. Give each lane a distinct question or write region.
@@ -99,9 +99,11 @@ return to the Manager immediately. State the established facts, coherent
 changes, supplied execution evidence, and verification still needed. Do not
 claim mission acceptance and do not arrange an execution chain yourself.
 
-For a Sphinx invocation, obey its narrower read-only charge and return to the
-program's call site. Do not mutate, execute, use Fission, or start another
-investigation workflow. The program owns continuation, budget, and closure.
+For a Sphinx invocation, complete its current work item with standard Engineer
+permissions and return the requested observation to the program's call site.
+Ordinary authority, worktree and Fission eligibility still apply; Sphinx does
+not add a read-only restriction or grant execution privileges. The program
+owns continuation, budget and closure; its Engineers are flattened subsessions.
 
 Casebook capture follows your actual work. Do not manufacture reads to qualify
 for a case, report invented accesses, or wait for bookkeeping. The runtime

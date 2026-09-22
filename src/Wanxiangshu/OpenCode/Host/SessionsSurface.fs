@@ -46,6 +46,7 @@ module SessionsSurface =
     type private ControlledOpenCodePort(childId: SessionId, rejectAbort: bool) =
         let aborts = ResizeArray<string>()
         let abortTimes = ResizeArray<int>()
+        let createParents = ResizeArray<string>()
 
         let rejection =
             TaskCompletionSource<Result<unit, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
@@ -55,6 +56,7 @@ module SessionsSurface =
 
         member _.Aborts = aborts.ToArray()
         member _.AbortTimes = abortTimes.ToArray()
+        member _.CreateParents = createParents.ToArray()
         member _.VirtualTime = virtualTime.Value
         member _.AdvanceTo(timestamp: int) = virtualTime.Value <- timestamp
 
@@ -76,7 +78,12 @@ module SessionsSurface =
 
             member _.CreateSession _ _ = Task.FromResult(Error "unused")
             member _.GetSessionParent _ = Task.FromResult(Ok None)
-            member _.CreateChildSession _ _ = Task.FromResult(Ok childId)
+            member _.CreateChildSession parent _ =
+                createParents.Add(SessionId.value parent)
+                let createdId =
+                    if createParents.Count = 1 then childId
+                    else SessionId.create (SessionId.value childId + "-" + string createParents.Count)
+                Task.FromResult(Ok createdId)
             member _.ListChildren _ = Task.FromResult(Ok [])
             member _.CloseChildSession _ = Task.FromResult(Ok())
 
@@ -89,6 +96,30 @@ module SessionsSurface =
             member _.SubscribeTerminalListener _ = subscription
             member _.SubscribeFutureTerminalListener _ = subscription
             member _.NotifyTerminal _ _ = true
+
+    /// Exercise the production flattening membrane, not a duplicated family-root
+    /// algorithm or the logical-parent argument above the Host adapter.
+    let flattenedChildAdapterProbe () : Task<obj> =
+        task {
+            let root = SessionId.create "flat-sphinx-root"
+            let transport = ControlledOpenCodePort(SessionId.create "flat-sphinx-engineer", false)
+            let sessions =
+                InjectedSessionPort(Some(transport :> IOpenCodePort), ControlledEventPort() :> IEventObservationPort)
+                :> ISessionHostPort
+            let options: OpenCodeChildOptions =
+                { Title = Some "standard Engineer"; Agent = Some "engineer"; Directory = None }
+            let! first = sessions.CreateChildSession(root, options)
+            let caller = first |> Result.defaultWith invalidOp
+            let! second = sessions.CreateChildSession(caller, options)
+            let worker = second |> Result.defaultWith invalidOp
+            return
+                createObj
+                    [ "root" ==> SessionId.value root
+                      "caller" ==> SessionId.value caller
+                      "worker" ==> SessionId.value worker
+                      "physicalParents" ==> transport.CreateParents
+                      "workerFamily" ==> SessionId.value (sessions.FamilyRootOf worker) ]
+        }
 
     /// managed-session-lifecycle-016/017: exercise the production session adapter against
     /// a controlled physical Host boundary. The returned view contains values,

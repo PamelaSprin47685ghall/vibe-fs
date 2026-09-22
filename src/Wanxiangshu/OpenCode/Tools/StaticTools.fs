@@ -1,7 +1,5 @@
 namespace Wanxiangshu.OpenCode
 
-open Wanxiangshu.Sphinx
-
 open System
 open Fable.Core.JsInterop
 open Wanxiangshu.Ablation
@@ -29,7 +27,7 @@ module StaticTools =
         | ToolPermission.BashHoneypot -> [ "bash-honeypot" ]
         | ToolPermission.Exec -> [ "run" ]
         | ToolPermission.Pty -> [ "open-terminal"; "send-terminal"; "read-terminal"; "signal-terminal" ]
-        | ToolPermission.Sphinx -> [ SphinxMcp.permissionKey ]
+        | ToolPermission.Sphinx -> [ "sphinx" ]
         | ToolPermission.ReviewAssessment -> [ "review" ]
         | ToolPermission.Chronicle -> [ "chronicle" ]
         | ToolPermission.Fetch -> [ "fetch" ]
@@ -93,7 +91,7 @@ module StaticTools =
           "rm"
           "bash-honeypot"
           "run"
-          "sphinx_*"
+          "sphinx"
           "review"
           "chronicle"
           "fetch"

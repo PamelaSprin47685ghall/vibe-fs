@@ -84,10 +84,34 @@ module Value =
         dependencyDiscount state action * (discount * rootGain + 0.65 * gateway)
         - max 0.0 action.Cost
 
+    let private pricedInvestigationDelta (expectation: TurnExpectation) (state: EpistemicState) (action: CognitiveAction) =
+        let grounded = float (groundedFindingCount state)
+        let marginalLoss = 0.72 / ((grounded + 1.0) * (grounded + 2.0))
+        let gain = min 1.0 (max 0.0 action.ExpectedRootGain + 0.65 * max 0.0 action.GatewayGain)
+        // Investigation and the ensuing candidate generation cost two work items.
+        dependencyDiscount state action * gain * marginalLoss - 2.0 * expectation.TurnPrice
+
+    let private pricedSynthesisDelta expectation (state: EpistemicState) =
+        let worthwhileInvestigation =
+            state.Actions
+            |> Map.exists (fun _ action ->
+                action.Kind = ActionKind.Investigate
+                && action.Status = ActionStatus.Open
+                && pricedInvestigationDelta expectation state action > 0.0)
+
+        if state.Synthesis.IsSome || Map.isEmpty state.Findings then
+            System.Double.NegativeInfinity
+        elif State.remainingYieldBudget state <= 1 || not worthwhileInvestigation then
+            1.0
+        else
+            System.Double.NegativeInfinity
+
     let private deltaForKind (state: EpistemicState) (action: CognitiveAction) =
-        match action.Kind with
-        | ActionKind.Synthesize -> synthesisDelta state action
-        | ActionKind.Investigate -> investigateDelta state action
+        match state.Budget.Expectation, action.Kind with
+        | Some expectation, ActionKind.Investigate -> pricedInvestigationDelta expectation state action
+        | Some expectation, ActionKind.Synthesize -> pricedSynthesisDelta expectation state
+        | None, ActionKind.Synthesize -> synthesisDelta state action
+        | None, ActionKind.Investigate -> investigateDelta state action
 
     let actionDelta (state: EpistemicState) (action: CognitiveAction) =
         if action.Status = ActionStatus.Resolved then

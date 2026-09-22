@@ -23,7 +23,7 @@ const buildConfig = () => {
 }
 installDefaultResources()
 
-test('WHAT[capability-enforcement-007] sphinx_wildcard_is_not_exposed_to_ordinary_interactive_roles', () => {
+test('WHAT[capability-enforcement-007] native_sphinx_is_role_gated_and_the_retired_mcp_wildcard_is_absent', () => {
   const config = buildConfig()
   assert.equal(configureManagedAgents(config).ok, true)
 
@@ -32,9 +32,11 @@ test('WHAT[capability-enforcement-007] sphinx_wildcard_is_not_exposed_to_ordinar
     const permission = config.agent[name].permission
     assert.equal(
       permission[permissionKey],
-      'deny',
-      `${name} must deny sphinx_*`,
+      undefined,
+      `${name} must not install the retired sphinx_* permission`,
     )
+    assert.equal(permission['*'], 'deny', 'retired and unknown tool names remain denied by default')
+    assert.equal(permission.sphinx, ['manager', 'orchestrator', 'engineer'].includes(name) ? 'allow' : 'deny')
   }
 })
 }

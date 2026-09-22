@@ -28,7 +28,7 @@ type ToolPermission =
     | Finality
     /// Engineer honeypot: visible as `bash-honeypot`, never a real shell.
     | BashHoneypot
-    /// AGENT-030: Sphinx MCP wildcard (`sphinx_*`) for the programmatic workflow entry.
+    /// Program-owned inquiry through the native sphinx(question) tool.
     | Sphinx
 
 [<RequireQualifiedAccess>]
@@ -51,8 +51,14 @@ module OfficeCapability =
                   ToolPermission.Horizon
                   ToolPermission.TodoWrite
                   ToolPermission.ReviewAssessment
-                  ToolPermission.Finality ]
-        | Role.Orchestrator -> set [ ToolPermission.Fork; ToolPermission.Join; ToolPermission.Horizon ]
+                  ToolPermission.Finality
+                  ToolPermission.Sphinx ]
+        | Role.Orchestrator ->
+            set
+                [ ToolPermission.Fork
+                  ToolPermission.Join
+                  ToolPermission.Horizon
+                  ToolPermission.Sphinx ]
         | Role.Engineer ->
             set
                 [ ToolPermission.Read
@@ -64,7 +70,8 @@ module OfficeCapability =
                   ToolPermission.Remove
                   ToolPermission.BashHoneypot
                   ToolPermission.Fetch
-                  ToolPermission.Fission ]
+                  ToolPermission.Fission
+                  ToolPermission.Sphinx ]
         | Role.Coder -> Set.empty
         | Role.Inspector -> Set.empty
         | Role.Browser -> Set.empty

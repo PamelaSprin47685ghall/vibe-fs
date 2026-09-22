@@ -3,7 +3,7 @@
 // WHAT[delegation-032] — Engineer completes its entrusted charge and returns directly
 // to Manager without organizing a verification chain or dispatching DevOps.
 // Direct, wrapped, or forwarded delegation from Engineer to DevOps is forbidden,
-// and Sphinx internal SyncDelegate only synchronously invokes read-only Engineer.
+// and Sphinx internal SyncDelegate invokes a standard Engineer without granting DevOps privileges.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -17,12 +17,15 @@ test('WHAT[delegation-032] engineer_has_no_devops_delegation_or_execution_dispat
   assert.match(deniedCalling, /Unknown or unavailable calling/)
 })
 
-test('WHAT[delegation-032] sync_delegate_in_sphinx_only_invokes_readonly_engineer_investigation', () => {
+test('WHAT[delegation-032] sync_delegate_in_sphinx_uses_the_canonical_engineer_not_a_special_readonly_role', () => {
   // SyncDelegate vocabulary for internal Engineer investigation
   const vocab = sync.vocabulary('Engineer', 'Fast', 'sphinx-scope')
   assert.equal(vocab.role, 'engineer')
   assert.equal(vocab.agent, 'engineer')
   assert.equal(vocab.scope, 'sphinx-scope')
+  assert.equal(isAllowed(vocab.agent, 'Write'), true)
+  assert.equal(isAllowed(vocab.agent, 'Fission'), true)
+  assert.equal(isAllowed(vocab.agent, 'Exec'), false)
 })
 
 test('WHAT[delegation-032] engineer_and_devops_mutual_delegation_and_command_isolation_in_permissions_and_schema', () => {

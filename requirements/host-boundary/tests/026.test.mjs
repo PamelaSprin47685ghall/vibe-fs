@@ -192,7 +192,7 @@ test('WHAT[host-boundary-026] Host source ownership follows subsystem inventory 
   const sphinxAdapter = requireShard('sphinx-host-adapter')
   assert.deepEqual(
     sphinxAdapter.compile.sort(),
-    ['OpenCode/Host/SphinxMcpConfig.fs', 'OpenCode/Host/SphinxMcpConfigSurface.fs'].sort(),
+    ['OpenCode/Host/SphinxConfig.fs', 'OpenCode/Host/SphinxMcpConfig.fs', 'OpenCode/Host/SphinxMcpConfigSurface.fs'].sort(),
   )
 
   // Unique production ownership, sibling signatures and aggregate coverage are

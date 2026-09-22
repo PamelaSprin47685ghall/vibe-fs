@@ -11,6 +11,15 @@
 /src/Wanxiangshu/Sphinx/Mcp.fs
 /src/Wanxiangshu/Sphinx/McpContract.fs
 /src/Wanxiangshu/Sphinx/McpServer.fs
+/src/Wanxiangshu/Sphinx/Inquiry.fs
+/src/Wanxiangshu/Sphinx/TurnBudget.fs
+/src/Wanxiangshu/Sphinx/InquiryRuntime.fs
+/src/Wanxiangshu/Sphinx/InquirySurface.fs
+/src/Wanxiangshu/OpenCode/Tools/SphinxTool.fs
+/src/Wanxiangshu/OpenCode/Host/SphinxExecution.fs
+/src/Wanxiangshu/OpenCode/Host/SphinxExecutionSurface.fs
+/src/Wanxiangshu/OpenCode/Plugin/SphinxCommand.fs
+/src/Wanxiangshu/OpenCode/Plugin/SphinxCommandSurface.fs
 /src/Wanxiangshu/Sphinx/Methodology.fs
 /src/Wanxiangshu/Sphinx/MonteCarlo.fs
 /src/Wanxiangshu/Sphinx/ObservationCodec.fs

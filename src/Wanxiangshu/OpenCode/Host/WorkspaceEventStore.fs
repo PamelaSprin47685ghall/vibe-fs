@@ -14,11 +14,11 @@ module WorkspaceEventStore =
     /// lifecycle/fetch, js-transaction durability and strength durable
     /// promotion, so its history program is the journal spine plus exactly
     /// those owning oracles. Registration order matches the historical full
-    /// program. Sphinx durable sessions are served by the Sphinx MCP process
-    /// with its own store and its own Sphinx program, never through this one.
+    /// program. Native Sphinx inquiries share this same writer and Current.
     let private hostProgram: IntegrationRule list =
         CanonicalIntegrator.baseRules
         @ Wanxiangshu.Strength.StrengthIntegrationRules.rules
+        @ Wanxiangshu.Sphinx.SphinxIntegrationRules.rules
         @ Wanxiangshu.Repository.Knowledge.Casebook.CasebookIntegrationRules.rules
         @ Wanxiangshu.Repository.Programming.Js.JsTransactionIntegrationRules.rules
 

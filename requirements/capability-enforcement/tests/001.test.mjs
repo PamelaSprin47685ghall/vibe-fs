@@ -22,6 +22,7 @@ test('WHAT[capability-enforcement-001] PROMPT_008_the_profile_derives_role_promp
     'Move',
     'Read',
     'Remove',
+    'Sphinx',
     'Write',
   ])
 })

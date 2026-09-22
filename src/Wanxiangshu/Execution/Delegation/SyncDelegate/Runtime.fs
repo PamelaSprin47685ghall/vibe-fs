@@ -64,6 +64,14 @@ type SyncDelegateRetryPort =
 /// Job-owned helpers for the delegation-031 settle path. Module scope keeps the
 /// member body flat while still seeing store/race primitives.
 module internal SyncDelegateInternals =
+    /// The response belongs to the accepted terminal, not the reusable session
+    /// or its historical WorkRecord. Reasoning and tool material are excluded.
+    let captureResponse (call: SyncDelegateCall) (turn: ReconciledTurn) =
+        let text = CompletedTurnClassifier.partsText turn.Parts
+
+        for invocation in call.Invocations do
+            invocation.CaptureResponse |> Option.iter (fun capture -> capture text)
+
     let settleCompletedFromParts
         (noteDelegateIfRole: SyncDelegateCall -> SessionId -> string -> unit)
         (store: SyncDelegateCallStore)
@@ -72,6 +80,7 @@ module internal SyncDelegateInternals =
         : bool =
         match CompletedTurnClassifier.partsSessionText turn.Parts with
         | record when not (System.String.IsNullOrWhiteSpace record) ->
+            captureResponse call turn
             noteDelegateIfRole call turn.SessionId record
             AsyncSupport.trySetResult call.Answer (Ok record) |> ignore
             true
@@ -217,6 +226,14 @@ type SyncDelegateRuntime
         (request: SyncDelegatePromptRequest)
         : Task<Result<PreparedDelegationHandoff, string>> =
         taskResult {
+            let requireLiveCall () =
+                match store.TryPeekCallByDelegate call.Delegate with
+                | Some active when Object.ReferenceEquals(active, call)
+                                   && not (call.Invocations |> List.exists (fun invocation -> invocation.IsCancelled())) ->
+                    Ok()
+                | _ -> Error "sync delegate call was cancelled before prompt dispatch"
+
+            do! requireLiveCall ()
             let tools = toolMap (canonicalRole call.Role)
             let route = DelegationHandoffRoute.syncRole call.OwnerScope call.Role
             let! prepared = handoff.Prepare call.Owner route |> TaskResultCE.ofTask
@@ -245,6 +262,7 @@ type SyncDelegateRuntime
                 |> LlmFacing.render
 
             let! identitySeed = issueCurrentOwnerIdentitySeed call.Owner call.Agent
+            do! requireLiveCall ()
 
             let accept physical root scope =
                 call.AcceptedPhysical <- Some physical
@@ -362,10 +380,11 @@ type SyncDelegateRuntime
         if call.Role = SyncDelegateRole.Inspector || call.Role = SyncDelegateRole.Engineer then
             noteDelegateAnswer (sessionKey turnSessionId) record
 
-    let finishCompletedCall turnSessionId (call: SyncDelegateCall) workRecord =
+    let finishCompletedCall (turn: ReconciledTurn) (call: SyncDelegateCall) workRecord =
         match workRecord with
         | Some record when not (String.IsNullOrWhiteSpace record) ->
-            noteDelegateIfRole call turnSessionId record
+            SyncDelegateInternals.captureResponse call turn
+            noteDelegateIfRole call turn.SessionId record
             AsyncSupport.trySetResult call.Answer (Ok record) |> ignore
             true
         | _ ->
@@ -384,6 +403,7 @@ type SyncDelegateRuntime
     let finishCompletedCallFromTurn (turn: ReconciledTurn) (call: SyncDelegateCall) =
         match CompletedTurnClassifier.partsSessionText turn.Parts with
         | record when not (System.String.IsNullOrWhiteSpace record) ->
+            SyncDelegateInternals.captureResponse call turn
             noteDelegateIfRole call turn.SessionId record
             AsyncSupport.trySetResult call.Answer (Ok record) |> ignore
             true
@@ -410,7 +430,7 @@ type SyncDelegateRuntime
                 return true
             | Ok receipt ->
                 let! workRecord = resolveWorkRecord turn.SessionId call receipt.CurrentHead turn.ProviderRun
-                return finishCompletedCall turn.SessionId call workRecord
+                return finishCompletedCall turn call workRecord
         }
 
     /// delegation-025 causal identity: a turn belongs to this invocation iff its
@@ -569,8 +589,17 @@ type SyncDelegateRuntime
     member _.Invoke
         (ownerSessionKey: string, role: SyncDelegateRole, charge: string, ?expectedToolCalls: int)
         : Task<Result<string, string>> =
-        SyncDelegateWorkflow.invoke store deps ownerSessionKey role charge expectedToolCalls None (fun () ->
-            Task.FromResult(LlmFacing.instruction charge))
+        SyncDelegateWorkflow.invoke
+            store
+            deps
+            ownerSessionKey
+            role
+            charge
+            expectedToolCalls
+            None
+            (fun () -> Task.FromResult(LlmFacing.instruction charge))
+            None
+            (fun () -> false)
         |> singletonResult
 
     /// EXEC-032 composition seam: caller supplies a low-trust provider prompt
@@ -583,8 +612,54 @@ type SyncDelegateRuntime
             prepareProviderPrompt: unit -> Task<LlmFacing.Document>,
             ?expectedToolCalls: int
         ) : Task<Result<string, string>> =
-        SyncDelegateWorkflow.invoke store deps ownerSessionKey role charge expectedToolCalls None prepareProviderPrompt
+        SyncDelegateWorkflow.invoke
+            store
+            deps
+            ownerSessionKey
+            role
+            charge
+            expectedToolCalls
+            None
+            prepareProviderPrompt
+            None
+            (fun () -> false)
         |> singletonResult
+
+    /// Program callers consume the exact formal response while ordinary callers
+    /// retain the bounded WorkRecord contract and the same authority/lifecycle.
+    member _.InvokeResponsePrepared
+        (
+            ownerSessionKey: string,
+            role: SyncDelegateRole,
+            charge: string,
+            prepareProviderPrompt: unit -> Task<LlmFacing.Document>,
+            ?isCancelled: unit -> bool
+        ) : Task<Result<string, string>> =
+        task {
+            // DSL-MUTABLE: resource — exact terminal response for this invocation.
+            let response = ref None
+
+            let! result =
+                SyncDelegateWorkflow.invoke
+                    store
+                    deps
+                    ownerSessionKey
+                    role
+                    charge
+                    None
+                    None
+                    prepareProviderPrompt
+                    (Some(fun text -> response.Value <- Some text))
+                    (defaultArg isCancelled (fun () -> false))
+                |> singletonResult
+
+            return
+                result
+                |> Result.bind (fun _ ->
+                    match response.Value with
+                    | Some text when not (String.IsNullOrWhiteSpace text) -> Ok text
+                    | _ -> Error "Completed delegation did not supply a formal response")
+        }
 
     member _.InvokeBatchPrepared
         (
@@ -604,6 +679,8 @@ type SyncDelegateRuntime
             expectedToolCalls
             (Some batch)
             prepareProviderPrompt
+            None
+            (fun () -> false)
 
     member _.HandleTurn
         (turn: ReconciledTurn, failure: ExecutionFailure option, permit: QuiescencePermit option)

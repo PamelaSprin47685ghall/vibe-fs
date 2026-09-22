@@ -26,7 +26,7 @@
 
 ## [007] SyncDelegate DAG 有环即错，收敛为 Sphinx 程序内部同步 Engineer 调研
 
-同步委托依赖关系必须构成严格有向无环图（DAG）。同步委托仅允许 Sphinx 程序工作流内部在需要语义事实时调用只读 Engineer 调研。被调用的只读 Engineer 仅调研现有本地事实，完成本次调研即返回程序调用点，不具备文件写入、真实执行、DevOps 差遣、Fission 或递归调用权限。
+同步委托依赖关系必须构成严格有向无环图（DAG）。Sphinx 程序工作流内部通过受管同步委派调用标准 Engineer，完成当前工作项即返回程序调用点。内部 Engineer 使用标准 OfficeCapability，不另设只读或禁止 Fission 的配置；不额外取得标准 Engineer 不具有的真实执行或 DevOps 差遣权限。物理会话始终经 family-root 压平，与当前 sub session 同级，不得创建孙 session；结果接纳绑定本次受管调用的确切终端身份。
 
 ## [008] sync batch 成员与顺序由 Host tool-call 集合决定
 

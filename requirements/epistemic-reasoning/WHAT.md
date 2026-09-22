@@ -61,15 +61,13 @@ Evidence 的内部标识至少由规范化的 semantic key 与 dependency key �
 
 每次接受 Observation 后，Runtime 按 plugin dependency DAG 传播 PluginDelta，直至没有可应用的确定性精化。确定性 closure 必须满足 `close(close(S)) = close(S)`，不得新增 witness、重复扣账或改变 certificate。归一化、incumbent 与 posterior 更新按 canonical event 顺序组合；只有声明独立支持且 conflict keys 不交叠的 delta 才要求交换。默认 Legacy plugin 必须保持原有吸收、Bayes、value、Pareto 与 projection 的可观察闭包结果。
 
-## [013] MCP Host 忠实翻译通用 Work 与 Legacy Continuation
+## [013] 唯一原生插件工具 sphinx(question)
 
-MCP Host 必须暴露 `sphinx_inquiry_start`、`sphinx_work_submit`、`sphinx_inquiry_status`、`sphinx_inquiry_export`、`sphinx_inquiry_cancel`；`submit` 一次接受一个或多个结果并直接返回下一批 ready work。旧 `start`、`assess`、`propose`、`investigate`、`synthesize`、`status`、`cancel`、`resume` 全部保留为 Legacy Adapter，其中四种 PendingRequest 仍各有唯一阶段工具与 `nextTool`。Host 只做 schema/表示转换，不裁决 observation 合法性、refiner、停止或答案。
+Sphinx 对模型只暴露一个原生插件工具 `sphinx`，必填参数为非空字符串 `question`，可选正整数 `expectTurns` 表示期望探究回合数。一次调用由程序消费内核产生的请求、接纳类型匹配的 observation，并返回最终 answer 或明确未决后果。`expectTurns` 只引导探究深度，不等于最大回合数，不强制补足回合，也不得取代内核的停止判断和独立安全预算。不得暴露 start、submit、status、cancel、export、assess、propose、investigate、synthesize 等 Sphinx 阶段工具，也不得向调用方返回要求继续驾驶流程的 `nextTool`。Host 只做表示转换；observation 合法性、闭包、停止与答案仍由 Sphinx 内核裁决。
 
-Protocol-boundary exemption（遵循 structured-workflow-017）：`nextTool` 与 generic work envelope 都是外部协议语义；默认 Legacy profile 下，Legacy Kernel 唯一拥有 continuation、closure 与停止判定，external caller 只提供 typed observation，不决定下一步执行语义；旧四阶段的 yield/observe 循环是协议语义而非领域程序计数器；通用 WorkEnvelope 路径由 Runtime 独占事件提交与 continuation，caller 只提交 typed observation。
+## [014] 唯一命令 /sphinx question，无 MCP 接入
 
-## [014] MCP Server 身份、版本与能力协商
-
-MCP initialize 的 `serverInfo.name` 固定为 `sphinx`，`serverInfo.version` 严格等于 package manifest version，并通过 module path 定位包根而非 cwd。`2024-11-05` 客户端必须继续使用 structuredContent/Legacy tools；更新协议可发现 generic tools。Tasks 只有双方协商能力后才可启用，direct-provider 不依赖 MCP Sampling。
+插件注册唯一的 Sphinx 命令 `/sphinx question`，直接将完整问题交给与工具相同的程序入口，而不是通过命令模板要求模型调用工具。完成后把 question 与 answer 作为 user message 写入当前对话，并使用 Host 的 `noReply` 路径，禁止触发新的 provider 回合。可用 `/sphinx --expect-turns N question` 提供深度提示。不得创建 Sphinx 或 Inquiry agent，也不启动 subtask。Sphinx 不再注册、启动或依赖 MCP Server，不注入 `config.mcp.sphinx`，不使用 `sphinx_*` 权限通配符。其他功能的 MCP 配置和用户命令保持不变。工具与命令服从同一个 epistemic-reasoning 功能开关。
 
 ## [015] Core 认识论零硬编码
 
@@ -83,9 +81,9 @@ MCP initialize 的 `serverInfo.name` 固定为 `sphinx`，`serverInfo.version` �
 
 每项 accepted observation 必须绑定 root snapshot hash、BranchId、WorkId、attempt、plugin lock、schema content hash、prompt/question ID、wording/polarity、candidate/label/order permutation、treatment assignment、blind token、random seed、model/provider、sampling parameters与 usage。seed 只固定 Sphinx 自己的随机化，不承诺 provider 输出确定。重放消费已接受 observation，不重新调用 provider，并产生相同 canonical Core state hash。
 
-## [018] 两宿主语义等价
+## [018] 原生入口与回放语义等价
 
-给定相同 initial envelope、plugin lock、canonical accepted-event 序列与资源事实，MCP Host 与 OpenCode Host 必须经同一 reducer 得到相同 graph、certificate、work、budget、status、answer 与 semantic hash。Host 私有 session ID、transport receipt、arrival timing 和日志不得进入 semantic hash；并发 provider 到达顺序不同不构成“相同事件序列”。
+工具调用与命令使用同一个程序化探究入口。给定相同 initial envelope、plugin lock、canonical accepted-event 序列与资源事实，在线执行与回放必须经同一 reducer 得到相同 graph、certificate、work、budget、status、answer 与 semantic hash。Host 私有 session ID、transport receipt、arrival timing 和日志不得进入 semantic hash；并发 provider 到达顺序不同不构成“相同事件序列”。
 
 ## [019] Inquiry 以 canonical EventStore 为唯一 durable truth
 
@@ -121,7 +119,7 @@ Plugin 必须声明其 closure 成立域：finite DAG，或 complete lattice/DCP
 
 ## [027] OpenCode Host 复用现有受管执行语义
 
-OpenCode Host 暴露与 MCP 同义的 start/status/cancel/explain/export，并把 ready WorkItem 交给现有 managed session、delegation/fission、capacity 与 failure-policy owner。每个 blind work 从共同 message snapshot 建立独立 child；失败重试使用同一 WorkId、新 attempt、新 child 和原始快照，不携带失败输出。fan-out/fan-in、abort、shutdown drain、provider-step boundary 与 exact capacity fence 不得在 Sphinx 内复制；默认 subagent depth 为 1，worker 不可递归派发。
+OpenCode Host 通过原生 `sphinx(question)` 接入现有 managed session、同步 Engineer、capacity 与 failure-policy owner，并使用插件已拥有的 workspace EventStore。Sphinx 本身是程序，不占用一个 session 层级。其 Engineer 必须经现有 Host 压平机制挂在当前 family root 下，与当前 sub session 同级，不得成为孙 session。blind work 的共同快照和失败重试身份不因入口改变；fan-out/fan-in、abort、shutdown drain、provider-step boundary 与 exact capacity fence 不得在 Sphinx 内复制。
 
 ## [028] Research export 区分可识别对象与外部真值
 
@@ -133,15 +131,15 @@ Stop plugin 可基于 decision-equivalence posterior、tested framing family 内
 
 ## [030] Legacy Adapter 黄金轨迹保持可观察兼容
 
-默认 Legacy profile 必须经 `旧 MCP → Legacy Adapter → Sphinx Core events → Legacy renderer` 重放冻结的 programming-quality transcript，并保持 request/nextTool 顺序、每次 accepted observation 的 revision、最终 epistemic basis、answer 与 `stop-dominates`。在 process restart 后，handle 恢复为同一 durable inquiry。
+默认 Legacy profile 必须通过历史 observation 解码与内核重放冻结的 programming-quality transcript，保持内部 request 顺序、每次 accepted observation 的 revision、最终 epistemic basis、answer 与 `stop-dominates`。旧事件解码仅用于历史数据兼容，不构成可调用的 MCP 或阶段工具入口。在 process restart 后，同一调用身份恢复为同一 durable inquiry。
 
 ## [031] Sphinx 探究流程全程序控制，无 Inquiry 角色与模型驾驶层
 
-Sphinx 探究的预算控制、工作项调度、认识状态推进与终止收束完全由程序控制。外部调用方（如 Manager 或 Orchestrator）通过高层工具入口输入问题、约束与预算即可直接获得有界探究结果、证据界限或明确未决后果；调用方不通过 yield/nextTool/phase 逐轮驾驶探究循环。系统不设立 Inquiry 角色、Persona、Prompt 及模型槽位，不作为独立参与者存在。
+Sphinx 探究的预算控制、工作项调度、认识状态推进与终止收束完全由程序控制。Manager、Orchestrator 与 Engineer 通过唯一的 `sphinx(question)` 工具输入问题，即可直接获得有界探究结果、证据界限或明确未决后果；预算由程序拥有，调用方不通过 yield/nextTool/phase 逐轮驾驶探究循环。DevOps、Blogger 无工具调用权。系统不设立 Inquiry 或 Sphinx 角色、Persona、Prompt 及模型槽位，不作为独立参与者存在。
 
-## [032] 内部 Engineer 调研只读、同步、有预算、可取消且无 Fission 与 DevOps 权能
+## [032] 内部 Engineer 使用标准权限且会话压平
 
-当 Sphinx 程序内部需要建立代码或语义事实时，同步调用内部只读 Engineer 工作实例进行本地调查。内部 Engineer 本次调用授权严格受限：仅限本地代码与事实只读调查，受调用预算与生命周期约束，完成指定调研后立即返回程序调用点；严禁修改工作树、严禁执行真实命令或差遣 DevOps、严禁递归调用 Sphinx、严禁使用 Fission。
+当 Sphinx 程序内部需要建立代码或语义事实时，同步调用标准 Engineer 工作实例，完成指定工作后返回程序调用点。其权限直接来自标准 Engineer 的 OfficeCapability，不另建只读 profile、不删减 write/edit 或 Fission，也不额外授予标准 Engineer 不具有的 DevOps 执行权限。内部 Engineer 与其他受管 Engineer 遵守同一 authority、工作树、Fission 资格、取消和压平规则；不得以 Sphinx 调用为由创建孙 session。结构化结果来自本次已确认完成的调用输出，不从历史工作记录或旧回合猜测。
 
 ## [033] 结果接纳按工作身份幂等且防止晚到与重复购买
 
@@ -150,3 +148,15 @@ Sphinx 探究的预算控制、工作项调度、认识状态推进与终止收�
 ## [034] 取消全链贯穿父工具、子 Engineer 与结果接纳
 
 父级高层 Sphinx 调用被取消时，取消信号必须完整贯穿至底层正在执行的子 Engineer 实例、进程/会话资源释放以及结果接纳层。取消后立即执行 clean drain，阻断任何在途结果的吸收与持久化，严禁遗留孤儿子会话或在取消后吸收迟到结果。
+
+## [035] 原生调用交付与期望深度的可观察契约
+
+工具与命令必须经同一个原生执行器。`expectTurns` 为可选正整数：低于实际所需回合数不截断探究，高于充分证据所需回合数不强行补足。工具只返回最终 answer，命令将原始 question 与该 answer 回填当前会话的一条 user message。回填必须使用真实 Host `noReply`，并阻断命令默认模型转发；不得仅设置 Host 不支持的字段就宣称没有新回合。Host 不支持无错误 handled 返回时，兼容拦截的可见提示必须如实记录。无效参数在派发 Engineer 或写入 user message 前拒绝；取消必须等待实际子工作 drain，且不误取消同一会话排队的其他探究。
+
+## [036] 期望回合转为持久化价格预算，而非提示词或硬配额
+
+原生完整调查的 `expectTurns` 支持整数 5 至 511，缺省为 12；不支持的值在购买工作前明确拒绝。一个回合指一个已派发的 Engineer observation 工作项，不是 token、墙钟时间或 Engineer 内部的每次 provider 请求。根调用拥有一份共享预算，内部 Engineer、其 Fission present 和嵌套 Sphinx 不重新分配预算；嵌套调用继承根目标与价格，不能自行改写。独立安全上限为整个根调用 512 个工作项。
+
+目标是最小化期望答案损失且约束期望用量，不是让每个问题恰好花完目标回合。Legacy 参考模型 `L(K)=0.72/(1+K)`、`T=2K+3` 给出初始价格 `lambda=1.44/(expectTurns-1)^2`。一次调查及其后的候选生成共计两个工作项，其预计根收益只有超过 `2*lambda` 才购买；评估和最终综合属于基准开销，综合不因低收益被跳过。Candidate.Cost 是未经校准的模型估计，不作为实际工作项消费记账。Legacy 历史回放不改用新价格策略。
+
+开始事件保存有效目标、价格、校准样本数和根预算身份；派发前以 canonical EventStore 事件收费。同一工作身份的重放不重复收费，重启不重新解释已锁定价格。根预算一旦终止，即使子调用未收到本地取消信号，也不得继续购买或吸收迟到观察。答案披露根预算的目标、实际工作项数、价格及安全上限；不宣称真实模型均值已经校准。只有价格限制导致的正常完成才用于后续同一问题和目标的校准，取消、错误、自然耗尽与安全上限截断不作为完整样本。初始曲线和反馈必须有数值测试；持续有益的参考任务应随目标增加而实际购买更多工作，充分解答的任务仍可提前结束。

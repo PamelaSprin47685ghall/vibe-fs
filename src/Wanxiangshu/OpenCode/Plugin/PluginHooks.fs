@@ -134,14 +134,14 @@ module PluginHooks =
 
             let toolBefore (toolInput: obj) (toolOutput: obj) =
                 task {
+                    let context = ToolHostCodec.decodeContext toolInput
+
                     do!
                         Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingGate.before
                             journal
                             workspaceDirectory
                             toolInput
                             toolOutput
-
-                    let context = ToolHostCodec.decodeContext toolInput
 
                     match journal, context.ToolCallId with
                     | Some durable, Some toolCallId when not (String.IsNullOrWhiteSpace context.SessionId) ->
@@ -270,6 +270,8 @@ module PluginHooks =
                                     Error error.Message)
 
                     scope.AttachToolRuntime(toolRegistration.Runtime :> ISessionRuntimeOwner)
+                    toolRegistration.Sphinx
+                    |> Option.iter (fun sphinx -> scope.AttachSessionCleanup sphinx.CancelSession)
                     return toolRegistration
                 }
 
@@ -336,55 +338,71 @@ module PluginHooks =
                 registeredHook HookKey.Event (unaryHook (box (fun raw -> wired.ObserveEvent raw)))
 
             let dispose =
-                registeredHook HookKey.Dispose (nullaryHook (box (fun () -> scope.DisposeAsync())))
+                let disposeSphinx () : Task =
+                    match toolRegistration |> Option.bind (fun registration -> registration.Sphinx) with
+                    | Some sphinx -> sphinx.DisposeAsync()
+                    | None -> Task.FromResult(()) :> Task
+                let disposeAll () =
+                    task {
+                        let! sphinxError =
+                            task {
+                                try
+                                    do! disposeSphinx ()
+                                    return None
+                                with error -> return Some error
+                            }
+                        do! scope.DisposeAsync()
+                        sphinxError |> Option.iter raise
+                    }
+                registeredHook HookKey.Dispose (nullaryHook (box disposeAll))
+
+            let runSphinx sessionId question expectTurns =
+                task {
+                    let registration =
+                        toolRegistration |> Option.defaultWith (fun () ->
+                            invalidOp "Sphinx requires the managed Engineer runtime and workspace EventStore")
+                    let context: HostToolContext =
+                        { SessionId = sessionId; Agent = None; ToolCallId = None
+                          ProviderRunId = None; PromptText = Some question
+                          AttachAbort = fun _ -> ignore }
+                    let! role = registration.Runtime.EnsureRoleFor context
+                    if not (role |> Option.exists (fun role -> OfficeCapability.isAllowed role ToolPermission.Sphinx)) then
+                        invalidOp "Sphinx requires a Manager, Orchestrator or Engineer conversation"
+                    let sphinx = registration.Sphinx |> Option.defaultWith (fun () -> invalidOp "Sphinx runtime is unavailable")
+                    return! sphinx.Run(context, "command:" + sessionId + ":" + Guid.NewGuid().ToString("N"), question, expectTurns)
+                }
+
+            let beforeCommand input output =
+                task {
+                    let! handled = SphinxCommand.before runSphinx client workspaceDirectory input output
+                    match handled, toolRegistration with
+                    | false, Some registration ->
+                        let adoptExisting parent record = registration.Runtime.AdoptExistingChild(parent, record)
+                        do! ExplicitSessionResume.before
+                                (journal |> Option.map AgentJournalPortAdapter.forSessionResume)
+                                snapshotOpt adoptExisting input output
+                    | _ -> ()
+                }
+
+            let commandBefore =
+                registeredHook HookKey.CommandBefore (pairedHook (box beforeCommand))
 
             let hooks =
-                match toolRegistration with
-                | None ->
-                    createObj
-                        [ chatMessage
-                          chatParamsRegistration
-                          messagesTransform
-                          systemTransformRegistration
-                          config
-                          sessionCompacting
-                          compactionAutoContinue
-                          toolDefinitionRegistration
-                          toolBeforeRegistration
-                          toolAfterRegistration
-                          event
-                          dispose ]
-                | Some registration ->
-                    let adoptExisting parent record =
-                        registration.Runtime.AdoptExistingChild(parent, record)
-
-                    let commandBefore =
-                        registeredHook
-                            HookKey.CommandBefore
-                            (pairedHook (
-                                box (
-                                    ExplicitSessionResume.before
-                                        (journal |> Option.map AgentJournalPortAdapter.forSessionResume)
-                                        snapshotOpt
-                                        adoptExisting
-                                )
-                            ))
-
-                    createObj
-                        [ chatMessage
-                          chatParamsRegistration
-                          messagesTransform
-                          systemTransformRegistration
-                          config
-                          sessionCompacting
-                          compactionAutoContinue
-                          toolDefinitionRegistration
-                          toolBeforeRegistration
-                          toolAfterRegistration
-                          event
-                          dispose
-                          "tool", registration.Tools
-                          commandBefore ]
+                createObj
+                    ([ chatMessage
+                       chatParamsRegistration
+                       messagesTransform
+                       systemTransformRegistration
+                       config
+                       sessionCompacting
+                       compactionAutoContinue
+                       toolDefinitionRegistration
+                       toolBeforeRegistration
+                       toolAfterRegistration
+                       event
+                       dispose
+                       commandBefore ]
+                     @ (toolRegistration |> Option.map (fun registration -> [ "tool", registration.Tools ]) |> Option.defaultValue []))
 
             return box hooks
         }

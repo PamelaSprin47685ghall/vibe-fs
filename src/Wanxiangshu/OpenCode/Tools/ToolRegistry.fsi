@@ -16,7 +16,8 @@ open Wanxiangshu.Repository.Programming.Js
 /// per-session resources live in ToolRuntimeScope.
 type ToolRegistration =
     { Tools: obj
-      Runtime: ToolRuntimeScope }
+      Runtime: ToolRuntimeScope
+      Sphinx: SphinxExecution option }
 
 module ToolRegistry =
 

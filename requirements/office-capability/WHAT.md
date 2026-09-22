@@ -57,8 +57,8 @@ DevOps 拥有完整的运维执行与直接工程修复权能：
 - **Entitled consequence**：拥有 Engineer 的全部本地工程能力（文件读、写、改、移、删）；拥有真实命令执行（Exec）、终端与进程管理（Pty）；拥有**角色固有的非架构级修复授权**——在执行中观察到非架构级缺陷或测试失败时，应自行调查、直接修改源码、补充必要回归测试并重新验证，无需 Manager 逐次授权，亦不受任何 `allowRepair` 式开关限制。
 - **Non-consequence**：不发明架构、产品含义、兼容性或安全政策；不通过削弱断言或绕过门禁制造成功；到达架构与产品边界时交回 Manager；自身不 fork、不 resume 其他代理，不使用 Fission。
 
-## [018] Sphinx consequence = 程序控制探究流程、工作项、预算、续行和收束；可同步调用只读 Engineer 调研；non-consequence = 充当独立 Role/Persona / 拥有独立 Fission 身份 / 保留 Inquiry 驾驶层
+## [018] Sphinx consequence = 程序控制探究流程、工作项、预算、续行和收束；同步调用标准 Engineer；non-consequence = 充当独立 Role/Persona / 拥有独立 Fission 身份 / 保留 Inquiry 驾驶层
 
 Sphinx 是完全由程序控制的探究流程（epistemic workflow）：
-- **Entitled consequence**：程序驱动探究步骤推进、工作项决策、预算控制、续行与收束；在需要语义调研时，由程序同步调用只读 Engineer 获取本地事实证据。
-- **Non-consequence**：Sphinx 不是 Role、Persona 或普通 subagent；不拥有独立 Fission 身份；内部 Engineer 调研调用不具备修改、真实执行、DevOps 调度、Fission 或递归探究权限；不设立任何中间模型驾驶层。
+- **Entitled consequence**：程序驱动探究步骤推进、工作项决策、预算控制、续行与收束；通过唯一 `sphinx(question, expectTurns?)` 工具及直接 `/sphinx question` 命令调用，同步使用标准 Engineer 获取事实与完成工作项。内部 Engineer 的文件修改、工具及 Fission 能力直接来自标准 Engineer 权限，受相同的资格与 authority 检查。
+- **Non-consequence**：Sphinx 不是 Role、Persona 或普通 subagent；不拥有独立 Fission 身份，不占用额外 session 层级；不额外授予 Engineer 真实执行或 DevOps 调度权；不设立中间模型驾驶层，不另造只读 Engineer profile。

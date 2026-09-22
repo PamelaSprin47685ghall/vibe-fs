@@ -760,7 +760,7 @@ module SyncDelegateSurface =
 
     /// Run one internal Engineer research charge. The returned promise remains
     /// pending until `settle` receives a reconciled provider turn; the charge is
-    /// data for a read-only Engineer, never a tool-module surface.
+    /// data for a standard Engineer, never a tool-module surface.
     let executeEngineerCharge (value: obj) (owner: string) (charge: string) : Task<string> =
         task {
             let harness = unbox<Harness> value
@@ -789,6 +789,19 @@ module SyncDelegateSurface =
                     match result with
                     | Ok workRecord -> box {| ok = true; value = workRecord |}
                     | Error error -> box {| ok = false; error = error |}
+        }
+
+    let invokeResponse (value: obj) (owner: string) (question: string) : Task<obj> =
+        task {
+            let harness = unbox<Harness> value
+            let! result =
+                harness.Runtime.InvokeResponsePrepared(
+                    SessionId.value (harness.OwnerSession owner), SyncDelegateRole.Engineer, question,
+                    (fun () -> Task.FromResult(LlmFacing.instruction question)))
+            return
+                match result with
+                | Ok response -> box {| ok = true; value = response |}
+                | Error error -> box {| ok = false; error = error |}
         }
 
     let private handleTurn

@@ -11,6 +11,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-event-vocabulary-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
+    <Compile Include="Sphinx/Inquiry.fsi"/>
+    <Compile Include="Sphinx/Inquiry.fs"/>
     <Compile Include="Sphinx/IntegrationRules.fsi"/>
     <Compile Include="Sphinx/IntegrationRules.fs"/>
   </ItemGroup>

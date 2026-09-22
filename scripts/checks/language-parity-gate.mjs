@@ -320,11 +320,11 @@ export const ROLE_PARITY_SPECS = [
     role: 'engineer',
     enPatterns: [
       /only role permitted to use Fission/i,
-      /Sphinx invocation[\s\S]*?read-only[\s\S]*?Do not mutate, execute, use Fission/i,
+      /Sphinx invocation[\s\S]*?standard Engineer[\s\S]*?not add a read-only restriction/i,
     ],
     zhPatterns: [
       /唯一允许使用 Fission/,
-      /Sphinx 内部调用另受只读任务约束[\s\S]*?不修改、不执行、不 Fission/,
+      /Sphinx 内部调用使用标准 Engineer 权限[\s\S]*?不另设只读限制/,
     ],
   },
   {

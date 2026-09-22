@@ -579,6 +579,30 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
+    module: 'Sphinx/InquirySurface.js',
+    owner: 'epistemic-reasoning',
+    laws: ['EPI-031', 'EPI-033', 'EPI-034', 'EPI-036'],
+    source: 'src/Wanxiangshu/Sphinx/InquirySurface.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
+    module: 'OpenCode/Host/SphinxExecutionSurface.js',
+    owner: 'epistemic-reasoning',
+    laws: ['EPI-032', 'EPI-035', 'EPI-036'],
+    source: 'src/Wanxiangshu/OpenCode/Host/SphinxExecutionSurface.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
+    module: 'OpenCode/Plugin/SphinxCommandSurface.js',
+    owner: 'epistemic-reasoning',
+    laws: ['EPI-014', 'EPI-035', 'EPI-036'],
+    source: 'src/Wanxiangshu/OpenCode/Plugin/SphinxCommandSurface.fs',
+    representation: 'json',
+    kind: 'resource',
+  },
+  {
     module: 'Sphinx/GecSurface.js',
     owner: 'epistemic-reasoning',
     laws: [

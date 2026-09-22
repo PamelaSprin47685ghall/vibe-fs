@@ -49,4 +49,6 @@ module internal SyncDelegateWorkflow =
         expectedToolCalls: int option ->
         batch: SyncDelegateBatch option ->
         prepareProviderPrompt: (unit -> Task<LlmFacing.Document>) ->
+        captureResponse: (string -> unit) option ->
+        isCancelled: (unit -> bool) ->
             Task<Result<SyncDelegateInvocationResult, string>>

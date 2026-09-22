@@ -8,7 +8,7 @@ test('WHAT[office-capability-003] office authority is immutable and invariant ac
   const engineerPermissions = office.permissions('engineer')
   assert.deepEqual(
     [...engineerPermissions].sort(),
-    ['BashHoneypot', 'Edit', 'Fetch', 'Fission', 'Glob', 'Grep', 'Move', 'Read', 'Remove', 'Write'].sort()
+    ['BashHoneypot', 'Edit', 'Fetch', 'Fission', 'Glob', 'Grep', 'Move', 'Read', 'Remove', 'Sphinx', 'Write'].sort()
   )
 
   // 2. Invariance across tiers: Calling with pseudo-tier composite names does not widen authority or create distinct roles
@@ -30,9 +30,9 @@ test('WHAT[office-capability-003] office authority is immutable and invariant ac
 
 test('WHAT[office-capability-003] office_permission_surface_matches_the_canonical_roles_matrix', () => {
   const matrix = [
-    ['manager', ['Finality', 'Fork', 'Horizon', 'Join', 'Resume', 'ReviewAssessment', 'TodoWrite']],
-    ['orchestrator', ['Fork', 'Horizon', 'Join']],
-    ['engineer', ['BashHoneypot', 'Edit', 'Fetch', 'Fission', 'Glob', 'Grep', 'Move', 'Read', 'Remove', 'Write']],
+    ['manager', ['Finality', 'Fork', 'Horizon', 'Join', 'Resume', 'ReviewAssessment', 'Sphinx', 'TodoWrite']],
+    ['orchestrator', ['Fork', 'Horizon', 'Join', 'Sphinx']],
+    ['engineer', ['BashHoneypot', 'Edit', 'Fetch', 'Fission', 'Glob', 'Grep', 'Move', 'Read', 'Remove', 'Sphinx', 'Write']],
     ['devops', ['Edit', 'Exec', 'Glob', 'Grep', 'Horizon', 'Join', 'Move', 'Pty', 'Read', 'Remove', 'Write']],
     ['blogger', ['Chronicle']],
   ]

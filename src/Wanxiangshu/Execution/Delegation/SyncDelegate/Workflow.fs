@@ -289,18 +289,21 @@ module internal SyncDelegateWorkflow =
             let sendAgent =
                 deps.ResolveBoundAgent delegateSession |> Option.defaultValue attachedAgent
 
-            do!
-                beginAndDispatch
-                    store
-                    deps
-                    ownerScope
-                    role
-                    batchOwner
-                    delegateSession
-                    sendAgent
-                    invocations
-                    combinedCharge
-                    combinedProviderPrompt
+            if invocations |> List.exists (fun invocation -> invocation.IsCancelled()) then
+                failAdmission store ownerScope role invocations "Sync delegate call was cancelled before dispatch"
+            else
+                do!
+                    beginAndDispatch
+                        store
+                        deps
+                        ownerScope
+                        role
+                        batchOwner
+                        delegateSession
+                        sendAgent
+                        invocations
+                        combinedCharge
+                        combinedProviderPrompt
         }
 
     let private runAttachedPair
@@ -384,6 +387,8 @@ module internal SyncDelegateWorkflow =
         (expectedToolCalls: int option)
         (batch: SyncDelegateBatch option)
         (prepareProviderPrompt: unit -> Task<LlmFacing.Document>)
+        (captureResponse: (string -> unit) option)
+        (isCancelled: unit -> bool)
         : Task<Result<SyncDelegateInvocationResult, string>> =
         task {
             let owner = SessionId.create ownerSessionKey
@@ -401,6 +406,8 @@ module internal SyncDelegateWorkflow =
                   Charge = charge
                   ExpectedToolCalls = expectedToolCalls
                   PrepareProviderPrompt = prepareProviderPrompt
+                  CaptureResponse = captureResponse
+                  IsCancelled = isCancelled
                   Batch = batch
                   Completion = completion
                   StartCursor = None }

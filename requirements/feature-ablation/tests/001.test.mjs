@@ -108,10 +108,11 @@ test('WHAT[feature-ablation-001] ABL_001_tool_map_and_fact_map_sync_with_active_
 
   // 3. Sphinx 工具映射唯一归属断言
   assert.equal(
-    tools['sphinx_*'],
+    tools.sphinx,
     'epistemic-reasoning',
-    'sphinx_* must map uniquely to epistemic-reasoning node',
+    'native sphinx must map uniquely to epistemic-reasoning node',
   )
+  assert.equal(tools['sphinx_*'], undefined, 'retired MCP wildcard must not remain an ablation entry')
 
   // 4. Fact Map 完整性与活跃角色架构同步
   const facts = factMap.facts || {}

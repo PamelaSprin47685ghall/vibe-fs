@@ -6,5 +6,6 @@ module SphinxEventTypes =
     val AnswerCommitted: string
     val LegacyObservation: string
     val GenericInquiry: string
+    val InquiryTransition: string
     val all: string list
     val isSphinxEvent: eventType: string -> bool

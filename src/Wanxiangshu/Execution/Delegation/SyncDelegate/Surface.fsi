@@ -27,6 +27,9 @@ module SyncDelegateSurface =
     /// pending until `settle` receives a reconciled provider turn.
     val invoke: value: obj -> owner: string -> role: string -> question: string -> Task<obj>
 
+    /// Exact formal response from the accepted terminal of this invocation.
+    val invokeResponse: value: obj -> owner: string -> question: string -> Task<obj>
+
     /// Settle the current managed child through the real HandleTurn path.
     val settleWithAuthorityRoot:
         value: obj ->

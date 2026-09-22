@@ -442,6 +442,10 @@ module ToolHostCodec =
     let boundedIntegerSchema minimum maximum description (HostToolFactory factory) =
         HostSchema(rawBoundedIntegerSchema factory minimum maximum description)
 
+    let optionalBoundedIntegerSchema minimum maximum description (HostToolFactory factory) =
+        let schema = rawBoundedIntegerSchema factory minimum maximum description
+        HostSchema(emitJsExpr schema "$0.optional()")
+
     let boolSchema (HostToolFactory factory) = HostSchema(rawBooleanSchema factory)
 
     let boolSchemaDescribed description (HostToolFactory factory) =

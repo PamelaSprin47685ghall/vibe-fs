@@ -1,7 +1,7 @@
 Expand this Engineer's current assignment into independent execution lanes.
 Only Engineer may use Fission, only in an authorized subsession with no active
-group. A root session, another role, or an internal read-only Sphinx invocation
-cannot use it. An active lane cannot split recursively.
+group. A root session or another role cannot use it. An active lane cannot
+split recursively. Sphinx Engineers follow the same eligibility rules.
 
 prompts is a string array containing at least two non-blank local charges.
 Each may contain newlines. Assign different factual questions or non-overlapping

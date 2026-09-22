@@ -39,6 +39,6 @@
     "js-devops": "process-execution",
     "js-blogger": "context-compression",
     "js-bookkeeper": "knowledge-reuse",
-    "sphinx_*": "epistemic-reasoning"
+    "sphinx": "epistemic-reasoning"
   }
 }

@@ -78,6 +78,8 @@ Sphinx/Mcp.fsi
 Sphinx/Mcp.fs
 Sphinx/Types.fsi
 Sphinx/Types.fs
+Sphinx/TurnBudget.fsi
+Sphinx/TurnBudget.fs
 Sphinx/RuntimeTypes.fsi
 Sphinx/RuntimeTypes.fs
 Sphinx/State.fsi
@@ -846,6 +848,8 @@ OpenCode/Host/ModelRouting.fsi
 OpenCode/Host/ModelRouting.fs
 OpenCode/Host/SphinxMcpConfig.fsi
 OpenCode/Host/SphinxMcpConfig.fs
+OpenCode/Host/SphinxConfig.fsi
+OpenCode/Host/SphinxConfig.fs
 OpenCode/Host/SphinxMcpConfigSurface.fsi
 OpenCode/Host/SphinxMcpConfigSurface.fs
 OpenCode/Host/ManagedAgentConfig.fsi
@@ -1326,6 +1330,8 @@ Composition/Durable/JournalIntegration.fsi
 Composition/Durable/JournalIntegration.fs
 Persistence/EventStore/CanonicalIntegrator.fsi
 Persistence/EventStore/CanonicalIntegrator.fs
+Sphinx/Inquiry.fsi
+Sphinx/Inquiry.fs
 Sphinx/IntegrationRules.fsi
 Sphinx/IntegrationRules.fs
 Strength/IntegrationRules.fsi
@@ -1362,6 +1368,10 @@ Persistence/Journal/Surface.fsi
 Persistence/Journal/Surface.fs
 OpenCode/Host/WorkspaceSharedJournal.fsi
 OpenCode/Host/WorkspaceSharedJournal.fs
+Sphinx/InquiryRuntime.fsi
+Sphinx/InquiryRuntime.fs
+Sphinx/InquirySurface.fsi
+Sphinx/InquirySurface.fs
 Sphinx/GenericDurability.fsi
 Sphinx/GenericDurability.fs
 Sphinx/McpServer.fsi
@@ -1426,6 +1436,12 @@ Repository/Knowledge/Casebook/FetchSurface.fsi
 Repository/Knowledge/Casebook/FetchSurface.fs
 Repository/Knowledge/Casebook/OpenCode/Tools.fsi
 Repository/Knowledge/Casebook/OpenCode/Tools.fs
+OpenCode/Host/SphinxExecution.fsi
+OpenCode/Host/SphinxExecution.fs
+OpenCode/Tools/SphinxTool.fsi
+OpenCode/Tools/SphinxTool.fs
+OpenCode/Host/SphinxExecutionSurface.fsi
+OpenCode/Host/SphinxExecutionSurface.fs
 OpenCode/Tools/ToolRegistry.fsi
 OpenCode/Tools/ToolRegistry.fs
 OpenCode/Tools/ToolRegistrySurface.fsi
@@ -1468,6 +1484,10 @@ OpenCode/Host/BloggerChronicleText.fsi
 OpenCode/Host/BloggerChronicleText.fs
 OpenCode/Plugin/PluginTransforms.fsi
 OpenCode/Plugin/PluginTransforms.fs
+OpenCode/Plugin/SphinxCommand.fsi
+OpenCode/Plugin/SphinxCommand.fs
+OpenCode/Plugin/SphinxCommandSurface.fsi
+OpenCode/Plugin/SphinxCommandSurface.fs
 OpenCode/Plugin/PluginHooks.fsi
 OpenCode/Plugin/PluginHooks.fs
 OpenCode/Plugin/SpikePlugin.fsi

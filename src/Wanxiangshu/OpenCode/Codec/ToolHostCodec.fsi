@@ -60,6 +60,9 @@ module ToolHostCodec =
     val boundedIntegerSchema:
         minimum: int -> maximum: int -> description: string -> factory: HostToolFactory -> HostSchema
 
+    val optionalBoundedIntegerSchema:
+        minimum: int -> maximum: int -> description: string -> factory: HostToolFactory -> HostSchema
+
     val boolSchema: factory: HostToolFactory -> HostSchema
     val boolSchemaDescribed: description: string -> factory: HostToolFactory -> HostSchema
     val enumSchema: values: string list -> factory: HostToolFactory -> HostSchema

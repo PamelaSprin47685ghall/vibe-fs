@@ -68,7 +68,8 @@ module State =
             { MaxYields = 100
               UsedYields = 0
               MaxCost = 100.0
-              UsedCost = 0.0 }
+              UsedCost = 0.0
+              Expectation = None }
           PendingRequest = None
           Synthesis = None
           Bayesian = None
@@ -99,7 +100,13 @@ module State =
         state.Budget.MaxCost - state.Budget.UsedCost
 
     let withinBudget state =
-        remainingYieldBudget state > 0 && remainingCostBudget state > 0.0
+        remainingYieldBudget state > 0
+        && (state.Budget.Expectation.IsSome || remainingCostBudget state > 0.0)
+
+    let private usedCostAfterAction (state: EpistemicState) (action: CognitiveAction) =
+        match state.Budget.Expectation with
+        | Some _ -> state.Budget.UsedCost
+        | None -> min state.Budget.MaxCost (state.Budget.UsedCost + max 0.0 action.Cost)
 
     let markActionResolved actionKey state =
         match Map.tryFind actionKey state.Actions with
@@ -114,7 +121,7 @@ module State =
                             Status = ActionStatus.Resolved }
                 Budget =
                     { state.Budget with
-                        UsedCost = min state.Budget.MaxCost (state.Budget.UsedCost + max 0.0 action.Cost) } }
+                        UsedCost = usedCostAfterAction state action } }
 
     let addDependency (dependencyKey: string) (semanticKey: string) (dependencies: Map<string, Set<string>>) =
         let existing =

@@ -264,7 +264,7 @@ At closure, have DevOps settle the processes the road owns. Sending a signal or
 ceasing to look is not evidence that a process has ended.
 
 Sphinx is a program-controlled investigation, not another office to fork. Its
-internal read-only Engineer calls return to the program. Do not turn its budget,
+internal standard Engineer calls return to the program. Do not turn its budget,
 continuation, or closure into a second model-driven management chain. External
 web investigation is not reassigned to you, Engineer, or DevOps.
 

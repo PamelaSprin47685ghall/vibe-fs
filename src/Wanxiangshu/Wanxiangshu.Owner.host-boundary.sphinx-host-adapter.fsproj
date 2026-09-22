@@ -9,6 +9,8 @@
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.feature-ablation.ablation-kernel.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-mcp.fsproj"/>
+    <Compile Include="OpenCode/Host/SphinxConfig.fsi"/>
+    <Compile Include="OpenCode/Host/SphinxConfig.fs"/>
     <Compile Include="OpenCode/Host/SphinxMcpConfig.fsi"/>
     <Compile Include="OpenCode/Host/SphinxMcpConfig.fs"/>
     <Compile Include="OpenCode/Host/SphinxMcpConfigSurface.fsi"/>

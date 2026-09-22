@@ -54,16 +54,16 @@ test('WHAT[provider-language-012] bilingual prompts maintain semantic parity acr
   assert.match(mgrEn, /Engineers assigned to bounded work, and one fixed\s+DevOps bound by the runtime/i, 'Manager en prompt must assert managing Engineers and fixed DevOps')
   assert.match(mgrEn, /cannot use Fission\. Delegate independent work to Engineers; do not create copies of yourself/i, 'Manager en prompt must forbid fission and clones')
 
-  // ── 4. Sphinx 内部 Engineer: 明确本次调用仅调研现有本地事实，无修改、无执行、无 Fission 权 ──
+  // ── 4. Sphinx 内部 Engineer: 使用标准权限，遵守普通 authority 与 Fission 资格 ──
   assert.match(
     engZh,
-    /Sphinx 内部调用另受只读任务约束：不修改、不执行、不 Fission、不递归启动探究/,
-    'Sphinx internal engineer zh prompt must assert read-only, no mutation, no execution, no fission',
+    /Sphinx 内部调用使用标准 Engineer 权限[\s\S]*?不另设只读限制[\s\S]*?普通 authority、工作树及 Fission 资格仍然适用/,
+    'Sphinx internal Engineer must retain standard permissions and ordinary eligibility in Chinese',
   )
   assert.match(
     engEn,
-    /For a Sphinx invocation, obey its narrower read-only charge[\s\S]*?Do not mutate,\s*execute,\s*use Fission,\s*or start another\s+investigation workflow/i,
-    'Sphinx internal engineer en prompt must assert read-only, no mutation, no execution, no fission',
+    /For a Sphinx invocation,[\s\S]*?standard Engineer\s+permissions[\s\S]*?Ordinary authority, worktree and Fission eligibility still apply/i,
+    'Sphinx internal Engineer must retain standard permissions and ordinary eligibility in English',
   )
 
   // ── 5. 全仓删除违规示例：严禁在任何双语提示词中保留「Manager 可分身」「DevOps 可分身」等肯定句式 ──

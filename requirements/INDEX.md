@@ -58,7 +58,7 @@
 
 | Package | 一句话 WHY |
 |---|---|
-| `delegation` | 一项语义工作交给另一 participant 时，authority、charge、owner 与返回后果必须明确；Manager 派发 Engineer 与续做固定 DevOps，禁止跨角色向后差遣；Sphinx 程序内部同步只读 Engineer 调研。 |
+| `delegation` | 一项语义工作交给另一 participant 时，authority、charge、owner 与返回后果必须明确；Manager 派发 Engineer 与续做固定 DevOps，禁止跨角色向后差遣；Sphinx 程序内部同步调用标准 Engineer，并压平为同级子会话。 |
 | `intra-participant-parallelism` | 同一个 participant（仅限 Engineer）可拥有多个 coequal execution presents，而 identity/authority/responsibility 与最终 completion 仍保持一个。 |
 | `process-execution` | participant 控制真实进程/PTY 时必须得到有界、可终止、物理完成可信的 execution semantics，承接大输出零 Distiller 留尾截断与 Large Gate 门禁。 |
 | `change-integration` | 独立 Git 工作道路进入共享 ref 时必须在短原子门内发布，长 review/repair 不应被全局串行化；DevOps 自修推进快照触发证书失效与独立重评。 |
@@ -116,7 +116,7 @@
 | Package | 一句话 WHY |
 |---|---|
 | `speculative-investigation` | 可丢弃 speculation 只有在 authoritative world 零影响时才可换取调查成本下降。 |
-| `epistemic-reasoning` | Sphinx 探究流程全程序控制，无 Inquiry 角色与模型驾驶层；认识状态区分 proposal/evidence、保留依赖与不确定性；内部只读 Engineer 同步调研。 |
+| `epistemic-reasoning` | 单一原生 sphinx 工具与命令；探究全程序控制，无 MCP 或模型驾驶层；内部标准 Engineer 同级压平；命令以 noReply 回填问答，expectTurns 仅提示深度。 |
 
 ## 13. Delivery
 
@@ -142,7 +142,7 @@
 | 10 | `host-boundary` | 31 | host-boundary-001 ~ 031 |
 | 11 | `participant-identity` | 10 | participant-identity-001 ~ 009、participant-identity-010（活跃身份解析与历史身份隔离解码） |
 | 12 | `execution-model-routing` | 19 | execution-model-routing-001 ~ 017、execution-model-routing-018（新角色集合模型路由解耦）、execution-model-routing-019（固定 DevOps 模型绑定持久性与禁止借 resume 换模型） |
-| 13 | `office-capability` | 12 | office-capability-001、003 ~ 007、011 ~ 012、015、office-capability-016（Engineer 职责与独享 Fission）、office-capability-017（DevOps 执行与固有非架构级自修授权）、office-capability-018（Sphinx 程控探究与内部只读 Engineer 调研） |
+| 13 | `office-capability` | 12 | office-capability-001、003 ~ 007、011 ~ 012、015、office-capability-016（Engineer 职责与独享 Fission）、office-capability-017（DevOps 执行与固有非架构级自修授权）、office-capability-018（Sphinx 程控探究与内部标准 Engineer） |
 | 14 | `capability-enforcement` | 24 | capability-enforcement-001 ~ 021、capability-enforcement-022（Fission 仅 Engineer 准入 fail-closed）、capability-enforcement-023（DevOps 固有自修授权禁 allowRepair 逐次开关）、capability-enforcement-024（Fork 与 Resume 权能分离） |
 | 15 | `participant-horizon` | 15 | participant-horizon-001 ~ 014、participant-horizon-015（Manager 并行来自派出多名 Engineer 而非自身分身） |
 | 16 | `cognitive-environment` | 16 | cognitive-environment-001 ~ 016 |
@@ -183,7 +183,7 @@
 | 51 | `repository-programming` | 27 | repository-programming-001 ~ 025、repository-programming-026（事务 ReadSnapshots 与案例实质访问严格分离）、repository-programming-027（Engineer 与 DevOps 统一文件工具与编程面生成） |
 | 52 | `requirement-grounding` | 12 | requirement-grounding-001 ~ 012 |
 | 53 | `speculative-investigation` | 14 | speculative-investigation-001 ~ 014 |
-| 54 | `epistemic-reasoning` | 34 | epistemic-reasoning-001 ~ 030、epistemic-reasoning-031（Sphinx 探究流程全程序控制，无 Inquiry 角色）、epistemic-reasoning-032（内部 Engineer 调研只读同步有预算可取消）、epistemic-reasoning-033（结果接纳幂等防重复购买）、epistemic-reasoning-034（取消全链贯穿父工具与子 Engineer） |
+| 54 | `epistemic-reasoning` | 36 | epistemic-reasoning-001 ~ 030、epistemic-reasoning-031（Sphinx 探究流程全程序控制，无 Inquiry 角色）、epistemic-reasoning-032（内部标准 Engineer 权限与会话压平）、epistemic-reasoning-033（结果接纳幂等防重复购买）、epistemic-reasoning-034（取消全链贯穿父工具与子 Engineer）、epistemic-reasoning-035（原生交付与 noReply）、epistemic-reasoning-036（共享期望预算、价格映射与持久化校准） |
 | 55 | `distribution` | 10 | distribution-001 ~ 009、distribution-010（打包资源与活动注册同步） |
 
 # 依赖骨架

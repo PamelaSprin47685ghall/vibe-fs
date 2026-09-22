@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as Ablation from '../../../dist/Ablation/Surface.js'
-import * as SphinxMcpConfigSurface from '../../../dist/OpenCode/Host/SphinxMcpConfigSurface.js'
+import { configure as configureSphinx } from '../../../dist/OpenCode/Plugin/SphinxCommandSurface.js'
 
 const withEnv = (entries, run) => {
   const previous = Object.fromEntries(entries.map(([name]) => [name, process.env[name]]))
@@ -119,7 +119,7 @@ test('WHAT[feature-ablation-002] ABL_002_strength_forced_off_when_speculation_ab
   })
 })
 
-test('WHAT[feature-ablation-002] ABL_002_primary_agents_and_sphinx_mcp_gated_by_ablation_state', () => {
+test('WHAT[feature-ablation-002] ABL_002_primary_agents_and_native_sphinx_tool_and_command_are_gated_together', () => {
   // 1. station-05 下 relay-incumbency 与 change-integration 为 ablated:
   // manager 与 orchestrator 必须被拒绝 (allowsPrimaryAgent === false)
   // browser 恒 false (fail-closed)
@@ -161,7 +161,7 @@ test('WHAT[feature-ablation-002] ABL_002_primary_agents_and_sphinx_mcp_gated_by_
     )
   })
 
-  // 3. epistemic-reasoning 为 ablated 时，Sphinx MCP 必须处于 Disabled
+  // 3. 关闭时原生工具与命令同时消失，遗留 MCP 配置被清除。
   withEnv(
     [
       ['WANXIANGSHU_ABLATION_PROFILE', 'station-41'],
@@ -169,18 +169,14 @@ test('WHAT[feature-ablation-002] ABL_002_primary_agents_and_sphinx_mcp_gated_by_
     ],
     () => {
       Ablation.load()
-      const envReader = (k) => (process.env[k] !== undefined ? process.env[k] : undefined)
-      const decision = SphinxMcpConfigSurface.launchDecision(envReader)
-      assert.equal(
-        decision.kind,
-        'disabled',
-        'Sphinx MCP must be Disabled when epistemic-reasoning is ablated',
-      )
-      assert.equal(
-        decision.enabled,
-        false,
-        'Sphinx MCP must be Disabled when epistemic-reasoning is ablated',
-      )
+      const config = { mcp: { sphinx: { type: 'local' }, other: { type: 'remote' } }, command: { sphinx: {}, other: {} } }
+      configureSphinx(config)
+      assert.equal(Ablation.allowsTool('sphinx'), false)
+      assert.equal(Ablation.allowsToolSchema('sphinx'), false)
+      assert.equal(config.command.sphinx, undefined)
+      assert.equal(config.mcp.sphinx, undefined)
+      assert.deepEqual(config.mcp.other, { type: 'remote' })
+      assert.deepEqual(config.command.other, {})
     },
   )
 
@@ -189,23 +185,18 @@ test('WHAT[feature-ablation-002] ABL_002_primary_agents_and_sphinx_mcp_gated_by_
     [
       ['WANXIANGSHU_ABLATION_PROFILE', 'production'],
       ['WANXIANGSHU_ABLATION_epistemic_reasoning', 'active'],
-      ['SPHINX_MCP_DISABLED', '0'],
+      ['SPHINX_MCP_DISABLED', '1'],
       ['WANXIANGSHU_TEST', '0'],
     ],
     () => {
       Ablation.load()
-      const envReader = (k) => (process.env[k] !== undefined ? process.env[k] : undefined)
-      const decision = SphinxMcpConfigSurface.launchDecision(envReader)
-      assert.notEqual(
-        decision.kind,
-        'disabled',
-        'Sphinx MCP must remain active when epistemic-reasoning is active',
-      )
-      assert.equal(
-        decision.enabled,
-        true,
-        'Sphinx MCP must remain active when epistemic-reasoning is active',
-      )
+      const config = { mcp: { sphinx: { type: 'local' } } }
+      configureSphinx(config)
+      assert.equal(Ablation.allowsTool('sphinx'), true)
+      assert.equal(Ablation.allowsToolSchema('sphinx'), true)
+      assert.equal(config.command.sphinx.subtask, false)
+      assert.equal(config.command.sphinx.agent, undefined)
+      assert.equal(config.mcp.sphinx, undefined, 'active native Sphinx never installs MCP, even with legacy environment variables')
     },
   )
 })

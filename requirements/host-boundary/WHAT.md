@@ -115,7 +115,7 @@ Host subsystem 的公开 Contract、Runtime 与物理 Adapter 必须保持编译
 - `Host.Signal.Adapter`（`host-signal-adapter`）：宿主信号词汇 `HostSignal`、完整 provider failure/terminal `HostEventCodec`、信号路由（`HostSignalAdapter`）、物理订阅与事件总线适配器（`SharedTerminalBus`/`Events`）；按实际知识消费窄 codec contract，不向 message/loop consumer 输出自身完整闭包，也不编入工具注册实现。
 - `Host.Tool.Adapter`（`host-tool-adapter`）：独立拥有 `ToolHostCodec` 与 `ToolHostSurface` 的参数解码、上下文身份配对、SDK schema、工具注册、abort listener 与有界输出接线；它是物理适配器，不是纯合同。工具注册闭包不得取得信号路由或终端总线实现；同时需要两侧的 composition 显式装配，不恢复宽 adapter 或复制物理实现。
 - `Host.Session.Runtime`（`host-session-runtime`）：SDK/HTTP 快照投影、进程级静止门禁状态机（`SessionQuiescenceGate`、`QuiescenceSurface`）、消息就地变更与宿主上下文投影，禁止被普通业务契约直接引用。
-- `Sphinx.Host.Adapter`（`sphinx-host-adapter`）：外部 Sphinx MCP 启动配置与环境适配器，隔离于核心契约之外。
+- `Sphinx.Host.Adapter`（`sphinx-host-adapter`）：原生 `/sphinx question` 命令配置适配器，隔离于核心契约之外；不启动或注入 Sphinx MCP。
 
 `HostDigest` 属于 `runtime-platform/digest` 的无领域摘要原语，不属于 `Host.Signal.Contract`；摘要计算不应使 consumer 获得 Host 消息、SDK、终端或物理适配能力。物理启动配置留在对应适配器，不回填共享终端合同。
 

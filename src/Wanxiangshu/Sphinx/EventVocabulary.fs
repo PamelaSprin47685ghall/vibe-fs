@@ -6,12 +6,14 @@ module SphinxEventTypes =
     let AnswerCommitted = "sphinx/answer-committed"
     let LegacyObservation = "sphinx-legacy/observation@1"
     let GenericInquiry = "sphinx-generic/inquiry@1"
+    let InquiryTransition = "sphinx/inquiry-transition"
 
     let all =
         [ PluginSetBound
           ObservationAccepted
           AnswerCommitted
           LegacyObservation
-          GenericInquiry ]
+          GenericInquiry
+          InquiryTransition ]
 
     let isSphinxEvent eventType = all |> List.contains eventType

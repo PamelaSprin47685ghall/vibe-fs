@@ -14,6 +14,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
     <Compile Include="Sphinx/Types.fsi"/>
     <Compile Include="Sphinx/Types.fs"/>
+    <Compile Include="Sphinx/TurnBudget.fsi"/>
+    <Compile Include="Sphinx/TurnBudget.fs"/>
     <Compile Include="Sphinx/RuntimeTypes.fsi"/>
     <Compile Include="Sphinx/RuntimeTypes.fs"/>
     <Compile Include="Sphinx/State.fsi"/>

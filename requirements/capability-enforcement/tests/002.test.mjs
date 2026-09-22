@@ -90,6 +90,7 @@ const allowList = (config, name) => {
     'horizon',
     'todowrite',
     'fission',
+    'sphinx',
     'review',
     'chronicle',
     'fetch',
@@ -103,9 +104,9 @@ const COGNITIVE_UTILITY_ALLOW = ['assume']
 const hostUtilityAllowFor = (role) => (role === 'Blogger' ? [] : HOST_UTILITY_ALLOW)
 const cognitiveUtilityAllowFor = (role) => (role === 'Blogger' ? [] : COGNITIVE_UTILITY_ALLOW)
 const ROLE_ALLOW = {
-  Manager: ['fork', 'resume', 'join', 'horizon', 'todowrite', 'suicide', 'review'],
-  Orchestrator: ['commission', 'join', 'horizon'],
-  Engineer: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission'],
+  Manager: ['fork', 'resume', 'join', 'horizon', 'todowrite', 'suicide', 'review', 'sphinx'],
+  Orchestrator: ['commission', 'join', 'horizon', 'sphinx'],
+  Engineer: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission', 'sphinx'],
   DevOps: [
     'read',
     'write',
@@ -154,6 +155,7 @@ test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_
       horizon: 'Horizon',
       todowrite: 'TodoWrite',
       fission: 'Fission',
+      sphinx: 'Sphinx',
       read: 'Read',
       write: 'Write',
       edit: 'Edit',

@@ -63,6 +63,7 @@
 /src/Wanxiangshu/OpenCode/Host/SharedStateSurface.fs
 /src/Wanxiangshu/OpenCode/Host/SharedTerminalBus.fs
 /src/Wanxiangshu/OpenCode/Host/SphinxMcpConfig.fs
+/src/Wanxiangshu/OpenCode/Host/SphinxConfig.fs
 /src/Wanxiangshu/OpenCode/Host/SphinxMcpConfigSurface.fs
 /src/Wanxiangshu/OpenCode/JoinResultRendererSurface.fs
 /src/Wanxiangshu/OpenCode/Plugin/Plugin.fs

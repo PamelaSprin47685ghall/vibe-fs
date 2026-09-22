@@ -194,7 +194,7 @@ module ManagedAgentConfig =
     /// AGENT-007's first layer is fail-closed: a validation failure elsewhere in the
     /// config must not silently drop every permission write.
     let applyOwnedFields (config: obj) (inventory: ManagedAgentInventory) : unit =
-        SphinxMcpConfig.apply config (SphinxMcpConfig.launchFromEnvironment ())
+        SphinxConfig.configure config
 
         if isNull config then
             ()

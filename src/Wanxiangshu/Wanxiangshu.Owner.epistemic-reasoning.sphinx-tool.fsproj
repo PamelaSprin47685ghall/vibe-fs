@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>sphinx</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>sphinx-tool</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>epistemic-reasoning</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>sphinx-tool</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-serve-runtime.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-host-adapter.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-tool-adapter.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.opencode-host-workspaceeventstore.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.action-affordance.persistence-runtime-path.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.office-capability.foundation-officecapability.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <Compile Include="OpenCode/Host/SphinxExecution.fsi"/>
+    <Compile Include="OpenCode/Host/SphinxExecution.fs"/>
+    <Compile Include="OpenCode/Tools/SphinxTool.fsi"/>
+    <Compile Include="OpenCode/Tools/SphinxTool.fs"/>
+    <Compile Include="OpenCode/Host/SphinxExecutionSurface.fsi"/>
+    <Compile Include="OpenCode/Host/SphinxExecutionSurface.fs"/>
+  </ItemGroup>
+</Project>

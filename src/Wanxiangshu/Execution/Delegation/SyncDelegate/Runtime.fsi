@@ -84,6 +84,14 @@ type SyncDelegateRuntime =
         ?expectedToolCalls: int ->
             Task<Result<SyncDelegateInvocationResult, string>>
 
+    member InvokeResponsePrepared:
+        ownerSessionKey: string *
+        role: SyncDelegateRole *
+        charge: string *
+        prepareProviderPrompt: (unit -> Task<LlmFacing.Document>) *
+        ?isCancelled: (unit -> bool) ->
+            Task<Result<string, string>>
+
     member HandleTurn:
         turn: ReconciledTurn *
         failure: Wanxiangshu.Execution.Failure.ExecutionFailure option *

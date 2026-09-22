@@ -40,7 +40,8 @@ type Budget =
     { MaxYields: int
       UsedYields: int
       MaxCost: float
-      UsedCost: float }
+      UsedCost: float
+      Expectation: TurnExpectation option }
 
 type EpistemicState =
     { RootQuestion: string

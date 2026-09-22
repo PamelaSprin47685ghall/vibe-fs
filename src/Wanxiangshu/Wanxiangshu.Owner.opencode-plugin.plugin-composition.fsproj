@@ -18,6 +18,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-hostturnobservedsurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-ledger.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-tool.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.feature-ablation.ablation-kernel.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.composition-turn-reconcilesurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.dispatch-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.execution-session-recovery-model.fsproj"/>
@@ -108,6 +110,10 @@
     <Compile Include="OpenCode/Plugin/PluginRecoveryWiring.fs"/>
     <Compile Include="OpenCode/Plugin/PluginTransforms.fsi"/>
     <Compile Include="OpenCode/Plugin/PluginTransforms.fs"/>
+    <Compile Include="OpenCode/Plugin/SphinxCommand.fsi"/>
+    <Compile Include="OpenCode/Plugin/SphinxCommand.fs"/>
+    <Compile Include="OpenCode/Plugin/SphinxCommandSurface.fsi"/>
+    <Compile Include="OpenCode/Plugin/SphinxCommandSurface.fs"/>
     <Compile Include="OpenCode/Plugin/PluginHooks.fsi"/>
     <Compile Include="OpenCode/Plugin/PluginHooks.fs"/>
     <Compile Include="OpenCode/Plugin/SpikePlugin.fsi"/>

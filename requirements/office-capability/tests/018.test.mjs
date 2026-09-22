@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as office from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 
-test('WHAT[office-capability-018] sphinx is programmatic workflow with synchronous read-only engineer survey and without role persona or fission', () => {
+test('WHAT[office-capability-018] sphinx is programmatic workflow using standard Engineer without its own role persona or fission identity', () => {
   // 1. Non-consequence: Sphinx is not a forkable office/persona
   const forkable = office.managerForkableOffices()
   assert.equal(forkable.includes('sphinx'), false)
@@ -20,6 +20,9 @@ test('WHAT[office-capability-018] sphinx is programmatic workflow with synchrono
 
   // 5. Exclusive Fission entitlement: Engineer is the sole office entitled to Fission
   assert.equal(office.isAllowed('engineer', 'Fission'), true)
+  assert.equal(office.isAllowed('engineer', 'Write'), true)
+  assert.equal(office.isAllowed('engineer', 'Edit'), true)
+  assert.equal(office.isAllowed('engineer', 'Sphinx'), true)
   assert.equal(office.isAllowed('manager', 'Fission'), false)
   assert.equal(office.isAllowed('devops', 'Fission'), false)
 })

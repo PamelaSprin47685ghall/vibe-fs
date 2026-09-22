@@ -25,7 +25,8 @@ open Wanxiangshu.Ablation
 /// per-session resources live in ToolRuntimeScope.
 type ToolRegistration =
     { Tools: obj
-      Runtime: ToolRuntimeScope }
+      Runtime: ToolRuntimeScope
+      Sphinx: SphinxExecution option }
 
 module ToolRegistry =
 
@@ -67,6 +68,7 @@ module ToolRegistry =
           "horizon", HorizonTool.admission
           "fission", FissionTool.admission
           "review", ReviewTool.admission
+          "sphinx", SphinxTool.admission
           "suicide", SuicideTool.admission
           "run", ExecutorTool.runAdmission
           "mv", FileMutationTools.mvAdmission
@@ -190,6 +192,8 @@ module ToolRegistry =
                 ?eventPort = eventPort
             )
 
+        let sphinx = SphinxTool.createExecution sessionPort workspaceDirectory syncDelegateRuntime runtime.LogicalOwnerFor
+
         let generatedJsSpecs () =
             [ for role in Roles.all do
                   match JsToolGenerator.generate (string role) (OfficeCapability.permissions role) jsProse with
@@ -226,6 +230,7 @@ module ToolRegistry =
               yield HorizonTool.spec horizonContext
               yield FissionTool.spec factory runtime
               yield ReviewTool.spec factory runtime
+              yield SphinxTool.spec factory sphinx
               yield SuicideTool.spec factory runtime
               yield ExecutorTool.runSpec factory runtime
               yield FileMutationTools.mvSpec factory
@@ -262,6 +267,7 @@ module ToolRegistry =
                 | "horizon" -> Some ToolPermission.Horizon
                 | "fission" -> Some ToolPermission.Fission
                 | "review" -> Some ToolPermission.ReviewAssessment
+                | "sphinx" -> Some ToolPermission.Sphinx
                 | "suicide" -> Some ToolPermission.Finality
                 | _ -> None
 
@@ -392,4 +398,5 @@ module ToolRegistry =
             baseSpecs |> List.map (fun spec -> { spec with Execute = gateExecute spec })
 
         { Tools = ToolHostCodec.registry factory specs
-          Runtime = runtime }
+          Runtime = runtime
+          Sphinx = sphinx }

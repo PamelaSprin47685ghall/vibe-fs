@@ -96,7 +96,14 @@ module Policy =
         next, InquiryResult.Yield request
 
     let private exhaustedReason (state: EpistemicState) =
-        if Map.isEmpty state.Findings && Map.isEmpty state.Evidence then
+        let priceLimited =
+            state.Budget.Expectation.IsSome
+            && (state.Actions |> Map.exists (fun _ action ->
+                action.Kind = ActionKind.Investigate && action.Status = ActionStatus.Open))
+
+        if priceLimited then
+            "turn-price"
+        elif Map.isEmpty state.Findings && Map.isEmpty state.Evidence then
             "policy-exhausted"
         elif state.Synthesis.IsSome then
             "stop-dominates"
@@ -123,7 +130,10 @@ module Policy =
         | _ -> state, InquiryResult.Answered(canonicalAnswer (exhaustedReason state) state)
 
     let private decideWithRoot (root: RootContract) (state: EpistemicState) =
-        if state.NeedsGeneration then
+        if state.Budget.Expectation.IsSome && State.remainingYieldBudget state <= 1
+           && not (Map.isEmpty state.Findings) && state.Synthesis.IsNone then
+            yieldRequest (SynthesizeRequest(state.Findings |> Map.toList |> List.map fst, root)) state
+        elif state.NeedsGeneration then
             yieldRequest (GenerateCandidatesRequest(Methodology.generationMethods state, root)) state
         else
             decideOpenAction state

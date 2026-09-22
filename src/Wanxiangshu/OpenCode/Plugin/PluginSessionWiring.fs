@@ -129,6 +129,8 @@ module PluginSessionWiring =
                     delegateRetryPort durable,
                     toolMapForRole =
                         (fun role ->
+                            // epistemic-reasoning-032: delegated Engineers have
+                            // the same WorkMain capabilities as other Engineers.
                             PromptAuthority.toolCapabilitiesFor role ProviderRequestKind.WorkMain
                             |> StaticTools.requestToolMap),
                     ?workspaceDirectory = workspaceDirectory,

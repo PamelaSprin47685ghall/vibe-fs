@@ -120,4 +120,4 @@ module SphinxIntegrationRules =
           PlanCut = fun _ _ _ _ -> Ok { ResetJson = "{}" }
           ApplyCut = fun current _ -> Ok current }
 
-    let rules: IntegrationRule list = [ sphinxRule; sphinxGenericRule ]
+    let rules: IntegrationRule list = [ sphinxRule; sphinxGenericRule; Inquiry.rule ]
