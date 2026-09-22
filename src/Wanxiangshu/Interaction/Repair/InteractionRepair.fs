@@ -286,7 +286,7 @@ module InteractionRepairWorkflow =
                  FissionRuntime.isSilentInterrupt context.Turn.SessionId
                  || obs.IsFissionActive context.Turn.SessionId
                  || obs.TryContinuationKind context.Turn.SessionId context.Turn.PhysicalUserMessageId = Some
-                                                                                                            PromptContinuationKind.ProviderRetryAttempt
+                     PromptContinuationKind.ProviderRetryAttempt
              | None ->
                  isFissionReplaced journal context.Turn.SessionId
                  || isRecoveryContinue journal context.Turn)
@@ -322,7 +322,7 @@ module InteractionRepairWorkflow =
                 FissionRuntime.isSilentInterrupt turn.SessionId
                 || obs.IsFissionActive turn.SessionId
                 || obs.TryContinuationKind turn.SessionId turn.PhysicalUserMessageId = Some
-                                                                                           PromptContinuationKind.ProviderRetryAttempt
+                    PromptContinuationKind.ProviderRetryAttempt
             | None -> isFissionReplaced journal turn.SessionId || isRecoveryContinue journal turn
 
         if isSuppressed then
