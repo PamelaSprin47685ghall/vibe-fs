@@ -794,10 +794,15 @@ module SyncDelegateSurface =
     let invokeResponse (value: obj) (owner: string) (question: string) : Task<obj> =
         task {
             let harness = unbox<Harness> value
+
             let! result =
                 harness.Runtime.InvokeResponsePrepared(
-                    SessionId.value (harness.OwnerSession owner), SyncDelegateRole.Engineer, question,
-                    (fun () -> Task.FromResult(LlmFacing.instruction question)))
+                    SessionId.value (harness.OwnerSession owner),
+                    SyncDelegateRole.Engineer,
+                    question,
+                    (fun () -> Task.FromResult(LlmFacing.instruction question))
+                )
+
             return
                 match result with
                 | Ok response -> box {| ok = true; value = response |}

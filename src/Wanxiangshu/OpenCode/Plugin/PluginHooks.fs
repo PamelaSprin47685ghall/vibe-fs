@@ -316,6 +316,7 @@ module PluginHooks =
                         box (fun (config: obj) ->
                             if not (isNull config) then
                                 config?snapshot <- box false
+
                             ManagerConfig.configureManager config |> ignore
                             scope.RecordCompactionSettingGap(HostCompactionGate.enforceSettings config)
                             ExplicitSessionResume.registerCommand config)

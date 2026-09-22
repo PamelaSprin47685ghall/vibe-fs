@@ -16,16 +16,19 @@ module TurnBudget =
     let defaultExpected = 12
 
     let validate (expected: int) =
-        if expected < minimum || expected > maximum
-           || System.Double.IsNaN(float expected) || floor (float expected) <> float expected then
+        if
+            expected < minimum
+            || expected > maximum
+            || System.Double.IsNaN(float expected)
+            || floor (float expected) <> float expected
+        then
             Error(sprintf "expectTurns must be an integer from %d to %d for a complete inquiry" minimum maximum)
         else
             Ok expected
 
     // Legacy reference loss: L(K)=0.72/(K+1), T=2K+3.
     // Minimizing L(T)+lambda*T yields lambda=1.44/(T-1)^2.
-    let initialPrice (expected: int) =
-        1.44 / (float (expected - 1) ** 2.0)
+    let initialPrice (expected: int) = 1.44 / (float (expected - 1) ** 2.0)
 
     let emptyCalibration = { Samples = 0; SumLogCoefficient = 0.0 }
 

@@ -76,7 +76,7 @@ module ChildPromptAuthority =
                     |> Seq.tryFind (fun dispatch ->
                         dispatch.PhysicalUserMessageId = turn.PhysicalUserMessageId
                         && dispatch.Origin = PromptAuthority.PromptOrigin.AuthorityRoot
-                                                 PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
+                            PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
 
                 let runtime = PromptDispatcher.forPrompts prompts
                 return! registerLinkedChildIfNeeded runtime turn handle activeProfile accepted

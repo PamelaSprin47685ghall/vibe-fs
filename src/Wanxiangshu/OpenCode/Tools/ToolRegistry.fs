@@ -192,7 +192,8 @@ module ToolRegistry =
                 ?eventPort = eventPort
             )
 
-        let sphinx = SphinxTool.createExecution sessionPort workspaceDirectory syncDelegateRuntime runtime.LogicalOwnerFor
+        let sphinx =
+            SphinxTool.createExecution sessionPort workspaceDirectory syncDelegateRuntime runtime.LogicalOwnerFor
 
         let generatedJsSpecs () =
             [ for role in Roles.all do
