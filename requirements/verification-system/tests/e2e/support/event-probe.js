@@ -58,7 +58,7 @@ export class EventProbe {
         const response = await fetch(`${this._baseUrl}/global/event`, {
           headers: {
             'Accept': 'text/event-stream',
-            'x-opencode-directory': this._workDir,
+            'x-opencode-directory': encodeURIComponent(this._workDir),
           },
           signal: this._abortController.signal,
         });

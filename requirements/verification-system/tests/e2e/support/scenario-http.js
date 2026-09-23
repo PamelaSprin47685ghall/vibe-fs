@@ -48,7 +48,7 @@ export class HttpClient {
     const qs = opts.query ? '?' + new URLSearchParams(opts.query).toString() : '';
     const res = await fetch(this._baseUrl + urlPath + qs, {
       method,
-      headers: { 'Content-Type': 'application/json', 'x-opencode-directory': this._workDir, ...(opts.headers || {}) },
+      headers: { 'Content-Type': 'application/json', 'x-opencode-directory': encodeURIComponent(this._workDir), ...(opts.headers || {}) },
       body: opts.body ? JSON.stringify(opts.body) : undefined,
     });
     const text = await res.text();
@@ -60,7 +60,7 @@ export class HttpClient {
     try {
       const res = await fetch(this._baseUrl + urlPath + qs, {
         method, signal,
-        headers: { 'Content-Type': 'application/json', 'x-opencode-directory': this._workDir, ...(opts.headers || {}) },
+        headers: { 'Content-Type': 'application/json', 'x-opencode-directory': encodeURIComponent(this._workDir), ...(opts.headers || {}) },
         body: opts.body ? JSON.stringify(opts.body) : undefined,
       });
       const text = await res.text();
@@ -92,7 +92,7 @@ export class HttpClient {
     try {
       const res = await fetch(`${this._baseUrl}/session/${sessionID}/prompt_async`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-opencode-directory': this._workDir },
+        headers: { 'Content-Type': 'application/json', 'x-opencode-directory': encodeURIComponent(this._workDir) },
         body: JSON.stringify({ parts: [{ type: 'text', text }], model: promptModel }),
         signal: ac.signal,
       });

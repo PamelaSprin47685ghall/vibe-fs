@@ -345,7 +345,10 @@ module SessionSnapshotPort =
     type SdkSnapshotPort(client: obj, workspaceDirectory: string option) =
         let headersObj () =
             match workspaceDirectory with
-            | Some dir -> createObj [ "x-opencode-directory", box dir ]
+            // OpenCode SDK encodes this header (see packages/sdk/js/src/client.ts).
+            // Raw Unicode paths (e.g. 万象) are rejected by fetch Headers as invalid.
+            | Some dir ->
+                createObj [ "x-opencode-directory", box (emitJsExpr dir "encodeURIComponent($0)") ]
             | None -> createObj []
 
         interface ISessionSnapshotPort with

@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>万象体系：站在用户一边的机器智能基础设施</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <style>
+        :root {
+            --bg: #0b0c10;
+            --text: #ffffff;
+            --text-secondary: #c5c6c7;
+            --accent: #ff6900;
+            --accent-blue: #00f2fe;
+            --accent-green: #00ff87;
+            --accent-red: #ff007f;
+            --card-bg: rgba(255,255,255,0.03);
+            --card-border: rgba(255,255,255,0.08);
+            --shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .viewport {
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .slides {
+            height: 100%;
+            width: 100%;
+            transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .slide {
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 5vh 8vw;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .slide::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 50% 20%, rgba(255,105,0,0.06) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 80%, rgba(0,242,254,0.04) 0%, transparent 40%);
+            pointer-events: none;
+        }
+
+        .content {
+            --content-scale: 1;
+            max-width: 1300px;
+            width: 100%;
+            position: relative;
+            z-index: 2;
+            opacity: 0;
+            transform: translateY(40px) scale(var(--content-scale));
+            transform-origin: center center;
+            transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .slide.active .content {
+            opacity: 1;
+            transform: translateY(0) scale(var(--content-scale));
+        }
+
+        .eyebrow {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--accent);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+
+        h1 {
+            font-size: clamp(2.5rem, 5vw, 4.5rem);
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: -0.01em;
+            margin-bottom: 1.5rem;
+        }
+
+        h2 {
+            font-size: clamp(1.8rem, 3.5vw, 3rem);
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 1.2rem;
+            background: linear-gradient(90deg, #fff, var(--text-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        h3 {
+            font-size: clamp(1.1rem, 2vw, 1.5rem);
+            font-weight: 600;
+            margin-bottom: 0.8rem;
+            color: #ffffff;
+        }
+
+        p {
+            font-size: clamp(0.95rem, 1.6vw, 1.25rem);
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        .highlight {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .highlight-blue {
+            color: var(--accent-blue);
+            font-weight: 600;
+        }
+
+        .highlight-green {
+            color: var(--accent-green);
+            font-weight: 600;
+        }
+
+        .big-number {
+            font-size: clamp(4rem, 10vw, 8rem);
+            font-weight: 900;
+            line-height: 0.9;
+            background: linear-gradient(135deg, var(--accent), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.2rem;
+            margin-top: 2rem;
+            width: 100%;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 1.8rem;
+            backdrop-filter: blur(20px);
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255,105,0,0.3);
+            box-shadow: 0 15px 40px rgba(255,105,0,0.08);
+        }
+
+        .card-icon {
+            font-size: 2.2rem;
+            margin-bottom: 0.8rem;
+        }
+
+        .card h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.6rem;
+        }
+
+        .card p {
+            font-size: 0.9rem;
+            line-height: 1.5;
+            color: var(--text-secondary);
+        }
+
+        .list {
+            list-style: none;
+            margin-top: 1.5rem;
+        }
+
+        .list li {
+            font-size: clamp(0.95rem, 1.5vw, 1.2rem);
+            line-height: 1.8;
+            color: var(--text-secondary);
+            padding-left: 1.5rem;
+            position: relative;
+            margin-bottom: 0.5rem;
+        }
+
+        .list li::before {
+            content: '→';
+            position: absolute;
+            left: 0;
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        .quote {
+            font-size: clamp(1.2rem, 2.2vw, 1.8rem);
+            font-weight: 500;
+            line-height: 1.4;
+            border-left: 4px solid var(--accent);
+            padding-left: 1.5rem;
+            margin: 1.5rem 0;
+            color: #ffffff;
+        }
+
+        .cta {
+            display: inline-block;
+            margin-top: 1.5rem;
+            padding: 0.8rem 2.2rem;
+            background: linear-gradient(135deg, var(--accent), #ff8c00);
+            color: white;
+            text-decoration: none;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 8px 30px rgba(255,105,0,0.25);
+        }
+
+        .cta:hover {
+            transform: scale(1.05);
+            box-shadow: 0 12px 40px rgba(255,105,0,0.35);
+        }
+
+        .nav-dots {
+            position: fixed;
+            right: 1.8rem;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+
+        .nav-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.15);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .nav-dot.active {
+            background: var(--accent);
+            transform: scale(1.4);
+            box-shadow: 0 0 15px rgba(255,105,0,0.5);
+        }
+
+        .scroll-hint {
+            position: fixed;
+            bottom: 1.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.3rem;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            animation: bounce 2s infinite;
+            opacity: 0.6;
+        }
+
+        .scroll-hint.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateX(-50%) translateY(0); }
+            50% { transform: translateX(-50%) translateY(8px); }
+        }
+
+        .progress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent), var(--accent-blue));
+            z-index: 1000;
+            transition: width 0.3s ease;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            background: rgba(255,105,0,0.1);
+            border: 1px solid rgba(255,105,0,0.25);
+            border-radius: 5px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: var(--accent);
+            margin-bottom: 0.8rem;
+            text-transform: uppercase;
+        }
+
+        /* Indicator tags: 现状 / 设计 / 目标 / 风险 */
+        .indicator-tag {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            margin-right: 0.5rem;
+            text-transform: uppercase;
+            vertical-align: middle;
+        }
+        .indicator-tag.fact {
+            background: rgba(0,255,135,0.08);
+            border: 1px solid rgba(0,255,135,0.3);
+            color: var(--accent-green);
+        }
+        .indicator-tag.derivation {
+            background: rgba(0,242,254,0.08);
+            border: 1px solid rgba(0,242,254,0.3);
+            color: var(--accent-blue);
+        }
+        .indicator-tag.target {
+            background: rgba(255,105,0,0.08);
+            border: 1px solid rgba(255,105,0,0.3);
+            color: var(--accent);
+        }
+        .indicator-tag.risk {
+            background: rgba(255,0,127,0.08);
+            border: 1px solid rgba(255,0,127,0.3);
+            color: var(--accent-red);
+        }
+
+        .two-col {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 3rem;
+            align-items: center;
+            width: 100%;
+        }
+
+        .two-col.even {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            background: rgba(255,255,255,0.02);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--card-border);
+        }
+
+        .data-table th, .data-table td {
+            padding: 0.8rem 1rem;
+            text-align: left;
+            font-size: 0.85rem;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .data-table th {
+            background: rgba(255,255,255,0.05);
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .metric-band {
+            display: flex;
+            gap: 2rem;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+            width: 100%;
+        }
+
+        .metric-box {
+            flex: 1;
+            min-width: 150px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 1.2rem;
+            text-align: center;
+        }
+
+        .metric-box .num {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--accent);
+            line-height: 1.2;
+        }
+
+        .metric-box .label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 0.4rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .center-text {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .ending h1 {
+            font-size: clamp(2rem, 5vw, 4.5rem);
+        }
+
+        .ending .slogan {
+            font-size: clamp(1rem, 2vw, 1.6rem);
+            color: var(--text-secondary);
+            letter-spacing: 0.05em;
+            margin-top: 1rem;
+        }
+
+        .chain {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.6rem;
+            width: 100%;
+            margin-top: 1.5rem;
+        }
+
+        .chain .node {
+            flex: 1;
+            text-align: center;
+            padding: 1rem 0.6rem;
+            border-radius: 14px;
+            border: 1px solid var(--card-border);
+            background: rgba(255,255,255,0.02);
+        }
+
+        .chain .node .t {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .chain .node .s {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 0.3rem;
+        }
+
+        .chain .arrow {
+            color: var(--accent);
+            font-size: 1.4rem;
+            font-weight: 800;
+        }
+
+        .stack-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.7rem;
+            margin-top: 1.2rem;
+        }
+
+        .stack-row {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 1.2rem;
+            align-items: center;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 0.8rem 1.1rem;
+        }
+
+        .stack-row .k {
+            font-weight: 700;
+            color: #fff;
+            font-size: 0.95rem;
+        }
+
+        .stack-row .v {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.45;
+        }
+
+        @media (max-width: 768px) {
+            .two-col, .two-col.even { grid-template-columns: 1fr; gap: 1.5rem; }
+            .cards { grid-template-columns: 1fr; }
+            .nav-dots { right: 0.8rem; }
+            .slide { padding: 4vh 5vw; }
+            .metric-band { gap: 1rem; }
+            .chain { flex-wrap: wrap; }
+            .stack-row { grid-template-columns: 1fr; gap: 0.3rem; }
+        }
+
+        /* Dense styles to respect heights */
+        .dense .cards {
+            gap: 0.8rem;
+            margin-top: 1.2rem;
+        }
+        .dense .card {
+            padding: 1.2rem;
+            border-radius: 14px;
+        }
+        .dense .card h3 {
+            font-size: 1.1rem;
+            margin-bottom: 0.4rem;
+        }
+        .dense .card p {
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+        .dense h2 {
+            margin-bottom: 0.6rem;
+        }
+        .dense p {
+            line-height: 1.4;
+        }
+        .dense .quote {
+            margin: 0.8rem 0;
+            padding-left: 1rem;
+            font-size: 1.2rem;
+        }
+        .dense .list {
+            margin-top: 0.8rem;
+        }
+        .dense .list li {
+            line-height: 1.6;
+            font-size: 0.9rem;
+            margin-bottom: 0.3rem;
+        }
+
+        @media (max-height: 800px) {
+            .slide { padding: 4vh 6vw; }
+            .cards { gap: 0.8rem; margin-top: 1.2rem; }
+            .card { padding: 1.2rem; }
+            .eyebrow { margin-bottom: 0.8rem; }
+            h2 { margin-bottom: 0.8rem; }
+            .quote { margin: 1rem 0; }
+            .list { margin-top: 0.8rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="progress" id="progress"></div>
+    <div class="viewport" id="viewport">
+        <div class="slides" id="slides">
+
+            <!-- Slide 1: Cover -->
+            <section class="slide active">
+                <div class="content center-text">
+                    <div class="tag">投资人讨论稿</div>
+                    <h1>万象体系</h1>
+                    <h3 style="color: var(--accent-blue); font-weight: 500; letter-spacing: 0.05em; margin-bottom: 2rem;">
+                        站在用户一边的机器智能基础设施
+                    </h3>
+                    <p style="max-width: 880px; margin-bottom: 2.5rem; text-align: center;">
+                        <span class="highlight">不是怎样多用人工智能，而是怎样不浪费人工智能。</span>
+                        万象术、万象稿、万象器，三条线算的是同一本账：完成一项真实任务的总成本。
+                    </p>
+
+                    <div class="metric-band" style="max-width: 1000px; justify-content: center;">
+                        <div class="metric-box">
+                            <div class="num">万象术</div>
+                            <div class="label">减少智能使用中的浪费</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="num">万象稿</div>
+                            <div class="label">减少推理执行中的浪费</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="num">万象器</div>
+                            <div class="label">减少硬件供给中的浪费</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="num">1 本账</div>
+                            <div class="label">每项真实任务的资源成本</div>
+                        </div>
+                    </div>
+
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 2rem;">
+                        张昆玮 · 戴元熙 &nbsp;|&nbsp; 清华大学交叉信息研究院校友创立
+                    </p>
+                </div>
+            </section>
+
+            <!-- Slide 2: One-sentence Claim -->
+            <section class="slide">
+                <div class="content">
+                    <div class="eyebrow">核心判断</div>
+                    <h2>从“造一头更聪明的象”，到“一万头大象怎样一起跳舞”</h2>
+                    <p class="quote">
+                        大象并不笨，问题在于它又有力、又很重。一万头象同时行动，如果没有道路、红绿灯、账本和分工，聪明本身反而会放大混乱。
+                    </p>
+                    <div class="cards" style="margin-top: 2rem;">
+                        <div class="card">
+                            <div class="card-icon">🎯</div>
+                            <h3>问题变了</h3>
+                            <p>不再是“谁更聪明”，而是谁负责什么、哪些可以同时发生、哪些必须等待、已发生的怎样可追溯、一项工作能否跨越某次模型会话继续向前。</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🧭</div>
+                            <h3>万象术的起点</h3>
+                            <p>不制造全知全能的智能体，而是研究不同智能体怎样在同一个工程中各尽其长、共同成事。</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">💰</div>
+                            <h3>继续往下做</h3>
+                            <p>更大的问题不是“怎样多用人工智能”，而是<strong>怎样不浪费人工智能</strong>——于是有了万象稿与万象器。</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 3: User's Ledger -->
+            <section class="slide dense">
+                <div class="content">
+                    <div class="eyebrow">站在用户这一边</div>
+                    <h2>用户在五种不知不觉的地方付钱</h2>
+                    <span class="indicator-tag fact">现状</span><strong>供应商的目标是模型被更广泛地调用；用户的账本是另一笔：</strong>
+                    <p style="margin-bottom: 0.8rem;">为了把一件真实的事情做完，我究竟付出了多少钱、多少时间和多少机器资源？</p>
+                    <table class="data-table">
+                        <tr><th>浪费</th><th>触发场景</th><th>你在为什么付费</th></tr>
+                        <tr><td style="color:var(--accent); font-weight:bold;">组织方式</td><td>困难的只有十分之一，整条工作链却跑在最昂贵的模型上</td><td>为“整链同一个价”付费</td></tr>
+                        <tr><td style="color:var(--accent-red); font-weight:bold;">失忆</td><td>昨天已查明的问题，今天重新搜索、重新阅读、重新推理</td><td>同一份认知劳动付两遍</td></tr>
+                        <tr><td style="color:var(--accent-blue); font-weight:bold;">等待</td><td>可并行的排成长队，先完成的要等最慢分支</td><td>为别人的尾巴付费</td></tr>
+                        <tr><td style="color:var(--accent-green); font-weight:bold;">计算组织</td><td>推理引擎反复搬运、重新整理本来可共享的数据</td><td>为重复组织同一个世界付费</td></tr>
+                        <tr><td style="color:var(--accent); font-weight:bold;">硬件结构</td><td>需要的是内存带宽，却连同闲置通用算力一起采购</td><td>为用不满的硅片付费</td></tr>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Slide 4: Cost Chain -->
+            <section class="slide dense">
+                <div class="content">
+                    <div class="eyebrow">一本账</div>
+                    <h2>任务 → 模型 → 推理 → 搬运 → 硬件</h2>
+                    <p style="margin-bottom: 0.6rem;">万象从用户账本出发，把同一个问题向下追了三层。只要某一层存在大量不必要的重复支付，就值得继续优化。</p>
+                    <div class="chain">
+                        <div class="node"><div class="t">任务</div><div class="s">真实需求</div></div>
+                        <div class="arrow">→</div>
+                        <div class="node" style="border-color: rgba(255,105,0,0.4);"><div class="t">模型调用</div><div class="s">谁值得用最强模型</div></div>
+                        <div class="arrow">→</div>
+                        <div class="node" style="border-color: rgba(0,242,254,0.4);"><div class="t">推理执行</div><div class="s">共享还是重建</div></div>
+                        <div class="arrow">→</div>
+                        <div class="node" style="border-color: rgba(0,242,254,0.4);"><div class="t">数据搬运</div><div class="s">带宽与位置</div></div>
+                        <div class="arrow">→</div>
+                        <div class="node" style="border-color: rgba(255,105,0,0.4);"><div class="t">硬件</div><div class="s">硅片与内存</div></div>
+                    </div>
+                    <div class="cards">
+                        <div class="card">
+                            <span class="indicator-tag target">设计</span>
+                            <h3>万象术</h3>
+                            <p>回答<strong>什么智能工作值得发生</strong>：模型不是岗位，模型是算力；昂贵推理只留给真正困难的判断。</p>
+                        </div>
+                        <div class="card">
+                            <span class="indicator-tag derivation">设计</span>
+                            <h3>万象稿</h3>
+                            <p>回答<strong>这些推理怎样更少重复</strong>：数据不动，视角动；低频结构与高频数值拆开。</p>
+                        </div>
+                        <div class="card">
+                            <span class="indicator-tag target">设计</span>
+                            <h3>万象器</h3>
+                            <p>回答<strong>不可避免的计算怎样更便宜落地</strong>：如果缺的是带宽，就别为闲置算力付钱。</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 5: Model is compute -->
+            <section class="slide">
+                <div class="content two-col even">
+                    <div>
+                        <div class="eyebrow">万象术 · 之一</div>
+                        <h2>模型不是岗位，模型是算力</h2>
+                        <ul class="list">
+                            <li><span class="highlight">职责决定“它是什么”</span>：参与者承担什么责任，是稳定结构。</li>
+                            <li><span class="highlight-blue">模型决定“这一秒用谁”</span>：可换，不漂移。模型可以换，职责不应该跟着漂移。</li>
+                            <li>同一项任务在不同价格、不同能力的模型之间分配工作。</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3>结算方式的改变</h3>
+                        <p style="margin-bottom: 1rem;">如果所有工作都锁死在一个模型上，相当于把不同难度、不同价值的工作用同一种价格结算。</p>
+                        <p class="highlight-green" style="font-size: 1.15rem; margin-bottom: 0.8rem;">同样质量的任务，能不能花更少的钱做完。</p>
+                        <p style="font-size: 0.8rem; line-height: 1.4;">
+                            <span class="indicator-tag target">目标</span> 当前系统已把岗位责任与底层模型选择分开，辅助性工作可使用更廉价模型。
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 6: Attention -->
+            <section class="slide dense">
+                <div class="content">
+                    <div class="eyebrow">万象术 · 之二</div>
+                    <h2>真正稀缺的是注意力</h2>
+                    <p style="margin-bottom: 0.8rem;">一个智能体自己规划、自己调查、自己写码、自己执行、自己判断完成——它把完全不同的工作塞进了同一个注意力空间。</p>
+                    <div class="two-col even">
+                        <div>
+                            <span class="indicator-tag fact">现状</span><strong>不同工作需要不同视角：</strong>
+                            <table class="data-table">
+                                <tr><th>工作</th><th>需要的视角</th></tr>
+                                <tr><td>复杂算法</td><td>局部专注</td></tr>
+                                <tr><td>项目管理</td><td>盯住全局目标</td></tr>
+                                <tr><td>执行命令</td><td>面对真实机器状态</td></tr>
+                                <tr><td>审查</td><td>寻找作者没看到的东西</td></tr>
+                                <tr><td>历史整理</td><td>从外部回看整个过程</td></tr>
+                            </table>
+                        </div>
+                        <div>
+                            <span class="indicator-tag derivation">设计</span><strong>职责被拆成四条边界：</strong>
+                            <div class="stack-list">
+                                <div class="stack-row"><div class="k">工程师</div><div class="v">理解问题与修改代码，<span style="color:var(--accent-red);">不负责真实命令执行</span></div></div>
+                                <div class="stack-row"><div class="k">项目负责人</div><div class="v">分解、委托、验收、推进，<span style="color:var(--accent-red);">不进入代码细节</span></div></div>
+                                <div class="stack-row"><div class="k">运维员</div><div class="v">真实机器上的运行、进程与测试结果，<span style="color:var(--accent-red);">不被并行改写</span></div></div>
+                                <div class="stack-row"><div class="k">记录员</div><div class="v">工作历史与认知上下文，<span style="color:var(--accent-red);">不争夺决策权</span></div></div>
+                            </div>
+                            <p style="font-size:0.85rem; margin-top:0.8rem; line-height:1.5;">
+                                <span class="indicator-tag target">目标</span> 分工的目的不是组织漂亮，而是<span class="highlight">减少注意力浪费</span>——每次昂贵调用承担更窄、更明确的责任。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 7: Parallel vs single operator -->
+            <section class="slide dense">
+                <div class="content">
+                    <div class="eyebrow">万象术 · 之三</div>
+                    <h2>工程师可以很多，运维员只有一条主线</h2>
+                    <div class="two-col even">
+                        <div>
+                            <span class="indicator-tag fact">现状</span><strong>有些并发越多越好，有些越多越难解释：</strong>
+                            <ul class="list" style="margin-top:0.8rem;">
+                                <li>十个工程师可在隔离工作空间同时研究十种方案。</li>
+                                <li>十个运维同时改同一个运行环境，就没人能回答：<strong style="color:var(--accent-red);">这个结果是谁造成的？</strong></li>
+                            </ul>
+                            <p style="font-size:0.85rem; margin-top:1rem; line-height:1.5;">
+                                <span class="indicator-tag risk">风险</span> 物理环境失去因果关系，前面花在智能上的所有钱都可能白花——已跑过的验证不再知道对应哪份代码。
+                            </p>
+                        </div>
+                        <div>
+                            <span class="indicator-tag derivation">设计</span><strong>执行保持唯一逻辑连续性：</strong>
+                            <div class="stack-list">
+                                <div class="stack-row"><div class="k">调查与实现</div><div class="v">大量展开，彼此隔离</div></div>
+                                <div class="stack-row"><div class="k">真实执行</div><div class="v">同一条主线上只有一个操作员</div></div>
+                                <div class="stack-row"><div class="k">底层会话可变</div><div class="v">不能凭空变出第二个同时有效的操作员</div></div>
+                                <div class="stack-row"><div class="k">用户关心的两件事</div><div class="v">出事能查清原因；验证知道验证的是哪份代码</div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 8: Recorder + case library -->
+            <section class="slide dense">
+                <div class="content">
+                    <div class="eyebrow">万象术 · 之四</div>
+                    <h2>主任务不写回忆录，旧钱不花两遍</h2>
+                    <div class="two-col even">
+                        <div>
+                            <span class="indicator-tag fact">现状</span><strong>任务内的浪费：贵的秘书工作</strong>
+                            <p style="margin-top:0.8rem; font-size:0.9rem; line-height:1.55;">
+                                模型正在解决困难问题，却不断被要求回顾、整理历史、压缩上下文、总结错误。这些工作都必要，但不应占用当前那次思考。
+                            </p>
+                            <p style="font-size:0.85rem; margin-top:0.6rem; line-height:1.5;">
+                                <span class="indicator-tag derivation">设计</span> 记录员是每个托管工作会话旁的伴随角色，负责记录工作历史与认知上下文。<span class="highlight">支持性工作不要持续打断主线工作。</span>
+                            </p>
+                        </div>
+                        <div>
+                            <span class="indicator-tag risk">现状</span><strong>跨任务的浪费：认知劳动被重复购买</strong>
+                            <p style="margin-top:0.8rem; font-size:0.9rem; line-height:1.55;">
+                                昨天读十几个文件、排除几条错路才找到的原因，过几天相似问题来了，系统从头开始。
+                            </p>
+                            <p style="font-size:0.85rem; margin-top:0.6rem; line-height:1.5;">
+                                <span class="indicator-tag target">设计</span> 案例库保存可复用经验，同时记住它依赖的真实文件状态；代码变了就重新维护，<span class="highlight-green">不把旧答案冒充今天的事实</span>。
+                            </p>
+                        </div>
+                    </div>
+                    <p class="quote" style="font-size:1.05rem; margin-top:1.2rem;">
+                        案例库从一开始就不是“真理库”，而是可以失效、可以更新的经验缓存——朴素，但足够：第二次少读多少文件、少走多少老路、少调用多少模型。
+                    </p>
+                </div>
+            </section>
+
+            <!-- Slide 9: Fission + collection -->
+            <section class="slide dense">
+                <div class="content">
+                    <div class="eyebrow">万象术 · 之五</div>
+                    <h2>并发在现场裂变，结果提前回收</h2>
+                    <div class="two-col even">
+                        <div>
+                            <span class="indicator-tag derivation">设计</span><strong>分派：并发不是一开始规划出来的</strong>
+                            <ul class="list" style="margin-top:0.8rem;">
+                                <li>最外层只看到一个普通需求，读进代码才发现六个问题可同时推进。</li>
+                                <li>让最接近问题的人在现场把工作裂成并行路线。</li>
+                                <li>路径仍属于同一个工程责任，不多出推诿主体。</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <span class="indicator-tag target">目标</span><strong>收取：真正困难的是收回来</strong>
+                            <ul class="list" style="margin-top:0.8rem;">
+                                <li>十个子任务不会同时结束：有的快、有的慢、有的此路不通。</li>
+                                <li>不必等全部结束——已完成的结果先被取回。</li>
+                                <li>分派 / 继续 / 结果收取 / 状态查看是四个独立动作。</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <p style="margin-top:1rem; font-size:0.95rem;">
+                        大规模智能体系统的效率，很大一部分损失在<span class="highlight">尾部等待</span>里：已经完成的工作，为什么要因为另一个无关任务还没结束而继续等？
+                    </p>
+                </div>
+            </section>
+
+            <!-- Slide 10: Relay + gate -->
+            <section class="slide dense">
+                <div class="content">
+                    <div class="eyebrow">万象术 · 之六</div>
+                    <h2>任务活得比一次会话更久，作者不能自授金牌</h2>
+                    <div class="two-col even">
+                        <div>
+                            <span class="indicator-tag fact">现状</span><strong>模型的两个相反弱点</strong>
+                            <p style="margin-top:0.7rem; font-size:0.9rem; line-height:1.55;">可能太早觉得自己已完成；也可能待得太久，依赖早先判断，难以重新审视。两者都来自：把长期任务的连续性寄托在一次会话上。</p>
+                            <p style="font-size:0.85rem; margin-top:0.6rem; line-height:1.5;">
+                                <span class="indicator-tag derivation">设计</span> 项目负责人可接力：新一任看到当前工作区、已有结果与未完成事项，<span class="highlight-blue">不继承前任全部私人思考</span>。工作不丢，路径依赖不必继承。
+                            </p>
+                        </div>
+                        <div>
+                            <span class="indicator-tag derivation">设计</span><strong>评审与合入分开</strong>
+                            <div class="stack-list">
+                                <div class="stack-row"><div class="k">模型评审</div><div class="v">语言与算法、结构、简洁性、测试证据、逻辑边界、完整性</div></div>
+                                <div class="stack-row"><div class="k">机器门禁</div><div class="v">真实代码状态、分支变化、合入条件</div></div>
+                                <div class="stack-row"><div class="k" style="color:var(--accent-red);">失效规则</div><div class="v">代码一变，建立在旧状态上的评价不能替新状态背书</div></div>
+                            </div>
+                            <p style="font-size:0.85rem; margin-top:0.8rem; line-height:1.5;">
+                                <span class="indicator-tag target">目标</span> 用户需要的不 是更多赞美，而是<span class="highlight">一个错误有没有机会被另一个视角发现</span>。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 11: Deep reasoning skeleton -->
+            <section class="slide dense">
+                <div class="content">
+                    <div class="eyebrow">万象术 · 之七</div>
+                    <h2>给深度推理一副骨架</h2>
+                    <p style="margin-bottom:0.8rem;">长不等于深。没有结构，模型很容易把“说得更多”误认为“知道得更多”。</p>
+                    <div class="cards">
+                        <div class="card">
+                            <div class="card-icon">🧱</div>
+                            <h3>事实</h3>
+                            <p>什么已经有证据；哪些结论直接建立在可验证状态上。</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🔍</div>
+                            <h3>证据</h3>
+                            <p>什么是真正新增的外部证据，而不只是模型又一次自述。</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">💭</div>
+                            <h3>假设</h3>
+                            <p>什么只是可能解释；它与事实之间的差距在哪里。</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🧩</div>
+                            <h3>依赖</h3>
+                            <p>哪些调查方向相互依赖，哪些可以独立推进。</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🎯</div>
+                            <h3>待解决工作</h3>
+                            <p>还有什么关键问题没回答；哪个新调查真正可能改变结论。</p>
+                        </div>
+                    </div>
+                    <p class="quote" style="font-size:1.1rem; margin-top:1.2rem;">
+                        深度推理不应按“想了多久”计价，而应按<span class="highlight">新增了多少有用认识</span>计价。再调一次只会重说已有内容，那就是用户不该支付的成本。
+                    </p>
+                </div>
+            </section>
+
+            <!-- Slide 12: Wanjung Dong: data static, view moves -->
+            <section class="slide">
+                <div class="content two-col even">
+                    <div>
+                        <div class="eyebrow">万象稿</div>
+                        <h2>数据不动，视角动</h2>
+                        <p style="margin-bottom:1rem;">
+                            推理从一条线变成不断分叉、重新汇合的图：多个分支阅读相同背景，却站在不同逻辑位置，运行时往往需要不断重新组织同一批底层数据。
+                        </p>
+                        <ul class="list">
+                            <li>把<span class="highlight">物理存储位置</span>、写入时的位置、读者眼中的虚拟位置分开。</li>
+                            <li>在<span class="highlight-blue">查询侧补偿位置差异</span>，同一份底层数据服务不同合法视角。</li>
+                            <li>一份键值缓存写入后，不因别的分支要换个位置理解，就把整份数据重搬一遍。</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <span class="indicator-tag derivation">推导</span>
+                        <h3>共享前后的差别</h3>
+                        <p style="margin-bottom:1rem; line-height:1.5;">示意性地看，是同一份物理缓存被复制的份数（$C$ 为一份物理缓存，$k$ 为读者数，$\Delta$ 为查询侧位置补偿）：</p>
+                        <p class="highlight" style="font-family:monospace; font-size:1.05rem; margin-bottom:0.8rem;">
+                            $$M_{\text{重建}} = k \cdot C$$
+                        </p>
+                        <p class="highlight-blue" style="font-family:monospace; font-size:1.05rem; margin-bottom:1rem;">
+                            $$M_{\text{共享}} = C + k \cdot \Delta$$
+                        </p>
+                        <p style="font-size:0.8rem; line-height:1.4;">
+                            <span class="indicator-tag fact">现状</span> 未经激进优化的初步实现已表现出明显局部收益；意义不在某个倍数，而在说明<span class="highlight-green">相当一部分成本来自重复组织同一个世界，而非模型必须完成的数学计算</span>。
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 13: structure vs values -->
+            <section class="slide dense">
+                <div class="content">
+                    <div class="eyebrow">万象稿</div>
+                    <h2>结构低频，数值高频</h2>
+                    <p style="margin-bottom:0.8rem;">推理图结构没变，为什么每生成一个新词元，都要重新扫描和整理整个历史？</p>
+                    <div class="two-col even">
+                        <div>
+                            <span class="indicator-tag derivation">设计</span><strong>低频 · 结构 → 尽量共享</strong>
+                            <div class="stack-list">
+                                <div class="stack-row"><div class="k">推理图结构</div><div class="v">多个读者共同需要</div></div>
+                                <div class="stack-row"><div class="k">位置与依赖</div><div class="v">不随每步重扫</div></div>
+                                <div class="stack-row"><div class="k">共同历史</div><div class="v">共享前缀继续共享</div></div>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="indicator-tag target">目标</span><strong>高频 · 数值 → 压到最小范围</strong>
+                            <div class="stack-list">
+                                <div class="stack-row"><div class="k">新词元状态</div><div class="v">真正随每一步变化的部分</div></div>
+                                <div class="stack-row"><div class="k">局部更新</div><div class="v">只动真正变动的部分</div></div>
+                                <div class="stack-row"><div class="k">目标状态</div><div class="v">从“不断重建上下文”到“在稳定共享世界上持续计算”</div></div>
+                            </div>
+                        </div>
+                    </div>
+                    <p style="margin-top:1rem; font-size:0.9rem; line-height:1.5;">
+                        <span class="indicator-tag fact">载体</span> 万象稿直接基于 <code>llama.cpp</code> 源码研究与修改——问题发生在推理执行本身，必须进入模型执行、缓存管理、注意力计算与后端调度。
+                    </p>
+                </div>
+            </section>
+
+            <!-- Slide 14: Wanxiang Qi: bandwidth -->
+            <section class="slide">
+                <div class="content two-col even">
+                    <div>
+                        <div class="eyebrow">万象器</div>
+                        <h2>缺的是带宽，为什么还要为闲置算力付钱</h2>
+                        <ul class="list">
+                            <li>小批量大模型生成、超大规模稀疏模型：计算单元常常不在做乘加，而是在<span class="highlight">等下一批权重从内存到达</span>。</li>
+                            <li>真正短缺的往往不是理论峰值算力：<span class="highlight-blue">内存容量、有效带宽、送达能力</span>。</li>
+                            <li><span class="highlight-green">问题：</span>如果真正短缺的是带宽，为什么一定要把大量暂时用不满的通用算力一起买回来？</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <span class="indicator-tag target">设计</span>
+                        <h3>硬件经济结构</h3>
+                        <p style="margin-bottom:1rem; line-height:1.5;">
+                            每颗芯片都有独立内存通道。有效组织这些通道，用户购买的不再只是一颗更贵的大芯片，而是通过更多成熟芯片获得更大的<span class="highlight">总内存与总带宽</span>。
+                        </p>
+                        <p style="font-size:0.85rem; line-height:1.5;">
+                            与黑芝麻智能推进合作；第一阶段不重新流片，用现有芯片 + 高速扩展互联探索多芯片共同承担大模型推理。
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 15: Phase 1 -->
+            <section class="slide dense">
+                <div class="content">
+                    <div class="eyebrow">万象器 · 第一阶段</div>
+                    <h2>先用现有芯片，重新算一次硬件的账</h2>
+                    <p style="margin-bottom:0.8rem;">以黑芝麻现有芯片组成推理原型，统一模型与统一运行条件下对标 DGX Spark：争取约 <span class="highlight">1/2 ~ 1/3 硬件成本</span>达到相近实际推理性能。</p>
+                    <div class="two-col even">
+                        <div>
+                            <span class="indicator-tag target">目标</span><strong>要带走的不是这台原型机，而是一组事实：</strong>
+                            <table class="data-table">
+                                <tr><th>问题</th><th>为什么关键</th></tr>
+                                <tr><td>纸面带宽 → 有效带宽</td><td>决定采购依据是标称值还是真实吞吐</td></tr>
+                                <tr><td>通信何时成为主要成本</td><td>决定芯片数量上限</td></tr>
+                                <tr><td>哪些单元经常忙、哪些经常等</td><td>决定硅面积该给谁</td></tr>
+                                <tr><td>推理愿意拿硅面积换什么</td><td>决定专用化的取舍</td></tr>
+                            </table>
+                        </div>
+                        <div>
+                            <span class="indicator-tag derivation">推导</span><strong>这些数据直接决定第二阶段是否推进：</strong>
+                            <p style="margin-top:0.7rem; font-size:0.9rem; line-height:1.55;">
+                                先让真实模型跑起来，先让真实互联暴露瓶颈，先看真实软件系统最终把时间花在哪里——然后再决定缓存多大、多少内存控制器、低精度占多少面积、稀疏专家怎么路由、芯片间怎么交换数据。
+                            </p>
+                            <p style="font-size:0.85rem; margin-top:0.7rem; line-height:1.5;">
+                                <span class="indicator-tag target">目标</span> 第二阶段围绕真实负载与产业伙伴探索专用推理芯片与机柜级系统，指向 Kimi K3 等超大参数模型的商用推理。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 16: why three lines converge -->
+            <section class="slide dense">
+                <div class="content">
+                    <div class="eyebrow">万象</div>
+                    <h2>为什么三件事会走到一起</h2>
+                    <p style="margin-bottom:0.8rem;">它们不是因为名字相近才放在一起。它们是同一个问题向下追了三层。</p>
+                    <table class="data-table">
+                        <tr><th>层</th><th>发现的浪费</th><th>对应的线</th><th>回答的问题</th></tr>
+                        <tr><td style="font-weight:bold;">最上层</td><td>昂贵的模型被用在不值得它做的事上</td><td style="color:var(--accent); font-weight:bold;">万象术</td><td>什么智能工作值得发生</td></tr>
+                        <tr><td style="font-weight:bold;">中间层</td><td>推理运行时重复整理、搬运可共享的数据</td><td style="color:var(--accent-blue); font-weight:bold;">万象稿</td><td>这些推理怎样更少重复</td></tr>
+                        <tr><td style="font-weight:bold;">最底层</td><td>为稀缺内存买进大量未用满的通用算力</td><td style="color:var(--accent-green); font-weight:bold;">万象器</td><td>不可避免的计算怎样更便宜落地</td></tr>
+                    </table>
+                    <p class="quote" style="font-size:1.05rem; margin-top:1.2rem;">
+                        目标不是把某一层指标做到极端，而是理解一项真实任务的成本<span class="highlight">怎样一层一层产生</span>。
+                    </p>
+                </div>
+            </section>
+
+            <!-- Slide 17: 多快好省 -->
+            <section class="slide dense">
+                <div class="content">
+                    <div class="eyebrow">万象</div>
+                    <h2>多、快、好、省——四种浪费，不是四句口号</h2>
+                    <div class="cards">
+                        <div class="card">
+                            <div class="card-icon">🧬</div>
+                            <h3>多</h3>
+                            <p>规模扩大后协调成本迅速上升。更多智能体、更多推理分支、更多芯片加入，系统仍要能继续工作。</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">⚡</div>
+                            <h3>快</h3>
+                            <p>无意义等待。已完成的结果不等最慢分支，可并行的不排长队，没变化的结构不反复重建。</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">🛡️</div>
+                            <h3>好</h3>
+                            <p>自我证明。作者不能自认完成就自动通过；旧经验不能因曾经正确就成为今天的事实。</p>
+                        </div>
+                        <div class="card">
+                            <div class="card-icon">💰</div>
+                            <h3>省</h3>
+                            <p>回到用户账本：昂贵模型用在刀刃上、旧认识不重复购买、数据不重复搬运、硬件支出转为有效吞吐。</p>
+                        </div>
+                    </div>
+                    <p class="quote" style="font-size:1.05rem; margin-top:1.2rem;">
+                        所谓“省”不是最后再做一次成本优化——它应该从<span class="highlight">第一行架构</span>开始。
+                    </p>
+                </div>
+            </section>
+
+            <!-- Slide 18: team -->
+            <section class="slide dense">
+                <div class="content">
+                    <div class="eyebrow">团队</div>
+                    <h2>证明的能力：向下追问，直到找到浪费发生的位置</h2>
+                    <p style="margin-bottom:0.8rem;">万象由清华大学交叉信息研究院计算机科学实验班校友张昆玮、戴元熙担纲创业。学校背景能说明过去，不能证明未来。</p>
+                    <div class="two-col even">
+                        <div>
+                            <span class="indicator-tag fact">现状</span><strong>观察到的浪费</strong>
+                            <ul class="list" style="margin-top:0.8rem; font-size:0.9rem;">
+                                <li>模型太贵</li>
+                                <li>注意力被琐事占满</li>
+                                <li>经验反复丢失</li>
+                                <li>并发一开始无法判断</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <span class="indicator-tag derivation">追问</span><strong>对应的研究与设计</strong>
+                            <ul class="list" style="margin-top:0.8rem; font-size:0.9rem;">
+                                <li>组合模型，昂贵推理只留困难判断</li>
+                                <li>拆职责，让每次调用责任更窄</li>
+                                <li>旧认识可复用，且随代码变化重新维护</li>
+                                <li>执行者在现场展开并行</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <p style="margin-top:1rem; font-size:0.95rem;">
+                        长任务被单次会话绑架 → 让任务跨会话继续；推理反复整理同一份数据 → 重新组织数据；硬件缺的是带宽 → 重算计力与带宽的采购关系。一路从智能体追到推理引擎，再追到芯片。
+                    </p>
+                </div>
+            </section>
+
+            <!-- Slide 19: conclusion -->
+            <section class="slide">
+                <div class="content center-text">
+                    <div class="eyebrow">结语</div>
+                    <h2>用户只在事情真正被做完的时候获得价值</h2>
+                    <p class="quote" style="max-width: 950px; text-align: center;">
+                        不会因为调用了更昂贵的模型而获得价值；不会因为生成了更多词元而获得价值；不会因为机器拥有更高的理论峰值而获得价值。
+                    </p>
+                    <p style="max-width: 900px; text-align:center; margin-top:1rem;">
+                        万象最终想优化的不是模型调用次数，也不是单颗芯片的峰值，而是<span class="highlight">每完成一项真实任务，需要付出多少资源</span>。
+                    </p>
+                    <div class="metric-band" style="max-width: 1000px; justify-content: center; margin-top:2rem;">
+                        <div class="metric-box"><div class="num" style="font-size:1.05rem;">何时用最强模型</div><div class="label">什么时候值得</div></div>
+                        <div class="metric-box"><div class="num" style="font-size:1.05rem;">何时复用旧经验</div><div class="label">什么时候足够</div></div>
+                        <div class="metric-box"><div class="num" style="font-size:1.05rem;">何时并行</div><div class="label">什么时候展开</div></div>
+                        <div class="metric-box"><div class="num" style="font-size:1.05rem;">何时停止调查</div><div class="label">什么时候不再</div></div>
+                        <div class="metric-box"><div class="num" style="font-size:1.05rem;">共享还是复制</div><div class="label">计算，还是带宽</div></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 20: appendix -->
+            <section class="slide dense">
+                <div class="content">
+                    <div class="eyebrow">附录</div>
+                    <h2>技术实现概况</h2>
+                    <div class="two-col even">
+                        <div>
+                            <span class="indicator-tag fact">载体</span><strong>三个方向，三套工程载体</strong>
+                            <table class="data-table">
+                                <tr><th>方向</th><th>载体</th><th>从这里开始的原因</th></tr>
+                                <tr><td style="color:var(--accent); font-weight:bold;">万象术</td><td>F# · OpenCode 插件</td><td>身份/权限/状态/委托/失败语义用类型表达</td></tr>
+                                <tr><td style="color:var(--accent-blue); font-weight:bold;">万象稿</td><td>llama.cpp 源码</td><td>问题发生在推理执行本身</td></tr>
+                                <tr><td style="color:var(--accent-green); font-weight:bold;">万象器</td><td>x64 + 5×RX6800（TP5）· Vulkan</td><td>可反复修改软件栈的真实物理实验场</td></tr>
+                            </table>
+                        </div>
+                        <div>
+                            <span class="indicator-tag derivation">推导</span><strong>为什么不是外围封装</strong>
+                            <ul class="list" style="margin-top:0.8rem; font-size:0.9rem;">
+                                <li>万象术实现的是模型之上的任务组织层，不是模型接口包装。</li>
+                                <li>万象稿要进入模型执行、缓存管理、注意力计算与后端调度。</li>
+                                <li>万象器的 TP5 平台已覆盖五卡真实多卡运行与点对点通信实验——纸上被忽略的问题会直接暴露：通信发生了多少次；一次很小的交换为何可能比计算本身更贵。</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Slide 21: Ending -->
+            <section class="slide ending">
+                <div class="content center-text">
+                    <div class="eyebrow">万象</div>
+                    <h1 class="highlight">智能最终必须懂经济学</h1>
+                    <p class="slogan">万象皆可用，众智自成事。</p>
+                    <p style="max-width:820px; text-align:center; margin-top:1.6rem;">
+                        知道什么时候值得使用最强模型；知道什么时候旧经验已经足够；知道什么时候应该并行；知道什么时候不应该再继续调查；知道什么时候应该共享，而不是复制；知道用户真正购买的是计算，还是带宽。
+                    </p>
+                    <a href="#" class="cta" onclick="goToSlide(0); return false;">回到开头</a>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <div class="nav-dots" id="navDots"></div>
+    <div class="scroll-hint" id="scrollHint">
+        <span>滚动 / 方向键翻页</span>
+        <span>&darr;</span>
+    </div>
+
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        const slidesContainer = document.getElementById('slides');
+        const navDots = document.getElementById('navDots');
+        const progress = document.getElementById('progress');
+        const scrollHint = document.getElementById('scrollHint');
+        let currentSlide = 0;
+        let isScrolling = false;
+        let touchStartY = 0;
+
+        // Create navigation dots
+        slides.forEach((_, index) => {
+            const dot = document.createElement('div');
+            dot.className = 'nav-dot' + (index === 0 ? ' active' : '');
+            dot.addEventListener('click', () => goToSlide(index));
+            navDots.appendChild(dot);
+        });
+
+        function updateSlide() {
+            slides.forEach((slide, index) => {
+                slide.classList.toggle('active', index === currentSlide);
+            });
+            document.querySelectorAll('.nav-dot').forEach((dot, index) => {
+                dot.classList.toggle('active', index === currentSlide);
+            });
+            slidesContainer.style.transform = `translateY(-${currentSlide * 100}vh)`;
+            progress.style.width = `${((currentSlide + 1) / slides.length) * 100}%`;
+
+            if (currentSlide === slides.length - 1) {
+                scrollHint.classList.add('hidden');
+            } else {
+                scrollHint.classList.remove('hidden');
+            }
+
+            fitContent();
+        }
+
+        function fitContent() {
+            requestAnimationFrame(() => {
+                const activeSlide = slides[currentSlide];
+                if (!activeSlide) return;
+                const content = activeSlide.querySelector('.content');
+                if (!content) return;
+
+                content.style.setProperty('--content-scale', '1');
+                activeSlide.style.overflowY = 'hidden';
+
+                const slideHeight = activeSlide.clientHeight;
+                const availableHeight = slideHeight * 0.85; // 85% of viewport height
+                const contentHeight = content.scrollHeight;
+
+                if (contentHeight > availableHeight) {
+                    const scale = availableHeight / contentHeight;
+                    const clampedScale = Math.max(scale, 0.72); // Don't shrink below 72%
+                    content.style.setProperty('--content-scale', clampedScale.toFixed(4));
+                    if (scale < 0.72) {
+                        activeSlide.style.overflowY = 'auto';
+                    }
+                }
+            });
+        }
+
+        function goToSlide(index) {
+            if (index < 0 || index >= slides.length) return;
+            currentSlide = index;
+            updateSlide();
+        }
+
+        function nextSlide() {
+            goToSlide(Math.min(currentSlide + 1, slides.length - 1));
+        }
+
+        function prevSlide() {
+            goToSlide(Math.max(currentSlide - 1, 0));
+        }
+
+        function handleWheel(e) {
+            e.preventDefault();
+            if (isScrolling) return;
+            isScrolling = true;
+            if (e.deltaY > 0) nextSlide();
+            else prevSlide();
+            setTimeout(() => isScrolling = false, 800);
+        }
+
+        function handleKey(e) {
+            if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+                e.preventDefault();
+                nextSlide();
+            } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'PageUp') {
+                e.preventDefault();
+                prevSlide();
+            } else if (e.key === 'Home') {
+                e.preventDefault();
+                goToSlide(0);
+            } else if (e.key === 'End') {
+                e.preventDefault();
+                goToSlide(slides.length - 1);
+            }
+        }
+
+        function handleTouchStart(e) {
+            touchStartY = e.touches[0].clientY;
+        }
+
+        function handleTouchEnd(e) {
+            const touchEndY = e.changedTouches[0].clientY;
+            const diff = touchStartY - touchEndY;
+            if (Math.abs(diff) > 50) {
+                if (diff > 0) nextSlide();
+                else prevSlide();
+            }
+        }
+
+        const viewport = document.getElementById('viewport');
+        viewport.addEventListener('wheel', handleWheel, { passive: false });
+        document.addEventListener('keydown', handleKey);
+        viewport.addEventListener('touchstart', handleTouchStart, { passive: true });
+        viewport.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+        // Initial setup
+        updateSlide();
+
+        // KaTeX auto-render for every slide's math
+        function renderMath() {
+            if (window.renderMathInElement) {
+                renderMathInElement(document.body, { delimiters: [{ left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false }], throwOnError: false });
+            } else {
+                setTimeout(renderMath, 100);
+            }
+        }
+        renderMath();
+
+        window.addEventListener('resize', () => {
+            clearTimeout(window.__fitTimeout);
+            window.__fitTimeout = setTimeout(fitContent, 100);
+        });
+    </script>
+</body>
+</html>

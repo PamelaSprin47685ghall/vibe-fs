@@ -61,7 +61,7 @@ const request = async (baseUrl, method, pathname, body) => {
     method,
     headers: {
       'Content-Type': 'application/json',
-      'x-opencode-directory': repo,
+      'x-opencode-directory': encodeURIComponent(repo),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });

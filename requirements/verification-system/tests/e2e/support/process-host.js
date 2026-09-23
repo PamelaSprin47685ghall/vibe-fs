@@ -158,7 +158,7 @@ export class ProcessHost {
       try {
         const res = await fetch(`${this._baseUrl}/path`, {
           method: 'GET',
-          headers: { 'x-opencode-directory': this._workDir },
+          headers: { 'x-opencode-directory': encodeURIComponent(this._workDir) },
           signal: AbortSignal.timeout(Math.max(0, Math.min(READY_POLL_INTERVAL_MS, deadline - Date.now()))),
         });
         if (res && res.status > 0) {
