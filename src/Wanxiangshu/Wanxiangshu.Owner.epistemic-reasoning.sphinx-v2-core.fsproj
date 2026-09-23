@@ -22,6 +22,7 @@
     <Compile Include="Sphinx/V2/Runtime/Context.fsi"/><Compile Include="Sphinx/V2/Runtime/Context.fs"/>
     <Compile Include="Sphinx/V2/Runtime/Refinement.fsi"/><Compile Include="Sphinx/V2/Runtime/Refinement.fs"/>
     <Compile Include="Sphinx/V2/Runtime/Decision.fsi"/><Compile Include="Sphinx/V2/Runtime/Decision.fs"/>
+
     <Compile Include="Sphinx/V2/Plugins/Questionnaire/Model.fsi"/><Compile Include="Sphinx/V2/Plugins/Questionnaire/Model.fs"/>
     <Compile Include="Sphinx/V2/Plugins/Questionnaire/Design.fsi"/><Compile Include="Sphinx/V2/Plugins/Questionnaire/Design.fs"/>
     <Compile Include="Sphinx/V2/Plugins/Questionnaire/Decode.fsi"/><Compile Include="Sphinx/V2/Plugins/Questionnaire/Decode.fs"/>

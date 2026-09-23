@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup>
+    <WanxiangshuSubsystem>sphinx</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>sphinx-v2-persistence</WanxiangshuCompileShard><WanxiangshuSemanticOwner>epistemic-reasoning</WanxiangshuSemanticOwner><WanxiangshuOwnerLocality>sphinx-v2-persistence</WanxiangshuOwnerLocality><WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind></PropertyGroup><ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.digest.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-canonical-json.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-v2-core.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.eventstore-integrator-contract.fsproj"/>
+    <Compile Include="Sphinx/V2/Persistence/Codec.fsi"/><Compile Include="Sphinx/V2/Persistence/Codec.fs"/>
+    <Compile Include="Sphinx/V2/Persistence/Integrator.fsi"/><Compile Include="Sphinx/V2/Persistence/Integrator.fs"/>
+  </ItemGroup></Project>

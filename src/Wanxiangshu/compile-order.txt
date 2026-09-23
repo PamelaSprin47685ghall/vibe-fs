@@ -508,6 +508,10 @@ Persistence/EventStore/EventKWayMerge.fsi
 Persistence/EventStore/EventKWayMerge.fs
 Persistence/EventStore/IntegrationKernel.fsi
 Persistence/EventStore/IntegrationKernel.fs
+Sphinx/V2/Persistence/Codec.fsi
+Sphinx/V2/Persistence/Codec.fs
+Sphinx/V2/Persistence/Integrator.fsi
+Sphinx/V2/Persistence/Integrator.fs
 Persistence/EventStore/Store.fsi
 Persistence/EventStore/Store.fs
 Strength/Persistence/Store.fsi
