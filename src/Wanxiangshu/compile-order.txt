@@ -1384,6 +1384,12 @@ Persistence/EventStore/CanonicalIntegrator.fsi
 Persistence/EventStore/CanonicalIntegrator.fs
 Sphinx/V2/Composition/Bind.fsi
 Sphinx/V2/Composition/Bind.fs
+Sphinx/V2/Plugins/Bayes/Exact.fsi
+Sphinx/V2/Plugins/Bayes/Exact.fs
+Sphinx/V2/Plugins/AStar/Refiner.fsi
+Sphinx/V2/Plugins/AStar/Refiner.fs
+Sphinx/V2/Plugins/Mcts/Refiner.fsi
+Sphinx/V2/Plugins/Mcts/Refiner.fs
 Sphinx/Inquiry.fsi
 Sphinx/Inquiry.fs
 Sphinx/IntegrationRules.fsi

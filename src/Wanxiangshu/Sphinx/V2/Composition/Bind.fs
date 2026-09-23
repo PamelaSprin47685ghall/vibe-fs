@@ -2,6 +2,7 @@ namespace Wanxiangshu.Sphinx.V2.Composition
 
 open System
 open Wanxiangshu.Persistence.EventStore
+open Wanxiangshu.Sphinx
 open Wanxiangshu.Sphinx.V2.Core
 open Wanxiangshu.Sphinx.V2.Persistence
 

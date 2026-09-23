@@ -7,8 +7,12 @@
     <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-v2-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.eventstore-integrator-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.persistence-eventstore-canonicalintegrator.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.eventstore-authoritative-vocabulary.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.persistence-eventstore-processeventlog.fsproj"/>
     <Compile Include="Sphinx/V2/Persistence/Codec.fsi"/><Compile Include="Sphinx/V2/Persistence/Codec.fs"/>
     <Compile Include="Sphinx/V2/Persistence/Integrator.fsi"/><Compile Include="Sphinx/V2/Persistence/Integrator.fs"/>
     <Compile Include="Sphinx/V2/Composition/Bind.fsi"/><Compile Include="Sphinx/V2/Composition/Bind.fs"/>
+    <Compile Include="Sphinx/V2/Plugins/Bayes/Exact.fsi"/><Compile Include="Sphinx/V2/Plugins/Bayes/Exact.fs"/>
+    <Compile Include="Sphinx/V2/Plugins/AStar/Refiner.fsi"/><Compile Include="Sphinx/V2/Plugins/AStar/Refiner.fs"/>
+    <Compile Include="Sphinx/V2/Plugins/Mcts/Refiner.fsi"/><Compile Include="Sphinx/V2/Plugins/Mcts/Refiner.fs"/>
   </ItemGroup></Project>
