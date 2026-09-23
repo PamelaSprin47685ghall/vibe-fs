@@ -8,22 +8,26 @@ type GraphRole =
     | RefinerState
 
 type GraphNode =
-    { Id: NodeId
-      Role: GraphRole
-      /// Core compares this by identity only; it never reads the semantic kind.
-      Kind: string
-      Payload: JsonEnvelope
-      Revision: Revision
-      ContentHash: string }
+    {
+        Id: NodeId
+        Role: GraphRole
+        /// Core compares this by identity only; it never reads the semantic kind.
+        Kind: string
+        Payload: JsonEnvelope
+        Revision: Revision
+        ContentHash: string
+    }
 
 type HyperEdge =
-    { Id: EdgeId
-      Tails: Set<NodeId>
-      Heads: Set<NodeId>
-      /// Core compares this by identity only; it never reads the relation.
-      Relation: string
-      Payload: JsonEnvelope option
-      Revision: Revision }
+    {
+        Id: EdgeId
+        Tails: Set<NodeId>
+        Heads: Set<NodeId>
+        /// Core compares this by identity only; it never reads the relation.
+        Relation: string
+        Payload: JsonEnvelope option
+        Revision: Revision
+    }
 
 type GraphPatch =
     { UpsertNodes: GraphNode list
@@ -40,5 +44,5 @@ module Graph =
     val applyPatch:
         Map<NodeId, GraphNode> ->
         Map<EdgeId, HyperEdge> ->
-            GraphPatch ->
-                Result<Map<NodeId, GraphNode> * Map<EdgeId, HyperEdge>, GraphError>
+        GraphPatch ->
+            Result<Map<NodeId, GraphNode> * Map<EdgeId, HyperEdge>, GraphError>

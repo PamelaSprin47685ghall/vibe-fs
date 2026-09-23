@@ -21,7 +21,7 @@ open Wanxiangshu.Sphinx.V2.Persistence
 module Bind =
 
     /// The v2 rule list, ready for `CanonicalIntegrator.createWithRules`.
-    let rules : IntegrationRule list = [ Integrator.rule ]
+    let rules: IntegrationRule list = [ Integrator.rule ]
 
     /// The `Current` key v2 publishes under.
     let currentKey = Integrator.currentKey
@@ -30,21 +30,16 @@ module Bind =
     ///
     /// `commonDir` must name a real durable directory. There is no memory fallback: an
     /// inquiry whose facts cannot survive a restart is not an inquiry (WHAT[sphinx-v2-033]).
-    let createDurableStore
-        (commonDir: string)
-        (writerId: string)
-        : Result<IEventStore, string> =
+    let createDurableStore (commonDir: string) (writerId: string) : Result<IEventStore, string> =
         if String.IsNullOrWhiteSpace commonDir then
             Error "SPHINX_COMMON_DIR must name a durable directory"
         elif String.IsNullOrWhiteSpace writerId then
             Error "a durable store requires a non-blank writer identity"
         else
             let integrator =
-                CanonicalIntegrator.createWithRules
-                    (CanonicalIntegrator.baseRules @ rules)
-                    (fun eventType ->
-                        AuthoritativeEventTypes.isKnown eventType
-                        || eventType = Codec.transitionEventType)
+                CanonicalIntegrator.createWithRules (CanonicalIntegrator.baseRules @ rules) (fun eventType ->
+                    AuthoritativeEventTypes.isKnown eventType
+                    || eventType = Codec.transitionEventType)
 
             Ok(EventStore.createLocal commonDir writerId integrator)
 

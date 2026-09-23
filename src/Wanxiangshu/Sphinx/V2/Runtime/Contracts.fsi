@@ -5,17 +5,19 @@ open Wanxiangshu.Sphinx.V2.Core
 type PluginError = { Code: string; Message: string }
 
 type PluginContext =
-    { InquiryId: InquiryId
-      GoalRevision: Revision
-      ScopeId: string
-      ConfigHash: string
-      /// Deterministic random state handed in; the plugin returns the advanced state.
-      RngState: string
-      /// Read-only view over the semantic graph the plugin owns.
-      Graph: JsonEnvelope option
-      /// Read-only budget facts.
-      Budget: JsonEnvelope option
-      LockedPluginRefs: string list }
+    {
+        InquiryId: InquiryId
+        GoalRevision: Revision
+        ScopeId: string
+        ConfigHash: string
+        /// Deterministic random state handed in; the plugin returns the advanced state.
+        RngState: string
+        /// Read-only view over the semantic graph the plugin owns.
+        Graph: JsonEnvelope option
+        /// Read-only budget facts.
+        Budget: JsonEnvelope option
+        LockedPluginRefs: string list
+    }
 
 type PluginDelta =
     { GraphPatches: GraphPatch list
@@ -50,14 +52,16 @@ type ExecutablePlugin =
       Refine: PluginContext -> RefinementInput -> PluginResult<PluginDelta> }
 
 and PluginManifest =
-    { Id: string
-      Release: string
-      /// Hash of the executable artifact, not a version label.
-      ImplementationHash: string
-      AbiHash: string
-      Capabilities: Set<string>
-      Dependencies: Set<string>
-      Schemas: Map<string, SchemaRef> }
+    {
+        Id: string
+        Release: string
+        /// Hash of the executable artifact, not a version label.
+        ImplementationHash: string
+        AbiHash: string
+        Capabilities: Set<string>
+        Dependencies: Set<string>
+        Schemas: Map<string, SchemaRef>
+    }
 
 module PluginContract =
     val validateManifest: PluginManifest -> PluginResult<unit>

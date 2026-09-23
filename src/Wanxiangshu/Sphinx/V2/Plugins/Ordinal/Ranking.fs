@@ -47,9 +47,7 @@ module Ranking =
         (worst: string)
         : float option =
         match Map.tryFind best theta, Map.tryFind worst theta, pairTotal theta presented with
-        | Some tb, Some tw, Some total ->
-            positiveLog total
-            |> Option.map (fun denominator -> (tb - tw) - denominator)
+        | Some tb, Some tw, Some total -> positiveLog total |> Option.map (fun denominator -> (tb - tw) - denominator)
         | _ -> None
 
     /// Plackett–Luce for a strict complete ranking. Every item in the ranking must be
@@ -66,7 +64,9 @@ module Ranking =
             | false -> None
 
         let rec walk (remaining: string list) (available: Set<string>) (acc: float) : float option =
-            match remaining, Map.tryFind (List.tryHead remaining |> Option.defaultValue "") theta, logNormalizer available with
+            match
+                remaining, Map.tryFind (List.tryHead remaining |> Option.defaultValue "") theta, logNormalizer available
+            with
             | [], _, _ -> Some acc
             | item :: rest, Some ti, Some denominator -> walk rest (Set.remove item available) (acc + ti - denominator)
             | _ -> None

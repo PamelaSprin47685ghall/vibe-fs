@@ -12,7 +12,6 @@ open System
 ///
 /// WHAT[sphinx-v2-021]: a rollout that needs a language model is a WorkItem. It never
 /// hides inside a `for` loop making network calls, and its real cost is charged.
-
 /// The transition oracle. A synchronous in-memory simulator is a legal implementation;
 /// a rollout that calls a model returns WorkProposals instead of results.
 type TransitionResult =
@@ -37,12 +36,26 @@ type ITransitionModel =
     abstract TerminalReward: state: string -> float option
 
 type NodeStats =
-    { Visits: int
-      ValueSum: float
-      ValueSumSquares: float
-      /// Model and horizon this node's statistics belong to.
-      ModelRef: string
-      Horizon: int }
+    {
+        Visits: int
+        ValueSum: float
+        ValueSumSquares: float
+        /// Model and horizon this node's statistics belong to.
+        ModelRef: string
+        Horizon: int
+    }
+
+/// The scaling factor for the exploration term. A declared reward range of zero width
+/// means the model has no usable spread, so the term falls back to unit scale rather
+/// than dividing by zero.
+let private rewardScale (rewardLow: float) (rewardHigh: float) : float =
+    let span = rewardHigh - rewardLow
+
+    let positive = span > 0.0
+
+    match positive with
+    | true -> span
+    | false -> 1.0
 
 [<RequireQualifiedAccess>]
 type NodeFault =
@@ -50,13 +63,6 @@ type NodeFault =
     | UnknownAction of state: string * action: string
     | InvalidRngState
     | MissingValueBridge
-
-/// The recommendation rule, stated explicitly so a reader can see what was maximized.
-[<RequireQualifiedAccess>]
-type Recommendation =
-    | BestMean of action: string * mean: float
-    | MostVisited of action: string * visits: int
-    | InsufficientSamples
 
 module Mcts =
 
@@ -88,21 +94,19 @@ module Mcts =
     /// The UCT value, scaled by the declared reward range. An unvisited node returns
     /// positive infinity so it is handled before any mean-vs-mean comparison.
     let uct (parentVisits: int) (exploration: float) (rewardLow: float) (rewardHigh: float) (node: NodeStats) : float =
-        let span = rewardHigh - rewardLow
-
         match node.Visits with
         | 0 -> Double.PositiveInfinity
         | visits ->
             let average = node.ValueSum / float visits
+            let explore = exploration * sqrt (log (float parentVisits) / float visits)
+            average + explore * rewardScale rewardLow rewardHigh
 
-            let positive = span > 0.0
-            let scale () = match positive with | true -> span | false -> 1.0
-
-            let explore =
-                exploration
-                * sqrt (log (float parentVisits) / float visits)
-
-            average + explore * (scale ())
+    /// The recommendation rule, stated explicitly so a reader can see what was maximized.
+    [<RequireQualifiedAccess>]
+    type Recommendation =
+        | BestMean of action: string * mean: float
+        | MostVisited of action: string * visits: int
+        | InsufficientSamples
 
     let recommend (stats: Map<string, NodeStats>) : Recommendation =
         let visited = stats |> Map.toList |> List.filter (fun (_, node) -> node.Visits > 0)
@@ -110,7 +114,9 @@ module Mcts =
         match visited |> List.isEmpty with
         | true -> Recommendation.InsufficientSamples
         | false ->
-            let best = visited |> List.maxBy (fun (_, node) -> node.ValueSum / float node.Visits)
+            let best =
+                visited |> List.maxBy (fun (_, node) -> node.ValueSum / float node.Visits)
+
             Recommendation.BestMean(fst best, snd best |> mean |> Option.defaultValue 0.0)
 
     /// Whether every child has been visited at least once.

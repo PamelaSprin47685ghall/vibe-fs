@@ -24,8 +24,7 @@ type BudgetReservedBody =
     { Reservation: Reservation
       RenderReserve: Map<string, float> }
 
-type UsageSettledBody =
-    { Usage: SettledUsage }
+type UsageSettledBody = { Usage: SettledUsage }
 
 type DispatchRequestedBody =
     { Work: WorkSpec
@@ -50,15 +49,17 @@ type WorkAttemptTransitionedBody =
       PhysicalRef: string option }
 
 type ResultAcceptedBody =
-    { WorkId: WorkId
-      Attempt: Attempt
-      Fence: Fence
-      ObservationId: ObservationId
-      /// Canonical response bytes exactly as the worker returned them (CB-03: raw
-      /// answers stay replayable; re-fitting never rewrites them).
-      CanonicalResult: string
-      ResultSchema: SchemaRef
-      ClusterId: string }
+    {
+        WorkId: WorkId
+        Attempt: Attempt
+        Fence: Fence
+        ObservationId: ObservationId
+        /// Canonical response bytes exactly as the worker returned them (CB-03: raw
+        /// answers stay replayable; re-fitting never rewrites them).
+        CanonicalResult: string
+        ResultSchema: SchemaRef
+        ClusterId: string
+    }
 
 type InterpretationPendingBody =
     { ObservationId: ObservationId
@@ -78,18 +79,15 @@ type InterpretationFailedBody =
       Reason: string }
 
 type GraphPatchedBody =
-    { Patch: GraphPatch
-      PluginRef: string }
+    { Patch: GraphPatch; PluginRef: string }
 
-type CertificateSlotsPatchedBody =
-    { Patches: CertificateSlotPatch list }
+type CertificateSlotsPatchedBody = { Patches: CertificateSlotPatch list }
 
 type CertificateInvalidatedBody =
     { Invalidation: JsonEnvelope
       Reason: string }
 
-type DecisionRecordedBody =
-    { Decision: JsonEnvelope }
+type DecisionRecordedBody = { Decision: JsonEnvelope }
 
 type AnswerPreparedBody =
     { RenderWorkId: WorkId
@@ -107,9 +105,7 @@ type HostTerminalRecordedBody =
       Terminal: string
       Receipt: JsonEnvelope }
 
-type InquiryStatusChangedBody =
-    { Status: string
-      Reason: string }
+type InquiryStatusChangedBody = { Status: string; Reason: string }
 
 [<RequireQualifiedAccess>]
 type InquiryEventBody =
@@ -147,16 +143,18 @@ type InquiryEventBody =
 /// One canonical envelope carries one whole transition batch (WHAT[sphinx-v2-019]).
 /// The batch is the unit of durability: either every event in it is applied or none.
 type TransitionBatch =
-    { SchemaVersion: string
-      InquiryId: InquiryId
-      PreviousRevision: Revision
-      PreviousHead: EventId option
-      Revision: Revision
-      CommandId: string
-      CommandFingerprint: string
-      Events: InquiryEventBody list
-      /// Optional self-check value; never a trust source.
-      PostStateFingerprint: string option }
+    {
+        SchemaVersion: string
+        InquiryId: InquiryId
+        PreviousRevision: Revision
+        PreviousHead: EventId option
+        Revision: Revision
+        CommandId: string
+        CommandFingerprint: string
+        Events: InquiryEventBody list
+        /// Optional self-check value; never a trust source.
+        PostStateFingerprint: string option
+    }
 
 type InquiryEvent =
     { Id: EventId

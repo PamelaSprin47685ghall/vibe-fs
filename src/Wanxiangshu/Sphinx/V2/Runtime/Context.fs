@@ -11,25 +11,30 @@ open Wanxiangshu.Sphinx.V2.Core
 /// were shown different byte counts are not comparable measurements, and the manifest is
 /// where that becomes visible.
 
-type IncludedArtifact = { Ref: ArtifactRef; Revision: Revision; ContentHash: string }
+type IncludedArtifact =
+    { Ref: ArtifactRef
+      Revision: Revision
+      ContentHash: string }
 
 type SnapshotExclusion = { ItemId: string; Handling: string }
 
 type ContextSnapshot =
-    { SnapshotId: SnapshotId
-      /// Canonical hash of the whole snapshot record.
-      ContentHash: string
-      GoalId: GoalId
-      GoalRevision: Revision
-      Included: IncludedArtifact list
-      Excluded: SnapshotExclusion list
-      /// Version of the selector/summarizer that produced this snapshot.
-      ContextVersion: string
-      /// measurement | intervention | generation | rendering.
-      Purpose: string
-      VisibilityPolicy: string
-      /// Hash of the bytes actually shown to a model, not of the source material.
-      ModelVisibleBytesHash: string }
+    {
+        SnapshotId: SnapshotId
+        /// Canonical hash of the whole snapshot record.
+        ContentHash: string
+        GoalId: GoalId
+        GoalRevision: Revision
+        Included: IncludedArtifact list
+        Excluded: SnapshotExclusion list
+        /// Version of the selector/summarizer that produced this snapshot.
+        ContextVersion: string
+        /// measurement | intervention | generation | rendering.
+        Purpose: string
+        VisibilityPolicy: string
+        /// Hash of the bytes actually shown to a model, not of the source material.
+        ModelVisibleBytesHash: string
+    }
 
 type SnapshotError = { Code: string; Message: string }
 
@@ -47,7 +52,10 @@ module Context =
             error "invalid-snapshot" "snapshot must record the hash of model-visible bytes"
         elif snapshot.Included |> List.isEmpty then
             error "invalid-snapshot" "snapshot must include at least one artifact revision"
-        elif snapshot.Excluded |> List.exists (fun exclusion -> System.String.IsNullOrWhiteSpace exclusion.Handling) then
+        elif
+            snapshot.Excluded
+            |> List.exists (fun exclusion -> System.String.IsNullOrWhiteSpace exclusion.Handling)
+        then
             error "invalid-snapshot" "every excluded item needs a handling rule"
         else
             Ok snapshot

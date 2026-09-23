@@ -12,7 +12,6 @@ open Wanxiangshu.Sphinx.V2.Core
 /// The old `Agenda.schedule` both ranked and packed, and ranked by string id. Splitting
 /// them is what lets a swap of two estimates change the dispatch while the id order
 /// stays irrelevant.
-
 /// How confident the ranking is: a fitted model position, an ordinal tier with no
 /// numeric gap, a single-response provisional order, or nothing at all. These are four
 /// different statements and are never averaged into one number (WHAT[sphinx-v2-021]).
@@ -24,13 +23,15 @@ type EstimateKind =
     | Unestimated
 
 type PlanEstimate =
-    { PlanId: PlanId
-      ScopeId: string
-      Kind: EstimateKind
-      /// Position in the declared value space. Meaningless without `Kind`.
-      Location: float option
-      /// None means the plan was never compared; never a zero.
-      Rank: int option }
+    {
+        PlanId: PlanId
+        ScopeId: string
+        Kind: EstimateKind
+        /// Position in the declared value space. Meaningless without `Kind`.
+        Location: float option
+        /// None means the plan was never compared; never a zero.
+        Rank: int option
+    }
 
 type UnestimatedPlan = { PlanId: PlanId; Reason: string }
 
@@ -103,7 +104,9 @@ module Decision =
         else
             selectBest candidates
             |> Result.map (fun selected ->
-                let others = candidates |> List.filter (fun estimate -> estimate.PlanId <> selected.PlanId)
+                let others =
+                    candidates |> List.filter (fun estimate -> estimate.PlanId <> selected.PlanId)
+
                 let tie = tieBreakRule selected selected
 
                 { Selected = selected

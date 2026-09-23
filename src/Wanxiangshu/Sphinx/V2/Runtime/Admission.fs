@@ -113,10 +113,7 @@ module Admission =
         | true -> runnableOutcome submission item
         | false -> error "attempt-mismatch" "result attempt or fence does not match the current attempt"
 
-    let private resultReason
-        (submission: ResultSubmission)
-        (item: WorkItem option)
-        : Result<WorkItem, CommandError> =
+    let private resultReason (submission: ResultSubmission) (item: WorkItem option) : Result<WorkItem, CommandError> =
         let unknownWork () =
             error "unknown-work" (sprintf "work %s is not planned" (WorkId.value submission.WorkId))
 
@@ -129,10 +126,7 @@ module Admission =
 
     /// Goal amendment is the one command that may move the goal, and it must name its
     /// authorizer — a plugin cannot authorize itself (WHAT[sphinx-v2-001]).
-    let admitGoalAmendment
-        (state: InquiryState)
-        (authorizedBy: string)
-        : Result<GoalSpec, CommandError> =
+    let admitGoalAmendment (state: InquiryState) (authorizedBy: string) : Result<GoalSpec, CommandError> =
         if System.String.IsNullOrWhiteSpace authorizedBy then
             error "invalid-goal" "goal amendment requires a non-blank authorizer"
         else

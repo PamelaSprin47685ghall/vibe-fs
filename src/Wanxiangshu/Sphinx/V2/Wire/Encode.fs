@@ -24,10 +24,11 @@ module Encode =
 
     /// Plain, sorted key/value records only.
     let record (entries: (string * obj) list) : obj =
-        box(entries |> List.sortBy fst |> Map.ofList)
+        box (entries |> List.sortBy fst |> Map.ofList)
 
     /// A list is emitted as a plain array.
-    let list (items: 'a list) (encode: 'a -> obj) : obj = items |> List.map encode |> List.toArray |> box
+    let list (items: 'a list) (encode: 'a -> obj) : obj =
+        items |> List.map encode |> List.toArray |> box
 
     /// The empty view. `None` in the domain is `null` on the wire.
     let option (value: 'a option) (encode: 'a -> obj) : obj =

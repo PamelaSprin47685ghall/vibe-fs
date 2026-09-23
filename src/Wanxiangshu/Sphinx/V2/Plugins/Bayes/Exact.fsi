@@ -11,11 +11,13 @@ type Factor =
       Qualified: bool }
 
 type Posterior =
-    { Probabilities: Map<string, float>
-      LogPartition: float
-      UsedObservations: string list
-      /// Observations dropped by a declared conservative rule, with the reason.
-      Dropped: (string * string) list }
+    {
+        Probabilities: Map<string, float>
+        LogPartition: float
+        UsedObservations: string list
+        /// Observations dropped by a declared conservative rule, with the reason.
+        Dropped: (string * string) list
+    }
 
 [<RequireQualifiedAccess>]
 type ExactFault =

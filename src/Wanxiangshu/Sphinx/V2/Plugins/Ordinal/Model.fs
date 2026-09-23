@@ -7,7 +7,6 @@ namespace Wanxiangshu.Sphinx.V2.Plugins
 /// evaluation, a `1/sqrt(N)` stand-in for standard error, and no tie handling at all.
 /// Here the model, the gauge and the tie mechanism are explicit, and the covariance is
 /// a real covariance.
-
 /// How a comparison record came to be. The position term `o` is only estimable when the
 /// design genuinely produced both positions.
 type BallotKind =
@@ -21,30 +20,34 @@ type BallotKind =
     | Conditional of conditionRef: string
 
 type Ballot =
-    { BallotId: string
-      ScopeId: string
-      ClusterId: string
-      Kind: BallotKind
-      /// +1 when the canonical left candidate was shown first, -1 otherwise.
-      Position: int
-      /// True when the design can actually identify the position term.
-      PositionIdentifiable: bool }
+    {
+        BallotId: string
+        ScopeId: string
+        ClusterId: string
+        Kind: BallotKind
+        /// +1 when the canonical left candidate was shown first, -1 otherwise.
+        Position: int
+        /// True when the design can actually identify the position term.
+        PositionIdentifiable: bool
+    }
 
 type ObservationModel =
-    { ModelRef: string
-      /// "pairwise-btl" or "pairwise-tie-aware".
-      Family: string
-      /// "zero-sum" or an orthogonal basis description.
-      Gauge: string
-      ThetaL2: float
-      /// Present only when the family uses one.
-      TieKappaPriorMean: float
-      TieKappaPriorVariance: float
-      OrderL2: float }
+    {
+        ModelRef: string
+        /// "pairwise-btl" or "pairwise-tie-aware".
+        Family: string
+        /// "zero-sum" or an orthogonal basis description.
+        Gauge: string
+        ThetaL2: float
+        /// Present only when the family uses one.
+        TieKappaPriorMean: float
+        TieKappaPriorVariance: float
+        OrderL2: float
+    }
 
 module OrdinalModel =
 
-    let defaultModel : ObservationModel =
+    let defaultModel: ObservationModel =
         { ModelRef = "ordinal.pairwise-btl@2"
           Family = "pairwise-btl"
           Gauge = "zero-sum"
@@ -53,7 +56,7 @@ module OrdinalModel =
           TieKappaPriorVariance = 4.0
           OrderL2 = 1.0 }
 
-    let tieAwareModel : ObservationModel =
+    let tieAwareModel: ObservationModel =
         { defaultModel with
             ModelRef = "ordinal.pairwise-tie-aware@2"
             Family = "pairwise-tie-aware"

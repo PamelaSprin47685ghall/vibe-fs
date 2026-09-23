@@ -58,7 +58,9 @@ module Decode =
     /// failing the response.
     let private textOf (name: string) (raw: obj) : string =
         let value = emitJsExpr (raw, name) "$0[$1]"
-        let present = emitJsExpr value "$0 !== undefined && $0 !== null && typeof $0 === 'string'"
+
+        let present =
+            emitJsExpr value "$0 !== undefined && $0 !== null && typeof $0 === 'string'"
 
         match present with
         | true -> unbox<string> value

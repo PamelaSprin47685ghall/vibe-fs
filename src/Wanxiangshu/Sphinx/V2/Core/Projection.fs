@@ -300,7 +300,11 @@ module Projection =
                   Status = record.Status
                   InterpretationId = record.InterpretationId
                   Plugin = record.PluginRef })
-          Rounds = state.Rounds |> Map.toList |> List.sortBy fst |> List.map (snd >> roundProjection)
+          Rounds =
+            state.Rounds
+            |> Map.toList
+            |> List.sortBy fst
+            |> List.map (snd >> roundProjection)
           Decisions = state.Decisions |> Map.toList |> List.sortBy fst
           Budget = budgetProjection state
           Answer =

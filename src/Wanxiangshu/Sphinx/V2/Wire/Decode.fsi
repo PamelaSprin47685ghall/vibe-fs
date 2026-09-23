@@ -4,7 +4,10 @@ open System
 open Fable.Core.JsInterop
 open Wanxiangshu.Sphinx.V2.Core
 
-type WireError = { Code: string; Path: string; Message: string }
+type WireError =
+    { Code: string
+      Path: string
+      Message: string }
 
 module Decode =
     val stringField: obj -> string -> Result<string, WireError>

@@ -13,14 +13,16 @@ open Wanxiangshu.Sphinx.V2.Core
 /// a tie or a half point. The reducer sees it as a result with no direction.
 
 type GraphDelta =
-    { Nodes: GraphNode list
-      Edges: HyperEdge list
-      /// Certificate slots the delta proposes.
-      CertificatePatches: CertificateSlotPatch list
-      /// Source observation this delta was derived from.
-      SourceObservation: string
-      /// Nothing new was learned; the inquiry revision must not move.
-      Empty: bool }
+    {
+        Nodes: GraphNode list
+        Edges: HyperEdge list
+        /// Certificate slots the delta proposes.
+        CertificatePatches: CertificateSlotPatch list
+        /// Source observation this delta was derived from.
+        SourceObservation: string
+        /// Nothing new was learned; the inquiry revision must not move.
+        Empty: bool
+    }
 
 [<RequireQualifiedAccess>]
 type ObserveFault =

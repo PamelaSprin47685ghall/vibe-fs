@@ -4,7 +4,9 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Sphinx.V2.Core
 
-type AppendReceipt = { Cuts: string list; AcceptedRevision: Revision }
+type AppendReceipt =
+    { Cuts: string list
+      AcceptedRevision: Revision }
 
 type AppendFault =
     | Rejected of reason: string
@@ -31,15 +33,21 @@ type PhysicalStatus =
 
 type IHostPort =
     abstract Capabilities: unit -> string list
+
     abstract Dispatch:
         inquiryId: InquiryId * work: WorkSpec * publicEnvelope: JsonEnvelope * privateTicket: JsonEnvelope ->
             Task<Result<DispatchReceipt, string>>
-    abstract ReadStatus: inquiryId: InquiryId * workId: WorkId * attempt: Attempt * physicalRef: string -> Task<PhysicalStatus>
+
+    abstract ReadStatus:
+        inquiryId: InquiryId * workId: WorkId * attempt: Attempt * physicalRef: string -> Task<PhysicalStatus>
+
     abstract ReadResult:
         inquiryId: InquiryId * workId: WorkId * attempt: Attempt * physicalRef: string ->
             Task<Result<string option, string>>
-    abstract RequestCancel: inquiryId: InquiryId * workId: WorkId * attempt: Attempt * physicalRef: string ->
-        Task<Result<Unit, string>>
+
+    abstract RequestCancel:
+        inquiryId: InquiryId * workId: WorkId * attempt: Attempt * physicalRef: string -> Task<Result<Unit, string>>
+
     /// Re-open the question "does this dispatch exist?" after a crash window.
     abstract Reconcile: inquiryId: InquiryId * dispatchIntentId: string -> Task<Result<string option, string>>
 
@@ -51,8 +59,10 @@ type ProviderUsage =
       UsageUnresolved: bool }
 
 type IProviderPort =
-    abstract Complete: inquiryId: InquiryId * prompt: JsonEnvelope * schemaRef: SchemaRef ->
-        Task<Result<string * ProviderUsage, string>>
+    abstract Complete:
+        inquiryId: InquiryId * prompt: JsonEnvelope * schemaRef: SchemaRef ->
+            Task<Result<string * ProviderUsage, string>>
+
     abstract Cancel: inquiryId: InquiryId * requestRef: string -> Task<Result<Unit, string>>
 
 type IDigestPort =

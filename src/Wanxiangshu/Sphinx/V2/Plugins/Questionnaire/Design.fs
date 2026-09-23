@@ -8,30 +8,34 @@ namespace Wanxiangshu.Sphinx.V2.Plugins
 /// could read the mapping would no longer be blind.
 
 type Assignment =
-    { Seed: string
-      /// Name and version of the shuffle actually used.
-      ShuffleAlgorithm: string
-      /// Opaque label -> real identity. Host-private; never sent to a worker.
-      LabelMap: Map<string, string>
-      /// The presented order, as shown.
-      Order: string list }
+    {
+        Seed: string
+        /// Name and version of the shuffle actually used.
+        ShuffleAlgorithm: string
+        /// Opaque label -> real identity. Host-private; never sent to a worker.
+        LabelMap: Map<string, string>
+        /// The presented order, as shown.
+        Order: string list
+    }
 
 type RoundDesign =
-    { ScopeId: string
-      SnapshotId: string
-      Purpose: string
-      QuestionId: string
-      TemplateRef: string
-      TemplateHash: string
-      PresentedSet: string list
-      OmittedSet: string list
-      Assignment: Assignment
-      /// The independence unit: responses in the same cluster are not independent votes.
-      ClusterId: string
-      ExpectedResponses: int
-      MaxAttempts: int
-      /// How a missing or excluded response is recorded.
-      MissingnessPolicy: string }
+    {
+        ScopeId: string
+        SnapshotId: string
+        Purpose: string
+        QuestionId: string
+        TemplateRef: string
+        TemplateHash: string
+        PresentedSet: string list
+        OmittedSet: string list
+        Assignment: Assignment
+        /// The independence unit: responses in the same cluster are not independent votes.
+        ClusterId: string
+        ExpectedResponses: int
+        MaxAttempts: int
+        /// How a missing or excluded response is recorded.
+        MissingnessPolicy: string
+    }
 
 type DesignError = { Code: string; Message: string }
 
@@ -60,7 +64,12 @@ module Design =
                 let index = int (digest (seed + string salt) % uint32 (List.length remaining))
 
                 let chosen = List.item index remaining
-                let rest = List.mapi (fun i item -> i, item) remaining |> List.filter (fun (i, _) -> i <> index) |> List.map snd
+
+                let rest =
+                    List.mapi (fun i item -> i, item) remaining
+                    |> List.filter (fun (i, _) -> i <> index)
+                    |> List.map snd
+
                 chosen :: move rest (salt + 1)
 
         move items 0
@@ -70,9 +79,7 @@ module Design =
     let buildAssignment (seed: string) (presented: string list) : Assignment =
         let ordered = shuffle seed presented
 
-        let labels =
-            ordered
-            |> List.mapi (fun index _ -> sprintf "item_%d" (index + 1))
+        let labels = ordered |> List.mapi (fun index _ -> sprintf "item_%d" (index + 1))
 
         { Seed = seed
           ShuffleAlgorithm = "fisher-yates/1"

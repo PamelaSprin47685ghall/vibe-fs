@@ -17,9 +17,9 @@ module private IdValidation =
         if isUsableId value then
             Ok value
         elif String.IsNullOrEmpty value then
-            Error (sprintf "%s must not be blank" prefix)
+            Error(sprintf "%s must not be blank" prefix)
         else
-            Error (sprintf "%s must not contain whitespace or control characters" prefix)
+            Error(sprintf "%s must not contain whitespace or control characters" prefix)
 
 [<Struct>]
 type InquiryId = private InquiryId of string
@@ -82,7 +82,8 @@ module private IdConstruction =
     let raiseId (message: string) : 'id = raise (ArgumentException message)
 
 module InquiryId =
-    let tryCreate value = IdConstruction.make "InquiryId" InquiryId value
+    let tryCreate value =
+        IdConstruction.make "InquiryId" InquiryId value
 
     let create value =
         match tryCreate value with
@@ -92,7 +93,8 @@ module InquiryId =
     let value (InquiryId inner) = inner
 
 module GoalId =
-    let tryCreate value = IdConstruction.make "GoalId" GoalId value
+    let tryCreate value =
+        IdConstruction.make "GoalId" GoalId value
 
     let create value =
         match tryCreate value with
@@ -102,7 +104,8 @@ module GoalId =
     let value (GoalId inner) = inner
 
 module SnapshotId =
-    let tryCreate value = IdConstruction.make "SnapshotId" SnapshotId value
+    let tryCreate value =
+        IdConstruction.make "SnapshotId" SnapshotId value
 
     let create value =
         match tryCreate value with
@@ -112,7 +115,8 @@ module SnapshotId =
     let value (SnapshotId inner) = inner
 
 module PlanId =
-    let tryCreate value = IdConstruction.make "PlanId" PlanId value
+    let tryCreate value =
+        IdConstruction.make "PlanId" PlanId value
 
     let create value =
         match tryCreate value with
@@ -122,7 +126,8 @@ module PlanId =
     let value (PlanId inner) = inner
 
 module WorkId =
-    let tryCreate value = IdConstruction.make "WorkId" WorkId value
+    let tryCreate value =
+        IdConstruction.make "WorkId" WorkId value
 
     let create value =
         match tryCreate value with
@@ -132,7 +137,8 @@ module WorkId =
     let value (WorkId inner) = inner
 
 module AttemptId =
-    let tryCreate value = IdConstruction.make "AttemptId" AttemptId value
+    let tryCreate value =
+        IdConstruction.make "AttemptId" AttemptId value
 
     let create value =
         match tryCreate value with
@@ -142,7 +148,8 @@ module AttemptId =
     let value (AttemptId inner) = inner
 
 module RoundId =
-    let tryCreate value = IdConstruction.make "RoundId" RoundId value
+    let tryCreate value =
+        IdConstruction.make "RoundId" RoundId value
 
     let create value =
         match tryCreate value with
@@ -152,7 +159,8 @@ module RoundId =
     let value (RoundId inner) = inner
 
 module ObservationId =
-    let tryCreate value = IdConstruction.make "ObservationId" ObservationId value
+    let tryCreate value =
+        IdConstruction.make "ObservationId" ObservationId value
 
     let create value =
         match tryCreate value with
@@ -162,7 +170,8 @@ module ObservationId =
     let value (ObservationId inner) = inner
 
 module DecisionId =
-    let tryCreate value = IdConstruction.make "DecisionId" DecisionId value
+    let tryCreate value =
+        IdConstruction.make "DecisionId" DecisionId value
 
     let create value =
         match tryCreate value with
@@ -172,7 +181,8 @@ module DecisionId =
     let value (DecisionId inner) = inner
 
 module CertificateId =
-    let tryCreate value = IdConstruction.make "CertificateId" CertificateId value
+    let tryCreate value =
+        IdConstruction.make "CertificateId" CertificateId value
 
     let create value =
         match tryCreate value with
@@ -182,7 +192,8 @@ module CertificateId =
     let value (CertificateId inner) = inner
 
 module EventId =
-    let tryCreate value = IdConstruction.make "EventId" EventId value
+    let tryCreate value =
+        IdConstruction.make "EventId" EventId value
 
     let create value =
         match tryCreate value with
@@ -192,7 +203,8 @@ module EventId =
     let value (EventId inner) = inner
 
 module NodeId =
-    let tryCreate value = IdConstruction.make "NodeId" NodeId value
+    let tryCreate value =
+        IdConstruction.make "NodeId" NodeId value
 
     let create value =
         match tryCreate value with
@@ -202,7 +214,8 @@ module NodeId =
     let value (NodeId inner) = inner
 
 module EdgeId =
-    let tryCreate value = IdConstruction.make "EdgeId" EdgeId value
+    let tryCreate value =
+        IdConstruction.make "EdgeId" EdgeId value
 
     let create value =
         match tryCreate value with
@@ -212,7 +225,8 @@ module EdgeId =
     let value (EdgeId inner) = inner
 
 module ArtifactRef =
-    let tryCreate value = IdConstruction.make "ArtifactRef" ArtifactRef value
+    let tryCreate value =
+        IdConstruction.make "ArtifactRef" ArtifactRef value
 
     let create value =
         match tryCreate value with

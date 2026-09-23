@@ -19,7 +19,7 @@ module Pairwise =
     /// log(sigmoid(x)) = -softplus(-x), computed so that large |x| stays finite.
     let logSigmoid (x: float) : float =
         if x >= 0.0 then
-            -System.Math.Log(1.0 + System.Math.Exp(-x))
+            - System.Math.Log(1.0 + System.Math.Exp(-x))
         else
             x - System.Math.Log(1.0 + System.Math.Exp(x))
 
@@ -36,12 +36,7 @@ module Pairwise =
     ///
     /// eta = theta_winner - theta_loser + beta * positionTerm, and
     /// log p = logSigmoid(eta).
-    let directionalLogLikelihood
-        (thetaWinner: float)
-        (thetaLoser: float)
-        (beta: float)
-        (position: float)
-        : float =
+    let directionalLogLikelihood (thetaWinner: float) (thetaLoser: float) (beta: float) (position: float) : float =
         let eta = thetaWinner - thetaLoser + beta * position
         logSigmoid eta
 

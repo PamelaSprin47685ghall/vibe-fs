@@ -11,11 +11,12 @@ open Wanxiangshu.Sphinx.V2.Core
 /// Runtime reaches them only through these shapes, which is what lets a test drive the
 /// whole inquiry with a recording double while the production composition binds a real
 /// adapter.
-
 /// A receipt the store hands back after accepting an append. `Cuts` being non-empty
 /// means the canonical integration refused the write, which is a real rejection rather
 /// than a transport hiccup.
-type AppendReceipt = { Cuts: string list; AcceptedRevision: Revision }
+type AppendReceipt =
+    { Cuts: string list
+      AcceptedRevision: Revision }
 
 type AppendFault =
     | Rejected of reason: string
@@ -49,15 +50,21 @@ type PhysicalStatus =
 /// The Host port: dispatch, read status, read result, request cancel, reconcile.
 type IHostPort =
     abstract Capabilities: unit -> string list
+
     abstract Dispatch:
         inquiryId: InquiryId * work: WorkSpec * publicEnvelope: JsonEnvelope * privateTicket: JsonEnvelope ->
             Task<Result<DispatchReceipt, string>>
-    abstract ReadStatus: inquiryId: InquiryId * workId: WorkId * attempt: Attempt * physicalRef: string -> Task<PhysicalStatus>
+
+    abstract ReadStatus:
+        inquiryId: InquiryId * workId: WorkId * attempt: Attempt * physicalRef: string -> Task<PhysicalStatus>
+
     abstract ReadResult:
         inquiryId: InquiryId * workId: WorkId * attempt: Attempt * physicalRef: string ->
             Task<Result<string option, string>>
-    abstract RequestCancel: inquiryId: InquiryId * workId: WorkId * attempt: Attempt * physicalRef: string ->
-        Task<Result<Unit, string>>
+
+    abstract RequestCancel:
+        inquiryId: InquiryId * workId: WorkId * attempt: Attempt * physicalRef: string -> Task<Result<Unit, string>>
+
     /// Re-open the question "does this dispatch exist?" after a crash window.
     abstract Reconcile: inquiryId: InquiryId * dispatchIntentId: string -> Task<Result<string option, string>>
 
@@ -71,8 +78,10 @@ type ProviderUsage =
 /// The provider port: it only calls, reports usage, and cancels. It does not own the
 /// inquiry and does not run a second opinion round.
 type IProviderPort =
-    abstract Complete: inquiryId: InquiryId * prompt: JsonEnvelope * schemaRef: SchemaRef ->
-        Task<Result<string * ProviderUsage, string>>
+    abstract Complete:
+        inquiryId: InquiryId * prompt: JsonEnvelope * schemaRef: SchemaRef ->
+            Task<Result<string * ProviderUsage, string>>
+
     abstract Cancel: inquiryId: InquiryId * requestRef: string -> Task<Result<Unit, string>>
 
 /// Digest is behind a port so Core stays free of a Host dependency while the hash

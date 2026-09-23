@@ -34,7 +34,8 @@ module Agenda =
     let private unmetDependency (state: InquiryState) (dependency: WorkId) : AgendaExclusion option =
         let existing = state.Work |> Map.tryFind dependency
 
-        let missing () = Some(AgendaExclusion.MissingDependency dependency)
+        let missing () =
+            Some(AgendaExclusion.MissingDependency dependency)
 
         let unmetItem (item: WorkItem) : AgendaExclusion option =
             match Work.isTerminal item.State with
@@ -56,7 +57,12 @@ module Agenda =
 
         match Set.isEmpty clash with
         | true -> None
-        | false -> clash |> Set.toList |> List.sort |> List.tryHead |> Option.map AgendaExclusion.ConflictKeyClash
+        | false ->
+            clash
+            |> Set.toList
+            |> List.sort
+            |> List.tryHead
+            |> Option.map AgendaExclusion.ConflictKeyClash
 
     let private affordable
         (state: InquiryState)
@@ -92,7 +98,13 @@ module Agenda =
 
     /// Carries out the verdict: grant takes the spec into the batch, decline records why.
     let private applyVerdict
-        (take: Map<string, float> -> Set<string> -> WorkSpec list -> WorkSpec list -> (WorkSpec * AgendaExclusion) list -> DispatchDecision)
+        (take:
+            Map<string, float>
+                -> Set<string>
+                -> WorkSpec list
+                -> WorkSpec list
+                -> (WorkSpec * AgendaExclusion) list
+                -> DispatchDecision)
         (reserved: Map<string, float>)
         (used: Set<string>)
         (remaining: WorkSpec list)
@@ -107,18 +119,17 @@ module Agenda =
         | DispatchVerdict.Granted ->
             let grown =
                 Work.reserved spec
-                |> Map.fold (fun acc key amount ->
-                    let existing = acc |> Map.tryFind key |> Option.defaultValue 0.0
-                    Map.add key (existing + amount) acc) reserved
+                |> Map.fold
+                    (fun acc key amount ->
+                        let existing = acc |> Map.tryFind key |> Option.defaultValue 0.0
+                        Map.add key (existing + amount) acc)
+                    reserved
 
             take grown (Set.union used spec.ConflictKeys) remaining (spec :: granted) blocked
         | DispatchVerdict.Declined cause -> take reserved used remaining granted ((spec, cause) :: blocked)
 
     /// The verdict once terminality is ruled out: a blocker wins, otherwise capacity.
-    let private blockerVerdict
-        (blocker: AgendaExclusion option)
-        (capacityReached: bool)
-        : DispatchVerdict =
+    let private blockerVerdict (blocker: AgendaExclusion option) (capacityReached: bool) : DispatchVerdict =
         let blocked (cause: AgendaExclusion) = DispatchVerdict.Declined cause
 
         let unblocked () =
@@ -176,9 +187,11 @@ module Agenda =
                 let applyGranted () =
                     let grown =
                         Work.reserved spec
-                        |> Map.fold (fun acc key amount ->
-                            let existing = acc |> Map.tryFind key |> Option.defaultValue 0.0
-                            Map.add key (existing + amount) acc) reserved
+                        |> Map.fold
+                            (fun acc key amount ->
+                                let existing = acc |> Map.tryFind key |> Option.defaultValue 0.0
+                                Map.add key (existing + amount) acc)
+                            reserved
 
                     take grown (Set.union used spec.ConflictKeys) rest (spec :: granted) blocked
 

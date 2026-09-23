@@ -7,20 +7,24 @@ namespace Wanxiangshu.Sphinx.V2.Plugins
 /// comes from the prior, not the data. That must be reported, not smoothed over.
 
 type ConnectivityReport =
-    { Components: string list list
-      Connected: bool
-      /// Candidates that never appear in any ballot.
-      Isolated: string list }
+    {
+        Components: string list list
+        Connected: bool
+        /// Candidates that never appear in any ballot.
+        Isolated: string list
+    }
 
 type DesignRankReport =
-    { /// Number of identifiable contrasts in the free coordinates.
-      Rank: int
-      ExpectedRank: int
-      Sufficient: bool
-      /// True when the design can identify a position effect at all.
-      PositionIdentifiable: bool
-      /// True when one candidate always wins or always loses.
-      SeparationDetected: bool }
+    {
+        /// Number of identifiable contrasts in the free coordinates.
+        Rank: int
+        ExpectedRank: int
+        Sufficient: bool
+        /// True when the design can identify a position effect at all.
+        PositionIdentifiable: bool
+        /// True when one candidate always wins or always loses.
+        SeparationDetected: bool
+    }
 
 module DesignCheck =
 
@@ -68,7 +72,9 @@ module DesignCheck =
                 | _ -> [])
             |> Set.ofList
 
-        let isolated = candidates |> List.filter (fun candidate -> not (Set.contains candidate compared))
+        let isolated =
+            candidates
+            |> List.filter (fun candidate -> not (Set.contains candidate compared))
 
         { Components = components
           Connected = components |> List.length <= 1
@@ -145,7 +151,5 @@ module DesignCheck =
         { Rank = spanningRank
           ExpectedRank = max 0 (candidateCount - 1)
           Sufficient = anyComparisons && report.Connected
-          PositionIdentifiable =
-            ballots
-            |> List.exists (fun ballot -> ballot.PositionIdentifiable)
+          PositionIdentifiable = ballots |> List.exists (fun ballot -> ballot.PositionIdentifiable)
           SeparationDetected = (not (List.isEmpty alwaysWins)) || (not (List.isEmpty alwaysLoses)) }

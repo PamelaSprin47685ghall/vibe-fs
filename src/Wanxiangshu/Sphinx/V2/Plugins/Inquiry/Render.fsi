@@ -1,12 +1,14 @@
 namespace Wanxiangshu.Sphinx.V2.Plugins
 
 type RenderRequest =
-    { GoalRef: string
-      MaterialRefs: string list
-      /// Conditions and disagreements the answer must reflect.
-      Conditions: string list
-      StopReason: string
-      SourceRefs: string list }
+    {
+        GoalRef: string
+        MaterialRefs: string list
+        /// Conditions and disagreements the answer must reflect.
+        Conditions: string list
+        StopReason: string
+        SourceRefs: string list
+    }
 
 type RenderResult =
     { AnswerText: string

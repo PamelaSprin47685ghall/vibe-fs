@@ -40,8 +40,7 @@ type IdempotencyOutcome<'value> =
 
 module Admission =
     val admitCommand:
-        InquiryState -> string -> string -> InquiryCommand ->
-            Result<IdempotencyOutcome<InquiryCommand>, CommandError>
+        InquiryState -> string -> string -> InquiryCommand -> Result<IdempotencyOutcome<InquiryCommand>, CommandError>
 
     val admitResult: InquiryState -> ResultSubmission -> Result<WorkItem, CommandError>
     val admitGoalAmendment: InquiryState -> string -> Result<GoalSpec, CommandError>

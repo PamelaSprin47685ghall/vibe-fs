@@ -33,7 +33,7 @@ module Contract =
 
     /// The complete public tool list, in a stable order so a tool listing is comparable
     /// across runs.
-    let all : SphinxTool list =
+    let all: SphinxTool list =
         [ SphinxTool.InquiryStart
           SphinxTool.WorkNext
           SphinxTool.WorkSubmit
@@ -67,4 +67,5 @@ module Contract =
 
     /// True when a name is one of the seven public tools. Everything else — including
     /// the old assess/propose/investigate/synthesize stages — is not a Sphinx tool.
-    let isTool (name: string) : bool = all |> List.exists (fun tool -> toolName tool = name)
+    let isTool (name: string) : bool =
+        all |> List.exists (fun tool -> toolName tool = name)

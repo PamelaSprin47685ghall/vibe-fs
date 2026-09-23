@@ -40,7 +40,10 @@ type InterpretationRecord =
 type ReservationKey = { WorkId: WorkId; Attempt: Attempt }
 
 /// An overrun fact. Recorded, never absorbed into a rejection.
-type OverrunFact = { WorkId: WorkId; Attempt: Attempt; Resources: Map<string, float> }
+type OverrunFact =
+    { WorkId: WorkId
+      Attempt: Attempt
+      Resources: Map<string, float> }
 
 /// A physical binding recovered from a Host. Never participates in semantic hashing.
 type PhysicalBinding =
@@ -51,35 +54,37 @@ type PhysicalBinding =
       Receipt: string option }
 
 type InquiryState =
-    { Id: InquiryId
-      ApiVersion: string
-      Revision: Revision
-      EventHead: EventId option
-      Goal: GoalSpec
-      ResourceSpecs: ResourceSpec list
-      RenderReserve: Map<string, float>
-      ConfigHash: string
-      ProfileRef: string
-      Graph: Map<NodeId, GraphNode>
-      Edges: Map<EdgeId, HyperEdge>
-      /// Certificates are addressed by their full scope key, never by node alone.
-      Certificates: Map<string, CertificateSlotPatch list>
-      /// Outstanding reservations: work identity -> reserved resources.
-      Work: Map<WorkId, WorkItem>
-      Reservations: Map<string, ReservationKey * Map<string, float>>
-      SettledUsage: Map<string, float>
-      SettledMoneyMinor: int64
-      /// Overruns recorded as facts, never absorbed.
-      Overruns: OverrunFact list
-      Observations: Map<string, ResultAcceptedBody>
-      Interpretations: Map<string, InterpretationRecord>
-      Rounds: Map<RoundId, RoundRecord>
-      Decisions: Map<string, string>
-      Answer: AnswerCommittedBody option
-      /// Command identity -> revision, for idempotent retry of a control command.
-      CommandReceipts: Map<string, Revision>
-      PhysicalBindings: Map<string, PhysicalBinding>
-      Status: InquiryStatus }
+    {
+        Id: InquiryId
+        ApiVersion: string
+        Revision: Revision
+        EventHead: EventId option
+        Goal: GoalSpec
+        ResourceSpecs: ResourceSpec list
+        RenderReserve: Map<string, float>
+        ConfigHash: string
+        ProfileRef: string
+        Graph: Map<NodeId, GraphNode>
+        Edges: Map<EdgeId, HyperEdge>
+        /// Certificates are addressed by their full scope key, never by node alone.
+        Certificates: Map<string, CertificateSlotPatch list>
+        /// Outstanding reservations: work identity -> reserved resources.
+        Work: Map<WorkId, WorkItem>
+        Reservations: Map<string, ReservationKey * Map<string, float>>
+        SettledUsage: Map<string, float>
+        SettledMoneyMinor: int64
+        /// Overruns recorded as facts, never absorbed.
+        Overruns: OverrunFact list
+        Observations: Map<string, ResultAcceptedBody>
+        Interpretations: Map<string, InterpretationRecord>
+        Rounds: Map<RoundId, RoundRecord>
+        Decisions: Map<string, string>
+        Answer: AnswerCommittedBody option
+        /// Command identity -> revision, for idempotent retry of a control command.
+        CommandReceipts: Map<string, Revision>
+        PhysicalBindings: Map<string, PhysicalBinding>
+        Status: InquiryStatus
+    }
 
 module InquiryState =
 
@@ -92,7 +97,12 @@ module InquiryState =
     /// Certificate lookup by the full scope address. A certificate addressed only by
     /// node would silently merge statements made under different goals, budgets or
     /// observation models.
-    let certificateKey (targetRef: string) (valueSpaceId: string) (scopeId: string) (semanticsModelRef: string) : string =
+    let certificateKey
+        (targetRef: string)
+        (valueSpaceId: string)
+        (scopeId: string)
+        (semanticsModelRef: string)
+        : string =
         String.concat "|" [ targetRef; valueSpaceId; scopeId; semanticsModelRef ]
 
     /// Reservation identity as one canonical string. A work identity split across a

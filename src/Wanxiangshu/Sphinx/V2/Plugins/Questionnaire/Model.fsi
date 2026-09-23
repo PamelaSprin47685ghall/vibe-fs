@@ -9,11 +9,13 @@ type Judgment =
     | Conditional of conditionRef: string
 
 type PairwiseResponse =
-    { Judgment: Judgment
-      Rationale: string
-      SourceLabels: string list
-      /// Local references to plan cards attached to this response.
-      ProposedAlternatives: ProposedAlternative list }
+    {
+        Judgment: Judgment
+        Rationale: string
+        SourceLabels: string list
+        /// Local references to plan cards attached to this response.
+        ProposedAlternatives: ProposedAlternative list
+    }
 
 and ProposedAlternative =
     { LocalId: string
@@ -27,21 +29,26 @@ type RankingResponse =
       Worst: string option
       Unjudged: string list }
 
-type MaxDiffObservation = { PresentedSet: string list; Best: string; Worst: string }
+type MaxDiffObservation =
+    { PresentedSet: string list
+      Best: string
+      Worst: string }
 
 type Observation =
-    { ObservationId: string
-      ScopeId: string
-      SnapshotId: string
-      /// measurement | intervention.
-      Purpose: string
-      QuestionId: string
-      QuestionHash: string
-      TemplateRef: string
-      ClusterId: string
-      /// The exact bytes the model saw.
-      VisibleBytesHash: string
-      CanonicalResult: string }
+    {
+        ObservationId: string
+        ScopeId: string
+        SnapshotId: string
+        /// measurement | intervention.
+        Purpose: string
+        QuestionId: string
+        QuestionHash: string
+        TemplateRef: string
+        ClusterId: string
+        /// The exact bytes the model saw.
+        VisibleBytesHash: string
+        CanonicalResult: string
+    }
 
 module QuestionnaireModel =
     val isDirectional: Judgment -> bool

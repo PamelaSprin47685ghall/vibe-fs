@@ -24,21 +24,23 @@ type WorkState =
 /// different attempt of the same work: the spec fields that make it *the same* work
 /// cannot change, while the identity that makes it *a different try* does.
 type WorkSpec =
-    { Id: WorkId
-      Attempt: Attempt
-      Fence: Fence
-      RoundId: RoundId option
-      PlanId: PlanId
-      Producer: string
-      Capability: string
-      Input: JsonEnvelope option
-      OutputSchema: SchemaRef option
-      Dependencies: Set<WorkId>
-      ConflictKeys: Set<string>
-      /// Physical binding, absent until a Host actually accepts the dispatch.
-      PhysicalRef: string option
-      /// Resources this work reserves for its attempt.
-      Reserved: Map<string, float> }
+    {
+        Id: WorkId
+        Attempt: Attempt
+        Fence: Fence
+        RoundId: RoundId option
+        PlanId: PlanId
+        Producer: string
+        Capability: string
+        Input: JsonEnvelope option
+        OutputSchema: SchemaRef option
+        Dependencies: Set<WorkId>
+        ConflictKeys: Set<string>
+        /// Physical binding, absent until a Host actually accepts the dispatch.
+        PhysicalRef: string option
+        /// Resources this work reserves for its attempt.
+        Reserved: Map<string, float>
+    }
 
 type WorkItem = { Spec: WorkSpec; State: WorkState }
 
@@ -82,8 +84,13 @@ module Work =
     let validateSpec (spec: WorkSpec) : Result<unit, WorkError> =
         if not (samePurpose spec spec) then
             Ok()
-        elif Set.isEmpty spec.Dependencies |> not && spec.Dependencies |> Set.contains spec.Id then
-            Error { Code = "self-dependency"; Message = "work cannot depend on itself" }
+        elif
+            Set.isEmpty spec.Dependencies |> not
+            && spec.Dependencies |> Set.contains spec.Id
+        then
+            Error
+                { Code = "self-dependency"
+                  Message = "work cannot depend on itself" }
         elif not (fenceBelongsToAttempt spec) then
             Error
                 { Code = "invalid-fence"

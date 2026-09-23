@@ -17,18 +17,20 @@ type GoalAmendment =
       ReplacedText: string option }
 
 type GoalSpec =
-    { GoalId: GoalId
-      Revision: Revision
-      /// Byte-exact user text. Never normalized, trimmed or reworded in storage.
-      OriginalText: string
-      /// Explicit supplementary constraints from the user, as supplied.
-      Constraints: string list
-      /// Content refs of the material the user attached; may be empty.
-      MaterialRefs: ArtifactRef list
-      /// Authorization reference proving the user supplied this goal.
-      AuthorizationRef: string
-      CreatedBy: string
-      Amendments: GoalAmendment list }
+    {
+        GoalId: GoalId
+        Revision: Revision
+        /// Byte-exact user text. Never normalized, trimmed or reworded in storage.
+        OriginalText: string
+        /// Explicit supplementary constraints from the user, as supplied.
+        Constraints: string list
+        /// Content refs of the material the user attached; may be empty.
+        MaterialRefs: ArtifactRef list
+        /// Authorization reference proving the user supplied this goal.
+        AuthorizationRef: string
+        CreatedBy: string
+        Amendments: GoalAmendment list
+    }
 
 type GoalError = { Code: string; Message: string }
 
@@ -56,7 +58,8 @@ module Goal =
         else
             Ok()
 
-    let tryCreate (goal: GoalSpec) : Result<GoalSpec, GoalError> = validate goal |> Result.map (fun () -> goal)
+    let tryCreate (goal: GoalSpec) : Result<GoalSpec, GoalError> =
+        validate goal |> Result.map (fun () -> goal)
 
     let create (goal: GoalSpec) : GoalSpec =
         match tryCreate goal with

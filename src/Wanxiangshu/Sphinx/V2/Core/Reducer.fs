@@ -16,15 +16,16 @@ module Reducer =
 
     /// One error constructor typed to CoreError, so no call site can accidentally widen
     /// the fold's error channel to some other record with the same shape.
-    let private coreError (code: string) (message: string) : CoreError =
-        { Code = code; Message = message }
+    let private coreError (code: string) (message: string) : CoreError = { Code = code; Message = message }
 
     let private isFinite (value: float) =
         not (Double.IsNaN value) && not (Double.IsInfinity value)
 
     let private goalValidate (goal: GoalSpec) : Result<GoalSpec, CoreError> =
         Goal.tryCreate goal
-        |> Result.mapError (fun fault -> { Code = fault.Code; Message = fault.Message })
+        |> Result.mapError (fun fault ->
+            { Code = fault.Code
+              Message = fault.Message })
 
     let private emptyState (origin: InquiryEvent) (body: InquiryCreatedBody) : Result<InquiryState, CoreError> =
         if origin.Revision <> Revision.origin then
@@ -33,7 +34,10 @@ module Reducer =
             Error(coreError "invalid-origin" "inquiry creation must not have a parent")
         else
             Budget.validateSpecs body.ResourceSpecs
-            |> Result.mapError (fun fault -> { Code = fault.Code; Message = fault.Message } : CoreError)
+            |> Result.mapError (fun fault ->
+                { Code = fault.Code
+                  Message = fault.Message }
+                : CoreError)
             |> Result.bind (fun () ->
                 goalValidate body.Goal
                 |> Result.map (fun goal ->
@@ -112,7 +116,8 @@ module Reducer =
                 { state with
                     Rounds =
                         state.Rounds
-                        |> Map.add body.RoundId
+                        |> Map.add
+                            body.RoundId
                             { RoundId = body.RoundId
                               ScopeId = body.ScopeId
                               ExpectedWork = body.ExpectedWork |> Set.ofList
@@ -121,27 +126,84 @@ module Reducer =
                               Closed = false
                               Outcome = None } }
 
-    let private closeRound (state: InquiryState) (roundId: RoundId) (outcome: string) : Result<InquiryState, CoreError> =
+    let private closeRound
+        (state: InquiryState)
+        (roundId: RoundId)
+        (outcome: string)
+        : Result<InquiryState, CoreError> =
         match state.Rounds |> Map.tryFind roundId with
         | Some record ->
             Ok
                 { state with
                     Rounds =
                         state.Rounds
-                        |> Map.add roundId { record with Closed = true; Outcome = Some outcome } }
+                        |> Map.add
+                            roundId
+                            { record with
+                                Closed = true
+                                Outcome = Some outcome } }
         | None -> Error(coreError "unknown-round" (sprintf "round %s is not open" (RoundId.value roundId)))
 
-    let private releaseReservation (state: InquiryState) (workId: WorkId) (attempt: Attempt) :
-        Result<InquiryState, CoreError> =
+    let private releaseReservation
+        (state: InquiryState)
+        (workId: WorkId)
+        (attempt: Attempt)
+        : Result<InquiryState, CoreError> =
         let key = InquiryState.reservationKey { WorkId = workId; Attempt = attempt }
 
         if state.Reservations |> Map.containsKey key then
-            Ok { state with Reservations = state.Reservations |> Map.remove key }
+            Ok
+                { state with
+                    Reservations = state.Reservations |> Map.remove key }
         else
             Ok state
 
+    /// Why a work id cannot be planned, or None when it can. Reporting the reason as a
+    /// value keeps the caller's control flow flat.
+    let private duplicateWork (alreadyPlanned: bool) (plannedTwice: bool) (id: string) : CoreError option =
+        let alreadyText () = sprintf "work %s already exists" id
+
+        let twiceText () =
+            sprintf "work %s is planned twice in one batch" id
+
+        let duplicateReason () =
+            match alreadyPlanned, plannedTwice with
+            | true, _ -> alreadyText ()
+            | false, true -> twiceText ()
+            | false, false -> ""
+
+        let duplicated = alreadyPlanned || plannedTwice
+
+        let refused () =
+            Some(coreError "duplicate-work" (duplicateReason ()))
+
+        let admitted () = None
+
+        match duplicated with
+        | true -> refused ()
+        | false -> admitted ()
+
+    /// Plans one work spec into the table, or reports why it cannot be planned.
+    let private planOneWork
+        (workError: WorkError -> CoreError)
+        (work: Map<WorkId, WorkItem>)
+        (spec: WorkSpec)
+        : Result<Map<WorkId, WorkItem>, CoreError> =
+        let planned =
+            work
+            |> Map.add
+                spec.Id
+                { Spec = spec
+                  State = WorkState.Planned }
+
+        Work.validateSpec spec
+        |> Result.mapError workError
+        |> Result.map (fun () -> planned)
+
     let private applyWorkPlanned (state: InquiryState) (specs: WorkSpec list) : Result<InquiryState, CoreError> =
-        let workError (fault: WorkError) : CoreError = { Code = fault.Code; Message = fault.Message }
+        let workError (fault: WorkError) : CoreError =
+            { Code = fault.Code
+              Message = fault.Message }
 
         let rec loop
             (work: Map<WorkId, WorkItem>)
@@ -153,28 +215,18 @@ module Reducer =
                 let id = WorkId.value spec.Id
 
                 let alreadyPlanned = state.Work |> Map.containsKey spec.Id
+
                 let plannedTwice = work |> Map.containsKey spec.Id
 
-                let planError () =
-                    Work.validateSpec spec
-                    |> Result.mapError workError
-                    |> Result.bind (fun () ->
-                        loop (work |> Map.add spec.Id { Spec = spec; State = WorkState.Planned }) rest)
+                let refused () =
+                    duplicateWork alreadyPlanned plannedTwice id |> Option.map Error
 
-                let duplicateReason () =
-                    if alreadyPlanned then sprintf "work %s already exists" id
-                    elif plannedTwice then sprintf "work %s is planned twice in one batch" id
-                    else ""
+                let planned () =
+                    planOneWork workError work spec |> Result.bind (fun next -> loop next rest)
 
-                let duplicated = alreadyPlanned || plannedTwice
+                refused () |> Option.defaultWith (fun _ -> planned ())
 
-                let planOrConflict () =
-                    if duplicated then Error(coreError "duplicate-work" (duplicateReason ())) else planError ()
-
-                planOrConflict ()
-
-        loop state.Work specs
-        |> Result.map (fun work -> { state with Work = work })
+        loop state.Work specs |> Result.map (fun work -> { state with Work = work })
 
     let private currentWork (state: InquiryState) (workId: WorkId) : Result<WorkItem, CoreError> =
         match state.Work |> Map.tryFind workId with
@@ -200,7 +252,12 @@ module Reducer =
             Error(coreError "missing-physical-ref" "running work requires a real physical reference")
         | _ -> Ok()
 
-    let private fenceMatches (item: WorkItem) (spec: WorkSpec) (fromState: string) (next: WorkState) : Result<unit, CoreError> =
+    let private fenceMatches
+        (item: WorkItem)
+        (spec: WorkSpec)
+        (fromState: string)
+        (next: WorkState)
+        : Result<unit, CoreError> =
         attemptMatches item spec fromState
         |> Result.bind (fun () -> physicalRefPresent next)
 
@@ -228,8 +285,7 @@ module Reducer =
         (item: WorkItem)
         (next: WorkState)
         : Result<unit, CoreError> =
-        let becomeReady =
-            dependenciesSucceeded state spec
+        let becomeReady = dependenciesSucceeded state spec
 
         match item.State, next with
         | WorkState.Planned, WorkState.Ready when not becomeReady ->
@@ -266,8 +322,7 @@ module Reducer =
             | WorkState.Cancelled _, WorkState.Ready -> true
             | _ -> false
 
-        let specIsImmutable =
-            not samePurpose
+        let specIsImmutable = not samePurpose
 
         let attemptAdvanceWrong =
             (retry && spec.Attempt <> Attempt.next item.Spec.Attempt)
@@ -279,20 +334,32 @@ module Reducer =
             Error(
                 coreError
                     "attempt-mismatch"
-                    (if retry then "retry must advance the attempt by exactly one"
-                     else "work attempt does not match the planned attempt")
+                    (if retry then
+                         "retry must advance the attempt by exactly one"
+                     else
+                         "work attempt does not match the planned attempt")
             )
         else
             legalStateChange state spec item next
 
-    let private applyWorkTransition (state: InquiryState) (body: WorkAttemptTransitionedBody) :
-        Result<InquiryState, CoreError> =
+    let private applyWorkTransition
+        (state: InquiryState)
+        (body: WorkAttemptTransitionedBody)
+        : Result<InquiryState, CoreError> =
         currentWork state body.WorkId
         |> Result.bind (fun item ->
             if body.FromState <> Work.stateName item.State then
-                Error(coreError "stale-work-state" (sprintf "expected %s but work is %s" body.FromState (Work.stateName item.State)))
+                Error(
+                    coreError
+                        "stale-work-state"
+                        (sprintf "expected %s but work is %s" body.FromState (Work.stateName item.State))
+                )
             else
-                let spec = { item.Spec with Attempt = body.Attempt; Fence = body.Fence; PhysicalRef = body.PhysicalRef }
+                let spec =
+                    { item.Spec with
+                        Attempt = body.Attempt
+                        Fence = body.Fence
+                        PhysicalRef = body.PhysicalRef }
 
                 fenceMatches item spec body.FromState body.NextState
                 |> Result.bind (fun () -> legalTransition state spec body.FromState body.NextState item)
@@ -312,24 +379,28 @@ module Reducer =
     ///
     /// The old reducer replaced the whole certificate keyed by node, which let the
     /// second writer erase the first. That is the failure this shape prevents.
-    let private slotConflict (message: string) : CoreError = coreError "certificate-conflict" message
+    let private slotConflict (message: string) : CoreError =
+        coreError "certificate-conflict" message
 
-    let private applyCertificateSlots (state: InquiryState) (patches: CertificateSlotPatch list) :
-        Result<InquiryState, CoreError> =
-        let certificateError (fault: CertificateError) : CoreError = { Code = fault.Code; Message = fault.Message }
+    let private applyCertificateSlots
+        (state: InquiryState)
+        (patches: CertificateSlotPatch list)
+        : Result<InquiryState, CoreError> =
+        let certificateError (fault: CertificateError) : CoreError =
+            { Code = fault.Code
+              Message = fault.Message }
 
         let key (patch: CertificateSlotPatch) : string =
-            InquiryState.certificateKey
-                patch.TargetRef
-                patch.ValueSpaceId
-                patch.ScopeId
-                patch.SemanticsModelRef
+            InquiryState.certificateKey patch.TargetRef patch.ValueSpaceId patch.ScopeId patch.SemanticsModelRef
 
         let slotName (patch: CertificateSlotPatch) = patch.Slot.Slot
 
         /// Nodes already in the graph.
         let existingNodes =
-            state.Graph |> Map.toList |> List.map (fun (nodeId, _) -> NodeId.value nodeId) |> Set.ofList
+            state.Graph
+            |> Map.toList
+            |> List.map (fun (nodeId, _) -> NodeId.value nodeId)
+            |> Set.ofList
 
         /// A certificate may only be attached to a node that exists. The old reducer
         /// accepted any target and let a later graph patch paper over it; here a missing
@@ -339,27 +410,30 @@ module Reducer =
 
         /// Different slots on the same candidate are independent and merge. The same
         /// slot must agree on its base revision, and an exact re-delivery is idempotent.
-        let mergeSlot (existing: CertificateSlotPatch list) (patch: CertificateSlotPatch) :
-            Result<CertificateSlotPatch list, CoreError> =
-            let found = existing |> List.tryFind (fun candidate -> candidate.Slot.Slot = slotName patch)
+        let mergeSlot
+            (existing: CertificateSlotPatch list)
+            (patch: CertificateSlotPatch)
+            : Result<CertificateSlotPatch list, CoreError> =
+            let found =
+                existing |> List.tryFind (fun candidate -> candidate.Slot.Slot = slotName patch)
 
             match found with
             | Some current when current.Slot.Revision <> patch.ExpectedSlotRevision ->
                 Error(
-                    slotConflict
-                        (sprintf
+                    slotConflict (
+                        sprintf
                             "certificate slot %s expects revision %d but the slot is at %d"
                             (slotName patch)
                             (Revision.value patch.ExpectedSlotRevision)
-                            (Revision.value current.Slot.Revision))
+                            (Revision.value current.Slot.Revision)
+                    )
                 )
             | Some current when current.Slot.Revision = patch.Slot.Revision && current.Slot = patch.Slot -> Ok existing
             | Some _ ->
                 Error(
-                    slotConflict
-                        (sprintf
-                            "certificate slot %s has a conflicting patch at the same base revision"
-                            (slotName patch))
+                    slotConflict (
+                        sprintf "certificate slot %s has a conflicting patch at the same base revision" (slotName patch)
+                    )
                 )
             | None -> Ok(existing @ [ patch ])
 
@@ -379,14 +453,18 @@ module Reducer =
                     let existing = slots |> Map.tryFind slotKey |> Option.defaultValue []
 
                     mergeSlot existing patch
-                    |> Result.bind (fun merged ->
-                        loop (slots |> Map.add slotKey merged) rest))
+                    |> Result.bind (fun merged -> loop (slots |> Map.add slotKey merged) rest))
 
         loop state.Certificates patches
-        |> Result.map (fun certificates -> { state with Certificates = certificates })
+        |> Result.map (fun certificates ->
+            { state with
+                Certificates = certificates })
 
     let private applyBudgetReserved (state: InquiryState) (body: BudgetReservedBody) : Result<InquiryState, CoreError> =
-        let budgetError (fault: BudgetError) : CoreError = { Code = fault.Code; Message = fault.Message }
+        let budgetError (fault: BudgetError) : CoreError =
+            { Code = fault.Code
+              Message = fault.Message }
+
         let workKey =
             { WorkId = body.Reservation.WorkId
               Attempt = body.Reservation.Attempt }
@@ -431,7 +509,10 @@ module Reducer =
         (settle: InquiryState -> Result<InquiryState, CoreError>)
         (recordOverrun: InquiryState -> InquiryState)
         : Result<InquiryState, CoreError> =
-        let workKey = { WorkId = usage.WorkId; Attempt = usage.Attempt }
+        let workKey =
+            { WorkId = usage.WorkId
+              Attempt = usage.Attempt }
+
         let withoutReservation = state.Reservations |> Map.remove key
         let stillLeft = remainingAfter usage outstanding
         let fullySpent = Map.isEmpty stillLeft
@@ -444,11 +525,16 @@ module Reducer =
                 else
                     untouched |> Map.add key (workKey, stillLeft)
 
-        settle { state with Reservations = stillReserved }
+        settle
+            { state with
+                Reservations = stillReserved }
         |> Result.map recordOverrun
 
     let private applyUsageSettled (state: InquiryState) (usage: SettledUsage) : Result<InquiryState, CoreError> =
-        let key = InquiryState.reservationKey { WorkId = usage.WorkId; Attempt = usage.Attempt }
+        let key =
+            InquiryState.reservationKey
+                { WorkId = usage.WorkId
+                  Attempt = usage.Attempt }
 
         let overrunFact =
             { WorkId = usage.WorkId
@@ -459,11 +545,15 @@ module Reducer =
         // nothing, and writing zero would claim the work was free.
         let recordOverrun (target: InquiryState) =
             if usage.Overrun then
-                { target with Overruns = target.Overruns @ [ overrunFact ] }
+                { target with
+                    Overruns = target.Overruns @ [ overrunFact ] }
             else
                 target
 
-        let settle (target: InquiryState) = Ok { target with SettledUsage = usage.Resources }
+        let settle (target: InquiryState) =
+            Ok
+                { target with
+                    SettledUsage = usage.Resources }
 
         // An audit with no outstanding reservation is still bookable.
         let bookAudit (target: InquiryState) = settle (recordOverrun target)
@@ -472,13 +562,16 @@ module Reducer =
 
         match state.Reservations |> Map.tryFind key with
         | _ when unresolved -> settle (recordOverrun state)
-        | Some (_, outstanding) -> releaseSettled state key outstanding usage settle recordOverrun
+        | Some(_, outstanding) -> releaseSettled state key outstanding usage settle recordOverrun
         | None -> bookAudit state
 
     /// A result is admissible only when it belongs to this attempt, carries this
     /// attempt's fence, and is not a second delivery of an already-accepted result.
-    let private resultAdmissible (state: InquiryState) (item: WorkItem) (body: ResultAcceptedBody) :
-        Result<unit, CoreError> =
+    let private resultAdmissible
+        (state: InquiryState)
+        (item: WorkItem)
+        (body: ResultAcceptedBody)
+        : Result<unit, CoreError> =
         if item.Spec.Attempt <> body.Attempt then
             Error(coreError "attempt-mismatch" "result attempt does not match the work")
         elif item.Spec.Fence <> body.Fence then
@@ -506,17 +599,17 @@ module Reducer =
                         { accepted with
                             Work =
                                 accepted.Work
-                                |> Map.add body.WorkId
+                                |> Map.add
+                                    body.WorkId
                                     { Spec = item.Spec
                                       State = WorkState.Succeeded body.Attempt } }
                 | _ ->
-                    Error(
-                        coreError
-                            "work-not-running"
-                            (sprintf "work %s is not running" (WorkId.value body.WorkId))
-                    )))
+                    Error(coreError "work-not-running" (sprintf "work %s is not running" (WorkId.value body.WorkId)))))
 
-    let private applyInterpretation (state: InquiryState) (body: InterpretationPendingBody) : Result<InquiryState, CoreError> =
+    let private applyInterpretation
+        (state: InquiryState)
+        (body: InterpretationPendingBody)
+        : Result<InquiryState, CoreError> =
         let id = ObservationId.value body.ObservationId
 
         if state.Interpretations |> Map.containsKey id then
@@ -526,7 +619,8 @@ module Reducer =
                 { state with
                     Interpretations =
                         state.Interpretations
-                        |> Map.add id
+                        |> Map.add
+                            id
                             { ObservationId = body.ObservationId
                               WorkId = body.WorkId
                               Attempt = body.Attempt
@@ -539,14 +633,19 @@ module Reducer =
     /// endpoint existence and revision sanity; it never judges whether the relation is
     /// warranted (WHAT[sphinx-v2-006]).
     let private applyGraphPatched (state: InquiryState) (body: GraphPatchedBody) : Result<InquiryState, CoreError> =
-        let graphError (fault: GraphError) : CoreError = { Code = fault.Code; Message = fault.Message }
+        let graphError (fault: GraphError) : CoreError =
+            { Code = fault.Code
+              Message = fault.Message }
 
         match String.IsNullOrWhiteSpace body.PluginRef with
         | true -> Error(coreError "invalid-patch" "graph patch must name its producing plugin")
         | false ->
             Graph.applyPatch state.Graph state.Edges body.Patch
             |> Result.mapError graphError
-            |> Result.map (fun (nodes, edges) -> { state with Graph = nodes; Edges = edges })
+            |> Result.map (fun (nodes, edges) ->
+                { state with
+                    Graph = nodes
+                    Edges = edges })
 
     let private applyAnswer (state: InquiryState) (body: AnswerCommittedBody) : Result<InquiryState, CoreError> =
         match state.Answer with
@@ -564,16 +663,34 @@ module Reducer =
 
         match terminal with
         | true -> Error(coreError "inquiry-terminal" "a terminal inquiry cannot return to active")
-        | false -> Ok { state with Status = InquiryStatus.Active }
+        | false ->
+            Ok
+                { state with
+                    Status = InquiryStatus.Active }
 
     let private applyStatus (state: InquiryState) (status: string) (reason: string) : Result<InquiryState, CoreError> =
         match status with
-        | "suspended" -> Ok { state with Status = InquiryStatus.Suspended reason }
-        | "failed" -> Ok { state with Status = InquiryStatus.Failed reason }
-        | "cancelled" -> Ok { state with Status = InquiryStatus.Cancelled reason }
-        | "cancelling" -> Ok { state with Status = InquiryStatus.Cancelling }
+        | "suspended" ->
+            Ok
+                { state with
+                    Status = InquiryStatus.Suspended reason }
+        | "failed" ->
+            Ok
+                { state with
+                    Status = InquiryStatus.Failed reason }
+        | "cancelled" ->
+            Ok
+                { state with
+                    Status = InquiryStatus.Cancelled reason }
+        | "cancelling" ->
+            Ok
+                { state with
+                    Status = InquiryStatus.Cancelling }
         | "active" -> resumeActive state
-        | "input-required" -> Ok { state with Status = InquiryStatus.InputRequired reason }
+        | "input-required" ->
+            Ok
+                { state with
+                    Status = InquiryStatus.InputRequired reason }
         | _ -> Error(coreError "unknown-status" (sprintf "unknown inquiry status: %s" status))
 
     /// Every event dispatches to exactly one handler, and each handler is a named
@@ -604,27 +721,44 @@ module Reducer =
         | InquiryEventBody.DecisionRecorded _ -> Ok state
         | InquiryEventBody.AnswerPrepared _ -> Ok state
         | InquiryEventBody.AnswerCommitted committed -> applyAnswer state committed
-        | InquiryEventBody.CancelRequested _ -> Ok { state with Status = InquiryStatus.Cancelling }
-        | InquiryEventBody.InquiryCancelled reason -> Ok { state with Status = InquiryStatus.Cancelled reason }
-        | InquiryEventBody.InquirySuspended reason -> Ok { state with Status = InquiryStatus.Suspended reason }
-        | InquiryEventBody.InquiryFailed reason -> Ok { state with Status = InquiryStatus.Failed reason }
+        | InquiryEventBody.CancelRequested _ ->
+            Ok
+                { state with
+                    Status = InquiryStatus.Cancelling }
+        | InquiryEventBody.InquiryCancelled reason ->
+            Ok
+                { state with
+                    Status = InquiryStatus.Cancelled reason }
+        | InquiryEventBody.InquirySuspended reason ->
+            Ok
+                { state with
+                    Status = InquiryStatus.Suspended reason }
+        | InquiryEventBody.InquiryFailed reason ->
+            Ok
+                { state with
+                    Status = InquiryStatus.Failed reason }
         | InquiryEventBody.InquiryStatusChanged statusBody -> applyStatus state statusBody.Status statusBody.Reason
         | InquiryEventBody.InquiryCreated _ -> Error(coreError "duplicate-inquiry" "inquiry is already created")
 
     /// A continuation of an existing history. Its own decisions live in `dispatchHandler`.
-    let private applyContinuation (current: InquiryState) (event: InquiryEvent) (body: InquiryEventBody) :
-        Result<InquiryState, CoreError> =
+    let private applyContinuation
+        (current: InquiryState)
+        (event: InquiryEvent)
+        (body: InquiryEventBody)
+        : Result<InquiryState, CoreError> =
         admitBusinessEvent current body
         |> Result.bind (fun () -> verifyChain current event)
         |> Result.bind (fun () -> dispatchHandler current body)
-        |> Result.map (fun next -> { next with Revision = event.Revision; EventHead = Some event.Id })
+        |> Result.map (fun next ->
+            { next with
+                Revision = event.Revision
+                EventHead = Some event.Id })
 
     let apply (state: InquiryState option) (event: InquiryEvent) : Result<InquiryState, CoreError> =
         let body = event.Body
 
         match Option.isSome state, body with
-        | true, InquiryEventBody.InquiryCreated _ ->
-            Error(coreError "duplicate-inquiry" "inquiry is already created")
+        | true, InquiryEventBody.InquiryCreated _ -> Error(coreError "duplicate-inquiry" "inquiry is already created")
         | true, _ -> applyContinuation (Option.get state) event body
         | false, InquiryEventBody.InquiryCreated created -> emptyState event created
         | false, _ -> Error(coreError "missing-inquiry" "first event must create the inquiry")
@@ -632,7 +766,8 @@ module Reducer =
     /// Fold a whole transition batch. The batch is the unit of durability, so a failure
     /// anywhere means no event in it is applied: the previous state is the only outcome.
     let foldBatch (events: InquiryEvent list) : Result<InquiryState, CoreError> =
-        let emptyBatch () = Error(coreError "empty-batch" "transition batch must carry at least one event")
+        let emptyBatch () =
+            Error(coreError "empty-batch" "transition batch must carry at least one event")
 
         let applyAll (carried: Result<InquiryState option, CoreError>) (event: InquiryEvent) =
             carried |> Result.bind (fun state -> apply state event |> Result.map Some)
@@ -641,7 +776,9 @@ module Reducer =
         | [] -> emptyBatch ()
         | _ ->
             let folded = List.fold applyAll (Ok None) events
-            let emptyResult () = Error(coreError "empty-batch" "transition batch produced no state")
+
+            let emptyResult () =
+                Error(coreError "empty-batch" "transition batch produced no state")
 
             folded
             |> function
@@ -651,11 +788,10 @@ module Reducer =
 
 
     let fold (events: InquiryEvent list) : Result<InquiryState, CoreError> =
-        let initial : Result<InquiryState option, CoreError> = Ok None
+        let initial: Result<InquiryState option, CoreError> = Ok None
 
         let applyAll (state: Result<InquiryState option, CoreError>) (event: InquiryEvent) =
-            state
-            |> Result.bind (fun carried -> apply carried event |> Result.map Some)
+            state |> Result.bind (fun carried -> apply carried event |> Result.map Some)
 
         match List.fold applyAll initial events with
         | Ok(Some state) -> Ok state

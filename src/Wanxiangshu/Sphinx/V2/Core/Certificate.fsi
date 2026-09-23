@@ -19,24 +19,28 @@ type CertificateStatus =
     | Conflicted
 
 type CertificateSlot =
-    { Slot: string
-      Producer: string
-      Schema: SchemaRef
-      CanonicalPayload: string
-      /// Revision of the slot's own content; a patch names the base it expects.
-      Revision: Revision
-      Guarantee: CertificateGuarantee
-      Status: CertificateStatus }
+    {
+        Slot: string
+        Producer: string
+        Schema: SchemaRef
+        CanonicalPayload: string
+        /// Revision of the slot's own content; a patch names the base it expects.
+        Revision: Revision
+        Guarantee: CertificateGuarantee
+        Status: CertificateStatus
+    }
 
 type CertificateSlotPatch =
-    { CertificateId: CertificateId
-      TargetRef: string
-      ValueSpaceId: string
-      ScopeId: string
-      SemanticsModelRef: string
-      Slot: CertificateSlot
-      /// Base revision the patch expects; a mismatch is a conflict, not a merge.
-      ExpectedSlotRevision: Revision }
+    {
+        CertificateId: CertificateId
+        TargetRef: string
+        ValueSpaceId: string
+        ScopeId: string
+        SemanticsModelRef: string
+        Slot: CertificateSlot
+        /// Base revision the patch expects; a mismatch is a conflict, not a merge.
+        ExpectedSlotRevision: Revision
+    }
 
 type CertificateError = { Code: string; Message: string }
 

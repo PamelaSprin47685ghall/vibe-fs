@@ -91,7 +91,11 @@ module Codec =
           CommandId = batch.CommandId
           CommandFingerprint = batch.CommandFingerprint
           PostStateFingerprint = batch.PostStateFingerprint
-          Events = batch.Events |> List.map (fun body -> { Tag = bodyTag body; Payload = bodyCanonical body }) }
+          Events =
+            batch.Events
+            |> List.map (fun body ->
+                { Tag = bodyTag body
+                  Payload = bodyCanonical body }) }
 
     /// Encodes one transition as one canonical envelope. The envelope id is derived
     /// from the inquiry, the revision and the command, so the same transition always

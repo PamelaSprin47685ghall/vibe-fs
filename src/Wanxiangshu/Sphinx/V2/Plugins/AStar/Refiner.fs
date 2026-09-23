@@ -15,26 +15,33 @@ open System.Collections.Generic
 /// `restore` exist because a crash in the middle of a search must not restart it, and
 /// because the OPEN/CLOSED frontier is the state a caller needs to see.
 
-type GraphEdge = { FromNode: string; ToNode: string; Cost: float }
+type GraphEdge =
+    { FromNode: string
+      ToNode: string
+      Cost: float }
 
 type AStarProblem =
-    { Start: string
-      Goal: string
-      Edges: GraphEdge list
-      /// Heuristic values. Guidance unless the caller declares them admissible.
-      Heuristic: Map<string, float>
-      /// True when the caller asserts the heuristic is admissible and consistent.
-      HeuristicAdmissible: bool }
+    {
+        Start: string
+        Goal: string
+        Edges: GraphEdge list
+        /// Heuristic values. Guidance unless the caller declares them admissible.
+        Heuristic: Map<string, float>
+        /// True when the caller asserts the heuristic is admissible and consistent.
+        HeuristicAdmissible: bool
+    }
 
 type SearchSnapshot =
-    { Open: (string * float) list
-      Closed: string list
-      BestG: Map<string, float>
-      Parents: Map<string, string>
-      Expanded: string list
-      /// The best known complete path cost, if any.
-      Incumbent: float option
-      ModelRevision: int }
+    {
+        Open: (string * float) list
+        Closed: string list
+        BestG: Map<string, float>
+        Parents: Map<string, string>
+        Expanded: string list
+        /// The best known complete path cost, if any.
+        Incumbent: float option
+        ModelRevision: int
+    }
 
 [<RequireQualifiedAccess>]
 type AStarFault =
@@ -87,11 +94,23 @@ module AStar =
 
     /// The endpoints must be real nodes, and the goal must be reachable by some edge.
     let private blankEndpoint (problem: AStarProblem) : bool =
-        String.IsNullOrWhiteSpace problem.Start || String.IsNullOrWhiteSpace problem.Goal
+        String.IsNullOrWhiteSpace problem.Start
+        || String.IsNullOrWhiteSpace problem.Goal
 
-    let private endpointFault (problem: AStarProblem) (adjacency: Map<string, (string * float) list>) : AStarFault option =
-        let startKnown = Map.containsKey problem.Start adjacency
-        let goalKnown = Map.containsKey problem.Goal adjacency
+    /// A node is known if it appears on either end of some edge. The start needs an
+    /// outgoing edge; the goal only needs to be reachable, so a terminal goal with no
+    /// outgoing edge is legal and must not be reported as unknown.
+    let private endpointFault
+        (problem: AStarProblem)
+        (adjacency: Map<string, (string * float) list>)
+        : AStarFault option =
+        let endpoints =
+            problem.Edges
+            |> List.collect (fun edge -> [ edge.FromNode; edge.ToNode ])
+            |> Set.ofList
+
+        let startKnown = Set.contains problem.Start endpoints
+        let goalKnown = Set.contains problem.Goal endpoints
 
         match blankEndpoint problem, startKnown, goalKnown with
         | true, _, _ -> Some AStarFault.BlankNode
@@ -109,9 +128,16 @@ module AStar =
         | None -> Ok adjacency
 
     let private validate (problem: AStarProblem) : Result<Map<string, (string * float) list>, AStarFault> =
-        let blank = problem.Edges |> List.tryFind (fun edge -> String.IsNullOrWhiteSpace edge.FromNode || String.IsNullOrWhiteSpace edge.ToNode)
+        let blank =
+            problem.Edges
+            |> List.tryFind (fun edge ->
+                String.IsNullOrWhiteSpace edge.FromNode || String.IsNullOrWhiteSpace edge.ToNode)
+
         let badCost = problem.Edges |> List.tryFind (fun edge -> not (isFinite edge.Cost))
-        let negative = problem.Edges |> List.tryFind (fun edge -> isFinite edge.Cost && edge.Cost < 0.0)
+
+        let negative =
+            problem.Edges
+            |> List.tryFind (fun edge -> isFinite edge.Cost && edge.Cost < 0.0)
 
         let edgeDefects = edgeDefect problem blank badCost negative
 
@@ -156,8 +182,7 @@ module AStar =
         | 0 -> compare (fst left) (fst right)
         | _ -> ordering
 
-    let private knownCost (bestG: Map<string, float>) (node: string) : float option =
-        bestG |> Map.tryFind node
+    let private knownCost (bestG: Map<string, float>) (node: string) : float option = bestG |> Map.tryFind node
 
     let private improved (bestG: Map<string, float>) (node: string) (cost: float) : bool =
         match knownCost bestG node with
@@ -226,7 +251,12 @@ module AStar =
                 let nodeG = snapshot.BestG |> Map.tryFind node |> Option.defaultValue 0.0
                 let successors = adjacency |> Map.tryFind node |> Option.defaultValue []
 
-                let relax (bestG: Map<string, float>) (parents: Map<string, string>) (candidate: string) (cost: float) =
+                let relax
+                    (bestG: Map<string, float>)
+                    (parents: Map<string, string>)
+                    (candidate: string)
+                    (cost: float)
+                    =
                     relaxNode bestG parents candidate cost node
 
                 let improvedG, improvedParents =
@@ -238,8 +268,7 @@ module AStar =
                 let scored = fValues problem improvedG
 
                 let keptOpen =
-                    rest
-                    |> List.filter (fun entry -> frontierWorthy snapshot improvedG (fst entry))
+                    rest |> List.filter (fun entry -> frontierWorthy snapshot improvedG (fst entry))
 
                 let freshOpen =
                     scored
@@ -268,7 +297,8 @@ module AStar =
     /// The global lower bound: the incumbent when OPEN is empty, otherwise the smallest
     /// f on the frontier. It is never a single node's g+h.
     let globalBound (snapshot: SearchSnapshot) : float option =
-        let frontierMinimum () = snapshot.Open |> List.map snd |> List.min |> Some
+        let frontierMinimum () =
+            snapshot.Open |> List.map snd |> List.min |> Some
 
         match List.isEmpty snapshot.Open, snapshot.Incumbent with
         | true, Some known -> Some known

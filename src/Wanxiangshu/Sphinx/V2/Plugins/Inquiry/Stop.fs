@@ -26,14 +26,16 @@ type StopReason =
     | Suspended of reason: string
 
 type StopClaim =
-    { Reason: StopReason
-      /// The plans the claim was evaluated over. Stops never cover more than this.
-      CoveredPlanIds: string list
-      /// True when the value of further computation was actually measured.
-      VocMeasured: bool
-      VocValue: float option
-      /// True when the claimed reason is a property of a declared model only.
-      ModelRelative: bool }
+    {
+        Reason: StopReason
+        /// The plans the claim was evaluated over. Stops never cover more than this.
+        CoveredPlanIds: string list
+        /// True when the value of further computation was actually measured.
+        VocMeasured: bool
+        VocValue: float option
+        /// True when the claimed reason is a property of a declared model only.
+        ModelRelative: bool
+    }
 
 [<RequireQualifiedAccess>]
 type StopFault =
@@ -62,8 +64,11 @@ module Stop =
         | _ -> false
 
     let validateClaim (claim: StopClaim) : Result<StopClaim, StopFault> =
-        let noVocsMeasured () = claim.VocValue.IsSome && not claim.VocMeasured
-        let inconsistentRelativity () = isModelRelative claim.Reason <> claim.ModelRelative
+        let noVocsMeasured () =
+            claim.VocValue.IsSome && not claim.VocMeasured
+
+        let inconsistentRelativity () =
+            isModelRelative claim.Reason <> claim.ModelRelative
 
         match List.isEmpty claim.CoveredPlanIds, noVocsMeasured (), inconsistentRelativity () with
         | true, _, _ -> Error StopFault.ClaimCoversNothing

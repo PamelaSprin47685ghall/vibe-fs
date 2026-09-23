@@ -16,12 +16,14 @@ type Judgment =
     | Conditional of conditionRef: string
 
 type PairwiseResponse =
-    { Judgment: Judgment
-      Rationale: string
-      SourceLabels: string list
-      /// Local references to plan cards attached to this response. The Runtime assigns
-      /// canonical ids only after it accepts the response; a worker never invents one.
-      ProposedAlternatives: ProposedAlternative list }
+    {
+        Judgment: Judgment
+        Rationale: string
+        SourceLabels: string list
+        /// Local references to plan cards attached to this response. The Runtime assigns
+        /// canonical ids only after it accepts the response; a worker never invents one.
+        ProposedAlternatives: ProposedAlternative list
+    }
 
 and ProposedAlternative =
     { LocalId: string
@@ -42,18 +44,20 @@ type MaxDiffObservation =
 
 /// A recorded measurement, replayable as the model produced it (WHAT[sphinx-v2-021]).
 type Observation =
-    { ObservationId: string
-      ScopeId: string
-      SnapshotId: string
-      /// measurement | intervention.
-      Purpose: string
-      QuestionId: string
-      QuestionHash: string
-      TemplateRef: string
-      ClusterId: string
-      /// The exact bytes the model saw.
-      VisibleBytesHash: string
-      CanonicalResult: string }
+    {
+        ObservationId: string
+        ScopeId: string
+        SnapshotId: string
+        /// measurement | intervention.
+        Purpose: string
+        QuestionId: string
+        QuestionHash: string
+        TemplateRef: string
+        ClusterId: string
+        /// The exact bytes the model saw.
+        VisibleBytesHash: string
+        CanonicalResult: string
+    }
 
 module QuestionnaireModel =
 
@@ -87,7 +91,8 @@ module QuestionnaireModel =
     /// candidate (WHAT[sphinx-v2-023]).
     let labelsWithin (presented: Set<string>) (response: PairwiseResponse) : Result<unit, string> =
         let unknown =
-            response.SourceLabels |> List.filter (fun label -> not (Set.contains label presented))
+            response.SourceLabels
+            |> List.filter (fun label -> not (Set.contains label presented))
 
         if List.isEmpty unknown then
             Ok()
@@ -97,7 +102,10 @@ module QuestionnaireModel =
     /// Local ids must be unique inside one response, otherwise two proposals collapse
     /// into one when the Runtime assigns canonical ids.
     let uniqueLocalIds (response: PairwiseResponse) : Result<unit, string> =
-        let ids = response.ProposedAlternatives |> List.map (fun alternative -> alternative.LocalId)
+        let ids =
+            response.ProposedAlternatives
+            |> List.map (fun alternative -> alternative.LocalId)
+
         let distinct = ids |> Set.ofList |> Set.count
 
         if distinct = List.length ids then

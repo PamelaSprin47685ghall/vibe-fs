@@ -15,16 +15,23 @@ open Wanxiangshu.Sphinx.V2.Core
 /// number cannot represent every 64-bit integer, so `revision: 9007199254740993` and
 /// `revision: 9007199254740992` must not compare equal.
 
-type WireError = { Code: string; Path: string; Message: string }
+type WireError =
+    { Code: string
+      Path: string
+      Message: string }
 
 module Decode =
 
     let private error code path message : Result<'value, WireError> =
-        Error { Code = code; Path = path; Message = message }
+        Error
+            { Code = code
+              Path = path
+              Message = message }
 
     let private isBlank (value: string) = String.IsNullOrWhiteSpace value
 
-    let private isString (value: obj) : bool = emitJsExpr value "typeof $0 === 'string'"
+    let private isString (value: obj) : bool =
+        emitJsExpr value "typeof $0 === 'string'"
 
     let private isFiniteNumber (value: obj) : bool =
         emitJsExpr value "typeof $0 === 'number' && Number.isFinite($0)"
@@ -63,14 +70,12 @@ module Decode =
 
         match isSafeCount value with
         | true -> Ok(unbox<int64> value)
-        | false ->
-            error
-                "INVALID_SCHEMA"
-                name
-                (sprintf "field %s must be a non-negative safe integer" name)
+        | false -> error "INVALID_SCHEMA" name (sprintf "field %s must be a non-negative safe integer" name)
 
     let private revisionFault (message: string) : WireError =
-        { Code = "INVALID_REVISION"; Path = "revision"; Message = message }
+        { Code = "INVALID_REVISION"
+          Path = "revision"
+          Message = message }
 
     let private revisionOf (parsed: int64) : Result<Revision, WireError> =
         match Revision.tryCreate parsed with
@@ -89,7 +94,9 @@ module Decode =
     /// A list of unique, non-blank strings. A repeated entry is a defect.
     let uniqueStringListField (raw: obj) (name: string) : Result<string list, WireError> =
         let value = field raw name
-        let items () = unbox<obj array> value |> Array.map string |> Array.toList
+
+        let items () =
+            unbox<obj array> value |> Array.map string |> Array.toList
 
         let blankEntry () =
             error "INVALID_SCHEMA" name (sprintf "field %s must not contain blank entries" name)

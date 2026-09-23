@@ -1,25 +1,32 @@
 namespace Wanxiangshu.Sphinx.V2.Plugins
 
-type GraphEdge = { FromNode: string; ToNode: string; Cost: float }
+type GraphEdge =
+    { FromNode: string
+      ToNode: string
+      Cost: float }
 
 type AStarProblem =
-    { Start: string
-      Goal: string
-      Edges: GraphEdge list
-      /// Heuristic values. Guidance unless the caller declares them admissible.
-      Heuristic: Map<string, float>
-      /// True when the caller asserts the heuristic is admissible and consistent.
-      HeuristicAdmissible: bool }
+    {
+        Start: string
+        Goal: string
+        Edges: GraphEdge list
+        /// Heuristic values. Guidance unless the caller declares them admissible.
+        Heuristic: Map<string, float>
+        /// True when the caller asserts the heuristic is admissible and consistent.
+        HeuristicAdmissible: bool
+    }
 
 type SearchSnapshot =
-    { Open: (string * float) list
-      Closed: string list
-      BestG: Map<string, float>
-      Parents: Map<string, string>
-      Expanded: string list
-      /// The best known complete path cost, if any.
-      Incumbent: float option
-      ModelRevision: int }
+    {
+        Open: (string * float) list
+        Closed: string list
+        BestG: Map<string, float>
+        Parents: Map<string, string>
+        Expanded: string list
+        /// The best known complete path cost, if any.
+        Incumbent: float option
+        ModelRevision: int
+    }
 
 [<RequireQualifiedAccess>]
 type AStarFault =

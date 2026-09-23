@@ -10,13 +10,15 @@ type EstimateKind =
     | Unestimated
 
 type PlanEstimate =
-    { PlanId: PlanId
-      ScopeId: string
-      Kind: EstimateKind
-      /// Position in the declared value space. Meaningless without `Kind`.
-      Location: float option
-      /// None means the plan was never compared; never a zero.
-      Rank: int option }
+    {
+        PlanId: PlanId
+        ScopeId: string
+        Kind: EstimateKind
+        /// Position in the declared value space. Meaningless without `Kind`.
+        Location: float option
+        /// None means the plan was never compared; never a zero.
+        Rank: int option
+    }
 
 type UnestimatedPlan = { PlanId: PlanId; Reason: string }
 

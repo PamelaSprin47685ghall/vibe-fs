@@ -6,9 +6,7 @@ namespace Wanxiangshu.Sphinx.V2.Core
 /// "sphinx-schema-v2" — WHAT[sphinx-v2-015] requires two different schema documents
 /// to be distinguishable by their reference alone, otherwise a schema edit is
 /// invisible to the reducer.
-type SchemaRef =
-    { Id: string
-      Hash: string }
+type SchemaRef = { Id: string; Hash: string }
 
 /// An immutable, schema-bound payload. `CanonicalPayload` is the canonical JSON text
 /// produced from the typed value; the same bytes are what travel on the wire and

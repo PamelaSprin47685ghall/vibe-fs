@@ -12,12 +12,14 @@ open Wanxiangshu.Sphinx.V2.Core
 /// explicit iteration budget plus a residual — never a claim of a fixed point.
 
 type DirtyTarget =
-    { Producer: string
-      Target: string
-      ScopeId: string
-      /// Fingerprint of every input the target last consumed.
-      InputFingerprint: string
-      Dependencies: Set<string> }
+    {
+        Producer: string
+        Target: string
+        ScopeId: string
+        /// Fingerprint of every input the target last consumed.
+        InputFingerprint: string
+        Dependencies: Set<string>
+    }
 
 type RefinementStep =
     { Target: DirtyTarget
@@ -68,8 +70,7 @@ module Refinement =
                  | true -> "unsatisfied-dependencies"
                  | false -> "no-dirty-targets") }
 
-        let step (pending: DirtyTarget list) (target: DirtyTarget) :
-            (DirtyTarget list * Set<string> * RefinementStep) =
+        let step (pending: DirtyTarget list) (target: DirtyTarget) : (DirtyTarget list * Set<string> * RefinementStep) =
             let remaining = pending |> List.filter (fun item -> item.Target <> target.Target)
 
             (remaining,

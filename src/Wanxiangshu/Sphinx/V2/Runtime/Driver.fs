@@ -10,7 +10,6 @@ open Wanxiangshu.Sphinx.V2.Core
 ///
 /// WHAT[sphinx-v2-011]: intent precedes effect. A transition batch is persisted before
 /// any Host or provider call is made, and an append failure produces no dispatch.
-
 /// What the caller may do after one advance.
 [<RequireQualifiedAccess>]
 type AdvanceOutcome =
@@ -78,7 +77,11 @@ module Driver =
             | _ -> None
 
         let pendingInterpretation () =
-            match state.Interpretations |> Map.toList |> List.filter (fun (_, record) -> record.Status = "pending") with
+            match
+                state.Interpretations
+                |> Map.toList
+                |> List.filter (fun (_, record) -> record.Status = "pending")
+            with
             | [] -> None
             | refinable -> Some(AdvanceOutcome.RefinementPending(refinable |> List.length))
 

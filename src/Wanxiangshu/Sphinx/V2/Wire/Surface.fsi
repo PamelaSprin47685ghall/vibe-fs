@@ -20,7 +20,10 @@ type SubmitResultWire =
       Result: obj
       ExecutionReceiptRef: string }
 
-type SurfaceError = { Code: string; Path: string; Message: string }
+type SurfaceError =
+    { Code: string
+      Path: string
+      Message: string }
 
 /// The v2 surface. Every entry point returns a plain JS object; every failure returns
 /// a typed error object with a stable code and a field path.

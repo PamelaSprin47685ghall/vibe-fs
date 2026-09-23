@@ -14,17 +14,19 @@ type PluginError = { Code: string; Message: string }
 /// What a plugin may observe and what it may propose. The context is a read-only
 /// snapshot: no network, no filesystem, no clock, no mutable store handle.
 type PluginContext =
-    { InquiryId: InquiryId
-      GoalRevision: Revision
-      ScopeId: string
-      ConfigHash: string
-      /// Deterministic random state handed in; the plugin returns the advanced state.
-      RngState: string
-      /// Read-only view over the semantic graph the plugin owns.
-      Graph: JsonEnvelope option
-      /// Read-only budget facts.
-      Budget: JsonEnvelope option
-      LockedPluginRefs: string list }
+    {
+        InquiryId: InquiryId
+        GoalRevision: Revision
+        ScopeId: string
+        ConfigHash: string
+        /// Deterministic random state handed in; the plugin returns the advanced state.
+        RngState: string
+        /// Read-only view over the semantic graph the plugin owns.
+        Graph: JsonEnvelope option
+        /// Read-only budget facts.
+        Budget: JsonEnvelope option
+        LockedPluginRefs: string list
+    }
 
 /// A proposed semantic change. Nothing here takes effect until the same admission
 /// path the Kernel uses has validated it — a plugin is not trusted because it is
@@ -64,14 +66,16 @@ type ExecutablePlugin =
       Refine: PluginContext -> RefinementInput -> PluginResult<PluginDelta> }
 
 and PluginManifest =
-    { Id: string
-      Release: string
-      /// Hash of the executable artifact, not a version label.
-      ImplementationHash: string
-      AbiHash: string
-      Capabilities: Set<string>
-      Dependencies: Set<string>
-      Schemas: Map<string, SchemaRef> }
+    {
+        Id: string
+        Release: string
+        /// Hash of the executable artifact, not a version label.
+        ImplementationHash: string
+        AbiHash: string
+        Capabilities: Set<string>
+        Dependencies: Set<string>
+        Schemas: Map<string, SchemaRef>
+    }
 
 module PluginContract =
 
@@ -79,14 +83,20 @@ module PluginContract =
     /// declaration to the signature it was compiled against.
     let validateManifest (manifest: PluginManifest) : PluginResult<unit> =
         if System.String.IsNullOrWhiteSpace manifest.Id then
-            Error { Code = "invalid-manifest"; Message = "plugin id must not be blank" }
+            Error
+                { Code = "invalid-manifest"
+                  Message = "plugin id must not be blank" }
         elif System.String.IsNullOrWhiteSpace manifest.Release then
-            Error { Code = "invalid-manifest"; Message = "plugin release must not be blank" }
+            Error
+                { Code = "invalid-manifest"
+                  Message = "plugin release must not be blank" }
         elif System.String.IsNullOrWhiteSpace manifest.ImplementationHash then
             Error
                 { Code = "invalid-manifest"
                   Message = "plugin implementation hash must not be blank" }
         elif System.String.IsNullOrWhiteSpace manifest.AbiHash then
-            Error { Code = "invalid-manifest"; Message = "plugin abi hash must not be blank" }
+            Error
+                { Code = "invalid-manifest"
+                  Message = "plugin abi hash must not be blank" }
         else
             Ok()

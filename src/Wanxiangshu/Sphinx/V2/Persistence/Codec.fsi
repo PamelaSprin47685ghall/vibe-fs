@@ -39,5 +39,4 @@ module Codec =
 
     /// Encodes one transition as one canonical envelope. The same transition always
     /// yields the same envelope id, so a retried append is idempotent at the store.
-    val encode:
-        (string -> string) -> TransitionBatch -> Wanxiangshu.Foundation.Identity.EventId option -> EventEnvelope
+    val encode: (string -> string) -> TransitionBatch -> Wanxiangshu.Foundation.Identity.EventId option -> EventEnvelope

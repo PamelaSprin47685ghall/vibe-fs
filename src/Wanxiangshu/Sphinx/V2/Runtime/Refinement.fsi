@@ -3,12 +3,14 @@ namespace Wanxiangshu.Sphinx.V2.Runtime
 open Wanxiangshu.Sphinx.V2.Core
 
 type DirtyTarget =
-    { Producer: string
-      Target: string
-      ScopeId: string
-      /// Fingerprint of every input the target last consumed.
-      InputFingerprint: string
-      Dependencies: Set<string> }
+    {
+        Producer: string
+        Target: string
+        ScopeId: string
+        /// Fingerprint of every input the target last consumed.
+        InputFingerprint: string
+        Dependencies: Set<string>
+    }
 
 type RefinementStep =
     { Target: DirtyTarget

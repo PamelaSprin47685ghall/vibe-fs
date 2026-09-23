@@ -41,7 +41,8 @@ module Registry =
     /// Topological order over plugin dependencies. A cycle is a build-time defect: no
     /// runtime protocol can resolve it, and silently picking an order would hide it.
     let ordered (plugins: LockedPlugin list) : Result<LockedPlugin list, RegistryError> =
-        let byId = plugins |> List.map (fun plugin -> plugin.Manifest.Id, plugin) |> Map.ofList
+        let byId =
+            plugins |> List.map (fun plugin -> plugin.Manifest.Id, plugin) |> Map.ofList
 
         let rec visit (id: string) (visiting: Set<string>) (acc: LockedPlugin list) =
             match byId |> Map.tryFind id with
@@ -69,9 +70,7 @@ module Registry =
     /// fails here, at startup, rather than at the moment of dispatch.
     let private missingDependencies (plugins: LockedPlugin list) : string list =
         let declaredIds =
-            plugins
-            |> List.map (fun plugin -> plugin.Manifest.Id)
-            |> Set.ofList
+            plugins |> List.map (fun plugin -> plugin.Manifest.Id) |> Set.ofList
 
         plugins
         |> List.collect (fun plugin -> plugin.Manifest.Dependencies |> Set.toList)
@@ -94,7 +93,10 @@ module Registry =
             |> List.map (fun plugin -> PluginContract.validateManifest plugin.Manifest)
             |> List.tryPick (fun outcome ->
                 match outcome with
-                | Error fault -> Some { Code = fault.Code; Message = fault.Message }
+                | Error fault ->
+                    Some
+                        { Code = fault.Code
+                          Message = fault.Message }
                 | Ok _ -> None)
 
         let dependencyProblem () =
@@ -130,8 +132,7 @@ module Registry =
     /// The lock a new proposal must match. Comparing implementation hashes, ABI hashes
     /// and schema hashes — not just release labels — is what makes a mid-inquiry
     /// implementation swap detectable (WHAT[sphinx-v2-003]).
-    let lockOf (plugins: LockedPlugin list) : PluginLockEntry list =
-        plugins |> List.map toLockEntry
+    let lockOf (plugins: LockedPlugin list) : PluginLockEntry list = plugins |> List.map toLockEntry
 
     let compatible (existing: PluginLockEntry list) (candidate: LockedPlugin list) : Result<unit, RegistryError> =
         let wanted = candidate |> List.map toLockEntry

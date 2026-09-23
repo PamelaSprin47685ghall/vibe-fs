@@ -24,22 +24,26 @@ type ResourceSpec =
 /// One reservation outstanding against the ledger. A reservation is a promise, not a
 /// charge: it is released when the work settles, and only the settled usage counts.
 type Reservation =
-    { WorkId: WorkId
-      Attempt: Attempt
-      Resources: Map<string, float>
-      /// Money is kept in the smallest currency unit so binary float addition cannot
-      /// accumulate a fiscal drift across a long inquiry.
-      MoneyMinor: int64 option }
+    {
+        WorkId: WorkId
+        Attempt: Attempt
+        Resources: Map<string, float>
+        /// Money is kept in the smallest currency unit so binary float addition cannot
+        /// accumulate a fiscal drift across a long inquiry.
+        MoneyMinor: int64 option
+    }
 
 type SettledUsage =
-    { WorkId: WorkId
-      Attempt: Attempt
-      Resources: Map<string, float>
-      MoneyMinor: int64 option
-      /// True when the provider never reported usage; the reserved amount stays.
-      UsageUnresolved: bool
-      /// True when the settled usage exceeded the reservation. Recorded, not rejected.
-      Overrun: bool }
+    {
+        WorkId: WorkId
+        Attempt: Attempt
+        Resources: Map<string, float>
+        MoneyMinor: int64 option
+        /// True when the provider never reported usage; the reserved amount stays.
+        UsageUnresolved: bool
+        /// True when the settled usage exceeded the reservation. Recorded, not rejected.
+        Overrun: bool
+    }
 
 type BudgetError = { Code: string; Message: string }
 
@@ -67,7 +71,9 @@ module Budget =
                 { Code = "invalid-budget"
                   Message = "every resource needs a name and a finite nonnegative authorized limit" }
         elif hasDuplicateNames specs then
-            Error { Code = "invalid-budget"; Message = "resource names must be unique" }
+            Error
+                { Code = "invalid-budget"
+                  Message = "resource names must be unique" }
         else
             Ok()
 
@@ -80,9 +86,17 @@ module Budget =
     /// signedFree = authorizedLimit - settledUsage - outstandingReservations.
     /// availableForNewWork = max(0, signedFree) and observedOverrun = max(0, -signedFree)
     /// are derived, never stored, so they cannot drift from the three facts that produce them.
-    let signedFree (specs: ResourceSpec list) (settled: Map<string, float>) (reserved: Map<string, float>) (name: string) :
-        float =
-        let limit = specs |> List.tryFind (fun spec -> spec.Name = name) |> Option.map (fun spec -> spec.AuthorizedLimit)
+    let signedFree
+        (specs: ResourceSpec list)
+        (settled: Map<string, float>)
+        (reserved: Map<string, float>)
+        (name: string)
+        : float =
+        let limit =
+            specs
+            |> List.tryFind (fun spec -> spec.Name = name)
+            |> Option.map (fun spec -> spec.AuthorizedLimit)
+
         let used = settled |> Map.tryFind name |> Option.defaultValue 0.0
         let outstanding = reserved |> Map.tryFind name |> Option.defaultValue 0.0
 
@@ -105,6 +119,47 @@ module Budget =
         (name: string)
         : float =
         max 0.0 (-(signedFree specs settled reserved name))
+
+    /// Either the projected ledger fits, or the reason it does not.
+    let private reservationOutcome
+        (projected: Map<string, float>)
+        (oversubscribedNames: string list)
+        : Result<Map<string, float>, BudgetError> =
+        let insufficiency () =
+            Error
+                { Code = "budget-insufficient"
+                  Message = sprintf "reservation exceeds available budget: %s" (String.concat ", " oversubscribedNames) }
+
+        match List.isEmpty oversubscribedNames with
+        | true -> Ok projected
+        | false -> insufficiency ()
+
+    /// The refusal for a reservation that cannot be admitted, with its most specific
+    /// reason first so the reported fault is stable.
+    let private reservationRefusal
+        (unknown: string list)
+        (negative: string list)
+        (projected: Map<string, float>)
+        (oversubscribedNames: string list)
+        : Result<Map<string, float>, BudgetError> =
+        let unknownResource () =
+            Error
+                { Code = "unknown-resource"
+                  Message = sprintf "reservation names unknown resources: %s" (String.concat ", " unknown) }
+
+        let invalidAmount () =
+            Error
+                { Code = "invalid-budget"
+                  Message =
+                    sprintf "reservation amounts must be finite and nonnegative: %s" (String.concat ", " negative) }
+
+        let oversubscribed () =
+            reservationOutcome projected oversubscribedNames
+
+        match List.isEmpty unknown, List.isEmpty negative with
+        | false, _ -> unknownResource ()
+        | true, false -> invalidAmount ()
+        | true, true -> oversubscribed ()
 
     /// A new reservation may not push the projected balance below zero. The caller
     /// keeps the render reserve out of this pool, so a render can never be priced out
@@ -129,31 +184,24 @@ module Budget =
             |> List.filter (fun (_, amount) -> not (isFinite amount) || amount < 0.0)
             |> List.map fst
 
-        if not (List.isEmpty unknown) then
-            Error
-                { Code = "unknown-resource"
-                  Message = sprintf "reservation names unknown resources: %s" (String.concat ", " unknown) }
-        elif not (List.isEmpty negative) then
-            Error
-                { Code = "invalid-budget"
-                  Message = sprintf "reservation amounts must be finite and nonnegative: %s" (String.concat ", " negative) }
-        else
-            let projected = merge reserved reservation.Resources
+        let projected = merge reserved reservation.Resources
 
-            let oversubscribedNames =
-                specs
-                |> List.filter (fun spec ->
-                    let projectedForSpec = projected |> Map.tryFind spec.Name |> Option.defaultValue 0.0
-                    let available = availableForNewWork specs settled reserved spec.Name
-                    projectedForSpec > available)
-                |> List.map (fun spec -> spec.Name)
+        let oversubscribedNames =
+            specs
+            |> List.filter (fun spec ->
+                let projectedForSpec = projected |> Map.tryFind spec.Name |> Option.defaultValue 0.0
+                let available = availableForNewWork specs settled reserved spec.Name
+                projectedForSpec > available)
+            |> List.map (fun spec -> spec.Name)
 
-            let names = String.concat ", " oversubscribedNames
+        let admissible =
+            List.isEmpty unknown
+            && List.isEmpty negative
+            && List.isEmpty oversubscribedNames
 
-            let insufficiency () =
-                Error { Code = "budget-insufficient"; Message = sprintf "reservation exceeds available budget: %s" names }
-
-            if List.isEmpty oversubscribedNames then Ok projected else insufficiency ()
+        match admissible with
+        | true -> Ok projected
+        | false -> reservationRefusal unknown negative projected oversubscribedNames
 
     /// Settlement replaces this work's own reservation with what it really spent.
     /// Releasing the reservation and booking the usage in one step is what keeps a
@@ -170,7 +218,10 @@ module Budget =
                 let outstanding = acc |> Map.tryFind key |> Option.defaultValue 0.0
                 let left = outstanding - amount
 
-                if left <= 0.0 then Map.remove key acc else Map.add key left acc)
+                if left <= 0.0 then
+                    Map.remove key acc
+                else
+                    Map.add key left acc)
 
         let booked =
             if usage.UsageUnresolved then

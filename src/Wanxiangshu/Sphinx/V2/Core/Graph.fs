@@ -25,23 +25,27 @@ type GraphRole =
     | RefinerState
 
 type GraphNode =
-    { Id: NodeId
-      Role: GraphRole
-      /// Core compares this by identity only; it never reads the semantic kind.
-      Kind: string
-      Payload: JsonEnvelope
-      Revision: Revision
-      /// Content hash of the payload as first accepted; a revision keeps its own.
-      ContentHash: string }
+    {
+        Id: NodeId
+        Role: GraphRole
+        /// Core compares this by identity only; it never reads the semantic kind.
+        Kind: string
+        Payload: JsonEnvelope
+        Revision: Revision
+        /// Content hash of the payload as first accepted; a revision keeps its own.
+        ContentHash: string
+    }
 
 type HyperEdge =
-    { Id: EdgeId
-      Tails: Set<NodeId>
-      Heads: Set<NodeId>
-      /// Core compares this by identity only; it never reads the relation.
-      Relation: string
-      Payload: JsonEnvelope option
-      Revision: Revision }
+    {
+        Id: EdgeId
+        Tails: Set<NodeId>
+        Heads: Set<NodeId>
+        /// Core compares this by identity only; it never reads the relation.
+        Relation: string
+        Payload: JsonEnvelope option
+        Revision: Revision
+    }
 
 type GraphPatch =
     { UpsertNodes: GraphNode list
@@ -66,16 +70,24 @@ module Graph =
     /// is warranted — that is the producing plugin's semantic responsibility.
     let private checkNode (node: GraphNode) : Result<unit, GraphError> =
         if System.String.IsNullOrWhiteSpace node.Kind then
-            Error { Code = "invalid-node"; Message = "graph node kind must not be blank" }
+            Error
+                { Code = "invalid-node"
+                  Message = "graph node kind must not be blank" }
         elif System.String.IsNullOrWhiteSpace node.ContentHash then
-            Error { Code = "invalid-node"; Message = "graph node content hash must not be blank" }
+            Error
+                { Code = "invalid-node"
+                  Message = "graph node content hash must not be blank" }
         else
             Ok()
 
-    let applyPatch (nodes: Map<NodeId, GraphNode>) (edges: Map<EdgeId, HyperEdge>) (patch: GraphPatch) :
-        Result<Map<NodeId, GraphNode> * Map<EdgeId, HyperEdge>, GraphError> =
+    let applyPatch
+        (nodes: Map<NodeId, GraphNode>)
+        (edges: Map<EdgeId, HyperEdge>)
+        (patch: GraphPatch)
+        : Result<Map<NodeId, GraphNode> * Map<EdgeId, HyperEdge>, GraphError> =
         let nodesAfterRemoval =
-            patch.RemoveNodes |> List.fold (fun graph nodeId -> Map.remove nodeId graph) nodes
+            patch.RemoveNodes
+            |> List.fold (fun graph nodeId -> Map.remove nodeId graph) nodes
 
         let nodesAfterUpsert =
             patch.UpsertNodes
@@ -111,6 +123,9 @@ module Graph =
         if not (List.isEmpty dangling) then
             Error
                 { Code = "dangling-edge"
-                  Message = sprintf "hyperedge endpoints must exist: %s" (String.concat ", " (dangling |> List.truncate 4 |> List.map NodeId.value)) }
+                  Message =
+                    sprintf
+                        "hyperedge endpoints must exist: %s"
+                        (String.concat ", " (dangling |> List.truncate 4 |> List.map NodeId.value)) }
         else
             nodeChecks |> Result.map (fun () -> nodesAfterUpsert, edgesAfterUpsert)

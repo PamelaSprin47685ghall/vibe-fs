@@ -16,8 +16,7 @@ type BudgetReservedBody =
     { Reservation: Reservation
       RenderReserve: Map<string, float> }
 
-type UsageSettledBody =
-    { Usage: SettledUsage }
+type UsageSettledBody = { Usage: SettledUsage }
 
 type DispatchRequestedBody =
     { Work: WorkSpec
@@ -42,15 +41,17 @@ type WorkAttemptTransitionedBody =
       PhysicalRef: string option }
 
 type ResultAcceptedBody =
-    { WorkId: WorkId
-      Attempt: Attempt
-      Fence: Fence
-      ObservationId: ObservationId
-      /// Canonical response bytes exactly as the worker returned them (CB-03: raw
-      /// answers stay replayable; re-fitting never rewrites them).
-      CanonicalResult: string
-      ResultSchema: SchemaRef
-      ClusterId: string }
+    {
+        WorkId: WorkId
+        Attempt: Attempt
+        Fence: Fence
+        ObservationId: ObservationId
+        /// Canonical response bytes exactly as the worker returned them (CB-03: raw
+        /// answers stay replayable; re-fitting never rewrites them).
+        CanonicalResult: string
+        ResultSchema: SchemaRef
+        ClusterId: string
+    }
 
 type InterpretationPendingBody =
     { ObservationId: ObservationId
@@ -70,11 +71,9 @@ type InterpretationFailedBody =
       Reason: string }
 
 type GraphPatchedBody =
-    { Patch: GraphPatch
-      PluginRef: string }
+    { Patch: GraphPatch; PluginRef: string }
 
-type CertificateSlotsPatchedBody =
-    { Patches: CertificateSlotPatch list }
+type CertificateSlotsPatchedBody = { Patches: CertificateSlotPatch list }
 
 type CertificateInvalidatedBody =
     { Invalidation: JsonEnvelope

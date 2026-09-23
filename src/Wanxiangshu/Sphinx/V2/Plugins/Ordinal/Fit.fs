@@ -19,20 +19,22 @@ type FitStatus =
     | LineSearchFailed of iterations: int
 
 type FitResult =
-    { Status: FitStatus
-      /// Theta in the declared gauge (zero-sum by default).
-      Theta: Map<string, float>
-      /// Beta, or None when the design cannot identify a position effect.
-      Beta: float option
-      Kappa: float option
-      /// Full covariance in the free coordinates, indexed by candidate id.
-      Covariance: Map<string * string, float>
-      Iterations: int
-      GradientNorm: float
-      /// The approximation actually used, named in the result.
-      EstimateKind: string
-      ModelRef: string
-      Assumptions: string list }
+    {
+        Status: FitStatus
+        /// Theta in the declared gauge (zero-sum by default).
+        Theta: Map<string, float>
+        /// Beta, or None when the design cannot identify a position effect.
+        Beta: float option
+        Kappa: float option
+        /// Full covariance in the free coordinates, indexed by candidate id.
+        Covariance: Map<string * string, float>
+        Iterations: int
+        GradientNorm: float
+        /// The approximation actually used, named in the result.
+        EstimateKind: string
+        ModelRef: string
+        Assumptions: string list
+    }
 
 type FitError = { Code: string; Message: string }
 
@@ -47,8 +49,7 @@ module Fit =
     /// Pivot selection: the largest remaining entry in the column. A zero column means
     /// the system is singular, which the caller must report rather than divide by.
     let private choosePivot (augmented: float array array) (column: int) (n: int) : int =
-        [ column .. n - 1 ]
-        |> List.maxBy (fun row -> abs (augmented.[row].[column]))
+        [ column .. n - 1 ] |> List.maxBy (fun row -> abs (augmented.[row].[column]))
 
     let private withSwap (augmented: float array array) (column: int) (pivot: int) : float array array =
         let copy = Array.copy augmented
@@ -86,10 +87,14 @@ module Fit =
 
     let private sweepColumn (rows: float array array) (column: int) (n: int) (from: int) : float array array =
         [ column + 1 .. n - 1 ]
-        |> List.fold (fun acc row -> acc |> Array.mapi (fun index values ->
-            match index = row with
-            | true -> eliminateRow acc column row from
-            | false -> values)) rows
+        |> List.fold
+            (fun acc row ->
+                acc
+                |> Array.mapi (fun index values ->
+                    match index = row with
+                    | true -> eliminateRow acc column row from
+                    | false -> values))
+            rows
 
     /// One elimination step. A singular pivot stops the solve; a real one recurses.
     let private eliminateOnce
@@ -122,10 +127,14 @@ module Fit =
         let n = rhs.Length
         let width = rhs.[0].Length
 
-        let augmented =
-            Array.init n (fun row -> Array.append matrix.[row] rhs.[row])
+        let augmented = Array.init n (fun row -> Array.append matrix.[row] rhs.[row])
 
-        let rec backColumn (triangular: float array array) (row: int) (column: int) (solution: float array array) : float array array =
+        let rec backColumn
+            (triangular: float array array)
+            (row: int)
+            (column: int)
+            (solution: float array array)
+            : float array array =
             match row < 0 with
             | true -> solution
             | false ->
@@ -137,7 +146,11 @@ module Fit =
                 solution.[row].[column] <- value
                 backColumn triangular (row - 1) column solution
 
-        let rec backInto (triangular: float array array) (solution: float array array) (column: int) : float array array =
+        let rec backInto
+            (triangular: float array array)
+            (solution: float array array)
+            (column: int)
+            : float array array =
             match column >= width with
             | true -> solution
             | false ->
@@ -148,8 +161,7 @@ module Fit =
         | None -> None
         | Some triangular ->
             let zeroed = Array.init n (fun _ -> Array.zeroCreate width)
-            backInto triangular zeroed 0
-            |> Some
+            backInto triangular zeroed 0 |> Some
 
     /// The zero-sum gauge is represented by dropping one candidate and solving for the
     /// rest; the dropped candidate's value is recovered by the constraint. The covariance
@@ -178,7 +190,9 @@ module Fit =
                 else
                     [ (left, right, value); (right, left, value) ])
 
-        mirrored |> List.map (fun (left, right, value) -> (left, right), value) |> Map.ofList
+        mirrored
+        |> List.map (fun (left, right, value) -> (left, right), value)
+        |> Map.ofList
 
     /// The MAP covariance, lifted from the free coordinates back into candidate space.
     /// No inverse means no covariance: reporting the prior as if it were data would be
@@ -205,98 +219,92 @@ module Fit =
         (gradientTolerance: float)
         (design: DesignRankReport)
         : Result<FitResult, FitError> =
-            // Newton on the penalized directional log-likelihood, in free coordinates.
-            let ids = candidates |> List.sort
-            let index = ids |> List.mapi (fun i id -> id, i) |> Map.ofList
-            let size = ids.Length
+        // Newton on the penalized directional log-likelihood, in free coordinates.
+        let ids = candidates |> List.sort
+        let index = ids |> List.mapi (fun i id -> id, i) |> Map.ofList
+        let size = ids.Length
 
-            let thetaArray = Array.zeroCreate<float> size
+        let thetaArray = Array.zeroCreate<float> size
 
-            let hessian = Array.init size (fun _ -> Array.zeroCreate<float> size)
-            let gradient = Array.zeroCreate<float> size
+        let hessian = Array.init size (fun _ -> Array.zeroCreate<float> size)
+        let gradient = Array.zeroCreate<float> size
 
-            let accumulate (ballot: Ballot) =
-                match ballot.Kind with
-                | BallotKind.Directional(winner, loser) ->
-                    let wi = index |> Map.find winner
-                    let li = index |> Map.find loser
+        let accumulate (ballot: Ballot) =
+            match ballot.Kind with
+            | BallotKind.Directional(winner, loser) ->
+                let wi = index |> Map.find winner
+                let li = index |> Map.find loser
 
-                    let tw = thetaArray.[wi]
-                    let tl = thetaArray.[li]
+                let tw = thetaArray.[wi]
+                let tl = thetaArray.[li]
 
-                    let gw, gl, _ =
-                        Pairwise.directionalGradient tw tl 0.0 (OrdinalModel.positionTerm ballot)
+                let gw, gl, _ =
+                    Pairwise.directionalGradient tw tl 0.0 (OrdinalModel.positionTerm ballot)
 
-                    gradient.[wi] <- gradient.[wi] + gw - model.ThetaL2 * tw
-                    gradient.[li] <- gradient.[li] + gl - model.ThetaL2 * tl
+                gradient.[wi] <- gradient.[wi] + gw - model.ThetaL2 * tw
+                gradient.[li] <- gradient.[li] + gl - model.ThetaL2 * tl
 
-                    // Observed information: -d^2 log p / d theta^2 is positive, and the
-                    // penalty contributes ThetaL2 on the diagonal.
-                    hessian.[wi].[wi] <- hessian.[wi].[wi] + 1.0 + model.ThetaL2
-                    hessian.[li].[li] <- hessian.[li].[li] + 1.0 + model.ThetaL2
-                    hessian.[wi].[li] <- hessian.[wi].[li] - 1.0
-                    hessian.[li].[wi] <- hessian.[li].[wi] - 1.0
-                | _ -> ()
+                // Observed information: -d^2 log p / d theta^2 is positive, and the
+                // penalty contributes ThetaL2 on the diagonal.
+                hessian.[wi].[wi] <- hessian.[wi].[wi] + 1.0 + model.ThetaL2
+                hessian.[li].[li] <- hessian.[li].[li] + 1.0 + model.ThetaL2
+                hessian.[wi].[li] <- hessian.[wi].[li] - 1.0
+                hessian.[li].[wi] <- hessian.[li].[wi] - 1.0
+            | _ -> ()
 
-            ballots |> List.iter accumulate
+        ballots |> List.iter accumulate
 
-            let gradientNorm =
-                gradient |> Array.map abs |> Array.sum
+        let gradientNorm = gradient |> Array.map abs |> Array.sum
 
-            let gradientColumn = Array.init size (fun i -> [| gradient.[i] |])
+        let gradientColumn = Array.init size (fun i -> [| gradient.[i] |])
 
-            match solveDense hessian gradientColumn with
-            | None ->
-                Ok
-                    { Status = FitStatus.NotConverged 0
-                      Theta = candidates |> List.map (fun candidate -> candidate, 0.0) |> Map.ofList
-                      Beta = None
-                      Kappa = None
-                      Covariance = Map.empty
-                      Iterations = 0
-                      GradientNorm = gradientNorm
-                      EstimateKind = "none"
-                      ModelRef = model.ModelRef
-                      Assumptions = [ "normal equations were singular under the declared gauge" ] }
-            | Some step ->
-                let updated =
-                    thetaArray
-                    |> Array.mapi (fun i value -> value - step.[i].[0])
+        match solveDense hessian gradientColumn with
+        | None ->
+            Ok
+                { Status = FitStatus.NotConverged 0
+                  Theta = candidates |> List.map (fun candidate -> candidate, 0.0) |> Map.ofList
+                  Beta = None
+                  Kappa = None
+                  Covariance = Map.empty
+                  Iterations = 0
+                  GradientNorm = gradientNorm
+                  EstimateKind = "none"
+                  ModelRef = model.ModelRef
+                  Assumptions = [ "normal equations were singular under the declared gauge" ] }
+        | Some step ->
+            let updated = thetaArray |> Array.mapi (fun i value -> value - step.[i].[0])
 
-                let converged = gradientNorm <= gradientTolerance
+            let converged = gradientNorm <= gradientTolerance
 
-                let theta =
-                    ids
-                    |> List.mapi (fun i id -> id, updated.[i])
-                    |> Map.ofList
+            let theta = ids |> List.mapi (fun i id -> id, updated.[i]) |> Map.ofList
 
-                // The MAP covariance is the inverse Hessian of the penalized
-                // log-posterior, computed in the same free coordinates as theta.
-                let identity =
-                    Array.init size (fun i -> Array.init size (fun j -> if i = j then 1.0 else 0.0))
+            // The MAP covariance is the inverse Hessian of the penalized
+            // log-posterior, computed in the same free coordinates as theta.
+            let identity =
+                Array.init size (fun i -> Array.init size (fun j -> if i = j then 1.0 else 0.0))
 
-                let solveInverse () = solveDense hessian identity
+            let solveInverse () = solveDense hessian identity
 
-                let inverse = solveInverse ()
+            let inverse = solveInverse ()
 
-                let covariance = covarianceOfIds ids inverse
+            let covariance = covarianceOfIds ids inverse
 
-                let outcome = convergedStatus converged maxIterations
+            let outcome = convergedStatus converged maxIterations
 
-                Ok
-                    { Status = outcome
-                      Theta = theta
-                      Beta = None
-                      Kappa = None
-                      Covariance = covariance
-                      Iterations = maxIterations
-                      GradientNorm = gradientNorm
-                      EstimateKind = "map-laplace"
-                      ModelRef = model.ModelRef
-                      Assumptions =
-                        [ "zero-sum gauge"
-                          "local Laplace approximation around the MAP"
-                          "regularization is a declared prior, not an absence of one" ] }
+            Ok
+                { Status = outcome
+                  Theta = theta
+                  Beta = None
+                  Kappa = None
+                  Covariance = covariance
+                  Iterations = maxIterations
+                  GradientNorm = gradientNorm
+                  EstimateKind = "map-laplace"
+                  ModelRef = model.ModelRef
+                  Assumptions =
+                    [ "zero-sum gauge"
+                      "local Laplace approximation around the MAP"
+                      "regularization is a declared prior, not an absence of one" ] }
 
     /// A failure result that carries no estimate at all. Named because three different
     /// failure modes share exactly this shape.
@@ -347,7 +355,8 @@ module Fit =
 
         let disconnected () =
             let count =
-                DesignCheck.connectivity ballots candidates |> fun report -> report.Components |> List.length
+                DesignCheck.connectivity ballots candidates
+                |> fun report -> report.Components |> List.length
 
             separatedLike
                 model
@@ -402,13 +411,12 @@ module Fit =
             failure FitStatus.NoDirectionalEvidence "no directional observations were recorded"
 
         let separated () =
-            failure
-                FitStatus.SeparationDetected
-                "a candidate always wins or always loses; the likelihood is unbounded"
+            failure FitStatus.SeparationDetected "a candidate always wins or always loses; the likelihood is unbounded"
 
         let disconnected () =
             let count =
-                DesignCheck.connectivity ballots candidates |> fun report -> report.Components |> List.length
+                DesignCheck.connectivity ballots candidates
+                |> fun report -> report.Components |> List.length
 
             failure
                 (FitStatus.DisconnectedComponents count)
@@ -433,8 +441,7 @@ module Fit =
     /// Variance of a contrast, using the full covariance. Dropping the cross term is the
     /// classic way to understate uncertainty on a difference.
     let contrastVariance (left: string) (right: string) (result: FitResult) : float option =
-        let get key =
-            result.Covariance |> Map.tryFind key
+        let get key = result.Covariance |> Map.tryFind key
 
         match get (left, left), get (right, right), get (left, right) with
         | Some vll, Some vrr, Some vlr -> Some(vll + vrr - 2.0 * vlr)

@@ -132,6 +132,8 @@ Sphinx/V2/Plugins/Ordinal/DesignCheck.fsi
 Sphinx/V2/Plugins/Ordinal/DesignCheck.fs
 Sphinx/V2/Plugins/Ordinal/Fit.fsi
 Sphinx/V2/Plugins/Ordinal/Fit.fs
+Sphinx/V2/Plugins/Ordinal/Surface.fsi
+Sphinx/V2/Plugins/Ordinal/Surface.fs
 Sphinx/Mcp.fsi
 Sphinx/Mcp.fs
 Sphinx/Types.fsi
@@ -1392,6 +1394,12 @@ Sphinx/V2/Plugins/AStar/Refiner.fsi
 Sphinx/V2/Plugins/AStar/Refiner.fs
 Sphinx/V2/Plugins/Mcts/Refiner.fsi
 Sphinx/V2/Plugins/Mcts/Refiner.fs
+Sphinx/V2/Plugins/Bayes/Surface.fsi
+Sphinx/V2/Plugins/Bayes/Surface.fs
+Sphinx/V2/Plugins/AStar/Surface.fsi
+Sphinx/V2/Plugins/AStar/Surface.fs
+Sphinx/V2/Plugins/Mcts/Surface.fsi
+Sphinx/V2/Plugins/Mcts/Surface.fs
 Sphinx/V2/Plugins/Inquiry/Plan.fsi
 Sphinx/V2/Plugins/Inquiry/Plan.fs
 Sphinx/V2/Plugins/Inquiry/Observe.fsi

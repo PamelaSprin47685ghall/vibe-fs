@@ -42,7 +42,8 @@ module DecisionModel =
             estimated
             |> List.mapi (fun index estimate -> { estimate with Rank = Some(index + 1) })
 
-        let renumberedIds = renumbered |> List.map (fun estimate -> estimate.PlanId) |> Set.ofList
+        let renumberedIds =
+            renumbered |> List.map (fun estimate -> estimate.PlanId) |> Set.ofList
 
         renumbered
         @ (estimates
@@ -74,5 +75,4 @@ module DecisionModel =
             |> List.filter (fun estimate -> estimate.Rank.IsSome)
             |> List.map (fun estimate -> estimate.Kind)
 
-        kinds
-        |> List.contains ContributionKind.SingleResponseProvisional
+        kinds |> List.contains ContributionKind.SingleResponseProvisional

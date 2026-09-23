@@ -26,14 +26,14 @@ module Integrator =
     let currentKey = "SphinxV2"
 
     /// The published state: one inquiry state per inquiry id.
-    let private empty : Map<InquiryId, InquiryState> = Map.empty
+    let private empty: Map<InquiryId, InquiryState> = Map.empty
 
-    let private eventWireDecoder : Decoder<Codec.EventBodyWire> =
+    let private eventWireDecoder: Decoder<Codec.EventBodyWire> =
         Decode.object (fun get ->
             { Codec.EventBodyWire.Tag = get.Required.Field "tag" Decode.string
               Payload = get.Required.Field "payload" Decode.string })
 
-    let private wireDecoder : Decoder<Codec.TransitionBatchWire> =
+    let private wireDecoder: Decoder<Codec.TransitionBatchWire> =
         Decode.object (fun get ->
             { Codec.TransitionBatchWire.SchemaVersion = get.Required.Field "schemaVersion" Decode.string
               Inquiry = get.Required.Field "inquiry" Decode.string
@@ -65,7 +65,8 @@ module Integrator =
             | Ok decoded -> decoded
             | Error _ -> ""
 
-        let payloadOf () = Decode.fromString Decode.value wire.Payload
+        let payloadOf () =
+            Decode.fromString Decode.value wire.Payload
 
         match wire.Tag, payloadOf () with
         | "CancelRequested", Ok value -> InquiryEventBody.CancelRequested(textOf value)
@@ -87,26 +88,32 @@ module Integrator =
 
     /// Folds a batch onto its own history. A continuation and a creation go through the
     /// same reducer; the only difference is whether a prior state exists to continue.
-    let private replayBatch (prior: InquiryState option) (events: InquiryEvent list) :
-        Result<InquiryState, string> =
+    let private replayBatch (prior: InquiryState option) (events: InquiryEvent list) : Result<InquiryState, string> =
         let step (state: InquiryState option) (event: InquiryEvent) : Result<InquiryState option, string> =
             let advanced =
                 match state with
-                | Some applied -> { event with Revision = Revision.next applied.Revision }
+                | Some applied ->
+                    { event with
+                        Revision = Revision.next applied.Revision }
                 | None -> event
 
             match Reducer.apply state advanced with
             | Ok next -> Ok(Some next)
             | Error fault -> Error fault.Message
 
-        match events |> List.fold (fun state event -> Result.bind (fun carried -> step carried event) state) (Ok prior) with
+        match
+            events
+            |> List.fold (fun state event -> Result.bind (fun carried -> step carried event) state) (Ok prior)
+        with
         | Ok(Some folded) -> Ok folded
         | Ok None -> Error "transition batch produced no state"
         | Error fault -> Error fault
 
     /// Folds one envelope into the published state.
-    let private integrateOne (states: Map<InquiryId, InquiryState>) (envelope: EventEnvelope) :
-        Result<Map<InquiryId, InquiryState>, string> =
+    let private integrateOne
+        (states: Map<InquiryId, InquiryState>)
+        (envelope: EventEnvelope)
+        : Result<Map<InquiryId, InquiryState>, string> =
         match tryDecodeWire envelope with
         | Error reason -> Error reason
         | Ok wire ->

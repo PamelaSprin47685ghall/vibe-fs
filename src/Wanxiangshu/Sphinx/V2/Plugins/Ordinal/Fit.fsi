@@ -10,20 +10,22 @@ type FitStatus =
     | LineSearchFailed of iterations: int
 
 type FitResult =
-    { Status: FitStatus
-      /// Theta in the declared gauge (zero-sum by default).
-      Theta: Map<string, float>
-      /// Beta, or None when the design cannot identify a position effect.
-      Beta: float option
-      Kappa: float option
-      /// Full covariance in the free coordinates, indexed by candidate id.
-      Covariance: Map<string * string, float>
-      Iterations: int
-      GradientNorm: float
-      /// The approximation actually used, named in the result.
-      EstimateKind: string
-      ModelRef: string
-      Assumptions: string list }
+    {
+        Status: FitStatus
+        /// Theta in the declared gauge (zero-sum by default).
+        Theta: Map<string, float>
+        /// Beta, or None when the design cannot identify a position effect.
+        Beta: float option
+        Kappa: float option
+        /// Full covariance in the free coordinates, indexed by candidate id.
+        Covariance: Map<string * string, float>
+        Iterations: int
+        GradientNorm: float
+        /// The approximation actually used, named in the result.
+        EstimateKind: string
+        ModelRef: string
+        Assumptions: string list
+    }
 
 type FitError = { Code: string; Message: string }
 

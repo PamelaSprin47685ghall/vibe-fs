@@ -8,9 +8,7 @@ open System
 /// not a label such as "sphinx-schema-v2". Two different schema documents must be
 /// distinguishable by their reference alone, otherwise a schema edit is invisible to
 /// the reducer and to replay.
-type SchemaRef =
-    { Id: string
-      Hash: string }
+type SchemaRef = { Id: string; Hash: string }
 
 /// An immutable, schema-bound payload. `CanonicalPayload` is the canonical JSON text
 /// produced from the typed value; the same bytes travel on the wire and participate
@@ -54,7 +52,9 @@ module JsonEnvelope =
                 { Code = "invalid-envelope"
                   Message = "canonical payload must not be blank" }
         else
-            Ok { Schema = schema; CanonicalPayload = canonicalPayload }
+            Ok
+                { Schema = schema
+                  CanonicalPayload = canonicalPayload }
 
     let ofCanonical (schema: SchemaRef) (canonicalPayload: string) : JsonEnvelope =
         match tryOfCanonical schema canonicalPayload with

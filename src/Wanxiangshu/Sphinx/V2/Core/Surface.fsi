@@ -92,8 +92,8 @@ module Surface =
         ResourceSpec list ->
         Map<string, float> ->
         Map<string, float> ->
-            Reservation ->
-                Result<Map<string, float>, BudgetError>
+        Reservation ->
+            Result<Map<string, float>, BudgetError>
 
     val certificateValidateGuarantee: CertificateGuarantee -> Result<unit, CertificateError>
     val certificateValidateSlot: CertificateSlot -> Result<unit, CertificateError>

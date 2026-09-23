@@ -20,12 +20,14 @@ type ITransitionModel =
     abstract TerminalReward: state: string -> float option
 
 type NodeStats =
-    { Visits: int
-      ValueSum: float
-      ValueSumSquares: float
-      /// Model and horizon this node's statistics belong to.
-      ModelRef: string
-      Horizon: int }
+    {
+        Visits: int
+        ValueSum: float
+        ValueSumSquares: float
+        /// Model and horizon this node's statistics belong to.
+        ModelRef: string
+        Horizon: int
+    }
 
 [<RequireQualifiedAccess>]
 type NodeFault =

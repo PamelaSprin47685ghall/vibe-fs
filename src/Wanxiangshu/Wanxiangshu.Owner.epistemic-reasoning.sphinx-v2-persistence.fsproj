@@ -25,4 +25,8 @@
     <Compile Include="Sphinx/V2/Wire/Decode.fsi"/><Compile Include="Sphinx/V2/Wire/Decode.fs"/>
     <Compile Include="Sphinx/V2/Wire/Encode.fsi"/><Compile Include="Sphinx/V2/Wire/Encode.fs"/>
     <Compile Include="Sphinx/V2/Wire/Surface.fsi"/><Compile Include="Sphinx/V2/Wire/Surface.fs"/>
+    <Compile Include="Sphinx/V2/Plugins/Bayes/Surface.fsi"/><Compile Include="Sphinx/V2/Plugins/Bayes/Surface.fs"/>
+    <Compile Include="Sphinx/V2/Plugins/AStar/Surface.fsi"/><Compile Include="Sphinx/V2/Plugins/AStar/Surface.fs"/>
+    <Compile Include="Sphinx/V2/Plugins/Mcts/Surface.fsi"/><Compile Include="Sphinx/V2/Plugins/Mcts/Surface.fs"/>
+    <Compile Include="Sphinx/V2/Plugins/Ordinal/Surface.fsi"/><Compile Include="Sphinx/V2/Plugins/Ordinal/Surface.fs"/>
   </ItemGroup></Project>

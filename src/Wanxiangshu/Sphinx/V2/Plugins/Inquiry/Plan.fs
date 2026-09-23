@@ -12,21 +12,23 @@ namespace Wanxiangshu.Sphinx.V2.Plugins
 /// zero-contribution, and never a fallback that only appears when nothing else runs.
 
 type PlanCard =
-    { PlanId: string
-      Description: string
-      TargetArtifactRefs: string list
-      Capability: string
-      ExpectedContribution: string
-      Conditions: string list
-      Continuation: string
-      /// Estimated resource need. The Host's cost model decides feasibility.
-      Reserved: Map<string, float>
-      /// Tool capability names the plan needs. A request, not a grant.
-      PermissionNeeds: string list
-      /// Where this proposal came from.
-      SourceObservation: string
-      /// True when this card is the direct render action.
-      IsAnswerNow: bool }
+    {
+        PlanId: string
+        Description: string
+        TargetArtifactRefs: string list
+        Capability: string
+        ExpectedContribution: string
+        Conditions: string list
+        Continuation: string
+        /// Estimated resource need. The Host's cost model decides feasibility.
+        Reserved: Map<string, float>
+        /// Tool capability names the plan needs. A request, not a grant.
+        PermissionNeeds: string list
+        /// Where this proposal came from.
+        SourceObservation: string
+        /// True when this card is the direct render action.
+        IsAnswerNow: bool
+    }
 
 type PlanProposal =
     { Cards: PlanCard list
@@ -48,8 +50,7 @@ module Plan =
     /// incomplete; a card that cannot be executed is excluded with a typed reason, not
     /// silently dropped.
     let validateCard (card: PlanCard) : Result<unit, PlanFault> =
-        match System.String.IsNullOrWhiteSpace card.Description,
-              System.String.IsNullOrWhiteSpace card.Capability with
+        match System.String.IsNullOrWhiteSpace card.Description, System.String.IsNullOrWhiteSpace card.Capability with
         | true, _ -> Error PlanFault.BlankDescription
         | _, true -> Error PlanFault.BlankCapability
         | false, false -> Ok()

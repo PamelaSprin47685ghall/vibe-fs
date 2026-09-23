@@ -20,13 +20,11 @@ module Surface =
 
     let setOf (items: string list) : Set<string> = items |> List.ofSeq |> Set.ofSeq
 
-    let mapOf (entries: (string * float) list) : Map<string, float> =
-        entries |> List.ofSeq |> Map.ofSeq
+    let mapOf (entries: (string * float) list) : Map<string, float> = entries |> List.ofSeq |> Map.ofSeq
 
     /// A cons list is a linked structure, not a JS array. A plain array passed to an
     /// `'a list` parameter reads as empty, so the surface converts on the way in.
-    let listOfItems (items: string list) : string list =
-        items |> List.ofSeq
+    let listOfItems (items: string list) : string list = items |> List.ofSeq
 
     let listCount (items: string list) : int = List.length items
 
@@ -85,7 +83,8 @@ module Surface =
     let firstReadyWork (state: InquiryState) : WorkItem option =
         InquiryState.readyWork state |> List.tryHead
 
-    let readyWorkCount (state: InquiryState) : int = InquiryState.readyWork state |> List.length
+    let readyWorkCount (state: InquiryState) : int =
+        InquiryState.readyWork state |> List.length
 
     // --- Result decomposition --------------------------------------------------
     // A Result crosses the boundary as a tagged outcome, and a caller must be able to
@@ -176,7 +175,9 @@ module Surface =
     let guaranteeCreate (tag: string) (args: string list) : CertificateGuarantee =
         // A JS caller passes a plain array; F# list patterns do not match it, so the
         // arguments are read by index and a short list yields "" rather than a wrong case.
-        let arg index = args |> List.tryItem index |> Option.defaultValue ""
+        let arg index =
+            args |> List.tryItem index |> Option.defaultValue ""
+
         let hasCount count = List.length args >= count
 
         let empiricalAssumptions () =
@@ -187,10 +188,8 @@ module Surface =
         match tag with
         | "empirical-summary" -> CertificateGuarantee.EmpiricalSummary(empiricalAssumptions ())
         | "ordinal-observation" -> CertificateGuarantee.OrdinalObservation(arg 0)
-        | "model-estimate" when hasCount 2 ->
-            CertificateGuarantee.ModelEstimate(arg 0, arg 1)
-        | "posterior-credible" when hasCount 3 ->
-            CertificateGuarantee.PosteriorCredible(arg 0, float (arg 1), arg 2)
+        | "model-estimate" when hasCount 2 -> CertificateGuarantee.ModelEstimate(arg 0, arg 1)
+        | "posterior-credible" when hasCount 3 -> CertificateGuarantee.PosteriorCredible(arg 0, float (arg 1), arg 2)
         | "frequentist-coverage" when hasCount 3 ->
             CertificateGuarantee.FrequentistCoverage(arg 0, float (arg 1), arg 2)
         | "deterministic-bound" -> CertificateGuarantee.DeterministicBound(arg 0, [])
@@ -243,7 +242,7 @@ module Surface =
 
     let goalTryCreate (goal: GoalSpec) : Result<GoalSpec, GoalError> = Goal.tryCreate goal
 
-    let revisionOrigin : Revision = Revision.origin
+    let revisionOrigin: Revision = Revision.origin
 
     let revisionNext (revision: Revision) : Revision = Revision.next revision
 
@@ -251,7 +250,7 @@ module Surface =
 
     let revisionTryCreate (value: int64) : Result<Revision, string> = Revision.tryCreate value
 
-    let attemptFirst : Attempt = Attempt.first
+    let attemptFirst: Attempt = Attempt.first
 
     let attemptValue (attempt: Attempt) : int64 = Attempt.value attempt
 
@@ -289,7 +288,8 @@ module Surface =
         : float =
         Budget.observedOverrun specs settled reserved name
 
-    let budgetMergeReserved (pools: Map<string, float> list) : Map<string, float> = Budget.mergeReserved pools
+    let budgetMergeReserved (pools: Map<string, float> list) : Map<string, float> =
+        pools |> List.ofSeq |> Budget.mergeReserved
 
     let budgetTryReserve
         (specs: ResourceSpec list)
@@ -302,8 +302,7 @@ module Surface =
     let certificateValidateGuarantee (guarantee: CertificateGuarantee) : Result<unit, CertificateError> =
         Certificate.validateGuarantee guarantee
 
-    let certificateValidateSlot (slot: CertificateSlot) : Result<unit, CertificateError> =
-        Certificate.validateSlot slot
+    let certificateValidateSlot (slot: CertificateSlot) : Result<unit, CertificateError> = Certificate.validateSlot slot
 
     let graphRoleName (role: GraphRole) : string = GraphRole.name role
 
@@ -311,14 +310,10 @@ module Surface =
 
     let reducerFoldBatch (events: InquiryEvent list) : Result<InquiryState, CoreError> = Reducer.foldBatch events
 
-    let reducerApply
-        (state: InquiryState option)
-        (event: InquiryEvent)
-        : Result<InquiryState, CoreError> =
+    let reducerApply (state: InquiryState option) (event: InquiryEvent) : Result<InquiryState, CoreError> =
         Reducer.apply state event
 
-    let projectionSemanticProjection (state: InquiryState) : SemanticProjection =
-        Projection.semanticProjection state
+    let projectionSemanticProjection (state: InquiryState) : SemanticProjection = Projection.semanticProjection state
 
     let projectionSemanticHash (state: InquiryState) : string = Projection.semanticHash state
 
@@ -326,7 +321,12 @@ module Surface =
 
     let projectionTraceHash (envelopes: string list) : string = Projection.traceHash envelopes
 
-    let stateCertificateKey (targetRef: string) (valueSpaceId: string) (scopeId: string) (semanticsModelRef: string) : string =
+    let stateCertificateKey
+        (targetRef: string)
+        (valueSpaceId: string)
+        (scopeId: string)
+        (semanticsModelRef: string)
+        : string =
         InquiryState.certificateKey targetRef valueSpaceId scopeId semanticsModelRef
 
     let stateReservationKey (key: ReservationKey) : string = InquiryState.reservationKey key
@@ -338,8 +338,8 @@ module Surface =
 
     let stateReadyWork (state: InquiryState) : WorkItem list = InquiryState.readyWork state
 
-    let eventTransitionType : string = SphinxV2EventTypes.transition
+    let eventTransitionType: string = SphinxV2EventTypes.transition
 
-    let eventAllTypes : string list = SphinxV2EventTypes.all
+    let eventAllTypes: string list = SphinxV2EventTypes.all
 
     let eventIsKnown (eventType: string) : bool = SphinxV2EventTypes.isKnown eventType

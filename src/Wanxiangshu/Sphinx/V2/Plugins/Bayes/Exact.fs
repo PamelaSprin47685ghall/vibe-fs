@@ -28,11 +28,13 @@ type Factor =
       Qualified: bool }
 
 type Posterior =
-    { Probabilities: Map<string, float>
-      LogPartition: float
-      UsedObservations: string list
-      /// Observations dropped by a declared conservative rule, with the reason.
-      Dropped: (string * string) list }
+    {
+        Probabilities: Map<string, float>
+        LogPartition: float
+        UsedObservations: string list
+        /// Observations dropped by a declared conservative rule, with the reason.
+        Dropped: (string * string) list
+    }
 
 [<RequireQualifiedAccess>]
 type ExactFault =
@@ -66,15 +68,26 @@ module Bayes =
     let private logSumExp (values: float list) : float =
         match values with
         | [] -> Double.NegativeInfinity
-        | _ -> values |> List.max |> fun peak -> logOfPeakAndMass peak (shiftedMass values peak)
+        | _ ->
+            values
+            |> List.max
+            |> fun peak -> logOfPeakAndMass peak (shiftedMass values peak)
 
     let private checkHypotheses (hypotheses: Hypothesis list) : Result<unit, ExactFault> =
         if hypotheses |> List.length < 2 then
             Error(ExactFault.TooFewHypotheses(hypotheses |> List.length))
-        elif hypotheses |> List.exists (fun hypothesis -> String.IsNullOrWhiteSpace hypothesis.Key) then
+        elif
+            hypotheses
+            |> List.exists (fun hypothesis -> String.IsNullOrWhiteSpace hypothesis.Key)
+        then
             Error ExactFault.BlankHypothesisKey
-        elif hypotheses |> List.map (fun hypothesis -> hypothesis.Key) |> Set.ofList |> Set.count
-             <> List.length hypotheses then
+        elif
+            hypotheses
+            |> List.map (fun hypothesis -> hypothesis.Key)
+            |> Set.ofList
+            |> Set.count
+            <> List.length hypotheses
+        then
             Error(ExactFault.DuplicateHypothesisKey(hypotheses |> List.map (fun h -> h.Key) |> List.head))
         else
             Ok()
@@ -84,12 +97,16 @@ module Bayes =
             hypotheses
             |> List.tryFind (fun hypothesis -> not (isFiniteNumber hypothesis.Prior) || hypothesis.Prior < 0.0)
 
-        let total () = hypotheses |> List.sumBy (fun hypothesis -> hypothesis.Prior)
+        let total () =
+            hypotheses |> List.sumBy (fun hypothesis -> hypothesis.Prior)
 
         let scaled () =
-            hypotheses |> List.map (fun hypothesis -> hypothesis.Key, hypothesis.Prior / total ()) |> Map.ofList
+            hypotheses
+            |> List.map (fun hypothesis -> hypothesis.Key, hypothesis.Prior / total ())
+            |> Map.ofList
 
-        let usable () = isFiniteNumber (total ()) && total () > 0.0
+        let usable () =
+            isFiniteNumber (total ()) && total () > 0.0
 
         let priorResult () =
             match usable () with
@@ -102,10 +119,14 @@ module Bayes =
 
     let private checkFactor (keys: Set<string>) (factor: Factor) : Result<unit, ExactFault> =
         let unknownKey =
-            factor.Likelihoods |> Map.toList |> List.tryFind (fun (key, _) -> not (Set.contains key keys))
+            factor.Likelihoods
+            |> Map.toList
+            |> List.tryFind (fun (key, _) -> not (Set.contains key keys))
 
         let missingKey =
-            keys |> Set.toList |> List.tryFind (fun key -> not (Map.containsKey key factor.Likelihoods))
+            keys
+            |> Set.toList
+            |> List.tryFind (fun key -> not (Map.containsKey key factor.Likelihoods))
 
         let badValue =
             factor.Likelihoods
@@ -126,7 +147,8 @@ module Bayes =
     /// purpose or an ambiguity; this module refuses the second case instead of silently
     /// picking one member (WHAT[sphinx-v2-021]).
     let private groupDecision (group: Factor list) : Result<Factor list * (string * string) list, ExactFault> =
-        let distinctIds = group |> List.map (fun factor -> factor.ObservationId) |> Set.ofList
+        let distinctIds =
+            group |> List.map (fun factor -> factor.ObservationId) |> Set.ofList
 
         match Set.count distinctIds with
         | 1 -> Ok(List.distinctBy (fun factor -> factor.ObservationId) group, [])
@@ -141,7 +163,8 @@ module Bayes =
             )
 
     let private combineGroup (group: Factor list) : Result<Factor list * (string * string) list, ExactFault> =
-        let distinctIds = group |> List.map (fun factor -> factor.ObservationId) |> Set.ofList
+        let distinctIds =
+            group |> List.map (fun factor -> factor.ObservationId) |> Set.ofList
 
         match Set.count distinctIds with
         | 1 -> Ok(List.distinctBy (fun factor -> factor.ObservationId) group, [])
@@ -156,7 +179,8 @@ module Bayes =
     /// Combines one dependency group into the members the fold keeps and the members a
     /// declared conservative rule dropped.
     let private foldGroup (group: Factor list) : Result<Factor list * (string * string) list, ExactFault> =
-        let distinctIds = group |> List.map (fun factor -> factor.ObservationId) |> Set.ofList
+        let distinctIds =
+            group |> List.map (fun factor -> factor.ObservationId) |> Set.ofList
 
         match Set.count distinctIds with
         | 1 -> Ok(List.distinctBy (fun factor -> factor.ObservationId) group, [])
@@ -231,7 +255,9 @@ module Bayes =
                 qualifiedGroups factors
                 |> Result.bind (fun (used, dropped) ->
                     used
-                    |> List.fold (fun state factor -> state |> Result.bind (fun () -> checkFactor keys factor)) (Ok())
+                    |> List.fold
+                        (fun state factor -> state |> Result.bind (fun () -> checkFactor keys factor))
+                        (Ok())
                     |> Result.bind (fun () -> posteriorFrom prior used dropped))))
 
     /// A prior-only run is legal and says so: it is not new evidence and not convergence.
