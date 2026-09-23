@@ -41,7 +41,7 @@ Plugin/SphinxCommand, Plugin/SphinxCommandSurface, 以及 host-adapter 分片。
 按提案第 04 章目录建立，每个生产模块都有对应 `.fsi`：
 
 - `Core/`：Ids、Envelope、Goal、Graph、Certificate、Work、Budget、Events、State、Reducer、Projection、Surface
-- `Runtime/`：Contracts、Ports、Registry、Admission、Agenda、Context、Refinement、Decision、Driver、Recovery、Surface
+- `Runtime/`：Contracts、Ports、Registry、Admission、Agenda、Context、Refinement、Decision、Driver、Recovery、Profile、Surface
 - `Plugins/Questionnaire/`：Model、Design、Decode
 - `Plugins/Ordinal/`：Model、Pairwise、Ranking、DesignCheck、Fit、Surface
 - `Plugins/Bayes/`：Exact、Surface
@@ -131,13 +131,14 @@ npm run check
 WANXIANGSHU_PROVIDER_LANGUAGE=en node --test 'requirements/*/tests/*.test.mjs'
 ```
 
-结果：`tests 3768 / pass 3682 / fail 13`。
+结果：`tests 3772 / pass 3686 / fail 13`。
 
 9 项失败与未改动的基线树逐字节相同（用 `git stash` 比对确认）：
 `context-compression-018`×1、`crash-reconciliation-018`×5、`requirement-grounding-008`×1、
 `structured-workflow-005`×1、`structured-workflow-014`×1。这些与 Sphinx 无关，属于其它 owner 的既有债务。
 另 4 项为测试间顺序/env 依赖（`feature-ablation-002`、`requirement-system-017`、
 `verification-system-008`×2），单独运行均通过。
+Sphinx 相关测试（`requirements/sphinx-v2/` + `requirements/epistemic-reasoning/`，共 28 条）全部通过。
 
 ### 本次未运行的验证
 
@@ -159,7 +160,13 @@ WANXIANGSHU_PROVIDER_LANGUAGE=en node --test 'requirements/*/tests/*.test.mjs'
 
 未建立的桥接：全局 expected-utility bridge 未实现，因此数值 Bellman/期望效用展开不激活；直接计划比较照常工作（WHAT-030 / 提案 10.7）。
 
-`thetaL2 = 1.0` 等初始数值默认进入 config hash 并记入 `ObservationModel`，不作为校准结论。
+`Runtime/Profile.fs` 的 `sphinx.default@2` 声明 `metaDepth=1`、`maxActivePlanCards=8`、
+`fitMaxIterations=100`、`fitGradientTolerance=1e-7`、`thetaL2=1.0`、`orderL2=1.0`、
+`tieKappaPriorMean=0 / variance=4.0`、`maxWorkAttempts=2`、`maxPureStepsPerAdvance=128`、
+`executionMode=Delegated`。这些常量进入 `Profile.configHashInput`，且该输入经测试断言不含
+`qualityWeight`/`methodUtility`/`expectedRootGain`/`answerQuality`/`gain`。真实模型与总资源额度
+无隐式默认，来自已授权的 Host/provider 配置。`thetaL2 = 1.0` 等数值不作为校准结论；改变它们是
+model revision，不在 inquiry 内静默热调。
 
 ## Data
 
@@ -173,7 +180,8 @@ WANXIANGSHU_PROVIDER_LANGUAGE=en node --test 'requirements/*/tests/*.test.mjs'
 - 跨进程原子写入故障注入未做。
 - 9 项既有失败见 Verification，非本次引入。
 - `Plugins/Inquiry/Observe.fromJudgment` 已能将判断转为 typed 边，但 `decisionnow` 成稿路径的 renderer 工作尚未接真实 provider 调用。
-- 元层 KG 近似与有界元层（提案 WP-14）以 `maxPureSteps` 与 `RefinementPending` 的形式落地，未做 KG 近似展开。
+- 元层 KG 近似与有界元层（提案 WP-14）以 `Profile.MetaDepth = 1`、`maxPureStepsPerAdvance = 128`
+  与 `AdvanceOutcome.RefinementPending` 的形式落地；KG 近似展开本身未实现，这是明确的计算近似而非最优性声称。
 
 ## 未声明项
 
