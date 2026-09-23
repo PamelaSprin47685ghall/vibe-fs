@@ -143,6 +143,10 @@ Sphinx/V2/Runtime/Decision.fs
 Sphinx/V2/Plugins/Questionnaire/Model.fs
 Sphinx/V2/Plugins/Questionnaire/Design.fs
 Sphinx/V2/Plugins/Questionnaire/Decode.fs
+Sphinx/V2/Plugins/Probes/Catalog.fsi
+Sphinx/V2/Plugins/Probes/Catalog.fs
+Sphinx/V2/Plugins/Probes/Prompts.fsi
+Sphinx/V2/Plugins/Probes/Prompts.fs
 Sphinx/V2/Plugins/Ordinal/Model.fs
 Sphinx/V2/Plugins/Ordinal/Pairwise.fs
 Sphinx/V2/Plugins/Ordinal/Ranking.fs
@@ -161,6 +165,8 @@ Sphinx/V2/Plugins/Inquiry/DecisionModel.fs
 Sphinx/V2/Plugins/Inquiry/Stop.fs
 Sphinx/V2/Plugins/Inquiry/Render.fs
 Sphinx/V2/Runtime/Driver.fs
+Sphinx/V2/Runtime/Recovery.fsi
+Sphinx/V2/Runtime/Recovery.fs
 Sphinx/V2/Hosts/Mcp/Contract.fs
 Sphinx/V2/Wire/Decode.fs
 Sphinx/V2/Wire/Encode.fs
@@ -1317,10 +1323,12 @@ Composition/Durable/JournalIntegration.fs
 Persistence/EventStore/CanonicalIntegrator.fsi
 Persistence/EventStore/CanonicalIntegrator.fs
 Sphinx/V2/Persistence/Codec.fsi
-Sphinx/V2/Persistence/Integrator.fsi
-Sphinx/V2/Composition/Bind.fsi
 Sphinx/V2/Persistence/Codec.fs
+Sphinx/V2/Persistence/Integrator.fsi
 Sphinx/V2/Persistence/Integrator.fs
+Sphinx/V2/Persistence/Export.fsi
+Sphinx/V2/Persistence/Export.fs
+Sphinx/V2/Composition/Bind.fsi
 Sphinx/V2/Composition/Bind.fs
 Sphinx/V2/Hosts/Mcp/Server.fsi
 Sphinx/V2/Hosts/Mcp/Server.fs

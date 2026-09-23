@@ -26,6 +26,8 @@
     <Compile Include="Sphinx/V2/Plugins/Questionnaire/Model.fsi"/><Compile Include="Sphinx/V2/Plugins/Questionnaire/Model.fs"/>
     <Compile Include="Sphinx/V2/Plugins/Questionnaire/Design.fsi"/><Compile Include="Sphinx/V2/Plugins/Questionnaire/Design.fs"/>
     <Compile Include="Sphinx/V2/Plugins/Questionnaire/Decode.fsi"/><Compile Include="Sphinx/V2/Plugins/Questionnaire/Decode.fs"/>
+    <Compile Include="Sphinx/V2/Plugins/Probes/Catalog.fsi"/><Compile Include="Sphinx/V2/Plugins/Probes/Catalog.fs"/>
+    <Compile Include="Sphinx/V2/Plugins/Probes/Prompts.fsi"/><Compile Include="Sphinx/V2/Plugins/Probes/Prompts.fs"/>
     <Compile Include="Sphinx/V2/Plugins/Ordinal/Model.fsi"/><Compile Include="Sphinx/V2/Plugins/Ordinal/Model.fs"/>
     <Compile Include="Sphinx/V2/Plugins/Ordinal/Pairwise.fsi"/><Compile Include="Sphinx/V2/Plugins/Ordinal/Pairwise.fs"/>
     <Compile Include="Sphinx/V2/Plugins/Ordinal/Ranking.fsi"/><Compile Include="Sphinx/V2/Plugins/Ordinal/Ranking.fs"/>
@@ -44,6 +46,7 @@
     <Compile Include="Sphinx/V2/Plugins/Inquiry/Stop.fsi"/><Compile Include="Sphinx/V2/Plugins/Inquiry/Stop.fs"/>
     <Compile Include="Sphinx/V2/Plugins/Inquiry/Render.fsi"/><Compile Include="Sphinx/V2/Plugins/Inquiry/Render.fs"/>
     <Compile Include="Sphinx/V2/Runtime/Driver.fsi"/><Compile Include="Sphinx/V2/Runtime/Driver.fs"/>
+    <Compile Include="Sphinx/V2/Runtime/Recovery.fsi"/><Compile Include="Sphinx/V2/Runtime/Recovery.fs"/>
     <Compile Include="Sphinx/V2/Hosts/Mcp/Contract.fsi"/><Compile Include="Sphinx/V2/Hosts/Mcp/Contract.fs"/>
     <Compile Include="Sphinx/V2/Wire/Decode.fsi"/><Compile Include="Sphinx/V2/Wire/Decode.fs"/>
     <Compile Include="Sphinx/V2/Wire/Encode.fsi"/><Compile Include="Sphinx/V2/Wire/Encode.fs"/>

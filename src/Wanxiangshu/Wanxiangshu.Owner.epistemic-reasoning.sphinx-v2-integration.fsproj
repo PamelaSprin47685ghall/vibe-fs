@@ -7,6 +7,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-v2-core.fsproj"/>
     <Compile Include="Sphinx/V2/Persistence/Codec.fsi"/><Compile Include="Sphinx/V2/Persistence/Codec.fs"/>
     <Compile Include="Sphinx/V2/Persistence/Integrator.fsi"/><Compile Include="Sphinx/V2/Persistence/Integrator.fs"/>
+    <Compile Include="Sphinx/V2/Persistence/Export.fsi"/><Compile Include="Sphinx/V2/Persistence/Export.fs"/>
     <Compile Include="Sphinx/V2/Composition/Bind.fsi"/><Compile Include="Sphinx/V2/Composition/Bind.fs"/>
     <Compile Include="Sphinx/V2/ServeEntry.fsi"/><Compile Include="Sphinx/V2/ServeEntry.fs"/>
     <Compile Include="Sphinx/V2/Hosts/Mcp/Server.fsi"/><Compile Include="Sphinx/V2/Hosts/Mcp/Server.fs"/>
