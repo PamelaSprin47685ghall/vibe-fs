@@ -49,11 +49,13 @@ Plugin/SphinxCommand, Plugin/SphinxCommandSurface, 以及 host-adapter 分片。
 - `Plugins/Mcts/`：Refiner、Surface
 - `Plugins/Inquiry/`：Plan、Observe、DecisionModel、Stop、Render
 - `Plugins/Probes/`：Catalog、Prompts
+- `Plugins/Provider/`：Adapter
 - `Persistence/`：Codec、Integrator、Export、Surface
 - `Composition/`：Bind
 - `Wire/`：Decode、Encode、Surface
 - `Hosts/Mcp/`：Contract、Server
 - `Hosts/OpenCode/`：Adapter
+- `Hosts/Provider/`：Adapter（`Plugins/Provider/Adapter` 提供与 Host 解耦的 usage 契约）
 - `ServeEntry.fs`
 
 ### 编译分片
@@ -139,6 +141,22 @@ WANXIANGSHU_PROVIDER_LANGUAGE=en node --test 'requirements/*/tests/*.test.mjs'
 另 4 项为测试间顺序/env 依赖（`feature-ablation-002`、`requirement-system-017`、
 `verification-system-008`×2），单独运行均通过。
 Sphinx 相关测试（`requirements/sphinx-v2/` + `requirements/epistemic-reasoning/`，共 28 条）全部通过。
+另 3 条为全仓跑时的顺序/env 依赖（`requirement-system-017`、`feature-ablation-002`），单独运行通过。
+
+### Host 适配器（WP-11 完成状态）
+
+- `Hosts/OpenCode/Adapter.fs`：`Dispatch` 调 `ISessionHostPort.CreateSiblingSession` 建真实 child，
+  `SendPrompt` 的 `SendOutcome` 只有携带 receipt 或 physical message 的两种情形才产生 `DispatchReceipt`；
+  `PhysicalRef` 是 Host 真实 session id，`DispatchIntentId` 由 `Recovery.intentKey` 产生供对账；
+  `Retryable`/`AcceptanceUnknown`/`Fatal` 一律返回 `Error`，不伪造 receipt。
+  `RequestCancel` 在 Host 未确认 abort 时返回 `Error`，调用方因此停在 `cancelling`。
+- `Hosts/Provider/Adapter.fs`：`CreateChildSession` + `SendPrompt` 之后接
+  `HostForkRunLifecycleSurface.create/completion` 读取真实 lifecycle 观测；
+  `Dispatch.ofObservation` 把观测翻译为 `ProviderOutcome`。
+- `Plugins/Provider/Adapter.fs`：与 Host 解耦的 usage 契约。`keepsReservation` 对
+  `UsageUnresolved` 恒真，因此 provider 不报用量时预留保留在账上，不写零；
+  `settledUsageOf` 产出带 `UsageUnresolved`/`Overrun` 的 `SettledUsage`。
+- `Core/Budget.fs`：`ProviderUsage` 迁入 ledger 所在模块，`Runtime/Ports` 只引用不再重复声明。
 
 ### 本次未运行的验证
 
@@ -176,7 +194,9 @@ model revision，不在 inquiry 内静默热调。
 
 ## Remaining
 
-- 真实 Host/provider 连接与计费：`Hosts/OpenCode/Adapter` 的 `ReadResult`/`Reconcile` 返回 `Ok None`（无证据时如实回答"没有"），尚未接真实 message 读取与 SSE 游标；需要授权环境下的 contract 测试（提案 WP-11/WP-12 的剩余部分）。
+- `Hosts/OpenCode/Adapter` 的 `ReadStatus`/`ReadResult`/`Reconcile` 仍返回 `Running`/`Ok None`：
+  这三个查询需要真实 message 读取与 XTrace 游标推进，本实现只在"无证据"时如实回答"没有"；
+  需要在授权环境下补 contract 测试（提案 WP-12 的剩余部分）。
 - 跨进程原子写入故障注入未做。
 - 9 项既有失败见 Verification，非本次引入。
 - `Plugins/Inquiry/Observe.fromJudgment` 已能将判断转为 typed 边，但 `decisionnow` 成稿路径的 renderer 工作尚未接真实 provider 调用。
