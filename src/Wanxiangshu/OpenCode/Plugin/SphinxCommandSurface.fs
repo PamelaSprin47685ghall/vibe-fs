@@ -6,5 +6,11 @@ open System.Threading.Tasks
 module SphinxCommandSurface =
     let configure (config: obj) = SphinxConfig.configure config
 
-    let before (run: string -> string -> int option -> Task<obj>) (client: obj) (directory: string option) (input: obj) (output: obj) =
+    let before
+        (run: string -> string -> int option -> Task<obj>)
+        (client: obj)
+        (directory: string option)
+        (input: obj)
+        (output: obj)
+        =
         SphinxCommand.before run client directory input output

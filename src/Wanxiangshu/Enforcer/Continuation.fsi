@@ -34,6 +34,7 @@ module EnforcerContinuation =
         | InjectRepair of BloggerRequestContext
         | CommitUnknown
         | AbandonThenCatchUp
+        | Stop of string
 
     /// Continuation transform result. Empty message lists are forbidden: Host
     /// forwards them as provider `messages` and rejects with 400.

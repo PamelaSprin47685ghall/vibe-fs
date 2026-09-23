@@ -682,13 +682,13 @@ module ProviderRecoveryWorkflow =
                     |> Option.bind (fun _ ->
                         let ownerSessionId = turn.SessionId
                         let requestKind = ProviderRequestKind.WorkMain
+
                         let failureState =
                             AgentProjection.tryFind ownerSessionId projections.AgentProjections
                             |> Option.bind _.ProviderFailures
 
                         ProviderFailureEvidence.currentState failureState
-                        |> Option.map (fun current -> ownerSessionId, requestKind, current))
-                )
+                        |> Option.map (fun current -> ownerSessionId, requestKind, current)))
 
             match hasCapacity, recoveryContext with
             | false, _ -> notifyFailure eventPort turn "All candidate providers exhausted (zero capacity)"

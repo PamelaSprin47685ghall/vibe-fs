@@ -84,12 +84,19 @@ module Value =
         dependencyDiscount state action * (discount * rootGain + 0.65 * gateway)
         - max 0.0 action.Cost
 
-    let private pricedInvestigationDelta (expectation: TurnExpectation) (state: EpistemicState) (action: CognitiveAction) =
+    let private pricedInvestigationDelta
+        (expectation: TurnExpectation)
+        (state: EpistemicState)
+        (action: CognitiveAction)
+        =
         let grounded = float (groundedFindingCount state)
         let marginalLoss = 0.72 / ((grounded + 1.0) * (grounded + 2.0))
-        let gain = min 1.0 (max 0.0 action.ExpectedRootGain + 0.65 * max 0.0 action.GatewayGain)
+
+        let gain =
+            min 1.0 (max 0.0 action.ExpectedRootGain + 0.65 * max 0.0 action.GatewayGain)
         // Investigation and the ensuing candidate generation cost two work items.
-        dependencyDiscount state action * gain * marginalLoss - 2.0 * expectation.TurnPrice
+        dependencyDiscount state action * gain * marginalLoss
+        - 2.0 * expectation.TurnPrice
 
     let private pricedSynthesisDelta expectation (state: EpistemicState) =
         let worthwhileInvestigation =

@@ -78,12 +78,18 @@ module SessionsSurface =
 
             member _.CreateSession _ _ = Task.FromResult(Error "unused")
             member _.GetSessionParent _ = Task.FromResult(Ok None)
+
             member _.CreateChildSession parent _ =
                 createParents.Add(SessionId.value parent)
+
                 let createdId =
-                    if createParents.Count = 1 then childId
-                    else SessionId.create (SessionId.value childId + "-" + string createParents.Count)
+                    if createParents.Count = 1 then
+                        childId
+                    else
+                        SessionId.create (SessionId.value childId + "-" + string createParents.Count)
+
                 Task.FromResult(Ok createdId)
+
             member _.ListChildren _ = Task.FromResult(Ok [])
             member _.CloseChildSession _ = Task.FromResult(Ok())
 
@@ -102,16 +108,24 @@ module SessionsSurface =
     let flattenedChildAdapterProbe () : Task<obj> =
         task {
             let root = SessionId.create "flat-sphinx-root"
-            let transport = ControlledOpenCodePort(SessionId.create "flat-sphinx-engineer", false)
+
+            let transport =
+                ControlledOpenCodePort(SessionId.create "flat-sphinx-engineer", false)
+
             let sessions =
                 InjectedSessionPort(Some(transport :> IOpenCodePort), ControlledEventPort() :> IEventObservationPort)
                 :> ISessionHostPort
+
             let options: OpenCodeChildOptions =
-                { Title = Some "standard Engineer"; Agent = Some "engineer"; Directory = None }
+                { Title = Some "standard Engineer"
+                  Agent = Some "engineer"
+                  Directory = None }
+
             let! first = sessions.CreateChildSession(root, options)
             let caller = first |> Result.defaultWith invalidOp
             let! second = sessions.CreateChildSession(caller, options)
             let worker = second |> Result.defaultWith invalidOp
+
             return
                 createObj
                     [ "root" ==> SessionId.value root

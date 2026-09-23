@@ -102,6 +102,7 @@ module CompletedTurnClassifier =
         match name with
         | Some value ->
             let lower = value.ToLowerInvariant()
+
             if lower.Contains("upstream_error") then
                 false
             else
