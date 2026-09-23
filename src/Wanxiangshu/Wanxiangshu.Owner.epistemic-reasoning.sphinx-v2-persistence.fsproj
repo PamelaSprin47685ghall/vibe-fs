@@ -15,4 +15,10 @@
     <Compile Include="Sphinx/V2/Plugins/Bayes/Exact.fsi"/><Compile Include="Sphinx/V2/Plugins/Bayes/Exact.fs"/>
     <Compile Include="Sphinx/V2/Plugins/AStar/Refiner.fsi"/><Compile Include="Sphinx/V2/Plugins/AStar/Refiner.fs"/>
     <Compile Include="Sphinx/V2/Plugins/Mcts/Refiner.fsi"/><Compile Include="Sphinx/V2/Plugins/Mcts/Refiner.fs"/>
+    <Compile Include="Sphinx/V2/Plugins/Inquiry/Plan.fsi"/><Compile Include="Sphinx/V2/Plugins/Inquiry/Plan.fs"/>
+    <Compile Include="Sphinx/V2/Plugins/Inquiry/Observe.fsi"/><Compile Include="Sphinx/V2/Plugins/Inquiry/Observe.fs"/>
+    <Compile Include="Sphinx/V2/Plugins/Inquiry/DecisionModel.fsi"/><Compile Include="Sphinx/V2/Plugins/Inquiry/DecisionModel.fs"/>
+    <Compile Include="Sphinx/V2/Plugins/Inquiry/Stop.fsi"/><Compile Include="Sphinx/V2/Plugins/Inquiry/Stop.fs"/>
+    <Compile Include="Sphinx/V2/Plugins/Inquiry/Render.fsi"/><Compile Include="Sphinx/V2/Plugins/Inquiry/Render.fs"/>
+    <Compile Include="Sphinx/V2/Runtime/Driver.fsi"/><Compile Include="Sphinx/V2/Runtime/Driver.fs"/>
   </ItemGroup></Project>
