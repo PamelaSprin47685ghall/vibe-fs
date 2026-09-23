@@ -276,13 +276,20 @@ module ProcessEventLog =
 
     let filePath (log: ProcessEventLog) = log.FilePath
 
-    let private durabilityBarrier path =
+    let private shouldFsync () : bool =
+        System.Environment.GetEnvironmentVariable "WANXIANGSHU_NO_FSYNC" <> "1"
+
+    let private syncFd (path: string) : unit =
         let fd = openSync path "r+"
 
         try
             fsyncSync fd
         finally
             closeSync fd
+
+    let private durabilityBarrier path =
+        if shouldFsync () then
+            syncFd path
 
     /// One semantic append = one sequence of complete canonical JSON+LF lines.
     /// Existing bytes are never read or rewritten.

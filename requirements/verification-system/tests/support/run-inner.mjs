@@ -76,6 +76,7 @@ async function main() {
   // NODE_TEST_CONTEXT or any other Host-owned environment variable.
   const originalHome = process.env.HOME || process.env.USERPROFILE
   process.env.WANXIANGSHU_NO_FATAL_EXIT = '1'
+  process.env.WANXIANGSHU_NO_FSYNC = '1'
 
   // Isolate HOME / USERPROFILE for the node:test inner runner so any test or
   // pre-import that touches ~/.config/opencode defaults to a throwaway temporary
