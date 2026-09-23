@@ -1382,6 +1382,8 @@ Composition/Durable/JournalIntegration.fsi
 Composition/Durable/JournalIntegration.fs
 Persistence/EventStore/CanonicalIntegrator.fsi
 Persistence/EventStore/CanonicalIntegrator.fs
+Sphinx/V2/Composition/Bind.fsi
+Sphinx/V2/Composition/Bind.fs
 Sphinx/Inquiry.fsi
 Sphinx/Inquiry.fs
 Sphinx/IntegrationRules.fsi
