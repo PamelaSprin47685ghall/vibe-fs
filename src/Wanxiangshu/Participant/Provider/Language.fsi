@@ -14,4 +14,13 @@ module ProviderLanguage =
     val tryParse: raw: string -> ProviderLanguage option
     val parse: raw: string -> ProviderLanguage
     val fromPreferenceObservation: observation: string option -> Result<ProviderLanguage, string>
+
+    val fromObservationLadder:
+        explicit: string option ->
+        hostConfig: string option ->
+        vscodeNls: string option ->
+        posixLocale: string option ->
+        intlLocale: string option ->
+            Result<ProviderLanguage, string>
+
     val inheritFrom: owner: ProviderLanguage -> ProviderLanguage

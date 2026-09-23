@@ -61,6 +61,7 @@ module ProviderLanguageSurface =
 
     let clearAllForTests () : unit =
         SessionProviderLanguage.clearAllForTests ()
+        Wanxiangshu.OpenCode.ProviderLanguageBinding.clearHostConfigPreferenceForTests ()
 
     let tryGet (sessionId: string) : obj =
         match SessionProviderLanguage.tryGet (SessionId.create sessionId) with
@@ -74,6 +75,9 @@ module ProviderLanguageSurface =
     let inheritFromOwner (ownerLanguage: string) (childSessionId: string) : obj =
         SessionProviderLanguage.inheritFromOwner (languageOf ownerLanguage) (SessionId.create childSessionId)
         |> resultOf
+
+    let setHostConfigPreference (raw: string) : unit =
+        Wanxiangshu.OpenCode.ProviderLanguageBinding.setHostConfigPreference raw
 
     let readGlobalPreference () : string =
         Wanxiangshu.OpenCode.ProviderLanguageBinding.readGlobalPreference ()
