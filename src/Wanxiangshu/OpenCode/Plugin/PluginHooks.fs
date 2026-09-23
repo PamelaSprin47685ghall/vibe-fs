@@ -134,14 +134,14 @@ module PluginHooks =
 
             let toolBefore (toolInput: obj) (toolOutput: obj) =
                 task {
-                    let context = ToolHostCodec.decodeContext toolInput
-
                     do!
                         Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingGate.before
                             journal
                             workspaceDirectory
                             toolInput
                             toolOutput
+
+                    let context = ToolHostCodec.decodeContext toolInput
 
                     match journal, context.ToolCallId with
                     | Some durable, Some toolCallId when not (String.IsNullOrWhiteSpace context.SessionId) ->

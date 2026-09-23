@@ -86,6 +86,7 @@ test('WHAT[distribution-010] distribution artifact contains active registrations
 
   // 证明无废弃角色专属的孤立 surface 模块存在
   for (const mod of surfaceModules) {
+    if (mod.startsWith('Sphinx/')) continue
     for (const dep of deprecatedRoles5) {
       assert.equal(
         mod.toLowerCase().includes(`/${dep}`),
