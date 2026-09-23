@@ -8,7 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.feature-ablation.ablation-kernel.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-mcp.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-v2-core.fsproj"/>
     
     <ProjectReference Include="Wanxiangshu.Owner.office-capability.foundation-officecapability.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>

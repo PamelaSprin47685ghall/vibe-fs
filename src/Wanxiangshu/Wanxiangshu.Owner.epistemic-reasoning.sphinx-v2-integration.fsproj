@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup>
+    <WanxiangshuSubsystem>sphinx</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>sphinx-v2-integration</WanxiangshuCompileShard><WanxiangshuSemanticOwner>epistemic-reasoning</WanxiangshuSemanticOwner><WanxiangshuOwnerLocality>sphinx-v2-integration</WanxiangshuOwnerLocality><WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind></PropertyGroup><ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.digest.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-canonical-json.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-v2-core.fsproj"/>
+    <Compile Include="Sphinx/V2/Persistence/Codec.fsi"/><Compile Include="Sphinx/V2/Persistence/Codec.fs"/>
+    <Compile Include="Sphinx/V2/Persistence/Integrator.fsi"/><Compile Include="Sphinx/V2/Persistence/Integrator.fs"/>
+    <Compile Include="Sphinx/V2/Composition/Bind.fsi"/><Compile Include="Sphinx/V2/Composition/Bind.fs"/>
+    <Compile Include="Sphinx/V2/ServeEntry.fsi"/><Compile Include="Sphinx/V2/ServeEntry.fs"/>
+    <Compile Include="Sphinx/V2/Hosts/Mcp/Server.fsi"/><Compile Include="Sphinx/V2/Hosts/Mcp/Server.fs"/>
+  </ItemGroup></Project>

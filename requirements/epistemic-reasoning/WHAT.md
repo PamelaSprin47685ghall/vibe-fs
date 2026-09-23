@@ -1,5 +1,12 @@
 # epistemic-reasoning — WHAT
 
+> **SUPERSEDED by `sphinx-v2` (2026-09-23 clean-break).**
+> The 36 propositions below described the Sphinx kernel that shipped before the
+> clean-break rewrite. They are retained as a historical record and as design
+> provenance; `sphinx-v2/SUPERSEDES.md` maps each one to its replacement. They are
+> not acceptance obligations for the current production tree.
+# epistemic-reasoning — WHAT
+
 ## [001] 认识状态为充分状态而非历史记录
 
 系统维护历史关于未来认知决策的充分统计量，完整 transcript、问题展开树或单轮自由文本不作为状态本体。Sphinx Core 的权威状态由 event head、typed hypergraph、ValueCertificate、WorkItem、PluginLock、ResourceBudget 与 InquiryStatus 构成。默认 Legacy plugin 可在 opaque graph payload 中维护 RootContract、Findings、Evidence、Hypotheses、Dependencies、CognitiveActions 与 PendingRequest；搜索缓存、后验数值和采样统计均为可替换证书或投影，不得成为第二权威状态。

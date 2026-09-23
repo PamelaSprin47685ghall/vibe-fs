@@ -45,17 +45,24 @@ type NodeStats =
         Horizon: int
     }
 
+/// The recommendation rule, stated explicitly so a reader can see what was maximized.
+[<RequireQualifiedAccess>]
+type Recommendation =
+    | BestMean of action: string * mean: float
+    | MostVisited of action: string * visits: int
+    | InsufficientSamples
+
 /// The scaling factor for the exploration term. A declared reward range of zero width
 /// means the model has no usable spread, so the term falls back to unit scale rather
 /// than dividing by zero.
-let private rewardScale (rewardLow: float) (rewardHigh: float) : float =
-    let span = rewardHigh - rewardLow
+module private RewardScale =
 
-    let positive = span > 0.0
+    let ofRange (rewardLow: float) (rewardHigh: float) : float =
+        let span = rewardHigh - rewardLow
 
-    match positive with
-    | true -> span
-    | false -> 1.0
+        match span > 0.0 with
+        | true -> span
+        | false -> 1.0
 
 [<RequireQualifiedAccess>]
 type NodeFault =
@@ -99,14 +106,7 @@ module Mcts =
         | visits ->
             let average = node.ValueSum / float visits
             let explore = exploration * sqrt (log (float parentVisits) / float visits)
-            average + explore * rewardScale rewardLow rewardHigh
-
-    /// The recommendation rule, stated explicitly so a reader can see what was maximized.
-    [<RequireQualifiedAccess>]
-    type Recommendation =
-        | BestMean of action: string * mean: float
-        | MostVisited of action: string * visits: int
-        | InsufficientSamples
+            average + explore * RewardScale.ofRange rewardLow rewardHigh
 
     let recommend (stats: Map<string, NodeStats>) : Recommendation =
         let visited = stats |> Map.toList |> List.filter (fun (_, node) -> node.Visits > 0)

@@ -1,45 +1,78 @@
+import assert from 'node:assert/strict'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { dirname, join, relative } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const { readFileSync, readdirSync } = await import("node:fs");
-const { dirname, join } = await import("node:path");
-const { fileURLToPath } = await import("node:url");
-const { close, createStore, start, resume, state, assessWhy, relativeServerEntry } = await import("./support.mjs");
+// This package is SUPERSEDED by `sphinx-v2` (see `../sphinx-v2/SUPERSEDES.md`).
+// Its 36 propositions described the Sphinx kernel that shipped before the
+// 2026-09-23 clean-break; they are retained as historical record and design
+// provenance, and are not acceptance obligations for the current tree.
+//
+// The executable proof for the Sphinx surface now lives in `../sphinx-v2/tests/`,
+// which covers the same laws under the new ids. This test keeps the historical
+// package honest: it asserts the supersede record exists, is complete enough to
+// map every old proposition, and does not claim the old kernel still runs.
 
-const here = dirname(fileURLToPath(import.meta.url))
-const root = join(here, '../../..')
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
+const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 
-test('WHAT[epistemic-reasoning-001] start_yields_semantic_assessment_request', () => {
-  const store = createStore()
-  const started = start(store, '花儿为什么这样红？')
-  assert.equal(started.status, 'yield')
-  assert.equal(started.request.type, 'SemanticAssessmentRequest')
-})
+const oldWhat = read('requirements/epistemic-reasoning/WHAT.md')
+const supersedes = read('requirements/sphinx-v2/SUPERSEDES.md')
+
+const oldPropositionIds = () => {
+  const ids = []
+  for (const match of oldWhat.matchAll(/^## \[(\d{3})\]/gm)) ids.push(match[1])
+  return ids
 }
 
-{
-const { test } = await import("node:test");
-const { default: assert } = await import("node:assert/strict");
-const { createStore, start, resume, state, mcpServer } = await import("../../../dist/Sphinx/Surface.js");
-
-
-test('WHAT[epistemic-reasoning-001] start_yield_returns_structured_content_with_next_tool', async () => {
-  const server = mcpServer(createStore())
-  const result = await server._registeredTools.start.handler({ question: '花青素合成是否解释红色？' })
-
-  assert.equal(result.isError, undefined)
-  assert.equal(result.content[0].type, 'text')
-  assert.match(result.content[0].text, /Next tool: assess/)
-
-  const structured = result.structuredContent
-  assert.equal(structured.status, 'yield')
-  assert.equal(typeof structured.handle, 'string')
-  assert.ok(structured.handle.length > 0)
-  assert.equal(structured.revision, 0)
-  assert.equal(structured.nextTool, 'assess')
-  assert.equal(structured.request.type, 'SemanticAssessmentRequest')
-  assert.equal(structured.answer, null)
+test('WHAT[epistemic-reasoning-001] superseded package keeps its WHAT and WHY documents', () => {
+  assert.ok(oldWhat.includes('SUPERSEDED'), 'WHAT.md must state that this package is superseded')
+  assert.ok(read('requirements/epistemic-reasoning/WHY.md').includes('SUPERSEDED'), 'WHY.md must state the same')
 })
-}
+
+test('WHAT[epistemic-reasoning-001] every superseded proposition has a recorded disposition', () => {
+  // The old numbering runs 001..036. Each must appear in the supersede mapping as
+  // either a replacement target or an explicit exit from the default build.
+  const ids = oldPropositionIds()
+  assert.ok(ids.length >= 36, `expected at least 36 historical propositions, found ${ids.length}`)
+
+  for (const id of ids) {
+    const referenced = supersedes.includes(`-${id}`) || supersedes.includes(` ${id} `)
+    assert.ok(referenced, `proposition ${id} has no recorded disposition in sphinx-v2/SUPERSEDES.md`)
+  }
+})
+
+test('WHAT[epistemic-reasoning-001] the old kernel is absent from the production sources', () => {
+  // The clean-break removed the whole legacy tree. Nothing in Sphinx/V2 may
+  // re-introduce the old types by name.
+  const walk = (dir) =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) return walk(full)
+      return entry.name.endsWith('.fs') ? [full] : []
+    })
+
+  const v2Sources = walk(join(ROOT, 'src/Wanxiangshu/Sphinx/V2'))
+
+  const forbidden = [
+    'SolverMode',
+    'EpistemicState',
+    'SessionStore',
+    'LegacyPlugin',
+    'GecInquiry',
+    'GecStore',
+    'GecSurface',
+    'expectedRootGain',
+    'gatewayGain',
+    'expectTurns',
+    'TurnPrice',
+  ]
+
+  for (const source of v2Sources) {
+    const text = readFileSync(source, 'utf8')
+    for (const token of forbidden) {
+      assert.ok(!text.includes(token), `${relative(ROOT, source)} reintroduces the retired ${token}`)
+    }
+  }
+})

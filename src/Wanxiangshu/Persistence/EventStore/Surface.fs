@@ -6,6 +6,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Thoth.Json
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Sphinx.V2.Composition
 
 /// Process-local EventStore owner surface. JS callers receive unprefixed
 /// operations; EventStoreHandle remains an opaque capability.
@@ -113,7 +114,7 @@ module Surface =
         let program =
             CanonicalIntegrator.baseRules
             @ Wanxiangshu.Strength.StrengthIntegrationRules.rules
-            @ Wanxiangshu.Sphinx.SphinxIntegrationRules.rules
+            @ Wanxiangshu.Sphinx.V2.Composition.Bind.rules
             @ Wanxiangshu.Repository.Knowledge.Casebook.CasebookIntegrationRules.rules
             @ Wanxiangshu.Repository.Programming.Js.JsTransactionIntegrationRules.rules
 

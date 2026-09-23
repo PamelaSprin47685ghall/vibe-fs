@@ -19,6 +19,13 @@ type ITransitionModel =
     abstract Sample: state: string * action: string * rngState: string -> TransitionResult * string
     abstract TerminalReward: state: string -> float option
 
+/// The recommendation rule, stated explicitly so a reader can see what was maximized.
+[<RequireQualifiedAccess>]
+type Recommendation =
+    | BestMean of action: string * mean: float
+    | MostVisited of action: string * visits: int
+    | InsufficientSamples
+
 type NodeStats =
     {
         Visits: int
@@ -35,13 +42,6 @@ type NodeFault =
     | UnknownAction of state: string * action: string
     | InvalidRngState
     | MissingValueBridge
-
-/// The recommendation rule, stated explicitly so a reader can see what was maximized.
-[<RequireQualifiedAccess>]
-type Recommendation =
-    | BestMean of action: string * mean: float
-    | MostVisited of action: string * visits: int
-    | InsufficientSamples
 
 module Mcts =
     /// State key includes model, history and remaining horizon (WHAT[sphinx-v2-013]).

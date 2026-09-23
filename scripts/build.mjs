@@ -142,7 +142,7 @@ async function verifyArtifacts(targetRoot = root) {
   const entry = path.join(targetRoot, 'dist/OpenCode/Plugin/Plugin.js')
   if (!fs.existsSync(entry)) throw new Error(`missing entry artifact: ${entry}`)
 
-  const sphinxEntry = path.join(targetRoot, 'dist/Sphinx/ServeEntry.js')
+  const sphinxEntry = path.join(targetRoot, 'dist/Sphinx/V2/ServeEntry.js')
   if (!fs.existsSync(sphinxEntry)) throw new Error(`missing sphinx entry artifact: ${sphinxEntry}`)
 
   const enforcerRoot = path.join(targetRoot, 'resources/enforcer')

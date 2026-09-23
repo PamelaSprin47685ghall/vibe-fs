@@ -101,11 +101,10 @@ module CompletedTurnClassifier =
         match name with
         | Some value ->
             let lower = value.ToLowerInvariant()
+            let upstreamAbort = lower.Contains("upstream_error")
+            let plainAbort = lower.Contains("abort")
 
-            if lower.Contains("upstream_error") then
-                false
-            else
-                lower.Contains("abort")
+            upstreamAbort |> not && plainAbort
         | None -> false
 
     /// CTX-004: stop is completed only when formal text passes the shared

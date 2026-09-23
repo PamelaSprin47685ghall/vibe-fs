@@ -1479,7 +1479,7 @@ export function detectChangedFiles({
     } else {
       const essentialOutputs = [
         path.join(resolvedOutputDir, 'OpenCode/Plugin/Plugin.js'),
-        path.join(resolvedOutputDir, 'Sphinx/ServeEntry.js'),
+        path.join(resolvedOutputDir, 'Sphinx/V2/ServeEntry.js'),
       ]
       const isProductionOutput = resolvedOutputDir === norm(path.resolve(root, 'dist'))
       hasOutputs = !isProductionOutput || essentialOutputs.every((p) => fs.existsSync(p))

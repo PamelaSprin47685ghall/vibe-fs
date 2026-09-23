@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Sphinx.V2.Composition
 
 /// Process-local EventStore owners keyed by git common-dir.
 /// One acquired entry owns exactly one WriterId.ndjson and one CanonicalIntegrator.
@@ -18,7 +19,7 @@ module WorkspaceEventStore =
     let private hostProgram: IntegrationRule list =
         CanonicalIntegrator.baseRules
         @ Wanxiangshu.Strength.StrengthIntegrationRules.rules
-        @ Wanxiangshu.Sphinx.SphinxIntegrationRules.rules
+        @ Wanxiangshu.Sphinx.V2.Composition.Bind.rules
         @ Wanxiangshu.Repository.Knowledge.Casebook.CasebookIntegrationRules.rules
         @ Wanxiangshu.Repository.Programming.Js.JsTransactionIntegrationRules.rules
 

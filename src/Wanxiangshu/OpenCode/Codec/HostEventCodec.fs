@@ -144,14 +144,16 @@ module HostEventCodec =
         let reason = failureReasonOf error
         let isUpstreamAbort = reason.ToLowerInvariant().Contains("upstream_error")
 
-        if isUpstreamAbort then
-            ExecutionFailure.ProviderTransient
-        else
+        let fromName () =
             match errName with
             | "MessageAbortedError"
             | "AbortError" -> ExecutionFailure.UserCancelled
             | "SupersededError" -> ExecutionFailure.Superseded
             | _ -> ExecutionFailure.ProviderTransient
+
+        match isUpstreamAbort with
+        | true -> ExecutionFailure.ProviderTransient
+        | false -> fromName ()
 
     let private decodeSessionErrorFor (sessionId: SessionId) (raw: obj) : HostSignal option =
         let properties = raw?properties

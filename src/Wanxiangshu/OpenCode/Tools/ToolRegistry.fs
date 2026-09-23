@@ -26,8 +26,7 @@ open Wanxiangshu.Ablation
 /// per-session resources live in ToolRuntimeScope.
 type ToolRegistration =
     { Tools: obj
-      Runtime: ToolRuntimeScope
-      Sphinx: SphinxExecution option }
+      Runtime: ToolRuntimeScope }
 
 module ToolRegistry =
 
@@ -69,7 +68,6 @@ module ToolRegistry =
           "horizon", HorizonTool.admission
           "fission", FissionTool.admission
           "review", ReviewTool.admission
-          "sphinx", SphinxTool.admission
           "suicide", SuicideTool.admission
           "run", ExecutorTool.runAdmission
           "mv", FileMutationTools.mvAdmission
@@ -193,9 +191,6 @@ module ToolRegistry =
                 ?eventPort = eventPort
             )
 
-        let sphinx =
-            SphinxTool.createExecution sessionPort workspaceDirectory syncDelegateRuntime runtime.LogicalOwnerFor
-
         // The canvas is durable, not process memory: a restart recovers the owner's
         // committed canvas from the journal instead of silently restarting at `{}`.
         let cognitiveRuntime = CognitiveRuntime(CognitiveJournalAdapter.port journal)
@@ -245,7 +240,6 @@ module ToolRegistry =
               yield HorizonTool.spec horizonContext
               yield FissionTool.spec factory runtime
               yield ReviewTool.spec factory runtime
-              yield SphinxTool.spec factory sphinx
               yield SuicideTool.spec factory runtime
               yield ExecutorTool.runSpec factory runtime
               yield FileMutationTools.mvSpec factory
@@ -282,7 +276,6 @@ module ToolRegistry =
                 | "horizon" -> Some ToolPermission.Horizon
                 | "fission" -> Some ToolPermission.Fission
                 | "review" -> Some ToolPermission.ReviewAssessment
-                | "sphinx" -> Some ToolPermission.Sphinx
                 | "suicide" -> Some ToolPermission.Finality
                 | _ -> None
 
@@ -413,5 +406,4 @@ module ToolRegistry =
             baseSpecs |> List.map (fun spec -> { spec with Execute = gateExecute spec })
 
         { Tools = ToolHostCodec.registry factory specs
-          Runtime = runtime
-          Sphinx = sphinx }
+          Runtime = runtime }

@@ -50,8 +50,6 @@ test('WHAT[host-boundary-026] host session contract compiles independently witho
     'OpenCode/Signals/HostSignalSubscribe.fs',
     'OpenCode/Host/Events.fs',
     'OpenCode/Host/SharedTerminalBus.fs',
-    'OpenCode/Host/SphinxMcpConfig.fs',
-    'OpenCode/Host/SphinxMcpConfigSurface.fs',
     'OpenCode/Host/Diagnostic.fs',
     'OpenCode/Host/ReliabilityDiagnostics.fs',
     'OpenCode/Host/ReliabilityDiagnosticsSurface.fs',
@@ -124,7 +122,6 @@ test('WHAT[host-boundary-026] Host source ownership follows subsystem inventory 
     'OpenCode/Host/Diagnostic.fs',
     'OpenCode/Signals/HostSignalAdapter.fs',
     'OpenCode/Host/SessionQuiescenceGate.fs',
-    'OpenCode/Host/SphinxMcpConfig.fs',
   ]
   for (const source of hostSources) {
     const owner = shardInventory.sourceProject.get(join(SOURCE_ROOT, source))
@@ -189,11 +186,6 @@ test('WHAT[host-boundary-026] Host source ownership follows subsystem inventory 
   assert.ok(sessionRuntime.compile.includes('OpenCode/Host/HostMessageProjection.fs'))
   assert.ok(sessionRuntime.compile.includes('OpenCode/Host/HostSessionContext.fs'))
 
-  const sphinxAdapter = requireShard('sphinx-host-adapter')
-  assert.deepEqual(
-    sphinxAdapter.compile.sort(),
-    ['OpenCode/Host/SphinxConfig.fs', 'OpenCode/Host/SphinxMcpConfig.fs', 'OpenCode/Host/SphinxMcpConfigSurface.fs'].sort(),
-  )
 
   // Unique production ownership, sibling signatures and aggregate coverage are
   // enforced by readCompileShardInventory for every shard, including explicit ones.

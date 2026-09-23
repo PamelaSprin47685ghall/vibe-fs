@@ -1,5 +1,10 @@
 # epistemic-reasoning — WHY
 
+> **SUPERSEDED by `sphinx-v2` (2026-09-23 clean-break).**
+> Kept as historical rationale for the pre-break kernel. See `sphinx-v2/WHY.md` for
+> the current rationale and `sphinx-v2/SUPERSEDES.md` for the per-proposition mapping.
+# epistemic-reasoning — WHY
+
 ## 不可替代的存在理由
 
 复杂探究的原始对话含大量重复措辞；把 transcript 当状态，会把重述误算成新知识。Sphinx 因此维护事件历史关于未来探究决策的充分统计量，并把每次实验条件、观测、证书精化与资源消耗保存为可回放事实。

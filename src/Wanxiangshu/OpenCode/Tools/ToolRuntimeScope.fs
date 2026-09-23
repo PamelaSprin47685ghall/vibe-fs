@@ -393,21 +393,19 @@ type ToolRuntimeScope
             return Result.toOption admission
         }
 
+    /// The role the Authority Root recorded, when one exists.
+    let recordedRole (durable) (sessionId: SessionId) : string option =
+        PromptAuthorityProjectionQueries.activeProfile sessionId (AgentJournal.snapshot durable).AgentProjections
+        |> Option.map (fun profile -> string profile.CanonicalRole)
+
     let ensureCommandRoleFor (sessionId: SessionId) (resolveAgent: SessionId -> Task<string option>) =
         task {
-            match journal with
-            | None -> return None
-            | Some durable ->
-                match
-                    PromptAuthorityProjectionQueries.activeProfile
-                        sessionId
-                        (AgentJournal.snapshot durable).AgentProjections
-                with
-                | Some profile -> return Some profile.CanonicalRole
-                | None ->
-                    match! resolveAgent sessionId with
-                    | None -> return None
-                    | Some agent -> return! acceptHumanRootFor durable sessionId (commandRootPhysicalId sessionId) agent
+            let recorded =
+                journal |> Option.bind (fun durable -> recordedRole durable sessionId)
+
+            match Option.isSome recorded with
+            | true -> return recorded
+            | false -> return! resolveAgent sessionId
         }
 
     /// The managed agent the Authority Root selected for this session.

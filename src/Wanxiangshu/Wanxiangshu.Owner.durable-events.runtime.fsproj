@@ -15,7 +15,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.eventstore-authoritative-vocabulary.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.persistence-eventstore-canonicalintegrator.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-integration-rules.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-v2-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-integration-rules.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-integration-rules.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.knowledge-integration-rules.fsproj"/>

@@ -7,7 +7,7 @@
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-tool.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-v2-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.feature-ablation.ablation-kernel.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-executortoolsurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-managedagent.fsproj"/>
@@ -29,7 +29,6 @@
     
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-digest.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.sphinx-host-adapter.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.institutional-learning.enforcer-institutionallearning-fold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.execution-fission-opencode-host.fsproj"/>
@@ -46,7 +45,6 @@
     
     
     <ProjectReference Include="Wanxiangshu.Owner.interaction.opencode-tools-filemutationtools.fsproj"/>
-
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-toolbindings.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.opencode-tools-bookkeepertool.fsproj"/>

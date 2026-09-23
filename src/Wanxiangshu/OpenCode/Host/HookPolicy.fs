@@ -15,7 +15,6 @@ type HookKey =
     | ToolAfter
     | Event
     | Dispose
-    | CommandBefore
 
 [<RequireQualifiedAccess>]
 type HookCriticality =
@@ -241,17 +240,6 @@ module HookPolicy =
               Failure = HookFailureDisposition.TypedPolicyFailClosed
               Identity = IdentityPermission.NoIdentityAccess
               Admission = AdmissionPermission.NoAdmissionAccess }
-        | HookKey.CommandBefore ->
-            { HostKey = "command.execute.before"
-              DiagnosticOperation = "plugin-hook-command-before-failed"
-              Criticality = HookCriticality.Security
-              Context = HookContext.CommandExecution
-              Effects = [ HookEffect.ObserveIdentity; HookEffect.AdmitExplicitResume ]
-              Retry = HookRetryPermission.RetryForbidden
-              Capacity = HookCapacityOwner.NoCapacity
-              Failure = HookFailureDisposition.TypedPolicyFailClosed
-              Identity = IdentityPermission.ObserveIdentity
-              Admission = AdmissionPermission.OwnedAdmissionGate }
 
     let accepts criticality disposition =
         match criticality, disposition with

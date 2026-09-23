@@ -58,7 +58,6 @@ const ALLOWED_CONTRACT_CLOSURE_SHARDS = new Set([
   'eventstore-event-vocabulary-contract',
   'eventstore-git-contract',
   'strength-event-vocabulary-contract',
-  'sphinx-event-vocabulary-contract',
   'casebook-event-vocabulary-contract',
   'js-transaction-event-vocabulary-contract',
   'identity',
@@ -104,7 +103,6 @@ test('WHAT[durable-events-022] EventStore contracts exclude physical and Strengt
   )
   for (const domainShard of [
     'strength-event-vocabulary-contract',
-    'sphinx-event-vocabulary-contract',
     'casebook-event-vocabulary-contract',
     'js-transaction-event-vocabulary-contract',
   ]) {
@@ -116,7 +114,6 @@ test('WHAT[durable-events-022] EventStore contracts exclude physical and Strengt
 
   const contractSources = productionSources(contractPlan)
   assert.ok(!contractSources.includes('Strength/EventVocabulary.fs'))
-  assert.ok(!contractSources.includes('Sphinx/EventVocabulary.fs'))
   assert.ok(!contractSources.includes('Repository/Knowledge/Casebook/EventVocabulary.fs'))
   assert.ok(!contractSources.includes('Repository/Programming/Js/EventVocabulary.fs'))
   assert.ok(!contractSources.includes('Strength/Events.fs'))
@@ -128,7 +125,6 @@ test('WHAT[durable-events-022] EventStore contracts exclude physical and Strengt
   )
   for (const domainShard of [
     'strength-event-vocabulary-contract',
-    'sphinx-event-vocabulary-contract',
     'casebook-event-vocabulary-contract',
     'js-transaction-event-vocabulary-contract',
   ]) {
@@ -140,7 +136,6 @@ test('WHAT[durable-events-022] EventStore contracts exclude physical and Strengt
 
   const assemblySources = productionSources(assemblyPlan)
   assert.ok(assemblySources.includes('Strength/EventVocabulary.fs'))
-  assert.ok(assemblySources.includes('Sphinx/EventVocabulary.fs'))
   assert.ok(assemblySources.includes('Repository/Knowledge/Casebook/EventVocabulary.fs'))
   assert.ok(assemblySources.includes('Repository/Programming/Js/EventVocabulary.fs'))
   assert.ok(!assemblySources.includes('Strength/Events.fs'))

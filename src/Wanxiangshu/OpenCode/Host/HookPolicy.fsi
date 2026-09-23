@@ -14,7 +14,6 @@ type HookKey =
     | ToolAfter
     | Event
     | Dispose
-    | CommandBefore
 
 [<RequireQualifiedAccess>]
 type HookCriticality =

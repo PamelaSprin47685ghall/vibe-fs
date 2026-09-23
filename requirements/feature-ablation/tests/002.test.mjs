@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as Ablation from '../../../dist/Ablation/Surface.js'
-import { configure as configureSphinx } from '../../../dist/OpenCode/Plugin/SphinxCommandSurface.js'
 
 // Ablation memoises the manifest on first load, so restoring the environment is not
 // enough on its own: the cache would keep answering for the profile that loaded it,
@@ -166,44 +165,6 @@ test('WHAT[feature-ablation-002] ABL_002_primary_agents_and_native_sphinx_tool_a
     )
   })
 
-  // 3. 关闭时原生工具与命令同时消失，遗留 MCP 配置被清除。
-  withEnv(
-    [
-      ['WANXIANGSHU_ABLATION_PROFILE', 'station-41'],
-      ['WANXIANGSHU_ABLATION_epistemic_reasoning', 'ablated'],
-    ],
-    () => {
-      Ablation.load()
-      const config = { mcp: { sphinx: { type: 'local' }, other: { type: 'remote' } }, command: { sphinx: {}, other: {} } }
-      configureSphinx(config)
-      assert.equal(Ablation.allowsTool('sphinx'), false)
-      assert.equal(Ablation.allowsToolSchema('sphinx'), false)
-      assert.equal(config.command.sphinx, undefined)
-      assert.equal(config.mcp.sphinx, undefined)
-      assert.deepEqual(config.mcp.other, { type: 'remote' })
-      assert.deepEqual(config.command.other, {})
-    },
-  )
-
-  // 4. epistemic-reasoning 为 active 时，Sphinx 开关由其自身状态控制，正常启用
-  withEnv(
-    [
-      ['WANXIANGSHU_ABLATION_PROFILE', 'production'],
-      ['WANXIANGSHU_ABLATION_epistemic_reasoning', 'active'],
-      ['SPHINX_MCP_DISABLED', '1'],
-      ['WANXIANGSHU_TEST', '0'],
-    ],
-    () => {
-      Ablation.load()
-      const config = { mcp: { sphinx: { type: 'local' } } }
-      configureSphinx(config)
-      assert.equal(Ablation.allowsTool('sphinx'), true)
-      assert.equal(Ablation.allowsToolSchema('sphinx'), true)
-      assert.equal(config.command.sphinx.subtask, false)
-      assert.equal(config.command.sphinx.agent, undefined)
-      assert.equal(config.mcp.sphinx, undefined, 'active native Sphinx never installs MCP, even with legacy environment variables')
-    },
-  )
 })
 
 test('WHAT[feature-ablation-002] ABL_002_station_05_denies_ablated_durable_fact_tags', () => {

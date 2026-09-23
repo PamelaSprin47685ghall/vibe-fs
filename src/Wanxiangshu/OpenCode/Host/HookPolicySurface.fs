@@ -39,8 +39,7 @@ module HookPolicySurface =
           HookKey.ToolBefore
           HookKey.ToolAfter
           HookKey.Event
-          HookKey.Dispose
-          HookKey.CommandBefore ]
+          HookKey.Dispose ]
 
     let rows () : obj array =
         keys

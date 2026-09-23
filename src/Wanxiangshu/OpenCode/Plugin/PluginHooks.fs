@@ -264,9 +264,6 @@ module PluginHooks =
 
                     scope.AttachToolRuntime(toolRegistration.Runtime :> ISessionRuntimeOwner)
 
-                    toolRegistration.Sphinx
-                    |> Option.iter (fun sphinx -> scope.AttachSessionCleanup sphinx.CancelSession)
-
                     return toolRegistration
                 }
 
@@ -339,88 +336,9 @@ module PluginHooks =
                 registeredHook HookKey.Event (unaryHook (box (fun raw -> wired.ObserveEvent raw)))
 
             let dispose =
-                let disposeSphinx () : Task =
-                    match toolRegistration |> Option.bind (fun registration -> registration.Sphinx) with
-                    | Some sphinx -> sphinx.DisposeAsync()
-                    | None -> Task.FromResult(()) :> Task
-
-                let disposeAll () =
-                    task {
-                        let! sphinxError =
-                            task {
-                                try
-                                    do! disposeSphinx ()
-                                    return None
-                                with error ->
-                                    return Some error
-                            }
-
-                        do! scope.DisposeAsync()
-                        sphinxError |> Option.iter raise
-                    }
+                let disposeAll () = scope.DisposeAsync()
 
                 registeredHook HookKey.Dispose (nullaryHook (box disposeAll))
-
-            let runSphinx sessionId question expectTurns =
-                task {
-                    let registration =
-                        toolRegistration
-                        |> Option.defaultWith (fun () ->
-                            invalidOp "Sphinx requires the managed Engineer runtime and workspace EventStore")
-
-                    let context: HostToolContext =
-                        { SessionId = sessionId
-                          Agent = None
-                          ToolCallId = None
-                          ProviderRunId = None
-                          PromptText = Some question
-                          AttachAbort = fun _ -> ignore }
-
-                    let! role =
-                        registration.Runtime.EnsureCommandRoleFor(SessionId.create sessionId, wired.ResolveSessionAgent)
-
-                    if
-                        not (
-                            role
-                            |> Option.exists (fun role -> OfficeCapability.isAllowed role ToolPermission.Sphinx)
-                        )
-                    then
-                        invalidOp "Sphinx requires a Manager, Orchestrator or Engineer conversation"
-
-                    let sphinx =
-                        registration.Sphinx
-                        |> Option.defaultWith (fun () -> invalidOp "Sphinx runtime is unavailable")
-
-                    return!
-                        sphinx.Run(
-                            context,
-                            "command:" + sessionId + ":" + Guid.NewGuid().ToString("N"),
-                            question,
-                            expectTurns
-                        )
-                }
-
-            let beforeCommand input output =
-                task {
-                    let! handled = SphinxCommand.before runSphinx client workspaceDirectory input output
-
-                    match handled, toolRegistration with
-                    | false, Some registration ->
-                        let adoptExisting parent record =
-                            registration.Runtime.AdoptExistingChild(parent, record)
-
-                        do!
-                            ExplicitSessionResume.before
-                                (journal |> Option.map AgentJournalPortAdapter.forSessionResume)
-                                snapshotOpt
-                                adoptExisting
-                                input
-                                output
-                    | _ -> ()
-                }
-
-            let commandBefore =
-                registeredHook HookKey.CommandBefore (pairedHook (box beforeCommand))
 
             let hooks =
                 createObj (
@@ -435,8 +353,7 @@ module PluginHooks =
                       toolBeforeRegistration
                       toolAfterRegistration
                       event
-                      dispose
-                      commandBefore ]
+                      dispose ]
                     @ (toolRegistration
                        |> Option.map (fun registration -> [ "tool", registration.Tools ])
                        |> Option.defaultValue [])
