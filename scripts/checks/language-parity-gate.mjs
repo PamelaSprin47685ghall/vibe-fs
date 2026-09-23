@@ -283,9 +283,9 @@ export const scanProviderLanguageBinding = (text) => {
   if (!text.includes('Environment.GetEnvironmentVariable')) {
     reject('Host binding must observe the raw provider-language environment value')
   }
-  if (!/ProviderLanguage\s*\.\s*fromPreferenceObservation/.test(text)) {
+  if (!/ProviderLanguage\s*\.\s*(?:fromPreferenceObservation|fromObservationLadder)/.test(text)) {
     reject(
-      'Host binding must delegate provider-language defaulting and parsing to ProviderLanguage.fromPreferenceObservation',
+      'Host binding must delegate provider-language defaulting and parsing to ProviderLanguage.fromPreferenceObservation or ProviderLanguage.fromObservationLadder',
     )
   }
   if (/ProviderLanguage\s*\.\s*English/.test(text)) {

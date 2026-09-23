@@ -41,7 +41,7 @@
 
 ## [009] 纯函数永不推断 HumanRoot
 
-来源判定中的纯计算函数绝不推断返回新的 `HumanRoot`。`HumanRoot` 只能在激活 Profile 缺席且携带合法显式 participant 时由 Ingress 边界授予；活跃 Run 中携带同一 participant 的外部用户消息只能成为绑定既有 Profile 的 `HumanMessage` continuation，缺失或漂移 participant 的未知消息必须拒绝，绝不可抬升为 Root。continuation 接纳后，Host 当前物理 user-message binding 必须推进到该消息，供 reconciler/provider-start 观察 exact 新物理目标；既有 Authority Root identity 不变。
+来源判定中的纯计算函数绝不推断返回新的 `HumanRoot`。`HumanRoot` 只能在激活 Profile 缺席且携带合法显式 participant 时由 Ingress 边界授予；活跃 Run 中携带同一 participant 的外部用户消息只能成为绑定既有 Profile 的 `HumanMessage` continuation，缺失或漂移 participant 的未知消息必须拒绝，绝不可抬升为 Root。Ingress 边界在外部消息未显式携带 participant 字段时，必须通过当前 Session 的 Durable Authority Projection 追溯既有活跃或历史 Profile，若存在确定性权威，则以该既有 participant 身份接纳为 `HumanMessage` continuation 或为新任务开启 HumanRoot，禁止因 Host 界面请求体省略 agent 字段而误判为 UnknownOrigin。continuation 接纳后，Host 当前物理 user-message binding 必须推进到该消息，供 reconciler/provider-start 观察 exact 新物理目标；既有 Authority Root identity 不变。
 
 ## [010] 自动 repair 稳定 exact occasion identity
 
