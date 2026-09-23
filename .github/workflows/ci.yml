@@ -20,5 +20,3 @@ jobs:
       - run: npm ci
       - run: dotnet tool restore
       - run: npm run verify:release
-        env:
-          UNIT_VERDICT_SILENCE_MS: 30000
