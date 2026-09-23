@@ -81,3 +81,42 @@ test('WHAT[sphinx-v2-013] intake, output and call counts are preserved', () => {
   assert.equal(counts[1], 200)
   assert.equal(counts[2], 3)
 })
+
+// WHAT[sphinx-v2-013]: the point of the whole design. When the comparison changes, the
+// selection changes with it. ID order must never decide it.
+
+test('WHAT[sphinx-v2-013] a better comparison changes the selected plan', () => {
+  const scope = 'scope_1'
+
+  const before = Loop.decisionSelect(scope, [
+    modelEstimate('check-A', scope, 0.5, 1),
+    modelEstimate('find-new', scope, 0.2, 2),
+  ])
+
+  assert.equal(before.SelectedPlanId, 'check-A')
+
+  const after = Loop.decisionSelect(scope, [
+    modelEstimate('check-A', scope, 0.2, 2),
+    modelEstimate('find-new', scope, 0.7, 1),
+  ])
+
+  assert.equal(after.SelectedPlanId, 'find-new')
+
+  // The ids are in opposite order in both inputs, so this cannot be an id sort.
+  assert.notEqual(before.SelectedPlanId, after.SelectedPlanId)
+})
+
+test('WHAT[sphinx-v2-013] selection never reads ID order', () => {
+  const scope = 'scope_1'
+  const forward = Loop.decisionSelect(scope, [
+    modelEstimate('aaa', scope, 0.9, 1),
+    modelEstimate('zzz', scope, 0.1, 2),
+  ])
+
+  const reversed = Loop.decisionSelect(scope, [
+    modelEstimate('zzz', scope, 0.1, 2),
+    modelEstimate('aaa', scope, 0.9, 1),
+  ])
+
+  assert.equal(forward.SelectedPlanId, reversed.SelectedPlanId)
+})
