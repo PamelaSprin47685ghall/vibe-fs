@@ -34,12 +34,10 @@ module ProviderLanguageBinding =
             Environment.GetEnvironmentVariable "VSCODE_NLS_CONFIG" |> Option.ofObj
 
         let posixLocale =
-            match Environment.GetEnvironmentVariable "LC_ALL" |> Option.ofObj with
-            | Some v -> Some v
-            | None ->
-                match Environment.GetEnvironmentVariable "LC_MESSAGES" |> Option.ofObj with
-                | Some v -> Some v
-                | None -> Environment.GetEnvironmentVariable "LANG" |> Option.ofObj
+            Environment.GetEnvironmentVariable "LC_ALL"
+            |> Option.ofObj
+            |> Option.orElseWith (fun () -> Environment.GetEnvironmentVariable "LC_MESSAGES" |> Option.ofObj)
+            |> Option.orElseWith (fun () -> Environment.GetEnvironmentVariable "LANG" |> Option.ofObj)
 
         let intlLocale =
             try

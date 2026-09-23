@@ -90,6 +90,19 @@ module ProviderLanguage =
             || lower.Contains "chs"
             || lower.Contains "chinese"
 
+    let private tryExplicitPreference (explicit: string option) (hostConfig: string option) =
+        [ explicit; hostConfig ]
+        |> List.tryPick (function
+            | Some raw when not (String.IsNullOrWhiteSpace raw) -> Some raw
+            | _ -> None)
+
+    let private detectSystemLanguage (candidates: string option list) =
+        candidates
+        |> List.tryPick (function
+            | Some raw when isChineseLocale raw -> Some ProviderLanguage.SimplifiedChinese
+            | _ -> None)
+        |> Option.defaultValue ProviderLanguage.English
+
     /// Resolves global preference through the normative preference ladder:
     /// 1. Explicit environment variable (WANXIANGSHU_PROVIDER_LANGUAGE)
     /// 2. Host config preference (opencode.json language)
@@ -102,22 +115,9 @@ module ProviderLanguage =
         (posixLocale: string option)
         (intlLocale: string option)
         : Result<ProviderLanguage, string> =
-        match explicit with
-        | Some raw when not (String.IsNullOrWhiteSpace raw) -> configuredPreference raw
-        | _ ->
-            match hostConfig with
-            | Some raw when not (String.IsNullOrWhiteSpace raw) -> configuredPreference raw
-            | _ ->
-                let systemDetected =
-                    [ vscodeNls; posixLocale; intlLocale ]
-                    |> List.tryPick (fun candidate ->
-                        match candidate with
-                        | Some raw when isChineseLocale raw -> Some ProviderLanguage.SimplifiedChinese
-                        | _ -> None)
-
-                match systemDetected with
-                | Some lang -> Ok lang
-                | None -> Ok ProviderLanguage.English
+        match tryExplicitPreference explicit hostConfig with
+        | Some raw -> configuredPreference raw
+        | None -> Ok(detectSystemLanguage [ vscodeNls; posixLocale; intlLocale ])
 
     /// HOST-026: child / attached / InternalLeaf language = owner | commissioner.
     let inheritFrom (owner: ProviderLanguage) : ProviderLanguage = owner

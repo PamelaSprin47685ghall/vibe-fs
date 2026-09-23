@@ -732,25 +732,29 @@ module HostSignalBootstrap =
                         |> Option.orElseWith (fun () ->
                             pa.LastAuthorityProfile |> Option.map (fun last -> last.SelectedAgent))))
 
+            let resolveFallbackAgent sid =
+                match tryDurableSessionAgent sid with
+                | Some agent ->
+                    SessionExecutionBinding.observeUserFacingAgent sid agent
+                    Some agent
+                | None when not (hasPhysicalParent sid) ->
+                    let defaultAgent = "manager"
+                    SessionExecutionBinding.observeUserFacingAgent sid defaultAgent
+                    Some defaultAgent
+                | None -> None
+
+            let resolveMissingOrFallbackAgent sid =
+                task {
+                    match! queryMissingAgent sid with
+                    | Some agent -> return Some agent
+                    | None -> return resolveFallbackAgent sid
+                }
+
             let resolveAgentForSession sid =
                 task {
                     match SessionExecutionBinding.tryAgent sid with
                     | Some agent -> return Some agent
-                    | None ->
-                        match! queryMissingAgent sid with
-                        | Some agent -> return Some agent
-                        | None ->
-                            match tryDurableSessionAgent sid with
-                            | Some agent ->
-                                SessionExecutionBinding.observeUserFacingAgent sid agent
-                                return Some agent
-                            | None ->
-                                if not (hasPhysicalParent sid) then
-                                    let defaultAgent = "manager"
-                                    SessionExecutionBinding.observeUserFacingAgent sid defaultAgent
-                                    return Some defaultAgent
-                                else
-                                    return None
+                    | None -> return! resolveMissingOrFallbackAgent sid
                 }
 
             let applyResolvedAgent agentOpt (decoded: PromptIngressCodec.DecodedMessage) =

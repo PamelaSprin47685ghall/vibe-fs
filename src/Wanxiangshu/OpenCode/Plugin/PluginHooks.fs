@@ -309,21 +309,21 @@ module PluginHooks =
             let systemTransformRegistration =
                 registeredHook HookKey.SystemTransform (pairedHook (box systemTransform))
 
-            let config =
-                registeredHook
-                    HookKey.Config
-                    (unaryHook (
-                        box (fun (config: obj) ->
-                            if not (isNull config) then
-                                config?snapshot <- box false
+            let syncHostLanguagePreference (config: obj) =
+                let lang = config?language
 
-                                if not (isNull config?language) then
-                                    ProviderLanguageBinding.setHostConfigPreference (string config?language)
+                if not (isNull lang) then
+                    ProviderLanguageBinding.setHostConfigPreference (string lang)
 
-                            ManagerConfig.configureManager config |> ignore
-                            scope.RecordCompactionSettingGap(HostCompactionGate.enforceSettings config)
-                            ExplicitSessionResume.registerCommand config)
-                    ))
+            let configurePluginHost (config: obj) =
+                if not (isNull config) then
+                    config?snapshot <- box false
+                    syncHostLanguagePreference config
+                    ManagerConfig.configureManager config |> ignore
+                    scope.RecordCompactionSettingGap(HostCompactionGate.enforceSettings config)
+                    ExplicitSessionResume.registerCommand config
+
+            let config = registeredHook HookKey.Config (unaryHook (box configurePluginHost))
 
             let sessionCompacting =
                 registeredHook HookKey.SessionCompacting (pairedHook (box HostCompactionGate.onSessionCompacting))

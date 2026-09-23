@@ -74,26 +74,29 @@ module SuicideTool =
             && certificate.SnapshotId = snapshot
             && certificate.AuthorityRevision = authority)
 
+    let private tryCurrentObligationsRef (journal: AgentJournal) (incumbent: IncumbencyId) =
+        let todoProjection = (AgentJournal.snapshot journal).AgentProjections.MagicTodo
+
+        Map.tryFind (IncumbencyId.value incumbent) todoProjection.ByIncumbency
+        |> Option.bind (fun s -> s.CurrentObligationsRef)
+
+    let private readBlobHasContent (journal: AgentJournal) (blobRef: BlobRef) : Task<bool> =
+        task {
+            match! journal.Writer.BlobWriter.Read blobRef with
+            | Ok body ->
+                let trimmed = body.Trim()
+                return trimmed <> "[]" && trimmed <> ""
+            | Error _ -> return true
+        }
+
     let private hasPendingObligations (journal: AgentJournal) (incumbent: IncumbencyId) : Task<bool> =
         task {
-            let todoProjection = (AgentJournal.snapshot journal).AgentProjections.MagicTodo
+            let emptyDigest = HostDigest.sha256Hex "[]"
 
-            match Map.tryFind (IncumbencyId.value incumbent) todoProjection.ByIncumbency with
+            match tryCurrentObligationsRef journal incumbent with
             | None -> return false
-            | Some incumbencyState ->
-                match incumbencyState.CurrentObligationsRef with
-                | None -> return false
-                | Some(blobRef, digest) ->
-                    let emptyDigest = HostDigest.sha256Hex "[]"
-
-                    if BlobDigest.value digest = emptyDigest then
-                        return false
-                    else
-                        match! journal.Writer.BlobWriter.Read blobRef with
-                        | Ok body ->
-                            let trimmed = body.Trim()
-                            return trimmed <> "[]" && trimmed <> ""
-                        | Error _ -> return true
+            | Some(_, digest) when BlobDigest.value digest = emptyDigest -> return false
+            | Some(blobRef, _) -> return! readBlobHasContent journal blobRef
         }
 
     let private retirementTransaction
