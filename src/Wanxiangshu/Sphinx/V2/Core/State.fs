@@ -124,12 +124,14 @@ module InquiryState =
         let dependenciesSucceeded (item: WorkItem) =
             item.Spec.Dependencies
             |> Set.forall (fun dependency ->
-                match state.Work |> Map.tryFind dependency with
-                | Some dependencyItem ->
-                    match dependencyItem.State with
+                state.Work
+                |> Map.tryFind dependency
+                |> Option.map (fun dependencyItem -> dependencyItem.State)
+                |> Option.map (fun state ->
+                    match state with
                     | WorkState.Succeeded _ -> true
-                    | _ -> false
-                | None -> false)
+                    | _ -> false)
+                |> Option.defaultValue false)
 
         state.Work
         |> Map.toList

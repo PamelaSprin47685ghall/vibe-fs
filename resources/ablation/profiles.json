@@ -61,7 +61,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-06": {
@@ -125,7 +126,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-07": {
@@ -189,7 +191,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-08": {
@@ -253,7 +256,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-09": {
@@ -317,7 +321,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-10": {
@@ -381,7 +386,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-11": {
@@ -445,7 +451,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-12": {
@@ -509,7 +516,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-13": {
@@ -573,7 +581,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-14": {
@@ -637,7 +646,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-15": {
@@ -701,7 +711,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-16": {
@@ -765,7 +776,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-17": {
@@ -829,7 +841,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-18": {
@@ -893,7 +906,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-19": {
@@ -957,7 +971,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-20": {
@@ -1021,7 +1036,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-21": {
@@ -1085,7 +1101,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-22": {
@@ -1149,7 +1166,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-23": {
@@ -1213,7 +1231,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-24": {
@@ -1277,7 +1296,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-25": {
@@ -1341,7 +1361,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-26": {
@@ -1405,7 +1426,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-27": {
@@ -1469,7 +1491,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-28": {
@@ -1533,7 +1556,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-29": {
@@ -1597,7 +1621,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-30": {
@@ -1661,7 +1686,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-31": {
@@ -1725,7 +1751,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-32": {
@@ -1789,7 +1816,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-33": {
@@ -1853,7 +1881,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-34": {
@@ -1917,7 +1946,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-35": {
@@ -1981,7 +2011,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-36": {
@@ -2045,7 +2076,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-37": {
@@ -2109,7 +2141,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-38": {
@@ -2173,7 +2206,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-39": {
@@ -2237,7 +2271,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-40": {
@@ -2301,7 +2336,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-41": {
@@ -2365,7 +2401,8 @@
         "delegation.async-fork": "ablated",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-42": {
@@ -2429,7 +2466,8 @@
         "delegation.async-fork": "active",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-43": {
@@ -2493,7 +2531,8 @@
         "delegation.async-fork": "active",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-44": {
@@ -2557,7 +2596,8 @@
         "delegation.async-fork": "active",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-45": {
@@ -2621,7 +2661,8 @@
         "delegation.async-fork": "active",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-46": {
@@ -2685,7 +2726,8 @@
         "delegation.async-fork": "active",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-47": {
@@ -2749,7 +2791,8 @@
         "delegation.async-fork": "active",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-48": {
@@ -2813,7 +2856,8 @@
         "delegation.async-fork": "active",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-49": {
@@ -2877,7 +2921,8 @@
         "delegation.async-fork": "active",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "ablated"
+        "cognitive-workspace": "ablated",
+        "sphinx-v2": "active"
       }
     },
     "station-50": {
@@ -2941,7 +2986,8 @@
         "delegation.async-fork": "active",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "active"
+        "cognitive-workspace": "active",
+        "sphinx-v2": "active"
       }
     },
     "station-51": {
@@ -3005,7 +3051,8 @@
         "delegation.async-fork": "active",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "active"
+        "cognitive-workspace": "active",
+        "sphinx-v2": "active"
       }
     },
     "station-52": {
@@ -3069,7 +3116,8 @@
         "delegation.async-fork": "active",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "active"
+        "cognitive-workspace": "active",
+        "sphinx-v2": "active"
       }
     },
     "station-53": {
@@ -3133,7 +3181,8 @@
         "delegation.async-fork": "active",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "active"
+        "cognitive-workspace": "active",
+        "sphinx-v2": "active"
       }
     },
     "station-54": {
@@ -3197,7 +3246,8 @@
         "delegation.async-fork": "active",
         "change-integration.orchestrator-tools": "ablated",
         "feature-ablation": "active",
-        "cognitive-workspace": "active"
+        "cognitive-workspace": "active",
+        "sphinx-v2": "active"
       }
     },
     "station-55": {
@@ -3261,7 +3311,8 @@
         "delegation.async-fork": "active",
         "change-integration.orchestrator-tools": "active",
         "feature-ablation": "active",
-        "cognitive-workspace": "active"
+        "cognitive-workspace": "active",
+        "sphinx-v2": "active"
       }
     },
     "station-56": {
@@ -3325,7 +3376,8 @@
         "delegation.async-fork": "active",
         "change-integration.orchestrator-tools": "active",
         "feature-ablation": "active",
-        "cognitive-workspace": "active"
+        "cognitive-workspace": "active",
+        "sphinx-v2": "active"
       }
     },
     "production": {
@@ -3389,7 +3441,8 @@
         "delegation.async-fork": "active",
         "change-integration.orchestrator-tools": "active",
         "feature-ablation": "active",
-        "cognitive-workspace": "active"
+        "cognitive-workspace": "active",
+        "sphinx-v2": "active"
       }
     }
   }

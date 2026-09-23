@@ -75,18 +75,26 @@ module Reducer =
         else
             Ok()
 
-    /// Terminal is terminal. A completed inquiry accepts later cost audits (a provider
-    /// can bill after the answer) but no new business fact.
+    /// A terminal inquiry still accepts cost audits and cancel requests: a provider
+    /// can bill after the answer, and a controller can still ask to stop. Nothing else
+    /// may write a new business fact.
+    let private isLateFact (body: InquiryEventBody) : bool =
+        match body with
+        | InquiryEventBody.UsageSettled _
+        | InquiryEventBody.UsageOverrunRecorded _
+        | InquiryEventBody.HostTerminalRecorded _
+        | InquiryEventBody.CancelRequested _ -> true
+        | _ -> false
+
     let private admitBusinessEvent (state: InquiryState) (body: InquiryEventBody) : Result<unit, CoreError> =
-        if InquiryState.isTerminal state.Status then
-            match body with
-            | InquiryEventBody.UsageSettled _
-            | InquiryEventBody.UsageOverrunRecorded _
-            | InquiryEventBody.HostTerminalRecorded _
-            | InquiryEventBody.CancelRequested _ -> Ok()
-            | _ -> Error(coreError "inquiry-terminal" "inquiry is terminal and accepts no new business event")
-        else
-            Ok()
+        let terminal = InquiryState.isTerminal state.Status
+        let businessFact = not (isLateFact body)
+        let rejected = terminal && businessFact
+
+        match rejected with
+        | true -> Error(coreError "inquiry-terminal" "inquiry is terminal and accepts no new business event")
+        | false -> Ok()
+
 
     let private applyGoalAmended (state: InquiryState) (goal: GoalSpec) : Result<InquiryState, CoreError> =
         if goal.GoalId <> state.Goal.GoalId then
@@ -113,6 +121,25 @@ module Reducer =
                               Closed = false
                               Outcome = None } }
 
+    let private closeRound (state: InquiryState) (roundId: RoundId) (outcome: string) : Result<InquiryState, CoreError> =
+        match state.Rounds |> Map.tryFind roundId with
+        | Some record ->
+            Ok
+                { state with
+                    Rounds =
+                        state.Rounds
+                        |> Map.add roundId { record with Closed = true; Outcome = Some outcome } }
+        | None -> Error(coreError "unknown-round" (sprintf "round %s is not open" (RoundId.value roundId)))
+
+    let private releaseReservation (state: InquiryState) (workId: WorkId) (attempt: Attempt) :
+        Result<InquiryState, CoreError> =
+        let key = InquiryState.reservationKey { WorkId = workId; Attempt = attempt }
+
+        if state.Reservations |> Map.containsKey key then
+            Ok { state with Reservations = state.Reservations |> Map.remove key }
+        else
+            Ok state
+
     let private applyWorkPlanned (state: InquiryState) (specs: WorkSpec list) : Result<InquiryState, CoreError> =
         let workError (fault: WorkError) : CoreError = { Code = fault.Code; Message = fault.Message }
 
@@ -125,15 +152,26 @@ module Reducer =
             | spec :: rest ->
                 let id = WorkId.value spec.Id
 
-                if state.Work |> Map.containsKey spec.Id then
-                    Error(coreError "duplicate-work" (sprintf "work %s already exists" id))
-                elif work |> Map.containsKey spec.Id then
-                    Error(coreError "duplicate-work" (sprintf "work %s is planned twice in one batch" id))
-                else
+                let alreadyPlanned = state.Work |> Map.containsKey spec.Id
+                let plannedTwice = work |> Map.containsKey spec.Id
+
+                let planError () =
                     Work.validateSpec spec
                     |> Result.mapError workError
                     |> Result.bind (fun () ->
                         loop (work |> Map.add spec.Id { Spec = spec; State = WorkState.Planned }) rest)
+
+                let duplicateReason () =
+                    if alreadyPlanned then sprintf "work %s already exists" id
+                    elif plannedTwice then sprintf "work %s is planned twice in one batch" id
+                    else ""
+
+                let duplicated = alreadyPlanned || plannedTwice
+
+                let planOrConflict () =
+                    if duplicated then Error(coreError "duplicate-work" (duplicateReason ())) else planError ()
+
+                planOrConflict ()
 
         loop state.Work specs
         |> Result.map (fun work -> { state with Work = work })
@@ -146,16 +184,64 @@ module Reducer =
     /// The fence is checked against the work's own attempt, not against a caller-supplied
     /// attempt number alone. A late result from a superseded attempt carries an older
     /// fence and must not land as the current result.
-    let private fenceMatches (item: WorkItem) (spec: WorkSpec) (fromState: string) (next: WorkState) : Result<unit, CoreError> =
+    let private attemptMatches (item: WorkItem) (spec: WorkSpec) (fromState: string) : Result<unit, CoreError> =
         if item.Spec.Attempt <> spec.Attempt then
             Error(coreError "attempt-mismatch" (sprintf "work attempt does not match: %s" fromState))
         elif item.Spec.Fence <> spec.Fence then
             Error(coreError "stale-fence" (sprintf "fence does not match the work attempt: %s" fromState))
         else
-            match next with
-            | WorkState.Running(_, physicalRef) when String.IsNullOrWhiteSpace physicalRef ->
-                Error(coreError "missing-physical-ref" "running work requires a real physical reference")
-            | _ -> Ok()
+            Ok()
+
+    /// Running is the one transition that must name a real physical reference: without
+    /// it there is nothing to reconcile against on recovery.
+    let private physicalRefPresent (next: WorkState) : Result<unit, CoreError> =
+        match next with
+        | WorkState.Running(_, physicalRef) when String.IsNullOrWhiteSpace physicalRef ->
+            Error(coreError "missing-physical-ref" "running work requires a real physical reference")
+        | _ -> Ok()
+
+    let private fenceMatches (item: WorkItem) (spec: WorkSpec) (fromState: string) (next: WorkState) : Result<unit, CoreError> =
+        attemptMatches item spec fromState
+        |> Result.bind (fun () -> physicalRefPresent next)
+
+    /// Dependencies must actually have succeeded. Being part of the same dispatch batch
+    /// is not completion, which is why the check reads real state rather than the
+    /// current batch membership.
+    let private succeededAttempt (item: WorkItem) : Attempt option =
+        match item.State with
+        | WorkState.Succeeded attempt -> Some attempt
+        | _ -> None
+
+    let private dependenciesSucceeded (state: InquiryState) (work: WorkSpec) : bool =
+        work.Dependencies
+        |> Set.forall (fun dependency ->
+            state.Work
+            |> Map.tryFind dependency
+            |> Option.bind succeededAttempt
+            |> Option.isSome)
+
+    /// The state machine itself, kept separate from the spec checks so each half stays
+    /// readable on its own.
+    let private legalStateChange
+        (state: InquiryState)
+        (spec: WorkSpec)
+        (item: WorkItem)
+        (next: WorkState)
+        : Result<unit, CoreError> =
+        let becomeReady =
+            dependenciesSucceeded state spec
+
+        match item.State, next with
+        | WorkState.Planned, WorkState.Ready when not becomeReady ->
+            Error(coreError "dependency-unsatisfied" "work dependencies are not complete")
+        | WorkState.Planned, WorkState.Superseded successor
+        | WorkState.Ready, WorkState.Superseded successor -> currentWork state successor |> Result.map (fun _ -> ())
+        | WorkState.Leased _, WorkState.Running _
+        | WorkState.Running _, WorkState.Running _ -> Ok()
+        | WorkState.Succeeded _, WorkState.Succeeded _ ->
+            Error(coreError "duplicate-observation" "an attempt already accepted an observation")
+        | _ when Work.isTerminal item.State -> Error(coreError "terminal-work" "work is already terminal")
+        | _ -> Ok()
 
     let private legalTransition
         (state: InquiryState)
@@ -180,40 +266,24 @@ module Reducer =
             | WorkState.Cancelled _, WorkState.Ready -> true
             | _ -> false
 
-        if not samePurpose then
-            Error(coreError "spec-mismatch" "work spec is immutable within its lifecycle")
-        elif retry && spec.Attempt <> Attempt.next item.Spec.Attempt then
-            Error(coreError "invalid-attempt" "retry must advance the attempt by exactly one")
-        elif not retry && spec.Attempt <> item.Spec.Attempt then
-            Error(coreError "attempt-mismatch" "work attempt does not match the planned attempt")
-        else
-            match item.State, next with
-            | WorkState.Planned, WorkState.Ready ->
-                // Dependencies must actually have succeeded. Being part of the same
-                // dispatch batch is not completion.
-                let satisfied =
-                    spec.Dependencies
-                    |> Set.forall (fun dependency ->
-                        match state.Work |> Map.tryFind dependency with
-                        | Some dependencyItem ->
-                            match dependencyItem.State with
-                            | WorkState.Succeeded _ -> true
-                            | _ -> false
-                        | None -> false)
+        let specIsImmutable =
+            not samePurpose
 
-                if satisfied then
-                    Ok()
-                else
-                    Error(coreError "dependency-unsatisfied" "work dependencies are not complete")
-            | WorkState.Planned, WorkState.Superseded successor
-            | WorkState.Ready, WorkState.Superseded successor ->
-                currentWork state successor |> Result.map (fun _ -> ())
-            | WorkState.Leased _, WorkState.Running _
-            | WorkState.Running _, WorkState.Running _ -> Ok()
-            | WorkState.Succeeded _, WorkState.Succeeded _ ->
-                Error(coreError "duplicate-observation" "an attempt already accepted an observation")
-            | _ when Work.isTerminal item.State -> Error(coreError "terminal-work" "work is already terminal")
-            | _ -> Ok()
+        let attemptAdvanceWrong =
+            (retry && spec.Attempt <> Attempt.next item.Spec.Attempt)
+            || (not retry && spec.Attempt <> item.Spec.Attempt)
+
+        if specIsImmutable then
+            Error(coreError "spec-mismatch" "work spec is immutable within its lifecycle")
+        elif attemptAdvanceWrong then
+            Error(
+                coreError
+                    "attempt-mismatch"
+                    (if retry then "retry must advance the attempt by exactly one"
+                     else "work attempt does not match the planned attempt")
+            )
+        else
+            legalStateChange state spec item next
 
     let private applyWorkTransition (state: InquiryState) (body: WorkAttemptTransitionedBody) :
         Result<InquiryState, CoreError> =
@@ -328,85 +398,111 @@ module Reducer =
 
     /// Settlement books the real usage and releases only the part that can no longer be
     /// consumed. When a provider reports nothing, the reservation stays booked.
+    /// The resources a settled usage leaves outstanding on its own reservation.
+    let private remainingAfter (usage: SettledUsage) (outstanding: Map<string, float>) : Map<string, float> =
+        (outstanding, usage.Resources)
+        ||> Map.fold (fun acc resource amount ->
+            let left = (acc |> Map.tryFind resource |> Option.defaultValue 0.0) - amount
+            let depleted = left <= 0.0
+
+            match depleted with
+            | true -> Map.remove resource acc
+            | false -> Map.add resource left acc)
+
+    /// Booking a reservation against a settled usage: release what can no longer be
+    /// consumed, keep the rest as an outstanding reservation.
+    let private releaseSettled
+        (state: InquiryState)
+        (key: string)
+        (outstanding: Map<string, float>)
+        (usage: SettledUsage)
+        (settle: InquiryState -> Result<InquiryState, CoreError>)
+        (recordOverrun: InquiryState -> InquiryState)
+        : Result<InquiryState, CoreError> =
+        let workKey = { WorkId = usage.WorkId; Attempt = usage.Attempt }
+        let withoutReservation = state.Reservations |> Map.remove key
+        let stillLeft = remainingAfter usage outstanding
+        let fullySpent = Map.isEmpty stillLeft
+
+        let stillReserved =
+            withoutReservation
+            |> fun untouched ->
+                if fullySpent then
+                    untouched
+                else
+                    untouched |> Map.add key (workKey, stillLeft)
+
+        settle { state with Reservations = stillReserved }
+        |> Result.map recordOverrun
+
     let private applyUsageSettled (state: InquiryState) (usage: SettledUsage) : Result<InquiryState, CoreError> =
         let key = InquiryState.reservationKey { WorkId = usage.WorkId; Attempt = usage.Attempt }
 
+        let overrunFact =
+            { WorkId = usage.WorkId
+              Attempt = usage.Attempt
+              Resources = usage.Resources }
+
+        // An unresolved usage keeps the whole reservation booked: the provider told us
+        // nothing, and writing zero would claim the work was free.
+        let recordOverrun (target: InquiryState) =
+            if usage.Overrun then
+                { target with Overruns = target.Overruns @ [ overrunFact ] }
+            else
+                target
+
+        let settle (target: InquiryState) = Ok { target with SettledUsage = usage.Resources }
+
+        // An audit with no outstanding reservation is still bookable.
+        let bookAudit (target: InquiryState) = settle (recordOverrun target)
+
+        let unresolved = usage.UsageUnresolved
+
         match state.Reservations |> Map.tryFind key with
-        | None ->
-            // No reservation (an audit arriving after release) is still bookable.
-            if usage.UsageUnresolved then
-                Ok { state with SettledUsage = usage.Resources }
-            elif usage.Overrun then
-                Ok
-                    { state with
-                        SettledUsage = usage.Resources
-                        Overruns = state.Overruns @ [ { WorkId = usage.WorkId; Attempt = usage.Attempt; Resources = usage.Resources } ] }
-            else
-                Ok { state with SettledUsage = usage.Resources }
-        | Some (workKey, outstanding) ->
-            if usage.UsageUnresolved then
-                Ok { state with SettledUsage = usage.Resources }
-            else
-                let booked = outstanding
+        | _ when unresolved -> settle (recordOverrun state)
+        | Some (_, outstanding) -> releaseSettled state key outstanding usage settle recordOverrun
+        | None -> bookAudit state
 
-                let remaining =
-                    (booked, usage.Resources)
-                    ||> Map.fold (fun acc resource amount ->
-                        let outstanding = acc |> Map.tryFind resource |> Option.defaultValue 0.0
-                        let left = outstanding - amount
-
-                        if left <= 0.0 then
-                            Map.remove resource acc
-                        else
-                            Map.add resource left acc)
-
-                let overruns =
-                    if usage.Overrun then
-                        state.Overruns
-                        @ [ { WorkId = usage.WorkId
-                              Attempt = usage.Attempt
-                              Resources = usage.Resources } ]
-                    else
-                        state.Overruns
-
-                Ok
-                    { state with
-                        Reservations = state.Reservations |> Map.remove key
-                        SettledUsage = usage.Resources
-                        Overruns = overruns }
+    /// A result is admissible only when it belongs to this attempt, carries this
+    /// attempt's fence, and is not a second delivery of an already-accepted result.
+    let private resultAdmissible (state: InquiryState) (item: WorkItem) (body: ResultAcceptedBody) :
+        Result<unit, CoreError> =
+        if item.Spec.Attempt <> body.Attempt then
+            Error(coreError "attempt-mismatch" "result attempt does not match the work")
+        elif item.Spec.Fence <> body.Fence then
+            Error(coreError "stale-fence" "result fence does not match the work attempt")
+        elif state.Observations |> Map.containsKey (ObservationId.value body.ObservationId) then
+            Error(coreError "duplicate-observation" "this observation is already accepted")
+        else
+            Ok()
 
     let private applyResultAccepted (state: InquiryState) (body: ResultAcceptedBody) : Result<InquiryState, CoreError> =
         currentWork state body.WorkId
         |> Result.bind (fun item ->
-            if item.Spec.Attempt <> body.Attempt then
-                Error(coreError "attempt-mismatch" "result attempt does not match the work")
-            elif item.Spec.Fence <> body.Fence then
-                Error(coreError "stale-fence" "result fence does not match the work attempt")
-            elif state.Observations |> Map.containsKey (ObservationId.value body.ObservationId) then
-                Error(coreError "duplicate-observation" "this observation is already accepted")
-            else
-                match body.ResultSchema with
-                | _ ->
-                    let accepted =
-                        { state with
-                            Observations = state.Observations |> Map.add (ObservationId.value body.ObservationId) body }
+            resultAdmissible state item body
+            |> Result.bind (fun () ->
+                let accepted =
+                    { state with
+                        Observations = state.Observations |> Map.add (ObservationId.value body.ObservationId) body }
 
-                    match item.State with
-                    | WorkState.Running _ ->
-                        Ok
-                            { accepted with
-                                Work =
-                                    accepted.Work
-                                    |> Map.add body.WorkId
-                                        { Spec = item.Spec
-                                          State = WorkState.Succeeded body.Attempt } }
-                    | WorkState.Succeeded _ -> Ok accepted
-                    | _ ->
-                        Error(
-                            coreError
-                                "work-not-running"
-                                (sprintf "work %s is not running" (WorkId.value body.WorkId))
-                        ))
+                // A result arriving after the work already succeeded is a duplicate
+                // delivery of a physical retry: bookable, not a second observation.
+                match item.State with
+                | WorkState.Succeeded _ -> Ok accepted
+                | WorkState.Running _ ->
+                    Ok
+                        { accepted with
+                            Work =
+                                accepted.Work
+                                |> Map.add body.WorkId
+                                    { Spec = item.Spec
+                                      State = WorkState.Succeeded body.Attempt } }
+                | _ ->
+                    Error(
+                        coreError
+                            "work-not-running"
+                            (sprintf "work %s is not running" (WorkId.value body.WorkId))
+                    )))
 
     let private applyInterpretation (state: InquiryState) (body: InterpretationPendingBody) : Result<InquiryState, CoreError> =
         let id = ObservationId.value body.ObservationId
@@ -445,108 +541,99 @@ module Reducer =
                     Answer = Some body
                     Status = InquiryStatus.StopReached body.StopReason })
 
+    let private resumeActive (state: InquiryState) : Result<InquiryState, CoreError> =
+        let terminal = InquiryState.isTerminal state.Status
+
+        match terminal with
+        | true -> Error(coreError "inquiry-terminal" "a terminal inquiry cannot return to active")
+        | false -> Ok { state with Status = InquiryStatus.Active }
+
     let private applyStatus (state: InquiryState) (status: string) (reason: string) : Result<InquiryState, CoreError> =
         match status with
         | "suspended" -> Ok { state with Status = InquiryStatus.Suspended reason }
         | "failed" -> Ok { state with Status = InquiryStatus.Failed reason }
         | "cancelled" -> Ok { state with Status = InquiryStatus.Cancelled reason }
         | "cancelling" -> Ok { state with Status = InquiryStatus.Cancelling }
-        | "active" ->
-            if InquiryState.isTerminal state.Status then
-                Error(coreError "inquiry-terminal" "a terminal inquiry cannot return to active")
-            else
-                Ok { state with Status = InquiryStatus.Active }
+        | "active" -> resumeActive state
         | "input-required" -> Ok { state with Status = InquiryStatus.InputRequired reason }
         | _ -> Error(coreError "unknown-status" (sprintf "unknown inquiry status: %s" status))
+
+    /// Every event dispatches to exactly one handler, and each handler is a named
+    /// function so the dispatch stays a flat table instead of a nesting of conditions.
+    let private dispatchHandler (state: InquiryState) (body: InquiryEventBody) : Result<InquiryState, CoreError> =
+        match body with
+        | InquiryEventBody.GoalAmended goal -> applyGoalAmended state goal
+        | InquiryEventBody.SnapshotRegistered _ -> Ok state
+        | InquiryEventBody.DecisionScopeOpened _ -> Ok state
+        | InquiryEventBody.RoundOpened round -> applyRoundOpened state round
+        | InquiryEventBody.RoundClosed(roundId, outcome) -> closeRound state roundId outcome
+        | InquiryEventBody.WorkPlanned specs -> applyWorkPlanned state specs
+        | InquiryEventBody.WorkAttemptTransitioned transition -> applyWorkTransition state transition
+        | InquiryEventBody.CertificateSlotsPatched patchesBody -> applyCertificateSlots state patchesBody.Patches
+        | InquiryEventBody.CertificateInvalidated _ -> Ok state
+        | InquiryEventBody.BudgetReserved reserved -> applyBudgetReserved state reserved
+        | InquiryEventBody.UsageSettled usage -> applyUsageSettled state usage.Usage
+        | InquiryEventBody.UsageOverrunRecorded usage -> applyUsageSettled state usage.Usage
+        | InquiryEventBody.ReservationReleased(workId, attempt) -> releaseReservation state workId attempt
+        | InquiryEventBody.DispatchRequested _ -> Ok state
+        | InquiryEventBody.DispatchReceiptRecorded _ -> Ok state
+        | InquiryEventBody.HostTerminalRecorded _ -> Ok state
+        | InquiryEventBody.ResultAccepted acceptedBody -> applyResultAccepted state acceptedBody
+        | InquiryEventBody.InterpretationPending pending -> applyInterpretation state pending
+        | InquiryEventBody.InterpretationApplied _ -> Ok state
+        | InquiryEventBody.InterpretationFailed _ -> Ok state
+        | InquiryEventBody.GraphPatched patched -> applyGraphPatched state patched
+        | InquiryEventBody.DecisionRecorded _ -> Ok state
+        | InquiryEventBody.AnswerPrepared _ -> Ok state
+        | InquiryEventBody.AnswerCommitted committed -> applyAnswer state committed
+        | InquiryEventBody.CancelRequested _ -> Ok { state with Status = InquiryStatus.Cancelling }
+        | InquiryEventBody.InquiryCancelled reason -> Ok { state with Status = InquiryStatus.Cancelled reason }
+        | InquiryEventBody.InquirySuspended reason -> Ok { state with Status = InquiryStatus.Suspended reason }
+        | InquiryEventBody.InquiryFailed reason -> Ok { state with Status = InquiryStatus.Failed reason }
+        | InquiryEventBody.InquiryStatusChanged statusBody -> applyStatus state statusBody.Status statusBody.Reason
+        | InquiryEventBody.InquiryCreated _ -> Error(coreError "duplicate-inquiry" "inquiry is already created")
 
     let apply (state: InquiryState option) (event: InquiryEvent) : Result<InquiryState, CoreError> =
         match state, event.Body with
         | None, InquiryEventBody.InquiryCreated body -> emptyState event body
         | None, _ -> Error(coreError "missing-inquiry" "first event must create the inquiry")
-        | Some current, InquiryEventBody.InquiryCreated _ -> Error(coreError "duplicate-inquiry" "inquiry is already created")
+        | Some current, InquiryEventBody.InquiryCreated _ ->
+            Error(coreError "duplicate-inquiry" "inquiry is already created")
         | Some current, body ->
             admitBusinessEvent current body
             |> Result.bind (fun () -> verifyChain current event)
-            |> Result.bind (fun () ->
-                let next =
-                    match body with
-                    | InquiryEventBody.InquiryCreated _ -> Error(coreError "duplicate-inquiry" "inquiry is already created")
-                    | InquiryEventBody.GoalAmended goalBody -> applyGoalAmended current goalBody
-                    | InquiryEventBody.SnapshotRegistered _ -> Ok current
-                    | InquiryEventBody.DecisionScopeOpened _ -> Ok current
-                    | InquiryEventBody.RoundOpened openBody -> applyRoundOpened current openBody
-                    | InquiryEventBody.RoundClosed(roundId, closeOutcome) ->
-                        match current.Rounds |> Map.tryFind roundId with
-                        | Some record ->
-                            Ok
-                                { current with
-                                    Rounds =
-                                        current.Rounds
-                                        |> Map.add roundId { record with Closed = true; Outcome = Some closeOutcome } }
-                        | None -> Error(coreError "unknown-round" (sprintf "round %s is not open" (RoundId.value roundId)))
-                    | InquiryEventBody.WorkPlanned specs -> applyWorkPlanned current specs
-                    | InquiryEventBody.WorkAttemptTransitioned transitionBody -> applyWorkTransition current transitionBody
-                    | InquiryEventBody.CertificateSlotsPatched patchesBody -> applyCertificateSlots current patchesBody.Patches
-                    | InquiryEventBody.CertificateInvalidated _ -> Ok current
-                    | InquiryEventBody.BudgetReserved reservedBody -> applyBudgetReserved current reservedBody
-                    | InquiryEventBody.UsageSettled usageBody -> applyUsageSettled current usageBody.Usage
-                    | InquiryEventBody.UsageOverrunRecorded usageBody -> applyUsageSettled current usageBody.Usage
-                    | InquiryEventBody.ReservationReleased(workId, attempt) ->
-                        let key = InquiryState.reservationKey { WorkId = workId; Attempt = attempt }
-
-                        if current.Reservations |> Map.containsKey key then
-                            Ok { current with Reservations = current.Reservations |> Map.remove key }
-                        else
-                            Ok current
-                    | InquiryEventBody.DispatchRequested _
-                    | InquiryEventBody.DispatchReceiptRecorded _
-                    | InquiryEventBody.HostTerminalRecorded _ ->
-                        // Physical facts: recovery needs them, semantics does not read them.
-                        Ok current
-                    | InquiryEventBody.ResultAccepted acceptedBody -> applyResultAccepted current acceptedBody
-                    | InquiryEventBody.InterpretationPending pendingBody -> applyInterpretation current pendingBody
-                    | InquiryEventBody.InterpretationApplied _
-                    | InquiryEventBody.InterpretationFailed _ -> Ok current
-                    | InquiryEventBody.GraphPatched patchedBody -> applyGraphPatched current patchedBody
-                    | InquiryEventBody.DecisionRecorded _
-                    | InquiryEventBody.AnswerPrepared _ -> Ok current
-                    | InquiryEventBody.AnswerCommitted committedBody -> applyAnswer current committedBody
-                    | InquiryEventBody.CancelRequested _ -> Ok { current with Status = InquiryStatus.Cancelling }
-                    | InquiryEventBody.InquiryCancelled reason -> Ok { current with Status = InquiryStatus.Cancelled reason }
-                    | InquiryEventBody.InquirySuspended reason -> Ok { current with Status = InquiryStatus.Suspended reason }
-                    | InquiryEventBody.InquiryFailed reason -> Ok { current with Status = InquiryStatus.Failed reason }
-                    | InquiryEventBody.InquiryStatusChanged statusBody ->
-                        applyStatus current statusBody.Status statusBody.Reason
-
-                next |> Result.map (fun value -> { value with Revision = event.Revision; EventHead = Some event.Id }))
+            |> Result.bind (fun () -> dispatchHandler current body)
+            |> Result.map (fun next -> { next with Revision = event.Revision; EventHead = Some event.Id })
 
     /// Fold a whole transition batch. The batch is the unit of durability, so a failure
     /// anywhere means no event in it is applied: the previous state is the only outcome.
     let foldBatch (events: InquiryEvent list) : Result<InquiryState, CoreError> =
-        if events |> List.isEmpty then
-            Error(coreError "empty-batch" "transition batch must carry at least one event")
-        else
-            let rec loop (state: InquiryState option) remaining =
-                match remaining with
-                | [] ->
-                    match state with
-                    | Some current -> Ok current
-                    | None -> Error(coreError "empty-batch" "transition batch produced no state")
-                | event :: rest ->
-                    match apply state event with
-                    | Ok next -> loop (Some next) rest
-                    | Error fault -> Error fault
+        let emptyBatch () = Error(coreError "empty-batch" "transition batch must carry at least one event")
 
-            loop None events
+        let applyAll (carried: Result<InquiryState option, CoreError>) (event: InquiryEvent) =
+            carried |> Result.bind (fun state -> apply state event |> Result.map Some)
+
+        match events with
+        | [] -> emptyBatch ()
+        | _ ->
+            let folded = List.fold applyAll (Ok None) events
+            let emptyResult () = Error(coreError "empty-batch" "transition batch produced no state")
+
+            folded
+            |> function
+                | Ok(Some state) -> Ok state
+                | Ok None -> emptyResult ()
+                | Error fault -> Error fault
+
 
     let fold (events: InquiryEvent list) : Result<InquiryState, CoreError> =
         let initial : Result<InquiryState option, CoreError> = Ok None
 
-        let step (state: Result<InquiryState option, CoreError>) (event: InquiryEvent) =
+        let applyAll (state: Result<InquiryState option, CoreError>) (event: InquiryEvent) =
             state
             |> Result.bind (fun carried -> apply carried event |> Result.map Some)
 
-        match List.fold step initial events with
+        match List.fold applyAll initial events with
         | Ok(Some state) -> Ok state
         | Ok None -> Error(coreError "empty-history" "inquiry has no events")
         | Error fault -> Error fault

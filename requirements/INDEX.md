@@ -118,6 +118,7 @@
 |---|---|
 | `speculative-investigation` | 可丢弃 speculation 只有在 authoritative world 零影响时才可换取调查成本下降。 |
 | `epistemic-reasoning` | 单一原生 sphinx 工具与命令；探究全程序控制，无 MCP 或模型驾驶层；内部标准 Engineer 同级压平；命令以 noReply 回填问答，expectTurns 仅提示深度。 |
+| `sphinx-v2` | clean-break 后的 Sphinx 内核：LLM 负责语义判断，程序负责科学问法、作用域估值与资源内调度；旧手写语义评分表整类删除。 |
 
 ## 13. Delivery
 
@@ -186,7 +187,8 @@
 | 52 | `requirement-grounding` | 12 | requirement-grounding-001 ~ 012 |
 | 53 | `speculative-investigation` | 14 | speculative-investigation-001 ~ 014 |
 | 54 | `epistemic-reasoning` | 36 | epistemic-reasoning-001 ~ 030、epistemic-reasoning-031（Sphinx 探究流程全程序控制，无 Inquiry 角色）、epistemic-reasoning-032（内部标准 Engineer 权限与会话压平）、epistemic-reasoning-033（结果接纳幂等防重复购买）、epistemic-reasoning-034（取消全链贯穿父工具与子 Engineer）、epistemic-reasoning-035（原生交付与 noReply）、epistemic-reasoning-036（共享期望预算、价格映射与持久化校准） |
-| 55 | `distribution` | 10 | distribution-001 ~ 009、distribution-010（打包资源与活动注册同步） |
+| 55 | `sphinx-v2` | 36 | sphinx-v2-001 ~ 036（取代 epistemic-reasoning 旧内核条款，关系见 SUPERSEDES.md） |
+| 56 | `distribution` | 10 | distribution-001 ~ 009、distribution-010（打包资源与活动注册同步） |
 
 # 依赖骨架
 

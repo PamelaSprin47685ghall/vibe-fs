@@ -140,7 +140,7 @@ module Budget =
         else
             let projected = merge reserved reservation.Resources
 
-            let oversubscribed =
+            let oversubscribedNames =
                 specs
                 |> List.filter (fun spec ->
                     let projectedForSpec = projected |> Map.tryFind spec.Name |> Option.defaultValue 0.0
@@ -148,12 +148,12 @@ module Budget =
                     projectedForSpec > available)
                 |> List.map (fun spec -> spec.Name)
 
-            if not (List.isEmpty oversubscribed) then
-                Error
-                    { Code = "budget-insufficient"
-                      Message = sprintf "reservation exceeds available budget: %s" (String.concat ", " oversubscribed) }
-            else
-                Ok projected
+            let names = String.concat ", " oversubscribedNames
+
+            let insufficiency () =
+                Error { Code = "budget-insufficient"; Message = sprintf "reservation exceeds available budget: %s" names }
+
+            if List.isEmpty oversubscribedNames then Ok projected else insufficiency ()
 
     /// Settlement replaces this work's own reservation with what it really spent.
     /// Releasing the reservation and booking the usage in one step is what keeps a
