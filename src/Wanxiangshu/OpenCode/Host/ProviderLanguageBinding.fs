@@ -9,6 +9,7 @@ open Wanxiangshu.Participant.Provider
 [<RequireQualifiedAccess>]
 module ProviderLanguageBinding =
 
+    // DSL-MUTABLE: resource — cached host configuration preference injected at startup
     let mutable private hostConfigPreference: string option = None
 
     let setHostConfigPreference (raw: string) : unit =

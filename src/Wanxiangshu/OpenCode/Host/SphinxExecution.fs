@@ -99,8 +99,11 @@ type SphinxExecution(store: IEventStore, engineers: ISphinxEngineerPort) =
         }
 
     let start (context: HostToolContext) invocationId question expectedTurns =
+        // DSL-MUTABLE: cancellation — flag indicating whether execution was cancelled
         let cancelled = ref false
+        // DSL-MUTABLE: resource — reference to child session handle
         let child = ref None
+        // DSL-MUTABLE: resource — reference to drain promise
         let drain = ref None
         let owner = SessionId.create context.SessionId
 
@@ -236,6 +239,7 @@ type SphinxExecution(store: IEventStore, engineers: ISphinxEngineerPort) =
             for flight in pending do
                 flight.Cancel()
 
+            // DSL-MUTABLE: algorithm-scratch — records first flight disposal failure
             let failure = ref None
 
             for flight in pending do
