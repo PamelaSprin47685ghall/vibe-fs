@@ -14,4 +14,20 @@
     <Compile Include="Sphinx/V2/Core/State.fsi"/><Compile Include="Sphinx/V2/Core/State.fs"/>
     <Compile Include="Sphinx/V2/Core/Reducer.fsi"/><Compile Include="Sphinx/V2/Core/Reducer.fs"/>
     <Compile Include="Sphinx/V2/Core/Projection.fsi"/><Compile Include="Sphinx/V2/Core/Projection.fs"/>
+    <Compile Include="Sphinx/V2/Runtime/Contracts.fsi"/><Compile Include="Sphinx/V2/Runtime/Contracts.fs"/>
+    <Compile Include="Sphinx/V2/Runtime/Ports.fsi"/><Compile Include="Sphinx/V2/Runtime/Ports.fs"/>
+    <Compile Include="Sphinx/V2/Runtime/Registry.fsi"/><Compile Include="Sphinx/V2/Runtime/Registry.fs"/>
+    <Compile Include="Sphinx/V2/Runtime/Admission.fsi"/><Compile Include="Sphinx/V2/Runtime/Admission.fs"/>
+    <Compile Include="Sphinx/V2/Runtime/Agenda.fsi"/><Compile Include="Sphinx/V2/Runtime/Agenda.fs"/>
+    <Compile Include="Sphinx/V2/Runtime/Context.fsi"/><Compile Include="Sphinx/V2/Runtime/Context.fs"/>
+    <Compile Include="Sphinx/V2/Runtime/Refinement.fsi"/><Compile Include="Sphinx/V2/Runtime/Refinement.fs"/>
+    <Compile Include="Sphinx/V2/Runtime/Decision.fsi"/><Compile Include="Sphinx/V2/Runtime/Decision.fs"/>
+    <Compile Include="Sphinx/V2/Plugins/Questionnaire/Model.fsi"/><Compile Include="Sphinx/V2/Plugins/Questionnaire/Model.fs"/>
+    <Compile Include="Sphinx/V2/Plugins/Questionnaire/Design.fsi"/><Compile Include="Sphinx/V2/Plugins/Questionnaire/Design.fs"/>
+    <Compile Include="Sphinx/V2/Plugins/Questionnaire/Decode.fsi"/><Compile Include="Sphinx/V2/Plugins/Questionnaire/Decode.fs"/>
+    <Compile Include="Sphinx/V2/Plugins/Ordinal/Model.fsi"/><Compile Include="Sphinx/V2/Plugins/Ordinal/Model.fs"/>
+    <Compile Include="Sphinx/V2/Plugins/Ordinal/Pairwise.fsi"/><Compile Include="Sphinx/V2/Plugins/Ordinal/Pairwise.fs"/>
+    <Compile Include="Sphinx/V2/Plugins/Ordinal/Ranking.fsi"/><Compile Include="Sphinx/V2/Plugins/Ordinal/Ranking.fs"/>
+    <Compile Include="Sphinx/V2/Plugins/Ordinal/DesignCheck.fsi"/><Compile Include="Sphinx/V2/Plugins/Ordinal/DesignCheck.fs"/>
+    <Compile Include="Sphinx/V2/Plugins/Ordinal/Fit.fsi"/><Compile Include="Sphinx/V2/Plugins/Ordinal/Fit.fs"/>
   </ItemGroup></Project>

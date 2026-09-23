@@ -36,7 +36,9 @@ type WorkSpec =
       Dependencies: Set<WorkId>
       ConflictKeys: Set<string>
       /// Physical binding, absent until a Host actually accepts the dispatch.
-      PhysicalRef: string option }
+      PhysicalRef: string option
+      /// Resources this work reserves for its attempt.
+      Reserved: Map<string, float> }
 
 type WorkItem = { Spec: WorkSpec; State: WorkState }
 
@@ -88,6 +90,10 @@ module Work =
                   Message = "fence must be bound to its own attempt" }
         else
             Ok()
+
+    /// Resources this work holds for its attempt. An empty map means the capability is
+    /// free, which is a claim the Host can contradict by reporting actual usage.
+    let reserved (spec: WorkSpec) : Map<string, float> = spec.Reserved
 
     let isTerminal (state: WorkState) : bool =
         match state with

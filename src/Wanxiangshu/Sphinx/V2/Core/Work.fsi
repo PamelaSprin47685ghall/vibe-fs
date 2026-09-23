@@ -26,13 +26,16 @@ type WorkSpec =
       Dependencies: Set<WorkId>
       ConflictKeys: Set<string>
       /// Physical binding, absent until a Host actually accepts the dispatch.
-      PhysicalRef: string option }
+      PhysicalRef: string option
+      /// Resources this work reserves for its attempt.
+      Reserved: Map<string, float> }
 
 type WorkItem = { Spec: WorkSpec; State: WorkState }
 
 type WorkError = { Code: string; Message: string }
 
 module Work =
+    val reserved: WorkSpec -> Map<string, float>
     val stateName: WorkState -> string
     val validateSpec: WorkSpec -> Result<unit, WorkError>
     val isTerminal: WorkState -> bool
