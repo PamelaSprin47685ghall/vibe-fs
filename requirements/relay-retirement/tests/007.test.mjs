@@ -102,3 +102,21 @@ test('WHAT[relay-retirement-007] blocked perfect iteration retries Accepted afte
   assert.equal(retired.ok, true)
   assert.equal(relay.retirement(retired.state, 'road-1').outcome, 'Accepted')
 })
+
+test('WHAT[relay-retirement-007] perfect iteration commits Continue when pending obligations remain and certificate is invalidated', () => {
+  const state = openAssessed(Array(8).fill('PERFECT'))
+  // When obligations remain, certificate is invalidated and retirement commits Continue so relay loop can dispatch next manager iteration
+  const invalidated = relay.invalidateCertificate(state, 'road-1', 'PendingObligationsRemain')
+  assert.equal(invalidated.ok, true)
+  const retired = relay.retireContinue(
+    invalidated.state,
+    'road-1',
+    'inc-1',
+    'ret-continue-due-to-obligations',
+    'run-1',
+    'tool-1',
+    'snapshot-1',
+  )
+  assert.equal(retired.ok, true)
+  assert.equal(relay.retirement(retired.state, 'road-1').outcome, 'Continue')
+})

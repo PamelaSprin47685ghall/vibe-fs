@@ -74,8 +74,43 @@ module SuicideTool =
             && certificate.SnapshotId = snapshot
             && certificate.AuthorityRevision = authority)
 
-    let private retirementTransaction roadId incumbent providerRun toolCallId snapshot authority (view: RoadView) =
-        let candidate = qualityCandidate view incumbent snapshot authority
+    let private hasPendingObligations (journal: AgentJournal) (incumbent: IncumbencyId) : Task<bool> =
+        task {
+            let todoProjection = (AgentJournal.snapshot journal).AgentProjections.MagicTodo
+
+            match Map.tryFind (IncumbencyId.value incumbent) todoProjection.ByIncumbency with
+            | None -> return false
+            | Some incumbencyState ->
+                match incumbencyState.CurrentObligationsRef with
+                | None -> return false
+                | Some(blobRef, digest) ->
+                    let emptyDigest = HostDigest.sha256Hex "[]"
+
+                    if BlobDigest.value digest = emptyDigest then
+                        return false
+                    else
+                        match! journal.Writer.BlobWriter.Read blobRef with
+                        | Ok body ->
+                            let trimmed = body.Trim()
+                            return trimmed <> "[]" && trimmed <> ""
+                        | Error _ -> return true
+        }
+
+    let private retirementTransaction
+        roadId
+        incumbent
+        providerRun
+        toolCallId
+        snapshot
+        authority
+        (view: RoadView)
+        hasPending
+        =
+        let candidate =
+            if hasPending then
+                None
+            else
+                qualityCandidate view incumbent snapshot authority
 
         let outcome =
             match candidate with
@@ -257,21 +292,27 @@ module SuicideTool =
         }
 
     let private runRetirement (prepared: PreparedRetirement) =
-        taskResult {
-            let! transaction =
-                retirementTransaction
-                    prepared.RoadId
-                    prepared.Incumbent
-                    prepared.Bound.ProviderRun
-                    prepared.Bound.ToolCallId
-                    prepared.Snapshot
-                    prepared.Authority
-                    prepared.View
-                |> Result.mapError (fun _ -> text Path.FinishFailed)
+        task {
+            let! hasPending = hasPendingObligations prepared.Bound.Journal prepared.Incumbent
 
-            let! projection = appendPrepared prepared transaction
-            let! _ = retirementFromProjection prepared projection
-            return retiredResult ()
+            return!
+                taskResult {
+                    let! transaction =
+                        retirementTransaction
+                            prepared.RoadId
+                            prepared.Incumbent
+                            prepared.Bound.ProviderRun
+                            prepared.Bound.ToolCallId
+                            prepared.Snapshot
+                            prepared.Authority
+                            prepared.View
+                            hasPending
+                        |> Result.mapError (fun _ -> text Path.FinishFailed)
+
+                    let! projection = appendPrepared prepared transaction
+                    let! _ = retirementFromProjection prepared projection
+                    return retiredResult ()
+                }
         }
 
     let private runFrozen (scope: ToolRuntimeScope) (context: HostToolContext) (prepared: PreparedRetirement) =

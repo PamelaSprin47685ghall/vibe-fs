@@ -719,11 +719,38 @@ module HostSignalBootstrap =
                     return fetched
                 }
 
+            let tryDurableSessionAgent (sessionId: SessionId) : string option =
+                journal
+                |> Option.bind (fun durable ->
+                    let snapshot = AgentJournal.snapshot durable
+
+                    Map.tryFind sessionId snapshot.AgentProjections.Sessions
+                    |> Option.bind (fun s -> s.PromptAuthority)
+                    |> Option.bind (fun pa ->
+                        pa.ActiveLogicalRun
+                        |> Option.map (fun run -> run.SelectedAgent)
+                        |> Option.orElseWith (fun () ->
+                            pa.LastAuthorityProfile |> Option.map (fun last -> last.SelectedAgent))))
+
             let resolveAgentForSession sid =
                 task {
                     match SessionExecutionBinding.tryAgent sid with
                     | Some agent -> return Some agent
-                    | None -> return! queryMissingAgent sid
+                    | None ->
+                        match! queryMissingAgent sid with
+                        | Some agent -> return Some agent
+                        | None ->
+                            match tryDurableSessionAgent sid with
+                            | Some agent ->
+                                SessionExecutionBinding.observeUserFacingAgent sid agent
+                                return Some agent
+                            | None ->
+                                if not (hasPhysicalParent sid) then
+                                    let defaultAgent = "manager"
+                                    SessionExecutionBinding.observeUserFacingAgent sid defaultAgent
+                                    return Some defaultAgent
+                                else
+                                    return None
                 }
 
             let applyResolvedAgent agentOpt (decoded: PromptIngressCodec.DecodedMessage) =
