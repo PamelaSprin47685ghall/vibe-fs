@@ -134,14 +134,14 @@ module PluginHooks =
 
             let toolBefore (toolInput: obj) (toolOutput: obj) =
                 task {
-                    let context = ToolHostCodec.decodeContext toolInput
-
                     do!
                         Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingGate.before
                             journal
                             workspaceDirectory
                             toolInput
                             toolOutput
+
+                    let context = ToolHostCodec.decodeContext toolInput
 
                     match journal, context.ToolCallId with
                     | Some durable, Some toolCallId when not (String.IsNullOrWhiteSpace context.SessionId) ->
@@ -309,18 +309,21 @@ module PluginHooks =
             let systemTransformRegistration =
                 registeredHook HookKey.SystemTransform (pairedHook (box systemTransform))
 
-            let config =
-                registeredHook
-                    HookKey.Config
-                    (unaryHook (
-                        box (fun (config: obj) ->
-                            if not (isNull config) then
-                                config?snapshot <- box false
+            let syncHostLanguagePreference (config: obj) =
+                let lang = config?language
 
-                            ManagerConfig.configureManager config |> ignore
-                            scope.RecordCompactionSettingGap(HostCompactionGate.enforceSettings config)
-                            ExplicitSessionResume.registerCommand config)
-                    ))
+                if not (isNull lang) then
+                    ProviderLanguageBinding.setHostConfigPreference (string lang)
+
+            let configurePluginHost (config: obj) =
+                if not (isNull config) then
+                    config?snapshot <- box false
+                    syncHostLanguagePreference config
+                    ManagerConfig.configureManager config |> ignore
+                    scope.RecordCompactionSettingGap(HostCompactionGate.enforceSettings config)
+                    ExplicitSessionResume.registerCommand config
+
+            let config = registeredHook HookKey.Config (unaryHook (box configurePluginHost))
 
             let sessionCompacting =
                 registeredHook HookKey.SessionCompacting (pairedHook (box HostCompactionGate.onSessionCompacting))

@@ -77,5 +77,47 @@ module ProviderLanguage =
         | Some raw when String.IsNullOrWhiteSpace raw -> Ok ProviderLanguage.English
         | Some raw -> configuredPreference raw
 
+    let private isChineseLocale (raw: string) : bool =
+        if String.IsNullOrWhiteSpace raw then
+            false
+        else
+            let lower = raw.ToLowerInvariant()
+
+            lower.StartsWith "zh"
+            || lower.Contains "zh-cn"
+            || lower.Contains "zh_cn"
+            || lower.Contains "zh-hans"
+            || lower.Contains "chs"
+            || lower.Contains "chinese"
+
+    let private tryExplicitPreference (explicit: string option) (hostConfig: string option) =
+        [ explicit; hostConfig ]
+        |> List.tryPick (function
+            | Some raw when not (String.IsNullOrWhiteSpace raw) -> Some raw
+            | _ -> None)
+
+    let private detectSystemLanguage (candidates: string option list) =
+        candidates
+        |> List.tryPick (function
+            | Some raw when isChineseLocale raw -> Some ProviderLanguage.SimplifiedChinese
+            | _ -> None)
+        |> Option.defaultValue ProviderLanguage.English
+
+    /// Resolves global preference through the normative preference ladder:
+    /// 1. Explicit environment variable (WANXIANGSHU_PROVIDER_LANGUAGE)
+    /// 2. Host config preference (opencode.json language)
+    /// 3. IDE / System locale (VSCODE_NLS_CONFIG, POSIX LC_ALL/LANG, Node Intl)
+    /// 4. Default fallback: ProviderLanguage.English
+    let fromObservationLadder
+        (explicit: string option)
+        (hostConfig: string option)
+        (vscodeNls: string option)
+        (posixLocale: string option)
+        (intlLocale: string option)
+        : Result<ProviderLanguage, string> =
+        match tryExplicitPreference explicit hostConfig with
+        | Some raw -> configuredPreference raw
+        | None -> Ok(detectSystemLanguage [ vscodeNls; posixLocale; intlLocale ])
+
     /// HOST-026: child / attached / InternalLeaf language = owner | commissioner.
     let inheritFrom (owner: ProviderLanguage) : ProviderLanguage = owner

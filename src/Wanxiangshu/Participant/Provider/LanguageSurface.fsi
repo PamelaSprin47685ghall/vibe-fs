@@ -18,6 +18,7 @@ module ProviderLanguageSurface =
     val tryGet: sessionId: string -> obj
     val bindOnce: sessionId: string -> language: string -> obj
     val inheritFromOwner: ownerLanguage: string -> childSessionId: string -> obj
+    val setHostConfigPreference: raw: string -> unit
     val readGlobalPreference: unit -> string
     val ensureRoot: sessionId: string -> string
     val ensureInherited: ownerSessionId: string -> childSessionId: string -> string

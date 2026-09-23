@@ -102,3 +102,19 @@ test('WHAT[relay-retirement-007] blocked perfect iteration retries Accepted afte
   assert.equal(retired.ok, true)
   assert.equal(relay.retirement(retired.state, 'road-1').outcome, 'Accepted')
 })
+
+test('WHAT[relay-retirement-007] perfect iteration commits Accepted directly without downgrading obligations', () => {
+  const state = openAssessed(Array(8).fill('PERFECT'))
+  const retired = relay.retireAccepted(
+    state,
+    'road-1',
+    'inc-1',
+    'ret-accepted-1',
+    'run-1',
+    'tool-1',
+    'certificate:assessment-1',
+    'snapshot-1',
+  )
+  assert.equal(retired.ok, true)
+  assert.equal(relay.retirement(retired.state, 'road-1').outcome, 'Accepted')
+})

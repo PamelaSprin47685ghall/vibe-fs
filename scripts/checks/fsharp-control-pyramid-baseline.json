@@ -1,12 +1,17 @@
 {
   "version": 1,
   "files": {
-    "src/Wanxiangshu/Execution/Delegation/Fork/Host/Agent.fs": 3,
     "src/Wanxiangshu/Execution/Delegation/SyncDelegate/OpenCode/Batching.fs": 10,
-    "src/Wanxiangshu/Execution/Session/OpenCode/HorizonTool.fs": 1,
     "src/Wanxiangshu/Interaction/Dispatch/PhysicalAcceptance.fs": 2,
     "src/Wanxiangshu/Interaction/Dispatch/Send.fs": 4,
+    "src/Wanxiangshu/Interaction/Repair/CompletedTurn.fs": 1,
+    "src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs": 1,
+    "src/Wanxiangshu/OpenCode/Host/ModelRouting.fs": 1,
     "src/Wanxiangshu/OpenCode/Host/OpenCodePort.fs": 1,
-    "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs": 2
+    "src/Wanxiangshu/OpenCode/Host/SphinxExecution.fs": 1,
+    "src/Wanxiangshu/OpenCode/Plugin/SphinxCommand.fs": 6,
+    "src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs": 1,
+    "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs": 2,
+    "src/Wanxiangshu/Sphinx/Inquiry.fs": 1
   }
 }

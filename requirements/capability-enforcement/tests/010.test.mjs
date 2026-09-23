@@ -339,7 +339,7 @@ const PLUGIN_TOOL_NAMES = [
   'join', 'horizon', 'fission', 'review', 'suicide', 'run',
   'mv', 'rm', 'bash-honeypot', 'assume', 'chronicle',
   'enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret',
-  'js-engineer', 'js-devops',
+  'js-engineer', 'js-devops', 'sphinx',
 ]
 const HOST_OWNED_TOOL_NAMES = [
   'todowrite', 'read', 'write', 'edit', 'glob', 'grep', 'skill',
