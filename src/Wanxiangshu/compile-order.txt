@@ -1336,6 +1336,8 @@ Sphinx/V2/Composition/Bind.fsi
 Sphinx/V2/Composition/Bind.fs
 Sphinx/V2/Hosts/Mcp/Server.fsi
 Sphinx/V2/Hosts/Mcp/Server.fs
+Sphinx/V2/Hosts/OpenCode/Adapter.fsi
+Sphinx/V2/Hosts/OpenCode/Adapter.fs
 Sphinx/V2/ServeEntry.fsi
 Sphinx/V2/ServeEntry.fs
 Strength/IntegrationRules.fsi
