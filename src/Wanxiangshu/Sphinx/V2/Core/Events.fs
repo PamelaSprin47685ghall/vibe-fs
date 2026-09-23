@@ -170,6 +170,8 @@ type InquiryEvent =
 [<RequireQualifiedAccess>]
 module SphinxV2EventTypes =
 
+    /// The canonical type every v2 transition is registered under. The shared
+    /// vocabulary and the codec both derive from this constant.
     let transition = "sphinx/v2-transition@1"
 
     let all = [ transition ]

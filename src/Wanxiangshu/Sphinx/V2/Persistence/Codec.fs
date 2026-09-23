@@ -17,8 +17,9 @@ open Wanxiangshu.Sphinx.V2.Core
 /// thing, so a partial transition can never become the accepted current.
 module Codec =
 
-    /// The registered canonical event type. Only this type is accepted by the v2 rule.
-    let transitionEventType = "sphinx/v2-transition@1"
+    /// The registered canonical event type. Derived from the Core vocabulary so the
+    /// reducer, the codec and the shared whitelist cannot drift apart.
+    let transitionEventType = SphinxV2EventTypes.transition
 
     /// The wire form of one event body. Tag and payload are separate so the Integrator
     /// can route without re-deriving which event it is.

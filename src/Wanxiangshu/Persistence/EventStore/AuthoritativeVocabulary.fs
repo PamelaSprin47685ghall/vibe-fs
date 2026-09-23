@@ -22,6 +22,9 @@ module AuthoritativeEventTypes =
               yield! JsTransactionEventTypes.all
               yield! CasebookEventTypes.all
               yield! StrengthEventTypes.all
-              yield! SphinxEventTypes.all ]
+              yield! SphinxEventTypes.all
+              // Sphinx clean-break: the v2 transition type, registered by the same
+              // vocabulary contract that also carries the historical Sphinx kinds.
+              "sphinx/v2-transition@1" ]
 
     let isKnown eventType = Set.contains eventType builtins
