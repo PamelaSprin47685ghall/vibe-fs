@@ -43,7 +43,9 @@ module Surface =
 
     let goalRevisionValue (goal: GoalSpec) : int64 = Revision.value goal.Revision
 
-    let goalAmendmentsOf (goal: GoalSpec) : GoalAmendment list = goal.Amendments
+    /// The amendment list as a JS array, so a caller can read its length without
+    /// walking an F# cons list.
+    let goalAmendmentsOf (goal: GoalSpec) : GoalAmendment array = goal.Amendments |> Array.ofList
 
     let statusNameOf (status: InquiryStatus) : string =
         match status with
@@ -305,6 +307,41 @@ module Surface =
     let certificateValidateSlot (slot: CertificateSlot) : Result<unit, CertificateError> = Certificate.validateSlot slot
 
     let graphRoleName (role: GraphRole) : string = GraphRole.name role
+
+    /// A minimal state for one inquiry, built the way the fold builds it. This lets a
+    /// caller exercise the state machine without hand-assembling an event.
+    let stateOfCreate (inquiryId: string) (goalText: string) : Result<InquiryState, CoreError> =
+        let goal =
+            { GoalId = GoalId.create (inquiryId + "-goal")
+              Revision = Revision.origin
+              OriginalText = goalText
+              Constraints = []
+              MaterialRefs = []
+              AuthorizationRef = "user"
+              CreatedBy = "user"
+              Amendments = [] }
+
+        let specs =
+            [ { Name = "modelCalls"
+                Kind = ResourceKind.Consumed "call"
+                AuthorizedLimit = 12.0 } ]
+
+        let body =
+            { Goal = goal
+              ResourceSpecs = specs
+              ProfileRef = "sphinx.default@2"
+              ConfigHash = "surface"
+              RenderReserve = Map.empty }
+
+        let event =
+            { Id = EventId.create (inquiryId + "-ev0")
+              InquiryId = InquiryId.create inquiryId
+              Revision = Revision.origin
+              Parent = None
+              BatchIndex = 0
+              Body = InquiryEventBody.InquiryCreated body }
+
+        Reducer.apply None event
 
     let reducerFold (events: InquiryEvent list) : Result<InquiryState, CoreError> = Reducer.fold events
 

@@ -17,7 +17,7 @@ module Surface =
     // Typed accessors, so a test never reads Fable's record layout directly.
     val goalTextOf: GoalSpec -> string
     val goalRevisionValue: GoalSpec -> int64
-    val goalAmendmentsOf: GoalSpec -> GoalAmendment list
+    val goalAmendmentsOf: GoalSpec -> GoalAmendment array
     val statusNameOf: InquiryStatus -> string
     val workSpecIdOf: WorkSpec -> WorkId
     val workSpecAttemptOf: WorkSpec -> Attempt
@@ -98,6 +98,9 @@ module Surface =
     val certificateValidateGuarantee: CertificateGuarantee -> Result<unit, CertificateError>
     val certificateValidateSlot: CertificateSlot -> Result<unit, CertificateError>
     val graphRoleName: GraphRole -> string
+
+    /// A minimal state for one inquiry, built the way the fold builds it.
+    val stateOfCreate: string -> string -> Result<InquiryState, CoreError>
 
     val reducerFold: InquiryEvent list -> Result<InquiryState, CoreError>
     val reducerFoldBatch: InquiryEvent list -> Result<InquiryState, CoreError>

@@ -115,7 +115,6 @@ Sphinx/V2/Plugins/Inquiry/Observe.fsi
 Sphinx/V2/Plugins/Inquiry/DecisionModel.fsi
 Sphinx/V2/Plugins/Inquiry/Stop.fsi
 Sphinx/V2/Plugins/Inquiry/Render.fsi
-Sphinx/V2/Runtime/Driver.fsi
 Sphinx/V2/Hosts/Mcp/Contract.fsi
 Sphinx/V2/Wire/Decode.fsi
 Sphinx/V2/Wire/Encode.fsi
@@ -164,9 +163,12 @@ Sphinx/V2/Plugins/Inquiry/Observe.fs
 Sphinx/V2/Plugins/Inquiry/DecisionModel.fs
 Sphinx/V2/Plugins/Inquiry/Stop.fs
 Sphinx/V2/Plugins/Inquiry/Render.fs
-Sphinx/V2/Runtime/Driver.fs
 Sphinx/V2/Runtime/Recovery.fsi
 Sphinx/V2/Runtime/Recovery.fs
+Sphinx/V2/Runtime/Driver.fsi
+Sphinx/V2/Runtime/Driver.fs
+Sphinx/V2/Runtime/Surface.fsi
+Sphinx/V2/Runtime/Surface.fs
 Sphinx/V2/Hosts/Mcp/Contract.fs
 Sphinx/V2/Wire/Decode.fs
 Sphinx/V2/Wire/Encode.fs
@@ -1328,6 +1330,8 @@ Sphinx/V2/Persistence/Integrator.fsi
 Sphinx/V2/Persistence/Integrator.fs
 Sphinx/V2/Persistence/Export.fsi
 Sphinx/V2/Persistence/Export.fs
+Sphinx/V2/Persistence/Surface.fsi
+Sphinx/V2/Persistence/Surface.fs
 Sphinx/V2/Composition/Bind.fsi
 Sphinx/V2/Composition/Bind.fs
 Sphinx/V2/Hosts/Mcp/Server.fsi

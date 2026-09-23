@@ -46,6 +46,7 @@
     <Compile Include="Sphinx/V2/Plugins/Inquiry/Stop.fsi"/><Compile Include="Sphinx/V2/Plugins/Inquiry/Stop.fs"/>
     <Compile Include="Sphinx/V2/Plugins/Inquiry/Render.fsi"/><Compile Include="Sphinx/V2/Plugins/Inquiry/Render.fs"/>
     <Compile Include="Sphinx/V2/Runtime/Driver.fsi"/><Compile Include="Sphinx/V2/Runtime/Driver.fs"/>
+    <Compile Include="Sphinx/V2/Runtime/Surface.fsi"/><Compile Include="Sphinx/V2/Runtime/Surface.fs"/>
     <Compile Include="Sphinx/V2/Runtime/Recovery.fsi"/><Compile Include="Sphinx/V2/Runtime/Recovery.fs"/>
     <Compile Include="Sphinx/V2/Hosts/Mcp/Contract.fsi"/><Compile Include="Sphinx/V2/Hosts/Mcp/Contract.fs"/>
     <Compile Include="Sphinx/V2/Wire/Decode.fsi"/><Compile Include="Sphinx/V2/Wire/Decode.fs"/>
