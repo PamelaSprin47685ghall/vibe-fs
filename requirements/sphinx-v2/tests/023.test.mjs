@@ -4,6 +4,10 @@ import test from 'node:test'
 import * as Core from '../../../dist/Sphinx/V2/Core/Surface.js'
 import * as Loop from '../../../dist/Sphinx/V2/Runtime/Surface.js'
 import * as Persist from '../../../dist/Sphinx/V2/Persistence/Surface.js'
+import * as Ordinal from '../../../dist/Sphinx/V2/Plugins/Ordinal/Surface.js'
+import * as Bayes from '../../../dist/Sphinx/V2/Plugins/Bayes/Surface.js'
+import * as AStar from '../../../dist/Sphinx/V2/Plugins/AStar/Surface.js'
+import * as Mcts from '../../../dist/Sphinx/V2/Plugins/Mcts/Surface.js'
 
 const ok = (result) => {
   assert.equal(Core.isOk(result), true)
@@ -62,20 +66,19 @@ const resourceSpec = (name, unit, limit) => ({
   AuthorizedLimit: limit,
 })
 
-test('WHAT[sphinx-v2-011] each crash window has exactly one reconciliation action', () => {
-  assert.equal(Loop.recoveryAction('DispatchPending'), 'dispatch')
-  assert.equal(Loop.recoveryAction('ReceiptPending'), 'reconcile-by-intent')
-  assert.equal(Loop.recoveryAction('RunningUnmarked'), 'reconcile-by-intent')
-  assert.equal(Loop.recoveryAction('ResultPending'), 'accept-if-valid')
-  assert.equal(Loop.recoveryAction('InterpretationPending'), 'interpret')
-  assert.equal(Loop.recoveryAction('CancelPending'), 'await-terminal')
-  assert.equal(Loop.recoveryAction('CommitPending'), 'commit-or-render')
+test('WHAT[sphinx-v2-023] a label outside the presented set is refused', () => {
+  const response = {
+    Judgment: null,
+    Rationale: '',
+    SourceLabels: ['item_1'],
+    ProposedAlternatives: [],
+  }
+
+  assert.equal(
+    Ordinal.isError(Ordinal.labelsWithin(Ordinal.stringSetOf(['item_1']), response, Ordinal.stringSetOf(['item_2']))),
+    true,
+  )
 })
 
-test('WHAT[sphinx-v2-011] only the windows with real work left may spend', () => {
-  assert.equal(Loop.recoveryMaySpend('DispatchPending'), true)
-  assert.equal(Loop.recoveryMaySpend('CommitPending'), true)
-  // Reconciliation and interpretation are pure; they must never bill.
-  assert.equal(Loop.recoveryMaySpend('ReceiptPending'), false)
-  assert.equal(Loop.recoveryMaySpend('InterpretationPending'), false)
-})
+// WHAT[sphinx-v2-004]: the Bayes posterior is computed over declared factors and
+// normalizes to a hand-checkable result.

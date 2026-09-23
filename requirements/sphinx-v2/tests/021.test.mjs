@@ -10,7 +10,6 @@ const ok = (result) => {
   return Core.okValue(result)
 }
 
-// Shared fixtures. Every record is plain JS: the surface reads PascalCase fields.
 const goalSpec = (text) =>
   Core.goalCreate({
     GoalId: Core.goalIdCreate('goal_loop'),
