@@ -3,6 +3,7 @@ namespace Wanxiangshu.Sphinx.V2.Runtime
 open System
 open Fable.Core.JsInterop
 open Wanxiangshu.Sphinx.V2.Core
+open Wanxiangshu.Sphinx.V2.Plugins
 
 /// The JS-native surface for the decision loop. Pure: no store, no clock, no model call.
 ///
@@ -35,6 +36,11 @@ module Surface =
 
     /// Classify a state into the next action, reported as plain values.
     val classifyOutcome: InquiryState -> obj
+
+    // Provider usage
+    val providerOutcome: string -> int64 -> int64 -> int64 -> bool -> Wanxiangshu.Sphinx.V2.Plugins.ProviderOutcome
+    val providerUsageUnresolved: Wanxiangshu.Sphinx.V2.Plugins.ProviderOutcome -> bool
+    val providerUsageCounts: Wanxiangshu.Sphinx.V2.Plugins.ProviderOutcome -> int64 * int64 * int64
 
     // Recovery
     val recoveryAction: string -> string

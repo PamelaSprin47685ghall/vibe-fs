@@ -19,6 +19,13 @@ type Reservation =
         MoneyMinor: int64 option
     }
 
+type ProviderUsage =
+    { InputTokens: int64
+      OutputTokens: int64
+      Calls: int64
+      MoneyMinor: int64
+      UsageUnresolved: bool }
+
 type SettledUsage =
     {
         WorkId: WorkId

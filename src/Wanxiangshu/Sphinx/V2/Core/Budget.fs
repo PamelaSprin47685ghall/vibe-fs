@@ -33,6 +33,15 @@ type Reservation =
         MoneyMinor: int64 option
     }
 
+/// One unit of provider consumption, as the provider reports it. It is a ledger record,
+/// not a semantic fact, which is why it lives beside the resources it is subtracted from.
+type ProviderUsage =
+    { InputTokens: int64
+      OutputTokens: int64
+      Calls: int64
+      MoneyMinor: int64
+      UsageUnresolved: bool }
+
 type SettledUsage =
     {
         WorkId: WorkId

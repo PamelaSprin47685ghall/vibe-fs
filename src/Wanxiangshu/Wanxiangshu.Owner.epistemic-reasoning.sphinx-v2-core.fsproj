@@ -45,6 +45,7 @@
     <Compile Include="Sphinx/V2/Plugins/Inquiry/DecisionModel.fsi"/><Compile Include="Sphinx/V2/Plugins/Inquiry/DecisionModel.fs"/>
     <Compile Include="Sphinx/V2/Plugins/Inquiry/Stop.fsi"/><Compile Include="Sphinx/V2/Plugins/Inquiry/Stop.fs"/>
     <Compile Include="Sphinx/V2/Plugins/Inquiry/Render.fsi"/><Compile Include="Sphinx/V2/Plugins/Inquiry/Render.fs"/>
+    <Compile Include="Sphinx/V2/Plugins/Provider/Adapter.fsi"/><Compile Include="Sphinx/V2/Plugins/Provider/Adapter.fs"/>
     <Compile Include="Sphinx/V2/Runtime/Driver.fsi"/><Compile Include="Sphinx/V2/Runtime/Driver.fs"/>
     <Compile Include="Sphinx/V2/Runtime/Surface.fsi"/><Compile Include="Sphinx/V2/Runtime/Surface.fs"/>
     <Compile Include="Sphinx/V2/Runtime/Profile.fsi"/><Compile Include="Sphinx/V2/Runtime/Profile.fs"/>

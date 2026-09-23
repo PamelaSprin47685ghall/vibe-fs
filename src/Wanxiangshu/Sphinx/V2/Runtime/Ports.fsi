@@ -51,13 +51,6 @@ type IHostPort =
     /// Re-open the question "does this dispatch exist?" after a crash window.
     abstract Reconcile: inquiryId: InquiryId * dispatchIntentId: string -> Task<Result<string option, string>>
 
-type ProviderUsage =
-    { InputTokens: int64
-      OutputTokens: int64
-      Calls: int64
-      MoneyMinor: int64
-      UsageUnresolved: bool }
-
 type IProviderPort =
     abstract Complete:
         inquiryId: InquiryId * prompt: JsonEnvelope * schemaRef: SchemaRef ->

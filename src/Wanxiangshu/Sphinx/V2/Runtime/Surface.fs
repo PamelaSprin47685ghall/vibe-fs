@@ -5,6 +5,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Sphinx.V2.Core
 open Wanxiangshu.Sphinx.V2.Plugins
+open Wanxiangshu.Sphinx.V2.Plugins
 
 /// The JS-native surface for the decision loop. Pure: no store, no clock, no model call.
 ///
@@ -188,6 +189,32 @@ module Surface =
 
     let stopIsModelRelative (reason: obj) : bool =
         Stop.isModelRelative (unbox<StopReason> reason)
+
+    // --- Provider usage ------------------------------------------------------------
+
+    /// One Host observation, as the provider adapter reports it. `UsageUnresolved` is
+    /// distinct from zero usage: the first means the Host did not tell us, the second
+    /// means nothing was consumed.
+    let providerOutcome
+        (text: string)
+        (inputTokens: int64)
+        (outputTokens: int64)
+        (calls: int64)
+        (usageUnresolved: bool)
+        : Wanxiangshu.Sphinx.V2.Plugins.ProviderOutcome =
+        { Text = text
+          InputTokens = inputTokens
+          OutputTokens = outputTokens
+          Calls = calls
+          MoneyMinor = 0L
+          UsageUnresolved = usageUnresolved
+          PhysicalRunRef = Some "run-ref" }
+
+    let providerUsageUnresolved (outcome: Wanxiangshu.Sphinx.V2.Plugins.ProviderOutcome) : bool =
+        Wanxiangshu.Sphinx.V2.Plugins.ProviderAdapter.keepsReservation outcome
+
+    let providerUsageCounts (outcome: Wanxiangshu.Sphinx.V2.Plugins.ProviderOutcome) : int64 * int64 * int64 =
+        Wanxiangshu.Sphinx.V2.Plugins.ProviderAdapter.usageCountsOf outcome
 
     // --- Recovery -----------------------------------------------------------------
 

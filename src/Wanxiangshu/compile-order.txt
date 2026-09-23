@@ -163,6 +163,8 @@ Sphinx/V2/Plugins/Inquiry/Observe.fs
 Sphinx/V2/Plugins/Inquiry/DecisionModel.fs
 Sphinx/V2/Plugins/Inquiry/Stop.fs
 Sphinx/V2/Plugins/Inquiry/Render.fs
+Sphinx/V2/Plugins/Provider/Adapter.fsi
+Sphinx/V2/Plugins/Provider/Adapter.fs
 Sphinx/V2/Runtime/Profile.fsi
 Sphinx/V2/Runtime/Profile.fs
 Sphinx/V2/Runtime/Recovery.fsi
@@ -1484,6 +1486,8 @@ Context/Trace/SemanticTraceSurface.fsi
 Context/Trace/SemanticTraceSurface.fs
 Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fsi
 Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fs
+Sphinx/V2/Hosts/Provider/Adapter.fsi
+Sphinx/V2/Hosts/Provider/Adapter.fs
 Change/Host/Surface.fsi
 Change/Host/Surface.fs
 Foundation/OutcomeSurface.fsi
