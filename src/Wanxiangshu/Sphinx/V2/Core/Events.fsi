@@ -70,7 +70,7 @@ type InterpretationFailedBody =
       Reason: string }
 
 type GraphPatchedBody =
-    { Patch: JsonEnvelope
+    { Patch: GraphPatch
       PluginRef: string }
 
 type CertificateSlotsPatchedBody =

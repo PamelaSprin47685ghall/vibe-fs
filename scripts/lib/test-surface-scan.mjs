@@ -603,6 +603,27 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
+    module: 'Sphinx/V2/Core/Surface.js',
+    owner: 'sphinx-v2',
+    laws: [
+      'SPHINX-V2-001',
+      'SPHINX-V2-003',
+      'SPHINX-V2-004',
+      'SPHINX-V2-005',
+      'SPHINX-V2-006',
+      'SPHINX-V2-007',
+      'SPHINX-V2-010',
+      'SPHINX-V2-015',
+      'SPHINX-V2-016',
+      'SPHINX-V2-019',
+      'SPHINX-V2-020',
+      'SPHINX-V2-025',
+    ],
+    source: 'src/Wanxiangshu/Sphinx/V2/Core/Surface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
     module: 'Sphinx/GecSurface.js',
     owner: 'epistemic-reasoning',
     laws: [

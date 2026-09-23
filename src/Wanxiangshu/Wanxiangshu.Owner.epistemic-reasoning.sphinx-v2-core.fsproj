@@ -14,6 +14,7 @@
     <Compile Include="Sphinx/V2/Core/State.fsi"/><Compile Include="Sphinx/V2/Core/State.fs"/>
     <Compile Include="Sphinx/V2/Core/Reducer.fsi"/><Compile Include="Sphinx/V2/Core/Reducer.fs"/>
     <Compile Include="Sphinx/V2/Core/Projection.fsi"/><Compile Include="Sphinx/V2/Core/Projection.fs"/>
+    <Compile Include="Sphinx/V2/Core/Surface.fsi"/><Compile Include="Sphinx/V2/Core/Surface.fs"/>
     <Compile Include="Sphinx/V2/Runtime/Contracts.fsi"/><Compile Include="Sphinx/V2/Runtime/Contracts.fs"/>
     <Compile Include="Sphinx/V2/Runtime/Ports.fsi"/><Compile Include="Sphinx/V2/Runtime/Ports.fs"/>
     <Compile Include="Sphinx/V2/Runtime/Registry.fsi"/><Compile Include="Sphinx/V2/Runtime/Registry.fs"/>

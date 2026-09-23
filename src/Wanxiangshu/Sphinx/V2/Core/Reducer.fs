@@ -327,6 +327,16 @@ module Reducer =
 
         let slotName (patch: CertificateSlotPatch) = patch.Slot.Slot
 
+        /// Nodes already in the graph.
+        let existingNodes =
+            state.Graph |> Map.toList |> List.map (fun (nodeId, _) -> NodeId.value nodeId) |> Set.ofList
+
+        /// A certificate may only be attached to a node that exists. The old reducer
+        /// accepted any target and let a later graph patch paper over it; here a missing
+        /// endpoint is a refusal (WHAT[sphinx-v2-007]).
+        let targetExists (patch: CertificateSlotPatch) : bool =
+            existingNodes |> Set.contains patch.TargetRef
+
         /// Different slots on the same candidate are independent and merge. The same
         /// slot must agree on its base revision, and an exact re-delivery is idempotent.
         let mergeSlot (existing: CertificateSlotPatch list) (patch: CertificateSlotPatch) :
@@ -359,6 +369,8 @@ module Reducer =
             : Result<Map<string, CertificateSlotPatch list>, CoreError> =
             match remaining with
             | [] -> Ok slots
+            | patch :: _ when not (targetExists patch) ->
+                Error(coreError "unknown-node" (sprintf "certificate target %s is not in the graph" patch.TargetRef))
             | patch :: rest ->
                 Certificate.validateSlot patch.Slot
                 |> Result.mapError certificateError
@@ -523,12 +535,18 @@ module Reducer =
                               Status = "pending"
                               Reason = None } }
 
+    /// A graph patch is applied, not merely noted. Core checks producer identity,
+    /// endpoint existence and revision sanity; it never judges whether the relation is
+    /// warranted (WHAT[sphinx-v2-006]).
     let private applyGraphPatched (state: InquiryState) (body: GraphPatchedBody) : Result<InquiryState, CoreError> =
-        // The payload is the plugin's own delta; Core validates only that it is present.
-        if String.IsNullOrWhiteSpace body.PluginRef then
-            Error(coreError "invalid-patch" "graph patch must name its producing plugin")
-        else
-            Ok state
+        let graphError (fault: GraphError) : CoreError = { Code = fault.Code; Message = fault.Message }
+
+        match String.IsNullOrWhiteSpace body.PluginRef with
+        | true -> Error(coreError "invalid-patch" "graph patch must name its producing plugin")
+        | false ->
+            Graph.applyPatch state.Graph state.Edges body.Patch
+            |> Result.mapError graphError
+            |> Result.map (fun (nodes, edges) -> { state with Graph = nodes; Edges = edges })
 
     let private applyAnswer (state: InquiryState) (body: AnswerCommittedBody) : Result<InquiryState, CoreError> =
         match state.Answer with
@@ -593,17 +611,23 @@ module Reducer =
         | InquiryEventBody.InquiryStatusChanged statusBody -> applyStatus state statusBody.Status statusBody.Reason
         | InquiryEventBody.InquiryCreated _ -> Error(coreError "duplicate-inquiry" "inquiry is already created")
 
+    /// A continuation of an existing history. Its own decisions live in `dispatchHandler`.
+    let private applyContinuation (current: InquiryState) (event: InquiryEvent) (body: InquiryEventBody) :
+        Result<InquiryState, CoreError> =
+        admitBusinessEvent current body
+        |> Result.bind (fun () -> verifyChain current event)
+        |> Result.bind (fun () -> dispatchHandler current body)
+        |> Result.map (fun next -> { next with Revision = event.Revision; EventHead = Some event.Id })
+
     let apply (state: InquiryState option) (event: InquiryEvent) : Result<InquiryState, CoreError> =
-        match state, event.Body with
-        | None, InquiryEventBody.InquiryCreated body -> emptyState event body
-        | None, _ -> Error(coreError "missing-inquiry" "first event must create the inquiry")
-        | Some current, InquiryEventBody.InquiryCreated _ ->
+        let body = event.Body
+
+        match Option.isSome state, body with
+        | true, InquiryEventBody.InquiryCreated _ ->
             Error(coreError "duplicate-inquiry" "inquiry is already created")
-        | Some current, body ->
-            admitBusinessEvent current body
-            |> Result.bind (fun () -> verifyChain current event)
-            |> Result.bind (fun () -> dispatchHandler current body)
-            |> Result.map (fun next -> { next with Revision = event.Revision; EventHead = Some event.Id })
+        | true, _ -> applyContinuation (Option.get state) event body
+        | false, InquiryEventBody.InquiryCreated created -> emptyState event created
+        | false, _ -> Error(coreError "missing-inquiry" "first event must create the inquiry")
 
     /// Fold a whole transition batch. The batch is the unit of durability, so a failure
     /// anywhere means no event in it is applied: the previous state is the only outcome.

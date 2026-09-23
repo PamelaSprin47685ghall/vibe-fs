@@ -98,6 +98,8 @@ Sphinx/V2/Core/Reducer.fsi
 Sphinx/V2/Core/Reducer.fs
 Sphinx/V2/Core/Projection.fsi
 Sphinx/V2/Core/Projection.fs
+Sphinx/V2/Core/Surface.fsi
+Sphinx/V2/Core/Surface.fs
 Sphinx/V2/Runtime/Contracts.fsi
 Sphinx/V2/Runtime/Contracts.fs
 Sphinx/V2/Runtime/Ports.fsi
