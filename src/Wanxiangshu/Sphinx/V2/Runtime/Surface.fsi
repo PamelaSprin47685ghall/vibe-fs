@@ -16,6 +16,13 @@ module Surface =
     val decisionSelect: string -> obj list -> obj
     val decisionExclude: string -> string -> obj
 
+    // Default profile
+    val profileDefault: unit -> DefaultProfile
+    val profileValidate: DefaultProfile -> Result<DefaultProfile, ProfileError>
+    val profileConfigInput: unit -> string
+    val profileClaimsIndependence: DefaultProfile -> bool
+    val profileWith: obj -> DefaultProfile
+
     // Stop
     val stopRanked: unit -> obj
     val stopOrdinal: unit -> obj

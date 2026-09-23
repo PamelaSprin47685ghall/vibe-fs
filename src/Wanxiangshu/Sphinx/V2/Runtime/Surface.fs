@@ -135,6 +135,39 @@ module Surface =
             {| Outcome = name ()
                Detail = detail () |}
 
+    // --- Default profile ---------------------------------------------------------
+
+    /// The declared default. Real models and real quotas have no implicit default: they
+    /// come from an authorized Host/provider configuration.
+    let profileDefault () : DefaultProfile = Profile.defaultProfile
+
+    let profileValidate (profile: DefaultProfile) : Result<DefaultProfile, ProfileError> = Profile.validate profile
+
+    let profileConfigInput () : string =
+        Profile.configHashInput Profile.defaultProfile
+
+    let profileClaimsIndependence (profile: DefaultProfile) : bool = Profile.claimsIndependence profile
+
+    /// A copy of the declared default with one engineering field replaced, so a test can
+    /// build an inadmissible profile without hand-assembling the whole record.
+    let profileWith (changes: obj) : DefaultProfile =
+        let declared = Profile.defaultProfile
+
+        let changed name fallback =
+            let value = changes?(name)
+            let present = (value: obj) <> null
+
+            match present with
+            | true -> box value
+            | false -> box fallback
+
+        { declared with
+            MaxActivePlanCards = int (unbox<float> (changed "MaxActivePlanCards" (float declared.MaxActivePlanCards)))
+            FitMaxIterations = int (unbox<float> (changed "FitMaxIterations" (float declared.FitMaxIterations)))
+            FitGradientTolerance = unbox<float> (changed "FitGradientTolerance" declared.FitGradientTolerance)
+            ThetaL2 = unbox<float> (changed "ThetaL2" declared.ThetaL2)
+            ExecutionMode = unbox<ExecutionMode> (changed "ExecutionMode" declared.ExecutionMode) }
+
     // --- Stop ---------------------------------------------------------------------
 
     let stopRanked () : obj = box StopReason.ModelRankedStop

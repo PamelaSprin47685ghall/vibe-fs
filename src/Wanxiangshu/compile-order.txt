@@ -163,6 +163,8 @@ Sphinx/V2/Plugins/Inquiry/Observe.fs
 Sphinx/V2/Plugins/Inquiry/DecisionModel.fs
 Sphinx/V2/Plugins/Inquiry/Stop.fs
 Sphinx/V2/Plugins/Inquiry/Render.fs
+Sphinx/V2/Runtime/Profile.fsi
+Sphinx/V2/Runtime/Profile.fs
 Sphinx/V2/Runtime/Recovery.fsi
 Sphinx/V2/Runtime/Recovery.fs
 Sphinx/V2/Runtime/Driver.fsi
