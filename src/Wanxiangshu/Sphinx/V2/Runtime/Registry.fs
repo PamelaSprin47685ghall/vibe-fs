@@ -67,48 +67,65 @@ module Registry =
 
     /// Bind manifests to executables. A declared capability with no executable behind it
     /// fails here, at startup, rather than at the moment of dispatch.
-    let bind (plugins: LockedPlugin list) : Result<LockedPlugin list, RegistryError> =
-        let manifests = plugins |> List.map (fun plugin -> plugin.Manifest)
-
-        let validated =
-            manifests
-            |> List.fold
-                (fun state manifest ->
-                    state
-                    |> Result.bind (fun () ->
-                        PluginContract.validateManifest manifest
-                        |> Result.mapError (fun fault -> { Code = fault.Code; Message = fault.Message })))
-                (Ok())
-
+    let private missingDependencies (plugins: LockedPlugin list) : string list =
         let declaredIds =
-            manifests
-            |> List.map (fun manifest -> manifest.Id)
+            plugins
+            |> List.map (fun plugin -> plugin.Manifest.Id)
             |> Set.ofList
 
-        let missingDependencies =
-            manifests
-            |> List.collect (fun manifest -> manifest.Dependencies |> Set.toList)
-            |> List.filter (fun dependency -> not (Set.contains dependency declaredIds))
+        plugins
+        |> List.collect (fun plugin -> plugin.Manifest.Dependencies |> Set.toList)
+        |> List.filter (fun dependency -> not (Set.contains dependency declaredIds))
 
-        match validated with
-        | Error fault -> Error fault
-        | Ok () ->
-            let grouped =
-                manifests |> List.groupBy (fun manifest -> manifest.Id)
+    let private conflictingReleases (plugins: LockedPlugin list) : string list =
+        plugins
+        |> List.groupBy (fun plugin -> plugin.Manifest.Id)
+        |> List.filter (fun (_, group) ->
+            group
+            |> List.map (fun plugin -> plugin.Manifest.Release)
+            |> Set.ofList
+            |> Set.count
+            |> fun count -> count > 1)
+        |> List.map fst
 
-            let conflicting =
-                grouped
-                |> List.filter (fun (_, group) ->
-                    let releases = group |> List.map (fun manifest -> manifest.Release) |> Set.ofList
-                    Set.count releases > 1)
-                |> List.map fst
+    let bind (plugins: LockedPlugin list) : Result<LockedPlugin list, RegistryError> =
+        let manifestError () =
+            plugins
+            |> List.map (fun plugin -> PluginContract.validateManifest plugin.Manifest)
+            |> List.tryPick (fun outcome ->
+                match outcome with
+                | Error fault -> Some { Code = fault.Code; Message = fault.Message }
+                | Ok _ -> None)
 
-            if not (List.isEmpty missingDependencies) then
-                error "plugin-dependency-missing" (sprintf "plugins declare missing dependencies: %s" (String.concat ", " missingDependencies))
-            elif not (List.isEmpty conflicting) then
-                error "plugin-conflict" (sprintf "plugin id bound to multiple releases: %s" (String.concat ", " conflicting))
-            else
-                ordered plugins
+        let dependencyProblem () =
+            let missing = missingDependencies plugins
+
+            match List.isEmpty missing with
+            | true -> None
+            | false ->
+                Some
+                    { Code = "plugin-dependency-missing"
+                      Message = sprintf "plugins declare missing dependencies: %s" (String.concat ", " missing) }
+
+        let releaseProblem () =
+            let conflicting = conflictingReleases plugins
+
+            match List.isEmpty conflicting with
+            | true -> None
+            | false ->
+                Some
+                    { Code = "plugin-conflict"
+                      Message = sprintf "plugin id bound to multiple releases: %s" (String.concat ", " conflicting) }
+
+        let problem () =
+            match dependencyProblem (), releaseProblem () with
+            | Some fault, _ -> Some fault
+            | None, Some fault -> Some fault
+            | None, None -> manifestError ()
+
+        match problem () with
+        | Some fault -> Error fault
+        | None -> ordered plugins
 
     /// The lock a new proposal must match. Comparing implementation hashes, ABI hashes
     /// and schema hashes — not just release labels — is what makes a mid-inquiry

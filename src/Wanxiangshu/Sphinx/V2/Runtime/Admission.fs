@@ -78,33 +78,54 @@ module Admission =
 
         let replay = InquiryState.commandRevision state commandId
 
-        match blankCommand || blankFingerprint || invalidPayload with
-        | true -> reject ()
-        | false ->
+        let admit () =
             match replay with
             | Some revision -> Ok(IdempotencyOutcome.Replay revision)
             | None -> Ok(IdempotencyOutcome.Fresh command)
 
+        match blankCommand || blankFingerprint || invalidPayload with
+        | true -> reject ()
+        | false -> admit ()
+
     /// A result is admissible only against a work that exists, is running, and carries
     /// the exact attempt and fence the caller presents.
-    let admitResult
-        (state: InquiryState)
-        (submission: ResultSubmission)
-        : Result<WorkItem, CommandError> =
-        match state.Work |> Map.tryFind submission.WorkId with
-        | None -> error "unknown-work" (sprintf "work %s is not planned" (WorkId.value submission.WorkId))
-        | Some item when item.Spec.Attempt <> submission.Attempt ->
-            error "attempt-mismatch" "result attempt does not match the current attempt"
-        | Some item when item.Spec.Fence <> submission.Fence ->
-            error "stale-fence" "result fence does not match the current attempt"
-        | Some item ->
+    /// A result is admissible only when the work is currently runnable under this exact
+    /// attempt and fence.
+    let private runnableOutcome (submission: ResultSubmission) (item: WorkItem) : Result<WorkItem, CommandError> =
+        let running =
             match item.State with
-            | WorkState.Running _ -> Ok item
-            | WorkState.Succeeded _ -> Ok item
-            | _ ->
-                error
-                    "work-not-running"
-                    (sprintf "work %s is in state %s" (WorkId.value submission.WorkId) (Work.stateName item.State))
+            | WorkState.Running _ -> true
+            | WorkState.Succeeded _ -> true
+            | _ -> false
+
+        match running with
+        | true -> Ok item
+        | false ->
+            error
+                "work-not-running"
+                (sprintf "work %s is in state %s" (WorkId.value submission.WorkId) (Work.stateName item.State))
+
+    let private matchingOutcome (submission: ResultSubmission) (item: WorkItem) : Result<WorkItem, CommandError> =
+        let matching =
+            item.Spec.Attempt = submission.Attempt && item.Spec.Fence = submission.Fence
+
+        match matching with
+        | true -> runnableOutcome submission item
+        | false -> error "attempt-mismatch" "result attempt or fence does not match the current attempt"
+
+    let private resultReason
+        (submission: ResultSubmission)
+        (item: WorkItem option)
+        : Result<WorkItem, CommandError> =
+        let unknownWork () =
+            error "unknown-work" (sprintf "work %s is not planned" (WorkId.value submission.WorkId))
+
+        match item with
+        | Some current -> matchingOutcome submission current
+        | None -> unknownWork ()
+
+    let admitResult (state: InquiryState) (submission: ResultSubmission) : Result<WorkItem, CommandError> =
+        resultReason submission (state.Work |> Map.tryFind submission.WorkId)
 
     /// Goal amendment is the one command that may move the goal, and it must name its
     /// authorizer — a plugin cannot authorize itself (WHAT[sphinx-v2-001]).

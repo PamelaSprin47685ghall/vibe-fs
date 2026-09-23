@@ -11,6 +11,11 @@ type AgendaExclusion =
     | CapacityUnavailable
     | AlreadyTerminal
 
+type DispatchVerdict =
+    | Granted
+    | Declined of AgendaExclusion
+    | Terminal
+
 type DispatchDecision =
     { Dispatchable: WorkSpec list
       Excluded: (WorkSpec * AgendaExclusion) list }

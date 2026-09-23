@@ -56,31 +56,33 @@ module Fit =
         copy.[pivot] <- augmented.[column]
         copy
 
+    let private scaleRow (values: float array) (column: int) (pivotValue: float) : float array =
+        let head = Array.take column values
+        let tail = Array.skip column values |> Array.map (fun value -> value / pivotValue)
+        Array.append head tail
+
     let private normalize (rows: float array array) (column: int) (from: int) : float array array =
+        let pivotValue = rows.[column].[column]
+
         rows
         |> Array.mapi (fun row values ->
             match row < from with
             | true -> values
-            | false ->
-                let pivotValue = rows.[column].[column]
+            | false -> scaleRow values column pivotValue)
 
-                values
-                |> Array.mapi (fun index value ->
-                    match index < column with
-                    | true -> value
-                    | false -> value / pivotValue))
+    /// The update for one already-pivoted row: untouched before `from`, then the
+    /// elimination step.
+    let private eliminateAt (factor: float) (pivot: float array) (from: int) (index: int) (value: float) : float =
+        match index < from with
+        | true -> value
+        | false -> value - factor * pivot.[index]
 
     let private eliminateRow (rows: float array array) (column: int) (row: int) (from: int) : float array =
         match row <= column with
         | true -> rows.[row]
         | false ->
             let factor = rows.[row].[column]
-
-            rows.[row]
-            |> Array.mapi (fun index value ->
-                match index < from with
-                | true -> value
-                | false -> value - factor * rows.[column].[index])
+            Array.mapi (eliminateAt factor rows.[column] from) rows.[row]
 
     let private sweepColumn (rows: float array array) (column: int) (n: int) (from: int) : float array array =
         [ column + 1 .. n - 1 ]
@@ -89,21 +91,28 @@ module Fit =
             | true -> eliminateRow acc column row from
             | false -> values)) rows
 
+    /// One elimination step. A singular pivot stops the solve; a real one recurses.
+    let private eliminateOnce
+        (run: float array array -> int -> float array array option)
+        (rows: float array array)
+        (column: int)
+        (n: int)
+        : float array array option =
+        let pivot = choosePivot rows column n
+        let pivotValue = rows.[pivot].[column]
+        let swapped = withSwap rows column pivot
+        let normalized = normalize swapped column column
+        let swept = sweepColumn normalized column n column
+
+        match abs pivotValue < 1e-12 with
+        | true -> None
+        | false -> run swept (column + 1)
+
     let private triangularize (augmented: float array array) (n: int) : float array array option =
         let rec run (rows: float array array) (column: int) : float array array option =
             match column >= n with
             | true -> Some rows
-            | false ->
-                let pivot = choosePivot rows column n
-                let pivotValue = rows.[pivot].[column]
-
-                match abs pivotValue < 1e-12 with
-                | true -> None
-                | false ->
-                    let swapped = withSwap rows column pivot
-                    let normalized = normalize swapped column column
-                    let swept = sweepColumn normalized column n column
-                    run swept (column + 1)
+            | false -> eliminateOnce run rows column n
 
         run augmented 0
 
@@ -170,6 +179,20 @@ module Fit =
                     [ (left, right, value); (right, left, value) ])
 
         mirrored |> List.map (fun (left, right, value) -> (left, right), value) |> Map.ofList
+
+    /// The MAP covariance, lifted from the free coordinates back into candidate space.
+    /// No inverse means no covariance: reporting the prior as if it were data would be
+    /// exactly the false precision this module refuses.
+    let private covarianceOfIds (ids: string list) (inverse: float array array option) : Map<string * string, float> =
+        match inverse with
+        | Some matrix -> buildCovariance ids matrix
+        | None -> Map.empty
+
+    /// Convergence is a fact about the step, not about the answer.
+    let private convergedStatus (converged: bool) (maxIterations: int) : FitStatus =
+        match converged with
+        | true -> FitStatus.Converged
+        | false -> FitStatus.NotConverged maxIterations
 
     /// The Newton step, in free coordinates under the zero-sum gauge. Kept as its own
     /// function so the design checks above stay readable and the numeric core can be
@@ -256,19 +279,12 @@ module Fit =
 
                 let inverse = solveInverse ()
 
-                let covariance =
-                    match inverse with
-                    | None -> Map.empty
-                    | Some matrix -> buildCovariance ids matrix
+                let covariance = covarianceOfIds ids inverse
 
-
-                let status =
-                    match converged with
-                    | true -> FitStatus.Converged
-                    | false -> FitStatus.NotConverged maxIterations
+                let outcome = convergedStatus converged maxIterations
 
                 Ok
-                    { Status = status
+                    { Status = outcome
                       Theta = theta
                       Beta = None
                       Kappa = None
@@ -281,6 +297,73 @@ module Fit =
                         [ "zero-sum gauge"
                           "local Laplace approximation around the MAP"
                           "regularization is a declared prior, not an absence of one" ] }
+
+    /// A failure result that carries no estimate at all. Named because three different
+    /// failure modes share exactly this shape.
+    let private separatedLike
+        (model: ObservationModel)
+        (candidates: string list)
+        (status: FitStatus)
+        (assumption: string)
+        : Result<FitResult, FitError> =
+        Ok
+            { Status = status
+              Theta = candidates |> List.map (fun candidate -> candidate, 0.0) |> Map.ofList
+              Beta = None
+              Kappa = None
+              Covariance = Map.empty
+              Iterations = 0
+              GradientNorm = 0.0
+              EstimateKind = "none"
+              ModelRef = model.ModelRef
+              Assumptions = [ assumption ] }
+
+    /// The design check, separated from the input check so neither nest is inside the
+    /// other's arms.
+    let private fitDesign
+        (model: ObservationModel)
+        (ballots: Ballot list)
+        (candidates: string list)
+        (maxIterations: int)
+        (gradientTolerance: float)
+        : Result<FitResult, FitError> =
+        let design = DesignCheck.designRank ballots candidates
+
+        let separated () =
+            let zeroed () =
+                candidates |> List.map (fun candidate -> candidate, 0.0) |> Map.ofList
+
+            Ok
+                { Status = FitStatus.SeparationDetected
+                  Theta = zeroed ()
+                  Beta = None
+                  Kappa = None
+                  Covariance = Map.empty
+                  Iterations = 0
+                  GradientNorm = 0.0
+                  EstimateKind = "none"
+                  ModelRef = model.ModelRef
+                  Assumptions = [ "a candidate always wins or always loses; the likelihood is unbounded" ] }
+
+        let disconnected () =
+            let count =
+                DesignCheck.connectivity ballots candidates |> fun report -> report.Components |> List.length
+
+            separatedLike
+                model
+                candidates
+                (FitStatus.DisconnectedComponents count)
+                (sprintf
+                    "comparison graph is disconnected into %d components; cross-component order is prior-driven"
+                    count)
+
+        let fitNow () =
+            continueFitting model ballots candidates maxIterations gradientTolerance design
+
+        match design.SeparationDetected, design.Sufficient with
+        | true, _ -> separated ()
+        | false, false -> disconnected ()
+        | false, true -> fitNow ()
 
     let fit
         (model: ObservationModel)
@@ -296,28 +379,13 @@ module Fit =
                 | BallotKind.Directional _ -> true
                 | _ -> false)
 
-        if candidates |> List.isEmpty then
-            error "no-candidates" "a fit needs at least one candidate"
-        elif directional |> List.isEmpty then
-            Ok
-                { Status = FitStatus.NoDirectionalEvidence
-                  Theta = candidates |> List.map (fun candidate -> candidate, 0.0) |> Map.ofList
-                  Beta = None
-                  Kappa = None
-                  Covariance = Map.empty
-                  Iterations = 0
-                  GradientNorm = 0.0
-                  EstimateKind = "none"
-                  ModelRef = model.ModelRef
-                  Assumptions = [ "no directional observations were recorded" ] }
-        else
-            let design = DesignCheck.designRank ballots candidates
-            let components = DesignCheck.connectivity ballots candidates |> fun report -> report.Components |> List.length
-            let separated = design.SeparationDetected
+        let failure (status: FitStatus) (assumption: string) : Result<FitResult, FitError> =
+            let zeroed () =
+                candidates |> List.map (fun candidate -> candidate, 0.0) |> Map.ofList
 
-            let noEstimate (status: FitStatus) (assumption: string) : FitResult =
+            Ok
                 { Status = status
-                  Theta = candidates |> List.map (fun candidate -> candidate, 0.0) |> Map.ofList
+                  Theta = zeroed ()
                   Beta = None
                   Kappa = None
                   Covariance = Map.empty
@@ -327,20 +395,40 @@ module Fit =
                   ModelRef = model.ModelRef
                   Assumptions = [ assumption ] }
 
-            match components, separated with
-            | 1, true ->
-                Ok(
-                    noEstimate
-                        FitStatus.SeparationDetected
-                        "a candidate always wins or always loses; the likelihood is unbounded"
-                )
-            | 1, false -> continueFitting model ballots candidates maxIterations gradientTolerance design
-            | count, _ ->
-                Ok(
-                    noEstimate
-                        (FitStatus.DisconnectedComponents count)
-                        "comparison graph is disconnected; cross-component order is prior-driven"
-                )
+        let noCandidates () =
+            error "no-candidates" "a fit needs at least one candidate"
+
+        let noDirection () =
+            failure FitStatus.NoDirectionalEvidence "no directional observations were recorded"
+
+        let separated () =
+            failure
+                FitStatus.SeparationDetected
+                "a candidate always wins or always loses; the likelihood is unbounded"
+
+        let disconnected () =
+            let count =
+                DesignCheck.connectivity ballots candidates |> fun report -> report.Components |> List.length
+
+            failure
+                (FitStatus.DisconnectedComponents count)
+                (sprintf
+                    "comparison graph is disconnected into %d components; cross-component order is prior-driven"
+                    count)
+
+        let startFitting () =
+            continueFitting
+                model
+                ballots
+                candidates
+                maxIterations
+                gradientTolerance
+                (DesignCheck.designRank ballots candidates)
+
+        match List.isEmpty candidates, List.isEmpty directional with
+        | true, _ -> noCandidates ()
+        | _, true -> noDirection ()
+        | false, false -> fitDesign model ballots candidates maxIterations gradientTolerance
 
     /// Variance of a contrast, using the full covariance. Dropping the cross term is the
     /// classic way to understate uncertainty on a difference.

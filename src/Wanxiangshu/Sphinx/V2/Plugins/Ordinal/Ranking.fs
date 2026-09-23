@@ -9,21 +9,31 @@ namespace Wanxiangshu.Sphinx.V2.Plugins
 
 module Ranking =
 
-    /// Sum over all ordered pairs of the presented set, in theta units. Returning None
-    /// when theta is incomplete keeps the caller from silently treating a missing
-    /// candidate as a zero-strength one.
+    /// log(exp(total)) is computed by summing exponentials directly: the candidate set
+    /// is small and the strengths are bounded, so logSumExp is not needed here.
     let private pairTotal (theta: Map<string, float>) (presented: string list) : float option =
-        presented
-        |> List.collect (fun left -> presented |> List.map (fun right -> left, right))
-        |> List.filter (fun (left, right) -> left <> right)
-        |> List.map (fun (left, right) ->
-            match Map.tryFind left theta, Map.tryFind right theta with
-            | Some tl, Some tr -> Some(System.Math.Exp(tl - tr))
-            | _ -> None)
-        |> fun terms ->
-            match terms |> List.contains None with
-            | true -> None
-            | false -> Some(terms |> List.choose id |> List.sum)
+        let pairs =
+            presented
+            |> List.collect (fun left -> presented |> List.map (fun right -> left, right))
+            |> List.filter (fun (left, right) -> left <> right)
+
+        let terms =
+            pairs
+            |> List.choose (fun (left, right) ->
+                match Map.tryFind left theta, Map.tryFind right theta with
+                | Some tl, Some tr -> Some(System.Math.Exp(tl - tr))
+                | _ -> None)
+
+        match List.length terms = List.length pairs with
+        | true -> Some(List.sum terms)
+        | false -> None
+
+    /// `total` must be positive; a non-positive denominator is a modeling failure, not a
+    /// zero-probability observation.
+    let private positiveLog (total: float) : float option =
+        match total > 0.0 with
+        | true -> Some(System.Math.Log total)
+        | false -> None
 
     /// MaxDiff joint likelihood for one best/worst observation.
     ///
@@ -36,44 +46,32 @@ module Ranking =
         (best: string)
         (worst: string)
         : float option =
-        let chosen =
-            match Map.tryFind best theta, Map.tryFind worst theta with
-            | Some tb, Some tw -> Some(tb - tw)
-            | _ -> None
-
-        match chosen, pairTotal theta presented with
-        | Some gap, Some total ->
-            match total <= 0.0 with
-            | true -> None
-            | false -> Some(gap - System.Math.Log(total))
+        match Map.tryFind best theta, Map.tryFind worst theta, pairTotal theta presented with
+        | Some tb, Some tw, Some total ->
+            positiveLog total
+            |> Option.map (fun denominator -> (tb - tw) - denominator)
         | _ -> None
 
     /// Plackett–Luce for a strict complete ranking. Every item in the ranking must be
     /// present in theta; a partial ranking is a different model, not a truncated one.
     let plackettLuceLogProbability (theta: Map<string, float>) (order: string list) : float option =
+        let strengthsOf (available: Set<string>) : float list =
+            available |> Set.toList |> List.choose (fun item -> Map.tryFind item theta)
+
         let logNormalizer (available: Set<string>) : float option =
-            let strengths = available |> Set.toList |> List.choose (fun item -> Map.tryFind item theta)
-            let complete = List.length strengths = Set.count available
-            match complete with
+            let strengths = strengthsOf available
+
+            match List.length strengths = Set.count available with
+            | true -> positiveLog (strengths |> List.sumBy System.Math.Exp)
             | false -> None
-            | true ->
-                let total = strengths |> List.sumBy System.Math.Exp
-                match total <= 0.0 with
-                | true -> None
-                | false -> Some(System.Math.Log total)
 
         let rec walk (remaining: string list) (available: Set<string>) (acc: float) : float option =
-            match remaining with
-            | [] -> Some acc
-            | item :: rest ->
-                match Map.tryFind item theta, logNormalizer available with
-                | Some ti, Some denominator ->
-                    walk rest (Set.remove item available) (acc + ti - denominator)
-                | _ -> None
+            match remaining, Map.tryFind (List.tryHead remaining |> Option.defaultValue "") theta, logNormalizer available with
+            | [], _, _ -> Some acc
+            | item :: rest, Some ti, Some denominator -> walk rest (Set.remove item available) (acc + ti - denominator)
+            | _ -> None
 
-        match List.length order = 0 with
-        | true -> None
-        | false -> walk order (Set.ofList order) 0.0
+        walk order (Set.ofList order) 0.0
 
     /// The expansion of a ranked ballot into pairs, kept as a *composite* term whose
     /// cluster the caller must carry. The returned count is not a sample size.
@@ -91,24 +89,15 @@ module Ranking =
             | Some index -> float (List.length order - index)
             | None -> 0.0
 
-        let totals =
-            candidates
-            |> List.map (fun candidate ->
-                candidate, ballots |> List.sumBy (fun order -> points order candidate))
-            |> Map.ofList
-
-        let exposure =
-            candidates
-            |> List.map (fun candidate -> candidate, ballots |> List.filter (fun order -> List.contains candidate order) |> List.length)
-            |> Map.ofList
+        let appearances (item: string) =
+            ballots |> List.filter (fun order -> List.contains item order) |> List.length
 
         candidates
         |> List.map (fun candidate ->
-            let appearances = exposure |> Map.tryFind candidate |> Option.defaultValue 0
-            let total = totals |> Map.tryFind candidate |> Option.defaultValue 0.0
+            let total = ballots |> List.sumBy (fun order -> points order candidate)
+            let shown = appearances candidate
 
-            if appearances = 0 then
-                candidate, 0.0
-            else
-                candidate, total / float appearances)
+            match shown with
+            | 0 -> candidate, 0.0
+            | n -> candidate, total / float n)
         |> Map.ofList

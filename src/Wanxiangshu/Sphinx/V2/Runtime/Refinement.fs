@@ -52,67 +52,72 @@ module Refinement =
     let propagate (stepLimit: int) (targets: DirtyTarget list) : RefinementOutcome =
         let limit = max 0 stepLimit
 
-        let rec pass (pending: DirtyTarget list) (completed: Set<string>) (steps: RefinementStep list) (iteration: int) =
+        let remainingOutcome
+            (pending: DirtyTarget list)
+            (steps: RefinementStep list)
+            (iteration: int)
+            (cyclic: bool)
+            : RefinementOutcome =
+            { Steps = List.rev steps
+              Remaining = pending
+              Iterations = iteration
+              Residual = float (List.length pending)
+              Converged = not cyclic
+              StopReason =
+                (match cyclic with
+                 | true -> "unsatisfied-dependencies"
+                 | false -> "no-dirty-targets") }
+
+        let step (pending: DirtyTarget list) (target: DirtyTarget) :
+            (DirtyTarget list * Set<string> * RefinementStep) =
+            let remaining = pending |> List.filter (fun item -> item.Target <> target.Target)
+
+            (remaining,
+             Set.singleton target.Target,
+             { Target = target
+               Applied = true
+               DerivedPatches = None
+               Note = "refinement executed" })
+
+        let rec pass
+            (pending: DirtyTarget list)
+            (completed: Set<string>)
+            (steps: RefinementStep list)
+            (iteration: int)
+            : RefinementOutcome =
             let ready = readyTargets completed pending
+            let exhausted = iteration >= limit
+            let stalled = List.isEmpty ready
 
-            match iteration >= limit with
-            | true ->
-                { Steps = List.rev steps
-                  Remaining = pending
-                  Iterations = iteration
-                  Residual = float (List.length pending)
-                  Converged = List.isEmpty pending
-                  StopReason = "iteration-limit" }
-            | false ->
-                match ready with
-                | [] ->
-                    // Nothing is runnable. An empty remaining set is convergence; a
-                    // non-empty one is a cycle we must name.
-                    let cyclic = not (List.isEmpty pending)
+            match exhausted, stalled with
+            | true, _ -> remainingOutcome pending steps iteration (not (List.isEmpty pending))
+            | false, true -> remainingOutcome pending steps iteration true
+            | false, false ->
+                let stepped = ready |> List.map (fun target -> step pending target)
 
-                    { Steps = List.rev steps
-                      Remaining = pending
-                      Iterations = iteration
-                      Residual = float (List.length pending)
-                      Converged = not cyclic
-                      StopReason =
-                        (if cyclic then
-                             "unsatisfied-dependencies"
-                         else
-                             "no-dirty-targets") }
-                | _ ->
-                    let step (target: DirtyTarget) : (DirtyTarget list * Set<string> * RefinementStep) =
-                        let remaining = pending |> List.filter (fun item -> item.Target <> target.Target)
+                let nextPending =
+                    stepped
+                    |> List.collect (fun (remaining, _, _) -> remaining)
+                    |> List.distinctBy (fun target -> target.Target)
 
-                        (remaining,
-                         completed |> Set.add target.Target,
-                         { Target = target
-                           Applied = true
-                           DerivedPatches = None
-                           Note = "refinement executed" })
+                let nextCompleted =
+                    stepped
+                    |> List.collect (fun (_, finished, _) -> finished |> Set.toList)
+                    |> Set.ofList
 
-                    let stepped = ready |> List.map step
+                let nextSteps = stepped |> List.collect (fun (_, _, recorded) -> [ recorded ])
 
-                    let nextPending =
-                        stepped
-                        |> List.collect (fun (remaining, _, _) -> remaining)
-                        |> List.distinctBy (fun target -> target.Target)
-
-                    let nextCompleted =
-                        stepped
-                        |> List.collect (fun (_, finished, _) -> finished |> Set.toList)
-                        |> Set.ofList
-                    let nextSteps = stepped |> List.collect (fun (_, _, recorded) -> [ recorded ])
-
-                    pass nextPending nextCompleted (List.rev nextSteps @ steps) (iteration + 1)
+                pass nextPending nextCompleted (List.rev nextSteps @ steps) (iteration + 1)
 
         pass targets Set.empty [] 0
 
     /// An idempotence check the caller can use before writing a revision: if the same
     /// inputs are already recorded, there is nothing new to persist.
     let unchanged (previous: DirtyTarget list) (incoming: DirtyTarget list) : bool =
-        let key (target: DirtyTarget) = target.Producer + "|" + target.Target + "|" + target.InputFingerprint
+        let key (target: DirtyTarget) =
+            target.Producer + "|" + target.Target + "|" + target.InputFingerprint
 
         (previous |> List.map key |> Set.ofList) = (incoming |> List.map key |> Set.ofList)
 
-    let fingerprint (inputs: string list) : string = fingerprintOf inputs
+    let fingerprint (inputs: string list) : string =
+        inputs |> List.sort |> String.concat "|"
