@@ -30,6 +30,7 @@ const REGISTERED_HOOK_NAMES = [
   'tool.execute.after',
   'event',
   'dispose',
+  'command.execute.before',
 ]
 
 test('WHAT[host-boundary-014] LocalInvariant crosses the typed membrane after fatal policy', () => {

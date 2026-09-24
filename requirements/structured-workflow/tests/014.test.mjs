@@ -503,7 +503,9 @@ test('WHAT[structured-workflow-014] NodeFs physical port and tool contracts have
   const capabilityRefs = references('Wanxiangshu.Owner.capability-enforcement.opencode-host-managedagentconfig.fsproj')
   assert.ok(capabilityRefs.includes(managedProject))
   assert.ok(capabilityRefs.includes(staticProject))
-  assert.ok(capabilityRefs.includes('Wanxiangshu.Owner.host-boundary.sphinx-host-adapter.fsproj'))
+  // The Sphinx clean-break retired the v1 host adapter; the surviving v2 kernel shard
+  // is what the managed-agent config still references.
+  assert.ok(capabilityRefs.includes('Wanxiangshu.Owner.epistemic-reasoning.sphinx-v2-core.fsproj'))
 
   const routingRefs = references('Wanxiangshu.Owner.execution-model-routing.opencode-host-modelroutingsurface.fsproj')
   assert.ok(routingRefs.includes(managedProject))

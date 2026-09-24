@@ -340,6 +340,28 @@ module PluginHooks =
 
                 registeredHook HookKey.Dispose (nullaryHook (box disposeAll))
 
+            // crash-reconciliation-018: the explicit `/continue` command runs before
+            // any physical message exists, so it re-enlists surviving child sessions
+            // process-locally and stages the restart disclosure the real chat.message
+            // will materialize. Registered after the tool runtime exists because it
+            // adopts that runtime's children.
+            let commandExecution =
+                let adoptExisting parent record =
+                    match toolRegistration with
+                    | Some registration -> registration.Runtime.AdoptExistingChild(parent, record)
+                    | None -> Error "tool runtime is unavailable"
+
+                registeredHook
+                    HookKey.CommandExecution
+                    (pairedHook (
+                        box (
+                            ExplicitSessionResume.before
+                                (journal |> Option.map AgentJournalPortAdapter.forSessionResume)
+                                snapshotOpt
+                                adoptExisting
+                        )
+                    ))
+
             let hooks =
                 createObj (
                     [ chatMessage
@@ -353,6 +375,7 @@ module PluginHooks =
                       toolBeforeRegistration
                       toolAfterRegistration
                       event
+                      commandExecution
                       dispose ]
                     @ (toolRegistration
                        |> Option.map (fun registration -> [ "tool", registration.Tools ])

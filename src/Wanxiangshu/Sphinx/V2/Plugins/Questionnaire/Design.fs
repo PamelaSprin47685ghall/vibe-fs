@@ -49,6 +49,7 @@ module Design =
     /// protocol change, not a silent one (WHAT[sphinx-v2-023]).
     let private shuffle (seed: string) (items: string list) : string list =
         let digest text =
+            // DSL-MUTABLE: algorithm-scratch — FNV-1a rolling hash accumulator
             let mutable hash = 2166136261u
 
             for character in text do

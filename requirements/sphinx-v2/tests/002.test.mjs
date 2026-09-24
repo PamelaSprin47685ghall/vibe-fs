@@ -97,9 +97,9 @@ test('WHAT[sphinx-v2-002] the declared default profile is admissible', () => {
   assert.equal(Core.isOk(Loop.profileValidate(Loop.profileDefault())), true)
 })
 
-// WHAT[sphinx-v2-019]: delegated execution makes no independence claim.
+// WHAT[sphinx-v2-002]: delegated execution makes no independence claim.
 
-test('WHAT[sphinx-v2-019] delegated execution claims no independence', () => {
+test('WHAT[sphinx-v2-002] delegated execution claims no independence', () => {
   assert.equal(Loop.profileClaimsIndependence(Loop.profileDefault()), false)
 
   const independent = Loop.profileWith({ ExecutionMode: 1 })

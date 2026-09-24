@@ -15,6 +15,7 @@ type HookKey =
     | ToolAfter
     | Event
     | Dispose
+    | CommandExecution
 
 [<RequireQualifiedAccess>]
 type HookCriticality =
@@ -235,6 +236,17 @@ module HookPolicy =
               Criticality = HookCriticality.Invariant
               Context = HookContext.PluginLifecycle
               Effects = [ HookEffect.DisposeOwnedResources ]
+              Retry = HookRetryPermission.RetryForbidden
+              Capacity = HookCapacityOwner.NoCapacity
+              Failure = HookFailureDisposition.TypedPolicyFailClosed
+              Identity = IdentityPermission.NoIdentityAccess
+              Admission = AdmissionPermission.NoAdmissionAccess }
+        | HookKey.CommandExecution ->
+            { HostKey = "command.execute.before"
+              DiagnosticOperation = "plugin-hook-command-before-failed"
+              Criticality = HookCriticality.Security
+              Context = HookContext.CommandExecution
+              Effects = [ HookEffect.AdmitExplicitResume ]
               Retry = HookRetryPermission.RetryForbidden
               Capacity = HookCapacityOwner.NoCapacity
               Failure = HookFailureDisposition.TypedPolicyFailClosed
