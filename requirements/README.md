@@ -26,7 +26,7 @@ grounding 由 `requirement-grounding` package 拥有。
 
 已知 proof gap 聚合台账见 [GAP.md](GAP.md)；包清单与依赖骨架见 [INDEX.md](INDEX.md)。
 
-## 55 包索引
+## 56 包索引
 
 ### 1. Requirement system
 | Package | 一句话 WHY |
@@ -59,6 +59,7 @@ grounding 由 `requirement-grounding` package 拥有。
 | [capability-enforcement](capability-enforcement/WHAT.md) | provider 看见的与 runtime 真能执行的 capability 同源且不扩大 office entitlement。 |
 | [participant-horizon](participant-horizon/WHAT.md) | 只有会改变合法行动的最小事实应穿过 horizon。 |
 | [cognitive-environment](cognitive-environment/WHAT.md) | 长期认知层与瞬时 runtime/mission 分开；knowledge 不创造 authority。 |
+| [cognitive-workspace](cognitive-workspace/WHAT.md) | 模型的工作记忆必须有唯一持久画板与唯一写入口；画板是认知结构，不是权限、完成判定或质量证书。 |
 | [attention-regulation](attention-regulation/WHAT.md) | 显式结束 evidence churn、解除自创心理债、延后非阻塞旁支；defer 不冒充 obligation。 |
 | [action-affordance](action-affordance/WHAT.md) | 决策点必须知道 act 的正负边界、成功后果与参数意义。 |
 | [provider-language](provider-language/WHAT.md) | 一个 life 一个稳定 natural-language world；protocol identifiers 不翻译。 |

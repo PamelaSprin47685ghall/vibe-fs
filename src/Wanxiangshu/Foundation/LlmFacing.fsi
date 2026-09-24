@@ -50,4 +50,7 @@ module LlmFacing =
         val table: name: string -> fields: Field list -> DataBlock
         val tableArray: name: string -> fields: Field list -> DataBlock
         val structuredValue: value: Value -> DataBlock list
+        val rootStructuredValue: value: Value -> DataBlock list
+        val ofJs: value: obj -> Value
+        val ofJson: jsonText: string -> Value
         val fileEffects: rewritten: string list -> created: string list -> DataBlock list

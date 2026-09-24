@@ -67,27 +67,12 @@ module AssumeTool =
         | Ok results ->
             Error(sprintf "assume update must produce exactly one JSON value; got %d; canvas unchanged" results.Length)
 
-    /// Host delivery state, never a TodoItem business field: it says whether the
-    /// UI projection landed, not whether the work is done.
-    [<RequireQualifiedAccess>]
-    module TodoSync =
-        let Applied = "applied"
-        let Pending = "pending"
-
     /// The rendering the model reads back: the full committed canvas, once, through
     /// the one LlmFacing writer.
-    ///
-    /// `canvas_json` always carries the lossless payload. TOML cannot express a root
-    /// `null`, a key holding `null`, or an object inside a mixed array, so the
-    /// readable hierarchical form is not an option that preserves every canvas the
-    /// model is allowed to write. Choosing the guaranteed-lossless form keeps the
-    /// canvas the model reads identical to the canvas it committed.
-    let private renderCanvas (todoSync: string) (canvasJson: string) : string =
+    let private renderCanvas (canvasJson: string) : string =
+        let value = LlmFacing.Data.ofJson canvasJson
         LlmFacing.instructions []
-        |> LlmFacing.withData
-            [ LlmFacing.Data.stringField "todo_sync" todoSync
-              LlmFacing.Data.stringField "canvas_encoding" "json"
-              LlmFacing.Data.stringField "canvas_json" canvasJson ]
+        |> LlmFacing.withData (LlmFacing.Data.rootStructuredValue value)
         |> LlmFacing.render
 
     let private jsonString (text: string) : string =
@@ -151,7 +136,7 @@ module AssumeTool =
         // A replay answers with the frozen first result, not a second rendering: the
         // bytes the model already saw are the ones it will see again.
         | CommitOutcome.Committed _
-        | CommitOutcome.Replayed _ -> renderCanvas TodoSync.Applied canvasJson
+        | CommitOutcome.Replayed _ -> renderCanvas canvasJson
 
     /// Run `update`, commit the resulting canvas, and render what the model reads.
     ///

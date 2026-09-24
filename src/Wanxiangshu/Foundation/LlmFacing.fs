@@ -65,6 +65,8 @@ module LlmFacing =
     [<RequireQualifiedAccess>]
     module Data =
 
+        open Fable.Core
+
         let private block text = DataBlock text
 
         /// JSON-compatible reference-data tree. This is the public semantic
@@ -77,6 +79,62 @@ module LlmFacing =
             | String of string
             | Array of Value list
             | Object of (string * Value) list
+
+        [<Emit("$0 === null")>]
+        let private jsNull (value: obj) : bool = jsNative
+
+        [<Emit("typeof $0")>]
+        let private jsType (value: obj) : string = jsNative
+
+        [<Emit("Array.isArray($0)")>]
+        let private jsIsArray (value: obj) : bool = jsNative
+
+        [<Emit("Number.isInteger($0)")>]
+        let private jsIsInteger (value: obj) : bool = jsNative
+
+        [<Emit("Number.isFinite($0)")>]
+        let private jsIsFinite (value: obj) : bool = jsNative
+
+        [<Emit("Object.keys($0)")>]
+        let private jsKeys (value: obj) : string array = jsNative
+
+        [<Emit("$0[$1]")>]
+        let private jsGet (target: obj) (key: obj) : obj = jsNative
+
+        [<Emit("$0.length")>]
+        let private jsLength (target: obj) : int = jsNative
+
+        let private maxSafeInteger = 9007199254740991.0
+
+        let private ofJsNumber (value: obj) : Value =
+            let num: float = unbox value
+            if jsIsInteger value && abs num <= maxSafeInteger then
+                Value.Integer(int64 num)
+            else
+                Value.Float num
+
+        let rec ofJs (value: obj) : Value =
+            if jsNull value then
+                Value.Null
+            elif jsType value = "boolean" then
+                Value.Bool(unbox value)
+            elif jsType value = "string" then
+                Value.String(unbox value)
+            elif jsType value = "number" then
+                ofJsNumber value
+            elif jsIsArray value then
+                Value.Array [ for i in 0 .. jsLength value - 1 -> ofJs (jsGet value i) ]
+            elif jsType value = "object" then
+                let keys = jsKeys value
+                Value.Object [ for k in keys -> k, ofJs (jsGet value k) ]
+            else
+                Value.Null
+
+        let ofJson (jsonText: string) : Value =
+            try
+                ofJs (JS.JSON.parse jsonText)
+            with _ ->
+                Value.Null
 
         let rec private isPrimitiveTree =
             function
@@ -205,6 +263,80 @@ module LlmFacing =
             | Value.Array items -> [ SyntheticToml.field "data" (renderInline (Value.Array items)) |> block ]
             | Value.Object fields -> encodeObject [ "data" ] fields
 
+        let rec private rootBlocks value =
+            let rec encodeObject path fields =
+                let present =
+                    fields
+                    |> List.choose (fun (name, item) ->
+                        match item with
+                        | Value.Null -> None
+                        | _ -> Some(name, item))
+
+                let localFields, nested =
+                    present
+                    |> List.fold
+                        (fun (local, nested) (name, item) ->
+                            match item with
+                            | Value.Object row -> local, nested @ encodeObject (path @ [ name ]) row
+                            | Value.Array items when
+                                not (List.isEmpty items)
+                                && List.forall
+                                    (function
+                                    | Value.Object _ -> true
+                                    | _ -> false)
+                                    items
+                                ->
+                                let rows =
+                                    items
+                                    |> List.collect (function
+                                        | Value.Object row -> encodeObjectRow (path @ [ name ]) row
+                                        | _ -> [])
+
+                                local, nested @ rows
+                            | Value.Null -> local, nested
+                            | _ ->
+                                local
+                                @ [ SyntheticToml.field (SyntheticToml.renderKey name) (renderInline item) ],
+                                nested)
+                        ([], [])
+
+                let self =
+                    match path, localFields with
+                    | [], [] -> []
+                    | [], fields -> fields |> List.map block
+                    | p, fields -> [ SyntheticToml.tableEntry (formatPath p) fields |> block ]
+
+                self @ nested
+
+            and encodeObjectRow path fields =
+                let present =
+                    fields
+                    |> List.choose (fun (name, item) ->
+                        match item with
+                        | Value.Null -> None
+                        | _ -> Some(name, item))
+
+                let localFields, nested =
+                    present
+                    |> List.fold
+                        (fun (local, nested) (name, item) ->
+                            match item with
+                            | Value.Object row -> local, nested @ encodeObject (path @ [ name ]) row
+                            | Value.Null -> local, nested
+                            | _ ->
+                                local
+                                @ [ SyntheticToml.field (SyntheticToml.renderKey name) (renderInline item) ],
+                                nested)
+                        ([], [])
+
+                (SyntheticToml.tableArrayEntry (formatPath path) localFields |> block) :: nested
+
+            match value with
+            | Value.Null -> []
+            | Value.Object fields -> encodeObject [] fields
+            | Value.Array [] -> []
+            | other -> structuredBlocks other
+
         let stringField name value =
             SyntheticToml.field name (SyntheticToml.renderString value) |> block
 
@@ -258,6 +390,8 @@ module LlmFacing =
             |> block
 
         let structuredValue (value: Value) = structuredBlocks value
+
+        let rootStructuredValue (value: Value) = rootBlocks value
 
         let fileEffects rewritten created =
             SyntheticToml.encodeFs rewritten created |> List.map block

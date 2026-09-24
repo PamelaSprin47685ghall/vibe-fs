@@ -80,7 +80,7 @@ npm install wanxiangshu --registry <your-private-registry>
 
 | 变量 | 作用 |
 |------|------|
-| `WANXIANGSHU_SKIP_AUTO_INJECTED=1` | 跳过 HOST-013 新的 `auto-injected` 伪工具注入；已落盘历史 pair 仍会 replay（`provider=cursor` 时同样跳过新注入） |
+| `WANXIANGSHU_SKIP_AUTO_INJECTED=1` | 跳过 HOST-013 新的 `auto-injected` 伪工具注入；已落盘历史 pair 仍会 replay |
 | `WANXIANGSHU_PROCESS_HARD_LIMIT_SECS` | executor 单进程硬超时上限（秒） |
 | `WANXIANGSHU_NO_FATAL_EXIT=1` | 诊断路径禁止 `process.exit`（测试用） |
 | `WANXIANGSHU_PROVIDER_LANGUAGE` | provider 语言偏好显式设置（`en` / `zh-CN`），位于全局语言阶梯最高优先级 |
@@ -109,14 +109,14 @@ Blogger、Bookkeeper、Predictor 等内部角色由编排路径调用，不作�
 
 ### 智能体角色
 
-核心活跃角色与 `requirements/office-capability`、`requirements/capability-enforcement` 一致。工具面由 `Roles.permissions` 定义：
+核心活跃角色与 `requirements/office-capability`、`requirements/capability-enforcement` 一致。工具面由 `OfficeCapability.permissions` 定义（`src/Wanxiangshu/Foundation/OfficeCapability.fs`；`Roles.fs` 只承载 Role 词汇）：
 
 | 角色 | 典型工具面 | 说明 |
 |------|------------|------|
 | Orchestrator | `commission`, `join`, `horizon`, `sphinx` | 顶层战役战略统筹与独立道路委任 |
 | Manager | `fork`, `resume`, `join`, `horizon`, `review`, `suicide`, `sphinx` | 独立评估、任务分解与推进未尽账本；通过 fork 派发 Engineer，通过 resume 续做固定 DevOps（无 Fission） |
-| Engineer | `read`, `write`, `edit`, `glob`, `grep`, `mv`, `rm`, `fetch`, `fission`, `sphinx` | 本地事实调查与源码读写实现（不执行真实命令，不差遣 DevOps）；独占 Fission 权能 |
-| DevOps | `read`, `write`, `edit`, `glob`, `grep`, `mv`, `rm`, `run`, `open-terminal`, `send-terminal`, `read-terminal`, `signal-terminal`, `join`, `horizon`, `sphinx` | 真实命令执行、终端与进程管理；具备角色固有的非架构级自修授权（无 Fission） |
+| Engineer | `read`, `write`, `edit`, `glob`, `grep`, `mv`, `rm`, `fetch`, `js-engineer`, `bash-honeypot`, `fission`, `sphinx` | 本地事实调查与源码读写实现（不执行真实命令，不差遣 DevOps）；独占 Fission 权能 |
+| DevOps | `read`, `write`, `edit`, `glob`, `grep`, `mv`, `rm`, `js-devops`, `run`, `open-terminal`, `send-terminal`, `read-terminal`, `signal-terminal`, `join`, `horizon` | 真实命令执行、终端与进程管理；具备角色固有的非架构级自修授权（无 Fission） |
 | Blogger | `chronicle` | Companion 叶子，记录工作历史与认知上下文 |
 
 Bookkeeper 是内部叶子角色（有独立 Role Law，不进 public Role DU）。每个 managed work session 配套叶子 Companion（Blogger）。精确权限见 `requirements/participant-identity` 与 `requirements/capability-enforcement`。
@@ -148,6 +148,7 @@ src/           生产源码
 resources/     随包运行时资源
 requirements/  56 包 normative 语义树：每包必备 WHY.md、WHAT.md 与 tests/
 proposals/     deferred 未来材料（用户管理）
+万象体系/     投资人材料（DOC.html、PPT.html）
 scripts/       构建与少量仓库检查
 docs/          项目文档与在线阅览（docs/index.html）
 dist/          最终编译输出，不提交
@@ -239,10 +240,10 @@ resources/wanxiangshu.mjs
 
 ### 构建与打包
 
-- **构建**：`scripts/build.mjs`（清空 `dist/` → Fable → 校验入口与资源）。不把 `resources/` 复制进 `dist/`。
+- **构建**：`scripts/build.mjs`（增量：按输入摘要判定 no-op / focused / clean 三模式；拓扑变化或显式 `--clean` 时清空 `dist/` 后 Fable 全量重建，其余情况增量编译；随后校验入口与资源）。不把 `resources/` 复制进 `dist/`。
 - **打包**：仓库根 `npm pack`（或 `--pack-destination artifacts/package`）。tarball = `dist/` + `resources/` + metadata（`package.json`、`README.md`、`LICENSE`）。不得含 `src/`、`requirements/`、`scripts/`、`artifacts/`。
 
-发布预检：`npm run verify:release`（干净工作树；验证日志进 CI artifact）。
+发布预检：`npm run verify:release`（干净工作树；验证日志默认写 `.fable-build/verify-logs/`，已被 .gitignore 忽略；CI 工作流 `.github/workflows/ci.yml` 运行同一命令，但无 artifact 上传，runner 结束后只剩余作业控制台输出）。
 
 ### 提交要求
 
@@ -260,7 +261,7 @@ npm run verify:release
 npm pack --pack-destination artifacts/package
 ```
 
-Git 工作树须干净。验证输出放 CI artifact 或发布附件，不提交进仓库。
+Git 工作树须干净。验证输出留存本地 `.fable-build/verify-logs/` 或作为发布附件，不提交进仓库。
 
 ### 安全与保密
 

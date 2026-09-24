@@ -735,8 +735,9 @@
                             </table>
                         </div>
                         <div>
-                            <span class="indicator-tag derivation">设计</span><strong>职责被拆成四条边界：</strong>
+                            <span class="indicator-tag derivation">设计</span><strong>职责被拆成几条清晰边界：</strong>
                             <div class="stack-list">
+                                <div class="stack-row"><div class="k">顶层统筹（Orchestrator）</div><div class="v">为各条独立道路委任或接续 Manager，<span style="color:var(--accent-red);">不直接进入工程细节</span></div></div>
                                 <div class="stack-row"><div class="k">工程师（Engineer）</div><div class="v">理解问题与修改代码，<span style="color:var(--accent-red);">不负责真实命令执行</span></div></div>
                                 <div class="stack-row"><div class="k">项目负责人（Manager）</div><div class="v">分解、委托、验收、推进，<span style="color:var(--accent-red);">不进入代码细节</span></div></div>
                                 <div class="stack-row"><div class="k">运维员（DevOps）</div><div class="v">真实机器上的运行、进程与测试结果，<span style="color:var(--accent-red);">不被并行改写</span></div></div>
@@ -771,6 +772,7 @@
                             <div class="stack-list">
                                 <div class="stack-row"><div class="k">调查与实现</div><div class="v">大量展开，彼此隔离</div></div>
                                 <div class="stack-row"><div class="k">真实执行</div><div class="v">同一条主线上只有一个操作员</div></div>
+                                <div class="stack-row"><div class="k">就地自修</div><div class="v">架构以下的缺陷与失败可就地修复并重跑</div></div>
                                 <div class="stack-row"><div class="k">底层会话可变</div><div class="v">不能凭空变出第二个同时有效的操作员</div></div>
                                 <div class="stack-row"><div class="k">用户关心的两件事</div><div class="v">出事能查清原因；验证知道验证的是哪份代码</div></div>
                             </div>
@@ -820,7 +822,7 @@
                             <span class="indicator-tag derivation">设计</span><strong>分派：并发不是一开始规划出来的</strong>
                             <ul class="list" style="margin-top:0.8rem;">
                                 <li>最外层只看到一个普通需求，读进代码才发现六个问题可同时推进。</li>
-                                <li>让最接近问题的人在现场把工作裂成并行路线。</li>
+                                <li>让最接近问题的人在现场把工作裂变（Fission）成并行路线。</li>
                                 <li>路径仍属于同一个工程责任，不多出推诿主体。</li>
                             </ul>
                         </div>
@@ -903,6 +905,7 @@
                     <p class="quote" style="font-size:1.1rem; margin-top:1.2rem;">
                         深度推理不应按“想了多久”计价，而应按<span class="highlight">新增了多少有用认识</span>计价。再调一次只会重说已有内容，那就是用户不该支付的成本。
                     </p>
+                    <p style="margin-top:0.8rem; font-size:0.9rem; line-height:1.5;"><span class="indicator-tag derivation">设计</span> 这副骨架在系统里的落地是 <span class="highlight-blue">Sphinx</span>：一个完全由程序控制的探究工作流，用唯一 <code>sphinx</code> 入口承接问题，把发现、证据、假设、依赖与待解决请求作为认知基底，由程序判断探究到哪一步该停。</p>
                 </div>
             </section>
 
