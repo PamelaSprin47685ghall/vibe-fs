@@ -574,18 +574,21 @@ module HostSignalBootstrap =
             let continueManagedChatMessage intent output =
                 match intent with
                 | ChatAdmissionIntent.Decision.ExternalRootIntent evidence ->
-                    scope.Sessions.ModelRoutingSessions.Add(SessionId.value evidence.Key.SessionId)
-                    |> ignore
+                    let sid = SessionId.value evidence.Key.SessionId
+                    let pid = PhysicalUserMessageId.value evidence.Key.PhysicalUserMessageId
 
-                    bindUserMessage
-                        (SessionId.value evidence.Key.SessionId)
-                        (PhysicalUserMessageId.value evidence.Key.PhysicalUserMessageId)
+                    scope.Sessions.ModelRoutingSessions.Add sid |> ignore
+                    bindUserMessage sid pid
+                    registerOwned sid
+                    ModelRouting.releasePhysicalExecution evidence.Key.SessionId evidence.Key.PhysicalUserMessageId |> ignore
                 | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence ->
                     let sessionId = SessionId.value evidence.Key.SessionId
                     let physicalId = PhysicalUserMessageId.value evidence.Key.PhysicalUserMessageId
 
                     scope.Sessions.ModelRoutingSessions.Add sessionId |> ignore
                     bindHumanContinuationMessage sessionId physicalId
+                    registerOwned sessionId
+                    ModelRouting.releasePhysicalExecution evidence.Key.SessionId evidence.Key.PhysicalUserMessageId |> ignore
                     registerOwned sessionId
                 | ChatAdmissionIntent.Decision.PendingPromptIntent evidence ->
                     let sessionId = SessionId.value evidence.Key.SessionId

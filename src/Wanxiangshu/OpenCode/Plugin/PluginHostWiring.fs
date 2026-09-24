@@ -208,16 +208,26 @@ module PluginHostWiring =
                 }
 
             let isLifecycleTerminated (sessionId: SessionId) =
-                match boot.Journal with
-                | None -> false
-                | Some durable ->
-                    let snapshot = AgentJournal.snapshot durable
+                let sessionOpt =
+                    boot.Journal
+                    |> Option.bind (fun durable ->
+                        let snapshot = AgentJournal.snapshot durable
+                        AgentProjection.tryFind sessionId snapshot.AgentProjections)
 
-                    AgentProjection.tryFind sessionId snapshot.AgentProjections
-                    |> Option.bind (fun (s: SessionAgentProjection) -> s.Relay)
-                    |> Option.bind (fun (r: RelayState) -> Fold.view r (RoadId.create (SessionId.value sessionId)))
+                let hasActiveRun =
+                    sessionOpt
+                    |> Option.bind (fun s -> s.PromptAuthority)
+                    |> Option.bind (fun pa -> pa.ActiveLogicalRun)
+                    |> Option.isSome
+
+                let hasRetirement =
+                    sessionOpt
+                    |> Option.bind (fun s -> s.Relay)
+                    |> Option.bind (fun r -> Fold.view r (RoadId.create (SessionId.value sessionId)))
                     |> Option.bind (fun road -> road.LatestRetirement)
                     |> Option.isSome
+
+                not hasActiveRun && hasRetirement
 
             match PluginHost.createHost input boot.PortOpt (Some boot.FamilyParent) (Some isLifecycleTerminated) with
             | Error err -> return raise (InvalidOperationException err)

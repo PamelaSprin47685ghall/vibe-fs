@@ -18,6 +18,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-projection.opencode-codec-providerwiredecode.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
         <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-projection-queries.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.durable-journal-port-adapter.fsproj"/>
 <Compile Include="Mission/Relay/OpenCode/NarrativeTransform.fsi"/>
     <Compile Include="Mission/Relay/OpenCode/NarrativeTransform.fs"/>
   </ItemGroup>

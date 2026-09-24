@@ -183,9 +183,18 @@ module RelayNarrativeTransform =
         |> Option.map (fun _ -> RelayProjectionDisposition.CurrentIteration)
         |> Option.defaultValue RelayProjectionDisposition.Unchanged
 
+    let private hasActiveLogicalRun (journal: AgentJournal) (sessionId: SessionId) =
+        let projections = (AgentJournal.snapshot journal).AgentProjections
+
+        AgentProjection.tryFind sessionId projections
+        |> Option.bind (fun s -> s.PromptAuthority)
+        |> Option.bind (fun pa -> pa.ActiveLogicalRun)
+        |> Option.isSome
+
     let private isUnadmittedContinuation journal sessionId (road: RoadView) (retirement: RetirementSummary) =
-        road.ActiveIncumbency.IsNone
-        || not (managerLoopGateAdmitted journal sessionId retirement)
+        not (hasActiveLogicalRun journal sessionId)
+        && (road.ActiveIncumbency.IsNone
+            || not (managerLoopGateAdmitted journal sessionId retirement))
 
     let private staleRetirement journal sessionId (road: RoadView) =
         road.LatestRetirement
