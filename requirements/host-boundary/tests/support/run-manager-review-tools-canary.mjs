@@ -40,7 +40,7 @@ try {
   // Use fixture version if binary not executable during static verification
 }
 
-const REVIEW_TOOLS = ['read-manager', 'grep-manager', 'glob-manager', 'js-manager'];
+const REVIEW_TOOLS = ['js-manager'];
 const CONTROL_TOOLS = ['read', 'grep', 'glob', 'js-engineer', 'js-devops'];
 const CONTRACT_TOKEN = 'do-not-use-except-for-review';
 
@@ -138,11 +138,7 @@ const isManagerRequest = (request, body) => {
     .filter((n) => typeof n === 'string');
 
   // Review tools are strictly exclusive to Role.Manager
-  const hasManagerReviewTools =
-    toolNames.includes('read-manager') ||
-    toolNames.includes('grep-manager') ||
-    toolNames.includes('glob-manager') ||
-    toolNames.includes('js-manager');
+  const hasManagerReviewTools = toolNames.includes('js-manager');
 
   if (!hasManagerReviewTools) {
     return false;
@@ -189,11 +185,11 @@ const provider = await startHttpServer(async (request, response) => {
     // 3. Target Manager session requests: step exclusively for manager lane
     managerStep += 1;
 
-    // Manager Step 1: Initial prompt -> issue read-manager tool call (with contract)
+    // Manager Step 1: Initial prompt -> issue js-manager tool call (with contract)
     if (managerStep === 1) {
       if (Array.isArray(body.tools)) {
         const readManagerTool = body.tools.find(
-          (t) => (t?.function?.name ?? t?.name) === 'read-manager',
+          (t) => (t?.function?.name ?? t?.name) === 'js-manager',
         );
         const contractProp = readManagerTool?.function?.parameters?.properties?.contract;
         const required = readManagerTool?.function?.parameters?.required ?? [];
@@ -203,9 +199,9 @@ const provider = await startHttpServer(async (request, response) => {
       }
 
       const call = {
-        name: 'read-manager',
+        name: 'js-manager',
         argsStr: JSON.stringify({
-          filePath: 'fixture-sample.txt',
+          program: "class Js extends JsProgram { async run() { const f = await this.file('fixture-sample.txt'); return f.text('^', '$'); } }",
           contract: CONTRACT_TOKEN,
         }),
       };
@@ -213,7 +209,7 @@ const provider = await startHttpServer(async (request, response) => {
       return;
     }
 
-    // Manager Step 2: Follow-up after read-manager normal execution
+    // Manager Step 2: Follow-up after js-manager normal execution
     if (managerStep === 2) {
       sendSSE(response, buildTextChunks('resp_read_norm_done', 'CANARY_READ_DONE', 15));
       return;
@@ -244,12 +240,12 @@ const provider = await startHttpServer(async (request, response) => {
       return;
     }
 
-    // Manager Step 4: Error path prompt -> issue read-manager with nonexistent file
+    // Manager Step 4: Error path prompt -> issue js-manager with nonexistent file
     if (managerStep === 4) {
       const call = {
-        name: 'read-manager',
+        name: 'js-manager',
         argsStr: JSON.stringify({
-          filePath: 'nonexistent-missing-file.txt',
+          program: "class Js extends JsProgram { async run() { const f = await this.file('nonexistent-missing-file.txt'); return f.text('^', '$'); } }",
           contract: CONTRACT_TOKEN,
         }),
       };
@@ -316,7 +312,7 @@ const scenarioDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wanxiangshu-manager-r
 const workspace = path.join(scenarioDir, 'workspace');
 fs.mkdirSync(workspace, { recursive: true });
 
-// Create test fixture file for read-manager
+// Create test fixture file for js-manager
 fs.writeFileSync(
   path.join(workspace, 'fixture-sample.txt'),
   'Hello Wanxiangshu Manager Review Tools Canary\nLine 2: sample text\n',
@@ -350,7 +346,7 @@ try {
   sessionID = sessionIdOf(sessionRes);
   assert.ok(sessionID, 'session creation failed to return sessionID');
 
-  // 1. Normal read-manager prompt
+  // 1. Normal js-manager prompt
   const msg1 = 'msg_canary_prompt_1';
   await request(host.baseUrl, 'POST', `/session/${sessionID}/prompt_async`, prompt(msg1, 'READ_SAMPLE'), 204);
 
@@ -461,7 +457,7 @@ try {
     versions: { opencode: opencodeVersion, plugin: pluginVersion },
     supportedVersionRange: fixture.supportedVersionRange,
     contractToken: CONTRACT_TOKEN,
-    fourTools: REVIEW_TOOLS.slice().sort(),
+    reviewTools: REVIEW_TOOLS.slice().sort(),
     controlTools: CONTROL_TOOLS.slice().sort(),
     wireInspection,
     hookIdentityChain: {

@@ -260,9 +260,6 @@ module ToolRegistry =
                       (fun (sessionId, reason) -> runtime.TerminateSession(sessionId, reason))
                       bloggerHost
 
-              yield ManagerReadTools.readManagerSpec factory runtime groundingObservation
-              yield ManagerReadTools.globManagerSpec factory runtime groundingObservation
-              yield ManagerReadTools.grepManagerSpec factory runtime groundingObservation
               yield! casebookToolSpecs
               yield! generatedJsSpecs () ]
 

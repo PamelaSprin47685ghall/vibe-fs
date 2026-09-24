@@ -28,7 +28,7 @@ Engineer 的调查不包含任何真实命令执行，即使命令只读；只�
 
 ## [007] Manager 无普通工具：原生读查与写入拒绝；评审专用只读工具限未接纳评审
 
-Manager 的核心权能是统筹、委托、评估与集成；原生 read/grep/glob 与一切写入/终端对 Manager 始终拒绝；评审接纳前仅可使用四个评审专用只读工具（read-manager、grep-manager、glob-manager、js-manager），接纳后这些工具同样拒绝；禁止 Fission；不提供评审专用只读工具的副本语义。
+Manager 的核心权能是统筹、委托、评估与集成；原生 read/grep/glob 与一切写入/终端对 Manager 始终拒绝；评审接纳前仅可使用评审专用只读工具 js-manager，接纳后该工具同样拒绝；禁止 Fission；不提供评审专用只读工具的副本语义。
 
 resume 的同道路续做语义归 delegation-003、delegation-024 所有。「DevOps 只能通过 resume 调用」不等于「resume 只能用于 DevOps」；续做不能改变已有角色、已绑定配置或控制权，也不能创建替代 DevOps。
 

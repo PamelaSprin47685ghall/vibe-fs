@@ -128,9 +128,6 @@ const ROLE_ALLOW = {
     'suicide',
     'review',
     'sphinx',
-    'read-manager',
-    'grep-manager',
-    'glob-manager',
     'js-manager',
   ],
   Orchestrator: ['commission', 'join', 'horizon', 'sphinx'],
@@ -202,9 +199,6 @@ test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_
   // 引自 ManagerReviewTools (dist/OpenCode/Tools/ManagerReviewTools.js) 权威目录：
   // 评审专用别名工具经 requiredPermissions 映射为领域权限（单一语义所有者仍是 ManagerReviewTools）
   const REVIEW_TOOL_PERMISSIONS = {
-    'read-manager': ['Read'],
-    'grep-manager': ['Grep'],
-    'glob-manager': ['Glob'],
     'js-manager': ['Read', 'Glob', 'Grep'],
   }
 

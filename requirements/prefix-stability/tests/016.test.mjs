@@ -13,7 +13,7 @@ import { installDefaultResources } from '../../../dist/OpenCode/Host/ManagedAgen
 
 installDefaultResources()
 
-const FOUR_DEDICATED_TOOLS = ['read-manager', 'glob-manager', 'grep-manager', 'js-manager']
+const REVIEW_TOOLS = ['js-manager']
 const CONTRACT_TOKEN = 'do-not-use-except-for-review'
 
 const createRawManagerTools = () => [
@@ -70,44 +70,6 @@ const createRawManagerTools = () => [
     name: 'review',
     description: 'Submit an independent 8-dimension review of workspace and artifacts.',
     parameters: JSON.parse(assessment.schemaJson),
-  },
-  {
-    name: 'read-manager',
-    description: 'Read file content from the filesystem during manager review.',
-    parameters: {
-      type: 'object',
-      properties: {
-        filePath: { type: 'string', description: 'The path to the file to read' },
-        offset: { type: 'integer', description: 'The line number to start reading from (1-indexed)' },
-        limit: { type: 'integer', description: 'The maximum number of lines to read' },
-      },
-      required: ['filePath'],
-    },
-  },
-  {
-    name: 'glob-manager',
-    description: 'Enumerate files matching a glob pattern during manager review.',
-    parameters: {
-      type: 'object',
-      properties: {
-        pattern: { type: 'string', description: 'The glob pattern to match files against' },
-        path: { type: 'string', description: 'The directory to search in (optional)' },
-      },
-      required: ['pattern'],
-    },
-  },
-  {
-    name: 'grep-manager',
-    description: 'Search file contents for regex or literal matches during manager review.',
-    parameters: {
-      type: 'object',
-      properties: {
-        pattern: { type: 'string', description: 'The regex or literal pattern to search for' },
-        path: { type: 'string', description: 'The directory to search in (optional)' },
-        include: { type: 'string', description: 'File pattern to include' },
-      },
-      required: ['pattern'],
-    },
   },
   {
     name: 'js-manager',
@@ -208,7 +170,7 @@ test('WHAT[prefix-stability-001] manager_life_review_acceptance_provider_wire_is
   }
 
   // Four dedicated review tools must have the exact contract schema decoration
-  for (const reviewToolName of FOUR_DEDICATED_TOOLS) {
+  for (const reviewToolName of REVIEW_TOOLS) {
     const tool = toolsBefore.find((t) => t.name === reviewToolName)
     assert.ok(tool, `review tool '${reviewToolName}' must exist in Manager tools`)
     assert.ok(
@@ -372,10 +334,10 @@ test('WHAT[prefix-stability-001] manager_life_review_acceptance_provider_wire_is
 
   // D. Contract Schema Immutability: changing contract decoration breaks canonical equality
   const alteredContractTools = buildDecoratedManagerTools()
-  const readTool = alteredContractTools.find((t) => t.name === 'read-manager')
+  const readTool = alteredContractTools.find((t) => t.name === 'js-manager')
   readTool.parameters.properties.contract.enum = ['altered-contract-enum']
   assert.notEqual(
-    canonicalJson.canonicalJson(toolsBefore.find((t) => t.name === 'read-manager')),
+    canonicalJson.canonicalJson(toolsBefore.find((t) => t.name === 'js-manager')),
     canonicalJson.canonicalJson(readTool),
     'WHAT[prefix-stability-001]: altering contract decoration enum must change canonical JSON',
   )

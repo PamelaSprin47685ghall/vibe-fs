@@ -7,11 +7,8 @@
   },
   "observedResult": "supported",
   "contractToken": "do-not-use-except-for-review",
-  "fourTools": [
-    "glob-manager",
-    "grep-manager",
-    "js-manager",
-    "read-manager"
+  "reviewTools": [
+    "js-manager"
   ],
   "controlTools": [
     "glob",

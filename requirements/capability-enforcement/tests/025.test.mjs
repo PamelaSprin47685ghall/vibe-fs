@@ -18,7 +18,8 @@ import {
 } from '../../verification-system/tests/support/plugin-fixture.mjs'
 import { requiredPermissions } from '../../../dist/OpenCode/Tools/ManagerReviewTools.js'
 
-const MANAGER_DEDICATED_TOOLS = ['read-manager', 'glob-manager', 'grep-manager']
+const MANAGER_REVIEW_TOOL = 'js-manager'
+const RETIRED_REVIEW_TOOLS = ['read-manager', 'glob-manager', 'grep-manager']
 
 test('WHAT[capability-enforcement-025] P01_unaccepted_review_manager_static_permissions_include_read_glob_grep', () => {
   const perms = office.permissions('manager')
@@ -52,33 +53,43 @@ test('WHAT[capability-enforcement-025] P08_manager_native_read_glob_grep_project
   assert.equal(managerPerms.grep, 'deny', 'Native grep must be projected as deny for Manager')
 })
 
-test('WHAT[capability-enforcement-025] P09_manager_denies_programming_tools_and_engineers_deny_manager_dedicated_tools', () => {
+test('WHAT[capability-enforcement-025] P09_manager_allows_sole_review_tool_and_retired_tools_not_admitted_to_any_role', () => {
   const managerPerms = permissionObj(Role.Manager)
   assert.equal(managerPerms['js-engineer'], 'deny', 'Manager must deny js-engineer')
   assert.equal(managerPerms['js-devops'], 'deny', 'Manager must deny js-devops')
   assert.equal(rolePredicate('js-engineer', 'manager'), false, 'Role predicate must deny js-engineer for Manager')
   assert.equal(rolePredicate('js-devops', 'manager'), false, 'Role predicate must deny js-devops for Manager')
+  assert.equal(managerPerms[MANAGER_REVIEW_TOOL], 'allow', 'Manager must allow the sole review tool js-manager')
 
-  for (const tool of MANAGER_DEDICATED_TOOLS) {
-    assert.equal(rolePredicate(tool, 'engineer'), false, `Engineer must deny dedicated tool ${tool}`)
-    assert.equal(rolePredicate(tool, 'devops'), false, `DevOps must deny dedicated tool ${tool}`)
+  for (const tool of RETIRED_REVIEW_TOOLS) {
+    for (const role of ['manager', 'engineer', 'devops']) {
+      assert.equal(rolePredicate(tool, role), false, `Retired tool ${tool} must not be admitted to ${role}`)
+    }
   }
 })
 
-test('WHAT[capability-enforcement-025] P10_three_dedicated_tools_projected_as_allow_in_manager_request', () => {
+test('WHAT[capability-enforcement-025] P10_sole_review_tool_allowed_and_retired_tools_absent_from_manager_surface', () => {
   const managerPerms = permissionObj(Role.Manager)
-  for (const tool of MANAGER_DEDICATED_TOOLS) {
-    assert.equal(managerPerms[tool], 'allow', `Manager request projection must allow dedicated tool ${tool}`)
+  assert.equal(managerPerms[MANAGER_REVIEW_TOOL], 'allow', 'Manager request projection must allow the sole review tool js-manager')
+  for (const tool of RETIRED_REVIEW_TOOLS) {
+    assert.equal(tool in managerPerms, false, `Retired tool ${tool} must no longer appear in the Manager tool surface`)
   }
 })
 
 test('WHAT[capability-enforcement-025] P05_no_active_incumbency_and_no_assessment_denies_review_readonly_admission', () => {
-  for (const tool of MANAGER_DEDICATED_TOOLS) {
+  // 无 active incumbency：当前事实收口为空集，js-manager 依赖的只读能力全部 fail closed
+  const noIncumbency = new ManagerCapabilityFacts(false, false, false, undefined)
+  for (const permission of [ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep]) {
     assert.equal(
-      rolePredicate(tool, 'manager'),
+      isAllowedForManagerFacts(noIncumbency, permission),
       false,
-      `Without active incumbency and assessment, admission for ${tool} must fail closed`,
+      `Without active incumbency, review-readonly permission ${permission} must fail closed`,
     )
+  }
+
+  // retired 工具在角色层即不被识别，任何角色都 fail closed
+  for (const tool of RETIRED_REVIEW_TOOLS) {
+    assert.equal(rolePredicate(tool, 'manager'), false, `Retired tool ${tool} must fail closed at the role layer`)
   }
 })
 
@@ -86,9 +97,9 @@ test('WHAT[capability-enforcement-025] P06_unknown_identity_never_authorized_by_
   const unknownCallers = ['unknown', 'guest', 'coder', 'inspector', '']
   for (const caller of unknownCallers) {
     assert.equal(rolePredicate('js-unknown', caller), false, `Unknown caller '${caller}' must not be admitted by js- suffix`)
-    assert.equal(rolePredicate('read-manager', caller), false, `Unknown caller '${caller}' must not be admitted to read-manager`)
-    assert.equal(rolePredicate('glob-manager', caller), false, `Unknown caller '${caller}' must not be admitted to glob-manager`)
-    assert.equal(rolePredicate('grep-manager', caller), false, `Unknown caller '${caller}' must not be admitted to grep-manager`)
+    for (const tool of [...RETIRED_REVIEW_TOOLS, MANAGER_REVIEW_TOOL]) {
+      assert.equal(rolePredicate(tool, caller), false, `Unknown caller '${caller}' must not be admitted to ${tool}`)
+    }
     assert.equal(rolePredicate('js-engineer', caller), false, `Unknown caller '${caller}' must not be admitted to js-engineer`)
   }
 })
@@ -108,22 +119,22 @@ test('WHAT[capability-enforcement-025] P03_unaccepted_or_malformed_review_retain
     // 评审未被接纳（返回 recorded = false 或拒绝提示）
     assert.match(String(reviewResult), /false|invalid|missing|有效评分|valid ratings/i)
 
-    // 评审未被接纳前，read-manager 专用只读工具仍准入，不得误封
+    // 评审未被接纳前，js-manager 专用只读工具仍准入，不得误封
     const beforeOutput = {
-      args: { path: 'src/Model.fs', contract: 'do-not-use-except-for-review' },
+      args: { program: "class Js extends JsProgram { async run() { const f = await this.file('src/Model.fs'); return f.text('^', '$'); } }", contract: 'do-not-use-except-for-review' },
     }
     await hooks['tool.execute.before'](
-      { tool: 'read-manager', sessionID, callID: 'call-p03' },
+      { tool: 'js-manager', sessionID, callID: 'call-p03' },
       beforeOutput,
     )
-    assert.equal('contract' in beforeOutput.args, false, 'read-manager must remain admitted and hide contract')
+    assert.equal('contract' in beforeOutput.args, false, 'js-manager must remain admitted and hide contract')
   })
 })
 
-test('WHAT[capability-enforcement-025] P07_valid_certificate_cleanup_blocker_or_retirement_freeze_denies_four_review_tools', () => {
-  const REVIEW_TOOLS = ['read-manager', 'glob-manager', 'grep-manager', 'js-manager']
+test('WHAT[capability-enforcement-025] P07_valid_certificate_cleanup_blocker_or_retirement_freeze_denies_review_tool', () => {
+  const REVIEW_TOOLS = ['js-manager']
 
-  // 1. 有效绑定证书状态（HasValidBoundCertificate = true）下：收窄为仅 Join/Finality，四专用只读工具必须全部拒绝
+  // 1. 有效绑定证书状态（HasValidBoundCertificate = true）下：收窄为仅 Join/Finality，评审专用只读工具必须拒绝
   const factsCert = new ManagerCapabilityFacts(true, false, true, undefined)
   for (const tool of REVIEW_TOOLS) {
     const perms = requiredPermissions(tool)
@@ -136,7 +147,7 @@ test('WHAT[capability-enforcement-025] P07_valid_certificate_cleanup_blocker_or_
     }
   }
 
-  // 2. 清理阻塞状态（CleanupBlockerDigest 有值）下：收窄为仅 Join/Finality，四专用只读工具必须全部拒绝
+  // 2. 清理阻塞状态（CleanupBlockerDigest 有值）下：收窄为仅 Join/Finality，评审专用只读工具必须拒绝
   const factsCleanup = new ManagerCapabilityFacts(true, false, false, 'blocker-digest-xyz')
   for (const tool of REVIEW_TOOLS) {
     const perms = requiredPermissions(tool)
@@ -149,7 +160,7 @@ test('WHAT[capability-enforcement-025] P07_valid_certificate_cleanup_blocker_or_
     }
   }
 
-  // 3. 退任冻结与非活跃状态：无活跃任期（HasActiveIncumbency = false）四专用工具全部收口拒绝
+  // 3. 退任冻结与非活跃状态：无活跃任期（HasActiveIncumbency = false）评审专用工具收口拒绝
   const factsFrozenOrInactive = new ManagerCapabilityFacts(false, false, false, undefined)
   for (const tool of REVIEW_TOOLS) {
     const perms = requiredPermissions(tool)
@@ -183,33 +194,33 @@ test('WHAT[capability-enforcement-025] P11_session_restart_and_compaction_evalua
     await stop(firstPlugin)
     const restartedPlugin = await start()
 
-    // 重启后验证已接纳评审的 session：read-manager 专用只读工具仍严格拒绝，不重置评审
+    // 重启后验证已接纳评审的 session：js-manager 专用只读工具仍严格拒绝，不重置评审
     const acceptedBeforeOutput = {
-      args: { path: 'src/Model.fs', contract: 'do-not-use-except-for-review' },
+      args: { program: "class Js extends JsProgram { async run() { const f = await this.file('src/Model.fs'); return f.text('^', '$'); } }", contract: 'do-not-use-except-for-review' },
     }
     await assert.rejects(
       async () => {
         await restartedPlugin['tool.execute.before'](
-          { tool: 'read-manager', sessionID: sessionAccepted, callID: 'call-p11-acc' },
+          { tool: 'js-manager', sessionID: sessionAccepted, callID: 'call-p11-acc' },
           acceptedBeforeOutput,
         )
       },
       /not permitted under current manager capability facts/i,
-      'read-manager must remain denied after restart when assessment was already accepted',
+      'js-manager must remain denied after restart when assessment was already accepted',
     )
 
-    // 重启后验证未接纳评审的 session：read-manager 专用只读工具仍准入，contract 正常被隐藏
+    // 重启后验证未接纳评审的 session：js-manager 专用只读工具仍准入，contract 正常被隐藏
     const unacceptedBeforeOutput = {
-      args: { path: 'src/Model.fs', contract: 'do-not-use-except-for-review' },
+      args: { program: "class Js extends JsProgram { async run() { const f = await this.file('src/Model.fs'); return f.text('^', '$'); } }", contract: 'do-not-use-except-for-review' },
     }
     await restartedPlugin['tool.execute.before'](
-      { tool: 'read-manager', sessionID: sessionUnaccepted, callID: 'call-p11-unacc' },
+      { tool: 'js-manager', sessionID: sessionUnaccepted, callID: 'call-p11-unacc' },
       unacceptedBeforeOutput,
     )
     assert.equal(
       'contract' in unacceptedBeforeOutput.args,
       false,
-      'read-manager must remain admitted after restart when assessment was not yet accepted',
+      'js-manager must remain admitted after restart when assessment was not yet accepted',
     )
 
     await stop(restartedPlugin)
@@ -246,14 +257,14 @@ test('WHAT[capability-enforcement-025] P13_review_accepted_after_before_hook_blo
 
     const beforeOutput = {
       args: {
-        path: 'src/App.fs',
+        program: "class Js extends JsProgram { async run() { const f = await this.file('src/App.fs'); return f.text('^', '$'); } }",
         contract: 'do-not-use-except-for-review',
       },
     }
 
     // Step 1: before hook 检查通过并放行，私有隐藏 contract
     await hooks['tool.execute.before'](
-      { tool: 'read-manager', sessionID, callID },
+      { tool: 'js-manager', sessionID, callID },
       beforeOutput,
     )
     assert.equal('contract' in beforeOutput.args, false, 'before hook must strip contract parameter')
@@ -262,7 +273,7 @@ test('WHAT[capability-enforcement-025] P13_review_accepted_after_before_hook_blo
     await injectAcceptedAssessment(runtime, sessionID)
 
     // Step 3: 工具进入运行时 ToolRegistry 执行门禁，门禁读取最新事实再次拒绝，确保零文件读取
-    const execResult = await hooks.tool['read-manager'].execute(
+    const execResult = await hooks.tool['js-manager'].execute(
       beforeOutput.args,
       { sessionID, agent: 'manager' },
     )
@@ -289,15 +300,15 @@ test('WHAT[capability-enforcement-025] P14_readonly_call_admitted_before_review_
     // Call 1 启动并在 Review 接纳前获得最终准入与执行
     const call1Output = {
       args: {
-        path: 'src/App.fs',
+        program: "class Js extends JsProgram { async run() { const f = await this.file('src/App.fs'); return f.text('^', '$'); } }",
         contract: 'do-not-use-except-for-review',
       },
     }
     await hooks['tool.execute.before'](
-      { tool: 'read-manager', sessionID, callID: call1ID },
+      { tool: 'js-manager', sessionID, callID: call1ID },
       call1Output,
     )
-    const call1ExecResult = await hooks.tool['read-manager'].execute(
+    const call1ExecResult = await hooks.tool['js-manager'].execute(
       call1Output.args,
       { sessionID, agent: 'manager' },
     )
@@ -312,8 +323,8 @@ test('WHAT[capability-enforcement-025] P14_readonly_call_admitted_before_review_
 
     // Call 1 照常完成 after 恢复
     await hooks['tool.execute.after'](
-      { tool: 'read-manager', sessionID, callID: call1ID, args: call1Output.args },
-      { title: 'read-manager', output: call1ExecResult, metadata: {} },
+      { tool: 'js-manager', sessionID, callID: call1ID, args: call1Output.args },
+      { title: 'js-manager', output: call1ExecResult, metadata: {} },
     )
     assert.equal(
       call1Output.args.contract,
@@ -324,14 +335,14 @@ test('WHAT[capability-enforcement-025] P14_readonly_call_admitted_before_review_
     // 后续新调用（Call 2）发起，在入口即被拒绝
     const call2Output = {
       args: {
-        path: 'src/App.fs',
+        program: "class Js extends JsProgram { async run() { const f = await this.file('src/App.fs'); return f.text('^', '$'); } }",
         contract: 'do-not-use-except-for-review',
       },
     }
     await assert.rejects(
       async () => {
         await hooks['tool.execute.before'](
-          { tool: 'read-manager', sessionID, callID: call2ID },
+          { tool: 'js-manager', sessionID, callID: call2ID },
           call2Output,
         )
       },

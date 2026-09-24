@@ -6,7 +6,7 @@
  *   - tool.execute.before
  *   - tool.execute.after
  *
- * Observes the 4 manager review tools (read-manager, grep-manager, glob-manager, js-manager)
+ * Observes the sole manager review tool (js-manager)
  * and control tools (read, grep, glob, js-engineer, js-devops), recording:
  *   - schema decoration with contract (type, enum, required)
  *   - before: args reference identity (===), 'contract' in args, business args preservation, private Symbol presence
@@ -35,7 +35,7 @@ const productionPluginPath =
   || process.env.WANXIANGSHU_E2E_MAGIC_TODO_HOST_CANARY_PLUGIN
   || (fs.existsSync(defaultProductionPluginPath) ? defaultProductionPluginPath : null);
 
-const REVIEW_TOOLS = Object.freeze(['read-manager', 'grep-manager', 'glob-manager', 'js-manager']);
+const REVIEW_TOOLS = Object.freeze(['js-manager']);
 const CONTROL_TOOLS = Object.freeze(['read', 'grep', 'glob', 'js-engineer', 'js-devops']);
 
 const emit = async (kind, value) => {
