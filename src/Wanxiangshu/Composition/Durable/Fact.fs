@@ -12,9 +12,9 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Enforcer.InstitutionalLearning
-open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Host
+open Wanxiangshu.Participant.Cognition
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 /// Durable routing vocabulary. Concrete fact families live with their semantic
@@ -45,8 +45,8 @@ module Fact =
         | Concern of ConcernFactCases
         | InstitutionalLearning of InstitutionalLearningFactCases
         | ChatExecution of ChatExecutionFactCases
+        | Cognition of AssumeFactCases.T
 
     type Fact =
         | Runtime of RuntimeFact
         | Agent of AgentFact
-        | MagicTodo of MagicTodoFacts.MagicTodoFact

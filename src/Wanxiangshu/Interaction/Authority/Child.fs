@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Interaction.Authority
 
 open Wanxiangshu.Change
-open Wanxiangshu.Mission.Obligation
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 open Wanxiangshu.Composition.Turn
@@ -16,7 +15,6 @@ open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
@@ -76,7 +74,7 @@ module ChildPromptAuthority =
                     |> Seq.tryFind (fun dispatch ->
                         dispatch.PhysicalUserMessageId = turn.PhysicalUserMessageId
                         && dispatch.Origin = PromptAuthority.PromptOrigin.AuthorityRoot
-                            PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
+                                                 PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
 
                 let runtime = PromptDispatcher.forPrompts prompts
                 return! registerLinkedChildIfNeeded runtime turn handle activeProfile accepted

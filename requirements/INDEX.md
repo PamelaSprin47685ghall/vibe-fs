@@ -1,6 +1,6 @@
 # Package index
 
-当前设计得到 **55 张 boundary card**。57 不是目标，也不是稳定 API；它只是当前按独立 WHY、failure meaning 与 independent-change test 得出的结果。后续全仓反向覆盖若发现 ORPHAN / OVERLAP / GARBAGE，应继续拆并。
+当前设计得到 **56 张 boundary card**。57 不是目标，也不是稳定 API；它只是当前按独立 WHY、failure meaning 与 independent-change test 得出的结果。后续全仓反向覆盖若发现 ORPHAN / OVERLAP / GARBAGE，应继续拆并。
 
 ## 1. Requirement system
 
@@ -37,6 +37,7 @@
 | `capability-enforcement` | provider 看见的 capability 与 runtime 真能执行的 capability 必须同源且不扩大 office entitlement；Fission 独占 Engineer，DevOps 固有自修无需逐次开关，Fork/Resume 权能分离。 |
 | `participant-horizon` | machine knowledge 大于 participant experience；只有会改变合法行动的最小事实应穿过 horizon；Manager 并行来自派出多名 Engineer 而非自身分身。 |
 | `cognitive-environment` | 世界观、身份、自我职责与继承知识必须按稳定认知层组织，瞬时 runtime/mission 不能伪装成长期身份。 |
+| `cognitive-workspace` | 模型的工作记忆必须有唯一持久画板与唯一写入口；画板是认知结构，不是权限、完成判定或质量证书。 |
 | `attention-regulation` | participant 必须能显式结束 evidence churn、解除自创心理债、延后非阻塞旁支，而不把这些 speech act 冒充事实或 obligation。 |
 | `action-affordance` | participant 在采取一个 action 的决策点必须知道该 act 的正边界、负边界、成功后果与参数意义。 |
 | `provider-language` | 一个 participant life 必须生活在单一、稳定的自然语言世界中，而 protocol identity 保持语言不变；核心角色双语 Prompt 语义同源一致。 |
@@ -86,7 +87,7 @@
 
 | Package | 一句话 WHY |
 |---|---|
-| `obligation-ledger` | 长期 mission 必须持续维护当前仍欠世界什么，而不是用 phase/status 伪装工作进度。 |
+| `obligation-ledger` | 宿主待办清单只是单向兼容投影；输入有界、整表替换、desired/applied 幂等，且永不反向成为语义权威。 |
 | `relay-incumbency` | 每一轮都在共享工作区上从权威用户消息重新开始并独立评估；同一 Road 至多一个 active 迭代，退休永不恢复；固定 DevOps 跨任期连续。 |
 | `relay-assessment` | 每任至多一次八维质量评级（PERFECT/REVISE/N/A 三态）；独立评估由只读 Engineer 支持，低分原位接责，DevOps 自修使旧快照证书失效并由后任独立重评。 |
 | `relay-retirement` | 退出是唯一正常出口；只有递归 live 资源能阻塞退休，固定 DevOps 跨任期连续且在退休中受明确收束边界保护。 |
@@ -126,7 +127,7 @@
 
 # 规范条款索引
 
-本节汇总全仓 **55 个规范包当前全部活跃条款**（以各包 `WHAT.md` 实际文本为准）：
+本节汇总全仓 **56 个规范包当前全部活跃条款**（以各包 `WHAT.md` 实际文本为准）：
 
 | 序号 | 规范包 (`Package`) | 活跃条款数 | 活跃条款清单与演进导航 |
 |---|---|---|---|
@@ -146,10 +147,11 @@
 | 14 | `capability-enforcement` | 24 | capability-enforcement-001 ~ 021、capability-enforcement-022（Fission 仅 Engineer 准入 fail-closed）、capability-enforcement-023（DevOps 固有自修授权禁 allowRepair 逐次开关）、capability-enforcement-024（Fork 与 Resume 权能分离） |
 | 15 | `participant-horizon` | 15 | participant-horizon-001 ~ 014、participant-horizon-015（Manager 并行来自派出多名 Engineer 而非自身分身） |
 | 16 | `cognitive-environment` | 16 | cognitive-environment-001 ~ 016 |
+| 17 | `cognitive-workspace` | 10 | cognitive-workspace-001 ~ 010 |
 | 17 | `attention-regulation` | 6 | attention-regulation-001 ~ 006 |
 | 18 | `action-affordance` | 14 | action-affordance-001 ~ 014 |
 | 19 | `provider-language` | 12 | provider-language-001 ~ 011、provider-language-012（核心角色双语 Prompt 语义一致与同源认知） |
-| 20 | `provider-projection` | 14 | provider-projection-001 ~ 014 |
+| 20 | `provider-projection` | 16 | provider-projection-001 ~ 014、provider-projection-015（认知结果投影退休不改 canonical history）、provider-projection-016（完整 JSON 画板无损表示与单次 render） |
 | 21 | `concern-routing` | 7 | concern-routing-001 ~ 007 |
 | 22 | `interaction-authority` | 22 | interaction-authority-001 ~ 020、interaction-authority-021（历史事件不可变与旧身份不升权）、interaction-authority-022（DevOps 恢复与续行锁定固定模型与执行权威） |
 | 23 | `managed-chat-execution` | 14 | managed-chat-execution-001 ~ 014 |
@@ -163,14 +165,14 @@
 | 31 | `change-integration` | 17 | change-integration-001 ~ 014、change-integration-015（修复改变工作树后必须重新验证与证书失效）、change-integration-016（并行协调隔离）、change-integration-017（多道路汇聚后必须重新验证） |
 | 32 | `semantic-trace` | 12 | semantic-trace-001 ~ 010、semantic-trace-011（Fission keyed convergence 与多 Present 轨迹归并）、semantic-trace-012（独立 Invocation 范围与 Resume 边界） |
 | 33 | `work-record` | 17 | work-record-001 ~ 016、work-record-017（Fission 汇聚生成单次 Invocation Canonical Record） |
-| 34 | `context-compression` | 27 | context-compression-001 ~ 027 |
-| 35 | `prefix-stability` | 15 | prefix-stability-001 ~ 015 |
+| 34 | `context-compression` | 29 | context-compression-001 ~ 027、context-compression-028（K 窗口公式与同回合多提交）、context-compression-029（coverage 落后不丢 raw 与紧急 Probe 例外） |
+| 35 | `prefix-stability` | 18 | prefix-stability-001 ~ 015、prefix-stability-016（阶段可见性计划属同一 epoch）、prefix-stability-017（墓碑化前置条件是当前画板可见载体）、prefix-stability-018（阶段重复绑定幂等且按 generation 隔离） |
 | 36 | `execution-failure-policy` | 14 | execution-failure-policy-001 ~ 014 |
 | 37 | `provider-attempt-recovery` | 23 | provider-attempt-recovery-001 ~ 023 |
 | 38 | `host-provider-failure-ownership` | 7 | host-provider-failure-ownership-001 ~ 007 |
 | 39 | `crash-reconciliation` | 20 | crash-reconciliation-001 ~ 019、crash-reconciliation-020（固定 DevOps 崩溃恢复单一逻辑权威与命令去重） |
 | 40 | `degeneration-guard` | 13 | degeneration-guard-001 ~ 013 |
-| 41 | `obligation-ledger` | 28 | obligation-ledger-001 ~ 028 |
+| 41 | `obligation-ledger` | 7 | obligation-ledger-001 ~ 007 |
 | 42 | `relay-incumbency` | 11 | relay-incumbency-001 ~ 006、008 ~ 009、relay-incumbency-010（道路唯一逻辑 DevOps 与控制权交接）、relay-incumbency-011（任期连续性与归属明确）、relay-incumbency-012（固定 DevOps 初始绑定与恢复唯一性） |
 | 43 | `relay-assessment` | 10 | relay-assessment-001 ~ 008、relay-assessment-009（独立评估由只读 Engineer 支持且实现者不自定答案）、relay-assessment-010（DevOps 自修改变快照使旧评估与证书失效且不可冒充新改动验证） |
 | 44 | `relay-retirement` | 7 | relay-retirement-001 ~ 004、007 ~ 008、relay-retirement-009（固定 DevOps 与跨任期资源在退休中的交接与收束边界） |

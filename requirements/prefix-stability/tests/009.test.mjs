@@ -30,16 +30,20 @@ test('WHAT[prefix-stability-009] prefix replacement removes covered history by s
   assert.equal(projected[1], raw[1], 'request-local presentation must survive as the same Host object')
   assert.equal(projected[2], raw[3], 'live history must survive as the same Host object')
 })
-test('WHAT[prefix-stability-009] stable identity replacement preserves survivor order and todowrite round objects', () => {
+test('WHAT[prefix-stability-009] stable identity replacement keeps the retained cognitive rounds and drops ordinary covered history', () => {
+  // context-compression-020 (revised): retention now comes from the caller's K-window
+  // verdict, not from an unbounded per-tool-name exemption. The retired `todowrite`
+  // exemption kept every ledger round raw forever; here a cognitive round is retained
+  // because the caller declared it inside the window.
   const raw = [
     {
-      info: { id: 'todo-call-msg', role: 'assistant' },
-      parts: [{ type: 'tool-call', tool: 'todowrite', callID: 'todo-call-1', args: { planComplete: false } }],
+      info: { id: 'assume-call-msg', role: 'assistant' },
+      parts: [{ type: 'tool-call', tool: 'assume', callID: 'assume-call-1', args: { update: '.' } }],
     },
     textMessage('request-local', 'assistant', 'request-local presentation only'),
     {
-      info: { id: 'todo-result-msg', role: 'tool' },
-      parts: [{ type: 'tool-result', callID: 'todo-call-1', result: { ok: true } }],
+      info: { id: 'assume-result-msg', role: 'tool' },
+      parts: [{ type: 'tool-result', callID: 'assume-call-1', result: { ok: true } }],
     },
     textMessage('covered-ordinary', 'assistant', 'replace me'),
     textMessage('live-u', 'user', 'live request'),
@@ -47,15 +51,16 @@ test('WHAT[prefix-stability-009] stable identity replacement preserves survivor 
 
   const projected = xwire.replacePrefixByHostIds(
     raw,
-    ['todo-call-msg', 'todo-result-msg', 'covered-ordinary'],
+    ['assume-call-msg', 'assume-result-msg', 'covered-ordinary'],
     null,
     'y-prefix',
     'compressed canonical X',
+    ['assume-call-1'],
   )
 
   assert.deepEqual(
     projected.map(item => item.info.id),
-    ['y-prefix', 'todo-call-msg', 'request-local', 'todo-result-msg', 'live-u'],
+    ['y-prefix', 'assume-call-msg', 'request-local', 'assume-result-msg', 'live-u'],
   )
   assert.equal(projected[1], raw[0])
   assert.equal(projected[2], raw[1])

@@ -1,41 +1,31 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as todo from '../../../dist/Mission/Obligation/Todo/MagicTodoSemanticSurface.js'
+import * as envelope from '../../../dist/Persistence/Journal/ObligationEnvelopeSurface.js'
 
-const sha256 = (value) => `digest:${value}`
-
-const life = 'manager-life'
-
-const firstCall = 'first-call'
-
-const secondCall = 'second-call'
-
-const obligation = (name, work, horizon = 'near') => ({ name, horizon, work })
-
-const ok = (result) => {
-  assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
-  return result.value
-}
-
-const rejected = (result) => {
-  assert.equal(result.ok, false, 'expected rejection')
-  return result.error
-}
-
-const localized = (callId, ordinal, frontier, digest) => ({
-  toolCallId: callId,
-  toolPartOrdinal: ordinal,
-  todowriteCallIds: [callId],
-  reviewFrontier: frontier,
-  providerInputDigest: digest,
+// obligation-ledger-007: the retired obligation-ledger envelope family stays
+// recognisable for audit and migration, and nothing more. These tests pin the
+// honest refusal — a decoder that returned a half-decoded shape would let a caller
+// believe it still had a ledger.
+test('WHAT[obligation-ledger-007] legacy envelope family is named without a decoder', () => {
+  assert.equal(envelope.legacyFamilyName, 'MagicTodo')
 })
 
-const items = [
-  obligation('implementation', 'Implement the requested behavior.'),
-  obligation('verification', 'Verify the behavior with evidence.', 'far'),
-]
+test('WHAT[obligation-ledger-007] a legacy envelope decodes to a typed refusal, never a value', () => {
+  const result = envelope.deserializeLegacyEnvelope('{"case":"TodoWriteAccepted"}')
 
-test('WHAT[obligation-ledger-007] admits multiple todowrite calls in one assistant message with sequential execution semantics', () => {
-  assert.equal(ok(todo.admitTodowriteBatch([firstCall, secondCall])), null)
-  assert.equal(ok(todo.admitTodowriteBatch([firstCall, firstCall])), null)
+  assert.equal(result.ok, false)
+  assert.equal(result.family, 'MagicTodo')
+  assert.match(result.error, /retired/i)
+
+  // The refusal must not smuggle a payload back: a decoded value would be a second,
+  // weaker source of truth for a protocol the system retired.
+  assert.deepEqual(Object.keys(result).sort(), ['error', 'family', 'ok'])
+})
+
+test('WHAT[obligation-ledger-007] an empty or malformed legacy envelope is refused the same way', () => {
+  for (const encoded of ['', 'not json', '{}']) {
+    const result = envelope.deserializeLegacyEnvelope(encoded)
+    assert.equal(result.ok, false, `'${encoded}' must be refused`)
+    assert.equal(result.family, 'MagicTodo')
+  }
 })

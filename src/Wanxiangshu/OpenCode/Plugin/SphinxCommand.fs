@@ -114,7 +114,7 @@ module SphinxCommand =
             if isNull input || string input?command <> "sphinx" then
                 return false
             else
-                if not (AblationSettings.allowsToolSchema "sphinx") then
+                if AblationGate.toolSchemaDenied (AblationGate.registry ()) "sphinx" then
                     invalidOp "Sphinx is disabled"
 
                 let request =

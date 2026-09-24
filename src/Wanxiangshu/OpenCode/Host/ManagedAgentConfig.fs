@@ -19,7 +19,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
@@ -164,7 +163,7 @@ module ManagedAgentConfig =
             created
 
     let private applyNamedOwnedFields (agents: obj) (inventory: ManagedAgentInventory) (name: string) : unit =
-        if not (AblationSettings.allowsPrimaryAgent name) then
+        if not (AblationGate.primaryAgentAllowed (AblationGate.registry ()) name) then
             let entry = ensureAgentEntry agents name
             entry?hidden <- true
         elif Option.isSome (ownedConfigForName inventory name) then

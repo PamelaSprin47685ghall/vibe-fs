@@ -131,7 +131,7 @@ li{margin-bottom:6px}
 <nav class="nav">
 <div class="nav-chapter">
 <div class="nav-chapter-title">序言</div>
-<a class="nav-page" data-page="p1-1">一万头大象怎样一起跳舞</a>
+<a class="nav-page" data-page="p1-1">一万头大象，怎样一起跳舞</a>
 <a class="nav-page" data-page="p1-2">站在用户这一边</a>
 </div>
 <div class="nav-chapter">
@@ -373,22 +373,22 @@ li{margin-bottom:6px}
 
 <div class="two-col">
 <div class="feature-tier tier-essential" style="margin:0">
-<h3>工程师</h3>
+<h3>工程师（Engineer）</h3>
 <p>专注理解问题与修改代码。</p>
 <p class="mini warn">不负责真实命令执行。</p>
 </div>
 <div class="feature-tier tier-essential" style="margin:0">
-<h3>项目负责人</h3>
+<h3>项目负责人（Manager）</h3>
 <p>负责分解、委托、验收和推进。</p>
 <p class="mini warn">不亲自进入代码细节。</p>
 </div>
 <div class="feature-tier tier-enhanced" style="margin:0">
-<h3>运维员</h3>
+<h3>运维员（DevOps）</h3>
 <p>负责真实机器上的运行、进程和测试结果。</p>
 <p class="mini warn">不接受并行改写同一现场。</p>
 </div>
 <div class="feature-tier tier-luxury" style="margin:0">
-<h3>记录员</h3>
+<h3>记录员（Blogger）</h3>
 <p>承担工作历史整理与认知上下文。</p>
 <p class="mini warn">不争夺主任务的决策权。</p>
 </div>
@@ -608,10 +608,10 @@ li{margin-bottom:6px}
 <p>这两种情况本质上都来自同一个限制：把长期任务的连续性寄托在一次模型会话上。</p>
 
 <h3>让任务活得比一次会话更久</h3>
-<p>万象术因此让项目负责人可以接力。前一任退出以后，新一任看到的是当前工作区、已有结果和仍未完成的事情，而不是被迫继承前任全部私人思考过程。</p>
+<p>万象术因此让任务可以跨会话继续。换一任项目负责人接手时，新的一轮从当前权威的用户诉求、工作区真实状态和已有结果出发，独立评估该做什么，而不是被迫把前任的私人思考过程再经历一遍。</p>
 <ul>
-<li>前任完成的工作不会丢；</li>
-<li>前任的路径依赖也不需要全部继承。</li>
+<li>每一轮都从当前真实状态重新开始、独立评估，不把上一轮的结论当作既定前提；</li>
+<li>前任完成的工作不会丢，前任的路径依赖也不需要全部继承。</li>
 </ul>
 <p>这样，一项任务可以持续很久，而具体负责判断的模型可以更新。用户购买的应该是一项任务的持续推进，而不是祈祷某一次会话永远保持清醒。</p>
 
@@ -628,10 +628,14 @@ li{margin-bottom:6px}
 <line x1="135" y1="97" x2="165" y2="97" stroke="#1B365D" stroke-width="1.6" marker-end="url(#m5)"/>
 <rect x="170" y="40" width="180" height="115" rx="8" fill="#EEF2F7" stroke="#1B365D" stroke-width="1.4"/>
 <text x="260" y="64" text-anchor="middle" font-size="12.5" fill="#1B365D" font-weight="600">模型评审</text>
-<text x="260" y="86" text-anchor="middle" font-size="10.5" fill="#2D5A8A">语言与算法</text>
-<text x="260" y="105" text-anchor="middle" font-size="10.5" fill="#2D5A8A">结构与简洁性</text>
-<text x="260" y="124" text-anchor="middle" font-size="10.5" fill="#2D5A8A">测试证据 · 逻辑边界</text>
-<text x="260" y="143" text-anchor="middle" font-size="10.5" fill="#2D5A8A">完整性</text>
+<text x="216" y="86" text-anchor="middle" font-size="10.5" fill="#2D5A8A">语言与算法</text>
+<text x="216" y="105" text-anchor="middle" font-size="10.5" fill="#2D5A8A">简洁性</text>
+<text x="216" y="124" text-anchor="middle" font-size="10.5" fill="#2D5A8A">结构</text>
+<text x="216" y="143" text-anchor="middle" font-size="10.5" fill="#2D5A8A">粒度</text>
+<text x="304" y="86" text-anchor="middle" font-size="10.5" fill="#2D5A8A">测试证据</text>
+<text x="304" y="105" text-anchor="middle" font-size="10.5" fill="#2D5A8A">逻辑与可靠性边界</text>
+<text x="304" y="124" text-anchor="middle" font-size="10.5" fill="#2D5A8A">调用方工效</text>
+<text x="304" y="143" text-anchor="middle" font-size="10.5" fill="#2D5A8A">完整性</text>
 <line x1="355" y1="97" x2="385" y2="97" stroke="#1B365D" stroke-width="1.6" marker-end="url(#m5)"/>
 <rect x="390" y="40" width="180" height="115" rx="8" fill="#fef3c7" stroke="#b45309" stroke-width="1.4"/>
 <text x="480" y="64" text-anchor="middle" font-size="12.5" fill="#92400e" font-weight="600">机器门禁</text>
@@ -647,7 +651,7 @@ li{margin-bottom:6px}
 </svg>
 </div>
 
-<p>前者检查语言与算法、结构、简洁性、测试证据、逻辑边界和完整性；后者检查真正的代码状态、分支变化和合入条件。用户真正需要的并不是更多赞美，而是：</p>
+<p>前者检查语言与算法、简洁性、结构、粒度、测试证据、逻辑与可靠性边界、调用方工效和完整性；后者检查真正的代码状态、分支变化和合入条件。用户真正需要的并不是更多赞美，而是：</p>
 <p style="font-weight:600;color:var(--accent);">一个错误有没有机会被另一个视角发现。</p>
 
 <div class="page-nav" id="nav-p2-6"></div>
@@ -995,12 +999,12 @@ $$\text{搬运量}_{\text{重建}}=k\cdot C_{\text{phys}}\qquad\text{搬运量}_
 <div class="feature-tier tier-essential">
 <h3>万象术 · F# / OpenCode 插件</h3>
 <p>选择 F#，主要是因为万象术内部存在大量关于身份、权限、任务状态、事件、委托关系与失败处理的复杂语义。相比把这些约束散落在大量条件判断中，强类型和代数数据类型更适合把"什么状态合法、什么状态不应该出现"直接表达在程序结构里。</p>
-<pre><code>// 示意：把合法状态写进类型，而不是写进一大堆 if
+<pre><code>// 示意：把合法状态写进类型，而不是写进一大堆 if；角色名与系统实现一致，状态机为简写
 type Role =
-    | Engineer          // 理解问题、修改代码
-    | Lead              // 分解、委托、验收、推进
-    | Operator          // 真实机器上的运行与进程
-    | Recorder          // 工作历史与认知上下文
+    | Engineer          // 工程师：理解问题、修改代码
+    | DevOps            // 运维员：真实机器上的运行、进程与测试
+    | Manager           // 项目负责人：分解、委托、验收、推进
+    | Blogger           // 记录员：工作历史整理与认知上下文
 
 type TaskState =
     | Dispatched        // 已分派，独立推进
@@ -1040,7 +1044,7 @@ type TaskState =
 <script>
 document.addEventListener('DOMContentLoaded',function(){
 var po=['p1-1','p1-2','p2-1','p2-2','p2-3','p2-4','p2-5','p2-6','p2-7','p3-1','p3-2','p4-1','p4-2','p5-1','p5-2','p6-1','p6-2','p6-3'];
-var pt={'p1-1':'一万头大象怎样一起跳舞','p1-2':'站在用户这一边','p2-1':'模型不是岗位，模型是算力','p2-2':'真正稀缺的是注意力','p2-3':'工程师可以很多，运维员只有一条主线','p2-4':'主任务不写回忆录，旧钱不花两遍','p2-5':'并发在现场裂变，结果提前回收','p2-6':'跨会话接力与机器门禁','p2-7':'给深度推理一副骨架','p3-1':'数据不动，视角动','p3-2':'结构低频，数值高频','p4-1':'缺的是带宽，为什么还要为闲置算力付钱','p4-2':'先用现有芯片，重新算一次硬件的账','p5-1':'为什么三件事会走到一起','p5-2':'多、快、好、省','p6-1':'团队','p6-2':'结语','p6-3':'附录：技术实现概况'};
+var pt={'p1-1':'一万头大象，怎样一起跳舞','p1-2':'站在用户这一边','p2-1':'模型不是岗位，模型是算力','p2-2':'真正稀缺的是注意力','p2-3':'工程师可以很多，运维员只有一条主线','p2-4':'主任务不写回忆录，旧钱不花两遍','p2-5':'并发在现场裂变，结果提前回收','p2-6':'跨会话接力与机器门禁','p2-7':'给深度推理一副骨架','p3-1':'数据不动，视角动','p3-2':'结构低频，数值高频','p4-1':'缺的是带宽，为什么还要为闲置算力付钱','p4-2':'先用现有芯片，重新算一次硬件的账','p5-1':'为什么三件事会走到一起','p5-2':'多、快、好、省','p6-1':'团队','p6-2':'结语','p6-3':'附录：技术实现概况'};
 function sp(id){
 if(!document.getElementById(id))id=po[0];
 document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});

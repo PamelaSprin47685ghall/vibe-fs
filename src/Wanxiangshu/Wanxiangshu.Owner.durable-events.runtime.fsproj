@@ -36,7 +36,6 @@
 <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-identityseed.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.obligation-ledger.mission-obligation-todo-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <Compile Include="Persistence/Journal/ObligationEnvelopeSurface.fsi"/>
     <Compile Include="Persistence/Journal/ObligationEnvelopeSurface.fs"/>

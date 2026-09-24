@@ -35,7 +35,7 @@ module PairProgrammingThoughtTransform =
 
     /// HOST-013 English canonical used by tests; production loads via session language.
     let text =
-        ProviderProse.instructionLines ProviderLanguage.English PairProgrammingGuidelinePath Map.empty
+        ProviderProse.instructionLines ProviderLanguage.SimplifiedChinese PairProgrammingGuidelinePath Map.empty
         |> LlmFacing.renderInstructions
 
     // ── JS Evidence parsers（flat；无嵌套 decision）──────────────────────────

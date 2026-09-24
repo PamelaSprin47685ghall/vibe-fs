@@ -17,10 +17,10 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Concern
-open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
+open Wanxiangshu.Participant.Cognition
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 type SessionAgentProjection =
@@ -47,7 +47,7 @@ type AgentProjectionSet =
       HandleByChildSession: Map<SessionId, HandleRecord>
       Fission: FissionProjectionState
       ChatExecutions: ChatExecutionProjectionState
-      MagicTodo: MagicTodoProjection.MagicTodoProjectionState
+      Cognition: Map<string, CognitiveProjection>
       DelegationCompletedHandoffs: Map<string, int64>
       Attention: AttentionProjectionState
       Concern: ConcernProjectionState

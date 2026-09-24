@@ -17,6 +17,8 @@
     <Compile Include="Ablation/FactMap.fs"/>
     <Compile Include="Ablation/Settings.fsi"/>
     <Compile Include="Ablation/Settings.fs"/>
+    <Compile Include="Ablation/Resolution.fsi"/>
+    <Compile Include="Ablation/Resolution.fs"/>
     <Compile Include="Ablation/Gate.fsi"/>
     <Compile Include="Ablation/Gate.fs"/>
     <Compile Include="Ablation/Surface.fsi"/>

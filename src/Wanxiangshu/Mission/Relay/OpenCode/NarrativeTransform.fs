@@ -87,18 +87,14 @@ module RelayNarrativeTransform =
         |> Option.exists (fun (toolIndex, wakeIndex) ->
             index > toolIndex && wakeIndex |> Option.forall (fun wake -> index <= wake))
 
-    /// The manager-loop gate occasion for this retirement is admitted when its
-    /// prompt was claimed or accepted. Every legitimate send claims first, so
-    /// an unadmitted occasion means this request continues the retired run
-    /// itself rather than delivering the next iteration.
-    let private managerLoopGateAdmitted (journal: AgentJournal) (sessionId: SessionId) (retirement: RetirementSummary) =
+    let private managerLoopGatePhysical (journal: AgentJournal) (sessionId: SessionId) (retirement: RetirementSummary) =
         let gateKind = ManagerLoopGate.gateKind retirement.Id
         let terminalRun = ProviderRunIdentity.create retirement.ProjectionCut.ProviderRunId
 
         PromptAuthorityProjectionQueries.activeProfile sessionId (AgentJournal.snapshot journal).AgentProjections
-        |> Option.exists (fun profile ->
+        |> Option.bind (fun profile ->
             (PromptDispatcher.forPrompts (PromptJournalAdapter.create journal))
-                .GateNudgeAlreadyAdmitted
+                .GateNudgeAcceptedPhysical
                 profile
                 PromptAuthority.ContinuationKind.ManagerGuard
                 gateKind
@@ -183,13 +179,62 @@ module RelayNarrativeTransform =
         |> Option.map (fun _ -> RelayProjectionDisposition.CurrentIteration)
         |> Option.defaultValue RelayProjectionDisposition.Unchanged
 
-    let private isUnadmittedContinuation journal sessionId (road: RoadView) (retirement: RetirementSummary) =
-        road.ActiveIncumbency.IsNone
-        || not (managerLoopGateAdmitted journal sessionId retirement)
+    let private requestBelongsToSuccessor (physical: string option) afterCut freshRoot acceptedHuman gatePhysical =
+        match physical with
+        | Some current ->
+            freshRoot = Some current
+            || gatePhysical = Some current
+            || (afterCut && acceptedHuman)
+        | _ -> false
 
-    let private staleRetirement journal sessionId (road: RoadView) =
+    let private isSuccessorRequest
+        journal
+        sessionId
+        (road: RoadView)
+        (retirement: RetirementSummary)
+        acceptedHuman
+        messages
+        =
+        let currentUser =
+            messages
+            |> List.indexed
+            |> List.choose (fun (index, message) ->
+                if messageRoleIsUser message then
+                    messageId message |> Option.map (fun physical -> index, physical)
+                else
+                    None)
+            |> List.tryLast
+
+        let afterCut =
+            match cutToolIndex retirement.ProjectionCut messages, currentUser with
+            | Some toolIndex, Some(userIndex, _) -> userIndex > toolIndex
+            | _ -> false
+
+        let projection =
+            AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
+            |> Option.bind (fun session -> session.PromptAuthority)
+
+        let freshRoot =
+            projection
+            |> Option.bind (fun authority -> authority.ActiveLogicalRun)
+            |> Option.map (fun profile -> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
+            |> Option.filter (fun root ->
+                road.AuthorityMessageIds
+                |> List.exists (fun oldRoot -> PhysicalUserMessageId.value oldRoot = root)
+                |> not)
+
+        let physical = currentUser |> Option.map snd
+
+        let gatePhysical =
+            managerLoopGatePhysical journal sessionId retirement
+            |> Option.map Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.value
+
+        requestBelongsToSuccessor physical afterCut freshRoot acceptedHuman gatePhysical
+
+    let private staleRetirement journal sessionId (road: RoadView) acceptedHuman messages =
         road.LatestRetirement
-        |> Option.filter (isUnadmittedContinuation journal sessionId road)
+        |> Option.filter (fun retirement ->
+            not (isSuccessorRequest journal sessionId road retirement acceptedHuman messages))
 
     let private projectActive (road: RoadView) outObj =
         let authorityMessageIds = authorityIdSet road
@@ -202,15 +247,13 @@ module RelayNarrativeTransform =
         HostMessageProjection.replaceMessagesInPlace outObj current
         dispositionAfterProjection road
 
-    let private project journal (interruptAttempt: SessionId -> Task<unit>) sessionId road outObj =
+    let private project journal (interruptAttempt: SessionId -> Task<unit>) sessionId road acceptedHuman outObj =
         task {
-            // A retirement with no active admitted loop prompt means this request
-            // continues the retired run itself. Interrupt it before any network
-            // request. The callback delegates stop -> continuation to the Manager
-            // owner; projection then empties the retired request context.
-            // Once a later iteration and its gate are both present, projection
-            // proceeds from the durable cut.
-            match staleRetirement journal sessionId road with
+            let messages = ProviderWireDecode.messagesFromTransformOutput outObj
+
+            // An active LogicalRun or a claimed loop gate does not identify this
+            // physical request: both can coexist with the retired attempt.
+            match staleRetirement journal sessionId road acceptedHuman messages with
             | Some _ ->
                 do! interruptAttempt sessionId
                 HostMessageProjection.replaceMessagesInPlace outObj []
@@ -220,6 +263,7 @@ module RelayNarrativeTransform =
 
     let apply
         (journal: AgentJournal option)
+        (acceptedHuman: bool)
         (interruptAttempt: SessionId -> Task<unit>)
         (sessionId: string option)
         (outObj: obj)
@@ -236,6 +280,6 @@ module RelayNarrativeTransform =
 
             match resolved with
             | Some(durable, currentSessionId, road) ->
-                return! project durable interruptAttempt currentSessionId road outObj
+                return! project durable interruptAttempt currentSessionId road acceptedHuman outObj
             | None -> return RelayProjectionDisposition.Unchanged
         }

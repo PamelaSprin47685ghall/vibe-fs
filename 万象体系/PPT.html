@@ -710,7 +710,7 @@
                         <p style="margin-bottom: 1rem;">如果所有工作都锁死在一个模型上，相当于把不同难度、不同价值的工作用同一种价格结算。</p>
                         <p class="highlight-green" style="font-size: 1.15rem; margin-bottom: 0.8rem;">同样质量的任务，能不能花更少的钱做完。</p>
                         <p style="font-size: 0.8rem; line-height: 1.4;">
-                            <span class="indicator-tag target">目标</span> 当前系统已把岗位责任与底层模型选择分开，辅助性工作可使用更廉价模型。
+                            <span class="indicator-tag fact">现状</span> 当前系统已把岗位责任与底层模型选择分开，辅助性工作可使用更廉价模型。
                         </p>
                     </div>
                 </div>
@@ -737,10 +737,10 @@
                         <div>
                             <span class="indicator-tag derivation">设计</span><strong>职责被拆成四条边界：</strong>
                             <div class="stack-list">
-                                <div class="stack-row"><div class="k">工程师</div><div class="v">理解问题与修改代码，<span style="color:var(--accent-red);">不负责真实命令执行</span></div></div>
-                                <div class="stack-row"><div class="k">项目负责人</div><div class="v">分解、委托、验收、推进，<span style="color:var(--accent-red);">不进入代码细节</span></div></div>
-                                <div class="stack-row"><div class="k">运维员</div><div class="v">真实机器上的运行、进程与测试结果，<span style="color:var(--accent-red);">不被并行改写</span></div></div>
-                                <div class="stack-row"><div class="k">记录员</div><div class="v">工作历史与认知上下文，<span style="color:var(--accent-red);">不争夺决策权</span></div></div>
+                                <div class="stack-row"><div class="k">工程师（Engineer）</div><div class="v">理解问题与修改代码，<span style="color:var(--accent-red);">不负责真实命令执行</span></div></div>
+                                <div class="stack-row"><div class="k">项目负责人（Manager）</div><div class="v">分解、委托、验收、推进，<span style="color:var(--accent-red);">不进入代码细节</span></div></div>
+                                <div class="stack-row"><div class="k">运维员（DevOps）</div><div class="v">真实机器上的运行、进程与测试结果，<span style="color:var(--accent-red);">不被并行改写</span></div></div>
+                                <div class="stack-row"><div class="k">记录员（Blogger）</div><div class="v">工作历史与认知上下文，<span style="color:var(--accent-red);">不争夺决策权</span></div></div>
                             </div>
                             <p style="font-size:0.85rem; margin-top:0.8rem; line-height:1.5;">
                                 <span class="indicator-tag target">目标</span> 分工的目的不是组织漂亮，而是<span class="highlight">减少注意力浪费</span>——每次昂贵调用承担更窄、更明确的责任。
@@ -779,7 +779,7 @@
                 </div>
             </section>
 
-            <!-- Slide 8: Recorder + case library -->
+            <!-- Slide 8: Blogger + case library -->
             <section class="slide dense">
                 <div class="content">
                     <div class="eyebrow">万象术 · 之四</div>
@@ -849,18 +849,18 @@
                             <span class="indicator-tag fact">现状</span><strong>模型的两个相反弱点</strong>
                             <p style="margin-top:0.7rem; font-size:0.9rem; line-height:1.55;">可能太早觉得自己已完成；也可能待得太久，依赖早先判断，难以重新审视。两者都来自：把长期任务的连续性寄托在一次会话上。</p>
                             <p style="font-size:0.85rem; margin-top:0.6rem; line-height:1.5;">
-                                <span class="indicator-tag derivation">设计</span> 项目负责人可接力：新一任看到当前工作区、已有结果与未完成事项，<span class="highlight-blue">不继承前任全部私人思考</span>。工作不丢，路径依赖不必继承。
+                                <span class="indicator-tag derivation">设计</span> 项目负责人按轮独立评估：每一轮从权威用户消息与当前真实状态重新判断，看到当前工作区、已有结果与未完成事项，<span class="highlight-blue">不继承前任的私人思考</span>。任务可以长期延续，工作不丢。
                             </p>
                         </div>
                         <div>
                             <span class="indicator-tag derivation">设计</span><strong>评审与合入分开</strong>
                             <div class="stack-list">
-                                <div class="stack-row"><div class="k">模型评审</div><div class="v">语言与算法、结构、简洁性、测试证据、逻辑边界、完整性</div></div>
+                                <div class="stack-row"><div class="k">模型评审</div><div class="v">语言与算法、简洁性、结构、粒度、测试证据、逻辑与可靠性边界、调用方工效、完整性</div></div>
                                 <div class="stack-row"><div class="k">机器门禁</div><div class="v">真实代码状态、分支变化、合入条件</div></div>
                                 <div class="stack-row"><div class="k" style="color:var(--accent-red);">失效规则</div><div class="v">代码一变，建立在旧状态上的评价不能替新状态背书</div></div>
                             </div>
                             <p style="font-size:0.85rem; margin-top:0.8rem; line-height:1.5;">
-                                <span class="indicator-tag target">目标</span> 用户需要的不 是更多赞美，而是<span class="highlight">一个错误有没有机会被另一个视角发现</span>。
+                                <span class="indicator-tag target">目标</span> 用户需要的不是更多赞美，而是<span class="highlight">一个错误有没有机会被另一个视角发现</span>。
                             </p>
                         </div>
                     </div>

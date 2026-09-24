@@ -296,27 +296,57 @@ module PrefixSurface =
         |> Option.map BlobRef.value
         |> optionObj
 
-    let retainTodoWriteRounds (messages: obj array) : bool array =
+    /// Projection of the caller's own retention decision.
+    ///
+    /// The unbounded `todowrite` exemption is gone (context-compression-020
+    /// revised): the caller keeps the real Opening and the last K phases, and this
+    /// surface only carries that verdict across the JS boundary. It must not grow a
+    /// second rule of its own, or the two would drift and one would silently win.
+    let retainedPrefixMessages (messages: obj array) : bool array =
         messages
         |> Array.toList
         |> List.map (fun message ->
-            let containsTodoWrite =
-                not (isNullish message?containsTodoWrite)
-                && unbox<bool> message?containsTodoWrite
-
-            let callIds =
-                if isNullish message?callIds then
-                    Set.empty
-                else
-                    message?callIds
-                    |> unbox<string array>
-                    |> Array.map ToolCallId.create
-                    |> Set.ofArray
-
             let facts: XPrefixProjection.RawPrefixMessageFacts =
-                { ContainsTodoWrite = containsTodoWrite
-                  ToolCallIds = callIds }
+                { Retained = not (isNullish message?retained) && unbox<bool> message?retained }
 
-            facts)
-        |> XPrefixProjection.retainTodoWriteRounds
+            facts.Retained)
         |> List.toArray
+
+    /// context-compression-028/029: the K-window decision across the JS boundary.
+    ///
+    /// The surface translates shapes only. It must not clamp, default or re-derive
+    /// anything: the clamp against real coverage is the one place the clause's
+    /// "desire vs. evidence" split would silently disappear.
+    let desiredCutoff (k: int) (phaseTurnStarts: int array) : obj =
+        match Wanxiangshu.Context.Prefix.PhaseWindow.desiredCutoff k (Array.toList phaseTurnStarts) with
+        | Wanxiangshu.Context.Prefix.PhaseWindowDecision.NoPhases -> box {| kind = "NoPhases" |}
+        | Wanxiangshu.Context.Prefix.PhaseWindowDecision.KeepFrom cutoff ->
+            box
+                {| kind = "KeepFrom"
+                   cutoffExclusive = cutoff |}
+
+    let actualCutoff (decision: obj) (committedCutoffExclusive: obj) (coveredCutoffExclusive: obj) : obj =
+        let parsedDecision =
+            match string decision?kind with
+            | "KeepFrom" -> Wanxiangshu.Context.Prefix.PhaseWindowDecision.KeepFrom(unbox<int> decision?cutoffExclusive)
+            | _ -> Wanxiangshu.Context.Prefix.PhaseWindowDecision.NoPhases
+
+        let optionOfInt (value: obj) =
+            if isNullish value then None else Some(unbox<int> value)
+
+        match
+            Wanxiangshu.Context.Prefix.PhaseWindow.actualCutoff
+                parsedDecision
+                (optionOfInt committedCutoffExclusive)
+                (optionOfInt coveredCutoffExclusive)
+        with
+        | Wanxiangshu.Context.Prefix.PhaseWindowDecision.NoPhases -> box {| kind = "NoPhases" |}
+        | Wanxiangshu.Context.Prefix.PhaseWindowDecision.KeepFrom cutoff ->
+            box
+                {| kind = "KeepFrom"
+                   cutoffExclusive = cutoff |}
+
+    let validateK (k: int) : obj =
+        match Wanxiangshu.Context.Prefix.PhaseWindow.validateK k with
+        | Ok() -> box {| ok = true; error = null |}
+        | Error reason -> box {| ok = false; error = reason |}

@@ -13,7 +13,7 @@ open Wanxiangshu.Foundation
 
 /// Shared session-scoped projection-update algebra for the fold families
 /// (formerly private helpers of `Fold`). `prefixOutcome` is shared by the
-/// Context family and the MagicTodo envelope branch; the `apply*` appliers at
+/// Context family and the Cognition envelope branch; the `apply*` appliers at
 /// the end assemble the single-field fact families whose decision lives in the
 /// owning domain fold.
 module ProjectionUpdate =

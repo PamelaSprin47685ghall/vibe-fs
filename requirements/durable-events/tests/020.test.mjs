@@ -110,6 +110,7 @@ test('WHAT[durable-events-020] Journal replay precompiles outer fact-family disp
 
   assert.match(envelope, /let\s+private\s+agentFactDecoder/)
   assert.match(envelope, /"Prompt"[\s\S]{0,200}AgentFact\.Prompt/)
+  assert.match(envelope, /"Cognition"[\s\S]{0,200}AgentFact\.Cognition/)
   assert.match(envelope, /"Host"[\s\S]{0,200}AgentFact\.Host/)
   assert.match(envelope, /Extra\.withCustom[\s\S]{0,120}factDecoder/)
   assert.match(envelope, /generateDecoderCached<Envelope>\s*\(\s*extra\s*=\s*decodeExtra\s*\)/)

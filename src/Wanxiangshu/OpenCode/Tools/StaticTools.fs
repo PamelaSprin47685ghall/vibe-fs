@@ -15,7 +15,6 @@ module StaticTools =
         | ToolPermission.Resume -> [ "resume" ]
         | ToolPermission.Join -> [ "join" ]
         | ToolPermission.Horizon -> [ "horizon" ]
-        | ToolPermission.TodoWrite -> [ "todowrite" ]
         | ToolPermission.Fission -> [ "fission" ]
         | ToolPermission.Read -> [ "read" ]
         | ToolPermission.Write -> [ "write" ]
@@ -71,7 +70,6 @@ module StaticTools =
           "signal-terminal"
           "join"
           "horizon"
-          "todowrite"
           "fission"
           "read"
           "write"
@@ -108,6 +106,7 @@ module StaticTools =
 
     /// PROMPT-012: an explicit complete allow/deny map for PromptInput.tools.
     let requestToolMap (allowed: Set<ToolPermission>) : Map<string, bool> =
+        let registry = AblationGate.registry ()
         let allowedNames = namesForPermissions allowed
 
         knownToolNames
@@ -124,7 +123,7 @@ module StaticTools =
              || name = "regret"
              || Set.contains name allowedNames))
         |> Map.ofList
-        |> AblationGate.filterToolPermissionMap
+        |> AblationGate.filterToolPermissionMap registry
 
     let private defaultPermission allowed name =
         if Set.contains name allowed then "allow" else "deny"
@@ -135,8 +134,8 @@ module StaticTools =
         else
             "deny"
 
-    let private permissionFor allowed role name =
-        match AblationSettings.allowsToolSchema name, name, role with
+    let private permissionFor (registry: AblationRegistry) allowed role name =
+        match not (AblationGate.toolSchemaDenied registry name), name, role with
         | false, _, _ -> "deny"
         | true, "fission", Role.Manager -> "deny"
         | true, "commission", Role.Manager -> "deny"
@@ -159,6 +158,7 @@ module StaticTools =
         | true, _, _ -> defaultPermission allowed name
 
     let permissionObj (role: Role) : obj =
+        let registry = AblationGate.registry ()
         let allowed = OfficeCapability.permissions role |> namesForPermissions
 
         // Host defaults set external_directory:* = ask (agent.ts). Rulesets merge by
@@ -168,7 +168,7 @@ module StaticTools =
             [ yield "*", box "deny"
               yield "external_directory", box "allow"
               for name in knownToolNames do
-                  yield name, box (permissionFor allowed role name) ]
+                  yield name, box (permissionFor registry allowed role name) ]
 
         createObj pairs
 

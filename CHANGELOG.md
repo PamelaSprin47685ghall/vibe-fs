@@ -2,6 +2,7 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- 修复 `suicide` 后旧 Manager 未被中断：`Continue` 退休保留 LogicalRun，不能据此将旧请求当作后继。Transform 以当前物理消息的正式 manager-loop gate／新 HumanRoot／已接纳的人类 continuation 识别后继；旧请求释放 exact provider step 并等待 Host interrupt 后才派发下一迭代。Host 允许仍持有旧 authority root 的退休 attempt 中断，拒绝中断不再静默吞掉；`relay-retirement-008` 覆盖旧请求清空、Host abort、下一迭代派发及不继承旧中断。
 - verification-system 契约面测试行为化重写与验证闭环（行为化重写与门禁闭合）：
   - `requirements/verification-system/tests/008.test.mjs` 行为化重写：删除全部匹配源代码/编译器内部表示的脆弱断言（深层导入未注册 dist 模块、mangled 符号 `BloggerDelta_nextChunk`/`Parallel_mapBounded` 等、`surfaceOf` 反射探测及 dist 全遍历动态加载）；保留并加强行为级回归（`assertBuildFresh` 防陈旧/防损坏、manifest 损坏、产物缺失/陈旧、reverse-consumer 重编译、未跟踪源盘点失败及 release 重置），呼应重写后 WHAT [001] 新增的「测试应该测试行为而非实现，因此不要写匹配源代码的测试」；VERIFICATION-SYSTEM-008 机器载体 = `requirements/verification-system/tests/008.test.mjs`（9/9 全绿）。
   - `scripts/checks/js-module-linkage.mjs` 新增 `validateModuleLoadability`：构建期动态 import 全部生产 dist 模块（821 个），加载失败即门禁失败；run/check/runCli 同步执行静态链接与动态可加载性校验；`scripts/build.mjs:190` 相应改为 await 调用，修复原同步假设导致的 `Promise !== 0` 假阴性。

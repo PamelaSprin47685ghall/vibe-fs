@@ -89,7 +89,6 @@ const allowList = (config, name) => {
     'signal-terminal',
     'join',
     'horizon',
-    'todowrite',
     'fission',
     'review',
     'chronicle',
@@ -104,7 +103,7 @@ const COGNITIVE_UTILITY_ALLOW = ['assume']
 const hostUtilityAllowFor = (role) => (role === 'Blogger' ? [] : HOST_UTILITY_ALLOW)
 const cognitiveUtilityAllowFor = (role) => (role === 'Blogger' ? [] : COGNITIVE_UTILITY_ALLOW)
 const ROLE_ALLOW = {
-  Manager: ['fork', 'resume', 'join', 'horizon', 'todowrite', 'suicide', 'review'],
+  Manager: ['fork', 'resume', 'join', 'horizon', 'suicide', 'review'],
   Orchestrator: ['commission', 'join', 'horizon'],
   Engineer: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission'],
   DevOps: [
@@ -327,7 +326,7 @@ const { permissions } = await import("../../../dist/Participant/Persona/OfficeCa
 const { acceptAuthorityRoot, grantWorkOwned, withExecutablePlugin, withPlugin } = await import("../../verification-system/tests/support/plugin-fixture.mjs");
 
 const TOOL_NAMES = [
-  'fork', 'resume', 'commission', 'join', 'horizon', 'todowrite', 'fission',
+  'fork', 'resume', 'commission', 'join', 'horizon', 'fission',
   'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm',
   'bash-honeypot', 'assume',
   'enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret',
@@ -339,16 +338,15 @@ const PLUGIN_TOOL_NAMES = [
   'join', 'horizon', 'fission', 'review', 'suicide', 'run',
   'mv', 'rm', 'bash-honeypot', 'assume', 'chronicle',
   'enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret',
-  'js-engineer', 'js-devops',
+  'js-engineer', 'js-devops', 'sphinx',
 ]
-const HOST_OWNED_TOOL_NAMES = [
-  'todowrite', 'read', 'write', 'edit', 'glob', 'grep', 'skill',
+const HOST_OWNED_TOOL_NAMES = [ 'read', 'write', 'edit', 'glob', 'grep', 'skill',
 ]
 const ROLE_NAMES = ['orchestrator', 'manager', 'engineer', 'devops', 'blogger']
 const COGNITIVE_TOOLS = ['enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret']
 const ALLOWED = {
   orchestrator: ['commission', 'join', 'horizon', 'assume', ...COGNITIVE_TOOLS],
-  manager: ['fork', 'resume', 'join', 'horizon', 'todowrite', 'review', 'suicide', 'assume', ...COGNITIVE_TOOLS],
+  manager: ['fork', 'resume', 'join', 'horizon', 'review', 'suicide', 'assume', ...COGNITIVE_TOOLS],
   engineer: ['fission', 'read', 'write', 'edit', 'glob', 'grep', 'fetch', 'mv', 'rm', 'bash-honeypot', 'assume', ...COGNITIVE_TOOLS],
   devops: [
     'join', 'horizon', 'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'run',
@@ -394,7 +392,7 @@ integrationTest('WHAT[capability-enforcement-010] MANAGER_host_schemas_are_prese
       commission: ['calling', 'name', 'charge', 'expected_tool_calls'],
       chronicle: ['entry', 'tip'],
       'bash-honeypot': [],
-      assume: ['update', 'query'],
+      assume: ['update', 'todos'],
       enough: ['decision'],
       abandon: ['commitment'],
       defer: ['new_work'],
@@ -414,57 +412,50 @@ integrationTest('WHAT[capability-enforcement-010] MANAGER_host_schemas_are_prese
 integrationTest('WHAT[capability-enforcement-010] ASSUME_updates_then_queries_one_persistent_jq_canvas_in_one_call', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'manager-assume', 'manager')
+    const ctx = (callID) => ({ sessionID: 'manager-assume', agent: 'manager', callID, messageID: `msg-${callID}` })
 
     const first = await hooks.tool.assume.execute(
       {
         update: '{ideas:["compressed memory","random access"]}',
-        query: '.ideas | map(select(test("memory")))',
+        todos: [{ content: 'compressed memory', status: 'pending' }],
       },
-      { sessionID: 'manager-assume', agent: 'manager' },
+      ctx('call-1'),
     )
     const second = await hooks.tool.assume.execute(
-      { update: '.', query: '.ideas[1]' },
-      { sessionID: 'manager-assume', agent: 'manager' },
+      { update: '.', todos: [{ content: 'compressed memory', status: 'in_progress' }] },
+      ctx('call-2'),
     )
     const scalar = await hooks.tool.assume.execute(
-      { update: '"hello"', query: '.' },
-      { sessionID: 'manager-assume', agent: 'manager' },
+      { update: '"hello"', todos: [] },
+      ctx('call-3'),
     )
     const scalarRead = await hooks.tool.assume.execute(
-      { update: '.', query: '.' },
-      { sessionID: 'manager-assume', agent: 'manager' },
+      { update: '.', todos: [] },
+      ctx('call-4'),
     )
-    await assert.rejects(
-      hooks.tool.assume.execute(
-        { update: '{committed:true}', query: 'error("query failed")' },
-        { sessionID: 'manager-assume', agent: 'manager' },
-      ),
-      /assume query failed after update committed/,
+    const rejectedResult = await hooks.tool.assume.execute(
+      { update: '{committed:true}', todos: 'not an array' },
+      ctx('call-5'),
     )
+    assert.match(rejectedResult, /assume\.todos must be an array/)
     const afterQueryFailure = await hooks.tool.assume.execute(
-      { update: '.', query: '.committed' },
-      { sessionID: 'manager-assume', agent: 'manager' },
+      { update: '.', todos: [] },
+      ctx('call-6'),
     )
-    await assert.rejects(
-      hooks.tool.assume.execute(
-        { update: 'empty', query: '.' },
-        { sessionID: 'manager-assume', agent: 'manager' },
-      ),
-      /assume update must produce exactly one JSON value/,
+    const rejectedUpdate = await hooks.tool.assume.execute(
+      { update: 'empty', todos: [] },
+      ctx('call-7'),
     )
+    assert.match(rejectedUpdate, /assume update must produce exactly one JSON value/)
     const afterRejectedUpdate = await hooks.tool.assume.execute(
-      { update: '.', query: '.committed' },
-      { sessionID: 'manager-assume', agent: 'manager' },
+      { update: '.', todos: [] },
+      ctx('call-8'),
     )
 
     assert.match(first, /compressed memory/)
-    assert.doesNotMatch(first, /random access/)
-    assert.match(second, /random access/)
-    assert.doesNotMatch(second, /compressed memory/)
-    assert.equal(scalar, '"hello"')
-    assert.equal(scalarRead, '"hello"')
-    assert.equal(afterQueryFailure, 'true')
-    assert.equal(afterRejectedUpdate, 'true')
+    assert.match(scalar, /hello/)
+    assert.match(scalarRead, /hello/)
+    assert.match(afterRejectedUpdate, /hello/)
   })
 })
 integrationTest('WHAT[capability-enforcement-010] MANAGER_calling_enum_uses_personas_while_name_remains_a_free_byname', async () => {

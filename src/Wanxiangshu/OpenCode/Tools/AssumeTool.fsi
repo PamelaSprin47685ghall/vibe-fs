@@ -1,8 +1,9 @@
 namespace Wanxiangshu.OpenCode
 
-/// One process-local persistent JSON canvas interpreted by jq.
-module AssumeTool =
+open System.Threading.Tasks
+open Wanxiangshu.Participant.Cognition
 
+module AssumeTool =
     [<RequireQualifiedAccess>]
     module Path =
         [<Literal>]
@@ -12,8 +13,19 @@ module AssumeTool =
         val ArgUpdate: string = "tool/assume/arg-update"
 
         [<Literal>]
-        val ArgQuery: string = "tool/assume/arg-query"
+        val ArgTodos: string = "tool/assume/arg-todos"
 
     val admission: ToolAdmission
 
-    val spec: factory: HostToolFactory -> ToolSpec
+    val executeWith:
+        runtime: CognitiveRuntime ->
+        resolveOwner: (HostToolContext -> CognitiveOwner.T option) ->
+        HostToolArguments ->
+        HostToolContext ->
+            Task<string>
+
+    val spec:
+        factory: HostToolFactory ->
+        runtime: CognitiveRuntime ->
+        resolveOwner: (HostToolContext -> CognitiveOwner.T option) ->
+            ToolSpec

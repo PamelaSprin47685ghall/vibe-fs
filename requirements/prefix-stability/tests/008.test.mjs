@@ -25,7 +25,7 @@ test('WHAT[prefix-stability-008] COMPANION_010_the_memory_returns_same_session_r
 
   assert.equal(plan.replacesPrefix, true)
   assert.equal(plan.dropLeading, 3)
-  assert.match(plan.memoryText, /prior responsibility/)
+  assert.match(plan.memoryText, /prior responsibility|既有责任/i)
   assert.match(plan.memoryText, /^# THE WORK LOG$/m)
   assert.doesNotMatch(plan.memoryText, /<work-log>|not a new user instruction/)
 })

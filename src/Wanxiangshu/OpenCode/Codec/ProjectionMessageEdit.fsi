@@ -11,6 +11,7 @@ module ProjectionMessageEdit =
         insertAfterHostMessageId: string option ->
         syntheticMessageId: string ->
         memory: string ->
+        retainedAssumeCallIds: Set<string> ->
             obj list
 
     val suppressHostMessagesByIds: rawMessages: obj list -> messageIds: Set<string> -> obj list

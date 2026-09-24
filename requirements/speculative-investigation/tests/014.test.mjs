@@ -11,7 +11,7 @@ test('WHAT[speculative-investigation-014] strength is strictly forced Off when s
     } else {
       process.env.WANXIANGSHU_STRENGTH_MODE = prevEnv
     }
-    ablation.resetCache()
+    ablation.resetRegistry()
   })
 
   // 1. Static contract verification: Settings.fs must check AblationSettings.strengthForcedOff () before checking WANXIANGSHU_STRENGTH_MODE
@@ -20,14 +20,16 @@ test('WHAT[speculative-investigation-014] strength is strictly forced Off when s
   assert.ok(modeFunctionMatch, 'mode () function must exist in Settings.fs')
 
   const modeBody = modeFunctionMatch[1]
-  const ablationCheckIdx = modeBody.indexOf('AblationSettings.strengthForcedOff ()')
+  // The ablation gate now decides from a registry the caller supplies, so the
+  // precedence is expressed by asking the gate before reading the rollout env.
+  const ablationCheckIdx = modeBody.indexOf('AblationGate.modeFor')
   const envCheckIdx = modeBody.indexOf('WANXIANGSHU_STRENGTH_MODE')
-  assert.ok(ablationCheckIdx >= 0, 'AblationSettings.strengthForcedOff check must be present')
+  assert.ok(ablationCheckIdx >= 0, 'the ablation gate must be consulted')
   assert.ok(envCheckIdx >= 0, 'WANXIANGSHU_STRENGTH_MODE check must be present')
-  assert.ok(ablationCheckIdx < envCheckIdx, 'AblationSettings.strengthForcedOff must precede WANXIANGSHU_STRENGTH_MODE check')
+  assert.ok(ablationCheckIdx < envCheckIdx, 'the ablation gate must precede WANXIANGSHU_STRENGTH_MODE check')
 
   // 2. Dynamic check on Ablation Surface
-  ablation.resetCache()
+  ablation.resetRegistry()
   const currentMode = ablation.modeFor('speculative-investigation')
   const isForcedOff = ablation.strengthForcedOff()
   assert.equal(isForcedOff, currentMode === 'ablated', 'strengthForcedOff must equal modeFor("speculative-investigation") === "ablated"')

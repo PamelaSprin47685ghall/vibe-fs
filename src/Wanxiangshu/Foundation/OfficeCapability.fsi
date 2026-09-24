@@ -6,7 +6,6 @@ type ToolPermission =
     | Resume
     | Join
     | Horizon
-    | TodoWrite
     | Fission
     | Read
     | Write

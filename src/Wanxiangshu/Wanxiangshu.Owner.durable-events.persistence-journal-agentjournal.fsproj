@@ -18,7 +18,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.execution-failure-policy.execution-failure-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-fatal-effect.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-async-support.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.obligation-ledger.mission-obligation-todo-model.fsproj"/>
     <Compile Include="Persistence/Journal/Writer.fsi"/>
     <Compile Include="Persistence/Journal/Writer.fs"/>
     <Compile Include="Persistence/Journal/AgentJournal.fsi"/>

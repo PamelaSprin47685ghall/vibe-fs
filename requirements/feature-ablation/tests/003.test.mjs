@@ -59,25 +59,19 @@ test('WHAT[feature-ablation-003] ABL_003_dag_station_order_and_borrow_edges_are_
 })
 
 test('WHAT[feature-ablation-003] ABL_003_cyclic_graph_load_fails_closed', () => {
-  const nodesPath = join(ROOT, 'resources/ablation/nodes.json')
-  const original = readFileSync(nodesPath, 'utf8')
-  try {
-    const doc = JSON.parse(original)
-    // requirement-system -> verification-system 已存在，添加反向边形成环
-    doc.edges.push({
-      from: 'verification-system',
-      to: 'requirement-system',
-      kind: 'station-order',
-    })
-    writeFileSync(nodesPath, JSON.stringify(doc, null, 2), 'utf8')
+  // The cycle is expressed as a document value, so the shared manifest is never
+  // rewritten and no sibling test can observe a half-written file.
+  const doc = JSON.parse(read('resources/ablation/nodes.json'))
+  doc.edges.push({
+    from: 'verification-system',
+    to: 'requirement-system',
+    kind: 'station-order',
+  })
 
-    const result = Ablation.load()
-    assert.equal(result.ok, false, 'manifest loading must fail when graph contains cycles')
-    assert.equal(result.kind, 'DagViolation')
-    assert.match(result.error, /cycle/i)
-    assert.deepEqual(Ablation.manifestNodeIds(), [])
-  } finally {
-    writeFileSync(nodesPath, original, 'utf8')
-    Ablation.load()
-  }
+  const result = Ablation.loadFromNodes(doc)
+  assert.equal(result.ok, false, 'manifest loading must fail when graph contains cycles')
+  assert.equal(result.kind, 'DagViolation')
+  assert.match(result.error, /cycle/i)
+  // A rejected document installs nothing, so no registry survives to answer later.
+  assert.equal(Ablation.installed(), null)
 })

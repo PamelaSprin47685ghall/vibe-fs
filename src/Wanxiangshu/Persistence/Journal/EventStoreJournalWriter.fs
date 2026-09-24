@@ -15,7 +15,6 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Mission.Obligation.Todo
 
 /// Local payload writer for EventStore journals.
 /// `BlobRef` keeps the long-standing `blobs/<handle>` application shape, while
@@ -97,25 +96,45 @@ type EventStoreBlobWriter private (store: IEventStore) =
 module JournalPayloadClosure =
 
     let ofFact (fact: Fact) : PayloadRef list =
+        /// A blob handle is an EventStore payload reference only when it is the
+        /// content address (64 lowercase sha256 hex chars) the store names files by.
+        /// Anything else — a test placeholder or malformed data — is not a payload
+        /// dependency, and claiming it would make every append fail the closure.
+        let payloadRefOfContentAddress (value: string) : PayloadRef option =
+            let isHex c =
+                (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')
+
+            if value.Length = 64 && value |> Seq.forall isHex then
+                Some(PayloadRef.create value)
+            else
+                None
+
+        let payloadRefOfBlobRef (ref: BlobRef) : PayloadRef option =
+            let value = BlobRef.value ref
+            let prefix = "blobs/"
+
+            if value.StartsWith(prefix, StringComparison.Ordinal) then
+                payloadRefOfContentAddress (value.Substring(prefix.Length))
+            else
+                None
+
+        let payloadRefOfBlobDigest (digest: BlobDigest) : PayloadRef option =
+            payloadRefOfContentAddress (BlobDigest.value digest)
+
         let refOf (ref: BlobRef) =
-            MagicTodoFactCodec.payloadRefOfBlobRef ref |> Option.toList
+            payloadRefOfBlobRef ref |> Option.toList
 
         let digestOf (digest: BlobDigest) =
-            MagicTodoFactCodec.payloadRefOfBlobDigest digest |> Option.toList
+            payloadRefOfBlobDigest digest |> Option.toList
 
         let pair (ref: BlobRef) (digest: BlobDigest) = refOf ref @ digestOf digest
 
         let refs =
             match fact with
             | Fact.Runtime _ -> []
-            | Fact.MagicTodo fact -> MagicTodoFactCodec.payloadRefs fact
             | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleCompleted p)) ->
-                (p.CompletionRef
-                 |> Option.toList
-                 |> List.choose MagicTodoFactCodec.payloadRefOfBlobRef)
-                @ (p.CompletionDigest
-                   |> Option.toList
-                   |> List.choose MagicTodoFactCodec.payloadRefOfBlobDigest)
+                (p.CompletionRef |> Option.toList |> List.choose payloadRefOfBlobRef)
+                @ (p.CompletionDigest |> Option.toList |> List.choose payloadRefOfBlobDigest)
             | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleFalseCompletionRejected p)) ->
                 pair p.ExpectedCompletionRef p.ExpectedCompletionDigest
             | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleFalseTerminalReported p)) ->
@@ -127,13 +146,11 @@ module JournalPayloadClosure =
                 pair p.TextRef p.TextDigest
             | Fact.Agent(AgentFact.Context(ContextFactCases.BlogObservationCommitted p)) ->
                 pair p.TextRef p.TextDigest
-                @ (p.EvidenceRef
-                   |> Option.toList
-                   |> List.choose MagicTodoFactCodec.payloadRefOfBlobRef)
+                @ (p.EvidenceRef |> Option.toList |> List.choose payloadRefOfBlobRef)
             | Fact.Agent(AgentFact.Context(ContextFactCases.BlogObservationsSquashed p)) -> pair p.TextRef p.TextDigest
             | Fact.Agent(AgentFact.Context(ContextFactCases.BloggerRequestMaterialized p)) ->
                 pair p.ContextRef p.ContextDigest
-                @ (p.SelectedFrameDigests |> List.choose MagicTodoFactCodec.payloadRefOfBlobDigest)
+                @ (p.SelectedFrameDigests |> List.choose payloadRefOfBlobDigest)
             | Fact.Agent(AgentFact.Context(ContextFactCases.PrefixRebaseCommitted p)) ->
                 pair p.FrozenRecordPrefixRef p.FrozenRecordPrefixDigest
             | Fact.Agent(AgentFact.Fission(FissionFactCases.FissionAdmitted p)) ->

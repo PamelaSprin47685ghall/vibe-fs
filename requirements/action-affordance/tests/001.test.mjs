@@ -27,15 +27,16 @@ test('WHAT[action-affordance-001] AA_assume_contract_answers_act_fit_boundary_re
   for (const locale of LOCALES) {
     const description = readTool('assume', locale)
     const update = read(`resources/provider/tool/assume/arg-update/${locale}.md`)
-    const query = read(`resources/provider/tool/assume/arg-query/${locale}.md`)
+    const todos = read(`resources/provider/tool/assume/arg-todos/${locale}.md`)
 
     assert.match(description, /持久.*JSON.*画板|persistent.*JSON.*canvas/is, 'act must be explicit')
     assert.match(description, /非线性|non-linear/i, 'fit must be explicit')
     assert.match(description, /没有.*预定义.*schema|no predefined schema/is, 'nearby ontology must not be imposed')
-    assert.match(description, /先.*update.*后.*query|update.*first.*query/is, 'update-before-query order must be explicit')
+    assert.match(description, /update|todos/is, 'both arguments must be named')
     assert.match(description, /先抽象.*执行.*验证|abstract.*execute.*verify/is, 'old assume commitment contract must survive')
     assert.match(update, /jq/i, 'update must identify jq syntax')
-    assert.match(update, /当前画板|current workspace/i, 'update must identify dot input semantics')
-    assert.match(query, /更新后|updated workspace/i, 'query must identify post-update input semantics')
+    assert.match(update, /当前画板|当前持久画板|current canvas|persistent canvas/i, 'update must identify dot input semantics')
+    assert.match(update, /恰好一个|exactly one/i, 'update must state the single-output rule')
+    assert.match(todos, /pending|in_progress|completed|cancelled/, 'todos must name the status vocabulary')
   }
 })

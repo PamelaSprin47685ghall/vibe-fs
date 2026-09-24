@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open Fable.Core
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider
 
@@ -8,15 +9,45 @@ open Wanxiangshu.Participant.Provider
 [<RequireQualifiedAccess>]
 module ProviderLanguageBinding =
 
+    // DSL-MUTABLE: resource — cached host configuration preference injected at startup
+    let mutable private hostConfigPreference: string option = None
+
+    let setHostConfigPreference (raw: string) : unit =
+        if not (isNull (box raw)) then
+            hostConfigPreference <- Some raw
+
+    let clearHostConfigPreferenceForTests () : unit = hostConfigPreference <- None
+
     let private valueOrRaise =
         function
         | Ok value -> value
         | Error error -> raise (InvalidOperationException error)
 
+    [<Emit("typeof Intl !== 'undefined' && Intl.DateTimeFormat ? (Intl.DateTimeFormat().resolvedOptions().locale || '') : ''")>]
+    let private jsIntlLocale () : string = jsNative
+
     let readGlobalPreference () : ProviderLanguage =
-        Environment.GetEnvironmentVariable "WANXIANGSHU_PROVIDER_LANGUAGE"
-        |> Option.ofObj
-        |> ProviderLanguage.fromPreferenceObservation
+        let explicit =
+            Environment.GetEnvironmentVariable "WANXIANGSHU_PROVIDER_LANGUAGE"
+            |> Option.ofObj
+
+        let vscodeNls =
+            Environment.GetEnvironmentVariable "VSCODE_NLS_CONFIG" |> Option.ofObj
+
+        let posixLocale =
+            Environment.GetEnvironmentVariable "LC_ALL"
+            |> Option.ofObj
+            |> Option.orElseWith (fun () -> Environment.GetEnvironmentVariable "LC_MESSAGES" |> Option.ofObj)
+            |> Option.orElseWith (fun () -> Environment.GetEnvironmentVariable "LANG" |> Option.ofObj)
+
+        let intlLocale =
+            try
+                let loc = jsIntlLocale ()
+                if String.IsNullOrEmpty loc then None else Some loc
+            with _ ->
+                None
+
+        ProviderLanguage.fromObservationLadder explicit hostConfigPreference vscodeNls posixLocale intlLocale
         |> valueOrRaise
 
     /// Root / first-touch: bind from the observed global preference once.

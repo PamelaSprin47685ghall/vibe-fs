@@ -19,9 +19,8 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Concern
-open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Participant.Cognition
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 type StreamId =
@@ -112,17 +111,6 @@ module Envelope =
 
     let serialize (envelope: Envelope) : string =
         match envelope.Fact with
-        | MagicTodo magicTodo ->
-            Encode.toString
-                0
-                (Encode.object
-                    [ "RuntimeId", Encode.string (RuntimeId.value envelope.RuntimeId)
-                      "LocalSeq", Encode.int64 (LocalSeq.value envelope.LocalSeq)
-                      "ObservedAt", Encode.datetimeOffset (envelope.ObservedAt.ToOffset TimeSpan.Zero)
-                      "EventId", Encode.string (EventId.value envelope.EventId)
-                      "Stream", streamEncoder envelope.Stream
-                      "ProviderRun", providerRunEncoder envelope.ProviderRun
-                      "Fact", Encode.object [ "MagicTodo", Encode.string (MagicTodoFactCodec.encode magicTodo) ] ])
         | _ ->
             Encode.Auto.toString (
                 0,
@@ -289,6 +277,9 @@ module Envelope =
     let private institutionalLearningFactDecoder =
         Decode.Auto.generateDecoderCached<InstitutionalLearningFactCases> (extra = extra)
 
+    let private cognitionFactDecoder =
+        Decode.Auto.generateDecoderCached<AssumeFactCases.T> (extra = extra)
+
     let private familyCase decoder wrap =
         Decode.index 1 decoder |> Decode.map wrap
 
@@ -310,6 +301,7 @@ module Envelope =
             | "Attention" -> familyCase attentionFactDecoder AgentFact.Attention
             | "Concern" -> familyCase concernFactDecoder AgentFact.Concern
             | "InstitutionalLearning" -> familyCase institutionalLearningFactDecoder AgentFact.InstitutionalLearning
+            | "Cognition" -> familyCase cognitionFactDecoder AgentFact.Cognition
             | name -> Decode.fail ("Cannot find AgentFact case " + name))
 
     let private factDecoder: Decoder<Fact> =
@@ -317,78 +309,20 @@ module Envelope =
         |> Decode.andThen (function
             | "Runtime" -> Decode.index 1 runtimeFactDecoder |> Decode.map Fact.Runtime
             | "Agent" -> Decode.index 1 agentFactDecoder |> Decode.map Fact.Agent
-            | "MagicTodo" -> Decode.fail "MagicTodo uses its canonical custom envelope decoder"
             | name -> Decode.fail ("Cannot find Fact case " + name))
 
     let private decodeExtra =
         Extra.withCustom (fun (_: Fact) -> Encode.nil) factDecoder extra
 
-    let private magicTodoEnvelopeDecoder: Decoder<Envelope> =
-        Decode.object (fun get ->
-            let canonical =
-                get.Required.Field "Fact" (Decode.object (fun fget -> fget.Required.Field "MagicTodo" Decode.string))
-
-            match MagicTodoFactCodec.tryDecode canonical with
-            | Ok fact ->
-                { RuntimeId = RuntimeId.create (get.Required.Field "RuntimeId" Decode.string)
-                  LocalSeq = LocalSeq.create (get.Required.Field "LocalSeq" Decode.int64)
-                  ObservedAt = get.Required.Field "ObservedAt" Decode.datetimeOffset
-                  EventId = EventId.create (get.Required.Field "EventId" Decode.string)
-                  Stream = get.Required.Field "Stream" streamDecoder
-                  ProviderRun = get.Required.Field "ProviderRun" providerRunDecoder
-                  Fact = Fact.MagicTodo fact }
-            | Error reason -> failwith ("invalid MagicTodo canonical payload: " + reason))
-
     let private currentEnvelopeDecoder: Decoder<Envelope> =
         Decode.Auto.generateDecoderCached<Envelope> (extra = decodeExtra)
 
-    let private decodeMagicTodoEnvelope decoder json =
-        match Decode.fromString decoder json with
-        | Ok envelope -> Some envelope
-        | Error _ -> None
-
-    let private tryDecodeMagicTodoJson json =
-        try
-            decodeMagicTodoEnvelope magicTodoEnvelopeDecoder json
-        with _ ->
-            None
-
-    let private tryDecodeMagicTodoEnvelope (json: string) : Envelope option =
-        if json.IndexOf("\"MagicTodo\"", StringComparison.Ordinal) < 0 then
-            None
-        else
-            tryDecodeMagicTodoJson json
-
-    let private hasMagicTodoFact (value: JsonValue) : bool =
-        emitJsExpr
-            value
-            "!!$0 && typeof $0 === 'object' && !!$0.Fact && typeof $0.Fact === 'object' && Object.prototype.hasOwnProperty.call($0.Fact, 'MagicTodo')"
-
-    let private decodeMagicTodoEnvelopeValue (value: JsonValue) =
-        Decode.fromValue "$" magicTodoEnvelopeDecoder value |> Result.toOption
-
-    let private tryDecodeMagicTodoValue value =
-        try
-            decodeMagicTodoEnvelopeValue value
-        with _ ->
-            None
-
-    let private tryDecodeMagicTodoEnvelopeValue (value: JsonValue) : Envelope option =
-        if not (hasMagicTodoFact value) then
-            None
-        else
-            tryDecodeMagicTodoValue value
-
     let private deserializeCurrentEnvelope json =
-        match tryDecodeMagicTodoEnvelope json with
-        | Some envelope -> Ok envelope
-        | None -> Decode.fromString currentEnvelopeDecoder json
+        Decode.fromString currentEnvelopeDecoder json
         |> Result.bind (fun envelope -> FactCodec.validateFact envelope.Fact |> Result.map (fun _ -> envelope))
 
     let private deserializeCurrentEnvelopeValue (value: JsonValue) =
-        match tryDecodeMagicTodoEnvelopeValue value with
-        | Some envelope -> Ok envelope
-        | None -> Decode.fromValue "$" currentEnvelopeDecoder value
+        Decode.fromValue "$" currentEnvelopeDecoder value
         |> Result.bind (fun envelope -> FactCodec.validateFact envelope.Fact |> Result.map (fun _ -> envelope))
 
     let deserialize (json: string) : Result<Envelope, string> =

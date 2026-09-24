@@ -12,8 +12,8 @@ open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Concern
-open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Relay
+open Wanxiangshu.Participant.Cognition
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 module Fact =
@@ -39,8 +39,8 @@ module Fact =
         | Concern of ConcernFactCases
         | InstitutionalLearning of InstitutionalLearningFactCases
         | ChatExecution of ChatExecutionFactCases
+        | Cognition of AssumeFactCases.T
 
     type Fact =
         | Runtime of RuntimeFact
         | Agent of AgentFact
-        | MagicTodo of MagicTodoFacts.MagicTodoFact

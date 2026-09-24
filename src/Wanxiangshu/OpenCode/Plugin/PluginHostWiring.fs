@@ -207,17 +207,31 @@ module PluginHostWiring =
                           CausalWaitObserver = causalWait.Observer }
                 }
 
+            // Continue keeps the authority run alive while its former physical
+            // attempt must still be interrupted. A new root after Accepted is different.
             let isLifecycleTerminated (sessionId: SessionId) =
-                match boot.Journal with
-                | None -> false
-                | Some durable ->
-                    let snapshot = AgentJournal.snapshot durable
+                let sessionOpt =
+                    boot.Journal
+                    |> Option.bind (fun durable ->
+                        let snapshot = AgentJournal.snapshot durable
+                        AgentProjection.tryFind sessionId snapshot.AgentProjections)
 
-                    AgentProjection.tryFind sessionId snapshot.AgentProjections
-                    |> Option.bind (fun (s: SessionAgentProjection) -> s.Relay)
-                    |> Option.bind (fun (r: RelayState) -> Fold.view r (RoadId.create (SessionId.value sessionId)))
-                    |> Option.bind (fun road -> road.LatestRetirement)
-                    |> Option.isSome
+                let activeRoot =
+                    sessionOpt
+                    |> Option.bind (fun s -> s.PromptAuthority)
+                    |> Option.bind (fun pa -> pa.ActiveLogicalRun)
+                    |> Option.map (fun profile -> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
+
+                sessionOpt
+                |> Option.bind (fun s -> s.Relay)
+                |> Option.bind (fun r -> Fold.view r (RoadId.create (SessionId.value sessionId)))
+                |> Option.exists (fun road ->
+                    road.LatestRetirement.IsSome
+                    && (match activeRoot with
+                        | None -> true
+                        | Some root ->
+                            road.AuthorityMessageIds
+                            |> List.exists (fun oldRoot -> PhysicalUserMessageId.value oldRoot = root)))
 
             match PluginHost.createHost input boot.PortOpt (Some boot.FamilyParent) (Some isLifecycleTerminated) with
             | Error err -> return raise (InvalidOperationException err)

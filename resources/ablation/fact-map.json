@@ -14,6 +14,6 @@
     "AgentFact.Concern": "concern-routing",
     "AgentFact.InstitutionalLearning": "institutional-learning",
     "AgentFact.ChatExecution": "managed-chat-execution",
-    "MagicTodo": "obligation-ledger"
+    "AgentFact.Cognition": "cognitive-workspace"
   }
 }

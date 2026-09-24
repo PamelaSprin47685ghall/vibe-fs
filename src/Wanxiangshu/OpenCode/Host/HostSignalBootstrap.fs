@@ -574,18 +574,26 @@ module HostSignalBootstrap =
             let continueManagedChatMessage intent output =
                 match intent with
                 | ChatAdmissionIntent.Decision.ExternalRootIntent evidence ->
-                    scope.Sessions.ModelRoutingSessions.Add(SessionId.value evidence.Key.SessionId)
-                    |> ignore
+                    let sid = SessionId.value evidence.Key.SessionId
+                    let pid = PhysicalUserMessageId.value evidence.Key.PhysicalUserMessageId
 
-                    bindUserMessage
-                        (SessionId.value evidence.Key.SessionId)
-                        (PhysicalUserMessageId.value evidence.Key.PhysicalUserMessageId)
+                    scope.Sessions.ModelRoutingSessions.Add sid |> ignore
+                    bindUserMessage sid pid
+                    registerOwned sid
+
+                    ModelRouting.releasePhysicalExecution evidence.Key.SessionId evidence.Key.PhysicalUserMessageId
+                    |> ignore
                 | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence ->
                     let sessionId = SessionId.value evidence.Key.SessionId
                     let physicalId = PhysicalUserMessageId.value evidence.Key.PhysicalUserMessageId
 
                     scope.Sessions.ModelRoutingSessions.Add sessionId |> ignore
                     bindHumanContinuationMessage sessionId physicalId
+                    registerOwned sessionId
+
+                    ModelRouting.releasePhysicalExecution evidence.Key.SessionId evidence.Key.PhysicalUserMessageId
+                    |> ignore
+
                     registerOwned sessionId
                 | ChatAdmissionIntent.Decision.PendingPromptIntent evidence ->
                     let sessionId = SessionId.value evidence.Key.SessionId
@@ -719,11 +727,42 @@ module HostSignalBootstrap =
                     return fetched
                 }
 
+            let tryDurableSessionAgent (sessionId: SessionId) : string option =
+                journal
+                |> Option.bind (fun durable ->
+                    let snapshot = AgentJournal.snapshot durable
+
+                    Map.tryFind sessionId snapshot.AgentProjections.Sessions
+                    |> Option.bind (fun s -> s.PromptAuthority)
+                    |> Option.bind (fun pa ->
+                        pa.ActiveLogicalRun
+                        |> Option.map (fun run -> run.SelectedAgent)
+                        |> Option.orElseWith (fun () ->
+                            pa.LastAuthorityProfile |> Option.map (fun last -> last.SelectedAgent))))
+
+            let resolveFallbackAgent sid =
+                match tryDurableSessionAgent sid with
+                | Some agent ->
+                    SessionExecutionBinding.observeUserFacingAgent sid agent
+                    Some agent
+                | None when not (hasPhysicalParent sid) ->
+                    let defaultAgent = "manager"
+                    SessionExecutionBinding.observeUserFacingAgent sid defaultAgent
+                    Some defaultAgent
+                | None -> None
+
+            let resolveMissingOrFallbackAgent sid =
+                task {
+                    match! queryMissingAgent sid with
+                    | Some agent -> return Some agent
+                    | None -> return resolveFallbackAgent sid
+                }
+
             let resolveAgentForSession sid =
                 task {
                     match SessionExecutionBinding.tryAgent sid with
                     | Some agent -> return Some agent
-                    | None -> return! queryMissingAgent sid
+                    | None -> return! resolveMissingOrFallbackAgent sid
                 }
 
             let applyResolvedAgent agentOpt (decoded: PromptIngressCodec.DecodedMessage) =

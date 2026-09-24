@@ -349,6 +349,15 @@ module ToolHostCodec =
     [<Emit("$0.schema.array($0.schema.string())")>]
     let private rawStringArraySchema (tool: obj) : obj = jsNative
 
+    [<Emit("""$0.schema.array(
+        $0.schema.object({
+            content: $0.schema.string().describe("Todo item content"),
+            status: $0.schema.enum(["pending", "in_progress", "completed", "cancelled"]).describe("Todo status"),
+            priority: $0.schema.enum(["high", "medium", "low"]).optional().describe("Todo priority")
+        })
+    ).describe($1)""")>]
+    let private rawTodoArraySchemaDescribed (tool: obj) (description: string) : obj = jsNative
+
     [<Emit("$0($1)")>]
     let private applyTool (factory: obj) (definition: obj) : obj = jsNative
 
@@ -483,6 +492,9 @@ module ToolHostCodec =
 
     let stringArraySchema (HostToolFactory factory) =
         HostSchema(rawStringArraySchema factory)
+
+    let todoArraySchemaDescribed description (HostToolFactory factory) =
+        HostSchema(rawTodoArraySchemaDescribed factory description)
 
     let register (HostToolFactory factory) (spec: ToolSpec) =
         let args =

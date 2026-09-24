@@ -204,6 +204,7 @@ module XWireSurface =
         (openingHostMessageId: obj)
         (syntheticMessageId: string)
         (memory: string)
+        (retainedAssumeCallIds: string array)
         : obj array =
         XWire.replacePrefixByHostIds
             (if isNull rawMessages then [] else Array.toList rawMessages)
@@ -217,6 +218,10 @@ module XWireSurface =
                  Some(text openingHostMessageId))
             syntheticMessageId
             memory
+            (if isNull retainedAssumeCallIds then
+                 Set.empty
+             else
+                 set retainedAssumeCallIds)
         |> List.toArray
 
     let suppressHostMessagesByIds (rawMessages: obj array) (hostMessageIds: string array) : obj array =

@@ -312,3 +312,23 @@ module AblationManifest =
                           ManifestFingerprint = nodesFingerprint ()
                           NodeCount = document.Nodes.Length }
                       Nodes = nodeMap })))
+
+    /// Build a registry straight from a document the caller already holds.
+    ///
+    /// Same validation as reading from disk, minus the read: this is the seam that
+    /// lets a caller ask about a manifest it constructed itself without touching what
+    /// other callers are reading.
+    let registryOf
+        (document: ManifestDocument)
+        (profileName: string option)
+        (explicit: Map<AblationNodeId, AblationMode>)
+        : Result<AblationRegistry, AblationLoadError> =
+        buildRegistry document profileName explicit
+
+    /// Decode a manifest document from a JS value the caller already holds.
+    ///
+    /// Same decoder the file reader uses, so a caller cannot construct a document the
+    /// loader would have rejected.
+    let decodeFromJs (document: obj) : Result<ManifestDocument, AblationLoadError> =
+        Decode.fromValue "$" decodeDocument document
+        |> Result.mapError (fun reason -> InvalidManifest reason)

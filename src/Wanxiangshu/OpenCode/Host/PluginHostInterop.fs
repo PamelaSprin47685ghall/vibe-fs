@@ -22,7 +22,6 @@ open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Git
 open Wanxiangshu.Git.Hook
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Mission.Obligation.Todo.OpenCode
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.Semble
@@ -372,11 +371,6 @@ module PluginHostInterop =
               Lifecycle = lifecycleAfterFailedTransaction settlement
               ExecutionKey = key
               Settlement = settlement }
-        | :? MagicTodoHostCodec.ProviderInputRejection ->
-            { Failure = ExecutionFailure.ProtocolRejection
-              Lifecycle = DurableExecutionLifecycle.NoAcceptedFact
-              ExecutionKey = key
-              Settlement = HookSettlementEvidence.NoOwnedExecution }
         | :? HostSignalBootstrap.ChatAdmissionHookException as managed ->
             let failure, lifecycle, settlement = managedFailure managed.Failure
 

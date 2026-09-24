@@ -20,8 +20,6 @@ const MANAGER_VISIBLE_SURFACES = [
   'tool/horizon/description',
   'tool/join/description',
   'tool/suicide/description',
-  'lifecycle/magic-todo/todowrite-description',
-  'lifecycle/magic-todo/manager-guideline',
 ]
 
 test('WHAT[participant-horizon-003] PH_exec_030_no_generic_state_dto_vocabulary_in_join_or_horizon_descriptions', () => {

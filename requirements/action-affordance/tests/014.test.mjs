@@ -1,41 +1,27 @@
 import assert from 'node:assert/strict'
+import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import test from 'node:test'
 
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '../../..')
-
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
-
 const LOCALES = ['en', 'zh-CN']
 
-const HIGH_RISK_TOOLS = Object.freeze([
-  'commission',
-  'establish-behavior',
-  'fork',
-  'inspect',
-  'query-shell',
-  'repair-behavior',
-  'resume',
-  'run',
-])
-
-const readTool = (tool, locale) => read(`resources/provider/tool/${tool}/description/${locale}.md`)
-
-test('WHAT[action-affordance-014] AA_assume_contract_is_update_then_query_over_one_free_form_canvas', () => {
+test('WHAT[action-affordance-014] AA_assume_contract_is_single_jq_update_and_complete_todo_declaration', () => {
   for (const locale of LOCALES) {
-    const description = readTool('assume', locale)
+    const description = read(`resources/provider/tool/assume/description/${locale}.md`)
     const update = read(`resources/provider/tool/assume/arg-update/${locale}.md`)
-    const query = read(`resources/provider/tool/assume/arg-query/${locale}.md`)
+    const todos = read(`resources/provider/tool/assume/arg-todos/${locale}.md`)
 
-    assert.match(description, /唯一.*画板|one.*workspace/is)
-    assert.match(description, /两个.*必填|two required/i)
-    assert.match(description, /update.*恰好一个|update.*exactly one/is)
-    assert.match(description, /update\s*=\s*["“]?\.["”]?|update.*`\.`/is)
-    assert.match(description, /query.*零.*一个.*多个|query.*zero.*one.*multiple/is)
-    assert.match(description, /query.*失败.*不.*回滚|query.*fail.*does not roll back/is)
-    assert.match(description, /jq.*先验|jq.*prior/i)
-    assert.doesNotMatch(update + query, /assumption/i)
+    assert.match(description, /唯一.*画板|one workspace|single canvas/is, 'one workspace')
+    assert.match(description, /update|todos/is, 'both arguments named')
+    assert.match(description, /恰好一个|exactly one/i, 'update must produce exactly one value')
+    assert.match(description, /完整|complete|whole/i, 'todos is the complete list')
+    assert.match(description, /完整|complete|whole|回滚|unchanged|not roll back/is, 'failure changes nothing')
+    assert.match(update, /jq/i, 'update identifies jq')
+    assert.match(update, /当前画板|当前持久画板|current canvas|persistent canvas/i, 'update identifies the dot input')
+    assert.match(todos, /pending|in_progress|completed|cancelled/, 'todos names the status vocabulary')
+    assert.doesNotMatch(description, /\bquery\b/i, 'the retired query parameter is gone')
   }
 })

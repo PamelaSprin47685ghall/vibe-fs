@@ -18,7 +18,7 @@ module SphinxConfig =
     let private apply (config: obj) =
         emitJsStatement config "if ($0.mcp) delete $0.mcp.sphinx"
 
-        if AblationSettings.allowsToolSchema "sphinx" then
+        if not (AblationGate.toolSchemaDenied (AblationGate.registry ()) "sphinx") then
             register config
         else
             emitJsStatement config "if ($0.command) delete $0.command.sphinx"

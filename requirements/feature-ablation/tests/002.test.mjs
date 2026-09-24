@@ -3,6 +3,9 @@ import test from 'node:test'
 import * as Ablation from '../../../dist/Ablation/Surface.js'
 import { configure as configureSphinx } from '../../../dist/OpenCode/Plugin/SphinxCommandSurface.js'
 
+// Ablation memoises the manifest on first load, so restoring the environment is not
+// enough on its own: the cache would keep answering for the profile that loaded it,
+// and leak into whichever test loads it next. The cache goes down with the env.
 const withEnv = (entries, run) => {
   const previous = Object.fromEntries(entries.map(([name]) => [name, process.env[name]]))
   try {
@@ -10,12 +13,14 @@ const withEnv = (entries, run) => {
       if (value === undefined) delete process.env[name]
       else process.env[name] = value
     }
+    Ablation.resetRegistry()
     run()
   } finally {
     for (const [name, value] of Object.entries(previous)) {
       if (value === undefined) delete process.env[name]
       else process.env[name] = value
     }
+    Ablation.resetRegistry()
   }
 }
 
@@ -206,7 +211,10 @@ test('WHAT[feature-ablation-002] ABL_002_station_05_denies_ablated_durable_fact_
     Ablation.load()
     assert.equal(Ablation.allowsFact('AgentFact.Delegation'), false)
     assert.equal(Ablation.allowsFact('AgentFact.Relay'), false)
-    assert.equal(Ablation.allowsFact('MagicTodo'), false)
+    assert.equal(Ablation.allowsFact('AgentFact.Cognition'), false)
+    // The retired ledger family is not mapped at all, so it is neither granted nor
+    // denied by a node: an unmapped tag stays allowed as the unowned default.
+    assert.equal(Ablation.allowsFact('MagicTodo'), true)
     assert.equal(Ablation.allowsFact('AgentFact.UnmappedFamily'), true)
   })
 })

@@ -13,7 +13,6 @@ module OfficeCapabilitySurface =
         | "Resume" -> Some ToolPermission.Resume
         | "Join" -> Some ToolPermission.Join
         | "Horizon" -> Some ToolPermission.Horizon
-        | "TodoWrite" -> Some ToolPermission.TodoWrite
         | "Fission" -> Some ToolPermission.Fission
         | "Read" -> Some ToolPermission.Read
         | "Write" -> Some ToolPermission.Write
@@ -38,7 +37,6 @@ module OfficeCapabilitySurface =
         | ToolPermission.Resume -> "Resume"
         | ToolPermission.Join -> "Join"
         | ToolPermission.Horizon -> "Horizon"
-        | ToolPermission.TodoWrite -> "TodoWrite"
         | ToolPermission.Fission -> "Fission"
         | ToolPermission.Read -> "Read"
         | ToolPermission.Write -> "Write"

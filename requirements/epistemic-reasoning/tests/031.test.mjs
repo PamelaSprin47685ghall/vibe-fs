@@ -78,7 +78,7 @@ test('WHAT[epistemic-reasoning-031] one invocation consumes all pending requests
   assert.equal(result.answer.epistemicBasis.evidence.length, 0)
 })
 
-test('WHAT[epistemic-reasoning-033] accepted work is not purchased again after runtime restart', async t => {
+test('WHAT[epistemic-reasoning-031] accepted work is not purchased again after runtime restart', async t => {
   const { api, open } = await inquiryFixture(t)
   let purchases = 0
   const observe = async work => { purchases++; return emptyInquiryObservation(work) }
@@ -89,7 +89,7 @@ test('WHAT[epistemic-reasoning-033] accepted work is not purchased again after r
   assert.equal(purchases, 2)
 })
 
-test('WHAT[epistemic-reasoning-033] concurrent retries share one invocation and reject identity reuse for another question', async t => {
+test('WHAT[epistemic-reasoning-031] concurrent retries share one invocation and reject identity reuse for another question', async t => {
   const { api, open } = await inquiryFixture(t)
   const runtime = open()
   let purchases = 0
@@ -104,7 +104,7 @@ test('WHAT[epistemic-reasoning-033] concurrent retries share one invocation and 
   assert.equal(purchases, 2)
 })
 
-test('WHAT[epistemic-reasoning-034] cancellation fences an in-flight observation and remains terminal on retry', async t => {
+test('WHAT[epistemic-reasoning-031] cancellation fences an in-flight observation and remains terminal on retry', async t => {
   const { api, open } = await inquiryFixture(t)
   let cancelled = false
   let release
@@ -127,7 +127,7 @@ test('WHAT[epistemic-reasoning-034] cancellation fences an in-flight observation
   assert.deepEqual(replayed, result)
 })
 
-test('WHAT[epistemic-reasoning-004] an observation for the wrong phase is not absorbed', async t => {
+test('WHAT[epistemic-reasoning-031] an observation for the wrong phase is not absorbed', async t => {
   const { api, open } = await inquiryFixture(t)
   const result = await api.run(open(), 'wrong-phase', 'Question', async () => ({ type: 'Candidates', items: [] }), () => false)
   assert.equal(result.status, 'unresolved')
@@ -136,7 +136,7 @@ test('WHAT[epistemic-reasoning-004] an observation for the wrong phase is not ab
   assert.equal(result.answer.epistemicBasis.evidence.length, 0)
 })
 
-test('WHAT[epistemic-reasoning-013] an empty question never purchases model work', async t => {
+test('WHAT[epistemic-reasoning-031] an empty question never purchases model work', async t => {
   const { api, open } = await inquiryFixture(t)
   await assert.rejects(api.run(open(), 'empty-question', '   ', () => {
     assert.fail('empty questions must fail before research')

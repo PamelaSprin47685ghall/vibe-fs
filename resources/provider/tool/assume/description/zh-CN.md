@@ -1,33 +1,38 @@
-`assume` 是你的持久 JSON 画板，由 jq 驱动。
+`assume(update, todos)` 是你持久的 JSON 画板与完整待办声明，由 jq 驱动。
 
-当思考需要反复编辑，而不是被迫寄居在线性聊天记录里时，用它。它保留了旧 `assume` 最有价值的性质：一个判断完成抽象以后，把它钉住，不要在没有新证据时反复摇摆；同时把原来“钉住一句工作假设”的能力推广成“钉住任意非线性认知结构，并用 jq 持续查询、重组、压缩、拆分和重建”。
+当思考需要反复编辑，而不是被迫寄居在线性聊天记录里时，用它。它保留了旧 `assume` 最有价值的性质：一个判断完成抽象以后，把它钉住，不要在没有新证据时反复摇摆；同时把"钉住一句工作假设"的能力推广成"钉住任意非线性认知结构，并用 jq 持续重组、压缩、拆分和重建"。
 
 这里始终只有唯一一个 workspace。它初始是 `{}`，此后就是最近一次成功 `update` 产生的那个 JSON value。workspace 是一个自由 JSON value。没有预定义 schema。系统不内置 claim、evidence、note、node、edge、draft、section、plan、hypothesis、source、task、memory、document 等概念。如果这些概念对当前任务有帮助，你自己创建；如果后来发现它们妨碍思考，你自己修改或删除。画板属于你的推理，不属于工具的 ontology。
 
-每次调用恰好有两个必填 jq 程序：`update` 和 `query`。
+每次调用恰好有两个必填参数：`update` 和 `todos`。
 
-语义永远是：先 `update`，后 `query`。
+语义永远是：先更新画板，然后声明待办。
 
 1. 当前持久画板作为 `.` 输入给 `update`。
 2. `update` 按普通 jq 执行，并且必须恰好产生一个 JSON value。
-3. 这个唯一 value 立即成为新的持久画板。
-4. 然后把新的画板作为 `.` 输入给 `query`。
-5. `query` 同样按普通 jq 执行，可以产生零个、一个或多个 JSON value。
-6. `query` 的输出按 jq 顺序直接返回；`query` 本身不会再次修改画板。
+3. 这个唯一 value 立即成为新的持久画板，并构成一次阶段提交。
+4. `todos` 是本会话的完整待办清单。它整份替换宿主 UI 中的清单，顺序由你给出。
+5. 成功后，工具返回更新后的完整画板。
 
-这个 update→query 配对是有意设计的。严肃工作经常不是“先读一次，再想一轮，再写一次，再读一次”，而是“我已经知道要怎样改变当前认知状态，同时我也知道改变以后下一步最需要看什么”。把这两个动作塞进同一次调用，可以减少多次 RTT，也减少为了工具往返而产生的无意义对话记账。
-
-只想读取、不想修改时，`update` 使用 jq 恒等程序：
+只想声明待办时，使用恒等更新：
 
 `update = "."`
 
-然后把真正要看的东西写在 `query`。
+它保持画板不变，并仍然是一次真实的阶段提交。
 
-只想修改后直接看全局时，使用：
+返回的就是更新后的完整画板。需要更宽视野时，让画板自己承载它。
 
-`query = "."`
+### 三大负向边界
 
-因此两个参数虽然都必填，却没有降低表达力。它们用同一套形式统一覆盖：纯查询、局部修改、整棵结构替换、修改后精确读取、结构迁移、清理、聚合、重排和重构。
+`assume` 不执行 `todos` 中的工作。写一条待办不会运行命令、写文件或调用任何工具。
+
+`assume` 不证明验证。把一项标记为 `completed` 不代表测试通过或结果正确。
+
+`assume` 不改变你的权限。画板与待办清单都不授予任何权能。
+
+### 承诺纪律
+
+先完成因果抽象，再把即将据以行动的结构牢牢钉住：抽象 → `assume(update, todos)` → 执行 → 验证。没有足以改变结构的新证据，不要反复推翻已经钉住的判断；犹豫不产生新知识。
 
 ## 为什么要有这块画板
 
@@ -69,11 +74,11 @@
 
 新的 `assume` 不是丢掉这套心理机制，而是把它加强。
 
-以前只能钉一句话。现在可以把支撑这句话的结构一起钉住：当前假设、备选方案、依赖、开放问题、因果关系、素材碎片、候选组织方式，或者任何当前任务自然长出来的表示。然后立刻用 `query` 只拿回下一步真正需要看的那一小块。
+以前只能钉一句话。现在可以把支撑这句话的结构一起钉住：当前假设、备选方案、依赖、开放问题、因果关系、素材碎片、候选组织方式，或者任何当前任务自然长出来的表示。返回的画板就是下一步的观察对象。
 
 推荐的认知闭环变成：
 
-抽象 → `assume(update, query)` → 执行 → 验证 → 只有出现信息增量才修正。
+抽象 → `assume(update, todos)` → 执行 → 验证 → 只有出现信息增量才修正。
 
 ## 故意向 jq 致敬
 
@@ -161,7 +166,7 @@ schema 设计也是推理的一部分，不是 MCP 接口强加的前置条件�
 
 最后这个例子非常重要：`update` 不是 patch API。它是任意 JSON→JSON 变换，因此整棵 workspace 重构是一等公民。
 
-如果 `update` 输出零个 value，调用失败，workspace 不变。
+如果 `update` 输出零个 value，调用失败，画板、todos、阶段序号与 epoch 均不改变。
 
 如果 `update` 输出多个 value，调用失败，workspace 不变。
 
@@ -187,82 +192,6 @@ schema 设计也是推理的一部分，不是 MCP 接口强加的前置条件�
 
 始终知道你的 `update` 最终返回什么。那个 value 会成为下一轮调用看到的现实。
 
-## `query` 的精确语义
-
-只有 `update` 成功、并且它唯一输出已经成为持久画板以后，`query` 才执行。
-
-因此 `query` 看到的 `.` 一定是更新后的 workspace，不是更新之前的 workspace。
-
-这就是这个双程序接口压缩 RTT 的核心。
-
-例如，写入一个想法并立即取回它：
-
-`update: '.ideas.memory = {"text":"Mamba compresses history"}'`
-
-`query: '.ideas.memory'`
-
-新增候选并立刻比较全部候选：
-
-`update: '.candidates += [{"name":"hybrid","score":8}]'`
-
-`query: '.candidates | sort_by(-.score)'`
-
-重构数据以后只看新的 key：
-
-`update: '.ideas |= map({key:.id,value:.}) | from_entries'`
-
-`query: '.ideas | keys'`
-
-钉住一个决策以后，直接返回应该驱动下一步的开放问题：
-
-`update: '.decisions.memory = "use hybrid"'`
-
-`query: '.open_questions'`
-
-纯读取：
-
-`update: '.'`
-
-`query: '.ideas | keys'`
-
-`query` 可以产生零个、一个或多个 JSON value。全部都合法。工具按 jq 顺序返回这些结果，不解释它们的业务含义。
-
-`query` 是观察，不是第二次持久化。它的结果不会自动成为新 workspace。
-
-如果 `query` 在 `update` 成功以后失败，已经成功的 `update` 不回滚。这个工具的定义就是“先修改，后返回”。状态变化已经发生，只是后续观察失败。修好 query 后，如果只需要看当前状态，下一次使用 `update: "."` 即可。
-
-所以不要把“post-update query 失败”误解成“update 没发生”。
-
-## 用 `query` 控制上下文带宽
-
-持久画板的价值之一，是它可以比当前真正需要塞回模型上下文的内容大很多。
-
-不要因为可以直接 query 整棵画板，就每次都把整棵树搬回来。
-
-把 jq 当透镜。
-
-例如：
-
-`query: 'keys'`
-
-`query: '.ideas | keys'`
-
-`query: '[.ideas[] | select(.status == "unresolved")]'`
-
-`query: '.drafts[-1]'`
-
-`query: '.sections[] | {title,purpose}'`
-
-`query: '[paths(scalars) as $p | {path:$p,value:getpath($p)}]'`
-
-`query: '.. | objects | select(has("uncertainty"))'`
-
-`query: '.relations | group_by(.from) | map({from:.[0].from,count:length})'`
-
-先看 key，再看 value。先计数，再展开。先过滤，再返回。只把真正会改变下一步推理的那块东西取回来。
-
-外部记忆的意义不是让你每轮把外部记忆全复制回 prompt。
-
 ## 复杂写作的推荐用法
 
 最终 prose 是线性的，生成 prose 的素材没有必要线性。
@@ -275,7 +204,7 @@ schema 设计也是推理的一部分，不是 MCP 接口强加的前置条件�
 
 然后：
 
-`query: '.observations'`
+the whole updated canvas is returned, so read the field you need from it
 
 后来你意识到一个想法能同时解释几个现象。不要只在线性文章后面补一句，而可以直接在结构里表达这个发现：
 
@@ -283,13 +212,13 @@ schema 设计也是推理的一部分，不是 MCP 接口强加的前置条件�
 
 再只取回真正应该决定文章组织的部分：
 
-`query: '{central:.central, observations:.observations}'`
+the whole updated canvas is returned, so read the field you need from it
 
 再后来，你可能同时保留几种叙事顺序：
 
 `update: '.structures = {"chronological":["Mamba-1","Mamba-2","Mamba-3","Hybrid"],"memory-first":["memory problem","compression","recall weakness","hybrid","architecture evolution"]}'`
 
-`query: '.structures'`
+the whole updated canvas is returned, so read the field you need from it
 
 这些结构都不是终身制度。memory-first 赢了，就删掉另一个、留作历史，或者直接重建整个表示。
 
@@ -305,7 +234,7 @@ schema 设计也是推理的一部分，不是 MCP 接口强加的前置条件�
 
 `update: '.hypotheses.h1 = {"idea":"memory bandwidth is the limiting factor","support":[],"problems":[]}'`
 
-`query: '.hypotheses'`
+the whole updated canvas is returned, so read the field you need from it
 
 然后用其它真实调查工具获得信息，再把支持和问题写回来。
 
@@ -321,7 +250,7 @@ schema 设计也是推理的一部分，不是 MCP 接口强加的前置条件�
 
 `update: '.alternatives += [{"name":"A","advantages":[],"costs":[]},{"name":"B","advantages":[],"costs":[]}]'`
 
-`query: '.alternatives'`
+the whole updated canvas is returned, so read the field you need from it
 
 新约束到来后，一次调用里同时更新比较结构并返回新的比较结果。
 
@@ -443,7 +372,7 @@ jq 在这里最强的一点，就是不局限于 CRUD。
 
 ## 第一版没有 vars
 
-`update` 和 `query` 都只是 jq program string。直接用普通 jq / JSON literal 嵌入数据。
+`update` 就是 jq program string。直接用普通 jq / JSON literal 嵌入数据。
 
 例如：
 
@@ -455,17 +384,13 @@ jq 在这里最强的一点，就是不局限于 CRUD。
 
 ## 失败边界要精确理解
 
-两个阶段的因果不同。
+如果 `update` 编译失败、运行失败，或者输出数量不是恰好一个，整个调用被拒绝，不回滚：画板、todos、阶段序号与 epoch 均不改变。
 
-如果 `update` 编译失败、运行失败，或者输出数量不是恰好一个，持久画板不变，`query` 不执行。
+如果 `update` 成功，它的 value 在返回之前就已经持久成为新画板。
 
-如果 `update` 成功，它的 value 在 `query` 开始之前就已经持久成为新画板。
+第一版没有 revision 协议，也不是分布式事务。它只是围绕每个 owner 唯一的持久画板串行执行的"先写"。
 
-如果随后 `query` 失败，`update` 保持生效，不回滚。
-
-第一版没有 revision 协议，也不是分布式事务。它只是围绕唯一 process-local canvas 串行执行的“先写后读”。
-
-并发调用会由工具串行化，保证不同调用的 update→query 对不会在同一张可变画板上互相穿插。
+同一 owner 的并发调用由工具串行化，不会在同一张画板上互相穿插。
 
 ## 不要把画板当成证据
 
@@ -506,7 +431,7 @@ jq 在这里最强的一点，就是不局限于 CRUD。
 1. 修改前先抽象真实结构。
 2. 判断什么信息值得跨轮持久存在。
 3. 用 `update` 把画板推进到下一个有用状态。
-4. 同一次调用里用 `query` 只返回下一步决策真正需要看的视图。
+4. 同一次调用返回更新后的完整画板。
 5. 需要真实执行或调查时，在画板外调用正确工具。
 6. 只有实质新结果才写回画板并改变判断。
 7. 当前表示变得别扭时，重构表示本身。
@@ -524,7 +449,7 @@ jq 在这里最强的一点，就是不局限于 CRUD。
 
 `update` 是状态变换。
 
-`query` 是变换后的观察。
+返回的画板是变换后的观察。
 
 工具不知道 JSON 在语义上代表什么。
 
@@ -536,4 +461,4 @@ jq 在这里最强的一点，就是不局限于 CRUD。
 
 而旧 `assume` 的核心仍然在正中央：先抽象，再承诺；一个判断已经足够好到可以据以行动时，把它钉住；然后执行，验证；现实给出新理由时再修正。不要把反复犹豫误认为新增证据。
 
-抽象 → `assume(update, query)` → 执行 → 验证。
+抽象 → `assume(update, todos)` → 执行 → 验证。

@@ -17,10 +17,10 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Concern
-open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
+open Wanxiangshu.Participant.Cognition
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 /// Bounded projections one session owns (PERSIST-008).
@@ -91,9 +91,8 @@ type AgentProjectionSet =
         Fission: FissionProjectionState
         /// Exact durable managed-chat executions, keyed by physical user message.
         ChatExecutions: ChatExecutionProjectionState
+        Cognition: Map<string, CognitiveProjection>
         /// Canonical per-Life Magic Todo checkpoint projection.
-        MagicTodo: MagicTodoProjection.MagicTodoProjectionState
-
         /// delegation-024: last parent XTrace cursor physically handed to each reusable
         /// delegate session. Keyed pair lookup; never inferred from prompt text.
         DelegationCompletedHandoffs: Map<string, int64>
@@ -134,9 +133,9 @@ module AgentProjection =
           HandleByChildSession = Map.empty
           Fission = FissionProjection.empty
           ChatExecutions = ChatExecutionProjection.empty
-          MagicTodo = MagicTodoProjection.empty
           DelegationCompletedHandoffs = Map.empty
           Attention = AttentionProjection.empty
+          Cognition = Map.empty
           Concern = ConcernProjection.empty
           InstitutionalLearning = InstitutionalLearningProjection.empty
           RuntimeStartCount = 0 }

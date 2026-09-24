@@ -76,13 +76,18 @@ npm install wanxiangshu --registry <your-private-registry>
 
 配置以 Host 文档与 `peerDependencies` 为准。角色与 Prompt 语义以 [requirements/README.md](requirements/README.md) 为高级参考；安装与挂载不依赖阅读条款正文。
 
-可选环境变量：
+部分常用可选环境变量（非全集）：
 
 | 变量 | 作用 |
 |------|------|
 | `WANXIANGSHU_SKIP_AUTO_INJECTED=1` | 跳过 HOST-013 新的 `auto-injected` 伪工具注入；已落盘历史 pair 仍会 replay（`provider=cursor` 时同样跳过新注入） |
 | `WANXIANGSHU_PROCESS_HARD_LIMIT_SECS` | executor 单进程硬超时上限（秒） |
 | `WANXIANGSHU_NO_FATAL_EXIT=1` | 诊断路径禁止 `process.exit`（测试用） |
+| `WANXIANGSHU_PROVIDER_LANGUAGE` | provider 语言偏好显式设置（`en` / `zh-CN`），位于全局语言阶梯最高优先级 |
+| `WANXIANGSHU_ADMISSION_TIMEOUT_MS` | prompt 物理 acceptance 等待超时（毫秒，默认 10000） |
+| `WANXIANGSHU_DIAG=1` | 让内部诊断记录经 stderr 可见；只观测，不改变任何决策 |
+| `WANXIANGSHU_ABLATION_PROFILE` | feature-ablation 拓扑 profile 选择（配 `resources/ablation/`） |
+| `WANXIANGSHU_STRENGTH_*` | 一族 Strength（speculative-investigation）rollout 参数：`MODE`（`off`/`dry-run`/`treatment`/`shadow`）与 cost、margin、budget 等旋钮 |
 
 ### 快速开始
 
@@ -108,19 +113,19 @@ Blogger、Bookkeeper、Predictor 等内部角色由编排路径调用，不作�
 
 | 角色 | 典型工具面 | 说明 |
 |------|------------|------|
-| Orchestrator | `commission`, `join`, `horizon` | 顶层战役战略统筹与独立道路委任 |
-| Manager | `fork`, `resume`, `join`, `horizon`, `todowrite`, `review`, `suicide` | 独立评估、任务分解与推进未尽账本；通过 fork 派发 Engineer，通过 resume 续做固定 DevOps（无 Fission） |
-| Engineer | `read`, `write`, `edit`, `glob`, `grep`, `mv`, `rm`, `fetch`, `fission` | 本地事实调查与源码读写实现（不执行真实命令，不差遣 DevOps）；独占 Fission 权能 |
-| DevOps | `read`, `write`, `edit`, `glob`, `grep`, `mv`, `rm`, `exec`, `pty`, `join`, `horizon` | 真实命令执行、终端与进程管理；具备角色固有的非架构级自修授权（无 Fission） |
+| Orchestrator | `commission`, `join`, `horizon`, `sphinx` | 顶层战役战略统筹与独立道路委任 |
+| Manager | `fork`, `resume`, `join`, `horizon`, `review`, `suicide`, `sphinx` | 独立评估、任务分解与推进未尽账本；通过 fork 派发 Engineer，通过 resume 续做固定 DevOps（无 Fission） |
+| Engineer | `read`, `write`, `edit`, `glob`, `grep`, `mv`, `rm`, `fetch`, `fission`, `sphinx` | 本地事实调查与源码读写实现（不执行真实命令，不差遣 DevOps）；独占 Fission 权能 |
+| DevOps | `read`, `write`, `edit`, `glob`, `grep`, `mv`, `rm`, `run`, `open-terminal`, `send-terminal`, `read-terminal`, `signal-terminal`, `join`, `horizon`, `sphinx` | 真实命令执行、终端与进程管理；具备角色固有的非架构级自修授权（无 Fission） |
 | Blogger | `chronicle` | Companion 叶子，记录工作历史与认知上下文 |
 
 Bookkeeper 是内部叶子角色（有独立 Role Law，不进 public Role DU）。每个 managed work session 配套叶子 Companion（Blogger）。精确权限见 `requirements/participant-identity` 与 `requirements/capability-enforcement`。
 
 ### 运行时数据
 
-领域事实写入 Git common directory 下插件私有 runtimes 路径中的 journal（按 runtime 的 NDJSON），不在业务 workspace 强制创建插件私有目录。随包资源：
+领域事实写入 Git common directory 下插件私有 `wanxiangshu-next/runtimes/` 路径中的 journal（按 runtime 的 NDJSON；取不到 common dir 时回退 XDG state home），不在业务 workspace 强制创建插件私有目录。随包资源：
 
-- `resources/provider/`（Common Law / Role Law / Tool Law / Delegation Law / Office Library；EN + zh-CN）；`resources/enforcer/<TipName>/{enforcer,main}{,.zh-CN}.md`；`resources/git/wanxiang-hook.mjs`；`resources/wanxiangshu.mjs`（model routing 模板）。**无** `resources/prompts/*`；**无** `catalog.json` SSOT。
+- `resources/provider/`（Common Law / Role Law / Tool Law / Delegation Law / Office Library，加 Casebook、Attention Regulation、Concern Routing、Institutional Learning；EN + zh-CN）；`resources/ablation/{fact-map,nodes,profiles,tool-map}.json`（feature-ablation 拓扑）；`resources/enforcer/<TipName>/{enforcer,main}{,.zh-CN}.md`；`resources/git/wanxiang-hook.mjs`；`resources/wanxiangshu.mjs`（model routing 模板）。**无** `resources/prompts/*`；**无** `catalog.json` SSOT。
 - journal 与事实名默认冻结；升级前阅读 [CHANGELOG](CHANGELOG.md)。
 
 
@@ -141,12 +146,13 @@ Bookkeeper 是内部叶子角色（有独立 Role Law，不进 public Role DU）
 ```text
 src/           生产源码
 resources/     随包运行时资源
-requirements/  55 包 normative 语义树：每包必备 WHY.md、WHAT.md 与 tests/
+requirements/  56 包 normative 语义树：每包必备 WHY.md、WHAT.md 与 tests/
 proposals/     deferred 未来材料（用户管理）
 scripts/       构建与少量仓库检查
 docs/          项目文档与在线阅览（docs/index.html）
 dist/          最终编译输出，不提交
 artifacts/     中间产物与本地发布产物，不提交
+.github/       CI workflows
 ```
 
 - 生产 F# 唯一根：`src/Wanxiangshu/`
@@ -178,7 +184,8 @@ npm run format-build-test
 
 | 命令 | 作用 |
 |------|------|
-| `npm run format-build-test` | 日常验证：Fantomas 写盘 → `scripts/check.mjs` → 编译 → unit → integration（warmup 与 distribution package 子步骤随 integration 调度） |
+| `npm run format-build-test` | 日常验证（入口 `node scripts/verify.mjs`）：Fantomas 检查（`format:check`）→ `check` → 编译 → unit → integration（warmup 与 distribution package 子步骤随 integration 调度） |
+| `npm run format` | Fantomas 写盘（与 `format:check` 的相对面：一个改文件，一个只判失败） |
 | `npm run verify:release` | 发布验证：在日常阶梯基础上追加 clean build（`--clean`）、Long Stroke e2e（`tests/014.test.mjs`）与真实 package 校验 |
 | `node scripts/build.mjs --plan` | 只读计划报告：`mode`/`reason`/`changedInputs`/`selectedShards`/`compileItems`/`fableCompileInvocations`，不写 `dist/` |
 
@@ -198,7 +205,7 @@ npm run format-build-test
 
 规范是万象术的语义根：每条行为命题有稳定 ID、测试落点和 owner 包。规范不跟踪实现进度，只定义正确性。
 
-- **规范**：`requirements/<package>/`（55 包 normative 树；必备 WHY.md、WHAT.md 与 tests/；WHAT 命题 ID 稳定寻址，条款与测试文件一一映射，覆盖缺口见 [requirements/GAP.md](requirements/GAP.md)）。
+- **规范**：`requirements/<package>/`（56 包 normative 树；必备 WHY.md、WHAT.md 与 tests/；WHAT 命题 ID 稳定寻址，条款与测试文件一一映射，覆盖缺口见 [requirements/GAP.md](requirements/GAP.md)）。
 - **历史 Clause 与变更记录**：2026-08-14 cutover 已归档（含 Kolmogorov 工程纪律与 completed change 考古；git 历史可回溯）。
 - 测试全部包自有（`requirements/<package>/tests/`），直接引用 WHAT 命题 ID。规范不跟踪实现进度。
 
@@ -216,6 +223,12 @@ resources/provider/
   lifecycle/<phase>/{en,zh-CN}.md
   runtime/<scenario>/{en,zh-CN}.md
   library/<office>/{en,zh-CN}.md
+  casebook/<step>/{en,zh-CN}.md
+  attention-regulation/<entry>/{en,zh-CN}.md
+  concern-routing/<entry>/{en,zh-CN}.md
+  institutional-learning/<entry>/{en,zh-CN}.md
+  README.md
+resources/ablation/{fact-map,nodes,profiles,tool-map}.json
 resources/enforcer/<TipName>/{enforcer,main}{,.zh-CN}.md
 resources/git/wanxiang-hook.mjs
 resources/wanxiangshu.mjs

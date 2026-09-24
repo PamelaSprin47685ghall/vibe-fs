@@ -21,11 +21,10 @@ type PrefixRendered =
 module XPrefixProjection =
     val render: intent: PrefixProjectionIntent -> PrefixRendered
 
-    type RawPrefixMessageFacts =
-        { ContainsTodoWrite: bool
-          ToolCallIds: Set<ToolCallId> }
-
-    val retainTodoWriteRounds: messages: RawPrefixMessageFacts list -> bool list
+    /// context-compression-020 (revised): the caller owns retention — the real Opening
+    /// and the last K phases. This record carries that decision; no tool name grants
+    /// an unbounded exemption any more.
+    type RawPrefixMessageFacts = { Retained: bool }
 
     val forSnapshot:
         snapshot: PrefixSnapshot option ->

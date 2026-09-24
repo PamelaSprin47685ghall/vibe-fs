@@ -23,8 +23,6 @@ const MANAGER_VISIBLE_SURFACES = [
   'tool/horizon/description',
   'tool/join/description',
   'tool/suicide/description',
-  'lifecycle/magic-todo/todowrite-description',
-  'lifecycle/magic-todo/manager-guideline',
 ]
 
 test('WHAT[participant-horizon-006] PH_exec_030_internal_machine_state_renders_as_consequence_not_dto', () => {

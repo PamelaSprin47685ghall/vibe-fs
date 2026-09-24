@@ -25,7 +25,6 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
-open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Mission.Relay.OpenCode
 open Wanxiangshu.Mission.Manager
@@ -53,7 +52,6 @@ open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Git
 open Wanxiangshu.Git.Hook
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Mission.Obligation.Todo.OpenCode
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Resources
@@ -294,9 +292,26 @@ module PluginTransforms =
                         |> ProviderWireDecode.messagesFromTransformOutput
                         |> ProviderWireCapture.lastUserMessageId
 
+                    // External HumanMessage acceptance lives in ChatExecutions, not
+                    // the claimed-prompt continuation map used by manager-loop gates.
+                    let acceptedHuman =
+                        match journal, sidOpt, physicalUserMessageId with
+                        | Some durable, Some sessionId, Some physical when not (String.IsNullOrWhiteSpace sessionId) ->
+                            let key: ChatExecutionKey =
+                                { SessionId = SessionId.create sessionId
+                                  PhysicalUserMessageId = physical }
+
+                            (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
+                            |> ChatExecutionProjection.byKey key
+                            |> Option.exists (fun execution ->
+                                execution.Evidence.Origin = PromptAuthority.PromptOrigin.Continuation
+                                                                PromptAuthority.ContinuationKind.HumanMessage)
+                        | _ -> false
+
                     return!
                         RelayNarrativeTransform.apply
                             journal
+                            acceptedHuman
                             (fun sid ->
                                 ManagerWorkflow.continueAfterRetiredAttempt
                                     sessionPort
@@ -316,8 +331,15 @@ module PluginTransforms =
                                                 ModelRouting.releasePhysicalExecution exactSessionId physical
                                                 |> ignore
 
-                                                let! _ = sessionPort.InterruptAttempt exactSessionId
-                                                return ()
+                                                let! interruption = sessionPort.InterruptAttempt exactSessionId
+
+                                                return
+                                                    interruption
+                                                    |> Result.defaultWith (fun error ->
+                                                        invalidOp (
+                                                            "MANAGER-LOOP-004: retired attempt interrupt failed: "
+                                                            + error
+                                                        ))
                                         })
                                     sid)
                             sidOpt

@@ -2,17 +2,15 @@ namespace Wanxiangshu.Persistence.Journal
 
 open System
 
-/// Pure canonical envelope/fold owner for obligation facts. Journal handles are
-/// intentionally absent; durable append/read stays in ObligationJournalSurface.
+/// Legacy-read boundary for the retired obligation-ledger envelope family.
+///
+/// obligation-ledger-007 keeps old envelopes recognisable for audit and migration.
+/// There is no decoder that returns a value: the domain types that would give a
+/// decoded fact meaning are gone, so the only honest answer names the retirement.
 [<RequireQualifiedAccess>]
 module ObligationEnvelopeSurface =
-    /// Serialize a typed MagicTodo fact JSON string into canonical fact bytes.
-    val serializeMagicTodoEnvelope: typed: string -> string
+    /// The family an old envelope carries, so a migration reader can tell what it
+    /// holds without a decoder that pretends to understand it.
+    val legacyFamilyName: string
 
-    /// Deserialize canonical fact bytes into a JS result object.
-    val deserializeMagicTodoEnvelope: encoded: string -> obj
-
-    /// Fold one MagicTodo envelope and return a JS result object.
-    val foldMagicEnvelope: sessionId: string -> providerRun: string -> typed: string -> obj
-
-    val foldLifecycleSequence: sessionId: string -> events: obj array -> obj
+    val deserializeLegacyEnvelope: encoded: string -> obj

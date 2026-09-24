@@ -13,6 +13,7 @@ type RelayProjectionDisposition =
 module RelayNarrativeTransform =
     val apply:
         journal: AgentJournal option ->
+        acceptedHuman: bool ->
         interruptAttempt: (SessionId -> Task<unit>) ->
         sessionId: string option ->
         outObj: obj ->

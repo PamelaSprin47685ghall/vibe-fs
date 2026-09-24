@@ -118,10 +118,12 @@ test('WHAT[guidance-delivery-008] ENFORCER_TIP_14_prompt_has_anti_repeat_and_sev
   assert.match(roleLaw, /Repetition is legal|Diversity is not a goal/i)
   assert.doesNotMatch(roleLaw, /omit all scores|omit zero-valued scores/i)
 
-  assert.match(prompt.normalInstruction, /exactly once/)
-  assert.match(prompt.normalInstruction, /required tip|catalog field/)
-  assert.match(prompt.squashInstruction, /required tip|catalog field/)
-  assert.match(prompt.squashInstruction, /exactly once/)
+  // The instruction plane is localized per the bound provider language, so the
+  // anchors accept either surface: "exactly once" / "恰好一次".
+  assert.match(prompt.normalInstruction, /exactly once|恰好一次|一次/)
+  assert.match(prompt.normalInstruction, /required tip|catalog field|必填 tip|目录中的一个字段/)
+  assert.match(prompt.squashInstruction, /required tip|catalog field|必填 tip|目录中的一个字段/)
+  assert.match(prompt.squashInstruction, /exactly once|恰好一次|一次/)
   assert.doesNotMatch(prompt.squashInstruction, /omit all scores/)
   assert.doesNotMatch(prompt.normalInstruction, /omit.*scores/i)
 

@@ -50,9 +50,7 @@ module SphinxMcpConfig =
         | _ -> false
 
     let launchFrom (read: string -> string option) : Launch =
-        if
-            not (AblationRegistry.isActive (AblationNodeId.create "epistemic-reasoning") (AblationSettings.current ()))
-        then
+        if not (AblationGate.modeFor (AblationGate.registry ()) "epistemic-reasoning" = AblationMode.Active) then
             Launch.Disabled
         else
             let disabled = envValue read "SPHINX_MCP_DISABLED"

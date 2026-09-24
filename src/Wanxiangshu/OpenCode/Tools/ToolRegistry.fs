@@ -15,6 +15,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Relay.OpenCode
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
+open Wanxiangshu.Participant.Cognition
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Repository.Programming.Js
@@ -195,6 +196,19 @@ module ToolRegistry =
         let sphinx =
             SphinxTool.createExecution sessionPort workspaceDirectory syncDelegateRuntime runtime.LogicalOwnerFor
 
+        // The canvas is durable, not process memory: a restart recovers the owner's
+        // committed canvas from the journal instead of silently restarting at `{}`.
+        let cognitiveRuntime = CognitiveRuntime(CognitiveJournalAdapter.port journal)
+
+        // The owner is derived from the verified tool context and the current
+        // authority. The tool has no workspace selector, so a caller cannot aim it
+        // at another owner's canvas.
+        let cognitiveOwnerFor (ctx: HostToolContext) =
+            if System.String.IsNullOrWhiteSpace ctx.SessionId then
+                None
+            else
+                Some(CognitiveOwner.create (SessionId.create ctx.SessionId) "")
+
         let generatedJsSpecs () =
             [ for role in Roles.all do
                   match JsToolGenerator.generate (string role) (OfficeCapability.permissions role) jsProse with
@@ -237,7 +251,7 @@ module ToolRegistry =
               yield FileMutationTools.mvSpec factory
               yield FileMutationTools.rmSpec factory
               yield BashHoneypotTool.spec
-              yield AssumeTool.spec factory
+              yield AssumeTool.spec factory cognitiveRuntime cognitiveOwnerFor
               yield! AttentionTools.specs factory (journal |> Option.map AgentJournalPortAdapter.forAttention)
               yield! ConcernTools.specs factory (journal |> Option.map AgentJournalPortAdapter.forConcern)
 
@@ -363,7 +377,7 @@ module ToolRegistry =
 
             let executeAfterBoundary args (ctx: HostToolContext) =
                 task {
-                    if AblationGate.toolDenied spec.Name then
+                    if AblationGate.toolDenied (AblationGate.registry ()) spec.Name then
                         return denied ctx Path.DeniedAblation (Map [ "tool", spec.Name ])
                     elif isStrengthReplica ctx then
                         // STRENGTH-004: Host-native read/glob/grep are the entire replica surface.

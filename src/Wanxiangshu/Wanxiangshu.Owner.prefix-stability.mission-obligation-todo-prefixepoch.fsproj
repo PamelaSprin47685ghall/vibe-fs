@@ -14,6 +14,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
     <Compile Include="Context/Prefix/ProbeSelection.fsi"/>
     <Compile Include="Context/Prefix/ProbeSelection.fs"/>
+    <Compile Include="Context/Prefix/PhaseWindow.fsi"/>
+    <Compile Include="Context/Prefix/PhaseWindow.fs"/>
     <Compile Include="Context/Prefix/Projection.fsi"/>
     <Compile Include="Context/Prefix/Projection.fs"/>
     <Compile Include="Context/Prefix/Epoch.fsi"/>

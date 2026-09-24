@@ -1,0 +1,1 @@
+本会话的完整待办清单，整体替换宿主 UI 中的现有清单。每一行必须是包含 `{content, status}` 以及可选 `priority`（默认为 `"medium"`）的对象。`status` 必须为 `pending`、`in_progress`、`completed` 或 `cancelled` 之一。调用方传入的清单顺序将得到严格保留。传入空列表 `[]` 会清空宿主 UI 清单，且不代表对工作质量的任何评价。

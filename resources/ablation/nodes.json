@@ -349,6 +349,13 @@
       "borrowed_surface": []
     },
     {
+      "id": "cognitive-workspace",
+      "package": "cognitive-workspace",
+      "station": 50,
+      "kind": "package",
+      "borrowed_surface": []
+    },
+    {
       "id": "relay-incumbency",
       "package": "relay-incumbency",
       "station": 51,

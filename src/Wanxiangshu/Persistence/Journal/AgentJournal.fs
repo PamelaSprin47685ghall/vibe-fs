@@ -11,10 +11,8 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Outcome
-open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Ablation
@@ -24,10 +22,6 @@ open Wanxiangshu.Ablation
 type JournalChange =
     { Revision: JournalRevision
       Envelope: Envelope }
-
-type MagicTodoAppendReceipt =
-    { EventId: EventId
-      Projection: ProjectionSet }
 
 type JournalAppendException(failure: JournalAppendFailure) =
     inherit Exception(JournalAppendFailure.describe failure)
@@ -85,6 +79,7 @@ module private AgentJournalInternals =
         | AgentFact.Concern _ -> "AgentFact.Concern"
         | AgentFact.InstitutionalLearning _ -> "AgentFact.InstitutionalLearning"
         | AgentFact.ChatExecution _ -> "AgentFact.ChatExecution"
+        | AgentFact.Cognition _ -> "AgentFact.Cognition"
 
     let rejectAblation (factTag: string) =
         FactRejected(
@@ -189,7 +184,7 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
         task {
             let tag = agentFactTag fact
 
-            if AblationGate.factDenied tag then
+            if AblationGate.factDenied (AblationGate.registry ()) tag then
                 return Error(rejectAblation tag)
             else
                 match! this.AppendEnvelope stream providerRun (Fact.Agent fact) with
@@ -201,24 +196,6 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
     ///
     /// `TodoWriteAccepted` must name the exact Prepared envelope; returning the
     /// receipt here prevents a caller from inventing or rediscovering that ref.
-    member this.AppendMagicTodo
-        (stream: StreamId)
-        (providerRun: ProviderRunIdentity option)
-        (fact: MagicTodoFact)
-        : Task<Result<MagicTodoAppendReceipt, JournalAppendFailure>> =
-        task {
-            if AblationGate.factDenied "MagicTodo" then
-                return Error(rejectAblation "MagicTodo")
-            else
-                match! this.AppendEnvelope stream providerRun (Fact.MagicTodo fact) with
-                | Ok(updated, envelope) ->
-                    return
-                        Ok
-                            { EventId = envelope.EventId
-                              Projection = updated }
-                | Error err -> return Error err
-        }
-
     member private this.PublishCommitted(envelope: Envelope) =
         lock gate (fun () ->
             // The EventStore append already validated and committed the
@@ -315,13 +292,6 @@ module AgentJournal =
         : Task<Result<ProjectionSet, JournalAppendFailure>> =
         journal.AppendAgent stream providerRun fact
 
-    let appendMagicTodo
-        (stream: StreamId)
-        (providerRun: ProviderRunIdentity option)
-        (fact: MagicTodoFact)
-        (journal: AgentJournal)
-        : Task<Result<MagicTodoAppendReceipt, JournalAppendFailure>> =
-        journal.AppendMagicTodo stream providerRun fact
 
     let snapshot (journal: AgentJournal) : ProjectionSet = journal.Snapshot
 

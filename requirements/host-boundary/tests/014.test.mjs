@@ -110,7 +110,12 @@ test('WHAT[host-boundary-014] typed ProtocolRejection rethrows unchanged without
   const captured = []
   process.stderr.write = (chunk) => { captured.push(String(chunk)); return true }
   try {
-    const rejection = PluginHooksSurface.providerInputRejection('provider-input-invalid')
+    // The typed rejection source moved with the ledger: `assume` refuses bad
+    // arguments as a tool result, so a ProtocolRejection now reaches the membrane
+    // from the Host's own wire rejection rather than a ledger-specific exception.
+    // The policy decision is what this clause pins, and it is reachable directly.
+    const rejection = new Error('provider-input-invalid')
+    rejection.name = 'ProtocolRejection'
     const wrapped = PluginHooksSurface.policyAwareHook(
       'tool-before-test',
       () => Promise.reject(rejection),

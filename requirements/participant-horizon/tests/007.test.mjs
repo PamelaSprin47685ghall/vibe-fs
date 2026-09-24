@@ -23,8 +23,6 @@ const MANAGER_VISIBLE_SURFACES = [
   'tool/horizon/description',
   'tool/join/description',
   'tool/suicide/description',
-  'lifecycle/magic-todo/todowrite-description',
-  'lifecycle/magic-todo/manager-guideline',
 ]
 
 test('WHAT[participant-horizon-007] PH_agent_008_internal_participants_absent_from_provider_visible_surfaces', () => {

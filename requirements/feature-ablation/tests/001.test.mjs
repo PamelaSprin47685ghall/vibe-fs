@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
 import * as Ablation from '../../../dist/Ablation/Surface.js'
@@ -121,7 +121,9 @@ test('WHAT[feature-ablation-001] ABL_001_tool_map_and_fact_map_sync_with_active_
   assert.equal(facts['AgentFact.Orchestrator'], 'change-integration')
   assert.equal(facts['AgentFact.Relay'], 'relay-incumbency')
   assert.equal(facts['AgentFact.Execution'], 'delegation')
-  assert.equal(facts['MagicTodo'], 'obligation-ledger')
+  assert.equal(facts['AgentFact.Cognition'], 'cognitive-workspace')
+  // The retired ledger family is no longer mapped: it was deleted with the protocol.
+  assert.ok(!('MagicTodo' in facts), 'the retired ledger family must not be mapped')
 
   // 5. 确保 fact-map 中所有节点在 nodes.json 中合法存在
   const nodeIds = new Set(nodesDoc.nodes.map((n) => n.id))
@@ -135,39 +137,35 @@ test('WHAT[feature-ablation-001] ABL_001_tool_map_and_fact_map_sync_with_active_
 })
 
 test('WHAT[feature-ablation-001] ABL_001_primary_node_uniqueness_and_presence_fail_closed', () => {
-  const nodesPath = join(ROOT, 'resources/ablation/nodes.json')
-  const original = readFileSync(nodesPath, 'utf8')
+  const original = read('resources/ablation/nodes.json')
 
-  const withNodesDoc = (modifier, run) => {
-    try {
-      const doc = JSON.parse(original)
-      modifier(doc)
-      writeFileSync(nodesPath, JSON.stringify(doc, null, 2), 'utf8')
-      run()
-    } finally {
-      writeFileSync(nodesPath, original, 'utf8')
-      Ablation.load()
-    }
+  // Build the malformed manifest in memory and ask the loader to reject it. The
+  // document is a value, so no sibling test ever observes a half-written file.
+  const rejectsAs = (modifier, kind, reasonPattern) => {
+    const doc = JSON.parse(original)
+    modifier(doc)
+    const result = Ablation.loadFromNodes(doc)
+    assert.equal(result.ok, false, `${kind} must fail closed`)
+    assert.equal(result.kind, kind)
+    assert.match(result.error, reasonPattern)
+    // A rejected document must leave no registry installed: the cell stays empty, so
+    // decisions fall back to the environment rather than to a half-built registry.
+    assert.equal(Ablation.installed(), null)
   }
 
   // 1. 缺失主节点：当包缺失同名主节点时，load 必须 fail-closed 返回 InvalidManifest
-  withNodesDoc(
+  rejectsAs(
     (doc) => {
       const target = doc.nodes.find((n) => n.id === 'feature-ablation')
       target.id = 'feature-ablation-custom'
       target.kind = 'custom'
     },
-    () => {
-      const result = Ablation.load()
-      assert.equal(result.ok, false, 'manifest loading must fail when primary node is missing')
-      assert.equal(result.kind, 'InvalidManifest')
-      assert.match(result.error, /missing a main node/i)
-      assert.deepEqual(Ablation.manifestNodeIds(), [])
-    },
+    'InvalidManifest',
+    /missing a main node/i,
   )
 
   // 2. 多个主节点：同一包出现多个主节点时，load 必须 fail-closed 返回 InvalidManifest
-  withNodesDoc(
+  rejectsAs(
     (doc) => {
       doc.nodes.push({
         id: 'feature-ablation-extra',
@@ -177,12 +175,7 @@ test('WHAT[feature-ablation-001] ABL_001_primary_node_uniqueness_and_presence_fa
         borrowed_surface: [],
       })
     },
-    () => {
-      const result = Ablation.load()
-      assert.equal(result.ok, false, 'manifest loading must fail when duplicate primary nodes exist')
-      assert.equal(result.kind, 'InvalidManifest')
-      assert.match(result.error, /multiple main nodes/i)
-      assert.deepEqual(Ablation.manifestNodeIds(), [])
-    },
+    'InvalidManifest',
+    /multiple main nodes/i,
   )
 })

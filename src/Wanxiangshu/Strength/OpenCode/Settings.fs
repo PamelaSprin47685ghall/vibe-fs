@@ -36,7 +36,7 @@ module StrengthSettings =
         | Some text -> parseNonNegativeInt fallback text
 
     let private mode () =
-        if AblationSettings.strengthForcedOff () then
+        if AblationGate.modeFor (AblationGate.registry ()) "speculative-investigation" = AblationMode.Ablated then
             StrengthRolloutMode.Off
         else
             match
