@@ -27,6 +27,7 @@ type JsFailure =
     | DuplicateMutationTarget of string
     | ResultTooLarge of string option
     | InvalidReturnValue
+    | ReadOnlyMutationRejected
     | FileChanged of string
     | TransactionPrepareFailed
     | TransactionCommitFailed
@@ -61,6 +62,7 @@ module JsFailure =
         | JsFailure.DuplicateMutationTarget _ -> "DUPLICATE_MUTATION_TARGET"
         | JsFailure.ResultTooLarge _ -> "RESULT_TOO_LARGE"
         | JsFailure.InvalidReturnValue -> "INVALID_RETURN_VALUE"
+        | JsFailure.ReadOnlyMutationRejected -> "READ_ONLY_MUTATION_REJECTED"
         | JsFailure.FileChanged _ -> "FILE_CHANGED"
         | JsFailure.TransactionPrepareFailed -> "TRANSACTION_PREPARE_FAILED"
         | JsFailure.TransactionCommitFailed -> "TRANSACTION_COMMIT_FAILED"
@@ -99,6 +101,7 @@ module JsFailure =
         | JsFailure.DuplicateMutationTarget path -> "the same path was mutated twice in one program: " + path
         | JsFailure.ResultTooLarge _ -> "result exceeds the output bound"
         | JsFailure.InvalidReturnValue -> "run() return value is not JSON-compatible"
+        | JsFailure.ReadOnlyMutationRejected -> "mutations are rejected on read-only surface"
         | JsFailure.FileChanged path -> "target changed since the read snapshot; no implicit retry: " + path
         | JsFailure.TransactionPrepareFailed -> "transaction prepare failed"
         | JsFailure.TransactionCommitFailed -> "transaction commit failed"
@@ -149,6 +152,7 @@ module JsFailure =
             JsFailure.DuplicateMutationTarget(after "the same path was mutated twice in one program: ")
         | "RESULT_TOO_LARGE" -> JsFailure.ResultTooLarge None
         | "INVALID_RETURN_VALUE" -> JsFailure.InvalidReturnValue
+        | "READ_ONLY_MUTATION_REJECTED" -> JsFailure.ReadOnlyMutationRejected
         | "FILE_CHANGED" -> JsFailure.FileChanged(after "target changed since the read snapshot; no implicit retry: ")
         | "TRANSACTION_PREPARE_FAILED" -> JsFailure.TransactionPrepareFailed
         | "TRANSACTION_COMMIT_FAILED" -> JsFailure.TransactionCommitFailed

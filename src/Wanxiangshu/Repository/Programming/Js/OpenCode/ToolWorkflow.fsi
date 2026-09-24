@@ -25,6 +25,7 @@ module JsToolWorkflow =
         | Failed of JsFailure
 
     val run:
+        capabilities: Set<JsCapability> ->
         root: string ->
         baseClassSource: string ->
         modelSource: string ->
@@ -35,6 +36,7 @@ module JsToolWorkflow =
             Task<JsToolOutcome>
 
     val runWithFileAccessObservation:
+        capabilities: Set<JsCapability> ->
         root: string ->
         baseClassSource: string ->
         modelSource: string ->

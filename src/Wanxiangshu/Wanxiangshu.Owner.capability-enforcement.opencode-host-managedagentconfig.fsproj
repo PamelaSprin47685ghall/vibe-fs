@@ -52,6 +52,8 @@
     <Compile Include="OpenCode/Host/ManagedAgentConfig.fs"/>
     <Compile Include="OpenCode/Host/ManagedAgentConfigSurface.fsi"/>
     <Compile Include="OpenCode/Host/ManagedAgentConfigSurface.fs"/>
+    <Compile Include="Repository/Programming/Js/OpenCode/ManagerReadTools.fsi"/>
+    <Compile Include="Repository/Programming/Js/OpenCode/ManagerReadTools.fs"/>
     <Compile Include="OpenCode/Tools/ToolRegistry.fsi"/>
     <Compile Include="OpenCode/Tools/ToolRegistry.fs"/>
     <Compile Include="OpenCode/Tools/ToolRegistrySurface.fsi"/>

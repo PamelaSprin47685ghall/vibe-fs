@@ -83,6 +83,7 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Repository.Knowledge.Casebook.OpenCode
+open Wanxiangshu.OpenCode.Host
 open PluginHostInterop
 
 module PluginHooks =
@@ -125,27 +126,6 @@ module PluginHooks =
             // executor while this three-hook membrane owns provider schema,
             // durable checkpoint admission, and accepted-result enrichment.
 
-            let toolDefinition (toolInput: obj) (toolOutput: obj) = ()
-
-            let toolBefore (toolInput: obj) (toolOutput: obj) =
-                task {
-                    do!
-                        Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingGate.before
-                            journal
-                            workspaceDirectory
-                            toolInput
-                            toolOutput
-
-                    let context = ToolHostCodec.decodeContext toolInput
-
-                    match journal, context.ToolCallId with
-                    | Some durable, Some toolCallId when not (String.IsNullOrWhiteSpace context.SessionId) ->
-                        let port = AgentJournalPortAdapter.forDelegatedToolEstimate durable
-                        do! DelegatedToolEstimateLedger.observe port (SessionId.create context.SessionId) toolCallId
-                    | _ -> ()
-
-                }
-
             let collectCasebookObservation (toolInput: obj) (toolOutput: obj) =
                 let toolName = if isNull toolInput then "" else string (toolInput?tool)
 
@@ -159,22 +139,6 @@ module PluginHooks =
 
                 if not (System.String.IsNullOrWhiteSpace sessionId) then
                     CasebookLifecycle.collector.Collect(sessionId, toolName, toolInput?args, rendered)
-
-            let toolAfter (toolInput: obj) (toolOutput: obj) =
-                task {
-
-                    do!
-                        Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingGate.after
-                            journal
-                            workspaceDirectory
-                            toolInput
-                            toolOutput
-
-                    if casebookEnabled then
-                        HookPolicy.observeOptional Diagnostic.emit OptionalHookEffect.CasebookObservation (fun () ->
-                            collectCasebookObservation toolInput toolOutput)
-                        |> ignore
-                }
 
             let ownedTransform (inObj: obj) (outObj: obj) : Task =
                 scope.RunOwnedWork(fun () -> transform inObj outObj)
@@ -286,6 +250,76 @@ module PluginHooks =
                         let! registration = guardedClientConfiguration ()
                         return Some registration
                     }
+
+            let getManagerCapabilityFacts (sessionId: string) =
+                match toolRegistration with
+                | Some registration -> registration.Runtime.ManagerCapabilityFactsFor sessionId
+                | None -> ToolRuntimeScope.emptyManagerFacts
+
+            let toolDefinition (toolInput: obj) (toolOutput: obj) =
+                ManagerReviewContract.decorateDefinition toolInput toolOutput
+
+            let toolBefore (toolInput: obj) (toolOutput: obj) =
+                task {
+                    do!
+                        Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingGate.before
+                            journal
+                            workspaceDirectory
+                            toolInput
+                            toolOutput
+
+                    let toolName =
+                        if isNull toolInput || isNull toolInput?tool then "" else string toolInput?tool
+
+                    if ManagerReviewTools.isReviewTool toolName then
+                        let sessionId =
+                            if isNull toolInput || isNull toolInput?sessionID then "" else string toolInput?sessionID
+
+                        let facts = getManagerCapabilityFacts sessionId
+
+                        let isPermitted =
+                            match ManagerReviewTools.requiredPermissions toolName with
+                            | Some required ->
+                                let allowed = OfficeCapability.permissionsForManagerFacts facts
+                                Set.isSubset required allowed && not (Set.isEmpty allowed)
+                            | None -> false
+
+                        if not isPermitted then
+                            invalidOp (
+                                sprintf
+                                    "Manager review tool '%s' is not permitted under current manager capability facts"
+                                    toolName
+                            )
+
+                    let context = ToolHostCodec.decodeContext toolInput
+
+                    match journal, context.ToolCallId with
+                    | Some durable, Some toolCallId when not (String.IsNullOrWhiteSpace context.SessionId) ->
+                        let port = AgentJournalPortAdapter.forDelegatedToolEstimate durable
+                        do! DelegatedToolEstimateLedger.observe port (SessionId.create context.SessionId) toolCallId
+                    | _ -> ()
+
+                    if ManagerReviewTools.isReviewTool toolName && not (isNull toolOutput) && not (isNull toolOutput?args) then
+                        ManagerReviewContract.hide toolOutput?args
+                }
+
+            let toolAfter (toolInput: obj) (toolOutput: obj) =
+                task {
+                    if not (isNull toolInput) && not (isNull toolInput?args) then
+                        ManagerReviewContract.restore toolInput?args
+
+                    do!
+                        Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingGate.after
+                            journal
+                            workspaceDirectory
+                            toolInput
+                            toolOutput
+
+                    if casebookEnabled then
+                        HookPolicy.observeOptional Diagnostic.emit OptionalHookEffect.CasebookObservation (fun () ->
+                            collectCasebookObservation toolInput toolOutput)
+                        |> ignore
+                }
 
             let chatMessage =
                 registeredHook HookKey.ChatMessage (curriedHook wired.ChatMessageHook)

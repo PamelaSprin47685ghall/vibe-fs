@@ -142,3 +142,7 @@ Host signal subscription必须返回closed `HostSignalSubscriptionError`与`Loca
 ## [031] Root workspace first-bind effect隔离
 
 Root workspace 是process-local Host资源定位结果，不是公开可变状态。private Host runtime只在当前值为`None`且候选为非空白`Some path`时完成首次绑定；`None`、空串与纯空白均不占用绑定，首次绑定后的任意候选不得改写结果。Host composition是binder的唯一production consumer；其余production路径只能消费显式注入的只读capability。不得从Git推导workspace family root，不得按consumer自行重算或直接读取全局atom。
+
+## [032] Contract 提示字段解耦与参数清理安全
+
+工具入参中的 `contract` 仅作为对 provider 的提示字段；插件本地对缺失或错误的 `contract` 采取乐观处理，不进行二次强校验。执行清理时，对需要暂存的参数执行私有暂存，并在 `after` 回调中原样恢复；异常退出路径同样保证同源恢复，确保历史原始调用与上下文记录不被参数清理逻辑改写。参数恢复后的对象身份与原始键顺序必须以真实 canary 得到严格证明。

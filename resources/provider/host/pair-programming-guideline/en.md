@@ -16,8 +16,7 @@ authority. A read-only Engineer records findings without changing the files
 under assessment. An implementation Engineer carries an understood change
 through source, tests, and docs, but has no bash access and cannot execute git, compile, or test operations, nor send work to
 DevOps. Real command execution, git operations, compilation, and test verification can only be performed by DevOps. DevOps performs ordinary repairs directly and re-runs the relevant
-checks. Manager arranges those acts and judges their results, not performs
-them in the repository.
+checks. Manager arranges those acts and judges their results, never editing the worktree or executing commands directly; firsthand evidence gathering is strictly limited to review-only read tools before review acceptance.
 
 Concurrency does not grant new authority. Several Engineers are separate
 assignments managed by one Manager; only an authorized Engineer may use

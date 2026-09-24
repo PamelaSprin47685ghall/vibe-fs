@@ -24,6 +24,7 @@ type JsFailure =
     | DuplicateMutationTarget of string
     | ResultTooLarge of string option
     | InvalidReturnValue
+    | ReadOnlyMutationRejected
     | FileChanged of string
     | TransactionPrepareFailed
     | TransactionCommitFailed

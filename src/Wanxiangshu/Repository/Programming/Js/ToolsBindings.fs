@@ -74,95 +74,105 @@ module JsToolsBindings =
     /// Build the api object for one sandbox run. `staging` collects every
     /// mutation the program makes; the caller commits or discards it.
     let createApi
+        (capabilities: Set<JsCapability>)
         (root: string)
         (staging: ResizeArray<JsStagedMutation>)
         (readSnapshots: ResizeArray<JsReadSnapshot>)
         : obj =
-        createObj
-            [ "js"
-              ==> createObj
-                      [ "read"
-                        ==> fun (path: string) ->
-                            result {
-                                let! full = resolveInside root path
-                                let! text = JsUtf8Fs.readUtf8Classified full
-                                readSnapshots.Add { Path = path; Text = text }
+        let members =
+            [ if Set.contains JsCapability.Read capabilities then
+                  "read"
+                  ==> fun (path: string) ->
+                      result {
+                          let! full = resolveInside root path
+                          let! text = JsUtf8Fs.readUtf8Classified full
+                          readSnapshots.Add { Path = path; Text = text }
 
-                                return
-                                    createObj
-                                        [ "ok" ==> true; "path" ==> path; "text" ==> text; "byteCount" ==> text.Length ]
-                            }
-                            |> renderOutcome
-                        "glob"
-                        ==> fun (pattern: string) ->
-                            task {
-                                let! globRes = JsGlobFs.glob root pattern
+                          return
+                              createObj
+                                  [ "ok" ==> true; "path" ==> path; "text" ==> text; "byteCount" ==> text.Length ]
+                      }
+                      |> renderOutcome
 
-                                match globRes with
-                                | Ok listing ->
-                                    return createObj [ "ok" ==> true; "paths" ==> (List.toArray listing.Paths) ]
-                                | Error failure -> return failureObj failure
-                            }
-                        "grep"
-                        ==> fun (needle: obj) (pattern: string) ->
-                            task {
-                                if
-                                    isUndefined pattern
-                                    || not (isString pattern)
-                                    || System.String.IsNullOrEmpty pattern
-                                then
-                                    return failureObj JsFailure.AnchorInvalidPattern
-                                else
-                                    let specRes =
-                                        result {
-                                            let! spec = anchorOf needle
-                                            do! requireNonEmptyExact spec
-                                            return spec
-                                        }
+              if Set.contains JsCapability.Glob capabilities then
+                  "glob"
+                  ==> fun (pattern: string) ->
+                      task {
+                          let! globRes = JsGlobFs.glob root pattern
 
-                                    let! grepRes =
-                                        task {
-                                            match specRes with
-                                            | Error e -> return Error e
-                                            | Ok spec -> return! JsAnchorFs.grep root spec pattern
-                                        }
+                          match globRes with
+                          | Ok listing ->
+                              return createObj [ "ok" ==> true; "paths" ==> (List.toArray listing.Paths) ]
+                          | Error failure -> return failureObj failure
+                      }
 
-                                    match grepRes with
-                                    | Error failure -> return failureObj failure
-                                    | Ok(listing: JsAnchorFs.JsGrepListing) ->
-                                        listing.ReadSnapshots |> List.iter readSnapshots.Add
+              if Set.contains JsCapability.Grep capabilities then
+                  "grep"
+                  ==> fun (needle: obj) (pattern: string) ->
+                      task {
+                          if
+                              isUndefined pattern
+                              || not (isString pattern)
+                              || System.String.IsNullOrEmpty pattern
+                          then
+                              return failureObj JsFailure.AnchorInvalidPattern
+                          else
+                              let specRes =
+                                  result {
+                                      let! spec = anchorOf needle
+                                      do! requireNonEmptyExact spec
+                                      return spec
+                                  }
 
-                                        let matches =
-                                            listing.Matches
-                                            |> List.map (fun hit ->
-                                                createObj
-                                                    [ "path" ==> hit.Path
-                                                      "line" ==> hit.Line
-                                                      "column" ==> hit.Column
-                                                      "text" ==> hit.Text ])
+                              let! grepRes =
+                                  task {
+                                      match specRes with
+                                      | Error e -> return Error e
+                                      | Ok spec -> return! JsAnchorFs.grep root spec pattern
+                                  }
 
-                                        return createObj [ "ok" ==> true; "matches" ==> (List.toArray matches) ]
-                            }
-                        "edit"
-                        ==> fun (path: string) (newText: obj) ->
-                            let replacement = string newText
+                              match grepRes with
+                              | Error failure -> return failureObj failure
+                              | Ok(listing: JsAnchorFs.JsGrepListing) ->
+                                  listing.ReadSnapshots |> List.iter readSnapshots.Add
 
-                            result {
-                                let! full = resolveInside root path
-                                let! current = JsUtf8Fs.readUtf8Classified full
-                                staging.Add(JsStagedMutation.Rewrite(path, current, replacement))
-                                return createObj [ "ok" ==> true ]
-                            }
-                            |> renderOutcome
-                        "write"
-                        ==> fun (path: string) (text: string) ->
-                            result {
-                                let! full = resolveInside root path
+                                  let matches =
+                                      listing.Matches
+                                      |> List.map (fun hit ->
+                                          createObj
+                                              [ "path" ==> hit.Path
+                                                "line" ==> hit.Line
+                                                "column" ==> hit.Column
+                                                "text" ==> hit.Text ])
 
-                                if JsMutationFs.existsPath full then
-                                    return! Error(JsFailure.FileAlreadyExists path)
+                                  return createObj [ "ok" ==> true; "matches" ==> (List.toArray matches) ]
+                      }
 
-                                staging.Add(JsStagedMutation.Create(path, text))
-                                return createObj [ "ok" ==> true ]
-                            }
-                            |> renderOutcome ] ]
+              if Set.contains JsCapability.Edit capabilities then
+                  "edit"
+                  ==> fun (path: string) (newText: obj) ->
+                      let replacement = string newText
+
+                      result {
+                          let! full = resolveInside root path
+                          let! current = JsUtf8Fs.readUtf8Classified full
+                          staging.Add(JsStagedMutation.Rewrite(path, current, replacement))
+                          return createObj [ "ok" ==> true ]
+                      }
+                      |> renderOutcome
+
+              if Set.contains JsCapability.Write capabilities then
+                  "write"
+                  ==> fun (path: string) (text: string) ->
+                      result {
+                          let! full = resolveInside root path
+
+                          if JsMutationFs.existsPath full then
+                              return! Error(JsFailure.FileAlreadyExists path)
+
+                          staging.Add(JsStagedMutation.Create(path, text))
+                          return createObj [ "ok" ==> true ]
+                      }
+                      |> renderOutcome ]
+
+        createObj [ "js" ==> createObj members ]

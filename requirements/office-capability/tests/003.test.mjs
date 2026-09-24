@@ -30,7 +30,8 @@ test('WHAT[office-capability-003] office authority is immutable and invariant ac
 
 test('WHAT[office-capability-003] office_permission_surface_matches_the_canonical_roles_matrix', () => {
   const matrix = [
-    ['manager', ['Finality', 'Fork', 'Horizon', 'Join', 'Resume', 'ReviewAssessment', 'Sphinx']],
+    // capability-enforcement-025 / office-capability-007: Manager 静态权限上限包含评审只读三能力 (Read/Glob/Grep)
+    ['manager', ['Finality', 'Fork', 'Glob', 'Grep', 'Horizon', 'Join', 'Read', 'Resume', 'ReviewAssessment', 'Sphinx']],
     ['orchestrator', ['Fork', 'Horizon', 'Join', 'Sphinx']],
     ['engineer', ['BashHoneypot', 'Edit', 'Fetch', 'Fission', 'Glob', 'Grep', 'Move', 'Read', 'Remove', 'Sphinx', 'Write']],
     ['devops', ['Edit', 'Exec', 'Glob', 'Grep', 'Horizon', 'Join', 'Move', 'Pty', 'Read', 'Remove', 'Write']],

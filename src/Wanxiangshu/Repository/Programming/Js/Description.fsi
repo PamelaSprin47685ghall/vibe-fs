@@ -80,6 +80,9 @@ module JsCanonicalDescription =
         val UltraDevOps: string = "tool/js-program/ultra-devops"
 
         [<Literal>]
+        val UltraManagerInvestigation: string = "tool/js-program/ultra-manager-investigation"
+
+        [<Literal>]
         val MechanicalSemantic: string = "tool/js-program/mechanical-semantic"
 
         [<Literal>]
@@ -197,6 +200,7 @@ module JsCanonicalDescription =
           UltraEngineering: string
           UltraInvestigation: string
           UltraDevOps: string
+          UltraManagerInvestigation: string
           MechanicalSemantic: string
           CommentAnchorOwnSearch: string
           CommentIgnoreGy: string

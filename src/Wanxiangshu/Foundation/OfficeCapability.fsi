@@ -32,6 +32,7 @@ type ManagerCapabilityFacts =
 
 [<RequireQualifiedAccess>]
 module OfficeCapability =
+    val managerReviewReadOnlyPermissions: ToolPermission Set
     val permissions: role: Role -> ToolPermission Set
     val isAllowed: role: Role -> permission: ToolPermission -> bool
     val permissionsForManagerFacts: facts: ManagerCapabilityFacts -> ToolPermission Set

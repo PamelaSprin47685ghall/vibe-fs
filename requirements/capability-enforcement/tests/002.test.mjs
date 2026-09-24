@@ -5,6 +5,7 @@ const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const { permissions } = await import("../../../dist/Participant/Persona/OfficeCapabilitySurface.js");
 const { configure: configureManagedAgents, installDefaultResources, validate: validateManagedAgents } = await import("../../../dist/OpenCode/Host/ManagedAgentConfigSurface.js");
+const { isReviewTool } = await import("../../../dist/OpenCode/Tools/ManagerReviewTools.js");
 
 installDefaultResources()
 const ROLES = [
@@ -67,7 +68,13 @@ const hostDefaults = () => [
 const mergedRules = (config, name) => [...hostDefaults(), ...rulesOf(config.agent[name].permission)]
 const allowList = (config, name) => {
   const rules = mergedRules(config, name)
-  const tools = [
+  // permission 的键是 Host schema 投影的真实来源，静态表覆盖 hostDefaults 提供但 permission 未列的项（如 bash/skill 等宿主默认项）；
+  // 只读键会漏掉宿主默认，只留静态表会漏新增工具，并集才是"全部可能被 schema 放行的候选"这一语义。
+  // 注意：'*' 与 'external_directory' 属于 Host 配置的兜底通配与路径边界元权限（CAPABILITY-ENFORCEMENT-011），不作为业务工具放行候选。
+  const permissionToolKeys = Object.keys(config.agent[name]?.permission ?? {}).filter(
+    (key) => key !== '*' && key !== 'external_directory',
+  )
+  const staticTools = [
     'bash',
     'bash-honeypot',
     'assume',
@@ -96,14 +103,36 @@ const allowList = (config, name) => {
     'suicide',
     'skill',
   ]
-  return tools.filter((tool) => evaluate(rules, tool, '*').action === 'allow')
+  const candidateTools = [...new Set([...staticTools, ...permissionToolKeys])]
+  return candidateTools.filter((tool) => evaluate(rules, tool, '*').action === 'allow')
 }
 const HOST_UTILITY_ALLOW = ['skill']
-const COGNITIVE_UTILITY_ALLOW = ['assume']
+const COGNITIVE_UTILITY_ALLOW = [
+  'assume',
+  'enough',
+  'abandon',
+  'defer',
+  'subscribe',
+  'publish',
+  'celebrate',
+  'regret',
+]
 const hostUtilityAllowFor = (role) => (role === 'Blogger' ? [] : HOST_UTILITY_ALLOW)
 const cognitiveUtilityAllowFor = (role) => (role === 'Blogger' ? [] : COGNITIVE_UTILITY_ALLOW)
 const ROLE_ALLOW = {
-  Manager: ['fork', 'resume', 'join', 'horizon', 'suicide', 'review', 'sphinx'],
+  Manager: [
+    'fork',
+    'resume',
+    'join',
+    'horizon',
+    'suicide',
+    'review',
+    'sphinx',
+    'read-manager',
+    'grep-manager',
+    'glob-manager',
+    'js-manager',
+  ],
   Orchestrator: ['commission', 'join', 'horizon', 'sphinx'],
   Engineer: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission', 'sphinx'],
   DevOps: [
@@ -168,12 +197,30 @@ test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_
       fetch: 'Fetch',
       suicide: 'Finality',
     })[toolName]
+
+  // 引自 ManagerReviewTools (dist/OpenCode/Tools/ManagerReviewTools.js) 权威目录：
+  // 评审专用别名工具经 requiredPermissions 映射为领域权限（单一语义所有者仍是 ManagerReviewTools）
+  const REVIEW_TOOL_PERMISSIONS = {
+    'read-manager': ['Read'],
+    'grep-manager': ['Grep'],
+    'glob-manager': ['Glob'],
+    'js-manager': ['Read', 'Glob', 'Grep'],
+  }
+
+  const permissionsForTool = (toolName) => {
+    if (isReviewTool(toolName)) {
+      return REVIEW_TOOL_PERMISSIONS[toolName] ?? []
+    }
+    const single = permissionOf(toolName)
+    return single ? [single] : []
+  }
+
   for (const role of ROLES) {
     const fromRoles = permissions(role.toLowerCase())
     const config = buildConfig()
     configureManagedAgents(config)
     const nonDomainUtilities = [...hostUtilityAllowFor(role), ...cognitiveUtilityAllowFor(role)]
-    const fromSchema = [...new Set(allowList(config, agentName(role)).filter((tool) => !nonDomainUtilities.includes(tool)).map(permissionOf))].sort()
+    const fromSchema = [...new Set(allowList(config, agentName(role)).filter((tool) => !nonDomainUtilities.includes(tool)).flatMap(permissionsForTool))].sort()
     assert.deepEqual(fromSchema, fromRoles, `${role}: domain permissions must equal the Host schema allow list`)
   }
 })

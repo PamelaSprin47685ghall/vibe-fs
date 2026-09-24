@@ -1,1 +1,1 @@
-Submit your quality assessment of the current delivery. Provide an honest PERFECT, REVISE, or N/A rating for each of the eight quality dimensions based on the current workspace and deliverables.
+Submit your quality assessment of the current delivery. Provide an honest PERFECT, REVISE, or N/A rating for each of the eight quality dimensions based on the current workspace and deliverables. Once accepted by the system, the assessment cannot be revoked or resubmitted.

@@ -141,11 +141,11 @@
 | 7 | `causal-wait` | 9 | causal-wait-001 ~ 009 |
 | 8 | `session-ontology` | 15 | session-ontology-001 ~ 015 |
 | 9 | `managed-session-lifecycle` | 24 | managed-session-lifecycle-001 ~ 022、managed-session-lifecycle-023（身份替换后旧活跃会话显式收束）、managed-session-lifecycle-024（固定 DevOps 崩溃恢复单一权威与进程排空） |
-| 10 | `host-boundary` | 31 | host-boundary-001 ~ 031 |
+| 10 | `host-boundary` | 32 | host-boundary-001 ~ 031、host-boundary-032（Contract 提示字段解耦与参数清理安全） |
 | 11 | `participant-identity` | 10 | participant-identity-001 ~ 009、participant-identity-010（活跃身份解析与历史身份隔离解码） |
 | 12 | `execution-model-routing` | 19 | execution-model-routing-001 ~ 017、execution-model-routing-018（新角色集合模型路由解耦）、execution-model-routing-019（固定 DevOps 模型绑定持久性与禁止借 resume 换模型） |
 | 13 | `office-capability` | 12 | office-capability-001、003 ~ 007、011 ~ 012、015、office-capability-016（Engineer 职责与独享 Fission）、office-capability-017（DevOps 执行与固有非架构级自修授权）、office-capability-018（Sphinx 程控探究与内部标准 Engineer） |
-| 14 | `capability-enforcement` | 24 | capability-enforcement-001 ~ 021、capability-enforcement-022（Fission 仅 Engineer 准入 fail-closed）、capability-enforcement-023（DevOps 固有自修授权禁 allowRepair 逐次开关）、capability-enforcement-024（Fork 与 Resume 权能分离） |
+| 14 | `capability-enforcement` | 26 | capability-enforcement-001 ~ 021、capability-enforcement-022（Fission 仅 Engineer 准入 fail-closed）、capability-enforcement-023（DevOps 固有自修授权禁 allowRepair 逐次开关）、capability-enforcement-024（Fork 与 Resume 权能分离）、capability-enforcement-025（Manager 评审专用只读工具固定可见与当前事实收口）、capability-enforcement-026（Review 接纳前禁止向固定 DevOps 派工） |
 | 15 | `participant-horizon` | 15 | participant-horizon-001 ~ 014、participant-horizon-015（Manager 并行来自派出多名 Engineer 而非自身分身） |
 | 16 | `cognitive-environment` | 16 | cognitive-environment-001 ~ 016 |
 | 17 | `cognitive-workspace` | 10 | cognitive-workspace-001 ~ 010 |

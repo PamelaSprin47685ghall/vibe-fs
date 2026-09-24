@@ -167,5 +167,5 @@ JS transaction invariant failure必须先完成CAS-preserving rollback或durable
 
 `JsToolGenerator` 与直接文件工具集为 Engineer 和 DevOps 提供统一的文件系统交互面：
 1. **直接文件工具**：配备 `Read`、`Write`、`Edit`、`Glob`、`Grep`、`Move` (`mv`)、`Remove` (`rm`)；
-2. **编程主工具**：按授予的 `ToolCapabilitySet` 动态生成 `js-engineer` 与 `js-devops`；
+2. **编程主工具**：按授予的 `ToolCapabilitySet` 动态生成 `js-engineer` 与 `js-devops`；编程面四层同构原则不变；`js-manager` 面向 Manager 且仅限当前未接纳评审的只读能力（Read/Glob/Grep），其能力过滤必须到达真实执行 API 层；
 3. **一致的安全沙箱与事务边界**：直接工具与 JS 工具共享相同的路径越界拦截、UTF-8 校验、符号链接防护以及 All-or-Nothing 事务语义。

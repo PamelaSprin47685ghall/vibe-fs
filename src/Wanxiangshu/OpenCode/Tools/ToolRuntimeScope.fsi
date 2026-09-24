@@ -86,6 +86,7 @@ type ToolRuntimeScope =
     member EnsureCommandRoleFor:
         sessionId: SessionId * resolveAgent: (SessionId -> Task<string option>) -> Task<string option>
 
+    static member emptyManagerFacts: ManagerCapabilityFacts
     member ManagerCapabilityFactsFor: sessionId: string -> ManagerCapabilityFacts
     member TryFreezeRetirement: sessionId: string * incumbentId: IncumbencyId -> bool
     member UnfreezeRetirement: sessionId: string -> unit

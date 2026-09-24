@@ -13,6 +13,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.office-capability.foundation-officecapability.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
 
+    <Compile Include="OpenCode/Tools/ManagerReviewTools.fsi"/>
+    <Compile Include="OpenCode/Tools/ManagerReviewTools.fs"/>
     <Compile Include="OpenCode/Tools/StaticTools.fsi"/>
     <Compile Include="OpenCode/Tools/StaticTools.fs"/>
   </ItemGroup>

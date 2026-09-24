@@ -57,6 +57,7 @@ module JsWorkflowSurface =
                     match fileAccessObservation with
                     | None ->
                         JsToolWorkflow.run
+                            surface.Capabilities
                             workspaceRoot
                             surface.BaseClassSource
                             program
@@ -66,6 +67,7 @@ module JsWorkflowSurface =
                             persistence
                     | Some observe ->
                         JsToolWorkflow.runWithFileAccessObservation
+                            surface.Capabilities
                             workspaceRoot
                             surface.BaseClassSource
                             program

@@ -84,6 +84,8 @@ test('WHAT[delegation-003] FORK_TOOL_manager_resume_dispatches_to_bound_fixed_de
   const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
 
   try {
+    await forkTool.injectAcceptedAssessment(runtime, owner)
+
     setTimeout(() => {
       forkTool.acceptPrompt(runtime, 0)
     }, 50)
@@ -114,6 +116,8 @@ test('WHAT[delegation-003] manager resume preserves companion devops across rest
   const runtime1 = await forkTool.createRuntime(directory, ownerDescriptor(owner))
 
   try {
+    await forkTool.injectAcceptedAssessment(runtime1, owner)
+
     setTimeout(() => {
       forkTool.acceptPrompt(runtime1, 0)
     }, 50)
@@ -175,6 +179,8 @@ test('WHAT[delegation-003] companion devops is preserved and not abandoned when 
   const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
 
   try {
+    await forkTool.injectAcceptedAssessment(runtime, owner)
+
     setTimeout(() => {
       forkTool.acceptPrompt(runtime, 0)
     }, 50)

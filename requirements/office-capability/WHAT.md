@@ -6,7 +6,7 @@ Office capability 由该职位有权产生的后果（Entitled Consequence）定
 
 ## [003] 同一 office 的 authority 不变
 
-同一 Office 的权能与权限集合保持完全一致。每个 Role 恰对应一个 Persona，不存在 fast/deep 档位或组合名解析语义。
+同一 Office 的权能与权限集合保持完全一致。每个 Role 恰对应一个 Persona，不存在 fast/deep 档位或组合名解析语义。当前执行事实（证书、清理阻塞、已接纳评审、退任冻结）可以按既有门禁收窄一次具体动作的准入，但不扩大 Office entitlement。
 
 ## [004] capability 是 consequence model，不是 tool whitelist 的口语转写
 
@@ -24,17 +24,17 @@ Engineer 的调查不包含任何真实命令执行，即使命令只读；只�
 
 ## [006] offices 不可互换：禁止把 office 当可互换通用 agent
 
-各 Office 具备不可替代的领域边界：Engineer 不是真实命令执行器；DevOps 不是架构/产品决策者，亦不负责差遣其他代理；Manager 不是工作区代码修改者或文件检视者；Sphinx 是程序工作流而非通用代理。
+各 Office 具备不可替代的领域边界：Engineer 不是真实命令执行器；DevOps 不是架构/产品决策者，亦不负责差遣其他代理；Manager 不承担直接源码实现；仅允许在当前独立评审中使用评审专用只读工具直接取证；Sphinx 是程序工作流而非通用代理。
 
-## [007] Manager 无普通工具：不读文件、不跑终端、不改仓库、不 inspect，无 Fission
+## [007] Manager 无普通工具：原生读查与写入拒绝；评审专用只读工具限未接纳评审
 
-Manager 的核心权能是统筹、委托、评估与集成，不亲自建立仓库具体事实。Manager 面向模型的工具仅限于 fork (仅 Engineer)、resume (已有 Engineer 续做或固定 DevOps)、join、horizon、todowrite、review、suicide 等编排、记账与评审接口，不具备文件读写、终端运行或直接 inspect 的能力，严禁使用 Fission，从一而终依靠委派与收集工作。
+Manager 的核心权能是统筹、委托、评估与集成；原生 read/grep/glob 与一切写入/终端对 Manager 始终拒绝；评审接纳前仅可使用四个评审专用只读工具（read-manager、grep-manager、glob-manager、js-manager），接纳后这些工具同样拒绝；禁止 Fission；不提供评审专用只读工具的副本语义。
 
 resume 的同道路续做语义归 delegation-003、delegation-024 所有。「DevOps 只能通过 resume 调用」不等于「resume 只能用于 DevOps」；续做不能改变已有角色、已绑定配置或控制权，也不能创建替代 DevOps。
 
 ## [011] Manager consequence = 完整管理与编排权能；non-consequence = 亲自修改工作树与使用 Fission
 
-Manager 在任何活跃任期阶段（包括评审前与接责后）均具备从一而终的完整管理与记账权能（Fork, Resume, Join, Horizon, TodoWrite, ReviewAssessment, Finality）。Manager 拥有权能并不等同于已有执行任务，有能力无任务完全合法。Manager 严禁以自己的双手亲自执行工作区源码修改、代码编写或检视调查，亦不得使用 Fission。
+Manager 在任何活跃任期阶段（包括评审前与接责后）均具备从一而终的完整管理与记账权能（Fork, Resume, Join, Horizon, TodoWrite, ReviewAssessment, Finality）。Manager 拥有权能并不等同于已有执行任务，有能力无任务完全合法。Manager 严禁亲自修改工作树、使用 Fission；评审未接纳前的只读取证是唯一合法直接调查窗口，评审接纳后即关闭；完整管理权不等于任何时刻都可以向固定 DevOps 派工——Review 接纳前不得向 DevOps 派工，已有只读 Engineer 的合法 resume 不受影响。
 
 ## [012] Orchestrator consequence = commission manager；不 commission 其它 office
 

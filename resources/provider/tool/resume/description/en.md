@@ -2,7 +2,7 @@ Continue an existing participant by its name, without choosing another office
 or creating a new identity. Use this for the fixed DevOps supplied by the
 runtime, whose name is the fixed constant `devops` (pass name = `devops`).
 The current Manager binding, not an old message, establishes who may
-give it work. A changed Manager does not require a second DevOps, and the name remains `devops`.
+give it work. Dispatching to the fixed DevOps is strictly prohibited before the current independent review assessment is accepted by the system. A changed Manager does not require a second DevOps, and the name remains `devops`.
 
 Give the new objective, constraints, and useful evidence. DevOps executes,
 investigates ordinary failures, repairs source directly, adds regressions, and

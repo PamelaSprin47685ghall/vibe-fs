@@ -6,7 +6,7 @@
 
 ## [002] provider-visible schema 与 runtime execution gate 读同一 capability truth
 
-Host 侧展示给模型的工具 Schema 与运行时执行拦截 Gate 必须双向完备，且均直接推导自唯一的 `Roles.permissions` 权威映射。无权限工具不出现在 Schema 中，异常绕过 Schema 的调用亦在运行时 Gate 被即时阻断。
+Host 侧展示给模型的工具 Schema 与运行时执行拦截 Gate 读同一 capability truth：schema 是固定上限投影，执行门禁是当前事实投影；两者同源，不意味着每轮动态删工具。无权限工具不出现在 Schema 中，异常绕过 Schema 的调用亦在运行时 Gate 被即时阻断。
 
 ## [003] capability projection 可按 office + request contract 收窄，但不得扩大 office entitlement
 
@@ -30,7 +30,7 @@ Host 侧展示给模型的工具 Schema 与运行时执行拦截 Gate 必须双�
 
 ## [008] js-* 编程面四层同构：capability → base-class member → description → example → runtime gate
 
-针对 JS 文件系统能力：若角色缺少对应 capability，则代码生成器生成的基类中不包含对应方法、工具描述中不提及该方法、示例代码中不展示该方法，且底层运行时 Gate 同样拦截对该方法的调用。面向活跃角色的编程工具仅生成 `js-engineer` 与 `js-devops`。
+针对 JS 文件系统能力：若角色缺少对应 capability，则代码生成器生成的基类中不包含对应方法、工具描述中不提及该方法、示例代码中不展示该方法，且底层运行时 Gate 同样拦截对该方法的调用。编程面四层同构原则不变；`js-manager` 面向 Manager 且仅限当前未接纳评审的只读能力（Read/Glob/Grep），其能力过滤必须到达真实执行 API 层。
 
 ## [009] 工具名引用完整性：same tool name → 唯一 schema owner + 唯一 semantic contract
 
@@ -46,7 +46,7 @@ Host 侧展示给模型的工具 Schema 与运行时执行拦截 Gate 必须双�
 
 ## [012] 工具名投影唯一写入口 = CanonicalRole → permission；禁止第二套旧名表/手写矩阵
 
-所有角色到工具名称的投影均以 `CanonicalRole → permission` 为唯一写入口。系统严禁引入历史别名兼容表或手工硬编码的工具名子集。
+所有角色到工具名称的投影均以 `CanonicalRole → permission` 为唯一写入口；允许 Manager 专用别名在同一写入口内按角色解析。系统严禁引入历史别名兼容表或手工硬编码的工具名子集。
 
 ## [013] 权威值严格分为 Evidence / Decision / Witness / Capability / Receipt / PhysicalHandle
 
@@ -105,3 +105,11 @@ DevOps 角色原生具备完整的本地工程文件操作能力（Read, Write, 
 `fork` 与 `resume` 在模型参数、生命周期与门禁上严格分离：
 - `fork`：仅允许 Manager 创建新的独立 Engineer 子会话；严禁 fork DevOps 或 fork 其他角色。
 - `resume`：用于 Manager 续做既有固定 DevOps 道路；同一道路同时至多允许一个活跃的 DevOps 工作单元。DevOps 忙时明确拒绝新的 assignment，不将新任务伪装为 nudge，亦不得通过新建操作员绕过忙碌状态。
+
+## [025] Manager 评审专用只读工具固定可见与当前事实收口
+
+Manager 评审专用只读工具（`read-manager`、`grep-manager`、`glob-manager`、`js-manager`）在模型 Schema 中固定可见；运行时由当前事实收口准入门禁：已接纳评审、退任冻结、已具备有效证书或存在清理阻塞时一律拒绝执行。原生 `read`/`grep`/`glob` 与 `js-engineer`/`js-devops` 对 Manager 的跨角色绕路调用始终拒绝。工具名到既有语义权限的映射必须维护在唯一目录中，禁止按后缀或启发式规则推测授权。
+
+## [026] Review 接纳前禁止向固定 DevOps 派工
+
+在当前迭代的 Review 被系统接纳前，严禁 Manager 向绑定的固定 DevOps 派发任何任务；已有只读 Engineer 的合法 `resume` 与 `fork` 只读调查不受误伤。对未接纳评审前向 DevOps 派工的拦截与拒绝，必须发生在任何持久化副作用之前。

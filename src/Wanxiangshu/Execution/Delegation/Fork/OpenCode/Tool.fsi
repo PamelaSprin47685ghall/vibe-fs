@@ -134,6 +134,9 @@ module ForkTool =
             [<Literal>]
             val CallingNotAllowed: string = "tool/resume/calling-not-allowed"
 
+            [<Literal>]
+            val AssessmentPendingForDevOps: string = "tool/resume/assessment-pending-for-devops"
+
     type Request =
         { Calling: string
           Name: string

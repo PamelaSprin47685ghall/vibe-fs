@@ -76,6 +76,7 @@ module JsDescriptionAssets =
           UltraEngineering = text lang JsCanonicalDescription.Path.UltraEngineering
           UltraInvestigation = text lang JsCanonicalDescription.Path.UltraInvestigation
           UltraDevOps = text lang JsCanonicalDescription.Path.UltraDevOps
+          UltraManagerInvestigation = text lang JsCanonicalDescription.Path.UltraManagerInvestigation
           MechanicalSemantic = text lang JsCanonicalDescription.Path.MechanicalSemantic
           CommentAnchorOwnSearch = text lang JsCanonicalDescription.Path.CommentAnchorOwnSearch
           CommentIgnoreGy = text lang JsCanonicalDescription.Path.CommentIgnoreGy
@@ -154,6 +155,7 @@ module JsToolSpec =
             match fileAccessObservation with
             | None ->
                 JsToolWorkflow.run
+                    surface.Capabilities
                     workspaceRoot
                     surface.BaseClassSource
                     programSource
@@ -163,6 +165,7 @@ module JsToolSpec =
                     persistence
             | Some observe ->
                 JsToolWorkflow.runWithFileAccessObservation
+                    surface.Capabilities
                     workspaceRoot
                     surface.BaseClassSource
                     programSource

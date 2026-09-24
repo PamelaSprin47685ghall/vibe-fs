@@ -44,4 +44,6 @@ module ForkToolSurface =
     val executeJoin: value: obj -> owner: string -> Task<string>
     val executeHorizon: value: obj -> owner: string -> Task<string>
     val settle: value: obj -> owner: string -> answer: string -> providerRun: string -> Task<bool>
+    val injectAcceptedAssessment: value: obj -> owner: string -> Task
+    val injectAuditPendingIncumbency: value: obj -> owner: string -> Task
     val disposeRuntime: value: obj -> unit

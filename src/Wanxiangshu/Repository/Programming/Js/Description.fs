@@ -85,6 +85,9 @@ module JsCanonicalDescription =
         let UltraDevOps = "tool/js-program/ultra-devops"
 
         [<Literal>]
+        let UltraManagerInvestigation = "tool/js-program/ultra-manager-investigation"
+
+        [<Literal>]
         let MechanicalSemantic = "tool/js-program/mechanical-semantic"
 
         [<Literal>]
@@ -202,6 +205,7 @@ module JsCanonicalDescription =
           UltraEngineering: string
           UltraInvestigation: string
           UltraDevOps: string
+          UltraManagerInvestigation: string
           MechanicalSemantic: string
           CommentAnchorOwnSearch: string
           CommentIgnoreGy: string
@@ -1040,6 +1044,10 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
                 Some(set [ JsCapability.Read; JsCapability.Grep; JsCapability.Edit ], prose.UltraEngineering)
             | "engineer" -> Some(set [ JsCapability.Read; JsCapability.Grep ], prose.UltraInvestigation)
             | "devops" -> Some(set [ JsCapability.Read; JsCapability.Edit ], prose.UltraDevOps)
+            | "manager" when
+                Set.isSubset capabilities (set [ JsCapability.Read; JsCapability.Glob; JsCapability.Grep ])
+                && not (Set.isEmpty capabilities) ->
+                Some(set [ JsCapability.Read; JsCapability.Glob; JsCapability.Grep ], prose.UltraManagerInvestigation)
             | _ -> None
 
         candidate

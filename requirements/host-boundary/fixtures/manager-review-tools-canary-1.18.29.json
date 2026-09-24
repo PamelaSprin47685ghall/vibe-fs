@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "supportedVersionRange": "1.18.29",
+  "observedVersions": {
+    "opencode": "1.18.29",
+    "plugin": "1.18.29"
+  },
+  "observedResult": "supported",
+  "contractToken": "do-not-use-except-for-review",
+  "fourTools": [
+    "glob-manager",
+    "grep-manager",
+    "js-manager",
+    "read-manager"
+  ],
+  "controlTools": [
+    "glob",
+    "grep",
+    "js-devops",
+    "js-engineer",
+    "read"
+  ],
+  "wireInspection": {
+    "contractRequired": true,
+    "contractType": "string",
+    "contractEnum": [
+      "do-not-use-except-for-review"
+    ],
+    "historicalToolCallPreservesContract": true,
+    "round2ToolsStable": true
+  },
+  "hookIdentityChain": {
+    "argsIdentityPreservedInBefore": true,
+    "argsIdentityPreservedInAfter": true,
+    "contractHiddenInBefore": true,
+    "symbolAttachedInBefore": true,
+    "contractRestoredInAfter": true,
+    "symbolClearedInAfter": true,
+    "businessArgsPreserved": true
+  },
+  "durableToolPart": {
+    "persistedInputRetainsContract": true,
+    "normalStatus": "completed",
+    "errorHandling": "after-called-and-contract-restored"
+  },
+  "terminalStates": {
+    "normal": "success",
+    "executorError": "error-settled-with-restore",
+    "cancellation": "aborted-or-settled"
+  }
+}

@@ -1,5 +1,5 @@
 按 name 继续已有参与者，不重选职位，也不创建新身份。
-固定 DevOps 由运行时提供，其名字是固定常量 `devops`，通过本工具托付（传入 name = `devops`）。谁能派工取决于当前 Manager 绑定，不取决于旧消息。
+固定 DevOps 由运行时提供，其名字是固定常量 `devops`，通过本工具托付（传入 name = `devops`）。谁能派工取决于当前 Manager 绑定，不取决于旧消息。当前独立评审（Review）接纳前严禁向固定 DevOps 派工。
 Manager 换任不需要第二名 DevOps，名字始终为 `devops`。
 
 给出新目标、约束和有用证据。DevOps 自行执行、调查普通失败、直接改源码、补回归并重新验证。

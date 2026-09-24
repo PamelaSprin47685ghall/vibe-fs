@@ -422,7 +422,7 @@ type ToolRuntimeScope
         | true, seconds when seconds > 0.0 && not (Double.IsInfinity seconds) -> TimeSpan.FromSeconds seconds
         | _ -> TimeSpan.FromHours 1.0
 
-    let emptyManagerFacts: ManagerCapabilityFacts =
+    let defaultEmptyManagerFacts: ManagerCapabilityFacts =
         { HasActiveIncumbency = false
           HasAssessment = false
           HasValidBoundCertificate = false
@@ -461,7 +461,7 @@ type ToolRuntimeScope
                       CleanupBlockerDigest = road.ActiveCleanupBlockerDigest }
 
                 Some facts)
-        |> Option.defaultValue emptyManagerFacts
+        |> Option.defaultValue defaultEmptyManagerFacts
 
     let devopsBindingTasks = Dictionary<string, Task<unit>>()
 
@@ -730,6 +730,12 @@ type ToolRuntimeScope
     /// exactly equal the active facts, so a mismatched or stale certificate
     /// can never open the finish window. The cleanup blocker digest is the
     /// stored objective evidence, passed through verbatim.
+    static member emptyManagerFacts: ManagerCapabilityFacts =
+        { HasActiveIncumbency = false
+          HasAssessment = false
+          HasValidBoundCertificate = false
+          CleanupBlockerDigest = None }
+
     member _.ManagerCapabilityFactsFor(sessionId: string) : ManagerCapabilityFacts = managerFactsOfSession sessionId
 
     member _.TryFreezeRetirement(sessionId: string, incumbentId: IncumbencyId) =

@@ -6,4 +6,8 @@ namespace Wanxiangshu.Repository.Programming.Js
 /// (JS-019). Mutations only stage (JS-012); the transaction engine commits.
 module JsToolsBindings =
     val createApi:
-        root: string -> staging: ResizeArray<JsStagedMutation> -> readSnapshots: ResizeArray<JsReadSnapshot> -> obj
+        capabilities: Set<JsCapability> ->
+        root: string ->
+        staging: ResizeArray<JsStagedMutation> ->
+        readSnapshots: ResizeArray<JsReadSnapshot> ->
+            obj

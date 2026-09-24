@@ -40,6 +40,12 @@ type ManagerCapabilityFacts =
 [<RequireQualifiedAccess>]
 module OfficeCapability =
 
+    let managerReviewReadOnlyPermissions: ToolPermission Set =
+        set
+            [ ToolPermission.Read
+              ToolPermission.Glob
+              ToolPermission.Grep ]
+
     let permissions (role: Role) : ToolPermission Set =
         match role with
         | Role.Manager ->
@@ -50,7 +56,10 @@ module OfficeCapability =
                   ToolPermission.Horizon
                   ToolPermission.ReviewAssessment
                   ToolPermission.Finality
-                  ToolPermission.Sphinx ]
+                  ToolPermission.Sphinx
+                  ToolPermission.Read
+                  ToolPermission.Glob
+                  ToolPermission.Grep ]
         | Role.Orchestrator ->
             set
                 [ ToolPermission.Fork
@@ -112,7 +121,7 @@ module OfficeCapability =
         elif facts.HasValidBoundCertificate then
             set [ ToolPermission.Join; ToolPermission.Finality ]
         elif facts.HasAssessment then
-            permissions Role.Manager |> Set.remove ToolPermission.ReviewAssessment
+            Set.difference (permissions Role.Manager) managerReviewReadOnlyPermissions
         else
             permissions Role.Manager
 

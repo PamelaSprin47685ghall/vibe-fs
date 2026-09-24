@@ -260,6 +260,9 @@ module ToolRegistry =
                       (fun (sessionId, reason) -> runtime.TerminateSession(sessionId, reason))
                       bloggerHost
 
+              yield ManagerReadTools.readManagerSpec factory runtime groundingObservation
+              yield ManagerReadTools.globManagerSpec factory runtime groundingObservation
+              yield ManagerReadTools.grepManagerSpec factory runtime groundingObservation
               yield! casebookToolSpecs
               yield! generatedJsSpecs () ]
 
@@ -269,15 +272,18 @@ module ToolRegistry =
             let original = spec.Execute
 
             let managerPermission =
-                match spec.Name with
-                | "fork" -> Some ToolPermission.Fork
-                | "resume" -> Some ToolPermission.Resume
-                | "join" -> Some ToolPermission.Join
-                | "horizon" -> Some ToolPermission.Horizon
-                | "fission" -> Some ToolPermission.Fission
-                | "review" -> Some ToolPermission.ReviewAssessment
-                | "suicide" -> Some ToolPermission.Finality
-                | _ -> None
+                match ManagerReviewTools.requiredPermissions spec.Name with
+                | Some perms -> perms |> Seq.tryHead
+                | None ->
+                    match spec.Name with
+                    | "fork" -> Some ToolPermission.Fork
+                    | "resume" -> Some ToolPermission.Resume
+                    | "join" -> Some ToolPermission.Join
+                    | "horizon" -> Some ToolPermission.Horizon
+                    | "fission" -> Some ToolPermission.Fission
+                    | "review" -> Some ToolPermission.ReviewAssessment
+                    | "suicide" -> Some ToolPermission.Finality
+                    | _ -> None
 
             let denied (ctx: HostToolContext) path (subs: Map<string, string>) =
                 ToolHostCodec.tomlObjectWithInstructions [ ProviderProse.render (lang ctx) path subs ] []

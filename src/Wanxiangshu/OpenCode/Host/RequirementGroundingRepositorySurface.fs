@@ -107,6 +107,7 @@ module RequirementGroundingRepositorySurface =
 
                     let! outcome =
                         JsToolWorkflow.runWithFileAccessObservation
+                            surface.Capabilities
                             runtime.Workspace
                             surface.BaseClassSource
                             program

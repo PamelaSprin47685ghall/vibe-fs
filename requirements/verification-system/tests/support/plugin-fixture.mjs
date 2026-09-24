@@ -387,6 +387,14 @@ export const acceptChildAgentOwnerRoot = async (runtime, childSessionId, promptK
   }
 }
 
+export const openIncumbency = async (runtime, sessionId, incumbencyId = `inc-${sessionId}`) => {
+  const result = await obligationJournalSurface.openIncumbency(runtime.journal, sessionId, incumbencyId)
+  if (!result?.ok) throw new Error(`openIncumbency(${sessionId}) rejected: ${result?.error ?? 'unknown error'}`)
+  return result
+}
+
+export const injectAuditPendingIncumbency = openIncumbency
+
 export const grantWorkOwned = async (runtime, sessionId, incumbencyId = `inc-${sessionId}`) => {
   const result = await obligationJournalSurface.grantWorkOwned(runtime.journal, sessionId, incumbencyId)
   if (!result?.ok) throw new Error(`grantWorkOwned(${sessionId}) rejected: ${result?.error ?? 'unknown error'}`)

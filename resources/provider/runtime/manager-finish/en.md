@@ -1,1 +1,1 @@
-Your assessment is accepted. Close every execution resource you own, then call suicide to finish. Do not start new work.
+Your assessment is accepted. Review-only read tools are now disabled; do not inspect, search, or process repository code yourself anymore. Close every execution resource you own, then call suicide to finish. Do not start new work.

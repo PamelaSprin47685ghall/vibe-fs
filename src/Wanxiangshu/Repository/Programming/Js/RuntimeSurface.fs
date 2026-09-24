@@ -19,7 +19,14 @@ module JsRuntimeSurface =
         // DSL-MUTABLE: resource — JS mutation staging buffer handed off in handle
         let staging = ResizeArray<JsStagedMutation>()
         let readSnapshots = ResizeArray<JsReadSnapshot>()
-        let api = JsToolsBindings.createApi root staging readSnapshots
+        let allCapabilities =
+            set
+                [ JsCapability.Read
+                  JsCapability.Write
+                  JsCapability.Edit
+                  JsCapability.Glob
+                  JsCapability.Grep ]
+        let api = JsToolsBindings.createApi allCapabilities root staging readSnapshots
         box (JsBindingsHandle(api, staging, readSnapshots))
 
     let api (handle: obj) : obj = (unbox<JsBindingsHandle> handle).Api

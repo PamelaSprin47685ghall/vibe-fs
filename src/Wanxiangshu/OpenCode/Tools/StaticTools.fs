@@ -94,6 +94,9 @@ module StaticTools =
           "chronicle"
           "fetch"
           "suicide"
+          "read-manager"
+          "grep-manager"
+          "glob-manager"
           "js-engineer"
           "js-manager"
           "js-orchestrator"
@@ -129,7 +132,9 @@ module StaticTools =
         if Set.contains name allowed then "allow" else "deny"
 
     let private jsPermission role name =
-        if name = jsToolName role && hasFsCapability role then
+        if name = "js-manager" && role = Role.Manager then
+            "allow"
+        elif name = jsToolName role && hasFsCapability role then
             "allow"
         else
             "deny"
@@ -139,6 +144,9 @@ module StaticTools =
         | false, _, _ -> "deny"
         | true, "fission", Role.Manager -> "deny"
         | true, "commission", Role.Manager -> "deny"
+        | true, ("read-manager" | "grep-manager" | "glob-manager"), Role.Manager -> "allow"
+        | true, ("read-manager" | "grep-manager" | "glob-manager"), _ -> "deny"
+        | true, ("read" | "grep" | "glob"), Role.Manager -> "deny"
         | true, "fork", Role.Orchestrator -> "deny"
         | true, "resume", Role.Orchestrator -> "deny"
         | true, "commission", Role.Orchestrator -> "allow"

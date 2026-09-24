@@ -238,6 +238,7 @@ module JsToolWorkflow =
     /// `persistence` enables durable prepare/commit facts (JS-012). Current and
     /// transaction head are owned by the canonical Integrator; no history reader is exposed here.
     let private runCore
+        (capabilities: Set<JsCapability>)
         (root: string)
         (baseClassSource: string)
         (modelSource: string)
@@ -253,7 +254,7 @@ module JsToolWorkflow =
                     // DSL-MUTABLE: algorithm-scratch — JS mutation staging accumulator
                     let staging = ResizeArray<JsStagedMutation>()
                     let readSnapshots = ResizeArray<JsReadSnapshot>()
-                    let api = JsToolsBindings.createApi root staging readSnapshots
+                    let api = JsToolsBindings.createApi capabilities root staging readSnapshots
 
                     let! resultJson =
                         JsSandbox.runSurface baseClassSource modelSource api deadlineMs deadlineEpochMs outputBoundBytes
@@ -264,14 +265,21 @@ module JsToolWorkflow =
                     let readPaths = snapshots |> List.map _.Path |> List.distinct
                     let effectPaths = mutations |> List.map JsStagedMutation.path |> List.distinct
 
-                    do! preflight root snapshots mutations
-                    do! observeFileAccess fileAccessObservation readPaths effectPaths
-                    do! preflight root snapshots mutations
+                    let hasMutationCapability =
+                        Set.contains JsCapability.Edit capabilities
+                        || Set.contains JsCapability.Write capabilities
 
-                    if List.isEmpty mutations then
-                        return value, [], []
+                    if not hasMutationCapability && not (List.isEmpty mutations) then
+                        return! Error JsFailure.ReadOnlyMutationRejected
                     else
-                        return! commitMutations root snapshots mutations value persistence
+                        do! preflight root snapshots mutations
+                        do! observeFileAccess fileAccessObservation readPaths effectPaths
+                        do! preflight root snapshots mutations
+
+                        if List.isEmpty mutations then
+                            return value, [], []
+                        else
+                            return! commitMutations root snapshots mutations value persistence
                 }
 
             match outcome with
@@ -280,6 +288,7 @@ module JsToolWorkflow =
         }
 
     let run
+        (capabilities: Set<JsCapability>)
         (root: string)
         (baseClassSource: string)
         (modelSource: string)
@@ -288,9 +297,10 @@ module JsToolWorkflow =
         (outputBoundBytes: int)
         (persistence: IJsTransactionPersistence option)
         : Task<JsToolOutcome> =
-        runCore root baseClassSource modelSource deadlineMs deadlineEpochMs outputBoundBytes persistence None
+        runCore capabilities root baseClassSource modelSource deadlineMs deadlineEpochMs outputBoundBytes persistence None
 
     let runWithFileAccessObservation
+        (capabilities: Set<JsCapability>)
         (root: string)
         (baseClassSource: string)
         (modelSource: string)
@@ -301,6 +311,7 @@ module JsToolWorkflow =
         (fileAccessObservation: FileAccessObservation)
         : Task<JsToolOutcome> =
         runCore
+            capabilities
             root
             baseClassSource
             modelSource

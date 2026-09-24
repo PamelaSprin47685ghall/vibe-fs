@@ -842,6 +842,8 @@ Context/Companion/Runtime.fsi
 Context/Companion/Runtime.fs
 OpenCode/Tools/ToolContext.fsi
 OpenCode/Tools/ToolContext.fs
+OpenCode/Tools/ManagerReviewTools.fsi
+OpenCode/Tools/ManagerReviewTools.fs
 OpenCode/Tools/StaticTools.fsi
 OpenCode/Tools/StaticTools.fs
 OpenCode/Tools/NodeFs.fsi
@@ -1432,6 +1434,8 @@ Repository/Knowledge/Casebook/FetchSurface.fsi
 Repository/Knowledge/Casebook/FetchSurface.fs
 Repository/Knowledge/Casebook/OpenCode/Tools.fsi
 Repository/Knowledge/Casebook/OpenCode/Tools.fs
+Repository/Programming/Js/OpenCode/ManagerReadTools.fsi
+Repository/Programming/Js/OpenCode/ManagerReadTools.fs
 OpenCode/Tools/ToolRegistry.fsi
 OpenCode/Tools/ToolRegistry.fs
 OpenCode/Tools/ToolRegistrySurface.fsi
@@ -1474,6 +1478,8 @@ OpenCode/Host/BloggerChronicleText.fsi
 OpenCode/Host/BloggerChronicleText.fs
 OpenCode/Plugin/PluginTransforms.fsi
 OpenCode/Plugin/PluginTransforms.fs
+OpenCode/Host/ManagerReviewContract.fsi
+OpenCode/Host/ManagerReviewContract.fs
 OpenCode/Plugin/PluginHooks.fsi
 OpenCode/Plugin/PluginHooks.fs
 OpenCode/Plugin/SpikePlugin.fsi

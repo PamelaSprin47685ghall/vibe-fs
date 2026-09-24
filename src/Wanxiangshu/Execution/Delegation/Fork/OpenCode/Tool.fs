@@ -154,6 +154,9 @@ module ForkTool =
             [<Literal>]
             let CallingNotAllowed = "tool/resume/calling-not-allowed"
 
+            [<Literal>]
+            let AssessmentPendingForDevOps = "tool/resume/assessment-pending-for-devops"
+
     let private lang (ctx: HostToolContext) =
         ProviderLanguageBinding.forSessionText ctx.SessionId
 
@@ -661,18 +664,29 @@ module ForkTool =
             let isDevOps =
                 String.Equals(request.Name.Trim(), "devops", StringComparison.OrdinalIgnoreCase)
 
-            if isDevOps then
-                do! scope.EnsureRoadDevOpsBound parentSessionId
+            let isDevOpsWithoutAssessment =
+                if isDevOps then
+                    let roadSessionId = SessionId.value parentSessionId
+                    let facts = scope.ManagerCapabilityFactsFor roadSessionId
+                    not facts.HasAssessment
+                else
+                    false
 
-            match scope.RuntimeFor context with
-            | Error _ -> return consequence (prose language Path.Fork.ChargeContextUnavailable)
-            | Ok runtime ->
-                let handles = agentHandles scope context
+            if isDevOpsWithoutAssessment then
+                return consequence (prose language Path.Resume.AssessmentPendingForDevOps)
+            else
+                if isDevOps then
+                    do! scope.EnsureRoadDevOpsBound parentSessionId
 
-                let existingByname =
-                    handles |> Option.bind (HandleProjection.tryFindByByname request.Name)
+                match scope.RuntimeFor context with
+                | Error _ -> return consequence (prose language Path.Fork.ChargeContextUnavailable)
+                | Ok runtime ->
+                    let handles = agentHandles scope context
 
-                return! executeForkOnRuntime scope request context language handles existingByname isDevOps runtime
+                    let existingByname =
+                        handles |> Option.bind (HandleProjection.tryFindByByname request.Name)
+
+                    return! executeForkOnRuntime scope request context language handles existingByname isDevOps runtime
         }
 
     let private executeManagerResume (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
