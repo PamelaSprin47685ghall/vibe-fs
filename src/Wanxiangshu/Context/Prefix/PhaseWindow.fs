@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Context.Prefix
 
+open Wanxiangshu.Foundation.Identity
+
 /// The K-window cutoff decision for one cognitive phase boundary.
 ///
 /// context-compression-028: with committed phases `A1..AN` and `Bi` the start of the
@@ -21,6 +23,13 @@ type PhaseWindowDecision =
 [<RequireQualifiedAccess>]
 module PhaseWindow =
 
+    /// context-compression-028: the window frozen when the owner opens. Positive by
+    /// construction, so `validateK` only has to refuse a *supplied* value. Nothing in
+    /// the product configures a different one yet — a per-owner override would have to
+    /// be recorded as an owner fact before this constant could stop being the answer
+    /// for every owner.
+    let defaultK = 2
+
     /// `K` is frozen when the owner opens and must be a positive integer. Zero would
     /// mean "keep nothing raw", which would delete the turn carrying the live canvas.
     let validateK (k: int) : Result<unit, string> =
@@ -28,6 +37,40 @@ module PhaseWindow =
             Error(sprintf "phase window K must be a positive integer; got %d (context-compression-028)" k)
         else
             Ok()
+
+    type PhaseCommitWindow =
+        { PhaseCallIds: ToolCallId list }
+
+    let emptyWindow: PhaseCommitWindow = { PhaseCallIds = [] }
+
+    /// Admit one committed phase and keep at most `k` entries, oldest first.
+    ///
+    /// Only the window is retained, never the whole phase history: `desiredCutoff`
+    /// reads `Bj` for `j = max(1, N − K + 1)`, and with the list holding the last
+    /// `min(N, K)` commits that index is always the oldest retained one. A bounded
+    /// window is therefore exactly as much evidence as the formula needs, and phase
+    /// commits do not accumulate here as the session grows.
+    let appendPhase (k: int) (callId: ToolCallId) (window: PhaseCommitWindow) : PhaseCommitWindow =
+        let kept =
+            if k < 1 then
+                []
+            else
+                window.PhaseCallIds @ [ callId ] |> List.rev |> List.truncate k |> List.rev
+
+        { PhaseCallIds = kept }
+
+    /// The window's desire: the turn start of the oldest phase still kept raw.
+    ///
+    /// `turnStartOf` is the canonical XTrace turn of a committed tool call in the
+    /// CURRENT generation, injected so this stays pure. A phase whose turn is no
+    /// longer addressable proves nothing — the caller must keep its raw tail rather
+    /// than fold at a boundary it cannot point to (context-compression-014/029).
+    let desiredCutoffOf (turnStartOf: ToolCallId -> int option) (window: PhaseCommitWindow) : PhaseWindowDecision =
+        window.PhaseCallIds
+        |> List.tryHead
+        |> Option.bind turnStartOf
+        |> Option.map PhaseWindowDecision.KeepFrom
+        |> Option.defaultValue PhaseWindowDecision.NoPhases
 
     /// The desired cutoff for `phaseTurnStarts`, the ordered start boundary of each
     /// committed phase's own semantic turn.
@@ -43,32 +86,3 @@ module PhaseWindow =
             let j = max 1 (n - k + 1)
             let index = min (max j 1) n
             PhaseWindowDecision.KeepFrom(List.item (index - 1) starts)
-
-    /// The actual cutoff: the desired one clamped to what the evidence supports.
-    ///
-    /// `coveredCutoffExclusive` is the furthest cutoff the committed coverage proves.
-    /// The actual cutoff never moves past it, and never retreats below
-    /// `committedCutoffExclusive` — a committed cutoff is history, not a preference.
-    /// Clamp a desired cutoff to the evidence: never past what coverage proves, and
-    /// never behind a cutoff already committed.
-    ///
-    /// Coverage fallen behind the committed cutoff cannot retreat it — a committed
-    /// cutoff is history, so the caller keeps what it already has until coverage
-    /// catches up.
-    let private clampTo (committedCutoffExclusive: int option) (desired: int) (covered: int) =
-        let floor = committedCutoffExclusive |> Option.defaultValue 0
-
-        if covered <= floor then
-            PhaseWindowDecision.KeepFrom floor
-        else
-            PhaseWindowDecision.KeepFrom(min desired covered)
-
-    let actualCutoff
-        (decision: PhaseWindowDecision)
-        (committedCutoffExclusive: int option)
-        (coveredCutoffExclusive: int option)
-        : PhaseWindowDecision =
-        match decision, coveredCutoffExclusive with
-        | PhaseWindowDecision.NoPhases, _ -> PhaseWindowDecision.NoPhases
-        | _, None -> PhaseWindowDecision.NoPhases
-        | PhaseWindowDecision.KeepFrom desired, Some covered -> clampTo committedCutoffExclusive desired covered

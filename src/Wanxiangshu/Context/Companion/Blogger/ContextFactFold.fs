@@ -223,7 +223,8 @@ module ContextFactFold =
                           Digest = payload.TextDigest
                           TextRef = payload.TextRef
                           CoveredFromSequence = payload.PreviousIngestedThroughSequence
-                          CoveredThroughSequence = payload.NextIngestedThroughSequence }
+                          CoveredThroughSequence = payload.NextIngestedThroughSequence
+                          CutoffExclusive = payload.NextCoverableTurnCutoffExclusive }
                     |> Result.mapError ContextFoldRejection.BlogObservationCommittedFrameRejected
                     |> Result.map (fun blogUpdated ->
                         [ ContextProjectionChange.EnforcementSet(sid, enfUpdated)
@@ -259,7 +260,9 @@ module ContextFactFold =
                       Digest = payload.TextDigest
                       TextRef = payload.TextRef
                       CoveredFromSequence = 0L
-                      CoveredThroughSequence = 0L }
+                      CoveredThroughSequence = 0L
+                      // The collapse derives its own claim from the frames it replaces.
+                      CutoffExclusive = 0 }
                 |> Result.mapError ContextFoldRejection.BlogObservationsSquashedFrameRejected
                 |> Result.map (fun blogUpdated ->
                     [ ContextProjectionChange.EnforcementSet(sid, enforcement)

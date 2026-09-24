@@ -27,6 +27,7 @@ module XWire =
 
     val internal candidate:
         port: WireJournalPort ->
+        window: ProbeBound ->
         sessionId: SessionId ->
         snapshot: Wanxiangshu.Participant.Provider.Projection.ProjectionSnapshot ->
         committed: PrefixSnapshot option ->

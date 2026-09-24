@@ -13,7 +13,10 @@ type BlogFrame =
       Digest: BlobDigest
       TextRef: BlobRef
       CoveredFromSequence: int64
-      CoveredThroughSequence: int64 }
+      CoveredThroughSequence: int64
+      /// context-compression-029: the complete-turn boundary this frame's material
+      /// summarises.
+      CutoffExclusive: int }
 
 type BlogCoverage =
     { IngestedThroughSequence: int64
@@ -40,6 +43,7 @@ module BlogProjection =
     val frameCount: state: BlogProjectionState -> int
     val frames: state: BlogProjectionState -> BlogFrame list
     val coverableFrames: state: BlogProjectionState -> BlogFrame list
+    val framesThroughCutoff: cutoffExclusive: int -> state: BlogProjectionState -> BlogFrame list
     val squashWidth: state: BlogProjectionState -> int
 
     val applyEntry:

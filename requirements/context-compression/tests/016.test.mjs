@@ -246,13 +246,15 @@ test('WHAT[context-compression-016] CTX_011_coverage_inside_the_live_tail_means_
     committedEpoch: 0,
     committedSnapshot: undefined,
     coverableCutoff: 5,
+    materialCutoff: 5,
     coveredDigest: 'd5',
     requestStartCutoff: 0,
     recomputeDigest: agreeing('d5'),
   })
 
   assert.equal(result.ok, false)
-  assert.equal(result.error, 'CoverageNotAheadOfRequest')
+  assert.equal(result.error, 'MaterialBeyondBoundary')
+  assert.match(result.message, /reaches past the covered boundary 0/)
 })
 test('WHAT[context-compression-016] CTX_011_the_candidate_never_swallows_the_message_being_answered', () => {
   // Companion is ahead of the request boundary — it consumed turns this request has
@@ -262,6 +264,9 @@ test('WHAT[context-compression-016] CTX_011_the_candidate_never_swallows_the_mes
     committedEpoch: 0,
     committedSnapshot: undefined,
     coverableCutoff: 9,
+    // The caller froze the subset that ends at the request boundary (CTX-029):
+    // material past it would replace the message being answered.
+    materialCutoff: 4,
     coveredDigest: 'd-clamped',
     requestStartCutoff: 4,
     recomputeDigest: agreeing('d-clamped'),
@@ -270,26 +275,33 @@ test('WHAT[context-compression-016] CTX_011_the_candidate_never_swallows_the_mes
   assert.equal(result.ok, true, result.ok ? '' : result.message)
   assert.equal(result.cutoff, 4, 'clamped to the request start, not the Companion coverage')
 })
-test('WHAT[context-compression-016] COMPANION_011_the_proof_hashes_exactly_the_clamped_cutoff', () => {
-  // Step 1 clamps before step 5 hashes. Hashing the Companion's unclamped cutoff would
-  // prove a prefix the candidate does not actually use — the check would pass while
-  // describing a different range.
+test('WHAT[context-compression-016] COMPANION_011_the_proof_hashes_the_companions_boundary_and_the_snapshot_records_the_materials', () => {
+  // Two numbers, and the distinction is the clause: the Companion's digest is a claim
+  // about ITS cutoff, while the snapshot must record the digest of the prefix this
+  // probe actually replaces. Folding below the Companion's boundary is legal only
+  // because that region is inside a proven, continuous prefix (CTX-029).
   const asked = []
 
   const result = selection.select({
     committedEpoch: 0,
     committedSnapshot: undefined,
     coverableCutoff: 9,
-    coveredDigest: 'd-at-4',
+    materialCutoff: 4,
+    coveredDigest: 'd-at-9',
     requestStartCutoff: 4,
     recomputeDigest: (cutoff) => {
       asked.push(cutoff)
-      return cutoff === 4 ? 'd-at-4' : 'wrong-range'
+      return cutoff === 9 ? 'd-at-9' : cutoff === 4 ? 'd-at-4' : 'wrong-range'
     },
   })
 
-  assert.deepEqual(asked, [4], 'the proof must hash the clamped cutoff exactly once')
+  assert.deepEqual(
+    asked,
+    [9, 4],
+    'the coverage claim is proven at its own cutoff, then the snapshot digest is taken at the material boundary',
+  )
   assert.equal(result.ok, true, result.ok ? '' : result.message)
+  assert.equal(result.candidate.prefixDigest, 'd-at-4')
 })
 
 test('WHAT[context-compression-016] journal_to_blob_materialization_and_probe_pipeline', async () => {
@@ -324,8 +336,10 @@ test('WHAT[context-compression-016] journal_to_blob_materialization_and_probe_pi
   }
 
   const frames = [
-    { kind: 'Entry', ref: ref1, digest: digest1, coveredFrom: 0, coveredThrough: 1 },
-    { kind: 'Entry', ref: ref2, digest: digest2, coveredFrom: 1, coveredThrough: 2 },
+    // Each frame carries the complete-turn boundary its material summarises
+    // (CTX-029): the subset a cutoff may use is the frames that end at or before it.
+    { kind: 'Entry', ref: ref1, digest: digest1, coveredFrom: 0, coveredThrough: 1, cutoff: 1 },
+    { kind: 'Entry', ref: ref2, digest: digest2, coveredFrom: 1, coveredThrough: 2, cutoff: 2 },
   ]
   const opening = {
     assignmentText: '# Common Law\nOriginal user assignment charter',
@@ -339,6 +353,7 @@ test('WHAT[context-compression-016] journal_to_blob_materialization_and_probe_pi
     opening,
     frames,
     coverableCutoff: 2,
+    materialCutoff: 2,
     coveredDigest: '26431b78769f0ddc2d42da5c6f920285fca27f5755353eda546a25aebefb9072',
     requestCutoff: 2,
   })
@@ -386,6 +401,7 @@ test('WHAT[context-compression-016] journal_materialization_fails_closed_on_corr
     sessionId: 'test-corrupt-ses',
     frames,
     coverableCutoff: 1,
+    materialCutoff: 1,
     coveredDigest: 'cov-bad',
     requestCutoff: 1,
   })

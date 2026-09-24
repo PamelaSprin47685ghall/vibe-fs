@@ -47,29 +47,50 @@ test('WHAT[context-compression-028] a non-positive K is refused', () => {
   assert.equal(phaseWindow.validateK(1).ok, true)
 })
 
-test('WHAT[context-compression-028] the actual cutoff never exceeds proven coverage', () => {
-  const desired = phaseWindow.desiredCutoff(2, turnStarts(4))
-
-  // Coverage proves only up to turn 2, so the desire is clamped down to it.
-  const clamped = phaseWindow.actualCutoff(desired, 2, 2)
-  assert.equal(clamped.kind, 'KeepFrom')
-  assert.equal(clamped.cutoffExclusive, 2)
+test('WHAT[context-compression-028] the frozen default is 2 and is a legal window', () => {
+  assert.equal(phaseWindow.defaultK, 2, 'the owner opens with K = 2 unless something records otherwise')
+  assert.equal(phaseWindow.validateK(phaseWindow.defaultK).ok, true)
 })
 
-test('WHAT[context-compression-028] no coverage means no compression', () => {
-  const desired = phaseWindow.desiredCutoff(2, turnStarts(4))
-  const decision = phaseWindow.actualCutoff(desired, 1, null)
-  assert.equal(decision.kind, 'NoPhases', 'uncovered raw must be kept, never dropped')
+test('WHAT[context-compression-028] the bounded window yields the same boundary as the full history', () => {
+  // The projection only ever holds the last K commits, so the formula must agree when
+  // it is handed that window instead of A1..AN: the oldest retained phase IS A_(N-K+1).
+  for (const n of [1, 2, 3, 7]) {
+    for (const k of [1, 2, 3]) {
+      const allTurns = turnStarts(n)
+      const window = allTurns.slice(-k)
+      const decision = phaseWindow.desiredCutoffOfWindow(
+        window.map((_, index) => `call-${index}`),
+        window,
+      )
+      assert.equal(decision.kind, 'KeepFrom')
+      assert.equal(
+        decision.cutoffExclusive,
+        cutoffOf(k, n),
+        `K=${k} N=${n}: the window-sized list must select the same Bj`,
+      )
+    }
+  }
 })
 
-test('WHAT[context-compression-028] a committed cutoff is history, not a preference', () => {
-  const desired = phaseWindow.desiredCutoff(2, turnStarts(4))
+test('WHAT[context-compression-028] the window keeps at most K commits in commit order', () => {
+  let window = []
+  for (const callId of ['a', 'b', 'c', 'd']) {
+    window = phaseWindow.appendPhase(2, callId, window)
+  }
+  assert.deepEqual(window, ['c', 'd'], 'only the last K commits stay; order is commit order')
 
-  // Coverage has moved past the committed cutoff, so the new cutoff advances.
-  const advanced = phaseWindow.actualCutoff(desired, 2, 9)
-  assert.equal(advanced.cutoffExclusive, 3)
+  assert.deepEqual(phaseWindow.appendPhase(2, 'a', null), ['a'])
+})
 
-  // Coverage that has fallen behind the committed cutoff cannot retreat it.
-  const behind = phaseWindow.actualCutoff(desired, 5, 3)
-  assert.equal(behind.cutoffExclusive, 5)
+test('WHAT[context-compression-028] a phase with no addressable turn proves no boundary', () => {
+  // The oldest retained phase is the one the cutoff would land on. If its turn is gone
+  // (a voided numbering), folding there would name a boundary the prefix cannot point
+  // to, so the honest answer is "no cutoff" rather than the next phase's turn.
+  const decision = phaseWindow.desiredCutoffOfWindow(['call-old', 'call-live'], [null, 42])
+  assert.equal(decision.kind, 'NoPhases')
+
+  const addressable = phaseWindow.desiredCutoffOfWindow(['call-old', 'call-live'], [7, 42])
+  assert.equal(addressable.kind, 'KeepFrom')
+  assert.equal(addressable.cutoffExclusive, 7, 'the oldest retained phase decides, not the newest')
 })

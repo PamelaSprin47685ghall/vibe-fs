@@ -16,17 +16,20 @@ type BlogFrameKind =
     | Squash
 
 type BlogFrame =
-    {
-        Kind: BlogFrameKind
-        Digest: BlobDigest
-        TextRef: BlobRef
-        /// Exclusive start of this frame's RecordCoverage interval
-        /// (`BlogObservationCommitted.PreviousIngestedThroughSequence`).
-        CoveredFromSequence: int64
-        /// Inclusive end of this frame's RecordCoverage interval
-        /// (`BlogObservationCommitted.NextIngestedThroughSequence`).
-        CoveredThroughSequence: int64
-    }
+    { Kind: BlogFrameKind
+      Digest: BlobDigest
+      TextRef: BlobRef
+      /// Exclusive start of this frame's RecordCoverage interval
+      /// (`BlogObservationCommitted.PreviousIngestedThroughSequence`).
+      CoveredFromSequence: int64
+      /// Inclusive end of this frame's RecordCoverage interval
+      /// (`BlogObservationCommitted.NextIngestedThroughSequence`).
+      CoveredThroughSequence: int64
+      /// context-compression-029: the complete-turn boundary this frame's material
+      /// summarises. Frames are appended in non-decreasing order of it, so the subset
+      /// a cutoff may use is a prefix of the coverable frames — material past the
+      /// cutoff would describe turns that are still raw after it.
+      CutoffExclusive: int }
 
 /// CTX-011: the two positions plus the proof that ties the second one to X.
 ///
@@ -136,6 +139,17 @@ module BlogProjection =
     let coverableFrames (state: BlogProjectionState) =
         frames state |> List.truncate state.Coverage.CoverableFrameCount
 
+    /// context-compression-029: the coverable frames whose own claim ends at or before
+    /// `cutoffExclusive` — the verifiable material subset for that boundary.
+    ///
+    /// A frame that also covers turns at or past the cutoff is excluded rather than
+    /// truncated: no part of an already-rendered summary can be withdrawn, so using it
+    /// would show the same turn twice, once summarised and once raw. When no frame ends
+    /// exactly at the cutoff the caller must not advance (`否则本次不前移`).
+    let framesThroughCutoff (cutoffExclusive: int) (state: BlogProjectionState) =
+        coverableFrames state
+        |> List.takeWhile (fun frame -> frame.CutoffExclusive <= cutoffExclusive)
+
     /// CTX-012: how many of the oldest frames the next squash takes.
     ///
     /// `ceil(m / 2)`, and `m = 1` is not skipped — a single frame can still be
@@ -175,7 +189,8 @@ module BlogProjection =
             let storedFrame =
                 { frame with
                     CoveredFromSequence = previousIngestSequence
-                    CoveredThroughSequence = nextIngestSequence }
+                    CoveredThroughSequence = nextIngestSequence
+                    CutoffExclusive = nextCutoff }
 
             let nextFrames = storedFrame :: state.Frames
 
@@ -243,7 +258,8 @@ module BlogProjection =
             let storedFrame =
                 { frame with
                     CoveredFromSequence = replaced |> List.map (fun item -> item.CoveredFromSequence) |> List.min
-                    CoveredThroughSequence = replaced |> List.map (fun item -> item.CoveredThroughSequence) |> List.max }
+                    CoveredThroughSequence = replaced |> List.map (fun item -> item.CoveredThroughSequence) |> List.max
+                    CutoffExclusive = replaced |> List.map (fun item -> item.CutoffExclusive) |> List.max }
 
             Ok
                 { state with

@@ -132,10 +132,11 @@ module XWireSurface =
     let private noCandidateReasonLabel (reason: NoCandidateReason) : string =
         match reason with
         | NoCandidateReason.NoCoverage -> "NoCoverage"
-        | NoCandidateReason.CoverageNotAheadOfRequest -> "CoverageNotAheadOfRequest"
         | NoCandidateReason.WouldRetreat _ -> "WouldRetreat"
         | NoCandidateReason.NotNewerThanCommitted -> "NotNewerThanCommitted"
         | NoCandidateReason.CutoffProofFailed(expected, recomputed) -> $"CutoffProofFailed:{expected}:{recomputed}"
+        | NoCandidateReason.BeyondPhaseBoundary(desired, material) -> $"BeyondPhaseBoundary:{desired}:{material}"
+        | NoCandidateReason.MaterialBeyondBoundary(material, limit) -> $"MaterialBeyondBoundary:{material}:{limit}"
 
     let private probeToJs (probe: PrefixProbe) : obj =
         let c = probe.Candidate
@@ -366,6 +367,22 @@ module XWireSurface =
                         let allowProbe =
                             XWire.mayProbe { ConsecutiveFailureCount = intValue input?failures }
 
+                        // CTX-028/029: `phaseWindow` carries the window boundary when one
+                        // spoke; otherwise this slot is failure recovery, whose only bound
+                        // is proven coverage. `materialCutoff` defaults to the coverage
+                        // cutoff because recovery freezes every coverable frame.
+                        let window =
+                            if isNullish input?phaseCutoff then
+                                ProbeBound.CoverageOnly
+                            else
+                                ProbeBound.PhaseBoundary(intValue input?phaseCutoff)
+
+                        let materialCutoff =
+                            if isNullish input?materialCutoff then
+                                coverableCutoff
+                            else
+                                intValue input?materialCutoff
+
                         let probeResult =
                             if allowProbe then
                                 PrefixProbeSelection.select
@@ -373,8 +390,10 @@ module XWireSurface =
                                     (SessionId.create sessionId)
                                     committedEpoch
                                     committedSnapshot
+                                    window
                                     coverableCutoff
                                     coveredDigest
+                                    materialCutoff
                                     requestStartCutoff
                                     frozenRef
                                     frozenDigest
@@ -828,8 +847,12 @@ module XWireSurface =
                                     if isNullish f?coveredThrough then
                                         0L
                                     else
-                                        int64 f?coveredThrough })
+                                        int64 f?coveredThrough
+                                  CutoffExclusive = if isNullish f?cutoff then 0 else int f?cutoff })
                             |> Array.toList
+                            // Stored newest-first, as the projection documents; the
+                            // material subset is read back oldest-first.
+                            |> List.rev
                         else
                             []
 
@@ -868,6 +891,18 @@ module XWireSurface =
                                 | Ok st -> Some st
                                 | Error _ -> None)
                           Blog = Some blogState
+                          PhaseCommits =
+                            (if isNullish input?phaseCallIds then
+                                 [||]
+                             else
+                                 unbox<obj array> input?phaseCallIds)
+                            |> Array.fold
+                                (fun window callId ->
+                                    PhaseWindow.appendPhase
+                                        PhaseWindow.defaultK
+                                        (ToolCallId.create (string callId))
+                                        window)
+                                PhaseWindow.emptyWindow
                           PrefixEpoch =
                             if isNullish input?prefixEpoch then
                                 None
@@ -903,7 +938,17 @@ module XWireSurface =
                             Some(snapshotOfJs input?committedSnapshot)
 
                     let! candidateResult =
-                        XWire.candidate port sessionId snapshot committedSnapshot wireState requestCutoff
+                        XWire.candidate
+                            port
+                            (if isNullish input?phaseCutoff then
+                                 ProbeBound.CoverageOnly
+                             else
+                                 ProbeBound.PhaseBoundary(intValue input?phaseCutoff))
+                            sessionId
+                            snapshot
+                            committedSnapshot
+                            wireState
+                            requestCutoff
 
                     match candidateResult with
                     | Ok probe ->
@@ -934,12 +979,15 @@ module XWireSurface =
                         let desc =
                             match reason with
                             | NoCandidateReason.NoCoverage -> "no coverage"
-                            | NoCandidateReason.CoverageNotAheadOfRequest -> "coverage not ahead of request"
                             | NoCandidateReason.WouldRetreat(committed, proposed) ->
                                 sprintf "cutoff %d behind %d" proposed committed
                             | NoCandidateReason.NotNewerThanCommitted -> "not newer than committed"
                             | NoCandidateReason.CutoffProofFailed(expected, recomputed) ->
                                 sprintf "cutoff proof failed: expected %s, recomputed %s" expected recomputed
+                            | NoCandidateReason.BeyondPhaseBoundary(desired, material) ->
+                                sprintf "material cutoff %d folds past the window %d" material desired
+                            | NoCandidateReason.MaterialBeyondBoundary(material, limit) ->
+                                sprintf "material cutoff %d reaches past the covered boundary %d" material limit
 
                         return
                             box

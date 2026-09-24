@@ -21,5 +21,7 @@ module PrefixSurface =
     val retainedPrefixMessages: messages: obj array -> bool array
 
     val desiredCutoff: k: int -> phaseTurnStarts: int array -> obj
-    val actualCutoff: decision: obj -> committedCutoffExclusive: obj -> coveredCutoffExclusive: obj -> obj
+    val defaultK: int
+    val appendPhase: k: int -> callId: string -> window: string array -> string array
+    val desiredCutoffOfWindow: window: string array -> turnByCallId: obj array -> obj
     val validateK: k: int -> obj

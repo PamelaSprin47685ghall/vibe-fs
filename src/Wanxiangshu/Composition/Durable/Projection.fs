@@ -92,6 +92,11 @@ type AgentProjectionSet =
         /// Exact durable managed-chat executions, keyed by physical user message.
         ChatExecutions: ChatExecutionProjectionState
         Cognition: Map<string, CognitiveProjection>
+        /// context-compression-028: the committed phases each session still keeps raw,
+        /// oldest first, bounded by the frozen window depth. Keyed by session because the
+        /// prefix owner asks "what does this session's provider history keep raw", while
+        /// `Cognition` answers the owner-scoped question "what canvas is current".
+        PhaseCommits: Map<SessionId, PhaseWindow.PhaseCommitWindow>
         /// Canonical per-Life Magic Todo checkpoint projection.
         /// delegation-024: last parent XTrace cursor physically handed to each reusable
         /// delegate session. Keyed pair lookup; never inferred from prompt text.
@@ -136,6 +141,7 @@ module AgentProjection =
           DelegationCompletedHandoffs = Map.empty
           Attention = AttentionProjection.empty
           Cognition = Map.empty
+          PhaseCommits = Map.empty
           Concern = ConcernProjection.empty
           InstitutionalLearning = InstitutionalLearningProjection.empty
           RuntimeStartCount = 0 }

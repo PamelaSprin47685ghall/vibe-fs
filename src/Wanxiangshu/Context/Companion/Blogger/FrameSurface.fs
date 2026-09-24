@@ -33,7 +33,8 @@ module BlogFrameSurface =
           Digest = BlobDigest.create (text value?digest)
           TextRef = BlobRef.create (text value?ref)
           CoveredFromSequence = int64Value value?coveredFrom
-          CoveredThroughSequence = int64Value value?coveredThrough }
+          CoveredThroughSequence = int64Value value?coveredThrough
+          CutoffExclusive = intValue value?cutoff }
 
     let private frameToJs (frame: BlogFrame) : obj =
         box
@@ -44,7 +45,8 @@ module BlogFrameSurface =
                digest = BlobDigest.value frame.Digest
                ref = BlobRef.value frame.TextRef
                coveredFrom = int frame.CoveredFromSequence
-               coveredThrough = int frame.CoveredThroughSequence |}
+               coveredThrough = int frame.CoveredThroughSequence
+               cutoff = frame.CutoffExclusive |}
 
     let private stateToJs (state: BlogProjectionState) : obj =
         let coverage = state.Coverage

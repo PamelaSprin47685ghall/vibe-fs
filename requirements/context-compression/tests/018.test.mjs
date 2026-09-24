@@ -987,13 +987,15 @@ test('WHAT[context-compression-018] ENFORCER_load_effective_frames_digest_mismat
     session: 'ses-main',
     committedEpoch: 0,
     committedSnapshot: null,
-    coverableCutoff: 0,
+    coverableCutoff: 5,
+    materialCutoff: 5,
     coveredDigest: 'wrong',
-    requestStartCutoff: 0,
+    requestStartCutoff: 20,
     frozenDigest: 'frozen',
     recomputeDigest: () => 'different',
   })
   assert.equal(probe.ok, false)
+  assert.equal(probe.error, 'CutoffProofFailed')
 })
 test('WHAT[context-compression-018] ENFORCER_rebuild_falls_back_to_raw_when_frame_blob_lost', () => {
   const state = commit(frames.empty, entry())

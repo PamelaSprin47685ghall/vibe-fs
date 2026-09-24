@@ -449,6 +449,21 @@ module XTraceProjection =
             | Some stable when stable = messageId -> Some part.Turn
             | _ -> None)
 
+    /// context-compression-028: the turn a committed tool call started in.
+    ///
+    /// `Bi` is the start of `Ai`'s own complete semantic turn, so the answer must be
+    /// read from the CURRENT generation: a phase committed in a voided numbering
+    /// cannot name a boundary the prefix may fold at. `None` therefore means "this
+    /// phase has no addressable turn here", which the window treats as no desire.
+    let tryTurnOfToolCallId (callId: ToolCallId) (state: XTraceProjectionState) : int option =
+        state
+        |> parts
+        |> currentGenerationParts
+        |> List.tryPick (fun part ->
+            match part.ToolCallId with
+            | Some owned when owned = callId -> Some part.Turn
+            | _ -> None)
+
     /// The first stable user message in the current Host generation is the raw
     /// session Opening. Same-session prefix replacement must never delete it;
     /// work-record-007 renders frozen-prefix records with includeOpening=false.

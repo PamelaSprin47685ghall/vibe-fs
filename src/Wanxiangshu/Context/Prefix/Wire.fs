@@ -205,8 +205,26 @@ module XWire =
             return LifecycleWorkRecord.materialize opening frameBodies "" false
         }
 
+    /// context-compression-028: the boundary this session's phase window keeps raw.
+    ///
+    /// The window holds the last `K` committed phases in commit order, so its oldest
+    /// entry is `A_(N−K+1)` — or `A1` while fewer than `K` phases exist — and that
+    /// phase's own semantic turn is where folding may begin. `None` means no phase has
+    /// committed, or none of the retained phases still has an addressable turn in the
+    /// current generation; either way there is no boundary to fold at, so the prefix
+    /// stays as committed.
+    let internal phaseWindowDesire (state: WireSessionState) : int option =
+        let xTrace = state.XTrace |> Option.defaultValue XTraceProjection.empty
+
+        match
+            PhaseWindow.desiredCutoffOf (fun callId -> XTraceProjection.tryTurnOfToolCallId callId xTrace) state.PhaseCommits
+        with
+        | PhaseWindowDecision.KeepFrom cutoffExclusive -> Some cutoffExclusive
+        | PhaseWindowDecision.NoPhases -> None
+
     let internal candidate
         (port: WireJournalPort)
+        (window: ProbeBound)
         (sessionId: SessionId)
         (snapshot: ProjectionSnapshot)
         (committed: PrefixSnapshot option)
@@ -217,10 +235,21 @@ module XWire =
             let prefix = state.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
             let blog = state.Blog |> Option.defaultValue BlogProjection.empty
 
-            if not (BlogProjection.hasCoverage blog) then
+            let coverableCutoff = blog.Coverage.CoverableTurnCutoffExclusive
+
+            // CTX-029: the frozen material must end exactly at the boundary this attempt
+            // will claim — a frame that also covers later turns would show them twice,
+            // once summarised and once raw. The subset therefore defines the cutoff, not
+            // the other way round.
+            let frames =
+                BlogProjection.framesThroughCutoff (PrefixProbeSelection.limit window coverableCutoff requestCutoff) blog
+
+            let materialCutoff =
+                frames |> List.map (fun frame -> frame.CutoffExclusive) |> List.tryLast |> Option.defaultValue 0
+
+            if materialCutoff <= 0 then
                 return Error NoCandidateReason.NoCoverage
             else
-                let frames = BlogProjection.coverableFrames blog
                 let! frozenResult = materializeFrozenRecordPrefix port state frames
                 let frozenRecordPrefix = requireOk frozenResult
                 let! blobResult = port.WriteBlob frozenRecordPrefix
@@ -232,8 +261,10 @@ module XWire =
                         sessionId
                         prefix.EpochId
                         committed
-                        blog.Coverage.CoverableTurnCutoffExclusive
+                        window
+                        coverableCutoff
                         blog.Coverage.CoveredPrefixDigest
+                        materialCutoff
                         requestCutoff
                         blob.BlobRef
                         blob.BlobDigest
@@ -293,7 +324,12 @@ module XWire =
                 openingHostMessageId
                 activation.SyntheticMessageId
                 activation.Memory
-                Set.empty
+                // CTX-028/029: the phases the window keeps raw survive inside a
+                // replaced prefix. A phase-boundary advance never reaches them (its
+                // cutoff is their own turn start), but recovery may fold past the
+                // window — and the live canvas must never be replaced by a summary of
+                // itself.
+                (state.PhaseCommits.PhaseCallIds |> List.map ToolCallId.value |> Set.ofList)
 
     let private renderPrefixMessages
         (state: WireSessionState)
@@ -541,6 +577,26 @@ module XWire =
                 )
             )
 
+    let private buildCandidate
+        (window: ProbeBound)
+        (port: WireJournalPort)
+        sessionId
+        physical
+        rawMessages
+        (state: WireSessionState)
+        =
+        task {
+            let xTrace = state.XTrace |> Option.defaultValue XTraceProjection.empty
+            let prefix = state.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
+            let! currentResult = port.CurrentProjection xTrace
+            let current = requireOk currentResult
+            let cutoff = requestStartCutoff physical rawMessages xTrace
+            let snapshot = { CurrentProjection = current }
+            return! candidate port window sessionId snapshot prefix.Snapshot state cutoff
+        }
+
+    /// CTX-029: recovery may fold past the phase window — a failed WorkMain is the
+    /// explicit exception, and it is recorded as a Probe cold boundary when promoted.
     let private prepareRetryCandidate
         allowProbe
         (port: WireJournalPort)
@@ -552,15 +608,136 @@ module XWire =
         if not allowProbe then
             Task.FromResult(Error NoCandidateReason.NoCoverage)
         else
-            task {
-                let xTrace = state.XTrace |> Option.defaultValue XTraceProjection.empty
-                let prefix = state.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
-                let! currentResult = port.CurrentProjection xTrace
-                let current = requireOk currentResult
-                let cutoff = requestStartCutoff physical rawMessages xTrace
-                let snapshot = { CurrentProjection = current }
-                return! candidate port sessionId snapshot prefix.Snapshot state cutoff
-            }
+            buildCandidate ProbeBound.CoverageOnly port sessionId physical rawMessages state
+
+    /// Render one admitted prefix plan: the choice inside it is the whole decision, so
+    /// the blob it needs is read through `requiredBlob` rather than re-derived here.
+    let private renderAdmittedPlan
+        (port: WireJournalPort)
+        (sessionId: SessionId)
+        (state: WireSessionState)
+        (rawMessages: obj list)
+        (plan: PendingAttemptPlan)
+        (output: obj)
+        : Task =
+        task {
+            let! frozenRecordPrefixBody =
+                readFrozenRecordPrefixBody port plan.ProjectionChoice plan.CommittedPrefixSnapshot
+
+            let memoryPreamble =
+                ProviderProse.render (ProviderProse.languageOf sessionId) CompanionPrompt.MemoryPreamble Map.empty
+
+            let prefixIntent =
+                XPrefixProjection.forChoice
+                    plan.ProjectionChoice
+                    plan.CommittedPrefixSnapshot
+                    memoryPreamble
+                    frozenRecordPrefixBody
+
+            let horizon = presentationHorizonForProbe (Option.isSome (AttemptPlanner.pendingProbeOf plan))
+
+            let transformed = renderPrefixMessages state rawMessages prefixIntent horizon
+
+            Wanxiangshu.OpenCode.HostMessageProjection.replaceMessagesInPlace output transformed
+        }
+
+    /// CTX-010: the probe is part of the immutable profile, so the plan is frozen before
+    /// anything is rendered; CTX-011 promotes it only when the attempt settles as
+    /// successful.
+    let private admitPhaseBoundaryPlan
+        (attempts: AttemptPlanCapability)
+        (sessionId: SessionId)
+        (physicalId: PhysicalUserMessageId)
+        (authority: PromptAuthority.AuthorityExecutionProfile)
+        (state: WireSessionState)
+        (origin: PromptAuthority.PromptOrigin)
+        (probe: PrefixProbe)
+        : Task<PendingAttemptPlan> =
+        let pendingPlan =
+            AttemptPlanner.freezePreInference
+                authority
+                physicalId
+                origin
+                ProviderRequestKind.WorkMain
+                (state.PrefixEpoch |> Option.bind (fun prefix -> prefix.Snapshot))
+                true
+                (fun () -> Ok probe)
+
+        requireAdmittedPendingPlan attempts sessionId physicalId pendingPlan |> Task.FromResult
+
+    /// The window spoke and the attempt may fold: freeze the probe into the plan, or
+    /// project the committed prefix when no probe could be built.
+    let private renderPhaseBoundaryAttempt
+        (port: WireJournalPort)
+        (attempts: AttemptPlanCapability)
+        (sessionId: SessionId)
+        (physicalId: PhysicalUserMessageId)
+        (authority: PromptAuthority.AuthorityExecutionProfile)
+        (state: WireSessionState)
+        (origin: PromptAuthority.PromptOrigin option)
+        (candidateResult: Result<PrefixProbe, NoCandidateReason>)
+        (output: obj)
+        (rawMessages: obj list)
+        : Task<PrefixPresentationHorizon> =
+        task {
+            match candidateResult, origin with
+            | Ok probe, Some accepted ->
+                let! admitted =
+                    admitPhaseBoundaryPlan attempts sessionId physicalId authority state accepted probe
+
+                do! renderAdmittedPlan port sessionId state rawMessages admitted output
+                return presentationHorizonForProbe true
+            | _ ->
+                do! applyCommittedPrefix port sessionId state rawMessages output
+                return PrefixPresentationHorizon.Current
+        }
+
+    /// context-compression-028: a committed phase opened a window, so this ordinary
+    /// attempt may carry the probe that folds up to its boundary.
+    ///
+    /// Inside a phase the window cannot move — the desire is derived from committed
+    /// phases alone, so two requests in the same phase project the same committed
+    /// prefix, byte for byte. The new prefix becomes durable only when this attempt
+    /// settles as successful (CTX-011/012); nothing is written up front, and a failed
+    /// attempt leaves the committed epoch exactly as it was.
+    let private planPhaseBoundaryPrefix
+        (port: WireJournalPort)
+        (attempts: AttemptPlanCapability)
+        (sessionId: SessionId)
+        (physical: PhysicalUserMessageId option)
+        (view: WireSnapshotView)
+        (output: obj)
+        (rawMessages: obj list)
+        : Task<PrefixPresentationHorizon> =
+        task {
+            // Flattened: the F# control-pyramid gate forbids a match inside an arm, so the
+            // window desire is bound first and each refusal path returns on its own.
+            let desired = view.State |> Option.bind phaseWindowDesire
+
+            match view.State, view.ActiveAuthorityProfile, physical, desired with
+            | Some state, Some authority, Some physicalId, Some desiredCutoff ->
+                let! candidateResult =
+                    buildCandidate (ProbeBound.PhaseBoundary desiredCutoff) port sessionId physicalId rawMessages state
+
+                return!
+                    renderPhaseBoundaryAttempt
+                        port
+                        attempts
+                        sessionId
+                        physicalId
+                        authority
+                        state
+                        (view.AcceptedOrigin physicalId)
+                        candidateResult
+                        output
+                        rawMessages
+            | Some state, _, _, _ ->
+                do! applyCommittedPrefix port sessionId state rawMessages output
+                return PrefixPresentationHorizon.Current
+            | None, _, _, _ ->
+                do! applyOrdinaryCommittedPrefix port sessionId view.State rawMessages output
+                return PrefixPresentationHorizon.Current
+        }
 
     let private pendingPlanForRetry
         (attempts: AttemptPlanCapability)
@@ -711,8 +888,7 @@ module XWire =
             match recoveryAttempt with
             | None ->
                 let view = port.ReadView sessionId
-                do! applyOrdinaryCommittedPrefix port sessionId view.State rawMessages output
-                return PrefixPresentationHorizon.Current
+                return! planPhaseBoundaryPrefix port attempts sessionId physical view output rawMessages
             | Some physical -> return! planProviderRetry port attempts sessionId physical output rawMessages
         }
 

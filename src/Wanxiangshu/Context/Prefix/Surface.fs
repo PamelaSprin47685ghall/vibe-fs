@@ -144,10 +144,11 @@ module PrefixSurface =
     let private noCandidateName (reason: NoCandidateReason) : string =
         match reason with
         | NoCandidateReason.NoCoverage -> "NoCoverage"
-        | NoCandidateReason.CoverageNotAheadOfRequest -> "CoverageNotAheadOfRequest"
         | NoCandidateReason.WouldRetreat _ -> "WouldRetreat"
         | NoCandidateReason.NotNewerThanCommitted -> "NotNewerThanCommitted"
         | NoCandidateReason.CutoffProofFailed _ -> "CutoffProofFailed"
+        | NoCandidateReason.BeyondPhaseBoundary _ -> "BeyondPhaseBoundary"
+        | NoCandidateReason.MaterialBeyondBoundary _ -> "MaterialBeyondBoundary"
 
     let private selectionToJs (result: Result<PrefixProbe, NoCandidateReason>) : obj =
         match result with
@@ -183,13 +184,22 @@ module PrefixSurface =
             else
                 unbox<int -> string> value?recomputeDigest
 
+        let window =
+            if isNullish value?phaseBoundary then
+                // Failure recovery: the proven coverage is the only bound (CTX-029).
+                ProbeBound.CoverageOnly
+            else
+                ProbeBound.PhaseBoundary(intValue value?phaseBoundary)
+
         PrefixProbeSelection.select
             (shaOf value?sha256)
             (SessionId.create (text value?session))
             (PrefixEpochId.create (int64Value value?committedEpoch))
             committed
+            window
             (intValue value?coverableCutoff)
             (text value?coveredDigest)
+            (intValue value?materialCutoff)
             (intValue value?requestStartCutoff)
             (BlobRef.create (
                 if isNullish value?frozenRef then
@@ -325,21 +335,51 @@ module PrefixSurface =
                 {| kind = "KeepFrom"
                    cutoffExclusive = cutoff |}
 
-    let actualCutoff (decision: obj) (committedCutoffExclusive: obj) (coveredCutoffExclusive: obj) : obj =
-        let parsedDecision =
-            match string decision?kind with
-            | "KeepFrom" -> Wanxiangshu.Context.Prefix.PhaseWindowDecision.KeepFrom(unbox<int> decision?cutoffExclusive)
-            | _ -> Wanxiangshu.Context.Prefix.PhaseWindowDecision.NoPhases
+    /// context-compression-028: the window in force when the owner opens.
+    let defaultK: int = Wanxiangshu.Context.Prefix.PhaseWindow.defaultK
 
-        let optionOfInt (value: obj) =
-            if isNullish value then None else Some(unbox<int> value)
+    /// One committed phase admitted into the bounded window; identity order is the
+    /// commit order and the result is trimmed to `k`.
+    let appendPhase (k: int) (callId: string) (window: string array) : string array =
+        let committed =
+            if isNull window then [] else Array.toList window
 
-        match
-            Wanxiangshu.Context.Prefix.PhaseWindow.actualCutoff
-                parsedDecision
-                (optionOfInt committedCutoffExclusive)
-                (optionOfInt coveredCutoffExclusive)
-        with
+        let next =
+            Wanxiangshu.Context.Prefix.PhaseWindow.emptyWindow
+            |> fun start ->
+                committed
+                |> List.fold
+                    (fun acc item ->
+                        Wanxiangshu.Context.Prefix.PhaseWindow.appendPhase
+                            k
+                            (ToolCallId.create item)
+                            acc)
+                    start
+            |> Wanxiangshu.Context.Prefix.PhaseWindow.appendPhase k (ToolCallId.create callId)
+
+        next.PhaseCallIds |> List.map ToolCallId.value |> List.toArray
+
+    /// The window's desire, with `turnByCallId[i]` the canonical turn of
+    /// `window[i]` (null = no addressable turn in the current generation).
+    let desiredCutoffOfWindow (window: string array) (turnByCallId: obj array) : obj =
+        let turns =
+            if isNull turnByCallId then [] else Array.toList turnByCallId
+
+        let committed =
+            { Wanxiangshu.Context.Prefix.PhaseWindow.PhaseCallIds =
+                (if isNull window then [] else Array.toList window)
+                |> List.map ToolCallId.create }
+
+        let turnOf (callId: ToolCallId) =
+            Array.tryFindIndex (fun item -> item = ToolCallId.value callId) window
+            |> Option.bind (fun position ->
+                if position < List.length turns then
+                    let value = List.item position turns
+                    if isNullish value then None else Some(unbox<int> value)
+                else
+                    None)
+
+        match Wanxiangshu.Context.Prefix.PhaseWindow.desiredCutoffOf turnOf committed with
         | Wanxiangshu.Context.Prefix.PhaseWindowDecision.NoPhases -> box {| kind = "NoPhases" |}
         | Wanxiangshu.Context.Prefix.PhaseWindowDecision.KeepFrom cutoff ->
             box

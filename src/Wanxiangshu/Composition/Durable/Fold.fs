@@ -78,8 +78,28 @@ module Fold =
                 { acc with
                     Cognition = Map.add key workspace acc.Cognition }
 
+        /// context-compression-028: append the admitted phase to the session's window.
+        ///
+        /// Bound to the admission, not to the fact stream: a refused or replayed line
+        /// must leave the window alone, otherwise the prefix would fold at a boundary
+        /// no committed phase opened.
+        let bindPhaseCommit (acc: AgentProjectionSet) =
+            match cognition with
+            | AssumeFactCases.T.AssumePhaseCommitted commit ->
+                let window =
+                    acc.PhaseCommits
+                    |> Map.tryFind commit.SessionId
+                    |> Option.defaultValue PhaseWindow.emptyWindow
+
+                { acc with
+                    PhaseCommits =
+                        Map.add
+                            commit.SessionId
+                            (PhaseWindow.appendPhase PhaseWindow.defaultK commit.ToolCallId window)
+                            acc.PhaseCommits }
+
         match CognitiveFactFold.fold current cognition with
-        | Ok changes -> Ok(List.fold bindWorkspace projection changes)
+        | Ok changes -> Ok(List.fold bindWorkspace projection changes |> bindPhaseCommit)
         | Error rejection ->
             Error
                 { Fact = CognitiveFoldRejection.fact rejection

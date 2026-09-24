@@ -141,6 +141,7 @@ module XTraceProjection =
     val partsForHostMessageIds: messageIds: Set<string> -> state: XTraceProjectionState -> XTraceSemanticPartView list
     val tryContiguousHostRange: messageIds: Set<string> -> state: XTraceProjectionState -> XTraceRange option
     val tryTurnOfHostMessageId: messageId: string -> state: XTraceProjectionState -> int option
+    val tryTurnOfToolCallId: callId: ToolCallId -> state: XTraceProjectionState -> int option
     val tryOpeningHostMessageId: state: XTraceProjectionState -> string option
     val hostMessageIdsBeforeTurn: cutoffExclusive: int -> state: XTraceProjectionState -> string list
     val internal semanticCursorFor: sequence: int64 -> state: XTraceProjectionState -> SemanticCursor

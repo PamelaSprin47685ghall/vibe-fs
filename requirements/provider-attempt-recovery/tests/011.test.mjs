@@ -467,7 +467,10 @@ const acceptedRetryInput = (overrides = {}) => ({
   currentProjection: baseProjection,
   committedSnapshot: null,
   coverableCutoff: 2,
-  coveredDigest: XWireSurface.coveredPrefixDigest(baseProjection, 1),
+  // The Companion's claim is proven at ITS cutoff; the frozen subset ends at the
+  // request boundary, which is where this attempt may fold (CTX-029).
+  coveredDigest: XWireSurface.coveredPrefixDigest(baseProjection, 2),
+  materialCutoff: 1,
   requestStartCutoff: 1,
   frozenRecordPrefixRef: 'blob/ref/frozen-1',
   frozenRecordPrefixDigest: 'sha256:frozen-1',

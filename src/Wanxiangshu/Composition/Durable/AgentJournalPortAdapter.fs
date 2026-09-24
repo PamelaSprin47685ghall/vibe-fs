@@ -170,12 +170,25 @@ module AgentJournalPortAdapter =
                     |> Option.map (fun s ->
                         { XTrace = s.XTrace
                           Blog = s.Blog
-                          PrefixEpoch = s.PrefixEpoch })
+                          PrefixEpoch = s.PrefixEpoch
+                          PhaseCommits =
+                            projections.PhaseCommits
+                            |> Map.tryFind sessionId
+                            |> Option.defaultValue PhaseWindow.emptyWindow })
 
                 { State = wireState
                   IsCompanion = isComp
                   ActiveAuthorityProfile = activeProf
-                  ProviderFailureState = failState }
+                  ProviderFailureState = failState
+                  AcceptedOrigin =
+                    fun physical ->
+                        let key: Wanxiangshu.Execution.Session.ChatExecution.ChatExecutionKey =
+                            { SessionId = sessionId
+                              PhysicalUserMessageId = physical }
+
+                        projections.ChatExecutions
+                        |> Wanxiangshu.Execution.Session.ChatExecution.ChatExecutionProjection.byKey key
+                        |> Option.map (fun execution -> execution.Evidence.Origin) }
           ReadBlob = fun blobRef -> journal.Writer.BlobWriter.Read blobRef
           WriteBlob =
             fun content ->

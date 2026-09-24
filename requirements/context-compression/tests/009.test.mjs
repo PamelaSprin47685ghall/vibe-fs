@@ -65,6 +65,7 @@ test('WHAT[context-compression-009] CTX_010_the_probe_records_the_epoch_it_was_b
     committedEpoch: 3,
     committedSnapshot: committedAt(2),
     coverableCutoff: 7,
+    materialCutoff: 7,
     coveredDigest: 'p7',
     requestStartCutoff: 20,
     recomputeDigest: agreeing('p7'),

@@ -50,17 +50,19 @@ module CompressionSurface =
     let private reasonName (reason: NoCandidateReason) : string =
         match reason with
         | NoCandidateReason.NoCoverage -> "NoCoverage"
-        | NoCandidateReason.CoverageNotAheadOfRequest -> "CoverageNotAheadOfRequest"
         | NoCandidateReason.WouldRetreat _ -> "WouldRetreat"
         | NoCandidateReason.NotNewerThanCommitted -> "NotNewerThanCommitted"
         | NoCandidateReason.CutoffProofFailed _ -> "CutoffProofFailed"
+        | NoCandidateReason.BeyondPhaseBoundary _ -> "BeyondPhaseBoundary"
+        | NoCandidateReason.MaterialBeyondBoundary _ -> "MaterialBeyondBoundary"
 
     let private reasonOf (value: obj) : NoCandidateReason =
         match text value with
-        | "CoverageNotAheadOfRequest" -> NoCandidateReason.CoverageNotAheadOfRequest
         | "WouldRetreat" -> NoCandidateReason.WouldRetreat(0, 0)
         | "NotNewerThanCommitted" -> NoCandidateReason.NotNewerThanCommitted
         | "CutoffProofFailed" -> NoCandidateReason.CutoffProofFailed("", "")
+        | "BeyondPhaseBoundary" -> NoCandidateReason.BeyondPhaseBoundary(0, 0)
+        | "MaterialBeyondBoundary" -> NoCandidateReason.MaterialBeyondBoundary(0, 0)
         | _ -> NoCandidateReason.NoCoverage
 
     let private optionObj (value: 'a option) : obj =
