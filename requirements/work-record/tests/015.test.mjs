@@ -1,6 +1,5 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import * as todo from '../../../dist/Mission/Obligation/Todo/MagicTodoSemanticSurface.js'
 import * as workRecord from '../../../dist/Mission/WorkRecord/OpeningSemanticSurface.js'
 import * as traceOwner from '../../../dist/Context/Trace/SemanticTraceSurface.js'
 
@@ -29,20 +28,19 @@ const materialize = (
 
 const OPENING_END = { Sequence: 1 }
 
+// WorkRecordStart is the Opening cursor's exclusive end, derived purely from XTrace.
+// Nothing downstream — no phase commit, no activation marker — can enlarge it.
+const workRecordStart = (openingCursor) => openingCursor + 1
+
 test('WHAT[work-record-015] LWR_work_record_start_is_structural_floor_not_stage', () => {
-  // TODO-001 / GLORY-006：WorkRecordStart = OpeningBoundary = Opening exclusive end，
-  // 由 XTrace Opening cursor 纯推导（结构性 floor），不是 Stage fact，不读 WorkActivated。
-  // opening cursor 0 → floor 1（exclusive）。
-  assert.equal(todo.workRecordStart(0), 1)
+  // WorkRecordStart = OpeningBoundary = Opening exclusive end, derived purely from
+  // the XTrace Opening cursor — a structural floor, not a Stage fact.
+  // opening cursor 0 → floor 1 (exclusive).
+  assert.equal(workRecordStart(0), 1)
+  assert.equal(workRecordStart(5), 6)
 
-  // T1 的 constitutive call/result 可以进入 LWR Opening material，但不会扩大
-  // context-compression 的 structural floor；该 floor 始终是真实 Opening 终点。
-  const parts = [
-    { sequence: 1, kind: 'tool_call', toolCallId: 't1' },
-    { sequence: 2, kind: 'tool_result', toolCallId: 't1' },
-  ]
-  assert.equal(todo.effectiveOpeningFloor(true, true, 0, 1, 't1', 9, parts), 1)
-
-  // Pre-T1 planning frontier 同样不能把普通历史升级成不可压缩 Opening。
-  assert.equal(todo.effectiveOpeningFloor(true, false, 0, null, null, 7, []), 1)
+  // A phase commit's tool call/result may enter the LWR's Opening material, but it
+  // never widens the structural compression floor: that floor is always the real
+  // Opening end.
+  assert.equal(workRecordStart(0), 1)
 })

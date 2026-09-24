@@ -1,6 +1,5 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import * as todo from '../../../dist/Mission/Obligation/Todo/MagicTodoSemanticSurface.js'
 import * as workRecord from '../../../dist/Mission/WorkRecord/OpeningSemanticSurface.js'
 import * as traceOwner from '../../../dist/Context/Trace/SemanticTraceSurface.js'
 

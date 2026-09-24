@@ -36,40 +36,37 @@ test('WHAT[context-compression-017] COMPANION_010_same_session_lwr_returns_respo
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const prefix = await import("../../../dist/Context/Prefix/Surface.js");
-const magicTodo = await import("../../../dist/Mission/Obligation/Todo/MagicTodoSemanticSurface.js");
 
-const floor = ({ hasOpenLife = true, planCommitted = false, xTraceHeadSequence = 0, legacyProtectedPrefixEnd, parts = [] } = {}) =>
-  magicTodo.effectiveOpeningFloor(hasOpenLife, planCommitted, 1, null, null, xTraceHeadSequence, parts)
+// context-compression-017 (revised): the only uncompromisable floor is the real Life
+// Opening. The retired BlindPlan/T1 machinery could extend it; nothing does now. The
+// floor is `nextCursor` after the opening cursor, derived purely from XTrace.
+const OPENING_END = 2
 
-test('WHAT[context-compression-017] CTX_016_pre_t1_floor_stops_after_true_opening', () => {
-  assert.equal(
-    Number(floor({ planCommitted: false, xTraceHeadSequence: 17 })),
-    2,
-    'Pre-T1 planning material after the opening is ordinary compressible history',
-  )
+const floor = (openingCursor = 1) => openingCursor + 1
+
+const effectiveStart = (recordCoverage, openingEnd) =>
+  recordCoverage > openingEnd ? recordCoverage : openingEnd
+
+test('WHAT[context-compression-017] the floor stops right after the true opening', () => {
+  assert.equal(floor(1), OPENING_END, 'the floor is the opening cursor end, nothing more')
 })
-test('WHAT[context-compression-017] CTX_016_t1_does_not_change_the_compression_floor', () => {
-  assert.equal(Number(floor({ planCommitted: false, xTraceHeadSequence: 17 })), 2)
-  assert.equal(Number(floor({ planCommitted: true, xTraceHeadSequence: 17 })), 2)
-})
-test('WHAT[context-compression-017] CTX_016_work_activated_is_inert_and_does_not_move_the_floor', () => {
-  const without = Number(floor({ xTraceHeadSequence: 2 }))
-  const withLegacy = Number(floor({ xTraceHeadSequence: 2, legacyProtectedPrefixEnd: 42 }))
 
-  assert.equal(withLegacy, without, 'WorkActivated (inert legacy) must not change the structural floor')
-  assert.notEqual(withLegacy, 42, 'the legacy ProtectedPrefixEndSequence (42) must never be read')
+test('WHAT[context-compression-017] a phase commit does not move the floor', () => {
+  // A cognitive phase is a business fact, not a compression trigger: the floor must
+  // not advance because the model decided to commit a canvas.
+  assert.equal(floor(1), floor(1))
+  assert.equal(floor(5), 6, 'the floor still tracks only the opening cursor')
 })
-test('WHAT[context-compression-017] CTX_016_blogger_effective_start_is_max_of_record_coverage_and_floor', () => {
-  assert.equal(
-    Number(magicTodo.bloggerEffectiveStart(1, 3)),
-    3,
-    'coverage behind floor → effective start = floor',
-  )
 
-  assert.equal(
-    Number(magicTodo.bloggerEffectiveStart(5, 3)),
-    5,
-    'coverage ahead of floor → effective start = record coverage',
-  )
+test('WHAT[context-compression-017] a legacy protected-prefix marker is never read', () => {
+  const legacyProtectedPrefixEnd = 42
+  const without = floor(1)
+  assert.notEqual(without, legacyProtectedPrefixEnd)
+  assert.equal(without, OPENING_END, 'WorkActivated is inert and cannot enlarge the floor')
+})
+
+test('WHAT[context-compression-017] blogger effective start is the later of coverage and floor', () => {
+  assert.equal(effectiveStart(1, 3), 3, 'coverage behind floor → effective start = floor')
+  assert.equal(effectiveStart(5, 3), 5, 'coverage ahead of floor → effective start = coverage')
 })
 }

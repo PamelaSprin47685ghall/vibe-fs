@@ -84,8 +84,6 @@ const { default: test } = await import("node:test");
 const pluginHooks = await import("../../../dist/OpenCode/Host/PluginHooksSurface.js");
 const dispatch = await import("../../../dist/Interaction/Dispatch/DispatchSurface.js");
 const recovery = await import("../../../dist/Interaction/Dispatch/RecoverySurface.js");
-const todoHost = await import("../../../dist/Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.js");
-const todoMembrane = await import("../../../dist/Mission/Obligation/Todo/MagicTodoMembraneSurface.js");
 const journal = await import("../../../dist/Persistence/Journal/Surface.js");
 
 const sha256Hex = (value) => createHash('sha256').update(value).digest('hex')

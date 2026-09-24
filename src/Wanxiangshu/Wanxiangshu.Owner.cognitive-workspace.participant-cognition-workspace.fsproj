@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>participant</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>participant-cognition-workspace</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>cognitive-workspace</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>participant-cognition-workspace</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
+    <Compile Include="Participant/Cognition/Workspace.fsi"/>
+    <Compile Include="Participant/Cognition/Workspace.fs"/>
+    <Compile Include="Participant/Cognition/Owner.fsi"/>
+    <Compile Include="Participant/Cognition/Owner.fs"/>
+    <Compile Include="Participant/Cognition/CanvasCodec.fsi"/>
+    <Compile Include="Participant/Cognition/CanvasCodec.fs"/>
+    <Compile Include="Participant/Cognition/Admission.fsi"/>
+    <Compile Include="Participant/Cognition/Admission.fs"/>
+    <Compile Include="Participant/Cognition/AssumeFactCases.fsi"/>
+    <Compile Include="Participant/Cognition/AssumeFactCases.fs"/>
+    <Compile Include="Participant/Cognition/Projection.fsi"/>
+    <Compile Include="Participant/Cognition/Projection.fs"/>
+    <Compile Include="Participant/Cognition/Fold.fsi"/>
+    <Compile Include="Participant/Cognition/Fold.fs"/>
+    <Compile Include="Participant/Cognition/JournalPort.fsi"/>
+    <Compile Include="Participant/Cognition/JournalPort.fs"/>
+    <Compile Include="Participant/Cognition/Runtime.fsi"/>
+    <Compile Include="Participant/Cognition/Runtime.fs"/>
+    <Compile Include="Participant/Cognition/AdmissionSurface.fsi"/>
+    <Compile Include="Participant/Cognition/AdmissionSurface.fs"/>
+    <Compile Include="Participant/Cognition/WorkspaceSurface.fsi"/>
+    <Compile Include="Participant/Cognition/WorkspaceSurface.fs"/>
+    <Compile Include="Participant/Cognition/FoldSurface.fsi"/>
+    <Compile Include="Participant/Cognition/FoldSurface.fs"/>
+  </ItemGroup>
+</Project>

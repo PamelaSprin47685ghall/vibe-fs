@@ -15,7 +15,6 @@ module StaticTools =
         | ToolPermission.Resume -> [ "resume" ]
         | ToolPermission.Join -> [ "join" ]
         | ToolPermission.Horizon -> [ "horizon" ]
-        | ToolPermission.TodoWrite -> [ "todowrite" ]
         | ToolPermission.Fission -> [ "fission" ]
         | ToolPermission.Read -> [ "read" ]
         | ToolPermission.Write -> [ "write" ]
@@ -71,7 +70,6 @@ module StaticTools =
           "signal-terminal"
           "join"
           "horizon"
-          "todowrite"
           "fission"
           "read"
           "write"

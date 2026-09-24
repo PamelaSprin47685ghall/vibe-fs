@@ -33,26 +33,14 @@ module XPrefixProjection =
         | PrefixProjectionIntent.Keep -> PrefixRendered.Physical
         | PrefixProjectionIntent.Activate activation -> PrefixRendered.Synthetic activation
 
-    type RawPrefixMessageFacts =
-        { ContainsTodoWrite: bool
-          ToolCallIds: Set<ToolCallId> }
-
-    /// context-compression-020: Y may replace ordinary dropped history, but a
-    /// todowrite round remains raw X. The call message establishes the protected
-    /// call id; any dropped message carrying that id (notably the result) belongs
-    /// to the same protected round. A malformed call without an id still protects
-    /// its own message rather than silently deleting the live obligation ledger.
-    let retainTodoWriteRounds (messages: RawPrefixMessageFacts list) : bool list =
-        let todoCallIds =
-            messages
-            |> List.filter (fun message -> message.ContainsTodoWrite)
-            |> List.collect (fun message -> Set.toList message.ToolCallIds)
-            |> Set.ofList
-
-        messages
-        |> List.map (fun message ->
-            message.ContainsTodoWrite
-            || not (Set.intersect message.ToolCallIds todoCallIds |> Set.isEmpty))
+    /// Which messages the caller has already decided to keep.
+    ///
+    /// context-compression-020 (revised): the only retention objects are the real
+    /// Opening and the last K phases. The retired `todowrite` exemption kept every
+    /// ledger round raw forever, which is the unbounded accumulation the refactor
+    /// removes — so this record carries the caller's decision rather than deriving
+    /// one from a tool name.
+    type RawPrefixMessageFacts = { Retained: bool }
 
     /// COMPANION-009: the intent for one request.
     ///

@@ -24,7 +24,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-async-support.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.participant-persona.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.prefix-stability.mission-obligation-todo-prefixepoch.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-projection.opencode-codec-providerwiredecode.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-projection.participant-provider-projection-wire.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>

@@ -8,7 +8,6 @@ type ToolPermission =
     | Join
     | Horizon
     /// Manager-only living-obligation checkpoint surface.
-    | TodoWrite
     /// Same-participant multi-present execution consequence (eligible offices only).
     | Fission
     | Read
@@ -49,7 +48,6 @@ module OfficeCapability =
                   ToolPermission.Resume
                   ToolPermission.Join
                   ToolPermission.Horizon
-                  ToolPermission.TodoWrite
                   ToolPermission.ReviewAssessment
                   ToolPermission.Finality
                   ToolPermission.Sphinx ]

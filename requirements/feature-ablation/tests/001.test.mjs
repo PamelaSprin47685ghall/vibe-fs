@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { withManifestLock } from './support/manifest-lock.mjs'
 import { join } from 'node:path'
 import test from 'node:test'
 import * as Ablation from '../../../dist/Ablation/Surface.js'
@@ -121,7 +122,9 @@ test('WHAT[feature-ablation-001] ABL_001_tool_map_and_fact_map_sync_with_active_
   assert.equal(facts['AgentFact.Orchestrator'], 'change-integration')
   assert.equal(facts['AgentFact.Relay'], 'relay-incumbency')
   assert.equal(facts['AgentFact.Execution'], 'delegation')
-  assert.equal(facts['MagicTodo'], 'obligation-ledger')
+  assert.equal(facts['AgentFact.Cognition'], 'cognitive-workspace')
+  // The retired ledger family is no longer mapped: it was deleted with the protocol.
+  assert.ok(!('MagicTodo' in facts), 'the retired ledger family must not be mapped')
 
   // 5. 确保 fact-map 中所有节点在 nodes.json 中合法存在
   const nodeIds = new Set(nodesDoc.nodes.map((n) => n.id))
@@ -138,17 +141,26 @@ test('WHAT[feature-ablation-001] ABL_001_primary_node_uniqueness_and_presence_fa
   const nodesPath = join(ROOT, 'resources/ablation/nodes.json')
   const original = readFileSync(nodesPath, 'utf8')
 
-  const withNodesDoc = (modifier, run) => {
-    try {
-      const doc = JSON.parse(original)
-      modifier(doc)
-      writeFileSync(nodesPath, JSON.stringify(doc, null, 2), 'utf8')
-      run()
-    } finally {
-      writeFileSync(nodesPath, original, 'utf8')
-      Ablation.load()
-    }
-  }
+  // Ablation caches the parsed manifest, so a mutated file restored on disk is not
+  // enough: without dropping the cache the mutation survives into later tests that
+  // load it. Both halves — the write and the cache — must be unwound, and the whole
+  // window must be held against sibling tests that touch the same manifest.
+  const withNodesDoc = (modifier, run) =>
+    withManifestLock(() => {
+      try {
+        const doc = JSON.parse(original)
+        modifier(doc)
+        writeFileSync(nodesPath, JSON.stringify(doc, null, 2), 'utf8')
+        Ablation.resetCache()
+        run()
+      } finally {
+        // Rewrite the byte-exact document this test started from, not a reformatting
+        // of whatever is on disk now: a sibling could have mutated the file in the
+        // meantime, and reformatting that would bake its mutation into the restore.
+        writeFileSync(nodesPath, original, 'utf8')
+        Ablation.resetCache()
+      }
+    })
 
   // 1. 缺失主节点：当包缺失同名主节点时，load 必须 fail-closed 返回 InvalidManifest
   withNodesDoc(

@@ -23,8 +23,6 @@ const MANAGER_VISIBLE_SURFACES = [
   'tool/horizon/description',
   'tool/join/description',
   'tool/suicide/description',
-  'lifecycle/magic-todo/todowrite-description',
-  'lifecycle/magic-todo/manager-guideline',
 ]
 
 test('WHAT[participant-horizon-008] PH_glory_002_030_manager_surface_hides_review_orchestration', () => {

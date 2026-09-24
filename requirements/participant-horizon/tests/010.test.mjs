@@ -23,8 +23,6 @@ const MANAGER_VISIBLE_SURFACES = [
   'tool/horizon/description',
   'tool/join/description',
   'tool/suicide/description',
-  'lifecycle/magic-todo/todowrite-description',
-  'lifecycle/magic-todo/manager-guideline',
 ]
 
 test('WHAT[participant-horizon-010] PH_agent_009_fork_visible_set_is_strictly_engineer', () => {

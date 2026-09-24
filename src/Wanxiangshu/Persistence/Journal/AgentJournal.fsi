@@ -9,16 +9,11 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
-open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 open Wanxiangshu.Foundation
 
 type JournalChange =
     { Revision: JournalRevision
       Envelope: Envelope }
-
-type MagicTodoAppendReceipt =
-    { EventId: EventId
-      Projection: ProjectionSet }
 
 type JournalAppendException =
     inherit Exception
@@ -38,11 +33,6 @@ type AgentJournal =
         fact: AgentFact ->
             Task<Result<ProjectionSet, JournalAppendFailure>>
 
-    member AppendMagicTodo:
-        stream: StreamId ->
-        providerRun: ProviderRunIdentity option ->
-        fact: MagicTodoFact ->
-            Task<Result<MagicTodoAppendReceipt, JournalAppendFailure>>
 
     member AwaitChangeFrom: fromRevision: JournalRevision -> Task<JournalChange>
 
@@ -67,12 +57,6 @@ module AgentJournal =
         journal: AgentJournal ->
             Task<Result<ProjectionSet, JournalAppendFailure>>
 
-    val appendMagicTodo:
-        stream: StreamId ->
-        providerRun: ProviderRunIdentity option ->
-        fact: MagicTodoFact ->
-        journal: AgentJournal ->
-            Task<Result<MagicTodoAppendReceipt, JournalAppendFailure>>
 
     val snapshot: journal: AgentJournal -> ProjectionSet
     val revision: journal: AgentJournal -> JournalRevision

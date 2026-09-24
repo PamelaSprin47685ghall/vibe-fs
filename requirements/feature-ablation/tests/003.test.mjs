@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
 import * as Ablation from '../../../dist/Ablation/Surface.js'
+import { withManifestLock } from './support/manifest-lock.mjs'
 
 const ROOT = new URL('../../..', import.meta.url).pathname
 
@@ -58,26 +59,49 @@ test('WHAT[feature-ablation-003] ABL_003_dag_station_order_and_borrow_edges_are_
   }
 })
 
-test('WHAT[feature-ablation-003] ABL_003_cyclic_graph_load_fails_closed', () => {
-  const nodesPath = join(ROOT, 'resources/ablation/nodes.json')
-  const original = readFileSync(nodesPath, 'utf8')
-  try {
-    const doc = JSON.parse(original)
-    // requirement-system -> verification-system 已存在，添加反向边形成环
-    doc.edges.push({
-      from: 'verification-system',
-      to: 'requirement-system',
-      kind: 'station-order',
-    })
-    writeFileSync(nodesPath, JSON.stringify(doc, null, 2), 'utf8')
+test('WHAT[feature-ablation-003] ABL_003_cyclic_graph_load_fails_closed', async () => {
+  await withManifestLock(() => {
+    const nodesPath = join(ROOT, 'resources/ablation/nodes.json')
+    const original = readFileSync(nodesPath, 'utf8')
 
-    const result = Ablation.load()
-    assert.equal(result.ok, false, 'manifest loading must fail when graph contains cycles')
-    assert.equal(result.kind, 'DagViolation')
-    assert.match(result.error, /cycle/i)
-    assert.deepEqual(Ablation.manifestNodeIds(), [])
-  } finally {
-    writeFileSync(nodesPath, original, 'utf8')
-    Ablation.load()
-  }
+    // The reversed edge is the only mutation this test makes, so removing it is the
+    // whole cleanup. The restore is derived from the document as committed rather
+    // than from whatever this test read first, which keeps it correct even if the
+    // committed file already carries the reversed edge.
+    const cleanEdges = (doc) =>
+      doc.edges.filter((edge) => !(edge.from === 'verification-system' && edge.to === 'requirement-system'))
+
+    try {
+      const doc = JSON.parse(original)
+      // requirement-system -> verification-system 已存在，添加反向边形成环
+      doc.edges.push({
+        from: 'verification-system',
+        to: 'requirement-system',
+        kind: 'station-order',
+      })
+      writeFileSync(nodesPath, JSON.stringify(doc, null, 2), 'utf8')
+      // The cache must be dropped after the write, otherwise the previous (valid)
+      // manifest is served and the cycle is never seen.
+      Ablation.resetCache()
+
+      const result = Ablation.load()
+      assert.equal(result.ok, false, 'manifest loading must fail when graph contains cycles')
+      assert.equal(result.kind, 'DagViolation')
+      assert.match(result.error, /cycle/i)
+      assert.deepEqual(Ablation.manifestNodeIds(), [])
+    } finally {
+      // Re-read what is on disk now and strip only the reversed edge. Rebuilding from
+      // a snapshot taken before the lock was acquired could write back a sibling's
+      // in-flight mutation; filtering the live document is correct either way because
+      // removing this one edge is idempotent on an already-clean manifest.
+      const current = JSON.parse(readFileSync(nodesPath, 'utf8'))
+      current.edges = current.edges.filter(
+        (edge) => !(edge.from === 'verification-system' && edge.to === 'requirement-system'),
+      )
+      writeFileSync(nodesPath, JSON.stringify(current, null, 2), 'utf8')
+      // Reset before the cleanup load, so the clean manifest is what gets cached.
+      Ablation.resetCache()
+      Ablation.load()
+    }
+  })
 })

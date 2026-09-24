@@ -18,28 +18,29 @@ module ProjectionMessageEdit =
     let private rawPartCallId (part: obj) =
         ProviderWireDecode.firstString part [ "callID"; "callId"; "toolCallId"; "id" ]
 
-    let private isTodoWritePart (part: obj) =
+    /// The cognitive tool whose results follow the latest-only rule.
+    ///
+    /// `todowrite` used to hold an unbounded retention exemption: every one of its
+    /// rounds survived prefix replacement forever, which is exactly the accumulation
+    /// the refactor removes. The exemption is now the K-window the prefix owner
+    /// already computes, so this predicate exists only to recognise the tool, never
+    /// to grant retention.
+    let private isAssumePart (part: obj) =
         ProviderWireDecode.firstString part [ "tool"; "name" ]
-        |> Option.exists (fun tool -> String.Equals(tool, "todowrite", StringComparison.OrdinalIgnoreCase))
+        |> Option.exists (fun tool -> String.Equals(tool, "assume", StringComparison.OrdinalIgnoreCase))
 
-    let private retentionFacts (message: obj) =
-        let parts = ProviderWireDecode.rawPartsOf message
+    /// Messages whose tool call belongs to `retainedCallIds`, matched by exact call
+    /// identity — never by text. A result payload replaced with a tombstone still
+    /// names its own call, which is what keeps the call/result pairing intact while
+    /// the payload alone changes.
+    let private messagesForCalls (covered: obj list) (retainedCallIds: Set<string>) =
+        covered
+        |> List.filter (fun message ->
+            let parts = ProviderWireDecode.rawPartsOf message
 
-        parts |> List.exists isTodoWritePart, parts |> List.choose rawPartCallId |> Set.ofList
-
-    let private retainedTodoRounds (covered: obj list) =
-        let facts = covered |> List.map retentionFacts
-
-        let todoCallIds =
-            facts |> List.filter fst |> List.collect (snd >> Set.toList) |> Set.ofList
-
-        let retained =
-            facts
-            |> List.map (fun (containsTodoWrite, callIds) ->
-                containsTodoWrite || not (Set.intersect callIds todoCallIds |> Set.isEmpty))
-
-        List.zip covered retained
-        |> List.choose (fun (message, retain) -> if retain then Some message else None)
+            parts
+            |> List.choose rawPartCallId
+            |> List.exists (fun callId -> Set.contains callId retainedCallIds))
 
     let private syntheticHead (syntheticId: string) (memory: string) =
         createObj
@@ -58,6 +59,7 @@ module ProjectionMessageEdit =
         (insertAfterHostMessageId: string option)
         (syntheticMessageId: string)
         (memory: string)
+        (retainedAssumeCallIds: Set<string>)
         : obj list =
         let coveredIds = coveredHostMessageIds |> Set.ofList
 
@@ -68,7 +70,7 @@ module ProjectionMessageEdit =
                 |> Option.exists (fun messageId -> Set.contains messageId coveredIds))
 
         let retainedCoveredIds =
-            retainedTodoRounds covered
+            messagesForCalls covered retainedAssumeCallIds
             |> List.choose ProviderWireDecode.hostMessageId
             |> Set.ofList
 

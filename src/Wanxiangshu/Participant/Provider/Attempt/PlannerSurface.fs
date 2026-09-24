@@ -23,7 +23,6 @@ module AttemptPlannerSurface =
         | ToolPermission.Resume -> "Resume"
         | ToolPermission.Join -> "Join"
         | ToolPermission.Horizon -> "Horizon"
-        | ToolPermission.TodoWrite -> "TodoWrite"
         | ToolPermission.Fission -> "Fission"
         | ToolPermission.Read -> "Read"
         | ToolPermission.Write -> "Write"

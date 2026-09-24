@@ -89,7 +89,6 @@ const allowList = (config, name) => {
     'signal-terminal',
     'join',
     'horizon',
-    'todowrite',
     'fission',
     'review',
     'chronicle',
@@ -104,7 +103,7 @@ const COGNITIVE_UTILITY_ALLOW = ['assume']
 const hostUtilityAllowFor = (role) => (role === 'Blogger' ? [] : HOST_UTILITY_ALLOW)
 const cognitiveUtilityAllowFor = (role) => (role === 'Blogger' ? [] : COGNITIVE_UTILITY_ALLOW)
 const ROLE_ALLOW = {
-  Manager: ['fork', 'resume', 'join', 'horizon', 'todowrite', 'suicide', 'review'],
+  Manager: ['fork', 'resume', 'join', 'horizon', 'suicide', 'review'],
   Orchestrator: ['commission', 'join', 'horizon'],
   Engineer: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission'],
   DevOps: [
@@ -270,7 +269,7 @@ const { default: assert } = await import("node:assert/strict");
 const { withPlugin } = await import("../../verification-system/tests/support/plugin-fixture.mjs");
 
 const TOOL_NAMES = [
-  'fork', 'resume', 'commission', 'join', 'horizon', 'todowrite', 'fission',
+  'fork', 'resume', 'commission', 'join', 'horizon', 'fission',
   'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm',
   'bash-honeypot', 'assume',
   'enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret',
@@ -284,7 +283,7 @@ const COGNITIVE_TOOLS = ['enough', 'abandon', 'defer', 'subscribe', 'publish', '
 
 const ALLOWED = {
   orchestrator: ['commission', 'join', 'horizon', 'assume', ...COGNITIVE_TOOLS],
-  manager: ['fork', 'resume', 'join', 'horizon', 'todowrite', 'review', 'suicide', 'assume', ...COGNITIVE_TOOLS],
+  manager: ['fork', 'resume', 'join', 'horizon', 'review', 'suicide', 'assume', ...COGNITIVE_TOOLS],
   engineer: ['fission', 'read', 'write', 'edit', 'glob', 'grep', 'fetch', 'mv', 'rm', 'bash-honeypot', 'assume', ...COGNITIVE_TOOLS],
   devops: [
     'join', 'horizon', 'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'run',

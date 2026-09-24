@@ -14,8 +14,6 @@ module PluginHooksSurface =
 
     val policyAwareHook: operation: string -> adaptedHook: obj -> obj
 
-    val providerInputRejection: message: string -> obj
-
     /// Classify a thrown JS value through the real failure membrane: typed
     /// failure kind, lifecycle, settlement evidence, and whether the hook
     /// arguments proved an owned execution key.

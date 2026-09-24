@@ -88,7 +88,6 @@ const allowList = (config, name) => {
     'signal-terminal',
     'join',
     'horizon',
-    'todowrite',
     'fission',
     'sphinx',
     'review',
@@ -104,7 +103,7 @@ const COGNITIVE_UTILITY_ALLOW = ['assume']
 const hostUtilityAllowFor = (role) => (role === 'Blogger' ? [] : HOST_UTILITY_ALLOW)
 const cognitiveUtilityAllowFor = (role) => (role === 'Blogger' ? [] : COGNITIVE_UTILITY_ALLOW)
 const ROLE_ALLOW = {
-  Manager: ['fork', 'resume', 'join', 'horizon', 'todowrite', 'suicide', 'review', 'sphinx'],
+  Manager: ['fork', 'resume', 'join', 'horizon', 'suicide', 'review', 'sphinx'],
   Orchestrator: ['commission', 'join', 'horizon', 'sphinx'],
   Engineer: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission', 'sphinx'],
   DevOps: [
@@ -153,7 +152,6 @@ test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_
       'signal-terminal': 'Pty',
       join: 'Join',
       horizon: 'Horizon',
-      todowrite: 'TodoWrite',
       fission: 'Fission',
       sphinx: 'Sphinx',
       read: 'Read',

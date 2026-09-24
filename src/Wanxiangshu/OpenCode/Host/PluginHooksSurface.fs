@@ -8,7 +8,6 @@ open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Obligation.Todo.OpenCode
 open Wanxiangshu.Persistence.Journal
 
 module PluginHooksSurface =
@@ -23,9 +22,6 @@ module PluginHooksSurface =
 
     let policyAwareHook operation (adaptedHook: obj) : obj =
         PluginHostInterop.policyAwareHook operation adaptedHook
-
-    let providerInputRejection message : obj =
-        MagicTodoHostCodec.ProviderInputRejection message
 
     /// Classify a thrown JS value through the real failure membrane and expose
     /// the normalized outcome fields (failure kind, lifecycle, settlement

@@ -25,7 +25,6 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
-open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Mission.Relay.OpenCode
 open Wanxiangshu.Mission.Manager
@@ -53,7 +52,6 @@ open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Git
 open Wanxiangshu.Git.Hook
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Mission.Obligation.Todo.OpenCode
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Resources

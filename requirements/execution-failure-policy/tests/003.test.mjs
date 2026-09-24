@@ -224,7 +224,10 @@ test('WHAT[execution-failure-policy-003] finite provider budget matrix fixes pol
     const wrapped = hooks.policyAwareHook(`policy-matrix-${label}`, () => label)
     assert.equal(await wrapped('args', 'context'), label)
 
-    const rejection = hooks.providerInputRejection(label)
+    // The retired ledger's typed rejection is gone; `assume` refuses bad arguments
+    // as a tool result, so a ProtocolRejection arrives from the Host wire itself.
+    const rejection = new Error(label)
+    rejection.name = 'ProtocolRejection'
     const failing = hooks.policyAwareHook(`policy-matrix-${label}`, () => Promise.reject(rejection))
     await assert.rejects(() => failing('args', 'context'), (error) => error === rejection)
   }

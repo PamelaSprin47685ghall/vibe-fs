@@ -111,3 +111,19 @@ Blogger claim/release conflict、semantic cut与compression invariant必须携�
 `BloggerMainRequestContext` 与 `BloggerSquashRequestContext` 的 record 字段只读：外部代码可以模式匹配与读取字段，但不能组装任意 `PreviousIngestedThroughSequence`／`NextIngestedThroughSequence`／`DeltaDigest`／`Toml`／epoch 组合。唯一构造入口是 `BloggerRequestMaterial.createMain`／`createSquash`（validating constructor），失败为 typed `BloggerRequestRejection`，永不产生部分 record。构造保证：`nextIngested > prevIngested`；`DeltaDigest = SHA256(Toml)`；epoch 为合法 generation；Squash 的 `CoveredFrameCount ≥ 1` 且与 `FrameDigests` 长度一致。`RequestId` 是 owner 在 materialization 时计算并冻结的 durable 身份（`mainRequestId`／`squashRequestId` canonical hash），构造与恢复只携带、不从 blob 内容重算。live 派生（`mainContextFromChunk`／`tryBuildSquashContext`）与恢复解码走同一构造器；恢复先解码未验证数据再验证，损坏／版本不兼容／I-O 不可用的 durable 输入分别成为 `CycleContextReloadRejection` 的独立分支（`BlobCorrupt`／`UnsupportedRequestKind`／`ItemsUndecodable`／`InvariantViolated`／`BlobUnreadable`），不得坍缩为 `None` 或零默认值。旧 epoch 请求不得借恢复取得当前提交权：恢复沿用 durable open 的 frozen epoch，commit 仍以 staged coverage 与 live projection 的一致性裁决。
 
 repair episode 的 durable abandon 失败时，rendezvous 进入终态失败：所有已接收未完成的观察者、入队请求与后续到达的旧/新 observer 都以同一异常拒绝；不发送 terminal 通知，不释放 exact flight，不重新打开预算。episode 以失败态保留注册，防止同一请求以新 budget 重启。
+
+## [028] K 窗口公式与同回合多提交
+
+设成功提交按顺序为 `A1..AN`，`Bi` 为包含 `Ai` 的完整 semantic turn 起始边界（canonical XTrace generation + stable Host identity）。`K` 在 owner 开启时冻结，必须为正整数，默认 2，含当前活跃阶段在内。
+
+```text
+N = 0：不给新 cutoff，沿用当前已提交前缀与原始尾部。
+N > 0：j = max(1, N − K + 1)
+desired cutoff exclusive = Bj
+```
+
+保留调用所属整回合，绝不在 call/result 中间切断。`A1` 之前的探索属于前导历史 P0；第一份阶段快照出现后，它可在 coverage 充分时被折叠，真实 Opening 仍永久保留。同一 semantic turn 内多个顺序提交的阶段序号各自增加，但物理边界可以相等；不得删除半个回合，也不得因两次调用共享边界而拒绝合法调用。
+
+## [029] coverage 落后不丢 raw，frame 不跨界冒用，紧急 Probe 是明示例外
+
+actual cutoff 必须同时满足：当前 generation、完整 semantic turn、连续 PrefixCoverage、有精确截断能力的已冻结 Blogger/LWR 材料、Opening floor、不得回退已提交 cutoff。Blogger 落后时：仍可提交新画板、投影 todos、退休已被替代的成功画板结果，但未覆盖的普通历史继续原样保留，不把 RawGap 冒充前缀覆盖。一个 Blogger frame 覆盖区间跨过 desired 边界时，必须使用可验证的完整材料子集，否则本次不前移。真实 WorkMain 失败后，既有 Probe 可在完整 coverage 与合法语义边界证明下越过正常 K 窗口，但必须作为 Probe 冷边界明确记录；这是紧急恢复例外，不是常规策略。

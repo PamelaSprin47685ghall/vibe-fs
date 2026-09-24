@@ -3,7 +3,6 @@ import test from 'node:test'
 {
 const { test } = await import("node:test");
 const { default: assert } = await import("node:assert/strict");
-const todo = await import("../../../dist/Mission/Obligation/Todo/MagicTodoSemanticSurface.js");
 const workRecord = await import("../../../dist/Mission/WorkRecord/OpeningSemanticSurface.js");
 const traceOwner = await import("../../../dist/Context/Trace/SemanticTraceSurface.js");
 

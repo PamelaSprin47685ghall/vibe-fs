@@ -98,7 +98,6 @@ const allowList = (config, name) => {
     'signal-terminal',
     'join',
     'horizon',
-    'todowrite',
     'fission',
     'review',
     'chronicle',
@@ -118,7 +117,7 @@ const hostUtilityAllowFor = (role) => (role === 'Blogger' ? [] : HOST_UTILITY_AL
 const cognitiveUtilityAllowFor = (role) => (role === 'Blogger' ? [] : COGNITIVE_UTILITY_ALLOW)
 
 const ROLE_ALLOW = {
-  Manager: ['fork', 'resume', 'join', 'horizon', 'todowrite', 'suicide', 'review'],
+  Manager: ['fork', 'resume', 'join', 'horizon', 'suicide', 'review'],
   Orchestrator: ['commission', 'join', 'horizon'],
   Engineer: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission'],
   DevOps: [

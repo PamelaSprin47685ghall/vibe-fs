@@ -12,7 +12,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-identityseed.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.prefix-stability.mission-obligation-todo-prefixepoch.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-projection.participant-provider-projection-wire.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj"/>

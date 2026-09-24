@@ -1,29 +1,34 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as prefix from '../../../dist/Context/Prefix/Surface.js'
-import * as magicTodo from '../../../dist/Mission/Obligation/Todo/MagicTodoSemanticSurface.js'
 
-const floor = ({ hasOpenLife = true, planCommitted = false, xTraceHeadSequence = 0, legacyProtectedPrefixEnd, parts = [] } = {}) =>
-  magicTodo.effectiveOpeningFloor(hasOpenLife, planCommitted, 1, null, null, xTraceHeadSequence, parts)
-
-test('WHAT[context-compression-020] todowrite_material_does_not_redefine_the_owned_opening_floor', () => {
-  const parts = [
-    { sequence: 8, kind: 'tool_call', toolCallId: 'todo-call-1' },
-    { sequence: 9, kind: 'tool_result', toolCallId: 'todo-call-1' },
-  ]
-
-  assert.equal(Number(floor({ xTraceHeadSequence: 20, parts })), 2)
-})
-
-test('WHAT[context-compression-020] todowrite call and matching result are retained across a Y cutoff', () => {
+test('WHAT[context-compression-020] only_the_opening_and_the_last_K_phases_are_retained', () => {
+  // The caller's own verdict is carried across the boundary unchanged. The retired
+  // todowrite exemption kept every ledger round raw forever; nothing may reintroduce
+  // a per-tool-name retention rule here.
   assert.deepEqual(
-    prefix.retainTodoWriteRounds([
-      { containsTodoWrite: false, callIds: [] },
-      { containsTodoWrite: true, callIds: ['todo-call-1'] },
-      { containsTodoWrite: false, callIds: ['todo-call-1'] },
-      { containsTodoWrite: false, callIds: ['other-call'] },
+    prefix.retainedPrefixMessages([
+      { retained: false },
+      { retained: true },
+      { retained: true },
+      { retained: false },
     ]),
     [false, true, true, false],
-    'only the todowrite round punches through an otherwise replaceable prefix',
+    'the caller decides retention; the surface never invents one',
+  )
+})
+
+test('WHAT[context-compression-020] a_retained_cognitive_round_needs_no_tool_name_to_survive', () => {
+  // The K-window rule keeps a round because it is inside the window, not because of
+  // which tool produced it. A round that names no recognisable tool is retained
+  // exactly as the caller decided.
+  assert.deepEqual(
+    prefix.retainedPrefixMessages([
+      { retained: true, tool: 'assume' },
+      { retained: true, tool: 'read' },
+      { retained: true },
+    ]),
+    [true, true, true],
+    'retention follows the phase window, never the tool name',
   )
 })

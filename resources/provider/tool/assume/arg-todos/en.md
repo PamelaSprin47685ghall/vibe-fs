@@ -1,0 +1,1 @@
+The complete todo list for this session, replacing the host UI list wholesale. Each row must be an object with `{content, status}` and an optional `priority` defaulting to `"medium"`. `status` must be one of `pending`, `in_progress`, `completed`, or `cancelled`. The caller's list order is preserved. An empty list `[]` clears the host UI list and carries no judgment about quality.

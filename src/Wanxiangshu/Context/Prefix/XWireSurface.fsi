@@ -37,6 +37,7 @@ module XWireSurface =
         openingHostMessageId: obj ->
         syntheticMessageId: string ->
         memory: string ->
+        retainedAssumeCallIds: string array ->
             obj array
 
     val suppressHostMessagesByIds: rawMessages: obj array -> hostMessageIds: string array -> obj array

@@ -13,7 +13,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-agentjournal.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-surface.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.obligation-ledger.mission-obligation-todo-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.prefix-stability.context-prefix-candidate.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.relay-assessment.mission-relay-workspace-snapshot.fsproj"/>

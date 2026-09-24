@@ -2,20 +2,6 @@ namespace Wanxiangshu.Mission.WorkRecord
 
 open Wanxiangshu.Context.Trace
 
-/// COMPANION-014 / GLORY-074: when Opening closes for a role.
-type CommitmentContract =
-    /// Manager T1: first accepted todowrite whose planComplete declaration is true.
-    | FirstPlanCompleteTodoWrite
-
-type OpeningPolicy =
-    | Immediate
-    | BlindPlan of CommitmentContract
-
-[<RequireQualifiedAccess>]
-module OpeningPolicy =
-
-    /// Non-Manager roles close Opening at InitialCharge (Immediate).
-    let immediate = Immediate
 
 /// COMPANION-003: LWR 的唯一物化规则。
 ///

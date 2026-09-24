@@ -1,33 +1,38 @@
-`assume` is your persistent JSON canvas, driven by jq.
+`assume(update, todos)` is your persistent JSON canvas plus your complete todo declaration, driven by jq.
 
-Use it when thought should remain editable instead of being trapped in the linear conversation. It preserves the best property of the original `assume`—once you have abstracted a judgment, pin it instead of wavering without new evidence—but generalizes that commitment point from one sentence into an arbitrary, persistent, non-linear structure that you can query and refactor with jq.
+Use it when thought should remain editable instead of being trapped in the linear conversation. It preserves the best property of the original `assume` — once you have abstracted a judgment, pin it instead of wavering without new evidence — while generalizing that commitment point into a persistent non-linear structure you can keep refactoring with jq.
 
-There is one workspace. It starts as `{}` and thereafter is whatever JSON value your last successful `update` produced. The workspace is one free-form JSON value. There is no predefined schema. There are no built-in concepts such as claim, evidence, note, node, edge, draft, section, plan, hypothesis, source, task, memory, or document. If any of those concepts help, create them yourself. If they stop helping, change or delete them. The canvas belongs to your reasoning, not to the tool.
+There is one workspace. It starts as `{}` and thereafter is whatever JSON value your last successful `update` produced. The canvas is one free-form JSON value. There is no predefined schema. There are no built-in concepts such as claim, evidence, note, node, edge, draft, section, plan, hypothesis, source, task, memory, or document. If any of those concepts help, create them yourself. If they stop helping, change or delete them. The canvas belongs to your reasoning, not to the tool.
 
-Every call has exactly two required jq programs: `update` and `query`.
+Every call has exactly two required arguments: `update` and `todos`.
 
-The semantics are always update first, query second.
+The semantics are always: update the canvas, then declare the todos.
 
 1. The current persistent canvas is passed to `update` as `.`.
 2. `update` runs as ordinary jq and must produce exactly one JSON value.
-3. That one value immediately becomes the new persistent canvas.
-4. The new canvas is then passed to `query` as `.`.
-5. `query` runs as ordinary jq and may produce zero, one, or multiple JSON values.
-6. The outputs of `query` are returned in jq order. `query` does not further modify the canvas.
+3. That one value atomically becomes the new persistent canvas and commits a phase.
+4. `todos` is your complete todo list for this session. It replaces the host UI list wholesale, in the order you give.
+5. On success the tool returns the full updated canvas.
 
-This update→query pairing is deliberate. Serious work often wants to change state and inspect the consequence immediately. A traditional read call followed by a write call followed by another read wastes round trips and encourages conversational bookkeeping. Here you can perform the state transition and request the exact post-transition view in one tool call.
-
-For a read-only operation, use the jq identity program as the update:
+A pure declaration uses the identity update:
 
 `update = "."`
 
-Then place the actual read in `query`.
+That keeps the canvas exactly as it is and still commits a phase with your new `todos`.
 
-For a change where you simply want to see the whole resulting canvas, use:
+The whole updated canvas is returned. When you need a wider view, put it in the canvas.
 
-`query = "."`
+### Negative boundaries
 
-Therefore the two required parameters do not reduce expressiveness. They give one uniform operation for read-only inspection, local mutation, whole-canvas replacement, mutation followed by focused inspection, and structural refactoring.
+`assume` does not execute the work in `todos`. Writing an entry does not run a command, write a file, or make a tool call.
+
+`assume` does not prove verification. Marking an entry `completed` does not mean a test passed or the result is correct.
+
+`assume` does not change your permissions. The canvas and the todo list grant no authority.
+
+### Commitment discipline
+
+Abstract first, then pin the structure you will act on: abstract → `assume(update, todos)` → execute → verify. Without materially new evidence, do not unsettle a judgment you have already pinned; hesitation produces no new knowledge.
 
 ## Why this exists
 
@@ -69,11 +74,11 @@ Experienced participants treat the first well-abstracted judgment as the default
 
 The new `assume` makes this stronger rather than discarding it.
 
-You no longer need to pin only a sentence. You can pin the structure that made the sentence reasonable: assumptions, alternatives, dependencies, unresolved questions, causal relations, fragments, candidate organizations, or whatever representation the task suggests. You can then query exactly the part needed for execution.
+You no longer need to pin only a sentence. You can pin the structure that made the sentence reasonable: assumptions, alternatives, dependencies, unresolved questions, causal relations, fragments, candidate organizations, or whatever representation the task suggests. The whole updated canvas comes back, so read the part needed for execution.
 
 The useful loop becomes:
 
-abstract → `assume(update, query)` → execute → verify → revise only on information gain.
+abstract → `assume(update, todos)` → execute → verify → revise only on information gain.
 
 ## jq is the interface on purpose
 
@@ -181,84 +186,6 @@ If your intention is to preserve the root and transform the ideas field, use an 
 
 Know what value your `update` returns. That value becomes reality for subsequent calls.
 
-## Exact query semantics
-
-Only after `update` succeeds and its single output becomes the persistent canvas does `query` run.
-
-The `.` seen by `query` is therefore the updated workspace, not the pre-update workspace.
-
-This ordering is the central RTT-saving property of the interface.
-
-Examples:
-
-Write an idea and immediately retrieve it:
-
-`update: '.ideas.memory = {"text":"Mamba compresses history"}'`
-
-`query: '.ideas.memory'`
-
-Append a candidate and immediately compare all candidates:
-
-`update: '.candidates += [{"name":"hybrid","score":8}]'`
-
-`query: '.candidates | sort_by(-.score)'`
-
-Refactor a structure and immediately inspect only the new keys:
-
-`update: '.ideas |= map({key:.id,value:.}) | from_entries'`
-
-`query: '.ideas | keys'`
-
-Record a decision and return the unresolved issues that should drive the next step:
-
-`update: '.decisions.memory = "use hybrid"'`
-
-`query: '.open_questions'`
-
-Pure read:
-
-`update: '.'`
-
-`query: '.ideas | keys'`
-
-`query` may emit zero, one, or multiple JSON values. All are valid. The tool returns those jq outputs in order and does not interpret their meaning.
-
-`query` is observational. It does not persist its result as another transformation.
-
-If `query` fails after `update` has succeeded, the successful update does not roll back. This tool is explicitly update first, query second. The state transition has already happened; the observation failed. Fix the query and call again with `update: "."` if all you need is to inspect the now-current state.
-
-That distinction is intentional and simple. Do not assume a failed post-update query implies a failed update.
-
-## Query narrowly to save context
-
-A persistent workspace is useful partly because it can become larger than the exact context you need right now.
-
-Do not habitually query `.` just because you can.
-
-Use jq as a lens.
-
-Examples:
-
-`query: 'keys'`
-
-`query: '.ideas | keys'`
-
-`query: '[.ideas[] | select(.status == "unresolved")]'`
-
-`query: '.drafts[-1]'`
-
-`query: '.sections[] | {title,purpose}'`
-
-`query: '[paths(scalars) as $p | {path:$p,value:getpath($p)}]'`
-
-`query: '.. | objects | select(has("uncertainty"))'`
-
-`query: '.relations | group_by(.from) | map({from:.[0].from,count:length})'`
-
-Inspect keys before values. Count before expanding. Filter before returning. Return the slice that will actually change your next reasoning step.
-
-The point of external memory is not to paste all external memory back into the prompt on every turn.
-
 ## Recommended pattern for difficult writing
 
 The final prose is linear. The material from which you create it does not have to be.
@@ -273,21 +200,21 @@ You might initially store several observations:
 
 Then ask for a compact view:
 
-`query: '.observations'`
+the whole updated canvas is returned, so read the field you need from it
 
 Later you notice one idea explains several observations. Instead of merely adding another paragraph, represent the discovery:
 
 `update: '.central = {"text":"The same compression that creates efficiency also creates recall risk","explains":[0,2,3]}'`
 
-Then query what should shape the article:
+Then read what should shape the article from the returned canvas:
 
-`query: '{central:.central, observations:.observations}'`
+the whole updated canvas is returned, so read the field you need from it
 
 Later you may compare organizations:
 
 `update: '.structures = {"chronological":["Mamba-1","Mamba-2","Mamba-3","Hybrid"],"memory-first":["memory problem","compression","recall weakness","hybrid","architecture evolution"]}'`
 
-`query: '.structures'`
+the whole updated canvas is returned, so read the field you need from it
 
 Nothing forces you to keep those structures. If the memory-first view wins, delete the other one, keep both as history, or replace the representation entirely.
 
@@ -303,7 +230,7 @@ For example:
 
 `update: '.hypotheses.h1 = {"idea":"memory bandwidth is the limiting factor","support":[],"problems":[]}'`
 
-`query: '.hypotheses'`
+the whole updated canvas is returned, so read the field you need from it
 
 After obtaining evidence elsewhere, update support or problems. The canvas does not verify evidence for you; it gives you an editable place to organize what external tools established.
 
@@ -315,7 +242,7 @@ Keep competing designs alive when the choice is not ready.
 
 `update: '.alternatives += [{"name":"A","advantages":[],"costs":[]},{"name":"B","advantages":[],"costs":[]}]'`
 
-`query: '.alternatives'`
+the whole updated canvas is returned, so read the field you need from it
 
 When a new constraint arrives, modify the alternatives and return the comparison in one call.
 
@@ -439,17 +366,15 @@ When storing long text, keep the surrounding jq simple so escaping is the only s
 
 ## Failure boundaries
 
-Understand the two stages precisely.
+Understand the failure precisely.
 
-If `update` fails to compile, fails at runtime, or does not produce exactly one JSON value, the persistent canvas is unchanged and `query` does not run.
+If `update` fails to compile, fails at runtime, or does not produce exactly one JSON value, the call is rejected and nothing rolls back: the persistent canvas, the todo list, the phase ordinal and the epoch are all unchanged.
 
-If `update` succeeds, its value is persisted before `query` starts.
+If `update` succeeds, its value is committed as the new canvas before the call returns.
 
-If `query` then fails, the update remains persisted. The query failure does not roll back the successful update.
+This is not a distributed transaction and there is no revision protocol. It is a serialized write over one durable canvas per owner.
 
-This is not a distributed transaction and there is no revision protocol in this first version. It is a serialized write-then-read operation over one process-local canvas.
-
-Concurrent calls are serialized by the tool so their update→query pairs do not interleave against the single mutable canvas.
+Concurrent calls for the same owner are serialized by the tool so their calls do not interleave against a single mutable canvas.
 
 ## Do not use the canvas as proof
 
@@ -486,7 +411,7 @@ When the task benefits from the canvas:
 1. Abstract the real structure before editing it.
 2. Decide what information is worth persisting.
 3. Use `update` to move the canvas to the next useful state.
-4. Use `query` in the same call to return only the view needed for the next decision.
+4. The full updated canvas is returned in the same call.
 5. Execute or investigate outside the canvas as required.
 6. Feed materially new results back into the canvas.
 7. Refactor the representation when it becomes awkward.
@@ -504,7 +429,7 @@ The state is one JSON value.
 
 `update` is the state transition.
 
-`query` is the post-transition observation.
+The returned canvas is the observation.
 
 The tool does not know what your JSON means.
 
@@ -516,4 +441,4 @@ The conversation remains the place where you communicate. The canvas is a place 
 
 And the old `assume` principle still holds at the center: abstract before commitment; once a judgment is good enough to act on, pin it; execute; verify; revise when reality gives you a reason. Do not mistake repeated hesitation for additional evidence.
 
-Abstract → `assume(update, query)` → execute → verify.
+Abstract → `assume(update, todos)` → execute → verify.

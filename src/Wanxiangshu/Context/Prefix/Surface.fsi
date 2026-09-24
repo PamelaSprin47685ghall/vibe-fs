@@ -18,4 +18,8 @@ module PrefixSurface =
     val forSnapshot: snapshot: obj -> memoryPreamble: string -> memoryBody: string -> obj
     val forChoice: choice: obj -> committed: obj -> memoryPreamble: string -> memoryBody: string -> obj
     val requiredBlob: choice: obj -> committed: obj -> obj
-    val retainTodoWriteRounds: messages: obj array -> bool array
+    val retainedPrefixMessages: messages: obj array -> bool array
+
+    val desiredCutoff: k: int -> phaseTurnStarts: int array -> obj
+    val actualCutoff: decision: obj -> committedCutoffExclusive: obj -> coveredCutoffExclusive: obj -> obj
+    val validateK: k: int -> obj

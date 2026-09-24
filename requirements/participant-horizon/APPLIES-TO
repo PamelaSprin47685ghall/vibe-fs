@@ -11,4 +11,3 @@
 /resources/provider/tool/horizon/**
 /scripts/checks/provider-leak-gate.mjs
 /requirements/managed-session-lifecycle/tests/distiller-ownership.test.mjs
-/requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs

@@ -11,8 +11,6 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Host
 open Wanxiangshu.Composition.Durable.Fact
-open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 
 /// Fact serialization (PERSIST-005).
 module FactCodec =
@@ -178,38 +176,12 @@ module FactCodec =
             )
         | other -> other
 
-    let private decodeMagicTodoCanonical canonical =
-        match MagicTodoFactCodec.tryDecode canonical with
-        | Ok fact -> Fact.MagicTodo fact
-        | Error reason -> failwith ("invalid MagicTodo canonical payload: " + reason)
-
-    let private decodeMagicTodoFact decoder json =
-        match Decode.fromString decoder json with
-        | Ok fact -> Some fact
-        | Error _ -> None
-
-    let private tryDecodeMagicTodo (json: string) : Fact option =
-        let decoder: Decoder<Fact> =
-            Decode.object (fun get ->
-                match get.Optional.Field "MagicTodo" Decode.string with
-                | Some canonical -> decodeMagicTodoCanonical canonical
-                | None -> failwith "not a MagicTodo fact")
-
-        try
-            decodeMagicTodoFact decoder json
-        with _ ->
-            None
-
     let serializeFact (fact: Fact) : string =
         match fact with
-        | MagicTodo magicTodo ->
-            Encode.Auto.toString (0, {| MagicTodo = MagicTodoFactCodec.encode magicTodo |}, extra = extra)
         | other -> Encode.Auto.toString (0, pinToUtc other, extra = extra)
 
     let private deserializeCurrentFact json =
-        match tryDecodeMagicTodo json with
-        | Some fact -> Ok fact
-        | None -> Decode.Auto.fromString<Fact> (json, extra = extra) |> Result.map pinToUtc
+        Decode.Auto.fromString<Fact> (json, extra = extra) |> Result.map pinToUtc
 
     let validateFact (fact: Fact) : Result<Fact, string> =
         let validate caseName schemaVersion =

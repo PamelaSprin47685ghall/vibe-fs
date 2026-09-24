@@ -166,6 +166,7 @@ module XWire =
         (openingHostMessageId: string option)
         (syntheticMessageId: string)
         (memory: string)
+        (retainedAssumeCallIds: Set<string>)
         =
         ProjectionMessageEdit.replacePrefixByHostIds
             rawMessages
@@ -173,6 +174,7 @@ module XWire =
             openingHostMessageId
             syntheticMessageId
             memory
+            retainedAssumeCallIds
 
     let suppressHostMessagesByIds (rawMessages: obj list) (hostMessageIds: Set<string>) =
         ProjectionMessageEdit.suppressHostMessagesByIds rawMessages hostMessageIds
@@ -291,6 +293,7 @@ module XWire =
                 openingHostMessageId
                 activation.SyntheticMessageId
                 activation.Memory
+                Set.empty
 
     let private renderPrefixMessages
         (state: WireSessionState)

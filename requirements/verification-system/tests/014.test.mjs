@@ -48,9 +48,9 @@ import {
   resetOpencodeSpawnCount,
 } from './e2e/support/process-host-utils.js'
 import {
-  assertMagicTodoHostCanariesAEGH,
+  assertManagerToolSurfaceCanariesAEGH,
   collectManagerProviderToolEvidence,
-} from './e2e/support/magic-todo-host-canary-plugin.mjs'
+} from './e2e/support/manager-tool-surface-canary-plugin.mjs'
 
 test('WHAT[verification-system-014] Long Stroke environment enforces single OpenCode process lifetime and static entry gate contract', () => {
   // VERIFICATION-SYSTEM-014 requires the Layer 4 Long Stroke environment to be driven
@@ -139,15 +139,15 @@ const awaitManagerJoinRunning = async (scenario, ctx) => {
 }
 
 const assertHostCanariesAEGH = async (scenario, ctx) => {
-  const dir = scenario.magicTodoHostCanaryDirectory
+  const dir = scenario.managerToolSurfaceCanaryDirectory
   assert.ok(
     dir,
-    'HOST_CANARY: scenario.magicTodoHostCanaryDirectory missing — setup.magicTodoHostCanary must be true',
+    'HOST_CANARY: scenario.managerToolSurfaceCanaryDirectory missing — setup.managerToolSurfaceCanary must be true',
   )
   const managerProviderWire = collectManagerProviderToolEvidence(scenario, {
     childSessionId: ctx?.childId ?? null,
   })
-  const result = assertMagicTodoHostCanariesAEGH(dir, {
+  const result = assertManagerToolSurfaceCanariesAEGH(dir, {
     managerProviderWire,
     xTraceParts: factPayloads(scenario.host.workDir, 'XTracePartAppended'),
   })

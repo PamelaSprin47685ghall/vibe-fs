@@ -9,7 +9,7 @@ open Wanxiangshu.Change
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Mission.Obligation.Todo
+open Wanxiangshu.Participant.Cognition
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Persistence.Journal
@@ -63,6 +63,28 @@ module Fold =
                 projection
             |> Result.mapError (fun reason -> { Fact = "Relay"; Reason = reason })
 
+    /// One cognitive commit folded into the aggregate index.
+    ///
+    /// Its own function so the family's decision is named rather than nested inside
+    /// the dispatcher: the dispatcher routes, this folds.
+    let private foldCognition (projection: AgentProjectionSet) (cognition: AssumeFactCases.T) =
+        let ownerKey = CognitiveOwner.keyOfFact cognition
+        let current = Map.tryFind ownerKey projection.Cognition
+
+        /// One committed workspace bound into the aggregate index.
+        let bindWorkspace (acc: AgentProjectionSet) (change: CognitiveProjectionChange) =
+            match change with
+            | CognitiveProjectionChange.CognitiveSet(key, workspace) ->
+                { acc with
+                    Cognition = Map.add key workspace acc.Cognition }
+
+        match CognitiveFactFold.fold current cognition with
+        | Ok changes -> Ok(List.fold bindWorkspace projection changes)
+        | Error rejection ->
+            Error
+                { Fact = CognitiveFoldRejection.fact rejection
+                  Reason = CognitiveFoldRejection.message rejection }
+
     let foldAgentFact (projection: AgentProjectionSet) (fact: AgentFact) : Result<AgentProjectionSet, FoldRejection> =
         // DSL-003: one dispatch per bounded-context family; each family folds
         // through its own branch so no fold depends on the whole catalogue.
@@ -76,6 +98,7 @@ module Fold =
             |> Result.map (fun updated ->
                 { projection with
                     ChatExecutions = updated })
+        | AgentFact.Cognition cognition -> foldCognition projection cognition
         | AgentFact.Orchestrator orchestrator ->
             // The Change family fold consumes the journal-owned `ProjectionSet`,
             // so its assembly stays with the dispatcher, downstream of that edge.
@@ -97,39 +120,8 @@ module Fold =
             ProjectionUpdate.applyInstitutionalLearning projection learning
             |> Result.bind (fun updated -> ProjectionUpdate.applyAttentionLearning updated learning)
 
-    let private foldMagicTodo (projection: ProjectionSet) (eventId: EventId) (fact: MagicTodoFacts.MagicTodoFact) =
-        match fact with
-        | MagicTodoFacts.MagicTodoFact.PrefixRebaseCommittedV2 rebase ->
-            ProjectionUpdate.tryUpdatePrefix
-                rebase.SessionId
-                (PrefixEpochProjection.applyRebase
-                    rebase.PreviousEpochId
-                    rebase.NextEpochId
-                    { FrozenRecordPrefixRef = rebase.FrozenRecordPrefixRef
-                      FrozenRecordPrefixDigest = rebase.FrozenRecordPrefixDigest
-                      CutoffExclusive = rebase.CutoffExclusive
-                      CoveredPrefixDigest = rebase.CoveredPrefixDigest
-                      SealRoot = rebase.SealRoot
-                      SyntheticMessageId = rebase.SyntheticMessageId })
-                projection.AgentProjections
-            |> ProjectionUpdate.prefixOutcome "PrefixRebaseCommittedV2" projection.AgentProjections
-            |> Result.map (fun agents ->
-                { projection with
-                    AgentProjections = agents })
-        | fact ->
-            MagicTodoProjection.fold eventId projection.AgentProjections.MagicTodo fact
-            |> Result.mapError (fun rejection ->
-                { Fact = "MagicTodo"
-                  Reason = sprintf "%A" rejection })
-            |> Result.map (fun magicTodo ->
-                { projection with
-                    AgentProjections =
-                        { projection.AgentProjections with
-                            MagicTodo = magicTodo } })
-
     /// Fact-only fold for callers that do not need envelope metadata.
     /// RuntimeStarted needs no envelope field (RuntimeId is in the payload).
-    /// MagicTodo requires an EventId and must go through foldEnvelope.
     let foldFact (projection: ProjectionSet) (fact: Fact) : Result<ProjectionSet, FoldRejection> =
         match fact with
         | Runtime(RuntimeStarted runtime) ->
@@ -144,7 +136,6 @@ module Fold =
             |> Result.map (fun agents ->
                 { projection with
                     AgentProjections = agents })
-        | MagicTodo _ -> reject "MagicTodo" "foldFact does not support MagicTodo; use foldEnvelope with an EventId"
 
     let foldEnvelope (projection: ProjectionSet) (envelope: Envelope) : Result<ProjectionSet, FoldRejection> =
         match envelope.Fact with
@@ -164,7 +155,6 @@ module Fold =
             |> Result.map (fun agents ->
                 { projection with
                     AgentProjections = agents })
-        | MagicTodo fact -> foldMagicTodo projection envelope.EventId fact
 // Historical enumeration intentionally has no Journal-owned API. Boot and
 // live facts both enter through CanonicalIntegrator, which invokes only
 // foldEnvelope for one already-ordered durable event at a time.

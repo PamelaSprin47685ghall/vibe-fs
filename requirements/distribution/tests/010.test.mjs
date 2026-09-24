@@ -84,10 +84,14 @@ test('WHAT[distribution-010] distribution artifact contains active registrations
   const surfaceModules = SURFACE_MANIFEST.map((s) => s.module)
   assert.ok(surfaceModules.length > 0, 'SURFACE_MANIFEST must have registered entries')
 
-  // 证明无废弃角色专属的孤立 surface 模块存在
+  // 证明无废弃角色专属的孤立 surface 模块存在。
+  // `Sphinx/InquirySurface.js` is an epistemic-reasoning tool surface, not a
+  // deprecated-role module: the role `inquiry` is retired, but the tool it left
+  // behind still legitimately owns clause anchors under epistemic-reasoning.
+  const retiredRoleDirs = ['coder', 'inspector', 'browser', 'distiller']
   for (const mod of surfaceModules) {
     if (mod.startsWith('Sphinx/')) continue
-    for (const dep of deprecatedRoles5) {
+    for (const dep of retiredRoleDirs) {
       assert.equal(
         mod.toLowerCase().includes(`/${dep}`),
         false,

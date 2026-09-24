@@ -5,74 +5,43 @@ open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
-open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
-open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 
-open Wanxiangshu.Foundation
-
-/// Journal owner operations specific to the obligation ledger. The generic
-/// JournalSurface owns boot/release; this module owns MagicTodo facts and the
-/// compact projections that prove their durability.
+/// Journal operations for the relay lifecycle, plus the retired obligation-ledger
+/// read boundary.
+///
+/// obligation-ledger-007: the append is gone, so the only honest answer refuses and
+/// names the retirement. The relay lifecycle functions stay because real callers use
+/// them; they are relay code that historically sat beside the old ledger route.
 [<RequireQualifiedAccess>]
 module ObligationJournalSurface =
-
-    let private text (value: obj) =
-        if isNull value then "" else string value
 
     let private streamOfSession (sessionId: string) =
         StreamId.Session(SessionId.create sessionId)
 
-    let private runOf (value: obj) =
-        if isNull value then
-            None
-        else
-            Some(ProviderRunIdentity.create (text value))
-
     let private appendResult result =
         match result with
-        | Ok receipt ->
-            box
-                {| ok = true
-                   eventId = EventId.value receipt.EventId |}
+        | Ok _ -> box {| ok = true |}
         | Error failure ->
             box
                 {| ok = false
                    error = JournalAppendFailure.describe failure |}
 
-    let appendMagicTodo (handle: JournalHandle) (sessionId: string) (providerRun: obj) (factJson: string) : Task<obj> =
-        task {
-            match MagicTodoFactCodec.tryDecode factJson with
-            | Error error -> return box {| ok = false; error = error |}
-            | Ok fact ->
-                let! result =
-                    AgentJournal.appendMagicTodo (streamOfSession sessionId) (runOf providerRun) fact handle.Journal
+    /// Retired. A refusal, so a migrated caller learns why instead of inferring it.
+    let appendMagicTodo (handle: JournalHandle) : obj =
+        ignore handle
 
-                return appendResult result
-        }
+        box
+            {| ok = false
+               error =
+                "appendMagicTodo is retired (obligation-ledger-007); the cognitive workspace commits through AgentFact.Cognition" |}
 
-    let writePayload (handle: JournalHandle) (content: string) : Task<obj> =
-        task {
-            let! result = handle.Journal.Writer.BlobWriter.Write content
-
-            return
-                match result with
-                | Ok receipt ->
-                    box
-                        {| ok = true
-                           blobRef = BlobRef.value receipt.BlobRef
-                           blobDigest = BlobDigest.value receipt.BlobDigest |}
-                | Error error -> box {| ok = false; error = error |}
-        }
-
-    let snapshotMagicTodo (handle: JournalHandle) (incumbencyId: string) : obj =
-        let projection = AgentJournal.snapshot handle.Journal
-
-        MagicTodoProjectionSurface.incumbencyView
-            projection.AgentProjections.MagicTodo
-            (Wanxiangshu.Mission.Relay.IncumbencyId.create incumbencyId)
+    /// Retired alongside the projection it would have returned.
+    let snapshotMagicTodo (handle: JournalHandle) : obj =
+        ignore handle
+        null
 
     let openIncumbency (handle: JournalHandle) (sessionId: string) (incumbencyId: string) : Task<obj> =
         task {
@@ -97,13 +66,7 @@ module ObligationJournalSurface =
 
                 let! result = AgentJournal.appendAgent (streamOfSession sessionId) None fact handle.Journal
 
-                return
-                    match result with
-                    | Ok _ -> box {| ok = true |}
-                    | Error failure ->
-                        box
-                            {| ok = false
-                               error = JournalAppendFailure.describe failure |}
+                return appendResult result
         }
 
     let grantWorkOwned (handle: JournalHandle) (sessionId: string) (incumbencyId: string) : Task<obj> =
@@ -160,13 +123,7 @@ module ObligationJournalSurface =
 
                 let! result = AgentJournal.appendAgent (streamOfSession sessionId) None fact handle.Journal
 
-                return
-                    match result with
-                    | Ok _ -> box {| ok = true |}
-                    | Error failure ->
-                        box
-                            {| ok = false
-                               error = JournalAppendFailure.describe failure |}
+                return appendResult result
         }
 
     let appendManagerLifecycle (handle: JournalHandle) (sessionId: string) (action: string) (payload: obj) : Task<obj> =
@@ -239,12 +196,6 @@ module ObligationJournalSurface =
 
                     let! result = AgentJournal.appendAgent (streamOfSession sessionId) None fact handle.Journal
 
-                    return
-                        match result with
-                        | Ok _ -> box {| ok = true |}
-                        | Error failure ->
-                            box
-                                {| ok = false
-                                   error = JournalAppendFailure.describe failure |}
+                    return appendResult result
             }
         | _ -> Task.FromResult(box {| ok = true |})

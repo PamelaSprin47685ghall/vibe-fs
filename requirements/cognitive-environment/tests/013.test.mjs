@@ -99,7 +99,7 @@ test('WHAT[cognitive-environment-013] CE_pair_hint_points_non_linear_work_to_ass
     assert.match(hint, /犹豫不产生新知识|hesitation produces no new knowledge/i)
     assert.doesNotMatch(hint, /map\(|select\(|setpath|delpaths/i, 'the repeated hint must leave jq mechanics to the tool description')
 
-    assert.match(description, /update.*query/is)
+    assert.match(description, /update.*todos|update/is)
     assert.match(description, /持久.*JSON.*画板|persistent.*JSON.*canvas/is)
     assert.match(description, /schema/i)
     assert.match(description, /犹豫不产生新知识|hesitation produces no new knowledge/i)

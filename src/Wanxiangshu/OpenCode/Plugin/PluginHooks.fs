@@ -24,7 +24,6 @@ open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Relay
 open Wanxiangshu.Mission.Relay.OpenCode
 open Wanxiangshu.Mission.WorkRecord
@@ -53,7 +52,6 @@ open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Git
 open Wanxiangshu.Git.Hook
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Mission.Obligation.Todo.OpenCode
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Repository.Investigation.WarmStart
@@ -61,7 +59,6 @@ open Wanxiangshu.Resources
 open Wanxiangshu.Strength.OpenCode
 open Wanxiangshu.Strength.Persistence
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Process
@@ -127,10 +124,8 @@ module PluginHooks =
             // TODO-002 / HOST-017..025: the builtin todowrite stays the physical
             // executor while this three-hook membrane owns provider schema,
             // durable checkpoint admission, and accepted-result enrichment.
-            let magicTodo = MagicTodoHostHooks.create journal snapshotOpt
 
-            let toolDefinition (toolInput: obj) (toolOutput: obj) =
-                magicTodo.Definition toolInput toolOutput
+            let toolDefinition (toolInput: obj) (toolOutput: obj) = ()
 
             let toolBefore (toolInput: obj) (toolOutput: obj) =
                 task {
@@ -149,7 +144,6 @@ module PluginHooks =
                         do! DelegatedToolEstimateLedger.observe port (SessionId.create context.SessionId) toolCallId
                     | _ -> ()
 
-                    do! magicTodo.Before toolInput toolOutput
                 }
 
             let collectCasebookObservation (toolInput: obj) (toolOutput: obj) =
@@ -168,7 +162,6 @@ module PluginHooks =
 
             let toolAfter (toolInput: obj) (toolOutput: obj) =
                 task {
-                    do! magicTodo.After toolInput toolOutput
 
                     do!
                         Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingGate.after

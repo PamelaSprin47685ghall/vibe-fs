@@ -46,7 +46,7 @@ test('WHAT[cognitive-environment-016] CE_016_pair_hint_retains_brief_trigger_wit
     assert.match(hint, /jq/i)
     assert.doesNotMatch(hint, /map\(|select\(|setpath|delpaths/i, `${locale} pair hint must not repeat jq manual`)
 
-    assert.match(assumeDesc, /update.*query/is)
+    assert.match(assumeDesc, /update.*todos|update/is)
     assert.match(assumeDesc, /map\(|select\(|setpath|delpaths/i, `${locale} tool description carries the detailed jq guidance`)
     assert.match(assumeDesc, /经验丰富|experienced participant/i, `${locale} tool description preserves the old commitment psychology`)
   }
