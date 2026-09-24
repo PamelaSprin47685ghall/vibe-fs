@@ -134,7 +134,7 @@ const ROLE_ALLOW = {
     'js-manager',
   ],
   Orchestrator: ['commission', 'join', 'horizon', 'sphinx'],
-  Engineer: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission', 'sphinx'],
+  Engineer: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission', 'sphinx', 'js-engineer'],
   DevOps: [
     'read',
     'write',
@@ -150,6 +150,7 @@ const ROLE_ALLOW = {
     'send-terminal',
     'read-terminal',
     'signal-terminal',
+    'js-devops',
   ],
   Blogger: ['chronicle'],
 }
