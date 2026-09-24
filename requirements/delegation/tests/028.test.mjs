@@ -95,8 +95,9 @@ const SOURCE_BUDGETS = new Map([
 ])
 
 const ADAPTER_RATCHET = new Map([
-  // 305/305 on 2026-09-18 — delegation-host-adapter consumes DelegationPtyCapability from delegation-pty-port.
-  ['delegation-host-adapter', 305],
+  // 306/306 on 2026-09-24 — delegation-host-adapter consumes DelegationPtyCapability from delegation-pty-port;
+  // the durable spine now also carries AgentFact.Cognition, which this adapter reaches transitively.
+  ['delegation-host-adapter', 306],
   ['delegation-pty-adapter', 305],
   // 47 on 2026-09-14 — this batch hoisted Runtime.fs settleCompletedFromParts
   // into a module-internal SyncDelegateInternals module (namespace-scoped files
