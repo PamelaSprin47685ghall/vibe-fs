@@ -48,26 +48,31 @@ const REQUEST_KIND_SWITCHED = body(
   ['read', 'write', 'return'],
 );
 
-// MANAGER-LOOP: the retired iteration ends with narrative and tool traffic,
-// plus a non-authority nudge the projection drops; the next iteration
-// restarts under the same tools/authority plan with its root user kept and every
-// user a subsequence of the previous users. Structural only: typed
-// authority-revision retention is proved by the unit projection tests and the
+// MANAGER-LOOP: the retired iteration ends with narrative and tool traffic, its
+// authority turn carries the guidance occurrence the Host had appended, and (in the
+// nudge variant) a non-authority nudge the projection had injected. The next iteration
+// keeps every one of those messages, in order, and appends its own fresh-head prompt
+// (relay-context-projection-001 retains raw messages, tool calls, results, nudge, late
+// parts and the internal loop wake); only the retired guidance occurrence and the
+// companion frame may disappear (context-compression-019 / GAP-022). Structural only:
+// typed authority-revision retention is proved by the unit projection tests and the
 // long-stroke root-only oracle.
-const MANAGER_RETIRED = body('test-model', [
+const GUIDANCE_SUFFIX = '\0\uFEFF<skill_content>\n# # Wait-cost calibration: priced interval.\n</skill_content>';
+const MANAGER_TRAFFIC = [
+  user(`Round 1${GUIDANCE_SUFFIX}`),
+  assistant('assessment evidence'),
+  { role: 'tool', tool_call_id: 'review-call', content: 'scores' },
+];
+const MANAGER_RETIRED = body('test-model', [SYSTEM, ...MANAGER_TRAFFIC]);
+// The same messages with the retired occurrence gone and the successor's own prompt appended.
+const MANAGER_NEXT = body('test-model', [
   SYSTEM,
   user('Round 1'),
   assistant('assessment evidence'),
   { role: 'tool', tool_call_id: 'review-call', content: 'scores' },
+  user('Round 2'),
 ]);
-const MANAGER_NEXT = body('test-model', [SYSTEM, user('Round 1')]);
-const MANAGER_RETIRED_WITH_NUDGE = body('test-model', [
-  SYSTEM,
-  user('Round 1'),
-  assistant('assessment evidence'),
-  { role: 'tool', tool_call_id: 'review-call', content: 'scores' },
-  user('work nudge'),
-]);
+const MANAGER_RETIRED_WITH_NUDGE = body('test-model', [SYSTEM, ...MANAGER_TRAFFIC, user('work nudge')]);
 
 const decide = (previous, next, boundary = null) =>
   sealDecision({ previousWire: previous === null ? null : wireOf(previous), body: next, boundary });
@@ -253,21 +258,23 @@ export const coldBoundaryCases = [
   // ── pure manager loop ───────────────────────────────────────────────────
 
   {
-    name: 'MANAGER-LOOP a new iteration reseals with the same authority and no retired traffic',
+    name: 'MANAGER-LOOP a new iteration keeps the retained history and retires only its injection',
     fn: () => {
       assertEq(decide(MANAGER_RETIRED, MANAGER_NEXT, at('manager-loop')).resealed, 'manager-loop');
       assertEq(
-        decide(MANAGER_RETIRED_WITH_NUDGE, MANAGER_NEXT, at('manager-loop')).resealed,
-        'manager-loop',
-        'dropping a non-authority old nudge is accepted',
+        decide(MANAGER_RETIRED_WITH_NUDGE, MANAGER_NEXT, at('manager-loop')).broken,
+        'manager-loop-rewrote-fixed',
+        'a retained nudge may not be dropped: relay-context-projection-001 keeps it',
       );
 
-      const beforeFallback = body('test-model', [
-        hostSystem('test-model'),
+      const beforeFallback = body('test-model', [hostSystem('test-model'), ...MANAGER_TRAFFIC]);
+      const afterFallback = body('test-model-b', [
+        hostSystem('test-model-b'),
         user('Round 1'),
         assistant('assessment evidence'),
+        { role: 'tool', tool_call_id: 'review-call', content: 'scores' },
+        user('Round 2'),
       ]);
-      const afterFallback = body('test-model-b', [hostSystem('test-model-b'), user('Round 1')]);
       assertEq(
         decide(beforeFallback, afterFallback, at('manager-loop')).resealed,
         'manager-loop',
@@ -277,8 +284,9 @@ export const coldBoundaryCases = [
   },
 
   {
-    name: 'MANAGER-LOOP a new iteration fails when retired data leaks',
+    name: 'MANAGER-LOOP a new iteration fails when retained history is rewritten, dropped or padded',
     fn: () => {
+      // Dropping the retained tool traffic is no longer an iteration; it is a rewrite.
       const leakedAssistant = body('test-model', [SYSTEM, user('Round 1'), assistant('assessment evidence')]);
       assertEq(
         decide(MANAGER_RETIRED, leakedAssistant, at('manager-loop')).broken,
@@ -295,9 +303,22 @@ export const coldBoundaryCases = [
         'manager-loop-rewrote-fixed',
       );
 
+      // A novel user wake inside the retained prefix is exactly what the contract forbids.
       const wakePrompt = body('test-model', [SYSTEM, user('Round 1'), user('continue the Road')]);
       assertEq(
         decide(MANAGER_RETIRED, wakePrompt, at('manager-loop')).broken,
+        'manager-loop-rewrote-fixed',
+      );
+
+      const paddedPrefix = body('test-model', [
+        SYSTEM,
+        user('Round 1'),
+        user('a synthetic wake'),
+        assistant('assessment evidence'),
+        { role: 'tool', tool_call_id: 'review-call', content: 'scores' },
+      ]);
+      assertEq(
+        decide(MANAGER_RETIRED, paddedPrefix, at('manager-loop')).broken,
         'manager-loop-rewrote-fixed',
       );
     },
@@ -351,8 +372,9 @@ export const coldBoundaryCases = [
         true,
         'an append-only retry on the same entry stays held',
       );
+      const continued = body('test-model', [...MANAGER_NEXT.messages, assistant('declared step 0')]);
       assertEq(
-        decide(MANAGER_NEXT, APPENDED, at('manager-loop')).held,
+        decide(MANAGER_NEXT, continued, at('manager-loop')).held,
         true,
         'an append-only continuation stays held until the restart breaks it',
       );

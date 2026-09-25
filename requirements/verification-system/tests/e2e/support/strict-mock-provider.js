@@ -166,7 +166,7 @@ export class StrictMockProvider {
     return this._signals.waitForExpectationAttempt(id, attempts, timeoutMs);
   }
   waitForIdle(timeoutMs) { return this._signals.waitForIdle(timeoutMs); }
-  matchCount(id) { return this._signals.matchCount(id); }
+  matchCount(id, sessionId) { return this._signals.matchCount(id, sessionId); }
   afterExpectation(id, callback, attempts = 1) {
     if (!Number.isInteger(attempts) || attempts < 1) {
       throw new Error(`afterExpectation attempts must be a positive integer: ${attempts}`);
@@ -351,7 +351,7 @@ export class StrictMockProvider {
       const faulted = selection.entry;
       if (faulted) {
         for (const id of new Set([faulted.id, faulted.turnId])) {
-          this._signals.consume({ id, permanent: true });
+          this._signals.consume({ id, permanent: true, sessionId: context?.sessionId });
           this._runAfterExpectation(id, context);
         }
       }
@@ -366,7 +366,7 @@ export class StrictMockProvider {
     // Both the step id and its turn id, so a flow may wait on either granularity —
     // `wait = "mgr"` for "the turn happened" and `wait = "mgr.1"` for a specific step.
     for (const id of new Set([entry.id, entry.turnId])) {
-      this._signals.consume({ id, permanent: true });
+      this._signals.consume({ id, permanent: true, sessionId: context?.sessionId });
       this._runAfterExpectation(id, context);
     }
 

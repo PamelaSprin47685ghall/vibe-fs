@@ -451,8 +451,12 @@ export async function bindManagerLoopSequence(scenario) {
       entry.respond = latestManagerAuditAttempt === 1
         ? initialLoopJoin
         : latestManagerAuditAttempt === 3
-          ? { type: 'text', text: 'Repair dispatched; await the owner work resource.' }
+          ? initialLoopJoin
           : retire();
+    } else if (entry?.turnId === 'manager-reopened-loop' && entry.step >= 3) {
+      // The successor's own iteration closes here: the repair work has been harvested by
+      // the join above, and every later cursor of this assess resource is a close.
+      entry.respond = retire();
     } else if (entry?.id === 'manager-t1-commitment.0') {
       managerAssumptionDelivered = true;
     } else if (entry?.turnId === 'manager-current-action') {
@@ -664,8 +668,18 @@ export async function oracleLongStroke(scenario, ctx) {
   );
   assert.equal(
     scenario.provider.matchCount('manager-loop.0'),
-    5,
-    'long-stroke determinism: initial, candidate, repair, repaired, and rebased snapshots each receive one authority audit',
+    1,
+    'long-stroke determinism: the initial HumanRoot/authority iteration receives one authority audit',
+  );
+  // The four successor iterations (candidate, repair, repaired, rebased) carry the
+  // owner-controlled assess resource as their fresh head, so their audits land on the
+  // assess-resource family (relay-context-projection-001: the successor keeps the
+  // predecessor history and appends its own head instead of restarting from the
+  // trimmed authority turn).
+  assert.equal(
+    scenario.provider.matchCount('manager-reopened-loop.0', ctx?.childId ?? null),
+    4,
+    'long-stroke determinism: candidate, repair, repaired, and rebased snapshots each receive one successor audit',
   );
   const linkedByname = factPayloads(workDir, 'HandleLinked').map((payload) => payload?.Byname);
   assert.equal(

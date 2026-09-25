@@ -6,6 +6,14 @@ export class StrictMockSignals {
     /** @type {Map<string, number>} total matches observed for each wait id */
     this._matchCount = new Map();
     /**
+     * Matches per wait id and session. A reusable turn family is declared once and may be
+     * answered on more than one lane in the same world (the Long Stroke Manager and the
+     * HumanRoot canary share the assess-resource family), so a claim like "every iteration
+     * receives one audit" is a per-session invariant and is counted that way.
+     * @type {Map<string, Map<string, number>>}
+     */
+    this._sessionMatchCount = new Map();
+    /**
      * How many matches have already been claimed by waitForExpectation.
      * Reusable / neverEnd edges keep matchCount rising; each wait claims exactly
      * one match. If a match arrives before wait is registered, the next wait
@@ -36,6 +44,11 @@ export class StrictMockSignals {
     const id = expectation.id;
     const permanent = expectation.permanent === true;
     this._matchCount.set(id, (this._matchCount.get(id) || 0) + 1);
+    if (typeof expectation.sessionId === 'string' && expectation.sessionId !== '') {
+      const perSession = this._sessionMatchCount.get(id) ?? new Map();
+      perSession.set(expectation.sessionId, (perSession.get(expectation.sessionId) || 0) + 1);
+      this._sessionMatchCount.set(id, perSession);
+    }
     if (permanent) this._consumed.add(id);
     this._resolveWaiters(this._expectationWaiters.get(id));
     // Do not delete the waiter set before resolve — _resolveWaiters iterates a copy.
@@ -47,7 +60,10 @@ export class StrictMockSignals {
     return this._consumed.has(id);
   }
 
-  matchCount(id) {
+  matchCount(id, sessionId) {
+    if (typeof sessionId === 'string' && sessionId !== '') {
+      return this._sessionMatchCount.get(id)?.get(sessionId) || 0;
+    }
     return this._matchCount.get(id) || 0;
   }
 

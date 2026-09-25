@@ -127,52 +127,86 @@ const probeKeepsFixedParts = (previousWire, nextWire) => isDeepStrictEqual(previ
 
 // ── pure manager loop ───────────────────────────────────────────────────────
 //
-// Every manager iteration restarts from the same workspace with no transferred
-// payload or synthetic context: a Continue retirement is followed by another ordinary
-// iteration under the same tools/authority plan; a preceding provider fallback may
-// change only OpenCode's exact model banner. This layer checks structure only: the
-// normalized system is equal, the next wire carries system/user
-// messages alone, its user list is nonempty, its root user equals the previous
-// root, and every next user is an exact ordered subsequence of the previous
-// users — so a novel wake or synthetic user cannot smuggle in, while a dropped
-// non-authority nudge the projection omits stays accepted. Full typed
-// authority-revision retention is proved by the unit projection tests and the
-// long-stroke root-only oracle, not here.
+// Every manager iteration keeps the same workspace, tools and authority plan: a
+// Continue retirement is followed by another ordinary iteration, and the successor
+// keeps the predecessor's provider history instead of restarting from a trimmed
+// transcript (relay-context-projection-001: raw messages, tool calls, results, nudge,
+// late parts and the internal loop wake are all retained). A preceding provider
+// fallback may change only OpenCode's exact model banner. This layer checks structure
+// only — the normalized system is equal, the previous message list is an ordered
+// PREFIX of the next one, and the only admitted difference inside that prefix is a
+// retired auxiliary injection (context-compression-019 / GAP-022: an old horizon's
+// guidance occurrence or companion frame must not replay). So a rewritten or dropped
+// historical message, a novel wake or a synthetic user cannot smuggle in, while the
+// successor's own appended turns and its fresh-head prompt are exactly what the
+// retained-history contract expects. Full typed authority-revision retention is proved
+// by the unit projection tests and the long-stroke root-only oracle, not here.
 
 const sameProviderPlan = (previousWire, nextWire) => isDeepStrictEqual(previousWire.tools, nextWire.tools);
 
-const withoutGuidancePart = (part) => {
-  if (part?.kind === 'text' && typeof part.text === 'string') {
-    const idx = part.text.indexOf('\0\uFEFF<skill_content>');
-    return idx >= 0 ? { ...part, text: part.text.slice(0, idx) } : part;
-  }
-  return part;
+// The Host appends each guidance occurrence — a `<skill_content>` skill block or an
+// Enforcer tip — as a `\0\uFEFF`-separated suffix to the request's terminal part (a user
+// message or the last completed tool result; `cursorGuidanceSeparator` in
+// PairProgrammingThoughtTransform.fs). A successor iteration retires such an occurrence
+// without rewriting the message it was attached to.
+const GUIDANCE_MARKER = '\0\uFEFF';
+
+const withoutGuidanceValue = (value) => {
+  if (typeof value !== 'string') return value;
+  const markerAt = value.indexOf(GUIDANCE_MARKER);
+  return markerAt < 0 ? value : value.slice(0, markerAt);
 };
 
-const withoutGuidanceMessage = (message) => ({
-  ...message,
-  parts: (message.parts ?? []).map(withoutGuidancePart),
-});
+const withoutGuidancePart = (part) => {
+  const text = withoutGuidanceValue(part?.text);
+  const result = withoutGuidanceValue(part?.result);
+  if (text === part?.text && result === part?.result) return part;
+  return { ...part, ...(text === part?.text ? {} : { text }), ...(result === part?.result ? {} : { result }) };
+};
+
+// System messages are never stripped: their content is compared separately.
+const withoutGuidanceMessage = (message) =>
+  message?.role === 'system' ? message : { ...message, parts: (message.parts ?? []).map(withoutGuidancePart) };
+
+// The companion frame is the other retired auxiliary injection: the Host renders it as
+// a synthetic assistant ack row plus a user row carrying the memory preamble and the
+// prior work record.
+const COMPANION_PREAMBLE_MARKER = '# older prefix of this session. Continue from it.';
+
+const isCompanionFrameRow = (message) =>
+  message?.role === 'user'
+  && (message.parts ?? []).some(
+    (part) => typeof part?.text === 'string' && part.text.includes(COMPANION_PREAMBLE_MARKER),
+  );
+
+const withoutCompanionFrames = (messages) => {
+  const kept = [];
+  for (const message of messages) {
+    if (!isCompanionFrameRow(message)) {
+      kept.push(message);
+      continue;
+    }
+    const ack = kept.at(-1);
+    const isSyntheticAck = ack?.role === 'assistant'
+      && (ack.parts ?? []).every((part) => part?.kind === 'text' && (part.text ?? '').length <= 1);
+    if (isSyntheticAck) kept.pop();
+  }
+  return kept;
+};
 
 const managerLoopKeepsAuthority = (previousWire, nextWire) => {
   if (!sameProviderPlan(previousWire, nextWire)) return false;
   const systemOf = (wire) => (wire.messages ?? []).filter((message) => message?.role === 'system');
-  const usersOf = (wire) => (wire.messages ?? []).filter((message) => message?.role === 'user').map(withoutGuidanceMessage);
-  if (!isDeepStrictEqual(systemOf(withoutHostModelBanner(previousWire)), systemOf(withoutHostModelBanner(nextWire)))) {
-    return false;
-  }
-  if ((nextWire.messages ?? []).some((message) => message?.role !== 'system' && message?.role !== 'user')) {
-    return false;
-  }
-  const previousUsers = usersOf(previousWire);
-  const nextUsers = usersOf(nextWire);
-  if (nextUsers.length === 0 || previousUsers.length === 0) return false;
-  if (!isDeepStrictEqual(nextUsers[0], previousUsers[0])) return false;
-  let cursor = 0;
-  for (const message of previousUsers) {
-    if (cursor < nextUsers.length && isDeepStrictEqual(message, nextUsers[cursor])) cursor += 1;
-  }
-  return cursor === nextUsers.length;
+  const normalizedPrevious = withoutHostModelBanner(previousWire);
+  const normalizedNext = withoutHostModelBanner(nextWire);
+  if (!isDeepStrictEqual(systemOf(normalizedPrevious), systemOf(normalizedNext))) return false;
+
+  const messagesOf = (wire) => withoutCompanionFrames((wire.messages ?? []).map(withoutGuidanceMessage));
+  const previousMessages = messagesOf(normalizedPrevious);
+  const nextMessages = messagesOf(normalizedNext);
+  if (previousMessages.length === 0 || nextMessages.length < previousMessages.length) return false;
+
+  return previousMessages.every((message, index) => isDeepStrictEqual(message, nextMessages[index]));
 };
 
 /**

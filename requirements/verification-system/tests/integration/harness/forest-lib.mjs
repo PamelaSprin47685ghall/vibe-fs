@@ -272,13 +272,20 @@ export function deriveRequests(scenario) {
     if (entries.length === 0) return;
 
     const first = entries[0];
+    // A title request carries the Host's own marker as its first message and is not part
+    // of the chat conversation: it neither continues the previous chat nor seeds the one
+    // that follows it (the seal does not compare title requests at all).
+    const isTitle = first.kind === 'title';
     // Derived from the declaration, not from a counter shared with other scenarios, so the
     // same scenario always yields the same ids no matter which order the forest is walked.
-    // A cold-boundary turn continues the previous turn's session (see `hasBoundary`).
+    // A cold-boundary turn continues the previous turn's session (see `hasBoundary`); a
+    // `manager-loop` entry reuses its own session across deliveries, which is why its
+    // triple is declared once.
     const managerLoop = group.entries.some((entry) => boundaryAt(scenario, entry)?.kind === 'manager-loop');
-    const continued = !managerLoop && hasBoundary(scenario, group.entries) && previousSessionId !== null;
+    const continued =
+      !isTitle && !managerLoop && hasBoundary(scenario, group.entries) && previousSessionId !== null;
     const sessionId = continued ? previousSessionId : `ses_${String(groupIndex).padStart(2, '0')}_${first.turnId}`;
-    previousSessionId = sessionId;
+    if (!isTitle) previousSessionId = sessionId;
     if (first.lane !== undefined) bindings.push([first.lane, sessionId]);
 
     const text = declaredText(first.turn);
@@ -293,7 +300,7 @@ export function deriveRequests(scenario) {
     const tools = continued && previousTools !== null && !requestKindSwitch && !managerLoop
       ? previousTools
       : declaredTools;
-    previousTools = tools;
+    if (!isTitle) previousTools = tools;
 
     // The conversation this session accumulates. Growing it in place is what keeps every
     // chat request an append-only continuation of the previous one (ARCH-004). A
@@ -307,14 +314,16 @@ export function deriveRequests(scenario) {
     // rewrote the fixed parts. Title requests keep their marker shape (the seal does
     // not compare them).
     const model = 'forest-lib-model';
-    // A `manager-loop` iteration needs no synthetic shape: it restarts from its
-    // own declared authority text below, which the scenario author keeps
-    // byte-identical across iterations. Retired-iteration traffic stays in
-    // `previousMessages` and never enters the fresh request.
+    // A `manager-loop` entry's first delivery establishes the seal and later deliveries of
+    // the SAME entry append to it, so the group starts from its declared authority text.
+    // The successor iteration is production-composed (its entry is `internal`), so no
+    // caller request can derive it; retained-history retention is proved by the real e2e
+    // oracles and the projection unit tests, not here. Every other cold boundary replaces
+    // the prefix — that is its whole point.
     const messages =
       requestKindSwitch && previousMessages !== null
         ? [...previousMessages, user(text)]
-        : first.kind === 'title'
+        : isTitle
           ? [user(TITLE_MARKER), user(text)]
           : [systemMessage(model), user(text)];
 
@@ -326,18 +335,6 @@ export function deriveRequests(scenario) {
       while (derivedStep < entry.step) {
         messages.push(assistant(`derived sparse cursor ${derivedStep} of ${entry.turnId}`));
         derivedStep += 1;
-      }
-      if (managerLoop && entry === entries[0]) {
-        requests.push({
-          expectedEntryId: entry.id,
-          sessionId,
-          body: {
-            sessionID: sessionId,
-            model,
-            tools,
-            messages: [...messages, assistant('retired iteration'), user(text)],
-          },
-        });
       }
       for (let delivery = 0; delivery < deliveryCount(scenario, entry); delivery += 1) {
         requests.push({
@@ -354,7 +351,7 @@ export function deriveRequests(scenario) {
       messages.push(assistant(`declared step ${entry.step} of ${entry.turnId}`));
       derivedStep += 1;
     }
-    previousMessages = messages;
+    if (!isTitle) previousMessages = messages;
   });
 
   const misclassified = requests.filter(

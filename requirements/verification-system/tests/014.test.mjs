@@ -20,9 +20,9 @@
  *
  * G4R §2 / Exit: one continuous OpenCode lifetime — spawn count must be exactly 1.
  *
- * Real-host Magic Todo canaries A/E/G/H: a test-only wrapper plugin observes
- * the production membrane in the sole serve lifetime without changing its
- * definition, args, or result bytes.
+ * The Manager tool surface is proven on the wire the sole serve lifetime really sent:
+ * the session cognitive write entry `assume` is advertised, the Manager spine is
+ * present, and the retired `todowrite` ledger never appears.
  */
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -48,9 +48,9 @@ import {
   resetOpencodeSpawnCount,
 } from './e2e/support/process-host-utils.js'
 import {
-  assertManagerToolSurfaceCanariesAEGH,
+  assertManagerToolSurface,
   collectManagerProviderToolEvidence,
-} from './e2e/support/manager-tool-surface-canary-plugin.mjs'
+} from './e2e/support/manager-tool-surface-evidence.mjs'
 
 test('WHAT[verification-system-014] Long Stroke environment enforces single OpenCode process lifetime and static entry gate contract', () => {
   // VERIFICATION-SYSTEM-014 requires the Layer 4 Long Stroke environment to be driven
@@ -141,24 +141,12 @@ const awaitManagerJoinRunning = async (scenario, ctx) => {
   await scenario.events.awaitEvent(isRunningJoin, null)
 }
 
-const assertHostCanariesAEGH = async (scenario, ctx) => {
-  const dir = scenario.managerToolSurfaceCanaryDirectory
-  assert.ok(
-    dir,
-    'HOST_CANARY: scenario.managerToolSurfaceCanaryDirectory missing — setup.managerToolSurfaceCanary must be true',
-  )
+const assertManagerToolSurfaceOnWire = async (scenario, ctx) => {
   const managerProviderWire = collectManagerProviderToolEvidence(scenario, {
     childSessionId: ctx?.childId ?? null,
   })
-  const result = assertManagerToolSurfaceCanariesAEGH(dir, {
-    managerProviderWire,
-    xTraceParts: factPayloads(scenario.host.workDir, 'XTracePartAppended'),
-  })
-  assert.equal(result.ok, true, 'HOST_CANARY A/E/G/H must pass')
-  console.log(
-    `[host-canary] A/E/G/H ok session=${result.canaries.H.sessionID} call=${result.canaries.H.callID} ` +
-      `statusDuringAfter=${result.canaries.G.toolPartStatusDuringAfter}`,
-  )
+  const result = assertManagerToolSurface({ managerProviderWire })
+  console.log(`[manager-surface] ok tools=${result.unionTools.join(',')} requests=${result.requestCount}`)
 }
 
 releaseTest('WHAT[verification-system-014] Long Stroke 真实物理验收环境', async () => {
@@ -168,7 +156,7 @@ releaseTest('WHAT[verification-system-014] Long Stroke 真实物理验收环境'
     customs: {
       ...CUSTOMS,
       awaitManagerJoinRunning,
-      assertHostCanariesAEGH,
+      assertManagerToolSurfaceOnWire,
     },
   })
   assert.equal(code, 0, `Long Stroke canary exited with code ${code}`)

@@ -861,14 +861,8 @@ export async function runCanary(scriptName, { customs, preFlow } = {}) {
       extraEnv: doc.setup?.env || {},
       routingSource: doc.routingSource,
       acceptanceGate: doc.setup?.acceptanceGate,
-      // Opt-in Phase 0 real-host A/E/G/H wrapper (long-stroke only).
-      magicTodoHostCanary: doc.setup?.magicTodoHostCanary === true,
       watchdogLabel: doc.setup?.watchdogLabel || doc.name,
     });
-    if (doc.setup?.magicTodoHostCanary === true) {
-      ctx.magicTodoHostCanaryDirectory = scenario.magicTodoHostCanaryDirectory;
-    }
-
     const eventCeilings = normalizeEventCeilings(doc.setup ?? {});
     attachEventCeilings(scenario, eventCeilings);
 
