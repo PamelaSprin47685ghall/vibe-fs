@@ -15,8 +15,7 @@ module PhaseWindow =
     val validateK: k: int -> Result<unit, string>
 
     /// The committed phases the window still keeps raw, oldest first, bounded by `K`.
-    type PhaseCommitWindow =
-        { PhaseCallIds: ToolCallId list }
+    type PhaseCommitWindow = { PhaseCallIds: ToolCallId list }
 
     val emptyWindow: PhaseCommitWindow
 

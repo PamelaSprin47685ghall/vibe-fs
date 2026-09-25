@@ -108,6 +108,7 @@ module LlmFacing =
 
         let private ofJsNumber (value: obj) : Value =
             let num: float = unbox value
+
             if jsIsInteger value && abs num <= maxSafeInteger then
                 Value.Integer(int64 num)
             else

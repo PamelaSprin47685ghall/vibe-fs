@@ -1,14 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as office from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
-import { permissionObj } from '../../../dist/OpenCode/Tools/StaticTools.js'
+import { rolePermissionRules, reviewToolPermissions } from '../../../dist/OpenCode/Tools/ToolSurface.js'
 import { rolePredicate } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
-import { Role } from '../../../dist/Foundation/Roles.js'
-import {
-  ManagerCapabilityFacts,
-  OfficeCapability_isAllowedForManagerFacts as isAllowedForManagerFacts,
-  ToolPermission,
-} from '../../../dist/Foundation/OfficeCapability.js'
 import {
   acceptAuthorityRoot,
   openIncumbency,
@@ -16,10 +10,12 @@ import {
   withExecutablePlugin,
   withRestartablePlugin,
 } from '../../verification-system/tests/support/plugin-fixture.mjs'
-import { requiredPermissions } from '../../../dist/OpenCode/Tools/ManagerReviewTools.js'
 
 const MANAGER_REVIEW_TOOL = 'js-manager'
 const RETIRED_REVIEW_TOOLS = ['read-manager', 'glob-manager', 'grep-manager']
+const managerFacts = (hasActiveIncumbency, hasAssessment, hasValidCertificate, cleanupBlockerDigest) =>
+  office.managerFacts(hasActiveIncumbency, hasAssessment, hasValidCertificate, cleanupBlockerDigest)
+const isAllowedForManagerFacts = (facts, permission) => office.managerFactsAllowed(facts, permission)
 
 test('WHAT[capability-enforcement-025] P01_unaccepted_review_manager_static_permissions_include_read_glob_grep', () => {
   const perms = office.permissions('manager')
@@ -29,32 +25,32 @@ test('WHAT[capability-enforcement-025] P01_unaccepted_review_manager_static_perm
 })
 
 test('WHAT[capability-enforcement-025] P02_review_accepted_facts_exclude_review_readonly_capabilities', () => {
-  // 依据 dist/Foundation/OfficeCapability.js 构造已接纳评审事实（HasActiveIncumbency=true, HasAssessment=true）
-  const facts = new ManagerCapabilityFacts(true, true, false, undefined)
+  // OfficeCapabilitySurface 构造已接纳评审事实（HasActiveIncumbency=true, HasAssessment=true）
+  const facts = managerFacts(true, true, false, undefined)
 
   // 评审接纳后，只读能力 Read/Glob/Grep 均不被允许
-  assert.equal(isAllowedForManagerFacts(facts, ToolPermission.Read), false, 'Read must be denied after assessment accepted')
-  assert.equal(isAllowedForManagerFacts(facts, ToolPermission.Glob), false, 'Glob must be denied after assessment accepted')
-  assert.equal(isAllowedForManagerFacts(facts, ToolPermission.Grep), false, 'Grep must be denied after assessment accepted')
+  assert.equal(isAllowedForManagerFacts(facts, 'Read'), false, 'Read must be denied after assessment accepted')
+  assert.equal(isAllowedForManagerFacts(facts, 'Glob'), false, 'Glob must be denied after assessment accepted')
+  assert.equal(isAllowedForManagerFacts(facts, 'Grep'), false, 'Grep must be denied after assessment accepted')
 
   // 评审接纳后，Join/Fork 等管理与编排权限仍被允许
-  assert.equal(isAllowedForManagerFacts(facts, ToolPermission.Fork), true, 'Fork must remain allowed after assessment accepted')
-  assert.equal(isAllowedForManagerFacts(facts, ToolPermission.Resume), true, 'Resume must remain allowed after assessment accepted')
-  assert.equal(isAllowedForManagerFacts(facts, ToolPermission.Join), true, 'Join must remain allowed after assessment accepted')
-  assert.equal(isAllowedForManagerFacts(facts, ToolPermission.Horizon), true, 'Horizon must remain allowed after assessment accepted')
-  assert.equal(isAllowedForManagerFacts(facts, ToolPermission.Finality), true, 'Finality must remain allowed after assessment accepted')
-  assert.equal(isAllowedForManagerFacts(facts, ToolPermission.Sphinx), true, 'Sphinx must remain allowed after assessment accepted')
+  assert.equal(isAllowedForManagerFacts(facts, 'Fork'), true, 'Fork must remain allowed after assessment accepted')
+  assert.equal(isAllowedForManagerFacts(facts, 'Resume'), true, 'Resume must remain allowed after assessment accepted')
+  assert.equal(isAllowedForManagerFacts(facts, 'Join'), true, 'Join must remain allowed after assessment accepted')
+  assert.equal(isAllowedForManagerFacts(facts, 'Horizon'), true, 'Horizon must remain allowed after assessment accepted')
+  assert.equal(isAllowedForManagerFacts(facts, 'Finality'), true, 'Finality must remain allowed after assessment accepted')
+  assert.equal(isAllowedForManagerFacts(facts, 'Sphinx'), true, 'Sphinx must remain allowed after assessment accepted')
 })
 
 test('WHAT[capability-enforcement-025] P08_manager_native_read_glob_grep_projected_as_deny', () => {
-  const managerPerms = permissionObj(Role.Manager)
+  const managerPerms = rolePermissionRules('manager')
   assert.equal(managerPerms.read, 'deny', 'Native read must be projected as deny for Manager')
   assert.equal(managerPerms.glob, 'deny', 'Native glob must be projected as deny for Manager')
   assert.equal(managerPerms.grep, 'deny', 'Native grep must be projected as deny for Manager')
 })
 
 test('WHAT[capability-enforcement-025] P09_manager_allows_sole_review_tool_and_retired_tools_not_admitted_to_any_role', () => {
-  const managerPerms = permissionObj(Role.Manager)
+  const managerPerms = rolePermissionRules('manager')
   assert.equal(managerPerms['js-engineer'], 'deny', 'Manager must deny js-engineer')
   assert.equal(managerPerms['js-devops'], 'deny', 'Manager must deny js-devops')
   assert.equal(rolePredicate('js-engineer', 'manager'), false, 'Role predicate must deny js-engineer for Manager')
@@ -69,7 +65,7 @@ test('WHAT[capability-enforcement-025] P09_manager_allows_sole_review_tool_and_r
 })
 
 test('WHAT[capability-enforcement-025] P10_sole_review_tool_allowed_and_retired_tools_absent_from_manager_surface', () => {
-  const managerPerms = permissionObj(Role.Manager)
+  const managerPerms = rolePermissionRules('manager')
   assert.equal(managerPerms[MANAGER_REVIEW_TOOL], 'allow', 'Manager request projection must allow the sole review tool js-manager')
   for (const tool of RETIRED_REVIEW_TOOLS) {
     assert.equal(tool in managerPerms, false, `Retired tool ${tool} must no longer appear in the Manager tool surface`)
@@ -78,8 +74,8 @@ test('WHAT[capability-enforcement-025] P10_sole_review_tool_allowed_and_retired_
 
 test('WHAT[capability-enforcement-025] P05_no_active_incumbency_and_no_assessment_denies_review_readonly_admission', () => {
   // 无 active incumbency：当前事实收口为空集，js-manager 依赖的只读能力全部 fail closed
-  const noIncumbency = new ManagerCapabilityFacts(false, false, false, undefined)
-  for (const permission of [ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep]) {
+  const noIncumbency = managerFacts(false, false, false, undefined)
+  for (const permission of ['Read', 'Glob', 'Grep']) {
     assert.equal(
       isAllowedForManagerFacts(noIncumbency, permission),
       false,
@@ -135,40 +131,40 @@ test('WHAT[capability-enforcement-025] P07_valid_certificate_cleanup_blocker_or_
   const REVIEW_TOOLS = ['js-manager']
 
   // 1. 有效绑定证书状态（HasValidBoundCertificate = true）下：收窄为仅 Join/Finality，评审专用只读工具必须拒绝
-  const factsCert = new ManagerCapabilityFacts(true, false, true, undefined)
+  const factsCert = managerFacts(true, false, true, undefined)
   for (const tool of REVIEW_TOOLS) {
-    const perms = requiredPermissions(tool)
+    const perms = reviewToolPermissions(tool)
     for (const p of perms) {
       assert.equal(
         isAllowedForManagerFacts(factsCert, p),
         false,
-        `${tool} permission ${p.cases ? p.cases()[p.tag] : p} must be denied under valid certificate`,
+        `${tool} permission ${p} must be denied under valid certificate`,
       )
     }
   }
 
   // 2. 清理阻塞状态（CleanupBlockerDigest 有值）下：收窄为仅 Join/Finality，评审专用只读工具必须拒绝
-  const factsCleanup = new ManagerCapabilityFacts(true, false, false, 'blocker-digest-xyz')
+  const factsCleanup = managerFacts(true, false, false, 'blocker-digest-xyz')
   for (const tool of REVIEW_TOOLS) {
-    const perms = requiredPermissions(tool)
+    const perms = reviewToolPermissions(tool)
     for (const p of perms) {
       assert.equal(
         isAllowedForManagerFacts(factsCleanup, p),
         false,
-        `${tool} permission ${p.cases ? p.cases()[p.tag] : p} must be denied under cleanup blocker`,
+        `${tool} permission ${p} must be denied under cleanup blocker`,
       )
     }
   }
 
   // 3. 退任冻结与非活跃状态：无活跃任期（HasActiveIncumbency = false）评审专用工具收口拒绝
-  const factsFrozenOrInactive = new ManagerCapabilityFacts(false, false, false, undefined)
+  const factsFrozenOrInactive = managerFacts(false, false, false, undefined)
   for (const tool of REVIEW_TOOLS) {
-    const perms = requiredPermissions(tool)
+    const perms = reviewToolPermissions(tool)
     for (const p of perms) {
       assert.equal(
         isAllowedForManagerFacts(factsFrozenOrInactive, p),
         false,
-        `${tool} permission ${p.cases ? p.cases()[p.tag] : p} must be denied when incumbency is not active`,
+        `${tool} permission ${p} must be denied when incumbency is not active`,
       )
     }
   }
@@ -230,19 +226,19 @@ test('WHAT[capability-enforcement-025] P11_session_restart_and_compaction_evalua
 test('WHAT[capability-enforcement-025] P12_distinct_incumbencies_do_not_leak_authorization_or_misattribute_assessment', async () => {
   // 两个不同任期状态的 facts 独立评估：
   // 任期 1：活跃但已接纳评审
-  const incumbency1Facts = new ManagerCapabilityFacts(true, true, false, undefined)
+  const incumbency1Facts = managerFacts(true, true, false, undefined)
   // 任期 2：合法新任期，活跃且未接纳评审
-  const incumbency2Facts = new ManagerCapabilityFacts(true, false, false, undefined)
+  const incumbency2Facts = managerFacts(true, false, false, undefined)
 
   // 任期 1 专用只读能力被封禁
-  assert.equal(isAllowedForManagerFacts(incumbency1Facts, ToolPermission.Read), false)
-  assert.equal(isAllowedForManagerFacts(incumbency1Facts, ToolPermission.Glob), false)
-  assert.equal(isAllowedForManagerFacts(incumbency1Facts, ToolPermission.Grep), false)
+  assert.equal(isAllowedForManagerFacts(incumbency1Facts, 'Read'), false)
+  assert.equal(isAllowedForManagerFacts(incumbency1Facts, 'Glob'), false)
+  assert.equal(isAllowedForManagerFacts(incumbency1Facts, 'Grep'), false)
 
   // 任期 2（新任期）不继承任期 1 的已评审限制，专用只读能力正常开启
-  assert.equal(isAllowedForManagerFacts(incumbency2Facts, ToolPermission.Read), true)
-  assert.equal(isAllowedForManagerFacts(incumbency2Facts, ToolPermission.Glob), true)
-  assert.equal(isAllowedForManagerFacts(incumbency2Facts, ToolPermission.Grep), true)
+  assert.equal(isAllowedForManagerFacts(incumbency2Facts, 'Read'), true)
+  assert.equal(isAllowedForManagerFacts(incumbency2Facts, 'Glob'), true)
+  assert.equal(isAllowedForManagerFacts(incumbency2Facts, 'Grep'), true)
 
   // 两个任期的调用授权互不借用，也不把旧 assessment 错封新任期
 })

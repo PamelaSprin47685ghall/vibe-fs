@@ -269,17 +269,19 @@ module JsToolWorkflow =
                         Set.contains JsCapability.Edit capabilities
                         || Set.contains JsCapability.Write capabilities
 
+                    let commitIfNotEmpty () =
+                        if List.isEmpty mutations then
+                            Task.FromResult(Ok(value, [], []))
+                        else
+                            commitMutations root snapshots mutations value persistence
+
                     if not hasMutationCapability && not (List.isEmpty mutations) then
                         return! Error JsFailure.ReadOnlyMutationRejected
                     else
                         do! preflight root snapshots mutations
                         do! observeFileAccess fileAccessObservation readPaths effectPaths
                         do! preflight root snapshots mutations
-
-                        if List.isEmpty mutations then
-                            return value, [], []
-                        else
-                            return! commitMutations root snapshots mutations value persistence
+                        return! commitIfNotEmpty ()
                 }
 
             match outcome with
@@ -297,7 +299,16 @@ module JsToolWorkflow =
         (outputBoundBytes: int)
         (persistence: IJsTransactionPersistence option)
         : Task<JsToolOutcome> =
-        runCore capabilities root baseClassSource modelSource deadlineMs deadlineEpochMs outputBoundBytes persistence None
+        runCore
+            capabilities
+            root
+            baseClassSource
+            modelSource
+            deadlineMs
+            deadlineEpochMs
+            outputBoundBytes
+            persistence
+            None
 
     let runWithFileAccessObservation
         (capabilities: Set<JsCapability>)

@@ -30,6 +30,7 @@ export function integrationNodeTestSteps(root) {
         path.join(root, 'requirements/durable-convergence/tests/009.test.mjs'),
         path.join(root, 'requirements/durable-events/tests/003.test.mjs'),
         path.join(root, 'requirements/durable-events/tests/009.test.mjs'),
+        path.join(root, 'requirements/host-boundary/tests/032.test.mjs'),
         path.join(root, 'requirements/managed-chat-execution/tests/009.test.mjs'),
         path.join(root, 'requirements/repository-programming/tests/020.test.mjs'),
         path.join(root, 'requirements/speculative-investigation/tests/008.test.mjs'),

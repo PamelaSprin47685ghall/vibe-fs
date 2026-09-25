@@ -217,7 +217,9 @@ module XWire =
         let xTrace = state.XTrace |> Option.defaultValue XTraceProjection.empty
 
         match
-            PhaseWindow.desiredCutoffOf (fun callId -> XTraceProjection.tryTurnOfToolCallId callId xTrace) state.PhaseCommits
+            PhaseWindow.desiredCutoffOf
+                (fun callId -> XTraceProjection.tryTurnOfToolCallId callId xTrace)
+                state.PhaseCommits
         with
         | PhaseWindowDecision.KeepFrom cutoffExclusive -> Some cutoffExclusive
         | PhaseWindowDecision.NoPhases -> None
@@ -242,10 +244,15 @@ module XWire =
             // once summarised and once raw. The subset therefore defines the cutoff, not
             // the other way round.
             let frames =
-                BlogProjection.framesThroughCutoff (PrefixProbeSelection.limit window coverableCutoff requestCutoff) blog
+                BlogProjection.framesThroughCutoff
+                    (PrefixProbeSelection.limit window coverableCutoff requestCutoff)
+                    blog
 
             let materialCutoff =
-                frames |> List.map (fun frame -> frame.CutoffExclusive) |> List.tryLast |> Option.defaultValue 0
+                frames
+                |> List.map (fun frame -> frame.CutoffExclusive)
+                |> List.tryLast
+                |> Option.defaultValue 0
 
             if materialCutoff <= 0 then
                 return Error NoCandidateReason.NoCoverage
@@ -634,7 +641,8 @@ module XWire =
                     memoryPreamble
                     frozenRecordPrefixBody
 
-            let horizon = presentationHorizonForProbe (Option.isSome (AttemptPlanner.pendingProbeOf plan))
+            let horizon =
+                presentationHorizonForProbe (Option.isSome (AttemptPlanner.pendingProbeOf plan))
 
             let transformed = renderPrefixMessages state rawMessages prefixIntent horizon
 
@@ -663,7 +671,8 @@ module XWire =
                 true
                 (fun () -> Ok probe)
 
-        requireAdmittedPendingPlan attempts sessionId physicalId pendingPlan |> Task.FromResult
+        requireAdmittedPendingPlan attempts sessionId physicalId pendingPlan
+        |> Task.FromResult
 
     /// The window spoke and the attempt may fold: freeze the probe into the plan, or
     /// project the committed prefix when no probe could be built.
@@ -682,8 +691,7 @@ module XWire =
         task {
             match candidateResult, origin with
             | Ok probe, Some accepted ->
-                let! admitted =
-                    admitPhaseBoundaryPlan attempts sessionId physicalId authority state accepted probe
+                let! admitted = admitPhaseBoundaryPlan attempts sessionId physicalId authority state accepted probe
 
                 do! renderAdmittedPlan port sessionId state rawMessages admitted output
                 return presentationHorizonForProbe true

@@ -173,38 +173,43 @@ module AssumeSnapshot =
     /// names an unknown status or priority, is a refusal. The alternative — an empty
     /// canvas — would silently discard a durable commit and let the next write
     /// overwrite history the next boot would still recover.
+    let private parseTodos (root: obj) : Result<TodoRow list, string> =
+        let rows =
+            if hasField root "todos" && not (isNull root?todos) then
+                unbox<obj array> root?todos |> Array.toList |> List.map rowOfJson
+            else
+                []
+
+        rows
+        |> List.fold
+            (fun collected row ->
+                match collected, row with
+                | Error reason, _ -> Error reason
+                | Ok _, Error reason -> Error reason
+                | Ok rows, Ok row -> Ok(row :: rows))
+            (Ok [])
+        |> Result.map List.rev
+
+    let private snapshotWithTodos (root: obj) (todos: TodoRow list) : AssumeSnapshot =
+        let version =
+            if hasField root "canvasEncodingVersion" then
+                string root?canvasEncodingVersion
+            else
+                CanvasEncodingVersion
+
+        { CanvasEncodingVersion = version
+          CanvasJson = CanvasCodec.toJson root?canvas
+          Todos = todos }
+
+    let private buildSnapshot (root: obj) : Result<AssumeSnapshot, string> =
+        if not (hasField root "canvas") then
+            Error "committed snapshot has no canvas field"
+        else
+            parseTodos root |> Result.map (snapshotWithTodos root)
+
     let tryParseJson (text: string) : Result<AssumeSnapshot, string> =
         try
             let root = jsonParse text
-
-            if not (hasField root "canvas") then
-                Error "committed snapshot has no canvas field"
-            else
-                let rows =
-                    if hasField root "todos" && not (isNull root?todos) then
-                        unbox<obj array> root?todos |> Array.toList |> List.map rowOfJson
-                    else
-                        []
-
-                match
-                    rows
-                    |> List.fold
-                        (fun collected row ->
-                            match collected, row with
-                            | Error reason, _ -> Error reason
-                            | Ok _, Error reason -> Error reason
-                            | Ok rows, Ok row -> Ok(row :: rows))
-                        (Ok [])
-                with
-                | Error reason -> Error reason
-                | Ok rows ->
-                    Ok
-                        { CanvasEncodingVersion =
-                            if hasField root "canvasEncodingVersion" then
-                                string root?canvasEncodingVersion
-                            else
-                                CanvasEncodingVersion
-                          CanvasJson = CanvasCodec.toJson root?canvas
-                          Todos = List.rev rows }
+            buildSnapshot root
         with error ->
             Error(sprintf "committed snapshot is not parsable: %s" (string error))

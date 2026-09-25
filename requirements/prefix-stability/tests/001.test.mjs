@@ -535,3 +535,337 @@ test('WHAT[prefix-stability-001] compiled XWireSurface reconciles completion and
   )
 })
 }
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const canonicalJson = await import("../../../dist/OpenCode/Codec/CanonicalJsonSurface.js");
+const language = await import("../../../dist/Participant/Provider/LanguageSurface.js");
+const providerProjection = await import("../../../dist/Participant/Provider/Projection/Surface.js");
+const strength = await import("../../../dist/Strength/Surface.js");
+const relay = await import("../../../dist/Mission/Relay/Surface.js");
+const assessment = await import("../../../dist/Mission/Relay/Assessment/Surface.js");
+const tools = await import("../../../dist/OpenCode/Tools/ToolSurface.js");
+const pluginHooks = await import("../../../dist/OpenCode/Host/PluginHooksSurface.js");
+const { installDefaultResources } = await import("../../../dist/OpenCode/Host/ManagedAgentConfigSurface.js");
+
+installDefaultResources()
+
+const REVIEW_TOOLS = ['js-manager']
+const CONTRACT_TOKEN = 'do-not-use-except-for-review'
+
+const createRawManagerTools = () => [
+  {
+    name: 'fork',
+    description: 'Delegate an independent assignment to an Engineer.',
+    parameters: {
+      type: 'object',
+      properties: {
+        calling: { type: 'string', enum: ['engineer'] },
+        name: { type: 'string' },
+        charge: { type: 'string' },
+        keywords: { type: 'string' },
+        attach: { type: 'string' },
+        expected_tool_calls: { type: 'integer' },
+      },
+      required: ['calling', 'name', 'charge'],
+    },
+  },
+  {
+    name: 'resume',
+    description: 'Continue working on an existing route or companion devops.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        charge: { type: 'string' },
+        keywords: { type: 'string' },
+        attach: { type: 'string' },
+        expected_tool_calls: { type: 'integer' },
+      },
+      required: ['name', 'charge'],
+    },
+  },
+  {
+    name: 'join',
+    description: 'Await completion of running delegated units.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'horizon',
+    description: 'Pull snapshot view of current delegation horizon and status.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'review',
+    description: 'Submit an independent 8-dimension review of workspace and artifacts.',
+    parameters: JSON.parse(assessment.schemaJson),
+  },
+  {
+    name: 'js-manager',
+    description: 'Run programmatic read-only exploration script using Read/Glob/Grep methods.',
+    parameters: {
+      type: 'object',
+      properties: {
+        program: { type: 'string', description: 'JavaScript code extending JsProgram' },
+      },
+      required: ['program'],
+    },
+  },
+  {
+    name: 'assume',
+    description: 'Cognitive workspace update and todo declaration.',
+    parameters: {
+      type: 'object',
+      properties: {
+        update: { type: 'string' },
+        todos: { type: 'array' },
+      },
+      required: ['update', 'todos'],
+    },
+  },
+  {
+    name: 'suicide',
+    description: 'Retire current manager run cleanly once obligations are fulfilled.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+]
+
+// 评审专用工具的 contract 装饰由 host owner 面提供（HOST-BOUNDARY-032）。
+const buildDecoratedManagerTools = () => {
+  const managerTools = createRawManagerTools()
+  for (const tool of managerTools) {
+    if (tools.isReviewTool(tool.name)) {
+      pluginHooks.decorateReviewToolDefinition(tool.name, tool)
+    }
+  }
+  return managerTools
+}
+
+const wire = (
+  messages,
+  {
+    tools: wireTools,
+    system,
+    providerId = 'manager-test-provider',
+    modelId = 'manager-model-v1',
+    variant = 'deep',
+  } = {},
+) => ({
+  modelId,
+  messages,
+  providerId,
+  system,
+  tools: wireTools,
+  variant,
+})
+
+test('WHAT[prefix-stability-001] manager_life_review_acceptance_provider_wire_is_append_only_prefix_and_tools_identical', () => {
+  const roadId = 'road-life-001'
+  const incId = 'inc-life-001'
+  const snapshotId = 'snap-life-001'
+  const authorityRev = 'auth-life-001'
+
+  // 1. Initial State: Manager Life begins in AuditPending phase
+  const opened = relay.openIncumbency(relay.empty(), roadId, incId, snapshotId, authorityRev)
+  assert.equal(opened.ok, true)
+  const initialView = relay.view(opened.state, roadId)
+  assert.equal(initialView.phase, 'AuditPending', 'initial Manager phase must be AuditPending')
+
+  // 资源文档经 provider-language owner 面读取
+  const assessPromptDoc = language.readText('zh-CN', 'runtime/manager-assess')
+  const workPromptDoc = language.readText('zh-CN', 'runtime/manager-work')
+
+  // Manager system prompt remains stable across the life
+  const managerSystemPrompt = strength.systemPromptForRole('Manager')
+
+  // Tools definition: identical tool set with contract-decorated schemas for review tools
+  const toolsBefore = buildDecoratedManagerTools()
+  const toolsAfter = buildDecoratedManagerTools()
+
+  assert.equal(toolsBefore.length, toolsAfter.length, 'tools count must be identical before and after review')
+  for (let i = 0; i < toolsBefore.length; i += 1) {
+    const b = toolsBefore[i]
+    const a = toolsAfter[i]
+    assert.equal(b.name, a.name, `tool name at index ${i} must match`)
+    assert.equal(
+      canonicalJson.canonicalJson(b),
+      canonicalJson.canonicalJson(a),
+      `tool '${b.name}' must be canonically identical in serialization`,
+    )
+  }
+
+  for (const reviewToolName of REVIEW_TOOLS) {
+    const tool = toolsBefore.find((candidate) => candidate.name === reviewToolName)
+    assert.ok(tool, `review tool '${reviewToolName}' must exist in Manager tools`)
+    assert.ok(
+      tool.parameters.properties?.contract,
+      `Tool ${reviewToolName} must be decorated with contract parameter`,
+    )
+    assert.equal(tool.parameters.properties.contract.type, 'string')
+    assert.deepEqual(tool.parameters.properties.contract.enum, [CONTRACT_TOKEN])
+    assert.ok(
+      tool.parameters.required.includes('contract'),
+      `Tool ${reviewToolName} must mark contract as required`,
+    )
+  }
+
+  // 2. Provider Attempt 1 (Before Review):
+  const initialUserMessage = {
+    id: 'msg-01',
+    role: 'user',
+    parts: [
+      { kind: 'text', text: 'AUTHORITY ASSIGNMENT: Implement feature X and verify requirements.' },
+      { kind: 'text', text: assessPromptDoc },
+    ],
+  }
+
+  const attemptBefore = wire([initialUserMessage], {
+    tools: toolsBefore.map((tool) => canonicalJson.canonicalJson(tool)),
+    system: [managerSystemPrompt],
+  })
+
+  // 3. State Transition: Manager completes independent assessment and submits Review
+  const assessed = relay.assess(
+    opened.state,
+    roadId,
+    incId,
+    'assess-life-001',
+    snapshotId,
+    authorityRev,
+    'REVISE', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT', 'PERFECT',
+  )
+  assert.equal(assessed.ok, true)
+  const assessedView = relay.view(assessed.state, roadId)
+  assert.equal(assessedView.phase, 'WorkOwned', 'assessed phase with REVISE must transition to WorkOwned')
+
+  const reviewAssistantMessage = {
+    id: 'msg-02',
+    role: 'assistant',
+    parts: [
+      {
+        kind: 'tool-call',
+        callId: 'call-review-01',
+        name: 'review',
+        args: JSON.stringify({
+          language_algorithms: 'REVISE',
+          simplicity: 'PERFECT',
+          structure: 'PERFECT',
+          granularity: 'PERFECT',
+          tests_evidence: 'PERFECT',
+          logic_reliability_boundaries: 'PERFECT',
+          caller_ergonomics: 'PERFECT',
+          completeness: 'PERFECT',
+          note: 'Need to address algorithmic defect.',
+        }),
+      },
+    ],
+  }
+
+  const reviewResultMessage = {
+    id: 'msg-03',
+    role: 'tool',
+    parts: [
+      {
+        kind: 'tool-result',
+        callId: 'call-review-01',
+        result: 'recorded = true\n\n[instructions]\ninstruction = "runtime/manager-work"',
+      },
+    ],
+  }
+
+  const repairWorkInstructionMessage = {
+    id: 'msg-04',
+    role: 'user',
+    parts: [
+      { kind: 'text', text: workPromptDoc },
+    ],
+  }
+
+  // 4. Provider Attempt 2 (After Review): history is strictly preserved; new turns are appended
+  const attemptAfter = wire(
+    [
+      initialUserMessage,
+      reviewAssistantMessage,
+      reviewResultMessage,
+      repairWorkInstructionMessage,
+    ],
+    {
+      tools: toolsAfter.map((tool) => canonicalJson.canonicalJson(tool)),
+      system: [managerSystemPrompt],
+    },
+  )
+
+  assert.equal(
+    providerProjection.isAppendOnlyPrefix(attemptBefore, attemptAfter),
+    true,
+    'attemptBefore must be an authoritative append-only prefix of attemptAfter across Review acceptance',
+  )
+
+  // Fail-Closed Negative Counterexamples
+  assert.equal(
+    providerProjection.isAppendOnlyPrefix(attemptAfter, attemptBefore),
+    false,
+    'reverse order must not satisfy append-only prefix law',
+  )
+
+  const mutatedHistory = wire(
+    [
+      {
+        id: 'msg-01',
+        role: 'user',
+        parts: [
+          { kind: 'text', text: 'MUTATED HISTORICAL ASSIGNMENT' },
+          { kind: 'text', text: assessPromptDoc },
+        ],
+      },
+      reviewAssistantMessage,
+      reviewResultMessage,
+      repairWorkInstructionMessage,
+    ],
+    {
+      tools: toolsAfter.map((tool) => canonicalJson.canonicalJson(tool)),
+      system: [managerSystemPrompt],
+    },
+  )
+  assert.equal(
+    providerProjection.isAppendOnlyPrefix(attemptBefore, mutatedHistory),
+    false,
+    'modifying historical bytes in attempt 2 must break append-only prefix law',
+  )
+
+  const driftedToolsAttempt = wire(
+    attemptAfter.messages,
+    {
+      tools: toolsAfter.slice(1).map((tool) => canonicalJson.canonicalJson(tool)),
+      system: [managerSystemPrompt],
+    },
+  )
+  assert.equal(
+    providerProjection.isAppendOnlyPrefix(attemptBefore, driftedToolsAttempt),
+    false,
+    'tools set drift across review must break prefix law even if messages prefix',
+  )
+
+  const alteredContractTools = buildDecoratedManagerTools()
+  const readTool = alteredContractTools.find((tool) => tool.name === 'js-manager')
+  readTool.parameters.properties.contract.enum = ['altered-contract-enum']
+  assert.notEqual(
+    canonicalJson.canonicalJson(toolsBefore.find((tool) => tool.name === 'js-manager')),
+    canonicalJson.canonicalJson(readTool),
+    'altering contract decoration enum must change canonical JSON',
+  )
+})
+}

@@ -190,7 +190,7 @@ test('WHAT[capability-enforcement-026] D05_case_variation_and_unbound_identity_c
       'stranger-operator',
       'UNBOUND-ATTEMPT',
     )
-    assert.match(unbound, /没有以该 name|不为人知|unknown|person-unknown/i)
+    assert.match(unbound, /没有以该 name|不为人知|unknown|person-unknown|No continuing person is known by that name/i)
   } finally {
     forkTool.disposeRuntime(runtime)
   }

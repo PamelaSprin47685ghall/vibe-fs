@@ -104,7 +104,13 @@ test('WHAT[verification-system-003] Long Stroke keeps one Manager loop and two e
   );
 
   const loopTools = ['fork', 'resume', 'join', 'horizon', 'review', 'suicide'];
-  const managerTools = ['fork', 'resume', 'join', 'horizon', 'todowrite', 'suicide'];
+  // The Manager provider surface: the session cognitive tool is `assume`
+  // (update + todos); the retired `todowrite` is not advertised to any agent.
+  const managerTools = [
+    'abandon', 'assume', 'celebrate', 'defer', 'enough',
+    'fork', 'horizon', 'join', 'js-manager', 'publish', 'regret', 'resume',
+    'review', 'skill', 'subscribe', 'suicide',
+  ];
   const request = (turn, step) => ({
     messages: [
       { role: 'user', content: turn },
@@ -123,10 +129,10 @@ test('WHAT[verification-system-003] Long Stroke keeps one Manager loop and two e
   const assessUser =
     '# You are the 2 Manager taking over this mission. A predecessor may already have done\n' +
     '# part of the work, or may already have finished it; investigate the actual workspace before you\n' +
-    '# act on either assumption. The shared workspace is the current execution state: check it directly\n' +
+    "# act on either assumption. The predecessor's work is the object you must assess; the shared workspace is the actual state it left behind: check it directly\n" +
     '# rather than trusting any inherited claim.\n' +
     '#\n' +
-    '# Entrust read-only Engineer work to establish facts about the current deliverable';
+    "# During assessment, you may directly use the review-only read tool js-manager, or entrust read-only work to Engineer to establish facts about the predecessor's work";
   const loopRequest = (turn, step) => ({
     messages: [
       { role: 'user', content: turn },

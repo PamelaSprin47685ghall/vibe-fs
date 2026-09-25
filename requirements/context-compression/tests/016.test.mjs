@@ -393,7 +393,7 @@ test('WHAT[context-compression-016] journal_materialization_fails_closed_on_corr
   }
 
   const frames = [
-    { kind: 'Entry', ref: 'blobs/corrupted-frame', digest: 'bad-digest', coveredFrom: 0, coveredThrough: 1 },
+    { kind: 'Entry', ref: 'blobs/corrupted-frame', digest: 'bad-digest', coveredFrom: 0, coveredThrough: 1, cutoff: 1 },
   ]
 
   const res = await xwire.candidateFromJournal({

@@ -8,12 +8,7 @@ module ManagerReviewTools =
 
     let requiredPermissions (toolName: string) : Set<ToolPermission> option =
         match toolName with
-        | "js-manager" ->
-            Some
-                (set
-                    [ ToolPermission.Read
-                      ToolPermission.Glob
-                      ToolPermission.Grep ])
+        | "js-manager" -> Some(set [ ToolPermission.Read; ToolPermission.Glob; ToolPermission.Grep ])
         | _ -> None
 
     let isReviewTool (toolName: string) : bool =

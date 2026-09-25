@@ -4,15 +4,10 @@ import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync, mkdirSync
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { rolePredicate, capabilityToolNames } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
-import { generateRole } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
+import { generateRole, permissionLabels } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
 import { allRoleLabels } from '../../../dist/Foundation/RolesSurface.js'
-import { createApi } from '../../../dist/Repository/Programming/Js/ToolsBindings.js'
-import { JsCapability } from '../../../dist/Repository/Programming/Js/Capability.js'
+import * as runtime from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 import { run, runObserved, caseName, failureCode, failureReason, rewritten, created, render } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
-import { JsToolWorkflow_run } from '../../../dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js'
-import { JsStagedMutation } from '../../../dist/Repository/Programming/Js/Transaction.js'
-import { ofSeq } from '../../../dist/fable_modules/fable-library-js.5.13.0/Set.js'
-import { compare } from '../../../dist/fable_modules/fable-library-js.5.13.0/Util.js'
 import {
   LEGACY_FORBIDDEN_NAMES,
   extractKnownToolNames,
@@ -20,9 +15,9 @@ import {
   scanRepo,
 } from '../../../scripts/checks/tool-referential-integrity.mjs'
 
-const jsCapSet = (caps) => ofSeq(caps, { Compare: (x, y) => (compare(x, y) | 0) })
-const managerJsCaps = jsCapSet([JsCapability.Read, JsCapability.Glob, JsCapability.Grep])
-const engineerJsCaps = jsCapSet([JsCapability.Read, JsCapability.Write, JsCapability.Edit, JsCapability.Glob, JsCapability.Grep])
+// 运行时绑定由 owner 面构造：生成器给出角色的权限 label，RuntimeSurface 按 label
+// 组装 api.js 成员，测试从不手写 capability 集合或 Fable Set。
+const roleApi = (role, dir) => runtime.api(runtime.createApiFor(dir, permissionLabels(role)))
 
 const LEGACY_VERDICT = `
 module VerdictTool =
@@ -92,9 +87,7 @@ test('WHAT[capability-enforcement-008] J01_manager_generated_surface_strictly_re
 test('WHAT[capability-enforcement-008] J02_manager_create_api_omits_mutation_methods', () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-j02-'))
   try {
-    const staging = []
-    const readSnapshots = []
-    const binding = createApi(managerJsCaps, dir, staging, readSnapshots)
+    const binding = roleApi('manager', dir)
 
     // 已授予只读成员正常暴露
     assert.equal(typeof binding.js.read, 'function', 'read must be constructed')
@@ -149,24 +142,21 @@ test('WHAT[capability-enforcement-008] J04_read_only_mutation_rejected_before_pr
     const targetFile = join(dir, 'file.txt')
     writeFileSync(targetFile, 'original', 'utf8')
 
-    const surface = generateRole('manager', 'en')
-    const outcome = await JsToolWorkflow_run(
-      managerJsCaps,
+    // 只读角色的真实 workflow 执行：既无 Edit 也无 Write，运行成功且零改写零创建
+    const outcome = await run(
       dir,
-      surface.baseClassSource,
+      'manager',
+      'en',
       `class Js extends JsProgram { async run() { return { ok: true }; } }`,
       2000,
       Date.now() + 60_000,
       1 << 20,
       null,
     )
-    assert.equal(outcome.tag, 0, 'Clean read-only execution succeeds with tag 0')
-
-    // 边界不变量验证：
-    // ToolWorkflow 提交前不变量：无 Edit/Write 权限且 mutations 非空时，必须返回 ReadOnlyMutationRejected
-    const staging = [new JsStagedMutation(0, ['file.txt', 'original', 'tampered'])]
-    const hasMutationCapability = false // manager capabilities {Read, Glob, Grep} 既无 Edit 亦无 Write
-    assert.equal(!hasMutationCapability && staging.length > 0, true, 'Pre-commit invariant detects mutation under read-only mode')
+    assert.equal(caseName(outcome), 'Succeeded', 'clean read-only execution succeeds')
+    assert.deepEqual(rewritten(outcome), [], 'read-only workflow rewrites nothing')
+    assert.deepEqual(created(outcome), [], 'read-only workflow creates nothing')
+    assert.equal(readFileSync(targetFile, 'utf8'), 'original', 'target file stays untouched')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -182,9 +172,7 @@ test('WHAT[capability-enforcement-008] J05_engineer_and_devops_retain_write_and_
 
   const dir = mkdtempSync(join(tmpdir(), 'wxs-j05-'))
   try {
-    const staging = []
-    const readSnapshots = []
-    const engApi = createApi(engineerJsCaps, dir, staging, readSnapshots)
+    const engApi = roleApi('engineer', dir)
     assert.equal(typeof engApi.js.edit, 'function', 'Engineer must retain edit api')
     assert.equal(typeof engApi.js.write, 'function', 'Engineer must retain write api')
   } finally {
@@ -210,9 +198,7 @@ test('WHAT[capability-enforcement-008] J07_string_literals_and_paths_with_quotes
   try {
     const specialName = 'file "quoted" and \'single\'.txt'
     writeFileSync(join(dir, specialName), 'special content', 'utf8')
-    const staging = []
-    const readSnapshots = []
-    const api = createApi(managerJsCaps, dir, staging, readSnapshots)
+    const api = roleApi('manager', dir)
 
     // filePath 含引号不改变纯数据解析意图
     const res = api.js.read(specialName)
@@ -244,9 +230,7 @@ test('WHAT[capability-enforcement-008] J08_path_resolution_enforces_workspace_ro
     const secretOutsideFile = join(outsideDir, 'secret.txt')
     writeFileSync(secretOutsideFile, 'super-secret-outside-content', 'utf8')
 
-    const staging = []
-    const readSnapshots = []
-    const api = createApi(managerJsCaps, dir, staging, readSnapshots)
+    const api = roleApi('manager', dir)
 
     // 1. 根目录内子路径与相对路径正常放行
     const insideRes = api.js.read('sub/foo.txt')
@@ -289,9 +273,7 @@ test('WHAT[capability-enforcement-008] J09_utf8_crlf_chinese_and_anchor_slice_co
     writeFileSync(join(dir, 'chinese.txt'), '你好，世界！万象树架构。', 'utf8')
     writeFileSync(join(dir, 'noeol.txt'), 'first\nsecond', 'utf8')
 
-    const staging = []
-    const readSnapshots = []
-    const api = createApi(managerJsCaps, dir, staging, readSnapshots)
+    const api = roleApi('manager', dir)
 
     // 空文件
     assert.equal(api.js.read('empty.txt').text, '')
@@ -315,9 +297,7 @@ test('WHAT[capability-enforcement-008] J10_missing_file_invalid_regex_and_output
   try {
     writeFileSync(join(dir, 'sample.txt'), 'literal [unclosed-bracket and regex text', 'utf8')
 
-    const staging = []
-    const readSnapshots = []
-    const api = createApi(managerJsCaps, dir, staging, readSnapshots)
+    const api = roleApi('manager', dir)
 
     // 1. 缺失文件明确返回 FILE_NOT_FOUND
     const miss = api.js.read('nonexistent.txt')

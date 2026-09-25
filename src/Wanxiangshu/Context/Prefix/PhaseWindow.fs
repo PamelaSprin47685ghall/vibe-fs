@@ -38,8 +38,7 @@ module PhaseWindow =
         else
             Ok()
 
-    type PhaseCommitWindow =
-        { PhaseCallIds: ToolCallId list }
+    type PhaseCommitWindow = { PhaseCallIds: ToolCallId list }
 
     let emptyWindow: PhaseCommitWindow = { PhaseCallIds = [] }
 

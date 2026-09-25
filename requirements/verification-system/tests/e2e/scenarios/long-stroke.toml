@@ -140,8 +140,9 @@ flow = [
   # Iteration #1 starts read-only. One low dimension atomically assigns work,
   # then the current iteration can fork → join; join stays in flight while child held.
   # Host evidence (StaticTools.knownToolNames + Manager permission matrix) does not
-  # advertise builtin todowrite on Manager provider tools — requiring tools=["todowrite"]
-  # here fails toolsGate. A/E/G/H assert uses wire evidence.
+  # advertise a builtin todowrite; the session cognitive tool is `assume` (update +
+  # todos), so requiring tools=["todowrite"] here fails toolsGate. A/E/G/H assert
+  # uses wire evidence.
   # All Manager prompts MUST use session="child" (bindChild); default session is Orchestrator.
   # The initial HumanRoot prompt and every owner-opened incarnation reuse the same
   # authority-first manager-loop entry; the binder varies review results by durable attempt.
@@ -169,7 +170,7 @@ flow = [
   { waitFact = { name = "HandleCompleted", gte = 1 }, timeoutMs = 60000 },
 
   # Bounded current-action cursors are verified by durable retirement and the
-  # Host todowrite canary rather than one incidental transport step number.
+  # Host cognitive-tool canary (assume) rather than one incidental transport step number.
   # HumanRoot preflow baseline: +2 RetirementCommitted(Continue+Accepted) / +2 IncumbencyOpened.
   # A Continue retirement is followed by another ordinary IncumbencyOpened event
   # and a physically observed provider request; Accepted exits.
@@ -269,6 +270,16 @@ step = 1
 reason = "prefix-probe"
 optional = true
 
+# A Continue retirement opens the next iteration on the same session: system, tools
+# and root authority stay fixed, the predecessor's history is retained in order, and
+# the only admitted in-prefix change is the retired auxiliary guidance suffix
+# (context-compression-019). The successor therefore breaks the raw seal exactly once,
+# when its own assess resource lands at step 0.
+[[epoch]]
+turn = "manager-reopened-loop"
+step = 0
+reason = "manager-loop"
+
 [[turn]]
 id = "strength-canary-owner"
 lane = "strength-canary-owner"
@@ -363,7 +374,7 @@ internal = true
 user = "# The account is not yet ready to entrust."
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "todowrite", args = { planComplete = true, workingOn = "long-stroke", obligations = [{ name = "long-stroke", horizon = "near", work = "Run the long stroke through publish_proof.txt." }] } }
+  respond = { type = "tool-call", tool = "assume", args = { update = ".", todos = [{ content = "Run the long stroke through publish_proof.txt.", status = "in_progress" }] } }
 
   [[turn.step]]
   respond = { type = "text", text = "T1 commitment recorded." }
@@ -388,16 +399,17 @@ tools = ["fork", "resume", "join", "horizon", "review", "suicide"]
   runtimeStep = 2
   respond = { type = "tool-call", tool = "join", args = {} }
 
-# Authority-first audit usually stays on manager-loop.0; when runtime/manager-assess
-# arrives as a fresh provider turn at step=0, this turn must answer with review
-# then optional suicide close; when the finish-resource race lands assess already
-# at step=1, only suicide matches.
+# A successor incarnation whose last provider-visible user message is the
+# owner-controlled manager-assess resource. The ladder mirrors manager-loop —
+# audit, work fork, join — because the successor retains its predecessor's
+# history and then walks the same iteration shape; the binder varies the audit
+# outcome by delivered attempt.
 [[turn]]
 id = "manager-reopened-loop"
 internal = true
 # The ordinal sentence is the leader; the declared fragment stays the stable
 # tail so the successor number never has to be re-pinned per iteration.
-user = ["# You are the ", "Entrust read-only Engineer work to establish facts about the current deliverable"]
+user = ["# You are the ", "entrust read-only work to Engineer to establish facts about the predecessor's work"]
 tools = ["fork", "resume", "join", "horizon", "review", "suicide"]
 
   [[turn.step]]
@@ -410,6 +422,11 @@ tools = ["fork", "resume", "join", "horizon", "review", "suicide"]
   optional = true
   respond = { type = "tool-call", tool = "suicide", args = {} }
 
+  [[turn.step]]
+  runtimeStep = 2
+  optional = true
+  respond = { type = "tool-call", tool = "join", args = {} }
+
 # A fresh Manager terminal can race with the externally injected interruption
 # while its child is still outstanding. INTERACTION-AUTHORITY-014 then requires
 # this exact JoinGuard on the same Manager session. It is separate
@@ -419,7 +436,7 @@ id = "manager-join-guard"
 internal = true
 optional = true
 user = "# Work remains away."
-tools = ["fork", "resume", "join", "horizon", "todowrite", "suicide"]
+tools = ["fork", "resume", "join", "horizon", "assume", "suicide"]
 forbiddenTools = ["commission"]
 
   [[turn.step]]
@@ -428,7 +445,7 @@ forbiddenTools = ["commission"]
 
   [[turn.step]]
   runtimeStep = 2
-  respond = { type = "tool-call", tool = "todowrite", args = { planComplete = true, workingOn = "long-stroke", obligations = [{ name = "long-stroke", horizon = "near", work = "Run the long stroke through publish_proof.txt." }] } }
+  respond = { type = "tool-call", tool = "assume", args = { update = ".", todos = [{ content = "Run the long stroke through publish_proof.txt.", status = "in_progress" }] } }
 
   [[turn.step]]
   runtimeStep = 3
@@ -485,15 +502,15 @@ user = "Interrupt the active join."
 id = "manager-current-action"
 internal = true
 user = "# The reviewed defects are now entrusted to you."
-tools = ["join", "todowrite", "suicide"]
+tools = ["join", "assume", "suicide"]
 
   # Host tips and owner nudges can place this exact resource at any bounded runtime
-  # cursor. The binder maps the first observed cursor to todowrite, one cursor per
-  # work episode to join, and every later cursor to suicide.
+  # cursor. The binder maps the first observed cursor to the assumption, one cursor
+  # per work episode to join, and every later cursor to suicide.
   [[turn.step]]
   runtimeStep = 0
   optional = true
-  respond = { type = "tool-call", tool = "todowrite", args = { planComplete = true, workingOn = "long-stroke", obligations = [{ name = "long-stroke", horizon = "near", work = "Run the long stroke through publish_proof.txt." }] } }
+  respond = { type = "tool-call", tool = "assume", args = { update = ".", todos = [{ content = "Run the long stroke through publish_proof.txt.", status = "in_progress" }] } }
 
   [[turn.step]]
   runtimeStep = 1

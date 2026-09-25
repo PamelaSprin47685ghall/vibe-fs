@@ -95,11 +95,13 @@ const SOURCE_BUDGETS = new Map([
 ])
 
 const ADAPTER_RATCHET = new Map([
-  // 307/307 on 2026-09-25 — the cognitive runtime surface (RuntimeSurface.fs) entered this
-  // adapter closure together with the durable spine's AgentFact.Cognition assembly, reached
-  // transitively via composition-durable-fact → participant-cognition-workspace; ratchet raised
-  // 306 → 307 as the explicit accounting required by WHAT[delegation-028].
-  ['delegation-host-adapter', 307],
+  // 312/312 on 2026-09-25 — the durable spine and prefix shards now declare the
+  // context-prefix-epoch vocabulary explicitly (Persistence/Journal, Composition/Durable and
+  // Context/Prefix/Wire consume ActivePrefixEpoch/PhaseWindow/PrefixEpochProjection), which
+  // carries Context/Prefix/{ProbeSelection,PhaseWindow,Projection,Epoch,Surface}.fs into this
+  // adapter closure; ratchet raised 307 → 312 as the explicit accounting required by
+  // WHAT[delegation-028]. The earlier 306 → 307 raise was the cognitive runtime surface.
+  ['delegation-host-adapter', 312],
   ['delegation-pty-adapter', 305],
   // 47 on 2026-09-14 — this batch hoisted Runtime.fs settleCompletedFromParts
   // into a module-internal SyncDelegateInternals module (namespace-scoped files

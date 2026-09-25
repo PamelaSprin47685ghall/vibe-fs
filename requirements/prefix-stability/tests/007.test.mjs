@@ -4,6 +4,9 @@ import * as authority from '../../../dist/Interaction/Authority/Surface.js'
 import * as planner from '../../../dist/Participant/Provider/Attempt/PlannerSurface.js'
 import * as delegation from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
 import * as strength from '../../../dist/Strength/Surface.js'
+import * as tools from '../../../dist/OpenCode/Tools/ToolSurface.js'
+import * as canonicalJson from '../../../dist/OpenCode/Codec/CanonicalJsonSurface.js'
+import * as providerProjection from '../../../dist/Participant/Provider/Projection/Surface.js'
 import { installDefaultResources } from '../../../dist/OpenCode/Host/ManagedAgentConfigSurface.js'
 
 installDefaultResources()
@@ -77,4 +80,38 @@ test('WHAT[prefix-stability-007] PROMPT_019_role_and_tier_capabilities_remain_ex
   assert.ok(engineerFast.toolCapabilities.length > 0)
   assert.deepEqual(managerFast.toolCapabilities, managerDeep.toolCapabilities)
   assert.notDeepEqual(managerFast.toolCapabilities, engineerFast.toolCapabilities)
+})
+
+test('WHAT[prefix-stability-007] manager_life_review_acceptance_system_prompt_byte_identical', () => {
+  // Office system prompt 在同一个生命周期（Life）内保持逐字节一致。
+  // 严禁因 T1 交托、Fallback 切换、Review 或 Host compaction 等事件改写 system prompt 字节或重绑 Persona。
+  const managerSystemPromptBefore = strength.systemPromptForRole('Manager')
+  const managerSystemPromptAfter = strength.systemPromptForRole('Manager')
+
+  assert.ok(managerSystemPromptBefore.length > 0, 'Manager system prompt must not be empty')
+  assert.equal(
+    managerSystemPromptBefore,
+    managerSystemPromptAfter,
+    'system prompt must remain byte-identical before and after Review acceptance in same Life',
+  )
+
+  // Negative counterexample: system prompt drift across Review breaks prefix stability
+  const attemptBefore = {
+    modelId: 'manager-model-v1',
+    providerId: 'manager-test-provider',
+    variant: 'deep',
+    messages: [{ id: 'msg-sys-01', role: 'user', parts: [{ kind: 'text', text: 'SYSTEM PROMPT STABILITY PROOF' }] }],
+    tools: tools.toolSpecNames().map((name) => canonicalJson.canonicalJson({ name })),
+    system: [managerSystemPromptBefore],
+  }
+  const driftedSystemAttempt = {
+    ...attemptBefore,
+    system: ['MUTATED SYSTEM PROMPT: Review event illegally modified prompt bytes'],
+  }
+
+  assert.equal(
+    providerProjection.isAppendOnlyPrefix(attemptBefore, driftedSystemAttempt),
+    false,
+    'system prompt drift across review must break provider prefix law',
+  )
 })

@@ -9,6 +9,10 @@ open System.Threading.Tasks
 module JsRuntimeSurface =
 
     val createApi: root: string -> obj
+
+    /// Bindings over an explicit JS capability-label set; unknown labels grant nothing.
+    val createApiFor: root: string -> permissionLabels: string array -> obj
+
     val api: handle: obj -> obj
     val stagedCount: handle: obj -> int
     val stagedKinds: handle: obj -> string array

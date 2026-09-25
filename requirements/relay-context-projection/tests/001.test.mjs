@@ -18,10 +18,12 @@ const cutMessages = [
   { id: 'a2', run: 'new-run', role: 'assistant', text: 'next iteration audit' },
 ]
 
-const cutResult = () => projection.applyCut(cutMessages, 'old-run', 'suicide-call', ['old-run'], ['u1'])
+const cutResult = () => projection.projectMessages(cutMessages)
 
 const ids = (result) => result.provider.map((message) => message.id ?? message.info?.id)
 
-test('WHAT[relay-context-projection-001] audit projection retains every physical message across the cut', () => {
-  assert.equal(cutResult().audit.length, cutMessages.length)
+test('WHAT[relay-context-projection-001] audit and provider both retain every physical message across the cut', () => {
+  const result = cutResult()
+  assert.equal(result.audit.length, cutMessages.length)
+  assert.deepEqual(result.provider, cutMessages)
 })

@@ -739,7 +739,10 @@ module ForkToolSurface =
                 let incId = IncumbencyId.create (sprintf "incumbency:%s" sessionStr)
                 let snapId = WorkspaceSnapshotId.create (sprintf "snapshot:%s" sessionStr)
                 let authRev = AuthorityRevision.create (sprintf "rev:%s" sessionStr)
-                let physUser = Wanxiangshu.Mission.Relay.PhysicalUserMessageId.create (sprintf "phys:%s" sessionStr)
+
+                let physUser =
+                    Wanxiangshu.Mission.Relay.PhysicalUserMessageId.create (sprintf "phys:%s" sessionStr)
+
                 let assessId = AssessmentId.create (sprintf "assess:%s" sessionStr)
 
                 let binding: AssessmentBinding =
@@ -762,7 +765,8 @@ module ForkToolSurface =
                           ScoreGrade.Perfect
                           ScoreGrade.Perfect
                           ScoreGrade.Revise ]
-                    |> Result.defaultWith (fun _ -> failwith "injectAcceptedAssessment: failed to construct score vector")
+                    |> Result.defaultWith (fun _ ->
+                        failwith "injectAcceptedAssessment: failed to construct score vector")
 
                 let events =
                     match existingRoad with
@@ -773,7 +777,14 @@ module ForkToolSurface =
                     | Some road ->
                         match road.ActiveIncumbency, road.ActiveSnapshotId, road.ActiveAuthorityRevision with
                         | Some activeInc, Some activeSnap, Some activeRev ->
-                            [ RelayEvent.AssessmentCommitted(assessId, activeInc, binding, activeSnap, activeRev, scores) ]
+                            [ RelayEvent.AssessmentCommitted(
+                                  assessId,
+                                  activeInc,
+                                  binding,
+                                  activeSnap,
+                                  activeRev,
+                                  scores
+                              ) ]
                         | _ ->
                             let currentRev =
                                 if road.AuthorityRevisions.IsEmpty then
@@ -803,7 +814,10 @@ module ForkToolSurface =
                     match! AgentJournal.appendAgent (StreamId.Session sessionId) None fact harness.Journal with
                     | Ok _ -> ()
                     | Error error ->
-                        return raise (InvalidOperationException(sprintf "Failed to append accepted assessment fact: %A" error))
+                        return
+                            raise (
+                                InvalidOperationException(sprintf "Failed to append accepted assessment fact: %A" error)
+                            )
         }
         :> Task
 
@@ -819,16 +833,16 @@ module ForkToolSurface =
                 |> Option.bind (fun relay -> Wanxiangshu.Mission.Relay.Fold.view relay (RoadId.create sessionStr))
 
             let hasActiveIncumbency =
-                existingRoad
-                |> Option.bind (fun road -> road.ActiveIncumbency)
-                |> Option.isSome
+                existingRoad |> Option.bind (fun road -> road.ActiveIncumbency) |> Option.isSome
 
             if not hasActiveIncumbency then
                 let roadId = RoadId.create sessionStr
                 let incId = IncumbencyId.create (sprintf "incumbency:%s" sessionStr)
                 let snapId = WorkspaceSnapshotId.create (sprintf "snapshot:%s" sessionStr)
                 let authRev = AuthorityRevision.create (sprintf "rev:%s" sessionStr)
-                let physUser = Wanxiangshu.Mission.Relay.PhysicalUserMessageId.create (sprintf "phys:%s" sessionStr)
+
+                let physUser =
+                    Wanxiangshu.Mission.Relay.PhysicalUserMessageId.create (sprintf "phys:%s" sessionStr)
 
                 let events =
                     match existingRoad with
@@ -848,8 +862,7 @@ module ForkToolSurface =
                             else
                                 []
 
-                        roadOpened
-                        @ [ RelayEvent.IncumbencyOpened(incId, snapId) ]
+                        roadOpened @ [ RelayEvent.IncumbencyOpened(incId, snapId) ]
 
                 match RelayTransaction.create events with
                 | Error error ->
@@ -863,7 +876,12 @@ module ForkToolSurface =
                     match! AgentJournal.appendAgent (StreamId.Session sessionId) None fact harness.Journal with
                     | Ok _ -> ()
                     | Error error ->
-                        return raise (InvalidOperationException(sprintf "Failed to append audit pending incumbency fact: %A" error))
+                        return
+                            raise (
+                                InvalidOperationException(
+                                    sprintf "Failed to append audit pending incumbency fact: %A" error
+                                )
+                            )
         }
         :> Task
 

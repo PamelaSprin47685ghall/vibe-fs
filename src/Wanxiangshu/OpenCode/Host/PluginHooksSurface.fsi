@@ -19,6 +19,10 @@ module PluginHooksSurface =
     /// arguments proved an owned execution key.
     val normalizeHookFailureOutcome: args: obj -> context: obj -> error: obj -> obj
 
+    /// HOST-BOUNDARY-032: run the real tool.definition decoration for one tool
+    /// id. Non-review ids are returned unmodified.
+    val decorateReviewToolDefinition: toolID: string -> definition: obj -> unit
+
     val hookFailurePolicy: failure: string -> settlement: string -> string
 
     /// Real Coordinator -> CompanionHost -> PromptDispatcher Host adapter. The

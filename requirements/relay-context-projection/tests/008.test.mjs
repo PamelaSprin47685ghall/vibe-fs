@@ -18,19 +18,19 @@ const cutMessages = [
   { id: 'a2', run: 'new-run', role: 'assistant', text: 'next iteration audit' },
 ]
 
-const cutResult = () => projection.applyCut(cutMessages, 'old-run', 'suicide-call', ['old-run'], ['u1'])
+const cutResult = () => projection.projectMessages(cutMessages)
 
 const ids = (result) => result.provider.map((message) => message.id ?? message.info?.id)
 
-test('WHAT[relay-context-projection-008] wire cut drops the retired tail and the internal loop wake until the next real user turn', () => {
+test('WHAT[relay-context-projection-008] the retired tail and the internal loop wake remain in the retained history', () => {
   const providerIds = ids(cutResult())
-  assert.equal(providerIds.includes('a-late'), false)
-  assert.equal(providerIds.includes('wake-1'), false)
-  assert.equal(providerIds.includes('t1'), false)
-  assert.equal(providerIds.includes('r1'), false)
+  assert.equal(providerIds.includes('a-late'), true)
+  assert.equal(providerIds.includes('wake-1'), true)
+  assert.equal(providerIds.includes('t1'), true)
+  assert.equal(providerIds.includes('r1'), true)
 })
 
-test('WHAT[relay-context-projection-008] projection cut preserves only typed authority from the retired iteration', () => {
+test('WHAT[relay-context-projection-008] projection keeps typed authority messages inside the retained physical history', () => {
   const messages = [
     { id: 'root-authority', run: '', role: 'user', text: 'root request' },
     { id: 'old-audit', run: 'old-run', role: 'assistant', text: 'audit' },
@@ -47,16 +47,10 @@ test('WHAT[relay-context-projection-008] projection cut preserves only typed aut
     { id: 'current', run: 'new-run', role: 'assistant', text: 'new audit' },
   ]
 
-  const result = projection.applyCut(
-    messages,
-    'old-run',
-    'suicide-call-2',
-    ['old-run'],
-    ['root-authority', 'authority-update'],
-  )
+  const result = projection.projectMessages(messages)
 
   assert.deepEqual(
     result.provider.map((message) => message.id),
-    ['root-authority', 'authority-update', 'current'],
+    ['root-authority', 'old-audit', 'authority-update', 'incidental-user-like', 'suicide', 'wake-2', 'current'],
   )
 })

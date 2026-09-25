@@ -9,14 +9,16 @@ type BlogFrameKind =
     | Squash
 
 type BlogFrame =
-    { Kind: BlogFrameKind
-      Digest: BlobDigest
-      TextRef: BlobRef
-      CoveredFromSequence: int64
-      CoveredThroughSequence: int64
-      /// context-compression-029: the complete-turn boundary this frame's material
-      /// summarises.
-      CutoffExclusive: int }
+    {
+        Kind: BlogFrameKind
+        Digest: BlobDigest
+        TextRef: BlobRef
+        CoveredFromSequence: int64
+        CoveredThroughSequence: int64
+        /// context-compression-029: the complete-turn boundary this frame's material
+        /// summarises.
+        CutoffExclusive: int
+    }
 
 type BlogCoverage =
     { IngestedThroughSequence: int64

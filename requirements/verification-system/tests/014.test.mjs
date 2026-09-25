@@ -110,8 +110,11 @@ const preFlowCanaries = async (scenario) => {
   })
   assert.ok(humanrootPrompt.ok, `humanroot-manager prompt failed: ${JSON.stringify(humanrootPrompt.data)}`)
 
-  for (const id of ['humanroot-loop.0', 'humanroot-loop.1']) {
-    await scenario.provider.waitForExpectationAttempt(id, 2, WAIT_FACT_WINDOW_MS)
+  // The successor iteration appends the owner-controlled assess resource, so its two
+  // deliveries are answered by the assess-resource family instead of the reusable
+  // authority-turn family. One delivery of each step is what the two iterations produce.
+  for (const id of ['humanroot-loop.0', 'humanroot-loop.1', 'manager-reopened-loop.0', 'manager-reopened-loop.1']) {
+    await scenario.provider.waitForExpectationAttempt(id, 1, WAIT_FACT_WINDOW_MS)
   }
   await assertHumanRootManagerLoop(scenario, humanrootSessionId)
 

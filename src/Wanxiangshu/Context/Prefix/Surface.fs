@@ -341,19 +341,14 @@ module PrefixSurface =
     /// One committed phase admitted into the bounded window; identity order is the
     /// commit order and the result is trimmed to `k`.
     let appendPhase (k: int) (callId: string) (window: string array) : string array =
-        let committed =
-            if isNull window then [] else Array.toList window
+        let committed = if isNull window then [] else Array.toList window
 
         let next =
             Wanxiangshu.Context.Prefix.PhaseWindow.emptyWindow
             |> fun start ->
                 committed
                 |> List.fold
-                    (fun acc item ->
-                        Wanxiangshu.Context.Prefix.PhaseWindow.appendPhase
-                            k
-                            (ToolCallId.create item)
-                            acc)
+                    (fun acc item -> Wanxiangshu.Context.Prefix.PhaseWindow.appendPhase k (ToolCallId.create item) acc)
                     start
             |> Wanxiangshu.Context.Prefix.PhaseWindow.appendPhase k (ToolCallId.create callId)
 
@@ -363,7 +358,10 @@ module PrefixSurface =
     /// `window[i]` (null = no addressable turn in the current generation).
     let desiredCutoffOfWindow (window: string array) (turnByCallId: obj array) : obj =
         let turns =
-            if isNull turnByCallId then [] else Array.toList turnByCallId
+            if isNull turnByCallId then
+                []
+            else
+                Array.toList turnByCallId
 
         let committed =
             { Wanxiangshu.Context.Prefix.PhaseWindow.PhaseCallIds =

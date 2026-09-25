@@ -41,23 +41,25 @@ type SessionAgentProjection =
       DelegatedToolEstimate: DelegatedToolEstimateProjectionState option }
 
 type AgentProjectionSet =
-    { Sessions: Map<SessionId, SessionAgentProjection>
-      Associations: Map<SessionId, SessionAssociation>
-      Orchestrator: OrchestratorProjection
-      HandleByChildSession: Map<SessionId, HandleRecord>
-      Fission: FissionProjectionState
-      ChatExecutions: ChatExecutionProjectionState
-      Cognition: Map<string, CognitiveProjection>
-      /// context-compression-028: the committed phases each session still keeps raw,
-      /// oldest first, bounded by the frozen window depth. Keyed by session because the
-      /// prefix owner asks "what does this session's provider history keep raw", while
-      /// `Cognition` answers the owner-scoped question "what canvas is current".
-      PhaseCommits: Map<SessionId, PhaseWindow.PhaseCommitWindow>
-      DelegationCompletedHandoffs: Map<string, int64>
-      Attention: AttentionProjectionState
-      Concern: ConcernProjectionState
-      InstitutionalLearning: InstitutionalLearningProjectionState
-      RuntimeStartCount: int }
+    {
+        Sessions: Map<SessionId, SessionAgentProjection>
+        Associations: Map<SessionId, SessionAssociation>
+        Orchestrator: OrchestratorProjection
+        HandleByChildSession: Map<SessionId, HandleRecord>
+        Fission: FissionProjectionState
+        ChatExecutions: ChatExecutionProjectionState
+        Cognition: Map<string, CognitiveProjection>
+        /// context-compression-028: the committed phases each session still keeps raw,
+        /// oldest first, bounded by the frozen window depth. Keyed by session because the
+        /// prefix owner asks "what does this session's provider history keep raw", while
+        /// `Cognition` answers the owner-scoped question "what canvas is current".
+        PhaseCommits: Map<SessionId, PhaseWindow.PhaseCommitWindow>
+        DelegationCompletedHandoffs: Map<string, int64>
+        Attention: AttentionProjectionState
+        Concern: ConcernProjectionState
+        InstitutionalLearning: InstitutionalLearningProjectionState
+        RuntimeStartCount: int
+    }
 
 module AgentProjection =
     val emptySession: SessionAgentProjection

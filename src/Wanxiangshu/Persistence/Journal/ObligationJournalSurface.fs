@@ -69,6 +69,10 @@ module ObligationJournalSurface =
                 return appendResult result
         }
 
+    /// Idempotent accepted-assessment commit on a session that may already hold an
+    /// open road: an already accepted assessment is left untouched, an open road
+    /// contributes its active incumbency/snapshot/authority revision to the
+    /// assessment, and a road that is not open yet is opened first.
     let grantWorkOwned (handle: JournalHandle) (sessionId: string) (incumbencyId: string) : Task<obj> =
         task {
             let roadId = Wanxiangshu.Mission.Relay.RoadId.create sessionId
@@ -77,6 +81,18 @@ module ObligationJournalSurface =
             let authRev = Wanxiangshu.Mission.Relay.AuthorityRevision.create "rev-1"
             let physUser = Wanxiangshu.Mission.Relay.PhysicalUserMessageId.create "user-root"
             let assessId = Wanxiangshu.Mission.Relay.AssessmentId.create ("assess-" + sessionId)
+
+            let existingRoad =
+                AgentProjection.tryFind
+                    (SessionId.create sessionId)
+                    (AgentJournal.snapshot handle.Journal).AgentProjections
+                |> Option.bind (fun session -> session.Relay)
+                |> Option.bind (fun relay -> Wanxiangshu.Mission.Relay.Fold.view relay roadId)
+
+            let accepted =
+                existingRoad
+                |> Option.bind (fun road -> road.AcceptedAssessmentTransport)
+                |> Option.isSome
 
             let binding: Wanxiangshu.Mission.Relay.AssessmentBinding =
                 { PhysicalUserMessageId = "user-root"
@@ -100,30 +116,61 @@ module ObligationJournalSurface =
                       Wanxiangshu.Mission.Relay.ScoreGrade.Revise ]
                 |> Result.defaultWith (fun _ -> failwith "scores")
 
-            let events =
-                [ Wanxiangshu.Mission.Relay.RelayEvent.RoadOpened(roadId, authRev, physUser)
-                  Wanxiangshu.Mission.Relay.RelayEvent.IncumbencyOpened(incId, snapId)
-                  Wanxiangshu.Mission.Relay.RelayEvent.AssessmentCommitted(
-                      assessId,
-                      incId,
-                      binding,
-                      snapId,
-                      authRev,
-                      scores
-                  ) ]
+            let assessment incumbent snapshot revision =
+                Wanxiangshu.Mission.Relay.RelayEvent.AssessmentCommitted(
+                    assessId,
+                    incumbent,
+                    binding,
+                    snapshot,
+                    revision,
+                    scores
+                )
 
-            match Wanxiangshu.Mission.Relay.RelayTransaction.create events with
-            | Error err -> return box {| ok = false; error = err |}
-            | Ok tx ->
-                let fact =
-                    AgentFact.Relay(
-                        Wanxiangshu.Mission.Relay.RelayFactCases.TransactionCommitted
-                            {| RoadId = roadId; Transaction = tx |}
-                    )
+            let pending =
+                if accepted then
+                    []
+                else
+                    match existingRoad with
+                    | None ->
+                        [ Wanxiangshu.Mission.Relay.RelayEvent.RoadOpened(roadId, authRev, physUser)
+                          Wanxiangshu.Mission.Relay.RelayEvent.IncumbencyOpened(incId, snapId)
+                          assessment incId snapId authRev ]
+                    | Some road ->
+                        match road.ActiveIncumbency, road.ActiveSnapshotId, road.ActiveAuthorityRevision with
+                        | Some activeIncumbency, Some activeSnapshot, Some activeRevision ->
+                            [ assessment activeIncumbency activeSnapshot activeRevision ]
+                        | _ ->
+                            let currentRevision =
+                                if road.AuthorityRevisions.IsEmpty then
+                                    authRev
+                                else
+                                    road.AuthorityRevision
 
-                let! result = AgentJournal.appendAgent (streamOfSession sessionId) None fact handle.Journal
+                            let roadOpened =
+                                if road.AuthorityRevisions.IsEmpty then
+                                    [ Wanxiangshu.Mission.Relay.RelayEvent.RoadOpened(roadId, currentRevision, physUser) ]
+                                else
+                                    []
 
-                return appendResult result
+                            roadOpened
+                            @ [ Wanxiangshu.Mission.Relay.RelayEvent.IncumbencyOpened(incId, snapId)
+                                assessment incId snapId currentRevision ]
+
+            match pending with
+            | [] -> return box {| ok = true |}
+            | events ->
+                match Wanxiangshu.Mission.Relay.RelayTransaction.create events with
+                | Error err -> return box {| ok = false; error = err |}
+                | Ok tx ->
+                    let fact =
+                        AgentFact.Relay(
+                            Wanxiangshu.Mission.Relay.RelayFactCases.TransactionCommitted
+                                {| RoadId = roadId; Transaction = tx |}
+                        )
+
+                    let! result = AgentJournal.appendAgent (streamOfSession sessionId) None fact handle.Journal
+
+                    return appendResult result
         }
 
     let appendManagerLifecycle (handle: JournalHandle) (sessionId: string) (action: string) (payload: obj) : Task<obj> =

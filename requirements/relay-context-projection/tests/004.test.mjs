@@ -18,14 +18,13 @@ const cutMessages = [
   { id: 'a2', run: 'new-run', role: 'assistant', text: 'next iteration audit' },
 ]
 
-const cutResult = () => projection.applyCut(cutMessages, 'old-run', 'suicide-call', ['old-run'], ['u1'])
+const cutResult = () => projection.projectMessages(cutMessages)
 
 const ids = (result) => result.provider.map((message) => message.id ?? message.info?.id)
 
-test('WHAT[relay-context-projection-004] retired finish and internal wake project to a clean authority start', () => {
+test('WHAT[relay-context-projection-004] retired finish and internal wake remain in the provider history', () => {
   const initial = [{ id: 'root', run: '', role: 'user', text: 'root user request' }]
-  const initialProvider = projection.applyCut(initial, '', '', [], ['root'])
-  assert.deepEqual(ids(initialProvider), ['root'])
+  assert.deepEqual(ids(projection.projectMessages(initial)), ['root'])
 
   const retired = [
     { id: 'root', run: '', role: 'user', text: 'root user request' },
@@ -39,6 +38,5 @@ test('WHAT[relay-context-projection-004] retired finish and internal wake projec
     },
     { id: 'wake', run: '', role: 'user', text: 'internal loop wake' },
   ]
-  const nextStart = projection.applyCut(retired, 'old-run', 'suicide-call', ['old-run'], ['root'])
-  assert.deepEqual(ids(nextStart), ['root'])
+  assert.deepEqual(ids(projection.projectMessages(retired)), ['root', 'old-audit', 'suicide', 'wake'])
 })

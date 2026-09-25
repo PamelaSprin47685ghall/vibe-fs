@@ -71,6 +71,114 @@ module JsToolsBindings =
         | AnchorSpec.Exact text when System.String.IsNullOrEmpty text -> Error JsFailure.AnchorEmptyContent
         | _ -> Ok()
 
+    let private makeReadMember (root: string) (readSnapshots: ResizeArray<JsReadSnapshot>) =
+        "read"
+        ==> fun (path: string) ->
+            result {
+                let! full = resolveInside root path
+                let! text = JsUtf8Fs.readUtf8Classified full
+                readSnapshots.Add { Path = path; Text = text }
+
+                return createObj [ "ok" ==> true; "path" ==> path; "text" ==> text; "byteCount" ==> text.Length ]
+            }
+            |> renderOutcome
+
+    let private makeGlobMember (root: string) =
+        "glob"
+        ==> fun (pattern: string) ->
+            task {
+                let! globRes = JsGlobFs.glob root pattern
+
+                return
+                    match globRes with
+                    | Ok listing -> createObj [ "ok" ==> true; "paths" ==> (List.toArray listing.Paths) ]
+                    | Error failure -> failureObj failure
+            }
+
+    let private renderGrepListing (readSnapshots: ResizeArray<JsReadSnapshot>) (listing: JsAnchorFs.JsGrepListing) =
+        listing.ReadSnapshots |> List.iter readSnapshots.Add
+
+        let matches =
+            listing.Matches
+            |> List.map (fun hit ->
+                createObj
+                    [ "path" ==> hit.Path
+                      "line" ==> hit.Line
+                      "column" ==> hit.Column
+                      "text" ==> hit.Text ])
+
+        createObj [ "ok" ==> true; "matches" ==> (List.toArray matches) ]
+
+    let private executeGrep
+        (root: string)
+        (readSnapshots: ResizeArray<JsReadSnapshot>)
+        (spec: AnchorSpec)
+        (pattern: string)
+        =
+        task {
+            let! grepRes = JsAnchorFs.grep root spec pattern
+
+            return
+                match grepRes with
+                | Error failure -> failureObj failure
+                | Ok listing -> renderGrepListing readSnapshots listing
+        }
+
+    let private runGrep (root: string) (readSnapshots: ResizeArray<JsReadSnapshot>) (needle: obj) (pattern: string) =
+        task {
+            if
+                isUndefined pattern
+                || not (isString pattern)
+                || System.String.IsNullOrEmpty pattern
+            then
+                return failureObj JsFailure.AnchorInvalidPattern
+            else
+                let specRes =
+                    result {
+                        let! spec = anchorOf needle
+                        do! requireNonEmptyExact spec
+                        return spec
+                    }
+
+                match specRes with
+                | Error e -> return failureObj e
+                | Ok spec -> return! executeGrep root readSnapshots spec pattern
+        }
+
+    let private makeGrepMember (root: string) (readSnapshots: ResizeArray<JsReadSnapshot>) =
+        "grep"
+        ==> fun (needle: obj) (pattern: string) -> runGrep root readSnapshots needle pattern
+
+    let private makeEditMember (root: string) (staging: ResizeArray<JsStagedMutation>) =
+        "edit"
+        ==> fun (path: string) (newText: obj) ->
+            let replacement = string newText
+
+            result {
+                let! full = resolveInside root path
+                let! current = JsUtf8Fs.readUtf8Classified full
+                staging.Add(JsStagedMutation.Rewrite(path, current, replacement))
+                return createObj [ "ok" ==> true ]
+            }
+            |> renderOutcome
+
+    let private makeWriteMember (root: string) (staging: ResizeArray<JsStagedMutation>) =
+        "write"
+        ==> fun (path: string) (text: string) ->
+            result {
+                let! full = resolveInside root path
+
+                do!
+                    if JsMutationFs.existsPath full then
+                        Error(JsFailure.FileAlreadyExists path)
+                    else
+                        Ok()
+
+                staging.Add(JsStagedMutation.Create(path, text))
+                return createObj [ "ok" ==> true ]
+            }
+            |> renderOutcome
+
     /// Build the api object for one sandbox run. `staging` collects every
     /// mutation the program makes; the caller commits or discards it.
     let createApi
@@ -81,98 +189,18 @@ module JsToolsBindings =
         : obj =
         let members =
             [ if Set.contains JsCapability.Read capabilities then
-                  "read"
-                  ==> fun (path: string) ->
-                      result {
-                          let! full = resolveInside root path
-                          let! text = JsUtf8Fs.readUtf8Classified full
-                          readSnapshots.Add { Path = path; Text = text }
-
-                          return
-                              createObj
-                                  [ "ok" ==> true; "path" ==> path; "text" ==> text; "byteCount" ==> text.Length ]
-                      }
-                      |> renderOutcome
+                  makeReadMember root readSnapshots
 
               if Set.contains JsCapability.Glob capabilities then
-                  "glob"
-                  ==> fun (pattern: string) ->
-                      task {
-                          let! globRes = JsGlobFs.glob root pattern
-
-                          match globRes with
-                          | Ok listing ->
-                              return createObj [ "ok" ==> true; "paths" ==> (List.toArray listing.Paths) ]
-                          | Error failure -> return failureObj failure
-                      }
+                  makeGlobMember root
 
               if Set.contains JsCapability.Grep capabilities then
-                  "grep"
-                  ==> fun (needle: obj) (pattern: string) ->
-                      task {
-                          if
-                              isUndefined pattern
-                              || not (isString pattern)
-                              || System.String.IsNullOrEmpty pattern
-                          then
-                              return failureObj JsFailure.AnchorInvalidPattern
-                          else
-                              let specRes =
-                                  result {
-                                      let! spec = anchorOf needle
-                                      do! requireNonEmptyExact spec
-                                      return spec
-                                  }
-
-                              let! grepRes =
-                                  task {
-                                      match specRes with
-                                      | Error e -> return Error e
-                                      | Ok spec -> return! JsAnchorFs.grep root spec pattern
-                                  }
-
-                              match grepRes with
-                              | Error failure -> return failureObj failure
-                              | Ok(listing: JsAnchorFs.JsGrepListing) ->
-                                  listing.ReadSnapshots |> List.iter readSnapshots.Add
-
-                                  let matches =
-                                      listing.Matches
-                                      |> List.map (fun hit ->
-                                          createObj
-                                              [ "path" ==> hit.Path
-                                                "line" ==> hit.Line
-                                                "column" ==> hit.Column
-                                                "text" ==> hit.Text ])
-
-                                  return createObj [ "ok" ==> true; "matches" ==> (List.toArray matches) ]
-                      }
+                  makeGrepMember root readSnapshots
 
               if Set.contains JsCapability.Edit capabilities then
-                  "edit"
-                  ==> fun (path: string) (newText: obj) ->
-                      let replacement = string newText
-
-                      result {
-                          let! full = resolveInside root path
-                          let! current = JsUtf8Fs.readUtf8Classified full
-                          staging.Add(JsStagedMutation.Rewrite(path, current, replacement))
-                          return createObj [ "ok" ==> true ]
-                      }
-                      |> renderOutcome
+                  makeEditMember root staging
 
               if Set.contains JsCapability.Write capabilities then
-                  "write"
-                  ==> fun (path: string) (text: string) ->
-                      result {
-                          let! full = resolveInside root path
-
-                          if JsMutationFs.existsPath full then
-                              return! Error(JsFailure.FileAlreadyExists path)
-
-                          staging.Add(JsStagedMutation.Create(path, text))
-                          return createObj [ "ok" ==> true ]
-                      }
-                      |> renderOutcome ]
+                  makeWriteMember root staging ]
 
         createObj [ "js" ==> createObj members ]

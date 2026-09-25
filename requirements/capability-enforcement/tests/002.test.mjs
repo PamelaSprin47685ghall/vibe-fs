@@ -5,7 +5,7 @@ const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const { permissions } = await import("../../../dist/Participant/Persona/OfficeCapabilitySurface.js");
 const { configure: configureManagedAgents, installDefaultResources, validate: validateManagedAgents } = await import("../../../dist/OpenCode/Host/ManagedAgentConfigSurface.js");
-const { isReviewTool } = await import("../../../dist/OpenCode/Tools/ManagerReviewTools.js");
+const { reviewToolPermissions } = await import("../../../dist/OpenCode/Tools/ToolSurface.js");
 
 installDefaultResources()
 const ROLES = [
@@ -196,16 +196,11 @@ test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_
       suicide: 'Finality',
     })[toolName]
 
-  // 引自 ManagerReviewTools (dist/OpenCode/Tools/ManagerReviewTools.js) 权威目录：
-  // 评审专用别名工具经 requiredPermissions 映射为领域权限（单一语义所有者仍是 ManagerReviewTools）
-  const REVIEW_TOOL_PERMISSIONS = {
-    'js-manager': ['Read', 'Glob', 'Grep'],
-  }
-
   const permissionsForTool = (toolName) => {
-    if (isReviewTool(toolName)) {
-      return REVIEW_TOOL_PERMISSIONS[toolName] ?? []
-    }
+    // 评审专用工具经 owner 目录（ToolSurface.reviewToolPermissions）映射为领域权限，
+    // 无评审契约的工具名称没有权限映射。
+    const reviewPermissions = reviewToolPermissions(toolName)
+    if (reviewPermissions.length > 0) return reviewPermissions
     const single = permissionOf(toolName)
     return single ? [single] : []
   }

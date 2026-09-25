@@ -18,13 +18,14 @@ const cutMessages = [
   { id: 'a2', run: 'new-run', role: 'assistant', text: 'next iteration audit' },
 ]
 
-const cutResult = () => projection.applyCut(cutMessages, 'old-run', 'suicide-call', ['old-run'], ['u1'])
+const cutResult = () => projection.projectMessages(cutMessages)
 
 const ids = (result) => result.provider.map((message) => message.id ?? message.info?.id)
 
-test('WHAT[relay-context-projection-006] projection is deterministic and bounded', () => {
-  const first = projection.applyCut(cutMessages, 'old-run', 'suicide-call', ['old-run'], ['u1'])
-  const second = projection.applyCut(cutMessages, 'old-run', 'suicide-call', ['old-run'], ['u1'])
+test('WHAT[relay-context-projection-006] projection is deterministic and retains the complete history', () => {
+  const first = projection.projectMessages(cutMessages)
+  const second = projection.projectMessages(cutMessages)
   assert.deepEqual(first.provider, second.provider)
-  assert.ok(first.provider.length <= first.audit.length)
+  assert.equal(first.provider.length, first.audit.length)
+  assert.equal(first.provider.length, cutMessages.length)
 })

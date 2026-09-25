@@ -25,16 +25,6 @@ const eventsSurface = await import('../../../../dist/OpenCode/Host/EventsSurface
 const dispatchSurface = await import('../../../../dist/Interaction/Dispatch/DispatchSurface.js')
 const obligationJournalSurface = await import('../../../../dist/Persistence/Journal/ObligationJournalSurface.js')
 const sessionBindingSurface = await import('../../../../dist/OpenCode/Host/SessionBindingSurface.js')
-const relayContract = await import('../../../../dist/Mission/Relay/Contract.js')
-const relayFacts = await import('../../../../dist/Mission/Relay/Facts.js')
-const relayFold = await import('../../../../dist/Mission/Relay/Fold.js')
-const durableFact = await import('../../../../dist/Composition/Durable/Fact.js')
-const agentJournal = await import('../../../../dist/Persistence/Journal/AgentJournal.js')
-const identity = await import('../../../../dist/Foundation/Identity.js')
-const envelope = await import('../../../../dist/Persistence/Journal/Envelope.js')
-const list = await import('../../../../dist/fable_modules/fable-library-js.5.13.0/List.js')
-const agentProjection = await import('../../../../dist/Composition/Durable/Projection.js')
-const outcome = await import('../../../../dist/Foundation/Outcome.js')
 
 const withJournalRuntime = async (directory, action) => {
   const journalResult = await workspaceHost.acquireSharedForWorkspace(
@@ -398,18 +388,6 @@ export const acceptChildAgentOwnerRoot = async (runtime, childSessionId, promptK
 }
 
 const resolveJournalHandle = (runtime) => runtime?.journal ?? runtime
-const resolveAgentJournal = (runtime) => {
-  const handle = resolveJournalHandle(runtime)
-  if (handle && typeof handle === 'object') {
-    if (handle.journal && typeof handle.journal === 'object') {
-      return handle.journal
-    }
-    try {
-      return journalSurface.JournalHandle__get_Journal(handle)
-    } catch (_) {}
-  }
-  return handle
-}
 
 export const openIncumbency = async (runtime, sessionId, incumbencyId = `inc-${sessionId}`) => {
   const handle = resolveJournalHandle(runtime)
@@ -420,108 +398,18 @@ export const openIncumbency = async (runtime, sessionId, incumbencyId = `inc-${s
 
 export const injectAuditPendingIncumbency = openIncumbency
 
+// The accepted assessment is a relay durable fact; it is committed through the
+// registered journal surface, so no relay/durable representation crosses here.
 export const injectAcceptedAssessment = async (runtime, sessionId, incumbencyId = `inc-${sessionId}`) => {
-  const journal = resolveAgentJournal(runtime)
-  const snapshot = agentJournal.AgentJournalModule_snapshot(journal)
-  const sessionProj = agentProjection.AgentProjection_tryFind(
-    identity.SessionIdModule_create(sessionId),
-    snapshot.AgentProjections,
+  const result = await obligationJournalSurface.grantWorkOwned(
+    resolveJournalHandle(runtime),
+    sessionId,
+    incumbencyId,
   )
-  const relayState = sessionProj?.Relay
-  const roadId = relayContract.RoadIdModule_create(sessionId)
-  const existingRoad = relayState ? relayFold.Fold_view(relayState, roadId) : undefined
-
-  if (existingRoad?.AcceptedAssessmentTransport != null) {
-    return { ok: true }
+  if (!result?.ok) {
+    throw new Error(`injectAcceptedAssessment(${sessionId}) rejected: ${result?.error ?? 'unknown error'}`)
   }
-
-  const incId = relayContract.IncumbencyIdModule_create(incumbencyId)
-  const snapId = relayContract.WorkspaceSnapshotIdModule_create(`snapshot-${sessionId}`)
-  const authRev = relayContract.AuthorityRevisionModule_create(`rev-${sessionId}`)
-  const physUser = relayContract.PhysicalUserMessageIdModule_create(`phys-${sessionId}`)
-  const assessId = relayContract.AssessmentIdModule_create(`assess-${sessionId}`)
-
-  const binding = new relayContract.AssessmentBinding(
-    `phys-${sessionId}`,
-    `run-${sessionId}`,
-    `tool-${sessionId}`,
-    `narrative-${sessionId}`,
-    `payload-${sessionId}`,
-    `root-${sessionId}`,
-    `req-${sessionId}`,
-    `evidence-${sessionId}`,
-  )
-
-  const scoresRes = relayContract.ScoreVectorModule_tryCreate(
-    list.ofArray([
-      relayContract.ScoreGrade.Perfect,
-      relayContract.ScoreGrade.Perfect,
-      relayContract.ScoreGrade.Perfect,
-      relayContract.ScoreGrade.Perfect,
-      relayContract.ScoreGrade.Perfect,
-      relayContract.ScoreGrade.Perfect,
-      relayContract.ScoreGrade.Perfect,
-      relayContract.ScoreGrade.Revise,
-    ]),
-  )
-  if (scoresRes.tag !== 0) {
-    throw new Error('injectAcceptedAssessment: failed to construct score vector')
-  }
-  const scores = scoresRes.fields[0]
-
-  let events
-  if (existingRoad == null) {
-    events = [
-      new relayFacts.RelayEvent(/* RoadOpened */ 0, [roadId, authRev, physUser]),
-      new relayFacts.RelayEvent(/* IncumbencyOpened */ 2, [incId, snapId]),
-      new relayFacts.RelayEvent(/* AssessmentCommitted */ 3, [assessId, incId, binding, snapId, authRev, scores]),
-    ]
-  } else if (existingRoad.ActiveIncumbency != null && existingRoad.ActiveSnapshotId != null && existingRoad.ActiveAuthorityRevision != null) {
-    events = [
-      new relayFacts.RelayEvent(/* AssessmentCommitted */ 3, [
-        assessId,
-        existingRoad.ActiveIncumbency,
-        binding,
-        existingRoad.ActiveSnapshotId,
-        existingRoad.ActiveAuthorityRevision,
-        scores,
-      ]),
-    ]
-  } else {
-    const currentRev = list.isEmpty(existingRoad.AuthorityRevisions) ? authRev : existingRoad.AuthorityRevision
-    const roadOpened = list.isEmpty(existingRoad.AuthorityRevisions)
-      ? [new relayFacts.RelayEvent(/* RoadOpened */ 0, [roadId, currentRev, physUser])]
-      : []
-    events = [
-      ...roadOpened,
-      new relayFacts.RelayEvent(/* IncumbencyOpened */ 2, [incId, snapId]),
-      new relayFacts.RelayEvent(/* AssessmentCommitted */ 3, [assessId, incId, binding, snapId, currentRev, scores]),
-    ]
-  }
-
-  const txRes = relayFacts.RelayTransactionModule_create(list.ofArray(events))
-  if (txRes.tag !== 0) {
-    throw new Error(`RelayTransaction failed: ${txRes.fields[0]}`)
-  }
-  const tx = txRes.fields[0]
-  const fact = new durableFact.AgentFact(/* Relay */ 2, [
-    new relayFacts.RelayFactCases({
-      RoadId: roadId,
-      Transaction: tx,
-    }),
-  ])
-
-  const appendRes = await agentJournal.AgentJournalModule_appendAgent(
-    new envelope.StreamId(/* Session */ 1, [identity.SessionIdModule_create(sessionId)]),
-    undefined,
-    fact,
-    journal,
-  )
-  if (appendRes.tag === 1) {
-    const err = outcome.JournalAppendFailureModule_describe(appendRes.fields[0])
-    throw new Error(`injectAcceptedAssessment(${sessionId}) rejected: ${err}`)
-  }
-  return { ok: true }
+  return result
 }
 
 export const grantWorkOwned = injectAcceptedAssessment

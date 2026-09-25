@@ -1,58 +1,16 @@
 namespace Wanxiangshu.Participant.Persona
 
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 
-/// JS-native office-capability owner. The manager's forkable office law is
-/// projected as labels so callers never decode Role unions or F# collections.
+/// JS-native office-capability owner. Role and permission labels are vocabulary
+/// at this edge; callers never decode Role unions or F# collections.
 [<RequireQualifiedAccess>]
 module OfficeCapabilitySurface =
 
-    let private permissionOf (label: string) : ToolPermission option =
-        match label with
-        | "Fork" -> Some ToolPermission.Fork
-        | "Resume" -> Some ToolPermission.Resume
-        | "Join" -> Some ToolPermission.Join
-        | "Horizon" -> Some ToolPermission.Horizon
-        | "Fission" -> Some ToolPermission.Fission
-        | "Read" -> Some ToolPermission.Read
-        | "Write" -> Some ToolPermission.Write
-        | "Edit" -> Some ToolPermission.Edit
-        | "Glob" -> Some ToolPermission.Glob
-        | "Grep" -> Some ToolPermission.Grep
-        | "Move" -> Some ToolPermission.Move
-        | "Remove" -> Some ToolPermission.Remove
-        | "Exec" -> Some ToolPermission.Exec
-        | "Pty" -> Some ToolPermission.Pty
-        | "ReviewAssessment" -> Some ToolPermission.ReviewAssessment
-        | "Chronicle" -> Some ToolPermission.Chronicle
-        | "Fetch" -> Some ToolPermission.Fetch
-        | "Finality" -> Some ToolPermission.Finality
-        | "BashHoneypot" -> Some ToolPermission.BashHoneypot
-        | "Sphinx" -> Some ToolPermission.Sphinx
-        | _ -> None
-
-    let private permissionLabel (permission: ToolPermission) : string =
-        match permission with
-        | ToolPermission.Fork -> "Fork"
-        | ToolPermission.Resume -> "Resume"
-        | ToolPermission.Join -> "Join"
-        | ToolPermission.Horizon -> "Horizon"
-        | ToolPermission.Fission -> "Fission"
-        | ToolPermission.Read -> "Read"
-        | ToolPermission.Write -> "Write"
-        | ToolPermission.Edit -> "Edit"
-        | ToolPermission.Glob -> "Glob"
-        | ToolPermission.Grep -> "Grep"
-        | ToolPermission.Move -> "Move"
-        | ToolPermission.Remove -> "Remove"
-        | ToolPermission.Exec -> "Exec"
-        | ToolPermission.Pty -> "Pty"
-        | ToolPermission.ReviewAssessment -> "ReviewAssessment"
-        | ToolPermission.Chronicle -> "Chronicle"
-        | ToolPermission.Fetch -> "Fetch"
-        | ToolPermission.Finality -> "Finality"
-        | ToolPermission.BashHoneypot -> "BashHoneypot"
-        | ToolPermission.Sphinx -> "Sphinx"
+    [<Emit("$0 == null")>]
+    let private isNullish (value: obj) : bool = jsNative
 
     let private officeName role =
         match role with
@@ -76,12 +34,45 @@ module OfficeCapabilitySurface =
         | Some role ->
             OfficeCapability.permissions role
             |> Set.toList
-            |> List.map permissionLabel
+            |> List.map OfficeCapability.permissionLabel
             |> List.sort
             |> List.toArray
 
     /// Unknown role or permission is denied.
     let isAllowed (roleLabel: string) (permissionLabel: string) : bool =
-        match Roles.tryParseRole roleLabel, permissionOf permissionLabel with
+        match Roles.tryParseRole roleLabel, OfficeCapability.permissionOfLabel permissionLabel with
         | Some role, Some permission when Roles.all |> List.contains role -> OfficeCapability.isAllowed role permission
+        | _ -> false
+
+    /// capability-enforcement-025: manager gate facts as a plain JS object. The
+    /// caller declares the four facts and never sees the F# record.
+    let managerFacts
+        (hasActiveIncumbency: bool)
+        (hasAssessment: bool)
+        (hasValidCertificate: bool)
+        (cleanupBlockerDigest: string)
+        : obj =
+        box
+            {| hasActiveIncumbency = hasActiveIncumbency
+               hasAssessment = hasAssessment
+               hasValidCertificate = hasValidCertificate
+               cleanupBlockerDigest = cleanupBlockerDigest |}
+
+    let private factsOfJs (facts: obj) : ManagerCapabilityFacts option =
+        if isNullish facts then
+            None
+        else
+            let digest: string = facts?cleanupBlockerDigest
+
+            Some
+                { HasActiveIncumbency = unbox<bool> (facts?hasActiveIncumbency)
+                  HasAssessment = unbox<bool> (facts?hasAssessment)
+                  HasValidBoundCertificate = unbox<bool> (facts?hasValidCertificate)
+                  CleanupBlockerDigest = if isNullish digest then None else Some digest }
+
+    /// capability-enforcement-025: the fact-driven manager gate. Missing facts and
+    /// unknown permission labels both fail closed.
+    let managerFactsAllowed (facts: obj) (permissionLabel: string) : bool =
+        match factsOfJs facts, OfficeCapability.permissionOfLabel permissionLabel with
+        | Some facts, Some permission -> OfficeCapability.isAllowedForManagerFacts facts permission
         | _ -> false

@@ -93,6 +93,8 @@
     <Compile Include="OpenCode/Host/PluginHostInterop.fs"/>
     <Compile Include="OpenCode/Host/PluginHooksSurface.fsi"/>
     <Compile Include="OpenCode/Host/PluginHooksSurface.fs"/>
+    <Compile Include="OpenCode/Host/ManagerReviewContract.fsi"/>
+    <Compile Include="OpenCode/Host/ManagerReviewContract.fs"/>
     <Compile Include="OpenCode/Host/BloggerChronicleText.fsi"/>
     <Compile Include="OpenCode/Host/BloggerChronicleText.fs"/>
     <Compile Include="OpenCode/Host/PluginHost.fsi"/>
@@ -109,8 +111,6 @@
     <Compile Include="OpenCode/Plugin/PluginRecoveryWiring.fs"/>
     <Compile Include="OpenCode/Plugin/PluginTransforms.fsi"/>
     <Compile Include="OpenCode/Plugin/PluginTransforms.fs"/>
-    <Compile Include="OpenCode/Host/ManagerReviewContract.fsi"/>
-    <Compile Include="OpenCode/Host/ManagerReviewContract.fs"/>
     <Compile Include="OpenCode/Plugin/PluginHooks.fsi"/>
     <Compile Include="OpenCode/Plugin/PluginHooks.fs"/>
     <Compile Include="OpenCode/Plugin/SpikePlugin.fsi"/>

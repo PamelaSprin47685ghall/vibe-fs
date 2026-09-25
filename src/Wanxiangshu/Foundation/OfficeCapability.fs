@@ -41,10 +41,7 @@ type ManagerCapabilityFacts =
 module OfficeCapability =
 
     let managerReviewReadOnlyPermissions: ToolPermission Set =
-        set
-            [ ToolPermission.Read
-              ToolPermission.Glob
-              ToolPermission.Grep ]
+        set [ ToolPermission.Read; ToolPermission.Glob; ToolPermission.Grep ]
 
     let permissions (role: Role) : ToolPermission Set =
         match role with
@@ -127,3 +124,52 @@ module OfficeCapability =
 
     let isAllowedForManagerFacts (facts: ManagerCapabilityFacts) (permission: ToolPermission) : bool =
         permissionsForManagerFacts facts |> Set.contains permission
+
+    /// Stable JS-native label for one permission.
+    let permissionLabel (permission: ToolPermission) : string =
+        match permission with
+        | ToolPermission.Fork -> "Fork"
+        | ToolPermission.Resume -> "Resume"
+        | ToolPermission.Join -> "Join"
+        | ToolPermission.Horizon -> "Horizon"
+        | ToolPermission.Fission -> "Fission"
+        | ToolPermission.Read -> "Read"
+        | ToolPermission.Write -> "Write"
+        | ToolPermission.Edit -> "Edit"
+        | ToolPermission.Glob -> "Glob"
+        | ToolPermission.Grep -> "Grep"
+        | ToolPermission.Move -> "Move"
+        | ToolPermission.Remove -> "Remove"
+        | ToolPermission.Exec -> "Exec"
+        | ToolPermission.Pty -> "Pty"
+        | ToolPermission.ReviewAssessment -> "ReviewAssessment"
+        | ToolPermission.Chronicle -> "Chronicle"
+        | ToolPermission.Fetch -> "Fetch"
+        | ToolPermission.Finality -> "Finality"
+        | ToolPermission.BashHoneypot -> "BashHoneypot"
+        | ToolPermission.Sphinx -> "Sphinx"
+
+    /// Unknown labels are not a permission.
+    let permissionOfLabel (label: string) : ToolPermission option =
+        match label with
+        | "Fork" -> Some ToolPermission.Fork
+        | "Resume" -> Some ToolPermission.Resume
+        | "Join" -> Some ToolPermission.Join
+        | "Horizon" -> Some ToolPermission.Horizon
+        | "Fission" -> Some ToolPermission.Fission
+        | "Read" -> Some ToolPermission.Read
+        | "Write" -> Some ToolPermission.Write
+        | "Edit" -> Some ToolPermission.Edit
+        | "Glob" -> Some ToolPermission.Glob
+        | "Grep" -> Some ToolPermission.Grep
+        | "Move" -> Some ToolPermission.Move
+        | "Remove" -> Some ToolPermission.Remove
+        | "Exec" -> Some ToolPermission.Exec
+        | "Pty" -> Some ToolPermission.Pty
+        | "ReviewAssessment" -> Some ToolPermission.ReviewAssessment
+        | "Chronicle" -> Some ToolPermission.Chronicle
+        | "Fetch" -> Some ToolPermission.Fetch
+        | "Finality" -> Some ToolPermission.Finality
+        | "BashHoneypot" -> Some ToolPermission.BashHoneypot
+        | "Sphinx" -> Some ToolPermission.Sphinx
+        | _ -> None

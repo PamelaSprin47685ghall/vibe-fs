@@ -8,3 +8,13 @@ module ToolSurface =
     val toolSpecNames: unit -> string array
     val bashHoneypotContract: unit -> obj
     val chronicleContract: unit -> obj
+
+    /// capability-enforcement-009/025: the review-only tool catalog and the
+    /// semantic permissions one tool name maps to, as stable labels.
+    val reviewToolNames: unit -> string array
+    val isReviewTool: toolName: string -> bool
+    val reviewToolPermissions: toolName: string -> string array
+
+    /// capability-enforcement-012: the host permission rules a canonical role
+    /// projects. An unknown role projects no tool at all.
+    val rolePermissionRules: roleLabel: string -> obj

@@ -19,6 +19,7 @@ module JsRuntimeSurface =
         // DSL-MUTABLE: resource — JS mutation staging buffer handed off in handle
         let staging = ResizeArray<JsStagedMutation>()
         let readSnapshots = ResizeArray<JsReadSnapshot>()
+
         let allCapabilities =
             set
                 [ JsCapability.Read
@@ -26,7 +27,25 @@ module JsRuntimeSurface =
                   JsCapability.Edit
                   JsCapability.Glob
                   JsCapability.Grep ]
+
         let api = JsToolsBindings.createApi allCapabilities root staging readSnapshots
+        box (JsBindingsHandle(api, staging, readSnapshots))
+
+    let private capabilityOfLabel (label: string) : JsCapability option =
+        match label with
+        | "Read" -> Some JsCapability.Read
+        | "Write" -> Some JsCapability.Write
+        | "Edit" -> Some JsCapability.Edit
+        | "Glob" -> Some JsCapability.Glob
+        | "Grep" -> Some JsCapability.Grep
+        | _ -> None
+
+    let createApiFor (root: string) (permissionLabels: string array) : obj =
+        // DSL-MUTABLE: resource — JS mutation staging buffer handed off in handle
+        let staging = ResizeArray<JsStagedMutation>()
+        let readSnapshots = ResizeArray<JsReadSnapshot>()
+        let capabilities = permissionLabels |> Array.choose capabilityOfLabel |> Set.ofArray
+        let api = JsToolsBindings.createApi capabilities root staging readSnapshots
         box (JsBindingsHandle(api, staging, readSnapshots))
 
     let api (handle: obj) : obj = (unbox<JsBindingsHandle> handle).Api

@@ -360,11 +360,11 @@ export async function bindManagerLoopSequence(scenario) {
   assert.ok(loopJoin, 'long-stroke: manager-loop join entry is required');
   const initialLoopAction = loopAction.respond;
   const initialLoopJoin = loopJoin.respond;
-  const currentActionTodo = runtime.scenario.entries.find(
+  const currentActionAssumption = runtime.scenario.entries.find(
     (entry) => entry.turnId === 'manager-current-action' && entry.step === 0,
   );
-  assert.ok(currentActionTodo, 'long-stroke: Manager current-action todowrite is required');
-  const currentActionTodoResponse = currentActionTodo.respond;
+  assert.ok(currentActionAssumption, 'long-stroke: Manager current-action assumption is required');
+  const currentActionAssumptionResponse = currentActionAssumption.respond;
   const humanAudit = runtime.scenario.entries.find(
     (entry) => entry.turnId === 'humanroot-loop' && entry.step === 0,
   );
@@ -403,7 +403,7 @@ export async function bindManagerLoopSequence(scenario) {
   // Initial deliveries stay as declared (low audit + work fork; HumanRoot low).
   // Later responses are selected by the new incarnation's audit delivery count.
   let latestManagerAuditAttempt = 0;
-  let managerTodoDelivered = false;
+  let managerAssumptionDelivered = false;
   let initialWorkJoined = false;
   let repairWorkJoined = false;
   const consume = runtime.consume;
@@ -433,18 +433,32 @@ export async function bindManagerLoopSequence(scenario) {
               },
             }
           : retire();
-    } else if (entry?.id === 'manager-loop.2') {
+    } else if (entry?.id === 'manager-reopened-loop.1') {
+      // A successor incarnation opens no work of its own unless the audit assigned it:
+      // only the repair iteration forks, everything else closes with the declared close.
+      entry.respond = latestManagerAuditAttempt === 3
+        ? {
+            type: 'tool-call',
+            tool: 'fork',
+            args: {
+              calling: 'engineer',
+              name: 'Conflict Resolver',
+              charge: 'Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary',
+            },
+          }
+        : retire();
+    } else if (entry?.id === 'manager-loop.2' || entry?.id === 'manager-reopened-loop.2') {
       entry.respond = latestManagerAuditAttempt === 1
         ? initialLoopJoin
         : latestManagerAuditAttempt === 3
           ? { type: 'text', text: 'Repair dispatched; await the owner work resource.' }
           : retire();
     } else if (entry?.id === 'manager-t1-commitment.0') {
-      managerTodoDelivered = true;
+      managerAssumptionDelivered = true;
     } else if (entry?.turnId === 'manager-current-action') {
-      if (!managerTodoDelivered) {
-        entry.respond = currentActionTodoResponse;
-        managerTodoDelivered = true;
+      if (!managerAssumptionDelivered) {
+        entry.respond = currentActionAssumptionResponse;
+        managerAssumptionDelivered = true;
       } else if (latestManagerAuditAttempt === 1 && !initialWorkJoined) {
         entry.respond = joinOwnedWork();
         initialWorkJoined = true;
@@ -806,51 +820,52 @@ const providerPlanOf = (request) => ({
 /**
  * Assert every fresh iteration preserves the provider-visible authority prefix:
  * same normalized system/tools plan and same typed authority users in order.
- * Later incarnations may append exactly the owner-controlled assessment resource.
- * Compares message structure only.
+ * A successor iteration is identified by its appended owner-controlled
+ * assessment resource, and it retains the full predecessor physical history —
+ * the retired epoch's messages, tool calls, results and internal wake stay in
+ * the provider context instead of being cut. Compares message structure only.
  */
 export function assertManagerLoopAuthorityPreserved(scenario, sessionId) {
   assert.ok(typeof sessionId === 'string' && sessionId.length > 0, 'manager-loop: session id required');
   const requests = canaryRequestsFor(scenario, sessionId);
   assert.ok(requests.length >= 2, `manager-loop: expected initial + next iteration requests (got ${requests.length})`);
-  const firsts = requests.filter((request) => !hasAssistantOrToolMessages(request));
-  assert.ok(firsts.length >= 2, `manager-loop: expected at least two iteration-first requests carrying only the current iteration (got ${firsts.length})`);
-  const baselinePlan = providerPlanOf(firsts[0]);
-  const baselineUsers = messageTextsByRole(firsts[0], 'user');
+  const baselinePlan = providerPlanOf(requests[0]);
+  const baselineUsers = messageTextsByRole(requests[0], 'user');
   assert.ok(baselineUsers.length >= 1, 'manager-loop: initial iteration must carry typed authority user messages');
-  // The ordinal sentence leads the resource; the digit is the successor number,
-  // so the anchor stops before it and never has to be re-pinned per iteration.
+  // The ordinal sentence leads the appended resource; the digit is the
+  // successor number, so the anchor stops before it and never has to be
+  // re-pinned per iteration.
   const assessmentResource = '# You are the ';
-  for (const [index, request] of firsts.entries()) {
+  const successorOrdinals = [];
+  for (const request of requests) {
+    const users = messageTextsByRole(request, 'user');
+    const appended = users.at(-1) ?? '';
+    if (!appended.startsWith(assessmentResource)) continue;
+    const ordinal = /# You are the (\d+) Manager taking over this mission\./.exec(appended)?.[1];
+    assert.ok(ordinal, 'manager-loop: successor request must carry the successor ordinal resource');
+    if (successorOrdinals.includes(ordinal)) continue;
+    successorOrdinals.push(ordinal);
+    const successor = Number(ordinal);
+    assert.ok(successor >= 2, `manager-loop: successor ordinal must be at least 2 (got ${ordinal})`);
     assert.deepEqual(
       providerPlanOf(request),
       baselinePlan,
-      `manager-loop: iteration #${index + 1} must keep the same normalized system/tools plan as the initial iteration`,
+      `manager-loop: successor iteration #${successor} must keep the same normalized system/tools plan as the initial iteration`,
     );
-    const users = messageTextsByRole(request, 'user');
     assert.deepEqual(
       users.slice(0, baselineUsers.length),
       baselineUsers,
-      `manager-loop: iteration #${index + 1} must preserve the typed authority user prefix`,
+      `manager-loop: successor iteration #${successor} must preserve the typed authority user prefix`,
     );
     assert.ok(
-      users.length === baselineUsers.length
-        || (users.length === baselineUsers.length + 1 && users.at(-1)?.startsWith(assessmentResource)),
-      `manager-loop: iteration #${index + 1} may append only the exact assessment resource`,
+      hasAssistantOrToolMessages(request),
+      `manager-loop: successor iteration #${successor} must retain the predecessor physical history`,
     );
-
-    // The successor ordinal is bound into the appended resource, and it must
-    // equal this iteration's 1-based position among the observed iteration-firsts.
-    const appended = users.at(-1) ?? '';
-    if (users.length === baselineUsers.length + 1) {
-      const ordinal = /# You are the (\d+) Manager taking over this mission\./.exec(appended)?.[1];
-      assert.equal(
-        ordinal,
-        String(index + 1),
-        `manager-loop: iteration #${index + 1} must be told it is successor ${index + 1}, got ${ordinal}`,
-      );
-    }
   }
+  assert.ok(
+    successorOrdinals.length >= 1,
+    `manager-loop: expected at least one successor iteration request (got ${successorOrdinals.length})`,
+  );
 }
 
 const canaryRequestsFor = (scenario, sessionId) =>
@@ -899,18 +914,30 @@ export async function assertHumanRootManagerLoop(scenario, sessionId, label = 'h
   await awaitNamedFact(workDir, waitFactShape('RetirementCommitted', { eq: 2 }), { timeoutMs: WAIT_FACT_WINDOW_MS });
   await awaitNamedFact(workDir, waitFactShape('IncumbencyOpened', { eq: 2 }), { timeoutMs: WAIT_FACT_WINDOW_MS });
 
-  // ONE reusable humanroot-loop family: each step delivered twice (initial +
-  // next iteration). An IncumbencyOpened fact alone is an event-only fake;
-  // physically observed deliveries under the same LogicalRun prove the loop.
+  // The authority-turn family answers the initial iteration only: once the successor
+  // carries the owner-controlled assess resource as its last user message, the
+  // assess-resource family (same review + suicide shape, perfect audit) answers it.
+  // An IncumbencyOpened fact alone is an event-only fake; physically observed
+  // deliveries under the same LogicalRun prove the loop.
   assert.equal(
     scenario.provider.matchCount('humanroot-loop.0'),
-    2,
-    `${label}: reusable humanroot-loop audit must be delivered twice (low then perfect)`,
+    1,
+    `${label}: authority-turn audit must be delivered once (low score → Continue)`,
   );
   assert.equal(
     scenario.provider.matchCount('humanroot-loop.1'),
-    2,
-    `${label}: reusable humanroot-loop close must be delivered twice (Continue then Accepted)`,
+    1,
+    `${label}: authority-turn close must be delivered once (Continue retirement)`,
+  );
+  assert.equal(
+    scenario.provider.matchCount('manager-reopened-loop.0'),
+    1,
+    `${label}: successor iteration audit must be delivered once (perfect → Accepted)`,
+  );
+  assert.equal(
+    scenario.provider.matchCount('manager-reopened-loop.1'),
+    1,
+    `${label}: successor iteration close must be delivered once (Accepted retirement)`,
   );
 
   const requests = canaryRequestsFor(scenario, sessionId);
@@ -932,16 +959,17 @@ export async function assertHumanRootManagerLoop(scenario, sessionId, label = 'h
 
   // Pure-loop authority: the next iteration carries the same system/provider
   // plan and the same typed authority user sequence as the initial iteration.
-  // Each iteration-first carries only the current iteration, with the internal
-  // wake stripped (next first has no assistant/tool at all). ONE reusable
-  // humanroot-loop family covers both iterations, so iterations are never
-  // distinguished by prompt text; the assertion below is on provider-visible
-  // message structure only.
+  // The next iteration now retains the full predecessor physical history —
+  // the first-iteration review call/result and the suicide call stay in the
+  // provider context, with the owner-controlled assessment resource appended.
+  // ONE reusable humanroot-loop family covers both iterations, so iterations
+  // are never distinguished by prompt text; the assertions below are on
+  // provider-visible message structure only.
   assertManagerLoopAuthorityPreserved(scenario, sessionId);
   assert.equal(
     hasAssistantOrToolMessages(requests[2]),
-    false,
-    `${label}: next iteration-first must carry only the current iteration with the wake stripped`,
+    true,
+    `${label}: next iteration-first must retain the predecessor physical history`,
   );
 
   const firstIterationReviewIds = assistantToolCallIds([requests[1]], 'review');
@@ -955,8 +983,8 @@ export async function assertHumanRootManagerLoop(scenario, sessionId, label = 'h
       request.messages.some((message) =>
         message.tool_call_id === firstIterationReviewIds[0]
         || message.tool_calls?.some((call) => call.id === firstIterationReviewIds[0])),
-      false,
-      `${label}: next iteration must exclude the first-iteration review call/result`,
+      true,
+      `${label}: next iteration must retain the first-iteration review call/result in its history`,
     );
   }
 

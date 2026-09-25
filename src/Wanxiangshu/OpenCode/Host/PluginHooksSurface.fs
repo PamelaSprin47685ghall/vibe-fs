@@ -8,6 +8,7 @@ open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Persistence.Journal
 
 module PluginHooksSurface =
@@ -34,6 +35,9 @@ module PluginHooksSurface =
                lifecycle = sprintf "%A" outcome.Lifecycle
                settlement = sprintf "%A" outcome.Settlement
                hasExecutionKey = outcome.ExecutionKey.IsSome |}
+
+    let decorateReviewToolDefinition (toolID: string) (definition: obj) : unit =
+        ManagerReviewContract.decorateDefinition (box {| toolID = toolID |}) definition
 
     let hookFailurePolicy failure settlement : string =
         let typedFailure =

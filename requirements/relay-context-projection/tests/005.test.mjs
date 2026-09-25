@@ -18,12 +18,12 @@ const cutMessages = [
   { id: 'a2', run: 'new-run', role: 'assistant', text: 'next iteration audit' },
 ]
 
-const cutResult = () => projection.applyCut(cutMessages, 'old-run', 'suicide-call', ['old-run'], ['u1'])
+const cutResult = () => projection.projectMessages(cutMessages)
 
 const ids = (result) => result.provider.map((message) => message.id ?? message.info?.id)
 
-test('WHAT[relay-context-projection-005] next iteration shows the current-iteration tail after a clean authority start', () => {
+test('WHAT[relay-context-projection-005] provider history keeps physical order with the current-iteration tail last', () => {
   const provider = ids(cutResult())
-  assert.equal(provider[0], 'u1')
-  assert.equal(provider[provider.length - 1], 'a2')
+  assert.deepEqual(provider, ['u1', 'a1', 't1', 'r1', 'a-late', 'wake-1', 'a2'])
+  assert.equal(provider[provider.length - 1], 'a2', 'current iteration tail must remain the last physical message')
 })

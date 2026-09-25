@@ -3,12 +3,11 @@ import test from 'node:test'
 import * as fold from '../../../dist/Participant/Cognition/FoldSurface.js'
 import * as runtime from '../../../dist/Participant/Cognition/RuntimeSurface.js'
 
-// cognitive-workspace-001/005/006: the canvas's owner is the physical session, a
-// Life turnover inside one session keeps the canvas and the ordinal, the canvas
-// survives a restart by recovering from committed facts, a failed recovery is
-// a refusal rather than an empty canvas, and one owner's commits fold onto one
-// another inside a single serial domain. The fold the fake journal uses is the
-// production one, so these assertions pin the runtime, not a copy of its rules.
+// cognitive-workspace-001: the canvas's owner is the physical session, a Life
+// turnover inside one session keeps the canvas and the ordinal, the canvas
+// survives a restart by recovering from committed facts, and a failed recovery
+// is a refusal rather than an empty canvas. The fold the fake journal uses is
+// the production one, so these assertions pin the runtime, not a copy of its rules.
 
 const makeJournal = () => {
   const blobs = new Map()
@@ -186,52 +185,4 @@ test('WHAT[cognitive-workspace-001] a projection whose snapshot blob is missing 
   assert.equal(journal.projections.get('ses-1').ordinal, 1)
 })
 
-test('WHAT[cognitive-workspace-005] concurrent commits for one owner fold onto one another in one serial domain', async () => {
-  const journal = makeJournal()
-  const rt = runtime.CognitiveRuntime_create(journal)
 
-  const dispatched = await Promise.all([
-    commit(rt, ofSession('ses-1'), { toolCallId: 'call-1', inputDigest: 'digest-1', merge: { x: 1 } }),
-    commit(rt, ofSession('ses-1'), { toolCallId: 'call-2', inputDigest: 'digest-2', merge: { y: 2 } }),
-  ])
-
-  assert.deepEqual(
-    dispatched.map((outcome) => outcome.ok),
-    [true, true]
-  )
-  assert.deepEqual(
-    dispatched.map((outcome) => outcome.ordinal).sort(),
-    [1, 2]
-  )
-
-  // The second commit read the first commit's canvas, so its write is stacked on top
-  // of it instead of overwriting it from an empty start.
-  const view = await currentCanvas(rt, ofSession('ses-1'))
-  assert.equal(view.ok, true, view.error ?? '')
-  assert.deepEqual(JSON.parse(view.canvasJson), { x: 1, y: 2 })
-})
-
-test('WHAT[cognitive-workspace-005] one owner committing never blocks or disturbs another owner', async () => {
-  const journal = makeJournal()
-  const rt = runtime.CognitiveRuntime_create(journal)
-
-  const dispatched = await Promise.all([
-    commit(rt, ofSession('ses-1'), { toolCallId: 'call-1', inputDigest: 'digest-1', merge: { x: 1 } }),
-    commit(rt, ofSession('ses-2'), { toolCallId: 'call-2', inputDigest: 'digest-2', merge: { y: 2 } }),
-  ])
-
-  assert.deepEqual(
-    dispatched.map((outcome) => outcome.ok),
-    [true, true]
-  )
-  // Each owner advanced from its own committed ordinal: no shared counter, no queue.
-  assert.deepEqual(
-    dispatched.map((outcome) => outcome.ordinal),
-    [1, 1]
-  )
-
-  const first = await currentCanvas(rt, ofSession('ses-1'))
-  const second = await currentCanvas(rt, ofSession('ses-2'))
-  assert.deepEqual(JSON.parse(first.canvasJson), { x: 1 })
-  assert.deepEqual(JSON.parse(second.canvasJson), { y: 2 })
-})

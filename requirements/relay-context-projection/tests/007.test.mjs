@@ -18,11 +18,11 @@ const cutMessages = [
   { id: 'a2', run: 'new-run', role: 'assistant', text: 'next iteration audit' },
 ]
 
-const cutResult = () => projection.applyCut(cutMessages, 'old-run', 'suicide-call', ['old-run'], ['u1'])
+const cutResult = () => projection.projectMessages(cutMessages)
 
 const ids = (result) => result.provider.map((message) => message.id ?? message.info?.id)
 
-test('WHAT[relay-context-projection-007] Accepted retirement reopened after invalidation cuts to authority plus current tail', () => {
+test('WHAT[relay-context-projection-007] Accepted retirement reopened after invalidation retains the full physical history', () => {
   const messages = [
     { id: 'root', run: '', role: 'user', text: 'root request' },
     { id: 'old-audit', run: 'old-run', role: 'assistant', text: 'perfect assessment narrative' },
@@ -37,6 +37,6 @@ test('WHAT[relay-context-projection-007] Accepted retirement reopened after inva
     { id: 'wake', run: '', role: 'user', text: 'internal loop wake' },
     { id: 'current', run: 'new-run', role: 'assistant', text: 'reopened iteration audit' },
   ]
-  const result = projection.applyCut(messages, 'old-run', 'suicide-accepted', ['old-run'], ['root'])
-  assert.deepEqual(ids(result), ['root', 'current'])
+  const result = projection.projectMessages(messages)
+  assert.deepEqual(ids(result), ['root', 'old-audit', 'suicide', 'late-old', 'wake', 'current'])
 })

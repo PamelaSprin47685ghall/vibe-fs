@@ -37,3 +37,7 @@ module OfficeCapability =
     val isAllowed: role: Role -> permission: ToolPermission -> bool
     val permissionsForManagerFacts: facts: ManagerCapabilityFacts -> ToolPermission Set
     val isAllowedForManagerFacts: facts: ManagerCapabilityFacts -> permission: ToolPermission -> bool
+    /// Stable JS-native label for one permission. Single definition point for every
+    /// surface that carries permissions across the JS edge.
+    val permissionLabel: permission: ToolPermission -> string
+    val permissionOfLabel: label: string -> ToolPermission option

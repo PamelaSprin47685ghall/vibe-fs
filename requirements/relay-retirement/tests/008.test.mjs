@@ -19,17 +19,16 @@ const cutMessages = [
   { id: 'a2', run: 'new-run', role: 'assistant', text: 'next iteration audit' },
 ]
 
-const cutResult = () =>
-  projection.applyCut(cutMessages, 'old-run', 'suicide-call', ['old-run'], ['u1'])
+const cutResult = () => projection.projectMessages(cutMessages)
 
 const ids = (result) => result.provider.map((message) => message.id ?? message.info?.id)
 
-test('WHAT[relay-retirement-008] RETIRE_008_physical_interruption_boundary_drops_retired_tail_and_loop_wake', () => {
+test('WHAT[relay-retirement-008] RETIRE_008_physical_interruption_boundary_retains_full_physical_history', () => {
   const providerIds = ids(cutResult())
-  assert.equal(providerIds.includes('a-late'), false, 'late retired part must be dropped')
-  assert.equal(providerIds.includes('wake-1'), false, 'internal loop wake must be dropped')
-  assert.equal(providerIds.includes('t1'), false, 'suicide tool call must be dropped')
-  assert.equal(providerIds.includes('r1'), false, 'suicide tool result must be dropped')
+  assert.equal(providerIds.includes('a-late'), true, 'late retired part must be retained')
+  assert.equal(providerIds.includes('wake-1'), true, 'internal loop wake must be retained')
+  assert.equal(providerIds.includes('t1'), true, 'suicide tool call must be retained')
+  assert.equal(providerIds.includes('r1'), true, 'suicide tool result must be retained')
   assert.equal(providerIds.includes('u1'), true, 'root authority must be preserved')
   assert.equal(providerIds.includes('a2'), true, 'new iteration audit must be preserved')
 })
@@ -95,8 +94,10 @@ test('WHAT[relay-retirement-008] suicide interrupts the old Host attempt before 
       messages: [...messages, gate],
     }
     await hooks['experimental.chat.messages.transform']({ sessionID }, nextRequest)
-    assert.ok(nextRequest.messages.some((message) => message.info?.id === rootID))
-    assert.equal(nextRequest.messages.some((message) => message.info?.id === retiredRun.id), false)
+    assert.ok(nextRequest.messages.some((message) => message.info?.id === rootID), 'root authority stays in the retained history')
+    assert.ok(nextRequest.messages.some((message) => message.info?.id === review.id), 'the next iteration request retains the full physical history')
+    assert.ok(nextRequest.messages.some((message) => message.info?.id === retiredRun.id), 'the suicide call stays in the retained history')
+    assert.ok(nextRequest.messages.some((message) => message.info?.id === nextUser.id), 'the gate message is appended after the retained history')
     assert.deepEqual(runtime.abortedIds, [sessionID], 'the new manager must not inherit the old interrupt')
 
     const human = {

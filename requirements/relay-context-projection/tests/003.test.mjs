@@ -18,16 +18,13 @@ const cutMessages = [
   { id: 'a2', run: 'new-run', role: 'assistant', text: 'next iteration audit' },
 ]
 
-const cutResult = () => projection.applyCut(cutMessages, 'old-run', 'suicide-call', ['old-run'], ['u1'])
+const cutResult = () => projection.projectMessages(cutMessages)
 
 const ids = (result) => result.provider.map((message) => message.id ?? message.info?.id)
 
-test('WHAT[relay-context-projection-003] next iteration context contains exact authority and existing current messages', () => {
+test('WHAT[relay-context-projection-003] next iteration context contains the full physical set with the authority root preserved', () => {
   const result = cutResult()
-  assert.deepEqual(
-    result.provider.filter((message) => ['u1'].includes(message.id)).map((message) => message.id),
-    ['u1'],
-  )
+  assert.ok(ids(result).includes('u1'), 'typed authority root must remain present')
   for (const message of result.provider) {
     assert.ok(cutMessages.some((origin) => origin.id === message.id), 'provider must not inject synthetic messages')
   }

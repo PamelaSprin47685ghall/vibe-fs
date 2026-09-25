@@ -648,6 +648,37 @@ module ForkTool =
 
             executeManagerNewCalling scope runtime context request language handles existingByname
 
+    let private resumeOnRuntime
+        (scope: ToolRuntimeScope)
+        (request: Request)
+        (context: HostToolContext)
+        language
+        isDevOps
+        =
+        match scope.RuntimeFor context with
+        | Error _ -> task { return consequence (prose language Path.Fork.ChargeContextUnavailable) }
+        | Ok runtime ->
+            let handles = agentHandles scope context
+
+            let existingByname =
+                handles |> Option.bind (HandleProjection.tryFindByByname request.Name)
+
+            executeForkOnRuntime scope request context language handles existingByname isDevOps runtime
+
+    let private resumeDevOpsAssessmentPending (scope: ToolRuntimeScope) parentSessionId isDevOps =
+        if isDevOps then
+            let roadSessionId = SessionId.value parentSessionId
+            let facts = scope.ManagerCapabilityFactsFor roadSessionId
+            not facts.HasAssessment
+        else
+            false
+
+    let private bindRoadDevOpsIfNeeded (scope: ToolRuntimeScope) parentSessionId isDevOps =
+        task {
+            if isDevOps then
+                do! scope.EnsureRoadDevOpsBound parentSessionId
+        }
+
     let private executeManagerResumeAfterGuards
         (scope: ToolRuntimeScope)
         (request: Request)
@@ -664,29 +695,11 @@ module ForkTool =
             let isDevOps =
                 String.Equals(request.Name.Trim(), "devops", StringComparison.OrdinalIgnoreCase)
 
-            let isDevOpsWithoutAssessment =
-                if isDevOps then
-                    let roadSessionId = SessionId.value parentSessionId
-                    let facts = scope.ManagerCapabilityFactsFor roadSessionId
-                    not facts.HasAssessment
-                else
-                    false
-
-            if isDevOpsWithoutAssessment then
+            if resumeDevOpsAssessmentPending scope parentSessionId isDevOps then
                 return consequence (prose language Path.Resume.AssessmentPendingForDevOps)
             else
-                if isDevOps then
-                    do! scope.EnsureRoadDevOpsBound parentSessionId
-
-                match scope.RuntimeFor context with
-                | Error _ -> return consequence (prose language Path.Fork.ChargeContextUnavailable)
-                | Ok runtime ->
-                    let handles = agentHandles scope context
-
-                    let existingByname =
-                        handles |> Option.bind (HandleProjection.tryFindByByname request.Name)
-
-                    return! executeForkOnRuntime scope request context language handles existingByname isDevOps runtime
+                do! bindRoadDevOpsIfNeeded scope parentSessionId isDevOps
+                return! resumeOnRuntime scope request context language isDevOps
         }
 
     let private executeManagerResume (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =

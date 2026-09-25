@@ -268,19 +268,21 @@ module ToolRegistry =
         let gateExecute (spec: ToolSpec) =
             let original = spec.Execute
 
+            let fallbackManagerPermission specName =
+                match specName with
+                | "fork" -> Some ToolPermission.Fork
+                | "resume" -> Some ToolPermission.Resume
+                | "join" -> Some ToolPermission.Join
+                | "horizon" -> Some ToolPermission.Horizon
+                | "fission" -> Some ToolPermission.Fission
+                | "review" -> Some ToolPermission.ReviewAssessment
+                | "suicide" -> Some ToolPermission.Finality
+                | _ -> None
+
             let managerPermission =
                 match ManagerReviewTools.requiredPermissions spec.Name with
                 | Some perms -> perms |> Seq.tryHead
-                | None ->
-                    match spec.Name with
-                    | "fork" -> Some ToolPermission.Fork
-                    | "resume" -> Some ToolPermission.Resume
-                    | "join" -> Some ToolPermission.Join
-                    | "horizon" -> Some ToolPermission.Horizon
-                    | "fission" -> Some ToolPermission.Fission
-                    | "review" -> Some ToolPermission.ReviewAssessment
-                    | "suicide" -> Some ToolPermission.Finality
-                    | _ -> None
+                | None -> fallbackManagerPermission spec.Name
 
             let denied (ctx: HostToolContext) path (subs: Map<string, string>) =
                 ToolHostCodec.tomlObjectWithInstructions [ ProviderProse.render (lang ctx) path subs ] []

@@ -91,9 +91,9 @@
 | `relay-incumbency` | 每一轮都在共享工作区上从权威用户消息重新开始并独立评估；同一 Road 至多一个 active 迭代，退休永不恢复；固定 DevOps 跨任期连续。 |
 | `relay-assessment` | 每任至多一次八维质量评级（PERFECT/REVISE/N/A 三态）；独立评估由只读 Engineer 支持，低分原位接责，DevOps 自修使旧快照证书失效并由后任独立重评。 |
 | `relay-retirement` | 退出是唯一正常出口；只有递归 live 资源能阻塞退休，固定 DevOps 跨任期连续且在退休中受明确收束边界保护。 |
-| `relay-context-projection` | 审计保留全量历史，provider 消息上下文只含权威消息与本轮消息，并在共享工作区上执行；固定 DevOps 执行事实通过客观记录感知、前任私有上下文隔离。 |
+| `relay-context-projection` | 物理历史、durable audit 与下一迭代 provider 投影保留同一份完整历史；ProjectionCut 只做请求身份判定与 stale 拦截，继任者据此看见并评审前任的工作。 |
 
-评审归 `relay-assessment`，终结归 `relay-retirement`，上下文切段归 `relay-context-projection`。
+评审归 `relay-assessment`，终结归 `relay-retirement`，上下文历史与退休请求边界归 `relay-context-projection`。
 
 ## 10. Feedback
 
@@ -177,7 +177,7 @@
 | 42 | `relay-incumbency` | 11 | relay-incumbency-001 ~ 006、008 ~ 009、relay-incumbency-010（道路唯一逻辑 DevOps 与控制权交接）、relay-incumbency-011（任期连续性与归属明确）、relay-incumbency-012（固定 DevOps 初始绑定与恢复唯一性） |
 | 43 | `relay-assessment` | 10 | relay-assessment-001 ~ 008、relay-assessment-009（独立评估由只读 Engineer 支持且实现者不自定答案）、relay-assessment-010（DevOps 自修改变快照使旧评估与证书失效且不可冒充新改动验证） |
 | 44 | `relay-retirement` | 7 | relay-retirement-001 ~ 004、007 ~ 008、relay-retirement-009（固定 DevOps 与跨任期资源在退休中的交接与收束边界） |
-| 45 | `relay-context-projection` | 9 | relay-context-projection-001 ~ 008、relay-context-projection-009（固定 DevOps 执行事实与前任上下文隔离） |
+| 45 | `relay-context-projection` | 9 | relay-context-projection-001 ~ 008、relay-context-projection-009（前任工作与交互对继任可见，固定 DevOps 执行事实如实呈现） |
 | 46 | `behavior-diagnosis` | 19 | behavior-diagnosis-001 ~ 019 |
 | 47 | `guidance-delivery` | 12 | guidance-delivery-001 ~ 012 |
 | 48 | `institutional-learning` | 8 | institutional-learning-001 ~ 008 |

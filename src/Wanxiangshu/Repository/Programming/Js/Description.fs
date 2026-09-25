@@ -1046,7 +1046,8 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
             | "devops" -> Some(set [ JsCapability.Read; JsCapability.Edit ], prose.UltraDevOps)
             | "manager" when
                 Set.isSubset capabilities (set [ JsCapability.Read; JsCapability.Glob; JsCapability.Grep ])
-                && not (Set.isEmpty capabilities) ->
+                && not (Set.isEmpty capabilities)
+                ->
                 Some(set [ JsCapability.Read; JsCapability.Glob; JsCapability.Grep ], prose.UltraManagerInvestigation)
             | _ -> None
 

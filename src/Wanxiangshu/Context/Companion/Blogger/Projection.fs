@@ -16,20 +16,22 @@ type BlogFrameKind =
     | Squash
 
 type BlogFrame =
-    { Kind: BlogFrameKind
-      Digest: BlobDigest
-      TextRef: BlobRef
-      /// Exclusive start of this frame's RecordCoverage interval
-      /// (`BlogObservationCommitted.PreviousIngestedThroughSequence`).
-      CoveredFromSequence: int64
-      /// Inclusive end of this frame's RecordCoverage interval
-      /// (`BlogObservationCommitted.NextIngestedThroughSequence`).
-      CoveredThroughSequence: int64
-      /// context-compression-029: the complete-turn boundary this frame's material
-      /// summarises. Frames are appended in non-decreasing order of it, so the subset
-      /// a cutoff may use is a prefix of the coverable frames — material past the
-      /// cutoff would describe turns that are still raw after it.
-      CutoffExclusive: int }
+    {
+        Kind: BlogFrameKind
+        Digest: BlobDigest
+        TextRef: BlobRef
+        /// Exclusive start of this frame's RecordCoverage interval
+        /// (`BlogObservationCommitted.PreviousIngestedThroughSequence`).
+        CoveredFromSequence: int64
+        /// Inclusive end of this frame's RecordCoverage interval
+        /// (`BlogObservationCommitted.NextIngestedThroughSequence`).
+        CoveredThroughSequence: int64
+        /// context-compression-029: the complete-turn boundary this frame's material
+        /// summarises. Frames are appended in non-decreasing order of it, so the subset
+        /// a cutoff may use is a prefix of the coverable frames — material past the
+        /// cutoff would describe turns that are still raw after it.
+        CutoffExclusive: int
+    }
 
 /// CTX-011: the two positions plus the proof that ties the second one to X.
 ///

@@ -259,6 +259,33 @@ module PluginHooks =
             let toolDefinition (toolInput: obj) (toolOutput: obj) =
                 ManagerReviewContract.decorateDefinition toolInput toolOutput
 
+            let isReviewPermitted toolName facts =
+                match ManagerReviewTools.requiredPermissions toolName with
+                | Some required ->
+                    let allowed = OfficeCapability.permissionsForManagerFacts facts
+                    Set.isSubset required allowed && not (Set.isEmpty allowed)
+                | None -> false
+
+            let assertReviewPermitted toolName sessionId =
+                let facts = getManagerCapabilityFacts sessionId
+
+                if not (isReviewPermitted toolName facts) then
+                    invalidOp (
+                        sprintf
+                            "Manager review tool '%s' is not permitted under current manager capability facts"
+                            toolName
+                    )
+
+            let toolField (toolInput: obj) (name: string) =
+                if isNull toolInput || isNull toolInput?(name) then
+                    ""
+                else
+                    string toolInput?(name)
+
+            let checkManagerReviewPermissions toolName toolInput =
+                if ManagerReviewTools.isReviewTool toolName then
+                    assertReviewPermitted toolName (toolField toolInput "sessionID")
+
             let toolBefore (toolInput: obj) (toolOutput: obj) =
                 task {
                     do!
@@ -268,28 +295,9 @@ module PluginHooks =
                             toolInput
                             toolOutput
 
-                    let toolName =
-                        if isNull toolInput || isNull toolInput?tool then "" else string toolInput?tool
+                    let toolName = toolField toolInput "tool"
 
-                    if ManagerReviewTools.isReviewTool toolName then
-                        let sessionId =
-                            if isNull toolInput || isNull toolInput?sessionID then "" else string toolInput?sessionID
-
-                        let facts = getManagerCapabilityFacts sessionId
-
-                        let isPermitted =
-                            match ManagerReviewTools.requiredPermissions toolName with
-                            | Some required ->
-                                let allowed = OfficeCapability.permissionsForManagerFacts facts
-                                Set.isSubset required allowed && not (Set.isEmpty allowed)
-                            | None -> false
-
-                        if not isPermitted then
-                            invalidOp (
-                                sprintf
-                                    "Manager review tool '%s' is not permitted under current manager capability facts"
-                                    toolName
-                            )
+                    checkManagerReviewPermissions toolName toolInput
 
                     let context = ToolHostCodec.decodeContext toolInput
 
@@ -299,7 +307,11 @@ module PluginHooks =
                         do! DelegatedToolEstimateLedger.observe port (SessionId.create context.SessionId) toolCallId
                     | _ -> ()
 
-                    if ManagerReviewTools.isReviewTool toolName && not (isNull toolOutput) && not (isNull toolOutput?args) then
+                    if
+                        ManagerReviewTools.isReviewTool toolName
+                        && not (isNull toolOutput)
+                        && not (isNull toolOutput?args)
+                    then
                         ManagerReviewContract.hide toolOutput?args
                 }
 
