@@ -8,7 +8,7 @@
 
 `cognitive-workspace` 的核心不变量：
 
-- **单一认知主权**：一个 owner 一块画板，一次 `assume(update, todos)` 同时钉住结构与声明清单；系统管理的当前画板呈现最多一份。
+- **单一认知主权**：一个物理 session 一块画板，一次 `assume(update, todos)` 同时钉住结构与声明清单；系统管理的当前画板呈现最多一份。
 - **画板即世界**：`update` 是任意 JSON→JSON 变换，没有预定义 schema，没有 CRUD 方言；语义解释由模型负责，工具只负责持久化与表示。
 - **声明只是单向投影**：todos 是给宿主 UI 的兼容清单，不反向恢复画板，不构成质量或完成证明。
 - **阶段是事实**：阶段边界由 canonical semantic turn 决定，不是 provider 数组下标；冷边界由已提交事实驱动。

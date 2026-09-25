@@ -67,12 +67,12 @@
 
 工具描述必须准确覆盖用户可见的操作纪律，同时严禁向模型泄露专职 Reviewer、隐式会话、终止屏障（barrier）等隐藏编排机制。所有描述资源必须成对完成本地化，并在语义锚点上保持严格一致。
 
-## [014] assume 是单画板、双 jq 程序、无 schema 的持久工作空间
+## [014] assume 是 session 独享、单 jq 更新与完整待办声明的持久工作空间
 
-`assume` 保留既有工具名，但 clean break 为一个进程内唯一的持久 JSON 画板：
-- 两个必填参数均使用标准 jq 语法：`update: string` 与 `query: string`；当前画板作为两者输入 `.`。
+`assume` 保留既有工具名，但 clean break 为一个每个物理 session 独享、跨 Life 更替（含 suicide 与退休）保留的持久 JSON 画板：
+- 两个必填参数：`update: string` 与 `todos: array`。`update` 是标准 jq 程序，当前画板作为其输入 `.`；`todos` 是本会话的完整待办声明，按 `{content, status}` 与可选 `priority` 规范化。
 - 不提供 workspace selector、vars、revision、claim/evidence/draft/node/edge 等预定义字段或领域动作；JSON 根结构完全由调用方自行创造和迁移。
-- 每次调用严格先执行 `update`；它必须产生且只产生一个 JSON value，该 value 原子替换持久画板。零输出、多输出或 jq 失败均不得修改画板。
-- `update` 成功落定后，再以新画板执行 `query`，并返回 `query` 的全部 jq JSON outputs。`query` 允许零个、一个或多个输出；若 `query` 失败，已经成功的 `update` 不回滚。
-- 纯查询使用恒等更新 `update = "."`；仅需修改后观察全局时使用 `query = "."`。因此两个必填参数覆盖读与写的组合，而无需第二个工具或额外 mode bit。
+- 每次调用严格先执行 `update`；它必须产生且只产生一个 JSON value，该 value 原子替换持久画板。零输出、多输出或 jq 失败均不得修改画板，画板、todos、阶段序号与 epoch 均不得变化。
+- `update` 成功落定后，工具返回更新后的完整画板；`todos` 与画板属于同一次提交 envelope，整份替换宿主 UI 清单。
+- 只想声明待办时，使用恒等更新 `update = "."`。因此一个 jq 更新参数加一份完整待办声明覆盖读与写的组合，而无需第二个工具、第二个 jq 参数或额外 mode bit。
 - 工具描述必须完整继承原 `assume` 的“先抽象→钉住→执行→验证；无新信息不反复改判”心理合同，并把“钉住一句工作假设”推广为“钉住可自由重构的认知结构”；同时充分解释非线性编辑、jq 先验复用、推荐用法与常见陷阱。

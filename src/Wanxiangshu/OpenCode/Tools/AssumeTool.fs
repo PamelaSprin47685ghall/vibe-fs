@@ -71,6 +71,7 @@ module AssumeTool =
     /// the one LlmFacing writer.
     let private renderCanvas (canvasJson: string) : string =
         let value = LlmFacing.Data.ofJson canvasJson
+
         LlmFacing.instructions []
         |> LlmFacing.withData (LlmFacing.Data.rootStructuredValue value)
         |> LlmFacing.render
@@ -150,17 +151,18 @@ module AssumeTool =
         (todos: (string * TodoStatus * TodoPriority) list)
         : Task<string> =
         task {
-            // The canvas jq sees is the owner's current committed canvas.
-            match! nextCanvas runtime.CurrentCanvas.CanvasJson update with
-            | Error reason -> return refuse [ reason ]
-            | Ok canvasJson ->
-                let inputDigest =
-                    // Canonical JSON of the exact tool input, so a replay is
-                    // recognised by what the model actually sent.
-                    Wanxiangshu.Foundation.CanonicalJson.canonicalJson (canonicalInput update todos)
+            let inputDigest =
+                // Canonical JSON of the exact tool input, so a replay is
+                // recognised by what the model actually sent.
+                Wanxiangshu.Foundation.CanonicalJson.canonicalJson (canonicalInput update todos)
 
-                let! outcome = runtime.Commit owner toolCallId inputDigest canvasJson todos
-                return renderOutcome outcome canvasJson
+            // The whole read-transform-commit runs inside the owner's serial domain:
+            // jq sees the owner's committed canvas, and the next call's jq sees this
+            // call's commit even when the Host dispatched both together.
+            let! outcome, canvasJson =
+                runtime.RunPhase owner toolCallId inputDigest todos (fun current -> nextCanvas current update)
+
+            return renderOutcome outcome canvasJson
         }
 
     /// One refusal as a completed task.

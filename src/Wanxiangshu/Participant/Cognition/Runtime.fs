@@ -102,6 +102,14 @@ module CommitInternals =
             | Ok(snapshotRef, snapshotDigest) -> return! appendAndCommit snapshotRef snapshotDigest
         }
 
+    /// The ordinal an owner's next committed phase claims. The committed ordinal is the
+    /// only source: a process-local counter would restart at one after a reboot and let
+    /// a fresh process re-claim an ordinal the journal already holds.
+    let ordinalAfter (committed: CognitiveProjection option) : int64 =
+        match committed with
+        | Some state -> state.Ordinal + 1L
+        | None -> 1L
+
 /// Owner-scoped serial admission.
 ///
 /// One queue per owner, so two owners never block each other, and a failed jq never
@@ -112,11 +120,11 @@ type CognitiveRuntime(port: CognitiveJournalPort) =
 
     let gates = Dictionary<string, Task<unit>>()
 
-    // DSL-MUTABLE: resource — global monotonic ordinal generator for committed cognitive phases.
-    let mutable latestOrdinal = 0L
-
-    // DSL-MUTABLE: resource — local cognitive canvas memory holding current assume snapshot.
-    let mutable canvas = AssumeSnapshot.empty
+    // DSL-MUTABLE: projection cache — the last committed canvas per owner, keyed by
+    // the physical session. Durable truth is the journal; this only accelerates the
+    // owner's own reads, so another owner's commit can never appear here and a
+    // restart recovers the same canvas from committed facts.
+    let canvases = Dictionary<string, AssumeSnapshot>()
 
     let gateFor (ownerKey: string) : Task<unit> =
         match gates.TryGetValue ownerKey with
@@ -131,27 +139,56 @@ type CognitiveRuntime(port: CognitiveJournalPort) =
         | true, current when Object.ReferenceEquals(current, previous) -> gates.[ownerKey] <- next
         | _ -> ()
 
-    member _.CurrentCanvas = canvas
+    /// The owner's current canvas: this process's committed canvas when it has
+    /// one, otherwise the canvas the owner's committed facts name.
+    ///
+    /// Fail-closed, not fail-silent: a projection that claims a snapshot whose blob
+    /// is missing or unparsable is a refusal naming the owner and the reason.
+    /// Answering an empty canvas there would silently discard a durable commit and
+    /// let the next write overwrite history the next boot would still recover.
+    member this.CurrentCanvas(owner: CognitiveOwner.T) : Task<Result<AssumeSnapshot, string>> =
+        let ownerKey = CognitiveOwner.key owner
 
-    /// Only a real commit advances the ordinal. A replay already holds one and a
-    /// rejection must not move it, so neither case touches the counter.
-    member this.ApplyOutcome
+        match canvases.TryGetValue ownerKey with
+        | true, snapshot -> Task.FromResult(Ok snapshot)
+        | false, _ ->
+            task {
+                match port.ReadProjection ownerKey with
+                | None -> return Ok AssumeSnapshot.empty
+                | Some state ->
+                    match state.SnapshotRef with
+                    | None -> return Ok AssumeSnapshot.empty
+                    | Some snapshotRef ->
+                        match! port.ReadBlob snapshotRef with
+                        | Error reason ->
+                            return Error(sprintf "cannot recover the committed canvas for owner %s: %s" ownerKey reason)
+                        | Ok text ->
+                            match AssumeSnapshot.tryParseJson text with
+                            | Error reason ->
+                                return
+                                    Error(
+                                        sprintf "cannot recover the committed canvas for owner %s: %s" ownerKey reason
+                                    )
+                            | Ok snapshot ->
+                                canvases.[ownerKey] <- snapshot
+                                return Ok snapshot
+            }
+
+    /// Only a real commit changes this owner's canvas. A replay answers with the
+    /// frozen first bytes and a rejection changes nothing, so neither case moves
+    /// the cache: a rejected write must not become the next read's current canvas.
+    member private this.ApplyOutcome
+        (ownerKey: string)
         (outcome: CommitOutcome, canvasJson: string, todos: (string * TodoStatus * TodoPriority) list)
         =
         match outcome with
-        | CommitOutcome.Committed ordinal ->
-            latestOrdinal <- ordinal
-            this.UpdateCanvas(AssumeSnapshot.ofJson canvasJson todos)
+        | CommitOutcome.Committed _ -> canvases.[ownerKey] <- AssumeSnapshot.ofJson canvasJson todos
         | CommitOutcome.Replayed _
         | CommitOutcome.Rejected _ -> ()
 
-    member this.AdvanceOrdinal(outcome: CommitOutcome) = this.ApplyOutcome(outcome, "{}", [])
-
-    member _.UpdateCanvas(snapshot: AssumeSnapshot) = canvas <- snapshot
-
-    member _.Serialized (ownerKey: string) (work: unit -> Task<CommitOutcome>) : Task<CommitOutcome> =
+    member _.Serialized<'result> (ownerKey: string) (work: unit -> Task<'result>) : Task<'result> =
         let previous = gateFor ownerKey
-        let completion = TaskCompletionSource<CommitOutcome>()
+        let completion = TaskCompletionSource<'result>()
 
         let next =
             task {
@@ -170,35 +207,45 @@ type CognitiveRuntime(port: CognitiveJournalPort) =
         replaceGate ownerKey previous next
         completion.Task
 
-    /// Commit one phase. The caller has already validated the tool input shape and
-    /// produced the new canvas plus normalised rows; this method owns ordering,
-    /// persistence, idempotence and fold.
-    member this.Commit
+    /// Commit one phase for one owner: read the current canvas, run `transform`
+    /// over it, then persist — the whole read-transform-write inside this owner's
+    /// serial domain, so the next call's transform sees this call's committed canvas
+    /// even when the Host dispatched both calls together.
+    ///
+    /// The committed canvas text travels beside the outcome so the tool can render
+    /// the exact bytes that were persisted, not a re-encoding of them.
+    member this.RunPhase
         (owner: CognitiveOwner.T)
         (toolCallId: ToolCallId)
         (inputDigest: string)
-        (canvasJson: string)
         (todos: (string * TodoStatus * TodoPriority) list)
-        : Task<CommitOutcome> =
+        (transform: string -> Task<Result<string, string>>)
+        : Task<CommitOutcome * string> =
         let ownerKey = CognitiveOwner.key owner
 
         this.Serialized ownerKey (fun () ->
             task {
-                match port.ReadProjection ownerKey with
-                | Some state when state.LastToolCallId = Some toolCallId ->
-                    return CommitInternals.replayOutcome state toolCallId inputDigest
-                | _ ->
-                    let! outcome =
-                        CommitInternals.persistPhase
-                            port
-                            ownerKey
-                            owner
-                            toolCallId
-                            (latestOrdinal + 1L)
-                            inputDigest
-                            canvasJson
-                            todos
+                match! this.CurrentCanvas owner with
+                | Error reason -> return CommitOutcome.Rejected reason, ""
+                | Ok current ->
+                    match! transform current.CanvasJson with
+                    | Error reason -> return CommitOutcome.Rejected reason, ""
+                    | Ok canvasJson ->
+                        match port.ReadProjection ownerKey with
+                        | Some state when state.LastToolCallId = Some toolCallId ->
+                            return CommitInternals.replayOutcome state toolCallId inputDigest, canvasJson
+                        | state ->
+                            let! outcome =
+                                CommitInternals.persistPhase
+                                    port
+                                    ownerKey
+                                    owner
+                                    toolCallId
+                                    (CommitInternals.ordinalAfter state)
+                                    inputDigest
+                                    canvasJson
+                                    todos
 
-                    this.ApplyOutcome(outcome, canvasJson, todos)
-                    return outcome
+                            this.ApplyOutcome ownerKey (outcome, canvasJson, todos)
+                            return outcome, canvasJson
             })

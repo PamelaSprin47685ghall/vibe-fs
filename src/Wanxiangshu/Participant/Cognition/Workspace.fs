@@ -1,6 +1,8 @@
 namespace Wanxiangshu.Participant.Cognition
 
 open System.Text
+open Fable.Core
+open Fable.Core.JsInterop
 
 /// One committed cognitive workspace snapshot.
 ///
@@ -148,3 +150,61 @@ module AssumeSnapshot =
             (escape snapshot.CanvasEncodingVersion)
             snapshot.CanvasJson
             (String.concat "," rows)
+
+    [<Emit("JSON.parse($0)")>]
+    let private jsonParse (text: string) : obj = jsNative
+
+    [<Emit("Object.prototype.hasOwnProperty.call($0, $1)")>]
+    let private hasField (value: obj) (name: string) : bool = jsNative
+
+    let private rowOfJson (row: obj) : Result<TodoRow, string> =
+        match TodoStatus.tryParse (string row?status), TodoPriority.tryParse (string row?priority) with
+        | Some status, Some priority ->
+            Ok
+                { Content = string row?content
+                  Status = status
+                  Priority = priority }
+        | _ -> Error(sprintf "committed snapshot row names an unknown status or priority")
+
+    /// Parse a committed snapshot back from its canonical bytes — the inverse of
+    /// `json`, used when a boot recovers the owner's canvas from durable facts.
+    ///
+    /// Fail-closed, not fail-silent: a blob that is not the snapshot shape, or that
+    /// names an unknown status or priority, is a refusal. The alternative — an empty
+    /// canvas — would silently discard a durable commit and let the next write
+    /// overwrite history the next boot would still recover.
+    let tryParseJson (text: string) : Result<AssumeSnapshot, string> =
+        try
+            let root = jsonParse text
+
+            if not (hasField root "canvas") then
+                Error "committed snapshot has no canvas field"
+            else
+                let rows =
+                    if hasField root "todos" && not (isNull root?todos) then
+                        unbox<obj array> root?todos |> Array.toList |> List.map rowOfJson
+                    else
+                        []
+
+                match
+                    rows
+                    |> List.fold
+                        (fun collected row ->
+                            match collected, row with
+                            | Error reason, _ -> Error reason
+                            | Ok _, Error reason -> Error reason
+                            | Ok rows, Ok row -> Ok(row :: rows))
+                        (Ok [])
+                with
+                | Error reason -> Error reason
+                | Ok rows ->
+                    Ok
+                        { CanvasEncodingVersion =
+                            if hasField root "canvasEncodingVersion" then
+                                string root?canvasEncodingVersion
+                            else
+                                CanvasEncodingVersion
+                          CanvasJson = CanvasCodec.toJson root?canvas
+                          Todos = List.rev rows }
+        with error ->
+            Error(sprintf "committed snapshot is not parsable: %s" (string error))

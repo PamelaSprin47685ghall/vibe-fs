@@ -15,6 +15,8 @@ test('WHAT[action-affordance-014] AA_assume_contract_is_single_jq_update_and_com
     const todos = read(`resources/provider/tool/assume/arg-todos/${locale}.md`)
 
     assert.match(description, /唯一.*画板|one workspace|single canvas/is, 'one workspace')
+    assert.match(description, /独享|互不可见|private to|other sessions|invisible/is, 'canvas is private to its own session')
+    assert.match(description, /不清空|空画板|重启|not cleared|empty canvas|restart|survives/is, 'canvas survives session end and restart')
     assert.match(description, /update|todos/is, 'both arguments named')
     assert.match(description, /恰好一个|exactly one/i, 'update must produce exactly one value')
     assert.match(description, /完整|complete|whole/i, 'todos is the complete list')

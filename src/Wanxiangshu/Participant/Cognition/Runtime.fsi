@@ -13,13 +13,21 @@ type CommitOutcome =
 
 type CognitiveRuntime =
     new: port: CognitiveJournalPort -> CognitiveRuntime
-    member CurrentCanvas: AssumeSnapshot
-    member Serialized: ownerKey: string -> work: (unit -> Task<CommitOutcome>) -> Task<CommitOutcome>
 
-    member Commit:
+    /// The owner's current canvas, restored from the owner's committed facts when
+    /// this process holds none. A projection that claims a snapshot whose blob is
+    /// missing or unparsable fails closed instead of answering an empty canvas.
+    member CurrentCanvas: owner: CognitiveOwner.T -> Task<Result<AssumeSnapshot, string>>
+
+    member Serialized: ownerKey: string -> work: (unit -> Task<'Result>) -> Task<'Result>
+
+    /// One committed phase for one owner: read the current canvas, run `transform`
+    /// over it, and persist — all inside this owner's serial domain, so the next
+    /// call's transform sees this call's committed canvas.
+    member RunPhase:
         owner: CognitiveOwner.T ->
         toolCallId: ToolCallId ->
         inputDigest: string ->
-        canvasJson: string ->
         todos: (string * TodoStatus * TodoPriority) list ->
-            Task<CommitOutcome>
+        transform: (string -> Task<Result<string, string>>) ->
+            Task<CommitOutcome * string>

@@ -300,6 +300,8 @@ Foundation/SyntheticToml.fsi
 Foundation/SyntheticToml.fs
 Foundation/LlmFacing.fsi
 Foundation/LlmFacing.fs
+Participant/Cognition/CanvasCodec.fsi
+Participant/Cognition/CanvasCodec.fs
 Participant/Cognition/Workspace.fsi
 Participant/Cognition/Workspace.fs
 Participant/Cognition/Projection.fsi
@@ -308,8 +310,6 @@ Participant/Cognition/Fold.fsi
 Participant/Cognition/Fold.fs
 Participant/Cognition/Owner.fsi
 Participant/Cognition/Owner.fs
-Participant/Cognition/CanvasCodec.fsi
-Participant/Cognition/CanvasCodec.fs
 Participant/Cognition/Admission.fsi
 Participant/Cognition/Admission.fs
 Participant/Cognition/JournalPort.fsi
@@ -322,6 +322,8 @@ Participant/Cognition/WorkspaceSurface.fsi
 Participant/Cognition/WorkspaceSurface.fs
 Participant/Cognition/FoldSurface.fsi
 Participant/Cognition/FoldSurface.fs
+Participant/Cognition/RuntimeSurface.fsi
+Participant/Cognition/RuntimeSurface.fs
 Participant/Cognition/TodoSink.fsi
 Participant/Cognition/TodoSink.fs
 Execution/Delegation/Handoff.fsi

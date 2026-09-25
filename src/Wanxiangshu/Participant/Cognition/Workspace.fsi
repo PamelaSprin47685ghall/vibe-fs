@@ -37,3 +37,4 @@ module AssumeSnapshot =
     val ofJson: canvasJson: string -> rows: (string * TodoStatus * TodoPriority) list -> AssumeSnapshot
     val normalizeTodos: rows: (string * TodoStatus * TodoPriority) list -> TodoRow list
     val json: snapshot: AssumeSnapshot -> string
+    val tryParseJson: text: string -> Result<AssumeSnapshot, string>

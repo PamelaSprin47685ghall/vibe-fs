@@ -95,9 +95,11 @@ const SOURCE_BUDGETS = new Map([
 ])
 
 const ADAPTER_RATCHET = new Map([
-  // 306/306 on 2026-09-24 — delegation-host-adapter consumes DelegationPtyCapability from delegation-pty-port;
-  // the durable spine now also carries AgentFact.Cognition, which this adapter reaches transitively.
-  ['delegation-host-adapter', 306],
+  // 307/307 on 2026-09-25 — the cognitive runtime surface (RuntimeSurface.fs) entered this
+  // adapter closure together with the durable spine's AgentFact.Cognition assembly, reached
+  // transitively via composition-durable-fact → participant-cognition-workspace; ratchet raised
+  // 306 → 307 as the explicit accounting required by WHAT[delegation-028].
+  ['delegation-host-adapter', 307],
   ['delegation-pty-adapter', 305],
   // 47 on 2026-09-14 — this batch hoisted Runtime.fs settleCompletedFromParts
   // into a module-internal SyncDelegateInternals module (namespace-scoped files

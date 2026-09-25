@@ -52,6 +52,12 @@ module CognitiveJournalAdapter =
 
                 Map.tryFind ownerKey projections.Cognition
 
+            /// The snapshot bytes a committed phase points at, read through the
+            /// journal's own blob capability so the workspace never holds a second
+            /// durable truth and a restart recovers exactly what was committed.
+            let readBlob (blobRef: BlobRef) = durable.Writer.BlobWriter.Read blobRef
+
             { WriteBlob = writeBlob
               AppendCommit = appendCommit
-              ReadProjection = readProjection }
+              ReadProjection = readProjection
+              ReadBlob = readBlob }

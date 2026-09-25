@@ -24,9 +24,7 @@ module WorkspaceSurface =
         | Some priority -> priority
         | None -> TodoPriority.Medium
 
-    let statusToJs (status: TodoStatus) : obj = box (TodoStatus.wire status)
 
-    let priorityToJs (priority: TodoPriority) : obj = box (TodoPriority.wire priority)
 
     /// A committed snapshot from its canvas text and declaration rows.
     ///

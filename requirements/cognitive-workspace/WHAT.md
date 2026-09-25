@@ -1,8 +1,8 @@
 # cognitive-workspace — WHAT
 
-## [001] 单一隐式 owner 画板与隔离作用域
+## [001] 画板按物理 session 独享、跨 Life 保留与隔离作用域
 
-每个认知 owner 在同一时刻恰有一份当前画板。owner 由已验证的工具上下文与当前 authority 解析为 `SessionId + 当前逻辑 Life/Incumbency 身份`，不是进程全局变量，也不是单独可复用的物理 SessionId。不同 owner 的画板互不可见、互不污染。子会话的声明只能写入子会话自己的画板。新 Life 从空画板开始；跨 Life 继承只允许显式、可审计的 bootstrap，禁止从宿主 UI 或上一个 Life 的内存状态偷偷继承。
+每个物理 session 在同一时刻恰有一份当前画板。画板 owner 是物理 SessionId，由已验证的工具上下文解析，不是进程全局变量，也不是当前逻辑 Life/Incumbency 身份。同一 session 的 Life 更替——包括 suicide 与退休——不切分、不重置画板，新 Life 在同一份画板上继续工作。不同 session 的画板互不可见、互不污染，隔离同时覆盖进程内状态与 jq 输入；子会话的声明只能写入子会话自己的画板。suicide 或退休之后画板不清空；重启后从已提交事实恢复当前画板，不回退为空；恢复失败时 fail-closed，不把丢失的已提交状态伪装成全新的空画板。新的物理 session 从空画板开始；禁止从宿主 UI 或上一个 session 的内存状态偷继承。画板保留不等于义务继承：todos 是每次 `assume` 的显式完整声明，退休与 Life 更替的义务出清语义不受影响。
 
 ## [002] jq 恰好一个输出，失败前不改变语义状态
 
@@ -18,7 +18,7 @@
 
 ## [005] owner 串行、跨实例一致、不同 owner 可并行
 
-同一 owner 的多个已物化 `assume` 按宿主工具调用顺序执行，后一次基于前一次的提交结果。跨 plugin instance 必须共用同一实际 owner 的串行 admission，不允许每个实例各建一把锁。不同 owner 不共享画板，也不共享无必要的全局执行队列。输入顺序与执行权来自 canonical Host identity，不来自异步回调返回次序。
+同一物理 session（画板 owner）的多个已物化 `assume` 按宿主工具调用顺序执行，后一次基于前一次的提交结果。跨 plugin instance 必须共用同一实际 owner 的串行 admission，不允许每个实例各建一把锁。不同 session 不共享画板，也不共享无必要的全局执行队列。输入顺序与执行权来自 canonical Host identity，不来自异步回调返回次序。
 
 ## [006] 先持久后 fold，崩溃恢复不重放 jq
 

@@ -15,6 +15,10 @@ type CognitiveJournalPort =
         AppendCommit: AssumePhaseCommitted -> Task<Result<unit, string>>
         /// One owner's folded state, or None when that owner never committed.
         ReadProjection: string -> CognitiveProjection option
+        /// The committed snapshot's bytes for one blob reference. Boot recovery
+        /// reads the canvas through here, so a missing or unreadable blob surfaces
+        /// as a refusal the owner answers rather than a silent empty canvas.
+        ReadBlob: BlobRef -> Task<Result<string, string>>
     }
 
 [<RequireQualifiedAccess>]
@@ -23,4 +27,5 @@ module CognitiveJournalPort =
     let empty: CognitiveJournalPort =
         { WriteBlob = fun _ -> Task.FromResult(Error "cognitive journal port is not wired")
           AppendCommit = fun _ -> Task.FromResult(Error "cognitive journal port is not wired")
-          ReadProjection = fun _ -> None }
+          ReadProjection = fun _ -> None
+          ReadBlob = fun _ -> Task.FromResult(Error "cognitive journal port is not wired") }

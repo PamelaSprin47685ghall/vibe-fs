@@ -33,5 +33,7 @@
     <Compile Include="Participant/Cognition/WorkspaceSurface.fs"/>
     <Compile Include="Participant/Cognition/FoldSurface.fsi"/>
     <Compile Include="Participant/Cognition/FoldSurface.fs"/>
+    <Compile Include="Participant/Cognition/RuntimeSurface.fsi"/>
+    <Compile Include="Participant/Cognition/RuntimeSurface.fs"/>
   </ItemGroup>
 </Project>

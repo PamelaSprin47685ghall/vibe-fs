@@ -909,6 +909,14 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
+    module: 'Participant/Cognition/RuntimeSurface.js',
+    owner: 'cognitive-workspace',
+    laws: ['COGNITIVE-WORKSPACE-001', 'COGNITIVE-WORKSPACE-005', 'COGNITIVE-WORKSPACE-006'],
+    source: 'src/Wanxiangshu/Participant/Cognition/RuntimeSurface.fs',
+    representation: 'json',
+    kind: 'resource',
+  },
+  {
     module: 'Enforcer/Cycle/Recovery.js',
     owner: 'context-compression',
     laws: ['CONTEXT-COMPRESSION-027'],

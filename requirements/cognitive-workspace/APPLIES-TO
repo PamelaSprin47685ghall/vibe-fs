@@ -5,4 +5,5 @@
 /src/Wanxiangshu/Participant/Cognition/**
 /src/Wanxiangshu/OpenCode/Tools/AssumeTool.fs
 /src/Wanxiangshu/OpenCode/Tools/AssumeTool.fsi
+/src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs
 /resources/provider/tool/assume/**

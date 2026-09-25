@@ -4,6 +4,8 @@ Use it when thought should remain editable instead of being trapped in the linea
 
 There is one workspace. It starts as `{}` and thereafter is whatever JSON value your last successful `update` produced. The canvas is one free-form JSON value. There is no predefined schema. There are no built-in concepts such as claim, evidence, note, node, edge, draft, section, plan, hypothesis, source, task, memory, or document. If any of those concepts help, create them yourself. If they stop helping, change or delete them. The canvas belongs to your reasoning, not to the tool.
 
+That canvas is private to a session: each session has exactly one canvas, and different sessions cannot see each other's canvas. What you see in this session is that canvas itself; there is no second one to pick. It persists within the session — every earlier successful commit stays in it. When the session ends, the canvas is not cleared; it is preserved for later work in the same session. After an application restart it is recovered from the committed facts instead of being reset to an empty canvas. A new session starts from an empty canvas and can neither see nor inherit what another session left behind. "One" means you cannot select or start a separate canvas — not that every session shares one.
+
 Every call has exactly two required arguments: `update` and `todos`.
 
 The semantics are always: update the canvas, then declare the todos.
@@ -336,7 +338,7 @@ Writing can be used as a diagnostic projection, not only as the final state.
 
 ## One workspace means one workspace
 
-There is no workspace selector.
+There is no workspace selector. In other words: you cannot choose the canvas. It belongs to your session; it is not a single canvas shared by every session.
 
 There is no per-call workspace name.
 
