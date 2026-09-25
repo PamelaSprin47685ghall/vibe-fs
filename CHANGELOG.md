@@ -2,6 +2,8 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- Manager 直接只读取证的窗口写回提示词（此前角色法一律禁止 Manager 亲自检视，与既有条款相互矛盾）：`role/manager` 双语在开篇与“亲自检视”一节写明唯一例外——评审未接纳前用评审专用只读工具（`js-manager`：Read/Glob/Grep）直接阅读静态快照，评审接纳即关闭，窗口外仍不亲自调查、修改或运行工作树；评审阶段“建立事实”条目补上这条直接阅读通道。`lifecycle/manager/t1-revelation` 双语同步：不再一律禁止检视，改为评审未接纳前静态快照由 Manager 亲自直接阅读，接纳后事实来自 Engineer 与 DevOps。`office-capability-007` 新增 `manager_direct_read_window_is_bounded_by_review_acceptance`，断言角色法双语同时写明只读工具与评审接纳的开闭边界；`docs/index.html` 角色表 Manager 行同步订正（读代码标为“评审前只读”，边界句去掉“不读写源码，全靠委派”）。验证：office-capability（24 passed）、provider-language、relay-assessment、participant-horizon、cognitive-environment、distribution、prefix-stability（71 passed）、action-affordance 与 capability-enforcement-025 全绿；`language-parity-gate` OK（333 资源）；`check.mjs` 本批文件零告警。
+
 - **context-compression-028/029 落地：K=2 阶段窗口真正决定前缀 cutoff**（`PhaseWindow` 此前只有纯函数与测试，无生产消费者；默认 K 连常量都没有）。本批把窗口接到既有 freeze 机制上，不新增事件类型、不改动已提交事件的载荷：
   - 冻结默认与载体：`PhaseWindow.defaultK = 2`（owner 开启时冻结的唯一来源，`validateK` 拒绝非正数）；新增有界窗口 `PhaseWindow.PhaseCommitWindow`（`PhaseCallIds`，commit 顺序，`appendPhase` 保留最后 K 个）与 `desiredCutoffOf`（注入 `ToolCallId → turn` 映射以保持纯函数；最旧保留阶段的回合不可寻址时返回 `NoPhases`，不回退到下一个阶段）。
   - 投影接线：`AgentProjectionSet.PhaseCommits: Map<SessionId, PhaseCommitWindow>`（键为会话，与认知投影“哪个画板是当前”的 owner 键分开），由 `Composition/Durable/Fold.fs` 在**认知提交被接纳时**追加（被拒绝或重放的行不移动窗口），经 `AgentJournalPortAdapter.forWire` 进入 `WireSessionState`。
