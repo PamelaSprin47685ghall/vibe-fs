@@ -374,9 +374,9 @@ If `update` fails to compile, fails at runtime, or does not produce exactly one 
 
 If `update` succeeds, its value is committed as the new canvas before the call returns.
 
-This is not a distributed transaction and there is no revision protocol. It is a serialized write over one durable canvas per owner.
+This is not a distributed transaction and there is no revision protocol. It is a serialized write over one durable canvas per session.
 
-Concurrent calls for the same owner are serialized by the tool so their calls do not interleave against a single mutable canvas.
+Concurrent calls for the same session are serialized by the tool so their calls do not interleave against a single mutable canvas.
 
 ## Do not use the canvas as proof
 

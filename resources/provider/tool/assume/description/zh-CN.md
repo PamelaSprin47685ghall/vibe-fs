@@ -206,7 +206,7 @@ schema 设计也是推理的一部分，不是 MCP 接口强加的前置条件�
 
 然后：
 
-the whole updated canvas is returned, so read the field you need from it
+工具会返回整个更新后的画板，按需从中读取你需要的字段。
 
 后来你意识到一个想法能同时解释几个现象。不要只在线性文章后面补一句，而可以直接在结构里表达这个发现：
 
@@ -214,13 +214,13 @@ the whole updated canvas is returned, so read the field you need from it
 
 再只取回真正应该决定文章组织的部分：
 
-the whole updated canvas is returned, so read the field you need from it
+工具会返回整个更新后的画板，按需从中读取你需要的字段。
 
 再后来，你可能同时保留几种叙事顺序：
 
 `update: '.structures = {"chronological":["Mamba-1","Mamba-2","Mamba-3","Hybrid"],"memory-first":["memory problem","compression","recall weakness","hybrid","architecture evolution"]}'`
 
-the whole updated canvas is returned, so read the field you need from it
+工具会返回整个更新后的画板，按需从中读取你需要的字段。
 
 这些结构都不是终身制度。memory-first 赢了，就删掉另一个、留作历史，或者直接重建整个表示。
 
@@ -236,7 +236,7 @@ the whole updated canvas is returned, so read the field you need from it
 
 `update: '.hypotheses.h1 = {"idea":"memory bandwidth is the limiting factor","support":[],"problems":[]}'`
 
-the whole updated canvas is returned, so read the field you need from it
+工具会返回整个更新后的画板，按需从中读取你需要的字段。
 
 然后用其它真实调查工具获得信息，再把支持和问题写回来。
 
@@ -252,7 +252,7 @@ the whole updated canvas is returned, so read the field you need from it
 
 `update: '.alternatives += [{"name":"A","advantages":[],"costs":[]},{"name":"B","advantages":[],"costs":[]}]'`
 
-the whole updated canvas is returned, so read the field you need from it
+工具会返回整个更新后的画板，按需从中读取你需要的字段。
 
 新约束到来后，一次调用里同时更新比较结构并返回新的比较结果。
 
@@ -390,9 +390,9 @@ jq 在这里最强的一点，就是不局限于 CRUD。
 
 如果 `update` 成功，它的 value 在返回之前就已经持久成为新画板。
 
-第一版没有 revision 协议，也不是分布式事务。它只是围绕每个 owner 唯一的持久画板串行执行的"先写"。
+第一版没有 revision 协议，也不是分布式事务。它只是围绕当前会话唯一的持久画板串行执行的"先写"。
 
-同一 owner 的并发调用由工具串行化，不会在同一张画板上互相穿插。
+同一会话的并发调用由工具串行化，不会在同一张画板上互相穿插。
 
 ## 不要把画板当成证据
 
