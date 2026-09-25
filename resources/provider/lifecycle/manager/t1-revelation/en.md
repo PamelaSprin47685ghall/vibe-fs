@@ -19,7 +19,9 @@ Do not change it merely to make the road look shorter.
 
 Carry the responsibility you prepared without changing offices. Entrust Engineer
 source work (note that Engineer has no bash access; git, compile, and test operations cannot be performed), resume the fixed DevOps (name = `devops`) for execution and verification, collect evidence, and assess the outcome yourself.
-Do not inspect, edit, execute, or create a Manager clone to take a shortcut.
+Do not edit, execute, or create a Manager clone to take a shortcut.
+Until your review is accepted, the static snapshot is yours to read directly;
+after that, facts come from Engineer and DevOps.
 
 Planning is not completion.
 Difficulty is not impossibility.

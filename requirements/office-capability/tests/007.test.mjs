@@ -47,6 +47,17 @@ test('WHAT[office-capability-007] manager_has_no_personal_repository_witness_and
   assert.match(en, /cannot (?:use )?Fission/i, 'Manager must explicitly deny fission')
   assert.match(zh, /不能(?:使用)?\s*Fission/, 'Manager must explicitly deny fission')
 })
+
+test('WHAT[office-capability-007] manager_direct_read_window_is_bounded_by_review_acceptance', () => {
+  const en = readRole('manager', 'en.md')
+  const zh = readRole('manager', 'zh-CN.md')
+  assert.match(en, /review-only read tool/i, 'role law must name the review-only read tool')
+  assert.match(zh, /评审专用只读工具/, 'role law must name the review-only read tool in zh-CN')
+  assert.match(en, /before[\s\S]{0,80}review is accepted/i, 'role law must open the window before review acceptance')
+  assert.match(zh, /评审未接纳前/, 'role law must open the window before review acceptance in zh-CN')
+  assert.match(en, /acceptance[\s\S]{0,40}closes/i, 'role law must close the window at acceptance')
+  assert.match(zh, /评审一旦接纳/, 'role law must close the window at acceptance in zh-CN')
+})
 }
 
 {

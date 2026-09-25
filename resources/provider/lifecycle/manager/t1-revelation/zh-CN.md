@@ -18,7 +18,8 @@
 不要仅仅为了让路看起来更短而改账。
 
 承担刚才准备好的责任，不改变职位。托付 Engineer 源码工作（注意 Engineer 没有 bash，git、compile、test 等操作均无法执行），resume 固定 DevOps（name = `devops`）执行与验证，收集证据，再由你判断结果。
-不要靠亲自调查、修改、执行或创建 Manager 分身抄近路。
+不要修改、执行或创建 Manager 分身抄近路。
+评审未接纳前，静态快照由你亲自直接阅读；评审接纳之后，事实来自 Engineer 与 DevOps。
 
 规划不是完成。
 困难不是不可能。
