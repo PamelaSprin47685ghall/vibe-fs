@@ -7,7 +7,8 @@ open Wanxiangshu.Git
 open Wanxiangshu.Host
 open Wanxiangshu.Persistence.EventStore
 
-/// durable-convergence-008. Product startup only ENSURES the Git hook membrane.
+/// durable-convergence-008. Product startup only ENSURES the Git hook membrane
+/// and the per-remote fetch refspec baseline.
 /// Actual full bidirectional convergence runs later in an independent Git-hook
 /// process through resources/git/wanxiang-hook.mjs + HookSync.
 [<RequireQualifiedAccess>]
@@ -182,18 +183,25 @@ module HookDispatcher =
         with _ ->
             []
 
-    let private ensureRemoteStoreFetchRefspec workspace remote =
-        let expected = sprintf "+%s:%s" StoreRef.canonical (StoreRef.remoteTracking remote)
-
+    let private ensureRemoteFetchRefspec workspace remote expected =
         if remoteFetchSpecs workspace remote |> List.contains expected then
             ()
         else
             GitSubject.execIn workspace [| "config"; "--add"; sprintf "remote.%s.fetch" remote; expected |]
             |> ignore
 
+    let private ensureRemoteStoreFetchRefspec workspace remote =
+        let expected = sprintf "+%s:%s" StoreRef.canonical (StoreRef.remoteTracking remote)
+        ensureRemoteFetchRefspec workspace remote expected
+
+    let private ensureRemoteHeadsFetchRefspec workspace remote =
+        let expected = sprintf "+refs/heads/*:refs/remotes/%s/*" remote
+        ensureRemoteFetchRefspec workspace remote expected
+
     let private ensureRemoteRefs workspace =
         for remote in remotes workspace do
             ensureRemoteStoreFetchRefspec workspace remote
+            ensureRemoteHeadsFetchRefspec workspace remote
 
     let private tryGitConfig workspace key =
         try

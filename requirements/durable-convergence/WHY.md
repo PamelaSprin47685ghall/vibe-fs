@@ -18,6 +18,7 @@
 - **Retained Merge = Set Union**：同一 retention 截止时刻仍活跃的 writer 内，两个不同 EventId 必须全部进入合并后的历史；只能整体淘汰过期 writer，不能按事件时间挑赢家。
 - **Resolution 必须覆盖全部 Heads**：解决冲突的裁决事件必须显式将所有竞争分支的 Head 作为其父事件；若破坏，重放历史无法证明冲突已真正被解决。
 - **Dumb Remote 原则**：远端仓库仅作为哑对象存储，不包含任何领域逻辑；所有收敛与验证完全在客户端完成。
+- **激活期 fetch refspec 基线必须完整且只增不改**：若 ensure 只追加 store tracking 行而不保证标准 heads 映射，一个原本没有 fetch 配置的 remote 会被永久留在 store-only 状态——用户的 `git fetch` 再也取不到任何分支，而 ensure 每次运行都因 store 行已存在而静默跳过，缺陷永不自愈。基线保证只允许追加缺失行：既修复缺行 remote，又绝不覆盖或删除用户既有配置。
 - **Activity 不等于 fetch 时间**：远端 snapshot 必须携带 writer blob OID 绑定的 activity manifest；否则一次下载就会错误延长 writer 寿命，导致历史无法按窗口收缩。
 - **Payload identity 已经是内容证明**：payload 文件名/缓存 OID 与远端 payload tree OID 同属 content-addressed identity；本地 stat identity 未变且缓存 OID 等于远端 OID 时，再读取同一 remote payload blob 不增加任何事实，只会把同步成本放大到历史 payload 总量，并让持有 store gate 的 Git Hook 长时间阻塞在线 append。
 - **收敛比较必须覆盖业务 Current**：相同 retained history 只得到相同事件顺序仍不充分；Structural、Journal、Strength、Casebook 与 JsTransaction 的 production Current 观察也必须逐项相同，否则重复 reducer 或遗漏注册仍可隐藏在绿色结构测试后。

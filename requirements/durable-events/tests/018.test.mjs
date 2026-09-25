@@ -34,6 +34,8 @@ test('WHAT[durable-events-018] HOOK_activation_ensure_installs_both_hooks_and_re
     const fetchSpecs = execFileSync('git', ['-C', repo, 'config', '--get-all', 'remote.origin.fetch'], { encoding: 'utf8' })
     assert.match(fetchSpecs, /\+refs\/wanxiang\/store:refs\/wanxiang\/remotes\/origin\/store/,
       'ensure must configure the remote tracking fetch refspec')
+    assert.match(fetchSpecs, /\+refs\/heads\/\*:refs\/remotes\/origin\/\*/,
+      'ensure must also keep the standard heads fetch refspec on the remote')
   } finally {
     rmSync(repo, { recursive: true, force: true })
   }

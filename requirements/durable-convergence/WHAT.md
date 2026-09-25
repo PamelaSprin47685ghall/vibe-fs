@@ -30,7 +30,7 @@
 
 ## [008] durability activation ensure hooks 且用户 Git 进程独立触发双向 sync
 
-万象术不提供后台常驻同步器或自动上传服务。插件加载期不修改 Git 配置；仅在首次激活持久化能力时确保安装 `reference-transaction` 与 `pre-push` Hook。后续同步完全由用户自身的 Git 操作拉起独立 Hook 子进程执行。若本地物理 fingerprint、retention expiry 与上次成功 materialization 均未变化，且本地 tracking ref 仍等于该 cached snapshot，则本次 `pre-push` 没有新的 Wanxiang truth 需要发布，必须零网络直接复用该 snapshot。任一 writer/payload 变化、TTL 跨界或已观察 tracking ref 变化时，才通过双向读取本地与远端写者流完成全量 k-way merge，原子替换本地写者集合并 CAS 发布远端快照。未被本机观察到的远端推进不会被 clean no-op `pre-push` 主动拉取，但也绝不会被覆盖；下一次本地 truth 变化或 tracking 更新时必须进入完整 convergence。
+万象术不提供后台常驻同步器或自动上传服务。插件加载期不修改 Git 配置；仅在首次激活持久化能力时确保安装 `reference-transaction` 与 `pre-push` Hook。激活持久化能力时的 ensure 在安装 Hook 之后，还必须为仓库内每个 remote 保证 fetch refspec 基线：`remote.<remote>.fetch` 必须同时包含 store tracking 行 `+refs/wanxiang/store:refs/wanxiang/remotes/<remote>/store` 与标准分支跟踪行 `+refs/heads/*:refs/remotes/<remote>/*`；该保证只允许对缺失行执行追加，禁止替换、删除或重排任何既有 fetch 配置，重复 ensure 不得产生重复行，且仅配了 store 行的 remote 必须由 ensure 补回缺失的标准 heads 行。后续同步完全由用户自身的 Git 操作拉起独立 Hook 子进程执行。若本地物理 fingerprint、retention expiry 与上次成功 materialization 均未变化，且本地 tracking ref 仍等于该 cached snapshot，则本次 `pre-push` 没有新的 Wanxiang truth 需要发布，必须零网络直接复用该 snapshot。任一 writer/payload 变化、TTL 跨界或已观察 tracking ref 变化时，才通过双向读取本地与远端写者流完成全量 k-way merge，原子替换本地写者集合并 CAS 发布远端快照。未被本机观察到的远端推进不会被 clean no-op `pre-push` 主动拉取，但也绝不会被覆盖；下一次本地 truth 变化或 tracking 更新时必须进入完整 convergence。
 
 ## [009] dumb remote 无 domain 逻辑
 

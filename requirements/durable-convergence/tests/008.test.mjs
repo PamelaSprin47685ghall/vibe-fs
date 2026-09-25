@@ -142,3 +142,57 @@ integrationTest('WHAT[durable-convergence-008] reference_transaction_is_also_ful
   assert.doesNotMatch(source, /downloadOnly|importOnly|ConvergeObserved/);
 });
 }
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { execFileSync } = await import("node:child_process");
+const { mkdtempSync, rmSync } = await import("node:fs");
+const { tmpdir } = await import("node:os");
+const { join } = await import("node:path");
+
+const Hook = await import("../../../dist/Git/Hook/Surface.js");
+
+const STORE_LINE = '+refs/wanxiang/store:refs/wanxiang/remotes/origin/store'
+const HEADS_LINE = '+refs/heads/*:refs/remotes/origin/*'
+
+const fetchSpecs = (repo) => execFileSync('git', ['-C', repo, 'config', '--get-all', 'remote.origin.fetch'], { encoding: 'utf8' })
+  .split('\n').map(line => line.trim()).filter(line => line.length > 0)
+
+const specRepo = () => {
+  const repo = mkdtempSync(join(tmpdir(), 'wxs-fetch-baseline-'))
+  execFileSync('git', ['init', '--quiet', repo])
+  execFileSync('git', ['-C', repo, 'remote', 'add', 'origin', 'https://example.com/repo.git'])
+  return repo
+}
+
+test('WHAT[durable-convergence-008] activation ensure keeps both the store and the standard heads fetch refspec on every remote', () => {
+  const repo = specRepo()
+  try {
+    assert.equal(Hook.ensure(repo), true)
+    const specs = fetchSpecs(repo)
+    assert.ok(specs.includes(STORE_LINE), 'ensure must keep the store tracking refspec')
+    assert.ok(specs.includes(HEADS_LINE), 'ensure must keep the standard heads fetch refspec')
+  } finally {
+    rmSync(repo, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[durable-convergence-008] activation ensure repairs a remote whose heads fetch refspec is missing without touching other lines', () => {
+  const repo = specRepo()
+  try {
+    execFileSync('git', ['-C', repo, 'config', '--replace-all', 'remote.origin.fetch', STORE_LINE])
+    assert.deepEqual(fetchSpecs(repo), [STORE_LINE], 'precondition: simulate the store-only defect state')
+
+    assert.equal(Hook.ensure(repo), true)
+
+    const specs = fetchSpecs(repo)
+    assert.ok(specs.includes(STORE_LINE), 'the pre-existing store line must survive untouched')
+    assert.ok(specs.includes(HEADS_LINE), 'ensure must add back the missing standard heads fetch refspec')
+
+    assert.equal(Hook.ensure(repo), true)
+    assert.deepEqual(fetchSpecs(repo), specs, 'repeated ensure must not duplicate fetch refspec lines')
+  } finally {
+    rmSync(repo, { recursive: true, force: true })
+  }
+})
+}
