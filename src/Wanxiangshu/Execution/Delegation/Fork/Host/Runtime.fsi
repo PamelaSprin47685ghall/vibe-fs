@@ -33,7 +33,8 @@ type HostForkRuntime =
         ?handoff: ReusableHandoffPort *
         ?sessionSnapshot: ISessionSnapshotPort *
         ?cancelSignals: (SessionId seq -> unit) *
-        ?ownership: HandleOwnership ->
+        ?ownership: HandleOwnership *
+        ?drainChildPtys: (SessionId -> Task<unit>) ->
             HostForkRuntime
 
     member internal Runtime: ForkRuntime
@@ -131,6 +132,8 @@ type HostForkRuntime =
     member RegisterPtySnapshot: id: PtyId -> command: string -> unit
     member UntrackPtyRun: id: string -> unit
     member OwnsPty: id: PtyId -> bool
+    member DrainOwnedWork: unit -> Task<unit>
+    member CloseOwnedPtys: ?graceMs: int -> Task<unit>
     member IsPtyCompletion: runId: string -> bool
     member TryBindTerminalName: name: string * id: PtyId -> Result<unit, string>
     member TryPtyByName: name: string -> PtyId option

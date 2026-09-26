@@ -2,6 +2,17 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- **修复 Manager 退休被 road 级固定 DevOps PTY 误拦（road/incumbency 资源分层）与固定 DevOps 工作返回收束**：
+  - **分层阻塞语义与生产接线**：`RetirementBlockersFor` 明确区分 road 级基础设施与 incumbency 级任期资源——通过递归会话树判定排除固定 DevOps 子会话及其递归子树的 runtime，并在 Manager runtime 上通过显式身份精确剔除 devops agent 资源，使固定 DevOps 的 PTY/agent/pending 不再计入 Manager 的 suicide blockers，同时完好保持 Engineer 等 incumbency 派生子会话与 Manager 自身任务的阻塞语义；完成 `relay-retirement` [003]/[009] 的生产接线，使生产行为与 `decideWithRoadResources` 纯函数规格完全一致。
+  - **managed-session-lifecycle 新增 [025] 规约**：PTY 物理退出即清 `HostForkRuntime` 记账（`ptyRuns`/`terminalByName`）；固定 DevOps 每次工作返回（run 终态结算）时收束其 PTY（单 PTY 精准 TERM → 有界等待 → KILL → 等真实物理退出），由 DevOps 工作完成触发而非 Manager 退休触发，不误伤其他会话；[024] 崩溃恢复收束边界保持不变。
+  - **PTY 收束能力接线**：新增 `PtyPort.ClosePty`、`HostForkRuntime.CloseOwnedPtys`/`DrainOwnedWork` 及可选 `drainChildPtys` 注入；`ToolRuntimeScope` 中的 `createRuntime` 完成生产接线。
+  - **质量缺陷结构修复（D1-D3）**：
+    - D1：将 `ToolRuntimeScopeSurface` 提取为独立文件 `ToolRuntimeScopeSurface.fs`/`.fsi`，纯强类型 F# 实现 `DummySessionHostPort`，彻底拔除核心文件中的 `emitJsExpr` raw JS 假桩，`017.test.mjs` 静态门禁自然合规；
+    - D2：删除 `isDevOpsPty` 子串匹配启发式（`pty.Contains "devops"`），改由会话树所有权精确判定，彻底消除误伤含 `devops` 命名之正常任期 PTY 的风险；
+    - D3：pending-runs 统计彻底废除跨字典混合减法（`PendingRunCount - devopsAgentRunsCount`），改为基于显式身份过滤的 `relevantAgents.Length` 单一真源。
+  - **能力插件勘误**：`capability-enforcement-010` 插件工具常量勘误（`'sphinx'` → `'js-manager'`），严格区分插件注册面与角色权限面。
+  - **真实执行验证**：`node scripts/build.mjs --clean` 通过（176 surfaces / 829 modules）；`npm run format-build-test` 全绿（format/check/build；unit 3696 passed / 0 failed / 24 skipped；integration 261 passed / 0 failed）；`relay-retirement/009`（5）、`managed-session-lifecycle/017`（4）与 `025`（3）目标用例全数通过。
+
 - 清除 HEAD 上残留的验证红灯（测试、静态门禁与格式化），工作区回到 `format-build-test` 全绿：
   - **语义面债务清零**（`js-semantic-surface-002/004`、`verification-system-013`）：语义测试区最后 5 个深层 dist 导入全部改走已登记 surface。`capability-enforcement` 002/008/025 与 `prefix-stability` 016 的断言改由 owner 面表达：`ToolSurface` 新增评审工具目录（`reviewToolNames`/`isReviewTool`/`reviewToolPermissions`）与角色 Host 权限投影（`rolePermissionRules`）；`OfficeCapabilitySurface` 以普通对象承载 Manager 收口事实（`managerFacts`/`managerFactsAllowed`）；`JsRuntimeSurface.createApiFor` 按 JS capability label 组装绑定（未授予的写成员在 `api.js` 上直接不存在）；`PluginHooksSurface.decorateReviewToolDefinition` 走真实 `tool.definition` 装饰。`verification-system` 夹具 `plugin-fixture.mjs` 的 `injectAcceptedAssessment` 改为 `ObligationJournalSurface.grantWorkOwned`（幂等：已开道路复用 active incumbency/snapshot/authority revision，已接纳评审不重放），夹具不再自建 relay fact，20 个使用方行为不变。`OfficeCapability.permissionLabel`/`permissionOfLabel` 成为 `ToolPermission` ↔ label 的唯一映射点（此前 `OfficeCapabilitySurface` 与 `GeneratorSurface` 各存一份）。
   - **生产控制金字塔清零**：`ManagerReviewContract`、`PluginHooks`、`ToolRegistry`、`Fork/OpenCode/Tool`、`Cognition/{Runtime,Workspace}`、`Js/{ToolWorkflow,ToolsBindings}` 逐处提取具名 helper 消除 `if`/`match`/`try` 嵌套（`fsharp-control-pyramid` 36 项 → 0，基线未放宽）；`plugin-composition` 分片把 `ManagerReviewContract` 排到消费它的 `PluginHooksSurface` 之前（与 `compile-order.txt` 一致）。

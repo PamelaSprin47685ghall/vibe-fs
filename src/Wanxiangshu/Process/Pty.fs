@@ -314,6 +314,20 @@ type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) a
     /// The caller must await the exit (via CloseAll or the registered exit task).
     member this.Close(id: PtyId, ?outcome: Result<string, string>) : unit = requestTerminate id
 
+    /// Async owner cleanup for a single PTY id: sends TERM, awaits exit with grace, then escalates to KILL if needed.
+    member this.ClosePty(id: PtyId, ?graceMs: int) : Task<unit> =
+        let grace = max 0 (defaultArg graceMs PtyOutcome.termToKillGraceMs)
+
+        task {
+            let isLive = lock gate (fun () -> active.ContainsKey id)
+
+            if isLive then
+                requestTerminate id
+                let exitTaskOpt = lock gate (fun () -> PtyPortSupport.findExitTask exitTasks id)
+                do! PtyPortSupport.awaitRegisteredExit handler exitTaskOpt grace id
+                lock gate (fun () -> exitTasks.Remove id |> ignore)
+        }
+
     /// Async owner cleanup: for each active id, send TERM (requestTerminate),
     /// await exit for `termToKillGraceMs` (or the supplied override), then
     /// escalate to KILL. If KILL itself fails, propagate the error instead of

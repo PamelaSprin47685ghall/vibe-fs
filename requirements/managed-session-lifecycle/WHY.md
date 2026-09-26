@@ -17,6 +17,7 @@
 
 - 身份替换后旧活跃会话必须按既有中断/退休机制显式收束，新任务仅接纳合法新身份（Engineer/DevOps），历史事件保持原样且旧身份不静默升权。
 - 同一道路拥有唯一的固定 DevOps 逻辑执行权威；物理会话崩溃恢复后保持单一权威，真实进程随会话生命周期彻底收束，恢复严格沿用原绑定模型/Persona。
+- **DevOps 工作返回时 PTY 彻底收束**：固定 DevOps 会话可复用，但其每次工作返回时必须彻底收束其本次持有的全部 PTY 进程并清理记账，严禁将未决终端进程残留至下一次 resume；该收束独立于道路关闭与 Manager 退休。
 
 - Handle 生命周期遵循严格的四态模型：`Active → CompletedAwaitingJoin → Retired` 与 `Active | CompletedAwaitingJoin → Abandoned`。
 - Completion cell 实行单赋值竞争，首个到达的完成事实具有唯一权威。

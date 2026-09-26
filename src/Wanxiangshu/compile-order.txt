@@ -1240,6 +1240,8 @@ OpenCode/JoinResultRendererSurface.fsi
 OpenCode/JoinResultRendererSurface.fs
 OpenCode/Tools/ToolRuntimeScope.fsi
 OpenCode/Tools/ToolRuntimeScope.fs
+OpenCode/Tools/ToolRuntimeScopeSurface.fsi
+OpenCode/Tools/ToolRuntimeScopeSurface.fs
 Mission/Relay/OpenCode/ReviewTool.fsi
 Mission/Relay/OpenCode/ReviewTool.fs
 Mission/Relay/OpenCode/SuicideTool.fsi

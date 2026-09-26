@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Collections.Generic
+open Fable.Core
 open System.Threading.Tasks
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Context.Trace

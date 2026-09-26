@@ -106,7 +106,9 @@ type HostForkRuntime
         ?cancelSignals: SessionId seq -> unit,
         /// Ownership of every handle this runtime forks. Host-owned hidden
         /// children stay outside the parent's list/join/recovery surface.
-        ?ownership: HandleOwnership
+        ?ownership: HandleOwnership,
+        /// Optional capability to drain child PTYs upon run completion (e.g. for DevOps session).
+        ?drainChildPtys: SessionId -> Task<unit>
     ) as this =
     let clockPort = clock
     let runtime = ForkRuntimeBackend.create clockPort raceExit createMailbox
@@ -307,7 +309,7 @@ type HostForkRuntime
                 // A PtyPort can be shared by multiple runtimes. Its sender fan-out
                 // must not turn another runtime's exit into this runtime's join.
                 runtime.PublishPtyCompletion item
-                runtime.UnregisterPty id
+                this.UntrackPtyRun id
                 notifyPtyObservers item)
     // Cross-process recovery is not wired into ordinary HostForkRuntime lifecycle.
     // HostForkRestart remains a detached algorithm library for explicit resume flows.
@@ -491,6 +493,10 @@ type HostForkRuntime
         // async tail so shutdown can drain it before releasing the Journal.
         startOwnedWork (fun () ->
             task {
+                match run.Role, drainChildPtys with
+                | Role.DevOps, Some drain -> do! drain run.ChildId
+                | _ -> ()
+
                 let! workRecord = workRecordForOutcome run outcome
 
                 do!
@@ -709,6 +715,21 @@ type HostForkRuntime
 
     member this.OwnsPty(id: PtyId) =
         lock gate (fun () -> ptyRuns.Contains id.Value)
+
+    member this.DrainOwnedWork() : Task<unit> =
+        task {
+            let! _ = stopOwnedWorkAndDrain ()
+            return ()
+        }
+
+    member this.CloseOwnedPtys(?graceMs: int) : Task<unit> =
+        task {
+            let ids = this.SnapshotOutstandingPtyRuns() |> List.map PtyId.Create
+
+            for id in ids do
+                do! ptyPortInstance.ClosePty(id, ?graceMs = graceMs)
+                this.UntrackPtyRun id.Value
+        }
 
     member this.IsPtyCompletion(runId: string) =
         lock gate (fun () -> ptyRuns.Contains runId)

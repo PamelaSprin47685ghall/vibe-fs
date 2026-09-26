@@ -7,6 +7,7 @@ type PtyPort =
 
     member AddExitListener: listener: (PtyExitEvent -> unit) -> unit
     member Close: id: PtyId * ?outcome: Result<string, string> -> unit
+    member ClosePty: id: PtyId * ?graceMs: int -> Task<unit>
     member CloseAll: ?graceMs: int -> Task<unit>
     member Complete: id: PtyId * ?outcome: Result<string, string> -> unit
     member CompleteAborted: id: PtyId * ?message: string -> unit

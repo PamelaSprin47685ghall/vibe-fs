@@ -183,6 +183,19 @@ type ToolRuntimeScope
         | true, path when System.IO.Directory.Exists path -> Some path
         | _ -> None
 
+    let drainChildPtysFor (childId: SessionId) : Task<unit> =
+        task {
+            let childRuntimeOpt =
+                lock gate (fun () ->
+                    match runtimes.TryGetValue(SessionId.value childId) with
+                    | true, r -> Some r
+                    | false, _ -> None)
+
+            match childRuntimeOpt with
+            | Some r -> do! r.CloseOwnedPtys()
+            | None -> ()
+        }
+
     let createRuntime sid =
         HostForkRuntime(
             SessionId.create sid,
@@ -203,7 +216,8 @@ type ToolRuntimeScope
             childWorkRecordFor = (fun childId -> childRecord (SessionId.value childId)),
             ?handoff = reusableHandoff,
             ?sessionSnapshot = snapshot,
-            cancelSignals = onCancelSignals
+            cancelSignals = onCancelSignals,
+            drainChildPtys = drainChildPtysFor
         )
 
     let getOrCreateRuntime ownerKey =
@@ -775,33 +789,81 @@ type ToolRuntimeScope
                 parentOf candidate
                 |> Option.exists (fun parent -> belongsToRoot parent (Set.add candidate visited))
 
-        let runtimeBlockers prefix ownerKey (runtime: HostForkRuntime) =
-            let agents =
-                runtime.SnapshotOutstandingAgentRuns()
-                |> List.map (fun (handle, child) ->
-                    sprintf "%s:%s:agent:%s:%s" prefix ownerKey handle (SessionId.value child))
-
-            if List.isEmpty agents then
-                ignore (runtime.Runtime.DrainAgentWakes 32)
-
-            let ptys =
-                runtime.SnapshotOutstandingPtyRuns()
-                |> List.map (fun pty -> sprintf "%s:%s:pty:%s" prefix ownerKey pty)
-
-            let pending =
-                [ if runtime.PendingRunCount > 0 then
-                      yield sprintf "%s:%s:pending-runs:%d" prefix ownerKey runtime.PendingRunCount
-
-                  if runtime.PendingCompletionCount > 0 then
-                      yield sprintf "%s:%s:pending-completions:%d" prefix ownerKey runtime.PendingCompletionCount ]
-
-            agents @ ptys @ pending
-
         lock gate (fun () ->
+            let devopsChildFromRuntime =
+                match runtimes.TryGetValue sessionId with
+                | true, runtime -> runtime.TryChildSession "devops"
+                | false, _ -> None
+
+            let devopsChildFromJournal =
+                journal
+                |> Option.bind (fun durable ->
+                    let snapshot = AgentJournal.snapshot durable
+
+                    AgentProjection.tryFind (SessionId.create sessionId) snapshot.AgentProjections
+                    |> Option.bind (fun s -> s.Handles)
+                    |> Option.bind (HandleProjection.tryFindByByname "devops")
+                    |> Option.map (fun h -> h.ChildSessionId))
+
+            let devopsChildSessionIdOpt =
+                devopsChildFromRuntime |> Option.orElse devopsChildFromJournal
+
+            let devopsChildKeyOpt = devopsChildSessionIdOpt |> Option.map SessionId.value
+
+            let rec belongsToDevOps (candidate: string) visited =
+                match devopsChildKeyOpt with
+                | Some devopsChildKey when candidate = devopsChildKey -> true
+                | Some _ when Set.contains candidate visited -> false
+                | Some _ ->
+                    parentOf candidate
+                    |> Option.exists (fun parent -> belongsToDevOps parent (Set.add candidate visited))
+                | None -> false
+
+            let isDevOpsAgent (handle: string) (child: SessionId) =
+                handle = "devops"
+                || (match devopsChildKeyOpt with
+                    | Some devopsChildKey -> SessionId.value child = devopsChildKey
+                    | None -> false)
+
+            let runtimeBlockers prefix ownerKey (runtime: HostForkRuntime) =
+                let rawAgents = runtime.SnapshotOutstandingAgentRuns()
+
+                let relevantAgents =
+                    rawAgents
+                    |> List.filter (fun (handle, child) ->
+                        if ownerKey = sessionId then
+                            not (isDevOpsAgent handle child)
+                        else
+                            true)
+
+                let agents =
+                    relevantAgents
+                    |> List.map (fun (handle, child) ->
+                        sprintf "%s:%s:agent:%s:%s" prefix ownerKey handle (SessionId.value child))
+
+                if List.isEmpty agents then
+                    ignore (runtime.Runtime.DrainAgentWakes 32)
+
+                let ptys =
+                    runtime.SnapshotOutstandingPtyRuns()
+                    |> List.map (fun pty -> sprintf "%s:%s:pty:%s" prefix ownerKey pty)
+
+                let pending =
+                    [ if relevantAgents.Length > 0 then
+                          yield sprintf "%s:%s:pending-runs:%d" prefix ownerKey relevantAgents.Length
+
+                      if runtime.PendingCompletionCount > 0 && not (List.isEmpty agents) then
+                          yield sprintf "%s:%s:pending-completions:%d" prefix ownerKey runtime.PendingCompletionCount ]
+
+                agents @ ptys @ pending
+
+            let isRelevantSession (candidate: string) =
+                belongsToRoot candidate Set.empty && not (belongsToDevOps candidate Set.empty)
+
             let forkBlockers =
                 runtimes
                 |> Seq.collect (fun pair ->
-                    if belongsToRoot pair.Key Set.empty then
+                    if isRelevantSession pair.Key then
                         runtimeBlockers "fork" pair.Key pair.Value
                     else
                         [])
@@ -810,7 +872,7 @@ type ToolRuntimeScope
             let executorBlockers =
                 executorRuntimes
                 |> Seq.collect (fun pair ->
-                    if belongsToRoot pair.Key Set.empty then
+                    if isRelevantSession pair.Key then
                         runtimeBlockers "executor" pair.Key pair.Value
                     else
                         [])

@@ -1792,6 +1792,14 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
+    module: 'OpenCode/Tools/ToolRuntimeScopeSurface.js',
+    owner: 'relay-retirement',
+    laws: ['RETIRE-003', 'RETIRE-009'],
+    source: 'src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScopeSurface.fs',
+    representation: 'json',
+    kind: 'resource',
+  },
+  {
     module: 'Mission/Relay/ProjectionSurface.js',
     owner: 'relay-context-projection',
     laws: ['PROJ-004', 'PROJ-006', 'PROJ-008', 'PROJ-009'],

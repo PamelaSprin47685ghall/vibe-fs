@@ -99,3 +99,7 @@ session delete、turn observation或strength semantic-cut incident必须先完�
 同一道路内固定绑定的 DevOps 具有唯一的逻辑操作员权威。当 DevOps 物理会话发生崩溃或故障恢复时，系统允许替换底层物理 Session，但必须确保逻辑操作员同一时刻至多对应一个可执行物理权威。
 恢复过程严格沿用初始化时已绑定的模型与 Persona 规则，严禁通过 resume 切换或重置模型。
 崩溃恢复严禁重复执行未决的物理命令；底层真实物理进程与 PTY 会话必须随 DevOps 会话及道路的关闭彻底排空与收束，禁止残留任何孤儿进程。
+
+## [025] 固定 DevOps 每次工作返回时 PTY 进程彻底收束与记账清理
+
+固定 DevOps 每次工作返回（其 run 终态结算）时，系统必须立即收束该 DevOps 会话拥有的全部 PTY 进程（TERM 后等待真实物理退出、必要时升级 KILL），并彻底清理对应的记账，禁止留待下次 resume 回收；该收束仅绑定 DevOps run 终态结算，不因 Manager 退休触发，且不影响其他会话的 PTY 资源与生命周期。

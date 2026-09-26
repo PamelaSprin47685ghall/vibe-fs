@@ -42,3 +42,59 @@ test('WHAT[relay-retirement-009] live incumbency-owned child tasks block retirem
     assert.fail('retirement.decideWithRoadResources is not yet implemented')
   }
 })
+
+test('WHAT[relay-retirement-009] ToolRuntimeScope RetirementBlockersFor excludes fixed road DevOps PTY and agent resources', async () => {
+  const scopeMod = await import('../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js')
+  const evaluate = scopeMod.evaluateRetirementBlockers || (scopeMod.ToolRuntimeScopeSurface && scopeMod.ToolRuntimeScopeSurface.evaluateRetirementBlockers)
+  assert.equal(typeof evaluate, 'function', 'evaluateRetirementBlockers must be exported on ToolRuntimeScope surface')
+
+  const blockers = evaluate({
+    managerSessionId: 'manager-road-1',
+    devopsChildSessionId: 'devops-session-1',
+    devopsPtys: ['devops-pty-1'],
+    managerHasDevopsAgent: true,
+  })
+
+  assert.deepEqual(blockers, [], 'DevOps PTY and agent runs must not appear in Manager retirement blockers')
+})
+
+test('WHAT[relay-retirement-009] ToolRuntimeScope RetirementBlockersFor preserves incumbency-owned Engineer blocking resources', async () => {
+  const scopeMod = await import('../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js')
+  const evaluate = scopeMod.evaluateRetirementBlockers || (scopeMod.ToolRuntimeScopeSurface && scopeMod.ToolRuntimeScopeSurface.evaluateRetirementBlockers)
+  assert.equal(typeof evaluate, 'function', 'evaluateRetirementBlockers must be exported on ToolRuntimeScope surface')
+
+  const blockers = evaluate({
+    managerSessionId: 'manager-road-1',
+    devopsChildSessionId: 'devops-session-1',
+    devopsPtys: ['devops-pty-1'],
+    managerHasDevopsAgent: true,
+    engineerChildSessionId: 'engineer-session-1',
+    engineerPtys: ['eng-pty-1'],
+    managerHasEngineerAgent: true,
+  })
+
+  assert.equal(blockers.length > 0, true, 'Engineer resources must block Manager retirement')
+  assert.equal(blockers.some((b) => b.includes('devops')), false, 'DevOps resources must not be among the blockers')
+  assert.equal(blockers.some((b) => b.includes('engineer-session-1')), true, 'Engineer child session must be among blockers')
+  assert.equal(blockers.some((b) => b.includes('eng-pty-1')), true, 'Engineer PTY must be among blockers')
+})
+
+
+test('WHAT[relay-retirement-009] ToolRuntimeScope RetirementBlockersFor does not falsely exclude Engineer PTY whose name contains devops substring', async () => {
+  const scopeMod = await import('../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js')
+  const evaluate = scopeMod.evaluateRetirementBlockers || (scopeMod.ToolRuntimeScopeSurface && scopeMod.ToolRuntimeScopeSurface.evaluateRetirementBlockers)
+  assert.equal(typeof evaluate, 'function', 'evaluateRetirementBlockers must be exported on ToolRuntimeScope surface')
+
+  const blockers = evaluate({
+    managerSessionId: 'manager-road-1',
+    devopsChildSessionId: 'devops-session-1',
+    devopsPtys: ['devops-pty-1'],
+    managerHasDevopsAgent: true,
+    engineerChildSessionId: 'engineer-session-1',
+    engineerPtys: ['engineer-devops-migration-pty'],
+    managerHasEngineerAgent: false,
+  })
+
+  assert.equal(blockers.length, 1, 'Engineer PTY containing devops substring must still block Manager retirement')
+  assert.equal(blockers[0].includes('engineer-devops-migration-pty'), true, 'Blocker must be the Engineer PTY')
+})
