@@ -672,12 +672,6 @@ export function hasSignatureRisk(sourceText) {
     || INLINE_FUN_PATTERN.test(stripped)
 }
 
-export const SIGNATURE_RISK_SOURCE_PATTERN = {
-  test(text) {
-    return hasSignatureRisk(text)
-  },
-}
-
 /**
  * Reads the on-disk owner topology into an immutable inventory for planning.
  *
@@ -1744,31 +1738,6 @@ export async function compileIncremental({
       }
     }
     return map
-  }
-
-  // Fast no-op cache hit when no changed paths and not clean
-  if (effectiveChangedPaths.length === 0 && !isClean) {
-    const hasJs = hasEmittedJsFiles(targetOutputDir)
-    if (hasJs) {
-      return {
-        ok: true,
-        code: 0,
-        signal: null,
-        mode: 'cached',
-        reason: 'no-changes-detected',
-        changedPaths: [],
-        compileItems: [],
-        elapsedMs: 0,
-        cached: true,
-        outputPath: targetOutputDir,
-        fingerprint: null,
-        snapshot: buildSnapshot(),
-      }
-    }
-    isClean = true
-    effectiveChangedPaths = collectTrackedInputs({ root, aggregatePath: resolvedAggregate, projectDirectory: resolvedProjectDirectory })
-  } else if (isClean && effectiveChangedPaths.length === 0) {
-    effectiveChangedPaths = collectTrackedInputs({ root, aggregatePath: resolvedAggregate, projectDirectory: resolvedProjectDirectory })
   }
 
   const plan = planImpactCompile({

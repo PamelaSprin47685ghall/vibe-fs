@@ -1961,19 +1961,21 @@ integrationTest('WHAT[structured-workflow-012] compile-impact CLI emits fresh ou
       'namespace ImpactFixture\n\nmodule Alpha =\n    let value = Core.baseValue + 999\n',
       'utf8',
     )
-    const result2 = runCli(flags)
+    // Production contract: changedPaths is mandatory; CLI caller must supply explicit changed paths.
+    // Proves that when an explicit changed file is passed, CLI recompiles the focused impact into the scratch/output dir,
+    // updates the output artifact with fresh bytes, and never creates or writes an authoritative build-manifest.
+    const result2 = runCli([alphaFs, ...flags])
     assert.equal(result2.status, 0, result2.stderr || result2.stdout)
     assert.match(result2.stdout, /compiled .* impact/)
-    assert.ok(!result2.stdout.includes('up-to-date (cached)'), 'auto-detect must recompile, not report a cache hit')
     const afterPath = findEmittedJs(outputDir, 'Alpha.js')
     assert.ok(afterPath, 'emitted Alpha.js still exists after second run')
     const after = readFileSync(afterPath, 'utf8')
-    assert.notEqual(after, before, 'auto-detected fixture change must produce an emergent emit delta')
+    assert.notEqual(after, before, 'explicitly passed changed file must produce an emergent emit delta')
     assert.ok(after.includes('baseValue + 999'), 'recompiled emit must carry the mutated fixture value')
     assert.ok(!existsSync(manifestPath), 'still no manifest written by a compile-only caller')
     assert.ok(
       !existsSync(join(outputDir, 'Foundation', 'FatalProcess.js')),
-      'auto-detect emit stays fixture-scoped, never production sources',
+      'focused emit stays fixture-scoped, never production sources',
     )
   } finally {
     rmSync(dir, { recursive: true, force: true })
@@ -2122,8 +2124,9 @@ integrationTest('WHAT[structured-workflow-012] independent Fable checks enforce 
 
 {
 const { default: assert } = await import("node:assert/strict");
+const { createHash } = await import("node:crypto");
 const { EventEmitter } = await import("node:events");
-const { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = await import("node:fs");
+const { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
 const { dirname, isAbsolute, join, relative, resolve } = await import("node:path");
 const { default: test } = await import("node:test");
@@ -2149,32 +2152,61 @@ const {
 const ROOT = resolve(import.meta.dirname, '../../..');
 
 test('WHAT[structured-workflow-012] collectTrackedInputs includes compile-order global.json and build state scripts, and compile-order change triggers full plan', () => {
-  const tracked = collectTrackedInputs({ root: ROOT });
+  const fixtureRoot = mkdtempSync(join(tmpdir(), 'tracked-inputs-fixture-'));
+  try {
+    const srcDir = join(fixtureRoot, 'src/Wanxiangshu');
+    const scriptsLibDir = join(fixtureRoot, 'scripts/lib');
+    mkdirSync(srcDir, { recursive: true });
+    mkdirSync(scriptsLibDir, { recursive: true });
 
-  // 1. Must include compile-order.txt
-  const hasCompileOrder = tracked.some((p) => p.endsWith('src/Wanxiangshu/compile-order.txt'));
-  assert.equal(hasCompileOrder, true, 'collectTrackedInputs must include src/Wanxiangshu/compile-order.txt');
+    // Minimal shard setup so assertProductionSourcesAssigned succeeds independently
+    mkdirSync(join(srcDir, 'Source'), { recursive: true });
+    writeFileSync(join(srcDir, 'Source/ModA.fsi'), 'namespace Core\nval a: int\n', 'utf8');
+    writeFileSync(join(srcDir, 'Source/ModA.fs'), 'namespace Core\nlet a = 1\n', 'utf8');
+    writeFileSync(
+      join(srcDir, 'Wanxiangshu.Shard.A.fsproj'),
+      '<Project Sdk="Microsoft.NET.Sdk">\n<ItemGroup>\n<Compile Include="Source/ModA.fsi"/>\n<Compile Include="Source/ModA.fs"/>\n</ItemGroup>\n</Project>\n',
+      'utf8',
+    );
+    const compileOrderPath = join(srcDir, 'compile-order.txt');
+    writeFileSync(compileOrderPath, 'Source/ModA.fsi\nSource/ModA.fs\n', 'utf8');
 
-  // 2. Must include root global.json
-  const hasGlobalJson = tracked.some((p) => p.endsWith('global.json'));
-  assert.equal(hasGlobalJson, true, 'collectTrackedInputs must include global.json');
+    // Config and script inputs
+    writeFileSync(join(fixtureRoot, 'global.json'), '{"sdk":{"version":"10.0.100"}}\n', 'utf8');
+    writeFileSync(join(fixtureRoot, 'Directory.Build.props'), '<Project/>\n', 'utf8');
+    writeFileSync(join(fixtureRoot, 'scripts/build.mjs'), '// build.mjs stub\n', 'utf8');
+    writeFileSync(join(scriptsLibDir, 'compile-shards.mjs'), '// compile-shards stub\n', 'utf8');
+    writeFileSync(join(scriptsLibDir, 'build-state.mjs'), '// build-state stub\n', 'utf8');
+    writeFileSync(join(scriptsLibDir, 'owner-compile.mjs'), '// owner-compile stub\n', 'utf8');
 
-  // 3. Must include scripts/lib/compile-shards.mjs
-  const hasCompileShards = tracked.some((p) => p.endsWith('scripts/lib/compile-shards.mjs'));
-  assert.equal(hasCompileShards, true, 'collectTrackedInputs must include scripts/lib/compile-shards.mjs');
+    const tracked = collectTrackedInputs({ root: fixtureRoot });
 
-  // 4. Must include scripts/lib/build-state.mjs
-  const hasBuildState = tracked.some((p) => p.endsWith('scripts/lib/build-state.mjs'));
-  assert.equal(hasBuildState, true, 'collectTrackedInputs must include scripts/lib/build-state.mjs');
+    // 1. Must include compile-order.txt
+    const hasCompileOrder = tracked.some((p) => p.endsWith('src/Wanxiangshu/compile-order.txt'));
+    assert.equal(hasCompileOrder, true, 'collectTrackedInputs must include src/Wanxiangshu/compile-order.txt');
 
-  // 5. compile-order.txt change in planner side triggers mode: full
-  const compileOrderPath = join(ROOT, 'src/Wanxiangshu/compile-order.txt');
-  const plan = planImpactCompile({
-    changedPaths: [compileOrderPath],
-    projectDirectory: join(ROOT, 'src/Wanxiangshu'),
-  });
-  assert.equal(plan.mode, 'full', 'compile-order.txt modification must trigger full compilation mode');
-  assert.equal(plan.reason, 'toolchain-or-project-change', 'compile-order.txt reason must be toolchain-or-project-change');
+    // 2. Must include root global.json
+    const hasGlobalJson = tracked.some((p) => p.endsWith('global.json'));
+    assert.equal(hasGlobalJson, true, 'collectTrackedInputs must include global.json');
+
+    // 3. Must include scripts/lib/compile-shards.mjs
+    const hasCompileShards = tracked.some((p) => p.endsWith('scripts/lib/compile-shards.mjs'));
+    assert.equal(hasCompileShards, true, 'collectTrackedInputs must include scripts/lib/compile-shards.mjs');
+
+    // 4. Must include scripts/lib/build-state.mjs
+    const hasBuildState = tracked.some((p) => p.endsWith('scripts/lib/build-state.mjs'));
+    assert.equal(hasBuildState, true, 'collectTrackedInputs must include scripts/lib/build-state.mjs');
+
+    // 5. compile-order.txt change in planner side triggers mode: full
+    const plan = planImpactCompile({
+      changedPaths: [compileOrderPath],
+      projectDirectory: srcDir,
+    });
+    assert.equal(plan.mode, 'full', 'compile-order.txt modification must trigger full compilation mode');
+    assert.equal(plan.reason, 'toolchain-or-project-change', 'compile-order.txt reason must be toolchain-or-project-change');
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
 });
 
 test('WHAT[structured-workflow-012] compileIncremental enforces mandatory changedPaths and bypasses build-manifest read and write', async () => {
@@ -2472,24 +2504,33 @@ test('WHAT[structured-workflow-012] build mode decisions: plain fs changes plan 
     writeFileSync(join(fixtureRoot, 'Directory.Build.props'), '<Project/>\n', 'utf8');
     writeFileSync(join(fixtureRoot, 'global.json'), '{"sdk":{"version":"10.0.100"}}\n', 'utf8');
 
-    // Create 3 shards so modifying 1 shard selects 1/3 = 33% < fullThreshold (60%)
+    // Create 4 shards:
+    // Shard A (Provider with inline function)
+    // Shard B (Consumer of Shard A via ProjectReference)
+    // Shard C (Independent ordinary shard)
+    // Shard D (Independent ordinary shard)
+    // Total shards = 4, fullThreshold = 60%.
     mkdirSync(join(srcDir, 'Source'), { recursive: true });
-    writeFileSync(join(srcDir, 'Source/ModA.fsi'), 'namespace Core\nval a: int\n', 'utf8');
-    writeFileSync(join(srcDir, 'Source/ModA.fs'), 'namespace Core\nlet a = 1\n', 'utf8');
+
+    // Shard A
+    writeFileSync(join(srcDir, 'Source/ModA.fsi'), 'namespace Core\nval a: int\nval inline helper: int -> int\n', 'utf8');
+    writeFileSync(join(srcDir, 'Source/ModA.fs'), 'namespace Core\nlet a = 1\nlet inline helper x = x + 1\n', 'utf8');
     writeFileSync(
       join(srcDir, 'Wanxiangshu.Shard.A.fsproj'),
       '<Project Sdk="Microsoft.NET.Sdk">\n<ItemGroup>\n<Compile Include="Source/ModA.fsi"/>\n<Compile Include="Source/ModA.fs"/>\n</ItemGroup>\n</Project>\n',
       'utf8',
     );
 
+    // Shard B references Shard A (reverse consumer)
     writeFileSync(join(srcDir, 'Source/ModB.fsi'), 'namespace Core\nval b: int\n', 'utf8');
     writeFileSync(join(srcDir, 'Source/ModB.fs'), 'namespace Core\nlet b = 1\n', 'utf8');
     writeFileSync(
       join(srcDir, 'Wanxiangshu.Shard.B.fsproj'),
-      '<Project Sdk="Microsoft.NET.Sdk">\n<ItemGroup>\n<Compile Include="Source/ModB.fsi"/>\n<Compile Include="Source/ModB.fs"/>\n</ItemGroup>\n</Project>\n',
+      '<Project Sdk="Microsoft.NET.Sdk">\n<ItemGroup>\n<ProjectReference Include="Wanxiangshu.Shard.A.fsproj"/>\n<Compile Include="Source/ModB.fsi"/>\n<Compile Include="Source/ModB.fs"/>\n</ItemGroup>\n</Project>\n',
       'utf8',
     );
 
+    // Shard C
     writeFileSync(join(srcDir, 'Source/ModC.fsi'), 'namespace Core\nval c: int\n', 'utf8');
     writeFileSync(join(srcDir, 'Source/ModC.fs'), 'namespace Core\nlet c = 1\n', 'utf8');
     writeFileSync(
@@ -2498,9 +2539,18 @@ test('WHAT[structured-workflow-012] build mode decisions: plain fs changes plan 
       'utf8',
     );
 
+    // Shard D
+    writeFileSync(join(srcDir, 'Source/ModD.fsi'), 'namespace Core\nval d: int\n', 'utf8');
+    writeFileSync(join(srcDir, 'Source/ModD.fs'), 'namespace Core\nlet d = 1\n', 'utf8');
+    writeFileSync(
+      join(srcDir, 'Wanxiangshu.Shard.D.fsproj'),
+      '<Project Sdk="Microsoft.NET.Sdk">\n<ItemGroup>\n<Compile Include="Source/ModD.fsi"/>\n<Compile Include="Source/ModD.fs"/>\n</ItemGroup>\n</Project>\n',
+      'utf8',
+    );
+
     writeFileSync(
       join(srcDir, 'compile-order.txt'),
-      'Source/ModA.fsi\nSource/ModA.fs\nSource/ModB.fsi\nSource/ModB.fs\nSource/ModC.fsi\nSource/ModC.fs\n',
+      'Source/ModA.fsi\nSource/ModA.fs\nSource/ModB.fsi\nSource/ModB.fs\nSource/ModC.fsi\nSource/ModC.fs\nSource/ModD.fsi\nSource/ModD.fs\n',
       'utf8',
     );
 
@@ -2509,21 +2559,8 @@ test('WHAT[structured-workflow-012] build mode decisions: plain fs changes plan 
     writeFileSync(join(distDir, 'OpenCode/Plugin/Plugin.js'), 'export const plugin = true;\n', 'utf8');
     writeFileSync(join(distDir, 'Sphinx/V2/ServeEntry.js'), 'export const serve = true;\n', 'utf8');
 
-    // Create a valid, self-consistent baseline manifest matching current outputs and toolchain
-    const repoManifest = readManifest({ root: ROOT });
-    let currentToolIdentity = repoManifest?.compiler?.toolIdentity;
-    if (!currentToolIdentity) {
-      try {
-        const { execFileSync } = await import('node:child_process');
-        let dotnetVer = 'unknown';
-        let fableVer = 'unknown';
-        try { dotnetVer = execFileSync('dotnet', ['--version'], { encoding: 'utf8' }).trim(); } catch {}
-        try { fableVer = execFileSync('dotnet', ['tool', 'run', 'fable', '--version'], { encoding: 'utf8' }).trim(); } catch {}
-        currentToolIdentity = `dotnet ${dotnetVer} / fable ${fableVer}`;
-      } catch {
-        currentToolIdentity = 'dotnet unknown / fable unknown';
-      }
-    }
+    // Controlled toolchain identity: completely decoupled from repo manifest and dotnet CLI
+    const controlledToolIdentity = 'controlled-toolchain-identity-v1';
 
     const initialCompilerInputs = collectCompilerInputs(fixtureRoot, null);
     const initialCompilerDigest = computeDigest(initialCompilerInputs);
@@ -2537,7 +2574,7 @@ test('WHAT[structured-workflow-012] build mode decisions: plain fs changes plan 
       schema: MANIFEST_SCHEMA,
       generation: 1,
       compiler: {
-        toolIdentity: currentToolIdentity,
+        toolIdentity: controlledToolIdentity,
         inputs: initialCompilerInputs,
         inputDigest: initialCompilerDigest,
       },
@@ -2551,15 +2588,20 @@ test('WHAT[structured-workflow-012] build mode decisions: plain fs changes plan 
     };
     writeManifest({ root: fixtureRoot, manifest: baselineManifest });
 
-    // 1. Only a non-signature body .fs change:
-    // Build mode MUST be focused (not clean), and planBuild must agree with runBuild decision.
-    writeFileSync(join(srcDir, 'Source/ModA.fs'), 'namespace Core\nlet a = 2\n', 'utf8');
+    // 1. Negative example: plain non-signature body .fs change (ModC.fs):
+    // Must plan focused mode and select ONLY Shard C (must NOT pull reverse consumers like Shard B).
+    writeFileSync(join(srcDir, 'Source/ModC.fs'), 'namespace Core\nlet c = 2\n', 'utf8');
 
-    const planFocused = await planBuild({ targetRoot: fixtureRoot });
-    assert.equal(planFocused.mode, 'focused', 'modifying only a non-signature .fs file must plan focused mode, never clean');
-    assert.ok(planFocused.selectedShards.some((p) => p.endsWith('Wanxiangshu.Shard.A.fsproj')), 'focused plan must select Shard A');
+    const planPlain = await planBuild({ targetRoot: fixtureRoot, currentToolchain: controlledToolIdentity });
+    assert.equal(planPlain.mode, 'focused', 'modifying plain non-signature .fs file must plan focused mode');
+    assert.ok(planPlain.selectedShards.some((p) => p.endsWith('Wanxiangshu.Shard.C.fsproj')), 'must select Shard C');
+    assert.equal(
+      planPlain.selectedShards.some((p) => p.endsWith('Wanxiangshu.Shard.B.fsproj')),
+      false,
+      'negative example: plain fs change must NOT pull reverse consumer Shard B',
+    );
 
-    const decisionFocused = determineBuildDecision({
+    const decisionPlain = determineBuildDecision({
       clean: false,
       existingManifest: baselineManifest,
       resolvedRoot: fixtureRoot,
@@ -2568,15 +2610,52 @@ test('WHAT[structured-workflow-012] build mode decisions: plain fs changes plan 
       compilerInputDigest: computeDigest(collectCompilerInputs(fixtureRoot, null)),
       generatedInputDigest: initialGeneratedDigest,
       artifactInputDigest: initialArtifactDigest,
-      currentToolchain: currentToolIdentity,
+      currentToolchain: controlledToolIdentity,
     });
-    assert.equal(planFocused.mode, decisionFocused.mode, 'plan mode must agree with build run decision mode');
+    assert.equal(planPlain.mode, decisionPlain.mode, 'plan mode must agree with build run decision mode');
 
-    // 2. Non-.fs/.fsi input change (e.g. Directory.Build.props or compile-order.txt):
-    // Build mode MUST be full (not clean).
+    // 2. D2 Regression lock: signature-risky inline body change in ModA.fs:
+    // Must pull reverse consumer Shard B into selectedShards, matching run-path planner (planImpactCompile).
+    writeFileSync(join(srcDir, 'Source/ModC.fs'), 'namespace Core\nlet c = 1\n', 'utf8'); // restore ModC
+    writeFileSync(join(srcDir, 'Source/ModA.fs'), 'namespace Core\nlet a = 1\nlet inline helper x = x + 42\n', 'utf8');
+
+    const planInline = await planBuild({ targetRoot: fixtureRoot, currentToolchain: controlledToolIdentity });
+    assert.equal(planInline.mode, 'focused', 'inline body change selecting 2/4 shards (50% < 60%) must plan focused mode');
+    assert.ok(planInline.selectedShards.some((p) => p.endsWith('Wanxiangshu.Shard.A.fsproj')), 'must select provider Shard A');
+    assert.ok(
+      planInline.selectedShards.some((p) => p.endsWith('Wanxiangshu.Shard.B.fsproj')),
+      'regression lock: inline body change MUST pull reverse consumer Shard B into selectedShards',
+    );
+    assert.equal(
+      planInline.selectedShards.some((p) => p.endsWith('Wanxiangshu.Shard.C.fsproj')),
+      false,
+      'unimpacted Shard C must not be pulled',
+    );
+
+    // Verify plan matches run path planner contract
+    const runPlannerImpact = planImpactCompile({
+      changedPaths: [join(srcDir, 'Source/ModA.fs')],
+      projectDirectory: srcDir,
+    });
+    assert.equal(planInline.mode, runPlannerImpact.mode, 'planBuild mode must agree with planImpactCompile');
+    assert.deepEqual(
+      planInline.selectedShards.map((p) => resolve(p)).sort(),
+      runPlannerImpact.projectPaths.map((p) => resolve(p)).sort(),
+      'planBuild selectedShards must agree with planImpactCompile projectPaths',
+    );
+
+    // 3. Threshold behavior: hitting >= 60% threshold triggers mode = full
+    // Modify ModA (pulls A & B = 2 shards) AND ModC (1 shard) => 3/4 = 75% >= 60%
+    writeFileSync(join(srcDir, 'Source/ModC.fs'), 'namespace Core\nlet c = 99\n', 'utf8');
+    const planThreshold = await planBuild({ targetRoot: fixtureRoot, currentToolchain: controlledToolIdentity });
+    assert.equal(planThreshold.mode, 'full', 'hitting 75% >= 60% threshold must plan full mode');
+
+    // 4. Non-.fs/.fsi input change (Directory.Build.props):
+    writeFileSync(join(srcDir, 'Source/ModA.fs'), 'namespace Core\nlet a = 1\nlet inline helper x = x + 1\n', 'utf8');
+    writeFileSync(join(srcDir, 'Source/ModC.fs'), 'namespace Core\nlet c = 1\n', 'utf8');
     writeFileSync(join(fixtureRoot, 'Directory.Build.props'), '<Project><!-- updated --></Project>\n', 'utf8');
 
-    const planFull = await planBuild({ targetRoot: fixtureRoot });
+    const planFull = await planBuild({ targetRoot: fixtureRoot, currentToolchain: controlledToolIdentity });
     assert.equal(planFull.mode, 'full', 'modifying non-.fs/.fsi input must plan full mode, not clean');
     assert.notEqual(planFull.mode, 'clean', 'planBuild must never report clean for non-clean non-fs changes');
   } finally {
@@ -2584,34 +2663,171 @@ test('WHAT[structured-workflow-012] build mode decisions: plain fs changes plan 
   }
 });
 
-test('WHAT[structured-workflow-012] build failure preserves prior valid manifest and does not delete it', async () => {
-  const fixtureRoot = mkdtempSync(join(tmpdir(), 'build-manifest-retention-'));
+test('WHAT[structured-workflow-012] build failure preserves prior valid manifest and does not delete it (unit: pre-compile failure)', async () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), 'build-manifest-retention-unit-'));
   try {
-    const buildStateDir = join(fixtureRoot, '.fable-build');
+    const srcDir = join(fixtureRoot, 'src/Wanxiangshu');
     const distDir = join(fixtureRoot, 'dist');
-    mkdirSync(buildStateDir, { recursive: true });
+    const buildStateDir = join(fixtureRoot, '.fable-build');
+    mkdirSync(srcDir, { recursive: true });
     mkdirSync(distDir, { recursive: true });
+    mkdirSync(buildStateDir, { recursive: true });
+
+    writeFileSync(join(fixtureRoot, 'Directory.Build.props'), '<Project/>\n', 'utf8');
+    writeFileSync(join(fixtureRoot, 'global.json'), '{"sdk":{"version":"10.0.100"}}\n', 'utf8');
+
+    // Minimal valid shard
+    mkdirSync(join(srcDir, 'Source'), { recursive: true });
+    writeFileSync(join(srcDir, 'Source/ModA.fsi'), 'namespace Core\nval a: int\n', 'utf8');
+    writeFileSync(join(srcDir, 'Source/ModA.fs'), 'namespace Core\nlet a = 1\n', 'utf8');
+    writeFileSync(
+      join(srcDir, 'Wanxiangshu.Shard.A.fsproj'),
+      '<Project Sdk="Microsoft.NET.Sdk">\n<ItemGroup>\n<Compile Include="Source/ModA.fsi"/>\n<Compile Include="Source/ModA.fs"/>\n</ItemGroup>\n</Project>\n',
+      'utf8',
+    );
+    writeFileSync(join(srcDir, 'compile-order.txt'), 'Source/ModA.fsi\nSource/ModA.fs\n', 'utf8');
+
+    // Dist baseline files
+    const goodDistFile = join(distDir, 'Output.js');
+    writeFileSync(goodDistFile, 'export const valid = true;\n', 'utf8');
+
+    const initialCompilerInputs = collectCompilerInputs(fixtureRoot, null);
+    const initialCompilerDigest = computeDigest(initialCompilerInputs);
+    const initialGeneratedInputs = collectGeneratedInputs(fixtureRoot);
+    const initialGeneratedDigest = computeDigest(initialGeneratedInputs);
+    const initialArtifactInputs = collectArtifactInputs(fixtureRoot);
+    const initialArtifactDigest = computeDigest(initialArtifactInputs);
+    const initialOutputs = collectOutputs(distDir);
 
     const priorManifest = {
       schema: MANIFEST_SCHEMA,
       generation: 42,
-      compiler: { inputDigest: 'd1', inputs: [] },
-      generated: { inputDigest: 'd2' },
-      artifacts: { inputDigest: 'd3' },
-      outputs: { 'out.js': ['h', 1, 1] },
+      compiler: {
+        toolIdentity: 'unit-toolchain-identity-v1',
+        inputs: initialCompilerInputs,
+        inputDigest: initialCompilerDigest,
+      },
+      generated: { inputDigest: initialGeneratedDigest },
+      artifacts: { inputDigest: initialArtifactDigest },
+      outputs: initialOutputs,
     };
     writeManifest({ root: fixtureRoot, manifest: priorManifest });
-    assert.equal(readManifest({ root: fixtureRoot })?.generation, 42);
 
-    // Contract: when compilation or post-checks fail during build,
-    // the system must NOT destroy the previous valid manifest.
-    // If a build fails, existing manifest on disk must be preserved for safe retry/inspection.
     const manifestPath = join(buildStateDir, 'build-manifest.json');
     assert.equal(existsSync(manifestPath), true, 'manifest file exists before build');
+    const manifestStatBefore = statSync(manifestPath);
+    const manifestContentBefore = readFileSync(manifestPath, 'utf8');
+    const distFilesBefore = readdirSync(distDir);
 
-    // Verify readManifest still reads generation 42 if build errored out
+    // Cause runBuild to fail before entering compilation by introducing an unassigned production source.
+    // This triggers assertProductionSourcesAssigned / collectCompilerInputs rejection.
+    writeFileSync(join(srcDir, 'Source/Unassigned.fs'), 'namespace Core\nlet unassigned = 12345\n', 'utf8');
+
+    await assert.rejects(
+      async () => {
+        await runBuild({ targetRoot: fixtureRoot, stdio: 'pipe' });
+      },
+      /production source coverage mismatch unassigned/i,
+      'runBuild must reject before compilation when unassigned production sources exist',
+    );
+
+    // Contract: failure must preserve existing valid manifest and dist exactly
+    assert.equal(existsSync(manifestPath), true, 'manifest must still exist after build failure');
+    const manifestStatAfter = statSync(manifestPath);
+    const manifestContentAfter = readFileSync(manifestPath, 'utf8');
     const manifestAfter = readManifest({ root: fixtureRoot });
+
     assert.equal(manifestAfter?.generation, 42, 'prior manifest generation must be preserved when build fails');
+    assert.equal(manifestContentAfter, manifestContentBefore, 'manifest file content must remain byte-for-byte identical');
+    assert.equal(manifestStatAfter.mtimeMs, manifestStatBefore.mtimeMs, 'manifest file mtime must not change');
+    assert.deepEqual(readdirSync(distDir), distFilesBefore, 'dist directory files must remain completely untouched');
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+integrationTest('WHAT[structured-workflow-012] build failure preserves prior valid manifest and does not delete it (integration: compiler failure)', { timeout: 120_000 }, async () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), 'build-manifest-retention-integration-'));
+  try {
+    const srcDir = join(fixtureRoot, 'src/Wanxiangshu');
+    const distDir = join(fixtureRoot, 'dist');
+    const buildStateDir = join(fixtureRoot, '.fable-build');
+    mkdirSync(srcDir, { recursive: true });
+    mkdirSync(distDir, { recursive: true });
+    mkdirSync(buildStateDir, { recursive: true });
+
+    writeFileSync(
+      join(fixtureRoot, 'Directory.Build.props'),
+      `<Project>\n  <Import Project="${join(ROOT, 'Directory.Build.props')}" />\n</Project>\n`,
+      'utf8',
+    );
+
+    mkdirSync(join(srcDir, 'Source'), { recursive: true });
+    writeFileSync(join(srcDir, 'Source/Core.fsi'), 'namespace Core\nval value: int\n', 'utf8');
+    const coreFsPath = join(srcDir, 'Source/Core.fs');
+    writeFileSync(coreFsPath, 'namespace Core\nlet value = 1\n', 'utf8');
+    writeFileSync(
+      join(srcDir, 'Wanxiangshu.Shard.Core.fsproj'),
+      `<Project Sdk="Microsoft.NET.Sdk">\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n  </PropertyGroup>\n  <ItemGroup>\n    <Compile Include="Source/Core.fsi"/>\n    <Compile Include="Source/Core.fs"/>\n  </ItemGroup>\n</Project>\n`,
+      'utf8',
+    );
+    writeFileSync(join(srcDir, 'compile-order.txt'), 'Source/Core.fsi\nSource/Core.fs\n', 'utf8');
+
+    // Established dist artifact
+    const baselineOutFile = join(distDir, 'Core.js');
+    writeFileSync(baselineOutFile, 'export const value = 1;\n', 'utf8');
+
+    const compilerInputs = collectCompilerInputs(fixtureRoot, null);
+    const compilerDigest = computeDigest(compilerInputs);
+    const generatedInputs = collectGeneratedInputs(fixtureRoot);
+    const generatedDigest = computeDigest(generatedInputs);
+    const artifactInputs = collectArtifactInputs(fixtureRoot);
+    const artifactDigest = computeDigest(artifactInputs);
+    const outputs = collectOutputs(distDir);
+
+    const manifestBefore = {
+      schema: MANIFEST_SCHEMA,
+      generation: 1,
+      compiler: {
+        toolIdentity: 'integration-baseline-identity',
+        inputs: compilerInputs,
+        inputDigest: compilerDigest,
+      },
+      generated: { inputDigest: generatedDigest },
+      artifacts: { inputDigest: artifactDigest },
+      outputs,
+    };
+    writeManifest({ root: fixtureRoot, manifest: manifestBefore });
+
+    const manifestPath = join(buildStateDir, 'build-manifest.json');
+    assert.equal(existsSync(manifestPath), true, 'manifest must exist before compile failure');
+    const manifestStatBefore = statSync(manifestPath);
+    const manifestBytesBefore = readFileSync(manifestPath);
+    const manifestShaBefore = createHash('sha256').update(manifestBytesBefore).digest('hex');
+    const distFilesBefore = readdirSync(distDir);
+
+    // Inject real syntax error into source to cause Fable compiler execution to fail
+    writeFileSync(coreFsPath, 'namespace Core\nlet syntax error invalid fsharp ???\n', 'utf8');
+
+    await assert.rejects(
+      async () => {
+        await runBuild({ targetRoot: fixtureRoot, stdio: 'pipe' });
+      },
+      /Fable compilation failed/i,
+      'runBuild must reject when Fable compiler fails with syntax error',
+    );
+
+    // Verify manifest (generation, mtime, sha256) and dist file set are strictly preserved
+    assert.equal(existsSync(manifestPath), true, 'manifest file must not be deleted on compiler failure');
+    const manifestAfter = readManifest({ root: fixtureRoot });
+    const manifestStatAfter = statSync(manifestPath);
+    const manifestBytesAfter = readFileSync(manifestPath);
+    const manifestShaAfter = createHash('sha256').update(manifestBytesAfter).digest('hex');
+
+    assert.equal(manifestAfter?.generation, 1, 'generation must remain 1');
+    assert.equal(manifestShaAfter, manifestShaBefore, 'manifest sha256 must remain identical');
+    assert.equal(manifestStatAfter.mtimeMs, manifestStatBefore.mtimeMs, 'manifest mtime must not be updated on failure');
+    assert.deepEqual(readdirSync(distDir), distFilesBefore, 'dist file set must remain unchanged');
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }

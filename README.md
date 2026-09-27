@@ -240,7 +240,7 @@ resources/wanxiangshu.mjs
 
 ### 构建与打包
 
-- **构建**：`scripts/build.mjs`（增量：按输入摘要判定 no-op / focused / full / clean 四模式，plan 与 run 共用判定；非源码输入或工具链变化进入 full 编译但不清空 `dist/`；仅源图增删或显式 `--clean` 时清空输出目录后重建；其余情况按受影响分片增量聚焦编译；随后校验入口与资源）。不把 `resources/` 复制进 `dist/`。
+- **构建**：`scripts/build.mjs`（增量：按输入摘要判定 no-op / focused / full / clean 四模式，plan 与 run 共用判定；非源码输入或工具链变化进入 full 编译但不清空 `dist/`；仅源图删除、重命名或显式 `--clean` 时清空输出目录后重建；其余情况按受影响分片增量聚焦编译；随后校验入口与资源）。不把 `resources/` 复制进 `dist/`。
 - **打包**：仓库根 `npm pack`（或 `--pack-destination artifacts/package`）。tarball = `dist/` + `resources/` + metadata（`package.json`、`README.md`、`LICENSE`）。不得含 `src/`、`requirements/`、`scripts/`、`artifacts/`。
 
 发布预检：`npm run verify:release`（干净工作树；验证日志默认写 `.fable-build/verify-logs/`，已被 .gitignore 忽略；CI 工作流 `.github/workflows/ci.yml` 运行同一命令，但无 artifact 上传，runner 结束后只剩余作业控制台输出）。

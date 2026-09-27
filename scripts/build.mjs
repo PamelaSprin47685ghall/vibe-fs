@@ -14,8 +14,7 @@ import {
 import {
   compileIncremental,
   resetOutputDirectory,
-  readImpactInventory,
-  planImpactFromInventory,
+  planImpactCompile,
 } from './lib/owner-compile.mjs'
 import {
   MANIFEST_SCHEMA,
@@ -577,6 +576,7 @@ export const buildEntrypoint = runBuild
  */
 export async function planBuild({
   targetRoot = root,
+  currentToolchain = getToolchainIdentity(),
 } = {}) {
   const resolvedRoot = path.resolve(targetRoot)
   const targetDist = path.join(resolvedRoot, 'dist')
@@ -599,7 +599,7 @@ export async function planBuild({
     compilerInputDigest,
     generatedInputDigest,
     artifactInputDigest,
-    currentToolchain: getToolchainIdentity(),
+    currentToolchain,
   })
 
   if (decision.mode === 'no-op') {
@@ -633,17 +633,13 @@ export async function planBuild({
     }
   }
 
-  const inventory = readImpactInventory({
-    projectDirectory: path.join(resolvedRoot, 'src/Wanxiangshu'),
-  })
-  const plan = planImpactFromInventory({
-    inventory,
+  const plan = planImpactCompile({
     changedPaths: decision.changedPaths.length > 0
       ? decision.changedPaths
       : compilerInputs.map((entry) => path.resolve(resolvedRoot, entry.path)),
-    fullThreshold: 0.6,
     isClean: decision.isClean,
-    forceFullReason: decision.mode === 'full' ? decision.reason : undefined,
+    projectDirectory: path.join(resolvedRoot, 'src/Wanxiangshu'),
+    fullThreshold: 0.6,
   })
 
   return {

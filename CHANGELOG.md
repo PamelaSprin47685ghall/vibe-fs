@@ -8,7 +8,7 @@
   - **构建跟踪输入补齐**：将 `compile-order.txt`、根 `global.json`、`scripts/lib/compile-shards.mjs` 及 `scripts/lib/build-state.mjs` 纳入追踪输入；`compile-order.txt` 变更判定为工具链/项目结构变更并触发 full 构建。
   - **增量编译暂存（staging）隔离与导入重定向**：`compileIncremental` 产物先写入独立暂存目录，成功后原子同步至 `dist/`，编译失败不污染输出目录；同步前对逃逸出暂存目录且物理目标落在输出目录内的相对导入执行相对路径重定向（解决跨目录产物 import 逃逸问题），越界与正常导入保持不变。
   - **Fable 缓存复用与输出隔离**：focused 编译的 flat 项目工作目录改按“不含源字节的集合指纹”确定，复用 Fable 编译缓存；编译产物输出目录仍严格按内容指纹隔离；warm 重入继续保证必定调用编译器。
-  - **构建模式判定对齐与清单保护**：`scripts/build.mjs` 中 plan 与 run 共享模式判定逻辑（涵盖 no-op / focused / full / clean）；非 `.fs/.fsi` 跟踪输入或工具链变更进入 full 构建且保留 `dist/`（仅显式 `--clean` 或源图增删清空输出目录）；构建失败或中断不再预先删除旧清单，仅在全链路编译、验证与输出同步成功后才原子写入新 manifest。
+  - **构建模式判定对齐与清单保护**：`scripts/build.mjs` 中 plan 与 run 共享模式判定逻辑（涵盖 no-op / focused / full / clean）；非 `.fs/.fsi` 跟踪输入或工具链变更进入 full 构建且保留 `dist/`（仅显式 `--clean` 或源图删除、重命名清空输出目录）；构建失败或中断不再预先删除旧清单，仅在全链路编译、验证与输出同步成功后才原子写入新 manifest。
   - **回归测试覆盖**：012 套件补齐签名形态独立断言、反面注释/字符串误命中、未映射源抛错、指纹稳定与隔离、staging 失败保护与相对导入重定向、以及构建模式规划与运行判定一致性等多项严格回归断言。
 
 - **修复 Manager 退休被 road 级固定 DevOps PTY 误拦（road/incumbency 资源分层）与固定 DevOps 工作返回收束**：
