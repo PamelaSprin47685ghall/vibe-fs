@@ -464,6 +464,21 @@ module XTraceProjection =
             | Some owned when owned = callId -> Some part.Turn
             | _ -> None)
 
+    /// context-compression-028/029: the turn of the newest captured message in the
+    /// current generation — the message this request answers.
+    ///
+    /// A loop's later provider steps answer their own assistant/tool history, so this
+    /// is NOT the trailing user message: one user message can drive many provider
+    /// steps, and bounding a fold by the message that opened the loop would forbid
+    /// every fold inside it. A candidate cutoff may not pass this turn, or the fold
+    /// would replace the very message being answered.
+    let frontierTurn (state: XTraceProjectionState) : int option =
+        state
+        |> parts
+        |> currentGenerationParts
+        |> List.tryLast
+        |> Option.map (fun part -> part.Turn)
+
     /// The first stable user message in the current Host generation is the raw
     /// session Opening. Same-session prefix replacement must never delete it;
     /// work-record-007 renders frozen-prefix records with includeOpening=false.

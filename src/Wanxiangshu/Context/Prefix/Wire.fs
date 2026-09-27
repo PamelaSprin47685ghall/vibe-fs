@@ -121,27 +121,15 @@ module XWire =
             ProviderWireDecode.hostMessageId message = Some messageId
             && isProviderRetryAttempt message)
 
-    let private requestStartCutoff
-        (physical: PhysicalUserMessageId)
-        (rawMessages: obj list)
-        (xTrace: XTraceProjectionState)
-        =
-        let physicalId = PhysicalUserMessageId.value physical
-
-        match XTraceProjection.tryTurnOfHostMessageId physicalId xTrace with
-        | Some cutoff -> cutoff
-        | None when isProviderRetryMessageId physicalId rawMessages ->
-            ProviderWireCapture.trySemanticTurnOfHostMessageId physicalId rawMessages
-            |> Option.defaultWith (fun () ->
-                raise (
-                    InvalidOperationException
-                        "X-wire cannot bind the retry user message to the Host semantic-turn coordinate"
-                ))
-        | None ->
-            raise (
-                InvalidOperationException
-                    "X-wire cannot bind the physical user message to stable canonical XTrace provenance"
-            )
+    /// context-compression-028/029: how many turns precede the message this request
+    /// answers, in canonical XTrace coordinates.
+    ///
+    /// That message is the newest one in the trace — a loop's later provider steps
+    /// answer their own assistant/tool history. Reading the trailing user message
+    /// instead would pin the bound at the turn that opened the loop (0 for the whole
+    /// of a single-user-message session) and forbid every fold inside it.
+    let private requestStartCutoff (xTrace: XTraceProjectionState) : int =
+        XTraceProjection.frontierTurn xTrace |> Option.defaultValue 0
 
     let private staleProviderRetryMessageIds (rawMessages: obj list) =
         let currentPhysical =
@@ -584,38 +572,24 @@ module XWire =
                 )
             )
 
-    let private buildCandidate
-        (window: ProbeBound)
-        (port: WireJournalPort)
-        sessionId
-        physical
-        rawMessages
-        (state: WireSessionState)
-        =
+    let private buildCandidate (window: ProbeBound) (port: WireJournalPort) sessionId (state: WireSessionState) =
         task {
             let xTrace = state.XTrace |> Option.defaultValue XTraceProjection.empty
             let prefix = state.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
             let! currentResult = port.CurrentProjection xTrace
             let current = requireOk currentResult
-            let cutoff = requestStartCutoff physical rawMessages xTrace
+            let cutoff = requestStartCutoff xTrace
             let snapshot = { CurrentProjection = current }
             return! candidate port window sessionId snapshot prefix.Snapshot state cutoff
         }
 
     /// CTX-029: recovery may fold past the phase window — a failed WorkMain is the
     /// explicit exception, and it is recorded as a Probe cold boundary when promoted.
-    let private prepareRetryCandidate
-        allowProbe
-        (port: WireJournalPort)
-        sessionId
-        physical
-        rawMessages
-        (state: WireSessionState)
-        =
+    let private prepareRetryCandidate allowProbe (port: WireJournalPort) sessionId (state: WireSessionState) =
         if not allowProbe then
             Task.FromResult(Error NoCandidateReason.NoCoverage)
         else
-            buildCandidate ProbeBound.CoverageOnly port sessionId physical rawMessages state
+            buildCandidate ProbeBound.CoverageOnly port sessionId state
 
     /// Render one admitted prefix plan: the choice inside it is the whole decision, so
     /// the blob it needs is read through `requiredBlob` rather than re-derived here.
@@ -724,8 +698,7 @@ module XWire =
 
             match view.State, view.ActiveAuthorityProfile, physical, desired with
             | Some state, Some authority, Some physicalId, Some desiredCutoff ->
-                let! candidateResult =
-                    buildCandidate (ProbeBound.PhaseBoundary desiredCutoff) port sessionId physicalId rawMessages state
+                let! candidateResult = buildCandidate (ProbeBound.PhaseBoundary desiredCutoff) port sessionId state
 
                 return!
                     renderPhaseBoundaryAttempt
@@ -776,7 +749,6 @@ module XWire =
         (state: WireSessionState)
         (prefix: ActivePrefixEpoch)
         (existingPlan: PendingAttemptPlan option)
-        (rawMessages: obj list)
         : Task<PendingAttemptPlan> =
         match existingPlan with
         | Some existing -> Task.FromResult existing
@@ -786,7 +758,7 @@ module XWire =
                 // Its presence does not authorize another cold prefix.
                 let allowProbe = mayProbe failure.Budget
 
-                let! candidateResult = prepareRetryCandidate allowProbe port sessionId physical rawMessages state
+                let! candidateResult = prepareRetryCandidate allowProbe port sessionId state
 
                 let selectProbeForPlan () = candidateResult
 
@@ -822,17 +794,7 @@ module XWire =
                 let existingPlan = pendingPlanForRetry attempts sessionId physical authority
 
                 let! admittedPlan =
-                    planOrBuildRetry
-                        port
-                        attempts
-                        sessionId
-                        physical
-                        authority
-                        failure
-                        state
-                        prefix
-                        existingPlan
-                        rawMessages
+                    planOrBuildRetry port attempts sessionId physical authority failure state prefix existingPlan
 
                 let presentationHorizon =
                     admittedPlan

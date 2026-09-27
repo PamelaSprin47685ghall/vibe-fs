@@ -171,7 +171,13 @@ test('WHAT[prefix-stability-009] prefix_proof_and_writeback_use_canonical_XTrace
   // canonical materialization call lives (it alone knows AgentJournal).
   assert.match(wireSource, /CurrentProjection/)
   assert.match(adapterSource, /XTraceMaterialization\.currentProjection/)
-  assert.match(wireSource, /XTraceProjection\.tryTurnOfHostMessageId/)
+  // The fold's request bound is the canonical trace frontier — the newest message the
+  // request answers — never the trailing user message: one user message drives a whole
+  // agent loop, so that message stays at the turn that opened it for the entire loop.
+  assert.match(
+    wireSource,
+    /let private requestStartCutoff \(xTrace: XTraceProjectionState\)[\s\S]{0,200}XTraceProjection\.frontierTurn/,
+  )
   assert.match(wireSource, /XTraceProjection\.hostMessageIdsBeforeTurn/)
   assert.match(wireSource, /replacePrefixByHostIds/)
   assert.doesNotMatch(

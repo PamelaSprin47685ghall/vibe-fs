@@ -126,4 +126,4 @@ desired cutoff exclusive = Bj
 
 ## [029] coverage 落后不丢 raw，frame 不跨界冒用，紧急 Probe 是明示例外
 
-actual cutoff 必须同时满足：当前 generation、完整 semantic turn、连续 PrefixCoverage、有精确截断能力的已冻结 Blogger/LWR 材料、Opening floor、不得回退已提交 cutoff。Blogger 落后时：仍可提交新画板、投影 todos、退休已被替代的成功画板结果，但未覆盖的普通历史继续原样保留，不把 RawGap 冒充前缀覆盖。一个 Blogger frame 覆盖区间跨过 desired 边界时，必须使用可验证的完整材料子集，否则本次不前移。真实 WorkMain 失败后，既有 Probe 可在完整 coverage 与合法语义边界证明下越过正常 K 窗口，但必须作为 Probe 冷边界明确记录；这是紧急恢复例外，不是常规策略。
+actual cutoff 必须同时满足：当前 generation、完整 semantic turn、连续 PrefixCoverage、有精确截断能力的已冻结 Blogger/LWR 材料、Opening floor、不得越过当前请求正在回答的最新消息所在回合、不得回退已提交 cutoff。该请求边界是 canonical XTrace 当前 generation 的最新语义回合，不是最后一条 `role=user` 消息：一条 user 消息可驱动整段 agent loop，其后每个 provider step 回答的是自身的 assistant/tool 历史；若以那条 user 消息为界，loop 内的阶段窗口永远不折叠，raw 历史无界增长。Blogger 落后时：仍可提交新画板、投影 todos、退休已被替代的成功画板结果，但未覆盖的普通历史继续原样保留，不把 RawGap 冒充前缀覆盖。一个 Blogger frame 覆盖区间跨过 desired 边界时，必须使用可验证的完整材料子集，否则本次不前移。真实 WorkMain 失败后，既有 Probe 可在完整 coverage 与合法语义边界证明下越过正常 K 窗口，但必须作为 Probe 冷边界明确记录；这是紧急恢复例外，不是常规策略。

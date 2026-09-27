@@ -2,6 +2,10 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- **修复 K 窗口前缀折叠在单条用户消息的 agent loop 内永不生效（context-compression-028/029）**：`XWire` 的常规 WorkMain 折叠上界原先取“请求里最后一条 `role=user` 消息”的回合。OpenCode 的 loop 把 tool result 挂在 assistant 消息上，因此一条 user 消息驱动的整段 loop 里该上界恒为 turn 0，`PrefixProbeSelection.limit = min(desired, coverage, 0) = 0` 使 `framesThroughCutoff` 恒为空集 → `NoCoverage` → 阶段窗口虽已提交、coverage 也追平，前缀却永不折叠，raw 历史无界增长（实机：manager 会话 15+ 次 assume 提交、coverage 29、窗口 desire 27，`PrefixRebaseCommitted` 0 次，而所有带第二条 user 消息的会话均按 Bⱼ 正常折叠）。
+  修复：新增 `XTraceProjection.frontierTurn`（当前 generation 最新语义回合，即本请求正在回答的消息），`XWire.requestStartCutoff` 改由它推导；折叠上界不再与“是否来了新用户消息”耦合，loop 内的 phase-boundary probe 与既有 CTX-011/012 提升路径一致生效。删除失效的 retry 位置回退与 `ProviderWireCapture.trySemanticTurnOfHostMessageId` 在 Wire 的调用点。
+  验证：`requirements/context-compression/tests/028.test.mjs` 新增生产级回归（真实 `XWire.applyTransform` + K=2 窗口 + loop 形态请求：修复前 `NoProbeReason` 让计划退化为 `UseCommittedEpoch`，修复后冻结 `UsePrefixProbe` 且 cutoff = B₁，并把被覆盖前缀换成 LWR memory、Opening 与窗口内回合保持 raw）；context-compression 278、prefix-stability 71、host-boundary + provider-attempt-recovery 321 全绿；对该仓库真实 journal 离线重放，manager 会话的 loop 内请求现取 cutoff 27。
+
 - **构建系统增量编译、签名风险检测与模式判定统一（修复与优化）**：
   - **签名风险检测与注释剥离**：签名风险判定改为先严格剥离 F# 注释与字符串（覆盖嵌套块注释与多行/转义字符串）再进行模式扫描，彻底消除注释/字符串中 `[<Literal>]`、`let inline` 等字样导致的误升级（实锤文件改动实测保持 focused 模式）；同时补齐复合属性中任意位置的 Literal 以及全限定名 `Microsoft.FSharp.Core.Literal` 的精确识别。
   - **未归属源文件守卫**：`planImpactCompile` 与 `planImpactFromInventory` 对未归属 `.fs` 改动统一抛出明确的覆盖失配异常（`coverage mismatch unassigned=[...]`），废除原静默 full 兜底。

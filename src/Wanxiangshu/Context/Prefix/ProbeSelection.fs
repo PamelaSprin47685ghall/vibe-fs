@@ -54,7 +54,9 @@ module PrefixProbeSelection =
 
     /// The furthest cutoff this attempt may fold at: the window's desire when the
     /// window spoke, the proven coverage when it did not, and never past the request
-    /// being answered.
+    /// being answered — the newest message the request carries, which in an agent
+    /// loop is its own assistant/tool history, not the user message that opened the
+    /// loop.
     let limit (window: ProbeBound) (coverableCutoff: int) (requestStartCutoff: int) =
         let coverageBounded =
             match window with
@@ -182,8 +184,10 @@ module PrefixProbeSelection =
     /// attempt is failure recovery, where coverage is the only bound (WHAT-029).
     /// `materialCutoff` is the boundary the frozen subset the caller passes actually
     /// covers — the last frame's own claim, or 0 for no material.
-    /// `requestStartCutoff` is how many turns precede this request's own physical user
-    /// message — the candidate may not swallow the message being answered.
+    /// `requestStartCutoff` is how many turns precede the newest message this request
+    /// answers — the candidate may not swallow that message. One user message can
+    /// drive many provider steps, so the trailing user message is NOT the bound: it
+    /// stays at the turn that opened the loop for the whole of it.
     /// `recomputeDigest` hashes X's CURRENT provider-visible prefix at a given cutoff;
     /// it is a function rather than a value because the proof hashes the Companion's
     /// frontier while the snapshot records the digest of the materialized boundary.
