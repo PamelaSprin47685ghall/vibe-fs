@@ -3,6 +3,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn as nodeSpawn } from 'node:child_process'
+import { assertProductionSourcesAssigned } from './compile-shards.mjs'
+import { parseModule, walkSyntax } from './js-syntax.mjs'
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = path.resolve(MODULE_DIR, '../..')
@@ -374,6 +376,8 @@ const FULL_IMPACT_BASENAMES = new Set([
   'package-lock.json',
   'pnpm-lock.yaml',
   'yarn.lock',
+  'global.json',
+  'compile-order.txt',
 ])
 
 function requiresFullImpact(changedPath, aggregatePath) {
@@ -384,6 +388,8 @@ function requiresFullImpact(changedPath, aggregatePath) {
     || /(?:^|\/)\.config\/dotnet-tools\.json$/.test(changedPath)
     || /(?:^|\/)scripts\/build\.mjs$/.test(changedPath)
     || /(?:^|\/)scripts\/lib\/owner-compile\.mjs$/.test(changedPath)
+    || /(?:^|\/)scripts\/lib\/compile-shards\.mjs$/.test(changedPath)
+    || /(?:^|\/)scripts\/lib\/build-state\.mjs$/.test(changedPath)
 }
 
 function discoverOwnerProjects(projectDirectory, aggregatePath) {
@@ -502,9 +508,9 @@ export function planImpactCompile({
       const signaturePath = normalized.replace(/\.fs$/i, '.fsi')
       const text = fs.readFileSync(normalized, 'utf8')
       if (!inventory.sourceOwner.has(signaturePath)
-        || SIGNATURE_RISK_SOURCE_PATTERN.test(text)) {
+        || hasSignatureRisk(text)) {
         signatureRiskPaths.add(normalized)
-  }
+      }
     }
   }
 
@@ -532,11 +538,145 @@ export function planImpactCompile({
   })
    }
 
-// An implementation body that still changes what callers compile against:
-// `let inline ...`, `member inline`, `[<Literal>]` constants and `inline fun`
-// lambdas are emitted at the call site even when the sibling .fsi is
-// unchanged, so the reverse-consumer impact of a signature change applies.
-const SIGNATURE_RISK_SOURCE_PATTERN = /\[\s*<\s*Literal[^\]>]*>\s*\]|\b(?:let|member|static\s+member|and)\s+inline\b|\binline\s+fun\b/
+// Lexical stripping of F# comments and strings to eliminate false positives in prose/comments.
+// Covers line comments (//), nested block comments (* ... *), triple-quoted strings, verbatim strings,
+// regular strings, and char literals.
+function stripFSharpCommentsAndStrings(src) {
+  let result = ''
+  let i = 0
+  const n = src.length
+  while (i < n) {
+    if (src[i] === '/' && src[i + 1] === '/') {
+      result += '  '
+      i += 2
+      while (i < n && src[i] !== '\n') {
+        result += ' '
+        i++
+      }
+      continue
+    }
+    if (src[i] === '(' && src[i + 1] === '*') {
+      let depth = 1
+      result += '  '
+      i += 2
+      while (i < n && depth > 0) {
+        if (src[i] === '(' && src[i + 1] === '*') {
+          depth++
+          result += '  '
+          i += 2
+        } else if (src[i] === '*' && src[i + 1] === ')') {
+          depth--
+          result += '  '
+          i += 2
+        } else {
+          result += src[i] === '\n' ? '\n' : ' '
+          i++
+        }
+      }
+      continue
+    }
+    const isTripleInterpolated = src[i] === '$' && src.startsWith('"""', i + 1)
+    const isTripleRegular = src.startsWith('"""', i)
+    if (isTripleInterpolated || isTripleRegular) {
+      const startSkip = isTripleInterpolated ? 4 : 3
+      result += ' '.repeat(startSkip)
+      i += startSkip
+      const endIdx = src.indexOf('"""', i)
+      if (endIdx === -1) {
+        while (i < n) {
+          result += src[i] === '\n' ? '\n' : ' '
+          i++
+        }
+      } else {
+        while (i < endIdx) {
+          result += src[i] === '\n' ? '\n' : ' '
+          i++
+        }
+        result += '   '
+        i = endIdx + 3
+      }
+      continue
+    }
+    const isVerbatimInterp1 = src[i] === '$' && src[i + 1] === '@' && src[i + 2] === '"'
+    const isVerbatimInterp2 = src[i] === '@' && src[i + 1] === '$' && src[i + 2] === '"'
+    const isVerbatim = src[i] === '@' && src[i + 1] === '"'
+    if (isVerbatimInterp1 || isVerbatimInterp2 || isVerbatim) {
+      const startSkip = isVerbatim ? 2 : 3
+      result += ' '.repeat(startSkip)
+      i += startSkip
+      while (i < n) {
+        if (src[i] === '"') {
+          if (src[i + 1] === '"') {
+            result += '  '
+            i += 2
+          } else {
+            result += ' '
+            i++
+            break
+          }
+        } else {
+          result += src[i] === '\n' ? '\n' : ' '
+          i++
+        }
+      }
+      continue
+    }
+    const isInterpString = src[i] === '$' && src[i + 1] === '"'
+    const isRegularString = src[i] === '"'
+    if (isInterpString || isRegularString) {
+      const startSkip = isInterpString ? 2 : 1
+      result += ' '.repeat(startSkip)
+      i += startSkip
+      while (i < n) {
+        if (src[i] === '\\') {
+          result += '  '
+          i += 2
+        } else if (src[i] === '"') {
+          result += ' '
+          i++
+          break
+        } else {
+          result += src[i] === '\n' ? '\n' : ' '
+          i++
+        }
+      }
+      continue
+    }
+    if (src[i] === '\'') {
+      if (src[i + 1] === '\\' && i + 3 < n && src[i + 3] === '\'') {
+        result += '    '
+        i += 4
+        continue
+      } else if (i + 2 < n && src[i + 2] === '\'' && src[i + 1] !== '\\' && src[i + 1] !== '\'') {
+        result += '   '
+        i += 3
+        continue
+      }
+    }
+    result += src[i]
+    i++
+  }
+  return result
+}
+
+const LITERAL_PATTERN = /\[<[^>]*\bLiteral(?:Attribute)?\b[^>]*>\]/s
+const INLINE_LET_PATTERN = /\b(?:let|and)\s+(?:(?:rec|private|internal|public)\s+)*inline\b|\b(?:let|and)\s+inline\b/
+const INLINE_MEMBER_PATTERN = /\b(?:(?:private|internal|public)\s+)?(?:static\s+member|member)\s+(?:(?:private|internal|public)\s+)*inline\b/
+const INLINE_FUN_PATTERN = /\binline\s+fun\b/
+
+export function hasSignatureRisk(sourceText) {
+  const stripped = stripFSharpCommentsAndStrings(sourceText)
+  return LITERAL_PATTERN.test(stripped)
+    || INLINE_LET_PATTERN.test(stripped)
+    || INLINE_MEMBER_PATTERN.test(stripped)
+    || INLINE_FUN_PATTERN.test(stripped)
+}
+
+export const SIGNATURE_RISK_SOURCE_PATTERN = {
+  test(text) {
+    return hasSignatureRisk(text)
+  },
+}
 
 /**
  * Reads the on-disk owner topology into an immutable inventory for planning.
@@ -751,20 +891,13 @@ export function planImpactFromInventory({ inventory, changedPaths, fullThreshold
 
   const signatureRisks = signatureRiskPaths ?? new Set()
 
+  const unmappedExisting = []
   for (const changedPath of normalizedChanges) {
     const ownerProject = sourceOwner.get(changedPath)
     if (!ownerProject) {
       const extension = path.extname(changedPath).toLowerCase()
       if (extension === '.fs' || extension === '.fsi') {
-        return impactPlan({
-          mode: 'full',
-          aggregate,
-          projects,
-          roots: allProjects,
-          selectedProjects: allProjects,
-          changedPaths: normalizedChanges,
-          reason: 'unmapped-source-change',
-        })
+        unmappedExisting.push(changedPath)
       }
       continue
     }
@@ -774,6 +907,13 @@ export function planImpactFromInventory({ inventory, changedPaths, fullThreshold
     if (extension === '.fsi' || signatureRisks.has(changedPath)) {
       addReverseConsumers(ownerProject)
     }
+  }
+
+  if (unmappedExisting.length > 0) {
+    throw new Error(
+      `Unmapped production source change (declared in no owner shard): ${unmappedExisting.join(', ')}. ` +
+      'Register the file in an owner fsproj — a silent full compile must not cover missing ownership.',
+    )
   }
 
   if (roots.size === 0) {
@@ -1004,11 +1144,14 @@ export function materializeOwnerCompile(plan, {
   // Anchor flat-project output under the source directory; with the wrapper
   // aggregate retired, we no longer have its path to anchor against.
   const flatAnchor = plan.aggregatePath ? path.dirname(plan.aggregatePath) : path.resolve(REPO_ROOT, 'src/Wanxiangshu')
+  // Project working directory is anchored by structural identity (restoreFingerprint)
+  // rather than source content bytes, preserving Fable's internal cache across body-only edits.
   const generatedProjectDir = outputDir
-    ? norm(path.join(flatAnchor, '.fable-build/output-compile', fingerprint, outputCompileInstance))
-    : artifactDir
+    ? norm(path.join(flatAnchor, '.fable-build/output-compile', restoreFingerprint))
+    : norm(path.join(resolvedScratchRoot, `project-${restoreFingerprint}`))
   const generatedProjectPath = norm(path.join(generatedProjectDir, plan.candidateBasename))
   const scratchPropsPath = norm(path.join(generatedProjectDir, 'Directory.Build.props'))
+  const artifactPropsPath = norm(path.join(artifactDir, 'Directory.Build.props'))
 
   const projectName = path.basename(plan.candidateBasename, path.extname(plan.candidateBasename))
   // Restore identity owns the obj/assets slot; artifact identity owns the
@@ -1056,6 +1199,9 @@ ${sourcePropsImport}  <Import Project="${escapeXmlAttr(resolvedRootPropsPath)}" 
   // Write if changed
   writeIfChanged(generatedProjectPath, flatXml)
   writeIfChanged(scratchPropsPath, scratchPropsContent)
+  if (artifactDir !== generatedProjectDir) {
+    writeIfChanged(artifactPropsPath, scratchPropsContent)
+  }
 
   return {
     projectPath: generatedProjectPath,
@@ -1386,6 +1532,18 @@ export function collectTrackedInputs({
   const projects = new Map(projectPaths.map((p) => [p, parseProjectFile(p)]))
   const sourcePaths = canonicalImpactOrder(projectPaths, projects)
 
+  // Verify production sources on disk match shard declarations
+  const shardImplementations = new Set(
+    [...projects.values()]
+      .flatMap((p) => p.compileItems)
+      .filter((item) => item.endsWith('.fs') && !item.endsWith('.fsi'))
+  )
+  assertProductionSourcesAssigned({
+    repositoryRoot: root,
+    sourceRoot: resolvedProjectDirectory,
+    shardImplementations,
+  })
+
   const tracked = new Set()
   if (resolvedAggregate && fs.existsSync(resolvedAggregate)) {
     tracked.add(resolvedAggregate)
@@ -1400,15 +1558,19 @@ export function collectTrackedInputs({
   }
 
   const configCandidates = [
+    path.resolve(root, 'global.json'),
     path.resolve(root, 'Directory.Build.props'),
     path.resolve(root, 'Directory.Build.targets'),
     path.resolve(root, 'package.json'),
     path.resolve(root, 'package-lock.json'),
     path.resolve(root, '.config/dotnet-tools.json'),
     path.resolve(root, 'scripts/build.mjs'),
-
     path.resolve(root, 'scripts/lib/owner-compile.mjs'),
+    path.resolve(root, 'scripts/lib/compile-shards.mjs'),
+    path.resolve(root, 'scripts/lib/build-state.mjs'),
     path.resolve(resolvedProjectDirectory, 'Directory.Build.props'),
+    path.resolve(resolvedProjectDirectory, 'compile-order.txt'),
+    path.resolve(root, 'src/Wanxiangshu/compile-order.txt'),
   ]
 
   for (const config of configCandidates) {
@@ -1421,129 +1583,133 @@ export function collectTrackedInputs({
 }
 
 /**
- * Detects modified, added, or removed inputs by comparing against the recorded build manifest.
+ * Normalizes relative ESM imports in stagingDir that escaped stagingDir
+ * to point to targetDir (e.g. from F# [<Import("...", ".../dist/fable_modules/...")>]).
+ *
+ * When compiling into a scratch staging directory, Fable rebases source-relative
+ * paths targeting `dist/` against the staging output directory, emitting specifiers like
+ * `../../../../dist/fable_modules/...`. When copied to `dist/`, such imports escape the
+ * package closure. This function rebases them to self-contained relative paths
+ * (e.g. `../fable_modules/...`) inside stagingDir before syncing to targetDir.
  */
-export function detectChangedFiles({
-  root = REPO_ROOT,
-  projectDirectory,
-  aggregatePath = null,
-  manifestPath = DEFAULT_BUILD_MANIFEST_PATH,
-  outputDir,
-} = {}) {
-  const resolvedOutputDir = norm(outputDir ?? path.resolve(root, 'dist'))
-  const resolvedManifestPath = norm(manifestPath)
-  const trackedFiles = collectTrackedInputs({ root, aggregatePath, projectDirectory })
+export function rebaseEmittedImports(stagingDir, targetDir) {
+  if (!stagingDir || !targetDir || !fs.existsSync(stagingDir)) {
+    return
+  }
 
-  let manifest = null
-  if (fs.existsSync(resolvedManifestPath)) {
+  const resolvedStaging = norm(stagingDir)
+  const resolvedTargetDir = norm(targetDir)
+
+  function walkJsFiles(dir) {
+    const entries = fs.readdirSync(dir, { withFileTypes: true })
+    const results = []
+    for (const entry of entries) {
+      const full = norm(path.join(dir, entry.name))
+      if (entry.isDirectory()) {
+        results.push(...walkJsFiles(full))
+      } else if (entry.isFile() && entry.name.endsWith('.js')) {
+        results.push(full)
+      }
+    }
+    return results
+  }
+
+  const jsFiles = walkJsFiles(resolvedStaging)
+  for (const filePath of jsFiles) {
+    const content = fs.readFileSync(filePath, 'utf8')
+    let program
     try {
-      manifest = JSON.parse(fs.readFileSync(resolvedManifestPath, 'utf8'))
+      program = parseModule(content, filePath)
     } catch {
-      manifest = null
-    }
-  }
-
-  let hasOutputs = false
-  if (fs.existsSync(resolvedOutputDir) && hasEmittedJsFiles(resolvedOutputDir)) {
-    if (manifest && manifest.outputs && typeof manifest.outputs === 'object') {
-      // Full dist walk comparison against manifest.outputs
-      const currentOutputs = {}
-      const walkFiles = (dir) => {
-        const entries = fs.readdirSync(dir, { withFileTypes: true })
-        for (const entry of entries) {
-          const fullPath = path.join(dir, entry.name)
-          if (entry.isDirectory()) {
-            walkFiles(fullPath)
-          } else if (entry.isFile()) {
-            const rel = path.relative(resolvedOutputDir, fullPath).replace(/\\/g, '/')
-            const stat = fs.statSync(fullPath)
-            const hash = computeFileHash(fullPath)
-            currentOutputs[rel] = [hash, stat.size, stat.mtimeMs]
-          }
-        }
-      }
-      try {
-        walkFiles(resolvedOutputDir)
-        const recordedKeys = Object.keys(manifest.outputs)
-        const currentKeys = Object.keys(currentOutputs)
-        if (
-          recordedKeys.length > 0 &&
-          recordedKeys.length === currentKeys.length &&
-          recordedKeys.every((k) => currentOutputs[k] && currentOutputs[k][0] === manifest.outputs[k][0])
-        ) {
-          hasOutputs = true
-        }
-      } catch {
-        hasOutputs = false
-      }
-    } else {
-      const essentialOutputs = [
-        path.join(resolvedOutputDir, 'OpenCode/Plugin/Plugin.js'),
-        path.join(resolvedOutputDir, 'Sphinx/V2/ServeEntry.js'),
-      ]
-      const isProductionOutput = resolvedOutputDir === norm(path.resolve(root, 'dist'))
-      hasOutputs = !isProductionOutput || essentialOutputs.every((p) => fs.existsSync(p))
-    }
-  }
-
-  if (!manifest || manifest.schema !== SCHEMA_VERSION || !hasOutputs) {
-    const currentFiles = {}
-    for (const file of trackedFiles) {
-      if (fs.existsSync(file)) {
-        const stat = fs.statSync(file)
-        const hash = computeFileHash(file)
-        currentFiles[file] = { mtimeMs: stat.mtimeMs, size: stat.size, hash }
-      }
-    }
-    return {
-      changedPaths: trackedFiles,
-      isCleanBuild: true,
-      manifest: null,
-      currentFiles,
-    }
-  }
-
-  const oldFiles = manifest.files ?? {}
-  const currentFiles = {}
-  const changedPaths = []
-
-  for (const file of trackedFiles) {
-    if (!fs.existsSync(file)) {
-      changedPaths.push(file)
       continue
     }
 
-    const stat = fs.statSync(file)
-    const oldEntry = oldFiles[file]
-    const hash = computeFileHash(file)
+    const fileDir = path.dirname(filePath)
+    const replacements = []
 
-    currentFiles[file] = { mtimeMs: stat.mtimeMs, size: stat.size, hash }
+    walkSyntax(program, (node) => {
+      let sourceNode = null
+      if (
+        (node.type === 'ImportDeclaration' ||
+          node.type === 'ExportNamedDeclaration' ||
+          node.type === 'ExportAllDeclaration') &&
+        node.source &&
+        typeof node.source.value === 'string'
+      ) {
+        sourceNode = node.source
+      } else if (
+        node.type === 'ImportExpression' &&
+        node.source &&
+        node.source.type === 'Literal' &&
+        typeof node.source.value === 'string'
+      ) {
+        sourceNode = node.source
+      }
 
-    if (!oldEntry || oldEntry.hash !== hash) {
-      changedPaths.push(file)
+      if (!sourceNode || typeof sourceNode.value !== 'string') {
+        return
+      }
+
+      const specifier = sourceNode.value
+      if (!specifier.startsWith('.')) {
+        return
+      }
+
+      const resolvedDestination = norm(path.resolve(fileDir, specifier))
+
+      // Check if this import escaped stagingDir:
+      const relToStaging = path.relative(resolvedStaging, resolvedDestination)
+      const escapesStaging = relToStaging.startsWith('..') || path.isAbsolute(relToStaging)
+      if (!escapesStaging) {
+        return
+      }
+
+      // Check if it lands inside the intended targetDir:
+      const relToTarget = path.relative(resolvedTargetDir, resolvedDestination)
+      const pointsToTarget = !relToTarget.startsWith('..') && !path.isAbsolute(relToTarget)
+      if (!pointsToTarget) {
+        return
+      }
+
+      // Rebase the path: In the final target layout, the file will be at
+      // path.relative(resolvedStaging, filePath) inside resolvedTargetDir.
+      const relFileFromStaging = path.relative(resolvedStaging, filePath)
+      const finalFileDir = path.dirname(path.resolve(resolvedTargetDir, relFileFromStaging))
+      let rebased = path.relative(finalFileDir, resolvedDestination).replace(/\\/g, '/')
+      if (!rebased.startsWith('.')) {
+        rebased = './' + rebased
+      }
+
+      // Preserve string quote style from sourceNode.raw
+      const raw = sourceNode.raw ?? `"${specifier}"`
+      const quote = raw[0] === "'" ? "'" : '"'
+      const newRaw = `${quote}${rebased}${quote}`
+
+      replacements.push({
+        start: sourceNode.start,
+        end: sourceNode.end,
+        text: newRaw,
+      })
+    })
+
+    if (replacements.length > 0) {
+      replacements.sort((a, b) => b.start - a.start)
+      let updatedContent = content
+      for (const { start, end, text } of replacements) {
+        updatedContent = updatedContent.slice(0, start) + text + updatedContent.slice(end)
+      }
+      fs.writeFileSync(filePath, updatedContent, 'utf8')
     }
-  }
-
-  // Check for deleted files that were in manifest
-  for (const oldFile of Object.keys(oldFiles)) {
-    if (!currentFiles[oldFile] && !fs.existsSync(oldFile)) {
-      changedPaths.push(oldFile)
-    }
-  }
-
-  return {
-    changedPaths: [...new Set(changedPaths)].sort(),
-    isCleanBuild: false,
-    manifest,
-    currentFiles,
   }
 }
 
 /**
- * Executes automatic freshness-driven incremental compilation.
+ * Executes incremental compilation for specified changed paths.
+ * Caller explicitly supplies changedPaths and clean intent; build manifests are not tracked.
  */
 export async function compileIncremental({
   changedPaths,
+  isClean = false,
   root = REPO_ROOT,
   projectDirectory,
   aggregatePath = null,
@@ -1554,30 +1720,18 @@ export async function compileIncremental({
   stdio = 'inherit',
   env = process.env,
   spawn = nodeSpawn,
-  manifestPath = DEFAULT_BUILD_MANIFEST_PATH,
 } = {}) {
+  if (!Array.isArray(changedPaths) || changedPaths.length === 0) {
+    throw new Error('changedPaths must be an array containing at least one path for compileIncremental')
+  }
+
   const resolvedOutputDir = outputDir ? norm(outputDir) : undefined
   const targetOutputDir = resolvedOutputDir ?? norm(path.resolve(root, 'dist'))
-  const resolvedManifestPath = norm(manifestPath)
   const resolvedAggregate = aggregatePath ? norm(aggregatePath) : null
   const resolvedProjectDirectory = projectDirectory ?? (resolvedAggregate ? path.dirname(resolvedAggregate) : path.resolve(root, 'src/Wanxiangshu'))
+  const resolvedScratchRoot = scratchRoot ? norm(scratchRoot) : DEFAULT_SCRATCH_ROOT
 
-  let effectiveChangedPaths
-  let isClean = false
-
-  if (Array.isArray(changedPaths)) {
-    effectiveChangedPaths = [...new Set(changedPaths.map((p) => norm(p)))].sort()
-  } else {
-    const detection = detectChangedFiles({
-      root,
-      projectDirectory: resolvedProjectDirectory,
-      aggregatePath: resolvedAggregate,
-      manifestPath: resolvedManifestPath,
-      outputDir: targetOutputDir,
-    })
-    effectiveChangedPaths = detection.changedPaths
-    isClean = detection.isCleanBuild
-  }
+  let effectiveChangedPaths = [...new Set(changedPaths.map((p) => norm(p)))].sort()
 
   const buildSnapshot = () => {
     const tracked = collectTrackedInputs({ root, aggregatePath: resolvedAggregate, projectDirectory: resolvedProjectDirectory })
@@ -1592,8 +1746,8 @@ export async function compileIncremental({
     return map
   }
 
-  // Fast no-op cache hit when no changed paths
-  if (effectiveChangedPaths.length === 0) {
+  // Fast no-op cache hit when no changed paths and not clean
+  if (effectiveChangedPaths.length === 0 && !isClean) {
     const hasJs = hasEmittedJsFiles(targetOutputDir)
     if (hasJs) {
       return {
@@ -1611,8 +1765,9 @@ export async function compileIncremental({
         snapshot: buildSnapshot(),
       }
     }
-    // If output is missing despite no changed paths, trigger clean compile
     isClean = true
+    effectiveChangedPaths = collectTrackedInputs({ root, aggregatePath: resolvedAggregate, projectDirectory: resolvedProjectDirectory })
+  } else if (isClean && effectiveChangedPaths.length === 0) {
     effectiveChangedPaths = collectTrackedInputs({ root, aggregatePath: resolvedAggregate, projectDirectory: resolvedProjectDirectory })
   }
 
@@ -1620,14 +1775,10 @@ export async function compileIncremental({
     changedPaths: effectiveChangedPaths,
     aggregatePath: resolvedAggregate,
     fullThreshold,
-    projectDirectory: projectDirectory ?? (resolvedAggregate ? path.dirname(resolvedAggregate) : path.resolve(root, 'src/Wanxiangshu')),
+    projectDirectory: resolvedProjectDirectory,
     isClean,
   })
 
-  // A `--clean` or `full` plan forces Fable to bypass its own cache: the
-  // narrower a plan, the more a fingerprint-addressed scratch already pins
-  // the inputs and the compiler cache is harmless; the broader the plan the
-  // more we want a cold rebuild to re-verify the emitted bytes.
   if (isClean || plan.mode === 'full') {
     plan.forceCompileCache = false
   }
@@ -1649,32 +1800,46 @@ export async function compileIncremental({
     }
   }
 
-  // Resetting output covers both triggered shapes: a caller `clean` (full
-  // rebuild) and a `full` plan (source deleted / fsproj / toolchain change —
-  // the emitted set is re-computed from scratch and any leftover artifact
-  // would falsely look live). A `focused` plan on un-stale files must not
-  // reset — that would defeat incrementalism.
-  const needsFullReset = isClean || plan.mode === 'full'
-  if (needsFullReset) {
-    if (resolvedOutputDir && fs.existsSync(resolvedOutputDir)) {
-      fs.rmSync(resolvedOutputDir, { recursive: true, force: true })
-    }
-    if (resolvedOutputDir) {
-      fs.mkdirSync(resolvedOutputDir, { recursive: true })
-    }
-  } else if (resolvedOutputDir && !fs.existsSync(resolvedOutputDir)) {
-    fs.mkdirSync(resolvedOutputDir, { recursive: true })
-  }
+  // Contract 8: reset output directory strictly for clean build or source graph mutations (delete/rename)
+  const needsFullReset = isClean || plan.reason === 'source-graph-change'
 
-  const result = await compileOwnerProject({
-    compilePlan: plan,
-    scratchRoot,
-    rootPropsPath,
-    outputDir: resolvedOutputDir,
-    stdio,
-    env,
-    spawn,
-  })
+  // Contract 6: Failures do not pollute output directory.
+  // Compile to an isolated scratch staging directory first; only sync to resolvedOutputDir upon verified success.
+  const stagingOutputDir = resolvedOutputDir
+    ? norm(path.join(resolvedScratchRoot, `staging-${Date.now()}-${Math.random().toString(36).slice(2)}`))
+    : undefined
+
+  let result
+  try {
+    result = await compileOwnerProject({
+      compilePlan: plan,
+      scratchRoot: resolvedScratchRoot,
+      rootPropsPath,
+      outputDir: stagingOutputDir ?? resolvedOutputDir,
+      stdio,
+      env,
+      spawn,
+    })
+
+    if (result.ok && stagingOutputDir) {
+      rebaseEmittedImports(stagingOutputDir, resolvedOutputDir)
+
+      if (needsFullReset) {
+        if (fs.existsSync(resolvedOutputDir)) {
+          fs.rmSync(resolvedOutputDir, { recursive: true, force: true })
+        }
+        fs.mkdirSync(resolvedOutputDir, { recursive: true })
+      } else if (!fs.existsSync(resolvedOutputDir)) {
+        fs.mkdirSync(resolvedOutputDir, { recursive: true })
+      }
+
+      fs.cpSync(stagingOutputDir, resolvedOutputDir, { recursive: true, force: true })
+    }
+  } finally {
+    if (stagingOutputDir && fs.existsSync(stagingOutputDir)) {
+      removeOutputDirectory(stagingOutputDir)
+    }
+  }
 
   return {
     ...result,
@@ -1682,6 +1847,7 @@ export async function compileIncremental({
     reason: plan.reason,
     changedPaths: effectiveChangedPaths,
     compileItems: plan.compileItems,
+    outputPath: targetOutputDir,
     snapshot: buildSnapshot(),
   }
 }

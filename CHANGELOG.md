@@ -2,6 +2,15 @@
 
 ## Unreleased — Manager 循环 clean cutover
 
+- **构建系统增量编译、签名风险检测与模式判定统一（修复与优化）**：
+  - **签名风险检测与注释剥离**：签名风险判定改为先严格剥离 F# 注释与字符串（覆盖嵌套块注释与多行/转义字符串）再进行模式扫描，彻底消除注释/字符串中 `[<Literal>]`、`let inline` 等字样导致的误升级（实锤文件改动实测保持 focused 模式）；同时补齐复合属性中任意位置的 Literal 以及全限定名 `Microsoft.FSharp.Core.Literal` 的精确识别。
+  - **未归属源文件守卫**：`planImpactCompile` 与 `planImpactFromInventory` 对未归属 `.fs` 改动统一抛出明确的覆盖失配异常（`coverage mismatch unassigned=[...]`），废除原静默 full 兜底。
+  - **构建跟踪输入补齐**：将 `compile-order.txt`、根 `global.json`、`scripts/lib/compile-shards.mjs` 及 `scripts/lib/build-state.mjs` 纳入追踪输入；`compile-order.txt` 变更判定为工具链/项目结构变更并触发 full 构建。
+  - **增量编译暂存（staging）隔离与导入重定向**：`compileIncremental` 产物先写入独立暂存目录，成功后原子同步至 `dist/`，编译失败不污染输出目录；同步前对逃逸出暂存目录且物理目标落在输出目录内的相对导入执行相对路径重定向（解决跨目录产物 import 逃逸问题），越界与正常导入保持不变。
+  - **Fable 缓存复用与输出隔离**：focused 编译的 flat 项目工作目录改按“不含源字节的集合指纹”确定，复用 Fable 编译缓存；编译产物输出目录仍严格按内容指纹隔离；warm 重入继续保证必定调用编译器。
+  - **构建模式判定对齐与清单保护**：`scripts/build.mjs` 中 plan 与 run 共享模式判定逻辑（涵盖 no-op / focused / full / clean）；非 `.fs/.fsi` 跟踪输入或工具链变更进入 full 构建且保留 `dist/`（仅显式 `--clean` 或源图增删清空输出目录）；构建失败或中断不再预先删除旧清单，仅在全链路编译、验证与输出同步成功后才原子写入新 manifest。
+  - **回归测试覆盖**：012 套件补齐签名形态独立断言、反面注释/字符串误命中、未映射源抛错、指纹稳定与隔离、staging 失败保护与相对导入重定向、以及构建模式规划与运行判定一致性等多项严格回归断言。
+
 - **修复 Manager 退休被 road 级固定 DevOps PTY 误拦（road/incumbency 资源分层）与固定 DevOps 工作返回收束**：
   - **分层阻塞语义与生产接线**：`RetirementBlockersFor` 明确区分 road 级基础设施与 incumbency 级任期资源——通过递归会话树判定排除固定 DevOps 子会话及其递归子树的 runtime，并在 Manager runtime 上通过显式身份精确剔除 devops agent 资源，使固定 DevOps 的 PTY/agent/pending 不再计入 Manager 的 suicide blockers，同时完好保持 Engineer 等 incumbency 派生子会话与 Manager 自身任务的阻塞语义；完成 `relay-retirement` [003]/[009] 的生产接线，使生产行为与 `decideWithRoadResources` 纯函数规格完全一致。
   - **managed-session-lifecycle 新增 [025] 规约**：PTY 物理退出即清 `HostForkRuntime` 记账（`ptyRuns`/`terminalByName`）；固定 DevOps 每次工作返回（run 终态结算）时收束其 PTY（单 PTY 精准 TERM → 有界等待 → KILL → 等真实物理退出），由 DevOps 工作完成触发而非 Manager 退休触发，不误伤其他会话；[024] 崩溃恢复收束边界保持不变。

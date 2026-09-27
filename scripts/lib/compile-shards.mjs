@@ -44,7 +44,7 @@ export function parseCompileShardProject(projectPath, { repositoryRoot = REPOSIT
   }
 }
 
-function productionSources(root) {
+export function productionSources(root) {
   const result = []
   const visit = (directory) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -184,9 +184,11 @@ export function assertProductionSourcesAssigned({
   shardImplementations = new Set(),
   aggregate = { missing: true, text: '', implementationFiles: [], signatureFiles: [], references: [] },
 } = {}) {
-  if (!sameSet(shardImplementations, discoveredSources)) {
-    const unassigned = [...discoveredSources].filter((source) => !shardImplementations.has(source)).map((source) => repoPath(repositoryRoot, source))
-    const stale = [...shardImplementations].filter((source) => !discoveredSources.has(source)).map((source) => repoPath(repositoryRoot, source))
+  const normShard = new Set([...shardImplementations].map(norm))
+  const normDiscovered = new Set([...discoveredSources].map(norm))
+  if (!sameSet(normShard, normDiscovered)) {
+    const unassigned = [...normDiscovered].filter((source) => !normShard.has(source)).map((source) => repoPath(repositoryRoot, source))
+    const stale = [...normShard].filter((source) => !normDiscovered.has(source)).map((source) => repoPath(repositoryRoot, source))
     throw new Error(`production source coverage mismatch unassigned=[${unassigned.slice(0, 12).join(', ')}] stale=[${stale.slice(0, 12).join(', ')}]`)
   }
   const srcDir = resolve(repositoryRoot, 'src')

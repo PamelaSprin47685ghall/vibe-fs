@@ -26,7 +26,6 @@ import {
   computeDigest,
   readManifest,
   writeManifest,
-  invalidateManifest,
 } from './lib/build-state.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -216,6 +215,167 @@ function computeCorpusDigest(generatedInputs, targetRoot) {
   return hasher.digest('hex')
 }
 
+// ── Build Mode Decision ──────────────────────────────────────────────────────
+
+export function checkOutputsValid(existingManifest, targetDist) {
+  if (!fs.existsSync(targetDist)) return false
+  const recordedOutputs = existingManifest?.outputs ?? {}
+  const currentOutputs = collectOutputs(targetDist)
+  const recordedKeys = Object.keys(recordedOutputs)
+  const currentKeys = Object.keys(currentOutputs)
+
+  return (
+    recordedKeys.length > 0 &&
+    recordedKeys.length === currentKeys.length &&
+    recordedKeys.every(
+      (k) => currentOutputs[k] && currentOutputs[k][0] === recordedOutputs[k][0],
+    )
+  )
+}
+
+export function determineBuildDecision({
+  clean = false,
+  existingManifest,
+  resolvedRoot,
+  targetDist,
+  compilerInputs,
+  compilerInputDigest,
+  generatedInputDigest,
+  artifactInputDigest,
+  currentToolchain,
+}) {
+  const missingDist = !fs.existsSync(targetDist)
+
+  if (clean) {
+    return {
+      mode: 'clean',
+      reason: 'clean-requested',
+      changedPaths: compilerInputs.map((e) => path.resolve(resolvedRoot, e.path)),
+      isClean: true,
+      outputsValid: false,
+      missingDist,
+    }
+  }
+
+  const hasValidManifest = Boolean(
+    existingManifest && existingManifest.schema === MANIFEST_SCHEMA,
+  )
+
+  const outputsValid = hasValidManifest && checkOutputsValid(existingManifest, targetDist)
+
+  if (!hasValidManifest || !outputsValid) {
+    const reason = missingDist
+      ? 'dist-missing'
+      : !hasValidManifest
+        ? 'manifest-missing-or-invalid'
+        : 'output-hash-mismatch'
+    return {
+      mode: 'full',
+      reason,
+      changedPaths: compilerInputs.map((e) => path.resolve(resolvedRoot, e.path)),
+      isClean: false,
+      outputsValid,
+      missingDist,
+    }
+  }
+
+  const recordedToolIdentity = existingManifest.compiler?.toolIdentity
+  if (recordedToolIdentity !== currentToolchain) {
+    return {
+      mode: 'full',
+      reason: 'toolchain-mismatch',
+      changedPaths: compilerInputs.map((e) => path.resolve(resolvedRoot, e.path)),
+      isClean: false,
+      outputsValid: true,
+      missingDist: false,
+    }
+  }
+
+  const oldCompilerInputs = existingManifest.compiler?.inputs ?? []
+  const oldMap = new Map(oldCompilerInputs.map((e) => [e.path, e]))
+  const currentMap = new Map(compilerInputs.map((e) => [e.path, e]))
+
+  const changedPaths = []
+  let topologyChanged = false
+  let hasNonFsChange = false
+
+  for (const curr of compilerInputs) {
+    const old = oldMap.get(curr.path)
+    if (!old) {
+      topologyChanged = true
+      changedPaths.push(path.resolve(resolvedRoot, curr.path))
+    } else if (old.sha256 !== curr.sha256) {
+      changedPaths.push(path.resolve(resolvedRoot, curr.path))
+      const ext = path.extname(curr.path).toLowerCase()
+      if (ext !== '.fs' && ext !== '.fsi') {
+        hasNonFsChange = true
+      }
+    }
+  }
+
+  for (const old of oldCompilerInputs) {
+    if (!currentMap.has(old.path)) {
+      topologyChanged = true
+      changedPaths.push(path.resolve(resolvedRoot, old.path))
+    }
+  }
+
+  if (oldCompilerInputs.length !== compilerInputs.length) {
+    topologyChanged = true
+  }
+
+  const uniqueChangedPaths = [...new Set(changedPaths)]
+
+  if (topologyChanged || hasNonFsChange) {
+    return {
+      mode: 'full',
+      reason: topologyChanged ? 'compiler-inputs-topology-changed' : 'toolchain-or-project-change',
+      changedPaths: uniqueChangedPaths.length > 0
+        ? uniqueChangedPaths
+        : compilerInputs.map((e) => path.resolve(resolvedRoot, e.path)),
+      isClean: false,
+      outputsValid: true,
+      missingDist: false,
+    }
+  }
+
+  if (uniqueChangedPaths.length > 0) {
+    return {
+      mode: 'focused',
+      reason: 'focused-impact',
+      changedPaths: uniqueChangedPaths,
+      isClean: false,
+      outputsValid: true,
+      missingDist: false,
+    }
+  }
+
+  const generatedMatch =
+    generatedInputDigest === existingManifest.generated?.inputDigest
+  const artifactMatch =
+    artifactInputDigest === existingManifest.artifacts?.inputDigest
+
+  if (generatedMatch && artifactMatch) {
+    return {
+      mode: 'no-op',
+      reason: 'build up-to-date',
+      changedPaths: [],
+      isClean: false,
+      outputsValid: true,
+      missingDist: false,
+    }
+  }
+
+  return {
+    mode: 'focused',
+    reason: 'non-compiler-inputs-changed',
+    changedPaths: [],
+    isClean: false,
+    outputsValid: true,
+    missingDist: false,
+  }
+}
+
 // ── Run Build Orchestrator ───────────────────────────────────────────────────
 
 export async function runBuild({
@@ -232,11 +392,6 @@ export async function runBuild({
   try {
     const existingManifest = readManifest({ root: resolvedRoot })
 
-    // Snapshot current inputs
-    // WP5 cutover: the wrapper aggregate fsproj is deleted. collectCompilerInputs
-    // reads through the compile-shard inventory itself — passing the null
-    // aggregate says "no wrapper to exclude", letting shards be the only
-    // source of truth without placeholder plumbing.
     const compilerInputs = collectCompilerInputs(resolvedRoot, null)
     const compilerInputDigest = computeDigest(compilerInputs)
 
@@ -246,61 +401,20 @@ export async function runBuild({
     const artifactInputs = collectArtifactInputs(resolvedRoot)
     const artifactInputDigest = computeDigest(artifactInputs)
 
-    let buildMode = 'clean'
-    let changedCompilerPaths = []
+    const decision = determineBuildDecision({
+      clean,
+      existingManifest,
+      resolvedRoot,
+      targetDist,
+      compilerInputs,
+      compilerInputDigest,
+      generatedInputDigest,
+      artifactInputDigest,
+      currentToolchain: getToolchainIdentity(),
+    })
 
-    if (!clean && existingManifest && existingManifest.schema === MANIFEST_SCHEMA) {
-      // Check outputs
-      const recordedOutputs = existingManifest.outputs ?? {}
-      const currentOutputs = collectOutputs(targetDist)
-      const recordedKeys = Object.keys(recordedOutputs)
-      const currentKeys = Object.keys(currentOutputs)
-
-      const outputsValid = recordedKeys.length > 0 &&
-        recordedKeys.length === currentKeys.length &&
-        recordedKeys.every((k) => currentOutputs[k] && currentOutputs[k][0] === recordedOutputs[k][0])
-
-      if (outputsValid) {
-        // Compare compiler inputs
-        const oldCompilerInputs = existingManifest.compiler?.inputs ?? []
-        const oldMap = new Map(oldCompilerInputs.map((e) => [e.path, e]))
-        const currentMap = new Map(compilerInputs.map((e) => [e.path, e]))
-
-        let topologyChanged = false
-        if (oldCompilerInputs.length !== compilerInputs.length) {
-          topologyChanged = true
-        } else {
-          for (const curr of compilerInputs) {
-            const old = oldMap.get(curr.path)
-            if (!old) {
-              topologyChanged = true
-              break
-            }
-            if (old.sha256 !== curr.sha256) {
-              changedCompilerPaths.push(path.resolve(resolvedRoot, curr.path))
-              const ext = path.extname(curr.path).toLowerCase()
-              if (ext !== '.fs' && ext !== '.fsi') {
-                topologyChanged = true
-              }
-            }
-          }
-        }
-
-        if (topologyChanged) {
-          buildMode = 'clean'
-        } else if (changedCompilerPaths.length > 0) {
-          buildMode = 'focused'
-        } else if (
-          generatedInputDigest === existingManifest.generated?.inputDigest &&
-          artifactInputDigest === existingManifest.artifacts?.inputDigest
-        ) {
-          buildMode = 'no-op'
-        } else {
-          // Non-compiler inputs changed (e.g. envelope corpus or artifacts)
-          buildMode = 'focused'
-        }
-      }
-    }
+    let buildMode = decision.mode
+    const changedCompilerPaths = decision.changedPaths
 
     if (buildMode === 'no-op') {
       logInfo('build up-to-date (no-op)')
@@ -312,15 +426,14 @@ export async function runBuild({
       }
     }
 
-    // Invalidate manifest before running compiler/writing to dist
-    invalidateManifest({ root: resolvedRoot })
+    let compileResult = null
 
-    const compileNeeded = buildMode === 'clean' || (buildMode === 'focused' && changedCompilerPaths.length > 0)
-
-    if (compileNeeded && buildMode === 'clean') {
+    if (buildMode === 'clean') {
       logInfo('Compiling F# (clean)...')
       resetOutputDirectory(targetDist)
-      const compileResult = await compileIncremental({
+      compileResult = await compileIncremental({
+        changedPaths: compilerInputs.map((e) => path.resolve(resolvedRoot, e.path)),
+        isClean: true,
         root: resolvedRoot,
         outputDir: targetDist,
         stdio,
@@ -331,10 +444,28 @@ export async function runBuild({
         )
       }
       logInfo(`compiled clean impact (${compileResult.compileItems?.length ?? 0} items in ${compileResult.elapsedMs}ms)`)
-    } else if (compileNeeded) {
+    } else if (buildMode === 'full') {
+      logInfo('Compiling F# (full)...')
+      compileResult = await compileIncremental({
+        changedPaths: changedCompilerPaths.length > 0
+          ? changedCompilerPaths
+          : compilerInputs.map((e) => path.resolve(resolvedRoot, e.path)),
+        isClean: false,
+        root: resolvedRoot,
+        outputDir: targetDist,
+        stdio,
+      })
+      if (!compileResult.ok) {
+        throw new Error(
+          `Fable compilation failed${compileResult.signal ? ` by signal ${compileResult.signal}` : ` with exit code ${compileResult.code}`}`,
+        )
+      }
+      logInfo(`compiled full impact (${compileResult.compileItems?.length ?? 0} items in ${compileResult.elapsedMs}ms)`)
+    } else if (buildMode === 'focused' && changedCompilerPaths.length > 0) {
       logInfo('Compiling F# (focused)...')
-      const compileResult = await compileIncremental({
-        changedPaths: changedCompilerPaths.length > 0 ? changedCompilerPaths : undefined,
+      compileResult = await compileIncremental({
+        changedPaths: changedCompilerPaths,
+        isClean: false,
         root: resolvedRoot,
         outputDir: targetDist,
         stdio,
@@ -405,7 +536,7 @@ export async function runBuild({
 
     return {
       ok: true,
-      mode: buildMode,
+      mode: compileResult?.mode && buildMode !== 'clean' ? compileResult.mode : buildMode,
       generation: nextGeneration,
       reused: false,
     }
@@ -439,33 +570,6 @@ function ensureHostSnapshotDisabled() {
 export const buildEntrypoint = runBuild
 
 /**
- * Compare current compiler inputs against the manifest-recorded snapshot to
- * surface the actual changed paths the next build would act on. Cheap
- * content-hash diff keyed by sha256 — identical semantics to `detectChangedFiles`.
- */
-function diffInputsForPlan({ resolvedRoot, manifest, compilerInputs }) {
-  const previous = new Map(
-    (manifest.compiler?.inputs ?? []).map((entry) => [
-      path.resolve(resolvedRoot, entry.path),
-      entry,
-    ]),
-  )
-  const changedInputs = []
-  const previousKept = new Set()
-  for (const entry of compilerInputs) {
-    const abs = path.resolve(resolvedRoot, entry.path)
-    previousKept.add(abs)
-    const before = previous.get(abs)
-    if (!before || before.sha256 !== entry.sha256) changedInputs.push(abs)
-  }
-  for (const abs of previous.keys()) {
-    if (!previousKept.has(abs)) changedInputs.push(abs)
-  }
-  return changedInputs
-}
-
-
-/**
  * WP4: read-only preview of what the next `npm run build` would do. Uses the
  * same manifest/digest path the build itself reads — no compiler spawn, no
  * manifest write, no dist write. Returns the structured plan; callers can
@@ -475,6 +579,7 @@ export async function planBuild({
   targetRoot = root,
 } = {}) {
   const resolvedRoot = path.resolve(targetRoot)
+  const targetDist = path.join(resolvedRoot, 'dist')
   const buildStateDirectory = path.join(resolvedRoot, '.fable-build')
   const manifestPath = path.join(buildStateDirectory, 'build-manifest.json')
   const manifest = readManifest({ root: resolvedRoot })
@@ -485,16 +590,22 @@ export async function planBuild({
   const artifactInputs = collectArtifactInputs(resolvedRoot)
   const artifactInputDigest = computeDigest(artifactInputs)
 
+  const decision = determineBuildDecision({
+    clean: false,
+    existingManifest: manifest,
+    resolvedRoot,
+    targetDist,
+    compilerInputs,
+    compilerInputDigest,
+    generatedInputDigest,
+    artifactInputDigest,
+    currentToolchain: getToolchainIdentity(),
+  })
 
-  const missingDist = !fs.existsSync(path.join(resolvedRoot, 'dist'))
-  const compilerInputsMatch = manifest.compiler?.inputDigest === compilerInputDigest
-  const generatedInputsMatch = manifest.generated?.inputDigest === generatedInputDigest
-  const artifactInputsMatch = manifest.artifacts?.inputDigest === artifactInputDigest
-
-  if (compilerInputsMatch && generatedInputsMatch && artifactInputsMatch && !missingDist) {
+  if (decision.mode === 'no-op') {
     return {
       mode: 'no-op',
-      reason: 'build up-to-date',
+      reason: decision.reason,
       changedInputs: [],
       selectedShards: [],
       compileItems: [],
@@ -506,24 +617,39 @@ export async function planBuild({
     }
   }
 
-  const changedInputs = diffInputsForPlan({ resolvedRoot, manifest, compilerInputs })
+  if (decision.mode === 'focused' && decision.changedPaths.length === 0) {
+    return {
+      mode: 'focused',
+      reason: decision.reason,
+      changedInputs: [],
+      selectedShards: [],
+      compileItems: [],
+      fableCompileInvocations: 0,
+      manifestPath,
+      compilerInputDigest,
+      generatedInputDigest,
+      artifactInputDigest,
+      missingDist: decision.missingDist,
+    }
+  }
 
   const inventory = readImpactInventory({
     projectDirectory: path.join(resolvedRoot, 'src/Wanxiangshu'),
   })
   const plan = planImpactFromInventory({
     inventory,
-    changedPaths: changedInputs.length > 0
-      ? changedInputs
+    changedPaths: decision.changedPaths.length > 0
+      ? decision.changedPaths
       : compilerInputs.map((entry) => path.resolve(resolvedRoot, entry.path)),
     fullThreshold: 0.6,
-    isClean: false,
+    isClean: decision.isClean,
+    forceFullReason: decision.mode === 'full' ? decision.reason : undefined,
   })
 
   return {
     mode: plan.mode,
     reason: plan.reason,
-    changedInputs: changedInputs.map((abs) => path.relative(resolvedRoot, abs).replace(/\\/g, '/')),
+    changedInputs: decision.changedPaths.map((abs) => path.relative(resolvedRoot, abs).replace(/\\/g, '/')),
     selectedShards: plan.projectPaths,
     compileItems: plan.compileItems,
     fableCompileInvocations: 1,
@@ -531,7 +657,7 @@ export async function planBuild({
     compilerInputDigest,
     generatedInputDigest,
     artifactInputDigest,
-    missingDist,
+    missingDist: decision.missingDist,
   }
 }
 

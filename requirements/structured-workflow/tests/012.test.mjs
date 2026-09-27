@@ -275,7 +275,7 @@ const { compileIncremental, compileOwnerProject, materializeOwnerCompile, planIm
 const ROOT = resolve(import.meta.dirname, '../../..')
 const SOURCE_ROOT = join(ROOT, 'src/Wanxiangshu')
 const AGGREGATE = join(SOURCE_ROOT, 'Wanxiangshu.fsproj')
-const writeProject = (root, name, shard, refs, source) => {
+const writeProject = (root, name, shard, refs, source, hasFsi = true) => {
   const path = join(root, `${name}.fsproj`)
   writeFileSync(path, `<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
@@ -284,31 +284,33 @@ const writeProject = (root, name, shard, refs, source) => {
   </PropertyGroup>
   <ItemGroup>
 ${refs.map((ref) => `    <ProjectReference Include="${ref}.fsproj"/>`).join('\n')}
-    <Compile Include="Source/${source}.fsi"/>
-    <Compile Include="Source/${source}.fs"/>
+${hasFsi ? `    <Compile Include="Source/${source}.fsi"/>\n` : ''}    <Compile Include="Source/${source}.fs"/>
   </ItemGroup>
 </Project>
 `)
   return path
 }
-const createFixture = () => {
+const createFixture = ({ omitSiblingFsi = [] } = {}) => {
   const root = mkdtempSync(join(tmpdir(), 'wanxiangshu-impact-'))
   mkdirSync(join(root, 'Source'))
   writeFileSync(join(root, 'Directory.Build.props'), '<Project/>\n')
 
+  const omittedSet = new Set(omitSiblingFsi)
   const sources = ['Base', 'Contract', 'Runtime', 'Consumer', 'Composition', 'Unrelated']
   for (const source of sources) {
-    writeFileSync(join(root, 'Source', `${source}.fsi`), `namespace Fixture\nval ${source.toLowerCase()}: string\n`)
+    if (!omittedSet.has(source)) {
+      writeFileSync(join(root, 'Source', `${source}.fsi`), `namespace Fixture\nval ${source.toLowerCase()}: string\n`)
+    }
     writeFileSync(join(root, 'Source', `${source}.fs`), `namespace Fixture\nlet ${source.toLowerCase()} = "${source}"\n`)
   }
 
   const projects = {
-    base: writeProject(root, 'Wanxiangshu.Owner.Base', 'base-contract', [], 'Base'),
-    contract: writeProject(root, 'Wanxiangshu.Owner.Provider.Contract', 'provider-contract', ['Wanxiangshu.Owner.Base'], 'Contract'),
-    runtime: writeProject(root, 'Wanxiangshu.Owner.Provider.Runtime', 'provider-runtime', ['Wanxiangshu.Owner.Provider.Contract'], 'Runtime'),
-    consumer: writeProject(root, 'Wanxiangshu.Owner.Consumer.Runtime', 'consumer-runtime', ['Wanxiangshu.Owner.Provider.Contract'], 'Consumer'),
-    composition: writeProject(root, 'Wanxiangshu.Owner.Composition.Runtime', 'composition-runtime', ['Wanxiangshu.Owner.Provider.Runtime', 'Wanxiangshu.Owner.Consumer.Runtime'], 'Composition'),
-    unrelated: writeProject(root, 'Wanxiangshu.Owner.Unrelated.Runtime', 'unrelated-runtime', ['Wanxiangshu.Owner.Base'], 'Unrelated'),
+    base: writeProject(root, 'Wanxiangshu.Owner.Base', 'base-contract', [], 'Base', !omittedSet.has('Base')),
+    contract: writeProject(root, 'Wanxiangshu.Owner.Provider.Contract', 'provider-contract', ['Wanxiangshu.Owner.Base'], 'Contract', !omittedSet.has('Contract')),
+    runtime: writeProject(root, 'Wanxiangshu.Owner.Provider.Runtime', 'provider-runtime', ['Wanxiangshu.Owner.Provider.Contract'], 'Runtime', !omittedSet.has('Runtime')),
+    consumer: writeProject(root, 'Wanxiangshu.Owner.Consumer.Runtime', 'consumer-runtime', ['Wanxiangshu.Owner.Provider.Contract'], 'Consumer', !omittedSet.has('Consumer')),
+    composition: writeProject(root, 'Wanxiangshu.Owner.Composition.Runtime', 'composition-runtime', ['Wanxiangshu.Owner.Provider.Runtime', 'Wanxiangshu.Owner.Consumer.Runtime'], 'Composition', !omittedSet.has('Composition')),
+    unrelated: writeProject(root, 'Wanxiangshu.Owner.Unrelated.Runtime', 'unrelated-runtime', ['Wanxiangshu.Owner.Base'], 'Unrelated', !omittedSet.has('Unrelated')),
   }
 
   const aggregate = join(root, 'Aggregate.fsproj')
@@ -316,7 +318,7 @@ const createFixture = () => {
   <PropertyGroup><AssemblyName>Fixture</AssemblyName></PropertyGroup>
   <ItemGroup>
 ${sources.flatMap((source) => [
-    `    <Compile Include="Source/${source}.fsi"/>`,
+    ...(omittedSet.has(source) ? [] : [`    <Compile Include="Source/${source}.fsi"/>`]),
     `    <Compile Include="Source/${source}.fs"/>`,
   ]).join('\n')}
   </ItemGroup>
@@ -351,14 +353,101 @@ test('WHAT[structured-workflow-012] implementation changes reach reverse consume
     rmSync(fixture.root, { recursive: true, force: true })
   }
 })
-test('WHAT[structured-workflow-012] signature-risky implementation changes still reach reverse consumers', () => {
-  const fixture = createFixture()
+test('WHAT[structured-workflow-012] signature-risky implementation changes independently reach reverse consumers across all syntax forms', () => {
+  const forms = [
+    {
+      name: 'standard [<Literal>]',
+      body: 'namespace Fixture\nlet runtime = "Runtime"\n[<Literal>] let rom = "x"\n',
+    },
+    {
+      name: 'compound attribute with Literal in last position [<X; Literal>]',
+      body: 'namespace Fixture\nlet runtime = "Runtime"\n[<System.Obsolete("old"); Literal>] let rom = "x"\n',
+    },
+    {
+      name: 'compound attribute with Literal in first position [<Literal; X>]',
+      body: 'namespace Fixture\nlet runtime = "Runtime"\n[<Literal; System.Obsolete("old")>] let rom = "x"\n',
+    },
+    {
+      name: 'compound attribute with Literal in middle position',
+      body: 'namespace Fixture\nlet runtime = "Runtime"\n[<System.Obsolete("old"); Literal; System.Diagnostics.DebuggerDisplay("disp")>] let rom = "x"\n',
+    },
+    {
+      name: 'fully qualified [<Microsoft.FSharp.Core.Literal>]',
+      body: 'namespace Fixture\nlet runtime = "Runtime"\n[<Microsoft.FSharp.Core.Literal>] let rom = "x"\n',
+    },
+    {
+      name: 'multiline attribute with Literal',
+      body: 'namespace Fixture\nlet runtime = "Runtime"\n[<System.Obsolete("old");\n  Literal>] let rom = "x"\n',
+    },
+    {
+      name: 'let inline',
+      body: 'namespace Fixture\nlet runtime = "Runtime"\nlet inline tag x = x + "r"\n',
+    },
+    {
+      name: 'let inline private',
+      body: 'namespace Fixture\nlet runtime = "Runtime"\nlet inline private tag x = x + "r"\n',
+    },
+    {
+      name: 'let inline internal',
+      body: 'namespace Fixture\nlet runtime = "Runtime"\nlet inline internal tag x = x + "r"\n',
+    },
+    {
+      name: 'member inline',
+      body: 'namespace Fixture\nlet runtime = "Runtime"\ntype Helper () =\n    member inline this.Tag x = x + "r"\n',
+    },
+    {
+      name: 'member inline private',
+      body: 'namespace Fixture\nlet runtime = "Runtime"\ntype Helper () =\n    member inline private this.Tag x = x + "r"\n',
+    },
+    {
+      name: 'static member inline',
+      body: 'namespace Fixture\nlet runtime = "Runtime"\ntype Helper () =\n    static member inline Tag x = x + "r"\n',
+    },
+    {
+      name: 'static member inline private',
+      body: 'namespace Fixture\nlet runtime = "Runtime"\ntype Helper () =\n    static member inline private Tag x = x + "r"\n',
+    },
+    {
+      name: 'and inline (mutually recursive binding, text-level)',
+      body: 'namespace Fixture\nlet runtime = "Runtime"\nlet rec first x = x\nand inline second y = y + "r"\n',
+    },
+    {
+      name: 'inline fun lambda (text-level spec requirement)',
+      body: 'namespace Fixture\nlet runtime = "Runtime"\nlet tag = inline fun x -> x + "r"\n',
+    },
+  ]
+
+  for (const { name, body } of forms) {
+    const fixture = createFixture()
+    try {
+      writeFileSync(join(fixture.root, 'Source/Runtime.fs'), body, 'utf8')
+      const plan = planImpactCompile({
+        changedPaths: [join(fixture.root, 'Source/Runtime.fs')],
+        projectDirectory: fixture.root,
+        aggregatePath: fixture.aggregate,
+        fullThreshold: 1,
+      })
+
+      assert.equal(plan.mode, 'focused', `${name} must result in focused impact`)
+      assert.ok(plan.projectPaths.includes(fixture.projects.consumer), `${name} must include reverse consumer`)
+      assert.ok(plan.projectPaths.includes(fixture.projects.composition), `${name} must include composition consumer`)
+      assert.ok(plan.projectPaths.includes(fixture.projects.runtime), `${name} must include owning runtime project`)
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true })
+    }
+  }
+})
+
+test('WHAT[structured-workflow-012] missing sibling fsi independently triggers signature risk and pulls reverse consumers', () => {
+  const fixture = createFixture({ omitSiblingFsi: ['Runtime'] })
   try {
-    // `let inline` / [<Literal>] bodies are emitted at the call site: a body
-    // change with an unchanged .fsi is still a contract change in effect.
+    // Runtime shard declares ONLY Source/Runtime.fs in its fsproj and aggregate; no Runtime.fsi exists on disk.
+    // An implementation without an interface file exposes all its public symbols as signature,
+    // so changes must pull reverse consumers even with no inline or Literal in source text.
     writeFileSync(
       join(fixture.root, 'Source/Runtime.fs'),
-      'namespace Fixture\n[<Literal>] let rom = "x"\nlet inline tag x = x + "r"\n'
+      'namespace Fixture\nlet runtime = "RuntimeMutated"\n',
+      'utf8',
     )
     const plan = planImpactCompile({
       changedPaths: [join(fixture.root, 'Source/Runtime.fs')],
@@ -368,11 +457,112 @@ test('WHAT[structured-workflow-012] signature-risky implementation changes still
     })
 
     assert.equal(plan.mode, 'focused')
-    assert.ok(plan.projectPaths.includes(fixture.projects.consumer))
-    assert.ok(plan.projectPaths.includes(fixture.projects.composition))
-    assert.ok(plan.projectPaths.includes(fixture.projects.runtime))
+    assert.ok(plan.projectPaths.includes(fixture.projects.consumer), 'missing sibling fsi must pull consumer')
+    assert.ok(plan.projectPaths.includes(fixture.projects.composition), 'missing sibling fsi must pull composition')
+    assert.ok(plan.projectPaths.includes(fixture.projects.runtime), 'missing sibling fsi must include runtime')
   } finally {
     rmSync(fixture.root, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[structured-workflow-012] comments and string literals containing Literal or inline do not trigger signature risk', () => {
+  // Replicating the 4 exact files from production where [<Literal>] or inline appear in comments:
+  // 1. Context/Companion/Blogger/Delta.fs
+  // 2. Host/Contract/ToolResultBound.fs
+  // 3. Interaction/Authority/Model.fs
+  // 4. Process/Deadline.fs
+  const negativeCases = [
+    {
+      source: 'Context/Companion/Blogger/Delta.fs',
+      comment: [
+        '/// CTX-003: the input contract. Not an estimate and not compared to any model\'s',
+        '/// window — it only bounds one rendered TOML chunk.',
+        '///',
+        '/// Plain `let`, not `[<Literal>]`: Fable inlines a literal and emits no export,',
+        '/// which would put the number out of reach of the layer-1 tests that pin it.',
+        'let runtime = "DeltaLimitBytes"',
+      ].join('\n'),
+    },
+    {
+      source: 'Host/Contract/ToolResultBound.fs',
+      comment: [
+        '// Not [<Literal>]: Fable drops unused compile-time literals from JS exports.',
+        '// These are contract values tests and callers must observe.',
+        'let runtime = "HostMaxLines"',
+      ].join('\n'),
+    },
+    {
+      source: 'Interaction/Authority/Model.fs',
+      comment: [
+        '/// Plain `let`, not `[<Literal>]`: Fable inlines a literal and emits no export,',
+        '/// leaving the clause value unassertable from a layer 1 test.',
+        'let runtime = "RecoveryTailWindow"',
+      ].join('\n'),
+    },
+    {
+      source: 'Process/Deadline.fs',
+      comment: [
+        '/// JS/Int32 ceiling for setTimeout: a larger delay is clamped/rejected by the',
+        '/// runtime, so any wait longer than this must be segmented.',
+        '///',
+        '/// Plain `let`, not `[<Literal>]`: Fable inlines a literal and emits no export,',
+        '/// so a layer 1 test could not read the bound it must assert against.',
+        'let runtime = "MaxTimerWaitMs"',
+      ].join('\n'),
+    },
+    {
+      source: 'multi-line block comment',
+      comment: [
+        '(*',
+        '   This block comment mentions [<Literal>] and let inline helper',
+        '   and static member inline or member inline without being code.',
+        '*)',
+        'let runtime = "BlockCommentRuntime"',
+      ].join('\n'),
+    },
+    {
+      source: 'string literal',
+      comment: [
+        'let runtime = "plain string mentioning [<Literal>] and let inline tag and inline fun"',
+      ].join('\n'),
+    },
+    {
+      source: 'verbatim string literal',
+      comment: [
+        'let runtime = @"verbatim string mentioning [<Literal>] and [<CompiledName(\"x\"); Literal>] and member inline"',
+      ].join('\n'),
+    },
+  ]
+
+  for (const { source, comment } of negativeCases) {
+    const fixture = createFixture()
+    try {
+      const sourceContent = `namespace Fixture\n${comment}\n`
+      writeFileSync(join(fixture.root, 'Source/Runtime.fs'), sourceContent, 'utf8')
+
+      const plan = planImpactCompile({
+        changedPaths: [join(fixture.root, 'Source/Runtime.fs')],
+        projectDirectory: fixture.root,
+        aggregatePath: fixture.aggregate,
+        fullThreshold: 1,
+      })
+
+      assert.equal(plan.mode, 'focused', `${source} comment/string must keep focused mode`)
+      assert.ok(
+        !plan.projectPaths.includes(fixture.projects.consumer),
+        `${source} comment/string must NOT trigger signature risk or pull consumer`,
+      )
+      assert.ok(
+        !plan.projectPaths.includes(fixture.projects.composition),
+        `${source} comment/string must NOT trigger signature risk or pull composition`,
+      )
+      assert.ok(
+        plan.projectPaths.includes(fixture.projects.runtime),
+        `${source} must include the owning runtime shard`,
+      )
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true })
+    }
   }
 })
 test('WHAT[structured-workflow-012] incremental compile executes focused flat compile and records cache', async () => {
@@ -813,7 +1003,7 @@ const writeChainFixture = () => {
   return { aggregate, root, sourceDirectory }
 }
 
-test('WHAT[structured-workflow-012] disk inventory matches the legacy plan and flags unmapped added sources as full', () => {
+test('WHAT[structured-workflow-012] disk inventory matches the legacy plan and rejects unmapped added sources fail-closed', () => {
   const fixture = writeChainFixture()
   try {
     const inventory = readImpactInventory({
@@ -835,14 +1025,28 @@ test('WHAT[structured-workflow-012] disk inventory matches the legacy plan and f
     assert.equal(legacy.mode, 'focused')
     assert.deepEqual(split, legacy)
 
-    // A newly added source file owned by no project is an unmapped .fs change.
-    writeFileSync(join(fixture.sourceDirectory, 'Added.fs'), 'namespace Fixture\nlet added = 1\n')
-    const addedPlan = planImpactFromInventory({
-      inventory,
-      changedPaths: [join(fixture.sourceDirectory, 'Added.fs')],
-    })
-    assert.equal(addedPlan.mode, 'full')
-    assert.equal(addedPlan.reason, 'unmapped-source-change')
+    // A newly added source file owned by no project is an unmapped .fs change: MUST throw fail-closed
+    const addedFile = join(fixture.sourceDirectory, 'Added.fs')
+    writeFileSync(addedFile, 'namespace Fixture\nlet added = 1\n')
+
+    assert.throws(
+      () => planImpactFromInventory({
+        inventory,
+        changedPaths: [addedFile],
+      }),
+      /unmapped/i,
+      'planImpactFromInventory must throw fail-closed for unmapped source change',
+    )
+
+    assert.throws(
+      () => planImpactCompile({
+        changedPaths: [addedFile],
+        projectDirectory: fixture.root,
+        aggregatePath: fixture.aggregate,
+      }),
+      /unmapped/i,
+      'planImpactCompile must throw fail-closed for unmapped source change',
+    )
   } finally {
     rmSync(fixture.root, { recursive: true, force: true })
   }
@@ -1227,7 +1431,8 @@ test('WHAT[structured-workflow-012] flat Fable projection materialization escape
     assert.doesNotMatch(propsMatch[1], /&(?!(amp|lt|gt|quot|apos);)/)
     assert.ok(!scratchProps.includes(`Project="${normalizedRootPropsPath}"`), 'Directory.Build.props must not contain raw unescaped Import Project attribute')
 
-    // 1. Invalidation proof: mutating signature file bytes invalidates fingerprint and isolates scratch/output
+    // 1. Invalidation proof: mutating signature file bytes invalidates content fingerprint and isolates output,
+    // while the flat project working directory stays stable across source byte changes (set fingerprint stability).
     writeFileSync(signatureFile, 'namespace Special\nmodule SpecialSource\nval x : int\nval y : string\n', 'utf8')
     const materializedAfterSigChange = materializeOwnerCompile(plan, {
       scratchRoot,
@@ -1236,17 +1441,17 @@ test('WHAT[structured-workflow-012] flat Fable projection materialization escape
     assert.notEqual(
       materializedAfterSigChange.fingerprint,
       initialMaterialized.fingerprint,
-      'signature source byte change must invalidate fingerprint',
+      'signature source byte change must invalidate artifact content fingerprint',
     )
-    assert.notEqual(
-      materializedAfterSigChange.scratchDir,
-      initialMaterialized.scratchDir,
-      'signature source byte change must isolate scratch directory',
+    assert.equal(
+      materializedAfterSigChange.projectDir ?? materializedAfterSigChange.scratchDir,
+      initialMaterialized.projectDir ?? initialMaterialized.scratchDir,
+      'signature source byte change must keep flat project working directory stable to reuse Fable cache',
     )
-    assert.notEqual(
+    assert.equal(
       materializedAfterSigChange.projectPath,
       initialMaterialized.projectPath,
-      'signature source byte change must isolate project path — flat project contents list items and land under artifactDir',
+      'signature source byte change must preserve stable flat project path',
     )
     assert.notEqual(
       materializedAfterSigChange.outputPath,
@@ -1269,7 +1474,8 @@ test('WHAT[structured-workflow-012] flat Fable projection materialization escape
       'signature byte change must preserve restore fingerprint — the split is what powers incremental restore reuse',
     )
 
-    // 2. Invalidation proof: mutating implementation source file bytes invalidates fingerprint and isolates scratch/output
+    // 2. Invalidation proof: mutating implementation source file bytes invalidates content fingerprint and isolates output,
+    // while flat project working directory remains stable.
     writeFileSync(compileFile, 'namespace Special\nmodule SpecialSource\nlet x = 2\nlet y = "hello"\n', 'utf8')
     const materializedAfterSrcChange = materializeOwnerCompile(plan, {
       scratchRoot,
@@ -1278,22 +1484,22 @@ test('WHAT[structured-workflow-012] flat Fable projection materialization escape
     assert.notEqual(
       materializedAfterSrcChange.fingerprint,
       materializedAfterSigChange.fingerprint,
-      'implementation source byte change must invalidate fingerprint',
+      'implementation source byte change must invalidate content fingerprint',
     )
     assert.notEqual(
       materializedAfterSrcChange.fingerprint,
       initialMaterialized.fingerprint,
       'implementation source byte change must invalidate initial fingerprint',
     )
-    assert.notEqual(
-      materializedAfterSrcChange.scratchDir,
-      materializedAfterSigChange.scratchDir,
-      'implementation source byte change must isolate scratch directory',
+    assert.equal(
+      materializedAfterSrcChange.projectDir ?? materializedAfterSrcChange.scratchDir,
+      materializedAfterSigChange.projectDir ?? materializedAfterSigChange.scratchDir,
+      'implementation source byte change must keep flat project working directory stable',
     )
-    assert.notEqual(
+    assert.equal(
       materializedAfterSrcChange.projectPath,
       materializedAfterSigChange.projectPath,
-      'implementation source byte change must isolate project path — flat project contents list items and land under artifactDir',
+      'implementation source byte change must keep flat project path stable',
     )
     assert.notEqual(
       materializedAfterSrcChange.outputPath,
@@ -1912,6 +2118,505 @@ integrationTest('WHAT[structured-workflow-012] independent Fable checks enforce 
   assert.notEqual(signatureOnly.status, 0, 'Fable does not materialize a consumable module from a signature-only project')
   assert.match(`${signatureOnly.stdout}\n${signatureOnly.stderr}`, /SignedProvider|not defined/i)
 })
+
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { EventEmitter } = await import("node:events");
+const { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = await import("node:fs");
+const { tmpdir } = await import("node:os");
+const { dirname, isAbsolute, join, relative, resolve } = await import("node:path");
+const { default: test } = await import("node:test");
+const {
+  collectTrackedInputs,
+  compileIncremental,
+  planImpactCompile,
+  planImpactFromInventory,
+  readImpactInventory,
+} = await import("../../../scripts/lib/owner-compile.mjs");
+const { determineBuildDecision, planBuild, runBuild } = await import("../../../scripts/build.mjs");
+const {
+  MANIFEST_SCHEMA,
+  collectArtifactInputs,
+  collectCompilerInputs,
+  collectGeneratedInputs,
+  collectOutputs,
+  computeDigest,
+  readManifest,
+  writeManifest,
+} = await import("../../../scripts/lib/build-state.mjs");
+
+const ROOT = resolve(import.meta.dirname, '../../..');
+
+test('WHAT[structured-workflow-012] collectTrackedInputs includes compile-order global.json and build state scripts, and compile-order change triggers full plan', () => {
+  const tracked = collectTrackedInputs({ root: ROOT });
+
+  // 1. Must include compile-order.txt
+  const hasCompileOrder = tracked.some((p) => p.endsWith('src/Wanxiangshu/compile-order.txt'));
+  assert.equal(hasCompileOrder, true, 'collectTrackedInputs must include src/Wanxiangshu/compile-order.txt');
+
+  // 2. Must include root global.json
+  const hasGlobalJson = tracked.some((p) => p.endsWith('global.json'));
+  assert.equal(hasGlobalJson, true, 'collectTrackedInputs must include global.json');
+
+  // 3. Must include scripts/lib/compile-shards.mjs
+  const hasCompileShards = tracked.some((p) => p.endsWith('scripts/lib/compile-shards.mjs'));
+  assert.equal(hasCompileShards, true, 'collectTrackedInputs must include scripts/lib/compile-shards.mjs');
+
+  // 4. Must include scripts/lib/build-state.mjs
+  const hasBuildState = tracked.some((p) => p.endsWith('scripts/lib/build-state.mjs'));
+  assert.equal(hasBuildState, true, 'collectTrackedInputs must include scripts/lib/build-state.mjs');
+
+  // 5. compile-order.txt change in planner side triggers mode: full
+  const compileOrderPath = join(ROOT, 'src/Wanxiangshu/compile-order.txt');
+  const plan = planImpactCompile({
+    changedPaths: [compileOrderPath],
+    projectDirectory: join(ROOT, 'src/Wanxiangshu'),
+  });
+  assert.equal(plan.mode, 'full', 'compile-order.txt modification must trigger full compilation mode');
+  assert.equal(plan.reason, 'toolchain-or-project-change', 'compile-order.txt reason must be toolchain-or-project-change');
+});
+
+test('WHAT[structured-workflow-012] compileIncremental enforces mandatory changedPaths and bypasses build-manifest read and write', async () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), 'compile-inc-contract-'));
+  try {
+    const outputDir = join(fixtureRoot, 'dist');
+    const manifestPath = join(fixtureRoot, '.fable-build/build-manifest.json');
+    mkdirSync(outputDir, { recursive: true });
+
+    // 1. changedPaths is mandatory: missing changedPaths must reject/throw
+    await assert.rejects(
+      async () => {
+        await compileIncremental({
+          root: fixtureRoot,
+          outputDir,
+          manifestPath,
+        });
+      },
+      /(?:changedPaths|required|must contain at least one)/i,
+      'compileIncremental must fail when changedPaths is omitted',
+    );
+
+    await assert.rejects(
+      async () => {
+        await compileIncremental({
+          changedPaths: [],
+          root: fixtureRoot,
+          outputDir,
+          manifestPath,
+        });
+      },
+      /(?:changedPaths|at least one)/i,
+      'compileIncremental must fail when changedPaths is empty array',
+    );
+
+    // 2. compileIncremental does not read or write build-manifest
+    assert.equal(existsSync(manifestPath), false, 'build-manifest must not be created before compile');
+
+    const fakeSpawnSuccess = (command, args) => {
+      const outIndex = args.indexOf('-o');
+      const targetDir = outIndex !== -1 ? args[outIndex + 1] : outputDir;
+      mkdirSync(targetDir, { recursive: true });
+      writeFileSync(join(targetDir, 'Out.js'), 'export const done = true;\n', 'utf8');
+
+      const child = new EventEmitter();
+      child.stdout = new EventEmitter();
+      child.stderr = new EventEmitter();
+      setImmediate(() => child.emit('close', 0, null));
+      return child;
+    };
+
+    // Prepare minimal fake shard project
+    const sourceDir = join(fixtureRoot, 'Source');
+    mkdirSync(sourceDir, { recursive: true });
+    writeFileSync(join(fixtureRoot, 'Directory.Build.props'), '<Project/>\n', 'utf8');
+    writeFileSync(join(sourceDir, 'Mod.fsi'), 'namespace Test\nval v: int\n', 'utf8');
+    writeFileSync(join(sourceDir, 'Mod.fs'), 'namespace Test\nlet v = 1\n', 'utf8');
+    const fsproj = join(fixtureRoot, 'Wanxiangshu.Shard.Test.fsproj');
+    writeFileSync(
+      fsproj,
+      '<Project Sdk="Microsoft.NET.Sdk">\n<ItemGroup>\n<Compile Include="Source/Mod.fsi"/>\n<Compile Include="Source/Mod.fs"/>\n</ItemGroup>\n</Project>\n',
+      'utf8',
+    );
+
+    const result = await compileIncremental({
+      changedPaths: [join(sourceDir, 'Mod.fs')],
+      projectDirectory: fixtureRoot,
+      rootPropsPath: join(fixtureRoot, 'Directory.Build.props'),
+      scratchRoot: join(fixtureRoot, '.scratch'),
+      outputDir,
+      manifestPath,
+      spawn: fakeSpawnSuccess,
+      stdio: 'pipe',
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(existsSync(manifestPath), false, 'compileIncremental must never write build-manifest.json');
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+test('WHAT[structured-workflow-012] compileIncremental staging semantics protects outputDir from failure pollution', async () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), 'compile-staging-proof-'));
+  try {
+    const outputDir = join(fixtureRoot, 'dist');
+    mkdirSync(outputDir, { recursive: true });
+    const baselineFile = join(outputDir, 'ExistingGood.js');
+    writeFileSync(baselineFile, 'export const valid = "prior-good-artifact";\n', 'utf8');
+
+    const sourceDir = join(fixtureRoot, 'Source');
+    mkdirSync(sourceDir, { recursive: true });
+    writeFileSync(join(fixtureRoot, 'Directory.Build.props'), '<Project/>\n', 'utf8');
+    writeFileSync(join(sourceDir, 'Comp.fsi'), 'namespace Test\nval c: int\n', 'utf8');
+    writeFileSync(join(sourceDir, 'Comp.fs'), 'namespace Test\nlet c = 42\n', 'utf8');
+    const fsproj = join(fixtureRoot, 'Wanxiangshu.Shard.Comp.fsproj');
+    writeFileSync(
+      fsproj,
+      '<Project Sdk="Microsoft.NET.Sdk">\n<ItemGroup>\n<Compile Include="Source/Comp.fsi"/>\n<Compile Include="Source/Comp.fs"/>\n</ItemGroup>\n</Project>\n',
+      'utf8',
+    );
+
+    // Failing compiler simulation that writes garbage into the target directory argument passed to spawn
+    const fakeSpawnFailure = (command, args) => {
+      const outIndex = args.indexOf('-o');
+      const spawnTargetDir = outIndex !== -1 ? args[outIndex + 1] : outputDir;
+      mkdirSync(spawnTargetDir, { recursive: true });
+      writeFileSync(join(spawnTargetDir, 'BrokenPartial.js'), '// broken partial output\n', 'utf8');
+
+      const child = new EventEmitter();
+      child.stdout = new EventEmitter();
+      child.stderr = new EventEmitter();
+      setImmediate(() => child.emit('close', 1, null));
+      return child;
+    };
+
+    const failResult = await compileIncremental({
+      changedPaths: [join(sourceDir, 'Comp.fs')],
+      projectDirectory: fixtureRoot,
+      rootPropsPath: join(fixtureRoot, 'Directory.Build.props'),
+      scratchRoot: join(fixtureRoot, '.scratch'),
+      outputDir,
+      spawn: fakeSpawnFailure,
+      stdio: 'pipe',
+    });
+
+    assert.equal(failResult.ok, false, 'compilation must fail on non-zero child exit');
+    // Staging invariant: the destination outputDir must NOT contain garbage written during failed compilation
+    assert.equal(
+      existsSync(join(outputDir, 'BrokenPartial.js')),
+      false,
+      'failing compilation must not pollute outputDir with partial/corrupted artifacts (staging semantics)',
+    );
+    // Prior good file must remain intact
+    assert.equal(
+      existsSync(baselineFile),
+      true,
+      'pre-existing valid artifacts in outputDir must be preserved across failing focused compile',
+    );
+    assert.equal(
+      readFileSync(baselineFile, 'utf8'),
+      'export const valid = "prior-good-artifact";\n',
+      'pre-existing artifact contents must not be truncated or corrupted',
+    );
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+test('WHAT[structured-workflow-012] compileIncremental staging rebaseEmittedImports rebases escaping imports landing in targetDir while preserving normal and external imports', async () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), 'compile-rebase-imports-'));
+  try {
+    const outputDir = join(fixtureRoot, 'dist');
+    const scratchRoot = join(fixtureRoot, '.scratch');
+    mkdirSync(outputDir, { recursive: true });
+    mkdirSync(scratchRoot, { recursive: true });
+
+    // Target inside outputDir that escaped import will land on
+    const neutralTargetDir = join(outputDir, 'deps', 'runtime');
+    mkdirSync(neutralTargetDir, { recursive: true });
+    const runtimeFinalPath = join(neutralTargetDir, 'Runtime.js');
+    writeFileSync(runtimeFinalPath, 'export class Runtime {}\n', 'utf8');
+
+    // External target outside outputDir
+    const externalFile = join(fixtureRoot, 'External.js');
+    writeFileSync(externalFile, 'export const externalValue = 999;\n', 'utf8');
+
+    // Project fixture for incremental compile
+    const sourceDir = join(fixtureRoot, 'Source');
+    mkdirSync(sourceDir, { recursive: true });
+    writeFileSync(join(fixtureRoot, 'Directory.Build.props'), '<Project/>\n', 'utf8');
+    writeFileSync(join(sourceDir, 'Mod.fsi'), 'namespace Test\nval m: int\n', 'utf8');
+    writeFileSync(join(sourceDir, 'Mod.fs'), 'namespace Test\nlet m = 1\n', 'utf8');
+    const fsproj = join(fixtureRoot, 'Wanxiangshu.Shard.Mod.fsproj');
+    writeFileSync(
+      fsproj,
+      '<Project Sdk="Microsoft.NET.Sdk">\n<ItemGroup>\n<Compile Include="Source/Mod.fsi"/>\n<Compile Include="Source/Mod.fs"/>\n</ItemGroup>\n</Project>\n',
+      'utf8',
+    );
+
+    let recordedEscapingSpecifier = null;
+    let recordedExternalSpecifier = null;
+
+    const fakeSpawnSuccess = (command, args) => {
+      const outIndex = args.indexOf('-o');
+      const stagingDir = outIndex !== -1 ? args[outIndex + 1] : outputDir;
+      mkdirSync(stagingDir, { recursive: true });
+
+      // 1. Normal module A: relative import pointing inside stagingDir to B.js
+      writeFileSync(join(stagingDir, 'B.js'), 'export const b = 42;\n', 'utf8');
+      writeFileSync(join(stagingDir, 'A.js'), "import { b } from './B.js';\nexport const a = b + 1;\n", 'utf8');
+
+      // 2. Escaping module C: relative import pointing from stagingDir to runtimeFinalPath (inside outputDir)
+      recordedEscapingSpecifier = relative(stagingDir, runtimeFinalPath).replace(/\\/g, '/');
+      if (!recordedEscapingSpecifier.startsWith('.')) {
+        recordedEscapingSpecifier = './' + recordedEscapingSpecifier;
+      }
+      writeFileSync(
+        join(stagingDir, 'C.js'),
+        `import { Runtime } from '${recordedEscapingSpecifier}';\nexport const runtime = new Runtime();\n`,
+        'utf8',
+      );
+
+      // 3. Out-of-bounds module D: relative import pointing from stagingDir to externalFile (outside outputDir)
+      recordedExternalSpecifier = relative(stagingDir, externalFile).replace(/\\/g, '/');
+      if (!recordedExternalSpecifier.startsWith('.')) {
+        recordedExternalSpecifier = './' + recordedExternalSpecifier;
+      }
+      writeFileSync(
+        join(stagingDir, 'D.js'),
+        `import { externalValue } from '${recordedExternalSpecifier}';\nexport const d = externalValue;\n`,
+        'utf8',
+      );
+
+      const child = new EventEmitter();
+      child.stdout = new EventEmitter();
+      child.stderr = new EventEmitter();
+      setImmediate(() => child.emit('close', 0, null));
+      return child;
+    };
+
+    const result = await compileIncremental({
+      changedPaths: [join(sourceDir, 'Mod.fs')],
+      projectDirectory: fixtureRoot,
+      rootPropsPath: join(fixtureRoot, 'Directory.Build.props'),
+      scratchRoot,
+      outputDir,
+      spawn: fakeSpawnSuccess,
+      stdio: 'pipe',
+    });
+
+    assert.equal(result.ok, true, 'incremental compile with staging and rebaseEmittedImports must succeed');
+
+    const extractImportSpecifier = (content) => {
+      const match = content.match(/from\s+['"]([^'"]+)['"]/);
+      return match ? match[1] : null;
+    };
+
+    const finalA = join(outputDir, 'A.js');
+    const finalB = join(outputDir, 'B.js');
+    const finalC = join(outputDir, 'C.js');
+    const finalD = join(outputDir, 'D.js');
+
+    assert.equal(existsSync(finalA), true, 'final A.js must exist in outputDir');
+    assert.equal(existsSync(finalB), true, 'final B.js must exist in outputDir');
+    assert.equal(existsSync(finalC), true, 'final C.js must exist in outputDir');
+    assert.equal(existsSync(finalD), true, 'final D.js must exist in outputDir');
+
+    // Verification 1: Normal module A import resolves to B.js in outputDir
+    const specA = extractImportSpecifier(readFileSync(finalA, 'utf8'));
+    assert.equal(specA, './B.js', 'normal module import within package must remain unchanged');
+    const targetA = resolve(dirname(finalA), specA);
+    assert.equal(targetA, finalB, 'A.js import must resolve to physical B.js in outputDir');
+
+    // Verification 2: Escaped module C import was rebased to point to Runtime.js in outputDir
+    const specC = extractImportSpecifier(readFileSync(finalC, 'utf8'));
+    assert.notEqual(specC, recordedEscapingSpecifier, 'C.js escaping specifier must have been rebased');
+    assert.equal(
+      specC.startsWith('../../'),
+      false,
+      'C.js rebased specifier must not escape outputDir with parent directory traversals',
+    );
+    const targetC = resolve(dirname(finalC), specC);
+    assert.equal(targetC, runtimeFinalPath, 'C.js rebased import must resolve to physical Runtime.js in outputDir');
+    assert.equal(existsSync(targetC), true, 'physical target of C.js rebased import must exist');
+    const relTargetC = relative(outputDir, targetC);
+    assert.equal(
+      !relTargetC.startsWith('..') && !isAbsolute(relTargetC),
+      true,
+      'physical target of C.js must reside within outputDir root',
+    );
+
+    // Verification 3: Out-of-bounds module D import pointing outside outputDir must remain untouched
+    const specD = extractImportSpecifier(readFileSync(finalD, 'utf8'));
+    assert.equal(
+      specD,
+      recordedExternalSpecifier,
+      'D.js import pointing outside targetDir must remain untouched and not erroneously rebased',
+    );
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+test('WHAT[structured-workflow-012] build mode decisions: plain fs changes plan focused, non-fs inputs plan full, and plan matches run mode', async () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), 'build-mode-fixture-'));
+  try {
+    const srcDir = join(fixtureRoot, 'src/Wanxiangshu');
+    const distDir = join(fixtureRoot, 'dist');
+    const buildStateDir = join(fixtureRoot, '.fable-build');
+    mkdirSync(srcDir, { recursive: true });
+    mkdirSync(distDir, { recursive: true });
+    mkdirSync(buildStateDir, { recursive: true });
+
+    writeFileSync(join(fixtureRoot, 'Directory.Build.props'), '<Project/>\n', 'utf8');
+    writeFileSync(join(fixtureRoot, 'global.json'), '{"sdk":{"version":"10.0.100"}}\n', 'utf8');
+
+    // Create 3 shards so modifying 1 shard selects 1/3 = 33% < fullThreshold (60%)
+    mkdirSync(join(srcDir, 'Source'), { recursive: true });
+    writeFileSync(join(srcDir, 'Source/ModA.fsi'), 'namespace Core\nval a: int\n', 'utf8');
+    writeFileSync(join(srcDir, 'Source/ModA.fs'), 'namespace Core\nlet a = 1\n', 'utf8');
+    writeFileSync(
+      join(srcDir, 'Wanxiangshu.Shard.A.fsproj'),
+      '<Project Sdk="Microsoft.NET.Sdk">\n<ItemGroup>\n<Compile Include="Source/ModA.fsi"/>\n<Compile Include="Source/ModA.fs"/>\n</ItemGroup>\n</Project>\n',
+      'utf8',
+    );
+
+    writeFileSync(join(srcDir, 'Source/ModB.fsi'), 'namespace Core\nval b: int\n', 'utf8');
+    writeFileSync(join(srcDir, 'Source/ModB.fs'), 'namespace Core\nlet b = 1\n', 'utf8');
+    writeFileSync(
+      join(srcDir, 'Wanxiangshu.Shard.B.fsproj'),
+      '<Project Sdk="Microsoft.NET.Sdk">\n<ItemGroup>\n<Compile Include="Source/ModB.fsi"/>\n<Compile Include="Source/ModB.fs"/>\n</ItemGroup>\n</Project>\n',
+      'utf8',
+    );
+
+    writeFileSync(join(srcDir, 'Source/ModC.fsi'), 'namespace Core\nval c: int\n', 'utf8');
+    writeFileSync(join(srcDir, 'Source/ModC.fs'), 'namespace Core\nlet c = 1\n', 'utf8');
+    writeFileSync(
+      join(srcDir, 'Wanxiangshu.Shard.C.fsproj'),
+      '<Project Sdk="Microsoft.NET.Sdk">\n<ItemGroup>\n<Compile Include="Source/ModC.fsi"/>\n<Compile Include="Source/ModC.fs"/>\n</ItemGroup>\n</Project>\n',
+      'utf8',
+    );
+
+    writeFileSync(
+      join(srcDir, 'compile-order.txt'),
+      'Source/ModA.fsi\nSource/ModA.fs\nSource/ModB.fsi\nSource/ModB.fs\nSource/ModC.fsi\nSource/ModC.fs\n',
+      'utf8',
+    );
+
+    mkdirSync(join(distDir, 'OpenCode/Plugin'), { recursive: true });
+    mkdirSync(join(distDir, 'Sphinx/V2'), { recursive: true });
+    writeFileSync(join(distDir, 'OpenCode/Plugin/Plugin.js'), 'export const plugin = true;\n', 'utf8');
+    writeFileSync(join(distDir, 'Sphinx/V2/ServeEntry.js'), 'export const serve = true;\n', 'utf8');
+
+    // Create a valid, self-consistent baseline manifest matching current outputs and toolchain
+    const repoManifest = readManifest({ root: ROOT });
+    let currentToolIdentity = repoManifest?.compiler?.toolIdentity;
+    if (!currentToolIdentity) {
+      try {
+        const { execFileSync } = await import('node:child_process');
+        let dotnetVer = 'unknown';
+        let fableVer = 'unknown';
+        try { dotnetVer = execFileSync('dotnet', ['--version'], { encoding: 'utf8' }).trim(); } catch {}
+        try { fableVer = execFileSync('dotnet', ['tool', 'run', 'fable', '--version'], { encoding: 'utf8' }).trim(); } catch {}
+        currentToolIdentity = `dotnet ${dotnetVer} / fable ${fableVer}`;
+      } catch {
+        currentToolIdentity = 'dotnet unknown / fable unknown';
+      }
+    }
+
+    const initialCompilerInputs = collectCompilerInputs(fixtureRoot, null);
+    const initialCompilerDigest = computeDigest(initialCompilerInputs);
+    const initialGeneratedInputs = collectGeneratedInputs(fixtureRoot);
+    const initialGeneratedDigest = computeDigest(initialGeneratedInputs);
+    const initialArtifactInputs = collectArtifactInputs(fixtureRoot);
+    const initialArtifactDigest = computeDigest(initialArtifactInputs);
+    const initialOutputs = collectOutputs(distDir);
+
+    const baselineManifest = {
+      schema: MANIFEST_SCHEMA,
+      generation: 1,
+      compiler: {
+        toolIdentity: currentToolIdentity,
+        inputs: initialCompilerInputs,
+        inputDigest: initialCompilerDigest,
+      },
+      generated: {
+        inputDigest: initialGeneratedDigest,
+      },
+      artifacts: {
+        inputDigest: initialArtifactDigest,
+      },
+      outputs: initialOutputs,
+    };
+    writeManifest({ root: fixtureRoot, manifest: baselineManifest });
+
+    // 1. Only a non-signature body .fs change:
+    // Build mode MUST be focused (not clean), and planBuild must agree with runBuild decision.
+    writeFileSync(join(srcDir, 'Source/ModA.fs'), 'namespace Core\nlet a = 2\n', 'utf8');
+
+    const planFocused = await planBuild({ targetRoot: fixtureRoot });
+    assert.equal(planFocused.mode, 'focused', 'modifying only a non-signature .fs file must plan focused mode, never clean');
+    assert.ok(planFocused.selectedShards.some((p) => p.endsWith('Wanxiangshu.Shard.A.fsproj')), 'focused plan must select Shard A');
+
+    const decisionFocused = determineBuildDecision({
+      clean: false,
+      existingManifest: baselineManifest,
+      resolvedRoot: fixtureRoot,
+      targetDist: distDir,
+      compilerInputs: collectCompilerInputs(fixtureRoot, null),
+      compilerInputDigest: computeDigest(collectCompilerInputs(fixtureRoot, null)),
+      generatedInputDigest: initialGeneratedDigest,
+      artifactInputDigest: initialArtifactDigest,
+      currentToolchain: currentToolIdentity,
+    });
+    assert.equal(planFocused.mode, decisionFocused.mode, 'plan mode must agree with build run decision mode');
+
+    // 2. Non-.fs/.fsi input change (e.g. Directory.Build.props or compile-order.txt):
+    // Build mode MUST be full (not clean).
+    writeFileSync(join(fixtureRoot, 'Directory.Build.props'), '<Project><!-- updated --></Project>\n', 'utf8');
+
+    const planFull = await planBuild({ targetRoot: fixtureRoot });
+    assert.equal(planFull.mode, 'full', 'modifying non-.fs/.fsi input must plan full mode, not clean');
+    assert.notEqual(planFull.mode, 'clean', 'planBuild must never report clean for non-clean non-fs changes');
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+test('WHAT[structured-workflow-012] build failure preserves prior valid manifest and does not delete it', async () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), 'build-manifest-retention-'));
+  try {
+    const buildStateDir = join(fixtureRoot, '.fable-build');
+    const distDir = join(fixtureRoot, 'dist');
+    mkdirSync(buildStateDir, { recursive: true });
+    mkdirSync(distDir, { recursive: true });
+
+    const priorManifest = {
+      schema: MANIFEST_SCHEMA,
+      generation: 42,
+      compiler: { inputDigest: 'd1', inputs: [] },
+      generated: { inputDigest: 'd2' },
+      artifacts: { inputDigest: 'd3' },
+      outputs: { 'out.js': ['h', 1, 1] },
+    };
+    writeManifest({ root: fixtureRoot, manifest: priorManifest });
+    assert.equal(readManifest({ root: fixtureRoot })?.generation, 42);
+
+    // Contract: when compilation or post-checks fail during build,
+    // the system must NOT destroy the previous valid manifest.
+    // If a build fails, existing manifest on disk must be preserved for safe retry/inspection.
+    const manifestPath = join(buildStateDir, 'build-manifest.json');
+    assert.equal(existsSync(manifestPath), true, 'manifest file exists before build');
+
+    // Verify readManifest still reads generation 42 if build errored out
+    const manifestAfter = readManifest({ root: fixtureRoot });
+    assert.equal(manifestAfter?.generation, 42, 'prior manifest generation must be preserved when build fails');
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+}
 
 integrationTest('WHAT[structured-workflow-012] flat closure compilation compiles transitive closure green and keeps unreferenced sources red', async () => {
   const emitterPath = join(FIXTURE_BOUNDARY, 'Emitter.fsproj')

@@ -3,11 +3,12 @@
 // `--scratch` hash) must still live. This runner speaks the same
 // compileIncremental contract as `scripts/build.mjs` — no manifest writes,
 // no dist writes — while still running one real Fable compile per call.
-import { resolve } from 'node:path'
+import { createHash } from 'node:crypto'
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 
 import {
   compileIncremental,
-  detectChangedFiles,
   DEFAULT_SCRATCH_ROOT,
 } from '../../../../scripts/lib/owner-compile.mjs'
 
@@ -41,18 +42,67 @@ const scratchRoot = resolve(props.find((arg) => arg.name === '--scratch')?.value
 const rootPropsPath = resolve(props.find((arg) => arg.name === '--props')?.value ?? 'Directory.Build.props')
 const outputDir = resolve(props.find((arg) => arg.name === '--output')?.value ?? 'out')
 
+function scanSourceHashes(dir, ignoredDirs = new Set()) {
+  const hashes = new Map()
+  const scan = (current) => {
+    if (!existsSync(current)) return
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const full = join(current, entry.name)
+      if (entry.isDirectory()) {
+        if (
+          entry.name.startsWith('.') ||
+          entry.name === 'bin' ||
+          entry.name === 'obj' ||
+          ignoredDirs.has(full)
+        ) {
+          continue
+        }
+        scan(full)
+      } else if (/\.(fs|fsi|fsproj|props)$/i.test(entry.name)) {
+        try {
+          const content = readFileSync(full)
+          const hash = createHash('sha256').update(content).digest('hex')
+          hashes.set(full, hash)
+        } catch {
+          // Ignore read errors
+        }
+      }
+    }
+  }
+  scan(dir)
+  return hashes
+}
+
+const ignoredDirs = new Set([scratchRoot, outputDir])
+const snapshotPath = resolve(scratchRoot, '.cli-snapshot.json')
+
 // Changed paths must be explicit — the production `build.mjs` detects via
 // manifest diff; the fixture contract is that a CLI caller names the
-// changed file.
+// changed file or falls back to snapshot diff in scratchRoot.
 let effectiveChanged = changed
 if (effectiveChanged.length === 0) {
-  const detection = detectChangedFiles({
-    aggregatePath: null,
-    projectDirectory,
-    outputDir,
-    manifestPath: resolve(scratchRoot, 'impact-manifest.json'),
-  })
-  effectiveChanged = detection.changedPaths
+  const currentHashes = scanSourceHashes(projectDirectory, ignoredDirs)
+  const changedPaths = []
+  if (existsSync(snapshotPath)) {
+    try {
+      const previous = JSON.parse(readFileSync(snapshotPath, 'utf8'))
+      for (const [file, hash] of currentHashes) {
+        if (previous[file] !== hash) {
+          changedPaths.push(file)
+        }
+      }
+      for (const file of Object.keys(previous)) {
+        if (!currentHashes.has(file)) {
+          changedPaths.push(file)
+        }
+      }
+    } catch {
+      changedPaths.push(...currentHashes.keys())
+    }
+  } else {
+    changedPaths.push(...currentHashes.keys())
+  }
+  effectiveChanged = changedPaths
 }
 
 if (effectiveChanged.length === 0) {
@@ -72,6 +122,17 @@ const result = await compileIncremental({
   stdio: 'pipe',
 })
 if (result.ok) {
+  try {
+    mkdirSync(scratchRoot, { recursive: true })
+    const finalHashes = scanSourceHashes(projectDirectory, ignoredDirs)
+    writeFileSync(
+      snapshotPath,
+      JSON.stringify(Object.fromEntries(finalHashes), null, 2),
+      'utf8',
+    )
+  } catch {
+    // Snapshot save is best-effort in fixture wrapper
+  }
   // Emit the [owner-compile] success trace unconditionally — with
   // `stdio: 'pipe'` compileIncremental does not echo it, and the test
   // surface asserts on that banner as the "real Fable completed" marker.
