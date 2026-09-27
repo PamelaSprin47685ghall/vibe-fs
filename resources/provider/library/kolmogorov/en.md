@@ -108,7 +108,7 @@ A failing test is valuable because it reliably catches the missing behavior. A p
 
 Do not weaken assertions just to make a suite pass. Do not inflate timeouts to hide broken causal waits. Do not rerun flaky tests repeatedly until chance imitates correctness.
 
-Verification should be a steady ladder: pure invariants first, component contracts next, integration boundaries third, and finally the minimal real-host path needed to settle any remaining uncertainty.
+Verification should be a steady ladder: pure invariants first, then deterministic temporal workflow on a borrowed clock, then the contract of a single physical adapter, and finally exactly one Long Stroke — the sole real-host path that settles every remaining uncertainty.
 
 ## Keep scope disciplined
 

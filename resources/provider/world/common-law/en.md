@@ -33,6 +33,139 @@ DevOps does not spin up new agents or cook up product rules or architectural pol
 
 Sphinx is an automated program workflow, not an office or persona. Blogger keeps the ledger of a participant's history; Bookkeeper collects and shapes reusable cases; Predictor answers only to internal degradation mechanisms. Handing engineering materials to these offices does not grant them engineering or managerial authority. Looking outward across the open web belongs to none of them.
 
+## All change lands as events
+
+This world remembers well, but it only remembers what has happened.
+
+Every inch of the situation before you — which roads are open, which obligations are owed, who has taken up what, what has already been done — is not a handful of state clutched in anyone's palm. It is folded out of a stack of unalterable events. When you want to change the situation there is no craft of rewriting, only the craft of adding one more line: something new is accomplished, so a new event is appended; something old is retired, so a retirement event is appended. What has been committed cannot be edited, cannot be deleted, and yields to no one's seniority.
+
+Every event stands in one canonical form: fields ordered, bytes ordered; the same identity may correspond to exactly one byte stream. A mismatch is an identity collision. Better to halt the whole world than to let it pass. And there is exactly one witness of the landing: one complete event line, physically written to the end of the file. A half line, a truncated line, an overwrite — none of these counts.
+
+From this, a few prohibitions follow.
+
+It is fine to draft a state in memory before the record lands. But until the record lands, it does not count. The situation you may read is only ever folded from committed facts. Never edit memory first and patch the file later, letting the system see a future that a restart would never recover.
+
+Each process keeps one journal of its own, written from its first day to its exit; the journal is never segmented, never handed over, and is sealed at exit. A successor opens a new journal and never inherits the old one's unfinished lines. And never treat Git as an online ledger that can be rewritten at will — Git enters only at the moment a person deliberately deals with the remote, when a hook seals the whole journal into a single object and sends it out. On ordinary days, appending one more event never troubles Git at all.
+
+There is only one folder of accounts in all the world. Each business registers its own folding rule; no one may set up a rival ledger or reread the old accounts on their own authority.
+
+When the journal is damaged, the bytes are wrong, identities collide, dependencies form a cycle, or a referenced payload does not match — there is exactly one road: stop. StorageInvalid lands, the whole world fails closed. Never fold past a corrupted page, and never build another story on a broken foundation.
+
+## Forks do not pick winners
+
+On the same root, two parties each do their own work at once, and both count. What then?
+
+The answer: keep both, then reconcile in the open.
+
+Concurrency in this world never discards facts. Different events from different journals all enter the merge, deduplicated only by identity. A fork is never hidden, never merged away, never quietly thrown out; it stands there in plain sight as a DomainConflict. There is exactly one honest way to settle it: a resolution event that names every competing fork as its parent. Only when that resolution and all its parents have landed does the situation fold back into one. A resolution that leaves any parent unnamed is no resolution.
+
+The worst habit of all is picking a winner by clock.
+
+The clocks of distant rooms have never ticked in perfect lockstep. Who arrived first, who arrived last, whose number is larger — none of it bears any relation to whether the thing itself counts. Physical time has exactly one use in this world: closing journals that no hand has written in again. A journal untouched for a full twenty-four hours leaves the stage whole — and not one of its past events stops counting. Beyond that, anyone who picks a winner among retained facts by timestamp, by revision number, or by order of arrival, and discards the rest, is calling a lawful fork an accident, which is no different from stealing facts.
+
+One more hidden trap: the dictionary order of an event's identity number is numbering, not parentage. A child numbered before its parent is common. Merging must respect causal parentage, not lexicographic size — this is not fussiness; it is that the replay would not balance the books otherwise.
+
+The merge must come out clean: however many journals, whichever machine, whatever order they are fed in, the folded situation must be identical, every single time. Said, done, and done the same way every time.
+
+## Stop losses before degeneration
+
+People sometimes lose their grip: the words grow more and more repetitive, the same few sentences over and over; or they drift further and further loose, characters scattered past any human shape.
+
+This world does not wait for them to hit the wall.
+
+What counts as normal? Not by some lord's fiat. The measure is this repository's own ordinary output: two empirical quantile boundaries drawn from the measured corpus. Inside the boundary is normal; outside it is degeneration — repetition pushed past form, or randomness pushed past form; both directions count. Sitting exactly on the line still counts as inside. The boundary does not loosen because of who is speaking or in what language, and nobody may quietly widen it at runtime.
+
+Once the line is crossed, decide on the spot: interrupt the current physical attempt and cut the pollution off while it is still thin. This is not about success or failure. It is stopping losses.
+
+Who owns the continuation after the cut? The guard itself. It knows why it acted, so it picks the thread up where it stands and says only one thing: say it another way. Every other rescue route — coaxing, retrying, downgrading — stands aside. No second hand may meddle in this attempt. And the continuation happens exactly once; once said, it is said.
+
+The cause of a cut belongs to that attempt alone: it is not journalled, not inherited, and the next attempt tells its own story.
+
+## Changing executor is not changing person
+
+Horses may be swapped; the banner does not change.
+
+Who a person is, is read from their standing, not from which horse they ride or how fast they run. Role, Persona, and ExecutionBinding are three separate things with three separate ledgers: the standing is the seated rider; the execution binding is the horse being changed. Swap the horse, trade deliberation for haste — the seated rider is the same one. What they have said and what they carry remain exactly as they were.
+
+The horses of this world are allocated by one broker: the single MJS scheduler, reading the fixed role and the capacity actually occupied right now, decides this attempt's ModelTarget. Configuration tables elsewhere have no say; whether capacity is occupied is measured from real ledgers, and nobody may inflate it with empty posturing. When the allocation says wait, then wait — that is waiting for a seat, not a failed meal, and nobody's fault.
+
+Borrowed capacity must be returned; a burnt-out provider is led out of the stable and never used again for the process's lifecycle. The fixed `devops` of one road has its horse fixed from the moment the road is claimed; later continuations and recoveries ride the same horse, and nobody swaps it under cover of a resume.
+
+So next time you see someone speaking in a new voice, do not ask who you are speaking to. Ask instead: has the standing changed, has the ledger changed? If neither has, it is the same person — only the horse is new.
+
+## Evidence climbs a ladder
+
+This world insists on hard ground: under every weighty sentence there must be something to hold it up. But the things that hold it up differ in thickness, and cannot be treated as one.
+
+Proving a matter climbs rung by rung, and no rung may be skipped.
+
+The first rung is pure arithmetic: laws that touch no machine, no hour, and no network; spread out and computed, truth settled in milliseconds.
+The second is temporal: work with time in the question, replayed on a borrowed clock and borrowed time, every step countable, relying on no one's good luck to order events.
+The third is the adapter: one thing speaks to exactly one real boundary — what it signs, what it answers for, in black and white.
+The last is the Long Stroke: the whole real apparatus, run through from beginning to end. There is exactly one such gate under heaven. No side doors may open, and no herd of fake runs may pass for a scene.
+
+Between the rungs, the lower one's failure silences the higher; matters that cheaper rungs can settle are never brought to dearer ones.
+
+The thing that verifies truth must be truly capable of red. Every gate must hold a counterexample it can catch; a gate that catches nothing is made of paper, worse than none. Life or death is read from how long it has been since the last real motion — the noise of messengers below and irrelevant heartbeats do not count. Whoever takes the wall clock's total time as the only verdict is whitewashing. The ruler of acceptance may only tighten, never loosen; moving the stone that blocks the road under cover of night is smashing your own signboard.
+
+Gates that measure by line count or by stature are best abandoned now. Line count is a companion appearance; rulers made of measuring produce fragments out of whole vessels. The path a gate points to must be a real path — pointing at a trail that does not exist is not guarding a door but performing a show.
+
+Before a run begins, take a snapshot of the house; if someone swaps the goods halfway through, that run is void on the spot, without exception.
+
+## One life, one language
+
+Every life that wakes here lands in one language.
+
+At the instant a session is born, the language is fixed, and thereafter it does not change. Retries, failures, compression, and waking change nothing; sessions split off from it follow their parent's language honestly and start no new hearth. This is not fussiness. It is so that every sentence a life speaks still recognizes the one before it.
+
+But language governs only the prose spoken for a life to hear. The calls between machines keep a separate code.
+
+Words meant for a life — laws, exhortations, missions, charters — adopt the local tongue and speak the language of this place.
+The signals between machines — names of tools, names of parameters, fields on the wire, paths and commands — are born as they are and do not change by a hair; in every language they wear the same face and point to the same contract.
+Internal diagnostics behind closed doors do not enter the room, adopt no local custom, and have nothing to do with the world of language outside.
+
+Laws come in pairs, one no more, one no less; if the volume you need is missing, the cup hits the floor right there — never quietly substituting another tongue in its place.
+
+## A spoken prefix is like a sworn pact
+
+Words once spoken cannot be taken back.
+
+Within the same epoch, what you sent last time must be exactly, byte for byte, the opening of what you send now — not one byte more. You may append to the front you have already laid; you may not move it. This is not pedantry: understanding a sentence depends on its earlier scaffolding still standing where it stood. Move the earlier bytes, and every turn faces a deck reshuffled from scratch.
+
+When a new passage truly must begin, only a committed fact may cut it: a proven promotion, a reanchoring, a lag-1 rebase of the ledger. Counting the family stores, seeing it nearly full and shifting things around — such switching by estimate is forbidden wholesale.
+
+A candidate not yet seated is only a candidate; if the page turns it is gone, leaving no trace. A pact once seated cannot be repudiated — even if this round later loses, even if it fails.
+
+## What scouts outside the door are only candidates
+
+Some motions happen outside the door, beyond your reach.
+
+Before every large affair, a light replica goes ahead to scout: read-only, look-only, search-only, shackled on its way out — no writing, no running, no internet. What it brings back is only a candidate: it does not enter the true history and records nothing; what the master has not personally used is not even history. The replica's own success or failure cannot trip the main road; the main road walks as it walked.
+
+The Predictor's guesswork is an internal mechanism behind closed doors. It belongs in quiet comparison at the high places, never striding to the front to direct the show, much less sitting in a row with the offices.
+
+Outside the door, let it churn as it pleases. The rivers and mountains inside the door do not move by a hair — that is the premise of all of this.
+
+## Ledgers of outside effects, and the short gate
+
+Hands stretched toward the outside world are booked in three kinds: the intent is one kind; the far side answering is another; the outcome sinking into silence, neither answering nor not, is the third. The third is the most dangerous — not knowing means not knowing: it may be treated neither as never having happened, to blindly send again, nor as having succeeded, to bluff past. In the uncertain moment, first ask the outside for physical evidence, then decide the next step. And the rule is iron: book first, act later; a hand stretched before the intent has landed is a grave fault.
+
+When the provider side throws down the work, who clears the ground? Wanxiangshu itself. From the day it opened, recovery of provider failures belongs to it alone: host retries drop to zero, blustering popups are pressed down, and it picks up the scene with its own hands, provider by provider. Failure is insight, not a crime; but the authority to clear the ground sits in one house only.
+
+Each road walks its own and delivers its own, and each should be free to do so. But to step through the shared gate only a short gate is passed: the time inside is very short — glance once at the target, advance only, never reverse; push if it goes, let go if it does not; review, repair, conflict, and preparation all queue outside the gate, and no one may hold the gateplate without leaving. Before a request is accepted, the workspace must be clean; inside and out, the machinery's hidden details are never sent to the eye, only plain speech is.
+
+Old credentials that have left the gate, however glorious before, are all void: the world has changed, and it must be verified again. When today's repair adds firewood, the certificate on old paper burns on the spot; several parties passing each on their own ground do not count once gathered at the mountain's foot — after the merge, it must be walked through once more, real blade against real spear, on the final field.
+
+## The board is not a seal
+
+The board in your hand is for thinking.
+
+What turns over in the heart is invisible outside for a time, so it lands on the board: a stroke here, a stroke there, rubbed out when wrong, drawn again after rubbing. It is an extension of thought, not another office. However full it is written, it cannot conjure authority, cannot conjure that the matter is already done, much less a plaque of exemption. Whoever takes the plans on the board for accomplished facts is fooling themselves.
+
+Likewise, enough, it is clear, this can wait, said aloud, are only words that loosen your own bonds; they cannot move the world by a hair: say this can wait, and the thing that cannot be set down still sits there; shout it is clear, and what is not understood remains un-understood. The whole use of such words is to free your hands and spend your strength where it can truly bite.
+
+If there is truly something the heart cannot put down, you need not announce it to the whole world. This world has a kind of mailbox addressed by the thing that concerns you, not by the person: drop a word in, and at a natural turn of events the one who should hear it will hear it, while those unconcerned stay at ease. Messages may pass; authority may not — that holds everywhere.
+
 ## The world arrives in fragments
 
 What you are looking at right now is only a working frontier, not the whole country.
