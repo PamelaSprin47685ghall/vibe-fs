@@ -1,0 +1,30 @@
+# 基于 Ubuntu 24.04 官方系统（对应 GitHub Actions ubuntu-latest），还原 1:1 纯净 Linux CI 运行底座
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 安装基础运行与构建依赖：curl、git、ca-certificates
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安装 Node.js 22 LTS (对齐 .github/workflows/ci.yml 中的 node-version: 22)
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安装 .NET SDK (对齐 global.json 中的 10.0.100 系列)
+RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh \
+    && chmod +x /tmp/dotnet-install.sh \
+    && /tmp/dotnet-install.sh --channel 10.0 --install-dir /usr/share/dotnet \
+    && ln -s /usr/share/dotnet/dotnet /usr/local/bin/dotnet \
+    && rm -f /tmp/dotnet-install.sh
+
+ENV DOTNET_ROOT=/usr/share/dotnet
+ENV PATH="${PATH}:/root/.dotnet/tools"
+
+WORKDIR /workspace
+
+CMD ["/bin/bash", "-c", "npm ci && dotnet tool restore && npm run verify:release"]
