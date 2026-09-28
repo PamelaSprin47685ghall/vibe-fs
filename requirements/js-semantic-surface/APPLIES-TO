@@ -5,5 +5,7 @@
 /src/Wanxiangshu/**/*Surface.fs
 /scripts/checks/js-boundary-gate.mjs
 /scripts/checks/js-surface-manifest.mjs
+/scripts/checks/js-module-linkage.mjs
 /scripts/lib/test-surface-scan.mjs
 /scripts/lib/walk.mjs
+/requirements/verification-system/tests/support/js-contract.mjs

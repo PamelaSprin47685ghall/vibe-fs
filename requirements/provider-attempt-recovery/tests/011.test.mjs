@@ -405,7 +405,7 @@ const TOOL_CAPABILITIES = [
   'Write',
 ]
 
-test('WHAT[provider-attempt-recovery-011] plans_carry_no_budget_snapshot', () => {
+test('WHAT[provider-attempt-recovery-011] public plan observation exposes no budget snapshot', () => {
   const planned = planner.plan({ role: 'engineer', kind: 'work-main' })
 
   for (const key of ['failures', 'budget', 'consecutiveFailureCount', 'count', 'exhausted']) {
@@ -430,19 +430,19 @@ test('WHAT[provider-attempt-recovery-011] an_attempt_without_a_probe_cannot_prom
   const withoutProbe = planner.plan({ role: 'engineer', kind: 'work-main', policyAllowsProbe: false })
   assert.equal(planner.promotableProbeId(withoutProbe, 'Completed'), null)
 })
-test('WHAT[provider-attempt-recovery-011] retry_decision_is_material_based_and_physically_bound', () => {
+test('WHAT[provider-attempt-recovery-011] maintenance policy changes with available material', () => {
   // Same failed kind, only the material flag flips the decision: no transient
   // channel participates — the two calls are pure functions of their inputs.
   assert.notEqual(
     compression.nextBloggerRequest('blogger-main', true),
     compression.nextBloggerRequest('blogger-main', false),
   )
-  // The decision names a request kind, never a physical identity: binding a
-  // fresh physical identity happens once per retry at the ledger (covered in
-  // provider-failure-ledger.test.mjs), not inside the policy.
+  // This pure policy result does not establish physical retry binding.
   assert.match(compression.nextBloggerRequest('blogger-main', true), /blogger-squash/)
 })
 }
+
+test.todo('WHAT[provider-attempt-recovery-011] actual render observes the admitted immutable plan and cannot consume a transient recovery permission (GAP-139)')
 
 {
 const { default: assert } = await import("node:assert/strict");

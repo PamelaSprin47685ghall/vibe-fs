@@ -19,11 +19,9 @@ module EnforcerSurface =
     val missingTipError: string
     val hasValidText: obj -> bool
     val canonicalCycle: obj -> obj
-    val isValidCycle: obj -> bool
     val maxBlogTextBytes: int
     val maxEvidenceBytes: int
     val composeBloggerSystemPrompt: string -> string -> string
     val loadFor: string -> obj array
     val validateBounds: string -> string option -> obj
-    val validateProviderRun: string -> obj
-    val classifyAssistantStep: obj -> obj
+    val resolveField: field: string -> rules: obj array -> obj

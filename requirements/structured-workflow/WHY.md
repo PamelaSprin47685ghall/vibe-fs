@@ -1,37 +1,19 @@
 # structured-workflow — WHY
 
-`WHAT.md` 是唯一 normative 合同。本文只解释为什么架构治理收敛为 `subsystem -> compile shard -> source`。
+## 存在理由
 
-## 为什么只保留 subsystem
+业务流程需要让人沿输入、判断、效果和返回直接读懂。若把“下一步执行哪里”存成业务数据，就会在宿主语言之外再造一个运行时；恢复、取消和组合也随之依赖隐藏的程序计数器。
 
-若同时维护 semantic owner、locality、fsproj、slice、exposure、audience、manifest 与 adjudication 八层，每层单看都有理由，叠加后却产生第二套产品：维护者必须先理解治理模型，才能修改业务代码；而大量细项目仍没有换来稳定的 change locality。
+具名领域操作可以压缩机械步骤，但需要保留可观察的承诺。一次调用、重复调用和失败后重入具有不同后果，不能被同一个“通用包装器”掩盖。业务事实与执行位置分开，恢复才能根据持久证据重新进入普通流程。
 
-Subsystem 回答唯一值得人工治理的问题：**哪一组知识、决策、不变量、失败语义与外部合同可以整体理解、整体替换？** 重构、重写、删除、任务分工与验收只以 subsystem 为单位。一个 subsystem 内部可以有很多 compile shard，但 shard 不拥有新的业务身份。
+## 知识边界与编译边界
 
-## 为什么 compile shard 仍然可以很细
+subsystem 是能够整体理解和替换的一组知识与责任。编译分片则解决编译隔离和增量效率，两者生命周期不同：分片变细不应创造新的业务所有者，分片合并也不应迫使无关知识合并。
 
-增量编译需要比业务治理更细的机械边界。稳定 `.fsi`、小 ProjectReference closure 和独立 adapter 能减少 implementation-only 修改的影响集合；这些收益不要求再创造 semantic owner。compile shard 应像函数内局部变量一样可调整：有收益就拆，无收益就合，不改变系统架构词汇。
+真正的解耦来自窄合同和依赖方向。若业务只需一个值，却连带获得对方的工厂、注册表和物理能力，增加标签或权限清单并不能消除耦合。依赖端口、在边界注入效果，才能同时缩小知识范围和能力范围。
 
-因此：
+## 证明的分工
 
-```text
-人类架构：Subsystem A -> Subsystem B
-构建实现：A/a1 -> A/a2 -> B/b1 -> ...
-源码：每个 .fs 恰属于一个 shard，进而恰属于一个 subsystem
-```
+编译器与结构门禁能发现缺依赖、签名越界和源归属错误，不能独自证明业务流程正确。行为、时序、真实适配和关键流程的准入/结算证据各有用途；生成物的确定性也不等于它没有物理能力。
 
-## 为什么依赖倒置比 ACL 更重要
-
-真正的解耦来自依赖方向，不来自授权表。若业务 consumer 为取得一个小类型而依赖一个同时携带 registry、factory、codec、并行工具和其他领域事实的大 project，再精细的 manifest 也没有把知识拆开。
-
-正确做法是先按 reason-to-change 分离知识，再让 consumer 只依赖所需的窄 contract/port。通用平台原语必须不认识 Session、Provider、Git、Relay 等领域概念；物理 adapter 依赖外界，业务依赖 capability port。这样编译边界与认知边界同时缩小。
-
-## 如何判断架构治理成效
-
-不以 shard 数量、owner 数量或目录整齐程度衡量。关注：
-
-- subsystem SCC 是否缩小；
-- ordinary change 是否更常落在 1 个 subsystem；
-- shared gravity well 的 reverse closure 是否下降；
-- 一个 subsystem 是否能只凭 public contract + proof 被替换；
-- compile shard 拆分是否真的减少依赖，而不是把同一宽依赖改名。
+判断改造是否有效，要看流程是否更直接、领域能否凭公开合同替换、依赖闭包是否缩小，而不是目录、分片或登记表的数量。

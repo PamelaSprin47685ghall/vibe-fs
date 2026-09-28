@@ -97,3 +97,32 @@ test('WHAT[prefix-stability-015] PPT_tryInject_without_session_id_still_appends_
   assert.deepEqual(await inject(undefined, out), out, 'session-less replay stays byte-identical')
 })
 }
+
+{
+const assert = (await import('node:assert/strict')).default
+const { createHash } = await import('node:crypto')
+const identity = await import('../../../dist/Context/Companion/ProjectionSurface.js')
+const sha256 = (text) => createHash('sha256').update(text).digest('hex')
+
+test('WHAT[prefix-stability-015] actual synthetic identities remain stable and distinguish every durable identity component', () => {
+  const sealInput = { session: 'ses-main', epoch: 2, cutoff: 5, prefixDigest: 'history', frozenDigest: 'record' }
+  const seal = identity.sealRoot(sha256, sealInput)
+  assert.equal(identity.sealRoot(sha256, { ...sealInput }), seal)
+  const messageId = identity.companionMemoryMessageId(sha256, seal)
+  assert.equal(identity.companionMemoryMessageId(sha256, seal), messageId)
+  for (const changed of [
+    { session: 'other-session' }, { epoch: 3 }, { cutoff: 6 },
+    { prefixDigest: 'other-history' }, { frozenDigest: 'other-record' },
+  ]) {
+    const otherSeal = identity.sealRoot(sha256, { ...sealInput, ...changed })
+    assert.notEqual(otherSeal, seal)
+    assert.notEqual(identity.companionMemoryMessageId(sha256, otherSeal), messageId)
+  }
+  const frame = { blogger: 'ses-blog', epoch: 2, ordinal: 0, digest: 'frame' }
+  const frameId = identity.frameMessageId(sha256, frame)
+  assert.equal(identity.frameMessageId(sha256, { ...frame }), frameId)
+  for (const changed of [{ blogger: 'other-blog' }, { epoch: 3 }, { ordinal: 1 }, { digest: 'other-frame' }]) {
+    assert.notEqual(identity.frameMessageId(sha256, { ...frame, ...changed }), frameId)
+  }
+})
+}

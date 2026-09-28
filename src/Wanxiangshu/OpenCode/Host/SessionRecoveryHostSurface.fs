@@ -266,6 +266,14 @@ module SessionRecoveryHostSurface =
                        physicalUserMessageId = physicalUserMessageId |}
         }
 
+    let executionStatus (handle: RecoveryHostHandle) (sessionId: string) (physicalUserMessageId: string) : obj =
+        let key = keyOf (acceptedEvidence sessionId physicalUserMessageId)
+
+        (AgentJournal.snapshot handle.Journal.Journal).AgentProjections.ChatExecutions
+        |> ChatExecutionProjection.byKey key
+        |> Option.map lifecycleView
+        |> Option.defaultValue null
+
     let signalCancelled (handle: RecoveryHostHandle) (sessionId: string) (physicalUserMessageId: string) : Task<obj> =
         task {
             let evidence = acceptedEvidence sessionId physicalUserMessageId

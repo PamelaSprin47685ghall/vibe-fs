@@ -19,12 +19,10 @@
 /src/Wanxiangshu/Host/Contract/ToolResultBound.fs
 /src/Wanxiangshu/OpenCode/Tools/PtyTool.fs
 /src/Wanxiangshu/OpenCode/Tools/ExecutorTool.fs
-/src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs
 /resources/provider/tool/run/**
 /resources/provider/tool/query-shell/**
 /resources/provider/tool/open-terminal/**
 /resources/provider/tool/read-terminal/**
 /resources/provider/tool/send-terminal/**
 /resources/provider/tool/signal-terminal/**
-/requirements/delegation/tests/join-v2-wire.test.mjs
-/requirements/managed-session-lifecycle/tests/distiller-ownership.test.mjs
+/src/Wanxiangshu/OpenCode/Tools/ExecutorToolSurface.fs

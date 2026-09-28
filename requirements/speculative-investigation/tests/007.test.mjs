@@ -117,3 +117,5 @@ test('WHAT[speculative-investigation-007] STRENGTH_007_provider_output_evidence_
   assert.equal(Strength.turnEvidenceClassify([call('c1', 'read', '{}')]), 'RealOutput')
 })
 }
+
+test.todo('WHAT[speculative-investigation-007] GAP-183: ambiguous Promotion storage blocks the actual continuation until matching durable evidence is established')

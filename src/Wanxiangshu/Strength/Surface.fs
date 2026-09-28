@@ -505,11 +505,9 @@ module StrengthSurface =
         |> List.toArray
 
     let isAllowedTool (tool: string) : bool =
-        match tool with
-        | "read"
-        | "glob"
-        | "grep" -> true
-        | _ -> false
+        StrengthReplicaTools.exactReadonlyHostToolMap
+        |> Map.tryFind tool
+        |> Option.defaultValue false
 
     /// Prompt identity remains role-owned and cannot inherit Strength metadata.
     let systemPromptIdForRole (role: string) : string =
@@ -556,10 +554,7 @@ module StrengthSurface =
             | _ -> "", ""
 
         box
-            {| satelliteCases = [| "Companion" |]
-               hasReplicaSatellite = false
-               attachmentCases = [| "Companion"; "SyncInspector"; "SyncCoder"; "Bookkeeper"; "StrengthReplica" |]
-               executionClass =
+            {| executionClass =
                 match StrengthReplicaAssociationHints.executionClass with
                 | SessionExecutionClass.InternalLeaf -> "InternalLeaf"
                 | SessionExecutionClass.Work -> "Work"

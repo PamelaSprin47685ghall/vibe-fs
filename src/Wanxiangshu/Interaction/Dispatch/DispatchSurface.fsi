@@ -107,12 +107,6 @@ module DispatchSurface =
 
     val projectionObservation: handle: JournalHandle -> session: string -> obj
 
-    val sendMemberObservation: unit -> obj
-
-    val awaitModeObservation: unit -> obj
-
-    val runtimeStartPolicy: unit -> obj
-
     val foldRuntimeStartWatermark: events: obj array -> obj
 
     val pendingClaimCount: handle: JournalHandle -> session: string -> int

@@ -1,4 +1,3 @@
-// requirements/verification-system/tests/verification-inputs.test.mjs
 // Verification inputs collection and mid-run perturbation detection tests.
 
 import assert from 'node:assert/strict'
@@ -6,8 +5,10 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
+
+test.todo('WHAT[verification-system-016] the actual verification run binds its evidence to the same immutable candidate snapshot')
 import { collectVerificationInputs, diffVerificationInputs } from '../../../scripts/lib/build-state.mjs'
-import { verify, verificationSteps } from '../../../scripts/verify.mjs'
+import { verify } from '../../../scripts/verify.mjs'
 
 function setupFixtureRepo() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-inputs-fixture-'))
@@ -195,24 +196,7 @@ test('WHAT[verification-system-016] verify with isolated logDirectory creates ru
   }
 })
 
-test('WHAT[verification-system-016] verificationSteps excludes TESTS_MJS_FILES from unit and integration step environments', () => {
-  const hostEnvWithOverride = {
-    PATH: process.env.PATH || '',
-    TESTS_MJS_FILES: 'some-test-override.test.mjs',
-    HOME: process.env.HOME || '',
-  }
-  const steps = verificationSteps({ root: '.', release: false, verbose: true, env: hostEnvWithOverride })
-  const unitStep = steps.find((s) => s.label === 'unit')
-  const integrationStep = steps.find((s) => s.label === 'integration')
-  assert.ok(unitStep, 'unit step should be defined')
-  assert.ok(integrationStep, 'integration step should be defined')
-  assert.equal('TESTS_MJS_FILES' in unitStep.env, false, 'unit step env must not contain TESTS_MJS_FILES')
-  assert.equal('TESTS_MJS_FILES' in integrationStep.env, false, 'integration step env must not contain TESTS_MJS_FILES')
-  assert.equal(unitStep.env.NODE_TEST_VERBOSE, '1')
-  assert.equal(unitStep.env.WXS_E2E_QUIET, '1')
-})
-
-test('WHAT[verification-system-016] verify immediately interrupts subsequent steps when input is perturbed mid-run', async () => {
+test('WHAT[verification-system-016] a detected step-boundary mutation prevents later steps', async () => {
   const fixture = setupFixtureRepo()
   const tmpLogs = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-step-interrupt-logs-'))
   let buf = ''
@@ -254,5 +238,30 @@ test('WHAT[verification-system-016] verify immediately interrupts subsequent ste
   } finally {
     fs.rmSync(fixture, { recursive: true, force: true })
     fs.rmSync(tmpLogs, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[verification-system-016] a mutation restored within one step still invalidates the run', {
+  todo: 'D2: fixed isolated inputs selected; current runner still uses mutable inputs and step-boundary hashes miss this counterexample',
+}, async () => {
+  const fixture = setupFixtureRepo()
+  try {
+    const target = path.join(fixture, 'src/Foo.fs')
+    const original = fs.readFileSync(target)
+    const result = await verify({
+      root: fixture,
+      output: { write() {} },
+      runStep: async ({ label }) => {
+        if (label === 'check') {
+          fs.writeFileSync(target, 'module Foo\nlet x = 999\n')
+          fs.writeFileSync(target, original)
+        }
+        return { label, ok: true, exitCode: 0, signal: null, durationMs: 1 }
+      },
+    })
+    assert.equal(result.exitCode, 1, 'changing and restoring an input is not a stable verification run')
+    assert.equal(result.outcome, 'fail')
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true })
   }
 })

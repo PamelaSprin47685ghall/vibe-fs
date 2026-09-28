@@ -125,7 +125,6 @@ const { default: path } = await import("node:path");
 const { fileURLToPath } = await import("node:url");
 const { readCompileShardInventory } = await import("../../../scripts/lib/compile-shards.mjs");
 const { buildSubsystemInventory } = await import("../../../scripts/checks/subsystems.mjs");
-const { assertEffectIsInjected, assertPureContract } = await import("../../structured-workflow/tests/support/m6-boundary-proof.mjs");
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 const requireShard = (projects, shardId) => {
@@ -198,8 +197,5 @@ test('WHAT[causal-wait-009] production inventory separates contract runtime adap
     'proof surface must not provide production capability',
   )
 })
-test('WHAT[causal-wait-009] causal wait contract excludes registry diagnostics mailbox and proof runtime', () => {
-  assertPureContract()
-  assertEffectIsInjected('console')
-})
+test.todo('WHAT[causal-wait-009] actual negative compilation and plugin wiring enforce injected wait capabilities and first process binding')
 }

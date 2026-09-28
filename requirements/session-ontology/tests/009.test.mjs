@@ -9,13 +9,14 @@ const linked = (pairs, start = assoc.empty) =>
     return result.value
   }, start)
 
-test('WHAT[session-ontology-009] COMPANION_001_every_work_session_may_have_a_companion', () => {
-  const roles = ['orchestrator', 'manager', 'coder', 'inspector', 'browser', 'inquiry', 'reviewer', 'devops', 'distiller']
-  const state = linked(roles.map((role) => ({ main: `ses_${role}`, blogger: `ses_${role}_y` })))
-  for (const role of roles) {
-    assert.equal(assoc.bloggerOf(`ses_${role}`, state), `ses_${role}_y`)
-    assert.equal(assoc.isCompanion(`ses_${role}_y`, state), true)
-  }
+test('WHAT[session-ontology-009] independent Work associations retain distinct Companions', () => {
+  const state = linked([
+    { main: 'work-a', blogger: 'companion-a' },
+    { main: 'work-b', blogger: 'companion-b' },
+  ])
+  assert.deepEqual(assoc.ids(state), ['work-a', 'companion-a', 'work-b', 'companion-b'])
+  assert.equal(assoc.bloggerOf('work-a', state), 'companion-a')
+  assert.equal(assoc.bloggerOf('work-b', state), 'companion-b')
 })
 
 test('WHAT[session-ontology-009] COMPANION_003_unlinking_frees_work_session_for_fresh_companion', () => {

@@ -21,15 +21,7 @@ const rebase = (state, { previousEpoch, nextEpoch, cutoff, digest, seal, prefixD
 const reanchor = (state, { previousEpoch, nextEpoch, observedRun = 'msg_compaction' }) =>
   prefix.applyReanchor({ previousEpoch, nextEpoch, observedRun }, state)
 
-test('WHAT[prefix-stability-012] PREFIX_STABILITY_committed_reanchor_survives_subsequent_failure', () => {
-  // CTX-015 / HOST-006：已提交的 reanchor（ContextReanchored）与 rebase
-  // （PrefixRebaseCommitted）不因后续 provider failure 回滚。投影层没有
-  // provider 结局输入；「失败后回滚」在类别上不存在（同 CTX-010 的
-  // 无 rollback 断言模式），且失败的重试（refusal）不触碰已提交状态。
-  for (const forbidden of ['rollback', 'revert', 'undo', 'restore', 'clear', 'discard']) {
-    assert.equal(typeof prefix[forbidden], 'undefined', `${forbidden} must not be an epoch API`)
-  }
-
+test('WHAT[prefix-stability-012] invalid later prefix facts leave the supplied committed projection unchanged', () => {
   const committed = rebase(prefix.empty, { previousEpoch: 0, nextEpoch: 1, cutoff: 7 }).value
   const reanchored = reanchor(committed, { previousEpoch: 1, nextEpoch: 2, observedRun: 'msg_c1' }).value
 
@@ -52,3 +44,5 @@ test('WHAT[prefix-stability-012] PREFIX_STABILITY_committed_reanchor_survives_su
   assert.equal(prefix.hasSnapshot(reanchored), false)
   assert.deepEqual(prefix.reanchoredRuns(reanchored), ['msg_c1'])
 })
+
+test.todo('WHAT[prefix-stability-012] committed rebase and reanchor survive actual later provider Failed and Aborted settlement plus journal reopen; GAP-106')

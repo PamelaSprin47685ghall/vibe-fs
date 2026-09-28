@@ -1,6 +1,4 @@
 import test from 'node:test'
-import { assertFatalBoundary } from '../../structured-workflow/tests/support/m6-boundary-proof.mjs'
 
-
-
-test('WHAT[dispatch-protocol-014] dispatch fatal preserves exact claim truth and one injected fuse', () => assertFatalBoundary('dispatch-protocol'))
+test.todo('WHAT[dispatch-protocol-014] actual invariant incident retains exact committed or unknown claim truth before invoking the injected fatal capability (GAP-136)')
+test.todo('WHAT[dispatch-protocol-014] duplicated actual dispatch incident reports and kills once without relabeling an accepted send as unsent (GAP-136)')

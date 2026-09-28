@@ -11,6 +11,9 @@ open Wanxiangshu.Repository.Programming.Js
 /// invocation mechanism; the vm context is the authority boundary.
 module JsSandbox =
 
+    [<Import("Buffer", "node:buffer")>]
+    let private nodeBuffer: obj = jsNative
+
     [<Import("createContext", "node:vm")>]
     let private createContext (sandbox: obj) : obj = jsNative
 
@@ -111,7 +114,7 @@ module JsSandbox =
             Error(decodeProgramFailed json)
         elif json.StartsWith invalidReturnPrefix then
             Error JsFailure.InvalidReturnValue
-        elif json.Length > outputBoundBytes then
+        elif (nodeBuffer?byteLength (json, "utf8") |> unbox<int>) > outputBoundBytes then
             Error(JsFailure.ResultTooLarge None)
         else
             Ok json

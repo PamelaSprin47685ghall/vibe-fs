@@ -171,3 +171,45 @@ test('WHAT[dispatch-protocol-015] malformed parts and boolean lookalikes are abs
   }
 })
 }
+
+test('WHAT[dispatch-protocol-015] actual ingress cannot reinterpret a malformed PromptKey as an external user root', async () => {
+  const { default: assert } = await import('node:assert/strict')
+  const { withExecutablePlugin } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
+  const dispatch = await import('../../../dist/Interaction/Dispatch/DispatchSurface.js')
+  await withExecutablePlugin(async (hooks, _directory, _children, runtime) => {
+    const output = (session, physical) => ({ message: { sessionID: session, id: physical, agent: 'engineer', role: 'user' }, parts: [] })
+    await hooks['chat.message']({ sessionID: 'valid-carrier-control', messageID: 'valid-physical', agent: 'engineer' }, output('valid-carrier-control', 'valid-physical'))
+    assert.notEqual(dispatch.projectionObservation(runtime.journal, 'valid-carrier-control').activeLogicalRun, null)
+    try {
+      await hooks['chat.message']({ sessionID: 'invalid-key', messageID: 'invalid-key-physical', agent: 'engineer', metadata: { wanxiangshu_prompt_key: 7 } }, output('invalid-key', 'invalid-key-physical'))
+    } catch (error) {
+      assert.match(String(error), /carrier|malformed|invalid|identity|prompt/i)
+    }
+    assert.equal(dispatch.projectionObservation(runtime.journal, 'invalid-key').activeLogicalRun, null, 'invalid synthetic metadata must not grant a new external authority')
+  })
+})
+
+test('WHAT[dispatch-protocol-015] malformed explicit agent cannot inherit identity from an otherwise valid pending claim', async () => {
+  const { default: assert } = await import('node:assert/strict')
+  const { withExecutablePlugin } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
+  const dispatch = await import('../../../dist/Interaction/Dispatch/DispatchSurface.js')
+  const authority = await import('../../../dist/Interaction/Authority/RuntimeSurface.js')
+  const { acceptOwner, hostPort } = await import('./support/authority.mjs')
+  await withExecutablePlugin(async (hooks, _directory, _children, runtime) => {
+    const seed = authority.issueInheritedIdentitySeed('engineer', await acceptOwner(runtime.journal, 'carrier-owner'))
+    assert.equal(seed.ok, true)
+    const sent = await dispatch.sendAgentOwnerRootAwait(hostPort(async () => dispatch.admittedWithReceipt('accepted-carrier')), runtime.journal, 'carrier-child', 'assignment', seed.value)
+    assert.equal(sent.ok, true)
+    try {
+      await hooks['chat.message']({ sessionID: 'carrier-child', messageID: 'carrier-physical', agent: 7, metadata: { wanxiangshu_prompt_key: sent.key } }, {
+        message: { sessionID: 'carrier-child', id: 'carrier-physical', agent: 'engineer', role: 'user' }, parts: [],
+      })
+    } catch (error) {
+      assert.match(String(error), /carrier|malformed|invalid|identity|prompt/i)
+    }
+    const projection = dispatch.projectionObservation(runtime.journal, 'carrier-child')
+    assert.equal(projection.activeLogicalRun, null)
+    assert.equal(projection.pendingClaims.length, 1)
+    assert.equal(projection.pendingClaims[0].promptKey, sent.key)
+  })
+})

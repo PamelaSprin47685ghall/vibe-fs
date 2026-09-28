@@ -1,13 +1,20 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import * as learning from '../../../dist/Enforcer/InstitutionalLearning/Surface.js'
+import { withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import { admit, context } from './support/plugin.mjs'
 
-const read = (path) => readFileSync(path, 'utf8')
-
-test('WHAT[institutional-learning-006] positive and negative experiences use the same non-punitive bounded enhancer', () => {
-  const tools = read('src/Wanxiangshu/OpenCode/Tools/InstitutionalLearningTools.fs')
-  const calls = [...tools.matchAll(/InstitutionalEnhancer\.evaluate experience rules/g)]
-  assert.equal(calls.length, 1, 'both verbs share one execution path and one evaluator')
-  assert.doesNotMatch(tools, /Penalty|Punish|Severity|Score/)
+test('WHAT[institutional-learning-006] actual celebrate and regret both accept informal experiences without fabricating rule creation', async () => {
+  await withExecutablePlugin(async (hooks, _directory, created, runtime) => {
+    const session = 'learning-both-verbs'
+    await admit(runtime, session)
+    for (const [verb, experience] of [['celebrate', 'An experiment happened to work today.'], ['regret', 'An experiment happened to fail today.']]) {
+      const result = await hooks.tool[verb].execute({ experience }, context(session, verb))
+      assert.match(result, /DISCARD/)
+      assert.match(result, /no rule was created/)
+    }
+    assert.deepEqual(created, [])
+    assert.deepEqual(runtime.prompts, [])
+  })
 })
+
+test.todo('WHAT[institutional-learning-006] GAP-181: a reusable positive mechanism has the same BIRTH opportunity as a negative one; two DISCARD receipts cannot prove this')

@@ -3,9 +3,13 @@
 # Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
 
 /src/Wanxiangshu/Execution/Session/LoopDetector.fs
+/src/Wanxiangshu/Execution/Session/LoopDetector.fsi
 /src/Wanxiangshu/Execution/Session/LoopDetectorSurface.fs
+/src/Wanxiangshu/Execution/Session/LoopDetectorSurface.fsi
 /src/Wanxiangshu/OpenCode/Host/LoopSensor.fs
+/src/Wanxiangshu/OpenCode/Host/LoopSensor.fsi
 /src/Wanxiangshu/OpenCode/Host/LoopSensorSurface.fs
+/src/Wanxiangshu/OpenCode/Host/LoopSensorSurface.fsi
 /src/Wanxiangshu/OpenCode/Codec/LoopEventCodec.fs
 /src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs
 /src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs
@@ -17,3 +21,5 @@
 /package.json
 /scripts/build.mjs
 /scripts/lib/derive-loop-detector-envelope.mjs
+/scripts/lib/loop-detector-repository-corpus.mjs
+/scripts/lib/generated-artifact-v1.mjs

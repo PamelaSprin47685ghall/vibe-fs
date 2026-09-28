@@ -11,6 +11,9 @@
 /src/Wanxiangshu/Context/Companion/HostBlogger.fs
 /src/Wanxiangshu/Strength/Replica/Runtime.fs
 /src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs
+/src/Wanxiangshu/OpenCode/Host/ChatAdmission/Intent.fs
+/src/Wanxiangshu/OpenCode/Host/ChatAdmission/Intent.fsi
+/src/Wanxiangshu/OpenCode/Host/ChatAdmission/IntentSurface.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginHostWiring.fs
 /src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs
@@ -18,6 +21,8 @@
 /src/Wanxiangshu/Foundation/Outcome.fs
 
 /src/Wanxiangshu/Foundation/OutcomeSurface.fs
+/src/Wanxiangshu/Interaction/Authority/RuntimeSurface.fs
+/src/Wanxiangshu/Interaction/Authority/RuntimeSurface.fsi
 /src/Wanxiangshu/Interaction/Dispatch/DispatchSurface.fs
 /src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs
 /src/Wanxiangshu/Interaction/Dispatch/Ingress.fs

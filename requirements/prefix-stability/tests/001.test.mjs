@@ -74,7 +74,7 @@ const mutatedWire = (wire, mutation) => mutation({
   })),
 })
 
-test('WHAT[prefix-stability-001] G2_engineer_Q1_Q2_Q3_provider_wire_append_only_prefix', async () => {
+test('WHAT[prefix-stability-001] reused delegation completes three questions; separately constructed wire fixtures satisfy the prefix predicate', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-g2-engineer-wire-'))
   const harness = await delegation.create(directory, [{ sessionId: OWNER, agent: 'manager' }])
   try {
@@ -169,6 +169,8 @@ test('WHAT[prefix-stability-001] G2_engineer_Q1_Q2_Q3_provider_wire_append_only_
     rmSync(directory, { recursive: true, force: true })
   }
 })
+
+test.todo('WHAT[prefix-stability-001] capture actual outbound provider wires from the reused delegation and verify their prefix identity; locally constructed transcript is not transport evidence; GAP-106')
 }
 
 {

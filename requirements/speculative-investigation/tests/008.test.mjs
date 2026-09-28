@@ -204,28 +204,7 @@ test('WHAT[speculative-investigation-008] STRENGTH_008_integrator_Current_reflec
 })
 }
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { readFileSync } = await import("node:fs");
-const { resolve } = await import("node:path");
-const { default: test } = await import("node:test");
-
-const root = resolve(import.meta.dirname, '../../..')
-const read = (path) => readFileSync(resolve(root, path), 'utf8')
-
-test('WHAT[speculative-investigation-008] StrengthReplay owns applyBeforeXTrace entry point for replay before xtrace', () => {
-  const replay = read('src/Wanxiangshu/Strength/OpenCode/Replay.fs')
-  const pt = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
-
-  assert.match(replay, /let\s+applyBeforeXTrace/)
-  assert.match(replay, /plansOrFailClosed/)
-  assert.match(replay, /XTraceProjection\.tryContiguousHostRange/)
-  assert.match(replay, /XTraceProjection\.orderedSemanticParts/)
-  assert.doesNotMatch(replay, /XTraceProjection\.(?:tryHostMessageId|parts|currentGenerationParts)|XTracePartRef/)
-  assert.doesNotMatch(replay, /stableHostIdOfProvenance|IndexOf\("\\\/part:|isContiguousFromFirst/)
-  assert.match(pt, /StrengthReplay\.applyBeforeXTrace/)
-})
-}
+test.todo('WHAT[speculative-investigation-008] GAP-183: actual next Owner transform replays Promoted frames before XTrace capture and survives restart and complete compression coverage')
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -233,6 +212,9 @@ const Strength = await import('../../../dist/Strength/Surface.js');
 const Projection = await import('../../../dist/Participant/Provider/Projection/Surface.js');
 const Adapter = await import('../../../dist/OpenCode/Codec/ProviderProjectionSurface.js');
 const { createLocalEventStore } = await import('../../verification-system/tests/support/local-event-store.mjs');
+const { mkdtempSync, rmSync } = await import('node:fs');
+const { tmpdir } = await import('node:os');
+const { join } = await import('node:path');
 
 const H = (text) => `H(${text})`
 
@@ -247,8 +229,10 @@ const append = async (durability, event) => {
   assert.equal(result.ok, true, result.error)
 }
 
-integrationTest('WHAT[speculative-investigation-008] STRENGTH_INTEGRATION_Prepared_candidate_consumption_Promoted_restart_replay_Traced', async () => {
-  const local = createLocalEventStore()
+integrationTest('WHAT[speculative-investigation-008] durable Prepared and supplied consumption evidence produce Promoted replay after a real EventStore close and reopen', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-strength-promoted-reopen-'))
+  const commonDir = join(directory, '.git')
+  let local = createLocalEventStore({ commonDir })
   try {
     const durability = Strength.durabilityCreate(local.store)
     const preparedEvent = Strength.eventPrepared('owner', 'decision-1', 'run-1', 'replica-1', 'K1', 'anchor-1', frame.digest, frame.byteLength, ['payload-a'])
@@ -272,6 +256,8 @@ integrationTest('WHAT[speculative-investigation-008] STRENGTH_INTEGRATION_Prepar
     assert.equal(promotion.view.kind, 'Promoted')
     await append(durability, promotion.event)
 
+    local.close()
+    local = createLocalEventStore({ commonDir })
     const restarted = Strength.durabilityCreate(local.store)
     projection = (await Strength.durabilityLoadProjection(restarted)).value
     assert.equal(Strength.projectionIsPromoted('decision-1', projection), true)
@@ -300,6 +286,9 @@ integrationTest('WHAT[speculative-investigation-008] STRENGTH_INTEGRATION_Prepar
     const [traced] = tracedPlans
     assert.equal(Strength.lifecycleNeedsRawReplay(22n, traced), true)
     assert.equal(Strength.lifecycleNeedsRawReplay(23n, traced), false)
-  } finally { local.close() }
+  } finally {
+    local.close()
+    rmSync(directory, { recursive: true, force: true })
+  }
 })
 }

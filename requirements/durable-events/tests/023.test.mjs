@@ -8,7 +8,6 @@ const { join, resolve } = await import("node:path");
 const eventCodec = await import("../../../dist/Persistence/EventStore/CodecSurface.js");
 const { readCompileShardInventory } = await import("../../../scripts/lib/compile-shards.mjs");
 const { buildSubsystemInventory } = await import("../../../scripts/checks/subsystems.mjs");
-const { assertEffectIsInjected, assertFatalBoundary, assertPureContract } = await import("../../structured-workflow/tests/support/m6-boundary-proof.mjs");
 
 const ROOT = resolve(import.meta.dirname, '../../..')
 const SOURCE_ROOT = join(ROOT, 'src/Wanxiangshu')
@@ -73,10 +72,7 @@ test('WHAT[durable-events-023] canonical codec surface keeps encode decode UTF-8
   assert.deepEqual(eventCodec.decodeUtf8Text(invalidUtf8), invalidUtf8Error)
   assert.deepEqual(eventCodec.decodeUtf8(invalidUtf8), invalidUtf8Error)
 })
-test('WHAT[durable-events-023] canonical codec and owner folds reject physical store and outer-union authority', () => {
-  assertPureContract()
-  assertEffectIsInjected('file-system')
-})
+test.todo('WHAT[durable-events-023] real isolated compilation rejects physical-store authority in codec and aggregate authority in domain folds')
 test('WHAT[durable-events-023] single-field family folds own their slice and declare no aggregate dependency', () => {
   const shardInventory = readCompileShardInventory({ repositoryRoot: ROOT })
   const subsystemInventory = buildSubsystemInventory({ compileInventory: shardInventory })
@@ -199,12 +195,9 @@ test('WHAT[durable-events-023] EXEC_one_commit_moves_every_related_view_together
       assert.equal(result.postState, true, 'ReadView must carry the session state the commit created')
     }),
   ))
-test('WHAT[durable-events-023] EXEC_revision_waiter_wakes_on_next_commit', () =>
+test('WHAT[durable-events-023] EXEC_revision_waiter_wakes_on_next_commit', { timeout: 8000 }, () =>
   withJournalDir('wait', (commonDir, tag) =>
-    Promise.race([
-      surface.revisionWaitScenario(commonDir, tag),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('revision waiter hung past 8s')), 8000)),
-    ]).then((result) => {
+    surface.revisionWaitScenario(commonDir, tag).then((result) => {
       assert.equal(result.committed, 'Ok')
       assert.equal(result.resolved, true, 'the registered waiter must resolve through the commit, not a poll')
       assert.ok(result.changeRevision > 0, 'the woken waiter must carry the new revision')

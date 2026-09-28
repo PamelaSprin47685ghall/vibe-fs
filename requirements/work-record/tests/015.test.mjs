@@ -1,46 +1,28 @@
-import { test } from 'node:test'
+import test from 'node:test'
 import assert from 'node:assert/strict'
-import * as workRecord from '../../../dist/Mission/WorkRecord/OpeningSemanticSurface.js'
-import * as traceOwner from '../../../dist/Context/Trace/SemanticTraceSurface.js'
+import { record, withReopenableJournal } from './support/record.mjs'
 
-const xTrace = {
-  item: traceOwner.item,
-  text: traceOwner.textPart,
-  reasoning: traceOwner.reasoningPart,
-  toolCall: (name, args) => traceOwner.toolCallPart('fixture-call', name, args),
-  toolResult: (result) => traceOwner.toolResultPart('fixture-call', result),
-}
-
-const opening = (assignment, requirements = []) => workRecord.opening(assignment, requirements, '')
-
-const materialize = (
-  openingValue,
-  frames,
-  trace,
-  coverage,
-  openingEnd = { Sequence: 0 },
-  includeOpening = true,
-) => {
-  const gapStart = Math.max(Number(coverage.Sequence), Number(openingEnd.Sequence))
-  const gap = traceOwner.render(traceOwner.forWorkRecord(traceOwner.sliceFrom({ sequence: gapStart }, trace)))
-  return workRecord.materialize(openingValue, frames, gap, includeOpening)
-}
-
-const OPENING_END = { Sequence: 1 }
-
-// WorkRecordStart is the Opening cursor's exclusive end, derived purely from XTrace.
-// Nothing downstream — no phase commit, no activation marker — can enlarge it.
-const workRecordStart = (openingCursor) => openingCursor + 1
-
-test('WHAT[work-record-015] LWR_work_record_start_is_structural_floor_not_stage', () => {
-  // WorkRecordStart = OpeningBoundary = Opening exclusive end, derived purely from
-  // the XTrace Opening cursor — a structural floor, not a Stage fact.
-  // opening cursor 0 → floor 1 (exclusive).
-  assert.equal(workRecordStart(0), 1)
-  assert.equal(workRecordStart(5), 6)
-
-  // A phase commit's tool call/result may enter the LWR's Opening material, but it
-  // never widens the structural compression floor: that floor is always the real
-  // Opening end.
-  assert.equal(workRecordStart(0), 1)
+test('WHAT[work-record-015] actual materializer retains work after Opening while later tool turns and trace head advance', async () => {
+  await withReopenableJournal(async (handle, reopen) => {
+    const session = 'record-structural-floor'
+    await record.captureOpening(handle, session, 'original charge', [])
+    const messages = [
+      { role: 'user', parts: [{ kind: 'text', text: 'original charge' }] },
+      { role: 'assistant', parts: [{ kind: 'text', text: 'early investigation' }] },
+    ]
+    await record.captureProjection(handle, session, { messages })
+    assert.equal(await record.lifecycleWorkRecord(handle, session, false), 'Recent work\nassistant: early investigation')
+    await record.captureProjection(handle, session, { messages: [
+      ...messages,
+      { role: 'assistant', parts: [{ kind: 'tool-call', callId: 'phase-call', name: 'assume', args: '{"update":".","todos":[]}' }] },
+      { role: 'tool', parts: [{ kind: 'tool-result', callId: 'phase-call', result: 'accepted' }] },
+      { role: 'assistant', parts: [{ kind: 'text', text: 'later investigation' }] },
+    ] })
+    const result = await record.lifecycleWorkRecord(handle, session, false)
+    assert.ok(result.includes('early investigation'))
+    assert.ok(result.includes('later investigation'))
+    assert.equal(result.includes('original charge'), false)
+    assert.equal(result.includes('[tool call]'), false)
+    assert.equal(await record.lifecycleWorkRecord(await reopen(), session, false), result)
+  })
 })

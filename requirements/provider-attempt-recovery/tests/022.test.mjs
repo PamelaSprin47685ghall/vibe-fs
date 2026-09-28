@@ -50,10 +50,15 @@ test('WHAT[provider-attempt-recovery-022] revocation denies the waiting attempt 
   assert.equal(await fence.awaitStop(f, 'ses-a', 'msg-run-1'), false)
   assert.deepEqual(fence.snapshot(f), { stopped: 0, waiting: 0, denied: 1 })
 
+  fence.observe(f, 'ses-a', 'msg-run-1')
+  assert.equal(await fence.awaitStop(f, 'ses-a', 'msg-run-1'), false, 'late terminal cannot revive revoked permission')
+
   // A later attempt of the same session is a different exact key and stays eligible.
   const later = fence.awaitStop(f, 'ses-a', 'msg-run-2')
-  assert.deepEqual(fence.snapshot(f), { stopped: 0, waiting: 1, denied: 1 })
+  assert.deepEqual(fence.snapshot(f), { stopped: 1, waiting: 1, denied: 1 })
 
   fence.observe(f, 'ses-a', 'msg-run-2')
   assert.equal(await later, true)
 })
+
+test.todo('WHAT[provider-attempt-recovery-022] actual Host terminal observation alone releases recovery while coarse error and idle cannot; fresh process inherits no stop permission (GAP-139)')

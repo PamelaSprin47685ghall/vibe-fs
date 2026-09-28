@@ -43,6 +43,9 @@ module ConcernTools =
         let PublishUnknown = "concern-routing/publish-unknown"
 
         [<Literal>]
+        let PublishConflict = "concern-routing/publish-conflict"
+
+        [<Literal>]
         let Invalid = "concern-routing/invalid"
 
         [<Literal>]
@@ -67,6 +70,7 @@ module ConcernTools =
 
     type private PublishFailure =
         | UnknownMailbox
+        | OccurrenceConflict
         | DurableUnavailable
 
     let private persistSubscription (durable: ConcernJournalPort) owner occurrence id concern providerRun =
@@ -103,7 +107,13 @@ module ConcernTools =
             let state = durable.ReadState sender
 
             match ConcernProjection.tryFindMessage occurrence state with
-            | Some _ -> return ()
+            | Some existing when
+                existing.SenderSessionId = sender
+                && existing.Id = id
+                && existing.Message = message
+                ->
+                return ()
+            | Some _ -> return! Error PublishFailure.OccurrenceConflict
             | None ->
                 let! fact =
                     ConcernProjection.publish sender occurrence id message state
@@ -124,6 +134,7 @@ module ConcernTools =
             match result with
             | Ok() -> return render ctx Path.PublishAccepted (Map [ "id", id ])
             | Error PublishFailure.UnknownMailbox -> return render ctx Path.PublishUnknown (Map [ "id", id ])
+            | Error PublishFailure.OccurrenceConflict -> return render ctx Path.PublishConflict Map.empty
             | Error PublishFailure.DurableUnavailable -> return render ctx Path.DurableUnavailable Map.empty
         }
 

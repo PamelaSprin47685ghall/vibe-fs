@@ -18,6 +18,21 @@ test('WHAT[process-execution-016] large_estimate_acquires_and_releases_the_gate'
   assert.equal(gateCountDuringRun, 0, 'the gate is held while the large process runs')
   assert.equal(getCount(), 1, 'the gate is released after the run')
 })
+
+test('WHAT[process-execution-016] a host spawn failure releases the large-output permit for the next execution', async () => {
+  const { runWithHostLauncher, command, estimate, context, createCancellationToken } = await import('../../../dist/Process/Surface.js')
+  assert.equal(getCount(), 1)
+  const failed = await runWithHostLauncher(async () => {
+    assert.equal(getCount(), 0)
+    throw new Error('controlled host spawn failure')
+  }, command('unused', [], null, null), estimate(1, 1024, 'large'), context(null, 1000), createCancellationToken(false))
+  assert.equal(failed.ok, false)
+  assert.equal(failed.error.kind, 'ExecutionFailed')
+  assert.match(failed.error.reason, /controlled host spawn failure/)
+  assert.equal(getCount(), 1)
+  assert.equal(await runLargeEstimate(() => assert.equal(getCount(), 0)), true)
+  assert.equal(getCount(), 1)
+})
 }
 
 {
@@ -37,7 +52,7 @@ const cancelled = () => createToken(true)
 const drain = () => {
   while (getCount() === 0) release()
 }
-const tick = () => new Promise((resolve) => setTimeout(resolve, 0))
+const tick = () => new Promise((resolve) => setImmediate(resolve))
 
 test('WHAT[process-execution-016] large_gate_first_acquire_succeeds_immediately', async () => {
   assert.equal(getCount(), 1, 'gate must start unheld')
@@ -91,6 +106,7 @@ test('WHAT[process-execution-016] large_gate_cancelled_waiter_is_skipped', async
   await acquire(live())
   const token = live()
   const waiter = acquire(token)
+  cancelToken(token)
   cancelToken(token)
   await assert.rejects(waiter, 'a cancelled waiter must reject, not block the queue')
 

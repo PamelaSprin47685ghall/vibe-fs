@@ -277,9 +277,7 @@ module OrchestratorProgram =
         task {
             match! appendPublishedEvidence deps job evidence landed with
             | Error verdict -> return Error verdict
-            | Ok() ->
-                do! deps.Relay.TerminateRoadResources job.JobId
-                return Ok(Landed landed)
+            | Ok() -> return Ok(Landed landed)
         }
 
     let private continueMergeAfterClassification

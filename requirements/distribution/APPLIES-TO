@@ -3,12 +3,16 @@
 # Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
 
 /package.json
-/src/Wanxiangshu/Wanxiangshu.fsproj
 /src/Wanxiangshu/AssemblyInfo.fs
 /src/Wanxiangshu/Resources/**
 /resources/**
 /scripts/build.mjs
 /scripts/check.mjs
+/scripts/verify.mjs
+/scripts/verify-package.mjs
+/scripts/lib/build-state.mjs
+/scripts/lib/owner-compile.mjs
+/scripts/lib/test-surface-scan.mjs
 /scripts/warmup-opencode.mjs
 /src/Wanxiangshu/Resources/EnforcerCatalogResource.fs
 /src/Wanxiangshu/Resources/ModelRoutingResource.fs

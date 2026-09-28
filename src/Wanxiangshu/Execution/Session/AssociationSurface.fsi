@@ -21,5 +21,3 @@ module AssociationSurface =
     val dedicatedAttachment: role: string -> string
     val strengthExecutionClass: string
     val strengthOwnership: owner: string -> obj
-    val isStrengthReplicaAttachment: kind: string -> bool
-    val satelliteKinds: string array

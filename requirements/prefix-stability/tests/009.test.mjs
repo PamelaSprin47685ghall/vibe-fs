@@ -90,8 +90,6 @@ test('WHAT[prefix-stability-009] transport suppression removes only exact stale 
 
 {
 const { default: assert } = await import("node:assert/strict");
-const { readFileSync } = await import("node:fs");
-const { resolve } = await import("node:path");
 const { default: test } = await import("node:test");
 const providerCodec = await import("../../../dist/OpenCode/Codec/ProviderProjectionSurface.js");
 const providerProjection = await import("../../../dist/Participant/Provider/Projection/Surface.js");
@@ -157,82 +155,7 @@ test('WHAT[prefix-stability-009] CTX_011_step5_the_proof_reads_the_SNAPSHOT_not_
     'the same cutoff over a grown projection must not produce the same proof',
   )
 })
-test('WHAT[prefix-stability-009] prefix_proof_and_writeback_use_canonical_XTrace_not_request_local_message_positions', () => {
-  const wireSource = readFileSync(
-    resolve(import.meta.dirname, '../../../src/Wanxiangshu/Context/Prefix/Wire.fs'),
-    'utf8',
-  )
-  const adapterSource = readFileSync(
-    resolve(import.meta.dirname, '../../../src/Wanxiangshu/Composition/Durable/AgentJournalPortAdapter.fs'),
-    'utf8',
-  )
-
-  // Wire reads canonical XTrace through the port; the adapter is where the
-  // canonical materialization call lives (it alone knows AgentJournal).
-  assert.match(wireSource, /CurrentProjection/)
-  assert.match(adapterSource, /XTraceMaterialization\.currentProjection/)
-  // The fold's request bound is the canonical trace frontier — the newest message the
-  // request answers — never the trailing user message: one user message drives a whole
-  // agent loop, so that message stays at the turn that opened it for the entire loop.
-  assert.match(
-    wireSource,
-    /let private requestStartCutoff \(xTrace: XTraceProjectionState\)[\s\S]{0,200}XTraceProjection\.frontierTurn/,
-  )
-  assert.match(wireSource, /XTraceProjection\.hostMessageIdsBeforeTurn/)
-  assert.match(wireSource, /replacePrefixByHostIds/)
-  assert.doesNotMatch(
-    wireSource,
-    /ProviderWireCapture\.decodeMessageView\(rawMessages\)[\s\S]{0,500}ProjectionRenderer\.cutoffDigest/,
-    'step-5 proof must not hash the mutable request presentation',
-  )
-})
-test('WHAT[prefix-stability-009] prefix lifecycle and rendering stay with the prefix owner', () => {
-  const ownerSource = readFileSync(
-    resolve(import.meta.dirname, '../../../src/Wanxiangshu/Context/Prefix/Projection.fs'),
-    'utf8',
-  )
-  const providerIntentSource = readFileSync(
-    resolve(import.meta.dirname, '../../../src/Wanxiangshu/Participant/Provider/Projection/Intent.fs'),
-    'utf8',
-  )
-  const providerRendererSource = readFileSync(
-    resolve(import.meta.dirname, '../../../src/Wanxiangshu/Participant/Provider/Projection/Renderer.fs'),
-    'utf8',
-  )
-
-  assert.match(ownerSource, /type PrefixActivation/)
-  assert.match(ownerSource, /type PrefixProjectionIntent/)
-  assert.match(ownerSource, /type PrefixRendered/)
-  assert.match(ownerSource, /let render \(intent: PrefixProjectionIntent\)/)
-  assert.doesNotMatch(providerIntentSource, /PrefixActivation|KeepPhysicalPrefix|ActivatePrefixEpoch|ReanchorAfterCompaction/)
-  assert.doesNotMatch(providerRendererSource, /PrefixActivation|RenderedPrefix|renderPrefix/)
-})
-test('WHAT[prefix-stability-009] retry_transport_rows_retire_only_at_a_real_cold_horizon', () => {
-  const wireSource = readFileSync(
-    resolve(import.meta.dirname, '../../../src/Wanxiangshu/Context/Prefix/Wire.fs'),
-    'utf8',
-  )
-
-  assert.match(wireSource, /let private staleProviderRetryMessageIds/)
-  assert.match(wireSource, /Some messageId <> currentPhysical/)
-  assert.match(wireSource, /let retryTransportRetirement/)
-  assert.match(
-    wireSource,
-    /PrefixPresentationHorizon\.Current\s*->\s*Set\.empty[\s\S]*?PrefixPresentationHorizon\.TentativeCold\s*->\s*staleProviderRetryMessageIds rawMessages/,
-    'same-horizon retry rows must remain byte-stable; only a real cold presentation may retire them',
-  )
-  assert.match(
-    wireSource,
-    /renderPrefixMessages state rawMessages PrefixProjectionIntent\.Keep PrefixPresentationHorizon\.Current/,
-    'ordinary presentation must preserve the current physical prefix',
-  )
-  assert.match(wireSource, /renderPrefixMessages state rawMessages prefixIntent presentationHorizon/)
-  assert.match(wireSource, /presentationHorizonForProbe/)
-  assert.match(wireSource, /XPrefixProjection\.render intent/)
-  assert.match(wireSource, /ProjectionMessageEdit\.suppressHostMessagesByIds prefixed staleTransport/)
-  assert.doesNotMatch(wireSource, /ProjectionIntent\.(?:SuppressTransportOnly|ReanchorAfterCompaction)/)
-  assert.doesNotMatch(wireSource, /Projection(?:Planner\.plan|Renderer\.renderPrefix)/)
-})
+test.todo('WHAT[prefix-stability-009] actual Host transform derives proof and writeback identities from canonical XTrace despite request-local presentation changes; GAP-106')
 test('WHAT[prefix-stability-009] compiled retry retirement preserves Current and only removes stale retry rows at TentativeCold', () => {
   const retry = (id) => ({
     info: { id, role: 'user', metadata: { wanxiangshu_origin: 'ProviderRetryAttempt' } },
@@ -250,5 +173,59 @@ test('WHAT[prefix-stability-009] compiled retry retirement preserves Current and
     ['retry-stale'],
     'the current physical retry remains on the new cold horizon',
   )
+})
+}
+
+{
+const assert = (await import('node:assert/strict')).default
+const { createHash } = await import('node:crypto')
+const xwire = await import('../../../dist/Context/Prefix/XWireSurface.js')
+const sha256 = (text) => createHash('sha256').update(text).digest('hex')
+
+test('WHAT[prefix-stability-009] actual candidate pipeline rejects changed covered history but accepts an unchanged prefix with a different tail', async () => {
+  const currentProjection = {
+    messages: [
+      { role: 'user', parts: [{ kind: 'text', text: 'task α' }] },
+      { role: 'assistant', parts: [{ kind: 'text', text: 'completed\r\nwork' }] },
+      { role: 'user', parts: [{ kind: 'text', text: 'live request' }] },
+    ],
+  }
+  const frame = 'recorded work α'
+  const written = []
+  const input = {
+    sessionId: 'ses-prefix-proof', prefixEpoch: 4, frameEpoch: 2,
+    currentProjection, coverableCutoff: 2, requestCutoff: 2,
+    coveredDigest: xwire.coveredPrefixDigest(currentProjection, 2),
+    frames: [{ kind: 'Entry', ref: 'frame-ref', digest: sha256(frame), coveredFrom: 0, coveredThrough: 2 }],
+    port: {
+      readBlob: async (ref) => {
+        assert.equal(ref, 'frame-ref')
+        return { ok: true, value: frame }
+      },
+      writeBlob: async (body) => {
+        written.push(body)
+        return { ok: true, value: { blobRef: `blobs/${sha256(body)}`, blobDigest: sha256(body) } }
+      },
+    },
+  }
+  const accepted = await xwire.candidateFromJournal(input)
+  assert.equal(accepted.ok, true, accepted.error)
+  assert.equal(accepted.probe.candidate.cutoff, 2)
+  assert.equal(accepted.probe.candidate.prefixDigest, input.coveredDigest)
+  assert.equal(written.length, 1)
+  assert.ok(written[0].includes(frame))
+
+  const changedTail = structuredClone(currentProjection)
+  changedTail.messages[2].parts[0].text = 'new live request'
+  const tailResult = await xwire.candidateFromJournal({ ...input, currentProjection: changedTail })
+  assert.equal(tailResult.ok, true, tailResult.error)
+  assert.deepEqual(tailResult.probe, accepted.probe)
+
+  const changedHistory = structuredClone(currentProjection)
+  changedHistory.messages[1].parts[0].text = 'different completed work'
+  const refused = await xwire.candidateFromJournal({ ...input, currentProjection: changedHistory })
+  assert.equal(refused.ok, false)
+  assert.equal(refused.probe, null)
+  assert.match(refused.error, /cutoff proof failed/)
 })
 }

@@ -28,7 +28,7 @@ const materialize = (
 
 const OPENING_END = { Sequence: 1 }
 
-test('WHAT[work-record-009] LWR_t1_commitment_call_result_is_constitutive_opening_material', () => {
+test('WHAT[work-record-009] renderer retains tool call and result when explicitly supplied as constitutive Opening', () => {
   // COMPANION-014 ⑨ / TODO-015：BlindPlan T1（第一次 accepted planComplete=true）的
   // todowrite call + canonical accepted result 是 constitutive Opening material，
   // 不得当 incidental tool 滤入 Recent work（XTrace.forOpening 保留 raw）。
@@ -47,3 +47,5 @@ test('WHAT[work-record-009] LWR_t1_commitment_call_result_is_constitutive_openin
   assert.equal(rendered.includes('Opening'), true)
   assert.equal(rendered.includes('Recent work'), false)
 })
+
+test.todo('WHAT[work-record-009] GAP-109 contract adaptation: reconcile the original BlindPlan T1 interval with cognitive-workspace and context-compression-017/028 before claiming an actual Opening freeze; the first Assume is not automatically an Opening boundary')

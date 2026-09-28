@@ -1,75 +1,39 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import test from 'node:test'
-import { parse as parseToml } from 'smol-toml'
-import * as warmStart from '../../../dist/Repository/Investigation/WarmStartSurface.js'
+import { hint, warmStart, withWorkspace } from './support/warm-start.mjs'
 
-const here = dirname(fileURLToPath(import.meta.url))
-
-const providerRoot = join(here, '../../../resources/provider')
-
-const hint = (ordinal, rank, file, content, score = 0.9) => ({
-  keywordOrdinal: ordinal,
-  localRank: rank,
-  filePath: file,
-  startLine: rank,
-  endLine: rank + 2,
-  content,
-  score,
-  totalLines: 100,
-})
-
-const search = (ordinal, query, hints) => ({ ordinal, query, hints })
-
-const readLines = (semanticPath, replacements = {}) => {
-  let text = readFileSync(join(providerRoot, semanticPath, 'en.md'), 'utf8')
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n')
-    .trimEnd()
-  for (const key in replacements) {
-    text = text.replaceAll(`{{${key}}}`, replacements[key])
-  }
-  return text.split('\n')
-}
-
-const renderCharge = (charge, searches) =>
-  warmStart.render(readLines('lifecycle/warm-start/charge-envelope', { charge }), charge, searches)
-
-const appendAppendix = (base, searches) =>
-  warmStart.appendToProviderPrompt(readLines('lifecycle/warm-start/appendix'), base, searches)
-
-const sid = 'ses_warm_start'
-
-const waitFor = async (predicate, message, ms = 1500) => {
-  const deadline = Date.now() + ms
-  while (!predicate()) {
-    if (Date.now() >= deadline) throw new Error(message)
-    await new Promise((resolve) => setImmediate(resolve))
-  }
-}
-
-test('WHAT[repository-investigation-007] AGENT_032_keywords_normalize_stable_exact_dedupe_and_cap_at_eight', () => {
-  const raw = ' alpha\r\n\r\nbeta\nalpha\nAlpha\n gamma \n d\n e\n f\n g\n h\n i\n'
+test('WHAT[repository-investigation-007] keyword lines preserve whole queries with stable exact dedupe and the current finite cap', () => {
+  const raw = ' auth handler\r\n\r\nbeta\nauth handler\nAuth handler\n gamma \n d\n e\n f\n g\n h\n i\n'
+  assert.deepEqual(warmStart.normalizeKeywords(raw), ['auth handler', 'beta', 'Auth handler', 'gamma', 'd', 'e', 'f', 'g'])
   assert.equal(warmStart.maxKeywords, 8)
-  assert.deepEqual(warmStart.normalizeKeywords(raw), ['alpha', 'beta', 'Alpha', 'gamma', 'd', 'e', 'f', 'g'])
 })
 
-test('WHAT[repository-investigation-007] AGENT_032_zero_keywords_is_byte_exact_zero_work', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'wxs-warm-start-role-'))
-  let calls = 0
-  const searchFn = async () => {
-    calls += 1
-    return []
-  }
+test('WHAT[repository-investigation-007] empty keywords perform zero searches even when the charge contains tempting query text', async (context) => {
+  await withWorkspace(async (directory) => {
+    let calls = 0
+    const search = async () => { calls += 1; return [] }
+    const charge = 'Find auth handlers.\r\nKeep this exact text.\n'
+    for (const keywords of [undefined, '', ' \r\n\t']) {
+      const result = await warmStart.prepareWithSearch(search, 'investigation-zero', 'Blogger', directory, keywords, charge)
+      assert.equal(result.ok, true)
+      assert.equal(calls, 0)
+      await context.test(`raw task bytes preserved for ${JSON.stringify(keywords)}`, { todo: 'GAP-084: current common renderer wraps instructions; clarify byte-equality boundary before changing it' }, () => {
+        assert.equal(result.value, charge)
+      })
+    }
+  })
+})
 
-  try {
-    const zero = await warmStart.prepareWithSearch(searchFn, sid, 'Blogger', root, ' \r\n ', 'raw charge')
-    assert.deepEqual(zero, { ok: true, value: '# raw charge\n' })
-    assert.equal(calls, 0)
-  } finally {
-    rmSync(root, { recursive: true, force: true })
-  }
+test('WHAT[repository-investigation-007] repeated invocations actually search again and expose changed results', async () => {
+  await withWorkspace(async (directory) => {
+    let calls = 0
+    const search = async (query) => { calls += 1; assert.equal(query, 'full query'); return [hint('src/a.fs', `revision-${calls}`)] }
+    const first = await warmStart.prepareWithSearch(search, 'investigation-repeat', 'Engineer', directory, 'full query', 'Inspect.')
+    const second = await warmStart.prepareWithSearch(search, 'investigation-repeat', 'Engineer', directory, 'full query', 'Inspect.')
+    assert.equal(calls, 2)
+    assert.equal(first.ok, true)
+    assert.equal(second.ok, true)
+    assert.ok(first.value.includes('revision-1'))
+    assert.ok(second.value.includes('revision-2'))
+  })
 })

@@ -76,18 +76,29 @@ test('WHAT[dispatch-protocol-011] PROMPT_006_send_payload_carries_prompt_key_met
         'dispatch this',
         seed,
       )
+      assert.equal(ownerRoot.ok, true, ownerRoot.error)
+      const accepted = await dispatch.acceptAgentOwnerRoot(opened.journal, 'ses_006m', ownerRoot.key, 'msg-actual-metadata-root')
+      assert.equal(accepted.ok, true, accepted.error)
       const continuation = await dispatch.sendContinuation(
         capturingPort(),
         opened.journal,
         'ses_006m',
         'retry the fixed participant',
         'ProviderRetryAttempt',
-        profileFor('rt-send-meta', 'ses_006m', 'msg_u1', 'engineer'),
+        accepted.profile,
         'Await',
       )
 
-      assert.ok(observation(ownerRoot).metadata, 'owner-root send must carry Metadata')
-      assert.ok(observation(continuation).metadata, 'continuation send must carry Metadata')
+      assert.deepEqual(observation(ownerRoot).metadata, {
+        wanxiangshu_prompt_key: ownerRoot.key,
+        wanxiangshu_origin: 'AgentOwnerRoot',
+        wanxiangshu_logical_run: null,
+      })
+      assert.deepEqual(observation(continuation).metadata, {
+        wanxiangshu_prompt_key: continuation.key,
+        wanxiangshu_origin: 'ProviderRetryAttempt',
+        wanxiangshu_logical_run: accepted.profile.logicalRun,
+      })
     } finally {
       journal.JournalSurface_dispose(opened.journal)
     }

@@ -1,38 +1,28 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { parse as parseDocument } from 'smol-toml'
-import { bindOnce } from '../../../dist/Participant/Provider/LanguageSurface.js'
+import { parse } from 'smol-toml'
+import { run, nodeCommand } from './support/executor.mjs'
 
 process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
 
-const { run: executeRun, formatSpooledOutcome } = await import('../../../dist/OpenCode/Tools/ExecutorToolSurface.js')
-
-const chain = (kind, extra = {}) => ({
-  kind,
-  ...extra,
-  describe: () => chain(`${kind}-described`, extra),
-  optional: () => chain(`${kind}-optional`, extra),
-})
-
-const fakeSchema = {
-  string: () => chain('string'),
-  number: () => chain('number'),
-  boolean: () => chain('boolean'),
+for (const budget of [1, 3, 4, 7, 16, 64]) {
+  test(`WHAT[process-execution-015] raw UTF-8 tail fits ${budget} bytes without splitting a code point`, async () => {
+    const original = 'prefix-' + '中文🔥'.repeat(40)
+    const wire = await run({ command: nodeCommand(`process.stdout.write(${JSON.stringify(original)})`), output_budget_bytes: budget })
+    const result = parse(wire)
+    const output = result.output
+    assert.equal(result.exit_code, 0)
+    assert.equal(result.output_truncated, true)
+    assert.equal(output.includes('\uFFFD'), false)
+    assert.ok(Buffer.byteLength(output, 'utf8') <= budget)
+    assert.ok(original.endsWith(output))
+    assert.equal(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.from(output)), output)
+  })
 }
 
-const toolModule = { tool: { schema: fakeSchema } }
-
-const parseToml = parseDocument
-
-const run = (args, context = { sessionID: 'ses-exec' }) => executeRun(toolModule, {}, args, context, 'ready')
-
-test('WHAT[process-execution-015] output_truncation_enforces_byte_budget_and_utf8_char_boundary', async () => {
-  // 包含 3 字节 UTF-8 中文字符与 4 字节 Emoji 的超长输出
-  const command = 'python3 -c "print(\'万象术\' * 100 + \'🔥\' * 50 + \'FINAL_TAIL_UTF8\')"'
-  const budgetBytes = 64
-  const result = await run({ command, output_budget_bytes: budgetBytes })
-
-  // process-execution-015: 截断必须对齐 UTF-8 字符边界，不得产生无效的 \uFFFD 乱码
-  assert.ok(!result.includes('\uFFFD'), 'truncation must not slice mid-UTF-8 multibyte character')
-  assert.ok(result.includes('FINAL_TAIL_UTF8'), 'latest UTF-8 tail must be retained')
+test('WHAT[process-execution-015] the complete visible result including metadata fits the explicit budget', { todo: 'GAP-092: the current budget applies only to raw output, not its envelope' }, async () => {
+  const budget = 256
+  const wire = await run({ command: nodeCommand("process.stdout.write('x'.repeat(2000))"), output_budget_bytes: budget })
+  assert.equal(parse(wire).exit_code, 0)
+  assert.ok(Buffer.byteLength(wire, 'utf8') <= budget, `complete result is ${Buffer.byteLength(wire)} bytes for ${budget}`)
 })

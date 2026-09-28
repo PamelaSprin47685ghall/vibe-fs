@@ -228,6 +228,11 @@ test('WHAT[causal-wait-006] CAUSAL_006_dispose_is_idempotent_single_leave', () =
   causal.dispose(lease)
   causal.dispose(lease)
 
+  const ended = causal.snapshot(registry)
+  causal.markExit(lease, 'WaitResolved')
+  causal.dispose(lease)
+  assert.deepEqual(causal.snapshot(registry), ended, 'a late mark cannot alter the already recorded exit')
+
   const leaves = causal.snapshot(registry).history.filter((transition) => transition.kind === 'Left')
   assert.equal(leaves.length, 1)
   assert.equal(causal.snapshot(registry).active.length, 0)
@@ -249,4 +254,41 @@ test('WHAT[causal-wait-006] CAUSAL_006_reenter_is_fresh_observation_not_revival'
 test('WHAT[causal-wait-006] CAUSAL_006_history_default_capacity_is_256', () => {
   assert.equal(causal.historyCapacity(causal.createRegistry()), 256)
 })
+}
+
+{
+  const assert = (await import('node:assert/strict')).default
+  const causal = await import('../../../dist/Execution/Session/Wait/Surface.js')
+  const temporal = await import('../../../dist/Process/Surface.js')
+  const descriptor = causal.createWait({
+    waitKind: 'controlled-failing-wait',
+    owner: causal.owner('workflow', { id: 'failure' }),
+    subject: { target: 'material' },
+    producer: causal.externalProducer('signal', { id: 'signal' }),
+    escapes: [causal.escape('deadlineAt', '2000-01-01T00:00:00.100Z')],
+    source: 'failure-boundary',
+  })
+
+  for (const failureAt of ['read', 'signal']) {
+    test(`WHAT[causal-wait-006] ${failureAt} failure records failure, cancels the unused deadline and cannot revive the wait`, async () => {
+      const registry = causal.createRegistry()
+      const timer = temporal.createVirtualTimer()
+      const deadline = temporal.timerDelay(timer, 100)
+      const fail = () => { throw new Error(`controlled ${failureAt} failure`) }
+      try {
+        await assert.rejects(causal.untilSignalOrDeadline(registry, descriptor, deadline,
+          failureAt === 'read' ? fail : () => null,
+          failureAt === 'signal' ? fail : () => new Promise(() => {})), /controlled/)
+        const ended = causal.snapshot(registry)
+        assert.equal(ended.active.length, 0)
+        assert.equal(ended.history.at(-1).exit, 'WaitFailed')
+        assert.equal(deadline.cancelCount, 1)
+        temporal.timerAdvance(timer, 1000)
+        await new Promise(resolve => setImmediate(resolve))
+        assert.deepEqual(causal.snapshot(registry), ended)
+      } finally {
+        temporal.timerDispose(timer)
+      }
+    })
+  }
 }

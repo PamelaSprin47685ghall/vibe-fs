@@ -164,7 +164,7 @@ test('WHAT[execution-model-routing-004] EMR_004_optional_null_is_k0_not_a_pendin
   assert.equal(pendingCount(runtime), 0)
   assert.deepEqual(snapshotOccupied(runtime), [])
 })
-test('WHAT[execution-model-routing-004] EMR_004_strength_reservation_is_adopted_by_chat_message_without_double_counting', async () => {
+test('WHAT[execution-model-routing-004] local reservation adoption reuses one token and scheduler result', async () => {
   let calls = 0
   const runtime = createRuntime(() => {
     calls += 1
@@ -180,6 +180,16 @@ test('WHAT[execution-model-routing-004] EMR_004_strength_reservation_is_adopted_
   assert.equal(calls, 1, 'physical acceptance adopts the reservation without another scheduler decision')
   assert.equal(snapshotOccupied(runtime).length, 1, 'reservation and physical execution are one capacity occurrence')
   assert.equal(key(tryLease(runtime, 'replica', 'msg-replica', 'engineer', 'alice', null)), 'provider/replica|none')
+})
+
+test('WHAT[execution-model-routing-004] unaccepted speculative intent must not preoccupy capacity', { todo: 'GAP-130: optional reservation currently occupies a token before chat.message; 34-D2 needs decision' }, () => {
+  const runtime = createRuntime(() => target('provider/replica'))
+  try {
+    tryReserveManaged(runtime, 'unaccepted', 'engineer', null)
+    assert.deepEqual(snapshotOccupied(runtime), [])
+  } finally {
+    routing.releaseExecution(runtime, 'unaccepted')
+  }
 })
 test('WHAT[execution-model-routing-004] EMR_004_reservation_adoption_binds_role_and_participant', async () => {
   const runtime = createRuntime(() => target('provider/replica'))

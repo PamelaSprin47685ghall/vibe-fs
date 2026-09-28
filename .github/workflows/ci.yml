@@ -26,7 +26,9 @@ jobs:
           UNIT_VERDICT_SILENCE_MS: 30000
         run: |
           set -x
-          if ! node scripts/verify.mjs --release; then
+          if node scripts/verify.mjs --release; then
+            exit 0
+          else
             CODE=$?
             echo "::error::verify:release exited with $CODE"
             find .fable-build/verify-logs/ -type f -name "*.log" | sort | while read -r file; do

@@ -17,6 +17,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-surface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-composition.composition-durable-providerfailure-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.execution-failure-policy.execution-failure-model.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.execution-failure-policy.execution-failure-decision.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.composition-turn-recovery-workflow.fsproj"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailureSurface.fsi"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/ProviderFailureSurface.fs"/>
   </ItemGroup>

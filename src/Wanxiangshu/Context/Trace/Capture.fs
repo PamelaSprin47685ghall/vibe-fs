@@ -948,8 +948,30 @@ module XTraceCapture =
         (assignmentText: string)
         (authoritativeRequirements: string list)
         =
-        captureUnitWithReceipt journal sessionId XTraceCaptureIdentity.PositionalIdentity (fun () ->
-            captureOpening journal sessionId assignmentText authoritativeRequirements)
+        task {
+            match journal with
+            | None -> return Ok(withoutJournalReceipt ())
+            | Some durable ->
+                return!
+                    serializeCapture sessionId (fun () ->
+                        task {
+                            match
+                                XTraceProjection.applyOpening
+                                    assignmentText
+                                    authoritativeRequirements
+                                    (xTraceOf durable sessionId)
+                            with
+                            | Error _ -> return Error(XTraceCaptureError.Refused "opening-already-captured")
+                            | Ok _ ->
+                                return!
+                                    captureDurableUnitWithReceipt
+                                        durable
+                                        sessionId
+                                        XTraceCaptureIdentity.PositionalIdentity
+                                        (fun () ->
+                                            captureOpening journal sessionId assignmentText authoritativeRequirements)
+                        })
+        }
 
     let captureTerminalTextWithReceipt
         (journal: AgentJournal option)

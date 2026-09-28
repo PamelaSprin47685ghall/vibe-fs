@@ -29,7 +29,12 @@ import {
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 export async function runCoverage(options = {}) {
-  const root = fs.realpathSync(path.resolve(options.root ?? REPO_ROOT))
+  let root
+  try {
+    root = fs.realpathSync(path.resolve(options.root ?? REPO_ROOT))
+  } catch (error) {
+    return { ok: false, code: 'BUILD_NOT_FRESH', error }
+  }
   const distDir = path.resolve(root, options.distDir ?? 'dist')
   const unitRunnerScript = options.unitRunnerScript ?? path.join(root, 'requirements/verification-system/tests/run.mjs')
   const c8Bin = options.c8Bin ?? path.join(root, 'node_modules/c8/bin/c8.js')

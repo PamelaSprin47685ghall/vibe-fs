@@ -1,166 +1,133 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { Worker } from 'node:worker_threads'
 import { encode } from 'gpt-tokenizer/encoding/o200k_base'
-import * as loopDetector from '../../../dist/Execution/Session/LoopDetectorSurface.js'
+import * as detector from '../../../dist/Execution/Session/LoopDetectorSurface.js'
 import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
-import {
-  deriveLoopDetectorEnvelope,
-  encodeParallel,
-  envelopeBounds,
-  loadLoopDetectorRepositoryCorpusV1,
-} from '../../../scripts/lib/derive-loop-detector-envelope.mjs'
-import {
-  loopDetectorRepositoryInputFiles,
-} from '../../../scripts/lib/loop-detector-repository-corpus.mjs'
+import { deriveLoopDetectorEnvelope, encodeParallel, loadLoopDetectorRepositoryCorpusV1, writeLoopDetectorEnvelopeArtifact } from '../../../scripts/lib/derive-loop-detector-envelope.mjs'
+import { loopDetectorRepositoryInputFiles } from '../../../scripts/lib/loop-detector-repository-corpus.mjs'
 
-const close = (actual, expected, tolerance = 1e-9) =>
-  assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} != ${expected}`)
+const close = (actual, expected) => assert.ok(Math.abs(actual - expected) <= 1e-9, `${actual} != ${expected}`)
 
-const lowerQuantileProbability = 0.025
-
-const upperQuantileProbability = 1.0
-
-const centralProbability = upperQuantileProbability - lowerQuantileProbability
-
-const referenceScore = (text) => {
-  const lastSeen = new Map()
-  let weightedDistinctTokens = loopDetector.normalWeightedDistinctCount
-  let step = 0
-
-  for (const token of encode(text)) {
-    step += 1
-    const previous = lastSeen.get(token)
-    weightedDistinctTokens =
-      loopDetector.lambda * weightedDistinctTokens +
-      1 -
-      (previous === undefined ? 0 : loopDetector.lambda ** (step - previous))
-    lastSeen.set(token, step)
-  }
-
-  return { weightedDistinctTokens, step }
-}
-
-test('WHAT[degeneration-guard-004] LOOP_004_repository_corpus_contains_normal_source_documents_only', () => {
-  const files = loopDetectorRepositoryInputFiles().map((file) => file.replaceAll('\\', '/'))
-
-  assert.ok(files.every(path.isAbsolute), 'selector must return filesystem paths')
-  assert.ok(files.some((file) => file.endsWith('/src/Wanxiangshu/Execution/Session/LoopDetector.fs')))
-  assert.ok(files.some((file) => file.endsWith('/requirements/degeneration-guard/WHAT.md')))
-  assert.ok(!files.some((file) => file.endsWith('/package-lock.json')))
-  assert.ok(!files.some((file) => file.endsWith('/scripts/checks/semantic-owners.json')))
-  assert.ok(!files.some((file) => file.endsWith('/docs/index.html')))
-})
-
-test('WHAT[degeneration-guard-004] LOOP_004_repository_corpus_excludes_tracked_paths_deleted_from_the_worktree', () => {
+test('WHAT[degeneration-guard-004] selector admits tracked source documents and excludes generated vendor fixture structured deleted and untracked paths', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'wanxiangshu-loop-selector-'))
-
   try {
     execFileSync('git', ['init', '-q'], { cwd: root })
-    writeFileSync(path.join(root, 'alive.md'), 'alive\n')
-    writeFileSync(path.join(root, 'deleted.md'), 'deleted\n')
-    execFileSync('git', ['add', 'alive.md', 'deleted.md'], { cwd: root })
+    const files = ['src/code.fs', 'note.md', 'deleted.md', 'node_modules/module.js', 'vendor/lib.py', 'fixtures/case.md', 'golden/result.md', 'generated/code.fs', 'data.json', 'events.jsonl', 'values.csv']
+    for (const file of files) {
+      mkdirSync(path.dirname(path.join(root, file)), { recursive: true })
+      writeFileSync(path.join(root, file), 'text\n')
+    }
+    execFileSync('git', ['add', '-f', ...files], { cwd: root })
     unlinkSync(path.join(root, 'deleted.md'))
-
-    assert.deepEqual(
-      loopDetectorRepositoryInputFiles(root).map((file) => path.basename(file)),
-      ['alive.md'],
-    )
+    writeFileSync(path.join(root, 'untracked.md'), 'untracked\n')
+    const selected = loopDetectorRepositoryInputFiles(root)
+    assert.ok(selected.every(path.isAbsolute))
+    assert.deepEqual(selected.map(file => path.relative(root, file)), ['note.md', 'src/code.fs'])
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
 })
 
-test('WHAT[degeneration-guard-004] LOOP_004_runtime_envelope_reads_every_selected_repository_input_through_the_tracking_reader', async () => {
+test('WHAT[degeneration-guard-004] selected bytes are tracked before UTF-8 and generated-marker filtering', () => {
   const reads = []
   const bytes = new Map([
     ['a.md', Buffer.from('first source\n')],
     ['b.fs', Buffer.from('module Second\nlet value = 2\n')],
+    ['c.md', Buffer.from([0xc3, 0x28])],
+    ['d.fs', Buffer.from('// auto-generated\nlet generated = 3\n')],
   ])
-  const derived = await deriveLoopDetectorEnvelope('/fixture-root', {
-    selectInputFiles: () => [...bytes.keys()].reverse().map((repositoryPath) => `/fixture-root/${repositoryPath}`),
-    readFile: (file) => {
-      const repositoryPath = file.replace('/fixture-root/', '')
-      reads.push(repositoryPath)
-      return bytes.get(repositoryPath)
-    },
+  const corpus = loadLoopDetectorRepositoryCorpusV1('/fixture-root', {
+    selectInputFiles: () => [...bytes.keys()].reverse().map(file => `/fixture-root/${file}`),
+    readFile: file => { const name = file.slice('/fixture-root/'.length); reads.push(name); return bytes.get(name) },
   })
-
-  assert.deepEqual(reads, ['a.md', 'b.fs'])
-  assert.deepEqual(derived.selectedInputs.map(({ path }) => path), ['a.md', 'b.fs'])
-  assert.ok(derived.selectedInputs.every(({ blob_digest: blobDigest }) => /^sha256:[0-9a-f]{64}$/.test(blobDigest)))
-
+  assert.deepEqual(reads, [...bytes.keys()])
+  assert.deepEqual(corpus.selectedInputs.map(({ path }) => path), [...bytes.keys()])
+  assert.deepEqual(corpus.texts, ['first source\n', 'module Second\nlet value = 2\n'])
+  assert.ok(corpus.selectedInputs.every(({ blob_digest }) => /^sha256:[0-9a-f]{64}$/.test(blob_digest)))
+  let outsideRead = false
   assert.throws(() => loadLoopDetectorRepositoryCorpusV1('/fixture-root', {
     selectInputFiles: () => ['/outside-root/secret.md'],
-    readFile: () => Buffer.from('must not be read'),
+    readFile: () => { outsideRead = true; return Buffer.from('unreachable') },
   }), { code: 'generated-selected-input-outside-root' })
+  assert.equal(outsideRead, false)
 })
 
-{
-const {
-  writeLoopDetectorEnvelopeArtifact,
-} = await import('../../../scripts/lib/derive-loop-detector-envelope.mjs')
+test('WHAT[degeneration-guard-004] tracked input byte changes affect derived input digests without a numeric snapshot', async () => {
+  const derive = text => deriveLoopDetectorEnvelope('/fixture-root', {
+    selectInputFiles: () => ['/fixture-root/a.md'], readFile: () => Buffer.from(text),
+  })
+  const first = await derive('ordinary source text\n')
+  const same = await derive('ordinary source text\n')
+  const changed = await derive('different source text\n')
+  assert.deepEqual(first, same)
+  assert.notEqual(first.selectedInputs[0].blob_digest, changed.selectedInputs[0].blob_digest)
+})
 
-const empiricalQuantile = (values, probability) => {
-  const rank = Math.ceil(probability * values.length)
-  const index = Math.min(values.length - 1, rank - 1)
-  return Float64Array.from(values).sort()[index]
-}
+test('WHAT[degeneration-guard-004] parallel tokenization equals whole-stream tokenization across safe and unsafe newline candidates', async () => {
+  const fixture = ['export class OrderProcessor {', '  // comment with slash /', '  /// doc comment', '  async processOrder(orderId: string) {}', '}', '', 'const message = "你好，世界！🚀";', '// 中文与多行换行', '', 'let count = 42;', '// ' + 'long text payload '.repeat(100)].join('\n')
+  const expected = Array.from(encode(fixture))
+  assert.deepEqual(await encodeParallel(fixture, 1), expected)
+  assert.deepEqual(await encodeParallel(fixture, 4), expected)
+})
 
-const referenceEnvelope = (tokens, lambda, initialValue) => {
+test('WHAT[degeneration-guard-004] worker failure rejects only after all spawned workers have terminated', async () => {
+  const spawned = []
+  const fixture = 'class Alpha {\nrun() { return 1; }\n}\nclass Beta {\ncompute() { return 2; }\n}\nlet value = 12345;'
+  await assert.rejects(() => encodeParallel(fixture, 4, {
+    workerFactory: (source, options) => {
+      const worker = spawned.length === 1 ? new Worker('process.exit(42)', { eval: true }) : new Worker(source, options)
+      spawned.push(worker)
+      return worker
+    },
+  }), /loop detector tokenize worker exited with 42/)
+  assert.ok(spawned.length > 0)
+  for (const worker of spawned) assert.equal(worker.threadId, -1)
+})
+
+const referenceEnvelope = (tokens, lambda, initial) => {
   const lastSeen = new Map()
-  let weightedDistinctTokens = initialValue
+  let value = initial
   let sum = 0
   const trajectory = new Float64Array(tokens.length)
-
-  for (let index = 0; index < tokens.length; index += 1) {
-    const step = index + 1
+  for (let index = 0; index < tokens.length; index++) {
     const token = tokens[index]
+    const step = index + 1
     const previous = lastSeen.get(token)
-    weightedDistinctTokens =
-      lambda * weightedDistinctTokens +
-      1 -
-      (previous === undefined ? 0 : lambda ** (step - previous))
+    value = lambda * value + 1 - (previous === undefined ? 0 : lambda ** (step - previous))
     lastSeen.set(token, step)
-    trajectory[index] = weightedDistinctTokens
-    sum += weightedDistinctTokens
+    trajectory[index] = value
+    sum += value
   }
-
-  return {
-    mean: sum / tokens.length,
-    minimum: empiricalQuantile(trajectory, lowerQuantileProbability),
-    maximum: empiricalQuantile(trajectory, upperQuantileProbability),
-  }
+  trajectory.sort()
+  return { mean: sum / tokens.length, minimum: trajectory[Math.ceil(0.025 * trajectory.length) - 1], maximum: trajectory.at(-1) }
 }
 
-integrationTest('WHAT[degeneration-guard-004] LOOP_004_runtime_envelope_is_freshly_derived_from_the_current_repository_without_numeric_snapshots', async () => {
-  let generatedBytes = null
-  const derived = await writeLoopDetectorEnvelopeArtifact(undefined, {
-    writeArtifact: (_target, bytes) => { generatedBytes = bytes },
-  })
-
+integrationTest('WHAT[degeneration-guard-004] current runtime envelope matches a fresh repository derivation and the self-consistent prior', async () => {
+  let generatedBytes
+  const derived = await writeLoopDetectorEnvelopeArtifact(undefined, { writeArtifact: (_target, bytes) => { generatedBytes = bytes } })
   assert.ok(Buffer.isBuffer(generatedBytes) && generatedBytes.length > 0)
   assert.equal(derived.halfLife, 256)
   close(derived.centralProbability, 0.975)
   close(derived.lowerQuantileProbability, 0.025)
-  close(derived.upperQuantileProbability, 1.0)
-  close(loopDetector.halfLife, derived.halfLife)
-  close(loopDetector.lambda, derived.lambda)
-  close(loopDetector.normalWeightedDistinctCount, derived.normalPrior)
-  close(loopDetector.centralProbability, derived.centralProbability)
-  close(loopDetector.lowerQuantileProbability, derived.lowerQuantileProbability)
-  close(loopDetector.upperQuantileProbability, derived.upperQuantileProbability)
-  close(loopDetector.minimumWeightedDistinctCount, derived.minimum)
-  close(loopDetector.maximumWeightedDistinctCount, derived.maximum)
-
+  close(derived.upperQuantileProbability, 1)
+  close(detector.halfLife, derived.halfLife)
+  close(detector.lambda, derived.lambda)
+  close(detector.normalWeightedDistinctCount, derived.normalPrior)
+  close(detector.centralProbability, derived.centralProbability)
+  close(detector.lowerQuantileProbability, derived.lowerQuantileProbability)
+  close(detector.upperQuantileProbability, derived.upperQuantileProbability)
+  close(detector.minimumWeightedDistinctCount, derived.minimum)
+  close(detector.maximumWeightedDistinctCount, derived.maximum)
   const tokens = encode(loadLoopDetectorRepositoryCorpusV1().texts.join('\n'))
   const reference = referenceEnvelope(tokens, derived.lambda, derived.normalPrior)
   close(reference.mean, derived.normalPrior)
   close(reference.minimum, derived.minimum)
   close(reference.maximum, derived.maximum)
 })
-}
+
+test.todo('WHAT[degeneration-guard-004] actual build binds generator selector selected bytes and runtime traversal to one staged input (GAP-145)')

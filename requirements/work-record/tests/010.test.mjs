@@ -1,40 +1,22 @@
-import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import * as workRecord from '../../../dist/Mission/WorkRecord/OpeningSemanticSurface.js'
-import * as traceOwner from '../../../dist/Context/Trace/SemanticTraceSurface.js'
+import test from 'node:test'
+import { record, withReopenableJournal } from './support/record.mjs'
 
-const xTrace = {
-  item: traceOwner.item,
-  text: traceOwner.textPart,
-  reasoning: traceOwner.reasoningPart,
-  toolCall: (name, args) => traceOwner.toolCallPart('fixture-call', name, args),
-  toolResult: (result) => traceOwner.toolResultPart('fixture-call', result),
-}
-
-const opening = (assignment, requirements = []) => workRecord.opening(assignment, requirements, '')
-
-const materialize = (
-  openingValue,
-  frames,
-  trace,
-  coverage,
-  openingEnd = { Sequence: 0 },
-  includeOpening = true,
-) => {
-  const gapStart = Math.max(Number(coverage.Sequence), Number(openingEnd.Sequence))
-  const gap = traceOwner.render(traceOwner.forWorkRecord(traceOwner.sliceFrom({ sequence: gapStart }, trace)))
-  return workRecord.materialize(openingValue, frames, gap, includeOpening)
-}
-
-const OPENING_END = { Sequence: 1 }
-
-test('WHAT[work-record-010] LWR_materialization_is_deterministic', () => {
-  const trace = [
-    xTrace.item({ sequence: 0, role: 'user', part: xTrace.text('task') }),
-    xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.text('work') }),
-  ]
-
-  const first = materialize(opening('task'), ['f1'], trace, { Sequence: 1 }, OPENING_END)
-  const second = materialize(opening('task'), ['f1'], trace, { Sequence: 1 }, OPENING_END)
-  assert.equal(first, second)
+test('WHAT[work-record-010] repeated bounded materialization of the same durable facts is deterministic', async () => {
+  await withReopenableJournal(async (handle, reopen) => {
+    const session = 'record-repeat'
+    await record.captureOpening(handle, session, 'task', [])
+    await record.captureProjection(handle, session, { messages: [
+      { role: 'user', parts: [{ kind: 'text', text: 'task' }] },
+      { role: 'assistant', parts: [{ kind: 'text', text: 'bounded work\r\n中文' }] },
+    ] })
+    const range = { StartInclusive: { Sequence: 1 }, EndExclusive: { Sequence: 3 } }
+    const first = await record.lifecycleWorkRecordBounded(handle, session, range)
+    assert.equal(typeof first, 'string')
+    assert.ok(first.includes('bounded work'))
+    assert.equal(await record.lifecycleWorkRecordBounded(handle, session, range), first)
+    assert.equal(await record.lifecycleWorkRecordBounded(await reopen(), session, range), first)
+  })
 })
+
+test.todo('WHAT[work-record-010] actual inspect and fork/join return the same bounded record for the same invocation facts; materializer determinism alone does not prove both consumers; GAP-109')

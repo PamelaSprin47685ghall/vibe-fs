@@ -55,20 +55,18 @@ test('WHAT[prefix-stability-007] PROMPT_019_participant_identity_preserved_acros
   assert.equal(profile('DevOps', 'Fast').systemPromptId, profile('DevOps', 'Deep').systemPromptId)
 })
 
-test('WHAT[prefix-stability-007] PROMPT_019_role_identity_does_not_inherit_attempt_cursor_or_replica_metadata', () => {
+test('WHAT[prefix-stability-007] planned Manager and DevOps carry their authority prompt identity', () => {
   const manager = profile('Manager', 'Fast')
   const devops = profile('DevOps', 'Fast')
 
-  // Authority owns prompt IDs; the derived attempt profile owns request kind and
-  // capabilities. Neither surface accepts a cursor or a replica id as an identity
-  // input, so changing those lifecycle facts cannot change the role identity.
+  // These are current plan identities, not observations across one Life.
   assert.equal(manager.systemPromptId, authority.systemPromptIdForRole('Manager'))
   assert.equal(devops.systemPromptId, authority.systemPromptIdForRole('DevOps'))
-  assert.equal('cursor' in manager, false)
-  assert.equal('replicaId' in manager, false)
   assert.match(manager.requestKind, /^work-?main$/i)
   assert.match(devops.requestKind, /^work-?main$/i)
 })
+
+test.todo('WHAT[prefix-stability-007] one actual Life keeps identical system bytes and Persona through delegation, failure, review and compaction; role IDs alone do not prove byte identity; GAP-106')
 
 test('WHAT[prefix-stability-007] PROMPT_019_role_and_tier_capabilities_remain_explicit', () => {
   const managerFast = profile('Manager', 'Fast')

@@ -28,4 +28,10 @@ test('WHAT[intra-participant-parallelism-008] keyed work bundle is idempotent an
   const merged1 = mustOk(fission.workBundleMerge(left, right)).bundle
   const merged2 = mustOk(fission.workBundleMerge(right, left)).bundle
   assert.deepEqual(fission.workBundleEntries(merged1), fission.workBundleEntries(merged2))
+  const other = mustOk(fission.workBundleAdd(0, 'ref-other', empty)).bundle
+  for (const [first, second] of [[left, other], [other, left]]) {
+    assert.equal(fission.workBundleMerge(first, second).reason, 'ConflictingLaneRecord')
+  }
 })
+
+test.todo('WHAT[intra-participant-parallelism-008] GAP-158: production lane materialization and replay preserve the keyed bundle contract')

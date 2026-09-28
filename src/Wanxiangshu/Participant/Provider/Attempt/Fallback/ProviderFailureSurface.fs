@@ -17,6 +17,7 @@ open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Execution.Session.ChatExecution
+open Wanxiangshu.Composition.Turn
 
 /// JSON/opaque owner boundary for the pure provider failure budget and its durable fold.
 /// Budget/projection identities and journal facts never cross as Fable records,
@@ -478,6 +479,76 @@ module ProviderFailureSurface =
         | FailureAdmissionOutcome.RetryExhausted -> "RetryExhausted"
         | FailureAdmissionOutcome.EpisodeSuperseded -> "EpisodeSuperseded"
         | FailureAdmissionOutcome.NoActiveRun -> "NoActiveRun"
+
+    let retryAttempt
+        (input: obj)
+        (current: obj)
+        (admit: obj -> Task<string>)
+        (redispatch: obj -> Task<unit>)
+        : Task<string> =
+        task {
+            let decoded = Wanxiangshu.Execution.Failure.Surface.inputOf input
+            let state = projectionOf current
+
+            let authorizationView (authorization: ProviderRecoveryAuthorization) : obj =
+                box
+                    {| decisionId = authorization.DecisionId.Value
+                       logicalRun = LogicalRunId.value authorization.LogicalRun
+                       providerRun = ProviderRunIdentity.value authorization.ProviderRun
+                       requestKind = ProviderRequestKind.label authorization.RequestKind |}
+
+            let turn: ReconciledTurn =
+                { SessionId = decoded.ExecutionKey.SessionId
+                  PhysicalUserMessageId = decoded.ExecutionKey.PhysicalUserMessageId
+                  AuthorityRootUserMessageId = state.AuthorityRootUserMessageId
+                  ProviderRun = decoded.Provider.ProviderRun
+                  Role = None
+                  Directory = None
+                  Parts = [||]
+                  Finish = None
+                  ErrorName = None
+                  Model = None
+                  Outcome = ReconcileProgram.TurnFailed "proof provider failure"
+                  Observation = None }
+
+            let ports: RetryPorts =
+                { Admit =
+                    fun authorization ->
+                        task {
+                            let! outcome = admit (authorizationView authorization)
+
+                            return
+                                match outcome with
+                                | "RetryAuthorized" -> Ok FailureAdmissionOutcome.RetryAuthorized
+                                | "RetryExhausted" -> Ok FailureAdmissionOutcome.RetryExhausted
+                                | "EpisodeSuperseded" -> Ok FailureAdmissionOutcome.EpisodeSuperseded
+                                | "NoActiveRun" -> Ok FailureAdmissionOutcome.NoActiveRun
+                                | "Rejected" -> Error "proof admission rejected"
+                                | other -> invalidArg "admit" $"unknown admission outcome '{other}'"
+                        }
+                  Redispatch =
+                    fun authorization _ ->
+                        task {
+                            do! redispatch (authorizationView authorization)
+                            return RetryVerdict.Dispatched
+                        } }
+
+            let! result =
+                Retry.attempt
+                    ports
+                    { Turn = turn
+                      Failure = decoded.Failure
+                      OwnerSession = turn.SessionId
+                      RequestKind = decoded.Provider.RequestKind
+                      Current = state
+                      Error = "proof provider failure" }
+
+            return
+                match result with
+                | RetryVerdict.Dispatched -> "Dispatched"
+                | RetryVerdict.Superseded -> "Superseded"
+                | RetryVerdict.Terminal _ -> "Terminal"
+        }
 
     /// Record one confirmed provider failure through the production ledger using
     /// an opaque JournalHandle. Only `ExecutionFailurePolicy` may licence the

@@ -119,28 +119,6 @@ module CasebookWorkflow =
                 return ()
         }
 
-    let singlePassDiffRefresh (input: obj) : Task<obj> =
-        task {
-            return
-                box
-                    {| ok = true
-                       performedReplayLoop = false
-                       caseId = input?caseId
-                       targetState = input?targetState |}
-        }
-
-    let applyExternalChangeToCase (input: obj) : obj =
-        let identity = string input?identity
-        let completion = string input?completionFileState
-        let newState = string input?newState
-
-        box
-            {| identity = identity
-               sessionId = identity
-               completionFileState = completion
-               maintenanceFileState = newState
-               sourceRole = "engineer" |}
-
     let finalizeCase (store: IEventStore) (case: Case) : Task<Result<unit, string>> =
         task {
             match! fetchCase store 0 case.Identity with

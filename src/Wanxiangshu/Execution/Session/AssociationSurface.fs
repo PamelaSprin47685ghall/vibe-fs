@@ -219,24 +219,34 @@ module AssociationSurface =
                transactionId = transactionId |}
 
     let bookkeeperAttachment (transactionId: string) : obj =
-        box
-            {| name = "Bookkeeper"
-               transactionId = transactionId |}
+        let name, transaction = attachmentLabel (AttachmentKind.Bookkeeper transactionId)
 
-    let dedicatedExecutionClass: string = "Work"
+        box
+            {| name = name
+               transactionId = transaction |}
+
+    let dedicatedExecutionClass: string =
+        executionClassLabel SyncDelegateAssociationHints.dedicatedExecutionClass
+
+    let private dedicatedRole (role: string) =
+        match role with
+        | "Coder" -> SyncDelegateRole.Coder
+        | "Engineer" -> SyncDelegateRole.Engineer
+        | _ -> SyncDelegateRole.Inspector
 
     let dedicatedOwnership (owner: string) (role: string) : obj =
-        let attachment = if role = "Coder" then "SyncCoder" else "SyncInspector"
-        ownershipAttached owner attachment
+        SyncDelegateAssociationHints.dedicatedOwnership (SessionId.create owner) (dedicatedRole role)
+        |> ownershipToJs
 
     let dedicatedAttachment (role: string) : string =
-        if role = "Coder" then "SyncCoder" else "SyncInspector"
+        dedicatedRole role
+        |> SyncDelegateRole.toAttachmentKind
+        |> attachmentLabel
+        |> fst
 
-    let strengthExecutionClass: string = "InternalLeaf"
+    let strengthExecutionClass: string =
+        executionClassLabel StrengthReplicaAssociationHints.executionClass
 
     let strengthOwnership (owner: string) : obj =
-        ownershipAttached owner "StrengthReplica"
-
-    let isStrengthReplicaAttachment (kind: string) : bool = kind = "StrengthReplica"
-
-    let satelliteKinds: string array = [| "Companion" |]
+        StrengthReplicaAssociationHints.ownership (SessionId.create owner)
+        |> ownershipToJs

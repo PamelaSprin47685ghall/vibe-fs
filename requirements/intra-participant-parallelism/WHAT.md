@@ -1,73 +1,71 @@
 # intra-participant-parallelism — WHAT
 
-## [001] 一人多 present，不增加 participant
+## [001] 一位 participant，多条 lane
 
-Fission 仅增加同一 logical participant 的并发 execution presents。所有 lanes 共享同一 logical identity、CanonicalRole、authority/responsibility owner、逻辑父子关系与外部子任务集合；不得因物理 lane 会话数量的增加而向外部暴露新的 AgentId、handle 或增加父级的 join 义务。
+Fission 只增加同一 logical participant 的并发 execution presents。各 lane 共享 logical identity、CanonicalRole、authority/responsibility owner、逻辑父子关系和外部子任务集合；不得新增对外 AgentId、handle 或父级 join 义务。
 
-## [002] canonical lane array
+## [002] Canonical lane array
 
-`fission(prompts: String Array)` 中每个数组元素对应一条独立的 lane；元素数量必须 N≥2，且每个元素必须包含非空白字符。每个 lane 的 prompt 字符串必须逐字节完整保留，包含其内部的换行符与格式，严禁二次拆分、格式修剪或静默丢弃空元素。
+`fission(prompts: String Array)` 的每个元素对应一条 lane，数量 N≥2，每项含非空白字符。完整保留每项 prompt 的字节、换行和格式，不二次拆分、修剪或静默丢弃空项。
 
-## [003] fresh sibling replacement transport
+## [003] Fresh sibling replacement
 
-Fission 的调用者必须是具备物理 Host parent 的 subsession，根会话（root session）严禁发起裂变。每条 lane 使用独立的 fresh Host session，其物理 parentID 必须等于原 caller 的 parentID。lane 的初始任务由原 caller 当时的 canonical Lifecycle Work Record 与该 lane 的输入构成；lane 会话不成为新的独立委托主体。
+调用者须为有物理 Host parent 的 subsession。每条 lane 新建独立 Host session，parentID 与原 caller 的 parentID 相同；初始任务由 caller 当时的 canonical Lifecycle Work Record 和该 lane 输入组成，不成为新委托主体。
 
-## [004] all-or-none admission
+## [004] All-or-none admission
 
-Fission 准入必须原子地建立全部 N 条 lanes。任一 lane 的创建、绑定或初始化发送失败时，必须全量回滚所有已建立的 lanes，原 caller 保持正常执行，严禁部分生效或缩减 lane 数量。
+全部 N 条 lanes 原子准入。任一创建、绑定或初始化发送失败，回滚所有已建立 lanes，原 caller 继续正常执行；不得部分生效或缩减数量。
 
-## [005] old caller silent interrupt
+## [005] Silent interrupt
 
-仅在全部 lanes 成功建立并准入后，原 caller 才发生 Fission 专有的静默中断（silent interrupt）。该中断不发布业务级的 `Aborted` completion，不触发故障恢复流程，不取消已有子任务，仅安全退休被 lanes 替代的旧物理执行实体。
+全部 lanes 建立并准入后，才静默退休被替代的旧物理 caller。不发布业务 Aborted completion，不触发故障恢复，不取消已有子任务。
 
-## [006] pre-fission outstanding completion 广播
+## [006] 裂变前 completion 广播
 
-裂变准入前已处于未决状态的子任务与进程属于 logical owner 的共享既有债权。其每一个完成结果必须以确定性载荷向每一条 Fission lane 进行 exactly-once 广播投递，不得产生重复的 WorkRecord 或多次逻辑完成。
+准入前未决的子任务和进程归 logical owner 共同所有。每项 completion 以确定性载荷向每条 lane 恰好交付一次，不重复 WorkRecord 或逻辑完成。
 
-## [007] post-fission completion lane affinity
+## [007] 裂变后 completion 亲和
 
-裂变准入后由特定 lane 新发起的子任务或进程完成项，严格绑定至发起该任务的 lane。其他 lanes 不得消费该任务的完成结果；针对既有子会话的追加提示（nudge）不改变原有亲和归属。
+准入后新子任务或进程的 completion 只由发起它的 lane 消费；对子会话的后续 nudge 不改变原亲和归属。
 
-## [008] keyed work convergence
+## [008] Keyed work convergence
 
-每条 lane 的工作记录在 group 中以 lane 索引为唯一 key。相同 key 且内容一致的合并操作具有幂等性，相同 key 但内容冲突时必须 fail-closed。最终产物由 keyed union 决定，严禁依赖到达时序或字符串无序拼接。
+以 lane index 为工作记录唯一 key。同 key 同内容合并幂等，内容冲突必须拒绝。最终产物由 keyed union 决定，不依赖到达时序或无序字符串拼接。
 
-## [009] single logical completion
+## [009] Single logical completion
 
-仅在所有 lane 的自有工作记录、裂变前广播债权与各 lane 亲和任务均完成结算后，group 方可收敛。一个 Fission group 最终仅向逻辑父级交付一次普通的 terminal completion，并将结果写回原 logical participant 的 completion cell。
+全部 lane 自有记录、裂变前广播债权及 lane 亲和任务结算后，group 才可收敛；向逻辑父级只交付一次普通 terminal completion，写回原 participant 的 completion cell。
 
-收敛后的最终接管属于同一个 logical lane 生命周期，而不是某一条固定的 physical user message。最终接管期间若发生 nudge、provider recovery/AABB 或 degeneration-guard interruption，其后继 continuation 仍由该接管 lane 拥有；只有后继链最终产生普通 `TurnCompleted` 后才允许写入 `FissionConverged` 并发布 logical completion。
+最终接管属于同一 logical lane 生命周期。nudge、provider recovery/AABB 或 degeneration interruption 后的 continuation 仍归该 lane；后继链普通 TurnCompleted 后才可写入 FissionConverged 并发布 logical completion。
 
-## [010] durable replay，不猜 lane
+## [010] Durable replay
 
-裂变产生的 group 标识、lane 成员关系、替换关系与收敛终结均依赖不可变的 durable facts 进行审计与重放；严禁通过扫描外部相似会话推测并发实体。进程中断后未完成的裂变作为中断事实记录，不进行自动隐式恢复。
+group、lane 成员、替换与收敛终结由不可变 durable facts 审计和重放，不扫描相似外部会话猜测。进程中断后的未完成裂变记为中断，不自动隐式恢复。
 
-## [011] V1 单 active group
+## [011] 单 active group
 
-一个 logical participant 同一时刻最多允许存在一个处于活跃状态的 Fission group。活跃 lane 再次调用裂变必须 fail-closed 为 already-fissioned，不支持递归裂变。
+同一 logical participant 同时至多一个 active group。活跃 lane 再次裂变须拒绝为 already-fissioned，不递归裂变。
 
-## [012] eligibility 单一 consequence source
+## [012] 权能单一来源
 
-Fission 的角色权能准入必须从 office consequence 的单一源头投影至模型可见 schema 与运行时门禁，相同 office 的不同档位权限严格一致。唯一具备裂变角色能力的是已证明的 Engineer（即 CanonicalRole=Engineer 且本次授权包含 Fission）；Manager、DevOps、Orchestrator、Blogger、Bookkeeper、Predictor 及其他非 Engineer 角色一律禁止。
+从 office consequence 同一来源投影模型工具集与运行时门禁，同 office 的不同档位权限相同。只有已证明的 Engineer 且本次授权含 Fission 才具备裂变权能；完整准入条件见 [017]。
 
-## [013] subsession-only origin
+## [013] Subsession-only origin
 
-裂变的调用源校验与角色权能正交：调用方必须证明自身为物理 subsession。直面用户的根会话在任何资源预留、记录物化或中断前必须直接 fail-closed，且在向模型投影工具集时显式剔除 Fission 工具，防止根会话被错误裂变。
+来源校验独立于角色权能。根会话须在资源预留、记录物化或中断前拒绝；其模型工具集中也须去除 Fission。
 
-## [014] control-plane successor precedes lane settlement
+## [014] 控制面先于 lane 结算
 
-Fission 不拥有 nudge、provider fallback/AABB 或 degeneration-guard 的恢复语义。对 Fission lane 的 reconciled turn：`TurnInProgress`、`TurnNeedsContinuation`、`TurnFailed` 与由 `DegenerationGuard` 导致的 `TurnAborted` 必须让渡给普通 Turn/Application owner。上述路径不得 materialize lane、不得失败 group、不得发布 logical completion。仅稳定 `TurnCompleted` 可进入 lane materialization / final takeover completion；真正的外部 abort 才可终止 group。
+nudge、provider fallback/AABB 和 degeneration 恢复由各自 owner 负责。lane 的 TurnInProgress、TurnNeedsContinuation、TurnFailed 及 DegenerationGuard 引发的 TurnAborted 交给普通 Turn/Application owner，不物化 lane、不失败 group、不发布 logical completion。
 
-## [015] deterministic ring convergence
+只有稳定 TurnCompleted 可进入 lane 物化或最终接管完成；真正外部 abort 才可终止 group。
 
-Ring convergence 的顺序只由 canonical lane index/count 决定。V1 的 ring fold 从 lane `0` 按索引递增环行至 lane `N-1`，以 keyed union 合并记录，并由确定的终点 lane `N-1` 接受最终 takeover。不得持久化或读取“最后到达/最后 materialize 的 lane”来选择接管者；不同完成到达顺序必须得到同一 merge order、同一 takeover lane 与同一 aggregate。
+## [015] Deterministic ring convergence
 
-## [016] Result traversal preserves input cardinality and order
+V1 按 canonical index 从 lane 0 到 N−1 环行，以 keyed union 合并；终点 N−1 接受最终 takeover。不同完成到达顺序须得到相同 merge order、takeover lane 和 aggregate，不以最后到达或最后物化的 lane 选择接管者。
 
-Foundation 的 `TaskResultList.traverseM` 是按输入基数有界的顺序 Result traversal，不是 retry。mapper 对每个已到达输入严格调用一次并保持输入顺序；成功时到达全部输入，首个 `Error` 原样短路且不得调用其后的输入，空输入不得调用 mapper。取消与异常沿 mapper task 传播且停止 traversal；该组合不拥有 deadline 或 recovery policy。
+## [017] 准入公式与身份边界
 
-## [017] Fission 准入判定公式与主体边界
+准入须同时满足：已证明 CanonicalRole=Engineer、本次授权含 Fission、subsession 来源、无 active group，以及其余现有准入条件。运行时入口与 ToolRegistry 都须拒绝不满足条件的调用，不能只隐藏 schema。
 
-Fission 的准入判定公式为：`已证明 CanonicalRole=Engineer ∧ 本次授权含 Fission ∧ subsession 来源 ∧ 无活跃 group ∧ 其他现有准入条件成立`。
-
-唯一可赋予 Fission 的角色是已证明的 Engineer；角色名、Persona 别名、工具参数、自称身份或被附上的 Engineer 工作记录均不能授予该能力。Manager 各任期状态（包括完整能力、评估前、接责后、清理窗口等）、Orchestrator、DevOps、Blogger、Bookkeeper、Predictor、未知或内部辅助身份一律拒绝；Engineer 根会话、已经在活跃 Fission group 中的 Engineer lane、Sphinx 内部只读 Engineer 均拒绝；历史 Manager Fission 状态仅可供历史读取与回放，严禁据此重建 lane、恢复执行或提升权限。
+角色名、Persona 别名、参数、自称身份和附带 Engineer WorkRecord 均不授予能力。所有非 Engineer 身份（含 Manager 各任期、Orchestrator、DevOps、Blogger、Bookkeeper、Predictor 及未知或内部辅助身份）、Engineer 根会话、已有 active group 的 lane、Sphinx 内部只读 Engineer 均拒绝。历史 Manager Fission 只供读取和重放，不重建 lane、恢复执行或扩权。

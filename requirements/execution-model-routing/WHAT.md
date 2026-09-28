@@ -1,108 +1,101 @@
 # execution-model-routing — WHAT
 
-## [001] 唯一模型调度 authority = `~/.config/opencode/wanxiangshu.mjs`；缺失时原子创建推荐模板
+## [001] 唯一调度配置
 
-Wanxiangshu 的 managed 模型调度由 `~/.config/opencode/wanxiangshu.mjs` 的 default export 唯一决定。其余来源（`opencode.json`、环境变量、Host-final agent inventory、内建表）一律不得覆盖或替代该权威。
-若文件不存在，系统在加载时确保目录存在并原子创建推荐策略模板，随后加载该文件。已有文件严禁自动覆盖。文件缺失、加载失败或导出非法时直接 fail closed。
+Managed 模型调度仅由 `~/.config/opencode/wanxiangshu.mjs` 的 default export 决定；`opencode.json`、环境变量、Host inventory 和内建表不得覆盖或替代。缺文件时原子创建推荐模板再加载，已有文件绝不覆盖；创建后仍缺失、加载失败或导出非法均 fail closed。
 
-## [002] scheduler ABI 只有 `role + running + previous → target | null`
+## [002] Scheduler ABI
 
-调度函数的唯一签名合同为：
-```js
-export default function route(role, running, previous) { ... }
-```
-- `role`：当前请求由 IdentitySeed 确立且在 logical run 内不可变的 fixed canonical Role。每次 fresh physical execution 均以该固定 Role 作为调度输入。participant 由 IdentitySeed 确立，随 acquire 输入与 capacity identity 显式传递，不作为调度函数参数。系统严格区分本地 participant 与远端 ModelTarget。
-- `running`：当前进程所有活跃 provider capacity token 的 ModelTarget multiset，元素形状固定为 `{ model: string, reasoning: string }`，保留重复项。
-- `previous`：仅当同一 SessionId 的当前活跃物理执行被原子取代时，才将该被取代执行的 target 作为同一 demand 的 fresh 调度输入；新 Session、exact terminal 释放后重建、无关 Session 一律传 `null`。`previous` 只是接续偏好提示，不占容量。
-- 返回值：必须包含非空 `provider/model` 与 `reasoning`，或返回 `null`。
-- 抛出异常、返回 Promise 或非法结构均视为配置错误，直接 fail closed。
+唯一签名为 `route(role, running, previous) → { model, reasoning } | null`。
 
-## [003] `running` 是真实 provider capacity token multiset；不是 live-session / active-execution 计数
+- `role` 来自 IdentitySeed，在 logical run 内固定；participant 显式随 acquire 传递，不是 scheduler 参数，也不等于远端 ModelTarget。
+- `running` 是进程持有的 provider capacity token 的 ModelTarget multiset，元素为 `{ model: string, reasoning: string }`，保留重复。
+- `previous` 只取被同一 session 的新物理执行原子取代的当前活跃 target；新 session、terminal 后重建或无关 session 为 `null`。它只是偏好，不占容量；[017] 的显式 recovery retry 绑定另有优先权。
+- target 含非空 `provider/model` 与 `reasoning`。抛错、Promise 或非法结构均作为配置错误 fail closed。
 
-`running` 准确反映系统内部实际持有的 provider capacity token 集合。基础 token 总数即为 `running.length`。同一进程内所有 plugin 实例与 worktree 共享该 module-level multiset 真相。显式 lender 的 token 被借用方使用时只计数一次，不得重复计数。
+## [003] 真实容量
 
-## [004] required execution demand 只在 `chat.message` 物理执行准入产生；`null` = 等待，不是失败
+`running.length` 等于实际持有的基础 token 数，不以会话或执行数量代替。同一进程所有插件实例和 worktree 共享这一真相；同一 token 被显式借用仍只计一次。
 
-发送或排队阶段严禁抢占 model slot，`SendPrompt` 必须保持 `Model=None`。唯一合法的需求准入点是 Host 接收物理 user message 后的 `chat.message` 边界。
-若调度器返回 `null`，不调用 provider、不消耗失败预算，demand 进入 pending 队列并在 occupancy 变更时由事件驱动重算。新到达的物理 user message 或会话销毁将取消并取代被 supersede 的旧 pending demand。
+## [004] 准入与等待
 
-## [005] 模型选择策略全部属于 MJS；runtime 不再拥有 lane、容量表或候选算法
+Required demand 只在 Host `chat.message` 接收物理 user message 时准入；发送或排队前不预占 model slot，SendPrompt 保持 `Model=None`。scheduler 返回 `null` 表示等待，不调用 provider、不耗失败预算；pending demand 随 occupancy 变化重算，新物理消息或会话销毁取消被取代的旧 demand。
 
-Runtime 仅负责加载 scheduler、校验 ABI、维护进程共享的 token ledger 与借贷仲裁，不拥有任何模型分类、优先级表、容量上限或调度策略。一切关于模型选取与并发限制的逻辑均属于 MJS 策略。
+## [005] 策略与资源分工
 
-## [006] managed lease 只在一个物理 execution 内稳定；session continuation 重新调度但可偏好上一 target
+模型候选、优先级及并发限制全部由 MJS 策略决定。Runtime 只负责配置加载与 ABI 校验、共享 token ledger 和借贷仲裁，不另设模型分类、lane、容量表或选择算法。
 
-物理执行租约与 `(SessionId, PhysicalUserMessageId)` 绑定。同一 PhysicalUserMessageId 的执行与重试严格复用已有 target 与 capacity fence，不重新触发调度器，亦严禁在同一 physical 内改变 Role、participant 或切换 agent；同一 SessionId 出现新 PhysicalUserMessageId（fresh physical execution）时原子替代旧租约，并将该 run 不可变的 canonical Role 重新经 MJS 调度器路由至 target（可选择新 target；仅当旧执行仍是当前活跃执行时才将其 target 作为 `previous` 传入供优先续用），但绝不改变 participant identity 或 Role。provider step 结束时必须把实际 lease target 与 exact `ProviderRunIdentity` 绑定；failure settlement 只可原子消费该 witness，禁止从 mutable session-last target 猜测失败 provider。每个 session 最多保留 latest run witness，新 run 自动废除旧 witness。租约不以 SessionId 为单位跨物理执行永久绑定；exact terminal 释放后不存在 session 级 previous 缓存。
+## [006] 物理执行内稳定
 
-## [007] physical execution identity / end evidence 释放 occupancy；session/业务 lifecycle 不拥有槽
+租约绑定 `(SessionId, PhysicalUserMessageId)`；同一物理执行及重试复用 target/fence，不重新调度或改变 Role、participant、agent。新物理执行原子替代旧租约，以固定 Role 重新调度，身份不变；仅当前活跃旧执行提供 previous，terminal 后不留 session 级 previous 缓存。
 
-租约释放必须依赖确切的物理执行终结证据（无 error、completed assistant、`finish` 明确属于 `stop | length | content-filter`，且其 parentID 匹配 PhysicalUserMessageId）。
-`finish="tool-calls"` 仅终结单步并归还 step token，不解除 physical execution binding；assistant error，以及 Host 将流错误归一化后的 `finish="unknown" | "error"`，都只作为单步终结证据，不直接删除 execution binding，以便 Host 继续同 material retry。业务层的 handle 完成、join 或 finality 不直接操作租约。
+Provider step 结束将实际 lease target 与 exact ProviderRunIdentity 绑定，失败结算仅原子消费该 witness。每个 session 只保留最新 witness，新 run 废除旧 witness，不从可变 session-last target 猜测失败 provider。
 
-## [008] `opencode.json` model 不再具有 authority；不校验不同角色 model 互异
+## [007] 终结与释放
 
-Host 的 `opencode.json` 不作为 managed model 的真相源。系统不要求不同 canonical 角色使用互异的物理模型字符串；两者解析至相同 target 属于合法状态 (历史 `fast-`/`deep-` 档亦然)。
+正常 physical execution 结束须有无 error、completed assistant、`finish=stop|length|content-filter`，且 parentID 匹配 PhysicalUserMessageId 的明确证据。`tool-calls`、assistant error 或 `finish=unknown|error` 只结束 provider step、归还 step token，保留物理绑定供同一 material 重试。业务 handle、join、finality 不直接释放租约。
 
-## [009] `chat.message` 是唯一 managed model admission；dispatch message 保持 model-free
+## [008] 角色不要求不同模型
 
-所有内部 synthetic prompt 分派均保持 `Model=None`。Host 接收物理 user message 后的 `chat.message` hook 负责获取租约，并将 `{providerID, modelID, variant}` 投影至 mutable message。后续 `chat.params` 仅验证当前物理执行已记录的确切绑定。
+`opencode.json` 不拥有 managed model authority。不同合法角色或历史 fast/deep 档可使用同一物理 target，不以模型字符串互异作为资格条件。
 
-## [010] provider capacity 独立成可抢占 token；只凭显式 lender 借用
+## [009] Host 投影边界
 
-ModelTarget 物理绑定与 provider capacity token 严格解耦。在 provider 请求发出前，`experimental.chat.messages.transform` 负责获取对应 provider 的 capacity token。
-借用只能使用 acquire 输入中 `lenderSessionId` 显式指定的 lender 的 credit；无 lender 输入的 demand 只走普通容量，绝不因派生关系、 ambient 拓扑或同名 session 而获得信用。token 仅在 provider-step 边界转移。显式召回（release/retire）须等待借用方 step 结束；但当 lender 自己的 `experimental.chat.messages.transform` 为同一 owned credit 再次进入后续 provider step 时，容量所有者必须在仲裁前回收该 credit 上任何外来 InFlight/Retiring step（transform 入口抢占召回）：回合内后代借用可阻塞属主，属主 transform 一旦触发即回收。等待中的 borrower 仍按单调序号优先于较晚的 lender owned step，不得被该回收饿死。
-同一 token 同时面对多个可执行 provider-step demand 时，必须按 demand 的单调序号选择最早者；owned、borrowed、ordinary 只决定该 demand 可使用哪枚 token，不构成调度优先级。较晚到达的 lender owned step 不得越过已等待且可借用该 token 的 child step。
-Host 开始执行某个 managed tool 时，tool context 的 exact `ProviderRunIdentity` 构成 provider→tool 的因果 step 边界：在任何 capability/role gate 与 tool body 运行前，必须用当前冻结的 `PhysicalUserMessageId` 结束该 provider step，使 token 进入可借用的 idle 状态。工具体可以同步等待 descendant provider work，因此严禁把 provider capacity 持有到 tool body 返回、严禁以 wall-clock timeout 猜测何时释放，也严禁通过允许借用真实仍在执行的 token 伪造并发容量。
+内部 synthetic prompt 分派保持 `Model=None`。`chat.message` 获取 exact 租约并向 Host message 投影 `{ providerID, modelID, variant }`；`chat.params` 只验证已有的物理绑定，不重新准入或选择模型。
 
-## [011] 物理 admission 顺序固定为 accept → acquire → bind → project
+## [010] Token 借用与公平
 
-Managed chat execution 必须先为 exact `(SessionId, PhysicalUserMessageId)` durable 写入 `Accepted`（携带 IdentitySeed 确立的不可变 canonical participant 证据），路由器随后才可排队或获取容量。
-一次物理执行的顺序严格为：
-1. resolve target：将 IdentitySeed 确立的 fixed canonical Role 经 MJS scheduler 解析为 ModelTarget（同一 physical execution 复用原 target；acquire 输入同时携带 IdentitySeed 派生的 participant 与可选的 `lenderSessionId`）；
-2. durable accept：写入包含 exact session、physical message 与 canonical participant 的 durable `Accepted` 事实；
-3. exact capacity acquire：以包含 SessionId + PhysicalUserMessageId + fixed Role + Participant + target + fence 的 exact capacity identity 获取 capacity fence；
-4. execution binding：建立 execution binding（binding 仅变更 target/lease，绝不修改 participant identity）；
-5. Host projection：将 target 投影至 Host 消息。
-任一步失败只能交给 `execution-failure-policy` 结算已拥有的事实与资源；严禁 acquire-before-accept、先改 Host message 后补 binding，或让未接受的发送意图预占容量。
+物理 ModelTarget 绑定与 provider capacity token 分离；请求发出前由 `experimental.chat.messages.transform` 获取 token。借用只认 acquire 显式 lender，不从派生关系、拓扑或同名 session 推导信用。借贷不复制 token，转移只在 provider-step 边界发生。
 
-## [012] Capacity 是 exact opaque fenced capability
+显式 release/retire 召回等待 borrower step 结束。lender 的 transform 进入后续 step 时，仲裁前回收自己 credit 上的外来 InFlight/Retiring step；同一 token 的可执行 demand 仍按单调序号先到先得，owned/borrowed/ordinary 只决定使用资格，不赋予优先级，较晚 lender 不得饿死已等待 borrower。
 
-每次成功 acquire 返回不可伪造、单次结算的 capacity fence。
-Capacity exact identity 严格为 `(SessionId, PhysicalUserMessageId, Role, Participant, ModelTarget, CapacityFence)`，严格区分本地 participant（Role/Persona/SelectedAgent 证据）与远端模型目标（ModelTarget）。
-同一 physical execution 的重试严格复用已有 target 与 fence；fresh physical execution 则获取对应新 execution 的 fresh fence。
-capacity fence 至少因果绑定 exact session、physical message、fixed Role + Participant、target、owner lineage 与 fence epoch。borrow/recall 只转移同一 fence 的合法 custody，不复制 token。release、retain 与 transfer 必须携带 exact fence 并验证包含 fixed Role+Participant 与 exact target 的完整 capacity identity 及当前 custody；旧 epoch、重复 settlement、错误 physical id 或按计数/session 猜测释放均 fail closed。capacity settlement 的选择由 `execution-failure-policy` 输出，路由器只验证并原子执行。
+Managed tool 入口的 exact ProviderRunIdentity 是 provider→tool 的因果边界：在任何权限检查或 tool body 前，按冻结 PhysicalUserMessageId 结束 provider step。工具可同步等待后代工作，因此不得持 token 到工具返回、用时间猜测释放，或借用仍实际执行中的 token 来虚增容量。
 
-## [013] Pending demand 是 bounded typed queue
+## [011] 准入顺序
 
-`null` 或暂不可 acquire 的已接受 demand 只能进入有明确上限的 typed queue；entry 必须携带 exact `(SessionId, PhysicalUserMessageId)`、resolved target、role/participant/lender 输入与 supersession identity。队列满返回 typed `CapacityQueueFull` 并交给 failure policy，绝不得丢弃、无限扩容、解析错误文本后重试，或借 wall-clock timeout 清退。capacity release、exact supersede、session deletion 与 shutdown 是队列重算/移除事件；队列 correctness 不依赖 polling、sleep 或 elapsed time。
+顺序固定为：以 IdentitySeed 的 Role 解析 target → durable Accepted → exact capacity acquire → execution binding → Host projection。获取资源或进入等待队列前，必须已接受 exact key 与完整 participant；binding 只改变 target/lease，不改变身份。acquire 显式携带 Role、participant 和可选 lender；同一 physical 复用既有 target。
 
-## [014] Capacity snapshot 与 reconciliation 只观察、绝不修复
+失败由 `execution-failure-policy` 结算已拥有的事实与资源；不 acquire-before-accept、不先改 Host 再补 binding、不让未接受意图占容量。
 
-Capacity owner 必须发布不可变 snapshot：ledger entry、token state、exact execution owner、pending waiter、role/participant 身份与单调 duplicate/stale/conflict transition counter。始终满足 `0 <= active <= ledger entries`，且每个 token、waiter 与 map owner 均可追溯到 snapshot 内同一 exact identity。纯 `Evidence -> Decision` reconciliation 对合法 evidence 返回 `NoOp`；任何 map/ledger divergence、无 owner token/waiter 或不可能计数返回 typed `FailClosed`，不得自动补删 ledger/map、清零 counter/config 或借时间推断。release、commit、cancel 仅返回封闭 outcome `Applied | AlreadyApplied | StaleFence | Conflict`；duplicate 不得二次递减，旧 fence 不得触碰新 execution。
+## [012] Exact fenced capability
 
-## [015] Reliability query 复用 capacity owner snapshot
+成功 acquire 返回不可伪造、单次结算的 opaque fence，其身份包含 `(SessionId, PhysicalUserMessageId, Role, Participant, ModelTarget, CapacityFence)`，并绑定 owner lineage 与 epoch。重试复用 target/fence，新物理执行使用 fresh fence。
 
-Reliability query 的 queue depth、active lease 与 duplicate/stale/conflict fence 数必须逐字段投影 execution-model-routing-014 immutable snapshot；diagnostic 模块严禁维护第二份 capacity/release counter、重算不同公式、reset/repair owner state 或把 query result 反馈给 routing。`CapacityQueueFull` observation 是缺失的 process-local monotonic diagnostic counter，只用于观测，不授权重试。
+borrow/recall 只转移合法 custody。release、retain、transfer 验证完整 identity、fence 与当前 custody；错误身份、旧 epoch 或按计数/session 猜测均拒绝。重复结算不再次消费，不触碰新 execution；outcome 遵守 [014]。结算选择来自 failure policy，路由只验证并原子执行。
 
-## [016] routing fatal绑定exact fence settlement并经注入fuse执行
+## [013] Bounded pending queue
 
-fatal incident必须携带exact execution key、capacity fence及`Committed | Unknown` settlement evidence；未settle、stale fence与coarse session identity无权fatal。routing/Host port只接受composition注入的mandatory fatal capability，不得直接引用physical adapter。同一incident只允许一次report与kill，fatal不得修复、清零或释放capacity state。
+已接受但 scheduler 返回 `null` 或暂不可 acquire 的 demand 进入有明确上限的 typed queue，保留 exact key、target 解析信息、Role/participant/lender 与 supersession identity。满队列返回 typed `CapacityQueueFull` 交 failure policy，不丢弃、不无限扩容、不解析错误文字重试。
 
-## [017] provider 恢复重投的原目标绑定与失败驱逐
+release、exact supersede、session deletion、shutdown 驱动重算或移除；正确性不依赖 polling、sleep、elapsed time 或超时清退。
 
-provider 恢复的一次已确认失败由 `ModelRouting` 结算失败 attempt 的 exact witness（execution-model-routing-006），且只有两种结局：
+## [014] 只读快照与 reconciliation
 
-- 保留目标：为同一 `SessionId` 写入一次单次消费的 recovery retry 绑定；该 session 的下一次 fresh admission 以该 target 作为调度偏好（优先于被原子取代执行提供的 `previous`），绑定随之被消费，无论该 admission 成功、排队还是被更新物理消息取代。
-- 驱逐目标：其 provider 在进程生命周期内被 poison，后续 fresh admission 回到普通调度。
+Capacity owner 发布不可变 snapshot，包含 ledger、token、exact execution owner、pending waiter、Role/participant 及单调 duplicate/stale/conflict counter。始终 `0 <= active <= ledger entries`，每个 token/waiter/map owner 均追溯到同一 exact identity。
 
-两种结局都只属于该 exact witness：witness 单次消费，重复或过期证据不产生第二结局；无 witness（例如进程重启后）不产生任何结局。recovery retry 绑定不是 session 级 previous 缓存：它只由失败结算从 exact witness 显式写入、只服务该 session 的下一次 fresh admission，并在 force cleanup（`ReleaseExecution`）时清除。
+纯 reconciliation 对合法 evidence 返回 `NoOp`；map/ledger 分歧、无 owner 资源或不可能计数返回 typed `FailClosed`，不修补状态、不清 counter/config、不借时间推断。release/commit/cancel outcome 闭合为 `Applied | AlreadyApplied | StaleFence | Conflict`；重复不二次递减，旧 fence 不动新执行。
 
-## [018] 新角色集合模型路由与旧角色槽位解耦
+## [015] 诊断复用快照
 
-Wanxiangshu 的模型调度权威以当前合法角色集合（Engineer、DevOps、Manager、Orchestrator、Blogger 等）为唯一合法输入。
-推荐策略模板与 MJS 调度器仅要求当前合法角色模型槽位；若调度输入为已废除角色，系统必须 fail closed，严禁为其分配模型租约或发起 provider 物理准入。
+Reliability query 的队深、活跃租约及 duplicate/stale/conflict 数逐字段投影 [014] snapshot，不维护第二份 counter、另算公式、reset/repair 或反馈控制 routing。`CapacityQueueFull` 只累积为进程内单调诊断计数，不授权重试。
 
-## [019] 固定 DevOps 模型绑定持久性与禁止通过 resume 换模型
+## [016] Fatal 权限
 
-同一道路内固定绑定的 DevOps 的 ModelTarget 由道路初始化阶段确定并持久化记录。
-后续该道路内所有针对 DevOps 的 resume、续行或崩溃恢复，必须严格继承并复用该既有 ModelTarget，严禁通过 resume 参数或运行时策略重新分配、篡改或覆盖 DevOps 的物理模型。
+Routing fatal incident 携 exact key、capacity fence 与 `Committed | Unknown` settlement evidence；未结算、stale fence、coarse session identity 不授权 fatal。只接受 composition 注入的 mandatory fatal capability，不直接调用 physical adapter；同一 incident 至多一次 report/kill，不以 fatal 修补、清零或释放 capacity。
+
+## [017] 失败目标的单次处置
+
+一次 provider 失败只消费 [006] 的 exact witness，选择其一：
+
+- 保留：写入该 session 下一次 fresh admission 单次消费的 recovery retry target，优先于被取代执行的 previous；无论本次准入成功、排队或被替代均消费。
+- 驱逐：其 provider 在本进程生命周期内被 poison，后续 fresh admission 回普通调度。
+
+重复、过期或缺失 witness（包括重启后）不产生处置。retry target 不是 session previous 缓存，只由 exact 失败结算创建，并在强制 execution cleanup 时清除。
+
+## [018] 当前角色集合
+
+仅当前合法角色可调度。推荐模板只要求当前角色槽位；废止角色输入 fail closed，不获得租约、不进入 provider 准入。
+
+## [019] DevOps 固定模型
+
+道路初始化时确定并持久记录固定 DevOps 的 ModelTarget。同一道路后续 resume、续行、崩溃恢复均复用它，不通过参数或运行时策略重新分配、覆盖或篡改。

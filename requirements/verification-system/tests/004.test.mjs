@@ -1,6 +1,29 @@
 import test from 'node:test'
 
 {
+const { default: assert } = await import('node:assert/strict')
+const { mkdtempSync, mkdirSync, rmSync, writeFileSync } = await import('node:fs')
+const { tmpdir } = await import('node:os')
+const { join } = await import('node:path')
+const { validateModuleLoadability } = await import('../../../scripts/checks/js-module-linkage.mjs')
+
+test('WHAT[verification-system-004] module loadability verifier is red when a dist module fails to load', async () => {
+  const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-module-load-red-'))
+  const distRoot = join(temporaryRoot, 'dist')
+  mkdirSync(distRoot, { recursive: true })
+
+  try {
+    writeFileSync(join(distRoot, 'broken.js'), 'throw new Error("top-level explosion in broken emitted module")\n')
+    const failures = await validateModuleLoadability(distRoot)
+    assert.ok(failures.length > 0, 'validateModuleLoadability must fail for modules that throw on load')
+    assert.match(failures[0], /broken\.js: failed to load emitted module/)
+  } finally {
+    rmSync(temporaryRoot, { recursive: true, force: true })
+  }
+})
+}
+
+{
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const { parseConcurrency, assertConcurrency } = await import("../../../scripts/lib/concurrency-cap.mjs");
@@ -207,6 +230,32 @@ test('WHAT[verification-system-004] js-boundary-gate verifier is red on controll
     rmSync(debtFile)
     const cleanExitCode = run({ root: fixture })
     assert.equal(cleanExitCode, 0, 'run must return exit code 0 on zero debt')
+  } finally {
+    rmSync(fixture, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[verification-system-004] boundary guard distinguishes environment keys from compiler-name lookups', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'boundary-environment-'))
+  try {
+    const directory = join(fixture, 'requirements/sample/tests')
+    mkdirSync(directory, { recursive: true })
+    const file = join(directory, '001.test.mjs')
+    const environmentSource = [
+      "const names = Object.keys(process.env).filter((name) => name.startsWith('WANXIANGSHU_ABLATION_'))",
+      "for (const name of Object.keys(process.env)) { if (name.startsWith('WANXIANGSHU_ABLATION_')) delete process.env[name] }",
+    ].join('\n')
+    writeFileSync(file, environmentSource)
+    assert.equal(run({ root: fixture }), 0)
+    for (const source of [
+      "const name = 'Example__run'; name.startsWith('Example__')",
+      "const name = '_Method'; name.endsWith('_Method')",
+      "Object.keys(process.env).filter((env) => { const name = 'Example__run'; return name.startsWith('Example__') })",
+    ]) {
+      writeFileSync(file, environmentSource + '\n' + source)
+      assert.equal(run({ root: fixture }), 1)
+      assert.ok(check({ root: fixture }).issues.some(({ code }) => code === 'mangled-lookup'))
+    }
   } finally {
     rmSync(fixture, { recursive: true, force: true })
   }

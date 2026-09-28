@@ -180,11 +180,6 @@ test('WHAT[dispatch-protocol-002] PROMPT_011_RuntimeStarted_advances_a_workspace
   assert.equal(earlyA.claimedAtRuntimeStartCount, 0)
   assert.equal(earlyB.claimedAtRuntimeStartCount, 0)
   assert.equal(lateA.claimedAtRuntimeStartCount, 2)
-  assert.deepEqual(dispatch.runtimeStartPolicy(), {
-    claimStamp: 'workspace-runtime-start-count',
-    advancesWorkspaceWatermark: true,
-    restartRecoveryAuthority: false,
-  })
 })
 }
 
@@ -291,3 +286,5 @@ test('WHAT[dispatch-protocol-002] HOST_004_stale_idle_repair_is_abandoned_at_the
   }
 })
 }
+
+test.todo('WHAT[dispatch-protocol-002] held and failed actual claim append prevents Host send, including crash between durable registration and transport invocation (GAP-136)')

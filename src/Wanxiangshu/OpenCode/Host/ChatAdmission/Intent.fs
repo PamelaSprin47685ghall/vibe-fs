@@ -9,8 +9,15 @@ open Wanxiangshu.Participant.Persona
 [<RequireQualifiedAccess>]
 module ChatAdmissionIntent =
 
+    [<RequireQualifiedAccess>]
+    type IdentityCarrierError =
+        | SessionId
+        | Agent
+        | PromptKey
+
     type DecodedMessage =
-        { SessionId: SessionId option
+        { InvalidIdentityCarrier: IdentityCarrierError option
+          SessionId: SessionId option
           PhysicalUserMessageId: PhysicalUserMessageId option
           ExplicitAgent: string option
           PromptKey: PromptKey option
@@ -33,6 +40,7 @@ module ChatAdmissionIntent =
     [<RequireQualifiedAccess>]
     /// DSL-class: Evidence
     type Rejection =
+        | MalformedIdentityCarrier of IdentityCarrierError
         | ManagedIntentMissingSessionId
         | ManagedIntentMissingPhysicalUserMessageId
         | DurableAuthorityUnavailable
@@ -206,7 +214,7 @@ module ChatAdmissionIntent =
         | KnownEvidence.HostInternal -> hostInternal message
         | KnownEvidence.Unaccepted -> resolveUnaccepted key message projection
 
-    let resolve (message: DecodedMessage) (snapshot: DurableSnapshot) : Decision =
+    let private resolveValid (message: DecodedMessage) (snapshot: DurableSnapshot) : Decision =
         match message.SessionId, snapshot.Authority, message.PhysicalUserMessageId with
         | None, _, _ when isHostInternal message -> hostInternal message
         | None, _, _ when message.PromptKey.IsSome || message.ExplicitAgent.IsSome ->
@@ -223,8 +231,21 @@ module ChatAdmissionIntent =
         | Some sessionId, Some projection, Some physicalMessageId ->
             resolveWithProjection message projection sessionId physicalMessageId
 
+    let resolve (message: DecodedMessage) (snapshot: DurableSnapshot) : Decision =
+        match message.InvalidIdentityCarrier with
+        | Some carrier -> Decision.Reject(Rejection.MalformedIdentityCarrier carrier)
+        | None -> resolveValid message snapshot
+
     let describeRejection (rejection: Rejection) : string =
         match rejection with
+        | Rejection.MalformedIdentityCarrier carrier ->
+            let name =
+                match carrier with
+                | IdentityCarrierError.SessionId -> "SessionId"
+                | IdentityCarrierError.Agent -> "agent"
+                | IdentityCarrierError.PromptKey -> "PromptKey"
+
+            sprintf "Malformed identity carrier: %s" name
         | Rejection.ManagedIntentMissingSessionId -> "Managed chat intent requires a SessionId"
         | Rejection.ManagedIntentMissingPhysicalUserMessageId ->
             "Managed chat intent requires an exact PhysicalUserMessageId"

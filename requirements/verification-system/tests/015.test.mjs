@@ -176,7 +176,7 @@ test('WHAT[verification-system-015] E3: complete line with invalid JSON or ident
   });
 });
 
-test('WHAT[verification-system-015] E4: file identity replacement and prefix truncation fail closed', async () => {
+test('WHAT[verification-system-015] E4: consumed prefix truncation fails closed', async () => {
   await withTempRepo(async ({ eventsDir }) => {
     const getObserver = () => createJournalObserver({
       readFiles: () => {
@@ -217,6 +217,27 @@ test('WHAT[verification-system-015] E4: file identity replacement and prefix tru
     }, /truncation/);
   });
 });
+
+test('WHAT[verification-system-015] file identity replacement fails even when size and bytes are unchanged', async () => {
+  const bytes = Buffer.from(`${JSON.stringify({ event_id: 'same-bytes', payload: { Fact: ['Recorded', {}] } })}\n`)
+  let inode = 1
+  const observer = createJournalObserver({
+    readFiles: () => [{
+      path: '/fixture/writer.ndjson', dev: 1, ino: inode, size: bytes.length,
+      readBytes: (offset, length) => bytes.subarray(offset, offset + length),
+    }],
+  })
+  try {
+    await observer.refresh()
+    assert.equal(observer.position(), 1)
+    inode = 2
+    await assert.rejects(observer.refresh(), /file identity replacement/)
+    assert.equal(observer.position(), 1)
+    await assert.rejects(observer.close(), /file identity replacement/)
+  } finally {
+    await observer.close()
+  }
+})
 
 test('WHAT[verification-system-015] multi-writer interleaving, subscription and close semantics', async () => {
   await withTempRepo(async ({ eventsDir }) => {

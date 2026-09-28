@@ -2,27 +2,30 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as hooks from '../../../dist/OpenCode/Host/PluginHooksSurface.js'
 
-test('WHAT[execution-failure-policy-011] unclassified hook failure preserves own evidence and issues settlement incomplete for proven execution', () => {
-  // 1. When hook arguments prove execution identity (sessionID + messageID),
-  // boundary issues SettlementIncomplete and preserves execution key
-  const argsWithIdentity = {
-    sessionID: 'ses-hook-011',
-    messageID: 'msg-hook-011',
-    messages: [{ id: 'msg-hook-011', role: 'user' }],
+const args = {
+  sessionID: 'ses-hook-011',
+  messages: [{ id: 'msg-hook-011', role: 'user' }],
+}
+
+test('WHAT[execution-failure-policy-011] unknown failures retain incomplete settlement with or without an owned identity', () => {
+  for (const [input, hasExecutionKey] of [
+    [args, true], [{}, false], [{ sessionID: args.sessionID }, false],
+    [{ sessionID: args.sessionID, messageID: 'unproven-message' }, false],
+  ]) {
+    const observed = hooks.normalizeHookFailureOutcome(input, {}, new Error('unexpected hook crash'))
+    assert.equal(observed.hasExecutionKey, hasExecutionKey)
+    assert.equal(observed.settlement, 'SettlementIncomplete')
+    assert.equal(observed.lifecycle, 'AcceptedBeforeProvider')
   }
-  const context = {}
-  const unknownError = new Error('unexpected hook crash')
+})
 
-  const outcomeWithIdentity = hooks.normalizeHookFailureOutcome(argsWithIdentity, context, unknownError)
-  assert.equal(outcomeWithIdentity.hasExecutionKey, true)
-  assert.equal(outcomeWithIdentity.settlement, 'SettlementIncomplete')
-
-  // 2. When hook arguments cannot prove execution identity, execution key is None
-  const argsWithoutIdentity = {}
-  const outcomeWithoutIdentity = hooks.normalizeHookFailureOutcome(argsWithoutIdentity, context, unknownError)
-  assert.equal(outcomeWithoutIdentity.hasExecutionKey, false)
-
-  // 3. Unknown failure does not forge a clean execution outcome or claim no owned execution
-  assert.notEqual(outcomeWithIdentity.settlement, 'ExactSettlementComplete')
-  assert.notEqual(outcomeWithIdentity.settlement, 'NoOwnedExecution')
+test('WHAT[execution-failure-policy-011] real hook membrane rethrows identical synchronous and asynchronous failures', async () => {
+  for (const input of [args, {}]) {
+    for (const error of [new Error('unexpected crash'), { reason: 'opaque Host rejection' }]) {
+      const sync = hooks.policyAwareHook('execfail-011-sync', () => { throw error })
+      assert.throws(() => sync(input, {}), (caught) => caught === error)
+      const asyncHook = hooks.policyAwareHook('execfail-011-async', () => Promise.reject(error))
+      await assert.rejects(asyncHook(input, {}), (caught) => caught === error)
+    }
+  }
 })

@@ -85,6 +85,7 @@ test('WHAT[process-execution-009] EXEC_011_collector_spooled_buffers_are_cleared
   const view = outputView(collector)
   assert.equal(view.stdoutChunks, 0)
   assert.equal(view.stderrChunks, 0)
+  spoolDelete(outputBuildResult(collector, 0).spoolPath)
 })
 test('WHAT[process-execution-009] EXEC_011_spool_chunk_count_rounds_up', () => {
   assert.equal(spoolChunkCount(0), 0)
@@ -171,4 +172,14 @@ test('WHAT[process-execution-009] PTY_SESSION_mutable_state_roundtrips', () => {
   sessionAppendOutput(session, 'partial')
   assert.equal(sessionView(session).output, 'partial')
 })
+}
+
+{
+  const assert = (await import('node:assert/strict')).default
+  const runtime = await import('../../../dist/Process/Surface.js')
+  test('WHAT[process-execution-009] the output threshold reflects a nonnegative requested budget', () => {
+    assert.equal(runtime.outputThreshold(0), 0)
+    assert.equal(runtime.outputThreshold(-5), 0)
+    assert.equal(runtime.outputThreshold(10), 10)
+  })
 }

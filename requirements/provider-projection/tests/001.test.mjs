@@ -2,36 +2,17 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as Projection from '../../../dist/Participant/Provider/Projection/Surface.js'
 
-const H = (text) => `H(${text})`
-
-const message = (role, text) => ({ role, parts: [{ kind: 'text', text }] })
-
-const row = (role, text, hostMessageId = null, hostIsPhysical = false) => ({
-  message: message(role, text),
-  hostMessageId,
-  hostIsPhysical,
+test('WHAT[provider-projection-001] repeated rendering of equal generic inputs gives equal output', () => {
+  const current = [{ role: 'user', parts: [{ kind: 'text', text: 'base' }] }]
+  const snapshot = Projection.projectionSnapshot(Projection.semanticProjection(current))
+  const intent = Projection.insertMessageRows({ key: 'sample', anchor: { kind: 'Append' }, rows: [{
+    message: { role: 'assistant', parts: [{ kind: 'text', text: 'projected' }] },
+    hostMessageId: 'projected-id', hostIsPhysical: false,
+  }] })
+  const first = Projection.renderMessagesWithHostIds(snapshot, current, [intent])
+  const repeated = Projection.renderMessagesWithHostIds(structuredClone(snapshot), structuredClone(current), [structuredClone(intent)])
+  assert.deepEqual(repeated, first)
+  assert.equal(Projection.renderWire(repeated.messages), Projection.renderWire(first.messages))
 })
 
-const snapshot = (messages = []) => Projection.projectionSnapshot(Projection.semanticProjection(messages))
-
-const base = (key, rows) => Projection.replaceMessageBase({ key, rows })
-
-const insert = (key, anchor, rows) => Projection.insertMessageRows({ key, anchor, rows })
-
-const before = (index) => ({ kind: 'BeforeMessageIndex', index })
-
-const append = { kind: 'Append' }
-
-test('WHAT[provider-projection-001] online and replay projection share one canonical generic renderer', () => {
-  const current = [message('user', 'base')]
-  const intent = insert('replayable', append, [row('assistant', 'projected', 'projected-id')])
-  const online = Projection.renderMessagesWithHostIds(snapshot(), current, [intent])
-  const replay = Projection.renderMessagesWithHostIds(
-    snapshot(),
-    structuredClone(current),
-    [structuredClone(intent)],
-  )
-
-  assert.deepEqual(replay, online)
-  assert.equal(Projection.renderWire(replay.messages), Projection.renderWire(online.messages))
-})
+test.todo('WHAT[provider-projection-001] real online and durable replay use the same pipeline; cloning the same input is not a replay execution (GAP-082)')

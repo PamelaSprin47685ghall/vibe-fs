@@ -1,17 +1,461 @@
 import test from 'node:test'
 
 {
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const enforcer = await import("../../../dist/Enforcer/Surface.js");
-const blog = await import("../../../dist/Enforcer/BlogSurface.js");
+const { default: assert } = await import('node:assert/strict')
+const { default: fc } = await import('fast-check')
+const { chmodSync, mkdtempSync, rmSync } = await import('node:fs')
+const { tmpdir } = await import('node:os')
+const { join } = await import('node:path')
+const blog = await import('../../../dist/Enforcer/BlogSurface.js')
+const journal = await import('../../../dist/Persistence/Journal/Surface.js')
+const dispatch = await import('../../../dist/Interaction/Dispatch/DispatchSurface.js')
+const runtime = await import('../../../dist/Context/Companion/RuntimeSurface.js')
 
+const NUDGE_KIND = 'blogger-missing-tool'
+const AABB_KIND = 'blogger-aabb'
+const freshCalls = () => ({
+  sendPrompt: [],
+  subscribe: [],
+  subscribeFuture: [],
+  rootRead: [],
+  eventSubscribe: [],
+  eventFuture: [],
+  eventNotify: [],
+})
+const sessionPort = (calls) => ({
+  SubscribeTerminal: (...args) => {
+    calls.subscribe.push(args)
+    return { Dispose: () => {} }
+  },
+  SubscribeFutureTerminal: (...args) => {
+    calls.subscribeFuture.push(args)
+    return { Dispose: () => {} }
+  },
+  SendPrompt: async (sessionId, text, options) => {
+    calls.sendPrompt.push({ sessionId, text, options })
+    return dispatch.admittedWithReceipt(`accepted-${calls.sendPrompt.length}`)
+  },
+})
+const rootPort = (calls) => ({
+  TryRead: () => {
+    calls.rootRead.push([])
+    return undefined
+  },
+})
+const eventPort = (calls) => ({
+  SubscribeTerminalListener: (...args) => {
+    calls.eventSubscribe.push(args)
+    return { Dispose: () => {} }
+  },
+  SubscribeFutureTerminalListener: (...args) => {
+    calls.eventFuture.push(args)
+    return { Dispose: () => {} }
+  },
+  NotifyTerminal: (...args) => {
+    calls.eventNotify.push(args)
+    return false
+  },
+})
+let ownerCounter = 0
+const setupOwner = async (t) => {
+  ownerCounter += 1
+  const n = ownerCounter
+  const ids = {
+    main: `ses-main-repair-${n}`,
+    blogger: `ses-blogger-repair-${n}`,
+    request: `req-blog-${n}`,
+    physical: `msg-phys-blog-${n}`,
+  }
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-blogger-repair-'))
+  const opened = await journal.JournalSurface_bootWithWriterId(
+    dir,
+    `writer-blog-${n}`,
+    `rt-blog-${n}`,
+    4242,
+    '2026-01-01T00:00:00Z',
+  )
+  assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
+  const accepted = await dispatch.acceptHumanRoot(opened.journal, ids.blogger, ids.physical, 'blogger')
+  assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error)
+  // Real process-local owner scope (also isolates the shared flight registry)
+  // and the exact live flight for this request.
+  const scope = runtime.createScope()
+  const request = runtime.main({
+    requestId: ids.request,
+    mainSession: ids.main,
+    bloggerSession: ids.blogger,
+    toml: 'repair-toml',
+  })
+  assert.equal(runtime.claimCurrentRequest(scope, ids.blogger, request), 'Claimed')
+  t.after(() => {
+    try {
+      runtime.dispose(scope)
+    } catch {}
+    try {
+      journal.JournalSurface_dispose(opened.journal)
+    } catch {}
+    rmSync(dir, { recursive: true, force: true })
+  })
+  const calls = freshCalls()
+  const ports = {
+    session: sessionPort(calls),
+    root: rootPort(calls),
+    events: eventPort(calls),
+  }
+  // BlogSurface.journalOf reads a structural `Journal` member or the raw
+  // AgentJournal; the boot handle wraps the live AgentJournal in `.journal`.
+  const durable = opened.journal.journal
+  return {
+    ids,
+    durable,
+    handle: opened.journal,
+    scope,
+    request,
+    ports,
+    calls,
+    dir,
+    writerFile: join(dir, 'wanxiang', 'events', `writer-blog-${n}.ndjson`),
+  }
+}
+const idleObservation = (ports, ids, run, { quiescent = true } = {}) => ({
+  quiescent,
+  context: {
+    sessionId: ids.blogger,
+    physicalUserMessageId: ids.physical,
+    authorityRoot: ids.physical,
+    providerRun: run,
+  },
+  sessionPort: ports.session,
+  rootWorkspace: ports.root,
+  eventPort: ports.events,
+})
+const captureFatal = async (work) => {
+  const previousExit = process.env.WANXIANGSHU_NO_FATAL_EXIT
+  const previousError = console.error
+  const records = []
+  process.env.WANXIANGSHU_NO_FATAL_EXIT = '1'
+  console.error = (...args) => records.push(args.join(' '))
+  try {
+    return { value: await work(), records }
+  } finally {
+    console.error = previousError
+    if (previousExit === undefined) delete process.env.WANXIANGSHU_NO_FATAL_EXIT
+    else process.env.WANXIANGSHU_NO_FATAL_EXIT = previousExit
+  }
+}
 
-test('WHAT[behavior-diagnosis-017] CHRONICLE_empty_canonical_text_returns_public_consequence', () => {
-  const result = blog.execute({ hasFlight: true, sessionId: 'ses-blog', entry: '   ', tip: 'primitive-obsession' })
-  assert.equal(result.ok, true)
-  assert.equal(result.text, 'nothing-to-remember')
-  assert.equal(result.error, blog.emptyTextError)
+test('WHAT[behavior-diagnosis-017] repeat_terminal_idle_is_idempotent_no_duplicate_nudge', async (t) => {
+  const { ids, durable, scope, request, ports, calls } = await setupOwner(t)
+
+  const first = await blog.observeIdleRepair(
+    scope,
+    durable,
+    request,
+    idleObservation(ports, ids, 'run-1'),
+  )
+  assert.equal(first.outcome, 'NudgeSent')
+  assert.equal(typeof first.promptKey, 'string')
+  assert.equal(calls.sendPrompt.length, 1)
+  assert.equal(blog.repairClaimedForKind(durable, ids.blogger, ids.request, 'run-1', NUDGE_KIND), true)
+  assert.equal(blog.repairIssuedForKind(durable, ids.blogger, ids.request, 'run-1', NUDGE_KIND), true)
+
+  const second = await blog.observeIdleRepair(
+    scope,
+    durable,
+    request,
+    idleObservation(ports, ids, 'run-1'),
+  )
+  assert.equal(second.outcome, 'PendingRepairWait')
+  assert.equal(calls.sendPrompt.length, 1)
+})
+
+test('WHAT[behavior-diagnosis-017] idle_without_quiescence_permit_spends_no_budget', async (t) => {
+  const { ids, durable, scope, request, ports, calls } = await setupOwner(t)
+
+  const res = await blog.observeIdleRepair(
+    scope,
+    durable,
+    request,
+    idleObservation(ports, ids, 'run-1', { quiescent: false }),
+  )
+  assert.equal(res.outcome, 'PendingRepairWait')
+  assert.equal(calls.sendPrompt.length, 0)
+  assert.equal(blog.repairClaimedForKind(durable, ids.blogger, ids.request, 'run-1', NUDGE_KIND), false)
+})
+
+test('WHAT[behavior-diagnosis-017] next_terminal_sends_at_most_one_aabb_then_abandons', async (t) => {
+  const { ids, durable, scope, request, ports, calls } = await setupOwner(t)
+
+  const nudge = await blog.observeIdleRepair(
+    scope,
+    durable,
+    request,
+    idleObservation(ports, ids, 'run-1'),
+  )
+  assert.equal(nudge.outcome, 'NudgeSent')
+  assert.equal(calls.sendPrompt.length, 1)
+
+  const aabb = await blog.observeIdleRepair(
+    scope,
+    durable,
+    request,
+    idleObservation(ports, ids, 'run-2'),
+  )
+  assert.equal(aabb.outcome, 'AabbSent')
+  assert.equal(typeof aabb.promptKey, 'string')
+  assert.equal(calls.sendPrompt.length, 2)
+  assert.equal(blog.repairClaimedForKind(durable, ids.blogger, ids.request, 'run-2', AABB_KIND), true)
+
+  const repeat = await blog.observeIdleRepair(
+    scope,
+    durable,
+    request,
+    idleObservation(ports, ids, 'run-2'),
+  )
+  assert.equal(repeat.outcome, 'PendingRepairWait')
+  assert.equal(calls.sendPrompt.length, 2)
+
+  const exhausted = await blog.observeIdleRepair(
+    scope,
+    durable,
+    request,
+    idleObservation(ports, ids, 'run-3'),
+  )
+  assert.equal(exhausted.outcome, 'AbandonedExhausted')
+  assert.equal(calls.sendPrompt.length, 2)
+  assert.equal(calls.eventNotify.length, 1)
+  assert.equal(typeof calls.eventNotify[0][0], 'string')
+  assert.equal(calls.eventNotify[0][0], ids.blogger)
+  assert.equal(runtime.tryGetFlight(scope, ids.blogger), null)
+})
+
+test('WHAT[behavior-diagnosis-017] exhausted repair stops its real continuation without a process fatal', async (t) => {
+  const { ids, durable, scope, request, ports, calls } = await setupOwner(t)
+  await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-1'))
+  await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-2'))
+  const messages = [{ info: { id: 'run-3', role: 'assistant', time: { completed: 1 } }, parts: [] }]
+
+  const { value, records } = await captureFatal(() =>
+    blog.continueTerminal(scope, durable, request, 'run-3', 0, messages),
+  )
+
+  assert.equal(value.kind, 'StopPhysicalRun')
+  assert.deepEqual(value.messages, messages)
+  assert.deepEqual(records, [])
+  assert.equal(calls.sendPrompt.length, 2)
+  assert.equal(calls.eventNotify.length, 1)
+  assert.equal(runtime.tryGetFlight(scope, ids.blogger), null)
+})
+
+test('WHAT[behavior-diagnosis-017] terminal without provider identity stops only the exact request', async (t) => {
+  const { durable, scope, request, ids } = await setupOwner(t)
+  const messages = [{ info: { role: 'assistant', time: { completed: 1 } }, parts: [] }]
+  const { value, records } = await captureFatal(() =>
+    blog.continueTerminal(scope, durable, request, '', 0, messages),
+  )
+  assert.equal(value.kind, 'StopPhysicalRun')
+  assert.deepEqual(records, [])
+  assert.equal(runtime.tryGetFlight(scope, ids.blogger), null)
+})
+
+test('WHAT[behavior-diagnosis-017] failed durable abandon retains its flight and never reports settlement', async (t) => {
+  const { durable, handle, scope, request, ids } = await setupOwner(t)
+  journal.JournalSurface_dispose(handle)
+  const { records } = await captureFatal(async () => {
+    await assert.rejects(() => blog.continueTerminal(scope, durable, request, '', 0, []))
+  })
+  assert.deepEqual(records, [])
+  assert.equal(runtime.tryGetFlight(scope, ids.blogger).requestId, ids.request)
+})
+
+test('WHAT[behavior-diagnosis-017] repair settlement failure rejects every waiting observer without fatal or release', async (t) => {
+  const { durable, handle, scope, request, ids, ports, calls } = await setupOwner(t)
+  await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-1'))
+  await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-2'))
+  journal.JournalSurface_dispose(handle)
+  const { value, records } = await captureFatal(() => Promise.allSettled([
+    blog.observeTransformRepair(scope, durable, request, 'run-3', []),
+    blog.observeTransformRepair(scope, durable, request, 'run-4', []),
+  ]))
+  assert.deepEqual(value.map(result => result.status), ['rejected', 'rejected'])
+  assert.equal(value[0].reason, value[1].reason, 'all observers receive the exact same failure')
+  assert.deepEqual(records, [])
+  assert.equal(calls.eventNotify.length, 0)
+  assert.equal(runtime.tryGetFlight(scope, ids.blogger).requestId, ids.request)
+})
+
+test('WHAT[behavior-diagnosis-017] unknown abandon commit still rejects every observer without release', async (t) => {
+  const { durable, scope, request, ids, ports, calls, writerFile } = await setupOwner(t)
+  await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-1'))
+  await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-2'))
+  // Physical write failure mid-append: the durable outcome is Unknown, not
+  // NotAttempted — the abandon may or may not be recorded.
+  chmodSync(writerFile, 0o400)
+  const { value, records } = await captureFatal(() => Promise.allSettled([
+    blog.observeTransformRepair(scope, durable, request, 'run-3', []),
+    blog.observeTransformRepair(scope, durable, request, 'run-4', []),
+  ]))
+  assert.deepEqual(value.map(result => result.status), ['rejected', 'rejected'])
+  assert.equal(value[0].reason, value[1].reason, 'all observers receive the exact same failure')
+  assert.match(String(value[0].reason), /append outcome unknown/)
+  assert.deepEqual(records, [])
+  assert.equal(calls.eventNotify.length, 0)
+  assert.equal(runtime.tryGetFlight(scope, ids.blogger).requestId, ids.request)
+})
+
+test('WHAT[behavior-diagnosis-017] late observers after settlement failure get the same failure and no new budget', async (t) => {
+  const { durable, handle, scope, request, ids, ports, calls } = await setupOwner(t)
+  await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-1'))
+  await blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-2'))
+  journal.JournalSurface_dispose(handle)
+  const { value: first, records } = await captureFatal(() => Promise.allSettled([
+    blog.observeTransformRepair(scope, durable, request, 'run-3', []),
+  ]))
+  assert.equal(first[0].status, 'rejected')
+  const failure = first[0].reason
+
+  const late = await Promise.allSettled([
+    blog.observeTransformRepair(scope, durable, request, 'run-5', []),
+    blog.observeIdleRepair(scope, durable, request, idleObservation(ports, ids, 'run-5')),
+  ])
+  assert.deepEqual(late.map(result => result.status), ['rejected', 'rejected'])
+  assert.equal(late[0].reason, failure, 'late transform posts replay the stored failure')
+  assert.equal(late[1].reason, failure, 'late idle posts replay the stored failure')
+  assert.match(
+    runtime.claimRepairEpisode(scope, 'req-blog-superseding', ids.physical, ids.main, ids.blogger),
+    /^Error:Claimed request req-blog-superseding does not match active flight/,
+  )
+  assert.deepEqual(records, [])
+  assert.equal(calls.sendPrompt.length, 2, 'a failed episode never re-opens the repair budget')
+  assert.equal(calls.eventNotify.length, 0)
+  assert.equal(runtime.tryGetFlight(scope, ids.blogger).requestId, ids.request)
+})
+
+test('WHAT[behavior-diagnosis-017] generated duplicate and interleaved repair observations preserve bounded effects', async () => {
+  await fc.assert(fc.asyncProperty(
+    fc.array(fc.record({ idle: fc.boolean(), duplicate: fc.boolean(), quiescent: fc.boolean() }), { maxLength: 20 }),
+    async (trace) => {
+      const cleanups = []
+      const owner = await setupOwner({ after: fn => cleanups.push(fn) })
+      const { durable, scope, request, ids, ports, calls } = owner
+      try {
+        const { records } = await captureFatal(async () => {
+          let run = 0
+          for (const observation of trace) {
+            if (!observation.duplicate) run += 1
+            const providerRun = `generated-run-${run}`
+            if (observation.idle) {
+              await blog.observeIdleRepair(scope, durable, request,
+                idleObservation(ports, ids, providerRun, observation))
+            } else {
+              const messages = [{ info: { id: providerRun, role: 'assistant', time: { completed: 1 } }, parts: [] }]
+              await blog.continueTerminal(scope, durable, request, providerRun, 0, messages)
+            }
+            assert.ok(calls.sendPrompt.length <= 2, 'one nudge and at most one physical AABB')
+            assert.ok(calls.eventNotify.length <= 1, 'one terminal per exact repair episode')
+            if (calls.eventNotify.length > 0) assert.equal(runtime.tryGetFlight(scope, ids.blogger), null)
+          }
+        })
+        assert.deepEqual(records, [])
+      } finally {
+        for (const cleanup of cleanups.reverse()) await cleanup()
+      }
+    },
+  ), { seed: 20260914, numRuns: 60 })
+})
+
+test('WHAT[behavior-diagnosis-017] transform_and_idle_interleave_resolves_to_single_owner', async (t) => {
+  const { ids, durable, scope, request, ports, calls } = await setupOwner(t)
+
+  const before = await blog.observeTransformRepair(scope, durable, request, 'run-1', [])
+  assert.equal(before.outcome, 'PendingRepairWait')
+  assert.equal(calls.sendPrompt.length, 0)
+
+  const nudge = await blog.observeIdleRepair(
+    scope,
+    durable,
+    request,
+    idleObservation(ports, ids, 'run-1'),
+  )
+  assert.equal(nudge.outcome, 'NudgeSent')
+  assert.equal(calls.sendPrompt.length, 1)
+
+  const sameRun = await blog.observeTransformRepair(scope, durable, request, 'run-1', [])
+  assert.equal(sameRun.outcome, 'PendingRepairWait')
+  assert.equal(calls.sendPrompt.length, 1)
+
+  const injected = await blog.observeTransformRepair(scope, durable, request, 'run-2', [])
+  assert.equal(injected.outcome, 'RepairInjected')
+  assert.equal(injected.messages.length, 1)
+  assert.equal(calls.sendPrompt.length, 1)
+
+  const settled = await blog.observeIdleRepair(
+    scope,
+    durable,
+    request,
+    idleObservation(ports, ids, 'run-2'),
+  )
+  assert.equal(settled.outcome, 'PendingRepairWait')
+  assert.equal(calls.sendPrompt.length, 1)
+
+  const exhausted = await blog.observeTransformRepair(scope, durable, request, 'run-3', [])
+  assert.equal(exhausted.outcome, 'AbandonedExhausted')
+  assert.equal(calls.sendPrompt.length, 1)
+  assert.equal(calls.eventNotify.length, 1)
+})
+
+test('WHAT[behavior-diagnosis-017] transform_on_aabb_claimed_terminal_waits_without_double_spend', async (t) => {
+  const { ids, durable, scope, request, ports, calls } = await setupOwner(t)
+
+  const nudge = await blog.observeIdleRepair(
+    scope,
+    durable,
+    request,
+    idleObservation(ports, ids, 'run-1'),
+  )
+  assert.equal(nudge.outcome, 'NudgeSent')
+
+  const injected = await blog.observeTransformRepair(scope, durable, request, 'run-2', [])
+  assert.equal(injected.outcome, 'RepairInjected')
+  assert.equal(injected.messages.length, 1)
+
+  const pending = await blog.observeTransformRepair(scope, durable, request, 'run-2', injected.messages)
+  assert.equal(pending.outcome, 'PendingRepairWait')
+  assert.equal(calls.sendPrompt.length, 1)
+
+  const exhausted = await blog.observeTransformRepair(scope, durable, request, 'run-3', injected.messages)
+  assert.equal(exhausted.outcome, 'AbandonedExhausted')
+  assert.equal(calls.sendPrompt.length, 1)
+})
+
+test('WHAT[behavior-diagnosis-017] repair_without_journal_abandons_without_physical_sends', async (t) => {
+  const { ids, scope, request, ports, calls } = await setupOwner(t)
+
+  const idle = await blog.observeIdleRepair(
+    scope,
+    null,
+    request,
+    idleObservation(ports, ids, 'run-1'),
+  )
+  assert.equal(idle.outcome, 'AbandonedExhausted')
+
+  const transform = await blog.observeTransformRepair(scope, null, request, 'run-1', [])
+  assert.equal(transform.outcome, 'AbandonedExhausted')
+
+  assert.equal(calls.sendPrompt.length, 0)
+})
+
+test('WHAT[behavior-diagnosis-017] shutdown_rejects_new_repair_episode_before_drain', async (t) => {
+  const { ids, scope } = await setupOwner(t)
+
+  runtime.beginBloggerShutdown(scope)
+
+  assert.equal(
+    runtime.claimRepairEpisode(scope, ids.request, ids.physical, ids.main, ids.blogger),
+    'Error:Blogger runtime is shutting down',
+  )
+
+  await runtime.drainRepairEpisodes(scope)
 })
 }
 
@@ -143,141 +587,27 @@ test('WHAT[behavior-diagnosis-017] authority gate-nudge admission is required be
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const enforcer = await import("../../../dist/Enforcer/Surface.js");
 const blog = await import("../../../dist/Enforcer/BlogSurface.js");
+const { call, decode, message } = await import('./support/cycle.mjs')
 
-const valid = (messageId, overrides = {}) => ({
-  messageId,
-  parts: [{ tool: 'chronicle', callID: 'c1', state: { status: 'completed', input: { tip: 'primitive-obsession', text: 'work' } } }],
-  ...overrides,
+test('WHAT[behavior-diagnosis-017] actual decoder ignores malformed messages and selects the last assistant', () => {
+  const malformed = [null, {}, { info: { role: 'user', id: 'user' } }, { info: { role: 'assistant' } }]
+  assert.equal(blog.decodeCycle(malformed), null)
+  const result = blog.decodeCycle([message([call()], 'first'), ...malformed, message([], 'last')])
+  assert.equal(result.messageId, 'last')
+  assert.equal(result.decodedCalls, 0)
+  assert.equal(result.decision.ok, false)
 })
-const prose = (messageId) => ({ messageId, parts: [{ type: 'text', text: 'plain response' }] })
-const invalid = (messageId) => ({ messageId, parts: [{ tool: 'chronicle', state: { status: 'completed', input: { text: 'no tip' } } }] })
-
-test('WHAT[behavior-diagnosis-017] ENFORCER_061_empty_calls_rebuilds_without_fatal', () => {
-  const out = blog.protocol(prose('asst-prose'))
-  assert.equal(out.state, 'ProjectMessages')
-  assert.equal(out.fatal, null)
-})
-test('WHAT[behavior-diagnosis-017] ENFORCER_061_invalid_tip_is_protocol_skip', () => {
-  const out = blog.protocol(invalid('asst-skip'))
-  assert.equal(out.state, 'ProjectMessages')
-  assert.equal(out.fatal, null)
-  assert.equal(enforcer.classifyAssistantStep(invalid('asst-skip')).acceptedCalls, 0)
-})
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { readFileSync } = await import("node:fs");
-const { dirname, join } = await import("node:path");
-const { default: test } = await import("node:test");
-const { fileURLToPath } = await import("node:url");
-
-
-test('WHAT[behavior-diagnosis-017] ENFORCER_stopPhysicalRun_argument_order_is_messages_then_fallback', () => {
-  // Definition: stopPhysicalRun (messages) (reason) — the fallback lambda is
-  // gone (ENFORCER-047: stop decision has no heal path today). Injection
-  // site is the ctx.Stop lambda in mkCtx; call sites pass rawMessages + reason.
-  const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
-  const continuation = readFileSync(join(root, 'src/Wanxiangshu/Enforcer/Continuation.fs'), 'utf8')
-
-  assert.match(
-    continuation,
-    /let private stopPhysicalRun\s*\(messages: obj list\)\s*\(reason: string\)/,
-    'definition order is messages then reason (no fallback since ENFORCER-047)',
-  )
-  // The only remaining direct call site is the ctx.Stop injection in mkCtx
-  // (`stop (reason) → stopPhysicalRun rawMessages reason`); continuation
-  // branches go through ctx.Stop and must not re-call stopPhysicalRun directly.
-  const calls = [...continuation.matchAll(/stopPhysicalRun\s+(\w+)\s+(\w+)\s+/g)].map((m) => [
-    m[1],
-    m[2],
-  ])
-  assert.ok(calls.length >= 1, `expected injection call site, got ${calls.length}`)
-  for (const [first, second] of calls) {
-    assert.equal(
-      first,
-      'rawMessages',
-      `stopPhysicalRun first arg must be rawMessages (the ctx.Stop injection), got ${first} ${second}`,
-    )
-    assert.equal(
-      second,
-      'reason',
-      `stopPhysicalRun second arg must be reason (not fallback), got ${first} ${second}`,
-    )
+test('WHAT[behavior-diagnosis-017] actual decoder consumes only completed chronicle calls with valid tip evidence', () => {
+  for (const part of [
+    null, call({ tool: 'blog' }), call({ type: 'text' }),
+    call({ state: { status: 'completed', input: { entry: 'work' } } }),
+    ...['pending', 'running', 'error', 'unknown', undefined].map((status) => call({ state: { status, input: call().state.input } })),
+  ]) {
+    const result = decode([part])
+    assert.equal(result.decodedCalls, 0)
+    assert.equal(result.decision.ok, false)
   }
-})
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const enforcer = await import("../../../dist/Enforcer/Surface.js");
-const blog = await import("../../../dist/Enforcer/BlogSurface.js");
-
-const classify = (messageId, parts) => enforcer.classifyAssistantStep({ messageId, parts })
-
-test('WHAT[behavior-diagnosis-017] ENFORCER_last_assistant_step_ignores_malformed_messages', () => {
-  assert.equal(classify('', [null]).providerRun, null)
-  assert.equal(classify('', [{ info: { id: 'x', role: 'user' } }]).acceptedCalls, 0)
-  assert.equal(classify('', [{ info: { id: 'x' } }]).acceptedCalls, 0)
-  assert.equal(classify('', [{ info: { role: 'assistant' } }]).acceptedCalls, 0)
-
-  const bare = classify('a-1', [])
-  assert.equal(bare.providerRun, 'a-1')
-  assert.equal(bare.acceptedCalls, 0)
-
-  const full = classify('a-2', [{ tool: 'chronicle', state: { status: 'completed', input: { tip: 'primitive-obsession', text: 't' } } }])
-  assert.equal(full.providerRun, 'a-2')
-  assert.equal(full.acceptedCalls, 1)
-})
-test('WHAT[behavior-diagnosis-017] ENFORCER_bad_tip_decode_is_protocol_skip_and_rebuilds', () => {
-  const out = classify('asst-skip', [{ tool: 'chronicle', state: { status: 'completed', input: { text: 'no tip' } } }])
-  assert.equal(out.protocol, 'ProjectMessages')
-  assert.equal(out.acceptedCalls, 0)
-})
-test('WHAT[behavior-diagnosis-017] ENFORCER_completed_blog_part_in_empty_arm_rebuilds', () => {
-  const out = classify('asst-completed-skip', [
-    { tool: 'chronicle', state: { status: 'completed', input: {} } },
-    { type: 'text', text: 'plain' },
-  ])
-  assert.equal(out.hasBlogToolPart, true)
-  assert.equal(out.acceptedCalls, 0)
-})
-test('WHAT[behavior-diagnosis-017] ENFORCER_interrupted_statusless_blog_part_aabbs', () => {
-  const out = blog.classifyPart({ tool: 'chronicle', state: { metadata: { interrupted: true } } })
-  assert.equal(out.blogPartInterrupted, true)
-  assert.equal(out.hasFailedBlogAttempt, true)
-})
-test('WHAT[behavior-diagnosis-017] ENFORCER_uninterrupted_statusless_blog_part_rebuilds', () => {
-  const out = blog.classifyPart({ tool: 'chronicle', state: { metadata: { interrupted: false } } })
-  assert.equal(out.blogPartInterrupted, false)
-  assert.equal(out.hasFailedBlogAttempt, false)
-})
-test('WHAT[behavior-diagnosis-017] ENFORCER_running_blog_part_projects_raw', () => {
-  const out = blog.classifyPart({ tool: 'chronicle', state: { status: 'running' } })
-  assert.equal(out.hasIncompleteBlogTool, true)
-  assert.equal(out.hasFailedBlogAttempt, false)
-})
-test('WHAT[behavior-diagnosis-017] ENFORCER_unknown_status_blog_part_is_not_a_failed_attempt', () => {
-  const out = blog.classifyPart({ tool: 'chronicle', state: { status: 'weird', metadata: { interrupted: false } } })
-  assert.equal(out.hasIncompleteBlogTool, false)
-  assert.equal(out.hasFailedBlogAttempt, false)
-})
-test('WHAT[behavior-diagnosis-017] ENFORCER_stateless_blog_part_has_no_status', () => {
-  const out = blog.classifyPart({ tool: 'chronicle' })
-  assert.equal(out.status, null)
-  assert.equal(out.hasFailedBlogAttempt, false)
-})
-test('WHAT[behavior-diagnosis-017] ENFORCER_statusless_blog_part_is_not_incomplete', () => {
-  const out = blog.classifyPart({ tool: 'chronicle', state: {} })
-  assert.equal(out.hasIncompleteBlogTool, false)
-  assert.equal(out.hasFailedBlogAttempt, false)
-})
-test('WHAT[behavior-diagnosis-017] ENFORCER_null_part_in_transcript_is_ignored', () => {
-  const out = classify('asst-nullpart', [null])
-  assert.equal(out.acceptedCalls, 0)
-  assert.equal(out.hasBlogToolPart, false)
+  assert.equal(decode([call()]).decision.ok, true)
 })
 }

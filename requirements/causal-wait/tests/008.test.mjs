@@ -21,7 +21,7 @@ const externalProducer = (kind, identity) => causal.externalProducer(kind, ident
 const readDiagnostic = (workspace) =>
   JSON.parse(fs.readFileSync(path.join(workspace, '.wanxiangshu', 'diagnostics', 'causal-waits.json'), 'utf8'))
 
-test('WHAT[causal-wait-008] CAUSAL_BRIDGE_writeSnapshot_overwrites_workspace_json', () => {
+test('WHAT[causal-wait-008] diagnostic bridge writes a non-Journal snapshot file (current behavior pending storage boundary decision)', () => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'causal-bridge-'))
   fs.mkdirSync(path.join(workspace, '.git', 'info'), { recursive: true })
   const registry = causal.createRegistry()
@@ -75,10 +75,41 @@ const lastTransition = (registry) => {
   return history.at(-1)
 }
 
-test('WHAT[causal-wait-008] CAUSAL_008_fresh_registry_starts_empty_no_durable_state', () => {
+test('WHAT[causal-wait-008] a newly constructed registry starts empty', () => {
   const snapshot = causal.snapshot(causal.createRegistry())
   assert.equal(snapshot.active.length, 0)
   assert.equal(snapshot.history.length, 0)
   assert.equal(snapshot.sequence, 0)
 })
+}
+
+{
+  const assert = (await import('node:assert/strict')).default
+  const { spawnSync } = await import('node:child_process')
+  const { mkdtempSync, rmSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  const { tmpdir } = await import('node:os')
+  const { fileURLToPath } = await import('node:url')
+  const fixture = fileURLToPath(new URL('./fixtures/registry-process.fixture.mjs', import.meta.url))
+  test('WHAT[causal-wait-008] a new process does not restore waits from the previous diagnostic file', () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'wxs-wait-restart-'))
+    const run = mode => {
+      const result = spawnSync(process.execPath, [fixture, mode, workspace], { encoding: 'utf8', timeout: 3000 })
+      assert.equal(result.status, 0, result.stderr || String(result.error))
+      return JSON.parse(result.stdout)
+    }
+    try {
+      const previous = run('write')
+      assert.equal(previous.active, 1)
+      assert.equal(previous.previousPid, previous.pid)
+      const next = run('read')
+      assert.notEqual(next.pid, previous.pid)
+      assert.equal(next.previousPid, previous.pid)
+      assert.equal(next.previousActive, 1, 'the old diagnostic file really remains')
+      assert.equal(next.active, 0)
+      assert.equal(next.history, 0)
+    } finally {
+      rmSync(workspace, { recursive: true, force: true })
+    }
+  })
 }

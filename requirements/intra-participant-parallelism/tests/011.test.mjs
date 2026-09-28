@@ -1,54 +1,34 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { assertJsData, assertOpaque } from '../../verification-system/tests/support/js-contract.mjs'
+import { fission, harness, parsed, deferred } from './support/admission.mjs'
 
-const fission = await import('../../../dist/Execution/Fission/Surface.js')
-
-const fissionHost = await import('../../../dist/OpenCode/Host/FissionHostSurface.js')
-
-const parsed = () => fission.parsePrompt([' lane A  ', 'lane B'])
-
-const harness = ({ failCreateAt, failStartAt, failInterrupt = false, parent = 'old-parent' } = {}) => {
-  const events = []
-  let serial = 0
-  const runtime = fission.createAdmission({
-    parentOf: async (owner) => {
-      events.push(['parent', owner])
-      return parent
-    },
-    ownerWorkRecord: async (owner) => {
-      events.push(['lwr', owner])
-      return 'CANONICAL-LWR'
-    },
-    createLane: async (_owner, physicalParent, lane) => {
-      events.push(['create', lane.index, physicalParent])
-      if (lane.index === failCreateAt) throw new Error(`create-${lane.index}`)
-      serial += 1
-      return `lane-${serial}`
-    },
-    startLane: async (laneSession, startup) => {
-      const index = Number(/lane_index = (\d+)/.exec(startup)?.[1])
-      events.push(['start', index, laneSession, startup])
-      if (index === failStartAt) throw new Error(`start-${index}`)
-    },
-    abortLane: async (laneSession) => {
-      events.push(['rollback', laneSession])
-    },
-    silentInterruptOwner: async (owner) => {
-      events.push(['silent-interrupt', owner])
-      if (failInterrupt) throw new Error('interrupt-failed')
-    },
-  })
-  return { events, runtime }
-}
-
-test('WHAT[intra-participant-parallelism-011] second admission while active is rejected as AlreadyFissioned until release', async () => {
-  const live = harness()
+test('WHAT[intra-participant-parallelism-011] reservation rejects a second admission even before the first finishes and is reusable after release', async () => {
+  const reached = deferred()
+  const release = deferred()
+  const { events, runtime } = harness({ beforeStart: async index => {
+    if (index === 0) {
+      reached.resolve()
+      await release.promise
+    }
+  } })
   const owner = 'single-flight-owner'
-  assert.equal((await fission.admit(live.runtime, owner, parsed())).ok, true)
-  const second = await fission.admit(live.runtime, owner, parsed())
-  assert.equal(second.ok, false)
-  assert.equal(second.reason, 'AlreadyFissioned')
-  fission.release(live.runtime, owner)
-  assert.equal(fission.isActive(live.runtime, owner), false)
+  const first = fission.admit(runtime, owner, parsed())
+  try {
+    await reached.promise
+    const created = events.filter(([kind]) => kind === 'created').length
+    assert.deepEqual(await fission.admit(runtime, owner, parsed()), { ok: false, reason: 'AlreadyFissioned' })
+    assert.equal(events.filter(([kind]) => kind === 'created').length, created)
+    release.resolve()
+    assert.equal((await first).ok, true)
+    assert.deepEqual(await fission.admit(runtime, owner, parsed()), { ok: false, reason: 'AlreadyFissioned' })
+    fission.release(runtime, owner)
+    assert.equal(fission.isActive(runtime, owner), false)
+    assert.equal((await fission.admit(runtime, owner, parsed())).ok, true)
+  } finally {
+    release.resolve()
+    await first
+    fission.release(runtime, owner)
+  }
 })
+
+test.todo('WHAT[intra-participant-parallelism-011] a real active lane maps back to its logical owner and cannot recursively create another group (GAP-158)')

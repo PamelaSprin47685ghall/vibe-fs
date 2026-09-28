@@ -3,10 +3,7 @@
 # Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
 
 /src/Wanxiangshu/Repository/Investigation/**
-/src/Wanxiangshu/OpenCode/Tools/InspectorTool.fs
-/src/Wanxiangshu/OpenCode/Tools/FetchTool.fs
-/resources/provider/role/inspector/**
-/resources/provider/tool/inspect/**
+/resources/provider/role/engineer/**
 /resources/provider/lifecycle/warm-start/**
 /src/Wanxiangshu/Repository/Investigation/Semble/Client.fs
 /src/Wanxiangshu/Repository/Investigation/Semble/Mcp.fs

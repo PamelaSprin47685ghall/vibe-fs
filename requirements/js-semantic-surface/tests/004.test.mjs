@@ -1,67 +1,36 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, join, relative, resolve } from 'node:path'
-import { tmpdir } from 'node:os'
+import { join, relative } from 'node:path'
 import test from 'node:test'
-import { fileURLToPath } from 'node:url'
-import { assertJsData, assertOpaque, isJsData } from '../../verification-system/tests/support/js-contract.mjs'
-import { validateModuleLinkage } from '../../../scripts/checks/js-module-linkage.mjs'
-import { validateSurfaceManifest } from '../../../scripts/checks/js-surface-manifest.mjs'
-import {
-  BUILD_VERIFICATION_FILES,
-  SURFACE_MANIFEST,
-  scanAll,
-  semanticImportEdges,
-  semanticTestFiles,
-} from '../../../scripts/lib/test-surface-scan.mjs'
-import { walk } from '../../../scripts/lib/walk.mjs'
+import { scanAll, semanticImportEdges } from '../../../scripts/lib/test-surface-scan.mjs'
+import { createWorkspaceFixture } from './support/workspace-fixture.mjs'
 
-const ROOT = resolve(join(dirname(fileURLToPath(import.meta.url)), '../../..'))
-
-const read = (path) => readFileSync(join(ROOT, path), 'utf8')
-
-const relativePath = (path) => relative(process.cwd(), path).replace(/\\/g, '/')
-
-const distImport = (prefix, module) => `${prefix}dist/${module}`
-
-const wholeScan = scanAll(join(ROOT, 'requirements'))
-
-const wholeSemanticFiles = new Set(semanticTestFiles(join(ROOT, 'requirements')).map(relativePath))
-
-const wholeSemanticImportEdges = semanticImportEdges(join(ROOT, 'requirements'))
-
-test('WHAT[js-semantic-surface-004] JS_SURFACE_004_helper_not_directly_tested', () => {
-  const violations = []
-
-  for (const { importer, target } of wholeSemanticImportEdges) {
-    const importerRel = relativePath(importer)
-    const targetRel = relativePath(target)
-    if (!wholeSemanticFiles.has(targetRel) || targetRel.endsWith('.test.mjs')) continue
-    if (targetRel.endsWith('verification-system/tests/support/js-contract.mjs')) continue
-    if ((wholeScan[targetRel] ?? []).length === 0) continue
-    violations.push(`${importerRel} imports debt-bearing helper ${targetRel}`)
-  }
-
-  assert.deepEqual(violations, [], violations.join('\n'))
+test('WHAT[js-semantic-surface-004] support dependencies are traversed transitively, including cycles', (t) => {
+  const { root, write } = createWorkspaceFixture(t)
+  const base = 'requirements/probe/tests/'
+  write(`${base}001.test.mjs`, "import './support/a.mjs'\n")
+  write(`${base}support/a.mjs`, "import './b.mjs'\n")
+  write(`${base}support/b.mjs`, "import './a.mjs'\n")
+  const edges = semanticImportEdges(join(root, 'requirements')).map(({ importer, target }) =>
+    [relative(root, importer), relative(root, target)])
+  assert.deepEqual(edges, [
+    [`${base}001.test.mjs`, `${base}support/a.mjs`],
+    [`${base}support/a.mjs`, `${base}support/b.mjs`],
+    [`${base}support/b.mjs`, `${base}support/a.mjs`],
+  ])
 })
 
-test('WHAT[js-semantic-surface-004] JS_SURFACE_004b_support_to_support_transitive_edge_is_scanned', () => {
-  const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-transitive-edge-'))
-  const testPath = join(temporaryRoot, 'requirements', 'probe', 'tests', 'probe.test.mjs')
-  const supportA = join(temporaryRoot, 'requirements', 'probe', 'tests', 'support', 'a.mjs')
-  const supportB = join(temporaryRoot, 'requirements', 'probe', 'tests', 'support', 'b.mjs')
-  mkdirSync(dirname(supportA), { recursive: true })
-  try {
-    writeFileSync(testPath, "import './support/a.mjs'\n")
-    writeFileSync(supportA, "import './b.mjs'\n")
-    writeFileSync(supportB, "export const x = 1\n")
-    const edges = semanticImportEdges(join(temporaryRoot, 'requirements'))
-    const edgeStrings = edges.map((e) => `${relativePath(e.importer)} -> ${relativePath(e.target)}`)
-    assert.ok(
-      edgeStrings.some((s) => s.includes('a.mjs') && s.includes('b.mjs')),
-      `support→support transitive edge must be traversed: ${edgeStrings.join('; ')}`,
-    )
-  } finally {
-    rmSync(temporaryRoot, { recursive: true, force: true })
+test('WHAT[js-semantic-surface-004] moving an internal import into support or leaving support unreferenced cannot hide it', (t) => {
+  const { root, write } = createWorkspaceFixture(t)
+  const base = 'requirements/probe/tests/'
+  write(`${base}001.test.mjs`, "import './support/a.mjs'\n")
+  write(`${base}support/a.mjs`, "import './b.mjs'\n")
+  write(`${base}support/b.mjs`, 'export const value = 1\n')
+  assert.deepEqual(scanAll(join(root, 'requirements')), {})
+  const source = ['import { hidden } from "../../../../', 'dist/Internal/Module.js"\n'].join('')
+  const referenced = write(`${base}support/b.mjs`, source)
+  const unreferenced = write(`${base}support/unused.js`, source)
+  const scanned = scanAll(join(root, 'requirements'))
+  for (const file of [referenced, unreferenced]) {
+    assert.ok(scanned[relative(process.cwd(), file)].some((hit) => hit.rule === 'deep-dist-import'))
   }
 })

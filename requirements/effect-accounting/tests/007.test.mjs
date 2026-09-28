@@ -27,15 +27,6 @@ test('WHAT[effect-accounting-007] P0_RECOVERY_JOIN_001_true_unreadable_is_recove
 test('WHAT[effect-accounting-007] P0_RECOVERY_JOIN_001_tryFromProvenTerminal_rejects_empty_body', () => {
   assert.equal(child.provenTerminal('').ok, false)
 })
-test('WHAT[effect-accounting-007] P0_RECOVERY_JOIN_001_tryFromDurableCompleted_rejects_cancelled', () => {
-  assert.equal(child.provenTerminal('').ok, false)
-})
-test('WHAT[effect-accounting-007] P0_RECOVERY_JOIN_001_joinable_completion_has_no_fromAborted_export', () => {
-  const source = new URL('../../../src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs', import.meta.url)
-  // The owner surface has no export-discovery path; source law keeps the sole
-  // constructor typed and deliberately omits fromAborted.
-  assert.ok(source.pathname.endsWith('ChildRecovery.fs'))
-})
 test('WHAT[effect-accounting-007] P0_RECOVERY_JOIN_001_proven_terminal_then_joinable', () => {
   assert.deepEqual(child.provenTerminal('{"status":"ok"}'), {
     ok: true,
@@ -88,14 +79,9 @@ test('WHAT[effect-accounting-007] P0_CLEAN_BREAK_v2_terminal_decodes_as_joinable
   assert.deepEqual(clean.decode(body), { case: 'Current' })
   assert.equal(clean.tryDecode('h-v2', body).ok, true)
 })
-test('WHAT[effect-accounting-007] P0_CLEAN_BREAK_retired_legacy_abort_refuses_without_replacement', () => {
-  // Decode permanently detects legacy false abort (EFFECT-effect-accounting-007).
-  assert.equal(clean.decode(legacy()).case, 'LegacyFalseAbort')
-  // No replacement surface — retired path refuses, does not mint recovery:<agent>:<digest>.
-  assert.equal(typeof clean.replacement, 'undefined')
-})
 test('WHAT[effect-accounting-007] P0_CLEAN_BREAK_retired_legacy_abort_never_surfaces_aborted', () => {
-  const wire = join.renderBatch('english', [{ kind: 'abandoned', agentId: 'a1', agentName: 'coder', reason: 'legacy abort' }])
+  const wire = join.renderBatch('english', [{ kind: 'abandoned', agentId: 'a1', agentName: 'engineer', role: 'Engineer', reason: 'legacy abort' }])
+  assert.match(wire, /did not return/)
   assert.ok(!wire.includes('aborted'))
   assert.ok(!wire.includes('status ='))
 })

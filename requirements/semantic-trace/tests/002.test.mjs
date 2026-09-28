@@ -59,23 +59,6 @@ const withJournal = async (fn) => {
 }
 const projection = (messages) => ({ messages })
 
-test('WHAT[semantic-trace-002] ProviderRetryAttempt_is_transport_control_not_durable_X_semantics', () => {
-  const source = readFileSync(
-    resolve(import.meta.dirname, '../../../src/Wanxiangshu/Context/Trace/Capture.fs'),
-    'utf8',
-  )
-
-  assert.match(
-    source,
-    /let private capturedObservationMessage[\s\S]*?PromptAuthority\.PromptOrigin\.Continuation PromptAuthority\.ContinuationKind\.ProviderRetryAttempt[\s\S]*?\{ observation\.Message with Parts = \[\] \}/,
-    'retry transport control must be classified by the exact continuation origin',
-  )
-  assert.match(
-    source,
-    /let captured = observations \|> List\.map capturedObservationMessage/,
-    'semantic capture must strip retry transport material before durable append',
-  )
-})
 test('WHAT[semantic-trace-002] typed retry observation retains stable identity but appends no semantics', async () => {
   await withJournal(async (handle) => {
     const captured = await trace.captureObservedMessages(handle, SESSION, [
@@ -100,6 +83,46 @@ test('WHAT[semantic-trace-002] typed retry observation retains stable identity b
       trace.orderedSemanticParts(trace.snapshot(handle, SESSION)),
       'the returned opaque current projection is the resulting owner state',
     )
+  })
+})
+test('WHAT[semantic-trace-002] retry-like ordinary text is preserved and metadata does not become semantic material', async () => {
+  await withJournal(async (handle) => {
+    const body = '上一物理尝试失败，请继续。\n/real/path is part of the task.'
+    const ordinary = {
+      hostMessageId: 'ordinary',
+      message: {
+        info: { id: 'ordinary-run', role: 'user', cost: 42, timestamp: 123, directory: '/metadata-only' },
+        parts: [{ id: 'ordinary-part', type: 'text', text: body }],
+      },
+    }
+    const retry = {
+      hostMessageId: 'retry', origin: 'ProviderRetryAttempt',
+      message: { info: { id: 'retry-run', role: 'user' }, parts: [{ id: 'retry-part', type: 'text', text: 'arbitrary control text' }] },
+    }
+    const captured = await trace.captureObservedMessages(handle, SESSION, [retry, ordinary])
+    assert.equal(captured.ok, true)
+    assert.equal(captured.receipt.capturedPartCount, 1)
+    assert.deepEqual(await trace.currentProjection(handle, SESSION), {
+      messages: [{ role: 'user', parts: [{ kind: 'text', text: body }] }],
+    })
+    const replay = await trace.captureObservedMessages(handle, SESSION, [ordinary])
+    assert.equal(replay.receipt.capturedPartCount, 0, 'removing the transport row must not renumber the existing physical part')
+  })
+})
+test('WHAT[semantic-trace-002] missing, blank or duplicate Host ids cannot receive stable capture identity', async () => {
+  await withJournal(async (handle) => {
+    const observation = (id, index) => ({
+      hostMessageId: id,
+      message: { info: { id: `run-${index}`, role: 'assistant' }, parts: [{ id: `part-${index}`, type: 'text', text: 'body' }] },
+    })
+    for (const [index, ids] of [[undefined], [' '], ['same', 'same'], ['a', 'b']].entries()) {
+      const result = await trace.captureObservedMessages(handle, `${SESSION}-${index}`, ids.map(observation))
+      assert.equal(result.ok, true)
+      assert.equal(result.receipt.identity, index === 3 ? 'stable-host' : 'positional')
+    }
+    await trace.captureProjection(handle, 'legacy-session', { messages: [{ role: 'user', parts: [trace.semanticText('legacy')] }] })
+    const legacy = await trace.captureObservedMessages(handle, 'legacy-session', [observation('stable-id', 0)])
+    assert.equal(legacy.receipt.identity, 'positional')
   })
 })
 }

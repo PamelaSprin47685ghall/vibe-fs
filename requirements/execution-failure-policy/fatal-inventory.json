@@ -82,40 +82,6 @@
       "notes": "RuntimeStarted semantic cut — startup seal; fail-stop on lifecycle inconsistency."
     },
     {
-      "id": "F05",
-      "ownerRequirement": "dispatch-protocol",
-      "sourceSymbol": "Interaction/Dispatch/DispatchSurface.fs :: DispatchSurface — ReportFatalDiagnostic arm removed under W4",
-      "operation": "dynamic (caller-supplied operation string, flattened k=v; payload)",
-      "triggerBranch": "The JS-facing narrowed dispatch port implements IDispatchSessionPort.ReportFatalDiagnostic by forwarding (operation, delimiter) straight to FatalProcess.trip,",
-      "inputSource": "Any consumer of PlainSessionPort.DispatchPort (production dispatch sends: sendAgentOwnerRootWithMode, sendContinuation, gate nudges, idle continuations; also test/bridge callers via the same member). Operation string is caller-chosen,",
-      "exactIdentity": "None enforced at this layer: operation/fields are opaque strings; settlement evidence is the caller's responsibility,",
-      "phase": "Any dispatch phase; the member carries no phase,",
-      "assertedInvariant": "A DispatchPort consumer that reports fatal has already settled its exact claim truth (see DISPATCH-PROTOCOL-014),",
-      "commitDisposition": "No local settlement: this member trips immediately. The caller must hold committed/unknown evidence first (HOST-BOUNDARY-022 / EXECFAIL-006 ordering applies to callers),",
-      "scopeOfEffect": "Whole current process,",
-      "evidenceType": "Production reachability of this member + dispatcher-side settlement proof; the m6-fatal-boundary helper call in dispatch-protocol/tests/m6-fatal-boundary.test.mjs is a shape assertion, not production evidence,",
-      "formalTestId": "requirements/dispatch-protocol/tests/014.test.mjs",
-      "status": "FixedWithRegression",
-      "notes": "DispatchSurface fatal entry deleted — ReportFatalDiagnostic removed from IDispatchSessionPort, settled owner responds via typed DetachedSendVerdict."
-    },
-    {
-      "id": "F06",
-      "ownerRequirement": "dispatch-protocol",
-      "sourceSymbol": "Interaction/Dispatch/DispatchSessionPort.fs :: IDispatchSessionPort — ReportFatalDiagnostic member deleted under W4",
-      "operation": "dynamic (caller-supplied operation string)",
-      "triggerBranch": "The narrow adapter over the real ISessionHostPort implements IDispatchSessionPort.ReportFatalDiagnostic by forwarding to FatalProcess.trip,",
-      "inputSource": "Any consumer handed ofSessionPort(sessions): fork child dispatch (RunLifecycle sendAgentOwnerRootWithJournal), sync-delegate runtime, session-nudge paths,",
-      "exactIdentity": "None enforced at this layer (opaque strings); settlement is the caller's duty,",
-      "phase": "Any dispatch phase,",
-      "assertedInvariant": "Same as F05: callers report fatal only after their exact claim truth is settled,",
-      "commitDisposition": "Immediate trip; no local settlement,",
-      "scopeOfEffect": "Whole current process,",
-      "evidenceType": "Call-graph reachability: production uses confirmed at RunLifecycle.sendAgentOwnerRootWithJournal (DispatchSessionPort.ofSessionPort sessions), SyncDelegate Dependencies default wiring, and SessionNudge toDispatchPort sites. Whether a live caller ever invokes the member with a fatal operation remains Open — the interface is a capability, each invocation is caller-owned,",
-      "formalTestId": "requirements/dispatch-protocol/tests/014.test.mjs",
-      "status": "FixedWithRegression",
-      "notes": "DispatchSessionPort ReportFatalDiagnostic deleted: exactly one transport-verdict rail is SettleDetachedSend."
-    },
-    {
       "id": "F07",
       "ownerRequirement": "dispatch-protocol",
       "sourceSymbol": "Interaction/Dispatch/Send.fs :: PromptDispatcher.Runtime.SettleDetachedSend (DetachedSendVerdict rail replaces fatal)",
@@ -129,25 +95,8 @@
       "scopeOfEffect": "Whole current process; Unknown acceptance outcome stays pending for durable/Host-evidence reconciliation by recovery (PROMPT-011),",
       "evidenceType": "Owner slice (DetachedDispatch) owns the typed-evidence migration + late-result contract tests per proposal W4,",
       "formalTestId": "requirements/dispatch-protocol/tests/014.test.mjs",
-      "status": "FixedWithRegression",
-      "notes": "Detached dispatch observer now delivers typed DetachedSendVerdict back to the dispatch owner; Abandon/SendFailed paths remain in Runtime.SettleDetachedSend."
-    },
-    {
-      "id": "F08",
-      "ownerRequirement": "dispatch-protocol",
-      "sourceSymbol": "Interaction/Dispatch/OpenCode/SessionNudge.fs :: NudgeToDispatchSessionPort — ReportFatalDiagnostic arm removed under W4",
-      "operation": "dynamic (caller-supplied operation string)",
-      "triggerBranch": "The continuation-send adapter implements IDispatchSessionPort.ReportFatalDiagnostic by forwarding to FatalProcess.trip,",
-      "inputSource": "Continuation/nudge repair sends via toDispatchPort at SessionNudge.fs use sites (idle-gate repair, interaction repair, nudge/AABB sends),",
-      "exactIdentity": "None enforced at this layer,",
-      "phase": "Continuation/repair send phase,",
-      "assertedInvariant": "Nudge send observer no longer reaches a raw fatal: dispatch is owned by SettleDetachedSend",
-      "commitDisposition": "Immediate trip; settlement is caller-owned,",
-      "scopeOfEffect": "Whole current process,",
-      "evidenceType": "Same as F05/F06: member liveness confirmed (6 production call sites construct the port); per-invocation settlement proof is caller-owned and Open,",
-      "formalTestId": "requirements/dispatch-protocol/tests/014.test.mjs",
-      "status": "FixedWithRegression",
-      "notes": "SessionNudge no longer carries ReportFatalDiagnostic — dispatch side is handled by the typed SettleDetachedSend rail."
+      "status": "Open",
+      "notes": "007/009 observe actual late Refused/Unknown outcomes. Original 009 fatal/Pending rule conflicts with that behavior (GAP-137); old 014 did not prove a real fatal boundary."
     },
     {
       "id": "F09",
@@ -195,9 +144,9 @@
       "assertedInvariant": "Exactly one production value flows into deps.TripFatal so the checkpointCompletedHandoff fuse has a single owner (F14 consumer audited together),",
       "commitDisposition": "n/a (binding); settlement duty sits at the F14 call,",
       "scopeOfEffect": "Capability scope: SyncDelegateWorkflow.Dependencies consumers; physical effect only when F14 invokes,",
-      "evidenceType": "DelegationCompletion (W9, landed in worktree): TripFatal capability is now a typed, injected settlement-aware binding; the F14 consumer proves the contract. Regression: requirements/delegation/tests/031.test.mjs WHAT[DELEG-031] (7 tests). Scanner still resolves the alias one hop to F14.",
-      "formalTestId": "requirements/delegation/tests/031.test.mjs::WHAT[DELEG-031] DELEG_031_checkpoint_probe_reports_typed_settlement_with_exact_identity",
-      "status": "FixedWithRegression"
+      "evidenceType": "031 observes checkpoint commitment and identity locally; it does not exercise this fatal binding or settlement/report/kill order. Full injected-fatal proof remains GAP-153, delegation-030 TODO.",
+      "formalTestId": null,
+      "status": "RetainedFuse"
     },
     {
       "id": "F12",
@@ -241,13 +190,13 @@
       "triggerBranch": "Only HandoffCheckpointCommitment.PhaseConflict(reason) reaches the fuse, via deps.TripFatal (one-hop alias of F11): the detail names the exact route + reason. Committed/NotCommitted/Unknown all return Ok and deliver the already-earned WorkRecord; NotCommitted/Unknown preserve pending-evidence for the next invocation durable re-read, never a re-execution. Then raise InvalidOperationException (harness return path).",
       "inputSource": "ReusableHandoffPort.CheckpointCompleted result for the exact owner/handoff; error string is the port's failure,",
       "exactIdentity": "Exact owner SessionId + PreparedDelegationHandoff,",
-      "phase": "Delegation completion checkpoint (post-child-completion, pre-parent-reuse), Committed-completion vs unwritten-evidence are NOT distinguished: the port returns Result<unit,string>, losing the commitment category. Per proposal §6 W9: migrate CheckpointCompletedHandoff/CheckpointCompleted to a typed commit contract preserving NotCommitted/Committed/Unknown; retain 'completed child' vs 'unwritten evidence' as separate facts; never re-run a completed subtask; never publish a reusable completion to the parent early,",
-      "assertedInvariant": "A finished delegation's completion checkpoint must be durable before the parent reuses it,",
+      "phase": "Completion checkpoint after proven child completion, before returning the earned WorkRecord.",
+      "assertedInvariant": "Checkpoint uncertainty preserves earned completion; only PhaseConflict invokes the fatal capability, with exact parent and route.",
       "commitDisposition": "Typed HandoffCheckpointSettlement preserved at the call (settled.Commitment + settled.Identity.Route). The completed child is proven before the checkpoint; the commitment never rewrites that completion. Landed in worktree by DelegationCompletion (W9).",
       "scopeOfEffect": "Whole current process,",
-      "evidenceType": "DelegationCompletion (W9, landed in worktree): typed HandoffCheckpointSettlement contract. Regression: requirements/delegation/tests/031.test.mjs WHAT[DELEG-031] — committed checkpoint advances frontier + delivers work record; uncommitted still delivers without reexecution; probe reports typed settlement with exact identity; duplicate completion idempotent; stale authority cannot claim; parent supersede leaves no orphan; Completed/Delete both orders settle exactly once (7 tests).",
-      "formalTestId": "requirements/delegation/tests/031.test.mjs::WHAT[DELEG-031] DELEG_031_committed_checkpoint_advances_frontier_and_delivers_work_record",
-      "status": "FixedWithRegression"
+      "evidenceType": "031 proves ordinary completion and separate Committed/NotCommitted checkpoint probes. It does not inject NotCommitted/Unknown into the same completion or execute PhaseConflict through fatal settlement/report/kill. GAP-153 retains those obligations.",
+      "formalTestId": null,
+      "status": "RetainedFuse"
     },
     {
       "id": "F15",
@@ -363,8 +312,8 @@
       "assertedInvariant": "Settlement first, fuse last: abandonment evidence attempted and reported before the fatal record, never scheduled after it,",
       "commitDisposition": "CURRENT TREE ALREADY SETTLES FIRST: durable BloggerAbandon.openRequest attempted first (failure captured as enforcer-cycle-settlement-failed emit, not swallowed), then releaseExact, then Diagnostic.fatal last. This matches the proposal §2.3 fix direction and the HEAD commit f55b67a6a message ('fatalClearWorking: abandon + release attempted before the fuse records'). The remaining owner work is per-commitment splits (NotCommitted/Committed/Unknown must not share one path — Unknown must not write a second abandonment or replay effects),",
       "scopeOfEffect": "Whole current process,",
-      "evidenceType": "Ordering fix committed at HEAD f55b67a6a (W1/W2 batch). Regression test: requirements/capability-enforcement/tests/021.test.mjs WHAT[ENF-021] 'failed durable abandon retains its flight and never reports settlement' + 'repair settlement failure rejects every waiting observer without fatal or release'. Per-commitment split tests (Unknown must not re-abandon) remain owner work,",
-      "formalTestId": "requirements/capability-enforcement/tests/021.test.mjs::WHAT[ENF-021] failed durable abandon retains its flight and never reports settlement",
+      "evidenceType": "Ordering fix committed at HEAD f55b67a6a (W1/W2 batch). Regression test: requirements/behavior-diagnosis/tests/017.test.mjs WHAT[behavior-diagnosis-017] 'failed durable abandon retains its flight and never reports settlement' + 'repair settlement failure rejects every waiting observer without fatal or release'. Per-commitment split tests (Unknown must not re-abandon) remain owner work,",
+      "formalTestId": "requirements/behavior-diagnosis/tests/017.test.mjs::WHAT[behavior-diagnosis-017] failed durable abandon retains its flight and never reports settlement",
       "status": "FixedWithRegression"
     },
     {
@@ -379,8 +328,8 @@
       "assertedInvariant": "Transform observations are read-only rendezvous posts; send-kind outcomes prove the rendezvous contract is violated,",
       "commitDisposition": "The coordinator already settled the exact request inside the episode (abandonment durable, flight released) for AbandonedExhausted; the mismatch branch fuses on contract violation with no further settlement. Owner (W1/W2) owns the outcome-split regression,",
       "scopeOfEffect": "Whole current process,",
-      "evidenceType": "Split committed at HEAD f55b67a6a ('Empty-text repair outcomes separated'). Regression: requirements/capability-enforcement/tests/021.test.mjs WHAT[ENF-021] 'exhausted repair stops its real continuation without a process fatal' (captureFatal records empty) + 'terminal without provider identity stops only the exact request'. A dedicated mismatch-fuse regression (send-kind outcome MUST fuse) is still owner work,",
-      "formalTestId": "requirements/capability-enforcement/tests/021.test.mjs::WHAT[ENF-021] exhausted repair stops its real continuation without a process fatal",
+      "evidenceType": "Split committed at HEAD f55b67a6a ('Empty-text repair outcomes separated'). Regression: requirements/behavior-diagnosis/tests/017.test.mjs WHAT[behavior-diagnosis-017] 'exhausted repair stops its real continuation without a process fatal' (captureFatal records empty) + 'terminal without provider identity stops only the exact request'. A dedicated mismatch-fuse regression (send-kind outcome MUST fuse) is still owner work,",
+      "formalTestId": "requirements/behavior-diagnosis/tests/017.test.mjs::WHAT[behavior-diagnosis-017] exhausted repair stops its real continuation without a process fatal",
       "status": "FixedWithRegression"
     },
     {
@@ -429,8 +378,8 @@
       "assertedInvariant": "Stop must not require sendable prose as its precondition,",
       "commitDisposition": "DELETED, not fused: HEAD f55b67a6a removed ensureNonEmpty ('project/stop consumers already cover empty input'). No live Diagnostic.fatal / FatalProcess.trip call site with this operation remains in the tree (verified: no matches for ensureNonEmpty or enforcer-empty-projection in src/). Stop now flows through StopPhysicalRun + barPhysicalProviderAdmission barrier instead,",
       "scopeOfEffect": "None (dead gate removed),",
-      "evidenceType": "Deletion committed at HEAD f55b67a6a. Regression: requirements/capability-enforcement/tests/021.test.mjs WHAT[ENF-021] 'terminal without provider identity stops only the exact request' (empty-identity terminal stops without a sendable-text precondition) + the W2 stop-barrier tests. Scanner treats the absent operation as covered-by-deletion; reintroducing the operation string without a row fails the gate,",
-      "formalTestId": "requirements/capability-enforcement/tests/021.test.mjs::WHAT[ENF-021] terminal without provider identity stops only the exact request",
+      "evidenceType": "Deletion committed at HEAD f55b67a6a. Regression: requirements/behavior-diagnosis/tests/017.test.mjs WHAT[behavior-diagnosis-017] 'terminal without provider identity stops only the exact request' (empty-identity terminal stops without a sendable-text precondition) + the W2 stop-barrier tests. Scanner treats the absent operation as covered-by-deletion; reintroducing the operation string without a row fails the gate,",
+      "formalTestId": "requirements/behavior-diagnosis/tests/017.test.mjs::WHAT[behavior-diagnosis-017] terminal without provider identity stops only the exact request",
       "status": "FixedWithRegression"
     },
     {
@@ -446,7 +395,7 @@
       "commitDisposition": "Settlement evidence precedes the call by construction (RejectFatalBeforeSettlement otherwise). NoOwnedExecution/ExactSettlementComplete/DurableOutcomeUnknown each route to the phase-correct interpreter path first. W3 (HEAD c9e39fffd) removed the fabricated NoAcceptedFact/NoOwnedExecution default for unclassifiable errors: they now land LocalInvariant + AcceptedBeforeProvider + SettlementIncomplete → rethrow (fail-loud), never the fuse,",
       "scopeOfEffect": "Whole current process (production); hook error rethrown to Host after the record,",
       "evidenceType": "requirements/host-boundary/tests/014.test.mjs (post-W3): 'unclassifiable hook failure rethrows with unproven settlement, no fuse until evidence lands' (stderr has no fatal operation line) + 'hook arguments supply the owned execution key instead of a fabricated no-evidence default' + 'every HookFailurePolicy branch is selected from typed policy and settlement evidence' + chat-hook-settlement.test.mjs HOST-BOUNDARY-022 ordering tests. Real-subprocess exit for this exact path is W11 follow-up (this slice's exit test proves the FatalProcess/Diagnostic physical layer, not this membrane),",
-      "formalTestId": "requirements/host-boundary/tests/014.test.mjs::WHAT[HOST-BOUNDARY-014] unclassifiable hook failure rethrows with unproven settlement, no fuse until evidence lands",
+      "formalTestId": "requirements/host-boundary/tests/014.test.mjs::WHAT[host-boundary-014] unclassifiable hook failure rethrows with unproven settlement, no fuse until evidence lands",
       "status": "FixedWithRegression"
     },
     {
@@ -495,8 +444,8 @@
       "assertedInvariant": "Abandonment durable implies the exact flight is still ours to release; anything else is ownership corruption,",
       "commitDisposition": "Durable abandonment is committed BEFORE this trip (ordering fixed). NotifyTerminal never runs after a release conflict (no success announced on unsettled ownership). Sync-reentrancy of NotifyTerminal + release/notify causality owned by W1 (landed at HEAD per f55b67a6a message: 'abandonEpisode settles in order: durable abandon, exact flight release, then NotifyTerminal'),",
       "scopeOfEffect": "Whole current process; no terminal emitted on this path,",
-      "evidenceType": "Ordering committed at HEAD f55b67a6a. Regression: requirements/capability-enforcement/tests/021.test.mjs WHAT[ENF-021] 'failed durable abandon retains its flight and never reports settlement' + ENF-021 'generated duplicate and interleaved repair observations preserve bounded effects' (fast-check property). Sync-reentrancy-specific regression remains owner work,",
-      "formalTestId": "requirements/capability-enforcement/tests/021.test.mjs::WHAT[ENF-021] failed durable abandon retains its flight and never reports settlement",
+      "evidenceType": "Ordering committed at HEAD f55b67a6a. Regression: requirements/behavior-diagnosis/tests/017.test.mjs WHAT[behavior-diagnosis-017] 'failed durable abandon retains its flight and never reports settlement' + behavior-diagnosis-017 'generated duplicate and interleaved repair observations preserve bounded effects' (fast-check property). Sync-reentrancy-specific regression remains owner work,",
+      "formalTestId": "requirements/behavior-diagnosis/tests/017.test.mjs::WHAT[behavior-diagnosis-017] failed durable abandon retains its flight and never reports settlement",
       "status": "FixedWithRegression"
     },
     {
@@ -511,8 +460,8 @@
       "assertedInvariant": "Settlement failure is shared evidence, never a fabricated success: success/terminal/release require the settlement receipt,",
       "commitDisposition": "No settlement claimed; no terminal emitted; flight retained; failed episodes stay registered so a fresh episode cannot re-spend repair budget on an unsettled request. Fixed at HEAD f55b67a6a (was: catch → Resolve(AbandonedExhausted) → trip, announcing success before the fuse — proposal §2.2 reproduction),",
       "scopeOfEffect": "Episode observers (all reject with same failure); process NOT fused on this path (rejection, not fatal),",
-      "evidenceType": "requirements/capability-enforcement/tests/021.test.mjs WHAT[ENF-021]: 'repair settlement failure rejects every waiting observer without fatal or release' (was RED pre-fix per proposal §2.1: expected rejected/rejected, got fulfilled/fulfilled — now the fix's regression) + 'unknown abandon commit still rejects every observer without release' + 'late observers after settlement failure get the same failure and no new budget' + 'failed durable abandon retains its flight and never reports settlement',",
-      "formalTestId": "requirements/capability-enforcement/tests/021.test.mjs::WHAT[ENF-021] repair settlement failure rejects every waiting observer without fatal or release",
+      "evidenceType": "requirements/behavior-diagnosis/tests/017.test.mjs WHAT[behavior-diagnosis-017]: 'repair settlement failure rejects every waiting observer without fatal or release' (was RED pre-fix per proposal §2.1: expected rejected/rejected, got fulfilled/fulfilled — now the fix's regression) + 'unknown abandon commit still rejects every observer without release' + 'late observers after settlement failure get the same failure and no new budget' + 'failed durable abandon retains its flight and never reports settlement',",
+      "formalTestId": "requirements/behavior-diagnosis/tests/017.test.mjs::WHAT[behavior-diagnosis-017] repair settlement failure rejects every waiting observer without fatal or release",
       "status": "FixedWithRegression"
     },
     {
@@ -524,62 +473,28 @@
       "inputSource": "ReusableHandoffPort.CheckpointCompleted result for the exact parent/handoff; missing-capability assembly state,",
       "exactIdentity": "Exact parent SessionId + PreparedDelegationHandoff (run.Handoff) — when present; branch (a) has identity but no port,",
       "phase": "Fork child completion checkpoint (pre-parent-completion-delivery),",
-      "assertedInvariant": "A completed child's completion checkpoint must be durable before the parent observes completion; a missing handoff capability is an assembly defect, not a retryable state,",
+      "assertedInvariant": "Proven fork completion survives NotCommitted/Unknown; PhaseConflict trips the fuse with exact parent and route. Missing prepared capability is an assembly defect.",
       "commitDisposition": "Typed settlement at the call; pending completion delivered whatever the commitment says. Landed in worktree by DelegationCompletion (W9).",
       "scopeOfEffect": "Whole current process,",
-      "evidenceType": "DelegationCompletion (W9, landed in worktree): same typed HandoffCheckpointSettlement migration covers the fork-host checkpoint path (RunLifecycle.fs). Regression: same WHAT[DELEG-031] suite (7 tests) + Completed/Delete both-orders test.",
-      "formalTestId": "requirements/delegation/tests/031.test.mjs::WHAT[DELEG-031] DELEG_031_completed_and_delete_in_both_orders_settle_exactly_once",
-      "status": "FixedWithRegression"
+      "evidenceType": "The former 031 reference executed SyncDelegate, not this fork-host fatal path. Actual fork checkpoint uncertainty and fatal ordering remain GAP-153 and 030/031 TODO.",
+      "formalTestId": null,
+      "status": "RetainedFuse"
     },
     {
       "id": "F32",
       "ownerRequirement": "host-boundary",
       "sourceSymbol": "OpenCode/Host/Diagnostic.fs :: Diagnostic.fatal + Foundation/FatalProcess.fs :: FatalProcess.kill/trip/physicalKill",
       "operation": "dynamic (physical exit adapter itself; per-call operation strings belong to F-rows above)",
-      "triggerBranch": "Diagnostic.fatal: validate fields → console.error one JSON line (fallback line on render failure) → FatalProcess.kill. FatalProcess.trip: console.error JSON {operation,result} → kill. kill → physicalKill: single gate WANXIANGSHU_NO_FATAL_EXIT; else process.kill(pid,SIGKILL), fallback process.exit(1), else throw (never returns in production),",
+      "triggerBranch": "Diagnostic.fatal: validate/report (fallback line on render failure), then FatalProcess.kill in finally. FatalProcess.trip: report JSON {operation,result}, then kill in finally. Reporting failure cannot bypass termination. kill → physicalKill: single gate WANXIANGSHU_NO_FATAL_EXIT; else process.kill(pid,SIGKILL), fallback process.exit(1), else throw (never returns in production),",
       "inputSource": "All F-row call sites + any future caller holding the composed capability,",
       "exactIdentity": "n/a (adapter is identity-agnostic; callers supply identity in the logged payload),",
       "phase": "Last step of every fatal path (EXECFAIL-006 / HOST-BOUNDARY-022),",
       "assertedInvariant": "console/report + kill is the SINGLE physical exit: one report owner, one kill owner per incident; a failing console capture cannot bypass the fuse; incident rebroadcast is idempotent; SIGKILL semantics stay (no finally-rescue weakening),",
       "commitDisposition": "The adapter performs no settlement itself — callers must hold committed/unknown evidence first. The log line is diagnostic, never a durable receipt,",
       "scopeOfEffect": "Whole current process, by design (fail-stop),",
-      "evidenceType": "RETAINED FUSE (this slice, ExitBoundaryGate W11): the adapter itself is the intentional last-resort fail-stop — untrusted-runtime premise (F01/F04/F09/F10/F17 cut rows), process-wide scope by design, no settlement of its own (callers hold committed/unknown evidence per EXECFAIL-006/HOST-BOUNDARY-022), exactly one report + one kill per incident. Proven by requirements/host-boundary/tests/fatal-process-exit.test.mjs — 7 real-subprocess tests (all modes exhaustively enumerated, so no sampling-based property test is warranted): report-once-then-die via both owner paths, pre-fuse committed payload survives + reopens, renderer-throw/piped-stdio non-bypass, idempotent rebroadcast, nonfatal paths exit 0. No production F# change: SIGKILL semantics preserved verbatim.",
-      "formalTestId": "requirements/host-boundary/tests/fatal-process-exit.test.mjs::WHAT[HOST-BOUNDARY-029] fatal child reports once then dies without returning",
+      "evidenceType": "RETAINED FUSE: intentional process-wide fail-stop, with no settlement of its own; callers hold committed/unknown evidence per EXECFAIL-006/HOST-BOUNDARY-022. requirements/host-boundary/tests/029.test.mjs exercises both production exit owners, distinguishes reporter exceptions from actual hard termination, and reopens facts committed by the same child before termination. Reporting now uses finally to preserve the fuse on render failure. Real nonfatal rejection, stale-callback and exhaustion paths remain an explicit TODO; removed print-only fixtures were not evidence of those paths.",
+      "formalTestId": "requirements/host-boundary/tests/029.test.mjs::WHAT[host-boundary-029] fatal child reports once then dies without returning",
       "status": "RetainedFuse"
-    },
-    {
-      "id": "F33",
-      "ownerRequirement": "dispatch-protocol",
-      "sourceSymbol": "OpenCode/Host/OpenCodePort.fs :: observeSdkPromptDispatch — late reject lands as OutcomeUnknown verdict, not a kill",
-      "operation": "dynamic (retired prompt-async-dispatch-listener-failed fatal fuse; late rejection lands as typed DetachedSendVerdict rail)",
-      "triggerBranch": "Background SDK promptAsync task rejects asynchronously (late transport failure after AdmittedWithReceipt already returned to the caller),",
-      "inputSource": "SDK promise rejection (ex.Message) for the exact sessionId; receipt was invocation/transport-level, NOT physical acceptance,",
-      "exactIdentity": "sessionId only — NO exact PromptKey/phase carried (proposal §2.7 defect), Caller already holds AdmittedWithReceipt; the late error must be delivered as typed evidence to the exact PromptKey/physical-attempt owner: determined-unsent → explicit abandonment; accepted → phase-owner convergence; Unknown → pending + durable/Host evidence read. Never re-emit, never string-flatten Retryable/Fatal/Unknown/exception together. Owner (DetachedDispatch, W4) owns the cross-layer delivery contract + per-trajectory tests (sync throw, async reject, HTTP refusal, accepted-then-lost, physical-acceptance-then-reject, duplicate late notice, superseded user),",
-      "phase": "Detached post-enqueue observation (post-AdmittedWithReceipt),",
-      "assertedInvariant": "async reject lands on the prompt owner as OutcomeUnknown via DetachedListener",
-      "commitDisposition": "Currently none: immediate fuse with session+text only. Target: exact-key typed delivery with abandonment/pending per commitment,",
-      "scopeOfEffect": "Whole current process,",
-      "evidenceType": "Owner slice owns the delivery-contract proof,",
-      "formalTestId": "requirements/dispatch-protocol/tests/014.test.mjs",
-      "status": "FixedWithRegression",
-      "notes": "SDK observer now lands on the dispatch owner via typed verdict; Promise reject no longer kills the pod."
-    },
-    {
-      "id": "F34",
-      "ownerRequirement": "dispatch-protocol",
-      "sourceSymbol": "OpenCode/Host/OpenCodePort.fs :: verdictForDetachedError — HTTP-prefix classification replaces the raw fatal",
-      "operation": "dynamic (retired prompt-async-dispatch-listener-failed fatal fuse; late rejection lands as typed DetachedSendVerdict rail)",
-      "triggerBranch": "Background HTTP prompt_async POST settles Error (network refusal, non-2xx, read failure) after AdmittedWithReceipt returned,",
-      "inputSource": "HTTP transport outcome for the exact sessionId; same receipt caveat as F33,",
-      "exactIdentity": "sessionId only — same exact-key defect as F33,",
-      "phase": "Detached post-enqueue observation (HTTP adapter),",
-      "assertedInvariant": "HTTP \"HTTP \" prefix → Refused; other transport → OutcomeUnknown",
-      "commitDisposition": "Same target as F33 with an independent HTTP contract test (definite refusal, lost response, accepted-then-failed must not co-judge). Owner (DetachedDispatch, W4),",
-      "scopeOfEffect": "Whole current process,",
-      "evidenceType": "Owner slice owns the HTTP-contract proof,",
-      "formalTestId": "requirements/dispatch-protocol/tests/014.test.mjs",
-      "status": "FixedWithRegression",
-      "notes": "HTTP observer same; \"HTTP \" prefix → Refused, other transport error → OutcomeUnknown."
     },
     {
       "id": "F35",
@@ -593,9 +508,9 @@
       "assertedInvariant": "The staged case must be exactly finalized before its physical identity is dropped; failure is diagnostic AND process-fatal,",
       "commitDisposition": "Case finalization migrated to a typed CaseFinalizeSettlement contract (HostSessionDeletion.fs + Casebook Lifecycle.fs): replayable exact finalize/drain result; identity retention is owner-driven, not finally-driven. Current: fuse fires, but the finally still drops the identity the completion-recovery may need. Per proposal W9: establish a replayable exact finalize/drain result; the finally must not discard identity needed for completion recovery — whether the identity may be retained and which durable evidence that needs is the owner's decision, not generic cleanup's guess,",
       "scopeOfEffect": "Whole current process + dropped delegate identity,",
-      "evidenceType": "DelegationCompletion-adjacent (W9, landed in worktree): typed CaseFinalizeSettlement. Regression: requirements/managed-session-lifecycle/tests/021.test.mjs — finalized releases identity exactly once; nothing-to-finalize is not a failure; uncommitted finalize does not publish a case (MANAGED-SESSION-022); identity retention is owner-driven not finally (4 tests).",
-      "formalTestId": "requirements/managed-session-lifecycle/tests/021.test.mjs::WHAT[MANAGED-SESSION-021] CASE_SETTLE_finalized_releases_identity_exactly_once",
-      "status": "FixedWithRegression"
+      "evidenceType": "022 proves real archive success, duplicate refusal and unavailable Bookkeeper. It does not observe exact identity retention or injected fatal/drain. Those lifecycle boundaries remain GAP-133 in 021/022.",
+      "formalTestId": "requirements/managed-session-lifecycle/tests/021.test.mjs",
+      "status": "RetainedFuse"
     },
     {
       "id": "F36",
@@ -817,38 +732,6 @@
       "status": "ExcludedWithEvidence",
       "operation": "dynamic (caller-supplied reason through the F12 magic-todo-infrastructure-failed funnel; matched by source file)",
       "notes": "no deferred prepare now refuses via ProviderInputRejection instead of fatal."
-    },
-    {
-      "id": "C01",
-      "ownerRequirement": "durable-events",
-      "sourceSymbol": "Strength/Persistence/Durability.fs :: StrengthDurability.publishPrepared SemanticCut branch (returns StrengthPreparedPublish.Rejected; no fatal inside the adapter)",
-      "operation": "dynamic (operation string strength-prepared-semantic-cut retired; fatal ownership is composition-side via F17 PluginStrengthPorts.commitAppendResult Diagnostic.fatal strength-semantic-cut; Rejected is the owner-observable cut-settled signal)",
-      "triggerBranch": "LANDED (sibling PersistenceCuts): the mutable optional fatalTripHandler global + setFatalTripHandler + both Option.iter call sites are DELETED. StrengthStore.publishWithPayloads SemanticCut now returns StrengthPreparedPublish.Rejected cut.Reason with no optional fuse; the append path returns StrengthDurableAppend.SemanticRejected. Fatal ownership lives composition-side (F17 row).",
-      "inputSource": "Strength durability store outcome,",
-      "exactIdentity": "cut evidence (rule + reason); request/owner threading is the owner's migration work,",
-      "phase": "Strength prepared/persist append,",
-      "assertedInvariant": "A true semantic cut must stop the process through exactly one owned fuse — not through an optionally-wired global,",
-      "commitDisposition": "Cut-settled signal is the Rejected/SemanticRejected return itself (DURABLE-EVENTS-025: persistence cut stores hold no optional fatal hook; the sole fatal owner is composition). No in-adapter fuse by design.",
-      "scopeOfEffect": "No process exit at this site; the cut is owner-observable evidence consumed composition-side (F17 fuse when the promotion is truly untrustworthy).",
-      "evidenceType": "PersistenceCuts (landed in worktree, not-yet-run pending Main integrated build): requirements/speculative-investigation/tests/006.test.mjs WHAT[SPEC-INV-006] (4 tests incl. prepared_cut_has_no_optional_fatal_handler_path) + DURABLE-EVENTS-025 clause (requirements/durable-events/WHAT.md). Strength shard focused-compile GREEN.",
-      "formalTestId": "requirements/speculative-investigation/tests/006.test.mjs::WHAT[SPEC-INV-006] prepared_cut_has_no_optional_fatal_handler_path",
-      "status": "FixedWithRegression"
-    },
-    {
-      "id": "C02",
-      "ownerRequirement": "knowledge-reuse",
-      "sourceSymbol": "Repository/Knowledge/Casebook/Store.fs :: CasebookStore.appendEvent cut branch (returns Error reason; no fatal inside the store)",
-      "operation": "dynamic (operation string casebook-semantic-cut retired with the dead handler; the cut is an owner-observable Error return)",
-      "triggerBranch": "LANDED (sibling PersistenceCuts): the mutable optional fatalTripHandler global + setFatalTripHandler + the Option.iter call site are DELETED. store.Append cut now returns Error reason with no optional fuse.",
-      "inputSource": "Casebook store append outcome,",
-      "exactIdentity": "eventId + eventType + cut reason,",
-      "phase": "Casebook durable append,",
-      "assertedInvariant": "Same as C01: a true cut needs exactly one owned fuse, never an optional global,",
-      "commitDisposition": "Cut-settled signal is the Error return itself (DURABLE-EVENTS-025: no optional fatal hook in the store).",
-      "scopeOfEffect": "No process exit at this site; the cut is owner-observable evidence.",
-      "evidenceType": "PersistenceCuts (landed in worktree, not-yet-run pending Main integrated build): requirements/knowledge-reuse/tests/013.test.mjs WHAT[KNOWLEDGE-REUSE-013] (4 tests incl. production_store_has_no_optional_fatal_handler_path) + DURABLE-EVENTS-025 clause. Strength + Casebook shards focused-compile GREEN.",
-      "formalTestId": "requirements/knowledge-reuse/tests/013.test.mjs::WHAT[KNOWLEDGE-REUSE-013] production_store_has_no_optional_fatal_handler_path",
-      "status": "FixedWithRegression"
     },
     {
       "id": "C04",

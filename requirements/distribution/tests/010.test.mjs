@@ -5,7 +5,7 @@ import test from 'node:test'
 
 const ROOT = new URL('../../..', import.meta.url).pathname
 
-test('WHAT[distribution-010] distribution artifact contains active registrations and surface consistency', async () => {
+test('WHAT[distribution-010] repository resources and emitted role/tool declarations exclude retired role registrations', async () => {
   // 1. 资源目录完全闭包深比较 (deepEqual)
   const roleDir = join(ROOT, 'resources/provider/role')
   assert.ok(existsSync(roleDir), 'resources/provider/role directory must exist')
@@ -78,25 +78,6 @@ test('WHAT[distribution-010] distribution artifact contains active registrations
     )
   }
 
-  // 4. Surface Manifest 注册一致性断言
-  const { SURFACE_MANIFEST } = await import('../../../scripts/lib/test-surface-scan.mjs')
-  assert.ok(Array.isArray(SURFACE_MANIFEST), 'SURFACE_MANIFEST must be an array')
-  const surfaceModules = SURFACE_MANIFEST.map((s) => s.module)
-  assert.ok(surfaceModules.length > 0, 'SURFACE_MANIFEST must have registered entries')
-
-  // 证明无废弃角色专属的孤立 surface 模块存在。
-  // `Sphinx/InquirySurface.js` is an epistemic-reasoning tool surface, not a
-  // deprecated-role module: the role `inquiry` is retired, but the tool it left
-  // behind still legitimately owns clause anchors under epistemic-reasoning.
-  const retiredRoleDirs = ['coder', 'inspector', 'browser', 'distiller']
-  for (const mod of surfaceModules) {
-    if (mod.startsWith('Sphinx/')) continue
-    for (const dep of retiredRoleDirs) {
-      assert.equal(
-        mod.toLowerCase().includes(`/${dep}`),
-        false,
-        `SURFACE_MANIFEST must not export deprecated role module ${mod}`,
-      )
-    }
-  }
 })
+
+test.todo('WHAT[distribution-010] GAP-210: actual installed plugin registration exposes only active tools and resources')

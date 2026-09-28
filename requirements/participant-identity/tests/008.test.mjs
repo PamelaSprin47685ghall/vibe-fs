@@ -97,7 +97,7 @@ test('WHAT[participant-identity-008] rejects stale owner identity evidence', () 
 })
 test('WHAT[participant-identity-008] closed owner run rejects its inherited identity evidence', () => {
   const owner = rootProfile()
-  const seed = inheritedSeed('inspector', owner)
+  const seed = inheritedSeed('engineer', owner)
 
   const validation = authority.validateInheritedIdentitySeedAgainstActiveOwner(null, seed)
 
@@ -122,7 +122,7 @@ test('WHAT[participant-identity-008] derived identity rejects root-selection evi
 })
 test('WHAT[participant-identity-008] inherited identity rejects a different owner session', () => {
   const owner = rootProfile()
-  const seed = inheritedSeed('inspector', owner)
+  const seed = inheritedSeed('engineer', owner)
   const wrongOwner = { ...owner, session: 'ses_different_owner' }
 
   const validation = authority.validateInheritedIdentitySeed(wrongOwner, seed)
@@ -136,7 +136,7 @@ test('WHAT[participant-identity-008] inherited identity rejects a different owne
 })
 test('WHAT[participant-identity-008] inherited identity rejects a different authority root', () => {
   const owner = rootProfile()
-  const seed = inheritedSeed('inspector', owner)
+  const seed = inheritedSeed('engineer', owner)
   const wrongRoot = { ...owner, authorityRoot: 'msg_different_root' }
 
   const validation = authority.validateInheritedIdentitySeed(wrongRoot, seed)
@@ -150,7 +150,7 @@ test('WHAT[participant-identity-008] inherited identity rejects a different auth
 })
 test('WHAT[participant-identity-008] durable inherited seed round-trips without re-resolution', () => {
   const owner = rootProfile()
-  const seed = inheritedSeed('inspector', owner)
+  const seed = inheritedSeed('engineer', owner)
   const claimed = authority.claimAgentOwnerRoot('pk_child', 'ses_child', 'digest-child', seed)
   assert.equal(claimed.ok, true, claimed.ok ? '' : claimed.error)
 
@@ -421,7 +421,6 @@ const { default: test } = await import("node:test");
 const Attempt = await import("../../../dist/Context/Companion/CompressionSurface.js");
 const ProviderFailure = await import("../../../dist/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.js");
 const Dispatch = await import("../../../dist/Interaction/Dispatch/DispatchSurface.js");
-const Fission = await import("../../../dist/Execution/Fission/Surface.js");
 const Authority = await import("../../../dist/Interaction/Authority/Surface.js");
 const Runtime = await import("../../../dist/Interaction/Authority/RuntimeSurface.js");
 const Strength = await import("../../../dist/Strength/Surface.js");
@@ -798,7 +797,6 @@ test('WHAT[participant-identity-008] SyncDelegate identity inherits its exact ow
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const authority = await import("../../../dist/Interaction/Authority/RuntimeSurface.js");
-const Fission = await import("../../../dist/Execution/Fission/Surface.js");
 const persona = await import("../../../dist/Participant/Persona/Surface.js");
 
 const H = (value) => `H(${value})`
@@ -851,7 +849,7 @@ test('WHAT[participant-identity-008] Strength replica inherits the owner Persona
     },
   )
 })
-test('WHAT[participant-identity-008] Fission lane carries owner-issued identity lineage', () => {
+test('WHAT[participant-identity-008] an Engineer inherited seed validates against its actual owner profile', () => {
   const owner = ownerProfile('engineer')
   const issued = authority.issueInheritedIdentitySeed('engineer', owner)
   assert.equal(issued.ok, true, issued.ok ? '' : issued.error)
@@ -862,14 +860,5 @@ test('WHAT[participant-identity-008] Fission lane carries owner-issued identity 
     error: null,
   })
 })
-test('WHAT[participant-identity-008] Fission lane identity never infers lineage from a physical parent', () => {
-  const lane = Fission.startedLane(1, 'ses_physical_parent', 'investigate independently')
-  assert.deepEqual(lane, {
-    index: 1,
-    prompt: 'investigate independently',
-    hasAgentId: false,
-    hasHandle: false,
-    hasParent: false,
-  })
-})
+test.todo('WHAT[participant-identity-008] actual Fission lane admission preserves owner-issued lineage without inferring it from a physical parent (GAP-158)')
 }

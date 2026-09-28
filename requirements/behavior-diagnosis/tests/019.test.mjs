@@ -1,6 +1,3 @@
 import test from 'node:test'
-import { assertFatalBoundary } from '../../structured-workflow/tests/support/m6-boundary-proof.mjs'
 
-
-
-test('WHAT[behavior-diagnosis-019] Enforcer fatal requires typed settlement and one injected fuse', () => assertFatalBoundary('behavior-diagnosis'))
+test.todo('WHAT[behavior-diagnosis-019] GAP-112 actual enforcer fatal requires mandatory injected capability and durable settlement and occurs once')

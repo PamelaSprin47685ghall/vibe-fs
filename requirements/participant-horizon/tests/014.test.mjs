@@ -1,16 +1,3 @@
-import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as fork from '../../../dist/Execution/Delegation/Fork/Surface.js'
 
-const assertDeniedGenerically = (orchestrator, calling) => {
-  const result = fork.unavailableCalling('en', orchestrator)
-  assert.match(result, /Unknown or unavailable calling/)
-  assert.doesNotMatch(result, /Reviewer|fast-|deep-|error\s*=/i)
-  assert.ok(calling)
-}
-
-test('WHAT[participant-horizon-014] FORK_unknown_calling_does_not_expose_machine_binding_affordance', () => {
-  const result = fork.unavailableCalling('en', true)
-  assert.match(result, /Unknown or unavailable calling/)
-  assert.doesNotMatch(result, /Reviewer|fast-|deep-|error\s*=/i)
-})
+test.todo('WHAT[participant-horizon-014] real visible actions and entity references remain reachable; generic rejection prose alone does not prove existence (GAP-079)')

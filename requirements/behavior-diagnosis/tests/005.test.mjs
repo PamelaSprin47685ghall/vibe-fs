@@ -1,36 +1,41 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFileSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
 import * as enforcer from '../../../dist/Enforcer/Surface.js'
 import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
+import { withRulebookPackage } from './support/resource-package.mjs'
 
-const BASE = 'base blogger system prompt'
-
-test('WHAT[behavior-diagnosis-005] BEHAVIOR_DIAGNOSIS_SYSTEM_003_zh_cn_leaf_load_is_complete_and_nonempty', () => {
-  const zh = enforcer.loadFor('zh-CN')
-  assert.equal(zh.length, 120, 'zh-CN rulebook must have 120 rules')
-  const names = new Set(zh.map((r) => r.name))
-  assert.equal(names.size, 120, 'zh-CN TipNames must be unique')
-  for (const rule of zh) {
-    assert.ok(rule.enforcerText.trim().length > 0, `zh-CN enforcer.md empty for ${rule.name}`)
-    assert.ok(rule.mainText.trim().length > 0, `zh-CN main.md empty for ${rule.name}`)
-    assert.equal(rule.name, rule.ruleId, `zh-CN RuleId mismatch for ${rule.name}`)
-    assert.equal(rule.name, rule.fieldName, `zh-CN FieldName mismatch for ${rule.name}`)
+integrationTest('WHAT[behavior-diagnosis-005] both locale views preserve authored leaf bodies and share identities', () => {
+  const english = enforcer.loadFor('en')
+  const chinese = enforcer.loadFor('zh-CN')
+  assert.deepEqual(chinese.map((rule) => rule.name), english.map((rule) => rule.name))
+  for (const [locale, rules] of [['', english], ['.zh-CN', chinese]]) {
+    for (const rule of rules) {
+      for (const [leaf, field] of [['enforcer', 'enforcerText'], ['main', 'mainText']]) {
+        const expected = readFileSync(new URL(`../../../resources/enforcer/${rule.name}/${leaf}${locale}.md`, import.meta.url), 'utf8').trim()
+        assert.ok(expected.length > 0)
+        assert.equal(rule[field], expected)
+      }
+    }
   }
 })
 
-integrationTest('WHAT[behavior-diagnosis-005] ENFORCER_PROMPT_017_rulebook_loads_authored_zh_cn_without_fallback', () => {
-  const en = enforcer.rules()
-  const zh = enforcer.loadFor('zh-CN')
-  assert.equal(en.length, 120)
-  assert.equal(zh.length, 120)
-  assert.deepEqual(zh.map((rule) => rule.name), en.map((rule) => rule.name))
-  for (let index = 0; index < zh.length; index += 1) {
-    assert.notEqual(zh[index].enforcerText, en[index].enforcerText)
-    assert.notEqual(zh[index].mainText, en[index].mainText)
-    assert.match(zh[index].enforcerText, /[\u3400-\u9fff]/)
-    assert.match(zh[index].mainText, /[\u3400-\u9fff]/)
-  }
-  const composed = enforcer.composeBloggerSystemPrompt('基础 Blogger 系统提示', 'zh-CN')
-  assert.match(composed, /# Enforcer RuleBook（规则书）/)
-  assert.match(composed, /[\u3400-\u9fff]/)
+integrationTest('WHAT[behavior-diagnosis-005] missing or blank Chinese leaves never fall back to valid English', async () => {
+  await withRulebookPackage(async ({ rulebook, write, surface }) => {
+    write('sample-rule', 'enforcer.md', 'English detection')
+    write('sample-rule', 'main.md', 'English guidance')
+    assert.equal(surface.rules().length, 1)
+    assert.throws(() => surface.loadFor('zh-CN'), /enforcer.zh-CN.md/)
+    write('sample-rule', 'enforcer.zh-CN.md', '检测正文')
+    assert.throws(() => surface.loadFor('zh-CN'), /main.zh-CN.md/)
+    write('sample-rule', 'main.zh-CN.md', ' \n')
+    assert.throws(() => surface.loadFor('zh-CN'), /main.zh-CN.md empty/)
+    write('sample-rule', 'main.zh-CN.md', '处置正文')
+    assert.equal(surface.loadFor('zh-CN')[0].mainText, '处置正文')
+    rmSync(join(rulebook, 'sample-rule/enforcer.zh-CN.md'))
+    assert.throws(() => surface.loadFor('zh-CN'), /enforcer.zh-CN.md/)
+  })
 })
+
+test.todo('WHAT[behavior-diagnosis-005] GAP-112 institutional BIRTH rejects either missing locale before durable append')

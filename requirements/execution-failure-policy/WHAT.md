@@ -1,108 +1,67 @@
 # execution-failure-policy — WHAT
 
-## [001] 失败分类是封闭代数
+## [001] 封闭失败分类
 
-执行失败必须在最早可信边界收敛为下列穷尽分类：
+执行失败在最早可信边界归入 `LocalInvariant`、`ProtocolRejection`、`AuthorizationDenied`、`UserCancelled`、`Superseded`、`CapacityQueueFull`、`ProviderTransient`、`ProviderPermanent`、`AcceptanceUnknown`、`StreamInterruptedAfterFirstToken` 或 `PersistenceFailure(NotCommitted | Committed | Unknown)`。异常类型、状态码与公开 Host 证据可参与解码；message、stack、stderr 等自由文本只作诊断，不决定类别与后果。
 
-```text
-LocalInvariant
-ProtocolRejection
-AuthorizationDenied
-UserCancelled
-Superseded
-CapacityQueueFull
-ProviderTransient
-ProviderPermanent
-AcceptanceUnknown
-StreamInterruptedAfterFirstToken
-PersistenceFailure(NotCommitted | Committed | Unknown)
-```
+## [002] 单一完整决策
 
-异常类型、状态码与公开 Host evidence 可以参与边界解码；message、stack、stderr 等自由文本只可作为诊断附件，严禁决定类别或后果。
+唯一纯策略根据失败类别、durable execution phase、确切容量所有权与 provider recovery facts，一次给出互斥的 `PreserveCurrentFact`、`AwaitAcceptanceReconciliation`、`RetryFreshAttempt`、`TerminalizeAcceptedPreProvider` 或 `TerminalizeProviderStarted`，同时确定 breaker、容量结算和 fatality。调用方只解释这份不可拆分的决策，不另算、覆盖其维度或默认重试；重试与终态不得并存。
 
-## [002] 唯一纯策略输出覆盖单一互斥 Resolution 与正交处置维度
+`PersistenceFailure(NotCommitted)` 固定保留当前事实和已持有的 exact fence（未持有则不结算），不改变 breaker、不 fatal，并停止在未提交步骤的所有后继边界之前。只有新的 typed persistence/recovery event 可重新裁决，不因此扩大 provider retry 权限。
 
-唯一 policy owner 接收 typed failure、durable execution phase、确切 capacity ownership、provider recovery budget/breaker facts，通过直接 F# CE 纯计算一个不可拆分的 `ExecutionFailureDecision`：
+## [003] Provider retry 授权
 
-```text
-ExecutionFailureResolution =
-  | PreserveCurrentFact
-  | AwaitAcceptanceReconciliation of ChatExecutionKey
-  | RetryFreshAttempt of ProviderRecoveryAuthorization
-  | TerminalizeAcceptedPreProvider of ChatExecutionKey * ChatExecutionTerminalDisposition
-  | TerminalizeProviderStarted of ChatExecutionKey * ChatExecutionTerminalDisposition
+仅 `ProviderTransient`、`ProviderPermanent` 可在 `ProviderStarted × Closed breaker × Available retry budget × 可恢复 request kind` 下授权 retry；`Open` 或 `Exhausted` 输出终态，其他 phase 不重试，`StrengthReplica` 不消耗 owner recovery。恢复事实只含一个预算、一个 breaker、request kind 与 logical/provider run identity。其他失败类别不授权 retry；提交未知先 reconciliation，已有可见 token 的中断不自动重放。
 
-{ Resolution: ExecutionFailureResolution
-  Breaker: BreakerDecision
-  CapacitySettlement: CapacitySettlement
-  Fatality: FatalityDecision }
-```
+每次 retry 携带 caller 不可构造的授权，精确绑定 `LogicalRunId`、源 `ProviderRunIdentity`、request kind 及由三者纯派生的稳定 `ProviderRecoveryDecisionId`。同一决策重放 identity 不变，新 attempt 产生新 identity；恢复 prompt 标识含 decision 与源 attempt identity，可见文本保持一致。同一授权的重复物理发射由 ledger owner 去重。
 
-彻底开除独立的 `RetryDecision` 与 `MessageDisposition` 维度及其非法积状态空间；`ExecutionFailureResolution` 是互斥和类型，每个失败回合严格收敛为一个继续分支（`RetryFreshAttempt`）或一个终结分支（`TerminalizeAcceptedPreProvider`、`TerminalizeProviderStarted`、`AwaitAcceptanceReconciliation`、`PreserveCurrentFact`），严禁“既不重试也不终结”或“既重试又终结”的矛盾局面。Breaker、capacity settlement 与 fatality 均作为单次求值的正交不可变事实与 Resolution 一同给出。调用方只能解释这一个 decision，严禁任一边界另算其中某项、按异常文本覆盖结果，或以 wildcard 给出默认 retry。
+## [004] Exact capacity settlement
 
-`PersistenceFailure(NotCommitted)` 的穷尽结果固定为：`Resolution = PreserveCurrentFact`、`Breaker = NoBreakerTransition`、`CapacitySettlement = RetainExactFence(exact fence)`（未持有 fence 时为 `NoCapacitySettlement`）、`Fatality = NoFatality`。它表示当前 transaction step 明确未提交，因此保留当前 durable phase 与已持有的 exact fence，并停止在所有后继边界之前；后续只能由新的 typed persistence/recovery event 重新裁决。该分支不得改变 provider retry 规则。
+容量结算仅为 `NoCapacitySettlement`、`RetainExactFence` 或 `ReleaseExactFence`。释放必须携带本次 admission 的不可伪造 fence，由 `execution-model-routing` 原子消费；无 fence、旧 epoch、错误 target 或 physical message 不得释放容量。失败、取消、supersede 与 fatal 均不得用计数减一、session-wide release 或 best-effort cleanup 代替确切结算。
 
-## [003] 只有已确认 provider 类别可授权 retry
+## [005] 按事实阶段终结
 
-`ProviderTransient` 与 `ProviderPermanent` 是仅有可进入 provider retry 裁决的类别。`ProviderRecoveryFacts` 只携带一个 `RetryBudget（Available | Exhausted）`、一个 `Breaker（Closed | Open）`、`ProviderRequestKind` 与两个 run identity，不存在第二预算维度。已确认 provider 失败在 `ProviderStarted × Closed × Available × 可恢复 request kind` 时输出 `RetryFreshAttempt`；`Open` 或 `Exhausted` 时输出 terminal；`NoAcceptedFact`、`AcceptedBeforeProvider`、`Terminal` phase 永不重试；`StrengthReplica` 永不消耗 owner recovery。类别本身不保证一定继续。其余类别始终不输出 retry。特别地，`AcceptanceUnknown` 只能进入 durable reconciliation，`StreamInterruptedAfterFirstToken` 不得自动重放可能已产生可见 token 的 effect；解码为非 provider 类别的 unknown、timeout 文案、cancel、tool-policy、join-control、pre-accept refusal 永不进入 retry 裁决（Host 错误边界自身的解码结果一律为 provider 类别，见 execution-failure-policy-009）。
+终态处置随 Resolution 携带 exact execution key 与 typed disposition：`TerminalizeAcceptedPreProvider` 只处理已 Accepted、未 ProviderStarted 的执行；`TerminalizeProviderStarted` 只处理已 ProviderStarted 的执行。`managed-chat-execution` 验证 key 与 durable phase，拒绝跨阶段、跨执行处置，独占消息事实和合法迁移；本包不直接写消息事实，也不以诊断文本决定终态。
 
-任一 `RetryFreshAttempt` 必须携带不可由 caller 构造的 sealed authorization，精确绑定一个稳定 logical operation (`LogicalRunId`)、本次 physical attempt (`ProviderRunIdentity`)、request kind 与由三者纯派生的稳定 policy decision identity。Provider 恢复 prompt 标识精确包含 `ProviderRecoveryDecisionId` 与源 `ProviderRunIdentity`，对外可见文本保持完全一致。同一 typed decision 重放得到相同 decision identity；新的失败 provider run 建立新 identity。相同 authorization identity 的重复物理发射由 ledger owner 去重，不由 Policy 去重。
+## [006] 结算之后才可 fatal
 
-## [004] 容量结算只作用于 exact opaque fence
+`FatalAfterSettlement` 仅来自 `LocalInvariant` 或无法安全继续的 `PersistenceFailure`。解释器遵守各 phase 的结算依赖：pre-provider terminal append 取得 `Committed` receipt 后才可释放 exact fence，`NotCommitted` 或 `Unknown` 不释放。fatal 始终最后执行，前提是所需 disposition 与 exact settlement 成功，或已有对应提交未知的 durable evidence；不得吞掉结算失败、立即退出或用 Host/UI 行为代替证据。
 
-策略依据 typed ownership 输出 `NoCapacitySettlement | RetainExactFence | ReleaseExactFence`。`ReleaseExactFence` 必须携带本次 admission 所得的不可伪造 fence identity，并由 `execution-model-routing` 原子消费；无 fence、旧 epoch、错误 target 或错误 physical message 均不得释放任何容量。fatality、取消、supersede 与失败恢复都不能使用计数减一、session-wide release 或 best-effort cleanup 代替 exact settlement。
+## [007] 未知不得当作未发生
 
-## [005] 终态处置直属 Resolution，不是第二状态机
+`AcceptanceUnknown`、`PersistenceFailure(Unknown)` 保持显式未知，依靠 durable reconciliation 或外部物理证据收敛，不映射为未发生、`NotCommitted`、可重试 provider 失败或成功。收敛前不重复发消息、启动 provider attempt、获取或释放容量；只有确证本次 append 未写入事实的 receipt 才能判定 `NotCommitted`。
 
-消息终态直接由 `ExecutionFailureResolution` 中的 `TerminalizeAcceptedPreProvider(ExactExecutionKey, TypedTerminalDisposition)` 与 `TerminalizeProviderStarted(ExactExecutionKey, TypedTerminalDisposition)` 表述，不再设独立于 Resolution 之外的第二状态机或自由字段。
+## [008] 时间不授权处置
 
-`TerminalizeAcceptedPreProvider` 是 binding、Host projection、拒绝、取消或删除在 durable `Accepted` 后且 `ProviderStarted` 前失败时的 typed terminal command；`TerminalizeProviderStarted` 只适用于已存在 durable `ProviderStarted` 的 execution。`managed-chat-execution` 必须按 exact key 与 durable phase 穷尽验证 command，拒绝跨 phase 或不同 execution 的处置。`execution-failure-policy` 不直接写消息事实，也不重定义 `Accepted → ProviderStarted → terminal` 的合法迁移。任何 diagnostic text 均不得成为 terminal disposition。
+策略与解释器只由 typed input、durable fact、capacity event、Host terminal evidence 或 persistence result 推进。deadline、sleep、elapsed time、轮询次数与错误文本不授权 retry、breaker transition、容量结算、终态或 fatality。
 
-## [006] fatal 必须在确切结算之后执行
+## [009] Host session error 边界
 
-`FatalAfterSettlement` 只由 `LocalInvariant` 或无法安全继续的 `PersistenceFailure` policy 分支产生。解释器必须按 durable phase 执行 decision：对 `Accepted` 后、`ProviderStarted` 前的 terminal disposition，必须先取得 exact terminal append 的 `Committed` receipt，之后才可执行 `ReleaseExactFence`；该 append 为 `NotCommitted` 或 `Unknown` 时不得释放 fence。其他 phase 只执行各自合法的 disposition/settlement dependency，严禁套用 universal release-before-disposition sequence。所有 phase 中，fatal boundary 始终是最后一步：只有 decision 要求的 disposition 与 exact capacity settlement 已成功，或对应提交状态已有 durable unknown evidence，才可调用。严禁 catch 后立即退出、吞掉 pre-fatal settlement 失败，或让 Host/UI 私有行为代替结算证据。
+Host 上报的 session error 一律解码为 `ProviderTransient`，只有 typed operator abort 与 supersede 分别为 `UserCancelled`、`Superseded`。工具语义错误留在 Host 的 part 循环；plugin、config、schema、permission 等 hook 失败仍按 `host-provider-failure-ownership` fail-loud，其他可信边界仍可产生 [001] 的其他类别。
 
-## [007] 提交未知保持未知且禁止重复 effect
-
-`AcceptanceUnknown` 与 `PersistenceFailure(Unknown)` 必须保留显式 uncertainty，依靠 durable read/reconciliation 或外部 physical evidence 收敛。它们不得被映射为 `NotCommitted`、“未发生”、provider transient、retryable 或成功；在收敛前不得重复发送消息、重复 provider attempt、重复获取或释放容量。只有明确证明本次 append 未写入事实的 receipt 才可形成 `PersistenceFailure(NotCommitted)`。
-
-## [008] 决策与恢复时间无关
-
-policy 与 interpreter 的推进仅由 typed input、durable fact、capacity event、Host terminal evidence 或 persistence result 驱动。deadline、sleep、elapsed time、轮询次数与错误文本不得授权 retry、breaker transition、capacity settlement、terminal resolution 或 fatality。
-
-## [009] Host 错误边界不做失败分类
-
-除非 typed control，Host 上报的任何错误一律解码为 `ProviderTransient`：
-operator abort → `UserCancelled`，supersede → `Superseded`（crash-reconciliation-008 / host-provider-failure-ownership-002）。
-工具调用等语义错误由 OpenCode 在自己的循环内解决，以 part 而非 session error 呈现，不经过本边界。
-
-理由：边界处没有可信证据区分 upstream 失败类别；任何“猜类别”的终点都是把 provider 噪音变成调用方可见的终态。
-重试、预算与上下文替换由 provider recovery 路径独占决定（provider-attempt-recovery-005/provider-attempt-recovery-008/provider-attempt-recovery-019），
-预算耗尽仍按 host-provider-failure-ownership-006 产生唯一 typed terminal。
-本边界不削弱 host-provider-failure-ownership-004：plugin/config/schema/permission 等 **hook 失败**仍 fail-loud。
-
-`LocalInvariant`、`ProtocolRejection`、`AuthorizationDenied`、`StreamInterruptedAfterFirstToken` 等类别仍保留在封闭代数中，
-由 provider adapter、持久化边界与 legacy 解码使用；execution-failure-policy-003 关于“这些类别永不进入 retry”的约束适用于这些边界。
-重试必须以替换上下文的方式发出（provider-attempt-recovery-011 wire 重建 prefix、丢弃旧 retry 行、`ProviderRetryAttempt` continuation），不得盲目重放已产生可见输出的 attempt。
+恢复由 `provider-attempt-recovery` 独占：重建 prefix、去掉旧 retry 行，以 `ProviderRetryAttempt` 替换上下文；不盲目重放已有可见输出的 attempt。预算耗尽按 `host-provider-failure-ownership` 产生唯一 typed terminal。
 
 ## [010] 致命入口逐处有据
 
-所有生产 fatal 入口及转入该入口的边界必须纳入可检查清单。每处记录触发前提、所属状态、不可达证明或实际回归；新增入口、入口漂移和缺失证据必须使标准验证失败。性质测试调用编译后的生产实现，固定 seed 并允许重放反例；测试自造的决策模型不能代替生产实现证据。
+所有生产 fatal 入口及转入边界必须登记触发前提、所属状态和不可达证明或实际回归；新增入口、入口漂移、缺失证据使标准验证失败。性质测试调用生产实现，以固定 seed 重放反例，不用自造模型替代。
 
-协议修复耗尽、过期回调、确定未发送和运行环境拒绝不得仅因“开发时没预料”成为 LocalInvariant。可达失败必须由所属请求或资源明确收敛；不释放其他请求的所有权，不重发 outcome unknown 的 effect，不在 fatal 后安排结算。保留的不变量熔断仍须满足 execution-failure-policy-006。
+协议修复耗尽、过期回调、确定未发送和运行环境拒绝，不因“未预料”就成为 `LocalInvariant`。可达失败由所属请求或资源收敛，不释放他人的所有权、不重发未知 effect；保留的熔断满足 [006]。
 
-## [014] fatal 清单是机器可检查的入口索引
+## [014] 可检查的致命入口索引
 
-`requirements/execution-failure-policy/fatal-inventory.json` 是 execution-failure-policy-010 的机器可检查索引，不是第二套策略：每条记录以稳定 ID（附录 A 的 F 系列、附录 B 的 T 系列、附录 C 的 C/X 系列，见 AGENTS.md 提案）登记 owner requirement、source symbol、触发分支、输入来源、exact identity、phase、被断言的不变量、提交/资源处置、影响范围、证据类型、正式测试 ID 与状态（`Open|Proved|PropertyChecked|FixedWithRegression|RetainedFuse|ExcludedWithEvidence`）。定位一律按 source symbol + operation 字符串，禁用行号。`scripts/checks/fatal-inventory-gate.mjs`（已接入 `scripts/check.mjs`）在三种情形下失败：扫描到无清单行的 fatal/trip 调用（含 `TripFatal` 点自由绑定与 `ReportFatalDiagnostic` 转接的一跳别名）；清单行的 operation 字符串离开其 source 文件（证据过期）；`FixedWithRegression` 行点名的测试文件不存在。附录 C 的受管子进程 kill、signal-0 存活探测、`TextDecoder fatal:true`、`SendOutcome.Fatal` 联合分支按 `ExcludedWithEvidence` 登记，不进入 fatal 账。
+fatal 索引用稳定 ID 登记 owner、源符号与 operation、触发与输入、exact identity、phase、不变量、提交和资源处置、影响范围、证据及正式测试。按符号与 operation 定位，不以行号定位；状态为 `Open | Proved | PropertyChecked | FixedWithRegression | RetainedFuse | ExcludedWithEvidence`。
 
-## [011] 未分类 hook 失败必须携带自有证据
+标准检查拒绝未登记入口（含间接转接）、过期定位及缺失的正式回归。真实的进程致命入口与受管子进程终止、存活探测、解码选项、结果类别等同名概念分开，排除也须有据。索引不另定失败策略。
 
-hook 抛出的不可识别异常不拥有"无已接受事实、无所属执行"的免费推定。边界只能从 hook 实参证明执行身份（`sessionID` 字段或 output.messages 单一会话 + 末尾物理用户消息），能证明则以该 `ChatExecutionKey` 下发 `SettlementIncomplete`，后续处置交由相应 phase 的 settlement owner，不补造执行已干净的记录；不能证明则 key 保持 None。未知类别不升级为 process fatal，也不降级为可重试 provider 噪音——它作为不变的 rethrow 信号交给 Host，fatal 决策保留给证据齐全的 phase。
+## [011] 未分类 hook 失败保留自有证据
 
-## [012] StopPhysicalRun 先落 admission barrier，物理 abort 独立观测
+不可识别 hook 异常只能由本次实参证明 execution key：会话标识与末尾物理用户消息必须无歧义。能证明则下发 `SettlementIncomplete`，由所属 phase 的 settlement owner 处置；不能证明则 key 为 None，均不得补造干净终态。原异常不变地交回 Host，不升级为 process fatal，也不降为可重试 provider 噪音。
 
-Enforcer 返回 `StopPhysicalRun` 时必须先把确切 execution 的 provider admission 钉死（suppress in-flight step + release custody），其后才是 detached Host abort 且其结果仅为诊断。abort 在途、拒绝、抛错都不允许恢复该 execution 的 provider admission；其他 request/execution 不受影响。
+## [012] StopPhysicalRun
 
-## [013] unhandled fatal 分支不可合并不同 lifecycle
+`StopPhysicalRun` 先封住确切 execution 的 provider admission、抑制在途 step 并交还 custody，再独立请求 Host abort。abort 在途、拒绝、抛错只作诊断，不恢复该 execution 的 admission，不影响其他 execution。
 
-单次空的 transform 文本、协议违例的 repair outcome（send-kind 回报 transform observe）、committed/unknown settlement 毁约等到 fatal 的入口必须按 commitment 语义分解成各自路径：成功结算的请求加入 catch-up，协议违例保留 fuse，SettlementIncomplete/Unknown 不得未经证据落为"未执行"。同一 fatal operation 不得吞掉不同寿命期的精确处置。
+## [013] 分清致命路径的生命周期
+
+不同触发、commitment 与结算状态不得因共用 fatal operation 而合并处置。成功结算的请求进入 catch-up，协议违例保留其 fuse，`SettlementIncomplete` 与 `Unknown` 未经证据不得当作未执行；空 transform、repair 协议违例与 committed/unknown settlement 毁约分别保留其精确路径。

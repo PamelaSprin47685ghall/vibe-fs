@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import * as concern from '../../../dist/Interaction/Concern/Surface.js'
-
-const read = (path) => readFileSync(path, 'utf8')
 
 test('WHAT[concern-routing-001] subscribe is idempotent per live owner and keeps id-to-concern immutable', () => {
   let state = concern.empty()
@@ -15,9 +12,25 @@ test('WHAT[concern-routing-001] subscribe is idempotent per live owner and keeps
   const replay = concern.subscribe('owner-a', 'gen-1', 'build', 'build health', state)
   assert.equal(replay.ok, true)
   assert.equal(replay.appended, false)
+  assert.equal(concern.subscribe('owner-a', 'new-call', 'build', 'build health', state).appended, false)
   assert.equal(concern.subscribe('owner-b', 'gen-2', 'build', 'build health', state).ok, false)
   assert.equal(concern.subscribe('owner-a', 'gen-2', 'build', 'different meaning', state).ok, false)
 })
+
+test('WHAT[concern-routing-001] generation identity cannot be reused for another owner, address or meaning', () => {
+  const state = concern.subscribe('owner-a', 'generation', 'build', 'build health', concern.empty()).state
+  for (const [owner, id, meaning] of [
+    ['owner-b', 'build', 'build health'],
+    ['owner-a', 'other', 'build health'],
+    ['owner-a', 'build', 'different concern'],
+  ]) {
+    const rejected = concern.applySubscribedClaim(owner, 'generation', id, meaning, state)
+    assert.equal(rejected.ok, false)
+    assert.deepEqual(concern.prepare('owner-a', rejected.state), concern.prepare('owner-a', state))
+  }
+})
+
+test.todo('WHAT[concern-routing-001] subscription remains isolated between real workspaces and conflicts do not overwrite durable owners (GAP-155)')
 
 test('WHAT[concern-routing-001] subscribe rejects blank address fields without creating a mailbox', () => {
   for (const fixture of [

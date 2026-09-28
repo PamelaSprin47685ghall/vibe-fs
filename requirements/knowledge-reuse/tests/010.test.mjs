@@ -329,7 +329,7 @@ const QUESTIONS = [
   ['When does CaseFinalize run?', 'ReuseScope close, once.'],
 ]
 
-test('WHAT[knowledge-reuse-010] G6_engineer_charge_sync_delegate_lifecycle_bookkeeper_fetch', async () => {
+test('WHAT[knowledge-reuse-010] actual Engineer charge results can be manually supplied to one Casebook draft and finalized', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-g6-engineer-charge-'))
   execFileSync('git', ['init', '--quiet', dir])
   mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
@@ -423,7 +423,7 @@ const QUESTIONS = [
   ['When does CaseFinalize run?', 'ReuseScope close, once.'],
 ]
 
-test('WHAT[knowledge-reuse-010] G6_G_host_reusable_inspector_one_finalize_then_cold_fetch', async () => {
+test('WHAT[knowledge-reuse-010] actual reusable Engineer results can be manually collected and archived; cleanup retains that archive', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-g6-host-reuse-'))
   execFileSync('git', ['init', '--quiet', dir])
   mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
@@ -658,3 +658,5 @@ test('WHAT[knowledge-reuse-010] G6_G_cancel_session_cleanup_no_publication', asy
   }
 })
 }
+
+test.todo('WHAT[knowledge-reuse-010] GAP-160: actual Engineer resume boundaries and Fission takeover each archive exactly one distinct logical invocation, rejecting lane, late and duplicate terminal events')

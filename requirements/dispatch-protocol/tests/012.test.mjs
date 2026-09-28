@@ -244,3 +244,5 @@ test('WHAT[dispatch-protocol-012] DP_012_physical_acceptance_hands_exact_claim_i
   }
 })
 }
+
+test.todo('WHAT[dispatch-protocol-012] real PhysicalAccepted handoff retains the whole atomic profile and only managed execution acquires exact capacity and creates execution facts (GAP-136)')

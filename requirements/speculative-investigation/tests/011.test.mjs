@@ -1,31 +1,6 @@
 import test from 'node:test'
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { readFile } = await import("node:fs/promises");
-const { default: test } = await import("node:test");
-
-const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
-const branch = (source, start, end) => {
-  const from = source.indexOf(start)
-  assert.ok(from >= 0, `missing branch ${start}`)
-  const to = source.indexOf(end, from + start.length)
-  assert.ok(to > from, `missing end branch ${end}`)
-  return source.slice(from, to)
-}
-
-test('WHAT[speculative-investigation-011] SPEC_INV_011_Strength_replica_lifecycle_has_no_wall_clock_terminal_arbitration', async () => {
-  const runtime = await read('src/Wanxiangshu/Strength/Replica/Runtime.fs')
-  assert.doesNotMatch(runtime, /ITimerPort|timer\.Delay|completionWins|settleCompletionRace|maxLatencyMs|TimedOut/)
-  assert.doesNotMatch(runtime, /\.IsCompleted|get_IsCompleted/)
-  assert.match(runtime, /SemanticTerminal:\s*StrengthReplicaTerminal option/)
-
-  const start = runtime.indexOf('member this.StartDecision')
-  assert.ok(start >= 0, 'Treatment must expose StartDecision')
-  const decision = runtime.slice(start, runtime.indexOf('member _.Dispose', start))
-  assert.match(decision, /let!\s+result\s*=\s*state\.Completion\.Task/)
-})
-}
+test.todo('WHAT[speculative-investigation-011] GAP-183: real Treatment remains pending without a causal terminal and cancels only on allowed events; no source-name scan proves this liveness boundary')
 
 {
 const { default: assert } = await import("node:assert/strict");

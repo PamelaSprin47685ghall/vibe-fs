@@ -1,6 +1,18 @@
 import test from 'node:test'
 
 {
+const { default: assert } = await import('node:assert/strict')
+const change = await import('../../../dist/Change/Surface.js')
+const classifyRebased = (head, rebasedCommit = 'r1', snapshot = 'h1') =>
+  change.classifyRebasedCandidate(head ?? null, rebasedCommit, snapshot)
+
+test('WHAT[change-integration-013] ORCH_005_a_rebased_candidate_publishes_only_while_the_target_has_not_moved', () => {
+  assert.equal(classifyRebased('h1').kind, 'PublishReady')
+  assert.equal(classifyRebased('h2').kind, 'NeedsRebase')
+})
+}
+
+{
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 

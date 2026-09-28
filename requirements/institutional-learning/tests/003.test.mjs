@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import * as learning from '../../../dist/Enforcer/InstitutionalLearning/Surface.js'
 
-const read = (path) => readFileSync(path, 'utf8')
-
-test('WHAT[institutional-learning-003] enhancer is bounded to the supplied experience and live rulebook snapshot', () => {
-  const enhancer = read('src/Wanxiangshu/Enforcer/InstitutionalLearning/Enhancer.fs')
-  assert.match(enhancer, /let evaluate \(experience: string\) \(rules: EnforcerRule list\)/)
-  assert.doesNotMatch(enhancer, /readFile|PackageResources|Http|fetch|Network|Repository/)
+test('WHAT[institutional-learning-003] current evaluator consumes the supplied rule names rather than an independent hidden rule-name list', () => {
+  const experience = 'known-rule applies to this success'
+  assert.equal(learning.evaluate(experience, ['known-rule']).disposition, 'ABSORB')
+  assert.equal(learning.evaluate(experience, []).disposition, 'DISCARD')
+  assert.equal(learning.evaluate(experience, ['different-rule']).disposition, 'DISCARD')
 })
+
+test.todo('WHAT[institutional-learning-003] GAP-181: semantic mechanism extraction and actual input-capability isolation; substring matching is not an abstraction oracle')

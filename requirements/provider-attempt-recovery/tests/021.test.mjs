@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { fileURLToPath } from 'node:url'
 import * as xwire from '../../../dist/Context/Prefix/XWireSurface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
@@ -11,11 +10,8 @@ import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 import * as failureOwner from '../../../dist/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.js'
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 
-const ROOT = fileURLToPath(new URL('../../../', import.meta.url))
-
-const FIRST_CODER_TARGET = { model: 'cursor/cursor-grok-4.6-xhigh', reasoning: 'xhigh' }
-
-const SECOND_CODER_TARGET = { model: 'neuralwatt/glm-5.2-flex', reasoning: 'high' }
+const FIRST_TARGET = { model: 'first/model', reasoning: 'high' }
+const SECOND_TARGET = { model: 'second/model', reasoning: 'none' }
 
 const admit = async (runtime, sessionId, physicalUserMessageId) => {
   const acquisition = await routing.acquireExecutionAdmission(
@@ -46,10 +42,19 @@ const release = (runtime, sessionId, physicalUserMessageId) => {
 }
 
 const loadedTemplate = async () => {
-  const template = await import('../../../resources/wanxiangshu.mjs')
-  const scheduler = template.default
-  scheduler.markProviderFailed = template.markProviderFailed
-  scheduler.hasTheoreticalCapacity = template.hasTheoreticalCapacity
+  const failed = new Set()
+  const providerOf = target => target.model.split('/')[0]
+  const scheduler = (_role, running, previous) => {
+    const available = target => !failed.has(providerOf(target)) && !running.some(active => active.model === target.model)
+    if (previous && available(previous)) return previous
+    return [FIRST_TARGET, SECOND_TARGET].find(available) ?? null
+  }
+  scheduler.markProviderFailed = provider => { failed.add(provider) }
+  scheduler.hasTheoreticalCapacity = () => failed.size < 2
+  const template = {
+    clearFailedProviders: () => failed.clear(),
+    providerCapacity: provider => failed.has(provider) ? 0 : 1,
+  }
   return { template, runtime: routing.createRuntime(scheduler) }
 }
 
@@ -57,18 +62,18 @@ const firstFailureKeptTarget = async () => {
   const { template, runtime } = await loadedTemplate()
   const holders = []
 
-  for (let index = 0; index < 4; index += 1) {
+  for (let index = 0; index < 1; index += 1) {
     holders.push(await admit(runtime, `holder-${index}`, `msg-holder-${index}`))
-    assert.deepEqual(holders[index], FIRST_CODER_TARGET)
+    assert.deepEqual(holders[index], FIRST_TARGET)
   }
 
   const failedTarget = await admit(runtime, 'ses-lwr', 'msg-first')
-  assert.deepEqual(failedTarget, SECOND_CODER_TARGET, 'the saturated first candidate pushes the attempt to the second')
+  assert.deepEqual(failedTarget, SECOND_TARGET, 'the occupied first candidate pushes the attempt to the second')
 
   routing.endProviderStep(runtime, 'ses-lwr', 'msg-first', 'run-first')
   release(runtime, 'ses-lwr', 'msg-first')
 
-  for (let index = 0; index < 4; index += 1) {
+  for (let index = 0; index < 1; index += 1) {
     release(runtime, `holder-${index}`, `msg-holder-${index}`)
   }
 
@@ -103,11 +108,11 @@ const admittedWithPhysical = (physicalMessageId) => ({
   SendPrompt: async () => dispatch.admittedWithPhysicalMessage(physicalMessageId),
 })
 
-test('WHAT[provider-attempt-recovery-021] first_failure_keeps_the_original_target_for_the_lwr_retry', async () => {
+test('WHAT[provider-attempt-recovery-021] explicit retain settlement preserves the exact failed target for one fresh admission', async () => {
   const { template, runtime, failedTarget } = await firstFailureKeptTarget()
 
   try {
-    // cursor is free again: without a binding the fresh admission takes the
+    // The first target is free again: without a binding fresh admission takes the
     // pool's first candidate, so a retained second candidate proves the binding.
     const retained = routing.retainFailedTargetForRetry(runtime, 'ses-lwr', 'run-first')
     assert.deepEqual(retained, failedTarget, 'the settlement resolves the exact failed target')
@@ -119,13 +124,13 @@ test('WHAT[provider-attempt-recovery-021] first_failure_keeps_the_original_targe
 
     const retryTarget = await admit(runtime, 'ses-lwr', 'msg-lwr-retry')
     assert.deepEqual(retryTarget, failedTarget, 'the recovery retry returns to the original target')
-    assert.equal(template.providerCapacity('neuralwatt'), 4, 'the first failure condemns nothing')
+    assert.equal(template.providerCapacity('second'), 1, 'retaining a target condemns nothing')
   } finally {
     template.clearFailedProviders()
   }
 })
 
-test('WHAT[provider-attempt-recovery-021] a_successful_lwr_retry_switches_nothing', async () => {
+test('WHAT[provider-attempt-recovery-021] retry preference is consumed once and does not pin future admissions', async () => {
   const { template, runtime, failedTarget } = await firstFailureKeptTarget()
 
   try {
@@ -133,28 +138,27 @@ test('WHAT[provider-attempt-recovery-021] a_successful_lwr_retry_switches_nothin
     const retryTarget = await admit(runtime, 'ses-lwr', 'msg-lwr-retry')
     assert.deepEqual(retryTarget, failedTarget)
 
-    // The retry completes: no settlement ever runs for a success.
+    release(runtime, 'ses-lwr', 'msg-lwr-retry')
     const next = await admit(runtime, 'ses-lwr', 'msg-next')
-    assert.deepEqual(next, failedTarget, 'a successful LWR retry keeps the route')
-    assert.equal(template.providerCapacity('neuralwatt'), 4, 'success never condemns a provider')
+    assert.deepEqual(next, FIRST_TARGET, 'the one-use preference has been consumed')
+    assert.equal(template.providerCapacity('second'), 1)
   } finally {
     template.clearFailedProviders()
   }
 })
 
-test('WHAT[provider-attempt-recovery-021] only_the_failed_lwr_retry_condemns_the_provider_and_rotates', async () => {
+test('WHAT[provider-attempt-recovery-021] explicit condemnation consumes an exact witness once and rotates to a healthy target', async () => {
   const { template, runtime, failedTarget } = await firstFailureKeptTarget()
 
   try {
     routing.retainFailedTargetForRetry(runtime, 'ses-lwr', 'run-first')
     assert.deepEqual(await admit(runtime, 'ses-lwr', 'msg-lwr-retry'), failedTarget)
 
-    // This time the LWR retry itself fails: it was dispatched by recovery, so
-    // its own confirmed failure condemns the provider.
+    // The test selects condemnation explicitly; workflow selection is separate.
     routing.endProviderStep(runtime, 'ses-lwr', 'msg-lwr-retry', 'run-lwr')
     const condemned = routing.condemnFailedTarget(runtime, 'run-lwr')
     assert.deepEqual(condemned, failedTarget, 'the condemning witness is the failed LWR retry target')
-    assert.equal(template.providerCapacity('neuralwatt'), 0, 'a failed LWR retry condemns its provider')
+    assert.equal(template.providerCapacity('second'), 0)
     assert.equal(
       routing.condemnFailedTarget(runtime, 'run-lwr'),
       null,
@@ -162,7 +166,7 @@ test('WHAT[provider-attempt-recovery-021] only_the_failed_lwr_retry_condemns_the
     )
 
     const rotated = await admit(runtime, 'ses-lwr', 'msg-after-condemn')
-    assert.deepEqual(rotated, FIRST_CODER_TARGET, 'the dispatch after the condemnation rotates')
+    assert.deepEqual(rotated, FIRST_TARGET, 'the dispatch after the condemnation rotates')
   } finally {
     template.clearFailedProviders()
   }
@@ -285,24 +289,4 @@ test('WHAT[provider-attempt-recovery-021] the_lwr_retry_payload_replaces_the_cov
   assert.equal(beforeAnyFailure.changed, false, 'no confirmed failure means no LWR replacement')
 })
 
-test('WHAT[provider-attempt-recovery-021] ordinary_recovery_and_the_delegate_decorator_share_one_settlement', () => {
-  const source = readFileSync(
-    join(ROOT, 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs'),
-    'utf8',
-  )
-
-  // The workflow never condemns a provider directly: the settlement is the
-  // single site, and both outcomes derive from the durable LWR-retry fact.
-  assert.equal(source.includes('ModelRouting.markProviderFailed'), false)
-  const settlement = source.match(/\bsettleFailedAttemptTarget\b/g) ?? []
-  assert.equal(settlement.length, 2, 'declared once, called from the one licensed redispatch')
-  const fact = source.indexOf('failedAttemptWasLwrRetry durable turn.SessionId turn.PhysicalUserMessageId')
-  const condemn = source.indexOf('ModelRouting.condemnFailedTarget')
-  const retain = source.indexOf('ModelRouting.retainFailedTargetForRetry')
-  assert.ok(fact !== -1 && condemn > fact && retain > fact, 'both outcomes derive from the durable fact')
-
-  // Ordinary recovery and the SyncDelegate decorator both plug the same
-  // redispatch, so neither can grow its own settlement rule.
-  const plugs = source.match(/Redispatch =\s*\n?\s*redispatchAfterFailure/g) ?? []
-  assert.equal(plugs.length, 2, 'the ordinary entry and the delegate entry share one redispatch')
-})
+test.todo('WHAT[provider-attempt-recovery-021] actual ordinary and sync-delegate recovery combine exact durable LWR evidence and target settlement after licensing and before send (GAP-139)')

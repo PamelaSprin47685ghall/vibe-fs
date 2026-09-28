@@ -120,19 +120,4 @@ test('WHAT[behavior-diagnosis-013] ENFORCER_045_mid_turn_advance_preserves_cover
 })
 }
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const enforcer = await import("../../../dist/Enforcer/Surface.js");
-const blog = await import("../../../dist/Enforcer/BlogSurface.js");
-
-
-test('WHAT[behavior-diagnosis-013] ENFORCER_commit_classification_exposes_named_semantic_branches', () => {
-  assert.equal(blog.classifyCommit({ callCount: 0, providerRun: 'run', tip: 'primitive-obsession' }).branch, 'ProtocolRepair')
-  assert.equal(blog.classifyCommit({ callCount: 1, providerRun: '', tip: 'primitive-obsession' }).branch, 'Fatal')
-  assert.equal(blog.classifyCommit({ callCount: 1, providerRun: 'run', tip: '' }).branch, 'ProtocolRepair')
-  assert.equal(blog.classifyCommit({ callCount: 1, providerRun: 'run', tip: 'not-a-field' }).branch, 'ProtocolRepair')
-  assert.equal(blog.classifyCommit({ callCount: 1, providerRun: 'run', tip: 'primitive-obsession' }).branch, 'Committed')
-  assert.equal(enforcer.validateProviderRun('run').ok, true)
-})
-}
+test.todo('WHAT[behavior-diagnosis-013] GAP-112 stale staged cursor cutoff or epoch is refused before actual append with zero durable commit')

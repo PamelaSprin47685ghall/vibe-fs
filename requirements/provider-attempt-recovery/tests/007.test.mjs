@@ -131,7 +131,7 @@ test('WHAT[provider-attempt-recovery-007] a_replayed_journal_reaches_the_same_bu
   assert.deepEqual({ failures: budgetOf(folded.value).failures }, { failures: 3 })
 })
 
-test('WHAT[provider-attempt-recovery-007] a_replayed_journal_with_intervening_success_restart_reaches_the_same_budget', () => {
+test('WHAT[provider-attempt-recovery-007] ordered facts with intervening success restart the failure streak', () => {
   const succeeded = providerSuccessRecorded({
     session: SESSION,
     logicalRun: RUN,
@@ -148,6 +148,19 @@ test('WHAT[provider-attempt-recovery-007] a_replayed_journal_with_intervening_su
 
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
   assert.deepEqual({ failures: budgetOf(folded.value).failures }, { failures: 1 })
+})
+
+test('WHAT[provider-attempt-recovery-007] a new failure fact after exhaustion stops durable replay', { todo: 'GAP-140: the fold currently absorbs AlreadyExhausted instead of rejecting a new failure fact' }, () => {
+  const folded = foldFacts([
+    rootFact(), failureFact({ run: 'first', count: 1 }), exhaustedFact({ count: 1 }),
+    failureFact({ run: 'new-after-exhaustion', count: 2 }),
+  ])
+  assert.equal(folded.ok, false)
+})
+
+test('WHAT[provider-attempt-recovery-007] durable replay refuses a count above its failure limit', { todo: 'GAP-140 / 37-D1: persisted facts do not establish a limit and the fold accepts the over-budget successor' }, () => {
+  const failures = Array.from({ length: budget.defaultBudget + 1 }, (_, index) => failureFact({ run: `run-${index}`, count: index + 1 }))
+  assert.equal(foldFacts([rootFact(), ...failures]).ok, false)
 })
 
 test('WHAT[provider-attempt-recovery-007] an_advance_naming_another_run_is_absorbed_not_applied', () => {

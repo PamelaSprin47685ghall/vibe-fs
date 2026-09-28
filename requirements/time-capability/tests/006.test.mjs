@@ -11,7 +11,7 @@ const descriptor = () =>
     owner: causal.owner('test-workflow', { id: 'until-signal' }),
     subject: { name: 'coverage' },
     producer: causal.externalProducer('journal', { rev: 'n' }),
-    escapes: [causal.escape('openEndedExternal')],
+    escapes: [causal.escape('deadlineAt', '2000-01-01T00:00:00.100Z')],
     source: 'until-signal-or-deadline.test',
   })
 

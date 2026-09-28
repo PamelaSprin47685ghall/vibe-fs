@@ -34,6 +34,7 @@ test('WHAT[knowledge-reuse-012] CASEBOOK_index_exposes_shelfmark_and_canonical_q
     const entries = snap.cases
     assert.equal(entries.length, 1)
     assert.equal(entries[0].question, question)
+    assert.deepEqual(Object.keys(entries[0]).sort(), ['question', 'shelfmark'])
     assert.match(entries[0].shelfmark, /^Persistence after restart · [0-9a-f]{8}$/)
     assert.equal(entries[0].shelfmark.includes('idx-private-1'), false)
     assert.equal('sessionId' in entries[0], false)

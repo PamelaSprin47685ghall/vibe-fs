@@ -1,29 +1,29 @@
 # host-provider-failure-ownership — WHAT
 
-## [001] Wanxiangshu enabled 时 Host chat retry 固定为零
+## [001] Host chat retry 为零
 
-plugin 成功启用后必须无条件把 `experimental.chatMaxRetries` 设为 0。环境变量、用户配置与 Host 默认值不能覆盖；`WANXIANGSHU_CHAT_MAX_RETRIES` 不再属于生产 contract。
+Wanxiangshu 成功启用后，`experimental.chatMaxRetries` 固定为 0，不受环境变量、用户配置或 Host 默认值覆盖。`WANXIANGSHU_CHAT_MAX_RETRIES` 不是生产配置项。
 
-## [002] 每个 physical provider run 只发起一次上游请求
+## [002] 每个 physical provider run 只请求一次
 
-Host 不为同一 ProviderRunIdentity 发起第二次 provider request。后续压缩、fallback、换 channel/provider/family 只能由 ExecutionFailurePolicy 授权新的 provider run。
+Host 不为同一 ProviderRunIdentity 再发 provider request。压缩、fallback 或更换 channel/provider/family 必须由 execution-failure-policy 授权新的 provider run。
 
-## [003] 恢复期不发射额外呈现且不声称越界 UI 抑制
+## [003] 呈现能力边界
 
-校正 HOSTFAIL 虚假声明：外部 server-plugin 的 `event` 钩子仅在 EventV2Bridge 发布之后被动观测，无法在物理上拦截或抑制上游已发布的 `session.error` 或 Desktop/CLI 原始界面提示。严禁声称具有不存在的 UI 拦截能力。Wanxiangshu 能且只能保证：在内部 provider recovery 处于活跃恢复期时，自身发射零额外 final presentation；仅在所有恢复尝试确定性耗尽时，才发射恰好一次由 Wanxiangshu 拥有的 typed terminal presentation。
+外部 server-plugin 的 event hook 只能观测已经发布的 session.error，不能拦截 Host 或 Desktop/CLI 原生提示，也不得声称可以。Wanxiangshu 在活跃 provider recovery 期间不发额外 final presentation；耗尽后只发一次自有 typed terminal presentation。
 
-## [004] 非认领错误保持 Host 默认 fail-loud
+## [004] 未认领错误仍由 Host 报出
 
-plugin/config/schema/permission/user validation、filesystem/Git/tool contract、unknown class、用户 cancel 与无恢复计划的错误不得被全局吞掉。未知错误默认使用 Host presentation。Host 上报的 `session.error` 不属此列：它一律由 provider recovery 接管（execution-failure-policy-009），预算耗尽后仍按 host-provider-failure-ownership-006 产生唯一 typed terminal。
+plugin/config/schema/permission/user validation、filesystem/Git/tool contract、未知类别、用户 cancel 和无恢复计划的错误不得被全局吞掉；未知错误保留 Host presentation。Host session.error 按 execution-failure-policy[009] 交 provider recovery，耗尽后按 [006] 呈现。
 
-## [005] provider recovery 只有一个 durable owner
+## [005] 恢复决策唯一归属
 
-ExecutionFailurePolicy 是 retry/fallback/capacity settlement 的唯一决策 owner；只有其 opaque recovery authorization 能启动后续 provider run。Plugin event observer、Change Orchestrator 与 Host retry loop 不得成为第二 writer。
+execution-failure-policy 独占 retry、fallback 与 capacity settlement 决策；后续 provider run 必须有其 opaque recovery authorization。plugin event observer、Change Orchestrator 和 Host retry loop 不得另行作出恢复决策或成为第二 writer。
 
-## [006] capacity exhaustion 只产生一个 final presentation
+## [006] 耗尽只呈现一次
 
-全部 provider/channel/family capacity 归零或恢复预算耗尽时写 typed exceptional terminal，停止后续 provider admission，并由 Wanxiangshu 产生恰好一次最终终态呈现（final presentation）；恢复中间状态保持静默，绝不重复生成中间终态呈现。
+全部 provider/channel/family capacity 归零或恢复预算耗尽后，写入 typed exceptional terminal，停止后续 provider admission，并且只产生一次 Wanxiangshu final presentation。中间恢复不产生终态呈现。
 
-## [007] OpenCode Host 版本漂移 fail closed
+## [007] Host 兼容性漂移拒绝
 
-兼容基线固定 OpenCode 1.18.29。gate 必须验证 chatMaxRetries consumer 与 session.error presentation producer→SDK→Desktop/CLI 链路；版本或 owner 漂移时失败并要求重新审计，不允许静默跳过。
+兼容基线为 OpenCode 1.18.29。gate 必须核验 chatMaxRetries consumer 和 session.error 的 producer→SDK→Desktop/CLI 链路；版本或 owner 漂移即失败并要求重新审计，不得跳过。

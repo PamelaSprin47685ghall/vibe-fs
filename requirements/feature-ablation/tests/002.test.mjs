@@ -1,24 +1,16 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as Ablation from '../../../dist/Ablation/Surface.js'
+import { withAblationEnv } from './support/ablation-fixture.mjs'
 
 // Ablation memoises the manifest on first load, so restoring the environment is not
 // enough on its own: the cache would keep answering for the profile that loaded it,
 // and leak into whichever test loads it next. The cache goes down with the env.
 const withEnv = (entries, run) => {
-  const previous = Object.fromEntries(entries.map(([name]) => [name, process.env[name]]))
   try {
-    for (const [name, value] of entries) {
-      if (value === undefined) delete process.env[name]
-      else process.env[name] = value
-    }
     Ablation.resetRegistry()
-    run()
+    return withAblationEnv(entries, run)
   } finally {
-    for (const [name, value] of Object.entries(previous)) {
-      if (value === undefined) delete process.env[name]
-      else process.env[name] = value
-    }
     Ablation.resetRegistry()
   }
 }
@@ -123,7 +115,7 @@ test('WHAT[feature-ablation-002] ABL_002_strength_forced_off_when_speculation_ab
   })
 })
 
-test('WHAT[feature-ablation-002] ABL_002_primary_agents_and_native_sphinx_tool_and_command_are_gated_together', () => {
+test('WHAT[feature-ablation-002] primary agent admission follows the selected ablation profile', () => {
   // 1. station-05 下 relay-incumbency 与 change-integration 为 ablated:
   // manager 与 orchestrator 必须被拒绝 (allowsPrimaryAgent === false)
   // browser 恒 false (fail-closed)

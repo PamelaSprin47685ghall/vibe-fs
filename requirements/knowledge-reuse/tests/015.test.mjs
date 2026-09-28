@@ -1,21 +1,25 @@
-// requirements/knowledge-reuse/tests/015.test.mjs
-//
-// Laws: knowledge-reuse-015
-
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { sandbox, createCase, casebook } from './support/casebook.mjs'
+import * as bookkeeper from '../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js'
+import { installBookkeeperRuntime, scriptedBookkeeperPort } from './support/bookkeeper-session-support.mjs'
 
-import * as casebook from '../../../dist/Repository/Knowledge/Casebook/Surface.js'
-
-test('WHAT[knowledge-reuse-015] T24_T25_abolishes_strict_observation_replay_and_stability_verification_loops', async () => {
-  // Proves that casebook does NOT require strict replay equality or replay-before / replay-after loops.
-  // Instead, diff-driven migration is performed in a single step.
-  assert.equal(typeof casebook.singlePassDiffRefresh, 'function', 'casebook must support singlePassDiffRefresh without stability loop')
-  const result = await casebook.singlePassDiffRefresh({
-    caseId: 'case-1',
-    maintenanceBaseline: 'state-B',
-    targetState: 'state-T',
-    diff: '+change',
-  })
-  assert.equal(result.performedReplayLoop, false, 'must NOT perform replay stability loops')
+test('WHAT[knowledge-reuse-015] actual fetch ignores unrelated file changes and makes one maintenance request for a related change', async () => {
+  const local = sandbox()
+  try {
+    const { identity, shelfmark } = await createCase(local)
+    const { port, createCalls } = scriptedBookkeeperPort()
+    installBookkeeperRuntime(port, [identity])
+    writeFileSync(join(local.dir, 'unrelated.txt'), 'new unrelated content')
+    await local.fetch(shelfmark)
+    assert.equal(createCalls.length, 0)
+    writeFileSync(join(local.dir, 'subject.txt'), 'version-C')
+    await local.fetch(shelfmark)
+    assert.equal(createCalls.length, 1)
+    assert.notEqual((await casebook.fetchCaseByIdentity(local.store, identity)).a, 'Answer B')
+  } finally { bookkeeper.resetRuntime(); local.close() }
 })
+
+test.todo('WHAT[knowledge-reuse-015] GAP-160: one physical target capture supplies both the diff and its committed baseline under concurrent file changes')

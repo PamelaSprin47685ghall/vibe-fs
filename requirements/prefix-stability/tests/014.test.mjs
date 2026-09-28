@@ -109,9 +109,8 @@ test('WHAT[prefix-stability-014] PREFIX_STABILITY_pair_body_stays_out_of_the_tra
   // The only projection the pair fact may grow is Guidelines (HOST-013 recovery).
   assert.equal(flags.guidelines, true, 'the anchored fact must land in Guidelines')
 
-  // HOST-013 行为约束 4: no trace-family projection may be created or touched.
-  // (LifecycleWorkRecord is materialized FROM the XTrace, so an absent XTrace
-  // also means the work record can never carry pair bytes.)
+  // This fact fold does not create trace or frame state. Message ingestion is
+  // a separate path and is not proved by these flags.
   assert.equal(flags.xTrace, false, 'XTrace must not be created by the pair fact')
   assert.equal(flags.blog, false, 'Companion frame sequence must not be created by the pair fact')
 })
@@ -180,5 +179,38 @@ test('WHAT[prefix-stability-014] PPT_tryInject_user_quoting_the_thought_text_is_
   assert.equal(isPairProgrammingThought(out[2]), false, 'matching text alone must not classify as marker')
   assert.equal(out.length, 3)
   assert.equal(out[2].info.role, 'user')
+})
+}
+
+{
+const assert = (await import('node:assert/strict')).default
+const pair = await import('../../../dist/OpenCode/Host/PairProgrammingThoughtSurface.js')
+const trace = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
+const { withReopenableJournal } = await import('../../semantic-trace/tests/support/journal.mjs')
+
+test('WHAT[prefix-stability-014] injected wire fed directly to durable capture excludes guidance and preserves ordinary quotation', { todo: 'GAP-108: direct capture retains suffix bytes; verify and close the actual Host admission path without teaching semantic capture to guess prose' }, async () => {
+  const guidance = 'a unique guidance sentence'
+  const raw = [{
+    info: { id: 'tool-message', role: 'assistant' },
+    parts: [{ id: 'tool-part', type: 'tool', tool: 'read', callID: 'call-1',
+      state: { status: 'completed', input: {}, output: 'file content\r\n', time: { start: 0, end: 1 } } }],
+  }]
+  const injected = await pair.tryInject('ses-trace-guidance', guidance, raw)
+  assert.equal(injected.ok, true)
+  assert.equal(injected.value[0].parts[0].state.output, `file content\r\n\0\uFEFF${guidance}`)
+  const quoted = {
+    info: { id: 'user-quote', role: 'user' },
+    parts: [{ id: 'quote-part', type: 'text', text: guidance }],
+  }
+  await withReopenableJournal(async (journal, reopen) => {
+    const captured = await trace.captureObservedMessages(journal, 'ses-trace-guidance', [...injected.value, quoted].map(message => ({
+      hostMessageId: message.info.id, message,
+    })))
+    assert.equal(captured.ok, true)
+    const recovered = await trace.currentProjection(await reopen(), 'ses-trace-guidance')
+    const parts = recovered.messages.flatMap(message => message.parts)
+    assert.deepEqual(parts.filter(part => part.kind === 'tool-result'), [{ kind: 'tool-result', result: 'file content\r\n' }])
+    assert.deepEqual(parts.filter(part => part.kind === 'text'), [{ kind: 'text', text: guidance }])
+  })
 })
 }

@@ -20,3 +20,5 @@ test('WHAT[process-execution-008] EXEC_018_drain_available_returns_two_completio
   assert.equal(batch[1].ptyId, 'b')
   assert.equal(completionMailboxPendingCount(mailbox), 0)
 })
+
+test.todo('WHAT[process-execution-008] Agent completion publishes only a pulse while physical PTY completion uses its own channel')

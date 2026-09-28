@@ -141,6 +141,7 @@ module SessionAssociationProjection =
         (current: Map<SessionId, SessionAssociation>)
         =
         match tryFind satelliteSessionId current with
+        | Some { Kind = ManagedSessionKind.WorkSession } -> true
         | Some { Kind = ManagedSessionKind.SatelliteSession(_, existingKind) } when existingKind <> kind -> true
         | _ -> false
 
@@ -195,7 +196,7 @@ module SessionAssociationProjection =
             Error(AssociationRejection.AlreadyLinkedToOther(existing, satelliteSessionId))
         | _, Some owner, _ when owner <> mainSessionId ->
             Error(AssociationRejection.CompanionClaimedByOther(owner, satelliteSessionId))
-        | _, Some _, true -> Error(AssociationRejection.SatelliteKindConflict satelliteSessionId)
+        | _, _, true -> Error(AssociationRejection.SatelliteKindConflict satelliteSessionId)
         | _ -> linkedSatellite kind mainSessionId satelliteSessionId parentOfMain current
 
     let linkSatellite

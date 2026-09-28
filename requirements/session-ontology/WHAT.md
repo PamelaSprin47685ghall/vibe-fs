@@ -1,12 +1,12 @@
 # session-ontology — WHAT
 
-## [001] Session 分类由 ExecutionClass 与 Ownership 正交决定
+## [001] 容器分类与参与者身份分离
 
-物理 managed session 的本体分类由 `SessionExecutionClass`（`Work | InternalLeaf`）与 `SessionOwnership`（`Root | Attached`）两个正交维度联合决定。该分类描述容器能力与 durable association，不描述 logical participant run 或 `ParticipantIdentity`。
+managed session 分类只描述物理容器的执行能力与归属，不表示 logical participant run 或 `ParticipantIdentity`。
 
 ## [002] ExecutionClass 与 Ownership 为穷尽正交组合
 
-每个 managed session 必须且仅能落在 `Work | InternalLeaf` 与 `Root | Attached` 的四格穷尽组合之一；`Attached` 状态恒携带且仅携带一个 `ownerSessionId` 与一个 `AttachmentKind`。
+每个 managed session 恰属 `Work | InternalLeaf` 与 `Root | Attached` 的四种正交组合之一。`Attached` 恰有一个 `ownerSessionId` 和一个 `AttachmentKind`。
 
 ## [003] Dedicated SyncInspector 与 SyncCoder 属于 Work + Attached
 
@@ -14,23 +14,23 @@ Dedicated SyncInspector 与 SyncCoder 属于 `Work + Attached`，具备完整的
 
 ## [004] Companion / Bookkeeper / StrengthReplica 属于 InternalLeaf + Attached
 
-Companion、Bookkeeper 与 StrengthReplica 属于 `InternalLeaf + Attached`；InternalLeaf 节点不得持有 Companion、不得递归附挂子叶节点，亦不得挂载其他 Attached 实体。
+Companion、Bookkeeper 与 StrengthReplica 属于 `InternalLeaf + Attached`。InternalLeaf 不得拥有任何 Attached 实体，包括 Companion 和其他内部叶子。
 
 ## [005] Attached 节点单一 Owner 且禁止自链
 
-每个 Attached session 严格归属于单一 `ownerSessionId`；Attached session 的 ID 绝对不得等于其 owner ID，任何自链接操作均直接拒绝。
+Attached session 只有一个 owner，且不得以自身为 owner；冲突归属与自链均拒绝。
 
 ## [006] 物理 Host Parent 恒为 Family Root 且逻辑归属由 Journal 承载
 
-所有 managed child 在 Host 物理层均挂在 family root 下（物理树深度恒为 2）；层级归属完全由持久化 journal association 承载。物理 parentID 既不得推断 logical ownership，也不得作为 child/attached/InternalLeaf 的 Role、Persona、identity provenance 或 owner-derived identity evidence。
+所有 managed child 在 Host 中直接挂在 family root 下。逻辑归属只由持久化关联事实决定，不从物理 parentID 推断；物理父节点也不构成 Role、Persona、身份来源或继承证据。
 
 ## [007] Durable 关联事实与正交分类派生视图解耦
 
-持久化 `SessionAssociation` 是关联关系的最小事实编码；`ExecutionClass × Ownership` 为纯派生视图（`SessionOwnershipClassification`）。派生逻辑只读且由 durable facts 决定，不得反向改写 association 或另建身份状态。
+持久化关联是最小事实，`ExecutionClass × Ownership` 是由这些事实只读派生的视图；不得反向改写关联或另建身份状态。
 
 ## [008] 关联写操作不变量与原子拒绝集
 
-关联写入操作严格原子校验并拒绝以下情形：自链（SelfLink）、给 Companion 递归附挂 Companion、替换已有有效 Companion 链接、冲突占用已被其他 Work 占用的 Companion，以及同 child 以冲突 kind 注册。同一对 (owner, child) 重复链接保证幂等。
+关联写入原子校验：自链、向 Companion 递归附挂、替换有效 Companion、抢占其他 Work 的 Companion 或将同一 child 注册为冲突种类时，全部拒绝且不改变已有事实。同一 owner、child 的重复链接幂等。
 
 ## [009] Work Root 唯一 Companion 规则
 
@@ -38,19 +38,15 @@ Companion、Bookkeeper 与 StrengthReplica 属于 `InternalLeaf + Attached`；In
 
 ## [010] Runtime 拓扑不决定业务分类与角色
 
-Session 的物理本体分类严格仅由 `ExecutionClass × Ownership` 决定，不得受 Role、Persona、工具暴露面或 Logical Run 影响；Companion 资格不设角色白名单。反向亦然：classification、association、Session cache 与 Host parent 均不得生成或修改 `ParticipantIdentity`。
+容器分类不由 Role、Persona、工具或 logical run 决定，Companion 资格不设角色白名单。分类、关联、Session 缓存和 Host parent 也不得生成或修改 `ParticipantIdentity`。
 
 ## [011] StrengthReplica 为 Universal 内部叶子且不跨决策复用
 
-StrengthReplica 属于进程内 `InternalLeaf + Attached`，不属于持久化 satellite kind；每个 owner 至多存在一个 active 副本，决策完成即销毁，禁止跨决策复用 transcript。
+StrengthReplica 是进程内的 `InternalLeaf + Attached`，不记录为持久化 satellite。每个 owner 至多有一个 active 副本，决策完成即销毁，不跨决策复用 transcript。
 
 ## [012] Bookkeeper 绑定具体 TransactionId
 
-Bookkeeper attachment 必须显式携带目标 transactionId，专用于临时取数审计，禁止与 Companion 或 Sync* 身份混用。
-
-## [013] Canonical Durable Role Label 稳定性
-
-持久化事实中的角色标签必须由规范的 role catalog 唯一确定，不得随内部类型枚举或代码重命名而漂移。
+Bookkeeper attachment 显式绑定目标 transactionId，只用于该事务的临时取数审计，不与 Companion 或同步受托身份混用。
 
 ## [014] 单一平坦拓扑与合法角色边界
 
@@ -58,4 +54,4 @@ Bookkeeper attachment 必须显式携带目标 transactionId，专用于临时�
 
 ## [015] SessionId 是可复用物理容器，不是 identity scope
 
-`SessionId` 只命名物理容器；logical participant run identity 由 exact run 与 `AuthorityRootAccepted` 内 participant-identity owner 的版本化 evidence 命名。同一 SessionId 只有在 `interaction-authority` 已为 exact `(SessionId, LogicalRunId, AuthorityRootId)` 持久化 `AuthorityLogicalRunClosed` 并释放 active identity binding 后，才可承载 fresh root 与不同 identity。Session ontology 只发布容器分类与 durable association；它不缓存或解析 identity，不发布 run closure，也不把 association removal、detach/attach、classification、idle/timeout 或 Host 观察冒充 lifecycle terminal 或 closure。
+`SessionId` 只命名可复用的物理容器，身份作用域与复用准入遵循 participant-identity-009。容器分类和关联不缓存或解析身份、不发布 run closure；移除关联、detach/attach、分类变化、idle/timeout 或 Host 观察均不代表 lifecycle terminal 或 closure。

@@ -12,4 +12,8 @@
 /src/Wanxiangshu/Repository/Programming/Js/Transaction.fs
 /src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs
 /src/Wanxiangshu/Persistence/Journal/FactCodec.fs
-/requirements/change-integration/tests/runtime.test.mjs
+/src/Wanxiangshu/Interaction/Dispatch/**
+/src/Wanxiangshu/Context/Companion/Blogger/Runtime/CycleProjection.fs*
+/src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs*
+/src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkRunLifecycle.fs*
+/src/Wanxiangshu/Participant/Cognition/**

@@ -61,7 +61,7 @@ const assertSingleRecovery = (decision, expected) => {
   assert.ok(decision.authorization)
 }
 
-test('WHAT[execution-failure-policy-002] cancel/retry/stream matrix is interpreted by registered owners', async () => {
+test('WHAT[execution-failure-policy-002] production owners separately interpret cancel retry and stream evidence', async () => {
   const cancelled = decide('UserCancelled')
   assertNoRecovery(cancelled)
   assert.equal(cancelled.resolution, 'TerminalizeProviderStarted')
@@ -242,12 +242,10 @@ test('WHAT[execution-failure-policy-002] cancel/retry/stream matrix is interpret
     'FatalMembraneInput',
     'Exact',
   )
-  const fatal = hooks.hookFailurePolicy('LocalInvariant', 'ExactSettlementComplete')
-  assert.deepEqual([...exactSettlement.trace, fatal].slice(-4), [
+  assert.deepEqual(exactSettlement.trace.slice(-3), [
     'TerminalizeAccepted',
     'UnbindExecution',
     'ReleaseBeforeProvider',
-    'FatalAfterSettlement',
   ])
   assert.equal(exactSettlement.admission.activeCapacity, 0)
 })
@@ -377,6 +375,33 @@ test('WHAT[execution-failure-policy-002] every phase and failure yields exactly 
         assert.equal(typeof decision.breaker.kind, 'string')
         assert.equal(typeof decision.capacitySettlement.kind, 'string')
         assert.equal(typeof decision.fatality.kind, 'string')
+        switch (decision.resolution) {
+          case 'RetryFreshAttempt':
+            assert.ok(decision.authorization)
+            assert.equal(decision.executionKey, null)
+            assert.equal(decision.terminalDisposition, null)
+            assert.equal(decision.fatality.kind, 'NoFatality')
+            break
+          case 'TerminalizeAcceptedPreProvider':
+          case 'TerminalizeProviderStarted':
+            assert.equal(decision.authorization, null)
+            assert.deepEqual(decision.executionKey, executionKey)
+            assert.ok(['Cancelled', 'Rejected', 'Failed'].includes(decision.terminalDisposition))
+            assert.equal(phase, decision.resolution === 'TerminalizeAcceptedPreProvider' ? 'AcceptedBeforeProvider' : 'ProviderStarted')
+            break
+          case 'AwaitAcceptanceReconciliation':
+            assert.equal(decision.authorization, null)
+            assert.deepEqual(decision.executionKey, executionKey)
+            assert.equal(decision.terminalDisposition, null)
+            break
+          case 'PreserveCurrentFact':
+            assert.equal(decision.authorization, null)
+            assert.equal(decision.executionKey, null)
+            assert.equal(decision.terminalDisposition, null)
+            break
+          default:
+            assert.fail(`unrecognized resolution: ${decision.resolution}`)
+        }
       }
     }
   }
