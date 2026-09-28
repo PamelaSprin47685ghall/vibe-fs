@@ -3,7 +3,6 @@ import test from 'node:test'
 
 import * as Core from '../../../dist/Sphinx/V2/Core/Surface.js'
 import * as Loop from '../../../dist/Sphinx/V2/Runtime/Surface.js'
-import * as Persist from '../../../dist/Sphinx/V2/Persistence/Surface.js'
 
 const ok = (result) => {
   assert.equal(Core.isOk(result), true)

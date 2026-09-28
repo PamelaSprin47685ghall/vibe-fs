@@ -137,6 +137,9 @@ export default {
         for (const stored of inflightCalls.values()) {
           if (stored.sessionID !== sessionID) continue;
           const part = locateToolPart(messages, sessionID, stored.callID);
+          if (part.status === 'running') {
+            await emit('tool.running.observed', { sessionID, callID: stored.callID });
+          }
           if (!['completed', 'error'].includes(part.status)) continue;
           await emit('tool.terminal.observed', {
             sessionID,

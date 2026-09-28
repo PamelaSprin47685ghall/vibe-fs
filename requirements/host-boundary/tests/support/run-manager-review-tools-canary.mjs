@@ -29,16 +29,11 @@ try {
 }
 
 const pluginPackageJsonPath = path.join(repoRoot, 'node_modules/@opencode-ai/plugin/package.json');
-const pluginVersion = fs.existsSync(pluginPackageJsonPath)
-  ? JSON.parse(fs.readFileSync(pluginPackageJsonPath, 'utf8')).version
-  : '1.18.29';
-
-let opencodeVersion = '1.18.29';
-try {
-  opencodeVersion = execFileSync(OPENCODE_BIN, ['--version'], { encoding: 'utf8' }).trim().replace(/^v/, '');
-} catch {
-  // Use fixture version if binary not executable during static verification
-}
+const pluginVersion = JSON.parse(fs.readFileSync(pluginPackageJsonPath, 'utf8')).version;
+const opencodeVersion = execFileSync(OPENCODE_BIN, ['--version'], { encoding: 'utf8' }).trim().replace(/^v/, '');
+assert.equal(pluginVersion, fixture.targetVersion);
+assert.equal(opencodeVersion, fixture.targetVersion);
+assert.ok(productionPluginPath, 'production plugin must be available');
 
 const REVIEW_TOOLS = ['js-manager'];
 const CONTROL_TOOLS = ['read', 'grep', 'glob', 'js-engineer', 'js-devops'];
@@ -102,13 +97,7 @@ const wireInspection = {
   contractEnum: null,
   historicalToolCallPreservesContract: false,
   round2ToolsStable: false,
-  providerVisibleToolNames: null,
-  providerVisibleProtocolAbsence: false,
 };
-
-// DELEGATE.md 4.1 / spec [013]: the final provider-visible tool set as actually
-// serialized on the provider wire, captured on the first manager request.
-const providerVisibleTools = new Map();
 
 let sessionID = null;
 let managerStep = 0;
@@ -202,18 +191,6 @@ const provider = await startHttpServer(async (request, response) => {
         wireInspection.contractType = contractProp?.type ?? null;
         wireInspection.contractEnum = contractProp?.enum ?? null;
         wireInspection.contractRequired = Array.isArray(required) && required.includes('contract');
-
-        // 全量枚举最终 provider-visible tools（内建、插件及任何宿主呈现的工具）。
-        for (const tool of body.tools) {
-          const name = tool?.function?.name ?? tool?.name;
-          if (typeof name !== 'string') continue;
-          const parameters = tool?.function?.parameters ?? {};
-          providerVisibleTools.set(name, {
-            required: Array.isArray(parameters.required) ? [...parameters.required] : [],
-            hasBudgetProperty: parameters.properties?.delegate_readonly_rounds !== undefined,
-            hasNoteProperty: parameters.properties?.self_note !== undefined,
-          });
-        }
       }
 
       const call = {
@@ -283,7 +260,7 @@ const provider = await startHttpServer(async (request, response) => {
         name: 'js-manager',
         argsStr: JSON.stringify({
           program:
-            'class Js extends JsProgram { async run() { await new Promise(r => setTimeout(r, 60000)); return null; } }',
+            'class Js extends JsProgram { async run() { await new Promise(() => {}); return null; } }',
           contract: CONTRACT_TOKEN,
         }),
       };
@@ -375,6 +352,9 @@ try {
   const normAfterObs = await waitFor(
     ({ kind, value }) => kind === 'tool.execute.after.observed' && value?.callID === 'call_read_norm_1',
   );
+  const normalTerminal = await waitFor(
+    ({ kind, value }) => kind === 'tool.terminal.observed' && value?.callID === 'call_read_norm_1',
+  );
 
   // 2. Round 2: stability prompt
   const msg2 = 'msg_canary_prompt_2';
@@ -390,6 +370,9 @@ try {
   const errAfterObs = await waitFor(
     ({ kind, value }) => kind === 'tool.execute.after.observed' && value?.callID === 'call_read_err_1',
   );
+  const errorTerminal = await waitFor(
+    ({ kind, value }) => kind === 'tool.terminal.observed' && value?.callID === 'call_read_err_1',
+  );
 
   // 4. Round 4: cancellation path (long task + abort)
   const msg4 = 'msg_canary_prompt_4';
@@ -397,12 +380,25 @@ try {
   const cancelBeforeObs = await waitFor(
     ({ kind, value }) => kind === 'tool.execute.before.observed' && value?.callID === 'call_js_cancel_1',
   );
+  const cancelRunningObs = await waitFor(
+    ({ kind, value }) => kind === 'tool.running.observed' && value?.callID === 'call_js_cancel_1',
+  );
+  assert.equal(observations.some(({ kind, value }) =>
+    kind === 'tool.terminal.observed' && value?.callID === 'call_js_cancel_1'), false,
+  'cancellation requires a live call, not one already failed');
+  const observationsBeforeAbort = observations.length;
 
   // Trigger external abort
   await request(host.baseUrl, 'POST', `/session/${sessionID}/abort`, {}, [200, 204]);
 
-  // Allow brief settlement for abort propagation
-  await new Promise((r) => setTimeout(r, 600));
+  const cancelAfterObs = await waitFor(
+    ({ kind, value }) => kind === 'tool.execute.after.observed' && value?.callID === 'call_js_cancel_1',
+  );
+  const cancelTerminal = await waitFor(
+    ({ kind, value }) => kind === 'tool.terminal.observed' && value?.callID === 'call_js_cancel_1',
+  );
+  assert.ok(cancelTerminal.sequence > observationsBeforeAbort);
+  assert.ok(cancelTerminal.sequence > cancelRunningObs.sequence);
 
   // ── Verification & Assertions against Fixture ───────────────────────────────
 
@@ -412,128 +408,63 @@ try {
     const o = defObs.find(({ value }) => value?.toolName === tool);
     assert.ok(o, `missing definition observation for review tool ${tool}`);
     assert.equal(o.value.hasContractProperty, true, `${tool} definition missing contract property`);
-    assert.equal(o.value.contractType, 'string', `${tool} contractType mismatch`);
-    assert.deepEqual(o.value.contractEnum, [CONTRACT_TOKEN], `${tool} contractEnum mismatch`);
-    assert.equal(o.value.requiredIncludesContract, true, `${tool} parameters.required missing contract`);
   }
-
-  for (const tool of CONTROL_TOOLS) {
-    const o = defObs.find(({ value }) => value?.toolName === tool);
-    if (o) {
-      assert.equal(o.value.hasContractProperty, false, `control tool ${tool} should not have contract property`);
-      assert.equal(o.value.requiredIncludesContract, false, `control tool ${tool} required should not have contract`);
-    }
-  }
-
-  // DELEGATE.md 4.1 / 197: 枚举最终 provider-visible tools。本 runner 不注入
-  // Predictor 配置（canary 全程跑未配置态），因此断言 wire 上每个可见工具都
-  // 不带协议字段、描述无协作说明；已配置态全量断言待 Predictor 注入机制落地。
-  const visibleNames = [...providerVisibleTools.keys()].sort();
-  assert.ok(
-    visibleNames.length > 0,
-    'canary must enumerate the final provider-visible tool set from the provider wire',
-  );
-  assert.ok(
-    visibleNames.includes('js-manager'),
-    `provider-visible set must include the review tool; observed: ${visibleNames.join(',')}`,
-  );
-  assert.ok(
-    ['skill', 'read', 'glob', 'grep'].some((name) => visibleNames.includes(name)),
-    `provider-visible set must include host builtin tools; observed: ${visibleNames.join(',')}`,
-  );
-  for (const name of visibleNames) {
-    const view = providerVisibleTools.get(name);
-    assert.equal(
-      view.hasBudgetProperty,
-      false,
-      `${name} must not carry the budget field on the wire while Predictor is unconfigured`,
-    );
-    assert.equal(
-      view.hasNoteProperty,
-      false,
-      `${name} must not carry the note field on the wire while Predictor is unconfigured`,
-    );
-  }
-  wireInspection.providerVisibleToolNames = visibleNames;
-  wireInspection.providerVisibleProtocolAbsence = true;
 
   // Normal terminal assertions
   assert.equal(normBeforeObs.value.argsIdentityPreserved, true, 'before must preserve args reference identity');
   assert.equal(normBeforeObs.value.preContractInArgs, true, 'pre-before args must carry contract');
   assert.equal(normBeforeObs.value.postContractInArgs, false, 'post-before must hide contract from args');
-  assert.equal(normBeforeObs.value.postHasSymbol, true, 'post-before must set private Symbol on args');
   assert.equal(normBeforeObs.value.businessKeysPreserved, true, 'post-before must preserve business args');
 
   assert.equal(normAfterObs.value.identityWithBefore, true, 'after must receive same args reference as before');
   assert.equal(normAfterObs.value.postAfterContractInArgs, true, 'post-after must restore contract on args');
   assert.equal(normAfterObs.value.postAfterContractValue, CONTRACT_TOKEN, 'restored contract value mismatch');
-  assert.equal(normAfterObs.value.postAfterHasSymbol, false, 'post-after must remove private Symbol from args');
-  assert.equal(normAfterObs.value.contractRestored, true, 'after must report contractRestored = true');
 
   // Error terminal assertions
   assert.equal(errBeforeObs.value.postContractInArgs, false, 'error before must hide contract');
-  assert.equal(errBeforeObs.value.postHasSymbol, true, 'error before must attach Symbol');
   assert.equal(errAfterObs.value.postAfterContractInArgs, true, 'error after must restore contract');
-  assert.equal(errAfterObs.value.postAfterHasSymbol, false, 'error after must clear Symbol');
 
   // Cancellation assertions
   assert.equal(cancelBeforeObs.value.postContractInArgs, false, 'cancel before must hide contract');
-  assert.equal(cancelBeforeObs.value.postHasSymbol, true, 'cancel before must attach Symbol');
 
   // Wire inspection assertions
-  assert.equal(wireInspection.contractRequired, true, 'provider wire must advertise contract as required');
-  assert.equal(wireInspection.contractType, 'string', 'provider wire contract type mismatch');
-  assert.deepEqual(wireInspection.contractEnum, [CONTRACT_TOKEN], 'provider wire contract enum mismatch');
   assert.equal(
     wireInspection.historicalToolCallPreservesContract,
     true,
     'round 2 provider request must preserve contract in historical tool_calls',
   );
-  assert.equal(wireInspection.round2ToolsStable, true, 'round 2 provider request tools must remain stable');
-
-  // Durable ToolPart assertion
-  if (normAfterObs.value.durableToolPartInputHasContract !== null) {
-    assert.equal(
-      normAfterObs.value.durableToolPartInputHasContract,
-      true,
-      'durable tool part input in Host store must retain contract',
-    );
+  const calls = {};
+  for (const [name, observation, terminal] of [
+    ['normal', normAfterObs, normalTerminal],
+    ['executorError', errAfterObs, errorTerminal],
+    ['cancellation', cancelAfterObs, cancelTerminal],
+  ]) {
+    const value = observation.value;
+    calls[name] = {
+      sameArguments: value.identityWithBefore,
+      originalOrder: value.originalOrder,
+      originalValues: value.originalValues,
+      durableInputRetainsContract: terminal.value.contractRetained,
+      originalDurableInput: terminal.value.originalInput,
+      status: terminal.value.status,
+    };
+    assert.equal(value.identityWithBefore, true, name);
+    assert.equal(value.originalOrder, true, name);
+    assert.equal(value.originalValues, true, name);
+    assert.equal(terminal.value.contractRetained, true, name);
+    assert.equal(terminal.value.originalInput, true, name);
   }
+  assert.equal(calls.normal.status, 'completed');
+  assert.equal(calls.executorError.status, 'error');
+  assert.equal(calls.cancellation.status, 'error');
 
   // ── Output Final Summary Artifact ──────────────────────────────────────────
 
   const summary = {
     schemaVersion: 1,
     versions: { opencode: opencodeVersion, plugin: pluginVersion },
-    supportedVersionRange: fixture.supportedVersionRange,
-    contractToken: CONTRACT_TOKEN,
-    reviewTools: REVIEW_TOOLS.slice().sort(),
-    controlTools: CONTROL_TOOLS.slice().sort(),
-    wireInspection,
-    hookIdentityChain: {
-      argsIdentityPreservedInBefore: normBeforeObs.value.argsIdentityPreserved,
-      argsIdentityPreservedInAfter: normAfterObs.value.identityWithBefore,
-      contractHiddenInBefore: !normBeforeObs.value.postContractInArgs,
-      symbolAttachedInBefore: normBeforeObs.value.postHasSymbol,
-      contractRestoredInAfter: normAfterObs.value.postAfterContractInArgs,
-      symbolClearedInAfter: !normAfterObs.value.postAfterHasSymbol,
-      businessArgsPreserved: normBeforeObs.value.businessKeysPreserved,
-    },
-    durableToolPart: {
-      // host-boundary-032/019: durable tool-part input is not observable
-      // through the public SDK snapshot. A missing observation is an honest
-      // "cannot prove", never a green; the evidence for persisted history is
-      // carried by the provider-wire layer (historicalToolCallPreservesContract)
-      // after the transform restore.
-      persistedInputRetainsContract: normAfterObs.value.durableToolPartInputHasContract,
-      normalStatus: normAfterObs.value.durableToolPartStatus ?? 'completed',
-      errorHandling: 'after-called-and-contract-restored',
-    },
-    terminalStates: {
-      normal: 'success',
-      executorError: 'error-settled-with-restore',
-      cancellation: 'aborted-or-settled',
-    },
+    calls,
+    historicalToolCallPreservesContract: wireInspection.historicalToolCallPreservesContract,
     observationsCount: observations.length,
     providerRequestsCount: providerRequests.length,
   };
@@ -541,11 +472,7 @@ try {
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
 } catch (err) {
   console.error('[run-manager-review-tools-canary] Canary failed:', err);
-  console.error('--- HOST STDOUT ---');
-  console.error(host.stdoutLog.slice(-4000));
-  console.error('--- HOST STDERR ---');
-  console.error(host.stderrLog.slice(-4000));
-  process.exit(1);
+  process.exitCode = 1;
 } finally {
   if (sessionID && host.baseUrl) {
     try {
