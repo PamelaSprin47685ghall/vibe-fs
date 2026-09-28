@@ -1,5 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { ProcessHost } from './process-host.js';
 import { EventProbe } from './event-probe.js';
 import { FsOracle, HttpClient } from './scenario-http.js';
@@ -16,6 +17,38 @@ import { collectCausalWaits, formatCausalSection } from './diagnostics-causal.js
 
 const JOURNAL_WAKE_GUARD_MS = 50;
 const delayPort = createNodeDelayPort();
+
+/**
+ * MCP fixtures available to e2e scenarios. A scenario declares a fixture by
+ * name (`setup.mcpFixture = "semble"`); the harness owns the name -> command
+ * mapping so the scenario file stays machine-independent and no e2e config
+ * hard-codes an absolute path. An unknown name fails closed at setup: a
+ * silently unmatched fixture would leave the world without MCP tools while
+ * every other assertion stayed green.
+ */
+const MCP_FIXTURES = {
+  semble: () => [
+    process.execPath,
+    path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '..', '..', 'support', 'semble-mcp-fixture.js',
+    ),
+  ],
+};
+
+const MCP_SERVER_KEY = 'wanxiang_fixture';
+
+function resolveMcpServers(mcpFixture) {
+  if (mcpFixture === undefined || mcpFixture === null || mcpFixture === false) return undefined;
+  if (typeof mcpFixture !== 'string' || mcpFixture.trim() === '') {
+    throw new Error(`mcpFixture must be a non-empty fixture name; got ${JSON.stringify(mcpFixture)}`);
+  }
+  const build = MCP_FIXTURES[mcpFixture];
+  if (typeof build !== 'function') {
+    throw new Error(`unknown mcp fixture '${mcpFixture}'; declared: ${Object.keys(MCP_FIXTURES).join(', ')}`);
+  }
+  return { [MCP_SERVER_KEY]: { type: 'local', command: build(), enabled: true } };
+}
 
 async function observeRestartJournal(workDir, watchdog, state) {
   let observed = readJournal(workDir).total;
@@ -151,6 +184,7 @@ export async function setupScenarioParallel(opts, tmpDir) {
       pluginPaths,
       contextLimit: opts.contextLimit,
       routingSource: opts.routingSource,
+      mcpServers: resolveMcpServers(opts.mcpFixture),
       extraEnv: {
         // The Host env denylist drops `WANXIANG*` so plugin configuration is always explicit
         // rather than inherited by accident. That also drops the diagnostics flag, so it is

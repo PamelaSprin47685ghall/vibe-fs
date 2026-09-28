@@ -101,3 +101,9 @@ semantic fold失败必须先durable写入对应bad fact与`ProjectionCutTail`，
 ## [025] persistence cut stores禁optional fatal hook，唯一fatal owner在composition
 
 `StrengthDurability` 与 `CasebookStore` 不得保留 module-global optional `fatalTripHandler`（默认 None、从未注册即为 dead capability）：semantic-cut 分支只返回 typed 结果（`StrengthPreparedPublish.Rejected` / `Error reason`），fatal 决策唯一归属 composition 侧既有 owner（Strength `Append` 侧 `PluginStrengthPorts.commitAppendResult` 的 `Diagnostic.fatal "strength-semantic-cut"`；`PublishPrepared` 侧 `Rejected` 即为 owner 可观测的 cut-settled 信号）。`JsToolsTransactionStore.appendPrepared/appendCommitted` 的 `FatalProcess.trip "js-transaction-semantic-cut"` 是同一 boundary 的 process-fatal 实现：cut 已由 Integrator 先行 durable settle（bad fact + `ProjectionCutTail` 同一次 append 落盘）才 trip。Prepared cut 前无任何 file effect；Committed cut 后 recovery 按 Committed/Unknown 精确区分，Unknown 永不视为 not-written。法律依据见 `requirements/durable-events/tests/` 下 Prepared/Committed cut 回归测试与各 owning package 的 WHAT-025/013/006 条款。
+
+## [026] 历史材料只能经离线迁移导入为全新导入事实
+
+协议升级需要接纳旧事实时，唯一合法路径是离线一次性迁移：经 EventStore 所有者的读取、payload 与 append 边界，在备份或副本上追加**仅承载历史材料的导入事实**。导入事实是全新的 `event_type`（追加词汇表原则，不与旧类型同名复用），载荷只重建旧事实的因果位置、digest、payload 引用与覆盖范围等历史证据。导入事实不得充当任何新时代协议的准入凭证：不得由它推导出可运行的授权、绑定或候选，不得产生副本，也不参与新委托的生命周期判定。
+
+存储层不因导入而出现迁移代次：[009] 的 leave-unread 与拒绝语义不变，运行时不双读、双写、不自动迁移、不维护旧载荷解析；未迁移的旧存储由入口检查拒绝以新运行时消费并给出明确迁移指引，禁止边读边跳过。迁移不得原地改写 append-only 历史、Git raw object 或 refs，不得清库，不得覆盖用户配置；envelope 父边、payload refs、decision 引用与 XTrace 因果锚点必须保留或正确重建，并以 cold replay 对照证明业务 Current 一致。迁移工具、输入/输出版本与一次性操作步骤由 owning package 提供自动化测试。

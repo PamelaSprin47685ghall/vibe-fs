@@ -19,6 +19,9 @@ module Surface =
     /// Read one durable event by identity. A missing event is `null`.
     val read: handle: EventStoreHandle * eventId: string -> obj
 
+    /// Read every stream id that owns a durable head.
+    val streams: handle: EventStoreHandle -> string array
+
     /// Read all structural heads for one stream.
     val heads: handle: EventStoreHandle * streamId: string -> string array
 

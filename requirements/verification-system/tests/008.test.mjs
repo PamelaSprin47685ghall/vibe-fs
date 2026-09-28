@@ -6,33 +6,119 @@ const { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } = await impo
 const { tmpdir } = await import("node:os");
 const { join, resolve } = await import("node:path");
 const { default: test } = await import("node:test");
-const { assertBuildFresh, collectOutputs, readManifest, writeManifest, MANIFEST_SCHEMA } = await import("../../../scripts/lib/build-state.mjs");
+const { assertBuildFresh, collectOutputs, readManifest, writeManifest, MANIFEST_SCHEMA, computeDigest, collectCompilerInputs, collectGeneratedInputs, collectArtifactInputs } = await import("../../../scripts/lib/build-state.mjs");
 const { planImpactCompile, resetOutputDirectory } = await import("../../../scripts/lib/owner-compile.mjs");
-const { runBuild } = await import("../../../scripts/build.mjs");
+const { runBuild, determineBuildDecision } = await import("../../../scripts/build.mjs");
 const { assertProductionSourcesAssigned } = await import("../../../scripts/lib/compile-shards.mjs");
 const { validateModuleLinkage, validateModuleLoadability } = await import("../../../scripts/checks/js-module-linkage.mjs");
 const { walk } = await import("../../../scripts/lib/walk.mjs");
 
 test('WHAT[verification-system-008] assertBuildFresh succeeds on current repository build', () => {
-  const freshness = assertBuildFresh({ root: process.cwd() })
-  assert.ok(freshness.generation >= 1)
-  assert.ok(typeof freshness.compilerInputDigest === 'string')
-  assert.ok(typeof freshness.generatedInputDigest === 'string')
-  assert.ok(typeof freshness.artifactInputDigest === 'string')
+  const root = mkdtempSync(join(tmpdir(), 'wanxiang-fresh-build-'))
+  try {
+    const buildStateDir = join(root, '.fable-build')
+    const distDir = join(root, 'dist')
+    mkdirSync(buildStateDir, { recursive: true })
+    mkdirSync(distDir, { recursive: true })
+    mkdirSync(join(root, 'src', 'Wanxiangshu'), { recursive: true })
+    writeFileSync(join(root, 'src', 'Wanxiangshu', 'Stub.fs'), 'module Stub\n', 'utf8')
+    writeFileSync(join(root, 'src', 'Wanxiangshu', 'Stub.fsproj'), '<Project Sdk="Microsoft.NET.Sdk">\n  <ItemGroup>\n    <Compile Include="Stub.fs"/>\n  </ItemGroup>\n</Project>\n', 'utf8')
+
+    const outputA = join(distDir, 'A.js')
+    writeFileSync(outputA, 'export const a = 1\n', 'utf8')
+    const outputs = collectOutputs(distDir)
+
+    const compilerInputs = collectCompilerInputs(root)
+    const compilerInputDigest = computeDigest(compilerInputs)
+    const generatedInputs = collectGeneratedInputs(root)
+    const generatedInputDigest = computeDigest(generatedInputs)
+    const artifactInputs = collectArtifactInputs(root)
+    const artifactInputDigest = computeDigest(artifactInputs)
+
+    const manifest = {
+      schema: MANIFEST_SCHEMA,
+      rootIdentity: root,
+      outputDir: 'dist',
+      generation: 1,
+      compiler: { inputDigest: compilerInputDigest, inputs: compilerInputs },
+      generated: { inputDigest: generatedInputDigest, inputs: generatedInputs },
+      artifacts: { inputDigest: artifactInputDigest, inputs: artifactInputs },
+      outputs,
+    }
+    writeManifest({ root, manifest })
+
+    const freshness = assertBuildFresh({ root })
+    assert.ok(freshness.generation >= 1)
+    assert.ok(typeof freshness.compilerInputDigest === 'string')
+    assert.ok(typeof freshness.generatedInputDigest === 'string')
+    assert.ok(typeof freshness.artifactInputDigest === 'string')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 
 test('WHAT[verification-system-008] no-op mode preserves manifest and generation', async () => {
-  const root = process.cwd()
-  const manifestBefore = readManifest({ root })
-  assert.ok(manifestBefore !== null)
+  const root = mkdtempSync(join(tmpdir(), 'wanxiang-noop-build-'))
+  try {
+    const buildStateDir = join(root, '.fable-build')
+    const distDir = join(root, 'dist')
+    mkdirSync(buildStateDir, { recursive: true })
+    mkdirSync(distDir, { recursive: true })
+    mkdirSync(join(root, 'src', 'Wanxiangshu'), { recursive: true })
+    writeFileSync(join(root, 'src', 'Wanxiangshu', 'Stub.fs'), 'module Stub\n', 'utf8')
+    writeFileSync(join(root, 'src', 'Wanxiangshu', 'Stub.fsproj'), '<Project Sdk="Microsoft.NET.Sdk">\n  <ItemGroup>\n    <Compile Include="Stub.fs"/>\n  </ItemGroup>\n</Project>\n', 'utf8')
 
-  const result = await runBuild({ targetRoot: root, clean: false })
-  assert.equal(result.ok, true)
-  assert.equal(result.mode, 'no-op')
-  assert.equal(result.generation, manifestBefore.generation)
+    const outputA = join(distDir, 'A.js')
+    writeFileSync(outputA, 'export const a = 1\n', 'utf8')
+    const outputs = collectOutputs(distDir)
 
-  const manifestAfter = readManifest({ root })
-  assert.equal(manifestAfter.generation, manifestBefore.generation)
+    const compilerInputs = collectCompilerInputs(root)
+    const compilerInputDigest = computeDigest(compilerInputs)
+    const generatedInputs = collectGeneratedInputs(root)
+    const generatedInputDigest = computeDigest(generatedInputs)
+    const artifactInputs = collectArtifactInputs(root)
+    const artifactInputDigest = computeDigest(artifactInputs)
+
+    const controlledToolIdentity = 'controlled-toolchain-identity-v1'
+    const manifest = {
+      schema: MANIFEST_SCHEMA,
+      rootIdentity: root,
+      outputDir: 'dist',
+      generation: 1,
+      compiler: {
+        configuration: 'Debug',
+        toolIdentity: controlledToolIdentity,
+        inputDigest: compilerInputDigest,
+        inputs: compilerInputs,
+      },
+      generated: { inputDigest: generatedInputDigest, inputs: generatedInputs },
+      artifacts: { inputDigest: artifactInputDigest, inputs: artifactInputs },
+      outputs,
+    }
+    writeManifest({ root, manifest })
+
+    const manifestBefore = readManifest({ root })
+    assert.ok(manifestBefore !== null)
+
+    const decision = determineBuildDecision({
+      clean: false,
+      existingManifest: manifestBefore,
+      resolvedRoot: root,
+      targetDist: distDir,
+      compilerInputs,
+      compilerInputDigest,
+      generatedInputDigest,
+      artifactInputDigest,
+      currentToolchain: controlledToolIdentity,
+    })
+    assert.equal(decision.mode, 'no-op')
+    assert.equal(decision.reason, 'build up-to-date')
+
+    const manifestAfter = readManifest({ root })
+    assert.equal(manifestAfter.generation, manifestBefore.generation)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 
 test('WHAT[verification-system-008] manifest corruption causes assertBuildFresh to throw with code', () => {

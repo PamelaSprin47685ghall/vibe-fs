@@ -102,7 +102,13 @@ const wireInspection = {
   contractEnum: null,
   historicalToolCallPreservesContract: false,
   round2ToolsStable: false,
+  providerVisibleToolNames: null,
+  providerVisibleProtocolAbsence: false,
 };
+
+// DELEGATE.md 4.1 / spec [013]: the final provider-visible tool set as actually
+// serialized on the provider wire, captured on the first manager request.
+const providerVisibleTools = new Map();
 
 let sessionID = null;
 let managerStep = 0;
@@ -196,6 +202,18 @@ const provider = await startHttpServer(async (request, response) => {
         wireInspection.contractType = contractProp?.type ?? null;
         wireInspection.contractEnum = contractProp?.enum ?? null;
         wireInspection.contractRequired = Array.isArray(required) && required.includes('contract');
+
+        // 全量枚举最终 provider-visible tools（内建、插件及任何宿主呈现的工具）。
+        for (const tool of body.tools) {
+          const name = tool?.function?.name ?? tool?.name;
+          if (typeof name !== 'string') continue;
+          const parameters = tool?.function?.parameters ?? {};
+          providerVisibleTools.set(name, {
+            required: Array.isArray(parameters.required) ? [...parameters.required] : [],
+            hasBudgetProperty: parameters.properties?.delegate_readonly_rounds !== undefined,
+            hasNoteProperty: parameters.properties?.self_note !== undefined,
+          });
+        }
       }
 
       const call = {
@@ -407,6 +425,38 @@ try {
     }
   }
 
+  // DELEGATE.md 4.1 / 197: 枚举最终 provider-visible tools。本 runner 不注入
+  // Predictor 配置（canary 全程跑未配置态），因此断言 wire 上每个可见工具都
+  // 不带协议字段、描述无协作说明；已配置态全量断言待 Predictor 注入机制落地。
+  const visibleNames = [...providerVisibleTools.keys()].sort();
+  assert.ok(
+    visibleNames.length > 0,
+    'canary must enumerate the final provider-visible tool set from the provider wire',
+  );
+  assert.ok(
+    visibleNames.includes('js-manager'),
+    `provider-visible set must include the review tool; observed: ${visibleNames.join(',')}`,
+  );
+  assert.ok(
+    ['skill', 'read', 'glob', 'grep'].some((name) => visibleNames.includes(name)),
+    `provider-visible set must include host builtin tools; observed: ${visibleNames.join(',')}`,
+  );
+  for (const name of visibleNames) {
+    const view = providerVisibleTools.get(name);
+    assert.equal(
+      view.hasBudgetProperty,
+      false,
+      `${name} must not carry the budget field on the wire while Predictor is unconfigured`,
+    );
+    assert.equal(
+      view.hasNoteProperty,
+      false,
+      `${name} must not carry the note field on the wire while Predictor is unconfigured`,
+    );
+  }
+  wireInspection.providerVisibleToolNames = visibleNames;
+  wireInspection.providerVisibleProtocolAbsence = true;
+
   // Normal terminal assertions
   assert.equal(normBeforeObs.value.argsIdentityPreserved, true, 'before must preserve args reference identity');
   assert.equal(normBeforeObs.value.preContractInArgs, true, 'pre-before args must carry contract');
@@ -470,7 +520,12 @@ try {
       businessArgsPreserved: normBeforeObs.value.businessKeysPreserved,
     },
     durableToolPart: {
-      persistedInputRetainsContract: normAfterObs.value.durableToolPartInputHasContract ?? true,
+      // host-boundary-032/019: durable tool-part input is not observable
+      // through the public SDK snapshot. A missing observation is an honest
+      // "cannot prove", never a green; the evidence for persisted history is
+      // carried by the provider-wire layer (historicalToolCallPreservesContract)
+      // after the transform restore.
+      persistedInputRetainsContract: normAfterObs.value.durableToolPartInputHasContract,
       normalStatus: normAfterObs.value.durableToolPartStatus ?? 'completed',
       errorHandling: 'after-called-and-contract-restored',
     },
@@ -486,6 +541,10 @@ try {
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
 } catch (err) {
   console.error('[run-manager-review-tools-canary] Canary failed:', err);
+  console.error('--- HOST STDOUT ---');
+  console.error(host.stdoutLog.slice(-4000));
+  console.error('--- HOST STDERR ---');
+  console.error(host.stderrLog.slice(-4000));
   process.exit(1);
 } finally {
   if (sessionID && host.baseUrl) {

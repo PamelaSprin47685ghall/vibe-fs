@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import * as Strength from '../../../dist/Strength/Surface.js'
 import { createLocalEventStore } from '../../verification-system/tests/support/local-event-store.mjs'
+import { strengthDelegationChainEvents } from '../../verification-system/tests/support/strength-delegation-chain.mjs'
 
 test('WHAT[durable-events-025] persistence cut stores have no optional fatal hook and composition is sole fatal owner after cut settles', async () => {
   // 1. Static boundary check: StrengthDurability and CasebookStore must not retain module-global fatalTripHandler
@@ -19,7 +20,7 @@ test('WHAT[durable-events-025] persistence cut stores have no optional fatal hoo
   try {
     const durability = Strength.durabilityCreate(local.store)
     const H = (text) => `H(${text})`
-    const frame = Strength.frameTryBuild(H, 10000, [{
+    const frame = Strength.frameTryBuild(H, [{
       requestOrdinal: 1,
       exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }]
     }]).value
@@ -29,16 +30,32 @@ test('WHAT[durable-events-025] persistence cut stores have no optional fatal hoo
       decisionId: 'd-de025',
       targetProviderRun: 'run-1',
       replicaSessionId: 'rep-1',
-      budget: 'K1',
       anchorDigest: 'anchor-a',
       bundle: frame,
+    }
+
+    // The Prepared fact carries a deterministic parent edge to its DelegationBound
+    // fact, so the causal chain must land first. The chain goes through the
+    // durability port because durabilityPublishPrepared derives the Bound parent id
+    // with the host digest, not with the test-local H.
+    const chain = strengthDelegationChainEvents(Strength, {
+      ownerSessionId: 'owner-de025',
+      decisionId: 'd-de025',
+      targetProviderRun: 'run-1',
+      replicaSessionId: 'rep-1',
+      anchorDigest: 'anchor-a',
+    })
+
+    for (const [label, event] of [['Requested', chain.requested], ['Bound', chain.bound]]) {
+      const appended = await Strength.durabilityAppend(durability, event)
+      assert.equal(appended.ok, true, `append Strength ${label} fact: ${JSON.stringify(appended.error)}`)
     }
 
     const firstPublished = await Strength.durabilityPublishPrepared(durability, firstReq)
     assert.equal(firstPublished.kind, 'Published')
 
     // Conflicting request with different replica/parameters for the same decisionId
-    const conflictFrame = Strength.frameTryBuild(H, 10000, [{
+    const conflictFrame = Strength.frameTryBuild(H, [{
       requestOrdinal: 1,
       exchanges: [{ toolName: 'grep', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' }]
     }]).value
@@ -47,7 +64,6 @@ test('WHAT[durable-events-025] persistence cut stores have no optional fatal hoo
       decisionId: 'd-de025',
       targetProviderRun: 'run-1',
       replicaSessionId: 'rep-conflict',
-      budget: 'K1',
       anchorDigest: 'anchor-b',
       bundle: conflictFrame,
     }

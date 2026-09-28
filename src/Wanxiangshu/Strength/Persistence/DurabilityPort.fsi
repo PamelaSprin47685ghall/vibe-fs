@@ -15,6 +15,7 @@ type StrengthPreparedPublish =
 type StrengthDurableAppend =
     | Applied
     | SemanticRejected of reason: string
+    | StorageInvalid of reason: string
     | StorageFailed of reason: string
 
 type StrengthPreparedRequest =
@@ -22,7 +23,6 @@ type StrengthPreparedRequest =
       DecisionId: StrengthDecisionId
       TargetProviderRun: ProviderRunIdentity
       ReplicaSessionId: SessionId
-      Budget: StrengthBudget
       AnchorDigest: string
       Bundle: StrengthFrameBundle }
 

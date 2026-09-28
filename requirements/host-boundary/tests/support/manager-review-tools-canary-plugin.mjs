@@ -142,26 +142,41 @@ export default {
         const isReview = REVIEW_TOOLS.includes(toolName);
         const isControl = CONTROL_TOOLS.includes(toolName);
 
+        // DELEGATE.md 4.1 / spec [013]: the final provider-visible tool set
+        // must be enumerated — every definition the host renders through this
+        // hook is observed, not only review/control tools.
         if (isReview || isControl) {
-          const parameters = hookOutput?.parameters;
-          const properties = parameters?.properties ?? {};
-          const required = Array.isArray(parameters?.required) ? parameters.required : [];
-          const contractProp = properties.contract ?? null;
+        const parameters = hookOutput?.parameters;
+        const properties = parameters?.properties ?? {};
+        const required = Array.isArray(parameters?.required) ? parameters.required : [];
+        const contractProp = properties.contract ?? null;
+        const description = typeof hookOutput?.description === 'string' ? hookOutput.description : null;
 
-          const record = {
-            toolName,
-            isReviewTool: isReview,
-            isControlTool: isControl,
-            hasContractProperty: contractProp !== null,
-            contractType: contractProp?.type ?? null,
-            contractEnum: Array.isArray(contractProp?.enum) ? [...contractProp.enum] : null,
-            contractDescription: contractProp?.description ?? null,
-            requiredIncludesContract: required.includes('contract'),
-            requiredList: [...required],
-            propertiesKeys: Object.keys(properties).sort(),
-          };
+        const record = {
+          toolName,
+          isReviewTool: isReview,
+          isControlTool: isControl,
+          hasContractProperty: contractProp !== null,
+          contractType: contractProp?.type ?? null,
+          contractEnum: Array.isArray(contractProp?.enum) ? [...contractProp.enum] : null,
+          contractDescription: contractProp?.description ?? null,
+          requiredIncludesContract: required.includes('contract'),
+          requiredList: [...required],
+          propertiesKeys: Object.keys(properties).sort(),
+          description,
+          hasBudgetProperty: properties.delegate_readonly_rounds !== undefined,
+          budgetType: properties.delegate_readonly_rounds?.type ?? null,
+          requiredIncludesBudget: required.includes('delegate_readonly_rounds'),
+          hasNoteProperty: properties.self_note !== undefined,
+          requiredIncludesNote: required.includes('self_note'),
+          descriptionHasCollaborationProse:
+            description !== null &&
+            /Fill in delegate_readonly_rounds on every tool call\.|每个工具调用都要填写 delegate_readonly_rounds/.test(
+              description,
+            ),
+        };
 
-          await emit('tool.definition.observed', record);
+        await emit('tool.definition.observed', record);
         }
       },
 

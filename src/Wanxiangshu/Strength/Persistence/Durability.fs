@@ -31,7 +31,6 @@ module StrengthDurability =
                         request.DecisionId
                         request.TargetProviderRun
                         request.ReplicaSessionId
-                        request.Budget
                         request.AnchorDigest
                         request.Bundle.Digest
                         request.Bundle.ByteLength
@@ -50,6 +49,8 @@ module StrengthDurability =
                 match! StrengthStore.append store HostDigest.sha256Hex event with
                 | Ok _ -> return StrengthDurableAppend.Applied
                 | Error(AppendError.SemanticCut cut) -> return StrengthDurableAppend.SemanticRejected cut.Reason
+                | Error(AppendError.StorageInvalid error) ->
+                    return StrengthDurableAppend.StorageInvalid(sprintf "%A" error)
                 | Error err -> return StrengthDurableAppend.StorageFailed(sprintf "%A" err)
             }
 

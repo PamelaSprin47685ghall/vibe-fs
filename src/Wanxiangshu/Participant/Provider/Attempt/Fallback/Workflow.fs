@@ -662,7 +662,9 @@ module ProviderRecoveryWorkflow =
                 |> Option.map (fun profile -> Roles.roleLabel profile.CanonicalRole)
                 |> Option.defaultValue ""
 
-            let hasCapacity = roleName = "" || ModelRouting.hasTheoreticalCapacity roleName
+            let hasCapacity =
+                roleName = ""
+                || ModelRouting.hasTheoreticalCapacity roleName Wanxiangshu.OpenCode.ModelExecutionPurpose.Normal
 
             let recoveryContext =
                 requestKindFor durable turn.SessionId turn.PhysicalUserMessageId
@@ -803,7 +805,9 @@ module ProviderRecoveryWorkflow =
                 |> Option.map (fun profile -> Roles.roleLabel profile.CanonicalRole)
                 |> Option.defaultValue ""
 
-            let hasCapacity = roleName = "" || ModelRouting.hasTheoreticalCapacity roleName
+            let hasCapacity =
+                roleName = ""
+                || ModelRouting.hasTheoreticalCapacity roleName Wanxiangshu.OpenCode.ModelExecutionPurpose.Normal
 
             let recoveryContext =
                 requestKindFor durable turn.SessionId turn.PhysicalUserMessageId

@@ -91,6 +91,17 @@ module ModelRoutingSurface =
             {| model = target.Model
                reasoning = target.Reasoning |}
 
+    /// The JS observation boundary mirrors the MJS ABI vocabulary exactly.
+    /// An absent purpose is the ordinary owner admission; only the two protocol
+    /// values are accepted and anything else fails closed. The purpose never
+    /// comes from tool arguments, user text or a role name.
+    let private purposeOf (value: obj) : ModelExecutionPurpose =
+        match text value with
+        | ""
+        | "normal" -> ModelExecutionPurpose.Normal
+        | "readonly-delegate" -> ModelExecutionPurpose.ReadonlyDelegate
+        | other -> invalidArg "purpose" (sprintf "execution-model-routing: unknown scheduler purpose %s" other)
+
     [<Emit("(function freeze(value) { if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) { Object.freeze(value); Object.keys(value).forEach(function (key) { freeze(value[key]); }); } return value; })($0)")>]
     let private deepFreeze (value: obj) : obj = jsNative
 
@@ -441,6 +452,7 @@ module ModelRoutingSurface =
         (role: string)
         (participant: string)
         (lenderSessionId: string)
+        (purpose: obj)
         : Task<obj> =
         task {
             let! acquisition =
@@ -449,6 +461,7 @@ module ModelRoutingSurface =
                     (PhysicalUserMessageId.create physicalUserMessageId)
                     (normalizeRoleText (box role))
                     participant
+                    (purposeOf purpose)
                     (if
                          isNullish (box lenderSessionId)
                          || System.String.IsNullOrWhiteSpace lenderSessionId
@@ -515,12 +528,13 @@ module ModelRoutingSurface =
 
     /// Invoke a scheduler with plain JS target observations. `null` means the
     /// scheduler declined the demand; target validation remains owned by routing.
-    let invokeScheduler (scheduler: obj) (role: string) (running: obj) (previous: obj) : obj =
+    let invokeScheduler (scheduler: obj) (role: string) (running: obj) (previous: obj) (purpose: obj) : obj =
         ModelRouting.invokeScheduler
             scheduler
             role
             (targetsOf running)
             (if isNullish previous then None else Some(targetOf previous))
+            (purposeOf purpose)
         |> Option.map targetObject
         |> Option.defaultValue null
 
@@ -529,6 +543,34 @@ module ModelRoutingSurface =
     let createRuntime (scheduler: obj) : obj =
         RuntimeHandle(ModelRouting.ModelRoutingRuntime(scheduler)) :> obj
 
+    /// Read-only Predictor slot existence query, observed from the loaded model
+    /// configuration. Tool decoration and readonly-delegate admission share
+    /// this one result; capacity and provider health do not change it.
+    let predictorConfiguration (scheduler: obj) : obj =
+        match ModelRouting.predictorConfiguration scheduler with
+        | ModelRouting.PredictorConfiguration.Configured -> box {| kind = "Configured"; reason = null |}
+        | ModelRouting.PredictorConfiguration.NotConfigured ->
+            box
+                {| kind = "NotConfigured"
+                   reason = null |}
+        | ModelRouting.PredictorConfiguration.ConfigurationInvalid reason ->
+            box
+                {| kind = "ConfigurationInvalid"
+                   reason = reason |}
+
+    /// Same query on the process-shared scheduler loaded during plugin load.
+    let sharedPredictorConfiguration () : obj =
+        match ModelRouting.sharedPredictorConfiguration () with
+        | ModelRouting.PredictorConfiguration.Configured -> box {| kind = "Configured"; reason = null |}
+        | ModelRouting.PredictorConfiguration.NotConfigured ->
+            box
+                {| kind = "NotConfigured"
+                   reason = null |}
+        | ModelRouting.PredictorConfiguration.ConfigurationInvalid reason ->
+            box
+                {| kind = "ConfigurationInvalid"
+                   reason = reason |}
+
     let acquireExecutionAdmission
         (runtime: obj)
         (sessionId: string)
@@ -536,6 +578,7 @@ module ModelRoutingSurface =
         (role: string)
         (participant: string)
         (lenderSessionId: string)
+        (purpose: obj)
         : Task<obj> =
         task {
             let! acquisition =
@@ -545,6 +588,7 @@ module ModelRoutingSurface =
                         physicalUserMessageId,
                         normalizeRoleText (box role),
                         participant,
+                        purposeOf purpose,
                         (if
                              isNullish (box lenderSessionId)
                              || System.String.IsNullOrWhiteSpace lenderSessionId
@@ -565,6 +609,7 @@ module ModelRoutingSurface =
         (role: string)
         (participant: string)
         (lenderSessionId: string)
+        (purpose: obj)
         : Task<obj> =
         task {
             let! acquisition =
@@ -574,6 +619,7 @@ module ModelRoutingSurface =
                         physicalUserMessageId,
                         normalizeRoleText (box role),
                         participant,
+                        purposeOf purpose,
                         (if
                              isNullish (box lenderSessionId)
                              || System.String.IsNullOrWhiteSpace lenderSessionId
@@ -634,11 +680,18 @@ module ModelRoutingSurface =
             | Ok name -> box name
             | Error _ -> null
 
-    let tryReserveManaged (runtime: obj) (sessionId: string) (role: string) (lenderSessionId: string) : obj =
+    let tryReserveManaged
+        (runtime: obj)
+        (sessionId: string)
+        (role: string)
+        (lenderSessionId: string)
+        (purpose: obj)
+        : obj =
         (runtimeOf runtime)
             .TryReserveManaged(
                 sessionId,
                 normalizeRoleText (box role),
+                purposeOf purpose,
                 (if
                      isNullish (box lenderSessionId)
                      || System.String.IsNullOrWhiteSpace lenderSessionId
@@ -657,6 +710,7 @@ module ModelRoutingSurface =
         (role: string)
         (participant: string)
         (lenderSessionId: string)
+        (purpose: obj)
         : obj =
         (runtimeOf runtime)
             .TryLease(
@@ -664,6 +718,7 @@ module ModelRoutingSurface =
                 physicalUserMessageId,
                 normalizeRoleText (box role),
                 participant,
+                purposeOf purpose,
                 (if
                      isNullish (box lenderSessionId)
                      || System.String.IsNullOrWhiteSpace lenderSessionId

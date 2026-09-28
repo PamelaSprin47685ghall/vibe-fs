@@ -88,7 +88,7 @@ const runPreFlowPrompt = async (scenario, lane, prompt, agent) => {
 
 const preFlowCanaries = async (scenario) => {
   await CUSTOMS.bindManagerLoopSequence(scenario)
-  await runPreFlowPrompt(scenario, 'strength-canary-owner', STRENGTH_HOST_CANARY_PROMPT, 'engineer')
+  await runPreFlowPrompt(scenario, 'strength-canary-owner', STRENGTH_HOST_CANARY_PROMPT, 'manager')
 
   assert.equal(
     scenario.provider.matchCount('strength-canary-replica.0'),

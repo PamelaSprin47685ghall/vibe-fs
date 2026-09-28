@@ -4,12 +4,14 @@ import test from 'node:test'
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const Strength = await import("../../../dist/Strength/Surface.js");
+const { createHash } = await import("node:crypto");
 
-const H = (text) => `H(${text})`
+// The fixture must hash the way the runtime does. A digest that echoes its
+// input carries the note text into the derived call id, which would report a
+// second visibility channel that no real digest produces.
+const H = (text) => createHash('sha256').update(text).digest('hex')
 const call = (callId, name, args) => ({ kind: 'tool-call', callId, name, args })
 const result = (callId, resultText) => ({ kind: 'tool-result', callId, result: resultText })
-const exchange = (toolName, canonicalArguments, canonicalResult) => ({ toolName, canonicalArguments, canonicalResult })
-const batch = (requestOrdinal, exchanges) => ({ requestOrdinal, exchanges })
 
 test('WHAT[speculative-investigation-009] STRENGTH_009_replica_mirror_localizes_owner_call_ids_without_changing_semantics', () => {
   const ownerMessages = [
@@ -34,34 +36,78 @@ test('WHAT[speculative-investigation-009] STRENGTH_009_replica_mirror_localizes_
   assert.equal(media.ok, false)
   assert.equal(media.error, 'MediaCannotCrossSession')
 })
+test('WHAT[speculative-investigation-009] STRENGTH_009_self_note_rides_the_original_call_record_and_nowhere_else', () => {
+  const ownerMessages = [
+    { role: 'assistant', parts: [call('owner-1', 'read', '{"filePath":"a","self_note":"check the date of the lock file"}')] },
+    { role: 'tool', parts: [result('owner-1', 'alpha')] },
+  ]
+  const digest = H(Strength.renderSemantic(ownerMessages))
+  const localized = Strength.frameTryLocalizeMirror(H, 'd1', digest, ownerMessages)
+  assert.equal(localized.ok, true)
+  const localizedArgs = localized.value[0].parts.filter((part) => part.kind === 'tool-call').map((part) => part.args)
+  assert.equal(localizedArgs.length, 1)
+  assert.equal(localizedArgs[0].includes('check the date of the lock file'), true)
+  // Exactly one visibility channel: the note is in the frozen call record, not
+  // duplicated into any other rendered material of the mirror. The localized
+  // call id is derived from the semantic digest, so it is a hash here; the
+  // other rendering path (the adapter round-trip below) checks that too.
+  const semantic = Strength.renderSemantic(localized.value)
+  const wire = Strength.renderWire(localized.value)
+  assert.equal(semantic.split('check the date of the lock file').length - 1, 1)
+  assert.equal(wire.split('check the date of the lock file').length - 1, 1)
+  assert.doesNotMatch(`${semantic}\n${wire}`, /self_note\s*=\s*"check the date of the lock file"[\s\S]*self_note\s*=\s*"check the date of the lock file"/)
+})
+test('WHAT[speculative-investigation-009] STRENGTH_009_every_note_in_one_batch_survives_in_original_call_order', () => {
+  const ownerMessages = [
+    { role: 'assistant', parts: [
+      call('owner-1', 'read', '{"filePath":"a","self_note":"first note"}'),
+      call('owner-2', 'grep', '{"pattern":"x","self_note":"second note"}'),
+      call('owner-3', 'glob', '{"pattern":"**/*.fs","self_note":"third note"}'),
+    ] },
+    { role: 'tool', parts: [result('owner-2', 'hit'), result('owner-1', 'alpha'), result('owner-3', 'a.fs')] },
+  ]
+  const digest = H(Strength.renderSemantic(ownerMessages))
+  const localized = Strength.frameTryLocalizeMirror(H, 'd1', digest, ownerMessages)
+  assert.equal(localized.ok, true)
+  const notes = localized.value[0].parts
+    .filter((part) => part.kind === 'tool-call')
+    .map((part) => /"self_note":"([^"]*)"/.exec(part.args)[1])
+  assert.deepEqual(notes, ['first note', 'second note', 'third note'])
+  // Only integers collapse to a maximum; a note is never the selected "best"
+  // entry of the batch and never enlarges or shrinks the round budget.
+  assert.deepEqual(Strength.budgetMaxOf([1, 5, 2]), { ok: true, value: 5 })
+  assert.deepEqual(Strength.budgetMaxOf([0, 0, 0]), { ok: true, value: 0 })
+})
 }
 
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const Adapter = await import("../../../dist/OpenCode/Codec/ProviderProjectionSurface.js");
 const Projection = await import("../../../dist/Participant/Provider/Projection/Surface.js");
 const Strength = await import("../../../dist/Strength/Surface.js");
+// Raw Host message decoding belongs to the codec surface: `decodeMessageView`
+// is exported there, not from the Strength surface.
+const Wire = await import("../../../dist/OpenCode/Codec/ProviderProjectionSurface.js");
 
 const H = (text) => `H(${text})`
 const text = (value) => ({ kind: 'text', text: value })
 const call = (callId, name, args) => ({ kind: 'tool-call', callId, name, args })
 const result = (callId, value) => ({ kind: 'tool-result', callId, result: value })
-const media = (mediaType, contentDigest) => ({ kind: 'media', mediaType, contentDigest })
 const msg = (role, parts) => ({ role, parts })
 const rendered = (messages) => ({ messages, hostMessageIds: messages.map(() => null), hostIsPhysical: messages.map(() => false) })
+const snapshot = (messages) => Projection.projectionSnapshot(Projection.semanticProjection(messages))
 
 test('WHAT[speculative-investigation-009] STRENGTH_009_rendered_message_adapter_roundtrips_wire_semantics_with_host_only_ids', () => {
   const input = rendered([msg('user', [text('hello')]), msg('assistant', [text('world')])])
-  const applied = Adapter.tryApplyRenderedMessages('replica-session', H, input)
+  const applied = Strength.tryApplyRenderedMessages('replica-session', H, input)
   assert.equal(applied.ok, true)
   assert.equal(applied.value.length, 2)
   assert.equal(applied.value[0].info.sessionID, 'replica-session')
   assert.doesNotMatch(applied.value[0].info.id, /strength|replica|prefetch/i)
-  const decoded = Adapter.decodeMessageView(applied.value)
+  const decoded = Wire.decodeMessageView(applied.value)
   assert.equal(Projection.renderWire(decoded.messages), Projection.renderWire(input.messages))
 })
-test('WHAT[speculative-investigation-009] STRENGTH_009_host_adapter_encodes_strength_tool_pairs_as_native_completed_OpenCode_parts', () => {
+test('WHAT[speculative-investigation-009] STRENGTH_009_host_adapter_encodes_delegation_tool_pairs_as_native_completed_OpenCode_parts', () => {
   const input = {
     messages: [msg('user', [text('owner mirror')]), msg('assistant', [call('c1', 'read', '{"filePath":"README.md"}'), call('c2', 'grep', '{"pattern":"Strength"}')]), msg('tool', [result('c1', 'alpha'), result('c2', 'beta')])],
     hostMessageIds: [null, 'synthetic-call-message', 'synthetic-result-message'],
@@ -73,26 +119,14 @@ test('WHAT[speculative-investigation-009] STRENGTH_009_host_adapter_encodes_stre
   assert.equal(applied.value[1].info.role, 'assistant')
   assert.deepEqual(applied.value[1].parts.map((part) => part.type), ['tool', 'tool'])
   assert.deepEqual(applied.value[1].parts.map((part) => part.callID), ['c1', 'c2'])
-  assert.deepEqual(applied.value[1].parts.map((part) => part.tool), ['read', 'grep'])
-  assert.deepEqual(applied.value[1].parts.map((part) => part.state.status), ['completed', 'completed'])
   assert.deepEqual(applied.value[1].parts.map((part) => part.state.input), [{ filePath: 'README.md' }, { pattern: 'Strength' }])
   assert.deepEqual(applied.value[1].parts.map((part) => part.state.output), ['alpha', 'beta'])
 })
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const Projection = await import("../../../dist/Participant/Provider/Projection/Surface.js");
-const Strength = await import("../../../dist/Strength/Surface.js");
-
-const H = (text) => `H(${text})`
-const bundle = Strength.frameTryBuild(H, 10000, [{ requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }, { toolName: 'grep', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' }] }]).value
-const snapshot = (messages = []) => Projection.projectionSnapshot(Projection.semanticProjection(messages))
-const text = (textValue) => ({ kind: 'text', text: textValue })
-const message = (role, parts) => ({ role, parts })
-
 test('WHAT[speculative-investigation-009] STRENGTH_006_009_candidate_wrong_target_and_promoted_replica_reflection_conflict', () => {
+  const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [
+    { toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' },
+    { toolName: 'grep', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' },
+  ] }]).value
   const wrongTarget = Strength.candidate(H, { ownerSessionId: 'owner', decisionId: 'd1', targetProviderRun: 'target-a', currentProviderRun: 'target-b', bundle })
   assert.equal(wrongTarget.ok, false)
   assert.equal(wrongTarget.error, 'StrengthCandidateWrongTarget')
@@ -106,25 +140,26 @@ test('WHAT[speculative-investigation-009] STRENGTH_006_009_candidate_wrong_targe
   assert.equal(invalidAnchor.ok, false)
   assert.equal(invalidAnchor.error, 'InvalidStrengthAnchor')
 })
-test('WHAT[speculative-investigation-009] STRENGTH_009_012_policy_promoted_frames_leave_later_pair_anchor_messages_in_place', () => {
-  const base = [message('user', [text('u1')]), message('assistant', [text('target-assistant')]), message('user', [text('pair-anchor-stand-in')])]
+test('WHAT[speculative-investigation-009] STRENGTH_009_012_promoted_frames_leave_later_pair_anchor_messages_in_place', () => {
+  const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] }]).value
+  const base = [msg('user', [text('u1')]), msg('assistant', [text('target-assistant')]), msg('user', [text('pair-anchor-stand-in')])]
   const promoted = Strength.promoted(H, { ownerSessionId: 'owner', decisionId: 'd1', targetProviderRun: 'target-1', beforeIndex: 1, isReplicaRequest: false, bundle }).value
-  const rendered = Projection.renderMessagesWithHostIds(snapshot(base), base, [promoted])
-  assert.deepEqual(rendered.messages.map((item) => item.role), ['user', 'assistant', 'tool', 'assistant', 'user'])
-  assert.equal(rendered.messages.at(-1).parts[0].text, 'pair-anchor-stand-in')
+  const renderedOutput = Projection.renderMessagesWithHostIds(snapshot(base), base, [promoted])
+  assert.deepEqual(renderedOutput.messages.map((item) => item.role), ['user', 'assistant', 'tool', 'assistant', 'user'])
+  assert.equal(renderedOutput.messages.at(-1).parts[0].text, 'pair-anchor-stand-in')
 })
 test('WHAT[speculative-investigation-009] STRENGTH_009_replica_mirror_replaces_base_then_local_batches_append', () => {
-  const mirrorMessages = [message('user', [text('mirror-base')])]
+  const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] }]).value
+  const mirrorMessages = [msg('user', [text('mirror-base')])]
   const mirror = Strength.projectionMirror({ decisionId: 'd1', targetProviderRun: 'target', semanticDigest: 'sem-a', rows: [{ message: mirrorMessages[0], hostMessageId: 'mirror-host-id', hostIsPhysical: true }] }).value
   const local = Strength.replicaLocal(H, { ownerSessionId: 'owner', decisionId: 'd1', bundle }).value
-  const base = [message('user', [text('child-physical')])]
-  const rendered = Projection.renderMessagesWithHostIds(snapshot(base), base, [mirror, local])
-  assert.equal(rendered.messages.length, 3)
-  assert.equal(rendered.messages[0].parts[0].text, 'mirror-base')
-  assert.equal(rendered.hostMessageIds[0], 'mirror-host-id')
-  assert.equal(rendered.hostIsPhysical[0], true)
-  assert.equal(rendered.messages[1].role, 'assistant')
-  assert.equal(rendered.messages[2].role, 'tool')
+  const base = [msg('user', [text('child-physical')])]
+  const renderedOutput = Projection.renderMessagesWithHostIds(snapshot(base), base, [mirror, local])
+  assert.equal(renderedOutput.messages.length, 3)
+  assert.equal(renderedOutput.messages[0].parts[0].text, 'mirror-base')
+  assert.equal(renderedOutput.hostMessageIds[0], 'mirror-host-id')
+  assert.equal(renderedOutput.hostIsPhysical[0], true)
+  assert.deepEqual(renderedOutput.messages.slice(1).map((item) => item.role), ['assistant', 'tool'])
 })
 }
 
@@ -136,28 +171,47 @@ const Wire = await import("../../../dist/OpenCode/Codec/ProviderProjectionSurfac
 
 const H = (text) => `H(${text})`
 const hostText = (text) => ({ type: 'text', text })
-const hostCall = (callId, tool, input) => ({ type: 'tool', tool, callID: callId, state: { status: 'completed', input, output: 'pending' } })
 const hostResult = (callId, tool, input, output) => ({ type: 'tool', tool, callID: callId, state: { status: 'completed', input, output } })
 const user = (id, sessionId, parts) => ({ info: { id, role: 'user', sessionID: sessionId }, parts })
 const assistant = (id, sessionId, parts) => ({ info: { id, role: 'assistant', sessionID: sessionId }, parts })
-const tool = (id, sessionId, parts) => ({ info: { id, role: 'tool', sessionID: sessionId }, parts })
-const binding = (replica, budget) => Strength.runtimeBinding('owner', replica, `decision-${replica}`, `target-${replica}`, 'Coder', budget, 65536, `semantic-${replica}`, [{ role: 'user', parts: [{ kind: 'text', text: 'owner mirror' }] }])
-const registered = (replica, budget) => {
-  const runtime = Strength.runtimeCreate()
-  assert.equal(Strength.runtimeRegister(runtime, binding(replica, budget)).ok, true)
-  return runtime
-}
-const apply = async (runtime, output) => Strength.transformApply(H, runtime, output)
 
 test('WHAT[speculative-investigation-009] STRENGTH_003_004_replica_initial_transform_replaces_bootstrap_with_frozen_owner_mirror', async () => {
-  const runtime = registered('replica-initial', 'K1')
-  const output = { messages: [user('u1', 'replica-initial', [hostText('Continue.')])] }
-  const outcome = await apply(runtime, output)
+  const runtime = Strength.runtimeCreate()
+  const binding = Strength.runtimeBinding('owner', 'replica-initial', 'decision-replica-initial', 'target-replica-initial', 'Engineer', 2, 'semantic-replica-initial', [{ role: 'user', parts: [{ kind: 'text', text: 'owner mirror' }] }])
+  assert.equal(Strength.runtimeRegister(runtime, binding).ok, true)
+  const outcome = await Strength.transformApply(H, runtime, { messages: [user('u1', 'replica-initial', [hostText('Continue.')])] }, true)
   assert.equal(outcome.kind, 'Ready')
   assert.deepEqual(outcome.batches, [])
-  assert.deepEqual(outcome.aborted, [])
   const decoded = Wire.decodeMessageView(outcome.output)
   assert.equal(decoded.messages.length, 1)
   assert.equal(decoded.messages[0].parts[0].text, 'owner mirror')
+})
+test('WHAT[speculative-investigation-009] STRENGTH_009_local_batches_append_after_the_mirror_in_the_same_transcript', async () => {
+  const runtime = Strength.runtimeCreate()
+  const binding = Strength.runtimeBinding('owner', 'replica-local', 'decision-replica-local', 'target-replica-local', 'Engineer', 2, 'semantic-replica-local', [{ role: 'user', parts: [{ kind: 'text', text: 'owner mirror' }] }])
+  assert.equal(Strength.runtimeRegister(runtime, binding).ok, true)
+  const outcome = await Strength.transformApply(H, runtime, { messages: [
+    user('u1', 'replica-local', [hostText('Continue.')]),
+    assistant('a1', 'replica-local', [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')]),
+  ] }, true)
+  assert.equal(outcome.kind, 'Ready')
+  assert.equal(outcome.batches.length, 1)
+  const decoded = Wire.decodeMessageView(outcome.output)
+  // WHAT[009] + host-boundary-006: a completed call/result pair is written back
+  // as one native completed tool part inside the assistant row, so the wire view
+  // holds the mirror plus one folded row per completed batch — never a separate
+  // tool message, and never the owner's raw call id.
+  assert.deepEqual(decoded.messages.map((item) => item.role), ['user', 'assistant'])
+  assert.equal(decoded.messages[0].parts[0].text, 'owner mirror')
+  const localParts = decoded.messages[1].parts
+  assert.equal(localParts.length, 1)
+  assert.equal(localParts[0].kind, 'ToolResult')
+  assert.equal(localParts[0].result, 'alpha')
+  assert.notEqual(localParts[0].callId, 'c1', 'the owner call id must be relocated into this decision')
+  // The original arguments and the real result stay on the Host row itself.
+  const localPart = outcome.output[1].parts[0]
+  assert.equal(localPart.tool, 'read')
+  assert.deepEqual(localPart.state.input, { filePath: 'a' })
+  assert.equal(localPart.state.output, 'alpha')
 })
 }

@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Thoth.Json
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Attachment
@@ -18,8 +19,8 @@ open Wanxiangshu.Resources
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Strength.OpenCode
+open Wanxiangshu.Strength.Migration
 open Wanxiangshu.Strength.Persistence
-open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
 
@@ -45,10 +46,6 @@ module StrengthSurface =
     type private RuntimeHandle(runtime: StrengthRuntime) =
         member _.Value = runtime
 
-    type private PredictorHandle(state: StrengthPredictorState) =
-        // DSL-MUTABLE: resource — predictor state holder
-        member val State = state with get, set
-
     let private isUndefined (value: obj) : bool = emitJsExpr value "$0 === undefined"
 
     let private isNullish (value: obj) = isNull value || isUndefined value
@@ -62,15 +59,35 @@ module StrengthSurface =
     let private optionalText (value: obj) =
         if isNullish value then None else Some(string value)
 
+    let private isJsString (value: obj) : bool =
+        emitJsExpr value "typeof $0 === 'string'"
+
+    let private isJsArray (value: obj) : bool = emitJsExpr value "Array.isArray($0)"
+
     let private roleResult (value: obj) : Result<Role, string> =
         match Roles.tryParseRole (textOf value) with
         | Some role -> Ok role
         | None -> Error(sprintf "unknown role: %s" (textOf value))
 
-    let private budgetResult (value: obj) : Result<StrengthBudget, string> =
-        match StrengthBudget.parse (textOf value) with
-        | Some budget -> Ok budget
-        | None -> Error(sprintf "unknown budget: %s" (textOf value))
+    /// host-boundary-030: only an exact JavaScript integer inside the declared
+    /// range is a rounds value. A string, a boolean, a fraction, NaN and
+    /// infinity are refused here instead of being coerced by a blind unbox.
+    /// The upper bound is the `delegate_readonly_rounds` schema maximum.
+    let private isDeclaredRounds (value: obj) : bool =
+        emitJsExpr value "typeof $0 === 'number' && Number.isInteger($0) && $0 >= 0 && $0 <= 2147483647"
+
+    /// WHAT[002]: an illegal declared budget is a new-call parameter error, not
+    /// a silent normalization. Admission states it as a visible reason.
+    let private requestedRoundsOutOfRange = "requested-rounds-out-of-range"
+
+    /// A binding boundary has no channel to argue a parameter with its caller:
+    /// a missing, non-positive or otherwise illegal declared value is simply an
+    /// empty budget there, so nothing may be registered on it.
+    let private roundsResult (value: obj) : Result<ReadonlyRoundBudget, string> =
+        if isDeclaredRounds value then
+            ReadonlyRoundBudget.tryCreate (unbox<int> value)
+        else
+            ReadonlyRoundBudget.tryCreate 0
 
     let private requestKindResult (value: obj) : Result<ProviderRequestKind, string> =
         match textOf value with
@@ -80,11 +97,6 @@ module StrengthSurface =
         | "interaction-repair" -> Ok ProviderRequestKind.InteractionRepair
         | "strength-replica" -> Ok ProviderRequestKind.StrengthReplica
         | unknown -> Error(sprintf "unknown request kind: %s" unknown)
-
-    let private budgetOf (value: obj) =
-        match budgetResult value with
-        | Ok budget -> budget
-        | Error error -> invalidArg "budget" error
 
     let private roleLabel role = Roles.roleLabel role
 
@@ -245,7 +257,6 @@ module StrengthSurface =
         | StrengthFrameError.EmptyBatch _ -> "EmptyBatch"
         | StrengthFrameError.InvalidRequestOrdinal _ -> "InvalidRequestOrdinal"
         | StrengthFrameError.UnsupportedTool _ -> "UnsupportedTool"
-        | StrengthFrameError.ByteLimitExceeded _ -> "ByteLimitExceeded"
 
     let private resultToJs valueOf errorOf result =
         match result with
@@ -307,8 +318,10 @@ module StrengthSurface =
         |> projectionIntentResultToJs
 
     /// Build one deterministic frame bundle from plain request batches.
-    let frameTryBuild (sha256: string -> string) (maxBytes: int) (batches: obj array) : obj =
-        StrengthFrame.tryBuild sha256 maxBytes (batchesOf batches)
+    /// DELEGATE-10: no Delegate-specific byte ceiling; integrity (digest,
+    /// real byte length) is still enforced inside tryBuild.
+    let frameTryBuild (sha256: string -> string) (batches: obj array) : obj =
+        StrengthFrame.tryBuild sha256 (batchesOf batches)
         |> resultToJs bundleToJs errorName
 
     /// Localize owner wire ids into decision-local ids without changing semantics.
@@ -374,110 +387,143 @@ module StrengthSurface =
 
         wire |> ProviderProjection.toSemantic |> ProviderProjection.renderSemantic
 
-    let costEstimate
-        (p1: float)
-        (p2: float)
-        (savedDeep1: float)
-        (savedDeep2: float)
-        (fast1: float)
-        (fast2: float)
-        (byte1: float)
-        (byte2: float)
-        (delay1: float)
-        (delay2: float)
-        (risk1: float)
-        (risk2: float)
-        : obj =
-        let estimate =
-            StrengthCostModel.estimate p1 p2 savedDeep1 savedDeep2 fast1 fast2 byte1 byte2 delay1 delay2 risk1 risk2
+    /// DELEGATE-7.2: everything admission needs is supplied as evidence. No
+    /// predictor sample, cost estimate, evidence count, holdout bucket or
+    /// margin participates any more.
+    let private requestedRoundsOptionResult (value: obj) : Result<ReadonlyRoundBudget option, string> =
+        if isNullish value then
+            Ok None
+        elif isDeclaredRounds value then
+            ReadonlyRoundBudget.tryCreate (unbox<int> value)
+            |> Result.mapError (fun _ -> requestedRoundsOutOfRange)
+            |> Result.map Some
+        else
+            Error requestedRoundsOutOfRange
 
-        box
-            {| V0 = estimate.V0
-               V1 = estimate.V1
-               V2 = estimate.V2 |}
+    /// WHAT[002]: the owner logical run names the authority an authorization
+    /// would consume. A frozen request carries it as the two named fields; an
+    /// admission opportunity carries the [logicalRunId; authorityRootUserMessageId]
+    /// pair. Both describe the same identity, so both decode here. Policy never
+    /// inspects the identity's content, so a shape that neither decodes must be
+    /// refused here: an empty identity would otherwise mint a real DecisionId and
+    /// a durable DelegationRequested with no authority behind it.
+    let private malformedOwnerLogicalRun = "malformed-owner-logical-run"
+
+    let private ownerLogicalRunIdentity (logicalRunId: obj) (authorityRootUserMessageId: obj) =
+        if
+            isJsString logicalRunId
+            && isJsString authorityRootUserMessageId
+            && not (String.IsNullOrWhiteSpace(string logicalRunId))
+            && not (String.IsNullOrWhiteSpace(string authorityRootUserMessageId))
+        then
+            Ok
+                { LogicalRunId = LogicalRunId.create (string logicalRunId)
+                  AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (string authorityRootUserMessageId) }
+        else
+            Error malformedOwnerLogicalRun
+
+    let private ownerLogicalRunOf (value: obj) : Result<OwnerLogicalRunIdentity, string> =
+        if isNullish value then
+            Error malformedOwnerLogicalRun
+        elif isJsArray value then
+            let entries = unbox<obj array> value
+
+            if entries.Length = 2 then
+                ownerLogicalRunIdentity entries.[0] entries.[1]
+            else
+                Error malformedOwnerLogicalRun
+        else
+            ownerLogicalRunIdentity value?logicalRunId value?authorityRootUserMessageId
 
     let private opportunityOf (value: obj) : Result<StrengthOpportunity, string> =
-        match requestKindResult value?requestKind, roleResult value?canonicalRole with
-        | Ok requestKind, Ok canonicalRole ->
-            Ok
-                { IsRootWork = unbox<bool> value?isRootWork
-                  RequestKind = requestKind
-                  CanonicalRole = canonicalRole
-                  SelectedAgent = textOf value?selectedAgent
-                  HasPrefixProbe = unbox<bool> value?hasPrefixProbe
-                  IsAttachedOrInternalLeaf = unbox<bool> value?isAttachedOrInternalLeaf
-                  OwnerCancelled = unbox<bool> value?ownerCancelled
-                  TargetProviderRunBound = unbox<bool> value?targetProviderRunBound
-                  EventStoreHealthy = unbox<bool> value?eventStoreHealthy
-                  HostCanaryHealthy = unbox<bool> value?hostCanaryHealthy
-                  PredictorAvailable = unbox<bool> value?predictorAvailable
-                  CostModelAvailable = unbox<bool> value?costModelAvailable }
+        match roleResult value?canonicalRole, requestedRoundsOptionResult value?requestedRounds with
         | Error error, _
         | _, Error error -> Error error
+        | Ok canonicalRole, Ok requestedRounds ->
+            match requestKindResult (box (textOf value?requestKind)) with
+            | Error error -> Error error
+            | Ok requestKind ->
+                match ownerLogicalRunOf value?ownerLogicalRun with
+                | Error error -> Error error
+                | Ok ownerLogicalRun ->
+                    Ok
+                        { OwnerSessionId = SessionId.create (textOf value?ownerSessionId)
+                          OwnerLogicalRun = ownerLogicalRun
+                          SourcePhysicalUserMessageId =
+                            PhysicalUserMessageId.create (textOf value?sourcePhysicalUserMessageId)
+                          SourceProviderRun = ProviderRunIdentity.create (textOf value?sourceProviderRun)
+                          SourceToolCallIds =
+                            arrayOf value?sourceToolCallIds
+                            |> Array.toList
+                            |> List.map (ToolCallId.create << textOf)
+                          RequestedRounds = requestedRounds
+                          ContractRevision = DelegationContractRevisions.create (int value?contractRevision)
+                          IsRootWork = unbox<bool> value?isRootWork
+                          RequestKind = requestKind
+                          CanonicalRole = canonicalRole
+                          HasPrefixProbe = unbox<bool> value?hasPrefixProbe
+                          IsReplicaOrInternalLeaf = unbox<bool> value?isReplicaOrInternalLeaf
+                          IsInteractionRepair = unbox<bool> value?isInteractionRepair
+                          IsExplicitRecoveryBranch = unbox<bool> value?isExplicitRecoveryBranch
+                          OwnerCancelled = unbox<bool> value?ownerCancelled
+                          TargetProviderRunBound = unbox<bool> value?targetProviderRunBound
+                          EventStoreHealthy = unbox<bool> value?eventStoreHealthy
+                          HostBoundaryHealthy = unbox<bool> value?hostBoundaryHealthy
+                          ProcessFuseHealthy = unbox<bool> value?processFuseHealthy
+                          OwnerLogicalRunSuperseded = unbox<bool> value?ownerLogicalRunSuperseded
+                          PendingRequested = unbox<bool> value?pendingRequested
+                          PredictorConfigured = unbox<bool> value?predictorConfigured }
 
-    let private predictionOf (value: obj) =
-        { P1 = float value?P1
-          P2 = float value?P2
-          EvidenceCount = int value?evidenceCount }
-
-    let private estimateOf (value: obj) =
-        { V0 = float value?V0
-          V1 = float value?V1
-          V2 = float value?V2 }
-
-    let private policyConfigOf (value: obj) =
-        { K1Margin = float value?K1Margin
-          K2Margin = float value?K2Margin
-          K2MinimumEvidence = int value?K2MinimumEvidence }
-
-    let policyDecide
-        (opportunity: obj)
-        (control: bool)
-        (shadow: bool)
-        (prediction: obj)
-        (estimate: obj)
-        (config: obj)
-        : obj =
+    /// Pure eligibility read: the exact reason admission refuses.
+    let policyEligibility (opportunity: obj) : obj =
         match opportunityOf opportunity with
         | Error error -> box {| ok = false; error = error |}
         | Ok opportunity ->
-            match
-                StrengthPolicy.decideFromFacts
-                    opportunity
-                    control
-                    shadow
-                    (predictionOf prediction)
-                    (estimateOf estimate)
-                    (policyConfigOf config)
-            with
-            | StrengthDecision.Skip reason ->
+            match StrengthPolicy.eligibility opportunity with
+            | StrengthEligibility.Eligible -> box {| kind = "Eligible" |}
+            | StrengthEligibility.Ineligible reason ->
                 box
-                    {| kind = "Skip"
-                       reason = reason
-                       budget = "K0" |}
-            | StrengthDecision.ControlHoldout ->
-                box
-                    {| kind = "ControlHoldout"
-                       budget = "K0" |}
-            | StrengthDecision.Speculate(budget, value) ->
-                box
-                    {| kind = "Speculate"
-                       budget = StrengthBudget.wire budget
-                       estimate =
-                        {| V0 = value.V0
-                           V1 = value.V1
-                           V2 = value.V2 |} |}
+                    {| kind = "Ineligible"
+                       reason = reason |}
 
-    let policyControlBucket
-        (sha256: string -> string)
-        (policyVersion: string)
-        (authorityRoot: string)
-        (targetRun: string)
-        =
-        StrengthPolicy.controlBucket sha256 policyVersion authorityRoot targetRun
+    /// Evidence in, admission decision out. The only "economic" input is the
+    /// owner's own integer, already collapsed to the batch maximum upstream.
+    let private delegationRequestToJs (request: DelegationRequest) : obj =
+        box
+            {| decisionId = StrengthDecisionId.value request.DecisionId
+               ownerSessionId = SessionId.value request.OwnerSessionId
+               ownerLogicalRun =
+                box
+                    {| logicalRunId = LogicalRunId.value request.OwnerLogicalRun.LogicalRunId
+                       authorityRootUserMessageId =
+                        AuthorityRootUserMessageId.value request.OwnerLogicalRun.AuthorityRootUserMessageId |}
+               sourcePhysicalUserMessageId = PhysicalUserMessageId.value request.SourcePhysicalUserMessageId
+               sourceProviderRun = ProviderRunIdentity.value request.SourceProviderRun
+               sourceToolCallIds = request.SourceToolCallIds |> List.map ToolCallId.value |> List.toArray
+               requestedRounds = ReadonlyRoundBudget.value request.RequestedRounds
+               contractRevision = DelegationContractRevisions.value request.ContractRevision |}
 
-    let policyIsControlHoldout (rateBasisPoints: int) (bucket: int) =
-        StrengthPolicy.isControlHoldout rateBasisPoints bucket
+    let private optionToObj =
+        function
+        | Some value -> box value
+        | None -> null
+
+    let policyDecide (sha256: string -> string) (opportunity: obj) : obj =
+        match opportunityOf opportunity with
+        | Error error when error = requestedRoundsOutOfRange ->
+            // A budget the owner declared illegally refuses this admission.
+            // A value that is not even an integer is a parameter error, not a
+            // decode failure, and must never reach the domain as a budget.
+            box {| kind = "Skip"; reason = error |}
+        | Error error -> box {| ok = false; error = error |}
+        | Ok opportunity ->
+            match StrengthPolicy.decide sha256 opportunity with
+            | StrengthAdmission.Admit request ->
+                box
+                    {| kind = "Admit"
+                       request = delegationRequestToJs request |}
+            | StrengthAdmission.Skip reason -> box {| kind = "Skip"; reason = reason |}
+
 
     let readonlyCapabilities (role: string) (requestKind: string) : string array =
         match roleResult (box role), requestKindResult (box requestKind) with
@@ -504,12 +550,12 @@ module StrengthSurface =
         |> List.map (fun (tool, allowed) -> box {| tool = tool; allowed = allowed |})
         |> List.toArray
 
-    let isAllowedTool (tool: string) : bool =
-        match tool with
-        | "read"
-        | "glob"
-        | "grep" -> true
-        | _ -> false
+    /// WHAT[004]: the readonly delegation tool gate. This is a projection of the
+    /// one execution-side predicate in StrengthFrame, which already refuses a
+    /// blank name and matches case-insensitively, so the capability labels
+    /// ("Read"/"Glob"/"Grep") and the host tool ids ("read"/"glob"/"grep")
+    /// answer the same question without a second hand-written name table.
+    let isAllowedTool (tool: string) : bool = StrengthFrame.isAllowedTool tool
 
     /// Prompt identity remains role-owned and cannot inherit Strength metadata.
     let systemPromptIdForRole (role: string) : string =
@@ -586,7 +632,7 @@ module StrengthSurface =
     let private commitDecisionName decision =
         match decision with
         | StrengthCommitDecision.Proceed -> "Proceed"
-        | StrengthCommitDecision.FallBackK0 -> "FallBackK0"
+        | StrengthCommitDecision.FallBackNoDelegation -> "FallBackNoDelegation"
         | StrengthCommitDecision.RetryAppend -> "RetryAppend"
         | StrengthCommitDecision.FailClosed -> "FailClosed"
 
@@ -619,33 +665,30 @@ module StrengthSurface =
         | StrengthPromotionDecision.IgnoreWrongRun -> "IgnoreWrongRun"
         | StrengthPromotionDecision.AwaitOrAbandon -> "AwaitOrAbandon"
 
+    /// DELEGATE-6.1: Prepared no longer carries any budget. RequestedRounds
+    /// belongs to the DelegationRequested fact alone.
     let eventPrepared
         (owner: string)
         (decision: string)
         (target: string)
         (replica: string)
-        (budget: string)
         (anchor: string)
         (digest: string)
         (byteLength: int)
         (refs: string array)
         : obj =
-        match budgetResult (box budget) with
-        | Error error -> box {| ok = false; error = error |}
-        | Ok budget ->
-            EventHandle(
-                StrengthEvents.prepared
-                    (SessionId.create owner)
-                    (StrengthDecisionId.create decision)
-                    (ProviderRunIdentity.create target)
-                    (SessionId.create replica)
-                    budget
-                    anchor
-                    digest
-                    byteLength
-                    (refs |> Array.toList |> List.map PayloadRef.create)
-            )
-            :> obj
+        EventHandle(
+            StrengthEvents.prepared
+                (SessionId.create owner)
+                (StrengthDecisionId.create decision)
+                (ProviderRunIdentity.create target)
+                (SessionId.create replica)
+                anchor
+                digest
+                byteLength
+                (refs |> Array.toList |> List.map PayloadRef.create)
+        )
+        :> obj
 
     let eventPromoted (owner: string) (decision: string) (target: string) (digest: string) (refs: string array) : obj =
         EventHandle(
@@ -665,30 +708,126 @@ module StrengthSurface =
         EventHandle(StrengthEvents.abandoned (StrengthDecisionId.create decision) (ProviderRunIdentity.create target))
         :> obj
 
-    let private eventOf (value: obj) =
-        unbox<EventHandle> value |> fun handle -> handle.Value
+    /// Fail closed at the JS/F# DU boundary: only a real EventHandle carries
+    /// a StrengthEvent. Any other value is refused here, so no fold ever
+    /// receives an undefined union value.
+    let private eventOf (value: obj) : Result<StrengthEvent, string> =
+        match value with
+        | :? EventHandle as handle -> Ok handle.Value
+        | _ -> Error "expected a Strength event handle"
 
-    let eventType (value: obj) =
-        match eventOf value with
+    let private closedFromName =
+        function
+        | DelegationClosedFrom.Requested -> "Requested"
+        | DelegationClosedFrom.Bound -> "Bound"
+
+    let private closedReasonName =
+        function
+        | DelegationClosedReason.NoMaterial -> "NoMaterial"
+        | DelegationClosedReason.CannotContinue -> "CannotContinue"
+        | DelegationClosedReason.Cancelled -> "Cancelled"
+        | DelegationClosedReason.Superseded -> "Superseded"
+        | DelegationClosedReason.RecoveryAbandoned -> "RecoveryAbandoned"
+
+    /// DELEGATE-015: imported history material is evidence, never an admission
+    /// (WHY [015]); the adopted/relinquished split stays a closed union.
+    let private importOutcomeToJs (outcome: DelegationImportOutcome) : obj =
+        match outcome with
+        | DelegationImportOutcome.Adopted material ->
+            box
+                {| kind = "adopted"
+                   targetProviderRun = ProviderRunIdentity.value material.TargetProviderRun
+                   frameDigest = material.FrameDigest
+                   byteLength = material.ByteLength
+                   materialPayloads = material.MaterialPayloads |> List.map PayloadRef.value |> List.toArray
+                   tracedStartInclusive = material.TracedStartInclusive |> optionToObj
+                   tracedEndExclusive = material.TracedEndExclusive |> optionToObj |}
+        | DelegationImportOutcome.Relinquished material ->
+            box
+                {| kind = "relinquished"
+                   targetProviderRun =
+                    material.TargetProviderRun
+                    |> Option.map ProviderRunIdentity.value
+                    |> optionToObj
+                   reason = material.Reason |}
+
+    let private eventTypeOf (event: StrengthEvent) =
+        match event with
+        | StrengthEvent.DelegationRequested _ -> "DelegationRequested"
+        | StrengthEvent.DelegationBound _ -> "DelegationBound"
+        | StrengthEvent.DelegationClosed _ -> "DelegationClosed"
         | StrengthEvent.Prepared _ -> "StrengthCandidatePrepared"
         | StrengthEvent.Promoted _ -> "StrengthCandidatePromoted"
         | StrengthEvent.Traced _ -> "StrengthFramesTraced"
+        | StrengthEvent.DelegationHistoryImported _ -> "DelegationHistoryImported"
         | StrengthEvent.Abandoned _ -> "StrengthCandidateAbandoned"
 
-    let eventView (value: obj) : obj =
+    let eventType (value: obj) =
         match eventOf value with
-        | StrengthEvent.Prepared event ->
+        | Error _ -> "unknown"
+        | Ok event -> eventTypeOf event
+
+    /// DELEGATE-6.2: the durable Prepared write set as the folded projection
+    /// shows it — the fact fields only. The discriminator belongs to the event
+    /// view; a folded view must not grow a key the durable event never had.
+    let private preparedFactToJs (event: StrengthCandidatePrepared) : obj =
+        box
+            {| ownerSessionId = SessionId.value event.OwnerSessionId
+               decisionId = StrengthDecisionId.value event.DecisionId
+               targetProviderRun = ProviderRunIdentity.value event.TargetProviderRun
+               replicaSessionId = SessionId.value event.ReplicaSessionId
+               anchorDigest = event.AnchorDigest
+               frameDigest = event.FrameDigest
+               byteLength = event.ByteLength
+               materialPayloads = event.MaterialPayloads |> List.map PayloadRef.value |> List.toArray |}
+
+    let private preparedToJs (event: StrengthCandidatePrepared) : obj =
+        box
+            {| kind = "Prepared"
+               ownerSessionId = SessionId.value event.OwnerSessionId
+               decisionId = StrengthDecisionId.value event.DecisionId
+               targetProviderRun = ProviderRunIdentity.value event.TargetProviderRun
+               replicaSessionId = SessionId.value event.ReplicaSessionId
+               anchorDigest = event.AnchorDigest
+               frameDigest = event.FrameDigest
+               byteLength = event.ByteLength
+               materialPayloads = event.MaterialPayloads |> List.map PayloadRef.value |> List.toArray |}
+
+    let private eventViewOf (event: StrengthEvent) : obj =
+        match event with
+        | StrengthEvent.DelegationRequested event ->
+            // The decoded envelope value is the fact itself: the discriminator
+            // and the request fields on one object, in the same field set as
+            // delegationRequestToJs (the nested form stays for policy and
+            // folded views, which read the request as a whole).
             box
-                {| kind = "Prepared"
+                {| kind = "DelegationRequested"
+                   decisionId = StrengthDecisionId.value event.DecisionId
                    ownerSessionId = SessionId.value event.OwnerSessionId
+                   ownerLogicalRun =
+                    box
+                        {| logicalRunId = LogicalRunId.value event.OwnerLogicalRun.LogicalRunId
+                           authorityRootUserMessageId =
+                            AuthorityRootUserMessageId.value event.OwnerLogicalRun.AuthorityRootUserMessageId |}
+                   sourcePhysicalUserMessageId = PhysicalUserMessageId.value event.SourcePhysicalUserMessageId
+                   sourceProviderRun = ProviderRunIdentity.value event.SourceProviderRun
+                   sourceToolCallIds = event.SourceToolCallIds |> List.map ToolCallId.value |> List.toArray
+                   requestedRounds = ReadonlyRoundBudget.value event.RequestedRounds
+                   contractRevision = DelegationContractRevisions.value event.ContractRevision |}
+        | StrengthEvent.DelegationBound event ->
+            box
+                {| kind = "DelegationBound"
                    decisionId = StrengthDecisionId.value event.DecisionId
                    targetProviderRun = ProviderRunIdentity.value event.TargetProviderRun
                    replicaSessionId = SessionId.value event.ReplicaSessionId
-                   budget = StrengthBudget.wire event.Budget
-                   anchorDigest = event.AnchorDigest
-                   frameDigest = event.FrameDigest
-                   byteLength = event.ByteLength
-                   materialPayloads = event.MaterialPayloads |> List.map PayloadRef.value |> List.toArray |}
+                   anchorDigest = event.AnchorDigest |}
+        | StrengthEvent.DelegationClosed event ->
+            box
+                {| kind = "DelegationClosed"
+                   decisionId = StrengthDecisionId.value event.DecisionId
+                   from = closedFromName event.From
+                   reason = closedReasonName event.Reason |}
+        | StrengthEvent.Prepared event -> box (preparedToJs event)
         | StrengthEvent.Promoted event ->
             box
                 {| kind = "Promoted"
@@ -703,11 +842,25 @@ module StrengthSurface =
                    decisionId = StrengthDecisionId.value event.DecisionId
                    startInclusive = event.StartInclusive
                    endExclusive = event.EndExclusive |}
+        | StrengthEvent.DelegationHistoryImported event ->
+            box
+                {| kind = "DelegationHistoryImported"
+                   decisionId = StrengthDecisionId.value event.DecisionId
+                   sourceStreamId = event.SourceStreamId
+                   sourceEventId = event.SourceEventId
+                   importId = event.ImportId
+                   oldBudgetEvidence = event.OldBudgetEvidence |> optionToObj
+                   outcome = importOutcomeToJs event.Outcome |}
         | StrengthEvent.Abandoned event ->
             box
                 {| kind = "Abandoned"
                    decisionId = StrengthDecisionId.value event.DecisionId
                    targetProviderRun = ProviderRunIdentity.value event.TargetProviderRun |}
+
+    let eventView (value: obj) : obj =
+        match eventOf value with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok event -> eventViewOf event
 
     let private projectionOf value =
         unbox<ProjectionHandle> value |> fun handle -> handle.Value
@@ -717,8 +870,15 @@ module StrengthSurface =
 
     let private projectionErrorName error =
         match error with
-        | StrengthProjectionError.PreparedConflict _ -> "PreparedConflict"
+        | StrengthProjectionError.RequestedConflict _ -> "RequestedConflict"
+        | StrengthProjectionError.BoundWithoutRequested _ -> "BoundWithoutRequested"
+        | StrengthProjectionError.BoundConflict _ -> "BoundConflict"
         | StrengthProjectionError.TargetAlreadyBound _ -> "TargetAlreadyBound"
+        | StrengthProjectionError.ClosedWithoutRequested _ -> "ClosedWithoutRequested"
+        | StrengthProjectionError.ClosedConflict _ -> "ClosedConflict"
+        | StrengthProjectionError.PreparedWithoutBound _ -> "PreparedWithoutBound"
+        | StrengthProjectionError.PreparedConflict _ -> "PreparedConflict"
+        | StrengthProjectionError.PreparedBindingMismatch _ -> "PreparedBindingMismatch"
         | StrengthProjectionError.PromotionWithoutPrepared _ -> "PromotionWithoutPrepared"
         | StrengthProjectionError.PromotionMismatch _ -> "PromotionMismatch"
         | StrengthProjectionError.PromotionAfterAbandon _ -> "PromotionAfterAbandon"
@@ -729,42 +889,56 @@ module StrengthSurface =
         | StrengthProjectionError.AbandonWithoutPrepared _ -> "AbandonWithoutPrepared"
         | StrengthProjectionError.AbandonMismatch _ -> "AbandonMismatch"
         | StrengthProjectionError.AbandonAfterPromotion _ -> "AbandonAfterPromotion"
+        | StrengthProjectionError.ImportConflict _ -> "ImportConflict"
 
-    let private preparedToJs (event: StrengthCandidatePrepared) : obj =
-        box
-            {| ownerSessionId = SessionId.value event.OwnerSessionId
-               decisionId = StrengthDecisionId.value event.DecisionId
-               targetProviderRun = ProviderRunIdentity.value event.TargetProviderRun
-               replicaSessionId = SessionId.value event.ReplicaSessionId
-               budget = StrengthBudget.wire event.Budget
-               anchorDigest = event.AnchorDigest
-               frameDigest = event.FrameDigest
-               byteLength = event.ByteLength
-               materialPayloads = event.MaterialPayloads |> List.map PayloadRef.value |> List.toArray |}
 
-    let private candidateViewToJs (view: StrengthCandidateView) : obj =
+    let private candidateStateName state =
+        match state with
+        | StrengthCandidateState.Requested -> "Requested"
+        | StrengthCandidateState.Bound -> "Bound"
+        | StrengthCandidateState.Prepared -> "Prepared"
+        | StrengthCandidateState.Promoted -> "Promoted"
+        | StrengthCandidateState.Traced -> "Traced"
+        | StrengthCandidateState.Closed _ -> "Closed"
+        | StrengthCandidateState.Abandoned -> "Abandoned"
+
+    /// Folded view of one decision: the immutable request plus everything
+    /// legally attached so far, expressed as a closed union — never boolean
+    /// combinations (DELEGATE-6.2).
+    let private delegationViewToJs (view: StrengthDelegationView) : obj =
         box
-            {| prepared = preparedToJs view.Prepared
-               promoted = view.Promoted
-               abandoned = view.Abandoned
+            {| request = delegationRequestToJs view.Request
+               binding =
+                view.Binding
+                |> Option.map (fun binding ->
+                    box
+                        {| targetProviderRun = ProviderRunIdentity.value binding.TargetProviderRun
+                           replicaSessionId = SessionId.value binding.ReplicaSessionId
+                           anchorDigest = binding.AnchorDigest |})
+                |> optionToObj
+               prepared = view.Prepared |> Option.map preparedFactToJs |> optionToObj
+               state = candidateStateName view.State
                traceRange =
                 view.TraceRange
                 |> Option.map (fun range ->
                     box
                         {| startInclusive = range.StartInclusive
                            endExclusive = range.EndExclusive |})
-                |> Option.toObj |}
+                |> optionToObj |}
 
     let projectionApply (projection: obj) (event: obj) : obj =
-        match StrengthProjection.apply (projectionOf projection) (eventOf event) with
-        | Ok next ->
-            box
-                {| ok = true
-                   value = (ProjectionHandle next :> obj) |}
-        | Error error ->
-            box
-                {| ok = false
-                   error = projectionErrorName error |}
+        match eventOf event with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok event ->
+            match StrengthProjection.apply (projectionOf projection) event with
+            | Ok next ->
+                box
+                    {| ok = true
+                       value = (ProjectionHandle next :> obj) |}
+            | Error error ->
+                box
+                    {| ok = false
+                       error = projectionErrorName error |}
 
     let projectionHasPrepared (decision: string) (projection: obj) =
         StrengthProjection.hasPrepared (StrengthDecisionId.create decision) (projectionOf projection)
@@ -779,7 +953,14 @@ module StrengthSurface =
 
     let projectionCandidate (decision: string) (projection: obj) =
         match StrengthProjection.tryCandidate (StrengthDecisionId.create decision) (projectionOf projection) with
-        | Some view -> candidateViewToJs view
+        | Some view -> delegationViewToJs view
+        | None -> null
+
+    /// DELEGATE-6.3: the requested rounds are read from the immutable
+    /// projection; no layer keeps its own copy of the budget.
+    let projectionRequestedRounds (decision: string) (projection: obj) =
+        match StrengthProjection.requestedRounds (StrengthDecisionId.create decision) (projectionOf projection) with
+        | Some rounds -> box (ReadonlyRoundBudget.value rounds)
         | None -> null
 
     let projectionTraceRange (decision: string) (projection: obj) =
@@ -790,8 +971,27 @@ module StrengthSurface =
                    endExclusive = range.EndExclusive |}
         | None -> null
 
+    /// DELEGATE-015: evidence-only imported history, folded by import identity.
+    /// The fold keeps the causal position, the digest and the trace coverage as
+    /// evidence, and never yields a runnable delegation (WHY [015]).
+    let private importedHistoryToJs (imported: DelegationHistoryImported) : obj =
+        box
+            {| decisionId = StrengthDecisionId.value imported.DecisionId
+               sourceStreamId = imported.SourceStreamId
+               sourceEventId = imported.SourceEventId
+               importId = imported.ImportId
+               oldBudgetEvidence = imported.OldBudgetEvidence |> optionToObj
+               outcome = importOutcomeToJs imported.Outcome |}
+
+    let projectionImported (importId: string) (projection: obj) =
+        match StrengthProjection.tryImported importId (projectionOf projection) with
+        | Some imported -> importedHistoryToJs imported
+        | None -> null
+
     let storeToEnvelope (sha256: string -> string) (event: obj) : obj =
-        EnvelopeHandle(StrengthStore.toEnvelope sha256 (eventOf event)) :> obj
+        match eventOf event with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok event -> EnvelopeHandle(StrengthStore.toEnvelope sha256 event) :> obj
 
     let private envelopeOf value =
         unbox<EnvelopeHandle> value |> fun handle -> handle.Value
@@ -814,6 +1014,149 @@ module StrengthSurface =
                    value = eventView (EventHandle event :> obj) |}
         | Error error -> box {| ok = false; error = error |}
 
+    // DELEGATE-015: offline migration of pre-delegation Strength history,
+    // projected JS-native. The planner and the classification live in the
+    // Migration module; here tests only get plain-object boundary shapes.
+
+    let private legacyEnvelopeToJs (envelope: LegacyEnvelope) : obj =
+        box
+            {| eventId = envelope.EventId
+               sourceStreamId = envelope.SourceStreamId
+               eventType = envelope.EventType
+               decisionId = envelope.DecisionId
+               budgetEvidence = envelope.BudgetEvidence |> optionToObj
+               targetProviderRun = envelope.TargetProviderRun |> optionToObj
+               frameDigest = envelope.FrameDigest |> optionToObj
+               byteLength = envelope.ByteLength |> optionToObj
+               tracedStartInclusive = envelope.TracedStartInclusive |> optionToObj
+               tracedEndExclusive = envelope.TracedEndExclusive |> optionToObj
+               materialPayloads = envelope.MaterialPayloads |}
+
+    /// host-boundary-030: a traced range crossing this boundary is a JS bigint
+    /// (a decoded Thoth int64 arrives as one, and `Encode.int64` writes it back
+    /// as text). Thoth's own `Decode.int64` only inspects `number` and `string`,
+    /// so a bigint would fail it as a bad primitive; accept the bigint here and
+    /// leave every other shape to the stock decoder, which fails closed.
+    let private int64View: Decoder<int64> =
+        fun path value ->
+            if emitJsExpr value "typeof $0 === 'bigint'" then
+                // In Fable a JS bigint already is an int64; no conversion.
+                Ok(unbox<int64> value)
+            else
+                Decode.int64 path value
+
+    let private legacyEnvelopeViewDecoder: Decoder<LegacyEnvelope> =
+        Decode.object (fun get ->
+            { LegacyEnvelope.EventId = get.Required.Field "eventId" Decode.string
+              SourceStreamId = get.Required.Field "sourceStreamId" Decode.string
+              EventType = get.Required.Field "eventType" Decode.string
+              DecisionId = get.Required.Field "decisionId" Decode.string
+              BudgetEvidence = get.Optional.Field "budgetEvidence" Decode.string
+              TargetProviderRun = get.Optional.Field "targetProviderRun" Decode.string
+              FrameDigest = get.Optional.Field "frameDigest" Decode.string
+              ByteLength = get.Optional.Field "byteLength" Decode.int
+              TracedStartInclusive = get.Optional.Field "tracedStartInclusive" int64View
+              TracedEndExclusive = get.Optional.Field "tracedEndExclusive" int64View
+              MaterialPayloads =
+                get.Optional.Field "materialPayloads" (Decode.list Decode.string)
+                |> Option.defaultValue []
+                |> List.toArray })
+
+    let private importFactToJs (fact: ImportFact) : obj =
+        box
+            {| decisionId = fact.DecisionId
+               sourceStreamId = fact.SourceStreamId
+               sourceEventId = fact.SourceEventId
+               importId = fact.ImportId
+               oldBudgetEvidence = fact.OldBudgetEvidence |> optionToObj
+               outcomeKind = fact.OutcomeKind
+               targetProviderRun = fact.TargetProviderRun |> optionToObj
+               frameDigest = fact.FrameDigest |> optionToObj
+               byteLength = fact.ByteLength |> optionToObj
+               tracedStartInclusive = fact.TracedStartInclusive |> optionToObj
+               tracedEndExclusive = fact.TracedEndExclusive |> optionToObj
+               materialPayloads = fact.MaterialPayloads
+               relinquishReason = fact.RelinquishReason |> optionToObj |}
+
+    let private importFactViewDecoder: Decoder<ImportFact> =
+        Decode.object (fun get ->
+            { ImportFact.DecisionId = get.Required.Field "decisionId" Decode.string
+              SourceStreamId = get.Required.Field "sourceStreamId" Decode.string
+              SourceEventId = get.Required.Field "sourceEventId" Decode.string
+              ImportId = get.Required.Field "importId" Decode.string
+              OldBudgetEvidence = get.Optional.Field "oldBudgetEvidence" Decode.string
+              OutcomeKind = get.Required.Field "outcomeKind" Decode.string
+              TargetProviderRun = get.Optional.Field "targetProviderRun" Decode.string
+              FrameDigest = get.Optional.Field "frameDigest" Decode.string
+              ByteLength = get.Optional.Field "byteLength" Decode.int
+              TracedStartInclusive = get.Optional.Field "tracedStartInclusive" int64View
+              TracedEndExclusive = get.Optional.Field "tracedEndExclusive" int64View
+              MaterialPayloads =
+                get.Optional.Field "materialPayloads" (Decode.list Decode.string)
+                |> Option.defaultValue []
+                |> List.toArray
+              RelinquishReason = get.Optional.Field "relinquishReason" Decode.string })
+
+    /// Recognize one envelope payload as legacy, current, or not Strength.
+    /// Canonical JSON text in; flat verdict out.
+    let migrationClassifyEnvelope (eventType: string) (payloadJson: string) : obj =
+        let classification =
+            LegacyProtocolClassifier.classifyEnvelopeJson eventType payloadJson
+
+        box
+            {| kind = classification.Kind
+               reason = classification.Reason |> optionToObj |}
+
+    /// Extract the legacy view of one envelope, or `null` when the envelope is
+    /// not one of the four pre-delegation Strength fact types.
+    let migrationReadLegacyEnvelope (envelopeJson: string) : obj =
+        match DelegationHistoryMigration.readLegacyEnvelope envelopeJson with
+        | Some envelope -> legacyEnvelopeToJs envelope
+        | None -> null
+
+    /// Plan the import facts of one legacy decision. Envelopes arrive in causal
+    /// order as JS-native views; the planner is the Migration module's.
+    let migrationPlanDecision (sha256: string -> string) (contractRevision: int) (envelopes: obj array) : obj =
+        let decoded =
+            envelopes
+            |> Array.map (fun envelope ->
+                match Decode.fromValue "$" legacyEnvelopeViewDecoder envelope with
+                | Ok value -> Ok value
+                | Error error -> Error error)
+
+        match
+            decoded
+            |> Array.tryPick (function
+                | Error error -> Some error
+                | Ok _ -> None)
+        with
+        | Some error -> box {| ok = false; error = error |}
+        | None ->
+            let legacy =
+                decoded
+                |> Array.choose (function
+                    | Ok value -> Some value
+                    | Error _ -> None)
+
+            try
+                let facts = DelegationHistoryMigration.planDecision sha256 contractRevision legacy
+
+                box
+                    {| ok = true
+                       value = facts |> Array.map importFactToJs |}
+            with error ->
+                box {| ok = false; error = error.Message |}
+
+    /// Render one planned import fact as the JS-native event the EventStore
+    /// surface appends; the same encoder as the runtime decode path.
+    let migrationImportEvent (sha256: string -> string) (value: obj) : obj =
+        match Decode.fromValue "$" importFactViewDecoder value with
+        | Ok fact ->
+            box
+                {| ok = true
+                   value = DelegationHistoryMigration.importEventJs sha256 fact |}
+        | Error error -> box {| ok = false; error = error |}
+
     let private appendErrorName error =
         match error with
         | AppendError.StorageInvalid invalid ->
@@ -830,15 +1173,18 @@ module StrengthSurface =
 
     let storeAppend (store: obj) (sha256: string -> string) (event: obj) : Task<obj> =
         task {
-            let! result = StrengthStore.append (EventStoreStrengthSurface.storeOf store) sha256 (eventOf event)
+            match eventOf event with
+            | Error error -> return box {| ok = false; error = error |}
+            | Ok event ->
+                let! result = StrengthStore.append (EventStoreStrengthSurface.storeOf store) sha256 event
 
-            return
-                match result with
-                | Ok() -> box {| ok = true |}
-                | Error error ->
-                    box
-                        {| ok = false
-                           error = appendErrorName error |}
+                return
+                    match result with
+                    | Ok() -> box {| ok = true |}
+                    | Error error ->
+                        box
+                            {| ok = false
+                               error = appendErrorName error |}
         }
 
     let storeWritePayload (store: obj) (bytes: byte array) : Task<obj> =
@@ -876,34 +1222,6 @@ module StrengthSurface =
     let private durabilityOf value =
         unbox<DurabilityHandle> value |> fun handle -> handle.Value
 
-    let durabilityPublishPrepared (durability: obj) (request: obj) : Task<obj> =
-        match budgetResult request?budget with
-        | Error error -> Task.FromResult(box {| ok = false; error = error |})
-        | Ok budget ->
-            let value = durabilityOf durability
-
-            let preparedRequest =
-                { OwnerSessionId = SessionId.create (textOf request?ownerSessionId)
-                  DecisionId = StrengthDecisionId.create (textOf request?decisionId)
-                  TargetProviderRun = ProviderRunIdentity.create (textOf request?targetProviderRun)
-                  ReplicaSessionId = SessionId.create (textOf request?replicaSessionId)
-                  Budget = budget
-                  AnchorDigest = textOf request?anchorDigest
-                  Bundle = bundleOf request?bundle }
-
-            task {
-                let! result = value.PublishPrepared preparedRequest
-
-                return
-                    match result with
-                    | StrengthPreparedPublish.Published -> box {| kind = "Published" |}
-                    | StrengthPreparedPublish.Rejected reason -> box {| kind = "Rejected"; reason = reason |}
-                    | StrengthPreparedPublish.StorageInvalid reason ->
-                        box
-                            {| kind = "StorageInvalid"
-                               reason = reason |}
-            }
-
     let durabilityLoadProjection (durability: obj) : Task<obj> =
         task {
             let! result = (durabilityOf durability).LoadProjection()
@@ -926,26 +1244,66 @@ module StrengthSurface =
                         {| ok = false
                            error = "missing candidate" |}
             | Some view ->
-                let! result = (durabilityOf durability).LoadFrameBundle view.Prepared
-
-                return
-                    match result with
-                    | Ok bundle ->
+                match view.Prepared with
+                | None ->
+                    return
                         box
-                            {| ok = true
-                               value = bundleToJs bundle |}
-                    | Error error -> box {| ok = false; error = error |}
+                            {| ok = false
+                               error = "missing candidate" |}
+                | Some prepared ->
+                    let! result = (durabilityOf durability).LoadFrameBundle prepared
+
+                    return
+                        match result with
+                        | Ok bundle ->
+                            box
+                                {| ok = true
+                                   value = bundleToJs bundle |}
+                        | Error error -> box {| ok = false; error = error |}
         }
 
     let durabilityAppend (durability: obj) (event: obj) : Task<obj> =
         task {
-            let! result = (durabilityOf durability).Append(eventOf event)
+            match eventOf event with
+            | Error error -> return box {| ok = false; error = error |}
+            | Ok event ->
+                let! result = (durabilityOf durability).Append event
+
+                return
+                    match result with
+                    | StrengthDurableAppend.Applied -> box {| ok = true |}
+                    | StrengthDurableAppend.SemanticRejected reason -> box {| ok = false; error = reason |}
+                    | StrengthDurableAppend.StorageInvalid _ ->
+                        box
+                            {| ok = false
+                               error = "StorageInvalid" |}
+                    | StrengthDurableAppend.StorageFailed reason -> box {| ok = false; error = reason |}
+        }
+
+    /// DELEGATE-6.6/STRENGTH-006: publish the durable candidate for one Bound
+    /// decision. The request carries no budget: RequestedRounds belongs to the
+    /// DelegationRequested fact alone. The frame bundle arrives in the same JS
+    /// shape every other bundle crosses this surface; its payload refs were
+    /// written by the caller beforehand.
+    let durabilityPublishPrepared (durability: obj) (request: obj) : Task<obj> =
+        task {
+            let! result =
+                (durabilityOf durability).PublishPrepared
+                    { OwnerSessionId = SessionId.create (textOf request?ownerSessionId)
+                      DecisionId = StrengthDecisionId.create (textOf request?decisionId)
+                      TargetProviderRun = ProviderRunIdentity.create (textOf request?targetProviderRun)
+                      ReplicaSessionId = SessionId.create (textOf request?replicaSessionId)
+                      AnchorDigest = textOf request?anchorDigest
+                      Bundle = bundleOf request?bundle }
 
             return
                 match result with
-                | StrengthDurableAppend.Applied -> box {| ok = true |}
-                | StrengthDurableAppend.SemanticRejected reason -> box {| ok = false; error = reason |}
-                | StrengthDurableAppend.StorageFailed reason -> box {| ok = false; error = reason |}
+                | StrengthPreparedPublish.Published -> box {| kind = "Published" |}
+                | StrengthPreparedPublish.StorageInvalid error ->
+                    box
+                        {| kind = "StorageInvalid"
+                           error = error |}
+                | StrengthPreparedPublish.Rejected error -> box {| kind = "Rejected"; error = error |}
         }
 
     let traceExpectedParts (bundle: obj) : obj array =
@@ -953,7 +1311,7 @@ module StrengthSurface =
         |> List.map (fun (kind, toolName, body) ->
             box
                 {| kind = kind
-                   toolName = toolName |> Option.toObj
+                   toolName = toolName |> optionToObj
                    body = body |})
         |> List.toArray
 
@@ -1075,7 +1433,7 @@ module StrengthSurface =
                     box
                         {| startInclusive = range.StartInclusive
                            endExclusive = range.EndExclusive |})
-                |> Option.toObj |}
+                |> optionToObj |}
 
     let private planOf (value: obj) : StrengthReplayPlan =
         let prepared =
@@ -1083,7 +1441,6 @@ module StrengthSurface =
               DecisionId = StrengthDecisionId.create (textOf value?prepared?decisionId)
               TargetProviderRun = ProviderRunIdentity.create (textOf value?prepared?targetProviderRun)
               ReplicaSessionId = SessionId.create (textOf value?prepared?replicaSessionId)
-              Budget = budgetOf value?prepared?budget
               AnchorDigest = textOf value?prepared?anchorDigest
               FrameDigest = textOf value?prepared?frameDigest
               ByteLength = int value?prepared?byteLength
@@ -1102,7 +1459,7 @@ module StrengthSurface =
 
         { Prepared = prepared
           Bundle = bundleOf value?bundle
-          BeforeMessageIndex = int value?beforeMessageIndex
+          BeforeMessageIndex = int (textOf value?beforeMessageIndex)
           ExistingTraceRange = traceRange }
 
     let lifecycleReplayPlans (owner: string) (messages: obj array) (bundle: obj) (projection: obj) : Task<obj> =
@@ -1197,179 +1554,6 @@ module StrengthSurface =
                    value = null
                    error = projectionIntentErrorName error |}
 
-    let predictorCreate () : obj =
-        PredictorHandle StrengthPredictor.empty :> obj
-
-    let private symbolToJs symbol =
-        match symbol with
-        | StrengthPrimarySymbol.ReadonlyBatch -> "ReadonlyBatch"
-        | StrengthPrimarySymbol.MutatingOrExecuting -> "MutatingOrExecuting"
-        | StrengthPrimarySymbol.TextOnly -> "TextOnly"
-        | StrengthPrimarySymbol.Other -> "Other"
-
-    let private featureToJs (feature: StrengthFeatureKey) : obj =
-        box
-            {| canonicalRole = roleLabel feature.CanonicalRole
-               recentPrimary = feature.RecentPrimary |> List.map symbolToJs |> List.toArray
-               visibleByteBucket = feature.VisibleByteBucket |}
-
-    let private predictorOf value = unbox<PredictorHandle> value
-
-    let private symbolResult (value: obj) : Result<StrengthPrimarySymbol, string> =
-        match textOf value with
-        | "ReadonlyBatch" -> Ok StrengthPrimarySymbol.ReadonlyBatch
-        | "MutatingOrExecuting" -> Ok StrengthPrimarySymbol.MutatingOrExecuting
-        | "TextOnly" -> Ok StrengthPrimarySymbol.TextOnly
-        | "Other" -> Ok StrengthPrimarySymbol.Other
-        | unknown -> Error(sprintf "unknown primary symbol: %s" unknown)
-
-    let predictorFeature (role: string) (recent: string array) (visibleBytes: int) : obj =
-        match roleResult (box role) with
-        | Error error -> box {| ok = false; error = error |}
-        | Ok role ->
-            match
-                recent
-                |> Array.toList
-                |> List.map (symbolResult << box)
-                |> List.fold
-                    (fun state item -> Result.bind (fun values -> Result.map (fun value -> value :: values) item) state)
-                    (Ok [])
-            with
-            | Error error -> box {| ok = false; error = error |}
-            | Ok symbols ->
-                let feature = StrengthPredictor.feature role (List.rev symbols) visibleBytes
-
-                box
-                    {| canonicalRole = roleLabel feature.CanonicalRole
-                       recentPrimary =
-                        feature.RecentPrimary
-                        |> List.map (function
-                            | StrengthPrimarySymbol.ReadonlyBatch -> "ReadonlyBatch"
-                            | StrengthPrimarySymbol.MutatingOrExecuting -> "MutatingOrExecuting"
-                            | StrengthPrimarySymbol.TextOnly -> "TextOnly"
-                            | StrengthPrimarySymbol.Other -> "Other")
-                        |> List.toArray
-                       visibleByteBucket = feature.VisibleByteBucket |}
-
-    let private featureOf (value: obj) : Result<StrengthFeatureKey, string> =
-        match roleResult value?canonicalRole with
-        | Error error -> Error error
-        | Ok role ->
-            arrayOf value?recentPrimary
-            |> Array.toList
-            |> List.map (symbolResult)
-            |> List.fold
-                (fun state item -> Result.bind (fun values -> Result.map (fun value -> value :: values) item) state)
-                (Ok [])
-            |> Result.map (fun recent ->
-                { CanonicalRole = role
-                  RecentPrimary = List.rev recent
-                  VisibleByteBucket = int value?visibleByteBucket })
-
-    let predictorObserveFirst (state: obj) (feature: obj) (symbol: string) : obj =
-        match featureOf feature, symbolResult (box symbol) with
-        | Ok feature, Ok symbol ->
-            let handle = predictorOf state
-            let next, readonly = StrengthPredictor.observeFirst feature symbol handle.State
-            handle.State <- next
-            box readonly
-        | Error error, _
-        | _, Error error -> box {| ok = false; error = error |}
-
-    let predictorObserveSecond (state: obj) (feature: obj) (symbol: string) : obj =
-        match featureOf feature, symbolResult (box symbol) with
-        | Ok feature, Ok symbol ->
-            let handle = predictorOf state
-            handle.State <- StrengthPredictor.observeSecond feature symbol handle.State
-            box ()
-        | Error error, _
-        | _, Error error -> box {| ok = false; error = error |}
-
-    let predictorBucket (state: obj) (feature: obj) : obj =
-        match featureOf feature with
-        | Error error -> box {| ok = false; error = error |}
-        | Ok feature ->
-            let bucket = StrengthPredictor.bucket feature (predictorOf state).State
-
-            box
-                {| opportunities = bucket.Opportunities
-                   readonlyFirst = bucket.ReadonlyFirst
-                   secondObservations = bucket.SecondObservations
-                   readonlySecond = bucket.ReadonlySecond |}
-
-    let predictorPredict (state: obj) (feature: obj) : obj =
-        match featureOf feature with
-        | Error error -> box {| ok = false; error = error |}
-        | Ok feature ->
-            let prediction = StrengthPredictor.predict feature (predictorOf state).State
-
-            box
-                {| P1 = prediction.P1
-                   P2 = prediction.P2
-                   evidenceCount = prediction.EvidenceCount |}
-
-    let rolloutEstimate (prediction: obj) (costs: obj) : obj =
-        let value =
-            StrengthRollout.estimate
-                (predictionOf prediction)
-                { SavedDeep1 = float costs?SavedDeep1
-                  SavedDeep2 = float costs?SavedDeep2
-                  Fast1 = float costs?Fast1
-                  Fast2 = float costs?Fast2
-                  Byte1 = float costs?Byte1
-                  Byte2 = float costs?Byte2
-                  Delay1 = float costs?Delay1
-                  Delay2 = float costs?Delay2
-                  Risk1 = float costs?Risk1
-                  Risk2 = float costs?Risk2 }
-
-        box
-            {| V0 = value.V0
-               V1 = value.V1
-               V2 = value.V2 |}
-
-    let rolloutIsShadow (mode: string) =
-        match mode with
-        | "Shadow" -> true
-        | _ -> false
-
-    let settingsLoad () : obj =
-        let settings = StrengthSettings.load ()
-
-        box
-            {| mode =
-                match settings.Mode with
-                | StrengthRolloutMode.Off -> "Off"
-                | StrengthRolloutMode.Shadow -> "Shadow"
-                | StrengthRolloutMode.DryRun -> "DryRun"
-                | StrengthRolloutMode.Treatment -> "Treatment"
-               policy =
-                {| K1Margin = settings.Policy.K1Margin
-                   K2Margin = settings.Policy.K2Margin
-                   K2MinimumEvidence = settings.Policy.K2MinimumEvidence |}
-               costs =
-                settings.Costs
-                |> Option.map (fun costs ->
-                    box
-                        {| SavedDeep1 = costs.SavedDeep1
-                           SavedDeep2 = costs.SavedDeep2
-                           Fast1 = costs.Fast1
-                           Fast2 = costs.Fast2
-                           Byte1 = costs.Byte1
-                           Byte2 = costs.Byte2
-                           Delay1 = costs.Delay1
-                           Delay2 = costs.Delay2
-                           Risk1 = costs.Risk1
-                           Risk2 = costs.Risk2 |})
-                |> Option.toObj
-               controlRateBasisPoints = settings.ControlRateBasisPoints |}
-
-    let settingsDryRunBudget () =
-        StrengthBudget.wire (StrengthSettings.dryRunBudget ())
-
-    let settingsHostCanaryHealthy () = StrengthSettings.hostCanaryHealthy ()
-    let settingsHostCanaryFingerprint = StrengthSettings.HostCanaryFingerprint
-
     type private ScopeHandle(scope: PluginStrengthScope) =
         member _.Value = scope
 
@@ -1388,70 +1572,9 @@ module StrengthSurface =
     let scopeClearSession (scope: obj) (session: string) = (scopeOf scope).ClearSession session
     let scopeDispose (scope: obj) = (scopeOf scope).Dispose()
 
-    /// Feature key read from the real scope (recent-primary window included).
-    let scopeFeature (scope: obj) (session: string) (role: string) (visibleBytes: int) : obj =
-        match roleResult (box role) with
-        | Error error -> box {| ok = false; error = error |}
-        | Ok role ->
-            (scopeOf scope).StrengthFeature(SessionId.create session, role, visibleBytes)
-            |> featureToJs
-
-    /// Prediction read from the real scope predictor evidence.
-    let scopePredict (scope: obj) (feature: obj) : obj =
-        match featureOf feature with
-        | Error error -> box {| ok = false; error = error |}
-        | Ok feature ->
-            let prediction = (scopeOf scope).StrengthPrediction feature
-
-            box
-                {| P1 = prediction.P1
-                   P2 = prediction.P2
-                   evidenceCount = prediction.EvidenceCount |}
-
-    /// Raw evidence bucket read from the real scope predictor evidence.
-    /// Proves same-run duplicates never inflate counters.
-    let scopeBucket (scope: obj) (feature: obj) : obj =
-        match featureOf feature with
-        | Error error -> box {| ok = false; error = error |}
-        | Ok feature ->
-            let bucket = (scopeOf scope).StrengthBucket feature
-
-            box
-                {| opportunities = bucket.Opportunities
-                   readonlyFirst = bucket.ReadonlyFirst
-                   secondObservations = bucket.SecondObservations
-                   readonlySecond = bucket.ReadonlySecond |}
-
-    /// Arm a counterfactual target on the real scope collector.
-    let scopeArm (scope: obj) (session: string) (targetRun: string) (feature: obj) : obj =
-        match featureOf feature with
-        | Error error -> box {| ok = false; error = error |}
-        | Ok feature ->
-            (scopeOf scope)
-                .ArmStrengthCounterfactual(SessionId.create session, ProviderRunIdentity.create targetRun, feature)
-
-            box {| ok = true |}
-
-    /// Observe one primary symbol on the real scope collector. Returns null
-    /// until a distinct second run completes the counterfactual pair.
-    let scopeObserve (scope: obj) (session: string) (providerRun: string) (symbol: string) : obj =
-        match symbolResult (box symbol) with
-        | Error error -> box {| ok = false; error = error |}
-        | Ok symbol ->
-            match
-                (scopeOf scope)
-                    .ObserveStrengthPrimary(SessionId.create session, ProviderRunIdentity.create providerRun, symbol)
-            with
-            | None -> null
-            | Some pair ->
-                box
-                    {| feature = featureToJs pair.Feature
-                       firstSymbol = symbolToJs pair.FirstSymbol
-                       secondSymbol = symbolToJs pair.SecondSymbol |}
-
     let private bindingOf (value: obj) : Result<StrengthReplicaBinding, string> =
-        match roleResult value?canonicalRole, budgetResult value?budget with
-        | Ok role, Ok budget ->
+        match roleResult value?canonicalRole, roundsResult value?requestedRounds with
+        | Ok role, Ok requestedRounds ->
             let requestKind = ProviderRequestKind.StrengthReplica
 
             Ok
@@ -1460,8 +1583,7 @@ module StrengthSurface =
                   DecisionId = StrengthDecisionId.create (textOf value?decisionId)
                   TargetProviderRun = ProviderRunIdentity.create (textOf value?targetProviderRun)
                   CanonicalRole = role
-                  Budget = budget
-                  MaxFrameBytes = int value?maxFrameBytes
+                  RequestedRounds = requestedRounds
                   SemanticDigest = textOf value?semanticDigest
                   LocalizedMirrorMessages = messagesOf value?localizedMirrorMessages
                   ToolCapabilitySet = PromptAuthority.toolCapabilitiesFor role requestKind }
@@ -1479,8 +1601,7 @@ module StrengthSurface =
         (decision: string)
         (target: string)
         (role: string)
-        (budget: string)
-        (maxFrameBytes: int)
+        (requestedRounds: int)
         (semanticDigest: string)
         (localizedMirrorMessages: obj array)
         : obj =
@@ -1490,8 +1611,7 @@ module StrengthSurface =
                decisionId = decision
                targetProviderRun = target
                canonicalRole = role
-               budget = budget
-               maxFrameBytes = maxFrameBytes
+               requestedRounds = requestedRounds
                semanticDigest = semanticDigest
                localizedMirrorMessages = localizedMirrorMessages |}
 
@@ -1518,8 +1638,7 @@ module StrengthSurface =
                decisionId = StrengthDecisionId.value binding.DecisionId
                targetProviderRun = ProviderRunIdentity.value binding.TargetProviderRun
                canonicalRole = roleLabel binding.CanonicalRole
-               budget = StrengthBudget.wire binding.Budget
-               maxFrameBytes = binding.MaxFrameBytes
+               requestedRounds = ReadonlyRoundBudget.value binding.RequestedRounds
                semanticDigest = binding.SemanticDigest
                localizedMirrorMessages = binding.LocalizedMirrorMessages |> List.map wireMessageToJs |> List.toArray |}
 
@@ -1583,12 +1702,24 @@ module StrengthSurface =
                    output = output
                    aborted = abortedIds |}
 
-    let transformApply (sha256: string -> string) (runtime: obj) (output: obj) : Task<obj> =
+    /// Mirror one outbound request through the real transform program.
+    /// DELEGATE-5.3: `outboundRequest` marks a real provider request boundary;
+    /// the live registry then owns the admission verdict, and an unadmitted
+    /// request retires before any physical send instead of being gated by the
+    /// visible batch count. `false` re-mirrors an already-admitted request
+    /// without consuming another round.
+    let transformApply (sha256: string -> string) (runtime: obj) (output: obj) (outboundRequest: bool) : Task<obj> =
         // DSL-MUTABLE: algorithm-scratch — aborted id accumulator
         let aborted = ResizeArray<string>()
 
         task {
-            let! outcome = StrengthReplicaTransform.apply sha256 (runtimeOf runtime) (emptySessionPort aborted) output
+            let! outcome =
+                StrengthReplicaTransform.apply
+                    sha256
+                    (runtimeOf runtime)
+                    (emptySessionPort aborted)
+                    output
+                    outboundRequest
 
             let messages =
                 if isNullish output?messages then
@@ -1629,24 +1760,13 @@ module StrengthSurface =
     /// model lease tracker). Attach/turn/transform/delete/dispose paths are
     /// the production paths; Start* bootstrap is out of scope for the handle
     /// because it needs a journal-backed dispatcher.
-    type private ReplicaHandle
-        (
-            runtime: StrengthReplicaRuntime,
-            live: StrengthRuntime,
-            aborted: ResizeArray<string>,
-            released: ResizeArray<string>
-        ) =
+    type private ReplicaHandle(runtime: StrengthReplicaRuntime, live: StrengthRuntime) =
         member _.Runtime = runtime
         member _.Live = live
-        member _.Aborted = aborted
-        member _.Released = released
 
     let private replicaOf value = unbox<ReplicaHandle> value
 
-    let replicaRuntimeCreate (maxFrameBytes: int) : obj =
-        let aborted = ResizeArray<string>()
-        let released = ResizeArray<string>()
-
+    let replicaRuntimeCreate () : obj =
         let sessions =
             { new ISessionHostPort with
                 member _.SubscribeTerminal(_, _) =
@@ -1660,9 +1780,7 @@ module StrengthSurface =
                 member _.SendPrompt(_, _, _) =
                     Task.FromResult(Outcome.Retryable "unused")
 
-                member _.AbortSession(sessionId) =
-                    aborted.Add(SessionId.value sessionId)
-                    Task.FromResult(Ok())
+                member _.AbortSession(_) = Task.FromResult(Ok())
 
                 member _.InterruptAttempt(_) = Task.FromResult(Ok())
                 member _.IsManagedChild(_) = true
@@ -1687,35 +1805,25 @@ module StrengthSurface =
                 dispatcher,
                 live,
                 (fun _ _ _ -> ()),
-                ?maxFrameBytes = Some maxFrameBytes,
-                ?releaseModel = Some(fun sessionId -> released.Add(SessionId.value sessionId))
+                ?releaseModel = Some(fun sessionId -> ())
             )
 
-        ReplicaHandle(runtime, live, aborted, released) :> obj
+        ReplicaHandle(runtime, live) :> obj
 
     /// Attach an already-live binding to the real coordinator. Returns the
     /// immutable-outcome completion task (JS-awaitable) on success.
-    let replicaAttach (handle: obj) (binding: obj) (purpose: string) : obj =
+    let replicaAttach (handle: obj) (binding: obj) : obj =
         let h = replicaOf handle
 
         match bindingOf binding with
         | Error error -> box {| ok = false; error = error |}
         | Ok binding ->
-            let parsed =
-                match purpose with
-                | "DryRun" -> Ok StrengthReplicaPurpose.DryRun
-                | "Treatment" -> Ok StrengthReplicaPurpose.Treatment
-                | unknown -> Error(sprintf "unknown replica purpose: %s" unknown)
-
-            match parsed with
+            match h.Runtime.AttachLiveDecision binding with
+            | Ok completion ->
+                box
+                    {| ok = true
+                       value = box {| completion = completion |} |}
             | Error error -> box {| ok = false; error = error |}
-            | Ok purpose ->
-                match h.Runtime.AttachLiveDecision(binding, purpose) with
-                | Ok completion ->
-                    box
-                        {| ok = true
-                           value = box {| completion = completion |} |}
-                | Error error -> box {| ok = false; error = error |}
 
     /// Register a binding directly into the handle live registry (orphan
     /// setup: binding present, no local decision state).
@@ -1828,16 +1936,6 @@ module StrengthSurface =
     let replicaCancelOwner (handle: obj) (owner: string) : Task =
         task { do! (replicaOf handle).Runtime.CancelOwner(SessionId.create owner) }
 
-    /// Drive the real CloseDryRunAtTargetTerminal path.
-    let replicaCloseDryRun (handle: obj) (turn: obj) : Task<obj> =
-        task {
-            match replicaTurnOf turn with
-            | Error error -> return box {| ok = false; error = error |}
-            | Ok turn ->
-                do! (replicaOf handle).Runtime.CloseDryRunAtTargetTerminal turn
-                return box {| ok = true |}
-        }
-
     /// Read-only peek at live decision state; null once physically retired.
     let replicaPeek (handle: obj) (replica: string) : obj =
         match (replicaOf handle).Runtime.TryPeek(SessionId.create replica) with
@@ -1846,14 +1944,313 @@ module StrengthSurface =
             box
                 {| requestsAdmitted = peek.RequestsAdmitted
                    batches = peek.Batches |> List.map batchToJs |> List.toArray
-                   terminal = peek.SemanticTerminal |> Option.map terminalToJs |> Option.toObj |}
+                   terminal = peek.SemanticTerminal |> Option.map terminalToJs |> optionToObj |}
 
     let replicaIsReplica (handle: obj) (session: string) : bool =
         (replicaOf handle).Runtime.IsReplica(SessionId.create session)
 
     let replicaDispose (handle: obj) = (replicaOf handle).Runtime.Dispose()
 
-    /// Host-port observations: aborted sessions and released model leases.
-    let replicaAborted (handle: obj) : string array = (replicaOf handle).Aborted.ToArray()
+    /// DELEGATE-011: cumulative physical-tail cleanup ledger. `replicaReleased`
+    /// is every replica whose lease was really released and whose child was
+    /// terminated, whatever its terminal was; `replicaAborted` is the subset
+    /// whose end was abnormal (failure, cancellation, deletion, dispose, or a
+    /// binding that never became a decision). Both accumulate and are idempotent:
+    /// the same physical tail observed twice yields the same array.
+    let replicaReleased (handle: obj) : string array = (replicaOf handle).Runtime.Released()
 
-    let replicaReleased (handle: obj) : string array = (replicaOf handle).Released.ToArray()
+    let replicaAborted (handle: obj) : string array = (replicaOf handle).Runtime.Aborted()
+
+    /// DELEGATE-5.3: the budget is the owner's own integer. Construction refuses
+    /// a negative value instead of silently normalizing it to zero.
+    let budgetTryCreate (value: int) : obj =
+        match ReadonlyRoundBudget.tryCreate value with
+        | Ok rounds ->
+            box
+                {| ok = true
+                   value = ReadonlyRoundBudget.value rounds |}
+        | Error error -> box {| ok = false; error = error |}
+
+    /// Collapse one batch of the owner's integers to its maximum. Illegal input
+    /// is refused, never normalized; a null value means the batch grants no
+    /// authorization opportunity at all, which is different from zero rounds.
+    let budgetMaxOf (values: int array) : obj =
+        let parsed =
+            values
+            |> Array.toList
+            |> List.fold
+                (fun state item ->
+                    match state, ReadonlyRoundBudget.tryCreate item with
+                    | Ok current, Ok rounds -> Ok(rounds :: current)
+                    | Error error, _ -> Error error
+                    | _, Error error -> Error error)
+                (Ok [])
+            |> Result.map List.rev
+
+        match parsed with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok [] -> box {| ok = true; value = null |}
+        | Ok budgets ->
+            match ReadonlyRoundBudget.maxOf budgets with
+            | Some rounds ->
+                box
+                    {| ok = true
+                       value = ReadonlyRoundBudget.value rounds |}
+            | None -> box {| ok = true; value = null |}
+
+    /// The lifecycle handle is the JS-visible authorization session: every
+    /// legal transition advances this same handle, so an alias obtained earlier
+    /// still observes the current state. The domain lifecycle stays a pure
+    /// value; only this handle is mutable.
+    type private LifecycleHandle(lifecycle: DelegationLifecycle) =
+        let mutable current = lifecycle
+
+        member _.Value
+            with get () = current
+            and set value = current <- value
+
+    let private lifecycleOf value =
+        unbox<LifecycleHandle> value |> fun handle -> handle.Value
+
+    let private closedFromResult (value: obj) : Result<DelegationClosedFrom, string> =
+        match textOf value with
+        | "Requested" -> Ok DelegationClosedFrom.Requested
+        | "Bound" -> Ok DelegationClosedFrom.Bound
+        | unknown -> Error(sprintf "unknown closed-from: %s" unknown)
+
+    let private closedReasonResult (value: obj) : Result<DelegationClosedReason, string> =
+        match textOf value with
+        | "NoMaterial" -> Ok DelegationClosedReason.NoMaterial
+        | "CannotContinue" -> Ok DelegationClosedReason.CannotContinue
+        | "Cancelled" -> Ok DelegationClosedReason.Cancelled
+        | "Superseded" -> Ok DelegationClosedReason.Superseded
+        | "RecoveryAbandoned" -> Ok DelegationClosedReason.RecoveryAbandoned
+        | unknown -> Error(sprintf "unknown closed reason: %s" unknown)
+
+    let private importedInt64Option (value: obj) : int64 option =
+        if isNullish value then
+            None
+        else
+            // The canonical payload writes int64 as text; JS bigint and number
+            // shapes reach here too, and BigInt accepts all three.
+            Some(unbox<int64> (emitJsExpr value "BigInt($0)"))
+
+    /// DELEGATE-015: the import outcome decodes from the canonical payload
+    /// view; kind selects the closed union and each kind carries its own
+    /// evidence fields.
+    let private importOutcomeResult (value: obj) : Result<DelegationImportOutcome, string> =
+        match textOf value?kind with
+        | "adopted" ->
+            Ok(
+                DelegationImportOutcome.Adopted
+                    { TargetProviderRun = ProviderRunIdentity.create (textOf value?target_provider_run)
+                      FrameDigest = textOf value?frame_digest
+                      ByteLength = unbox<int> value?byte_length
+                      MaterialPayloads =
+                        arrayOf value?payload_refs
+                        |> Array.map (fun reference -> PayloadRef.create (textOf reference))
+                        |> Array.toList
+                      TracedStartInclusive = importedInt64Option value?traced_start_inclusive
+                      TracedEndExclusive = importedInt64Option value?traced_end_exclusive }
+            )
+        | "relinquished" ->
+            Ok(
+                DelegationImportOutcome.Relinquished
+                    { TargetProviderRun =
+                        if isNullish value?target_provider_run then
+                            None
+                        else
+                            Some(ProviderRunIdentity.create (textOf value?target_provider_run))
+                      Reason = textOf value?reason }
+            )
+        | unknown -> Error(sprintf "unknown import outcome kind: %s" unknown)
+
+    let private delegationBindingOf (value: obj) : DelegationBinding =
+        { DecisionId = StrengthDecisionId.create (textOf value?decisionId)
+          TargetProviderRun = ProviderRunIdentity.create (textOf value?targetProviderRun)
+          ReplicaSessionId = SessionId.create (textOf value?replicaSessionId)
+          AnchorDigest = textOf value?anchorDigest }
+
+    let private delegationClosedOf (value: obj) : Result<DelegationClosed, string> =
+        match closedFromResult value?from, closedReasonResult value?reason with
+        | Ok closedFrom, Ok reason ->
+            Ok
+                { DecisionId = StrengthDecisionId.create (textOf value?decisionId)
+                  From = closedFrom
+                  Reason = reason }
+        | Error error, _
+        | _, Error error -> Error error
+
+    /// A successful transition advances the handle in place and hands the
+    /// same handle back, so a caller that kept the original reference observes
+    /// the advanced lifecycle; a refused transition leaves the handle untouched.
+    let private transitionResultToJs
+        (handle: LifecycleHandle)
+        (result: Result<DelegationLifecycle, DelegationTransitionError>)
+        =
+        match result with
+        | Ok lifecycle ->
+            handle.Value <- lifecycle
+            box {| ok = true; value = (handle :> obj) |}
+        | Error error ->
+            let name =
+                match error with
+                | DelegationTransitionError.IllegalFrom _ -> "IllegalFrom"
+                | DelegationTransitionError.Conflict _ -> "Conflict"
+
+            box {| ok = false; error = name |}
+
+    let private delegationRequestOf (value: obj) : Result<DelegationRequest, string> =
+        match requestedRoundsOptionResult value?requestedRounds with
+        | Error error -> Error error
+        | Ok None -> Error "missing requested rounds"
+        | Ok(Some requestedRounds) ->
+            match ownerLogicalRunOf value?ownerLogicalRun with
+            | Error error -> Error error
+            | Ok ownerLogicalRun ->
+                Ok
+                    { DecisionId = StrengthDecisionId.create (textOf value?decisionId)
+                      OwnerSessionId = SessionId.create (textOf value?ownerSessionId)
+                      OwnerLogicalRun = ownerLogicalRun
+                      SourcePhysicalUserMessageId =
+                        PhysicalUserMessageId.create (textOf value?sourcePhysicalUserMessageId)
+                      SourceProviderRun = ProviderRunIdentity.create (textOf value?sourceProviderRun)
+                      SourceToolCallIds =
+                        arrayOf value?sourceToolCallIds
+                        |> Array.toList
+                        |> List.map (ToolCallId.create << textOf)
+                      RequestedRounds = requestedRounds
+                      ContractRevision = DelegationContractRevisions.create (int value?contractRevision) }
+
+    /// DELEGATE-6.1: derive the DecisionId deterministically from the contract
+    /// version, the owner logical run and the source provider run. A retry that
+    /// changes target cannot mint a second budget.
+    let delegationDeriveDecisionId
+        (sha256: string -> string)
+        (contractRevision: int)
+        (logicalRunId: string)
+        (authorityRootUserMessageId: string)
+        (sourceProviderRun: string)
+        : string =
+        Delegation.deriveDecisionId
+            sha256
+            (DelegationContractRevisions.create contractRevision)
+            { LogicalRunId = LogicalRunId.create logicalRunId
+              AuthorityRootUserMessageId = AuthorityRootUserMessageId.create authorityRootUserMessageId }
+            (ProviderRunIdentity.create sourceProviderRun)
+        |> StrengthDecisionId.value
+
+    /// Fold one frozen request into the lifecycle: the entry point of every
+    /// legal transition sequence.
+    let delegationRequest (value: obj) : obj =
+        match delegationRequestOf value with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok request -> LifecycleHandle(Delegation.request request) :> obj
+
+    let delegationBind (lifecycle: obj) (binding: obj) : obj =
+        let handle = unbox<LifecycleHandle> lifecycle
+        let declared = delegationBindingOf binding
+        // The child carries no decision of its own: the binding's identity
+        // comes from the authorization this handle currently holds.
+        let completed =
+            { declared with
+                DecisionId = Delegation.decisionId handle.Value }
+
+        transitionResultToJs handle (Delegation.tryBind handle.Value completed)
+
+    let delegationPrepare (lifecycle: obj) : obj =
+        let handle = unbox<LifecycleHandle> lifecycle
+        transitionResultToJs handle (Delegation.tryPrepare handle.Value)
+
+    let delegationPromote (lifecycle: obj) : obj =
+        let handle = unbox<LifecycleHandle> lifecycle
+        transitionResultToJs handle (Delegation.tryPromote handle.Value)
+
+    let delegationTrace (lifecycle: obj) : obj =
+        let handle = unbox<LifecycleHandle> lifecycle
+        transitionResultToJs handle (Delegation.tryTrace handle.Value)
+
+    let delegationClose (lifecycle: obj) (closed: obj) : obj =
+        match delegationClosedOf closed with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok declared ->
+            let handle = unbox<LifecycleHandle> lifecycle
+
+            let completed =
+                { declared with
+                    DecisionId = Delegation.decisionId handle.Value }
+
+            transitionResultToJs handle (Delegation.tryClose handle.Value completed)
+
+    let delegationAbandon (lifecycle: obj) : obj =
+        let handle = unbox<LifecycleHandle> lifecycle
+        transitionResultToJs handle (Delegation.tryAbandon handle.Value)
+
+    let delegationDecisionId (lifecycle: obj) : string =
+        Delegation.decisionId (lifecycleOf lifecycle) |> StrengthDecisionId.value
+
+    let eventRequested (value: obj) : obj =
+        match delegationRequestOf value with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok request ->
+            EventHandle(
+                StrengthEvents.requested
+                    request.DecisionId
+                    request.OwnerSessionId
+                    request.OwnerLogicalRun
+                    request.SourcePhysicalUserMessageId
+                    request.SourceProviderRun
+                    request.SourceToolCallIds
+                    request.RequestedRounds
+                    request.ContractRevision
+            )
+            :> obj
+
+    /// DELEGATE-6.2: Bound fixes target, replica session and anchor digest
+    /// before the first outbound request.
+    let eventBound (decision: string) (target: string) (replica: string) (anchorDigest: string) : obj =
+        EventHandle(
+            StrengthEvents.bound
+                (StrengthDecisionId.create decision)
+                (ProviderRunIdentity.create target)
+                (SessionId.create replica)
+                anchorDigest
+        )
+        :> obj
+
+    /// DELEGATE-6.3: closing names the legal predecessor it closes from.
+    let eventClosed (decision: string) (closedFrom: string) (reason: string) : obj =
+        match closedFromResult (box closedFrom), closedReasonResult (box reason) with
+        | Ok from, Ok reason ->
+            EventHandle(StrengthEvents.closed (StrengthDecisionId.create decision) from reason) :> obj
+        | Error error, _
+        | _, Error error -> box {| ok = false; error = error |}
+
+    /// DELEGATE-015: imported history is evidence, never an admission. The
+    /// constructor accepts the canonical payload view (snake_case fields inside
+    /// the outcome object), validates it into the closed import union, and
+    /// returns an event handle the projection fold can consume.
+    let eventHistoryImported
+        (decision: string)
+        (sourceStreamId: string)
+        (sourceEventId: string)
+        (importId: string)
+        (oldBudgetEvidence: string)
+        (outcome: obj)
+        : obj =
+        match importOutcomeResult outcome with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok importedOutcome ->
+            EventHandle(
+                StrengthEvents.historyImported
+                    (StrengthDecisionId.create decision)
+                    sourceStreamId
+                    sourceEventId
+                    importId
+                    (if isNullish oldBudgetEvidence then
+                         None
+                     else
+                         Some oldBudgetEvidence)
+                    importedOutcome
+            )
+            :> obj

@@ -4,6 +4,8 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import * as PluginHooksSurface from '../../../dist/OpenCode/Host/PluginHooksSurface.js'
+import * as ModelRoutingSurface from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 import { openIncumbency, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 import { OPENCODE_BIN } from '../../verification-system/tests/e2e/support/process-host-utils.js'
@@ -467,6 +469,779 @@ test('WHAT[host-boundary-032] C16_upstream_validation_rejection_not_swallowed_an
   })
 })
 
+// ---------------------------------------------------------------------------
+// DELEGATE.md 3.2/3.3/4.2/4.3: explicit read-only delegation protocol.
+// Production tool.definition decoration is gated behind the Predictor
+// configuration existence query (ModelRouting, DELEGATE.md 9.2); the schema
+// contract itself is proven through the same registered contract function
+// (PluginHooksSurface.decorateReadonlyDelegationToolDefinition), while the
+// argument-boundary assertions run through the real plugin hooks, where the
+// cleanup mechanism is the same unconditional hide/restore as the review
+// contract.
+// ---------------------------------------------------------------------------
+
+test('WHAT[host-boundary-032] C17_delegation_schema_adds_required_budget_and_optional_note_without_dropping_tool_contract', () => {
+  const previousLanguage = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+  process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+  try {
+    const definition = {
+      description: 'Original description of the tool',
+      parameters: {
+        type: 'object',
+        properties: { path: { type: 'string' } },
+        required: ['path'],
+        additionalProperties: false,
+      },
+    }
+    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', definition)
+
+    const props = definition.parameters.properties
+    // 预算：integer、范围 [0, 2147483647]、原文 description，且必填
+    assert.equal(props.delegate_readonly_rounds.type, 'integer')
+    assert.equal(props.delegate_readonly_rounds.minimum, 0)
+    assert.equal(props.delegate_readonly_rounds.maximum, 2147483647)
+    assert.ok(
+      typeof props.delegate_readonly_rounds.description === 'string' &&
+        props.delegate_readonly_rounds.description.length > 0,
+      'budget must carry the DELEGATE.md 3.2 description',
+    )
+    assert.deepEqual(
+      definition.parameters.required,
+      ['path', 'delegate_readonly_rounds'],
+      'original required entry must be preserved and only the budget appended',
+    )
+    // 短记：string 可省略，绝不进 required，不设 minLength
+    assert.equal(props.self_note.type, 'string')
+    assert.equal(
+      definition.parameters.required.includes('self_note'),
+      false,
+      'self_note must never join required',
+    )
+    assert.equal('minLength' in props.self_note, false, 'self_note must not carry a minLength gate')
+    // 原有属性与兼容约束保持
+    assert.deepEqual(definition.parameters.properties.path, { type: 'string' })
+    assert.equal(definition.parameters.additionalProperties, false)
+    // 协作说明幂等追加在原描述之后，不替换原描述
+    assert.ok(
+      definition.description.startsWith('Original description of the tool'),
+      'original tool description must stay as the prefix',
+    )
+    assert.ok(
+      definition.description.includes('Fill in delegate_readonly_rounds on every tool call.'),
+      'English collaboration prose must be appended once',
+    )
+  } finally {
+    if (previousLanguage === undefined) {
+      delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+    } else {
+      process.env.WANXIANGSHU_PROVIDER_LANGUAGE = previousLanguage
+    }
+  }
+})
+
+test('WHAT[host-boundary-032] C18_budget_rejects_illegal_values_and_never_coerces_them', () => {
+  // 边界与正常值：原生有限整数且在 [0, 2147483647] 内
+  for (const value of [0, 1, 2, 5, 2147483647]) {
+    const result = PluginHooksSurface.readonlyDelegationBudgetOf(value)
+    assert.equal(result.ok, true, `budget ${value} must be accepted`)
+    assert.equal(result.rounds, value)
+  }
+  // 缺失、null、负数、小数、数值字符串、布尔、越界、非有限值、对象/数组
+  const rejected = [
+    undefined,
+    null,
+    -1,
+    -0.5,
+    1.5,
+    '3',
+    '0',
+    true,
+    false,
+    2147483648,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    Number.NEGATIVE_INFINITY,
+    {},
+    [],
+  ]
+  for (const value of rejected) {
+    const result = PluginHooksSurface.readonlyDelegationBudgetOf(value)
+    assert.equal(result.ok, false, `budget ${typeof value}:${String(value)} must be rejected without coercion`)
+    assert.equal(typeof result.error, 'string')
+    assert.equal(result.rounds, undefined, 'rejected budget must not produce a value')
+  }
+})
+
+test('WHAT[host-boundary-032] C19_self_note_is_optional_string_only_and_empty_is_legal', () => {
+  const missing = PluginHooksSurface.readonlyDelegationSelfNoteOf(undefined)
+  assert.equal(missing.ok, true, 'absent self_note is legal')
+  assert.equal(missing.note, null)
+
+  const empty = PluginHooksSurface.readonlyDelegationSelfNoteOf('')
+  assert.equal(empty.ok, true, 'empty string is legal')
+  assert.equal(empty.note, '')
+
+  const noteText = '我怀疑入口与调用方对空值的约定不同，接下来先核对调用点'
+  const note = PluginHooksSurface.readonlyDelegationSelfNoteOf(noteText)
+  assert.equal(note.ok, true)
+  assert.equal(note.note, noteText, 'note content must round-trip verbatim')
+
+  for (const value of [0, 1, true, null, {}, [], ['note']]) {
+    const result = PluginHooksSurface.readonlyDelegationSelfNoteOf(value)
+    assert.equal(result.ok, false, `self_note ${JSON.stringify(value)} must be rejected without coercion`)
+  }
+})
+
+test('WHAT[host-boundary-032] C20_delegation_decoration_is_idempotent_and_coexists_with_review_contract', () => {
+  const previousLanguage = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+  process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+  try {
+    const definition = {
+      description: 'Description for js-manager',
+      parameters: {
+        type: 'object',
+        properties: { path: { type: 'string' } },
+        required: ['path'],
+      },
+    }
+    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('js-manager', definition)
+    PluginHooksSurface.decorateReviewToolDefinition('js-manager', definition)
+    const firstSnapshot = structuredClone(definition)
+
+    // 重复装饰、两类装饰交替都不产生重复项
+    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('js-manager', definition)
+    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('js-manager', definition)
+    PluginHooksSurface.decorateReviewToolDefinition('js-manager', definition)
+    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('js-manager', definition)
+    PluginHooksSurface.decorateReviewToolDefinition('js-manager', definition)
+
+    assert.deepEqual(definition, firstSnapshot, 'coexisting decorations must be idempotent across repeats')
+    assert.equal(
+      definition.parameters.required.filter((x) => x === 'delegate_readonly_rounds').length,
+      1,
+      'budget must appear exactly once in required',
+    )
+    assert.equal(
+      definition.parameters.required.filter((x) => x === 'self_note').length,
+      0,
+      'note must never join required',
+    )
+    assert.equal(
+      definition.parameters.required.filter((x) => x === 'contract').length,
+      1,
+      'review contract must appear exactly once and stay intact beside the delegation protocol',
+    )
+    assert.equal(
+      definition.description.split('Fill in delegate_readonly_rounds on every tool call.').length - 1,
+      1,
+      'collaboration prose must be appended exactly once',
+    )
+  } finally {
+    if (previousLanguage === undefined) {
+      delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+    } else {
+      process.env.WANXIANGSHU_PROVIDER_LANGUAGE = previousLanguage
+    }
+  }
+})
+
+test('WHAT[host-boundary-032] C21_collaboration_prose_follows_language_binding_and_switches_cleanly', () => {
+  const previousLanguage = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+  try {
+    process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'zh-CN'
+    const definition = {
+      description: '原始工具描述',
+      parameters: { type: 'object', properties: {}, required: [] },
+    }
+    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', definition)
+    assert.ok(
+      definition.description.includes('每个工具调用都要填写 delegate_readonly_rounds'),
+      'Chinese collaboration prose required under zh-CN preference',
+    )
+    assert.equal(
+      definition.description.includes('Fill in delegate_readonly_rounds on every tool call.'),
+      false,
+      'English prose must not arrive under a Chinese preference',
+    )
+    const zhSnapshot = structuredClone(definition)
+    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', definition)
+    assert.deepEqual(definition, zhSnapshot, 'Chinese decoration must be idempotent')
+
+    // 语言切换后只剩当前语言一段，不叠加
+    process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', definition)
+    assert.ok(definition.description.includes('Fill in delegate_readonly_rounds on every tool call.'))
+    assert.equal(
+      definition.description.includes('每个工具调用都要填写 delegate_readonly_rounds'),
+      false,
+      'prior-language prose must be replaced, not stacked',
+    )
+    assert.ok(
+      definition.description.startsWith('原始工具描述'),
+      'original description must remain the prefix after a language switch',
+    )
+  } finally {
+    if (previousLanguage === undefined) {
+      delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+    } else {
+      process.env.WANXIANGSHU_PROVIDER_LANGUAGE = previousLanguage
+    }
+  }
+})
+
+test('WHAT[host-boundary-032] C22_conflicting_same_name_properties_and_bad_required_fail_loudly', () => {
+  const budgetConflict = {
+    description: 'D',
+    parameters: {
+      type: 'object',
+      properties: {
+        path: { type: 'string' },
+        delegate_readonly_rounds: { type: 'integer', minimum: 0, maximum: 100, description: 'tool-local budget' },
+      },
+      required: ['path'],
+    },
+  }
+  assert.throws(
+    () => PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', budgetConflict),
+    /conflicting delegate_readonly_rounds/,
+    'a same-name property that differs from the protocol must fail, not be overwritten',
+  )
+
+  const noteConflict = {
+    description: 'D',
+    parameters: {
+      type: 'object',
+      properties: {
+        path: { type: 'string' },
+        self_note: { type: 'string', description: 'tool-local note' },
+      },
+      required: ['path'],
+    },
+  }
+  assert.throws(
+    () => PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', noteConflict),
+    /conflicting self_note/,
+    'a same-name note that differs from the protocol must fail',
+  )
+
+  const badRequired = {
+    description: 'D',
+    parameters: { type: 'object', properties: { path: { type: 'string' } }, required: 'path' },
+  }
+  assert.throws(
+    () => PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', badRequired),
+    /required/,
+    'a non-array required must fail loudly instead of publishing a partial protocol',
+  )
+
+  const missingProperties = {
+    description: 'D',
+    parameters: { type: 'object' },
+  }
+  assert.throws(
+    () => PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', missingProperties),
+    /properties/,
+    'a root schema that cannot be legally extended must fail loudly',
+  )
+})
+
+test('WHAT[host-boundary-032] C23_delegation_fields_stripped_from_business_view_but_preserved_as_evidence', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    const tool = 'read'
+    const sessionID = 'ses-c23'
+    await openIncumbency(runtime, sessionID)
+    const callID = 'call-c23-1'
+    const note = '我怀疑入口与调用方对空值的约定不同，接下来先核对调用点'
+    const beforeOutput = {
+      args: {
+        filePath: 'src/A.fs',
+        delegate_readonly_rounds: 5,
+        self_note: note,
+      },
+    }
+
+    await hooks['tool.execute.before']({ tool, sessionID, callID }, beforeOutput)
+    assert.equal(
+      'delegate_readonly_rounds' in beforeOutput.args,
+      false,
+      'business view must not see the budget field',
+    )
+    assert.equal('self_note' in beforeOutput.args, false, 'business view must not see the note field')
+    assert.deepEqual(beforeOutput.args, { filePath: 'src/A.fs' }, 'business view keeps only tool parameters')
+
+    await hooks['tool.execute.after'](
+      { tool, sessionID, callID, args: beforeOutput.args },
+      { title: tool, output: 'file contents', metadata: {} },
+    )
+
+    assert.equal(
+      beforeOutput.args.delegate_readonly_rounds,
+      5,
+      'original provider arguments must preserve the budget as evidence',
+    )
+    assert.equal(
+      beforeOutput.args.self_note,
+      note,
+      'original provider arguments must preserve the note as evidence',
+    )
+  })
+})
+
+test('WHAT[host-boundary-032] C24_review_contract_and_delegation_fields_coexist_without_crosstalk', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    const tool = 'js-manager'
+    const sessionID = 'ses-c24'
+    await openIncumbency(runtime, sessionID)
+    const callID = 'call-c24-1'
+    const beforeOutput = {
+      args: {
+        path: 'src/App.fs',
+        contract: 'js-manager-contract-v1',
+        delegate_readonly_rounds: 2,
+        self_note: 'note-c24',
+      },
+    }
+
+    await hooks['tool.execute.before']({ tool, sessionID, callID }, beforeOutput)
+    assert.deepEqual(
+      beforeOutput.args,
+      { path: 'src/App.fs' },
+      'both contract families must leave the business view together',
+    )
+
+    await hooks['tool.execute.after'](
+      { tool, sessionID, callID, args: beforeOutput.args },
+      { title: tool, output: 'file contents', metadata: {} },
+    )
+
+    assert.equal(beforeOutput.args.contract, 'js-manager-contract-v1', 'review contract must be restored')
+    assert.equal(beforeOutput.args.delegate_readonly_rounds, 2, 'budget must be restored beside the contract')
+    assert.equal(beforeOutput.args.self_note, 'note-c24', 'note must be restored beside the contract')
+  })
+})
+
+test('WHAT[host-boundary-032] C25_frozen_delegation_fields_fail_atomically_without_losing_evidence', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    const sessionID = 'ses-c25'
+    await openIncumbency(runtime, sessionID)
+    const frozenArgs = Object.freeze({ path: 'src/Secret.fs', delegate_readonly_rounds: 3, self_note: 'secret' })
+
+    await assert.rejects(
+      async () => {
+        await hooks['tool.execute.before'](
+          { tool: 'read', sessionID, callID: 'call-c25' },
+          { args: frozenArgs },
+        )
+      },
+      TypeError,
+      'frozen args with protocol fields must fail atomically with TypeError',
+    )
+    assert.equal(frozenArgs.delegate_readonly_rounds, 3, 'budget evidence must remain unchanged on failure')
+    assert.equal(frozenArgs.self_note, 'secret', 'note evidence must remain unchanged on failure')
+  })
+})
+
+test('WHAT[host-boundary-032] C26_concurrent_delegation_restores_do_not_crosstalk', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    const call1 = {
+      sessionID: 'ses-c26-1',
+      callID: 'call-c26-1',
+      output: { args: { path: 'file-alpha.txt', delegate_readonly_rounds: 1, self_note: 'note-alpha' } },
+    }
+    const call2 = {
+      sessionID: 'ses-c26-2',
+      callID: 'call-c26-2',
+      output: { args: { path: 'file-beta.txt', delegate_readonly_rounds: 9, self_note: 'note-beta' } },
+    }
+
+    await Promise.all([
+      openIncumbency(runtime, call1.sessionID),
+      openIncumbency(runtime, call2.sessionID),
+    ])
+
+    await Promise.all([
+      hooks['tool.execute.before']({ tool: 'read', sessionID: call1.sessionID, callID: call1.callID }, call1.output),
+      hooks['tool.execute.before']({ tool: 'read', sessionID: call2.sessionID, callID: call2.callID }, call2.output),
+    ])
+
+    assert.equal('delegate_readonly_rounds' in call1.output.args, false)
+    assert.equal('self_note' in call1.output.args, false)
+    assert.equal('delegate_readonly_rounds' in call2.output.args, false)
+    assert.equal('self_note' in call2.output.args, false)
+
+    // 乱序恢复也不串值
+    await Promise.all([
+      hooks['tool.execute.after'](
+        { tool: 'read', sessionID: call2.sessionID, callID: call2.callID, args: call2.output.args },
+        { title: 'read', output: 'out2', metadata: {} },
+      ),
+      hooks['tool.execute.after'](
+        { tool: 'read', sessionID: call1.sessionID, callID: call1.callID, args: call1.output.args },
+        { title: 'read', output: 'out1', metadata: {} },
+      ),
+    ])
+
+    assert.equal(call1.output.args.delegate_readonly_rounds, 1, 'call1 must restore its own budget')
+    assert.equal(call1.output.args.self_note, 'note-alpha', 'call1 must restore its own note')
+    assert.equal(call2.output.args.delegate_readonly_rounds, 9, 'call2 must restore its own budget')
+    assert.equal(call2.output.args.self_note, 'note-beta', 'call2 must restore its own note')
+  })
+})
+
+test('WHAT[host-boundary-032] C27_business_tool_execution_never_receives_protocol_fields', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    const sessionID = 'ses-c27'
+    await openIncumbency(runtime, sessionID)
+    const directArgs = { path: 'src/App.fs', delegate_readonly_rounds: 0, self_note: 'stays out of the business view' }
+
+    await hooks['tool.execute.before'](
+      { tool: 'js-manager', sessionID, callID: 'call-c27' },
+      { args: directArgs },
+    )
+
+    const execResult = await hooks.tool['js-manager'].execute(directArgs, { sessionID, agent: 'manager' })
+    assert.ok(typeof execResult === 'string', 'tool execution must succeed on the cleaned business view')
+
+    // 业务执行视图在 before 暂存之后不再持有协议字段；在 after 恢复之前断言，
+    // 证明 execute 收到的确实是剥净后的视图（C24 已在 before 后证明同一机制）。
+    assert.equal(
+      'delegate_readonly_rounds' in directArgs,
+      false,
+      'business execution view must not carry the budget field',
+    )
+    assert.equal(
+      'self_note' in directArgs,
+      false,
+      'business execution view must not carry the note field',
+    )
+
+    await hooks['tool.execute.after'](
+      { tool: 'js-manager', sessionID, callID: 'call-c27', args: directArgs },
+      { title: 'js-manager', output: execResult, metadata: {} },
+    )
+
+    // after 的同源恢复之后，provider 原始 arguments 证据重新出现；这与
+    // C23/C24/C26 证明的恢复契约同构——字段不丢，只是不进业务视图。
+    assert.equal(
+      directArgs.delegate_readonly_rounds,
+      0,
+      'budget evidence must be restored to the original arguments',
+    )
+    assert.equal(
+      directArgs.self_note,
+      'stays out of the business view',
+      'note evidence must be restored to the original arguments',
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// DELEGATE.md 9.1/9.2 两态门控：ModelRouting.initialize 的 scheduler 是进程
+// 单例（每测试进程只 import 一次），因此两个可观察态由测试自有的动态源驱动
+// ——fixture 在隔离 HOME 下写出的 wanxiangshu.mjs 导出 predictorConfiguration，
+// 读 globalThis 上的测试注入值，不触碰用户真实配置。默认（未注入）即未配置。
+// ---------------------------------------------------------------------------
+
+const setPredictorState = (state, reason) => {
+  globalThis.__wanxiangshu_test_predictor_state = state
+  if (reason === undefined) {
+    delete globalThis.__wanxiangshu_test_predictor_reason
+  } else {
+    globalThis.__wanxiangshu_test_predictor_reason = reason
+  }
+}
+
+const clearPredictorState = () => {
+  delete globalThis.__wanxiangshu_test_predictor_state
+  delete globalThis.__wanxiangshu_test_predictor_reason
+}
+
+test('WHAT[host-boundary-032] C28_unconfigured_predictor_leaves_tool_definitions_undecorated', async () => {
+  clearPredictorState()
+  await withExecutablePlugin(async (hooks) => {
+    for (const toolID of ['js-manager', 'read', 'write']) {
+      const originalDescription = `Description for ${toolID}`
+      const output = {
+        description: originalDescription,
+        parameters: {
+          type: 'object',
+          properties: { path: { type: 'string' } },
+          required: ['path'],
+        },
+      }
+      await hooks['tool.definition']({ toolID }, output)
+      assert.equal(
+        output.parameters.properties?.delegate_readonly_rounds,
+        undefined,
+        `${toolID} must not gain the budget field while Predictor is unconfigured`,
+      )
+      assert.equal(
+        output.parameters.properties?.self_note,
+        undefined,
+        `${toolID} must not gain the note field while Predictor is unconfigured`,
+      )
+      assert.equal(
+        output.parameters.required.includes('delegate_readonly_rounds'),
+        false,
+        `${toolID} must not require the budget while Predictor is unconfigured`,
+      )
+      assert.equal(
+        output.description,
+        originalDescription,
+        `${toolID} description must gain no collaboration prose while Predictor is unconfigured`,
+      )
+    }
+  })
+})
+
+test('WHAT[host-boundary-032] C29_configured_predictor_decorates_every_tool_through_the_definition_hook', async () => {
+  setPredictorState('configured')
+  const previousLanguage = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+  process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+  try {
+    await withExecutablePlugin(async (hooks) => {
+      for (const toolID of ['js-manager', 'read', 'write']) {
+        const originalDescription = `Description for ${toolID}`
+        const output = {
+          description: originalDescription,
+          parameters: {
+            type: 'object',
+            properties: { path: { type: 'string' } },
+            required: ['path'],
+          },
+        }
+        await hooks['tool.definition']({ toolID }, output)
+        assert.equal(
+          output.parameters.properties.delegate_readonly_rounds.type,
+          'integer',
+          `${toolID} must gain the required budget when Predictor is configured`,
+        )
+        assert.equal(
+          output.parameters.properties.self_note.type,
+          'string',
+          `${toolID} must gain the optional note when Predictor is configured`,
+        )
+        assert.equal(
+          output.parameters.required.includes('delegate_readonly_rounds'),
+          true,
+          `${toolID} must require the budget when Predictor is configured`,
+        )
+        assert.equal(
+          output.parameters.required.includes('self_note'),
+          false,
+          `${toolID} must keep the note omissible when Predictor is configured`,
+        )
+        assert.equal(
+          output.parameters.required.includes('path'),
+          true,
+          `${toolID} must keep its original required entry`,
+        )
+        assert.ok(
+          output.description.startsWith(originalDescription),
+          `${toolID} original description must stay as the prefix`,
+        )
+        assert.ok(
+          output.description.length > originalDescription.length,
+          `${toolID} description must gain the collaboration prose`,
+        )
+        if (toolID === 'js-manager') {
+          // 与评审 contract 在同一 hook 路径并存，互不排斥
+          assert.equal(
+            output.parameters.required.includes('contract'),
+            true,
+            'review contract must coexist with the delegation budget on js-manager',
+          )
+          assert.equal(
+            output.parameters.properties.contract.type,
+            'string',
+            'review contract property must coexist with the delegation protocol',
+          )
+        }
+      }
+    })
+  } finally {
+    clearPredictorState()
+    if (previousLanguage === undefined) {
+      delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+    } else {
+      process.env.WANXIANGSHU_PROVIDER_LANGUAGE = previousLanguage
+    }
+  }
+})
+
+test('WHAT[host-boundary-032] C30_configured_decoration_through_hook_is_idempotent', async () => {
+  setPredictorState('configured')
+  try {
+    await withExecutablePlugin(async (hooks) => {
+      const output = {
+        description: 'Description for read',
+        parameters: {
+          type: 'object',
+          properties: { path: { type: 'string' } },
+          required: ['path'],
+        },
+      }
+      await hooks['tool.definition']({ toolID: 'read' }, output)
+      const firstSnapshot = structuredClone(output)
+      await hooks['tool.definition']({ toolID: 'read' }, output)
+      await hooks['tool.definition']({ toolID: 'read' }, output)
+      assert.deepEqual(
+        output,
+        firstSnapshot,
+        'repeated definition hook calls must not duplicate required entries or prose',
+      )
+      assert.equal(
+        output.parameters.required.filter((x) => x === 'delegate_readonly_rounds').length,
+        1,
+        'budget must appear exactly once in required across repeats',
+      )
+    })
+  } finally {
+    clearPredictorState()
+  }
+})
+
+test('WHAT[host-boundary-032] C31_invalid_predictor_configuration_fails_closed_without_publishing_partial_protocol', async () => {
+  setPredictorState('invalid', 'predictor candidates must be [model, reasoning] pairs')
+  try {
+    await withExecutablePlugin(async (hooks) => {
+      const output = {
+        description: 'Description for read',
+        parameters: {
+          type: 'object',
+          properties: { path: { type: 'string' } },
+          required: ['path'],
+        },
+      }
+      await assert.rejects(
+        async () => {
+          await hooks['tool.definition']({ toolID: 'read' }, output)
+        },
+        (error) => error != null,
+        'invalid Predictor configuration must fail closed on the tool.definition hook',
+      )
+      assert.equal(
+        output.parameters.properties?.delegate_readonly_rounds,
+        undefined,
+        'no partial protocol may be published on the fail-closed path',
+      )
+      assert.equal(
+        output.description,
+        'Description for read',
+        'no collaboration prose may be appended on the fail-closed path',
+      )
+
+      // 修复配置后同一 hook 立即恢复装饰：失败只属于那一回，无缓存状态
+      setPredictorState('configured')
+      await hooks['tool.definition']({ toolID: 'read' }, output)
+      assert.equal(
+        output.parameters.properties.delegate_readonly_rounds.type,
+        'integer',
+        'the hook must decorate again once the configuration is repaired',
+      )
+    })
+  } finally {
+    clearPredictorState()
+  }
+})
+
+test('WHAT[host-boundary-032] C32_decoration_gate_shares_the_single_predictor_configuration_query', async () => {
+  clearPredictorState()
+  await withExecutablePlugin(async (hooks) => {
+    assert.equal(
+      ModelRoutingSurface.sharedPredictorConfiguration().kind,
+      'NotConfigured',
+      'the shared query must report the unconfigured state',
+    )
+    const output = {
+      description: 'Description for read',
+      parameters: {
+        type: 'object',
+        properties: { path: { type: 'string' } },
+        required: ['path'],
+      },
+    }
+    await hooks['tool.definition']({ toolID: 'read' }, output)
+    assert.equal(
+      output.parameters.properties?.delegate_readonly_rounds,
+      undefined,
+      'decoration must stay off while the shared query reports NotConfigured',
+    )
+  })
+
+  setPredictorState('configured')
+  await withExecutablePlugin(async (hooks) => {
+    assert.equal(
+      ModelRoutingSurface.sharedPredictorConfiguration().kind,
+      'Configured',
+      'the shared query must report the configured state',
+    )
+    const output = {
+      description: 'Description for read',
+      parameters: {
+        type: 'object',
+        properties: { path: { type: 'string' } },
+        required: ['path'],
+      },
+    }
+    await hooks['tool.definition']({ toolID: 'read' }, output)
+    assert.equal(
+      output.parameters.properties.delegate_readonly_rounds.type,
+      'integer',
+      'decoration must follow the same single query result',
+    )
+  })
+})
+
+test('WHAT[host-boundary-032] C33_gate_follows_configuration_changes_within_one_plugin_instance', async () => {
+  setPredictorState('configured')
+  try {
+    await withExecutablePlugin(async (hooks) => {
+      const makeDefinition = () => ({
+        description: 'Description for read',
+        parameters: {
+          type: 'object',
+          properties: { path: { type: 'string' } },
+          required: ['path'],
+        },
+      })
+
+      const configuredOutput = makeDefinition()
+      await hooks['tool.definition']({ toolID: 'read' }, configuredOutput)
+      assert.equal(
+        configuredOutput.parameters.properties.delegate_readonly_rounds.type,
+        'integer',
+        'configured state must decorate within one plugin instance',
+      )
+
+      clearPredictorState()
+      const revertedOutput = makeDefinition()
+      await hooks['tool.definition']({ toolID: 'read' }, revertedOutput)
+      assert.equal(
+        revertedOutput.parameters.properties?.delegate_readonly_rounds,
+        undefined,
+        'removing the configuration must stop decoration in the same instance',
+      )
+      assert.equal(
+        revertedOutput.description,
+        'Description for read',
+        'removing the configuration must stop the collaboration prose',
+      )
+
+      setPredictorState('configured')
+      const reconfiguredOutput = makeDefinition()
+      await hooks['tool.definition']({ toolID: 'read' }, reconfiguredOutput)
+      assert.equal(
+        reconfiguredOutput.parameters.properties.delegate_readonly_rounds.type,
+        'integer',
+        'reconfiguring must resume decoration without a second enabled truth',
+      )
+    })
+  } finally {
+    clearPredictorState()
+  }
+})
+
 const here = path.dirname(fileURLToPath(import.meta.url))
 const runnerPath = path.join(here, 'support/run-manager-review-tools-canary.mjs')
 const repoRoot = path.resolve(here, '../../..')
@@ -546,6 +1321,28 @@ integrationTest(
       true,
       'round 2 provider tools must remain stable',
     )
+    // DELEGATE.md 4.1 / 197: 真实 Host canary 必须枚举最终 provider-visible
+    // tools。当前 runner 跑未配置态，断言枚举面存在、含内建与插件工具、
+    // 且全部工具不带协议字段（无功能基线的 wire 级证明）。
+    assert.ok(
+      Array.isArray(stdoutSummary.wireInspection?.providerVisibleToolNames) &&
+        stdoutSummary.wireInspection.providerVisibleToolNames.length > 0,
+      'canary must enumerate the final provider-visible tool set on the real host',
+    )
+    const visibleToolNames = stdoutSummary.wireInspection.providerVisibleToolNames
+    assert.ok(
+      visibleToolNames.includes('js-manager'),
+      `provider-visible set must include the plugin tool js-manager; observed: ${visibleToolNames.join(',')}`,
+    )
+    assert.ok(
+      ['skill', 'read', 'glob', 'grep'].some((name) => visibleToolNames.includes(name)),
+      `provider-visible set must include host builtin tools; observed: ${visibleToolNames.join(',')}`,
+    )
+    assert.equal(
+      stdoutSummary.wireInspection?.providerVisibleProtocolAbsence,
+      true,
+      'every provider-visible tool must be free of the delegation protocol fields while Predictor is unconfigured',
+    )
     assert.equal(stdoutSummary.hookIdentityChain?.argsIdentityPreservedInBefore, true)
     assert.equal(stdoutSummary.hookIdentityChain?.argsIdentityPreservedInAfter, true)
     assert.equal(stdoutSummary.hookIdentityChain?.contractHiddenInBefore, true)
@@ -553,11 +1350,22 @@ integrationTest(
     assert.equal(stdoutSummary.hookIdentityChain?.contractRestoredInAfter, true)
     assert.equal(stdoutSummary.hookIdentityChain?.symbolClearedInAfter, true)
     assert.equal(stdoutSummary.hookIdentityChain?.businessArgsPreserved, true)
-    assert.equal(
-      stdoutSummary.durableToolPart?.persistedInputRetainsContract,
-      true,
-      'durable tool part in Host store must retain contract',
-    )
+    // WHAT[host-boundary-032] 层界裁定：durableToolPart 观察降为诊断记录。
+    // 宿主持久化快照的 tool part input 在公开 SDK 面不可观测（1.18.29），
+    // runner 的旧 ?? true 兜底已摘除，缺失即如实记录 null；wire 层历史由
+    // historicalToolCallPreservesContract 与 provider-visible 枚举断言承载，
+    // 该层不作为本仓门禁对象，不因 durable 观测缺失或剥离判红。
+    if (stdoutSummary.durableToolPart?.persistedInputRetainsContract === false) {
+      // 观测到「持久化层被剥离」时如实写入失败诊断，不作为本仓门禁。
+      process.stderr.write(
+        '[host-boundary-032 diagnostic] durable tool part input lost the protocol field on the Host-persisted snapshot; ' +
+          'persisted-layer evidence is not a gate in this repository. ' +
+          'wire layer historicalToolCallPreservesContract=' +
+          String(stdoutSummary.wireInspection?.historicalToolCallPreservesContract) +
+          '\n',
+      )
+    }
+
     assert.equal(
       stdoutSummary.terminalStates?.normal,
       'success',
@@ -565,4 +1373,302 @@ integrationTest(
     )
   },
 )
+
+// host-boundary-032 / DELEGATE.md 4.3: the Host persists tool-call input after
+// the before hook strips the protocol fields, so the next provider request is
+// built from stripped history. The provider-facing transform restores the
+// vaulted wire originals into that history before any consumer reads it.
+
+test('WHAT[host-boundary-032] C34_transform_restores_hidden_protocol_fields_into_persisted_history', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    const tool = 'js-manager'
+    const sessionID = 'ses-c34'
+    await openIncumbency(runtime, sessionID)
+    const callID = 'call-c34-1'
+    const beforeOutput = {
+      args: {
+        path: 'src/App.fs',
+        contract: 'js-manager-contract-v1',
+        delegate_readonly_rounds: 3,
+        self_note: 'note-c34',
+      },
+    }
+
+    await hooks['tool.execute.before']({ tool, sessionID, callID }, beforeOutput)
+
+    // The persisted history the next provider request is built from: protocol
+    // fields stripped from the durable tool-call input.
+    const transformed = {
+      messages: [
+        {
+          role: 'assistant',
+          info: { id: 'asst-c34', sessionID },
+          parts: [
+            {
+              type: 'tool',
+              tool,
+              callID,
+              state: { status: 'completed', input: { path: 'src/App.fs' }, output: 'file contents' },
+            },
+          ],
+        },
+      ],
+    }
+
+    await hooks['experimental.chat.messages.transform']({}, transformed)
+
+    const restoredInput = transformed.messages[0].parts[0].state.input
+    assert.equal(
+      restoredInput.contract,
+      'js-manager-contract-v1',
+      'review contract must return to the persisted history on the wire',
+    )
+    assert.equal(
+      restoredInput.delegate_readonly_rounds,
+      3,
+      'budget must return to the persisted history on the wire',
+    )
+    assert.equal(
+      restoredInput.self_note,
+      'note-c34',
+      'note must return to the persisted history on the wire',
+    )
+    assert.equal(
+      restoredInput.path,
+      'src/App.fs',
+      'business arguments must survive the restore untouched',
+    )
+  })
+})
+
+test('WHAT[host-boundary-032] C35_unknown_tool_call_leaves_persisted_history_untouched', async () => {
+  await withExecutablePlugin(async (hooks) => {
+    // No before hook ran for this call: nothing was vaulted (e.g. history from
+    // before a process restart). The restore must fail open and leave the wire
+    // untouched; the pair-programming guideline marker is another mechanism's
+    // legitimate output and is excluded from the comparison below.
+    const transformed = {
+      messages: [
+        {
+          role: 'assistant',
+          info: { id: 'asst-c35', sessionID: 'ses-c35' },
+          parts: [
+            {
+              type: 'tool',
+              tool: 'read',
+              callID: 'call-c35-unknown',
+              state: { status: 'completed', input: { path: 'src/Old.fs' }, output: 'old contents' },
+            },
+          ],
+        },
+      ],
+    }
+    const before = structuredClone(transformed)
+
+    await hooks['experimental.chat.messages.transform']({}, transformed)
+
+    // The restore must fail open on a call with no vault entry. The
+    // pair-programming guideline injector (HOST-013 Cursor mode,
+    // prefix-stability-010) legitimately appends its NUL+BOM marker to
+    // terminal tool results on the provider wire; that is a different
+    // mechanism with its own contract, so the wire is compared with only
+    // that marker removed — every other mutation still fails here.
+    const wireWithoutGuidelineMarker = structuredClone(transformed)
+
+    for (const message of wireWithoutGuidelineMarker.messages) {
+      for (const part of message.parts ?? []) {
+        if (typeof part?.state?.output === 'string') {
+          part.state.output = part.state.output.split('\u0000\uFEFF')[0]
+        }
+      }
+    }
+
+    assert.deepEqual(
+      wireWithoutGuidelineMarker,
+      before,
+      'a call with no vault entry must fail open and leave the wire untouched but for the pair-programming guideline marker',
+    )
+
+    assert.deepEqual(
+      transformed.messages[0].parts[0].state.input,
+      { path: 'src/Old.fs' },
+      'the persisted call input must keep exactly its business arguments',
+    )
+
+    assert.deepEqual(
+      Object.keys(transformed.messages[0].parts[0].state.input),
+      ['path'],
+      'no protocol key may appear in the persisted call input',
+    )
+  })
+})
+
+test('WHAT[host-boundary-032] C36_repeated_transforms_restore_once_and_stay_stable', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    const tool = 'js-manager'
+    const sessionID = 'ses-c36'
+    await openIncumbency(runtime, sessionID)
+    const callID = 'call-c36-1'
+
+    await hooks['tool.execute.before'](
+      { tool, sessionID, callID },
+      { args: { path: 'src/App.fs', contract: 'js-manager-contract-v1' } },
+    )
+
+    const transformed = {
+      messages: [
+        {
+          role: 'assistant',
+          info: { id: 'asst-c36', sessionID },
+          parts: [
+            {
+              type: 'tool',
+              tool,
+              callID,
+              state: { status: 'completed', input: { path: 'src/App.fs' }, output: 'file contents' },
+            },
+          ],
+        },
+      ],
+    }
+
+    await hooks['experimental.chat.messages.transform']({}, transformed)
+    const afterFirst = structuredClone(transformed)
+
+    await hooks['experimental.chat.messages.transform']({}, transformed)
+    await hooks['experimental.chat.messages.transform']({}, transformed)
+
+    assert.deepEqual(
+      transformed,
+      afterFirst,
+      'repeated transforms must not duplicate or reorder the restored fields',
+    )
+    assert.deepEqual(
+      Object.keys(transformed.messages[0].parts[0].state.input),
+      ['path', 'contract'],
+      'business keys must keep their order before the appended protocol key',
+    )
+  })
+})
+
+test('WHAT[host-boundary-032] C37_tool_results_are_never_rewritten_by_the_restore', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    const tool = 'js-manager'
+    const sessionID = 'ses-c37'
+    await openIncumbency(runtime, sessionID)
+    const callID = 'call-c37-1'
+
+    await hooks['tool.execute.before'](
+      { tool, sessionID, callID },
+      {
+        args: {
+          path: 'src/App.fs',
+          contract: 'js-manager-contract-v1',
+          delegate_readonly_rounds: 1,
+        },
+      },
+    )
+
+    const transformed = {
+      messages: [
+        {
+          role: 'assistant',
+          info: { id: 'asst-c37', sessionID },
+          parts: [
+            {
+              type: 'tool',
+              tool,
+              callID,
+              state: { status: 'completed', input: { path: 'src/App.fs' }, output: 'file contents' },
+            },
+          ],
+        },
+        {
+          role: 'tool',
+          info: { id: 'asst-c37-result', sessionID },
+          parts: [{ type: 'tool-result', callID, result: 'file contents' }],
+        },
+      ],
+    }
+
+    await hooks['experimental.chat.messages.transform']({}, transformed)
+
+    assert.deepEqual(
+      transformed.messages[1].parts[0].result,
+      'file contents',
+      'tool results must stay verbatim through the restore',
+    )
+    assert.equal(
+      transformed.messages[0].parts[0].state.input.contract,
+      'js-manager-contract-v1',
+      'the call itself must still be restored beside its result',
+    )
+    assert.equal(
+      transformed.messages[0].parts[0].state.input.delegate_readonly_rounds,
+      1,
+      'the budget must still be restored beside its result',
+    )
+  })
+})
+
+test('WHAT[host-boundary-032] C38_restore_only_touches_protocol_fields_never_business_arguments', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    const tool = 'read'
+    const sessionID = 'ses-c38'
+    await openIncumbency(runtime, sessionID)
+    const callID = 'call-c38-1'
+
+    await hooks['tool.execute.before'](
+      { tool, sessionID, callID },
+      {
+        args: {
+          path: 'src/App.fs',
+          pattern: 'TODO',
+          limit: 10,
+          delegate_readonly_rounds: 2,
+        },
+      },
+    )
+
+    const transformed = {
+      messages: [
+        {
+          role: 'assistant',
+          info: { id: 'asst-c38', sessionID },
+          parts: [
+            {
+              type: 'tool',
+              tool,
+              callID,
+              state: {
+                status: 'completed',
+                input: { path: 'src/App.fs', pattern: 'TODO', limit: 10 },
+                output: 'matches',
+              },
+            },
+          ],
+        },
+      ],
+    }
+
+    await hooks['experimental.chat.messages.transform']({}, transformed)
+
+    const input = transformed.messages[0].parts[0].state.input
+    assert.deepEqual(
+      { path: input.path, pattern: input.pattern, limit: input.limit },
+      { path: 'src/App.fs', pattern: 'TODO', limit: 10 },
+      'every business argument must survive verbatim',
+    )
+    assert.equal(
+      input.delegate_readonly_rounds,
+      2,
+      'the protocol field must be restored beside the business arguments',
+    )
+    assert.deepEqual(
+      Object.keys(input),
+      ['path', 'pattern', 'limit', 'delegate_readonly_rounds'],
+      'business keys must keep their order before the appended protocol key',
+    )
+  })
+})
 

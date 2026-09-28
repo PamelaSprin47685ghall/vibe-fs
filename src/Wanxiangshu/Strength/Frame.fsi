@@ -23,7 +23,6 @@ type StrengthFrameError =
     | EmptyBatch of requestOrdinal: int
     | InvalidRequestOrdinal of expected: int * actual: int
     | UnsupportedTool of toolName: string
-    | ByteLimitExceeded of actualBytes: int * maxBytes: int
 
 [<RequireQualifiedAccess>]
 type StrengthMirrorError =
@@ -38,7 +37,6 @@ module StrengthFrame =
 
     val tryBuild:
         sha256: (string -> string) ->
-        maxBytes: int ->
         batches: StrengthRequestBatch list ->
             Result<StrengthFrameBundle, StrengthFrameError>
 

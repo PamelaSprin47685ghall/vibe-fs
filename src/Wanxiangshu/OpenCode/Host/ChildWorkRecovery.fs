@@ -33,7 +33,8 @@ module ChildWorkRecovery =
           ChildSessionId: SessionId }
 
     let private isChildWorkRun (run: PromptAuthority.AuthorityExecutionProfile) : bool =
-        run.AuthorityKind = PromptAuthority.RootAuthorityKind.AgentOwnerRoot && run.CanonicalRole <> Role.Manager
+        run.AuthorityKind = PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+        && run.CanonicalRole <> Role.Manager
 
     let private activeChildRuns (projections: AgentProjectionSet) : SessionId list =
         projections.Sessions

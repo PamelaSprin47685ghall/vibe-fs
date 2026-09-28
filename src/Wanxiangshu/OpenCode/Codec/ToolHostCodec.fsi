@@ -50,6 +50,7 @@ type ToolSpec =
 module ToolHostCodec =
     val newHandleId: unit -> string
     val decodeContext: raw: obj -> HostToolContext
+    val hookCallId: raw: obj -> ToolCallId option
     val factory: toolModule: obj -> HostToolFactory
     val internal schemaValue: schema: HostSchema -> obj
     val stringSchema: factory: HostToolFactory -> HostSchema

@@ -322,12 +322,16 @@ module PluginHooks =
             // vault. contract only for review tools (the only place review hide
             // runs); the delegation fields are recorded wherever they appear,
             // matching the unconditional readonly hide.
+            //
+            // The call id is read from the hook input itself: WHAT[009]'s
+            // both-halves pairing lives in decodeContext, and this hook input
+            // carries no messageID, so decodeContext would always answer None.
             let recordProtocolArgumentVault (toolInput: obj) (toolOutput: obj) =
                 if not (isNull toolOutput) && not (isNull toolOutput?args) then
                     let toolName = toolField toolInput "tool"
                     let context = ToolHostCodec.decodeContext toolInput
 
-                    match context.ToolCallId with
+                    match ToolHostCodec.hookCallId toolInput with
                     | Some toolCallId when not (String.IsNullOrWhiteSpace context.SessionId) ->
                         match ProtocolArgumentVault.snapshotOfArguments toolOutput?args with
                         | Some snapshot ->
@@ -369,7 +373,9 @@ module PluginHooks =
 
                     let context = ToolHostCodec.decodeContext toolInput
 
-                    match journal, context.ToolCallId with
+                    // Same hook-shaped call id as the vault above:
+                    // the decodeContext ToolCallId is None on this hook input.
+                    match journal, ToolHostCodec.hookCallId toolInput with
                     | Some durable, Some toolCallId when not (String.IsNullOrWhiteSpace context.SessionId) ->
                         let port = AgentJournalPortAdapter.forDelegatedToolEstimate durable
                         do! DelegatedToolEstimateLedger.observe port (SessionId.create context.SessionId) toolCallId

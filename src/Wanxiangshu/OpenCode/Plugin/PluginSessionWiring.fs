@@ -169,7 +169,11 @@ module PluginSessionWiring =
 
                             let lenderSessionId = tryParentKey sessionId
 
-                            ModelRouting.tryReserveManaged sessionId role lenderSessionId
+                            ModelRouting.tryReserveManaged
+                                sessionId
+                                role
+                                ModelExecutionPurpose.ReadonlyDelegate
+                                lenderSessionId
                             |> Option.map ModelRouting.toOpenCodeModel),
                     ?releaseModel = Some(fun sessionId -> ModelRouting.releaseExecution sessionId |> ignore)
                 )

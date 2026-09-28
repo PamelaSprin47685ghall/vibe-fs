@@ -11,6 +11,7 @@ module ModelRoutingSurface =
         role: string ->
         participant: string ->
         lenderSessionId: string ->
+        purpose: obj ->
             Task<obj>
 
     val sharedExecutionAdmissionTarget: token: obj -> obj
@@ -25,8 +26,11 @@ module ModelRoutingSurface =
     val sharedEnterProviderStep:
         sessionId: string -> physicalUserMessageId: string -> visibleProviderRuns: string array -> Task
 
-    val invokeScheduler: scheduler: obj -> role: string -> running: obj -> previous: obj -> obj
+    val invokeScheduler: scheduler: obj -> role: string -> running: obj -> previous: obj -> purpose: obj -> obj
     val createRuntime: scheduler: obj -> obj
+
+    val predictorConfiguration: scheduler: obj -> obj
+    val sharedPredictorConfiguration: unit -> obj
 
     val acquireExecutionAdmission:
         runtime: obj ->
@@ -35,6 +39,7 @@ module ModelRoutingSurface =
         role: string ->
         participant: string ->
         lenderSessionId: string ->
+        purpose: obj ->
             Task<obj>
 
     val beginExecutionAdmission:
@@ -44,6 +49,7 @@ module ModelRoutingSurface =
         role: string ->
         participant: string ->
         lenderSessionId: string ->
+        purpose: obj ->
             Task<obj>
 
     val awaitQueuedExecutionAdmission: queueToken: obj -> Task<obj>
@@ -51,7 +57,9 @@ module ModelRoutingSurface =
     val commitExecutionAdmission: runtime: obj -> token: obj -> observed: obj -> obj
     val releaseExecutionAdmissionBeforeProvider: runtime: obj -> token: obj -> observed: obj -> obj
     val executionAdmissionLifecycle: runtime: obj -> token: obj -> obj
-    val tryReserveManaged: runtime: obj -> sessionId: string -> role: string -> lenderSessionId: string -> obj
+
+    val tryReserveManaged:
+        runtime: obj -> sessionId: string -> role: string -> lenderSessionId: string -> purpose: obj -> obj
 
     val tryLease:
         runtime: obj ->
@@ -60,6 +68,7 @@ module ModelRoutingSurface =
         role: string ->
         participant: string ->
         lenderSessionId: string ->
+        purpose: obj ->
             obj
 
     val bindDevopsTarget: runtime: obj -> sessionId: string -> target: obj -> unit

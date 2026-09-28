@@ -87,7 +87,43 @@ npm install wanxiangshu --registry <your-private-registry>
 | `WANXIANGSHU_ADMISSION_TIMEOUT_MS` | prompt 物理 acceptance 等待超时（毫秒，默认 10000） |
 | `WANXIANGSHU_DIAG=1` | 让内部诊断记录经 stderr 可见；只观测，不改变任何决策 |
 | `WANXIANGSHU_ABLATION_PROFILE` | feature-ablation 拓扑 profile 选择（配 `resources/ablation/`） |
-| `WANXIANGSHU_STRENGTH_*` | 一族 Strength（speculative-investigation）rollout 参数：`MODE`（`off`/`dry-run`/`treatment`/`shadow`）与 cost、margin、budget 等旋钮 |
+
+### 升级：只读委托（调度协议 2）
+
+只读委托由模型调度配置驱动，没有独立开关。升级只做两件事：旧的环境变量已全部失效；模型调度配置需要升到协议 2。
+
+**旧环境变量已失效。** `WANXIANGSHU_STRENGTH_MODE`、`WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET`、`WANXIANGSHU_STRENGTH_HOST_CANARY`、`WANXIANGSHU_STRENGTH_K1_MARGIN`、`WANXIANGSHU_STRENGTH_K2_MARGIN`、`WANXIANGSHU_STRENGTH_K2_MIN_EVIDENCE`、`WANXIANGSHU_STRENGTH_CONTROL_BPS`、`WANXIANGSHU_STRENGTH_POLICY_VERSION`、`WANXIANGSHU_STRENGTH_SAVED_DEEP_*` 等一律不再读取。残留旧值不会阻止运行，也不会启用任何功能；从 shell 环境里删掉即可。
+
+**模型调度配置升级。** 配置位于 `~/.config/opencode/wanxiangshu.mjs`，需要导出：
+
+- `export const routingProtocol = 2`：调度 ABI 的稳定契约版本，不是运行开关。
+- `export default function route(role, running, previous, purpose)`：`purpose` 取 `"normal"`（角色常规执行）或 `"readonly-delegate"`（只读委托，从 Predictor 模型池选择）。用途不改变角色与参与者身份。
+- `export const hasTheoreticalCapacity = (role, purpose) => …`。
+- `export const predictorConfiguration = () => ({ state: 'configured' | 'unconfigured' | 'invalid', reason })`：Predictor 槽位存在且候选非空即已配置；容量与 provider 健康不参与这个判断。
+
+随包模板 `resources/wanxiangshu.mjs` 已是协议 2 的参照形状，对照修改自己的配置即可。旧的三参数配置会被加载器明确拒绝并给出可操作错误；运行时不会覆盖用户已有的配置文件。
+
+**启用方式。** Predictor 模型配置是唯一启用依据：配置存在即启用，未配置就是没有委托。没有独立开关、环境变量或消融选项；模板自带的非空 Predictor 池同样算作已配置。
+
+**历史数据迁移。** 旧存储不会在新运行时被静默消费：未迁移的旧协议事件在集成规则入口被明确拒绝。迁移是离线一次性操作，在 EventStore 备份副本上进行，先跑 dry-run 核对报告，再加 `--execute`：
+
+```bash
+node scripts/build.mjs
+git rev-parse --git-common-dir        # 找到 EventStore 所在的 common dir
+cp -a "$(git rev-parse --git-common-dir)" /path/to/backup   # 先复制；迁移只在副本上进行
+
+node scripts/migrate-delegation-history.mjs \
+  --backup /path/to/backup --input-version pre-delegation \
+  --contract-revision 1 --report migration-report.json
+# 核对报告后：
+node scripts/migrate-delegation-history.mjs \
+  --backup /path/to/backup --input-version pre-delegation \
+  --contract-revision 1 --report migration-report.json --execute
+```
+
+`--input-version` 与 `--contract-revision` 按迁移工具内的登记表校验：输入版本只有 `pre-delegation`（分类器只认定这一种旧协议），契约修订与运行时一致为 `1`（定义在 `src/Wanxiangshu/Strength/OpenCode/Delegate.fs`）。
+
+迁移只追加 `DelegationHistoryImported` 导入事实，不改写 append-only 历史、Git 对象或 refs，也不触碰用户配置；脚本拒绝在活库上运行。已配置并启用后，主模型的可见工具会多出必填参数 `delegate_readonly_rounds` 与可选参数 `self_note`；角色语义与 Prompt 见 [requirements/README.md](requirements/README.md)。
 
 ### 快速开始
 

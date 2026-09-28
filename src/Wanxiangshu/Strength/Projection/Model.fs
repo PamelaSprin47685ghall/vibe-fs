@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Strength.Projection
 
 open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
@@ -8,23 +9,36 @@ open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Prediction
-
-open Wanxiangshu.Foundation.Identity
 
 type StrengthTraceRange =
     { StartInclusive: int64
       EndExclusive: int64 }
 
-type StrengthCandidateView =
-    { Prepared: StrengthCandidatePrepared
-      Promoted: bool
-      TraceRange: StrengthTraceRange option
-      Abandoned: bool }
+/// DELEGATE-6.2: one delegation lifecycle expressed as a closed union, never as
+/// boolean combinations. Legal edges are enforced by the fold below.
+[<RequireQualifiedAccess>]
+type StrengthCandidateState =
+    | Requested
+    | Bound
+    | Prepared
+    | Promoted
+    | Traced
+    | Closed of DelegationClosed
+    | Abandoned
+
+/// Folded view of one DecisionId: the immutable request plus the facts legally
+/// attached so far. Prepared is the candidate that a Bound request produced.
+type StrengthDelegationView =
+    { Request: DelegationRequest
+      Binding: DelegationBinding option
+      Prepared: StrengthCandidatePrepared option
+      State: StrengthCandidateState
+      TraceRange: StrengthTraceRange option }
 
 type StrengthProjection =
-    { ByDecision: Map<string, StrengthCandidateView>
-      ByTargetRun: Map<string, StrengthDecisionId> }
+    { ByDecision: Map<string, StrengthDelegationView>
+      ByTargetRun: Map<string, StrengthDecisionId>
+      ImportedHistory: Map<string, DelegationHistoryImported> }
 
 /// Typed refusal taxonomy for Strength-owned projection decisions.
 [<RequireQualifiedAccess>]
@@ -163,11 +177,18 @@ module StrengthProjectionIntent =
         : Result<ProjectionIntent, StrengthProjectionIntentError> =
         insertion sha256 ownerSessionId decisionId ProjectionMessageAnchor.Append bundle
 
-/// DSL-class: Decision — Strength candidate fold refusals (Prepared/Promoted/Trace/Abandon).
+/// DSL-class: Decision — Strength delegation fold refusals.
 [<RequireQualifiedAccess>]
 type StrengthProjectionError =
-    | PreparedConflict of decisionId: StrengthDecisionId
+    | RequestedConflict of decisionId: StrengthDecisionId
+    | BoundWithoutRequested of decisionId: StrengthDecisionId
+    | BoundConflict of decisionId: StrengthDecisionId
     | TargetAlreadyBound of targetProviderRun: ProviderRunIdentity
+    | ClosedWithoutRequested of decisionId: StrengthDecisionId
+    | ClosedConflict of decisionId: StrengthDecisionId
+    | PreparedWithoutBound of decisionId: StrengthDecisionId
+    | PreparedConflict of decisionId: StrengthDecisionId
+    | PreparedBindingMismatch of decisionId: StrengthDecisionId
     | PromotionWithoutPrepared of decisionId: StrengthDecisionId
     | PromotionMismatch of decisionId: StrengthDecisionId
     | PromotionAfterAbandon of decisionId: StrengthDecisionId
@@ -178,12 +199,14 @@ type StrengthProjectionError =
     | AbandonWithoutPrepared of decisionId: StrengthDecisionId
     | AbandonMismatch of decisionId: StrengthDecisionId
     | AbandonAfterPromotion of decisionId: StrengthDecisionId
+    | ImportConflict of importId: string
 
 module StrengthProjection =
 
     let empty =
         { ByDecision = Map.empty
-          ByTargetRun = Map.empty }
+          ByTargetRun = Map.empty
+          ImportedHistory = Map.empty }
 
     let private decisionKey decisionId = StrengthDecisionId.value decisionId
     let private targetKey providerRun = ProviderRunIdentity.value providerRun
@@ -192,16 +215,42 @@ module StrengthProjection =
         Map.tryFind (decisionKey decisionId) projection.ByDecision
 
     let hasPrepared decisionId projection =
-        Option.isSome (tryCandidate decisionId projection)
+        tryCandidate decisionId projection
+        |> Option.exists (fun view -> Option.isSome view.Prepared)
 
     let isPromoted decisionId projection =
-        tryCandidate decisionId projection |> Option.exists (fun view -> view.Promoted)
+        tryCandidate decisionId projection
+        |> Option.exists (fun view ->
+            view.State = StrengthCandidateState.Promoted
+            || view.State = StrengthCandidateState.Traced)
 
     let tryDecisionForTarget (targetProviderRun: ProviderRunIdentity) (projection: StrengthProjection) =
         Map.tryFind (targetKey targetProviderRun) projection.ByTargetRun
 
     let tryTraceRange decisionId projection =
         tryCandidate decisionId projection |> Option.bind (fun view -> view.TraceRange)
+
+    /// DELEGATE-6.3: the binding reads the requested rounds from the immutable
+    /// projection; no layer keeps its own mutable copy of the budget.
+    let requestedRounds decisionId projection =
+        tryCandidate decisionId projection
+        |> Option.filter (fun view ->
+            match view.State with
+            // A superseded authorization was replaced by a successor, so it no
+            // longer offers a budget. Every other close keeps the requested
+            // fact readable — the Closed state itself already blocks any spend
+            // at the fold — and an abandoned candidate offers nothing.
+            | StrengthCandidateState.Closed closed -> closed.Reason <> DelegationClosedReason.Superseded
+            | StrengthCandidateState.Abandoned -> false
+            | StrengthCandidateState.Requested
+            | StrengthCandidateState.Bound
+            | StrengthCandidateState.Prepared
+            | StrengthCandidateState.Promoted
+            | StrengthCandidateState.Traced -> true)
+        |> Option.map (fun view -> view.Request.RequestedRounds)
+
+    let tryImported (importId: string) (projection: StrengthProjection) =
+        Map.tryFind importId projection.ImportedHistory
 
     let private samePromotion (prepared: StrengthCandidatePrepared) (promoted: StrengthCandidatePromoted) =
         prepared.OwnerSessionId = promoted.OwnerSessionId
@@ -210,97 +259,243 @@ module StrengthProjection =
         && prepared.FrameDigest = promoted.FrameDigest
         && prepared.MaterialPayloads = promoted.MaterialPayloads
 
-    let private registerPrepared (projection: StrengthProjection) (prepared: StrengthCandidatePrepared) =
-        let tkey = targetKey prepared.TargetProviderRun
+    let private applyRequested projection (requested: DelegationRequest) =
+        let dkey = decisionKey requested.DecisionId
 
-        match Map.tryFind tkey projection.ByTargetRun with
-        | Some existingDecision when existingDecision <> prepared.DecisionId ->
-            Error(StrengthProjectionError.TargetAlreadyBound prepared.TargetProviderRun)
-        | _ ->
+        match Map.tryFind dkey projection.ByDecision with
+        | Some existing ->
+            if Delegation.sameRequest existing.Request requested then
+                Ok projection
+            else
+                Error(StrengthProjectionError.RequestedConflict requested.DecisionId)
+        | None ->
             let view =
-                { Prepared = prepared
-                  Promoted = false
-                  TraceRange = None
-                  Abandoned = false }
+                { Request = requested
+                  Binding = None
+                  Prepared = None
+                  State = StrengthCandidateState.Requested
+                  TraceRange = None }
 
             Ok
-                { ByDecision = Map.add (decisionKey prepared.DecisionId) view projection.ByDecision
-                  ByTargetRun = Map.add tkey prepared.DecisionId projection.ByTargetRun }
+                { projection with
+                    ByDecision = Map.add dkey view projection.ByDecision }
 
-    let private applyPrepared (projection: StrengthProjection) (prepared: StrengthCandidatePrepared) =
+    let private applyBound projection (bound: DelegationBinding) =
+        let dkey = decisionKey bound.DecisionId
+        let tkey = targetKey bound.TargetProviderRun
+
+        match Map.tryFind tkey projection.ByTargetRun with
+        | Some other when other <> bound.DecisionId ->
+            Error(StrengthProjectionError.TargetAlreadyBound bound.TargetProviderRun)
+        | _ ->
+            match Map.tryFind dkey projection.ByDecision with
+            | None -> Error(StrengthProjectionError.BoundWithoutRequested bound.DecisionId)
+            | Some existing ->
+                match existing.State with
+                | StrengthCandidateState.Bound when
+                    existing.Binding
+                    |> Option.exists (fun current -> Delegation.sameBinding current bound)
+                    ->
+                    Ok projection
+                | StrengthCandidateState.Bound -> Error(StrengthProjectionError.BoundConflict bound.DecisionId)
+                | StrengthCandidateState.Requested ->
+                    Ok
+                        { projection with
+                            ByDecision =
+                                Map.add
+                                    dkey
+                                    { existing with
+                                        Binding = Some bound
+                                        State = StrengthCandidateState.Bound }
+                                    projection.ByDecision
+                            ByTargetRun = Map.add tkey bound.DecisionId projection.ByTargetRun }
+                | _ -> Error(StrengthProjectionError.BoundConflict bound.DecisionId)
+
+    let private closeView
+        projection
+        dkey
+        (existing: StrengthDelegationView)
+        (closed: DelegationClosed)
+        (releasedTarget: string option)
+        =
+        let byTargetRun =
+            match releasedTarget with
+            | Some tkey -> Map.remove tkey projection.ByTargetRun
+            | None -> projection.ByTargetRun
+
+        Ok
+            { projection with
+                ByDecision =
+                    Map.add
+                        dkey
+                        { existing with
+                            State = StrengthCandidateState.Closed closed }
+                        projection.ByDecision
+                ByTargetRun = byTargetRun }
+
+    let private applyClosed projection (closed: DelegationClosed) =
+        let dkey = decisionKey closed.DecisionId
+
+        match Map.tryFind dkey projection.ByDecision with
+        | None -> Error(StrengthProjectionError.ClosedWithoutRequested closed.DecisionId)
+        | Some existing ->
+            match existing.State with
+            | StrengthCandidateState.Closed prior when prior = closed -> Ok projection
+            | StrengthCandidateState.Closed _ -> Error(StrengthProjectionError.ClosedConflict closed.DecisionId)
+            | StrengthCandidateState.Requested when closed.From = DelegationClosedFrom.Requested ->
+                closeView projection dkey existing closed None
+            | StrengthCandidateState.Bound when closed.From = DelegationClosedFrom.Bound ->
+                let released =
+                    existing.Binding
+                    |> Option.map (fun binding -> targetKey binding.TargetProviderRun)
+
+                closeView projection dkey existing closed released
+            | _ -> Error(StrengthProjectionError.ClosedConflict closed.DecisionId)
+
+    let private applyPrepared projection (prepared: StrengthCandidatePrepared) =
         let dkey = decisionKey prepared.DecisionId
 
         match Map.tryFind dkey projection.ByDecision with
-        | Some existing when existing.Prepared = prepared -> Ok projection
-        | Some _ -> Error(StrengthProjectionError.PreparedConflict prepared.DecisionId)
-        | None -> registerPrepared projection prepared
+        | None -> Error(StrengthProjectionError.PreparedWithoutBound prepared.DecisionId)
+        | Some existing ->
+            match existing.Prepared with
+            | Some prior when prior = prepared -> Ok projection
+            | Some _ -> Error(StrengthProjectionError.PreparedConflict prepared.DecisionId)
+            | None ->
+                if existing.State <> StrengthCandidateState.Bound then
+                    Error(StrengthProjectionError.PreparedWithoutBound prepared.DecisionId)
+                else
+                    match existing.Binding with
+                    | None -> Error(StrengthProjectionError.PreparedWithoutBound prepared.DecisionId)
+                    | Some binding ->
+                        if
+                            prepared.TargetProviderRun <> binding.TargetProviderRun
+                            || prepared.ReplicaSessionId <> binding.ReplicaSessionId
+                            || prepared.OwnerSessionId <> existing.Request.OwnerSessionId
+                        then
+                            Error(StrengthProjectionError.PreparedBindingMismatch prepared.DecisionId)
+                        else
+                            Ok
+                                { projection with
+                                    ByDecision =
+                                        Map.add
+                                            dkey
+                                            { existing with
+                                                Prepared = Some prepared
+                                                State = StrengthCandidateState.Prepared }
+                                            projection.ByDecision }
 
-    let private applyPromoted (projection: StrengthProjection) (promoted: StrengthCandidatePromoted) =
+    let private applyPromoted projection (promoted: StrengthCandidatePromoted) =
         let dkey = decisionKey promoted.DecisionId
 
         match Map.tryFind dkey projection.ByDecision with
         | None -> Error(StrengthProjectionError.PromotionWithoutPrepared promoted.DecisionId)
-        | Some view when view.Abandoned -> Error(StrengthProjectionError.PromotionAfterAbandon promoted.DecisionId)
-        | Some view when not (samePromotion view.Prepared promoted) ->
-            Error(StrengthProjectionError.PromotionMismatch promoted.DecisionId)
-        | Some view when view.Promoted -> Ok projection
-        | Some view ->
-            Ok
-                { projection with
-                    ByDecision = Map.add dkey { view with Promoted = true } projection.ByDecision }
+        | Some existing ->
+            match existing.State with
+            | StrengthCandidateState.Abandoned
+            | StrengthCandidateState.Closed _ ->
+                Error(StrengthProjectionError.PromotionAfterAbandon promoted.DecisionId)
+            | StrengthCandidateState.Promoted
+            | StrengthCandidateState.Traced ->
+                match existing.Prepared with
+                | Some prior when samePromotion prior promoted -> Ok projection
+                | _ -> Error(StrengthProjectionError.PromotionMismatch promoted.DecisionId)
+            | StrengthCandidateState.Prepared ->
+                match existing.Prepared with
+                | Some prior when samePromotion prior promoted ->
+                    Ok
+                        { projection with
+                            ByDecision =
+                                Map.add
+                                    dkey
+                                    { existing with
+                                        State = StrengthCandidateState.Promoted }
+                                    projection.ByDecision }
+                | _ -> Error(StrengthProjectionError.PromotionMismatch promoted.DecisionId)
+            | _ -> Error(StrengthProjectionError.PromotionWithoutPrepared promoted.DecisionId)
 
-    let private attachTraceRange
-        (projection: StrengthProjection)
-        (decisionId: StrengthDecisionId)
-        (range: StrengthTraceRange)
-        (view: StrengthCandidateView)
-        : Result<StrengthProjection, StrengthProjectionError> =
-        match view.TraceRange with
-        | Some existing when existing = range -> Ok projection
-        | Some _ -> Error(StrengthProjectionError.TraceConflict decisionId)
-        | None ->
-            Ok
-                { projection with
-                    ByDecision =
-                        Map.add (decisionKey decisionId) { view with TraceRange = Some range } projection.ByDecision }
-
-    let private applyTraced (projection: StrengthProjection) (traced: StrengthFramesTraced) =
+    let private applyTraced projection (traced: StrengthFramesTraced) =
         let dkey = decisionKey traced.DecisionId
 
         match Map.tryFind dkey projection.ByDecision with
         | None -> Error(StrengthProjectionError.TraceWithoutPrepared traced.DecisionId)
-        | Some view when not view.Promoted -> Error(StrengthProjectionError.TraceWithoutPromotion traced.DecisionId)
-        | Some _ when traced.StartInclusive < 0L || traced.EndExclusive <= traced.StartInclusive ->
-            Error(StrengthProjectionError.InvalidTraceRange traced.DecisionId)
-        | Some view ->
+        | Some existing ->
             let range =
                 { StartInclusive = traced.StartInclusive
                   EndExclusive = traced.EndExclusive }
 
-            attachTraceRange projection traced.DecisionId range view
+            match existing.State with
+            | StrengthCandidateState.Traced when existing.TraceRange = Some range -> Ok projection
+            | StrengthCandidateState.Traced -> Error(StrengthProjectionError.TraceConflict traced.DecisionId)
+            | StrengthCandidateState.Promoted ->
+                if traced.StartInclusive < 0L || traced.EndExclusive <= traced.StartInclusive then
+                    Error(StrengthProjectionError.InvalidTraceRange traced.DecisionId)
+                else
+                    Ok
+                        { projection with
+                            ByDecision =
+                                Map.add
+                                    dkey
+                                    { existing with
+                                        State = StrengthCandidateState.Traced
+                                        TraceRange = Some range }
+                                    projection.ByDecision }
+            | _ -> Error(StrengthProjectionError.TraceWithoutPromotion traced.DecisionId)
 
-    let private applyAbandoned (projection: StrengthProjection) (abandoned: StrengthCandidateAbandoned) =
+    let private applyAbandoned projection (abandoned: StrengthCandidateAbandoned) =
         let dkey = decisionKey abandoned.DecisionId
 
         match Map.tryFind dkey projection.ByDecision with
         | None -> Error(StrengthProjectionError.AbandonWithoutPrepared abandoned.DecisionId)
-        | Some view when view.Promoted -> Error(StrengthProjectionError.AbandonAfterPromotion abandoned.DecisionId)
-        | Some view when view.Prepared.TargetProviderRun <> abandoned.TargetProviderRun ->
-            Error(StrengthProjectionError.AbandonMismatch abandoned.DecisionId)
-        | Some view when view.Abandoned -> Ok projection
-        | Some view ->
+        | Some existing ->
+            match existing.State with
+            | StrengthCandidateState.Abandoned ->
+                match existing.Binding with
+                | Some binding when binding.TargetProviderRun = abandoned.TargetProviderRun -> Ok projection
+                | _ -> Error(StrengthProjectionError.AbandonMismatch abandoned.DecisionId)
+            | StrengthCandidateState.Promoted
+            | StrengthCandidateState.Traced -> Error(StrengthProjectionError.AbandonAfterPromotion abandoned.DecisionId)
+            | StrengthCandidateState.Prepared ->
+                match existing.Binding with
+                | Some binding when binding.TargetProviderRun = abandoned.TargetProviderRun ->
+                    Ok
+                        { projection with
+                            ByDecision =
+                                Map.add
+                                    dkey
+                                    { existing with
+                                        State = StrengthCandidateState.Abandoned }
+                                    projection.ByDecision
+                            ByTargetRun = Map.remove (targetKey abandoned.TargetProviderRun) projection.ByTargetRun }
+                | _ -> Error(StrengthProjectionError.AbandonMismatch abandoned.DecisionId)
+            | _ -> Error(StrengthProjectionError.AbandonWithoutPrepared abandoned.DecisionId)
+
+    /// DELEGATE: imported history is evidence only. It never enters ByDecision
+    /// or ByTargetRun, so it neither advances a lifecycle nor mints an
+    /// admission; re-appending the identical import is idempotent.
+    let private applyImported projection (imported: DelegationHistoryImported) =
+        let key = imported.ImportId
+
+        match Map.tryFind key projection.ImportedHistory with
+        | Some existing when existing = imported -> Ok projection
+        | Some _ -> Error(StrengthProjectionError.ImportConflict imported.ImportId)
+        | None ->
             Ok
-                { ByDecision = Map.add dkey { view with Abandoned = true } projection.ByDecision
-                  ByTargetRun = Map.remove (targetKey abandoned.TargetProviderRun) projection.ByTargetRun }
+                { projection with
+                    ImportedHistory = Map.add key imported projection.ImportedHistory }
 
     let apply
         (projection: StrengthProjection)
         (event: StrengthEvent)
         : Result<StrengthProjection, StrengthProjectionError> =
         match event with
+        | StrengthEvent.DelegationRequested requested -> applyRequested projection requested
+        | StrengthEvent.DelegationBound bound -> applyBound projection bound
+        | StrengthEvent.DelegationClosed closed -> applyClosed projection closed
         | StrengthEvent.Prepared prepared -> applyPrepared projection prepared
         | StrengthEvent.Promoted promoted -> applyPromoted projection promoted
         | StrengthEvent.Traced traced -> applyTraced projection traced
+        | StrengthEvent.DelegationHistoryImported imported -> applyImported projection imported
         | StrengthEvent.Abandoned abandoned -> applyAbandoned projection abandoned
 
 // No history-fold API by design. CanonicalIntegrator is the sole history

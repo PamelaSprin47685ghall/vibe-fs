@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Strength
 
 open Wanxiangshu.Persistence.EventStore
+open Wanxiangshu.Strength.Migration
 open Wanxiangshu.Strength.Persistence
 open Wanxiangshu.Strength.Projection
 
@@ -17,12 +18,16 @@ module StrengthIntegrationRules =
           Accepts = fun envelope -> StrengthEventTypes.isStrengthEvent envelope.EventType
           Integrate =
             fun current envelope ->
-                match StrengthStore.tryDecodeEnvelope envelope with
-                | Error error -> Error error
-                | Ok event ->
-                    StrengthProjection.apply (unbox<StrengthProjection> current) event
-                    |> Result.map box
-                    |> Result.mapError (fun error -> sprintf "Strength integration rejected: %A" error)
+                match LegacyProtocolClassifier.classifyPayload envelope.EventType envelope.Payload with
+                | LegacyProtocolVerdict.LegacyStrength reason -> Error(LegacyProtocolClassifier.refusalMessage reason)
+                | LegacyProtocolVerdict.CurrentProtocol
+                | LegacyProtocolVerdict.NotStrength ->
+                    match StrengthStore.tryDecodeEnvelope envelope with
+                    | Error error -> Error error
+                    | Ok event ->
+                        StrengthProjection.apply (unbox<StrengthProjection> current) event
+                        |> Result.map box
+                        |> Result.mapError (fun error -> sprintf "Strength integration rejected: %A" error)
           PlanCut = fun _ _ _ _ -> Ok { ResetJson = "{}" }
           ApplyCut = fun current _ -> Ok current }
 

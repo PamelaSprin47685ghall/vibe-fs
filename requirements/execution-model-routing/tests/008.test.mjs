@@ -56,10 +56,11 @@ test('WHAT[execution-model-routing-008] EMR_008_host_inventory_no_longer_exposes
   assert.doesNotMatch(strengthScope, /ManagedAgentInventory|RecordManagedAgentInventory/)
 })
 test('WHAT[execution-model-routing-008] SPEC_INV_fast_and_deep_physical_model_equality_is_not_an_eligibility_gate', async () => {
+  // Strength/OpenCode/Speculate.fs was removed by the readonly-delegation clean
+  // break; its host-inventory independence is asserted over the surviving
+  // delegation owner files above and over Policy.fs here.
   const policy = await source('src/Wanxiangshu/Strength/Policy.fs')
-  const speculate = await source('src/Wanxiangshu/Strength/OpenCode/Speculate.fs')
 
   assert.doesNotMatch(policy, /ModelBindingsDistinct|model-bindings-not-distinct/)
-  assert.doesNotMatch(speculate, /ManagedAgentInventory|modelsDistinct|fastBinding/)
 })
 }

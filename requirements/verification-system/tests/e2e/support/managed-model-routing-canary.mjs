@@ -76,10 +76,24 @@ try {
     scenarioDir,
     providerUrl: `${provider.url}/v1`,
     pluginPaths: [resolvePluginPath('opencode')],
-        routingSource: `export default function route(role) {
+        routingSource: `export const routingProtocol = 2
+export const hasTheoreticalCapacity = (role, purpose) => true;
+export default function route(role, running, previous, purpose) {
 
   if (new Set(['manager', 'orchestrator', 'engineer', 'devops', 'blogger', 'bookkeeper', 'predictor']).has(role)) return { model: 'test/test-model', reasoning: 'none' }
   throw new Error('unexpected managed role: ' + role)
+}
+
+export const predictorConfiguration = () => {
+  const state = globalThis.__wanxiangshu_test_predictor_state ?? 'unconfigured'
+  if (state === 'configured') return { state: 'configured', reason: null }
+  if (state === 'invalid') {
+    return {
+      state: 'invalid',
+      reason: globalThis.__wanxiangshu_test_predictor_reason ?? 'test Predictor configuration is invalid',
+    }
+  }
+  return { state: 'unconfigured', reason: null }
 }
 `,
   });

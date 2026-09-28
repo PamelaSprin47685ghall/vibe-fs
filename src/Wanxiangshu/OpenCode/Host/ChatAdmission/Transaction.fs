@@ -608,6 +608,7 @@ module internal ChatAdmissionTransaction =
                                 evidence.PhysicalUserMessageId
                                 (AcceptedChatExecutionEvidence.canonicalRole evidence)
                                 (AcceptedChatExecutionEvidence.participant evidence)
+                                ModelExecutionPurpose.Normal
                                 lenderSessionId
 
                         return Ok acquired

@@ -116,13 +116,6 @@ test('WHAT[feature-ablation-002] ABL_002_station_14_keeps_engineer_surface_and_a
   })
 })
 
-test('WHAT[feature-ablation-002] ABL_002_strength_forced_off_when_speculation_ablated', () => {
-  withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-05']], () => {
-    Ablation.load()
-    assert.equal(Ablation.strengthForcedOff(), true)
-  })
-})
-
 test('WHAT[feature-ablation-002] ABL_002_primary_agents_and_native_sphinx_tool_and_command_are_gated_together', () => {
   // 1. station-05 下 relay-incumbency 与 change-integration 为 ablated:
   // manager 与 orchestrator 必须被拒绝 (allowsPrimaryAgent === false)

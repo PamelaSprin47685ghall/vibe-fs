@@ -10,7 +10,8 @@ export const createEnvironment = (initPlugin) => {
   mkdirSync(routingDir, { recursive: true })
   writeFileSync(
     join(routingDir, 'wanxiangshu.mjs'),
-    `export default function route(role, running) {
+    `export const routingProtocol = 2
+export default function route(role, running) {
   if (role === 'engineer' || role === 'coder') {
     const occupied = running.filter((item) => item.model === 'provider/model-a' && item.reasoning === 'none').length
     return occupied === 0

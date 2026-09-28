@@ -223,7 +223,6 @@ test('WHAT[verification-system-009] every wired gate path exists and checks set 
   const nonGateFiles = new Set([
     'owner-impact-corpus.json',
     'subsystems.json',
-    'release-closure-nodes.json',
     // Helper / non-gate modules:
     'fsharp-control-pyramid-guide.mjs',
     'js-module-linkage.mjs',

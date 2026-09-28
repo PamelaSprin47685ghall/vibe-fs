@@ -10,6 +10,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Strength
 
 module PluginHooksSurface =
 
@@ -164,3 +165,40 @@ module PluginHooksSurface =
     let firstBloggerEffect (observation: BloggerAdapterObservation) = observation.First
 
     let secondBloggerEffect (observation: BloggerAdapterObservation) = observation.Second
+
+    /// DELEGATE.md 4.2: run the real read-only delegation schema decoration for
+    /// one tool id. Production gates this behind the Predictor configuration
+    /// existence query; this surface entry calls the same contract function so
+    /// the schema contract, idempotence, conflict rejection and bilingual
+    /// prose can be proven without asserting on production enablement.
+    let decorateReadonlyDelegationToolDefinition (toolID: string) (definition: obj) : unit =
+        ReadonlyDelegationContract.decorateDefinition (box {| toolID = toolID |}) definition
+
+    /// DELEGATE.md 3.2: JS-boundary budget validation as a JS-native result:
+    /// { ok = true; rounds = <int> } or { ok = false; error = <code> }.
+    let readonlyDelegationBudgetOf (value: obj) : obj =
+        match ReadonlyDelegationContract.tryReadonlyRoundBudget value with
+        | Ok budget ->
+            box
+                {| ok = true
+                   rounds = ReadonlyRoundBudget.value budget |}
+        | Error message -> box {| ok = false; error = message |}
+
+    /// DELEGATE.md 3.2: self_note validation as a JS-native result:
+    /// { ok = true; note = <string|null> } or { ok = false; error = <code> }.
+    let readonlyDelegationSelfNoteOf (value: obj) : obj =
+        match ReadonlyDelegationContract.trySelfNote value with
+        | Ok note ->
+            box
+                {| ok = true
+                   note = Option.toObj note |}
+        | Error message -> box {| ok = false; error = message |}
+
+    /// Production tool.execute.before calls the same hide: the business
+    /// argument view drops both protocol fields while provider evidence keeps
+    /// the saved descriptors under a private Symbol.
+    let hideReadonlyDelegationArgs (args: obj) : unit = ReadonlyDelegationContract.hide args
+
+    /// Production tool.execute.after calls the same restore: original
+    /// property descriptors return to the args object; no-op when absent.
+    let restoreReadonlyDelegationArgs (args: obj) : unit = ReadonlyDelegationContract.restore args

@@ -1,32 +1,32 @@
 namespace Wanxiangshu.Strength
 
 open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Strength.Prediction
 
 type StrengthOpportunity =
-    { IsRootWork: bool
+    { OwnerSessionId: SessionId
+      OwnerLogicalRun: OwnerLogicalRunIdentity
+      SourcePhysicalUserMessageId: PhysicalUserMessageId
+      SourceProviderRun: ProviderRunIdentity
+      SourceToolCallIds: ToolCallId list
+      RequestedRounds: ReadonlyRoundBudget option
+      ContractRevision: DelegationContractRevision
+      IsRootWork: bool
       RequestKind: ProviderRequestKind
       CanonicalRole: Role
-      SelectedAgent: string
       HasPrefixProbe: bool
-      IsAttachedOrInternalLeaf: bool
+      IsReplicaOrInternalLeaf: bool
+      IsInteractionRepair: bool
+      IsExplicitRecoveryBranch: bool
       OwnerCancelled: bool
       TargetProviderRunBound: bool
       EventStoreHealthy: bool
-      HostCanaryHealthy: bool
-      PredictorAvailable: bool
-      CostModelAvailable: bool }
-
-type StrengthPrediction =
-    { P1: float
-      P2: float
-      EvidenceCount: int }
-
-type StrengthPolicyConfig =
-    { K1Margin: float
-      K2Margin: float
-      K2MinimumEvidence: int }
+      HostBoundaryHealthy: bool
+      ProcessFuseHealthy: bool
+      OwnerLogicalRunSuperseded: bool
+      PendingRequested: bool
+      PredictorConfigured: bool }
 
 [<RequireQualifiedAccess>]
 type StrengthEligibility =
@@ -34,25 +34,15 @@ type StrengthEligibility =
     | Eligible
 
 [<RequireQualifiedAccess>]
-type StrengthDecision =
+type StrengthAdmission =
+    | Admit of DelegationRequest
     | Skip of reason: string
-    | ControlHoldout
-    | Speculate of budget: StrengthBudget * estimate: StrengthValueEstimate
 
+[<RequireQualifiedAccess>]
 module StrengthPolicy =
     val eligibleRoles: Set<Role>
     val eligibility: opportunity: StrengthOpportunity -> StrengthEligibility
 
-    val controlBucket:
-        sha256: (string -> string) -> policyVersion: string -> authorityRoot: string -> targetRun: string -> int
+    val tryRequest: sha256: (string -> string) -> opportunity: StrengthOpportunity -> Result<DelegationRequest, string>
 
-    val isControlHoldout: rateBasisPoints: int -> bucket: int -> bool
-
-    val decideFromFacts:
-        opportunity: StrengthOpportunity ->
-        control: bool ->
-        shadow: bool ->
-        prediction: StrengthPrediction ->
-        estimate: StrengthValueEstimate ->
-        config: StrengthPolicyConfig ->
-            StrengthDecision
+    val decide: sha256: (string -> string) -> opportunity: StrengthOpportunity -> StrengthAdmission

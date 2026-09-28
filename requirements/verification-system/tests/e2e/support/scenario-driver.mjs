@@ -860,6 +860,7 @@ export async function runCanary(scriptName, { customs, preFlow } = {}) {
       strict: doc.setup?.strict !== false,
       extraEnv: doc.setup?.env || {},
       routingSource: doc.routingSource,
+      mcpFixture: doc.setup?.mcpFixture,
       acceptanceGate: doc.setup?.acceptanceGate,
       watchdogLabel: doc.setup?.watchdogLabel || doc.name,
     });

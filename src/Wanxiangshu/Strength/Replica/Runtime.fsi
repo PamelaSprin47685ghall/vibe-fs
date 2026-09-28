@@ -23,14 +23,18 @@ type StrengthReplicaOutcome =
       Batches: StrengthRequestBatch list
       Terminal: StrengthReplicaTerminal }
 
-type StrengthDryRunStart =
+/// DELEGATE-5.3: identity of one real outbound Replica provider request.
+/// PriorProviderRun is the Host identity of the latest assistant response
+/// already visible in the transform view (None before the first response).
+type StrengthReplicaRequestKey =
+    { ReplicaSessionId: SessionId
+      PriorProviderRun: ProviderRunIdentity option }
+
+/// DELEGATE-6.2: prepared-stage handle. The empty replica child exists with
+/// internal identity, but no prompt was sent and no model capacity reserved.
+type StrengthReplicaPreparation =
     { ReplicaSessionId: SessionId
       Completion: Task<StrengthReplicaOutcome> }
-
-[<RequireQualifiedAccess>]
-type StrengthReplicaPurpose =
-    | Treatment
-    | DryRun
 
 type StrengthReplicaPeek =
     { RequestsAdmitted: int
@@ -44,46 +48,57 @@ type StrengthReplicaRuntime =
         liveRegistry: StrengthRuntime *
         registerReplica: (SessionId -> SessionId -> string -> unit) *
         ?workspaceDirectory: string *
-        ?maxFrameBytes: int *
         ?tryAcquireModel: (SessionId -> string -> OpencodeModel option) *
         ?releaseModel: (SessionId -> unit) ->
             StrengthReplicaRuntime
 
-    member MaxFrameBytes: int
     member IsReplica: sessionId: SessionId -> bool
     member TryOwner: sessionId: SessionId -> SessionId option
     member TryDecision: sessionId: SessionId -> StrengthDecisionId option
     member TryPeek: replicaSessionId: SessionId -> StrengthReplicaPeek option
 
-    member AttachLiveDecision:
-        binding: StrengthReplicaBinding * purpose: StrengthReplicaPurpose ->
-            Result<Task<StrengthReplicaOutcome>, string>
+    /// DELEGATE-6.2 prepared stage: create the empty child and internal
+    /// identity without sending a prompt or reserving model capacity. The
+    /// caller persists DelegationBound before SendPreparedPrompt.
+    member PrepareReplicaStart:
+        owner: SessionId *
+        decisionId: StrengthDecisionId *
+        targetProviderRun: ProviderRunIdentity *
+        requestedRounds: ReadonlyRoundBudget *
+        replicaAgent: string *
+        localizedMirror: WireMessage list *
+        mirrorSemanticDigest: string ->
+            Task<Result<StrengthReplicaPreparation, string>>
+
+    /// DELEGATE-6.2 start stage: acquire the model lease, admit the bootstrap
+    /// outbound request and send the prompt. Idempotent on an already-admitted
+    /// bootstrap; never re-sends it as a free extra request.
+    member SendPreparedPrompt: replicaSessionId: SessionId -> Task<Result<unit, string>>
+
+    member AttachLiveDecision: binding: StrengthReplicaBinding -> Result<Task<StrengthReplicaOutcome>, string>
 
     member HandleTransform: output: obj -> Task<bool>
     member HandleTurn: turn: ReconciledTurn -> bool
     member HandleSessionDeleted: sessionId: SessionId -> unit
     member CancelOwner: owner: SessionId -> Task
-    member CloseDryRunAtTargetTerminal: turn: ReconciledTurn -> Task
 
-    member StartDryRun:
-        owner: SessionId *
-        decisionId: StrengthDecisionId *
-        targetProviderRun: ProviderRunIdentity *
-        budget: StrengthBudget *
-        replicaAgent: string *
-        localizedMirror: WireMessage list *
-        mirrorSemanticDigest: string ->
-            Task<Result<StrengthDryRunStart, string>>
-
+    /// Single-step decision entry: prepare then send. Wiring that must persist
+    /// DelegationBound between the stages uses PrepareReplicaStart followed by
+    /// SendPreparedPrompt instead.
     member StartDecision:
         owner: SessionId *
         decisionId: StrengthDecisionId *
         targetProviderRun: ProviderRunIdentity *
-        budget: StrengthBudget *
+        requestedRounds: ReadonlyRoundBudget *
         replicaAgent: string *
         localizedMirror: WireMessage list *
         mirrorSemanticDigest: string ->
             Task<Result<StrengthReplicaOutcome, string>>
 
     member Dispose: unit -> unit
+
+    member Released: unit -> string array
+
+    member Aborted: unit -> string array
+
     interface IDisposable

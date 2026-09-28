@@ -8,15 +8,27 @@ type StrengthTraceRange =
     { StartInclusive: int64
       EndExclusive: int64 }
 
-type StrengthCandidateView =
-    { Prepared: StrengthCandidatePrepared
-      Promoted: bool
-      TraceRange: StrengthTraceRange option
-      Abandoned: bool }
+[<RequireQualifiedAccess>]
+type StrengthCandidateState =
+    | Requested
+    | Bound
+    | Prepared
+    | Promoted
+    | Traced
+    | Closed of DelegationClosed
+    | Abandoned
+
+type StrengthDelegationView =
+    { Request: DelegationRequest
+      Binding: DelegationBinding option
+      Prepared: StrengthCandidatePrepared option
+      State: StrengthCandidateState
+      TraceRange: StrengthTraceRange option }
 
 type StrengthProjection =
-    { ByDecision: Map<string, StrengthCandidateView>
-      ByTargetRun: Map<string, StrengthDecisionId> }
+    { ByDecision: Map<string, StrengthDelegationView>
+      ByTargetRun: Map<string, StrengthDecisionId>
+      ImportedHistory: Map<string, DelegationHistoryImported> }
 
 [<RequireQualifiedAccess>]
 type StrengthProjectionIntentError =
@@ -59,8 +71,15 @@ module StrengthProjectionIntent =
 
 [<RequireQualifiedAccess>]
 type StrengthProjectionError =
-    | PreparedConflict of decisionId: StrengthDecisionId
+    | RequestedConflict of decisionId: StrengthDecisionId
+    | BoundWithoutRequested of decisionId: StrengthDecisionId
+    | BoundConflict of decisionId: StrengthDecisionId
     | TargetAlreadyBound of targetProviderRun: ProviderRunIdentity
+    | ClosedWithoutRequested of decisionId: StrengthDecisionId
+    | ClosedConflict of decisionId: StrengthDecisionId
+    | PreparedWithoutBound of decisionId: StrengthDecisionId
+    | PreparedConflict of decisionId: StrengthDecisionId
+    | PreparedBindingMismatch of decisionId: StrengthDecisionId
     | PromotionWithoutPrepared of decisionId: StrengthDecisionId
     | PromotionMismatch of decisionId: StrengthDecisionId
     | PromotionAfterAbandon of decisionId: StrengthDecisionId
@@ -71,10 +90,11 @@ type StrengthProjectionError =
     | AbandonWithoutPrepared of decisionId: StrengthDecisionId
     | AbandonMismatch of decisionId: StrengthDecisionId
     | AbandonAfterPromotion of decisionId: StrengthDecisionId
+    | ImportConflict of importId: string
 
 module StrengthProjection =
     val empty: StrengthProjection
-    val tryCandidate: decisionId: StrengthDecisionId -> projection: StrengthProjection -> StrengthCandidateView option
+    val tryCandidate: decisionId: StrengthDecisionId -> projection: StrengthProjection -> StrengthDelegationView option
     val hasPrepared: decisionId: StrengthDecisionId -> projection: StrengthProjection -> bool
     val isPromoted: decisionId: StrengthDecisionId -> projection: StrengthProjection -> bool
 
@@ -82,6 +102,11 @@ module StrengthProjection =
         targetProviderRun: ProviderRunIdentity -> projection: StrengthProjection -> StrengthDecisionId option
 
     val tryTraceRange: decisionId: StrengthDecisionId -> projection: StrengthProjection -> StrengthTraceRange option
+
+    val requestedRounds: decisionId: StrengthDecisionId -> projection: StrengthProjection -> ReadonlyRoundBudget option
+
+    /// Evidence-only imported history. It never yields a runnable delegation.
+    val tryImported: importId: string -> projection: StrengthProjection -> DelegationHistoryImported option
 
     val apply:
         projection: StrengthProjection -> event: StrengthEvent -> Result<StrengthProjection, StrengthProjectionError>

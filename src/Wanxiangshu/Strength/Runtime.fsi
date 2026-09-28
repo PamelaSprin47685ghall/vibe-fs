@@ -10,8 +10,7 @@ type StrengthReplicaBinding =
       DecisionId: StrengthDecisionId
       TargetProviderRun: ProviderRunIdentity
       CanonicalRole: Role
-      Budget: StrengthBudget
-      MaxFrameBytes: int
+      RequestedRounds: ReadonlyRoundBudget
       SemanticDigest: string
       LocalizedMirrorMessages: ProviderProjection.WireMessage list
       ToolCapabilitySet: Set<ToolPermission> }
@@ -35,5 +34,6 @@ type StrengthRuntime =
     member TryFindByOwner: ownerSessionId: SessionId -> StrengthReplicaBinding option
     member TryFindByReplica: replicaSessionId: SessionId -> StrengthReplicaBinding option
     member TryCapabilities: replicaSessionId: SessionId -> Set<ToolPermission> option
+    member TryAdmitRequest: replicaSessionId: SessionId -> bool
     member Retire: replicaSessionId: SessionId -> StrengthReplicaBinding option
     member Clear: unit -> unit

@@ -8,13 +8,15 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Strength
 
-/// STRENGTH-006/007/008/017: Persist adapter for Strength facts.
+/// STRENGTH-006/007/008 + DELEGATE-6.2/6.3: Persist adapter for Strength facts.
 ///
 /// There is no feature-owned journal/ref/blob namespace. Large material is first
 /// written to the existing Git raw object store and then named only by the
 /// EventEnvelope.PayloadRefs closure. One decision owns one EventStore stream;
-/// Prepared -> Promoted -> Traced/Abandoned parent edges make restart fold
-/// deterministic and let the generic store reject missing causal predecessors.
+/// DelegationRequested -> DelegationBound -> Prepared -> Promoted -> Traced,
+/// plus Requested/Bound -> DelegationClosed and Prepared -> Abandoned parent
+/// edges make restart fold deterministic and let the generic store reject
+/// missing causal predecessors.
 [<RequireQualifiedAccess>]
 module StrengthStore =
 
@@ -22,6 +24,10 @@ module StrengthStore =
 
     let private kindOf =
         function
+        | StrengthEvent.DelegationRequested _ -> StrengthEventTypes.DelegationRequested
+        | StrengthEvent.DelegationBound _ -> StrengthEventTypes.DelegationBound
+        | StrengthEvent.DelegationClosed _ -> StrengthEventTypes.DelegationClosed
+        | StrengthEvent.DelegationHistoryImported _ -> StrengthEventTypes.DelegationHistoryImported
         | StrengthEvent.Prepared _ -> StrengthEventTypes.CandidatePrepared
         | StrengthEvent.Promoted _ -> StrengthEventTypes.CandidatePromoted
         | StrengthEvent.Traced _ -> StrengthEventTypes.FramesTraced
@@ -29,6 +35,10 @@ module StrengthStore =
 
     let private decisionOf =
         function
+        | StrengthEvent.DelegationRequested requested -> requested.DecisionId
+        | StrengthEvent.DelegationBound bound -> bound.DecisionId
+        | StrengthEvent.DelegationClosed closed -> closed.DecisionId
+        | StrengthEvent.DelegationHistoryImported imported -> imported.DecisionId
         | StrengthEvent.Prepared prepared -> prepared.DecisionId
         | StrengthEvent.Promoted promoted -> promoted.DecisionId
         | StrengthEvent.Traced traced -> traced.DecisionId
@@ -37,9 +47,22 @@ module StrengthStore =
     /// Fixed identity per decision+fact-kind. A second payload for the same fact
     /// therefore becomes EventStore IdentityCollision instead of a second truth.
     let eventIdFor (sha256: string -> string) (decisionId: StrengthDecisionId) (eventType: string) : EventId =
-        String.concat "\u001f" [ "strength-event-v1"; decisionText decisionId; eventType ]
+        String.concat "" [ "strength-event-v1"; decisionText decisionId; eventType ]
         |> sha256
         |> EventId.create
+
+    /// Imported history is the one fact kind that repeats within a decision:
+    /// every imported legacy event carries its own ImportId, and that identity
+    /// — not the decision and fact kind — decides the envelope EventId. Two
+    /// imports of one decision must not collide, and re-running the same
+    /// import must land on the identical id so the dedupe stays idempotent.
+    let private eventIdOf (sha256: string -> string) (event: StrengthEvent) : EventId =
+        match event with
+        | StrengthEvent.DelegationHistoryImported imported ->
+            String.concat "\u001f" [ "strength-import-v1"; decisionText imported.DecisionId; imported.ImportId ]
+            |> sha256
+            |> EventId.create
+        | _ -> eventIdFor sha256 (decisionOf event) (kindOf event)
 
     let private streamIdFor decisionId =
         EventStreamId.create ("strength/" + decisionText decisionId)
@@ -49,20 +72,123 @@ module StrengthStore =
         let id eventType = eventIdFor sha256 decisionId eventType
 
         match event with
-        | StrengthEvent.Prepared _ -> []
+        | StrengthEvent.DelegationHistoryImported _ -> []
+        | StrengthEvent.DelegationRequested _ -> []
+        | StrengthEvent.DelegationBound _ -> [ id StrengthEventTypes.DelegationRequested ]
+        | StrengthEvent.DelegationClosed closed ->
+            match closed.From with
+            | DelegationClosedFrom.Requested -> [ id StrengthEventTypes.DelegationRequested ]
+            | DelegationClosedFrom.Bound -> [ id StrengthEventTypes.DelegationBound ]
+        | StrengthEvent.Prepared _ -> [ id StrengthEventTypes.DelegationBound ]
         | StrengthEvent.Promoted _ -> [ id StrengthEventTypes.CandidatePrepared ]
         | StrengthEvent.Traced _ -> [ id StrengthEventTypes.CandidatePromoted ]
         | StrengthEvent.Abandoned _ -> [ id StrengthEventTypes.CandidatePrepared ]
 
+    let private closedFromText =
+        function
+        | DelegationClosedFrom.Requested -> "requested"
+        | DelegationClosedFrom.Bound -> "bound"
+
+    let private closedFromOf =
+        function
+        | "requested" -> Some DelegationClosedFrom.Requested
+        | "bound" -> Some DelegationClosedFrom.Bound
+        | _ -> None
+
+    let private closedReasonText =
+        function
+        | DelegationClosedReason.NoMaterial -> "no-material"
+        | DelegationClosedReason.CannotContinue -> "cannot-continue"
+        | DelegationClosedReason.Cancelled -> "cancelled"
+        | DelegationClosedReason.Superseded -> "superseded"
+        | DelegationClosedReason.RecoveryAbandoned -> "recovery-abandoned"
+
+    let private closedReasonOf =
+        function
+        | "no-material" -> Some DelegationClosedReason.NoMaterial
+        | "cannot-continue" -> Some DelegationClosedReason.CannotContinue
+        | "cancelled" -> Some DelegationClosedReason.Cancelled
+        | "superseded" -> Some DelegationClosedReason.Superseded
+        | "recovery-abandoned" -> Some DelegationClosedReason.RecoveryAbandoned
+        | _ -> None
+
     let private encodePayload =
         function
+        | StrengthEvent.DelegationHistoryImported imported ->
+            let outcomeJson =
+                match imported.Outcome with
+                | DelegationImportOutcome.Adopted material ->
+                    Encode.object
+                        [ "kind", Encode.string "adopted"
+                          "target_provider_run", Encode.string (ProviderRunIdentity.value material.TargetProviderRun)
+                          "frame_digest", Encode.string material.FrameDigest
+                          "byte_length", Encode.int material.ByteLength
+                          "payload_refs",
+                          Encode.list (
+                              material.MaterialPayloads
+                              |> List.map (fun payloadRef -> Encode.string (PayloadRef.value payloadRef))
+                          )
+                          "traced_start_inclusive",
+                          (match material.TracedStartInclusive with
+                           | Some value -> Encode.int64 value
+                           | None -> Encode.nil)
+                          "traced_end_exclusive",
+                          (match material.TracedEndExclusive with
+                           | Some value -> Encode.int64 value
+                           | None -> Encode.nil) ]
+                | DelegationImportOutcome.Relinquished material ->
+                    Encode.object
+                        [ "kind", Encode.string "relinquished"
+                          "target_provider_run",
+                          (match material.TargetProviderRun with
+                           | Some value -> Encode.string (ProviderRunIdentity.value value)
+                           | None -> Encode.nil)
+                          "reason", Encode.string material.Reason ]
+
+            Encode.object
+                [ "decision_id", Encode.string (decisionText imported.DecisionId)
+                  "source_stream_id", Encode.string imported.SourceStreamId
+                  "source_event_id", Encode.string imported.SourceEventId
+                  "import_id", Encode.string imported.ImportId
+                  "old_budget_evidence",
+                  (match imported.OldBudgetEvidence with
+                   | Some value -> Encode.string value
+                   | None -> Encode.nil)
+                  "outcome", outcomeJson ]
+        | StrengthEvent.DelegationRequested requested ->
+            Encode.object
+                [ "owner_session_id", Encode.string (SessionId.value requested.OwnerSessionId)
+                  "decision_id", Encode.string (decisionText requested.DecisionId)
+                  "logical_run_id", Encode.string (LogicalRunId.value requested.OwnerLogicalRun.LogicalRunId)
+                  "authority_root_user_message_id",
+                  Encode.string (AuthorityRootUserMessageId.value requested.OwnerLogicalRun.AuthorityRootUserMessageId)
+                  "source_physical_user_message_id",
+                  Encode.string (PhysicalUserMessageId.value requested.SourcePhysicalUserMessageId)
+                  "source_provider_run", Encode.string (ProviderRunIdentity.value requested.SourceProviderRun)
+                  "source_tool_call_ids",
+                  Encode.list (
+                      requested.SourceToolCallIds
+                      |> List.map (fun callId -> Encode.string (ToolCallId.value callId))
+                  )
+                  "requested_rounds", Encode.int (ReadonlyRoundBudget.value requested.RequestedRounds)
+                  "contract_revision", Encode.int (DelegationContractRevisions.value requested.ContractRevision) ]
+        | StrengthEvent.DelegationBound bound ->
+            Encode.object
+                [ "decision_id", Encode.string (decisionText bound.DecisionId)
+                  "target_provider_run", Encode.string (ProviderRunIdentity.value bound.TargetProviderRun)
+                  "replica_session_id", Encode.string (SessionId.value bound.ReplicaSessionId)
+                  "anchor_digest", Encode.string bound.AnchorDigest ]
+        | StrengthEvent.DelegationClosed closed ->
+            Encode.object
+                [ "decision_id", Encode.string (decisionText closed.DecisionId)
+                  "closed_from", Encode.string (closedFromText closed.From)
+                  "closed_reason", Encode.string (closedReasonText closed.Reason) ]
         | StrengthEvent.Prepared prepared ->
             Encode.object
                 [ "owner_session_id", Encode.string (SessionId.value prepared.OwnerSessionId)
                   "decision_id", Encode.string (decisionText prepared.DecisionId)
                   "target_provider_run", Encode.string (ProviderRunIdentity.value prepared.TargetProviderRun)
                   "replica_session_id", Encode.string (SessionId.value prepared.ReplicaSessionId)
-                  "budget", Encode.string (StrengthBudget.wire prepared.Budget)
                   "anchor_digest", Encode.string prepared.AnchorDigest
                   "frame_digest", Encode.string prepared.FrameDigest
                   "byte_length", Encode.int prepared.ByteLength ]
@@ -133,7 +259,7 @@ module StrengthStore =
             if version <> 1 then
                 Error(sprintf "unsupported Strength frame payload version: %d" version)
             else
-                StrengthFrame.tryBuild sha256 byteLength batches
+                StrengthFrame.tryBuild sha256 batches
                 |> Result.mapError (sprintf "invalid Strength frame payload: %A")
                 |> Result.bind (validateBundleDigest digest byteLength))
 
@@ -141,6 +267,10 @@ module StrengthStore =
         function
         | StrengthEvent.Prepared prepared -> prepared.MaterialPayloads
         | StrengthEvent.Promoted promoted -> promoted.MaterialPayloads
+        | StrengthEvent.DelegationHistoryImported _
+        | StrengthEvent.DelegationRequested _
+        | StrengthEvent.DelegationBound _
+        | StrengthEvent.DelegationClosed _
         | StrengthEvent.Traced _
         | StrengthEvent.Abandoned _ -> []
 
@@ -149,12 +279,73 @@ module StrengthStore =
         let decisionId = decisionOf event
 
         EventEnvelope.normalize
-            { EventId = eventIdFor sha256 decisionId eventType
+            { EventId = eventIdOf sha256 event
               StreamId = streamIdFor decisionId
               EventType = eventType
               Parents = parentsFor sha256 event
               Payload = encodePayload event
               PayloadRefs = payloadRefsOf event }
+
+    let private decodeRequested payload : Result<StrengthEvent, string> =
+        let decoder =
+            Decode.object (fun get ->
+                get.Required.Field "owner_session_id" Decode.string,
+                get.Required.Field "decision_id" Decode.string,
+                get.Required.Field "logical_run_id" Decode.string,
+                get.Required.Field "authority_root_user_message_id" Decode.string,
+                get.Required.Field "source_physical_user_message_id" Decode.string,
+                get.Required.Field "source_provider_run" Decode.string,
+                get.Required.Field "source_tool_call_ids" (Decode.list Decode.string),
+                get.Required.Field "requested_rounds" Decode.int,
+                get.Required.Field "contract_revision" Decode.int)
+
+        Decode.fromValue "$" decoder payload
+        |> Result.bind
+            (fun (owner, decision, logicalRun, authorityRoot, sourcePhysical, sourceRun, calls, rounds, revision) ->
+                match ReadonlyRoundBudget.tryCreate rounds with
+                | Error reason -> Error(sprintf "invalid Strength requested rounds: %s" reason)
+                | Ok budget ->
+                    Ok(
+                        StrengthEvents.requested
+                            (StrengthDecisionId.create decision)
+                            (SessionId.create owner)
+                            { LogicalRunId = LogicalRunId.create logicalRun
+                              AuthorityRootUserMessageId = AuthorityRootUserMessageId.create authorityRoot }
+                            (PhysicalUserMessageId.create sourcePhysical)
+                            (ProviderRunIdentity.create sourceRun)
+                            (calls |> List.map ToolCallId.create)
+                            budget
+                            (DelegationContractRevisions.create revision)
+                    ))
+
+    let private decodeBound payload : Result<StrengthEvent, string> =
+        let decoder =
+            Decode.object (fun get ->
+                get.Required.Field "decision_id" Decode.string,
+                get.Required.Field "target_provider_run" Decode.string,
+                get.Required.Field "replica_session_id" Decode.string,
+                get.Required.Field "anchor_digest" Decode.string)
+
+        Decode.fromValue "$" decoder payload
+        |> Result.map (fun (decision, target, replica, anchor) ->
+            StrengthEvents.bound
+                (StrengthDecisionId.create decision)
+                (ProviderRunIdentity.create target)
+                (SessionId.create replica)
+                anchor)
+
+    let private decodeClosed payload : Result<StrengthEvent, string> =
+        let decoder =
+            Decode.object (fun get ->
+                get.Required.Field "decision_id" Decode.string,
+                get.Required.Field "closed_from" Decode.string,
+                get.Required.Field "closed_reason" Decode.string)
+
+        Decode.fromValue "$" decoder payload
+        |> Result.bind (fun (decision, fromText, reasonText) ->
+            match closedFromOf fromText, closedReasonOf reasonText with
+            | Some from, Some reason -> Ok(StrengthEvents.closed (StrengthDecisionId.create decision) from reason)
+            | _ -> Error(sprintf "invalid Strength delegation closed fact: from=%s reason=%s" fromText reasonText))
 
     let private decodePrepared payload refs : Result<StrengthEvent, string> =
         let decoder =
@@ -163,28 +354,21 @@ module StrengthStore =
                 get.Required.Field "decision_id" Decode.string,
                 get.Required.Field "target_provider_run" Decode.string,
                 get.Required.Field "replica_session_id" Decode.string,
-                get.Required.Field "budget" Decode.string,
                 get.Required.Field "anchor_digest" Decode.string,
                 get.Required.Field "frame_digest" Decode.string,
                 get.Required.Field "byte_length" Decode.int)
 
         Decode.fromValue "$" decoder payload
-        |> Result.bind (fun (owner, decision, target, replica, budgetText, anchor, digest, byteLength) ->
-            match StrengthBudget.parse budgetText with
-            | None -> Error(sprintf "invalid Strength budget: %s" budgetText)
-            | Some budget ->
-                Ok(
-                    StrengthEvents.prepared
-                        (SessionId.create owner)
-                        (StrengthDecisionId.create decision)
-                        (ProviderRunIdentity.create target)
-                        (SessionId.create replica)
-                        budget
-                        anchor
-                        digest
-                        byteLength
-                        refs
-                ))
+        |> Result.map (fun (owner, decision, target, replica, anchor, digest, byteLength) ->
+            StrengthEvents.prepared
+                (SessionId.create owner)
+                (StrengthDecisionId.create decision)
+                (ProviderRunIdentity.create target)
+                (SessionId.create replica)
+                anchor
+                digest
+                byteLength
+                refs)
 
     let private decodePromoted payload refs : Result<StrengthEvent, string> =
         let decoder =
@@ -226,8 +410,66 @@ module StrengthStore =
         |> Result.map (fun (decision, target) ->
             StrengthEvents.abandoned (StrengthDecisionId.create decision) (ProviderRunIdentity.create target))
 
+    let private decodeImported payload : Result<StrengthEvent, string> =
+        let outcomeDecoder =
+            Decode.object (fun get ->
+                get.Required.Field "kind" Decode.string,
+                get.Optional.Field "target_provider_run" Decode.string,
+                get.Optional.Field "frame_digest" Decode.string,
+                get.Optional.Field "byte_length" Decode.int,
+                get.Optional.Field "payload_refs" (Decode.list Decode.string),
+                get.Optional.Field "traced_start_inclusive" Decode.int64,
+                get.Optional.Field "traced_end_exclusive" Decode.int64,
+                get.Optional.Field "reason" Decode.string)
+
+        let decoder =
+            Decode.object (fun get ->
+                get.Required.Field "decision_id" Decode.string,
+                get.Required.Field "source_stream_id" Decode.string,
+                get.Required.Field "source_event_id" Decode.string,
+                get.Required.Field "import_id" Decode.string,
+                get.Optional.Field "old_budget_evidence" Decode.string,
+                get.Required.Field "outcome" outcomeDecoder)
+
+        Decode.fromValue "$" decoder payload
+        |> Result.bind (fun (decision, sourceStream, sourceEvent, importId, budget, outcome) ->
+            match outcome with
+            | "adopted", Some target, Some digest, Some byteLength, Some refs, startInclusive, endExclusive, _ ->
+                Ok(
+                    StrengthEvents.historyImported
+                        (StrengthDecisionId.create decision)
+                        sourceStream
+                        sourceEvent
+                        importId
+                        budget
+                        (DelegationImportOutcome.Adopted
+                            { TargetProviderRun = ProviderRunIdentity.create target
+                              FrameDigest = digest
+                              ByteLength = byteLength
+                              MaterialPayloads = refs |> List.map PayloadRef.create
+                              TracedStartInclusive = startInclusive
+                              TracedEndExclusive = endExclusive })
+                )
+            | "relinquished", target, _, _, _, _, _, reason ->
+                Ok(
+                    StrengthEvents.historyImported
+                        (StrengthDecisionId.create decision)
+                        sourceStream
+                        sourceEvent
+                        importId
+                        budget
+                        (DelegationImportOutcome.Relinquished
+                            { TargetProviderRun = target |> Option.map ProviderRunIdentity.create
+                              Reason = Option.defaultValue "" reason })
+                )
+            | other, _, _, _, _, _, _, _ -> Error(sprintf "invalid Strength delegation import outcome: %s" other))
+
     let tryDecodeEnvelope (envelope: EventEnvelope) : Result<StrengthEvent, string> =
         match envelope.EventType with
+        | eventType when eventType = StrengthEventTypes.DelegationHistoryImported -> decodeImported envelope.Payload
+        | eventType when eventType = StrengthEventTypes.DelegationRequested -> decodeRequested envelope.Payload
+        | eventType when eventType = StrengthEventTypes.DelegationBound -> decodeBound envelope.Payload
+        | eventType when eventType = StrengthEventTypes.DelegationClosed -> decodeClosed envelope.Payload
         | eventType when eventType = StrengthEventTypes.CandidatePrepared ->
             decodePrepared envelope.Payload envelope.PayloadRefs
         | eventType when eventType = StrengthEventTypes.CandidatePromoted ->

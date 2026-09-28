@@ -351,6 +351,10 @@ module ReadonlyDelegationContract =
             else
                 string toolInput?toolID
 
+        // `invalid` is the Host's synthetic placeholder for a malformed tool
+        // call. It matches none of the three schema shapes above, decoration
+        // has no consumer, and publishing the protocol fields into it would
+        // leak them onto the error path. Skip it entirely.
         if toolId <> "invalid" then
             let jsonSchema = toolOutput?jsonSchema
             let parameters = toolOutput?parameters

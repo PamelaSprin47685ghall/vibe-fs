@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as prefix from '../../../dist/Context/Prefix/Surface.js'
+import * as xwire from '../../../dist/Context/Prefix/XWireSurface.js'
 
 // context-compression-029: the actual cutoff is the window's desire clamped by what the
 // frozen material proves. Two boundaries are involved and they are not the same number:
@@ -141,5 +142,84 @@ test('WHAT[context-compression-029] a claim that does not match fails closed', (
 
   assert.equal(result.ok, false)
   assert.equal(result.error, 'CutoffProofFailed')
+})
+
+// The request bound is the newest message the request answers, not the user message
+// that opened it: one user message drives a whole agent loop. The projection below is
+// that loop — one opening message, then every provider step answering its own
+// assistant/tool history — so a fold must land inside it, and a bound pinned at the
+// opening turn must forbid it entirely.
+const loopProjection = (() => {
+  const messages = [{ role: 'user', parts: [{ kind: 'text', text: 'opening task charter' }] }]
+
+  for (let turn = 1; turn <= 8; turn += 1) {
+    messages.push({ role: 'assistant', parts: [{ kind: 'text', text: `assistant ${turn}` }] })
+  }
+
+  return { messages }
+})()
+
+const loopTransform = (overrides = {}) =>
+  xwire.transform({
+    journal: true,
+    sessionId: 'ses-029-loop',
+    acceptedRetry: true,
+    failures: 1,
+    prefixEpoch: '0',
+    physicalUser: 'user-1',
+    acceptedPhysicalUser: 'user-1',
+    snapshotPort: true,
+    currentProjection: loopProjection,
+    committedSnapshot: null,
+    coverableCutoff: 8,
+    coveredDigest: xwire.coveredPrefixDigest(loopProjection, 8),
+    materialCutoff: 2,
+    requestStartCutoff: 8,
+    phaseCutoff: 2,
+    frozenRecordPrefixRef: 'blob/ref/frozen-1',
+    frozenRecordPrefixDigest: 'sha256:frozen-1',
+    frozenRecordPrefixBody: 'frozen record prefix body text',
+    memoryPreamble: 'companion memory preamble',
+    outcome: null,
+    ...overrides,
+  })
+
+test('WHAT[context-compression-029] the fold lands inside a loop whose bound is its own newest turn', () => {
+  // Two phase commits at turns 2 and 6, K = 2: the window keeps both and desires B1 = 2.
+  // The request sits at the loop frontier (turn 8), so folding to B1 replaces history
+  // the request itself has already sent.
+  const boundary = prefix.desiredCutoff(2, [2, 6])
+  assert.equal(boundary.kind, 'KeepFrom')
+  assert.equal(boundary.cutoffExclusive, 2)
+
+  const result = loopTransform({ phaseCutoff: boundary.cutoffExclusive })
+
+  assert.equal(result.ok, true)
+  assert.ok(result.probe !== null, result.noProbeReason ?? '')
+  assert.equal(result.probe.candidate.cutoff, 2, 'folded to B1 inside the loop')
+  assert.equal(
+    result.probe.candidate.prefixDigest,
+    xwire.coveredPrefixDigest(loopProjection, 2),
+    'the snapshot records the prefix the probe actually replaces',
+  )
+  assert.equal(result.changed, true)
+  assert.equal(result.output.messages.length, 8, 'two turns fold into the memory head, the tail stays raw')
+  assert.equal(result.output.messages[1].parts[0].text, 'assistant 2', 'B1 itself stays raw inside the window')
+  assert.equal(result.output.messages[7].parts[0].text, 'assistant 8', 'the newest turn the request answers stays raw')
+})
+
+test('WHAT[context-compression-029] a bound pinned at the opening user message forbids every fold in the loop', () => {
+  // The forbidden reading: the bound is the trailing role=user message, which stays at
+  // turn 0 for the whole loop. Then nothing inside the loop may fold and the raw history
+  // grows without bound — exactly what the clause forbids.
+  const boundary = prefix.desiredCutoff(2, [2, 6])
+
+  const result = loopTransform({ phaseCutoff: boundary.cutoffExclusive, requestStartCutoff: 0 })
+
+  assert.equal(result.ok, true)
+  assert.equal(result.probe, null)
+  assert.equal(result.noProbeReason, 'MaterialBeyondBoundary:2:0')
+  assert.equal(result.changed, false)
+  assert.deepEqual(result.output, loopProjection, 'no fold happens anywhere inside the loop')
 })
 

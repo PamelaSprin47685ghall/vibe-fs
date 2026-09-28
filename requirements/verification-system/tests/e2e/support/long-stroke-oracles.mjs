@@ -17,6 +17,8 @@
  *
  */
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   readJournal,
   watchJournal,
@@ -27,6 +29,8 @@ import {
 import { WAIT_FACT_WINDOW_MS } from './time-budget.js';
 import { isAppendOnlyPrefix, sealHolds, wireOf } from './provider-wire.js';
 import { awaitSessionSettled } from './session-quiescence.js';
+import { kindOf } from './runtime-key.js';
+import { bindLaneSession } from './lane.mjs';
 
 /** ≤50ms wall guard matching scenario-driver FACT_WAKE_GUARD_MS. */
 const FACT_WAKE_GUARD_MS = 50;
@@ -1049,8 +1053,562 @@ export async function assertHumanRootManagerLoop(scenario, sessionId, label = 'h
   assert.equal(settled, true, `${label}: canary session must settle to idle via causal host events`);
 }
 
+// ── DELEGATE 14.5: explicit read-only delegation legs ───────────────────────
+
+const DELEGATE_PREDICTOR_MODEL = 'test/test-model-b';
+const LARGE_READ_PROBE_MARKER = 'LARGE_READ_PROBE_MARKER';
+
+const payloadReplicaSessionId = (payload) =>
+  payload?.replicaSessionId ?? payload?.replica_session_id ?? payload?.ReplicaSessionId ?? null;
+
+const chatRequestsOfSession = (requests, sessionId) =>
+  (requests ?? []).filter(
+    (request) => (request?.sessionID ?? request?.sessionId) === sessionId && kindOf(request) === 'chat',
+  );
+
+const requestModel = (request) => {
+  const model = request?.model;
+  if (typeof model === 'string') return model;
+  return model?.modelID ?? model?.id ?? null;
+};
+
+const budgetOfCall = (call) => {
+  const args = call?.function?.arguments ?? call?.arguments;
+  if (typeof args !== 'string') return null;
+  try {
+    const value = JSON.parse(args)?.delegate_readonly_rounds;
+    return typeof value === 'number' ? value : null;
+  } catch {
+    return null;
+  }
+};
+
+const hasPositiveBudgetCall = (request) =>
+  (request?.messages ?? []).some(
+    (message) =>
+      Array.isArray(message?.tool_calls)
+      && message.tool_calls.some((call) => (budgetOfCall(call) ?? 0) > 0),
+  );
+
+/**
+ * DELEGATE 9.2: bind every durable DelegationBound replica session to its own
+ * alias and prove, from the public wire, that the companion really ran on the
+ * configured Predictor target with the admitted-round counts the scenario
+ * scripted. This world configures the Predictor pool equal to the role-pool
+ * model, so this is an exact-TARGET pin ("the companion ran the configured
+ * Predictor model"), not a pool-distinctness pin; the purpose axis is
+ * witnessed directly by assertDelegationPurposeOnWire.
+ * The preflow entry (014.test.mjs) pins the first decision's single bootstrap
+ * delivery; this oracle covers both decisions from the durable side.
+ */
+export async function bindDelegationReplicas(scenario, ctx) {
+  const bounds = factPayloads(scenario.host.workDir, 'DelegationBound');
+  const replicaIds = bounds
+    .map(payloadReplicaSessionId)
+    .filter((id) => typeof id === 'string' && id !== '');
+  // Exactly two, not a floor: capture and binding are idempotent per decision, so
+  // a third Bound fact is a repeated delegation (R6).
+  assert.equal(
+    replicaIds.length,
+    2,
+    `DELEGATE 14.5: expected exactly two durable DelegationBound facts (normal + recovery), got ${replicaIds.length}`,
+  );
+
+  const requests = scenario.provider.requests ?? [];
+  const chats = replicaIds.map((id) => ({ id, chats: chatRequestsOfSession(requests, id) }));
+
+  for (const { id, chats: sessionChats } of chats) {
+    assert.ok(sessionChats.length > 0, `DELEGATE 14.5: replica ${id} must have physically sent provider requests`);
+    for (const request of sessionChats) {
+      assert.equal(
+        requestModel(request),
+        DELEGATE_PREDICTOR_MODEL,
+        `DELEGATE 9.2: replica ${id} must run exactly on the configured Predictor target (saw ${requestModel(request)})`,
+      );
+    }
+  }
+
+  // The normal-complete decision admitted 2 rounds (round 2 spent on the
+  // plain-text early end); the recovery decision admitted 1 (its N+1 was
+  // refused at the transform gate before any physical send). Compared as a
+  // multiset: durable fact order must not decide which replica is which.
+  const counts = chats.map(({ chats: sessionChats }) => sessionChats.length).sort((left, right) => left - right);
+  assert.deepEqual(
+    counts,
+    [1, 2],
+    `DELEGATE 14.5: replica chat request counts must be one budget-1 and one budget-2 decision, got ${JSON.stringify(counts)}`,
+  );
+
+  chats.forEach(({ id }, index) => {
+    bindLaneSession(scenario.provider, id, `delegate-replica-${index + 1}`);
+  });
+  ctx.delegationReplicas = replicaIds;
+  console.log(
+    `[delegation] bound replicas=${JSON.stringify(replicaIds)} chatCounts=${JSON.stringify(counts)} model=${DELEGATE_PREDICTOR_MODEL}`,
+  );
+}
+
+/**
+ * DELEGATE 14.5: the companion's real readonly result (the large-probe marker
+ * carried by the frame, alive at its head under any tool truncation) must
+ * reach both delegating owners' later provider requests. Owners are the
+ * sessions whose wire carried a positive delegate_readonly_rounds call.
+ */
+export async function assertDelegationMaterialOnWire(scenario) {
+  const requests = scenario.provider.requests ?? [];
+  const ownerSessions = new Set();
+  for (const request of requests) {
+    if (hasPositiveBudgetCall(request)) ownerSessions.add(request?.sessionID ?? request?.sessionId);
+  }
+  assert.ok(
+    ownerSessions.size >= 2,
+    `DELEGATE 14.5: expected two delegating owner sessions, got ${[...ownerSessions].length}`,
+  );
+
+  for (const ownerId of ownerSessions) {
+    const carried = requests.some(
+      (request) =>
+        (request?.sessionID ?? request?.sessionId) === ownerId
+        && (request?.messages ?? []).some((message) => {
+          const content = message?.content;
+          const text = typeof content === 'string' ? content : JSON.stringify(content ?? '');
+          return text.includes(LARGE_READ_PROBE_MARKER);
+        }),
+    );
+    assert.ok(
+      carried,
+      `DELEGATE 14.5: owner ${ownerId} must receive the companion's real readonly result in a later provider request`,
+    );
+  }
+  // R6: bounded delivery. The canary owner walks three chat requests (budget
+  // call, injected continuation, successor); the recovery owner four (budget
+  // call, faulted delivery, retried delivery, successor). An unbounded
+  // redelivery loop after injection fails this equality.
+  const ownerChatCounts = [...ownerSessions]
+    .map((ownerId) => chatRequestsOfSession(requests, ownerId).length)
+    .sort((left, right) => left - right);
+  assert.deepEqual(
+    ownerChatCounts,
+    [3, 4],
+    `DELEGATE 14.5: owner delivery must be bounded at 3 and 4 chat requests, got ${JSON.stringify(ownerChatCounts)}`,
+  );
+
+  console.log(`[delegation] material returned to owners=${[...ownerSessions].length} chatCounts=${JSON.stringify(ownerChatCounts)}`);
+}
+
+const providerOfModel = (model) =>
+  typeof model === 'string' && model.includes('/') ? model.slice(0, model.indexOf('/')) : null;
+
+/**
+ * DELEGATE 14.5 capacity leg: the owner waits for its companion on ONE shared
+ * provider token, without deadlock.
+ *
+ * What this proves from the public wire:
+ *   1. same provider — the companion's Predictor-pool model and the owner's
+ *      role-pool model resolve to the same provider, which is the pool whose
+ *      single capacity token they share (the ledger is keyed by provider with
+ *      exactly one token per provider; execution-model-routing 003 proves one
+ *      acquire builds one ledger entry and one token);
+ *   2. parent waits — the owner request that CARRIES the budget call reaches
+ *      the mock only AFTER every companion request has arrived, because the
+ *      owner transform does not release its provider request until the
+ *      companion window closed. An owner request inside the companion window
+ *      would mean the parent did not wait (or the ledger double-occupied).
+ *
+ * What it deliberately does not claim: the ledger's no-double-occupancy
+ * invariant itself (a process-local fact with no wire expression under a
+ * synchronous mock) — that stays proven at the execution-model-routing unit
+ * seam. Run completion is the deadlock witness: a deadlocked parent would fail
+ * the run's watchdog before reaching this oracle.
+ */
+export async function assertDelegateCapacityOneParentWaits(scenario) {
+  const requests = scenario.provider.requests ?? [];
+  const sessionOf = (request) => request?.sessionID ?? request?.sessionId;
+
+  const bounds = factPayloads(scenario.host.workDir, 'DelegationBound');
+  const replicaIds = bounds
+    .map(payloadReplicaSessionId)
+    .filter((id) => typeof id === 'string' && id !== '');
+  assert.equal(
+    replicaIds.length,
+    2,
+    `DELEGATE 14.5: expected exactly two durable DelegationBound facts, got ${replicaIds.length}`,
+  );
+
+  const ownerSessions = new Set();
+  for (const request of requests) {
+    if (hasPositiveBudgetCall(request)) ownerSessions.add(sessionOf(request));
+  }
+  assert.ok(ownerSessions.size >= 2, 'DELEGATE 14.5: expected two delegating owner sessions');
+
+  for (const replicaId of replicaIds) {
+    const replicaRequests = chatRequestsOfSession(requests, replicaId);
+    assert.ok(replicaRequests.length > 0, `DELEGATE 14.5: replica ${replicaId} must have physically sent requests`);
+
+    const first = requests.indexOf(replicaRequests[0]);
+    const last = requests.indexOf(replicaRequests[replicaRequests.length - 1]);
+    const replicaModel = requestModel(replicaRequests[0]);
+    const replicaProvider = providerOfModel(replicaModel);
+    assert.ok(replicaProvider !== null, `DELEGATE 14.5: replica ${replicaId} model must be provider-qualified (saw ${replicaModel})`);
+
+    // Same provider: the identity axis is unchanged and the purpose axis
+    // picks the Predictor pool, so owner and companion share one provider token.
+    // Deliberately NOT asserted here: model distinctness. DELEGATE 9.2 /
+    // WHAT[014] make Predictor-equals-owner-model a legal state, and pool
+    // identity is decided by purpose, not by the model name. The "companion
+    // used the Predictor target" witness lives in bindDelegationReplicas
+    // (exact target pin) and assertDelegationPurposeOnWire (direct purpose).
+    for (const ownerId of ownerSessions) {
+      const ownerModels = new Set(
+        chatRequestsOfSession(requests, ownerId).map((request) => requestModel(request)),
+      );
+      for (const ownerModel of ownerModels) {
+        assert.equal(
+          providerOfModel(ownerModel),
+          replicaProvider,
+          `DELEGATE 14.5: owner ${ownerId} (${ownerModel}) and companion ${replicaId} (${replicaModel}) must share one provider token`,
+        );
+      }
+    }
+
+    // Parent waits: no owner request may arrive inside the companion window.
+    for (let index = first; index <= last; index += 1) {
+      assert.ok(
+        !ownerSessions.has(sessionOf(requests[index])),
+        `DELEGATE 14.5: an owner request arrived inside the companion window (index ${index}); the parent did not wait for the child`,
+      );
+    }
+
+    // The delegating owner request — the one carrying the budget call — is
+    // released by the transform only after the companion window closed.
+    for (const ownerId of ownerSessions) {
+      const budgetIndex = requests.findIndex(
+        (request) => sessionOf(request) === ownerId && hasPositiveBudgetCall(request),
+      );
+      assert.ok(
+        budgetIndex > last,
+        `DELEGATE 14.5: owner ${ownerId}'s delegating request (index ${budgetIndex}) must arrive after the companion window closes (last ${last})`,
+      );
+    }
+  }
+  console.log(`[delegation] capacity-1 parent-waits-child proven for ${replicaIds.length} decisions`);
+}
+
+const toolFunctionShape = (tool) => {
+  const fn = tool?.function ?? tool ?? {};
+  return {
+    name: fn?.name ?? tool?.name ?? '(unnamed)',
+    description: typeof fn?.description === 'string' ? fn.description : '',
+    properties: fn?.parameters?.properties ?? {},
+    required: Array.isArray(fn?.parameters?.required) ? fn.parameters.required : [],
+  };
+};
+
+/**
+ * DELEGATE 4.1/11.2 + E5 + G10 on the real provider wire, in the configured
+ * world this scenario drives:
+ *
+ *   1. tool enumeration — on at least one real provider request, EVERY visible
+ *      tool (built-in + plugin + MCP) exposes the required
+ *      `delegate_readonly_rounds` and keeps `self_note` out of `required`.
+ *      The world declares a stdio MCP fixture by name (setup.mcpFixture =
+ *      "semble"), so the wire surface must include an MCP tool; the MCP check
+ *      below keys on the fixture's own tool description rather than a guessed
+ *      host naming scheme. Dynamically discovered tools after
+ *      mcp.tools.changed are NOT covered — see the boundary note below;
+ *   2. wire history retention (E5) — a completed owner call appears in a LATER
+ *      request's history with both original arguments (budget and note) intact,
+ *      so the persisted record was never stripped or rewritten;
+ *   3. collaboration text (G10) — every visible tool's description carries the
+ *      stable companion narrative in the actual provider language (this world
+ *      runs English); a dropped or reworded-away note turns this red.
+ *
+ * Red capability: each clause is a per-tool exact assertion against the bytes
+ * the Host actually sent. Missing field, note promoted to required, note text
+ * gone, or history stripped each fails with the offending tool named.
+ */
+export async function assertDelegationProtocolSurface(scenario) {
+  const requests = scenario.provider.requests ?? [];
+  const sessionOf = (request) => request?.sessionID ?? request?.sessionId;
+
+  const ownerSessions = new Set();
+  for (const request of requests) {
+    if (hasPositiveBudgetCall(request)) ownerSessions.add(sessionOf(request));
+  }
+  assert.ok(ownerSessions.size >= 2, 'DELEGATE 14.5: expected two delegating owner sessions for the protocol surface');
+
+  // 1 + 3: the full visible tool surface of a delegating owner's real requests.
+  let examinedRequests = 0;
+  let examinedTools = 0;
+  for (const request of requests) {
+    const tools = request?.tools;
+    if (!Array.isArray(tools) || tools.length === 0) continue;
+    if (!ownerSessions.has(sessionOf(request))) continue;
+    examinedRequests += 1;
+    for (const tool of tools) {
+      examinedTools += 1;
+      const { name, description, properties, required } = toolFunctionShape(tool);
+      assert.ok(
+        properties.delegate_readonly_rounds !== undefined,
+        `DELEGATE 4.1: tool ${name} on the owner wire must expose delegate_readonly_rounds in its schema`,
+      );
+      assert.ok(
+        required.includes('delegate_readonly_rounds'),
+        `DELEGATE 4.1: tool ${name} must list delegate_readonly_rounds as required`,
+      );
+      assert.ok(
+        !required.includes('self_note'),
+        `DELEGATE 4.1: tool ${name} must keep self_note optional (never required)`,
+      );
+      assert.ok(
+        description.includes('delegate_readonly_rounds') && /companion/i.test(description),
+        `DELEGATE G10: tool ${name} must carry the stable companion collaboration note`,
+      );
+    }
+  }
+  assert.ok(examinedRequests > 0, 'DELEGATE 4.1: no delegating owner provider request with a tool surface was observed');
+  assert.ok(examinedTools > 0, 'DELEGATE 4.1: the observed owner requests advertised no tools');
+
+  // DELEGATE 4.1 MCP coverage: the world declares a stdio MCP fixture whose
+  // only tool answers tools/list with the fixture's deterministic
+  // description. If the Host connects the fixture and renders its tools
+  // through the same tool.definition hook as built-in and plugin tools, the
+  // MCP tool must appear on the owner wire — and the per-tool loop above then
+  // checks it like any other tool, so a Host that exposes MCP tools WITHOUT
+  // the delegation protocol turns that loop red with the tool named. The
+  // check keys on the fixture description, not on a host naming scheme.
+  //
+  // Boundary (stated, not papered over): tool discovery AFTER
+  // mcp.tools.changed is not asserted here — this scenario has no event-hook
+  // observation and the Host's re-emission behavior is unproven. What IS
+  // proven: a statically connected MCP tool rides the same schema contract as
+  // built-in and plugin tools.
+  const mcpToolNames = new Set();
+  for (const request of requests) {
+    if (!ownerSessions.has(sessionOf(request))) continue;
+    for (const tool of request?.tools ?? []) {
+      const { name, description } = toolFunctionShape(tool);
+      if (/semantic search hits/i.test(description)) mcpToolNames.add(name);
+    }
+  }
+  assert.ok(
+    mcpToolNames.size > 0,
+    'DELEGATE 4.1: the MCP fixture tool (deterministic semantic search hits) must appear on the owner wire; ' +
+      'either the fixture never connected or the Host does not advertise MCP tools to the provider',
+  );
+
+  // 2: retention in later histories + the note-less call is legal. Every call
+  // the mock sees already lives inside a request history (a response never
+  // becomes a request), so finding the budget call with both arguments intact
+  // IS the later-history retention; the companion's own note-less calls are the
+  // executed-omission witness.
+  let retainedWithNote = false;
+  let noteLessExecuted = false;
+  for (const request of requests) {
+    for (const message of request?.messages ?? []) {
+      if (message?.role !== 'assistant' || !Array.isArray(message?.tool_calls)) continue;
+      for (const call of message.tool_calls) {
+        const args = call?.function?.arguments ?? call?.arguments;
+        if (typeof args !== 'string') continue;
+        let parsed = null;
+        try {
+          parsed = JSON.parse(args);
+        } catch {
+          continue;
+        }
+        if (typeof parsed?.delegate_readonly_rounds !== 'number') continue;
+        if (typeof parsed?.self_note === 'string' && parsed.self_note.length > 0) retainedWithNote = true;
+        else noteLessExecuted = true;
+      }
+    }
+  }
+  assert.ok(
+    retainedWithNote,
+    'DELEGATE E5: a completed call with both delegate_readonly_rounds and self_note must survive into later request histories',
+  );
+  assert.ok(
+    noteLessExecuted,
+    'DELEGATE 4.1: a completed call omitting self_note must exist on the wire (the note is optional in practice)',
+  );
+
+  console.log(
+    `[delegation] protocol surface ok: ${examinedTools} tools across ${examinedRequests} owner requests; ` +
+      'budget required, note optional, companion note present, history retained',
+  );
+}
+
+/**
+ * DELEGATE 9.2: Predictor 与 owner 配成相同模型是合法状态。This world
+ * configures the Predictor pool equal to the role-pool model, so the wire
+ * alone cannot tell the pools apart; this oracle proves the same-model
+ * configuration did not close the delegation:
+ *   1. every companion request still runs exactly on the configured Predictor
+ *      target (the wire pin from bindDelegationReplicas, restated on the
+ *      same-model world);
+ *   2. owner and companion still share one provider (same model trivially, but
+ *      the shared-token claim is explicit);
+ *   3. exactly two companion executions are still bound, and the companion's
+ *      real readonly result still reaches both delegating owners' later
+ *      requests;
+ *   4. the protocol surface is still fully decorated (required budget,
+ *      optional note, collaboration prose).
+ * Red capability: any layer that treats model equality as "the Predictor is
+ * not really configured" (config query, delegate admission, tool decoration)
+ * turns the bound count, the material-on-wire, or the protocol-surface
+ * assertions red.
+ */
+export async function assertDelegationSameModelIsLegal(scenario) {
+  const requests = scenario.provider.requests ?? [];
+  const bounds = factPayloads(scenario.host.workDir, 'DelegationBound');
+  const replicaIds = bounds
+    .map(payloadReplicaSessionId)
+    .filter((id) => typeof id === 'string' && id !== '');
+  assert.equal(
+    replicaIds.length,
+    2,
+    `DELEGATE 9.2: expected exactly two companion executions under the shared model, got ${replicaIds.length}`,
+  );
+
+  const ownerSessions = new Set();
+  for (const request of requests) {
+    if (hasPositiveBudgetCall(request)) ownerSessions.add(request?.sessionID ?? request?.sessionId);
+  }
+  assert.ok(ownerSessions.size >= 2, 'DELEGATE 9.2: expected two delegating owner sessions');
+
+  for (const replicaId of replicaIds) {
+    const replicaRequests = chatRequestsOfSession(requests, replicaId);
+    assert.ok(
+      replicaRequests.length > 0,
+      `DELEGATE 9.2: companion ${replicaId} must have physically sent requests under the shared model`,
+    );
+    const replicaModel = requestModel(replicaRequests[0]);
+    assert.equal(
+      replicaModel,
+      DELEGATE_PREDICTOR_MODEL,
+      `DELEGATE 9.2: companion ${replicaId} must still run exactly on the configured Predictor target (saw ${replicaModel})`,
+    );
+
+    for (const ownerId of ownerSessions) {
+      const ownerModels = new Set(
+        chatRequestsOfSession(requests, ownerId).map((request) => requestModel(request)),
+      );
+      for (const ownerModel of ownerModels) {
+        assert.equal(
+          providerOfModel(ownerModel),
+          providerOfModel(replicaModel),
+          `DELEGATE 9.2: owner ${ownerId} (${ownerModel}) and companion ${replicaId} (${replicaModel}) must share one provider token`,
+        );
+      }
+    }
+  }
+
+  // The companion's real readonly result still reaches both owners: a
+  // same-model configuration did not silently disable the round trip.
+  for (const ownerId of ownerSessions) {
+    const carried = requests.some(
+      (request) =>
+        (request?.sessionID ?? request?.sessionId) === ownerId
+        && (request?.messages ?? []).some((message) => {
+          const content = message?.content;
+          const text = typeof content === 'string' ? content : JSON.stringify(content ?? '');
+          return text.includes(LARGE_READ_PROBE_MARKER);
+        }),
+    );
+    assert.ok(
+      carried,
+      `DELEGATE 9.2: owner ${ownerId} must still receive the companion's real readonly result under the shared model`,
+    );
+  }
+
+  // The protocol surface is still fully decorated: same-model must not
+  // withdraw the budget, the note, or the collaboration prose.
+  await assertDelegationProtocolSurface(scenario);
+
+  console.log(
+    `[delegation] same-model legality ok: model=${DELEGATE_PREDICTOR_MODEL} companions=${replicaIds.length}`,
+  );
+}
+
+/**
+ * DELEGATE 9.2 (C): the direct purpose witness. The world's routingSource
+ * runs inside the spawned OpenCode process and records every real routing
+ * decision (role + purpose -> model) next to its own config file; the purpose
+ * argument never appears on the provider wire, so this decision log is the
+ * only direct evidence that the companion targets were routed under the
+ * readonly-delegate purpose rather than through the role pool.
+ */
+export async function assertDelegationPurposeOnWire(scenario) {
+  const requests = scenario.provider.requests ?? [];
+  const decisionsPath = path.join(
+    path.dirname(scenario.host.workDir),
+    'home',
+    '.config',
+    'opencode',
+    'wanxiangshu-routing-decisions.jsonl',
+  );
+  assert.ok(
+    fs.existsSync(decisionsPath),
+    `DELEGATE 9.2: routing decision log missing at ${decisionsPath}; the purpose axis would be unwitnessed`,
+  );
+
+  const decisions = fs
+    .readFileSync(decisionsPath, 'utf8')
+    .split('\n')
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line));
+
+  const delegateDecisions = decisions.filter((decision) => decision.purpose === 'readonly-delegate');
+  assert.ok(
+    delegateDecisions.length >= 2,
+    `DELEGATE 9.2: expected readonly-delegate routing decisions for both companions, got ${delegateDecisions.length} of ${decisions.length}`,
+  );
+  for (const decision of delegateDecisions) {
+    assert.equal(
+      decision.model,
+      DELEGATE_PREDICTOR_MODEL,
+      `DELEGATE 9.2: a readonly-delegate routing decision must select the configured Predictor target (saw ${decision.model})`,
+    );
+    assert.ok(
+      ['manager', 'orchestrator', 'engineer', 'devops', 'blogger', 'bookkeeper', 'predictor'].includes(decision.role),
+      'DELEGATE 9.2: the purpose axis never changes the role identity',
+    );
+  }
+
+  // The normal branch was exercised too: this world really drove both purposes.
+  assert.ok(
+    decisions.some((decision) => decision.purpose !== 'readonly-delegate'),
+    'DELEGATE 9.2: the owner branch of the purpose axis must have been exercised',
+  );
+
+  // Correlation with the wire: the model every companion request actually ran
+  // equals the model the logged readonly-delegate decisions selected.
+  const bounds = factPayloads(scenario.host.workDir, 'DelegationBound');
+  const replicaIds = bounds
+    .map(payloadReplicaSessionId)
+    .filter((id) => typeof id === 'string' && id !== '');
+  for (const replicaId of replicaIds) {
+    for (const request of chatRequestsOfSession(requests, replicaId)) {
+      const model = requestModel(request);
+      assert.ok(
+        delegateDecisions.some((decision) => decision.model === model),
+        `DELEGATE 9.2: companion ${replicaId} wire model ${model} has no readonly-delegate routing decision behind it`,
+      );
+    }
+  }
+
+  console.log(
+    `[delegation] purpose witness ok: ${delegateDecisions.length} readonly-delegate decisions of ${decisions.length} total`,
+  );
+}
+
 export const CUSTOMS = {
   holdChildC1UntilLabor,
   bindManagerLoopSequence,
   oracleLongStroke,
+  bindDelegationReplicas,
+  assertDelegationMaterialOnWire,
+  assertDelegateCapacityOneParentWaits,
+  assertDelegationProtocolSurface,
+  assertDelegationSameModelIsLegal,
+  assertDelegationPurposeOnWire,
 };

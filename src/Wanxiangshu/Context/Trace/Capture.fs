@@ -447,7 +447,8 @@ module XTraceCapture =
     /// STRENGTH-008: whether this XTrace can accept a historical insertion
     /// without positional provenance drift. Empty traces are eligible; once a
     /// runtime has captured parts, every provenance must be Host-message based.
-    /// Legacy `g:N/turn:M/part:P` traces remain readable but force Strength K0.
+    /// Legacy `g:N/turn:M/part:P` traces remain readable but refuse stable
+    /// historical insertion (XTraceStableCaptureEligibility.LegacyPositionalTrace).
     let supportsStableInsertion (journal: AgentJournal option) (sessionId: SessionId) : bool =
         match journal with
         | None -> false

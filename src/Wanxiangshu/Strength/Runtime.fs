@@ -8,7 +8,6 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Foundation
@@ -26,8 +25,7 @@ type StrengthReplicaBinding =
       DecisionId: StrengthDecisionId
       TargetProviderRun: ProviderRunIdentity
       CanonicalRole: Role
-      Budget: StrengthBudget
-      MaxFrameBytes: int
+      RequestedRounds: ReadonlyRoundBudget
       SemanticDigest: string
       LocalizedMirrorMessages: ProviderProjection.WireMessage list
       ToolCapabilitySet: Set<ToolPermission> }
@@ -68,12 +66,19 @@ type StrengthRuntime() =
     // DSL-MUTABLE: resource — replica-to-binding map
     let byReplica = Dictionary<string, StrengthReplicaBinding>()
 
+    /// DELEGATE-5.3: the single request-budget account, keyed by replica
+    /// session. Every outbound request the registry admits counts against that
+    /// replica's own RequestedRounds; no owner ever shares or inherits another
+    /// owner's count, and a refused request consumes nothing.
+    // DSL-MUTABLE: resource — admitted outbound request count per live replica
+    let admittedRequests = Dictionary<string, int>()
+
     member _.Register(binding: StrengthReplicaBinding) : Result<unit, StrengthRuntimeRegisterError> =
         lock gate (fun () ->
             let ownerKey = SessionId.value binding.OwnerSessionId
             let replicaKey = SessionId.value binding.ReplicaSessionId
 
-            if binding.Budget = StrengthBudget.K0 then
+            if ReadonlyRoundBudget.value binding.RequestedRounds = 0 then
                 Error StrengthRuntimeRegisterError.EmptyBudget
             elif not (StrengthReplicaTools.isExactReadonly binding.ToolCapabilitySet) then
                 Error(StrengthRuntimeRegisterError.RoleIneligible binding.CanonicalRole)
@@ -84,6 +89,7 @@ type StrengthRuntime() =
             else
                 byOwner.[ownerKey] <- binding
                 byReplica.[replicaKey] <- binding
+                admittedRequests.[replicaKey] <- 0
                 Ok())
 
     member _.TryFindByOwner(ownerSessionId: SessionId) : StrengthReplicaBinding option =
@@ -102,6 +108,28 @@ type StrengthRuntime() =
         this.TryFindByReplica replicaSessionId
         |> Option.map (fun binding -> binding.ToolCapabilitySet)
 
+    /// DELEGATE-5.3: the one request-budget account. Admits one more outbound
+    /// request for this replica while its budget is not spent and consumes the
+    /// round on success; a refused request consumes nothing. The account is per
+    /// live binding, so per-owner isolation holds by construction.
+    member _.TryAdmitRequest(replicaSessionId: SessionId) : bool =
+        lock gate (fun () ->
+            match byReplica.TryGetValue(SessionId.value replicaSessionId) with
+            | false, _ -> false
+            | true, binding ->
+                let key = SessionId.value replicaSessionId
+
+                let used =
+                    match admittedRequests.TryGetValue key with
+                    | true, count -> count
+                    | false, _ -> 0
+
+                if used < ReadonlyRoundBudget.value binding.RequestedRounds then
+                    admittedRequests.[key] <- used + 1
+                    true
+                else
+                    false)
+
     member _.Retire(replicaSessionId: SessionId) : StrengthReplicaBinding option =
         lock gate (fun () ->
             let replicaKey = SessionId.value replicaSessionId
@@ -111,9 +139,11 @@ type StrengthRuntime() =
             | true, binding ->
                 byReplica.Remove replicaKey |> ignore
                 byOwner.Remove(SessionId.value binding.OwnerSessionId) |> ignore
+                admittedRequests.Remove replicaKey |> ignore
                 Some binding)
 
     member _.Clear() =
         lock gate (fun () ->
             byOwner.Clear()
-            byReplica.Clear())
+            byReplica.Clear()
+            admittedRequests.Clear())

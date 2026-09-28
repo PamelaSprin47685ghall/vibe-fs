@@ -51,12 +51,32 @@ const setupRoutingHome = (directory) => {
   mkdirSync(routingDir, { recursive: true })
   writeFileSync(
     join(routingDir, 'wanxiangshu.mjs'),
-    `export default function route(role, running) {
+    `export const routingProtocol = 2
+export default function route(role, running, previous, purpose) {
   if (!new Set(['manager', 'orchestrator', 'engineer', 'coder', 'inspector', 'browser', 'inquiry', 'reviewer', 'devops', 'distiller', 'blogger', 'bookkeeper', 'predictor']).has(role)) throw new Error('unexpected managed role: ' + role)
   if (Array.isArray(globalThis.__wanxiangshu_test_routing_seen)) {
     globalThis.__wanxiangshu_test_routing_seen.push({ role, running: running.map((item) => ({ ...item })) })
   }
   return { model: 'provider/' + role + '-model', reasoning: 'none' }
+}
+
+// DELEGATE.md 9.1/9.2 + execution-model-routing-020: the read-only Predictor
+// configuration existence query, mirroring resources/wanxiangshu.mjs. The
+// scheduler is a process singleton (ModelRouting.initialize imports it once
+// per test process and never reloads), so the two observable states are
+// driven by a test-owned dynamic source instead of rewriting this file per
+// incarnation. The default is unconfigured: every existing fixture consumer
+// keeps the no-decoration baseline, and tests opt in explicitly.
+export const predictorConfiguration = () => {
+  const state = globalThis.__wanxiangshu_test_predictor_state ?? 'unconfigured'
+  if (state === 'configured') return { state: 'configured', reason: null }
+  if (state === 'invalid') {
+    return {
+      state: 'invalid',
+      reason: globalThis.__wanxiangshu_test_predictor_reason ?? 'test Predictor configuration is invalid',
+    }
+  }
+  return { state: 'unconfigured', reason: null }
 }\n`,
     'utf8',
   )

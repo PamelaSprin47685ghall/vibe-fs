@@ -11,6 +11,7 @@ const journal = await import("../../../dist/Persistence/Journal/Surface.js");
 const casebook = await import("../../../dist/Repository/Knowledge/Casebook/Surface.js");
 const transaction = await import("../../../dist/Repository/Programming/Js/TransactionSurface.js");
 const strength = await import("../../../dist/Strength/Surface.js");
+const { strengthDelegationChainEvents } = await import("../../verification-system/tests/support/strength-delegation-chain.mjs");
 
 const id = (n) => n.toString(16).padStart(40, '0')
 const hash = (text) => `proof-hash(${text})`
@@ -42,12 +43,22 @@ test('WHAT[durable-events-019] every registered business oracle changes its prod
         await strength.storeWritePayload(store, new TextEncoder().encode('canonical strength material')),
         'write Strength payload',
       )
+      const delegationChain = strengthDelegationChainEvents(strength, {
+        ownerSessionId: 'canonical-owner',
+        decisionId: 'canonical-decision',
+        targetProviderRun: 'canonical-target-run',
+        replicaSessionId: 'canonical-replica',
+        anchorDigest: 'canonical-anchor',
+      })
+
+      mustOk(await strength.storeAppend(store, hash, delegationChain.requested), 'append Strength Requested fact')
+      mustOk(await strength.storeAppend(store, hash, delegationChain.bound), 'append Strength Bound fact')
+
       const strengthFact = strength.eventPrepared(
         'canonical-owner',
         'canonical-decision',
         'canonical-target-run',
         'canonical-replica',
-        'K1',
         'canonical-anchor',
         'canonical-frame',
         27,

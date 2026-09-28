@@ -34,7 +34,7 @@ export function integrationNodeTestSteps(root) {
         path.join(root, 'requirements/managed-chat-execution/tests/009.test.mjs'),
         path.join(root, 'requirements/repository-programming/tests/020.test.mjs'),
         path.join(root, 'requirements/speculative-investigation/tests/008.test.mjs'),
-        path.join(root, 'requirements/crash-reconciliation/tests/020.test.mjs'),
+        path.join(root, 'requirements/speculative-investigation/tests/016.test.mjs'),
         path.join(root, 'requirements/office-capability/tests/005.test.mjs'),
         path.join(root, 'requirements/office-capability/tests/007.test.mjs'),
         path.join(root, 'requirements/office-capability/tests/016.test.mjs'),

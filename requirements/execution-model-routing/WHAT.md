@@ -5,15 +5,21 @@
 Wanxiangshu 的 managed 模型调度由 `~/.config/opencode/wanxiangshu.mjs` 的 default export 唯一决定。其余来源（`opencode.json`、环境变量、Host-final agent inventory、内建表）一律不得覆盖或替代该权威。
 若文件不存在，系统在加载时确保目录存在并原子创建推荐策略模板，随后加载该文件。已有文件严禁自动覆盖。文件缺失、加载失败或导出非法时直接 fail closed。
 
-## [002] scheduler ABI 只有 `role + running + previous → target | null`
+## [002] scheduler ABI 为 `role + running + previous + purpose → target | null`，协议版本 `routingProtocol = 2`
 
-调度函数的唯一签名合同为：
+调度函数的签名合同为：
 ```js
-export default function route(role, running, previous) { ... }
+export const routingProtocol = 2
+export const hasTheoreticalCapacity = (role, purpose) => { ... }
+export const predictorConfiguration = () => ({ state, reason })
+export default function route(role, running, previous, purpose) { ... }
 ```
 - `role`：当前请求由 IdentitySeed 确立且在 logical run 内不可变的 fixed canonical Role。每次 fresh physical execution 均以该固定 Role 作为调度输入。participant 由 IdentitySeed 确立，随 acquire 输入与 capacity identity 显式传递，不作为调度函数参数。系统严格区分本地 participant 与远端 ModelTarget。
 - `running`：当前进程所有活跃 provider capacity token 的 ModelTarget multiset，元素形状固定为 `{ model: string, reasoning: string }`，保留重复项。
-- `previous`：仅当同一 SessionId 的当前活跃物理执行被原子取代时，才将该被取代执行的 target 作为同一 demand 的 fresh 调度输入；新 Session、exact terminal 释放后重建、无关 Session 一律传 `null`。`previous` 只是接续偏好提示，不占容量。
+- `previous`：仅当同一 SessionId 的当前活跃物理执行被原子取代时，才将该被取代执行的 target 作为同一 demand 的 fresh 调度输入；新 Session、exact terminal 释放后重建、无关 Session 一律传 `null`。`previous` 只是接续偏好提示，不占容量。只读委托的新鲜 Replica 物理执行不得继承 owner 当前活跃执行的 target 作为自己的 `previous`：Replica 入场按新 physical execution 规则收到 `null`（或本条已定义的 recovery retry 偏好），由 purpose 选择 Predictor 池。
+- `purpose`：独立于身份的调度用途，仅取 `"normal"` 或 `"readonly-delegate"`。`"normal"` 沿用按 Role 的模型池；`"readonly-delegate"` 从同一份模型配置中的 Predictor 模型池选择，且不更换 role/participant 身份。该用途由 Host 真实请求类型与授权 binding 推导（不从工具参数、用户文本或角色名推导），沿 pending demand、目标可用性复查、`previous` 偏好与同 physical 重试一并传递与保存，不得只在首次 route 传递、复查时退回默认 `normal`。
+- `routingProtocol`：模板必须导出 `routingProtocol = 2`；它是协议格式版本，不是启用开关。加载器显式验证 `routingProtocol === 2`；旧三参数配置不得凭「JS 忽略多余参数、调用不抛错」假意通过，必须给出可操作的升级错误并 fail closed，且不得自动覆盖用户已有的 `wanxiangshu.mjs`。
+- 协议 2 的导出形状除 `route` 外还包含两个只读查询：`hasTheoreticalCapacity(role, purpose)` 与 `predictorConfiguration()`。`hasTheoreticalCapacity` 的输入从旧 `(role)` 扩展为 `(role, purpose)`：理论容量必须按用途分别回答（`"normal"` 按 Role 池、`"readonly-delegate"` 按 Predictor 池），不得沿用只回答角色池的旧形状；它与 [020] 的配置存在性查询是两个不同问题，互不顶替。`predictorConfiguration()` 的返回形状与「未导出查询即配置错误」规则由 [020] 规定。
 - 返回值：必须包含非空 `provider/model` 与 `reasoning`，或返回 `null`。
 - 抛出异常、返回 Promise 或非法结构均视为配置错误，直接 fail closed。
 
@@ -105,4 +111,13 @@ Wanxiangshu 的模型调度权威以当前合法角色集合（Engineer、DevOps
 ## [019] 固定 DevOps 模型绑定持久性与禁止通过 resume 换模型
 
 同一道路内固定绑定的 DevOps 的 ModelTarget 由道路初始化阶段确定并持久化记录。
-后续该道路内所有针对 DevOps 的 resume、续行或崩溃恢复，必须严格继承并复用该既有 ModelTarget，严禁通过 resume 参数或运行时策略重新分配、篡改或覆盖 DevOps 的物理模型。
+后续该道路内所有针对 DevOps 的 resume、续行或崩溃恢复，必须严格继承并复用该既有 ModelTarget，严禁通过 resume 参数或运行时策略重新分配、篡改或覆盖 DevOps 的物理模型。固定 DevOps 目标绑定只约束原 owner execution：readonly-delegate 用途是新的只读委托 execution，不得借同一 Role 把 owner 的 ModelTarget 覆盖到 Replica；Replica 按用途经 scheduler 走 Predictor 池，并遵守自己的准入、`previous` 与终结规则。
+
+## [020] Predictor 配置存在性查询：Predictor 槽位存在且候选非空即已配置，与容量/健康分离
+
+启用状态从同一份 MJS 模型配置派生：Predictor 槽位不存在或候选列表为空表示未配置；槽位存在、候选合法且非空表示已配置；配置结构非法是配置错误，必须明确报告，不得静默变成「未配置」。
+模型配置所有者提供只读的配置存在性查询，工具定义装饰与只读委托准入共用同一结果，不维护第二份 enabled 真相；查询在工具定义注册与呈现之前完成解析。
+查询的返回形状固定为 `{ state, reason }`：`state ∈ { "configured", "unconfigured", "invalid" }`，`reason` 仅在 `invalid` 时给出可操作原因、其余取 null。模板未导出 `predictorConfiguration()` 查询本身即配置错误：此时查询结果必须是 `invalid` 配置错误，不得因「没有查询可答」静默降级为「未配置」，也不得让加载假意通过。
+容量查询 `hasTheoreticalCapacity(role, purpose)` 与存在性查询回答两个不同问题：前者回答该用途下是否仍有理论可用候选，输入含用途；后者只回答 Predictor 配置是否存在。前者为 false（容量暂满或 provider 全数不可用）不得反推后者为「未配置」，后者也不得代替前者参与容量裁决。
+配置存在性与运行容量、provider 健康严格分离：容量暂满、provider 不可用或一次 route 返回 `null`，都不改变已配置状态，也不得用 `hasTheoreticalCapacity` 的 provider 健康检查或 route `null` 反推用户没有配置；具体请求按既有 pending、取消与失败规则处理。
+Predictor 与 owner 配置为相同模型是合法状态；不得因模型名相同或价格信息缺失关闭委托。

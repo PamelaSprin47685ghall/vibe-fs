@@ -354,6 +354,7 @@ function buildEnv(opts) {
     pluginPaths: opts.pluginPaths,
     contextLimit: opts.contextLimit,
     routingSource: opts.routingSource,
+    mcpServers: opts.mcpServers,
     extraEnv: opts.extraEnv,
   });
 

@@ -7,83 +7,60 @@ const Strength = await import("../../../dist/Strength/Surface.js");
 const { installDefaultResources } = await import("../../../dist/OpenCode/Host/ManagedAgentConfigSurface.js");
 
 installDefaultResources()
-const eligibleOpportunity = {
+const opportunity = {
   isRootWork: true,
   requestKind: 'work-main',
-  canonicalRole: 'coder',
-  selectedAgent: 'coder',
-  effectiveAgent: 'coder',
-  isFallbackRetry: false,
+  canonicalRole: 'engineer',
+  ownerSessionId: 'owner',
+  ownerLogicalRun: ['logical-1', 'authority-root-1'],
+  sourcePhysicalUserMessageId: 'user-1',
+  sourceProviderRun: 'run-1',
+  sourceToolCallIds: ['call-1', 'call-2'],
+  requestedRounds: 2,
+  contractRevision: 1,
   hasPrefixProbe: false,
-  isReviewerOrFinality: false,
-  isAttachedOrInternalLeaf: false,
+  isReplicaOrInternalLeaf: false,
+  isInteractionRepair: false,
+  isExplicitRecoveryBranch: false,
   ownerCancelled: false,
   targetProviderRunBound: true,
   eventStoreHealthy: true,
-  hostCanaryHealthy: true,
-  predictorAvailable: true,
-  costModelAvailable: true,
-}
-const prediction = { P1: 0.9, P2: 0.8, evidenceCount: 100 }
-const values = { V0: 0, V1: 5, V2: 8 }
-const config = { K1Margin: 1, K2Margin: 2, K2MinimumEvidence: 20 }
-const decide = (opportunity, control = false, shadow = false, p = prediction, v = values, c = config) => Strength.policyDecide(opportunity, control, shadow, p, v, c)
-const skipReason = (decision) => {
-  assert.equal(decision.kind, 'Skip')
-  return decision.reason
+  hostBoundaryHealthy: true,
+  processFuseHealthy: true,
+  ownerLogicalRunSuperseded: false,
+  pendingRequested: true,
+  predictorConfigured: true,
 }
 
-test('WHAT[speculative-investigation-001] STRENGTH_002_011_policy_k0_default_when_host_canary_or_cost_is_unproven', () => {
-  const unhealthy = decide({ ...eligibleOpportunity, hostCanaryHealthy: false })
-  assert.equal(skipReason(unhealthy), 'host-canary-unhealthy')
-  assert.equal(unhealthy.budget, 'K0')
-  const noPredictor = decide({ ...eligibleOpportunity, predictorAvailable: false })
-  assert.equal(skipReason(noPredictor), 'predictor-unavailable')
-  assert.equal(noPredictor.budget, 'K0')
-  const noCost = decide({ ...eligibleOpportunity, costModelAvailable: false })
-  assert.equal(skipReason(noCost), 'cost-model-unavailable')
-  assert.equal(noCost.budget, 'K0')
-  const shadow = decide(eligibleOpportunity, false, true)
-  assert.equal(skipReason(shadow), 'shadow-k0')
-  assert.equal(shadow.budget, 'K0')
-})
-test('WHAT[speculative-investigation-001] STRENGTH_001_014_policy_nested_replica_cannot_speculate', () => {
-  const nested = decide({ ...eligibleOpportunity, isRootWork: false, isAttachedOrInternalLeaf: true, requestKind: 'strength-replica' })
-  assert.equal(nested.budget, 'K0')
-})
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { readFileSync } = await import("node:fs");
-const { default: test } = await import("node:test");
-const Strength = await import("../../../dist/Strength/Surface.js");
-
-const packageJson = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'))
-const withEnv = (name, value, run) => {
-  const previous = process.env[name]
-  try {
-    if (value === undefined) delete process.env[name]
-    else process.env[name] = value
-    run()
-  } finally {
-    if (previous === undefined) delete process.env[name]
-    else process.env[name] = previous
+// WHAT[001]: delegation is visible only once the owner model offered integers
+// through the tool protocol. Nothing in this Surface can enable, disable or
+// adjust that from the host side.
+test('WHAT[speculative-investigation-001] STRENGTH_001_strength_surface_exposes_no_enable_switch_or_rollout_mode', () => {
+  for (const name of ['settingsLoad', 'settingsDryRunBudget', 'settingsHostCanaryHealthy', 'settingsHostCanaryFingerprint', 'startDryRun', 'observeDryRun', 'closeDryRunAtPrimaryTerminal']) {
+    assert.equal(Strength[name], undefined, `no host-side switch may remain exported as ${name}`)
   }
-}
-const withCanary = (value, run) => withEnv('WANXIANGSHU_STRENGTH_HOST_CANARY', value, run)
-
-test('WHAT[speculative-investigation-001] STRENGTH_011_default_settings_are_shadow_k0_with_economic_holdout_and_no_k2_enablement', () => {
-  withEnv('WANXIANGSHU_STRENGTH_MODE', undefined, () => {
-    withCanary(undefined, () => {
-      const settings = Strength.settingsLoad()
-      assert.equal(settings.mode, 'Shadow')
-      assert.equal(settings.costs, null)
-      assert.equal(Strength.settingsHostCanaryHealthy(), false)
-      assert.equal(settings.controlRateBasisPoints, 1000)
-      assert.equal(settings.policy.K2MinimumEvidence, 50)
-      assert.ok(settings.policy.K2Margin > settings.policy.K1Margin)
-    })
-  })
+  for (const name of ['predictorCreate', 'rolloutEstimate', 'costEstimate']) {
+    assert.equal(Strength[name], undefined, `no statistical estimator may remain exported as ${name}`)
+  }
+})
+test('WHAT[speculative-investigation-001] STRENGTH_002_011_unconfigured_predictor_is_a_visible_dependency_gap_not_a_silent_baseline', () => {
+  assert.equal(Strength.policyEligibility({ ...opportunity, predictorConfigured: false }).reason, 'predictor-unconfigured')
+  assert.equal(Strength.policyEligibility(opportunity).kind, 'Eligible')
+})
+test('WHAT[speculative-investigation-001] STRENGTH_001_014_zero_rounds_and_unconfigured_predictor_are_two_observably_different_states', () => {
+  const zero = Strength.policyDecide((text) => text, { ...opportunity, requestedRounds: 0 })
+  const unconfigured = Strength.policyDecide((text) => text, { ...opportunity, predictorConfigured: false })
+  assert.equal(zero.kind, 'Skip')
+  assert.equal(zero.reason, 'zero-round-budget')
+  assert.equal(unconfigured.kind, 'Skip')
+  assert.equal(unconfigured.reason, 'predictor-unconfigured')
+  assert.notEqual(zero.reason, unconfigured.reason)
+})
+test('WHAT[speculative-investigation-001] STRENGTH_002_speculation_opportunity_is_pure_frozen_protocol_evidence_without_wall_clock_state', () => {
+  const first = Strength.policyDecide((text) => text, opportunity)
+  const second = Strength.policyDecide((text) => text, opportunity)
+  assert.deepEqual(first, second)
+  assert.equal(first.kind, 'Admit')
+  assert.equal(first.request.requestedRounds, 2)
 })
 }

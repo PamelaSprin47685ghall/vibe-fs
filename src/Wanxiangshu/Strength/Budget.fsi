@@ -1,12 +1,10 @@
 namespace Wanxiangshu.Strength
 
-[<RequireQualifiedAccess>]
-type StrengthBudget =
-    | K0
-    | K1
-    | K2
+[<Struct>]
+type ReadonlyRoundBudget = private ReadonlyRoundBudget of int
 
-module StrengthBudget =
-    val parse: string -> StrengthBudget option
-    val wire: StrengthBudget -> string
-    val requestLimit: StrengthBudget -> int
+module ReadonlyRoundBudget =
+    val tryCreate: value: int -> Result<ReadonlyRoundBudget, string>
+    val value: budget: ReadonlyRoundBudget -> int
+
+    val maxOf: budgets: ReadonlyRoundBudget list -> ReadonlyRoundBudget option

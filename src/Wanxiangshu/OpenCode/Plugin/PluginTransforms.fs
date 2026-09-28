@@ -679,8 +679,7 @@ module PluginTransforms =
                     let! _ = XWire.applyTransform isReplica snapshotOpt wirePort attempts outObj
                     return ()
                 }
-          ReplicaSanitize = HostMessageProjection.sanitizeOutputMessages
-          }
+          ReplicaSanitize = HostMessageProjection.sanitizeOutputMessages }
 
     let normalTransform
         (caps: NormalTransformCapabilities)

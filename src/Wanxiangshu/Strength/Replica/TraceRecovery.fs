@@ -8,7 +8,6 @@ open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 
 type StrengthTraceObservedPart =

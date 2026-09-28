@@ -39,3 +39,21 @@ module PluginHooksSurface =
     val firstBloggerEffect: observation: BloggerAdapterObservation -> string
 
     val secondBloggerEffect: observation: BloggerAdapterObservation -> string
+
+    /// DELEGATE.md 4.2: run the real read-only delegation schema decoration
+    /// for one tool id (same contract function production uses).
+    val decorateReadonlyDelegationToolDefinition: toolID: string -> definition: obj -> unit
+
+    /// DELEGATE.md 3.2: JS-boundary budget validation projected as a
+    /// JS-native view: { ok = true; rounds: number } or { ok: false; error: string }.
+    val readonlyDelegationBudgetOf: value: obj -> obj
+
+    /// DELEGATE.md 3.2: self_note validation projected as a JS-native view:
+    /// { ok = true; note: string | null } or { ok: false; error: string }.
+    val readonlyDelegationSelfNoteOf: value: obj -> obj
+
+    /// Production tool.execute.before hide for the two protocol fields.
+    val hideReadonlyDelegationArgs: args: obj -> unit
+
+    /// Production tool.execute.after restore for the two protocol fields.
+    val restoreReadonlyDelegationArgs: args: obj -> unit

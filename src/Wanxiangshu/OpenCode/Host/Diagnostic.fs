@@ -39,7 +39,8 @@ module Diagnostic =
               "persistence_commitment"
               "hook"
               "policy_class"
-              // speculative-investigation-013: visible DryRun child identity; observation-only.
+              // speculative-investigation-013: the read-only delegation Replica child
+              // session id is visible for observation only; it is never a business fact.
               "replica_session_id"
               "blogger_session_id"
               "operation"

@@ -103,6 +103,10 @@ function makeConfig(llmUrl, pluginPaths = [], opts = {}) {
     },
     agent: managedAgents,
     plugin: pluginPaths,
+    // undefined is dropped by JSON.stringify, so a caller that passes no
+    // mcpServers keeps the config bytes byte-identical to before; only a
+    // scenario that declares an MCP fixture grows a key.
+    mcp: opts.mcpServers ?? undefined,
   };
 }
 
@@ -119,7 +123,8 @@ function makeConfig(llmUrl, pluginPaths = [], opts = {}) {
  * @param {number} [opts.contextLimit] - Provider context limit
  * @param {string} [opts.model] - Model ID string (default "test/test-model")
  * @param {string} [opts.apiKey] - Provider API key
- * @param {string} [opts.routingSource] - Exact isolated ~/.config/opencode/wanxiangshu.mjs body
+ * @param {string} [opts.routingSource] - Exact isolated ~/.config/opencode/wanxiangshu.mjs body; overrides the frozen default when present
+ * @param {object} [opts.mcpServers] - MCP server map for Config.mcp ({ [key]: { type: 'local', command, enabled } })
  * @param {object} [opts.extraEnv] - Additional env vars for this test
  * @returns {object} Environment key-value object to merge over process.env
  */
@@ -142,12 +147,27 @@ export function createIsolatedEnv(opts) {
   // recommended providers into a test provider process.
   const routingDir = path.join(home, '.config', 'opencode');
   fs.mkdirSync(routingDir, { recursive: true });
-  const routingSource = `export const hasTheoreticalCapacity = () => true;
-export default function route(role, running, previous) {
+  const defaultRoutingSource = `export const routingProtocol = 2
+export const hasTheoreticalCapacity = (role, purpose) => true;
+export default function route(role, running, previous, purpose) {
   if (new Set(['manager', 'orchestrator', 'engineer', 'devops', 'blogger', 'bookkeeper', 'predictor']).has(role)) return { model: 'test/test-model', reasoning: 'none' }
   throw new Error('unexpected managed role: ' + role + ' | stack: ' + new Error().stack)
+}
+
+export const predictorConfiguration = () => {
+  const state = globalThis.__wanxiangshu_test_predictor_state ?? 'unconfigured'
+  if (state === 'configured') return { state: 'configured', reason: null }
+  if (state === 'invalid') {
+    return {
+      state: 'invalid',
+      reason: globalThis.__wanxiangshu_test_predictor_reason ?? 'test Predictor configuration is invalid',
+    }
+  }
+  return { state: 'unconfigured', reason: null }
 }\n`;
-  fs.writeFileSync(path.join(routingDir, 'wanxiangshu.mjs'), routingSource, 'utf8');
+  // An explicit scenario/host routingSource wins; the frozen default keeps every
+  // caller that passes none byte-identical to the previous behavior.
+  fs.writeFileSync(path.join(routingDir, 'wanxiangshu.mjs'), opts.routingSource ?? defaultRoutingSource, 'utf8');
 
   provisionPluginDependency(path.join(xdgConfig, 'opencode'));
 

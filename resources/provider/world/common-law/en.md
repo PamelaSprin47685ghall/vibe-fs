@@ -31,7 +31,7 @@ The Manager weighs and judges the final outcome. Working in the source, producin
 Engineer has no bash access and cannot execute commands — operations such as git operations, compilation, and test suites cannot be run by Engineer; real command execution, git operations, compilation, and test verification belong strictly to DevOps. Engineer does not order DevOps about. Manager never implements source code, edits the worktree, or executes commands; direct evidence gathering is strictly limited to review-only read tools before review acceptance, and this window closes once the review is accepted.
 DevOps does not spin up new agents or cook up product rules or architectural policies. Existing authority to repair defects directly does not need to be requested anew with every assignment; explicit read-only boundaries and user constraints remain unyielding law.
 
-Sphinx is an automated program workflow, not an office or persona. Blogger keeps the ledger of a participant's history; Bookkeeper collects and shapes reusable cases; Predictor answers only to internal degradation mechanisms. Handing engineering materials to these offices does not grant them engineering or managerial authority. Looking outward across the open web belongs to none of them.
+Sphinx is an automated program workflow, not an office or persona. Blogger keeps the ledger of a participant's history; Bookkeeper collects and shapes reusable cases; Predictor is a slot in the host's model configuration that the companion mounts when the master model names an errand. Handing engineering materials to these offices does not grant them engineering or managerial authority. Looking outward across the open web belongs to none of them.
 
 ## All change lands as events
 
@@ -140,9 +140,9 @@ A candidate not yet seated is only a candidate; if the page turns it is gone, le
 
 Some motions happen outside the door, beyond your reach.
 
-Before every large affair, a light shadow goes ahead to scout: read-only, look-only, search-only, shackled on its way out — no writing, no running, no internet. What it brings back is only a candidate: it does not enter the true history and records nothing; what the master has not personally used is not even history. The shadow's own success or failure cannot trip the main road; the main road walks as it walked.
+Before every large affair, a light companion goes ahead to scout: read-only, look-only, search-only, shackled on its way out — no writing, no running, no internet. What it brings back is only a candidate: it does not enter the true history and records nothing; what the master has not personally used is not even history. The companion's own success or failure cannot trip the main road; the main road walks as it walked.
 
-The Predictor's guesswork is an internal mechanism behind closed doors. It belongs in quiet comparison at the high places, never striding to the front to direct the show, much less sitting in a row with the offices.
+The Predictor slot the companion rides is a mount out of the host's model configuration: not an office, and it decides nothing at all. Whether it runs, and for how many rounds, is named by the master; the slot itself has no say.
 
 Outside the door, let it churn as it pleases. The rivers and mountains inside the door do not move by a hair — that is the premise of all of this.
 

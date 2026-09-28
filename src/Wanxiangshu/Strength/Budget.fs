@@ -1,34 +1,25 @@
 namespace Wanxiangshu.Strength
 
-/// Strength K0/K1/K2 budget — request-gated progression.
-/// K0 = no speculation. K1 = one request batch. K2 = two request batches.
-/// Request count is the unit, not tool-call count.
-/// Threshold is holdout-measured ExpectedValue(K) > margin.
+/// STRENGTH-003: the delegation budget counts provider requests, never tool
+/// calls. It is a whole non-negative integer chosen by the owner model as the
+/// maximum across one parallel tool batch; there are no tier levels.
+[<Struct>]
+type ReadonlyRoundBudget = private ReadonlyRoundBudget of int
 
-[<RequireQualifiedAccess>]
-type StrengthBudget =
-    | K0
-    | K1
-    | K2
+module ReadonlyRoundBudget =
 
-module StrengthBudget =
+    let tryCreate value =
+        if value < 0 then
+            Error "negative-readonly-round-budget"
+        else
+            Ok(ReadonlyRoundBudget value)
 
-    let parse =
-        function
-        | "K0" -> Some StrengthBudget.K0
-        | "K1" -> Some StrengthBudget.K1
-        | "K2" -> Some StrengthBudget.K2
-        | _ -> None
+    let value (ReadonlyRoundBudget value) = value
 
-    let wire =
-        function
-        | StrengthBudget.K0 -> "K0"
-        | StrengthBudget.K1 -> "K1"
-        | StrengthBudget.K2 -> "K2"
-
-    /// STRENGTH-003: K is a provider-request budget, never a tool-call budget.
-    let requestLimit =
-        function
-        | StrengthBudget.K0 -> 0
-        | StrengthBudget.K1 -> 1
-        | StrengthBudget.K2 -> 2
+    /// STRENGTH-003: one batch of already-validated budgets collapses to its
+    /// maximum. None means the tool set grants no authorization opportunity at
+    /// all; Some 0 means do not start a Replica, not a mode of its own.
+    let maxOf (budgets: ReadonlyRoundBudget list) : ReadonlyRoundBudget option =
+        match budgets with
+        | [] -> None
+        | _ -> Some(List.maxBy value budgets)

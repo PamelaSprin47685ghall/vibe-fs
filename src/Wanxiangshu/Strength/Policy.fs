@@ -1,35 +1,36 @@
 namespace Wanxiangshu.Strength
 
-open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Strength.Prediction
-
-open System
 open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Participant.Provider.Attempt
 
-/// STRENGTH-002: frozen evidence only. No mutable stage/phase appears here.
+/// DELEGATE-7.2: everything admission needs, supplied by the caller as evidence.
+/// No predictor sample, cost estimate, evidence count, holdout bucket or margin
+/// participates any more: the only economic judgement is the owner's integer,
+/// already collapsed to the batch maximum by the collection boundary.
 type StrengthOpportunity =
-    { IsRootWork: bool
+    { OwnerSessionId: SessionId
+      OwnerLogicalRun: OwnerLogicalRunIdentity
+      SourcePhysicalUserMessageId: PhysicalUserMessageId
+      SourceProviderRun: ProviderRunIdentity
+      SourceToolCallIds: ToolCallId list
+      RequestedRounds: ReadonlyRoundBudget option
+      ContractRevision: DelegationContractRevision
+      IsRootWork: bool
       RequestKind: ProviderRequestKind
       CanonicalRole: Role
-      SelectedAgent: string
       HasPrefixProbe: bool
-      IsAttachedOrInternalLeaf: bool
+      IsReplicaOrInternalLeaf: bool
+      IsInteractionRepair: bool
+      IsExplicitRecoveryBranch: bool
       OwnerCancelled: bool
       TargetProviderRunBound: bool
       EventStoreHealthy: bool
-      HostCanaryHealthy: bool
-      PredictorAvailable: bool
-      CostModelAvailable: bool }
-
-type StrengthPrediction =
-    { P1: float
-      P2: float
-      EvidenceCount: int }
-
-type StrengthPolicyConfig =
-    { K1Margin: float
-      K2Margin: float
-      K2MinimumEvidence: int }
+      HostBoundaryHealthy: bool
+      ProcessFuseHealthy: bool
+      OwnerLogicalRunSuperseded: bool
+      PendingRequested: bool
+      PredictorConfigured: bool }
 
 [<RequireQualifiedAccess>]
 type StrengthEligibility =
@@ -37,15 +38,17 @@ type StrengthEligibility =
     | Eligible
 
 [<RequireQualifiedAccess>]
-type StrengthDecision =
+type StrengthAdmission =
+    | Admit of DelegationRequest
     | Skip of reason: string
-    | ControlHoldout
-    | Speculate of budget: StrengthBudget * estimate: StrengthValueEstimate
 
+[<RequireQualifiedAccess>]
 module StrengthPolicy =
 
-    let eligibleRoles =
-        set [ Role.Engineer; Role.Coder; Role.Inspector; Role.DevOps; Role.Inquiry ]
+    /// execution-model-routing-018 / office-capability: the current legal role
+    /// set. Retired coder/inspector/inquiry roles are never restored to satisfy
+    /// an outdated list.
+    let eligibleRoles = Roles.all |> Set.ofList
 
     let eligibility (opportunity: StrengthOpportunity) : StrengthEligibility =
         if not opportunity.IsRootWork then
@@ -56,80 +59,61 @@ module StrengthPolicy =
             StrengthEligibility.Ineligible "role-ineligible"
         elif opportunity.HasPrefixProbe then
             StrengthEligibility.Ineligible "prefix-probe"
-        elif opportunity.IsAttachedOrInternalLeaf then
-            StrengthEligibility.Ineligible "attached-or-internal-leaf"
+        elif opportunity.IsReplicaOrInternalLeaf then
+            StrengthEligibility.Ineligible "replica-or-internal-leaf"
+        elif opportunity.IsInteractionRepair then
+            StrengthEligibility.Ineligible "interaction-repair"
+        elif opportunity.IsExplicitRecoveryBranch then
+            StrengthEligibility.Ineligible "explicit-recovery-branch"
         elif opportunity.OwnerCancelled then
             StrengthEligibility.Ineligible "owner-cancelled"
         elif not opportunity.TargetProviderRunBound then
             StrengthEligibility.Ineligible "target-provider-run-unbound"
         elif not opportunity.EventStoreHealthy then
             StrengthEligibility.Ineligible "event-store-unhealthy"
-        elif not opportunity.HostCanaryHealthy then
-            StrengthEligibility.Ineligible "host-canary-unhealthy"
-        elif not opportunity.PredictorAvailable then
-            StrengthEligibility.Ineligible "predictor-unavailable"
-        elif not opportunity.CostModelAvailable then
-            StrengthEligibility.Ineligible "cost-model-unavailable"
+        elif not opportunity.HostBoundaryHealthy then
+            StrengthEligibility.Ineligible "host-boundary-unhealthy"
+        elif not opportunity.ProcessFuseHealthy then
+            StrengthEligibility.Ineligible "process-fuse-unhealthy"
+        elif opportunity.OwnerLogicalRunSuperseded then
+            StrengthEligibility.Ineligible "owner-logical-run-superseded"
+        elif not opportunity.PendingRequested then
+            StrengthEligibility.Ineligible "no-pending-requested"
+        elif not opportunity.PredictorConfigured then
+            StrengthEligibility.Ineligible "predictor-unconfigured"
         else
             StrengthEligibility.Eligible
 
-    /// A deterministic hash-to-bucket adapter. The hash implementation is owned
-    /// by the caller; the policy consumes canonical hex so assignment remains
-    /// restart-stable and contains no RNG/time source.
-    let controlBucket (sha256: string -> string) (policyVersion: string) (authorityRoot: string) (targetRun: string) =
-        let digest =
-            sha256 (String.concat "\u001f" [ authorityRoot; targetRun; policyVersion ])
-
-        let prefix =
-            if String.IsNullOrEmpty digest then
-                "0"
-            else
-                digest.Substring(0, min 16 digest.Length)
-
-        // The digest is already the uniformizing primitive. A small ordinal fold
-        // avoids platform-specific integer parsing while preserving a stable
-        // 0..9999 bucket in both .NET and Fable/JS.
-        prefix |> Seq.fold (fun acc ch -> (acc * 131 + int ch) % 10000) 0
-
-    let isControlHoldout (rateBasisPoints: int) (bucket: int) =
-        let rate = max 0 (min 10000 rateBasisPoints)
-        bucket >= 0 && bucket < rate
-
-    let private speculationDecision k1Worthwhile k2Worthwhile estimate =
-        if k2Worthwhile && k1Worthwhile then
-            StrengthDecision.Speculate(StrengthBudget.K2, estimate)
-        elif k1Worthwhile then
-            StrengthDecision.Speculate(StrengthBudget.K1, estimate)
-        else
-            StrengthDecision.Skip "non-positive-value"
-
-    /// Pure Evidence → Decision. `shadow=true` computes upstream prediction/value
-    /// but never intervenes. `control=true` is checked only after eligibility so
-    /// ineligible traffic never masquerades as a holdout observation.
-    let decideFromFacts
-        (opportunity: StrengthOpportunity)
-        (control: bool)
-        (shadow: bool)
-        (prediction: StrengthPrediction)
-        (estimate: StrengthValueEstimate)
-        (config: StrengthPolicyConfig)
-        : StrengthDecision =
+    /// Pure Evidence -> Decision. Predictor configuration is the caller's input
+    /// and means existence only: temporary capacity shortage is not a reason to
+    /// refuse admission, and capacity is never probed here.
+    let tryRequest (sha256: string -> string) (opportunity: StrengthOpportunity) : Result<DelegationRequest, string> =
         match eligibility opportunity with
-        | StrengthEligibility.Ineligible reason -> StrengthDecision.Skip reason
-        | StrengthEligibility.Eligible when shadow -> StrengthDecision.Skip "shadow-k0"
-        | StrengthEligibility.Eligible when control -> StrengthDecision.ControlHoldout
+        | StrengthEligibility.Ineligible reason -> Error reason
         | StrengthEligibility.Eligible ->
-            let k1Worthwhile = estimate.V1 > config.K1Margin
+            match opportunity.RequestedRounds with
+            | None -> Error "no-authorization-opportunity"
+            | Some budget when ReadonlyRoundBudget.value budget = 0 -> Error "zero-round-budget"
+            | Some budget ->
+                match opportunity.SourceToolCallIds with
+                | [] -> Error "empty-source-tool-call-set"
+                | calls ->
+                    Ok
+                        { DecisionId =
+                            Delegation.deriveDecisionId
+                                sha256
+                                opportunity.ContractRevision
+                                opportunity.OwnerLogicalRun
+                                opportunity.SourceProviderRun
+                          OwnerSessionId = opportunity.OwnerSessionId
+                          OwnerLogicalRun = opportunity.OwnerLogicalRun
+                          SourcePhysicalUserMessageId = opportunity.SourcePhysicalUserMessageId
+                          SourceProviderRun = opportunity.SourceProviderRun
+                          SourceToolCallIds = calls
+                          RequestedRounds = budget
+                          ContractRevision = opportunity.ContractRevision }
 
-            let k2Worthwhile =
-                prediction.EvidenceCount >= config.K2MinimumEvidence
-                && config.K2Margin > config.K1Margin
-                && estimate.V2 > estimate.V1 + config.K2Margin
-
-            speculationDecision k1Worthwhile k2Worthwhile estimate
-
-    let budgetOf (decision: StrengthDecision) : StrengthBudget =
-        match decision with
-        | StrengthDecision.Skip _
-        | StrengthDecision.ControlHoldout -> StrengthBudget.K0
-        | StrengthDecision.Speculate(budget, _) -> budget
+    let decide (sha256: string -> string) (opportunity: StrengthOpportunity) : StrengthAdmission =
+        match tryRequest sha256 opportunity with
+        | Ok request -> StrengthAdmission.Admit request
+        | Error reason -> StrengthAdmission.Skip reason

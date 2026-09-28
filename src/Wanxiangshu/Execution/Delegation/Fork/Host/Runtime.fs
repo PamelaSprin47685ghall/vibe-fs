@@ -658,7 +658,8 @@ type HostForkRuntime
     /// this process currently drives.
     member internal _.TryChildFromDurable(agentId: string) : (SessionId * Role * string) option =
         journal
-        |> Option.bind (fun durable -> DurableChildLookup.byHandleId (AgentJournal.handleProjection durable this.ParentId) agentId)
+        |> Option.bind (fun durable ->
+            DurableChildLookup.byHandleId (AgentJournal.handleProjection durable this.ParentId) agentId)
 
     /// Resolve a child for reuse: process-local registration first, then the
     /// durable handle, which is adopted on demand so placement/await see it.

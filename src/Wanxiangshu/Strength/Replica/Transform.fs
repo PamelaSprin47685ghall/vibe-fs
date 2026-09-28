@@ -10,7 +10,7 @@ open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Prediction
+open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Strength.Projection
 
 [<RequireQualifiedAccess>]
@@ -22,7 +22,8 @@ type StrengthReplicaTransformOutcome =
 /// STRENGTH-003/004/009/014: transform program for the InternalLeaf replica.
 /// It bypasses Work recovery/Companion writers, replaces the physical child
 /// transcript with the frozen owner mirror, and replays only this decision's
-/// completed prior batches. Reaching K aborts before the next provider request.
+/// completed prior batches. The runtime admission owns the request budget: a
+/// request that was not admitted retires here before any physical send.
 [<RequireQualifiedAccess>]
 module StrengthReplicaTransform =
 
@@ -333,7 +334,7 @@ module StrengthReplicaTransform =
         : Result<StrengthFrameBundle option, StrengthFrameError> =
         match batches with
         | [] -> Ok None
-        | _ -> StrengthFrame.tryBuild sha256 binding.MaxFrameBytes batches |> Result.map Some
+        | _ -> StrengthFrame.tryBuild sha256 batches |> Result.map Some
 
     let private replicaIntents
         (sha256: string -> string)
@@ -368,8 +369,9 @@ module StrengthReplicaTransform =
         task {
             // Physical identity remains live until the Host reports the child
             // terminal/deletion. This transform only closes semantic admission
-            // and aborts before K+1 can leave the process; retiring here races
-            // already-queued Host transforms into the Ordinary branch.
+            // and aborts before the unadmitted request can leave the process;
+            // retiring here races already-queued Host transforms into the
+            // Ordinary branch.
             let! _ = sessions.AbortSession replicaSessionId
             return StrengthReplicaTransformOutcome.Retired(reason, batches)
         }
@@ -424,6 +426,8 @@ module StrengthReplicaTransform =
         | Ok ordered ->
             applyPlanned sha256 sessionIdText output currentWire ordered batches runtime sessions replicaSessionId
 
+    // Mirrors the frozen owner conversation plus this decision's completed
+    // batches for a request the runtime admission already allowed.
     let private applyUnderBudget
         (sha256: string -> string)
         (binding: StrengthReplicaBinding)
@@ -450,6 +454,10 @@ module StrengthReplicaTransform =
                 sessions
                 replicaSessionId
 
+    /// DELEGATE-5.3: the outbound request gate is the live registry's real
+    /// admission, never the visible batch count. `outboundRequest` marks a new
+    /// physical request; the registry's verdict decides, and a request that is
+    /// not admitted retires before any physical N+1 send.
     let private applyBatches
         (sha256: string -> string)
         (binding: StrengthReplicaBinding)
@@ -457,11 +465,18 @@ module StrengthReplicaTransform =
         (output: obj)
         (currentWire: ProviderProjection.ProviderWireProjection)
         (batches: StrengthRequestBatch list)
+        (outboundRequest: bool)
         (runtime: StrengthRuntime)
         (sessions: ISessionHostPort)
         (replicaSessionId: SessionId)
         : Task<StrengthReplicaTransformOutcome> =
-        if List.length batches >= StrengthBudget.requestLimit binding.Budget then
+        // DELEGATE-5.3: the live registry owns the request budget. A new
+        // outbound request asks it for admission and retires before any
+        // physical N+1 send when refused; mirroring an already-admitted request
+        // again consumes nothing.
+        let admitted = (not outboundRequest) || runtime.TryAdmitRequest replicaSessionId
+
+        if not admitted then
             retireWith runtime sessions replicaSessionId "provider-request-budget-reached" batches
         else
             applyUnderBudget sha256 binding sessionIdText output currentWire batches runtime sessions replicaSessionId
@@ -474,6 +489,7 @@ module StrengthReplicaTransform =
         (binding: StrengthReplicaBinding)
         (sessionIdText: string)
         (replicaSessionId: SessionId)
+        (outboundRequest: bool)
         : Task<StrengthReplicaTransformOutcome> =
         task {
             let rawMessages = ProviderWireDecode.messagesFromTransformOutput output
@@ -481,7 +497,17 @@ module StrengthReplicaTransform =
             let batches = batchesForReplica rawMessages currentWire
 
             return!
-                applyBatches sha256 binding sessionIdText output currentWire batches runtime sessions replicaSessionId
+                applyBatches
+                    sha256
+                    binding
+                    sessionIdText
+                    output
+                    currentWire
+                    batches
+                    outboundRequest
+                    runtime
+                    sessions
+                    replicaSessionId
         }
 
     let private applyWithSessionId
@@ -490,21 +516,25 @@ module StrengthReplicaTransform =
         (sessions: ISessionHostPort)
         (output: obj)
         (sessionIdText: string)
+        (outboundRequest: bool)
         : Task<StrengthReplicaTransformOutcome> =
         let replicaSessionId = SessionId.create sessionIdText
 
         match runtime.TryFindByReplica replicaSessionId with
         | None -> task { return StrengthReplicaTransformOutcome.NotReplica }
-        | Some binding -> applyWithBinding sha256 runtime sessions output binding sessionIdText replicaSessionId
+        | Some binding ->
+            applyWithBinding sha256 runtime sessions output binding sessionIdText replicaSessionId outboundRequest
 
     let apply
         (sha256: string -> string)
         (runtime: StrengthRuntime)
         (sessions: ISessionHostPort)
         (output: obj)
+        (outboundRequest: bool)
         : Task<StrengthReplicaTransformOutcome> =
         task {
             match ProviderWireDecode.projectionSessionIdFromMessages output with
             | None -> return StrengthReplicaTransformOutcome.NotReplica
-            | Some sessionIdText -> return! applyWithSessionId sha256 runtime sessions output sessionIdText
+            | Some sessionIdText ->
+                return! applyWithSessionId sha256 runtime sessions output sessionIdText outboundRequest
         }

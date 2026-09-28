@@ -24,9 +24,10 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-projection.opencode-codec-providerwiredecode.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-projection.participant-provider-projection-plan.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-budget.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-turnevidence.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-prediction-predictor.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-event-vocabulary-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-frame-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-projection.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-replica-core.fsproj"/>
     <Compile Include="Strength/Replica/Transform.fsi"/>
     <Compile Include="Strength/Replica/Transform.fs"/>
     <Compile Include="Strength/Replica/Runtime.fsi"/>

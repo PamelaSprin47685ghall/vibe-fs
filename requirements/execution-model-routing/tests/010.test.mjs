@@ -720,3 +720,203 @@ test('WHAT[execution-model-routing-010] EMR_010_managed_tool_execution_ends_the_
   )
 })
 }
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const routing = await import("../../../dist/OpenCode/Host/ModelRoutingSurface.js");
+
+const {
+  createRuntime,
+  acquireExecutionAdmission,
+  commitExecutionAdmission,
+  executionAdmissionTarget,
+  enterProviderStep,
+  endProviderStep,
+  suppressProviderStep,
+  snapshotOccupied,
+  capacitySnapshot,
+} = routing
+const target = (model = 'provider/only', reasoning = 'none') => ({ model, reasoning })
+const key = (value) => `${value.model}|${value.reasoning}`
+const providerOf = (model) => model.slice(0, model.indexOf('/'))
+const providerLimited = (limits, routes) => (role, running, previous) => {
+  const candidates = routes[role] ?? []
+  const available = (candidate) =>
+    running.filter((item) => providerOf(item.model) === providerOf(candidate.model)).length
+    < (limits[providerOf(candidate.model)] ?? 0)
+  if (previous && candidates.some((candidate) => key(candidate) === key(previous)) && available(previous)) return previous
+  return candidates.find(available) ?? null
+}
+const acquireTarget = async (runtime, sessionId, physicalUserMessageId, role, participant, lenderSessionId = null) => {
+  const acquisition = await acquireExecutionAdmission(
+    runtime,
+    sessionId,
+    physicalUserMessageId,
+    role,
+    participant,
+    lenderSessionId,
+  )
+  assert.equal(acquisition.kind, 'Acquired')
+  const projected = executionAdmissionTarget(runtime, acquisition.lease)
+  const settlement = commitExecutionAdmission(runtime, acquisition.lease, {
+    sessionId,
+    physicalUserMessageId,
+    role,
+    participant,
+    target: projected,
+  })
+  assert.ok(['Applied', 'AlreadyApplied'].includes(settlement.kind))
+  return projected
+}
+
+// DELEGATE 9.3 / execution-model-routing-010: with one provider token the owner
+// must never hold an undelivered step while it synchronously waits for the
+// Replica, the Replica must run on the owner credit through an explicit lender,
+// and the credit must return to the owner afterwards. No timeout, no capacity
+// growth, no second in-flight step.
+test('WHAT[execution-model-routing-010] EMR_010_owner_waits_for_replica_on_one_provider_token_without_deadlock', async () => {
+  const only = target('provider/only')
+  const runtime = createRuntime(providerLimited({ provider: 1 }, { engineer: [only] }))
+
+  // The owner holds the only provider token with its request in flight.
+  const ownerTarget = await acquireTarget(runtime, 'owner', 'msg-owner', 'engineer', 'alice')
+  assert.equal(key(ownerTarget), key(only))
+  await enterProviderStep(runtime, 'owner', 'msg-owner', [])
+  assert.deepEqual(capacitySnapshot(runtime).tokenStateCounts, { idle: 0, inFlight: 1, retiring: 0 })
+
+  // The Replica is admitted against the owner's credit through the explicit
+  // lender: borrowing creates no second token.
+  const replicaTarget = await acquireTarget(runtime, 'replica', 'msg-replica', 'engineer', 'replica', 'owner')
+  assert.equal(key(replicaTarget), key(only))
+  assert.equal(capacitySnapshot(runtime).ledgerEntries.length, 1)
+  assert.equal(snapshotOccupied(runtime).length, 1)
+
+  // While the owner still holds its step, the borrowed step cannot be granted:
+  // one token never serves two simultaneously in-flight steps.
+  const replicaStep = enterProviderStep(runtime, 'replica', 'msg-replica', [])
+  assert.deepEqual(
+    capacitySnapshot(runtime).waiters.map((waiter) => waiter.sessionId),
+    ['replica'],
+    'a borrow cannot fake concurrency against an undelivered owner step',
+  )
+  assert.deepEqual(capacitySnapshot(runtime).tokenStateCounts, { idle: 0, inFlight: 1, retiring: 0 })
+
+  // The provider→tool boundary ends the owner step before the tool body runs,
+  // so the owner waiting inside the tool body no longer holds the token; the
+  // waiting Replica step is granted the same credit.
+  suppressProviderStep(runtime, 'owner', 'msg-owner')
+  assert.deepEqual(
+    capacitySnapshot(runtime).waiters.map((waiter) => waiter.sessionId),
+    [],
+    'ending the owner step hands the same credit to the waiting Replica step',
+  )
+  await replicaStep
+  assert.equal(snapshotOccupied(runtime).length, 1, 'the Replica runs on the shared credit')
+
+  // The Replica finishes; the credit returns to idle.
+  endProviderStep(runtime, 'replica', 'msg-replica', 'run-replica')
+  assert.deepEqual(capacitySnapshot(runtime).tokenStateCounts, { idle: 1, inFlight: 0, retiring: 0 })
+
+  // The owner re-enters messages.transform and takes the credit back.
+  const ownerNext = enterProviderStep(runtime, 'owner', 'msg-owner', ['run-owner'])
+  assert.deepEqual(capacitySnapshot(runtime).waiters.map((waiter) => waiter.sessionId), [])
+  await ownerNext
+  suppressProviderStep(runtime, 'owner', 'msg-owner')
+  assert.deepEqual(capacitySnapshot(runtime).tokenStateCounts, { idle: 1, inFlight: 0, retiring: 0 })
+  assert.equal(capacitySnapshot(runtime).ledgerEntries.length, 1)
+  assert.equal(snapshotOccupied(runtime).length, 1)
+})
+}
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const routing = await import("../../../dist/OpenCode/Host/ModelRoutingSurface.js");
+
+const {
+  createRuntime,
+  acquireExecutionAdmission,
+  commitExecutionAdmission,
+  executionAdmissionTarget,
+  enterProviderStep,
+  endProviderStep,
+  releasePhysicalExecution,
+  snapshotOccupied,
+  capacitySnapshot,
+} = routing
+const target = (model = 'provider/only', reasoning = 'none') => ({ model, reasoning })
+const key = (value) => `${value.model}|${value.reasoning}`
+const providerOf = (model) => model.slice(0, model.indexOf('/'))
+const providerLimited = (limits, routes) => (role, running, previous) => {
+  const candidates = routes[role] ?? []
+  const available = (candidate) =>
+    running.filter((item) => providerOf(item.model) === providerOf(candidate.model)).length
+    < (limits[providerOf(candidate.model)] ?? 0)
+  if (previous && candidates.some((candidate) => key(candidate) === key(previous)) && available(previous)) return previous
+  return candidates.find(available) ?? null
+}
+const acquireTarget = async (runtime, sessionId, physicalUserMessageId, role, participant, lenderSessionId = null) => {
+  const acquisition = await acquireExecutionAdmission(
+    runtime,
+    sessionId,
+    physicalUserMessageId,
+    role,
+    participant,
+    lenderSessionId,
+  )
+  assert.equal(acquisition.kind, 'Acquired')
+  const projected = executionAdmissionTarget(runtime, acquisition.lease)
+  const settlement = commitExecutionAdmission(runtime, acquisition.lease, {
+    sessionId,
+    physicalUserMessageId,
+    role,
+    participant,
+    target: projected,
+  })
+  assert.ok(['Applied', 'AlreadyApplied'].includes(settlement.kind))
+  return projected
+}
+
+// DELEGATE 14.5 / execution-model-routing-010: two owners run concurrently.
+// Model resources belong to exact executions: one owner's step or teardown never
+// touches the other owner's token or lease.
+test('WHAT[execution-model-routing-010] EMR_010_two_owners_never_crosstalk_capacity_or_leases', async () => {
+  const only = target('provider/only')
+  const runtime = createRuntime(providerLimited({ provider: 2 }, { engineer: [only, only] }))
+
+  // Both owners hold their own lease on the same provider at the same time.
+  const first = await acquireTarget(runtime, 'owner-a', 'msg-a', 'engineer', 'alice')
+  const second = await acquireTarget(runtime, 'owner-b', 'msg-b', 'engineer', 'bob')
+  assert.equal(key(first), key(only))
+  assert.equal(key(second), key(only))
+  assert.equal(capacitySnapshot(runtime).ledgerEntries.length, 2)
+  assert.equal(snapshotOccupied(runtime).length, 2)
+
+  // Interleaved provider steps: each step belongs to its own execution.
+  await enterProviderStep(runtime, 'owner-a', 'msg-a', [])
+  await enterProviderStep(runtime, 'owner-b', 'msg-b', [])
+  assert.deepEqual(capacitySnapshot(runtime).tokenStateCounts, { idle: 0, inFlight: 2, retiring: 0 })
+
+  // Ending owner-a's step must not end owner-b's.
+  endProviderStep(runtime, 'owner-a', 'msg-a', 'run-a')
+  assert.deepEqual(capacitySnapshot(runtime).tokenStateCounts, { idle: 1, inFlight: 1, retiring: 0 })
+
+  // Releasing owner-a's execution frees exactly one token — never owner-b's.
+  releasePhysicalExecution(runtime, 'owner-a', 'msg-a')
+  assert.equal(snapshotOccupied(runtime).length, 1, "one owner's teardown never frees the other owner's token")
+  assert.equal(capacitySnapshot(runtime).ledgerEntries.length, 1)
+  assert.deepEqual(
+    capacitySnapshot(runtime).owners.map((owner) => owner.sessionId),
+    ['owner-b'],
+    'the surviving capacity belongs to owner-b alone',
+  )
+
+  // Owner-b still finishes its own step and releases cleanly.
+  endProviderStep(runtime, 'owner-b', 'msg-b', 'run-b')
+  assert.deepEqual(capacitySnapshot(runtime).tokenStateCounts, { idle: 1, inFlight: 0, retiring: 0 })
+  releasePhysicalExecution(runtime, 'owner-b', 'msg-b')
+  assert.equal(snapshotOccupied(runtime).length, 0)
+  assert.equal(capacitySnapshot(runtime).ledgerEntries.length, 0)
+})
+}

@@ -258,6 +258,21 @@ const boundaryAt = (scenario, entry) =>
  * as a mismatch rather than as a different-but-stable serialisation.
  */
 export function deriveRequests(scenario) {
+  // A turn group whose lane a flow 'createSession' opens runs in a NEW session, not a
+  // CTX-010 continuation of the previous chat turn: 'createSession' allocates a fresh
+  // session, so its first request has no previous wire and the seal HOLDS. Reusing the
+  // previous turn's session here would make that first delivery look like an undeclared
+  // prefix rebase - the break vs-003 reports for strength-recovery-owner.0. Only a
+  // request rejected and retried inside the SAME session is a continuation; a
+  // createSession lane is the explicit signal that this group is not.
+  const createSessionLanes = new Set(
+    (scenario.flow ?? [])
+      .filter((flowStep) => flowStep?.createSession !== undefined)
+      .flatMap((flowStep) => [
+        ...(Array.isArray(flowStep.createSession.bind) ? flowStep.createSession.bind : []),
+        ...(typeof flowStep.createSession.as === "string" ? [flowStep.createSession.as] : []),
+      ]),
+  );
   const bindings = [];
   const requests = [];
   let previousSessionId = null;
@@ -282,8 +297,10 @@ export function deriveRequests(scenario) {
     // `manager-loop` entry reuses its own session across deliveries, which is why its
     // triple is declared once.
     const managerLoop = group.entries.some((entry) => boundaryAt(scenario, entry)?.kind === 'manager-loop');
+    const opensNewSession = first.lane !== undefined && createSessionLanes.has(first.lane);
     const continued =
-      !isTitle && !managerLoop && hasBoundary(scenario, group.entries) && previousSessionId !== null;
+      !isTitle && !managerLoop && !opensNewSession
+        && hasBoundary(scenario, group.entries) && previousSessionId !== null;
     const sessionId = continued ? previousSessionId : `ses_${String(groupIndex).padStart(2, '0')}_${first.turnId}`;
     if (!isTitle) previousSessionId = sessionId;
     if (first.lane !== undefined) bindings.push([first.lane, sessionId]);

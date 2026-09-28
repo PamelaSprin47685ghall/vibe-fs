@@ -2,7 +2,6 @@ namespace Wanxiangshu.Strength
 
 open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Strength.Prediction
 
 open System
 open Wanxiangshu.Foundation.Identity
@@ -15,7 +14,7 @@ type StrengthToolExchange =
       CanonicalArguments: string
       CanonicalResult: string }
 
-/// One Replica provider request. RequestOrdinal, not tool count, spends K.
+/// One Replica provider request. RequestOrdinal, not tool count, spends one round of the request budget.
 type StrengthRequestBatch =
     { RequestOrdinal: int
       Exchanges: StrengthToolExchange list }
@@ -33,7 +32,6 @@ type StrengthFrameError =
     | EmptyBatch of requestOrdinal: int
     | InvalidRequestOrdinal of expected: int * actual: int
     | UnsupportedTool of toolName: string
-    | ByteLimitExceeded of actualBytes: int * maxBytes: int
 
 [<RequireQualifiedAccess>]
 type StrengthMirrorError =
@@ -51,7 +49,7 @@ module StrengthFrame =
 
     /// Fable-compatible UTF-8 length. .NET Encoding.GetByteCount is not
     /// available in Fable, while UTF-16 String.Length would undercharge non-ASCII
-    /// payloads and make the hard byte fuse platform-dependent.
+    /// payloads and make the measured ByteLength platform-dependent.
     let private isUtf16LowSurrogate (code: int) = code >= 0xDC00 && code <= 0xDFFF
 
     let private utf8Step (text: string) (index: int) =
@@ -106,25 +104,8 @@ module StrengthFrame =
     let canonicalText (batches: StrengthRequestBatch list) =
         batches |> List.map canonicalBatch |> String.concat "\u001c"
 
-    let private buildValidated
-        (sha256: string -> string)
-        (maxBytes: int)
-        (batches: StrengthRequestBatch list)
-        : Result<StrengthFrameBundle, StrengthFrameError> =
-        let canonical = canonicalText batches
-        let bytes = utf8ByteCount canonical
-
-        if maxBytes < 0 || bytes > maxBytes then
-            Error(StrengthFrameError.ByteLimitExceeded(bytes, maxBytes))
-        else
-            Ok
-                { Batches = batches
-                  Digest = sha256 canonical
-                  ByteLength = bytes }
-
     let tryBuild
         (sha256: string -> string)
-        (maxBytes: int)
         (batches: StrengthRequestBatch list)
         : Result<StrengthFrameBundle, StrengthFrameError> =
         let rec validateBatches expected remaining =
@@ -143,7 +124,12 @@ module StrengthFrame =
         | [] -> Error StrengthFrameError.EmptyBundle
         | _ ->
             validateBatches 1 batches
-            |> Result.bind (fun () -> buildValidated sha256 maxBytes batches)
+            |> Result.map (fun () ->
+                let canonical = canonicalText batches
+
+                { Batches = batches
+                  Digest = sha256 canonical
+                  ByteLength = utf8ByteCount canonical })
 
     /// STRENGTH-009: strip owner-local tool-call identity while preserving the
     /// exact semantic projection and call/result pairing. The resulting IDs are

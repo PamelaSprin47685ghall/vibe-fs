@@ -7,6 +7,11 @@ open System.Threading.Tasks
 /// Strength records, unions, identities, collections and live registries remain
 /// private to their owners. Tests cross this module with JSON-shaped values and
 /// opaque handles only; Fable representation is never a contract.
+///
+/// The surface describes the readonly-delegation contract only: an explicit
+/// integer authorization from the owner model, one real execution, and honest
+/// durable facts. Predictors, cost models, control holdouts, rollout modes,
+/// tier budgets, byte ceilings and production DryRun have no exports here.
 module StrengthSurface =
 
     /// Apply Strength's native completed-tool Host adaptation to rendered rows.
@@ -20,8 +25,9 @@ module StrengthSurface =
 
     val replicaLocal: sha256: (string -> string) -> value: obj -> obj
 
-    /// Build one deterministic frame bundle from plain request batches.
-    val frameTryBuild: sha256: (string -> string) -> maxBytes: int -> batches: obj array -> obj
+    /// Build one deterministic frame bundle from plain request batches. No
+    /// Delegate-specific byte ceiling; integrity is enforced inside tryBuild.
+    val frameTryBuild: sha256: (string -> string) -> batches: obj array -> obj
 
     /// Localize owner wire ids into decision-local ids without changing semantics.
     val frameTryLocalizeMirror:
@@ -42,33 +48,9 @@ module StrengthSurface =
 
     val renderSemantic: messages: obj array -> string
 
-    val costEstimate:
-        p1: float ->
-        p2: float ->
-        savedDeep1: float ->
-        savedDeep2: float ->
-        fast1: float ->
-        fast2: float ->
-        byte1: float ->
-        byte2: float ->
-        delay1: float ->
-        delay2: float ->
-        risk1: float ->
-        risk2: float ->
-            obj
-
-    val policyDecide:
-        opportunity: obj -> control: bool -> shadow: bool -> prediction: obj -> estimate: obj -> config: obj -> obj
-
-    val policyControlBucket:
-        sha256: (string -> string) -> policyVersion: string -> authorityRoot: string -> targetRun: string -> int
-
-    val policyIsControlHoldout: rateBasisPoints: int -> bucket: int -> bool
-
     val readonlyCapabilities: role: string -> requestKind: string -> string array
 
     /// StrengthReplica readonly capability labels for a canonical role.
-    /// Kept as the short owner name consumed by policy and authority laws.
     val capabilities: role: string -> string array
 
     val readonlyCapabilitiesResult: role: string -> requestKind: string -> obj
@@ -94,12 +76,28 @@ module StrengthSurface =
 
     val promotionDecide: targetRun: string -> observedRun: string -> evidence: string -> string
 
+    // Drive-only events and projection, all under the new vocabulary.
+
+    val eventRequested: value: obj -> obj
+
+    val eventBound: decision: string -> target: string -> replica: string -> anchorDigest: string -> obj
+
+    val eventClosed: decision: string -> closedFrom: string -> reason: string -> obj
+
+    val eventHistoryImported:
+        decision: string ->
+        sourceStreamId: string ->
+        sourceEventId: string ->
+        importId: string ->
+        oldBudgetEvidence: string ->
+        outcome: obj ->
+            obj
+
     val eventPrepared:
         owner: string ->
         decision: string ->
         target: string ->
         replica: string ->
-        budget: string ->
         anchor: string ->
         digest: string ->
         byteLength: int ->
@@ -127,15 +125,76 @@ module StrengthSurface =
 
     val projectionDecisionForTarget: target: string -> projection: obj -> string
 
+    /// Folded view of one decision: immutable request, legal attachments and
+    /// the closed lifecycle state. Never boolean combinations.
     val projectionCandidate: decision: string -> projection: obj -> obj
 
+    /// Read the requested rounds from the immutable projection.
+    val projectionRequestedRounds: decision: string -> projection: obj -> obj
+
     val projectionTraceRange: decision: string -> projection: obj -> obj
+
+    /// Evidence-only imported history, keyed by import identity (DELEGATE-015):
+    /// the folded material keeps its causal position, digest and trace coverage
+    /// as evidence, and never yields a runnable delegation.
+    val projectionImported: importId: string -> projection: obj -> obj
+
+    // Budget: one plain non-negative integer chosen by the owner model.
+
+    val budgetTryCreate: value: int -> obj
+
+    /// Collapse one batch of the owner's integers to its maximum.
+    val budgetMaxOf: values: int array -> obj
+
+    // Admission: evidence in, decision out. No economic or statistical input.
+
+    val policyEligibility: opportunity: obj -> obj
+
+    val policyDecide: sha256: (string -> string) -> opportunity: obj -> obj
+
+    // Authorization lifecycle transitions with illegal edges refused.
+
+    val delegationDeriveDecisionId:
+        sha256: (string -> string) ->
+        contractRevision: int ->
+        logicalRunId: string ->
+        authorityRootUserMessageId: string ->
+        sourceProviderRun: string ->
+            string
+
+    val delegationRequest: value: obj -> obj
+
+    val delegationBind: lifecycle: obj -> binding: obj -> obj
+
+    val delegationPrepare: lifecycle: obj -> obj
+
+    val delegationPromote: lifecycle: obj -> obj
+
+    val delegationTrace: lifecycle: obj -> obj
+
+    val delegationClose: lifecycle: obj -> closed: obj -> obj
+
+    val delegationAbandon: lifecycle: obj -> obj
+
+    val delegationDecisionId: lifecycle: obj -> string
 
     val storeToEnvelope: sha256: (string -> string) -> event: obj -> obj
 
     val envelopeView: value: obj -> obj
 
     val storeTryDecodeEnvelope: value: obj -> obj
+
+    // Offline migration of pre-delegation Strength history (DELEGATE-015).
+    // Boundary shapes are JS-native views; the classifier and the planner stay
+    // inside the Migration module.
+
+    val migrationClassifyEnvelope: eventType: string -> payloadJson: string -> obj
+
+    val migrationReadLegacyEnvelope: envelopeJson: string -> obj
+
+    val migrationPlanDecision: sha256: (string -> string) -> contractRevision: int -> envelopes: obj array -> obj
+
+    val migrationImportEvent: sha256: (string -> string) -> value: obj -> obj
 
     val storeAppend: store: obj -> sha256: (string -> string) -> event: obj -> Task<obj>
 
@@ -147,13 +206,13 @@ module StrengthSurface =
 
     val durabilityCreate: store: obj -> obj
 
-    val durabilityPublishPrepared: durability: obj -> request: obj -> Task<obj>
-
     val durabilityLoadProjection: durability: obj -> Task<obj>
 
     val durabilityLoadBundleForDecision: durability: obj -> projection: obj -> decision: string -> Task<obj>
 
     val durabilityAppend: durability: obj -> event: obj -> Task<obj>
+
+    val durabilityPublishPrepared: durability: obj -> request: obj -> Task<obj>
 
     val traceExpectedParts: bundle: obj -> obj array
 
@@ -174,30 +233,6 @@ module StrengthSurface =
 
     val lifecycleReplayIntents: sha256: (string -> string) -> plans: obj array -> obj
 
-    val predictorCreate: unit -> obj
-
-    val predictorFeature: role: string -> recent: string array -> visibleBytes: int -> obj
-
-    val predictorObserveFirst: state: obj -> feature: obj -> symbol: string -> obj
-
-    val predictorObserveSecond: state: obj -> feature: obj -> symbol: string -> obj
-
-    val predictorBucket: state: obj -> feature: obj -> obj
-
-    val predictorPredict: state: obj -> feature: obj -> obj
-
-    val rolloutEstimate: prediction: obj -> costs: obj -> obj
-
-    val rolloutIsShadow: mode: string -> bool
-
-    val settingsLoad: unit -> obj
-
-    val settingsDryRunBudget: unit -> string
-
-    val settingsHostCanaryHealthy: unit -> bool
-
-    val settingsHostCanaryFingerprint: string
-
     val scopeCreate: unit -> obj
 
     val scopeFuseReason: scope: obj -> string
@@ -207,16 +242,6 @@ module StrengthSurface =
     val scopeClearSession: scope: obj -> session: string -> unit
 
     val scopeDispose: scope: obj -> unit
-
-    val scopeFeature: scope: obj -> session: string -> role: string -> visibleBytes: int -> obj
-
-    val scopePredict: scope: obj -> feature: obj -> obj
-
-    val scopeBucket: scope: obj -> feature: obj -> obj
-
-    val scopeArm: scope: obj -> session: string -> targetRun: string -> feature: obj -> obj
-
-    val scopeObserve: scope: obj -> session: string -> providerRun: string -> symbol: string -> obj
 
     val scopeRuntimeRegister: scope: obj -> binding: obj -> obj
 
@@ -230,8 +255,7 @@ module StrengthSurface =
         decision: string ->
         target: string ->
         role: string ->
-        budget: string ->
-        maxFrameBytes: int ->
+        requestedRounds: int ->
         semanticDigest: string ->
         localizedMirrorMessages: obj array ->
             obj
@@ -242,11 +266,14 @@ module StrengthSurface =
 
     val runtimeRetire: runtime: obj -> replica: string -> obj
 
-    val transformApply: sha256: (string -> string) -> runtime: obj -> output: obj -> Task<obj>
+    /// Mirror one outbound request. `outboundRequest` marks a real provider
+    /// request boundary; the live registry owns the admission verdict.
+    val transformApply: sha256: (string -> string) -> runtime: obj -> output: obj -> outboundRequest: bool -> Task<obj>
 
-    val replicaRuntimeCreate: maxFrameBytes: int -> obj
+    val replicaRuntimeCreate: unit -> obj
 
-    val replicaAttach: handle: obj -> binding: obj -> purpose: string -> obj
+    /// Attach an already-live binding to the real coordinator.
+    val replicaAttach: handle: obj -> binding: obj -> obj
 
     val replicaLiveRegister: handle: obj -> binding: obj -> obj
 
@@ -262,8 +289,8 @@ module StrengthSurface =
 
     val replicaCancelOwner: handle: obj -> owner: string -> Task
 
-    val replicaCloseDryRun: handle: obj -> turn: obj -> Task<obj>
-
+    /// Live admission book: real admitted request count, completed batches and
+    /// the first immutable semantic terminal (DELEGATE-5.3).
     val replicaPeek: handle: obj -> replica: string -> obj
 
     val replicaIsReplica: handle: obj -> session: string -> bool

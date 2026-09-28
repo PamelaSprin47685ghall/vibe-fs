@@ -40,7 +40,8 @@ const { default: test } = await import("node:test");
 const routing = await import("../../../dist/OpenCode/Host/ModelRoutingSurface.js");
 
 const { bootstrapAndLoadAt, invokeScheduler } = routing
-const template = `export default function route(role, running) {
+const template = `export const routingProtocol = 2
+export default function route(role, running) {
   if (role !== 'coder') return null
   return running.length === 0
     ? { model: 'provider/coder-model', reasoning: 'none' }
@@ -66,7 +67,9 @@ test('WHAT[execution-model-routing-001] EMR_001_missing_scheduler_is_created_onc
 })
 test('WHAT[execution-model-routing-001] EMR_001_existing_scheduler_is_never_overwritten', async () => {
   await withTemp(async (path) => {
-    const existing = `export default () => ({ model: 'provider/user-choice', reasoning: 'high' })\n`
+    // A user file from protocol 2: the loader must load it as-is and never
+    // overwrite it with the recommended template.
+    const existing = `export const routingProtocol = 2\nexport default () => ({ model: 'provider/user-choice', reasoning: 'high' })\n`
     await import('node:fs/promises').then(({ mkdir }) => mkdir(join(path, '..'), { recursive: true }))
     await writeFile(path, existing, 'utf8')
 

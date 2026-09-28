@@ -21,56 +21,62 @@ type StrengthReplayPlan =
 [<RequireQualifiedAccess>]
 module StrengthLifecycle =
 
-    let private abandonOrWait (view: StrengthCandidateView) (turn: ReconciledTurn) =
-        match turn.Outcome with
-        | ReconcileProgram.TurnCompleted
-        | ReconcileProgram.TurnAborted _
-        | ReconcileProgram.TurnFailed _ ->
-            Some(StrengthEvents.abandoned view.Prepared.DecisionId view.Prepared.TargetProviderRun)
-        | ReconcileProgram.TurnNeedsContinuation _
-        | ReconcileProgram.TurnInProgress -> None
+    let private abandonOrWait (view: StrengthDelegationView) (turn: ReconciledTurn) =
+        match view.Binding, turn.Outcome with
+        | Some binding, ReconcileProgram.TurnCompleted
+        | Some binding, ReconcileProgram.TurnAborted _
+        | Some binding, ReconcileProgram.TurnFailed _ ->
+            Some(StrengthEvents.abandoned view.Request.DecisionId binding.TargetProviderRun)
+        | _ -> None
 
-    let private promotionEvent (view: StrengthCandidateView) (turn: ReconciledTurn) =
-        match StrengthTurnEvidence.promotionDecision view.Prepared.TargetProviderRun turn with
-        | StrengthPromotionDecision.Promote ->
-            Some(
-                StrengthEvents.promoted
-                    view.Prepared.OwnerSessionId
-                    view.Prepared.DecisionId
-                    view.Prepared.TargetProviderRun
-                    view.Prepared.FrameDigest
-                    view.Prepared.MaterialPayloads
-            )
-        | StrengthPromotionDecision.IgnoreWrongRun -> None
-        | StrengthPromotionDecision.AwaitOrAbandon -> abandonOrWait view turn
+    let private promotionEvent (view: StrengthDelegationView) (turn: ReconciledTurn) =
+        match view.Binding, view.Prepared with
+        | Some binding, Some prepared ->
+            match StrengthTurnEvidence.promotionDecision binding.TargetProviderRun turn with
+            | StrengthPromotionDecision.Promote ->
+                Some(
+                    StrengthEvents.promoted
+                        prepared.OwnerSessionId
+                        prepared.DecisionId
+                        prepared.TargetProviderRun
+                        prepared.FrameDigest
+                        prepared.MaterialPayloads
+                )
+            | StrengthPromotionDecision.IgnoreWrongRun -> None
+            | StrengthPromotionDecision.AwaitOrAbandon -> abandonOrWait view turn
+        | _ -> None
 
     let reconcileEvent (projection: StrengthProjection) (turn: ReconciledTurn) : StrengthEvent option =
         StrengthProjection.tryDecisionForTarget turn.ProviderRun projection
         |> Option.bind (fun decisionId -> StrengthProjection.tryCandidate decisionId projection)
         |> Option.bind (fun view ->
-            if view.Promoted || view.Abandoned then
-                None
-            else
-                promotionEvent view turn)
+            match view.State with
+            | StrengthCandidateState.Prepared -> promotionEvent view turn
+            | StrengthCandidateState.Requested
+            | StrengthCandidateState.Bound
+            | StrengthCandidateState.Promoted
+            | StrengthCandidateState.Traced
+            | StrengthCandidateState.Closed _
+            | StrengthCandidateState.Abandoned -> None)
 
-    let private anchorMissingError (view: StrengthCandidateView) (target: string) =
+    let private anchorMissingError (prepared: StrengthCandidatePrepared) (target: string) =
         Error(
             sprintf
                 "Promoted Strength target anchor is absent: decision=%s target=%s"
-                (StrengthDecisionId.value view.Prepared.DecisionId)
+                (StrengthDecisionId.value prepared.DecisionId)
                 target
         )
 
-    let private digestMismatchError (view: StrengthCandidateView) =
+    let private digestMismatchError (prepared: StrengthCandidatePrepared) =
         Error(
             sprintf
                 "Promoted Strength payload digest mismatch: decision=%s"
-                (StrengthDecisionId.value view.Prepared.DecisionId)
+                (StrengthDecisionId.value prepared.DecisionId)
         )
 
-    let private requireDigestMatch (view: StrengthCandidateView) (bundle: StrengthFrameBundle) =
-        if bundle.Digest <> view.Prepared.FrameDigest then
-            digestMismatchError view
+    let private requireDigestMatch (prepared: StrengthCandidatePrepared) (bundle: StrengthFrameBundle) =
+        if bundle.Digest <> prepared.FrameDigest then
+            digestMismatchError prepared
         else
             Ok()
 
@@ -88,32 +94,53 @@ module StrengthLifecycle =
             projection.ByDecision
             |> Map.toList
             |> List.map snd
-            |> List.filter (fun view ->
-                view.Prepared.OwnerSessionId = ownerSessionId
-                && view.Promoted
-                && not view.Abandoned)
-            |> List.sortBy (fun view -> StrengthDecisionId.value view.Prepared.DecisionId)
+            |> List.choose (fun view ->
+                match view.Prepared with
+                | Some prepared when prepared.OwnerSessionId = ownerSessionId ->
+                    match view.State with
+                    | StrengthCandidateState.Promoted
+                    | StrengthCandidateState.Traced -> Some(prepared, view)
+                    | StrengthCandidateState.Requested
+                    | StrengthCandidateState.Bound
+                    | StrengthCandidateState.Prepared
+                    | StrengthCandidateState.Closed _
+                    | StrengthCandidateState.Abandoned -> None
+                | _ -> None)
+            |> List.sortBy (fun (prepared, _) -> StrengthDecisionId.value prepared.DecisionId)
 
-        let rec loop (remaining: StrengthCandidateView list) (acc: StrengthReplayPlan list) =
+        let rec loop
+            (remaining: (StrengthCandidatePrepared * StrengthDelegationView) list)
+            (acc: StrengthReplayPlan list)
+            =
             taskResult {
                 match remaining with
                 | [] -> return List.rev acc
-                | view :: tail ->
-                    let target = ProviderRunIdentity.value view.Prepared.TargetProviderRun
+                | (prepared, view) :: tail ->
+                    let target = ProviderRunIdentity.value prepared.TargetProviderRun
+
+                    let authorityRoot =
+                        view.Request.OwnerLogicalRun.AuthorityRootUserMessageId
+                        |> AuthorityRootUserMessageId.value
+
+                    let targetIndex =
+                        messages |> List.tryFindIndex (fun message -> messageIdOf message = Some target)
+
+                    let rootIndex =
+                        messages
+                        |> List.tryFindIndex (fun message -> messageIdOf message = Some authorityRoot)
 
                     let! beforeIndex =
-                        messages
-                        |> List.tryFindIndex (fun message -> messageIdOf message = Some target)
-                        |> Option.map Ok
-                        |> Option.defaultValue (anchorMissingError view target)
+                        match targetIndex, rootIndex with
+                        | Some targetAt, Some rootAt when rootAt < targetAt -> Ok targetAt
+                        | _ -> anchorMissingError prepared target
 
-                    let! bundle = loadBundle view.Prepared
-                    do! requireDigestMatch view bundle
+                    let! bundle = loadBundle prepared
+                    do! requireDigestMatch prepared bundle
 
                     return!
                         loop
                             tail
-                            ({ Prepared = view.Prepared
+                            ({ Prepared = prepared
                                Bundle = bundle
                                BeforeMessageIndex = beforeIndex
                                ExistingTraceRange = view.TraceRange }

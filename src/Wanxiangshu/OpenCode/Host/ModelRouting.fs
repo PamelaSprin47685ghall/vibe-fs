@@ -15,7 +15,8 @@ type private ExecutionLease =
     { PhysicalUserMessageId: string option
       Participant: string option
       RoutingRole: Role
-      Target: ModelRoutingTarget }
+      Target: ModelRoutingTarget
+      Purpose: ModelExecutionPurpose }
 
 module ModelRouting =
 
@@ -69,8 +70,27 @@ module ModelRouting =
     [<Emit("$0 != null && typeof $0.then === 'function'")>]
     let private isThenable (value: obj) : bool = jsNative
 
-    [<Emit("$0($1, $2, $3)")>]
-    let private callScheduler (scheduler: obj) (role: string) (running: obj array) (previous: obj) : obj = jsNative
+    [<Emit("$0($1, $2, $3, $4)")>]
+    let private callScheduler
+        (scheduler: obj)
+        (role: string)
+        (running: obj array)
+        (previous: obj)
+        (purpose: string)
+        : obj =
+        jsNative
+
+    [<Emit("$0($1)")>]
+    let private callMarkProviderFailed (markFailed: obj) (provider: string) : unit = jsNative
+
+    [<Emit("$0($1, $2)")>]
+    let private callCapacityQuery (query: obj) (role: string) (purpose: string) : obj = jsNative
+
+    [<Emit("$0()")>]
+    let private callPredictorConfiguration (query: obj) : obj = jsNative
+
+    [<Emit("typeof $0 === 'number'")>]
+    let private isNumber (value: obj) : bool = jsNative
 
     let private nonEmpty name (value: obj) =
         match value with
@@ -96,11 +116,78 @@ module ModelRouting =
     let private targetObject (target: ModelRoutingTarget) =
         createObj [ "model" ==> target.Model; "reasoning" ==> target.Reasoning ]
 
+    let private routingProtocolVersion = 2.0
+
+    let private purposeLabel =
+        function
+        | ModelExecutionPurpose.Normal -> "normal"
+        | ModelExecutionPurpose.ReadonlyDelegate -> "readonly-delegate"
+
+    /// The protocol version is a stable contract version of the scheduler ABI,
+    /// not an enable switch. A three-parameter JS function silently ignores the
+    /// extra purpose argument, so neither `function.length` nor a quiet call can
+    /// prove the upgrade; the loader requires the explicit marker.
+    let private requireRoutingProtocol (moduleObj: obj) =
+        let declared = if isNull moduleObj then null else moduleObj?routingProtocol
+
+        if isNull declared then
+            invalidOp
+                "execution-model-routing: wanxiangshu.mjs must export `routingProtocol = 2`; the scheduler ABI is route(role, running, previous, purpose). Migrate the existing configuration manually (the recommended template in resources/wanxiangshu.mjs shows the new shape); an existing user file is never overwritten."
+        elif not (isNumber declared) then
+            invalidOp
+                "execution-model-routing: wanxiangshu.mjs routingProtocol must be the number 2; the scheduler ABI is route(role, running, previous, purpose). Migrate the existing configuration manually (the recommended template in resources/wanxiangshu.mjs shows the new shape); an existing user file is never overwritten."
+        elif unbox<float> declared <> routingProtocolVersion then
+            invalidOp (
+                sprintf
+                    "execution-model-routing: wanxiangshu.mjs declares routingProtocol = %s but this runtime requires 2 (route(role, running, previous, purpose)). Migrate the existing configuration manually (the recommended template in resources/wanxiangshu.mjs shows the new shape); an existing user file is never overwritten."
+                    (string declared)
+            )
+
+    [<RequireQualifiedAccess>]
+    type PredictorConfiguration =
+        | Configured
+        | NotConfigured
+        | ConfigurationInvalid of reason: string
+
+    let private predictorConfigurationOf (value: obj) : PredictorConfiguration =
+        if isNull value then
+            PredictorConfiguration.ConfigurationInvalid "predictor configuration query returned no result"
+        else
+            match string value?state with
+            | "configured" -> PredictorConfiguration.Configured
+            | "unconfigured" -> PredictorConfiguration.NotConfigured
+            | "invalid" ->
+                let reason = if isNull value?reason then "" else string value?reason
+                PredictorConfiguration.ConfigurationInvalid reason
+            | other ->
+                PredictorConfiguration.ConfigurationInvalid(
+                    sprintf "predictor configuration query returned unknown state %s" other
+                )
+
+    /// Read-only existence query owned by the same MJS model configuration:
+    /// absent Predictor slot or empty candidates are not configured; valid
+    /// non-empty targets are configured; a malformed structure is a
+    /// configuration error. It is deliberately independent of capacity and
+    /// provider health, and must not be inferred from one route returning null.
+    let predictorConfiguration (scheduler: obj) : PredictorConfiguration =
+        let query =
+            if isNull scheduler then
+                null
+            else
+                scheduler?predictorConfiguration
+
+        if not (isFunction query) then
+            PredictorConfiguration.ConfigurationInvalid
+                "wanxiangshu.mjs must export predictorConfiguration() as the read-only Predictor slot existence query"
+        else
+            callPredictorConfiguration query |> predictorConfigurationOf
+
     let invokeScheduler
         (scheduler: obj)
         (role: string)
         (running: ModelRoutingTarget array)
         (previous: ModelRoutingTarget option)
+        (purpose: ModelExecutionPurpose)
         : ModelRoutingTarget option =
         if not (isFunction scheduler) then
             invalidOp "execution-model-routing: scheduler default export must be a function"
@@ -114,6 +201,7 @@ module ModelRouting =
                 (role.Trim())
                 (running |> Array.map targetObject)
                 (previous |> Option.map targetObject |> Option.defaultValue null)
+                (purposeLabel purpose)
 
         if isThenable result then
             invalidOp "execution-model-routing: scheduler must be synchronous and must not return a Promise"
@@ -174,9 +262,12 @@ module ModelRouting =
             if not (isFunction scheduler) then
                 invalidOp "execution-model-routing: scheduler default export must be a function"
 
+            requireRoutingProtocol moduleObj
+
             if not (isNull moduleObj) then
                 scheduler?markProviderFailed <- moduleObj?markProviderFailed
                 scheduler?hasTheoreticalCapacity <- moduleObj?hasTheoreticalCapacity
+                scheduler?predictorConfiguration <- moduleObj?predictorConfiguration
 
             return scheduler
         }
@@ -294,6 +385,13 @@ module ModelRouting =
         let boundDevopsTargetBySession = Dictionary<string, ModelRoutingTarget>()
         // DSL-MUTABLE: resource — superseded physical user message identities per session
         let supersededPhysical = HashSet<string * string>()
+        // DSL-MUTABLE: resource — execution purpose per admitted physical user
+        // message. The purpose outlives the active lease so a stale or superseded
+        // commit still knows whether it was a readonly-delegate execution;
+        // purged with the session.
+        let leasePurposeBySession =
+            Dictionary<string, (string * ModelExecutionPurpose) list>()
+
         let admissionQueue = ExecutionAdmissionQueue(gate, transitionCounters)
         let admissionOwner = ExecutionCapacityOwner(transitionCounters)
         // DSL-MUTABLE: resource — process-local scheduler poison
@@ -311,18 +409,46 @@ module ModelRouting =
             else
                 scheduler?hasTheoreticalCapacity
 
-        let hasTheoreticalCapacityLocked (role: string) : bool =
+        let hasTheoreticalCapacityLocked (role: string) (purpose: ModelExecutionPurpose) : bool =
             if not (isNull hasCapFn) && isFunction hasCapFn then
-                unbox<bool> (callScheduler hasCapFn role [||] null)
+                unbox<bool> (callCapacityQuery hasCapFn role (purposeLabel purpose))
             else
                 true
 
         let running () = capacity.Snapshot()
 
-        let activePhysicalTarget sessionId =
+        /// A fresh execution inherits the replaced execution's target only as a
+        /// same-purpose continuation (execution-model-routing-002): an owner
+        /// execution never inherits a readonly-delegate target, and a readonly
+        /// delegate never inherits the owner target.
+        let activeTargetOfPurpose (purpose: ModelExecutionPurpose) sessionId =
             match activeBySession.TryGetValue sessionId with
-            | true, lease when lease.PhysicalUserMessageId.IsSome -> Some lease.Target
+            | true, lease when lease.PhysicalUserMessageId.IsSome && lease.Purpose = purpose -> Some lease.Target
             | _ -> None
+
+        /// Record the purpose of an admitted physical execution. Reservations carry
+        /// no physical identity yet; their adoption records the real one.
+        let rememberLeasePurpose sessionId (lease: ExecutionLease) =
+            match lease.PhysicalUserMessageId with
+            | Some physical ->
+                let existing =
+                    match leasePurposeBySession.TryGetValue sessionId with
+                    | true, entries -> entries
+                    | false, _ -> []
+
+                leasePurposeBySession.[sessionId] <- (physical, lease.Purpose) :: existing
+            | None -> ()
+
+        /// Purpose of a possibly stale admitted physical execution. An unknown
+        /// execution is treated as an ordinary owner execution: the conservative
+        /// side of the fixed DevOps binding rule (execution-model-routing-019).
+        let staleLeasePurpose sessionId physicalUserMessageId =
+            match leasePurposeBySession.TryGetValue sessionId with
+            | true, entries ->
+                entries
+                |> List.tryFind (fun (physical, _) -> physical = physicalUserMessageId)
+                |> Option.map snd
+            | false, _ -> None
 
         let retireProviderRunTarget sessionId =
             match latestProviderRunBySession.TryGetValue sessionId with
@@ -372,16 +498,16 @@ module ModelRouting =
 
         let markProviderOfTarget (target: ModelRoutingTarget) =
             if not (isNull markFailedFn) && isFunction markFailedFn then
-                callScheduler markFailedFn (targetProvider target) [||] null |> ignore
+                callMarkProviderFailed markFailedFn (targetProvider target)
 
         // provider-attempt-recovery-021: a confirmed provider failure that kept its target binds this
         // session's next fresh admission to that target; the binding is consumed
-        // once, and only a still-active replaced execution can otherwise supply
-        // the ordinary previous hint.
-        let recoveryPreviousTarget sessionId =
+        // once, and only a still-active replaced execution of the same purpose can
+        // otherwise supply the ordinary previous hint.
+        let recoveryPreviousTarget (purpose: ModelExecutionPurpose) sessionId =
             match takeRecoveryRetryTarget sessionId with
             | Some target -> Some target
-            | None -> activePhysicalTarget sessionId
+            | None -> activeTargetOfPurpose purpose sessionId
 
         let ensureHealthy () = fatalError |> Option.iter raise
 
@@ -390,15 +516,15 @@ module ModelRouting =
             capacity.Fail error
             admissionQueue.Fail error
 
-        let scheduleOrPoison running (role: Role) previous =
+        let scheduleOrPoison running (role: Role) previous (purpose: ModelExecutionPurpose) =
             try
-                invokeScheduler scheduler (Roles.roleLabel role) running previous
+                invokeScheduler scheduler (Roles.roleLabel role) running previous purpose
             with ex ->
                 poison ex
                 raise ex
 
-        let exactTargetAvailable (role: Role) target running =
-            match scheduleOrPoison running role (Some target) with
+        let exactTargetAvailable (role: Role) target running (purpose: ModelExecutionPurpose) =
+            match scheduleOrPoison running role (Some target) purpose with
             | Some candidate -> candidate = target
             | None -> false
 
@@ -409,6 +535,7 @@ module ModelRouting =
             (role: Role)
             lenderSessionId
             previous
+            (purpose: ModelExecutionPurpose)
             =
             try
                 capacity.RouteFresh(
@@ -416,56 +543,91 @@ module ModelRouting =
                     oldPhysicalUserMessageId,
                     physicalUserMessageId,
                     lenderSessionId,
-                    fun running -> scheduleOrPoison running role previous
+                    fun running -> scheduleOrPoison running role previous purpose
                 )
             with ex ->
                 poison ex
                 raise ex
 
-        let reserveFreshOrPoison sessionId (role: Role) lenderSessionId previous =
+        let reserveFreshOrPoison sessionId (role: Role) lenderSessionId previous (purpose: ModelExecutionPurpose) =
             try
                 capacity.ReserveFresh(
                     sessionId,
                     lenderSessionId,
-                    (fun running -> scheduleOrPoison running role previous)
+                    (fun running -> scheduleOrPoison running role previous purpose)
                 )
             with ex ->
                 poison ex
                 raise ex
 
         let rememberExecution (demand: ExecutionAdmissionDemand) (target: ModelRoutingTarget) =
-            activeBySession.[demand.SessionId] <-
+            let lease: ExecutionLease =
                 { PhysicalUserMessageId = Some demand.PhysicalUserMessageId
                   Participant = Some demand.Participant
                   RoutingRole = demand.Role
-                  Target = target }
+                  Target = target
+                  Purpose = demand.Purpose }
 
-        let enforceImmutableDevopsBinding (sessionId: string) (role: Role) (target: ModelRoutingTarget) =
-            match role = Role.DevOps, boundDevopsTargetBySession.TryGetValue sessionId with
-            | true, (true, bound) when bound <> target && exactTargetAvailable role bound (running ()) ->
-                invalidOp (
-                    sprintf
-                        "execution-model-routing: DevOps model binding is immutable (%s/%s vs %s/%s)"
-                        bound.Model
-                        bound.Reasoning
-                        target.Model
-                        target.Reasoning
-                )
-            | true, _ -> boundDevopsTargetBySession.[sessionId] <- target
-            | _ -> ()
+            activeBySession.[demand.SessionId] <- lease
+            rememberLeasePurpose demand.SessionId lease
+
+        /// The fixed DevOps target binding belongs to the owner execution only
+        /// (execution-model-routing-019). A readonly-delegate execution is a new
+        /// physical execution: it must neither inherit nor overwrite the binding.
+        let enforceImmutableDevopsBinding
+            (sessionId: string)
+            (role: Role)
+            (target: ModelRoutingTarget)
+            (purpose: ModelExecutionPurpose)
+            =
+            match purpose with
+            | ModelExecutionPurpose.ReadonlyDelegate -> ()
+            | ModelExecutionPurpose.Normal ->
+                match role = Role.DevOps, boundDevopsTargetBySession.TryGetValue sessionId with
+                | true, (true, bound) when
+                    bound <> target
+                    && exactTargetAvailable role bound (running ()) ModelExecutionPurpose.Normal
+                    ->
+                    invalidOp (
+                        sprintf
+                            "execution-model-routing: DevOps model binding is immutable (%s/%s vs %s/%s)"
+                            bound.Model
+                            bound.Reasoning
+                            target.Model
+                            target.Reasoning
+                    )
+                | true, _ -> boundDevopsTargetBySession.[sessionId] <- target
+                | _ -> ()
 
         let tryGetBoundDevopsTarget (sessionId: string) (role: Role) =
             match role = Role.DevOps, boundDevopsTargetBySession.TryGetValue sessionId with
             | true, (true, t) -> Some t
             | _ -> None
 
-        let resolvePreviousTarget sessionId role =
-            match activePhysicalTarget sessionId with
+        let resolvePreviousTarget (purpose: ModelExecutionPurpose) sessionId role =
+            match activeTargetOfPurpose purpose sessionId with
             | Some t -> Some t
             | None -> tryGetBoundDevopsTarget sessionId role
 
+        /// A fresh readonly-delegate execution never inherits the owner's active
+        /// target or fixed DevOps binding as its previous hint: it enters as a
+        /// new physical execution and receives null (or the session's own
+        /// single-consumption recovery retry preference) while purpose selects
+        /// the Predictor pool.
+        let previousForFreshPurpose (purpose: ModelExecutionPurpose) sessionId (role: Role) =
+            match purpose with
+            | ModelExecutionPurpose.ReadonlyDelegate -> takeRecoveryRetryTarget sessionId
+            | ModelExecutionPurpose.Normal ->
+                recoveryPreviousTarget ModelExecutionPurpose.Normal sessionId
+                |> Option.orElseWith (fun () -> tryGetBoundDevopsTarget sessionId role)
+
+        let previousForReservationPurpose (purpose: ModelExecutionPurpose) sessionId (role: Role) =
+            match purpose with
+            | ModelExecutionPurpose.ReadonlyDelegate -> None
+            | ModelExecutionPurpose.Normal -> resolvePreviousTarget ModelExecutionPurpose.Normal sessionId role
+
         let commit (demand: ExecutionAdmissionDemand) (target: ModelRoutingTarget) =
-            enforceImmutableDevopsBinding demand.SessionId demand.Role target
+            enforceImmutableDevopsBinding demand.SessionId demand.Role target demand.Purpose
             rememberExecution demand target
 
             let identity: ExecutionAdmissionExactIdentity =
@@ -496,6 +658,7 @@ module ModelRouting =
                 demand.Role
                 demand.LenderSessionId
                 demand.PreviousTarget
+                demand.Purpose
             |> commitScheduled demand
 
         let rec drainDemands () =
@@ -514,6 +677,7 @@ module ModelRouting =
             let changed = activeBySession.Remove sessionId
             retireProviderRunTarget sessionId
             recoveryRetryTargetBySession.Remove sessionId |> ignore
+            leasePurposeBySession.Remove sessionId |> ignore
             capacity.ReleaseSession sessionId |> ignore
 
             if admissionQueue.ContainsSession sessionId then
@@ -541,8 +705,10 @@ module ModelRouting =
             physicalUserMessageId
             (expectedRole: Role)
             (expectedParticipant: string option)
+            (expectedPurpose: ModelExecutionPurpose)
             (observedRole: Role)
             (observedParticipant: string)
+            (observedPurpose: ModelExecutionPurpose)
             =
             if expectedRole <> observedRole then
                 invalidOp (
@@ -566,6 +732,16 @@ module ModelRouting =
                 )
             | _ -> ()
 
+            if expectedPurpose <> observedPurpose then
+                invalidOp (
+                    sprintf
+                        "execution-model-routing: physical execution %s/%s changed execution purpose (%s -> %s)"
+                        sessionId
+                        physicalUserMessageId
+                        (purposeLabel expectedPurpose)
+                        (purposeLabel observedPurpose)
+                )
+
         let issueAdmission sessionId physicalUserMessageId (role: Role) (participant: string) target =
             let identity: ExecutionAdmissionExactIdentity =
                 { SessionId = sessionId
@@ -584,26 +760,53 @@ module ModelRouting =
             physicalUserMessageId
             (role: Role)
             (participant: string)
+            (purpose: ModelExecutionPurpose)
             (lease: ExecutionLease)
             =
             match lease.PhysicalUserMessageId with
             | Some current when current = physicalUserMessageId ->
-                requireSameIdentity sessionId physicalUserMessageId lease.RoutingRole lease.Participant role participant
+                requireSameIdentity
+                    sessionId
+                    physicalUserMessageId
+                    lease.RoutingRole
+                    lease.Participant
+                    lease.Purpose
+                    role
+                    participant
+                    purpose
+
                 Some(issueAdmission sessionId physicalUserMessageId role participant lease.Target)
             | None ->
-                requireSameIdentity sessionId physicalUserMessageId lease.RoutingRole lease.Participant role participant
+                requireSameIdentity
+                    sessionId
+                    physicalUserMessageId
+                    lease.RoutingRole
+                    lease.Participant
+                    lease.Purpose
+                    role
+                    participant
+                    purpose
 
                 capacity.AdoptReservation(sessionId, physicalUserMessageId, lease.Target)
 
-                activeBySession.[sessionId] <-
+                let adopted =
                     { lease with
                         PhysicalUserMessageId = Some physicalUserMessageId
                         Participant = Some participant }
 
+                activeBySession.[sessionId] <- adopted
+                rememberLeasePurpose sessionId adopted
+
                 Some(issueAdmission sessionId physicalUserMessageId role participant lease.Target)
             | Some _ -> None
 
-        let reusePendingExecution sessionId physicalUserMessageId (role: Role) (participant: string) =
+        let reusePendingExecution
+            sessionId
+            physicalUserMessageId
+            (role: Role)
+            (participant: string)
+            (purpose: ModelExecutionPurpose)
+            =
             match admissionQueue.TryCurrent sessionId with
             | Some demand when demand.PhysicalUserMessageId = physicalUserMessageId ->
                 requireSameIdentity
@@ -611,17 +814,25 @@ module ModelRouting =
                     physicalUserMessageId
                     demand.Role
                     (Some demand.Participant)
+                    demand.Purpose
                     role
                     participant
+                    purpose
 
                 Some(ExecutionAdmissionAcquisition.Queued demand.Node)
             | Some _
             | None -> None
 
-        let currentExecutionOutcome sessionId physicalUserMessageId (role: Role) (participant: string) =
+        let currentExecutionOutcome
+            sessionId
+            physicalUserMessageId
+            (role: Role)
+            (participant: string)
+            (purpose: ModelExecutionPurpose)
+            =
             match activeBySession.TryGetValue sessionId with
-            | true, lease -> reuseOrAdoptActiveExecution sessionId physicalUserMessageId role participant lease
-            | false, _ -> reusePendingExecution sessionId physicalUserMessageId role participant
+            | true, lease -> reuseOrAdoptActiveExecution sessionId physicalUserMessageId role participant purpose lease
+            | false, _ -> reusePendingExecution sessionId physicalUserMessageId role participant purpose
 
         let currentPhysicalUserMessageId sessionId =
             match activeBySession.TryGetValue sessionId with
@@ -638,6 +849,7 @@ module ModelRouting =
             physicalUserMessageId
             (role: Role)
             (participant: string)
+            (purpose: ModelExecutionPurpose)
             (lenderSessionId: string option)
             (previous: ModelRoutingTarget option)
             =
@@ -649,13 +861,18 @@ module ModelRouting =
                     role
                     lenderSessionId
                     previous
+                    purpose
             with
             | Some target ->
-                activeBySession.[sessionId] <-
+                let lease: ExecutionLease =
                     { PhysicalUserMessageId = Some physicalUserMessageId
                       Participant = Some participant
                       RoutingRole = role
-                      Target = target }
+                      Target = target
+                      Purpose = purpose }
+
+                activeBySession.[sessionId] <- lease
+                rememberLeasePurpose sessionId lease
 
                 drainDemands ()
                 issueAdmission sessionId physicalUserMessageId role participant target
@@ -668,6 +885,7 @@ module ModelRouting =
                         physicalUserMessageId,
                         role,
                         participant,
+                        purpose,
                         lenderSessionId,
                         previous
                     )
@@ -680,9 +898,10 @@ module ModelRouting =
             physicalUserMessageId
             (role: Role)
             (participant: string)
+            (purpose: ModelExecutionPurpose)
             (lenderSessionId: string option)
             =
-            match currentExecutionOutcome sessionId physicalUserMessageId role participant with
+            match currentExecutionOutcome sessionId physicalUserMessageId role participant purpose with
             | Some current -> current
             | None ->
                 let oldPhysicalUserMessageId = currentPhysicalUserMessageId sessionId
@@ -690,10 +909,7 @@ module ModelRouting =
                 oldPhysicalUserMessageId
                 |> Option.iter (fun oldId -> supersededPhysical.Add(sessionId, oldId) |> ignore)
 
-                let recoveryTarget () = recoveryPreviousTarget sessionId
-                let devopsTarget () = tryGetBoundDevopsTarget sessionId role
-
-                let previous = recoveryTarget () |> Option.orElseWith (fun () -> devopsTarget ())
+                let previous = previousForFreshPurpose purpose sessionId role
 
                 activeBySession.Remove sessionId |> ignore
                 supersedeCurrentDemand sessionId
@@ -704,6 +920,7 @@ module ModelRouting =
                     physicalUserMessageId
                     role
                     participant
+                    purpose
                     lenderSessionId
                     previous
 
@@ -712,70 +929,79 @@ module ModelRouting =
             physicalUserMessageId
             (role: Role)
             (participant: string)
+            (purpose: ModelExecutionPurpose)
             (lenderSessionId: string option)
             =
             lock gate (fun () ->
                 ensureHealthy ()
 
-                if not (hasTheoreticalCapacityLocked (Roles.roleLabel role)) then
+                if not (hasTheoreticalCapacityLocked (Roles.roleLabel role) purpose) then
                     ExecutionAdmissionAcquisition.QueueFull
                 else
-                    acquireFreshOrAdopt sessionId physicalUserMessageId role participant lenderSessionId)
+                    acquireFreshOrAdopt sessionId physicalUserMessageId role participant purpose lenderSessionId)
 
         let acquireManagedSafe
             sessionId
             physicalUserMessageId
             (role: Role)
             (participant: string)
+            (purpose: ModelExecutionPurpose)
             (lenderSessionId: string option)
             =
             try
-                acquireManagedTask sessionId physicalUserMessageId role participant lenderSessionId
+                acquireManagedTask sessionId physicalUserMessageId role participant purpose lenderSessionId
                 |> Task.FromResult
             with ex ->
                 failedTask<ExecutionAdmissionAcquisition> ex
 
-        let tryReserveFresh sessionId (role: Role) (lenderSessionId: string option) =
-            let previous =
-                match activePhysicalTarget sessionId with
-                | Some t -> Some t
-                | None -> tryGetBoundDevopsTarget sessionId role
+        let tryReserveFresh sessionId (role: Role) (purpose: ModelExecutionPurpose) (lenderSessionId: string option) =
+            let previous = previousForReservationPurpose purpose sessionId role
 
-            match reserveFreshOrPoison sessionId role lenderSessionId previous with
+            match reserveFreshOrPoison sessionId role lenderSessionId previous purpose with
             | None -> None
             | Some target ->
-                enforceImmutableDevopsBinding sessionId role target
+                enforceImmutableDevopsBinding sessionId role target purpose
 
-                activeBySession.[sessionId] <-
+                let lease: ExecutionLease =
                     { PhysicalUserMessageId = None
                       Participant = None
                       RoutingRole = role
-                      Target = target }
+                      Target = target
+                      Purpose = purpose }
+
+                activeBySession.[sessionId] <- lease
+                rememberLeasePurpose sessionId lease
 
                 drainDemands ()
                 Some target
 
-        let reserveFreshAndEnforce sessionId role lenderSessionId =
-            match tryReserveFresh sessionId role lenderSessionId with
+        let reserveFreshAndEnforce sessionId role purpose lenderSessionId =
+            match tryReserveFresh sessionId role purpose lenderSessionId with
             | None -> None
             | Some target ->
-                enforceImmutableDevopsBinding sessionId role target
+                enforceImmutableDevopsBinding sessionId role target purpose
                 Some target
 
-        let tryReserveLocked sessionId (role: Role) (lenderSessionId: string option) =
+        let tryReserveLocked sessionId (role: Role) (purpose: ModelExecutionPurpose) (lenderSessionId: string option) =
             ensureHealthy ()
 
             match activeBySession.TryGetValue sessionId, admissionQueue.ContainsSession sessionId with
-            | (true, lease), _ when lease.PhysicalUserMessageId.IsNone && lease.RoutingRole = role -> Some lease.Target
+            | (true, lease), _ when
+                lease.PhysicalUserMessageId.IsNone
+                && lease.RoutingRole = role
+                && lease.Purpose = purpose
+                ->
+                Some lease.Target
             | (true, _), _ -> None
             | (false, _), true -> None
-            | (false, _), false -> reserveFreshAndEnforce sessionId role lenderSessionId
+            | (false, _), false -> reserveFreshAndEnforce sessionId role purpose lenderSessionId
 
         let adoptExistingReservation
             sessionId
             physicalUserMessageId
             (role: Role)
             (participant: string)
+            (purpose: ModelExecutionPurpose)
             (lease: ExecutionLease)
             =
             if lease.RoutingRole <> role then
@@ -786,6 +1012,16 @@ module ModelRouting =
                         physicalUserMessageId
                         (Roles.roleLabel lease.RoutingRole)
                         (Roles.roleLabel role)
+                )
+
+            if lease.Purpose <> purpose then
+                invalidOp (
+                    sprintf
+                        "execution-model-routing: physical execution %s/%s changed execution purpose (%s -> %s)"
+                        sessionId
+                        physicalUserMessageId
+                        (purposeLabel lease.Purpose)
+                        (purposeLabel purpose)
                 )
 
             match lease.Participant with
@@ -815,16 +1051,21 @@ module ModelRouting =
             physicalUserMessageId
             (role: Role)
             (participant: string)
+            (purpose: ModelExecutionPurpose)
             lenderSessionId
             previous
             =
-            match routeFreshOrPoison sessionId None physicalUserMessageId role lenderSessionId previous with
+            match routeFreshOrPoison sessionId None physicalUserMessageId role lenderSessionId previous purpose with
             | Some target ->
-                activeBySession.[sessionId] <-
+                let lease: ExecutionLease =
                     { PhysicalUserMessageId = Some physicalUserMessageId
                       Participant = Some participant
                       RoutingRole = role
-                      Target = target }
+                      Target = target
+                      Purpose = purpose }
+
+                activeBySession.[sessionId] <- lease
+                rememberLeasePurpose sessionId lease
 
                 drainDemands ()
                 Some target
@@ -835,19 +1076,20 @@ module ModelRouting =
             physicalUserMessageId
             (role: Role)
             (participant: string)
+            (purpose: ModelExecutionPurpose)
             (lenderSessionId: string option)
             =
             if admissionQueue.ContainsSession sessionId then
                 None
             else
-                let previous = resolvePreviousTarget sessionId role
-                routeFreshOrNone sessionId physicalUserMessageId role participant lenderSessionId previous
+                let previous = previousForReservationPurpose purpose sessionId role
+                routeFreshOrNone sessionId physicalUserMessageId role participant purpose lenderSessionId previous
 
-        let acquireFreshLeaseAndEnforce sessionId physicalUserMessageId role participant lenderSessionId =
-            match tryAcquireFreshLease sessionId physicalUserMessageId role participant lenderSessionId with
+        let acquireFreshLeaseAndEnforce sessionId physicalUserMessageId role participant purpose lenderSessionId =
+            match tryAcquireFreshLease sessionId physicalUserMessageId role participant purpose lenderSessionId with
             | None -> None
             | Some target ->
-                enforceImmutableDevopsBinding sessionId role target
+                enforceImmutableDevopsBinding sessionId role target purpose
                 Some target
 
         let replaceActiveLeaseAndEnforce
@@ -855,10 +1097,18 @@ module ModelRouting =
             physicalUserMessageId
             role
             participant
+            purpose
             lenderSessionId
             (oldLease: ExecutionLease)
             =
-            let previous = Some oldLease.Target
+            /// A fresh physical execution inherits the replaced execution's target
+            /// only as a same-purpose continuation; a purpose change is a
+            /// different execution and receives no previous hint.
+            let previous =
+                match purpose, oldLease.Purpose with
+                | ModelExecutionPurpose.Normal, ModelExecutionPurpose.Normal -> Some oldLease.Target
+                | _ -> None
+
             let oldPhysicalUserMessageId = oldLease.PhysicalUserMessageId
 
             oldPhysicalUserMessageId
@@ -874,17 +1124,22 @@ module ModelRouting =
                     role
                     lenderSessionId
                     previous
+                    purpose
 
             match targetOpt with
             | Some target ->
-                activeBySession.[sessionId] <-
+                let lease: ExecutionLease =
                     { PhysicalUserMessageId = Some physicalUserMessageId
                       Participant = Some participant
                       RoutingRole = role
-                      Target = target }
+                      Target = target
+                      Purpose = purpose }
+
+                activeBySession.[sessionId] <- lease
+                rememberLeasePurpose sessionId lease
 
                 drainDemands ()
-                enforceImmutableDevopsBinding sessionId role target
+                enforceImmutableDevopsBinding sessionId role target purpose
                 Some target
             | None -> None
 
@@ -893,6 +1148,7 @@ module ModelRouting =
             physicalUserMessageId
             (role: Role)
             (participant: string)
+            (purpose: ModelExecutionPurpose)
             (lenderSessionId: string option)
             =
             match
@@ -902,20 +1158,29 @@ module ModelRouting =
             | false, (true, lease) when
                 lease.PhysicalUserMessageId = Some physicalUserMessageId
                 && lease.RoutingRole = role
+                && lease.Purpose = purpose
                 && (lease.Participant = Some participant || lease.Participant.IsNone)
                 ->
                 Some lease.Target
             | false, (true, lease) when
                 lease.PhysicalUserMessageId.IsNone
                 && lease.RoutingRole = role
+                && lease.Purpose = purpose
                 && (lease.Participant = Some participant || lease.Participant.IsNone)
                 ->
-                adoptExistingReservation sessionId physicalUserMessageId role participant lease
+                adoptExistingReservation sessionId physicalUserMessageId role participant purpose lease
             | false, (true, lease) when lease.PhysicalUserMessageId <> Some physicalUserMessageId ->
-                replaceActiveLeaseAndEnforce sessionId physicalUserMessageId role participant lenderSessionId lease
+                replaceActiveLeaseAndEnforce
+                    sessionId
+                    physicalUserMessageId
+                    role
+                    participant
+                    purpose
+                    lenderSessionId
+                    lease
             | false, (true, _) -> None
             | false, (false, _) ->
-                acquireFreshLeaseAndEnforce sessionId physicalUserMessageId role participant lenderSessionId
+                acquireFreshLeaseAndEnforce sessionId physicalUserMessageId role participant purpose lenderSessionId
 
         let enterProviderStepLocked sessionId physicalUserMessageId fence =
             ensureHealthy ()
@@ -927,7 +1192,7 @@ module ModelRouting =
                     physicalUserMessageId,
                     lease.Target,
                     fence,
-                    fun running -> exactTargetAvailable lease.RoutingRole lease.Target running
+                    fun running -> exactTargetAvailable lease.RoutingRole lease.Target running lease.Purpose
                 )
             | _ ->
                 failedTask<unit> (
@@ -1056,18 +1321,47 @@ module ModelRouting =
                 physicalUserMessageId: string,
                 role: Role,
                 participant: string,
+                purpose: ModelExecutionPurpose,
                 lenderSessionId: string option
             ) : Task<ExecutionAdmissionAcquisition> =
             match normalizeAdmissionInput sessionId physicalUserMessageId role participant with
             | Error error -> failedTask<ExecutionAdmissionAcquisition> error
             | Ok(normSessionId, normPhysicalUserMessageId, normRole, normParticipant) ->
                 let normLender = lenderSessionId |> Option.bind normalizeSessionId
-                acquireManagedSafe normSessionId normPhysicalUserMessageId normRole normParticipant normLender
+                acquireManagedSafe normSessionId normPhysicalUserMessageId normRole normParticipant purpose normLender
 
         member _.ExecutionAdmissionTarget(lease: ExecutionAdmissionLease) = admissionOwner.Target lease
 
         member _.CommitExecutionAdmission(lease: ExecutionAdmissionLease, observed: ExecutionAdmissionExactIdentity) =
-            lock gate (fun () -> enforceImmutableDevopsBinding observed.SessionId observed.Role observed.Target)
+            /// The fixed DevOps binding is a per-road rule of the owner execution.
+            /// While the committing physical execution is still the active one we
+            /// enforce with its own purpose: a readonly-delegate execution is a
+            /// new execution and never touches the owner binding. A stale or
+            /// superseded commit has no live purpose to read, and the ordinary
+            /// owner rule still applies — the immutable-binding check is keyed to
+            /// the road, not to the currently active physical execution, and the
+            /// commit itself settles as a stale fence outcome when the lease no
+            /// longer matches.
+            let enforceBinding () =
+                match activeBySession.TryGetValue observed.SessionId with
+                | true, active when active.PhysicalUserMessageId = Some observed.PhysicalUserMessageId ->
+                    enforceImmutableDevopsBinding observed.SessionId observed.Role observed.Target active.Purpose
+                | _ ->
+                    // A stale or superseded commit has no live lease: the
+                    // remembered purpose of the admitted execution keeps the
+                    // readonly-delegate exemption total, and an unknown execution
+                    // is treated as an ordinary owner execution.
+                    match staleLeasePurpose observed.SessionId observed.PhysicalUserMessageId with
+                    | Some purpose ->
+                        enforceImmutableDevopsBinding observed.SessionId observed.Role observed.Target purpose
+                    | None ->
+                        enforceImmutableDevopsBinding
+                            observed.SessionId
+                            observed.Role
+                            observed.Target
+                            ModelExecutionPurpose.Normal
+
+            lock gate enforceBinding
             admissionOwner.Commit(lease, observed)
 
         member _.ReleaseExecutionAdmissionBeforeProvider
@@ -1087,13 +1381,13 @@ module ModelRouting =
         /// yet a provider execution identity. The exact chat.message later adopts
         /// it without another scheduler decision or another running occurrence.
         member _.TryReserveManaged
-            (sessionId: string, role: Role, lenderSessionId: string option)
+            (sessionId: string, role: Role, purpose: ModelExecutionPurpose, lenderSessionId: string option)
             : ModelRoutingTarget option =
             match normalizeReservationInput sessionId role with
             | Error _ -> None
             | Ok(normSessionId, normRole) ->
                 let normLender = lenderSessionId |> Option.bind normalizeSessionId
-                lock gate (fun () -> tryReserveLocked normSessionId normRole normLender)
+                lock gate (fun () -> tryReserveLocked normSessionId normRole purpose normLender)
 
         member _.TryLease
             (
@@ -1101,6 +1395,7 @@ module ModelRouting =
                 physicalUserMessageId: string,
                 role: Role,
                 participant: string,
+                purpose: ModelExecutionPurpose,
                 lenderSessionId: string option
             ) : ModelRoutingTarget option =
             match normalizeExecutionInput sessionId physicalUserMessageId role participant with
@@ -1109,12 +1404,15 @@ module ModelRouting =
                 let normLender = lenderSessionId |> Option.bind normalizeSessionId
 
                 lock gate (fun () ->
-                    tryLeaseLocked normSessionId normPhysicalUserMessageId normRole normParticipant normLender)
+                    tryLeaseLocked normSessionId normPhysicalUserMessageId normRole normParticipant purpose normLender)
 
         member _.BindDevopsTarget(sessionId: string, target: ModelRoutingTarget) =
             lock gate (fun () ->
                 match boundDevopsTargetBySession.TryGetValue sessionId with
-                | true, bound when bound <> target && exactTargetAvailable Role.DevOps bound (running ()) ->
+                | true, bound when
+                    bound <> target
+                    && exactTargetAvailable Role.DevOps bound (running ()) ModelExecutionPurpose.Normal
+                    ->
                     invalidOp (
                         sprintf
                             "execution-model-routing: DevOps model binding is immutable (%s/%s vs %s/%s)"
@@ -1231,8 +1529,14 @@ module ModelRouting =
             | None -> None
             | Some normSessionId -> lock gate (fun () -> retainFailedTargetOfRun normSessionId (providerRun.Trim()))
 
-        member _.HasTheoreticalCapacity(role: string) : bool =
-            lock gate (fun () -> hasTheoreticalCapacityLocked role)
+        member _.HasTheoreticalCapacity (role: string) (purpose: ModelExecutionPurpose) : bool =
+            lock gate (fun () -> hasTheoreticalCapacityLocked role purpose)
+
+        /// Read-only Predictor slot existence query owned by the loaded MJS
+        /// configuration. Tool decoration and readonly-delegate admission share
+        /// this one result instead of keeping a second enabled truth.
+        member _.PredictorConfiguration: PredictorConfiguration =
+            predictorConfiguration scheduler
 
     let private sharedGate = obj ()
     // DSL-MUTABLE: resource — process-shared scheduler runtime singleton
@@ -1282,13 +1586,17 @@ module ModelRouting =
         current()
             .RetainFailedTargetForRetry(SessionId.value sessionId, ProviderRunIdentity.value providerRun)
 
-    let internal hasTheoreticalCapacity (role: string) : bool = current().HasTheoreticalCapacity role
+    /// purpose defaults to Normal: the provider recovery retry decisions ask
+    /// about the owner execution of the failing role.
+    let internal hasTheoreticalCapacity (role: string) (purpose: ModelExecutionPurpose) : bool =
+        current().HasTheoreticalCapacity role purpose
 
     let internal acquireExecutionAdmission
         (sessionId: SessionId)
         (physicalUserMessageId: PhysicalUserMessageId)
         (role: Role)
         (participant: string)
+        (purpose: ModelExecutionPurpose)
         (lenderSessionId: string option)
         =
         current()
@@ -1297,6 +1605,7 @@ module ModelRouting =
                 PhysicalUserMessageId.value physicalUserMessageId,
                 role,
                 participant,
+                purpose,
                 lenderSessionId
             )
 
@@ -1315,9 +1624,14 @@ module ModelRouting =
     let hasRuntime () : bool =
         lock sharedGate (fun () -> sharedRuntime.IsSome)
 
-    let tryReserveManaged (sessionId: SessionId) (role: Role) (lenderSessionId: string option) =
+    let tryReserveManaged
+        (sessionId: SessionId)
+        (role: Role)
+        (purpose: ModelExecutionPurpose)
+        (lenderSessionId: string option)
+        =
         match lock sharedGate (fun () -> sharedRuntime) with
-        | Some runtime -> runtime.TryReserveManaged(SessionId.value sessionId, role, lenderSessionId)
+        | Some runtime -> runtime.TryReserveManaged(SessionId.value sessionId, role, purpose, lenderSessionId)
         | None -> None
 
     let tryLease
@@ -1325,6 +1639,7 @@ module ModelRouting =
         (physicalUserMessageId: PhysicalUserMessageId)
         (role: Role)
         (participant: string)
+        (purpose: ModelExecutionPurpose)
         (lenderSessionId: string option)
         =
         match lock sharedGate (fun () -> sharedRuntime) with
@@ -1334,6 +1649,7 @@ module ModelRouting =
                 PhysicalUserMessageId.value physicalUserMessageId,
                 role,
                 participant,
+                purpose,
                 lenderSessionId
             )
         | None -> None
@@ -1390,6 +1706,10 @@ module ModelRouting =
         | None -> CapacityTransitionOutcome.AlreadyApplied
 
     let internal capacitySnapshot () = current().CapacitySnapshot()
+
+    /// Same Predictor existence query on the process-shared scheduler, resolved
+    /// from the one loaded model configuration.
+    let internal sharedPredictorConfiguration () : PredictorConfiguration = current().PredictorConfiguration
 
     let enterProviderStep
         (sessionId: SessionId)

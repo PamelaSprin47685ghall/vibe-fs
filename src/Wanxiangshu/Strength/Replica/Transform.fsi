@@ -21,4 +21,5 @@ module StrengthReplicaTransform =
         runtime: StrengthRuntime ->
         sessions: ISessionHostPort ->
         output: obj ->
+        outboundRequest: bool ->
             Task<StrengthReplicaTransformOutcome>

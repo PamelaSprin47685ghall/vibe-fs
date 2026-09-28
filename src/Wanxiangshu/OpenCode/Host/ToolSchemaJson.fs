@@ -139,6 +139,7 @@ module ToolSchemaJson =
         | _ -> None
 
     let private canFlattenAllOf (members: obj array) (parent: obj) : bool =
+        // DSL-MUTABLE: algorithm-scratch — keys already merged while checking allOf flattenability
         let mutable pushed =
             entries parent
             |> Array.map entryKey

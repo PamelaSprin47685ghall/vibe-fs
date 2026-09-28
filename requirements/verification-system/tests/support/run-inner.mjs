@@ -88,9 +88,22 @@ async function main() {
   mkdirSync(runnerRoutingDir, { recursive: true })
   writeFileSync(
     join(runnerRoutingDir, 'wanxiangshu.mjs'),
-    `export default function route(role, running) {
+    `export const routingProtocol = 2
+export default function route(role, running, previous, purpose) {
   if (!new Set(['manager', 'orchestrator', 'engineer', 'coder', 'inspector', 'browser', 'inquiry', 'reviewer', 'devops', 'distiller', 'blogger', 'bookkeeper', 'predictor']).has(role)) throw new Error('unexpected managed role: ' + role)
   return { model: 'provider/' + role + '-model', reasoning: 'none' }
+}
+
+export const predictorConfiguration = () => {
+  const state = globalThis.__wanxiangshu_test_predictor_state ?? 'unconfigured'
+  if (state === 'configured') return { state: 'configured', reason: null }
+  if (state === 'invalid') {
+    return {
+      state: 'invalid',
+      reason: globalThis.__wanxiangshu_test_predictor_reason ?? 'test Predictor configuration is invalid',
+    }
+  }
+  return { state: 'unconfigured', reason: null }
 }\n`,
     'utf8',
   )

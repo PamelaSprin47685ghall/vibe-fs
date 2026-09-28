@@ -12,45 +12,31 @@ module PluginStrengthPorts =
 
     /// Build the neutral Host ports from the composition-held Strength state.
     ///
-    /// Evaluation point matches the old inline construction: `strengthScope`
-    /// is the live scope object (primary observation and fuse trips read
-    /// through it per turn), while the replica runtime is the wire-time value
-    /// (attached later by `PluginSessionWiring`, so still absent here).
+    /// The replica-dependent closures are evaluated LAZILY, at the moment of
+    /// each event, from the live `strengthScope`.
+    /// `PluginSessionWiring.attach` installs the `StrengthReplicaRuntime` AFTER
+    /// this record is built (SpikePlugin.fs: host wiring first, attach second),
+    /// so an eager capture here would permanently observe `None` and the
+    /// replica turn / cancel / delete paths would never fire. A late read with
+    /// no runtime attached answers exactly like an absent handler:
+    /// HostTurnObserver.fs treats `None` and a handler returning `false`
+    /// identically, and the cancel/delete consumers iterate an empty effect.
     /// Ordering and failure semantics are verbatim from `HostSignalBootstrap`:
-    /// replica pre-turn short-circuit first; dry-run close, primary
-    /// observation and durability commit before ordinary turn observation;
-    /// projection-load failure trips the fuse and raises, semantic rejection
-    /// is process-fatal, storage failure trips the fuse and raises.
+    /// replica pre-turn short-circuit first; the durable append runs before
+    /// ordinary turn observation; projection-load failure trips the fuse and
+    /// raises, semantic rejection is process-fatal, storage failure trips the
+    /// fuse and raises.
     let create
         (strengthScope: PluginStrengthScope option)
         (strengthDurability: StrengthDurabilityPort option)
         : HostSignalBootstrap.StrengthHostPorts =
-        let strengthReplicaRuntime =
-            strengthScope |> Option.bind (fun s -> s.StrengthReplicaRuntime)
-
         let handlePreTurn =
-            strengthReplicaRuntime
-            |> Option.map (fun runtime -> fun (turn: ReconciledTurn) -> Task.FromResult(runtime.HandleTurn turn))
-
-        let closeDryRunAtPrimaryTerminal (turn: ReconciledTurn) =
-            match strengthReplicaRuntime with
-            | Some runtime -> runtime.CloseDryRunAtTargetTerminal turn
-            | None -> Task.FromResult() :> Task
-
-        let observeStrengthPrimary (turn: ReconciledTurn) =
             strengthScope
-            |> Option.bind (fun s ->
-                s.ObserveStrengthPrimary(
-                    turn.SessionId,
-                    turn.ProviderRun,
-                    StrengthTurnEvidence.primarySymbol turn.Parts
-                ))
-            |> Option.iter (fun pair ->
-                Diagnostic.emit
-                    "strength-counterfactual-observed"
-                    [ "session_id", SessionId.value turn.SessionId
-                      "provider_run", ProviderRunIdentity.value turn.ProviderRun
-                      "result", sprintf "first=%A second=%A" pair.FirstSymbol pair.SecondSymbol ])
+            |> Option.map (fun s ->
+                fun (turn: ReconciledTurn) ->
+                    match s.StrengthReplicaRuntime with
+                    | Some runtime -> Task.FromResult(runtime.HandleTurn turn)
+                    | None -> Task.FromResult false)
 
         /// Both durability failures leave this process unable to trust the
         /// promotion it just attempted: trip the fuse, then raise.
@@ -64,6 +50,8 @@ module PluginStrengthPorts =
             | StrengthDurableAppend.SemanticRejected error ->
                 // durable-events-021: process is no longer trustworthy
                 Diagnostic.fatal "strength-semantic-cut" [ "result", error ]
+            | StrengthDurableAppend.StorageInvalid reason ->
+                tripFuse ("Strength promotion commit storage invalid: " + reason)
             | StrengthDurableAppend.StorageFailed reason ->
                 tripFuse ("Strength promotion commit storage failure: " + reason)
 
@@ -83,14 +71,12 @@ module PluginStrengthPorts =
                 | Ok projection -> return! commitReconciledEvent durability projection turn
             }
 
-        /// speculative-investigation-013 / STRENGTH-010 / STRENGTH-007: dry-run close, primary
-        /// observation and the durable append all run before ordinary turn
-        /// observation.
+        /// speculative-investigation-010 / STRENGTH-007: the durable append of
+        /// Promoted/Abandoned runs before ordinary turn observation. Promotion
+        /// consumption proof is exactly the reconciled turn evidence; primary
+        /// counterfactual observation no longer exists.
         let observePrimaryTurnBody (turn: ReconciledTurn) : Task<unit> =
             task {
-                do! closeDryRunAtPrimaryTerminal turn
-                observeStrengthPrimary turn
-
                 match strengthDurability with
                 | Some durability -> do! commitDurablePromotion durability turn
                 | None -> ()
@@ -102,15 +88,20 @@ module PluginStrengthPorts =
             | _ -> Some observePrimaryTurnBody
 
         let cancelStrengthOwner =
-            strengthReplicaRuntime
-            |> Option.map (fun runtime -> fun (sessionId: SessionId) -> runtime.CancelOwner sessionId |> ignore)
+            strengthScope
+            |> Option.map (fun s ->
+                fun (sessionId: SessionId) ->
+                    s.StrengthReplicaRuntime
+                    |> Option.iter (fun runtime -> runtime.CancelOwner sessionId |> ignore))
 
         let onSessionDeleted =
-            strengthReplicaRuntime
-            |> Option.map (fun runtime ->
+            strengthScope
+            |> Option.map (fun s ->
                 fun (sid: SessionId) ->
-                    runtime.CancelOwner sid |> ignore
-                    runtime.HandleSessionDeleted sid)
+                    s.StrengthReplicaRuntime
+                    |> Option.iter (fun runtime ->
+                        runtime.CancelOwner sid |> ignore
+                        runtime.HandleSessionDeleted sid))
 
         { HandlePreTurn = handlePreTurn
           ObservePrimaryTurn = observePrimaryTurn

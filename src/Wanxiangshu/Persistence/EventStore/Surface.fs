@@ -153,6 +153,17 @@ module Surface =
         | None -> null
         | Some envelope -> envelopeToJs envelope
 
+    /// Read every stream id that owns a durable head. Offline tooling
+    /// enumerates the store through this owner surface instead of reading
+    /// writer files; the head-to-stream hop reuses the same read path.
+    let streams (handle: EventStoreHandle) : string array =
+        handle.Store.AllHeads()
+        |> List.choose (fun eventId -> handle.Store.TryEvent eventId)
+        |> List.map (fun envelope -> EventStreamId.value envelope.StreamId)
+        |> List.distinct
+        |> List.sort
+        |> List.toArray
+
     /// Read all structural heads for one stream.
     let heads (handle: EventStoreHandle, streamId: string) : string array =
         handle.Store.TryHeads(EventStreamId.create streamId)

@@ -272,25 +272,6 @@ module EnforcerContinuation =
                 return! refreshGapAfterPark ctx mainSessionId sessionKey caughtUpReason
         }
 
-    /// Parked-resume adjudication: claim succeeded → continue building
-    /// context; claim conflict → emit + ctx.Stop so the foreign owner stays
-    /// the only writer of this frame, never a fatal trip over a routine
-    /// supersede.
-    let private resumeAfterClaim
-        (ctx: Context)
-        (sessionKey: string)
-        (live: BloggerRequestContext)
-        : Task<ContinuationOutcome> =
-        task {
-            match BloggerRuntimeHost.claimCurrentRequest ctx.Scope sessionKey live with
-            | Ok() ->
-                let! rebuilt = resumeWithContext ctx live
-                return ctx.Project rebuilt
-            | Error reason ->
-                Diagnostic.emit "blogger-flight-claim-conflict" [ "session_id", sessionKey; "result", reason ]
-                return ctx.Stop "park-resumed-foreign-flight"
-        }
-
     let private projectAfterParkWake
         (ctx: Context)
         (mainSessionId: SessionId)
@@ -302,12 +283,7 @@ module EnforcerContinuation =
                 ctx.Scope.CancelParked sessionKey
                 return ctx.Stop "park-resumed-main-sealed"
             else
-                // Exact claim: already-ours refreshes, empty claims, foreign
-                // declines. A foreign identity here means this parked resume
-                // arrived after the parked context was superseded — the correct
-                // outcome is ctx.Stop (committed evidence preserved), not a
-                // fatal trip over a routine supersede.
-                return! resumeAfterClaim ctx sessionKey live
+                return! resumeCatchUpWithLive ctx sessionKey live
         }
 
     let private afterParkResumed

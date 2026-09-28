@@ -11,11 +11,25 @@ module ModelRouting =
     val internal failureOfExecutionAdmissionAcquisition: ExecutionAdmissionAcquisition -> ExecutionFailure option
     val internal capacityOwnership: lease: ExecutionAdmissionLease -> CapacityOwnership
 
+    /// Read-only Predictor slot existence query result, derived from the
+    /// same MJS model configuration. Absent or empty Predictor candidates are
+    /// not configured; valid non-empty candidates are configured; a malformed
+    /// structure is a configuration error. Capacity and provider health do not
+    /// change the configured state.
+    [<RequireQualifiedAccess>]
+    type PredictorConfiguration =
+        | Configured
+        | NotConfigured
+        | ConfigurationInvalid of reason: string
+
+    val predictorConfiguration: scheduler: obj -> PredictorConfiguration
+
     val invokeScheduler:
         scheduler: obj ->
         role: string ->
         running: ModelRoutingTarget array ->
         previous: ModelRoutingTarget option ->
+        purpose: ModelExecutionPurpose ->
             ModelRoutingTarget option
 
     val configPath: unit -> string
@@ -33,8 +47,11 @@ module ModelRouting =
             physicalUserMessageId: string *
             role: Role *
             participant: string *
+            purpose: ModelExecutionPurpose *
             lenderSessionId: string option ->
                 Task<ExecutionAdmissionAcquisition>
+
+        member PredictorConfiguration: PredictorConfiguration
 
         member ExecutionAdmissionTarget:
             lease: ExecutionAdmissionLease -> Result<ModelRoutingTarget, ExecutionAdmissionRejection>
@@ -49,13 +66,15 @@ module ModelRouting =
             lease: ExecutionAdmissionLease -> Result<string, ExecutionAdmissionRejection>
 
         member TryReserveManaged:
-            sessionId: string * role: Role * lenderSessionId: string option -> ModelRoutingTarget option
+            sessionId: string * role: Role * purpose: ModelExecutionPurpose * lenderSessionId: string option ->
+                ModelRoutingTarget option
 
         member TryLease:
             sessionId: string *
             physicalUserMessageId: string *
             role: Role *
             participant: string *
+            purpose: ModelExecutionPurpose *
             lenderSessionId: string option ->
                 ModelRoutingTarget option
 
@@ -85,6 +104,7 @@ module ModelRouting =
         member PendingCount: int
         member PendingBound: int
         member PendingContractVersion: int
+        member HasTheoreticalCapacity: role: string -> purpose: ModelExecutionPurpose -> bool
 
     val initialize: unit -> Task
 
@@ -95,13 +115,14 @@ module ModelRouting =
     val internal retainFailedTargetForRetry:
         sessionId: SessionId -> providerRun: ProviderRunIdentity -> ModelRoutingTarget option
 
-    val internal hasTheoreticalCapacity: role: string -> bool
+    val internal hasTheoreticalCapacity: role: string -> ?purpose: ModelExecutionPurpose -> bool
 
     val internal acquireExecutionAdmission:
         sessionId: SessionId ->
         physicalUserMessageId: PhysicalUserMessageId ->
         role: Role ->
         participant: string ->
+        purpose: ModelExecutionPurpose ->
         lenderSessionId: string option ->
             Task<ExecutionAdmissionAcquisition>
 
@@ -117,15 +138,22 @@ module ModelRouting =
     val hasRuntime: unit -> bool
 
     val tryReserveManaged:
-        sessionId: SessionId -> role: Role -> lenderSessionId: string option -> ModelRoutingTarget option
+        sessionId: SessionId ->
+        role: Role ->
+        purpose: ModelExecutionPurpose ->
+        lenderSessionId: string option ->
+            ModelRoutingTarget option
 
     val tryLease:
         sessionId: SessionId ->
         physicalUserMessageId: PhysicalUserMessageId ->
         role: Role ->
         participant: string ->
+        purpose: ModelExecutionPurpose ->
         lenderSessionId: string option ->
             ModelRoutingTarget option
+
+    val internal sharedPredictorConfiguration: unit -> PredictorConfiguration
 
     val internal boundDevopsModel: sessionId: SessionId -> OpencodeModel option
     val internal releaseExecution: sessionId: SessionId -> CapacityTransitionOutcome

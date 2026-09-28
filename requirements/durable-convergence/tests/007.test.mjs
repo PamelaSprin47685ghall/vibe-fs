@@ -10,6 +10,7 @@ const eventStore = await import("../../../dist/Persistence/EventStore/Surface.js
 const casebook = await import("../../../dist/Repository/Knowledge/Casebook/Surface.js");
 const transaction = await import("../../../dist/Repository/Programming/Js/TransactionSurface.js");
 const strength = await import("../../../dist/Strength/Surface.js");
+const { strengthDelegationChainEvents } = await import("../../verification-system/tests/support/strength-delegation-chain.mjs");
 
 const structuralEvent = {
   id: '7'.repeat(40),
@@ -50,6 +51,17 @@ test('WHAT[durable-convergence-007] retained rich history rebuilds the exact liv
         await strength.storeWritePayload(liveStore, new TextEncoder().encode('parity strength material')),
         'write Strength payload',
       )
+      const delegationChain = strengthDelegationChainEvents(strength, {
+        ownerSessionId: 'parity-owner',
+        decisionId: 'parity-decision',
+        targetProviderRun: 'parity-target',
+        replicaSessionId: 'parity-replica',
+        anchorDigest: 'parity-anchor',
+      })
+
+      mustOk(await strength.storeAppend(liveStore, (text) => `parity-hash(${text})`, delegationChain.requested), 'append Strength Requested fact')
+      mustOk(await strength.storeAppend(liveStore, (text) => `parity-hash(${text})`, delegationChain.bound), 'append Strength Bound fact')
+
       mustOk(
         await strength.storeAppend(
           liveStore,
@@ -59,7 +71,6 @@ test('WHAT[durable-convergence-007] retained rich history rebuilds the exact liv
             'parity-decision',
             'parity-target',
             'parity-replica',
-            'K1',
             'parity-anchor',
             'parity-frame',
             24,

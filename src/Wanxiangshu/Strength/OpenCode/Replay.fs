@@ -217,6 +217,8 @@ module StrengthReplay =
             | StrengthDurableAppend.SemanticRejected _ -> ()
             | StrengthDurableAppend.StorageFailed error ->
                 failClosed ("Strength Traced commit storage failure: " + error)
+            | StrengthDurableAppend.StorageInvalid error ->
+                failClosed ("Strength Traced commit storage invalid: " + error)
         }
 
     let private commitPlanTrace

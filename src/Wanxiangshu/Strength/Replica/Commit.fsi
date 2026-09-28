@@ -16,7 +16,7 @@ type StrengthDurableEvidence =
 [<RequireQualifiedAccess>]
 type StrengthCommitDecision =
     | Proceed
-    | FallBackK0
+    | FallBackNoDelegation
     | RetryAppend
     | FailClosed
 

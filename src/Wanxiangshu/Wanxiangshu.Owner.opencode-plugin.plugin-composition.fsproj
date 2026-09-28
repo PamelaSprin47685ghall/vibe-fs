@@ -65,7 +65,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-composition.durable-trace-capture.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.opencode-host-sessionbindingsurface.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-budget.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-event-vocabulary-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-opencode-delegate.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-replica-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.speculative-investigation.strength-turnevidence.fsproj"/>

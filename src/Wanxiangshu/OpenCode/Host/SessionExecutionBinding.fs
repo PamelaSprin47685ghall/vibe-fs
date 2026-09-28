@@ -78,12 +78,12 @@ module SessionExecutionBinding =
     // DSL-MUTABLE: single-flight — durable child evidence installed at Load Phase.
     // The in-process maps above are a cache of what this process currently drives;
     // the durable handle projection is the existence truth across a restart.
-    let mutable private durableChildEvidence: (string -> (string * string) option) option = None
+    let mutable private durableChildEvidence: (string -> (string * string) option) option =
+        None
 
     /// Install the durable resolver: sessionId -> (parentSessionId, agent). Called
     /// once at plugin load; reads fall through to it and cache the answer locally.
-    let installDurableChildEvidence (resolve: string -> (string * string) option) =
-        durableChildEvidence <- Some resolve
+    let installDurableChildEvidence (resolve: string -> (string * string) option) = durableChildEvidence <- Some resolve
 
     let private durableParentOf (sessionKey: string) : string option =
         durableChildEvidence

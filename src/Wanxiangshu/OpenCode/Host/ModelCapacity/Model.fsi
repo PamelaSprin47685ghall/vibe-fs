@@ -5,6 +5,15 @@ open Wanxiangshu.Foundation
 
 type ModelRoutingTarget = { Model: string; Reasoning: string }
 
+/// Scheduler execution purpose. It travels with physical admission and reaches
+/// the MJS scheduler as the fourth argument; it is derived from the Host
+/// request type / authorization binding, never from tool arguments, user text,
+/// model self-description or a role name.
+[<RequireQualifiedAccess>]
+type ModelExecutionPurpose =
+    | Normal
+    | ReadonlyDelegate
+
 [<Struct; StructuralEquality; StructuralComparison>]
 type internal CapacityCreditId = private CapacityCreditId of int64
 

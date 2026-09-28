@@ -19,6 +19,7 @@ type internal ExecutionAdmissionDemand =
       PhysicalUserMessageId: string
       Role: Role
       Participant: string
+      Purpose: ModelExecutionPurpose
       LenderSessionId: string option
       PreviousTarget: ModelRoutingTarget option
       Node: ExecutionAdmissionQueueNode }
@@ -47,6 +48,7 @@ type internal ExecutionAdmissionQueue =
         physicalUserMessageId: string *
         role: Role *
         participant: string *
+        purpose: ModelExecutionPurpose *
         lenderSessionId: string option *
         previousTarget: ModelRoutingTarget option ->
             ExecutionAdmissionAcquisition

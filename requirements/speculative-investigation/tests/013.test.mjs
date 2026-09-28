@@ -183,7 +183,7 @@ test('WHAT[speculative-investigation-013] STRENGTH_013_two_owner_decisions_proje
   assert.equal(Strength.projectionDecisionForTarget('run-d-b', projection), 'd-b')
 
   // Closing one owner's authorization leaves the other owner's decision intact.
-  apply(Strength.eventClosed('d-a', 'Bound', 'OwnerCancelled'))
+  apply(Strength.eventClosed('d-a', 'Bound', 'Cancelled'))
   assert.equal(Strength.projectionCandidate('d-a', projection).state, 'Closed')
   assert.equal(Strength.projectionCandidate('d-b', projection).state, 'Bound')
 })

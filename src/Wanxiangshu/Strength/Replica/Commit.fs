@@ -8,7 +8,6 @@ open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 
 /// STRENGTH-006/007: adapter-level append result. CommitUnknown means the
@@ -33,7 +32,7 @@ type StrengthDurableEvidence =
 [<RequireQualifiedAccess>]
 type StrengthCommitDecision =
     | Proceed
-    | FallBackK0
+    | FallBackNoDelegation
     | RetryAppend
     | FailClosed
 
@@ -43,7 +42,7 @@ module StrengthCommit =
     let private preparedUnknown evidence =
         match evidence with
         | StrengthDurableEvidence.Matches -> StrengthCommitDecision.Proceed
-        | StrengthDurableEvidence.Absent -> StrengthCommitDecision.FallBackK0
+        | StrengthDurableEvidence.Absent -> StrengthCommitDecision.FallBackNoDelegation
         | StrengthDurableEvidence.Conflicts
         | StrengthDurableEvidence.Unknown -> StrengthCommitDecision.FailClosed
 
@@ -55,14 +54,14 @@ module StrengthCommit =
         | StrengthDurableEvidence.Unknown -> StrengthCommitDecision.FailClosed
 
     /// Prepared is still pre-intervention. A definite rejection, or an unknown
-    /// append later proved absent, may safely collapse this decision to K0.
+    /// append later proved absent, may safely fall back to no delegation.
     let resolvePrepared
         (appendOutcome: StrengthAppendOutcome)
         (durableEvidence: StrengthDurableEvidence)
         : StrengthCommitDecision =
         match appendOutcome with
         | StrengthAppendOutcome.Committed -> StrengthCommitDecision.Proceed
-        | StrengthAppendOutcome.Rejected -> StrengthCommitDecision.FallBackK0
+        | StrengthAppendOutcome.Rejected -> StrengthCommitDecision.FallBackNoDelegation
         | StrengthAppendOutcome.CommitUnknown -> preparedUnknown durableEvidence
 
     /// Promotion closes already-real causality: the target provider run has

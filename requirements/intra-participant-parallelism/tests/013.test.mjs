@@ -81,7 +81,7 @@ const withRoutingHome = async (body) => {
   mkdirSync(configDir, { recursive: true })
   writeFileSync(
     join(configDir, 'wanxiangshu.mjs'),
-    "export default function route() { return { model: 'fixture/root-model', reasoning: 'none' } }\n",
+    "export const routingProtocol = 2\nexport default function route(role, running, previous, purpose) { return { model: 'fixture/root-model', reasoning: 'none' } }\nexport const predictorConfiguration = () => { const state = globalThis.__wanxiangshu_test_predictor_state ?? 'unconfigured'; if (state === 'configured') return { state: 'configured', reason: null }; if (state === 'invalid') return { state: 'invalid', reason: globalThis.__wanxiangshu_test_predictor_reason ?? 'test Predictor configuration is invalid' }; return { state: 'unconfigured', reason: null } }\n",
     'utf8',
   )
   process.env.HOME = home

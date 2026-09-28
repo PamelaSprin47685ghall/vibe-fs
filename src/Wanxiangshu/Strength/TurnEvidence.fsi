@@ -3,7 +3,6 @@ namespace Wanxiangshu.Strength
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
-open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Replica
 
 /// STRENGTH-007: maps Host reconciliation material onto the domain's causal
@@ -12,6 +11,5 @@ open Wanxiangshu.Strength.Replica
 [<RequireQualifiedAccess>]
 module StrengthTurnEvidence =
     val classifyParts: parts: MessagePart array -> StrengthProviderOutputEvidence
-    val primarySymbol: parts: MessagePart array -> StrengthPrimarySymbol
 
     val promotionDecision: targetProviderRun: ProviderRunIdentity -> turn: ReconciledTurn -> StrengthPromotionDecision

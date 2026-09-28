@@ -434,6 +434,17 @@ module ToolHostCodec =
           PromptText = promptText raw
           AttachAbort = attachAbort raw }
 
+    /// The call id carried by a plugin `tool.execute.*` hook input.
+    ///
+    /// WHAT[009]'s both-halves identity pairing belongs to the tool execution
+    /// context, so `decodeContext` requires `messageID` beside `callID`. The
+    /// plugin hooks receive `{ tool, sessionID, callID }` and never a
+    /// `messageID`; hook-side consumers (the protocol argument vault, the
+    /// delegated-tool estimate ledger) read the call id here instead of
+    /// inheriting a pairing the hook input cannot satisfy.
+    let hookCallId (raw: obj) : ToolCallId option =
+        contextString raw "callID" |> Option.map ToolCallId.create
+
     let factory (toolModule: obj) = HostToolFactory(toolModule?tool)
 
     let internal schemaValue (HostSchema schema) = schema

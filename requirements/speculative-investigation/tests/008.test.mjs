@@ -3,24 +3,33 @@ import { integrationTest } from '../../verification-system/tests/support/tier-ga
 
 {
 const { default: assert } = await import("node:assert/strict");
+const { createHash } = await import("node:crypto");
 const { default: test } = await import("node:test");
 const Strength = await import("../../../dist/Strength/Surface.js");
 
-const H = (text) => `H(${text})`
-const frame = () => Strength.frameTryBuild(H, 10000, [{ requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }, { toolName: 'grep', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' }] }]).value
-const prepared = (value, decisionId = 'd1', target = 'run-1') => Strength.eventPrepared('owner', decisionId, target, `replica-${decisionId}`, 'K1', 'anchor-a', value.digest, value.byteLength, [`p-${decisionId}`])
+const H = (text) => createHash('sha256').update(text).digest('hex')
+const frame = () => Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [
+  { toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' },
+  { toolName: 'grep', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' },
+] }]).value
+const request = (decisionId = 'd1', target = 'run-1') => Strength.eventRequested({
+  decisionId, ownerSessionId: 'owner',
+  ownerLogicalRun: { logicalRunId: 'logical-1', authorityRootUserMessageId: 'user-1' },
+  sourcePhysicalUserMessageId: 'user-1', sourceProviderRun: target,
+  sourceToolCallIds: ['call-1'], requestedRounds: 2, contractRevision: 1,
+})
+const bound = (decisionId = 'd1', target = 'run-1') => Strength.eventBound(decisionId, target, `replica-${decisionId}`, 'anchor-a')
+const prepared = (value, decisionId = 'd1', target = 'run-1') => Strength.eventPrepared('owner', decisionId, target, `replica-${decisionId}`, 'anchor-a', value.digest, value.byteLength, [`p-${decisionId}`])
 const promoted = (value, decisionId = 'd1', target = 'run-1') => Strength.eventPromoted('owner', decisionId, target, value.digest, [`p-${decisionId}`])
 const apply = (state, event) => {
   const result = Strength.projectionApply(state, event)
   assert.equal(result.ok, true, result.error)
   return result.value
 }
-const turn = (providerRun, parts, outcome = 'completed') => ({ sessionId: 'owner', physicalUserMessageId: 'user-1', authorityRootUserMessageId: 'user-1', providerRun, parts, outcome })
-const call = (callId, name, args) => ({ kind: 'tool-call', callId, name, args })
 
 test('WHAT[speculative-investigation-008] STRENGTH_006_008_replay_excludes_Prepared_and_rebuilds_only_Promoted_at_exact_target_anchor', async () => {
   const value = frame()
-  let projection = apply(Strength.projectionEmpty(), prepared(value))
+  let projection = apply(apply(apply(Strength.projectionEmpty(), request()), bound()), prepared(value))
   const messages = [{ id: 'user-1' }, { id: 'run-1' }, { id: 'user-2' }]
   let replay = await Strength.lifecycleReplayPlans('owner', messages, value, projection)
   assert.equal(replay.ok, true)
@@ -46,20 +55,22 @@ test('WHAT[speculative-investigation-008] STRENGTH_008_replay_loads_each_selecte
   let projection = Strength.projectionEmpty()
 
   for (const decisionId of ['d2', 'd1', 'd3']) {
+    projection = apply(projection, request(decisionId, `run-${decisionId}`))
+    projection = apply(projection, bound(decisionId, `run-${decisionId}`))
     projection = apply(projection, prepared(value, decisionId, `run-${decisionId}`))
     projection = apply(projection, promoted(value, decisionId, `run-${decisionId}`))
   }
 
-  projection = apply(projection, prepared(value, 'd0', 'run-d0'))
+  projection = apply(projection, request('d0', 'run-d0'))
 
-  const messages = ['d3', 'd1', 'd2'].map((decisionId) => ({ id: `run-${decisionId}` }))
+  const messages = [{ id: 'user-1' }, ...['d3', 'd1', 'd2'].map((decisionId) => ({ id: `run-${decisionId}` }))]
   const successfulLoads = ['d3', 'd2', 'd1'].map((decisionId) => ({ decisionId, bundle: value }))
   const replay = await Strength.lifecycleReplayPlansObserved('owner', messages, successfulLoads, projection)
 
   assert.equal(replay.ok, true, replay.error)
   assert.deepEqual(replay.loadedDecisionIds, ['d1', 'd2', 'd3'])
   assert.deepEqual(replay.value.map((plan) => plan.prepared.decisionId), ['d1', 'd2', 'd3'])
-  assert.deepEqual(replay.value.map((plan) => plan.beforeMessageIndex), [1, 2, 0])
+  assert.deepEqual(replay.value.map((plan) => plan.beforeMessageIndex), [2, 3, 1])
 
   const failed = await Strength.lifecycleReplayPlansObserved('owner', messages, [
     { decisionId: 'd1', bundle: value },
@@ -90,12 +101,30 @@ test('WHAT[speculative-investigation-008] STRENGTH_008_replay_loads_each_selecte
 })
 test('WHAT[speculative-investigation-008] STRENGTH_008_compaction_does_not_retire_raw_replay_without_xtrace_coverage', async () => {
   const value = frame()
-  let projection = apply(Strength.projectionEmpty(), prepared(value))
+  let projection = apply(apply(apply(Strength.projectionEmpty(), request()), bound()), prepared(value))
   projection = apply(projection, promoted(value))
   projection = apply(projection, Strength.eventTraced('d1', 40n, 44n))
   const plan = (await Strength.lifecycleReplayPlans('owner', [{ id: 'user-1' }, { id: 'run-1' }], value, projection)).value[0]
   assert.equal(Strength.lifecycleNeedsRawReplay(null, plan), true)
   assert.equal(Strength.lifecycleNeedsRawReplay(42n, plan), true)
+})
+test('WHAT[speculative-investigation-008] STRENGTH_008_shortened_conversation_never_erases_the_authorization', async () => {
+  const value = frame()
+  let projection = apply(apply(apply(Strength.projectionEmpty(), request()), bound()), prepared(value))
+  projection = apply(projection, promoted(value))
+  projection = apply(projection, Strength.eventTraced('d1', 10n, 14n))
+  // A compaction-sized transcript still keeps the durable authorization and the
+  // promoted material that has not yet been covered by XTrace.
+  assert.equal(Strength.projectionRequestedRounds('d1', projection), 2)
+  const whole = await Strength.lifecycleReplayPlans('owner', [{ id: 'user-1' }, { id: 'run-1' }], value, projection)
+  assert.equal(whole.ok, true)
+  assert.deepStrictEqual(whole.value[0].existingTraceRange, { startInclusive: 10n, endExclusive: 14n })
+  // Dropping the anchor from the transcript fails closed instead of silently
+  // forgetting the frame; the authorization itself is untouched.
+  const short = await Strength.lifecycleReplayPlans('owner', [{ id: 'run-1' }], value, projection)
+  assert.equal(short.ok, false)
+  assert.match(short.error, /target anchor is absent/i)
+  assert.equal(Strength.projectionRequestedRounds('d1', projection), 2)
 })
 test('WHAT[speculative-investigation-008] STRENGTH_008_trace_recovery_requires_one_exact_contiguous_canonical_match', () => {
   const value = frame()
@@ -118,71 +147,20 @@ test('WHAT[speculative-investigation-008] STRENGTH_008_trace_recovery_requires_o
 
 {
 const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const Strength = await import("../../../dist/Strength/Surface.js");
-const Fission = await import("../../../dist/Execution/Fission/Surface.js");
-const authority = await import("../../../dist/Interaction/Authority/RuntimeSurface.js");
-const persona = await import("../../../dist/Participant/Persona/Surface.js");
-
-const H = (value) => `H(${value})`
-const rootSelection = (agent) => {
-  const resolved = persona.resolveParticipantIdentityAtRoot(agent)
-  assert.equal(resolved.ok, true, resolved.ok ? '' : resolved.error)
-  return {
-    kind: 'RootSelection',
-    ownerSession: null,
-    ownerLogicalRun: null,
-    ownerAuthorityRoot: null,
-    participantIdentity: {
-      selectedAgent: resolved.identity.name,
-      peerAgent: resolved.identity.peer,
-      canonicalRole: resolved.identity.role,
-      selectedTier: resolved.identity.initialTier.toLowerCase(),
-      persona: resolved.identity.persona,
-      personaCatalogVersion: resolved.identity.catalogVersion,
-      origin: resolved.identity.origin,
-    },
-  }
-}
-const ownerProfile = (agent = 'engineer') => {
-  const result = authority.createAuthorityRoot(
-    H,
-    'runtime-special-lineage',
-    'ses_special_owner',
-    'HumanRoot',
-    'msg_special_owner',
-    rootSelection(agent),
-  )
-  assert.equal(result.ok, true, result.ok ? '' : result.error)
-  return result.value
-}
-const binding = (owner, replica, decision, role = 'Coder', budget = 'K1') => Strength.runtimeBinding(owner, replica, decision, `run-${decision}`, role, budget, 65536, `sem-${decision}`, [])
-const hostText = (text) => ({ type: 'text', text })
-const hostResult = (callId, tool, input, output) => ({ type: 'tool', tool, callID: callId, state: { status: 'completed', input, output } })
-const user = (id, sessionId, parts) => ({ info: { id, role: 'user', sessionID: sessionId }, parts })
-const assistant = (id, sessionId, parts) => ({ info: { id, role: 'assistant', sessionID: sessionId }, parts })
-const replicaBinding = (owner, replica, decision, budget) => Strength.runtimeBinding(owner, replica, decision, `run-${decision}`, 'Coder', budget, 65536, `sem-${decision}`, [{ role: 'user', parts: [{ kind: 'text', text: 'owner mirror' }] }])
-const attach = (replica, budget, purpose = 'Treatment', owner = 'owner') => {
-  const handle = Strength.replicaRuntimeCreate(65536)
-  const decision = `decision-${replica}`
-  const result = Strength.replicaAttach(handle, replicaBinding(owner, replica, decision, budget), purpose)
-  assert.equal(result.ok, true, result.error)
-  return { handle, completion: result.value.completion }
-}
-const turn = (sessionId, outcome, providerRun = 'run-t') => ({ sessionId, providerRun, outcome, parts: [] })
-const oneBatch = (replica) => ({ messages: [user('u1', replica, [hostText('Continue.')]), assistant('a1', replica, [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')])] })
-
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
+const { createHash } = await import("node:crypto");
 const { default: test } = await import("node:test");
 const Strength = await import("../../../dist/Strength/Surface.js");
 const { createLocalEventStore } = await import("../../verification-system/tests/support/local-event-store.mjs");
 
-const H = (text) => `H(${text})`
-const prepared = ({ refs = ['payload-a'], digest = 'frame-a', decision = 'd1' } = {}) => Strength.eventPrepared('owner', decision, 'run-1', 'replica', 'K1', 'anchor-a', digest, 123, refs)
+const H = (text) => createHash('sha256').update(text).digest('hex')
+const request = ({ refs = ['payload-a'], digest = 'frame-a', decision = 'd1' } = {}) => Strength.eventRequested({
+  decisionId: decision, ownerSessionId: 'owner',
+  ownerLogicalRun: { logicalRunId: 'logical-1', authorityRootUserMessageId: 'user-1' },
+  sourcePhysicalUserMessageId: 'user-1', sourceProviderRun: 'run-1',
+  sourceToolCallIds: ['call-1'], requestedRounds: 2, contractRevision: 1,
+})
 const promoted = ({ refs = ['payload-a'], digest = 'frame-a', decision = 'd1' } = {}) => Strength.eventPromoted('owner', decision, 'run-1', digest, refs)
+const prepared = ({ refs = ['payload-a'], digest = 'frame-a', decision = 'd1' } = {}) => Strength.eventPrepared('owner', decision, 'run-1', 'replica', 'anchor-a', digest, 123, refs)
 const append = async (store, event) => Strength.storeAppend(store, H, event)
 const writePayload = async (store, text) => {
   const result = await Strength.storeWritePayload(store, new TextEncoder().encode(text))
@@ -194,6 +172,8 @@ test('WHAT[speculative-investigation-008] STRENGTH_008_integrator_Current_reflec
   const local = createLocalEventStore()
   try {
     const ref = await writePayload(local.store, 'frame-material')
+    assert.equal((await append(local.store, request())).ok, true)
+    assert.equal((await append(local.store, Strength.eventBound('d1', 'run-1', 'replica', 'anchor-a'))).ok, true)
     assert.equal((await append(local.store, prepared({ refs: [ref] }))).ok, true)
     assert.equal((await append(local.store, promoted({ refs: [ref] }))).ok, true)
     assert.equal((await append(local.store, Strength.eventTraced('d1', 10n, 12n))).ok, true)
@@ -229,14 +209,32 @@ test('WHAT[speculative-investigation-008] StrengthReplay owns applyBeforeXTrace 
 
 {
 const { default: assert } = await import("node:assert/strict");
+const { createHash } = await import("node:crypto");
+const { default: test } = await import("node:test");
 const Strength = await import('../../../dist/Strength/Surface.js');
 const Projection = await import('../../../dist/Participant/Provider/Projection/Surface.js');
 const Adapter = await import('../../../dist/OpenCode/Codec/ProviderProjectionSurface.js');
 const { createLocalEventStore } = await import('../../verification-system/tests/support/local-event-store.mjs');
 
-const H = (text) => `H(${text})`
+const H = (text) => createHash('sha256').update(text).digest('hex')
 
-const frame = Strength.frameTryBuild(H, 65536, [{ requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"src/a.fs"}', canonicalResult: 'let a = 1' }, { toolName: 'grep', canonicalArguments: '{"pattern":"a"}', canonicalResult: 'src/a.fs:1:let a = 1' }] }]).value
+const frame = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [
+  { toolName: 'read', canonicalArguments: '{"filePath":"src/a.fs"}', canonicalResult: 'let a = 1' },
+  { toolName: 'grep', canonicalArguments: '{"pattern":"a"}', canonicalResult: 'src/a.fs:1:let a = 1' },
+] }]).value
+// A persisted frame payload is the Store wire contract (encodeFrameBundlePayload):
+// version + digest + byte_length + batches[request_ordinal/exchanges[tool_name/arguments/result]].
+// The JS frame shape is the Surface shape, not the payload shape; serializing it
+// verbatim makes decodeFrameBundlePayload refuse the load.
+const payloadOf = (bundle) => ({
+  version: 1,
+  digest: bundle.digest,
+  byte_length: bundle.byteLength,
+  batches: bundle.batches.map((b) => ({
+    request_ordinal: b.requestOrdinal,
+    exchanges: b.exchanges.map((e) => ({ tool_name: e.toolName, arguments: e.canonicalArguments, result: e.canonicalResult })),
+  })),
+})
 
 const text = (value) => ({ kind: 'text', text: value })
 const message = (role, parts) => ({ role, parts })
@@ -247,20 +245,53 @@ const append = async (durability, event) => {
   assert.equal(result.ok, true, result.error)
 }
 
-integrationTest('WHAT[speculative-investigation-008] STRENGTH_INTEGRATION_Prepared_candidate_consumption_Promoted_restart_replay_Traced', async () => {
+integrationTest('WHAT[speculative-investigation-008] STRENGTH_INTEGRATION_Authorization_Bound_Prepared_consumption_Promoted_restart_replay_Traced', async () => {
   const local = createLocalEventStore()
   try {
     const durability = Strength.durabilityCreate(local.store)
-    const preparedEvent = Strength.eventPrepared('owner', 'decision-1', 'run-1', 'replica-1', 'K1', 'anchor-1', frame.digest, frame.byteLength, ['payload-a'])
-    assert.equal((await Strength.durabilityPublishPrepared(durability, { ownerSessionId: 'owner', decisionId: 'decision-1', targetProviderRun: 'run-1', replicaSessionId: 'replica-1', budget: 'K1', anchorDigest: 'anchor-1', bundle: frame })).kind, 'Published')
+    const decision = 'decision-1'
+    await append(durability, Strength.eventRequested({
+      decisionId: decision, ownerSessionId: 'owner',
+      ownerLogicalRun: { logicalRunId: 'logical-1', authorityRootUserMessageId: 'user-1' },
+      sourcePhysicalUserMessageId: 'user-1', sourceProviderRun: 'run-1',
+      sourceToolCallIds: ['call-1'], requestedRounds: 2, contractRevision: 1,
+    }))
+    await append(durability, Strength.eventBound(decision, 'run-1', 'replica-1', 'anchor-1'))
+    const ref = await Strength.storeWritePayload(local.store, new TextEncoder().encode(JSON.stringify(payloadOf(frame))))
+    assert.equal(ref.ok, true)
+    await append(durability, Strength.eventPrepared('owner', decision, 'run-1', 'replica-1', 'anchor-1', frame.digest, frame.byteLength, [ref.value]))
+
     let loaded = await Strength.durabilityLoadProjection(durability)
     assert.equal(loaded.ok, true)
     let projection = loaded.value
-    assert.equal(Strength.projectionIsPromoted('decision-1', projection), false)
+    assert.equal(Strength.projectionRequestedRounds(decision, projection), 2)
+    assert.equal(Strength.projectionIsPromoted(decision, projection), false)
     assert.equal((await Strength.lifecycleReplayPlans('owner', [{ id: 'run-1' }], frame, projection)).value.length, 0)
 
+    // The payload written above must be the real material: the production
+    // recovery entry decodes it through the same path a restart would use and
+    // returns the same batches, byteLength and digest as the frame it was built
+    // from. A payloadOf transcription drift — a renamed or mis-nested key —
+    // makes this load refuse instead of passing.
+    const reloaded = await Strength.durabilityLoadBundleForDecision(durability, projection, decision)
+    assert.equal(reloaded.ok, true, reloaded.error)
+    assert.equal(reloaded.value.digest, frame.digest)
+    assert.equal(reloaded.value.byteLength, frame.byteLength)
+    assert.equal(reloaded.value.batches.length, frame.batches.length)
+    for (const [index, batch] of frame.batches.entries()) {
+      const loadedBatch = reloaded.value.batches[index]
+      assert.equal(loadedBatch.requestOrdinal, batch.requestOrdinal)
+      assert.equal(loadedBatch.exchanges.length, batch.exchanges.length)
+      for (const [position, exchange] of batch.exchanges.entries()) {
+        const loadedExchange = loadedBatch.exchanges[position]
+        assert.equal(loadedExchange.toolName, exchange.toolName)
+        assert.equal(loadedExchange.canonicalArguments, exchange.canonicalArguments)
+        assert.equal(loadedExchange.canonicalResult, exchange.canonicalResult)
+      }
+    }
+
     const current = [message('user', [text('inspect the file')])]
-    const candidateIntent = Strength.candidate(H, { ownerSessionId: 'owner', decisionId: 'decision-1', targetProviderRun: 'run-1', currentProviderRun: 'run-1', bundle: frame }).value
+    const candidateIntent = Strength.candidate(H, { ownerSessionId: 'owner', decisionId: decision, targetProviderRun: 'run-1', currentProviderRun: 'run-1', bundle: frame }).value
     const candidateWire = Projection.renderMessagesWithHostIds(snapshot(current), current, [candidateIntent])
     assert.deepEqual(candidateWire.messages.map((item) => item.role), ['user', 'assistant', 'tool'])
 
@@ -274,7 +305,7 @@ integrationTest('WHAT[speculative-investigation-008] STRENGTH_INTEGRATION_Prepar
 
     const restarted = Strength.durabilityCreate(local.store)
     projection = (await Strength.durabilityLoadProjection(restarted)).value
-    assert.equal(Strength.projectionIsPromoted('decision-1', projection), true)
+    assert.equal(Strength.projectionIsPromoted(decision, projection), true)
 
     const baseWire = [message('user', [text('inspect the file')]), message('assistant', [text('primary output')]), message('user', [text('continue')])]
     const rawResult = Adapter.tryApplyRenderedMessages('owner', H, { messages: baseWire, hostMessageIds: ['user-1', 'run-1', 'user-2'], hostIsPhysical: [false, false, false] })
@@ -290,11 +321,11 @@ integrationTest('WHAT[speculative-investigation-008] STRENGTH_INTEGRATION_Prepar
     const replayed = Projection.renderMessagesWithHostIds(snapshot(baseWire), baseWire, replayIntents.value)
     const written = Adapter.tryApplyRenderedInsertionsPreservingBase('owner', H, rawBase, replayed)
     assert.equal(written.ok, true)
-    assert.equal(written.value[0], rawBase[0])
-    assert.equal(written.value[3], rawBase[1])
+    assert.deepEqual(written.value[0], rawBase[0], 'the preserved base rows are structurally identical, not the same reference')
+    assert.deepEqual(written.value[3], rawBase[1])
     assert.deepEqual(Adapter.decodeMessageView(written.value).messages.map((item) => item.role), ['user', 'assistant', 'tool', 'assistant', 'user'])
 
-    await append(restarted, Strength.eventTraced('decision-1', 20n, 24n))
+    await append(restarted, Strength.eventTraced(decision, 20n, 24n))
     projection = (await Strength.durabilityLoadProjection(restarted)).value
     const tracedPlans = (await Strength.lifecycleReplayPlans('owner', rawBase.map((value, index) => ({ id: ['user-1', 'run-1', 'user-2'][index] })), frame, projection)).value
     const [traced] = tracedPlans
