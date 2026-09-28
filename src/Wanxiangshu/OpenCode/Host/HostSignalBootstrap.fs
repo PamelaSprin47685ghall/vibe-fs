@@ -715,6 +715,118 @@ module HostSignalBootstrap =
                 | ChatAdmissionIntent.Decision.PendingPromptIntent _, _, _ ->
                     rejectedChatMessage (IntentRejected ChatAdmissionIntent.Rejection.DurableAuthorityUnavailable)
 
+            let client = if isNull input then null else input?client
+
+            let sessionAgentOfResponse (rawBody: obj) : string option = HostIngressCodec.sessionAgent rawBody
+
+            let executeSessionGet (sessObj: obj) (getFn: obj) (sId: string) : Task<string option> =
+                task {
+                    let payload =
+                        createObj
+                            [ "path", box (createObj [ "id", box sId ])
+                              "sessionID", box sId
+                              "headers", box (createObj []) ]
+
+                    let! res = unbox<Task<obj>> (getFn?call (sessObj, payload))
+                    return sessionAgentOfResponse res
+                }
+
+            let canQuerySession =
+                not (isNull client)
+                && not (isNull client?session)
+                && not (isNull client?session?get)
+
+            let safeQuerySession (sessionId: SessionId) : Task<string option> =
+                task {
+                    try
+                        return! executeSessionGet client?session client?session?get (SessionId.value sessionId)
+                    with _ ->
+                        return None
+                }
+
+            let tryGetSessionAgent (sessionId: SessionId) : Task<string option> =
+                if not canQuerySession then
+                    Task.FromResult None
+                else
+                    safeQuerySession sessionId
+
+            let queryMissingAgent sid =
+                task {
+                    let! fetched = tryGetSessionAgent sid
+                    fetched |> Option.iter (SessionExecutionBinding.observeUserFacingAgent sid)
+                    return fetched
+                }
+
+            let tryDurableSessionAgent (sessionId: SessionId) : string option =
+                journal
+                |> Option.bind (fun durable ->
+                    let snapshot = AgentJournal.snapshot durable
+
+                    Map.tryFind sessionId snapshot.AgentProjections.Sessions
+                    |> Option.bind (fun s -> s.PromptAuthority)
+                    |> Option.bind (fun pa ->
+                        pa.ActiveLogicalRun
+                        |> Option.map (fun run -> run.SelectedAgent)
+                        |> Option.orElseWith (fun () ->
+                            pa.LastAuthorityProfile |> Option.map (fun last -> last.SelectedAgent))))
+
+            let resolveFallbackAgent sid =
+                match tryDurableSessionAgent sid with
+                | Some agent ->
+                    SessionExecutionBinding.observeUserFacingAgent sid agent
+                    Some agent
+                | None when not (hasPhysicalParent sid) ->
+                    let activeFallback =
+                        journal
+                        |> Option.bind (fun durable ->
+                            let snapshot = AgentJournal.snapshot durable
+
+                            snapshot.AgentProjections.Sessions
+                            |> Map.values
+                            |> Seq.tryPick (fun s ->
+                                s.PromptAuthority
+                                |> Option.bind (fun pa ->
+                                    pa.ActiveLogicalRun
+                                    |> Option.map (fun run -> run.SelectedAgent)
+                                    |> Option.orElseWith (fun () ->
+                                        pa.LastAuthorityProfile |> Option.map (fun last -> last.SelectedAgent)))))
+
+                    let defaultAgent = activeFallback |> Option.defaultValue "manager"
+                    SessionExecutionBinding.observeUserFacingAgent sid defaultAgent
+                    Some defaultAgent
+                | None -> None
+
+            let resolveMissingOrFallbackAgent sid =
+                task {
+                    match! queryMissingAgent sid with
+                    | Some agent -> return Some agent
+                    | None -> return resolveFallbackAgent sid
+                }
+
+            let resolveAgentForSession sid =
+                task {
+                    match SessionExecutionBinding.tryAgent sid with
+                    | Some agent -> return Some agent
+                    | None -> return! resolveMissingOrFallbackAgent sid
+                }
+
+            let applyResolvedAgent agentOpt (decoded: PromptIngressCodec.DecodedMessage) =
+                match agentOpt with
+                | Some agent ->
+                    { decoded with
+                        ExplicitAgent = Some agent }
+                | None -> decoded
+
+            let resolveAgentForDecodedMessage (decoded: PromptIngressCodec.DecodedMessage) =
+                task {
+                    match decoded.ExplicitAgent, decoded.SessionId with
+                    | Some _, _
+                    | _, None -> return decoded
+                    | None, Some sid ->
+                        let! agentOpt = resolveAgentForSession sid
+                        return applyResolvedAgent agentOpt decoded
+                }
+
             let chatMessageHook =
                 fun (input: obj) (output: obj) ->
                     task {
